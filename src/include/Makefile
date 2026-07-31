@@ -22,9 +22,7 @@ SUBDIRS = access bootstrap catalog commands common datatype \
 	lib libpq mb nodes optimizer parser partitioning postmaster \
 	regex replication rewrite \
 	statistics storage tcop snowball snowball/libstemmer tsearch \
-	tsearch/dicts utils port port/atomics port/win32 port/win32_msvc \
-	port/win32_msvc/sys port/win32/arpa port/win32/netinet \
-	port/win32/sys portability
+	tsearch/dicts utils port port/atomics portability
 
 # Install all headers
 install: all installdirs

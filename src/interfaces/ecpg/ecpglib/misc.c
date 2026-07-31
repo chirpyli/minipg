@@ -6,7 +6,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "ecpg-pthread-win32.h"
+#include <pthread.h>
 #include "ecpgerrno.h"
 #include "ecpglib.h"
 #include "ecpglib_extern.h"

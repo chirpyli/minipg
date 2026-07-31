@@ -63,14 +63,12 @@ PGAC_ARG_REQ(with, template, [NAME], [override operating system template],
 
 case $host_os in
      aix*) template=aix ;;
-  cygwin*|msys*) template=cygwin ;;
   darwin*) template=darwin ;;
 dragonfly*) template=netbsd ;;
  freebsd*) template=freebsd ;;
     hpux*) template=hpux ;;
  linux*|gnu*|k*bsd*-gnu)
            template=linux ;;
-   mingw*) template=win32 ;;
   netbsd*) template=netbsd ;;
  openbsd*) template=openbsd ;;
  solaris*) template=solaris ;;
@@ -692,11 +690,6 @@ if test "$enable_profiling" = yes && test "$ac_cv_prog_cc_g" = yes; then
   else
     AC_MSG_ERROR([--enable-profiling is supported only when using GCC])
   fi
-fi
-
-# We already have this in Makefile.win32, but configure needs it too
-if test "$PORTNAME" = "win32"; then
-  CPPFLAGS="$CPPFLAGS -I$srcdir/src/include/port/win32"
 fi
 
 # Now that we're done automatically adding stuff to C[XX]FLAGS, put back the
@@ -1901,25 +1894,7 @@ if test "$enable_thread_safety" = yes; then
   AC_REPLACE_FUNCS(pthread_barrier_wait)
 fi
 
-if test "$PORTNAME" = "win32" -o "$PORTNAME" = "cygwin"; then
-	# Cygwin and (apparently, based on test results) Mingw both
-	# have a broken strtof(), so substitute the same replacement
-	# code we use with VS2013. That's not a perfect fix, since
-	# (unlike with VS2013) it doesn't avoid double-rounding, but
-	# we have no better options. To get that, though, we have to
-	# force the file to be compiled despite HAVE_STRTOF.
-	AC_LIBOBJ([strtof])
-	AC_MSG_NOTICE([On $host_os we will use our strtof wrapper.])
-fi
-
 case $host_os in
-        # Windows uses a specialised env handler
-        mingw*)
-                AC_DEFINE(HAVE_SETENV, 1, [Define to 1 because replacement version used.])
-                AC_DEFINE(HAVE_UNSETENV, 1, [Define to 1 because replacement version used.])
-                ac_cv_func_setenv=yes
-                ac_cv_func_unsetenv=yes
-                ;;
         *)
                 AC_REPLACE_FUNCS([setenv unsetenv])
                 ;;
@@ -1946,47 +1921,6 @@ fi
 # (i.e., allow '-' as a flag character), so use our version on those platforms.
 if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
   AC_LIBOBJ(getopt)
-fi
-
-# mingw has adopted a GNU-centric interpretation of optind/optreset,
-# so always use our version on Windows.
-if test "$PORTNAME" = "win32"; then
-  AC_LIBOBJ(getopt)
-  AC_LIBOBJ(getopt_long)
-fi
-
-# Win32 (really MinGW) support
-if test "$PORTNAME" = "win32"; then
-  AC_CHECK_FUNCS(_configthreadlocale)
-  AC_REPLACE_FUNCS(gettimeofday)
-  AC_LIBOBJ(dirmod)
-  AC_LIBOBJ(kill)
-  AC_LIBOBJ(open)
-  AC_LIBOBJ(system)
-  AC_LIBOBJ(win32common)
-  AC_LIBOBJ(win32env)
-  AC_LIBOBJ(win32error)
-  AC_LIBOBJ(win32ntdll)
-  AC_LIBOBJ(win32security)
-  AC_LIBOBJ(win32setlocale)
-  AC_LIBOBJ(win32stat)
-  AC_DEFINE([HAVE_SYMLINK], 1,
-            [Define to 1 if you have the `symlink' function.])
-  AC_CHECK_TYPES(MINIDUMP_TYPE, [pgac_minidump_type=yes], [pgac_minidump_type=no], [
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <string.h>
-#include <dbghelp.h>])
-fi
-if test x"$pgac_minidump_type" = x"yes" ; then
-  AC_SUBST(have_win32_dbghelp,yes)
-else
-  AC_SUBST(have_win32_dbghelp,no)
-fi
-
-# Cygwin needs only a bit of that
-if test "$PORTNAME" = "cygwin"; then
-  AC_LIBOBJ(dirmod)
 fi
 
 AC_CHECK_FUNC(syslog,
@@ -2304,9 +2238,6 @@ if test "$PORTNAME" != "win32"; then
     fi
   fi
   AC_MSG_RESULT([$sematype])
-else
-  AC_DEFINE(USE_WIN32_SEMAPHORES, 1, [Define to select Win32-style semaphores.])
-  SEMA_IMPLEMENTATION="src/backend/port/win32_sema.c"
 fi
 
 
@@ -2314,9 +2245,6 @@ fi
 if test "$PORTNAME" != "win32"; then
   AC_DEFINE(USE_SYSV_SHARED_MEMORY, 1, [Define to select SysV-style shared memory.])
   SHMEM_IMPLEMENTATION="src/backend/port/sysv_shmem.c"
-else
-  AC_DEFINE(USE_WIN32_SHARED_MEMORY, 1, [Define to select Win32-style shared memory.])
-  SHMEM_IMPLEMENTATION="src/backend/port/win32_shmem.c"
 fi
 
 # Select random number source. If a TLS library is used then it will be the
@@ -2325,8 +2253,6 @@ fi
 AC_MSG_CHECKING([which random number source to use])
 if test x"$with_ssl" = x"openssl" ; then
   AC_MSG_RESULT([OpenSSL])
-elif test x"$PORTNAME" = x"win32" ; then
-  AC_MSG_RESULT([Windows native])
 elif test x"$cross_compiling" = x"yes"; then
   AC_MSG_RESULT([assuming /dev/urandom])
 else
@@ -2533,18 +2459,6 @@ AC_CONFIG_LINKS([
   src/include/pg_config_os.h:src/include/port/${template}.h
   src/Makefile.port:src/makefiles/Makefile.${template}
 ])
-
-if test "$PORTNAME" = "win32"; then
-AC_CONFIG_COMMANDS([check_win32_symlinks],[
-# Links sometimes fail undetected on Mingw -
-# so here we detect it and warn the user
-for FILE in $CONFIG_LINKS
- do
-	# test -e works for symlinks in the MinGW console
-	test -e `expr "$FILE" : '\([[^:]]*\)'` || AC_MSG_WARN([*** link for $FILE -- please fix by hand])
- done
-])
-fi
 
 AC_CONFIG_HEADERS([src/include/pg_config.h],
 [

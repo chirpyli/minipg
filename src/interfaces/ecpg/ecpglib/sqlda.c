@@ -11,7 +11,7 @@
 
 #include "catalog/pg_type_d.h"
 #include "decimal.h"
-#include "ecpg-pthread-win32.h"
+#include <pthread.h>
 #include "ecpgerrno.h"
 #include "ecpglib.h"
 #include "ecpglib_extern.h"

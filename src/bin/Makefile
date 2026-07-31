@@ -34,11 +34,5 @@ SUBDIRS = \
 	psql \
 	scripts
 
-ifeq ($(PORTNAME), win32)
-SUBDIRS += pgevent
-else
-ALWAYS_SUBDIRS += pgevent
-endif
-
 $(recurse)
 $(recurse_always)
