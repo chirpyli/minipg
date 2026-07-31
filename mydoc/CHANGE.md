@@ -3,6 +3,7 @@
 - 2026-07-13: 提交postgres 14.23版本
 - 2026-07-31: 裁剪 contrib 扩展（方案 A）：删除 44 个与内核学习无关的扩展，仅保留 12 个"内核观察类 + 示例型"扩展，约删减 12.3 万行。保留 test_decoding（逻辑复制插件，随阶段 8 裁 replication 时再删）；subscription 测试改用 jsonb 替代已删的 hstore。详见下文。
 - 2026-07-31: 裁剪跨平台兼容性，仅保留Linux。删除所有 Windows / MinGW / MSVC / Cygwin / MSYS 专属代码与构建脚本，回归测试 `make check-world` 全部通过。详见下文。
+- 2026-07-31: 修复 Windows 裁剪遗留的 `make clean` 失败：`src/backend/port/Makefile` 残留对 `win32` 子目录的引用（`SUBDIRS += win32` 与 `clean` 规则中的 `$(MAKE) -C win32 clean`），因 win32 目录已删导致 `make clean` 报 "No such file or directory"。已移除该引用，`make clean` / `make check-world` 均通过。
 - 2026-07-31: 裁剪 ecpg（嵌入式 SQL 预处理器，阶段 2）：整体删除 `src/interfaces/ecpg/`（约 16.6 万行，405 个文件），并清理构建系统引用（interfaces/Makefile、GNUmakefile 的 world 递归、Makefile.global[.in] 的 ecpg_config.h 规则、configure.ac 的 AC_CONFIG_HEADERS）。`make check-world` 全部通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
@@ -27,6 +28,12 @@
 - `src/interfaces/ecpg/ecpglib/{memory,descriptor,connect,sqlda,misc}.c`：将无条件的 `#include "ecpg-pthread-win32.h"` 改为标准 `#include <pthread.h>`（该头在 Unix 下仅封装 pthread.h）。
 
 **验证**：`./configure` 成功；`make -j` 成功；`make check-world` 全部通过。
+
+**后续修复（同次裁剪遗留）**：`make clean` 曾报错 `make[4]: *** win32: No such file or directory`。
+原因：初次 Windows 裁剪删除了 `src/backend/port/win32/` 目录，但 `src/backend/port/Makefile`
+仍残留两处引用——第 30-32 行 `ifeq ($(PORTNAME), win32) SUBDIRS += win32`（条件，仅 win32 平台生效）
+与第 48 行 `distclean clean:` 规则中无条件的 `$(MAKE) -C win32 clean`。由于 minipg 已仅支持 Linux，
+已移除该 `SUBDIRS` 条件块与 clean 规则中的 win32 递归。修复后 `make clean` 与 `make check-world` 均通过。
 
 **注意事项**：`configure` 脚本保留原生成版本（本机 autoconf 2.71 与 PG14 要求的 2.69 版本不符，未重新生成）。若日后需要 `autoreconf`，请安装 autoconf 2.69 或放宽 `configure.ac` 的版本宏。
 

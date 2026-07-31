@@ -27,9 +27,9 @@ OBJS = \
 	pg_sema.o \
 	pg_shmem.o
 
-ifeq ($(PORTNAME), win32)
-SUBDIRS += win32
-endif
+# 注：原 win32 子目录（ifeq ($(PORTNAME), win32) SUBDIRS += win32 与
+# distclean/clean 中的 $(MAKE) -C win32 clean）已在 minipg 裁剪 Windows
+# 平台支持时删除，此处一并移除引用，仅保留 Linux 构建。
 
 include $(top_srcdir)/src/backend/common.mk
 
@@ -45,4 +45,3 @@ endif
 
 distclean clean:
 	rm -f tas_cpp.s
-	$(MAKE) -C win32 clean
