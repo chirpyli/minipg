@@ -4,6 +4,7 @@
 - 2026-07-31: 裁剪 contrib 扩展（方案 A）：删除 44 个与内核学习无关的扩展，仅保留 12 个"内核观察类 + 示例型"扩展，约删减 12.3 万行。保留 test_decoding（逻辑复制插件，随阶段 8 裁 replication 时再删）；subscription 测试改用 jsonb 替代已删的 hstore。详见下文。
 - 2026-07-31: 裁剪跨平台兼容性，仅保留Linux。删除所有 Windows / MinGW / MSVC / Cygwin / MSYS 专属代码与构建脚本，回归测试 `make check-world` 全部通过。详见下文。
 - 2026-07-31: 修复 Windows 裁剪遗留的 `make clean` 失败：`src/backend/port/Makefile` 残留对 `win32` 子目录的引用（`SUBDIRS += win32` 与 `clean` 规则中的 `$(MAKE) -C win32 clean`），因 win32 目录已删导致 `make clean` 报 "No such file or directory"。已移除该引用，`make clean` / `make check-world` 均通过。
+- 2026-07-31: 裁剪非 plpgsql 过程语言（阶段 3）：删除 `src/pl/plperl/`、`src/pl/plpython/`、`src/pl/tcl/`（pltcl）三个外部解释器桥接语言，仅保留 `src/pl/plpgsql/`（PG 原生、最能体现 fmgr call-handler + SPI 扩展机制的教学样例）。修改 `src/pl/Makefile` 移除对应条件子目录。约删 4 万行。`make check-world` 全部通过。详见下文。
 - 2026-07-31: 裁剪 ecpg（嵌入式 SQL 预处理器，阶段 2）：整体删除 `src/interfaces/ecpg/`（约 16.6 万行，405 个文件），并清理构建系统引用（interfaces/Makefile、GNUmakefile 的 world 递归、Makefile.global[.in] 的 ecpg_config.h 规则、configure.ac 的 AC_CONFIG_HEADERS）。`make check-world` 全部通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
@@ -87,4 +88,23 @@
 **说明**：本机 autoconf 版本（2.71）与 PG14 要求（2.69）不符，未重新生成 `configure`；已直接修正已生成的 `Makefile.global` 与模板/configure.ac，使源码一致且当前构建可用。若日后 `autoreconf`，需装 autoconf 2.69 或放宽版本宏。
 
 **验证**：`make -j4` 顶层编译成功；`make check-world` 全部通过（EXIT=0）。服务端内核代码不依赖 ecpg。
+
+## 裁剪：非 plpgsql 过程语言（阶段 3，存储过程）
+
+**目的**：存储过程/PL 对内核学习的价值不在于"多"，而在于展示 **fmgr 的 call-handler 扩展点** 与 **SPI（Server Programming Interface）回连执行器** 两大机制。plperl / plpython / pltcl 三种语言均为"外部解释器 + 胶水代码"桥接，原理与 plpgsql 完全一致，仅宿主语言不同；体积大（合计约 4 万行）、依赖重（perl/python/tcl 解释器）、对内核无新启发。故仅保留 **plpgsql**（PG 自研、零外部依赖、最贴近内核，是触发器/函数默认教学载体），删除其余三种。
+
+**删除内容**：
+- `src/pl/plperl/`（~24,371 行）
+- `src/pl/plpython/`（~10,878 行）
+- `src/pl/tcl/`（pltcl，~4,761 行）
+
+**保留**：`src/pl/plpgsql/`（~31,243 行，PG 原生过程语言）
+
+**修改的构建文件**：
+- `src/pl/Makefile`：移除 `ifeq ($(with_perl)/with_python/with_tcl)` 条件块与 `ALWAYS_SUBDIRS`，SUBDIRS 仅保留 `plpgsql`。
+- `configure.ac` 中 `with_perl/with_python/with_tcl` 选项**保留**（其用于定位 perl/python 可执行文件供核心代码生成使用，与已删 PL 目录解耦，不可删）；`src/Makefile.global` 中 `with_perl/with_python/with_tcl` 变量定义亦保留。
+
+**说明**：本机 autoconf 版本不符，未重跑 configure；`src/pl/Makefile` 不再用这些选项加入子目录，构建即生效。
+
+**验证**：`make -j4` 编译成功；`make check-world` 全部通过（EXIT=0）。plpgsql 自身 13 个回归测试全部 ok。
 
