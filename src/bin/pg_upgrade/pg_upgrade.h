@@ -33,37 +33,10 @@
 
 extern char *output_files[];
 
-/*
- * WIN32 files do not accept writes from multiple processes
- *
- * On Win32, we can't send both pg_upgrade output and command output to the
- * same file because we get the error: "The process cannot access the file
- * because it is being used by another process." so send the pg_ctl
- * command-line output to a new file, rather than into the server log file.
- * Ideally we could use UTILITY_LOG_FILE for this, but some Windows platforms
- * keep the pg_ctl output file open by the running postmaster, even after
- * pg_ctl exits.
- *
- * We could use the Windows pgwin32_open() flags to allow shared file
- * writes but is unclear how all other tools would use those flags, so
- * we just avoid it and log a little differently on Windows;  we adjust
- * the error message appropriately.
- */
-#ifndef WIN32
 #define SERVER_START_LOG_FILE	SERVER_LOG_FILE
 #define SERVER_STOP_LOG_FILE	SERVER_LOG_FILE
-#else
-#define SERVER_START_LOG_FILE	"pg_upgrade_server_start.log"
-/*
- *	"pg_ctl start" keeps SERVER_START_LOG_FILE and SERVER_LOG_FILE open
- *	while the server is running, so we use UTILITY_LOG_FILE for "pg_ctl
- *	stop".
- */
-#define SERVER_STOP_LOG_FILE	UTILITY_LOG_FILE
-#endif
 
 
-#ifndef WIN32
 #define pg_mv_file			rename
 #define PATH_SEPARATOR		'/'
 #define PATH_QUOTE	'\''
@@ -73,18 +46,6 @@ extern char *output_files[];
 #define SCRIPT_EXT			"sh"
 #define ECHO_QUOTE	"'"
 #define ECHO_BLANK	""
-#else
-#define pg_mv_file			pgrename
-#define PATH_SEPARATOR		'\\'
-#define PATH_QUOTE	'"'
-#define RM_CMD				"DEL /q"
-#define RMDIR_CMD			"RMDIR /s/q"
-#define SCRIPT_PREFIX		""
-#define SCRIPT_EXT			"bat"
-#define EXE_EXT				".exe"
-#define ECHO_QUOTE	""
-#define ECHO_BLANK	"."
-#endif
 
 
 /*

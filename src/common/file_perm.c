@@ -64,7 +64,6 @@ SetDataDirectoryCreatePerm(int dataDirMode)
 bool
 GetDataDirectoryCreatePerm(const char *dataDir)
 {
-#if !defined(WIN32) && !defined(__CYGWIN__)
 	struct stat statBuf;
 
 	/*
@@ -78,13 +77,6 @@ GetDataDirectoryCreatePerm(const char *dataDir)
 	/* Set permissions */
 	SetDataDirectoryCreatePerm(statBuf.st_mode);
 	return true;
-#else							/* !defined(WIN32) && !defined(__CYGWIN__) */
-	/*
-	 * On Windows, we don't have anything to do here since they don't have
-	 * Unix-y permissions.
-	 */
-	return true;
-#endif
 }
 
 

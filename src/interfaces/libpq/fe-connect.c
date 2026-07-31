@@ -33,54 +33,29 @@
 #include "pg_config_paths.h"
 #include "port/pg_bswap.h"
 
-#ifdef WIN32
-#include "win32.h"
-#ifdef _WIN32_IE
-#undef _WIN32_IE
-#endif
-#define _WIN32_IE 0x0500
-#ifdef near
-#undef near
-#endif
-#define near
-#include <shlobj.h>
-#ifdef _MSC_VER					/* mstcpip.h is missing on mingw */
-#include <mstcpip.h>
-#endif
-#else
+
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #ifdef HAVE_NETINET_TCP_H
 #include <netinet/tcp.h>
 #endif
-#endif
 
 #ifdef ENABLE_THREAD_SAFETY
-#ifdef WIN32
-#include "pthread-win32.h"
-#else
 #include <pthread.h>
-#endif
 #endif
 
 #ifdef USE_LDAP
-#ifdef WIN32
-#include <winldap.h>
-#else
 /* OpenLDAP deprecates RFC 1823, but we want standard conformance */
 #define LDAP_DEPRECATED 1
 #include <ldap.h>
 typedef struct timeval LDAP_TIMEVAL;
-#endif
 static int	ldapServiceLookup(const char *purl, PQconninfoOption *options,
 							  PQExpBuffer errorMessage);
 #endif
 
-#ifndef WIN32
+#ifndef PGPASSFILE
 #define PGPASSFILE ".pgpass"
-#else
-#define PGPASSFILE "pgpass.conf"
 #endif
 
 /*

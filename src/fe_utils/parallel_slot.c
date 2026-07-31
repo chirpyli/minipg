@@ -12,10 +12,6 @@
  *-------------------------------------------------------------------------
  */
 
-#ifdef WIN32
-#define FD_SETSIZE 1024			/* must set before winsock2.h is included */
-#endif
-
 #include "postgres_fe.h"
 
 #ifdef HAVE_SYS_SELECT_H
@@ -90,37 +86,21 @@ select_loop(int maxFd, fd_set *workerset)
 	for (;;)
 	{
 		/*
-		 * On Windows, we need to check once in a while for cancel requests;
-		 * on other platforms we rely on select() returning when interrupted.
+		 * On other platforms we rely on select() returning when interrupted.
 		 */
 		struct timeval *tvp;
-#ifdef WIN32
-		struct timeval tv = {0, 1000000};
 
-		tvp = &tv;
-#else
 		tvp = NULL;
-#endif
 
 		*workerset = saveSet;
 		i = select(maxFd + 1, workerset, NULL, NULL, tvp);
-
-#ifdef WIN32
-		if (i == SOCKET_ERROR)
-		{
-			i = -1;
-
-			if (WSAGetLastError() == WSAEINTR)
-				errno = EINTR;
-		}
-#endif
 
 		if (i < 0 && errno == EINTR)
 			continue;			/* ignore this */
 		if (i < 0 || CancelRequested)
 			return -1;			/* but not this */
 		if (i == 0)
-			continue;			/* timeout (Win32 only) */
+			continue;			/* timeout (should not happen on Linux) */
 		break;
 	}
 
@@ -299,27 +279,11 @@ connect_slot(ParallelSlotArray *sa, int slotno, const char *dbname)
 
 	/*
 	 * POSIX defines FD_SETSIZE as the highest file descriptor acceptable to
-	 * FD_SET() and allied macros.  Windows defines it as a ceiling on the
-	 * count of file descriptors in the set, not a ceiling on the value of
-	 * each file descriptor; see
-	 * https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select
-	 * and
-	 * https://learn.microsoft.com/en-us/windows/win32/api/winsock/ns-winsock-fd_set.
-	 * We can't ignore that, because Windows starts file descriptors at a
-	 * higher value, delays reuse, and skips values.  With less than ten
-	 * concurrent file descriptors, opened and closed rapidly, one can reach
-	 * file descriptor 1024.
+	 * FD_SET() and allied macros.
 	 *
 	 * Doing a hard exit here is a bit grotty, but it doesn't seem worth
 	 * complicating the API to make it less grotty.
 	 */
-#ifdef WIN32
-	if (slotno >= FD_SETSIZE)
-	{
-		pg_log_fatal("too many jobs for this platform: %d", slotno);
-		exit(1);
-	}
-#else
 	{
 		int			fd = PQsocket(slot->connection);
 
@@ -330,7 +294,6 @@ connect_slot(ParallelSlotArray *sa, int slotno, const char *dbname)
 			exit(1);
 		}
 	}
-#endif
 
 	/* Setup the connection using the supplied command, if any. */
 	if (sa->initcmd)

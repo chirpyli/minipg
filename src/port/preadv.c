@@ -17,11 +17,7 @@
 
 #include "c.h"
 
-#ifdef WIN32
-#include <windows.h>
-#else
 #include <unistd.h>
-#endif
 
 #include "port/pg_iovec.h"
 

@@ -62,10 +62,6 @@ OSInfo		os_info;
 
 char	   *output_files[] = {
 	SERVER_LOG_FILE,
-#ifdef WIN32
-	/* unique file for pg_ctl start */
-	SERVER_START_LOG_FILE,
-#endif
 	UTILITY_LOG_FILE,
 	INTERNAL_LOG_FILE,
 	NULL
@@ -444,12 +440,7 @@ copy_subdir_files(const char *old_subdir, const char *new_subdir)
 	prep_status("Copying old %s to new server", old_subdir);
 
 	exec_prog(UTILITY_LOG_FILE, NULL, true, true,
-#ifndef WIN32
 			  "cp -Rf \"%s\" \"%s\"",
-#else
-	/* flags: everything, no confirm, quiet, overwrite read-only */
-			  "xcopy /e /y /q /r \"%s\" \"%s\\\"",
-#endif
 			  old_path, new_path);
 
 	check_ok();

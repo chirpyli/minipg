@@ -23,9 +23,6 @@
 
 static char *gnuish_strerror_r(int errnum, char *buf, size_t buflen);
 static char *get_errno_symbol(int errnum);
-#ifdef WIN32
-static char *win32_socket_strerror(int errnum, char *buf, size_t buflen);
-#endif
 
 
 /*
@@ -46,13 +43,6 @@ char *
 pg_strerror_r(int errnum, char *buf, size_t buflen)
 {
 	char	   *str;
-
-	/* If it's a Windows Winsock error, that needs special handling */
-#ifdef WIN32
-	/* Winsock error code range, per WinError.h */
-	if (errnum >= 10000 && errnum <= 11999)
-		return win32_socket_strerror(errnum, buf, buflen);
-#endif
 
 	/* Try the platform's strerror_r(), or maybe just strerror() */
 	str = gnuish_strerror_r(errnum, buf, buflen);
@@ -270,45 +260,3 @@ get_errno_symbol(int errnum)
 }
 
 
-#ifdef WIN32
-
-/*
- * Windows' strerror() doesn't know the Winsock codes, so handle them this way
- */
-static char *
-win32_socket_strerror(int errnum, char *buf, size_t buflen)
-{
-	static HANDLE handleDLL = INVALID_HANDLE_VALUE;
-
-	if (handleDLL == INVALID_HANDLE_VALUE)
-	{
-		handleDLL = LoadLibraryEx("netmsg.dll", NULL,
-								  DONT_RESOLVE_DLL_REFERENCES | LOAD_LIBRARY_AS_DATAFILE);
-		if (handleDLL == NULL)
-		{
-			snprintf(buf, buflen,
-					 "winsock error %d (could not load netmsg.dll to translate: error code %lu)",
-					 errnum, GetLastError());
-			return buf;
-		}
-	}
-
-	ZeroMemory(buf, buflen);
-	if (FormatMessage(FORMAT_MESSAGE_IGNORE_INSERTS |
-					  FORMAT_MESSAGE_FROM_SYSTEM |
-					  FORMAT_MESSAGE_FROM_HMODULE,
-					  handleDLL,
-					  errnum,
-					  MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
-					  buf,
-					  buflen - 1,
-					  NULL) == 0)
-	{
-		/* Failed to get id */
-		snprintf(buf, buflen, "unrecognized winsock error %d", errnum);
-	}
-
-	return buf;
-}
-
-#endif							/* WIN32 */

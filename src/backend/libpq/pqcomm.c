@@ -71,9 +71,6 @@
 #include <netinet/tcp.h>
 #endif
 #include <utime.h>
-#ifdef _MSC_VER					/* mstcpip.h is missing on mingw */
-#include <mstcpip.h>
-#endif
 
 #include "common/ip.h"
 #include "libpq/libpq.h"
@@ -194,11 +191,9 @@ pq_init(void)
 	 * needed. That allows us to provide safely interruptible reads and
 	 * writes.
 	 */
-#ifndef WIN32
 	if (!pg_set_noblock(MyProcPort->sock))
 		ereport(FATAL,
 				(errmsg("could not set socket to nonblocking mode: %m")));
-#endif
 
 	FeBeWaitSet = CreateWaitEventSet(TopMemoryContext, 3);
 	socket_pos = AddWaitEventToSet(FeBeWaitSet, WL_SOCKET_WRITEABLE,
@@ -334,9 +329,7 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 #ifdef HAVE_UNIX_SOCKETS
 	char		unixSocketPath[MAXPGPATH];
 #endif
-#if !defined(WIN32) || defined(IPV6_V6ONLY)
 	int			one = 1;
-#endif
 
 	/* Initialize hint structure */
 	MemSet(&hint, 0, sizeof(hint));
@@ -461,18 +454,10 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 			continue;
 		}
 
-#ifndef WIN32
-
 		/*
 		 * Without the SO_REUSEADDR flag, a new postmaster can't be started
 		 * right away after a stop or crash, giving "address already in use"
 		 * error on TCP ports.
-		 *
-		 * On win32, however, this behavior only happens if the
-		 * SO_EXCLUSIVEADDRUSE is set. With SO_REUSEADDR, win32 allows
-		 * multiple servers to listen on the same address, resulting in
-		 * unpredictable behavior. With no flags at all, win32 behaves as Unix
-		 * with SO_REUSEADDR.
 		 */
 		if (!IS_AF_UNIX(addr->ai_family))
 		{
@@ -489,7 +474,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 				continue;
 			}
 		}
-#endif
 
 #ifdef IPV6_V6ONLY
 		if (addr->ai_family == AF_INET6)
@@ -648,9 +632,6 @@ Setup_AF_UNIX(const char *sock_path)
 	Assert(Unix_socket_group);
 	if (Unix_socket_group[0] != '\0')
 	{
-#ifdef WIN32
-		elog(WARNING, "configuration item unix_socket_group is not supported on this platform");
-#else
 		char	   *endptr;
 		unsigned long val;
 		gid_t		gid;
@@ -682,7 +663,6 @@ Setup_AF_UNIX(const char *sock_path)
 							sock_path)));
 			return STATUS_ERROR;
 		}
-#endif
 	}
 
 	if (chmod(sock_path, Unix_socket_permissions) == -1)
@@ -743,15 +723,10 @@ StreamConnection(pgsocket server_fd, Port *port)
 		return STATUS_ERROR;
 	}
 
-	/* select NODELAY and KEEPALIVE options if it's a TCP connection */
+		/* select NODELAY and KEEPALIVE options if it's a TCP connection */
 	if (!IS_AF_UNIX(port->laddr.addr.ss_family))
 	{
 		int			on;
-#ifdef WIN32
-		int			oldopt;
-		int			optlen;
-		int			newopt;
-#endif
 
 #ifdef	TCP_NODELAY
 		on = 1;
@@ -771,50 +746,6 @@ StreamConnection(pgsocket server_fd, Port *port)
 					(errmsg("%s(%s) failed: %m", "setsockopt", "SO_KEEPALIVE")));
 			return STATUS_ERROR;
 		}
-
-#ifdef WIN32
-
-		/*
-		 * This is a Win32 socket optimization.  The OS send buffer should be
-		 * large enough to send the whole Postgres send buffer in one go, or
-		 * performance suffers.  The Postgres send buffer can be enlarged if a
-		 * very large message needs to be sent, but we won't attempt to
-		 * enlarge the OS buffer if that happens, so somewhat arbitrarily
-		 * ensure that the OS buffer is at least PQ_SEND_BUFFER_SIZE * 4.
-		 * (That's 32kB with the current default).
-		 *
-		 * The default OS buffer size used to be 8kB in earlier Windows
-		 * versions, but was raised to 64kB in Windows 2012.  So it shouldn't
-		 * be necessary to change it in later versions anymore.  Changing it
-		 * unnecessarily can even reduce performance, because setting
-		 * SO_SNDBUF in the application disables the "dynamic send buffering"
-		 * feature that was introduced in Windows 7.  So before fiddling with
-		 * SO_SNDBUF, check if the current buffer size is already large enough
-		 * and only increase it if necessary.
-		 *
-		 * See https://support.microsoft.com/kb/823764/EN-US/ and
-		 * https://msdn.microsoft.com/en-us/library/bb736549%28v=vs.85%29.aspx
-		 */
-		optlen = sizeof(oldopt);
-		if (getsockopt(port->sock, SOL_SOCKET, SO_SNDBUF, (char *) &oldopt,
-					   &optlen) < 0)
-		{
-			ereport(LOG,
-					(errmsg("%s(%s) failed: %m", "getsockopt", "SO_SNDBUF")));
-			return STATUS_ERROR;
-		}
-		newopt = PQ_SEND_BUFFER_SIZE * 4;
-		if (oldopt < newopt)
-		{
-			if (setsockopt(port->sock, SOL_SOCKET, SO_SNDBUF, (char *) &newopt,
-						   sizeof(newopt)) < 0)
-			{
-				ereport(LOG,
-						(errmsg("%s(%s) failed: %m", "setsockopt", "SO_SNDBUF")));
-				return STATUS_ERROR;
-			}
-		}
-#endif
 
 		/*
 		 * Also apply the current keepalive parameters.  If we fail to set a
@@ -1579,52 +1510,6 @@ fail:
  * Support for TCP Keepalive parameters
  */
 
-/*
- * On Windows, we need to set both idle and interval at the same time.
- * We also cannot reset them to the default (setting to zero will
- * actually set them to zero, not default), therefore we fallback to
- * the out-of-the-box default instead.
- */
-#if defined(WIN32) && defined(SIO_KEEPALIVE_VALS)
-static int
-pq_setkeepaliveswin32(Port *port, int idle, int interval)
-{
-	struct tcp_keepalive ka;
-	DWORD		retsize;
-
-	if (idle <= 0)
-		idle = 2 * 60 * 60;		/* default = 2 hours */
-	if (interval <= 0)
-		interval = 1;			/* default = 1 second */
-
-	ka.onoff = 1;
-	ka.keepalivetime = idle * 1000;
-	ka.keepaliveinterval = interval * 1000;
-
-	if (WSAIoctl(port->sock,
-				 SIO_KEEPALIVE_VALS,
-				 (LPVOID) &ka,
-				 sizeof(ka),
-				 NULL,
-				 0,
-				 &retsize,
-				 NULL,
-				 NULL)
-		!= 0)
-	{
-		ereport(LOG,
-				(errmsg("%s(%s) failed: error code %d",
-						"WSAIoctl", "SIO_KEEPALIVE_VALS", WSAGetLastError())));
-		return STATUS_ERROR;
-	}
-	if (port->keepalives_idle != idle)
-		port->keepalives_idle = idle;
-	if (port->keepalives_interval != interval)
-		port->keepalives_interval = interval;
-	return STATUS_OK;
-}
-#endif
-
 int
 pq_getkeepalivesidle(Port *port)
 {
@@ -1637,7 +1522,6 @@ pq_getkeepalivesidle(Port *port)
 
 	if (port->default_keepalives_idle == 0)
 	{
-#ifndef WIN32
 		ACCEPT_TYPE_ARG3 size = sizeof(port->default_keepalives_idle);
 
 		if (getsockopt(port->sock, IPPROTO_TCP, PG_TCP_KEEPALIVE_IDLE,
@@ -1648,10 +1532,6 @@ pq_getkeepalivesidle(Port *port)
 					(errmsg("%s(%s) failed: %m", "getsockopt", PG_TCP_KEEPALIVE_IDLE_STR)));
 			port->default_keepalives_idle = -1; /* don't know */
 		}
-#else							/* WIN32 */
-		/* We can't get the defaults on Windows, so return "don't know" */
-		port->default_keepalives_idle = -1;
-#endif							/* WIN32 */
 	}
 
 	return port->default_keepalives_idle;
@@ -1671,7 +1551,6 @@ pq_setkeepalivesidle(int idle, Port *port)
 	if (idle == port->keepalives_idle)
 		return STATUS_OK;
 
-#ifndef WIN32
 	if (port->default_keepalives_idle <= 0)
 	{
 		if (pq_getkeepalivesidle(port) < 0)
@@ -1695,9 +1574,6 @@ pq_setkeepalivesidle(int idle, Port *port)
 	}
 
 	port->keepalives_idle = idle;
-#else							/* WIN32 */
-	return pq_setkeepaliveswin32(port, idle, port->keepalives_interval);
-#endif
 #else
 	if (idle != 0)
 	{
@@ -1722,7 +1598,6 @@ pq_getkeepalivesinterval(Port *port)
 
 	if (port->default_keepalives_interval == 0)
 	{
-#ifndef WIN32
 		ACCEPT_TYPE_ARG3 size = sizeof(port->default_keepalives_interval);
 
 		if (getsockopt(port->sock, IPPROTO_TCP, TCP_KEEPINTVL,
@@ -1733,10 +1608,6 @@ pq_getkeepalivesinterval(Port *port)
 					(errmsg("%s(%s) failed: %m", "getsockopt", "TCP_KEEPINTVL")));
 			port->default_keepalives_interval = -1; /* don't know */
 		}
-#else
-		/* We can't get the defaults on Windows, so return "don't know" */
-		port->default_keepalives_interval = -1;
-#endif							/* WIN32 */
 	}
 
 	return port->default_keepalives_interval;
@@ -1755,7 +1626,6 @@ pq_setkeepalivesinterval(int interval, Port *port)
 	if (interval == port->keepalives_interval)
 		return STATUS_OK;
 
-#ifndef WIN32
 	if (port->default_keepalives_interval <= 0)
 	{
 		if (pq_getkeepalivesinterval(port) < 0)
@@ -1779,9 +1649,6 @@ pq_setkeepalivesinterval(int interval, Port *port)
 	}
 
 	port->keepalives_interval = interval;
-#else							/* WIN32 */
-	return pq_setkeepaliveswin32(port, port->keepalives_idle, interval);
-#endif
 #else
 	if (interval != 0)
 	{

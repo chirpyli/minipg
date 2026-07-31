@@ -11,12 +11,7 @@
 #include <limits.h>
 #include <math.h>
 #include <signal.h>
-#ifndef WIN32
 #include <unistd.h>				/* for write() */
-#else
-#include <io.h>					/* for _write() */
-#include <win32.h>
-#endif
 
 #include "command.h"
 #include "common.h"
@@ -238,9 +233,6 @@ NoticeProcessor(void *arg, const char *message)
  * set sigint_interrupt_enabled true while blocked, instructing the signal
  * catcher to longjmp through sigint_interrupt_jmp.  We assume readline and
  * fgets are coded to handle possible interruption.
- *
- * On Windows, currently this does not work, so control-C is less useful
- * there.
  */
 volatile bool sigint_interrupt_enabled = false;
 
@@ -249,14 +241,12 @@ sigjmp_buf	sigint_interrupt_jmp;
 static void
 psql_cancel_callback(void)
 {
-#ifndef WIN32
 	/* if we are waiting for input, longjmp out of it */
 	if (sigint_interrupt_enabled)
 	{
 		sigint_interrupt_enabled = false;
 		siglongjmp(sigint_interrupt_jmp, 1);
 	}
-#endif
 
 	/* else, set cancel flag to stop any long-running loops */
 	cancel_pressed = true;
@@ -2222,13 +2212,6 @@ expand_tilde(char **filename)
 	if (!filename || !(*filename))
 		return;
 
-	/*
-	 * WIN32 doesn't use tilde expansion for file names. Also, it uses tilde
-	 * for short versions of long file names, though the tilde is usually
-	 * toward the end, not at the beginning.
-	 */
-#ifndef WIN32
-
 	/* try tilde expansion */
 	if (**filename == '~')
 	{
@@ -2263,7 +2246,6 @@ expand_tilde(char **filename)
 			*filename = newfn;
 		}
 	}
-#endif
 }
 
 /*

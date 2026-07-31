@@ -27,10 +27,6 @@
  *
  */
 
-#ifdef WIN32
-#define FD_SETSIZE 1024			/* must set before winsock2.h is included */
-#endif
-
 #include "postgres_fe.h"
 
 #include <ctype.h>
@@ -116,27 +112,7 @@ typedef struct socket_set
  * Multi-platform thread implementations
  */
 
-#ifdef WIN32
-/* Use Windows threads */
-#include <windows.h>
-#define GETERRNO() (_dosmaperr(GetLastError()), errno)
-#define THREAD_T HANDLE
-#define THREAD_FUNC_RETURN_TYPE unsigned
-#define THREAD_FUNC_RETURN return 0
-#define THREAD_FUNC_CC __stdcall
-#define THREAD_CREATE(handle, function, arg) \
-	((*(handle) = (HANDLE) _beginthreadex(NULL, 0, (function), (arg), 0, NULL)) == 0 ? errno : 0)
-#define THREAD_JOIN(handle) \
-	(WaitForSingleObject(handle, INFINITE) != WAIT_OBJECT_0 ? \
-	GETERRNO() : CloseHandle(handle) ? 0 : GETERRNO())
-#define THREAD_BARRIER_T SYNCHRONIZATION_BARRIER
-#define THREAD_BARRIER_INIT(barrier, n) \
-	(InitializeSynchronizationBarrier((barrier), (n), 0) ? 0 : GETERRNO())
-#define THREAD_BARRIER_WAIT(barrier) \
-	EnterSynchronizationBarrier((barrier), \
-								SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY)
-#define THREAD_BARRIER_DESTROY(barrier)
-#elif defined(ENABLE_THREAD_SAFETY)
+#if defined(ENABLE_THREAD_SAFETY)
 /* Use POSIX threads */
 #include "port/pg_pthread.h"
 #define THREAD_T pthread_t
@@ -7009,8 +6985,6 @@ finishCon(CState *st)
  * Support for duration option: set timer_exceeded after so many seconds.
  */
 
-#ifndef WIN32
-
 static void
 handle_sig_alarm(SIGNAL_ARGS)
 {
@@ -7023,34 +6997,6 @@ setalarm(int seconds)
 	pqsignal(SIGALRM, handle_sig_alarm);
 	alarm(seconds);
 }
-
-#else							/* WIN32 */
-
-static VOID CALLBACK
-win32_timer_callback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
-{
-	timer_exceeded = true;
-}
-
-static void
-setalarm(int seconds)
-{
-	HANDLE		queue;
-	HANDLE		timer;
-
-	/* This function will be called at most once, so we can cheat a bit. */
-	queue = CreateTimerQueue();
-	if (seconds > ((DWORD) -1) / 1000 ||
-		!CreateTimerQueueTimer(&timer, queue,
-							   win32_timer_callback, NULL, seconds * 1000, 0,
-							   WT_EXECUTEINTIMERTHREAD | WT_EXECUTEONLYONCE))
-	{
-		pg_log_fatal("failed to set timer");
-		exit(1);
-	}
-}
-
-#endif							/* WIN32 */
 
 
 /*
@@ -7186,21 +7132,12 @@ static void
 add_socket_to_set(socket_set *sa, int fd, int idx)
 {
 	/* See connect_slot() for background on this code. */
-#ifdef WIN32
-	if (sa->fds.fd_count + 1 >= FD_SETSIZE)
-	{
-		pg_log_fatal("too many concurrent database clients for this platform: %d",
-					 sa->fds.fd_count + 1);
-		exit(1);
-	}
-#else
 	if (fd < 0 || fd >= FD_SETSIZE)
 	{
 		pg_log_fatal("socket file descriptor out of range for select(): %d",
 					 fd);
 		exit(1);
 	}
-#endif
 	FD_SET(fd, &sa->fds);
 	if (fd > sa->maxfd)
 		sa->maxfd = fd;

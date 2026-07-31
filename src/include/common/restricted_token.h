@@ -16,9 +16,4 @@
  */
 void		get_restricted_token(void);
 
-#ifdef WIN32
-/* Create a restricted token and execute the specified process with it. */
-HANDLE		CreateRestrictedProcess(char *cmd, PROCESS_INFORMATION *processInfo);
-#endif
-
 #endif							/* COMMON_RESTRICTED_TOKEN_H */

@@ -73,11 +73,7 @@ extern int	max_safe_fds;
  * actually believe these cases are okay without further evidence (namely,
  * a pending fsync request getting canceled ... see ProcessSyncRequests).
  */
-#ifndef WIN32
 #define FILE_POSSIBLY_DELETED(err)	((err) == ENOENT)
-#else
-#define FILE_POSSIBLY_DELETED(err)	((err) == ENOENT || (err) == EACCES)
-#endif
 
 /*
  * prototypes for functions in fd.c

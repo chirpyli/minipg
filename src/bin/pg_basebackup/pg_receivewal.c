@@ -455,14 +455,11 @@ StreamLog(void)
  * When sigint is called, just tell the system to exit at the next possible
  * moment.
  */
-#ifndef WIN32
-
 static void
 sigint_handler(int signum)
 {
 	time_to_stop = true;
 }
-#endif
 
 int
 main(int argc, char **argv)
@@ -688,9 +685,7 @@ main(int argc, char **argv)
 	 * Trap signals.  (Don't do this until after the initial password prompt,
 	 * if one is needed, in GetConnection.)
 	 */
-#ifndef WIN32
 	pqsignal(SIGINT, sigint_handler);
-#endif
 
 	/*
 	 * Run IDENTIFY_SYSTEM to make sure we've successfully have established a

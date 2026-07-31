@@ -57,15 +57,9 @@ wait_result_to_str(int exitstatus)
 	}
 	else if (WIFSIGNALED(exitstatus))
 	{
-#if defined(WIN32)
-		snprintf(str, sizeof(str),
-				 _("child process was terminated by exception 0x%X"),
-				 WTERMSIG(exitstatus));
-#else
 		snprintf(str, sizeof(str),
 				 _("child process was terminated by signal %d: %s"),
 				 WTERMSIG(exitstatus), pg_strsignal(WTERMSIG(exitstatus)));
-#endif
 	}
 	else
 		snprintf(str, sizeof(str),

@@ -214,11 +214,7 @@ get_user_info(char **user_name_p)
 	const char *user_name;
 	char	   *errstr;
 
-#ifndef WIN32
 	user_id = geteuid();
-#else
-	user_id = 1;
-#endif
 
 	user_name = get_user_name(&errstr);
 	if (!user_name)

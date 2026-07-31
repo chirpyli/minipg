@@ -26,9 +26,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#ifdef WIN32
-#include <io.h>
-#endif
 
 #include "common/string.h"
 #include "dumputils.h"
@@ -2334,22 +2331,6 @@ _allocAH(const char *FileSpec, const ArchiveFormat fmt,
 	/* Open stdout with no compression for AH output handle */
 	AH->gzOut = 0;
 	AH->OF = stdout;
-
-	/*
-	 * On Windows, we need to use binary mode to read/write non-text files,
-	 * which include all archive formats as well as compressed plain text.
-	 * Force stdin/stdout into binary mode if that is what we are using.
-	 */
-#ifdef WIN32
-	if ((fmt != archNull || compression != 0) &&
-		(AH->fSpec == NULL || strcmp(AH->fSpec, "") == 0))
-	{
-		if (mode == archModeWrite)
-			_setmode(fileno(stdout), O_BINARY);
-		else
-			_setmode(fileno(stdin), O_BINARY);
-	}
-#endif
 
 	AH->SetupWorkerPtr = setupWorkerPtr;
 

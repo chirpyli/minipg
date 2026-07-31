@@ -187,131 +187,8 @@ static const struct encoding_match encoding_match_list[] = {
 	{PG_SQL_ASCII, NULL}		/* end marker */
 };
 
-#ifdef WIN32
-/*
- * On Windows, use CP<code page number> instead of the nl_langinfo() result
- *
- * Visual Studio 2012 expanded the set of valid LC_CTYPE values, so have its
- * locale machinery determine the code page.  See comments at IsoLocaleName().
- * For other compilers, follow the locale's predictable format.
- *
- * Visual Studio 2015 should still be able to do the same, but the declaration
- * of lc_codepage is missing in _locale_t, causing this code compilation to
- * fail, hence this falls back instead on GetLocaleInfoEx. VS 2015 may be an
- * exception and post-VS2015 versions should be able to handle properly the
- * codepage number using _create_locale(). So, instead of the same logic as
- * VS 2012 and VS 2013, this routine uses GetLocaleInfoEx to parse short
- * locale names like "de-DE", "fr-FR", etc. If those cannot be parsed correctly
- * process falls back to the pre-VS-2010 manual parsing done with
- * using <Language>_<Country>.<CodePage> as a base.
- *
- * Returns a malloc()'d string for the caller to free.
- */
-static char *
-win32_langinfo(const char *ctype)
-{
-	char	   *r = NULL;
 
-#if defined(_MSC_VER) && (_MSC_VER < 1900)
-	_locale_t	loct = NULL;
-
-	loct = _create_locale(LC_CTYPE, ctype);
-	if (loct != NULL)
-	{
-		r = malloc(16);			/* excess */
-		if (r != NULL)
-			sprintf(r, "CP%u", loct->locinfo->lc_codepage);
-		_free_locale(loct);
-	}
-#else
-	char	   *codepage;
-
-#if defined(_MSC_VER) && (_MSC_VER >= 1900)
-	uint32		cp;
-	WCHAR		wctype[LOCALE_NAME_MAX_LENGTH];
-
-	memset(wctype, 0, sizeof(wctype));
-	MultiByteToWideChar(CP_ACP, 0, ctype, -1, wctype, LOCALE_NAME_MAX_LENGTH);
-
-	if (GetLocaleInfoEx(wctype,
-						LOCALE_IDEFAULTANSICODEPAGE | LOCALE_RETURN_NUMBER,
-						(LPWSTR) &cp, sizeof(cp) / sizeof(WCHAR)) > 0)
-	{
-		r = malloc(16);			/* excess */
-		if (r != NULL)
-		{
-			/*
-			 * If the return value is CP_ACP that means no ANSI code page is
-			 * available, so only Unicode can be used for the locale.
-			 */
-			if (cp == CP_ACP)
-				strcpy(r, "utf8");
-			else
-				sprintf(r, "CP%u", cp);
-		}
-	}
-	else
-#endif
-	{
-		/*
-		 * Locale format on Win32 is <Language>_<Country>.<CodePage>.  For
-		 * example, English_United States.1252.  If we see digits after the
-		 * last dot, assume it's a codepage number.  Otherwise, we might be
-		 * dealing with a Unix-style locale string; Windows' setlocale() will
-		 * take those even though GetLocaleInfoEx() won't, so we end up here.
-		 * In that case, just return what's after the last dot and hope we can
-		 * find it in our table.
-		 */
-		codepage = strrchr(ctype, '.');
-		if (codepage != NULL)
-		{
-			size_t		ln;
-
-			codepage++;
-			ln = strlen(codepage);
-			r = malloc(ln + 3);
-			if (r != NULL)
-			{
-				if (strspn(codepage, "0123456789") == ln)
-					sprintf(r, "CP%s", codepage);
-				else
-					strcpy(r, codepage);
-			}
-		}
-
-	}
-#endif
-
-	return r;
-}
-
-#ifndef FRONTEND
-/*
- * Given a Windows code page identifier, find the corresponding PostgreSQL
- * encoding.  Issue a warning and return -1 if none found.
- */
-int
-pg_codepage_to_encoding(UINT cp)
-{
-	char		sys[16];
-	int			i;
-
-	sprintf(sys, "CP%u", cp);
-
-	/* Check the table */
-	for (i = 0; encoding_match_list[i].system_enc_name; i++)
-		if (pg_strcasecmp(sys, encoding_match_list[i].system_enc_name) == 0)
-			return encoding_match_list[i].pg_enc_code;
-
-	ereport(WARNING,
-			(errmsg("could not determine encoding for codeset \"%s\"", sys)));
-
-	return -1;
-}
-#endif
-#endif							/* WIN32 */
-
-#if (defined(HAVE_LANGINFO_H) && defined(CODESET)) || defined(WIN32)
+#if (defined(HAVE_LANGINFO_H) && defined(CODESET))
 
 /*
  * Given a setting for LC_CTYPE, return the Postgres ID of the associated
@@ -358,13 +235,9 @@ pg_get_encoding_from_locale(const char *ctype, bool write_message)
 			return -1;			/* bogus ctype passed in? */
 		}
 
-#ifndef WIN32
 		sys = nl_langinfo(CODESET);
 		if (sys)
 			sys = strdup(sys);
-#else
-		sys = win32_langinfo(name);
-#endif
 
 		setlocale(LC_CTYPE, save);
 		free(save);
@@ -381,13 +254,9 @@ pg_get_encoding_from_locale(const char *ctype, bool write_message)
 			pg_strcasecmp(ctype, "POSIX") == 0)
 			return PG_SQL_ASCII;
 
-#ifndef WIN32
 		sys = nl_langinfo(CODESET);
 		if (sys)
 			sys = strdup(sys);
-#else
-		sys = win32_langinfo(ctype);
-#endif
 	}
 
 	if (!sys)
@@ -404,19 +273,6 @@ pg_get_encoding_from_locale(const char *ctype, bool write_message)
 	}
 
 	/* Special-case kluges for particular platforms go here */
-
-#ifdef __darwin__
-
-	/*
-	 * Current macOS has many locales that report an empty string for CODESET,
-	 * but they all seem to actually use UTF-8.
-	 */
-	if (strlen(sys) == 0)
-	{
-		free(sys);
-		return PG_UTF8;
-	}
-#endif
 
 	/*
 	 * We print a warning if we got a CODESET string but couldn't recognize

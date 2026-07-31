@@ -95,49 +95,7 @@ pg_strong_random(void *buf, size_t len)
 	return false;
 }
 
-#elif WIN32
-
-#include <wincrypt.h>
-/*
- * Cache a global crypto provider that only gets freed when the process
- * exits, in case we need random numbers more than once.
- */
-static HCRYPTPROV hProvider = 0;
-
-void
-pg_strong_random_init(void)
-{
-	/* No initialization needed on WIN32 */
-}
-
-bool
-pg_strong_random(void *buf, size_t len)
-{
-	if (hProvider == 0)
-	{
-		if (!CryptAcquireContext(&hProvider,
-								 NULL,
-								 MS_DEF_PROV,
-								 PROV_RSA_FULL,
-								 CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
-		{
-			/*
-			 * On failure, set back to 0 in case the value was for some reason
-			 * modified.
-			 */
-			hProvider = 0;
-		}
-	}
-	/* Re-check in case we just retrieved the provider */
-	if (hProvider != 0)
-	{
-		if (CryptGenRandom(hProvider, len, buf))
-			return true;
-	}
-	return false;
-}
-
-#else							/* not USE_OPENSSL or WIN32 */
+#else							/* not USE_OPENSSL */
 
 /*
  * Without OpenSSL or Win32 support, just read /dev/urandom ourselves.

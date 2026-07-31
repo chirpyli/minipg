@@ -18,12 +18,9 @@
 
 #include <signal.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
 #include <sys/ioctl.h>
-#endif
+
 
 #ifdef HAVE_TERMIOS_H
 #include <termios.h>
@@ -89,12 +86,12 @@ PQprint(FILE *fout, const PGresult *res, const PQprintOpt *po)
 		bool		usePipe = false;
 		char	   *pagerenv;
 
-#if defined(ENABLE_THREAD_SAFETY) && !defined(WIN32)
+#if defined(ENABLE_THREAD_SAFETY)
 		sigset_t	osigset;
 		bool		sigpipe_masked = false;
 		bool		sigpipe_pending;
 #endif
-#if !defined(ENABLE_THREAD_SAFETY) && !defined(WIN32)
+#if !defined(ENABLE_THREAD_SAFETY)
 		pqsigfunc	oldsigpipehandler = NULL;
 #endif
 
@@ -195,14 +192,12 @@ PQprint(FILE *fout, const PGresult *res, const PQprintOpt *po)
 				if (fout)
 				{
 					usePipe = true;
-#ifndef WIN32
 #ifdef ENABLE_THREAD_SAFETY
 					if (pq_block_sigpipe(&osigset, &sigpipe_pending) == 0)
 						sigpipe_masked = true;
 #else
 					oldsigpipehandler = pqsignal(SIGPIPE, SIG_IGN);
 #endif							/* ENABLE_THREAD_SAFETY */
-#endif							/* WIN32 */
 				}
 				else
 					fout = stdout;

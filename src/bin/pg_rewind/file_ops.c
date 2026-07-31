@@ -456,7 +456,7 @@ recurse_dir(const char *datadir, const char *parentpath,
 		}
 		else if (S_ISLNK(fst.st_mode))
 		{
-#if defined(HAVE_READLINK) || defined(WIN32)
+#if defined(HAVE_READLINK)
 			char		link_target[MAXPGPATH];
 			int			len;
 

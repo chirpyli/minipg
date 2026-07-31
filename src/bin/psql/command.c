@@ -11,17 +11,9 @@
 #include <time.h>
 #include <pwd.h>
 #include <utime.h>
-#ifndef WIN32
 #include <sys/stat.h>			/* for stat() */
 #include <fcntl.h>				/* open() flags */
 #include <unistd.h>				/* for geteuid(), getpid(), stat() */
-#else
-#include <win32.h>
-#include <io.h>
-#include <fcntl.h>
-#include <direct.h>
-#include <sys/stat.h>			/* for stat() */
-#endif
 
 #include "catalog/pg_class_d.h"
 #include "command.h"
@@ -175,10 +167,6 @@ static void printSSLInfo(void);
 static void printGSSInfo(void);
 static bool printPsetInfo(const char *param, printQueryOpt *popt);
 static char *pset_value_string(const char *param, printQueryOpt *popt);
-
-#ifdef WIN32
-static void checkWin32Codepage(void);
-#endif
 
 static bool restricted;
 static char *restrict_key;
@@ -572,7 +560,6 @@ exec_command_cd(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			dir = opt;
 		else
 		{
-#ifndef WIN32
 			struct passwd *pw;
 			uid_t		user_id = geteuid();
 
@@ -586,14 +573,6 @@ exec_command_cd(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				exit(EXIT_FAILURE);
 			}
 			dir = pw->pw_dir;
-#else							/* WIN32 */
-
-			/*
-			 * On Windows, 'cd' without arguments prints the current
-			 * directory, so if someone wants to code this here instead...
-			 */
-			dir = "/";
-#endif							/* WIN32 */
 		}
 
 		if (chdir(dir) == -1)
@@ -3665,10 +3644,6 @@ connection_warnings(bool in_startup)
 				   formatPGVersionNumber(pset.sversion, false,
 										 sverbuf, sizeof(sverbuf)));
 
-#ifdef WIN32
-		if (in_startup)
-			checkWin32Codepage();
-#endif
 		printSSLInfo();
 		printGSSInfo();
 	}
@@ -3718,29 +3693,7 @@ printGSSInfo(void)
 }
 
 
-/*
- * checkWin32Codepage
- *
- * Prints a warning when win32 console codepage differs from Windows codepage
- */
-#ifdef WIN32
-static void
-checkWin32Codepage(void)
-{
-	unsigned int wincp,
-				concp;
 
-	wincp = GetACP();
-	concp = GetConsoleCP();
-	if (wincp != concp)
-	{
-		printf(_("WARNING: Console code page (%u) differs from Windows code page (%u)\n"
-				 "         8-bit characters might not work correctly. See psql reference\n"
-				 "         page \"Notes for Windows users\" for details.\n"),
-			   concp, wincp);
-	}
-}
-#endif
 
 
 /*
@@ -3853,21 +3806,12 @@ editFile(const char *fname, int lineno)
 	 * severe brain damage in their command shell plus the fact that standard
 	 * program paths include spaces.
 	 */
-#ifndef WIN32
 	if (lineno > 0)
 		sys = psprintf("exec %s %s%d '%s'",
 					   editorName, editor_lineno_arg, lineno, fname);
 	else
 		sys = psprintf("exec %s '%s'",
 					   editorName, fname);
-#else
-	if (lineno > 0)
-		sys = psprintf("\"%s\" %s%d \"%s\"",
-					   editorName, editor_lineno_arg, lineno, fname);
-	else
-		sys = psprintf("\"%s\" \"%s\"",
-					   editorName, fname);
-#endif
 	result = system(sys);
 	if (result == -1)
 		pg_log_error("could not start editor \"%s\"", editorName);
@@ -3910,36 +3854,13 @@ do_edit(const char *filename_arg, PQExpBuffer query_buf,
 	else
 	{
 		/* make a temp file to edit */
-#ifndef WIN32
 		const char *tmpdir = getenv("TMPDIR");
 
 		if (!tmpdir)
 			tmpdir = "/tmp";
-#else
-		char		tmpdir[MAXPGPATH];
-		int			ret;
 
-		ret = GetTempPath(MAXPGPATH, tmpdir);
-		if (ret == 0 || ret > MAXPGPATH)
-		{
-			pg_log_error("could not locate temporary directory: %s",
-						 !ret ? strerror(errno) : "");
-			return false;
-		}
-#endif
-
-		/*
-		 * No canonicalize_path() here. EDIT.EXE run from CMD.EXE prepends the
-		 * current directory to the supplied path unless we use only
-		 * backslashes, so we do that.
-		 */
-#ifndef WIN32
 		snprintf(fnametmp, sizeof(fnametmp), "%s%spsql.edit.%d.sql", tmpdir,
 				 "/", (int) getpid());
-#else
-		snprintf(fnametmp, sizeof(fnametmp), "%s%spsql.edit.%d.sql", tmpdir,
-				 "" /* trailing separator already present */ , (int) getpid());
-#endif
 
 		fname = (const char *) fnametmp;
 
@@ -4927,15 +4848,7 @@ pset_value_string(const char *param, printQueryOpt *popt)
 
 
 
-#ifndef WIN32
 #define DEFAULT_SHELL "/bin/sh"
-#else
-/*
- *	CMD.EXE is in different places in different Win32 releases so we
- *	have to rely on the path to find it.
- */
-#define DEFAULT_SHELL "cmd.exe"
-#endif
 
 static bool
 do_shell(const char *command)
@@ -4948,19 +4861,11 @@ do_shell(const char *command)
 		const char *shellName;
 
 		shellName = getenv("SHELL");
-#ifdef WIN32
-		if (shellName == NULL)
-			shellName = getenv("COMSPEC");
-#endif
 		if (shellName == NULL)
 			shellName = DEFAULT_SHELL;
 
 		/* See EDITOR handling comment for an explanation */
-#ifndef WIN32
 		sys = psprintf("exec %s", shellName);
-#else
-		sys = psprintf("\"%s\"", shellName);
-#endif
 		result = system(sys);
 		free(sys);
 	}

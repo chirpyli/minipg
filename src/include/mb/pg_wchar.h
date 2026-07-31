@@ -354,9 +354,6 @@ typedef struct pg_enc2name
 {
 	const char *name;
 	pg_enc		encoding;
-#ifdef WIN32
-	unsigned	codepage;		/* codepage for WIN32 */
-#endif
 } pg_enc2name;
 
 extern PGDLLIMPORT const pg_enc2name pg_enc2name_tbl[];
@@ -704,9 +701,5 @@ extern int	latin2mic_with_table(const unsigned char *l, unsigned char *p,
 extern int	mic2latin_with_table(const unsigned char *mic, unsigned char *p,
 								 int len, int lc, int encoding,
 								 const unsigned char *tab, bool noError);
-
-#ifdef WIN32
-extern WCHAR *pgwin32_message_to_UTF16(const char *str, int len, int *utf16len);
-#endif
 
 #endif							/* PG_WCHAR_H */

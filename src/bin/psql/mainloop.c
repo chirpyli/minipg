@@ -294,11 +294,7 @@ MainLoop(FILE *source)
 			if (found_help)
 			{
 				if (query_buf->len != 0)
-#ifndef WIN32
 					puts(_("Use \\? for help or press control-C to clear the input buffer."));
-#else
-					puts(_("Use \\? for help."));
-#endif
 				else
 				{
 					puts(_("You are using psql, the command-line interface to PostgreSQL."));
@@ -328,11 +324,7 @@ MainLoop(FILE *source)
 						prompt_status == PROMPT_PAREN)
 						puts(_("Use \\q to quit."));
 					else
-#ifndef WIN32
 						puts(_("Use control-D to quit."));
-#else
-						puts(_("Use control-C to quit."));
-#endif
 				}
 				else
 				{
@@ -352,11 +344,7 @@ MainLoop(FILE *source)
 				prompt_status != PROMPT_READY &&
 				prompt_status != PROMPT_CONTINUE &&
 				prompt_status != PROMPT_PAREN)
-#ifndef WIN32
 				puts(_("Use control-D to quit."));
-#else
-				puts(_("Use control-C to quit."));
-#endif
 		}
 
 		/* echo back if flag is set, unless interactive */

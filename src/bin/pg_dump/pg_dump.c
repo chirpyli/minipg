@@ -742,9 +742,6 @@ main(int argc, char **argv)
 	 * WaitForMultipleObjects() call.
 	 */
 	if (numWorkers <= 0
-#ifdef WIN32
-		|| numWorkers > MAXIMUM_WAIT_OBJECTS
-#endif
 		)
 		fatal("invalid number of parallel jobs");
 

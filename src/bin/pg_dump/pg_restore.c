@@ -381,14 +381,6 @@ main(int argc, char **argv)
 	}
 
 	/* See comments in pg_dump.c */
-#ifdef WIN32
-	if (numWorkers > MAXIMUM_WAIT_OBJECTS)
-	{
-		pg_log_error("maximum number of parallel jobs is %d",
-					 MAXIMUM_WAIT_OBJECTS);
-		exit(1);
-	}
-#endif
 
 	/* Can't do single-txn mode with multiple connections */
 	if (opts->single_txn && numWorkers > 1)

@@ -31,9 +31,6 @@ extern char *bonjour_name;
 extern bool restart_after_crash;
 extern bool remove_temp_files_after_crash;
 
-#ifdef WIN32
-extern HANDLE PostmasterHandle;
-#else
 extern int	postmaster_alive_fds[2];
 
 /*
@@ -43,7 +40,6 @@ extern int	postmaster_alive_fds[2];
 #define POSTMASTER_FD_WATCH		0	/* used in children to check for
 									 * postmaster death */
 #define POSTMASTER_FD_OWN		1	/* kept open by postmaster only */
-#endif
 
 extern PGDLLIMPORT const char *progname;
 

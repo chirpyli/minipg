@@ -22,9 +22,6 @@
 
 #include "postgres_fe.h"
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/param.h>			/* for MAXHOSTNAMELEN on most */
@@ -36,7 +33,7 @@
 #include <netdb.h>				/* for MAXHOSTNAMELEN on some */
 #endif
 #include <pwd.h>
-#endif
+
 
 #include "common/md5.h"
 #include "common/scram-common.h"
@@ -1078,17 +1075,11 @@ pg_fe_getauthname(PQExpBuffer errorMessage)
 	char	   *result = NULL;
 	const char *name = NULL;
 
-#ifdef WIN32
-	/* Microsoft recommends buffer size of UNLEN+1, where UNLEN = 256 */
-	char		username[256 + 1];
-	DWORD		namesize = sizeof(username);
-#else
 	uid_t		user_id = geteuid();
 	char		pwdbuf[BUFSIZ];
 	struct passwd pwdstr;
 	struct passwd *pw = NULL;
 	int			pwerr;
-#endif
 
 	/*
 	 * Some users are using configure --enable-thread-safety-force, so we
@@ -1099,14 +1090,6 @@ pg_fe_getauthname(PQExpBuffer errorMessage)
 	 */
 	pglock_thread();
 
-#ifdef WIN32
-	if (GetUserName(username, &namesize))
-		name = username;
-	else if (errorMessage)
-		appendPQExpBuffer(errorMessage,
-						  libpq_gettext("user name lookup failure: error code %lu\n"),
-						  GetLastError());
-#else
 	pwerr = pqGetpwuid(user_id, &pwdstr, pwdbuf, sizeof(pwdbuf), &pw);
 	if (pw != NULL)
 		name = pw->pw_name;
@@ -1122,7 +1105,6 @@ pg_fe_getauthname(PQExpBuffer errorMessage)
 							  libpq_gettext("local user with ID %d does not exist\n"),
 							  (int) user_id);
 	}
-#endif
 
 	if (name)
 	{

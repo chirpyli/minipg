@@ -21,34 +21,14 @@
 
 #include <ctype.h>
 #include <sys/stat.h>
-#ifdef WIN32
-#ifdef _WIN32_IE
-#undef _WIN32_IE
-#endif
-#define _WIN32_IE 0x0500
-#ifdef near
-#undef near
-#endif
-#define near
-#include <shlobj.h>
-#else
 #include <unistd.h>
-#endif
 
 #include "mb/pg_wchar.h"
 #include "pg_config_paths.h"
 
 
-#ifndef WIN32
 #define IS_PATH_VAR_SEP(ch) ((ch) == ':')
-#else
-#define IS_PATH_VAR_SEP(ch) ((ch) == ';')
-#endif
 
-#ifdef WIN32
-static void debackslash_path(char *path, int encoding);
-static int	pg_sjis_mblen(const unsigned char *s);
-#endif
 static void make_relative_path(char *ret_path, const char *target_path,
 							   const char *bin_path, const char *my_exec_path);
 static void trim_directory(char *path);
@@ -61,27 +41,7 @@ static void trim_trailing_separator(char *path);
  * On Windows, a path may begin with "C:" or "//network/".  Advance over
  * this and point to the effective start of the path.
  */
-#ifdef WIN32
-
-static char *
-skip_drive(const char *path)
-{
-	if (IS_DIR_SEP(path[0]) && IS_DIR_SEP(path[1]))
-	{
-		path += 2;
-		while (*path && !IS_DIR_SEP(*path))
-			path++;
-	}
-	else if (isalpha((unsigned char) path[0]) && path[1] == ':')
-	{
-		path += 2;
-	}
-	return (char *) path;
-}
-#else
-
 #define skip_drive(path)	(path)
-#endif
 
 /*
  *	has_drive_prefix
@@ -91,11 +51,7 @@ skip_drive(const char *path)
 bool
 has_drive_prefix(const char *path)
 {
-#ifdef WIN32
-	return skip_drive(path) != path;
-#else
 	return false;
-#endif
 }
 
 /*
@@ -152,65 +108,6 @@ last_dir_separator(const char *filename)
 }
 
 
-#ifdef WIN32
-
-/*
- * Convert '\' to '/' within the given path, assuming the path
- * is in the specified encoding.
- */
-static void
-debackslash_path(char *path, int encoding)
-{
-	char	   *p;
-
-	/*
-	 * Of the supported encodings, only Shift-JIS has multibyte characters
-	 * that can include a byte equal to '\' (0x5C).  So rather than implement
-	 * a fully encoding-aware conversion, we special-case SJIS.  (Invoking the
-	 * general encoding-aware logic in wchar.c is impractical here for
-	 * assorted reasons.)
-	 */
-	if (encoding == PG_SJIS)
-	{
-		for (p = path; *p; p += pg_sjis_mblen((const unsigned char *) p))
-		{
-			if (*p == '\\')
-				*p = '/';
-		}
-	}
-	else
-	{
-		for (p = path; *p; p++)
-		{
-			if (*p == '\\')
-				*p = '/';
-		}
-	}
-}
-
-/*
- * SJIS character length
- *
- * This must match the behavior of
- *		pg_encoding_mblen_bounded(PG_SJIS, s)
- * In particular, unlike the version of pg_sjis_mblen in src/common/wchar.c,
- * do not allow caller to accidentally step past end-of-string.
- */
-static int
-pg_sjis_mblen(const unsigned char *s)
-{
-	int			len;
-
-	if (*s >= 0xa1 && *s <= 0xdf)
-		len = 1;				/* 1 byte kana? */
-	else if (IS_HIGHBIT_SET(*s) && s[1] != '\0')
-		len = 2;				/* kanji? */
-	else
-		len = 1;				/* should be ASCII */
-	return len;
-}
-
-#endif							/* WIN32 */
 
 
 /*
@@ -233,13 +130,6 @@ pg_sjis_mblen(const unsigned char *s)
 void
 make_native_path(char *filename)
 {
-#ifdef WIN32
-	char	   *p;
-
-	for (p = filename; *p; p++)
-		if (*p == '/')
-			*p = '\\';
-#endif
 }
 
 
@@ -255,19 +145,6 @@ make_native_path(char *filename)
 void
 cleanup_path(char *path)
 {
-#ifdef WIN32
-	/*
-	 * GetShortPathName() will fail if the path does not exist, or short names
-	 * are disabled on this file system.  In both cases, we just return the
-	 * original path.  This is particularly useful for --sysconfdir, which
-	 * might not exist.
-	 */
-	GetShortPathName(path, path, MAXPGPATH - 1);
-
-	/* Replace '\' with '/' */
-	/* All server-safe encodings are alike here, so just use PG_SQL_ASCII */
-	debackslash_path(path, PG_SQL_ASCII);
-#endif
 }
 
 
@@ -338,24 +215,6 @@ canonicalize_path_enc(char *path, int encoding)
 	bool		was_sep = false;
 	int			pending_strips;
 
-#ifdef WIN32
-
-	/*
-	 * The Windows command processor will accept suitably quoted paths with
-	 * forward slashes, but barfs badly with mixed forward and back slashes.
-	 * Hence, start by converting all back slashes to forward slashes.
-	 */
-	debackslash_path(path, encoding);
-
-	/*
-	 * In Win32, if you do: prog.exe "a b" "\c\d\" the system will pass \c\d"
-	 * as argv[2], so trim off trailing quote.
-	 */
-	p = path + strlen(path);
-	if (p > path && *(p - 1) == '"')
-		*(p - 1) = '/';
-#endif
-
 	/*
 	 * Removing the trailing slash on a path means we never get ugly double
 	 * trailing slashes. Also, Win32 can't stat() a directory with a trailing
@@ -367,11 +226,6 @@ canonicalize_path_enc(char *path, int encoding)
 	 * Remove duplicate adjacent separators
 	 */
 	p = path;
-#ifdef WIN32
-	/* Don't remove leading double-slash on Win32 */
-	if (*p)
-		p++;
-#endif
 	to_p = p;
 	for (; *p; p++, to_p++)
 	{
@@ -486,21 +340,6 @@ path_is_relative_and_below_cwd(const char *path)
 	/* don't allow anything above the cwd */
 	else if (path_contains_parent_reference(path))
 		return false;
-#ifdef WIN32
-
-	/*
-	 * On Win32, a drive letter _not_ followed by a slash, e.g. 'E:abc', is
-	 * relative to the cwd on that drive, or the drive's root directory if
-	 * that drive has no cwd.  Because the path itself cannot tell us which is
-	 * the case, we have to assume the worst, i.e. that it is not below the
-	 * cwd.  We could use GetFullPathName() to find the full path but that
-	 * could change if the current directory for the drive changes underneath
-	 * us, so we just disallow it.
-	 */
-	else if (isalpha((unsigned char) path[0]) && path[1] == ':' &&
-			 !IS_DIR_SEP(path[2]))
-		return false;
-#endif
 	else
 		return true;
 }
@@ -566,13 +405,6 @@ get_progname(const char *argv0)
 		abort();				/* This could exit the postmaster */
 	}
 
-#if defined(__CYGWIN__) || defined(WIN32)
-	/* strip ".exe" suffix, regardless of case */
-	if (strlen(progname) > sizeof(EXE) - 1 &&
-		pg_strcasecmp(progname + strlen(progname) - (sizeof(EXE) - 1), EXE) == 0)
-		progname[strlen(progname) - (sizeof(EXE) - 1)] = '\0';
-#endif
-
 	return progname;
 }
 
@@ -587,12 +419,7 @@ dir_strcmp(const char *s1, const char *s2)
 	while (*s1 && *s2)
 	{
 		if (
-#ifndef WIN32
 			*s1 != *s2
-#else
-		/* On windows, paths are case-insensitive */
-			pg_tolower((unsigned char) *s1) != pg_tolower((unsigned char) *s2)
-#endif
 			&& !(IS_DIR_SEP(*s1) && IS_DIR_SEP(*s2)))
 			return (int) *s1 - (int) *s2;
 		s1++, s2++;
@@ -900,7 +727,6 @@ get_man_path(const char *my_exec_path, char *ret_path)
 bool
 get_home_path(char *ret_path)
 {
-#ifndef WIN32
 	char		pwdbuf[BUFSIZ];
 	struct passwd pwdstr;
 	struct passwd *pwd = NULL;
@@ -910,22 +736,6 @@ get_home_path(char *ret_path)
 		return false;
 	strlcpy(ret_path, pwd->pw_dir, MAXPGPATH);
 	return true;
-#else
-	char	   *tmppath;
-
-	/*
-	 * Note: We use getenv() here because the more modern SHGetFolderPath()
-	 * would force the backend to link with shell32.lib, which eats valuable
-	 * desktop heap.  XXX This function is used only in psql, which already
-	 * brings in shell32 via libpq.  Moving this function to its own file
-	 * would keep it out of the backend, freeing it from this concern.
-	 */
-	tmppath = getenv("APPDATA");
-	if (!tmppath)
-		return false;
-	snprintf(ret_path, MAXPGPATH, "%s/postgresql", tmppath);
-	return true;
-#endif
 }
 
 

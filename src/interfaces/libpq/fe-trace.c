@@ -19,11 +19,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
-#endif
 
 #include "libpq-fe.h"
 #include "libpq-int.h"

@@ -41,7 +41,6 @@ extern pqsigfunc pqsignal(int signo, pqsigfunc func);
 pqsigfunc
 pqsignal(int signo, pqsigfunc func)
 {
-#ifndef WIN32
 	struct sigaction act,
 				oact;
 
@@ -57,7 +56,4 @@ pqsignal(int signo, pqsigfunc func)
 	if (sigaction(signo, &act, &oact) < 0)
 		return SIG_ERR;
 	return oact.sa_handler;
-#else							/* WIN32 */
-	return signal(signo, func);
-#endif
 }

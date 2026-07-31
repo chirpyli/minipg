@@ -165,9 +165,7 @@ static uint64 totaldone;
 static int	tablespacecount;
 
 /* Pipe to communicate with background wal receiver process */
-#ifndef WIN32
 static int	bgpipe[2] = {-1, -1};
-#endif
 
 /* Handle to child process */
 static pid_t bgchild = -1;
@@ -176,11 +174,7 @@ static bool in_log_streamer = false;
 /* End position for xlog streaming, empty string if unknown yet */
 static XLogRecPtr xlogendptr;
 
-#ifndef WIN32
 static int	has_xlogendptr = 0;
-#else
-static volatile LONG has_xlogendptr = 0;
-#endif
 
 /* Contents of configuration file to be generated */
 static PQExpBuffer recoveryconfcontents = NULL;
@@ -265,10 +259,8 @@ disconnect_atexit(void)
 		PQfinish(conn);
 }
 
-#ifndef WIN32
 /*
- * On windows, our background thread dies along with the process. But on
- * Unix, if we have started a subprocess, we want to kill it off so it
+ * If we have started a subprocess, we want to kill it off so it
  * doesn't remain running trying to stream data.
  */
 static void
@@ -277,7 +269,6 @@ kill_bgchild_atexit(void)
 	if (bgchild > 0)
 		kill(bgchild, SIGTERM);
 }
-#endif
 
 /*
  * Split argument into old_dir and new_dir and append to tablespace mapping
@@ -453,7 +444,6 @@ reached_end_position(XLogRecPtr segendpos, uint32 timeline,
 {
 	if (!has_xlogendptr)
 	{
-#ifndef WIN32
 		fd_set		fds;
 		struct timeval tv;
 		int			r;
@@ -504,14 +494,6 @@ reached_end_position(XLogRecPtr segendpos, uint32 timeline,
 			 */
 			return false;
 		}
-#else
-
-		/*
-		 * On win32, has_xlogendptr is set by the main thread, so if it's not
-		 * set here, we just go back and wait until it shows up.
-		 */
-		return false;
-#endif
 	}
 
 	/*
@@ -549,11 +531,7 @@ LogStreamerMain(logstreamer_param *param)
 	stream.timeline = param->timeline;
 	stream.sysidentifier = param->sysidentifier;
 	stream.stream_stop = reached_end_position;
-#ifndef WIN32
 	stream.stop_socket = bgpipe[0];
-#else
-	stream.stop_socket = PGINVALID_SOCKET;
-#endif
 	stream.standby_message_timeout = standby_message_timeout;
 	stream.synchronous = false;
 	/* fsync happens at the end of pg_basebackup for all data */
@@ -623,14 +601,12 @@ StartLogStreamer(char *startpos, uint32 timeline, char *sysidentifier)
 	/* Round off to even segment position */
 	param->startptr -= XLogSegmentOffset(param->startptr, WalSegSz);
 
-#ifndef WIN32
 	/* Create our background pipe */
 	if (pipe(bgpipe) < 0)
 	{
 		pg_log_error("could not create pipe for background process: %m");
 		exit(1);
 	}
-#endif
 
 	/* Get a second connection */
 	param->bgconn = GetConnection();
@@ -692,10 +668,8 @@ StartLogStreamer(char *startpos, uint32 timeline, char *sysidentifier)
 	}
 
 	/*
-	 * Start a child process and tell it to start streaming. On Unix, this is
-	 * a fork(). On Windows, we create a thread.
+	 * Start a child process and tell it to start streaming (fork()).
 	 */
-#ifndef WIN32
 	bgchild = fork();
 	if (bgchild == 0)
 	{
@@ -712,14 +686,6 @@ StartLogStreamer(char *startpos, uint32 timeline, char *sysidentifier)
 	 * Else we are in the parent process and all is well.
 	 */
 	atexit(kill_bgchild_atexit);
-#else							/* WIN32 */
-	bgchild = _beginthreadex(NULL, 0, (void *) LogStreamerMain, param, 0, NULL);
-	if (bgchild == 0)
-	{
-		pg_log_error("could not create background thread: %m");
-		exit(1);
-	}
-#endif
 }
 
 /*
@@ -1068,10 +1034,6 @@ ReceiveTarFile(PGconn *conn, PGresult *res, int rownum)
 		 */
 		if (strcmp(basedir, "-") == 0)
 		{
-#ifdef WIN32
-			_setmode(fileno(stdout), _O_BINARY);
-#endif
-
 #ifdef HAVE_LIBZ
 			if (compresslevel != 0)
 			{
@@ -1570,9 +1532,7 @@ ReceiveTarAndUnpackCopyChunk(size_t r, char *copybuf, void *callback_data)
 
 	if (state->file == NULL)
 	{
-#ifndef WIN32
 		int			filemode;
-#endif
 
 		/*
 		 * No current file, so this must be the header for a new file
@@ -1586,10 +1546,8 @@ ReceiveTarAndUnpackCopyChunk(size_t r, char *copybuf, void *callback_data)
 
 		state->current_len_left = read_tar_number(&copybuf[124], 12);
 
-#ifndef WIN32
 		/* Set permissions on the file */
 		filemode = read_tar_number(&copybuf[100], 8);
-#endif
 
 		/*
 		 * All files are padded up to a multiple of TAR_BLOCK_SIZE
@@ -1634,11 +1592,9 @@ ReceiveTarAndUnpackCopyChunk(size_t r, char *copybuf, void *callback_data)
 						exit(1);
 					}
 				}
-#ifndef WIN32
 				if (chmod(state->filename, (mode_t) filemode))
 					pg_log_error("could not set permissions on directory \"%s\": %m",
 								 state->filename);
-#endif
 			}
 			else if (copybuf[156] == '2')
 			{
@@ -1684,11 +1640,9 @@ ReceiveTarAndUnpackCopyChunk(size_t r, char *copybuf, void *callback_data)
 			exit(1);
 		}
 
-#ifndef WIN32
 		if (chmod(state->filename, (mode_t) filemode))
 			pg_log_error("could not set permissions on file \"%s\": %m",
 						 state->filename);
-#endif
 
 		if (state->current_len_left == 0)
 		{
@@ -2090,25 +2044,12 @@ BaseBackup(void)
 
 	if (bgchild > 0)
 	{
-#ifndef WIN32
 		int			status;
 		pid_t		r;
-#else
-		DWORD		status;
-
-		/*
-		 * get a pointer sized version of bgchild to avoid warnings about
-		 * casting to a different size on WIN64.
-		 */
-		intptr_t	bgchild_handle = bgchild;
-		uint32		hi,
-					lo;
-#endif
 
 		if (verbose)
 			pg_log_info("waiting for background process to finish streaming ...");
 
-#ifndef WIN32
 		if (write(bgpipe[1], xlogend, strlen(xlogend)) != strlen(xlogend))
 		{
 			pg_log_info("could not send command to background pipe: %m");
@@ -2133,44 +2074,6 @@ BaseBackup(void)
 			exit(1);
 		}
 		/* Exited normally, we're happy! */
-#else							/* WIN32 */
-
-		/*
-		 * On Windows, since we are in the same process, we can just store the
-		 * value directly in the variable, and then set the flag that says
-		 * it's there.
-		 */
-		if (sscanf(xlogend, "%X/%X", &hi, &lo) != 2)
-		{
-			pg_log_error("could not parse write-ahead log location \"%s\"",
-						 xlogend);
-			exit(1);
-		}
-		xlogendptr = ((uint64) hi) << 32 | lo;
-		InterlockedIncrement(&has_xlogendptr);
-
-		/* First wait for the thread to exit */
-		if (WaitForSingleObjectEx((HANDLE) bgchild_handle, INFINITE, FALSE) !=
-			WAIT_OBJECT_0)
-		{
-			_dosmaperr(GetLastError());
-			pg_log_error("could not wait for child thread: %m");
-			exit(1);
-		}
-		if (GetExitCodeThread((HANDLE) bgchild_handle, &status) == 0)
-		{
-			_dosmaperr(GetLastError());
-			pg_log_error("could not get child thread exit status: %m");
-			exit(1);
-		}
-		if (status != 0)
-		{
-			pg_log_error("child thread exited with error %u",
-						 (unsigned int) status);
-			exit(1);
-		}
-		/* Exited normally, we're happy */
-#endif
 	}
 
 	/* Free the configuration file contents */

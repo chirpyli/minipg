@@ -113,9 +113,6 @@ typedef struct Latch
 	sig_atomic_t maybe_sleeping;
 	bool		is_shared;
 	int			owner_pid;
-#ifdef WIN32
-	HANDLE		event;
-#endif
 } Latch;
 
 /*
@@ -128,12 +125,8 @@ typedef struct Latch
 #define WL_TIMEOUT			 (1 << 3)	/* not for WaitEventSetWait() */
 #define WL_POSTMASTER_DEATH  (1 << 4)
 #define WL_EXIT_ON_PM_DEATH	 (1 << 5)
-#ifdef WIN32
-#define WL_SOCKET_CONNECTED  (1 << 6)
-#else
 /* avoid having to deal with case on platforms not requiring it */
 #define WL_SOCKET_CONNECTED  WL_SOCKET_WRITEABLE
-#endif
 
 #define WL_SOCKET_MASK		(WL_SOCKET_READABLE | \
 							 WL_SOCKET_WRITEABLE | \
@@ -145,9 +138,6 @@ typedef struct WaitEvent
 	uint32		events;			/* triggered events */
 	pgsocket	fd;				/* socket fd associated with event */
 	void	   *user_data;		/* pointer provided in AddWaitEventToSet */
-#ifdef WIN32
-	bool		reset;			/* Is reset of the event required? */
-#endif
 } WaitEvent;
 
 /* forward declaration to avoid exposing latch.c implementation details */

@@ -33,9 +33,6 @@
 #include "libpq-int.h"
 #include "common/openssl.h"
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -44,16 +41,11 @@
 #include <netinet/tcp.h>
 #endif
 #include <arpa/inet.h>
-#endif
 
 #include <sys/stat.h>
 
 #ifdef ENABLE_THREAD_SAFETY
-#ifdef WIN32
-#include "pthread-win32.h"
-#else
 #include <pthread.h>
-#endif
 #endif
 
 #include <openssl/ssl.h>
@@ -1142,9 +1134,6 @@ initialize_SSL(PGconn *conn)
 	{
 #ifdef USE_SSL_ENGINE
 		if (strchr(conn->sslkey, ':')
-#ifdef WIN32
-			&& conn->sslkey[1] != ':'
-#endif
 			)
 		{
 			/* Colon, but not in second character, treat as engine:key */
@@ -1286,7 +1275,7 @@ initialize_SSL(PGconn *conn)
 		 * is not clear how that would work since Unix-style permissions may
 		 * not be available.
 		 */
-#if !defined(WIN32) && !defined(__CYGWIN__)
+#if !defined(WIN32)
 		if (buf.st_uid == 0 ?
 			buf.st_mode & (S_IWGRP | S_IXGRP | S_IRWXO) :
 			buf.st_mode & (S_IRWXG | S_IRWXO))

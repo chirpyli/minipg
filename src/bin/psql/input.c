@@ -7,9 +7,7 @@
  */
 #include "postgres_fe.h"
 
-#ifndef WIN32
 #include <unistd.h>
-#endif
 #include <fcntl.h>
 #include <limits.h>
 
@@ -19,11 +17,7 @@
 #include "settings.h"
 #include "tab-complete.h"
 
-#ifndef WIN32
 #define PSQLHISTORY ".psql_history"
-#else
-#define PSQLHISTORY "psql_history"
-#endif
 
 /* Runtime options for turning off readline and history */
 /* (of course there is no runtime command for doing that :) */

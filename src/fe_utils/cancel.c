@@ -58,10 +58,6 @@ static const char *cancel_not_sent_msg = NULL;
  */
 volatile sig_atomic_t CancelRequested = false;
 
-#ifdef WIN32
-static CRITICAL_SECTION cancelConnLock;
-#endif
-
 /*
  * Additional callback for cancellations.
  */
@@ -78,10 +74,6 @@ SetCancelConn(PGconn *conn)
 {
 	PGcancel   *oldCancelConn;
 
-#ifdef WIN32
-	EnterCriticalSection(&cancelConnLock);
-#endif
-
 	/* Free the old one if we have one */
 	oldCancelConn = cancelConn;
 
@@ -92,10 +84,6 @@ SetCancelConn(PGconn *conn)
 		PQfreeCancel(oldCancelConn);
 
 	cancelConn = PQgetCancel(conn);
-
-#ifdef WIN32
-	LeaveCriticalSection(&cancelConnLock);
-#endif
 }
 
 /*
@@ -108,10 +96,6 @@ ResetCancelConn(void)
 {
 	PGcancel   *oldCancelConn;
 
-#ifdef WIN32
-	EnterCriticalSection(&cancelConnLock);
-#endif
-
 	oldCancelConn = cancelConn;
 
 	/* be sure handle_sigint doesn't use pointer while freeing */
@@ -119,10 +103,6 @@ ResetCancelConn(void)
 
 	if (oldCancelConn != NULL)
 		PQfreeCancel(oldCancelConn);
-
-#ifdef WIN32
-	LeaveCriticalSection(&cancelConnLock);
-#endif
 }
 
 
@@ -140,8 +120,6 @@ ResetCancelConn(void)
  * to protect the PGcancel structure against being changed while the signal
  * thread is using it.
  */
-
-#ifndef WIN32
 
 /*
  * handle_sigint
@@ -191,56 +169,3 @@ setup_cancel_handler(void (*callback) (void))
 
 	pqsignal(SIGINT, handle_sigint);
 }
-
-#else							/* WIN32 */
-
-static BOOL WINAPI
-consoleHandler(DWORD dwCtrlType)
-{
-	char		errbuf[256];
-
-	if (dwCtrlType == CTRL_C_EVENT ||
-		dwCtrlType == CTRL_BREAK_EVENT)
-	{
-		CancelRequested = true;
-
-		if (cancel_callback != NULL)
-			cancel_callback();
-
-		/* Send QueryCancel if we are processing a database query */
-		EnterCriticalSection(&cancelConnLock);
-		if (cancelConn != NULL)
-		{
-			if (PQcancel(cancelConn, errbuf, sizeof(errbuf)))
-			{
-				write_stderr(cancel_sent_msg);
-			}
-			else
-			{
-				write_stderr(cancel_not_sent_msg);
-				write_stderr(errbuf);
-			}
-		}
-
-		LeaveCriticalSection(&cancelConnLock);
-
-		return TRUE;
-	}
-	else
-		/* Return FALSE for any signals not being handled */
-		return FALSE;
-}
-
-void
-setup_cancel_handler(void (*callback) (void))
-{
-	cancel_callback = callback;
-	cancel_sent_msg = _("Cancel request sent\n");
-	cancel_not_sent_msg = _("Could not send cancel request: ");
-
-	InitializeCriticalSection(&cancelConnLock);
-
-	SetConsoleCtrlHandler(consoleHandler, TRUE);
-}
-
-#endif							/* WIN32 */

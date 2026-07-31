@@ -80,7 +80,6 @@ void
 copyFile(const char *src, const char *dst,
 		 const char *schemaName, const char *relName)
 {
-#ifndef WIN32
 	int			src_fd;
 	int			dest_fd;
 	char	   *buffer;
@@ -125,17 +124,6 @@ copyFile(const char *src, const char *dst,
 	pg_free(buffer);
 	close(src_fd);
 	close(dest_fd);
-
-#else							/* WIN32 */
-
-	if (CopyFile(src, dst, true) == 0)
-	{
-		_dosmaperr(GetLastError());
-		pg_fatal("error while copying relation \"%s.%s\" (\"%s\" to \"%s\"): %s\n",
-				 schemaName, relName, src, dst, strerror(errno));
-	}
-
-#endif							/* WIN32 */
 }
 
 

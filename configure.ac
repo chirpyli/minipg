@@ -60,33 +60,18 @@ PGAC_ARG_REQ(with, template, [NAME], [override operating system template],
 ],
 [
 # --with-template not given
+# minipg 仅支持 Linux，直接使用 linux 模板
 
 case $host_os in
-     aix*) template=aix ;;
-  darwin*) template=darwin ;;
-dragonfly*) template=netbsd ;;
- freebsd*) template=freebsd ;;
-    hpux*) template=hpux ;;
  linux*|gnu*|k*bsd*-gnu)
            template=linux ;;
-  netbsd*) template=netbsd ;;
- openbsd*) template=openbsd ;;
- solaris*) template=solaris ;;
-esac
-
-  if test x"$template" = x"" ; then
-    AC_MSG_ERROR([[
+  *) AC_MSG_ERROR([[
 *******************************************************************
-PostgreSQL has apparently not been ported to your platform yet.
-To try a manual configuration, look into the src/template directory
-for a similar platform and use the '--with-template=' option.
-
-Please also contact <]AC_PACKAGE_BUGREPORT[> to see about
-rectifying this.  Include the above 'checking host system type...'
-line.
+minipg 仅支持 Linux 平台。当前检测到的操作系统 "$host_os" 不受支持。
 *******************************************************************
 ]])
-  fi
+     ;;
+esac
 
 ])
 

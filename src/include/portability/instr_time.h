@@ -55,8 +55,6 @@
 #ifndef INSTR_TIME_H
 #define INSTR_TIME_H
 
-#ifndef WIN32
-
 #ifdef HAVE_CLOCK_GETTIME
 
 /* Use clock_gettime() */
@@ -206,47 +204,6 @@ typedef struct timeval instr_time;
 	(((uint64) (t).tv_sec * (uint64) 1000000) + (uint64) (t).tv_usec)
 
 #endif							/* HAVE_CLOCK_GETTIME */
-
-#else							/* WIN32 */
-
-/* Use QueryPerformanceCounter() */
-
-typedef LARGE_INTEGER instr_time;
-
-#define INSTR_TIME_IS_ZERO(t)	((t).QuadPart == 0)
-
-#define INSTR_TIME_SET_ZERO(t)	((t).QuadPart = 0)
-
-#define INSTR_TIME_SET_CURRENT(t)	QueryPerformanceCounter(&(t))
-
-#define INSTR_TIME_ADD(x,y) \
-	((x).QuadPart += (y).QuadPart)
-
-#define INSTR_TIME_SUBTRACT(x,y) \
-	((x).QuadPart -= (y).QuadPart)
-
-#define INSTR_TIME_ACCUM_DIFF(x,y,z) \
-	((x).QuadPart += (y).QuadPart - (z).QuadPart)
-
-#define INSTR_TIME_GET_DOUBLE(t) \
-	(((double) (t).QuadPart) / GetTimerFrequency())
-
-#define INSTR_TIME_GET_MILLISEC(t) \
-	(((double) (t).QuadPart * 1000.0) / GetTimerFrequency())
-
-#define INSTR_TIME_GET_MICROSEC(t) \
-	((uint64) (((double) (t).QuadPart * 1000000.0) / GetTimerFrequency()))
-
-static inline double
-GetTimerFrequency(void)
-{
-	LARGE_INTEGER f;
-
-	QueryPerformanceFrequency(&f);
-	return (double) f.QuadPart;
-}
-
-#endif							/* WIN32 */
 
 /* same macro on all platforms */
 

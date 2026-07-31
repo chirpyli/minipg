@@ -65,30 +65,6 @@ pg_mkdir_p(char *path, int omode)
 	retval = 0;
 	p = path;
 
-#ifdef WIN32
-	/* skip network and drive specifiers for win32 */
-	if (strlen(p) >= 2)
-	{
-		if (p[0] == '/' && p[1] == '/')
-		{
-			/* network drive */
-			p = strchr(p + 2, '/');
-			if (p == NULL)
-			{
-				errno = EINVAL;
-				return -1;
-			}
-		}
-		else if (p[1] == ':' &&
-				 ((p[0] >= 'a' && p[0] <= 'z') ||
-				  (p[0] >= 'A' && p[0] <= 'Z')))
-		{
-			/* local drive */
-			p += 2;
-		}
-	}
-#endif
-
 	/*
 	 * POSIX 1003.2: For each dir operand that does not name an existing
 	 * directory, effects equivalent to those caused by the following command
@@ -124,7 +100,6 @@ pg_mkdir_p(char *path, int omode)
 			 * If we got EEXIST because there's already a directory there,
 			 * don't complain.
 			 */
-#ifndef WIN32
 			int			save_errno = errno;
 			struct stat sb;
 
@@ -137,25 +112,6 @@ pg_mkdir_p(char *path, int omode)
 				retval = -1;
 				break;
 			}
-#else							/* WIN32 */
-			/*
-			 * On Windows, stat() opens a handle and can transiently fail on a
-			 * directory another process is concurrently creating.  Probe with
-			 * a path-based attribute query instead: it requests only
-			 * FILE_READ_ATTRIBUTES and is exempt from share-mode denial, so
-			 * it reliably sees a concurrently-created directory.  We assume
-			 * GetFileAttributes() won't change errno.
-			 */
-			DWORD		attr = GetFileAttributes(path);
-
-			if (errno != EEXIST ||
-				attr == INVALID_FILE_ATTRIBUTES ||
-				!(attr & FILE_ATTRIBUTE_DIRECTORY))
-			{
-				retval = -1;
-				break;
-			}
-#endif							/* WIN32 */
 		}
 
 		if (!last)

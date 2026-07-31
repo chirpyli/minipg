@@ -33,12 +33,8 @@
 #include <signal.h>
 #include <time.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
 #include <sys/time.h>
-#endif
 
 #ifdef HAVE_POLL_H
 #include <poll.h>
@@ -1002,17 +998,7 @@ pqSendSome(PGconn *conn, int len)
 	{
 		int			sent;
 
-#ifndef WIN32
 		sent = pqsecure_write(conn, ptr, len);
-#else
-
-		/*
-		 * Windows can fail on large sends, per KB article Q201213. The
-		 * failure-point appears to be different in different versions of
-		 * Windows, but 64k should always be safe.
-		 */
-		sent = pqsecure_write(conn, ptr, Min(len, 65536));
-#endif
 
 		if (sent < 0)
 		{
@@ -1419,11 +1405,7 @@ libpq_binddomain(void)
 	if (!already_bound)
 	{
 		/* bindtextdomain() does not preserve errno */
-#ifdef WIN32
-		int			save_errno = GetLastError();
-#else
 		int			save_errno = errno;
-#endif
 
 		(void) pthread_mutex_lock(&binddomain_mutex);
 
@@ -1444,11 +1426,7 @@ libpq_binddomain(void)
 
 		(void) pthread_mutex_unlock(&binddomain_mutex);
 
-#ifdef WIN32
-		SetLastError(save_errno);
-#else
 		errno = save_errno;
-#endif
 	}
 }
 

@@ -32,27 +32,12 @@
 #define USECS_SEC			1000000
 
 /* These are macros to avoid timing the function call overhead. */
-#ifndef WIN32
 #define START_TIMER \
 do { \
 	alarm_triggered = false; \
 	alarm(secs_per_test); \
 	gettimeofday(&start_t, NULL); \
 } while (0)
-#else
-/* WIN32 doesn't support alarm, so we create a thread and sleep there */
-#define START_TIMER \
-do { \
-	alarm_triggered = false; \
-	if (CreateThread(NULL, 0, process_alarm, NULL, 0, NULL) == \
-		INVALID_HANDLE_VALUE) \
-	{ \
-		pg_log_error("could not create thread for alarm"); \
-		exit(1); \
-	} \
-	gettimeofday(&start_t, NULL); \
-} while (0)
-#endif
 
 #define STOP_TIMER	\
 do { \
@@ -82,11 +67,7 @@ static void test_open_syncs(void);
 static void test_open_sync(const char *msg, int writes_size);
 static void test_file_descriptor_sync(void);
 
-#ifndef WIN32
 static void process_alarm(int sig);
-#else
-static DWORD WINAPI process_alarm(LPVOID param);
-#endif
 static void signal_cleanup(int sig);
 
 #ifdef HAVE_FSYNC_WRITETHROUGH
@@ -109,11 +90,8 @@ main(int argc, char *argv[])
 	/* Prevent leaving behind the test file */
 	pqsignal(SIGINT, signal_cleanup);
 	pqsignal(SIGTERM, signal_cleanup);
-#ifndef WIN32
 	pqsignal(SIGALRM, process_alarm);
-#endif
 #ifdef SIGHUP
-	/* Not defined on win32 */
 	pqsignal(SIGHUP, signal_cleanup);
 #endif
 
@@ -587,9 +565,7 @@ signal_cleanup(int signum)
 static int
 pg_fsync_writethrough(int fd)
 {
-#ifdef WIN32
-	return _commit(fd);
-#elif defined(F_FULLFSYNC)
+#ifdef F_FULLFSYNC
 	return (fcntl(fd, F_FULLFSYNC, 0) == -1) ? -1 : 0;
 #else
 	errno = ENOSYS;
@@ -612,19 +588,8 @@ print_elapse(struct timeval start_t, struct timeval stop_t, int ops)
 	printf(_(OPS_FORMAT), per_second, avg_op_time_us);
 }
 
-#ifndef WIN32
 static void
 process_alarm(int sig)
 {
 	alarm_triggered = true;
 }
-#else
-static DWORD WINAPI
-process_alarm(LPVOID param)
-{
-	/* WIN32 doesn't support alarm, so we create a thread and sleep here */
-	Sleep(secs_per_test * 1000);
-	alarm_triggered = true;
-	ExitThread(0);
-}
-#endif

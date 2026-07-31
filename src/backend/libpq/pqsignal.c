@@ -119,7 +119,6 @@ pqinitmask(void)
 pqsigfunc
 pqsignal_pm(int signo, pqsigfunc func)
 {
-#ifndef WIN32
 	struct sigaction act,
 				oact;
 
@@ -142,7 +141,4 @@ pqsignal_pm(int signo, pqsigfunc func)
 	if (sigaction(signo, &act, &oact) < 0)
 		return SIG_ERR;
 	return oact.sa_handler;
-#else							/* WIN32 */
-	return pqsignal(signo, func);
-#endif
 }

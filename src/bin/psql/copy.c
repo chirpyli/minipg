@@ -9,11 +9,7 @@
 
 #include <signal.h>
 #include <sys/stat.h>
-#ifndef WIN32
 #include <unistd.h>				/* for isatty */
-#else
-#include <io.h>					/* I think */
-#endif
 
 #include "common.h"
 #include "common/logging.h"

@@ -103,12 +103,7 @@ get_control_data(ClusterInfo *cluster, bool live_check)
 	unsetenv("LC_MONETARY");
 	unsetenv("LC_NUMERIC");
 	unsetenv("LC_TIME");
-#ifndef WIN32
 	unsetenv("LANG");
-#else
-	/* On Windows the default locale may not be English, so force it */
-	setenv("LANG", "en", 1);
-#endif
 	unsetenv("LANGUAGE");
 	unsetenv("LC_ALL");
 	setenv("LC_MESSAGES", "C", 1);

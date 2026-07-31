@@ -107,15 +107,8 @@ extern PGDLLIMPORT volatile uint32 CritSectionCount;
 extern void ProcessInterrupts(void);
 
 /* Test whether an interrupt is pending */
-#ifndef WIN32
 #define INTERRUPTS_PENDING_CONDITION() \
 	(unlikely(InterruptPending))
-#else
-#define INTERRUPTS_PENDING_CONDITION() \
-	(unlikely(UNBLOCKED_SIGNAL_QUEUE()) ? \
-	 pgwin32_dispatch_queued_signals() : (void) 0, \
-	 unlikely(InterruptPending))
-#endif
 
 /* Service interrupt, if one is pending and it's safe to service it now */
 #define CHECK_FOR_INTERRUPTS() \

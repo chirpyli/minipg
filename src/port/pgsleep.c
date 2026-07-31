@@ -22,8 +22,6 @@
  * In a Windows backend, we don't use this implementation, but rather
  * the signal-aware version in src/backend/port/win32/signal.c.
  */
-#if defined(FRONTEND) || !defined(WIN32)
-
 /*
  * pg_usleep --- delay the specified number of microseconds.
  *
@@ -48,16 +46,10 @@ pg_usleep(long microsec)
 {
 	if (microsec > 0)
 	{
-#ifndef WIN32
 		struct timeval delay;
 
 		delay.tv_sec = microsec / 1000000L;
 		delay.tv_usec = microsec % 1000000L;
 		(void) select(0, NULL, NULL, NULL, &delay);
-#else
-		SleepEx((microsec < 500 ? 1 : (microsec + 500) / 1000), FALSE);
-#endif
 	}
 }
-
-#endif							/* defined(FRONTEND) || !defined(WIN32) */

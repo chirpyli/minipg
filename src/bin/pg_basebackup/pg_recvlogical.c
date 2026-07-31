@@ -647,13 +647,7 @@ error:
 }
 
 /*
- * Unfortunately we can't do sensible signal handling on windows...
- */
-#ifndef WIN32
-
-/*
- * When sigint is called, just tell the system to exit at the next possible
- * moment.
+ * Signal handlers.
  */
 static void
 sigint_handler(int signum)
@@ -669,7 +663,6 @@ sighup_handler(int signum)
 {
 	output_reopen = true;
 }
-#endif
 
 
 int
@@ -937,10 +930,8 @@ main(int argc, char **argv)
 	 * Trap signals.  (Don't do this until after the initial password prompt,
 	 * if one is needed, in GetConnection.)
 	 */
-#ifndef WIN32
 	pqsignal(SIGINT, sigint_handler);
 	pqsignal(SIGHUP, sighup_handler);
-#endif
 
 	/*
 	 * Run IDENTIFY_SYSTEM to make sure we connected using a database specific

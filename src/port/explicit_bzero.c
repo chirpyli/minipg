@@ -24,14 +24,6 @@ explicit_bzero(void *buf, size_t len)
 	(void) memset_s(buf, len, 0, len);
 }
 
-#elif defined(WIN32)
-
-void
-explicit_bzero(void *buf, size_t len)
-{
-	(void) SecureZeroMemory(buf, len);
-}
-
 #else
 
 /*

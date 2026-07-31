@@ -7,15 +7,9 @@
  */
 #include "postgres_fe.h"
 
-#ifndef WIN32
 #include <unistd.h>				/* for geteuid() */
-#else
-#include <win32.h>
-#endif
 
-#ifndef WIN32
 #include <sys/ioctl.h>			/* for ioctl() */
-#endif
 
 #ifdef HAVE_TERMIOS_H
 #include <termios.h>
@@ -482,11 +476,7 @@ helpVariables(unsigned short int pager)
 	fprintf(output, _("\nEnvironment variables:\n"));
 	fprintf(output, _("Usage:\n"));
 
-#ifndef WIN32
 	fprintf(output, _("  NAME=VALUE [NAME=VALUE] psql ...\n  or \\setenv NAME [VALUE] inside psql\n\n"));
-#else
-	fprintf(output, _("  set NAME=VALUE\n  psql ...\n  or \\setenv NAME [VALUE] inside psql\n\n"));
-#endif
 
 	fprintf(output, _("  COLUMNS\n"
 					  "    number of columns for wrapped format\n"));

@@ -10,9 +10,6 @@
 #include "postgres_fe.h"
 
 #include <time.h>
-#ifdef WIN32
-#include <io.h>
-#endif
 
 #include "common/string.h"
 #include "getopt_long.h"
@@ -257,28 +254,6 @@ parseCommandLine(int argc, char *argv[])
 							 "-D", _("new cluster data resides"), false);
 	check_required_directory(&user_opts.socketdir, "PGSOCKETDIR", true,
 							 "-s", _("sockets will be created"), false);
-
-#ifdef WIN32
-
-	/*
-	 * On Windows, initdb --sync-only will fail with a "Permission denied"
-	 * error on file pg_upgrade_utility.log if pg_upgrade is run inside the
-	 * new cluster directory, so we do a check here.
-	 */
-	{
-		char		cwd[MAXPGPATH],
-					new_cluster_pgdata[MAXPGPATH];
-
-		strlcpy(new_cluster_pgdata, new_cluster.pgdata, MAXPGPATH);
-		canonicalize_path(new_cluster_pgdata);
-
-		if (!getcwd(cwd, MAXPGPATH))
-			pg_fatal("could not determine current directory\n");
-		canonicalize_path(cwd);
-		if (path_is_prefix_of_path(new_cluster_pgdata, cwd))
-			pg_fatal("cannot run pg_upgrade from inside the new cluster data directory on Windows\n");
-	}
-#endif
 }
 
 
@@ -323,19 +298,11 @@ usage(void)
 			 "For example:\n"
 			 "  pg_upgrade -d oldCluster/data -D newCluster/data -b oldCluster/bin -B newCluster/bin\n"
 			 "or\n"));
-#ifndef WIN32
 	printf(_("  $ export PGDATAOLD=oldCluster/data\n"
 			 "  $ export PGDATANEW=newCluster/data\n"
 			 "  $ export PGBINOLD=oldCluster/bin\n"
 			 "  $ export PGBINNEW=newCluster/bin\n"
 			 "  $ pg_upgrade\n"));
-#else
-	printf(_("  C:\\> set PGDATAOLD=oldCluster/data\n"
-			 "  C:\\> set PGDATANEW=newCluster/data\n"
-			 "  C:\\> set PGBINOLD=oldCluster/bin\n"
-			 "  C:\\> set PGBINNEW=newCluster/bin\n"
-			 "  C:\\> pg_upgrade\n"));
-#endif
 	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 	printf(_("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
 }
@@ -468,8 +435,6 @@ adjust_data_dir(ClusterInfo *cluster)
 void
 get_sock_dir(ClusterInfo *cluster, bool live_check)
 {
-#if defined(HAVE_UNIX_SOCKETS) && !defined(WIN32)
-
 	/*
 	 * sockdir and port were added to postmaster.pid in PG 9.1. Pre-9.1 cannot
 	 * process pg_ctl -w for sockets in non-default locations.
@@ -530,7 +495,4 @@ get_sock_dir(ClusterInfo *cluster, bool live_check)
 		 * default
 		 */
 		cluster->sockdir = NULL;
-#else							/* !HAVE_UNIX_SOCKETS || WIN32 */
-	cluster->sockdir = NULL;
-#endif
 }

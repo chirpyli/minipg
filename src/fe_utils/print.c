@@ -21,9 +21,7 @@
 #include <math.h>
 #include <unistd.h>
 
-#ifndef WIN32
 #include <sys/ioctl.h>			/* for ioctl() */
-#endif
 
 #ifdef HAVE_TERMIOS_H
 #include <termios.h>
@@ -2921,14 +2919,12 @@ print_troff_ms_vertical(const printTableContent *cont, FILE *fout)
  * Turn off SIGPIPE interrupt --- call this before writing to a temporary
  * query output file that is a pipe.
  *
- * No-op on Windows, where there's no SIGPIPE interrupts.
+ * No-op on platforms without SIGPIPE interrupts.
  */
 void
 disable_sigpipe_trap(void)
 {
-#ifndef WIN32
 	pqsignal(SIGPIPE, SIG_IGN);
-#endif
 }
 
 /*
@@ -2944,14 +2940,12 @@ disable_sigpipe_trap(void)
  * need a genuine save-and-restore-state approach; but for now, that would be
  * useless complication.  In non-psql programs, this always enables SIGPIPE.
  *
- * No-op on Windows, where there's no SIGPIPE interrupts.
+ * No-op on platforms without SIGPIPE interrupts.
  */
 void
 restore_sigpipe_trap(void)
 {
-#ifndef WIN32
 	pqsignal(SIGPIPE, always_ignore_sigpipe ? SIG_IGN : SIG_DFL);
-#endif
 }
 
 /*

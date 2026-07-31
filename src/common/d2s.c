@@ -52,10 +52,6 @@
  * does, even though we could use them here without worrying about the
  * alignment concerns that apply elsewhere.
  */
-#if !defined(HAVE_INT128) && defined(_MSC_VER) \
-	&& !defined(RYU_ONLY_64_BIT_OPS) && defined(_M_X64)
-#define HAS_64_BIT_INTRINSICS
-#endif
 
 #include "ryu_common.h"
 #include "digit_table.h"

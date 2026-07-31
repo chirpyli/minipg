@@ -43,34 +43,7 @@ simple_prompt(const char *prompt, bool echo)
 #if defined(HAVE_TERMIOS_H)
 	struct termios t_orig,
 				t;
-#elif defined(WIN32)
-	HANDLE		t = NULL;
-	DWORD		t_orig = 0;
 #endif
-
-#ifdef WIN32
-
-	/*
-	 * A Windows console has an "input code page" and an "output code page";
-	 * these usually match each other, but they rarely match the "Windows ANSI
-	 * code page" defined at system boot and expected of "char *" arguments to
-	 * Windows API functions.  The Microsoft CRT write() implementation
-	 * automatically converts text between these code pages when writing to a
-	 * console.  To identify such file descriptors, it calls GetConsoleMode()
-	 * on the underlying HANDLE, which in turn requires GENERIC_READ access on
-	 * the HANDLE.  Opening termout in mode "w+" allows that detection to
-	 * succeed.  Otherwise, write() would not recognize the descriptor as a
-	 * console, and non-ASCII characters would display incorrectly.
-	 *
-	 * XXX fgets() still receives text in the console's input code page.  This
-	 * makes non-ASCII credentials unportable.
-	 *
-	 * Unintuitively, we also open termin in mode "w+", even though we only
-	 * read it; that's needed for SetConsoleMode() to succeed.
-	 */
-	termin = fopen("CONIN$", "w+");
-	termout = fopen("CONOUT$", "w+");
-#else
 
 	/*
 	 * Do not try to collapse these into one "w+" mode file. Doesn't work on
@@ -78,18 +51,7 @@ simple_prompt(const char *prompt, bool echo)
 	 */
 	termin = fopen("/dev/tty", "r");
 	termout = fopen("/dev/tty", "w");
-#endif
 	if (!termin || !termout
-#ifdef WIN32
-
-	/*
-	 * Direct console I/O does not work from the MSYS 1.0.10 console.  Writes
-	 * reach nowhere user-visible; reads block indefinitely.  XXX This affects
-	 * most Windows terminal environments, including rxvt, mintty, Cygwin
-	 * xterm, Cygwin sshd, and PowerShell ISE.  Switch to a more-generic test.
-	 */
-		|| (getenv("OSTYPE") && strcmp(getenv("OSTYPE"), "msys") == 0)
-#endif
 		)
 	{
 		if (termin)
@@ -108,15 +70,6 @@ simple_prompt(const char *prompt, bool echo)
 		t_orig = t;
 		t.c_lflag &= ~ECHO;
 		tcsetattr(fileno(termin), TCSAFLUSH, &t);
-#elif defined(WIN32)
-		/* need the file's HANDLE to turn echo off */
-		t = (HANDLE) _get_osfhandle(_fileno(termin));
-
-		/* save the old configuration first */
-		GetConsoleMode(t, &t_orig);
-
-		/* set to the new mode */
-		SetConsoleMode(t, ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
 #endif
 	}
 
@@ -140,10 +93,6 @@ simple_prompt(const char *prompt, bool echo)
 		/* restore previous echo behavior, then echo \n */
 #if defined(HAVE_TERMIOS_H)
 		tcsetattr(fileno(termin), TCSAFLUSH, &t_orig);
-		fputs("\n", termout);
-		fflush(termout);
-#elif defined(WIN32)
-		SetConsoleMode(t, t_orig);
 		fputs("\n", termout);
 		fflush(termout);
 #endif

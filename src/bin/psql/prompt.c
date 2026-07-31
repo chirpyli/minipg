@@ -7,11 +7,6 @@
  */
 #include "postgres_fe.h"
 
-#ifdef WIN32
-#include <io.h>
-#include <win32.h>
-#endif
-
 #include "common.h"
 #include "common/string.h"
 #include "input.h"

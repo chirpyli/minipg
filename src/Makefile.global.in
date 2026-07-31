@@ -283,8 +283,6 @@ ZIC = @ZIC@
 # Linking
 
 AR = @AR@
-DLLTOOL = @DLLTOOL@
-DLLWRAP = @DLLWRAP@
 LIBS = @LIBS@
 LDAP_LIBS_FE = @LDAP_LIBS_FE@
 LDAP_LIBS_BE = @LDAP_LIBS_BE@
@@ -582,12 +580,9 @@ libpq = -L$(libpq_builddir) -lpq
 # pgport before libpq.  This does cause duplicate -lpgport's to appear
 # on client link lines, since that also appears in $(LIBS).  On platforms
 # where we have symbol export control for libpq, the whole exercise is
-# unnecessary because libpq won't expose any of these symbols.  Currently,
-# only macOS warns about duplicate library references, so we only suppress
-# the duplicates on macOS.
-ifeq ($(PORTNAME),darwin)
-libpq_pgport = $(libpq)
-else ifdef PGXS
+# unnecessary because libpq won't expose any of these symbols.
+# minipg 仅支持 Linux，已移除 macOS/darwin 特殊处理分支。
+ifdef PGXS
 libpq_pgport = -L$(libdir) -lpgcommon -lpgport $(libpq)
 else
 libpq_pgport = -L$(top_builddir)/src/common -lpgcommon -L$(top_builddir)/src/port -lpgport $(libpq)
@@ -604,7 +599,7 @@ else
 libpq_pgport_shlib = -L$(top_builddir)/src/common -lpgcommon_shlib -L$(top_builddir)/src/port -lpgport_shlib $(libpq)
 endif
 
-# Cygwin seems to need ldap libraries to be mentioned here, too
+
 
 
 ##########################################################################

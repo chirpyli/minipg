@@ -60,7 +60,6 @@
  * error during lookup: returns an errno code, *result is NULL
  * (caller should *not* assume that the errno variable is set)
  */
-#ifndef WIN32
 int
 pqGetpwuid(uid_t uid, struct passwd *resultbuf, char *buffer,
 		   size_t buflen, struct passwd **result)
@@ -75,7 +74,6 @@ pqGetpwuid(uid_t uid, struct passwd *resultbuf, char *buffer,
 	return (*result == NULL) ? errno : 0;
 #endif
 }
-#endif
 
 /*
  * Wrapper around gethostbyname() or gethostbyname_r() to mimic

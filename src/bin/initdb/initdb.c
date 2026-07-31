@@ -603,7 +603,6 @@ get_id(void)
 {
 	const char *username;
 
-#ifndef WIN32
 	if (geteuid() == 0)			/* 0 is root's uid */
 	{
 		pg_log_error("cannot be run as root");
@@ -612,7 +611,6 @@ get_id(void)
 				  "own the server process.\n"));
 		exit(1);
 	}
-#endif
 
 	username = get_user_name_or_exit(progname);
 
@@ -904,11 +902,7 @@ choose_dsm_implementation(void)
 	}
 #endif
 
-#ifdef WIN32
-	return "windows";
-#else
 	return "sysv";
-#endif
 }
 
 /*
@@ -1176,12 +1170,6 @@ setup_config(void)
 							  "#effective_io_concurrency = 0");
 #endif
 
-#ifdef WIN32
-	conflines = replace_token(conflines,
-							  "#update_process_title = on",
-							  "#update_process_title = off");
-#endif
-
 	/*
 	 * Change password_encryption setting to md5 if md5 was chosen as an
 	 * authentication method, unless scram-sha-256 was also chosen.
@@ -1263,13 +1251,6 @@ setup_config(void)
 		struct addrinfo *gai_result;
 		struct addrinfo hints;
 		int			err = 0;
-
-#ifdef WIN32
-		/* need to call WSAStartup before calling getaddrinfo */
-		WSADATA		wsaData;
-
-		err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-#endif
 
 		/* for best results, this code should match parse_hba_line() */
 		hints.ai_flags = AI_NUMERICHOST;
@@ -2162,9 +2143,6 @@ check_locale_encoding(const char *locale, int user_enc)
 	if (!(locale_enc == user_enc ||
 		  locale_enc == PG_SQL_ASCII ||
 		  locale_enc == -1 ||
-#ifdef WIN32
-		  user_enc == PG_UTF8 ||
-#endif
 		  user_enc == PG_SQL_ASCII))
 	{
 		pg_log_error("encoding mismatch");
@@ -2225,7 +2203,7 @@ setlocales(void)
 	lc_time = canonname;
 	check_locale_name(LC_MONETARY, lc_monetary, &canonname);
 	lc_monetary = canonname;
-#if defined(LC_MESSAGES) && !defined(WIN32)
+#if defined(LC_MESSAGES)
 	check_locale_name(LC_MESSAGES, lc_messages, &canonname);
 	lc_messages = canonname;
 #else
@@ -2463,17 +2441,8 @@ setup_locale_encoding(void)
 		else if (!pg_valid_server_encoding_id(ctype_enc))
 		{
 			/*
-			 * We recognized it, but it's not a legal server encoding. On
-			 * Windows, UTF-8 works with any locale, so we can fall back to
-			 * UTF-8.
+			 * We recognized it, but it's not a legal server encoding.
 			 */
-#ifdef WIN32
-			encodingid = PG_UTF8;
-			printf(_("Encoding \"%s\" implied by locale is not allowed as a server-side encoding.\n"
-					 "The default database encoding will be set to \"%s\" instead.\n"),
-				   pg_encoding_to_char(ctype_enc),
-				   pg_encoding_to_char(encodingid));
-#else
 			pg_log_error("locale \"%s\" requires unsupported encoding \"%s\"",
 						 lc_ctype, pg_encoding_to_char(ctype_enc));
 			fprintf(stderr,
@@ -2481,7 +2450,6 @@ setup_locale_encoding(void)
 					  "Rerun %s with a different locale selection.\n"),
 					pg_encoding_to_char(ctype_enc), progname);
 			exit(1);
-#endif
 		}
 		else
 		{

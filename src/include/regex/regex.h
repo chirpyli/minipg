@@ -42,9 +42,7 @@
  * matters on BSD family systems including macOS that use the same include
  * guard.
  */
-#ifndef _WIN32
 #include <regex.h>
-#endif
 
 /* Avoid redefinition errors due to the system header. */
 #undef REG_UBACKREF

@@ -35,10 +35,8 @@ typedef struct PGShmemHeader	/* standard header for all Postgres shmem */
 	Size		freeoffset;		/* offset to first free space */
 	dsm_handle	dsm_control;	/* ID of dynamic shared memory control seg */
 	void	   *index;			/* pointer to ShmemIndex table */
-#ifndef WIN32					/* Windows doesn't have useful inode#s */
 	dev_t		device;			/* device data directory is on */
 	ino_t		inode;			/* inode number of data directory */
-#endif
 } PGShmemHeader;
 
 /* GUC variables */
@@ -62,20 +60,13 @@ typedef enum
 	SHMEM_TYPE_MMAP
 }			PGShmemType;
 
-#ifndef WIN32
 extern unsigned long UsedShmemSegID;
-#else
-extern HANDLE UsedShmemSegID;
-extern void *ShmemProtectiveRegion;
-#endif
 extern void *UsedShmemSegAddr;
 
-#if !defined(WIN32) && !defined(EXEC_BACKEND)
+#if !defined(EXEC_BACKEND)
 #define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_MMAP
-#elif !defined(WIN32)
-#define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_SYSV
 #else
-#define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_WINDOWS
+#define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_SYSV
 #endif
 
 #ifdef EXEC_BACKEND

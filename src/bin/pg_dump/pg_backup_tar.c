@@ -369,36 +369,7 @@ tarOpen(ArchiveHandle *AH, const char *filename, char mode)
 		 */
 		old_umask = umask(S_IRWXG | S_IRWXO);
 
-#ifndef WIN32
 		tm->tmpFH = tmpfile();
-#else
-
-		/*
-		 * On WIN32, tmpfile() generates a filename in the root directory,
-		 * which requires administrative permissions on certain systems. Loop
-		 * until we find a unique file name we can create.
-		 */
-		while (1)
-		{
-			char	   *name;
-			int			fd;
-
-			name = _tempnam(NULL, "pg_temp_");
-			if (name == NULL)
-				break;
-			fd = open(name, O_RDWR | O_CREAT | O_EXCL | O_BINARY |
-					  O_TEMPORARY, S_IRUSR | S_IWUSR);
-			free(name);
-
-			if (fd != -1)		/* created a file */
-			{
-				tm->tmpFH = fdopen(fd, "w+b");
-				break;
-			}
-			else if (errno != EEXIST)	/* failure other than file exists */
-				break;
-		}
-#endif
 
 		if (tm->tmpFH == NULL)
 			fatal("could not generate temporary file name: %m");

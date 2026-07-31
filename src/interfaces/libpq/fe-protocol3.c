@@ -18,13 +18,9 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
 #ifdef HAVE_NETINET_TCP_H
 #include <netinet/tcp.h>
-#endif
 #endif
 
 #include "common/int.h"

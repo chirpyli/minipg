@@ -131,16 +131,11 @@
  * fork()).  On other platforms, it's only useful for verifying those
  * otherwise Windows-specific code paths.
  */
-#if defined(WIN32) && !defined(__CYGWIN__)
-#define EXEC_BACKEND
-#endif
 
 /*
  * Define this if your operating system supports link()
  */
-#if !defined(WIN32) && !defined(__CYGWIN__)
 #define HAVE_WORKING_LINK 1
-#endif
 
 /*
  * USE_POSIX_FADVISE controls whether Postgres will attempt to use the
@@ -206,11 +201,7 @@
  * location for AF_UNIX sockets and many installations on Windows don't
  * support them yet.
  */
-#ifndef WIN32
 #define DEFAULT_PGSOCKET_DIR  "/tmp"
-#else
-#define DEFAULT_PGSOCKET_DIR ""
-#endif
 
 /*
  * This is the default event source for Windows event log.

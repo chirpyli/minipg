@@ -37,43 +37,6 @@ static const char *sgr_locus = NULL;
 #define ANSI_ESCAPE_FMT "\x1b[%sm"
 #define ANSI_ESCAPE_RESET "\x1b[0m"
 
-#ifdef WIN32
-
-#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-#endif
-
-/*
- * Attempt to enable VT100 sequence processing for colorization on Windows.
- * If current environment is not VT100-compatible or if this mode could not
- * be enabled, return false.
- */
-static bool
-enable_vt_processing(void)
-{
-	/* Check stderr */
-	HANDLE		hOut = GetStdHandle(STD_ERROR_HANDLE);
-	DWORD		dwMode = 0;
-
-	if (hOut == INVALID_HANDLE_VALUE)
-		return false;
-
-	/*
-	 * Look for the current console settings and check if VT100 is already
-	 * enabled.
-	 */
-	if (!GetConsoleMode(hOut, &dwMode))
-		return false;
-	if ((dwMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0)
-		return true;
-
-	dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-	if (!SetConsoleMode(hOut, dwMode))
-		return false;
-	return true;
-}
-#endif							/* WIN32 */
-
 /*
  * This should be called before any output happens.
  */
@@ -83,16 +46,6 @@ pg_logging_init(const char *argv0)
 	const char *pg_color_env = getenv("PG_COLOR");
 	bool		log_color = false;
 	bool		color_terminal = isatty(fileno(stderr));
-
-#ifdef WIN32
-
-	/*
-	 * On Windows, check if environment is VT100-compatible if using a
-	 * terminal.
-	 */
-	if (color_terminal)
-		color_terminal = enable_vt_processing();
-#endif
 
 	/* usually the default, but not on Windows */
 	setvbuf(stderr, NULL, _IONBF, 0);

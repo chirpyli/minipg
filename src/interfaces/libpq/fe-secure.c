@@ -22,27 +22,11 @@
 #include <fcntl.h>
 #include <ctype.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#ifdef HAVE_NETINET_TCP_H
-#include <netinet/tcp.h>
-#endif
-#include <arpa/inet.h>
-#endif
 
 #include <sys/stat.h>
 
 #ifdef ENABLE_THREAD_SAFETY
-#ifdef WIN32
-#include "pthread-win32.h"
-#else
 #include <pthread.h>
-#endif
 #endif
 
 #include "fe-auth.h"
@@ -110,13 +94,7 @@ struct sigpipe_info
 			pqsignal(SIGPIPE, spinfo); \
 	} while (0)
 #endif							/* ENABLE_THREAD_SAFETY */
-#else							/* WIN32 */
-
-#define DECLARE_SIGPIPE_INFO(spinfo)
-#define DISABLE_SIGPIPE(conn, spinfo, failaction)
-#define REMEMBER_EPIPE(spinfo, cond)
-#define RESTORE_SIGPIPE(conn, spinfo)
-#endif							/* WIN32 */
+#endif							/* !WIN32 */
 
 /* ------------------------------------------------------------ */
 /*			 Procedures common to all secure sessions			*/
@@ -496,7 +474,7 @@ PQgssEncInUse(PGconn *conn)
 #endif							/* ENABLE_GSS */
 
 
-#if defined(ENABLE_THREAD_SAFETY) && !defined(WIN32)
+#if defined(ENABLE_THREAD_SAFETY)
 
 /*
  *	Block SIGPIPE for this thread.  This prevents send()/write() from exiting

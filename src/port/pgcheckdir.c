@@ -49,7 +49,6 @@ pg_check_dir(const char *dir)
 			/* skip this and parent directory */
 			continue;
 		}
-#ifndef WIN32
 		/* file starts with "." */
 		else if (file->d_name[0] == '.')
 		{
@@ -60,7 +59,6 @@ pg_check_dir(const char *dir)
 		{
 			mount_found = true;
 		}
-#endif
 		else
 		{
 			result = 4;			/* not empty */

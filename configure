@@ -2975,36 +2975,18 @@ if test "${with_template+set}" = set; then :
 else
 
 # --with-template not given
+# minipg 仅支持 Linux
 
 case $host_os in
-     aix*) template=aix ;;
-  cygwin*|msys*) template=cygwin ;;
-  darwin*) template=darwin ;;
-dragonfly*) template=netbsd ;;
- freebsd*) template=freebsd ;;
-    hpux*) template=hpux ;;
  linux*|gnu*|k*bsd*-gnu)
            template=linux ;;
-   mingw*) template=win32 ;;
-  netbsd*) template=netbsd ;;
- openbsd*) template=openbsd ;;
- solaris*) template=solaris ;;
-esac
-
-  if test x"$template" = x"" ; then
-    as_fn_error $? "
+  *) as_fn_error $? "
 *******************************************************************
-PostgreSQL has apparently not been ported to your platform yet.
-To try a manual configuration, look into the src/template directory
-for a similar platform and use the '--with-template=' option.
-
-Please also contact <pgsql-bugs@lists.postgresql.org> to see about
-rectifying this.  Include the above 'checking host system type...'
-line.
+minipg 仅支持 Linux 平台。当前检测到的操作系统 \"$host_os\" 不受支持。
 *******************************************************************
 " "$LINENO" 5
-  fi
-
+     ;;
+esac
 
 fi
 
@@ -3016,11 +2998,7 @@ $as_echo "$template" >&6; }
 PORTNAME=$template
 
 
-# Initialize default assumption that we do not need separate assembly code
-# for TAS (test-and-set).  This can be overridden by the template file
-# when it's executed.
-need_tas=no
-tas_file=dummy.s
+# minipg 仅支持 Linux，不需要 TAS 汇编代码（使用 __sync_lock_test_and_set 内建函数）
 
 
 
@@ -8062,17 +8040,10 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 #
-# Set up TAS assembly code if needed; the template file has now had its
-# chance to request this.
+# TAS assembly code not needed on Linux/gcc (uses __sync_lock_test_and_set builtin).
+# minipg 仅支持 Linux，已移除 tas/ 目录与 need_tas/tas_file 机制。
 #
-ac_config_links="$ac_config_links src/backend/port/tas.s:src/backend/port/tas/${tas_file}"
-
-
-if test "$need_tas" = yes ; then
-  TAS=tas.o
-else
-  TAS=""
-fi
+TAS=""
 
 
 #
@@ -20280,7 +20251,7 @@ ac_config_headers="$ac_config_headers src/include/pg_config.h"
 ac_config_headers="$ac_config_headers src/include/pg_config_ext.h"
 
 
-ac_config_headers="$ac_config_headers src/interfaces/ecpg/include/ecpg_config.h"
+# ecpg_config.h 已随 ecpg 裁剪移除（minipg 阶段 2）
 
 
 cat >confcache <<\_ACEOF
@@ -20985,7 +20956,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    "src/backend/port/tas.s") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/tas.s:src/backend/port/tas/${tas_file}" ;;
+    # tas.s 已移除（minipg 仅支持 Linux，不需要 TAS 汇编）
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "src/backend/port/pg_sema.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION}" ;;
@@ -20995,7 +20966,7 @@ do
     "check_win32_symlinks") CONFIG_COMMANDS="$CONFIG_COMMANDS check_win32_symlinks" ;;
     "src/include/pg_config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/include/pg_config.h" ;;
     "src/include/pg_config_ext.h") CONFIG_HEADERS="$CONFIG_HEADERS src/include/pg_config_ext.h" ;;
-    "src/interfaces/ecpg/include/ecpg_config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/interfaces/ecpg/include/ecpg_config.h" ;;
+    # ecpg_config.h 已随 ecpg 裁剪移除
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -21607,7 +21578,7 @@ echo >src/include/stamp-h
 # Update timestamp for pg_config_ext.h (see Makefile.global)
 echo >src/include/stamp-ext-h
  ;;
-    "src/interfaces/ecpg/include/ecpg_config.h":H) echo >src/interfaces/ecpg/include/stamp-h ;;
+    # ecpg_config.h 已随 ecpg 裁剪移除
 
   esac
 done # for ac_tag

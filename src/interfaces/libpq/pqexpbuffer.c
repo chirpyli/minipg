@@ -29,10 +29,6 @@
 
 #include "pqexpbuffer.h"
 
-#ifdef WIN32
-#include "win32.h"
-#endif
-
 
 /* All "broken" PQExpBuffers point to this string. */
 static const char oom_buffer[1] = "";

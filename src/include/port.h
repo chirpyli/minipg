@@ -17,16 +17,9 @@
 #include <netdb.h>
 #include <pwd.h>
 
-/* socket has a different definition on WIN32 */
-#ifndef WIN32
 typedef int pgsocket;
 
 #define PGINVALID_SOCKET (-1)
-#else
-typedef SOCKET pgsocket;
-
-#define PGINVALID_SOCKET INVALID_SOCKET
-#endif
 
 /* non-blocking */
 extern bool pg_set_noblock(pgsocket sock);
@@ -88,13 +81,8 @@ extern void pgfnames_cleanup(char **filenames);
  *
  *	By using macros here we avoid needing to include path.c in libpq.
  */
-#ifndef WIN32
 #define IS_DIR_SEP(ch) IS_NONWINDOWS_DIR_SEP(ch)
 #define is_absolute_path(filename) is_nonwindows_absolute_path(filename)
-#else
-#define IS_DIR_SEP(ch) IS_WINDOWS_DIR_SEP(ch)
-#define is_absolute_path(filename) is_windows_absolute_path(filename)
-#endif
 
 /*
  * This macro provides a centralized list of all errnos that identify
@@ -137,17 +125,9 @@ extern int pg_disable_aslr(void);
 #endif
 
 
-#if defined(WIN32) || defined(__CYGWIN__)
-#define EXE ".exe"
-#else
 #define EXE ""
-#endif
 
-#if defined(WIN32) && !defined(__CYGWIN__)
-#define DEVNULL "nul"
-#else
 #define DEVNULL "/dev/null"
-#endif
 
 /* Portable delay handling */
 extern void pg_usleep(long microsec);
@@ -241,125 +221,16 @@ extern const char *pg_strsignal(int signum);
 extern int	pclose_check(FILE *stream);
 
 /* Global variable holding time zone information. */
-#if defined(WIN32) || defined(__CYGWIN__)
-#define TIMEZONE_GLOBAL _timezone
-#define TZNAME_GLOBAL _tzname
-#else
 #define TIMEZONE_GLOBAL timezone
 #define TZNAME_GLOBAL tzname
-#endif
-
-#if defined(WIN32) || defined(__CYGWIN__)
-/*
- *	Win32 doesn't have reliable rename/unlink during concurrent access.
- */
-extern int	pgrename(const char *from, const char *to);
-extern int	pgunlink(const char *path);
-
-/* Include this first so later includes don't see these defines */
-#ifdef _MSC_VER
-#include <io.h>
-#endif
-
-#define rename(from, to)		pgrename(from, to)
-#define unlink(path)			pgunlink(path)
-#endif							/* defined(WIN32) || defined(__CYGWIN__) */
-
-/*
- *	Win32 also doesn't have symlinks, but we can emulate them with
- *	junction points on newer Win32 versions.
- *
- *	Cygwin has its own symlinks which work on Win95/98/ME where
- *	junction points don't, so use those instead.  We have no way of
- *	knowing what type of system Cygwin binaries will be run on.
- *		Note: Some CYGWIN includes might #define WIN32.
- */
-#if defined(WIN32) && !defined(__CYGWIN__)
-extern int	pgsymlink(const char *oldpath, const char *newpath);
-extern int	pgreadlink(const char *path, char *buf, size_t size);
-
-#define symlink(oldpath, newpath)	pgsymlink(oldpath, newpath)
-#define readlink(path, buf, size)	pgreadlink(path, buf, size)
-#endif
 
 extern bool rmtree(const char *path, bool rmtopdir);
-
-#if defined(WIN32) && !defined(__CYGWIN__)
-
-/*
- * We want the 64-bit variant of lseek().
- *
- * For Visual Studio, this must be after <io.h> to avoid messing up its
- * lseek() and _lseeki64() function declarations.
- *
- * For MinGW there is already a macro, so we have to undefine it (depending on
- * _FILE_OFFSET_BITS, it may point at its own lseek64, but we don't want to
- * count on that being set).
- */
-#undef lseek
-#define lseek(a,b,c) _lseeki64((a),(b),(c))
-
-/*
- * We want the 64-bit variant of chsize().  It sets errno and also returns it,
- * so convert non-zero result to -1 to match POSIX.
- *
- * Prevent MinGW from declaring functions, and undefine its macro before we
- * define our own.
- */
-#ifndef _MSC_VER
-#define FTRUNCATE_DEFINED
-#include <unistd.h>
-#undef ftruncate
-#endif
-#define ftruncate(a,b) (_chsize_s((a),(b)) == 0 ? 0 : -1)
-
-/*
- * open() and fopen() replacements to allow deletion of open files and
- * passing of other special options.
- */
-#define		O_DIRECT	0x80000000
-extern HANDLE pgwin32_open_handle(const char *, int, bool);
-extern int	pgwin32_open(const char *, int,...);
-extern FILE *pgwin32_fopen(const char *, const char *);
-#define		open(a,b,c) pgwin32_open(a,b,c)
-#define		fopen(a,b) pgwin32_fopen(a,b)
-
-/*
- * Mingw-w64 headers #define popen and pclose to _popen and _pclose.  We want
- * to use our popen wrapper, rather than plain _popen, so override that.  For
- * consistency, use our version of pclose, too.
- */
-#ifdef popen
-#undef popen
-#endif
-#ifdef pclose
-#undef pclose
-#endif
-
-/*
- * system() and popen() replacements to enclose the command in an extra
- * pair of quotes.
- */
-extern int	pgwin32_system(const char *command);
-extern FILE *pgwin32_popen(const char *command, const char *type);
-
-#define system(a) pgwin32_system(a)
-#define popen(a,b) pgwin32_popen(a,b)
-#define pclose(a) _pclose(a)
-
-/* New versions of MingW have gettimeofday, old mingw and msvc don't */
-#ifndef HAVE_GETTIMEOFDAY
-/* Last parameter not used */
-extern int	gettimeofday(struct timeval *tp, struct timezone *tzp);
-#endif
-#else							/* !WIN32 */
 
 /*
  *	Win32 requires a special close for sockets and pipes, while on Unix
  *	close() does them all.
  */
 #define closesocket close
-#endif							/* WIN32 */
 
 /*
  * On Windows, setvbuf() does not support _IOLBF mode, and interprets that
@@ -369,11 +240,7 @@ extern int	gettimeofday(struct timeval *tp, struct timezone *tzp);
  * unbuffered mode instead on Windows.  Always use PG_IOLBF not _IOLBF
  * directly in order to implement this behavior.
  */
-#ifndef WIN32
 #define PG_IOLBF	_IOLBF
-#else
-#define PG_IOLBF	_IONBF
-#endif
 
 /*
  * Default "extern" declarations or macro substitutes for library routines.
@@ -381,9 +248,7 @@ extern int	gettimeofday(struct timeval *tp, struct timezone *tzp);
  */
 
 /* Type to use with fseeko/ftello */
-#ifndef WIN32					/* WIN32 is handled in port/win32_port.h */
 #define pgoff_t off_t
-#endif
 
 extern double pg_erand48(unsigned short xseed[3]);
 extern long pg_lrand48(void);
@@ -515,10 +380,8 @@ extern char *dlerror(void);
 #endif
 
 /* thread.h */
-#ifndef WIN32
 extern int	pqGetpwuid(uid_t uid, struct passwd *resultbuf, char *buffer,
 					   size_t buflen, struct passwd **result);
-#endif
 
 extern int	pqGethostbyname(const char *name,
 							struct hostent *resultbuf,
@@ -551,10 +414,6 @@ extern void *bsearch_arg(const void *key, const void *base,
 
 /* port/chklocale.c */
 extern int	pg_get_encoding_from_locale(const char *ctype, bool write_message);
-
-#if defined(WIN32) && !defined(FRONTEND)
-extern int	pg_codepage_to_encoding(UINT cp);
-#endif
 
 /* port/inet_net_ntop.c */
 extern char *pg_inet_net_ntop(int af, const void *src, int bits,

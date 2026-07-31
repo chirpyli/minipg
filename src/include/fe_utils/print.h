@@ -19,11 +19,7 @@
 
 
 /* This is not a particularly great place for this ... */
-#ifndef __CYGWIN__
 #define DEFAULT_PAGER "more"
-#else
-#define DEFAULT_PAGER "less"
-#endif
 
 enum printFormat
 {

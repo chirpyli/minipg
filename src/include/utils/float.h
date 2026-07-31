@@ -25,13 +25,6 @@
 /* Radians per degree, a.k.a. PI / 180 */
 #define RADIANS_PER_DEGREE 0.0174532925199432957692
 
-/* Visual C++ etc lacks NAN, and won't accept 0.0/0.0. */
-#if defined(WIN32) && !defined(NAN)
-static const uint32 nan[2] = {0xffffffff, 0x7fffffff};
-
-#define NAN (*(const float8 *) nan)
-#endif
-
 extern PGDLLIMPORT int extra_float_digits;
 
 /*

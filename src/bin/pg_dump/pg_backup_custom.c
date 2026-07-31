@@ -797,10 +797,8 @@ _ReopenArchive(ArchiveHandle *AH)
 	if (tpos < 0)
 		fatal("could not determine seek position in archive file: %m");
 
-#ifndef WIN32
 	if (fclose(AH->FH) != 0)
 		fatal("could not close archive file: %m");
-#endif
 
 	AH->FH = fopen(AH->fSpec, PG_BINARY_R);
 	if (!AH->FH)

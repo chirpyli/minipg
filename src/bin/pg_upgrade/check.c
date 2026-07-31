@@ -48,22 +48,7 @@ static char *get_canonical_locale_name(int category, const char *locale);
 static char *
 fix_path_separator(char *path)
 {
-#ifdef WIN32
-
-	char	   *result;
-	char	   *c;
-
-	result = pg_strdup(path);
-
-	for (c = result; *c != '\0'; c++)
-		if (*c == '/')
-			*c = '\\';
-
-	return result;
-#else
-
 	return path;
-#endif
 }
 
 void
@@ -609,10 +594,8 @@ create_script_for_old_cluster_deletion(char **deletion_script_file_name)
 		pg_fatal("could not open file \"%s\": %s\n",
 				 *deletion_script_file_name, strerror(errno));
 
-#ifndef WIN32
 	/* add shebang header */
 	fprintf(script, "#!/bin/sh\n\n");
-#endif
 
 	/* delete old cluster's default tablespace */
 	fprintf(script, RMDIR_CMD " %c%s%c\n", PATH_QUOTE,
@@ -660,11 +643,9 @@ create_script_for_old_cluster_deletion(char **deletion_script_file_name)
 
 	fclose(script);
 
-#ifndef WIN32
 	if (chmod(*deletion_script_file_name, S_IRWXU) != 0)
 		pg_fatal("could not add execute permission to file \"%s\": %s\n",
 				 *deletion_script_file_name, strerror(errno));
-#endif
 
 	check_ok();
 }

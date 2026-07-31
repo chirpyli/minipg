@@ -18,11 +18,7 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#ifdef WIN32
-#include "win32.h"
-#else
 #include <unistd.h>
-#endif
 
 #include "common/int.h"
 #include "libpq-fe.h"

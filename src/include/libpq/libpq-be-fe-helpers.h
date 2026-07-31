@@ -136,19 +136,11 @@ libpqsrv_connect_prepare(void)
 	 */
 	if (!AcquireExternalFD())
 	{
-#ifndef WIN32					/* can't write #if within ereport() macro */
 		ereport(ERROR,
 				(errcode(ERRCODE_SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION),
 				 errmsg("could not establish connection"),
 				 errdetail("There are too many open files on the local server."),
 				 errhint("Raise the server's max_files_per_process and/or \"ulimit -n\" limits.")));
-#else
-		ereport(ERROR,
-				(errcode(ERRCODE_SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION),
-				 errmsg("could not establish connection"),
-				 errdetail("There are too many open files on the local server."),
-				 errhint("Raise the server's max_files_per_process setting.")));
-#endif
 	}
 }
 
@@ -194,19 +186,10 @@ libpqsrv_connect_internal(PGconn *conn, uint32 wait_event_info)
 			int			io_flag;
 			int			rc;
 
-			if (status == PGRES_POLLING_READING)
-				io_flag = WL_SOCKET_READABLE;
-#ifdef WIN32
-
-			/*
-			 * Windows needs a different test while waiting for
-			 * connection-made
-			 */
-			else if (PQstatus(conn) == CONNECTION_STARTED)
-				io_flag = WL_SOCKET_CONNECTED;
-#endif
-			else
-				io_flag = WL_SOCKET_WRITEABLE;
+		if (status == PGRES_POLLING_READING)
+			io_flag = WL_SOCKET_READABLE;
+		else
+			io_flag = WL_SOCKET_WRITEABLE;
 
 			rc = WaitLatchOrSocket(MyLatch,
 								   WL_EXIT_ON_PM_DEATH | WL_LATCH_SET | io_flag,

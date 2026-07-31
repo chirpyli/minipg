@@ -19,10 +19,6 @@ static void check_bin_dir(ClusterInfo *cluster, bool check_versions);
 static void get_bin_version(ClusterInfo *cluster);
 static void check_exec(const char *dir, const char *program, bool check_version);
 
-#ifdef WIN32
-static int	win32_check_directory_write_permissions(void);
-#endif
-
 
 /*
  * get_bin_version
@@ -89,14 +85,6 @@ exec_prog(const char *log_file, const char *opt_log_file,
 	FILE	   *log;
 	va_list		ap;
 
-#ifdef WIN32
-	static DWORD mainThreadId = 0;
-
-	/* We assume we are called from the primary thread first */
-	if (mainThreadId == 0)
-		mainThreadId = GetCurrentThreadId();
-#endif
-
 	written = 0;
 	va_start(ap, fmt);
 	written += vsnprintf(cmd + written, MAXCMDLEN - written, fmt, ap);
@@ -110,56 +98,12 @@ exec_prog(const char *log_file, const char *opt_log_file,
 
 	pg_log(PG_VERBOSE, "%s\n", cmd);
 
-#ifdef WIN32
-
-	/*
-	 * For some reason, Windows issues a file-in-use error if we write data to
-	 * the log file from a non-primary thread just before we create a
-	 * subprocess that also writes to the same log file.  One fix is to sleep
-	 * for 100ms.  A cleaner fix is to write to the log file _after_ the
-	 * subprocess has completed, so we do this only when writing from a
-	 * non-primary thread.  fflush(), running system() twice, and pre-creating
-	 * the file do not see to help.
-	 */
-	if (mainThreadId != GetCurrentThreadId())
-		result = system(cmd);
-#endif
-
 	log = fopen(log_file, "a");
-
-#ifdef WIN32
-	{
-		/*
-		 * "pg_ctl -w stop" might have reported that the server has stopped
-		 * because the postmaster.pid file has been removed, but "pg_ctl -w
-		 * start" might still be in the process of closing and might still be
-		 * holding its stdout and -l log file descriptors open.  Therefore,
-		 * try to open the log file a few more times.
-		 */
-		int			iter;
-
-		for (iter = 0; iter < 4 && log == NULL; iter++)
-		{
-			pg_usleep(1000000); /* 1 sec */
-			log = fopen(log_file, "a");
-		}
-	}
-#endif
 
 	if (log == NULL)
 		pg_fatal("could not open log file \"%s\": %m\n", log_file);
 
-#ifdef WIN32
-	/* Are we printing "command:" before its output? */
-	if (mainThreadId == GetCurrentThreadId())
-		fprintf(log, "\n\n");
-#endif
 	fprintf(log, "command: %s\n", cmd);
-#ifdef WIN32
-	/* Are we printing "command:" after its output? */
-	if (mainThreadId != GetCurrentThreadId())
-		fprintf(log, "\n\n");
-#endif
 
 	/*
 	 * In Windows, we must close the log file at this point so the file is not
@@ -167,11 +111,7 @@ exec_prog(const char *log_file, const char *opt_log_file,
 	 */
 	fclose(log);
 
-#ifdef WIN32
-	/* see comment above */
-	if (mainThreadId == GetCurrentThreadId())
-#endif
-		result = system(cmd);
+	result = system(cmd);
 
 	if (result != 0 && report_error)
 	{
@@ -192,20 +132,10 @@ exec_prog(const char *log_file, const char *opt_log_file,
 				   log_file);
 	}
 
-#ifndef WIN32
-
-	/*
-	 * We can't do this on Windows because it will keep the "pg_ctl start"
-	 * output filename open until the server stops, so we do the \n\n above on
-	 * that platform.  We use a unique filename for "pg_ctl start" that is
-	 * never reused while the server is running, so it works fine.  We could
-	 * log these commands to a third file, but that just adds complexity.
-	 */
 	if ((log = fopen(log_file, "a")) == NULL)
 		pg_fatal("could not write to log file \"%s\": %m\n", log_file);
 	fprintf(log, "\n\n");
 	fclose(log);
-#endif
 
 	return result == 0;
 }
@@ -250,11 +180,7 @@ pid_lock_file_exists(const char *datadir)
 void
 verify_directories(void)
 {
-#ifndef WIN32
 	if (access(".", R_OK | W_OK | X_OK) != 0)
-#else
-	if (win32_check_directory_write_permissions() != 0)
-#endif
 		pg_fatal("You must have read and write access in the current directory.\n");
 
 	check_bin_dir(&old_cluster, false);
@@ -262,32 +188,6 @@ verify_directories(void)
 	check_bin_dir(&new_cluster, true);
 	check_data_dir(&new_cluster);
 }
-
-
-#ifdef WIN32
-/*
- * win32_check_directory_write_permissions()
- *
- *	access() on WIN32 can't check directory permissions, so we have to
- *	optionally create, then delete a file to check.
- *		http://msdn.microsoft.com/en-us/library/1w06ktdy%28v=vs.80%29.aspx
- */
-static int
-win32_check_directory_write_permissions(void)
-{
-	int			fd;
-
-	/*
-	 * We open a file we would normally create anyway.  We do this even in
-	 * 'check' mode, which isn't ideal, but this is the best we can do.
-	 */
-	if ((fd = open(GLOBALS_DUMP_FILE, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR)) < 0)
-		return -1;
-	close(fd);
-
-	return unlink(GLOBALS_DUMP_FILE);
-}
-#endif
 
 
 /*

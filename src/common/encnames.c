@@ -303,11 +303,7 @@ static const pg_encname pg_encname_tbl[] =
  * XXX must be sorted by the same order as enum pg_enc (in mb/pg_wchar.h)
  * ----------
  */
-#ifndef WIN32
 #define DEF_ENC2NAME(name, codepage) { #name, PG_##name }
-#else
-#define DEF_ENC2NAME(name, codepage) { #name, PG_##name, codepage }
-#endif
 
 const pg_enc2name pg_enc2name_tbl[] =
 {

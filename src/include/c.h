@@ -67,9 +67,6 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <errno.h>
-#if defined(WIN32) || defined(__CYGWIN__)
-#include <fcntl.h>				/* ensure O_BINARY is available */
-#endif
 #include <locale.h>
 #ifdef ENABLE_NLS
 #include <libintl.h>
@@ -1302,22 +1299,12 @@ typedef union PGAlignedXLogBlock
 
 /*
  *	NOTE:  this is also used for opening text files.
- *	WIN32 treats Control-Z as EOF in files opened in text mode.
- *	Therefore, we open files in binary mode on Win32 so we can read
- *	literal control-Z.  The other affect is that we see CRLF, but
- *	that is OK because we can already handle those cleanly.
+ *	minipg 仅支持 Linux，文件以默认文本模式打开（PG_BINARY 为 0）。
  */
-#if defined(WIN32) || defined(__CYGWIN__)
-#define PG_BINARY	O_BINARY
-#define PG_BINARY_A "ab"
-#define PG_BINARY_R "rb"
-#define PG_BINARY_W "wb"
-#else
 #define PG_BINARY	0
 #define PG_BINARY_A "a"
 #define PG_BINARY_R "r"
 #define PG_BINARY_W "w"
-#endif
 
 /*
  * Provide prototypes for routines not present in a particular machine's
@@ -1380,21 +1367,8 @@ extern unsigned long long strtoull(const char *str, char **endptr, int base);
 
 /*
  * When there is no sigsetjmp, its functionality is provided by plain
- * setjmp.  We now support the case only on Windows.  However, it seems
- * that MinGW-64 has some longstanding issues in its setjmp support,
- * so on that toolchain we cheat and use gcc's builtins.
+ * setjmp.  minipg 仅支持 Linux，Linux 有原生 sigsetjmp，无需此 hack。
  */
-#ifdef WIN32
-#ifdef __MINGW64__
-typedef intptr_t sigjmp_buf[5];
-#define sigsetjmp(x,y) __builtin_setjmp(x)
-#define siglongjmp __builtin_longjmp
-#else							/* !__MINGW64__ */
-#define sigjmp_buf jmp_buf
-#define sigsetjmp(x,y) setjmp(x)
-#define siglongjmp longjmp
-#endif							/* __MINGW64__ */
-#endif							/* WIN32 */
 
 /* EXEC_BACKEND defines */
 #ifdef EXEC_BACKEND

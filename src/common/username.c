@@ -30,7 +30,6 @@
 const char *
 get_user_name(char **errstr)
 {
-#ifndef WIN32
 	struct passwd *pw;
 	uid_t		user_id = geteuid();
 
@@ -47,23 +46,6 @@ get_user_name(char **errstr)
 	}
 
 	return pw->pw_name;
-#else
-	/* Microsoft recommends buffer size of UNLEN+1, where UNLEN = 256 */
-	/* "static" variable remains after function exit */
-	static char username[256 + 1];
-	DWORD		len = sizeof(username);
-
-	*errstr = NULL;
-
-	if (!GetUserName(username, &len))
-	{
-		*errstr = psprintf(_("user name lookup failure: error code %lu"),
-						   GetLastError());
-		return NULL;
-	}
-
-	return username;
-#endif
 }
 
 

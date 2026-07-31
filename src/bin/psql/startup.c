@@ -7,12 +7,7 @@
  */
 #include "postgres_fe.h"
 
-#ifndef WIN32
 #include <unistd.h>
-#else							/* WIN32 */
-#include <io.h>
-#include <win32.h>
-#endif							/* WIN32 */
 
 #include "command.h"
 #include "common.h"
@@ -31,13 +26,8 @@
  */
 PsqlSettings pset;
 
-#ifndef WIN32
 #define SYSPSQLRC	"psqlrc"
 #define PSQLRC		".psqlrc"
-#else
-#define SYSPSQLRC	"psqlrc"
-#define PSQLRC		"psqlrc.conf"
-#endif
 
 /*
  * Structures to pass information between the option parsing routine
@@ -793,10 +783,6 @@ process_psqlrc_file(char *filename)
 {
 	char	   *psqlrc_minor,
 			   *psqlrc_major;
-
-#if defined(WIN32) && (!defined(__MINGW32__))
-#define R_OK 4
-#endif
 
 	psqlrc_minor = psprintf("%s-%s", filename, PG_VERSION);
 	psqlrc_major = psprintf("%s-%s", filename, PG_MAJORVERSION);

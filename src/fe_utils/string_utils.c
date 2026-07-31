@@ -593,9 +593,6 @@ appendShellString(PQExpBuffer buf, const char *str)
 bool
 appendShellStringNoError(PQExpBuffer buf, const char *str)
 {
-#ifdef WIN32
-	int			backslash_run_length = 0;
-#endif
 	bool		ok = true;
 	const char *p;
 
@@ -610,7 +607,6 @@ appendShellStringNoError(PQExpBuffer buf, const char *str)
 		return ok;
 	}
 
-#ifndef WIN32
 	appendPQExpBufferChar(buf, '\'');
 	for (p = str; *p; p++)
 	{
@@ -626,65 +622,6 @@ appendShellStringNoError(PQExpBuffer buf, const char *str)
 			appendPQExpBufferChar(buf, *p);
 	}
 	appendPQExpBufferChar(buf, '\'');
-#else							/* WIN32 */
-
-	/*
-	 * A Windows system() argument experiences two layers of interpretation.
-	 * First, cmd.exe interprets the string.  Its behavior is undocumented,
-	 * but a caret escapes any byte except LF or CR that would otherwise have
-	 * special meaning.  Handling of a caret before LF or CR differs between
-	 * "cmd.exe /c" and other modes, and it is unusable here.
-	 *
-	 * Second, the new process parses its command line to construct argv (see
-	 * https://msdn.microsoft.com/en-us/library/17w5ykft.aspx).  This treats
-	 * backslash-double quote sequences specially.
-	 */
-	appendPQExpBufferStr(buf, "^\"");
-	for (p = str; *p; p++)
-	{
-		if (*p == '\n' || *p == '\r')
-		{
-			ok = false;
-			continue;
-		}
-
-		/* Change N backslashes before a double quote to 2N+1 backslashes. */
-		if (*p == '"')
-		{
-			while (backslash_run_length)
-			{
-				appendPQExpBufferStr(buf, "^\\");
-				backslash_run_length--;
-			}
-			appendPQExpBufferStr(buf, "^\\");
-		}
-		else if (*p == '\\')
-			backslash_run_length++;
-		else
-			backslash_run_length = 0;
-
-		/*
-		 * Decline to caret-escape the most mundane characters, to ease
-		 * debugging and lest we approach the command length limit.
-		 */
-		if (!((*p >= 'a' && *p <= 'z') ||
-			  (*p >= 'A' && *p <= 'Z') ||
-			  (*p >= '0' && *p <= '9')))
-			appendPQExpBufferChar(buf, '^');
-		appendPQExpBufferChar(buf, *p);
-	}
-
-	/*
-	 * Change N backslashes at end of argument to 2N backslashes, because they
-	 * precede the double quote that terminates the argument.
-	 */
-	while (backslash_run_length)
-	{
-		appendPQExpBufferStr(buf, "^\\");
-		backslash_run_length--;
-	}
-	appendPQExpBufferStr(buf, "^\"");
-#endif							/* WIN32 */
 
 	return ok;
 }

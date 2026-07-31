@@ -24,16 +24,10 @@
 #include "libpq-events.h"
 
 #include <time.h>
-#ifndef WIN32
 #include <sys/time.h>
-#endif
 
 #ifdef ENABLE_THREAD_SAFETY
-#ifdef WIN32
-#include "pthread-win32.h"
-#else
 #include <pthread.h>
-#endif
 #include <signal.h>
 #endif
 
@@ -604,18 +598,10 @@ extern char *const pgresStatus[];
 
 #ifdef USE_SSL
 
-#ifndef WIN32
 #define USER_CERT_FILE		".postgresql/postgresql.crt"
 #define USER_KEY_FILE		".postgresql/postgresql.key"
 #define ROOT_CERT_FILE		".postgresql/root.crt"
 #define ROOT_CRL_FILE		".postgresql/root.crl"
-#else
-/* On Windows, the "home" directory is already PostgreSQL-specific */
-#define USER_CERT_FILE		"postgresql.crt"
-#define USER_KEY_FILE		"postgresql.key"
-#define ROOT_CERT_FILE		"root.crt"
-#define ROOT_CRL_FILE		"root.crl"
-#endif
 
 #endif							/* USE_SSL */
 
@@ -731,7 +717,7 @@ extern ssize_t pqsecure_write(PGconn *, const void *ptr, size_t len);
 extern ssize_t pqsecure_raw_read(PGconn *, void *ptr, size_t len);
 extern ssize_t pqsecure_raw_write(PGconn *, const void *ptr, size_t len);
 
-#if defined(ENABLE_THREAD_SAFETY) && !defined(WIN32)
+#if defined(ENABLE_THREAD_SAFETY)
 extern int	pq_block_sigpipe(sigset_t *osigset, bool *sigpipe_pending);
 extern void pq_reset_sigpipe(sigset_t *osigset, bool sigpipe_pending,
 							 bool got_epipe);
@@ -870,14 +856,8 @@ extern char *libpq_ngettext(const char *msgid, const char *msgid_plural, unsigne
  * These macros are needed to let error-handling code be portable between
  * Unix and Windows.  (ugh)
  */
-#ifdef WIN32
-#define SOCK_ERRNO (WSAGetLastError())
-#define SOCK_STRERROR winsock_strerror
-#define SOCK_ERRNO_SET(e) WSASetLastError(e)
-#else
 #define SOCK_ERRNO errno
 #define SOCK_STRERROR strerror_r
 #define SOCK_ERRNO_SET(e) (errno = (e))
-#endif
 
 #endif							/* LIBPQ_INT_H */

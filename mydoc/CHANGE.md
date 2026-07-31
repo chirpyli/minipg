@@ -6,6 +6,17 @@
 - 2026-07-31: 修复 Windows 裁剪遗留的 `make clean` 失败：`src/backend/port/Makefile` 残留对 `win32` 子目录的引用（`SUBDIRS += win32` 与 `clean` 规则中的 `$(MAKE) -C win32 clean`），因 win32 目录已删导致 `make clean` 报 "No such file or directory"。已移除该引用，`make clean` / `make check-world` 均通过。
 - 2026-07-31: 裁剪非 plpgsql 过程语言（阶段 3）：删除 `src/pl/plperl/`、`src/pl/plpython/`、`src/pl/tcl/`（pltcl）三个外部解释器桥接语言，仅保留 `src/pl/plpgsql/`（PG 原生、最能体现 fmgr call-handler + SPI 扩展机制的教学样例）。修改 `src/pl/Makefile` 移除对应条件子目录。约删 4 万行。`make check-world` 全部通过。详见下文。
 - 2026-07-31: 裁剪 ecpg（嵌入式 SQL 预处理器，阶段 2）：整体删除 `src/interfaces/ecpg/`（约 16.6 万行，405 个文件），并清理构建系统引用（interfaces/Makefile、GNUmakefile 的 world 递归、Makefile.global[.in] 的 ecpg_config.h 规则、configure.ac 的 AC_CONFIG_HEADERS）。`make check-world` 全部通过。详见下文。
+- 2026-07-31: 收尾清理源码级非 Linux 条件编译：修复上一轮 Windows 裁剪遗留的 `src/fe_utils/cancel.c` 未闭合 `#ifndef WIN32` 编译错误，并手工删除源码（`.c`/`.h`）中残留的 `WIN32`/`__CYGWIN__`/`_MSC_VER` 条件编译分支（含 `fe_utils/{cancel,print,string_utils,parallel_slot}.c`、`common/{exec,d2s}.c`、`backend/libpq/{pqsignal,pqcomm}.c`）。`make` 与 `make check-world` 均通过。注意：初次全仓库扫描存在工具假阴性误判，实际 `src/bin`、`src/test`、`fe_utils/psqlscan.c`、`configure.ac` 等仍含大量平台宏，需后续继续清理。详见下文。
+- 2026-07-31: 继续清理 `src/backend/main/main.c` 中遗漏的 7 处平台代码（见上）。
+- 2026-07-31: 手工清理 src/bin 下产品工具的非 Linux 平台条件编译（生成代码如 *scan.c/*gram.c 暂不处理）：
+  - fe_utils: cancel.c、print.c、string_utils.c、parallel_slot.c、psqlscan.c（__ia64__ 块）
+  - common: exec.c、d2s.c
+  - backend/libpq: pqsignal.c、pqcomm.c
+  - backend/main: main.c
+  - psql(8 文件)、pg_dump(7 文件，含并行 fork 实现深度清理)、pgbench、pg_resetwal、initdb(2)、pg_basebackup(3)、pg_receivewal、pg_recvlogical
+  - pg_rewind(2 文件)、pg_upgrade(9 文件：pg_upgrade.h/server.c/controldata.c/util.c/file.c/check.c/exec.c/option.c/pg_upgrade.c/parallel.c，删除 Windows 线程实现与 CopyFile/xcopy 分支，统一为 fork/posix 路径)、pg_ctl(单文件 pg_ctl.c，删除整个 Windows 服务管理实现块 ~600 行，含 pgwin32_* 函数、CreateRestrictedProcess、do_register/do_unregister/do_runservice、eventlog、全局 WIN32 变量，并将 -N/-P/-U/-S/-e 选项在 Linux 下改为"not supported on this platform"报错)
+  - 全部通过 make 编译验证，make -j16 全量编译通过。
+  - 剩余暂缓：initdb/findtimezone.c（Windows 实现块约 1000 行，目前 Linux 走 `#ifndef WIN32` 路径已正确，整体删除风险高暂缓）。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
 

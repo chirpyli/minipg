@@ -30,11 +30,7 @@
  * seem worth insisting on ABI compatibility for Windows too.  Hence, on
  * that platform just define PGSemaphore as HANDLE.
  */
-#ifndef USE_WIN32_SEMAPHORES
 typedef struct PGSemaphoreData *PGSemaphore;
-#else
-typedef HANDLE PGSemaphore;
-#endif
 
 
 /* Report amount of shared memory needed */

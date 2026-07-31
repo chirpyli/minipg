@@ -355,7 +355,6 @@ main(int argc, char *argv[])
 	 * -- any other user won't have sufficient permissions to modify files in
 	 * the data directory.
 	 */
-#ifndef WIN32
 	if (geteuid() == 0)
 	{
 		pg_log_error("cannot be executed by \"root\"");
@@ -363,7 +362,6 @@ main(int argc, char *argv[])
 					progname);
 		exit(1);
 	}
-#endif
 
 	get_restricted_token();
 

@@ -23,10 +23,6 @@
  * Determine which dynamic shared memory implementations will be supported
  * on this platform, and which one will be the default.
  */
-#ifdef WIN32
-#define USE_DSM_WINDOWS
-#define DEFAULT_DYNAMIC_SHARED_MEMORY_TYPE		DSM_IMPL_WINDOWS
-#else
 #ifdef HAVE_SHM_OPEN
 #define USE_DSM_POSIX
 #define DEFAULT_DYNAMIC_SHARED_MEMORY_TYPE		DSM_IMPL_POSIX
@@ -36,7 +32,6 @@
 #define DEFAULT_DYNAMIC_SHARED_MEMORY_TYPE		DSM_IMPL_SYSV
 #endif
 #define USE_DSM_MMAP
-#endif
 
 /* GUC. */
 extern int	dynamic_shared_memory_type;
