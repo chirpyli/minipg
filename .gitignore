@@ -43,3 +43,7 @@ lib*.pc
 /Release/
 /tmp_install/
 /portlock/
+
+.vscode/
+.codebuddy/
+autom4te.cache/
