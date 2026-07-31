@@ -20,8 +20,9 @@ $node_subscriber->init(allows_streaming => 'logical');
 $node_subscriber->start;
 
 # Create some preexisting content on publisher
+# 注：原测试使用 hstore 扩展验证键值类型的逻辑复制。minipg 已裁剪 hstore
+# 扩展，这里改用内核内置的 jsonb 类型覆盖同类场景（CREATE EXTENSION hstore 已移除）。
 my $ddl = qq(
-	CREATE EXTENSION hstore WITH SCHEMA public;
 	CREATE TABLE public.tst_one_array (
 		a INTEGER PRIMARY KEY,
 		b INTEGER[]
@@ -92,7 +93,7 @@ my $ddl = qq(
 	);
 	CREATE TABLE public.tst_hstore (
 		a INTEGER PRIMARY KEY,
-		b public.hstore
+		b jsonb
 	);
 
 	SET check_function_bodies=off;
@@ -237,12 +238,12 @@ $node_publisher->safe_psql(
 		(4, tstzrange('Thu Jul 31 00:00:00 2014 CEST'::timestamptz, 'Mon Aug 04 00:00:00 2014 CEST'::timestamptz), '{"[4,5]", NULL, "[40,50]"}'),
 		(5, NULL, NULL);
 
-	-- tst_hstore
+	-- tst_hstore (jsonb)
 	INSERT INTO tst_hstore (a, b) VALUES
-		(1, '"a"=>"1"'),
-		(2, '"zzz"=>"foo"'),
-		(3, '"123"=>"321"'),
-		(4, '"yellow horse"=>"moaned"');
+		(1, '{"a":"1"}'),
+		(2, '{"zzz":"foo"}'),
+		(3, '{"123":"321"}'),
+		(4, '{"yellow horse":"moaned"}');
 
 	-- tst_dom_constr
 	INSERT INTO tst_dom_constr VALUES (10);
@@ -331,10 +332,10 @@ e|{d,NULL}
 3|["2014-08-01 00:00:00+02","2014-08-04 00:00:00+02")|{"[3,5)"}
 4|["2014-07-31 00:00:00+02","2014-08-04 00:00:00+02")|{"[4,6)",NULL,"[40,51)"}
 5||
-1|"a"=>"1"
-2|"zzz"=>"foo"
-3|"123"=>"321"
-4|"yellow horse"=>"moaned"',
+1|{"a": "1"}
+2|{"zzz": "foo"}
+3|{"123": "321"}
+4|{"yellow horse": "moaned"}',
 	'check replicated inserts on subscriber');
 
 # Run batch of updates
@@ -365,8 +366,8 @@ $node_publisher->safe_psql(
 	UPDATE tst_range SET b = '(1, 90)' WHERE a > 3;
 	UPDATE tst_range_array SET c = '{"[100, 1000]"}' WHERE a = 1;
 	UPDATE tst_range_array SET b = tstzrange('Mon Aug 04 00:00:00 2014 CEST'::timestamptz, 'infinity'), c = '{NULL, "[11,9999999]"}' WHERE a > 3;
-	UPDATE tst_hstore SET b = '"updated"=>"value"' WHERE a < 3;
-	UPDATE tst_hstore SET b = '"also"=>"updated"' WHERE a = 3;
+	UPDATE tst_hstore SET b = '{"updated":"value"}' WHERE a < 3;
+	UPDATE tst_hstore SET b = '{"also":"updated"}' WHERE a = 3;
 ));
 
 $node_publisher->wait_for_catchup('tap_sub');
@@ -452,10 +453,10 @@ e|{e,d}
 3|["2014-08-01 00:00:00+02","2014-08-04 00:00:00+02")|{"[3,5)"}
 4|["2014-08-04 00:00:00+02",infinity)|{NULL,"[11,10000000)"}
 5|["2014-08-04 00:00:00+02",infinity)|{NULL,"[11,10000000)"}
-1|"updated"=>"value"
-2|"updated"=>"value"
-3|"also"=>"updated"
-4|"yellow horse"=>"moaned"',
+1|{"updated": "value"}
+2|{"updated": "value"}
+3|{"also": "updated"}
+4|{"yellow horse": "moaned"}',
 	'check replicated updates on subscriber');
 
 # Run batch of deletes
@@ -542,9 +543,9 @@ e|{e,d}
 (5,"{c,NULL,b}",)|{"(5,\"{a,b,c}\",5)"}
 2|["2014-08-02 00:00:00+02","2014-08-04 00:00:00+02")|{"[2,4)","[20,31)"}
 3|["2014-08-01 00:00:00+02","2014-08-04 00:00:00+02")|{"[3,5)"}
-2|"updated"=>"value"
-3|"also"=>"updated"
-4|"yellow horse"=>"moaned"',
+2|{"updated": "value"}
+3|{"also": "updated"}
+4|{"yellow horse": "moaned"}',
 	'check replicated deletes on subscriber');
 
 # Test a domain with a constraint backed by a SQL-language function,
