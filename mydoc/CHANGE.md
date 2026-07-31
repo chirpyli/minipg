@@ -3,6 +3,7 @@
 - 2026-07-13: 提交postgres 14.23版本
 - 2026-07-31: 裁剪 contrib 扩展（方案 A）：删除 44 个与内核学习无关的扩展，仅保留 12 个"内核观察类 + 示例型"扩展，约删减 12.3 万行。保留 test_decoding（逻辑复制插件，随阶段 8 裁 replication 时再删）；subscription 测试改用 jsonb 替代已删的 hstore。详见下文。
 - 2026-07-31: 裁剪跨平台兼容性，仅保留Linux。删除所有 Windows / MinGW / MSVC / Cygwin / MSYS 专属代码与构建脚本，回归测试 `make check-world` 全部通过。详见下文。
+- 2026-07-31: 裁剪 ecpg（嵌入式 SQL 预处理器，阶段 2）：整体删除 `src/interfaces/ecpg/`（约 16.6 万行，405 个文件），并清理构建系统引用（interfaces/Makefile、GNUmakefile 的 world 递归、Makefile.global[.in] 的 ecpg_config.h 规则、configure.ac 的 AC_CONFIG_HEADERS）。`make check-world` 全部通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
 
@@ -58,4 +59,25 @@
 - `src/test/recovery`、`src/bin/pg_basebackup` 的 `EXTRA_INSTALL = contrib/test_decoding` 保留有效（test_decoding 已恢复）。
 
 完成上述修复后，`make check-world` 全部通过（EXIT=0）。
+
+## 裁剪：ecpg 嵌入式 SQL 预处理器（阶段 2）
+
+**目的**：ecpg 是 PostgreSQL 的**客户端嵌入式 SQL 预处理器**——开发者在 `.pgc` 文件里混写 `EXEC SQL` 语句，ecpg 工具把它翻译成对 ecpglib（底层调 libpq）的 C 调用后再编译。它是**客户端工具链**，与 server 内核（存储/执行器/优化器/事务）毫无耦合，对"数据库内核学习"无价值，且体积小、独立性强，是裁剪方案里收益高、风险低的大块。
+
+**删除内容**：整体删除 `src/interfaces/ecpg/`（405 个被跟踪文件，约 16.6 万行），含：
+- `preproc/`（~9.6 万行，核心预处理器/解析器）
+- `test/`（~5.1 万行，ecpg 自身回归测试，非内核）
+- `pgtypeslib/`（~7.9k 行，嵌入式专用数值类型库）
+- `ecpglib/`（~7.8k 行，运行时库）
+- `compatlib/`、`include/`
+
+**修改的构建文件**（保持源码与生成物一致）：
+- `src/interfaces/Makefile`：SUBDIRS 移除 `ecpg`；删除 `all-ecpg-recurse` / `install-ecpg-recurse` 规则
+- `GNUmakefile`：`check-world` / `checkprep` / `installcheck-world` 的递归列表移除 `src/interfaces/ecpg`
+- `src/Makefile.global`（已生成）与 `src/Makefile.global.in`（模板）：移除 `ecpg_config.h` 自动重建规则
+- `configure.ac`：移除 `ecpg_config.h` 的 `AC_CONFIG_HEADERS`
+
+**说明**：本机 autoconf 版本（2.71）与 PG14 要求（2.69）不符，未重新生成 `configure`；已直接修正已生成的 `Makefile.global` 与模板/configure.ac，使源码一致且当前构建可用。若日后 `autoreconf`，需装 autoconf 2.69 或放宽版本宏。
+
+**验证**：`make -j4` 顶层编译成功；`make check-world` 全部通过（EXIT=0）。服务端内核代码不依赖 ecpg。
 

@@ -2472,7 +2472,6 @@ AC_CONFIG_HEADERS([src/include/pg_config_ext.h],
 echo >src/include/stamp-ext-h
 ])
 
-AC_CONFIG_HEADERS([src/interfaces/ecpg/include/ecpg_config.h],
-                  [echo >src/interfaces/ecpg/include/stamp-h])
+# ecpg_config.h 的 AC_CONFIG_HEADERS 已移除：ecpg 在 minipg 裁剪（阶段 2）中删除。
 
 AC_OUTPUT

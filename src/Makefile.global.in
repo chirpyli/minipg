@@ -827,12 +827,7 @@ $(top_builddir)/src/include/pg_config_ext.h: $(top_builddir)/src/include/stamp-e
 $(top_builddir)/src/include/stamp-ext-h: $(top_srcdir)/src/include/pg_config_ext.h.in $(top_builddir)/config.status
 	cd $(top_builddir) && ./config.status src/include/pg_config_ext.h
 
-# Also remake ecpg_config.h from ecpg_config.h.in if the latter changed, same
-# logic as above.
-$(top_builddir)/src/interfaces/ecpg/include/ecpg_config.h: $(top_builddir)/src/interfaces/ecpg/include/stamp-h ;
-
- $(top_builddir)/src/interfaces/ecpg/include/stamp-h: $(top_builddir)/src/interfaces/ecpg/include/ecpg_config.h.in $(top_builddir)/config.status
-	cd $(top_builddir) && ./config.status src/interfaces/ecpg/include/ecpg_config.h
+# ecpg_config.h 规则已移除：ecpg 在 minipg 裁剪（阶段 2）中整体删除。
 
 # When configure changes, rerun configure with the same options as
 # last time. To change configure, you need to run autoconf manually.
