@@ -16,7 +16,8 @@
   - psql(8 文件)、pg_dump(7 文件，含并行 fork 实现深度清理)、pgbench、pg_resetwal、initdb(2)、pg_basebackup(3)、pg_receivewal、pg_recvlogical
   - pg_rewind(2 文件)、pg_upgrade(9 文件：pg_upgrade.h/server.c/controldata.c/util.c/file.c/check.c/exec.c/option.c/pg_upgrade.c/parallel.c，删除 Windows 线程实现与 CopyFile/xcopy 分支，统一为 fork/posix 路径)、pg_ctl(单文件 pg_ctl.c，删除整个 Windows 服务管理实现块 ~600 行，含 pgwin32_* 函数、CreateRestrictedProcess、do_register/do_unregister/do_runservice、eventlog、全局 WIN32 变量，并将 -N/-P/-U/-S/-e 选项在 Linux 下改为"not supported on this platform"报错)
   - 全部通过 make 编译验证，make -j16 全量编译通过。
-  - 剩余暂缓：initdb/findtimezone.c（Windows 实现块约 1000 行，目前 Linux 走 `#ifndef WIN32` 路径已正确，整体删除风险高暂缓）。详见下文。
+  - initdb/findtimezone.c：删除 `#else /* WIN32 */` 整段 Windows 实现块（约 1000 行，含 win32_tzmap[] 映射表、注册表读取逻辑），并去掉 `#ifndef WIN32` 开头使 Linux 实现无条件。`make -j16` 与 `make check-world` 均通过。详见下文。
+- 2026-07-31: 裁剪 bin 运维/性能/升级类工具（与内核学习无关，且非回归测试依赖）：删除 `src/bin/` 下 `pgbench`、`pg_amcheck`、`pg_archivecleanup`、`pg_checksums`、`pg_resetwal`、`pg_test_fsync`、`pg_test_timing`、`pg_upgrade`、`pg_verifybackup` 以及 `scripts/`（clusterdb/createdb/createuser/dropdb/dropuser/reindexdb/vacuumdb/pg_isready）。同步修改 `src/bin/Makefile` 的 `SUBDIRS` 移除对应条目。保留 `initdb`/`pg_ctl`/`psql`/`pg_config`（PostgresNode.pm 测试框架硬依赖）、`pg_dump`（test_pg_dump 依赖 + 逻辑转储教学）、`pg_basebackup`/`pg_rewind`（replication 子系统保留，待阶段 8 再删）、`pg_controldata`/`pg_waldump`（内核观察工具）。`make check-world` 通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
 
