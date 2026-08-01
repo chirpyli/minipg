@@ -63,16 +63,7 @@ typedef enum
 extern unsigned long UsedShmemSegID;
 extern void *UsedShmemSegAddr;
 
-#if !defined(EXEC_BACKEND)
 #define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_MMAP
-#else
-#define DEFAULT_SHARED_MEMORY_TYPE SHMEM_TYPE_SYSV
-#endif
-
-#ifdef EXEC_BACKEND
-extern void PGSharedMemoryReAttach(void);
-extern void PGSharedMemoryNoReAttach(void);
-#endif
 
 extern PGShmemHeader *PGSharedMemoryCreate(Size size,
 										   PGShmemHeader **shim);

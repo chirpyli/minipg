@@ -466,9 +466,8 @@ InitializeParallelDSM(ParallelContext *pcxt)
 		/*
 		 * Serialize entrypoint information.  It's unsafe to pass function
 		 * pointers across processes, as the function pointer may be different
-		 * in each process in EXEC_BACKEND builds, so we always pass library
-		 * and function name.  (We use library name "postgres" for functions
-		 * in the core backend.)
+		 * in each process, so we always pass library and function name.
+		 * (We use library name "postgres" for functions in the core backend.)
 		 */
 		lnamelen = strlen(pcxt->library_name);
 		entrypointstate = shm_toc_allocate(pcxt->toc, lnamelen +
@@ -1594,8 +1593,8 @@ ParallelWorkerShutdown(int code, Datum arg)
  * boundaries.  We can't pass actual function addresses because of the
  * possibility that the function has been loaded at a different address
  * in a different process.  This is obviously a hazard for functions in
- * loadable libraries, but it can happen even for functions in the core code
- * on platforms using EXEC_BACKEND (e.g., Windows).
+ * loadable libraries, but it can also happen for functions in the core code
+ * when the address-space layout differs between processes.
  *
  * At some point it might be worthwhile to get rid of InternalParallelWorkers[]
  * in favor of applying load_external_function() for core functions too;

@@ -17,6 +17,37 @@
   - pg_rewind(2 文件)、pg_upgrade(9 文件：pg_upgrade.h/server.c/controldata.c/util.c/file.c/check.c/exec.c/option.c/pg_upgrade.c/parallel.c，删除 Windows 线程实现与 CopyFile/xcopy 分支，统一为 fork/posix 路径)、pg_ctl(单文件 pg_ctl.c，删除整个 Windows 服务管理实现块 ~600 行，含 pgwin32_* 函数、CreateRestrictedProcess、do_register/do_unregister/do_runservice、eventlog、全局 WIN32 变量，并将 -N/-P/-U/-S/-e 选项在 Linux 下改为"not supported on this platform"报错)
   - 全部通过 make 编译验证，make -j16 全量编译通过。
   - initdb/findtimezone.c：删除 `#else /* WIN32 */` 整段 Windows 实现块（约 1000 行，含 win32_tzmap[] 映射表、注册表读取逻辑），并去掉 `#ifndef WIN32` 开头使 Linux 实现无条件。`make -j16` 与 `make check-world` 均通过。详见下文。
+  - EXEC_BACKEND 清理（方案 A，仅删孤立低风险分支，不动 postmaster.c/guc.c/sysv_shmem.c 等核心启动架构）：
+    - common/exec.c：删除 `pg_disable_aslr()` 整函数及其 EXEC_BACKEND 专属 include 头块（CRLF 文件，用 sed 删 28-34 行）。
+    - include/port.h：删除 `pg_disable_aslr()` 声明。
+    - bin/pg_ctl/pg_ctl.c、test/regress/pg_regress.c：删除 fork 前的 `pg_disable_aslr()` 调用分支。
+    - backend/main/main.c：删除 `main()` 中 `--fork` 分发到 `SubPostmasterMain` 的分支。
+    - 说明：保留 `NON_EXEC_STATIC` 宏（其余文件仍在用）；本阶段不动 guc.c/sysv_shmem.c 等。
+    - `make -j16` 全量编译 + backend/common 强制重编均通过，无未定义符号。详见下文。
+  - EXEC_BACKEND 清理（方案 B，逐文件彻底删除 exec 模型双实现）：
+    - backend/postmaster/postmaster.c + include/postmaster/postmaster.h：删除全部 exec 后端机制——`postmaster_forkexec` / `backend_forkexec` / `internal_forkexec` / `SubPostmasterMain`、`save_backend_variables` / `restore_backend_variables` / `read_backend_variables` / `read_inheritable_socket`、`ShmemBackendArray*` 系列（Add/Remove/Alloc）及其声明与全部调用点；`BackendStartup` / `StartChildProcess` / `StartAutovacuumWorker` / `bgworker_forkexec` / `do_start_bgworker` 的 fork/exec 双分支统一为 `fork_process()` 路径；`write_nondefault_variables` / `find_other_exec` 相关的 EXEC 专属初始化块一并移除。
+    - backend/postmaster/autovacuum.c + include/postmaster/autovacuum.h：删除 `avlauncher_forkexec()` / `avworker_forkexec()`、`AutovacuumLauncherIAm()` / `AutovacuumWorkerIAm()` 及头文件中的 `#ifdef EXEC_BACKEND` 声明块；`StartAutoVacLauncher` / `StartAutoVacWorker` 只保留 `fork_process()` 分支；`AutoVacLauncherMain` / `AutoVacWorkerMain` 的 `NON_EXEC_STATIC` 展开为 `static`，其中 `InitProcess()` 去掉 `#ifndef EXEC_BACKEND` 包裹。
+    - backend/postmaster/syslogger.c + include/postmaster/syslogger.h（同时清理该文件残留的 Windows 死代码，共删约 320 行）：
+      - EXEC_BACKEND 部分：删除 `syslogger_forkexec()` / `syslogger_parseArgs()` 整块及头文件中的 `SysLoggerMain` 声明；`SysLogger_Start()` 的 fork/exec 双分支合并为纯 `fork_process()`；`SysLoggerMain` 与 `first_syslogger_file_time` 的 `NON_EXEC_STATIC` 展开为 `static`。
+      - WIN32 部分：删除 Windows 数据传输线程实现 `pipeThread()`（约 76 行）及 `threadHandle` / `sysloggerSection` 临界区变量与其 `InitializeCriticalSection` / `Enter` / `LeaveCriticalSection` 调用；`syslogPipe` 去掉 `HANDLE` 分支统一为 `int[2]`；管道创建去掉 `CreatePipe`+`SECURITY_ATTRIBUTES` 分支；stderr 重定向去掉 `_open_osfhandle` / `_setmode(_O_BINARY)` 分支；主循环去掉 Windows 专用的 `LeaveCriticalSection` + 等待路径，统一走 `WaitEventSetWait` + `WL_SOCKET_READABLE`；`logfile_open()` 与 `update_metainfo_datafile()` 中两处 `_setmode(_O_TEXT)`（CRLF 行尾）一并删除。
+    - backend/postmaster/bgworker.c + include/postmaster/bgworker_internals.h：删除仅供 exec 后端从共享内存回读自身定义的 `BackgroundWorkerEntry()` 及其声明；`StartBackgroundWorker()` 中 `InitProcess()` 去掉 `#ifndef EXEC_BACKEND` 包裹；修正 `LookupBackgroundWorkerFunction()` 注释中的 EXEC_BACKEND 描述。
+    - backend/storage/ipc/ipci.c：删除共享内存尺寸估算中的 `ShmemBackendArraySize()` 累加与 `ShmemBackendArrayAllocation()` 调用块（配套 postmaster.c 已删的 ShmemBackendArray 机制）；`CreateSharedMemoryAndSemaphores()` 中"重新 attach 已存在段"分支简化为无条件 `elog(PANIC)`；重写函数头注释。
+    - backend/storage/ipc/dsm.c + include/storage/dsm.h：`dsm_backend_startup()` 删除 exec 后端专用的控制段 attach + sanity 校验逻辑（子进程经 fork 继承映射），简化为只置 `dsm_init_done`；删除 `dsm_set_control_handle()` 及其声明。
+    - backend/port/sysv_shmem.c + include/storage/pg_shmem.h：删除 `PGSharedMemoryReAttach()` / `PGSharedMemoryNoReAttach()` 两个函数整块（约 82 行，含 `__CYGWIN__` 分支）及其头文件声明；`InternalIpcMemoryCreate()` 删除 `PG_SHMEM_ADDR` 环境变量指定 attach 地址的 exec 专用变通逻辑（含 macOS ASLR 默认值）；`PGSharedMemoryDetach()` 删除 cygipc 的 `shmdt(NULL)` 变通；`DEFAULT_SHARED_MEMORY_TYPE` 从条件宏固定为 `SHMEM_TYPE_MMAP`；重写文件头注释。
+    - `make -j16` 全量编译通过。
+    - 续（方案 B 收尾，彻底删除剩余 EXEC_BACKEND 双实现 + NON_EXEC_STATIC 宏）：
+      - include/c.h：删除 `NON_EXEC_STATIC` 宏定义块（`#ifdef EXEC_BACKEND ... #else ... static`）；全仓库剩余的 `NON_EXEC_STATIC` 用法（proc.c 的 `ProcStructLock`/`AuxiliaryProcs`、pmsignal.c 的 `PMSignalState`、pgstat.c 的 `pgStatSock`/`PgstatCollectorMain`）直接展开为 `static`。
+      - backend/utils/misc/guc.c + include/utils/guc.h：删除 EXEC 专用 `CONFIG_EXEC_PARAMS` 宏、`write_nondefault_variables()` / `read_nondefault_variables()` 整块（含其 `#ifdef EXEC_BACKEND` 包裹，约 220 行）及 guc.h 声明；`shared_memory_options[]` 中 mmap 项去掉 `#ifndef EXEC_BACKEND` 始终可用；简化两处注释中的 EXEC_BACKEND 描述。
+      - backend/postmaster/pgstat.c + include/pgstat.h：删除 `pgstat_forkexec()`（含前向声明）、`#ifdef EXEC_BACKEND` 包裹；`SysLogger_Start` 同款 fork 双分支已删（上轮）；`PgstatCollectorMain` 的 `NON_EXEC_STATIC`→`static` 并去掉 pgstat.h 中的 `#ifdef EXEC_BACKEND` 声明块；`PgstatCollectorStart` 的 fork 双分支统一为 `fork_process()`（恢复 `case 0:` 子进程分支）。
+      - backend/utils/init/globals.c + include/miscadmin.h：删除 EXEC 专用全局变量 `postgres_exec_path[]`（globals.c 定义 + miscadmin.h `extern` 声明，已无引用）。
+      - backend/tcop/postgres.c、backend/bootstrap/bootstrap.c、backend/utils/init/miscinit.c：去掉 `InitProcess()` / `InitAuxiliaryProcess()` 的 `#ifndef EXEC_BACKEND` 包裹（始终调用），miscinit.c 中 `pqinitmask()` 的 `#ifdef EXEC_BACKEND` 包裹去除（始终调用）。
+      - backend/utils/init/postinit.c：删除 EXEC 专属 "重新加载 pg_hba.conf/pg_ident.conf" 块（`#ifdef EXEC_BACKEND` 包裹，约 40 行），因 fork 子进程已继承。
+      - backend/replication/basebackup.c：删除 `noChecksumFiles[]` 中 EXEC 专用的 `config_exec_params` 排除项。
+      - backend/storage/lmgr/{proc,predicate,lock,lwlock}.c：删除 `#ifndef EXEC_BACKEND`/`#ifdef EXEC_BACKEND` 包裹与 `Assert`、简化相关注释（fork 继承语义）。
+      - backend/port/posix_sema.c：删除 `USE_NAMED_POSIX_SEMAPHORES && EXEC_BACKEND` 的 `#error` 块，简化文件头注释。
+      - include/pg_config_manual.h：删除描述已不存在的 EXEC_BACKEND 宏的说明注释块。
+      - 其余纯注释提及（main.c、postmaster.c、guc.c、pgtz.c、mcxt.c、walreceiver.c、walsender.c、parallel.c、be-secure-openssl.c、buf_init.c、shmem.c、latch.c、fd.c、fork_process.c、elog.c）：将注释中的 "EXEC_BACKEND case / SubPostmasterMain" 描述改写为 fork() 继承语义，集中清理以免误导。
+      - `make -j16` 全量编译通过（修复 pgstat.c 合并 fork 分支后残留的 `#endif`）。
 - 2026-07-31: 裁剪 bin 运维/性能/升级类工具（与内核学习无关，且非回归测试依赖）：删除 `src/bin/` 下 `pgbench`、`pg_amcheck`、`pg_archivecleanup`、`pg_checksums`、`pg_resetwal`、`pg_test_fsync`、`pg_test_timing`、`pg_upgrade`、`pg_verifybackup` 以及 `scripts/`（clusterdb/createdb/createuser/dropdb/dropuser/reindexdb/vacuumdb/pg_isready）。同步修改 `src/bin/Makefile` 的 `SUBDIRS` 移除对应条目。保留 `initdb`/`pg_ctl`/`psql`/`pg_config`（PostgresNode.pm 测试框架硬依赖）、`pg_dump`（test_pg_dump 依赖 + 逻辑转储教学）、`pg_basebackup`/`pg_rewind`（replication 子系统保留，待阶段 8 再删）、`pg_controldata`/`pg_waldump`（内核观察工具）。`make check-world` 通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）

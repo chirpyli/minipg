@@ -189,45 +189,6 @@ PerformAuthentication(Port *port)
 	ClientAuthInProgress = true;	/* limit visibility of log messages */
 
 	/*
-	 * In EXEC_BACKEND case, we didn't inherit the contents of pg_hba.conf
-	 * etcetera from the postmaster, and have to load them ourselves.
-	 *
-	 * FIXME: [fork/exec] Ugh.  Is there a way around this overhead?
-	 */
-#ifdef EXEC_BACKEND
-
-	/*
-	 * load_hba() and load_ident() want to work within the PostmasterContext,
-	 * so create that if it doesn't exist (which it won't).  We'll delete it
-	 * again later, in PostgresMain.
-	 */
-	if (PostmasterContext == NULL)
-		PostmasterContext = AllocSetContextCreate(TopMemoryContext,
-												  "Postmaster",
-												  ALLOCSET_DEFAULT_SIZES);
-
-	if (!load_hba())
-	{
-		/*
-		 * It makes no sense to continue if we fail to load the HBA file,
-		 * since there is no way to connect to the database in this case.
-		 */
-		ereport(FATAL,
-				(errmsg("could not load pg_hba.conf")));
-	}
-
-	if (!load_ident())
-	{
-		/*
-		 * It is ok to continue if we fail to load the IDENT file, although it
-		 * means that you cannot log in using any of the authentication
-		 * methods that need a user name mapping. load_ident() already logged
-		 * the details of error to the log.
-		 */
-	}
-#endif
-
-	/*
 	 * Set up a timeout in case a buggy or malicious client fails to respond
 	 * during authentication.  Since we're inside a transaction and might do
 	 * database access, we have to use the statement_timeout infrastructure.
@@ -509,8 +470,7 @@ pg_split_opts(char **argv, int *argcp, const char *optstr)
  * workers in shared_preload_libraries, and before shared memory size is
  * determined.
  *
- * Note that in EXEC_BACKEND environment, the value is passed down from
- * postmaster to subprocesses via BackendParameters in SubPostmasterMain; only
+ * Note that the value is inherited by postmaster subprocesses via fork(); only
  * postmaster itself and processes not under postmaster control should call
  * this.
  */

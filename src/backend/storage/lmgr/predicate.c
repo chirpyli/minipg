@@ -1150,9 +1150,7 @@ CheckPointPredicate(void)
  * This is called from CreateSharedMemoryAndSemaphores(), which see for
  * more comments.  In the normal postmaster case, the shared hash tables
  * are created here.  Backends inherit the pointers
- * to the shared tables via fork().  In the EXEC_BACKEND case, each
- * backend re-executes this code to obtain pointers to the already existing
- * shared hash tables.
+ * to the shared tables via fork().
  */
 void
 InitPredicateLocks(void)
@@ -1162,9 +1160,7 @@ InitPredicateLocks(void)
 	Size		requestSize;
 	bool		found;
 
-#ifndef EXEC_BACKEND
 	Assert(!IsUnderPostmaster);
-#endif
 
 	/*
 	 * Compute size of predicate lock target hashtable. Note these

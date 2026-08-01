@@ -384,9 +384,7 @@ static void GetSingleProcBlockerStatusData(PGPROC *blocked_proc,
  * are created here, as well as a locallock hash table that will remain
  * unused and empty in the postmaster itself.  Backends inherit the pointers
  * to the shared tables via fork(), and also inherit an image of the locallock
- * hash table, which they proceed to use.  In the EXEC_BACKEND case, each
- * backend re-executes this code to obtain pointers to the already existing
- * shared hash tables and to create its locallock hash table.
+ * hash table, which they proceed to use.
  */
 void
 InitLocks(void)

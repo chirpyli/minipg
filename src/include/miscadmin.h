@@ -183,10 +183,6 @@ extern char OutputFileName[];
 extern PGDLLIMPORT char my_exec_path[];
 extern char pkglib_path[];
 
-#ifdef EXEC_BACKEND
-extern char postgres_exec_path[];
-#endif
-
 /*
  * done in storage/backendid.h for now.
  *

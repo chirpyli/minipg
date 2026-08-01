@@ -1370,13 +1370,6 @@ extern unsigned long long strtoull(const char *str, char **endptr, int base);
  * setjmp.  minipg 仅支持 Linux，Linux 有原生 sigsetjmp，无需此 hack。
  */
 
-/* EXEC_BACKEND defines */
-#ifdef EXEC_BACKEND
-#define NON_EXEC_STATIC
-#else
-#define NON_EXEC_STATIC static
-#endif
-
 /* /port compatibility functions */
 #include "port.h"
 

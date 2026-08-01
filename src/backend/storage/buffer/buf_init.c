@@ -102,7 +102,6 @@ InitBufferPool(void)
 	{
 		/* should find all of these, or none of them */
 		Assert(foundDescs && foundBufs && foundIOCV && foundBufCkpt);
-		/* note: this path is only taken in EXEC_BACKEND case */
 	}
 	else
 	{

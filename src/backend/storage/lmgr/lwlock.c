@@ -192,8 +192,7 @@ static int	LWLockTrancheNamesAllocated = 0;
 
 /*
  * This points to the main array of LWLocks in shared memory.  Backends inherit
- * the pointer by fork from the postmaster (except in the EXEC_BACKEND case,
- * where we have special measures to pass it down).
+ * the pointer by fork from the postmaster.
  */
 LWLockPadded *MainLWLockArray = NULL;
 
@@ -229,7 +228,7 @@ static int	NamedLWLockTrancheRequestsAllocated = 0;
  * NamedLWLockTrancheRequests is both the valid length of the request array,
  * and the length of the shared-memory NamedLWLockTrancheArray later on.
  * This variable and NamedLWLockTrancheArray are non-static so that
- * postmaster.c can copy them to child processes in EXEC_BACKEND builds.
+ * postmaster.c can reference them.
  */
 int			NamedLWLockTrancheRequests = 0;
 

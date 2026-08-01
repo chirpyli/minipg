@@ -2451,8 +2451,8 @@ InitWalSenderSlot(void)
 	int			i;
 
 	/*
-	 * WalSndCtl should be set up already (we inherit this by fork() or
-	 * EXEC_BACKEND mechanism from the postmaster).
+	 * WalSndCtl should be set up already (we inherit this by fork()
+	 * from the postmaster).
 	 */
 	Assert(WalSndCtl != NULL);
 	Assert(MyWalSnd == NULL);

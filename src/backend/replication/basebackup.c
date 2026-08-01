@@ -240,9 +240,6 @@ static const struct exclude_list_item noChecksumFiles[] = {
 	{"pg_filenode.map", false},
 	{"pg_internal.init", true},
 	{"PG_VERSION", false},
-#ifdef EXEC_BACKEND
-	{"config_exec_params", true},
-#endif
 	{NULL, false}
 };
 

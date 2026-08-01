@@ -96,10 +96,9 @@ InitPostmasterChild(void)
 	IsUnderPostmaster = true;	/* we are a postmaster subprocess now */
 
 	/*
-	 * Set reference point for stack-depth checking.  This might seem
-	 * redundant in !EXEC_BACKEND builds; but it's not because the postmaster
-	 * launches its children from signal handlers, so we might be running on
-	 * an alternative stack.
+	 * Set reference point for stack-depth checking.  The postmaster launches
+	 * its children from signal handlers, so we might be running on an
+	 * alternative stack.
 	 */
 	(void) set_stack_base();
 
@@ -118,10 +117,7 @@ InitPostmasterChild(void)
 	/* We don't want the postmaster's proc_exit() handlers */
 	on_exit_reset();
 
-	/* In EXEC_BACKEND case we will not have inherited BlockSig etc values */
-#ifdef EXEC_BACKEND
 	pqinitmask();
-#endif
 
 	/* Initialize process-local latch support */
 	InitializeLatchSupport();

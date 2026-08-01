@@ -118,11 +118,6 @@
 #define HBA_FILENAME	"pg_hba.conf"
 #define IDENT_FILENAME	"pg_ident.conf"
 
-#ifdef EXEC_BACKEND
-#define CONFIG_EXEC_PARAMS "global/config_exec_params"
-#define CONFIG_EXEC_PARAMS_NEW "global/config_exec_params.new"
-#endif
-
 /*
  * Precision with which REAL type guc values are to be printed for GUC
  * serialization.
@@ -525,9 +520,7 @@ static struct config_enum_entry shared_memory_options[] = {
 #ifndef WIN32
 	{"sysv", SHMEM_TYPE_SYSV, false},
 #endif
-#ifndef EXEC_BACKEND
 	{"mmap", SHMEM_TYPE_MMAP, false},
-#endif
 #ifdef WIN32
 	{"windows", SHMEM_TYPE_WINDOWS, false},
 #endif
@@ -5925,11 +5918,6 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 
 	/*
 	 * Reflect the final DataDir value back into the data_directory GUC var.
-	 * (If you are wondering why we don't just make them a single variable,
-	 * it's because the EXEC_BACKEND case needs DataDir to be transmitted to
-	 * child backends specially.  XXX is that still true?  Given that we now
-	 * chdir to DataDir, EXEC_BACKEND can read the config file without knowing
-	 * DataDir in advance.)
 	 */
 	SetConfigOption("data_directory", DataDir, PGC_POSTMASTER, PGC_S_OVERRIDE);
 
@@ -7441,15 +7429,10 @@ set_config_option(const char *name, const char *value,
 				 * we are trying to find out if the value is potentially good,
 				 * not actually use it.
 				 *
-				 * In EXEC_BACKEND builds, this works differently: we load all
-				 * non-default settings from the CONFIG_EXEC_PARAMS file
-				 * during backend start.  In that case we must accept
-				 * PGC_SIGHUP settings, so as to have the same value as if
-				 * we'd forked from the postmaster.  This can also happen when
-				 * using RestoreGUCState() within a background worker that
-				 * needs to have the same settings as the user backend that
-				 * started it. is_reload will be true when either situation
-				 * applies.
+				 * This can also happen when using RestoreGUCState() within a
+				 * background worker that needs to have the same settings as
+				 * the user backend that started it. is_reload will be true
+				 * when either situation applies.
 				 */
 				if (IsUnderPostmaster && changeVal && !is_reload)
 					return -1;
@@ -10285,231 +10268,6 @@ _ShowOption(struct config_generic *record, bool use_units)
 }
 
 
-#ifdef EXEC_BACKEND
-
-/*
- *	These routines dump out all non-default GUC options into a binary
- *	file that is read by all exec'ed backends.  The format is:
- *
- *		variable name, string, null terminated
- *		variable value, string, null terminated
- *		variable sourcefile, string, null terminated (empty if none)
- *		variable sourceline, integer
- *		variable source, integer
- *		variable scontext, integer
- */
-static void
-write_one_nondefault_variable(FILE *fp, struct config_generic *gconf)
-{
-	if (gconf->source == PGC_S_DEFAULT)
-		return;
-
-	fprintf(fp, "%s", gconf->name);
-	fputc(0, fp);
-
-	switch (gconf->vartype)
-	{
-		case PGC_BOOL:
-			{
-				struct config_bool *conf = (struct config_bool *) gconf;
-
-				if (*conf->variable)
-					fprintf(fp, "true");
-				else
-					fprintf(fp, "false");
-			}
-			break;
-
-		case PGC_INT:
-			{
-				struct config_int *conf = (struct config_int *) gconf;
-
-				fprintf(fp, "%d", *conf->variable);
-			}
-			break;
-
-		case PGC_REAL:
-			{
-				struct config_real *conf = (struct config_real *) gconf;
-
-				fprintf(fp, "%.17g", *conf->variable);
-			}
-			break;
-
-		case PGC_STRING:
-			{
-				struct config_string *conf = (struct config_string *) gconf;
-
-				if (*conf->variable)
-					fprintf(fp, "%s", *conf->variable);
-			}
-			break;
-
-		case PGC_ENUM:
-			{
-				struct config_enum *conf = (struct config_enum *) gconf;
-
-				fprintf(fp, "%s",
-						config_enum_lookup_by_value(conf, *conf->variable));
-			}
-			break;
-	}
-
-	fputc(0, fp);
-
-	if (gconf->sourcefile)
-		fprintf(fp, "%s", gconf->sourcefile);
-	fputc(0, fp);
-
-	fwrite(&gconf->sourceline, 1, sizeof(gconf->sourceline), fp);
-	fwrite(&gconf->source, 1, sizeof(gconf->source), fp);
-	fwrite(&gconf->scontext, 1, sizeof(gconf->scontext), fp);
-}
-
-void
-write_nondefault_variables(GucContext context)
-{
-	int			elevel;
-	FILE	   *fp;
-	int			i;
-
-	Assert(context == PGC_POSTMASTER || context == PGC_SIGHUP);
-
-	elevel = (context == PGC_SIGHUP) ? LOG : ERROR;
-
-	/*
-	 * Open file
-	 */
-	fp = AllocateFile(CONFIG_EXEC_PARAMS_NEW, "w");
-	if (!fp)
-	{
-		ereport(elevel,
-				(errcode_for_file_access(),
-				 errmsg("could not write to file \"%s\": %m",
-						CONFIG_EXEC_PARAMS_NEW)));
-		return;
-	}
-
-	for (i = 0; i < num_guc_variables; i++)
-	{
-		write_one_nondefault_variable(fp, guc_variables[i]);
-	}
-
-	if (FreeFile(fp))
-	{
-		ereport(elevel,
-				(errcode_for_file_access(),
-				 errmsg("could not write to file \"%s\": %m",
-						CONFIG_EXEC_PARAMS_NEW)));
-		return;
-	}
-
-	/*
-	 * Put new file in place.  This could delay on Win32, but we don't hold
-	 * any exclusive locks.
-	 */
-	rename(CONFIG_EXEC_PARAMS_NEW, CONFIG_EXEC_PARAMS);
-}
-
-
-/*
- *	Read string, including null byte from file
- *
- *	Return NULL on EOF and nothing read
- */
-static char *
-read_string_with_null(FILE *fp)
-{
-	int			i = 0,
-				ch,
-				maxlen = 256;
-	char	   *str = NULL;
-
-	do
-	{
-		if ((ch = fgetc(fp)) == EOF)
-		{
-			if (i == 0)
-				return NULL;
-			else
-				elog(FATAL, "invalid format of exec config params file");
-		}
-		if (i == 0)
-			str = guc_malloc(FATAL, maxlen);
-		else if (i == maxlen)
-			str = guc_realloc(FATAL, str, maxlen *= 2);
-		str[i++] = ch;
-	} while (ch != 0);
-
-	return str;
-}
-
-
-/*
- *	This routine loads a previous postmaster dump of its non-default
- *	settings.
- */
-void
-read_nondefault_variables(void)
-{
-	FILE	   *fp;
-	char	   *varname,
-			   *varvalue,
-			   *varsourcefile;
-	int			varsourceline;
-	GucSource	varsource;
-	GucContext	varscontext;
-
-	/*
-	 * Open file
-	 */
-	fp = AllocateFile(CONFIG_EXEC_PARAMS, "r");
-	if (!fp)
-	{
-		/* File not found is fine */
-		if (errno != ENOENT)
-			ereport(FATAL,
-					(errcode_for_file_access(),
-					 errmsg("could not read from file \"%s\": %m",
-							CONFIG_EXEC_PARAMS)));
-		return;
-	}
-
-	for (;;)
-	{
-		struct config_generic *record;
-
-		if ((varname = read_string_with_null(fp)) == NULL)
-			break;
-
-		if ((record = find_option(varname, true, false, FATAL)) == NULL)
-			elog(FATAL, "failed to locate variable \"%s\" in exec config params file", varname);
-
-		if ((varvalue = read_string_with_null(fp)) == NULL)
-			elog(FATAL, "invalid format of exec config params file");
-		if ((varsourcefile = read_string_with_null(fp)) == NULL)
-			elog(FATAL, "invalid format of exec config params file");
-		if (fread(&varsourceline, 1, sizeof(varsourceline), fp) != sizeof(varsourceline))
-			elog(FATAL, "invalid format of exec config params file");
-		if (fread(&varsource, 1, sizeof(varsource), fp) != sizeof(varsource))
-			elog(FATAL, "invalid format of exec config params file");
-		if (fread(&varscontext, 1, sizeof(varscontext), fp) != sizeof(varscontext))
-			elog(FATAL, "invalid format of exec config params file");
-
-		(void) set_config_option(varname, varvalue,
-								 varscontext, varsource,
-								 GUC_ACTION_SET, true, 0, true);
-		if (varsourcefile[0])
-			set_config_sourcefile(varname, varsourcefile, varsourceline);
-
-		free(varname);
-		free(varvalue);
-		free(varsourcefile);
-	}
-
-	FreeFile(fp);
-}
-#endif							/* EXEC_BACKEND */
 
 /*
  * can_skip_gucvar:
@@ -11917,8 +11675,8 @@ check_timezone_abbreviations(char **newval, void **extra, GucSource source)
 	 * replace it with "Default".  This hack has two purposes: to avoid
 	 * wasting cycles loading values that might soon be overridden from the
 	 * config file, and to avoid trying to read the timezone abbrev files
-	 * during InitializeGUCOptions().  The latter doesn't work in an
-	 * EXEC_BACKEND subprocess because my_exec_path hasn't been set yet and so
+	 * during InitializeGUCOptions().  The latter doesn't work during
+	 * InitializeGUCOptions() because my_exec_path hasn't been set yet and so
 	 * we can't locate PGSHAREDIR.
 	 */
 	if (*newval == NULL)

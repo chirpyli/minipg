@@ -96,8 +96,7 @@ static pg_noinline void mul_size_error(Size s1, Size s2) pg_attribute_noreturn()
  * In normal multi-backend operation, this is called once during
  * postmaster startup, and not at all by individual backend startup
  * (since the backends inherit an already-initialized context subsystem
- * by virtue of being forked off the postmaster).  But in an EXEC_BACKEND
- * build, each process must do this for itself.
+ * by virtue of being forked off the postmaster).
  *
  * In a standalone backend this must be called during backend startup.
  */

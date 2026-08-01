@@ -1067,9 +1067,8 @@ ssl_external_passwd_cb(char *buf, int size, int rwflag, void *userdata)
  *
  * If OpenSSL is told to use a passphrase-protected server key, by default
  * it will issue a prompt on /dev/tty and try to read a key from there.
- * That's no good during a postmaster SIGHUP cycle, not to mention SSL context
- * reload in an EXEC_BACKEND postmaster child.  So override it with this dummy
- * function that just returns an empty passphrase, guaranteeing failure.
+ * That's no good during a postmaster SIGHUP cycle.  So override it with this
+ * dummy function that just returns an empty passphrase, guaranteeing failure.
  */
 static int
 dummy_ssl_passwd_cb(char *buf, int size, int rwflag, void *userdata)

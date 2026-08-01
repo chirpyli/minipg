@@ -168,7 +168,7 @@ static PgStat_MsgSLRU SLRUStats[SLRU_NUM_ELEMENTS];
  * Local data
  * ----------
  */
-NON_EXEC_STATIC pgsocket pgStatSock = PGINVALID_SOCKET;
+static pgsocket pgStatSock = PGINVALID_SOCKET;
 
 static struct sockaddr_storage pgStatAddr;
 
@@ -299,11 +299,8 @@ static instr_time total_func_time;
  * Local function forward declarations
  * ----------
  */
-#ifdef EXEC_BACKEND
-static pid_t pgstat_forkexec(void);
-#endif
 
-NON_EXEC_STATIC void PgstatCollectorMain(int argc, char *argv[]) pg_attribute_noreturn();
+static void PgstatCollectorMain(int argc, char *argv[]) pg_attribute_noreturn();
 
 static PgStat_StatDBEntry *pgstat_get_db_entry(Oid databaseid, bool create);
 static PgStat_StatTabEntry *pgstat_get_tab_entry(PgStat_StatDBEntry *dbentry,
@@ -716,30 +713,6 @@ pgstat_reset_all(void)
 	pgstat_reset_remove_files(PGSTAT_STAT_PERMANENT_DIRECTORY);
 }
 
-#ifdef EXEC_BACKEND
-
-/*
- * pgstat_forkexec() -
- *
- * Format up the arglist for, then fork and exec, statistics collector process
- */
-static pid_t
-pgstat_forkexec(void)
-{
-	char	   *av[10];
-	int			ac = 0;
-
-	av[ac++] = "postgres";
-	av[ac++] = "--forkcol";
-	av[ac++] = NULL;			/* filled in by postmaster_forkexec */
-
-	av[ac] = NULL;
-	Assert(ac < lengthof(av));
-
-	return postmaster_forkexec(ac, av);
-}
-#endif							/* EXEC_BACKEND */
-
 
 /*
  * pgstat_start() -
@@ -779,18 +752,13 @@ pgstat_start(void)
 	/*
 	 * Okay, fork off the collector.
 	 */
-#ifdef EXEC_BACKEND
-	switch ((pgStatPid = pgstat_forkexec()))
-#else
 	switch ((pgStatPid = fork_process()))
-#endif
 	{
 		case -1:
 			ereport(LOG,
 					(errmsg("could not fork statistics collector: %m")));
 			return 0;
 
-#ifndef EXEC_BACKEND
 		case 0:
 			/* in postmaster child ... */
 			InitPostmasterChild();
@@ -804,7 +772,6 @@ pgstat_start(void)
 
 			PgstatCollectorMain(0, NULL);
 			break;
-#endif
 
 		default:
 			return (int) pgStatPid;
@@ -3169,11 +3136,9 @@ pgstat_send_slru(void)
  *
  *	Start up the statistics collector process.  This is the body of the
  *	postmaster child process.
- *
- *	The argc/argv parameters are valid only in EXEC_BACKEND case.
  * ----------
  */
-NON_EXEC_STATIC void
+static void
 PgstatCollectorMain(int argc, char *argv[])
 {
 	int			len;

@@ -233,12 +233,11 @@ InitializeLatchSupport(void)
 		}
 		else
 		{
-			/*
-			 * Postmaster didn't create a self-pipe ... or else we're in an
-			 * EXEC_BACKEND build, in which case it doesn't matter since the
-			 * postmaster's pipe FDs were closed by the action of FD_CLOEXEC.
-			 * fd.c won't have state to clean up, either.
-			 */
+		/*
+		 * Postmaster didn't create a self-pipe.  In that case it doesn't
+		 * matter since the postmaster's pipe FDs were closed by the action
+		 * of FD_CLOEXEC.  fd.c won't have state to clean up, either.
+		 */
 			Assert(selfpipe_readfd == -1);
 		}
 	}

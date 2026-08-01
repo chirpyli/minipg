@@ -50,9 +50,7 @@
  *		(c) In standard Unix-ish environments, individual backends do not
  *	need to re-establish their local pointers into shared memory, because
  *	they inherit correct values of those variables via fork() from the
- *	postmaster.  However, this does not work in the EXEC_BACKEND case.
- *	In ports using EXEC_BACKEND, new backends have to set up their local
- *	pointers using the method described in (b) above.
+ *	postmaster.
  *
  *		(d) memory allocation model: shared memory can never be
  *	freed, once allocated.   Each hash table has its own free list,

@@ -9,10 +9,9 @@
  * In either implementation, typedef PGSemaphore is equivalent to "sem_t *".
  * With unnamed semaphores, the sem_t structs live in an array in shared
  * memory.  With named semaphores, that's not true because we cannot persuade
- * sem_open to do its allocation there.  Therefore, the named-semaphore code
- * *does not cope with EXEC_BACKEND*.  The sem_t structs will just be in the
+ * sem_open to do its allocation there.  The sem_t structs will just be in the
  * postmaster's private memory, where they are successfully inherited by
- * forked backends, but they could not be accessed by exec'd backends.
+ * forked backends.
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -37,11 +36,7 @@
 #include "storage/shmem.h"
 
 
-/* see file header comment */
-#if defined(USE_NAMED_POSIX_SEMAPHORES) && defined(EXEC_BACKEND)
-#error cannot use named POSIX semaphores with EXEC_BACKEND
-#endif
-
+/* typedef PGSemaphore is equivalent to pointer to sem_t */
 typedef union SemTPadded
 {
 	sem_t		pgsem;

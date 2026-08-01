@@ -51,14 +51,6 @@ extern int	MaxLivePostmasterChildren(void);
 
 extern bool PostmasterMarkPIDForWorkerNotify(int);
 
-#ifdef EXEC_BACKEND
-extern pid_t postmaster_forkexec(int argc, char *argv[]);
-extern void SubPostmasterMain(int argc, char *argv[]) pg_attribute_noreturn();
-
-extern Size ShmemBackendArraySize(void);
-extern void ShmemBackendArrayAllocation(void);
-#endif
-
 /*
  * Note: MAX_BACKENDS is limited to 2^18-1 because that's the width reserved
  * for buffer references in buf_internals.h.  This limitation could be lifted

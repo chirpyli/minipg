@@ -3091,10 +3091,9 @@ RemovePgTempFiles(void)
 	FreeDir(spc_dir);
 
 	/*
-	 * In EXEC_BACKEND case there is a pgsql_tmp directory at the top level of
-	 * DataDir as well.  However, that is *not* cleaned here because doing so
-	 * would create a race condition.  It's done separately, earlier in
-	 * postmaster startup.
+	 * The pgsql_tmp directory at the top level of DataDir is *not* cleaned
+	 * here because doing so would create a race condition.  It's done
+	 * separately, earlier in postmaster startup.
 	 */
 }
 

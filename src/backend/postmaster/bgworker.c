@@ -622,27 +622,6 @@ ResetBackgroundWorkerCrashTimes(void)
 	}
 }
 
-#ifdef EXEC_BACKEND
-/*
- * In EXEC_BACKEND mode, workers use this to retrieve their details from
- * shared memory.
- */
-BackgroundWorker *
-BackgroundWorkerEntry(int slotno)
-{
-	static BackgroundWorker myEntry;
-	BackgroundWorkerSlot *slot;
-
-	Assert(slotno < BackgroundWorkerData->total_slots);
-	slot = &BackgroundWorkerData->slot[slotno];
-	Assert(slot->in_use);
-
-	/* must copy this in case we don't intend to retain shmem access */
-	memcpy(&myEntry, &slot->worker, sizeof myEntry);
-	return &myEntry;
-}
-#endif
-
 /*
  * Complain about the BackgroundWorker definition using error level elevel.
  * Return true if it looks ok, false if not (unless elevel >= ERROR, in
@@ -846,14 +825,10 @@ StartBackgroundWorker(void)
 		BaseInit();
 
 		/*
-		 * Create a per-backend PGPROC struct in shared memory, except in the
-		 * EXEC_BACKEND case where this was done in SubPostmasterMain. We must
-		 * do this before we can use LWLocks (and in the EXEC_BACKEND case we
-		 * already had to do some stuff with LWLocks).
+		 * Create a per-backend PGPROC struct in shared memory.  We must do
+		 * this before we can use LWLocks.
 		 */
-#ifndef EXEC_BACKEND
 		InitProcess();
-#endif
 	}
 
 	/*
@@ -1254,8 +1229,7 @@ TerminateBackgroundWorker(BackgroundWorkerHandle *handle)
  * boundaries.  We can't pass actual function addresses because of the
  * possibility that the function has been loaded at a different address
  * in a different process.  This is obviously a hazard for functions in
- * loadable libraries, but it can happen even for functions in the core code
- * on platforms using EXEC_BACKEND (e.g., Windows).
+ * loadable libraries.
  *
  * At some point it might be worthwhile to get rid of InternalBGWorkers[]
  * in favor of applying load_external_function() for core functions too;

@@ -305,12 +305,8 @@ static WorkerInfo MyWorkerInfo = NULL;
 /* PID of launcher, valid only in worker while shutting down */
 int			AutovacuumLauncherPid = 0;
 
-#ifdef EXEC_BACKEND
-static pid_t avlauncher_forkexec(void);
-static pid_t avworker_forkexec(void);
-#endif
-NON_EXEC_STATIC void AutoVacWorkerMain(int argc, char *argv[]) pg_attribute_noreturn();
-NON_EXEC_STATIC void AutoVacLauncherMain(int argc, char *argv[]) pg_attribute_noreturn();
+static void AutoVacWorkerMain(int argc, char *argv[]) pg_attribute_noreturn();
+static void AutoVacLauncherMain(int argc, char *argv[]) pg_attribute_noreturn();
 
 static Oid	do_start_worker(void);
 static void HandleAutoVacLauncherInterrupts(void);
@@ -359,38 +355,6 @@ static void autovac_refresh_stats(void);
  *					  AUTOVACUUM LAUNCHER CODE
  ********************************************************************/
 
-#ifdef EXEC_BACKEND
-/*
- * forkexec routine for the autovacuum launcher process.
- *
- * Format up the arglist, then fork and exec.
- */
-static pid_t
-avlauncher_forkexec(void)
-{
-	char	   *av[10];
-	int			ac = 0;
-
-	av[ac++] = "postgres";
-	av[ac++] = "--forkavlauncher";
-	av[ac++] = NULL;			/* filled in by postmaster_forkexec */
-	av[ac] = NULL;
-
-	Assert(ac < lengthof(av));
-
-	return postmaster_forkexec(ac, av);
-}
-
-/*
- * We need this set from the outside, before InitProcess is called
- */
-void
-AutovacuumLauncherIAm(void)
-{
-	am_autovacuum_launcher = true;
-}
-#endif
-
 /*
  * Main entry point for autovacuum launcher process, to be called from the
  * postmaster.
@@ -400,18 +364,13 @@ StartAutoVacLauncher(void)
 {
 	pid_t		AutoVacPID;
 
-#ifdef EXEC_BACKEND
-	switch ((AutoVacPID = avlauncher_forkexec()))
-#else
 	switch ((AutoVacPID = fork_process()))
-#endif
 	{
 		case -1:
 			ereport(LOG,
 					(errmsg("could not fork autovacuum launcher process: %m")));
 			return 0;
 
-#ifndef EXEC_BACKEND
 		case 0:
 			/* in postmaster child ... */
 			InitPostmasterChild();
@@ -421,7 +380,7 @@ StartAutoVacLauncher(void)
 
 			AutoVacLauncherMain(0, NULL);
 			break;
-#endif
+
 		default:
 			return (int) AutoVacPID;
 	}
@@ -433,7 +392,7 @@ StartAutoVacLauncher(void)
 /*
  * Main loop for the autovacuum launcher process.
  */
-NON_EXEC_STATIC void
+static void
 AutoVacLauncherMain(int argc, char *argv[])
 {
 	sigjmp_buf	local_sigjmp_buf;
@@ -473,14 +432,10 @@ AutoVacLauncherMain(int argc, char *argv[])
 	BaseInit();
 
 	/*
-	 * Create a per-backend PGPROC struct in shared memory, except in the
-	 * EXEC_BACKEND case where this was done in SubPostmasterMain. We must do
-	 * this before we can use LWLocks (and in the EXEC_BACKEND case we already
-	 * had to do some stuff with LWLocks).
+	 * Create a per-backend PGPROC struct in shared memory.  We must do this
+	 * before we can use LWLocks.
 	 */
-#ifndef EXEC_BACKEND
 	InitProcess();
-#endif
 
 	InitPostgres(NULL, InvalidOid, NULL, InvalidOid, NULL, false);
 
@@ -1440,38 +1395,6 @@ avl_sigusr2_handler(SIGNAL_ARGS)
  *					  AUTOVACUUM WORKER CODE
  ********************************************************************/
 
-#ifdef EXEC_BACKEND
-/*
- * forkexec routines for the autovacuum worker.
- *
- * Format up the arglist, then fork and exec.
- */
-static pid_t
-avworker_forkexec(void)
-{
-	char	   *av[10];
-	int			ac = 0;
-
-	av[ac++] = "postgres";
-	av[ac++] = "--forkavworker";
-	av[ac++] = NULL;			/* filled in by postmaster_forkexec */
-	av[ac] = NULL;
-
-	Assert(ac < lengthof(av));
-
-	return postmaster_forkexec(ac, av);
-}
-
-/*
- * We need this set from the outside, before InitProcess is called
- */
-void
-AutovacuumWorkerIAm(void)
-{
-	am_autovacuum_worker = true;
-}
-#endif
-
 /*
  * Main entry point for autovacuum worker process.
  *
@@ -1482,18 +1405,13 @@ StartAutoVacWorker(void)
 {
 	pid_t		worker_pid;
 
-#ifdef EXEC_BACKEND
-	switch ((worker_pid = avworker_forkexec()))
-#else
 	switch ((worker_pid = fork_process()))
-#endif
 	{
 		case -1:
 			ereport(LOG,
 					(errmsg("could not fork autovacuum worker process: %m")));
 			return 0;
 
-#ifndef EXEC_BACKEND
 		case 0:
 			/* in postmaster child ... */
 			InitPostmasterChild();
@@ -1503,7 +1421,7 @@ StartAutoVacWorker(void)
 
 			AutoVacWorkerMain(0, NULL);
 			break;
-#endif
+
 		default:
 			return (int) worker_pid;
 	}
@@ -1515,7 +1433,7 @@ StartAutoVacWorker(void)
 /*
  * AutoVacWorkerMain
  */
-NON_EXEC_STATIC void
+static void
 AutoVacWorkerMain(int argc, char *argv[])
 {
 	sigjmp_buf	local_sigjmp_buf;
@@ -1555,14 +1473,10 @@ AutoVacWorkerMain(int argc, char *argv[])
 	BaseInit();
 
 	/*
-	 * Create a per-backend PGPROC struct in shared memory, except in the
-	 * EXEC_BACKEND case where this was done in SubPostmasterMain. We must do
-	 * this before we can use LWLocks (and in the EXEC_BACKEND case we already
-	 * had to do some stuff with LWLocks).
+	 * Create a per-backend PGPROC struct in shared memory.  We must do this
+	 * before we can use LWLocks.
 	 */
-#ifndef EXEC_BACKEND
 	InitProcess();
-#endif
 
 	/*
 	 * If an exception is encountered, processing resumes here.

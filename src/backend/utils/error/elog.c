@@ -2251,9 +2251,9 @@ write_console(const char *line, int len)
 	 *
 	 * In contrast to write_eventlog(), don't skip straight to write() based
 	 * on the applicable encodings.  Unlike WriteConsoleW(), write() depends
-	 * on the suitability of the console output code page.  Since we put
-	 * stderr into binary mode in SubPostmasterMain(), write() skips the
-	 * necessary translation anyway.
+	 * on the suitability of the console output code page.  Since the
+	 * postmaster puts stderr into binary mode, write() skips the necessary
+	 * translation anyway.
 	 *
 	 * WriteConsoleW() will fail if stderr is redirected, so just fall through
 	 * to writing unconverted to the logfile in this case.

@@ -80,16 +80,9 @@ RequestAddinShmemSpace(Size size)
  * CreateSharedMemoryAndSemaphores
  *		Creates and initializes shared memory and semaphores.
  *
- * This is called by the postmaster or by a standalone backend.
- * It is also called by a backend forked from the postmaster in the
- * EXEC_BACKEND case.  In the latter case, the shared memory segment
- * already exists and has been physically attached to, but we have to
- * initialize pointers in local memory that reference the shared structures,
- * because we didn't inherit the correct pointer values from the postmaster
- * as we do in the fork() scenario.  The easiest way to do that is to run
- * through the same code as before.  (Note that the called routines mostly
- * check IsUnderPostmaster, rather than EXEC_BACKEND, to detect this case.
- * This is a bit code-wasteful and could be cleaned up.)
+ * This is called by the postmaster or by a standalone backend.  Child
+ * backends inherit the shared memory mappings through fork(), so they do
+ * not need to run this again.
  */
 void
 CreateSharedMemoryAndSemaphores(void)
@@ -150,9 +143,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
 		size = add_size(size, AsyncShmemSize());
-#ifdef EXEC_BACKEND
-		size = add_size(size, ShmemBackendArraySize());
-#endif
 
 		/* freeze the addin request size and include it */
 		addin_request_allowed = false;
@@ -185,13 +175,8 @@ CreateSharedMemoryAndSemaphores(void)
 	}
 	else
 	{
-		/*
-		 * We are reattaching to an existing shared memory segment. This
-		 * should only be reached in the EXEC_BACKEND case.
-		 */
-#ifndef EXEC_BACKEND
+		/* Child backends inherit the segment, so this must not happen. */
 		elog(PANIC, "should be attached to shared memory already");
-#endif
 	}
 
 	/*
@@ -269,15 +254,6 @@ CreateSharedMemoryAndSemaphores(void)
 	BTreeShmemInit();
 	SyncScanShmemInit();
 	AsyncShmemInit();
-
-#ifdef EXEC_BACKEND
-
-	/*
-	 * Alloc the win32 shared backend array
-	 */
-	if (!IsUnderPostmaster)
-		ShmemBackendArrayAllocation();
-#endif
 
 	/* Initialize dynamic shared memory facilities. */
 	if (!IsUnderPostmaster)

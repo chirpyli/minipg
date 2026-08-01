@@ -194,7 +194,7 @@ WalReceiverMain(void)
 
 	/*
 	 * WalRcv should be set up already (if we are a backend, we inherit this
-	 * by fork() or EXEC_BACKEND mechanism from the postmaster).
+	 * by fork() from the postmaster).
 	 */
 	Assert(walrcv != NULL);
 

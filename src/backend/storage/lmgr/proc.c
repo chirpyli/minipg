@@ -74,11 +74,11 @@ PGPROC	   *MyProc = NULL;
  * relatively infrequently (only at backend startup or shutdown) and not for
  * very long, so a spinlock is okay.
  */
-NON_EXEC_STATIC slock_t *ProcStructLock = NULL;
+static slock_t *ProcStructLock = NULL;
 
 /* Pointers to shared-memory structures */
 PROC_HDR   *ProcGlobal = NULL;
-NON_EXEC_STATIC PGPROC *AuxiliaryProcs = NULL;
+static PGPROC *AuxiliaryProcs = NULL;
 PGPROC	   *PreparedXactProcs = NULL;
 
 /* If we are waiting for a lock, this points to the associated LOCALLOCK */
@@ -151,9 +151,7 @@ ProcGlobalSemas(void)
  *	  implementation typically requires us to create semaphores in the
  *	  postmaster, not in backends.
  *
- * Note: this is NOT called by individual backends under a postmaster,
- * not even in the EXEC_BACKEND case.  The ProcGlobal and AuxiliaryProcs
- * pointers must be propagated specially for EXEC_BACKEND operation.
+ * Note: this is NOT called by individual backends under a postmaster.
  */
 void
 InitProcGlobal(void)
@@ -306,7 +304,7 @@ InitProcess(void)
 
 	/*
 	 * ProcGlobal should be set up already (if we are a backend, we inherit
-	 * this by fork() or EXEC_BACKEND mechanism from the postmaster).
+	 * this by fork() from the postmaster).
 	 */
 	if (ProcGlobal == NULL)
 		elog(PANIC, "proc header uninitialized");
@@ -476,8 +474,8 @@ InitProcess(void)
  * InitProcessPhase2 -- make MyProc visible in the shared ProcArray.
  *
  * This is separate from InitProcess because we can't acquire LWLocks until
- * we've created a PGPROC, but in the EXEC_BACKEND case ProcArrayAdd won't
- * work until after we've done CreateSharedMemoryAndSemaphores.
+ * we've created a PGPROC.  ProcArrayAdd won't work until after we've done
+ * CreateSharedMemoryAndSemaphores.
  */
 void
 InitProcessPhase2(void)
@@ -522,7 +520,7 @@ InitAuxiliaryProcess(void)
 
 	/*
 	 * ProcGlobal should be set up already (if we are a backend, we inherit
-	 * this by fork() or EXEC_BACKEND mechanism from the postmaster).
+	 * this by fork() from the postmaster).
 	 */
 	if (ProcGlobal == NULL || AuxiliaryProcs == NULL)
 		elog(PANIC, "proc header uninitialized");

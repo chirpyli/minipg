@@ -1,8 +1,6 @@
 /*
  * fork_process.c
- *	 A simple wrapper on top of fork(). This does not handle the
- *	 EXEC_BACKEND case; it might be extended to do so, but it would be
- *	 considerably more complex.
+ *	 A simple wrapper on top of fork().
  *
  * Copyright (c) 1996-2021, PostgreSQL Global Development Group
  *

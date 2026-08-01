@@ -119,8 +119,7 @@ static void *dsm_main_space_begin = NULL;
  * allow the postmaster to map dynamic shared memory segments before it
  * begins to start child processes, provided that each process adjusted
  * the reference counts for those segments in the control segment at
- * startup time, but there's no obvious need for such a facility, which
- * would also be complex to handle in the EXEC_BACKEND case.  Once the
+ * startup time, but there's no obvious need for such a facility.  Once the
  * postmaster has begun spawning children, there's an additional problem:
  * each new mapping would require an update to the control segment,
  * which requires locking, in which the postmaster must not be involved.
@@ -387,52 +386,15 @@ dsm_postmaster_shutdown(int code, Datum arg)
 }
 
 /*
- * Prepare this backend for dynamic shared memory usage.  Under EXEC_BACKEND,
- * we must reread the state file and map the control segment; in other cases,
- * we'll have inherited the postmaster's mapping and global variables.
+ * Prepare this backend for dynamic shared memory usage.  We inherit the
+ * postmaster's mapping and global variables through fork(), so there is
+ * nothing to do here beyond noting that initialization has happened.
  */
 static void
 dsm_backend_startup(void)
 {
-#ifdef EXEC_BACKEND
-	{
-		void	   *control_address = NULL;
-
-		/* Attach control segment. */
-		Assert(dsm_control_handle != 0);
-		dsm_impl_op(DSM_OP_ATTACH, dsm_control_handle, 0,
-					&dsm_control_impl_private, &control_address,
-					&dsm_control_mapped_size, ERROR);
-		dsm_control = control_address;
-		/* If control segment doesn't look sane, something is badly wrong. */
-		if (!dsm_control_segment_sane(dsm_control, dsm_control_mapped_size))
-		{
-			dsm_impl_op(DSM_OP_DETACH, dsm_control_handle, 0,
-						&dsm_control_impl_private, &control_address,
-						&dsm_control_mapped_size, WARNING);
-			ereport(FATAL,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("dynamic shared memory control segment is not valid")));
-		}
-	}
-#endif
-
 	dsm_init_done = true;
 }
-
-#ifdef EXEC_BACKEND
-/*
- * When running under EXEC_BACKEND, we get a callback here when the main
- * shared memory segment is re-attached, so that we can record the control
- * handle retrieved from it.
- */
-void
-dsm_set_control_handle(dsm_handle h)
-{
-	Assert(dsm_control_handle == 0 && h != 0);
-	dsm_control_handle = h;
-}
-#endif
 
 /*
  * Reserve some space in the main shared memory segment for DSM segments.

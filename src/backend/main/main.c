@@ -170,11 +170,6 @@ main(int argc, char *argv[])
 	 * Dispatch to one of various subprograms depending on first argument.
 	 */
 
-#ifdef EXEC_BACKEND
-	if (argc > 1 && strncmp(argv[1], "--fork", 6) == 0)
-		SubPostmasterMain(argc, argv);	/* does not return */
-#endif
-
 	if (argc > 1 && strcmp(argv[1], "--boot") == 0)
 		AuxiliaryProcessMain(argc, argv);	/* does not return */
 	else if (argc > 1 && strcmp(argv[1], "--describe-config") == 0)
@@ -194,8 +189,7 @@ main(int argc, char *argv[])
  * Place platform-specific startup hacks here.  This is the right
  * place to put code that must be executed early in the launch of any new
  * server process.  Note that this code will NOT be executed when a backend
- * or sub-bootstrap process is forked, unless we are in a fork/exec
- * environment (ie EXEC_BACKEND is defined).
+ * or sub-bootstrap process is forked.
  *
  * XXX The need for code here is proof that the platform in question
  * is too brain-dead to provide a standard C execution environment
