@@ -77,9 +77,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -104,7 +102,7 @@
 /* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
 #if defined(HAVE_SYNC_FILE_RANGE)
 #define PG_FLUSH_DATA_WORKS 1
-#elif !defined(WIN32) && defined(MS_ASYNC)
+#elif defined(MS_ASYNC)
 #define PG_FLUSH_DATA_WORKS 1
 #elif defined(USE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 #define PG_FLUSH_DATA_WORKS 1
@@ -351,7 +349,7 @@ static int	fsync_parent_path(const char *fname, int elevel);
 int
 pg_fsync(int fd)
 {
-#if !defined(WIN32) && defined(USE_ASSERT_CHECKING)
+#ifdef USE_ASSERT_CHECKING
 	struct stat st;
 
 	/*
@@ -417,9 +415,7 @@ pg_fsync_writethrough(int fd)
 {
 	if (enableFsync)
 	{
-#ifdef WIN32
-		return _commit(fd);
-#elif defined(F_FULLFSYNC)
+#if defined(F_FULLFSYNC)
 		return (fcntl(fd, F_FULLFSYNC, 0) == -1) ? -1 : 0;
 #else
 		errno = ENOSYS;
@@ -515,7 +511,7 @@ pg_flush_data(int fd, off_t offset, off_t nbytes)
 		return;
 	}
 #endif
-#if !defined(WIN32) && defined(MS_ASYNC)
+#if defined(MS_ASYNC)
 	{
 		void	   *p;
 		static int	pagesize = 0;
@@ -631,26 +627,7 @@ pg_flush_data(int fd, off_t offset, off_t nbytes)
 int
 pg_truncate(const char *path, off_t length)
 {
-#ifdef WIN32
-	int			save_errno;
-	int			ret;
-	int			fd;
-
-	fd = OpenTransientFile(path, O_RDWR | PG_BINARY);
-	if (fd >= 0)
-	{
-		ret = ftruncate(fd, length);
-		save_errno = errno;
-		CloseTransientFile(fd);
-		errno = save_errno;
-	}
-	else
-		ret = -1;
-
-	return ret;
-#else
 	return truncate(path, length);
-#endif
 }
 
 /*
@@ -2047,26 +2024,9 @@ retry:
 	if (returnCode < 0)
 	{
 		/*
-		 * Windows may run out of kernel buffers and return "Insufficient
-		 * system resources" error.  Wait a bit and retry to solve it.
-		 *
-		 * It is rumored that EINTR is also possible on some Unix filesystems,
-		 * in which case immediate retry is indicated.
+		 * It is rumored that EINTR is possible on some Unix filesystems, in
+		 * which case immediate retry is indicated.
 		 */
-#ifdef WIN32
-		DWORD		error = GetLastError();
-
-		switch (error)
-		{
-			case ERROR_NO_SYSTEM_RESOURCES:
-				pg_usleep(1000L);
-				errno = EINTR;
-				break;
-			default:
-				_dosmaperr(error);
-				break;
-		}
-#endif
 		/* OK to retry if interrupted */
 		if (errno == EINTR)
 			goto retry;
@@ -2151,20 +2111,6 @@ retry:
 		/*
 		 * See comments in FileRead()
 		 */
-#ifdef WIN32
-		DWORD		error = GetLastError();
-
-		switch (error)
-		{
-			case ERROR_NO_SYSTEM_RESOURCES:
-				pg_usleep(1000L);
-				errno = EINTR;
-				break;
-			default:
-				_dosmaperr(error);
-				break;
-		}
-#endif
 		/* OK to retry if interrupted */
 		if (errno == EINTR)
 			goto retry;

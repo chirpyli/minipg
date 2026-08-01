@@ -75,9 +75,6 @@
 #include <gnu/libc-version.h>
 #endif
 
-#ifdef WIN32
-#include <shlwapi.h>
-#endif
 
 #define		MAX_L10N_DATA		80
 
@@ -118,9 +115,6 @@ typedef struct
 static HTAB *collation_cache = NULL;
 
 
-#if defined(WIN32) && defined(LC_MESSAGES)
-static char *IsoLocaleName(const char *);	/* MSVC specific */
-#endif
 
 #ifdef USE_ICU
 static void icu_set_collation_attributes(UCollator *collator, const char *loc);
@@ -146,27 +140,7 @@ pg_perm_setlocale(int category, const char *locale)
 	char	   *result;
 	const char *envvar;
 
-#ifndef WIN32
 	result = setlocale(category, locale);
-#else
-
-	/*
-	 * On Windows, setlocale(LC_MESSAGES) does not work, so just assume that
-	 * the given value is good and set it in the environment variables. We
-	 * must ignore attempts to set to "", which means "keep using the old
-	 * environment value".
-	 */
-#ifdef LC_MESSAGES
-	if (category == LC_MESSAGES)
-	{
-		result = (char *) locale;
-		if (locale == NULL || locale[0] == '\0')
-			return result;
-	}
-	else
-#endif
-		result = setlocale(category, locale);
-#endif							/* WIN32 */
 
 	if (result == NULL)
 		return result;			/* fall out immediately on failure */
@@ -204,12 +178,6 @@ pg_perm_setlocale(int category, const char *locale)
 #ifdef LC_MESSAGES
 		case LC_MESSAGES:
 			envvar = "LC_MESSAGES";
-#ifdef WIN32
-			result = IsoLocaleName(locale);
-			if (result == NULL)
-				result = (char *) locale;
-			elog(DEBUG3, "IsoLocaleName() executed; locale: \"%s\"", result);
-#endif							/* WIN32 */
 			break;
 #endif							/* LC_MESSAGES */
 		case LC_MONETARY:
@@ -345,10 +313,8 @@ check_locale_messages(char **newval, void **extra, GucSource source)
 
 	/*
 	 * LC_MESSAGES category does not exist everywhere, but accept it anyway
-	 *
-	 * On Windows, we can't even check the value, so accept blindly
 	 */
-#if defined(LC_MESSAGES) && !defined(WIN32)
+#ifdef LC_MESSAGES
 	return check_locale(LC_MESSAGES, *newval, NULL);
 #else
 	return true;
@@ -471,9 +437,6 @@ PGLC_localeconv(void)
 	struct lconv worklconv;
 	char	   *save_lc_monetary;
 	char	   *save_lc_numeric;
-#ifdef WIN32
-	char	   *save_lc_ctype;
-#endif
 
 	/* Did we do it already? */
 	if (CurrentLocaleConvValid)
@@ -511,8 +474,6 @@ PGLC_localeconv(void)
 		elog(ERROR, "setlocale(NULL) failed");
 	save_lc_numeric = pstrdup(save_lc_numeric);
 
-#ifdef WIN32
-
 	/*
 	 * The POSIX standard explicitly says that it is undefined what happens if
 	 * LC_MONETARY or LC_NUMERIC imply an encoding (codeset) different from
@@ -521,23 +482,9 @@ PGLC_localeconv(void)
 	 * codeset implied by the LC_MONETARY or LC_NUMERIC locale name.  Hence,
 	 * once we have successfully collected the localeconv() results, we will
 	 * convert them from that codeset to the desired server encoding.
-	 *
-	 * Windows, of course, resolutely does things its own way; on that
-	 * platform LC_CTYPE has to match LC_MONETARY/LC_NUMERIC to get sane
-	 * results.  Hence, we must temporarily set that category as well.
 	 */
 
-	/* Save prevailing value of ctype locale */
-	save_lc_ctype = setlocale(LC_CTYPE, NULL);
-	if (!save_lc_ctype)
-		elog(ERROR, "setlocale(NULL) failed");
-	save_lc_ctype = pstrdup(save_lc_ctype);
-
 	/* Here begins the critical section where we must not throw error */
-
-	/* use numeric to set the ctype */
-	setlocale(LC_CTYPE, locale_numeric);
-#endif
 
 	/* Get formatting information for numeric */
 	setlocale(LC_NUMERIC, locale_numeric);
@@ -547,11 +494,6 @@ PGLC_localeconv(void)
 	worklconv.decimal_point = strdup(extlconv->decimal_point);
 	worklconv.thousands_sep = strdup(extlconv->thousands_sep);
 	worklconv.grouping = strdup(extlconv->grouping);
-
-#ifdef WIN32
-	/* use monetary to set the ctype */
-	setlocale(LC_CTYPE, locale_monetary);
-#endif
 
 	/* Get formatting information for monetary */
 	setlocale(LC_MONETARY, locale_monetary);
@@ -577,16 +519,10 @@ PGLC_localeconv(void)
 
 	/*
 	 * Restore the prevailing locale settings; failure to do so is fatal.
-	 * Possibly we could limp along with nondefault LC_MONETARY or LC_NUMERIC,
-	 * but proceeding with the wrong value of LC_CTYPE would certainly be bad
-	 * news; and considering that the prevailing LC_MONETARY and LC_NUMERIC
-	 * are almost certainly "C", there's really no reason that restoring those
-	 * should fail.
+	 * Considering that the prevailing LC_MONETARY and LC_NUMERIC are almost
+	 * certainly "C", there's really no reason that restoring those should
+	 * fail.
 	 */
-#ifdef WIN32
-	if (!setlocale(LC_CTYPE, save_lc_ctype))
-		elog(FATAL, "failed to restore LC_CTYPE to \"%s\"", save_lc_ctype);
-#endif
 	if (!setlocale(LC_MONETARY, save_lc_monetary))
 		elog(FATAL, "failed to restore LC_MONETARY to \"%s\"", save_lc_monetary);
 	if (!setlocale(LC_NUMERIC, save_lc_numeric))
@@ -604,9 +540,6 @@ PGLC_localeconv(void)
 		/* Release the pstrdup'd locale names */
 		pfree(save_lc_monetary);
 		pfree(save_lc_numeric);
-#ifdef WIN32
-		pfree(save_lc_ctype);
-#endif
 
 		/* If any of the preceding strdup calls failed, complain now. */
 		if (!struct_lconv_is_valid(&worklconv))
@@ -657,65 +590,6 @@ PGLC_localeconv(void)
 	return &CurrentLocaleConv;
 }
 
-#ifdef WIN32
-/*
- * On Windows, strftime() returns its output in encoding CP_ACP (the default
- * operating system codepage for the computer), which is likely different
- * from SERVER_ENCODING.  This is especially important in Japanese versions
- * of Windows which will use SJIS encoding, which we don't support as a
- * server encoding.
- *
- * So, instead of using strftime(), use wcsftime() to return the value in
- * wide characters (internally UTF16) and then convert to UTF8, which we
- * know how to handle directly.
- *
- * Note that this only affects the calls to strftime() in this file, which are
- * used to get the locale-aware strings. Other parts of the backend use
- * pg_strftime(), which isn't locale-aware and does not need to be replaced.
- */
-static size_t
-strftime_win32(char *dst, size_t dstlen,
-			   const char *format, const struct tm *tm)
-{
-	size_t		len;
-	wchar_t		wformat[8];		/* formats used below need 3 chars */
-	wchar_t		wbuf[MAX_L10N_DATA];
-
-	/*
-	 * Get a wchar_t version of the format string.  We only actually use
-	 * plain-ASCII formats in this file, so we can say that they're UTF8.
-	 */
-	len = MultiByteToWideChar(CP_UTF8, 0, format, -1,
-							  wformat, lengthof(wformat));
-	if (len == 0)
-		elog(ERROR, "could not convert format string from UTF-8: error code %lu",
-			 GetLastError());
-
-	len = wcsftime(wbuf, MAX_L10N_DATA, wformat, tm);
-	if (len == 0)
-	{
-		/*
-		 * wcsftime failed, possibly because the result would not fit in
-		 * MAX_L10N_DATA.  Return 0 with the contents of dst unspecified.
-		 */
-		return 0;
-	}
-
-	len = WideCharToMultiByte(CP_UTF8, 0, wbuf, len, dst, dstlen - 1,
-							  NULL, NULL);
-	if (len == 0)
-		elog(ERROR, "could not convert string to UTF-8: error code %lu",
-			 GetLastError());
-
-	dst[len] = '\0';
-
-	return len;
-}
-
-/* redefine strftime() */
-#define strftime(a,b,c,d) strftime_win32(a,b,c,d)
-#endif							/* WIN32 */
-
 /*
  * Subroutine for cache_locale_time().
  * Convert the given string from encoding "encoding" to the database
@@ -755,9 +629,6 @@ cache_locale_time(void)
 	int			encoding;
 	int			i;
 	char	   *save_lc_time;
-#ifdef WIN32
-	char	   *save_lc_ctype;
-#endif
 
 	/* did we do this already? */
 	if (CurrentLCTimeValid)
@@ -777,25 +648,6 @@ cache_locale_time(void)
 	if (!save_lc_time)
 		elog(ERROR, "setlocale(NULL) failed");
 	save_lc_time = pstrdup(save_lc_time);
-
-#ifdef WIN32
-
-	/*
-	 * On Windows, it appears that wcsftime() internally uses LC_CTYPE, so we
-	 * must set it here.  This code looks the same as what PGLC_localeconv()
-	 * does, but the underlying reason is different: this does NOT determine
-	 * the encoding we'll get back from strftime_win32().
-	 */
-
-	/* Save prevailing value of ctype locale */
-	save_lc_ctype = setlocale(LC_CTYPE, NULL);
-	if (!save_lc_ctype)
-		elog(ERROR, "setlocale(NULL) failed");
-	save_lc_ctype = pstrdup(save_lc_ctype);
-
-	/* use lc_time to set the ctype */
-	setlocale(LC_CTYPE, locale_time);
-#endif
 
 	setlocale(LC_TIME, locale_time);
 
@@ -845,10 +697,6 @@ cache_locale_time(void)
 	 * Restore the prevailing locale settings; as in PGLC_localeconv(),
 	 * failure to do so is fatal.
 	 */
-#ifdef WIN32
-	if (!setlocale(LC_CTYPE, save_lc_ctype))
-		elog(FATAL, "failed to restore LC_CTYPE to \"%s\"", save_lc_ctype);
-#endif
 	if (!setlocale(LC_TIME, save_lc_time))
 		elog(FATAL, "failed to restore LC_TIME to \"%s\"", save_lc_time);
 
@@ -861,11 +709,6 @@ cache_locale_time(void)
 
 	/* Release the pstrdup'd locale names */
 	pfree(save_lc_time);
-#ifdef WIN32
-	pfree(save_lc_ctype);
-#endif
-
-#ifndef WIN32
 
 	/*
 	 * As in PGLC_localeconv(), we must convert strftime()'s output from the
@@ -875,16 +718,6 @@ cache_locale_time(void)
 	encoding = pg_get_encoding_from_locale(locale_time, true);
 	if (encoding < 0)
 		encoding = PG_SQL_ASCII;
-
-#else
-
-	/*
-	 * On Windows, strftime_win32() always returns UTF8 data, so convert from
-	 * that if necessary.
-	 */
-	encoding = PG_UTF8;
-
-#endif							/* WIN32 */
 
 	bufptr = buf;
 
@@ -913,263 +746,6 @@ cache_locale_time(void)
 	CurrentLCTimeValid = true;
 }
 
-
-#if defined(WIN32) && defined(LC_MESSAGES)
-/*
- * Convert a Windows setlocale() argument to a Unix-style one.
- *
- * Regardless of platform, we install message catalogs under a Unix-style
- * LL[_CC][.ENCODING][@VARIANT] naming convention.  Only LC_MESSAGES settings
- * following that style will elicit localized interface strings.
- *
- * Before Visual Studio 2012 (msvcr110.dll), Windows setlocale() accepted "C"
- * (but not "c") and strings of the form <Language>[_<Country>][.<CodePage>],
- * case-insensitive.  setlocale() returns the fully-qualified form; for
- * example, setlocale("thaI") returns "Thai_Thailand.874".  Internally,
- * setlocale() and _create_locale() select a "locale identifier"[1] and store
- * it in an undocumented _locale_t field.  From that LCID, we can retrieve the
- * ISO 639 language and the ISO 3166 country.  Character encoding does not
- * matter, because the server and client encodings govern that.
- *
- * Windows Vista introduced the "locale name" concept[2], closely following
- * RFC 4646.  Locale identifiers are now deprecated.  Starting with Visual
- * Studio 2012, setlocale() accepts locale names in addition to the strings it
- * accepted historically.  It does not standardize them; setlocale("Th-tH")
- * returns "Th-tH".  setlocale(category, "") still returns a traditional
- * string.  Furthermore, msvcr110.dll changed the undocumented _locale_t
- * content to carry locale names instead of locale identifiers.
- *
- * Visual Studio 2015 should still be able to do the same as Visual Studio
- * 2012, but the declaration of locale_name is missing in _locale_t, causing
- * this code compilation to fail, hence this falls back instead on to
- * enumerating all system locales by using EnumSystemLocalesEx to find the
- * required locale name.  If the input argument is in Unix-style then we can
- * get ISO Locale name directly by using GetLocaleInfoEx() with LCType as
- * LOCALE_SNAME.
- *
- * MinGW headers declare _create_locale(), but msvcrt.dll lacks that symbol in
- * releases before Windows 8. IsoLocaleName() always fails in a MinGW-built
- * postgres.exe, so only Unix-style values of the lc_messages GUC can elicit
- * localized messages. In particular, every lc_messages setting that initdb
- * can select automatically will yield only C-locale messages. XXX This could
- * be fixed by running the fully-qualified locale name through a lookup table.
- *
- * This function returns a pointer to a static buffer bearing the converted
- * name or NULL if conversion fails.
- *
- * [1] https://docs.microsoft.com/en-us/windows/win32/intl/locale-identifiers
- * [2] https://docs.microsoft.com/en-us/windows/win32/intl/locale-names
- */
-
-#if _MSC_VER >= 1900
-/*
- * Callback function for EnumSystemLocalesEx() in get_iso_localename().
- *
- * This function enumerates all system locales, searching for one that matches
- * an input with the format: <Language>[_<Country>], e.g.
- * English[_United States]
- *
- * The input is a three wchar_t array as an LPARAM. The first element is the
- * locale_name we want to match, the second element is an allocated buffer
- * where the Unix-style locale is copied if a match is found, and the third
- * element is the search status, 1 if a match was found, 0 otherwise.
- */
-static BOOL CALLBACK
-search_locale_enum(LPWSTR pStr, DWORD dwFlags, LPARAM lparam)
-{
-	wchar_t		test_locale[LOCALE_NAME_MAX_LENGTH];
-	wchar_t   **argv;
-
-	(void) (dwFlags);
-
-	argv = (wchar_t **) lparam;
-	*argv[2] = (wchar_t) 0;
-
-	memset(test_locale, 0, sizeof(test_locale));
-
-	/* Get the name of the <Language> in English */
-	if (GetLocaleInfoEx(pStr, LOCALE_SENGLISHLANGUAGENAME,
-						test_locale, LOCALE_NAME_MAX_LENGTH))
-	{
-		/*
-		 * If the enumerated locale does not have a hyphen ("en") OR  the
-		 * lc_message input does not have an underscore ("English"), we only
-		 * need to compare the <Language> tags.
-		 */
-		if (wcsrchr(pStr, '-') == NULL || wcsrchr(argv[0], '_') == NULL)
-		{
-			if (_wcsicmp(argv[0], test_locale) == 0)
-			{
-				wcscpy(argv[1], pStr);
-				*argv[2] = (wchar_t) 1;
-				return FALSE;
-			}
-		}
-
-		/*
-		 * We have to compare a full <Language>_<Country> tag, so we append
-		 * the underscore and name of the country/region in English, e.g.
-		 * "English_United States".
-		 */
-		else
-		{
-			size_t		len;
-
-			wcscat(test_locale, L"_");
-			len = wcslen(test_locale);
-			if (GetLocaleInfoEx(pStr, LOCALE_SENGLISHCOUNTRYNAME,
-								test_locale + len,
-								LOCALE_NAME_MAX_LENGTH - len))
-			{
-				if (_wcsicmp(argv[0], test_locale) == 0)
-				{
-					wcscpy(argv[1], pStr);
-					*argv[2] = (wchar_t) 1;
-					return FALSE;
-				}
-			}
-		}
-	}
-
-	return TRUE;
-}
-
-/*
- * This function converts a Windows locale name to an ISO formatted version
- * for Visual Studio 2015 or greater.
- *
- * Returns NULL, if no valid conversion was found.
- */
-static char *
-get_iso_localename(const char *winlocname)
-{
-	wchar_t		wc_locale_name[LOCALE_NAME_MAX_LENGTH];
-	wchar_t		buffer[LOCALE_NAME_MAX_LENGTH];
-	static char iso_lc_messages[LOCALE_NAME_MAX_LENGTH];
-	const char *period;
-	int			len;
-	int			ret_val;
-
-	/*
-	 * Valid locales have the following syntax:
-	 * <Language>[_<Country>[.<CodePage>]]
-	 *
-	 * GetLocaleInfoEx can only take locale name without code-page and for the
-	 * purpose of this API the code-page doesn't matter.
-	 */
-	period = strchr(winlocname, '.');
-	if (period != NULL)
-		len = period - winlocname;
-	else
-		len = pg_mbstrlen(winlocname);
-
-	memset(wc_locale_name, 0, sizeof(wc_locale_name));
-	memset(buffer, 0, sizeof(buffer));
-	MultiByteToWideChar(CP_ACP, 0, winlocname, len, wc_locale_name,
-						LOCALE_NAME_MAX_LENGTH);
-
-	/*
-	 * If the lc_messages is already an Unix-style string, we have a direct
-	 * match with LOCALE_SNAME, e.g. en-US, en_US.
-	 */
-	ret_val = GetLocaleInfoEx(wc_locale_name, LOCALE_SNAME, (LPWSTR) &buffer,
-							  LOCALE_NAME_MAX_LENGTH);
-	if (!ret_val)
-	{
-		/*
-		 * Search for a locale in the system that matches language and country
-		 * name.
-		 */
-		wchar_t    *argv[3];
-
-		argv[0] = wc_locale_name;
-		argv[1] = buffer;
-		argv[2] = (wchar_t *) &ret_val;
-		EnumSystemLocalesEx(search_locale_enum, LOCALE_WINDOWS, (LPARAM) argv,
-							NULL);
-	}
-
-	if (ret_val)
-	{
-		size_t		rc;
-		char	   *hyphen;
-
-		/* Locale names use only ASCII, any conversion locale suffices. */
-		rc = wchar2char(iso_lc_messages, buffer, sizeof(iso_lc_messages), NULL);
-		if (rc == -1 || rc == sizeof(iso_lc_messages))
-			return NULL;
-
-		/*
-		 * Simply replace the hyphen with an underscore.  See comments in
-		 * IsoLocaleName.
-		 */
-		hyphen = strchr(iso_lc_messages, '-');
-		if (hyphen)
-			*hyphen = '_';
-		return iso_lc_messages;
-	}
-
-	return NULL;
-}
-#endif							/* _MSC_VER >= 1900 */
-
-static char *
-IsoLocaleName(const char *winlocname)
-{
-#if defined(_MSC_VER)
-	static char iso_lc_messages[LOCALE_NAME_MAX_LENGTH];
-
-	if (pg_strcasecmp("c", winlocname) == 0 ||
-		pg_strcasecmp("posix", winlocname) == 0)
-	{
-		strcpy(iso_lc_messages, "C");
-		return iso_lc_messages;
-	}
-	else
-	{
-#if (_MSC_VER >= 1900)			/* Visual Studio 2015 or later */
-		return get_iso_localename(winlocname);
-#else
-		_locale_t	loct;
-
-		loct = _create_locale(LC_CTYPE, winlocname);
-		if (loct != NULL)
-		{
-			size_t		rc;
-			char	   *hyphen;
-
-			/* Locale names use only ASCII, any conversion locale suffices. */
-			rc = wchar2char(iso_lc_messages, loct->locinfo->locale_name[LC_CTYPE],
-							sizeof(iso_lc_messages), NULL);
-			_free_locale(loct);
-			if (rc == -1 || rc == sizeof(iso_lc_messages))
-				return NULL;
-
-			/*
-			 * Since the message catalogs sit on a case-insensitive
-			 * filesystem, we need not standardize letter case here.  So long
-			 * as we do not ship message catalogs for which it would matter,
-			 * we also need not translate the script/variant portion, e.g.
-			 * uz-Cyrl-UZ to uz_UZ@cyrillic.  Simply replace the hyphen with
-			 * an underscore.
-			 *
-			 * Note that the locale name can be less-specific than the value
-			 * we would derive under earlier Visual Studio releases.  For
-			 * example, French_France.1252 yields just "fr".  This does not
-			 * affect any of the country-specific message catalogs available
-			 * as of this writing (pt_BR, zh_CN, zh_TW).
-			 */
-			hyphen = strchr(iso_lc_messages, '-');
-			if (hyphen)
-				*hyphen = '_';
-			return iso_lc_messages;
-		}
-#endif							/* Visual Studio 2015 or later */
-	}
-#endif							/* defined(_MSC_VER) */
-	return NULL;				/* Not supported on this version of msvc/mingw */
-}
-#endif							/* WIN32 && LC_MESSAGES */
 
 
 /*
@@ -1515,18 +1091,13 @@ pg_newlocale_from_collation(Oid collid)
 			{
 				/* Normal case where they're the same */
 				errno = 0;
-#ifndef WIN32
 				loc = newlocale(LC_COLLATE_MASK | LC_CTYPE_MASK, collcollate,
 								NULL);
-#else
-				loc = _create_locale(LC_ALL, collcollate);
-#endif
 				if (!loc)
 					report_newlocale_failure(collcollate);
 			}
 			else
 			{
-#ifndef WIN32
 				/* We need two newlocale() steps */
 				locale_t	loc1;
 
@@ -1538,17 +1109,6 @@ pg_newlocale_from_collation(Oid collid)
 				loc = newlocale(LC_CTYPE_MASK, collctype, loc1);
 				if (!loc)
 					report_newlocale_failure(collctype);
-#else
-
-				/*
-				 * XXX The _create_locale() API doesn't appear to support
-				 * this. Could perhaps be worked around by changing
-				 * pg_locale_t to contain two separate fields.
-				 */
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("collations with different collate and ctype values are not supported on this platform")));
-#endif
 			}
 
 			result.info.lt = loc;
@@ -1693,39 +1253,6 @@ get_collation_actual_version(char collprovider, const char *collcollate)
 		else
 			ereport(ERROR,
 					(errmsg("could not load locale \"%s\"", collcollate)));
-#elif defined(WIN32) && _WIN32_WINNT >= 0x0600
-		/*
-		 * If we are targeting Windows Vista and above, we can ask for a name
-		 * given a collation name (earlier versions required a location code
-		 * that we don't have).
-		 */
-		NLSVERSIONINFOEX version = {sizeof(NLSVERSIONINFOEX)};
-		WCHAR		wide_collcollate[LOCALE_NAME_MAX_LENGTH];
-
-		MultiByteToWideChar(CP_ACP, 0, collcollate, -1, wide_collcollate,
-							LOCALE_NAME_MAX_LENGTH);
-		if (!GetNLSVersionEx(COMPARE_STRING, wide_collcollate, &version))
-		{
-			/*
-			 * GetNLSVersionEx() wants a language tag such as "en-US", not a
-			 * locale name like "English_United States.1252".  Until those
-			 * values can be prevented from entering the system, or 100%
-			 * reliably converted to the more useful tag format, tolerate the
-			 * resulting error and report that we have no version data.
-			 */
-			if (GetLastError() == ERROR_INVALID_PARAMETER)
-				return NULL;
-
-			ereport(ERROR,
-					(errmsg("could not get collation version for locale \"%s\": error code %lu",
-							collcollate,
-							GetLastError())));
-		}
-		collversion = psprintf("%lu.%lu,%lu.%lu",
-							   (version.dwNLSVersion >> 8) & 0xFFFF,
-							   version.dwNLSVersion & 0xFF,
-							   (version.dwDefinedVersion >> 8) & 0xFFFF,
-							   version.dwDefinedVersion & 0xFF);
 #endif
 	}
 
@@ -1970,29 +1497,6 @@ wchar2char(char *to, const wchar_t *from, size_t tolen, pg_locale_t locale)
 	if (tolen == 0)
 		return 0;
 
-#ifdef WIN32
-
-	/*
-	 * On Windows, the "Unicode" locales assume UTF16 not UTF8 encoding, and
-	 * for some reason mbstowcs and wcstombs won't do this for us, so we use
-	 * MultiByteToWideChar().
-	 */
-	if (GetDatabaseEncoding() == PG_UTF8)
-	{
-		result = WideCharToMultiByte(CP_UTF8, 0, from, -1, to, tolen,
-									 NULL, NULL);
-		/* A zero return is failure */
-		if (result <= 0)
-			result = -1;
-		else
-		{
-			Assert(result <= tolen);
-			/* Microsoft counts the zero terminator in the result */
-			result--;
-		}
-	}
-	else
-#endif							/* WIN32 */
 	if (locale == (pg_locale_t) 0)
 	{
 		/* Use wcstombs directly for the default locale */
@@ -2042,30 +1546,6 @@ char2wchar(wchar_t *to, size_t tolen, const char *from, size_t fromlen,
 	if (tolen == 0)
 		return 0;
 
-#ifdef WIN32
-	/* See WIN32 "Unicode" comment above */
-	if (GetDatabaseEncoding() == PG_UTF8)
-	{
-		/* Win32 API does not work for zero-length input */
-		if (fromlen == 0)
-			result = 0;
-		else
-		{
-			result = MultiByteToWideChar(CP_UTF8, 0, from, fromlen, to, tolen - 1);
-			/* A zero return is failure */
-			if (result == 0)
-				result = -1;
-		}
-
-		if (result != -1)
-		{
-			Assert(result < tolen);
-			/* Append trailing null wchar (MultiByteToWideChar() does not) */
-			to[result] = 0;
-		}
-	}
-	else
-#endif							/* WIN32 */
 	{
 		/* mbstowcs requires ending '\0' */
 		char	   *str = pnstrdup(from, fromlen);

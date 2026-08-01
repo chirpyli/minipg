@@ -179,11 +179,6 @@ libpqrcv_connect(const char *conninfo, bool logical, const char *appname,
 
 		if (status == PGRES_POLLING_READING)
 			io_flag = WL_SOCKET_READABLE;
-#ifdef WIN32
-		/* Windows needs a different test while waiting for connection-made */
-		else if (PQstatus(conn->streamConn) == CONNECTION_STARTED)
-			io_flag = WL_SOCKET_CONNECTED;
-#endif
 		else
 			io_flag = WL_SOCKET_WRITEABLE;
 

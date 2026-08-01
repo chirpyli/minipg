@@ -384,7 +384,6 @@ PostmasterIsAliveInternal(void)
 	postmaster_possibly_dead = false;
 #endif
 
-#ifndef WIN32
 	{
 		char		c;
 		ssize_t		rc;
@@ -416,18 +415,6 @@ PostmasterIsAliveInternal(void)
 			return false;
 		}
 	}
-
-#else							/* WIN32 */
-	if (WaitForSingleObject(PostmasterHandle, 0) == WAIT_TIMEOUT)
-		return true;
-	else
-	{
-#ifdef USE_POSTMASTER_DEATH_SIGNAL
-		postmaster_possibly_dead = true;
-#endif
-		return false;
-	}
-#endif							/* WIN32 */
 }
 
 /*

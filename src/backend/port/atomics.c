@@ -18,9 +18,6 @@
 #include "storage/spin.h"
 
 #ifdef PG_HAVE_MEMORY_BARRIER_EMULATION
-#ifdef WIN32
-#error "barriers are required (and provided) on WIN32 platforms"
-#endif
 #include <signal.h>
 #endif
 

@@ -17,8 +17,6 @@
 
 #include "miscadmin.h"
 #include "postmaster/fork_process.h"
-
-#ifndef WIN32
 /*
  * Wrapper for fork(). Return values are the same as those for fork():
  * -1 if the fork failed, 0 in the child process, and the PID of the
@@ -111,5 +109,3 @@ fork_process(void)
 
 	return result;
 }
-
-#endif							/* ! WIN32 */

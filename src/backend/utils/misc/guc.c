@@ -23,9 +23,7 @@
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 #include <sys/stat.h>
 #ifdef HAVE_SYSLOG
 #include <syslog.h>
@@ -517,13 +515,8 @@ static struct config_enum_entry recovery_init_sync_method_options[] = {
 };
 
 static struct config_enum_entry shared_memory_options[] = {
-#ifndef WIN32
 	{"sysv", SHMEM_TYPE_SYSV, false},
-#endif
 	{"mmap", SHMEM_TYPE_MMAP, false},
-#ifdef WIN32
-	{"windows", SHMEM_TYPE_WINDOWS, false},
-#endif
 	{NULL, 0, false}
 };
 
@@ -559,7 +552,6 @@ bool		log_executor_stats = false;
 bool		log_statement_stats = false;	/* this is sort of all three above
 											 * together */
 bool		log_btree_build_stats = false;
-char	   *event_source;
 
 bool		row_security;
 bool		check_function_bodies = true;
@@ -1549,11 +1541,7 @@ static struct config_bool ConfigureNamesBool[] =
 			gettext_noop("Enables updating of the process title every time a new SQL command is received by the server.")
 		},
 		&update_process_title,
-#ifdef WIN32
-		false,
-#else
 		true,
-#endif
 		NULL, NULL, NULL
 	},
 
@@ -4262,17 +4250,6 @@ static struct config_string ConfigureNamesString[] =
 		&syslog_ident_str,
 		"postgres",
 		NULL, assign_syslog_ident, NULL
-	},
-
-	{
-		{"event_source", PGC_POSTMASTER, LOGGING_WHERE,
-			gettext_noop("Sets the application name used to identify "
-						 "PostgreSQL messages in the event log."),
-			NULL
-		},
-		&event_source,
-		DEFAULT_EVENT_SOURCE,
-		NULL, NULL, NULL
 	},
 
 	{
@@ -11525,10 +11502,6 @@ check_log_destination(char **newval, void **extra, GucSource source)
 #ifdef HAVE_SYSLOG
 		else if (pg_strcasecmp(tok, "syslog") == 0)
 			newlogdest |= LOG_DESTINATION_SYSLOG;
-#endif
-#ifdef WIN32
-		else if (pg_strcasecmp(tok, "eventlog") == 0)
-			newlogdest |= LOG_DESTINATION_EVENTLOG;
 #endif
 		else
 		{

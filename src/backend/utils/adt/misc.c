@@ -327,7 +327,7 @@ pg_tablespace_location(PG_FUNCTION_ARGS)
 		tablespaceOid == GLOBALTABLESPACE_OID)
 		PG_RETURN_TEXT_P(cstring_to_text(""));
 
-#if defined(HAVE_READLINK) || defined(WIN32)
+#ifdef HAVE_READLINK
 
 	/*
 	 * Find the location of the tablespace by reading the symbolic link that
@@ -882,11 +882,6 @@ pg_current_logfile(PG_FUNCTION_ARGS)
 							LOG_METAINFO_DATAFILE)));
 		PG_RETURN_NULL();
 	}
-
-#ifdef WIN32
-	/* syslogger.c writes CRLF line endings on Windows */
-	_setmode(_fileno(fd), _O_TEXT);
-#endif
 
 	/*
 	 * Read the file to gather current log filename(s) registered by the

@@ -110,9 +110,6 @@ InitPostmasterChild(void)
 	 * chunking protocol isn't disturbed. Non-logpipe data gets translated on
 	 * redirection (e.g. via pg_ctl -l) anyway.
 	 */
-#ifdef WIN32
-	_setmode(fileno(stderr), _O_BINARY);
-#endif
 
 	/* We don't want the postmaster's proc_exit() handlers */
 	on_exit_reset();
@@ -330,17 +327,13 @@ checkDataDir(void)
 	 * This check is an essential part of the interlock that prevents two
 	 * postmasters from starting in the same directory (see CreateLockFile()).
 	 * Do not remove or weaken it.
-	 *
-	 * XXX can we safely enable this check on Windows?
 	 */
-#if !defined(WIN32) && !defined(__CYGWIN__)
 	if (stat_buf.st_uid != geteuid())
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("data directory \"%s\" has wrong ownership",
 						DataDir),
 				 errhint("The server must be started by the user that owns the data directory.")));
-#endif
 
 	/*
 	 * Check if the directory has correct permissions.  If not, reject.
@@ -348,19 +341,13 @@ checkDataDir(void)
 	 * Only two possible modes are allowed, 0700 and 0750.  The latter mode
 	 * indicates that group read/execute should be allowed on all newly
 	 * created files and directories.
-	 *
-	 * XXX temporarily suppress check when on Windows, because there may not
-	 * be proper support for Unix-y file permissions.  Need to think of a
-	 * reasonable check to apply on Windows.
 	 */
-#if !defined(WIN32) && !defined(__CYGWIN__)
 	if (stat_buf.st_mode & PG_MODE_MASK_GROUP)
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("data directory \"%s\" has invalid permissions",
 						DataDir),
 				 errdetail("Permissions should be u=rwx (0700) or u=rwx,g=rx (0750).")));
-#endif
 
 	/*
 	 * Reset creation modes and mask based on the mode of the data directory.
@@ -370,16 +357,11 @@ checkDataDir(void)
 	 * are present on the data directory then modify the create modes and mask
 	 * to allow group read/execute on newly created files and directories and
 	 * set the data_directory_mode GUC.
-	 *
-	 * Suppress when on Windows, because there may not be proper support for
-	 * Unix-y file permissions.
 	 */
-#if !defined(WIN32) && !defined(__CYGWIN__)
 	SetDataDirectoryCreatePerm(stat_buf.st_mode);
 
 	umask(pg_mode_mask);
 	data_directory_mode = pg_dir_create_mode;
-#endif
 
 	/* Check for PG_VERSION */
 	ValidatePgVersion(DataDir);
@@ -1055,16 +1037,7 @@ CreateLockFile(const char *filename, bool amPostmaster,
 	 */
 	my_pid = getpid();
 
-#ifndef WIN32
 	my_p_pid = getppid();
-#else
-
-	/*
-	 * Windows hasn't got getppid(), but doesn't need it since it's not using
-	 * real kill() either...
-	 */
-	my_p_pid = 0;
-#endif
 
 	envvar = getenv("PG_GRANDPARENT_PID");
 	if (envvar)

@@ -32,9 +32,8 @@
 #include "utils/guc.h"
 #include "utils/ps_status.h"
 
-#if !defined(WIN32) || defined(_MSC_VER)
 extern char **environ;
-#endif
+
 bool		update_process_title = true;
 
 
@@ -59,8 +58,6 @@ bool		update_process_title = true;
  * PS_USE_CLOBBER_ARGV
  *	   write over the argv and environment area
  *	   (Linux and most SysV-like systems)
- * PS_USE_WIN32
- *	   push the string out as the name of a Windows event
  * PS_USE_NONE
  *	   don't update ps display
  *	   (This is the default, as it is safest.)
@@ -77,8 +74,6 @@ bool		update_process_title = true;
 #define PS_USE_CHANGE_ARGV
 #elif defined(__linux__) || defined(_AIX) || defined(__sgi) || (defined(sun) && !defined(BSD)) || defined(__svr5__) || defined(__darwin__) || defined(__GNU__)
 #define PS_USE_CLOBBER_ARGV
-#elif defined(WIN32)
-#define PS_USE_WIN32
 #else
 #define PS_USE_NONE
 #endif
@@ -426,25 +421,6 @@ set_ps_display(const char *activity)
 			   last_status_len - ps_buffer_cur_len);
 	last_status_len = ps_buffer_cur_len;
 #endif							/* PS_USE_CLOBBER_ARGV */
-
-#ifdef PS_USE_WIN32
-	{
-		/*
-		 * Win32 does not support showing any changed arguments. To make it at
-		 * all possible to track which backend is doing what, we create a
-		 * named object that can be viewed with for example Process Explorer.
-		 */
-		static HANDLE ident_handle = INVALID_HANDLE_VALUE;
-		char		name[PS_BUFFER_SIZE + 32];
-
-		if (ident_handle != INVALID_HANDLE_VALUE)
-			CloseHandle(ident_handle);
-
-		sprintf(name, "pgident(%d): %s", MyProcPid, ps_buffer);
-
-		ident_handle = CreateEvent(NULL, TRUE, FALSE, name);
-	}
-#endif							/* PS_USE_WIN32 */
 #endif							/* not PS_USE_NONE */
 }
 

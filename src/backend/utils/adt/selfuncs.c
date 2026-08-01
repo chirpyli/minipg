@@ -4646,16 +4646,6 @@ convert_string_datum(Datum value, Oid typid, Oid collid, bool *failure)
 		 * fatal.
 		 */
 		xfrmlen = strxfrm(NULL, val, 0);
-#ifdef WIN32
-
-		/*
-		 * On Windows, strxfrm returns INT_MAX when an error occurs. Instead
-		 * of trying to allocate this much memory (and fail), just return the
-		 * original string unmodified as if we were in the C locale.
-		 */
-		if (xfrmlen == INT_MAX)
-			return val;
-#endif
 		xfrmstr = (char *) palloc(xfrmlen + 1);
 		xfrmlen2 = strxfrm(xfrmstr, val, xfrmlen + 1);
 

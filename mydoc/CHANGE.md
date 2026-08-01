@@ -48,6 +48,37 @@
       - include/pg_config_manual.h：删除描述已不存在的 EXEC_BACKEND 宏的说明注释块。
       - 其余纯注释提及（main.c、postmaster.c、guc.c、pgtz.c、mcxt.c、walreceiver.c、walsender.c、parallel.c、be-secure-openssl.c、buf_init.c、shmem.c、latch.c、fd.c、fork_process.c、elog.c）：将注释中的 "EXEC_BACKEND case / SubPostmasterMain" 描述改写为 fork() 继承语义，集中清理以免误导。
       - `make -j16` 全量编译通过（修复 pgstat.c 合并 fork 分支后残留的 `#endif`）。
+    - 清理 `src/backend/postmaster/postmaster.c` 中全部 WIN32 死代码（minipg 仅 Unix/Linux）：
+      - 删除 `PostmasterHandle`（HANDLE 全局变量）及其 `#else` 分支，仅保留 Unix 的 `postmaster_alive_fds[]`。
+      - 删除 `InitPostmasterDeathWatchHandle()` 内 `DuplicateHandle`/`GetLastError` 的 Windows 分支与 `#ifndef WIN32`/`#else`/`#endif` 包裹，仅保留 Unix `pipe()` 实现。
+      - 删除 Windows 专用的 `waitpid()` 子集实现（~50 行）及 `pgwin32_deadchild_callback()` 回调函数整块（含 `CreateIoCompletionPort` 初始化）。
+      - 删除 I/O completion port 初始化块（`CreateIoCompletionPort`）。
+      - 删除 syslogPipe 关闭逻辑中的 `CloseHandle` 分支，仅保留 Unix `close()`。
+      - 删除 `LogChildExit()` 中 `exception 0x%X` 的 Windows 异常消息分支，仅保留 Unix `signal N: strsignal` 消息。
+      - 删除 `CleanupBackgroundWorker()` / `CleanupBackend()` 中 `ERROR_WAIT_NO_CHILDREN` 的 Windows 专用处理块。
+      - 删除全部 Windows 缺少 sigaction 时手动 `PG_SETMASK(&BlockSig)`/`PG_SETMASK(&UnBlockSig)` 的变通块（sigusr1_handler、SIGHUP_handler、pmdie、reaper、process_startup_packet_die 共 8 处），并简化相应注释。
+      - 删除 `extern char **environ` 的 Windows 条件声明块（Unix 下 environ 已由 `<unistd.h>` 提供）。
+      - `postmaster.c:4441` 用户指定的 `PG_SETMASK(&BlockSig)` Windows 变通块已删除。
+      - `make -j16` 编译通过；`make check` 回归测试 216 项全部通过。
+    - 继续清理 backend 核心代码中的 WIN32 死代码（minipg 仅 Unix/Linux，共约 130+ 处）：
+      - 去 `#ifndef WIN32` / `#ifdef WIN32` 包裹，保留 Unix 侧：
+        - `utils/misc/guc.c`：`<sys/mman.h>` 与 `shared_memory_options[]` 中 sysv 项去掉 `WIN32` 包裹，删除 windows 枚举项（SHMEM_TYPE_WINDOWS 变孤儿，保留无害）。
+        - `storage/file/fd.c`、`storage/ipc/dsm.c`、`storage/ipc/dsm_impl.c`：`<sys/mman.h>` 去 `WIN32` 包裹。
+        - `utils/init/miscinit.c`：`getppid()` 去 `WIN32` 分支（删 Windows `my_p_pid=0` 分支）。
+        - `postmaster/fork_process.c`：整个 `fork_process()` 去 `#ifndef WIN32` 包裹。
+        - `utils/fmgr/dfmgr.c`：结构体 `inode` 成员、`SAME_INODE` 宏、`inode` 赋值去 `WIN32` 包裹。
+        - `commands/copyto.c`：行结束符去 `WIN32` 分支，仅留 Unix `\n`。
+        - `utils/misc/ps_status.c`：`extern char **environ` 改为无条件声明。
+        - `libpq/ifaddr.c`：删除 Win32 版 `pg_foreach_ifaddr`（Winsock）整段，`#elif HAVE_GETIFADDRS` 改 `#ifdef`。
+        - `storage/ipc/pmsignal.c`：`PostmasterDeathTest()` 删除 `WaitForSingleObject(PostmasterHandle)` 的 Windows 分支，仅留 Unix `read()` 逻辑。
+      - 删除纯 Windows-only 整块：
+        - `utils/init/miscinit.c`：删 `_setmode(stderr, _O_BINARY)` 块。
+        - `utils/adt/misc.c`：删 `_setmode(fd, _O_TEXT)` 块。
+        - `utils/adt/selfuncs.c`：删 `strxfrm` 返回 `INT_MAX` 的 Windows 特殊处理块。
+        - `libpq/hba.c`：LDAP 头文件去 `WIN32` 分支，仅留 `<ldap.h>`。
+      - 修复编译：补全 `fork_process.c` 被误删的 `result`/`oomfilename` 声明、`pmsignal.c` 残留的 `#ifndef WIN32` 未闭合。
+      - 暂缓（高风险，需单独一轮重构）：`utils/error/elog.c` eventlog 输出路径（含 `pgwin32_message_to_UTF16` 跨文件调用）、`utils/mb/mbutils.c` 的 `pgwin32_message_to_UTF16` 与悬空 `if`、`utils/adt/pg_locale.c`（~42 处 WIN32/_MSC_VER 混合）、`storage/ipc/latch.c`（WAIT_USE_WIN32 宏贯穿 33 处四路选择链）、`utils/adt/varlena.c`、`postmaster/pgstat.c` 的 `pgwin32_noblock`、`storage/file/fd.c` 的 `GetLastError` 重试、`guc.c` 的 `SHMEM_TYPE_WINDOWS` 枚举引用。
+      - `make -j16` 编译通过（修复 fork_process.c / pmsignal.c 两处误删）。
 - 2026-07-31: 裁剪 bin 运维/性能/升级类工具（与内核学习无关，且非回归测试依赖）：删除 `src/bin/` 下 `pgbench`、`pg_amcheck`、`pg_archivecleanup`、`pg_checksums`、`pg_resetwal`、`pg_test_fsync`、`pg_test_timing`、`pg_upgrade`、`pg_verifybackup` 以及 `scripts/`（clusterdb/createdb/createuser/dropdb/dropuser/reindexdb/vacuumdb/pg_isready）。同步修改 `src/bin/Makefile` 的 `SUBDIRS` 移除对应条目。保留 `initdb`/`pg_ctl`/`psql`/`pg_config`（PostgresNode.pm 测试框架硬依赖）、`pg_dump`（test_pg_dump 依赖 + 逻辑转储教学）、`pg_basebackup`/`pg_rewind`（replication 子系统保留，待阶段 8 再删）、`pg_controldata`/`pg_waldump`（内核观察工具）。`make check-world` 通过。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
@@ -151,3 +182,36 @@
 
 **验证**：`make -j4` 编译成功；`make check-world` 全部通过（EXIT=0）。plpgsql 自身 13 个回归测试全部 ok。
 
+## 裁剪：WIN32 死代码清理（第二轮，高风险文件）
+
+**目的**：minipg 明确仅支持 Unix/Linux，`#ifdef WIN32` / `_MSC_VER` / `__CYGWIN__` 分支在本平台**永不参与编译**，属纯死代码。第一轮已清理 backend 核心低风险文件，本轮处理此前暂缓的高风险文件（跨文件引用、条件嵌套复杂、`#ifdef` 切割 if/else 结构）。
+
+**删除内容**（按文件）：
+
+*等待事件多路复用*
+- `storage/ipc/latch.c`（33 处，最大项）：删除整个 `WAIT_USE_WIN32` 实现路径——实现选择宏分支、`WaitEventSet.handles` 成员、`WaitEventAdjustWin32()`（41 行）、Windows 版 `WaitEventSetWaitBlock()`（225 行）、`Latch.event` 的 `CreateEvent`/`SetEvent`、`FreeWaitEventSet` 的 `WSACloseEvent` 清理等。**保留** epoll/kqueue/poll 三套可移植实现，不破坏抽象层。
+
+*本地化*
+- `utils/adt/pg_locale.c`（32 处）：删除 `IsoLocaleName()`/`get_iso_localename()` 整块（257 行）、`strftime_win32()`（59 行）、`PGLC_localeconv()` 与 `cache_locale_time()` 中的 `save_lc_ctype` 保存/恢复逻辑、`_create_locale()` 分支、`wchar2char`/`char2wchar` 的 UTF16 分支、`GetNLSVersionEx` 排序版本分支。
+- `utils/mb/mbutils.c`：删除 `pgwin32_message_to_UTF16()`（73 行，其唯一调用方已随 elog.c 删除）、`pg_bind_textdomain_codeset()` 的 Windows 分支。
+
+*日志*
+- `utils/error/elog.c`：删除 `write_eventlog()` + `GetACPEncoding()`（110 行）、`write_console()` 的 `WriteConsoleW` 分支、`vwrite_stderr()` 的服务模式分支、两处 eventlog 输出调用点。
+- 连带删除已成孤儿的 **Windows 事件日志 GUC**：`event_source` 变量与 GUC 定义（guc.c）、`DEFAULT_EVENT_SOURCE` 宏（pg_config_manual.h）、`log_destination` 的 `eventlog` 关键字、postgresql.conf.sample 中对应配置项。（`LOG_DESTINATION_EVENTLOG` 位值保留，避免 CSVLOG 等位值重新编号。）
+
+*其他*
+- `utils/adt/varlena.c`：删除 Windows UTF-8 排序回退限制、UTF-16 比较分支（87 行）
+- `storage/file/fd.c`：`FileRead`/`FileWrite` 的 `GetLastError`/`_dosmaperr` 映射（保留 EINTR 重试）、`pg_truncate` 的 Windows 实现、`_commit`、3 处 `!defined(WIN32)` 条件简化
+- `access/transam/xlog.c`、`access/transam/xlogarchive.c`：删除 WAL 文件"先改名再删除"的 Windows FILE_SHARE_DELETE 变通逻辑
+- `postmaster/pgstat.c`：删除 2 秒轮询变通（改回无限等待）与 `pgwin32_noblock`
+- `libpq/auth.c`：删除 `winldap.h`/`ldap_sslinit`/动态加载 WLDAP32.DLL 分支、`auth_peer` 的 Windows 桩
+- `libpq/be-secure-common.c`：私钥文件权限检查不再跳过
+- `utils/init/miscinit.c`：数据目录属主/权限检查不再跳过（3 处）
+- `utils/misc/ps_status.c`：删除 `PS_USE_WIN32` 模式
+- `postmaster/postmaster.c`、`postmaster/pgarch.c`、`tcop/postgres.c`、`commands/dbcommands.c`、`commands/collationcmds.c`、`replication/basebackup.c`、`replication/libpqwalreceiver/`、`utils/adt/genfile.c`、`utils/adt/misc.c`、`port/atomics.c`、`utils/misc/guc.c`：各 1-3 处小块
+
+**行为变化说明**：以下检查在 Windows 上原本被跳过，现无条件生效（在 Unix 上本就生效，故无实际行为变化）：数据目录属主/权限检查、SSL 私钥权限检查。`update_process_title` 默认值固定为 `true`（Unix 原值）。
+
+**保留项**：`utils/adt/float.c`、`utils/adt/numutils.c` 中的 `_MSC_VER` 为**编译器特性检测**（HUGE_VALF、`_BitScanReverse`）而非平台代码，予以保留；Bison 生成文件（`gram.c` 等）不手改。
+
+**验证**：`make -j` 全量编译无 error/warning；`make check-world` 全部通过（EXIT=0），主回归 216 项、plpgsql 107 项及各 contrib 套件均 ok。

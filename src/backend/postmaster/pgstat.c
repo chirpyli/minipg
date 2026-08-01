@@ -3229,21 +3229,9 @@ PgstatCollectorMain(int argc, char *argv[])
 			/*
 			 * Try to receive and process a message.  This will not block,
 			 * since the socket is set to non-blocking mode.
-			 *
-			 * XXX On Windows, we have to force pgwin32_recv to cooperate,
-			 * despite the previous use of pg_set_noblock() on the socket.
-			 * This is extremely broken and should be fixed someday.
 			 */
-#ifdef WIN32
-			pgwin32_noblock = 1;
-#endif
-
 			len = recv(pgStatSock, (char *) &msg,
 					   sizeof(PgStat_Msg), 0);
-
-#ifdef WIN32
-			pgwin32_noblock = 0;
-#endif
 
 			if (len < 0)
 			{
@@ -3386,23 +3374,7 @@ PgstatCollectorMain(int argc, char *argv[])
 		}						/* end of inner message-processing loop */
 
 		/* Sleep until there's something to do */
-#ifndef WIN32
 		wr = WaitEventSetWait(wes, -1L, &event, 1, WAIT_EVENT_PGSTAT_MAIN);
-#else
-
-		/*
-		 * Windows, at least in its Windows Server 2003 R2 incarnation,
-		 * sometimes loses FD_READ events.  Waking up and retrying the recv()
-		 * fixes that, so don't sleep indefinitely.  This is a crock of the
-		 * first water, but until somebody wants to debug exactly what's
-		 * happening there, this is the best we can do.  The two-second
-		 * timeout matches our pre-9.2 behavior, and needs to be short enough
-		 * to not provoke "using stale statistics" complaints from
-		 * backend_read_statsfile.
-		 */
-		wr = WaitEventSetWait(wes, 2 * 1000L /* msec */ , &event, 1,
-							  WAIT_EVENT_PGSTAT_MAIN);
-#endif
 
 		/*
 		 * Emergency bailout if postmaster has died.  This is to avoid the

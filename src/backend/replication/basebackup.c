@@ -1114,14 +1114,8 @@ sendFileWithContent(const char *filename, const char *content,
 	 * Construct a stat struct for the backup_label file we're injecting in
 	 * the tar.
 	 */
-	/* Windows doesn't have the concept of uid and gid */
-#ifdef WIN32
-	statbuf.st_uid = 0;
-	statbuf.st_gid = 0;
-#else
 	statbuf.st_uid = geteuid();
 	statbuf.st_gid = getegid();
-#endif
 	statbuf.st_mtime = time(NULL);
 	statbuf.st_mode = pg_file_create_mode;
 	statbuf.st_size = len;
@@ -1414,7 +1408,7 @@ sendDir(const char *path, int basepathlen, bool sizeonly, List *tablespaces,
 		/* Allow symbolic links in pg_tblspc only */
 		if (strcmp(path, "./pg_tblspc") == 0 && S_ISLNK(statbuf.st_mode))
 		{
-#if defined(HAVE_READLINK) || defined(WIN32)
+#ifdef HAVE_READLINK
 			char		linkpath[MAXPGPATH];
 			int			rllen;
 

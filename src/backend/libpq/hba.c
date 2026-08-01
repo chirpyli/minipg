@@ -46,11 +46,7 @@
 #include "utils/varlena.h"
 
 #ifdef USE_LDAP
-#ifdef WIN32
-#include <winldap.h>
-#else
 #include <ldap.h>
-#endif
 #endif
 
 

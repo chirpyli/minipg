@@ -4260,9 +4260,6 @@ RemoveXlogFile(const char *segname, XLogSegNo recycleSegNo,
 			   XLogSegNo *endlogSegNo)
 {
 	char		path[MAXPGPATH];
-#ifdef WIN32
-	char		newpath[MAXPGPATH];
-#endif
 	struct stat statbuf;
 
 	snprintf(path, MAXPGPATH, XLOGDIR "/%s", segname);
@@ -4295,31 +4292,7 @@ RemoveXlogFile(const char *segname, XLogSegNo recycleSegNo,
 				(errmsg_internal("removing write-ahead log file \"%s\"",
 								 segname)));
 
-#ifdef WIN32
-
-		/*
-		 * On Windows, if another process (e.g another backend) holds the file
-		 * open in FILE_SHARE_DELETE mode, unlink will succeed, but the file
-		 * will still show up in directory listing until the last handle is
-		 * closed. To avoid confusing the lingering deleted file for a live
-		 * WAL file that needs to be archived, rename it before deleting it.
-		 *
-		 * If another process holds the file open without FILE_SHARE_DELETE
-		 * flag, rename will fail. We'll try again at the next checkpoint.
-		 */
-		snprintf(newpath, MAXPGPATH, "%s.deleted", path);
-		if (rename(path, newpath) != 0)
-		{
-			ereport(LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not rename file \"%s\": %m",
-							path)));
-			return;
-		}
-		rc = durable_unlink(newpath, LOG);
-#else
 		rc = durable_unlink(path, LOG);
-#endif
 		if (rc != 0)
 		{
 			/* Message already logged by durable_unlink() */
@@ -11394,7 +11367,7 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 			if (get_dirent_type(fullpath, de, false, ERROR) != PGFILETYPE_LNK)
 				continue;
 
-#if defined(HAVE_READLINK) || defined(WIN32)
+#ifdef HAVE_READLINK
 			rllen = readlink(fullpath, linkpath, sizeof(linkpath));
 			if (rllen < 0)
 			{

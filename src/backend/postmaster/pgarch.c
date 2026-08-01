@@ -590,20 +590,11 @@ pgarch_archiveXlog(char *xlog)
 		}
 		else if (WIFSIGNALED(rc))
 		{
-#if defined(WIN32)
-			ereport(lev,
-					(errmsg("archive command was terminated by exception 0x%X",
-							WTERMSIG(rc)),
-					 errhint("See C include file \"ntstatus.h\" for a description of the hexadecimal value."),
-					 errdetail("The failed archive command was: %s",
-							   xlogarchcmd)));
-#else
 			ereport(lev,
 					(errmsg("archive command was terminated by signal %d: %s",
 							WTERMSIG(rc), pg_strsignal(WTERMSIG(rc))),
 					 errdetail("The failed archive command was: %s",
 							   xlogarchcmd)));
-#endif
 		}
 		else
 		{

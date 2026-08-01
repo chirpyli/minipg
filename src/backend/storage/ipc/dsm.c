@@ -28,9 +28,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 #include <sys/stat.h>
 
 #include "lib/ilist.h"

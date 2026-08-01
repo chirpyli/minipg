@@ -468,10 +468,6 @@
 #syslog_sequence_numbers = on
 #syslog_split_messages = on
 
-# This is only relevant when logging to eventlog (Windows):
-# (change requires restart)
-#event_source = 'PostgreSQL'
-
 # - When to Log -
 
 #log_min_messages = warning		# values in order of decreasing detail:

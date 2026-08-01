@@ -442,14 +442,9 @@ pg_stat_file(PG_FUNCTION_ARGS)
 	values[0] = Int64GetDatum((int64) fst.st_size);
 	values[1] = TimestampTzGetDatum(time_t_to_timestamptz(fst.st_atime));
 	values[2] = TimestampTzGetDatum(time_t_to_timestamptz(fst.st_mtime));
-	/* Unix has file status change time, while Win32 has creation time */
-#if !defined(WIN32) && !defined(__CYGWIN__)
+	/* Unix has file status change time, but no creation time */
 	values[3] = TimestampTzGetDatum(time_t_to_timestamptz(fst.st_ctime));
 	isnull[4] = true;
-#else
-	isnull[3] = true;
-	values[4] = TimestampTzGetDatum(time_t_to_timestamptz(fst.st_ctime));
-#endif
 	values[5] = BoolGetDatum(S_ISDIR(fst.st_mode));
 
 	tuple = heap_form_tuple(tupdesc, values, isnull);

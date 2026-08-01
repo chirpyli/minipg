@@ -455,16 +455,11 @@ static void InitPostmasterDeathWatchHandle(void);
 #define EXIT_STATUS_1(st)  (WIFEXITED(st) && WEXITSTATUS(st) == 1)
 #define EXIT_STATUS_3(st)  (WIFEXITED(st) && WEXITSTATUS(st) == 3)
 
-#ifndef WIN32
 /*
  * File descriptors for pipe used to monitor if postmaster is alive.
  * First is POSTMASTER_FD_WATCH, second is POSTMASTER_FD_OWN.
  */
 int			postmaster_alive_fds[2] = {-1, -1};
-#else
-/* Process handle of postmaster used for the same purpose on Windows */
-HANDLE		PostmasterHandle;
-#endif
 
 /*
  * Postmaster main entry point
@@ -839,9 +834,6 @@ PostmasterMain(int argc, char *argv[])
 
 	/* For debugging: display postmaster environment */
 	{
-#if !defined(WIN32) || defined(_MSC_VER)
-		extern char **environ;
-#endif
 		char	  **p;
 
 		ereport(DEBUG3,
@@ -934,17 +926,6 @@ PostmasterMain(int argc, char *argv[])
 	 * wake up from sleep on postmaster death.
 	 */
 	InitPostmasterDeathWatchHandle();
-
-#ifdef WIN32
-
-	/*
-	 * Initialize I/O completion port used to deliver list of dead children.
-	 */
-	win32ChildQueue = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
-	if (win32ChildQueue == NULL)
-		ereport(FATAL,
-				(errmsg("could not create I/O completion port for child queue")));
-#endif
 
 	/*
 	 * Forcibly remove the files signaling a standby promotion request.
@@ -2466,8 +2447,6 @@ ClosePostmasterPorts(bool am_syslogger)
 {
 	int			i;
 
-#ifndef WIN32
-
 	/*
 	 * Close the write end of postmaster death watch pipe. It's important to
 	 * do this as early as possible, so that if postmaster dies, others won't
@@ -2480,7 +2459,6 @@ ClosePostmasterPorts(bool am_syslogger)
 	postmaster_alive_fds[POSTMASTER_FD_OWN] = -1;
 	/* Notify fd.c that we released one pipe FD. */
 	ReleaseExternalFD();
-#endif
 
 	/*
 	 * Close the postmaster's listen sockets.  These aren't tracked by fd.c,
@@ -2501,15 +2479,9 @@ ClosePostmasterPorts(bool am_syslogger)
 	 */
 	if (!am_syslogger)
 	{
-#ifndef WIN32
 		if (syslogPipe[0] >= 0)
 			close(syslogPipe[0]);
 		syslogPipe[0] = -1;
-#else
-		if (syslogPipe[0])
-			CloseHandle(syslogPipe[0]);
-		syslogPipe[0] = 0;
-#endif
 	}
 
 #ifdef USE_BONJOUR
@@ -2581,12 +2553,8 @@ SIGHUP_handler(SIGNAL_ARGS)
 	int			save_errno = errno;
 
 	/*
-	 * We rely on the signal mechanism to have blocked all signals ... except
-	 * on Windows, which lacks sigaction(), so we have to do it manually.
+	 * We rely on the signal mechanism to have blocked all signals.
 	 */
-#ifdef WIN32
-	PG_SETMASK(&BlockSig);
-#endif
 
 	if (Shutdown <= SmartShutdown)
 	{
@@ -2642,10 +2610,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 
 	}
 
-#ifdef WIN32
-	PG_SETMASK(&UnBlockSig);
-#endif
-
 	errno = save_errno;
 }
 
@@ -2659,12 +2623,8 @@ pmdie(SIGNAL_ARGS)
 	int			save_errno = errno;
 
 	/*
-	 * We rely on the signal mechanism to have blocked all signals ... except
-	 * on Windows, which lacks sigaction(), so we have to do it manually.
+	 * We rely on the signal mechanism to have blocked all signals.
 	 */
-#ifdef WIN32
-	PG_SETMASK(&BlockSig);
-#endif
 
 	ereport(DEBUG2,
 			(errmsg_internal("postmaster received signal %d",
@@ -2795,10 +2755,6 @@ pmdie(SIGNAL_ARGS)
 			break;
 	}
 
-#ifdef WIN32
-	PG_SETMASK(&UnBlockSig);
-#endif
-
 	errno = save_errno;
 }
 
@@ -2813,12 +2769,8 @@ reaper(SIGNAL_ARGS)
 	int			exitstatus;		/* its exit status */
 
 	/*
-	 * We rely on the signal mechanism to have blocked all signals ... except
-	 * on Windows, which lacks sigaction(), so we have to do it manually.
+	 * We rely on the signal mechanism to have blocked all signals.
 	 */
-#ifdef WIN32
-	PG_SETMASK(&BlockSig);
-#endif
 
 	ereport(DEBUG4,
 			(errmsg_internal("reaping dead processes")));
@@ -3138,9 +3090,6 @@ reaper(SIGNAL_ARGS)
 	PostmasterStateMachine();
 
 	/* Done with signal handler */
-#ifdef WIN32
-	PG_SETMASK(&UnBlockSig);
-#endif
 
 	errno = save_errno;
 }
@@ -3169,12 +3118,6 @@ CleanupBackgroundWorker(int pid,
 
 		if (rw->rw_pid != pid)
 			continue;
-
-#ifdef WIN32
-		/* see CleanupBackend */
-		if (exitstatus == ERROR_WAIT_NO_CHILDREN)
-			exitstatus = 0;
-#endif
 
 		snprintf(namebuf, MAXPGPATH, _("background worker \"%s\""),
 				 rw->rw_worker.bgw_type);
@@ -3265,22 +3208,6 @@ CleanupBackend(int pid,
 	 * assume everything is all right and proceed to remove the backend from
 	 * the active backend list.
 	 */
-
-#ifdef WIN32
-
-	/*
-	 * On win32, also treat ERROR_WAIT_NO_CHILDREN (128) as nonfatal case,
-	 * since that sometimes happens under load when the process fails to start
-	 * properly (long before it starts using shared memory). Microsoft reports
-	 * it is related to mutex failure:
-	 * http://archives.postgresql.org/pgsql-hackers/2010-09/msg00790.php
-	 */
-	if (exitstatus == ERROR_WAIT_NO_CHILDREN)
-	{
-		LogChildExit(LOG, _("server process"), pid, exitstatus);
-		exitstatus = 0;
-	}
-#endif
 
 	if (!EXIT_STATUS_0(exitstatus) && !EXIT_STATUS_1(exitstatus))
 	{
@@ -3605,17 +3532,6 @@ LogChildExit(int lev, const char *procname, int pid, int exitstatus)
 				 activity ? errdetail("Failed process was running: %s", activity) : 0));
 	else if (WIFSIGNALED(exitstatus))
 	{
-#if defined(WIN32)
-		ereport(lev,
-
-		/*------
-		  translator: %s is a noun phrase describing a child process, such as
-		  "server process" */
-				(errmsg("%s (PID %d) was terminated by exception 0x%X",
-						procname, pid, WTERMSIG(exitstatus)),
-				 errhint("See C include file \"ntstatus.h\" for a description of the hexadecimal value."),
-				 activity ? errdetail("Failed process was running: %s", activity) : 0));
-#else
 		ereport(lev,
 
 		/*------
@@ -3625,7 +3541,6 @@ LogChildExit(int lev, const char *procname, int pid, int exitstatus)
 						procname, pid, WTERMSIG(exitstatus),
 						pg_strsignal(WTERMSIG(exitstatus))),
 				 activity ? errdetail("Failed process was running: %s", activity) : 0));
-#endif
 	}
 	else
 		ereport(lev,
@@ -4435,14 +4350,6 @@ sigusr1_handler(SIGNAL_ARGS)
 	int			save_errno = errno;
 
 	/*
-	 * We rely on the signal mechanism to have blocked all signals ... except
-	 * on Windows, which lacks sigaction(), so we have to do it manually.
-	 */
-#ifdef WIN32
-	PG_SETMASK(&BlockSig);
-#endif
-
-	/*
 	 * RECOVERY_STARTED and BEGIN_HOT_STANDBY signals are ignored in
 	 * unexpected states. If the startup process quickly starts up, completes
 	 * recovery, exits, we might process the death of the startup process
@@ -4596,10 +4503,6 @@ sigusr1_handler(SIGNAL_ARGS)
 		 */
 		signal_child(StartupPID, SIGUSR2);
 	}
-
-#ifdef WIN32
-	PG_SETMASK(&UnBlockSig);
-#endif
 
 	errno = save_errno;
 }
@@ -5362,90 +5265,6 @@ PostmasterMarkPIDForWorkerNotify(int pid)
 
 
 
-#ifdef WIN32
-
-/*
- * Subset implementation of waitpid() for Windows.  We assume pid is -1
- * (that is, check all child processes) and options is WNOHANG (don't wait).
- */
-static pid_t
-waitpid(pid_t pid, int *exitstatus, int options)
-{
-	win32_deadchild_waitinfo *childinfo;
-	DWORD		exitcode;
-	DWORD		dwd;
-	ULONG_PTR	key;
-	OVERLAPPED *ovl;
-
-	/* Try to consume one win32_deadchild_waitinfo from the queue. */
-	if (!GetQueuedCompletionStatus(win32ChildQueue, &dwd, &key, &ovl, 0))
-	{
-		errno = EAGAIN;
-		return -1;
-	}
-
-	childinfo = (win32_deadchild_waitinfo *) key;
-	pid = childinfo->procId;
-
-	/*
-	 * Remove handle from wait - required even though it's set to wait only
-	 * once
-	 */
-	UnregisterWaitEx(childinfo->waitHandle, NULL);
-
-	if (!GetExitCodeProcess(childinfo->procHandle, &exitcode))
-	{
-		/*
-		 * Should never happen. Inform user and set a fixed exitcode.
-		 */
-		write_stderr("could not read exit code for process\n");
-		exitcode = 255;
-	}
-	*exitstatus = exitcode;
-
-	/*
-	 * Close the process handle.  Only after this point can the PID can be
-	 * recycled by the kernel.
-	 */
-	CloseHandle(childinfo->procHandle);
-
-	/*
-	 * Free struct that was allocated before the call to
-	 * RegisterWaitForSingleObject()
-	 */
-	pfree(childinfo);
-
-	return pid;
-}
-
-/*
- * Note! Code below executes on a thread pool! All operations must
- * be thread safe! Note that elog() and friends must *not* be used.
- */
-static void WINAPI
-pgwin32_deadchild_callback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
-{
-	/* Should never happen, since we use INFINITE as timeout value. */
-	if (TimerOrWaitFired)
-		return;
-
-	/*
-	 * Post the win32_deadchild_waitinfo object for waitpid() to deal with. If
-	 * that fails, we leak the object, but we also leak a whole process and
-	 * get into an unrecoverable state, so there's not much point in worrying
-	 * about that.  We'd like to panic, but we can't use that infrastructure
-	 * from this thread.
-	 */
-	if (!PostQueuedCompletionStatus(win32ChildQueue,
-									0,
-									(ULONG_PTR) lpParameter,
-									NULL))
-		write_stderr("could not post child completion status\n");
-
-	/* Queue SIGCHLD signal. */
-	pg_queue_signal(SIGCHLD);
-}
-#endif							/* WIN32 */
 
 /*
  * Initialize one and only handle for monitoring postmaster death.
@@ -5456,8 +5275,6 @@ pgwin32_deadchild_callback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
 static void
 InitPostmasterDeathWatchHandle(void)
 {
-#ifndef WIN32
-
 	/*
 	 * Create a pipe. Postmaster holds the write end of the pipe open
 	 * (POSTMASTER_FD_OWN), and children hold the read end. Children can pass
@@ -5485,20 +5302,4 @@ InitPostmasterDeathWatchHandle(void)
 		ereport(FATAL,
 				(errcode_for_socket_access(),
 				 errmsg_internal("could not set postmaster death monitoring pipe to nonblocking mode: %m")));
-#else
-
-	/*
-	 * On Windows, we use a process handle for the same purpose.
-	 */
-	if (DuplicateHandle(GetCurrentProcess(),
-						GetCurrentProcess(),
-						GetCurrentProcess(),
-						&PostmasterHandle,
-						0,
-						TRUE,
-						DUPLICATE_SAME_ACCESS) == 0)
-		ereport(FATAL,
-				(errmsg_internal("could not duplicate postmaster handle: error code %lu",
-								 GetLastError())));
-#endif							/* WIN32 */
 }

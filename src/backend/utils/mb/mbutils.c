@@ -1304,11 +1304,9 @@ pg_bind_textdomain_codeset(const char *domainname)
 	int			encoding = GetDatabaseEncoding();
 	int			new_msgenc;
 
-#ifndef WIN32
 	const char *ctype = setlocale(LC_CTYPE, NULL);
 
 	if (pg_strcasecmp(ctype, "C") == 0 || pg_strcasecmp(ctype, "POSIX") == 0)
-#endif
 		if (encoding != PG_SQL_ASCII &&
 			raw_pg_bind_textdomain_codeset(domainname, encoding))
 			return encoding;
@@ -1316,12 +1314,6 @@ pg_bind_textdomain_codeset(const char *domainname)
 	new_msgenc = pg_get_encoding_from_locale(NULL, elog_ok);
 	if (new_msgenc < 0)
 		new_msgenc = PG_SQL_ASCII;
-
-#ifdef WIN32
-	if (!raw_pg_bind_textdomain_codeset(domainname, new_msgenc))
-		/* On failure, the old message encoding remains valid. */
-		return GetMessageEncoding();
-#endif
 
 	return new_msgenc;
 }
@@ -1850,76 +1842,3 @@ report_untranslatable_char(int src_encoding, int dest_encoding,
 					pg_enc2name_tbl[dest_encoding].name)));
 }
 
-
-#ifdef WIN32
-/*
- * Convert from MessageEncoding to a palloc'ed, null-terminated utf16
- * string. The character length is also passed to utf16len if not
- * null. Returns NULL iff failed. Before MessageEncoding initialization, "str"
- * should be ASCII-only; this will function as though MessageEncoding is UTF8.
- */
-WCHAR *
-pgwin32_message_to_UTF16(const char *str, int len, int *utf16len)
-{
-	int			msgenc = GetMessageEncoding();
-	WCHAR	   *utf16;
-	int			dstlen;
-	UINT		codepage;
-
-	if (msgenc == PG_SQL_ASCII)
-		/* No conversion is possible, and SQL_ASCII is never utf16. */
-		return NULL;
-
-	codepage = pg_enc2name_tbl[msgenc].codepage;
-
-	/*
-	 * Use MultiByteToWideChar directly if there is a corresponding codepage,
-	 * or double conversion through UTF8 if not.  Double conversion is needed,
-	 * for example, in an ENCODING=LATIN8, LC_CTYPE=C database.
-	 */
-	if (codepage != 0)
-	{
-		utf16 = (WCHAR *) palloc(sizeof(WCHAR) * (len + 1));
-		dstlen = MultiByteToWideChar(codepage, 0, str, len, utf16, len);
-		utf16[dstlen] = (WCHAR) 0;
-	}
-	else
-	{
-		char	   *utf8;
-
-		/*
-		 * XXX pg_do_encoding_conversion() requires a transaction.  In the
-		 * absence of one, hope for the input to be valid UTF8.
-		 */
-		if (IsTransactionState())
-		{
-			utf8 = (char *) pg_do_encoding_conversion((unsigned char *) str,
-													  len,
-													  msgenc,
-													  PG_UTF8);
-			if (utf8 != str)
-				len = strlen(utf8);
-		}
-		else
-			utf8 = (char *) str;
-
-		utf16 = (WCHAR *) palloc(sizeof(WCHAR) * (len + 1));
-		dstlen = MultiByteToWideChar(CP_UTF8, 0, utf8, len, utf16, len);
-		utf16[dstlen] = (WCHAR) 0;
-
-		if (utf8 != str)
-			pfree(utf8);
-	}
-
-	if (dstlen == 0 && len > 0)
-	{
-		pfree(utf16);
-		return NULL;			/* error */
-	}
-
-	if (utf16len)
-		*utf16len = dstlen;
-	return utf16;
-}
-
-#endif							/* WIN32 */

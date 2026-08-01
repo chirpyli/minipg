@@ -138,22 +138,8 @@ static int	CheckBSDAuth(Port *port, char *user);
  *----------------------------------------------------------------
  */
 #ifdef USE_LDAP
-#ifndef WIN32
-/* We use a deprecated function to keep the codepath the same as win32. */
 #define LDAP_DEPRECATED 1
 #include <ldap.h>
-#else
-#include <winldap.h>
-
-/* Correct header from the Platform SDK */
-typedef
-ULONG		(*__ldap_start_tls_sA) (IN PLDAP ExternalHandle,
-									OUT PULONG ServerReturnValue,
-									OUT LDAPMessage **result,
-									IN PLDAPControlA * ServerControls,
-									IN PLDAPControlA * ClientControls
-);
-#endif
 
 static int	CheckLDAPAuth(Port *port);
 
@@ -2027,10 +2013,8 @@ auth_peer(hbaPort *port)
 {
 	uid_t		uid;
 	gid_t		gid;
-#ifndef WIN32
 	struct passwd *pw;
 	int			ret;
-#endif
 
 	if (getpeereid(port->sock, &uid, &gid) != 0)
 	{
@@ -2046,7 +2030,6 @@ auth_peer(hbaPort *port)
 		return STATUS_ERROR;
 	}
 
-#ifndef WIN32
 	errno = 0;					/* clear errno before call */
 	pw = getpwuid(uid);
 	if (!pw)
@@ -2070,11 +2053,6 @@ auth_peer(hbaPort *port)
 	ret = check_usermap(port->hba->usermap, port->user_name, port->authn_id, false);
 
 	return ret;
-#else
-	/* should have failed with ENOSYS above */
-	Assert(false);
-	return STATUS_ERROR;
-#endif
 }
 
 
@@ -2390,20 +2368,6 @@ InitializeLDAPConnection(Port *port, LDAP **ldap)
 	scheme = port->hba->ldapscheme;
 	if (scheme == NULL)
 		scheme = "ldap";
-#ifdef WIN32
-	if (strcmp(scheme, "ldaps") == 0)
-		*ldap = ldap_sslinit(port->hba->ldapserver, port->hba->ldapport, 1);
-	else
-		*ldap = ldap_init(port->hba->ldapserver, port->hba->ldapport);
-	if (!*ldap)
-	{
-		ereport(LOG,
-				(errmsg("could not initialize LDAP: error code %d",
-						(int) LdapGetLastError())));
-
-		return STATUS_ERROR;
-	}
-#else
 #ifdef HAVE_LDAP_INITIALIZE
 
 	/*
@@ -2520,7 +2484,6 @@ InitializeLDAPConnection(Port *port, LDAP **ldap)
 		return STATUS_ERROR;
 	}
 #endif
-#endif
 
 	if ((r = ldap_set_option(*ldap, LDAP_OPT_PROTOCOL_VERSION, &ldapversion)) != LDAP_SUCCESS)
 	{
@@ -2534,52 +2497,7 @@ InitializeLDAPConnection(Port *port, LDAP **ldap)
 
 	if (port->hba->ldaptls)
 	{
-#ifndef WIN32
 		if ((r = ldap_start_tls_s(*ldap, NULL, NULL)) != LDAP_SUCCESS)
-#else
-		static __ldap_start_tls_sA _ldap_start_tls_sA = NULL;
-
-		if (_ldap_start_tls_sA == NULL)
-		{
-			/*
-			 * Need to load this function dynamically because it may not exist
-			 * on Windows, and causes a load error for the whole exe if
-			 * referenced.
-			 */
-			HANDLE		ldaphandle;
-
-			ldaphandle = LoadLibrary("WLDAP32.DLL");
-			if (ldaphandle == NULL)
-			{
-				/*
-				 * should never happen since we import other files from
-				 * wldap32, but check anyway
-				 */
-				ereport(LOG,
-						(errmsg("could not load library \"%s\": error code %lu",
-								"WLDAP32.DLL", GetLastError())));
-				ldap_unbind(*ldap);
-				return STATUS_ERROR;
-			}
-			_ldap_start_tls_sA = (__ldap_start_tls_sA) (pg_funcptr_t) GetProcAddress(ldaphandle, "ldap_start_tls_sA");
-			if (_ldap_start_tls_sA == NULL)
-			{
-				ereport(LOG,
-						(errmsg("could not load function _ldap_start_tls_sA in wldap32.dll"),
-						 errdetail("LDAP over SSL is not supported on this platform.")));
-				ldap_unbind(*ldap);
-				FreeLibrary(ldaphandle);
-				return STATUS_ERROR;
-			}
-
-			/*
-			 * Leak LDAP handle on purpose, because we need the library to
-			 * stay open. This is ok because it will only ever be leaked once
-			 * per process and is automatically cleaned up on process exit.
-			 */
-		}
-		if ((r = _ldap_start_tls_sA(*ldap, NULL, NULL, NULL, NULL)) != LDAP_SUCCESS)
-#endif
 		{
 			ereport(LOG,
 					(errmsg("could not start LDAP TLS session: %s",

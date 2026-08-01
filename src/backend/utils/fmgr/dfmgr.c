@@ -56,10 +56,7 @@ typedef struct df_files
 {
 	struct df_files *next;		/* List link */
 	dev_t		device;			/* Device file is on */
-#ifndef WIN32					/* ensures we never again depend on this under
-								 * win32 */
 	ino_t		inode;			/* Inode number of file */
-#endif
 	void	   *handle;			/* a handle for pg_dl* functions */
 	char		filename[FLEXIBLE_ARRAY_MEMBER];	/* Full pathname of file */
 } DynamicFileList;
@@ -67,12 +64,7 @@ typedef struct df_files
 static DynamicFileList *file_list = NULL;
 static DynamicFileList *file_tail = NULL;
 
-/* stat() call under Win32 returns an st_ino field, but it has no meaning */
-#ifndef WIN32
 #define SAME_INODE(A,B) ((A).st_ino == (B).inode && (A).st_dev == (B).device)
-#else
-#define SAME_INODE(A,B) false
-#endif
 
 char	   *Dynamic_library_path;
 
@@ -231,9 +223,7 @@ internal_load_library(const char *libname)
 		MemSet(file_scanner, 0, offsetof(DynamicFileList, filename));
 		strcpy(file_scanner->filename, libname);
 		file_scanner->device = stat_buf.st_dev;
-#ifndef WIN32
 		file_scanner->inode = stat_buf.st_ino;
-#endif
 		file_scanner->next = NULL;
 
 		file_scanner->handle = dlopen(file_scanner->filename, RTLD_NOW | RTLD_GLOBAL);

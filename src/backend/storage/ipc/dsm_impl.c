@@ -51,9 +51,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 #include <sys/stat.h>
 #ifdef HAVE_SYS_IPC_H
 #include <sys/ipc.h>

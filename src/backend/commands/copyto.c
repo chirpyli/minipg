@@ -199,12 +199,8 @@ CopySendEndOfRow(CopyToState cstate)
 		case COPY_FILE:
 			if (!cstate->opts.binary)
 			{
-				/* Default line termination depends on platform */
-#ifndef WIN32
-				CopySendChar(cstate, '\n');
-#else
-				CopySendString(cstate, "\r\n");
-#endif
+			/* Default line termination depends on platform */
+			CopySendChar(cstate, '\n');
 			}
 
 			if (fwrite(fe_msgbuf->data, fe_msgbuf->len, 1,

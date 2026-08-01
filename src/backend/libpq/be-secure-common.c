@@ -164,12 +164,7 @@ check_ssl_key_file_permissions(const char *ssl_key_file, bool isServerStart)
 	 * src/interfaces/libpq/fe-secure-openssl.c so any changes here may need
 	 * to be made there as well.  The environment is different though; this
 	 * code can assume that we're not running as root.
-	 *
-	 * Ideally we would do similar permissions checks on Windows, but it is
-	 * not clear how that would work since Unix-style permissions may not be
-	 * available.
 	 */
-#if !defined(WIN32) && !defined(__CYGWIN__)
 	if (buf.st_uid != geteuid() && buf.st_uid != 0)
 	{
 		ereport(loglevel,
@@ -189,7 +184,6 @@ check_ssl_key_file_permissions(const char *ssl_key_file, bool isServerStart)
 				 errdetail("File must have permissions u=rw (0600) or less if owned by the database user, or permissions u=rw,g=r (0640) or less if owned by root.")));
 		return false;
 	}
-#endif
 
 	return true;
 }

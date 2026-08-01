@@ -771,9 +771,6 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 	if (!(ctype_encoding == encoding ||
 		  ctype_encoding == PG_SQL_ASCII ||
 		  ctype_encoding == -1 ||
-#ifdef WIN32
-		  encoding == PG_UTF8 ||
-#endif
 		  (encoding == PG_SQL_ASCII && superuser())))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -786,9 +783,6 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 	if (!(collate_encoding == encoding ||
 		  collate_encoding == PG_SQL_ASCII ||
 		  collate_encoding == -1 ||
-#ifdef WIN32
-		  encoding == PG_UTF8 ||
-#endif
 		  (encoding == PG_SQL_ASCII && superuser())))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),

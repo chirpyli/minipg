@@ -228,70 +228,7 @@ run_ifaddr_callback(PgIfAddrCallback callback, void *cb_data,
 	(*callback) (addr, mask, cb_data);
 }
 
-#ifdef WIN32
-
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
-/*
- * Enumerate the system's network interface addresses and call the callback
- * for each one.  Returns 0 if successful, -1 if trouble.
- *
- * This version is for Win32.  Uses the Winsock 2 functions (ie: ws2_32.dll)
- */
-int
-pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
-{
-	INTERFACE_INFO *ptr,
-			   *ii = NULL;
-	unsigned long length,
-				i;
-	unsigned long n_ii = 0;
-	SOCKET		sock;
-	int			error;
-
-	sock = WSASocket(AF_INET, SOCK_DGRAM, 0, 0, 0, 0);
-	if (sock == INVALID_SOCKET)
-		return -1;
-
-	while (n_ii < 1024)
-	{
-		n_ii += 64;
-		ptr = realloc(ii, sizeof(INTERFACE_INFO) * n_ii);
-		if (!ptr)
-		{
-			free(ii);
-			closesocket(sock);
-			errno = ENOMEM;
-			return -1;
-		}
-
-		ii = ptr;
-		if (WSAIoctl(sock, SIO_GET_INTERFACE_LIST, 0, 0,
-					 ii, n_ii * sizeof(INTERFACE_INFO),
-					 &length, 0, 0) == SOCKET_ERROR)
-		{
-			error = WSAGetLastError();
-			if (error == WSAEFAULT || error == WSAENOBUFS)
-				continue;		/* need to make the buffer bigger */
-			closesocket(sock);
-			free(ii);
-			return -1;
-		}
-
-		break;
-	}
-
-	for (i = 0; i < length / sizeof(INTERFACE_INFO); ++i)
-		run_ifaddr_callback(callback, cb_data,
-							(struct sockaddr *) &ii[i].iiAddress,
-							(struct sockaddr *) &ii[i].iiNetmask);
-
-	closesocket(sock);
-	free(ii);
-	return 0;
-}
-#elif HAVE_GETIFADDRS			/* && !WIN32 */
+#ifdef HAVE_GETIFADDRS
 
 #ifdef HAVE_IFADDRS_H
 #include <ifaddrs.h>

@@ -47,3 +47,7 @@ lib*.pc
 .vscode/
 .codebuddy/
 autom4te.cache/
+
+# clangd cache and compile DB
+.cache/
+compile_commands.json
