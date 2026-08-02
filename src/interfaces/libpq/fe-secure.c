@@ -97,69 +97,18 @@ struct sigpipe_info
 #endif							/* !WIN32 */
 
 /* ------------------------------------------------------------ */
-/*			 Procedures common to all secure sessions			*/
+/*			 Procedures common to all sessions					*/
 /* ------------------------------------------------------------ */
 
-
-int
-PQsslInUse(PGconn *conn)
-{
-	if (!conn)
-		return 0;
-	return conn->ssl_in_use;
-}
-
 /*
- *	Exported function to allow application to tell us it's already
- *	initialized OpenSSL.
- */
-void
-PQinitSSL(int do_init)
-{
-#ifdef USE_SSL
-	pgtls_init_library(do_init, do_init);
-#endif
-}
-
-/*
- *	Exported function to allow application to tell us it's already
- *	initialized OpenSSL and/or libcrypto.
- */
-void
-PQinitOpenSSL(int do_ssl, int do_crypto)
-{
-#ifdef USE_SSL
-	pgtls_init_library(do_ssl, do_crypto);
-#endif
-}
-
-/*
- *	Initialize global SSL context
+ *	Initialize global context.
+ *
+ * This build supports no transport encryption, so there is nothing to set up.
  */
 int
 pqsecure_initialize(PGconn *conn, bool do_ssl, bool do_crypto)
 {
-	int			r = 0;
-
-#ifdef USE_SSL
-	r = pgtls_init(conn, do_ssl, do_crypto);
-#endif
-
-	return r;
-}
-
-/*
- *	Begin or continue negotiating a secure session.
- */
-PostgresPollingStatusType
-pqsecure_open_client(PGconn *conn)
-{
-#ifdef USE_SSL
-	return pgtls_open_client(conn);
-#else
-	/* shouldn't get here */
-	return PGRES_POLLING_FAILED;
-#endif
+	return 0;
 }
 
 /*
@@ -168,9 +117,6 @@ pqsecure_open_client(PGconn *conn)
 void
 pqsecure_close(PGconn *conn)
 {
-#ifdef USE_SSL
-	pgtls_close(conn);
-#endif
 }
 
 /*
@@ -183,27 +129,7 @@ pqsecure_close(PGconn *conn)
 ssize_t
 pqsecure_read(PGconn *conn, void *ptr, size_t len)
 {
-	ssize_t		n;
-
-#ifdef USE_SSL
-	if (conn->ssl_in_use)
-	{
-		n = pgtls_read(conn, ptr, len);
-	}
-	else
-#endif
-#ifdef ENABLE_GSS
-	if (conn->gssenc)
-	{
-		n = pg_GSS_read(conn, ptr, len);
-	}
-	else
-#endif
-	{
-		n = pqsecure_raw_read(conn, ptr, len);
-	}
-
-	return n;
+	return pqsecure_raw_read(conn, ptr, len);
 }
 
 ssize_t
@@ -273,15 +199,6 @@ pqsecure_raw_read(PGconn *conn, void *ptr, size_t len)
 ssize_t
 pqsecure_bytes_pending(PGconn *conn)
 {
-#ifdef USE_SSL
-	if (conn->ssl_in_use)
-		return pgtls_bytes_pending(conn);
-#endif
-#ifdef ENABLE_GSS
-	if (conn->gssenc)
-		return pg_GSS_bytes_pending(conn);
-#endif
-
 	/* Plaintext connections have no transport buffer. */
 	return 0;
 }
@@ -296,27 +213,7 @@ pqsecure_bytes_pending(PGconn *conn)
 ssize_t
 pqsecure_write(PGconn *conn, const void *ptr, size_t len)
 {
-	ssize_t		n;
-
-#ifdef USE_SSL
-	if (conn->ssl_in_use)
-	{
-		n = pgtls_write(conn, ptr, len);
-	}
-	else
-#endif
-#ifdef ENABLE_GSS
-	if (conn->gssenc)
-	{
-		n = pg_GSS_write(conn, ptr, len);
-	}
-	else
-#endif
-	{
-		n = pqsecure_raw_write(conn, ptr, len);
-	}
-
-	return n;
+	return pqsecure_raw_write(conn, ptr, len);
 }
 
 ssize_t
@@ -400,79 +297,6 @@ retry_masked:
 
 	return n;
 }
-
-/* Dummy versions of SSL info functions, when built without SSL support */
-#ifndef USE_SSL
-
-void *
-PQgetssl(PGconn *conn)
-{
-	return NULL;
-}
-
-void *
-PQsslStruct(PGconn *conn, const char *struct_name)
-{
-	return NULL;
-}
-
-const char *
-PQsslAttribute(PGconn *conn, const char *attribute_name)
-{
-	return NULL;
-}
-
-const char *const *
-PQsslAttributeNames(PGconn *conn)
-{
-	static const char *const result[] = {NULL};
-
-	return result;
-}
-#endif							/* USE_SSL */
-
-/*
- * Dummy versions of OpenSSL key password hook functions, when built without
- * OpenSSL.
- */
-#ifndef USE_OPENSSL
-
-PQsslKeyPassHook_OpenSSL_type
-PQgetSSLKeyPassHook_OpenSSL(void)
-{
-	return NULL;
-}
-
-void
-PQsetSSLKeyPassHook_OpenSSL(PQsslKeyPassHook_OpenSSL_type hook)
-{
-	return;
-}
-
-int
-PQdefaultSSLKeyPassHook_OpenSSL(char *buf, int size, PGconn *conn)
-{
-	return 0;
-}
-#endif							/* USE_OPENSSL */
-
-/* Dummy version of GSSAPI information functions, when built without GSS support */
-#ifndef ENABLE_GSS
-
-void *
-PQgetgssctx(PGconn *conn)
-{
-	return NULL;
-}
-
-int
-PQgssEncInUse(PGconn *conn)
-{
-	return 0;
-}
-
-#endif							/* ENABLE_GSS */
-
 
 #if defined(ENABLE_THREAD_SAFETY)
 

@@ -27,19 +27,9 @@ typedef enum UserAuth
 	uaReject,
 	uaImplicitReject,			/* Not a user-visible option */
 	uaTrust,
-	uaIdent,
 	uaPassword,
-	uaMD5,
-	uaSCRAM,
-	uaGSS,
-	uaSSPI,
-	uaPAM,
-	uaBSD,
-	uaLDAP,
-	uaCert,
-	uaRADIUS,
-	uaPeer
-#define USER_AUTH_LAST uaPeer	/* Must be last value of this enum */
+	uaSCRAM
+#define USER_AUTH_LAST uaSCRAM	/* Must be last value of this enum */
 } UserAuth;
 
 /*
@@ -58,24 +48,7 @@ typedef enum ConnType
 {
 	ctLocal,
 	ctHost,
-	ctHostSSL,
-	ctHostNoSSL,
-	ctHostGSS,
-	ctHostNoGSS,
 } ConnType;
-
-typedef enum ClientCertMode
-{
-	clientCertOff,
-	clientCertCA,
-	clientCertFull
-} ClientCertMode;
-
-typedef enum ClientCertName
-{
-	clientCertCN,
-	clientCertDN
-} ClientCertName;
 
 typedef struct HbaLine
 {
@@ -92,34 +65,6 @@ typedef struct HbaLine
 	char	   *hostname;
 	UserAuth	auth_method;
 	char	   *usermap;
-	char	   *pamservice;
-	bool		pam_use_hostname;
-	bool		ldaptls;
-	char	   *ldapscheme;
-	char	   *ldapserver;
-	int			ldapport;
-	char	   *ldapbinddn;
-	char	   *ldapbindpasswd;
-	char	   *ldapsearchattribute;
-	char	   *ldapsearchfilter;
-	char	   *ldapbasedn;
-	int			ldapscope;
-	char	   *ldapprefix;
-	char	   *ldapsuffix;
-	ClientCertMode clientcert;
-	ClientCertName clientcertname;
-	char	   *krb_realm;
-	bool		include_realm;
-	bool		compat_realm;
-	bool		upn_username;
-	List	   *radiusservers;
-	char	   *radiusservers_s;
-	List	   *radiussecrets;
-	char	   *radiussecrets_s;
-	List	   *radiusidentifiers;
-	char	   *radiusidentifiers_s;
-	List	   *radiusports;
-	char	   *radiusports_s;
 } HbaLine;
 
 typedef struct IdentLine

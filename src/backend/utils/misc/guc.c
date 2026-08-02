@@ -108,10 +108,6 @@
 #include "utils/varlena.h"
 #include "utils/xml.h"
 
-#ifndef PG_KRB_SRVTAB
-#define PG_KRB_SRVTAB ""
-#endif
-
 #define CONFIG_FILENAME "postgresql.conf"
 #define HBA_FILENAME	"pg_hba.conf"
 #define IDENT_FILENAME	"pg_ident.conf"
@@ -179,7 +175,6 @@ static void assign_syslog_ident(const char *newval, void *extra);
 static void assign_session_replication_role(int newval, void *extra);
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
 static bool check_bonjour(bool *newval, void **extra, GucSource source);
-static bool check_ssl(bool *newval, void **extra, GucSource source);
 static bool check_stage_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_canonical_path(char **newval, void **extra, GucSource source);
@@ -494,18 +489,6 @@ static const struct config_enum_entry password_encryption_options[] = {
 	{NULL, 0, false}
 };
 
-const struct config_enum_entry ssl_protocol_versions_info[] = {
-	{"", PG_TLS_ANY, false},
-	{"TLSv1", PG_TLS1_VERSION, false},
-	{"TLSv1.1", PG_TLS1_1_VERSION, false},
-	{"TLSv1.2", PG_TLS1_2_VERSION, false},
-	{"TLSv1.3", PG_TLS1_3_VERSION, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(ssl_protocol_versions_info) == (PG_TLS1_3_VERSION + 2),
-				 "array length mismatch");
-
 static struct config_enum_entry recovery_init_sync_method_options[] = {
 	{"fsync", RECOVERY_INIT_SYNC_METHOD_FSYNC, false},
 #ifdef HAVE_SYNCFS
@@ -595,14 +578,6 @@ int			tcp_keepalives_idle;
 int			tcp_keepalives_interval;
 int			tcp_keepalives_count;
 int			tcp_user_timeout;
-
-/*
- * SSL renegotiation was been removed in PostgreSQL 9.5, but we tolerate it
- * being set to zero (meaning never renegotiate) for backward compatibility.
- * This avoids breaking compatibility with clients that have never supported
- * renegotiation and therefore always try to zero it.
- */
-int			ssl_renegotiation_limit;
 
 /*
  * This really belongs in pg_shmem.c, but is defined here so that it doesn't
@@ -1179,33 +1154,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&track_commit_timestamp,
 		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"ssl", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Enables SSL connections."),
-			NULL
-		},
-		&EnableSSL,
-		false,
-		check_ssl, NULL, NULL
-	},
-	{
-		{"ssl_passphrase_command_supports_reload", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Also use ssl_passphrase_command during server reload."),
-			NULL
-		},
-		&ssl_passphrase_command_supports_reload,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"ssl_prefer_server_ciphers", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Give priority to server ciphersuite order."),
-			NULL
-		},
-		&SSLPreferServerCiphers,
-		true,
 		NULL, NULL, NULL
 	},
 	{
@@ -1827,16 +1775,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&integer_datetimes,
 		true,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"krb_caseins_users", PGC_SIGHUP, CONN_AUTH_AUTH,
-			gettext_noop("Sets whether Kerberos and GSSAPI user names should be treated as case-insensitive."),
-			NULL
-		},
-		&pg_krb_caseins_users,
-		false,
 		NULL, NULL, NULL
 	},
 
@@ -3367,17 +3305,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"ssl_renegotiation_limit", PGC_USERSET, CONN_AUTH_SSL,
-			gettext_noop("SSL renegotiation is no longer supported; this can only be 0."),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE,
-		},
-		&ssl_renegotiation_limit,
-		0, 0, 0,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"tcp_keepalives_count", PGC_USERSET, CONN_AUTH_SETTINGS,
 			gettext_noop("Maximum number of TCP keepalive retransmits."),
 			gettext_noop("This controls the number of consecutive keepalive retransmits that can be "
@@ -4031,17 +3958,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"krb_server_keyfile", PGC_SIGHUP, CONN_AUTH_AUTH,
-			gettext_noop("Sets the location of the Kerberos server key file."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&pg_krb_server_keyfile,
-		PG_KRB_SRVTAB,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"bonjour_name", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
 			gettext_noop("Sets the Bonjour service name."),
 			NULL
@@ -4369,71 +4285,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"ssl_library", PGC_INTERNAL, PRESET_OPTIONS,
-			gettext_noop("Shows the name of the SSL library."),
-			NULL,
-			GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE
-		},
-		&ssl_library,
-#ifdef USE_SSL
-		"OpenSSL",
-#else
-		"",
-#endif
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_cert_file", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL server certificate file."),
-			NULL
-		},
-		&ssl_cert_file,
-		"server.crt",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_key_file", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL server private key file."),
-			NULL
-		},
-		&ssl_key_file,
-		"server.key",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_ca_file", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL certificate authority file."),
-			NULL
-		},
-		&ssl_ca_file,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_crl_file", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL certificate revocation list file."),
-			NULL
-		},
-		&ssl_crl_file,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_crl_dir", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL certificate revocation list directory."),
-			NULL
-		},
-		&ssl_crl_dir,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
 		{"stats_temp_directory", PGC_SIGHUP, STATS_COLLECTOR,
 			gettext_noop("Writes temporary statistics files to the specified directory."),
 			NULL,
@@ -4463,58 +4314,6 @@ static struct config_string ConfigureNamesString[] =
 		&TSCurrentConfig,
 		"pg_catalog.simple",
 		check_TSCurrentConfig, assign_TSCurrentConfig, NULL
-	},
-
-	{
-		{"ssl_ciphers", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Sets the list of allowed SSL ciphers."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&SSLCipherSuites,
-#ifdef USE_OPENSSL
-		"HIGH:MEDIUM:+3DES:!aNULL",
-#else
-		"none",
-#endif
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_ecdh_curve", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Sets the curve to use for ECDH."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&SSLECDHCurve,
-#ifdef USE_SSL
-		"prime256v1",
-#else
-		"none",
-#endif
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_dh_params_file", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Location of the SSL DH parameters file."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&ssl_dh_params_file,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_passphrase_command", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Command to obtain passphrases for SSL."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&ssl_passphrase_command,
-		"",
-		NULL, NULL, NULL
 	},
 
 	{
@@ -4913,30 +4712,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&plan_cache_mode,
 		PLAN_CACHE_MODE_AUTO, plan_cache_mode_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_min_protocol_version", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Sets the minimum SSL/TLS protocol version to use."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&ssl_min_protocol_version,
-		PG_TLS1_2_VERSION,
-		ssl_protocol_versions_info + 1, /* don't allow PG_TLS_ANY */
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ssl_max_protocol_version", PGC_SIGHUP, CONN_AUTH_SSL,
-			gettext_noop("Sets the maximum SSL/TLS protocol version to use."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&ssl_max_protocol_version,
-		PG_TLS_ANY,
-		ssl_protocol_versions_info,
 		NULL, NULL, NULL
 	},
 
@@ -11581,19 +11356,6 @@ check_bonjour(bool *newval, void **extra, GucSource source)
 	if (*newval)
 	{
 		GUC_check_errmsg("Bonjour is not supported by this build");
-		return false;
-	}
-#endif
-	return true;
-}
-
-static bool
-check_ssl(bool *newval, void **extra, GucSource source)
-{
-#ifndef USE_SSL
-	if (*newval)
-	{
-		GUC_check_errmsg("SSL is not supported by this build");
 		return false;
 	}
 #endif

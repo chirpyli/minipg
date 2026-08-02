@@ -37,51 +37,19 @@
 #include "tcop/tcopprot.h"
 #include "utils/memutils.h"
 
-char	   *ssl_library;
-char	   *ssl_cert_file;
-char	   *ssl_key_file;
-char	   *ssl_ca_file;
-char	   *ssl_crl_file;
-char	   *ssl_crl_dir;
-char	   *ssl_dh_params_file;
-char	   *ssl_passphrase_command;
-bool		ssl_passphrase_command_supports_reload;
-
-#ifdef USE_SSL
-bool		ssl_loaded_verify_locations = false;
-#endif
-
-/* GUC variable controlling SSL cipher list */
-char	   *SSLCipherSuites = NULL;
-
-/* GUC variable for default ECHD curve. */
-char	   *SSLECDHCurve;
-
-/* GUC variable: if false, prefer client ciphers */
-bool		SSLPreferServerCiphers;
-
-int			ssl_min_protocol_version;
-int			ssl_max_protocol_version;
-
 /* ------------------------------------------------------------ */
-/*			 Procedures common to all secure sessions			*/
+/*			 Procedures common to all sessions					*/
 /* ------------------------------------------------------------ */
 
 /*
  *	Initialize global context.
  *
- * If isServerStart is true, report any errors as FATAL (so we don't return).
- * Otherwise, log errors at LOG level and return -1 to indicate trouble,
- * preserving the old SSL state if any.  Returns 0 if OK.
+ * This build supports no transport encryption, so there is nothing to set up.
  */
 int
 secure_initialize(bool isServerStart)
 {
-#ifdef USE_SSL
-	return be_tls_init(isServerStart);
-#else
 	return 0;
-#endif
 }
 
 /*
@@ -90,22 +58,6 @@ secure_initialize(bool isServerStart)
 void
 secure_destroy(void)
 {
-#ifdef USE_SSL
-	be_tls_destroy();
-#endif
-}
-
-/*
- * Indicate if we have loaded the root CA store to verify certificates
- */
-bool
-secure_loaded_verify_locations(void)
-{
-#ifdef USE_SSL
-	return ssl_loaded_verify_locations;
-#else
-	return false;
-#endif
 }
 
 /*
@@ -114,18 +66,7 @@ secure_loaded_verify_locations(void)
 int
 secure_open_server(Port *port)
 {
-	int			r = 0;
-
-#ifdef USE_SSL
-	r = be_tls_open_server(port);
-
-	ereport(DEBUG2,
-			(errmsg_internal("SSL connection from DN:\"%s\" CN:\"%s\"",
-							 port->peer_dn ? port->peer_dn : "(anonymous)",
-							 port->peer_cn ? port->peer_cn : "(anonymous)")));
-#endif
-
-	return r;
+	return 0;
 }
 
 /*
@@ -134,10 +75,6 @@ secure_open_server(Port *port)
 void
 secure_close(Port *port)
 {
-#ifdef USE_SSL
-	if (port->ssl_in_use)
-		be_tls_close(port);
-#endif
 }
 
 /*
@@ -153,26 +90,8 @@ secure_read(Port *port, void *ptr, size_t len)
 	ProcessClientReadInterrupt(false);
 
 retry:
-#ifdef USE_SSL
-	waitfor = 0;
-	if (port->ssl_in_use)
-	{
-		n = be_tls_read(port, ptr, len, &waitfor);
-	}
-	else
-#endif
-#ifdef ENABLE_GSS
-	if (port->gss && port->gss->enc)
-	{
-		n = be_gssapi_read(port, ptr, len);
-		waitfor = WL_SOCKET_READABLE;
-	}
-	else
-#endif
-	{
-		n = secure_raw_read(port, ptr, len);
-		waitfor = WL_SOCKET_READABLE;
-	}
+	n = secure_raw_read(port, ptr, len);
+	waitfor = WL_SOCKET_READABLE;
 
 	/* In blocking mode, wait until the socket is ready */
 	if (n < 0 && !port->noblock && (errno == EWOULDBLOCK || errno == EAGAIN))
@@ -260,26 +179,8 @@ secure_write(Port *port, void *ptr, size_t len)
 	ProcessClientWriteInterrupt(false);
 
 retry:
-	waitfor = 0;
-#ifdef USE_SSL
-	if (port->ssl_in_use)
-	{
-		n = be_tls_write(port, ptr, len, &waitfor);
-	}
-	else
-#endif
-#ifdef ENABLE_GSS
-	if (port->gss && port->gss->enc)
-	{
-		n = be_gssapi_write(port, ptr, len);
-		waitfor = WL_SOCKET_WRITEABLE;
-	}
-	else
-#endif
-	{
-		n = secure_raw_write(port, ptr, len);
-		waitfor = WL_SOCKET_WRITEABLE;
-	}
+	n = secure_raw_write(port, ptr, len);
+	waitfor = WL_SOCKET_WRITEABLE;
 
 	if (n < 0 && !port->noblock && (errno == EWOULDBLOCK || errno == EAGAIN))
 	{

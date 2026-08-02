@@ -96,23 +96,8 @@ static int	ldapServiceLookup(const char *purl, PQconninfoOption *options,
  */
 #define DefaultHost		"localhost"
 #define DefaultOption	""
-#ifdef USE_SSL
-#define DefaultChannelBinding	"prefer"
-#else
 #define DefaultChannelBinding	"disable"
-#endif
 #define DefaultTargetSessionAttrs	"any"
-#ifdef USE_SSL
-#define DefaultSSLMode "prefer"
-#else
-#define DefaultSSLMode	"disable"
-#endif
-#ifdef ENABLE_GSS
-#include "fe-gssapi-common.h"
-#define DefaultGSSMode "prefer"
-#else
-#define DefaultGSSMode "disable"
-#endif
 
 /* ----------
  * Definition of the conninfo parameters and their fallback resources.
@@ -240,76 +225,9 @@ static const internalPQconninfoOption PQconninfoOptions[] = {
 		"TCP-User-Timeout", "", 10, /* strlen(INT32_MAX) == 10 */
 	offsetof(struct pg_conn, pgtcp_user_timeout)},
 
-	/*
-	 * ssl options are allowed even without client SSL support because the
-	 * client can still handle SSL modes "disable" and "allow". Other
-	 * parameters have no effect on non-SSL connections, so there is no reason
-	 * to exclude them since none of them are mandatory.
-	 */
-	{"sslmode", "PGSSLMODE", DefaultSSLMode, NULL,
-		"SSL-Mode", "", 12,		/* sizeof("verify-full") == 12 */
-	offsetof(struct pg_conn, sslmode)},
-
-	{"sslcompression", "PGSSLCOMPRESSION", "0", NULL,
-		"SSL-Compression", "", 1,
-	offsetof(struct pg_conn, sslcompression)},
-
-	{"sslcert", "PGSSLCERT", NULL, NULL,
-		"SSL-Client-Cert", "", 64,
-	offsetof(struct pg_conn, sslcert)},
-
-	{"sslkey", "PGSSLKEY", NULL, NULL,
-		"SSL-Client-Key", "", 64,
-	offsetof(struct pg_conn, sslkey)},
-
-	{"sslpassword", NULL, NULL, NULL,
-		"SSL-Client-Key-Password", "*", 20,
-	offsetof(struct pg_conn, sslpassword)},
-
-	{"sslrootcert", "PGSSLROOTCERT", NULL, NULL,
-		"SSL-Root-Certificate", "", 64,
-	offsetof(struct pg_conn, sslrootcert)},
-
-	{"sslcrl", "PGSSLCRL", NULL, NULL,
-		"SSL-Revocation-List", "", 64,
-	offsetof(struct pg_conn, sslcrl)},
-
-	{"sslcrldir", "PGSSLCRLDIR", NULL, NULL,
-		"SSL-Revocation-List-Dir", "", 64,
-	offsetof(struct pg_conn, sslcrldir)},
-
-	{"sslsni", "PGSSLSNI", "1", NULL,
-		"SSL-SNI", "", 1,
-	offsetof(struct pg_conn, sslsni)},
-
 	{"requirepeer", "PGREQUIREPEER", NULL, NULL,
 		"Require-Peer", "", 10,
 	offsetof(struct pg_conn, requirepeer)},
-
-	{"ssl_min_protocol_version", "PGSSLMINPROTOCOLVERSION", "TLSv1.2", NULL,
-		"SSL-Minimum-Protocol-Version", "", 8,	/* sizeof("TLSv1.x") == 8 */
-	offsetof(struct pg_conn, ssl_min_protocol_version)},
-
-	{"ssl_max_protocol_version", "PGSSLMAXPROTOCOLVERSION", NULL, NULL,
-		"SSL-Maximum-Protocol-Version", "", 8,	/* sizeof("TLSv1.x") == 8 */
-	offsetof(struct pg_conn, ssl_max_protocol_version)},
-
-	/*
-	 * As with SSL, all GSS options are exposed even in builds that don't have
-	 * support.
-	 */
-	{"gssencmode", "PGGSSENCMODE", DefaultGSSMode, NULL,
-		"GSSENC-Mode", "", 8,	/* sizeof("disable") == 8 */
-	offsetof(struct pg_conn, gssencmode)},
-
-	/* Kerberos and GSSAPI authentication support specifying the service name */
-	{"krbsrvname", "PGKRBSRVNAME", PG_KRB_SRVNAM, NULL,
-		"Kerberos-service-name", "", 20,
-	offsetof(struct pg_conn, krbsrvname)},
-
-	{"gsslib", "PGGSSLIB", NULL, NULL,
-		"GSS-library", "", 7,	/* sizeof("gssapi") == 7 */
-	offsetof(struct pg_conn, gsslib)},
 
 	{"replication", NULL, NULL, NULL,
 		"Replication", "D", 5,
@@ -441,57 +359,6 @@ pqDropConnection(PGconn *conn, bool flushInput)
 	conn->outCount = 0;
 
 	/* Free authentication/encryption state */
-#ifdef ENABLE_GSS
-	{
-		OM_uint32	min_s;
-
-		if (conn->gcred != GSS_C_NO_CREDENTIAL)
-		{
-			gss_release_cred(&min_s, &conn->gcred);
-			conn->gcred = GSS_C_NO_CREDENTIAL;
-		}
-		if (conn->gctx)
-			gss_delete_sec_context(&min_s, &conn->gctx, GSS_C_NO_BUFFER);
-		if (conn->gtarg_nam)
-			gss_release_name(&min_s, &conn->gtarg_nam);
-		if (conn->gss_SendBuffer)
-		{
-			free(conn->gss_SendBuffer);
-			conn->gss_SendBuffer = NULL;
-		}
-		if (conn->gss_RecvBuffer)
-		{
-			free(conn->gss_RecvBuffer);
-			conn->gss_RecvBuffer = NULL;
-		}
-		if (conn->gss_ResultBuffer)
-		{
-			free(conn->gss_ResultBuffer);
-			conn->gss_ResultBuffer = NULL;
-		}
-		conn->gssenc = false;
-	}
-#endif
-#ifdef ENABLE_SSPI
-	if (conn->sspitarget)
-	{
-		free(conn->sspitarget);
-		conn->sspitarget = NULL;
-	}
-	if (conn->sspicred)
-	{
-		FreeCredentialsHandle(conn->sspicred);
-		free(conn->sspicred);
-		conn->sspicred = NULL;
-	}
-	if (conn->sspictx)
-	{
-		DeleteSecurityContext(conn->sspictx);
-		free(conn->sspictx);
-		conn->sspictx = NULL;
-	}
-	conn->usesspi = 0;
-#endif
 	if (conn->sasl_state)
 	{
 		/*
@@ -1257,127 +1124,6 @@ connectOptions2(PGconn *conn)
 	{
 		conn->channel_binding = strdup(DefaultChannelBinding);
 		if (!conn->channel_binding)
-			goto oom_error;
-	}
-
-	/*
-	 * validate sslmode option
-	 */
-	if (conn->sslmode)
-	{
-		if (strcmp(conn->sslmode, "disable") != 0
-			&& strcmp(conn->sslmode, "allow") != 0
-			&& strcmp(conn->sslmode, "prefer") != 0
-			&& strcmp(conn->sslmode, "require") != 0
-			&& strcmp(conn->sslmode, "verify-ca") != 0
-			&& strcmp(conn->sslmode, "verify-full") != 0)
-		{
-			conn->status = CONNECTION_BAD;
-			appendPQExpBuffer(&conn->errorMessage,
-							  libpq_gettext("invalid %s value: \"%s\"\n"),
-							  "sslmode", conn->sslmode);
-			return false;
-		}
-
-#ifndef USE_SSL
-		switch (conn->sslmode[0])
-		{
-			case 'a':			/* "allow" */
-			case 'p':			/* "prefer" */
-
-				/*
-				 * warn user that an SSL connection will never be negotiated
-				 * since SSL was not compiled in?
-				 */
-				break;
-
-			case 'r':			/* "require" */
-			case 'v':			/* "verify-ca" or "verify-full" */
-				conn->status = CONNECTION_BAD;
-				appendPQExpBuffer(&conn->errorMessage,
-								  libpq_gettext("sslmode value \"%s\" invalid when SSL support is not compiled in\n"),
-								  conn->sslmode);
-				return false;
-		}
-#endif
-	}
-	else
-	{
-		conn->sslmode = strdup(DefaultSSLMode);
-		if (!conn->sslmode)
-			goto oom_error;
-	}
-
-	/*
-	 * Validate TLS protocol versions for ssl_min_protocol_version and
-	 * ssl_max_protocol_version.
-	 */
-	if (!sslVerifyProtocolVersion(conn->ssl_min_protocol_version))
-	{
-		conn->status = CONNECTION_BAD;
-		appendPQExpBuffer(&conn->errorMessage,
-						  libpq_gettext("invalid %s value: \"%s\"\n"),
-						  "ssl_min_protocol_version",
-						  conn->ssl_min_protocol_version);
-		return false;
-	}
-	if (!sslVerifyProtocolVersion(conn->ssl_max_protocol_version))
-	{
-		conn->status = CONNECTION_BAD;
-		appendPQExpBuffer(&conn->errorMessage,
-						  libpq_gettext("invalid %s value: \"%s\"\n"),
-						  "ssl_max_protocol_version",
-						  conn->ssl_max_protocol_version);
-		return false;
-	}
-
-	/*
-	 * Check if the range of SSL protocols defined is correct.  This is done
-	 * at this early step because this is independent of the SSL
-	 * implementation used, and this avoids unnecessary cycles with an
-	 * already-built SSL context when the connection is being established, as
-	 * it would be doomed anyway.
-	 */
-	if (!sslVerifyProtocolRange(conn->ssl_min_protocol_version,
-								conn->ssl_max_protocol_version))
-	{
-		conn->status = CONNECTION_BAD;
-		appendPQExpBufferStr(&conn->errorMessage,
-							 libpq_gettext("invalid SSL protocol version range\n"));
-		return false;
-	}
-
-	/*
-	 * validate gssencmode option
-	 */
-	if (conn->gssencmode)
-	{
-		if (strcmp(conn->gssencmode, "disable") != 0 &&
-			strcmp(conn->gssencmode, "prefer") != 0 &&
-			strcmp(conn->gssencmode, "require") != 0)
-		{
-			conn->status = CONNECTION_BAD;
-			appendPQExpBuffer(&conn->errorMessage,
-							  libpq_gettext("invalid %s value: \"%s\"\n"),
-							  "gssencmode",
-							  conn->gssencmode);
-			return false;
-		}
-#ifndef ENABLE_GSS
-		if (strcmp(conn->gssencmode, "require") == 0)
-		{
-			conn->status = CONNECTION_BAD;
-			appendPQExpBuffer(&conn->errorMessage,
-							  libpq_gettext("gssencmode value \"%s\" invalid when GSSAPI support is not compiled in\n"),
-							  conn->gssencmode);
-			return false;
-		}
-#endif
-	}
-	else
-	{
-		conn->gssencmode = strdup(DefaultGSSMode);
-		if (!conn->gssencmode)
 			goto oom_error;
 	}
 
@@ -2448,14 +2194,6 @@ keep_going:						/* We will come back to here until there is
 		 */
 		conn->pversion = PG_PROTOCOL(3, 0);
 		conn->send_appname = true;
-#ifdef USE_SSL
-		/* initialize these values based on SSL mode */
-		conn->allow_ssl_try = (conn->sslmode[0] != 'd');	/* "disable" */
-		conn->wait_ssl_try = (conn->sslmode[0] == 'a'); /* "allow" */
-#endif
-#ifdef ENABLE_GSS
-		conn->try_gss = (conn->gssencmode[0] != 'd');	/* "disable" */
-#endif
 
 		reset_connection_state_machine = false;
 		need_new_connection = true;
@@ -2853,100 +2591,6 @@ keep_going:						/* We will come back to here until there is
 #endif							/* WIN32 */
 				}
 
-				if (IS_AF_UNIX(conn->raddr.addr.ss_family))
-				{
-					/* Don't request SSL or GSSAPI over Unix sockets */
-#ifdef USE_SSL
-					conn->allow_ssl_try = false;
-#endif
-#ifdef ENABLE_GSS
-					conn->try_gss = false;
-#endif
-				}
-
-#ifdef ENABLE_GSS
-
-				/*
-				 * If GSSAPI encryption is enabled, then call
-				 * pg_GSS_have_cred_cache() which will return true if we can
-				 * acquire credentials (and give us a handle to use in
-				 * conn->gcred), and then send a packet to the server asking
-				 * for GSSAPI Encryption (and skip past SSL negotiation and
-				 * regular startup below).
-				 */
-				if (conn->try_gss && !conn->gctx)
-					conn->try_gss = pg_GSS_have_cred_cache(&conn->gcred);
-				if (conn->try_gss && !conn->gctx)
-				{
-					ProtocolVersion pv = pg_hton32(NEGOTIATE_GSS_CODE);
-
-					if (pqPacketSend(conn, 0, &pv, sizeof(pv)) != STATUS_OK)
-					{
-						appendPQExpBuffer(&conn->errorMessage,
-										  libpq_gettext("could not send GSSAPI negotiation packet: %s\n"),
-										  SOCK_STRERROR(SOCK_ERRNO, sebuf, sizeof(sebuf)));
-						goto error_return;
-					}
-
-					/* Ok, wait for response */
-					conn->status = CONNECTION_GSS_STARTUP;
-					return PGRES_POLLING_READING;
-				}
-				else if (!conn->gctx && conn->gssencmode[0] == 'r')
-				{
-					appendPQExpBufferStr(&conn->errorMessage,
-										 libpq_gettext("GSSAPI encryption required but was impossible (possibly no credential cache, no server support, or using a local socket)\n"));
-					goto error_return;
-				}
-#endif
-
-#ifdef USE_SSL
-
-				/*
-				 * Enable the libcrypto callbacks before checking if SSL needs
-				 * to be done.  This is done before sending the startup packet
-				 * as depending on the type of authentication done, like MD5
-				 * or SCRAM that use cryptohashes, the callbacks would be
-				 * required even without a SSL connection
-				 */
-				if (pqsecure_initialize(conn, false, true) < 0)
-					goto error_return;
-
-				/*
-				 * If SSL is enabled and we haven't already got encryption of
-				 * some sort running, request SSL instead of sending the
-				 * startup message.
-				 */
-				if (conn->allow_ssl_try && !conn->wait_ssl_try &&
-					!conn->ssl_in_use
-#ifdef ENABLE_GSS
-					&& !conn->gssenc
-#endif
-					)
-				{
-					ProtocolVersion pv;
-
-					/*
-					 * Send the SSL request packet.
-					 *
-					 * Theoretically, this could block, but it really
-					 * shouldn't since we only got here if the socket is
-					 * write-ready.
-					 */
-					pv = pg_hton32(NEGOTIATE_SSL_CODE);
-					if (pqPacketSend(conn, 0, &pv, sizeof(pv)) != STATUS_OK)
-					{
-						appendPQExpBuffer(&conn->errorMessage,
-										  libpq_gettext("could not send SSL negotiation packet: %s\n"),
-										  SOCK_STRERROR(SOCK_ERRNO, sebuf, sizeof(sebuf)));
-						goto error_return;
-					}
-					/* Ok, wait for response */
-					conn->status = CONNECTION_SSL_STARTUP;
-					return PGRES_POLLING_READING;
-				}
-#endif							/* USE_SSL */
-
 				/*
 				 * Build the startup packet.
 				 */
@@ -2981,256 +2625,13 @@ keep_going:						/* We will come back to here until there is
 			}
 
 			/*
-			 * Handle SSL negotiation: wait for postmaster messages and
-			 * respond as necessary.
+			 * This build supports no transport encryption, so these states are
+			 * never entered.
 			 */
 		case CONNECTION_SSL_STARTUP:
-			{
-#ifdef USE_SSL
-				PostgresPollingStatusType pollres;
-
-				/*
-				 * On first time through, get the postmaster's response to our
-				 * SSL negotiation packet.
-				 */
-				if (!conn->ssl_in_use)
-				{
-					/*
-					 * We use pqReadData here since it has the logic to
-					 * distinguish no-data-yet from connection closure. Since
-					 * conn->ssl isn't set, a plain recv() will occur.
-					 */
-					char		SSLok;
-					int			rdresult;
-
-					rdresult = pqReadData(conn);
-					if (rdresult < 0)
-					{
-						/* errorMessage is already filled in */
-						goto error_return;
-					}
-					if (rdresult == 0)
-					{
-						/* caller failed to wait for data */
-						return PGRES_POLLING_READING;
-					}
-					if (pqGetc(&SSLok, conn) < 0)
-					{
-						/* should not happen really */
-						return PGRES_POLLING_READING;
-					}
-					if (SSLok == 'S')
-					{
-						/* mark byte consumed */
-						conn->inStart = conn->inCursor;
-
-						/*
-						 * Set up global SSL state if required.  The crypto
-						 * state has already been set if libpq took care of
-						 * doing that, so there is no need to make that happen
-						 * again.
-						 */
-						if (pqsecure_initialize(conn, true, false) != 0)
-							goto error_return;
-					}
-					else if (SSLok == 'N')
-					{
-						/* mark byte consumed */
-						conn->inStart = conn->inCursor;
-						/* OK to do without SSL? */
-						if (conn->sslmode[0] == 'r' ||	/* "require" */
-							conn->sslmode[0] == 'v')	/* "verify-ca" or
-														 * "verify-full" */
-						{
-							/* Require SSL, but server does not want it */
-							appendPQExpBufferStr(&conn->errorMessage,
-												 libpq_gettext("server does not support SSL, but SSL was required\n"));
-							goto error_return;
-						}
-						/* Otherwise, proceed with normal startup */
-						conn->allow_ssl_try = false;
-						/* We can proceed using this connection */
-						conn->status = CONNECTION_MADE;
-						return PGRES_POLLING_WRITING;
-					}
-					else if (SSLok == 'E')
-					{
-						/*
-						 * Server failure of some sort, such as failure to
-						 * fork a backend process.  Don't bother retrieving
-						 * the error message; we should not trust it as the
-						 * server has not been authenticated yet.
-						 */
-						appendPQExpBuffer(&conn->errorMessage,
-										  libpq_gettext("server sent an error response during SSL exchange\n"));
-						goto error_return;
-					}
-					else
-					{
-						appendPQExpBuffer(&conn->errorMessage,
-										  libpq_gettext("received invalid response to SSL negotiation: %c\n"),
-										  SSLok);
-						goto error_return;
-					}
-				}
-
-				/*
-				 * Begin or continue the SSL negotiation process.
-				 */
-				pollres = pqsecure_open_client(conn);
-				if (pollres == PGRES_POLLING_OK)
-				{
-					/*
-					 * At this point we should have no data already buffered.
-					 * If we do, it was received before we performed the SSL
-					 * handshake, so it wasn't encrypted and indeed may have
-					 * been injected by a man-in-the-middle.
-					 */
-					if (conn->inCursor != conn->inEnd)
-					{
-						appendPQExpBufferStr(&conn->errorMessage,
-											 libpq_gettext("received unencrypted data after SSL response\n"));
-						goto error_return;
-					}
-
-					/* SSL handshake done, ready to send startup packet */
-					conn->status = CONNECTION_MADE;
-					return PGRES_POLLING_WRITING;
-				}
-				if (pollres == PGRES_POLLING_FAILED)
-				{
-					/*
-					 * Failed ... if sslmode is "prefer" then do a non-SSL
-					 * retry
-					 */
-					if (conn->sslmode[0] == 'p' /* "prefer" */
-						&& conn->allow_ssl_try	/* redundant? */
-						&& !conn->wait_ssl_try) /* redundant? */
-					{
-						/* only retry once */
-						conn->allow_ssl_try = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-					/* Else it's a hard failure */
-					goto error_return;
-				}
-				/* Else, return POLLING_READING or POLLING_WRITING status */
-				return pollres;
-#else							/* !USE_SSL */
-				/* can't get here */
-				goto error_return;
-#endif							/* USE_SSL */
-			}
-
 		case CONNECTION_GSS_STARTUP:
-			{
-#ifdef ENABLE_GSS
-				PostgresPollingStatusType pollres;
-
-				/*
-				 * If we haven't yet, get the postmaster's response to our
-				 * negotiation packet
-				 */
-				if (conn->try_gss && !conn->gctx)
-				{
-					char		gss_ok;
-					int			rdresult = pqReadData(conn);
-
-					if (rdresult < 0)
-						/* pqReadData fills in error message */
-						goto error_return;
-					else if (rdresult == 0)
-						/* caller failed to wait for data */
-						return PGRES_POLLING_READING;
-					if (pqGetc(&gss_ok, conn) < 0)
-						/* shouldn't happen... */
-						return PGRES_POLLING_READING;
-
-					if (gss_ok == 'E')
-					{
-						/*
-						 * Server failure of some sort.  Assume it's a
-						 * protocol version support failure, and let's see if
-						 * we can't recover (if it's not, we'll get a better
-						 * error message on retry).  Server gets fussy if we
-						 * don't hang up the socket, though.
-						 */
-						conn->try_gss = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-
-					/* mark byte consumed */
-					conn->inStart = conn->inCursor;
-
-					if (gss_ok == 'N')
-					{
-						/* Server doesn't want GSSAPI; fall back if we can */
-						if (conn->gssencmode[0] == 'r')
-						{
-							appendPQExpBufferStr(&conn->errorMessage,
-												 libpq_gettext("server doesn't support GSSAPI encryption, but it was required\n"));
-							goto error_return;
-						}
-
-						conn->try_gss = false;
-						/* We can proceed using this connection */
-						conn->status = CONNECTION_MADE;
-						return PGRES_POLLING_WRITING;
-					}
-					else if (gss_ok != 'G')
-					{
-						appendPQExpBuffer(&conn->errorMessage,
-										  libpq_gettext("received invalid response to GSSAPI negotiation: %c\n"),
-										  gss_ok);
-						goto error_return;
-					}
-				}
-
-				/* Begin or continue GSSAPI negotiation */
-				pollres = pqsecure_open_gss(conn);
-				if (pollres == PGRES_POLLING_OK)
-				{
-					/*
-					 * At this point we should have no data already buffered.
-					 * If we do, it was received before we performed the GSS
-					 * handshake, so it wasn't encrypted and indeed may have
-					 * been injected by a man-in-the-middle.
-					 */
-					if (conn->inCursor != conn->inEnd)
-					{
-						appendPQExpBufferStr(&conn->errorMessage,
-											 libpq_gettext("received unencrypted data after GSSAPI encryption response\n"));
-						goto error_return;
-					}
-
-					/* All set for startup packet */
-					conn->status = CONNECTION_MADE;
-					return PGRES_POLLING_WRITING;
-				}
-				else if (pollres == PGRES_POLLING_FAILED)
-				{
-					if (conn->gssencmode[0] == 'p')
-					{
-						/*
-						 * We failed, but we can retry on "prefer".  Have to
-						 * drop the current connection to do so, though.
-						 */
-						conn->try_gss = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-					/* Else it's a hard failure */
-					goto error_return;
-				}
-				/* Else, return POLLING_READING or POLLING_WRITING status */
-				return pollres;
-#else							/* !ENABLE_GSS */
-				/* unreachable */
-				goto error_return;
-#endif							/* ENABLE_GSS */
-			}
+			/* unreachable */
+			goto error_return;
 
 			/*
 			 * Handle authentication exchange: wait for postmaster messages
@@ -3368,54 +2769,6 @@ keep_going:						/* We will come back to here until there is
 
 					/* Check to see if we should mention pgpassfile */
 					pgpassfileWarning(conn);
-
-#ifdef ENABLE_GSS
-
-					/*
-					 * If gssencmode is "prefer" and we're using GSSAPI, retry
-					 * without it.
-					 */
-					if (conn->gssenc && conn->gssencmode[0] == 'p')
-					{
-						/* only retry once */
-						conn->try_gss = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-#endif
-
-#ifdef USE_SSL
-
-					/*
-					 * if sslmode is "allow" and we haven't tried an SSL
-					 * connection already, then retry with an SSL connection
-					 */
-					if (conn->sslmode[0] == 'a' /* "allow" */
-						&& !conn->ssl_in_use
-						&& conn->allow_ssl_try
-						&& conn->wait_ssl_try)
-					{
-						/* only retry once */
-						conn->wait_ssl_try = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-
-					/*
-					 * if sslmode is "prefer" and we're in an SSL connection,
-					 * then do a non-SSL retry
-					 */
-					if (conn->sslmode[0] == 'p' /* "prefer" */
-						&& conn->ssl_in_use
-						&& conn->allow_ssl_try	/* redundant? */
-						&& !conn->wait_ssl_try) /* redundant? */
-					{
-						/* only retry once */
-						conn->allow_ssl_try = false;
-						need_new_connection = true;
-						goto keep_going;
-					}
-#endif
 
 					goto error_return;
 				}
@@ -4104,39 +3457,8 @@ freePGconn(PGconn *conn)
 		free(conn->keepalives_interval);
 	if (conn->keepalives_count)
 		free(conn->keepalives_count);
-	if (conn->sslmode)
-		free(conn->sslmode);
-	if (conn->sslcert)
-		free(conn->sslcert);
-	if (conn->sslkey)
-		free(conn->sslkey);
-	if (conn->sslpassword)
-	{
-		explicit_bzero(conn->sslpassword, strlen(conn->sslpassword));
-		free(conn->sslpassword);
-	}
-	if (conn->sslrootcert)
-		free(conn->sslrootcert);
-	if (conn->sslcrl)
-		free(conn->sslcrl);
-	if (conn->sslcrldir)
-		free(conn->sslcrldir);
-	if (conn->sslcompression)
-		free(conn->sslcompression);
-	if (conn->sslsni)
-		free(conn->sslsni);
 	if (conn->requirepeer)
 		free(conn->requirepeer);
-	if (conn->ssl_min_protocol_version)
-		free(conn->ssl_min_protocol_version);
-	if (conn->ssl_max_protocol_version)
-		free(conn->ssl_max_protocol_version);
-	if (conn->gssencmode)
-		free(conn->gssencmode);
-	if (conn->krbsrvname)
-		free(conn->krbsrvname);
-	if (conn->gsslib)
-		free(conn->gsslib);
 	if (conn->connip)
 		free(conn->connip);
 	/* Note that conn->Pfdebug is not ours to close or free */
@@ -5878,30 +5200,6 @@ conninfo_add_defaults(PQconninfoOption *options, PQExpBuffer errorMessage)
 		}
 
 		/*
-		 * Interpret the deprecated PGREQUIRESSL environment variable.  Per
-		 * tradition, translate values starting with "1" to sslmode=require,
-		 * and ignore other values.  Given both PGREQUIRESSL=1 and PGSSLMODE,
-		 * PGSSLMODE takes precedence; the opposite was true before v9.3.
-		 */
-		if (strcmp(option->keyword, "sslmode") == 0)
-		{
-			const char *requiresslenv = getenv("PGREQUIRESSL");
-
-			if (requiresslenv != NULL && requiresslenv[0] == '1')
-			{
-				option->val = strdup("require");
-				if (!option->val)
-				{
-					if (errorMessage)
-						appendPQExpBufferStr(errorMessage,
-											 libpq_gettext("out of memory\n"));
-					return false;
-				}
-				continue;
-			}
-		}
-
-		/*
 		 * No environment variable specified or the variable isn't set - try
 		 * compiled-in default
 		 */
@@ -6311,17 +5609,6 @@ conninfo_uri_parse_params(char *params,
 		/*
 		 * Special keyword handling for improved JDBC compatibility.
 		 */
-		if (strcmp(keyword, "ssl") == 0 &&
-			strcmp(value, "true") == 0)
-		{
-			free(keyword);
-			free(value);
-			malloced = false;
-
-			keyword = "sslmode";
-			value = "require";
-		}
-
 		/*
 		 * Store the value if the corresponding option exists; ignore
 		 * otherwise.  At this point both keyword and value are not
@@ -6493,20 +5780,6 @@ conninfo_storeval(PQconninfoOption *connOptions,
 {
 	PQconninfoOption *option;
 	char	   *value_copy;
-
-	/*
-	 * For backwards compatibility, requiressl=1 gets translated to
-	 * sslmode=require, and requiressl=0 gets translated to sslmode=prefer
-	 * (which is the default for sslmode).
-	 */
-	if (strcmp(keyword, "requiressl") == 0)
-	{
-		keyword = "sslmode";
-		if (value[0] == '1')
-			value = "require";
-		else
-			value = "prefer";
-	}
 
 	option = conninfo_find(connOptions, keyword);
 	if (option == NULL)

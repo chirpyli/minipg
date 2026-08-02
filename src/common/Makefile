@@ -79,19 +79,12 @@ OBJS_COMMON = \
 	wait_error.o \
 	wchar.o
 
-ifeq ($(with_ssl),openssl)
-OBJS_COMMON += \
-	protocol_openssl.o \
-	cryptohash_openssl.o \
-	hmac_openssl.o
-else
 OBJS_COMMON += \
 	cryptohash.o \
 	hmac.o \
 	md5.o \
 	sha1.o \
 	sha2.o
-endif
 
 # A few files are currently only built for frontend, not server
 # (Mkvcbuild.pm has a copy of this list, too).  logging.c is excluded

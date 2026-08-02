@@ -4,8 +4,9 @@
 # Set of tests for authentication and pg_hba.conf. The following password
 # methods are checked through this test:
 # - Plain
-# - MD5-encrypted
 # - SCRAM-encrypted
+# Note that md5 is no longer supported as an authentication method, but
+# md5-encrypted stored passwords are still accepted by the "password" method.
 # This test can only run with Unix-domain sockets.
 
 use strict;
@@ -20,7 +21,7 @@ if (!$use_unix_sockets)
 }
 else
 {
-	plan tests => 23;
+	plan tests => 21;
 }
 
 
@@ -114,16 +115,6 @@ $ENV{"PGPASSWORD"} = 'badpass';
 test_role($node, 'scram_role', 'scram-sha-256', 2,
 	log_unlike => [qr/connection authenticated:/]);
 $ENV{"PGPASSWORD"} = 'pass';
-
-# For "md5" method, all users should be able to connect (SCRAM
-# authentication will be performed for the user with a SCRAM secret.)
-reset_pg_hba($node, 'md5');
-test_role($node, 'scram_role', 'md5', 0,
-	log_like =>
-	  [qr/connection authenticated: identity="scram_role" method=md5/]);
-test_role($node, 'md5_role', 'md5', 0,
-	log_like =>
-	  [qr/connection authenticated: identity="md5_role" method=md5/]);
 
 # Tests for channel binding without SSL.
 # Using the password authentication method; channel binding can't work

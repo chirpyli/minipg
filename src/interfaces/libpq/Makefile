@@ -45,23 +45,6 @@ OBJS = \
 	pqexpbuffer.o \
 	fe-auth.o
 
-# File shared across all SSL implementations supported.
-ifneq ($(with_ssl),no)
-OBJS += \
-	fe-secure-common.o
-endif
-
-ifeq ($(with_ssl),openssl)
-OBJS += \
-	fe-secure-openssl.o
-endif
-
-ifeq ($(with_gssapi),yes)
-OBJS += \
-	fe-gssapi-common.o \
-	fe-secure-gssapi.o
-endif
-
 ifeq ($(PORTNAME), cygwin)
 override shlib = cyg$(NAME)$(DLSUFFIX)
 endif
@@ -82,21 +65,10 @@ endif
 # instead link with -lpgcommon_shlib and -lpgport_shlib, to get object files
 # that are built correctly for use in a shlib.
 SHLIB_LINK_INTERNAL = -lpgcommon_shlib -lpgport_shlib
-ifneq ($(PORTNAME), win32)
-SHLIB_LINK += $(filter -lcrypt -ldes -lcom_err -lcrypto -lk5crypto -lkrb5 -lgssapi_krb5 -lgss -lgssapi -lssl -lsocket -lnsl -lresolv -lintl -lm, $(LIBS)) $(LDAP_LIBS_FE) $(PTHREAD_LIBS)
-else
-SHLIB_LINK += $(filter -lcrypt -ldes -lcom_err -lcrypto -lk5crypto -lkrb5 -lgssapi32 -lssl -lsocket -lnsl -lresolv -lintl -lm $(PTHREAD_LIBS), $(LIBS)) $(LDAP_LIBS_FE)
-endif
-ifeq ($(PORTNAME), win32)
-SHLIB_LINK += -lshell32 -lws2_32 -lsecur32 $(filter -leay32 -lssleay32 -lcomerr32 -lkrb5_32, $(LIBS))
-endif
+SHLIB_LINK += $(filter -lcrypt -lsocket -lnsl -lresolv -lintl -lm, $(LIBS)) $(PTHREAD_LIBS)
 SHLIB_PREREQS = submake-libpgport
 
 SHLIB_EXPORTS = exports.txt
-
-ifeq ($(with_ssl),openssl)
-PKG_CONFIG_REQUIRES_PRIVATE = libssl libcrypto
-endif
 
 all: all-lib
 

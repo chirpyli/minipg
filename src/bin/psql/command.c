@@ -163,8 +163,6 @@ static int	count_lines_in_buf(PQExpBuffer buf);
 static void print_with_linenumbers(FILE *output, char *lines, bool is_func);
 static void minimal_error_message(PGresult *res);
 
-static void printSSLInfo(void);
-static void printGSSInfo(void);
 static bool printPsetInfo(const char *param, printQueryOpt *popt);
 static char *pset_value_string(const char *param, printQueryOpt *popt);
 
@@ -627,8 +625,6 @@ exec_command_conninfo(PsqlScanState scan_state, bool active_branch)
 					printf(_("You are connected to database \"%s\" as user \"%s\" on host \"%s\" at port \"%s\".\n"),
 						   db, PQuser(pset.db), host, PQport(pset.db));
 			}
-			printSSLInfo();
-			printGSSInfo();
 		}
 	}
 
@@ -3643,56 +3639,8 @@ connection_warnings(bool in_startup)
 										 cverbuf, sizeof(cverbuf)),
 				   formatPGVersionNumber(pset.sversion, false,
 										 sverbuf, sizeof(sverbuf)));
-
-		printSSLInfo();
-		printGSSInfo();
 	}
 }
-
-
-/*
- * printSSLInfo
- *
- * Prints information about the current SSL connection, if SSL is in use
- */
-static void
-printSSLInfo(void)
-{
-	const char *protocol;
-	const char *cipher;
-	const char *bits;
-	const char *compression;
-
-	if (!PQsslInUse(pset.db))
-		return;					/* no SSL */
-
-	protocol = PQsslAttribute(pset.db, "protocol");
-	cipher = PQsslAttribute(pset.db, "cipher");
-	bits = PQsslAttribute(pset.db, "key_bits");
-	compression = PQsslAttribute(pset.db, "compression");
-
-	printf(_("SSL connection (protocol: %s, cipher: %s, bits: %s, compression: %s)\n"),
-		   protocol ? protocol : _("unknown"),
-		   cipher ? cipher : _("unknown"),
-		   bits ? bits : _("unknown"),
-		   (compression && strcmp(compression, "off") != 0) ? _("on") : _("off"));
-}
-
-/*
- * printGSSInfo
- *
- * Prints information about the current GSSAPI connection, if GSSAPI encryption is in use
- */
-static void
-printGSSInfo(void)
-{
-	if (!PQgssEncInUse(pset.db))
-		return;					/* no GSSAPI encryption in use */
-
-	printf(_("GSSAPI-encrypted connection\n"));
-}
-
-
 
 
 

@@ -80,6 +80,7 @@
       - 暂缓（高风险，需单独一轮重构）：`utils/error/elog.c` eventlog 输出路径（含 `pgwin32_message_to_UTF16` 跨文件调用）、`utils/mb/mbutils.c` 的 `pgwin32_message_to_UTF16` 与悬空 `if`、`utils/adt/pg_locale.c`（~42 处 WIN32/_MSC_VER 混合）、`storage/ipc/latch.c`（WAIT_USE_WIN32 宏贯穿 33 处四路选择链）、`utils/adt/varlena.c`、`postmaster/pgstat.c` 的 `pgwin32_noblock`、`storage/file/fd.c` 的 `GetLastError` 重试、`guc.c` 的 `SHMEM_TYPE_WINDOWS` 枚举引用。
       - `make -j16` 编译通过（修复 fork_process.c / pmsignal.c 两处误删）。
 - 2026-07-31: 裁剪 bin 运维/性能/升级类工具（与内核学习无关，且非回归测试依赖）：删除 `src/bin/` 下 `pgbench`、`pg_amcheck`、`pg_archivecleanup`、`pg_checksums`、`pg_resetwal`、`pg_test_fsync`、`pg_test_timing`、`pg_upgrade`、`pg_verifybackup` 以及 `scripts/`（clusterdb/createdb/createuser/dropdb/dropuser/reindexdb/vacuumdb/pg_isready）。同步修改 `src/bin/Makefile` 的 `SUBDIRS` 移除对应条目。保留 `initdb`/`pg_ctl`/`psql`/`pg_config`（PostgresNode.pm 测试框架硬依赖）、`pg_dump`（test_pg_dump 依赖 + 逻辑转储教学）、`pg_basebackup`/`pg_rewind`（replication 子系统保留，待阶段 8 再删）、`pg_controldata`/`pg_waldump`（内核观察工具）。`make check-world` 通过。详见下文。
+- 2026-08-02: 裁剪 SSL/TLS 与 GSSAPI 传输加密，认证收敛为 trust/reject/password/scram-sha-256 四种（md5 仅删认证协商、保留存储格式兼容）。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
 
@@ -215,3 +216,41 @@
 **保留项**：`utils/adt/float.c`、`utils/adt/numutils.c` 中的 `_MSC_VER` 为**编译器特性检测**（HUGE_VALF、`_BitScanReverse`）而非平台代码，予以保留；Bison 生成文件（`gram.c` 等）不手改。
 
 **验证**：`make -j` 全量编译无 error/warning；`make check-world` 全部通过（EXIT=0），主回归 216 项、plpgsql 107 项及各 contrib 套件均 ok。
+
+## 裁剪：SSL/TLS 与 GSSAPI 传输加密，认证收敛为口令类
+
+**目的**：minipg 面向内核学习，SSL/TLS 与 GSSAPI 传输加密是一整套与"连接建立/认证"正交的密码学子系统，且当前构建（`pg_config.h` 中 `USE_OPENSSL`/`ENABLE_GSS` 等均 `#undef`）这些特性本就关闭，相关代码全为编译期死代码。删除后可显著降低连接建立与认证流程的阅读成本。认证方式收敛为仅 `trust`/`reject`/`password`/`scram-sha-256` 四种口令类方法。
+
+**为什么可以删**：
+- 当前构建所有 SSL/GSS/LDAP/PAM/BSD/SSPI 宏均未定义，待删代码绝大部分是 `#ifdef` 未命中分支，二进制中根本不存在，删除不改变运行时行为。
+- `secure_*` 抽象层是 `pqcomm.c` 与 `fe-secure.c` 的稳定 I/O 契约，保留函数签名、仅拍平 SSL/GSS 分支为裸 socket 直通，避免跨模块级联改动。
+- 客户端 libpq 同步裁剪，保持前后端协议一致。
+
+**删除的认证方式**：`md5`（仅删认证协商方式，保留存储格式识别与校验）、`ident`、`peer`、`gss`、`sspi`、`pam`、`bsd`、`ldap`、`cert`、`radius`。
+**保留的认证方式**：`trust`、`reject`（含内部 `uaImplicitReject`）、`password`（明文）、`scram-sha-256`。
+
+**删除的文件与目录**：
+- 后端：`src/backend/libpq/be-secure-openssl.c`、`be-secure-common.c`、`be-secure-gssapi.c`、`be-gssapi-common.c`、`README.SSL`
+- 客户端：`src/interfaces/libpq/fe-secure-openssl.c`、`fe-secure-common.c`、`fe-secure-gssapi.c`、`fe-gssapi-common.c`
+- 头文件：`src/include/common/openssl.h`、`src/include/libpq/be-gssapi-common.h`、`src/interfaces/libpq/fe-gssapi-common.h`
+- 测试目录：`src/test/ssl/`、`src/test/kerberos/`、`src/test/ldap/`、`src/test/modules/ssl_passphrase_callback/`
+
+**修改的文件（按层）**：
+- 头文件：`libpq-be.h`（删 `Port` 的 SSL/GSS/SSPI 字段块）、`hba.h`（`UserAuth` 枚举收敛为 5 项、删 `HbaLine` 中 ldap*/radius*/pamservice/krb_realm/clientcert 字段与 `ClientCertMode` 枚举）、`crypt.h`（删 `md5_crypt_verify` 原型）、`libpq.h`、`libpq-int.h`、`libpq-fe.h`（删 `PQssl*`/`PQgss*` 声明）
+- 后端核心：`be-secure.c`（10 处分支拍平为 `secure_raw_read/write` 直通）、`postmaster.c`（保留 `SSLRequest`/`GSSENCRequest` 的 `'N'` 应答与重读启动包逻辑，删握手调用分支）、`pqcomm.c`/`postinit.c`/`main.c`（去宏引用）
+- 认证：`auth.c`（删 PAM/BSD/LDAP/SSL/GSS/SSPI 实现与外部认证函数，`ClientAuthentication` 的 switch 收敛为 5 分支，删 `md5_crypt_verify` 调用路径）、`hba.c`（`UserAuthName[]` 收敛为 5 项并与枚举严格对齐，方法关键字解析仅接受 4 种、其余走 `unsupauth` 报错，删 ldap*/radius*/pam*/sspi 专属选项解析）、`crypt.c`（删 `md5_crypt_verify` 实现，保留 `get_password_type`/`encrypt_password`/`plain_crypt_verify` 的 md5 存储兼容）
+- SCRAM：`auth-scram.c`/`fe-auth-scram.c` 禁用依赖 TLS 通道绑定的 `SCRAM-SHA-256-PLUS` 变体（通告与协商）；`port/pg_strong_random.c`（删 OpenSSL `RAND_bytes` 分支，保留 `/dev/urandom`）、`port/timingsafe_bcmp.c`（删 `CRYPTO_memcmp` 分支保留自实现）
+- GUC/视图/配置：`guc.c`（删全部 `ssl_*` 参数、`check_ssl`、`ssl_renegotiation_limit`、`CONN_AUTH_SSL` 分组、`ssl_protocol_versions_info`）、`postgresql.conf.sample`（删整个 SSL 配置段）、`pg_hba.conf.sample`（方法列表仅留 4 种）、`system_views.sql`（删 `pg_stat_ssl`/`pg_stat_gssapi` 两个视图）、`backend_status.c`（去 SSL/GSS 状态采集，但保持 `pg_stat_get_activity` 元组列数不变，相关列恒 NULL/false）、`catalog/catversion.h`（bump CATALOG_VERSION_NO）
+- 客户端：`fe-secure.c`（拍平）、`fe-connect.c`（删 sslmode/gssencmode 等连接参数与 SSL/GSS 状态机）、`fe-auth.c`（删 `AUTH_REQ_MD5`/`GSS`/`SSPI`/`KRB5`/`SCM_CREDS` 分支）、`exports.txt`（删导出符号、不回收序号）
+- 构建系统：`configure.ac`（删 `--with-ssl`/`--with-openssl`/`--with-gssapi`/`--with-ldap`/`--with-pam`/`--with-bsd-auth` 及 OpenSSL 随机源选择分支）、重生成 `configure` 与 `pg_config.h.in`（使用 autoconf 2.69 忠实重生成）、`Makefile.global.in`、`pg_config_manual.h`（删 `USE_SSL` 派生）、`config/programs.m4`（删 `PGAC_LDAP_SAFE`）、`utils/misc/Makefile`、`backend/storage/lmgr/Makefile`、libpq 与 libpq 后端 `Makefile`（OBJS 与条件块）
+- 测试：`src/test/Makefile`、`src/test/modules/Makefile`、`authentication/t/001_password.pl`（删 md5 认证用例，plan 23→21）、`initdb/initdb.c`（authmethod 合法值收敛为 trust/reject/password/scram-sha-256）、`regress/pg_regress.c` 与 `perl/TestLib.pm`（删 SSL/GSS 相关环境变量）、`psql/command.c`（删 `printSSLInfo`/`printGSSInfo` 及调用）、`regress/expected/rules.out`（删 `pg_stat_ssl`/`pg_stat_gssapi` 的 `pg_rules` 行）
+
+**兼容性保证**：
+- 服务端对标准 psql（默认 `sslmode=prefer`）发来的 `SSLRequest`/`GSSENCRequest` 仍正确回复单字节 `'N'` 后继续读真实启动包，外部驱动握手不中断。
+- `md5` 存储的口令仍可被 `password`（明文）/scram 认证流程校验（`plain_crypt_verify` 既有能力），避免既有 `pg_authid` 数据失效。
+- `password_encryption=md5` 仍可作为存储格式保留。
+
+**验证**：`make`（autoconf 2.69 重生成 configure）全量编译通过；`make check-world` 全部通过（EXIT=0），主回归 216 项全 ok（含 `rules` 测试因删两个系统视图需同步更新预期）；全仓库扫描 `pg_stat_ssl`/`pg_stat_gssapi`/`be_tls_`/`pq_gss`/`AUTH_REQ_MD5`/`USE_OPENSSL`/`PQsslInUse` 等残留符号为 0 处。
+
+**注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成（与 PG14 要求一致），无需放宽版本宏。
+

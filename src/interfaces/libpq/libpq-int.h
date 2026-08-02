@@ -37,43 +37,6 @@
 /* include stuff found in fe only */
 #include "pqexpbuffer.h"
 
-#ifdef ENABLE_GSS
-#if defined(HAVE_GSSAPI_H)
-#include <gssapi.h>
-#else
-#include <gssapi/gssapi.h>
-#endif
-#endif
-
-#ifdef ENABLE_SSPI
-#define SECURITY_WIN32
-#if defined(WIN32) && !defined(_MSC_VER)
-#include <ntsecapi.h>
-#endif
-#include <security.h>
-#undef SECURITY_WIN32
-
-#ifndef ENABLE_GSS
-/*
- * Define a fake structure compatible with GSSAPI on Unix.
- */
-typedef struct
-{
-	void	   *value;
-	int			length;
-} gss_buffer_desc;
-#endif
-#endif							/* ENABLE_SSPI */
-
-#ifdef USE_OPENSSL
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#ifndef OPENSSL_NO_ENGINE
-#define USE_SSL_ENGINE
-#endif
-#endif							/* USE_OPENSSL */
-
 /*
  * POSTGRES backend dependent Constants.
  */
@@ -372,22 +335,7 @@ struct pg_conn
 										 * retransmits */
 	char	   *keepalives_count;	/* maximum number of TCP keepalive
 									 * retransmits */
-	char	   *sslmode;		/* SSL mode (require,prefer,allow,disable) */
-	char	   *sslcompression; /* SSL compression (0 or 1) */
-	char	   *sslkey;			/* client key filename */
-	char	   *sslcert;		/* client certificate filename */
-	char	   *sslpassword;	/* client key file password */
-	char	   *sslrootcert;	/* root certificate filename */
-	char	   *sslcrl;			/* certificate revocation list filename */
-	char	   *sslcrldir;		/* certificate revocation list directory name */
-	char	   *sslsni;			/* use SSL SNI extension (0 or 1) */
 	char	   *requirepeer;	/* required peer credentials for local sockets */
-	char	   *gssencmode;		/* GSS mode (require,prefer,disable) */
-	char	   *krbsrvname;		/* Kerberos service name */
-	char	   *gsslib;			/* What GSS library to use ("gssapi" or
-								 * "sspi") */
-	char	   *ssl_min_protocol_version;	/* minimum TLS protocol version */
-	char	   *ssl_max_protocol_version;	/* maximum TLS protocol version */
 	char	   *target_session_attrs;	/* desired session properties */
 
 	/* Optional file to write trace info to */
@@ -511,61 +459,6 @@ struct pg_conn
 	/* SSL structures */
 	bool		ssl_in_use;
 
-#ifdef USE_SSL
-	bool		allow_ssl_try;	/* Allowed to try SSL negotiation */
-	bool		wait_ssl_try;	/* Delay SSL negotiation until after
-								 * attempting normal connection */
-#ifdef USE_OPENSSL
-	SSL		   *ssl;			/* SSL status, if have SSL connection */
-	X509	   *peer;			/* X509 cert of server */
-#ifdef USE_SSL_ENGINE
-	ENGINE	   *engine;			/* SSL engine, if any */
-#else
-	void	   *engine;			/* dummy field to keep struct the same if
-								 * OpenSSL version changes */
-#endif
-	bool		crypto_loaded;	/* Track if libcrypto locking callbacks have
-								 * been done for this connection. This can be
-								 * removed once support for OpenSSL 1.0.2 is
-								 * removed as this locking is handled
-								 * internally in OpenSSL >= 1.1.0. */
-#endif							/* USE_OPENSSL */
-#endif							/* USE_SSL */
-
-#ifdef ENABLE_GSS
-	gss_ctx_id_t gctx;			/* GSS context */
-	gss_name_t	gtarg_nam;		/* GSS target name */
-
-	/* The following are encryption-only */
-	bool		try_gss;		/* GSS attempting permitted */
-	bool		gssenc;			/* GSS encryption is usable */
-	gss_cred_id_t gcred;		/* GSS credential temp storage. */
-
-	/* GSS encryption I/O state --- see fe-secure-gssapi.c */
-	char	   *gss_SendBuffer; /* Encrypted data waiting to be sent */
-	int			gss_SendLength; /* End of data available in gss_SendBuffer */
-	int			gss_SendNext;	/* Next index to send a byte from
-								 * gss_SendBuffer */
-	int			gss_SendConsumed;	/* Number of source bytes encrypted but
-									 * not yet reported as sent */
-	char	   *gss_RecvBuffer; /* Received, encrypted data */
-	int			gss_RecvLength; /* End of data available in gss_RecvBuffer */
-	char	   *gss_ResultBuffer;	/* Decryption of data in gss_RecvBuffer */
-	int			gss_ResultLength;	/* End of data available in
-									 * gss_ResultBuffer */
-	int			gss_ResultNext; /* Next index to read a byte from
-								 * gss_ResultBuffer */
-	uint32		gss_MaxPktSize; /* Maximum size we can encrypt and fit the
-								 * results into our output buffer */
-#endif
-
-#ifdef ENABLE_SSPI
-	CredHandle *sspicred;		/* SSPI credentials handle */
-	CtxtHandle *sspictx;		/* SSPI context */
-	char	   *sspitarget;		/* SSPI target name */
-	int			usesspi;		/* Indicate if SSPI is in use on the
-								 * connection */
-#endif
 
 	/*
 	 * Buffer for current error message.  This is cleared at the start of any
@@ -721,108 +614,6 @@ extern ssize_t pqsecure_raw_write(PGconn *, const void *ptr, size_t len);
 extern int	pq_block_sigpipe(sigset_t *osigset, bool *sigpipe_pending);
 extern void pq_reset_sigpipe(sigset_t *osigset, bool sigpipe_pending,
 							 bool got_epipe);
-#endif
-
-/* === SSL === */
-
-/*
- * The SSL implementation provides these functions.
- */
-
-/*
- *	Implementation of PQinitSSL().
- */
-extern void pgtls_init_library(bool do_ssl, int do_crypto);
-
-/*
- * Initialize SSL library.
- *
- * The conn parameter is only used to be able to pass back an error
- * message - no connection-local setup is made here.  do_ssl controls
- * if SSL is initialized, and do_crypto does the same for the crypto
- * part.
- *
- * Returns 0 if OK, -1 on failure (adding a message to conn->errorMessage).
- */
-extern int	pgtls_init(PGconn *conn, bool do_ssl, bool do_crypto);
-
-/*
- *	Begin or continue negotiating a secure session.
- */
-extern PostgresPollingStatusType pgtls_open_client(PGconn *conn);
-
-/*
- *	Close SSL connection.
- */
-extern void pgtls_close(PGconn *conn);
-
-/*
- *	Read data from a secure connection.
- *
- * On failure, this function is responsible for appending a suitable message
- * to conn->errorMessage.  The caller must still inspect errno, but only
- * to determine whether to continue/retry after error.
- */
-extern ssize_t pgtls_read(PGconn *conn, void *ptr, size_t len);
-
-/*
- *	Return the number of bytes available in the transport buffer.
- */
-extern ssize_t pgtls_bytes_pending(PGconn *conn);
-
-/*
- *	Write data to a secure connection.
- *
- * On failure, this function is responsible for appending a suitable message
- * to conn->errorMessage.  The caller must still inspect errno, but only
- * to determine whether to continue/retry after error.
- */
-extern ssize_t pgtls_write(PGconn *conn, const void *ptr, size_t len);
-
-/*
- * Get the hash of the server certificate, for SCRAM channel binding type
- * tls-server-end-point.
- *
- * NULL is sent back to the caller in the event of an error, with an
- * error message for the caller to consume.
- *
- * This is not supported with old versions of OpenSSL that don't have
- * the X509_get_signature_nid() function.
- */
-#if defined(USE_OPENSSL) && (defined(HAVE_X509_GET_SIGNATURE_NID) || defined(HAVE_X509_GET_SIGNATURE_INFO))
-#define HAVE_PGTLS_GET_PEER_CERTIFICATE_HASH
-extern char *pgtls_get_peer_certificate_hash(PGconn *conn, size_t *len);
-#endif
-
-/*
- * Verify that the server certificate matches the host name we connected to.
- *
- * The certificate's Common Name and Subject Alternative Names are considered.
- *
- * Returns 1 if the name matches, and 0 if it does not. On error, returns
- * -1, and sets the libpq error message.
- *
- */
-extern int	pgtls_verify_peer_name_matches_certificate_guts(PGconn *conn,
-															int *names_examined,
-															char **first_name);
-
-/* === GSSAPI === */
-
-#ifdef ENABLE_GSS
-
-/*
- * Establish a GSSAPI-encrypted connection.
- */
-extern PostgresPollingStatusType pqsecure_open_gss(PGconn *conn);
-
-/*
- * Read and write functions for GSSAPI-encrypted connections, with internal
- * buffering to handle nonblocking sockets.
- */
-extern ssize_t pg_GSS_write(PGconn *conn, const void *ptr, size_t len);
-extern ssize_t pg_GSS_read(PGconn *conn, void *ptr, size_t len);
-extern ssize_t pg_GSS_bytes_pending(PGconn *conn);
 #endif
 
 /* === in libpq-trace.c === */

@@ -152,64 +152,6 @@ encrypt_password(PasswordType target_type, const char *role,
 }
 
 /*
- * Check MD5 authentication response, and return STATUS_OK or STATUS_ERROR.
- *
- * 'shadow_pass' is the user's correct password or password hash, as stored
- * in pg_authid.rolpassword.
- * 'client_pass' is the response given by the remote user to the MD5 challenge.
- * 'md5_salt' is the salt used in the MD5 authentication challenge.
- *
- * In the error case, optionally store a palloc'd string at *logdetail
- * that will be sent to the postmaster log (but not the client).
- */
-int
-md5_crypt_verify(const char *role, const char *shadow_pass,
-				 const char *client_pass,
-				 const char *md5_salt, int md5_salt_len,
-				 char **logdetail)
-{
-	int			retval;
-	char		crypt_pwd[MD5_PASSWD_LEN + 1];
-
-	Assert(md5_salt_len > 0);
-
-	if (get_password_type(shadow_pass) != PASSWORD_TYPE_MD5)
-	{
-		/* incompatible password hash format. */
-		*logdetail = psprintf(_("User \"%s\" has a password that cannot be used with MD5 authentication."),
-							  role);
-		return STATUS_ERROR;
-	}
-
-	/*
-	 * Compute the correct answer for the MD5 challenge.
-	 *
-	 * We do not bother setting logdetail for any pg_md5_encrypt failure
-	 * below: the only possible error is out-of-memory, which is unlikely, and
-	 * if it did happen adding a psprintf call would only make things worse.
-	 */
-	/* stored password already encrypted, only do salt */
-	if (!pg_md5_encrypt(shadow_pass + strlen("md5"),
-						md5_salt, md5_salt_len,
-						crypt_pwd))
-	{
-		return STATUS_ERROR;
-	}
-
-	if (strlen(client_pass) == strlen(crypt_pwd) &&
-		timingsafe_bcmp(client_pass, crypt_pwd, strlen(crypt_pwd)) == 0)
-		retval = STATUS_OK;
-	else
-	{
-		*logdetail = psprintf(_("Password does not match for user \"%s\"."),
-							  role);
-		retval = STATUS_ERROR;
-	}
-
-	return retval;
-}
-
-/*
  * Check given password for given user, and return STATUS_OK or STATUS_ERROR.
  *
  * 'shadow_pass' is the user's correct password hash, as stored in

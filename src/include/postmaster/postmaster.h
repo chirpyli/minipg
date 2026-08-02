@@ -14,7 +14,6 @@
 #define _POSTMASTER_H
 
 /* GUC options */
-extern bool EnableSSL;
 extern int	ReservedBackends;
 extern PGDLLIMPORT int PostPortNumber;
 extern int	Unix_socket_permissions;

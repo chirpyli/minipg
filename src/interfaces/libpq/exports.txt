@@ -113,7 +113,6 @@ PQexecPrepared            110
 PQsendQueryPrepared       111
 PQdsplen                  112
 PQserverVersion           113
-PQgetssl                  114
 pg_char_to_encoding       115
 pg_valid_server_encoding  116
 pqsignal                  117
@@ -123,7 +122,6 @@ PQgetCancel               120
 PQfreeCancel              121
 PQcancel                  122
 lo_create                 123
-PQinitSSL                 124
 PQregisterThreadLock      125
 PQescapeStringConn        126
 PQescapeByteaConn         127
@@ -152,7 +150,6 @@ PQresultInstanceData      149
 PQresultSetInstanceData   150
 PQfireResultCreateEvents  151
 PQconninfoParse           152
-PQinitOpenSSL             153
 PQescapeLiteral           154
 PQescapeIdentifier        155
 PQconnectdbParams         156
@@ -165,20 +162,11 @@ lo_lseek64                162
 lo_tell64                 163
 lo_truncate64             164
 PQconninfo                165
-PQsslInUse                166
-PQsslStruct               167
-PQsslAttributeNames       168
-PQsslAttribute            169
 PQsetErrorContextVisibility 170
 PQresultVerboseErrorMessage 171
 PQencryptPasswordConn     172
 PQresultMemorySize        173
 PQhostaddr                174
-PQgssEncInUse             175
-PQgetgssctx               176
-PQsetSSLKeyPassHook_OpenSSL         177
-PQgetSSLKeyPassHook_OpenSSL         178
-PQdefaultSSLKeyPassHook_OpenSSL     179
 PQenterPipelineMode       180
 PQexitPipelineMode        181
 PQpipelineSync            182

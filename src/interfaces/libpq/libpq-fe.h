@@ -70,11 +70,11 @@ typedef enum
 	CONNECTION_AUTH_OK,			/* Received authentication; waiting for
 								 * backend startup. */
 	CONNECTION_SETENV,			/* This state is no longer used. */
-	CONNECTION_SSL_STARTUP,		/* Negotiating SSL. */
+	CONNECTION_SSL_STARTUP,		/* This state is no longer used. */
 	CONNECTION_NEEDED,			/* Internal state: connect() needed */
 	CONNECTION_CHECK_WRITABLE,	/* Checking if session is read-write. */
 	CONNECTION_CONSUME,			/* Consuming any extra messages. */
-	CONNECTION_GSS_STARTUP,		/* Negotiating GSSAPI. */
+	CONNECTION_GSS_STARTUP,		/* This state is no longer used. */
 	CONNECTION_CHECK_TARGET,	/* Checking target server properties. */
 	CONNECTION_CHECK_STANDBY	/* Checking if server is in standby mode. */
 } ConnStatusType;
@@ -355,28 +355,6 @@ extern int	PQconnectionUsedPassword(const PGconn *conn);
 extern int	PQclientEncoding(const PGconn *conn);
 extern int	PQsetClientEncoding(PGconn *conn, const char *encoding);
 
-/* SSL information functions */
-extern int	PQsslInUse(PGconn *conn);
-extern void *PQsslStruct(PGconn *conn, const char *struct_name);
-extern const char *PQsslAttribute(PGconn *conn, const char *attribute_name);
-extern const char *const *PQsslAttributeNames(PGconn *conn);
-
-/* Get the OpenSSL structure associated with a connection. Returns NULL for
- * unencrypted connections or if any other TLS library is in use. */
-extern void *PQgetssl(PGconn *conn);
-
-/* Tell libpq whether it needs to initialize OpenSSL */
-extern void PQinitSSL(int do_init);
-
-/* More detailed way to tell libpq whether it needs to initialize OpenSSL */
-extern void PQinitOpenSSL(int do_ssl, int do_crypto);
-
-/* Return true if GSSAPI encryption is in use */
-extern int	PQgssEncInUse(PGconn *conn);
-
-/* Returns GSSAPI context if GSSAPI is in use */
-extern void *PQgetgssctx(PGconn *conn);
-
 /* Set verbosity for PQerrorMessage and PQresultErrorMessage */
 extern PGVerbosity PQsetErrorVerbosity(PGconn *conn, PGVerbosity verbosity);
 
@@ -656,14 +634,6 @@ extern char *PQencryptPasswordConn(PGconn *conn, const char *passwd, const char 
 extern int	pg_char_to_encoding(const char *name);
 extern const char *pg_encoding_to_char(int encoding);
 extern int	pg_valid_server_encoding_id(int encoding);
-
-/* === in fe-secure-openssl.c === */
-
-/* Support for overriding sslpassword handling with a callback */
-typedef int (*PQsslKeyPassHook_OpenSSL_type) (char *buf, int size, PGconn *conn);
-extern PQsslKeyPassHook_OpenSSL_type PQgetSSLKeyPassHook_OpenSSL(void);
-extern void PQsetSSLKeyPassHook_OpenSSL(PQsslKeyPassHook_OpenSSL_type hook);
-extern int	PQdefaultSSLKeyPassHook_OpenSSL(char *buf, int size, PGconn *conn);
 
 #ifdef __cplusplus
 }

@@ -80,14 +80,6 @@ AC_MSG_RESULT([$template])
 PORTNAME=$template
 AC_SUBST(PORTNAME)
 
-# Initialize default assumption that we do not need separate assembly code
-# for TAS (test-and-set).  This can be overridden by the template file
-# when it's executed.
-need_tas=no
-tas_file=dummy.s
-
-
-
 ##
 ## Command line options
 ##
@@ -729,19 +721,6 @@ AC_SUBST(GCC)
 
 
 #
-# Set up TAS assembly code if needed; the template file has now had its
-# chance to request this.
-#
-AC_CONFIG_LINKS([src/backend/port/tas.s:src/backend/port/tas/${tas_file}])
-
-if test "$need_tas" = yes ; then
-  TAS=tas.o
-else
-  TAS=""
-fi
-AC_SUBST(TAS)
-
-#
 # Set up pkg_config in case we need it below
 #
 PKG_PROG_PKG_CONFIG
@@ -847,65 +826,6 @@ AC_MSG_CHECKING([whether to build Python modules])
 PGAC_ARG_BOOL(with, python, no, [build Python modules (PL/Python)])
 AC_MSG_RESULT([$with_python])
 AC_SUBST(with_python)
-
-#
-# GSSAPI
-#
-AC_MSG_CHECKING([whether to build with GSSAPI support])
-PGAC_ARG_BOOL(with, gssapi, no, [build with GSSAPI support],
-[
-  AC_DEFINE(ENABLE_GSS, 1, [Define to build with GSSAPI support. (--with-gssapi)])
-  krb_srvtab="FILE:\$(sysconfdir)/krb5.keytab"
-])
-AC_MSG_RESULT([$with_gssapi])
-AC_SUBST(with_gssapi)
-
-
-AC_SUBST(krb_srvtab)
-
-
-#
-# Kerberos configuration parameters
-#
-PGAC_ARG_REQ(with, krb-srvnam,
-             [NAME], [default service principal name in Kerberos (GSSAPI) [postgres]],
-             [],
-             [with_krb_srvnam="postgres"])
-AC_SUBST(with_krb_srvnam)
-AC_DEFINE_UNQUOTED([PG_KRB_SRVNAM], ["$with_krb_srvnam"],
-                   [Define to the name of the default PostgreSQL service principal in Kerberos (GSSAPI). (--with-krb-srvnam=NAME)])
-
-
-#
-# PAM
-#
-AC_MSG_CHECKING([whether to build with PAM support])
-PGAC_ARG_BOOL(with, pam, no,
-              [build with PAM support],
-              [AC_DEFINE([USE_PAM], 1, [Define to 1 to build with PAM support. (--with-pam)])])
-AC_MSG_RESULT([$with_pam])
-
-
-#
-# BSD AUTH
-#
-AC_MSG_CHECKING([whether to build with BSD Authentication support])
-PGAC_ARG_BOOL(with, bsd-auth, no,
-              [build with BSD Authentication support],
-              [AC_DEFINE([USE_BSD_AUTH], 1, [Define to 1 to build with BSD Authentication support. (--with-bsd-auth)])])
-AC_MSG_RESULT([$with_bsd_auth])
-
-
-#
-# LDAP
-#
-AC_MSG_CHECKING([whether to build with LDAP support])
-PGAC_ARG_BOOL(with, ldap, no,
-              [build with LDAP support],
-              [AC_DEFINE([USE_LDAP], 1, [Define to 1 to build with LDAP support. (--with-ldap)])])
-AC_MSG_RESULT([$with_ldap])
-AC_SUBST(with_ldap)
-
 
 #
 # Bonjour
@@ -1280,65 +1200,6 @@ else
 *** Not using atomic operations will cause poor performance.])
 fi
 
-if test "$with_gssapi" = yes ; then
-  if test "$PORTNAME" != "win32"; then
-    AC_SEARCH_LIBS(gss_init_sec_context, [gssapi_krb5 gss 'gssapi -lkrb5 -lcrypto'], [],
-                   [AC_MSG_ERROR([could not find function 'gss_init_sec_context' required for GSSAPI])])
-  else
-    LIBS="$LIBS -lgssapi32"
-  fi
-fi
-
-#
-# SSL Library
-#
-# There is currently only one supported SSL/TLS library: OpenSSL.
-#
-PGAC_ARG_REQ(with, ssl, [LIB], [use LIB for SSL/TLS support (openssl)])
-if test x"$with_ssl" = x"" ; then
-  with_ssl=no
-fi
-PGAC_ARG_BOOL(with, openssl, no, [obsolete spelling of --with-ssl=openssl])
-if test "$with_openssl" = yes ; then
-  with_ssl=openssl
-fi
-
-if test "$with_ssl" = openssl ; then
-  dnl Order matters!
-  # Minimum required OpenSSL version is 1.0.1
-  AC_DEFINE(OPENSSL_API_COMPAT, [0x10001000L],
-            [Define to the OpenSSL API version in use. This avoids deprecation warnings from newer OpenSSL versions.])
-  if test "$PORTNAME" != "win32"; then
-     AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL])])
-     AC_CHECK_LIB(ssl,    SSL_new, [], [AC_MSG_ERROR([library 'ssl' is required for OpenSSL])])
-  else
-     AC_SEARCH_LIBS(CRYPTO_new_ex_data, [eay32 crypto], [], [AC_MSG_ERROR([library 'eay32' or 'crypto' is required for OpenSSL])])
-     AC_SEARCH_LIBS(SSL_new, [ssleay32 ssl], [], [AC_MSG_ERROR([library 'ssleay32' or 'ssl' is required for OpenSSL])])
-  fi
-  # Function introduced in OpenSSL 1.0.2.
-  AC_CHECK_FUNCS([X509_get_signature_nid])
-  # Functions introduced in OpenSSL 1.1.0. We used to check for
-  # OPENSSL_VERSION_NUMBER, but that didn't work with 1.1.0, because LibreSSL
-  # defines OPENSSL_VERSION_NUMBER to claim version 2.0.0, even though it
-  # doesn't have these OpenSSL 1.1.0 functions. So check for individual
-  # functions.
-  AC_CHECK_FUNCS([OPENSSL_init_ssl BIO_meth_new ASN1_STRING_get0_data HMAC_CTX_new HMAC_CTX_free])
-  # OpenSSL versions before 1.1.0 required setting callback functions, for
-  # thread-safety. In 1.1.0, it's no longer required, and CRYPTO_lock()
-  # function was removed.
-  AC_CHECK_FUNCS([CRYPTO_lock])
-  # Function introduced in OpenSSL 1.1.1.
-  AC_CHECK_FUNCS([X509_get_signature_info SSL_CTX_set_num_tickets])
-  AC_DEFINE([USE_OPENSSL], 1, [Define to 1 to build with OpenSSL support. (--with-ssl=openssl)])
-elif test "$with_ssl" != no ; then
-  AC_MSG_ERROR([--with-ssl must specify openssl])
-fi
-AC_SUBST(with_ssl)
-
-if test "$with_pam" = yes ; then
-  AC_CHECK_LIB(pam,    pam_start, [], [AC_MSG_ERROR([library 'pam' is required for PAM])])
-fi
-
 if test "$with_libxml" = yes ; then
   AC_CHECK_LIB(xml2, xmlSaveToBuffer, [], [AC_MSG_ERROR([library 'xml2' (version >= 2.6.23) is required for XML support])])
 fi
@@ -1350,45 +1211,6 @@ fi
 if test "$with_lz4" = yes ; then
   AC_CHECK_LIB(lz4, LZ4_compress_default, [], [AC_MSG_ERROR([library 'lz4' is required for LZ4 support])])
 fi
-
-# Note: We can test for libldap_r only after we know PTHREAD_LIBS;
-# also, on AIX, we may need to have openssl in LIBS for this step.
-if test "$with_ldap" = yes ; then
-  _LIBS="$LIBS"
-  if test "$PORTNAME" != "win32"; then
-    AC_CHECK_LIB(ldap, ldap_bind, [],
-		 [AC_MSG_ERROR([library 'ldap' is required for LDAP])],
-		 [$EXTRA_LDAP_LIBS])
-    LDAP_LIBS_BE="-lldap $EXTRA_LDAP_LIBS"
-    # This test is carried out against libldap.
-    AC_CHECK_FUNCS([ldap_initialize])
-    # The separate ldap_r library only exists in OpenLDAP < 2.5, and if we
-    # have 2.5 or later, we shouldn't even probe for ldap_r (we might find a
-    # library from a separate OpenLDAP installation).  The most reliable
-    # way to check that is to check for a function introduced in 2.5.
-    AC_CHECK_FUNC([ldap_verify_credentials],
-		  [thread_safe_libldap=yes],
-		  [thread_safe_libldap=no])
-    if test "$enable_thread_safety" = yes -a "$thread_safe_libldap" = no; then
-      # Use ldap_r for FE if available, else assume ldap is thread-safe.
-      # On some platforms ldap_r fails to link without PTHREAD_LIBS.
-      LIBS="$_LIBS"
-      AC_CHECK_LIB(ldap_r, ldap_bind,
-		   [LDAP_LIBS_FE="-lldap_r $EXTRA_LDAP_LIBS"],
-		   [LDAP_LIBS_FE="-lldap $EXTRA_LDAP_LIBS"],
-		   [$PTHREAD_CFLAGS $PTHREAD_LIBS $EXTRA_LDAP_LIBS])
-    else
-      LDAP_LIBS_FE="-lldap $EXTRA_LDAP_LIBS"
-    fi
-  else
-    AC_CHECK_LIB(wldap32, ldap_bind, [], [AC_MSG_ERROR([library 'wldap32' is required for LDAP])])
-    LDAP_LIBS_FE="-lwldap32"
-    LDAP_LIBS_BE="-lwldap32"
-  fi
-  LIBS="$_LIBS"
-fi
-AC_SUBST(LDAP_LIBS_FE)
-AC_SUBST(LDAP_LIBS_BE)
 
 # for contrib/sepgsql
 if test "$with_selinux" = yes; then
@@ -1520,26 +1342,6 @@ if test "$with_lz4" = yes; then
   AC_CHECK_HEADERS(lz4.h, [], [AC_MSG_ERROR([lz4.h header file is required for LZ4])])
 fi
 
-if test "$with_gssapi" = yes ; then
-  AC_CHECK_HEADERS(gssapi/gssapi.h, [],
-	[AC_CHECK_HEADERS(gssapi.h, [], [AC_MSG_ERROR([gssapi.h header file is required for GSSAPI])])])
-fi
-
-if test "$with_ssl" = openssl ; then
-  AC_CHECK_HEADER(openssl/ssl.h, [], [AC_MSG_ERROR([header file <openssl/ssl.h> is required for OpenSSL])])
-  AC_CHECK_HEADER(openssl/err.h, [], [AC_MSG_ERROR([header file <openssl/err.h> is required for OpenSSL])])
-fi
-
-if test "$with_pam" = yes ; then
-  AC_CHECK_HEADERS(security/pam_appl.h, [],
-                   [AC_CHECK_HEADERS(pam/pam_appl.h, [],
-                                     [AC_MSG_ERROR([header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM.])])])
-fi
-
-if test "$with_bsd_auth" = yes ; then
-  AC_CHECK_HEADER(bsd_auth.h, [], [AC_MSG_ERROR([header file <bsd_auth.h> is required for BSD Authentication support])])
-fi
-
 if test "$with_systemd" = yes ; then
   AC_CHECK_HEADER(systemd/sd-daemon.h, [], [AC_MSG_ERROR([header file <systemd/sd-daemon.h> is required for systemd support])])
 fi
@@ -1550,20 +1352,6 @@ fi
 
 if test "$with_libxslt" = yes ; then
   AC_CHECK_HEADER(libxslt/xslt.h, [], [AC_MSG_ERROR([header file <libxslt/xslt.h> is required for XSLT support])])
-fi
-
-if test "$with_ldap" = yes ; then
-  if test "$PORTNAME" != "win32"; then
-     AC_CHECK_HEADERS(ldap.h, [],
-                      [AC_MSG_ERROR([header file <ldap.h> is required for LDAP])])
-     PGAC_LDAP_SAFE
-  else
-     AC_CHECK_HEADERS(winldap.h, [],
-                      [AC_MSG_ERROR([header file <winldap.h> is required for LDAP])],
-                      [AC_INCLUDES_DEFAULT
-#include <windows.h>
-                      ])
-  fi
 fi
 
 if test "$with_bonjour" = yes ; then
@@ -2232,13 +2020,9 @@ if test "$PORTNAME" != "win32"; then
   SHMEM_IMPLEMENTATION="src/backend/port/sysv_shmem.c"
 fi
 
-# Select random number source. If a TLS library is used then it will be the
-# first choice, else the native platform sources (Windows API or /dev/urandom)
-# will be used.
+# Select random number source.  /dev/urandom is the only supported source.
 AC_MSG_CHECKING([which random number source to use])
-if test x"$with_ssl" = x"openssl" ; then
-  AC_MSG_RESULT([OpenSSL])
-elif test x"$cross_compiling" = x"yes"; then
+if test x"$cross_compiling" = x"yes"; then
   AC_MSG_RESULT([assuming /dev/urandom])
 else
   AC_MSG_RESULT([/dev/urandom])
@@ -2247,7 +2031,7 @@ else
   if test x"$ac_cv_file__dev_urandom" = x"no" ; then
     AC_MSG_ERROR([
 no source of strong random numbers was found
-PostgreSQL can use OpenSSL, native Windows API or /dev/urandom as a source of random numbers.])
+PostgreSQL requires /dev/urandom as a source of random numbers.])
   fi
 fi
 

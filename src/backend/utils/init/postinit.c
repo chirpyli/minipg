@@ -224,32 +224,6 @@ PerformAuthentication(Port *port)
 			appendStringInfo(&logmsg, _(" application_name=%s"),
 							 port->application_name);
 
-#ifdef USE_SSL
-		if (port->ssl_in_use)
-			appendStringInfo(&logmsg, _(" SSL enabled (protocol=%s, cipher=%s, bits=%d)"),
-							 be_tls_get_version(port),
-							 be_tls_get_cipher(port),
-							 be_tls_get_cipher_bits(port));
-#endif
-#ifdef ENABLE_GSS
-		if (port->gss)
-		{
-			const char *princ = be_gssapi_get_princ(port);
-
-			if (princ)
-				appendStringInfo(&logmsg,
-								 _(" GSS (authenticated=%s, encrypted=%s, principal=%s)"),
-								 be_gssapi_get_auth(port) ? _("yes") : _("no"),
-								 be_gssapi_get_enc(port) ? _("yes") : _("no"),
-								 princ);
-			else
-				appendStringInfo(&logmsg,
-								 _(" GSS (authenticated=%s, encrypted=%s)"),
-								 be_gssapi_get_auth(port) ? _("yes") : _("no"),
-								 be_gssapi_get_enc(port) ? _("yes") : _("no"));
-		}
-#endif
-
 		ereport(LOG, errmsg_internal("%s", logmsg.data));
 		pfree(logmsg.data);
 	}

@@ -34,11 +34,7 @@
  * be initialized by calling pg_strong_random_init().
  *
  * We rely on system facilities for actually generating the numbers.
- * We support a number of sources:
- *
- * 1. OpenSSL's RAND_bytes()
- * 2. Windows' CryptGenRandom() function
- * 3. /dev/urandom
+ * The random data is read from /dev/urandom.
  *
  * Returns true on success, and false if none of the sources
  * were available. NB: It is important to check the return value!
@@ -48,57 +44,8 @@
 
 
 
-#ifdef USE_OPENSSL
-
-#include <openssl/rand.h>
-
-void
-pg_strong_random_init(void)
-{
-	/*
-	 * Make sure processes do not share OpenSSL randomness state.  This is no
-	 * longer required in OpenSSL 1.1.1 and later versions, but until we drop
-	 * support for version < 1.1.1 we need to do this.
-	 */
-	RAND_poll();
-}
-
-bool
-pg_strong_random(void *buf, size_t len)
-{
-	int			i;
-
-	/*
-	 * Check that OpenSSL's CSPRNG has been sufficiently seeded, and if not
-	 * add more seed data using RAND_poll().  With some older versions of
-	 * OpenSSL, it may be necessary to call RAND_poll() a number of times.  If
-	 * RAND_poll() fails to generate seed data within the given amount of
-	 * retries, subsequent RAND_bytes() calls will fail, but we allow that to
-	 * happen to let pg_strong_random() callers handle that with appropriate
-	 * error handling.
-	 */
-#define NUM_RAND_POLL_RETRIES 8
-
-	for (i = 0; i < NUM_RAND_POLL_RETRIES; i++)
-	{
-		if (RAND_status() == 1)
-		{
-			/* The CSPRNG is sufficiently seeded */
-			break;
-		}
-
-		RAND_poll();
-	}
-
-	if (RAND_bytes(buf, len) == 1)
-		return true;
-	return false;
-}
-
-#else							/* not USE_OPENSSL */
-
 /*
- * Without OpenSSL or Win32 support, just read /dev/urandom ourselves.
+ * Read /dev/urandom ourselves.
  */
 
 void
@@ -137,4 +84,3 @@ pg_strong_random(void *buf, size_t len)
 	close(f);
 	return true;
 }
-#endif

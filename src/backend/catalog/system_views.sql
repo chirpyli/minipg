@@ -911,28 +911,6 @@ CREATE VIEW pg_stat_subscription AS
             LEFT JOIN pg_stat_get_subscription(NULL) st
                       ON (st.subid = su.oid);
 
-CREATE VIEW pg_stat_ssl AS
-    SELECT
-            S.pid,
-            S.ssl,
-            S.sslversion AS version,
-            S.sslcipher AS cipher,
-            S.sslbits AS bits,
-            S.ssl_client_dn AS client_dn,
-            S.ssl_client_serial AS client_serial,
-            S.ssl_issuer_dn AS issuer_dn
-    FROM pg_stat_get_activity(NULL) AS S
-    WHERE S.client_port IS NOT NULL;
-
-CREATE VIEW pg_stat_gssapi AS
-    SELECT
-            S.pid,
-            S.gss_auth AS gss_authenticated,
-            S.gss_princ AS principal,
-            S.gss_enc AS encrypted
-    FROM pg_stat_get_activity(NULL) AS S
-    WHERE S.client_port IS NOT NULL;
-
 CREATE VIEW pg_replication_slots AS
     SELECT
             L.slot_name,

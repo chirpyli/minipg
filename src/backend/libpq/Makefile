@@ -18,7 +18,6 @@ OBJS = \
 	auth-scram.o \
 	auth.o \
 	be-fsstubs.o \
-	be-secure-common.o \
 	be-secure.o \
 	crypt.o \
 	hba.o \
@@ -27,13 +26,5 @@ OBJS = \
 	pqformat.o \
 	pqmq.o \
 	pqsignal.o
-
-ifeq ($(with_ssl),openssl)
-OBJS += be-secure-openssl.o
-endif
-
-ifeq ($(with_gssapi),yes)
-OBJS += be-gssapi-common.o be-secure-gssapi.o
-endif
 
 include $(top_srcdir)/src/backend/common.mk

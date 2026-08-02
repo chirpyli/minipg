@@ -45,10 +45,6 @@
 #include "utils/memutils.h"
 #include "utils/varlena.h"
 
-#ifdef USE_LDAP
-#include <ldap.h>
-#endif
-
 
 #define MAX_TOKEN	10240
 
@@ -119,18 +115,8 @@ static const char *const UserAuthName[] =
 	"reject",
 	"implicit reject",			/* Not a user-visible option */
 	"trust",
-	"ident",
 	"password",
-	"md5",
-	"scram-sha-256",
-	"gss",
-	"sspi",
-	"pam",
-	"bsd",
-	"ldap",
-	"cert",
-	"radius",
-	"peer"
+	"scram-sha-256"
 };
 
 
@@ -1015,52 +1001,33 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 			 strcmp(token->string, "hostgssenc") == 0 ||
 			 strcmp(token->string, "hostnogssenc") == 0)
 	{
-
 		if (token->string[4] == 's')	/* "hostssl" */
 		{
-			parsedline->conntype = ctHostSSL;
-			/* Log a warning if SSL support is not active */
-#ifdef USE_SSL
-			if (!EnableSSL)
-			{
-				ereport(elevel,
-						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						 errmsg("hostssl record cannot match because SSL is disabled"),
-						 errhint("Set ssl = on in postgresql.conf."),
-						 errcontext("line %d of configuration file \"%s\"",
-									line_num, HbaFileName)));
-				*err_msg = "hostssl record cannot match because SSL is disabled";
-			}
-#else
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
 					 errmsg("hostssl record cannot match because SSL is not supported by this build"),
-					 errhint("Compile with --with-ssl to use SSL connections."),
 					 errcontext("line %d of configuration file \"%s\"",
 								line_num, HbaFileName)));
 			*err_msg = "hostssl record cannot match because SSL is not supported by this build";
-#endif
+			return NULL;
 		}
 		else if (token->string[4] == 'g')	/* "hostgssenc" */
 		{
-			parsedline->conntype = ctHostGSS;
-#ifndef ENABLE_GSS
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
 					 errmsg("hostgssenc record cannot match because GSSAPI is not supported by this build"),
-					 errhint("Compile with --with-gssapi to use GSSAPI connections."),
 					 errcontext("line %d of configuration file \"%s\"",
 								line_num, HbaFileName)));
 			*err_msg = "hostgssenc record cannot match because GSSAPI is not supported by this build";
-#endif
+			return NULL;
 		}
-		else if (token->string[4] == 'n' && token->string[6] == 's')
-			parsedline->conntype = ctHostNoSSL;
-		else if (token->string[4] == 'n' && token->string[6] == 'g')
-			parsedline->conntype = ctHostNoGSS;
 		else
 		{
-			/* "host" */
+			/*
+			 * "host", "hostnossl" and "hostnogssenc".  Since this build
+			 * supports no transport encryption at all, the "no" variants are
+			 * equivalent to a plain "host" record.
+			 */
 			parsedline->conntype = ctHost;
 		}
 	}							/* record type */
@@ -1333,68 +1300,32 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 	unsupauth = NULL;
 	if (strcmp(token->string, "trust") == 0)
 		parsedline->auth_method = uaTrust;
-	else if (strcmp(token->string, "ident") == 0)
-		parsedline->auth_method = uaIdent;
-	else if (strcmp(token->string, "peer") == 0)
-		parsedline->auth_method = uaPeer;
 	else if (strcmp(token->string, "password") == 0)
 		parsedline->auth_method = uaPassword;
-	else if (strcmp(token->string, "gss") == 0)
-#ifdef ENABLE_GSS
-		parsedline->auth_method = uaGSS;
-#else
-		unsupauth = "gss";
-#endif
-	else if (strcmp(token->string, "sspi") == 0)
-#ifdef ENABLE_SSPI
-		parsedline->auth_method = uaSSPI;
-#else
-		unsupauth = "sspi";
-#endif
 	else if (strcmp(token->string, "reject") == 0)
 		parsedline->auth_method = uaReject;
-	else if (strcmp(token->string, "md5") == 0)
-	{
-		if (Db_user_namespace)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("MD5 authentication is not supported when \"db_user_namespace\" is enabled"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "MD5 authentication is not supported when \"db_user_namespace\" is enabled";
-			return NULL;
-		}
-		parsedline->auth_method = uaMD5;
-	}
 	else if (strcmp(token->string, "scram-sha-256") == 0)
 		parsedline->auth_method = uaSCRAM;
+	else if (strcmp(token->string, "ident") == 0)
+		unsupauth = "ident";
+	else if (strcmp(token->string, "peer") == 0)
+		unsupauth = "peer";
+	else if (strcmp(token->string, "md5") == 0)
+		unsupauth = "md5";
+	else if (strcmp(token->string, "gss") == 0)
+		unsupauth = "gss";
+	else if (strcmp(token->string, "sspi") == 0)
+		unsupauth = "sspi";
 	else if (strcmp(token->string, "pam") == 0)
-#ifdef USE_PAM
-		parsedline->auth_method = uaPAM;
-#else
 		unsupauth = "pam";
-#endif
 	else if (strcmp(token->string, "bsd") == 0)
-#ifdef USE_BSD_AUTH
-		parsedline->auth_method = uaBSD;
-#else
 		unsupauth = "bsd";
-#endif
 	else if (strcmp(token->string, "ldap") == 0)
-#ifdef USE_LDAP
-		parsedline->auth_method = uaLDAP;
-#else
 		unsupauth = "ldap";
-#endif
 	else if (strcmp(token->string, "cert") == 0)
-#ifdef USE_SSL
-		parsedline->auth_method = uaCert;
-#else
 		unsupauth = "cert";
-#endif
 	else if (strcmp(token->string, "radius") == 0)
-		parsedline->auth_method = uaRADIUS;
+		unsupauth = "radius";
 	else
 	{
 		ereport(elevel,
@@ -1419,81 +1350,6 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 		*err_msg = psprintf("invalid authentication method \"%s\": not supported by this build",
 							token->string);
 		return NULL;
-	}
-
-	/*
-	 * XXX: When using ident on local connections, change it to peer, for
-	 * backwards compatibility.
-	 */
-	if (parsedline->conntype == ctLocal &&
-		parsedline->auth_method == uaIdent)
-		parsedline->auth_method = uaPeer;
-
-	/* Invalid authentication combinations */
-	if (parsedline->conntype == ctLocal &&
-		parsedline->auth_method == uaGSS)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-				 errmsg("gssapi authentication is not supported on local sockets"),
-				 errcontext("line %d of configuration file \"%s\"",
-							line_num, HbaFileName)));
-		*err_msg = "gssapi authentication is not supported on local sockets";
-		return NULL;
-	}
-
-	if (parsedline->conntype != ctLocal &&
-		parsedline->auth_method == uaPeer)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-				 errmsg("peer authentication is only supported on local sockets"),
-				 errcontext("line %d of configuration file \"%s\"",
-							line_num, HbaFileName)));
-		*err_msg = "peer authentication is only supported on local sockets";
-		return NULL;
-	}
-
-	/*
-	 * SSPI authentication can never be enabled on ctLocal connections,
-	 * because it's only supported on Windows, where ctLocal isn't supported.
-	 */
-
-
-	if (parsedline->conntype != ctHostSSL &&
-		parsedline->auth_method == uaCert)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-				 errmsg("cert authentication is only supported on hostssl connections"),
-				 errcontext("line %d of configuration file \"%s\"",
-							line_num, HbaFileName)));
-		*err_msg = "cert authentication is only supported on hostssl connections";
-		return NULL;
-	}
-
-	/*
-	 * For GSS and SSPI, set the default value of include_realm to true.
-	 * Having include_realm set to false is dangerous in multi-realm
-	 * situations and is generally considered bad practice.  We keep the
-	 * capability around for backwards compatibility, but we might want to
-	 * remove it at some point in the future.  Users who still need to strip
-	 * the realm off would be better served by using an appropriate regex in a
-	 * pg_ident.conf mapping.
-	 */
-	if (parsedline->auth_method == uaGSS ||
-		parsedline->auth_method == uaSSPI)
-		parsedline->include_realm = true;
-
-	/*
-	 * For SSPI, include_realm defaults to the SAM-compatible domain (aka
-	 * NetBIOS name) and user names instead of the Kerberos principal name for
-	 * compatibility.
-	 */
-	if (parsedline->auth_method == uaSSPI)
-	{
-		parsedline->compat_realm = true;
-		parsedline->upn_username = false;
 	}
 
 	/* Parse remaining arguments */
@@ -1531,162 +1387,6 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 		}
 	}
 
-	/*
-	 * Check if the selected authentication method has any mandatory arguments
-	 * that are not set.
-	 */
-	if (parsedline->auth_method == uaLDAP)
-	{
-#ifndef HAVE_LDAP_INITIALIZE
-		/* Not mandatory for OpenLDAP, because it can use DNS SRV records */
-		MANDATORY_AUTH_ARG(parsedline->ldapserver, "ldapserver", "ldap");
-#endif
-
-		/*
-		 * LDAP can operate in two modes: either with a direct bind, using
-		 * ldapprefix and ldapsuffix, or using a search+bind, using
-		 * ldapbasedn, ldapbinddn, ldapbindpasswd and one of
-		 * ldapsearchattribute or ldapsearchfilter.  Disallow mixing these
-		 * parameters.
-		 */
-		if (parsedline->ldapprefix || parsedline->ldapsuffix)
-		{
-			if (parsedline->ldapbasedn ||
-				parsedline->ldapbinddn ||
-				parsedline->ldapbindpasswd ||
-				parsedline->ldapsearchattribute ||
-				parsedline->ldapsearchfilter)
-			{
-				ereport(elevel,
-						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						 errmsg("cannot use ldapbasedn, ldapbinddn, ldapbindpasswd, ldapsearchattribute, ldapsearchfilter, or ldapurl together with ldapprefix"),
-						 errcontext("line %d of configuration file \"%s\"",
-									line_num, HbaFileName)));
-				*err_msg = "cannot use ldapbasedn, ldapbinddn, ldapbindpasswd, ldapsearchattribute, ldapsearchfilter, or ldapurl together with ldapprefix";
-				return NULL;
-			}
-		}
-		else if (!parsedline->ldapbasedn)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("authentication method \"ldap\" requires argument \"ldapbasedn\", \"ldapprefix\", or \"ldapsuffix\" to be set"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "authentication method \"ldap\" requires argument \"ldapbasedn\", \"ldapprefix\", or \"ldapsuffix\" to be set";
-			return NULL;
-		}
-
-		/*
-		 * When using search+bind, you can either use a simple attribute
-		 * (defaulting to "uid") or a fully custom search filter.  You can't
-		 * do both.
-		 */
-		if (parsedline->ldapsearchattribute && parsedline->ldapsearchfilter)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("cannot use ldapsearchattribute together with ldapsearchfilter"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "cannot use ldapsearchattribute together with ldapsearchfilter";
-			return NULL;
-		}
-	}
-
-	if (parsedline->auth_method == uaRADIUS)
-	{
-		MANDATORY_AUTH_ARG(parsedline->radiusservers, "radiusservers", "radius");
-		MANDATORY_AUTH_ARG(parsedline->radiussecrets, "radiussecrets", "radius");
-
-		if (list_length(parsedline->radiusservers) < 1)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("list of RADIUS servers cannot be empty"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "list of RADIUS servers cannot be empty";
-			return NULL;
-		}
-
-		if (list_length(parsedline->radiussecrets) < 1)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("list of RADIUS secrets cannot be empty"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "list of RADIUS secrets cannot be empty";
-			return NULL;
-		}
-
-		/*
-		 * Verify length of option lists - each can be 0 (except for secrets,
-		 * but that's already checked above), 1 (use the same value
-		 * everywhere) or the same as the number of servers.
-		 */
-		if (!(list_length(parsedline->radiussecrets) == 1 ||
-			  list_length(parsedline->radiussecrets) == list_length(parsedline->radiusservers)))
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("the number of RADIUS secrets (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-							list_length(parsedline->radiussecrets),
-							list_length(parsedline->radiusservers)),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = psprintf("the number of RADIUS secrets (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-								list_length(parsedline->radiussecrets),
-								list_length(parsedline->radiusservers));
-			return NULL;
-		}
-		if (!(list_length(parsedline->radiusports) == 0 ||
-			  list_length(parsedline->radiusports) == 1 ||
-			  list_length(parsedline->radiusports) == list_length(parsedline->radiusservers)))
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("the number of RADIUS ports (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-							list_length(parsedline->radiusports),
-							list_length(parsedline->radiusservers)),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = psprintf("the number of RADIUS ports (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-								list_length(parsedline->radiusports),
-								list_length(parsedline->radiusservers));
-			return NULL;
-		}
-		if (!(list_length(parsedline->radiusidentifiers) == 0 ||
-			  list_length(parsedline->radiusidentifiers) == 1 ||
-			  list_length(parsedline->radiusidentifiers) == list_length(parsedline->radiusservers)))
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("the number of RADIUS identifiers (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-							list_length(parsedline->radiusidentifiers),
-							list_length(parsedline->radiusservers)),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = psprintf("the number of RADIUS identifiers (%d) must be 1 or the same as the number of RADIUS servers (%d)",
-								list_length(parsedline->radiusidentifiers),
-								list_length(parsedline->radiusservers));
-			return NULL;
-		}
-	}
-
-	/*
-	 * Enforce any parameters implied by other settings.
-	 */
-	if (parsedline->auth_method == uaCert)
-	{
-		/*
-		 * For auth method cert, client certificate validation is mandatory, and it implies
-		 * the level of verify-full.
-		 */
-		parsedline->clientcert = clientCertFull;
-	}
-
 	return parsedline;
 }
 
@@ -1703,400 +1403,13 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline,
 {
 	int			line_num = hbaline->linenumber;
 
-#ifdef USE_LDAP
-	hbaline->ldapscope = LDAP_SCOPE_SUBTREE;
-#endif
-
 	if (strcmp(name, "map") == 0)
 	{
-		if (hbaline->auth_method != uaIdent &&
-			hbaline->auth_method != uaPeer &&
-			hbaline->auth_method != uaGSS &&
-			hbaline->auth_method != uaSSPI &&
-			hbaline->auth_method != uaCert)
-			INVALID_AUTH_OPTION("map", gettext_noop("ident, peer, gssapi, sspi, and cert"));
-		hbaline->usermap = pstrdup(val);
-	}
-	else if (strcmp(name, "clientcert") == 0)
-	{
-		if (hbaline->conntype != ctHostSSL)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("clientcert can only be configured for \"hostssl\" rows"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "clientcert can only be configured for \"hostssl\" rows";
-			return false;
-		}
-
-		if (strcmp(val, "verify-full") == 0)
-		{
-			hbaline->clientcert = clientCertFull;
-		}
-		else if (strcmp(val, "verify-ca") == 0)
-		{
-			if (hbaline->auth_method == uaCert)
-			{
-				ereport(elevel,
-						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						 errmsg("clientcert only accepts \"verify-full\" when using \"cert\" authentication"),
-						 errcontext("line %d of configuration file \"%s\"",
-									line_num, HbaFileName)));
-				*err_msg = "clientcert can only be set to \"verify-full\" when using \"cert\" authentication";
-				return false;
-			}
-
-			hbaline->clientcert = clientCertCA;
-		}
-		else
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("invalid value for clientcert: \"%s\"", val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			return false;
-		}
-	}
-	else if (strcmp(name, "clientname") == 0)
-	{
-		if (hbaline->conntype != ctHostSSL)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("clientname can only be configured for \"hostssl\" rows"),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = "clientname can only be configured for \"hostssl\" rows";
-			return false;
-		}
-
-		if (strcmp(val, "CN") == 0)
-		{
-			hbaline->clientcertname = clientCertCN;
-		}
-		else if (strcmp(val, "DN") == 0)
-		{
-			hbaline->clientcertname = clientCertDN;
-		}
-		else
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("invalid value for clientname: \"%s\"", val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			return false;
-		}
-	}
-	else if (strcmp(name, "pamservice") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaPAM, "pamservice", "pam");
-		hbaline->pamservice = pstrdup(val);
-	}
-	else if (strcmp(name, "pam_use_hostname") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaPAM, "pam_use_hostname", "pam");
-		if (strcmp(val, "1") == 0)
-			hbaline->pam_use_hostname = true;
-		else
-			hbaline->pam_use_hostname = false;
-
-	}
-	else if (strcmp(name, "ldapurl") == 0)
-	{
-#ifdef LDAP_API_FEATURE_X_OPENLDAP
-		LDAPURLDesc *urldata;
-		int			rc;
-#endif
-
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapurl", "ldap");
-#ifdef LDAP_API_FEATURE_X_OPENLDAP
-		rc = ldap_url_parse(val, &urldata);
-		if (rc != LDAP_SUCCESS)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("could not parse LDAP URL \"%s\": %s", val, ldap_err2string(rc))));
-			*err_msg = psprintf("could not parse LDAP URL \"%s\": %s",
-								val, ldap_err2string(rc));
-			return false;
-		}
-
-		if (strcmp(urldata->lud_scheme, "ldap") != 0 &&
-			strcmp(urldata->lud_scheme, "ldaps") != 0)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("unsupported LDAP URL scheme: %s", urldata->lud_scheme)));
-			*err_msg = psprintf("unsupported LDAP URL scheme: %s",
-								urldata->lud_scheme);
-			ldap_free_urldesc(urldata);
-			return false;
-		}
-
-		if (urldata->lud_scheme)
-			hbaline->ldapscheme = pstrdup(urldata->lud_scheme);
-		if (urldata->lud_host)
-			hbaline->ldapserver = pstrdup(urldata->lud_host);
-		hbaline->ldapport = urldata->lud_port;
-		if (urldata->lud_dn)
-			hbaline->ldapbasedn = pstrdup(urldata->lud_dn);
-
-		if (urldata->lud_attrs)
-			hbaline->ldapsearchattribute = pstrdup(urldata->lud_attrs[0]);	/* only use first one */
-		hbaline->ldapscope = urldata->lud_scope;
-		if (urldata->lud_filter)
-			hbaline->ldapsearchfilter = pstrdup(urldata->lud_filter);
-		ldap_free_urldesc(urldata);
-#else							/* not OpenLDAP */
-		ereport(elevel,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("LDAP URLs not supported on this platform")));
-		*err_msg = "LDAP URLs not supported on this platform";
-#endif							/* not OpenLDAP */
-	}
-	else if (strcmp(name, "ldaptls") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldaptls", "ldap");
-		if (strcmp(val, "1") == 0)
-			hbaline->ldaptls = true;
-		else
-			hbaline->ldaptls = false;
-	}
-	else if (strcmp(name, "ldapscheme") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapscheme", "ldap");
-		if (strcmp(val, "ldap") != 0 && strcmp(val, "ldaps") != 0)
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("invalid ldapscheme value: \"%s\"", val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-		hbaline->ldapscheme = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapserver") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapserver", "ldap");
-		hbaline->ldapserver = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapport") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapport", "ldap");
-		hbaline->ldapport = atoi(val);
-		if (hbaline->ldapport == 0)
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("invalid LDAP port number: \"%s\"", val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = psprintf("invalid LDAP port number: \"%s\"", val);
-			return false;
-		}
-	}
-	else if (strcmp(name, "ldapbinddn") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapbinddn", "ldap");
-		hbaline->ldapbinddn = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapbindpasswd") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapbindpasswd", "ldap");
-		hbaline->ldapbindpasswd = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapsearchattribute") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapsearchattribute", "ldap");
-		hbaline->ldapsearchattribute = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapsearchfilter") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapsearchfilter", "ldap");
-		hbaline->ldapsearchfilter = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapbasedn") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapbasedn", "ldap");
-		hbaline->ldapbasedn = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapprefix") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapprefix", "ldap");
-		hbaline->ldapprefix = pstrdup(val);
-	}
-	else if (strcmp(name, "ldapsuffix") == 0)
-	{
-		REQUIRE_AUTH_OPTION(uaLDAP, "ldapsuffix", "ldap");
-		hbaline->ldapsuffix = pstrdup(val);
-	}
-	else if (strcmp(name, "krb_realm") == 0)
-	{
-		if (hbaline->auth_method != uaGSS &&
-			hbaline->auth_method != uaSSPI)
-			INVALID_AUTH_OPTION("krb_realm", gettext_noop("gssapi and sspi"));
-		hbaline->krb_realm = pstrdup(val);
-	}
-	else if (strcmp(name, "include_realm") == 0)
-	{
-		if (hbaline->auth_method != uaGSS &&
-			hbaline->auth_method != uaSSPI)
-			INVALID_AUTH_OPTION("include_realm", gettext_noop("gssapi and sspi"));
-		if (strcmp(val, "1") == 0)
-			hbaline->include_realm = true;
-		else
-			hbaline->include_realm = false;
-	}
-	else if (strcmp(name, "compat_realm") == 0)
-	{
-		if (hbaline->auth_method != uaSSPI)
-			INVALID_AUTH_OPTION("compat_realm", gettext_noop("sspi"));
-		if (strcmp(val, "1") == 0)
-			hbaline->compat_realm = true;
-		else
-			hbaline->compat_realm = false;
-	}
-	else if (strcmp(name, "upn_username") == 0)
-	{
-		if (hbaline->auth_method != uaSSPI)
-			INVALID_AUTH_OPTION("upn_username", gettext_noop("sspi"));
-		if (strcmp(val, "1") == 0)
-			hbaline->upn_username = true;
-		else
-			hbaline->upn_username = false;
-	}
-	else if (strcmp(name, "radiusservers") == 0)
-	{
-		struct addrinfo *gai_result;
-		struct addrinfo hints;
-		int			ret;
-		List	   *parsed_servers;
-		ListCell   *l;
-		char	   *dupval = pstrdup(val);
-
-		REQUIRE_AUTH_OPTION(uaRADIUS, "radiusservers", "radius");
-
-		if (!SplitGUCList(dupval, ',', &parsed_servers))
-		{
-			/* syntax error in list */
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("could not parse RADIUS server list \"%s\"",
-							val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			return false;
-		}
-
-		/* For each entry in the list, translate it */
-		foreach(l, parsed_servers)
-		{
-			MemSet(&hints, 0, sizeof(hints));
-			hints.ai_socktype = SOCK_DGRAM;
-			hints.ai_family = AF_UNSPEC;
-
-			ret = pg_getaddrinfo_all((char *) lfirst(l), NULL, &hints, &gai_result);
-			if (ret || !gai_result)
-			{
-				ereport(elevel,
-						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						 errmsg("could not translate RADIUS server name \"%s\" to address: %s",
-								(char *) lfirst(l), gai_strerror(ret)),
-						 errcontext("line %d of configuration file \"%s\"",
-									line_num, HbaFileName)));
-				if (gai_result)
-					pg_freeaddrinfo_all(hints.ai_family, gai_result);
-
-				list_free(parsed_servers);
-				return false;
-			}
-			pg_freeaddrinfo_all(hints.ai_family, gai_result);
-		}
-
-		/* All entries are OK, so store them */
-		hbaline->radiusservers = parsed_servers;
-		hbaline->radiusservers_s = pstrdup(val);
-	}
-	else if (strcmp(name, "radiusports") == 0)
-	{
-		List	   *parsed_ports;
-		ListCell   *l;
-		char	   *dupval = pstrdup(val);
-
-		REQUIRE_AUTH_OPTION(uaRADIUS, "radiusports", "radius");
-
-		if (!SplitGUCList(dupval, ',', &parsed_ports))
-		{
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("could not parse RADIUS port list \"%s\"",
-							val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			*err_msg = psprintf("invalid RADIUS port number: \"%s\"", val);
-			return false;
-		}
-
-		foreach(l, parsed_ports)
-		{
-			if (atoi(lfirst(l)) == 0)
-			{
-				ereport(elevel,
-						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						 errmsg("invalid RADIUS port number: \"%s\"", val),
-						 errcontext("line %d of configuration file \"%s\"",
-									line_num, HbaFileName)));
-
-				return false;
-			}
-		}
-		hbaline->radiusports = parsed_ports;
-		hbaline->radiusports_s = pstrdup(val);
-	}
-	else if (strcmp(name, "radiussecrets") == 0)
-	{
-		List	   *parsed_secrets;
-		char	   *dupval = pstrdup(val);
-
-		REQUIRE_AUTH_OPTION(uaRADIUS, "radiussecrets", "radius");
-
-		if (!SplitGUCList(dupval, ',', &parsed_secrets))
-		{
-			/* syntax error in list */
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("could not parse RADIUS secret list \"%s\"",
-							val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			return false;
-		}
-
-		hbaline->radiussecrets = parsed_secrets;
-		hbaline->radiussecrets_s = pstrdup(val);
-	}
-	else if (strcmp(name, "radiusidentifiers") == 0)
-	{
-		List	   *parsed_identifiers;
-		char	   *dupval = pstrdup(val);
-
-		REQUIRE_AUTH_OPTION(uaRADIUS, "radiusidentifiers", "radius");
-
-		if (!SplitGUCList(dupval, ',', &parsed_identifiers))
-		{
-			/* syntax error in list */
-			ereport(elevel,
-					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-					 errmsg("could not parse RADIUS identifiers list \"%s\"",
-							val),
-					 errcontext("line %d of configuration file \"%s\"",
-								line_num, HbaFileName)));
-			return false;
-		}
-
-		hbaline->radiusidentifiers = parsed_identifiers;
-		hbaline->radiusidentifiers_s = pstrdup(val);
+		/*
+		 * No authentication method supported by this build makes use of a
+		 * user name map.
+		 */
+		INVALID_AUTH_OPTION("map", gettext_noop("none"));
 	}
 	else
 	{
@@ -2141,33 +1454,6 @@ check_hba(hbaPort *port)
 		{
 			if (IS_AF_UNIX(port->raddr.addr.ss_family))
 				continue;
-
-			/* Check SSL state */
-			if (port->ssl_in_use)
-			{
-				/* Connection is SSL, match both "host" and "hostssl" */
-				if (hba->conntype == ctHostNoSSL)
-					continue;
-			}
-			else
-			{
-				/* Connection is not SSL, match both "host" and "hostnossl" */
-				if (hba->conntype == ctHostSSL)
-					continue;
-			}
-
-			/* Check GSSAPI state */
-#ifdef ENABLE_GSS
-			if (port->gss && port->gss->enc &&
-				hba->conntype == ctHostNoGSS)
-				continue;
-			else if (!(port->gss && port->gss->enc) &&
-					 hba->conntype == ctHostGSS)
-				continue;
-#else
-			if (hba->conntype == ctHostGSS)
-				continue;
-#endif
 
 			/* Check IP address */
 			switch (hba->ip_cmp_method)
@@ -2327,12 +1613,8 @@ load_hba(void)
 /*
  * This macro specifies the maximum number of authentication options
  * that are possible with any given authentication method that is supported.
- * Currently LDAP supports 12, and there are 3 that are not dependent on
- * the auth method here.  It may not actually be possible to set all of them
- * at the same time, but we'll set the macro value high enough to be
- * conservative and avoid warnings from static analysis tools.
  */
-#define MAX_HBA_OPTIONS 15
+#define MAX_HBA_OPTIONS 4
 
 /*
  * Create a text array listing the options specified in the HBA line.
@@ -2346,101 +1628,10 @@ gethba_options(HbaLine *hba)
 
 	noptions = 0;
 
-	if (hba->auth_method == uaGSS || hba->auth_method == uaSSPI)
-	{
-		if (hba->include_realm)
-			options[noptions++] =
-				CStringGetTextDatum("include_realm=true");
-
-		if (hba->krb_realm)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("krb_realm=%s", hba->krb_realm));
-	}
-
 	if (hba->usermap)
 		options[noptions++] =
 			CStringGetTextDatum(psprintf("map=%s", hba->usermap));
 
-	if (hba->clientcert != clientCertOff)
-		options[noptions++] =
-			CStringGetTextDatum(psprintf("clientcert=%s", (hba->clientcert == clientCertCA) ? "verify-ca" : "verify-full"));
-
-	if (hba->pamservice)
-		options[noptions++] =
-			CStringGetTextDatum(psprintf("pamservice=%s", hba->pamservice));
-
-	if (hba->auth_method == uaLDAP)
-	{
-		if (hba->ldapserver)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapserver=%s", hba->ldapserver));
-
-		if (hba->ldapport)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapport=%d", hba->ldapport));
-
-		if (hba->ldapscheme)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapscheme=%s", hba->ldapscheme));
-
-		if (hba->ldaptls)
-			options[noptions++] =
-				CStringGetTextDatum("ldaptls=true");
-
-		if (hba->ldapprefix)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapprefix=%s", hba->ldapprefix));
-
-		if (hba->ldapsuffix)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapsuffix=%s", hba->ldapsuffix));
-
-		if (hba->ldapbasedn)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapbasedn=%s", hba->ldapbasedn));
-
-		if (hba->ldapbinddn)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapbinddn=%s", hba->ldapbinddn));
-
-		if (hba->ldapbindpasswd)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapbindpasswd=%s",
-											 hba->ldapbindpasswd));
-
-		if (hba->ldapsearchattribute)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapsearchattribute=%s",
-											 hba->ldapsearchattribute));
-
-		if (hba->ldapsearchfilter)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapsearchfilter=%s",
-											 hba->ldapsearchfilter));
-
-		if (hba->ldapscope)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("ldapscope=%d", hba->ldapscope));
-	}
-
-	if (hba->auth_method == uaRADIUS)
-	{
-		if (hba->radiusservers_s)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("radiusservers=%s", hba->radiusservers_s));
-
-		if (hba->radiussecrets_s)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("radiussecrets=%s", hba->radiussecrets_s));
-
-		if (hba->radiusidentifiers_s)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("radiusidentifiers=%s", hba->radiusidentifiers_s));
-
-		if (hba->radiusports_s)
-			options[noptions++] =
-				CStringGetTextDatum(psprintf("radiusports=%s", hba->radiusports_s));
-	}
 
 	/* If you add more options, consider increasing MAX_HBA_OPTIONS. */
 	Assert(noptions <= MAX_HBA_OPTIONS);
@@ -2502,18 +1693,6 @@ fill_hba_line(Tuplestorestate *tuple_store, TupleDesc tupdesc,
 				break;
 			case ctHost:
 				typestr = "host";
-				break;
-			case ctHostSSL:
-				typestr = "hostssl";
-				break;
-			case ctHostNoSSL:
-				typestr = "hostnossl";
-				break;
-			case ctHostGSS:
-				typestr = "hostgssenc";
-				break;
-			case ctHostNoGSS:
-				typestr = "hostnogssenc";
 				break;
 		}
 		if (typestr)

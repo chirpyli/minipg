@@ -223,7 +223,6 @@ static bool Reinit = true;
 static int	SendStop = false;
 
 /* still more option variables */
-bool		EnableSSL = false;
 
 int			PreAuthDelay = 0;
 int			AuthenticationTimeout = 60;
@@ -370,11 +369,6 @@ static volatile sig_atomic_t WalReceiverRequested = false;
 /* set when there's a worker that needs to be started up */
 static volatile bool StartWorkerNeeded = true;
 static volatile bool HaveCrashedWorker = false;
-
-#ifdef USE_SSL
-/* Set when and if SSL has been initialized properly */
-static bool LoadedSSL = false;
-#endif
 
 #ifdef USE_BONJOUR
 static DNSServiceRef bonjour_sdref = NULL;
@@ -887,17 +881,6 @@ PostmasterMain(int argc, char *argv[])
 	 * process any libraries that should be preloaded at postmaster start
 	 */
 	process_shared_preload_libraries();
-
-	/*
-	 * Initialize SSL library, if specified.
-	 */
-#ifdef USE_SSL
-	if (EnableSSL)
-	{
-		(void) secure_initialize(true);
-		LoadedSSL = true;
-	}
-#endif
 
 	/*
 	 * Now that loadable modules have had their chance to register background
@@ -1892,15 +1875,7 @@ retry:
 	{
 		char		SSLok;
 
-#ifdef USE_SSL
-		/* No SSL when disabled or on Unix sockets */
-		if (!LoadedSSL || IS_AF_UNIX(port->laddr.addr.ss_family))
-			SSLok = 'N';
-		else
-			SSLok = 'S';		/* Support for SSL */
-#else
 		SSLok = 'N';			/* No support for SSL */
-#endif
 
 retry1:
 		if (send(port->sock, &SSLok, 1, 0) != 1)
@@ -1912,11 +1887,6 @@ retry1:
 					 errmsg("failed to send SSL negotiation response: %m")));
 			return STATUS_ERROR;	/* close the connection */
 		}
-
-#ifdef USE_SSL
-		if (SSLok == 'S' && secure_open_server(port) == -1)
-			return STATUS_ERROR;
-#endif
 
 		/*
 		 * At this point we should have no data already buffered.  If we do,
@@ -1950,12 +1920,6 @@ retry1:
 	{
 		char		GSSok = 'N';
 
-#ifdef ENABLE_GSS
-		/* No GSSAPI encryption when on Unix socket */
-		if (!IS_AF_UNIX(port->laddr.addr.ss_family))
-			GSSok = 'G';
-#endif
-
 		while (send(port->sock, &GSSok, 1, 0) != 1)
 		{
 			if (errno == EINTR)
@@ -1965,11 +1929,6 @@ retry1:
 					 errmsg("failed to send GSSAPI negotiation response: %m")));
 			return STATUS_ERROR;	/* close the connection */
 		}
-
-#ifdef ENABLE_GSS
-		if (GSSok == 'G' && secure_open_gssapi(port) == -1)
-			return STATUS_ERROR;
-#endif
 
 		/*
 		 * At this point we should have no data already buffered.  If we do,
@@ -2590,24 +2549,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 		if (!load_ident())
 			ereport(LOG,
 					(errmsg("%s was not reloaded", "pg_ident.conf")));
-
-#ifdef USE_SSL
-		/* Reload SSL configuration as well */
-		if (EnableSSL)
-		{
-			if (secure_initialize(false) == 0)
-				LoadedSSL = true;
-			else
-				ereport(LOG,
-						(errmsg("SSL configuration was not reloaded")));
-		}
-		else
-		{
-			secure_destroy();
-			LoadedSSL = false;
-		}
-#endif
-
 	}
 
 	errno = save_errno;

@@ -183,13 +183,9 @@ with_icu	= @with_icu@
 with_perl	= @with_perl@
 with_python	= @with_python@
 with_tcl	= @with_tcl@
-with_ssl	= @with_ssl@
 with_readline	= @with_readline@
 with_selinux	= @with_selinux@
 with_systemd	= @with_systemd@
-with_gssapi	= @with_gssapi@
-with_krb_srvnam	= @with_krb_srvnam@
-with_ldap	= @with_ldap@
 with_libxml	= @with_libxml@
 with_libxslt	= @with_libxslt@
 with_llvm	= @with_llvm@
@@ -210,8 +206,6 @@ python_libspec		= @python_libspec@
 python_additional_libs	= @python_additional_libs@
 python_majorversion	= @python_majorversion@
 python_version		= @python_version@
-
-krb_srvtab = @krb_srvtab@
 
 ICU_CFLAGS		= @ICU_CFLAGS@
 ICU_LIBS		= @ICU_LIBS@
@@ -284,8 +278,6 @@ ZIC = @ZIC@
 
 AR = @AR@
 LIBS = @LIBS@
-LDAP_LIBS_FE = @LDAP_LIBS_FE@
-LDAP_LIBS_BE = @LDAP_LIBS_BE@
 UUID_LIBS = @UUID_LIBS@
 LLVM_LIBS=@LLVM_LIBS@
 LD = @LD@
@@ -744,10 +736,6 @@ PG_CRC32C_OBJS = @PG_CRC32C_OBJS@
 LIBS := -lpgcommon -lpgport $(LIBS)
 
 # to make ws2_32.lib the last library
-
-# Not really standard libc functions, used by the backend.
-TAS         = @TAS@
-
 
 ##########################################################################
 #

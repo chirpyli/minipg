@@ -54,6 +54,9 @@
 /* Define to the default TCP port number as a string constant. */
 #undef DEF_PGPORT_STR
 
+/* Define to build with GSSAPI support. (--with-gssapi) */
+#undef ENABLE_GSS
+
 /* Define to 1 if you want National Language Support. (--enable-nls) */
 #undef ENABLE_NLS
 
@@ -71,6 +74,9 @@
 /* Define to 1 if you have the `append_history' function. */
 #undef HAVE_APPEND_HISTORY
 
+/* Define to 1 if you have the `ASN1_STRING_get0_data' function. */
+#undef HAVE_ASN1_STRING_GET0_DATA
+
 /* Define to 1 if you want to use atomics if available. */
 #undef HAVE_ATOMICS
 
@@ -79,6 +85,9 @@
 
 /* Define to 1 if you have the `backtrace_symbols' function. */
 #undef HAVE_BACKTRACE_SYMBOLS
+
+/* Define to 1 if you have the `BIO_meth_new' function. */
+#undef HAVE_BIO_METH_NEW
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #undef HAVE_CLOCK_GETTIME
@@ -94,6 +103,9 @@
 
 /* Define to 1 if you have the <crtdefs.h> header file. */
 #undef HAVE_CRTDEFS_H
+
+/* Define to 1 if you have the `CRYPTO_lock' function. */
+#undef HAVE_CRYPTO_LOCK
 
 /* Define to 1 if you have the declaration of `fdatasync', and to 0 if you
    don't. */
@@ -258,11 +270,26 @@
 /* Define to 1 if you have the `getrusage' function. */
 #undef HAVE_GETRUSAGE
 
+/* Define to 1 if you have the `gettimeofday' function. */
+#undef HAVE_GETTIMEOFDAY
+
+/* Define to 1 if you have the <gssapi/gssapi.h> header file. */
+#undef HAVE_GSSAPI_GSSAPI_H
+
+/* Define to 1 if you have the <gssapi.h> header file. */
+#undef HAVE_GSSAPI_H
+
 /* Define to 1 if you have the <history.h> header file. */
 #undef HAVE_HISTORY_H
 
 /* Define to 1 if you have the `history_truncate_file' function. */
 #undef HAVE_HISTORY_TRUNCATE_FILE
+
+/* Define to 1 if you have the `HMAC_CTX_free' function. */
+#undef HAVE_HMAC_CTX_FREE
+
+/* Define to 1 if you have the `HMAC_CTX_new' function. */
+#undef HAVE_HMAC_CTX_NEW
 
 /* Define to 1 if you have the <ifaddrs.h> header file. */
 #undef HAVE_IFADDRS_H
@@ -300,17 +327,38 @@
 /* Define to 1 if you have the <langinfo.h> header file. */
 #undef HAVE_LANGINFO_H
 
+/* Define to 1 if you have the <ldap.h> header file. */
+#undef HAVE_LDAP_H
+
+/* Define to 1 if you have the `ldap_initialize' function. */
+#undef HAVE_LDAP_INITIALIZE
+
+/* Define to 1 if you have the `crypto' library (-lcrypto). */
+#undef HAVE_LIBCRYPTO
+
+/* Define to 1 if you have the `ldap' library (-lldap). */
+#undef HAVE_LIBLDAP
+
 /* Define to 1 if you have the `lz4' library (-llz4). */
 #undef HAVE_LIBLZ4
 
 /* Define to 1 if you have the `m' library (-lm). */
 #undef HAVE_LIBM
 
+/* Define to 1 if you have the `pam' library (-lpam). */
+#undef HAVE_LIBPAM
+
 /* Define if you have a function readline library */
 #undef HAVE_LIBREADLINE
 
 /* Define to 1 if you have the `selinux' library (-lselinux). */
 #undef HAVE_LIBSELINUX
+
+/* Define to 1 if you have the `ssl' library (-lssl). */
+#undef HAVE_LIBSSL
+
+/* Define to 1 if you have the `wldap32' library (-lwldap32). */
+#undef HAVE_LIBWLDAP32
 
 /* Define to 1 if you have the `xml2' library (-lxml2). */
 #undef HAVE_LIBXML2
@@ -345,6 +393,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define to 1 if the system has the type `MINIDUMP_TYPE'. */
+#undef HAVE_MINIDUMP_TYPE
+
 /* Define to 1 if you have the `mkdtemp' function. */
 #undef HAVE_MKDTEMP
 
@@ -354,8 +405,14 @@
 /* Define to 1 if you have the <net/if.h> header file. */
 #undef HAVE_NET_IF_H
 
+/* Define to 1 if you have the `OPENSSL_init_ssl' function. */
+#undef HAVE_OPENSSL_INIT_SSL
+
 /* Define to 1 if you have the <ossp/uuid.h> header file. */
 #undef HAVE_OSSP_UUID_H
+
+/* Define to 1 if you have the <pam/pam_appl.h> header file. */
+#undef HAVE_PAM_PAM_APPL_H
 
 /* Define to 1 if you have the `poll' function. */
 #undef HAVE_POLL
@@ -442,6 +499,9 @@
 /* Define to 1 if you have the `rl_reset_screen_size' function. */
 #undef HAVE_RL_RESET_SCREEN_SIZE
 
+/* Define to 1 if you have the <security/pam_appl.h> header file. */
+#undef HAVE_SECURITY_PAM_APPL_H
+
 /* Define to 1 if you have the `setenv' function. */
 #undef HAVE_SETENV
 
@@ -462,6 +522,9 @@
 
 /* Define to 1 if you have the `srandom' function. */
 #undef HAVE_SRANDOM
+
+/* Define to 1 if you have the `SSL_CTX_set_num_tickets' function. */
+#undef HAVE_SSL_CTX_SET_NUM_TICKETS
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -658,8 +721,17 @@
 /* Define to 1 if you have the <wctype.h> header file. */
 #undef HAVE_WCTYPE_H
 
+/* Define to 1 if you have the <winldap.h> header file. */
+#undef HAVE_WINLDAP_H
+
 /* Define to 1 if you have the `writev' function. */
 #undef HAVE_WRITEV
+
+/* Define to 1 if you have the `X509_get_signature_info' function. */
+#undef HAVE_X509_GET_SIGNATURE_INFO
+
+/* Define to 1 if you have the `X509_get_signature_nid' function. */
+#undef HAVE_X509_GET_SIGNATURE_NID
 
 /* Define to 1 if the assembler supports X86_64's POPCNTQ instruction. */
 #undef HAVE_X86_64_POPCNTQ
@@ -697,6 +769,9 @@
 /* Define to 1 if your compiler understands __builtin_unreachable. */
 #undef HAVE__BUILTIN_UNREACHABLE
 
+/* Define to 1 if you have the `_configthreadlocale' function. */
+#undef HAVE__CONFIGTHREADLOCALE
+
 /* Define to 1 if you have __cpuid. */
 #undef HAVE__CPUID
 
@@ -723,6 +798,10 @@
 
 /* Define bytes to use libc memset(). */
 #undef MEMSET_LOOP_LIMIT
+
+/* Define to the OpenSSL API version in use. This avoids deprecation warnings
+   from newer OpenSSL versions. */
+#undef OPENSSL_API_COMPAT
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -755,6 +834,10 @@
 
 /* Define to the name of a signed 64-bit integer type. */
 #undef PG_INT64_TYPE
+
+/* Define to the name of the default PostgreSQL service principal in Kerberos
+   (GSSAPI). (--with-krb-srvnam=NAME) */
+#undef PG_KRB_SRVNAM
 
 /* PostgreSQL major version as a string */
 #undef PG_MAJORVERSION
@@ -831,8 +914,14 @@
 /* Define to 1 to build with Bonjour support. (--with-bonjour) */
 #undef USE_BONJOUR
 
+/* Define to 1 to build with BSD Authentication support. (--with-bsd-auth) */
+#undef USE_BSD_AUTH
+
 /* Define to build with ICU support. (--with-icu) */
 #undef USE_ICU
+
+/* Define to 1 to build with LDAP support. (--with-ldap) */
+#undef USE_LDAP
 
 /* Define to 1 to build with XML support. (--with-libxml) */
 #undef USE_LIBXML
@@ -849,6 +938,12 @@
 
 /* Define to select named POSIX semaphores. */
 #undef USE_NAMED_POSIX_SEMAPHORES
+
+/* Define to 1 to build with OpenSSL support. (--with-ssl=openssl) */
+#undef USE_OPENSSL
+
+/* Define to 1 to build with PAM support. (--with-pam) */
+#undef USE_PAM
 
 /* Define to 1 to use software CRC-32C implementation (slicing-by-8). */
 #undef USE_SLICING_BY_8_CRC32C
@@ -870,6 +965,12 @@
 
 /* Define to select unnamed POSIX semaphores. */
 #undef USE_UNNAMED_POSIX_SEMAPHORES
+
+/* Define to select Win32-style semaphores. */
+#undef USE_WIN32_SEMAPHORES
+
+/* Define to select Win32-style shared memory. */
+#undef USE_WIN32_SHARED_MEMORY
 
 /* Define to 1 if `wcstombs_l' requires <xlocale.h>. */
 #undef WCSTOMBS_L_IN_XLOCALE

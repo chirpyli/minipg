@@ -827,25 +827,11 @@ initialize_environment(void)
 		unsetenv("PGCONNECT_TIMEOUT");
 		unsetenv("PGDATA");
 		unsetenv("PGDATABASE");
-		unsetenv("PGGSSENCMODE");
-		unsetenv("PGGSSLIB");
 		/* PGHOSTADDR, see below */
-		unsetenv("PGKRBSRVNAME");
 		unsetenv("PGPASSFILE");
 		unsetenv("PGPASSWORD");
-		unsetenv("PGREQUIREPEER");
-		unsetenv("PGREQUIRESSL");
 		unsetenv("PGSERVICE");
 		unsetenv("PGSERVICEFILE");
-		unsetenv("PGSSLCERT");
-		unsetenv("PGSSLCRL");
-		unsetenv("PGSSLCRLDIR");
-		unsetenv("PGSSLKEY");
-		unsetenv("PGSSLMAXPROTOCOLVERSION");
-		unsetenv("PGSSLMINPROTOCOLVERSION");
-		unsetenv("PGSSLMODE");
-		unsetenv("PGSSLROOTCERT");
-		unsetenv("PGSSLSNI");
 		unsetenv("PGTARGETSESSIONATTRS");
 		unsetenv("PGUSER");
 		/* PGPORT, see below */

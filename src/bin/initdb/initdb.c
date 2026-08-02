@@ -80,38 +80,11 @@
 extern const char *select_default_timezone(const char *share_path);
 
 static const char *const auth_methods_host[] = {
-	"trust", "reject", "scram-sha-256", "md5", "password", "ident", "radius",
-#ifdef ENABLE_GSS
-	"gss",
-#endif
-#ifdef ENABLE_SSPI
-	"sspi",
-#endif
-#ifdef USE_PAM
-	"pam", "pam ",
-#endif
-#ifdef USE_BSD_AUTH
-	"bsd",
-#endif
-#ifdef USE_LDAP
-	"ldap",
-#endif
-#ifdef USE_SSL
-	"cert",
-#endif
+	"trust", "reject", "scram-sha-256", "password",
 	NULL
 };
 static const char *const auth_methods_local[] = {
-	"trust", "reject", "scram-sha-256", "md5", "password", "peer", "radius",
-#ifdef USE_PAM
-	"pam", "pam ",
-#endif
-#ifdef USE_BSD_AUTH
-	"bsd",
-#endif
-#ifdef USE_LDAP
-	"ldap",
-#endif
+	"trust", "reject", "scram-sha-256", "password",
 	NULL
 };
 
@@ -1169,20 +1142,6 @@ setup_config(void)
 							  "#effective_io_concurrency = 1",
 							  "#effective_io_concurrency = 0");
 #endif
-
-	/*
-	 * Change password_encryption setting to md5 if md5 was chosen as an
-	 * authentication method, unless scram-sha-256 was also chosen.
-	 */
-	if ((strcmp(authmethodlocal, "md5") == 0 &&
-		 strcmp(authmethodhost, "scram-sha-256") != 0) ||
-		(strcmp(authmethodhost, "md5") == 0 &&
-		 strcmp(authmethodlocal, "scram-sha-256") != 0))
-	{
-		conflines = replace_token(conflines,
-								  "#password_encryption = scram-sha-256",
-								  "password_encryption = md5");
-	}
 
 	/*
 	 * If group access has been enabled for the cluster then it makes sense to
@@ -2294,11 +2253,9 @@ check_authmethod_valid(const char *authmethod, const char *const *valid_methods,
 static void
 check_need_password(const char *authmethodlocal, const char *authmethodhost)
 {
-	if ((strcmp(authmethodlocal, "md5") == 0 ||
-		 strcmp(authmethodlocal, "password") == 0 ||
+	if ((strcmp(authmethodlocal, "password") == 0 ||
 		 strcmp(authmethodlocal, "scram-sha-256") == 0) &&
-		(strcmp(authmethodhost, "md5") == 0 ||
-		 strcmp(authmethodhost, "password") == 0 ||
+		(strcmp(authmethodhost, "password") == 0 ||
 		 strcmp(authmethodhost, "scram-sha-256") == 0) &&
 		!(pwprompt || pwfilename))
 	{
@@ -2963,16 +2920,6 @@ main(int argc, char *argv[])
 		{
 			case 'A':
 				authmethodlocal = authmethodhost = pg_strdup(optarg);
-
-				/*
-				 * When ident is specified, use peer for local connections.
-				 * Mirrored, when peer is specified, use ident for TCP/IP
-				 * connections.
-				 */
-				if (strcmp(authmethodhost, "ident") == 0)
-					authmethodlocal = "peer";
-				else if (strcmp(authmethodlocal, "peer") == 0)
-					authmethodhost = "ident";
 				break;
 			case 10:
 				authmethodlocal = pg_strdup(optarg);

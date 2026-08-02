@@ -648,12 +648,8 @@ MSGFMT
 PG_CRC32C_OBJS
 CFLAGS_ARMV8_CRC32C
 CFLAGS_SSE42
-have_win32_dbghelp
 LIBOBJS
 UUID_LIBS
-LDAP_LIBS_BE
-LDAP_LIBS_FE
-with_ssl
 PTHREAD_CFLAGS
 PTHREAD_LIBS
 PTHREAD_CC
@@ -713,10 +709,6 @@ with_uuid
 with_readline
 with_systemd
 with_selinux
-with_ldap
-with_krb_srvnam
-krb_srvtab
-with_gssapi
 with_python
 with_perl
 with_tcl
@@ -729,7 +721,6 @@ autodepend
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
-TAS
 GCC
 CPP
 CFLAGS_SL
@@ -851,11 +842,6 @@ with_tcl
 with_tclconfig
 with_perl
 with_python
-with_gssapi
-with_krb_srvnam
-with_pam
-with_bsd_auth
-with_ldap
 with_bonjour
 with_selinux
 with_systemd
@@ -869,8 +855,6 @@ with_system_tzdata
 with_zlib
 with_lz4
 with_gnu_ld
-with_ssl
-with_openssl
 enable_largefile
 '
       ac_precious_vars='build_alias
@@ -1556,12 +1540,6 @@ Optional Packages:
   --with-tclconfig=DIR    tclConfig.sh is in DIR
   --with-perl             build Perl modules (PL/Perl)
   --with-python           build Python modules (PL/Python)
-  --with-gssapi           build with GSSAPI support
-  --with-krb-srvnam=NAME  default service principal name in Kerberos (GSSAPI)
-                          [postgres]
-  --with-pam              build with PAM support
-  --with-bsd-auth         build with BSD Authentication support
-  --with-ldap             build with LDAP support
   --with-bonjour          build with Bonjour support
   --with-selinux          build with SELinux support
   --with-systemd          build with systemd support
@@ -1577,8 +1555,6 @@ Optional Packages:
   --without-zlib          do not use Zlib
   --with-lz4              build with LZ4 support
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
-  --with-ssl=LIB          use LIB for SSL/TLS support (openssl)
-  --with-openssl          obsolete spelling of --with-ssl=openssl
 
 Some influential environment variables:
   CC          C compiler command
@@ -2975,7 +2951,7 @@ if test "${with_template+set}" = set; then :
 else
 
 # --with-template not given
-# minipg 仅支持 Linux
+# minipg 仅支持 Linux，直接使用 linux 模板
 
 case $host_os in
  linux*|gnu*|k*bsd*-gnu)
@@ -2988,6 +2964,7 @@ minipg 仅支持 Linux 平台。当前检测到的操作系统 \"$host_os\" 不�
      ;;
 esac
 
+
 fi
 
 
@@ -2996,10 +2973,6 @@ fi
 $as_echo "$template" >&6; }
 
 PORTNAME=$template
-
-
-# minipg 仅支持 Linux，不需要 TAS 汇编代码（使用 __sync_lock_test_and_set 内建函数）
-
 
 
 ##
@@ -7798,11 +7771,6 @@ $as_echo "#define PROFILE_PID_DIR 1" >>confdefs.h
   fi
 fi
 
-# We already have this in Makefile.win32, but configure needs it too
-if test "$PORTNAME" = "win32"; then
-  CPPFLAGS="$CPPFLAGS -I$srcdir/src/include/port/win32"
-fi
-
 # Now that we're done automatically adding stuff to C[XX]FLAGS, put back the
 # user-specified flags (if any) at the end.  This lets users override
 # the automatic additions.
@@ -8037,13 +8005,6 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
-
-
-#
-# TAS assembly code not needed on Linux/gcc (uses __sync_lock_test_and_set builtin).
-# minipg 仅支持 Linux，已移除 tas/ 目录与 need_tas/tas_file 机制。
-#
-TAS=""
 
 
 #
@@ -8551,188 +8512,6 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_python" >&5
 $as_echo "$with_python" >&6; }
-
-
-#
-# GSSAPI
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with GSSAPI support" >&5
-$as_echo_n "checking whether to build with GSSAPI support... " >&6; }
-
-
-
-# Check whether --with-gssapi was given.
-if test "${with_gssapi+set}" = set; then :
-  withval=$with_gssapi;
-  case $withval in
-    yes)
-
-
-$as_echo "#define ENABLE_GSS 1" >>confdefs.h
-
-  krb_srvtab="FILE:\$(sysconfdir)/krb5.keytab"
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-gssapi option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_gssapi=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_gssapi" >&5
-$as_echo "$with_gssapi" >&6; }
-
-
-
-
-
-
-#
-# Kerberos configuration parameters
-#
-
-
-
-# Check whether --with-krb-srvnam was given.
-if test "${with_krb_srvnam+set}" = set; then :
-  withval=$with_krb_srvnam;
-  case $withval in
-    yes)
-      as_fn_error $? "argument required for --with-krb-srvnam option" "$LINENO" 5
-      ;;
-    no)
-      as_fn_error $? "argument required for --with-krb-srvnam option" "$LINENO" 5
-      ;;
-    *)
-
-      ;;
-  esac
-
-else
-  with_krb_srvnam="postgres"
-fi
-
-
-
-
-cat >>confdefs.h <<_ACEOF
-#define PG_KRB_SRVNAM "$with_krb_srvnam"
-_ACEOF
-
-
-
-#
-# PAM
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with PAM support" >&5
-$as_echo_n "checking whether to build with PAM support... " >&6; }
-
-
-
-# Check whether --with-pam was given.
-if test "${with_pam+set}" = set; then :
-  withval=$with_pam;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_PAM 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-pam option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_pam=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_pam" >&5
-$as_echo "$with_pam" >&6; }
-
-
-#
-# BSD AUTH
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with BSD Authentication support" >&5
-$as_echo_n "checking whether to build with BSD Authentication support... " >&6; }
-
-
-
-# Check whether --with-bsd-auth was given.
-if test "${with_bsd_auth+set}" = set; then :
-  withval=$with_bsd_auth;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_BSD_AUTH 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-bsd-auth option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_bsd_auth=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_bsd_auth" >&5
-$as_echo "$with_bsd_auth" >&6; }
-
-
-#
-# LDAP
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with LDAP support" >&5
-$as_echo_n "checking whether to build with LDAP support... " >&6; }
-
-
-
-# Check whether --with-ldap was given.
-if test "${with_ldap+set}" = set; then :
-  withval=$with_ldap;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_LDAP 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-ldap option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_ldap=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_ldap" >&5
-$as_echo "$with_ldap" >&6; }
-
 
 
 #
@@ -12911,460 +12690,6 @@ $as_echo "$as_me: WARNING:
 *** Not using atomic operations will cause poor performance." >&2;}
 fi
 
-if test "$with_gssapi" = yes ; then
-  if test "$PORTNAME" != "win32"; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing gss_init_sec_context" >&5
-$as_echo_n "checking for library containing gss_init_sec_context... " >&6; }
-if ${ac_cv_search_gss_init_sec_context+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char gss_init_sec_context ();
-int
-main ()
-{
-return gss_init_sec_context ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' gssapi_krb5 gss 'gssapi -lkrb5 -lcrypto'; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_gss_init_sec_context=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_gss_init_sec_context+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_gss_init_sec_context+:} false; then :
-
-else
-  ac_cv_search_gss_init_sec_context=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_gss_init_sec_context" >&5
-$as_echo "$ac_cv_search_gss_init_sec_context" >&6; }
-ac_res=$ac_cv_search_gss_init_sec_context
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "could not find function 'gss_init_sec_context' required for GSSAPI" "$LINENO" 5
-fi
-
-  else
-    LIBS="$LIBS -lgssapi32"
-  fi
-fi
-
-#
-# SSL Library
-#
-# There is currently only one supported SSL/TLS library: OpenSSL.
-#
-
-
-
-# Check whether --with-ssl was given.
-if test "${with_ssl+set}" = set; then :
-  withval=$with_ssl;
-  case $withval in
-    yes)
-      as_fn_error $? "argument required for --with-ssl option" "$LINENO" 5
-      ;;
-    no)
-      as_fn_error $? "argument required for --with-ssl option" "$LINENO" 5
-      ;;
-    *)
-
-      ;;
-  esac
-
-fi
-
-
-if test x"$with_ssl" = x"" ; then
-  with_ssl=no
-fi
-
-
-
-# Check whether --with-openssl was given.
-if test "${with_openssl+set}" = set; then :
-  withval=$with_openssl;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-openssl option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_openssl=no
-
-fi
-
-
-if test "$with_openssl" = yes ; then
-  with_ssl=openssl
-fi
-
-if test "$with_ssl" = openssl ; then
-    # Minimum required OpenSSL version is 1.0.1
-
-$as_echo "#define OPENSSL_API_COMPAT 0x10001000L" >>confdefs.h
-
-  if test "$PORTNAME" != "win32"; then
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for CRYPTO_new_ex_data in -lcrypto" >&5
-$as_echo_n "checking for CRYPTO_new_ex_data in -lcrypto... " >&6; }
-if ${ac_cv_lib_crypto_CRYPTO_new_ex_data+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lcrypto  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char CRYPTO_new_ex_data ();
-int
-main ()
-{
-return CRYPTO_new_ex_data ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_crypto_CRYPTO_new_ex_data=yes
-else
-  ac_cv_lib_crypto_CRYPTO_new_ex_data=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_crypto_CRYPTO_new_ex_data" >&5
-$as_echo "$ac_cv_lib_crypto_CRYPTO_new_ex_data" >&6; }
-if test "x$ac_cv_lib_crypto_CRYPTO_new_ex_data" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBCRYPTO 1
-_ACEOF
-
-  LIBS="-lcrypto $LIBS"
-
-else
-  as_fn_error $? "library 'crypto' is required for OpenSSL" "$LINENO" 5
-fi
-
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_new in -lssl" >&5
-$as_echo_n "checking for SSL_new in -lssl... " >&6; }
-if ${ac_cv_lib_ssl_SSL_new+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lssl  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char SSL_new ();
-int
-main ()
-{
-return SSL_new ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ssl_SSL_new=yes
-else
-  ac_cv_lib_ssl_SSL_new=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_new" >&5
-$as_echo "$ac_cv_lib_ssl_SSL_new" >&6; }
-if test "x$ac_cv_lib_ssl_SSL_new" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBSSL 1
-_ACEOF
-
-  LIBS="-lssl $LIBS"
-
-else
-  as_fn_error $? "library 'ssl' is required for OpenSSL" "$LINENO" 5
-fi
-
-  else
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing CRYPTO_new_ex_data" >&5
-$as_echo_n "checking for library containing CRYPTO_new_ex_data... " >&6; }
-if ${ac_cv_search_CRYPTO_new_ex_data+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char CRYPTO_new_ex_data ();
-int
-main ()
-{
-return CRYPTO_new_ex_data ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' eay32 crypto; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_CRYPTO_new_ex_data=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_CRYPTO_new_ex_data+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_CRYPTO_new_ex_data+:} false; then :
-
-else
-  ac_cv_search_CRYPTO_new_ex_data=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_CRYPTO_new_ex_data" >&5
-$as_echo "$ac_cv_search_CRYPTO_new_ex_data" >&6; }
-ac_res=$ac_cv_search_CRYPTO_new_ex_data
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "library 'eay32' or 'crypto' is required for OpenSSL" "$LINENO" 5
-fi
-
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing SSL_new" >&5
-$as_echo_n "checking for library containing SSL_new... " >&6; }
-if ${ac_cv_search_SSL_new+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char SSL_new ();
-int
-main ()
-{
-return SSL_new ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' ssleay32 ssl; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_SSL_new=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_SSL_new+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_SSL_new+:} false; then :
-
-else
-  ac_cv_search_SSL_new=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_SSL_new" >&5
-$as_echo "$ac_cv_search_SSL_new" >&6; }
-ac_res=$ac_cv_search_SSL_new
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-else
-  as_fn_error $? "library 'ssleay32' or 'ssl' is required for OpenSSL" "$LINENO" 5
-fi
-
-  fi
-  # Function introduced in OpenSSL 1.0.2.
-  for ac_func in X509_get_signature_nid
-do :
-  ac_fn_c_check_func "$LINENO" "X509_get_signature_nid" "ac_cv_func_X509_get_signature_nid"
-if test "x$ac_cv_func_X509_get_signature_nid" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_X509_GET_SIGNATURE_NID 1
-_ACEOF
-
-fi
-done
-
-  # Functions introduced in OpenSSL 1.1.0. We used to check for
-  # OPENSSL_VERSION_NUMBER, but that didn't work with 1.1.0, because LibreSSL
-  # defines OPENSSL_VERSION_NUMBER to claim version 2.0.0, even though it
-  # doesn't have these OpenSSL 1.1.0 functions. So check for individual
-  # functions.
-  for ac_func in OPENSSL_init_ssl BIO_meth_new ASN1_STRING_get0_data HMAC_CTX_new HMAC_CTX_free
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
-if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
-  # OpenSSL versions before 1.1.0 required setting callback functions, for
-  # thread-safety. In 1.1.0, it's no longer required, and CRYPTO_lock()
-  # function was removed.
-  for ac_func in CRYPTO_lock
-do :
-  ac_fn_c_check_func "$LINENO" "CRYPTO_lock" "ac_cv_func_CRYPTO_lock"
-if test "x$ac_cv_func_CRYPTO_lock" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_CRYPTO_LOCK 1
-_ACEOF
-
-fi
-done
-
-  # Function introduced in OpenSSL 1.1.1.
-  for ac_func in X509_get_signature_info SSL_CTX_set_num_tickets
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
-if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
-
-$as_echo "#define USE_OPENSSL 1" >>confdefs.h
-
-elif test "$with_ssl" != no ; then
-  as_fn_error $? "--with-ssl must specify openssl" "$LINENO" 5
-fi
-
-
-if test "$with_pam" = yes ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pam_start in -lpam" >&5
-$as_echo_n "checking for pam_start in -lpam... " >&6; }
-if ${ac_cv_lib_pam_pam_start+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lpam  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char pam_start ();
-int
-main ()
-{
-return pam_start ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_pam_pam_start=yes
-else
-  ac_cv_lib_pam_pam_start=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pam_pam_start" >&5
-$as_echo "$ac_cv_lib_pam_pam_start" >&6; }
-if test "x$ac_cv_lib_pam_pam_start" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBPAM 1
-_ACEOF
-
-  LIBS="-lpam $LIBS"
-
-else
-  as_fn_error $? "library 'pam' is required for PAM" "$LINENO" 5
-fi
-
-fi
-
 if test "$with_libxml" = yes ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for xmlSaveToBuffer in -lxml2" >&5
 $as_echo_n "checking for xmlSaveToBuffer in -lxml2... " >&6; }
@@ -13514,187 +12839,6 @@ else
 fi
 
 fi
-
-# Note: We can test for libldap_r only after we know PTHREAD_LIBS;
-# also, on AIX, we may need to have openssl in LIBS for this step.
-if test "$with_ldap" = yes ; then
-  _LIBS="$LIBS"
-  if test "$PORTNAME" != "win32"; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ldap_bind in -lldap" >&5
-$as_echo_n "checking for ldap_bind in -lldap... " >&6; }
-if ${ac_cv_lib_ldap_ldap_bind+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lldap $EXTRA_LDAP_LIBS $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ldap_bind ();
-int
-main ()
-{
-return ldap_bind ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ldap_ldap_bind=yes
-else
-  ac_cv_lib_ldap_ldap_bind=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ldap_ldap_bind" >&5
-$as_echo "$ac_cv_lib_ldap_ldap_bind" >&6; }
-if test "x$ac_cv_lib_ldap_ldap_bind" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBLDAP 1
-_ACEOF
-
-  LIBS="-lldap $LIBS"
-
-else
-  as_fn_error $? "library 'ldap' is required for LDAP" "$LINENO" 5
-fi
-
-    LDAP_LIBS_BE="-lldap $EXTRA_LDAP_LIBS"
-    # This test is carried out against libldap.
-    for ac_func in ldap_initialize
-do :
-  ac_fn_c_check_func "$LINENO" "ldap_initialize" "ac_cv_func_ldap_initialize"
-if test "x$ac_cv_func_ldap_initialize" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LDAP_INITIALIZE 1
-_ACEOF
-
-fi
-done
-
-    # The separate ldap_r library only exists in OpenLDAP < 2.5, and if we
-    # have 2.5 or later, we shouldn't even probe for ldap_r (we might find a
-    # library from a separate OpenLDAP installation).  The most reliable
-    # way to check that is to check for a function introduced in 2.5.
-    ac_fn_c_check_func "$LINENO" "ldap_verify_credentials" "ac_cv_func_ldap_verify_credentials"
-if test "x$ac_cv_func_ldap_verify_credentials" = xyes; then :
-  thread_safe_libldap=yes
-else
-  thread_safe_libldap=no
-fi
-
-    if test "$enable_thread_safety" = yes -a "$thread_safe_libldap" = no; then
-      # Use ldap_r for FE if available, else assume ldap is thread-safe.
-      # On some platforms ldap_r fails to link without PTHREAD_LIBS.
-      LIBS="$_LIBS"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ldap_bind in -lldap_r" >&5
-$as_echo_n "checking for ldap_bind in -lldap_r... " >&6; }
-if ${ac_cv_lib_ldap_r_ldap_bind+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lldap_r $PTHREAD_CFLAGS $PTHREAD_LIBS $EXTRA_LDAP_LIBS $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ldap_bind ();
-int
-main ()
-{
-return ldap_bind ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ldap_r_ldap_bind=yes
-else
-  ac_cv_lib_ldap_r_ldap_bind=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ldap_r_ldap_bind" >&5
-$as_echo "$ac_cv_lib_ldap_r_ldap_bind" >&6; }
-if test "x$ac_cv_lib_ldap_r_ldap_bind" = xyes; then :
-  LDAP_LIBS_FE="-lldap_r $EXTRA_LDAP_LIBS"
-else
-  LDAP_LIBS_FE="-lldap $EXTRA_LDAP_LIBS"
-fi
-
-    else
-      LDAP_LIBS_FE="-lldap $EXTRA_LDAP_LIBS"
-    fi
-  else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ldap_bind in -lwldap32" >&5
-$as_echo_n "checking for ldap_bind in -lwldap32... " >&6; }
-if ${ac_cv_lib_wldap32_ldap_bind+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lwldap32  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ldap_bind ();
-int
-main ()
-{
-return ldap_bind ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_wldap32_ldap_bind=yes
-else
-  ac_cv_lib_wldap32_ldap_bind=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_wldap32_ldap_bind" >&5
-$as_echo "$ac_cv_lib_wldap32_ldap_bind" >&6; }
-if test "x$ac_cv_lib_wldap32_ldap_bind" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBWLDAP32 1
-_ACEOF
-
-  LIBS="-lwldap32 $LIBS"
-
-else
-  as_fn_error $? "library 'wldap32' is required for LDAP" "$LINENO" 5
-fi
-
-    LDAP_LIBS_FE="-lwldap32"
-    LDAP_LIBS_BE="-lwldap32"
-  fi
-  LIBS="$_LIBS"
-fi
-
-
 
 # for contrib/sepgsql
 if test "$with_selinux" = yes; then
@@ -14152,96 +13296,6 @@ done
 
 fi
 
-if test "$with_gssapi" = yes ; then
-  for ac_header in gssapi/gssapi.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "gssapi/gssapi.h" "ac_cv_header_gssapi_gssapi_h" "$ac_includes_default"
-if test "x$ac_cv_header_gssapi_gssapi_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_GSSAPI_GSSAPI_H 1
-_ACEOF
-
-else
-  for ac_header in gssapi.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "gssapi.h" "ac_cv_header_gssapi_h" "$ac_includes_default"
-if test "x$ac_cv_header_gssapi_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_GSSAPI_H 1
-_ACEOF
-
-else
-  as_fn_error $? "gssapi.h header file is required for GSSAPI" "$LINENO" 5
-fi
-
-done
-
-fi
-
-done
-
-fi
-
-if test "$with_ssl" = openssl ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/ssl.h" "ac_cv_header_openssl_ssl_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_ssl_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <openssl/ssl.h> is required for OpenSSL" "$LINENO" 5
-fi
-
-
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/err.h" "ac_cv_header_openssl_err_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_err_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <openssl/err.h> is required for OpenSSL" "$LINENO" 5
-fi
-
-
-fi
-
-if test "$with_pam" = yes ; then
-  for ac_header in security/pam_appl.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "security/pam_appl.h" "ac_cv_header_security_pam_appl_h" "$ac_includes_default"
-if test "x$ac_cv_header_security_pam_appl_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_SECURITY_PAM_APPL_H 1
-_ACEOF
-
-else
-  for ac_header in pam/pam_appl.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "pam/pam_appl.h" "ac_cv_header_pam_pam_appl_h" "$ac_includes_default"
-if test "x$ac_cv_header_pam_pam_appl_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_PAM_PAM_APPL_H 1
-_ACEOF
-
-else
-  as_fn_error $? "header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM." "$LINENO" 5
-fi
-
-done
-
-fi
-
-done
-
-fi
-
-if test "$with_bsd_auth" = yes ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "bsd_auth.h" "ac_cv_header_bsd_auth_h" "$ac_includes_default"
-if test "x$ac_cv_header_bsd_auth_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <bsd_auth.h> is required for BSD Authentication support" "$LINENO" 5
-fi
-
-
-fi
-
 if test "$with_systemd" = yes ; then
   ac_fn_c_check_header_mongrel "$LINENO" "systemd/sd-daemon.h" "ac_cv_header_systemd_sd_daemon_h" "$ac_includes_default"
 if test "x$ac_cv_header_systemd_sd_daemon_h" = xyes; then :
@@ -14273,84 +13327,6 @@ else
 fi
 
 
-fi
-
-if test "$with_ldap" = yes ; then
-  if test "$PORTNAME" != "win32"; then
-     for ac_header in ldap.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "ldap.h" "ac_cv_header_ldap_h" "$ac_includes_default"
-if test "x$ac_cv_header_ldap_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LDAP_H 1
-_ACEOF
-
-else
-  as_fn_error $? "header file <ldap.h> is required for LDAP" "$LINENO" 5
-fi
-
-done
-
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for compatible LDAP implementation" >&5
-$as_echo_n "checking for compatible LDAP implementation... " >&6; }
-if ${pgac_cv_ldap_safe+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <ldap.h>
-#if !defined(LDAP_VENDOR_VERSION) || \
-     (defined(LDAP_API_FEATURE_X_OPENLDAP) && \
-      LDAP_VENDOR_VERSION >= 20424 && LDAP_VENDOR_VERSION <= 20431)
-choke me
-#endif
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  pgac_cv_ldap_safe=yes
-else
-  pgac_cv_ldap_safe=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $pgac_cv_ldap_safe" >&5
-$as_echo "$pgac_cv_ldap_safe" >&6; }
-
-if test "$pgac_cv_ldap_safe" != yes; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
-*** With OpenLDAP versions 2.4.24 through 2.4.31, inclusive, each backend
-*** process that loads libpq (via WAL receiver, dblink, or postgres_fdw) and
-*** also uses LDAP will crash on exit." >&5
-$as_echo "$as_me: WARNING:
-*** With OpenLDAP versions 2.4.24 through 2.4.31, inclusive, each backend
-*** process that loads libpq (via WAL receiver, dblink, or postgres_fdw) and
-*** also uses LDAP will crash on exit." >&2;}
-fi
-  else
-     for ac_header in winldap.h
-do :
-  ac_fn_c_check_header_compile "$LINENO" "winldap.h" "ac_cv_header_winldap_h" "$ac_includes_default
-#include <windows.h>
-
-"
-if test "x$ac_cv_header_winldap_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_WINLDAP_H 1
-_ACEOF
-
-else
-  as_fn_error $? "header file <winldap.h> is required for LDAP" "$LINENO" 5
-fi
-
-done
-
-  fi
 fi
 
 if test "$with_bonjour" = yes ; then
@@ -15634,7 +14610,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -15680,7 +14656,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -15704,7 +14680,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -15749,7 +14725,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -15773,7 +14749,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -17034,35 +16010,7 @@ fi
 
 fi
 
-if test "$PORTNAME" = "win32" -o "$PORTNAME" = "cygwin"; then
-	# Cygwin and (apparently, based on test results) Mingw both
-	# have a broken strtof(), so substitute the same replacement
-	# code we use with VS2013. That's not a perfect fix, since
-	# (unlike with VS2013) it doesn't avoid double-rounding, but
-	# we have no better options. To get that, though, we have to
-	# force the file to be compiled despite HAVE_STRTOF.
-	case " $LIBOBJS " in
-  *" strtof.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS strtof.$ac_objext"
- ;;
-esac
-
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: On $host_os we will use our strtof wrapper." >&5
-$as_echo "$as_me: On $host_os we will use our strtof wrapper." >&6;}
-fi
-
 case $host_os in
-        # Windows uses a specialised env handler
-        mingw*)
-
-$as_echo "#define HAVE_SETENV 1" >>confdefs.h
-
-
-$as_echo "#define HAVE_UNSETENV 1" >>confdefs.h
-
-                ac_cv_func_setenv=yes
-                ac_cv_func_unsetenv=yes
-                ;;
         *)
                 ac_fn_c_check_func "$LINENO" "setenv" "ac_cv_func_setenv"
 if test "x$ac_cv_func_setenv" = xyes; then :
@@ -17153,155 +16101,6 @@ if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
   case " $LIBOBJS " in
   *" getopt.$ac_objext "* ) ;;
   *) LIBOBJS="$LIBOBJS getopt.$ac_objext"
- ;;
-esac
-
-fi
-
-# mingw has adopted a GNU-centric interpretation of optind/optreset,
-# so always use our version on Windows.
-if test "$PORTNAME" = "win32"; then
-  case " $LIBOBJS " in
-  *" getopt.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" getopt_long.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt_long.$ac_objext"
- ;;
-esac
-
-fi
-
-# Win32 (really MinGW) support
-if test "$PORTNAME" = "win32"; then
-  for ac_func in _configthreadlocale
-do :
-  ac_fn_c_check_func "$LINENO" "_configthreadlocale" "ac_cv_func__configthreadlocale"
-if test "x$ac_cv_func__configthreadlocale" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE__CONFIGTHREADLOCALE 1
-_ACEOF
-
-fi
-done
-
-  ac_fn_c_check_func "$LINENO" "gettimeofday" "ac_cv_func_gettimeofday"
-if test "x$ac_cv_func_gettimeofday" = xyes; then :
-  $as_echo "#define HAVE_GETTIMEOFDAY 1" >>confdefs.h
-
-else
-  case " $LIBOBJS " in
-  *" gettimeofday.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS gettimeofday.$ac_objext"
- ;;
-esac
-
-fi
-
-
-  case " $LIBOBJS " in
-  *" dirmod.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS dirmod.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" kill.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS kill.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" open.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS open.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" system.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS system.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32common.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32common.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32env.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32env.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32error.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32error.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32ntdll.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32ntdll.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32security.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32security.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32setlocale.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32setlocale.$ac_objext"
- ;;
-esac
-
-  case " $LIBOBJS " in
-  *" win32stat.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS win32stat.$ac_objext"
- ;;
-esac
-
-
-$as_echo "#define HAVE_SYMLINK 1" >>confdefs.h
-
-  ac_fn_c_check_type "$LINENO" "MINIDUMP_TYPE" "ac_cv_type_MINIDUMP_TYPE" "
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <string.h>
-#include <dbghelp.h>
-"
-if test "x$ac_cv_type_MINIDUMP_TYPE" = xyes; then :
-
-cat >>confdefs.h <<_ACEOF
-#define HAVE_MINIDUMP_TYPE 1
-_ACEOF
-
-pgac_minidump_type=yes
-else
-  pgac_minidump_type=no
-fi
-
-fi
-if test x"$pgac_minidump_type" = x"yes" ; then
-  have_win32_dbghelp=yes
-
-else
-  have_win32_dbghelp=no
-
-fi
-
-# Cygwin needs only a bit of that
-if test "$PORTNAME" = "cygwin"; then
-  case " $LIBOBJS " in
-  *" dirmod.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS dirmod.$ac_objext"
  ;;
 esac
 
@@ -19203,11 +18002,6 @@ $as_echo "#define USE_SYSV_SEMAPHORES 1" >>confdefs.h
   fi
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $sematype" >&5
 $as_echo "$sematype" >&6; }
-else
-
-$as_echo "#define USE_WIN32_SEMAPHORES 1" >>confdefs.h
-
-  SEMA_IMPLEMENTATION="src/backend/port/win32_sema.c"
 fi
 
 
@@ -19217,25 +18011,12 @@ if test "$PORTNAME" != "win32"; then
 $as_echo "#define USE_SYSV_SHARED_MEMORY 1" >>confdefs.h
 
   SHMEM_IMPLEMENTATION="src/backend/port/sysv_shmem.c"
-else
-
-$as_echo "#define USE_WIN32_SHARED_MEMORY 1" >>confdefs.h
-
-  SHMEM_IMPLEMENTATION="src/backend/port/win32_shmem.c"
 fi
 
-# Select random number source. If a TLS library is used then it will be the
-# first choice, else the native platform sources (Windows API or /dev/urandom)
-# will be used.
+# Select random number source.  /dev/urandom is the only supported source.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking which random number source to use" >&5
 $as_echo_n "checking which random number source to use... " >&6; }
-if test x"$with_ssl" = x"openssl" ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: OpenSSL" >&5
-$as_echo "OpenSSL" >&6; }
-elif test x"$PORTNAME" = x"win32" ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: Windows native" >&5
-$as_echo "Windows native" >&6; }
-elif test x"$cross_compiling" = x"yes"; then
+if test x"$cross_compiling" = x"yes"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: assuming /dev/urandom" >&5
 $as_echo "assuming /dev/urandom" >&6; }
 else
@@ -19264,7 +18045,7 @@ fi
   if test x"$ac_cv_file__dev_urandom" = x"no" ; then
     as_fn_error $? "
 no source of strong random numbers was found
-PostgreSQL can use OpenSSL, native Windows API or /dev/urandom as a source of random numbers." "$LINENO" 5
+PostgreSQL requires /dev/urandom as a source of random numbers." "$LINENO" 5
   fi
 fi
 
@@ -20240,19 +19021,13 @@ ac_config_files="$ac_config_files GNUmakefile src/Makefile.global"
 ac_config_links="$ac_config_links src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
 
 
-if test "$PORTNAME" = "win32"; then
-ac_config_commands="$ac_config_commands check_win32_symlinks"
-
-fi
-
 ac_config_headers="$ac_config_headers src/include/pg_config.h"
 
 
 ac_config_headers="$ac_config_headers src/include/pg_config_ext.h"
 
 
-# ecpg_config.h 已随 ecpg 裁剪移除（minipg 阶段 2）
-
+# ecpg_config.h 的 AC_CONFIG_HEADERS 已移除：ecpg 在 minipg 裁剪（阶段 2）中删除。
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -20789,7 +19564,6 @@ cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
 config_files="$ac_config_files"
 config_headers="$ac_config_headers"
 config_links="$ac_config_links"
-config_commands="$ac_config_commands"
 
 _ACEOF
 
@@ -20821,9 +19595,6 @@ $config_headers
 
 Configuration links:
 $config_links
-
-Configuration commands:
-$config_commands
 
 Report bugs to <pgsql-bugs@lists.postgresql.org>.
 PostgreSQL home page: <https://www.postgresql.org/>."
@@ -20956,17 +19727,14 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    # tas.s 已移除（minipg 仅支持 Linux，不需要 TAS 汇编）
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "src/backend/port/pg_sema.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION}" ;;
     "src/backend/port/pg_shmem.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION}" ;;
     "src/include/pg_config_os.h") CONFIG_LINKS="$CONFIG_LINKS src/include/pg_config_os.h:src/include/port/${template}.h" ;;
     "src/Makefile.port") CONFIG_LINKS="$CONFIG_LINKS src/Makefile.port:src/makefiles/Makefile.${template}" ;;
-    "check_win32_symlinks") CONFIG_COMMANDS="$CONFIG_COMMANDS check_win32_symlinks" ;;
     "src/include/pg_config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/include/pg_config.h" ;;
     "src/include/pg_config_ext.h") CONFIG_HEADERS="$CONFIG_HEADERS src/include/pg_config_ext.h" ;;
-    # ecpg_config.h 已随 ecpg 裁剪移除
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -20981,7 +19749,6 @@ if $ac_need_defaults; then
   test "${CONFIG_FILES+set}" = set || CONFIG_FILES=$config_files
   test "${CONFIG_HEADERS+set}" = set || CONFIG_HEADERS=$config_headers
   test "${CONFIG_LINKS+set}" = set || CONFIG_LINKS=$config_links
-  test "${CONFIG_COMMANDS+set}" = set || CONFIG_COMMANDS=$config_commands
 fi
 
 # Have a temporary directory for convenience.  Make it in the build tree
@@ -21278,7 +20045,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 fi # test -n "$CONFIG_HEADERS"
 
 
-eval set X "  :F $CONFIG_FILES  :H $CONFIG_HEADERS  :L $CONFIG_LINKS  :C $CONFIG_COMMANDS"
+eval set X "  :F $CONFIG_FILES  :H $CONFIG_HEADERS  :L $CONFIG_LINKS  "
 shift
 for ac_tag
 do
@@ -21553,23 +20320,11 @@ $as_echo "$as_me: linking $ac_source to $ac_file" >&6;}
       as_fn_error $? "cannot link or copy $ac_source to $ac_file" "$LINENO" 5
   fi
  ;;
-  :C)  { $as_echo "$as_me:${as_lineno-$LINENO}: executing $ac_file commands" >&5
-$as_echo "$as_me: executing $ac_file commands" >&6;}
- ;;
+
   esac
 
 
   case $ac_file$ac_mode in
-    "check_win32_symlinks":C)
-# Links sometimes fail undetected on Mingw -
-# so here we detect it and warn the user
-for FILE in $CONFIG_LINKS
- do
-	# test -e works for symlinks in the MinGW console
-	test -e `expr "$FILE" : '\([^:]*\)'` || { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** link for $FILE -- please fix by hand" >&5
-$as_echo "$as_me: WARNING: *** link for $FILE -- please fix by hand" >&2;}
- done
- ;;
     "src/include/pg_config.h":H)
 # Update timestamp for pg_config.h (see Makefile.global)
 echo >src/include/stamp-h
@@ -21578,7 +20333,6 @@ echo >src/include/stamp-h
 # Update timestamp for pg_config_ext.h (see Makefile.global)
 echo >src/include/stamp-ext-h
  ;;
-    # ecpg_config.h 已随 ecpg 裁剪移除
 
   esac
 done # for ac_tag

@@ -248,9 +248,6 @@ help(const char *progname)
 	printf(_("  -h HOSTNAME        host name or IP address to listen on\n"));
 	printf(_("  -i                 enable TCP/IP connections\n"));
 	printf(_("  -k DIRECTORY       Unix-domain socket location\n"));
-#ifdef USE_SSL
-	printf(_("  -l                 enable SSL connections\n"));
-#endif
 	printf(_("  -N MAX-CONNECT     maximum number of allowed connections\n"));
 	printf(_("  -p PORT            port number to listen on\n"));
 	printf(_("  -s                 show statistics after each query\n"));
