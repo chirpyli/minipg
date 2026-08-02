@@ -289,3 +289,43 @@
 
 **注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成（与 PG14 要求一致）。`src/Makefile` 的 `install-local` 原会安装已删除的 `nls-global.mk`，已一并移除该行，`make install`/`make check-world` 的 temp-install 阶段不再报错。
 
+
+## 裁剪：彻底移除 ICU（International Components for Unicode）支持
+
+**目的**：minipg 仅支持 Unix/Linux 固定环境，ICU 解决的"跨 OS 版本排序可移植/可复现"问题在此场景下价值很低，而其代价（外部 libicu 依赖、二进制膨胀、构建复杂度、大量条件编译分支）对精简目标是负担。本次按用户确认**彻底删除**（含 `--with-icu` 配置选项、COLLPROVIDER_ICU 枚举、所有 USE_ICU 代码分支、icu_to_uchar/icu_from_uchar 辅助函数、pg_enc2icu_tbl 编码映射表、相关回归测试）。
+
+**删除的配置开关与构建文件**：
+- `configure.ac`：删 `PGAC_ARG_OPTARG(with, icu, ...)` 段、`PGAC_CHECK_ICU` 调用、`ICU_CFLAGS`/`ICU_LIBS` 变量与 `with_icu` 结果写入；`src/include/pg_config.h.in` 删 `#undef USE_ICU`
+- `configure`（autoconf 2.69 重生成）：删 ICU 检测块、`--with-icu` help 文本、ICU_CFLAGS/ICU_LIBS/with_icu 变量声明
+- `src/Makefile.global.in`：删 `with_icu = @with_icu@` 与 ICU 链接变量
+- `src/include/pg_config.h`：删 `#undef USE_ICU` 及注释
+
+**删除的数据结构与枚举**：
+- `pg_collation.h` / `pg_collation_d.h`：删 `COLLPROVIDER_ICU 'i'` 枚举值
+- `pg_wchar.h`：删 `is_encoding_supported_by_icu` / `get_encoding_name_for_icu` 声明
+- `encnames.c`：删 `pg_enc2icu_tbl[]` 表、`is_encoding_supported_by_icu` / `get_encoding_name_for_icu` 定义
+
+**修改的 backend 文件（删 USE_ICU / COLLPROVIDER_ICU 分支，保留 libc 路径）**：
+- `pg_locale.c`：删 ucnv.h include、icu_set_collation_attributes 前向声明、icu_to_uchar/icu_from_uchar/init_icu_converter/icu_set_collation_attributes 整段实现；`pg_newlocale_from_collation` 删 COLLPROVIDER_ICU 分支（保留 libc/error）；`get_collation_actual_version` 删 ICU 分支
+- `varlena.c`：`varstr_cmp`/`varstrfastcmp_locale`/`varstr_abbrev_convert` 删 ICU sort-key 路径（ucol_strcollUTF8/ucol_getSortKey/ucol_nextSortKeyPart/icu_to_uchar），统一走 strcoll_l/strxfrm_l
+- `formatting.c`：删 unicode/ustring.h include、ICU 辅助函数块、str_initcap/str_lower/str_upper 内 ICU 分支
+- `varchar.c`：`hashbpchar`/`bpchar` 比较删 ICU 分支
+- `hashfunc.c`：`hashbpchar`/`hashtextextended` 删 ICU sort-key 分支（非确定性 collation 仅 ICU 支持，删后走报错路径）
+- `regc_pg_locale.c`：删 `PG_REGEX_LOCALE_ICU` 枚举值及 13 处 case 分支（u_isalpha/u_isupper/u_islower 等）
+- `collationcmds.c`：删 "icu" provider 解析、"icu" collencoding 分支、`get_icu_language_tag`/`get_icu_locale_comment` 整段、pg_import_system_collations 内 ICU 检测块、ucol_countAvailable 导入循环；nondeterministic 检查简化为无条件报错
+- `namespace.c`：`FindDefaultCollation` 删 ICU 编码判定分支
+- `like.c` / `like_support.c`：删 COLLPROVIDER_ICU 分支（统一多字节/isalpha_l 判断）
+
+**修改的前端/其他文件**：
+- `psql/describe.c`：删除 `\dC` 中 `WHEN 'i' THEN 'icu'` 显示分支
+- 回归测试：`src/test/regress/sql/collate.icu.utf8.sql`、`expected/collate.icu.utf8.out`、`expected/collate.icu.utf8_1.out`、`results/collate.icu.utf8.out` 四个文件删除；`parallel_schedule` 移除 `collate.icu.utf8` 调度项
+
+**行为变化**：
+- 创建 collation 不再支持 `provider='icu'`；指定会报 `unrecognized collation provider: icu`
+- 不再支持 ICU collation 的 nondeterministic（大小写/重音不敏感）语义，相关 CREATE 直接报错
+- 排序/哈希/正则/格式化全部走 libc locale，语义随 glibc 版本确定（固定环境下稳定）
+- 二进制不再链接 libicu
+
+**验证**：`./configure --without-icu` + `make -j` 全量编译通过（exit 0，无 error/warning）；`make check` 215 项、`make check-world` 全量通过（exit 0）。全仓库扫描 `USE_ICU`/`COLLPROVIDER_ICU`/`icu_to_uchar`/`pg_enc2icu_tbl` 等功能符号残留为 0 处（仅注释中的说明文字已同步清理）。
+
+**注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成。

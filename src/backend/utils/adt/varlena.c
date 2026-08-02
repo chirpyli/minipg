@@ -1635,55 +1635,12 @@ varstr_cmp(const char *arg1, int len1, const char *arg2, int len2, Oid collid)
 
 		if (mylocale)
 		{
-			if (mylocale->provider == COLLPROVIDER_ICU)
-			{
-#ifdef USE_ICU
-#ifdef HAVE_UCOL_STRCOLLUTF8
-				if (GetDatabaseEncoding() == PG_UTF8)
-				{
-					UErrorCode	status;
-
-					status = U_ZERO_ERROR;
-					result = ucol_strcollUTF8(mylocale->info.icu.ucol,
-											  arg1, len1,
-											  arg2, len2,
-											  &status);
-					if (U_FAILURE(status))
-						ereport(ERROR,
-								(errmsg("collation failed: %s", u_errorName(status))));
-				}
-				else
-#endif
-				{
-					int32_t		ulen1,
-								ulen2;
-					UChar	   *uchar1,
-							   *uchar2;
-
-					ulen1 = icu_to_uchar(&uchar1, arg1, len1);
-					ulen2 = icu_to_uchar(&uchar2, arg2, len2);
-
-					result = ucol_strcoll(mylocale->info.icu.ucol,
-										  uchar1, ulen1,
-										  uchar2, ulen2);
-
-					pfree(uchar1);
-					pfree(uchar2);
-				}
-#else							/* not USE_ICU */
-				/* shouldn't happen */
-				elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
-#endif							/* not USE_ICU */
-			}
-			else
-			{
 #ifdef HAVE_LOCALE_T
-				result = strcoll_l(a1p, a2p, mylocale->info.lt);
+			result = strcoll_l(a1p, a2p, mylocale->info.lt);
 #else
-				/* shouldn't happen */
-				elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
+			/* shouldn't happen */
+			elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
 #endif
-			}
 		}
 		else
 			result = strcoll(a1p, a2p);
@@ -2058,7 +2015,7 @@ varstr_sortsupport(SortSupport ssup, Oid typid, Oid collid)
 	 * platforms.
 	 */
 #ifndef TRUST_STRXFRM
-	if (!collate_c && !(locale && locale->provider == COLLPROVIDER_ICU))
+	if (!collate_c)
 		abbreviate = false;
 #endif
 
@@ -2333,55 +2290,12 @@ varstrfastcmp_locale(char *a1p, int len1, char *a2p, int len2, SortSupport ssup)
 
 	if (sss->locale)
 	{
-		if (sss->locale->provider == COLLPROVIDER_ICU)
-		{
-#ifdef USE_ICU
-#ifdef HAVE_UCOL_STRCOLLUTF8
-			if (GetDatabaseEncoding() == PG_UTF8)
-			{
-				UErrorCode	status;
-
-				status = U_ZERO_ERROR;
-				result = ucol_strcollUTF8(sss->locale->info.icu.ucol,
-										  a1p, len1,
-										  a2p, len2,
-										  &status);
-				if (U_FAILURE(status))
-					ereport(ERROR,
-							(errmsg("collation failed: %s", u_errorName(status))));
-			}
-			else
-#endif
-			{
-				int32_t		ulen1,
-							ulen2;
-				UChar	   *uchar1,
-						   *uchar2;
-
-				ulen1 = icu_to_uchar(&uchar1, a1p, len1);
-				ulen2 = icu_to_uchar(&uchar2, a2p, len2);
-
-				result = ucol_strcoll(sss->locale->info.icu.ucol,
-									  uchar1, ulen1,
-									  uchar2, ulen2);
-
-				pfree(uchar1);
-				pfree(uchar2);
-			}
-#else							/* not USE_ICU */
-			/* shouldn't happen */
-			elog(ERROR, "unsupported collprovider: %c", sss->locale->provider);
-#endif							/* not USE_ICU */
-		}
-		else
-		{
 #ifdef HAVE_LOCALE_T
-			result = strcoll_l(sss->buf1, sss->buf2, sss->locale->info.lt);
+		result = strcoll_l(sss->buf1, sss->buf2, sss->locale->info.lt);
 #else
-			/* shouldn't happen */
-			elog(ERROR, "unsupported collprovider: %c", sss->locale->provider);
+		/* shouldn't happen */
+		elog(ERROR, "unsupported collprovider: %c", sss->locale->provider);
 #endif
-		}
 	}
 	else
 		result = strcoll(sss->buf1, sss->buf2);
@@ -2479,14 +2393,9 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 	else
 	{
 		Size		bsize;
-#ifdef USE_ICU
-		int32_t		ulen = -1;
-		UChar	   *uchar = NULL;
-#endif
 
 		/*
-		 * We're not using the C collation, so fall back on strxfrm or ICU
-		 * analogs.
+		 * We're not using the C collation, so fall back on strxfrm.
 		 */
 
 		/* By convention, we use buffer 1 to store and NUL-terminate */
@@ -2508,65 +2417,23 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 		memcpy(sss->buf1, authoritative_data, len);
 
 		/*
-		 * Just like strcoll(), strxfrm() expects a NUL-terminated string. Not
-		 * necessary for ICU, but doesn't hurt.
+		 * Just like strcoll(), strxfrm() expects a NUL-terminated string.
 		 */
 		sss->buf1[len] = '\0';
 		sss->last_len1 = len;
 
-#ifdef USE_ICU
-		/* When using ICU and not UTF8, convert string to UChar. */
-		if (sss->locale && sss->locale->provider == COLLPROVIDER_ICU &&
-			GetDatabaseEncoding() != PG_UTF8)
-			ulen = icu_to_uchar(&uchar, sss->buf1, len);
-#endif
-
 		/*
-		 * Loop: Call strxfrm() or ucol_getSortKey(), possibly enlarge buffer,
+		 * Loop: Call strxfrm(), possibly enlarge buffer,
 		 * and try again.  Both of these functions have the result buffer
 		 * content undefined if the result did not fit, so we need to retry
 		 * until everything fits, even though we only need the first few bytes
-		 * in the end.  When using ucol_nextSortKeyPart(), however, we only
+		 * in the end.  When using strxfrm_l(), however, we only
 		 * ask for as many bytes as we actually need.
 		 */
 		for (;;)
 		{
-#ifdef USE_ICU
-			if (sss->locale && sss->locale->provider == COLLPROVIDER_ICU)
-			{
-				/*
-				 * When using UTF8, use the iteration interface so we only
-				 * need to produce as many bytes as we actually need.
-				 */
-				if (GetDatabaseEncoding() == PG_UTF8)
-				{
-					UCharIterator iter;
-					uint32_t	state[2];
-					UErrorCode	status;
-
-					uiter_setUTF8(&iter, sss->buf1, len);
-					state[0] = state[1] = 0;	/* won't need that again */
-					status = U_ZERO_ERROR;
-					bsize = ucol_nextSortKeyPart(sss->locale->info.icu.ucol,
-												 &iter,
-												 state,
-												 (uint8_t *) sss->buf2,
-												 Min(sizeof(Datum), sss->buflen2),
-												 &status);
-					if (U_FAILURE(status))
-						ereport(ERROR,
-								(errmsg("sort key generation failed: %s",
-										u_errorName(status))));
-				}
-				else
-					bsize = ucol_getSortKey(sss->locale->info.icu.ucol,
-											uchar, ulen,
-											(uint8_t *) sss->buf2, sss->buflen2);
-			}
-			else
-#endif
 #ifdef HAVE_LOCALE_T
-			if (sss->locale && sss->locale->provider == COLLPROVIDER_LIBC)
+			if (sss->locale)
 				bsize = strxfrm_l(sss->buf2, sss->buf1,
 								  sss->buflen2, sss->locale->info.lt);
 			else
@@ -2595,11 +2462,6 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 		 * okay.  See remarks on bytea case above.)
 		 */
 		memcpy(pres, sss->buf2, Min(sizeof(Datum), bsize));
-
-#ifdef USE_ICU
-		if (uchar)
-			pfree(uchar);
-#endif
 	}
 
 	/*

@@ -172,9 +172,7 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 
 	if (collproviderstr)
 	{
-		if (pg_strcasecmp(collproviderstr, "icu") == 0)
-			collprovider = COLLPROVIDER_ICU;
-		else if (pg_strcasecmp(collproviderstr, "libc") == 0)
+		if (pg_strcasecmp(collproviderstr, "libc") == 0)
 			collprovider = COLLPROVIDER_LIBC;
 		else
 			ereport(ERROR,
@@ -196,43 +194,19 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 				 errmsg("parameter \"lc_ctype\" must be specified")));
 
 	/*
-	 * Nondeterministic collations are currently only supported with ICU
-	 * because that's the only case where it can actually make a difference.
+	 * Nondeterministic collations are currently not supported, because
+	 * libc collations cannot make a difference in case/encoding handling.
 	 * So we can save writing the code for the other providers.
 	 */
-	if (!collisdeterministic && collprovider != COLLPROVIDER_ICU)
+	if (!collisdeterministic)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("nondeterministic collations not supported with this provider")));
 
 	if (!fromEl)
 	{
-		if (collprovider == COLLPROVIDER_ICU)
-		{
-#ifdef USE_ICU
-			/*
-			 * We could create ICU collations with collencoding == database
-			 * encoding, but it seems better to use -1 so that it matches the
-			 * way initdb would create ICU collations.  However, only allow
-			 * one to be created when the current database's encoding is
-			 * supported.  Otherwise the collation is useless, plus we get
-			 * surprising behaviors like not being able to drop the collation.
-			 *
-			 * Skip this test when !USE_ICU, because the error we want to
-			 * throw for that isn't thrown till later.
-			 */
-			if (!is_encoding_supported_by_icu(GetDatabaseEncoding()))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("current database's encoding is not supported with this provider")));
-#endif
-			collencoding = -1;
-		}
-		else
-		{
-			collencoding = GetDatabaseEncoding();
-			check_encoding_locale_matches(collencoding, collcollate, collctype);
-		}
+		collencoding = GetDatabaseEncoding();
+		check_encoding_locale_matches(collencoding, collcollate, collctype);
 	}
 
 	if (!collversion)
@@ -455,65 +429,6 @@ cmpaliases(const void *a, const void *b)
 #endif							/* READ_LOCALE_A_OUTPUT */
 
 
-#ifdef USE_ICU
-/*
- * Get the ICU language tag for a locale name.
- * The result is a palloc'd string.
- */
-static char *
-get_icu_language_tag(const char *localename)
-{
-	char		buf[ULOC_FULLNAME_CAPACITY];
-	UErrorCode	status;
-
-	status = U_ZERO_ERROR;
-	uloc_toLanguageTag(localename, buf, sizeof(buf), true, &status);
-	if (U_FAILURE(status))
-		ereport(ERROR,
-				(errmsg("could not convert locale name \"%s\" to language tag: %s",
-						localename, u_errorName(status))));
-
-	return pstrdup(buf);
-}
-
-/*
- * Get a comment (specifically, the display name) for an ICU locale.
- * The result is a palloc'd string, or NULL if we can't get a comment
- * or find that it's not all ASCII.  (We can *not* accept non-ASCII
- * comments, because the contents of template0 must be encoding-agnostic.)
- */
-static char *
-get_icu_locale_comment(const char *localename)
-{
-	UErrorCode	status;
-	UChar		displayname[128];
-	int32		len_uchar;
-	int32		i;
-	char	   *result;
-
-	status = U_ZERO_ERROR;
-	len_uchar = uloc_getDisplayName(localename, "en",
-									displayname, lengthof(displayname),
-									&status);
-	if (U_FAILURE(status))
-		return NULL;			/* no good reason to raise an error */
-
-	/* Check for non-ASCII comment (can't use pg_is_ascii for this) */
-	for (i = 0; i < len_uchar; i++)
-	{
-		if (displayname[i] > 127)
-			return NULL;
-	}
-
-	/* OK, transcribe */
-	result = palloc(len_uchar + 1);
-	for (i = 0; i < len_uchar; i++)
-		result[i] = displayname[i];
-	result[len_uchar] = '\0';
-
-	return result;
-}
-#endif							/* USE_ICU */
 
 
 /*
@@ -691,67 +606,6 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 	}
 #endif							/* READ_LOCALE_A_OUTPUT */
 
-	/*
-	 * Load collations known to ICU
-	 *
-	 * We use uloc_countAvailable()/uloc_getAvailable() rather than
-	 * ucol_countAvailable()/ucol_getAvailable().  The former returns a full
-	 * set of language+region combinations, whereas the latter only returns
-	 * language+region combinations if they are distinct from the language's
-	 * base collation.  So there might not be a de-DE or en-GB, which would be
-	 * confusing.
-	 */
-#ifdef USE_ICU
-	{
-		int			i;
-
-		/*
-		 * Start the loop at -1 to sneak in the root locale without too much
-		 * code duplication.
-		 */
-		for (i = -1; i < uloc_countAvailable(); i++)
-		{
-			const char *name;
-			char	   *langtag;
-			char	   *icucomment;
-			const char *collcollate;
-			Oid			collid;
-
-			if (i == -1)
-				name = "";		/* ICU root locale */
-			else
-				name = uloc_getAvailable(i);
-
-			langtag = get_icu_language_tag(name);
-			collcollate = U_ICU_VERSION_MAJOR_NUM >= 54 ? langtag : name;
-
-			/*
-			 * Be paranoid about not allowing any non-ASCII strings into
-			 * pg_collation
-			 */
-			if (!pg_is_ascii(langtag) || !pg_is_ascii(collcollate))
-				continue;
-
-			collid = CollationCreate(psprintf("%s-x-icu", langtag),
-									 nspid, GetUserId(),
-									 COLLPROVIDER_ICU, true, -1,
-									 collcollate, collcollate,
-									 get_collation_actual_version(COLLPROVIDER_ICU, collcollate),
-									 true, true);
-			if (OidIsValid(collid))
-			{
-				ncreated++;
-
-				CommandCounterIncrement();
-
-				icucomment = get_icu_locale_comment(name);
-				if (icucomment)
-					CreateComments(collid, CollationRelationId, 0,
-								   icucomment);
-			}
-		}
-	}
-#endif							/* USE_ICU */
 
 	PG_RETURN_INT32(ncreated);
 }

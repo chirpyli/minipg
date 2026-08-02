@@ -69,7 +69,6 @@ typedef enum
 	PG_REGEX_LOCALE_1BYTE,		/* Use <ctype.h> functions */
 	PG_REGEX_LOCALE_WIDE_L,		/* Use locale_t <wctype.h> functions */
 	PG_REGEX_LOCALE_1BYTE_L,	/* Use locale_t <ctype.h> functions */
-	PG_REGEX_LOCALE_ICU			/* Use ICU uchar.h functions */
 } PG_Locale_Strategy;
 
 static PG_Locale_Strategy pg_regex_strategy;
@@ -268,11 +267,6 @@ pg_set_regex_collation(Oid collation)
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("nondeterministic collations are not supported for regular expressions")));
 
-#ifdef USE_ICU
-		if (pg_regex_locale && pg_regex_locale->provider == COLLPROVIDER_ICU)
-			pg_regex_strategy = PG_REGEX_LOCALE_ICU;
-		else
-#endif
 		if (GetDatabaseEncoding() == PG_UTF8)
 		{
 			if (pg_regex_locale)
@@ -319,10 +313,6 @@ pg_wc_isdigit(pg_wchar c)
 					isdigit_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isdigit(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -355,10 +345,6 @@ pg_wc_isalpha(pg_wchar c)
 					isalpha_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isalpha(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -391,10 +377,6 @@ pg_wc_isalnum(pg_wchar c)
 					isalnum_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isalnum(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -436,10 +418,6 @@ pg_wc_isupper(pg_wchar c)
 					isupper_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isupper(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -472,10 +450,6 @@ pg_wc_islower(pg_wchar c)
 					islower_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_islower(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -508,10 +482,6 @@ pg_wc_isgraph(pg_wchar c)
 					isgraph_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isgraph(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -544,10 +514,6 @@ pg_wc_isprint(pg_wchar c)
 					isprint_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isprint(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -580,10 +546,6 @@ pg_wc_ispunct(pg_wchar c)
 					ispunct_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_ispunct(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -616,10 +578,6 @@ pg_wc_isspace(pg_wchar c)
 					isspace_l((unsigned char) c, pg_regex_locale->info.lt));
 #endif
 			break;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_isspace(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -660,10 +618,6 @@ pg_wc_toupper(pg_wchar c)
 				return toupper_l((unsigned char) c, pg_regex_locale->info.lt);
 #endif
 			return c;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_toupper(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -704,10 +658,6 @@ pg_wc_tolower(pg_wchar c)
 				return tolower_l((unsigned char) c, pg_regex_locale->info.lt);
 #endif
 			return c;
-		case PG_REGEX_LOCALE_ICU:
-#ifdef USE_ICU
-			return u_tolower(c);
-#endif
 			break;
 	}
 	return 0;					/* can't get here, but keep compiler quiet */
@@ -858,9 +808,6 @@ pg_ctype_get_cache(pg_wc_probefunc probefunc, int cclasscode)
 #else
 			max_chr = (pg_wchar) MAX_SIMPLE_CHR;
 #endif
-			break;
-		case PG_REGEX_LOCALE_ICU:
-			max_chr = (pg_wchar) MAX_SIMPLE_CHR;
 			break;
 		default:
 			max_chr = 0;		/* can't get here, but keep compiler quiet */

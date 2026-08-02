@@ -573,8 +573,6 @@ extern int	pg_encoding_verifymbstr(int encoding, const char *mbstr, int len);
 extern int	pg_encoding_max_length(int encoding);
 extern int	pg_valid_client_encoding(const char *name);
 extern int	pg_valid_server_encoding(const char *name);
-extern bool is_encoding_supported_by_icu(int encoding);
-extern const char *get_encoding_name_for_icu(int encoding);
 
 extern unsigned char *unicode_to_utf8(pg_wchar c, unsigned char *utf8string);
 extern pg_wchar utf8_to_unicode(const unsigned char *c);

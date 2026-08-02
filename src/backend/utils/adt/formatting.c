@@ -79,10 +79,6 @@
 #include <wctype.h>
 #endif
 
-#ifdef USE_ICU
-#include <unicode/ustring.h>
-#endif
-
 #include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "mb/pg_wchar.h"
@@ -1568,52 +1564,6 @@ str_numth(char *dest, char *num, int type)
  *			upper/lower/initcap functions
  *****************************************************************************/
 
-#ifdef USE_ICU
-
-typedef int32_t (*ICU_Convert_Func) (UChar *dest, int32_t destCapacity,
-									 const UChar *src, int32_t srcLength,
-									 const char *locale,
-									 UErrorCode *pErrorCode);
-
-static int32_t
-icu_convert_case(ICU_Convert_Func func, pg_locale_t mylocale,
-				 UChar **buff_dest, UChar *buff_source, int32_t len_source)
-{
-	UErrorCode	status;
-	int32_t		len_dest;
-
-	len_dest = len_source;		/* try first with same length */
-	*buff_dest = palloc(len_dest * sizeof(**buff_dest));
-	status = U_ZERO_ERROR;
-	len_dest = func(*buff_dest, len_dest, buff_source, len_source,
-					mylocale->info.icu.locale, &status);
-	if (status == U_BUFFER_OVERFLOW_ERROR)
-	{
-		/* try again with adjusted length */
-		pfree(*buff_dest);
-		*buff_dest = palloc(len_dest * sizeof(**buff_dest));
-		status = U_ZERO_ERROR;
-		len_dest = func(*buff_dest, len_dest, buff_source, len_source,
-						mylocale->info.icu.locale, &status);
-	}
-	if (U_FAILURE(status))
-		ereport(ERROR,
-				(errmsg("case conversion failed: %s", u_errorName(status))));
-	return len_dest;
-}
-
-static int32_t
-u_strToTitle_default_BI(UChar *dest, int32_t destCapacity,
-						const UChar *src, int32_t srcLength,
-						const char *locale,
-						UErrorCode *pErrorCode)
-{
-	return u_strToTitle(dest, destCapacity, src, srcLength,
-						NULL, locale, pErrorCode);
-}
-
-#endif							/* USE_ICU */
-
 /*
  * If the system provides the needed functions for wide-character manipulation
  * (which are all standardized by C99), then we implement upper/lower/initcap
@@ -1670,23 +1620,6 @@ str_tolower(const char *buff, size_t nbytes, Oid collid)
 			mylocale = pg_newlocale_from_collation(collid);
 		}
 
-#ifdef USE_ICU
-		if (mylocale && mylocale->provider == COLLPROVIDER_ICU)
-		{
-			int32_t		len_uchar;
-			int32_t		len_conv;
-			UChar	   *buff_uchar;
-			UChar	   *buff_conv;
-
-			len_uchar = icu_to_uchar(&buff_uchar, buff, nbytes);
-			len_conv = icu_convert_case(u_strToLower, mylocale,
-										&buff_conv, buff_uchar, len_uchar);
-			icu_from_uchar(&result, buff_conv, len_conv);
-			pfree(buff_uchar);
-			pfree(buff_conv);
-		}
-		else
-#endif
 		{
 			if (pg_database_encoding_max_length() > 1)
 			{
@@ -1794,23 +1727,6 @@ str_toupper(const char *buff, size_t nbytes, Oid collid)
 			mylocale = pg_newlocale_from_collation(collid);
 		}
 
-#ifdef USE_ICU
-		if (mylocale && mylocale->provider == COLLPROVIDER_ICU)
-		{
-			int32_t		len_uchar,
-						len_conv;
-			UChar	   *buff_uchar;
-			UChar	   *buff_conv;
-
-			len_uchar = icu_to_uchar(&buff_uchar, buff, nbytes);
-			len_conv = icu_convert_case(u_strToUpper, mylocale,
-										&buff_conv, buff_uchar, len_uchar);
-			icu_from_uchar(&result, buff_conv, len_conv);
-			pfree(buff_uchar);
-			pfree(buff_conv);
-		}
-		else
-#endif
 		{
 			if (pg_database_encoding_max_length() > 1)
 			{
@@ -1919,23 +1835,6 @@ str_initcap(const char *buff, size_t nbytes, Oid collid)
 			mylocale = pg_newlocale_from_collation(collid);
 		}
 
-#ifdef USE_ICU
-		if (mylocale && mylocale->provider == COLLPROVIDER_ICU)
-		{
-			int32_t		len_uchar,
-						len_conv;
-			UChar	   *buff_uchar;
-			UChar	   *buff_conv;
-
-			len_uchar = icu_to_uchar(&buff_uchar, buff, nbytes);
-			len_conv = icu_convert_case(u_strToTitle_default_BI, mylocale,
-										&buff_conv, buff_uchar, len_uchar);
-			icu_from_uchar(&result, buff_conv, len_conv);
-			pfree(buff_uchar);
-			pfree(buff_conv);
-		}
-		else
-#endif
 		{
 			if (pg_database_encoding_max_length() > 1)
 			{

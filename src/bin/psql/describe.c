@@ -5042,7 +5042,7 @@ listCollations(const char *pattern, bool verbose, bool showSystem)
 
 	if (pset.sversion >= 100000)
 		appendPQExpBuffer(&buf,
-						  ",\n       CASE c.collprovider WHEN 'd' THEN 'default' WHEN 'c' THEN 'libc' WHEN 'i' THEN 'icu' END AS \"%s\"",
+						  ",\n       CASE c.collprovider WHEN 'd' THEN 'default' WHEN 'c' THEN 'libc' END AS \"%s\"",
 						  gettext_noop("Provider"));
 	else
 		appendPQExpBuffer(&buf,

@@ -15,29 +15,7 @@
 #if defined(LOCALE_T_IN_XLOCALE) || defined(WCSTOMBS_L_IN_XLOCALE)
 #include <xlocale.h>
 #endif
-#ifdef USE_ICU
-/* only include the C APIs, to avoid errors in cpluspluscheck */
-#undef U_SHOW_CPLUSPLUS_API
-#define U_SHOW_CPLUSPLUS_API 0
-#undef U_SHOW_CPLUSPLUS_HEADER_API
-#define U_SHOW_CPLUSPLUS_HEADER_API 0
-#include <unicode/ucol.h>
-#endif
-
 #include "utils/guc.h"
-
-#ifdef USE_ICU
-/*
- * ucol_strcollUTF8() was introduced in ICU 50, but it is buggy before ICU 53.
- * (see
- * <https://www.postgresql.org/message-id/flat/f1438ec6-22aa-4029-9a3b-26f79d330e72%40manitou-mail.org>)
- */
-#if U_ICU_VERSION_MAJOR_NUM >= 53
-#define HAVE_UCOL_STRCOLLUTF8 1
-#else
-#undef HAVE_UCOL_STRCOLLUTF8
-#endif
-#endif
 
 
 /* GUC settings */
@@ -93,14 +71,7 @@ struct pg_locale_struct
 #ifdef HAVE_LOCALE_T
 		locale_t	lt;
 #endif
-#ifdef USE_ICU
-		struct
-		{
-			const char *locale;
-			UCollator  *ucol;
-		}			icu;
-#endif
-		int			dummy;		/* in case we have neither LOCALE_T nor ICU */
+		int			dummy;		/* in case we have no LOCALE_T */
 	}			info;
 };
 
@@ -109,11 +80,6 @@ typedef struct pg_locale_struct *pg_locale_t;
 extern pg_locale_t pg_newlocale_from_collation(Oid collid);
 
 extern char *get_collation_actual_version(char collprovider, const char *collcollate);
-
-#ifdef USE_ICU
-extern int32_t icu_to_uchar(UChar **buff_uchar, const char *buff, size_t nbytes);
-extern int32_t icu_from_uchar(char **result, const UChar *buff_uchar, int32_t len_uchar);
-#endif
 
 /* These functions convert from/to libc's wchar_t, *not* pg_wchar_t */
 extern size_t wchar2char(char *to, const wchar_t *from, size_t tolen,

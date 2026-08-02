@@ -2021,10 +2021,8 @@ lookup_collation(const char *collname, Oid collnamespace, int32 encoding)
 		return collid;
 
 	/*
-	 * Check for any-encoding entry.  This takes a bit more work: while libc
-	 * collations with collencoding = -1 do work with all encodings, ICU
-	 * collations only work with certain encodings, so we have to check that
-	 * aspect before deciding it's a match.
+	 * Check for any-encoding entry.  libc collations with collencoding = -1
+	 * work with all encodings, so we can use them directly.
 	 */
 	colltup = SearchSysCache3(COLLNAMEENCNSP,
 							  PointerGetDatum(collname),
@@ -2033,17 +2031,7 @@ lookup_collation(const char *collname, Oid collnamespace, int32 encoding)
 	if (!HeapTupleIsValid(colltup))
 		return InvalidOid;
 	collform = (Form_pg_collation) GETSTRUCT(colltup);
-	if (collform->collprovider == COLLPROVIDER_ICU)
-	{
-		if (is_encoding_supported_by_icu(encoding))
-			collid = collform->oid;
-		else
-			collid = InvalidOid;
-	}
-	else
-	{
-		collid = collform->oid;
-	}
+	collid = collform->oid;
 	ReleaseSysCache(colltup);
 	return collid;
 }

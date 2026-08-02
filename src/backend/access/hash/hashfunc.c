@@ -290,31 +290,8 @@ hashtext(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-#ifdef USE_ICU
-		if (mylocale->provider == COLLPROVIDER_ICU)
-		{
-			int32_t		ulen = -1;
-			UChar	   *uchar = NULL;
-			Size		bsize;
-			uint8_t    *buf;
-
-			ulen = icu_to_uchar(&uchar, VARDATA_ANY(key), VARSIZE_ANY_EXHDR(key));
-
-			bsize = ucol_getSortKey(mylocale->info.icu.ucol,
-									uchar, ulen, NULL, 0);
-			buf = palloc(bsize);
-			ucol_getSortKey(mylocale->info.icu.ucol,
-							uchar, ulen, buf, bsize);
-			pfree(uchar);
-
-			result = hash_any(buf, bsize);
-
-			pfree(buf);
-		}
-		else
-#endif
-			/* shouldn't happen */
-			elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
+		/* shouldn't happen: nondeterministic collations require ICU support */
+		elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
 	}
 
 	/* Avoid leaking memory for toasted inputs */
@@ -348,31 +325,8 @@ hashtextextended(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-#ifdef USE_ICU
-		if (mylocale->provider == COLLPROVIDER_ICU)
-		{
-			int32_t		ulen = -1;
-			UChar	   *uchar = NULL;
-			Size		bsize;
-			uint8_t    *buf;
-
-			ulen = icu_to_uchar(&uchar, VARDATA_ANY(key), VARSIZE_ANY_EXHDR(key));
-
-			bsize = ucol_getSortKey(mylocale->info.icu.ucol,
-									uchar, ulen, NULL, 0);
-			buf = palloc(bsize);
-			ucol_getSortKey(mylocale->info.icu.ucol,
-							uchar, ulen, buf, bsize);
-			pfree(uchar);
-
-			result = hash_any_extended(buf, bsize, PG_GETARG_INT64(1));
-
-			pfree(buf);
-		}
-		else
-#endif
-			/* shouldn't happen */
-			elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
+		/* shouldn't happen: nondeterministic collations require ICU support */
+		elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
 	}
 
 	PG_FREE_IF_COPY(key, 0);

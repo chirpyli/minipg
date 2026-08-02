@@ -204,12 +204,10 @@ Generic_Text_IC_like(text *str, text *pat, Oid collation)
 	/*
 	 * For efficiency reasons, in the single byte case we don't call lower()
 	 * on the pattern and text, but instead call SB_lower_char on each
-	 * character.  In the multi-byte case we don't have much choice :-(. Also,
-	 * ICU does not support single-character case folding, so we go the long
-	 * way.
+	 * character.  In the multi-byte case we don't have much choice :-(.
 	 */
 
-	if (pg_database_encoding_max_length() > 1 || (locale && locale->provider == COLLPROVIDER_ICU))
+	if (pg_database_encoding_max_length() > 1)
 	{
 		pat = DatumGetTextPP(DirectFunctionCall1Coll(lower, collation,
 													 PointerGetDatum(pat)));

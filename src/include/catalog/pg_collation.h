@@ -65,7 +65,6 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_collation_oid_index, 3085, on pg_collation using bt
 #ifdef EXPOSE_TO_CLIENT_CODE
 
 #define COLLPROVIDER_DEFAULT	'd'
-#define COLLPROVIDER_ICU		'i'
 #define COLLPROVIDER_LIBC		'c'
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */

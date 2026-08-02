@@ -67,10 +67,6 @@
 #include "utils/relcache.h"
 #include "utils/syscache.h"
 
-#ifdef USE_ICU
-#include <unicode/ucnv.h>
-#endif
-
 #ifdef __GLIBC__
 #include <gnu/libc-version.h>
 #endif
@@ -115,10 +111,6 @@ typedef struct
 static HTAB *collation_cache = NULL;
 
 
-
-#ifdef USE_ICU
-static void icu_set_collation_attributes(UCollator *collator, const char *loc);
-#endif
 
 /*
  * pg_perm_setlocale
@@ -1113,39 +1105,6 @@ pg_newlocale_from_collation(Oid collid)
 					 errmsg("collation provider LIBC is not supported on this platform")));
 #endif							/* not HAVE_LOCALE_T */
 		}
-		else if (collform->collprovider == COLLPROVIDER_ICU)
-		{
-#ifdef USE_ICU
-			UCollator  *collator;
-			UErrorCode	status;
-
-			if (strcmp(collcollate, collctype) != 0)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("collations with different collate and ctype values are not supported by ICU")));
-
-			status = U_ZERO_ERROR;
-			collator = ucol_open(collcollate, &status);
-			if (U_FAILURE(status))
-				ereport(ERROR,
-						(errmsg("could not open collator for locale \"%s\": %s",
-								collcollate, u_errorName(status))));
-
-			if (U_ICU_VERSION_MAJOR_NUM < 54)
-				icu_set_collation_attributes(collator, collcollate);
-
-			/* We will leak this string if we get an error below :-( */
-			result.info.icu.locale = MemoryContextStrdup(TopMemoryContext,
-														 collcollate);
-			result.info.icu.ucol = collator;
-#else							/* not USE_ICU */
-			/* could get here if a collation was created by a build with ICU */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("ICU is not supported in this build"), \
-					 errhint("You need to rebuild PostgreSQL using %s.", "--with-icu")));
-#endif							/* not USE_ICU */
-		}
 
 		collversion = SysCacheGetAttr(COLLOID, tp, Anum_pg_collation_collversion,
 									  &isnull);
@@ -1203,32 +1162,10 @@ get_collation_actual_version(char collprovider, const char *collcollate)
 {
 	char	   *collversion = NULL;
 
-#ifdef USE_ICU
-	if (collprovider == COLLPROVIDER_ICU)
-	{
-		UCollator  *collator;
-		UErrorCode	status;
-		UVersionInfo versioninfo;
-		char		buf[U_MAX_VERSION_STRING_LENGTH];
-
-		status = U_ZERO_ERROR;
-		collator = ucol_open(collcollate, &status);
-		if (U_FAILURE(status))
-			ereport(ERROR,
-					(errmsg("could not open collator for locale \"%s\": %s",
-							collcollate, u_errorName(status))));
-		ucol_getVersion(collator, versioninfo);
-		ucol_close(collator);
-
-		u_versionToString(versioninfo, buf);
-		collversion = pstrdup(buf);
-	}
-	else
-#endif
-		if (collprovider == COLLPROVIDER_LIBC &&
-			pg_strcasecmp("C", collcollate) != 0 &&
-			pg_strncasecmp("C.", collcollate, 2) != 0 &&
-			pg_strcasecmp("POSIX", collcollate) != 0)
+	if (collprovider == COLLPROVIDER_LIBC &&
+		pg_strcasecmp("C", collcollate) != 0 &&
+		pg_strncasecmp("C.", collcollate, 2) != 0 &&
+		pg_strcasecmp("POSIX", collcollate) != 0)
 	{
 #if defined(__GLIBC__)
 		/* Use the glibc version because we don't have anything better. */
@@ -1254,220 +1191,6 @@ get_collation_actual_version(char collprovider, const char *collcollate)
 }
 
 
-#ifdef USE_ICU
-/*
- * Converter object for converting between ICU's UChar strings and C strings
- * in database encoding.  Since the database encoding doesn't change, we only
- * need one of these per session.
- */
-static UConverter *icu_converter = NULL;
-
-static void
-init_icu_converter(void)
-{
-	const char *icu_encoding_name;
-	UErrorCode	status;
-	UConverter *conv;
-
-	if (icu_converter)
-		return;					/* already done */
-
-	icu_encoding_name = get_encoding_name_for_icu(GetDatabaseEncoding());
-	if (!icu_encoding_name)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("encoding \"%s\" not supported by ICU",
-						pg_encoding_to_char(GetDatabaseEncoding()))));
-
-	status = U_ZERO_ERROR;
-	conv = ucnv_open(icu_encoding_name, &status);
-	if (U_FAILURE(status))
-		ereport(ERROR,
-				(errmsg("could not open ICU converter for encoding \"%s\": %s",
-						icu_encoding_name, u_errorName(status))));
-
-	icu_converter = conv;
-}
-
-/*
- * Convert a string in the database encoding into a string of UChars.
- *
- * The source string at buff is of length nbytes
- * (it needn't be nul-terminated)
- *
- * *buff_uchar receives a pointer to the palloc'd result string, and
- * the function's result is the number of UChars generated.
- *
- * The result string is nul-terminated, though most callers rely on the
- * result length instead.
- */
-int32_t
-icu_to_uchar(UChar **buff_uchar, const char *buff, size_t nbytes)
-{
-	UErrorCode	status;
-	int32_t		len_uchar;
-
-	init_icu_converter();
-
-	status = U_ZERO_ERROR;
-	len_uchar = ucnv_toUChars(icu_converter, NULL, 0,
-							  buff, nbytes, &status);
-	if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR)
-		ereport(ERROR,
-				(errmsg("%s failed: %s", "ucnv_toUChars", u_errorName(status))));
-
-	*buff_uchar = palloc_array(UChar, len_uchar + 1);
-
-	status = U_ZERO_ERROR;
-	len_uchar = ucnv_toUChars(icu_converter, *buff_uchar, len_uchar + 1,
-							  buff, nbytes, &status);
-	if (U_FAILURE(status))
-		ereport(ERROR,
-				(errmsg("%s failed: %s", "ucnv_toUChars", u_errorName(status))));
-
-	return len_uchar;
-}
-
-/*
- * Convert a string of UChars into the database encoding.
- *
- * The source string at buff_uchar is of length len_uchar
- * (it needn't be nul-terminated)
- *
- * *result receives a pointer to the palloc'd result string, and the
- * function's result is the number of bytes generated (not counting nul).
- *
- * The result string is nul-terminated.
- */
-int32_t
-icu_from_uchar(char **result, const UChar *buff_uchar, int32_t len_uchar)
-{
-	UErrorCode	status;
-	int32_t		len_result;
-
-	init_icu_converter();
-
-	status = U_ZERO_ERROR;
-	len_result = ucnv_fromUChars(icu_converter, NULL, 0,
-								 buff_uchar, len_uchar, &status);
-	if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR)
-		ereport(ERROR,
-				(errmsg("%s failed: %s", "ucnv_fromUChars",
-						u_errorName(status))));
-
-	*result = palloc(len_result + 1);
-
-	status = U_ZERO_ERROR;
-	len_result = ucnv_fromUChars(icu_converter, *result, len_result + 1,
-								 buff_uchar, len_uchar, &status);
-	if (U_FAILURE(status))
-		ereport(ERROR,
-				(errmsg("%s failed: %s", "ucnv_fromUChars",
-						u_errorName(status))));
-
-	return len_result;
-}
-
-/*
- * Parse collation attributes and apply them to the open collator.  This takes
- * a string like "und@colStrength=primary;colCaseLevel=yes" and parses and
- * applies the key-value arguments.
- *
- * Starting with ICU version 54, the attributes are processed automatically by
- * ucol_open(), so this is only necessary for emulating this behavior on older
- * versions.
- */
-pg_attribute_unused()
-static void
-icu_set_collation_attributes(UCollator *collator, const char *loc)
-{
-	char	   *str = asc_tolower(loc, strlen(loc));
-
-	str = strchr(str, '@');
-	if (!str)
-		return;
-	str++;
-
-	for (char *token = strtok(str, ";"); token; token = strtok(NULL, ";"))
-	{
-		char	   *e = strchr(token, '=');
-
-		if (e)
-		{
-			char	   *name;
-			char	   *value;
-			UColAttribute uattr;
-			UColAttributeValue uvalue;
-			UErrorCode	status;
-
-			status = U_ZERO_ERROR;
-
-			*e = '\0';
-			name = token;
-			value = e + 1;
-
-			/*
-			 * See attribute name and value lists in ICU i18n/coll.cpp
-			 */
-			if (strcmp(name, "colstrength") == 0)
-				uattr = UCOL_STRENGTH;
-			else if (strcmp(name, "colbackwards") == 0)
-				uattr = UCOL_FRENCH_COLLATION;
-			else if (strcmp(name, "colcaselevel") == 0)
-				uattr = UCOL_CASE_LEVEL;
-			else if (strcmp(name, "colcasefirst") == 0)
-				uattr = UCOL_CASE_FIRST;
-			else if (strcmp(name, "colalternate") == 0)
-				uattr = UCOL_ALTERNATE_HANDLING;
-			else if (strcmp(name, "colnormalization") == 0)
-				uattr = UCOL_NORMALIZATION_MODE;
-			else if (strcmp(name, "colnumeric") == 0)
-				uattr = UCOL_NUMERIC_COLLATION;
-			else
-				/* ignore if unknown */
-				continue;
-
-			if (strcmp(value, "primary") == 0)
-				uvalue = UCOL_PRIMARY;
-			else if (strcmp(value, "secondary") == 0)
-				uvalue = UCOL_SECONDARY;
-			else if (strcmp(value, "tertiary") == 0)
-				uvalue = UCOL_TERTIARY;
-			else if (strcmp(value, "quaternary") == 0)
-				uvalue = UCOL_QUATERNARY;
-			else if (strcmp(value, "identical") == 0)
-				uvalue = UCOL_IDENTICAL;
-			else if (strcmp(value, "no") == 0)
-				uvalue = UCOL_OFF;
-			else if (strcmp(value, "yes") == 0)
-				uvalue = UCOL_ON;
-			else if (strcmp(value, "shifted") == 0)
-				uvalue = UCOL_SHIFTED;
-			else if (strcmp(value, "non-ignorable") == 0)
-				uvalue = UCOL_NON_IGNORABLE;
-			else if (strcmp(value, "lower") == 0)
-				uvalue = UCOL_LOWER_FIRST;
-			else if (strcmp(value, "upper") == 0)
-				uvalue = UCOL_UPPER_FIRST;
-			else
-				status = U_ILLEGAL_ARGUMENT_ERROR;
-
-			if (status == U_ZERO_ERROR)
-				ucol_setAttribute(collator, uattr, uvalue, &status);
-
-			/*
-			 * Pretend the error came from ucol_open(), for consistent error
-			 * message across ICU versions.
-			 */
-			if (U_FAILURE(status))
-				ereport(ERROR,
-						(errmsg("could not open collator for locale \"%s\": %s",
-								loc, u_errorName(status))));
-		}
-	}
-}
-
-#endif							/* USE_ICU */
 
 /*
  * These functions convert from/to libc's wchar_t, *not* pg_wchar_t.
