@@ -174,7 +174,6 @@ static void assign_syslog_facility(int newval, void *extra);
 static void assign_syslog_ident(const char *newval, void *extra);
 static void assign_session_replication_role(int newval, void *extra);
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
-static bool check_bonjour(bool *newval, void **extra, GucSource source);
 static bool check_stage_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_canonical_path(char **newval, void **extra, GucSource source);
@@ -1137,15 +1136,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&session_auth_is_superuser,
 		false,
 		NULL, NULL, NULL
-	},
-	{
-		{"bonjour", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Enables advertising the server via Bonjour."),
-			NULL
-		},
-		&enable_bonjour,
-		false,
-		check_bonjour, NULL, NULL
 	},
 	{
 		{"track_commit_timestamp", PGC_POSTMASTER, REPLICATION_SENDING,
@@ -3957,15 +3947,6 @@ static struct config_string ConfigureNamesString[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"bonjour_name", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the Bonjour service name."),
-			NULL
-		},
-		&bonjour_name,
-		"",
-		NULL, NULL, NULL
-	},
 
 	/* See main.c about why defaults for LC_foo are not all alike */
 
@@ -11349,18 +11330,6 @@ check_temp_buffers(int *newval, void **extra, GucSource source)
 	return true;
 }
 
-static bool
-check_bonjour(bool *newval, void **extra, GucSource source)
-{
-#ifndef USE_BONJOUR
-	if (*newval)
-	{
-		GUC_check_errmsg("Bonjour is not supported by this build");
-		return false;
-	}
-#endif
-	return true;
-}
 
 static bool
 check_stage_log_stats(bool *newval, void **extra, GucSource source)

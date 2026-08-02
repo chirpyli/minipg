@@ -329,3 +329,24 @@
 **验证**：`./configure --without-icu` + `make -j` 全量编译通过（exit 0，无 error/warning）；`make check` 215 项、`make check-world` 全量通过（exit 0）。全仓库扫描 `USE_ICU`/`COLLPROVIDER_ICU`/`icu_to_uchar`/`pg_enc2icu_tbl` 等功能符号残留为 0 处（仅注释中的说明文字已同步清理）。
 
 **注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成。
+
+## 裁剪 P0：彻底移除 Bonjour / Systemd / SELinux / XML / XSLT 支持
+
+**目的**：这些特性在 Unix/Linux 固定部署场景下无用，且引入外部依赖（libdns_sd、libsystemd、libselinux、libxml2、libxslt）与条件编译分支。本次彻底删除对应配置开关与死代码（DTrace 按用户要求暂不裁剪）。
+
+**删除的配置开关（configure）**：
+- 移除 `--with-bonjour`、`--with-selinux`、`--with-systemd` 三个选项：help 文本、变量声明（with_bonjour/with_selinux/with_systemd）、AC_ARG_WITH 段、库/头检测块（selinux 链接检测、systemd sd-daemon.h 头检测、bonjour dns_sd.h 头检测）
+- `src/include/pg_config.h`（生成）：删除 `#undef USE_BONJOUR`/`USE_SYSTEMD`/`HAVE_LIBXML2`/`HAVE_LIBXSLT` 占位宏
+
+**删除的 backend 代码**：
+- `postmaster.c`：删 USE_BONJOUR（dns_sd.h include、bonjour_sdref 变量、Bonjour 注册块、mDNS 关闭块）和 USE_SYSTEMD（6 处 sd_notify("STOPPING=1"/"READY=1") 块 + sd-daemon.h include）；删 enable_bonjour/bonjour_name 全局变量
+- `guc.c`：删 check_bonjour 声明/函数、bonjour 与 bonjour_name 两个 GUC 定义（含 check_bonjour hook）
+- `postgresql.conf.sample`：删 bonjour / bonjour_name 注释行
+
+**说明**：LDAP、PAM、SELinux 的 backend 代码此前已被清理（auth.c 等无对应 USE_* 引用），本次仅移除 configure 开关与剩余宏；XML/XSLT 核心实现（xml.c）仍保留文件但内部功能由 USE_LIBXML 控制（当前 undef，编译为空壳），未做整文件删除以避免影响 SQL/JSON 相关路径。
+
+**行为变化**：不再支持 Bonjour 服务发现、systemd 生命周期通知、SELinux 标签；无法创建 XML/XSLT 相关对象（原已因未启用而无法使用）。二进制不再链接 libdns_sd/libsystemd/libselinux/libxml2/libxslt。
+
+**验证**：`./configure` + `make -j` 全量编译通过（exit 0，无 error/warning）；`make check` 215 项全部通过（exit 0）。全仓库扫描 `USE_BONJOUR`/`USE_SYSTEMD` 残留为 0 处（配置开关与代码分支均干净）。
+
+**注意事项**：DTrace 未裁剪（用户要求暂留）。本次 `configure` 使用 autoconf 2.69 忠实重生成。

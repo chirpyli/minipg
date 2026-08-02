@@ -81,14 +81,6 @@
 #include <sys/select.h>
 #endif
 
-#ifdef USE_BONJOUR
-#include <dns_sd.h>
-#endif
-
-#ifdef USE_SYSTEMD
-#include <systemd/sd-daemon.h>
-#endif
-
 #ifdef HAVE_PTHREAD_IS_THREADED_NP
 #include <pthread.h>
 #endif
@@ -231,8 +223,6 @@ bool		log_hostname;		/* for ps display and logging */
 bool		Log_connections = false;
 bool		Db_user_namespace = false;
 
-bool		enable_bonjour = false;
-char	   *bonjour_name;
 bool		restart_after_crash = true;
 bool		remove_temp_files_after_crash = true;
 
@@ -370,9 +360,6 @@ static volatile sig_atomic_t WalReceiverRequested = false;
 static volatile bool StartWorkerNeeded = true;
 static volatile bool HaveCrashedWorker = false;
 
-#ifdef USE_BONJOUR
-static DNSServiceRef bonjour_sdref = NULL;
-#endif
 
 /*
  * postmaster.c - function prototypes
@@ -1044,44 +1031,6 @@ PostmasterMain(int argc, char *argv[])
 		pfree(rawstring);
 	}
 
-#ifdef USE_BONJOUR
-	/* Register for Bonjour only if we opened TCP socket(s) */
-	if (enable_bonjour && ListenSocket[0] != PGINVALID_SOCKET)
-	{
-		DNSServiceErrorType err;
-
-		/*
-		 * We pass 0 for interface_index, which will result in registering on
-		 * all "applicable" interfaces.  It's not entirely clear from the
-		 * DNS-SD docs whether this would be appropriate if we have bound to
-		 * just a subset of the available network interfaces.
-		 */
-		err = DNSServiceRegister(&bonjour_sdref,
-								 0,
-								 0,
-								 bonjour_name,
-								 "_postgresql._tcp.",
-								 NULL,
-								 NULL,
-								 pg_hton16(PostPortNumber),
-								 0,
-								 NULL,
-								 NULL,
-								 NULL);
-		if (err != kDNSServiceErr_NoError)
-			ereport(LOG,
-					(errmsg("DNSServiceRegister() failed: error code %ld",
-							(long) err)));
-
-		/*
-		 * We don't bother to read the mDNS daemon's reply, and we expect that
-		 * it will automatically terminate our registration when the socket is
-		 * closed at postmaster termination.  So there's nothing more to be
-		 * done here.  However, the bonjour_sdref is kept around so that
-		 * forked children can close their copies of the socket.
-		 */
-	}
-#endif
 
 #ifdef HAVE_UNIX_SOCKETS
 	if (Unix_socket_directories)
@@ -2443,11 +2392,6 @@ ClosePostmasterPorts(bool am_syslogger)
 		syslogPipe[0] = -1;
 	}
 
-#ifdef USE_BONJOUR
-	/* If using Bonjour, close the connection to the mDNS daemon */
-	if (bonjour_sdref)
-		close(DNSServiceRefSockFD(bonjour_sdref));
-#endif
 }
 
 
@@ -2588,9 +2532,6 @@ pmdie(SIGNAL_ARGS)
 
 			/* Report status */
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
-#ifdef USE_SYSTEMD
-			sd_notify(0, "STOPPING=1");
-#endif
 
 			/*
 			 * If we reached normal running, we have to wait for any online
@@ -2634,9 +2575,6 @@ pmdie(SIGNAL_ARGS)
 
 			/* Report status */
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
-#ifdef USE_SYSTEMD
-			sd_notify(0, "STOPPING=1");
-#endif
 
 			if (pmState == PM_STARTUP || pmState == PM_RECOVERY)
 			{
@@ -2676,9 +2614,6 @@ pmdie(SIGNAL_ARGS)
 
 			/* Report status */
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
-#ifdef USE_SYSTEMD
-			sd_notify(0, "STOPPING=1");
-#endif
 
 			/* tell children to shut down ASAP */
 			SetQuitSignalReason(PMQUIT_FOR_STOP);
@@ -2841,9 +2776,6 @@ reaper(SIGNAL_ARGS)
 
 			/* Report status */
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_READY);
-#ifdef USE_SYSTEMD
-			sd_notify(0, "READY=1");
-#endif
 
 			continue;
 		}
@@ -4328,9 +4260,6 @@ sigusr1_handler(SIGNAL_ARGS)
 		if (!EnableHotStandby)
 		{
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STANDBY);
-#ifdef USE_SYSTEMD
-			sd_notify(0, "READY=1");
-#endif
 		}
 
 		pmState = PM_RECOVERY;
@@ -4350,9 +4279,6 @@ sigusr1_handler(SIGNAL_ARGS)
 
 		/* Report status */
 		AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_READY);
-#ifdef USE_SYSTEMD
-		sd_notify(0, "READY=1");
-#endif
 
 		pmState = PM_HOT_STANDBY;
 		connsAllowed = ALLOW_ALL_CONNS;
