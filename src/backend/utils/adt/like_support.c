@@ -303,8 +303,7 @@ match_pattern_prefix(Node *leftop,
 	switch (ldatatype)
 	{
 		case TEXTOID:
-			if (opfamily == TEXT_PATTERN_BTREE_FAM_OID ||
-				opfamily == TEXT_SPGIST_FAM_OID)
+			if (opfamily == TEXT_PATTERN_BTREE_FAM_OID)
 			{
 				eqopr = TextEqualOperator;
 				ltopr = TextPatternLessOperator;

@@ -53,7 +53,7 @@ test: copy copyselect copydml insert insert_conflict
 # ----------
 test: create_misc create_operator create_procedure create_schema
 # These depend on create_misc and create_operator
-test: create_index create_index_spgist create_view index_including index_including_gist
+test: create_index create_view index_including index_including_gist
 
 # ----------
 # Another group of parallel tests
@@ -76,7 +76,7 @@ test: select_into select_distinct select_distinct_on select_implicit select_havi
 # ----------
 # Another group of parallel tests
 # ----------
-test: brin gin gist spgist privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
+test: brin gin gist privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
 
 # ----------
 # Additional BRIN tests

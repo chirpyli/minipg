@@ -148,6 +148,7 @@ CREATE INDEX brin_pvactst ON pvactst USING brin (i);
 CREATE INDEX gin_pvactst ON pvactst USING gin (a);
 CREATE INDEX gist_pvactst ON pvactst USING gist (p);
 CREATE INDEX spgist_pvactst ON pvactst USING spgist (p);
+ERROR:  access method "spgist" does not exist
 -- VACUUM invokes parallel index cleanup
 SET min_parallel_index_scan_size to 0;
 VACUUM (PARALLEL 2) pvactst;

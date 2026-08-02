@@ -17,7 +17,6 @@
 #include "access/heapam_xlog.h"
 #include "access/multixact.h"
 #include "access/nbtxlog.h"
-#include "access/spgxlog.h"
 #include "access/xact.h"
 #include "access/xlog_internal.h"
 #include "catalog/storage_xlog.h"

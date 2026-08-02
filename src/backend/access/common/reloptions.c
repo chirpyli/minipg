@@ -23,7 +23,6 @@
 #include "access/htup_details.h"
 #include "access/nbtree.h"
 #include "access/reloptions.h"
-#include "access/spgist_private.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablespace.h"
@@ -204,16 +203,6 @@ static relopt_int intRelOpts[] =
 										 * inserts */
 		},
 		GIST_DEFAULT_FILLFACTOR, GIST_MIN_FILLFACTOR, 100
-	},
-	{
-		{
-			"fillfactor",
-			"Packs spgist index pages only to this percentage",
-			RELOPT_KIND_SPGIST,
-			ShareUpdateExclusiveLock	/* since it applies only to later
-										 * inserts */
-		},
-		SPGIST_DEFAULT_FILLFACTOR, SPGIST_MIN_FILLFACTOR, 100
 	},
 	{
 		{

@@ -41,7 +41,6 @@ OBJS = \
 	genfile.o \
 	geo_ops.o \
 	geo_selfuncs.o \
-	geo_spgist.o \
 	inet_cidr_ntop.o \
 	inet_net_pton.o \
 	int.o \
@@ -69,7 +68,6 @@ OBJS = \
 	network.o \
 	network_gist.o \
 	network_selfuncs.o \
-	network_spgist.o \
 	numeric.o \
 	numutils.o \
 	oid.o \
@@ -85,7 +83,6 @@ OBJS = \
 	rangetypes.o \
 	rangetypes_gist.o \
 	rangetypes_selfuncs.o \
-	rangetypes_spgist.o \
 	rangetypes_typanalyze.o \
 	regexp.o \
 	regproc.o \

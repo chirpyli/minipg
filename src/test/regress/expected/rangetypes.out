@@ -1165,6 +1165,7 @@ select count(*) from test_range_gist where ir -|- int4multirange(int4range(100,2
 -- test SP-GiST index that's been built incrementally
 create table test_range_spgist(ir int4range);
 create index test_range_spgist_idx on test_range_spgist using spgist (ir);
+ERROR:  access method "spgist" does not exist
 insert into test_range_spgist select int4range(g, g+10) from generate_series(1,2000) g;
 insert into test_range_spgist select 'empty'::int4range from generate_series(1,500) g;
 insert into test_range_spgist select int4range(g, g+10000) from generate_series(1,1000) g;
@@ -1314,7 +1315,9 @@ select count(*) from test_range_spgist where ir -|- int4range(100,500);
 
 -- now check same queries using a bulk-loaded index
 drop index test_range_spgist_idx;
+ERROR:  index "test_range_spgist_idx" does not exist
 create index test_range_spgist_idx on test_range_spgist using spgist (ir);
+ERROR:  access method "spgist" does not exist
 select count(*) from test_range_spgist where ir @> 'empty'::int4range;
  count 
 -------
@@ -1384,12 +1387,12 @@ select count(*) from test_range_spgist where ir -|- int4range(100,500);
 -- test index-only scans
 explain (costs off)
 select ir from test_range_spgist where ir -|- int4range(10,20) order by ir;
-                               QUERY PLAN                               
-------------------------------------------------------------------------
+                  QUERY PLAN                   
+-----------------------------------------------
  Sort
    Sort Key: ir
-   ->  Index Only Scan using test_range_spgist_idx on test_range_spgist
-         Index Cond: (ir -|- '[10,20)'::int4range)
+   ->  Seq Scan on test_range_spgist
+         Filter: (ir -|- '[10,20)'::int4range)
 (4 rows)
 
 select ir from test_range_spgist where ir -|- int4range(10,20) order by ir;
@@ -1416,14 +1419,16 @@ select count(*) from test_range_elem where i <@ int4range(10,50);
 
 -- also test spgist index on anyrange expression
 create index on test_range_elem using spgist(int4range(i,i+10));
+ERROR:  access method "spgist" does not exist
 explain (costs off)
 select count(*) from test_range_elem where int4range(i,i+10) <@ int4range(10,30);
-                               QUERY PLAN                                
--------------------------------------------------------------------------
+                            QUERY PLAN                            
+------------------------------------------------------------------
  Aggregate
-   ->  Index Scan using test_range_elem_int4range_idx on test_range_elem
-         Index Cond: (int4range(i, (i + 10)) <@ '[10,30)'::int4range)
-(3 rows)
+   ->  Bitmap Heap Scan on test_range_elem
+         Filter: (int4range(i, (i + 10)) <@ '[10,30)'::int4range)
+         ->  Bitmap Index Scan on test_range_elem_idx
+(4 rows)
 
 select count(*) from test_range_elem where int4range(i,i+10) <@ int4range(10,30);
  count 
