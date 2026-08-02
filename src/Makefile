@@ -18,7 +18,6 @@ SUBDIRS = \
 	timezone \
 	backend \
 	backend/utils/mb/conversion_procs \
-	backend/snowball \
 	include \
 	interfaces \
 	backend/replication/libpqwalreceiver \

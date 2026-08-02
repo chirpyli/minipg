@@ -21,8 +21,8 @@ SUBDIRS = access bootstrap catalog commands common datatype \
 	executor fe_utils foreign jit \
 	lib libpq mb nodes optimizer parser partitioning postmaster \
 	regex replication rewrite \
-	statistics storage tcop snowball snowball/libstemmer tsearch \
-	tsearch/dicts utils port port/atomics portability
+	statistics storage tcop \
+	utils port port/atomics portability
 
 # Install all headers
 install: all installdirs

@@ -23,8 +23,6 @@ CREATE TABLE datatype_table (
     v_float        FLOAT(1),
     v_float8       FLOAT8,
     v_money        MONEY,
-    v_tsquery      TSQUERY,
-    v_tsvector     TSVECTOR,
     v_date         DATE,
     v_time         TIME,
     v_time_tz      TIME WITH TIME ZONE,

@@ -244,15 +244,6 @@ CREATE TYPE unknown_comptype AS (
 	u unknown    -- fail
 );
 
-CREATE TABLE IF NOT EXISTS test_tsvector(
-	t text,
-	a tsvector
-);
-
-CREATE TABLE IF NOT EXISTS test_tsvector(
-	t text
-);
-
 -- invalid: non-lowercase quoted reloptions identifiers
 CREATE TABLE tas_case WITH ("Fillfactor" = 10) AS SELECT 1 a;
 

@@ -51,9 +51,6 @@ get_command_type(PG_FUNCTION_ARGS)
 		case SCT_CreateOpClass:
 			type = "create operator class";
 			break;
-		case SCT_AlterTSConfig:
-			type = "alter text search configuration";
-			break;
 		default:
 			type = "unknown command type";
 			break;

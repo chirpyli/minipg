@@ -148,16 +148,11 @@
   opfmethod => 'btree', opfname => 'enum_ops' },
 { oid => '3523',
   opfmethod => 'hash', opfname => 'enum_ops' },
-{ oid => '3626',
-  opfmethod => 'btree', opfname => 'tsvector_ops' },
-{ oid => '3655',
-  opfmethod => 'gist', opfname => 'tsvector_ops' },
-{ oid => '3659',
-  opfmethod => 'gin', opfname => 'tsvector_ops' },
-{ oid => '3683',
-  opfmethod => 'btree', opfname => 'tsquery_ops' },
-{ oid => '3702',
-  opfmethod => 'gist', opfname => 'tsquery_ops' },
+
+
+
+
+
 { oid => '3901',
   opfmethod => 'btree', opfname => 'range_ops' },
 { oid => '3903',

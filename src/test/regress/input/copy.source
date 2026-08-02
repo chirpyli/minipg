@@ -39,8 +39,6 @@ COPY hash_txt_heap FROM '@abs_srcdir@/data/hash.data';
 
 COPY hash_f8_heap FROM '@abs_srcdir@/data/hash.data';
 
-COPY test_tsvector FROM '@abs_srcdir@/data/tsearch.data';
-
 COPY testjsonb FROM '@abs_srcdir@/data/jsonb.data';
 
 -- the data in this file has a lot of duplicates in the index key
@@ -79,7 +77,6 @@ ANALYZE hash_i4_heap;
 ANALYZE hash_name_heap;
 ANALYZE hash_txt_heap;
 ANALYZE hash_f8_heap;
-ANALYZE test_tsvector;
 ANALYZE bt_i4_heap;
 ANALYZE bt_name_heap;
 ANALYZE bt_txt_heap;

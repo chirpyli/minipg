@@ -321,60 +321,6 @@ select description from pg_description
   where objoid = $1 and classoid = 'pg_class'::regclass and objsubid = $2;
 END;
 
-CREATE OR REPLACE FUNCTION ts_debug(config regconfig, document text,
-    OUT alias text,
-    OUT description text,
-    OUT token text,
-    OUT dictionaries regdictionary[],
-    OUT dictionary regdictionary,
-    OUT lexemes text[])
- RETURNS SETOF record
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-select
-    tt.alias AS alias,
-    tt.description AS description,
-    parse.token AS token,
-    ARRAY ( SELECT m.mapdict::regdictionary
-            FROM pg_ts_config_map AS m
-            WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
-            ORDER BY m.mapseqno )
-    AS dictionaries,
-    ( SELECT mapdict::regdictionary
-      FROM pg_ts_config_map AS m
-      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
-      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
-      LIMIT 1
-    ) AS dictionary,
-    ( SELECT ts_lexize(mapdict, parse.token)
-      FROM pg_ts_config_map AS m
-      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
-      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
-      LIMIT 1
-    ) AS lexemes
-FROM ts_parse(
-        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 ), $2
-    ) AS parse,
-     ts_token_type(
-        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 )
-    ) AS tt
-WHERE tt.tokid = parse.tokid;
-END;
-
-CREATE OR REPLACE FUNCTION ts_debug(document text,
-    OUT alias text,
-    OUT description text,
-    OUT token text,
-    OUT dictionaries regdictionary[],
-    OUT dictionary regdictionary,
-    OUT lexemes text[])
- RETURNS SETOF record
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-    SELECT * FROM ts_debug(get_current_ts_config(), $1);
-END;
 
 CREATE OR REPLACE FUNCTION
   pg_start_backup(label text, fast boolean DEFAULT false, exclusive boolean DEFAULT true)

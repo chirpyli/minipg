@@ -115,10 +115,6 @@ typedef enum ObjectClass
 	OCLASS_TRIGGER,				/* pg_trigger */
 	OCLASS_SCHEMA,				/* pg_namespace */
 	OCLASS_STATISTIC_EXT,		/* pg_statistic_ext */
-	OCLASS_TSPARSER,			/* pg_ts_parser */
-	OCLASS_TSDICT,				/* pg_ts_dict */
-	OCLASS_TSTEMPLATE,			/* pg_ts_template */
-	OCLASS_TSCONFIG,			/* pg_ts_config */
 	OCLASS_ROLE,				/* pg_authid */
 	OCLASS_DATABASE,			/* pg_database */
 	OCLASS_TBLSPACE,			/* pg_tablespace */

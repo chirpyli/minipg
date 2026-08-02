@@ -20,7 +20,7 @@ include $(top_builddir)/src/Makefile.global
 SUBDIRS = access bootstrap catalog parser commands executor foreign lib libpq \
 	main nodes optimizer partitioning port postmaster \
 	regex replication rewrite \
-	statistics storage tcop tsearch utils $(top_builddir)/src/timezone \
+	statistics storage tcop utils $(top_builddir)/src/timezone \
 	jit
 
 include $(srcdir)/common.mk
@@ -206,7 +206,6 @@ ifeq ($(MAKE_DLL), true)
 endif
 endif
 	$(MAKE) -C catalog install-data
-	$(MAKE) -C tsearch install-data
 	$(MAKE) -C utils install-data
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_hba.conf.sample '$(DESTDIR)$(datadir)/pg_hba.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
@@ -271,7 +270,6 @@ ifeq ($(MAKE_DLL), true)
 endif
 endif
 	$(MAKE) -C catalog uninstall-data
-	$(MAKE) -C tsearch uninstall-data
 	$(MAKE) -C utils uninstall-data
 	rm -f '$(DESTDIR)$(datadir)/pg_hba.conf.sample' \
 	      '$(DESTDIR)$(datadir)/pg_ident.conf.sample' \

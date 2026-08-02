@@ -96,18 +96,6 @@ OBJS = \
 	tid.o \
 	timestamp.o \
 	trigfuncs.o \
-	tsginidx.o \
-	tsgistidx.o \
-	tsquery.o \
-	tsquery_cleanup.o \
-	tsquery_gist.o \
-	tsquery_op.o \
-	tsquery_rewrite.o \
-	tsquery_util.o \
-	tsrank.o \
-	tsvector.o \
-	tsvector_op.o \
-	tsvector_parser.o \
 	uuid.o \
 	varbit.o \
 	varchar.o \

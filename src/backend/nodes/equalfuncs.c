@@ -2261,30 +2261,6 @@ _equalReassignOwnedStmt(const ReassignOwnedStmt *a, const ReassignOwnedStmt *b)
 }
 
 static bool
-_equalAlterTSDictionaryStmt(const AlterTSDictionaryStmt *a, const AlterTSDictionaryStmt *b)
-{
-	COMPARE_NODE_FIELD(dictname);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterTSConfigurationStmt(const AlterTSConfigurationStmt *a,
-							   const AlterTSConfigurationStmt *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_NODE_FIELD(cfgname);
-	COMPARE_NODE_FIELD(tokentype);
-	COMPARE_NODE_FIELD(dicts);
-	COMPARE_SCALAR_FIELD(override);
-	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
 _equalCreatePublicationStmt(const CreatePublicationStmt *a,
 							const CreatePublicationStmt *b)
 {
@@ -3676,12 +3652,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ReassignOwnedStmt:
 			retval = _equalReassignOwnedStmt(a, b);
-			break;
-		case T_AlterTSDictionaryStmt:
-			retval = _equalAlterTSDictionaryStmt(a, b);
-			break;
-		case T_AlterTSConfigurationStmt:
-			retval = _equalAlterTSConfigurationStmt(a, b);
 			break;
 		case T_CreatePolicyStmt:
 			retval = _equalCreatePolicyStmt(a, b);

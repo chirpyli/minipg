@@ -1816,10 +1816,6 @@ typedef enum ObjectType
 	OBJECT_TABLESPACE,
 	OBJECT_TRANSFORM,
 	OBJECT_TRIGGER,
-	OBJECT_TSCONFIGURATION,
-	OBJECT_TSDICTIONARY,
-	OBJECT_TSPARSER,
-	OBJECT_TSTEMPLATE,
 	OBJECT_TYPE,
 	OBJECT_USER_MAPPING,
 	OBJECT_VIEW
@@ -3583,46 +3579,6 @@ typedef struct ReassignOwnedStmt
 	List	   *roles;
 	RoleSpec   *newrole;
 } ReassignOwnedStmt;
-
-/*
- * TS Dictionary stmts: DefineStmt, RenameStmt and DropStmt are default
- */
-typedef struct AlterTSDictionaryStmt
-{
-	NodeTag		type;
-	List	   *dictname;		/* qualified name (list of Value strings) */
-	List	   *options;		/* List of DefElem nodes */
-} AlterTSDictionaryStmt;
-
-/*
- * TS Configuration stmts: DefineStmt, RenameStmt and DropStmt are default
- */
-typedef enum AlterTSConfigType
-{
-	ALTER_TSCONFIG_ADD_MAPPING,
-	ALTER_TSCONFIG_ALTER_MAPPING_FOR_TOKEN,
-	ALTER_TSCONFIG_REPLACE_DICT,
-	ALTER_TSCONFIG_REPLACE_DICT_FOR_TOKEN,
-	ALTER_TSCONFIG_DROP_MAPPING
-} AlterTSConfigType;
-
-typedef struct AlterTSConfigurationStmt
-{
-	NodeTag		type;
-	AlterTSConfigType kind;		/* ALTER_TSCONFIG_ADD_MAPPING, etc */
-	List	   *cfgname;		/* qualified name (list of Value strings) */
-
-	/*
-	 * dicts will be non-NIL if ADD/ALTER MAPPING was specified. If dicts is
-	 * NIL, but tokentype isn't, DROP MAPPING was specified.
-	 */
-	List	   *tokentype;		/* list of Value strings */
-	List	   *dicts;			/* list of list of Value strings */
-	bool		override;		/* if true - remove old variant */
-	bool		replace;		/* if true - replace dictionary by another */
-	bool		missing_ok;		/* for DROP - skip error if missing? */
-} AlterTSConfigurationStmt;
-
 
 typedef struct CreatePublicationStmt
 {

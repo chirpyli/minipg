@@ -26,7 +26,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_trigger.h"
-#include "catalog/pg_ts_config.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/event_trigger.h"
@@ -984,10 +983,6 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_TABLE:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 		case OBJECT_TYPE:
 		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
@@ -1039,10 +1034,6 @@ EventTriggerSupportsObjectClass(ObjectClass objclass)
 		case OCLASS_TRIGGER:
 		case OCLASS_SCHEMA:
 		case OCLASS_STATISTIC_EXT:
-		case OCLASS_TSPARSER:
-		case OCLASS_TSDICT:
-		case OCLASS_TSTEMPLATE:
-		case OCLASS_TSCONFIG:
 		case OCLASS_FDW:
 		case OCLASS_FOREIGN_SERVER:
 		case OCLASS_USER_MAPPING:
@@ -1776,44 +1767,6 @@ EventTriggerCollectCreateOpClass(CreateOpClassStmt *stmt, Oid opcoid,
 }
 
 /*
- * EventTriggerCollectAlterTSConfig
- *		Save data about an ALTER TEXT SEARCH CONFIGURATION command being
- *		executed
- */
-void
-EventTriggerCollectAlterTSConfig(AlterTSConfigurationStmt *stmt, Oid cfgId,
-								 Oid *dictIds, int ndicts)
-{
-	MemoryContext oldcxt;
-	CollectedCommand *command;
-
-	/* ignore if event trigger context not set, or collection disabled */
-	if (!currentEventTriggerState ||
-		currentEventTriggerState->commandCollectionInhibited)
-		return;
-
-	oldcxt = MemoryContextSwitchTo(currentEventTriggerState->cxt);
-
-	command = palloc0(sizeof(CollectedCommand));
-	command->type = SCT_AlterTSConfig;
-	command->in_extension = creating_extension;
-	ObjectAddressSet(command->d.atscfg.address,
-					 TSConfigRelationId, cfgId);
-	if (ndicts > 0)
-	{
-		command->d.atscfg.dictIds = palloc_array(Oid, ndicts);
-		memcpy(command->d.atscfg.dictIds, dictIds, sizeof(Oid) * ndicts);
-	}
-	command->d.atscfg.ndicts = ndicts;
-	command->parsetree = (Node *) copyObject(stmt);
-
-	currentEventTriggerState->commandList =
-		lappend(currentEventTriggerState->commandList, command);
-
-	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
  * EventTriggerCollectAlterDefPrivs
  *		Save data about an ALTER DEFAULT PRIVILEGES command being
  *		executed
@@ -1920,7 +1873,6 @@ pg_event_trigger_ddl_commands(PG_FUNCTION_ARGS)
 			case SCT_AlterTable:
 			case SCT_AlterOpFamily:
 			case SCT_CreateOpClass:
-			case SCT_AlterTSConfig:
 				{
 					char	   *identity;
 					char	   *type;
@@ -1936,8 +1888,6 @@ pg_event_trigger_ddl_commands(PG_FUNCTION_ARGS)
 						addr = cmd->d.opfam.address;
 					else if (cmd->type == SCT_CreateOpClass)
 						addr = cmd->d.createopc.address;
-					else if (cmd->type == SCT_AlterTSConfig)
-						addr = cmd->d.atscfg.address;
 
 					/*
 					 * If an object was dropped in the same command we may end
@@ -2141,10 +2091,6 @@ stringify_grant_objtype(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
 			elog(ERROR, "unsupported object type: %d", (int) objtype);
@@ -2223,10 +2169,6 @@ stringify_adefprivs_objtype(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
 			elog(ERROR, "unsupported object type: %d", (int) objtype);

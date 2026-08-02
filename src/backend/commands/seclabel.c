@@ -85,10 +85,6 @@ SecLabelSupportsObjectType(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 		case OBJECT_USER_MAPPING:
 			return false;
 

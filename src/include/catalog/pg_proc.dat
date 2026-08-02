@@ -6153,23 +6153,10 @@
   proname => 'pg_statistics_obj_is_visible', procost => '10',
   provolatile => 's', prorettype => 'bool', proargtypes => 'oid',
   prosrc => 'pg_statistics_obj_is_visible' },
-{ oid => '3756', descr => 'is text search parser visible in search path?',
-  proname => 'pg_ts_parser_is_visible', procost => '10', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'oid',
-  prosrc => 'pg_ts_parser_is_visible' },
-{ oid => '3757', descr => 'is text search dictionary visible in search path?',
-  proname => 'pg_ts_dict_is_visible', procost => '10', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'oid',
-  prosrc => 'pg_ts_dict_is_visible' },
-{ oid => '3768', descr => 'is text search template visible in search path?',
-  proname => 'pg_ts_template_is_visible', procost => '10', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'oid',
-  prosrc => 'pg_ts_template_is_visible' },
-{ oid => '3758',
-  descr => 'is text search configuration visible in search path?',
-  proname => 'pg_ts_config_is_visible', procost => '10', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'oid',
-  prosrc => 'pg_ts_config_is_visible' },
+
+
+
+
 { oid => '3815', descr => 'is collation visible in search path?',
   proname => 'pg_collation_is_visible', procost => '10', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid',
@@ -8959,564 +8946,193 @@
   proargtypes => 'anyenum', prosrc => 'enum_send' },
 
 # text search stuff
-{ oid => '3610', descr => 'I/O',
-  proname => 'tsvectorin', prorettype => 'tsvector', proargtypes => 'cstring',
-  prosrc => 'tsvectorin' },
-{ oid => '3639', descr => 'I/O',
-  proname => 'tsvectorrecv', prorettype => 'tsvector',
-  proargtypes => 'internal', prosrc => 'tsvectorrecv' },
-{ oid => '3611', descr => 'I/O',
-  proname => 'tsvectorout', prorettype => 'cstring', proargtypes => 'tsvector',
-  prosrc => 'tsvectorout' },
-{ oid => '3638', descr => 'I/O',
-  proname => 'tsvectorsend', prorettype => 'bytea', proargtypes => 'tsvector',
-  prosrc => 'tsvectorsend' },
-{ oid => '3612', descr => 'I/O',
-  proname => 'tsqueryin', prorettype => 'tsquery', proargtypes => 'cstring',
-  prosrc => 'tsqueryin' },
-{ oid => '3641', descr => 'I/O',
-  proname => 'tsqueryrecv', prorettype => 'tsquery', proargtypes => 'internal',
-  prosrc => 'tsqueryrecv' },
-{ oid => '3613', descr => 'I/O',
-  proname => 'tsqueryout', prorettype => 'cstring', proargtypes => 'tsquery',
-  prosrc => 'tsqueryout' },
-{ oid => '3640', descr => 'I/O',
-  proname => 'tsquerysend', prorettype => 'bytea', proargtypes => 'tsquery',
-  prosrc => 'tsquerysend' },
-{ oid => '3646', descr => 'I/O',
-  proname => 'gtsvectorin', prorettype => 'gtsvector', proargtypes => 'cstring',
-  prosrc => 'gtsvectorin' },
-{ oid => '3647', descr => 'I/O',
-  proname => 'gtsvectorout', prorettype => 'cstring',
-  proargtypes => 'gtsvector', prosrc => 'gtsvectorout' },
 
-{ oid => '3616',
-  proname => 'tsvector_lt', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_lt' },
-{ oid => '3617',
-  proname => 'tsvector_le', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_le' },
-{ oid => '3618',
-  proname => 'tsvector_eq', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_eq' },
-{ oid => '3619',
-  proname => 'tsvector_ne', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_ne' },
-{ oid => '3620',
-  proname => 'tsvector_ge', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_ge' },
-{ oid => '3621',
-  proname => 'tsvector_gt', prorettype => 'bool',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_gt' },
-{ oid => '3622', descr => 'less-equal-greater',
-  proname => 'tsvector_cmp', prorettype => 'int4',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_cmp' },
 
-{ oid => '3711', descr => 'number of lexemes',
-  proname => 'length', prorettype => 'int4', proargtypes => 'tsvector',
-  prosrc => 'tsvector_length' },
-{ oid => '3623', descr => 'strip position information',
-  proname => 'strip', prorettype => 'tsvector', proargtypes => 'tsvector',
-  prosrc => 'tsvector_strip' },
-{ oid => '3624', descr => 'set given weight for whole tsvector',
-  proname => 'setweight', prorettype => 'tsvector',
-  proargtypes => 'tsvector char', prosrc => 'tsvector_setweight' },
-{ oid => '3320', descr => 'set given weight for given lexemes',
-  proname => 'setweight', prorettype => 'tsvector',
-  proargtypes => 'tsvector char _text',
-  prosrc => 'tsvector_setweight_by_filter' },
-{ oid => '3625',
-  proname => 'tsvector_concat', prorettype => 'tsvector',
-  proargtypes => 'tsvector tsvector', prosrc => 'tsvector_concat' },
-{ oid => '3321', descr => 'delete lexeme',
-  proname => 'ts_delete', prorettype => 'tsvector',
-  proargtypes => 'tsvector text', prosrc => 'tsvector_delete_str' },
-{ oid => '3323', descr => 'delete given lexemes',
-  proname => 'ts_delete', prorettype => 'tsvector',
-  proargtypes => 'tsvector _text', prosrc => 'tsvector_delete_arr' },
-{ oid => '3322', descr => 'expand tsvector to set of rows',
-  proname => 'unnest', prorows => '10', proretset => 't',
-  prorettype => 'record', proargtypes => 'tsvector',
-  proallargtypes => '{tsvector,text,_int2,_text}', proargmodes => '{i,o,o,o}',
-  proargnames => '{tsvector,lexeme,positions,weights}',
-  prosrc => 'tsvector_unnest' },
-{ oid => '3326', descr => 'convert tsvector to array of lexemes',
-  proname => 'tsvector_to_array', prorettype => '_text',
-  proargtypes => 'tsvector', prosrc => 'tsvector_to_array' },
-{ oid => '3327', descr => 'build tsvector from array of lexemes',
-  proname => 'array_to_tsvector', prorettype => 'tsvector',
-  proargtypes => '_text', prosrc => 'array_to_tsvector' },
-{ oid => '3319',
-  descr => 'delete lexemes that do not have one of the given weights',
-  proname => 'ts_filter', prorettype => 'tsvector',
-  proargtypes => 'tsvector _char', prosrc => 'tsvector_filter' },
 
-{ oid => '3634',
-  proname => 'ts_match_vq', prorettype => 'bool',
-  proargtypes => 'tsvector tsquery', prosrc => 'ts_match_vq' },
-{ oid => '3635',
-  proname => 'ts_match_qv', prorettype => 'bool',
-  proargtypes => 'tsquery tsvector', prosrc => 'ts_match_qv' },
-{ oid => '3760',
-  proname => 'ts_match_tt', procost => '100', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'text text', prosrc => 'ts_match_tt' },
-{ oid => '3761',
-  proname => 'ts_match_tq', procost => '100', provolatile => 's',
-  prorettype => 'bool', proargtypes => 'text tsquery',
-  prosrc => 'ts_match_tq' },
 
-{ oid => '3648', descr => 'GiST tsvector support',
-  proname => 'gtsvector_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gtsvector_compress' },
-{ oid => '3649', descr => 'GiST tsvector support',
-  proname => 'gtsvector_decompress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gtsvector_decompress' },
-{ oid => '3650', descr => 'GiST tsvector support',
-  proname => 'gtsvector_picksplit', prorettype => 'internal',
-  proargtypes => 'internal internal', prosrc => 'gtsvector_picksplit' },
-{ oid => '3651', descr => 'GiST tsvector support',
-  proname => 'gtsvector_union', prorettype => 'gtsvector',
-  proargtypes => 'internal internal', prosrc => 'gtsvector_union' },
-{ oid => '3652', descr => 'GiST tsvector support',
-  proname => 'gtsvector_same', prorettype => 'internal',
-  proargtypes => 'gtsvector gtsvector internal', prosrc => 'gtsvector_same' },
-{ oid => '3653', descr => 'GiST tsvector support',
-  proname => 'gtsvector_penalty', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'gtsvector_penalty' },
-{ oid => '3654', descr => 'GiST tsvector support',
-  proname => 'gtsvector_consistent', prorettype => 'bool',
-  proargtypes => 'internal tsvector int2 oid internal',
-  prosrc => 'gtsvector_consistent' },
-{ oid => '3790', descr => 'GiST tsvector support (obsolete)',
-  proname => 'gtsvector_consistent', prorettype => 'bool',
-  proargtypes => 'internal gtsvector int4 oid internal',
-  prosrc => 'gtsvector_consistent_oldsig' },
-{ oid => '3434', descr => 'GiST tsvector support',
-  proname => 'gtsvector_options', proisstrict => 'f', prorettype => 'void',
-  proargtypes => 'internal', prosrc => 'gtsvector_options' },
 
-{ oid => '3656', descr => 'GIN tsvector support',
-  proname => 'gin_extract_tsvector', prorettype => 'internal',
-  proargtypes => 'tsvector internal internal',
-  prosrc => 'gin_extract_tsvector' },
-{ oid => '3657', descr => 'GIN tsvector support',
-  proname => 'gin_extract_tsquery', prorettype => 'internal',
-  proargtypes => 'tsvector internal int2 internal internal internal internal',
-  prosrc => 'gin_extract_tsquery' },
-{ oid => '3658', descr => 'GIN tsvector support',
-  proname => 'gin_tsquery_consistent', prorettype => 'bool',
-  proargtypes => 'internal int2 tsvector int4 internal internal internal internal',
-  prosrc => 'gin_tsquery_consistent' },
-{ oid => '3921', descr => 'GIN tsvector support',
-  proname => 'gin_tsquery_triconsistent', prorettype => 'char',
-  proargtypes => 'internal int2 tsvector int4 internal internal internal',
-  prosrc => 'gin_tsquery_triconsistent' },
-{ oid => '3724', descr => 'GIN tsvector support',
-  proname => 'gin_cmp_tslexeme', prorettype => 'int4',
-  proargtypes => 'text text', prosrc => 'gin_cmp_tslexeme' },
-{ oid => '2700', descr => 'GIN tsvector support',
-  proname => 'gin_cmp_prefix', prorettype => 'int4',
-  proargtypes => 'text text int2 internal', prosrc => 'gin_cmp_prefix' },
-{ oid => '3077', descr => 'GIN tsvector support (obsolete)',
-  proname => 'gin_extract_tsvector', prorettype => 'internal',
-  proargtypes => 'tsvector internal', prosrc => 'gin_extract_tsvector_2args' },
-{ oid => '3087', descr => 'GIN tsvector support (obsolete)',
-  proname => 'gin_extract_tsquery', prorettype => 'internal',
-  proargtypes => 'tsquery internal int2 internal internal',
-  prosrc => 'gin_extract_tsquery_5args' },
-{ oid => '3088', descr => 'GIN tsvector support (obsolete)',
-  proname => 'gin_tsquery_consistent', prorettype => 'bool',
-  proargtypes => 'internal int2 tsquery int4 internal internal',
-  prosrc => 'gin_tsquery_consistent_6args' },
-{ oid => '3791', descr => 'GIN tsvector support (obsolete)',
-  proname => 'gin_extract_tsquery', prorettype => 'internal',
-  proargtypes => 'tsquery internal int2 internal internal internal internal',
-  prosrc => 'gin_extract_tsquery_oldsig' },
-{ oid => '3792', descr => 'GIN tsvector support (obsolete)',
-  proname => 'gin_tsquery_consistent', prorettype => 'bool',
-  proargtypes => 'internal int2 tsquery int4 internal internal internal internal',
-  prosrc => 'gin_tsquery_consistent_oldsig' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '3789', descr => 'clean up GIN pending list',
   proname => 'gin_clean_pending_list', provolatile => 'v', proparallel => 'u',
   prorettype => 'int8', proargtypes => 'regclass',
   prosrc => 'gin_clean_pending_list' },
 
-{ oid => '3662',
-  proname => 'tsquery_lt', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_lt' },
-{ oid => '3663',
-  proname => 'tsquery_le', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_le' },
-{ oid => '3664',
-  proname => 'tsquery_eq', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_eq' },
-{ oid => '3665',
-  proname => 'tsquery_ne', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_ne' },
-{ oid => '3666',
-  proname => 'tsquery_ge', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_ge' },
-{ oid => '3667',
-  proname => 'tsquery_gt', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_gt' },
-{ oid => '3668', descr => 'less-equal-greater',
-  proname => 'tsquery_cmp', prorettype => 'int4',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_cmp' },
 
-{ oid => '3669',
-  proname => 'tsquery_and', prorettype => 'tsquery',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_and' },
-{ oid => '3670',
-  proname => 'tsquery_or', prorettype => 'tsquery',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_or' },
-{ oid => '5003',
-  proname => 'tsquery_phrase', prorettype => 'tsquery',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsquery_phrase' },
-{ oid => '5004', descr => 'phrase-concatenate with distance',
-  proname => 'tsquery_phrase', prorettype => 'tsquery',
-  proargtypes => 'tsquery tsquery int4', prosrc => 'tsquery_phrase_distance' },
-{ oid => '3671',
-  proname => 'tsquery_not', prorettype => 'tsquery', proargtypes => 'tsquery',
-  prosrc => 'tsquery_not' },
 
-{ oid => '3691',
-  proname => 'tsq_mcontains', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsq_mcontains' },
-{ oid => '3692',
-  proname => 'tsq_mcontained', prorettype => 'bool',
-  proargtypes => 'tsquery tsquery', prosrc => 'tsq_mcontained' },
 
-{ oid => '3672', descr => 'number of nodes',
-  proname => 'numnode', prorettype => 'int4', proargtypes => 'tsquery',
-  prosrc => 'tsquery_numnode' },
-{ oid => '3673', descr => 'show real useful query for GiST index',
-  proname => 'querytree', prorettype => 'text', proargtypes => 'tsquery',
-  prosrc => 'tsquerytree' },
 
-{ oid => '3684', descr => 'rewrite tsquery',
-  proname => 'ts_rewrite', prorettype => 'tsquery',
-  proargtypes => 'tsquery tsquery tsquery', prosrc => 'tsquery_rewrite' },
-{ oid => '3685', descr => 'rewrite tsquery',
-  proname => 'ts_rewrite', procost => '100', provolatile => 'v',
-  proparallel => 'u', prorettype => 'tsquery', proargtypes => 'tsquery text',
-  prosrc => 'tsquery_rewrite_query' },
 
-{ oid => '3695', descr => 'GiST tsquery support',
-  proname => 'gtsquery_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gtsquery_compress' },
-{ oid => '3697', descr => 'GiST tsquery support',
-  proname => 'gtsquery_picksplit', prorettype => 'internal',
-  proargtypes => 'internal internal', prosrc => 'gtsquery_picksplit' },
-{ oid => '3698', descr => 'GiST tsquery support',
-  proname => 'gtsquery_union', prorettype => 'int8',
-  proargtypes => 'internal internal', prosrc => 'gtsquery_union' },
-{ oid => '3699', descr => 'GiST tsquery support',
-  proname => 'gtsquery_same', prorettype => 'internal',
-  proargtypes => 'int8 int8 internal', prosrc => 'gtsquery_same' },
-{ oid => '3700', descr => 'GiST tsquery support',
-  proname => 'gtsquery_penalty', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'gtsquery_penalty' },
-{ oid => '3701', descr => 'GiST tsquery support',
-  proname => 'gtsquery_consistent', prorettype => 'bool',
-  proargtypes => 'internal tsquery int2 oid internal',
-  prosrc => 'gtsquery_consistent' },
-{ oid => '3793', descr => 'GiST tsquery support (obsolete)',
-  proname => 'gtsquery_consistent', prorettype => 'bool',
-  proargtypes => 'internal internal int4 oid internal',
-  prosrc => 'gtsquery_consistent_oldsig' },
 
-{ oid => '3686', descr => 'restriction selectivity of tsvector @@ tsquery',
-  proname => 'tsmatchsel', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'internal oid internal int4', prosrc => 'tsmatchsel' },
-{ oid => '3687', descr => 'join selectivity of tsvector @@ tsquery',
-  proname => 'tsmatchjoinsel', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'internal oid internal int2 internal',
-  prosrc => 'tsmatchjoinsel' },
-{ oid => '3688', descr => 'tsvector typanalyze',
-  proname => 'ts_typanalyze', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'internal', prosrc => 'ts_typanalyze' },
 
-{ oid => '3689', descr => 'statistics of tsvector column',
-  proname => 'ts_stat', procost => '10', prorows => '10000', proretset => 't',
-  provolatile => 'v', proparallel => 'u', prorettype => 'record',
-  proargtypes => 'text', proallargtypes => '{text,text,int4,int4}',
-  proargmodes => '{i,o,o,o}', proargnames => '{query,word,ndoc,nentry}',
-  prosrc => 'ts_stat1' },
-{ oid => '3690', descr => 'statistics of tsvector column',
-  proname => 'ts_stat', procost => '10', prorows => '10000', proretset => 't',
-  provolatile => 'v', proparallel => 'u', prorettype => 'record',
-  proargtypes => 'text text', proallargtypes => '{text,text,text,int4,int4}',
-  proargmodes => '{i,i,o,o,o}',
-  proargnames => '{query,weights,word,ndoc,nentry}', prosrc => 'ts_stat2' },
 
-{ oid => '3703', descr => 'relevance',
-  proname => 'ts_rank', prorettype => 'float4',
-  proargtypes => '_float4 tsvector tsquery int4', prosrc => 'ts_rank_wttf' },
-{ oid => '3704', descr => 'relevance',
-  proname => 'ts_rank', prorettype => 'float4',
-  proargtypes => '_float4 tsvector tsquery', prosrc => 'ts_rank_wtt' },
-{ oid => '3705', descr => 'relevance',
-  proname => 'ts_rank', prorettype => 'float4',
-  proargtypes => 'tsvector tsquery int4', prosrc => 'ts_rank_ttf' },
-{ oid => '3706', descr => 'relevance',
-  proname => 'ts_rank', prorettype => 'float4',
-  proargtypes => 'tsvector tsquery', prosrc => 'ts_rank_tt' },
-{ oid => '3707', descr => 'relevance',
-  proname => 'ts_rank_cd', prorettype => 'float4',
-  proargtypes => '_float4 tsvector tsquery int4', prosrc => 'ts_rankcd_wttf' },
-{ oid => '3708', descr => 'relevance',
-  proname => 'ts_rank_cd', prorettype => 'float4',
-  proargtypes => '_float4 tsvector tsquery', prosrc => 'ts_rankcd_wtt' },
-{ oid => '3709', descr => 'relevance',
-  proname => 'ts_rank_cd', prorettype => 'float4',
-  proargtypes => 'tsvector tsquery int4', prosrc => 'ts_rankcd_ttf' },
-{ oid => '3710', descr => 'relevance',
-  proname => 'ts_rank_cd', prorettype => 'float4',
-  proargtypes => 'tsvector tsquery', prosrc => 'ts_rankcd_tt' },
 
-{ oid => '3713', descr => 'get parser\'s token types',
-  proname => 'ts_token_type', prorows => '16', proretset => 't',
-  prorettype => 'record', proargtypes => 'oid',
-  proallargtypes => '{oid,int4,text,text}', proargmodes => '{i,o,o,o}',
-  proargnames => '{parser_oid,tokid,alias,description}',
-  prosrc => 'ts_token_type_byid' },
-{ oid => '3714', descr => 'get parser\'s token types',
-  proname => 'ts_token_type', prorows => '16', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => 'text',
-  proallargtypes => '{text,int4,text,text}', proargmodes => '{i,o,o,o}',
-  proargnames => '{parser_name,tokid,alias,description}',
-  prosrc => 'ts_token_type_byname' },
-{ oid => '3715', descr => 'parse text to tokens',
-  proname => 'ts_parse', prorows => '1000', proretset => 't',
-  prorettype => 'record', proargtypes => 'oid text',
-  proallargtypes => '{oid,text,int4,text}', proargmodes => '{i,i,o,o}',
-  proargnames => '{parser_oid,txt,tokid,token}', prosrc => 'ts_parse_byid' },
-{ oid => '3716', descr => 'parse text to tokens',
-  proname => 'ts_parse', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => 'text text',
-  proallargtypes => '{text,text,int4,text}', proargmodes => '{i,i,o,o}',
-  proargnames => '{parser_name,txt,tokid,token}', prosrc => 'ts_parse_byname' },
 
-{ oid => '3717', descr => '(internal)',
-  proname => 'prsd_start', prorettype => 'internal',
-  proargtypes => 'internal int4', prosrc => 'prsd_start' },
-{ oid => '3718', descr => '(internal)',
-  proname => 'prsd_nexttoken', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'prsd_nexttoken' },
-{ oid => '3719', descr => '(internal)',
-  proname => 'prsd_end', prorettype => 'void', proargtypes => 'internal',
-  prosrc => 'prsd_end' },
-{ oid => '3720', descr => '(internal)',
-  proname => 'prsd_headline', prorettype => 'internal',
-  proargtypes => 'internal internal tsquery', prosrc => 'prsd_headline' },
-{ oid => '3721', descr => '(internal)',
-  proname => 'prsd_lextype', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'prsd_lextype' },
 
-{ oid => '3723', descr => 'normalize one word by dictionary',
-  proname => 'ts_lexize', prorettype => '_text',
-  proargtypes => 'regdictionary text', prosrc => 'ts_lexize' },
 
-{ oid => '6183', descr => 'debug function for text search configuration',
-  proname => 'ts_debug', prolang => 'sql', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => 'regconfig text',
-  proallargtypes => '{regconfig,text,text,text,text,_regdictionary,regdictionary,_text}',
-  proargmodes => '{i,i,o,o,o,o,o,o}',
-  proargnames => '{config,document,alias,description,token,dictionaries,dictionary,lexemes}',
-  prosrc => 'see system_functions.sql' },
 
-{ oid => '6184',
-  descr => 'debug function for current text search configuration',
-  proname => 'ts_debug', prolang => 'sql', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => 'text',
-  proallargtypes => '{text,text,text,text,_regdictionary,regdictionary,_text}',
-  proargmodes => '{i,o,o,o,o,o,o}',
-  proargnames => '{document,alias,description,token,dictionaries,dictionary,lexemes}',
-  prosrc => 'see system_functions.sql' },
 
-{ oid => '3725', descr => '(internal)',
-  proname => 'dsimple_init', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'dsimple_init' },
-{ oid => '3726', descr => '(internal)',
-  proname => 'dsimple_lexize', prorettype => 'internal',
-  proargtypes => 'internal internal internal internal',
-  prosrc => 'dsimple_lexize' },
 
-{ oid => '3728', descr => '(internal)',
-  proname => 'dsynonym_init', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'dsynonym_init' },
-{ oid => '3729', descr => '(internal)',
-  proname => 'dsynonym_lexize', prorettype => 'internal',
-  proargtypes => 'internal internal internal internal',
-  prosrc => 'dsynonym_lexize' },
 
-{ oid => '3731', descr => '(internal)',
-  proname => 'dispell_init', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'dispell_init' },
-{ oid => '3732', descr => '(internal)',
-  proname => 'dispell_lexize', prorettype => 'internal',
-  proargtypes => 'internal internal internal internal',
-  prosrc => 'dispell_lexize' },
 
-{ oid => '3740', descr => '(internal)',
-  proname => 'thesaurus_init', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'thesaurus_init' },
-{ oid => '3741', descr => '(internal)',
-  proname => 'thesaurus_lexize', prorettype => 'internal',
-  proargtypes => 'internal internal internal internal',
-  prosrc => 'thesaurus_lexize' },
 
-{ oid => '3743', descr => 'generate headline',
-  proname => 'ts_headline', procost => '100', prorettype => 'text',
-  proargtypes => 'regconfig text tsquery text',
-  prosrc => 'ts_headline_byid_opt' },
-{ oid => '3744', descr => 'generate headline',
-  proname => 'ts_headline', procost => '100', prorettype => 'text',
-  proargtypes => 'regconfig text tsquery', prosrc => 'ts_headline_byid' },
-{ oid => '3754', descr => 'generate headline',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'text', proargtypes => 'text tsquery text',
-  prosrc => 'ts_headline_opt' },
-{ oid => '3755', descr => 'generate headline',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'text', proargtypes => 'text tsquery',
-  prosrc => 'ts_headline' },
 
-{ oid => '4201', descr => 'generate headline from jsonb',
-  proname => 'ts_headline', procost => '100', prorettype => 'jsonb',
-  proargtypes => 'regconfig jsonb tsquery text',
-  prosrc => 'ts_headline_jsonb_byid_opt' },
-{ oid => '4202', descr => 'generate headline from jsonb',
-  proname => 'ts_headline', procost => '100', prorettype => 'jsonb',
-  proargtypes => 'regconfig jsonb tsquery',
-  prosrc => 'ts_headline_jsonb_byid' },
-{ oid => '4203', descr => 'generate headline from jsonb',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'jsonb tsquery text',
-  prosrc => 'ts_headline_jsonb_opt' },
-{ oid => '4204', descr => 'generate headline from jsonb',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'jsonb tsquery',
-  prosrc => 'ts_headline_jsonb' },
 
-{ oid => '4205', descr => 'generate headline from json',
-  proname => 'ts_headline', procost => '100', prorettype => 'json',
-  proargtypes => 'regconfig json tsquery text',
-  prosrc => 'ts_headline_json_byid_opt' },
-{ oid => '4206', descr => 'generate headline from json',
-  proname => 'ts_headline', procost => '100', prorettype => 'json',
-  proargtypes => 'regconfig json tsquery', prosrc => 'ts_headline_json_byid' },
-{ oid => '4207', descr => 'generate headline from json',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'json', proargtypes => 'json tsquery text',
-  prosrc => 'ts_headline_json_opt' },
-{ oid => '4208', descr => 'generate headline from json',
-  proname => 'ts_headline', procost => '100', provolatile => 's',
-  prorettype => 'json', proargtypes => 'json tsquery',
-  prosrc => 'ts_headline_json' },
 
-{ oid => '3745', descr => 'transform to tsvector',
-  proname => 'to_tsvector', procost => '100', prorettype => 'tsvector',
-  proargtypes => 'regconfig text', prosrc => 'to_tsvector_byid' },
-{ oid => '3746', descr => 'make tsquery',
-  proname => 'to_tsquery', procost => '100', prorettype => 'tsquery',
-  proargtypes => 'regconfig text', prosrc => 'to_tsquery_byid' },
-{ oid => '3747', descr => 'transform to tsquery',
-  proname => 'plainto_tsquery', procost => '100', prorettype => 'tsquery',
-  proargtypes => 'regconfig text', prosrc => 'plainto_tsquery_byid' },
-{ oid => '5006', descr => 'transform to tsquery',
-  proname => 'phraseto_tsquery', procost => '100', prorettype => 'tsquery',
-  proargtypes => 'regconfig text', prosrc => 'phraseto_tsquery_byid' },
-{ oid => '5007', descr => 'transform to tsquery',
-  proname => 'websearch_to_tsquery', procost => '100', prorettype => 'tsquery',
-  proargtypes => 'regconfig text', prosrc => 'websearch_to_tsquery_byid' },
-{ oid => '3749', descr => 'transform to tsvector',
-  proname => 'to_tsvector', procost => '100', provolatile => 's',
-  prorettype => 'tsvector', proargtypes => 'text', prosrc => 'to_tsvector' },
-{ oid => '3750', descr => 'make tsquery',
-  proname => 'to_tsquery', procost => '100', provolatile => 's',
-  prorettype => 'tsquery', proargtypes => 'text', prosrc => 'to_tsquery' },
-{ oid => '3751', descr => 'transform to tsquery',
-  proname => 'plainto_tsquery', procost => '100', provolatile => 's',
-  prorettype => 'tsquery', proargtypes => 'text', prosrc => 'plainto_tsquery' },
-{ oid => '5001', descr => 'transform to tsquery',
-  proname => 'phraseto_tsquery', procost => '100', provolatile => 's',
-  prorettype => 'tsquery', proargtypes => 'text',
-  prosrc => 'phraseto_tsquery' },
-{ oid => '5009', descr => 'transform to tsquery',
-  proname => 'websearch_to_tsquery', procost => '100', provolatile => 's',
-  prorettype => 'tsquery', proargtypes => 'text',
-  prosrc => 'websearch_to_tsquery' },
-{ oid => '4209', descr => 'transform string values from jsonb to tsvector',
-  proname => 'to_tsvector', procost => '100', provolatile => 's',
-  prorettype => 'tsvector', proargtypes => 'jsonb',
-  prosrc => 'jsonb_string_to_tsvector' },
-{ oid => '4213', descr => 'transform specified values from jsonb to tsvector',
-  proname => 'jsonb_to_tsvector', procost => '100', provolatile => 's',
-  prorettype => 'tsvector', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_to_tsvector' },
-{ oid => '4210', descr => 'transform string values from json to tsvector',
-  proname => 'to_tsvector', procost => '100', provolatile => 's',
-  prorettype => 'tsvector', proargtypes => 'json',
-  prosrc => 'json_string_to_tsvector' },
-{ oid => '4215', descr => 'transform specified values from json to tsvector',
-  proname => 'json_to_tsvector', procost => '100', provolatile => 's',
-  prorettype => 'tsvector', proargtypes => 'json jsonb',
-  prosrc => 'json_to_tsvector' },
-{ oid => '4211', descr => 'transform string values from jsonb to tsvector',
-  proname => 'to_tsvector', procost => '100', prorettype => 'tsvector',
-  proargtypes => 'regconfig jsonb', prosrc => 'jsonb_string_to_tsvector_byid' },
-{ oid => '4214', descr => 'transform specified values from jsonb to tsvector',
-  proname => 'jsonb_to_tsvector', procost => '100', prorettype => 'tsvector',
-  proargtypes => 'regconfig jsonb jsonb', prosrc => 'jsonb_to_tsvector_byid' },
-{ oid => '4212', descr => 'transform string values from json to tsvector',
-  proname => 'to_tsvector', procost => '100', prorettype => 'tsvector',
-  proargtypes => 'regconfig json', prosrc => 'json_string_to_tsvector_byid' },
-{ oid => '4216', descr => 'transform specified values from json to tsvector',
-  proname => 'json_to_tsvector', procost => '100', prorettype => 'tsvector',
-  proargtypes => 'regconfig json jsonb', prosrc => 'json_to_tsvector_byid' },
 
-{ oid => '3752', descr => 'trigger for automatic update of tsvector column',
-  proname => 'tsvector_update_trigger', proisstrict => 'f', provolatile => 'v',
-  prorettype => 'trigger', proargtypes => '',
-  prosrc => 'tsvector_update_trigger_byid' },
-{ oid => '3753', descr => 'trigger for automatic update of tsvector column',
-  proname => 'tsvector_update_trigger_column', proisstrict => 'f',
-  provolatile => 'v', prorettype => 'trigger', proargtypes => '',
-  prosrc => 'tsvector_update_trigger_bycolumn' },
 
-{ oid => '3759', descr => 'get current tsearch configuration',
-  proname => 'get_current_ts_config', provolatile => 's',
-  prorettype => 'regconfig', proargtypes => '',
-  prosrc => 'get_current_ts_config' },
 
-{ oid => '3736', descr => 'I/O',
-  proname => 'regconfigin', provolatile => 's', prorettype => 'regconfig',
-  proargtypes => 'cstring', prosrc => 'regconfigin' },
-{ oid => '3737', descr => 'I/O',
-  proname => 'regconfigout', provolatile => 's', prorettype => 'cstring',
-  proargtypes => 'regconfig', prosrc => 'regconfigout' },
-{ oid => '3738', descr => 'I/O',
-  proname => 'regconfigrecv', prorettype => 'regconfig',
-  proargtypes => 'internal', prosrc => 'regconfigrecv' },
-{ oid => '3739', descr => 'I/O',
-  proname => 'regconfigsend', prorettype => 'bytea', proargtypes => 'regconfig',
-  prosrc => 'regconfigsend' },
 
-{ oid => '3771', descr => 'I/O',
-  proname => 'regdictionaryin', provolatile => 's',
-  prorettype => 'regdictionary', proargtypes => 'cstring',
-  prosrc => 'regdictionaryin' },
-{ oid => '3772', descr => 'I/O',
-  proname => 'regdictionaryout', provolatile => 's', prorettype => 'cstring',
-  proargtypes => 'regdictionary', prosrc => 'regdictionaryout' },
-{ oid => '3773', descr => 'I/O',
-  proname => 'regdictionaryrecv', prorettype => 'regdictionary',
-  proargtypes => 'internal', prosrc => 'regdictionaryrecv' },
-{ oid => '3774', descr => 'I/O',
-  proname => 'regdictionarysend', prorettype => 'bytea',
-  proargtypes => 'regdictionary', prosrc => 'regdictionarysend' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # jsonb
 { oid => '3806', descr => 'I/O',

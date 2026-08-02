@@ -313,34 +313,6 @@ foreach my $row (@{ $catalog_data{pg_tablespace} })
 	$tablespaceoids{ $row->{spcname} } = $row->{oid};
 }
 
-# text search configuration OID lookup
-my %tsconfigoids;
-foreach my $row (@{ $catalog_data{pg_ts_config} })
-{
-	$tsconfigoids{ $row->{cfgname} } = $row->{oid};
-}
-
-# text search dictionary OID lookup
-my %tsdictoids;
-foreach my $row (@{ $catalog_data{pg_ts_dict} })
-{
-	$tsdictoids{ $row->{dictname} } = $row->{oid};
-}
-
-# text search parser OID lookup
-my %tsparseroids;
-foreach my $row (@{ $catalog_data{pg_ts_parser} })
-{
-	$tsparseroids{ $row->{prsname} } = $row->{oid};
-}
-
-# text search template OID lookup
-my %tstemplateoids;
-foreach my $row (@{ $catalog_data{pg_ts_template} })
-{
-	$tstemplateoids{ $row->{tmplname} } = $row->{oid};
-}
-
 # type lookups
 my %typeoids;
 my %types;
@@ -396,10 +368,6 @@ my %lookup_kind = (
 	pg_opfamily    => \%opfoids,
 	pg_proc        => \%procoids,
 	pg_tablespace  => \%tablespaceoids,
-	pg_ts_config   => \%tsconfigoids,
-	pg_ts_dict     => \%tsdictoids,
-	pg_ts_parser   => \%tsparseroids,
-	pg_ts_template => \%tstemplateoids,
 	pg_type        => \%typeoids,
 	encoding       => \%encids);
 

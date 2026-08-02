@@ -124,17 +124,9 @@ extern bool ConversionIsVisible(Oid conid);
 extern Oid	get_statistics_object_oid(List *names, bool missing_ok);
 extern bool StatisticsObjIsVisible(Oid relid);
 
-extern Oid	get_ts_parser_oid(List *names, bool missing_ok);
-extern bool TSParserIsVisible(Oid prsId);
 
-extern Oid	get_ts_dict_oid(List *names, bool missing_ok);
-extern bool TSDictionaryIsVisible(Oid dictId);
 
-extern Oid	get_ts_template_oid(List *names, bool missing_ok);
-extern bool TSTemplateIsVisible(Oid tmplId);
 
-extern Oid	get_ts_config_oid(List *names, bool missing_ok);
-extern bool TSConfigIsVisible(Oid cfgid);
 
 extern void DeconstructQualifiedName(List *names,
 									 char **nspname_p,

@@ -536,8 +536,6 @@ CREATE TABLE tab_core_types AS SELECT
   '1 2'::int2vector,
   '1 2'::oidvector,
   format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
-  'a fat cat sat on a mat and ate a fat rat'::tsvector,
-  'fat & rat'::tsquery,
   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
   '11'::xid8,
   'pg_class'::regclass,
@@ -577,12 +575,12 @@ SELECT oid, typname, typtype, typelem, typarray, typarray
   WHERE typtype NOT IN ('p', 'c') AND
     -- reg* types cannot be pg_upgraded, so discard them.
     oid != ALL(ARRAY['regproc', 'regprocedure', 'regoper',
-                     'regoperator', 'regconfig', 'regdictionary',
+                     'regoperator',
                      'regnamespace', 'regcollation']::regtype[]) AND
     -- Discard types that do not accept input values as these cannot be
     -- tested easily.
     -- Note: XML might be disabled at compile-time.
-    oid != ALL(ARRAY['gtsvector', 'pg_node_tree',
+    oid != ALL(ARRAY['pg_node_tree',
                      'pg_ndistinct', 'pg_dependencies', 'pg_mcv_list',
                      'pg_brin_bloom_summary',
                      'pg_brin_minmax_multi_summary', 'xml']::regtype[]) AND

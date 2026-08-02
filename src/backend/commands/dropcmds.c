@@ -294,28 +294,24 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				name = NameListToString(castNode(List, object));
 			}
 			break;
-		case OBJECT_TSPARSER:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
 				msg = gettext_noop("text search parser \"%s\" does not exist, skipping");
 				name = NameListToString(castNode(List, object));
 			}
 			break;
-		case OBJECT_TSDICTIONARY:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
 				msg = gettext_noop("text search dictionary \"%s\" does not exist, skipping");
 				name = NameListToString(castNode(List, object));
 			}
 			break;
-		case OBJECT_TSTEMPLATE:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
 				msg = gettext_noop("text search template \"%s\" does not exist, skipping");
 				name = NameListToString(castNode(List, object));
 			}
 			break;
-		case OBJECT_TSCONFIGURATION:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
 				msg = gettext_noop("text search configuration \"%s\" does not exist, skipping");

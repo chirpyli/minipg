@@ -86,8 +86,6 @@ extern void EventTriggerCollectAlterOpFam(AlterOpFamilyStmt *stmt,
 extern void EventTriggerCollectCreateOpClass(CreateOpClassStmt *stmt,
 											 Oid opcoid, List *operators,
 											 List *procedures);
-extern void EventTriggerCollectAlterTSConfig(AlterTSConfigurationStmt *stmt,
-											 Oid cfgId, Oid *dictIds, int ndicts);
 extern void EventTriggerCollectAlterDefPrivs(AlterDefaultPrivilegesStmt *stmt);
 
 #endif							/* EVENT_TRIGGER_H */

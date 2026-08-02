@@ -55,7 +55,6 @@ OBJS = \
 	tablecmds.o \
 	tablespace.o \
 	trigger.o \
-	tsearchcmds.o \
 	typecmds.o \
 	user.o \
 	vacuum.o \

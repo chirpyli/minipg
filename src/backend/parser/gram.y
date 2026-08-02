@@ -297,7 +297,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
 		DropOwnedStmt ReassignOwnedStmt
-		AlterTSConfigurationStmt AlterTSDictionaryStmt
 		CreateMatViewStmt RefreshMatViewStmt CreateAmStmt
 		CreatePublicationStmt AlterPublicationStmt
 		CreateSubscriptionStmt AlterSubscriptionStmt DropSubscriptionStmt
@@ -931,8 +930,6 @@ stmt:
 			| AlterRoleStmt
 			| AlterSubscriptionStmt
 			| AlterStatsStmt
-			| AlterTSConfigurationStmt
-			| AlterTSDictionaryStmt
 			| AlterUserMappingStmt
 			| AnalyzeStmt
 			| CallStmt
@@ -5751,42 +5748,6 @@ DefineStmt:
 					n->params	= $6;
 					$$ = (Node *)n;
 				}
-			| CREATE TEXT_P SEARCH PARSER any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TSPARSER;
-					n->args = NIL;
-					n->defnames = $5;
-					n->definition = $6;
-					$$ = (Node *)n;
-				}
-			| CREATE TEXT_P SEARCH DICTIONARY any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TSDICTIONARY;
-					n->args = NIL;
-					n->defnames = $5;
-					n->definition = $6;
-					$$ = (Node *)n;
-				}
-			| CREATE TEXT_P SEARCH TEMPLATE any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TSTEMPLATE;
-					n->args = NIL;
-					n->defnames = $5;
-					n->definition = $6;
-					$$ = (Node *)n;
-				}
-			| CREATE TEXT_P SEARCH CONFIGURATION any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TSCONFIGURATION;
-					n->args = NIL;
-					n->defnames = $5;
-					n->definition = $6;
-					$$ = (Node *)n;
-				}
 			| CREATE COLLATION any_name definition
 				{
 					DefineStmt *n = makeNode(DefineStmt);
@@ -6324,10 +6285,6 @@ object_type_any_name:
 			| COLLATION								{ $$ = OBJECT_COLLATION; }
 			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
 			| STATISTICS							{ $$ = OBJECT_STATISTIC_EXT; }
-			| TEXT_P SEARCH PARSER					{ $$ = OBJECT_TSPARSER; }
-			| TEXT_P SEARCH DICTIONARY				{ $$ = OBJECT_TSDICTIONARY; }
-			| TEXT_P SEARCH TEMPLATE				{ $$ = OBJECT_TSTEMPLATE; }
-			| TEXT_P SEARCH CONFIGURATION			{ $$ = OBJECT_TSCONFIGURATION; }
 		;
 
 /*
@@ -8941,42 +8898,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER TEXT_P SEARCH PARSER any_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_TSPARSER;
-					n->object = (Node *) $5;
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH DICTIONARY any_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_TSDICTIONARY;
-					n->object = (Node *) $5;
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH TEMPLATE any_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_TSTEMPLATE;
-					n->object = (Node *) $5;
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_TSCONFIGURATION;
-					n->object = (Node *) $5;
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER TYPE_P any_name RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -9206,42 +9127,6 @@ AlterObjectSchemaStmt:
 					n->objectType = OBJECT_STATISTIC_EXT;
 					n->object = (Node *) $3;
 					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH PARSER any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_TSPARSER;
-					n->object = (Node *) $5;
-					n->newschema = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH DICTIONARY any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_TSDICTIONARY;
-					n->object = (Node *) $5;
-					n->newschema = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH TEMPLATE any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_TSTEMPLATE;
-					n->object = (Node *) $5;
-					n->newschema = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_TSCONFIGURATION;
-					n->object = (Node *) $5;
-					n->newschema = $8;
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
@@ -9521,22 +9406,6 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					n->objectType = OBJECT_STATISTIC_EXT;
 					n->object = (Node *) $3;
 					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH DICTIONARY any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_TSDICTIONARY;
-					n->object = (Node *) $5;
-					n->newowner = $8;
-					$$ = (Node *)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_TSCONFIGURATION;
-					n->object = (Node *) $5;
-					n->newowner = $8;
 					$$ = (Node *)n;
 				}
 			| ALTER FOREIGN DATA_P WRAPPER name OWNER TO RoleSpec
@@ -10478,86 +10347,6 @@ opt_as:		AS
 		;
 
 
-/*****************************************************************************
- *
- * Manipulate a text search dictionary or configuration
- *
- *****************************************************************************/
-
-AlterTSDictionaryStmt:
-			ALTER TEXT_P SEARCH DICTIONARY any_name definition
-				{
-					AlterTSDictionaryStmt *n = makeNode(AlterTSDictionaryStmt);
-					n->dictname = $5;
-					n->options = $6;
-					$$ = (Node *)n;
-				}
-		;
-
-AlterTSConfigurationStmt:
-			ALTER TEXT_P SEARCH CONFIGURATION any_name ADD_P MAPPING FOR name_list any_with any_name_list
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_ADD_MAPPING;
-					n->cfgname = $5;
-					n->tokentype = $9;
-					n->dicts = $11;
-					n->override = false;
-					n->replace = false;
-					$$ = (Node*)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING FOR name_list any_with any_name_list
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_ALTER_MAPPING_FOR_TOKEN;
-					n->cfgname = $5;
-					n->tokentype = $9;
-					n->dicts = $11;
-					n->override = true;
-					n->replace = false;
-					$$ = (Node*)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING REPLACE any_name any_with any_name
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_REPLACE_DICT;
-					n->cfgname = $5;
-					n->tokentype = NIL;
-					n->dicts = list_make2($9,$11);
-					n->override = false;
-					n->replace = true;
-					$$ = (Node*)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING FOR name_list REPLACE any_name any_with any_name
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_REPLACE_DICT_FOR_TOKEN;
-					n->cfgname = $5;
-					n->tokentype = $9;
-					n->dicts = list_make2($11,$13);
-					n->override = false;
-					n->replace = true;
-					$$ = (Node*)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name DROP MAPPING FOR name_list
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_DROP_MAPPING;
-					n->cfgname = $5;
-					n->tokentype = $9;
-					n->missing_ok = false;
-					$$ = (Node*)n;
-				}
-			| ALTER TEXT_P SEARCH CONFIGURATION any_name DROP MAPPING IF_P EXISTS FOR name_list
-				{
-					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
-					n->kind = ALTER_TSCONFIG_DROP_MAPPING;
-					n->cfgname = $5;
-					n->tokentype = $11;
-					n->missing_ok = true;
-					$$ = (Node*)n;
-				}
-		;
 
 /* Use this if TIME or ORDINALITY after WITH should be taken as an identifier */
 any_with:	WITH

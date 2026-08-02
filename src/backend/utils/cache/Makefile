@@ -25,7 +25,6 @@ OBJS = \
 	relmapper.o \
 	spccache.o \
 	syscache.o \
-	ts_cache.o \
 	typcache.o
 
 include $(top_srcdir)/src/backend/common.mk

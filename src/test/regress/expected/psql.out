@@ -5253,33 +5253,9 @@ AS $function$select $1[s],
          IMMUTABLE PARALLEL SAFE STRICT COST 1
 1       RETURN ($2 + $1)
 \sf ts_debug(text)
-CREATE OR REPLACE FUNCTION pg_catalog.ts_debug(document text, OUT alias text, OUT description text, OUT token text, OUT dictionaries regdictionary[], OUT dictionary regdictionary, OUT lexemes text[])
- RETURNS SETOF record
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
- SELECT ts_debug.alias,
-     ts_debug.description,
-     ts_debug.token,
-     ts_debug.dictionaries,
-     ts_debug.dictionary,
-     ts_debug.lexemes
-    FROM ts_debug(get_current_ts_config(), ts_debug.document) ts_debug(alias, description, token, dictionaries, dictionary, lexemes);
-END
+ERROR:  function "ts_debug(text)" does not exist
 \sf+ ts_debug(text)
-        CREATE OR REPLACE FUNCTION pg_catalog.ts_debug(document text, OUT alias text, OUT description text, OUT token text, OUT dictionaries regdictionary[], OUT dictionary regdictionary, OUT lexemes text[])
-         RETURNS SETOF record
-         LANGUAGE sql
-         STABLE PARALLEL SAFE STRICT
-1       BEGIN ATOMIC
-2        SELECT ts_debug.alias,
-3            ts_debug.description,
-4            ts_debug.token,
-5            ts_debug.dictionaries,
-6            ts_debug.dictionary,
-7            ts_debug.lexemes
-8           FROM ts_debug(get_current_ts_config(), ts_debug.document) ts_debug(alias, description, token, dictionaries, dictionary, lexemes);
-9       END
+ERROR:  function "ts_debug(text)" does not exist
 -- check describing invalid multipart names
 \dA regression.heap
 improper qualified name (too many dotted names): regression.heap
@@ -5629,29 +5605,21 @@ List of access methods
 (0 rows)
 
 \dF "no.such.text.search.configuration"
-List of text search configurations
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_config" does not exist
+LINE 5: FROM pg_catalog.pg_ts_config c
+             ^
 \dFd "no.such.text.search.dictionary"
-List of text search dictionaries
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
+LINE 5: FROM pg_catalog.pg_ts_dict d
+             ^
 \dFp "no.such.text.search.parser"
- List of text search parsers
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
+LINE 5: FROM pg_catalog.pg_ts_parser p
+             ^
 \dFt "no.such.text.search.template"
-List of text search templates
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_template" does not exist
+LINE 5: FROM pg_catalog.pg_ts_template t
+             ^
 \dg "no.such.role"
            List of roles
  Role name | Attributes | Member of 
@@ -5831,29 +5799,21 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.forei
 (0 rows)
 
 \dF "no.such.schema"."no.such.text.search.configuration"
-List of text search configurations
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_config" does not exist
+LINE 5: FROM pg_catalog.pg_ts_config c
+             ^
 \dFd "no.such.schema"."no.such.text.search.dictionary"
-List of text search dictionaries
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
+LINE 5: FROM pg_catalog.pg_ts_dict d
+             ^
 \dFp "no.such.schema"."no.such.text.search.parser"
- List of text search parsers
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
+LINE 5: FROM pg_catalog.pg_ts_parser p
+             ^
 \dFt "no.such.schema"."no.such.text.search.template"
-List of text search templates
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_template" does not exist
+LINE 5: FROM pg_catalog.pg_ts_template t
+             ^
 \dg "no.such.schema"."no.such.role"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.role"
 \dL "no.such.schema"."no.such.language"
@@ -5978,29 +5938,21 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
 (0 rows)
 
 \dF regression."no.such.schema"."no.such.text.search.configuration"
-List of text search configurations
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_config" does not exist
+LINE 5: FROM pg_catalog.pg_ts_config c
+             ^
 \dFd regression."no.such.schema"."no.such.text.search.dictionary"
-List of text search dictionaries
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
+LINE 5: FROM pg_catalog.pg_ts_dict d
+             ^
 \dFp regression."no.such.schema"."no.such.text.search.parser"
- List of text search parsers
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
+LINE 5: FROM pg_catalog.pg_ts_parser p
+             ^
 \dFt regression."no.such.schema"."no.such.text.search.template"
-List of text search templates
- Schema | Name | Description 
---------+------+-------------
-(0 rows)
-
+ERROR:  relation "pg_catalog.pg_ts_template" does not exist
+LINE 5: FROM pg_catalog.pg_ts_template t
+             ^
 \do regression."no.such.schema"."no.such.operator"
                              List of operators
  Schema | Name | Left arg type | Right arg type | Result type | Description 

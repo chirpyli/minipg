@@ -55,10 +55,6 @@
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
-#include "catalog/pg_ts_config.h"
-#include "catalog/pg_ts_dict.h"
-#include "catalog/pg_ts_parser.h"
-#include "catalog/pg_ts_template.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_user_mapping.h"
 #include "commands/dbcommands.h"
@@ -491,62 +487,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		true
 	},
 	{
-		"text search configuration",
-		TSConfigRelationId,
-		TSConfigOidIndexId,
-		TSCONFIGOID,
-		TSCONFIGNAMENSP,
-		Anum_pg_ts_config_oid,
-		Anum_pg_ts_config_cfgname,
-		Anum_pg_ts_config_cfgnamespace,
-		Anum_pg_ts_config_cfgowner,
-		InvalidAttrNumber,
-		OBJECT_TSCONFIGURATION,
-		true
-	},
-	{
-		"text search dictionary",
-		TSDictionaryRelationId,
-		TSDictionaryOidIndexId,
-		TSDICTOID,
-		TSDICTNAMENSP,
-		Anum_pg_ts_dict_oid,
-		Anum_pg_ts_dict_dictname,
-		Anum_pg_ts_dict_dictnamespace,
-		Anum_pg_ts_dict_dictowner,
-		InvalidAttrNumber,
-		OBJECT_TSDICTIONARY,
-		true
-	},
-	{
-		"text search parser",
-		TSParserRelationId,
-		TSParserOidIndexId,
-		TSPARSEROID,
-		TSPARSERNAMENSP,
-		Anum_pg_ts_parser_oid,
-		Anum_pg_ts_parser_prsname,
-		Anum_pg_ts_parser_prsnamespace,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
-		true
-	},
-	{
-		"text search template",
-		TSTemplateRelationId,
-		TSTemplateOidIndexId,
-		TSTEMPLATEOID,
-		TSTEMPLATENAMENSP,
-		Anum_pg_ts_template_oid,
-		Anum_pg_ts_template_tmplname,
-		Anum_pg_ts_template_tmplnamespace,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
-		true,
-	},
-	{
 		"type",
 		TypeRelationId,
 		TypeOidIndexId,
@@ -764,22 +704,6 @@ static const struct object_type_map
 	/* OCLASS_SCHEMA */
 	{
 		"schema", OBJECT_SCHEMA
-	},
-	/* OCLASS_TSPARSER */
-	{
-		"text search parser", OBJECT_TSPARSER
-	},
-	/* OCLASS_TSDICT */
-	{
-		"text search dictionary", OBJECT_TSDICTIONARY
-	},
-	/* OCLASS_TSTEMPLATE */
-	{
-		"text search template", OBJECT_TSTEMPLATE
-	},
-	/* OCLASS_TSCONFIG */
-	{
-		"text search configuration", OBJECT_TSCONFIGURATION
 	},
 	/* OCLASS_ROLE */
 	{
@@ -1088,26 +1012,6 @@ get_object_address(ObjectType objtype, Node *object,
 						get_transform_oid(type_id, lang_id, missing_ok);
 					address.objectSubId = 0;
 				}
-				break;
-			case OBJECT_TSPARSER:
-				address.classId = TSParserRelationId;
-				address.objectId = get_ts_parser_oid(castNode(List, object), missing_ok);
-				address.objectSubId = 0;
-				break;
-			case OBJECT_TSDICTIONARY:
-				address.classId = TSDictionaryRelationId;
-				address.objectId = get_ts_dict_oid(castNode(List, object), missing_ok);
-				address.objectSubId = 0;
-				break;
-			case OBJECT_TSTEMPLATE:
-				address.classId = TSTemplateRelationId;
-				address.objectId = get_ts_template_oid(castNode(List, object), missing_ok);
-				address.objectSubId = 0;
-				break;
-			case OBJECT_TSCONFIGURATION:
-				address.classId = TSConfigRelationId;
-				address.objectId = get_ts_config_oid(castNode(List, object), missing_ok);
-				address.objectSubId = 0;
 				break;
 			case OBJECT_USER_MAPPING:
 				address = get_object_address_usermapping(castNode(List, object),
@@ -2256,19 +2160,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_COLLATION:
 		case OBJECT_CONVERSION:
 		case OBJECT_STATISTIC_EXT:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSTEMPLATE:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_DEFAULT:
-		case OBJECT_POLICY:
-		case OBJECT_RULE:
-		case OBJECT_TRIGGER:
-		case OBJECT_TABCONSTRAINT:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPFAMILY:
-			objnode = (Node *) name;
-			break;
 		case OBJECT_ACCESS_METHOD:
 		case OBJECT_DATABASE:
 		case OBJECT_EVENT_TRIGGER:
@@ -2368,6 +2259,13 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 {
 	switch (objtype)
 	{
+		case OBJECT_ACCESS_METHOD:
+			/* We treat access methods as being owned by superusers */
+			if (!superuser_arg(roleid))
+				ereport(ERROR,
+						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						 errmsg("must be superuser")));
+			break;
 		case OBJECT_INDEX:
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
@@ -2529,16 +2427,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
 							   strVal((Value *) object));
 			break;
-		case OBJECT_TSDICTIONARY:
-			if (!pg_ts_dict_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_TSCONFIGURATION:
-			if (!pg_ts_config_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
 		case OBJECT_ROLE:
 
 			/*
@@ -2559,15 +2447,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 							 errmsg("must have CREATEROLE privilege")));
 			}
-			break;
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
-		case OBJECT_ACCESS_METHOD:
-			/* We treat these object types as being owned by superusers */
-			if (!superuser_arg(roleid))
-				ereport(ERROR,
-						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("must be superuser")));
 			break;
 		case OBJECT_STATISTIC_EXT:
 			if (!pg_statistics_object_ownercheck(address.objectId, roleid))
@@ -3494,128 +3373,9 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_TSPARSER:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_parser prsForm;
-				char	   *nspname;
 
-				tup = SearchSysCache1(TSPARSEROID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search parser %u",
-							 object->objectId);
-					break;
-				}
-				prsForm = (Form_pg_ts_parser) GETSTRUCT(tup);
 
-				/* Qualify the name if not visible in search path */
-				if (TSParserIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(prsForm->prsnamespace);
 
-				appendStringInfo(&buffer, _("text search parser %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(prsForm->prsname)));
-				ReleaseSysCache(tup);
-				break;
-			}
-
-		case OCLASS_TSDICT:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_dict dictForm;
-				char	   *nspname;
-
-				tup = SearchSysCache1(TSDICTOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search dictionary %u",
-							 object->objectId);
-					break;
-				}
-
-				dictForm = (Form_pg_ts_dict) GETSTRUCT(tup);
-
-				/* Qualify the name if not visible in search path */
-				if (TSDictionaryIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(dictForm->dictnamespace);
-
-				appendStringInfo(&buffer, _("text search dictionary %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(dictForm->dictname)));
-				ReleaseSysCache(tup);
-				break;
-			}
-
-		case OCLASS_TSTEMPLATE:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_template tmplForm;
-				char	   *nspname;
-
-				tup = SearchSysCache1(TSTEMPLATEOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search template %u",
-							 object->objectId);
-					break;
-				}
-
-				tmplForm = (Form_pg_ts_template) GETSTRUCT(tup);
-
-				/* Qualify the name if not visible in search path */
-				if (TSTemplateIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(tmplForm->tmplnamespace);
-
-				appendStringInfo(&buffer, _("text search template %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(tmplForm->tmplname)));
-				ReleaseSysCache(tup);
-				break;
-			}
-
-		case OCLASS_TSCONFIG:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_config cfgForm;
-				char	   *nspname;
-
-				tup = SearchSysCache1(TSCONFIGOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search configuration %u",
-							 object->objectId);
-					break;
-				}
-
-				cfgForm = (Form_pg_ts_config) GETSTRUCT(tup);
-
-				/* Qualify the name if not visible in search path */
-				if (TSConfigIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(cfgForm->cfgnamespace);
-
-				appendStringInfo(&buffer, _("text search configuration %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(cfgForm->cfgname)));
-				ReleaseSysCache(tup);
-				break;
-			}
 
 		case OCLASS_ROLE:
 			{
@@ -4454,21 +4214,9 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "statistics object");
 			break;
 
-		case OCLASS_TSPARSER:
-			appendStringInfoString(&buffer, "text search parser");
-			break;
 
-		case OCLASS_TSDICT:
-			appendStringInfoString(&buffer, "text search dictionary");
-			break;
 
-		case OCLASS_TSTEMPLATE:
-			appendStringInfoString(&buffer, "text search template");
-			break;
 
-		case OCLASS_TSCONFIG:
-			appendStringInfoString(&buffer, "text search configuration");
-			break;
 
 		case OCLASS_ROLE:
 			appendStringInfoString(&buffer, "role");
@@ -5315,113 +5063,9 @@ getObjectIdentityParts(const ObjectAddress *object,
 			}
 			break;
 
-		case OCLASS_TSPARSER:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_parser formParser;
-				char	   *schema;
 
-				tup = SearchSysCache1(TSPARSEROID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search parser %u",
-							 object->objectId);
-					break;
-				}
-				formParser = (Form_pg_ts_parser) GETSTRUCT(tup);
-				schema = get_namespace_name_or_temp(formParser->prsnamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(formParser->prsname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(formParser->prsname)));
-				ReleaseSysCache(tup);
-				break;
-			}
 
-		case OCLASS_TSDICT:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_dict formDict;
-				char	   *schema;
 
-				tup = SearchSysCache1(TSDICTOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search dictionary %u",
-							 object->objectId);
-					break;
-				}
-				formDict = (Form_pg_ts_dict) GETSTRUCT(tup);
-				schema = get_namespace_name_or_temp(formDict->dictnamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(formDict->dictname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(formDict->dictname)));
-				ReleaseSysCache(tup);
-				break;
-			}
-
-		case OCLASS_TSTEMPLATE:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_template formTmpl;
-				char	   *schema;
-
-				tup = SearchSysCache1(TSTEMPLATEOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search template %u",
-							 object->objectId);
-					break;
-				}
-				formTmpl = (Form_pg_ts_template) GETSTRUCT(tup);
-				schema = get_namespace_name_or_temp(formTmpl->tmplnamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(formTmpl->tmplname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(formTmpl->tmplname)));
-				ReleaseSysCache(tup);
-				break;
-			}
-
-		case OCLASS_TSCONFIG:
-			{
-				HeapTuple	tup;
-				Form_pg_ts_config formCfg;
-				char	   *schema;
-
-				tup = SearchSysCache1(TSCONFIGOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for text search configuration %u",
-							 object->objectId);
-					break;
-				}
-				formCfg = (Form_pg_ts_config) GETSTRUCT(tup);
-				schema = get_namespace_name_or_temp(formCfg->cfgnamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(formCfg->cfgname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(formCfg->cfgname)));
-				ReleaseSysCache(tup);
-				break;
-			}
 
 		case OCLASS_ROLE:
 			{

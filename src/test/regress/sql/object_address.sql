@@ -255,10 +255,6 @@ WITH objects (classid, objid, objsubid) AS (VALUES
     ('pg_trigger'::regclass, 0, 0), -- no trigger
     ('pg_namespace'::regclass, 0, 0), -- no schema
     ('pg_statistic_ext'::regclass, 0, 0), -- no statistics
-    ('pg_ts_parser'::regclass, 0, 0), -- no TS parser
-    ('pg_ts_dict'::regclass, 0, 0), -- no TS dictionnary
-    ('pg_ts_template'::regclass, 0, 0), -- no TS template
-    ('pg_ts_config'::regclass, 0, 0), -- no TS configuration
     ('pg_authid'::regclass, 0, 0), -- no role
     ('pg_database'::regclass, 0, 0), -- no database
     ('pg_tablespace'::regclass, 0, 0), -- no tablespace

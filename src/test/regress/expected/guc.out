@@ -798,16 +798,18 @@ select current_setting('nosuch.setting', true);
 -- because that creates ordering hazards for pg_dump
 create function func_with_bad_set() returns int as $$ select 1 $$
 language sql
-set default_text_search_config = no_such_config;
-NOTICE:  text search configuration "no_such_config" does not exist
-ERROR:  invalid value for parameter "default_text_search_config": "no_such_config"
+set work_mem = no_such_config;
+ERROR:  invalid value for parameter "work_mem": "no_such_config"
 set check_function_bodies = off;
 create function func_with_bad_set() returns int as $$ select 1 $$
 language sql
-set default_text_search_config = no_such_config;
-NOTICE:  text search configuration "no_such_config" does not exist
+set work_mem = no_such_config;
+ERROR:  invalid value for parameter "work_mem": "no_such_config"
 select func_with_bad_set();
-ERROR:  invalid value for parameter "default_text_search_config": "no_such_config"
+ERROR:  function func_with_bad_set() does not exist
+LINE 1: select func_with_bad_set();
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 reset check_function_bodies;
 set default_with_oids to f;
 -- Should not allow to set it to true.

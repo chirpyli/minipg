@@ -296,13 +296,13 @@ select current_setting('nosuch.setting', true);
 
 create function func_with_bad_set() returns int as $$ select 1 $$
 language sql
-set default_text_search_config = no_such_config;
+set work_mem = no_such_config;
 
 set check_function_bodies = off;
 
 create function func_with_bad_set() returns int as $$ select 1 $$
 language sql
-set default_text_search_config = no_such_config;
+set work_mem = no_such_config;
 
 select func_with_bad_set();
 

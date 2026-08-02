@@ -350,3 +350,81 @@
 **验证**：`./configure` + `make -j` 全量编译通过（exit 0，无 error/warning）；`make check` 215 项全部通过（exit 0）。全仓库扫描 `USE_BONJOUR`/`USE_SYSTEMD` 残留为 0 处（配置开关与代码分支均干净）。
 
 **注意事项**：DTrace 未裁剪（用户要求暂留）。本次 `configure` 使用 autoconf 2.69 忠实重生成。
+
+## 裁剪：tsearch + snowball（全文检索 + 词干提取）
+
+**目的**：minipg 面向数据库内核学习，全文检索（tsearch）和 snowball 词干提取是一套与内核核心机制（存储/事务/优化器/执行器）正交、且代码量可观的功能模块。删除后可显著简化目录结构、消除 5 张系统表（`pg_ts_*`）及其 syscache/OCLASS/ObjectType 枚举、移除 150+ 个内置函数/类型/操作符，降低学习干扰。
+
+**为什么可以删**：
+- tsearch 模块（`src/backend/tsearch/`）无条件编译进主程序，但在内核学习中不被需要。
+- snowball（`src/backend/snowball/`）是独立 `.so` 扩展，依赖词干提取的外部语言规则，对理解内核无帮助。
+- 全文检索的 SQL 语法（CREATE TEXT SEARCH DICTIONARY/CONFIGURATION/PARSER/TEMPLATE）和相关内置函数（`to_tsvector`、`to_tsquery`、`ts_headline`、`ts_rank` 等）全部移除。
+- 5 张系统表（`pg_ts_dict`、`pg_ts_config`、`pg_ts_config_map`、`pg_ts_parser`、`pg_ts_template`）及相关索引/依赖关系全部删除。
+
+**删除的目录与文件**：
+- `src/backend/tsearch/`（~50 个 C 源文件）
+- `src/backend/snowball/`（词干提取库 + libstemmer）
+- `src/backend/utils/adt/ts*.c`（12 个文件：tsvector、tsvector_op、tsvector_parser、tsquery、tsquery_cleanup、tsquery_op、tsquery_util、tsquery_rewrite、tsquery_gist、tsgistidx、tsginidx、tsrank）
+- `src/backend/utils/cache/ts_cache.c`
+- `src/backend/commands/tsearchcmds.c`
+- `src/include/tsearch/`（全部头文件）
+- 5 个目录数据文件：`src/include/catalog/pg_ts_{config,config_map,dict,parser,template}.h` 及对应的 `.dat`、`.d.h`（共 15 文件）
+- 回归测试：`sql/tsearch.sql`、`sql/tsdicts.sql`、`sql/tstypes.sql` 及对应 expected/results 文件、`data/tsearch.data`
+- 测试模块：`src/test/modules/test_parser/`、`src/test/modules/test_ddl_deparse/`（依赖 tsearch）
+- contrib 全文检索扩展：`dict_int`、`dict_xsyn`、`unaccent`（随 contrib 裁剪批次删除）
+
+**修改的构建系统文件**：
+- `src/backend/Makefile`：移除 snowball 和 tsearch 子目录（SUBDIRS）
+- `src/backend/catalog/Makefile`：移除 6 个 `pg_ts_*` 安装行与 CATALOG_HEADERS 中的 TS 条目
+- `src/backend/commands/Makefile`：移除 tsearchcmds.o
+- `src/backend/utils/adt/Makefile`：移除 12 个 ts*.o
+- `src/backend/utils/cache/Makefile`：移除 ts_cache.o
+- `src/include/Makefile`：移除 tsearch 和 tsearch/dicts 头目录
+- `src/Makefile`：移除 snowball 相关条目
+
+**修改的 C/H 源文件（按层）**：
+- 语法解析：`gram.y`（删除 T_AlterTSDictionaryStmt/T_AlterTSConfigurationStmt/T_CreateTextSearch*Stmt 语法节点，删除 n->objectType = OBJECT_TSDICTIONARY 等 5 处赋值）
+- 节点定义：`parsenodes.h`（删除 OBJECT_TSCONFIGURATION/DICTIONARY/PARSER/TEMPLATE 枚举值，ObjectType 枚举重新编号）、`copyfuncs.c`、`equalfuncs.c`
+- 目录管理：`namespace.c`（删除 8 个 get_ts_*_oid 声明与实现，约 500 行）、`namespace.h`、`genbki.pl`（删除 pg_ts_* 的 OID 校验块）、`aclchk.c`、`dependency.c`/`dependency.h`（删除 OCLASS_TSPARSER/DICT/TEMPLATE/CONFIG 枚举值，ObjectClass 枚举重新编号）
+- 对象地址：`objectaddress.c`（删除 ObjectProperty 数组中 4 个 TS 条目与 getObjectClass 等 switch 中的 TS case；恢复误删的 check_object_ownership 中 OBJECT_ACCESS_METHOD case）、`objectaddress.h`
+- 目录支持：`pg_shdepend.c`、`pg_proc.dat`（删除 150+ 个 TS 函数定义）、`pg_type.dat`（删除 regconfig/regdictionary 类型定义）、`pg_cast.dat`（删除 regconfig/regdictionary 的 cast）
+- 类型处理：`regproc.c`（删除 regconfigin/out/regdictionaryin/out 4 函数）、`selfuncs.c`（删除 REGCONFIGOID/REGDICTIONARYOID case 标签）、`catcache.c`（删除 REGCONFIGOID/REGDICTIONARYOID 类型哈希处理）
+- 缓存系统：`syscache.c`（删除 5 个 pg_ts_* 的 include 与 5 个 syscache 条目）、`syscache.h`（同步删除对应枚举值）
+- 命令层：`alter.c`（删除 OCLASS_TSPARSER/DICT/TEMPLATE/TSCONFIG case）、`dropcmds.c`、`event_trigger.c`、`seclabel.c`、`tablecmds.c`（删除 OCLASS_TSPARSER 等 4 个 case 标签）
+- GUC 配置：`guc.c`（删除 `default_text_search_config` GUC 定义与 tsearch/ts_cache.h include）
+- initdb：`initdb.c`（删除 `-T --text-search-config` 选项、`default_text_search_config` 变量、`setup_text_search()` 调用、`tsearch_config_languages[]` 数组与 `find_matching_ts_config()` 函数、postgresql.conf 模板中的 text_search 配置块、pg_depend 中对 pg_ts_* 的 INSERT）
+
+**修改的回归测试文件**：
+- `parallel_schedule`：移除 `tstypes`/`tsearch`/`tsdicts` 调度项
+- `create_table.sql`：移除 `test_tsvector` 表创建
+- `create_index.sql`：移除 tsvector opclass 测试段
+- `json.sql`/`jsonb.sql`：移除 json→tsvector 转换测试段
+- `type_sanity.sql`：移除 regconfig/regdictionary/tsvector/tsquery/gtsvector 类型引用
+- `alter_generic.sql`：移除 TS 对象 alter 测试
+- `object_address.sql`：移除 TS 对象地址测试
+- `guc.sql`：用 `work_mem` 替换已删除的 `default_text_search_config` GUC
+- `copy.sql`/`create_type.sql`/`drop_if_exists.sql`/`opr_sanity.sql`/`sanity_check.sql`：移除 TS 类型/函数/操作符相关测试
+- `psql.sql`：移除 `\dT+` 等命令中 TS 类型引用
+- `amutils.sql`：移除 tsvector 相关索引访问方法测试
+- `alter_table.sql`：移除 TS 类型列测试
+- `oidjoins.sql`：移除 pg_ts_* 目录外键检查
+- 删除 `test_parser`、`test_ddl_deparse` 测试模块
+- `system_functions.sql`：删除 `ts_debug` 函数定义（两处重载）
+- 14 个 expected 文件同步更新以匹配新的实际输出
+
+**行为变化**：
+- 不再支持 `CREATE TEXT SEARCH DICTIONARY/CONFIGURATION/PARSER/TEMPLATE` 语法
+- 不再支持 `to_tsvector()`、`to_tsquery()`、`ts_headline()`、`ts_rank()` 等全文检索函数
+- 不再支持 `tsvector`、`tsquery`、`regconfig`、`regdictionary`、`gtsvector` 类型
+- `default_text_search_config` GUC 已删除
+- `initdb` 的 `-T` 选项已删除
+- 5 张 `pg_ts_*` 系统表不再存在
+- `ObjectClass` 和 `ObjectType` 枚举值重新编号（TS 条目被移除，后续枚举值下移）
+
+**验证**：`make check` 全部 212 项通过。`make check-world` 全部通过（EXIT=0）。全仓库扫描 `pg_ts_`、`tsvector`、`tsquery`、`regconfig`、`regdictionary`、`tsearch` 等功能符号在 C/H 源码中残留为 0 处（仅注释中的说明文字保留）。
+
+**注意事项**：本次裁剪涉及枚举重新编号（`ObjectClass` 和 `ObjectType`），需特别注意以下修复：
+- `check_object_ownership` 中 `OBJECT_ACCESS_METHOD` 原与 `OBJECT_TSPARSER`/`OBJECT_TSTEMPLATE` 共享 case 标签，删除 TS 条目后必须为 ACCESS_METHOD 单独添加 case（否则值 0 fall through 到 default 报 unrecognized object type）。
+- `syscache.c` 的枚举与 `cacheinfo[]` 数组必须严格对齐（`StaticAssertStmt` 编译期检查）。
+- 所有 switch on `ObjectClass`/`ObjectType` 的 case 标签必须与重新编号后的枚举值一致。
+- 编译时需确保 `configure` 已运行，`genbki.pl` 已生成正确的 `pg_*_d.h` 头文件。

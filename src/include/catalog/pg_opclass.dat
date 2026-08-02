@@ -214,19 +214,11 @@
   opcintype => 'anyenum' },
 { opcmethod => 'hash', opcname => 'enum_ops', opcfamily => 'hash/enum_ops',
   opcintype => 'anyenum' },
-{ opcmethod => 'btree', opcname => 'tsvector_ops',
-  opcfamily => 'btree/tsvector_ops', opcintype => 'tsvector' },
-{ opcmethod => 'gist', opcname => 'tsvector_ops',
-  opcfamily => 'gist/tsvector_ops', opcintype => 'tsvector',
-  opckeytype => 'gtsvector' },
-{ opcmethod => 'gin', opcname => 'tsvector_ops',
-  opcfamily => 'gin/tsvector_ops', opcintype => 'tsvector',
-  opckeytype => 'text' },
-{ opcmethod => 'btree', opcname => 'tsquery_ops',
-  opcfamily => 'btree/tsquery_ops', opcintype => 'tsquery' },
-{ opcmethod => 'gist', opcname => 'tsquery_ops',
-  opcfamily => 'gist/tsquery_ops', opcintype => 'tsquery',
-  opckeytype => 'int8' },
+
+
+
+
+
 { opcmethod => 'btree', opcname => 'range_ops', opcfamily => 'btree/range_ops',
   opcintype => 'anyrange' },
 { opcmethod => 'hash', opcname => 'range_ops', opcfamily => 'hash/range_ops',

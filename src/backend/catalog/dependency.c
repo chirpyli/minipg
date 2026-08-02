@@ -55,10 +55,6 @@
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
-#include "catalog/pg_ts_config.h"
-#include "catalog/pg_ts_dict.h"
-#include "catalog/pg_ts_parser.h"
-#include "catalog/pg_ts_template.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_user_mapping.h"
 #include "commands/comment.h"
@@ -164,10 +160,6 @@ static const Oid object_classes[] = {
 	TriggerRelationId,			/* OCLASS_TRIGGER */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	StatisticExtRelationId,		/* OCLASS_STATISTIC_EXT */
-	TSParserRelationId,			/* OCLASS_TSPARSER */
-	TSDictionaryRelationId,		/* OCLASS_TSDICT */
-	TSTemplateRelationId,		/* OCLASS_TSTEMPLATE */
-	TSConfigRelationId,			/* OCLASS_TSCONFIG */
 	AuthIdRelationId,			/* OCLASS_ROLE */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
@@ -1472,9 +1464,6 @@ doDeletion(const ObjectAddress *object, int flags)
 			RemoveStatisticsById(object->objectId);
 			break;
 
-		case OCLASS_TSCONFIG:
-			RemoveTSConfigurationById(object->objectId);
-			break;
 
 		case OCLASS_EXTENSION:
 			RemoveExtensionById(object->objectId);
@@ -1502,9 +1491,6 @@ doDeletion(const ObjectAddress *object, int flags)
 		case OCLASS_AMOP:
 		case OCLASS_AMPROC:
 		case OCLASS_SCHEMA:
-		case OCLASS_TSPARSER:
-		case OCLASS_TSDICT:
-		case OCLASS_TSTEMPLATE:
 		case OCLASS_FDW:
 		case OCLASS_FOREIGN_SERVER:
 		case OCLASS_USER_MAPPING:
@@ -1856,20 +1842,6 @@ find_expr_references_walker(Node *node,
 					if (SearchSysCacheExists1(COLLOID,
 											  ObjectIdGetDatum(objoid)))
 						add_object_address(OCLASS_COLLATION, objoid, 0,
-										   context->addrs);
-					break;
-				case REGCONFIGOID:
-					objoid = DatumGetObjectId(con->constvalue);
-					if (SearchSysCacheExists1(TSCONFIGOID,
-											  ObjectIdGetDatum(objoid)))
-						add_object_address(OCLASS_TSCONFIG, objoid, 0,
-										   context->addrs);
-					break;
-				case REGDICTIONARYOID:
-					objoid = DatumGetObjectId(con->constvalue);
-					if (SearchSysCacheExists1(TSDICTOID,
-											  ObjectIdGetDatum(objoid)))
-						add_object_address(OCLASS_TSDICT, objoid, 0,
 										   context->addrs);
 					break;
 
@@ -2843,17 +2815,9 @@ getObjectClass(const ObjectAddress *object)
 		case StatisticExtRelationId:
 			return OCLASS_STATISTIC_EXT;
 
-		case TSParserRelationId:
-			return OCLASS_TSPARSER;
 
-		case TSDictionaryRelationId:
-			return OCLASS_TSDICT;
 
-		case TSTemplateRelationId:
-			return OCLASS_TSTEMPLATE;
 
-		case TSConfigRelationId:
-			return OCLASS_TSCONFIG;
 
 		case AuthIdRelationId:
 			return OCLASS_ROLE;

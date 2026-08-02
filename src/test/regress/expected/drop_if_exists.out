@@ -98,32 +98,60 @@ CREATE CONVERSION test_conversion_exists
 DROP CONVERSION test_conversion_exists;
 -- text search parser
 DROP TEXT SEARCH PARSER test_tsparser_exists;
-ERROR:  text search parser "test_tsparser_exists" does not exist
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH PARSER test_tsparser_exists;
+             ^
 DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
-NOTICE:  text search parser "test_tsparser_exists" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
+             ^
 -- text search dictionary
 DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-ERROR:  text search dictionary "test_tsdict_exists" does not exist
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
+             ^
 DROP TEXT SEARCH DICTIONARY IF EXISTS test_tsdict_exists;
-NOTICE:  text search dictionary "test_tsdict_exists" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH DICTIONARY IF EXISTS test_tsdict_exists;
+             ^
 CREATE TEXT SEARCH DICTIONARY test_tsdict_exists (
         Template=ispell,
         DictFile=ispell_sample,
         AffFile=ispell_sample
 );
+ERROR:  syntax error at or near "TEXT"
+LINE 1: CREATE TEXT SEARCH DICTIONARY test_tsdict_exists (
+               ^
 DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
+             ^
 -- test search template
 DROP TEXT SEARCH TEMPLATE test_tstemplate_exists;
-ERROR:  text search template "test_tstemplate_exists" does not exist
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH TEMPLATE test_tstemplate_exists;
+             ^
 DROP TEXT SEARCH TEMPLATE IF EXISTS test_tstemplate_exists;
-NOTICE:  text search template "test_tstemplate_exists" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH TEMPLATE IF EXISTS test_tstemplate_exists;
+             ^
 -- text search configuration
 DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-ERROR:  text search configuration "test_tsconfig_exists" does not exist
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
+             ^
 DROP TEXT SEARCH CONFIGURATION IF EXISTS test_tsconfig_exists;
-NOTICE:  text search configuration "test_tsconfig_exists" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH CONFIGURATION IF EXISTS test_tsconfig_exist...
+             ^
 CREATE TEXT SEARCH CONFIGURATION test_tsconfig_exists (COPY=english);
+ERROR:  syntax error at or near "TEXT"
+LINE 1: CREATE TEXT SEARCH CONFIGURATION test_tsconfig_exists (COPY=...
+               ^
 DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
+             ^
 -- extension
 DROP EXTENSION test_extension_exists;
 ERROR:  extension "test_extension_exists" does not exist
@@ -288,13 +316,21 @@ NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP TABLE IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
+             ^
 DROP TEXT SEARCH DICTIONARY IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH DICTIONARY IF EXISTS no_such_schema.foo;
+             ^
 DROP TEXT SEARCH PARSER IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH PARSER IF EXISTS no_such_schema.foo;
+             ^
 DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TEXT"
+LINE 1: DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
+             ^
 DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP TYPE IF EXISTS no_such_schema.foo;

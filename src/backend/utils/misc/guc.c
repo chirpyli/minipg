@@ -87,7 +87,6 @@
 #include "storage/proc.h"
 #include "storage/standby.h"
 #include "tcop/tcopprot.h"
-#include "tsearch/ts_cache.h"
 #include "utils/acl.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
@@ -4285,16 +4284,6 @@ static struct config_string ConfigureNamesString[] =
 		&SyncRepStandbyNames,
 		"",
 		check_synchronous_standby_names, assign_synchronous_standby_names, NULL
-	},
-
-	{
-		{"default_text_search_config", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets default text search configuration."),
-			NULL
-		},
-		&TSCurrentConfig,
-		"pg_catalog.simple",
-		check_TSCurrentConfig, assign_TSCurrentConfig, NULL
 	},
 
 	{

@@ -100,19 +100,6 @@ extern void IsThereOpFamilyInNamespace(const char *opfname, Oid opfmethod,
 extern Oid	get_opclass_oid(Oid amID, List *opclassname, bool missing_ok);
 extern Oid	get_opfamily_oid(Oid amID, List *opfamilyname, bool missing_ok);
 
-/* commands/tsearchcmds.c */
-extern ObjectAddress DefineTSParser(List *names, List *parameters);
-
-extern ObjectAddress DefineTSDictionary(List *names, List *parameters);
-extern ObjectAddress AlterTSDictionary(AlterTSDictionaryStmt *stmt);
-
-extern ObjectAddress DefineTSTemplate(List *names, List *parameters);
-
-extern ObjectAddress DefineTSConfiguration(List *names, List *parameters,
-										   ObjectAddress *copied);
-extern void RemoveTSConfigurationById(Oid cfgId);
-extern ObjectAddress AlterTSConfiguration(AlterTSConfigurationStmt *stmt);
-
 extern text *serialize_deflist(List *deflist);
 extern List *deserialize_deflist(Datum txt);
 

@@ -53,10 +53,6 @@
 #include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
-#include "catalog/pg_ts_config.h"
-#include "catalog/pg_ts_dict.h"
-#include "catalog/pg_ts_parser.h"
-#include "catalog/pg_ts_template.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/event_trigger.h"
@@ -3416,10 +3412,8 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_TABLESPACE:
 						msg = gettext_noop("permission denied for tablespace %s");
 						break;
-					case OBJECT_TSCONFIGURATION:
 						msg = gettext_noop("permission denied for text search configuration %s");
 						break;
-					case OBJECT_TSDICTIONARY:
 						msg = gettext_noop("permission denied for text search dictionary %s");
 						break;
 					case OBJECT_TYPE:
@@ -3443,8 +3437,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_TABCONSTRAINT:
 					case OBJECT_TRANSFORM:
 					case OBJECT_TRIGGER:
-					case OBJECT_TSPARSER:
-					case OBJECT_TSTEMPLATE:
 					case OBJECT_USER_MAPPING:
 						elog(ERROR, "unsupported object type %d", objtype);
 				}
@@ -3547,10 +3539,8 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_TABLESPACE:
 						msg = gettext_noop("must be owner of tablespace %s");
 						break;
-					case OBJECT_TSCONFIGURATION:
 						msg = gettext_noop("must be owner of text search configuration %s");
 						break;
-					case OBJECT_TSDICTIONARY:
 						msg = gettext_noop("must be owner of text search dictionary %s");
 						break;
 
@@ -3579,8 +3569,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_PUBLICATION_REL:
 					case OBJECT_ROLE:
 					case OBJECT_TRANSFORM:
-					case OBJECT_TSPARSER:
-					case OBJECT_TSTEMPLATE:
 					case OBJECT_USER_MAPPING:
 						elog(ERROR, "unsupported object type %d", objtype);
 				}
@@ -5105,60 +5093,6 @@ pg_opfamily_ownercheck(Oid opf_oid, Oid roleid)
 }
 
 /*
- * Ownership check for a text search dictionary (specified by OID).
- */
-bool
-pg_ts_dict_ownercheck(Oid dict_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(TSDICTOID, ObjectIdGetDatum(dict_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("text search dictionary with OID %u does not exist",
-						dict_oid)));
-
-	ownerId = ((Form_pg_ts_dict) GETSTRUCT(tuple))->dictowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a text search configuration (specified by OID).
- */
-bool
-pg_ts_config_ownercheck(Oid cfg_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(TSCONFIGOID, ObjectIdGetDatum(cfg_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("text search configuration with OID %u does not exist",
-						cfg_oid)));
-
-	ownerId = ((Form_pg_ts_config) GETSTRUCT(tuple))->cfgowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
  * Ownership check for a foreign-data wrapper (specified by OID).
  */
 bool
@@ -5907,10 +5841,6 @@ recordExtObjInitPriv(Oid objoid, Oid classoid)
 			 classoid == OperatorClassRelationId ||
 			 classoid == OperatorFamilyRelationId ||
 			 classoid == NamespaceRelationId ||
-			 classoid == TSConfigRelationId ||
-			 classoid == TSDictionaryRelationId ||
-			 classoid == TSParserRelationId ||
-			 classoid == TSTemplateRelationId ||
 			 classoid == TransformRelationId
 		)
 	{

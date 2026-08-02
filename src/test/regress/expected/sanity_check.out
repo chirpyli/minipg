@@ -158,11 +158,6 @@ pg_subscription_rel|t
 pg_tablespace|t
 pg_transform|t
 pg_trigger|t
-pg_ts_config|t
-pg_ts_config_map|t
-pg_ts_dict|t
-pg_ts_parser|t
-pg_ts_template|t
 pg_type|t
 pg_user_mapping|t
 point_tbl|t
@@ -206,7 +201,6 @@ tenk2|t
 test_range_excl|t
 test_range_gist|t
 test_range_spgist|t
-test_tsvector|f
 testjsonb|f
 text_tbl|f
 textrange_test|t

@@ -2961,9 +2961,21 @@ create operator class alter1.ctype_hash_ops default for type alter1.ctype using 
   operator 1 alter1.=(alter1.ctype, alter1.ctype);
 create conversion alter1.latin1_to_utf8 for 'latin1' to 'utf8' from iso8859_1_to_utf8;
 create text search parser alter1.prs(start = prsd_start, gettoken = prsd_nexttoken, end = prsd_end, lextypes = prsd_lextype);
+ERROR:  syntax error at or near "text"
+LINE 1: create text search parser alter1.prs(start = prsd_start, get...
+               ^
 create text search configuration alter1.cfg(parser = alter1.prs);
+ERROR:  syntax error at or near "text"
+LINE 1: create text search configuration alter1.cfg(parser = alter1....
+               ^
 create text search template alter1.tmpl(init = dsimple_init, lexize = dsimple_lexize);
+ERROR:  syntax error at or near "text"
+LINE 1: create text search template alter1.tmpl(init = dsimple_init,...
+               ^
 create text search dictionary alter1.dict(template = alter1.tmpl);
+ERROR:  syntax error at or near "text"
+LINE 1: create text search dictionary alter1.dict(template = alter1....
+               ^
 insert into alter1.t1(f2) values(11);
 insert into alter1.t1(f2) values(12);
 alter table alter1.t1 set schema alter1; -- no-op, same schema
@@ -2979,9 +2991,21 @@ alter type alter1.ctype set schema alter1; -- no-op, same schema
 alter type alter1.ctype set schema alter2;
 alter conversion alter1.latin1_to_utf8 set schema alter2;
 alter text search parser alter1.prs set schema alter2;
+ERROR:  syntax error at or near "text"
+LINE 1: alter text search parser alter1.prs set schema alter2;
+              ^
 alter text search configuration alter1.cfg set schema alter2;
+ERROR:  syntax error at or near "text"
+LINE 1: alter text search configuration alter1.cfg set schema alter2...
+              ^
 alter text search template alter1.tmpl set schema alter2;
+ERROR:  syntax error at or near "text"
+LINE 1: alter text search template alter1.tmpl set schema alter2;
+              ^
 alter text search dictionary alter1.dict set schema alter2;
+ERROR:  syntax error at or near "text"
+LINE 1: alter text search dictionary alter1.dict set schema alter2;
+              ^
 -- this should succeed because nothing is left in alter1
 drop schema alter1;
 insert into alter2.t1(f2) values(13);
@@ -3012,7 +3036,7 @@ select alter2.plus1(41);
 
 -- clean up
 drop schema alter2 cascade;
-NOTICE:  drop cascades to 13 other objects
+NOTICE:  drop cascades to 9 other objects
 DETAIL:  drop cascades to table alter2.t1
 drop cascades to view alter2.v1
 drop cascades to function alter2.plus1(integer)
@@ -3022,10 +3046,6 @@ drop cascades to function alter2.same(alter2.ctype,alter2.ctype)
 drop cascades to operator alter2.=(alter2.ctype,alter2.ctype)
 drop cascades to operator family alter2.ctype_hash_ops for access method hash
 drop cascades to conversion alter2.latin1_to_utf8
-drop cascades to text search parser alter2.prs
-drop cascades to text search configuration alter2.cfg
-drop cascades to text search template alter2.tmpl
-drop cascades to text search dictionary alter2.dict
 --
 -- composite types
 --

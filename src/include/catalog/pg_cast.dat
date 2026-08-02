@@ -221,33 +221,19 @@
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'regtype', casttarget => 'int4', castfunc => '0',
   castcontext => 'a', castmethod => 'b' },
-{ castsource => 'oid', casttarget => 'regconfig', castfunc => '0',
+
   castcontext => 'i', castmethod => 'b' },
-{ castsource => 'regconfig', casttarget => 'oid', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'int8', casttarget => 'regconfig', castfunc => 'oid',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'int2', casttarget => 'regconfig', castfunc => 'int4(int2)',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'int4', casttarget => 'regconfig', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'regconfig', casttarget => 'int8', castfunc => 'int8(oid)',
+
+
+
   castcontext => 'a', castmethod => 'f' },
-{ castsource => 'regconfig', casttarget => 'int4', castfunc => '0',
   castcontext => 'a', castmethod => 'b' },
-{ castsource => 'oid', casttarget => 'regdictionary', castfunc => '0',
+
   castcontext => 'i', castmethod => 'b' },
-{ castsource => 'regdictionary', casttarget => 'oid', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'int8', casttarget => 'regdictionary', castfunc => 'oid',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'int2', casttarget => 'regdictionary', castfunc => 'int4(int2)',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'int4', casttarget => 'regdictionary', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'regdictionary', casttarget => 'int8', castfunc => 'int8(oid)',
+
+
+
   castcontext => 'a', castmethod => 'f' },
-{ castsource => 'regdictionary', casttarget => 'int4', castfunc => '0',
   castcontext => 'a', castmethod => 'b' },
 { castsource => 'text', casttarget => 'regclass', castfunc => 'regclass',
   castcontext => 'i', castmethod => 'f' },

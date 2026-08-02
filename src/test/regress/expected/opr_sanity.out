@@ -1135,13 +1135,11 @@ ORDER BY 1, 2;
  ?-|  | ?-|
  ?|   | ?|
  ?||  | ?||
- @@   | @@
- @@@  | @@@
  |    | |
  ~<=~ | ~>=~
  ~<~  | ~>~
  ~=   | ~=
-(29 rows)
+(27 rows)
 
 -- Likewise for negator pairs.
 SELECT DISTINCT o1.oprname AS op1, o2.oprname AS op2
@@ -1946,7 +1944,6 @@ ORDER BY 1, 2, 3;
         403 |            5 | ~>~
         405 |            1 | =
         783 |            1 | <<
-        783 |            1 | @@
         783 |            2 | &<
         783 |            3 | &&
         783 |            4 | &>
@@ -1977,9 +1974,7 @@ ORDER BY 1, 2, 3;
         783 |           48 | <@
         783 |           68 | <@
        2742 |            1 | &&
-       2742 |            1 | @@
        2742 |            2 | @>
-       2742 |            2 | @@@
        2742 |            3 | <@
        2742 |            4 | =
        2742 |            7 | @>
@@ -2054,7 +2049,7 @@ ORDER BY 1, 2, 3;
        4000 |           28 | ^@
        4000 |           29 | <^
        4000 |           30 | >^
-(124 rows)
+(121 rows)
 
 -- Check that all opclass search operators have selectivity estimators.
 -- This is not absolutely required, but it seems a reasonable thing
@@ -2181,9 +2176,7 @@ ORDER BY 1, 2, 3;
                     | range_ops        | range_ops        | anyrange
                     | record_image_ops | record_image_ops | record
                     | record_ops       | record_ops       | record
-                    | tsquery_ops      | tsquery_ops      | tsquery
-                    | tsvector_ops     | tsvector_ops     | tsvector
-(16 rows)
+(14 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.

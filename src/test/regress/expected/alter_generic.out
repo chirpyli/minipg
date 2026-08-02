@@ -555,143 +555,6 @@ SELECT nspname, stxname, rolname
  alt_nsp2 | alt_stat2 | regress_alter_generic_user3
 (4 rows)
 
---
--- Text Search Dictionary
---
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
-CREATE TEXT SEARCH DICTIONARY alt_ts_dict1 (template=simple);
-CREATE TEXT SEARCH DICTIONARY alt_ts_dict2 (template=simple);
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict1 RENAME TO alt_ts_dict2;  -- failed (name conflict)
-ERROR:  text search dictionary "alt_ts_dict2" already exists in schema "alt_nsp1"
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict1 RENAME TO alt_ts_dict3;  -- OK
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict2 OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict2 OWNER TO regress_alter_generic_user3;  -- OK
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict2 SET SCHEMA alt_nsp2;  -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
-CREATE TEXT SEARCH DICTIONARY alt_ts_dict1 (template=simple);
-CREATE TEXT SEARCH DICTIONARY alt_ts_dict2 (template=simple);
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict3 RENAME TO alt_ts_dict4;  -- failed (not owner)
-ERROR:  must be owner of text search dictionary alt_ts_dict3
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict1 RENAME TO alt_ts_dict4;  -- OK
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict3 OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of text search dictionary alt_ts_dict3
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict2 OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict3 SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of text search dictionary alt_ts_dict3
-ALTER TEXT SEARCH DICTIONARY alt_ts_dict2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
-ERROR:  text search dictionary "alt_ts_dict2" already exists in schema "alt_nsp2"
-RESET SESSION AUTHORIZATION;
-SELECT nspname, dictname, rolname
-  FROM pg_ts_dict t, pg_namespace n, pg_authid a
-  WHERE t.dictnamespace = n.oid AND t.dictowner = a.oid
-    AND n.nspname in ('alt_nsp1', 'alt_nsp2')
-  ORDER BY nspname, dictname;
- nspname  |   dictname   |           rolname           
-----------+--------------+-----------------------------
- alt_nsp1 | alt_ts_dict2 | regress_alter_generic_user2
- alt_nsp1 | alt_ts_dict3 | regress_alter_generic_user1
- alt_nsp1 | alt_ts_dict4 | regress_alter_generic_user2
- alt_nsp2 | alt_ts_dict2 | regress_alter_generic_user3
-(4 rows)
-
---
--- Text Search Configuration
---
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
-CREATE TEXT SEARCH CONFIGURATION alt_ts_conf1 (copy=english);
-CREATE TEXT SEARCH CONFIGURATION alt_ts_conf2 (copy=english);
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf1 RENAME TO alt_ts_conf2;  -- failed (name conflict)
-ERROR:  text search configuration "alt_ts_conf2" already exists in schema "alt_nsp1"
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf1 RENAME TO alt_ts_conf3;  -- OK
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf2 OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf2 OWNER TO regress_alter_generic_user3;  -- OK
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf2 SET SCHEMA alt_nsp2;  -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
-CREATE TEXT SEARCH CONFIGURATION alt_ts_conf1 (copy=english);
-CREATE TEXT SEARCH CONFIGURATION alt_ts_conf2 (copy=english);
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf3 RENAME TO alt_ts_conf4;  -- failed (not owner)
-ERROR:  must be owner of text search configuration alt_ts_conf3
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf1 RENAME TO alt_ts_conf4;  -- OK
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf3 OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of text search configuration alt_ts_conf3
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf2 OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf3 SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of text search configuration alt_ts_conf3
-ALTER TEXT SEARCH CONFIGURATION alt_ts_conf2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
-ERROR:  text search configuration "alt_ts_conf2" already exists in schema "alt_nsp2"
-RESET SESSION AUTHORIZATION;
-SELECT nspname, cfgname, rolname
-  FROM pg_ts_config t, pg_namespace n, pg_authid a
-  WHERE t.cfgnamespace = n.oid AND t.cfgowner = a.oid
-    AND n.nspname in ('alt_nsp1', 'alt_nsp2')
-  ORDER BY nspname, cfgname;
- nspname  |   cfgname    |           rolname           
-----------+--------------+-----------------------------
- alt_nsp1 | alt_ts_conf2 | regress_alter_generic_user2
- alt_nsp1 | alt_ts_conf3 | regress_alter_generic_user1
- alt_nsp1 | alt_ts_conf4 | regress_alter_generic_user2
- alt_nsp2 | alt_ts_conf2 | regress_alter_generic_user3
-(4 rows)
-
---
--- Text Search Template
---
-CREATE TEXT SEARCH TEMPLATE alt_ts_temp1 (lexize=dsimple_lexize);
-CREATE TEXT SEARCH TEMPLATE alt_ts_temp2 (lexize=dsimple_lexize);
-ALTER TEXT SEARCH TEMPLATE alt_ts_temp1 RENAME TO alt_ts_temp2; -- failed (name conflict)
-ERROR:  text search template "alt_ts_temp2" already exists in schema "alt_nsp1"
-ALTER TEXT SEARCH TEMPLATE alt_ts_temp1 RENAME TO alt_ts_temp3; -- OK
-ALTER TEXT SEARCH TEMPLATE alt_ts_temp2 SET SCHEMA alt_nsp2;    -- OK
-CREATE TEXT SEARCH TEMPLATE alt_ts_temp2 (lexize=dsimple_lexize);
-ALTER TEXT SEARCH TEMPLATE alt_ts_temp2 SET SCHEMA alt_nsp2;    -- failed (name conflict)
-ERROR:  text search template "alt_ts_temp2" already exists in schema "alt_nsp2"
--- invalid: non-lowercase quoted identifiers
-CREATE TEXT SEARCH TEMPLATE tstemp_case ("Init" = init_function);
-ERROR:  text search template parameter "Init" not recognized
-SELECT nspname, tmplname
-  FROM pg_ts_template t, pg_namespace n
-  WHERE t.tmplnamespace = n.oid AND nspname like 'alt_nsp%'
-  ORDER BY nspname, tmplname;
- nspname  |   tmplname   
-----------+--------------
- alt_nsp1 | alt_ts_temp2
- alt_nsp1 | alt_ts_temp3
- alt_nsp2 | alt_ts_temp2
-(3 rows)
-
---
--- Text Search Parser
---
-CREATE TEXT SEARCH PARSER alt_ts_prs1
-    (start = prsd_start, gettoken = prsd_nexttoken, end = prsd_end, lextypes = prsd_lextype);
-CREATE TEXT SEARCH PARSER alt_ts_prs2
-    (start = prsd_start, gettoken = prsd_nexttoken, end = prsd_end, lextypes = prsd_lextype);
-ALTER TEXT SEARCH PARSER alt_ts_prs1 RENAME TO alt_ts_prs2; -- failed (name conflict)
-ERROR:  text search parser "alt_ts_prs2" already exists in schema "alt_nsp1"
-ALTER TEXT SEARCH PARSER alt_ts_prs1 RENAME TO alt_ts_prs3; -- OK
-ALTER TEXT SEARCH PARSER alt_ts_prs2 SET SCHEMA alt_nsp2;   -- OK
-CREATE TEXT SEARCH PARSER alt_ts_prs2
-    (start = prsd_start, gettoken = prsd_nexttoken, end = prsd_end, lextypes = prsd_lextype);
-ALTER TEXT SEARCH PARSER alt_ts_prs2 SET SCHEMA alt_nsp2;   -- failed (name conflict)
-ERROR:  text search parser "alt_ts_prs2" already exists in schema "alt_nsp2"
--- invalid: non-lowercase quoted identifiers
-CREATE TEXT SEARCH PARSER tspars_case ("Start" = start_function);
-ERROR:  text search parser parameter "Start" not recognized
-SELECT nspname, prsname
-  FROM pg_ts_parser t, pg_namespace n
-  WHERE t.prsnamespace = n.oid AND nspname like 'alt_nsp%'
-  ORDER BY nspname, prsname;
- nspname  |   prsname   
-----------+-------------
- alt_nsp1 | alt_ts_prs2
- alt_nsp1 | alt_ts_prs3
- alt_nsp2 | alt_ts_prs2
-(3 rows)
-
 ---
 --- Cleanup resources
 ---
@@ -702,7 +565,7 @@ NOTICE:  drop cascades to server alt_fserv3
 DROP LANGUAGE alt_lang2 CASCADE;
 DROP LANGUAGE alt_lang3 CASCADE;
 DROP SCHEMA alt_nsp1 CASCADE;
-NOTICE:  drop cascades to 28 other objects
+NOTICE:  drop cascades to 18 other objects
 DETAIL:  drop cascades to function alt_func3(integer)
 drop cascades to function alt_agg3(integer)
 drop cascades to function alt_func4(integer)
@@ -721,27 +584,13 @@ drop cascades to operator family alt_opf4 for access method hash
 drop cascades to operator family alt_opf2 for access method hash
 drop cascades to table alt_regress_1
 drop cascades to table alt_regress_2
-drop cascades to text search dictionary alt_ts_dict3
-drop cascades to text search dictionary alt_ts_dict4
-drop cascades to text search dictionary alt_ts_dict2
-drop cascades to text search configuration alt_ts_conf3
-drop cascades to text search configuration alt_ts_conf4
-drop cascades to text search configuration alt_ts_conf2
-drop cascades to text search template alt_ts_temp3
-drop cascades to text search template alt_ts_temp2
-drop cascades to text search parser alt_ts_prs3
-drop cascades to text search parser alt_ts_prs2
 DROP SCHEMA alt_nsp2 CASCADE;
-NOTICE:  drop cascades to 9 other objects
+NOTICE:  drop cascades to 5 other objects
 DETAIL:  drop cascades to function alt_nsp2.alt_func2(integer)
 drop cascades to function alt_nsp2.alt_agg2(integer)
 drop cascades to conversion alt_nsp2.alt_conv2
 drop cascades to operator alt_nsp2.@-@(integer,integer)
 drop cascades to operator family alt_nsp2.alt_opf2 for access method hash
-drop cascades to text search dictionary alt_nsp2.alt_ts_dict2
-drop cascades to text search configuration alt_nsp2.alt_ts_conf2
-drop cascades to text search template alt_nsp2.alt_ts_temp2
-drop cascades to text search parser alt_nsp2.alt_ts_prs2
 DROP USER regress_alter_generic_user1;
 DROP USER regress_alter_generic_user2;
 DROP USER regress_alter_generic_user3;

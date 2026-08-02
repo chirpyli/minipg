@@ -258,8 +258,6 @@ GetCCHashEqFuncs(Oid keytype, CCHashFN *hashfunc, RegProcedure *eqfunc, CCFastEq
 		case REGCLASSOID:
 		case REGTYPEOID:
 		case REGCOLLATIONOID:
-		case REGCONFIGOID:
-		case REGDICTIONARYOID:
 		case REGROLEOID:
 		case REGNAMESPACEOID:
 			*hashfunc = int4hashfast;

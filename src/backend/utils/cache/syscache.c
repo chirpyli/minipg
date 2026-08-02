@@ -67,11 +67,6 @@
 #include "catalog/pg_subscription_rel.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
-#include "catalog/pg_ts_config.h"
-#include "catalog/pg_ts_config_map.h"
-#include "catalog/pg_ts_dict.h"
-#include "catalog/pg_ts_parser.h"
-#include "catalog/pg_ts_template.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_user_mapping.h"
 #include "lib/qunique.h"
@@ -852,105 +847,6 @@ static const struct cachedesc cacheinfo[] = {
 			0,
 		},
 		16
-	},
-	{TSConfigMapRelationId,		/* TSCONFIGMAP */
-		TSConfigMapIndexId,
-		3,
-		{
-			Anum_pg_ts_config_map_mapcfg,
-			Anum_pg_ts_config_map_maptokentype,
-			Anum_pg_ts_config_map_mapseqno,
-			0
-		},
-		2
-	},
-	{TSConfigRelationId,		/* TSCONFIGNAMENSP */
-		TSConfigNameNspIndexId,
-		2,
-		{
-			Anum_pg_ts_config_cfgname,
-			Anum_pg_ts_config_cfgnamespace,
-			0,
-			0
-		},
-		2
-	},
-	{TSConfigRelationId,		/* TSCONFIGOID */
-		TSConfigOidIndexId,
-		1,
-		{
-			Anum_pg_ts_config_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{TSDictionaryRelationId,	/* TSDICTNAMENSP */
-		TSDictionaryNameNspIndexId,
-		2,
-		{
-			Anum_pg_ts_dict_dictname,
-			Anum_pg_ts_dict_dictnamespace,
-			0,
-			0
-		},
-		2
-	},
-	{TSDictionaryRelationId,	/* TSDICTOID */
-		TSDictionaryOidIndexId,
-		1,
-		{
-			Anum_pg_ts_dict_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{TSParserRelationId,		/* TSPARSERNAMENSP */
-		TSParserNameNspIndexId,
-		2,
-		{
-			Anum_pg_ts_parser_prsname,
-			Anum_pg_ts_parser_prsnamespace,
-			0,
-			0
-		},
-		2
-	},
-	{TSParserRelationId,		/* TSPARSEROID */
-		TSParserOidIndexId,
-		1,
-		{
-			Anum_pg_ts_parser_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{TSTemplateRelationId,		/* TSTEMPLATENAMENSP */
-		TSTemplateNameNspIndexId,
-		2,
-		{
-			Anum_pg_ts_template_tmplname,
-			Anum_pg_ts_template_tmplnamespace,
-			0,
-			0
-		},
-		2
-	},
-	{TSTemplateRelationId,		/* TSTEMPLATEOID */
-		TSTemplateOidIndexId,
-		1,
-		{
-			Anum_pg_ts_template_oid,
-			0,
-			0,
-			0
-		},
-		2
 	},
 	{TypeRelationId,			/* TYPENAMENSP */
 		TypeNameNspIndexId,

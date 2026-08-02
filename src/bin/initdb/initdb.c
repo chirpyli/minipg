@@ -103,7 +103,6 @@ static char *lc_monetary = NULL;
 static char *lc_numeric = NULL;
 static char *lc_time = NULL;
 static char *lc_messages = NULL;
-static const char *default_text_search_config = NULL;
 static char *username = NULL;
 static bool pwprompt = false;
 static char *pwfilename = NULL;
@@ -129,7 +128,6 @@ static char *bki_file;
 static char *hba_file;
 static char *ident_file;
 static char *conf_file;
-static char *dictionary_file;
 static char *info_schema_file;
 static char *features_file;
 static char *system_constraints_file;
@@ -254,7 +252,6 @@ void		setup_bin_paths(const char *argv0);
 void		setup_data_file_paths(void);
 void		setup_locale_encoding(void);
 void		setup_signals(void);
-void		setup_text_search(void);
 void		create_data_directory(void);
 void		create_xlog_or_symlink(void);
 void		warn_on_mount_point(int error);
@@ -618,125 +615,6 @@ get_encoding_id(const char *encoding_name)
 }
 
 /*
- * Support for determining the best default text search configuration.
- * We key this off the first part of LC_CTYPE (ie, the language name).
- */
-struct tsearch_config_match
-{
-	const char *tsconfname;
-	const char *langname;
-};
-
-static const struct tsearch_config_match tsearch_config_languages[] =
-{
-	{"arabic", "ar"},
-	{"arabic", "Arabic"},
-	{"armenian", "hy"},
-	{"armenian", "Armenian"},
-	{"basque", "eu"},
-	{"basque", "Basque"},
-	{"catalan", "ca"},
-	{"catalan", "Catalan"},
-	{"danish", "da"},
-	{"danish", "Danish"},
-	{"dutch", "nl"},
-	{"dutch", "Dutch"},
-	{"english", "C"},
-	{"english", "POSIX"},
-	{"english", "en"},
-	{"english", "English"},
-	{"finnish", "fi"},
-	{"finnish", "Finnish"},
-	{"french", "fr"},
-	{"french", "French"},
-	{"german", "de"},
-	{"german", "German"},
-	{"greek", "el"},
-	{"greek", "Greek"},
-	{"hindi", "hi"},
-	{"hindi", "Hindi"},
-	{"hungarian", "hu"},
-	{"hungarian", "Hungarian"},
-	{"indonesian", "id"},
-	{"indonesian", "Indonesian"},
-	{"irish", "ga"},
-	{"irish", "Irish"},
-	{"italian", "it"},
-	{"italian", "Italian"},
-	{"lithuanian", "lt"},
-	{"lithuanian", "Lithuanian"},
-	{"nepali", "ne"},
-	{"nepali", "Nepali"},
-	{"norwegian", "no"},
-	{"norwegian", "Norwegian"},
-	{"portuguese", "pt"},
-	{"portuguese", "Portuguese"},
-	{"romanian", "ro"},
-	{"russian", "ru"},
-	{"russian", "Russian"},
-	{"serbian", "sr"},
-	{"serbian", "Serbian"},
-	{"spanish", "es"},
-	{"spanish", "Spanish"},
-	{"swedish", "sv"},
-	{"swedish", "Swedish"},
-	{"tamil", "ta"},
-	{"tamil", "Tamil"},
-	{"turkish", "tr"},
-	{"turkish", "Turkish"},
-	{"yiddish", "yi"},
-	{"yiddish", "Yiddish"},
-	{NULL, NULL}				/* end marker */
-};
-
-/*
- * Look for a text search configuration matching lc_ctype, and return its
- * name; return NULL if no match.
- */
-static const char *
-find_matching_ts_config(const char *lc_type)
-{
-	int			i;
-	char	   *langname,
-			   *ptr;
-
-	/*
-	 * Convert lc_ctype to a language name by stripping everything after an
-	 * underscore (usual case) or a hyphen (Windows "locale name"; see
-	 * comments at IsoLocaleName()).
-	 *
-	 * XXX Should ' ' be a stop character?	This would select "norwegian" for
-	 * the Windows locale "Norwegian (Nynorsk)_Norway.1252".  If we do so, we
-	 * should also accept the "nn" and "nb" Unix locales.
-	 *
-	 * Just for paranoia, we also stop at '.' or '@'.
-	 */
-	if (lc_type == NULL)
-		langname = pg_strdup("");
-	else
-	{
-		ptr = langname = pg_strdup(lc_type);
-		while (*ptr &&
-			   *ptr != '_' && *ptr != '-' && *ptr != '.' && *ptr != '@')
-			ptr++;
-		*ptr = '\0';
-	}
-
-	for (i = 0; tsearch_config_languages[i].tsconfname; i++)
-	{
-		if (pg_strcasecmp(tsearch_config_languages[i].langname, langname) == 0)
-		{
-			free(langname);
-			return tsearch_config_languages[i].tsconfname;
-		}
-	}
-
-	free(langname);
-	return NULL;
-}
-
-
-/*
  * set name of given input file variable under data directory
  */
 static void
@@ -1093,13 +971,6 @@ setup_config(void)
 			break;
 	}
 	conflines = replace_token(conflines, "#datestyle = 'iso, mdy'", repltok);
-
-	snprintf(repltok, sizeof(repltok),
-			 "default_text_search_config = 'pg_catalog.%s'",
-			 escape_quotes(default_text_search_config));
-	conflines = replace_token(conflines,
-							  "#default_text_search_config = 'pg_catalog.simple'",
-							  repltok);
 
 	if (default_timezone)
 	{
@@ -1530,14 +1401,6 @@ setup_depend(FILE *cmdfd)
 		" FROM pg_namespace "
 		"    WHERE nspname LIKE 'pg%';\n\n",
 
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_ts_parser;\n\n",
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_ts_dict;\n\n",
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_ts_template;\n\n",
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_ts_config;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_collation;\n\n",
 		"INSERT INTO pg_shdepend SELECT 0,0,0,0, tableoid,oid, 'p' "
@@ -2196,8 +2059,6 @@ usage(const char *progname)
 			 "                            new databases (default taken from environment)\n"));
 	printf(_("      --no-locale           equivalent to --locale=C\n"));
 	printf(_("      --pwfile=FILE         read password for the new superuser from file\n"));
-	printf(_("  -T, --text-search-config=CFG\n"
-			 "                            default text search configuration\n"));
 	printf(_("  -U, --username=NAME       database superuser name\n"));
 	printf(_("  -W, --pwprompt            prompt for a password for the new superuser\n"));
 	printf(_("  -X, --waldir=WALDIR       location for the write-ahead log directory\n"));
@@ -2432,7 +2293,6 @@ setup_data_file_paths(void)
 	set_input(&hba_file, "pg_hba.conf.sample");
 	set_input(&ident_file, "pg_ident.conf.sample");
 	set_input(&conf_file, "postgresql.conf.sample");
-	set_input(&dictionary_file, "snowball_create.sql");
 	set_input(&info_schema_file, "information_schema.sql");
 	set_input(&features_file, "sql_features.txt");
 	set_input(&system_constraints_file, "system_constraints.sql");
@@ -2460,7 +2320,6 @@ setup_data_file_paths(void)
 	check_input(hba_file);
 	check_input(ident_file);
 	check_input(conf_file);
-	check_input(dictionary_file);
 	check_input(info_schema_file);
 	check_input(features_file);
 	check_input(system_constraints_file);
@@ -2468,40 +2327,6 @@ setup_data_file_paths(void)
 	check_input(system_views_file);
 }
 
-
-void
-setup_text_search(void)
-{
-	if (!default_text_search_config)
-	{
-		default_text_search_config = find_matching_ts_config(lc_ctype);
-		if (!default_text_search_config)
-		{
-			pg_log_info("could not find suitable text search configuration for locale \"%s\"",
-						lc_ctype);
-			default_text_search_config = "simple";
-		}
-	}
-	else
-	{
-		const char *checkmatch = find_matching_ts_config(lc_ctype);
-
-		if (checkmatch == NULL)
-		{
-			pg_log_warning("suitable text search configuration for locale \"%s\" is unknown",
-						   lc_ctype);
-		}
-		else if (strcmp(checkmatch, default_text_search_config) != 0)
-		{
-			pg_log_warning("specified text search configuration \"%s\" might not match locale \"%s\"",
-						   default_text_search_config, lc_ctype);
-		}
-	}
-
-	printf(_("The default text search configuration will be set to \"%s\".\n"),
-		   default_text_search_config);
-
-}
 
 
 void
@@ -2817,8 +2642,6 @@ initialize_data_directory(void)
 
 	setup_collation(cmdfd);
 
-	setup_run_file(cmdfd, dictionary_file);
-
 	setup_privileges(cmdfd);
 
 	setup_schema(cmdfd);
@@ -2851,7 +2674,6 @@ main(int argc, char *argv[])
 		{"lc-time", required_argument, NULL, 6},
 		{"lc-messages", required_argument, NULL, 7},
 		{"no-locale", no_argument, NULL, 8},
-		{"text-search-config", required_argument, NULL, 'T'},
 		{"auth", required_argument, NULL, 'A'},
 		{"auth-local", required_argument, NULL, 10},
 		{"auth-host", required_argument, NULL, 11},
@@ -2986,13 +2808,10 @@ main(int argc, char *argv[])
 			case 9:
 				pwfilename = pg_strdup(optarg);
 				break;
-			case 's':
-				show_setting = true;
-				break;
-			case 'T':
-				default_text_search_config = pg_strdup(optarg);
-				break;
-			case 'X':
+		case 's':
+			show_setting = true;
+			break;
+		case 'X':
 				xlog_dir = pg_strdup(optarg);
 				break;
 			case 12:
@@ -3121,8 +2940,6 @@ main(int argc, char *argv[])
 	setup_data_file_paths();
 
 	setup_locale_encoding();
-
-	setup_text_search();
 
 	printf("\n");
 

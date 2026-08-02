@@ -28,8 +28,7 @@ typedef enum CollectedCommandType
 	SCT_Grant,
 	SCT_AlterOpFamily,
 	SCT_AlterDefaultPrivileges,
-	SCT_CreateOpClass,
-	SCT_AlterTSConfig
+	SCT_CreateOpClass
 } CollectedCommandType;
 
 /*
@@ -86,14 +85,6 @@ typedef struct CollectedCommand
 			List	   *operators;
 			List	   *procedures;
 		}			createopc;
-
-		/* ALTER TEXT SEARCH CONFIGURATION ADD/ALTER/DROP MAPPING */
-		struct
-		{
-			ObjectAddress address;
-			Oid		   *dictIds;
-			int			ndicts;
-		}			atscfg;
 
 		/* ALTER DEFAULT PRIVILEGES */
 		struct

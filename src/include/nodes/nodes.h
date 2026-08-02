@@ -397,8 +397,6 @@ typedef enum NodeTag
 	T_CreateEnumStmt,
 	T_CreateRangeStmt,
 	T_AlterEnumStmt,
-	T_AlterTSDictionaryStmt,
-	T_AlterTSConfigurationStmt,
 	T_CreateFdwStmt,
 	T_AlterFdwStmt,
 	T_CreateForeignServerStmt,

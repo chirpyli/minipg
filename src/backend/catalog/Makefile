@@ -61,8 +61,7 @@ CATALOG_HEADERS := \
 	pg_cast.h pg_enum.h pg_namespace.h pg_conversion.h pg_depend.h \
 	pg_database.h pg_db_role_setting.h pg_tablespace.h \
 	pg_authid.h pg_auth_members.h pg_shdepend.h pg_shdescription.h \
-	pg_ts_config.h pg_ts_config_map.h pg_ts_dict.h \
-	pg_ts_parser.h pg_ts_template.h pg_extension.h \
+	pg_extension.h \
 	pg_foreign_data_wrapper.h pg_foreign_server.h pg_user_mapping.h \
 	pg_foreign_table.h pg_policy.h pg_replication_origin.h \
 	pg_default_acl.h pg_init_privs.h pg_seclabel.h pg_shseclabel.h \
@@ -81,8 +80,7 @@ POSTGRES_BKI_DATA = $(addprefix $(top_srcdir)/src/include/catalog/,\
 	pg_database.dat pg_language.dat \
 	pg_namespace.dat pg_opclass.dat pg_operator.dat pg_opfamily.dat \
 	pg_proc.dat pg_range.dat pg_tablespace.dat \
-	pg_ts_config.dat pg_ts_config_map.dat pg_ts_dict.dat pg_ts_parser.dat \
-	pg_ts_template.dat pg_type.dat \
+	pg_type.dat \
 	)
 
 all: distprep generated-header-symlinks

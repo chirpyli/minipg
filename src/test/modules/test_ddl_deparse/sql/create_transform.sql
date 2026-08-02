@@ -10,7 +10,7 @@
 -- This won't actually be used, because the SQL function language
 -- doesn't implement transforms (there would be no point).
 CREATE TRANSFORM FOR int LANGUAGE SQL (
-    FROM SQL WITH FUNCTION prsd_lextype(internal),
+    FROM SQL WITH FUNCTION varchar_support(internal),
     TO SQL WITH FUNCTION int4recv(internal));
 
 DROP TRANSFORM FOR int LANGUAGE SQL;

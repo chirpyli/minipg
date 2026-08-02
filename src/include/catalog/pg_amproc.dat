@@ -277,10 +277,8 @@
   amprocrighttype => 'anyenum', amprocnum => '1', amproc => 'enum_cmp' },
 { amprocfamily => 'btree/enum_ops', amproclefttype => 'anyenum',
   amprocrighttype => 'anyenum', amprocnum => '4', amproc => 'btequalimage' },
-{ amprocfamily => 'btree/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '1', amproc => 'tsvector_cmp' },
-{ amprocfamily => 'btree/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '1', amproc => 'tsquery_cmp' },
+
+
 { amprocfamily => 'btree/range_ops', amproclefttype => 'anyrange',
   amprocrighttype => 'anyrange', amprocnum => '1', amproc => 'range_cmp' },
 { amprocfamily => 'btree/multirange_ops', amproclefttype => 'anymultirange',
@@ -544,45 +542,20 @@
 { amprocfamily => 'gist/circle_ops', amproclefttype => 'circle',
   amprocrighttype => 'circle', amprocnum => '8',
   amproc => 'gist_circle_distance' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '1',
-  amproc => 'gtsvector_consistent(internal,tsvector,int2,oid,internal)' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '2',
-  amproc => 'gtsvector_union' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '3',
-  amproc => 'gtsvector_compress' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '4',
-  amproc => 'gtsvector_decompress' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '5',
-  amproc => 'gtsvector_penalty' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '6',
-  amproc => 'gtsvector_picksplit' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '7', amproc => 'gtsvector_same' },
-{ amprocfamily => 'gist/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '10',
-  amproc => 'gtsvector_options' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '1',
-  amproc => 'gtsquery_consistent(internal,tsquery,int2,oid,internal)' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '2', amproc => 'gtsquery_union' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '3',
-  amproc => 'gtsquery_compress' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '5',
-  amproc => 'gtsquery_penalty' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '6',
-  amproc => 'gtsquery_picksplit' },
-{ amprocfamily => 'gist/tsquery_ops', amproclefttype => 'tsquery',
-  amprocrighttype => 'tsquery', amprocnum => '7', amproc => 'gtsquery_same' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { amprocfamily => 'gist/range_ops', amproclefttype => 'anyrange',
   amprocrighttype => 'anyrange', amprocnum => '1',
   amproc => 'range_gist_consistent' },
@@ -646,23 +619,12 @@
 { amprocfamily => 'gin/array_ops', amproclefttype => 'anyarray',
   amprocrighttype => 'anyarray', amprocnum => '6',
   amproc => 'ginarraytriconsistent' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '1',
-  amproc => 'gin_cmp_tslexeme' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '2',
-  amproc => 'gin_extract_tsvector(tsvector,internal,internal)' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '3',
-  amproc => 'gin_extract_tsquery(tsvector,internal,int2,internal,internal,internal,internal)' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '4',
-  amproc => 'gin_tsquery_consistent(internal,int2,tsvector,int4,internal,internal,internal,internal)' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '5', amproc => 'gin_cmp_prefix' },
-{ amprocfamily => 'gin/tsvector_ops', amproclefttype => 'tsvector',
-  amprocrighttype => 'tsvector', amprocnum => '6',
-  amproc => 'gin_tsquery_triconsistent' },
+
+
+
+
+
+
 { amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
   amprocrighttype => 'jsonb', amprocnum => '1', amproc => 'gin_compare_jsonb' },
 { amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',

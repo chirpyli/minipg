@@ -12506,10 +12506,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_AMOP:
 			case OCLASS_AMPROC:
 			case OCLASS_SCHEMA:
-			case OCLASS_TSPARSER:
-			case OCLASS_TSDICT:
-			case OCLASS_TSTEMPLATE:
-			case OCLASS_TSCONFIG:
 			case OCLASS_ROLE:
 			case OCLASS_DATABASE:
 			case OCLASS_TBLSPACE:

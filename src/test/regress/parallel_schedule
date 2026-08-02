@@ -30,7 +30,7 @@ test: strings numerology point lseg line box path polygon circle date time timet
 # horology depends on interval, timetz, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
-test: geometry horology tstypes regex type_sanity opr_sanity misc_sanity comments expressions unicode xid mvcc database encoding euc_kr
+test: geometry horology regex type_sanity opr_sanity misc_sanity comments expressions unicode xid mvcc database encoding euc_kr
 
 # ----------
 # These four each depend on the previous one
@@ -108,7 +108,7 @@ test: publication subscription
 # ----------
 # Another group of parallel tests
 # ----------
-test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid tsearch tsdicts foreign_data window xmlmap functional_deps advisory_lock indirect_toast equivclass
+test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid foreign_data window xmlmap functional_deps advisory_lock indirect_toast equivclass
 
 # ----------
 # Another group of parallel tests (JSON related)

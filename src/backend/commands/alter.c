@@ -36,10 +36,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_subscription.h"
-#include "catalog/pg_ts_config.h"
-#include "catalog/pg_ts_dict.h"
-#include "catalog/pg_ts_parser.h"
-#include "catalog/pg_ts_template.h"
 #include "commands/alter.h"
 #include "commands/collationcmds.h"
 #include "commands/conversioncmds.h"
@@ -124,24 +120,8 @@ report_namespace_conflict(Oid classId, const char *name, Oid nspOid)
 			break;
 		case StatisticExtRelationId:
 			Assert(OidIsValid(nspOid));
-			msgfmt = gettext_noop("statistics object \"%s\" already exists in schema \"%s\"");
-			break;
-		case TSParserRelationId:
-			Assert(OidIsValid(nspOid));
-			msgfmt = gettext_noop("text search parser \"%s\" already exists in schema \"%s\"");
-			break;
-		case TSDictionaryRelationId:
-			Assert(OidIsValid(nspOid));
-			msgfmt = gettext_noop("text search dictionary \"%s\" already exists in schema \"%s\"");
-			break;
-		case TSTemplateRelationId:
-			Assert(OidIsValid(nspOid));
-			msgfmt = gettext_noop("text search template \"%s\" already exists in schema \"%s\"");
-			break;
-		case TSConfigRelationId:
-			Assert(OidIsValid(nspOid));
-			msgfmt = gettext_noop("text search configuration \"%s\" already exists in schema \"%s\"");
-			break;
+		msgfmt = gettext_noop("statistics object \"%s\" already exists in schema \"%s\"");
+		break;
 		default:
 			elog(ERROR, "unsupported object class %u", classId);
 			break;
@@ -388,10 +368,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_PROCEDURE:
 		case OBJECT_ROUTINE:
 		case OBJECT_STATISTIC_EXT:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 		case OBJECT_PUBLICATION:
 		case OBJECT_SUBSCRIPTION:
 			{
@@ -533,10 +509,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 		case OBJECT_PROCEDURE:
 		case OBJECT_ROUTINE:
 		case OBJECT_STATISTIC_EXT:
-		case OBJECT_TSCONFIGURATION:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSPARSER:
-		case OBJECT_TSTEMPLATE:
 			{
 				Relation	catalog;
 				Relation	relation;
@@ -623,10 +595,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_OPCLASS:
 		case OCLASS_OPFAMILY:
 		case OCLASS_STATISTIC_EXT:
-		case OCLASS_TSPARSER:
-		case OCLASS_TSDICT:
-		case OCLASS_TSTEMPLATE:
-		case OCLASS_TSCONFIG:
 			{
 				Relation	catalog;
 
@@ -882,8 +850,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_ROUTINE:
 		case OBJECT_STATISTIC_EXT:
 		case OBJECT_TABLESPACE:
-		case OBJECT_TSDICTIONARY:
-		case OBJECT_TSCONFIGURATION:
 			{
 				Relation	catalog;
 				Relation	relation;

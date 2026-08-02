@@ -158,8 +158,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterSeqStmt:
 		case T_AlterStatsStmt:
 		case T_AlterSubscriptionStmt:
-		case T_AlterTSConfigurationStmt:
-		case T_AlterTSDictionaryStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
@@ -1412,28 +1410,7 @@ ProcessUtilitySlow(ParseState *pstate,
 												 stmt->defnames,
 												 stmt->definition);
 							break;
-						case OBJECT_TSPARSER:
-							Assert(stmt->args == NIL);
-							address = DefineTSParser(stmt->defnames,
-													 stmt->definition);
-							break;
-						case OBJECT_TSDICTIONARY:
-							Assert(stmt->args == NIL);
-							address = DefineTSDictionary(stmt->defnames,
-														 stmt->definition);
-							break;
-						case OBJECT_TSTEMPLATE:
-							Assert(stmt->args == NIL);
-							address = DefineTSTemplate(stmt->defnames,
-													   stmt->definition);
-							break;
-						case OBJECT_TSCONFIGURATION:
-							Assert(stmt->args == NIL);
-							address = DefineTSConfiguration(stmt->defnames,
-															stmt->definition,
-															&secondaryObject);
-							break;
-						case OBJECT_COLLATION:
+																														case OBJECT_COLLATION:
 							Assert(stmt->args == NIL);
 							address = DefineCollation(pstate,
 													  stmt->defnames,
@@ -1728,21 +1705,6 @@ ProcessUtilitySlow(ParseState *pstate,
 			case T_AlterOpFamilyStmt:
 				AlterOpFamily((AlterOpFamilyStmt *) parsetree);
 				/* commands are stashed in AlterOpFamily */
-				commandCollected = true;
-				break;
-
-			case T_AlterTSDictionaryStmt:
-				address = AlterTSDictionary((AlterTSDictionaryStmt *) parsetree);
-				break;
-
-			case T_AlterTSConfigurationStmt:
-				AlterTSConfiguration((AlterTSConfigurationStmt *) parsetree);
-
-				/*
-				 * Commands are stashed in MakeConfigurationMapping and
-				 * DropConfigurationMapping, which are called from
-				 * AlterTSConfiguration
-				 */
 				commandCollected = true;
 				break;
 
@@ -2290,16 +2252,12 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_EVENT_TRIGGER:
 			tag = CMDTAG_ALTER_EVENT_TRIGGER;
 			break;
-		case OBJECT_TSCONFIGURATION:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
 			break;
-		case OBJECT_TSDICTIONARY:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_DICTIONARY;
 			break;
-		case OBJECT_TSPARSER:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_PARSER;
 			break;
-		case OBJECT_TSTEMPLATE:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_TEMPLATE;
 			break;
 		case OBJECT_TYPE:
@@ -2549,16 +2507,12 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;
-				case OBJECT_TSPARSER:
 					tag = CMDTAG_DROP_TEXT_SEARCH_PARSER;
 					break;
-				case OBJECT_TSDICTIONARY:
 					tag = CMDTAG_DROP_TEXT_SEARCH_DICTIONARY;
 					break;
-				case OBJECT_TSTEMPLATE:
 					tag = CMDTAG_DROP_TEXT_SEARCH_TEMPLATE;
 					break;
-				case OBJECT_TSCONFIGURATION:
 					tag = CMDTAG_DROP_TEXT_SEARCH_CONFIGURATION;
 					break;
 				case OBJECT_FOREIGN_TABLE:
@@ -2729,16 +2683,12 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TYPE:
 					tag = CMDTAG_CREATE_TYPE;
 					break;
-				case OBJECT_TSPARSER:
 					tag = CMDTAG_CREATE_TEXT_SEARCH_PARSER;
 					break;
-				case OBJECT_TSDICTIONARY:
 					tag = CMDTAG_CREATE_TEXT_SEARCH_DICTIONARY;
 					break;
-				case OBJECT_TSTEMPLATE:
 					tag = CMDTAG_CREATE_TEXT_SEARCH_TEMPLATE;
 					break;
-				case OBJECT_TSCONFIGURATION:
 					tag = CMDTAG_CREATE_TEXT_SEARCH_CONFIGURATION;
 					break;
 				case OBJECT_COLLATION:
@@ -3005,11 +2955,9 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_TYPE;
 			break;
 
-		case T_AlterTSDictionaryStmt:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_DICTIONARY;
 			break;
 
-		case T_AlterTSConfigurationStmt:
 			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
 			break;
 
@@ -3625,11 +3573,9 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterTSDictionaryStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterTSConfigurationStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
