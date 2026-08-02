@@ -179,7 +179,6 @@ bitcodedir = $(pkglibdir)/bitcode
 #
 # Records the choice of the various --enable-xxx and --with-xxx options.
 
-with_icu	= @with_icu@
 with_perl	= @with_perl@
 with_python	= @with_python@
 with_tcl	= @with_tcl@
@@ -206,8 +205,6 @@ python_additional_libs	= @python_additional_libs@
 python_majorversion	= @python_majorversion@
 python_version		= @python_version@
 
-ICU_CFLAGS		= @ICU_CFLAGS@
-ICU_LIBS		= @ICU_LIBS@
 
 TCLSH			= @TCLSH@
 TCL_LIBS		= @TCL_LIBS@
@@ -235,7 +232,6 @@ CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 PG_SYSROOT = @PG_SYSROOT@
 
-override CPPFLAGS += $(ICU_CFLAGS)
 
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)
