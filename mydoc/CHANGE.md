@@ -1,6 +1,7 @@
 # 变更日志
 
 - 2026-07-13: 提交postgres 14.23版本
+- 2026-08-02: 裁剪 PO 翻译文件：删除全部非英文/中文的 `.po` 文件（cs/de/el/es/fr/he/it/ja/ko/pl/pt_BR/ru/sv/tr/uk/vi 共 140 个），仅保留各模块的 `zh_CN.po`（12 个）。同步将 12 个 `nls.mk` 的 `AVAIL_LANGUAGES` 收敛为 `zh_CN`。当前构建 `ENABLE_NLS` 默认关闭，翻译不参与 `make check-world` 编译，回归测试不受影响。详见下文。
 - 2026-07-31: 裁剪 contrib 扩展（方案 A）：删除 44 个与内核学习无关的扩展，仅保留 12 个"内核观察类 + 示例型"扩展，约删减 12.3 万行。保留 test_decoding（逻辑复制插件，随阶段 8 裁 replication 时再删）；subscription 测试改用 jsonb 替代已删的 hstore。详见下文。
 - 2026-07-31: 裁剪跨平台兼容性，仅保留Linux。删除所有 Windows / MinGW / MSVC / Cygwin / MSYS 专属代码与构建脚本，回归测试 `make check-world` 全部通过。详见下文。
 - 2026-07-31: 修复 Windows 裁剪遗留的 `make clean` 失败：`src/backend/port/Makefile` 残留对 `win32` 子目录的引用（`SUBDIRS += win32` 与 `clean` 规则中的 `$(MAKE) -C win32 clean`），因 win32 目录已删导致 `make clean` 报 "No such file or directory"。已移除该引用，`make clean` / `make check-world` 均通过。
