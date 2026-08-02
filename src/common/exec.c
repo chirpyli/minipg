@@ -422,14 +422,6 @@ set_pglocale_pgservice(const char *argv0, const char *app)
 	if (find_my_exec(argv0, my_exec_path) < 0)
 		return;
 
-#ifdef ENABLE_NLS
-	get_locale_path(my_exec_path, path);
-	bindtextdomain(app, path);
-	textdomain(app);
-	/* set for libpq to use, but don't override existing setting */
-	setenv("PGLOCALEDIR", path, 0);
-#endif
-
 	if (getenv("PGSYSCONFDIR") == NULL)
 	{
 		get_etc_path(my_exec_path, path);

@@ -361,14 +361,6 @@ extern PGDLLIMPORT const pg_enc2name pg_enc2name_tbl[];
 /*
  * Encoding names for gettext
  */
-typedef struct pg_enc2gettext
-{
-	pg_enc		encoding;
-	const char *name;
-} pg_enc2gettext;
-
-extern const pg_enc2gettext pg_enc2gettext_tbl[];
-
 /*
  * pg_wchar stuff
  */
@@ -634,10 +626,6 @@ extern int	GetDatabaseEncoding(void);
 extern const char *GetDatabaseEncodingName(void);
 extern void SetMessageEncoding(int encoding);
 extern int	GetMessageEncoding(void);
-
-#ifdef ENABLE_NLS
-extern int	pg_bind_textdomain_codeset(const char *domainname);
-#endif
 
 extern unsigned char *pg_do_encoding_conversion(unsigned char *src, int len,
 												int src_encoding,

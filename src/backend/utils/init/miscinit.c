@@ -1708,14 +1708,5 @@ process_session_preload_libraries(void)
 void
 pg_bindtextdomain(const char *domain)
 {
-#ifdef ENABLE_NLS
-	if (my_exec_path[0] != '\0')
-	{
-		char		locale_path[MAXPGPATH];
-
-		get_locale_path(my_exec_path, locale_path);
-		bindtextdomain(domain, locale_path);
-		pg_bind_textdomain_codeset(domain);
-	}
-#endif
+	/* minipg 已移除 Native Language Support（ENABLE_NLS），无需绑定翻译域 */
 }

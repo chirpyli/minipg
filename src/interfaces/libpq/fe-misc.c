@@ -1387,61 +1387,8 @@ PQenv2encoding(void)
 }
 
 
-#ifdef ENABLE_NLS
-
-static void
-libpq_binddomain(void)
-{
-	/*
-	 * At least on Windows, there are gettext implementations that fail if
-	 * multiple threads call bindtextdomain() concurrently.  Use a mutex and
-	 * flag variable to ensure that we call it just once per process.  It is
-	 * not known that similar bugs exist on non-Windows platforms, but we
-	 * might as well do it the same way everywhere.
-	 */
-	static volatile bool already_bound = false;
-	static pthread_mutex_t binddomain_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-	if (!already_bound)
-	{
-		/* bindtextdomain() does not preserve errno */
-		int			save_errno = errno;
-
-		(void) pthread_mutex_lock(&binddomain_mutex);
-
-		if (!already_bound)
-		{
-			const char *ldir;
-
-			/*
-			 * No relocatable lookup here because the calling executable could
-			 * be anywhere
-			 */
-			ldir = getenv("PGLOCALEDIR");
-			if (!ldir)
-				ldir = LOCALEDIR;
-			bindtextdomain(PG_TEXTDOMAIN("libpq"), ldir);
-			already_bound = true;
-		}
-
-		(void) pthread_mutex_unlock(&binddomain_mutex);
-
-		errno = save_errno;
-	}
-}
-
-char *
-libpq_gettext(const char *msgid)
-{
-	libpq_binddomain();
-	return dgettext(PG_TEXTDOMAIN("libpq"), msgid);
-}
-
-char *
-libpq_ngettext(const char *msgid, const char *msgid_plural, unsigned long n)
-{
-	libpq_binddomain();
-	return dngettext(PG_TEXTDOMAIN("libpq"), msgid, msgid_plural, n);
-}
-
-#endif							/* ENABLE_NLS */
+/*
+ * libpq 的翻译函数（libpq_gettext/libpq_ngettext）已在 minipg 移除
+ * Native Language Support（ENABLE_NLS）后改为 libpq-int.h 中的空宏直通，
+ * 因此此处不再提供实际实现。
+ */

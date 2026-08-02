@@ -2,6 +2,7 @@
 
 - 2026-07-13: 提交postgres 14.23版本
 - 2026-08-02: 裁剪 PO 翻译文件：删除全部非英文/中文的 `.po` 文件（cs/de/el/es/fr/he/it/ja/ko/pl/pt_BR/ru/sv/tr/uk/vi 共 140 个），仅保留各模块的 `zh_CN.po`（12 个）。同步将 12 个 `nls.mk` 的 `AVAIL_LANGUAGES` 收敛为 `zh_CN`。当前构建 `ENABLE_NLS` 默认关闭，翻译不参与 `make check-world` 编译，回归测试不受影响。详见下文。
+- 2026-08-02: 彻底移除 Native Language Support（ENABLE_NLS）翻译子系统（保留 gettext 空宏直通层，源码业务调用零改动）。删除 `--enable-nls` 配置项、12 个 `nls.mk`、`src/nls-global.mk`、`src/Makefile` 的 nls-global.mk 安装指令、configure.ac 的 NLS 段与 PGAC_CHECK_GETTEXT 调用、pg_config.h.in 的 `#undef ENABLE_NLS`；拍平 c.h（删 libintl.h 包含、gettext 空宏移出条件保护）、elog.c（err_gettext 直通）、pg_locale.c（SetMessageEncoding→GetDatabaseEncoding）、miscinit.c（pg_bindtextdomain 空函数）、mbutils.c（删 NLS 编码绑定函数）、pg_wchar.h（删 pg_enc2gettext 类型/声明）、encnames.c（删 pg_enc2gettext_tbl）、fe-misc.c（删 libpq 翻译实现）、libpq-int.h（libpq_gettext 空宏化）、print.c（删两处 NLS 翻译块）、exec.c（删 bindtextdomain 块）。autoconf 2.69 重生成 configure/autoheader。make check-world 全量通过。详见下文。
 - 2026-07-31: 裁剪 contrib 扩展（方案 A）：删除 44 个与内核学习无关的扩展，仅保留 12 个"内核观察类 + 示例型"扩展，约删减 12.3 万行。保留 test_decoding（逻辑复制插件，随阶段 8 裁 replication 时再删）；subscription 测试改用 jsonb 替代已删的 hstore。详见下文。
 - 2026-07-31: 裁剪跨平台兼容性，仅保留Linux。删除所有 Windows / MinGW / MSVC / Cygwin / MSYS 专属代码与构建脚本，回归测试 `make check-world` 全部通过。详见下文。
 - 2026-07-31: 修复 Windows 裁剪遗留的 `make clean` 失败：`src/backend/port/Makefile` 残留对 `win32` 子目录的引用（`SUBDIRS += win32` 与 `clean` 规则中的 `$(MAKE) -C win32 clean`），因 win32 目录已删导致 `make clean` 报 "No such file or directory"。已移除该引用，`make clean` / `make check-world` 均通过。
@@ -254,4 +255,36 @@
 **验证**：`make`（autoconf 2.69 重生成 configure）全量编译通过；`make check-world` 全部通过（EXIT=0），主回归 216 项全 ok（含 `rules` 测试因删两个系统视图需同步更新预期）；全仓库扫描 `pg_stat_ssl`/`pg_stat_gssapi`/`be_tls_`/`pq_gss`/`AUTH_REQ_MD5`/`USE_OPENSSL`/`PQsslInUse` 等残留符号为 0 处。
 
 **注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成（与 PG14 要求一致），无需放宽版本宏。
+
+## 裁剪：彻底移除 Native Language Support（ENABLE_NLS）翻译子系统
+
+**目的**：minipg 面向内核学习，GNU gettext 翻译体系（`ENABLE_NLS` + `.po`/`.mo` + `nls.mk` + `bindtextdomain` 调用链）是一套与内核逻辑完全正交、且当前构建本就关闭（死代码）的消息展示层。拆除后可显著减少 `c.h`/`elog.c`/`pg_locale.c`/`libpq` 等处跨模块的条件编译分支，降低阅读干扰。
+
+**设计原则（半裁剪）**：保留 `gettext` 空宏直通层（`c.h` 中 `#define gettext(x) (x)` 等无条件保留），使源码中所有 `errmsg(_("..."))`/`libpq_gettext("...")` 调用**无需任何改动**即编译为原文直通。这样未来若需重新启用翻译，只需恢复 `#ifdef ENABLE_NLS` 外壳即可，业务源码零回归成本。
+
+**删除的认证/构建开关**：
+- `configure.ac`：`PGAC_ARG_OPTARG(enable, nls, ...)` 整段、`if test "$enable_nls" = yes; then PGAC_CHECK_GETTEXT; fi` 块
+- `pg_config.h.in`：`#undef ENABLE_NLS`
+- `configure`（autoconf 2.69 重生成）
+
+**删除的文件**：
+- 构建描述：12 个 `src/**/nls.mk`、顶层 `src/nls-global.mk`
+- 翻译数据：`*.po`（前次已裁剪，仅留 `zh_CN.po`）
+
+**修改的文件（按层）**：
+- 头文件：`c.h`（删 `#ifdef ENABLE_NLS #include <libintl.h> #endif`，`gettext`/`dgettext`/`ngettext`/`dngettext` 空宏移出条件保护、改为无条件保留并补注释）、`libpq-int.h`（`libpq_gettext`/`libpq_ngettext` 由外部函数声明+条件空宏改为无条件空宏）、`pg_wchar.h`（删 `pg_enc2gettext` 类型、`pg_enc2gettext_tbl` 声明、`pg_bind_textdomain_codeset` 的 `#ifdef ENABLE_NLS` 声明）
+- 后端核心：`elog.c`（`err_gettext` 拍平为 `return str;`）、`pg_locale.c`（`SetMessageEncoding` 的 NLS 分支拍平为 `GetDatabaseEncoding()`，保留编码核心逻辑）、`miscinit.c`（`pg_bindtextdomain` 拍平为空函数）、`mbutils.c`（删 `#ifdef ENABLE_NLS` 包住的 `raw_pg_bind_textdomain_codeset`/`pg_bind_textdomain_codeset` 整块）
+- 字符集：`encnames.c`（删 `pg_enc2gettext_tbl[]` 定义块，仅 NLS 使用）
+- 客户端 libpq：`fe-misc.c`（删 `#ifdef ENABLE_NLS` 包住的 `libpq_binddomain`/`libpq_gettext`/`libpq_ngettext` 实现整块）、`exec.c`（删 `bindtextdomain`/`textdomain`/`setenv PGLOCALEDIR` 块）
+- 工具：`print.c`（两处 `printTableAddHeader`/`printTableAddCell` 删 `#ifdef ENABLE_NLS` 翻译块，无条件保留 `(void) translate;` 消未用参数警告）
+- 构建：`src/Makefile`（删 `install-local` 安装 `nls-global.mk` 的行）、`src/Makefile.global.in`（删 `enable_nls = @enable_nls@` 变量行与 NLS 递归构建块，改为说明性注释）
+
+**保留项（兼容性保证）**：
+- `gettext`/`dgettext`/`ngettext`/`dngettext`/`libpq_gettext`/`libpq_ngettext` 空宏：`errmsg(_("..."))` 等数百处调用点**保持原样不改**，编译后透明直通原文
+- `pg_enc`、`pg_wchar`、`GetDatabaseEncoding`、`SetMessageEncoding`、locale/排序规则（ICU 除外）等**字符集核心**：完全保留，与翻译层正交，不受影响
+- `PG_TEXTDOMAIN(...)` 宏：仅为字符串常量标识，空宏环境下被忽略，保留无害
+
+**验证**：autoconf 2.69 重生成 `configure`/`pg_config.h.in` 后 `./configure` + `make -j4` 全量编译通过（exit 0，无 error/warning）；`make check-world` 全量通过（exit 0，主回归 216 项、plpgsql 107 项及各 contrib 套件均 ok）。全仓库扫描 `ENABLE_NLS`/`pg_bind_textdomain_codeset`/`bindtextdomain` 等功能符号残留为 0 处（仅剩空宏定义与注释中的说明文字）。
+
+**注意事项**：本次 `configure` 使用 autoconf 2.69 忠实重生成（与 PG14 要求一致）。`src/Makefile` 的 `install-local` 原会安装已删除的 `nls-global.mk`，已一并移除该行，`make install`/`make check-world` 的 temp-install 阶段不再报错。
 

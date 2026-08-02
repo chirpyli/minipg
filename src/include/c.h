@@ -68,9 +68,6 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <locale.h>
-#ifdef ENABLE_NLS
-#include <libintl.h>
-#endif
 
 
 /* ----------------------------------------------------------------
@@ -1215,15 +1212,16 @@ typedef union PGAlignedXLogBlock
 
 /*
  * gettext support
+ *
+ * minipg 已移除 Native Language Support（ENABLE_NLS）翻译子系统。
+ * 保留以下空宏作为透明直通，使源码中所有 gettext()/dgettext()/ngettext()
+ * 调用在编译期直接展开为原文，行为与翻译关闭时一致；同时保留将来若需
+ * 重新启用翻译时可一键接回 <libintl.h> 的钩子。
  */
-
-#ifndef ENABLE_NLS
-/* stuff we'd otherwise get from <libintl.h> */
 #define gettext(x) (x)
 #define dgettext(d,x) (x)
 #define ngettext(s,p,n) ((n) == 1 ? (s) : (p))
 #define dngettext(d,s,p,n) ((n) == 1 ? (s) : (p))
-#endif
 
 #define _(x) gettext(x)
 

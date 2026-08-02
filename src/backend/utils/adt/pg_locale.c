@@ -146,11 +146,9 @@ pg_perm_setlocale(int category, const char *locale)
 		return result;			/* fall out immediately on failure */
 
 	/*
-	 * Use the right encoding in translated messages.  Under ENABLE_NLS, let
-	 * pg_bind_textdomain_codeset() figure it out.  Under !ENABLE_NLS, message
-	 * format strings are ASCII, but database-encoding strings may enter the
-	 * message via %s.  This makes the overall message encoding equal to the
-	 * database encoding.
+	 * minipg 已移除 Native Language Support（ENABLE_NLS）翻译子系统，消息
+	 * 格式串为 ASCII，但数据库编码的字符串可能通过 %s 进入消息。这使整体
+	 * 消息编码等于数据库编码。
 	 */
 	if (category == LC_CTYPE)
 	{
@@ -160,11 +158,7 @@ pg_perm_setlocale(int category, const char *locale)
 		strlcpy(save_lc_ctype, result, sizeof(save_lc_ctype));
 		result = save_lc_ctype;
 
-#ifdef ENABLE_NLS
-		SetMessageEncoding(pg_bind_textdomain_codeset(textdomain(NULL)));
-#else
 		SetMessageEncoding(GetDatabaseEncoding());
-#endif
 	}
 
 	switch (category)

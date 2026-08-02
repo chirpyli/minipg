@@ -3090,9 +3090,7 @@ void
 printTableAddHeader(printTableContent *const content, char *header,
 					const bool translate, const char align)
 {
-#ifndef ENABLE_NLS
 	(void) translate;			/* unused parameter */
-#endif
 
 	if (content->header >= content->headers + content->ncolumns)
 	{
@@ -3104,10 +3102,6 @@ printTableAddHeader(printTableContent *const content, char *header,
 
 	*content->header = (char *) mbvalidate((unsigned char *) header,
 										   content->opt->encoding);
-#ifdef ENABLE_NLS
-	if (translate)
-		*content->header = _(*content->header);
-#endif
 	content->header++;
 
 	*content->align = align;
@@ -3130,9 +3124,7 @@ void
 printTableAddCell(printTableContent *const content, char *cell,
 				  const bool translate, const bool mustfree)
 {
-#ifndef ENABLE_NLS
 	(void) translate;			/* unused parameter */
-#endif
 
 	if (content->cellsadded >= content->ncolumns * content->nrows)
 	{
@@ -3144,11 +3136,6 @@ printTableAddCell(printTableContent *const content, char *cell,
 
 	*content->cell = (char *) mbvalidate((unsigned char *) cell,
 										 content->opt->encoding);
-
-#ifdef ENABLE_NLS
-	if (translate)
-		*content->cell = _(*content->cell);
-#endif
 
 	if (mustfree)
 	{

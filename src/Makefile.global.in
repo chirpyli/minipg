@@ -193,7 +193,6 @@ with_system_tzdata = @with_system_tzdata@
 with_uuid	= @with_uuid@
 with_zlib	= @with_zlib@
 enable_rpath	= @enable_rpath@
-enable_nls	= @enable_nls@
 enable_debug	= @enable_debug@
 enable_dtrace	= @enable_dtrace@
 enable_coverage	= @enable_coverage@
@@ -946,14 +945,9 @@ endif # autodepend
 ##########################################################################
 #
 # Native language support
-
-ifeq ($(enable_nls), yes)
-ifneq (,$(wildcard $(srcdir)/nls.mk))
-
-include $(top_srcdir)/src/nls-global.mk
-
-endif # nls.mk
-endif # enable_nls
+#
+# minipg 已移除 Native Language Support（ENABLE_NLS）翻译子系统，不再包含
+# 翻译域构建逻辑（原 nls-global.mk / nls.mk 机制已删除）。
 
 
 ##########################################################################

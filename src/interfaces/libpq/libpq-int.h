@@ -635,13 +635,12 @@ extern void pqTraceOutputNoTypeByteMessage(PGconn *conn, const char *message);
  */
 #define OUTBUFFER_THRESHOLD	65536
 
-#ifdef ENABLE_NLS
-extern char *libpq_gettext(const char *msgid) pg_attribute_format_arg(1);
-extern char *libpq_ngettext(const char *msgid, const char *msgid_plural, unsigned long n) pg_attribute_format_arg(1) pg_attribute_format_arg(2);
-#else
+/*
+ * minipg 已移除 Native Language Support（ENABLE_NLS），libpq 的翻译函数
+ * 无条件定义为空宏直通，使所有 libpq_gettext(...) 调用直接返回原文。
+ */
 #define libpq_gettext(x) (x)
 #define libpq_ngettext(s, p, n) ((n) == 1 ? (s) : (p))
-#endif
 
 /*
  * These macros are needed to let error-handling code be portable between

@@ -296,14 +296,7 @@ in_error_recursion_trouble(void)
 static inline const char *
 err_gettext(const char *str)
 {
-#ifdef ENABLE_NLS
-	if (in_error_recursion_trouble())
-		return str;
-	else
-		return gettext(str);
-#else
 	return str;
-#endif
 }
 
 /*
