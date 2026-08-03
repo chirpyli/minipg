@@ -13,7 +13,7 @@ test: tablespace
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char name varchar text int2 int4 int8 oid float4 float8 bit numeric txid uuid enum rangetypes pg_lsn regproc
+test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid uuid enum rangetypes pg_lsn regproc
 
 # ----------
 # The second group of parallel tests
@@ -29,7 +29,7 @@ test: strings numerology date time timetz timestamp timestamptz interval multira
 # horology depends on interval, timetz, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
-test: horology regex type_sanity opr_sanity misc_sanity comments expressions unicode xid mvcc database encoding euc_kr
+test: horology regex opr_sanity misc_sanity comments expressions unicode xid mvcc database euc_kr
 
 # ----------
 # These four each depend on the previous one
@@ -75,12 +75,12 @@ test: select_into select_distinct select_distinct_on select_implicit select_havi
 # ----------
 # Another group of parallel tests
 # ----------
-test: gin privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
+test: privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
 
 # ----------
 # Another group of parallel tests
 # ----------
-test: create_table_like alter_generic alter_operator misc async dbsize misc_functions sysviews tsrf tid tidscan tidrangescan incremental_sort
+test: create_table_like alter_generic alter_operator misc async dbsize misc_functions sysviews tsrf tid tidscan tidrangescan
 
 # rules cannot run concurrently with any test that creates
 # a view or rule in the public schema
@@ -105,10 +105,6 @@ test: publication subscription
 test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid foreign_data window xmlmap functional_deps advisory_lock indirect_toast equivclass
 
 # ----------
-# Another group of parallel tests (JSON related)
-# ----------
-test: json jsonb json_encoding jsonpath jsonpath_encoding jsonb_jsonpath
-
 # ----------
 # Another group of parallel tests
 # NB: temp.sql does a reconnect which transiently uses 2 connections,

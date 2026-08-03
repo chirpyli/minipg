@@ -461,26 +461,6 @@
 { castsource => 'numeric', casttarget => 'numeric',
   castfunc => 'numeric(numeric,int4)', castcontext => 'i', castmethod => 'f' },
 
-# json to/from jsonb
-{ castsource => 'json', casttarget => 'jsonb', castfunc => '0',
-  castcontext => 'a', castmethod => 'i' },
-{ castsource => 'jsonb', casttarget => 'json', castfunc => '0',
-  castcontext => 'a', castmethod => 'i' },
-
-# jsonb to numeric and bool types
-{ castsource => 'jsonb', casttarget => 'bool', castfunc => 'bool(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'numeric', castfunc => 'numeric(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'int2', castfunc => 'int2(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'int4', castfunc => 'int4(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'int8', castfunc => 'int8(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'float4', castfunc => 'float4(jsonb)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'jsonb', casttarget => 'float8', castfunc => 'float8(jsonb)',
   castcontext => 'e', castmethod => 'f' },
 
 # range to multirange

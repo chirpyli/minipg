@@ -233,7 +233,7 @@ CREATE TABLE array_index_op_test (
 );
 
 CREATE TABLE testjsonb (
-       j jsonb
+       j text
 );
 
 CREATE TABLE unknowntab (
@@ -417,17 +417,17 @@ DROP FUNCTION immut_func(int);
 
 -- prevent using columns of unsupported types in key (type must have a btree operator class)
 CREATE TABLE partitioned (
-	a json
+	a xml
 ) PARTITION BY LIST (a);
 CREATE TABLE partitioned (
-	a json
-) PARTITION BY LIST (a json_ops);
+	a xml
+) PARTITION BY LIST (a);
 CREATE TABLE partitioned (
-	a json
+	a xml
 ) PARTITION BY RANGE (a);
 CREATE TABLE partitioned (
-	a json
-) PARTITION BY RANGE (a json_ops);
+	a xml
+) PARTITION BY RANGE (a);
 
 -- cannot add NO INHERIT constraints to partitioned tables
 CREATE TABLE partitioned (

@@ -14,7 +14,6 @@ select a,ord from unnest(array['a','b']) with ordinality as z(a,ord);
 select * from unnest(array['a','b']) with ordinality as z(a,ord);
 select a,ord from unnest(array[1.0::float8]) with ordinality as z(a,ord);
 select * from unnest(array[1.0::float8]) with ordinality as z(a,ord);
-select row_to_json(s.*) from generate_series(11,14) with ordinality s;
 -- ordinality vs. views
 create temporary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord);
 select * from vw_ord;
@@ -761,27 +760,11 @@ select x from int8_tbl, extractq2_2_opt(int8_tbl) f(x);
 
 create type rngfunc2 as (a integer, b text);
 
-select *, row_to_json(u) from unnest(array[(1,'foo')::rngfunc2, null::rngfunc2]) u;
-select *, row_to_json(u) from unnest(array[null::rngfunc2, null::rngfunc2]) u;
-select *, row_to_json(u) from unnest(array[null::rngfunc2, (1,'foo')::rngfunc2, null::rngfunc2]) u;
-select *, row_to_json(u) from unnest(array[]::rngfunc2[]) u;
 
 drop type rngfunc2;
 
 -- check handling of functions pulled up into function RTEs (bug #17227)
 
-explain (verbose, costs off)
-select * from
-  (select jsonb_path_query_array(module->'lectures', '$[*]') as lecture
-   from unnest(array['{"lectures": [{"id": "1"}]}'::jsonb])
-        as unnested_modules(module)) as ss,
-  jsonb_to_recordset(ss.lecture) as j (id text);
-
-select * from
-  (select jsonb_path_query_array(module->'lectures', '$[*]') as lecture
-   from unnest(array['{"lectures": [{"id": "1"}]}'::jsonb])
-        as unnested_modules(module)) as ss,
-  jsonb_to_recordset(ss.lecture) as j (id text);
 
 -- check detection of mismatching record types with a const-folded expression
 

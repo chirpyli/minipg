@@ -4,7 +4,7 @@
 -- Use hand-rolled hash functions and operator classes to get predictable
 -- result on different machines.  See the definitions of
 -- part_part_test_int4_ops and part_test_text_ops in insert.sql.
-CREATE TABLE mchash (a int, b text, c jsonb)
+CREATE TABLE mchash (a int, b text, c text)
   PARTITION BY HASH (a part_test_int4_ops, b part_test_text_ops);
 CREATE TABLE mchash1
   PARTITION OF mchash FOR VALUES WITH (MODULUS 4, REMAINDER 0);
@@ -48,7 +48,7 @@ SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, VARIADIC NULL::int[]);
 (1 row)
 
 -- too many arguments
-SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, NULL::int, NULL::text, NULL::json);
+SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, NULL::int, NULL::text, NULL::text);
 ERROR:  number of partitioning columns (2) does not match number of partition keys provided (3)
 -- too few arguments
 SELECT satisfies_hash_partition('mchash'::regclass, 3, 1, NULL::int);
@@ -76,7 +76,7 @@ SELECT satisfies_hash_partition('mchash'::regclass, 2, 1,
 								variadic array[1,2]::int[]);
 ERROR:  column 2 of the partition key has type "text", but supplied value is of type "integer"
 -- multiple partitioning columns of the same type
-CREATE TABLE mcinthash (a int, b int, c jsonb)
+CREATE TABLE mcinthash (a int, b int, c text)
   PARTITION BY HASH (a part_test_int4_ops, b part_test_int4_ops);
 -- now variadic should work, should be false
 SELECT satisfies_hash_partition('mcinthash'::regclass, 4, 0,

@@ -15,6 +15,3 @@ ALTER FUNCTION bt_metap(text) PARALLEL SAFE;
 ALTER FUNCTION bt_page_stats(text, int4) PARALLEL SAFE;
 ALTER FUNCTION bt_page_items(text, int4) PARALLEL SAFE;
 ALTER FUNCTION fsm_page_contents(bytea) PARALLEL SAFE;
-ALTER FUNCTION gin_metapage_info(bytea) PARALLEL SAFE;
-ALTER FUNCTION gin_page_opaque_info(bytea) PARALLEL SAFE;
-ALTER FUNCTION gin_leafpage_items(bytea) PARALLEL SAFE;

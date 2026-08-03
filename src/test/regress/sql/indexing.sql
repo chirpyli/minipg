@@ -736,9 +736,6 @@ create index idxpart_spgist on idxpart using spgist(b);
 explain (costs off) select * from idxpart where b = 'abcd';
 drop index idxpart_spgist;
 
-create index idxpart_gin on idxpart using gin(c);
-explain (costs off) select * from idxpart where c @> array[42];
-drop index idxpart_gin;
 
 reset enable_seqscan;
 drop table idxpart;

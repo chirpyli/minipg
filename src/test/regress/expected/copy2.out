@@ -506,7 +506,7 @@ ROLLBACK;
 create table check_con_tbl (f1 int);
 create function check_con_function(check_con_tbl) returns bool as $$
 begin
-  raise notice 'input = %', row_to_json($1);
+  raise notice 'input = %', $1;
   return $1.f1 > 0;
 end $$ language plpgsql immutable;
 alter table check_con_tbl add check (check_con_function(check_con_tbl.*));
@@ -519,10 +519,10 @@ Check constraints:
     "check_con_tbl_check" CHECK (check_con_function(check_con_tbl.*))
 
 copy check_con_tbl from stdin;
-NOTICE:  input = {"f1":1}
-NOTICE:  input = {"f1":null}
+NOTICE:  input = (1)
+NOTICE:  input = ()
 copy check_con_tbl from stdin;
-NOTICE:  input = {"f1":0}
+NOTICE:  input = (0)
 ERROR:  new row for relation "check_con_tbl" violates check constraint "check_con_tbl_check"
 DETAIL:  Failing row contains (0).
 CONTEXT:  COPY check_con_tbl, line 1: "0"

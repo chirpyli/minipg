@@ -1667,10 +1667,10 @@ SELECT ROW(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one';
  (1)
 (1 row)
 
-SELECT row_to_json(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one';
- row_to_json 
--------------
- {"i":1}
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one';
+ i 
+---
+ 1
 (1 row)
 
 --

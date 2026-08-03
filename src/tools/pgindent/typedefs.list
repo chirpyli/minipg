@@ -958,7 +958,6 @@ GinScanKey
 GinScanOpaque
 GinScanOpaqueData
 GinState
-GinStatsData
 GinTernaryValue
 GinTupleCollector
 GinVacuumState

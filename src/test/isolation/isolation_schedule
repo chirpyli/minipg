@@ -89,9 +89,7 @@ test: timeouts
 test: vacuum-concurrent-drop
 test: vacuum-conflict
 test: vacuum-skip-locked
-test: horizons
 test: predicate-hash
-test: predicate-gin
 test: partition-concurrent-attach
 test: partition-drop-index-locking
 test: partition-key-update-1

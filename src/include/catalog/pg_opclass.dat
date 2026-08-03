@@ -183,8 +183,7 @@
 
 
 
-{ opcmethod => 'gin', opcname => 'array_ops', opcfamily => 'gin/array_ops',
-  opcintype => 'anyarray', opckeytype => 'anyelement' },
+
 { opcmethod => 'btree', opcname => 'uuid_ops', opcfamily => 'btree/uuid_ops',
   opcintype => 'uuid' },
 { opcmethod => 'hash', opcname => 'uuid_ops', opcfamily => 'hash/uuid_ops',
@@ -212,12 +211,9 @@
 { opcmethod => 'hash', opcname => 'multirange_ops',
   opcfamily => 'hash/multirange_ops', opcintype => 'anymultirange' },
 
-{ opcmethod => 'btree', opcname => 'jsonb_ops', opcfamily => 'btree/jsonb_ops',
-  opcintype => 'jsonb' },
-{ opcmethod => 'hash', opcname => 'jsonb_ops', opcfamily => 'hash/jsonb_ops',
-  opcintype => 'jsonb' },
-{ opcmethod => 'gin', opcname => 'jsonb_ops', opcfamily => 'gin/jsonb_ops',
-  opcintype => 'jsonb', opckeytype => 'text' },
+
+
+
 
 
 

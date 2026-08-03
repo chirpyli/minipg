@@ -31,7 +31,6 @@
 #include <unistd.h>
 
 #include "access/commit_ts.h"
-#include "access/gin.h"
 #include "access/rmgr.h"
 #include "access/tableam.h"
 #include "access/toast_compression.h"
@@ -3306,17 +3305,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gin_fuzzy_search_limit", PGC_USERSET, CLIENT_CONN_OTHER,
-			gettext_noop("Sets the maximum allowed result for exact search by GIN."),
-			NULL,
-			0
-		},
-		&GinFuzzySearchLimit,
-		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"effective_cache_size", PGC_USERSET, QUERY_TUNING_COST,
 			gettext_noop("Sets the planner's assumption about the total size of the data caches."),
 			gettext_noop("That is, the total size of the caches (kernel cache and shared buffers) used for PostgreSQL data files. "
@@ -3381,17 +3369,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&pgstat_track_activity_query_size,
 		1024, 100, 1048576,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"gin_pending_list_limit", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the maximum size of the pending list for GIN index."),
-			NULL,
-			GUC_UNIT_KB
-		},
-		&gin_pending_list_limit,
-		4096, 64, MAX_KILOBYTES,
 		NULL, NULL, NULL
 	},
 

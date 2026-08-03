@@ -7131,7 +7131,6 @@ spgcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 	*indexPages = costs.numIndexPages;
 }
 
-
 /*
  * Support routines for gincostestimate
  */

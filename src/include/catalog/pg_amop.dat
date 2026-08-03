@@ -1083,18 +1083,10 @@
 
 
 # gin array_ops
-{ amopfamily => 'gin/array_ops', amoplefttype => 'anyarray',
-  amoprighttype => 'anyarray', amopstrategy => '1',
-  amopopr => '&&(anyarray,anyarray)', amopmethod => 'gin' },
-{ amopfamily => 'gin/array_ops', amoplefttype => 'anyarray',
-  amoprighttype => 'anyarray', amopstrategy => '2',
-  amopopr => '@>(anyarray,anyarray)', amopmethod => 'gin' },
-{ amopfamily => 'gin/array_ops', amoplefttype => 'anyarray',
-  amoprighttype => 'anyarray', amopstrategy => '3',
-  amopopr => '<@(anyarray,anyarray)', amopmethod => 'gin' },
-{ amopfamily => 'gin/array_ops', amoplefttype => 'anyarray',
-  amoprighttype => 'anyarray', amopstrategy => '4',
-  amopopr => '=(anyarray,anyarray)', amopmethod => 'gin' },
+
+
+
+
 
 # btree enum_ops
 { amopfamily => 'btree/enum_ops', amoplefttype => 'anyenum',
@@ -1230,49 +1222,21 @@
 
 
 
-# btree jsonb_ops
-{ amopfamily => 'btree/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '1', amopopr => '<(jsonb,jsonb)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '2', amopopr => '<=(jsonb,jsonb)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '3', amopopr => '=(jsonb,jsonb)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '4', amopopr => '>=(jsonb,jsonb)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '5', amopopr => '>(jsonb,jsonb)',
-  amopmethod => 'btree' },
 
-# hash jsonb_ops
-{ amopfamily => 'hash/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '1', amopopr => '=(jsonb,jsonb)',
-  amopmethod => 'hash' },
 
-# GIN jsonb_ops
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '7', amopopr => '@>(jsonb,jsonb)',
-  amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'text', amopstrategy => '9', amopopr => '?(jsonb,text)',
-  amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => '_text', amopstrategy => '10', amopopr => '?|(jsonb,_text)',
-  amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => '_text', amopstrategy => '11', amopopr => '?&(jsonb,_text)',
-  amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonpath', amopstrategy => '15',
-  amopopr => '@?(jsonb,jsonpath)', amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonpath', amopstrategy => '16',
-  amopopr => '@@(jsonb,jsonpath)', amopmethod => 'gin' },
 
-# GIN jsonb_path_ops
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

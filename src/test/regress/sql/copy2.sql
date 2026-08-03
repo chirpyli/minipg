@@ -340,7 +340,7 @@ ROLLBACK;
 create table check_con_tbl (f1 int);
 create function check_con_function(check_con_tbl) returns bool as $$
 begin
-  raise notice 'input = %', row_to_json($1);
+  raise notice 'input = %', $1;
   return $1.f1 > 0;
 end $$ language plpgsql immutable;
 alter table check_con_tbl add check (check_con_function(check_con_tbl.*));

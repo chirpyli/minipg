@@ -1401,17 +1401,6 @@ explain (costs off) select * from idxpart where b = 'abcd';
 
 drop index idxpart_spgist;
 ERROR:  index "idxpart_spgist" does not exist
-create index idxpart_gin on idxpart using gin(c);
-explain (costs off) select * from idxpart where c @> array[42];
-                  QUERY PLAN                  
-----------------------------------------------
- Bitmap Heap Scan on idxpart1 idxpart
-   Recheck Cond: (c @> '{42}'::integer[])
-   ->  Bitmap Index Scan on idxpart1_c_idx
-         Index Cond: (c @> '{42}'::integer[])
-(4 rows)
-
-drop index idxpart_gin;
 reset enable_seqscan;
 drop table idxpart;
 -- intentionally leave some objects around

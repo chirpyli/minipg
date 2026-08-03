@@ -848,6 +848,8 @@
 
 
 
+
+
 { oid => '338', descr => 'validate an operator class',
   proname => 'amvalidate', provolatile => 'v', prorettype => 'bool',
   proargtypes => 'oid', prosrc => 'amvalidate' },
@@ -3705,27 +3707,13 @@
   proname => 'pg_lsn', prorettype => 'pg_lsn', proargtypes => 'numeric',
   prosrc => 'numeric_pg_lsn' },
 
-{ oid => '3556', descr => 'convert jsonb to boolean',
-  proname => 'bool', prorettype => 'bool', proargtypes => 'jsonb',
-  prosrc => 'jsonb_bool' },
-{ oid => '3449', descr => 'convert jsonb to numeric',
-  proname => 'numeric', prorettype => 'numeric', proargtypes => 'jsonb',
-  prosrc => 'jsonb_numeric' },
-{ oid => '3450', descr => 'convert jsonb to int2',
-  proname => 'int2', prorettype => 'int2', proargtypes => 'jsonb',
-  prosrc => 'jsonb_int2' },
-{ oid => '3451', descr => 'convert jsonb to int4',
-  proname => 'int4', prorettype => 'int4', proargtypes => 'jsonb',
-  prosrc => 'jsonb_int4' },
-{ oid => '3452', descr => 'convert jsonb to int8',
-  proname => 'int8', prorettype => 'int8', proargtypes => 'jsonb',
-  prosrc => 'jsonb_int8' },
-{ oid => '3453', descr => 'convert jsonb to float4',
-  proname => 'float4', prorettype => 'float4', proargtypes => 'jsonb',
-  prosrc => 'jsonb_float4' },
-{ oid => '2580', descr => 'convert jsonb to float8',
-  proname => 'float8', prorettype => 'float8', proargtypes => 'jsonb',
-  prosrc => 'jsonb_float8' },
+
+
+
+
+
+
+
 
 # formatting
 { oid => '1770', descr => 'format timestamp with time zone to text',
@@ -7321,24 +7309,11 @@
 
 
 # GIN array support
-{ oid => '2743', descr => 'GIN array support',
-  proname => 'ginarrayextract', prorettype => 'internal',
-  proargtypes => 'anyarray internal internal', prosrc => 'ginarrayextract' },
-{ oid => '2774', descr => 'GIN array support',
-  proname => 'ginqueryarrayextract', prorettype => 'internal',
-  proargtypes => 'anyarray internal int2 internal internal internal internal',
-  prosrc => 'ginqueryarrayextract' },
-{ oid => '2744', descr => 'GIN array support',
-  proname => 'ginarrayconsistent', prorettype => 'bool',
-  proargtypes => 'internal int2 anyarray int4 internal internal internal internal',
-  prosrc => 'ginarrayconsistent' },
-{ oid => '3920', descr => 'GIN array support',
-  proname => 'ginarraytriconsistent', prorettype => 'char',
-  proargtypes => 'internal int2 anyarray int4 internal internal internal',
-  prosrc => 'ginarraytriconsistent' },
-{ oid => '3076', descr => 'GIN array support (obsolete)',
-  proname => 'ginarrayextract', prorettype => 'internal',
-  proargtypes => 'anyarray internal', prosrc => 'ginarrayextract_2args' },
+
+
+
+
+
 
 # overlap/contains/contained
 { oid => '2747',
@@ -7621,157 +7596,46 @@
   proargtypes => 'text', prosrc => 'xml_is_well_formed_content' },
 
 # json
-{ oid => '321', descr => 'I/O',
-  proname => 'json_in', prorettype => 'json', proargtypes => 'cstring',
-  prosrc => 'json_in' },
-{ oid => '322', descr => 'I/O',
-  proname => 'json_out', prorettype => 'cstring', proargtypes => 'json',
-  prosrc => 'json_out' },
-{ oid => '323', descr => 'I/O',
-  proname => 'json_recv', prorettype => 'json', proargtypes => 'internal',
-  prosrc => 'json_recv' },
-{ oid => '324', descr => 'I/O',
-  proname => 'json_send', prorettype => 'bytea', proargtypes => 'json',
-  prosrc => 'json_send' },
-{ oid => '3153', descr => 'map array to json',
-  proname => 'array_to_json', provolatile => 's', prorettype => 'json',
-  proargtypes => 'anyarray', prosrc => 'array_to_json' },
-{ oid => '3154', descr => 'map array to json with optional pretty printing',
-  proname => 'array_to_json', provolatile => 's', prorettype => 'json',
-  proargtypes => 'anyarray bool', prosrc => 'array_to_json_pretty' },
-{ oid => '3155', descr => 'map row to json',
-  proname => 'row_to_json', provolatile => 's', prorettype => 'json',
-  proargtypes => 'record', prosrc => 'row_to_json' },
-{ oid => '3156', descr => 'map row to json with optional pretty printing',
-  proname => 'row_to_json', provolatile => 's', prorettype => 'json',
-  proargtypes => 'record bool', prosrc => 'row_to_json_pretty' },
-{ oid => '3173', descr => 'json aggregate transition function',
-  proname => 'json_agg_transfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'internal', proargtypes => 'internal anyelement',
-  prosrc => 'json_agg_transfn' },
-{ oid => '3174', descr => 'json aggregate final function',
-  proname => 'json_agg_finalfn', proisstrict => 'f', prorettype => 'json',
-  proargtypes => 'internal', prosrc => 'json_agg_finalfn' },
-{ oid => '3175', descr => 'aggregate input into json',
-  proname => 'json_agg', prokind => 'a', proisstrict => 'f', provolatile => 's',
-  prorettype => 'json', proargtypes => 'anyelement',
-  prosrc => 'aggregate_dummy' },
-{ oid => '3180', descr => 'json object aggregate transition function',
-  proname => 'json_object_agg_transfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'internal', proargtypes => 'internal any any',
-  prosrc => 'json_object_agg_transfn' },
-{ oid => '3196', descr => 'json object aggregate final function',
-  proname => 'json_object_agg_finalfn', proisstrict => 'f',
-  prorettype => 'json', proargtypes => 'internal',
-  prosrc => 'json_object_agg_finalfn' },
-{ oid => '3197', descr => 'aggregate input into a json object',
-  proname => 'json_object_agg', prokind => 'a', proisstrict => 'f',
-  provolatile => 's', prorettype => 'json', proargtypes => 'any any',
-  prosrc => 'aggregate_dummy' },
-{ oid => '3198', descr => 'build a json array from any inputs',
-  proname => 'json_build_array', provariadic => 'any', proisstrict => 'f',
-  provolatile => 's', prorettype => 'json', proargtypes => 'any',
-  proallargtypes => '{any}', proargmodes => '{v}',
-  prosrc => 'json_build_array' },
-{ oid => '3199', descr => 'build an empty json array',
-  proname => 'json_build_array', proisstrict => 'f', provolatile => 's',
-  prorettype => 'json', proargtypes => '',
-  prosrc => 'json_build_array_noargs' },
-{ oid => '3200',
-  descr => 'build a json object from pairwise key/value inputs',
-  proname => 'json_build_object', provariadic => 'any', proisstrict => 'f',
-  provolatile => 's', prorettype => 'json', proargtypes => 'any',
-  proallargtypes => '{any}', proargmodes => '{v}',
-  prosrc => 'json_build_object' },
-{ oid => '3201', descr => 'build an empty json object',
-  proname => 'json_build_object', proisstrict => 'f', provolatile => 's',
-  prorettype => 'json', proargtypes => '',
-  prosrc => 'json_build_object_noargs' },
-{ oid => '3202', descr => 'map text array of key value pairs to json object',
-  proname => 'json_object', prorettype => 'json', proargtypes => '_text',
-  prosrc => 'json_object' },
-{ oid => '3203', descr => 'map text arrays of keys and values to json object',
-  proname => 'json_object', prorettype => 'json', proargtypes => '_text _text',
-  prosrc => 'json_object_two_arg' },
-{ oid => '3176', descr => 'map input to json',
-  proname => 'to_json', provolatile => 's', prorettype => 'json',
-  proargtypes => 'anyelement', prosrc => 'to_json' },
-{ oid => '3261', descr => 'remove object fields with null values from json',
-  proname => 'json_strip_nulls', prorettype => 'json', proargtypes => 'json',
-  prosrc => 'json_strip_nulls' },
 
-{ oid => '3947',
-  proname => 'json_object_field', prorettype => 'json',
-  proargtypes => 'json text', proargnames => '{from_json, field_name}',
-  prosrc => 'json_object_field' },
-{ oid => '3948',
-  proname => 'json_object_field_text', prorettype => 'text',
-  proargtypes => 'json text', proargnames => '{from_json, field_name}',
-  prosrc => 'json_object_field_text' },
-{ oid => '3949',
-  proname => 'json_array_element', prorettype => 'json',
-  proargtypes => 'json int4', proargnames => '{from_json, element_index}',
-  prosrc => 'json_array_element' },
-{ oid => '3950',
-  proname => 'json_array_element_text', prorettype => 'text',
-  proargtypes => 'json int4', proargnames => '{from_json, element_index}',
-  prosrc => 'json_array_element_text' },
-{ oid => '3951', descr => 'get value from json with path elements',
-  proname => 'json_extract_path', provariadic => 'text', prorettype => 'json',
-  proargtypes => 'json _text', proallargtypes => '{json,_text}',
-  proargmodes => '{i,v}', proargnames => '{from_json,path_elems}',
-  prosrc => 'json_extract_path' },
-{ oid => '3953', descr => 'get value from json as text with path elements',
-  proname => 'json_extract_path_text', provariadic => 'text',
-  prorettype => 'text', proargtypes => 'json _text',
-  proallargtypes => '{json,_text}', proargmodes => '{i,v}',
-  proargnames => '{from_json,path_elems}', prosrc => 'json_extract_path_text' },
-{ oid => '3955', descr => 'key value pairs of a json object',
-  proname => 'json_array_elements', prorows => '100', proretset => 't',
-  prorettype => 'json', proargtypes => 'json', proallargtypes => '{json,json}',
-  proargmodes => '{i,o}', proargnames => '{from_json,value}',
-  prosrc => 'json_array_elements' },
-{ oid => '3969', descr => 'elements of json array',
-  proname => 'json_array_elements_text', prorows => '100', proretset => 't',
-  prorettype => 'text', proargtypes => 'json', proallargtypes => '{json,text}',
-  proargmodes => '{i,o}', proargnames => '{from_json,value}',
-  prosrc => 'json_array_elements_text' },
-{ oid => '3956', descr => 'length of json array',
-  proname => 'json_array_length', prorettype => 'int4', proargtypes => 'json',
-  prosrc => 'json_array_length' },
-{ oid => '3957', descr => 'get json object keys',
-  proname => 'json_object_keys', prorows => '100', proretset => 't',
-  prorettype => 'text', proargtypes => 'json', prosrc => 'json_object_keys' },
-{ oid => '3958', descr => 'key value pairs of a json object',
-  proname => 'json_each', prorows => '100', proretset => 't',
-  prorettype => 'record', proargtypes => 'json',
-  proallargtypes => '{json,text,json}', proargmodes => '{i,o,o}',
-  proargnames => '{from_json,key,value}', prosrc => 'json_each' },
-{ oid => '3959', descr => 'key value pairs of a json object',
-  proname => 'json_each_text', prorows => '100', proretset => 't',
-  prorettype => 'record', proargtypes => 'json',
-  proallargtypes => '{json,text,text}', proargmodes => '{i,o,o}',
-  proargnames => '{from_json,key,value}', prosrc => 'json_each_text' },
-{ oid => '3960', descr => 'get record fields from a json object',
-  proname => 'json_populate_record', proisstrict => 'f', provolatile => 's',
-  prorettype => 'anyelement', proargtypes => 'anyelement json bool',
-  prosrc => 'json_populate_record' },
-{ oid => '3961',
-  descr => 'get set of records with fields from a json array of objects',
-  proname => 'json_populate_recordset', prorows => '100', proisstrict => 'f',
-  proretset => 't', provolatile => 's', prorettype => 'anyelement',
-  proargtypes => 'anyelement json bool', prosrc => 'json_populate_recordset' },
-{ oid => '3204', descr => 'get record fields from a json object',
-  proname => 'json_to_record', provolatile => 's', prorettype => 'record',
-  proargtypes => 'json', prosrc => 'json_to_record' },
-{ oid => '3205',
-  descr => 'get set of records with fields from a json array of objects',
-  proname => 'json_to_recordset', prorows => '100', proisstrict => 'f',
-  proretset => 't', provolatile => 's', prorettype => 'record',
-  proargtypes => 'json', prosrc => 'json_to_recordset' },
-{ oid => '3968', descr => 'get the type of a json value',
-  proname => 'json_typeof', prorettype => 'text', proargtypes => 'json',
-  prosrc => 'json_typeof' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # uuid
 { oid => '2952', descr => 'I/O',
@@ -8012,10 +7876,6 @@
 
 
 
-{ oid => '3789', descr => 'clean up GIN pending list',
-  proname => 'gin_clean_pending_list', provolatile => 'v', proparallel => 'u',
-  prorettype => 'int8', proargtypes => 'regclass',
-  prosrc => 'gin_clean_pending_list' },
 
 
 
@@ -8142,314 +8002,96 @@
 
 
 
-# jsonb
-{ oid => '3806', descr => 'I/O',
-  proname => 'jsonb_in', prorettype => 'jsonb', proargtypes => 'cstring',
-  prosrc => 'jsonb_in' },
-{ oid => '3805', descr => 'I/O',
-  proname => 'jsonb_recv', prorettype => 'jsonb', proargtypes => 'internal',
-  prosrc => 'jsonb_recv' },
-{ oid => '3804', descr => 'I/O',
-  proname => 'jsonb_out', prorettype => 'cstring', proargtypes => 'jsonb',
-  prosrc => 'jsonb_out' },
-{ oid => '3803', descr => 'I/O',
-  proname => 'jsonb_send', prorettype => 'bytea', proargtypes => 'jsonb',
-  prosrc => 'jsonb_send' },
-
-{ oid => '3263', descr => 'map text array of key value pairs to jsonb object',
-  proname => 'jsonb_object', prorettype => 'jsonb', proargtypes => '_text',
-  prosrc => 'jsonb_object' },
-{ oid => '3264', descr => 'map text array of key value pairs to jsonb object',
-  proname => 'jsonb_object', prorettype => 'jsonb',
-  proargtypes => '_text _text', prosrc => 'jsonb_object_two_arg' },
-{ oid => '3787', descr => 'map input to jsonb',
-  proname => 'to_jsonb', provolatile => 's', prorettype => 'jsonb',
-  proargtypes => 'anyelement', prosrc => 'to_jsonb' },
-{ oid => '3265', descr => 'jsonb aggregate transition function',
-  proname => 'jsonb_agg_transfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'internal', proargtypes => 'internal anyelement',
-  prosrc => 'jsonb_agg_transfn' },
-{ oid => '3266', descr => 'jsonb aggregate final function',
-  proname => 'jsonb_agg_finalfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'internal',
-  prosrc => 'jsonb_agg_finalfn' },
-{ oid => '3267', descr => 'aggregate input into jsonb',
-  proname => 'jsonb_agg', prokind => 'a', proisstrict => 'f',
-  provolatile => 's', prorettype => 'jsonb', proargtypes => 'anyelement',
-  prosrc => 'aggregate_dummy' },
-{ oid => '3268', descr => 'jsonb object aggregate transition function',
-  proname => 'jsonb_object_agg_transfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'internal', proargtypes => 'internal any any',
-  prosrc => 'jsonb_object_agg_transfn' },
-{ oid => '3269', descr => 'jsonb object aggregate final function',
-  proname => 'jsonb_object_agg_finalfn', proisstrict => 'f', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'internal',
-  prosrc => 'jsonb_object_agg_finalfn' },
-{ oid => '3270', descr => 'aggregate inputs into jsonb object',
-  proname => 'jsonb_object_agg', prokind => 'a', proisstrict => 'f',
-  prorettype => 'jsonb', proargtypes => 'any any',
-  prosrc => 'aggregate_dummy' },
-{ oid => '3271', descr => 'build a jsonb array from any inputs',
-  proname => 'jsonb_build_array', provariadic => 'any', proisstrict => 'f',
-  provolatile => 's', prorettype => 'jsonb', proargtypes => 'any',
-  proallargtypes => '{any}', proargmodes => '{v}',
-  prosrc => 'jsonb_build_array' },
-{ oid => '3272', descr => 'build an empty jsonb array',
-  proname => 'jsonb_build_array', proisstrict => 'f', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => '',
-  prosrc => 'jsonb_build_array_noargs' },
-{ oid => '3273',
-  descr => 'build a jsonb object from pairwise key/value inputs',
-  proname => 'jsonb_build_object', provariadic => 'any', proisstrict => 'f',
-  provolatile => 's', prorettype => 'jsonb', proargtypes => 'any',
-  proallargtypes => '{any}', proargmodes => '{v}',
-  prosrc => 'jsonb_build_object' },
-{ oid => '3274', descr => 'build an empty jsonb object',
-  proname => 'jsonb_build_object', proisstrict => 'f', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => '',
-  prosrc => 'jsonb_build_object_noargs' },
-{ oid => '3262', descr => 'remove object fields with null values from jsonb',
-  proname => 'jsonb_strip_nulls', prorettype => 'jsonb', proargtypes => 'jsonb',
-  prosrc => 'jsonb_strip_nulls' },
-
-{ oid => '3478',
-  proname => 'jsonb_object_field', prorettype => 'jsonb',
-  proargtypes => 'jsonb text', proargnames => '{from_json, field_name}',
-  prosrc => 'jsonb_object_field' },
-{ oid => '3214',
-  proname => 'jsonb_object_field_text', prorettype => 'text',
-  proargtypes => 'jsonb text', proargnames => '{from_json, field_name}',
-  prosrc => 'jsonb_object_field_text' },
-{ oid => '3215',
-  proname => 'jsonb_array_element', prorettype => 'jsonb',
-  proargtypes => 'jsonb int4', proargnames => '{from_json, element_index}',
-  prosrc => 'jsonb_array_element' },
-{ oid => '3216',
-  proname => 'jsonb_array_element_text', prorettype => 'text',
-  proargtypes => 'jsonb int4', proargnames => '{from_json, element_index}',
-  prosrc => 'jsonb_array_element_text' },
-{ oid => '3217', descr => 'get value from jsonb with path elements',
-  proname => 'jsonb_extract_path', provariadic => 'text', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text', proallargtypes => '{jsonb,_text}',
-  proargmodes => '{i,v}', proargnames => '{from_json,path_elems}',
-  prosrc => 'jsonb_extract_path' },
-{ oid => '3940', descr => 'get value from jsonb as text with path elements',
-  proname => 'jsonb_extract_path_text', provariadic => 'text',
-  prorettype => 'text', proargtypes => 'jsonb _text',
-  proallargtypes => '{jsonb,_text}', proargmodes => '{i,v}',
-  proargnames => '{from_json,path_elems}',
-  prosrc => 'jsonb_extract_path_text' },
-{ oid => '3219', descr => 'elements of a jsonb array',
-  proname => 'jsonb_array_elements', prorows => '100', proretset => 't',
-  prorettype => 'jsonb', proargtypes => 'jsonb',
-  proallargtypes => '{jsonb,jsonb}', proargmodes => '{i,o}',
-  proargnames => '{from_json,value}', prosrc => 'jsonb_array_elements' },
-{ oid => '3465', descr => 'elements of jsonb array',
-  proname => 'jsonb_array_elements_text', prorows => '100', proretset => 't',
-  prorettype => 'text', proargtypes => 'jsonb',
-  proallargtypes => '{jsonb,text}', proargmodes => '{i,o}',
-  proargnames => '{from_json,value}', prosrc => 'jsonb_array_elements_text' },
-{ oid => '3207', descr => 'length of jsonb array',
-  proname => 'jsonb_array_length', prorettype => 'int4', proargtypes => 'jsonb',
-  prosrc => 'jsonb_array_length' },
-{ oid => '3931', descr => 'get jsonb object keys',
-  proname => 'jsonb_object_keys', prorows => '100', proretset => 't',
-  prorettype => 'text', proargtypes => 'jsonb', prosrc => 'jsonb_object_keys' },
-{ oid => '3208', descr => 'key value pairs of a jsonb object',
-  proname => 'jsonb_each', prorows => '100', proretset => 't',
-  prorettype => 'record', proargtypes => 'jsonb',
-  proallargtypes => '{jsonb,text,jsonb}', proargmodes => '{i,o,o}',
-  proargnames => '{from_json,key,value}', prosrc => 'jsonb_each' },
-{ oid => '3932', descr => 'key value pairs of a jsonb object',
-  proname => 'jsonb_each_text', prorows => '100', proretset => 't',
-  prorettype => 'record', proargtypes => 'jsonb',
-  proallargtypes => '{jsonb,text,text}', proargmodes => '{i,o,o}',
-  proargnames => '{from_json,key,value}', prosrc => 'jsonb_each_text' },
-{ oid => '3209', descr => 'get record fields from a jsonb object',
-  proname => 'jsonb_populate_record', proisstrict => 'f', provolatile => 's',
-  prorettype => 'anyelement', proargtypes => 'anyelement jsonb',
-  prosrc => 'jsonb_populate_record' },
-{ oid => '3475',
-  descr => 'get set of records with fields from a jsonb array of objects',
-  proname => 'jsonb_populate_recordset', prorows => '100', proisstrict => 'f',
-  proretset => 't', provolatile => 's', prorettype => 'anyelement',
-  proargtypes => 'anyelement jsonb', prosrc => 'jsonb_populate_recordset' },
-{ oid => '3490', descr => 'get record fields from a jsonb object',
-  proname => 'jsonb_to_record', provolatile => 's', prorettype => 'record',
-  proargtypes => 'jsonb', prosrc => 'jsonb_to_record' },
-{ oid => '3491',
-  descr => 'get set of records with fields from a jsonb array of objects',
-  proname => 'jsonb_to_recordset', prorows => '100', proisstrict => 'f',
-  proretset => 't', provolatile => 's', prorettype => 'record',
-  proargtypes => 'jsonb', prosrc => 'jsonb_to_recordset' },
-{ oid => '3210', descr => 'get the type of a jsonb value',
-  proname => 'jsonb_typeof', prorettype => 'text', proargtypes => 'jsonb',
-  prosrc => 'jsonb_typeof' },
-{ oid => '4038',
-  proname => 'jsonb_ne', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_ne' },
-{ oid => '4039',
-  proname => 'jsonb_lt', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_lt' },
-{ oid => '4040',
-  proname => 'jsonb_gt', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_gt' },
-{ oid => '4041',
-  proname => 'jsonb_le', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_le' },
-{ oid => '4042',
-  proname => 'jsonb_ge', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_ge' },
-{ oid => '4043',
-  proname => 'jsonb_eq', prorettype => 'bool', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_eq' },
-{ oid => '4044', descr => 'less-equal-greater',
-  proname => 'jsonb_cmp', prorettype => 'int4', proargtypes => 'jsonb jsonb',
-  prosrc => 'jsonb_cmp' },
-{ oid => '4045', descr => 'hash',
-  proname => 'jsonb_hash', prorettype => 'int4', proargtypes => 'jsonb',
-  prosrc => 'jsonb_hash' },
-{ oid => '3416', descr => 'hash',
-  proname => 'jsonb_hash_extended', prorettype => 'int8',
-  proargtypes => 'jsonb int8', prosrc => 'jsonb_hash_extended' },
-{ oid => '4046',
-  proname => 'jsonb_contains', prorettype => 'bool',
-  proargtypes => 'jsonb jsonb', prosrc => 'jsonb_contains' },
-{ oid => '4047',
-  proname => 'jsonb_exists', prorettype => 'bool', proargtypes => 'jsonb text',
-  prosrc => 'jsonb_exists' },
-{ oid => '4048',
-  proname => 'jsonb_exists_any', prorettype => 'bool',
-  proargtypes => 'jsonb _text', prosrc => 'jsonb_exists_any' },
-{ oid => '4049',
-  proname => 'jsonb_exists_all', prorettype => 'bool',
-  proargtypes => 'jsonb _text', prosrc => 'jsonb_exists_all' },
-{ oid => '4050',
-  proname => 'jsonb_contained', prorettype => 'bool',
-  proargtypes => 'jsonb jsonb', prosrc => 'jsonb_contained' },
-{ oid => '3480', descr => 'GIN support',
-  proname => 'gin_compare_jsonb', prorettype => 'int4',
-  proargtypes => 'text text', prosrc => 'gin_compare_jsonb' },
-{ oid => '3482', descr => 'GIN support',
-  proname => 'gin_extract_jsonb', prorettype => 'internal',
-  proargtypes => 'jsonb internal internal', prosrc => 'gin_extract_jsonb' },
-{ oid => '3483', descr => 'GIN support',
-  proname => 'gin_extract_jsonb_query', prorettype => 'internal',
-  proargtypes => 'jsonb internal int2 internal internal internal internal',
-  prosrc => 'gin_extract_jsonb_query' },
-{ oid => '3484', descr => 'GIN support',
-  proname => 'gin_consistent_jsonb', prorettype => 'bool',
-  proargtypes => 'internal int2 jsonb int4 internal internal internal internal',
-  prosrc => 'gin_consistent_jsonb' },
-{ oid => '3488', descr => 'GIN support',
-  proname => 'gin_triconsistent_jsonb', prorettype => 'char',
-  proargtypes => 'internal int2 jsonb int4 internal internal internal',
-  prosrc => 'gin_triconsistent_jsonb' },
-{ oid => '3485', descr => 'GIN support',
-  proname => 'gin_extract_jsonb_path', prorettype => 'internal',
-  proargtypes => 'jsonb internal internal',
-  prosrc => 'gin_extract_jsonb_path' },
-{ oid => '3486', descr => 'GIN support',
-  proname => 'gin_extract_jsonb_query_path', prorettype => 'internal',
-  proargtypes => 'jsonb internal int2 internal internal internal internal',
-  prosrc => 'gin_extract_jsonb_query_path' },
-{ oid => '3487', descr => 'GIN support',
-  proname => 'gin_consistent_jsonb_path', prorettype => 'bool',
-  proargtypes => 'internal int2 jsonb int4 internal internal internal internal',
-  prosrc => 'gin_consistent_jsonb_path' },
-{ oid => '3489', descr => 'GIN support',
-  proname => 'gin_triconsistent_jsonb_path', prorettype => 'char',
-  proargtypes => 'internal int2 jsonb int4 internal internal internal',
-  prosrc => 'gin_triconsistent_jsonb_path' },
-{ oid => '3301',
-  proname => 'jsonb_concat', prorettype => 'jsonb',
-  proargtypes => 'jsonb jsonb', prosrc => 'jsonb_concat' },
-{ oid => '3302',
-  proname => 'jsonb_delete', prorettype => 'jsonb', proargtypes => 'jsonb text',
-  prosrc => 'jsonb_delete' },
-{ oid => '3303',
-  proname => 'jsonb_delete', prorettype => 'jsonb', proargtypes => 'jsonb int4',
-  prosrc => 'jsonb_delete_idx' },
-{ oid => '3343',
-  proname => 'jsonb_delete', provariadic => 'text', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text', proallargtypes => '{jsonb,_text}',
-  proargmodes => '{i,v}', proargnames => '{from_json,path_elems}',
-  prosrc => 'jsonb_delete_array' },
-{ oid => '3304',
-  proname => 'jsonb_delete_path', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text', prosrc => 'jsonb_delete_path' },
-{ oid => '5054', descr => 'Set part of a jsonb, handle NULL value',
-  proname => 'jsonb_set_lax', proisstrict => 'f', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text jsonb bool text', prosrc => 'jsonb_set_lax' },
-{ oid => '3305', descr => 'Set part of a jsonb',
-  proname => 'jsonb_set', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text jsonb bool', prosrc => 'jsonb_set' },
-{ oid => '3306', descr => 'Indented text from jsonb',
-  proname => 'jsonb_pretty', prorettype => 'text', proargtypes => 'jsonb',
-  prosrc => 'jsonb_pretty' },
-{ oid => '3579', descr => 'Insert value into a jsonb',
-  proname => 'jsonb_insert', prorettype => 'jsonb',
-  proargtypes => 'jsonb _text jsonb bool', prosrc => 'jsonb_insert' },
-
-# jsonpath
-{ oid => '4001', descr => 'I/O',
-  proname => 'jsonpath_in', prorettype => 'jsonpath', proargtypes => 'cstring',
-  prosrc => 'jsonpath_in' },
-{ oid => '4002', descr => 'I/O',
-  proname => 'jsonpath_recv', prorettype => 'jsonpath',
-  proargtypes => 'internal', prosrc => 'jsonpath_recv' },
-{ oid => '4003', descr => 'I/O',
-  proname => 'jsonpath_out', prorettype => 'cstring', proargtypes => 'jsonpath',
-  prosrc => 'jsonpath_out' },
-{ oid => '4004', descr => 'I/O',
-  proname => 'jsonpath_send', prorettype => 'bytea', proargtypes => 'jsonpath',
-  prosrc => 'jsonpath_send' },
-
-{ oid => '4005', descr => 'jsonpath exists test',
-  proname => 'jsonb_path_exists', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath jsonb bool', prosrc => 'jsonb_path_exists' },
-{ oid => '4006', descr => 'jsonpath query',
-  proname => 'jsonb_path_query', prorows => '1000', proretset => 't',
-  prorettype => 'jsonb', proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_query' },
-{ oid => '4007', descr => 'jsonpath query wrapped into array',
-  proname => 'jsonb_path_query_array', prorettype => 'jsonb',
-  proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_query_array' },
-{ oid => '4008', descr => 'jsonpath query first item',
-  proname => 'jsonb_path_query_first', prorettype => 'jsonb',
-  proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_query_first' },
-{ oid => '4009', descr => 'jsonpath match',
-  proname => 'jsonb_path_match', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath jsonb bool', prosrc => 'jsonb_path_match' },
-
-{ oid => '1177', descr => 'jsonpath exists test with timezone',
-  proname => 'jsonb_path_exists_tz', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_exists_tz' },
-{ oid => '1179', descr => 'jsonpath query with timezone',
-  proname => 'jsonb_path_query_tz', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'jsonb',
-  proargtypes => 'jsonb jsonpath jsonb bool', prosrc => 'jsonb_path_query_tz' },
-{ oid => '1180', descr => 'jsonpath query wrapped into array with timezone',
-  proname => 'jsonb_path_query_array_tz', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_query_array_tz' },
-{ oid => '2023', descr => 'jsonpath query first item with timezone',
-  proname => 'jsonb_path_query_first_tz', provolatile => 's',
-  prorettype => 'jsonb', proargtypes => 'jsonb jsonpath jsonb bool',
-  prosrc => 'jsonb_path_query_first_tz' },
-{ oid => '2030', descr => 'jsonpath match with timezone',
-  proname => 'jsonb_path_match_tz', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath jsonb bool', prosrc => 'jsonb_path_match_tz' },
-
-{ oid => '4010', descr => 'implementation of @? operator',
-  proname => 'jsonb_path_exists_opr', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath', prosrc => 'jsonb_path_exists_opr' },
-{ oid => '4011', descr => 'implementation of @@ operator',
-  proname => 'jsonb_path_match_opr', prorettype => 'bool',
-  proargtypes => 'jsonb jsonpath', prosrc => 'jsonb_path_match_opr' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # historical int8/txid_snapshot variants of xid8 functions
 { oid => '2939', descr => 'I/O',
@@ -10022,9 +9664,7 @@
   proname => 'raw_array_subscript_handler', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'raw_array_subscript_handler' },
 # type subscripting support
-{ oid => '6098', descr => 'jsonb subscripting logic',
-  proname => 'jsonb_subscript_handler', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'jsonb_subscript_handler' },
+
 
 # collation management functions
 { oid => '3445', descr => 'import collations from operating system',

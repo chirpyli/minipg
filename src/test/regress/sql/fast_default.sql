@@ -426,7 +426,7 @@ LANGUAGE plpgsql
 AS $$
 
 begin
-    raise notice 'old tuple: %', to_json(OLD)::text;
+    raise notice 'old tuple: %', OLD::text;
     if TG_OP = 'DELETE'
     then
        return OLD;

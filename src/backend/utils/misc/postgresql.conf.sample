@@ -660,7 +660,6 @@
 #bytea_output = 'hex'			# hex, escape
 #xmlbinary = 'base64'
 #xmloption = 'content'
-#gin_pending_list_limit = 4MB
 
 # - Locale and Formatting -
 
@@ -699,7 +698,6 @@
 # - Other Defaults -
 
 #dynamic_library_path = '$libdir'
-#gin_fuzzy_search_limit = 0
 
 
 #------------------------------------------------------------------------------

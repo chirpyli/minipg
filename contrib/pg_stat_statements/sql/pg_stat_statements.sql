@@ -38,9 +38,6 @@ SELECT :add + 1 + 1 AS "add" \gset
 -- set operator
 SELECT 1 AS i UNION SELECT 2 ORDER BY i;
 
--- ? operator
-select '{"a":1, "b":2}'::jsonb ? 'b';
-
 -- cte
 WITH t(f) AS (
   VALUES (1.0), (2.0)

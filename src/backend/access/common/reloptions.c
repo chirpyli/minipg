@@ -113,15 +113,6 @@ static relopt_bool boolRelOpts[] =
 	},
 	{
 		{
-			"fastupdate",
-			"Enables \"fast update\" feature for this GIN index",
-			RELOPT_KIND_GIN,
-			AccessExclusiveLock
-		},
-		true
-	},
-	{
-		{
 			"security_barrier",
 			"View acts as a row security barrier",
 			RELOPT_KIND_VIEW,
@@ -289,15 +280,6 @@ static relopt_int intRelOpts[] =
 			ShareUpdateExclusiveLock
 		},
 		TOAST_TUPLE_TARGET, 128, TOAST_TUPLE_TARGET_MAIN
-	},
-	{
-		{
-			"gin_pending_list_limit",
-			"Maximum size of the pending list for this GIN index, in kilobytes.",
-			RELOPT_KIND_GIN,
-			AccessExclusiveLock
-		},
-		-1, 64, MAX_KILOBYTES
 	},
 	{
 		{

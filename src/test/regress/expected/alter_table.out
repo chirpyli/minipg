@@ -2531,7 +2531,7 @@ DROP TABLE check_fk_presence_1, check_fk_presence_2;
 create table at_base_table(id int, stuff text);
 insert into at_base_table values (23, 'skidoo');
 create view at_view_1 as select * from at_base_table bt;
-create view at_view_2 as select *, to_json(v1) as j from at_view_1 v1;
+create view at_view_2 as select * from at_view_1 v1;
 \d+ at_view_1
                           View "public.at_view_1"
  Column |  Type   | Collation | Nullable | Default | Storage  | Description 
@@ -2549,24 +2549,22 @@ View definition:
 --------+---------+-----------+----------+---------+----------+-------------
  id     | integer |           |          |         | plain    | 
  stuff  | text    |           |          |         | extended | 
- j      | json    |           |          |         | extended | 
 View definition:
  SELECT v1.id,
-    v1.stuff,
-    to_json(v1.*) AS j
+    v1.stuff
    FROM at_view_1 v1;
 
 explain (verbose, costs off) select * from at_view_2;
-                        QUERY PLAN                        
-----------------------------------------------------------
+             QUERY PLAN              
+-------------------------------------
  Seq Scan on public.at_base_table bt
-   Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff))
+   Output: bt.id, bt.stuff
 (2 rows)
 
 select * from at_view_2;
- id | stuff  |             j              
-----+--------+----------------------------
- 23 | skidoo | {"id":23,"stuff":"skidoo"}
+ id | stuff  
+----+--------
+ 23 | skidoo
 (1 row)
 
 create or replace view at_view_1 as select *, 2+2 as more from at_base_table bt;
@@ -2589,24 +2587,22 @@ View definition:
 --------+---------+-----------+----------+---------+----------+-------------
  id     | integer |           |          |         | plain    | 
  stuff  | text    |           |          |         | extended | 
- j      | json    |           |          |         | extended | 
 View definition:
  SELECT v1.id,
-    v1.stuff,
-    to_json(v1.*) AS j
+    v1.stuff
    FROM at_view_1 v1;
 
 explain (verbose, costs off) select * from at_view_2;
-                         QUERY PLAN                          
--------------------------------------------------------------
+             QUERY PLAN              
+-------------------------------------
  Seq Scan on public.at_base_table bt
-   Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff, 4))
+   Output: bt.id, bt.stuff
 (2 rows)
 
 select * from at_view_2;
- id | stuff  |                  j                  
-----+--------+-------------------------------------
- 23 | skidoo | {"id":23,"stuff":"skidoo","more":4}
+ id | stuff  
+----+--------
+ 23 | skidoo
 (1 row)
 
 drop view at_view_2;

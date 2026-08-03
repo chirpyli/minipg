@@ -46,14 +46,6 @@ extern void gistcostestimate(struct PlannerInfo *root,
 							 Selectivity *indexSelectivity,
 							 double *indexCorrelation,
 							 double *indexPages);
-extern void spgcostestimate(struct PlannerInfo *root,
-							struct IndexPath *path,
-							double loop_count,
-							Cost *indexStartupCost,
-							Cost *indexTotalCost,
-							Selectivity *indexSelectivity,
-							double *indexCorrelation,
-							double *indexPages);
 extern void gincostestimate(struct PlannerInfo *root,
 							struct IndexPath *path,
 							double loop_count,
@@ -63,4 +55,12 @@ extern void gincostestimate(struct PlannerInfo *root,
 							double *indexCorrelation,
 							double *indexPages);
 
+extern void spgcostestimate(struct PlannerInfo *root,
+							struct IndexPath *path,
+							double loop_count,
+							Cost *indexStartupCost,
+							Cost *indexTotalCost,
+							Selectivity *indexSelectivity,
+							double *indexCorrelation,
+							double *indexPages);
 #endif							/* INDEX_SELFUNCS_H */

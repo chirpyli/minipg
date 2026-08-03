@@ -44,23 +44,17 @@ select pg_relpages('test_pkey'::regclass);
 select pg_relpages(oid) from pg_class where relname = 'test_pkey';
 select pg_relpages(relname) from pg_class where relname = 'test_pkey';
 
-create index test_ginidx on test using gin (b);
 
-select * from pgstatginindex('test_ginidx');
 
 create index test_hashidx on test using hash (b);
 
 select * from pgstathashindex('test_hashidx');
 
 -- these should error with the wrong type
-select pgstatginindex('test_pkey');
 select pgstathashindex('test_pkey');
 
-select pgstatindex('test_ginidx');
-select pgstathashindex('test_ginidx');
 
 select pgstatindex('test_hashidx');
-select pgstatginindex('test_hashidx');
 
 -- check that using any of these functions with unsupported relations will fail
 create table test_partitioned (a int) partition by range (a);
@@ -72,7 +66,6 @@ select pgstattuple('test_partitioned_index');
 select pgstattuple_approx('test_partitioned');
 select pg_relpages('test_partitioned');
 select pgstatindex('test_partitioned');
-select pgstatginindex('test_partitioned');
 select pgstathashindex('test_partitioned');
 select pgstathashindex('test_partitioned_hash_index');
 
@@ -82,7 +75,6 @@ select pgstattuple('test_view');
 select pgstattuple_approx('test_view');
 select pg_relpages('test_view');
 select pgstatindex('test_view');
-select pgstatginindex('test_view');
 select pgstathashindex('test_view');
 
 create foreign data wrapper dummy;
@@ -93,7 +85,6 @@ select pgstattuple('test_foreign_table');
 select pgstattuple_approx('test_foreign_table');
 select pg_relpages('test_foreign_table');
 select pgstatindex('test_foreign_table');
-select pgstatginindex('test_foreign_table');
 select pgstathashindex('test_foreign_table');
 
 -- a partition of a partitioned table should work though
@@ -109,7 +100,6 @@ select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
 
 -- not for the index calls though, of course
 select pgstatindex('test_partition');
-select pgstatginindex('test_partition');
 select pgstathashindex('test_partition');
 
 -- an actual index of a partitioned table should work though
@@ -126,7 +116,6 @@ select pg_relpages('test_sequence');
 
 -- these should fail for sequences
 select pgstatindex('test_sequence');
-select pgstatginindex('test_sequence');
 select pgstathashindex('test_sequence');
 select pgstattuple_approx('test_sequence');
 

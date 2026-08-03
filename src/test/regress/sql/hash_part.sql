@@ -6,7 +6,7 @@
 -- result on different machines.  See the definitions of
 -- part_part_test_int4_ops and part_test_text_ops in insert.sql.
 
-CREATE TABLE mchash (a int, b text, c jsonb)
+CREATE TABLE mchash (a int, b text, c text)
   PARTITION BY HASH (a part_test_int4_ops, b part_test_text_ops);
 CREATE TABLE mchash1
   PARTITION OF mchash FOR VALUES WITH (MODULUS 4, REMAINDER 0);
@@ -39,7 +39,7 @@ SELECT satisfies_hash_partition('mchash'::regclass, 4, NULL, NULL);
 SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, VARIADIC NULL::int[]);
 
 -- too many arguments
-SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, NULL::int, NULL::text, NULL::json);
+SELECT satisfies_hash_partition('mchash'::regclass, 4, 0, NULL::int, NULL::text, NULL::text);
 
 -- too few arguments
 SELECT satisfies_hash_partition('mchash'::regclass, 3, 1, NULL::int);
@@ -59,7 +59,7 @@ SELECT satisfies_hash_partition('mchash'::regclass, 2, 1,
 								variadic array[1,2]::int[]);
 
 -- multiple partitioning columns of the same type
-CREATE TABLE mcinthash (a int, b int, c jsonb)
+CREATE TABLE mcinthash (a int, b int, c text)
   PARTITION BY HASH (a part_test_int4_ops, b part_test_int4_ops);
 
 -- now variadic should work, should be false

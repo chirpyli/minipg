@@ -120,8 +120,7 @@
   opfmethod => 'hash', opfname => 'bpchar_pattern_ops' },
 { oid => '2235',
   opfmethod => 'hash', opfname => 'aclitem_ops' },
-{ oid => '2745',
-  opfmethod => 'gin', opfname => 'array_ops' },
+
 { oid => '2968',
   opfmethod => 'btree', opfname => 'uuid_ops' },
 { oid => '2969',
@@ -143,14 +142,10 @@
   opfmethod => 'btree', opfname => 'range_ops' },
 { oid => '3903',
   opfmethod => 'hash', opfname => 'range_ops' },
-{ oid => '4033',
-  opfmethod => 'btree', opfname => 'jsonb_ops' },
-{ oid => '4034',
-  opfmethod => 'hash', opfname => 'jsonb_ops' },
-{ oid => '4036',
-  opfmethod => 'gin', opfname => 'jsonb_ops' },
-{ oid => '4037',
-  opfmethod => 'gin', opfname => 'jsonb_path_ops' },
+
+
+
+
 
 
 

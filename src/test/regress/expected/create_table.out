@@ -197,7 +197,7 @@ CREATE TABLE array_index_op_test (
 	t			text[]
 );
 CREATE TABLE testjsonb (
-       j jsonb
+       j text
 );
 CREATE TABLE unknowntab (
 	u unknown    -- fail
@@ -439,23 +439,25 @@ ERROR:  functions in partition key expression must be marked IMMUTABLE
 DROP FUNCTION immut_func(int);
 -- prevent using columns of unsupported types in key (type must have a btree operator class)
 CREATE TABLE partitioned (
-	a json
+	a xml
 ) PARTITION BY LIST (a);
-ERROR:  data type json has no default operator class for access method "btree"
+ERROR:  data type xml has no default operator class for access method "btree"
 HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 CREATE TABLE partitioned (
-	a json
-) PARTITION BY LIST (a json_ops);
-ERROR:  operator class "json_ops" does not exist for access method "btree"
+	a xml
+) PARTITION BY LIST (a);
+ERROR:  data type xml has no default operator class for access method "btree"
+HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 CREATE TABLE partitioned (
-	a json
+	a xml
 ) PARTITION BY RANGE (a);
-ERROR:  data type json has no default operator class for access method "btree"
+ERROR:  data type xml has no default operator class for access method "btree"
 HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 CREATE TABLE partitioned (
-	a json
-) PARTITION BY RANGE (a json_ops);
-ERROR:  operator class "json_ops" does not exist for access method "btree"
+	a xml
+) PARTITION BY RANGE (a);
+ERROR:  data type xml has no default operator class for access method "btree"
+HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 -- cannot add NO INHERIT constraints to partitioned tables
 CREATE TABLE partitioned (
 	a int,

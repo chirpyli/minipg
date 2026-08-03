@@ -41,16 +41,7 @@ OBJS = \
 	int.o \
 	ipaddr.o \
 	int8.o \
-	json.o \
-	jsonb.o \
-	jsonb_gin.o \
-	jsonb_op.o \
-	jsonb_util.o \
-	jsonfuncs.o \
-	jsonbsubs.o \
-	jsonpath.o \
-	jsonpath_exec.o \
-	jsonpath_gram.o \
+	json_escape.o \
 	like.o \
 	like_support.o \
 	lockfuncs.o \
@@ -96,14 +87,6 @@ OBJS = \
 	xid8funcs.o \
 	xml.o
 
-jsonpath_scan.c: FLEXFLAGS = -CF -p -p
-jsonpath_scan.c: FLEX_NO_BACKUP=yes
-
-# jsonpath_scan is compiled as part of jsonpath_gram
-jsonpath_gram.o: jsonpath_scan.c
-
-# jsonpath_gram.c and jsonpath_scan.c are in the distribution tarball,
-# so they are not cleaned here.
 clean distclean maintainer-clean:
 	rm -f lex.backup
 

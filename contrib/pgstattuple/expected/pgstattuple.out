@@ -123,13 +123,6 @@ select pg_relpages(relname) from pg_class where relname = 'test_pkey';
            1
 (1 row)
 
-create index test_ginidx on test using gin (b);
-select * from pgstatginindex('test_ginidx');
- version | pending_pages | pending_tuples 
----------+---------------+----------------
-       2 |             0 |              0
-(1 row)
-
 create index test_hashidx on test using hash (b);
 select * from pgstathashindex('test_hashidx');
  version | bucket_pages | overflow_pages | bitmap_pages | unused_pages | live_items | dead_items | free_percent 
@@ -138,18 +131,10 @@ select * from pgstathashindex('test_hashidx');
 (1 row)
 
 -- these should error with the wrong type
-select pgstatginindex('test_pkey');
-ERROR:  relation "test_pkey" is not a GIN index
 select pgstathashindex('test_pkey');
 ERROR:  relation "test_pkey" is not a hash index
-select pgstatindex('test_ginidx');
-ERROR:  relation "test_ginidx" is not a btree index
-select pgstathashindex('test_ginidx');
-ERROR:  relation "test_ginidx" is not a hash index
 select pgstatindex('test_hashidx');
 ERROR:  relation "test_hashidx" is not a btree index
-select pgstatginindex('test_hashidx');
-ERROR:  relation "test_hashidx" is not a GIN index
 -- check that using any of these functions with unsupported relations will fail
 create table test_partitioned (a int) partition by range (a);
 create index test_partitioned_index on test_partitioned(a);
@@ -165,8 +150,6 @@ select pg_relpages('test_partitioned');
 ERROR:  "test_partitioned" is not a table, index, materialized view, sequence, or TOAST table
 select pgstatindex('test_partitioned');
 ERROR:  relation "test_partitioned" is not a btree index
-select pgstatginindex('test_partitioned');
-ERROR:  relation "test_partitioned" is not a GIN index
 select pgstathashindex('test_partitioned');
 ERROR:  relation "test_partitioned" is not a hash index
 select pgstathashindex('test_partitioned_hash_index');
@@ -181,8 +164,6 @@ select pg_relpages('test_view');
 ERROR:  "test_view" is not a table, index, materialized view, sequence, or TOAST table
 select pgstatindex('test_view');
 ERROR:  relation "test_view" is not a btree index
-select pgstatginindex('test_view');
-ERROR:  relation "test_view" is not a GIN index
 select pgstathashindex('test_view');
 ERROR:  relation "test_view" is not a hash index
 create foreign data wrapper dummy;
@@ -197,8 +178,6 @@ select pg_relpages('test_foreign_table');
 ERROR:  "test_foreign_table" is not a table, index, materialized view, sequence, or TOAST table
 select pgstatindex('test_foreign_table');
 ERROR:  relation "test_foreign_table" is not a btree index
-select pgstatginindex('test_foreign_table');
-ERROR:  relation "test_foreign_table" is not a GIN index
 select pgstathashindex('test_foreign_table');
 ERROR:  relation "test_foreign_table" is not a hash index
 -- a partition of a partitioned table should work though
@@ -243,8 +222,6 @@ select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
 -- not for the index calls though, of course
 select pgstatindex('test_partition');
 ERROR:  relation "test_partition" is not a btree index
-select pgstatginindex('test_partition');
-ERROR:  relation "test_partition" is not a GIN index
 select pgstathashindex('test_partition');
 ERROR:  relation "test_partition" is not a hash index
 -- an actual index of a partitioned table should work though
@@ -280,8 +257,6 @@ select pg_relpages('test_sequence');
 -- these should fail for sequences
 select pgstatindex('test_sequence');
 ERROR:  relation "test_sequence" is not a btree index
-select pgstatginindex('test_sequence');
-ERROR:  relation "test_sequence" is not a GIN index
 select pgstathashindex('test_sequence');
 ERROR:  relation "test_sequence" is not a hash index
 select pgstattuple_approx('test_sequence');

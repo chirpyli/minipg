@@ -2462,114 +2462,36 @@
   oprname => '*', oprleft => 'anyrange', oprright => 'anyrange',
   oprresult => 'anyrange', oprcom => '*(anyrange,anyrange)',
   oprcode => 'range_intersect' },
-{ oid => '3962', descr => 'get json object field',
-  oprname => '->', oprleft => 'json', oprright => 'text', oprresult => 'json',
-  oprcode => 'json_object_field' },
-{ oid => '3963', descr => 'get json object field as text',
-  oprname => '->>', oprleft => 'json', oprright => 'text', oprresult => 'text',
-  oprcode => 'json_object_field_text' },
-{ oid => '3964', descr => 'get json array element',
-  oprname => '->', oprleft => 'json', oprright => 'int4', oprresult => 'json',
-  oprcode => 'json_array_element' },
-{ oid => '3965', descr => 'get json array element as text',
-  oprname => '->>', oprleft => 'json', oprright => 'int4', oprresult => 'text',
-  oprcode => 'json_array_element_text' },
-{ oid => '3966', descr => 'get value from json with path elements',
-  oprname => '#>', oprleft => 'json', oprright => '_text', oprresult => 'json',
-  oprcode => 'json_extract_path' },
-{ oid => '3967', descr => 'get value from json as text with path elements',
-  oprname => '#>>', oprleft => 'json', oprright => '_text', oprresult => 'text',
-  oprcode => 'json_extract_path_text' },
-{ oid => '3211', descr => 'get jsonb object field',
-  oprname => '->', oprleft => 'jsonb', oprright => 'text', oprresult => 'jsonb',
-  oprcode => 'jsonb_object_field' },
-{ oid => '3477', descr => 'get jsonb object field as text',
-  oprname => '->>', oprleft => 'jsonb', oprright => 'text', oprresult => 'text',
-  oprcode => 'jsonb_object_field_text' },
-{ oid => '3212', descr => 'get jsonb array element',
-  oprname => '->', oprleft => 'jsonb', oprright => 'int4', oprresult => 'jsonb',
-  oprcode => 'jsonb_array_element' },
-{ oid => '3481', descr => 'get jsonb array element as text',
-  oprname => '->>', oprleft => 'jsonb', oprright => 'int4', oprresult => 'text',
-  oprcode => 'jsonb_array_element_text' },
-{ oid => '3213', descr => 'get value from jsonb with path elements',
-  oprname => '#>', oprleft => 'jsonb', oprright => '_text',
-  oprresult => 'jsonb', oprcode => 'jsonb_extract_path' },
-{ oid => '3206', descr => 'get value from jsonb as text with path elements',
-  oprname => '#>>', oprleft => 'jsonb', oprright => '_text',
-  oprresult => 'text', oprcode => 'jsonb_extract_path_text' },
-{ oid => '3240', descr => 'equal',
-  oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'jsonb',
-  oprright => 'jsonb', oprresult => 'bool', oprcom => '=(jsonb,jsonb)',
-  oprnegate => '<>(jsonb,jsonb)', oprcode => 'jsonb_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '3241', descr => 'not equal',
-  oprname => '<>', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '<>(jsonb,jsonb)', oprnegate => '=(jsonb,jsonb)',
-  oprcode => 'jsonb_ne', oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '3242', descr => 'less than',
-  oprname => '<', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '>(jsonb,jsonb)', oprnegate => '>=(jsonb,jsonb)',
-  oprcode => 'jsonb_lt', oprrest => 'scalarltsel',
-  oprjoin => 'scalarltjoinsel' },
-{ oid => '3243', descr => 'greater than',
-  oprname => '>', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '<(jsonb,jsonb)', oprnegate => '<=(jsonb,jsonb)',
-  oprcode => 'jsonb_gt', oprrest => 'scalargtsel',
-  oprjoin => 'scalargtjoinsel' },
-{ oid => '3244', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '>=(jsonb,jsonb)', oprnegate => '>(jsonb,jsonb)',
-  oprcode => 'jsonb_le', oprrest => 'scalarlesel',
-  oprjoin => 'scalarlejoinsel' },
-{ oid => '3245', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '<=(jsonb,jsonb)', oprnegate => '<(jsonb,jsonb)',
-  oprcode => 'jsonb_ge', oprrest => 'scalargesel',
-  oprjoin => 'scalargejoinsel' },
-{ oid => '3246', descr => 'contains',
-  oprname => '@>', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '<@(jsonb,jsonb)', oprcode => 'jsonb_contains',
-  oprrest => 'matchingsel', oprjoin => 'matchingjoinsel' },
-{ oid => '3247', descr => 'key exists',
-  oprname => '?', oprleft => 'jsonb', oprright => 'text', oprresult => 'bool',
-  oprcode => 'jsonb_exists', oprrest => 'matchingsel',
-  oprjoin => 'matchingjoinsel' },
-{ oid => '3248', descr => 'any key exists',
-  oprname => '?|', oprleft => 'jsonb', oprright => '_text', oprresult => 'bool',
-  oprcode => 'jsonb_exists_any', oprrest => 'matchingsel',
-  oprjoin => 'matchingjoinsel' },
-{ oid => '3249', descr => 'all keys exist',
-  oprname => '?&', oprleft => 'jsonb', oprright => '_text', oprresult => 'bool',
-  oprcode => 'jsonb_exists_all', oprrest => 'matchingsel',
-  oprjoin => 'matchingjoinsel' },
-{ oid => '3250', descr => 'is contained by',
-  oprname => '<@', oprleft => 'jsonb', oprright => 'jsonb', oprresult => 'bool',
-  oprcom => '@>(jsonb,jsonb)', oprcode => 'jsonb_contained',
-  oprrest => 'matchingsel', oprjoin => 'matchingjoinsel' },
-{ oid => '3284', descr => 'concatenate',
-  oprname => '||', oprleft => 'jsonb', oprright => 'jsonb',
-  oprresult => 'jsonb', oprcode => 'jsonb_concat' },
-{ oid => '3285', descr => 'delete object field',
-  oprname => '-', oprleft => 'jsonb', oprright => 'text', oprresult => 'jsonb',
-  oprcode => 'jsonb_delete(jsonb,text)' },
-{ oid => '3398', descr => 'delete object fields',
-  oprname => '-', oprleft => 'jsonb', oprright => '_text', oprresult => 'jsonb',
-  oprcode => 'jsonb_delete(jsonb,_text)' },
-{ oid => '3286', descr => 'delete array element',
-  oprname => '-', oprleft => 'jsonb', oprright => 'int4', oprresult => 'jsonb',
-  oprcode => 'jsonb_delete(jsonb,int4)' },
-{ oid => '3287', descr => 'delete path',
-  oprname => '#-', oprleft => 'jsonb', oprright => '_text',
-  oprresult => 'jsonb', oprcode => 'jsonb_delete_path' },
-{ oid => '4012', descr => 'jsonpath exists',
-  oprname => '@?', oprleft => 'jsonb', oprright => 'jsonpath',
-  oprresult => 'bool', oprcode => 'jsonb_path_exists_opr(jsonb,jsonpath)',
-  oprrest => 'matchingsel', oprjoin => 'matchingjoinsel' },
-{ oid => '4013', descr => 'jsonpath match',
-  oprname => '@@', oprleft => 'jsonb', oprright => 'jsonpath',
-  oprresult => 'bool', oprcode => 'jsonb_path_match_opr(jsonb,jsonpath)',
-  oprrest => 'matchingsel', oprjoin => 'matchingjoinsel' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { oid => '2860', oid_symbol => 'MULTIRANGE_EQ_OP', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't',
   oprleft => 'anymultirange', oprright => 'anymultirange', oprresult => 'bool',

@@ -1308,18 +1308,14 @@ SELECT p_oid, proname, prodesc FROM funcdescs
   WHERE prodesc IS DISTINCT FROM expecteddesc
     AND oprdesc NOT LIKE 'deprecated%'
 ORDER BY 1;
- p_oid |         proname         |                     prodesc                     
--------+-------------------------+-------------------------------------------------
-   378 | array_append            | append element onto end of array
-   379 | array_prepend           | prepend element onto front of array
-  1035 | aclinsert               | add/update ACL item
-  1036 | aclremove               | remove ACL item
-  1037 | aclcontains             | contains
-  3217 | jsonb_extract_path      | get value from jsonb with path elements
-  3940 | jsonb_extract_path_text | get value from jsonb as text with path elements
-  3951 | json_extract_path       | get value from json with path elements
-  3953 | json_extract_path_text  | get value from json as text with path elements
-(9 rows)
+ p_oid |    proname    |               prodesc               
+-------+---------------+-------------------------------------
+   378 | array_append  | append element onto end of array
+   379 | array_prepend | prepend element onto front of array
+  1035 | aclinsert     | add/update ACL item
+  1036 | aclremove     | remove ACL item
+  1037 | aclcontains   | contains
+(5 rows)
 
 -- Operators that are commutator pairs should have identical volatility
 -- and leakproofness markings on their implementation functions.
@@ -1768,16 +1764,15 @@ WHERE p1.opfmethod = 0 OR p1.opfnamespace = 0;
 -- get noticed.
 SELECT oid, opfname FROM pg_opfamily f
 WHERE NOT EXISTS (SELECT 1 FROM pg_opclass WHERE opcfamily = f.oid);
- oid  |    opfname     
-------+----------------
+ oid  |   opfname    
+------+--------------
  1974 | network_ops
  1975 | network_ops
  1984 | macaddr_ops
  1985 | macaddr_ops
  3371 | macaddr8_ops
  3372 | macaddr8_ops
- 4037 | jsonb_path_ops
-(7 rows)
+(6 rows)
 
 -- **************** pg_opclass ****************
 -- Look for illegal values in pg_opclass fields
@@ -1898,17 +1893,7 @@ ORDER BY 1, 2, 3;
         403 |            5 | >
         403 |            5 | ~>~
         405 |            1 | =
-       2742 |            1 | &&
-       2742 |            2 | @>
-       2742 |            3 | <@
-       2742 |            4 | =
-       2742 |            7 | @>
-       2742 |            9 | ?
-       2742 |           10 | ?|
-       2742 |           11 | ?&
-       2742 |           15 | @?
-       2742 |           16 | @@
-(25 rows)
+(15 rows)
 
 -- Check that all opclass search operators have selectivity estimators.
 -- This is not absolutely required, but it seems a reasonable thing
@@ -2029,13 +2014,12 @@ ORDER BY 1, 2, 3;
                     | float_ops        | float4_ops       | real
                     | float_ops        | float8_ops       | double precision
                     | interval_ops     | interval_ops     | interval
-                    | jsonb_ops        | jsonb_ops        | jsonb
                     | multirange_ops   | multirange_ops   | anymultirange
                     | numeric_ops      | numeric_ops      | numeric
                     | range_ops        | range_ops        | anyrange
                     | record_image_ops | record_image_ops | record
                     | record_ops       | record_ops       | record
-(14 rows)
+(13 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.

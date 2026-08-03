@@ -17,7 +17,6 @@ SUBDIRS = \
 		  test_ddl_deparse \
 		  test_escape \
 		  test_extensions \
-		  test_ginpostinglist \
 		  test_integerset \
 		  test_misc \
 		  test_predtest \

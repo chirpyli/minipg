@@ -270,8 +270,7 @@
 { amprocfamily => 'btree/multirange_ops', amproclefttype => 'anymultirange',
   amprocrighttype => 'anymultirange', amprocnum => '1',
   amproc => 'multirange_cmp' },
-{ amprocfamily => 'btree/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '1', amproc => 'jsonb_cmp' },
+
 { amprocfamily => 'btree/xid8_ops', amproclefttype => 'xid8',
   amprocrighttype => 'xid8', amprocnum => '1', amproc => 'xid8cmp' },
 { amprocfamily => 'btree/xid8_ops', amproclefttype => 'xid8',
@@ -441,11 +440,8 @@
 { amprocfamily => 'hash/multirange_ops', amproclefttype => 'anymultirange',
   amprocrighttype => 'anymultirange', amprocnum => '2',
   amproc => 'hash_multirange_extended' },
-{ amprocfamily => 'hash/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '1', amproc => 'jsonb_hash' },
-{ amprocfamily => 'hash/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '2',
-  amproc => 'jsonb_hash_extended' },
+
+
 
 
 
@@ -510,37 +506,21 @@
 
 
 # gin
-{ amprocfamily => 'gin/array_ops', amproclefttype => 'anyarray',
-  amprocrighttype => 'anyarray', amprocnum => '2',
-  amproc => 'ginarrayextract(anyarray,internal,internal)' },
-{ amprocfamily => 'gin/array_ops', amproclefttype => 'anyarray',
-  amprocrighttype => 'anyarray', amprocnum => '3',
-  amproc => 'ginqueryarrayextract' },
-{ amprocfamily => 'gin/array_ops', amproclefttype => 'anyarray',
-  amprocrighttype => 'anyarray', amprocnum => '4',
-  amproc => 'ginarrayconsistent' },
-{ amprocfamily => 'gin/array_ops', amproclefttype => 'anyarray',
-  amprocrighttype => 'anyarray', amprocnum => '6',
-  amproc => 'ginarraytriconsistent' },
 
 
 
 
 
 
-{ amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '1', amproc => 'gin_compare_jsonb' },
-{ amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '2', amproc => 'gin_extract_jsonb' },
-{ amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '3',
-  amproc => 'gin_extract_jsonb_query' },
-{ amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '4',
-  amproc => 'gin_consistent_jsonb' },
-{ amprocfamily => 'gin/jsonb_ops', amproclefttype => 'jsonb',
-  amprocrighttype => 'jsonb', amprocnum => '6',
-  amproc => 'gin_triconsistent_jsonb' },
+
+
+
+
+
+
+
+
+
 
 
 

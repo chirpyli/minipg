@@ -342,8 +342,6 @@ ExplainResultDesc(ExplainStmt *stmt)
 
 			if (strcmp(p, "xml") == 0)
 				result_type = XMLOID;
-			else if (strcmp(p, "json") == 0)
-				result_type = JSONOID;
 			else
 				result_type = TEXTOID;
 			/* don't "break", as ExplainQuery will use the last value */

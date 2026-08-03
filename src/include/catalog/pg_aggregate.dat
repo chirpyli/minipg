@@ -545,17 +545,11 @@
   aggfinalfn => 'range_agg_finalfn', aggfinalextra => 't',
   aggtranstype => 'internal' },
 
-# json
-{ aggfnoid => 'json_agg', aggtransfn => 'json_agg_transfn',
-  aggfinalfn => 'json_agg_finalfn', aggtranstype => 'internal' },
-{ aggfnoid => 'json_object_agg', aggtransfn => 'json_object_agg_transfn',
-  aggfinalfn => 'json_object_agg_finalfn', aggtranstype => 'internal' },
 
-# jsonb
-{ aggfnoid => 'jsonb_agg', aggtransfn => 'jsonb_agg_transfn',
-  aggfinalfn => 'jsonb_agg_finalfn', aggtranstype => 'internal' },
-{ aggfnoid => 'jsonb_object_agg', aggtransfn => 'jsonb_object_agg_transfn',
-  aggfinalfn => 'jsonb_object_agg_finalfn', aggtranstype => 'internal' },
+
+
+
+
 
 # ordered-set and hypothetical-set aggregates
 { aggfnoid => 'percentile_disc(float8,anyelement)', aggkind => 'o',

@@ -4984,7 +4984,7 @@ List of access methods
  Name  | Type  |       Handler        |        Description         
 -------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
- gin   | Index | ginhandler           | GIN index access method
+ gin   | Index | ginhandler           | 
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
@@ -4995,7 +4995,7 @@ List of access methods
  Name  | Type  |       Handler        |        Description         
 -------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
- gin   | Index | ginhandler           | GIN index access method
+ gin   | Index | ginhandler           | 
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
@@ -5054,12 +5054,6 @@ List of access methods
  btree | float_ops       | >=(real,double precision)             |        4 | search  | 
  btree | float_ops       | >(real,double precision)              |        5 | search  | 
 (20 rows)
-
-\dAo * pg_catalog.jsonb_path_ops
-        List of operators of operator families
- AM | Operator family | Operator | Strategy | Purpose 
-----+-----------------+----------+----------+---------
-(0 rows)
 
 \dAp+ btree float_ops
                                                          List of support functions of operator families

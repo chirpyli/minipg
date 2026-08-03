@@ -51,15 +51,6 @@ select * from unnest(array[1.0::float8]) with ordinality as z(a,ord);
  1 |   1
 (1 row)
 
-select row_to_json(s.*) from generate_series(11,14) with ordinality s;
-       row_to_json       
--------------------------
- {"s":11,"ordinality":1}
- {"s":12,"ordinality":2}
- {"s":13,"ordinality":3}
- {"s":14,"ordinality":4}
-(4 rows)
-
 -- ordinality vs. views
 create temporary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord);
 select * from vw_ord;
@@ -2388,63 +2379,8 @@ select x from int8_tbl, extractq2_2_opt(int8_tbl) f(x);
 
 -- check handling of nulls in SRF results (bug #7808)
 create type rngfunc2 as (a integer, b text);
-select *, row_to_json(u) from unnest(array[(1,'foo')::rngfunc2, null::rngfunc2]) u;
- a |  b  |     row_to_json     
----+-----+---------------------
- 1 | foo | {"a":1,"b":"foo"}
-   |     | {"a":null,"b":null}
-(2 rows)
-
-select *, row_to_json(u) from unnest(array[null::rngfunc2, null::rngfunc2]) u;
- a | b |     row_to_json     
----+---+---------------------
-   |   | {"a":null,"b":null}
-   |   | {"a":null,"b":null}
-(2 rows)
-
-select *, row_to_json(u) from unnest(array[null::rngfunc2, (1,'foo')::rngfunc2, null::rngfunc2]) u;
- a |  b  |     row_to_json     
----+-----+---------------------
-   |     | {"a":null,"b":null}
- 1 | foo | {"a":1,"b":"foo"}
-   |     | {"a":null,"b":null}
-(3 rows)
-
-select *, row_to_json(u) from unnest(array[]::rngfunc2[]) u;
- a | b | row_to_json 
----+---+-------------
-(0 rows)
-
 drop type rngfunc2;
 -- check handling of functions pulled up into function RTEs (bug #17227)
-explain (verbose, costs off)
-select * from
-  (select jsonb_path_query_array(module->'lectures', '$[*]') as lecture
-   from unnest(array['{"lectures": [{"id": "1"}]}'::jsonb])
-        as unnested_modules(module)) as ss,
-  jsonb_to_recordset(ss.lecture) as j (id text);
-                                                                       QUERY PLAN                                                                       
---------------------------------------------------------------------------------------------------------------------------------------------------------
- Nested Loop
-   Output: jsonb_path_query_array((unnested_modules.module -> 'lectures'::text), '$[*]'::jsonpath, '{}'::jsonb, false), j.id
-   ->  Function Scan on pg_catalog.unnest unnested_modules
-         Output: unnested_modules.module
-         Function Call: unnest('{"{\"lectures\": [{\"id\": \"1\"}]}"}'::jsonb[])
-   ->  Function Scan on pg_catalog.jsonb_to_recordset j
-         Output: j.id
-         Function Call: jsonb_to_recordset(jsonb_path_query_array((unnested_modules.module -> 'lectures'::text), '$[*]'::jsonpath, '{}'::jsonb, false))
-(8 rows)
-
-select * from
-  (select jsonb_path_query_array(module->'lectures', '$[*]') as lecture
-   from unnest(array['{"lectures": [{"id": "1"}]}'::jsonb])
-        as unnested_modules(module)) as ss,
-  jsonb_to_recordset(ss.lecture) as j (id text);
-    lecture    | id 
----------------+----
- [{"id": "1"}] | 1
-(1 row)
-
 -- check detection of mismatching record types with a const-folded expression
 with a(b) as (values (row(1,2,3)))
 select * from a, coalesce(b) as c(d int, e int);  -- fail
