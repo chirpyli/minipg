@@ -19,7 +19,6 @@ array_op_test|f
 b|f
 b_star|f
 bit_defaults|f
-box_tbl|f
 bprime|f
 bt_f8_heap|t
 bt_i4_heap|t
@@ -30,7 +29,6 @@ c_star|f
 char_tbl|f
 check2_tbl|f
 check_tbl|f
-circle_tbl|t
 city|f
 copy_tbl|f
 d|f
@@ -45,7 +43,7 @@ emp|f
 equipment_r|f
 extra_wide_table|f
 f_star|f
-fast_emp4000|t
+fast_emp4000|f
 float4_tbl|f
 float8_tbl|f
 func_index_heap|t
@@ -55,7 +53,6 @@ hash_name_heap|t
 hash_txt_heap|t
 hobbies_r|f
 ihighway|t
-inet_tbl|f
 insert_tbl|f
 int2_tbl|f
 int4_tbl|f
@@ -64,9 +61,7 @@ interval_tbl|f
 invalid_check_con|f
 invalid_check_con_child|f
 iportaltest|f
-line_tbl|f
 log_table|f
-lseg_tbl|f
 main_table|f
 mlparted|f
 mlparted1|f
@@ -97,7 +92,6 @@ onek|t
 onek2|t
 past_inh_parent|f
 past_parted|f
-path_tbl|f
 person|f
 persons|f
 persons2|t
@@ -159,12 +153,6 @@ pg_transform|t
 pg_trigger|t
 pg_type|t
 pg_user_mapping|t
-point_tbl|t
-polygon_tbl|t
-quad_box_tbl|f
-quad_box_tbl_ord_seq1|f
-quad_box_tbl_ord_seq2|f
-quad_poly_tbl|f
 ramp|f
 real_city|f
 regress_constr_partition1|t
@@ -187,17 +175,9 @@ tableam_parted_d_heap2|f
 tableam_parted_heap2|f
 tableam_tbl_heap2|f
 tableam_tblas_heap2|f
-tbl_include_box|t
-tbl_include_box_pk|f
-tbl_include_pk|t
-tbl_include_reg|t
-tbl_include_unique1|t
-tbl_include_unique2|f
 tenk1|t
 tenk2|t
-test_range_excl|t
-test_range_gist|t
-test_range_spgist|f
+test_range_elem|t
 testjsonb|f
 text_tbl|f
 textrange_test|t

@@ -69,7 +69,7 @@ CREATE TABLE tenk2 (
 CREATE TABLE person (
 	name 		text,
 	age			int4,
-	location 	point
+	location 	text
 );
 CREATE TABLE emp (
 	salary 		int4,
@@ -86,7 +86,7 @@ NOTICE:  merging multiple inherited definitions of column "age"
 NOTICE:  merging multiple inherited definitions of column "location"
 CREATE TABLE city (
 	name		name,
-	location 	box,
+	location 	text,
 	budget 		city_budget
 );
 CREATE TABLE dept (
@@ -94,14 +94,14 @@ CREATE TABLE dept (
 	mgrname 	text
 );
 CREATE TABLE slow_emp4000 (
-	home_base	 box
+	home_base	 text
 );
 CREATE TABLE fast_emp4000 (
-	home_base	 box
+	home_base	 text
 );
 CREATE TABLE road (
 	name		text,
-	thepath 	path
+	thepath 	text
 );
 CREATE TABLE ihighway () INHERITS (road);
 CREATE TABLE shighway (
@@ -110,7 +110,7 @@ CREATE TABLE shighway (
 CREATE TABLE real_city (
 	pop			int4,
 	cname		text,
-	outline 	path
+	outline 	text
 );
 --
 -- test the "star" operators a bit more thoroughly -- this time,
@@ -141,7 +141,7 @@ CREATE TABLE e_star (
 	e 			int2
 ) INHERITS (c_star);
 CREATE TABLE f_star (
-	f 			polygon
+	f 			text
 ) INHERITS (e_star);
 CREATE TABLE aggtest (
 	a 			int2,
@@ -439,23 +439,23 @@ ERROR:  functions in partition key expression must be marked IMMUTABLE
 DROP FUNCTION immut_func(int);
 -- prevent using columns of unsupported types in key (type must have a btree operator class)
 CREATE TABLE partitioned (
-	a point
+	a json
 ) PARTITION BY LIST (a);
-ERROR:  data type point has no default operator class for access method "btree"
+ERROR:  data type json has no default operator class for access method "btree"
 HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 CREATE TABLE partitioned (
-	a point
-) PARTITION BY LIST (a point_ops);
-ERROR:  operator class "point_ops" does not exist for access method "btree"
+	a json
+) PARTITION BY LIST (a json_ops);
+ERROR:  operator class "json_ops" does not exist for access method "btree"
 CREATE TABLE partitioned (
-	a point
+	a json
 ) PARTITION BY RANGE (a);
-ERROR:  data type point has no default operator class for access method "btree"
+ERROR:  data type json has no default operator class for access method "btree"
 HINT:  You must specify a btree operator class or define a default btree operator class for the data type.
 CREATE TABLE partitioned (
-	a point
-) PARTITION BY RANGE (a point_ops);
-ERROR:  operator class "point_ops" does not exist for access method "btree"
+	a json
+) PARTITION BY RANGE (a json_ops);
+ERROR:  operator class "json_ops" does not exist for access method "btree"
 -- cannot add NO INHERIT constraints to partitioned tables
 CREATE TABLE partitioned (
 	a int,

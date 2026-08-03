@@ -178,39 +178,12 @@
 
 # OIDS 600 - 699
 
-{ oid => '600', array_type_oid => '1017',
-  descr => 'geometric point \'(x, y)\'',
-  typname => 'point', typlen => '16', typbyval => 'f', typcategory => 'G',
-  typsubscript => 'raw_array_subscript_handler', typelem => 'float8',
-  typinput => 'point_in', typoutput => 'point_out', typreceive => 'point_recv',
-  typsend => 'point_send', typalign => 'd' },
-{ oid => '601', array_type_oid => '1018',
-  descr => 'geometric line segment \'(pt1,pt2)\'',
-  typname => 'lseg', typlen => '32', typbyval => 'f', typcategory => 'G',
-  typsubscript => 'raw_array_subscript_handler', typelem => 'point',
-  typinput => 'lseg_in', typoutput => 'lseg_out', typreceive => 'lseg_recv',
-  typsend => 'lseg_send', typalign => 'd' },
-{ oid => '602', array_type_oid => '1019',
-  descr => 'geometric path \'(pt1,...)\'',
-  typname => 'path', typlen => '-1', typbyval => 'f', typcategory => 'G',
-  typinput => 'path_in', typoutput => 'path_out', typreceive => 'path_recv',
-  typsend => 'path_send', typalign => 'd', typstorage => 'x' },
-{ oid => '603', array_type_oid => '1020',
-  descr => 'geometric box \'(lower left,upper right)\'',
-  typname => 'box', typlen => '32', typbyval => 'f', typcategory => 'G',
-  typdelim => ';', typsubscript => 'raw_array_subscript_handler',
-  typelem => 'point', typinput => 'box_in', typoutput => 'box_out',
-  typreceive => 'box_recv', typsend => 'box_send', typalign => 'd' },
-{ oid => '604', array_type_oid => '1027',
-  descr => 'geometric polygon \'(pt1,...)\'',
-  typname => 'polygon', typlen => '-1', typbyval => 'f', typcategory => 'G',
-  typinput => 'poly_in', typoutput => 'poly_out', typreceive => 'poly_recv',
-  typsend => 'poly_send', typalign => 'd', typstorage => 'x' },
-{ oid => '628', array_type_oid => '629', descr => 'geometric line',
-  typname => 'line', typlen => '24', typbyval => 'f', typcategory => 'G',
-  typsubscript => 'raw_array_subscript_handler', typelem => 'float8',
-  typinput => 'line_in', typoutput => 'line_out', typreceive => 'line_recv',
-  typsend => 'line_send', typalign => 'd' },
+
+
+
+
+
+
 
 # OIDS 700 - 799
 
@@ -229,11 +202,7 @@
   typname => 'unknown', typlen => '-2', typbyval => 'f', typtype => 'p',
   typcategory => 'X', typinput => 'unknownin', typoutput => 'unknownout',
   typreceive => 'unknownrecv', typsend => 'unknownsend', typalign => 'c' },
-{ oid => '718', array_type_oid => '719',
-  descr => 'geometric circle \'(center,radius)\'',
-  typname => 'circle', typlen => '24', typbyval => 'f', typcategory => 'G',
-  typinput => 'circle_in', typoutput => 'circle_out',
-  typreceive => 'circle_recv', typsend => 'circle_send', typalign => 'd' },
+
 { oid => '790', array_type_oid => '791',
   descr => 'monetary amounts, $d,ddd.cc',
   typname => 'money', typlen => '8', typbyval => 'FLOAT8PASSBYVAL',
@@ -242,27 +211,10 @@
 
 # OIDS 800 - 899
 
-{ oid => '829', array_type_oid => '1040',
-  descr => 'XX:XX:XX:XX:XX:XX, MAC address',
-  typname => 'macaddr', typlen => '6', typbyval => 'f', typcategory => 'U',
-  typinput => 'macaddr_in', typoutput => 'macaddr_out',
-  typreceive => 'macaddr_recv', typsend => 'macaddr_send', typalign => 'i' },
-{ oid => '869', array_type_oid => '1041',
-  descr => 'IP address/netmask, host address, netmask optional',
-  typname => 'inet', typlen => '-1', typbyval => 'f', typcategory => 'I',
-  typispreferred => 't', typinput => 'inet_in', typoutput => 'inet_out',
-  typreceive => 'inet_recv', typsend => 'inet_send', typalign => 'i',
-  typstorage => 'm' },
-{ oid => '650', array_type_oid => '651',
-  descr => 'network IP address/netmask, network address',
-  typname => 'cidr', typlen => '-1', typbyval => 'f', typcategory => 'I',
-  typinput => 'cidr_in', typoutput => 'cidr_out', typreceive => 'cidr_recv',
-  typsend => 'cidr_send', typalign => 'i', typstorage => 'm' },
-{ oid => '774', array_type_oid => '775',
-  descr => 'XX:XX:XX:XX:XX:XX:XX:XX, MAC address',
-  typname => 'macaddr8', typlen => '8', typbyval => 'f', typcategory => 'U',
-  typinput => 'macaddr8_in', typoutput => 'macaddr8_out',
-  typreceive => 'macaddr8_recv', typsend => 'macaddr8_send', typalign => 'i' },
+
+
+
+
 
 # OIDS 1000 - 1099
 

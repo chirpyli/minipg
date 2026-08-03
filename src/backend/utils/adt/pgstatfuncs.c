@@ -817,9 +817,8 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 											 NI_NUMERICHOST | NI_NUMERICSERV);
 					if (ret == 0)
 					{
-						clean_ipv6_addr(beentry->st_clientaddr.addr.ss_family, remote_host);
-						values[12] = DirectFunctionCall1(inet_in,
-														 CStringGetDatum(remote_host));
+					clean_ipv6_addr(beentry->st_clientaddr.addr.ss_family, remote_host);
+					values[12] = CStringGetTextDatum(remote_host);
 						if (beentry->st_clienthostname &&
 							beentry->st_clienthostname[0])
 							values[13] = CStringGetTextDatum(beentry->st_clienthostname);
@@ -1202,8 +1201,7 @@ pg_stat_get_backend_client_addr(PG_FUNCTION_ARGS)
 
 	clean_ipv6_addr(beentry->st_clientaddr.addr.ss_family, remote_host);
 
-	PG_RETURN_INET_P(DirectFunctionCall1(inet_in,
-										 CStringGetDatum(remote_host)));
+	PG_RETURN_TEXT_P(CStringGetTextDatum(remote_host));
 }
 
 Datum

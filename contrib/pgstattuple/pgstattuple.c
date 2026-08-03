@@ -24,7 +24,6 @@
 
 #include "postgres.h"
 
-#include "access/gist_private.h"
 #include "access/hash.h"
 #include "access/heapam.h"
 #include "access/nbtree.h"
@@ -73,9 +72,6 @@ static void pgstat_btree_page(pgstattuple_type *stat,
 							  Relation rel, BlockNumber blkno,
 							  BufferAccessStrategy bstrategy);
 static void pgstat_hash_page(pgstattuple_type *stat,
-							 Relation rel, BlockNumber blkno,
-							 BufferAccessStrategy bstrategy);
-static void pgstat_gist_page(pgstattuple_type *stat,
 							 Relation rel, BlockNumber blkno,
 							 BufferAccessStrategy bstrategy);
 static Datum pgstat_index(Relation rel, BlockNumber start,
@@ -275,9 +271,6 @@ pgstat_relation(Relation rel, FunctionCallInfo fcinfo)
 				case HASH_AM_OID:
 					return pgstat_index(rel, HASH_METAPAGE + 1,
 										pgstat_hash_page, fcinfo);
-				case GIST_AM_OID:
-					return pgstat_index(rel, GIST_ROOT_BLKNO + 1,
-										pgstat_gist_page, fcinfo);
 			case GIN_AM_OID:
 				err = "gin index";
 				break;
@@ -500,39 +493,6 @@ pgstat_hash_page(pgstattuple_type *stat, Relation rel, BlockNumber blkno,
 	_hash_relbuf(rel, buf);
 }
 
-/*
- * pgstat_gist_page -- check tuples in a gist page
- */
-static void
-pgstat_gist_page(pgstattuple_type *stat, Relation rel, BlockNumber blkno,
-				 BufferAccessStrategy bstrategy)
-{
-	Buffer		buf;
-	Page		page;
-
-	buf = ReadBufferExtended(rel, MAIN_FORKNUM, blkno, RBM_NORMAL, bstrategy);
-	LockBuffer(buf, GIST_SHARE);
-	page = BufferGetPage(buf);
-	if (PageIsNew(page))
-	{
-		/* fully empty page */
-		stat->free_space += BLCKSZ;
-	}
-	else if (PageGetSpecialSize(page) == MAXALIGN(sizeof(GISTPageOpaqueData)))
-	{
-		if (GistPageIsLeaf(page))
-		{
-			pgstat_index_page(stat, page, FirstOffsetNumber,
-							  PageGetMaxOffsetNumber(page));
-		}
-		else
-		{
-			/* root or node */
-		}
-	}
-
-	UnlockReleaseBuffer(buf);
-}
 
 /*
  * pgstat_index -- returns live/dead tuples info in a generic index

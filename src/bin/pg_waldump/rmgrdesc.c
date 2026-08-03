@@ -12,7 +12,6 @@
 #include "access/commit_ts.h"
 #include "access/generic_xlog.h"
 #include "access/ginxlog.h"
-#include "access/gistxlog.h"
 #include "access/hash_xlog.h"
 #include "access/heapam_xlog.h"
 #include "access/multixact.h"

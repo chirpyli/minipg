@@ -141,26 +141,46 @@ VACUUM FULL vactst;
 VACUUM (DISABLE_PAGE_SKIPPING) vaccluster;
 -- PARALLEL option
 CREATE TABLE pvactst (i INT, a INT[], p POINT) with (autovacuum_enabled = off);
+ERROR:  type "point" does not exist
+LINE 1: CREATE TABLE pvactst (i INT, a INT[], p POINT) with (autovac...
+                                                ^
 INSERT INTO pvactst SELECT i, array[1,2,3], point(i, i+1) FROM generate_series(1,1000) i;
+ERROR:  relation "pvactst" does not exist
+LINE 1: INSERT INTO pvactst SELECT i, array[1,2,3], point(i, i+1) FR...
+                    ^
 CREATE INDEX btree_pvactst ON pvactst USING btree (i);
+ERROR:  relation "pvactst" does not exist
 CREATE INDEX hash_pvactst ON pvactst USING hash (i);
+ERROR:  relation "pvactst" does not exist
 CREATE INDEX gin_pvactst ON pvactst USING gin (a);
+ERROR:  relation "pvactst" does not exist
 CREATE INDEX gist_pvactst ON pvactst USING gist (p);
+ERROR:  relation "pvactst" does not exist
 CREATE INDEX spgist_pvactst ON pvactst USING spgist (p);
-ERROR:  access method "spgist" does not exist
+ERROR:  relation "pvactst" does not exist
 -- VACUUM invokes parallel index cleanup
 SET min_parallel_index_scan_size to 0;
 VACUUM (PARALLEL 2) pvactst;
+ERROR:  relation "pvactst" does not exist
 -- VACUUM invokes parallel bulk-deletion
 UPDATE pvactst SET i = i WHERE i < 1000;
+ERROR:  relation "pvactst" does not exist
+LINE 1: UPDATE pvactst SET i = i WHERE i < 1000;
+               ^
 VACUUM (PARALLEL 2) pvactst;
+ERROR:  relation "pvactst" does not exist
 UPDATE pvactst SET i = i WHERE i < 1000;
+ERROR:  relation "pvactst" does not exist
+LINE 1: UPDATE pvactst SET i = i WHERE i < 1000;
+               ^
 VACUUM (PARALLEL 0) pvactst; -- disable parallel vacuum
+ERROR:  relation "pvactst" does not exist
 VACUUM (PARALLEL -1) pvactst; -- error
 ERROR:  parallel workers for vacuum must be between 0 and 1024
 LINE 1: VACUUM (PARALLEL -1) pvactst;
                 ^
 VACUUM (PARALLEL 2, INDEX_CLEANUP FALSE) pvactst;
+ERROR:  relation "pvactst" does not exist
 VACUUM (PARALLEL 2, FULL TRUE) pvactst; -- error, cannot use both PARALLEL and FULL
 ERROR:  VACUUM FULL cannot be performed in parallel
 VACUUM (PARALLEL) pvactst; -- error, cannot use PARALLEL option without parallel degree
@@ -175,6 +195,7 @@ WARNING:  disabling parallel option of vacuum on "tmp" --- cannot vacuum tempora
 VACUUM (PARALLEL 0, FULL TRUE) tmp; -- can specify parallel disabled (even though that's implied by FULL)
 RESET min_parallel_index_scan_size;
 DROP TABLE pvactst;
+ERROR:  table "pvactst" does not exist
 -- INDEX_CLEANUP option
 CREATE TABLE no_index_cleanup (i INT PRIMARY KEY, t TEXT);
 -- Use uncompressed data stored in toast.

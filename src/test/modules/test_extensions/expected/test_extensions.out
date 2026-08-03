@@ -198,49 +198,7 @@ CREATE EXTENSION test_ext_cor;  -- fail
 ERROR:  type test_ext_type is not a member of extension "test_ext_cor"
 DETAIL:  An extension is not allowed to replace an object that it does not own.
 DROP TYPE test_ext_type;
--- this makes a shell "point <<@@ polygon" operator too
-CREATE OPERATOR @@>> ( PROCEDURE = poly_contain_pt,
-  LEFTARG = polygon, RIGHTARG = point,
-  COMMUTATOR = <<@@ );
-CREATE EXTENSION test_ext_cor;  -- fail
-ERROR:  operator <<@@(point,polygon) is not a member of extension "test_ext_cor"
-DETAIL:  An extension is not allowed to replace an object that it does not own.
-DROP OPERATOR <<@@ (point, polygon);
-CREATE EXTENSION test_ext_cor;  -- now it should work
-SELECT ext_cor_func();
-         ext_cor_func         
-------------------------------
- ext_cor_func: from extension
-(1 row)
-
-SELECT * FROM ext_cor_view;
-             col              
-------------------------------
- ext_cor_view: from extension
-(1 row)
-
-SELECT 'x'::test_ext_type;
- test_ext_type 
----------------
- x
-(1 row)
-
-SELECT point(0,0) <<@@ polygon(circle(point(0,0),1));
- ?column? 
-----------
- t
-(1 row)
-
 \dx+ test_ext_cor
-Objects in extension "test_ext_cor"
-      Object description      
-------------------------------
- function ext_cor_func()
- operator <<@@(point,polygon)
- type test_ext_type
- view ext_cor_view
-(4 rows)
-
 --
 -- CREATE IF NOT EXISTS is an entirely unsound thing for an extension
 -- to be doing, but let's at least plug the major security hole in it.

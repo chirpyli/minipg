@@ -80,11 +80,6 @@ SELECT bt_page_items('test1_a_hash', 0);
 ERROR:  "test1_a_hash" is not a btree index
 SELECT bt_page_items(get_raw_page('test1_a_hash', 0));
 ERROR:  block is a meta page
-CREATE INDEX test1_b_gist ON test1 USING gist(b);
--- Special area of GiST is the same as btree, this complains about inconsistent
--- leaf data on the page.
-SELECT bt_page_items(get_raw_page('test1_b_gist', 0));
-ERROR:  block is not a valid btree leaf page
 -- Several failure modes.
 -- Suppress the DETAIL message, to allow the tests to work across various
 -- page sizes and architectures.

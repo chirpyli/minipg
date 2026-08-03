@@ -2,18 +2,10 @@
 -- CREATE_TYPE
 --
 --
--- Note: widget_in/out were created in create_function_1, without any
--- prior shell-type creation.  These commands therefore complete a test
--- of the "old style" approach of making the functions first.
+-- Note: widget_in/out were removed along with the geometry-type
+-- regression test helpers; only city_budget remains as a user-defined
+-- base type example.
 --
-CREATE TYPE widget (
-   internallength = 24,
-   input = widget_in,
-   output = widget_out,
-   typmod_in = numerictypmodin,
-   typmod_out = numerictypmodout,
-   alignment = double
-);
 CREATE TYPE city_budget (
    internallength = 16,
    input = int44in,
@@ -183,27 +175,6 @@ DETAIL:  drop cascades to function base_fn_in(cstring)
 drop cascades to function base_fn_out(base_type)
 -- Check usage of typmod with a user-defined type
 -- (we have borrowed numeric's typmod functions)
-CREATE TEMP TABLE mytab (foo widget(42,13,7));     -- should fail
-ERROR:  invalid NUMERIC type modifier
-LINE 1: CREATE TEMP TABLE mytab (foo widget(42,13,7));
-                                     ^
-CREATE TEMP TABLE mytab (foo widget(42,13));
-SELECT format_type(atttypid,atttypmod) FROM pg_attribute
-WHERE attrelid = 'mytab'::regclass AND attnum > 0;
-  format_type  
----------------
- widget(42,13)
-(1 row)
-
--- might as well exercise the widget type while we're here
-INSERT INTO mytab VALUES ('(1,2,3)'), ('(-44,5.5,12)');
-TABLE mytab;
-     foo      
---------------
- (1,2,3)
- (-44,5.5,12)
-(2 rows)
-
 -- and test format_type() a bit more, too
 select format_type('varchar'::regtype, 42);
       format_type      

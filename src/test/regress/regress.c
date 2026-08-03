@@ -42,7 +42,6 @@
 #include "storage/spin.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
-#include "utils/geo_decls.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
 #include "utils/typcache.h"
@@ -79,63 +78,8 @@
 #define RDELIM			')'
 #define DELIM			','
 
-static void regress_lseg_construct(LSEG *lseg, Point *pt1, Point *pt2);
 
 PG_MODULE_MAGIC;
-
-
-/* return the point where two paths intersect, or NULL if no intersection. */
-PG_FUNCTION_INFO_V1(interpt_pp);
-
-Datum
-interpt_pp(PG_FUNCTION_ARGS)
-{
-	PATH	   *p1 = PG_GETARG_PATH_P(0);
-	PATH	   *p2 = PG_GETARG_PATH_P(1);
-	int			i,
-				j;
-	LSEG		seg1,
-				seg2;
-	bool		found;			/* We've found the intersection */
-
-	found = false;				/* Haven't found it yet */
-
-	for (i = 0; i < p1->npts - 1 && !found; i++)
-	{
-		regress_lseg_construct(&seg1, &p1->p[i], &p1->p[i + 1]);
-		for (j = 0; j < p2->npts - 1 && !found; j++)
-		{
-			regress_lseg_construct(&seg2, &p2->p[j], &p2->p[j + 1]);
-			if (DatumGetBool(DirectFunctionCall2(lseg_intersect,
-												 LsegPGetDatum(&seg1),
-												 LsegPGetDatum(&seg2))))
-				found = true;
-		}
-	}
-
-	if (!found)
-		PG_RETURN_NULL();
-
-	/*
-	 * Note: DirectFunctionCall2 will kick out an error if lseg_interpt()
-	 * returns NULL, but that should be impossible since we know the two
-	 * segments intersect.
-	 */
-	PG_RETURN_DATUM(DirectFunctionCall2(lseg_interpt,
-										LsegPGetDatum(&seg1),
-										LsegPGetDatum(&seg2)));
-}
-
-
-/* like lseg_construct, but assume space already allocated */
-static void
-regress_lseg_construct(LSEG *lseg, Point *pt1, Point *pt2)
-{
-	lseg->p[0].x = pt1->x;
-	lseg->p[0].y = pt1->y;
-	lseg->p[1].x = pt2->x;
-	lseg->p[1].y = pt2->y;
-}
 
 PG_FUNCTION_INFO_V1(overpaid);
 
@@ -152,76 +96,6 @@ overpaid(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(salary > 699);
 }
 
-/* New type "widget"
- * This used to be "circle", but I added circle to builtins,
- *	so needed to make sure the names do not collide. - tgl 97/04/21
- */
-
-typedef struct
-{
-	Point		center;
-	double		radius;
-} WIDGET;
-
-PG_FUNCTION_INFO_V1(widget_in);
-PG_FUNCTION_INFO_V1(widget_out);
-
-#define NARGS	3
-
-Datum
-widget_in(PG_FUNCTION_ARGS)
-{
-	char	   *str = PG_GETARG_CSTRING(0);
-	char	   *p,
-			   *coord[NARGS];
-	int			i;
-	WIDGET	   *result;
-
-	for (i = 0, p = str; *p && i < NARGS && *p != RDELIM; p++)
-	{
-		if (*p == DELIM || (*p == LDELIM && i == 0))
-			coord[i++] = p + 1;
-	}
-
-	if (i < NARGS)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("invalid input syntax for type %s: \"%s\"",
-						"widget", str)));
-
-	result = (WIDGET *) palloc(sizeof(WIDGET));
-	result->center.x = atof(coord[0]);
-	result->center.y = atof(coord[1]);
-	result->radius = atof(coord[2]);
-
-	PG_RETURN_POINTER(result);
-}
-
-Datum
-widget_out(PG_FUNCTION_ARGS)
-{
-	WIDGET	   *widget = (WIDGET *) PG_GETARG_POINTER(0);
-	char	   *str = psprintf("(%g,%g,%g)",
-							   widget->center.x, widget->center.y, widget->radius);
-
-	PG_RETURN_CSTRING(str);
-}
-
-PG_FUNCTION_INFO_V1(pt_in_widget);
-
-Datum
-pt_in_widget(PG_FUNCTION_ARGS)
-{
-	Point	   *point = PG_GETARG_POINT_P(0);
-	WIDGET	   *widget = (WIDGET *) PG_GETARG_POINTER(1);
-	float8		distance;
-
-	distance = DatumGetFloat8(DirectFunctionCall2(point_distance,
-												  PointPGetDatum(point),
-												  PointPGetDatum(&widget->center)));
-
-	PG_RETURN_BOOL(distance < widget->radius);
-}
 
 PG_FUNCTION_INFO_V1(reverse_name);
 

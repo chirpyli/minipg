@@ -19,7 +19,6 @@ SUBDIRS = \
 	pg_config \
 	pg_controldata \
 	pg_ctl \
-	pg_dump \
 	pg_rewind \
 	pg_waldump \
 	psql

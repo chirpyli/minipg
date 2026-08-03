@@ -15,9 +15,6 @@ CREATE TABLE datatype_table (
     v_varchar      VARCHAR(10),
     v_text         TEXT,
     v_bool         BOOLEAN,
-    v_inet         INET,
-    v_cidr         CIDR,
-    v_macaddr      MACADDR,
     v_numeric      NUMERIC(1,0),
     v_real         REAL,
     v_float        FLOAT(1),
@@ -33,12 +30,6 @@ CREATE TABLE datatype_table (
     v_bit4         BIT(4),
     v_varbit       VARBIT,
     v_varbit4      VARBIT(4),
-    v_box          BOX,
-    v_circle       CIRCLE,
-    v_lseg         LSEG,
-    v_path         PATH,
-    v_point        POINT,
-    v_polygon      POLYGON,
     v_json         JSON,
     v_xml          XML,
     v_uuid         UUID,
@@ -77,8 +68,7 @@ CREATE TABLE employees OF employee_type (
 CREATE TABLE person (
     id          INT NOT NULL PRIMARY KEY,
 	name 		text,
-	age			int4,
-	location 	point
+	age			int4
 );
 
 CREATE TABLE emp (

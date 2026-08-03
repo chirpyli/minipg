@@ -175,7 +175,7 @@ SELECT name, statement, parameter_types FROM pg_prepared_statements
       |         ORDER BY unique1;                                        | 
  q6   | PREPARE q6 AS                                                   +| {integer,name}
       |     SELECT * FROM tenk1 WHERE unique1 = $1 AND stringu1 = $2;    | 
- q7   | PREPARE q7(unknown) AS                                          +| {path}
+ q7   | PREPARE q7(unknown) AS                                          +| {text}
       |     SELECT * FROM road WHERE thepath = $1;                       | 
 (5 rows)
 

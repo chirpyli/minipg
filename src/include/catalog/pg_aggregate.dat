@@ -143,9 +143,7 @@
 { aggfnoid => 'max(anyenum)', aggtransfn => 'enum_larger',
   aggcombinefn => 'enum_larger', aggsortop => '>(anyenum,anyenum)',
   aggtranstype => 'anyenum' },
-{ aggfnoid => 'max(inet)', aggtransfn => 'network_larger',
-  aggcombinefn => 'network_larger', aggsortop => '>(inet,inet)',
-  aggtranstype => 'inet' },
+
 { aggfnoid => 'max(pg_lsn)', aggtransfn => 'pg_lsn_larger',
   aggcombinefn => 'pg_lsn_larger', aggsortop => '>(pg_lsn,pg_lsn)',
   aggtranstype => 'pg_lsn' },
@@ -208,9 +206,7 @@
 { aggfnoid => 'min(anyenum)', aggtransfn => 'enum_smaller',
   aggcombinefn => 'enum_smaller', aggsortop => '<(anyenum,anyenum)',
   aggtranstype => 'anyenum' },
-{ aggfnoid => 'min(inet)', aggtransfn => 'network_smaller',
-  aggcombinefn => 'network_smaller', aggsortop => '<(inet,inet)',
-  aggtranstype => 'inet' },
+
 { aggfnoid => 'min(pg_lsn)', aggtransfn => 'pg_lsn_smaller',
   aggcombinefn => 'pg_lsn_smaller', aggsortop => '<(pg_lsn,pg_lsn)',
   aggtranstype => 'pg_lsn' },

@@ -22,15 +22,14 @@ test: boolean char name varchar text int2 int4 int8 oid float4 float8 bit numeri
 # multirangetypes depends on rangetypes
 # multirangetypes shouldn't run concurrently with type_sanity
 # ----------
-test: strings numerology point lseg line box path polygon circle date time timetz timestamp timestamptz interval inet macaddr macaddr8 multirangetypes create_function_0
+test: strings numerology date time timetz timestamp timestamptz interval multirangetypes create_function_0
 
 # ----------
 # Another group of parallel tests
-# geometry depends on point, lseg, box, path, polygon and circle
 # horology depends on interval, timetz, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
-test: geometry horology regex type_sanity opr_sanity misc_sanity comments expressions unicode xid mvcc database encoding euc_kr
+test: horology regex type_sanity opr_sanity misc_sanity comments expressions unicode xid mvcc database encoding euc_kr
 
 # ----------
 # These four each depend on the previous one
@@ -53,7 +52,7 @@ test: copy copyselect copydml insert insert_conflict
 # ----------
 test: create_misc create_operator create_procedure create_schema
 # These depend on create_misc and create_operator
-test: create_index create_view index_including index_including_gist
+test: create_index create_view index_including
 
 # ----------
 # Another group of parallel tests
@@ -76,7 +75,7 @@ test: select_into select_distinct select_distinct_on select_implicit select_havi
 # ----------
 # Another group of parallel tests
 # ----------
-test: gin gist privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
+test: gin privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
 
 # ----------
 # Another group of parallel tests

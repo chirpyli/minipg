@@ -3,19 +3,10 @@
 --
 
 --
--- Note: widget_in/out were created in create_function_1, without any
--- prior shell-type creation.  These commands therefore complete a test
--- of the "old style" approach of making the functions first.
+-- Note: widget_in/out were removed along with the geometry-type
+-- regression test helpers; only city_budget remains as a user-defined
+-- base type example.
 --
-CREATE TYPE widget (
-   internallength = 24,
-   input = widget_in,
-   output = widget_out,
-   typmod_in = numerictypmodin,
-   typmod_out = numerictypmodout,
-   alignment = double
-);
-
 CREATE TYPE city_budget (
    internallength = 16,
    input = int44in,
@@ -150,16 +141,6 @@ DROP TYPE base_type CASCADE;
 
 -- Check usage of typmod with a user-defined type
 -- (we have borrowed numeric's typmod functions)
-
-CREATE TEMP TABLE mytab (foo widget(42,13,7));     -- should fail
-CREATE TEMP TABLE mytab (foo widget(42,13));
-
-SELECT format_type(atttypid,atttypmod) FROM pg_attribute
-WHERE attrelid = 'mytab'::regclass AND attnum > 0;
-
--- might as well exercise the widget type while we're here
-INSERT INTO mytab VALUES ('(1,2,3)'), ('(-44,5.5,12)');
-TABLE mytab;
 
 -- and test format_type() a bit more, too
 select format_type('varchar'::regtype, 42);

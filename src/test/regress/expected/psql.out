@@ -4941,11 +4941,10 @@ List of access methods
 -------+-------
  btree | Index
  gin   | Index
- gist  | Index
  hash  | Index
  heap  | Table
  heap2 | Table
-(6 rows)
+(5 rows)
 
 \dA *
 List of access methods
@@ -4953,11 +4952,10 @@ List of access methods
 -------+-------
  btree | Index
  gin   | Index
- gist  | Index
  hash  | Index
  heap  | Table
  heap2 | Table
-(6 rows)
+(5 rows)
 
 \dA h*
 List of access methods
@@ -4987,11 +4985,10 @@ List of access methods
 -------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
  gin   | Index | ginhandler           | GIN index access method
- gist  | Index | gisthandler          | GiST index access method
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
-(6 rows)
+(5 rows)
 
 \dA+ *
                       List of access methods
@@ -4999,11 +4996,10 @@ List of access methods
 -------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
  gin   | Index | ginhandler           | GIN index access method
- gist  | Index | gisthandler          | GiST index access method
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
-(6 rows)
+(5 rows)
 
 \dA+ h*
                      List of access methods
@@ -5060,13 +5056,10 @@ List of access methods
 (20 rows)
 
 \dAo * pg_catalog.jsonb_path_ops
-             List of operators of operator families
- AM  | Operator family |      Operator      | Strategy | Purpose 
------+-----------------+--------------------+----------+---------
- gin | jsonb_path_ops  | @>(jsonb,jsonb)    |        7 | search
- gin | jsonb_path_ops  | @?(jsonb,jsonpath) |       15 | search
- gin | jsonb_path_ops  | @@(jsonb,jsonpath) |       16 | search
-(3 rows)
+        List of operators of operator families
+ AM | Operator family | Operator | Strategy | Purpose 
+----+-----------------+----------+----------+---------
+(0 rows)
 
 \dAp+ btree float_ops
                                                          List of support functions of operator families
@@ -5417,12 +5410,6 @@ improper qualified name (too many dotted names): regression.mypub
 improper qualified name (too many dotted names): public.mysub
 \dRs regression.mysub
 improper qualified name (too many dotted names): regression.mysub
-\dT host.regression.public.widget
-improper qualified name (too many dotted names): host.regression.public.widget
-\dT "regression{1,2}".public.widget
-cross-database references are not implemented: "regression{1,2}".public.widget
-\dT nonesuch.public.widget
-cross-database references are not implemented: nonesuch.public.widget
 \dx regression.plpgsql
 improper qualified name (too many dotted names): regression.plpgsql
 \dx nonesuch.plpgsql

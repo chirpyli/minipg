@@ -336,10 +336,9 @@ ORDER BY 2;
  3832 | anyrange_in
  4231 | multirange_in
  4233 | multirange_recv
- 3876 | range_gist_union
  3834 | range_in
  3836 | range_recv
-(7 rows)
+(6 rows)
 
 -- similarly for the anycompatible family
 SELECT p1.oid, p1.proname
@@ -635,13 +634,6 @@ text_le(text,text)
 text_gt(text,text)
 text_ge(text,text)
 int8(smallint)
-macaddr_eq(macaddr,macaddr)
-macaddr_lt(macaddr,macaddr)
-macaddr_le(macaddr,macaddr)
-macaddr_gt(macaddr,macaddr)
-macaddr_ge(macaddr,macaddr)
-macaddr_ne(macaddr,macaddr)
-macaddr_cmp(macaddr,macaddr)
 btint8cmp(bigint,bigint)
 int48eq(integer,bigint)
 int48ne(integer,bigint)
@@ -655,14 +647,6 @@ cash_lt(money,money)
 cash_le(money,money)
 cash_gt(money,money)
 cash_ge(money,money)
-network_eq(inet,inet)
-network_lt(inet,inet)
-network_le(inet,inet)
-network_gt(inet,inet)
-network_ge(inet,inet)
-network_ne(inet,inet)
-network_cmp(inet,inet)
-lseg_eq(lseg,lseg)
 bpchareq(character,character)
 bpcharlt(character,character)
 bpcharle(character,character)
@@ -715,17 +699,6 @@ timetz_cmp(time with time zone,time with time zone)
 "interval"(time without time zone)
 name(character varying)
 "varchar"(name)
-circle_eq(circle,circle)
-circle_ne(circle,circle)
-circle_lt(circle,circle)
-circle_gt(circle,circle)
-circle_le(circle,circle)
-circle_ge(circle,circle)
-lseg_ne(lseg,lseg)
-lseg_lt(lseg,lseg)
-lseg_le(lseg,lseg)
-lseg_gt(lseg,lseg)
-lseg_ge(lseg,lseg)
 biteq(bit,bit)
 bitne(bit,bit)
 bitge(bit,bit)
@@ -825,14 +798,6 @@ sha384(bytea)
 sha512(bytea)
 gen_random_uuid()
 starts_with(text,text)
-macaddr8_eq(macaddr8,macaddr8)
-macaddr8_lt(macaddr8,macaddr8)
-macaddr8_le(macaddr8,macaddr8)
-macaddr8_gt(macaddr8,macaddr8)
-macaddr8_ge(macaddr8,macaddr8)
-macaddr8_ne(macaddr8,macaddr8)
-macaddr8_cmp(macaddr8,macaddr8)
-macaddr8(macaddr)
 xid8lt(xid8,xid8)
 xid8gt(xid8,xid8)
 xid8le(xid8,xid8)
@@ -983,11 +948,10 @@ WHERE c.castmethod = 'b' AND
  pg_ndistinct      | bytea             |        0 | i
  pg_dependencies   | bytea             |        0 | i
  pg_mcv_list       | bytea             |        0 | i
- cidr              | inet              |        0 | i
  xml               | text              |        0 | a
  xml               | character varying |        0 | a
  xml               | character         |        0 | a
-(10 rows)
+(9 rows)
 
 -- **************** pg_conversion ****************
 -- Look for illegal values in pg_conversion fields.
@@ -1123,23 +1087,15 @@ ORDER BY 1, 2;
  +    | +
  -|-  | -|-
  <    | >
- <->  | <->
  <<   | >>
- <<=  | >>=
  <=   | >=
  <>   | <>
  <@   | @>
  =    | =
- ?#   | ?#
- ?-   | ?-
- ?-|  | ?-|
- ?|   | ?|
- ?||  | ?||
  |    | |
  ~<=~ | ~>=~
  ~<~  | ~>~
- ~=   | ~=
-(27 rows)
+(19 rows)
 
 -- Likewise for negator pairs.
 SELECT DISTINCT o1.oprname AS op1, o2.oprname AS op2
@@ -1158,10 +1114,9 @@ ORDER BY 1, 2;
  <    | >=
  <=   | >
  <>   | =
- <>   | ~=
  ~<=~ | ~>~
  ~<~  | ~>=~
-(13 rows)
+(12 rows)
 
 -- A mergejoinable or hashjoinable operator must be binary, must return
 -- boolean, and must have a commutator (itself, unless it's a cross-type
@@ -1820,9 +1775,16 @@ WHERE p1.opfmethod = 0 OR p1.opfnamespace = 0;
 -- get noticed.
 SELECT oid, opfname FROM pg_opfamily f
 WHERE NOT EXISTS (SELECT 1 FROM pg_opclass WHERE opcfamily = f.oid);
- oid | opfname 
------+---------
-(0 rows)
+ oid  |    opfname     
+------+----------------
+ 1974 | network_ops
+ 1975 | network_ops
+ 1984 | macaddr_ops
+ 1985 | macaddr_ops
+ 3371 | macaddr8_ops
+ 3372 | macaddr8_ops
+ 4037 | jsonb_path_ops
+(7 rows)
 
 -- **************** pg_opclass ****************
 -- Look for illegal values in pg_opclass fields
@@ -1943,36 +1905,6 @@ ORDER BY 1, 2, 3;
         403 |            5 | >
         403 |            5 | ~>~
         405 |            1 | =
-        783 |            1 | <<
-        783 |            2 | &<
-        783 |            3 | &&
-        783 |            4 | &>
-        783 |            5 | >>
-        783 |            6 | -|-
-        783 |            6 | ~=
-        783 |            7 | @>
-        783 |            8 | <@
-        783 |            9 | &<|
-        783 |           10 | <<|
-        783 |           11 | |>>
-        783 |           12 | |&>
-        783 |           15 | <->
-        783 |           16 | @>
-        783 |           18 | =
-        783 |           19 | <>
-        783 |           20 | <
-        783 |           21 | <=
-        783 |           22 | >
-        783 |           23 | >=
-        783 |           24 | <<
-        783 |           25 | <<=
-        783 |           26 | >>
-        783 |           27 | >>=
-        783 |           28 | <@
-        783 |           29 | <^
-        783 |           30 | >^
-        783 |           48 | <@
-        783 |           68 | <@
        2742 |            1 | &&
        2742 |            2 | @>
        2742 |            3 | <@
@@ -1983,7 +1915,7 @@ ORDER BY 1, 2, 3;
        2742 |           11 | ?&
        2742 |           15 | @?
        2742 |           16 | @@
-(55 rows)
+(25 rows)
 
 -- Check that all opclass search operators have selectivity estimators.
 -- This is not absolutely required, but it seems a reasonable thing

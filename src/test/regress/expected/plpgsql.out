@@ -1760,12 +1760,10 @@ select f1(42) as int, f1(4.5) as num;
 (1 row)
 
 select f1(point(3,4));  -- fail for lack of + operator
-ERROR:  operator does not exist: point + integer
-LINE 1: x + 1
-          ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
-QUERY:  x + 1
-CONTEXT:  PL/pgSQL function f1(anyelement) line 3 at RETURN
+ERROR:  function point(integer, integer) does not exist
+LINE 1: select f1(point(3,4));
+                  ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function f1(x anyelement);
 create function f1(x anyelement) returns anyarray as $$
 begin
@@ -1885,18 +1883,16 @@ select x, pg_typeof(x), y, pg_typeof(y)
 
 select x, pg_typeof(x), y, pg_typeof(y)
   from f1(11, array[1, 2], point(1,2), point(3,4));
-    x     | pg_typeof |         y         | pg_typeof 
-----------+-----------+-------------------+-----------
- {11,1,2} | integer[] | {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 2:   from f1(11, array[1, 2], point(1,2), point(3,4));
+                                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x), y, pg_typeof(y)
   from f1(11, '{1,2}', point(1,2), '(3,4)');
-    x     | pg_typeof |         y         | pg_typeof 
-----------+-----------+-------------------+-----------
- {11,1,2} | integer[] | {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 2:   from f1(11, '{1,2}', point(1,2), '(3,4)');
+                               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x), y, pg_typeof(y)
   from f1(11, array[1, 2.2], 42, 34.5);  -- fail
 ERROR:  function f1(integer, numeric[], integer, numeric) does not exist

@@ -1363,9 +1363,6 @@ drop role regress_partitioning_role;
 \dRp regression.mypub
 \dRs public.mysub
 \dRs regression.mysub
-\dT host.regression.public.widget
-\dT "regression{1,2}".public.widget
-\dT nonesuch.public.widget
 \dx regression.plpgsql
 \dx nonesuch.plpgsql
 \dX host.regression.public.func_deps_stat

@@ -627,57 +627,27 @@
 
 # btree macaddr
 
-{ amopfamily => 'btree/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '1',
-  amopopr => '<(macaddr,macaddr)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '2',
-  amopopr => '<=(macaddr,macaddr)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '3',
-  amopopr => '=(macaddr,macaddr)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '4',
-  amopopr => '>=(macaddr,macaddr)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '5',
-  amopopr => '>(macaddr,macaddr)', amopmethod => 'btree' },
+
+
+
+
+
 
 # btree macaddr8
 
-{ amopfamily => 'btree/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '1',
-  amopopr => '<(macaddr8,macaddr8)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '2',
-  amopopr => '<=(macaddr8,macaddr8)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '3',
-  amopopr => '=(macaddr8,macaddr8)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '4',
-  amopopr => '>=(macaddr8,macaddr8)', amopmethod => 'btree' },
-{ amopfamily => 'btree/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '5',
-  amopopr => '>(macaddr8,macaddr8)', amopmethod => 'btree' },
+
+
+
+
+
 
 # btree network
 
-{ amopfamily => 'btree/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '1', amopopr => '<(inet,inet)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '2', amopopr => '<=(inet,inet)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '3', amopopr => '=(inet,inet)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '4', amopopr => '>=(inet,inet)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '5', amopopr => '>(inet,inet)',
-  amopmethod => 'btree' },
+
+
+
+
+
 
 # btree numeric
 
@@ -922,9 +892,7 @@
   amopmethod => 'hash' },
 
 # network_ops
-{ amopfamily => 'hash/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '1', amopopr => '=(inet,inet)',
-  amopmethod => 'hash' },
+
 
 # integer_ops
 { amopfamily => 'hash/integer_ops', amoplefttype => 'int2',
@@ -961,14 +929,10 @@
   amopopr => '=(interval,interval)', amopmethod => 'hash' },
 
 # macaddr_ops
-{ amopfamily => 'hash/macaddr_ops', amoplefttype => 'macaddr',
-  amoprighttype => 'macaddr', amopstrategy => '1',
-  amopopr => '=(macaddr,macaddr)', amopmethod => 'hash' },
+
 
 # macaddr8_ops
-{ amopfamily => 'hash/macaddr8_ops', amoplefttype => 'macaddr8',
-  amoprighttype => 'macaddr8', amopstrategy => '1',
-  amopopr => '=(macaddr8,macaddr8)', amopmethod => 'hash' },
+
 
 # oid_ops
 { amopfamily => 'hash/oid_ops', amoplefttype => 'oid', amoprighttype => 'oid',
@@ -1080,154 +1044,59 @@
   amoprighttype => 'anyarray', amopstrategy => '1',
   amopopr => '=(anyarray,anyarray)', amopmethod => 'hash' },
 
-# gist box_ops
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '1', amopopr => '<<(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '2', amopopr => '&<(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '3', amopopr => '&&(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '4', amopopr => '&>(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '5', amopopr => '>>(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '6', amopopr => '~=(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '7', amopopr => '@>(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '8', amopopr => '<@(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '9', amopopr => '&<|(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '10', amopopr => '<<|(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '11', amopopr => '|>>(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'box',
-  amopstrategy => '12', amopopr => '|&>(box,box)', amopmethod => 'gist' },
-{ amopfamily => 'gist/box_ops', amoplefttype => 'box', amoprighttype => 'point',
-  amopstrategy => '15', amoppurpose => 'o', amopopr => '<->(box,point)',
-  amopmethod => 'gist', amopsortfamily => 'btree/float_ops' },
 
-# gist point_ops
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '11', amopopr => '|>>(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '30', amopopr => '>^(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '1', amopopr => '<<(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '5', amopopr => '>>(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '10', amopopr => '<<|(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '29', amopopr => '<^(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '6', amopopr => '~=(point,point)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'point', amopstrategy => '15', amoppurpose => 'o',
-  amopopr => '<->(point,point)', amopmethod => 'gist',
-  amopsortfamily => 'btree/float_ops' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'box', amopstrategy => '28', amopopr => '<@(point,box)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'polygon', amopstrategy => '48',
-  amopopr => '<@(point,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/point_ops', amoplefttype => 'point',
-  amoprighttype => 'circle', amopstrategy => '68',
-  amopopr => '<@(point,circle)', amopmethod => 'gist' },
 
-# gist poly_ops (supports polygons)
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '1',
-  amopopr => '<<(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '2',
-  amopopr => '&<(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '3',
-  amopopr => '&&(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '4',
-  amopopr => '&>(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '5',
-  amopopr => '>>(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '6',
-  amopopr => '~=(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '7',
-  amopopr => '@>(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '8',
-  amopopr => '<@(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '9',
-  amopopr => '&<|(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '10',
-  amopopr => '<<|(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '11',
-  amopopr => '|>>(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'polygon', amopstrategy => '12',
-  amopopr => '|&>(polygon,polygon)', amopmethod => 'gist' },
-{ amopfamily => 'gist/poly_ops', amoplefttype => 'polygon',
-  amoprighttype => 'point', amopstrategy => '15', amoppurpose => 'o',
-  amopopr => '<->(polygon,point)', amopmethod => 'gist',
-  amopsortfamily => 'btree/float_ops' },
 
-# gist circle_ops
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '1',
-  amopopr => '<<(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '2',
-  amopopr => '&<(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '3',
-  amopopr => '&&(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '4',
-  amopopr => '&>(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '5',
-  amopopr => '>>(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '6',
-  amopopr => '~=(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '7',
-  amopopr => '@>(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '8',
-  amopopr => '<@(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '9',
-  amopopr => '&<|(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '10',
-  amopopr => '<<|(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '11',
-  amopopr => '|>>(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'circle', amopstrategy => '12',
-  amopopr => '|&>(circle,circle)', amopmethod => 'gist' },
-{ amopfamily => 'gist/circle_ops', amoplefttype => 'circle',
-  amoprighttype => 'point', amopstrategy => '15', amoppurpose => 'o',
-  amopopr => '<->(circle,point)', amopmethod => 'gist',
-  amopsortfamily => 'btree/float_ops' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # gin array_ops
 { amopfamily => 'gin/array_ops', amoplefttype => 'anyarray',
@@ -1313,116 +1182,44 @@
   amopopr => '=(anyrange,anyrange)', amopmethod => 'hash' },
 
 # GiST range_ops
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '1',
-  amopopr => '<<(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '1',
-  amopopr => '<<(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '2',
-  amopopr => '&<(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '2',
-  amopopr => '&<(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '3',
-  amopopr => '&&(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '3',
-  amopopr => '&&(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '4',
-  amopopr => '&>(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '4',
-  amopopr => '&>(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '5',
-  amopopr => '>>(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '5',
-  amopopr => '>>(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '6',
-  amopopr => '-|-(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '6',
-  amopopr => '-|-(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '7',
-  amopopr => '@>(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '7',
-  amopopr => '@>(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '8',
-  amopopr => '<@(anyrange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anymultirange', amopstrategy => '8',
-  amopopr => '<@(anyrange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyelement', amopstrategy => '16',
-  amopopr => '@>(anyrange,anyelement)', amopmethod => 'gist' },
-{ amopfamily => 'gist/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '18',
-  amopopr => '=(anyrange,anyrange)', amopmethod => 'gist' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # GiST multirange_ops
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '1',
-  amopopr => '<<(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '1',
-  amopopr => '<<(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '2',
-  amopopr => '&<(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '2',
-  amopopr => '&<(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '3',
-  amopopr => '&&(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '3',
-  amopopr => '&&(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '4',
-  amopopr => '&>(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '4',
-  amopopr => '&>(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '5',
-  amopopr => '>>(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '5',
-  amopopr => '>>(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '6',
-  amopopr => '-|-(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '6',
-  amopopr => '-|-(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '7',
-  amopopr => '@>(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '7',
-  amopopr => '@>(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '8',
-  amopopr => '<@(anymultirange,anymultirange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyrange', amopstrategy => '8',
-  amopopr => '<@(anymultirange,anyrange)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anyelement', amopstrategy => '16',
-  amopopr => '@>(anymultirange,anyelement)', amopmethod => 'gist' },
-{ amopfamily => 'gist/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '18',
-  amopopr => '=(anymultirange,anymultirange)', amopmethod => 'gist' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # btree multirange_ops
 { amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
@@ -1492,53 +1289,25 @@
   amopopr => '@@(jsonb,jsonpath)', amopmethod => 'gin' },
 
 # GIN jsonb_path_ops
-{ amopfamily => 'gin/jsonb_path_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonb', amopstrategy => '7', amopopr => '@>(jsonb,jsonb)',
-  amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_path_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonpath', amopstrategy => '15',
-  amopopr => '@?(jsonb,jsonpath)', amopmethod => 'gin' },
-{ amopfamily => 'gin/jsonb_path_ops', amoplefttype => 'jsonb',
-  amoprighttype => 'jsonpath', amopstrategy => '16',
-  amopopr => '@@(jsonb,jsonpath)', amopmethod => 'gin' },
+
+
+
 
 
 
 
 # GiST inet_ops
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '3', amopopr => '&&(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '18', amopopr => '=(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '19', amopopr => '<>(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '20', amopopr => '<(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '21', amopopr => '<=(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '22', amopopr => '>(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '23', amopopr => '>=(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '24', amopopr => '<<(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '25', amopopr => '<<=(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '26', amopopr => '>>(inet,inet)',
-  amopmethod => 'gist' },
-{ amopfamily => 'gist/network_ops', amoplefttype => 'inet',
-  amoprighttype => 'inet', amopstrategy => '27', amopopr => '>>=(inet,inet)',
-  amopmethod => 'gist' },
+
+
+
+
+
+
+
+
+
+
+
 
 
 

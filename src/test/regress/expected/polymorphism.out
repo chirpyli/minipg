@@ -12,14 +12,10 @@ select polyf(42) as int, polyf(4.5) as num;
 (1 row)
 
 select polyf(point(3,4));  -- fail for lack of + operator
-ERROR:  operator does not exist: point + integer
-LINE 2:   select x + 1
-                   ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
-QUERY:  
-  select x + 1
-
-CONTEXT:  SQL function "polyf" during inlining
+ERROR:  function point(integer, integer) does not exist
+LINE 1: select polyf(point(3,4));
+                     ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function polyf(x anyelement);
 create function polyf(x anyelement) returns anyarray as $$
   select array[x + 1, x + 2]
@@ -159,18 +155,16 @@ select x, pg_typeof(x), y, pg_typeof(y)
 
 select x, pg_typeof(x), y, pg_typeof(y)
   from polyf(11, array[1, 2], point(1,2), point(3,4));
-    x     | pg_typeof |         y         | pg_typeof 
-----------+-----------+-------------------+-----------
- {11,1,2} | integer[] | {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 2:   from polyf(11, array[1, 2], point(1,2), point(3,4));
+                                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x), y, pg_typeof(y)
   from polyf(11, '{1,2}', point(1,2), '(3,4)');
-    x     | pg_typeof |         y         | pg_typeof 
-----------+-----------+-------------------+-----------
- {11,1,2} | integer[] | {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 2:   from polyf(11, '{1,2}', point(1,2), '(3,4)');
+                                  ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x), y, pg_typeof(y)
   from polyf(11, array[1, 2.2], 42, 34.5);  -- fail
 ERROR:  function polyf(integer, numeric[], integer, numeric) does not exist
@@ -1829,9 +1823,9 @@ select x, pg_typeof(x) from anyctest(11, 12.3) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, point(1,2)) x;  -- fail
-ERROR:  function anyctest(integer, point) does not exist
+ERROR:  function point(integer, integer) does not exist
 LINE 1: select x, pg_typeof(x) from anyctest(11, point(1,2)) x;
-                                    ^
+                                                 ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x) from anyctest('11', '12.3') x;  -- defaults to text
   x   | pg_typeof 
@@ -1891,9 +1885,9 @@ select x, pg_typeof(x) from anyctest(12.3, '{13,14.4}') x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[point(1,2)]) x;  -- fail
-ERROR:  function anyctest(integer, point[]) does not exist
+ERROR:  function point(integer, integer) does not exist
 LINE 1: select x, pg_typeof(x) from anyctest(11, array[point(1,2)]) ...
-                                    ^
+                                                       ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x) from anyctest(11, 12) x;  -- fail
 ERROR:  function anyctest(integer, integer) does not exist
@@ -2039,17 +2033,15 @@ select x, pg_typeof(x) from anyctest(11, array[1, 2], 42, 34.5) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[1, 2], point(1,2), point(3,4)) x;
-         x         | pg_typeof 
--------------------+-----------
- {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 1: ...ct x, pg_typeof(x) from anyctest(11, array[1, 2], point(1,2)...
+                                                             ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x) from anyctest(11, '{1,2}', point(1,2), '(3,4)') x;
-         x         | pg_typeof 
--------------------+-----------
- {"(1,2)","(3,4)"} | point[]
-(1 row)
-
+ERROR:  function point(integer, integer) does not exist
+LINE 1: select x, pg_typeof(x) from anyctest(11, '{1,2}', point(1,2)...
+                                                          ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x) from anyctest(11, array[1, 2.2], 42, 34.5) x;  -- fail
 ERROR:  function anyctest(integer, numeric[], integer, numeric) does not exist
 LINE 1: select x, pg_typeof(x) from anyctest(11, array[1, 2.2], 42, ...

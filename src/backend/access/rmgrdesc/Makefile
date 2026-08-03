@@ -14,7 +14,6 @@ OBJS = \
 	dbasedesc.o \
 	genericdesc.o \
 	gindesc.o \
-	gistdesc.o \
 	hashdesc.o \
 	heapdesc.o \
 	logicalmsgdesc.o \

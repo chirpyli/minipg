@@ -17,7 +17,6 @@
 
 #include <float.h>
 
-#include "access/gist_private.h"
 #include "access/hash.h"
 #include "access/heaptoast.h"
 #include "access/htup_details.h"
@@ -184,16 +183,6 @@ static relopt_int intRelOpts[] =
 										 * inserts */
 		},
 		HASH_DEFAULT_FILLFACTOR, HASH_MIN_FILLFACTOR, 100
-	},
-	{
-		{
-			"fillfactor",
-			"Packs gist index pages only to this percentage",
-			RELOPT_KIND_GIST,
-			ShareUpdateExclusiveLock	/* since it applies only to later
-										 * inserts */
-		},
-		GIST_DEFAULT_FILLFACTOR, GIST_MIN_FILLFACTOR, 100
 	},
 	{
 		{
@@ -452,14 +441,6 @@ relopt_enum_elt_def StdRdOptIndexCleanupValues[] =
 	{(const char *) NULL}		/* list terminator */
 };
 
-/* values from GistOptBufferingMode */
-relopt_enum_elt_def gistBufferingOptValues[] =
-{
-	{"auto", GIST_OPTION_BUFFERING_AUTO},
-	{"on", GIST_OPTION_BUFFERING_ON},
-	{"off", GIST_OPTION_BUFFERING_OFF},
-	{(const char *) NULL}		/* list terminator */
-};
 
 /* values from ViewOptCheckOption */
 relopt_enum_elt_def viewCheckOptValues[] =
@@ -481,17 +462,6 @@ static relopt_enum enumRelOpts[] =
 		},
 		StdRdOptIndexCleanupValues,
 		STDRD_OPTION_VACUUM_INDEX_CLEANUP_AUTO,
-		gettext_noop("Valid values are \"on\", \"off\", and \"auto\".")
-	},
-	{
-		{
-			"buffering",
-			"Enables buffering build for this GiST index",
-			RELOPT_KIND_GIST,
-			AccessExclusiveLock
-		},
-		gistBufferingOptValues,
-		GIST_OPTION_BUFFERING_AUTO,
 		gettext_noop("Valid values are \"on\", \"off\", and \"auto\".")
 	},
 	{

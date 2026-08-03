@@ -56,29 +56,9 @@ select prop,
          with ordinality as u(prop,ord)
  where a.amname = 'gist'
  order by ord;
-        prop        | AM | Index | Column 
---------------------+----+-------+--------
- asc                |    |       | f
- desc               |    |       | f
- nulls_first        |    |       | f
- nulls_last         |    |       | f
- orderable          |    |       | f
- distance_orderable |    |       | t
- returnable         |    |       | f
- search_array       |    |       | f
- search_nulls       |    |       | t
- clusterable        |    | t     | 
- index_scan         |    | t     | 
- bitmap_scan        |    | t     | 
- backward_scan      |    | f     | 
- can_order          | f  |       | 
- can_unique         | f  |       | 
- can_multi_col      | t  |       | 
- can_exclude        | t  |       | 
- can_include        | t  |       | 
- bogus              |    |       | 
-(19 rows)
-
+ERROR:  relation "gcircleind" does not exist
+LINE 3:        pg_index_has_property('gcircleind'::regclass, prop) a...
+                                     ^
 select prop,
        pg_index_column_has_property('onek_hundred'::regclass, 1, prop) as btree,
        pg_index_column_has_property('hash_i4_index'::regclass, 1, prop) as hash,
@@ -92,8 +72,8 @@ select prop,
                     'bogus']::text[])
          with ordinality as u(prop,ord)
  order by ord;
-ERROR:  relation "sp_radix_ind" does not exist
-LINE 5:        pg_index_column_has_property('sp_radix_ind'::regclass...
+ERROR:  relation "gcircleind" does not exist
+LINE 4:        pg_index_column_has_property('gcircleind'::regclass, ...
                                             ^
 select prop,
        pg_index_has_property('onek_hundred'::regclass, prop) as btree,
@@ -106,8 +86,8 @@ select prop,
                     'bogus']::text[])
          with ordinality as u(prop,ord)
  order by ord;
-ERROR:  relation "sp_radix_ind" does not exist
-LINE 5:        pg_index_has_property('sp_radix_ind'::regclass, prop)...
+ERROR:  relation "gcircleind" does not exist
+LINE 4:        pg_index_has_property('gcircleind'::regclass, prop) a...
                                      ^
 select amname, prop, pg_indexam_has_property(a.oid, prop) as p
   from pg_am a,
@@ -130,19 +110,13 @@ select amname, prop, pg_indexam_has_property(a.oid, prop) as p
  gin    | can_exclude   | f
  gin    | can_include   | f
  gin    | bogus         | 
- gist   | can_order     | f
- gist   | can_unique    | f
- gist   | can_multi_col | t
- gist   | can_exclude   | t
- gist   | can_include   | t
- gist   | bogus         | 
  hash   | can_order     | f
  hash   | can_unique    | f
  hash   | can_multi_col | f
  hash   | can_exclude   | t
  hash   | can_include   | f
  hash   | bogus         | 
-(24 rows)
+(18 rows)
 
 --
 -- additional checks for pg_index_column_has_property

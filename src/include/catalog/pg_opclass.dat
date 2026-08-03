@@ -34,10 +34,8 @@
   opcintype => 'char' },
 { opcmethod => 'hash', opcname => 'char_ops', opcfamily => 'hash/char_ops',
   opcintype => 'char' },
-{ opcmethod => 'btree', opcname => 'cidr_ops', opcfamily => 'btree/network_ops',
-  opcintype => 'inet', opcdefault => 'f' },
-{ opcmethod => 'hash', opcname => 'cidr_ops', opcfamily => 'hash/network_ops',
-  opcintype => 'inet', opcdefault => 'f' },
+
+
 { oid => '3122', oid_symbol => 'DATE_BTREE_OPS_OID',
   opcmethod => 'btree', opcname => 'date_ops',
   opcfamily => 'btree/datetime_ops', opcintype => 'date' },
@@ -52,12 +50,9 @@
   opcintype => 'float8' },
 { opcmethod => 'hash', opcname => 'float8_ops', opcfamily => 'hash/float_ops',
   opcintype => 'float8' },
-{ opcmethod => 'btree', opcname => 'inet_ops', opcfamily => 'btree/network_ops',
-  opcintype => 'inet' },
-{ opcmethod => 'hash', opcname => 'inet_ops', opcfamily => 'hash/network_ops',
-  opcintype => 'inet' },
-{ opcmethod => 'gist', opcname => 'inet_ops', opcfamily => 'gist/network_ops',
-  opcintype => 'inet', opcdefault => 'f' },
+
+
+
 { oid => '1979', oid_symbol => 'INT2_BTREE_OPS_OID',
   opcmethod => 'btree', opcname => 'int2_ops', opcfamily => 'btree/integer_ops',
   opcintype => 'int2' },
@@ -77,14 +72,10 @@
   opcfamily => 'btree/interval_ops', opcintype => 'interval' },
 { opcmethod => 'hash', opcname => 'interval_ops',
   opcfamily => 'hash/interval_ops', opcintype => 'interval' },
-{ opcmethod => 'btree', opcname => 'macaddr_ops',
-  opcfamily => 'btree/macaddr_ops', opcintype => 'macaddr' },
-{ opcmethod => 'hash', opcname => 'macaddr_ops',
-  opcfamily => 'hash/macaddr_ops', opcintype => 'macaddr' },
-{ opcmethod => 'btree', opcname => 'macaddr8_ops',
-  opcfamily => 'btree/macaddr8_ops', opcintype => 'macaddr8' },
-{ opcmethod => 'hash', opcname => 'macaddr8_ops',
-  opcfamily => 'hash/macaddr8_ops', opcintype => 'macaddr8' },
+
+
+
+
 
 # Here's an ugly little hack to save space in the system catalog indexes.
 # btree doesn't ordinarily allow a storage type different from input type;
@@ -190,14 +181,10 @@
   opcdefault => 'f' },
 { opcmethod => 'hash', opcname => 'aclitem_ops',
   opcfamily => 'hash/aclitem_ops', opcintype => 'aclitem' },
-{ opcmethod => 'gist', opcname => 'box_ops', opcfamily => 'gist/box_ops',
-  opcintype => 'box' },
-{ opcmethod => 'gist', opcname => 'point_ops', opcfamily => 'gist/point_ops',
-  opcintype => 'point', opckeytype => 'box' },
-{ opcmethod => 'gist', opcname => 'poly_ops', opcfamily => 'gist/poly_ops',
-  opcintype => 'polygon', opckeytype => 'box' },
-{ opcmethod => 'gist', opcname => 'circle_ops', opcfamily => 'gist/circle_ops',
-  opcintype => 'circle', opckeytype => 'box' },
+
+
+
+
 { opcmethod => 'gin', opcname => 'array_ops', opcfamily => 'gin/array_ops',
   opcintype => 'anyarray', opckeytype => 'anyelement' },
 { opcmethod => 'btree', opcname => 'uuid_ops', opcfamily => 'btree/uuid_ops',
@@ -221,24 +208,19 @@
   opcintype => 'anyrange' },
 { opcmethod => 'hash', opcname => 'range_ops', opcfamily => 'hash/range_ops',
   opcintype => 'anyrange' },
-{ opcmethod => 'gist', opcname => 'range_ops', opcfamily => 'gist/range_ops',
-  opcintype => 'anyrange' },
+
 { opcmethod => 'btree', opcname => 'multirange_ops',
   opcfamily => 'btree/multirange_ops', opcintype => 'anymultirange' },
 { opcmethod => 'hash', opcname => 'multirange_ops',
   opcfamily => 'hash/multirange_ops', opcintype => 'anymultirange' },
-{ opcmethod => 'gist', opcname => 'multirange_ops',
-  opcfamily => 'gist/multirange_ops', opcintype => 'anymultirange',
-  opckeytype => 'anyrange' },
+
 { opcmethod => 'btree', opcname => 'jsonb_ops', opcfamily => 'btree/jsonb_ops',
   opcintype => 'jsonb' },
 { opcmethod => 'hash', opcname => 'jsonb_ops', opcfamily => 'hash/jsonb_ops',
   opcintype => 'jsonb' },
 { opcmethod => 'gin', opcname => 'jsonb_ops', opcfamily => 'gin/jsonb_ops',
   opcintype => 'jsonb', opckeytype => 'text' },
-{ opcmethod => 'gin', opcname => 'jsonb_path_ops',
-  opcfamily => 'gin/jsonb_path_ops', opcintype => 'jsonb', opcdefault => 'f',
-  opckeytype => 'int4' },
+
 
 
 

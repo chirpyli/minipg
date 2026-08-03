@@ -267,9 +267,13 @@ CREATE OPERATOR FAMILY alt_opf2 USING hash;
 ALTER OPERATOR FAMILY alt_opf1 USING hash OWNER TO regress_alter_generic_user2;
 ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user2;
 CREATE OPERATOR CLASS alt_opc1 FOR TYPE macaddr USING hash AS STORAGE macaddr;
+ERROR:  type "macaddr" does not exist
 CREATE OPERATOR CLASS alt_opc2 FOR TYPE macaddr USING hash AS STORAGE macaddr;
+ERROR:  type "macaddr" does not exist
 ALTER OPERATOR CLASS alt_opc1 USING hash OWNER TO regress_alter_generic_user2;
+ERROR:  operator class "alt_opc1" does not exist for access method "hash"
 ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user2;
+ERROR:  operator class "alt_opc2" does not exist for access method "hash"
 SET SESSION AUTHORIZATION regress_alter_generic_user2;
 ALTER OPERATOR FAMILY alt_opf3 USING hash RENAME TO alt_opf4;	-- failed (not owner)
 ERROR:  must be owner of operator family alt_opf3
@@ -285,14 +289,15 @@ ERROR:  operator family "alt_opf2" for access method "hash" already exists in sc
 ALTER OPERATOR CLASS alt_opc3 USING hash RENAME TO alt_opc4;	-- failed (not owner)
 ERROR:  must be owner of operator class alt_opc3
 ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc4;  -- OK
+ERROR:  operator class "alt_opc1" does not exist for access method "hash"
 ALTER OPERATOR CLASS alt_opc3 USING hash OWNER TO regress_alter_generic_user2;  -- failed (not owner)
 ERROR:  must be owner of operator class alt_opc3
 ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  operator class "alt_opc2" does not exist for access method "hash"
 ALTER OPERATOR CLASS alt_opc3 USING hash SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  must be owner of operator class alt_opc3
 ALTER OPERATOR CLASS alt_opc2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
-ERROR:  operator class "alt_opc2" for access method "hash" already exists in schema "alt_nsp2"
+ERROR:  operator class "alt_opc2" does not exist for access method "hash"
 RESET SESSION AUTHORIZATION;
 SELECT nspname, opfname, amname, rolname
   FROM pg_opfamily o, pg_am m, pg_namespace n, pg_authid a
@@ -315,11 +320,9 @@ SELECT nspname, opcname, amname, rolname
   ORDER BY nspname, opcname;
  nspname  | opcname  | amname |           rolname           
 ----------+----------+--------+-----------------------------
- alt_nsp1 | alt_opc2 | hash   | regress_alter_generic_user2
  alt_nsp1 | alt_opc3 | hash   | regress_alter_generic_user1
- alt_nsp1 | alt_opc4 | hash   | regress_alter_generic_user2
  alt_nsp2 | alt_opc2 | hash   | regress_alter_generic_user3
-(4 rows)
+(2 rows)
 
 -- ALTER OPERATOR FAMILY ... ADD/DROP
 -- Should work. Textbook case of CREATE / ALTER ADD / ALTER DROP / DROP
@@ -395,8 +398,11 @@ ALTER OPERATOR FAMILY alt_opf8 USING btree ADD OPERATOR 1 < (int4, int4);
 DROP OPERATOR FAMILY alt_opf8 USING btree;
 -- Should work. Textbook case of ALTER OPERATOR FAMILY ... ADD OPERATOR with FOR ORDER BY
 CREATE OPERATOR FAMILY alt_opf9 USING gist;
+ERROR:  access method "gist" does not exist
 ALTER OPERATOR FAMILY alt_opf9 USING gist ADD OPERATOR 1 < (int4, int4) FOR ORDER BY float_ops;
+ERROR:  access method "gist" does not exist
 DROP OPERATOR FAMILY alt_opf9 USING gist;
+ERROR:  access method "gist" does not exist
 -- Should fail. Ensure correct ordering methods in ALTER OPERATOR FAMILY ... ADD OPERATOR .. FOR ORDER BY
 CREATE OPERATOR FAMILY alt_opf10 USING btree;
 ALTER OPERATOR FAMILY alt_opf10 USING btree ADD OPERATOR 1 < (int4, int4) FOR ORDER BY float_ops;
@@ -404,9 +410,13 @@ ERROR:  access method "btree" does not support ordering operators
 DROP OPERATOR FAMILY alt_opf10 USING btree;
 -- Should work. Textbook case of ALTER OPERATOR FAMILY ... ADD OPERATOR with FOR ORDER BY
 CREATE OPERATOR FAMILY alt_opf11 USING gist;
+ERROR:  access method "gist" does not exist
 ALTER OPERATOR FAMILY alt_opf11 USING gist ADD OPERATOR 1 < (int4, int4) FOR ORDER BY float_ops;
+ERROR:  access method "gist" does not exist
 ALTER OPERATOR FAMILY alt_opf11 USING gist DROP OPERATOR 1 (int4, int4);
+ERROR:  access method "gist" does not exist
 DROP OPERATOR FAMILY alt_opf11 USING gist;
+ERROR:  access method "gist" does not exist
 -- Should fail. btree comparison functions should return INTEGER in ALTER OPERATOR FAMILY ... ADD FUNCTION
 BEGIN TRANSACTION;
 CREATE OPERATOR FAMILY alt_opf12 USING btree;
@@ -446,9 +456,11 @@ ROLLBACK;
 -- Should fail. In gist throw an error when giving different data types for function argument
 -- without defining left / right type in ALTER OPERATOR FAMILY ... ADD FUNCTION
 CREATE OPERATOR FAMILY alt_opf16 USING gist;
+ERROR:  access method "gist" does not exist
 ALTER OPERATOR FAMILY alt_opf16 USING gist ADD FUNCTION 1 btint42cmp(int4, int2);
-ERROR:  associated data types must be specified for index support function
+ERROR:  access method "gist" does not exist
 DROP OPERATOR FAMILY alt_opf16 USING gist;
+ERROR:  access method "gist" does not exist
 -- Should fail. duplicate operator number / function number in ALTER OPERATOR FAMILY ... ADD FUNCTION
 CREATE OPERATOR FAMILY alt_opf17 USING btree;
 ALTER OPERATOR FAMILY alt_opf17 USING btree ADD OPERATOR 1 < (int4, int4), OPERATOR 1 < (int4, int4); -- operator # appears twice in same statement

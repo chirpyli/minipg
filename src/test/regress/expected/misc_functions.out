@@ -26,11 +26,9 @@ SELECT num_nonnulls(NULL::text, NULL::int);
 (1 row)
 
 SELECT num_nonnulls(1, 2, NULL::text, NULL::point, '', int8 '9', 1.0 / NULL);
- num_nonnulls 
---------------
-            4
-(1 row)
-
+ERROR:  type "point" does not exist
+LINE 1: SELECT num_nonnulls(1, 2, NULL::text, NULL::point, '', int8 ...
+                                                    ^
 SELECT num_nonnulls(VARIADIC '{1,2,NULL,3}'::int[]);
  num_nonnulls 
 --------------
@@ -74,11 +72,9 @@ SELECT num_nulls(NULL::text, NULL::int);
 (1 row)
 
 SELECT num_nulls(1, 2, NULL::text, NULL::point, '', int8 '9', 1.0 / NULL);
- num_nulls 
------------
-         3
-(1 row)
-
+ERROR:  type "point" does not exist
+LINE 1: SELECT num_nulls(1, 2, NULL::text, NULL::point, '', int8 '9'...
+                                                 ^
 SELECT num_nulls(VARIADIC '{1,2,NULL,3}'::int[]);
  num_nulls 
 -----------

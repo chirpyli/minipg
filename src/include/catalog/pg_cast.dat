@@ -363,48 +363,29 @@
   castcontext => 'a', castmethod => 'f' },
 
 # Geometric category
-{ castsource => 'point', casttarget => 'box', castfunc => 'box(point)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'lseg', casttarget => 'point', castfunc => 'point(lseg)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'path', casttarget => 'point', castfunc => 'point(path)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'path', casttarget => 'polygon', castfunc => 'polygon(path)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'box', casttarget => 'point', castfunc => 'point(box)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'box', casttarget => 'lseg', castfunc => 'lseg(box)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'box', casttarget => 'polygon', castfunc => 'polygon(box)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'box', casttarget => 'circle', castfunc => 'circle(box)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'polygon', casttarget => 'point', castfunc => 'point(polygon)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'polygon', casttarget => 'path', castfunc => 'path',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'polygon', casttarget => 'box', castfunc => 'box(polygon)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'polygon', casttarget => 'circle',
-  castfunc => 'circle(polygon)', castcontext => 'e', castmethod => 'f' },
-{ castsource => 'circle', casttarget => 'point', castfunc => 'point(circle)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'circle', casttarget => 'box', castfunc => 'box(circle)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'circle', casttarget => 'polygon',
-  castfunc => 'polygon(circle)', castcontext => 'e', castmethod => 'f' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # MAC address category
-{ castsource => 'macaddr', casttarget => 'macaddr8', castfunc => 'macaddr8',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'macaddr8', casttarget => 'macaddr', castfunc => 'macaddr',
-  castcontext => 'i', castmethod => 'f' },
+
+
 
 # INET category
-{ castsource => 'cidr', casttarget => 'inet', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'inet', casttarget => 'cidr', castfunc => 'cidr',
-  castcontext => 'a', castmethod => 'f' },
+
+
 
 # BitString category
 { castsource => 'bit', casttarget => 'varbit', castfunc => '0',
@@ -430,10 +411,8 @@
 # parse_coerce.c's automatic casts ('a' to text, 'e' from text) else odd
 # behavior will ensue when the automatic cast is applied instead of the
 # pg_cast entry!
-{ castsource => 'cidr', casttarget => 'text', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'inet', casttarget => 'text', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
+
+
 { castsource => 'bool', casttarget => 'text', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'xml', casttarget => 'text', castfunc => '0',
@@ -443,10 +422,8 @@
 
 # Cross-category casts to and from VARCHAR
 # We support all the same casts as for TEXT.
-{ castsource => 'cidr', casttarget => 'varchar', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'inet', casttarget => 'varchar', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
+
+
 { castsource => 'bool', casttarget => 'varchar', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'xml', casttarget => 'varchar', castfunc => '0',
@@ -456,10 +433,8 @@
 
 # Cross-category casts to and from BPCHAR
 # We support all the same casts as for TEXT.
-{ castsource => 'cidr', casttarget => 'bpchar', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'inet', casttarget => 'bpchar', castfunc => 'text(inet)',
-  castcontext => 'a', castmethod => 'f' },
+
+
 { castsource => 'bool', casttarget => 'bpchar', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'xml', casttarget => 'bpchar', castfunc => '0',

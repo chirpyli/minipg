@@ -23,6 +23,9 @@ ALTER TABLE attmp ADD COLUMN d float8;
 ALTER TABLE attmp ADD COLUMN e float4;
 ALTER TABLE attmp ADD COLUMN f int2;
 ALTER TABLE attmp ADD COLUMN g polygon;
+ERROR:  type "polygon" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN g polygon;
+                                       ^
 ALTER TABLE attmp ADD COLUMN i char;
 ALTER TABLE attmp ADD COLUMN k int4;
 ALTER TABLE attmp ADD COLUMN l tid;
@@ -31,9 +34,21 @@ ALTER TABLE attmp ADD COLUMN n oidvector;
 --ALTER TABLE attmp ADD COLUMN o lock;
 ALTER TABLE attmp ADD COLUMN p boolean;
 ALTER TABLE attmp ADD COLUMN q point;
+ERROR:  type "point" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN q point;
+                                       ^
 ALTER TABLE attmp ADD COLUMN r lseg;
+ERROR:  type "lseg" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN r lseg;
+                                       ^
 ALTER TABLE attmp ADD COLUMN s path;
+ERROR:  type "path" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN s path;
+                                       ^
 ALTER TABLE attmp ADD COLUMN t box;
+ERROR:  type "box" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN t box;
+                                       ^
 ALTER TABLE attmp ADD COLUMN v timestamp;
 ALTER TABLE attmp ADD COLUMN w interval;
 ALTER TABLE attmp ADD COLUMN x float8[];
@@ -47,11 +62,13 @@ INSERT INTO attmp (a, b, c, d, e, f, g,    i,    k, l, m, n, p, q, r, s, t,
 	'1 2 3 4 5 6 7 8', true, '(1.1,1.1)', '(4.1,4.1,3.1,3.1)',
 	'(0,2,4.1,4.1,3.1,3.1)', '(4.1,4.1,3.1,3.1)',
 	'epoch', '01:00:10', '{1.0,2.0,3.0,4.0}', '{1.0,2.0,3.0,4.0}', '{1,2,3,4}');
+ERROR:  column "g" of relation "attmp" does not exist
+LINE 1: INSERT INTO attmp (a, b, c, d, e, f, g,    i,    k, l, m, n,...
+                                             ^
 SELECT * FROM attmp;
- initial | a |  b   |  c   |  d  |  e  | f |           g           | i |   k    |   l   |  m  |        n        | p |     q     |           r           |              s              |          t          |            v             |        w         |     x     |     y     |     z     
----------+---+------+------+-----+-----+---+-----------------------+---+--------+-------+-----+-----------------+---+-----------+-----------------------+-----------------------------+---------------------+--------------------------+------------------+-----------+-----------+-----------
-         | 4 | name | text | 4.1 | 4.1 | 2 | ((4.1,4.1),(3.1,3.1)) | c | 314159 | (1,1) | 512 | 1 2 3 4 5 6 7 8 | t | (1.1,1.1) | [(4.1,4.1),(3.1,3.1)] | ((0,2),(4.1,4.1),(3.1,3.1)) | (4.1,4.1),(3.1,3.1) | Thu Jan 01 00:00:00 1970 | @ 1 hour 10 secs | {1,2,3,4} | {1,2,3,4} | {1,2,3,4}
-(1 row)
+ initial | a | b | c | d | e | f | i | k | l | m | n | p | v | w | x | y | z 
+---------+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+(0 rows)
 
 DROP TABLE attmp;
 -- the wolf bug - schema mods caused inconsistent row descriptors
@@ -65,6 +82,9 @@ ALTER TABLE attmp ADD COLUMN d float8;
 ALTER TABLE attmp ADD COLUMN e float4;
 ALTER TABLE attmp ADD COLUMN f int2;
 ALTER TABLE attmp ADD COLUMN g polygon;
+ERROR:  type "polygon" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN g polygon;
+                                       ^
 ALTER TABLE attmp ADD COLUMN i char;
 ALTER TABLE attmp ADD COLUMN k int4;
 ALTER TABLE attmp ADD COLUMN l tid;
@@ -73,9 +93,21 @@ ALTER TABLE attmp ADD COLUMN n oidvector;
 --ALTER TABLE attmp ADD COLUMN o lock;
 ALTER TABLE attmp ADD COLUMN p boolean;
 ALTER TABLE attmp ADD COLUMN q point;
+ERROR:  type "point" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN q point;
+                                       ^
 ALTER TABLE attmp ADD COLUMN r lseg;
+ERROR:  type "lseg" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN r lseg;
+                                       ^
 ALTER TABLE attmp ADD COLUMN s path;
+ERROR:  type "path" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN s path;
+                                       ^
 ALTER TABLE attmp ADD COLUMN t box;
+ERROR:  type "box" does not exist
+LINE 1: ALTER TABLE attmp ADD COLUMN t box;
+                                       ^
 ALTER TABLE attmp ADD COLUMN v timestamp;
 ALTER TABLE attmp ADD COLUMN w interval;
 ALTER TABLE attmp ADD COLUMN x float8[];
@@ -89,11 +121,13 @@ INSERT INTO attmp (a, b, c, d, e, f, g,    i,   k, l, m, n, p, q, r, s, t,
 	'1 2 3 4 5 6 7 8', true, '(1.1,1.1)', '(4.1,4.1,3.1,3.1)',
 	'(0,2,4.1,4.1,3.1,3.1)', '(4.1,4.1,3.1,3.1)',
 	'epoch', '01:00:10', '{1.0,2.0,3.0,4.0}', '{1.0,2.0,3.0,4.0}', '{1,2,3,4}');
+ERROR:  column "g" of relation "attmp" does not exist
+LINE 1: INSERT INTO attmp (a, b, c, d, e, f, g,    i,   k, l, m, n, ...
+                                             ^
 SELECT * FROM attmp;
- initial | a |  b   |  c   |  d  |  e  | f |           g           | i |   k    |   l   |  m  |        n        | p |     q     |           r           |              s              |          t          |            v             |        w         |     x     |     y     |     z     
----------+---+------+------+-----+-----+---+-----------------------+---+--------+-------+-----+-----------------+---+-----------+-----------------------+-----------------------------+---------------------+--------------------------+------------------+-----------+-----------+-----------
-         | 4 | name | text | 4.1 | 4.1 | 2 | ((4.1,4.1),(3.1,3.1)) | c | 314159 | (1,1) | 512 | 1 2 3 4 5 6 7 8 | t | (1.1,1.1) | [(4.1,4.1),(3.1,3.1)] | ((0,2),(4.1,4.1),(3.1,3.1)) | (4.1,4.1),(3.1,3.1) | Thu Jan 01 00:00:00 1970 | @ 1 hour 10 secs | {1,2,3,4} | {1,2,3,4} | {1,2,3,4}
-(1 row)
+ initial | a | b | c | d | e | f | i | k | l | m | n | p | v | w | x | y | z 
+---------+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+(0 rows)
 
 CREATE INDEX attmp_idx ON attmp (a, (d + e), b);
 ALTER INDEX attmp_idx ALTER COLUMN 0 SET STATISTICS 1000;
@@ -661,16 +695,18 @@ Inherits: nv_parent
 CREATE TEMP TABLE PKTABLE (ptest1 int PRIMARY KEY);
 INSERT INTO PKTABLE VALUES(42);
 CREATE TEMP TABLE FKTABLE (ftest1 inet);
+ERROR:  type "inet" does not exist
+LINE 1: CREATE TEMP TABLE FKTABLE (ftest1 inet);
+                                          ^
 -- This next should fail, because int=inet does not exist
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest1) references pktable;
-ERROR:  foreign key constraint "fktable_ftest1_fkey" cannot be implemented
-DETAIL:  Key columns "ftest1" and "ptest1" are of incompatible types: inet and integer.
+ERROR:  relation "fktable" does not exist
 -- This should also fail for the same reason, but here we
 -- give the column name
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest1) references pktable(ptest1);
-ERROR:  foreign key constraint "fktable_ftest1_fkey" cannot be implemented
-DETAIL:  Key columns "ftest1" and "ptest1" are of incompatible types: inet and integer.
+ERROR:  relation "fktable" does not exist
 DROP TABLE FKTABLE;
+ERROR:  table "fktable" does not exist
 -- This should succeed, even though they are different types,
 -- because int=int8 exists and is a member of the integer opfamily
 CREATE TEMP TABLE FKTABLE (ftest1 int8);
@@ -705,32 +741,44 @@ DROP TABLE FKTABLE;
 DROP TABLE PKTABLE;
 CREATE TEMP TABLE PKTABLE (ptest1 int, ptest2 inet,
                            PRIMARY KEY(ptest1, ptest2));
+ERROR:  type "inet" does not exist
+LINE 1: CREATE TEMP TABLE PKTABLE (ptest1 int, ptest2 inet,
+                                                      ^
 -- This should fail, because we just chose really odd types
 CREATE TEMP TABLE FKTABLE (ftest1 cidr, ftest2 timestamp);
+ERROR:  type "cidr" does not exist
+LINE 1: CREATE TEMP TABLE FKTABLE (ftest1 cidr, ftest2 timestamp);
+                                          ^
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest1, ftest2) references pktable;
-ERROR:  foreign key constraint "fktable_ftest1_ftest2_fkey" cannot be implemented
-DETAIL:  Key columns "ftest1" and "ptest1" are of incompatible types: cidr and integer.
+ERROR:  relation "fktable" does not exist
 DROP TABLE FKTABLE;
+ERROR:  table "fktable" does not exist
 -- Again, so should this...
 CREATE TEMP TABLE FKTABLE (ftest1 cidr, ftest2 timestamp);
+ERROR:  type "cidr" does not exist
+LINE 1: CREATE TEMP TABLE FKTABLE (ftest1 cidr, ftest2 timestamp);
+                                          ^
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest1, ftest2)
      references pktable(ptest1, ptest2);
-ERROR:  foreign key constraint "fktable_ftest1_ftest2_fkey" cannot be implemented
-DETAIL:  Key columns "ftest1" and "ptest1" are of incompatible types: cidr and integer.
+ERROR:  relation "fktable" does not exist
 DROP TABLE FKTABLE;
+ERROR:  table "fktable" does not exist
 -- This fails because we mixed up the column ordering
 CREATE TEMP TABLE FKTABLE (ftest1 int, ftest2 inet);
+ERROR:  type "inet" does not exist
+LINE 1: CREATE TEMP TABLE FKTABLE (ftest1 int, ftest2 inet);
+                                                      ^
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest1, ftest2)
      references pktable(ptest2, ptest1);
-ERROR:  foreign key constraint "fktable_ftest1_ftest2_fkey" cannot be implemented
-DETAIL:  Key columns "ftest1" and "ptest2" are of incompatible types: integer and inet.
+ERROR:  relation "fktable" does not exist
 -- As does this...
 ALTER TABLE FKTABLE ADD FOREIGN KEY(ftest2, ftest1)
      references pktable(ptest1, ptest2);
-ERROR:  foreign key constraint "fktable_ftest2_ftest1_fkey" cannot be implemented
-DETAIL:  Key columns "ftest2" and "ptest1" are of incompatible types: inet and integer.
+ERROR:  relation "fktable" does not exist
 DROP TABLE FKTABLE;
+ERROR:  table "fktable" does not exist
 DROP TABLE PKTABLE;
+ERROR:  table "pktable" does not exist
 -- Test that ALTER CONSTRAINT updates trigger deferrability properly
 CREATE TEMP TABLE PKTABLE (ptest1 int primary key);
 CREATE TEMP TABLE FKTABLE (ftest1 int);
@@ -3265,7 +3313,9 @@ DROP TYPE test_type_empty;
 -- typed tables: OF / NOT OF
 --
 CREATE TYPE tt_t0 AS (z inet, x int, y numeric(8,2));
+ERROR:  type "inet" does not exist
 ALTER TYPE tt_t0 DROP ATTRIBUTE z;
+ERROR:  relation "tt_t0" does not exist
 CREATE TABLE tt0 (x int NOT NULL, y numeric(8,2));	-- OK
 CREATE TABLE tt1 (x int, y bigint);					-- wrong base type
 CREATE TABLE tt2 (x int, y numeric(9,2));			-- wrong typmod
@@ -3276,19 +3326,21 @@ CREATE TABLE tt6 () INHERITS (tt0);					-- can't have a parent
 CREATE TABLE tt7 (x int, q text, y numeric(8,2));
 ALTER TABLE tt7 DROP q;								-- OK
 ALTER TABLE tt0 OF tt_t0;
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt1 OF tt_t0;
-ERROR:  table "tt1" has different type for column "y"
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt2 OF tt_t0;
-ERROR:  table "tt2" has different type for column "y"
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt3 OF tt_t0;
-ERROR:  table has column "y" where type requires "x"
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt4 OF tt_t0;
-ERROR:  table is missing column "y"
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt5 OF tt_t0;
-ERROR:  table has extra column "z"
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt6 OF tt_t0;
-ERROR:  typed tables cannot inherit
+ERROR:  type "tt_t0" does not exist
 ALTER TABLE tt7 OF tt_t0;
+ERROR:  type "tt_t0" does not exist
 CREATE TYPE tt_t1 AS (x int, y numeric(8,2));
 ALTER TABLE tt7 OF tt_t1;			-- reassign an already-typed table
 ALTER TABLE tt7 NOT OF;

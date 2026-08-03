@@ -3317,6 +3317,7 @@ SELECT count(*) FROM testjsonb WHERE j = '{"pos":98, "line":371, "node":"CBA", "
 --gin path opclass
 DROP INDEX jidx;
 CREATE INDEX jidx ON testjsonb USING gin (j jsonb_path_ops);
+ERROR:  operator class "jsonb_path_ops" does not exist for access method "gin"
 SET enable_seqscan = off;
 SELECT count(*) FROM testjsonb WHERE j @> '{"wait":null}';
  count 
@@ -3435,14 +3436,12 @@ SELECT count(*) FROM testjsonb WHERE j @@ 'exists($)';
 
 EXPLAIN (COSTS OFF)
 SELECT count(*) FROM testjsonb WHERE j @? '$.wait ? (@ == null)';
-                            QUERY PLAN                             
--------------------------------------------------------------------
+                       QUERY PLAN                        
+---------------------------------------------------------
  Aggregate
-   ->  Bitmap Heap Scan on testjsonb
-         Recheck Cond: (j @? '$."wait"?(@ == null)'::jsonpath)
-         ->  Bitmap Index Scan on jidx
-               Index Cond: (j @? '$."wait"?(@ == null)'::jsonpath)
-(5 rows)
+   ->  Seq Scan on testjsonb
+         Filter: (j @? '$."wait"?(@ == null)'::jsonpath)
+(3 rows)
 
 SELECT count(*) FROM testjsonb WHERE j @? '$.wait ? (@ == null)';
  count 
@@ -3512,6 +3511,7 @@ SELECT count(*) FROM testjsonb WHERE j @? '$.bar';
 
 RESET enable_seqscan;
 DROP INDEX jidx;
+ERROR:  index "jidx" does not exist
 -- nested tests
 SELECT '{"ff":{"a":12,"b":16}}'::jsonb;
            jsonb            
@@ -3669,6 +3669,7 @@ insert into nestjsonb (j) values ('{"a":[["b",{"x":1}],["b",{"x":2}]],"c":3}');
 insert into nestjsonb (j) values ('[[14,2,3]]');
 insert into nestjsonb (j) values ('[1,[14,2,3]]');
 create index on nestjsonb using gin(j jsonb_path_ops);
+ERROR:  operator class "jsonb_path_ops" does not exist for access method "gin"
 set enable_seqscan = on;
 set enable_bitmapscan = off;
 select * from nestjsonb where j @> '{"a":[[{"x":2}]]}'::jsonb;

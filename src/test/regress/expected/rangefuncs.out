@@ -1883,9 +1883,9 @@ select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
 
 -- and if it doesn't work, you get a compile-time not run-time error
 select * from array_to_set(array['one', 'two']) as t(f1 point,f2 text);
-ERROR:  return type mismatch in function declared to return record
-DETAIL:  Final statement returns integer instead of point at column 1.
-CONTEXT:  SQL function "array_to_set" during startup
+ERROR:  type "point" does not exist
+LINE 1: ... * from array_to_set(array['one', 'two']) as t(f1 point,f2 t...
+                                                             ^
 -- with "strict", this function can't be inlined in FROM
 explain (verbose, costs off)
   select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
@@ -1922,9 +1922,9 @@ select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
 (2 rows)
 
 select * from array_to_set(array['one', 'two']) as t(f1 point,f2 text);
-ERROR:  return type mismatch in function declared to return record
-DETAIL:  Final statement returns integer instead of point at column 1.
-CONTEXT:  SQL function "array_to_set" during inlining
+ERROR:  type "point" does not exist
+LINE 1: ... * from array_to_set(array['one', 'two']) as t(f1 point,f2 t...
+                                                             ^
 explain (verbose, costs off)
   select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
                           QUERY PLAN                          

@@ -313,131 +313,40 @@
 { oid => '484', descr => 'negate',
   oprname => '-', oprkind => 'l', oprleft => '0', oprright => 'int8',
   oprresult => 'int8', oprcode => 'int8um' },
-{ oid => '485', descr => 'is left of',
-  oprname => '<<', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_left', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '486', descr => 'overlaps or is left of',
-  oprname => '&<', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_overleft', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '487', descr => 'overlaps or is right of',
-  oprname => '&>', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_overright', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '488', descr => 'is right of',
-  oprname => '>>', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_right', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '489', descr => 'is contained by',
-  oprname => '<@', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcom => '@>(polygon,polygon)',
-  oprcode => 'poly_contained', oprrest => 'contsel', oprjoin => 'contjoinsel' },
-{ oid => '490', descr => 'contains',
-  oprname => '@>', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcom => '<@(polygon,polygon)',
-  oprcode => 'poly_contain', oprrest => 'contsel', oprjoin => 'contjoinsel' },
-{ oid => '491', descr => 'same as',
-  oprname => '~=', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcom => '~=(polygon,polygon)', oprcode => 'poly_same',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '492', descr => 'overlaps',
-  oprname => '&&', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcom => '&&(polygon,polygon)',
-  oprcode => 'poly_overlap', oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '493', descr => 'is left of',
-  oprname => '<<', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_left', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '494', descr => 'overlaps or is left of',
-  oprname => '&<', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_overleft', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '495', descr => 'overlaps or is right of',
-  oprname => '&>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_overright', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '496', descr => 'is right of',
-  oprname => '>>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_right', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '497', descr => 'is contained by',
-  oprname => '<@', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '@>(box,box)', oprcode => 'box_contained', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '498', descr => 'contains',
-  oprname => '@>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '<@(box,box)', oprcode => 'box_contain', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '499', descr => 'same as',
-  oprname => '~=', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '~=(box,box)', oprcode => 'box_same', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '500', descr => 'overlaps',
-  oprname => '&&', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '&&(box,box)', oprcode => 'box_overlap', oprrest => 'areasel',
-  oprjoin => 'areajoinsel' },
-{ oid => '501', descr => 'greater than or equal by area',
-  oprname => '>=', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '<=(box,box)', oprnegate => '<(box,box)', oprcode => 'box_ge',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '502', descr => 'greater than by area',
-  oprname => '>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '<(box,box)', oprnegate => '<=(box,box)', oprcode => 'box_gt',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '503', descr => 'equal by area',
-  oprname => '=', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '=(box,box)', oprcode => 'box_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '504', descr => 'less than by area',
-  oprname => '<', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '>(box,box)', oprnegate => '>=(box,box)', oprcode => 'box_lt',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '505', descr => 'less than or equal by area',
-  oprname => '<=', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcom => '>=(box,box)', oprnegate => '>(box,box)', oprcode => 'box_le',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '506', descr => 'deprecated, use |>> instead',
-  oprname => '>^', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcode => 'point_above', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '507', descr => 'is left of',
-  oprname => '<<', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcode => 'point_left', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '508', descr => 'is right of',
-  oprname => '>>', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcode => 'point_right', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '509', descr => 'deprecated, use <<| instead',
-  oprname => '<^', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcode => 'point_below', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '510', descr => 'same as',
-  oprname => '~=', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcom => '~=(point,point)', oprnegate => '<>(point,point)',
-  oprcode => 'point_eq', oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '511', descr => 'point inside box',
-  oprname => '<@', oprleft => 'point', oprright => 'box', oprresult => 'bool',
-  oprcom => '@>(box,point)', oprcode => 'on_pb', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '433', descr => 'contains',
-  oprname => '@>', oprleft => 'box', oprright => 'point', oprresult => 'bool',
-  oprcom => '<@(point,box)', oprcode => 'box_contain_pt', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '512', descr => 'point within closed path, or point on open path',
-  oprname => '<@', oprleft => 'point', oprright => 'path', oprresult => 'bool',
-  oprcom => '@>(path,point)', oprcode => 'on_ppath' },
-{ oid => '513', descr => 'center of',
-  oprname => '@@', oprkind => 'l', oprleft => '0', oprright => 'box',
-  oprresult => 'point', oprcode => 'box_center' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { oid => '514', descr => 'multiply',
   oprname => '*', oprleft => 'int4', oprright => 'int4', oprresult => 'int4',
   oprcom => '*(int4,int4)', oprcode => 'int4mul' },
-{ oid => '517', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,point)',
-  oprcode => 'point_distance' },
+
 { oid => '518', descr => 'not equal',
   oprname => '<>', oprleft => 'int4', oprright => 'int4', oprresult => 'bool',
   oprcom => '<>(int4,int4)', oprnegate => '=(int4,int4)', oprcode => 'int4ne',
@@ -681,42 +590,18 @@
   oprcom => '=(oidvector,oidvector)', oprnegate => '<>(oidvector,oidvector)',
   oprcode => 'oidvectoreq', oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
 
-{ oid => '613', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'line',
-  oprresult => 'float8', oprcom => '<->(line,point)', oprcode => 'dist_pl' },
-{ oid => '760', descr => 'distance between',
-  oprname => '<->', oprleft => 'line', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,line)', oprcode => 'dist_lp' },
-{ oid => '614', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'lseg',
-  oprresult => 'float8', oprcom => '<->(lseg,point)', oprcode => 'dist_ps' },
-{ oid => '761', descr => 'distance between',
-  oprname => '<->', oprleft => 'lseg', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,lseg)', oprcode => 'dist_sp' },
-{ oid => '615', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'box',
-  oprresult => 'float8', oprcom => '<->(box,point)', oprcode => 'dist_pb' },
-{ oid => '606', descr => 'distance between',
-  oprname => '<->', oprleft => 'box', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,box)', oprcode => 'dist_bp' },
-{ oid => '616', descr => 'distance between',
-  oprname => '<->', oprleft => 'lseg', oprright => 'line',
-  oprresult => 'float8', oprcom => '<->(line,lseg)', oprcode => 'dist_sl' },
-{ oid => '762', descr => 'distance between',
-  oprname => '<->', oprleft => 'line', oprright => 'lseg',
-  oprresult => 'float8', oprcom => '<->(lseg,line)', oprcode => 'dist_ls' },
-{ oid => '617', descr => 'distance between',
-  oprname => '<->', oprleft => 'lseg', oprright => 'box', oprresult => 'float8',
-  oprcom => '<->(box,lseg)', oprcode => 'dist_sb' },
-{ oid => '763', descr => 'distance between',
-  oprname => '<->', oprleft => 'box', oprright => 'lseg', oprresult => 'float8',
-  oprcom => '<->(lseg,box)', oprcode => 'dist_bs' },
-{ oid => '618', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'path',
-  oprresult => 'float8', oprcom => '<->(path,point)', oprcode => 'dist_ppath' },
-{ oid => '784', descr => 'distance between',
-  oprname => '<->', oprleft => 'path', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,path)', oprcode => 'dist_pathp' },
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '620', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'float4',
@@ -927,145 +812,53 @@
   oprname => '/', oprleft => 'int2', oprright => 'int8', oprresult => 'int8',
   oprcode => 'int28div' },
 
-{ oid => '706', descr => 'distance between',
-  oprname => '<->', oprleft => 'box', oprright => 'box', oprresult => 'float8',
-  oprcom => '<->(box,box)', oprcode => 'box_distance' },
-{ oid => '707', descr => 'distance between',
-  oprname => '<->', oprleft => 'path', oprright => 'path',
-  oprresult => 'float8', oprcom => '<->(path,path)',
-  oprcode => 'path_distance' },
-{ oid => '708', descr => 'distance between',
-  oprname => '<->', oprleft => 'line', oprright => 'line',
-  oprresult => 'float8', oprcom => '<->(line,line)',
-  oprcode => 'line_distance' },
-{ oid => '709', descr => 'distance between',
-  oprname => '<->', oprleft => 'lseg', oprright => 'lseg',
-  oprresult => 'float8', oprcom => '<->(lseg,lseg)',
-  oprcode => 'lseg_distance' },
-{ oid => '712', descr => 'distance between',
-  oprname => '<->', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'float8', oprcom => '<->(polygon,polygon)',
-  oprcode => 'poly_distance' },
 
-{ oid => '713', descr => 'not equal',
-  oprname => '<>', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcom => '<>(point,point)', oprnegate => '~=(point,point)',
-  oprcode => 'point_ne', oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
+
+
+
+
+
+
 
 # add translation/rotation/scaling operators for geometric types. - thomas 97/05/10
-{ oid => '731', descr => 'add points (translate)',
-  oprname => '+', oprleft => 'point', oprright => 'point', oprresult => 'point',
-  oprcom => '+(point,point)', oprcode => 'point_add' },
-{ oid => '732', descr => 'subtract points (translate)',
-  oprname => '-', oprleft => 'point', oprright => 'point', oprresult => 'point',
-  oprcode => 'point_sub' },
-{ oid => '733', descr => 'multiply points (scale/rotate)',
-  oprname => '*', oprleft => 'point', oprright => 'point', oprresult => 'point',
-  oprcom => '*(point,point)', oprcode => 'point_mul' },
-{ oid => '734', descr => 'divide points (scale/rotate)',
-  oprname => '/', oprleft => 'point', oprright => 'point', oprresult => 'point',
-  oprcode => 'point_div' },
-{ oid => '735', descr => 'concatenate',
-  oprname => '+', oprleft => 'path', oprright => 'path', oprresult => 'path',
-  oprcom => '+(path,path)', oprcode => 'path_add' },
-{ oid => '736', descr => 'add (translate path)',
-  oprname => '+', oprleft => 'path', oprright => 'point', oprresult => 'path',
-  oprcode => 'path_add_pt' },
-{ oid => '737', descr => 'subtract (translate path)',
-  oprname => '-', oprleft => 'path', oprright => 'point', oprresult => 'path',
-  oprcode => 'path_sub_pt' },
-{ oid => '738', descr => 'multiply (rotate/scale path)',
-  oprname => '*', oprleft => 'path', oprright => 'point', oprresult => 'path',
-  oprcode => 'path_mul_pt' },
-{ oid => '739', descr => 'divide (rotate/scale path)',
-  oprname => '/', oprleft => 'path', oprright => 'point', oprresult => 'path',
-  oprcode => 'path_div_pt' },
-{ oid => '755', descr => 'contains',
-  oprname => '@>', oprleft => 'path', oprright => 'point', oprresult => 'bool',
-  oprcom => '<@(point,path)', oprcode => 'path_contain_pt' },
-{ oid => '756', descr => 'is contained by',
-  oprname => '<@', oprleft => 'point', oprright => 'polygon',
-  oprresult => 'bool', oprcom => '@>(polygon,point)',
-  oprcode => 'pt_contained_poly', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '757', descr => 'contains',
-  oprname => '@>', oprleft => 'polygon', oprright => 'point',
-  oprresult => 'bool', oprcom => '<@(point,polygon)',
-  oprcode => 'poly_contain_pt', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '758', descr => 'is contained by',
-  oprname => '<@', oprleft => 'point', oprright => 'circle',
-  oprresult => 'bool', oprcom => '@>(circle,point)',
-  oprcode => 'pt_contained_circle', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '759', descr => 'contains',
-  oprname => '@>', oprleft => 'circle', oprright => 'point',
-  oprresult => 'bool', oprcom => '<@(point,circle)',
-  oprcode => 'circle_contain_pt', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '773', descr => 'absolute value',
   oprname => '@', oprkind => 'l', oprleft => '0', oprright => 'int4',
   oprresult => 'int4', oprcode => 'int4abs' },
 
 # additional operators for geometric types - thomas 1997-07-09
-{ oid => '792', descr => 'equal',
-  oprname => '=', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcom => '=(path,path)', oprcode => 'path_n_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '793', descr => 'less than',
-  oprname => '<', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcom => '>(path,path)', oprcode => 'path_n_lt' },
-{ oid => '794', descr => 'greater than',
-  oprname => '>', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcom => '<(path,path)', oprcode => 'path_n_gt' },
-{ oid => '795', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcom => '>=(path,path)', oprcode => 'path_n_le' },
-{ oid => '796', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcom => '<=(path,path)', oprcode => 'path_n_ge' },
-{ oid => '797', descr => 'number of points',
-  oprname => '#', oprkind => 'l', oprleft => '0', oprright => 'path',
-  oprresult => 'int4', oprcode => 'path_npoints' },
-{ oid => '798', descr => 'intersect',
-  oprname => '?#', oprleft => 'path', oprright => 'path', oprresult => 'bool',
-  oprcode => 'path_inter' },
-{ oid => '799', descr => 'sum of path segment lengths',
-  oprname => '@-@', oprkind => 'l', oprleft => '0', oprright => 'path',
-  oprresult => 'float8', oprcode => 'path_length' },
-{ oid => '800', descr => 'is above (allows touching)',
-  oprname => '>^', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_above_eq', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '801', descr => 'is below (allows touching)',
-  oprname => '<^', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_below_eq', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '802', descr => 'deprecated, use && instead',
-  oprname => '?#', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_overlap', oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '803', descr => 'box intersection',
-  oprname => '#', oprleft => 'box', oprright => 'box', oprresult => 'box',
-  oprcode => 'box_intersect' },
-{ oid => '804', descr => 'add point to box (translate)',
-  oprname => '+', oprleft => 'box', oprright => 'point', oprresult => 'box',
-  oprcode => 'box_add' },
-{ oid => '805', descr => 'subtract point from box (translate)',
-  oprname => '-', oprleft => 'box', oprright => 'point', oprresult => 'box',
-  oprcode => 'box_sub' },
-{ oid => '806', descr => 'multiply box by point (scale)',
-  oprname => '*', oprleft => 'box', oprright => 'point', oprresult => 'box',
-  oprcode => 'box_mul' },
-{ oid => '807', descr => 'divide box by point (scale)',
-  oprname => '/', oprleft => 'box', oprright => 'point', oprresult => 'box',
-  oprcode => 'box_div' },
-{ oid => '808', descr => 'horizontally aligned',
-  oprname => '?-', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcom => '?-(point,point)', oprcode => 'point_horiz' },
-{ oid => '809', descr => 'vertically aligned',
-  oprname => '?|', oprleft => 'point', oprright => 'point', oprresult => 'bool',
-  oprcom => '?|(point,point)', oprcode => 'point_vert' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '843', descr => 'multiply',
   oprname => '*', oprleft => 'money', oprright => 'float4',
@@ -1174,15 +967,9 @@
   oprcode => 'aclitemeq', oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
 
 # additional geometric operators - thomas 1997-07-09
-{ oid => '969', descr => 'center of',
-  oprname => '@@', oprkind => 'l', oprleft => '0', oprright => 'lseg',
-  oprresult => 'point', oprcode => 'lseg_center' },
-{ oid => '970', descr => 'center of',
-  oprname => '@@', oprkind => 'l', oprleft => '0', oprright => 'path',
-  oprresult => 'point', oprcode => 'path_center' },
-{ oid => '971', descr => 'center of',
-  oprname => '@@', oprkind => 'l', oprleft => '0', oprright => 'polygon',
-  oprresult => 'point', oprcode => 'poly_center' },
+
+
+
 
 { oid => '1054', oid_symbol => 'BpcharEqualOperator', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'bpchar',
@@ -1622,204 +1409,68 @@
   oprresult => 'interval', oprcode => 'time_mi_time' },
 
 # additional geometric operators - thomas 97/04/18
-{ oid => '1420', descr => 'center of',
-  oprname => '@@', oprkind => 'l', oprleft => '0', oprright => 'circle',
-  oprresult => 'point', oprcode => 'circle_center' },
-{ oid => '1500', descr => 'equal by area',
-  oprname => '=', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '=(circle,circle)',
-  oprnegate => '<>(circle,circle)', oprcode => 'circle_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '1501', descr => 'not equal by area',
-  oprname => '<>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '<>(circle,circle)',
-  oprnegate => '=(circle,circle)', oprcode => 'circle_ne', oprrest => 'neqsel',
-  oprjoin => 'neqjoinsel' },
-{ oid => '1502', descr => 'less than by area',
-  oprname => '<', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '>(circle,circle)',
-  oprnegate => '>=(circle,circle)', oprcode => 'circle_lt',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '1503', descr => 'greater than by area',
-  oprname => '>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '<(circle,circle)',
-  oprnegate => '<=(circle,circle)', oprcode => 'circle_gt',
-  oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '1504', descr => 'less than or equal by area',
-  oprname => '<=', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '>=(circle,circle)',
-  oprnegate => '>(circle,circle)', oprcode => 'circle_le', oprrest => 'areasel',
-  oprjoin => 'areajoinsel' },
-{ oid => '1505', descr => 'greater than or equal by area',
-  oprname => '>=', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '<=(circle,circle)',
-  oprnegate => '<(circle,circle)', oprcode => 'circle_ge', oprrest => 'areasel',
-  oprjoin => 'areajoinsel' },
 
-{ oid => '1506', descr => 'is left of',
-  oprname => '<<', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_left', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '1507', descr => 'overlaps or is left of',
-  oprname => '&<', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_overleft', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '1508', descr => 'overlaps or is right of',
-  oprname => '&>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_overright', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '1509', descr => 'is right of',
-  oprname => '>>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_right', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '1510', descr => 'is contained by',
-  oprname => '<@', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '@>(circle,circle)',
-  oprcode => 'circle_contained', oprrest => 'contsel',
-  oprjoin => 'contjoinsel' },
-{ oid => '1511', descr => 'contains',
-  oprname => '@>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '<@(circle,circle)',
-  oprcode => 'circle_contain', oprrest => 'contsel', oprjoin => 'contjoinsel' },
-{ oid => '1512', descr => 'same as',
-  oprname => '~=', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '~=(circle,circle)', oprcode => 'circle_same',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '1513', descr => 'overlaps',
-  oprname => '&&', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcom => '&&(circle,circle)',
-  oprcode => 'circle_overlap', oprrest => 'areasel', oprjoin => 'areajoinsel' },
-{ oid => '1514', descr => 'is above',
-  oprname => '|>>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_above', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '1515', descr => 'is below',
-  oprname => '<<|', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_below', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
 
-{ oid => '1516', descr => 'add',
-  oprname => '+', oprleft => 'circle', oprright => 'point',
-  oprresult => 'circle', oprcode => 'circle_add_pt' },
-{ oid => '1517', descr => 'subtract',
-  oprname => '-', oprleft => 'circle', oprright => 'point',
-  oprresult => 'circle', oprcode => 'circle_sub_pt' },
-{ oid => '1518', descr => 'multiply',
-  oprname => '*', oprleft => 'circle', oprright => 'point',
-  oprresult => 'circle', oprcode => 'circle_mul_pt' },
-{ oid => '1519', descr => 'divide',
-  oprname => '/', oprleft => 'circle', oprright => 'point',
-  oprresult => 'circle', oprcode => 'circle_div_pt' },
 
-{ oid => '1520', descr => 'distance between',
-  oprname => '<->', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'float8', oprcom => '<->(circle,circle)',
-  oprcode => 'circle_distance' },
-{ oid => '1521', descr => 'number of points',
-  oprname => '#', oprkind => 'l', oprleft => '0', oprright => 'polygon',
-  oprresult => 'int4', oprcode => 'poly_npoints' },
-{ oid => '1522', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'circle',
-  oprresult => 'float8', oprcom => '<->(circle,point)', oprcode => 'dist_pc' },
-{ oid => '3291', descr => 'distance between',
-  oprname => '<->', oprleft => 'circle', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,circle)',
-  oprcode => 'dist_cpoint' },
-{ oid => '3276', descr => 'distance between',
-  oprname => '<->', oprleft => 'point', oprright => 'polygon',
-  oprresult => 'float8', oprcom => '<->(polygon,point)',
-  oprcode => 'dist_ppoly' },
-{ oid => '3289', descr => 'distance between',
-  oprname => '<->', oprleft => 'polygon', oprright => 'point',
-  oprresult => 'float8', oprcom => '<->(point,polygon)',
-  oprcode => 'dist_polyp' },
-{ oid => '1523', descr => 'distance between',
-  oprname => '<->', oprleft => 'circle', oprright => 'polygon',
-  oprresult => 'float8', oprcom => '<->(polygon,circle)',
-  oprcode => 'dist_cpoly' },
-{ oid => '1383', descr => 'distance between',
-  oprname => '<->', oprleft => 'polygon', oprright => 'circle',
-  oprresult => 'float8', oprcom => '<->(circle,polygon)',
-  oprcode => 'dist_polyc' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # additional geometric operators - thomas 1997-07-09
-{ oid => '1524', descr => 'distance between',
-  oprname => '<->', oprleft => 'line', oprright => 'box', oprresult => 'float8',
-  oprcom => '<->(box,line)', oprcode => 'dist_lb' },
-{ oid => '1382', descr => 'distance between',
-  oprname => '<->', oprleft => 'box', oprright => 'line', oprresult => 'float8',
-  oprcom => '<->(line,box)', oprcode => 'dist_bl' },
 
-{ oid => '1525', descr => 'intersect',
-  oprname => '?#', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '?#(lseg,lseg)', oprcode => 'lseg_intersect' },
-{ oid => '1526', descr => 'parallel',
-  oprname => '?||', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '?||(lseg,lseg)', oprcode => 'lseg_parallel' },
-{ oid => '1527', descr => 'perpendicular',
-  oprname => '?-|', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '?-|(lseg,lseg)', oprcode => 'lseg_perp' },
-{ oid => '1528', descr => 'horizontal',
-  oprname => '?-', oprkind => 'l', oprleft => '0', oprright => 'lseg',
-  oprresult => 'bool', oprcode => 'lseg_horizontal' },
-{ oid => '1529', descr => 'vertical',
-  oprname => '?|', oprkind => 'l', oprleft => '0', oprright => 'lseg',
-  oprresult => 'bool', oprcode => 'lseg_vertical' },
-{ oid => '1535', descr => 'equal',
-  oprname => '=', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '=(lseg,lseg)', oprnegate => '<>(lseg,lseg)', oprcode => 'lseg_eq',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '1536', descr => 'intersection point',
-  oprname => '#', oprleft => 'lseg', oprright => 'lseg', oprresult => 'point',
-  oprcom => '#(lseg,lseg)', oprcode => 'lseg_interpt' },
-{ oid => '1537', descr => 'intersect',
-  oprname => '?#', oprleft => 'lseg', oprright => 'line', oprresult => 'bool',
-  oprcode => 'inter_sl' },
-{ oid => '1538', descr => 'intersect',
-  oprname => '?#', oprleft => 'lseg', oprright => 'box', oprresult => 'bool',
-  oprcode => 'inter_sb' },
-{ oid => '1539', descr => 'intersect',
-  oprname => '?#', oprleft => 'line', oprright => 'box', oprresult => 'bool',
-  oprcode => 'inter_lb' },
 
-{ oid => '1546', descr => 'point on line',
-  oprname => '<@', oprleft => 'point', oprright => 'line', oprresult => 'bool',
-  oprcode => 'on_pl' },
-{ oid => '1547', descr => 'is contained by',
-  oprname => '<@', oprleft => 'point', oprright => 'lseg', oprresult => 'bool',
-  oprcode => 'on_ps' },
-{ oid => '1548', descr => 'lseg on line',
-  oprname => '<@', oprleft => 'lseg', oprright => 'line', oprresult => 'bool',
-  oprcode => 'on_sl' },
-{ oid => '1549', descr => 'is contained by',
-  oprname => '<@', oprleft => 'lseg', oprright => 'box', oprresult => 'bool',
-  oprcode => 'on_sb' },
 
-{ oid => '1557', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'point', oprright => 'line', oprresult => 'point',
-  oprcode => 'close_pl' },
-{ oid => '1558', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'point', oprright => 'lseg', oprresult => 'point',
-  oprcode => 'close_ps' },
-{ oid => '1559', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'point', oprright => 'box', oprresult => 'point',
-  oprcode => 'close_pb' },
 
-{ oid => '1566', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'lseg', oprright => 'line', oprresult => 'point',
-  oprcode => 'close_sl' },
-{ oid => '1567', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'lseg', oprright => 'box', oprresult => 'point',
-  oprcode => 'close_sb' },
-{ oid => '1568', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'line', oprright => 'box', oprresult => 'point',
-  oprcode => 'close_lb' },
-{ oid => '1577', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'line', oprright => 'lseg', oprresult => 'point',
-  oprcode => 'close_ls' },
-{ oid => '1578', descr => 'closest point to A on B',
-  oprname => '##', oprleft => 'lseg', oprright => 'lseg', oprresult => 'point',
-  oprcode => 'close_lseg' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { oid => '1583', descr => 'multiply',
   oprname => '*', oprleft => 'interval', oprright => 'float8',
   oprresult => 'interval', oprcom => '*(float8,interval)',
@@ -1832,222 +1483,69 @@
   oprname => '/', oprleft => 'interval', oprright => 'float8',
   oprresult => 'interval', oprcode => 'interval_div' },
 
-{ oid => '1586', descr => 'not equal',
-  oprname => '<>', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '<>(lseg,lseg)', oprnegate => '=(lseg,lseg)', oprcode => 'lseg_ne',
-  oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '1587', descr => 'less than by length',
-  oprname => '<', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '>(lseg,lseg)', oprnegate => '>=(lseg,lseg)',
-  oprcode => 'lseg_lt' },
-{ oid => '1588', descr => 'less than or equal by length',
-  oprname => '<=', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '>=(lseg,lseg)', oprnegate => '>(lseg,lseg)',
-  oprcode => 'lseg_le' },
-{ oid => '1589', descr => 'greater than by length',
-  oprname => '>', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '<(lseg,lseg)', oprnegate => '<=(lseg,lseg)',
-  oprcode => 'lseg_gt' },
-{ oid => '1590', descr => 'greater than or equal by length',
-  oprname => '>=', oprleft => 'lseg', oprright => 'lseg', oprresult => 'bool',
-  oprcom => '<=(lseg,lseg)', oprnegate => '<(lseg,lseg)',
-  oprcode => 'lseg_ge' },
 
-{ oid => '1591', descr => 'distance between endpoints',
-  oprname => '@-@', oprkind => 'l', oprleft => '0', oprright => 'lseg',
-  oprresult => 'float8', oprcode => 'lseg_length' },
 
-{ oid => '1611', descr => 'intersect',
-  oprname => '?#', oprleft => 'line', oprright => 'line', oprresult => 'bool',
-  oprcom => '?#(line,line)', oprcode => 'line_intersect' },
-{ oid => '1612', descr => 'parallel',
-  oprname => '?||', oprleft => 'line', oprright => 'line', oprresult => 'bool',
-  oprcom => '?||(line,line)', oprcode => 'line_parallel' },
-{ oid => '1613', descr => 'perpendicular',
-  oprname => '?-|', oprleft => 'line', oprright => 'line', oprresult => 'bool',
-  oprcom => '?-|(line,line)', oprcode => 'line_perp' },
-{ oid => '1614', descr => 'horizontal',
-  oprname => '?-', oprkind => 'l', oprleft => '0', oprright => 'line',
-  oprresult => 'bool', oprcode => 'line_horizontal' },
-{ oid => '1615', descr => 'vertical',
-  oprname => '?|', oprkind => 'l', oprleft => '0', oprright => 'line',
-  oprresult => 'bool', oprcode => 'line_vertical' },
-{ oid => '1616', descr => 'equal',
-  oprname => '=', oprleft => 'line', oprright => 'line', oprresult => 'bool',
-  oprcom => '=(line,line)', oprcode => 'line_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '1617', descr => 'intersection point',
-  oprname => '#', oprleft => 'line', oprright => 'line', oprresult => 'point',
-  oprcom => '#(line,line)', oprcode => 'line_interpt' },
 
-{ oid => '4161', descr => 'is above',
-  oprname => '|>>', oprleft => 'point', oprright => 'point',
-  oprresult => 'bool', oprcode => 'point_above', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '4162', descr => 'is below',
-  oprname => '<<|', oprleft => 'point', oprright => 'point',
-  oprresult => 'bool', oprcode => 'point_below', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # MACADDR type
-{ oid => '1220', descr => 'equal',
-  oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'macaddr',
-  oprright => 'macaddr', oprresult => 'bool', oprcom => '=(macaddr,macaddr)',
-  oprnegate => '<>(macaddr,macaddr)', oprcode => 'macaddr_eq',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '1221', descr => 'not equal',
-  oprname => '<>', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'bool', oprcom => '<>(macaddr,macaddr)',
-  oprnegate => '=(macaddr,macaddr)', oprcode => 'macaddr_ne',
-  oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '1222', descr => 'less than',
-  oprname => '<', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'bool', oprcom => '>(macaddr,macaddr)',
-  oprnegate => '>=(macaddr,macaddr)', oprcode => 'macaddr_lt',
-  oprrest => 'scalarltsel', oprjoin => 'scalarltjoinsel' },
-{ oid => '1223', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'bool', oprcom => '>=(macaddr,macaddr)',
-  oprnegate => '>(macaddr,macaddr)', oprcode => 'macaddr_le',
-  oprrest => 'scalarlesel', oprjoin => 'scalarlejoinsel' },
-{ oid => '1224', descr => 'greater than',
-  oprname => '>', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'bool', oprcom => '<(macaddr,macaddr)',
-  oprnegate => '<=(macaddr,macaddr)', oprcode => 'macaddr_gt',
-  oprrest => 'scalargtsel', oprjoin => 'scalargtjoinsel' },
-{ oid => '1225', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'bool', oprcom => '<=(macaddr,macaddr)',
-  oprnegate => '<(macaddr,macaddr)', oprcode => 'macaddr_ge',
-  oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
 
-{ oid => '3147', descr => 'bitwise not',
-  oprname => '~', oprkind => 'l', oprleft => '0', oprright => 'macaddr',
-  oprresult => 'macaddr', oprcode => 'macaddr_not' },
-{ oid => '3148', descr => 'bitwise and',
-  oprname => '&', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'macaddr', oprcode => 'macaddr_and' },
-{ oid => '3149', descr => 'bitwise or',
-  oprname => '|', oprleft => 'macaddr', oprright => 'macaddr',
-  oprresult => 'macaddr', oprcode => 'macaddr_or' },
+
+
+
+
+
+
+
+
+
 
 # MACADDR8 type
-{ oid => '3362', descr => 'equal',
-  oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'macaddr8',
-  oprright => 'macaddr8', oprresult => 'bool', oprcom => '=(macaddr8,macaddr8)',
-  oprnegate => '<>(macaddr8,macaddr8)', oprcode => 'macaddr8_eq',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '3363', descr => 'not equal',
-  oprname => '<>', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'bool', oprcom => '<>(macaddr8,macaddr8)',
-  oprnegate => '=(macaddr8,macaddr8)', oprcode => 'macaddr8_ne',
-  oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '3364', descr => 'less than',
-  oprname => '<', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'bool', oprcom => '>(macaddr8,macaddr8)',
-  oprnegate => '>=(macaddr8,macaddr8)', oprcode => 'macaddr8_lt',
-  oprrest => 'scalarltsel', oprjoin => 'scalarltjoinsel' },
-{ oid => '3365', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'bool', oprcom => '>=(macaddr8,macaddr8)',
-  oprnegate => '>(macaddr8,macaddr8)', oprcode => 'macaddr8_le',
-  oprrest => 'scalarlesel', oprjoin => 'scalarlejoinsel' },
-{ oid => '3366', descr => 'greater than',
-  oprname => '>', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'bool', oprcom => '<(macaddr8,macaddr8)',
-  oprnegate => '<=(macaddr8,macaddr8)', oprcode => 'macaddr8_gt',
-  oprrest => 'scalargtsel', oprjoin => 'scalargtjoinsel' },
-{ oid => '3367', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'bool', oprcom => '<=(macaddr8,macaddr8)',
-  oprnegate => '<(macaddr8,macaddr8)', oprcode => 'macaddr8_ge',
-  oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
 
-{ oid => '3368', descr => 'bitwise not',
-  oprname => '~', oprkind => 'l', oprleft => '0', oprright => 'macaddr8',
-  oprresult => 'macaddr8', oprcode => 'macaddr8_not' },
-{ oid => '3369', descr => 'bitwise and',
-  oprname => '&', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'macaddr8', oprcode => 'macaddr8_and' },
-{ oid => '3370', descr => 'bitwise or',
-  oprname => '|', oprleft => 'macaddr8', oprright => 'macaddr8',
-  oprresult => 'macaddr8', oprcode => 'macaddr8_or' },
+
+
+
+
+
+
+
+
+
 
 # INET type (these also support CIDR via implicit cast)
-{ oid => '1201', descr => 'equal',
-  oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'inet',
-  oprright => 'inet', oprresult => 'bool', oprcom => '=(inet,inet)',
-  oprnegate => '<>(inet,inet)', oprcode => 'network_eq', oprrest => 'eqsel',
-  oprjoin => 'eqjoinsel' },
-{ oid => '1202', descr => 'not equal',
-  oprname => '<>', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '<>(inet,inet)', oprnegate => '=(inet,inet)',
-  oprcode => 'network_ne', oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '1203', descr => 'less than',
-  oprname => '<', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '>(inet,inet)', oprnegate => '>=(inet,inet)',
-  oprcode => 'network_lt', oprrest => 'scalarltsel',
-  oprjoin => 'scalarltjoinsel' },
-{ oid => '1204', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '>=(inet,inet)', oprnegate => '>(inet,inet)',
-  oprcode => 'network_le', oprrest => 'scalarlesel',
-  oprjoin => 'scalarlejoinsel' },
-{ oid => '1205', descr => 'greater than',
-  oprname => '>', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '<(inet,inet)', oprnegate => '<=(inet,inet)',
-  oprcode => 'network_gt', oprrest => 'scalargtsel',
-  oprjoin => 'scalargtjoinsel' },
-{ oid => '1206', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '<=(inet,inet)', oprnegate => '<(inet,inet)',
-  oprcode => 'network_ge', oprrest => 'scalargesel',
-  oprjoin => 'scalargejoinsel' },
-{ oid => '931', oid_symbol => 'OID_INET_SUB_OP', descr => 'is subnet',
-  oprname => '<<', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '>>(inet,inet)', oprcode => 'network_sub', oprrest => 'networksel',
-  oprjoin => 'networkjoinsel' },
-{ oid => '932', oid_symbol => 'OID_INET_SUBEQ_OP',
-  descr => 'is subnet or equal',
-  oprname => '<<=', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '>>=(inet,inet)', oprcode => 'network_subeq',
-  oprrest => 'networksel', oprjoin => 'networkjoinsel' },
-{ oid => '933', oid_symbol => 'OID_INET_SUP_OP', descr => 'is supernet',
-  oprname => '>>', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '<<(inet,inet)', oprcode => 'network_sup', oprrest => 'networksel',
-  oprjoin => 'networkjoinsel' },
-{ oid => '934', oid_symbol => 'OID_INET_SUPEQ_OP',
-  descr => 'is supernet or equal',
-  oprname => '>>=', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '<<=(inet,inet)', oprcode => 'network_supeq',
-  oprrest => 'networksel', oprjoin => 'networkjoinsel' },
-{ oid => '3552', oid_symbol => 'OID_INET_OVERLAP_OP',
-  descr => 'overlaps (is subnet or supernet)',
-  oprname => '&&', oprleft => 'inet', oprright => 'inet', oprresult => 'bool',
-  oprcom => '&&(inet,inet)', oprcode => 'network_overlap',
-  oprrest => 'networksel', oprjoin => 'networkjoinsel' },
 
-{ oid => '2634', descr => 'bitwise not',
-  oprname => '~', oprkind => 'l', oprleft => '0', oprright => 'inet',
-  oprresult => 'inet', oprcode => 'inetnot' },
-{ oid => '2635', descr => 'bitwise and',
-  oprname => '&', oprleft => 'inet', oprright => 'inet', oprresult => 'inet',
-  oprcode => 'inetand' },
-{ oid => '2636', descr => 'bitwise or',
-  oprname => '|', oprleft => 'inet', oprright => 'inet', oprresult => 'inet',
-  oprcode => 'inetor' },
-{ oid => '2637', descr => 'add',
-  oprname => '+', oprleft => 'inet', oprright => 'int8', oprresult => 'inet',
-  oprcom => '+(int8,inet)', oprcode => 'inetpl' },
-{ oid => '2638', descr => 'add',
-  oprname => '+', oprleft => 'int8', oprright => 'inet', oprresult => 'inet',
-  oprcom => '+(inet,int8)', oprcode => 'int8pl_inet' },
-{ oid => '2639', descr => 'subtract',
-  oprname => '-', oprleft => 'inet', oprright => 'int8', oprresult => 'inet',
-  oprcode => 'inetmi_int8' },
-{ oid => '2640', descr => 'subtract',
-  oprname => '-', oprleft => 'inet', oprright => 'inet', oprresult => 'int8',
-  oprcode => 'inetmi' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # case-insensitive LIKE hacks
 { oid => '1625', oid_symbol => 'OID_NAME_ICLIKE_OP',
@@ -2722,46 +2220,16 @@
   oprcom => '+(date,int4)', oprcode => 'integer_pl_date' },
 
 # new operators for Y-direction rtree opfamilies
-{ oid => '2570', descr => 'is below',
-  oprname => '<<|', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_below', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2571', descr => 'overlaps or is below',
-  oprname => '&<|', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_overbelow', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2572', descr => 'overlaps or is above',
-  oprname => '|&>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_overabove', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2573', descr => 'is above',
-  oprname => '|>>', oprleft => 'box', oprright => 'box', oprresult => 'bool',
-  oprcode => 'box_above', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2574', descr => 'is below',
-  oprname => '<<|', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_below', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2575', descr => 'overlaps or is below',
-  oprname => '&<|', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_overbelow', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2576', descr => 'overlaps or is above',
-  oprname => '|&>', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_overabove', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2577', descr => 'is above',
-  oprname => '|>>', oprleft => 'polygon', oprright => 'polygon',
-  oprresult => 'bool', oprcode => 'poly_above', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2589', descr => 'overlaps or is below',
-  oprname => '&<|', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_overbelow', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
-{ oid => '2590', descr => 'overlaps or is above',
-  oprname => '|&>', oprleft => 'circle', oprright => 'circle',
-  oprresult => 'bool', oprcode => 'circle_overabove', oprrest => 'positionsel',
-  oprjoin => 'positionjoinsel' },
+
+
+
+
+
+
+
+
+
+
 
 # overlap/contains/contained for arrays
 { oid => '2750', oid_symbol => 'OID_ARRAY_OVERLAP_OP', descr => 'overlaps',

@@ -76,7 +76,7 @@ CREATE TABLE tenk2 (
 CREATE TABLE person (
 	name 		text,
 	age			int4,
-	location 	point
+	location 	text
 );
 
 
@@ -98,7 +98,7 @@ CREATE TABLE stud_emp (
 
 CREATE TABLE city (
 	name		name,
-	location 	box,
+	location 	text,
 	budget 		city_budget
 );
 
@@ -108,16 +108,16 @@ CREATE TABLE dept (
 );
 
 CREATE TABLE slow_emp4000 (
-	home_base	 box
+	home_base	 text
 );
 
 CREATE TABLE fast_emp4000 (
-	home_base	 box
+	home_base	 text
 );
 
 CREATE TABLE road (
 	name		text,
-	thepath 	path
+	thepath 	text
 );
 
 CREATE TABLE ihighway () INHERITS (road);
@@ -129,7 +129,7 @@ CREATE TABLE shighway (
 CREATE TABLE real_city (
 	pop			int4,
 	cname		text,
-	outline 	path
+	outline 	text
 );
 
 --
@@ -164,7 +164,7 @@ CREATE TABLE e_star (
 ) INHERITS (c_star);
 
 CREATE TABLE f_star (
-	f 			polygon
+	f 			text
 ) INHERITS (e_star);
 
 CREATE TABLE aggtest (
@@ -417,17 +417,17 @@ DROP FUNCTION immut_func(int);
 
 -- prevent using columns of unsupported types in key (type must have a btree operator class)
 CREATE TABLE partitioned (
-	a point
+	a json
 ) PARTITION BY LIST (a);
 CREATE TABLE partitioned (
-	a point
-) PARTITION BY LIST (a point_ops);
+	a json
+) PARTITION BY LIST (a json_ops);
 CREATE TABLE partitioned (
-	a point
+	a json
 ) PARTITION BY RANGE (a);
 CREATE TABLE partitioned (
-	a point
-) PARTITION BY RANGE (a point_ops);
+	a json
+) PARTITION BY RANGE (a json_ops);
 
 -- cannot add NO INHERIT constraints to partitioned tables
 CREATE TABLE partitioned (

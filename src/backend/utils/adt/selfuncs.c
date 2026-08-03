@@ -4377,21 +4377,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 			*scaledhibound = convert_timevalue_to_scalar(hibound, boundstypid,
 														 &failure);
 			return !failure;
-
-			/*
-			 * Built-in network types
-			 */
-		case INETOID:
-		case CIDROID:
-		case MACADDROID:
-		case MACADDR8OID:
-			*scaledvalue = convert_network_to_scalar(value, valuetypid,
-													 &failure);
-			*scaledlobound = convert_network_to_scalar(lobound, boundstypid,
-													   &failure);
-			*scaledhibound = convert_network_to_scalar(hibound, boundstypid,
-													   &failure);
-			return !failure;
 	}
 	/* Don't know how to convert */
 	*scaledvalue = *scaledlobound = *scaledhibound = 0;

@@ -133,24 +133,6 @@ CREATE EXTENSION test_ext_cor;  -- fail
 
 DROP TYPE test_ext_type;
 
--- this makes a shell "point <<@@ polygon" operator too
-CREATE OPERATOR @@>> ( PROCEDURE = poly_contain_pt,
-  LEFTARG = polygon, RIGHTARG = point,
-  COMMUTATOR = <<@@ );
-
-CREATE EXTENSION test_ext_cor;  -- fail
-
-DROP OPERATOR <<@@ (point, polygon);
-
-CREATE EXTENSION test_ext_cor;  -- now it should work
-
-SELECT ext_cor_func();
-
-SELECT * FROM ext_cor_view;
-
-SELECT 'x'::test_ext_type;
-
-SELECT point(0,0) <<@@ polygon(circle(point(0,0),1));
 
 \dx+ test_ext_cor
 

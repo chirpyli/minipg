@@ -27,10 +27,6 @@ SELECT bt_metap('test1_a_hash');
 SELECT bt_page_stats('test1_a_hash', 0);
 SELECT bt_page_items('test1_a_hash', 0);
 SELECT bt_page_items(get_raw_page('test1_a_hash', 0));
-CREATE INDEX test1_b_gist ON test1 USING gist(b);
--- Special area of GiST is the same as btree, this complains about inconsistent
--- leaf data on the page.
-SELECT bt_page_items(get_raw_page('test1_b_gist', 0));
 
 -- Several failure modes.
 -- Suppress the DETAIL message, to allow the tests to work across various

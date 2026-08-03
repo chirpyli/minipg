@@ -39,11 +39,8 @@ OBJS = \
 	format_type.o \
 	formatting.o \
 	genfile.o \
-	geo_ops.o \
-	geo_selfuncs.o \
-	inet_cidr_ntop.o \
-	inet_net_pton.o \
 	int.o \
+	ipaddr.o \
 	int8.o \
 	json.o \
 	jsonb.o \
@@ -65,9 +62,6 @@ OBJS = \
 	multirangetypes.o \
 	multirangetypes_selfuncs.o \
 	name.o \
-	network.o \
-	network_gist.o \
-	network_selfuncs.o \
 	numeric.o \
 	numutils.o \
 	oid.o \
@@ -81,7 +75,6 @@ OBJS = \
 	pseudotypes.o \
 	quote.o \
 	rangetypes.o \
-	rangetypes_gist.o \
 	rangetypes_selfuncs.o \
 	rangetypes_typanalyze.o \
 	regexp.o \
@@ -89,6 +82,7 @@ OBJS = \
 	ri_triggers.o \
 	rowtypes.o \
 	ruleutils.o \
+	selfuncs_geo.o \
 	selfuncs.o \
 	tid.o \
 	timestamp.o \

@@ -681,26 +681,37 @@ DROP TABLE dropcol;
 -- check handling of regular btree constraint along with gist constraint
 create table twoconstraints (f1 int unique, f2 box,
                              exclude using gist(f2 with &&));
+ERROR:  type "box" does not exist
+LINE 1: create table twoconstraints (f1 int unique, f2 box,
+                                                       ^
 insert into twoconstraints values(1, '((0,0),(1,1))');
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: insert into twoconstraints values(1, '((0,0),(1,1))');
+                    ^
 insert into twoconstraints values(1, '((2,2),(3,3))');  -- fail on f1
-ERROR:  duplicate key value violates unique constraint "twoconstraints_f1_key"
-DETAIL:  Key (f1)=(1) already exists.
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: insert into twoconstraints values(1, '((2,2),(3,3))');
+                    ^
 insert into twoconstraints values(2, '((0,0),(1,2))');  -- fail on f2
-ERROR:  conflicting key value violates exclusion constraint "twoconstraints_f2_excl"
-DETAIL:  Key (f2)=((1,2),(0,0)) conflicts with existing key (f2)=((1,1),(0,0)).
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: insert into twoconstraints values(2, '((0,0),(1,2))');
+                    ^
 insert into twoconstraints values(2, '((0,0),(1,2))')
   on conflict on constraint twoconstraints_f1_key do nothing;  -- fail on f2
-ERROR:  conflicting key value violates exclusion constraint "twoconstraints_f2_excl"
-DETAIL:  Key (f2)=((1,2),(0,0)) conflicts with existing key (f2)=((1,1),(0,0)).
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: insert into twoconstraints values(2, '((0,0),(1,2))')
+                    ^
 insert into twoconstraints values(2, '((0,0),(1,2))')
   on conflict on constraint twoconstraints_f2_excl do nothing;  -- do nothing
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: insert into twoconstraints values(2, '((0,0),(1,2))')
+                    ^
 select * from twoconstraints;
- f1 |     f2      
-----+-------------
-  1 | (1,1),(0,0)
-(1 row)
-
+ERROR:  relation "twoconstraints" does not exist
+LINE 1: select * from twoconstraints;
+                      ^
 drop table twoconstraints;
+ERROR:  table "twoconstraints" does not exist
 -- check handling of self-conflicts at various isolation levels
 create table selfconflict (f1 int primary key, f2 int);
 begin transaction isolation level read committed;

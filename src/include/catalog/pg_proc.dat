@@ -328,79 +328,33 @@
   proname => 'unknownout', prorettype => 'cstring', proargtypes => 'unknown',
   prosrc => 'unknownout' },
 
-{ oid => '115',
-  proname => 'box_above_eq', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_above_eq' },
-{ oid => '116',
-  proname => 'box_below_eq', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_below_eq' },
 
-{ oid => '117', descr => 'I/O',
-  proname => 'point_in', prorettype => 'point', proargtypes => 'cstring',
-  prosrc => 'point_in' },
-{ oid => '118', descr => 'I/O',
-  proname => 'point_out', prorettype => 'cstring', proargtypes => 'point',
-  prosrc => 'point_out' },
-{ oid => '119', descr => 'I/O',
-  proname => 'lseg_in', prorettype => 'lseg', proargtypes => 'cstring',
-  prosrc => 'lseg_in' },
-{ oid => '120', descr => 'I/O',
-  proname => 'lseg_out', prorettype => 'cstring', proargtypes => 'lseg',
-  prosrc => 'lseg_out' },
-{ oid => '121', descr => 'I/O',
-  proname => 'path_in', prorettype => 'path', proargtypes => 'cstring',
-  prosrc => 'path_in' },
-{ oid => '122', descr => 'I/O',
-  proname => 'path_out', prorettype => 'cstring', proargtypes => 'path',
-  prosrc => 'path_out' },
-{ oid => '123', descr => 'I/O',
-  proname => 'box_in', prorettype => 'box', proargtypes => 'cstring',
-  prosrc => 'box_in' },
-{ oid => '124', descr => 'I/O',
-  proname => 'box_out', prorettype => 'cstring', proargtypes => 'box',
-  prosrc => 'box_out' },
-{ oid => '125',
-  proname => 'box_overlap', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_overlap' },
-{ oid => '126',
-  proname => 'box_ge', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_ge' },
-{ oid => '127',
-  proname => 'box_gt', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_gt' },
-{ oid => '128',
-  proname => 'box_eq', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_eq' },
-{ oid => '129',
-  proname => 'box_lt', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_lt' },
-{ oid => '130',
-  proname => 'box_le', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_le' },
-{ oid => '131',
-  proname => 'point_above', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_above' },
-{ oid => '132',
-  proname => 'point_left', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_left' },
-{ oid => '133',
-  proname => 'point_right', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_right' },
-{ oid => '134',
-  proname => 'point_below', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_below' },
-{ oid => '135',
-  proname => 'point_eq', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_eq' },
-{ oid => '136',
-  proname => 'on_pb', prorettype => 'bool', proargtypes => 'point box',
-  prosrc => 'on_pb' },
-{ oid => '137',
-  proname => 'on_ppath', prorettype => 'bool', proargtypes => 'point path',
-  prosrc => 'on_ppath' },
-{ oid => '138',
-  proname => 'box_center', prorettype => 'point', proargtypes => 'box',
-  prosrc => 'box_center' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 { oid => '139',
   descr => 'restriction selectivity for area-comparison operators',
   proname => 'areasel', provolatile => 's', prorettype => 'float8',
@@ -532,30 +486,14 @@
 { oid => '185',
   proname => 'oidne', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oid oid', prosrc => 'oidne' },
-{ oid => '186',
-  proname => 'box_same', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_same' },
-{ oid => '187',
-  proname => 'box_contain', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_contain' },
-{ oid => '188',
-  proname => 'box_left', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_left' },
-{ oid => '189',
-  proname => 'box_overleft', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_overleft' },
-{ oid => '190',
-  proname => 'box_overright', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_overright' },
-{ oid => '191',
-  proname => 'box_right', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_right' },
-{ oid => '192',
-  proname => 'box_contained', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_contained' },
-{ oid => '193',
-  proname => 'box_contain_pt', prorettype => 'bool', proargtypes => 'box point',
-  prosrc => 'box_contain_pt' },
+
+
+
+
+
+
+
+
 
 { oid => '195', descr => 'I/O',
   proname => 'pg_node_tree_in', prorettype => 'pg_node_tree',
@@ -651,15 +589,9 @@
   proname => 'float8smaller', prorettype => 'float8',
   proargtypes => 'float8 float8', prosrc => 'float8smaller' },
 
-{ oid => '225',
-  proname => 'lseg_center', prorettype => 'point', proargtypes => 'lseg',
-  prosrc => 'lseg_center' },
-{ oid => '226',
-  proname => 'path_center', prorettype => 'point', proargtypes => 'path',
-  prosrc => 'path_center' },
-{ oid => '227',
-  proname => 'poly_center', prorettype => 'point', proargtypes => 'polygon',
-  prosrc => 'poly_center' },
+
+
+
 
 { oid => '228', descr => 'round to nearest integer',
   proname => 'dround', prorettype => 'float8', proargtypes => 'float8',
@@ -706,9 +638,7 @@
 { oid => '238', descr => 'convert float4 to int2',
   proname => 'int2', prorettype => 'int2', proargtypes => 'float4',
   prosrc => 'ftoi2' },
-{ oid => '239',
-  proname => 'line_distance', prorettype => 'float8',
-  proargtypes => 'line line', prosrc => 'line_distance' },
+
 
 { oid => '240',
   proname => 'nameeqtext', proleakproof => 't', prorettype => 'bool',
@@ -762,12 +692,8 @@
   proname => 'timeofday', provolatile => 'v', prorettype => 'text',
   proargtypes => '', prosrc => 'timeofday' },
 
-{ oid => '277',
-  proname => 'inter_sl', prorettype => 'bool', proargtypes => 'lseg line',
-  prosrc => 'inter_sl' },
-{ oid => '278',
-  proname => 'inter_lb', prorettype => 'bool', proargtypes => 'line box',
-  prosrc => 'inter_lb' },
+
+
 
 { oid => '279',
   proname => 'float48mul', prorettype => 'float8',
@@ -914,10 +840,6 @@
   proname => 'hashhandler', provolatile => 'v',
   prorettype => 'index_am_handler', proargtypes => 'internal',
   prosrc => 'hashhandler' },
-{ oid => '332', descr => 'gist index access method handler',
-  proname => 'gisthandler', provolatile => 'v',
-  prorettype => 'index_am_handler', proargtypes => 'internal',
-  prosrc => 'gisthandler' },
 { oid => '333', descr => 'gin index access method handler',
   proname => 'ginhandler', provolatile => 'v', prorettype => 'index_am_handler',
   proargtypes => 'internal', prosrc => 'ginhandler' },
@@ -945,36 +867,16 @@
   proname => 'pg_indexam_progress_phasename', prorettype => 'text',
   proargtypes => 'oid int8', prosrc => 'pg_indexam_progress_phasename' },
 
-{ oid => '339',
-  proname => 'poly_same', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_same' },
-{ oid => '340',
-  proname => 'poly_contain', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_contain' },
-{ oid => '341',
-  proname => 'poly_left', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_left' },
-{ oid => '342',
-  proname => 'poly_overleft', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_overleft' },
-{ oid => '343',
-  proname => 'poly_overright', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_overright' },
-{ oid => '344',
-  proname => 'poly_right', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_right' },
-{ oid => '345',
-  proname => 'poly_contained', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_contained' },
-{ oid => '346',
-  proname => 'poly_overlap', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_overlap' },
-{ oid => '347', descr => 'I/O',
-  proname => 'poly_in', prorettype => 'polygon', proargtypes => 'cstring',
-  prosrc => 'poly_in' },
-{ oid => '348', descr => 'I/O',
-  proname => 'poly_out', prorettype => 'cstring', proargtypes => 'polygon',
-  prosrc => 'poly_out' },
+
+
+
+
+
+
+
+
+
+
 
 { oid => '350', descr => 'less-equal-greater',
   proname => 'btint2cmp', proleakproof => 't', prorettype => 'int4',
@@ -1073,57 +975,23 @@
   proargtypes => 'numeric numeric numeric bool bool',
   prosrc => 'in_range_numeric_numeric' },
 
-{ oid => '361',
-  proname => 'lseg_distance', prorettype => 'float8',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_distance' },
-{ oid => '362',
-  proname => 'lseg_interpt', prorettype => 'point', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_interpt' },
-{ oid => '363',
-  proname => 'dist_ps', prorettype => 'float8', proargtypes => 'point lseg',
-  prosrc => 'dist_ps' },
-{ oid => '380',
-  proname => 'dist_sp', prorettype => 'float8', proargtypes => 'lseg point',
-  prosrc => 'dist_sp' },
-{ oid => '364',
-  proname => 'dist_pb', prorettype => 'float8', proargtypes => 'point box',
-  prosrc => 'dist_pb' },
-{ oid => '357',
-  proname => 'dist_bp', prorettype => 'float8', proargtypes => 'box point',
-  prosrc => 'dist_bp' },
-{ oid => '365',
-  proname => 'dist_sb', prorettype => 'float8', proargtypes => 'lseg box',
-  prosrc => 'dist_sb' },
-{ oid => '381',
-  proname => 'dist_bs', prorettype => 'float8', proargtypes => 'box lseg',
-  prosrc => 'dist_bs' },
-{ oid => '366',
-  proname => 'close_ps', prorettype => 'point', proargtypes => 'point lseg',
-  prosrc => 'close_ps' },
-{ oid => '367',
-  proname => 'close_pb', prorettype => 'point', proargtypes => 'point box',
-  prosrc => 'close_pb' },
-{ oid => '368',
-  proname => 'close_sb', prorettype => 'point', proargtypes => 'lseg box',
-  prosrc => 'close_sb' },
-{ oid => '369',
-  proname => 'on_ps', prorettype => 'bool', proargtypes => 'point lseg',
-  prosrc => 'on_ps' },
-{ oid => '370',
-  proname => 'path_distance', prorettype => 'float8',
-  proargtypes => 'path path', prosrc => 'path_distance' },
-{ oid => '371',
-  proname => 'dist_ppath', prorettype => 'float8', proargtypes => 'point path',
-  prosrc => 'dist_ppath' },
-{ oid => '421',
-  proname => 'dist_pathp', prorettype => 'float8', proargtypes => 'path point',
-  prosrc => 'dist_pathp' },
-{ oid => '372',
-  proname => 'on_sb', prorettype => 'bool', proargtypes => 'lseg box',
-  prosrc => 'on_sb' },
-{ oid => '373',
-  proname => 'inter_sb', prorettype => 'bool', proargtypes => 'lseg box',
-  prosrc => 'inter_sb' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # OIDS 400 - 499
 
@@ -1215,30 +1083,18 @@
 { oid => '777', descr => 'hash',
   proname => 'hash_aclitem_extended', prorettype => 'int8',
   proargtypes => 'aclitem int8', prosrc => 'hash_aclitem_extended' },
-{ oid => '399', descr => 'hash',
-  proname => 'hashmacaddr', prorettype => 'int4', proargtypes => 'macaddr',
-  prosrc => 'hashmacaddr' },
-{ oid => '778', descr => 'hash',
-  proname => 'hashmacaddrextended', prorettype => 'int8',
-  proargtypes => 'macaddr int8', prosrc => 'hashmacaddrextended' },
-{ oid => '422', descr => 'hash',
-  proname => 'hashinet', prorettype => 'int4', proargtypes => 'inet',
-  prosrc => 'hashinet' },
-{ oid => '779', descr => 'hash',
-  proname => 'hashinetextended', prorettype => 'int8',
-  proargtypes => 'inet int8', prosrc => 'hashinetextended' },
+
+
+
+
 { oid => '432', descr => 'hash',
   proname => 'hash_numeric', prorettype => 'int4', proargtypes => 'numeric',
   prosrc => 'hash_numeric' },
 { oid => '780', descr => 'hash',
   proname => 'hash_numeric_extended', prorettype => 'int8',
   proargtypes => 'numeric int8', prosrc => 'hash_numeric_extended' },
-{ oid => '328', descr => 'hash',
-  proname => 'hashmacaddr8', prorettype => 'int4', proargtypes => 'macaddr8',
-  prosrc => 'hashmacaddr8' },
-{ oid => '781', descr => 'hash',
-  proname => 'hashmacaddr8extended', prorettype => 'int8',
-  proargtypes => 'macaddr8 int8', prosrc => 'hashmacaddr8extended' },
+
+
 
 { oid => '438', descr => 'count the number of NULL arguments',
   proname => 'num_nulls', provariadic => 'any', proisstrict => 'f',
@@ -1435,43 +1291,19 @@
   proname => 'bit_count', prorettype => 'int8', proargtypes => 'bytea',
   prosrc => 'bytea_bit_count' },
 
-{ oid => '725',
-  proname => 'dist_pl', prorettype => 'float8', proargtypes => 'point line',
-  prosrc => 'dist_pl' },
-{ oid => '702',
-  proname => 'dist_lp', prorettype => 'float8', proargtypes => 'line point',
-  prosrc => 'dist_lp' },
-{ oid => '726',
-  proname => 'dist_lb', prorettype => 'float8', proargtypes => 'line box',
-  prosrc => 'dist_lb' },
-{ oid => '703',
-  proname => 'dist_bl', prorettype => 'float8', proargtypes => 'box line',
-  prosrc => 'dist_bl' },
-{ oid => '727',
-  proname => 'dist_sl', prorettype => 'float8', proargtypes => 'lseg line',
-  prosrc => 'dist_sl' },
-{ oid => '704',
-  proname => 'dist_ls', prorettype => 'float8', proargtypes => 'line lseg',
-  prosrc => 'dist_ls' },
 
-{ oid => '728',
-  proname => 'dist_cpoly', prorettype => 'float8',
-  proargtypes => 'circle polygon', prosrc => 'dist_cpoly' },
-{ oid => '785',
-  proname => 'dist_polyc', prorettype => 'float8',
-  proargtypes => 'polygon circle', prosrc => 'dist_polyc' },
-{ oid => '729',
-  proname => 'poly_distance', prorettype => 'float8',
-  proargtypes => 'polygon polygon', prosrc => 'poly_distance' },
-{ oid => '3275',
-  proname => 'dist_ppoly', prorettype => 'float8',
-  proargtypes => 'point polygon', prosrc => 'dist_ppoly' },
-{ oid => '3292',
-  proname => 'dist_polyp', prorettype => 'float8',
-  proargtypes => 'polygon point', prosrc => 'dist_polyp' },
-{ oid => '3290',
-  proname => 'dist_cpoint', prorettype => 'float8',
-  proargtypes => 'circle point', prosrc => 'dist_cpoint' },
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '740',
   proname => 'text_lt', proleakproof => 't', prorettype => 'bool',
@@ -1942,107 +1774,43 @@
   prorettype => 'void', proargtypes => 'oid int8 bytea',
   prosrc => 'be_lo_put' },
 
-{ oid => '959',
-  proname => 'on_pl', prorettype => 'bool', proargtypes => 'point line',
-  prosrc => 'on_pl' },
-{ oid => '960',
-  proname => 'on_sl', prorettype => 'bool', proargtypes => 'lseg line',
-  prosrc => 'on_sl' },
-{ oid => '961',
-  proname => 'close_pl', prorettype => 'point', proargtypes => 'point line',
-  prosrc => 'close_pl' },
-{ oid => '962',
-  proname => 'close_sl', prorettype => 'point', proargtypes => 'lseg line',
-  prosrc => 'close_sl' },
-{ oid => '963',
-  proname => 'close_lb', prorettype => 'point', proargtypes => 'line box',
-  prosrc => 'close_lb' },
+
+
+
+
+
 
 { oid => '964', descr => 'large object unlink (delete)',
   proname => 'lo_unlink', provolatile => 'v', proparallel => 'u',
   prorettype => 'int4', proargtypes => 'oid', prosrc => 'be_lo_unlink' },
 
-{ oid => '973',
-  proname => 'path_inter', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_inter' },
-{ oid => '975', descr => 'box area',
-  proname => 'area', prorettype => 'float8', proargtypes => 'box',
-  prosrc => 'box_area' },
-{ oid => '976', descr => 'box width',
-  proname => 'width', prorettype => 'float8', proargtypes => 'box',
-  prosrc => 'box_width' },
-{ oid => '977', descr => 'box height',
-  proname => 'height', prorettype => 'float8', proargtypes => 'box',
-  prosrc => 'box_height' },
-{ oid => '978',
-  proname => 'box_distance', prorettype => 'float8', proargtypes => 'box box',
-  prosrc => 'box_distance' },
-{ oid => '979', descr => 'area of a closed path',
-  proname => 'area', prorettype => 'float8', proargtypes => 'path',
-  prosrc => 'path_area' },
-{ oid => '980',
-  proname => 'box_intersect', prorettype => 'box', proargtypes => 'box box',
-  prosrc => 'box_intersect' },
-{ oid => '4067', descr => 'bounding box of two boxes',
-  proname => 'bound_box', prorettype => 'box', proargtypes => 'box box',
-  prosrc => 'boxes_bound_box' },
-{ oid => '981', descr => 'box diagonal',
-  proname => 'diagonal', prorettype => 'lseg', proargtypes => 'box',
-  prosrc => 'box_diagonal' },
-{ oid => '982',
-  proname => 'path_n_lt', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_n_lt' },
-{ oid => '983',
-  proname => 'path_n_gt', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_n_gt' },
-{ oid => '984',
-  proname => 'path_n_eq', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_n_eq' },
-{ oid => '985',
-  proname => 'path_n_le', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_n_le' },
-{ oid => '986',
-  proname => 'path_n_ge', prorettype => 'bool', proargtypes => 'path path',
-  prosrc => 'path_n_ge' },
-{ oid => '987',
-  proname => 'path_length', prorettype => 'float8', proargtypes => 'path',
-  prosrc => 'path_length' },
-{ oid => '988',
-  proname => 'point_ne', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_ne' },
-{ oid => '989',
-  proname => 'point_vert', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_vert' },
-{ oid => '990',
-  proname => 'point_horiz', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_horiz' },
-{ oid => '991',
-  proname => 'point_distance', prorettype => 'float8',
-  proargtypes => 'point point', prosrc => 'point_distance' },
-{ oid => '992', descr => 'slope between points',
-  proname => 'slope', prorettype => 'float8', proargtypes => 'point point',
-  prosrc => 'point_slope' },
-{ oid => '993', descr => 'convert points to line segment',
-  proname => 'lseg', prorettype => 'lseg', proargtypes => 'point point',
-  prosrc => 'lseg_construct' },
-{ oid => '994',
-  proname => 'lseg_intersect', prorettype => 'bool', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_intersect' },
-{ oid => '995',
-  proname => 'lseg_parallel', prorettype => 'bool', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_parallel' },
-{ oid => '996',
-  proname => 'lseg_perp', prorettype => 'bool', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_perp' },
-{ oid => '997',
-  proname => 'lseg_vertical', prorettype => 'bool', proargtypes => 'lseg',
-  prosrc => 'lseg_vertical' },
-{ oid => '998',
-  proname => 'lseg_horizontal', prorettype => 'bool', proargtypes => 'lseg',
-  prosrc => 'lseg_horizontal' },
-{ oid => '999',
-  proname => 'lseg_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_eq' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # OIDS 1000 - 1999
 
@@ -2232,18 +2000,10 @@
   proname => 'time_eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'time time', prosrc => 'time_eq' },
 
-{ oid => '1146',
-  proname => 'circle_add_pt', prorettype => 'circle',
-  proargtypes => 'circle point', prosrc => 'circle_add_pt' },
-{ oid => '1147',
-  proname => 'circle_sub_pt', prorettype => 'circle',
-  proargtypes => 'circle point', prosrc => 'circle_sub_pt' },
-{ oid => '1148',
-  proname => 'circle_mul_pt', prorettype => 'circle',
-  proargtypes => 'circle point', prosrc => 'circle_mul_pt' },
-{ oid => '1149',
-  proname => 'circle_div_pt', prorettype => 'circle',
-  proargtypes => 'circle point', prosrc => 'circle_div_pt' },
+
+
+
+
 
 { oid => '1150', descr => 'I/O',
   proname => 'timestamptz_in', provolatile => 's', prorettype => 'timestamptz',
@@ -2609,6 +2369,11 @@
 
 # OIDS 1300 - 1399
 
+
+
+
+
+
 { oid => '1300',
   descr => 'restriction selectivity for position-comparison operators',
   proname => 'positionsel', provolatile => 's', prorettype => 'float8',
@@ -2627,7 +2392,6 @@
   proname => 'contjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'contjoinsel' },
-
 { oid => '1304', descr => 'intervals overlap?',
   proname => 'overlaps', proisstrict => 'f', prorettype => 'bool',
   proargtypes => 'timestamptz timestamptz timestamptz timestamptz',
@@ -2899,328 +2663,126 @@
   proname => 'overlay', prorettype => 'text', proargtypes => 'text text int4',
   prosrc => 'textoverlay_no_len' },
 
-{ oid => '1406', descr => 'vertically aligned',
-  proname => 'isvertical', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_vert' },
-{ oid => '1407', descr => 'horizontally aligned',
-  proname => 'ishorizontal', prorettype => 'bool', proargtypes => 'point point',
-  prosrc => 'point_horiz' },
-{ oid => '1408', descr => 'parallel',
-  proname => 'isparallel', prorettype => 'bool', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_parallel' },
-{ oid => '1409', descr => 'perpendicular',
-  proname => 'isperp', prorettype => 'bool', proargtypes => 'lseg lseg',
-  prosrc => 'lseg_perp' },
-{ oid => '1410', descr => 'vertical',
-  proname => 'isvertical', prorettype => 'bool', proargtypes => 'lseg',
-  prosrc => 'lseg_vertical' },
-{ oid => '1411', descr => 'horizontal',
-  proname => 'ishorizontal', prorettype => 'bool', proargtypes => 'lseg',
-  prosrc => 'lseg_horizontal' },
-{ oid => '1412', descr => 'parallel',
-  proname => 'isparallel', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_parallel' },
-{ oid => '1413', descr => 'perpendicular',
-  proname => 'isperp', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_perp' },
-{ oid => '1414', descr => 'vertical',
-  proname => 'isvertical', prorettype => 'bool', proargtypes => 'line',
-  prosrc => 'line_vertical' },
-{ oid => '1415', descr => 'horizontal',
-  proname => 'ishorizontal', prorettype => 'bool', proargtypes => 'line',
-  prosrc => 'line_horizontal' },
-{ oid => '1416', descr => 'center of',
-  proname => 'point', prorettype => 'point', proargtypes => 'circle',
-  prosrc => 'circle_center' },
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '1419', descr => 'convert interval to time',
   proname => 'time', prorettype => 'time', proargtypes => 'interval',
   prosrc => 'interval_time' },
 
-{ oid => '1421', descr => 'convert points to box',
-  proname => 'box', prorettype => 'box', proargtypes => 'point point',
-  prosrc => 'points_box' },
-{ oid => '1422',
-  proname => 'box_add', prorettype => 'box', proargtypes => 'box point',
-  prosrc => 'box_add' },
-{ oid => '1423',
-  proname => 'box_sub', prorettype => 'box', proargtypes => 'box point',
-  prosrc => 'box_sub' },
-{ oid => '1424',
-  proname => 'box_mul', prorettype => 'box', proargtypes => 'box point',
-  prosrc => 'box_mul' },
-{ oid => '1425',
-  proname => 'box_div', prorettype => 'box', proargtypes => 'box point',
-  prosrc => 'box_div' },
-{ oid => '1426',
-  proname => 'path_contain_pt', prolang => 'sql', prorettype => 'bool',
-  proargtypes => 'path point', prosrc => 'see system_functions.sql' },
-{ oid => '1428',
-  proname => 'poly_contain_pt', prorettype => 'bool',
-  proargtypes => 'polygon point', prosrc => 'poly_contain_pt' },
-{ oid => '1429',
-  proname => 'pt_contained_poly', prorettype => 'bool',
-  proargtypes => 'point polygon', prosrc => 'pt_contained_poly' },
 
-{ oid => '1430', descr => 'path closed?',
-  proname => 'isclosed', prorettype => 'bool', proargtypes => 'path',
-  prosrc => 'path_isclosed' },
-{ oid => '1431', descr => 'path open?',
-  proname => 'isopen', prorettype => 'bool', proargtypes => 'path',
-  prosrc => 'path_isopen' },
-{ oid => '1432',
-  proname => 'path_npoints', prorettype => 'int4', proargtypes => 'path',
-  prosrc => 'path_npoints' },
+
+
+
+
+
+
+
+
+
+
+
 
 # pclose and popen might better be named close and open, but that crashes initdb.
 # - thomas 97/04/20
-{ oid => '1433', descr => 'close path',
-  proname => 'pclose', prorettype => 'path', proargtypes => 'path',
-  prosrc => 'path_close' },
-{ oid => '1434', descr => 'open path',
-  proname => 'popen', prorettype => 'path', proargtypes => 'path',
-  prosrc => 'path_open' },
 
-{ oid => '1435',
-  proname => 'path_add', prorettype => 'path', proargtypes => 'path path',
-  prosrc => 'path_add' },
-{ oid => '1436',
-  proname => 'path_add_pt', prorettype => 'path', proargtypes => 'path point',
-  prosrc => 'path_add_pt' },
-{ oid => '1437',
-  proname => 'path_sub_pt', prorettype => 'path', proargtypes => 'path point',
-  prosrc => 'path_sub_pt' },
-{ oid => '1438',
-  proname => 'path_mul_pt', prorettype => 'path', proargtypes => 'path point',
-  prosrc => 'path_mul_pt' },
-{ oid => '1439',
-  proname => 'path_div_pt', prorettype => 'path', proargtypes => 'path point',
-  prosrc => 'path_div_pt' },
 
-{ oid => '1440', descr => 'convert x, y to point',
-  proname => 'point', prorettype => 'point', proargtypes => 'float8 float8',
-  prosrc => 'construct_point' },
-{ oid => '1441',
-  proname => 'point_add', prorettype => 'point', proargtypes => 'point point',
-  prosrc => 'point_add' },
-{ oid => '1442',
-  proname => 'point_sub', prorettype => 'point', proargtypes => 'point point',
-  prosrc => 'point_sub' },
-{ oid => '1443',
-  proname => 'point_mul', prorettype => 'point', proargtypes => 'point point',
-  prosrc => 'point_mul' },
-{ oid => '1444',
-  proname => 'point_div', prorettype => 'point', proargtypes => 'point point',
-  prosrc => 'point_div' },
 
-{ oid => '1445',
-  proname => 'poly_npoints', prorettype => 'int4', proargtypes => 'polygon',
-  prosrc => 'poly_npoints' },
-{ oid => '1446', descr => 'convert polygon to bounding box',
-  proname => 'box', prorettype => 'box', proargtypes => 'polygon',
-  prosrc => 'poly_box' },
-{ oid => '1447', descr => 'convert polygon to path',
-  proname => 'path', prorettype => 'path', proargtypes => 'polygon',
-  prosrc => 'poly_path' },
-{ oid => '1448', descr => 'convert box to polygon',
-  proname => 'polygon', prorettype => 'polygon', proargtypes => 'box',
-  prosrc => 'box_poly' },
-{ oid => '1449', descr => 'convert path to polygon',
-  proname => 'polygon', prorettype => 'polygon', proargtypes => 'path',
-  prosrc => 'path_poly' },
 
-{ oid => '1450', descr => 'I/O',
-  proname => 'circle_in', prorettype => 'circle', proargtypes => 'cstring',
-  prosrc => 'circle_in' },
-{ oid => '1451', descr => 'I/O',
-  proname => 'circle_out', prorettype => 'cstring', proargtypes => 'circle',
-  prosrc => 'circle_out' },
-{ oid => '1452',
-  proname => 'circle_same', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_same' },
-{ oid => '1453',
-  proname => 'circle_contain', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_contain' },
-{ oid => '1454',
-  proname => 'circle_left', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_left' },
-{ oid => '1455',
-  proname => 'circle_overleft', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_overleft' },
-{ oid => '1456',
-  proname => 'circle_overright', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_overright' },
-{ oid => '1457',
-  proname => 'circle_right', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_right' },
-{ oid => '1458',
-  proname => 'circle_contained', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_contained' },
-{ oid => '1459',
-  proname => 'circle_overlap', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_overlap' },
-{ oid => '1460',
-  proname => 'circle_below', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_below' },
-{ oid => '1461',
-  proname => 'circle_above', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_above' },
-{ oid => '1462',
-  proname => 'circle_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_eq' },
-{ oid => '1463',
-  proname => 'circle_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_ne' },
-{ oid => '1464',
-  proname => 'circle_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_lt' },
-{ oid => '1465',
-  proname => 'circle_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_gt' },
-{ oid => '1466',
-  proname => 'circle_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_le' },
-{ oid => '1467',
-  proname => 'circle_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_ge' },
-{ oid => '1468', descr => 'area of circle',
-  proname => 'area', prorettype => 'float8', proargtypes => 'circle',
-  prosrc => 'circle_area' },
-{ oid => '1469', descr => 'diameter of circle',
-  proname => 'diameter', prorettype => 'float8', proargtypes => 'circle',
-  prosrc => 'circle_diameter' },
-{ oid => '1470', descr => 'radius of circle',
-  proname => 'radius', prorettype => 'float8', proargtypes => 'circle',
-  prosrc => 'circle_radius' },
-{ oid => '1471',
-  proname => 'circle_distance', prorettype => 'float8',
-  proargtypes => 'circle circle', prosrc => 'circle_distance' },
-{ oid => '1472',
-  proname => 'circle_center', prorettype => 'point', proargtypes => 'circle',
-  prosrc => 'circle_center' },
-{ oid => '1473', descr => 'convert point and radius to circle',
-  proname => 'circle', prorettype => 'circle', proargtypes => 'point float8',
-  prosrc => 'cr_circle' },
-{ oid => '1474', descr => 'convert polygon to circle',
-  proname => 'circle', prorettype => 'circle', proargtypes => 'polygon',
-  prosrc => 'poly_circle' },
-{ oid => '1475', descr => 'convert vertex count and circle to polygon',
-  proname => 'polygon', prorettype => 'polygon', proargtypes => 'int4 circle',
-  prosrc => 'circle_poly' },
-{ oid => '1476',
-  proname => 'dist_pc', prorettype => 'float8', proargtypes => 'point circle',
-  prosrc => 'dist_pc' },
-{ oid => '1477',
-  proname => 'circle_contain_pt', prorettype => 'bool',
-  proargtypes => 'circle point', prosrc => 'circle_contain_pt' },
-{ oid => '1478',
-  proname => 'pt_contained_circle', prorettype => 'bool',
-  proargtypes => 'point circle', prosrc => 'pt_contained_circle' },
-{ oid => '4091', descr => 'convert point to empty box',
-  proname => 'box', prorettype => 'box', proargtypes => 'point',
-  prosrc => 'point_box' },
-{ oid => '1479', descr => 'convert box to circle',
-  proname => 'circle', prorettype => 'circle', proargtypes => 'box',
-  prosrc => 'box_circle' },
-{ oid => '1480', descr => 'convert circle to box',
-  proname => 'box', prorettype => 'box', proargtypes => 'circle',
-  prosrc => 'circle_box' },
 
-{ oid => '1482',
-  proname => 'lseg_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_ne' },
-{ oid => '1483',
-  proname => 'lseg_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_lt' },
-{ oid => '1484',
-  proname => 'lseg_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_le' },
-{ oid => '1485',
-  proname => 'lseg_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_gt' },
-{ oid => '1486',
-  proname => 'lseg_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'lseg lseg', prosrc => 'lseg_ge' },
-{ oid => '1487',
-  proname => 'lseg_length', prorettype => 'float8', proargtypes => 'lseg',
-  prosrc => 'lseg_length' },
-{ oid => '1488',
-  proname => 'close_ls', prorettype => 'point', proargtypes => 'line lseg',
-  prosrc => 'close_ls' },
-{ oid => '1489',
-  proname => 'close_lseg', prorettype => 'point', proargtypes => 'lseg lseg',
-  prosrc => 'close_lseg' },
 
-{ oid => '1490', descr => 'I/O',
-  proname => 'line_in', prorettype => 'line', proargtypes => 'cstring',
-  prosrc => 'line_in' },
-{ oid => '1491', descr => 'I/O',
-  proname => 'line_out', prorettype => 'cstring', proargtypes => 'line',
-  prosrc => 'line_out' },
-{ oid => '1492',
-  proname => 'line_eq', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_eq' },
-{ oid => '1493', descr => 'construct line from points',
-  proname => 'line', prorettype => 'line', proargtypes => 'point point',
-  prosrc => 'line_construct_pp' },
-{ oid => '1494',
-  proname => 'line_interpt', prorettype => 'point', proargtypes => 'line line',
-  prosrc => 'line_interpt' },
-{ oid => '1495',
-  proname => 'line_intersect', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_intersect' },
-{ oid => '1496',
-  proname => 'line_parallel', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_parallel' },
-{ oid => '1497',
-  proname => 'line_perp', prorettype => 'bool', proargtypes => 'line line',
-  prosrc => 'line_perp' },
-{ oid => '1498',
-  proname => 'line_vertical', prorettype => 'bool', proargtypes => 'line',
-  prosrc => 'line_vertical' },
-{ oid => '1499',
-  proname => 'line_horizontal', prorettype => 'bool', proargtypes => 'line',
-  prosrc => 'line_horizontal' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # OIDS 1500 - 1599
 
-{ oid => '1530', descr => 'distance between endpoints',
-  proname => 'length', prorettype => 'float8', proargtypes => 'lseg',
-  prosrc => 'lseg_length' },
-{ oid => '1531', descr => 'sum of path segments',
-  proname => 'length', prorettype => 'float8', proargtypes => 'path',
-  prosrc => 'path_length' },
 
-{ oid => '1532', descr => 'center of',
-  proname => 'point', prorettype => 'point', proargtypes => 'lseg',
-  prosrc => 'lseg_center' },
-{ oid => '1533', descr => 'center of',
-  proname => 'point', prorettype => 'point', proargtypes => 'path',
-  prosrc => 'path_center' },
-{ oid => '1534', descr => 'center of',
-  proname => 'point', prorettype => 'point', proargtypes => 'box',
-  prosrc => 'box_center' },
-{ oid => '1540', descr => 'center of',
-  proname => 'point', prorettype => 'point', proargtypes => 'polygon',
-  prosrc => 'poly_center' },
-{ oid => '1541', descr => 'diagonal of',
-  proname => 'lseg', prorettype => 'lseg', proargtypes => 'box',
-  prosrc => 'box_diagonal' },
-{ oid => '1542', descr => 'center of',
-  proname => 'center', prorettype => 'point', proargtypes => 'box',
-  prosrc => 'box_center' },
-{ oid => '1543', descr => 'center of',
-  proname => 'center', prorettype => 'point', proargtypes => 'circle',
-  prosrc => 'circle_center' },
-{ oid => '1544', descr => 'convert circle to 12-vertex polygon',
-  proname => 'polygon', prolang => 'sql', prorettype => 'polygon',
-  proargtypes => 'circle', prosrc => 'see system_functions.sql' },
-{ oid => '1545', descr => 'number of points',
-  proname => 'npoints', prorettype => 'int4', proargtypes => 'path',
-  prosrc => 'path_npoints' },
-{ oid => '1556', descr => 'number of points',
-  proname => 'npoints', prorettype => 'int4', proargtypes => 'polygon',
-  prosrc => 'poly_npoints' },
+
+
+
+
+
+
+
+
+
+
+
+
 
 { oid => '1564', descr => 'I/O',
   proname => 'bit_in', prorettype => 'bit', proargtypes => 'cstring oid int4',
@@ -3894,290 +3456,111 @@
   prosrc => 'bit_bit_count' },
 
 # for macaddr type support
-{ oid => '436', descr => 'I/O',
-  proname => 'macaddr_in', prorettype => 'macaddr', proargtypes => 'cstring',
-  prosrc => 'macaddr_in' },
-{ oid => '437', descr => 'I/O',
-  proname => 'macaddr_out', prorettype => 'cstring', proargtypes => 'macaddr',
-  prosrc => 'macaddr_out' },
 
-{ oid => '753', descr => 'MACADDR manufacturer fields',
-  proname => 'trunc', prorettype => 'macaddr', proargtypes => 'macaddr',
-  prosrc => 'macaddr_trunc' },
 
-{ oid => '830',
-  proname => 'macaddr_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_eq' },
-{ oid => '831',
-  proname => 'macaddr_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_lt' },
-{ oid => '832',
-  proname => 'macaddr_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_le' },
-{ oid => '833',
-  proname => 'macaddr_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_gt' },
-{ oid => '834',
-  proname => 'macaddr_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_ge' },
-{ oid => '835',
-  proname => 'macaddr_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_ne' },
-{ oid => '836', descr => 'less-equal-greater',
-  proname => 'macaddr_cmp', proleakproof => 't', prorettype => 'int4',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_cmp' },
-{ oid => '3144',
-  proname => 'macaddr_not', prorettype => 'macaddr', proargtypes => 'macaddr',
-  prosrc => 'macaddr_not' },
-{ oid => '3145',
-  proname => 'macaddr_and', prorettype => 'macaddr',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_and' },
-{ oid => '3146',
-  proname => 'macaddr_or', prorettype => 'macaddr',
-  proargtypes => 'macaddr macaddr', prosrc => 'macaddr_or' },
-{ oid => '3359', descr => 'sort support',
-  proname => 'macaddr_sortsupport', prorettype => 'void',
-  proargtypes => 'internal', prosrc => 'macaddr_sortsupport' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # for macaddr8 type support
-{ oid => '4110', descr => 'I/O',
-  proname => 'macaddr8_in', prorettype => 'macaddr8', proargtypes => 'cstring',
-  prosrc => 'macaddr8_in' },
-{ oid => '4111', descr => 'I/O',
-  proname => 'macaddr8_out', prorettype => 'cstring', proargtypes => 'macaddr8',
-  prosrc => 'macaddr8_out' },
 
-{ oid => '4112', descr => 'MACADDR8 manufacturer fields',
-  proname => 'trunc', prorettype => 'macaddr8', proargtypes => 'macaddr8',
-  prosrc => 'macaddr8_trunc' },
 
-{ oid => '4113',
-  proname => 'macaddr8_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_eq' },
-{ oid => '4114',
-  proname => 'macaddr8_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_lt' },
-{ oid => '4115',
-  proname => 'macaddr8_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_le' },
-{ oid => '4116',
-  proname => 'macaddr8_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_gt' },
-{ oid => '4117',
-  proname => 'macaddr8_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_ge' },
-{ oid => '4118',
-  proname => 'macaddr8_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_ne' },
-{ oid => '4119', descr => 'less-equal-greater',
-  proname => 'macaddr8_cmp', proleakproof => 't', prorettype => 'int4',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_cmp' },
-{ oid => '4120',
-  proname => 'macaddr8_not', prorettype => 'macaddr8',
-  proargtypes => 'macaddr8', prosrc => 'macaddr8_not' },
-{ oid => '4121',
-  proname => 'macaddr8_and', prorettype => 'macaddr8',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_and' },
-{ oid => '4122',
-  proname => 'macaddr8_or', prorettype => 'macaddr8',
-  proargtypes => 'macaddr8 macaddr8', prosrc => 'macaddr8_or' },
-{ oid => '4123', descr => 'convert macaddr to macaddr8',
-  proname => 'macaddr8', proleakproof => 't', prorettype => 'macaddr8',
-  proargtypes => 'macaddr', prosrc => 'macaddrtomacaddr8' },
-{ oid => '4124', descr => 'convert macaddr8 to macaddr',
-  proname => 'macaddr', prorettype => 'macaddr', proargtypes => 'macaddr8',
-  prosrc => 'macaddr8tomacaddr' },
-{ oid => '4125', descr => 'set 7th bit in macaddr8',
-  proname => 'macaddr8_set7bit', prorettype => 'macaddr8',
-  proargtypes => 'macaddr8', prosrc => 'macaddr8_set7bit' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # for inet type support
-{ oid => '910', descr => 'I/O',
-  proname => 'inet_in', prorettype => 'inet', proargtypes => 'cstring',
-  prosrc => 'inet_in' },
-{ oid => '911', descr => 'I/O',
-  proname => 'inet_out', prorettype => 'cstring', proargtypes => 'inet',
-  prosrc => 'inet_out' },
+
+
 
 # for cidr type support
-{ oid => '1267', descr => 'I/O',
-  proname => 'cidr_in', prorettype => 'cidr', proargtypes => 'cstring',
-  prosrc => 'cidr_in' },
-{ oid => '1427', descr => 'I/O',
-  proname => 'cidr_out', prorettype => 'cstring', proargtypes => 'cidr',
-  prosrc => 'cidr_out' },
+
+
 
 # these are used for both inet and cidr
-{ oid => '920',
-  proname => 'network_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_eq' },
-{ oid => '921',
-  proname => 'network_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_lt' },
-{ oid => '922',
-  proname => 'network_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_le' },
-{ oid => '923',
-  proname => 'network_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_gt' },
-{ oid => '924',
-  proname => 'network_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_ge' },
-{ oid => '925',
-  proname => 'network_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_ne' },
-{ oid => '3562', descr => 'larger of two',
-  proname => 'network_larger', prorettype => 'inet', proargtypes => 'inet inet',
-  prosrc => 'network_larger' },
-{ oid => '3563', descr => 'smaller of two',
-  proname => 'network_smaller', prorettype => 'inet',
-  proargtypes => 'inet inet', prosrc => 'network_smaller' },
-{ oid => '926', descr => 'less-equal-greater',
-  proname => 'network_cmp', proleakproof => 't', prorettype => 'int4',
-  proargtypes => 'inet inet', prosrc => 'network_cmp' },
-{ oid => '927',
-  proname => 'network_sub', prosupport => 'network_subset_support',
-  prorettype => 'bool', proargtypes => 'inet inet', prosrc => 'network_sub' },
-{ oid => '928',
-  proname => 'network_subeq', prosupport => 'network_subset_support',
-  prorettype => 'bool', proargtypes => 'inet inet', prosrc => 'network_subeq' },
-{ oid => '929',
-  proname => 'network_sup', prosupport => 'network_subset_support',
-  prorettype => 'bool', proargtypes => 'inet inet', prosrc => 'network_sup' },
-{ oid => '930',
-  proname => 'network_supeq', prosupport => 'network_subset_support',
-  prorettype => 'bool', proargtypes => 'inet inet', prosrc => 'network_supeq' },
-{ oid => '1173', descr => 'planner support for network_sub/superset',
-  proname => 'network_subset_support', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'network_subset_support' },
 
-{ oid => '3551',
-  proname => 'network_overlap', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'network_overlap' },
-{ oid => '5033', descr => 'sort support',
-  proname => 'network_sortsupport', prorettype => 'void',
-  proargtypes => 'internal', prosrc => 'network_sortsupport' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # inet/cidr functions
-{ oid => '598', descr => 'abbreviated display of inet value',
-  proname => 'abbrev', prorettype => 'text', proargtypes => 'inet',
-  prosrc => 'inet_abbrev' },
-{ oid => '599', descr => 'abbreviated display of cidr value',
-  proname => 'abbrev', prorettype => 'text', proargtypes => 'cidr',
-  prosrc => 'cidr_abbrev' },
-{ oid => '605', descr => 'change netmask of inet',
-  proname => 'set_masklen', prorettype => 'inet', proargtypes => 'inet int4',
-  prosrc => 'inet_set_masklen' },
-{ oid => '635', descr => 'change netmask of cidr',
-  proname => 'set_masklen', prorettype => 'cidr', proargtypes => 'cidr int4',
-  prosrc => 'cidr_set_masklen' },
-{ oid => '711', descr => 'address family (4 for IPv4, 6 for IPv6)',
-  proname => 'family', prorettype => 'int4', proargtypes => 'inet',
-  prosrc => 'network_family' },
-{ oid => '683', descr => 'network part of address',
-  proname => 'network', prorettype => 'cidr', proargtypes => 'inet',
-  prosrc => 'network_network' },
-{ oid => '696', descr => 'netmask of address',
-  proname => 'netmask', prorettype => 'inet', proargtypes => 'inet',
-  prosrc => 'network_netmask' },
-{ oid => '697', descr => 'netmask length',
-  proname => 'masklen', prorettype => 'int4', proargtypes => 'inet',
-  prosrc => 'network_masklen' },
-{ oid => '698', descr => 'broadcast address of network',
-  proname => 'broadcast', prorettype => 'inet', proargtypes => 'inet',
-  prosrc => 'network_broadcast' },
-{ oid => '699', descr => 'show address octets only',
-  proname => 'host', prorettype => 'text', proargtypes => 'inet',
-  prosrc => 'network_host' },
-{ oid => '730', descr => 'show all parts of inet/cidr value',
-  proname => 'text', prorettype => 'text', proargtypes => 'inet',
-  prosrc => 'network_show' },
-{ oid => '1362', descr => 'hostmask of address',
-  proname => 'hostmask', prorettype => 'inet', proargtypes => 'inet',
-  prosrc => 'network_hostmask' },
-{ oid => '1715', descr => 'convert inet to cidr',
-  proname => 'cidr', prorettype => 'cidr', proargtypes => 'inet',
-  prosrc => 'inet_to_cidr' },
 
-{ oid => '2196', descr => 'inet address of the client',
-  proname => 'inet_client_addr', proisstrict => 'f', provolatile => 's',
-  proparallel => 'r', prorettype => 'inet', proargtypes => '',
-  prosrc => 'inet_client_addr' },
-{ oid => '2197', descr => 'client\'s port number for this connection',
-  proname => 'inet_client_port', proisstrict => 'f', provolatile => 's',
-  proparallel => 'r', prorettype => 'int4', proargtypes => '',
-  prosrc => 'inet_client_port' },
-{ oid => '2198', descr => 'inet address of the server',
-  proname => 'inet_server_addr', proisstrict => 'f', provolatile => 's',
-  proparallel => 'r', prorettype => 'inet', proargtypes => '',
-  prosrc => 'inet_server_addr' },
-{ oid => '2199', descr => 'server\'s port number for this connection',
-  proname => 'inet_server_port', proisstrict => 'f', provolatile => 's',
-  proparallel => 'r', prorettype => 'int4', proargtypes => '',
-  prosrc => 'inet_server_port' },
 
-{ oid => '2627',
-  proname => 'inetnot', prorettype => 'inet', proargtypes => 'inet',
-  prosrc => 'inetnot' },
-{ oid => '2628',
-  proname => 'inetand', prorettype => 'inet', proargtypes => 'inet inet',
-  prosrc => 'inetand' },
-{ oid => '2629',
-  proname => 'inetor', prorettype => 'inet', proargtypes => 'inet inet',
-  prosrc => 'inetor' },
-{ oid => '2630',
-  proname => 'inetpl', prorettype => 'inet', proargtypes => 'inet int8',
-  prosrc => 'inetpl' },
-{ oid => '2631',
-  proname => 'int8pl_inet', prolang => 'sql', prorettype => 'inet',
-  proargtypes => 'int8 inet', prosrc => 'see system_functions.sql' },
-{ oid => '2632',
-  proname => 'inetmi_int8', prorettype => 'inet', proargtypes => 'inet int8',
-  prosrc => 'inetmi_int8' },
-{ oid => '2633',
-  proname => 'inetmi', prorettype => 'int8', proargtypes => 'inet inet',
-  prosrc => 'inetmi' },
-{ oid => '4071', descr => 'are the addresses from the same family?',
-  proname => 'inet_same_family', prorettype => 'bool',
-  proargtypes => 'inet inet', prosrc => 'inet_same_family' },
-{ oid => '4063',
-  descr => 'the smallest network which includes both of the given networks',
-  proname => 'inet_merge', prorettype => 'cidr', proargtypes => 'inet inet',
-  prosrc => 'inet_merge' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # GiST support for inet and cidr
-{ oid => '3553', descr => 'GiST support',
-  proname => 'inet_gist_consistent', prorettype => 'bool',
-  proargtypes => 'internal inet int2 oid internal',
-  prosrc => 'inet_gist_consistent' },
-{ oid => '3554', descr => 'GiST support',
-  proname => 'inet_gist_union', prorettype => 'inet',
-  proargtypes => 'internal internal', prosrc => 'inet_gist_union' },
-{ oid => '3555', descr => 'GiST support',
-  proname => 'inet_gist_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'inet_gist_compress' },
-{ oid => '3573', descr => 'GiST support',
-  proname => 'inet_gist_fetch', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'inet_gist_fetch' },
-{ oid => '3557', descr => 'GiST support',
-  proname => 'inet_gist_penalty', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'inet_gist_penalty' },
-{ oid => '3558', descr => 'GiST support',
-  proname => 'inet_gist_picksplit', prorettype => 'internal',
-  proargtypes => 'internal internal', prosrc => 'inet_gist_picksplit' },
-{ oid => '3559', descr => 'GiST support',
-  proname => 'inet_gist_same', prorettype => 'internal',
-  proargtypes => 'inet inet internal', prosrc => 'inet_gist_same' },
+
+
+
+
+
+
+
 
 
 # Selectivity estimation for inet and cidr
-{ oid => '3560', descr => 'restriction selectivity for network operators',
-  proname => 'networksel', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'internal oid internal int4', prosrc => 'networksel' },
-{ oid => '3561', descr => 'join selectivity for network operators',
-  proname => 'networkjoinsel', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'internal oid internal int2 internal',
-  prosrc => 'networkjoinsel' },
 
 { oid => '1690',
   proname => 'time_mi_time', prorettype => 'interval',
@@ -5249,7 +4632,7 @@
   proname => 'pg_stat_get_activity', prorows => '100', proisstrict => 'f',
   proretset => 't', provolatile => 's', proparallel => 'r',
   prorettype => 'record', proargtypes => 'int4',
-  proallargtypes => '{int4,oid,int4,oid,text,text,text,text,text,timestamptz,timestamptz,timestamptz,timestamptz,inet,text,int4,xid,xid,text,bool,text,text,int4,text,numeric,text,bool,text,bool,int4,int8}',
+  proallargtypes => '{int4,oid,int4,oid,text,text,text,text,text,timestamptz,timestamptz,timestamptz,timestamptz,text,text,int4,xid,xid,text,bool,text,text,int4,text,numeric,text,bool,text,bool,int4,int8}',
   proargmodes => '{i,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o}',
   proargnames => '{pid,datid,pid,usesysid,application_name,state,query,wait_event_type,wait_event,xact_start,query_start,backend_start,state_change,client_addr,client_hostname,client_port,backend_xid,backend_xmin,backend_type,ssl,sslversion,sslcipher,sslbits,ssl_client_dn,ssl_client_serial,ssl_issuer_dn,gss_auth,gss_princ,gss_enc,leader_pid,query_id}',
   prosrc => 'pg_stat_get_activity' },
@@ -5338,11 +4721,7 @@
   proname => 'pg_stat_get_backend_start', provolatile => 's',
   proparallel => 'r', prorettype => 'timestamptz', proargtypes => 'int4',
   prosrc => 'pg_stat_get_backend_start' },
-{ oid => '1392',
-  descr => 'statistics: address of client connected to backend',
-  proname => 'pg_stat_get_backend_client_addr', provolatile => 's',
-  proparallel => 'r', prorettype => 'inet', proargtypes => 'int4',
-  prosrc => 'pg_stat_get_backend_client_addr' },
+
 { oid => '1393',
   descr => 'statistics: port number of client connected to backend',
   proname => 'pg_stat_get_backend_client_port', provolatile => 's',
@@ -6437,9 +5816,7 @@
 { oid => '2797', descr => 'maximum value of all tid input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'tid',
   proargtypes => 'tid', prosrc => 'aggregate_dummy' },
-{ oid => '3564', descr => 'maximum value of all inet input values',
-  proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'inet',
-  proargtypes => 'inet', prosrc => 'aggregate_dummy' },
+
 { oid => '4189', descr => 'maximum value of all pg_lsn input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'pg_lsn',
   proargtypes => 'pg_lsn', prosrc => 'aggregate_dummy' },
@@ -6504,9 +5881,7 @@
 { oid => '2798', descr => 'minimum value of all tid input values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'tid',
   proargtypes => 'tid', prosrc => 'aggregate_dummy' },
-{ oid => '3565', descr => 'minimum value of all inet input values',
-  proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'inet',
-  proargtypes => 'inet', prosrc => 'aggregate_dummy' },
+
 { oid => '4190', descr => 'minimum value of all pg_lsn input values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'pg_lsn',
   proargtypes => 'pg_lsn', prosrc => 'aggregate_dummy' },
@@ -7582,12 +6957,8 @@
 { oid => '2427', descr => 'I/O',
   proname => 'float8send', prorettype => 'bytea', proargtypes => 'float8',
   prosrc => 'float8send' },
-{ oid => '2428', descr => 'I/O',
-  proname => 'point_recv', prorettype => 'point', proargtypes => 'internal',
-  prosrc => 'point_recv' },
-{ oid => '2429', descr => 'I/O',
-  proname => 'point_send', prorettype => 'bytea', proargtypes => 'point',
-  prosrc => 'point_send' },
+
+
 { oid => '2430', descr => 'I/O',
   proname => 'bpcharrecv', provolatile => 's', prorettype => 'bpchar',
   proargtypes => 'internal oid int4', prosrc => 'bpcharrecv' },
@@ -7739,66 +7110,30 @@
 { oid => '2479', descr => 'I/O',
   proname => 'interval_send', prorettype => 'bytea', proargtypes => 'interval',
   prosrc => 'interval_send' },
-{ oid => '2480', descr => 'I/O',
-  proname => 'lseg_recv', prorettype => 'lseg', proargtypes => 'internal',
-  prosrc => 'lseg_recv' },
-{ oid => '2481', descr => 'I/O',
-  proname => 'lseg_send', prorettype => 'bytea', proargtypes => 'lseg',
-  prosrc => 'lseg_send' },
-{ oid => '2482', descr => 'I/O',
-  proname => 'path_recv', prorettype => 'path', proargtypes => 'internal',
-  prosrc => 'path_recv' },
-{ oid => '2483', descr => 'I/O',
-  proname => 'path_send', prorettype => 'bytea', proargtypes => 'path',
-  prosrc => 'path_send' },
-{ oid => '2484', descr => 'I/O',
-  proname => 'box_recv', prorettype => 'box', proargtypes => 'internal',
-  prosrc => 'box_recv' },
-{ oid => '2485', descr => 'I/O',
-  proname => 'box_send', prorettype => 'bytea', proargtypes => 'box',
-  prosrc => 'box_send' },
-{ oid => '2486', descr => 'I/O',
-  proname => 'poly_recv', prorettype => 'polygon', proargtypes => 'internal',
-  prosrc => 'poly_recv' },
-{ oid => '2487', descr => 'I/O',
-  proname => 'poly_send', prorettype => 'bytea', proargtypes => 'polygon',
-  prosrc => 'poly_send' },
-{ oid => '2488', descr => 'I/O',
-  proname => 'line_recv', prorettype => 'line', proargtypes => 'internal',
-  prosrc => 'line_recv' },
-{ oid => '2489', descr => 'I/O',
-  proname => 'line_send', prorettype => 'bytea', proargtypes => 'line',
-  prosrc => 'line_send' },
-{ oid => '2490', descr => 'I/O',
-  proname => 'circle_recv', prorettype => 'circle', proargtypes => 'internal',
-  prosrc => 'circle_recv' },
-{ oid => '2491', descr => 'I/O',
-  proname => 'circle_send', prorettype => 'bytea', proargtypes => 'circle',
-  prosrc => 'circle_send' },
+
+
+
+
+
+
+
+
+
+
+
+
 { oid => '2492', descr => 'I/O',
   proname => 'cash_recv', prorettype => 'money', proargtypes => 'internal',
   prosrc => 'cash_recv' },
 { oid => '2493', descr => 'I/O',
   proname => 'cash_send', prorettype => 'bytea', proargtypes => 'money',
   prosrc => 'cash_send' },
-{ oid => '2494', descr => 'I/O',
-  proname => 'macaddr_recv', prorettype => 'macaddr', proargtypes => 'internal',
-  prosrc => 'macaddr_recv' },
-{ oid => '2495', descr => 'I/O',
-  proname => 'macaddr_send', prorettype => 'bytea', proargtypes => 'macaddr',
-  prosrc => 'macaddr_send' },
-{ oid => '2496', descr => 'I/O',
-  proname => 'inet_recv', prorettype => 'inet', proargtypes => 'internal',
-  prosrc => 'inet_recv' },
-{ oid => '2497', descr => 'I/O',
-  proname => 'inet_send', prorettype => 'bytea', proargtypes => 'inet',
-  prosrc => 'inet_send' },
-{ oid => '2498', descr => 'I/O',
-  proname => 'cidr_recv', prorettype => 'cidr', proargtypes => 'internal',
-  prosrc => 'cidr_recv' },
-{ oid => '2499', descr => 'I/O',
-  proname => 'cidr_send', prorettype => 'bytea', proargtypes => 'cidr',
-  prosrc => 'cidr_send' },
+
+
+
+
+
+
 { oid => '2500', descr => 'I/O',
   proname => 'cstring_recv', provolatile => 's', prorettype => 'cstring',
   proargtypes => 'internal', prosrc => 'cstring_recv' },
@@ -7817,12 +7152,8 @@
 { oid => '3121', descr => 'I/O',
   proname => 'void_send', prorettype => 'bytea', proargtypes => 'void',
   prosrc => 'void_send' },
-{ oid => '3446', descr => 'I/O',
-  proname => 'macaddr8_recv', prorettype => 'macaddr8',
-  proargtypes => 'internal', prosrc => 'macaddr8_recv' },
-{ oid => '3447', descr => 'I/O',
-  proname => 'macaddr8_send', prorettype => 'bytea', proargtypes => 'macaddr8',
-  prosrc => 'macaddr8_send' },
+
+
 
 # System-view support functions with pretty-print option
 { oid => '2504', descr => 'source text of a rule with pretty-print option',
@@ -8087,97 +7418,35 @@
   prosrc => 'pg_conf_load_time' },
 
 # new functions for Y-direction rtree opclasses
-{ oid => '2562',
-  proname => 'box_below', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_below' },
-{ oid => '2563',
-  proname => 'box_overbelow', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_overbelow' },
-{ oid => '2564',
-  proname => 'box_overabove', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_overabove' },
-{ oid => '2565',
-  proname => 'box_above', prorettype => 'bool', proargtypes => 'box box',
-  prosrc => 'box_above' },
-{ oid => '2566',
-  proname => 'poly_below', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_below' },
-{ oid => '2567',
-  proname => 'poly_overbelow', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_overbelow' },
-{ oid => '2568',
-  proname => 'poly_overabove', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_overabove' },
-{ oid => '2569',
-  proname => 'poly_above', prorettype => 'bool',
-  proargtypes => 'polygon polygon', prosrc => 'poly_above' },
-{ oid => '2587',
-  proname => 'circle_overbelow', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_overbelow' },
-{ oid => '2588',
-  proname => 'circle_overabove', prorettype => 'bool',
-  proargtypes => 'circle circle', prosrc => 'circle_overabove' },
+
+
+
+
+
+
+
+
+
+
 
 # support functions for GiST r-tree emulation
-{ oid => '2578', descr => 'GiST support',
-  proname => 'gist_box_consistent', prorettype => 'bool',
-  proargtypes => 'internal box int2 oid internal',
-  prosrc => 'gist_box_consistent' },
-{ oid => '2581', descr => 'GiST support',
-  proname => 'gist_box_penalty', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'gist_box_penalty' },
-{ oid => '2582', descr => 'GiST support',
-  proname => 'gist_box_picksplit', prorettype => 'internal',
-  proargtypes => 'internal internal', prosrc => 'gist_box_picksplit' },
-{ oid => '2583', descr => 'GiST support',
-  proname => 'gist_box_union', prorettype => 'box',
-  proargtypes => 'internal internal', prosrc => 'gist_box_union' },
-{ oid => '2584', descr => 'GiST support',
-  proname => 'gist_box_same', prorettype => 'internal',
-  proargtypes => 'box box internal', prosrc => 'gist_box_same' },
-{ oid => '3998', descr => 'GiST support',
-  proname => 'gist_box_distance', prorettype => 'float8',
-  proargtypes => 'internal box int2 oid internal',
-  prosrc => 'gist_box_distance' },
-{ oid => '2585', descr => 'GiST support',
-  proname => 'gist_poly_consistent', prorettype => 'bool',
-  proargtypes => 'internal polygon int2 oid internal',
-  prosrc => 'gist_poly_consistent' },
-{ oid => '2586', descr => 'GiST support',
-  proname => 'gist_poly_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gist_poly_compress' },
-{ oid => '2591', descr => 'GiST support',
-  proname => 'gist_circle_consistent', prorettype => 'bool',
-  proargtypes => 'internal circle int2 oid internal',
-  prosrc => 'gist_circle_consistent' },
-{ oid => '2592', descr => 'GiST support',
-  proname => 'gist_circle_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gist_circle_compress' },
-{ oid => '1030', descr => 'GiST support',
-  proname => 'gist_point_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gist_point_compress' },
-{ oid => '3282', descr => 'GiST support',
-  proname => 'gist_point_fetch', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'gist_point_fetch' },
-{ oid => '2179', descr => 'GiST support',
-  proname => 'gist_point_consistent', prorettype => 'bool',
-  proargtypes => 'internal point int2 oid internal',
-  prosrc => 'gist_point_consistent' },
-{ oid => '3064', descr => 'GiST support',
-  proname => 'gist_point_distance', prorettype => 'float8',
-  proargtypes => 'internal point int2 oid internal',
-  prosrc => 'gist_point_distance' },
-{ oid => '3280', descr => 'GiST support',
-  proname => 'gist_circle_distance', prorettype => 'float8',
-  proargtypes => 'internal circle int2 oid internal',
-  prosrc => 'gist_circle_distance' },
-{ oid => '3288', descr => 'GiST support',
-  proname => 'gist_poly_distance', prorettype => 'float8',
-  proargtypes => 'internal polygon int2 oid internal',
-  prosrc => 'gist_poly_distance' },
-{ oid => '3435', descr => 'sort support',
-  proname => 'gist_point_sortsupport', prorettype => 'void',
-  proargtypes => 'internal', prosrc => 'gist_point_sortsupport' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # GIN array support
 { oid => '2743', descr => 'GIN array support',
@@ -9634,29 +8903,6 @@
 { oid => '3874',
   proname => 'range_gt', prorettype => 'bool',
   proargtypes => 'anyrange anyrange', prosrc => 'range_gt' },
-{ oid => '3875', descr => 'GiST support',
-  proname => 'range_gist_consistent', prorettype => 'bool',
-  proargtypes => 'internal anyrange int2 oid internal',
-  prosrc => 'range_gist_consistent' },
-{ oid => '3876', descr => 'GiST support',
-  proname => 'range_gist_union', prorettype => 'anyrange',
-  proargtypes => 'internal internal', prosrc => 'range_gist_union' },
-{ oid => '3879', descr => 'GiST support',
-  proname => 'range_gist_penalty', prorettype => 'internal',
-  proargtypes => 'internal internal internal', prosrc => 'range_gist_penalty' },
-{ oid => '3880', descr => 'GiST support',
-  proname => 'range_gist_picksplit', prorettype => 'internal',
-  proargtypes => 'internal internal', prosrc => 'range_gist_picksplit' },
-{ oid => '3881', descr => 'GiST support',
-  proname => 'range_gist_same', prorettype => 'internal',
-  proargtypes => 'anyrange anyrange internal', prosrc => 'range_gist_same' },
-{ oid => '6154', descr => 'GiST support',
-  proname => 'multirange_gist_consistent', prorettype => 'bool',
-  proargtypes => 'internal anymultirange int2 oid internal',
-  prosrc => 'multirange_gist_consistent' },
-{ oid => '6156', descr => 'GiST support',
-  proname => 'multirange_gist_compress', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'multirange_gist_compress' },
 { oid => '3902', descr => 'hash a range',
   proname => 'hash_range', prorettype => 'int4', proargtypes => 'anyrange',
   prosrc => 'hash_range' },

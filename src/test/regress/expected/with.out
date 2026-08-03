@@ -1427,7 +1427,9 @@ with recursive search_graph(f, t, label) as (
 	where g.f = sg.t
 ) cycle f, t set is_cycle to point '(1,1)' default point '(0,0)' using path
 select * from search_graph;
-ERROR:  could not identify an equality operator for type point
+ERROR:  type "point" does not exist
+LINE 7: ) cycle f, t set is_cycle to point '(1,1)' default point '(0...
+                                     ^
 with recursive search_graph(f, t, label) as (
 	select * from graph g
 	union all

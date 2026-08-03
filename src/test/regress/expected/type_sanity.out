@@ -675,14 +675,6 @@ WHERE p1.rngmultitypid IS NULL OR p1.rngmultitypid = 0;
 -- Create a table that holds all the known in-core data types and leave it
 -- around so as pg_upgrade is able to test their binary compatibility.
 CREATE TABLE tab_core_types AS SELECT
-  '(11,12)'::point,
-  '(1,1),(2,2)'::line,
-  '((11,11),(12,12))'::lseg,
-  '((11,11),(13,13))'::box,
-  '((11,12),(13,13),(14,14))'::path AS openedpath,
-  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
-  '((11,12),(13,13),(14,14))'::polygon,
-  '1,1,1'::circle,
   'today'::date,
   'now'::time,
   'now'::timestamp,
@@ -692,10 +684,6 @@ CREATE TABLE tab_core_types AS SELECT
   '{"reason":"because"}'::json,
   '{"when":"now"}'::jsonb,
   '$.a[*] ? (@ > 2)'::jsonpath,
-  '127.0.0.1'::inet,
-  '127.0.0.0/8'::cidr,
-  '00:01:03:86:1c:ba'::macaddr8,
-  '00:01:03:86:1c:ba'::macaddr,
   2::int2, 4::int4, 8::int8,
   4::float4, '8'::float8, pi()::numeric,
   'foo'::"char",
