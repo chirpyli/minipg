@@ -337,7 +337,6 @@ DECLARE_UNIQUE_INDEX(pg_type_typname_nsp_index, 2704, on pg_type using btree(typ
  * Backwards compatibility for ancient random spellings of pg_type OID macros.
  * Don't use these names in new code.
  */
-#define CASHOID	MONEYOID
 #define LSNOID	PG_LSNOID
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */

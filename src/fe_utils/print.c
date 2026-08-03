@@ -3481,7 +3481,6 @@ column_type_alignment(Oid ftype)
 		case XIDOID:
 		case XID8OID:
 		case CIDOID:
-		case MONEYOID:
 			align = 'r';
 			break;
 		default:

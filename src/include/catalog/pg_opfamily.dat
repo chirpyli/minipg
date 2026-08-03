@@ -98,8 +98,6 @@
   opfmethod => 'btree', opfname => 'text_pattern_ops' },
 { oid => '2097', oid_symbol => 'BPCHAR_PATTERN_BTREE_FAM_OID',
   opfmethod => 'btree', opfname => 'bpchar_pattern_ops' },
-{ oid => '2099',
-  opfmethod => 'btree', opfname => 'money_ops' },
 { oid => '2222', oid_symbol => 'BOOL_HASH_FAM_OID',
   opfmethod => 'hash', opfname => 'bool_ops' },
 { oid => '2223',

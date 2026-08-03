@@ -23,7 +23,6 @@ OBJS = \
 	arrayutils.o \
 	ascii.o \
 	bool.o \
-	cash.o \
 	char.o \
 	cryptohashfuncs.o \
 	date.o \

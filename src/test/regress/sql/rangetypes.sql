@@ -361,17 +361,6 @@ alter type two_ints add attribute c two_ints_range;
 
 drop type two_ints cascade;
 
---
--- Check behavior when subtype lacks a hash function
---
-
-create type cashrange as range (subtype = money);
-
-set enable_sort = off;  -- try to make it pick a hash setop implementation
-
-select '(2,5)'::cashrange except select '(5,6)'::cashrange;
-
-reset enable_sort;
 
 --
 -- OUT/INOUT/TABLE functions

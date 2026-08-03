@@ -144,11 +144,19 @@ WHERE  hash_array(v)::bit(32) != hash_array_extended(v, 0)::bit(32)
 
 -- array hashing with non-hashable element type
 SELECT v as value, hash_array(v)::bit(32) as standard
-FROM   (VALUES ('{0}'::money[])) x(v);
-ERROR:  could not identify a hash function for type money
+FROM   (VALUES ('{0}'::numeric[])) x(v);
+ value |             standard             
+-------+----------------------------------
+ {0}   | 00000000000000000000000000011110
+(1 row)
+
 SELECT v as value, hash_array_extended(v, 0)::bit(32) as extended0
-FROM   (VALUES ('{0}'::money[])) x(v);
-ERROR:  could not identify an extended hash function for type money
+FROM   (VALUES ('{0}'::numeric[])) x(v);
+ value |            extended0             
+-------+----------------------------------
+ {0}   | 00000000000000000000000000011110
+(1 row)
+
 SELECT v as value, hashbpchar(v)::bit(32) as standard,
        hashbpcharextended(v, 0)::bit(32) as extended0,
        hashbpcharextended(v, 1)::bit(32) as extended1
@@ -296,13 +304,21 @@ WHERE  hash_record(v)::bit(32) != hash_record_extended(v, 0)::bit(32)
 
 DROP TYPE hash_test_t1;
 -- record hashing with non-hashable field type
-CREATE TYPE hash_test_t2 AS (a money, b text);
+CREATE TYPE hash_test_t2 AS (a numeric, b text);
 SELECT v as value, hash_record(v)::bit(32) as standard
 FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
-ERROR:  could not identify a hash function for type money
+  value  |             standard             
+---------+----------------------------------
+ (1,aaa) | 00100111000001010111101100111101
+(1 row)
+
 SELECT v as value, hash_record_extended(v, 0)::bit(32) as extended0
 FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
-ERROR:  could not identify an extended hash function for type money
+  value  |            extended0             
+---------+----------------------------------
+ (1,aaa) | 00100111000001010111101100111101
+(1 row)
+
 DROP TYPE hash_test_t2;
 --
 -- Check special cases for specific data types

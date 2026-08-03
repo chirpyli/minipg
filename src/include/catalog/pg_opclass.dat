@@ -152,8 +152,6 @@
   opcmethod => 'btree', opcname => 'bpchar_pattern_ops',
   opcfamily => 'btree/bpchar_pattern_ops', opcintype => 'bpchar',
   opcdefault => 'f' },
-{ opcmethod => 'btree', opcname => 'money_ops', opcfamily => 'btree/money_ops',
-  opcintype => 'money' },
 { opcmethod => 'hash', opcname => 'bool_ops', opcfamily => 'hash/bool_ops',
   opcintype => 'bool' },
 { opcmethod => 'hash', opcname => 'bytea_ops', opcfamily => 'hash/bytea_ops',

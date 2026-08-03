@@ -78,14 +78,6 @@
   castfunc => 'float4(numeric)', castcontext => 'i', castmethod => 'f' },
 { castsource => 'numeric', casttarget => 'float8',
   castfunc => 'float8(numeric)', castcontext => 'i', castmethod => 'f' },
-{ castsource => 'money', casttarget => 'numeric', castfunc => 'numeric(money)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'numeric', casttarget => 'money', castfunc => 'money(numeric)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'int4', casttarget => 'money', castfunc => 'money(int4)',
-  castcontext => 'a', castmethod => 'f' },
-{ castsource => 'int8', casttarget => 'money', castfunc => 'money(int8)',
-  castcontext => 'a', castmethod => 'f' },
 
 # Allow explicit coercions between int4 and bool
 { castsource => 'int4', casttarget => 'bool', castfunc => 'bool(int4)',

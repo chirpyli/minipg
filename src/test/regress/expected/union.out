@@ -479,20 +479,19 @@ reset enable_hashagg;
 -- non-hashable type
 set enable_hashagg to on;
 explain (costs off)
-select x from (values (100::money), (200::money)) _(x) union select x from (values (100::money), (300::money)) _(x);
-                  QUERY PLAN                   
------------------------------------------------
- Unique
-   ->  Sort
-         Sort Key: "*VALUES*".column1
-         ->  Append
-               ->  Values Scan on "*VALUES*"
-               ->  Values Scan on "*VALUES*_1"
-(6 rows)
+select x from (values (100::numeric), (200::numeric)) _(x) union select x from (values (100::numeric), (300::numeric)) _(x);
+               QUERY PLAN                
+-----------------------------------------
+ HashAggregate
+   Group Key: "*VALUES*".column1
+   ->  Append
+         ->  Values Scan on "*VALUES*"
+         ->  Values Scan on "*VALUES*_1"
+(5 rows)
 
 set enable_hashagg to off;
 explain (costs off)
-select x from (values (100::money), (200::money)) _(x) union select x from (values (100::money), (300::money)) _(x);
+select x from (values (100::numeric), (200::numeric)) _(x) union select x from (values (100::numeric), (300::numeric)) _(x);
                   QUERY PLAN                   
 -----------------------------------------------
  Unique
@@ -563,23 +562,22 @@ select x from (values (array[1, 2]), (array[1, 3])) _(x) except select x from (v
 
 -- non-hashable type
 explain (costs off)
-select x from (values (array[100::money]), (array[200::money])) _(x) union select x from (values (array[100::money]), (array[300::money])) _(x);
-                  QUERY PLAN                   
------------------------------------------------
- Unique
-   ->  Sort
-         Sort Key: "*VALUES*".column1
-         ->  Append
-               ->  Values Scan on "*VALUES*"
-               ->  Values Scan on "*VALUES*_1"
-(6 rows)
+select x from (values (array[100::numeric]), (array[200::numeric])) _(x) union select x from (values (array[100::numeric]), (array[300::numeric])) _(x);
+               QUERY PLAN                
+-----------------------------------------
+ HashAggregate
+   Group Key: "*VALUES*".column1
+   ->  Append
+         ->  Values Scan on "*VALUES*"
+         ->  Values Scan on "*VALUES*_1"
+(5 rows)
 
-select x from (values (array[100::money]), (array[200::money])) _(x) union select x from (values (array[100::money]), (array[300::money])) _(x);
-     x     
------------
- {$100.00}
- {$200.00}
- {$300.00}
+select x from (values (array[100::numeric]), (array[200::numeric])) _(x) union select x from (values (array[100::numeric]), (array[300::numeric])) _(x);
+   x   
+-------
+ {100}
+ {300}
+ {200}
 (3 rows)
 
 set enable_hashagg to off;
@@ -710,7 +708,7 @@ select x from (values (row(1, 2)), (row(1, 3))) _(x) except select x from (value
 -- With an anonymous row type, the typcache does not report that the
 -- type is hashable.  (Otherwise, this would fail at execution time.)
 explain (costs off)
-select x from (values (row(100::money)), (row(200::money))) _(x) union select x from (values (row(100::money)), (row(300::money))) _(x);
+select x from (values (row(100::numeric)), (row(200::numeric))) _(x) union select x from (values (row(100::numeric)), (row(300::numeric))) _(x);
                   QUERY PLAN                   
 -----------------------------------------------
  Unique
@@ -721,35 +719,34 @@ select x from (values (row(100::money)), (row(200::money))) _(x) union select x 
                ->  Values Scan on "*VALUES*_1"
 (6 rows)
 
-select x from (values (row(100::money)), (row(200::money))) _(x) union select x from (values (row(100::money)), (row(300::money))) _(x);
-     x     
------------
- ($100.00)
- ($200.00)
- ($300.00)
+select x from (values (row(100::numeric)), (row(200::numeric))) _(x) union select x from (values (row(100::numeric)), (row(300::numeric))) _(x);
+   x   
+-------
+ (100)
+ (200)
+ (300)
 (3 rows)
 
 -- With a defined row type, the typcache can inspect the type's fields
 -- for hashability.
-create type ct1 as (f1 money);
+create type ct1 as (f1 numeric);
 explain (costs off)
-select x from (values (row(100::money)::ct1), (row(200::money)::ct1)) _(x) union select x from (values (row(100::money)::ct1), (row(300::money)::ct1)) _(x);
-                  QUERY PLAN                   
------------------------------------------------
- Unique
-   ->  Sort
-         Sort Key: "*VALUES*".column1
-         ->  Append
-               ->  Values Scan on "*VALUES*"
-               ->  Values Scan on "*VALUES*_1"
-(6 rows)
+select x from (values (row(100::numeric)::ct1), (row(200::numeric)::ct1)) _(x) union select x from (values (row(100::numeric)::ct1), (row(300::numeric)::ct1)) _(x);
+               QUERY PLAN                
+-----------------------------------------
+ HashAggregate
+   Group Key: "*VALUES*".column1
+   ->  Append
+         ->  Values Scan on "*VALUES*"
+         ->  Values Scan on "*VALUES*_1"
+(5 rows)
 
-select x from (values (row(100::money)::ct1), (row(200::money)::ct1)) _(x) union select x from (values (row(100::money)::ct1), (row(300::money)::ct1)) _(x);
-     x     
------------
- ($100.00)
- ($200.00)
- ($300.00)
+select x from (values (row(100::numeric)::ct1), (row(200::numeric)::ct1)) _(x) union select x from (values (row(100::numeric)::ct1), (row(300::numeric)::ct1)) _(x);
+   x   
+-------
+ (300)
+ (200)
+ (100)
 (3 rows)
 
 drop type ct1;

@@ -752,23 +752,7 @@
   amoprighttype => 'bpchar', amopstrategy => '5',
   amopopr => '~>~(bpchar,bpchar)', amopmethod => 'btree' },
 
-# btree money_ops
 
-{ amopfamily => 'btree/money_ops', amoplefttype => 'money',
-  amoprighttype => 'money', amopstrategy => '1', amopopr => '<(money,money)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/money_ops', amoplefttype => 'money',
-  amoprighttype => 'money', amopstrategy => '2', amopopr => '<=(money,money)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/money_ops', amoplefttype => 'money',
-  amoprighttype => 'money', amopstrategy => '3', amopopr => '=(money,money)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/money_ops', amoplefttype => 'money',
-  amoprighttype => 'money', amopstrategy => '4', amopopr => '>=(money,money)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/money_ops', amoplefttype => 'money',
-  amoprighttype => 'money', amopstrategy => '5', amopopr => '>(money,money)',
-  amopmethod => 'btree' },
 
 # btree array_ops
 

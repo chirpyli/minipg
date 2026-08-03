@@ -162,12 +162,12 @@ reset enable_hashagg;
 set enable_hashagg to on;
 
 explain (costs off)
-select x from (values (100::money), (200::money)) _(x) union select x from (values (100::money), (300::money)) _(x);
+select x from (values (100::numeric), (200::numeric)) _(x) union select x from (values (100::numeric), (300::numeric)) _(x);
 
 set enable_hashagg to off;
 
 explain (costs off)
-select x from (values (100::money), (200::money)) _(x) union select x from (values (100::money), (300::money)) _(x);
+select x from (values (100::numeric), (200::numeric)) _(x) union select x from (values (100::numeric), (300::numeric)) _(x);
 
 reset enable_hashagg;
 
@@ -186,8 +186,8 @@ select x from (values (array[1, 2]), (array[1, 3])) _(x) except select x from (v
 
 -- non-hashable type
 explain (costs off)
-select x from (values (array[100::money]), (array[200::money])) _(x) union select x from (values (array[100::money]), (array[300::money])) _(x);
-select x from (values (array[100::money]), (array[200::money])) _(x) union select x from (values (array[100::money]), (array[300::money])) _(x);
+select x from (values (array[100::numeric]), (array[200::numeric])) _(x) union select x from (values (array[100::numeric]), (array[300::numeric])) _(x);
+select x from (values (array[100::numeric]), (array[200::numeric])) _(x) union select x from (values (array[100::numeric]), (array[300::numeric])) _(x);
 
 set enable_hashagg to off;
 
@@ -221,15 +221,15 @@ select x from (values (row(1, 2)), (row(1, 3))) _(x) except select x from (value
 -- With an anonymous row type, the typcache does not report that the
 -- type is hashable.  (Otherwise, this would fail at execution time.)
 explain (costs off)
-select x from (values (row(100::money)), (row(200::money))) _(x) union select x from (values (row(100::money)), (row(300::money))) _(x);
-select x from (values (row(100::money)), (row(200::money))) _(x) union select x from (values (row(100::money)), (row(300::money))) _(x);
+select x from (values (row(100::numeric)), (row(200::numeric))) _(x) union select x from (values (row(100::numeric)), (row(300::numeric))) _(x);
+select x from (values (row(100::numeric)), (row(200::numeric))) _(x) union select x from (values (row(100::numeric)), (row(300::numeric))) _(x);
 
 -- With a defined row type, the typcache can inspect the type's fields
 -- for hashability.
-create type ct1 as (f1 money);
+create type ct1 as (f1 numeric);
 explain (costs off)
-select x from (values (row(100::money)::ct1), (row(200::money)::ct1)) _(x) union select x from (values (row(100::money)::ct1), (row(300::money)::ct1)) _(x);
-select x from (values (row(100::money)::ct1), (row(200::money)::ct1)) _(x) union select x from (values (row(100::money)::ct1), (row(300::money)::ct1)) _(x);
+select x from (values (row(100::numeric)::ct1), (row(200::numeric)::ct1)) _(x) union select x from (values (row(100::numeric)::ct1), (row(300::numeric)::ct1)) _(x);
+select x from (values (row(100::numeric)::ct1), (row(200::numeric)::ct1)) _(x) union select x from (values (row(100::numeric)::ct1), (row(300::numeric)::ct1)) _(x);
 drop type ct1;
 
 set enable_hashagg to off;

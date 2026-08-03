@@ -569,13 +569,13 @@ CREATE TABLE bools_true PARTITION OF bools FOR VALUES IN (1);
 DROP TABLE bools;
 
 -- specified literal can be cast, and the cast might not be immutable
-CREATE TABLE moneyp (
-	a money
+CREATE TABLE numericp (
+	a numeric
 ) PARTITION BY LIST (a);
-CREATE TABLE moneyp_10 PARTITION OF moneyp FOR VALUES IN (10);
-CREATE TABLE moneyp_11 PARTITION OF moneyp FOR VALUES IN ('11');
-CREATE TABLE moneyp_12 PARTITION OF moneyp FOR VALUES IN (to_char(12, '99')::int);
-DROP TABLE moneyp;
+CREATE TABLE numericp_10 PARTITION OF numericp FOR VALUES IN (10);
+CREATE TABLE numericp_11 PARTITION OF numericp FOR VALUES IN ('11');
+CREATE TABLE numericp_12 PARTITION OF numericp FOR VALUES IN (to_char(12, '99')::int);
+DROP TABLE numericp;
 
 -- cast is immutable
 CREATE TABLE bigintp (

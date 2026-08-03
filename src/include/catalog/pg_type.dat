@@ -203,21 +203,6 @@
   typcategory => 'X', typinput => 'unknownin', typoutput => 'unknownout',
   typreceive => 'unknownrecv', typsend => 'unknownsend', typalign => 'c' },
 
-{ oid => '790', array_type_oid => '791',
-  descr => 'monetary amounts, $d,ddd.cc',
-  typname => 'money', typlen => '8', typbyval => 'FLOAT8PASSBYVAL',
-  typcategory => 'N', typinput => 'cash_in', typoutput => 'cash_out',
-  typreceive => 'cash_recv', typsend => 'cash_send', typalign => 'd' },
-
-# OIDS 800 - 899
-
-
-
-
-
-
-# OIDS 1000 - 1099
-
 { oid => '1033', array_type_oid => '1034', descr => 'access control list',
   typname => 'aclitem', typlen => '12', typbyval => 'f', typcategory => 'U',
   typinput => 'aclitemin', typoutput => 'aclitemout', typreceive => '-',
