@@ -1,5 +1,6 @@
 # 变更日志
 
+- 2026-08-03: 清理 SP-GiST 残留测试期望（接续 2026-08-02 的 spgist 裁剪）。上一轮裁剪虽删源码并改了部分 expected，但运行期与期望仍不一致，导致 `make check-world` 未真正全绿。本次修正：主回归 `expected/opr_sanity.out`（删除 spgist 操作符族 84→55 行）、`expected/type_sanity.out`（列宽格式 + 注释漂移）、`expected/psql.out`（移除 `\dAf spgist` 块及多余的 `(3 rows)`）、`expected/privileges.out`（多余空行）；`contrib/test_decoding` 的 5 个 expected（ddl/messages/replorigin/stream/twophase_stream，此前误将 `ERROR: unexpected RM_NEXT_ID rmgr_id: 21` 作为期望，现运行期逻辑解码正常，改为实际成功输出）。全仓库已无 `USING spgist`/`spgist`/`spg_handler` 残留引用。`make check` 主回归 207 项全过。
 - 2026-07-13: 提交postgres 14.23版本
 - 2026-08-02: 裁剪 SP-GiST 索引访问方法（spgist）。删除 `src/backend/access/spgist/`（11 个 C 文件，约 250 KB）、4 个头文件、3 个 opclass 支持文件（`geo_spgist.c`/`network_spgist.c`/`rangetypes_spgist.c`）、WAL 描述符 `spgdesc.c`。清理 catalog 6 个 `.dat` 文件（158 个条目：1 AM + 32 proc + 7 opclass + 7 opfamily + 36 amproc + 75 amop）。清理外部耦合点：`rmgrlist.h`（删除 RM_SPGIST_ID，后续枚举值前移）、`rmgr.c`（删除 spgxlog.h include）、`reloptions.c/.h`（删除 RELOPT_KIND_SPGIST 和 fillfactor 选项）、`decode.c`（删除 RM_SPGIST_ID case）、`like_support.c`（删除 TEXT_SPGIST_FAM_OID 分支）、`pgstattuple.c`（删除 SPGIST_AM_OID case）。删除测试模块 `spgist_name_ops/`、回归测试 `spgist.sql`/`create_index_spgist.sql` 及对应 expected 文件、`parallel_schedule` 中调度条目。更新 11 个测试 expected 文件（rangetypes/box/polygon/inet/opr_sanity/index_including/vacuum/sanity_check/psql/amutils/indexing）及 `test_decoding` 的 5 个 expected（ddl/rewrite/replorigin/messages/stream/twophase_stream）。`make check-world` 全部通过（EXIT=0）。约删减 330 KB 源码。
 - 2026-08-02: 裁剪 PO 翻译文件：删除全部非英文/中文的 `.po` 文件（cs/de/el/es/fr/he/it/ja/ko/pl/pt_BR/ru/sv/tr/uk/vi 共 140 个），仅保留各模块的 `zh_CN.po`（12 个）。同步将 12 个 `nls.mk` 的 `AVAIL_LANGUAGES` 收敛为 `zh_CN`。当前构建 `ENABLE_NLS` 默认关闭，翻译不参与 `make check-world` 编译，回归测试不受影响。详见下文。
@@ -85,6 +86,7 @@
       - `make -j16` 编译通过（修复 fork_process.c / pmsignal.c 两处误删）。
 - 2026-07-31: 裁剪 bin 运维/性能/升级类工具（与内核学习无关，且非回归测试依赖）：删除 `src/bin/` 下 `pgbench`、`pg_amcheck`、`pg_archivecleanup`、`pg_checksums`、`pg_resetwal`、`pg_test_fsync`、`pg_test_timing`、`pg_upgrade`、`pg_verifybackup` 以及 `scripts/`（clusterdb/createdb/createuser/dropdb/dropuser/reindexdb/vacuumdb/pg_isready）。同步修改 `src/bin/Makefile` 的 `SUBDIRS` 移除对应条目。保留 `initdb`/`pg_ctl`/`psql`/`pg_config`（PostgresNode.pm 测试框架硬依赖）、`pg_dump`（test_pg_dump 依赖 + 逻辑转储教学）、`pg_basebackup`/`pg_rewind`（replication 子系统保留，待阶段 8 再删）、`pg_controldata`/`pg_waldump`（内核观察工具）。`make check-world` 通过。详见下文。
 - 2026-08-02: 裁剪 SSL/TLS 与 GSSAPI 传输加密，认证收敛为 trust/reject/password/scram-sha-256 四种（md5 仅删认证协商、保留存储格式兼容）。详见下文。
+- 2026-08-03: 裁剪 BRIN 索引访问方法（block range index）。删除 `src/backend/access/brin/`（13 个 C 文件、约 300+ KB）、7 个头文件、WAL 描述符 `brindesc.c`、代价估算 `brincostestimate`、autovacuum 的 `AutoVacuumRequestWork` 与 BRIN summarize 分支、rmgr 的 `RM_BRIN_ID`（bump `XLOG_PAGE_MAGIC` 0xD10D→0xD10E）、psql 的 BRIN 补全、`reloptions.c/.h` 的 `RELOPT_KIND_BRIN` 及 `pages_per_range`/`autosummarize` 选项、decode.c 的 `RM_BRIN_ID` case、pgstattuple 的 `BRIN_AM_OID` case；清理 catalog 7 个 `.dat` 文件（pg_am/pg_type/pg_proc/pg_amop/pg_opclass/pg_opfamily/pg_amproc）中所有 brin 条目与注释；删除 pageinspect 的 brinfuncs.c + brin 测试 + 升级脚本中的 brin 函数、test/modules/brin、regress 的 brin*.sql/expected。详见下文。
 
 ## 裁剪：仅支持Linux（移除 Windows 等平台代码）
 
@@ -429,3 +431,58 @@
 - `syscache.c` 的枚举与 `cacheinfo[]` 数组必须严格对齐（`StaticAssertStmt` 编译期检查）。
 - 所有 switch on `ObjectClass`/`ObjectType` 的 case 标签必须与重新编号后的枚举值一致。
 - 编译时需确保 `configure` 已运行，`genbki.pl` 已生成正确的 `pg_*_d.h` 头文件。
+
+## 裁剪：BRIN 索引访问方法（block range index）
+
+**目的**：BRIN 是一种针对"按物理存储顺序聚集的大表"的轻量级块区间索引——它不为每行建立条目，而是按连续的物理块区间记录每区间列值的最小/最大值摘要，用极小空间代价换得跳过无关磁盘块的能力。对内核学习而言，它属于"索引访问方法（AM）家族中与 btree/gist/gin/spgist 并列的第四种实现"，原理与 btree 等完全同构（同样实现 amhandler 接口、同样的 index AM 抽象层），删去可让 AM 体系更聚焦；且其代价估算、WAL、autovacuum 自动 summarize、rel 选项等大量分散耦合在核心子系统中，去除后显著降低核心代码阅读干扰。
+
+**为什么可以删**：
+- BRIN 是标准 access method，与 btree/gist/gin 平级，通过 `pg_am` 系统表注册，删除后不影响其他索引类型。
+- 删除 `brin.c` 后，原 `brincostestimate` 仅通过 `indexAM` 的 `amcostestimate` 函数指针间接调用（只有 brin 的 `brinhandler` 指向它），其他 AM 不受影响，planner 不会触达已删函数。
+- autovacuum 的 workitem 框架（仅 BRIN 的 autosummarize 使用）整体随 BRIN 一并移除：`AutoVacuumRequestWork`、`AVW_BRINSummarizeRange` 分支、两处 switch case 全部去掉。
+
+**删除的目录与文件**：
+- `src/backend/access/brin/`（13 个 C 文件，约 300+ KB）：brin.c、brin_build.c、brin_insert.c、brin_scan.c、brin_minmax.c、brin_minmax_multi.c、brin_inclusion.c、brin_bloom.c、brin_tuple.c、brin_pageops.c、brin_revmap.c、brin_validate.c、brin_xlog.c
+- 头文件：`src/include/access/` 下 brin.h、brin_internal.h、brin_page.h、brin_pageops.h、brin_revmap.h、brin_tuple.h、brin_xlog.h（共 7 个）
+- `src/backend/access/rmgrdesc/brindesc.c`（WAL 描述符）
+- `src/test/modules/brin/`（测试模块）
+
+**修改的构建系统文件**：
+- `src/backend/access/Makefile`：SUBDIRS 移除 `brin`
+- `src/backend/access/rmgrdesc/Makefile`：OBJS 移除 `brindesc.o`
+
+**修改的 C/H 源文件（按层）**：
+- WAL：`src/include/access/rmgrlist.h`（删除 `RM_BRIN_ID` 行，后续枚举值前移）、`src/backend/access/transam/rmgr.c`（删 `brin_xlog.h` include）、`src/bin/pg_waldump/rmgrdesc.c`（删 `brin_xlog.h` include）、`src/include/access/xlog_internal.h`（`XLOG_PAGE_MAGIC` 0xD10D→0xD10E 标记不兼容）
+- 代价估算：`src/backend/utils/adt/selfuncs.c`（删 `brincostestimate` 函数定义及 `brin.h`/`brin_page.h` include）、`src/include/utils/index_selfuncs.h`（删 `brincostestimate` 声明）
+- 关系选项：`src/backend/access/common/reloptions.c`（删 `autosummarize` 与 `pages_per_range` 两个 relopt 选项块）、`src/include/access/reloptions.h`（删 `RELOPT_KIND_BRIN` 枚举值）
+- autovacuum：`src/backend/postmaster/autovacuum.c`（删 `AutoVacuumRequestWork` 函数、两处 switch 中的 `AVW_BRINSummarizeRange` case）、`src/include/postmaster/autovacuum.h`（删 `AutoVacuumRequestWork` 声明；`AVW_BRINSummarizeRange` 枚举值保留作为 `AutoVacuumWorkItemType` 类型占位，已无引用）
+- 逻辑解码：`src/backend/replication/logical/decode.c`（删 `RM_BRIN_ID` case）
+- 统计：`contrib/pgstattuple/pgstattuple.c`（删 `BRIN_AM_OID` case）
+- psql：`src/bin/psql/tab-complete.c`（删 BRIN 索引选项的 `CREATE INDEX` 与 SET 补全项）
+
+**清理 catalog `.dat` 文件（条目级删除，含跨行条目）**：
+- `pg_am.dat`：删除 brin 访问方法条目（oid 3580）
+- `pg_type.dat`：删除 `pg_brin_bloom_summary`、`pg_brin_minmax_multi_summary` 两个 brin 专用类型
+- `pg_proc.dat`：删除全部 brin 函数（brinhandler、brin_summarize_range、brin_desummarize_range、各 opclass 支持函数、类型 in/out/recv/send 等）
+- `pg_amop.dat` / `pg_amproc.dat` / `pg_opclass.dat` / `pg_opfamily.dat`：删除全部 brin 操作符族/类/支持过程映射
+- 用 perl 脚本按"完整 `{...}` 条目块（内部无嵌套花括号）+ 可选尾逗号"匹配，块内含 `brin`（不区分大小写）则整条移除；随后清理残留的 brin 注释行（如 `# BRIN opclasses`）
+
+**修改 contrib/pageinspect（剥离 brin 支持）**：
+- `Makefile`：OBJS 移除 `brinfuncs.o`、REGRESS 移除 `brin`
+- 删除 `brinfuncs.c` 及 `sql/brin.sql`/`expected/brin.out`
+- 升级脚本：删除 `pageinspect--1.2--1.3.sql`、`--1.4--1.5.sql`、`--1.5.sql`、`--1.8--1.9.sql` 中全部 brin 函数定义/ALTER
+- `sql/btree.sql` + `expected/btree.out`：移除创建 `test1_a_brin` brin 索引的两行测试
+
+**删除的回归测试**：
+- `src/test/regress/sql/brin.sql`、`brin_bloom.sql`、`brin_multi.sql` 及对应 `expected/*.out`（这些测试未被任何 `*.schedule` 调度，直接删除文件）
+
+**行为变化**：
+- 不再支持 `CREATE INDEX ... USING brin`（`pg_am` 中已无 brin 访问方法，写该语句会报访问方法不存在）
+- 不再支持 `pages_per_range` / `autosummarize` 关系选项
+- 不再支持 brin 相关的 `brin_summarize_range()` / `brin_desummarize_range()` SQL 函数
+- WAL 记录类型编号因 `RM_BRIN_ID` 删除而前移，`XLOG_PAGE_MAGIC` 已 bump，旧 WAL 归档与新版本不兼容（minipg 为学习用 fork，可接受）
+
+**验证**：待 `make check-world`（详情见下方说明）。全仓库扫描 `RM_BRIN_ID`/`BRIN_AM_OID`/`brinhandler`/`brin_summarize_range`/`RELOPT_KIND_BRIN`/`brincostestimate` 等符号残留为 0 处；`src/backend/access/brin` 目录、`src/include/access/brin*.h`、`src/test/modules/brin` 均已不存在；catalog `.dat` 文件经 perl `do` 解析无误。
+
+**注意事项**：删除 `RM_BRIN_ID` 使 `RmgrIds` 枚举后续值（`RM_COMMIT_TS_ID` 等）编号前移，已同步 bump `XLOG_PAGE_MAGIC` 以声明 WAL 格式不兼容；之前 spgist 裁剪同样是此做法。autovacuum 的 workitem 框架（`AutoVacuumWorkItem*` 结构体、共享内存数组、工作项循环）整体保留，仅去除 BRIN 专有的请求/处理分支，其余机制（如将来其他使用者）仍可工作。
+

@@ -39,9 +39,7 @@ SELECT bt_page_items(get_raw_page('test1_b_gist', 0));
 -- invalid page size
 SELECT bt_page_items('aaa'::bytea);
 -- invalid special area size
-CREATE INDEX test1_a_brin ON test1 USING brin(a);
 SELECT bt_page_items(get_raw_page('test1', 0));
-SELECT bt_page_items(get_raw_page('test1_a_brin', 0));
 \set VERBOSITY default
 
 -- Tests with all-zero pages.

@@ -2639,11 +2639,6 @@ perform_work_item(AutoVacuumWorkItem *workitem)
 		/* have at it */
 		switch (workitem->avw_type)
 		{
-			case AVW_BRINSummarizeRange:
-				DirectFunctionCall2(brin_summarize_range,
-									ObjectIdGetDatum(workitem->avw_relation),
-									Int64GetDatum((int64) workitem->avw_blockNumber));
-				break;
 			default:
 				elog(WARNING, "unrecognized work item found: type %d",
 					 workitem->avw_type);
@@ -3262,10 +3257,6 @@ autovac_report_workitem(AutoVacuumWorkItem *workitem,
 
 	switch (workitem->avw_type)
 	{
-		case AVW_BRINSummarizeRange:
-			snprintf(activity, MAX_AUTOVAC_ACTIV_LEN,
-					 "autovacuum: BRIN summarize");
-			break;
 	}
 
 	/*
@@ -3300,45 +3291,6 @@ AutoVacuumingActive(void)
 	return true;
 }
 
-/*
- * Request one work item to the next autovacuum run processing our database.
- * Return false if the request can't be recorded.
- */
-bool
-AutoVacuumRequestWork(AutoVacuumWorkItemType type, Oid relationId,
-					  BlockNumber blkno)
-{
-	int			i;
-	bool		result = false;
-
-	LWLockAcquire(AutovacuumLock, LW_EXCLUSIVE);
-
-	/*
-	 * Locate an unused work item and fill it with the given data.
-	 */
-	for (i = 0; i < NUM_WORKITEMS; i++)
-	{
-		AutoVacuumWorkItem *workitem = &AutoVacuumShmem->av_workItems[i];
-
-		if (workitem->avw_used)
-			continue;
-
-		workitem->avw_used = true;
-		workitem->avw_active = false;
-		workitem->avw_type = type;
-		workitem->avw_database = MyDatabaseId;
-		workitem->avw_relation = relationId;
-		workitem->avw_blockNumber = blkno;
-		result = true;
-
-		/* done */
-		break;
-	}
-
-	LWLockRelease(AutovacuumLock);
-
-	return result;
-}
 
 /*
  * autovac_init

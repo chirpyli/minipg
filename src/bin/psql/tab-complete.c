@@ -1837,15 +1837,13 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("fillfactor",
 					  "deduplicate_items",	/* BTREE */
 					  "fastupdate", "gin_pending_list_limit",	/* GIN */
-					  "buffering",	/* GiST */
-					  "pages_per_range", "autosummarize"	/* BRIN */
+					  "buffering"	/* GiST */
 			);
 	else if (Matches("ALTER", "INDEX", MatchAny, "SET", "("))
 		COMPLETE_WITH("fillfactor =",
 					  "deduplicate_items =",	/* BTREE */
 					  "fastupdate =", "gin_pending_list_limit =",	/* GIN */
-					  "buffering =",	/* GiST */
-					  "pages_per_range =", "autosummarize ="	/* BRIN */
+					  "buffering ="	/* GiST */
 			);
 	else if (Matches("ALTER", "INDEX", MatchAny, "NO", "DEPENDS"))
 		COMPLETE_WITH("ON EXTENSION");

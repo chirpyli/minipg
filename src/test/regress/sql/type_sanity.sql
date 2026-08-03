@@ -582,8 +582,7 @@ SELECT oid, typname, typtype, typelem, typarray, typarray
     -- Note: XML might be disabled at compile-time.
     oid != ALL(ARRAY['pg_node_tree',
                      'pg_ndistinct', 'pg_dependencies', 'pg_mcv_list',
-                     'pg_brin_bloom_summary',
-                     'pg_brin_minmax_multi_summary', 'xml']::regtype[]) AND
+                     'xml']::regtype[]) AND
     -- Discard arrays.
     NOT EXISTS (SELECT 1 FROM pg_type u WHERE u.typarray = t.oid)
     -- Exclude everything from the table created above.  This checks

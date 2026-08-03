@@ -27,8 +27,4 @@
 { oid => '2742', oid_symbol => 'GIN_AM_OID',
   descr => 'GIN index access method',
   amname => 'gin', amhandler => 'ginhandler', amtype => 'i' },
-{ oid => '3580', oid_symbol => 'BRIN_AM_OID',
-  descr => 'block range index (BRIN) access method',
-  amname => 'brin', amhandler => 'brinhandler', amtype => 'i' },
-
 ]

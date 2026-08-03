@@ -66,9 +66,6 @@ extern void AutoVacWorkerFailed(void);
 /* autovacuum cost-delay balancer */
 extern void AutoVacuumUpdateDelay(void);
 
-extern bool AutoVacuumRequestWork(AutoVacuumWorkItemType type,
-								  Oid relationId, BlockNumber blkno);
-
 /* shared memory stuff */
 extern Size AutoVacuumShmemSize(void);
 extern void AutoVacuumShmemInit(void);

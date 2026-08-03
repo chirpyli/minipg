@@ -278,13 +278,10 @@ pgstat_relation(Relation rel, FunctionCallInfo fcinfo)
 				case GIST_AM_OID:
 					return pgstat_index(rel, GIST_ROOT_BLKNO + 1,
 										pgstat_gist_page, fcinfo);
-				case GIN_AM_OID:
-					err = "gin index";
-					break;
-				case BRIN_AM_OID:
-					err = "brin index";
-					break;
-				default:
+			case GIN_AM_OID:
+				err = "gin index";
+				break;
+			default:
 					err = "unknown index";
 					break;
 			}

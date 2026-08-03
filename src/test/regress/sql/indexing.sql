@@ -732,10 +732,6 @@ create table idxpart (a int, b text, c int[]) partition by range (a);
 create table idxpart1 partition of idxpart for values from (0) to (100000);
 set enable_seqscan to off;
 
-create index idxpart_brin on idxpart using brin(b);
-explain (costs off) select * from idxpart where b = 'abcd';
-drop index idxpart_brin;
-
 create index idxpart_spgist on idxpart using spgist(b);
 explain (costs off) select * from idxpart where b = 'abcd';
 drop index idxpart_spgist;

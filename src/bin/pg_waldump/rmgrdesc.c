@@ -8,7 +8,6 @@
 #define FRONTEND 1
 #include "postgres.h"
 
-#include "access/brin_xlog.h"
 #include "access/clog.h"
 #include "access/commit_ts.h"
 #include "access/generic_xlog.h"
@@ -19,7 +18,6 @@
 #include "access/multixact.h"
 #include "access/nbtxlog.h"
 #include "access/rmgr.h"
-#include "access/spgxlog.h"
 #include "access/xact.h"
 #include "access/xlog_internal.h"
 #include "catalog/storage_xlog.h"

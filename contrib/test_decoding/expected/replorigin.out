@@ -155,11 +155,20 @@ SELECT pg_replication_origin_session_reset();
 ERROR:  no replication origin is configured
 -- and magically the replayed xact will be filtered!
 SELECT data FROM pg_logical_slot_get_changes('regression_slot', NULL, NULL, 'include-xids', '0', 'skip-empty-xacts', '1', 'only-local', '1');
-ERROR:  unexpected RM_NEXT_ID rmgr_id: 21
+ data 
+------
+(0 rows)
+
 --but new original changes still show up
 INSERT INTO origin_tbl(data) VALUES ('will be replicated');
 SELECT data FROM pg_logical_slot_get_changes('regression_slot', NULL, NULL, 'include-xids', '0', 'skip-empty-xacts', '1',  'only-local', '1');
-ERROR:  unexpected RM_NEXT_ID rmgr_id: 21
+                                      data                                      
+--------------------------------------------------------------------------------
+ BEGIN
+ table public.origin_tbl: INSERT: id[integer]:3 data[text]:'will be replicated'
+ COMMIT
+(3 rows)
+
 SELECT pg_drop_replication_slot('regression_slot');
  pg_drop_replication_slot 
 --------------------------

@@ -47,10 +47,6 @@ SELECT bt_index_check(17);
 SELECT bt_index_parent_check(17);
 
 -- verify wrong index types are rejected (error)
-BEGIN;
-CREATE INDEX bttest_a_brin_idx ON bttest_a USING brin(id);
-SELECT bt_index_parent_check('bttest_a_brin_idx');
-ROLLBACK;
 
 -- normal check outside of xact
 SELECT bt_index_check('bttest_a_idx');

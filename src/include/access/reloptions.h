@@ -48,7 +48,6 @@ typedef enum relopt_kind
 	RELOPT_KIND_ATTRIBUTE = (1 << 6),
 	RELOPT_KIND_TABLESPACE = (1 << 7),
 	RELOPT_KIND_VIEW = (1 << 9),
-	RELOPT_KIND_BRIN = (1 << 10),
 	RELOPT_KIND_PARTITIONED = (1 << 11),
 	/* if you add a new kind, make sure you update "last_default" too */
 	RELOPT_KIND_LAST_DEFAULT = RELOPT_KIND_PARTITIONED,

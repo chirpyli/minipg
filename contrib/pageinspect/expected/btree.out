@@ -93,10 +93,7 @@ ERROR:  block is not a valid btree leaf page
 SELECT bt_page_items('aaa'::bytea);
 ERROR:  invalid page size
 -- invalid special area size
-CREATE INDEX test1_a_brin ON test1 USING brin(a);
 SELECT bt_page_items(get_raw_page('test1', 0));
-ERROR:  input page is not a valid btree page
-SELECT bt_page_items(get_raw_page('test1_a_brin', 0));
 ERROR:  input page is not a valid btree page
 \set VERBOSITY default
 -- Tests with all-zero pages.

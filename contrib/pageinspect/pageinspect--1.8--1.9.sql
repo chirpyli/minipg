@@ -120,18 +120,3 @@ RETURNS SETOF record
 AS 'MODULE_PATHNAME', 'bt_page_items_1_9'
 LANGUAGE C STRICT PARALLEL SAFE;
 
---
--- brin_page_items()
---
-DROP FUNCTION brin_page_items(IN page bytea, IN index_oid regclass);
-CREATE FUNCTION brin_page_items(IN page bytea, IN index_oid regclass,
-    OUT itemoffset int,
-    OUT blknum int8,
-    OUT attnum int,
-    OUT allnulls bool,
-    OUT hasnulls bool,
-    OUT placeholder bool,
-    OUT value text)
-RETURNS SETOF record
-AS 'MODULE_PATHNAME', 'brin_page_items'
-LANGUAGE C STRICT PARALLEL SAFE;

@@ -96,15 +96,6 @@ static relopt_bool boolRelOpts[] =
 {
 	{
 		{
-			"autosummarize",
-			"Enables automatic summarization on this BRIN index",
-			RELOPT_KIND_BRIN,
-			AccessExclusiveLock
-		},
-		false
-	},
-	{
-		{
 			"autovacuum_enabled",
 			"Enables autovacuum in this relation",
 			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST,
@@ -309,14 +300,6 @@ static relopt_int intRelOpts[] =
 			ShareUpdateExclusiveLock
 		},
 		TOAST_TUPLE_TARGET, 128, TOAST_TUPLE_TARGET_MAIN
-	},
-	{
-		{
-			"pages_per_range",
-			"Number of pages that each page range covers in a BRIN index",
-			RELOPT_KIND_BRIN,
-			AccessExclusiveLock
-		}, 128, 1, 131072
 	},
 	{
 		{

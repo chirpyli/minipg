@@ -1242,7 +1242,6 @@ drop role regress_partitioning_role;
 \dA+ *
 \dA+ h*
 \dA+ foo
-\dAc brin pg*.oid*
 \dAf spgist
 \dAf btree int4
 \dAo+ btree float_ops
@@ -1280,14 +1279,6 @@ drop role regress_partitioning_role;
 \da host.regression.pg_catalog.sum
 \da +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
-\dAc nonesuch.brin
-\dAc regression.brin
-\dAf nonesuch.brin
-\dAf regression.brin
-\dAo nonesuch.brin
-\dAo regression.brin
-\dAp nonesuch.brin
-\dAp regression.brin
 \db nonesuch.pg_default
 \db regression.pg_default
 \dc host.regression.public.conversion

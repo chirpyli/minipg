@@ -4939,27 +4939,25 @@ Indexes:
 List of access methods
  Name  | Type  
 -------+-------
- brin  | Index
  btree | Index
  gin   | Index
  gist  | Index
  hash  | Index
  heap  | Table
  heap2 | Table
-(7 rows)
+(6 rows)
 
 \dA *
 List of access methods
  Name  | Type  
 -------+-------
- brin  | Index
  btree | Index
  gin   | Index
  gist  | Index
  hash  | Index
  heap  | Table
  heap2 | Table
-(7 rows)
+(6 rows)
 
 \dA h*
 List of access methods
@@ -4984,30 +4982,28 @@ List of access methods
 
 \dA: extra argument "bar" ignored
 \dA+
-                            List of access methods
- Name  | Type  |       Handler        |              Description               
--------+-------+----------------------+----------------------------------------
- brin  | Index | brinhandler          | block range index (BRIN) access method
+                      List of access methods
+ Name  | Type  |       Handler        |        Description         
+-------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
  gin   | Index | ginhandler           | GIN index access method
  gist  | Index | gisthandler          | GiST index access method
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
-(7 rows)
+(6 rows)
 
 \dA+ *
-                            List of access methods
- Name  | Type  |       Handler        |              Description               
--------+-------+----------------------+----------------------------------------
- brin  | Index | brinhandler          | block range index (BRIN) access method
+                      List of access methods
+ Name  | Type  |       Handler        |        Description         
+-------+-------+----------------------+----------------------------
  btree | Index | bthandler            | b-tree index access method
  gin   | Index | ginhandler           | GIN index access method
  gist  | Index | gisthandler          | GiST index access method
  hash  | Index | hashhandler          | hash index access method
  heap  | Table | heap_tableam_handler | heap table access method
  heap2 | Table | heap_tableam_handler | 
-(7 rows)
+(6 rows)
 
 \dA+ h*
                      List of access methods
@@ -5023,15 +5019,6 @@ List of access methods
  Name | Type | Handler | Description 
 ------+------+---------+-------------
 (0 rows)
-
-\dAc brin pg*.oid*
-                      List of operator classes
-  AM  | Input type | Storage type |    Operator class    | Default? 
-------+------------+--------------+----------------------+----------
- brin | oid        |              | oid_bloom_ops        | no
- brin | oid        |              | oid_minmax_multi_ops | no
- brin | oid        |              | oid_minmax_ops       | yes
-(3 rows)
 
 \dAf spgist
         List of operator families
@@ -5262,22 +5249,6 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.sum
 cross-database references are not implemented: +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
 cross-database references are not implemented: nonesuch.pg_catalog.sum
-\dAc nonesuch.brin
-improper qualified name (too many dotted names): nonesuch.brin
-\dAc regression.brin
-improper qualified name (too many dotted names): regression.brin
-\dAf nonesuch.brin
-improper qualified name (too many dotted names): nonesuch.brin
-\dAf regression.brin
-improper qualified name (too many dotted names): regression.brin
-\dAo nonesuch.brin
-improper qualified name (too many dotted names): nonesuch.brin
-\dAo regression.brin
-improper qualified name (too many dotted names): regression.brin
-\dAp nonesuch.brin
-improper qualified name (too many dotted names): nonesuch.brin
-\dAp regression.brin
-improper qualified name (too many dotted names): regression.brin
 \db nonesuch.pg_default
 improper qualified name (too many dotted names): nonesuch.pg_default
 \db regression.pg_default

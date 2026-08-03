@@ -22,14 +22,6 @@
 #include "access/amapi.h"
 
 /* Functions in selfuncs.c */
-extern void brincostestimate(struct PlannerInfo *root,
-							 struct IndexPath *path,
-							 double loop_count,
-							 Cost *indexStartupCost,
-							 Cost *indexTotalCost,
-							 Selectivity *indexSelectivity,
-							 double *indexCorrelation,
-							 double *indexPages);
 extern void btcostestimate(struct PlannerInfo *root,
 						   struct IndexPath *path,
 						   double loop_count,
