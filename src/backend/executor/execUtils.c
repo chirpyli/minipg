@@ -53,7 +53,6 @@
 #include "executor/executor.h"
 #include "executor/execPartition.h"
 #include "executor/nodeModifyTable.h"
-#include "jit/jit.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -162,9 +161,6 @@ CreateExecutorState(void)
 
 	estate->es_use_parallel_mode = false;
 
-	estate->es_jit_flags = 0;
-	estate->es_jit = NULL;
-
 	/*
 	 * Return the executor state structure
 	 */
@@ -206,13 +202,6 @@ FreeExecutorState(EState *estate)
 		FreeExprContext((ExprContext *) linitial(estate->es_exprcontexts),
 						true);
 		/* FreeExprContext removed the list link for us */
-	}
-
-	/* release JIT context, if allocated */
-	if (estate->es_jit)
-	{
-		jit_release_context(estate->es_jit);
-		estate->es_jit = NULL;
 	}
 
 	/* release partition directory, if allocated */

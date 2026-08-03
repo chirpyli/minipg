@@ -1183,13 +1183,6 @@ JOBOBJECTINFOCLASS
 JOBOBJECT_BASIC_LIMIT_INFORMATION
 JOBOBJECT_BASIC_UI_RESTRICTIONS
 JOBOBJECT_SECURITY_LIMIT_INFORMATION
-JitContext
-JitInstrumentation
-JitProviderCallbacks
-JitProviderCompileExprCB
-JitProviderInit
-JitProviderReleaseContextCB
-JitProviderResetAfterErrorCB
 Join
 JoinCostWorkspace
 JoinExpr
@@ -1264,8 +1257,6 @@ LLVMAttributeRef
 LLVMBasicBlockRef
 LLVMBuilderRef
 LLVMIntPredicate
-LLVMJitContext
-LLVMJitHandle
 LLVMMemoryBufferRef
 LLVMModuleRef
 LLVMOrcJITStackRef
@@ -2388,7 +2379,6 @@ SharedInvalRelmapMsg
 SharedInvalSmgrMsg
 SharedInvalSnapshotMsg
 SharedInvalidationMessage
-SharedJitInstrumentation
 SharedMemoizeInfo
 SharedRecordTableEntry
 SharedRecordTableKey

@@ -215,10 +215,6 @@ endef
 
 all: $(PROGRAM) $(DATA_built) $(HEADER_allbuilt) $(SCRIPTS_built) $(addsuffix $(DLSUFFIX), $(MODULES)) $(addsuffix .control, $(EXTENSION))
 
-ifeq ($(with_llvm), yes)
-all: $(addsuffix .bc, $(MODULES)) $(patsubst %.o,%.bc, $(OBJS))
-endif
-
 ifdef MODULE_big
 # shared library parameters
 NAME = $(MODULE_big)
@@ -243,9 +239,6 @@ ifneq (,$(DATA_TSEARCH))
 endif # DATA_TSEARCH
 ifdef MODULES
 	$(INSTALL_SHLIB) $(addsuffix $(DLSUFFIX), $(MODULES)) '$(DESTDIR)$(pkglibdir)/'
-ifeq ($(with_llvm), yes)
-	$(foreach mod, $(MODULES), $(call install_llvm_module,$(mod),$(mod).bc))
-endif # with_llvm
 endif # MODULES
 ifdef DOCS
 ifdef docdir
@@ -265,10 +258,6 @@ ifneq (,$(strip $(HEADER_dirs)))
 	$(foreach dir,$(HEADER_dirs),$(call install_headers,$(dir),$(HEADER_files_$(dir))))
 endif # HEADERS
 ifdef MODULE_big
-ifeq ($(with_llvm), yes)
-	$(call install_llvm_module,$(MODULE_big),$(OBJS))
-endif # with_llvm
-
 install: install-lib
 endif # MODULE_big
 
@@ -312,9 +301,6 @@ ifneq (,$(DATA_TSEARCH))
 endif
 ifdef MODULES
 	rm -f $(addprefix '$(DESTDIR)$(pkglibdir)'/, $(addsuffix $(DLSUFFIX), $(MODULES)))
-ifeq ($(with_llvm), yes)
-	$(foreach mod, $(MODULES), $(call uninstall_llvm_module,$(mod)))
-endif # with_llvm
 endif # MODULES
 ifdef DOCS
 	rm -f $(addprefix '$(DESTDIR)$(docdir)/$(docmoduledir)'/, $(DOCS))
@@ -333,10 +319,6 @@ ifneq (,$(strip $(HEADER_dirs)))
 endif # HEADERS
 
 ifdef MODULE_big
-ifeq ($(with_llvm), yes)
-	$(call uninstall_llvm_module,$(MODULE_big))
-endif # with_llvm
-
 uninstall: uninstall-lib
 endif # MODULE_big
 

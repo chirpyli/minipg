@@ -648,19 +648,6 @@ typedef struct EState
 	struct dsa_area *es_query_dsa;
 
 	/*
-	 * JIT information. es_jit_flags indicates whether JIT should be performed
-	 * and with which options.  es_jit is created on-demand when JITing is
-	 * performed.
-	 *
-	 * es_jit_worker_instr is the combined, on demand allocated,
-	 * instrumentation from all workers. The leader's instrumentation is kept
-	 * separate, and is combined on demand by ExplainPrintJITSummary().
-	 */
-	int			es_jit_flags;
-	struct JitContext *es_jit;
-	struct JitInstrumentation *es_jit_worker_instr;
-
-	/*
 	 * Lists of ResultRelInfos for foreign tables on which batch-inserts are
 	 * to be executed and owning ModifyTableStates, stored in the same order.
 	 */
@@ -999,9 +986,6 @@ typedef struct PlanState
 
 	Instrumentation *instrument;	/* Optional runtime stats for this node */
 	WorkerInstrumentation *worker_instrument;	/* per-worker instrumentation */
-
-	/* Per-worker JIT instrumentation */
-	struct SharedJitInstrumentation *worker_jit_instrument;
 
 	/*
 	 * Common structural data for all Plan types.  These links to subsidiary

@@ -88,13 +88,6 @@ extern void ResourceOwnerRememberDSM(ResourceOwner owner,
 extern void ResourceOwnerForgetDSM(ResourceOwner owner,
 								   dsm_segment *);
 
-/* support for JITContext management */
-extern void ResourceOwnerEnlargeJIT(ResourceOwner owner);
-extern void ResourceOwnerRememberJIT(ResourceOwner owner,
-									 Datum handle);
-extern void ResourceOwnerForgetJIT(ResourceOwner owner,
-								   Datum handle);
-
 /* support for cryptohash context management */
 extern void ResourceOwnerEnlargeCryptoHash(ResourceOwner owner);
 extern void ResourceOwnerRememberCryptoHash(ResourceOwner owner,

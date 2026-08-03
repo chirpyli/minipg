@@ -51,7 +51,6 @@
 #include "executor/execdebug.h"
 #include "executor/nodeSubplan.h"
 #include "foreign/fdwapi.h"
-#include "jit/jit.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "parser/parsetree.h"
@@ -248,7 +247,6 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	estate->es_crosscheck_snapshot = RegisterSnapshot(queryDesc->crosscheck_snapshot);
 	estate->es_top_eflags = eflags;
 	estate->es_instrument = queryDesc->instrument_options;
-	estate->es_jit_flags = queryDesc->plannedstmt->jitFlags;
 
 	/*
 	 * Set up an AFTER-trigger statement context, unless told not to, or

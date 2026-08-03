@@ -23,7 +23,6 @@
 #include "common/cryptohash.h"
 #include "common/hashfn.h"
 #include "common/hmac.h"
-#include "jit/jit.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
 #include "storage/predicate.h"
@@ -129,7 +128,6 @@ typedef struct ResourceOwnerData
 	ResourceArray snapshotarr;	/* snapshot references */
 	ResourceArray filearr;		/* open temporary files */
 	ResourceArray dsmarr;		/* dynamic shmem segments */
-	ResourceArray jitarr;		/* JIT contexts */
 	ResourceArray cryptohasharr;	/* cryptohash contexts */
 	ResourceArray hmacarr;		/* HMAC contexts */
 
@@ -449,7 +447,6 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 	ResourceArrayInit(&(owner->snapshotarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->filearr), FileGetDatum(-1));
 	ResourceArrayInit(&(owner->dsmarr), PointerGetDatum(NULL));
-	ResourceArrayInit(&(owner->jitarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->cryptohasharr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->hmacarr), PointerGetDatum(NULL));
 
@@ -552,14 +549,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			if (isCommit)
 				PrintDSMLeakWarning(res);
 			dsm_detach(res);
-		}
-
-		/* Ditto for JIT contexts */
-		while (ResourceArrayGetAny(&(owner->jitarr), &foundres))
-		{
-			JitContext *context = (JitContext *) PointerGetDatum(foundres);
-
-			jit_release_context(context);
 		}
 
 		/* Ditto for cryptohash contexts */
@@ -749,7 +738,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner->snapshotarr.nitems == 0);
 	Assert(owner->filearr.nitems == 0);
 	Assert(owner->dsmarr.nitems == 0);
-	Assert(owner->jitarr.nitems == 0);
 	Assert(owner->cryptohasharr.nitems == 0);
 	Assert(owner->hmacarr.nitems == 0);
 	Assert(owner->nlocks == 0 || owner->nlocks == MAX_RESOWNER_LOCKS + 1);
@@ -778,7 +766,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceArrayFree(&(owner->snapshotarr));
 	ResourceArrayFree(&(owner->filearr));
 	ResourceArrayFree(&(owner->dsmarr));
-	ResourceArrayFree(&(owner->jitarr));
 	ResourceArrayFree(&(owner->cryptohasharr));
 	ResourceArrayFree(&(owner->hmacarr));
 
@@ -1363,41 +1350,6 @@ PrintDSMLeakWarning(dsm_segment *seg)
 {
 	elog(WARNING, "dynamic shared memory leak: segment %u still referenced",
 		 dsm_segment_handle(seg));
-}
-
-/*
- * Make sure there is room for at least one more entry in a ResourceOwner's
- * JIT context reference array.
- *
- * This is separate from actually inserting an entry because if we run out of
- * memory, it's critical to do so *before* acquiring the resource.
- */
-void
-ResourceOwnerEnlargeJIT(ResourceOwner owner)
-{
-	ResourceArrayEnlarge(&(owner->jitarr));
-}
-
-/*
- * Remember that a JIT context is owned by a ResourceOwner
- *
- * Caller must have previously done ResourceOwnerEnlargeJIT()
- */
-void
-ResourceOwnerRememberJIT(ResourceOwner owner, Datum handle)
-{
-	ResourceArrayAdd(&(owner->jitarr), handle);
-}
-
-/*
- * Forget that a JIT context is owned by a ResourceOwner
- */
-void
-ResourceOwnerForgetJIT(ResourceOwner owner, Datum handle)
-{
-	if (!ResourceArrayRemove(&(owner->jitarr), handle))
-		elog(ERROR, "JIT context %p is not owned by resource owner %s",
-			 DatumGetPointer(handle), owner->name);
 }
 
 /*

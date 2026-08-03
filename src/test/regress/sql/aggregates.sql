@@ -1162,8 +1162,6 @@ analyze agg_data_20k;
 
 set enable_hashagg = false;
 
-set jit_above_cost = 0;
-
 explain (costs off)
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
   from agg_data_20k group by g%10000;
@@ -1183,8 +1181,6 @@ select * from
     where g < r.a
     group by g/2) as s;
 
-set jit_above_cost to default;
-
 create table agg_group_3 as
 select (g/2)::numeric as c1, sum(7::int4) as c2, count(*) as c3
   from agg_data_2k group by g/2;
@@ -1197,8 +1193,6 @@ select (g/2)::numeric as c1, array_agg(g::numeric) as c2, count(*) as c3
 
 set enable_hashagg = true;
 set enable_sort = false;
-
-set jit_above_cost = 0;
 
 explain (costs off)
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
@@ -1218,8 +1212,6 @@ select * from
     from agg_data_2k
     where g < r.a
     group by g/2) as s;
-
-set jit_above_cost to default;
 
 create table agg_hash_3 as
 select (g/2)::numeric as c1, sum(7::int4) as c2, count(*) as c3

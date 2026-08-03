@@ -20,8 +20,7 @@ include $(top_builddir)/src/Makefile.global
 SUBDIRS = access bootstrap catalog parser commands executor foreign lib libpq \
 	main nodes optimizer partitioning port postmaster \
 	regex replication rewrite \
-	statistics storage tcop utils $(top_builddir)/src/timezone \
-	jit
+	statistics storage tcop utils $(top_builddir)/src/timezone
 
 include $(srcdir)/common.mk
 
@@ -211,13 +210,6 @@ endif
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/utils/misc/postgresql.conf.sample '$(DESTDIR)$(datadir)/postgresql.conf.sample'
 
-ifeq ($(with_llvm), yes)
-install-bin: install-postgres-bitcode
-
-install-postgres-bitcode: $(OBJS) all
-	$(call install_llvm_module,postgres,$(call expand_subsys, $(filter-out $(top_builddir)/src/timezone/objfiles.txt, $(SUBDIROBJS))))
-endif
-
 install-bin: postgres $(POSTGRES_IMP) installdirs
 	$(INSTALL_PROGRAM) postgres$(X) '$(DESTDIR)$(bindir)/postgres$(X)'
 ifneq ($(PORTNAME), win32)
@@ -274,9 +266,6 @@ endif
 	rm -f '$(DESTDIR)$(datadir)/pg_hba.conf.sample' \
 	      '$(DESTDIR)$(datadir)/pg_ident.conf.sample' \
 	      '$(DESTDIR)$(datadir)/postgresql.conf.sample'
-ifeq ($(with_llvm), yes)
-	$(call uninstall_llvm_module,postgres)
-endif
 
 
 ##########################################################################

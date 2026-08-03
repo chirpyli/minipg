@@ -492,3 +492,57 @@
 
 **注意事项**：删除 `RM_BRIN_ID` 使 `RmgrIds` 枚举后续值（`RM_COMMIT_TS_ID` 等）编号前移，已同步 bump `XLOG_PAGE_MAGIC` 以声明 WAL 格式不兼容；之前 spgist 裁剪同样是此做法。autovacuum 的 workitem 框架（`AutoVacuumWorkItem*` 结构体、共享内存数组、工作项循环）整体保留，仅去除 BRIN 专有的请求/处理分支，其余机制（如将来其他使用者）仍可工作。
 
+## 裁剪：彻底移除 JIT（LLVM 即时编译）子系统
+
+**目的**：minipg 面向数据库内核学习，JIT（基于 LLVM 把表达式求值/元组拆解在运行时编译为原生机器码）是一套与内核核心机制正交、且当前构建（`configure --with-llvm` 默认 `no`）本就未启用的可选加速层。其实现通过 `JitProviderCallbacks` 函数指针间接调用、且解释器是完整等价回退路径，删除后所有查询照常运行，仅失去高成本分析型查询的运行时加速。删除后可显著降低 LLVM 外部依赖、bitcode/内联/发射等大量分散耦合的代码阅读干扰。注意：与"不可裁"约束的 btree/hash 索引零耦合。
+
+**为什么可以删**：
+- JIT 通过 `src/backend/jit/jit.c` 这层与实现无关的包装层 + 共享库（`src/backend/jit/llvm/`，需 `--with-llvm`）间接调用；minipg 默认未启用 LLVM，llvm 子目录全部为编译期死代码。
+- `execExpr.c` 的 `ExecReadyExpr()` 在 `jit_compile_expr()` 返回 false（未启用/库未加载/表达式不支持）时走 `ExecReadyInterpretedExpr()`；裁剪即把该分支无条件化，与裁剪前 false 路径完全等价。
+- 表达式 JIT（`PGJIT_EXPR`）与元组拆解 JIT（`PGJIT_DEFORM`）两条路径均可干净摘除，且无其他调用方。
+
+**删除的目录与文件**：
+- `src/backend/jit/`（jit.c 包装层 + README）
+- `src/backend/jit/llvm/`（llvmjit.c、llvmjit_expr.c、llvmjit_types.c、llvmjit_deform.c、llvmjit_inline.cpp、llvmjit_error.cpp、llvmjit_wrap.cpp、SectionMemoryManager.cpp、SectionMemoryManager.LICENSE、Makefile）
+- `src/include/jit/`（jit.h、llvmjit.h、llvmjit_emit.h、llvmjit_backport.h、SectionMemoryManager.h）
+
+**修改的构建系统文件**：
+- `src/backend/Makefile`：SUBDIRS 移除 `jit`；删除 `ifeq ($(with_llvm), yes)` 的 install/uninstall bitcode 分支
+- `src/include/Makefile`：头文件安装子目录清单移除 `jit`
+- `src/Makefile`：移除 `ifeq ($(with_llvm), yes) SUBDIRS += backend/jit/llvm` 分支
+- `src/backend/common.mk`：删除 `ifeq ($(with_llvm), yes) objfiles.txt: $(patsubst %.o,%.bc, $(OBJS))` 分支
+- `src/makefiles/pgxs.mk`：删除 all/install/uninstall 中所有 `ifeq ($(with_llvm), yes)` bitcode 分支
+- `src/Makefile.global.in`：删除 `with_llvm`、`bitcodedir`、`LLVM_BINPATH`、`CLANG`、`LLVM_CPPFLAGS`、`BITCODE_CFLAGS` 变量，删除 LLVM/bitcode 安装宏与 `.bc` 编译规则，删除整段 "LLVM support" 注释
+- `configure.ac`：删除 `--with-llvm` 检测块（`PGAC_ARG_BOOL(with, llvm, ...)`/`PGAC_LLVM_SUPPORT`）、bitcode/clang 配置块（`with_llvm=yes` 守卫）、`PGAC_CHECK_LLVM_FUNCTIONS` 调用、`with_llvm` 信息输出块（本机 autoconf 2.71 与 PG14 要求 2.69 不符，未重生成 `configure`；已直接修正已生成 `Makefile.global.in` 与 `configure.ac` 使源码一致，现有已生成 configure 仍可用）
+- `config/llvm.m4`：保留（被 aclocal.m4 include，且 `PGAC_LLVM_SUPPORT` 宏已不再被 configure.ac 调用，属无害死代码）
+
+**修改的 C/H 源文件（按层）**：
+- 表达式执行：`execExpr.c`（`ExecReadyExpr()` 改为无条件 `ExecReadyInterpretedExpr()`，移除 `jit/jit.h` include）
+- EState 生命周期：`execMain.c`（删 `es_jit_flags = plannedstmt->jitFlags`、include）、`execUtils.c`（删 `es_jit_flags/es_jit` 初始化与 `jit_release_context` 释放块、include）、`nodeValuesscan.c`（删 `saved_jit_flags` hack，恢复无条件 `ExecInitExprList`、include）
+- 分组执行：`execGrouping.c`（删 `allow_jit` 变量与三目，直接传 `parent`、删注释块）
+- 错误处理：`tcop/postgres.c`（删 `jit_reset_after_error()` 调用与 include）
+- 资源管理：`utils/resowner/resowner.c`（删 `jitarr` 字段、init/free/Assert、以及 `ResourceOwnerEnlargeJIT`/`RememberJIT`/`ForgetJIT` 三个函数与 `jit_release_context` 释放块、include）、`include/utils/resowner_private.h`（删对应声明）
+- 并行执行：`execParallel.c`（删 `PARALLEL_KEY_JIT_INSTRUMENTATION` 宏、`FixedParallelExecutorState.jit_flags`、`ParallelExecutorInfo.jit_instrumentation`、`fpes->jit_flags`、`estate->es_jit_flags` 守卫的估算/分配块、`ExecParallelRetrieveJitInstrumentation` 函数、worker 端 jit_instrumentation 查找/回写、`pei->jit_instrumentation` 变量、include）、`include/executor/execParallel.h`（删 `jit_instrumentation` 字段）
+- EXPLAIN：`commands/explain.c`（删 `ExplainPrintJIT`/`ExplainPrintJITSummary` 函数与声明、调用、per-worker JIT 打印块、include）、`include/commands/explain.h`（删 `ExplainPrintJITSummary` 声明）
+- 节点序列化：`nodes/copyfuncs.c`、`nodes/outfuncs.c`、`nodes/readfuncs.c`（删 `PlannedStmt` 的 `jitFlags` 字段读写）
+- 计划：`optimizer/plan/planner.c`（删 `jitFlags` 计算段与 `jit/jit.h` include）
+- GUC：`utils/misc/guc.c`（删 10 个 JIT GUC：`jit_enabled`/`jit_provider`/`jit_above_cost`/`jit_inline_above_cost`/`jit_optimize_above_cost`/`jit_expressions`/`jit_tuple_deforming`/`jit_debugging_support`/`jit_dump_bitcode`/`jit_profiling_support`，及 include）、`utils/misc/postgresql.conf.sample`（删 JIT 配置段与 `jit_provider` 行）
+- catalog：`pg_proc.dat`（删 `pg_jit_available` 内置函数条目，BKI 重新生成）
+- 头文件：`nodes/execnodes.h`（删 `EState.es_jit_flags`/`es_jit`/`es_jit_worker_instr` 与 `PlanState.worker_jit_instrument` 字段）、`nodes/plannodes.h`（删 `PlannedStmt.jitFlags` 字段）、`include/pg_config.h.in`（删 `#undef USE_LLVM`）
+- 注释：`utils/fmgr/fmgr.c`（删过时的 `/* extern so it's callable via JIT */` 注释）
+- 工具链：`tools/pgindent/typedefs.list`（删 JIT/LLVM 相关 typedef 条目）、`tools/pgindent/exclude_file_patterns`（删 `src/include/jit/*.h` exclude 规则）
+
+**修改的回归测试**：
+- `sql/aggregates.sql`、`sql/select_distinct.sql`、`sql/groupingsets.sql`：删除 `set jit_above_cost = 0` / `set jit_above_cost to default` / `SET jit_above_cost=0` / `SET jit_above_cost TO DEFAULT` 行（GUC 已不存在）
+- `expected/aggregates.out`、`expected/select_distinct.out`、`expected/groupingsets.out`：同步删除上述 `SET jit_above_cost` 输出行
+
+**行为变化**：
+- 不再支持 `--with-llvm` 构建选项；所有查询统一走解释器执行路径（ExprInterpExpr），与裁剪前未触发 JIT 时语义完全一致
+- `EXPLAIN` 不再输出 JIT 统计段（原仅在 `es->costs` 且实际发生 JIT 时显示）；`jit_*` 系列 GUC 全部移除，`postgresql.conf` 中无 JIT 配置段
+- 并行查询不再采集/汇总 per-worker JIT instrumentation
+- `pg_jit_available()` 内置函数不再存在
+
+**验证**：`make -j`（干净全量编译，须先 `make clean` 清除可能残留的旧 `jit.o`，否则旧对象与新头混链会导致运行期内存损坏、回归测试大面积崩溃）通过（exit 0，无 error/undefined reference）；`make check` 主回归 **182 项全部通过（EXIT=0）**；contrib 与全仓库扫描 `jit_compile_expr`/`PGJIT_*`/`es_jit_flags`/`with_llvm`/`llvmjit`/`ResourceOwner*JIT`/`ExplainPrintJIT`/`JITContext`/`JITInstrumentation`/`SharedJitInstrumentation`/`worker_jit_instrument`/`pg_jit_available` 等功能符号残留为 0 处。注意：本机 autoconf 2.71 ≠ PG14 要求的 2.69，未重生成 `configure`；若日后 `autoreconf` 需装 2.69 或放宽版本宏（此点与先前 NLS/SSL/ICU 裁剪一致）。
+
+**注意事项**：裁剪后务必做**干净重建**（删除 `src/backend/jit/*.o` 残留对象）再回归；实测若保留旧 `jit.o`（其引用已删的 `jit_enabled` 等符号，但链接器因 SUBDIRS 已移除未重编、旧对象仍被链入），会在运行期引发 server 进程 SIGSEGV，表现为 `make check` 大面积 "server process terminated by signal 11"（如 numeric/select_distinct 等测试输出被截断）。该崩溃为陈旧对象混链所致，与 JIT 功能删除本身无关——干净重建后即消失。
+

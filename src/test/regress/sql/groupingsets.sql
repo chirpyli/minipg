@@ -517,7 +517,6 @@ set work_mem='64kB';
 
 set enable_sort = true;
 set enable_hashagg = false;
-set jit_above_cost = 0;
 
 explain (costs off)
 select g100, g10, sum(g::numeric), count(*), max(g::text)

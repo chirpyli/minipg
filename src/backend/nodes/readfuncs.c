@@ -1586,7 +1586,6 @@ _readPlannedStmt(void)
 	READ_BOOL_FIELD(transientPlan);
 	READ_BOOL_FIELD(dependsOnRole);
 	READ_BOOL_FIELD(parallelModeNeeded);
-	READ_INT_FIELD(jitFlags);
 	READ_NODE_FIELD(planTree);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(resultRelations);

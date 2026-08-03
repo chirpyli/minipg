@@ -31,7 +31,6 @@
 #include "executor/executor.h"
 #include "executor/nodeAgg.h"
 #include "foreign/fdwapi.h"
-#include "jit/jit.h"
 #include "lib/bipartite_match.h"
 #include "lib/knapsack.h"
 #include "miscadmin.h"
@@ -526,31 +525,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	result->utilityStmt = parse->utilityStmt;
 	result->stmt_location = parse->stmt_location;
 	result->stmt_len = parse->stmt_len;
-
-	result->jitFlags = PGJIT_NONE;
-	if (jit_enabled && jit_above_cost >= 0 &&
-		top_plan->total_cost > jit_above_cost)
-	{
-		result->jitFlags |= PGJIT_PERFORM;
-
-		/*
-		 * Decide how much effort should be put into generating better code.
-		 */
-		if (jit_optimize_above_cost >= 0 &&
-			top_plan->total_cost > jit_optimize_above_cost)
-			result->jitFlags |= PGJIT_OPT3;
-		if (jit_inline_above_cost >= 0 &&
-			top_plan->total_cost > jit_inline_above_cost)
-			result->jitFlags |= PGJIT_INLINE;
-
-		/*
-		 * Decide which operations should be JITed.
-		 */
-		if (jit_expressions)
-			result->jitFlags |= PGJIT_EXPR;
-		if (jit_tuple_deforming)
-			result->jitFlags |= PGJIT_DEFORM;
-	}
 
 	if (glob->partition_directory != NULL)
 		DestroyPartitionDirectory(glob->partition_directory);

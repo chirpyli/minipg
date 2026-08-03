@@ -50,7 +50,6 @@
 #include "commands/variable.h"
 #include "common/string.h"
 #include "funcapi.h"
-#include "jit/jit.h"
 #include "libpq/auth.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -1936,84 +1935,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"jit", PGC_USERSET, QUERY_TUNING_OTHER,
-			gettext_noop("Allow JIT compilation."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&jit_enabled,
-		true,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_debugging_support", PGC_SU_BACKEND, DEVELOPER_OPTIONS,
-			gettext_noop("Register JIT-compiled functions with debugger."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&jit_debugging_support,
-		false,
-
-		/*
-		 * This is not guaranteed to be available, but given it's a developer
-		 * oriented option, it doesn't seem worth adding code checking
-		 * availability.
-		 */
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_dump_bitcode", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Write out LLVM bitcode to facilitate JIT debugging."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&jit_dump_bitcode,
-		false,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_expressions", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("Allow JIT compilation of expressions."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&jit_expressions,
-		true,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_profiling_support", PGC_SU_BACKEND, DEVELOPER_OPTIONS,
-			gettext_noop("Register JIT-compiled functions with perf profiler."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&jit_profiling_support,
-		false,
-
-		/*
-		 * This is not guaranteed to be available, but given it's a developer
-		 * oriented option, it doesn't seem worth adding code checking
-		 * availability.
-		 */
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_tuple_deforming", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("Allow JIT compilation of tuple deforming."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&jit_tuple_deforming,
-		true,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"data_sync_retry", PGC_POSTMASTER, ERROR_HANDLING_OPTIONS,
 			gettext_noop("Whether to continue running after a failure to sync data files."),
 		},
@@ -3516,39 +3437,6 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
-		{"jit_above_cost", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Perform JIT compilation if query is more expensive."),
-			gettext_noop("-1 disables JIT compilation."),
-			GUC_EXPLAIN
-		},
-		&jit_above_cost,
-		100000, -1, DBL_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_optimize_above_cost", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Optimize JIT-compiled functions if query is more expensive."),
-			gettext_noop("-1 disables optimization."),
-			GUC_EXPLAIN
-		},
-		&jit_optimize_above_cost,
-		500000, -1, DBL_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"jit_inline_above_cost", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Perform JIT inlining if query is more expensive."),
-			gettext_noop("-1 disables inlining."),
-			GUC_EXPLAIN
-		},
-		&jit_inline_above_cost,
-		500000, -1, DBL_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"cursor_tuple_fraction", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets the planner's estimate of the fraction of "
 						 "a cursor's rows that will be retrieved."),
@@ -4294,17 +4182,6 @@ static struct config_string ConfigureNamesString[] =
 		&wal_consistency_checking_string,
 		"",
 		check_wal_consistency_checking, assign_wal_consistency_checking, NULL
-	},
-
-	{
-		{"jit_provider", PGC_POSTMASTER, CLIENT_CONN_PRELOAD,
-			gettext_noop("JIT provider to use."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&jit_provider,
-		"llvmjit",
-		NULL, NULL, NULL
 	},
 
 	{

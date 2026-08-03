@@ -342,19 +342,6 @@ choke me
 AC_SUBST(SUN_STUDIO_CC)
 
 
-#
-# LLVM
-#
-# Checked early because subsequent tests depend on it.
-PGAC_ARG_BOOL(with, llvm, no, [build with LLVM based JIT support],
-              [AC_DEFINE([USE_LLVM], 1, [Define to 1 to build with LLVM based JIT support. (--with-llvm)])])
-AC_SUBST(with_llvm)
-dnl must use AS_IF here, else AC_REQUIRES inside PGAC_LLVM_SUPPORT malfunctions
-AS_IF([test "$with_llvm" = yes], [
-  PGAC_LLVM_SUPPORT()
-]) # fi
-
-
 unset CFLAGS
 unset CXXFLAGS
 
@@ -577,52 +564,6 @@ AC_SUBST(CFLAGS_VECTORIZE)
 # 2. We don't bother to duplicate extra-warnings switches --- seeing a
 # warning in the main build is enough.
 # 3. But we must duplicate -Wno-warning flags, else we'll see those anyway.
-if test "$with_llvm" = yes ; then
-  CLANGXX="$CLANG -xc++"
-
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, BITCODE_CFLAGS, [-fno-strict-aliasing])
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANGXX, BITCODE_CXXFLAGS, [-fno-strict-aliasing])
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, BITCODE_CFLAGS, [-fwrapv])
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANGXX, BITCODE_CXXFLAGS, [-fwrapv])
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, BITCODE_CFLAGS, [-fexcess-precision=standard])
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANGXX, BITCODE_CXXFLAGS, [-fexcess-precision=standard])
-
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, BITCODE_CFLAGS, [-Xclang -no-opaque-pointers])
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANGXX, BITCODE_CXXFLAGS, [-Xclang -no-opaque-pointers])
-
-  # Ideally bitcode should perhaps match $CC's use, or not, of outline atomic
-  # functions, but for now we err on the side of suppressing them in bitcode,
-  # because we can't assume they're available at runtime.  This affects aarch64
-  # builds using the basic armv8-a ISA without LSE support.
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANG, BITCODE_CFLAGS, [-mno-outline-atomics])
-  PGAC_PROG_VARCXX_VARFLAGS_OPT(CLANG, BITCODE_CXXFLAGS, [-mno-outline-atomics])
-
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, NOT_THE_CFLAGS, [-Wunused-command-line-argument])
-  if test -n "$NOT_THE_CFLAGS"; then
-    BITCODE_CFLAGS="$BITCODE_CFLAGS -Wno-unused-command-line-argument"
-  fi
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, NOT_THE_CFLAGS, [-Wcompound-token-split-by-macro])
-  if test -n "$NOT_THE_CFLAGS"; then
-    BITCODE_CFLAGS="$BITCODE_CFLAGS -Wno-compound-token-split-by-macro"
-  fi
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, NOT_THE_CFLAGS, [-Wdeprecated-non-prototype])
-  if test -n "$NOT_THE_CFLAGS"; then
-    BITCODE_CFLAGS="$BITCODE_CFLAGS -Wno-deprecated-non-prototype"
-  fi
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, NOT_THE_CFLAGS, [-Wformat-truncation])
-  if test -n "$NOT_THE_CFLAGS"; then
-    BITCODE_CFLAGS="$BITCODE_CFLAGS -Wno-format-truncation"
-  fi
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_VARCC_VARFLAGS_OPT(CLANG, NOT_THE_CFLAGS, [-Wstringop-truncation])
-  if test -n "$NOT_THE_CFLAGS"; then
-    BITCODE_CFLAGS="$BITCODE_CFLAGS -Wno-stringop-truncation"
-  fi
-fi
 
 # supply -g if --enable-debug
 if test "$enable_debug" = yes && test "$ac_cv_prog_cc_g" = yes; then
@@ -1720,10 +1661,6 @@ if test "$with_icu" = yes; then
   CPPFLAGS=$ac_save_CPPFLAGS
 fi
 
-if test "$with_llvm" = yes; then
-  PGAC_CHECK_LLVM_FUNCTIONS()
-fi
-
 # Lastly, restore full LIBS list and check for readline/libedit symbols
 LIBS="$LIBS_including_readline"
 
@@ -2174,14 +2111,6 @@ AC_MSG_NOTICE([using compiler=$cc_string])
 AC_MSG_NOTICE([using CFLAGS=$CFLAGS])
 AC_MSG_NOTICE([using CPPFLAGS=$CPPFLAGS])
 AC_MSG_NOTICE([using LDFLAGS=$LDFLAGS])
-# Currently only used when LLVM is used
-if test "$with_llvm" = yes ; then
-   AC_MSG_NOTICE([using CXX=$CXX])
-   AC_MSG_NOTICE([using CXXFLAGS=$CXXFLAGS])
-   AC_MSG_NOTICE([using CLANG=$CLANG])
-   AC_MSG_NOTICE([using BITCODE_CFLAGS=$BITCODE_CFLAGS])
-   AC_MSG_NOTICE([using BITCODE_CXXFLAGS=$BITCODE_CXXFLAGS])
-fi
 
 # prepare build tree if outside source tree
 # Note 1: test -ef might not exist, but it's more reliable than `pwd`.

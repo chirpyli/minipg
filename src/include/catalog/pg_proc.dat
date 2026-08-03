@@ -5571,9 +5571,6 @@
   proname => 'pg_sleep_until', prolang => 'sql', provolatile => 'v',
   prorettype => 'void', proargtypes => 'timestamptz',
   prosrc => 'see system_functions.sql' },
-{ oid => '315', descr => 'Is JIT compilation available in this session?',
-  proname => 'pg_jit_available', provolatile => 'v', prorettype => 'bool',
-  proargtypes => '', prosrc => 'pg_jit_available' },
 
 { oid => '2971', descr => 'convert boolean to text',
   proname => 'text', prorettype => 'text', proargtypes => 'bool',
