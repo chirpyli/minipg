@@ -8,7 +8,6 @@ DATA = test_ddl_deparse--1.0.sql
 
 # test_ddl_deparse must be first
 REGRESS = test_ddl_deparse \
-	create_extension \
 	create_schema \
 	create_type \
 	create_conversion \
@@ -27,8 +26,6 @@ REGRESS = test_ddl_deparse \
 	opfamily \
 	defprivs \
 	matviews
-
-EXTRA_INSTALL = contrib/pg_stat_statements
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config

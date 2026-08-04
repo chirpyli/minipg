@@ -25,8 +25,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_event_trigger.h"
-#include "catalog/pg_foreign_data_wrapper.h"
-#include "catalog/pg_foreign_server.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_largeobject_metadata.h"
@@ -79,12 +77,6 @@ report_name_conflict(Oid classId, const char *name)
 	{
 		case EventTriggerRelationId:
 			msgfmt = gettext_noop("event trigger \"%s\" already exists");
-			break;
-		case ForeignDataWrapperRelationId:
-			msgfmt = gettext_noop("foreign-data wrapper \"%s\" already exists");
-			break;
-		case ForeignServerRelationId:
-			msgfmt = gettext_noop("server \"%s\" already exists");
 			break;
 		case LanguageRelationId:
 			msgfmt = gettext_noop("language \"%s\" already exists");
@@ -334,7 +326,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
 		case OBJECT_INDEX:
-		case OBJECT_FOREIGN_TABLE:
 			return RenameRelation(stmt);
 
 		case OBJECT_COLUMN:
@@ -359,8 +350,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_COLLATION:
 		case OBJECT_CONVERSION:
 		case OBJECT_EVENT_TRIGGER:
-		case OBJECT_FDW:
-		case OBJECT_FOREIGN_SERVER:
 		case OBJECT_FUNCTION:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPFAMILY:
@@ -482,7 +471,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 											  oldSchemaAddr ? &oldNspOid : NULL);
 			break;
 
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
@@ -621,9 +609,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_ROLE:
 		case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:
-		case OCLASS_FDW:
-		case OCLASS_FOREIGN_SERVER:
-		case OCLASS_USER_MAPPING:
 		case OCLASS_DEFACL:
 		case OCLASS_EXTENSION:
 		case OCLASS_EVENT_TRIGGER:
@@ -815,14 +800,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_DOMAIN:		/* same as TYPE */
 			return AlterTypeOwner(castNode(List, stmt->object), newowner, stmt->objectType);
 			break;
-
-		case OBJECT_FDW:
-			return AlterForeignDataWrapperOwner(strVal((Value *) stmt->object),
-												newowner);
-
-		case OBJECT_FOREIGN_SERVER:
-			return AlterForeignServerOwner(strVal((Value *) stmt->object),
-										   newowner);
 
 		case OBJECT_EVENT_TRIGGER:
 			return AlterEventTriggerOwner(strVal((Value *) stmt->object),

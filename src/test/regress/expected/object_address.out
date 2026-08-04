@@ -10,7 +10,13 @@ CREATE USER regress_addr_user;
 CREATE SCHEMA addr_nsp;
 SET search_path TO 'addr_nsp';
 CREATE FOREIGN DATA WRAPPER addr_fdw;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN DATA WRAPPER addr_fdw;
+               ^
 CREATE SERVER addr_fserv FOREIGN DATA WRAPPER addr_fdw;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER addr_fserv FOREIGN DATA WRAPPER addr_fdw;
+               ^
 CREATE TEXT SEARCH DICTIONARY addr_ts_dict (template=simple);
 ERROR:  syntax error at or near "TEXT"
 LINE 1: CREATE TEXT SEARCH DICTIONARY addr_ts_dict (template=simple)...
@@ -39,6 +45,9 @@ CREATE MATERIALIZED VIEW addr_nsp.genmatview AS SELECT * FROM addr_nsp.gentable;
 CREATE TYPE addr_nsp.gencomptype AS (a int);
 CREATE TYPE addr_nsp.genenum AS ENUM ('one', 'two');
 CREATE FOREIGN TABLE addr_nsp.genftable (a int) SERVER addr_fserv;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN TABLE addr_nsp.genftable (a int) SERVER addr_...
+               ^
 CREATE AGGREGATE addr_nsp.genaggr(int4) (sfunc = int4pl, stype = int4);
 CREATE DOMAIN addr_nsp.gendomain AS int4 CONSTRAINT domconstr CHECK (value > 0);
 CREATE FUNCTION addr_nsp.trig() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN END; $$;
@@ -46,7 +55,13 @@ CREATE TRIGGER t BEFORE INSERT ON addr_nsp.gentable FOR EACH ROW EXECUTE PROCEDU
 CREATE POLICY genpol ON addr_nsp.gentable;
 CREATE PROCEDURE addr_nsp.proc(int4) LANGUAGE SQL AS $$ $$;
 CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
+               ^
 CREATE USER MAPPING FOR regress_addr_user SERVER "integer";
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR regress_addr_user SERVER "integer";
+                            ^
 ALTER DEFAULT PRIVILEGES FOR ROLE regress_addr_user IN SCHEMA public GRANT ALL ON TABLES TO regress_addr_user;
 ALTER DEFAULT PRIVILEGES FOR ROLE regress_addr_user REVOKE DELETE ON TABLES FROM regress_addr_user;
 -- this transform would be quite unsafe to leave lying around,
@@ -163,12 +178,12 @@ WARNING:  error for materialized view,{addr_nsp,zwei},{}: name list length must 
 WARNING:  error for materialized view,{addr_nsp,zwei},{integer}: name list length must be exactly 1
 WARNING:  error for materialized view,{eins,zwei,drei},{}: name list length must be exactly 1
 WARNING:  error for materialized view,{eins,zwei,drei},{integer}: name list length must be exactly 1
-WARNING:  error for foreign table,{eins},{}: improper relation name (too many dotted names): 
-WARNING:  error for foreign table,{eins},{integer}: improper relation name (too many dotted names): 
-WARNING:  error for foreign table,{addr_nsp,zwei},{}: name list length must be exactly 1
-WARNING:  error for foreign table,{addr_nsp,zwei},{integer}: name list length must be exactly 1
-WARNING:  error for foreign table,{eins,zwei,drei},{}: name list length must be exactly 1
-WARNING:  error for foreign table,{eins,zwei,drei},{integer}: name list length must be exactly 1
+WARNING:  error for foreign table,{eins},{}: unrecognized object type "foreign table"
+WARNING:  error for foreign table,{eins},{integer}: unrecognized object type "foreign table"
+WARNING:  error for foreign table,{addr_nsp,zwei},{}: unrecognized object type "foreign table"
+WARNING:  error for foreign table,{addr_nsp,zwei},{integer}: unrecognized object type "foreign table"
+WARNING:  error for foreign table,{eins,zwei,drei},{}: unrecognized object type "foreign table"
+WARNING:  error for foreign table,{eins,zwei,drei},{integer}: unrecognized object type "foreign table"
 WARNING:  error for table column,{eins},{}: column name must be qualified
 WARNING:  error for table column,{eins},{integer}: column name must be qualified
 WARNING:  error for table column,{addr_nsp,zwei},{}: name list length must be exactly 1
@@ -211,12 +226,12 @@ WARNING:  error for cast,{addr_nsp,zwei},{}: name list length must be exactly 1
 WARNING:  error for cast,{addr_nsp,zwei},{integer}: name list length must be exactly 1
 WARNING:  error for cast,{eins,zwei,drei},{}: name list length must be exactly 1
 WARNING:  error for cast,{eins,zwei,drei},{integer}: name list length must be exactly 1
-WARNING:  error for table constraint,{eins},{}: unrecognized object type: 38
-WARNING:  error for table constraint,{eins},{integer}: unrecognized object type: 38
-WARNING:  error for table constraint,{addr_nsp,zwei},{}: unrecognized object type: 38
-WARNING:  error for table constraint,{addr_nsp,zwei},{integer}: unrecognized object type: 38
-WARNING:  error for table constraint,{eins,zwei,drei},{}: unrecognized object type: 38
-WARNING:  error for table constraint,{eins,zwei,drei},{integer}: unrecognized object type: 38
+WARNING:  error for table constraint,{eins},{}: unrecognized object type: 35
+WARNING:  error for table constraint,{eins},{integer}: unrecognized object type: 35
+WARNING:  error for table constraint,{addr_nsp,zwei},{}: unrecognized object type: 35
+WARNING:  error for table constraint,{addr_nsp,zwei},{integer}: unrecognized object type: 35
+WARNING:  error for table constraint,{eins,zwei,drei},{}: unrecognized object type: 35
+WARNING:  error for table constraint,{eins,zwei,drei},{integer}: unrecognized object type: 35
 WARNING:  error for domain constraint,{eins},{}: argument list length must be exactly 1
 WARNING:  error for domain constraint,{eins},{integer}: type "eins" does not exist
 WARNING:  error for domain constraint,{addr_nsp,zwei},{}: name list length must be exactly 1
@@ -243,28 +258,28 @@ WARNING:  error for operator,{eins,zwei,drei},{}: argument list length must be e
 WARNING:  error for operator,{eins,zwei,drei},{integer}: argument list length must be exactly 2
 WARNING:  error for operator class,{eins},{}: name list length must be at least 2
 WARNING:  error for operator class,{eins},{integer}: name list length must be at least 2
-WARNING:  error for operator class,{addr_nsp,zwei},{}: unrecognized object type: 24
-WARNING:  error for operator class,{addr_nsp,zwei},{integer}: unrecognized object type: 24
-WARNING:  error for operator class,{eins,zwei,drei},{}: unrecognized object type: 24
-WARNING:  error for operator class,{eins,zwei,drei},{integer}: unrecognized object type: 24
+WARNING:  error for operator class,{addr_nsp,zwei},{}: unrecognized object type: 21
+WARNING:  error for operator class,{addr_nsp,zwei},{integer}: unrecognized object type: 21
+WARNING:  error for operator class,{eins,zwei,drei},{}: unrecognized object type: 21
+WARNING:  error for operator class,{eins,zwei,drei},{integer}: unrecognized object type: 21
 WARNING:  error for operator family,{eins},{}: name list length must be at least 2
 WARNING:  error for operator family,{eins},{integer}: name list length must be at least 2
-WARNING:  error for operator family,{addr_nsp,zwei},{}: unrecognized object type: 26
-WARNING:  error for operator family,{addr_nsp,zwei},{integer}: unrecognized object type: 26
-WARNING:  error for operator family,{eins,zwei,drei},{}: unrecognized object type: 26
-WARNING:  error for operator family,{eins,zwei,drei},{integer}: unrecognized object type: 26
-WARNING:  error for rule,{eins},{}: unrecognized object type: 33
-WARNING:  error for rule,{eins},{integer}: unrecognized object type: 33
-WARNING:  error for rule,{addr_nsp,zwei},{}: unrecognized object type: 33
-WARNING:  error for rule,{addr_nsp,zwei},{integer}: unrecognized object type: 33
-WARNING:  error for rule,{eins,zwei,drei},{}: unrecognized object type: 33
-WARNING:  error for rule,{eins,zwei,drei},{integer}: unrecognized object type: 33
-WARNING:  error for trigger,{eins},{}: unrecognized object type: 42
-WARNING:  error for trigger,{eins},{integer}: unrecognized object type: 42
-WARNING:  error for trigger,{addr_nsp,zwei},{}: unrecognized object type: 42
-WARNING:  error for trigger,{addr_nsp,zwei},{integer}: unrecognized object type: 42
-WARNING:  error for trigger,{eins,zwei,drei},{}: unrecognized object type: 42
-WARNING:  error for trigger,{eins,zwei,drei},{integer}: unrecognized object type: 42
+WARNING:  error for operator family,{addr_nsp,zwei},{}: unrecognized object type: 23
+WARNING:  error for operator family,{addr_nsp,zwei},{integer}: unrecognized object type: 23
+WARNING:  error for operator family,{eins,zwei,drei},{}: unrecognized object type: 23
+WARNING:  error for operator family,{eins,zwei,drei},{integer}: unrecognized object type: 23
+WARNING:  error for rule,{eins},{}: unrecognized object type: 30
+WARNING:  error for rule,{eins},{integer}: unrecognized object type: 30
+WARNING:  error for rule,{addr_nsp,zwei},{}: unrecognized object type: 30
+WARNING:  error for rule,{addr_nsp,zwei},{integer}: unrecognized object type: 30
+WARNING:  error for rule,{eins,zwei,drei},{}: unrecognized object type: 30
+WARNING:  error for rule,{eins,zwei,drei},{integer}: unrecognized object type: 30
+WARNING:  error for trigger,{eins},{}: unrecognized object type: 39
+WARNING:  error for trigger,{eins},{integer}: unrecognized object type: 39
+WARNING:  error for trigger,{addr_nsp,zwei},{}: unrecognized object type: 39
+WARNING:  error for trigger,{addr_nsp,zwei},{integer}: unrecognized object type: 39
+WARNING:  error for trigger,{eins,zwei,drei},{}: unrecognized object type: 39
+WARNING:  error for trigger,{eins,zwei,drei},{integer}: unrecognized object type: 39
 WARNING:  error for text search parser,{eins},{}: unrecognized object type "text search parser"
 WARNING:  error for text search parser,{eins},{integer}: unrecognized object type "text search parser"
 WARNING:  error for text search parser,{addr_nsp,zwei},{}: unrecognized object type "text search parser"
@@ -289,18 +304,18 @@ WARNING:  error for text search configuration,{addr_nsp,zwei},{}: unrecognized o
 WARNING:  error for text search configuration,{addr_nsp,zwei},{integer}: unrecognized object type "text search configuration"
 WARNING:  error for text search configuration,{eins,zwei,drei},{}: unrecognized object type "text search configuration"
 WARNING:  error for text search configuration,{eins,zwei,drei},{integer}: unrecognized object type "text search configuration"
-WARNING:  error for policy,{eins},{}: unrecognized object type: 27
-WARNING:  error for policy,{eins},{integer}: unrecognized object type: 27
-WARNING:  error for policy,{addr_nsp,zwei},{}: unrecognized object type: 27
-WARNING:  error for policy,{addr_nsp,zwei},{integer}: unrecognized object type: 27
-WARNING:  error for policy,{eins,zwei,drei},{}: unrecognized object type: 27
-WARNING:  error for policy,{eins,zwei,drei},{integer}: unrecognized object type: 27
-WARNING:  error for user mapping,{eins},{}: argument list length must be exactly 1
-WARNING:  error for user mapping,{eins},{integer}: user mapping for user "eins" on server "integer" does not exist
-WARNING:  error for user mapping,{addr_nsp,zwei},{}: argument list length must be exactly 1
-WARNING:  error for user mapping,{addr_nsp,zwei},{integer}: user mapping for user "addr_nsp" on server "integer" does not exist
-WARNING:  error for user mapping,{eins,zwei,drei},{}: argument list length must be exactly 1
-WARNING:  error for user mapping,{eins,zwei,drei},{integer}: user mapping for user "eins" on server "integer" does not exist
+WARNING:  error for policy,{eins},{}: unrecognized object type: 24
+WARNING:  error for policy,{eins},{integer}: unrecognized object type: 24
+WARNING:  error for policy,{addr_nsp,zwei},{}: unrecognized object type: 24
+WARNING:  error for policy,{addr_nsp,zwei},{integer}: unrecognized object type: 24
+WARNING:  error for policy,{eins,zwei,drei},{}: unrecognized object type: 24
+WARNING:  error for policy,{eins,zwei,drei},{integer}: unrecognized object type: 24
+WARNING:  error for user mapping,{eins},{}: unrecognized object type "user mapping"
+WARNING:  error for user mapping,{eins},{integer}: unrecognized object type "user mapping"
+WARNING:  error for user mapping,{addr_nsp,zwei},{}: unrecognized object type "user mapping"
+WARNING:  error for user mapping,{addr_nsp,zwei},{integer}: unrecognized object type "user mapping"
+WARNING:  error for user mapping,{eins,zwei,drei},{}: unrecognized object type "user mapping"
+WARNING:  error for user mapping,{eins,zwei,drei},{integer}: unrecognized object type "user mapping"
 WARNING:  error for default acl,{eins},{}: argument list length must be exactly 1
 WARNING:  error for default acl,{eins},{integer}: unrecognized default ACL object type "i"
 WARNING:  error for default acl,{addr_nsp,zwei},{}: argument list length must be exactly 1
@@ -359,13 +374,13 @@ ERROR:  tablespace "one" does not exist
 SELECT pg_get_object_address('tablespace', '{one,two}', '{}');
 ERROR:  name list length must be exactly 1
 SELECT pg_get_object_address('foreign-data wrapper', '{one}', '{}');
-ERROR:  foreign-data wrapper "one" does not exist
+ERROR:  unrecognized object type "foreign-data wrapper"
 SELECT pg_get_object_address('foreign-data wrapper', '{one,two}', '{}');
-ERROR:  name list length must be exactly 1
+ERROR:  unrecognized object type "foreign-data wrapper"
 SELECT pg_get_object_address('server', '{one}', '{}');
-ERROR:  server "one" does not exist
+ERROR:  unrecognized object type "server"
 SELECT pg_get_object_address('server', '{one,two}', '{}');
-ERROR:  name list length must be exactly 1
+ERROR:  unrecognized object type "server"
 SELECT pg_get_object_address('extension', '{one}', '{}');
 ERROR:  extension "one" does not exist
 SELECT pg_get_object_address('extension', '{one,two}', '{}');
@@ -457,11 +472,9 @@ ERROR:  name list length must be exactly 1
 --- Cleanup resources
 ---
 DROP FOREIGN DATA WRAPPER addr_fdw CASCADE;
-NOTICE:  drop cascades to 4 other objects
-DETAIL:  drop cascades to server addr_fserv
-drop cascades to foreign table genftable
-drop cascades to server integer
-drop cascades to user mapping for regress_addr_user on server integer
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: DROP FOREIGN DATA WRAPPER addr_fdw CASCADE;
+             ^
 DROP PUBLICATION addr_pub;
 DROP SUBSCRIPTION regress_addr_sub;
 DROP SCHEMA addr_nsp CASCADE;
@@ -533,40 +546,8 @@ SELECT ROW(pg_identify_object(objects.classid, objects.objid, objects.objsubid))
          AS descr
 FROM objects
 ORDER BY objects.classid, objects.objid, objects.objsubid;
-("(""default acl"",,,)")|("(""default acl"",,)")|NULL
-("(tablespace,,,)")|("(tablespace,,)")|NULL
-("(type,,,)")|("(type,,)")|NULL
-("(routine,,,)")|("(routine,,)")|NULL
-("(relation,,,)")|("(relation,,)")|NULL
-("(""table column"",,,)")|("(""table column"",,)")|NULL
-("(role,,,)")|("(role,,)")|NULL
-("(database,,,)")|("(database,,)")|NULL
-("(server,,,)")|("(server,,)")|NULL
-("(""user mapping"",,,)")|("(""user mapping"",,)")|NULL
-("(""foreign-data wrapper"",,,)")|("(""foreign-data wrapper"",,)")|NULL
-("(""access method"",,,)")|("(""access method"",,)")|NULL
-("(""operator of access method"",,,)")|("(""operator of access method"",,)")|NULL
-("(""function of access method"",,,)")|("(""function of access method"",,)")|NULL
-("(""default value"",,,)")|("(""default value"",,)")|NULL
-("(cast,,,)")|("(cast,,)")|NULL
-("(constraint,,,)")|("(constraint,,)")|NULL
-("(conversion,,,)")|("(conversion,,)")|NULL
-("(language,,,)")|("(language,,)")|NULL
-("(""large object"",,,)")|("(""large object"",,)")|NULL
-("(schema,,,)")|("(schema,,)")|NULL
-("(""operator class"",,,)")|("(""operator class"",,)")|NULL
-("(operator,,,)")|("(operator,,)")|NULL
-("(rule,,,)")|("(rule,,)")|NULL
-("(trigger,,,)")|("(trigger,,)")|NULL
-("(""operator family"",,,)")|("(""operator family"",,)")|NULL
-("(extension,,,)")|("(extension,,)")|NULL
-("(policy,,,)")|("(policy,,)")|NULL
-("(""statistics object"",,,)")|("(""statistics object"",,)")|NULL
-("(collation,,,)")|("(collation,,)")|NULL
-("(""event trigger"",,,)")|("(""event trigger"",,)")|NULL
-("(transform,,,)")|("(transform,,)")|NULL
-("(subscription,,,)")|("(subscription,,)")|NULL
-("(publication,,,)")|("(publication,,)")|NULL
-("(""publication relation"",,,)")|("(""publication relation"",,)")|NULL
+ERROR:  relation "pg_foreign_data_wrapper" does not exist
+LINE 26:     ('pg_foreign_data_wrapper'::regclass, 0, 0), 
+              ^
 -- restore normal output mode
 \a\t

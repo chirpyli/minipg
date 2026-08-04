@@ -1339,9 +1339,6 @@ extractRelOptions(HeapTuple tuple, TupleDesc tupdesc,
 		case RELKIND_PARTITIONED_INDEX:
 			options = index_reloptions(amoptions, datum, false);
 			break;
-		case RELKIND_FOREIGN_TABLE:
-			options = NULL;
-			break;
 		default:
 			Assert(false);		/* can't get here */
 			options = NULL;		/* keep compiler quiet */

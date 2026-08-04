@@ -36,7 +36,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_foreign_table.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
@@ -59,8 +58,6 @@
 #include "commands/typecmds.h"
 #include "commands/user.h"
 #include "executor/executor.h"
-#include "foreign/fdwapi.h"
-#include "foreign/foreign.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -272,12 +269,6 @@ static const struct dropmsgstrings dropmsgstringarray[] = {
 		gettext_noop("type \"%s\" does not exist, skipping"),
 		gettext_noop("\"%s\" is not a type"),
 	gettext_noop("Use DROP TYPE to remove a type.")},
-	{RELKIND_FOREIGN_TABLE,
-		ERRCODE_UNDEFINED_OBJECT,
-		gettext_noop("foreign table \"%s\" does not exist"),
-		gettext_noop("foreign table \"%s\" does not exist, skipping"),
-		gettext_noop("\"%s\" is not a foreign table"),
-	gettext_noop("Use DROP FOREIGN TABLE to remove a foreign table.")},
 	{RELKIND_PARTITIONED_TABLE,
 		ERRCODE_UNDEFINED_TABLE,
 		gettext_noop("table \"%s\" does not exist"),
@@ -316,19 +307,6 @@ struct DropRelationCallbackState
 #define		ATT_FOREIGN_TABLE		0x0020
 #define		ATT_PARTITIONED_INDEX	0x0040
 
-/*
- * ForeignTruncateInfo
- *
- * Information related to truncation of foreign tables.  This is used for
- * the elements in a hash table. It uses the server OID as lookup key,
- * and includes a per-server list of all foreign tables involved in the
- * truncation.
- */
-typedef struct ForeignTruncateInfo
-{
-	Oid			serverid;
-	List	   *rels;
-} ForeignTruncateInfo;
 
 /*
  * Partition tables are expected to be dropped when the parent partitioned
@@ -566,7 +544,6 @@ static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
 static ObjectAddress ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode);
 static void ATExecDropOf(Relation rel, LOCKMODE lockmode);
 static void ATExecReplicaIdentity(Relation rel, ReplicaIdentityStmt *stmt, LOCKMODE lockmode);
-static void ATExecGenericOptions(Relation rel, List *options);
 static void ATExecSetRowSecurity(Relation rel, bool rls);
 static void ATExecForceNoForceRowSecurity(Relation rel, bool force_rls);
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
@@ -1158,22 +1135,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 			IndexStmt  *idxstmt;
 			Oid			constraintOid;
 
-			if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-			{
-				if (idxRel->rd_index->indisunique)
-					ereport(ERROR,
-							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-							 errmsg("cannot create foreign partition of partitioned table \"%s\"",
-									RelationGetRelationName(parent)),
-							 errdetail("Table \"%s\" contains indexes that are unique.",
-									   RelationGetRelationName(parent))));
-				else
-				{
-					index_close(idxRel, AccessShareLock);
-					continue;
-				}
-			}
-
 			attmap = build_attrmap_by_name(RelationGetDescr(rel),
 										   RelationGetDescr(parent));
 			idxstmt =
@@ -1362,10 +1323,6 @@ RemoveRelations(DropStmt *drop)
 
 		case OBJECT_MATVIEW:
 			relkind = RELKIND_MATVIEW;
-			break;
-
-		case OBJECT_FOREIGN_TABLE:
-			relkind = RELKIND_FOREIGN_TABLE;
 			break;
 
 		default:
@@ -1761,7 +1718,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 {
 	List	   *rels;
 	List	   *seq_relids = NIL;
-	HTAB	   *ft_htab = NULL;
 	EState	   *estate;
 	ResultRelInfo *resultRelInfos;
 	ResultRelInfo *resultRelInfo;
@@ -1920,44 +1876,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 		 * Each list is saved as a single entry in a hash table that uses the
 		 * server OID as lookup key.
 		 */
-		if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		{
-			Oid			serverid = GetForeignServerIdByRelId(RelationGetRelid(rel));
-			bool		found;
-			ForeignTruncateInfo *ft_info;
-
-			/* First time through, initialize hashtable for foreign tables */
-			if (!ft_htab)
-			{
-				HASHCTL		hctl;
-
-				memset(&hctl, 0, sizeof(HASHCTL));
-				hctl.keysize = sizeof(Oid);
-				hctl.entrysize = sizeof(ForeignTruncateInfo);
-				hctl.hcxt = CurrentMemoryContext;
-
-				ft_htab = hash_create("TRUNCATE for Foreign Tables",
-									  32,	/* start small and extend */
-									  &hctl,
-									  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
-			}
-
-			/* Find or create cached entry for the foreign table */
-			ft_info = hash_search(ft_htab, &serverid, HASH_ENTER, &found);
-			if (!found)
-			{
-				ft_info->serverid = serverid;
-				ft_info->rels = NIL;
-			}
-
-			/*
-			 * Save the foreign table in the entry of the server that the
-			 * foreign table belongs to.
-			 */
-			ft_info->rels = lappend(ft_info->rels, rel);
-			continue;
-		}
-
 		/*
 		 * Normally, we need a transaction-safe truncation here.  However, if
 		 * the table was either created in the current (sub)transaction or has
@@ -2018,35 +1936,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 		}
 
 		pgstat_count_truncate(rel);
-	}
-
-	/* Now go through the hash table, and truncate foreign tables */
-	if (ft_htab)
-	{
-		ForeignTruncateInfo *ft_info;
-		HASH_SEQ_STATUS seq;
-
-		hash_seq_init(&seq, ft_htab);
-
-		PG_TRY();
-		{
-			while ((ft_info = hash_seq_search(&seq)) != NULL)
-			{
-				FdwRoutine *routine = GetFdwRoutineByServerId(ft_info->serverid);
-
-				/* truncate_check_rel() has checked that already */
-				Assert(routine->ExecForeignTruncate != NULL);
-
-				routine->ExecForeignTruncate(ft_info->rels,
-											 behavior,
-											 restart_seqs);
-			}
-		}
-		PG_FINALLY();
-		{
-			hash_destroy(ft_htab);
-		}
-		PG_END_TRY();
 	}
 
 	/*
@@ -2134,24 +2023,12 @@ truncate_check_rel(Oid relid, Form_pg_class reltuple)
 	char	   *relname = NameStr(reltuple->relname);
 
 	/*
-	 * Only allow truncate on regular tables, foreign tables using foreign
-	 * data wrappers supporting TRUNCATE and partitioned tables (although, the
-	 * latter are only being included here for the following checks; no
+	 * Only allow truncate on regular tables and partitioned tables (although,
+	 * the latter are only being included here for the following checks; no
 	 * physical truncation will occur in their case.).
 	 */
-	if (reltuple->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		Oid			serverid = GetForeignServerIdByRelId(relid);
-		FdwRoutine *fdwroutine = GetFdwRoutineByServerId(serverid);
-
-		if (!fdwroutine->ExecForeignTruncate)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot truncate foreign table \"%s\"",
-							relname)));
-	}
-	else if (reltuple->relkind != RELKIND_RELATION &&
-			 reltuple->relkind != RELKIND_PARTITIONED_TABLE)
+	if (reltuple->relkind != RELKIND_RELATION &&
+		reltuple->relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table", relname)));
@@ -2433,7 +2310,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 							RelationGetRelationName(relation))));
 
 		if (relation->rd_rel->relkind != RELKIND_RELATION &&
-			relation->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 			relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -3383,7 +3259,6 @@ renameatt_check(Oid myrelid, Form_pg_class classform, bool recursing)
 		relkind != RELKIND_COMPOSITE_TYPE &&
 		relkind != RELKIND_INDEX &&
 		relkind != RELKIND_PARTITIONED_INDEX &&
-		relkind != RELKIND_FOREIGN_TABLE &&
 		relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -4238,13 +4113,9 @@ AlterTableGetLockLevel(List *cmds)
 				cmd_lockmode = AccessExclusiveLock;
 				break;
 
-				/*
-				 * Changing foreign table options may affect optimization.
-				 */
-			case AT_GenericOptions:
-			case AT_AlterColumnGenericOptions:
-				cmd_lockmode = AccessExclusiveLock;
-				break;
+			/*
+			 * Changing foreign table options may affect optimization.
+			 */
 
 				/*
 				 * These subcommands affect write operations only.
@@ -4395,9 +4266,13 @@ AlterTableGetLockLevel(List *cmds)
 				cmd_lockmode = AlterTableGetRelOptionsLockLevel((List *) cmd->def);
 				break;
 
-			case AT_AttachPartition:
-				cmd_lockmode = ShareUpdateExclusiveLock;
-				break;
+		case AT_AlterColumnGenericOptions:
+			cmd_lockmode = AccessExclusiveLock;
+			break;
+
+		case AT_AttachPartition:
+			cmd_lockmode = ShareUpdateExclusiveLock;
+			break;
 
 			case AT_DetachPartition:
 				if (((PartitionCmd *) cmd->def)->concurrent)
@@ -4662,16 +4537,10 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 									  AT_PASS_UNSET, context);
 			Assert(cmd != NULL);
 			/* Performs own recursion */
-			ATPrepAlterColumnType(wqueue, tab, rel, recurse, recursing, cmd,
-								  lockmode, context);
-			pass = AT_PASS_ALTER_TYPE;
-			break;
-		case AT_AlterColumnGenericOptions:
-			ATSimplePermissions(rel, ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
+		ATPrepAlterColumnType(wqueue, tab, rel, recurse, recursing, cmd,
+								lockmode, context);
+		pass = AT_PASS_ALTER_TYPE;
+		break;
 		case AT_ChangeOwner:	/* ALTER OWNER */
 			/* This command never recurses */
 			/* No command-specific prep needed */
@@ -4790,11 +4659,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_NoForceRowSecurity:
 			ATSimplePermissions(rel, ATT_TABLE);
 			/* These commands never recurse */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
-		case AT_GenericOptions:
-			ATSimplePermissions(rel, ATT_FOREIGN_TABLE);
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
@@ -5070,13 +4934,8 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_AlterColumnType:	/* ALTER COLUMN TYPE */
 			/* parse transformation was done earlier */
-			address = ATExecAlterColumnType(tab, rel, cmd, lockmode);
-			break;
-		case AT_AlterColumnGenericOptions:	/* ALTER COLUMN OPTIONS */
-			address =
-				ATExecAlterColumnGenericOptions(rel, cmd->name,
-												(List *) cmd->def, lockmode);
-			break;
+		address = ATExecAlterColumnType(tab, rel, cmd, lockmode);
+		break;
 		case AT_ChangeOwner:	/* ALTER OWNER */
 			ATExecChangeOwner(RelationGetRelid(rel),
 							  get_rolespec_oid(cmd->newowner, false),
@@ -5203,9 +5062,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_NoForceRowSecurity:
 			ATExecForceNoForceRowSecurity(rel, false);
-			break;
-		case AT_GenericOptions:
-			ATExecGenericOptions(rel, (List *) cmd->def);
 			break;
 		case AT_AttachPartition:
 			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
@@ -5351,10 +5207,10 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 						break;
 				}
 				break;
-			case AT_AlterColumnGenericOptions:
-				/* This command never recurses */
-				/* No command-specific prep needed */
-				pass = AT_PASS_MISC;
+		case AT_AlterColumnGenericOptions:
+			/* This command never recurses */
+			/* No command-specific prep needed */
+			pass = AT_PASS_MISC;
 				break;
 			default:
 				pass = cur_pass;
@@ -6089,9 +5945,6 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_COMPOSITE_TYPE:
 			actual_target = ATT_COMPOSITE_TYPE;
 			break;
-		case RELKIND_FOREIGN_TABLE:
-			actual_target = ATT_FOREIGN_TABLE;
-			break;
 		default:
 			actual_target = 0;
 			break;
@@ -6425,13 +6278,6 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("cannot alter type \"%s\" because column \"%s.%s\" uses it",
-								RelationGetRelationName(origRelation),
-								RelationGetRelationName(rel),
-								NameStr(att->attname))));
-			else if (origRelation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter foreign table \"%s\" because column \"%s.%s\" uses its row type",
 								RelationGetRelationName(origRelation),
 								RelationGetRelationName(rel),
 								NameStr(att->attname))));
@@ -9669,11 +9515,6 @@ addFkRecurseReferencing(List **wqueue, Constraint *fkconstraint, Relation rel,
 {
 	AssertArg(OidIsValid(parentConstr));
 
-	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("foreign key constraints are not supported on foreign tables")));
-
 	/*
 	 * If the referencing relation is a plain table, add the check triggers to
 	 * it and, if necessary, schedule it to be checked in Phase 3.
@@ -10085,11 +9926,6 @@ CloneFkReferencing(List **wqueue, Relation parentRel, Relation partRel)
 	 */
 	if (clone == NIL)
 		return;
-
-	if (partRel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("foreign key constraints are not supported on foreign tables")));
 
 	/*
 	 * The constraint key may differ, if the columns in the partition are
@@ -12508,11 +12344,8 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_SCHEMA:
 			case OCLASS_ROLE:
 			case OCLASS_DATABASE:
-			case OCLASS_TBLSPACE:
-			case OCLASS_FDW:
-			case OCLASS_FOREIGN_SERVER:
-			case OCLASS_USER_MAPPING:
-			case OCLASS_DEFACL:
+		case OCLASS_TBLSPACE:
+		case OCLASS_DEFACL:
 			case OCLASS_EXTENSION:
 			case OCLASS_EVENT_TRIGGER:
 			case OCLASS_PUBLICATION:
@@ -13388,117 +13221,6 @@ TryReuseForeignKey(Oid oldId, Constraint *con)
 
 	ReleaseSysCache(tup);
 }
-
-/*
- * ALTER COLUMN .. OPTIONS ( ... )
- *
- * Returns the address of the modified column
- */
-static ObjectAddress
-ATExecAlterColumnGenericOptions(Relation rel,
-								const char *colName,
-								List *options,
-								LOCKMODE lockmode)
-{
-	Relation	ftrel;
-	Relation	attrel;
-	ForeignServer *server;
-	ForeignDataWrapper *fdw;
-	HeapTuple	tuple;
-	HeapTuple	newtuple;
-	bool		isnull;
-	Datum		repl_val[Natts_pg_attribute];
-	bool		repl_null[Natts_pg_attribute];
-	bool		repl_repl[Natts_pg_attribute];
-	Datum		datum;
-	Form_pg_foreign_table fttableform;
-	Form_pg_attribute atttableform;
-	AttrNumber	attnum;
-	ObjectAddress address;
-
-	if (options == NIL)
-		return InvalidObjectAddress;
-
-	/* First, determine FDW validator associated to the foreign table. */
-	ftrel = table_open(ForeignTableRelationId, AccessShareLock);
-	tuple = SearchSysCache1(FOREIGNTABLEREL, rel->rd_id);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign table \"%s\" does not exist",
-						RelationGetRelationName(rel))));
-	fttableform = (Form_pg_foreign_table) GETSTRUCT(tuple);
-	server = GetForeignServer(fttableform->ftserver);
-	fdw = GetForeignDataWrapper(server->fdwid);
-
-	table_close(ftrel, AccessShareLock);
-	ReleaseSysCache(tuple);
-
-	attrel = table_open(AttributeRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	/* Prevent them from altering a system attribute */
-	atttableform = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = atttableform->attnum;
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"", colName)));
-
-
-	/* Initialize buffers for new tuple values */
-	memset(repl_val, 0, sizeof(repl_val));
-	memset(repl_null, false, sizeof(repl_null));
-	memset(repl_repl, false, sizeof(repl_repl));
-
-	/* Extract the current options */
-	datum = SysCacheGetAttr(ATTNAME,
-							tuple,
-							Anum_pg_attribute_attfdwoptions,
-							&isnull);
-	if (isnull)
-		datum = PointerGetDatum(NULL);
-
-	/* Transform the options */
-	datum = transformGenericOptions(AttributeRelationId,
-									datum,
-									options,
-									fdw->fdwvalidator);
-
-	if (PointerIsValid(DatumGetPointer(datum)))
-		repl_val[Anum_pg_attribute_attfdwoptions - 1] = datum;
-	else
-		repl_null[Anum_pg_attribute_attfdwoptions - 1] = true;
-
-	repl_repl[Anum_pg_attribute_attfdwoptions - 1] = true;
-
-	/* Everything looks good - update the tuple */
-
-	newtuple = heap_modify_tuple(tuple, RelationGetDescr(attrel),
-								 repl_val, repl_null, repl_repl);
-
-	CatalogTupleUpdate(attrel, &newtuple->t_self, newtuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  atttableform->attnum);
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-
-	ReleaseSysCache(tuple);
-
-	table_close(attrel, RowExclusiveLock);
-
-	heap_freetuple(newtuple);
-
-	return address;
-}
-
 /*
  * ALTER TABLE OWNER
  *
@@ -13539,7 +13261,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		case RELKIND_RELATION:
 		case RELKIND_VIEW:
 		case RELKIND_MATVIEW:
-		case RELKIND_FOREIGN_TABLE:
 		case RELKIND_PARTITIONED_TABLE:
 			/* ok to change owner */
 			break;
@@ -15879,84 +15600,6 @@ ATExecForceNoForceRowSecurity(Relation rel, bool force_rls)
 }
 
 /*
- * ALTER FOREIGN TABLE <name> OPTIONS (...)
- */
-static void
-ATExecGenericOptions(Relation rel, List *options)
-{
-	Relation	ftrel;
-	ForeignServer *server;
-	ForeignDataWrapper *fdw;
-	HeapTuple	tuple;
-	bool		isnull;
-	Datum		repl_val[Natts_pg_foreign_table];
-	bool		repl_null[Natts_pg_foreign_table];
-	bool		repl_repl[Natts_pg_foreign_table];
-	Datum		datum;
-	Form_pg_foreign_table tableform;
-
-	if (options == NIL)
-		return;
-
-	ftrel = table_open(ForeignTableRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheCopy1(FOREIGNTABLEREL, rel->rd_id);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign table \"%s\" does not exist",
-						RelationGetRelationName(rel))));
-	tableform = (Form_pg_foreign_table) GETSTRUCT(tuple);
-	server = GetForeignServer(tableform->ftserver);
-	fdw = GetForeignDataWrapper(server->fdwid);
-
-	memset(repl_val, 0, sizeof(repl_val));
-	memset(repl_null, false, sizeof(repl_null));
-	memset(repl_repl, false, sizeof(repl_repl));
-
-	/* Extract the current options */
-	datum = SysCacheGetAttr(FOREIGNTABLEREL,
-							tuple,
-							Anum_pg_foreign_table_ftoptions,
-							&isnull);
-	if (isnull)
-		datum = PointerGetDatum(NULL);
-
-	/* Transform the options */
-	datum = transformGenericOptions(ForeignTableRelationId,
-									datum,
-									options,
-									fdw->fdwvalidator);
-
-	if (PointerIsValid(DatumGetPointer(datum)))
-		repl_val[Anum_pg_foreign_table_ftoptions - 1] = datum;
-	else
-		repl_null[Anum_pg_foreign_table_ftoptions - 1] = true;
-
-	repl_repl[Anum_pg_foreign_table_ftoptions - 1] = true;
-
-	/* Everything looks good - update the tuple */
-
-	tuple = heap_modify_tuple(tuple, RelationGetDescr(ftrel),
-							  repl_val, repl_null, repl_repl);
-
-	CatalogTupleUpdate(ftrel, &tuple->t_self, tuple);
-
-	/*
-	 * Invalidate relcache so that all sessions will refresh any cached plans
-	 * that might depend on the old options.
-	 */
-	CacheInvalidateRelcache(rel);
-
-	InvokeObjectPostAlterHook(ForeignTableRelationId,
-							  RelationGetRelid(rel), 0);
-
-	table_close(ftrel, RowExclusiveLock);
-
-	heap_freetuple(tuple);
-}
-
-/*
  * ALTER TABLE ALTER COLUMN SET COMPRESSION
  *
  * Return value is the address of the modified column
@@ -16872,11 +16515,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a materialized view", rv->relname)));
 
-	if (reltype == OBJECT_FOREIGN_TABLE && relkind != RELKIND_FOREIGN_TABLE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a foreign table", rv->relname)));
-
 	if (reltype == OBJECT_TYPE && relkind != RELKIND_COMPOSITE_TYPE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -16908,7 +16546,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 		relkind != RELKIND_VIEW &&
 		relkind != RELKIND_MATVIEW &&
 		relkind != RELKIND_SEQUENCE &&
-		relkind != RELKIND_FOREIGN_TABLE &&
 		relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -17783,34 +17420,6 @@ AttachPartitionEnsureIndexes(Relation rel, Relation attachrel)
 		attachrelIdxRels[i] = index_open(cldIdxId, AccessShareLock);
 		attachInfos[i] = BuildIndexInfo(attachrelIdxRels[i]);
 		i++;
-	}
-
-	/*
-	 * If we're attaching a foreign table, we must fail if any of the indexes
-	 * is a constraint index; otherwise, there's nothing to do here.  Do this
-	 * before starting work, to avoid wasting the effort of building a few
-	 * non-unique indexes before coming across a unique one.
-	 */
-	if (attachrel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		foreach(cell, idxes)
-		{
-			Oid			idx = lfirst_oid(cell);
-			Relation	idxRel = index_open(idx, AccessShareLock);
-
-			if (idxRel->rd_index->indisunique ||
-				idxRel->rd_index->indisprimary)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot attach foreign table \"%s\" as partition of partitioned table \"%s\"",
-								RelationGetRelationName(attachrel),
-								RelationGetRelationName(rel)),
-						 errdetail("Partitioned table \"%s\" contains unique indexes.",
-								   RelationGetRelationName(rel))));
-			index_close(idxRel, AccessShareLock);
-		}
-
-		goto out;
 	}
 
 	/*

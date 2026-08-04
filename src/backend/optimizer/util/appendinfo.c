@@ -16,7 +16,6 @@
 
 #include "access/htup_details.h"
 #include "access/table.h"
-#include "foreign/fdwapi.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/appendinfo.h"
@@ -878,46 +877,6 @@ add_row_identity_columns(PlannerInfo *root, Index rtindex,
 					  InvalidOid,
 					  0);
 		add_row_identity_var(root, var, rtindex, "ctid");
-	}
-	else if (relkind == RELKIND_FOREIGN_TABLE)
-	{
-		/*
-		 * Let the foreign table's FDW add whatever junk TLEs it wants.
-		 */
-		FdwRoutine *fdwroutine;
-
-		fdwroutine = GetFdwRoutineForRelation(target_relation, false);
-
-		if (fdwroutine->AddForeignUpdateTargets != NULL)
-			fdwroutine->AddForeignUpdateTargets(root, rtindex,
-												target_rte, target_relation);
-
-		/*
-		 * For UPDATE, we need to make the FDW fetch unchanged columns by
-		 * asking it to fetch a whole-row Var.  That's because the top-level
-		 * targetlist only contains entries for changed columns, but
-		 * ExecUpdate will need to build the complete new tuple.  (Actually,
-		 * we only really need this in UPDATEs that are not pushed to the
-		 * remote side, but it's hard to tell if that will be the case at the
-		 * point when this function is called.)
-		 *
-		 * We will also need the whole row if there are any row triggers, so
-		 * that the executor will have the "old" row to pass to the trigger.
-		 * Alas, this misses system columns.
-		 */
-		if (commandType == CMD_UPDATE ||
-			(target_relation->trigdesc &&
-			 (target_relation->trigdesc->trig_delete_after_row ||
-			  target_relation->trigdesc->trig_delete_before_row)))
-		{
-			var = makeVar(rtindex,
-						  InvalidAttrNumber,
-						  RECORDOID,
-						  -1,
-						  InvalidOid,
-						  0);
-			add_row_identity_var(root, var, rtindex, "wholerow");
-		}
 	}
 }
 

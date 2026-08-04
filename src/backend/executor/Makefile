@@ -40,7 +40,6 @@ OBJS = \
 	nodeBitmapOr.o \
 	nodeCtescan.o \
 	nodeCustom.o \
-	nodeForeignscan.o \
 	nodeFunctionscan.o \
 	nodeGather.o \
 	nodeGatherMerge.o \

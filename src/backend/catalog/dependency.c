@@ -36,8 +36,6 @@
 #include "catalog/pg_depend.h"
 #include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_foreign_data_wrapper.h"
-#include "catalog/pg_foreign_server.h"
 #include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
@@ -56,7 +54,6 @@
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
-#include "catalog/pg_user_mapping.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/event_trigger.h"
@@ -163,9 +160,6 @@ static const Oid object_classes[] = {
 	AuthIdRelationId,			/* OCLASS_ROLE */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
-	ForeignDataWrapperRelationId,	/* OCLASS_FDW */
-	ForeignServerRelationId,	/* OCLASS_FOREIGN_SERVER */
-	UserMappingRelationId,		/* OCLASS_USER_MAPPING */
 	DefaultAclRelationId,		/* OCLASS_DEFACL */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
 	EventTriggerRelationId,		/* OCLASS_EVENT_TRIGGER */
@@ -1491,9 +1485,6 @@ doDeletion(const ObjectAddress *object, int flags)
 		case OCLASS_AMOP:
 		case OCLASS_AMPROC:
 		case OCLASS_SCHEMA:
-		case OCLASS_FDW:
-		case OCLASS_FOREIGN_SERVER:
-		case OCLASS_USER_MAPPING:
 		case OCLASS_DEFACL:
 		case OCLASS_EVENT_TRIGGER:
 		case OCLASS_TRANSFORM:
@@ -2805,15 +2796,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case TableSpaceRelationId:
 			return OCLASS_TBLSPACE;
-
-		case ForeignDataWrapperRelationId:
-			return OCLASS_FDW;
-
-		case ForeignServerRelationId:
-			return OCLASS_FOREIGN_SERVER;
-
-		case UserMappingRelationId:
-			return OCLASS_USER_MAPPING;
 
 		case DefaultAclRelationId:
 			return OCLASS_DEFACL;

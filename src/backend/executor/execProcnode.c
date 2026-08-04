@@ -81,7 +81,6 @@
 #include "executor/nodeBitmapOr.h"
 #include "executor/nodeCtescan.h"
 #include "executor/nodeCustom.h"
-#include "executor/nodeForeignscan.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
@@ -275,10 +274,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 														 estate, eflags);
 			break;
 
-		case T_ForeignScan:
-			result = (PlanState *) ExecInitForeignScan((ForeignScan *) node,
-													   estate, eflags);
-			break;
 
 		case T_CustomScan:
 			result = (PlanState *) ExecInitCustomScan((CustomScan *) node,
@@ -673,9 +668,6 @@ ExecEndNode(PlanState *node)
 			ExecEndWorkTableScan((WorkTableScanState *) node);
 			break;
 
-		case T_ForeignScanState:
-			ExecEndForeignScan((ForeignScanState *) node);
-			break;
 
 		case T_CustomScanState:
 			ExecEndCustomScan((CustomScanState *) node);
@@ -792,9 +784,6 @@ ExecShutdownNode_walker(PlanState *node, void *context)
 	{
 		case T_GatherState:
 			ExecShutdownGather((GatherState *) node);
-			break;
-		case T_ForeignScanState:
-			ExecShutdownForeignScan((ForeignScanState *) node);
 			break;
 		case T_CustomScanState:
 			ExecShutdownCustomScan((CustomScanState *) node);

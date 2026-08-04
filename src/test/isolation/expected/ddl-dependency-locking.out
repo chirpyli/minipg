@@ -112,22 +112,6 @@ step s2_commit: COMMIT;
 step s1_create_table_with_type: <... completed>
 ERROR:  referenced type was concurrently dropped
 
-starting permutation: s1_begin s1_create_server_with_fdw_wrapper s2_drop_fdw_wrapper s1_commit
-step s1_begin: BEGIN;
-step s1_create_server_with_fdw_wrapper: CREATE SERVER srv_fdw_wrapper FOREIGN DATA WRAPPER fdw_wrapper;
-step s2_drop_fdw_wrapper: DROP FOREIGN DATA WRAPPER fdw_wrapper RESTRICT; <waiting ...>
-step s1_commit: COMMIT;
-step s2_drop_fdw_wrapper: <... completed>
-ERROR:  cannot drop foreign-data wrapper fdw_wrapper because other objects depend on it
-
-starting permutation: s2_begin s2_drop_fdw_wrapper s1_create_server_with_fdw_wrapper s2_commit
-step s2_begin: BEGIN;
-step s2_drop_fdw_wrapper: DROP FOREIGN DATA WRAPPER fdw_wrapper RESTRICT;
-step s1_create_server_with_fdw_wrapper: CREATE SERVER srv_fdw_wrapper FOREIGN DATA WRAPPER fdw_wrapper; <waiting ...>
-step s2_commit: COMMIT;
-step s1_create_server_with_fdw_wrapper: <... completed>
-ERROR:  referenced foreign-data wrapper was concurrently dropped
-
 starting permutation: s1_begin s1_alter_function_owner s2_drop_role s1_commit
 step s1_begin: BEGIN;
 step s1_alter_function_owner: ALTER FUNCTION public.falter() OWNER TO regress_dependency;

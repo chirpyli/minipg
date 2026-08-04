@@ -23,7 +23,6 @@
 #include "catalog/pg_class.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
-#include "foreign/fdwapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -89,10 +88,6 @@ static void set_tablesample_rel_size(PlannerInfo *root, RelOptInfo *rel,
 									 RangeTblEntry *rte);
 static void set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 										 RangeTblEntry *rte);
-static void set_foreign_size(PlannerInfo *root, RelOptInfo *rel,
-							 RangeTblEntry *rte);
-static void set_foreign_pathlist(PlannerInfo *root, RelOptInfo *rel,
-								 RangeTblEntry *rte);
 static void set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 								Index rti, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
@@ -385,14 +380,9 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 	{
 		switch (rel->rtekind)
 		{
-			case RTE_RELATION:
-				if (rte->relkind == RELKIND_FOREIGN_TABLE)
-				{
-					/* Foreign table */
-					set_foreign_size(root, rel, rte);
-				}
-				else if (rte->relkind == RELKIND_PARTITIONED_TABLE)
-				{
+		case RTE_RELATION:
+			if (rte->relkind == RELKIND_PARTITIONED_TABLE)
+			{
 					/*
 					 * We could get here if asked to scan a partitioned table
 					 * with ONLY.  In that case we shouldn't scan any of the
@@ -479,14 +469,9 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	{
 		switch (rel->rtekind)
 		{
-			case RTE_RELATION:
-				if (rte->relkind == RELKIND_FOREIGN_TABLE)
-				{
-					/* Foreign table */
-					set_foreign_pathlist(root, rel, rte);
-				}
-				else if (rte->tablesample != NULL)
-				{
+		case RTE_RELATION:
+			if (rte->tablesample != NULL)
+			{
 					/* Sampled relation */
 					set_tablesample_rel_pathlist(root, rel, rte);
 				}
@@ -624,23 +609,6 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 				if (proparallel != PROPARALLEL_SAFE)
 					return;
 				if (!is_parallel_safe(root, (Node *) rte->tablesample->args))
-					return;
-			}
-
-			/*
-			 * Ask FDWs whether they can support performing a ForeignScan
-			 * within a worker.  Most often, the answer will be no.  For
-			 * example, if the nature of the FDW is such that it opens a TCP
-			 * connection with a remote server, each parallel worker would end
-			 * up with a separate connection, and these connections might not
-			 * be appropriately coordinated between workers and the leader.
-			 */
-			if (rte->relkind == RELKIND_FOREIGN_TABLE)
-			{
-				Assert(rel->fdwroutine);
-				if (!rel->fdwroutine->IsForeignScanParallelSafe)
-					return;
-				if (!rel->fdwroutine->IsForeignScanParallelSafe(root, rel, rte))
 					return;
 			}
 
@@ -882,41 +850,6 @@ set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *
 	add_path(rel, path);
 
 	/* For the moment, at least, there are no other paths to consider */
-}
-
-/*
- * set_foreign_size
- *		Set size estimates for a foreign table RTE
- */
-static void
-set_foreign_size(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	/* Mark rel with estimated output rows, width, etc */
-	set_foreign_size_estimates(root, rel);
-
-	/* Let FDW adjust the size estimates, if it can */
-	rel->fdwroutine->GetForeignRelSize(root, rel, rte->relid);
-
-	/* ... but do not let it set the rows estimate to zero */
-	rel->rows = clamp_row_est(rel->rows);
-
-	/*
-	 * Also, make sure rel->tuples is not insane relative to rel->rows.
-	 * Notably, this ensures sanity if pg_class.reltuples contains -1 and the
-	 * FDW doesn't do anything to replace that.
-	 */
-	rel->tuples = Max(rel->tuples, rel->rows);
-}
-
-/*
- * set_foreign_pathlist
- *		Build access paths for a foreign table RTE
- */
-static void
-set_foreign_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	/* Call the FDW's GetForeignPaths function to generate path(s) */
-	rel->fdwroutine->GetForeignPaths(root, rel, rte->relid);
 }
 
 /*
@@ -3979,9 +3912,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			break;
 		case T_SubqueryScanPath:
 			ptype = "SubqueryScan";
-			break;
-		case T_ForeignPath:
-			ptype = "ForeignScan";
 			break;
 		case T_CustomPath:
 			ptype = "CustomScan";

@@ -3613,8 +3613,6 @@ check_restrict_nonsystem_relation_kind(char **newval, void **extra, GucSource so
 
 		if (pg_strcasecmp(tok, "view") == 0)
 			flags |= RESTRICT_RELKIND_VIEW;
-		else if (pg_strcasecmp(tok, "foreign-table") == 0)
-			flags |= RESTRICT_RELKIND_FOREIGN_TABLE;
 		else
 		{
 			GUC_check_errdetail("Unrecognized key word: \"%s\".", tok);

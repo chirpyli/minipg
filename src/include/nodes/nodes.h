@@ -66,7 +66,6 @@ typedef enum NodeTag
 	T_CteScan,
 	T_NamedTuplestoreScan,
 	T_WorkTableScan,
-	T_ForeignScan,
 	T_CustomScan,
 	T_Join,
 	T_NestLoop,
@@ -124,7 +123,6 @@ typedef enum NodeTag
 	T_CteScanState,
 	T_NamedTuplestoreScanState,
 	T_WorkTableScanState,
-	T_ForeignScanState,
 	T_CustomScanState,
 	T_JoinState,
 	T_NestLoopState,
@@ -231,7 +229,6 @@ typedef enum NodeTag
 	T_TidPath,
 	T_TidRangePath,
 	T_SubqueryScanPath,
-	T_ForeignPath,
 	T_CustomPath,
 	T_NestPath,
 	T_MergePath,
@@ -393,18 +390,9 @@ typedef enum NodeTag
 	T_CreateEnumStmt,
 	T_CreateRangeStmt,
 	T_AlterEnumStmt,
-	T_CreateFdwStmt,
-	T_AlterFdwStmt,
-	T_CreateForeignServerStmt,
-	T_AlterForeignServerStmt,
-	T_CreateUserMappingStmt,
-	T_AlterUserMappingStmt,
-	T_DropUserMappingStmt,
 	T_AlterTableSpaceOptionsStmt,
 	T_AlterTableMoveAllStmt,
 	T_SecLabelStmt,
-	T_CreateForeignTableStmt,
-	T_ImportForeignSchemaStmt,
 	T_CreateExtensionStmt,
 	T_AlterExtensionStmt,
 	T_AlterExtensionContentsStmt,
@@ -508,7 +496,6 @@ typedef enum NodeTag
 	T_WindowObjectData,			/* private in nodeWindowAgg.c */
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
 	T_InlineCodeBlock,			/* in nodes/parsenodes.h */
-	T_FdwRoutine,				/* in foreign/fdwapi.h */
 	T_IndexAmRoutine,			/* in access/amapi.h */
 	T_TableAmRoutine,			/* in access/tableam.h */
 	T_TsmRoutine,				/* in access/tsmapi.h */

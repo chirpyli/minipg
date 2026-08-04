@@ -878,14 +878,6 @@ test_atomic_ops(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-PG_FUNCTION_INFO_V1(test_fdw_handler);
-Datum
-test_fdw_handler(PG_FUNCTION_ARGS)
-{
-	elog(ERROR, "test_fdw_handler is not implemented");
-	PG_RETURN_NULL();
-}
-
 PG_FUNCTION_INFO_V1(test_support_func);
 Datum
 test_support_func(PG_FUNCTION_ARGS)

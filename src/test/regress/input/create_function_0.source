@@ -44,11 +44,6 @@ CREATE FUNCTION test_atomic_ops()
     AS '@libdir@/regress@DLSUFFIX@'
     LANGUAGE C;
 
-CREATE FUNCTION test_fdw_handler()
-    RETURNS fdw_handler
-    AS '@libdir@/regress@DLSUFFIX@', 'test_fdw_handler'
-    LANGUAGE C;
-
 CREATE FUNCTION test_support_func(internal)
     RETURNS internal
     AS '@libdir@/regress@DLSUFFIX@', 'test_support_func'

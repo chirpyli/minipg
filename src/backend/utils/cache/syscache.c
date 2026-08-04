@@ -40,9 +40,6 @@
 #include "catalog/pg_enum.h"
 #include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_foreign_data_wrapper.h"
-#include "catalog/pg_foreign_server.h"
-#include "catalog/pg_foreign_table.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
@@ -68,7 +65,6 @@
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
-#include "catalog/pg_user_mapping.h"
 #include "lib/qunique.h"
 #include "miscadmin.h"
 #include "storage/lmgr.h"
@@ -417,61 +413,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		8
-	},
-	{ForeignDataWrapperRelationId,	/* FOREIGNDATAWRAPPERNAME */
-		ForeignDataWrapperNameIndexId,
-		1,
-		{
-			Anum_pg_foreign_data_wrapper_fdwname,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{ForeignDataWrapperRelationId,	/* FOREIGNDATAWRAPPEROID */
-		ForeignDataWrapperOidIndexId,
-		1,
-		{
-			Anum_pg_foreign_data_wrapper_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{ForeignServerRelationId,	/* FOREIGNSERVERNAME */
-		ForeignServerNameIndexId,
-		1,
-		{
-			Anum_pg_foreign_server_srvname,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{ForeignServerRelationId,	/* FOREIGNSERVEROID */
-		ForeignServerOidIndexId,
-		1,
-		{
-			Anum_pg_foreign_server_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{ForeignTableRelationId,	/* FOREIGNTABLEREL */
-		ForeignTableRelidIndexId,
-		1,
-		{
-			Anum_pg_foreign_table_ftrelid,
-			0,
-			0,
-			0
-		},
-		4
 	},
 	{IndexRelationId,			/* INDEXRELID */
 		IndexRelidIndexId,
@@ -869,28 +810,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		64
-	},
-	{UserMappingRelationId,		/* USERMAPPINGOID */
-		UserMappingOidIndexId,
-		1,
-		{
-			Anum_pg_user_mapping_oid,
-			0,
-			0,
-			0
-		},
-		2
-	},
-	{UserMappingRelationId,		/* USERMAPPINGUSERSERVER */
-		UserMappingUserServerIndexId,
-		2,
-		{
-			Anum_pg_user_mapping_umuser,
-			Anum_pg_user_mapping_umserver,
-			0,
-			0
-		},
-		2
 	},
 	/* intentionally out of alphabetical order, to avoid an ABI break: */
 	{ExtensionRelationId,		/* EXTENSIONOID */

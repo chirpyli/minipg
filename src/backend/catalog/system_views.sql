@@ -1197,29 +1197,6 @@ CREATE VIEW pg_stat_progress_copy AS
     FROM pg_stat_get_progress_info('COPY') AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
-CREATE VIEW pg_user_mappings AS
-    SELECT
-        U.oid       AS umid,
-        S.oid       AS srvid,
-        S.srvname   AS srvname,
-        U.umuser    AS umuser,
-        CASE WHEN U.umuser = 0 THEN
-            'public'
-        ELSE
-            A.rolname
-        END AS usename,
-        CASE WHEN (U.umuser <> 0 AND A.rolname = current_user
-                     AND (pg_has_role(S.srvowner, 'USAGE')
-                          OR has_server_privilege(S.oid, 'USAGE')))
-                    OR (U.umuser = 0 AND pg_has_role(S.srvowner, 'USAGE'))
-                    OR (SELECT rolsuper FROM pg_authid WHERE rolname = current_user)
-                    THEN U.umoptions
-                 ELSE NULL END AS umoptions
-    FROM pg_user_mapping U
-        JOIN pg_foreign_server S ON (U.umserver = S.oid)
-        LEFT JOIN pg_authid A ON (A.oid = U.umuser);
-
-REVOKE ALL ON pg_user_mapping FROM public;
 
 CREATE VIEW pg_replication_origin_status AS
     SELECT *

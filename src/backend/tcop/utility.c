@@ -143,8 +143,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterEventTrigStmt:
 		case T_AlterExtensionContentsStmt:
 		case T_AlterExtensionStmt:
-		case T_AlterFdwStmt:
-		case T_AlterForeignServerStmt:
 		case T_AlterFunctionStmt:
 		case T_AlterObjectDependsStmt:
 		case T_AlterObjectSchemaStmt:
@@ -162,7 +160,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
 		case T_AlterTypeStmt:
-		case T_AlterUserMappingStmt:
 		case T_CommentStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateAmStmt:
@@ -172,9 +169,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateEnumStmt:
 		case T_CreateEventTrigStmt:
 		case T_CreateExtensionStmt:
-		case T_CreateFdwStmt:
-		case T_CreateForeignServerStmt:
-		case T_CreateForeignTableStmt:
 		case T_CreateFunctionStmt:
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
@@ -192,7 +186,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateTableSpaceStmt:
 		case T_CreateTransformStmt:
 		case T_CreateTrigStmt:
-		case T_CreateUserMappingStmt:
 		case T_CreatedbStmt:
 		case T_DefineStmt:
 		case T_DropOwnedStmt:
@@ -200,11 +193,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropStmt:
 		case T_DropSubscriptionStmt:
 		case T_DropTableSpaceStmt:
-		case T_DropUserMappingStmt:
 		case T_DropdbStmt:
 		case T_GrantRoleStmt:
 		case T_GrantStmt:
-		case T_ImportForeignSchemaStmt:
 		case T_IndexStmt:
 		case T_ReassignOwnedStmt:
 		case T_RefreshMatViewStmt:
@@ -1128,10 +1119,9 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_CreateStmt:
-			case T_CreateForeignTableStmt:
-				{
-					List	   *stmts;
-					RangeVar   *table_rv = NULL;
+			{
+				List	   *stmts;
+				RangeVar   *table_rv = NULL;
 
 					/* Run parse analysis ... */
 					stmts = transformCreateStmt((CreateStmt *) parsetree,
@@ -1186,28 +1176,10 @@ ProcessUtilitySlow(ParseState *pstate,
 												   toast_options,
 												   true);
 
-							NewRelationCreateToastTable(address.objectId,
-														toast_options);
-						}
-						else if (IsA(stmt, CreateForeignTableStmt))
-						{
-							CreateForeignTableStmt *cstmt = (CreateForeignTableStmt *) stmt;
-
-							/* Remember transformed RangeVar for LIKE */
-							table_rv = cstmt->base.relation;
-
-							/* Create the table itself */
-							address = DefineRelation(&cstmt->base,
-													 RELKIND_FOREIGN_TABLE,
-													 InvalidOid, NULL,
-													 queryString);
-							CreateForeignTable(cstmt,
-											   address.objectId);
-							EventTriggerCollectSimpleCommand(address,
-															 secondaryObject,
-															 stmt);
-						}
-						else if (IsA(stmt, TableLikeClause))
+						NewRelationCreateToastTable(address.objectId,
+													toast_options);
+					}
+					else if (IsA(stmt, TableLikeClause))
 						{
 							/*
 							 * Do delayed processing of LIKE options.  This
@@ -1475,19 +1447,9 @@ ProcessUtilitySlow(ParseState *pstate,
 
 							if (relkind != RELKIND_RELATION &&
 								relkind != RELKIND_MATVIEW &&
-								relkind != RELKIND_PARTITIONED_TABLE &&
-								relkind != RELKIND_FOREIGN_TABLE)
+								relkind != RELKIND_PARTITIONED_TABLE)
 								elog(ERROR, "unexpected relkind \"%c\" on partition \"%s\"",
 									 relkind, stmt->relation->relname);
-
-							if (relkind == RELKIND_FOREIGN_TABLE &&
-								(stmt->unique || stmt->primary))
-								ereport(ERROR,
-										(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-										 errmsg("cannot create unique index on partitioned table \"%s\"",
-												stmt->relation->relname),
-										 errdetail("Table \"%s\" contains partitions that are foreign tables.",
-												   stmt->relation->relname)));
 						}
 						list_free(inheritors);
 					}
@@ -1545,41 +1507,6 @@ ProcessUtilitySlow(ParseState *pstate,
 														 &secondaryObject);
 				break;
 
-			case T_CreateFdwStmt:
-				address = CreateForeignDataWrapper((CreateFdwStmt *) parsetree);
-				break;
-
-			case T_AlterFdwStmt:
-				address = AlterForeignDataWrapper((AlterFdwStmt *) parsetree);
-				break;
-
-			case T_CreateForeignServerStmt:
-				address = CreateForeignServer((CreateForeignServerStmt *) parsetree);
-				break;
-
-			case T_AlterForeignServerStmt:
-				address = AlterForeignServer((AlterForeignServerStmt *) parsetree);
-				break;
-
-			case T_CreateUserMappingStmt:
-				address = CreateUserMapping((CreateUserMappingStmt *) parsetree);
-				break;
-
-			case T_AlterUserMappingStmt:
-				address = AlterUserMapping((AlterUserMappingStmt *) parsetree);
-				break;
-
-			case T_DropUserMappingStmt:
-				RemoveUserMapping((DropUserMappingStmt *) parsetree);
-				/* no commands stashed for DROP */
-				commandCollected = true;
-				break;
-
-			case T_ImportForeignSchemaStmt:
-				ImportForeignSchema((ImportForeignSchemaStmt *) parsetree);
-				/* commands are stashed inside ImportForeignSchema */
-				commandCollected = true;
-				break;
 
 			case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
 				{
@@ -1948,7 +1875,6 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
-		case OBJECT_FOREIGN_TABLE:
 			RemoveRelations(stmt);
 			break;
 		default:
@@ -2187,15 +2113,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 			break;
 		case OBJECT_EXTENSION:
 			tag = CMDTAG_ALTER_EXTENSION;
-			break;
-		case OBJECT_FDW:
-			tag = CMDTAG_ALTER_FOREIGN_DATA_WRAPPER;
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			tag = CMDTAG_ALTER_SERVER;
-			break;
-		case OBJECT_FOREIGN_TABLE:
-			tag = CMDTAG_ALTER_FOREIGN_TABLE;
 			break;
 		case OBJECT_FUNCTION:
 			tag = CMDTAG_ALTER_FUNCTION;
@@ -2438,39 +2355,30 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_EXTENSION;
 			break;
 
-		case T_CreateFdwStmt:
 			tag = CMDTAG_CREATE_FOREIGN_DATA_WRAPPER;
 			break;
 
-		case T_AlterFdwStmt:
 			tag = CMDTAG_ALTER_FOREIGN_DATA_WRAPPER;
 			break;
 
-		case T_CreateForeignServerStmt:
 			tag = CMDTAG_CREATE_SERVER;
 			break;
 
-		case T_AlterForeignServerStmt:
 			tag = CMDTAG_ALTER_SERVER;
 			break;
 
-		case T_CreateUserMappingStmt:
 			tag = CMDTAG_CREATE_USER_MAPPING;
 			break;
 
-		case T_AlterUserMappingStmt:
 			tag = CMDTAG_ALTER_USER_MAPPING;
 			break;
 
-		case T_DropUserMappingStmt:
 			tag = CMDTAG_DROP_USER_MAPPING;
 			break;
 
-		case T_CreateForeignTableStmt:
 			tag = CMDTAG_CREATE_FOREIGN_TABLE;
 			break;
 
-		case T_ImportForeignSchemaStmt:
 			tag = CMDTAG_IMPORT_FOREIGN_SCHEMA;
 			break;
 
@@ -2513,13 +2421,10 @@ CreateCommandTag(Node *parsetree)
 					break;
 					tag = CMDTAG_DROP_TEXT_SEARCH_TEMPLATE;
 					break;
-					tag = CMDTAG_DROP_TEXT_SEARCH_CONFIGURATION;
-					break;
-				case OBJECT_FOREIGN_TABLE:
-					tag = CMDTAG_DROP_FOREIGN_TABLE;
-					break;
-				case OBJECT_EXTENSION:
-					tag = CMDTAG_DROP_EXTENSION;
+				tag = CMDTAG_DROP_TEXT_SEARCH_CONFIGURATION;
+				break;
+			case OBJECT_EXTENSION:
+				tag = CMDTAG_DROP_EXTENSION;
 					break;
 				case OBJECT_FUNCTION:
 					tag = CMDTAG_DROP_FUNCTION;
@@ -2548,16 +2453,10 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_EVENT_TRIGGER:
 					tag = CMDTAG_DROP_EVENT_TRIGGER;
 					break;
-				case OBJECT_RULE:
-					tag = CMDTAG_DROP_RULE;
-					break;
-				case OBJECT_FDW:
-					tag = CMDTAG_DROP_FOREIGN_DATA_WRAPPER;
-					break;
-				case OBJECT_FOREIGN_SERVER:
-					tag = CMDTAG_DROP_SERVER;
-					break;
-				case OBJECT_OPCLASS:
+			case OBJECT_RULE:
+				tag = CMDTAG_DROP_RULE;
+				break;
+			case OBJECT_OPCLASS:
 					tag = CMDTAG_DROP_OPERATOR_CLASS;
 					break;
 				case OBJECT_OPFAMILY:
@@ -3216,7 +3115,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateStmt:
-		case T_CreateForeignTableStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -3232,14 +3130,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_CreateFdwStmt:
-		case T_AlterFdwStmt:
-		case T_CreateForeignServerStmt:
-		case T_AlterForeignServerStmt:
-		case T_CreateUserMappingStmt:
-		case T_AlterUserMappingStmt:
-		case T_DropUserMappingStmt:
-		case T_ImportForeignSchemaStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

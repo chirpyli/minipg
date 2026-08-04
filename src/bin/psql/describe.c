@@ -1141,7 +1141,6 @@ permissionsList(const char *pattern)
 					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_MATVIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_FOREIGN_TABLE) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
 					  " END as \"%s\",\n"
 					  "  ",
@@ -1151,7 +1150,6 @@ permissionsList(const char *pattern)
 					  gettext_noop("view"),
 					  gettext_noop("materialized view"),
 					  gettext_noop("sequence"),
-					  gettext_noop("foreign table"),
 					  gettext_noop("partitioned table"),
 					  gettext_noop("Type"));
 
@@ -1238,7 +1236,6 @@ permissionsList(const char *pattern)
 						 CppAsString2(RELKIND_VIEW) ","
 						 CppAsString2(RELKIND_MATVIEW) ","
 						 CppAsString2(RELKIND_SEQUENCE) ","
-						 CppAsString2(RELKIND_FOREIGN_TABLE) ","
 						 CppAsString2(RELKIND_PARTITIONED_TABLE) ")\n");
 
 	/*
@@ -2028,7 +2025,6 @@ describeOneTableDetails(const char *schemaname,
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
 		tableinfo.relkind == RELKIND_MATVIEW ||
-		tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
 		tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 		show_column_details = true;
@@ -2085,16 +2081,8 @@ describeOneTableDetails(const char *schemaname,
 							  gettext_noop("no"));
 			isindexkey_col = cols++;
 		}
-		appendPQExpBufferStr(&buf, ",\n  pg_catalog.pg_get_indexdef(a.attrelid, a.attnum, TRUE) AS indexdef");
-		indexdef_col = cols++;
-	}
-	/* FDW options for foreign table column, only for 9.2 or later */
-	if (tableinfo.relkind == RELKIND_FOREIGN_TABLE && pset.sversion >= 90200)
-	{
-		appendPQExpBufferStr(&buf, ",\n  CASE WHEN attfdwoptions IS NULL THEN '' ELSE "
-							 "  '(' || pg_catalog.array_to_string(ARRAY(SELECT pg_catalog.quote_ident(option_name) || ' ' || pg_catalog.quote_literal(option_value)  FROM "
-							 "  pg_catalog.pg_options_to_table(attfdwoptions)), ', ') || ')' END AS attfdwoptions");
-		fdwopts_col = cols++;
+	appendPQExpBufferStr(&buf, ",\n  pg_catalog.pg_get_indexdef(a.attrelid, a.attnum, TRUE) AS indexdef");
+	indexdef_col = cols++;
 	}
 	if (verbose)
 	{
@@ -2117,7 +2105,6 @@ describeOneTableDetails(const char *schemaname,
 			tableinfo.relkind == RELKIND_INDEX ||
 			tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
 			tableinfo.relkind == RELKIND_MATVIEW ||
-			tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 		{
 			appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
@@ -2131,7 +2118,6 @@ describeOneTableDetails(const char *schemaname,
 		if (tableinfo.relkind == RELKIND_RELATION ||
 			tableinfo.relkind == RELKIND_VIEW ||
 			tableinfo.relkind == RELKIND_MATVIEW ||
-			tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 			tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
 			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 		{
@@ -2201,10 +2187,6 @@ describeOneTableDetails(const char *schemaname,
 			printfPQExpBuffer(&title, _("Composite type \"%s.%s\""),
 							  schemaname, relationname);
 			break;
-		case RELKIND_FOREIGN_TABLE:
-			printfPQExpBuffer(&title, _("Foreign table \"%s.%s\""),
-							  schemaname, relationname);
-			break;
 		case RELKIND_PARTITIONED_TABLE:
 			if (tableinfo.relpersistence == 'u')
 				printfPQExpBuffer(&title, _("Unlogged partitioned table \"%s.%s\""),
@@ -2234,8 +2216,6 @@ describeOneTableDetails(const char *schemaname,
 		headers[cols++] = gettext_noop("Key?");
 	if (indexdef_col >= 0)
 		headers[cols++] = gettext_noop("Definition");
-	if (fdwopts_col >= 0)
-		headers[cols++] = gettext_noop("FDW options");
 	if (attstorage_col >= 0)
 		headers[cols++] = gettext_noop("Storage");
 	if (attcompression_col >= 0)
@@ -2300,10 +2280,6 @@ describeOneTableDetails(const char *schemaname,
 			printTableAddCell(&cont, PQgetvalue(res, i, isindexkey_col), true, false);
 		if (indexdef_col >= 0)
 			printTableAddCell(&cont, PQgetvalue(res, i, indexdef_col), false, false);
-
-		/* FDW options for foreign table columns */
-		if (fdwopts_col >= 0)
-			printTableAddCell(&cont, PQgetvalue(res, i, fdwopts_col), false, false);
 
 		/* Storage mode, if relevant */
 		if (attstorage_col >= 0)
@@ -2557,7 +2533,6 @@ describeOneTableDetails(const char *schemaname,
 	/* If you add relkinds here, see also "Finish printing..." stanza below */
 	else if (tableinfo.relkind == RELKIND_RELATION ||
 			 tableinfo.relkind == RELKIND_MATVIEW ||
-			 tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
 			 tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
 			 tableinfo.relkind == RELKIND_TOASTVALUE)
@@ -3468,7 +3443,6 @@ describeOneTableDetails(const char *schemaname,
 	 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_MATVIEW ||
-		tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 		tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
 		tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
 		tableinfo.relkind == RELKIND_TOASTVALUE)
@@ -3481,45 +3455,6 @@ describeOneTableDetails(const char *schemaname,
 		is_partitioned = (tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
 						  tableinfo.relkind == RELKIND_PARTITIONED_INDEX);
 
-		/* print foreign server name */
-		if (tableinfo.relkind == RELKIND_FOREIGN_TABLE)
-		{
-			char	   *ftoptions;
-
-			/* Footer information about foreign table */
-			printfPQExpBuffer(&buf,
-							  "SELECT s.srvname,\n"
-							  "  pg_catalog.array_to_string(ARRAY(\n"
-							  "    SELECT pg_catalog.quote_ident(option_name)"
-							  " || ' ' || pg_catalog.quote_literal(option_value)\n"
-							  "    FROM pg_catalog.pg_options_to_table(ftoptions)),  ', ')\n"
-							  "FROM pg_catalog.pg_foreign_table f,\n"
-							  "     pg_catalog.pg_foreign_server s\n"
-							  "WHERE f.ftrelid = '%s' AND s.oid = f.ftserver;",
-							  oid);
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else if (PQntuples(result) != 1)
-			{
-				PQclear(result);
-				goto error_return;
-			}
-
-			/* Print server name */
-			printfPQExpBuffer(&buf, _("Server: %s"),
-							  PQgetvalue(result, 0, 0));
-			printTableAddFooter(&cont, buf.data);
-
-			/* Print per-table FDW options, if any */
-			ftoptions = PQgetvalue(result, 0, 1);
-			if (ftoptions && ftoptions[0] != '\0')
-			{
-				printfPQExpBuffer(&buf, _("FDW options: (%s)"), ftoptions);
-				printTableAddFooter(&cont, buf.data);
-			}
-			PQclear(result);
-		}
 
 		/* print tables inherited from (exclude partitioned parents) */
 		printfPQExpBuffer(&buf,
@@ -4104,7 +4039,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_FOREIGN_TABLE) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_PARTITIONED_INDEX) " THEN '%s'"
 					  " END as \"%s\",\n"
@@ -4118,7 +4052,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  gettext_noop("sequence"),
 					  gettext_noop("special"),
 					  gettext_noop("TOAST table"),
-					  gettext_noop("foreign table"),
 					  gettext_noop("partitioned table"),
 					  gettext_noop("partitioned index"),
 					  gettext_noop("Type"),
@@ -4218,8 +4151,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_SEQUENCE) ",");
 	if (showSystem || pattern)
 		appendPQExpBufferStr(&buf, "'s',"); /* was RELKIND_SPECIAL */
-	if (showForeign)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_FOREIGN_TABLE) ",");
 
 	appendPQExpBufferStr(&buf, "''");	/* dummy */
 	appendPQExpBufferStr(&buf, ")\n");
@@ -5772,317 +5703,6 @@ describeOneTSConfig(const char *oid, const char *nspname, const char *cfgname,
 }
 
 
-/*
- * \dew
- *
- * Describes foreign-data wrappers
- */
-bool
-listForeignDataWrappers(const char *pattern, bool verbose)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80400)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support foreign-data wrappers.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	initPQExpBuffer(&buf);
-	printfPQExpBuffer(&buf,
-					  "SELECT fdw.fdwname AS \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(fdw.fdwowner) AS \"%s\",\n",
-					  gettext_noop("Name"),
-					  gettext_noop("Owner"));
-	if (pset.sversion >= 90100)
-		appendPQExpBuffer(&buf,
-						  "  fdw.fdwhandler::pg_catalog.regproc AS \"%s\",\n",
-						  gettext_noop("Handler"));
-	appendPQExpBuffer(&buf,
-					  "  fdw.fdwvalidator::pg_catalog.regproc AS \"%s\"",
-					  gettext_noop("Validator"));
-
-	if (verbose)
-	{
-		appendPQExpBufferStr(&buf, ",\n  ");
-		printACLColumn(&buf, "fdwacl");
-		appendPQExpBuffer(&buf,
-						  ",\n CASE WHEN fdwoptions IS NULL THEN '' ELSE "
-						  "  '(' || pg_catalog.array_to_string(ARRAY(SELECT "
-						  "  pg_catalog.quote_ident(option_name) ||  ' ' || "
-						  "  pg_catalog.quote_literal(option_value)  FROM "
-						  "  pg_catalog.pg_options_to_table(fdwoptions)),  ', ') || ')' "
-						  "  END AS \"%s\"",
-						  gettext_noop("FDW options"));
-
-		if (pset.sversion >= 90100)
-			appendPQExpBuffer(&buf,
-							  ",\n  d.description AS \"%s\" ",
-							  gettext_noop("Description"));
-	}
-
-	appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_foreign_data_wrapper fdw\n");
-
-	if (verbose && pset.sversion >= 90100)
-		appendPQExpBufferStr(&buf,
-							 "LEFT JOIN pg_catalog.pg_description d\n"
-							 "       ON d.classoid = fdw.tableoid "
-							 "AND d.objoid = fdw.oid AND d.objsubid = 0\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								NULL, "fdwname", NULL, NULL,
-								NULL, 1))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of foreign-data wrappers");
-	myopt.translate_header = true;
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
-
-/*
- * \des
- *
- * Describes foreign servers.
- */
-bool
-listForeignServers(const char *pattern, bool verbose)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80400)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support foreign servers.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	initPQExpBuffer(&buf);
-	printfPQExpBuffer(&buf,
-					  "SELECT s.srvname AS \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(s.srvowner) AS \"%s\",\n"
-					  "  f.fdwname AS \"%s\"",
-					  gettext_noop("Name"),
-					  gettext_noop("Owner"),
-					  gettext_noop("Foreign-data wrapper"));
-
-	if (verbose)
-	{
-		appendPQExpBufferStr(&buf, ",\n  ");
-		printACLColumn(&buf, "s.srvacl");
-		appendPQExpBuffer(&buf,
-						  ",\n"
-						  "  s.srvtype AS \"%s\",\n"
-						  "  s.srvversion AS \"%s\",\n"
-						  "  CASE WHEN srvoptions IS NULL THEN '' ELSE "
-						  "  '(' || pg_catalog.array_to_string(ARRAY(SELECT "
-						  "  pg_catalog.quote_ident(option_name) ||  ' ' || "
-						  "  pg_catalog.quote_literal(option_value)  FROM "
-						  "  pg_catalog.pg_options_to_table(srvoptions)),  ', ') || ')' "
-						  "  END AS \"%s\",\n"
-						  "  d.description AS \"%s\"",
-						  gettext_noop("Type"),
-						  gettext_noop("Version"),
-						  gettext_noop("FDW options"),
-						  gettext_noop("Description"));
-	}
-
-	appendPQExpBufferStr(&buf,
-						 "\nFROM pg_catalog.pg_foreign_server s\n"
-						 "     JOIN pg_catalog.pg_foreign_data_wrapper f ON f.oid=s.srvfdw\n");
-
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "LEFT JOIN pg_catalog.pg_description d\n       "
-							 "ON d.classoid = s.tableoid AND d.objoid = s.oid "
-							 "AND d.objsubid = 0\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								NULL, "s.srvname", NULL, NULL,
-								NULL, 1))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of foreign servers");
-	myopt.translate_header = true;
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
-
-/*
- * \deu
- *
- * Describes user mappings.
- */
-bool
-listUserMappings(const char *pattern, bool verbose)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80400)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support user mappings.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	initPQExpBuffer(&buf);
-	printfPQExpBuffer(&buf,
-					  "SELECT um.srvname AS \"%s\",\n"
-					  "  um.usename AS \"%s\"",
-					  gettext_noop("Server"),
-					  gettext_noop("User name"));
-
-	if (verbose)
-		appendPQExpBuffer(&buf,
-						  ",\n CASE WHEN umoptions IS NULL THEN '' ELSE "
-						  "  '(' || pg_catalog.array_to_string(ARRAY(SELECT "
-						  "  pg_catalog.quote_ident(option_name) ||  ' ' || "
-						  "  pg_catalog.quote_literal(option_value)  FROM "
-						  "  pg_catalog.pg_options_to_table(umoptions)),  ', ') || ')' "
-						  "  END AS \"%s\"",
-						  gettext_noop("FDW options"));
-
-	appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_user_mappings um\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								NULL, "um.srvname", "um.usename", NULL,
-								NULL, 1))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of user mappings");
-	myopt.translate_header = true;
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
-
-/*
- * \det
- *
- * Describes foreign tables.
- */
-bool
-listForeignTables(const char *pattern, bool verbose)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 90100)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support foreign tables.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	initPQExpBuffer(&buf);
-	printfPQExpBuffer(&buf,
-					  "SELECT n.nspname AS \"%s\",\n"
-					  "  c.relname AS \"%s\",\n"
-					  "  s.srvname AS \"%s\"",
-					  gettext_noop("Schema"),
-					  gettext_noop("Table"),
-					  gettext_noop("Server"));
-
-	if (verbose)
-		appendPQExpBuffer(&buf,
-						  ",\n CASE WHEN ftoptions IS NULL THEN '' ELSE "
-						  "  '(' || pg_catalog.array_to_string(ARRAY(SELECT "
-						  "  pg_catalog.quote_ident(option_name) ||  ' ' || "
-						  "  pg_catalog.quote_literal(option_value)  FROM "
-						  "  pg_catalog.pg_options_to_table(ftoptions)),  ', ') || ')' "
-						  "  END AS \"%s\",\n"
-						  "  d.description AS \"%s\"",
-						  gettext_noop("FDW options"),
-						  gettext_noop("Description"));
-
-	appendPQExpBufferStr(&buf,
-						 "\nFROM pg_catalog.pg_foreign_table ft\n"
-						 "  INNER JOIN pg_catalog.pg_class c"
-						 " ON c.oid = ft.ftrelid\n"
-						 "  INNER JOIN pg_catalog.pg_namespace n"
-						 " ON n.oid = c.relnamespace\n"
-						 "  INNER JOIN pg_catalog.pg_foreign_server s"
-						 " ON s.oid = ft.ftserver\n");
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "   LEFT JOIN pg_catalog.pg_description d\n"
-							 "          ON d.classoid = c.tableoid AND "
-							 "d.objoid = c.oid AND d.objsubid = 0\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								"n.nspname", "c.relname", NULL,
-								"pg_catalog.pg_table_is_visible(c.oid)",
-								NULL, 3))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of foreign tables");
-	myopt.translate_header = true;
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
 
 /*
  * \dx

@@ -21,7 +21,6 @@
 
 #include "access/sysattr.h"
 #include "catalog/pg_class.h"
-#include "foreign/fdwapi.h"
 #include "miscadmin.h"
 #include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
@@ -153,8 +152,6 @@ static Result *create_resultscan_plan(PlannerInfo *root, Path *best_path,
 									  List *tlist, List *scan_clauses);
 static WorkTableScan *create_worktablescan_plan(PlannerInfo *root, Path *best_path,
 												List *tlist, List *scan_clauses);
-static ForeignScan *create_foreignscan_plan(PlannerInfo *root, ForeignPath *best_path,
-											List *tlist, List *scan_clauses);
 static CustomScan *create_customscan_plan(PlannerInfo *root,
 										  CustomPath *best_path,
 										  List *tlist, List *scan_clauses);
@@ -401,7 +398,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_CteScan:
 		case T_WorkTableScan:
 		case T_NamedTuplestoreScan:
-		case T_ForeignScan:
 		case T_CustomScan:
 			plan = create_scan_plan(root, best_path, flags);
 			break;
@@ -749,13 +745,6 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 													  best_path,
 													  tlist,
 													  scan_clauses);
-			break;
-
-		case T_ForeignScan:
-			plan = (Plan *) create_foreignscan_plan(root,
-													(ForeignPath *) best_path,
-													tlist,
-													scan_clauses);
 			break;
 
 		case T_CustomScan:
@@ -1106,23 +1095,6 @@ is_async_capable_plan(Plan *plan, Path *path)
 {
 	switch (nodeTag(path))
 	{
-		case T_ForeignPath:
-			{
-				FdwRoutine *fdwroutine = path->parent->fdwroutine;
-
-				/*
-				 * If the generated plan node includes a gating Result node,
-				 * we can't execute it asynchronously.
-				 */
-				if (IsA(plan, Result))
-					return false;
-
-				Assert(fdwroutine != NULL);
-				if (fdwroutine->IsForeignPathAsyncCapable != NULL &&
-					fdwroutine->IsForeignPathAsyncCapable((ForeignPath *) path))
-					return true;
-			}
-			break;
 		default:
 			break;
 	}
@@ -3991,149 +3963,6 @@ create_worktablescan_plan(PlannerInfo *root, Path *best_path,
 	return scan_plan;
 }
 
-/*
- * create_foreignscan_plan
- *	 Returns a foreignscan plan for the relation scanned by 'best_path'
- *	 with restriction clauses 'scan_clauses' and targetlist 'tlist'.
- */
-static ForeignScan *
-create_foreignscan_plan(PlannerInfo *root, ForeignPath *best_path,
-						List *tlist, List *scan_clauses)
-{
-	ForeignScan *scan_plan;
-	RelOptInfo *rel = best_path->path.parent;
-	Index		scan_relid = rel->relid;
-	Oid			rel_oid = InvalidOid;
-	Plan	   *outer_plan = NULL;
-
-	Assert(rel->fdwroutine != NULL);
-
-	/* transform the child path if any */
-	if (best_path->fdw_outerpath)
-		outer_plan = create_plan_recurse(root, best_path->fdw_outerpath,
-										 CP_EXACT_TLIST);
-
-	/*
-	 * If we're scanning a base relation, fetch its OID.  (Irrelevant if
-	 * scanning a join relation.)
-	 */
-	if (scan_relid > 0)
-	{
-		RangeTblEntry *rte;
-
-		Assert(rel->rtekind == RTE_RELATION);
-		rte = planner_rt_fetch(scan_relid, root);
-		Assert(rte->rtekind == RTE_RELATION);
-		rel_oid = rte->relid;
-	}
-
-	/*
-	 * Sort clauses into best execution order.  We do this first since the FDW
-	 * might have more info than we do and wish to adjust the ordering.
-	 */
-	scan_clauses = order_qual_clauses(root, scan_clauses);
-
-	/*
-	 * Let the FDW perform its processing on the restriction clauses and
-	 * generate the plan node.  Note that the FDW might remove restriction
-	 * clauses that it intends to execute remotely, or even add more (if it
-	 * has selected some join clauses for remote use but also wants them
-	 * rechecked locally).
-	 */
-	scan_plan = rel->fdwroutine->GetForeignPlan(root, rel, rel_oid,
-												best_path,
-												tlist, scan_clauses,
-												outer_plan);
-
-	/* Copy cost data from Path to Plan; no need to make FDW do this */
-	copy_generic_path_info(&scan_plan->scan.plan, &best_path->path);
-
-	/* Copy foreign server OID; likewise, no need to make FDW do this */
-	scan_plan->fs_server = rel->serverid;
-
-	/*
-	 * Likewise, copy the relids that are represented by this foreign scan. An
-	 * upper rel doesn't have relids set, but it covers all the base relations
-	 * participating in the underlying scan, so use root's all_baserels.
-	 */
-	if (rel->reloptkind == RELOPT_UPPER_REL)
-		scan_plan->fs_relids = root->all_baserels;
-	else
-		scan_plan->fs_relids = best_path->path.parent->relids;
-
-	/*
-	 * If this is a foreign join, and to make it valid to push down we had to
-	 * assume that the current user is the same as some user explicitly named
-	 * in the query, mark the finished plan as depending on the current user.
-	 */
-	if (rel->useridiscurrent)
-		root->glob->dependsOnRole = true;
-
-	/*
-	 * Replace any outer-relation variables with nestloop params in the qual,
-	 * fdw_exprs and fdw_recheck_quals expressions.  We do this last so that
-	 * the FDW doesn't have to be involved.  (Note that parts of fdw_exprs or
-	 * fdw_recheck_quals could have come from join clauses, so doing this
-	 * beforehand on the scan_clauses wouldn't work.)  We assume
-	 * fdw_scan_tlist contains no such variables.
-	 */
-	if (best_path->path.param_info)
-	{
-		scan_plan->scan.plan.qual = (List *)
-			replace_nestloop_params(root, (Node *) scan_plan->scan.plan.qual);
-		scan_plan->fdw_exprs = (List *)
-			replace_nestloop_params(root, (Node *) scan_plan->fdw_exprs);
-		scan_plan->fdw_recheck_quals = (List *)
-			replace_nestloop_params(root,
-									(Node *) scan_plan->fdw_recheck_quals);
-	}
-
-	/*
-	 * If rel is a base relation, detect whether any system columns are
-	 * requested from the rel.  (If rel is a join relation, rel->relid will be
-	 * 0, but there can be no Var with relid 0 in the rel's targetlist or the
-	 * restriction clauses, so we skip this in that case.  Note that any such
-	 * columns in base relations that were joined are assumed to be contained
-	 * in fdw_scan_tlist.)	This is a bit of a kluge and might go away
-	 * someday, so we intentionally leave it out of the API presented to FDWs.
-	 */
-	scan_plan->fsSystemCol = false;
-	if (scan_relid > 0)
-	{
-		Bitmapset  *attrs_used = NULL;
-		ListCell   *lc;
-		int			i;
-
-		/*
-		 * First, examine all the attributes needed for joins or final output.
-		 * Note: we must look at rel's targetlist, not the attr_needed data,
-		 * because attr_needed isn't computed for inheritance child rels.
-		 */
-		pull_varattnos((Node *) rel->reltarget->exprs, scan_relid, &attrs_used);
-
-		/* Add all the attributes used by restriction clauses. */
-		foreach(lc, rel->baserestrictinfo)
-		{
-			RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
-
-			pull_varattnos((Node *) rinfo->clause, scan_relid, &attrs_used);
-		}
-
-		/* Now, are any system columns requested from rel? */
-		for (i = FirstLowInvalidHeapAttributeNumber + 1; i < 0; i++)
-		{
-			if (bms_is_member(i - FirstLowInvalidHeapAttributeNumber, attrs_used))
-			{
-				scan_plan->fsSystemCol = true;
-				break;
-			}
-		}
-
-		bms_free(attrs_used);
-	}
-
-	return scan_plan;
-}
 
 /*
  * create_customscan_plan
@@ -5655,43 +5484,6 @@ make_worktablescan(List *qptlist,
 	return node;
 }
 
-ForeignScan *
-make_foreignscan(List *qptlist,
-				 List *qpqual,
-				 Index scanrelid,
-				 List *fdw_exprs,
-				 List *fdw_private,
-				 List *fdw_scan_tlist,
-				 List *fdw_recheck_quals,
-				 Plan *outer_plan)
-{
-	ForeignScan *node = makeNode(ForeignScan);
-	Plan	   *plan = &node->scan.plan;
-
-	/* cost will be filled in by create_foreignscan_plan */
-	plan->targetlist = qptlist;
-	plan->qual = qpqual;
-	plan->lefttree = outer_plan;
-	plan->righttree = NULL;
-	node->scan.scanrelid = scanrelid;
-
-	/* these may be overridden by the FDW's PlanDirectModify callback. */
-	node->operation = CMD_SELECT;
-	node->resultRelation = 0;
-
-	/* fs_server will be filled in by create_foreignscan_plan */
-	node->fs_server = InvalidOid;
-	node->fdw_exprs = fdw_exprs;
-	node->fdw_private = fdw_private;
-	node->fdw_scan_tlist = fdw_scan_tlist;
-	node->fdw_recheck_quals = fdw_recheck_quals;
-	/* fs_relids will be filled in by create_foreignscan_plan */
-	node->fs_relids = NULL;
-	/* fsSystemCol will be filled in by create_foreignscan_plan */
-	node->fsSystemCol = false;
-
-	return node;
-}
 
 static RecursiveUnion *
 make_recursive_union(List *tlist,
@@ -6865,8 +6657,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 	ModifyTable *node = makeNode(ModifyTable);
 	bool		transition_tables = false;
 	bool		transition_tables_valid = false;
-	List	   *fdw_private_list;
-	Bitmapset  *direct_modify_plans;
 	ListCell   *lc;
 	int			i;
 
@@ -6931,101 +6721,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 	node->returningLists = returningLists;
 	node->rowMarks = rowMarks;
 	node->epqParam = epqParam;
-
-	/*
-	 * For each result relation that is a foreign table, allow the FDW to
-	 * construct private plan data, and accumulate it all into a list.
-	 */
-	fdw_private_list = NIL;
-	direct_modify_plans = NULL;
-	i = 0;
-	foreach(lc, resultRelations)
-	{
-		Index		rti = lfirst_int(lc);
-		FdwRoutine *fdwroutine;
-		List	   *fdw_private;
-		bool		direct_modify;
-
-		/*
-		 * If possible, we want to get the FdwRoutine from our RelOptInfo for
-		 * the table.  But sometimes we don't have a RelOptInfo and must get
-		 * it the hard way.  (In INSERT, the target relation is not scanned,
-		 * so it's not a baserel; and there are also corner cases for
-		 * updatable views where the target rel isn't a baserel.)
-		 */
-		if (rti < root->simple_rel_array_size &&
-			root->simple_rel_array[rti] != NULL)
-		{
-			RelOptInfo *resultRel = root->simple_rel_array[rti];
-
-			fdwroutine = resultRel->fdwroutine;
-		}
-		else
-		{
-			RangeTblEntry *rte = planner_rt_fetch(rti, root);
-
-			Assert(rte->rtekind == RTE_RELATION);
-			if (rte->relkind == RELKIND_FOREIGN_TABLE)
-			{
-				/* Check if the access to foreign tables is restricted */
-				if (unlikely((restrict_nonsystem_relation_kind & RESTRICT_RELKIND_FOREIGN_TABLE) != 0))
-				{
-					/* there must not be built-in foreign tables */
-					Assert(rte->relid >= FirstNormalObjectId);
-					ereport(ERROR,
-							(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-							 errmsg("access to non-system foreign table is restricted")));
-				}
-
-				fdwroutine = GetFdwRoutineByRelId(rte->relid);
-			}
-			else
-				fdwroutine = NULL;
-		}
-
-		/*
-		 * Try to modify the foreign table directly if (1) the FDW provides
-		 * callback functions needed for that and (2) there are no local
-		 * structures that need to be run for each modified row: row-level
-		 * triggers on the foreign table, stored generated columns, WITH CHECK
-		 * OPTIONs from parent views, transition tables on the named relation.
-		 */
-		direct_modify = false;
-		if (fdwroutine != NULL &&
-			fdwroutine->PlanDirectModify != NULL &&
-			fdwroutine->BeginDirectModify != NULL &&
-			fdwroutine->IterateDirectModify != NULL &&
-			fdwroutine->EndDirectModify != NULL &&
-			withCheckOptionLists == NIL &&
-			!has_row_triggers(root, rti, operation) &&
-			!has_stored_generated_columns(root, rti))
-		{
-			/* transition_tables is the same for all result relations */
-			if (!transition_tables_valid)
-			{
-				transition_tables = has_transition_tables(root,
-														  nominalRelation,
-														  operation);
-				transition_tables_valid = true;
-			}
-			if (!transition_tables)
-				direct_modify = fdwroutine->PlanDirectModify(root, node,
-															 rti, i);
-		}
-		if (direct_modify)
-			direct_modify_plans = bms_add_member(direct_modify_plans, i);
-
-		if (!direct_modify &&
-			fdwroutine != NULL &&
-			fdwroutine->PlanForeignModify != NULL)
-			fdw_private = fdwroutine->PlanForeignModify(root, node, rti, i);
-		else
-			fdw_private = NIL;
-		fdw_private_list = lappend(fdw_private_list, fdw_private);
-		i++;
-	}
-	node->fdwPrivLists = fdw_private_list;
-	node->fdwDirectModifyPlans = direct_modify_plans;
 
 	return node;
 }

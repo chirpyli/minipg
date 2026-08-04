@@ -45,7 +45,6 @@ extern PGDLLIMPORT int log_statement;
 
 /* Flags for restrict_nonsystem_relation_kind value */
 #define RESTRICT_RELKIND_VIEW			0x01
-#define RESTRICT_RELKIND_FOREIGN_TABLE	0x02
 
 extern PGDLLIMPORT int restrict_nonsystem_relation_kind;
 

@@ -1633,8 +1633,6 @@ _readModifyTable(void)
 	READ_NODE_FIELD(updateColnosLists);
 	READ_NODE_FIELD(withCheckOptionLists);
 	READ_NODE_FIELD(returningLists);
-	READ_NODE_FIELD(fdwPrivLists);
-	READ_BITMAPSET_FIELD(fdwDirectModifyPlans);
 	READ_NODE_FIELD(rowMarks);
 	READ_INT_FIELD(epqParam);
 	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
@@ -1992,28 +1990,6 @@ _readWorkTableScan(void)
 	READ_DONE();
 }
 
-/*
- * _readForeignScan
- */
-static ForeignScan *
-_readForeignScan(void)
-{
-	READ_LOCALS(ForeignScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_ENUM_FIELD(operation, CmdType);
-	READ_UINT_FIELD(resultRelation);
-	READ_OID_FIELD(fs_server);
-	READ_NODE_FIELD(fdw_exprs);
-	READ_NODE_FIELD(fdw_private);
-	READ_NODE_FIELD(fdw_scan_tlist);
-	READ_NODE_FIELD(fdw_recheck_quals);
-	READ_BITMAPSET_FIELD(fs_relids);
-	READ_BOOL_FIELD(fsSystemCol);
-
-	READ_DONE();
-}
 
 /*
  * _readCustomScan
@@ -2834,8 +2810,6 @@ parseNodeString(void)
 		return_value = _readNamedTuplestoreScan();
 	else if (MATCH("WORKTABLESCAN", 13))
 		return_value = _readWorkTableScan();
-	else if (MATCH("FOREIGNSCAN", 11))
-		return_value = _readForeignScan();
 	else if (MATCH("CUSTOMSCAN", 10))
 		return_value = _readCustomScan();
 	else if (MATCH("JOIN", 4))

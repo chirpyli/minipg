@@ -51,7 +51,6 @@
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
-#include "catalog/pg_foreign_table.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
@@ -341,7 +340,6 @@ heap_create(const char *relname,
 	{
 		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
-		case RELKIND_FOREIGN_TABLE:
 
 			/*
 			 * Force reltablespace to zero if the relation has no physical
@@ -419,7 +417,6 @@ heap_create(const char *relname,
 		{
 			case RELKIND_VIEW:
 			case RELKIND_COMPOSITE_TYPE:
-			case RELKIND_FOREIGN_TABLE:
 			case RELKIND_PARTITIONED_TABLE:
 			case RELKIND_PARTITIONED_INDEX:
 				Assert(false);
@@ -1257,7 +1254,7 @@ heap_create_with_catalog(const char *relname,
 		if (IsBinaryUpgrade &&
 			(relkind == RELKIND_RELATION || relkind == RELKIND_SEQUENCE ||
 			 relkind == RELKIND_VIEW || relkind == RELKIND_MATVIEW ||
-			 relkind == RELKIND_COMPOSITE_TYPE || relkind == RELKIND_FOREIGN_TABLE ||
+			 relkind == RELKIND_COMPOSITE_TYPE ||
 			 relkind == RELKIND_PARTITIONED_TABLE))
 		{
 			if (!OidIsValid(binary_upgrade_next_heap_pg_class_oid))
@@ -1295,12 +1292,11 @@ heap_create_with_catalog(const char *relname,
 	{
 		switch (relkind)
 		{
-			case RELKIND_RELATION:
-			case RELKIND_VIEW:
-			case RELKIND_MATVIEW:
-			case RELKIND_FOREIGN_TABLE:
-			case RELKIND_PARTITIONED_TABLE:
-				relacl = get_user_default_acl(OBJECT_TABLE, ownerid,
+		case RELKIND_RELATION:
+		case RELKIND_VIEW:
+		case RELKIND_MATVIEW:
+		case RELKIND_PARTITIONED_TABLE:
+			relacl = get_user_default_acl(OBJECT_TABLE, ownerid,
 											  relnamespace);
 				break;
 			case RELKIND_SEQUENCE:
@@ -1991,25 +1987,6 @@ heap_drop_with_catalog(Oid relid)
 	CheckTableForSerializableConflictIn(rel);
 
 	/*
-	 * Delete pg_foreign_table tuple first.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		Relation	rel;
-		HeapTuple	tuple;
-
-		rel = table_open(ForeignTableRelationId, RowExclusiveLock);
-
-		tuple = SearchSysCache1(FOREIGNTABLEREL, ObjectIdGetDatum(relid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for foreign table %u", relid);
-
-		CatalogTupleDelete(rel, &tuple->t_self);
-
-		ReleaseSysCache(tuple);
-		table_close(rel, RowExclusiveLock);
-	}
-
 	/*
 	 * If a partitioned table, delete the pg_partitioned_table tuple.
 	 */

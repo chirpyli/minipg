@@ -331,13 +331,11 @@ ExecScanReScan(ScanState *node)
 			int			rtindex = -1;
 
 			/*
-			 * If an FDW or custom scan provider has replaced the join with a
-			 * scan, there are multiple RTIs; reset the relsubs_done flag for
-			 * all of them.
+			 * If a custom scan provider has replaced the join with a scan,
+			 * there are multiple RTIs; reset the relsubs_done flag for all of
+			 * them.
 			 */
-			if (IsA(node->ps.plan, ForeignScan))
-				relids = ((ForeignScan *) node->ps.plan)->fs_relids;
-			else if (IsA(node->ps.plan, CustomScan))
+			if (IsA(node->ps.plan, CustomScan))
 				relids = ((CustomScan *) node->ps.plan)->custom_relids;
 			else
 				elog(ERROR, "unexpected scan node: %d",

@@ -25,7 +25,6 @@
 #include "access/xact.h"
 #include "executor/executor.h"
 #include "executor/nodeLockRows.h"
-#include "foreign/fdwapi.h"
 #include "miscadmin.h"
 #include "utils/rel.h"
 
@@ -121,41 +120,6 @@ lnext:
 		/* shouldn't ever get a null result... */
 		if (isNull)
 			elog(ERROR, "ctid is NULL");
-
-		/* requests for foreign tables must be passed to their FDW */
-		if (erm->relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		{
-			FdwRoutine *fdwroutine;
-			bool		updated = false;
-
-			fdwroutine = GetFdwRoutineForRelation(erm->relation, false);
-			/* this should have been checked already, but let's be safe */
-			if (fdwroutine->RefetchForeignRow == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot lock rows in foreign table \"%s\"",
-								RelationGetRelationName(erm->relation))));
-
-			fdwroutine->RefetchForeignRow(estate,
-										  erm,
-										  datum,
-										  markSlot,
-										  &updated);
-			if (TupIsNull(markSlot))
-			{
-				/* couldn't get the lock, so skip this row */
-				goto lnext;
-			}
-
-			/*
-			 * if FDW says tuple was updated before getting locked, we need to
-			 * perform EPQ testing to see if quals are still satisfied
-			 */
-			if (updated)
-				epq_needed = true;
-
-			continue;
-		}
 
 		/* okay, try to lock (and fetch) the tuple */
 		tid = *((ItemPointer) DatumGetPointer(datum));

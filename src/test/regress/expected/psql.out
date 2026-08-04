@@ -5307,21 +5307,21 @@ cross-database references are not implemented: regress(ion).public.shoe
 \dv nonesuch.public.shoe
 cross-database references are not implemented: nonesuch.public.shoe
 \des nonesuch.server
-improper qualified name (too many dotted names): nonesuch.server
+invalid command \des
 \des regression.server
-improper qualified name (too many dotted names): regression.server
+invalid command \des
 \des nonesuch.server
-improper qualified name (too many dotted names): nonesuch.server
+invalid command \des
 \des regression.server
-improper qualified name (too many dotted names): regression.server
+invalid command \des
 \des nonesuch.username
-improper qualified name (too many dotted names): nonesuch.username
+invalid command \des
 \des regression.username
-improper qualified name (too many dotted names): regression.username
+invalid command \des
 \dew nonesuch.fdw
-improper qualified name (too many dotted names): nonesuch.fdw
+invalid command \dew
 \dew regression.fdw
-improper qualified name (too many dotted names): regression.fdw
+invalid command \dew
 \df host.regression.public.namelen
 improper qualified name (too many dotted names): host.regression.public.namelen
 \df regres[qrstuv]ion.public.namelen
@@ -5528,17 +5528,9 @@ List of access methods
 (0 rows)
 
 \des "no.such.foreign.server"
-       List of foreign servers
- Name | Owner | Foreign-data wrapper 
-------+-------+----------------------
-(0 rows)
-
+invalid command \des
 \dew "no.such.foreign.data.wrapper"
-   List of foreign-data wrappers
- Name | Owner | Handler | Validator 
-------+-------+---------+-----------
-(0 rows)
-
+invalid command \dew
 \df "no.such.function"
                        List of functions
  Schema | Name | Result data type | Argument data types | Type 
@@ -5730,9 +5722,9 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.table
 (0 rows)
 
 \des "no.such.schema"."no.such.foreign.server"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.foreign.server"
+invalid command \des
 \dew "no.such.schema"."no.such.foreign.data.wrapper"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.foreign.data.wrapper"
+invalid command \dew
 \df "no.such.schema"."no.such.function"
                        List of functions
  Schema | Name | Result data type | Argument data types | Type 

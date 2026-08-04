@@ -17,7 +17,6 @@
 #include "executor/execAsync.h"
 #include "executor/executor.h"
 #include "executor/nodeAppend.h"
-#include "executor/nodeForeignscan.h"
 
 /*
  * Asynchronously request a tuple from a designed async-capable node.
@@ -34,9 +33,6 @@ ExecAsyncRequest(AsyncRequest *areq)
 
 	switch (nodeTag(areq->requestee))
 	{
-		case T_ForeignScanState:
-			ExecAsyncForeignScanRequest(areq);
-			break;
 		default:
 			/* If the node doesn't support async, caller messed up. */
 			elog(ERROR, "unrecognized node type: %d",
@@ -64,12 +60,8 @@ ExecAsyncConfigureWait(AsyncRequest *areq)
 	/* must provide our own instrumentation support */
 	if (areq->requestee->instrument)
 		InstrStartNode(areq->requestee->instrument);
-
 	switch (nodeTag(areq->requestee))
 	{
-		case T_ForeignScanState:
-			ExecAsyncForeignScanConfigureWait(areq);
-			break;
 		default:
 			/* If the node doesn't support async, caller messed up. */
 			elog(ERROR, "unrecognized node type: %d",
@@ -90,12 +82,8 @@ ExecAsyncNotify(AsyncRequest *areq)
 	/* must provide our own instrumentation support */
 	if (areq->requestee->instrument)
 		InstrStartNode(areq->requestee->instrument);
-
 	switch (nodeTag(areq->requestee))
 	{
-		case T_ForeignScanState:
-			ExecAsyncForeignScanNotify(areq);
-			break;
 		default:
 			/* If the node doesn't support async, caller messed up. */
 			elog(ERROR, "unrecognized node type: %d",

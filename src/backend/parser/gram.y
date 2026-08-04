@@ -118,12 +118,6 @@ typedef struct PrivTarget
 	List	   *objs;
 } PrivTarget;
 
-/* Private struct for the result of import_qualification production */
-typedef struct ImportQual
-{
-	ImportForeignSchemaType type;
-	List	   *table_names;
-} ImportQual;
 
 /* Private struct for the result of opt_select_limit production */
 typedef struct SelectLimit
@@ -247,7 +241,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	ResTarget			*target;
 	struct PrivTarget	*privtarget;
 	AccessPriv			*accesspriv;
-	struct ImportQual	*importqual;
 	InsertStmt			*istmt;
 	VariableSetStmt		*vsetstmt;
 	PartitionElem		*partelem;
@@ -262,11 +255,11 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
 		AlterEventTrigStmt AlterCollationStmt
 		AlterDatabaseStmt AlterDatabaseSetStmt AlterDomainStmt AlterEnumStmt
-		AlterFdwStmt AlterForeignServerStmt AlterGroupStmt
+		AlterGroupStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
 		AlterOperatorStmt AlterTypeStmt AlterSeqStmt AlterSystemStmt AlterTableStmt
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
-		AlterCompositeTypeStmt AlterUserMappingStmt
+		AlterCompositeTypeStmt
 		AlterRoleStmt AlterRoleSetStmt AlterPolicyStmt AlterStatsStmt
 		AlterDefaultPrivilegesStmt DefACLAction
 		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
@@ -274,16 +267,16 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		CreateDomainStmt CreateExtensionStmt CreateGroupStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
-		CreateFdwStmt CreateForeignServerStmt CreateForeignTableStmt
+		
 		CreateAssertionStmt CreateTransformStmt CreateTrigStmt CreateEventTrigStmt
-		CreateUserStmt CreateUserMappingStmt CreateRoleStmt CreatePolicyStmt
+		CreateUserStmt CreateRoleStmt CreatePolicyStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
 		DropCastStmt DropRoleStmt
 		DropdbStmt DropTableSpaceStmt
 		DropTransformStmt
-		DropUserMappingStmt ExplainStmt FetchStmt
-		GrantStmt GrantRoleStmt ImportForeignSchemaStmt IndexStmt InsertStmt
+		ExplainStmt FetchStmt
+		GrantStmt GrantRoleStmt IndexStmt InsertStmt
 		ListenStmt LoadStmt LockStmt NotifyStmt ExplainableStmt PreparableStmt
 		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
 		RemoveFuncStmt RemoveOperStmt RenameStmt ReturnStmt RevokeStmt RevokeRoleStmt
@@ -335,8 +328,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <list>	OptRoleList AlterOptRoleList
 %type <defelt>	CreateOptRoleElem AlterOptRoleElem
 
-%type <str>		opt_type
-%type <str>		foreign_server_version opt_foreign_server_version
 %type <str>		opt_in_database
 
 %type <str>		OptSchemaName
@@ -386,8 +377,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <ival>	defacl_privilege_target
 %type <defelt>	DefACLOption
 %type <list>	DefACLOptionList
-%type <ival>	import_qualification_type
-%type <importqual> import_qualification
 %type <node>	vacuum_relation
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
@@ -415,9 +404,9 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				opclass_purpose opt_opfamily transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
-				execute_param_clause using_clause returning_clause
-				opt_enum_val_list enum_val_list table_func_column_list
-				create_generic_options alter_generic_options
+			execute_param_clause using_clause returning_clause
+			opt_enum_val_list enum_val_list table_func_column_list
+			alter_generic_options
 				relation_expr_list dostmt_opt_list
 				transform_element_list transform_type_list
 				TriggerTransitions TriggerReferencing
@@ -431,8 +420,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <node>	grouping_sets_clause
 %type <node>	opt_publication_for_tables publication_for_tables
 
-%type <list>	opt_fdw_options fdw_options
-%type <defelt>	fdw_option
 
 %type <range>	OptTempTableName
 %type <into>	into_clause create_as_target create_mv_target
@@ -549,7 +536,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <str>		var_name type_function_name param_name
 %type <str>		createdb_opt_name plassign_target
 %type <node>	var_value zone_value
-%type <rolespec> auth_ident RoleSpec opt_granted_by
+%type <rolespec> RoleSpec opt_granted_by
 
 %type <keyword> unreserved_keyword type_func_name_keyword
 %type <keyword> col_name_keyword reserved_keyword
@@ -894,8 +881,6 @@ stmt:
 			| AlterEnumStmt
 			| AlterExtensionStmt
 			| AlterExtensionContentsStmt
-			| AlterFdwStmt
-			| AlterForeignServerStmt
 			| AlterFunctionStmt
 			| AlterGroupStmt
 			| AlterObjectDependsStmt
@@ -914,7 +899,6 @@ stmt:
 			| AlterRoleStmt
 			| AlterSubscriptionStmt
 			| AlterStatsStmt
-			| AlterUserMappingStmt
 			| AnalyzeStmt
 			| CallStmt
 			| CheckPointStmt
@@ -930,9 +914,6 @@ stmt:
 			| CreateConversionStmt
 			| CreateDomainStmt
 			| CreateExtensionStmt
-			| CreateFdwStmt
-			| CreateForeignServerStmt
-			| CreateForeignTableStmt
 			| CreateFunctionStmt
 			| CreateGroupStmt
 			| CreateMatViewStmt
@@ -953,7 +934,6 @@ stmt:
 			| CreateEventTrigStmt
 			| CreateRoleStmt
 			| CreateUserStmt
-			| CreateUserMappingStmt
 			| CreatedbStmt
 			| DeallocateStmt
 			| DeclareCursorStmt
@@ -970,14 +950,12 @@ stmt:
 			| DropTableSpaceStmt
 			| DropTransformStmt
 			| DropRoleStmt
-			| DropUserMappingStmt
 			| DropdbStmt
 			| ExecuteStmt
 			| ExplainStmt
 			| FetchStmt
 			| GrantStmt
 			| GrantRoleStmt
-			| ImportForeignSchemaStmt
 			| IndexStmt
 			| InsertStmt
 			| ListenStmt
@@ -1870,7 +1848,6 @@ DiscardStmt:
 
 /*****************************************************************************
  *
- *	ALTER [ TABLE | INDEX | SEQUENCE | VIEW | MATERIALIZED VIEW | FOREIGN TABLE ] variations
  *
  * Note: we accept all subcommands for each of the variants, and sort
  * out what's really legal at execution time.
@@ -2058,24 +2035,6 @@ AlterTableStmt:
 					n->roles = $10;
 					n->new_tablespacename = $13;
 					n->nowait = $14;
-					$$ = (Node *)n;
-				}
-		|	ALTER FOREIGN TABLE relation_expr alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $4;
-					n->cmds = $5;
-					n->objtype = OBJECT_FOREIGN_TABLE;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-		|	ALTER FOREIGN TABLE IF_P EXISTS relation_expr alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $6;
-					n->cmds = $7;
-					n->objtype = OBJECT_FOREIGN_TABLE;
-					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
 		;
@@ -2367,7 +2326,6 @@ alter_table_cmd:
 					def->location = @3;
 					$$ = (Node *)n;
 				}
-			/* ALTER FOREIGN TABLE <name> ALTER [COLUMN] <colname> OPTIONS */
 			| ALTER opt_column ColId alter_generic_options
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
@@ -3436,7 +3394,7 @@ TypedTableElement:
 			| TableConstraint					{ $$ = $1; }
 		;
 
-columnDef:	ColId Typename opt_column_compression create_generic_options ColQualList
+columnDef:	ColId Typename opt_column_compression ColQualList
 				{
 					ColumnDef *n = makeNode(ColumnDef);
 					n->colname = $1;
@@ -3450,8 +3408,7 @@ columnDef:	ColId Typename opt_column_compression create_generic_options ColQualL
 					n->raw_default = NULL;
 					n->cooked_default = NULL;
 					n->collOid = InvalidOid;
-					n->fdwoptions = $4;
-					SplitColQualList($5, &n->constraints, &n->collClause,
+					SplitColQualList($4, &n->constraints, &n->collClause,
 									 yyscanner);
 					n->location = @1;
 					$$ = (Node *)n;
@@ -4772,67 +4729,7 @@ AlterExtensionContentsStmt:
 /*****************************************************************************
  *
  *		QUERY:
- *             CREATE FOREIGN DATA WRAPPER name options
- *
- *****************************************************************************/
 
-CreateFdwStmt: CREATE FOREIGN DATA_P WRAPPER name opt_fdw_options create_generic_options
-				{
-					CreateFdwStmt *n = makeNode(CreateFdwStmt);
-					n->fdwname = $5;
-					n->func_options = $6;
-					n->options = $7;
-					$$ = (Node *) n;
-				}
-		;
-
-fdw_option:
-			HANDLER handler_name				{ $$ = makeDefElem("handler", (Node *)$2, @1); }
-			| NO HANDLER						{ $$ = makeDefElem("handler", NULL, @1); }
-			| VALIDATOR handler_name			{ $$ = makeDefElem("validator", (Node *)$2, @1); }
-			| NO VALIDATOR						{ $$ = makeDefElem("validator", NULL, @1); }
-		;
-
-fdw_options:
-			fdw_option							{ $$ = list_make1($1); }
-			| fdw_options fdw_option			{ $$ = lappend($1, $2); }
-		;
-
-opt_fdw_options:
-			fdw_options							{ $$ = $1; }
-			| /*EMPTY*/							{ $$ = NIL; }
-		;
-
-/*****************************************************************************
- *
- *		QUERY :
- *				ALTER FOREIGN DATA WRAPPER name options
- *
- ****************************************************************************/
-
-AlterFdwStmt: ALTER FOREIGN DATA_P WRAPPER name opt_fdw_options alter_generic_options
-				{
-					AlterFdwStmt *n = makeNode(AlterFdwStmt);
-					n->fdwname = $5;
-					n->func_options = $6;
-					n->options = $7;
-					$$ = (Node *) n;
-				}
-			| ALTER FOREIGN DATA_P WRAPPER name fdw_options
-				{
-					AlterFdwStmt *n = makeNode(AlterFdwStmt);
-					n->fdwname = $5;
-					n->func_options = $6;
-					n->options = NIL;
-					$$ = (Node *) n;
-				}
-		;
-
-/* Options definition for CREATE FDW, SERVER and USER MAPPING */
-create_generic_options:
-			OPTIONS '(' generic_option_list ')'			{ $$ = $3; }
-			| /*EMPTY*/									{ $$ = NIL; }
-		;
 
 generic_option_list:
 			generic_option_elem
@@ -4905,47 +4802,6 @@ generic_option_arg:
  *
  *****************************************************************************/
 
-CreateForeignServerStmt: CREATE SERVER name opt_type opt_foreign_server_version
-						 FOREIGN DATA_P WRAPPER name create_generic_options
-				{
-					CreateForeignServerStmt *n = makeNode(CreateForeignServerStmt);
-					n->servername = $3;
-					n->servertype = $4;
-					n->version = $5;
-					n->fdwname = $9;
-					n->options = $10;
-					n->if_not_exists = false;
-					$$ = (Node *) n;
-				}
-				| CREATE SERVER IF_P NOT EXISTS name opt_type opt_foreign_server_version
-						 FOREIGN DATA_P WRAPPER name create_generic_options
-				{
-					CreateForeignServerStmt *n = makeNode(CreateForeignServerStmt);
-					n->servername = $6;
-					n->servertype = $7;
-					n->version = $8;
-					n->fdwname = $12;
-					n->options = $13;
-					n->if_not_exists = true;
-					$$ = (Node *) n;
-				}
-		;
-
-opt_type:
-			TYPE_P Sconst			{ $$ = $2; }
-			| /*EMPTY*/				{ $$ = NULL; }
-		;
-
-
-foreign_server_version:
-			VERSION_P Sconst		{ $$ = $2; }
-		|	VERSION_P NULL_P		{ $$ = NULL; }
-		;
-
-opt_foreign_server_version:
-			foreign_server_version	{ $$ = $1; }
-			| /*EMPTY*/				{ $$ = NULL; }
-		;
 
 /*****************************************************************************
  *
@@ -4954,244 +4810,23 @@ opt_foreign_server_version:
  *
  ****************************************************************************/
 
-AlterForeignServerStmt: ALTER SERVER name foreign_server_version alter_generic_options
-				{
-					AlterForeignServerStmt *n = makeNode(AlterForeignServerStmt);
-					n->servername = $3;
-					n->version = $4;
-					n->options = $5;
-					n->has_version = true;
-					$$ = (Node *) n;
-				}
-			| ALTER SERVER name foreign_server_version
-				{
-					AlterForeignServerStmt *n = makeNode(AlterForeignServerStmt);
-					n->servername = $3;
-					n->version = $4;
-					n->has_version = true;
-					$$ = (Node *) n;
-				}
-			| ALTER SERVER name alter_generic_options
-				{
-					AlterForeignServerStmt *n = makeNode(AlterForeignServerStmt);
-					n->servername = $3;
-					n->options = $4;
-					$$ = (Node *) n;
-				}
-		;
 
 /*****************************************************************************
  *
  *		QUERY:
- *             CREATE FOREIGN TABLE relname (...) SERVER name (...)
  *
  *****************************************************************************/
 
-CreateForeignTableStmt:
-		CREATE FOREIGN TABLE qualified_name
-			'(' OptTableElementList ')'
-			OptInherit SERVER name create_generic_options
-				{
-					CreateForeignTableStmt *n = makeNode(CreateForeignTableStmt);
-					$4->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->base.relation = $4;
-					n->base.tableElts = $6;
-					n->base.inhRelations = $8;
-					n->base.ofTypename = NULL;
-					n->base.constraints = NIL;
-					n->base.options = NIL;
-					n->base.oncommit = ONCOMMIT_NOOP;
-					n->base.tablespacename = NULL;
-					n->base.if_not_exists = false;
-					/* FDW-specific data */
-					n->servername = $10;
-					n->options = $11;
-					$$ = (Node *) n;
-				}
-		| CREATE FOREIGN TABLE IF_P NOT EXISTS qualified_name
-			'(' OptTableElementList ')'
-			OptInherit SERVER name create_generic_options
-				{
-					CreateForeignTableStmt *n = makeNode(CreateForeignTableStmt);
-					$7->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->base.relation = $7;
-					n->base.tableElts = $9;
-					n->base.inhRelations = $11;
-					n->base.ofTypename = NULL;
-					n->base.constraints = NIL;
-					n->base.options = NIL;
-					n->base.oncommit = ONCOMMIT_NOOP;
-					n->base.tablespacename = NULL;
-					n->base.if_not_exists = true;
-					/* FDW-specific data */
-					n->servername = $13;
-					n->options = $14;
-					$$ = (Node *) n;
-				}
-		| CREATE FOREIGN TABLE qualified_name
-			PARTITION OF qualified_name OptTypedTableElementList PartitionBoundSpec
-			SERVER name create_generic_options
-				{
-					CreateForeignTableStmt *n = makeNode(CreateForeignTableStmt);
-					$4->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->base.relation = $4;
-					n->base.inhRelations = list_make1($7);
-					n->base.tableElts = $8;
-					n->base.partbound = $9;
-					n->base.ofTypename = NULL;
-					n->base.constraints = NIL;
-					n->base.options = NIL;
-					n->base.oncommit = ONCOMMIT_NOOP;
-					n->base.tablespacename = NULL;
-					n->base.if_not_exists = false;
-					/* FDW-specific data */
-					n->servername = $11;
-					n->options = $12;
-					$$ = (Node *) n;
-				}
-		| CREATE FOREIGN TABLE IF_P NOT EXISTS qualified_name
-			PARTITION OF qualified_name OptTypedTableElementList PartitionBoundSpec
-			SERVER name create_generic_options
-				{
-					CreateForeignTableStmt *n = makeNode(CreateForeignTableStmt);
-					$7->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->base.relation = $7;
-					n->base.inhRelations = list_make1($10);
-					n->base.tableElts = $11;
-					n->base.partbound = $12;
-					n->base.ofTypename = NULL;
-					n->base.constraints = NIL;
-					n->base.options = NIL;
-					n->base.oncommit = ONCOMMIT_NOOP;
-					n->base.tablespacename = NULL;
-					n->base.if_not_exists = true;
-					/* FDW-specific data */
-					n->servername = $14;
-					n->options = $15;
-					$$ = (Node *) n;
-				}
-		;
 
 /*****************************************************************************
  *
  *		QUERY:
- *				IMPORT FOREIGN SCHEMA remote_schema
  *				[ { LIMIT TO | EXCEPT } ( table_list ) ]
  *				FROM SERVER server_name INTO local_schema [ OPTIONS (...) ]
  *
  ****************************************************************************/
 
-ImportForeignSchemaStmt:
-		IMPORT_P FOREIGN SCHEMA name import_qualification
-		  FROM SERVER name INTO name create_generic_options
-			{
-				ImportForeignSchemaStmt *n = makeNode(ImportForeignSchemaStmt);
-				n->server_name = $8;
-				n->remote_schema = $4;
-				n->local_schema = $10;
-				n->list_type = $5->type;
-				n->table_list = $5->table_names;
-				n->options = $11;
-				$$ = (Node *) n;
-			}
-		;
 
-import_qualification_type:
-		LIMIT TO				{ $$ = FDW_IMPORT_SCHEMA_LIMIT_TO; }
-		| EXCEPT				{ $$ = FDW_IMPORT_SCHEMA_EXCEPT; }
-		;
-
-import_qualification:
-		import_qualification_type '(' relation_expr_list ')'
-			{
-				ImportQual *n = (ImportQual *) palloc(sizeof(ImportQual));
-				n->type = $1;
-				n->table_names = $3;
-				$$ = n;
-			}
-		| /*EMPTY*/
-			{
-				ImportQual *n = (ImportQual *) palloc(sizeof(ImportQual));
-				n->type = FDW_IMPORT_SCHEMA_ALL;
-				n->table_names = NIL;
-				$$ = n;
-			}
-		;
-
-/*****************************************************************************
- *
- *		QUERY:
- *             CREATE USER MAPPING FOR auth_ident SERVER name [OPTIONS]
- *
- *****************************************************************************/
-
-CreateUserMappingStmt: CREATE USER MAPPING FOR auth_ident SERVER name create_generic_options
-				{
-					CreateUserMappingStmt *n = makeNode(CreateUserMappingStmt);
-					n->user = $5;
-					n->servername = $7;
-					n->options = $8;
-					n->if_not_exists = false;
-					$$ = (Node *) n;
-				}
-				| CREATE USER MAPPING IF_P NOT EXISTS FOR auth_ident SERVER name create_generic_options
-				{
-					CreateUserMappingStmt *n = makeNode(CreateUserMappingStmt);
-					n->user = $8;
-					n->servername = $10;
-					n->options = $11;
-					n->if_not_exists = true;
-					$$ = (Node *) n;
-				}
-		;
-
-/* User mapping authorization identifier */
-auth_ident: RoleSpec			{ $$ = $1; }
-			| USER				{ $$ = makeRoleSpec(ROLESPEC_CURRENT_USER, @1); }
-		;
-
-/*****************************************************************************
- *
- *		QUERY :
- *				DROP USER MAPPING FOR auth_ident SERVER name
- *
- * XXX you'd think this should have a CASCADE/RESTRICT option, even if it's
- * only pro forma; but the SQL standard doesn't show one.
- ****************************************************************************/
-
-DropUserMappingStmt: DROP USER MAPPING FOR auth_ident SERVER name
-				{
-					DropUserMappingStmt *n = makeNode(DropUserMappingStmt);
-					n->user = $5;
-					n->servername = $7;
-					n->missing_ok = false;
-					$$ = (Node *) n;
-				}
-				|  DROP USER MAPPING IF_P EXISTS FOR auth_ident SERVER name
-				{
-					DropUserMappingStmt *n = makeNode(DropUserMappingStmt);
-					n->user = $7;
-					n->servername = $9;
-					n->missing_ok = true;
-					$$ = (Node *) n;
-				}
-		;
-
-/*****************************************************************************
- *
- *		QUERY :
- *				ALTER USER MAPPING FOR auth_ident SERVER name OPTIONS
- *
- ****************************************************************************/
-
-AlterUserMappingStmt: ALTER USER MAPPING FOR auth_ident SERVER name alter_generic_options
-				{
-					AlterUserMappingStmt *n = makeNode(AlterUserMappingStmt);
-					n->user = $5;
-					n->servername = $7;
-					n->options = $8;
-					$$ = (Node *) n;
-				}
 		;
 
 /*****************************************************************************
@@ -6257,7 +5892,6 @@ object_type_any_name:
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| MATERIALIZED VIEW						{ $$ = OBJECT_MATVIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
-			| FOREIGN TABLE							{ $$ = OBJECT_FOREIGN_TABLE; }
 			| COLLATION								{ $$ = OBJECT_COLLATION; }
 			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
 			| STATISTICS							{ $$ = OBJECT_STATISTIC_EXT; }
@@ -6281,11 +5915,9 @@ drop_type_name:
 			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
 			| EVENT TRIGGER							{ $$ = OBJECT_EVENT_TRIGGER; }
 			| EXTENSION								{ $$ = OBJECT_EXTENSION; }
-			| FOREIGN DATA_P WRAPPER				{ $$ = OBJECT_FDW; }
 			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
 			| PUBLICATION							{ $$ = OBJECT_PUBLICATION; }
 			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
-			| SERVER								{ $$ = OBJECT_FOREIGN_SERVER; }
 		;
 
 /* object types attached to a table */
@@ -6931,22 +6563,6 @@ privilege_target:
 					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = OBJECT_SEQUENCE;
 					n->objs = $2;
-					$$ = n;
-				}
-			| FOREIGN DATA_P WRAPPER name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_FDW;
-					n->objs = $4;
-					$$ = n;
-				}
-			| FOREIGN SERVER name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_FOREIGN_SERVER;
-					n->objs = $3;
 					$$ = n;
 				}
 			| FUNCTION function_with_argtypes_list
@@ -8454,15 +8070,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->newname = $8;
 					$$ = (Node *)n;
 				}
-			| ALTER FOREIGN DATA_P WRAPPER name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_FDW;
-					n->object = (Node *) makeString($5);
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER FUNCTION function_with_argtypes RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -8560,15 +8167,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					RenameStmt *n = makeNode(RenameStmt);
 					n->renameType = OBJECT_SCHEMA;
 					n->subname = $3;
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER SERVER name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_FOREIGN_SERVER;
-					n->object = (Node *) makeString($3);
 					n->newname = $6;
 					n->missing_ok = false;
 					$$ = (Node *)n;
@@ -8682,26 +8280,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-			| ALTER FOREIGN TABLE relation_expr RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_FOREIGN_TABLE;
-					n->relation = $4;
-					n->subname = NULL;
-					n->newname = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER FOREIGN TABLE IF_P EXISTS relation_expr RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_FOREIGN_TABLE;
-					n->relation = $6;
-					n->subname = NULL;
-					n->newname = $9;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 			| ALTER TABLE relation_expr RENAME opt_column name TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -8785,28 +8363,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->relation = $5;
 					n->subname = $8;
 					n->newname = $10;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER FOREIGN TABLE relation_expr RENAME opt_column name TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_COLUMN;
-					n->relationType = OBJECT_FOREIGN_TABLE;
-					n->relation = $4;
-					n->subname = $7;
-					n->newname = $9;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER FOREIGN TABLE IF_P EXISTS relation_expr RENAME opt_column name TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_COLUMN;
-					n->relationType = OBJECT_FOREIGN_TABLE;
-					n->relation = $6;
-					n->subname = $9;
-					n->newname = $11;
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
@@ -9160,24 +8716,6 @@ AlterObjectSchemaStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-			| ALTER FOREIGN TABLE relation_expr SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_FOREIGN_TABLE;
-					n->relation = $4;
-					n->newschema = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER FOREIGN TABLE IF_P EXISTS relation_expr SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_FOREIGN_TABLE;
-					n->relation = $6;
-					n->newschema = $9;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 			| ALTER TYPE_P any_name SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
@@ -9381,22 +8919,6 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
 					n->objectType = OBJECT_STATISTIC_EXT;
 					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER FOREIGN DATA_P WRAPPER name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_FDW;
-					n->object = (Node *) makeString($5);
-					n->newowner = $8;
-					$$ = (Node *)n;
-				}
-			| ALTER SERVER name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_FOREIGN_SERVER;
-					n->object = (Node *) makeString($3);
 					n->newowner = $6;
 					$$ = (Node *)n;
 				}

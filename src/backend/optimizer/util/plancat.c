@@ -30,7 +30,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_statistic_ext.h"
-#include "foreign/fdwapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -93,8 +92,6 @@ static void set_baserel_partition_constraint(Relation relation,
  *	max_attr	highest valid AttrNumber
  *	indexlist	list of IndexOptInfos for relation's indexes
  *	statlist	list of StatisticExtInfo for relation's statistic objects
- *	serverid	if it's a foreign table, the server OID
- *	fdwroutine	if it's a foreign table, the FDW function pointers
  *	pages		number of pages
  *	tuples		number of tuples
  *	rel_parallel_workers user-defined number of parallel workers
@@ -134,8 +131,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	 */
 	if (!relation->rd_tableam)
 	{
-		if (!(relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE ||
-			  relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE))
+		if (relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot open relation \"%s\"",
@@ -459,29 +455,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	rel->indexlist = indexinfos;
 
 	rel->statlist = get_relation_statistics(rel, relation);
-
-	/* Grab foreign-table info using the relcache, while we have it */
-	if (relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		/* Check if the access to foreign tables is restricted */
-		if (unlikely((restrict_nonsystem_relation_kind & RESTRICT_RELKIND_FOREIGN_TABLE) != 0))
-		{
-			/* there must not be built-in foreign tables */
-			Assert(RelationGetRelid(relation) >= FirstNormalObjectId);
-
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("access to non-system foreign table is restricted")));
-		}
-
-		rel->serverid = GetForeignServerIdByRelId(RelationGetRelid(relation));
-		rel->fdwroutine = GetFdwRoutineForRelation(relation, true);
-	}
-	else
-	{
-		rel->serverid = InvalidOid;
-		rel->fdwroutine = NULL;
-	}
 
 	/* Collect info about relation's foreign keys, if relevant */
 	get_relation_foreign_keys(root, rel, relation, inhparent);
@@ -1101,13 +1074,6 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 			/* Sequences always have a known size */
 			*pages = 1;
 			*tuples = 1;
-			*allvisfrac = 0;
-			break;
-		case RELKIND_FOREIGN_TABLE:
-			/* Just use whatever's in pg_class */
-			/* Note that FDW must cope if reltuples is -1! */
-			*pages = rel->rd_rel->relpages;
-			*tuples = rel->rd_rel->reltuples;
 			*allvisfrac = 0;
 			break;
 		default:
@@ -2208,10 +2174,6 @@ has_transition_tables(PlannerInfo *root, Index rti, CmdType event)
 	bool		result = false;
 
 	Assert(rte->rtekind == RTE_RELATION);
-
-	/* Currently foreign tables cannot have transition tables */
-	if (rte->relkind == RELKIND_FOREIGN_TABLE)
-		return result;
 
 	/* Assume we already have adequate lock */
 	relation = table_open(rte->relid, NoLock);

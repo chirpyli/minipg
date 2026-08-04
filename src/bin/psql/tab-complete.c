@@ -449,14 +449,6 @@ static const SchemaQuery Query_for_list_of_sequences = {
 	.result = "pg_catalog.quote_ident(c.relname)",
 };
 
-static const SchemaQuery Query_for_list_of_foreign_tables = {
-	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind IN (" CppAsString2(RELKIND_FOREIGN_TABLE) ")",
-	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
-	.namespace = "c.relnamespace",
-	.result = "pg_catalog.quote_ident(c.relname)",
-};
-
 static const SchemaQuery Query_for_list_of_tables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
@@ -540,7 +532,6 @@ static const SchemaQuery Query_for_list_of_updatables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_FOREIGN_TABLE) ", "
 	CppAsString2(RELKIND_VIEW) ", "
 	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
@@ -556,7 +547,6 @@ static const SchemaQuery Query_for_list_of_selectables = {
 	CppAsString2(RELKIND_SEQUENCE) ", "
 	CppAsString2(RELKIND_VIEW) ", "
 	CppAsString2(RELKIND_MATVIEW) ", "
-	CppAsString2(RELKIND_FOREIGN_TABLE) ", "
 	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
@@ -568,7 +558,6 @@ static const SchemaQuery Query_for_list_of_truncatables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_FOREIGN_TABLE) ", "
 	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
@@ -584,8 +573,7 @@ static const SchemaQuery Query_for_list_of_analyzables = {
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
 	CppAsString2(RELKIND_PARTITIONED_TABLE) ", "
-	CppAsString2(RELKIND_MATVIEW) ", "
-	CppAsString2(RELKIND_FOREIGN_TABLE) ")",
+	CppAsString2(RELKIND_MATVIEW) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -892,21 +880,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "SELECT pg_catalog.quote_ident(tmplname) FROM pg_catalog.pg_ts_template "\
 " WHERE substring(pg_catalog.quote_ident(tmplname),1,%d)='%s'"
 
-#define Query_for_list_of_fdws \
-" SELECT pg_catalog.quote_ident(fdwname) "\
-"   FROM pg_catalog.pg_foreign_data_wrapper "\
-"  WHERE substring(pg_catalog.quote_ident(fdwname),1,%d)='%s'"
-
-#define Query_for_list_of_servers \
-" SELECT pg_catalog.quote_ident(srvname) "\
-"   FROM pg_catalog.pg_foreign_server "\
-"  WHERE substring(pg_catalog.quote_ident(srvname),1,%d)='%s'"
-
-#define Query_for_list_of_user_mappings \
-" SELECT pg_catalog.quote_ident(usename) "\
-"   FROM pg_catalog.pg_user_mappings "\
-"  WHERE substring(pg_catalog.quote_ident(usename),1,%d)='%s'"
-
 #define Query_for_list_of_access_methods \
 " SELECT pg_catalog.quote_ident(amname) "\
 "   FROM pg_catalog.pg_am "\
@@ -1119,7 +1092,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"RULE", "SELECT pg_catalog.quote_ident(rulename) FROM pg_catalog.pg_rules WHERE substring(pg_catalog.quote_ident(rulename),1,%d)='%s'"},
 	{"SCHEMA", Query_for_list_of_schemas},
 	{"SEQUENCE", NULL, NULL, &Query_for_list_of_sequences},
-	{"SERVER", Query_for_list_of_servers},
 	{"STATISTICS", NULL, NULL, &Query_for_list_of_statistics},
 	{"SUBSCRIPTION", NULL, Query_for_list_of_subscriptions},
 	{"SYSTEM", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
@@ -1554,7 +1526,7 @@ psql_completion(const char *text, int start, int end)
 		"\\copyright", "\\crosstabview",
 		"\\d", "\\da", "\\dA", "\\dAc", "\\dAf", "\\dAo", "\\dAp",
 		"\\db", "\\dc", "\\dC", "\\dd", "\\ddp", "\\dD",
-		"\\des", "\\det", "\\deu", "\\dew", "\\dE", "\\df",
+		"\\dE", "\\df",
 		"\\dF", "\\dFd", "\\dFp", "\\dFt", "\\dg", "\\di", "\\dl", "\\dL",
 		"\\dm", "\\dn", "\\do", "\\dO", "\\dp", "\\dP", "\\dPi", "\\dPt",
 		"\\drds", "\\dRs", "\\dRp", "\\ds", "\\dS",
@@ -3327,25 +3299,6 @@ psql_completion(const char *text, int start, int end)
 			 TailMatches("FROM|IN"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_cursors);
 
-/* FOREIGN DATA WRAPPER */
-	/* applies in ALTER/DROP FDW and in CREATE SERVER */
-	else if (TailMatches("FOREIGN", "DATA", "WRAPPER") &&
-			 !TailMatches("CREATE", MatchAny, MatchAny, MatchAny))
-		COMPLETE_WITH_QUERY(Query_for_list_of_fdws);
-	/* applies in CREATE SERVER */
-	else if (TailMatches("FOREIGN", "DATA", "WRAPPER", MatchAny) &&
-			 HeadMatches("CREATE", "SERVER"))
-		COMPLETE_WITH("OPTIONS");
-
-/* FOREIGN TABLE */
-	else if (TailMatches("FOREIGN", "TABLE") &&
-			 !TailMatches("CREATE", MatchAny, MatchAny))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_foreign_tables, NULL);
-
-/* FOREIGN SERVER */
-	else if (TailMatches("FOREIGN", "SERVER"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_servers);
-
 /*
  * GRANT and REVOKE are allowed inside CREATE SCHEMA and
  * ALTER DEFAULT PRIVILEGES, so use TailMatches
@@ -3918,12 +3871,6 @@ psql_completion(const char *text, int start, int end)
 							" UNION SELECT 'CURRENT_USER'"
 							" UNION SELECT 'PUBLIC'"
 							" UNION SELECT 'USER'");
-	else if (Matches("ALTER|DROP", "USER", "MAPPING", "FOR"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_user_mappings);
-	else if (Matches("CREATE|ALTER|DROP", "USER", "MAPPING", "FOR", MatchAny))
-		COMPLETE_WITH("SERVER");
-	else if (Matches("CREATE|ALTER", "USER", "MAPPING", "FOR", MatchAny, "SERVER", MatchAny))
-		COMPLETE_WITH("OPTIONS");
 
 /*
  * VACUUM [ ( option [, ...] ) ] [ table_and_columns [, ...] ]
@@ -4025,12 +3972,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
 	else if (TailMatchesCS("\\dD*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_domains, NULL);
-	else if (TailMatchesCS("\\des*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_servers);
-	else if (TailMatchesCS("\\deu*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_user_mappings);
-	else if (TailMatchesCS("\\dew*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_fdws);
 	else if (TailMatchesCS("\\df*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_routines, NULL);
 	else if (HeadMatchesCS("\\df*"))
@@ -4079,8 +4020,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_statistics, NULL);
 	else if (TailMatchesCS("\\dm*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews, NULL);
-	else if (TailMatchesCS("\\dE*"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_foreign_tables, NULL);
 	else if (TailMatchesCS("\\dy*"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
 

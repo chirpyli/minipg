@@ -19,7 +19,6 @@
 #include "commands/defrem.h"
 #include "commands/prepare.h"
 #include "executor/nodeHash.h"
-#include "foreign/fdwapi.h"
 #include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -111,7 +110,6 @@ static void show_tidbitmap_info(BitmapHeapScanState *planstate,
 								ExplainState *es);
 static void show_instrumentation_count(const char *qlabel, int which,
 									   PlanState *planstate, ExplainState *es);
-static void show_foreignscan_info(ForeignScanState *fsstate, ExplainState *es);
 static void show_eval_params(Bitmapset *bms_params, ExplainState *es);
 static const char *explain_get_index_name(Oid indexId);
 static void show_buffer_usage(ExplainState *es, const BufferUsage *usage,
@@ -936,10 +934,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 			*rels_used = bms_add_member(*rels_used,
 										((Scan *) plan)->scanrelid);
 			break;
-		case T_ForeignScan:
-			*rels_used = bms_add_members(*rels_used,
-										 ((ForeignScan *) plan)->fs_relids);
-			break;
 		case T_CustomScan:
 			*rels_used = bms_add_members(*rels_used,
 										 ((CustomScan *) plan)->custom_relids);
@@ -1113,31 +1107,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_WorkTableScan:
 			pname = sname = "WorkTable Scan";
 			break;
-		case T_ForeignScan:
-			sname = "Foreign Scan";
-			switch (((ForeignScan *) plan)->operation)
-			{
-				case CMD_SELECT:
-					pname = "Foreign Scan";
-					operation = "Select";
-					break;
-				case CMD_INSERT:
-					pname = "Foreign Insert";
-					operation = "Insert";
-					break;
-				case CMD_UPDATE:
-					pname = "Foreign Update";
-					operation = "Update";
-					break;
-				case CMD_DELETE:
-					pname = "Foreign Delete";
-					operation = "Delete";
-					break;
-				default:
-					pname = "???";
-					break;
-			}
-			break;
 		case T_CustomScan:
 			sname = "Custom Scan";
 			custom_name = ((CustomScan *) plan)->methods->CustomName;
@@ -1300,7 +1269,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_WorkTableScan:
 			ExplainScanTarget((Scan *) plan, es);
 			break;
-		case T_ForeignScan:
 		case T_CustomScan:
 			if (((Scan *) plan)->scanrelid > 0)
 				ExplainScanTarget((Scan *) plan, es);
@@ -1749,13 +1717,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 											   planstate, es);
 			}
 			break;
-		case T_ForeignScan:
-			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			show_foreignscan_info((ForeignScanState *) planstate, es);
-			break;
 		case T_CustomScan:
 			{
 				CustomScanState *css = (CustomScanState *) planstate;
@@ -2036,10 +1997,6 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 	 * to update or delete, which would be confusing in this context.  So, we
 	 * suppress it in all the cases.
 	 */
-	if (IsA(plan, ForeignScan) &&
-		((ForeignScan *) plan)->operation != CMD_SELECT)
-		return;
-
 	/* Set up deparsing context */
 	context = set_deparse_context_plan(es->deparse_cxt,
 									   plan,
@@ -3225,26 +3182,6 @@ show_instrumentation_count(const char *qlabel, int which,
 	}
 }
 
-/*
- * Show extra information for a ForeignScan node.
- */
-static void
-show_foreignscan_info(ForeignScanState *fsstate, ExplainState *es)
-{
-	FdwRoutine *fdwroutine = fsstate->fdwroutine;
-
-	/* Let the FDW emit whatever fields it wants */
-	if (((ForeignScan *) fsstate->ss.ps.plan)->operation != CMD_SELECT)
-	{
-		if (fdwroutine->ExplainDirectModify != NULL)
-			fdwroutine->ExplainDirectModify(fsstate, es);
-	}
-	else
-	{
-		if (fdwroutine->ExplainForeignScan != NULL)
-			fdwroutine->ExplainForeignScan(fsstate, es);
-	}
-}
 
 /*
  * Show initplan params evaluated at Gather or Gather Merge node.
@@ -3559,7 +3496,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 		case T_BitmapHeapScan:
 		case T_TidScan:
 		case T_TidRangeScan:
-		case T_ForeignScan:
 		case T_CustomScan:
 		case T_ModifyTable:
 			/* Assert it's on a real relation */
@@ -3698,7 +3634,6 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 	for (j = 0; j < mtstate->mt_nrels; j++)
 	{
 		ResultRelInfo *resultRelInfo = mtstate->resultRelInfo + j;
-		FdwRoutine *fdwroutine = resultRelInfo->ri_FdwRoutine;
 
 		if (labeltargets)
 		{
@@ -3711,38 +3646,23 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 			 */
 			if (es->format == EXPLAIN_FORMAT_TEXT)
 			{
-				ExplainIndentText(es);
-				appendStringInfoString(es->str,
-									   fdwroutine ? foperation : operation);
-			}
-
-			/* Identify target */
-			ExplainTargetRel((Plan *) node,
-							 resultRelInfo->ri_RangeTableIndex,
-							 es);
-
-			if (es->format == EXPLAIN_FORMAT_TEXT)
-			{
-				appendStringInfoChar(es->str, '\n');
-				es->indent++;
-			}
+			ExplainIndentText(es);
+			appendStringInfoString(es->str, operation);
 		}
 
-		/* Give FDW a chance if needed */
-		if (!resultRelInfo->ri_usesFdwDirectModify &&
-			fdwroutine != NULL &&
-			fdwroutine->ExplainForeignModify != NULL)
+		/* Identify target */
+		ExplainTargetRel((Plan *) node,
+						 resultRelInfo->ri_RangeTableIndex,
+						 es);
+
+		if (es->format == EXPLAIN_FORMAT_TEXT)
 		{
-			List	   *fdw_private = (List *) list_nth(node->fdwPrivLists, j);
-
-			fdwroutine->ExplainForeignModify(mtstate,
-											 resultRelInfo,
-											 fdw_private,
-											 j,
-											 es);
+			appendStringInfoChar(es->str, '\n');
+			es->indent++;
 		}
+	}
 
-		if (labeltargets)
+	if (labeltargets)
 		{
 			/* Undo the indentation we added in text format */
 			if (es->format == EXPLAIN_FORMAT_TEXT)

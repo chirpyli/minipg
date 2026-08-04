@@ -534,15 +534,6 @@ typedef struct PartitionSchemeData *PartitionScheme;
  *		For otherrels that are appendrel members, these fields are filled
  *		in just as for a baserel, except we don't bother with lateral_vars.
  *
- * If the relation is either a foreign table or a join of foreign tables that
- * all belong to the same foreign server and are assigned to the same user to
- * check access permissions as (cf checkAsUser), these fields will be set:
- *
- *		serverid - OID of foreign server, if foreign table (else InvalidOid)
- *		userid - OID of user to check access as (InvalidOid means current user)
- *		useridiscurrent - we've assumed that userid equals current user
- *		fdwroutine - function hooks for FDW, if foreign table (else NULL)
- *		fdw_private - private state for FDW, if foreign table (else NULL)
  *
  * Two fields are used to cache knowledge acquired during the join search
  * about whether this rel is provably unique when being joined to given other
@@ -727,14 +718,6 @@ typedef struct RelOptInfo
 	int			rel_parallel_workers;	/* wanted number of parallel workers */
 	uint32		amflags;		/* Bitmask of optional features supported by
 								 * the table AM */
-
-	/* Information about foreign tables and foreign joins */
-	Oid			serverid;		/* identifies server for the table or join */
-	Oid			userid;			/* identifies user to check access as */
-	bool		useridiscurrent;	/* join is only valid for current user */
-	/* use "struct FdwRoutine" to avoid including fdwapi.h here */
-	struct FdwRoutine *fdwroutine;
-	void	   *fdw_private;
 
 	/* cache space for remembering if we have proven this relation unique */
 	List	   *unique_for_rels;	/* known unique for these other relid
@@ -1380,23 +1363,6 @@ typedef struct SubqueryScanPath
 	Path		path;
 	Path	   *subpath;		/* path representing subquery execution */
 } SubqueryScanPath;
-
-/*
- * ForeignPath represents a potential scan of a foreign table, foreign join
- * or foreign upper-relation.
- *
- * fdw_private stores FDW private data about the scan.  While fdw_private is
- * not actually touched by the core code during normal operations, it's
- * generally a good idea to use a representation that can be dumped by
- * nodeToString(), so that you can examine the structure during debugging
- * with tools like pprint().
- */
-typedef struct ForeignPath
-{
-	Path		path;
-	Path	   *fdw_outerpath;
-	List	   *fdw_private;
-} ForeignPath;
 
 /*
  * CustomPath represents a table scan or a table join done by some out-of-core

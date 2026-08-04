@@ -53,8 +53,6 @@ static List *subbuild_joinrel_restrictlist(RelOptInfo *joinrel,
 static List *subbuild_joinrel_joinlist(RelOptInfo *joinrel,
 									   List *joininfo_list,
 									   List *new_joininfo);
-static void set_foreign_rel_properties(RelOptInfo *joinrel,
-									   RelOptInfo *outer_rel, RelOptInfo *inner_rel);
 static void add_join_rel(PlannerInfo *root, RelOptInfo *joinrel);
 static void build_joinrel_partition_info(RelOptInfo *joinrel,
 										 RelOptInfo *outer_rel, RelOptInfo *inner_rel,
@@ -235,11 +233,6 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent)
 	rel->subplan_params = NIL;
 	rel->rel_parallel_workers = -1; /* set up in get_relation_info */
 	rel->amflags = 0;
-	rel->serverid = InvalidOid;
-	rel->userid = rte->checkAsUser;
-	rel->useridiscurrent = false;
-	rel->fdwroutine = NULL;
-	rel->fdw_private = NULL;
 	rel->unique_for_rels = NIL;
 	rel->non_unique_for_rels = NIL;
 	rel->baserestrictinfo = NIL;
@@ -479,55 +472,6 @@ find_join_rel(PlannerInfo *root, Relids relids)
 	return NULL;
 }
 
-/*
- * set_foreign_rel_properties
- *		Set up foreign-join fields if outer and inner relation are foreign
- *		tables (or joins) belonging to the same server and assigned to the same
- *		user to check access permissions as.
- *
- * In addition to an exact match of userid, we allow the case where one side
- * has zero userid (implying current user) and the other side has explicit
- * userid that happens to equal the current user; but in that case, pushdown of
- * the join is only valid for the current user.  The useridiscurrent field
- * records whether we had to make such an assumption for this join or any
- * sub-join.
- *
- * Otherwise these fields are left invalid, so GetForeignJoinPaths will not be
- * called for the join relation.
- *
- */
-static void
-set_foreign_rel_properties(RelOptInfo *joinrel, RelOptInfo *outer_rel,
-						   RelOptInfo *inner_rel)
-{
-	if (OidIsValid(outer_rel->serverid) &&
-		inner_rel->serverid == outer_rel->serverid)
-	{
-		if (inner_rel->userid == outer_rel->userid)
-		{
-			joinrel->serverid = outer_rel->serverid;
-			joinrel->userid = outer_rel->userid;
-			joinrel->useridiscurrent = outer_rel->useridiscurrent || inner_rel->useridiscurrent;
-			joinrel->fdwroutine = outer_rel->fdwroutine;
-		}
-		else if (!OidIsValid(inner_rel->userid) &&
-				 outer_rel->userid == GetUserId())
-		{
-			joinrel->serverid = outer_rel->serverid;
-			joinrel->userid = outer_rel->userid;
-			joinrel->useridiscurrent = true;
-			joinrel->fdwroutine = outer_rel->fdwroutine;
-		}
-		else if (!OidIsValid(outer_rel->userid) &&
-				 inner_rel->userid == GetUserId())
-		{
-			joinrel->serverid = outer_rel->serverid;
-			joinrel->userid = inner_rel->userid;
-			joinrel->useridiscurrent = true;
-			joinrel->fdwroutine = outer_rel->fdwroutine;
-		}
-	}
-}
 
 /*
  * add_join_rel
@@ -647,11 +591,6 @@ build_join_rel(PlannerInfo *root,
 	joinrel->subplan_params = NIL;
 	joinrel->rel_parallel_workers = -1;
 	joinrel->amflags = 0;
-	joinrel->serverid = InvalidOid;
-	joinrel->userid = InvalidOid;
-	joinrel->useridiscurrent = false;
-	joinrel->fdwroutine = NULL;
-	joinrel->fdw_private = NULL;
 	joinrel->unique_for_rels = NIL;
 	joinrel->non_unique_for_rels = NIL;
 	joinrel->baserestrictinfo = NIL;
@@ -673,7 +612,6 @@ build_join_rel(PlannerInfo *root,
 	joinrel->nullable_partexprs = NULL;
 
 	/* Compute information relevant to the foreign relations. */
-	set_foreign_rel_properties(joinrel, outer_rel, inner_rel);
 
 	/*
 	 * Create a new tlist containing just the vars that need to be output from
@@ -826,13 +764,6 @@ build_child_join_rel(PlannerInfo *root, RelOptInfo *outer_rel,
 	joinrel->allvisfrac = 0;
 	joinrel->eclass_indexes = NULL;
 	joinrel->subroot = NULL;
-	joinrel->subplan_params = NIL;
-	joinrel->amflags = 0;
-	joinrel->serverid = InvalidOid;
-	joinrel->userid = InvalidOid;
-	joinrel->useridiscurrent = false;
-	joinrel->fdwroutine = NULL;
-	joinrel->fdw_private = NULL;
 	joinrel->baserestrictinfo = NIL;
 	joinrel->baserestrictcost.startup = 0;
 	joinrel->baserestrictcost.per_tuple = 0;
@@ -851,10 +782,7 @@ build_child_join_rel(PlannerInfo *root, RelOptInfo *outer_rel,
 	joinrel->nullable_partexprs = NULL;
 
 	joinrel->top_parent_relids = bms_union(outer_rel->top_parent_relids,
-										   inner_rel->top_parent_relids);
-
-	/* Compute information relevant to foreign relations. */
-	set_foreign_rel_properties(joinrel, outer_rel, inner_rel);
+											inner_rel->top_parent_relids);
 
 	/* Compute information needed for mapping Vars to the child rel */
 	appinfos = find_appinfos_by_relids(root, joinrel->relids, &nappinfos);

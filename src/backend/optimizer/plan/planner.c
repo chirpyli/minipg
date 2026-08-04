@@ -30,7 +30,6 @@
 #include "catalog/pg_type.h"
 #include "executor/executor.h"
 #include "executor/nodeAgg.h"
-#include "foreign/fdwapi.h"
 #include "lib/bipartite_match.h"
 #include "lib/knapsack.h"
 #include "miscadmin.h"
@@ -1662,14 +1661,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		final_rel->consider_parallel = true;
 
 	/*
-	 * If the current_rel belongs to a single FDW, so does the final_rel.
-	 */
-	final_rel->serverid = current_rel->serverid;
-	final_rel->userid = current_rel->userid;
-	final_rel->useridiscurrent = current_rel->useridiscurrent;
-	final_rel->fdwroutine = current_rel->fdwroutine;
-
-	/*
 	 * Generate paths for the final_rel.  Insert all surviving paths, with
 	 * LockRows, Limit, and/or ModifyTable steps added if needed.
 	 */
@@ -1870,16 +1861,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	extra.limit_tuples = limit_tuples;
 	extra.count_est = count_est;
 	extra.offset_est = offset_est;
-
-	/*
-	 * If there is an FDW that's responsible for all baserels of the query,
-	 * let it consider adding ForeignPaths.
-	 */
-	if (final_rel->fdwroutine &&
-		final_rel->fdwroutine->GetForeignUpperPaths)
-		final_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_FINAL,
-													current_rel, final_rel,
-													&extra);
 
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
@@ -2224,16 +2205,6 @@ select_rowmark_type(RangeTblEntry *rte, LockClauseStrength strength)
 	if (rte->rtekind != RTE_RELATION)
 	{
 		/* If it's not a table at all, use ROW_MARK_COPY */
-		return ROW_MARK_COPY;
-	}
-	else if (rte->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		/* Let the FDW select the rowmark type, if it wants to */
-		FdwRoutine *fdwroutine = GetFdwRoutineByRelId(rte->relid);
-
-		if (fdwroutine->GetForeignRowMarkType != NULL)
-			return fdwroutine->GetForeignRowMarkType(rte, strength);
-		/* Otherwise, use ROW_MARK_COPY by default */
 		return ROW_MARK_COPY;
 	}
 	else
@@ -3413,10 +3384,6 @@ make_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 	/*
 	 * If the input rel belongs to a single FDW, so does the grouped rel.
 	 */
-	grouped_rel->serverid = input_rel->serverid;
-	grouped_rel->userid = input_rel->userid;
-	grouped_rel->useridiscurrent = input_rel->useridiscurrent;
-	grouped_rel->fdwroutine = input_rel->fdwroutine;
 
 	return grouped_rel;
 }
@@ -3626,16 +3593,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("could not implement GROUP BY"),
 				 errdetail("Some of the datatypes only support hashing, while others only support sorting.")));
-
-	/*
-	 * If there is an FDW that's responsible for all baserels of the query,
-	 * let it consider adding ForeignPaths.
-	 */
-	if (grouped_rel->fdwroutine &&
-		grouped_rel->fdwroutine->GetForeignUpperPaths)
-		grouped_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_GROUP_AGG,
-													  input_rel, grouped_rel,
-													  extra);
 
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
@@ -4042,10 +3999,6 @@ create_window_paths(PlannerInfo *root,
 	/*
 	 * If the input rel belongs to a single FDW, so does the window rel.
 	 */
-	window_rel->serverid = input_rel->serverid;
-	window_rel->userid = input_rel->userid;
-	window_rel->useridiscurrent = input_rel->useridiscurrent;
-	window_rel->fdwroutine = input_rel->fdwroutine;
 
 	/*
 	 * Consider computing window functions starting from the existing
@@ -4074,12 +4027,6 @@ create_window_paths(PlannerInfo *root,
 	 * If there is an FDW that's responsible for all baserels of the query,
 	 * let it consider adding ForeignPaths.
 	 */
-	if (window_rel->fdwroutine &&
-		window_rel->fdwroutine->GetForeignUpperPaths)
-		window_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_WINDOW,
-													 input_rel, window_rel,
-													 NULL);
-
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_WINDOW,
@@ -4246,10 +4193,6 @@ create_distinct_paths(PlannerInfo *root,
 	/*
 	 * If the input rel belongs to a single FDW, so does the distinct_rel.
 	 */
-	distinct_rel->serverid = input_rel->serverid;
-	distinct_rel->userid = input_rel->userid;
-	distinct_rel->useridiscurrent = input_rel->useridiscurrent;
-	distinct_rel->fdwroutine = input_rel->fdwroutine;
 
 	/* Estimate number of distinct rows there will be */
 	if (parse->groupClause || parse->groupingSets || parse->hasAggs ||
@@ -4388,12 +4331,6 @@ create_distinct_paths(PlannerInfo *root,
 	 * If there is an FDW that's responsible for all baserels of the query,
 	 * let it consider adding ForeignPaths.
 	 */
-	if (distinct_rel->fdwroutine &&
-		distinct_rel->fdwroutine->GetForeignUpperPaths)
-		distinct_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_DISTINCT,
-													   input_rel, distinct_rel,
-													   NULL);
-
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_DISTINCT,
@@ -4447,10 +4384,6 @@ create_ordered_paths(PlannerInfo *root,
 	/*
 	 * If the input rel belongs to a single FDW, so does the ordered_rel.
 	 */
-	ordered_rel->serverid = input_rel->serverid;
-	ordered_rel->userid = input_rel->userid;
-	ordered_rel->useridiscurrent = input_rel->useridiscurrent;
-	ordered_rel->fdwroutine = input_rel->fdwroutine;
 
 	foreach(lc, input_rel->pathlist)
 	{
@@ -4645,12 +4578,6 @@ create_ordered_paths(PlannerInfo *root,
 	 * If there is an FDW that's responsible for all baserels of the query,
 	 * let it consider adding ForeignPaths.
 	 */
-	if (ordered_rel->fdwroutine &&
-		ordered_rel->fdwroutine->GetForeignUpperPaths)
-		ordered_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_ORDERED,
-													  input_rel, ordered_rel,
-													  NULL);
-
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_ORDERED,
@@ -6376,10 +6303,6 @@ create_partial_grouping_paths(PlannerInfo *root,
 	partially_grouped_rel->consider_parallel =
 		grouped_rel->consider_parallel;
 	partially_grouped_rel->reloptkind = grouped_rel->reloptkind;
-	partially_grouped_rel->serverid = grouped_rel->serverid;
-	partially_grouped_rel->userid = grouped_rel->userid;
-	partially_grouped_rel->useridiscurrent = grouped_rel->useridiscurrent;
-	partially_grouped_rel->fdwroutine = grouped_rel->fdwroutine;
 
 	/*
 	 * Build target list for partial aggregate paths.  These paths cannot just
@@ -6669,21 +6592,6 @@ create_partial_grouping_paths(PlannerInfo *root,
 										 NIL,
 										 agg_partial_costs,
 										 dNumPartialPartialGroups));
-	}
-
-	/*
-	 * If there is an FDW that's responsible for all baserels of the query,
-	 * let it consider adding partially grouped ForeignPaths.
-	 */
-	if (partially_grouped_rel->fdwroutine &&
-		partially_grouped_rel->fdwroutine->GetForeignUpperPaths)
-	{
-		FdwRoutine *fdwroutine = partially_grouped_rel->fdwroutine;
-
-		fdwroutine->GetForeignUpperPaths(root,
-										 UPPERREL_PARTIAL_GROUP_AGG,
-										 input_rel, partially_grouped_rel,
-										 extra);
 	}
 
 	return partially_grouped_rel;

@@ -50,7 +50,6 @@
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/nodeSubplan.h"
-#include "foreign/fdwapi.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "parser/parsetree.h"
@@ -989,7 +988,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 {
 	Relation	resultRel = resultRelInfo->ri_RelationDesc;
 	TriggerDesc *trigDesc = resultRel->trigdesc;
-	FdwRoutine *fdwroutine;
 
 	/* Expect a fully-formed ResultRelInfo from InitResultRelInfo(). */
 	Assert(resultRelInfo->ri_needLockTagTuple ==
@@ -1067,55 +1065,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 						 errmsg("cannot change materialized view \"%s\"",
 								RelationGetRelationName(resultRel))));
 			break;
-		case RELKIND_FOREIGN_TABLE:
-			/* Okay only if the FDW supports it */
-			fdwroutine = resultRelInfo->ri_FdwRoutine;
-			switch (operation)
-			{
-				case CMD_INSERT:
-					if (fdwroutine->ExecForeignInsert == NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("cannot insert into foreign table \"%s\"",
-										RelationGetRelationName(resultRel))));
-					if (fdwroutine->IsForeignRelUpdatable != NULL &&
-						(fdwroutine->IsForeignRelUpdatable(resultRel) & (1 << CMD_INSERT)) == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("foreign table \"%s\" does not allow inserts",
-										RelationGetRelationName(resultRel))));
-					break;
-				case CMD_UPDATE:
-					if (fdwroutine->ExecForeignUpdate == NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("cannot update foreign table \"%s\"",
-										RelationGetRelationName(resultRel))));
-					if (fdwroutine->IsForeignRelUpdatable != NULL &&
-						(fdwroutine->IsForeignRelUpdatable(resultRel) & (1 << CMD_UPDATE)) == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("foreign table \"%s\" does not allow updates",
-										RelationGetRelationName(resultRel))));
-					break;
-				case CMD_DELETE:
-					if (fdwroutine->ExecForeignDelete == NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("cannot delete from foreign table \"%s\"",
-										RelationGetRelationName(resultRel))));
-					if (fdwroutine->IsForeignRelUpdatable != NULL &&
-						(fdwroutine->IsForeignRelUpdatable(resultRel) & (1 << CMD_DELETE)) == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("foreign table \"%s\" does not allow deletes",
-										RelationGetRelationName(resultRel))));
-					break;
-				default:
-					elog(ERROR, "unrecognized CmdType: %d", (int) operation);
-					break;
-			}
-			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -1144,8 +1093,6 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 static void
 CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 {
-	FdwRoutine *fdwroutine;
-
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
@@ -1179,22 +1126,13 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot lock rows in materialized view \"%s\"",
-								RelationGetRelationName(rel))));
-			break;
-		case RELKIND_FOREIGN_TABLE:
-			/* Okay only if the FDW supports it */
-			fdwroutine = GetFdwRoutineForRelation(rel, false);
-			if (fdwroutine->RefetchForeignRow == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot lock rows in foreign table \"%s\"",
-								RelationGetRelationName(rel))));
+							RelationGetRelationName(rel))));
 			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot lock rows in relation \"%s\"",
-							RelationGetRelationName(rel))));
+						RelationGetRelationName(rel))));
 			break;
 	}
 }
@@ -1241,19 +1179,12 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 		resultRelInfo->ri_TrigWhenExprs = NULL;
 		resultRelInfo->ri_TrigInstrument = NULL;
 	}
-	if (resultRelationDesc->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		resultRelInfo->ri_FdwRoutine = GetFdwRoutineForRelation(resultRelationDesc, true);
-	else
-		resultRelInfo->ri_FdwRoutine = NULL;
-
 	/* The following fields are set later if needed */
 	resultRelInfo->ri_RowIdAttNo = 0;
 	resultRelInfo->ri_projectNew = NULL;
 	resultRelInfo->ri_newTupleSlot = NULL;
 	resultRelInfo->ri_oldTupleSlot = NULL;
 	resultRelInfo->ri_projectNewInfoValid = false;
-	resultRelInfo->ri_FdwState = NULL;
-	resultRelInfo->ri_usesFdwDirectModify = false;
 	resultRelInfo->ri_ConstraintExprs = NULL;
 	resultRelInfo->ri_GeneratedExprs = NULL;
 	resultRelInfo->ri_projectReturning = NULL;
@@ -2597,44 +2528,12 @@ EvalPlanQualFetchRowMark(EPQState *epqstate, Index rti, TupleTableSlot *slot)
 		if (isNull)
 			return false;
 
-		/* fetch requests on foreign tables must be passed to their FDW */
-		if (erm->relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		{
-			FdwRoutine *fdwroutine;
-			bool		updated = false;
-
-			fdwroutine = GetFdwRoutineForRelation(erm->relation, false);
-			/* this should have been checked already, but let's be safe */
-			if (fdwroutine->RefetchForeignRow == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot lock rows in foreign table \"%s\"",
-								RelationGetRelationName(erm->relation))));
-
-			fdwroutine->RefetchForeignRow(epqstate->recheckestate,
-										  erm,
-										  datum,
-										  slot,
-										  &updated);
-			if (TupIsNull(slot))
-				elog(ERROR, "failed to fetch tuple for EvalPlanQual recheck");
-
-			/*
-			 * Ideally we'd insist on updated == false here, but that assumes
-			 * that FDWs can track that exactly, which they might not be able
-			 * to.  So just ignore the flag.
-			 */
-			return true;
-		}
-		else
-		{
-			/* ordinary table, fetch the tuple */
-			if (!table_tuple_fetch_row_version(erm->relation,
-											   (ItemPointer) DatumGetPointer(datum),
-											   SnapshotAny, slot))
-				elog(ERROR, "failed to fetch tuple for EvalPlanQual recheck");
-			return true;
-		}
+		/* ordinary table, fetch the tuple */
+		if (!table_tuple_fetch_row_version(erm->relation,
+										   (ItemPointer) DatumGetPointer(datum),
+										   SnapshotAny, slot))
+			elog(ERROR, "failed to fetch tuple for EvalPlanQual recheck");
+		return true;
 	}
 	else
 	{

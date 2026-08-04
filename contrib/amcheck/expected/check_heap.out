@@ -180,12 +180,23 @@ SELECT * FROM verify_heapam('test_sequence',
 ERROR:  "test_sequence" is not a table, materialized view, or TOAST table
 -- Check that foreign tables are rejected
 CREATE FOREIGN DATA WRAPPER dummy;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN DATA WRAPPER dummy;
+               ^
 CREATE SERVER dummy_server FOREIGN DATA WRAPPER dummy;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER dummy_server FOREIGN DATA WRAPPER dummy;
+               ^
 CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_server;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_serv...
+               ^
 SELECT * FROM verify_heapam('test_foreign_table',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  "test_foreign_table" is not a table, materialized view, or TOAST table
+ERROR:  relation "test_foreign_table" does not exist
+LINE 1: SELECT * FROM verify_heapam('test_foreign_table',
+                                    ^
 -- cleanup
 DROP TABLE heaptest;
 DROP TABLE test_partition;

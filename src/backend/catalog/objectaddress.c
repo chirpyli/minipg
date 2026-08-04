@@ -36,8 +36,6 @@
 #include "catalog/pg_enum.h"
 #include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_foreign_data_wrapper.h"
-#include "catalog/pg_foreign_server.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_largeobject_metadata.h"
@@ -56,7 +54,6 @@
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
-#include "catalog/pg_user_mapping.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/event_trigger.h"
@@ -65,7 +62,6 @@
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
-#include "foreign/foreign.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -252,34 +248,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_extension_extowner,
 		InvalidAttrNumber,
 		OBJECT_EXTENSION,
-		true
-	},
-	{
-		"foreign-data wrapper",
-		ForeignDataWrapperRelationId,
-		ForeignDataWrapperOidIndexId,
-		FOREIGNDATAWRAPPEROID,
-		FOREIGNDATAWRAPPERNAME,
-		Anum_pg_foreign_data_wrapper_oid,
-		Anum_pg_foreign_data_wrapper_fdwname,
-		InvalidAttrNumber,
-		Anum_pg_foreign_data_wrapper_fdwowner,
-		Anum_pg_foreign_data_wrapper_fdwacl,
-		OBJECT_FDW,
-		true
-	},
-	{
-		"foreign server",
-		ForeignServerRelationId,
-		ForeignServerOidIndexId,
-		FOREIGNSERVEROID,
-		FOREIGNSERVERNAME,
-		Anum_pg_foreign_server_oid,
-		Anum_pg_foreign_server_srvname,
-		InvalidAttrNumber,
-		Anum_pg_foreign_server_srvowner,
-		Anum_pg_foreign_server_srvacl,
-		OBJECT_FOREIGN_SERVER,
 		true
 	},
 	{
@@ -541,21 +509,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,		/* no ACL (same as relation) */
 		OBJECT_STATISTIC_EXT,
 		true
-	},
-	{
-		"user mapping",
-		UserMappingRelationId,
-		UserMappingOidIndexId,
-		USERMAPPINGOID,
-		-1,
-		Anum_pg_user_mapping_oid,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_USER_MAPPING,
-		false
-	},
+	}
 };
 
 /*
@@ -597,9 +551,6 @@ static const struct object_type_map
 	{
 		"composite type", -1
 	},							/* unmapped */
-	{
-		"foreign table", OBJECT_FOREIGN_TABLE
-	},
 	{
 		"table column", OBJECT_COLUMN
 	},
@@ -717,18 +668,6 @@ static const struct object_type_map
 	{
 		"tablespace", OBJECT_TABLESPACE
 	},
-	/* OCLASS_FDW */
-	{
-		"foreign-data wrapper", OBJECT_FDW
-	},
-	/* OCLASS_FOREIGN_SERVER */
-	{
-		"server", OBJECT_FOREIGN_SERVER
-	},
-	/* OCLASS_USER_MAPPING */
-	{
-		"user mapping", OBJECT_USER_MAPPING
-	},
 	/* OCLASS_DEFACL */
 	{
 		"default acl", OBJECT_DEFACL
@@ -794,8 +733,6 @@ static ObjectAddress get_object_address_opcf(ObjectType objtype, List *object,
 static ObjectAddress get_object_address_opf_member(ObjectType objtype,
 												   List *object, bool missing_ok);
 
-static ObjectAddress get_object_address_usermapping(List *object,
-													bool missing_ok);
 static ObjectAddress get_object_address_publication_rel(List *object,
 														Relation *relp,
 														bool missing_ok);
@@ -877,13 +814,12 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_SEQUENCE:
 			case OBJECT_TABLE:
 			case OBJECT_VIEW:
-			case OBJECT_MATVIEW:
-			case OBJECT_FOREIGN_TABLE:
-				address =
-					get_relation_by_qualified_name(objtype, castNode(List, object),
-												   &relation, lockmode,
-												   missing_ok);
-				break;
+		case OBJECT_MATVIEW:
+			address =
+				get_relation_by_qualified_name(objtype, castNode(List, object),
+											   &relation, lockmode,
+											   missing_ok);
+			break;
 			case OBJECT_COLUMN:
 				address =
 					get_object_address_attribute(objtype, castNode(List, object),
@@ -927,14 +863,12 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_TABLESPACE:
 			case OBJECT_ROLE:
 			case OBJECT_SCHEMA:
-			case OBJECT_LANGUAGE:
-			case OBJECT_FDW:
-			case OBJECT_FOREIGN_SERVER:
-			case OBJECT_EVENT_TRIGGER:
-			case OBJECT_ACCESS_METHOD:
-			case OBJECT_PUBLICATION:
-			case OBJECT_SUBSCRIPTION:
-				address = get_object_address_unqualified(objtype,
+		case OBJECT_LANGUAGE:
+		case OBJECT_EVENT_TRIGGER:
+		case OBJECT_ACCESS_METHOD:
+		case OBJECT_PUBLICATION:
+		case OBJECT_SUBSCRIPTION:
+			address = get_object_address_unqualified(objtype,
 														 (Value *) object, missing_ok);
 				break;
 			case OBJECT_TYPE:
@@ -1012,13 +946,9 @@ get_object_address(ObjectType objtype, Node *object,
 						get_transform_oid(type_id, lang_id, missing_ok);
 					address.objectSubId = 0;
 				}
-				break;
-			case OBJECT_USER_MAPPING:
-				address = get_object_address_usermapping(castNode(List, object),
-														 missing_ok);
-				break;
-			case OBJECT_PUBLICATION_REL:
-				address = get_object_address_publication_rel(castNode(List, object),
+			break;
+		case OBJECT_PUBLICATION_REL:
+			address = get_object_address_publication_rel(castNode(List, object),
 															 &relation,
 															 missing_ok);
 				break;
@@ -1190,21 +1120,11 @@ get_object_address_unqualified(ObjectType objtype,
 			break;
 		case OBJECT_LANGUAGE:
 			address.classId = LanguageRelationId;
-			address.objectId = get_language_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_FDW:
-			address.classId = ForeignDataWrapperRelationId;
-			address.objectId = get_foreign_data_wrapper_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			address.classId = ForeignServerRelationId;
-			address.objectId = get_foreign_server_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_EVENT_TRIGGER:
-			address.classId = EventTriggerRelationId;
+		address.objectId = get_language_oid(name, missing_ok);
+		address.objectSubId = 0;
+		break;
+	case OBJECT_EVENT_TRIGGER:
+		address.classId = EventTriggerRelationId;
 			address.objectId = get_event_trigger_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
@@ -1286,18 +1206,11 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("\"%s\" is not a materialized view",
-								RelationGetRelationName(relation))));
-			break;
-		case OBJECT_FOREIGN_TABLE:
-			if (relation->rd_rel->relkind != RELKIND_FOREIGN_TABLE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is not a foreign table",
-								RelationGetRelationName(relation))));
-			break;
-		default:
-			elog(ERROR, "unrecognized objtype: %d", (int) objtype);
-			break;
+						RelationGetRelationName(relation))));
+		break;
+	default:
+		elog(ERROR, "unrecognized objtype: %d", (int) objtype);
+		break;
 	}
 
 	/* Done. */
@@ -1717,75 +1630,6 @@ get_object_address_opf_member(ObjectType objtype,
 }
 
 /*
- * Find the ObjectAddress for a user mapping.
- */
-static ObjectAddress
-get_object_address_usermapping(List *object, bool missing_ok)
-{
-	ObjectAddress address;
-	Oid			userid;
-	char	   *username;
-	char	   *servername;
-	ForeignServer *server;
-	HeapTuple	tp;
-
-	ObjectAddressSet(address, UserMappingRelationId, InvalidOid);
-
-	/* fetch string names from input lists, for error messages */
-	username = strVal(linitial(object));
-	servername = strVal(lsecond(object));
-
-	/* look up pg_authid OID of mapped user; InvalidOid if PUBLIC */
-	if (strcmp(username, "public") == 0)
-		userid = InvalidOid;
-	else
-	{
-		tp = SearchSysCache1(AUTHNAME,
-							 CStringGetDatum(username));
-		if (!HeapTupleIsValid(tp))
-		{
-			if (!missing_ok)
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("user mapping for user \"%s\" on server \"%s\" does not exist",
-								username, servername)));
-			return address;
-		}
-		userid = ((Form_pg_authid) GETSTRUCT(tp))->oid;
-		ReleaseSysCache(tp);
-	}
-
-	/* Now look up the pg_user_mapping tuple */
-	server = GetForeignServerByName(servername, true);
-	if (!server)
-	{
-		if (!missing_ok)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("server \"%s\" does not exist", servername)));
-		return address;
-	}
-	tp = SearchSysCache2(USERMAPPINGUSERSERVER,
-						 ObjectIdGetDatum(userid),
-						 ObjectIdGetDatum(server->serverid));
-	if (!HeapTupleIsValid(tp))
-	{
-		if (!missing_ok)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("user mapping for user \"%s\" on server \"%s\" does not exist",
-							username, servername)));
-		return address;
-	}
-
-	address.objectId = ((Form_pg_user_mapping) GETSTRUCT(tp))->oid;
-
-	ReleaseSysCache(tp);
-
-	return address;
-}
-
-/*
  * Find the ObjectAddress for a publication relation.  The first element of
  * the object parameter is the relation name, the second is the
  * publication name.
@@ -2109,7 +1953,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	{
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_CAST:
-		case OBJECT_USER_MAPPING:
 		case OBJECT_PUBLICATION_REL:
 		case OBJECT_DEFACL:
 		case OBJECT_TRANSFORM:
@@ -2154,7 +1997,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
 		case OBJECT_INDEX:
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_COLUMN:
 		case OBJECT_ATTRIBUTE:
 		case OBJECT_COLLATION:
@@ -2164,8 +2006,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_DATABASE:
 		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_EXTENSION:
-		case OBJECT_FDW:
-		case OBJECT_FOREIGN_SERVER:
 		case OBJECT_LANGUAGE:
 		case OBJECT_PUBLICATION:
 		case OBJECT_ROLE:
@@ -2188,12 +2028,9 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 			objnode = (Node *) list_make2(typename, linitial(args));
 			break;
 		case OBJECT_PUBLICATION_REL:
-			objnode = (Node *) list_make2(name, linitial(args));
-			break;
-		case OBJECT_USER_MAPPING:
-			objnode = (Node *) list_make2(linitial(name), linitial(args));
-			break;
-		case OBJECT_DEFACL:
+		objnode = (Node *) list_make2(name, linitial(args));
+		break;
+	case OBJECT_DEFACL:
 			objnode = (Node *) lcons(linitial(args), name);
 			break;
 		case OBJECT_AMOP:
@@ -2271,7 +2108,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_COLUMN:
 		case OBJECT_RULE:
 		case OBJECT_TRIGGER:
@@ -2346,20 +2182,10 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 		case OBJECT_EXTENSION:
 			if (!pg_extension_ownercheck(address.objectId, roleid))
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_FDW:
-			if (!pg_foreign_data_wrapper_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			if (!pg_foreign_server_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_EVENT_TRIGGER:
-			if (!pg_event_trigger_ownercheck(address.objectId, roleid))
+						   strVal((Value *) object));
+		break;
+	case OBJECT_EVENT_TRIGGER:
+		if (!pg_event_trigger_ownercheck(address.objectId, roleid))
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
 							   strVal((Value *) object));
 			break;
@@ -3415,67 +3241,12 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 							 object->objectId);
 					break;
 				}
-				appendStringInfo(&buffer, _("tablespace %s"), tblspace);
-				break;
-			}
-
-		case OCLASS_FDW:
-			{
-				ForeignDataWrapper *fdw;
-
-				fdw = GetForeignDataWrapperExtended(object->objectId,
-													missing_ok);
-				if (fdw)
-					appendStringInfo(&buffer, _("foreign-data wrapper %s"), fdw->fdwname);
-				break;
-			}
-
-		case OCLASS_FOREIGN_SERVER:
-			{
-				ForeignServer *srv;
-
-				srv = GetForeignServerExtended(object->objectId, missing_ok);
-				if (srv)
-					appendStringInfo(&buffer, _("server %s"), srv->servername);
-				break;
-			}
-
-		case OCLASS_USER_MAPPING:
-			{
-				HeapTuple	tup;
-				Oid			useid;
-				char	   *usename;
-				Form_pg_user_mapping umform;
-				ForeignServer *srv;
-
-				tup = SearchSysCache1(USERMAPPINGOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for user mapping %u",
-							 object->objectId);
-					break;
-				}
-
-				umform = (Form_pg_user_mapping) GETSTRUCT(tup);
-				useid = umform->umuser;
-				srv = GetForeignServer(umform->umserver);
-
-				ReleaseSysCache(tup);
-
-				if (OidIsValid(useid))
-					usename = GetUserNameFromId(useid, false);
-				else
-					usename = "public";
-
-				appendStringInfo(&buffer, _("user mapping for %s on server %s"), usename,
-								 srv->servername);
-				break;
-			}
+			appendStringInfo(&buffer, _("tablespace %s"), tblspace);
+			break;
+		}
 
 		case OCLASS_DEFACL:
-			{
+		{
 				Relation	defaclrel;
 				ScanKeyData skey[1];
 				SysScanDesc rcscan;
@@ -3828,10 +3599,6 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 			break;
 		case RELKIND_COMPOSITE_TYPE:
 			appendStringInfo(buffer, _("composite type %s"),
-							 relname);
-			break;
-		case RELKIND_FOREIGN_TABLE:
-			appendStringInfo(buffer, _("foreign table %s"),
 							 relname);
 			break;
 		default:
@@ -4228,23 +3995,11 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_TBLSPACE:
 			appendStringInfoString(&buffer, "tablespace");
-			break;
+		break;
 
-		case OCLASS_FDW:
-			appendStringInfoString(&buffer, "foreign-data wrapper");
-			break;
-
-		case OCLASS_FOREIGN_SERVER:
-			appendStringInfoString(&buffer, "server");
-			break;
-
-		case OCLASS_USER_MAPPING:
-			appendStringInfoString(&buffer, "user mapping");
-			break;
-
-		case OCLASS_DEFACL:
-			appendStringInfoString(&buffer, "default acl");
-			break;
+	case OCLASS_DEFACL:
+		appendStringInfoString(&buffer, "default acl");
+		break;
 
 		case OCLASS_EXTENSION:
 			appendStringInfoString(&buffer, "extension");
@@ -4333,9 +4088,6 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId,
 			break;
 		case RELKIND_COMPOSITE_TYPE:
 			appendStringInfoString(buffer, "composite type");
-			break;
-		case RELKIND_FOREIGN_TABLE:
-			appendStringInfoString(buffer, "foreign table");
 			break;
 		default:
 			/* shouldn't get here */
@@ -5115,83 +4867,12 @@ getObjectIdentityParts(const ObjectAddress *object,
 				if (objname)
 					*objname = list_make1(tblspace);
 				appendStringInfoString(&buffer,
-									   quote_identifier(tblspace));
-				break;
-			}
-
-		case OCLASS_FDW:
-			{
-				ForeignDataWrapper *fdw;
-
-				fdw = GetForeignDataWrapperExtended(object->objectId,
-													missing_ok);
-				if (fdw)
-				{
-					appendStringInfoString(&buffer, quote_identifier(fdw->fdwname));
-					if (objname)
-						*objname = list_make1(pstrdup(fdw->fdwname));
-				}
-				break;
-			}
-
-		case OCLASS_FOREIGN_SERVER:
-			{
-				ForeignServer *srv;
-
-				srv = GetForeignServerExtended(object->objectId,
-											   missing_ok);
-				if (srv)
-				{
-					appendStringInfoString(&buffer,
-										   quote_identifier(srv->servername));
-					if (objname)
-						*objname = list_make1(pstrdup(srv->servername));
-				}
-				break;
-			}
-
-		case OCLASS_USER_MAPPING:
-			{
-				HeapTuple	tup;
-				Oid			useid;
-				Form_pg_user_mapping umform;
-				ForeignServer *srv;
-				const char *usename;
-
-				tup = SearchSysCache1(USERMAPPINGOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for user mapping %u",
-							 object->objectId);
-					break;
-				}
-				umform = (Form_pg_user_mapping) GETSTRUCT(tup);
-				useid = umform->umuser;
-				srv = GetForeignServer(umform->umserver);
-
-				ReleaseSysCache(tup);
-
-				if (OidIsValid(useid))
-					usename = GetUserNameFromId(useid, false);
-				else
-					usename = "public";
-
-				if (objname)
-				{
-					*objname = list_make1(pstrdup(usename));
-					*objargs = list_make1(pstrdup(srv->servername));
-				}
-
-				appendStringInfo(&buffer, "%s on server %s",
-								 quote_identifier(usename),
-								 srv->servername);
-				break;
-			}
+								   quote_identifier(tblspace));
+			break;
+		}
 
 		case OCLASS_DEFACL:
-			{
+		{
 				Relation	defaclrel;
 				ScanKeyData skey[1];
 				SysScanDesc rcscan;
@@ -5635,8 +5316,6 @@ get_relkind_objtype(char relkind)
 			return OBJECT_VIEW;
 		case RELKIND_MATVIEW:
 			return OBJECT_MATVIEW;
-		case RELKIND_FOREIGN_TABLE:
-			return OBJECT_FOREIGN_TABLE;
 		case RELKIND_TOASTVALUE:
 			return OBJECT_TABLE;
 		default:

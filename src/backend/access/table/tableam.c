@@ -61,16 +61,6 @@ table_slot_callbacks(Relation relation)
 
 	if (relation->rd_tableam)
 		tts_cb = relation->rd_tableam->slot_callbacks(relation);
-	else if (relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		/*
-		 * Historically FDWs expect to store heap tuples in slots. Continue
-		 * handing them one, to make it less painful to adapt FDWs to new
-		 * versions. The cost of a heap slot over a virtual slot is pretty
-		 * small.
-		 */
-		tts_cb = &TTSOpsHeapTuple;
-	}
 	else
 	{
 		/*

@@ -23,7 +23,6 @@
 #include "executor/nodeBitmapOr.h"
 #include "executor/nodeCtescan.h"
 #include "executor/nodeCustom.h"
-#include "executor/nodeForeignscan.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
@@ -224,10 +223,6 @@ ExecReScan(PlanState *node)
 
 		case T_WorkTableScanState:
 			ExecReScanWorkTableScan((WorkTableScanState *) node);
-			break;
-
-		case T_ForeignScanState:
-			ExecReScanForeignScan((ForeignScanState *) node);
 			break;
 
 		case T_CustomScanState:

@@ -103,25 +103,6 @@ extern Oid	get_opfamily_oid(Oid amID, List *opfamilyname, bool missing_ok);
 extern text *serialize_deflist(List *deflist);
 extern List *deserialize_deflist(Datum txt);
 
-/* commands/foreigncmds.c */
-extern ObjectAddress AlterForeignServerOwner(const char *name, Oid newOwnerId);
-extern void AlterForeignServerOwner_oid(Oid, Oid newOwnerId);
-extern ObjectAddress AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId);
-extern void AlterForeignDataWrapperOwner_oid(Oid fwdId, Oid newOwnerId);
-extern ObjectAddress CreateForeignDataWrapper(CreateFdwStmt *stmt);
-extern ObjectAddress AlterForeignDataWrapper(AlterFdwStmt *stmt);
-extern ObjectAddress CreateForeignServer(CreateForeignServerStmt *stmt);
-extern ObjectAddress AlterForeignServer(AlterForeignServerStmt *stmt);
-extern ObjectAddress CreateUserMapping(CreateUserMappingStmt *stmt);
-extern ObjectAddress AlterUserMapping(AlterUserMappingStmt *stmt);
-extern Oid	RemoveUserMapping(DropUserMappingStmt *stmt);
-extern void CreateForeignTable(CreateForeignTableStmt *stmt, Oid relid);
-extern void ImportForeignSchema(ImportForeignSchemaStmt *stmt);
-extern Datum transformGenericOptions(Oid catalogId,
-									 Datum oldOptions,
-									 List *options,
-									 Oid fdwvalidator);
-
 /* commands/amcmds.c */
 extern ObjectAddress CreateAccessMethod(CreateAmStmt *stmt);
 extern Oid	get_index_am_oid(const char *amname, bool missing_ok);

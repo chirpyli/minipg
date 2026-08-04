@@ -902,28 +902,8 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 						status = PSQL_CMD_UNKNOWN;
 						break;
 				}
-				break;
-			case 'e':			/* SQL/MED subsystem */
-				switch (cmd[2])
-				{
-					case 's':
-						success = listForeignServers(pattern, show_verbose);
-						break;
-					case 'u':
-						success = listUserMappings(pattern, show_verbose);
-						break;
-					case 'w':
-						success = listForeignDataWrappers(pattern, show_verbose);
-						break;
-					case 't':
-						success = listForeignTables(pattern, show_verbose);
-						break;
-					default:
-						status = PSQL_CMD_UNKNOWN;
-						break;
-				}
-				break;
-			case 'x':			/* Extensions */
+			break;
+		case 'x':			/* Extensions */
 				if (show_verbose)
 					success = listExtensionContents(pattern);
 				else

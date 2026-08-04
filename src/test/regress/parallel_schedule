@@ -102,7 +102,7 @@ test: publication subscription
 # ----------
 # Another group of parallel tests
 # ----------
-test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid foreign_data window functional_deps advisory_lock indirect_toast equivclass
+test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid window functional_deps advisory_lock indirect_toast equivclass
 
 # ----------
 # ----------

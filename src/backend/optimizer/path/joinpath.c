@@ -17,7 +17,6 @@
 #include <math.h>
 
 #include "executor/executor.h"
-#include "foreign/fdwapi.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/cost.h"
 #include "optimizer/optimizer.h"
@@ -326,23 +325,10 @@ add_paths_to_joinrel(PlannerInfo *root,
 	 * restrictlist has such clauses, and if not, allow them to consider
 	 * pushing down joins.
 	 */
-	if ((joinrel->fdwroutine &&
-		 joinrel->fdwroutine->GetForeignJoinPaths) ||
-		set_join_pathlist_hook)
+	if (set_join_pathlist_hook)
 		consider_join_pushdown = !has_pseudoconstant_clauses(root,
 															 restrictlist);
 
-	/*
-	 * 5. If inner and outer relations are foreign tables (or joins) belonging
-	 * to the same server and assigned to the same user to check access
-	 * permissions as, give the FDW a chance to push down joins.
-	 */
-	if (joinrel->fdwroutine &&
-		joinrel->fdwroutine->GetForeignJoinPaths &&
-		consider_join_pushdown)
-		joinrel->fdwroutine->GetForeignJoinPaths(root, joinrel,
-												 outerrel, innerrel,
-												 jointype, &extra);
 
 	/*
 	 * 6. Finally, give extensions a chance to manipulate the path list.  They

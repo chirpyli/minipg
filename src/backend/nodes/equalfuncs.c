@@ -1900,105 +1900,6 @@ _equalAlterExtensionContentsStmt(const AlterExtensionContentsStmt *a, const Alte
 	return true;
 }
 
-static bool
-_equalCreateFdwStmt(const CreateFdwStmt *a, const CreateFdwStmt *b)
-{
-	COMPARE_STRING_FIELD(fdwname);
-	COMPARE_NODE_FIELD(func_options);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterFdwStmt(const AlterFdwStmt *a, const AlterFdwStmt *b)
-{
-	COMPARE_STRING_FIELD(fdwname);
-	COMPARE_NODE_FIELD(func_options);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalCreateForeignServerStmt(const CreateForeignServerStmt *a, const CreateForeignServerStmt *b)
-{
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_STRING_FIELD(servertype);
-	COMPARE_STRING_FIELD(version);
-	COMPARE_STRING_FIELD(fdwname);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterForeignServerStmt(const AlterForeignServerStmt *a, const AlterForeignServerStmt *b)
-{
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_STRING_FIELD(version);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(has_version);
-
-	return true;
-}
-
-static bool
-_equalCreateUserMappingStmt(const CreateUserMappingStmt *a, const CreateUserMappingStmt *b)
-{
-	COMPARE_NODE_FIELD(user);
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterUserMappingStmt(const AlterUserMappingStmt *a, const AlterUserMappingStmt *b)
-{
-	COMPARE_NODE_FIELD(user);
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalDropUserMappingStmt(const DropUserMappingStmt *a, const DropUserMappingStmt *b)
-{
-	COMPARE_NODE_FIELD(user);
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
-_equalCreateForeignTableStmt(const CreateForeignTableStmt *a, const CreateForeignTableStmt *b)
-{
-	if (!_equalCreateStmt(&a->base, &b->base))
-		return false;
-
-	COMPARE_STRING_FIELD(servername);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalImportForeignSchemaStmt(const ImportForeignSchemaStmt *a, const ImportForeignSchemaStmt *b)
-{
-	COMPARE_STRING_FIELD(server_name);
-	COMPARE_STRING_FIELD(remote_schema);
-	COMPARE_STRING_FIELD(local_schema);
-	COMPARE_SCALAR_FIELD(list_type);
-	COMPARE_NODE_FIELD(table_list);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
 
 static bool
 _equalCreateTransformStmt(const CreateTransformStmt *a, const CreateTransformStmt *b)
@@ -2570,7 +2471,6 @@ _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 	COMPARE_NODE_FIELD(collClause);
 	COMPARE_SCALAR_FIELD(collOid);
 	COMPARE_NODE_FIELD(constraints);
-	COMPARE_NODE_FIELD(fdwoptions);
 	COMPARE_LOCATION_FIELD(location);
 
 	return true;
@@ -3484,33 +3384,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterExtensionContentsStmt:
 			retval = _equalAlterExtensionContentsStmt(a, b);
-			break;
-		case T_CreateFdwStmt:
-			retval = _equalCreateFdwStmt(a, b);
-			break;
-		case T_AlterFdwStmt:
-			retval = _equalAlterFdwStmt(a, b);
-			break;
-		case T_CreateForeignServerStmt:
-			retval = _equalCreateForeignServerStmt(a, b);
-			break;
-		case T_AlterForeignServerStmt:
-			retval = _equalAlterForeignServerStmt(a, b);
-			break;
-		case T_CreateUserMappingStmt:
-			retval = _equalCreateUserMappingStmt(a, b);
-			break;
-		case T_AlterUserMappingStmt:
-			retval = _equalAlterUserMappingStmt(a, b);
-			break;
-		case T_DropUserMappingStmt:
-			retval = _equalDropUserMappingStmt(a, b);
-			break;
-		case T_CreateForeignTableStmt:
-			retval = _equalCreateForeignTableStmt(a, b);
-			break;
-		case T_ImportForeignSchemaStmt:
-			retval = _equalImportForeignSchemaStmt(a, b);
 			break;
 		case T_CreateTransformStmt:
 			retval = _equalCreateTransformStmt(a, b);

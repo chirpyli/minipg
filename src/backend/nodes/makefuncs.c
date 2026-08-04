@@ -550,7 +550,6 @@ makeColumnDef(const char *colname, Oid typeOid, int32 typmod, Oid collOid)
 	n->collClause = NULL;
 	n->collOid = collOid;
 	n->constraints = NIL;
-	n->fdwoptions = NIL;
 	n->location = -1;
 
 	return n;

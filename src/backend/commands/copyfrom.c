@@ -38,7 +38,6 @@
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "executor/tuptable.h"
-#include "foreign/fdwapi.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
@@ -555,7 +554,6 @@ CopyFrom(CopyFromState cstate)
 	 * allowed on views, so we only hint about them in the view case.)
 	 */
 	if (cstate->rel->rd_rel->relkind != RELKIND_RELATION &&
-		cstate->rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 		cstate->rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE &&
 		!(cstate->rel->trigdesc &&
 		  cstate->rel->trigdesc->trig_insert_instead_row))
@@ -671,11 +669,6 @@ CopyFrom(CopyFromState cstate)
 	mtstate->resultRelInfo = resultRelInfo;
 	mtstate->rootResultRelInfo = resultRelInfo;
 
-	if (resultRelInfo->ri_FdwRoutine != NULL &&
-		resultRelInfo->ri_FdwRoutine->BeginForeignInsert != NULL)
-		resultRelInfo->ri_FdwRoutine->BeginForeignInsert(mtstate,
-														 resultRelInfo);
-
 	/* Prepare to catch AFTER triggers. */
 	AfterTriggerBeginQuery();
 
@@ -734,8 +727,7 @@ CopyFrom(CopyFromState cstate)
 		 */
 		insertMethod = CIM_SINGLE;
 	}
-	else if (resultRelInfo->ri_FdwRoutine != NULL ||
-			 cstate->volatile_defexprs)
+	else if (cstate->volatile_defexprs)
 	{
 		/*
 		 * Can't support multi-inserts to foreign tables or if there are any
@@ -914,8 +906,7 @@ CopyFrom(CopyFromState cstate)
 				 */
 				leafpart_use_multi_insert = insertMethod == CIM_MULTI_CONDITIONAL &&
 					!has_before_insert_row_trig &&
-					!has_instead_insert_row_trig &&
-					resultRelInfo->ri_FdwRoutine == NULL;
+					!has_instead_insert_row_trig;
 
 				/* Set the multi-insert buffer to use for this partition. */
 				if (leafpart_use_multi_insert)
@@ -1033,9 +1024,8 @@ CopyFrom(CopyFromState cstate)
 				 * If the target is a plain table, check the constraints of
 				 * the tuple.
 				 */
-				if (resultRelInfo->ri_FdwRoutine == NULL &&
-					resultRelInfo->ri_RelationDesc->rd_att->constr)
-					ExecConstraints(resultRelInfo, myslot, estate);
+			if (resultRelInfo->ri_RelationDesc->rd_att->constr)
+				ExecConstraints(resultRelInfo, myslot, estate);
 
 				/*
 				 * Also check the tuple against the partition constraint, if
@@ -1073,28 +1063,8 @@ CopyFrom(CopyFromState cstate)
 				{
 					List	   *recheckIndexes = NIL;
 
-					/* OK, store the tuple */
-					if (resultRelInfo->ri_FdwRoutine != NULL)
-					{
-						myslot = resultRelInfo->ri_FdwRoutine->ExecForeignInsert(estate,
-																				 resultRelInfo,
-																				 myslot,
-																				 NULL);
-
-						if (myslot == NULL) /* "do nothing" */
-							continue;	/* next tuple please */
-
-						/*
-						 * AFTER ROW Triggers might reference the tableoid
-						 * column, so (re-)initialize tts_tableOid before
-						 * evaluating them.
-						 */
-						myslot->tts_tableOid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
-					}
-					else
-					{
-						/* OK, store the tuple and create index entries for it */
-						table_tuple_insert(resultRelInfo->ri_RelationDesc,
+					/* OK, store the tuple and create index entries for it */
+					table_tuple_insert(resultRelInfo->ri_RelationDesc,
 										   myslot, mycid, ti_options, bistate);
 
 						if (resultRelInfo->ri_NumIndices > 0)
@@ -1105,7 +1075,6 @@ CopyFrom(CopyFromState cstate)
 																   false,
 																   NULL,
 																   NIL);
-					}
 
 					/* AFTER ROW INSERT Triggers */
 					ExecARInsertTriggers(estate, resultRelInfo, myslot,
@@ -1148,12 +1117,6 @@ CopyFrom(CopyFromState cstate)
 	AfterTriggerEndQuery(estate);
 
 	ExecResetTupleTable(estate->es_tupleTable, false);
-
-	/* Allow the FDW to shut down */
-	if (target_resultRelInfo->ri_FdwRoutine != NULL &&
-		target_resultRelInfo->ri_FdwRoutine->EndForeignInsert != NULL)
-		target_resultRelInfo->ri_FdwRoutine->EndForeignInsert(estate,
-															  target_resultRelInfo);
 
 	/* Tear down the multi-insert buffer data */
 	if (insertMethod != CIM_SINGLE)

@@ -85,18 +85,6 @@ extern bool listCollations(const char *pattern, bool verbose, bool showSystem);
 /* \dn */
 extern bool listSchemas(const char *pattern, bool verbose, bool showSystem);
 
-/* \dew */
-extern bool listForeignDataWrappers(const char *pattern, bool verbose);
-
-/* \des */
-extern bool listForeignServers(const char *pattern, bool verbose);
-
-/* \deu */
-extern bool listUserMappings(const char *pattern, bool verbose);
-
-/* \det */
-extern bool listForeignTables(const char *pattern, bool verbose);
-
 /* \dL */
 extern bool listLanguages(const char *pattern, bool verbose, bool showSystem);
 

@@ -20,7 +20,6 @@
 #include "catalog/pg_type.h"
 #include "executor/execPartition.h"
 #include "executor/executor.h"
-#include "foreign/fdwapi.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -913,28 +912,10 @@ ExecInitRoutingInfo(ModifyTableState *mtstate,
 		partRelInfo->ri_PartitionTupleSlot = NULL;
 
 	/*
-	 * If the partition is a foreign table, let the FDW init itself for
-	 * routing tuples to the partition.
+	 * Determine the batch size.  Without FDW support, batching is not
+	 * available, so we use a batch size of 1.
 	 */
-	if (partRelInfo->ri_FdwRoutine != NULL &&
-		partRelInfo->ri_FdwRoutine->BeginForeignInsert != NULL)
-		partRelInfo->ri_FdwRoutine->BeginForeignInsert(mtstate, partRelInfo);
-
-	/*
-	 * Determine if the FDW supports batch insert and determine the batch size
-	 * (a FDW may support batching, but it may be disabled for the
-	 * server/table or for this particular query).
-	 *
-	 * If the FDW does not support batching, we set the batch size to 1.
-	 */
-	if (mtstate->operation == CMD_INSERT &&
-		partRelInfo->ri_FdwRoutine != NULL &&
-		partRelInfo->ri_FdwRoutine->GetForeignModifyBatchSize &&
-		partRelInfo->ri_FdwRoutine->ExecForeignBatchInsert)
-		partRelInfo->ri_BatchSize =
-			partRelInfo->ri_FdwRoutine->GetForeignModifyBatchSize(partRelInfo);
-	else
-		partRelInfo->ri_BatchSize = 1;
+	partRelInfo->ri_BatchSize = 1;
 
 	Assert(partRelInfo->ri_BatchSize >= 1);
 
@@ -1150,12 +1131,6 @@ ExecCleanupTupleRouting(ModifyTableState *mtstate,
 	for (i = 0; i < proute->num_partitions; i++)
 	{
 		ResultRelInfo *resultRelInfo = proute->partitions[i];
-
-		/* Allow any FDWs to shut down */
-		if (resultRelInfo->ri_FdwRoutine != NULL &&
-			resultRelInfo->ri_FdwRoutine->EndForeignInsert != NULL)
-			resultRelInfo->ri_FdwRoutine->EndForeignInsert(mtstate->ps.state,
-														   resultRelInfo);
 
 		/*
 		 * Close it if it's not one of the result relations borrowed from the

@@ -410,8 +410,6 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_NODE_FIELD(updateColnosLists);
 	WRITE_NODE_FIELD(withCheckOptionLists);
 	WRITE_NODE_FIELD(returningLists);
-	WRITE_NODE_FIELD(fdwPrivLists);
-	WRITE_BITMAPSET_FIELD(fdwDirectModifyPlans);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_INT_FIELD(epqParam);
 	WRITE_ENUM_FIELD(onConflictAction, OnConflictAction);
@@ -684,23 +682,6 @@ _outWorkTableScan(StringInfo str, const WorkTableScan *node)
 	WRITE_INT_FIELD(wtParam);
 }
 
-static void
-_outForeignScan(StringInfo str, const ForeignScan *node)
-{
-	WRITE_NODE_TYPE("FOREIGNSCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_ENUM_FIELD(operation, CmdType);
-	WRITE_UINT_FIELD(resultRelation);
-	WRITE_OID_FIELD(fs_server);
-	WRITE_NODE_FIELD(fdw_exprs);
-	WRITE_NODE_FIELD(fdw_private);
-	WRITE_NODE_FIELD(fdw_scan_tlist);
-	WRITE_NODE_FIELD(fdw_recheck_quals);
-	WRITE_BITMAPSET_FIELD(fs_relids);
-	WRITE_BOOL_FIELD(fsSystemCol);
-}
 
 static void
 _outCustomScan(StringInfo str, const CustomScan *node)
@@ -1838,16 +1819,6 @@ _outSubqueryScanPath(StringInfo str, const SubqueryScanPath *node)
 	WRITE_NODE_FIELD(subpath);
 }
 
-static void
-_outForeignPath(StringInfo str, const ForeignPath *node)
-{
-	WRITE_NODE_TYPE("FOREIGNPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(fdw_outerpath);
-	WRITE_NODE_FIELD(fdw_private);
-}
 
 static void
 _outCustomPath(StringInfo str, const CustomPath *node)
@@ -2333,10 +2304,6 @@ _outRelOptInfo(StringInfo str, const RelOptInfo *node)
 	WRITE_NODE_FIELD(subplan_params);
 	WRITE_INT_FIELD(rel_parallel_workers);
 	WRITE_UINT_FIELD(amflags);
-	WRITE_OID_FIELD(serverid);
-	WRITE_OID_FIELD(userid);
-	WRITE_BOOL_FIELD(useridiscurrent);
-	/* we don't try to print fdwroutine or fdw_private */
 	/* can't print unique_for_rels/non_unique_for_rels; BMSes aren't Nodes */
 	WRITE_NODE_FIELD(baserestrictinfo);
 	WRITE_UINT_FIELD(baserestrict_min_security);
@@ -2684,29 +2651,6 @@ _outCreateStmt(StringInfo str, const CreateStmt *node)
 	_outCreateStmtInfo(str, (const CreateStmt *) node);
 }
 
-static void
-_outCreateForeignTableStmt(StringInfo str, const CreateForeignTableStmt *node)
-{
-	WRITE_NODE_TYPE("CREATEFOREIGNTABLESTMT");
-
-	_outCreateStmtInfo(str, (const CreateStmt *) node);
-
-	WRITE_STRING_FIELD(servername);
-	WRITE_NODE_FIELD(options);
-}
-
-static void
-_outImportForeignSchemaStmt(StringInfo str, const ImportForeignSchemaStmt *node)
-{
-	WRITE_NODE_TYPE("IMPORTFOREIGNSCHEMASTMT");
-
-	WRITE_STRING_FIELD(server_name);
-	WRITE_STRING_FIELD(remote_schema);
-	WRITE_STRING_FIELD(local_schema);
-	WRITE_ENUM_FIELD(list_type, ImportForeignSchemaType);
-	WRITE_NODE_FIELD(table_list);
-	WRITE_NODE_FIELD(options);
-}
 
 static void
 _outIndexStmt(StringInfo str, const IndexStmt *node)
@@ -2910,7 +2854,6 @@ _outColumnDef(StringInfo str, const ColumnDef *node)
 	WRITE_NODE_FIELD(collClause);
 	WRITE_OID_FIELD(collOid);
 	WRITE_NODE_FIELD(constraints);
-	WRITE_NODE_FIELD(fdwoptions);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -3847,12 +3790,9 @@ outNode(StringInfo str, const void *obj)
 				_outNamedTuplestoreScan(str, obj);
 				break;
 			case T_WorkTableScan:
-				_outWorkTableScan(str, obj);
-				break;
-			case T_ForeignScan:
-				_outForeignScan(str, obj);
-				break;
-			case T_CustomScan:
+			_outWorkTableScan(str, obj);
+			break;
+		case T_CustomScan:
 				_outCustomScan(str, obj);
 				break;
 			case T_Join:
@@ -4093,12 +4033,9 @@ outNode(StringInfo str, const void *obj)
 				_outTidRangePath(str, obj);
 				break;
 			case T_SubqueryScanPath:
-				_outSubqueryScanPath(str, obj);
-				break;
-			case T_ForeignPath:
-				_outForeignPath(str, obj);
-				break;
-			case T_CustomPath:
+			_outSubqueryScanPath(str, obj);
+			break;
+		case T_CustomPath:
 				_outCustomPath(str, obj);
 				break;
 			case T_AppendPath:
@@ -4250,12 +4187,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_CreateStmt:
 				_outCreateStmt(str, obj);
-				break;
-			case T_CreateForeignTableStmt:
-				_outCreateForeignTableStmt(str, obj);
-				break;
-			case T_ImportForeignSchemaStmt:
-				_outImportForeignSchemaStmt(str, obj);
 				break;
 			case T_IndexStmt:
 				_outIndexStmt(str, obj);

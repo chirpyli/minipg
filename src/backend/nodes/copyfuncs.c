@@ -212,8 +212,6 @@ _copyModifyTable(const ModifyTable *from)
 	COPY_NODE_FIELD(updateColnosLists);
 	COPY_NODE_FIELD(withCheckOptionLists);
 	COPY_NODE_FIELD(returningLists);
-	COPY_NODE_FIELD(fdwPrivLists);
-	COPY_BITMAPSET_FIELD(fdwDirectModifyPlans);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_SCALAR_FIELD(epqParam);
 	COPY_SCALAR_FIELD(onConflictAction);
@@ -738,34 +736,6 @@ _copyWorkTableScan(const WorkTableScan *from)
 	return newnode;
 }
 
-/*
- * _copyForeignScan
- */
-static ForeignScan *
-_copyForeignScan(const ForeignScan *from)
-{
-	ForeignScan *newnode = makeNode(ForeignScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(operation);
-	COPY_SCALAR_FIELD(resultRelation);
-	COPY_SCALAR_FIELD(fs_server);
-	COPY_NODE_FIELD(fdw_exprs);
-	COPY_NODE_FIELD(fdw_private);
-	COPY_NODE_FIELD(fdw_scan_tlist);
-	COPY_NODE_FIELD(fdw_recheck_quals);
-	COPY_BITMAPSET_FIELD(fs_relids);
-	COPY_SCALAR_FIELD(fsSystemCol);
-
-	return newnode;
-}
 
 /*
  * _copyCustomScan
@@ -2942,7 +2912,6 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_NODE_FIELD(collClause);
 	COPY_SCALAR_FIELD(collOid);
 	COPY_NODE_FIELD(constraints);
-	COPY_NODE_FIELD(fdwoptions);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -4187,123 +4156,6 @@ _copyAlterExtensionContentsStmt(const AlterExtensionContentsStmt *from)
 	return newnode;
 }
 
-static CreateFdwStmt *
-_copyCreateFdwStmt(const CreateFdwStmt *from)
-{
-	CreateFdwStmt *newnode = makeNode(CreateFdwStmt);
-
-	COPY_STRING_FIELD(fdwname);
-	COPY_NODE_FIELD(func_options);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterFdwStmt *
-_copyAlterFdwStmt(const AlterFdwStmt *from)
-{
-	AlterFdwStmt *newnode = makeNode(AlterFdwStmt);
-
-	COPY_STRING_FIELD(fdwname);
-	COPY_NODE_FIELD(func_options);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static CreateForeignServerStmt *
-_copyCreateForeignServerStmt(const CreateForeignServerStmt *from)
-{
-	CreateForeignServerStmt *newnode = makeNode(CreateForeignServerStmt);
-
-	COPY_STRING_FIELD(servername);
-	COPY_STRING_FIELD(servertype);
-	COPY_STRING_FIELD(version);
-	COPY_STRING_FIELD(fdwname);
-	COPY_SCALAR_FIELD(if_not_exists);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterForeignServerStmt *
-_copyAlterForeignServerStmt(const AlterForeignServerStmt *from)
-{
-	AlterForeignServerStmt *newnode = makeNode(AlterForeignServerStmt);
-
-	COPY_STRING_FIELD(servername);
-	COPY_STRING_FIELD(version);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(has_version);
-
-	return newnode;
-}
-
-static CreateUserMappingStmt *
-_copyCreateUserMappingStmt(const CreateUserMappingStmt *from)
-{
-	CreateUserMappingStmt *newnode = makeNode(CreateUserMappingStmt);
-
-	COPY_NODE_FIELD(user);
-	COPY_STRING_FIELD(servername);
-	COPY_SCALAR_FIELD(if_not_exists);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterUserMappingStmt *
-_copyAlterUserMappingStmt(const AlterUserMappingStmt *from)
-{
-	AlterUserMappingStmt *newnode = makeNode(AlterUserMappingStmt);
-
-	COPY_NODE_FIELD(user);
-	COPY_STRING_FIELD(servername);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static DropUserMappingStmt *
-_copyDropUserMappingStmt(const DropUserMappingStmt *from)
-{
-	DropUserMappingStmt *newnode = makeNode(DropUserMappingStmt);
-
-	COPY_NODE_FIELD(user);
-	COPY_STRING_FIELD(servername);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
-static CreateForeignTableStmt *
-_copyCreateForeignTableStmt(const CreateForeignTableStmt *from)
-{
-	CreateForeignTableStmt *newnode = makeNode(CreateForeignTableStmt);
-
-	CopyCreateStmtFields((const CreateStmt *) from, (CreateStmt *) newnode);
-
-	COPY_STRING_FIELD(servername);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static ImportForeignSchemaStmt *
-_copyImportForeignSchemaStmt(const ImportForeignSchemaStmt *from)
-{
-	ImportForeignSchemaStmt *newnode = makeNode(ImportForeignSchemaStmt);
-
-	COPY_STRING_FIELD(server_name);
-	COPY_STRING_FIELD(remote_schema);
-	COPY_STRING_FIELD(local_schema);
-	COPY_SCALAR_FIELD(list_type);
-	COPY_NODE_FIELD(table_list);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
 static CreateTransformStmt *
 _copyCreateTransformStmt(const CreateTransformStmt *from)
 {
@@ -4911,9 +4763,6 @@ copyObjectImpl(const void *from)
 		case T_WorkTableScan:
 			retval = _copyWorkTableScan(from);
 			break;
-		case T_ForeignScan:
-			retval = _copyForeignScan(from);
-			break;
 		case T_CustomScan:
 			retval = _copyCustomScan(from);
 			break;
@@ -5439,33 +5288,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_AlterExtensionContentsStmt:
 			retval = _copyAlterExtensionContentsStmt(from);
-			break;
-		case T_CreateFdwStmt:
-			retval = _copyCreateFdwStmt(from);
-			break;
-		case T_AlterFdwStmt:
-			retval = _copyAlterFdwStmt(from);
-			break;
-		case T_CreateForeignServerStmt:
-			retval = _copyCreateForeignServerStmt(from);
-			break;
-		case T_AlterForeignServerStmt:
-			retval = _copyAlterForeignServerStmt(from);
-			break;
-		case T_CreateUserMappingStmt:
-			retval = _copyCreateUserMappingStmt(from);
-			break;
-		case T_AlterUserMappingStmt:
-			retval = _copyAlterUserMappingStmt(from);
-			break;
-		case T_DropUserMappingStmt:
-			retval = _copyDropUserMappingStmt(from);
-			break;
-		case T_CreateForeignTableStmt:
-			retval = _copyCreateForeignTableStmt(from);
-			break;
-		case T_ImportForeignSchemaStmt:
-			retval = _copyImportForeignSchemaStmt(from);
 			break;
 		case T_CreateTransformStmt:
 			retval = _copyCreateTransformStmt(from);

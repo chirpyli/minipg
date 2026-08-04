@@ -224,16 +224,8 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 
 	/* Set up CreateStmtContext */
 	cxt.pstate = pstate;
-	if (IsA(stmt, CreateForeignTableStmt))
-	{
-		cxt.stmtType = "CREATE FOREIGN TABLE";
-		cxt.isforeign = true;
-	}
-	else
-	{
-		cxt.stmtType = "CREATE TABLE";
-		cxt.isforeign = false;
-	}
+	cxt.stmtType = "CREATE TABLE";
+	cxt.isforeign = false;
 	cxt.relation = stmt->relation;
 	cxt.rel = NULL;
 	cxt.inhRelations = stmt->inhRelations;
@@ -837,31 +829,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 					 parser_errposition(cxt->pstate,
 										constraint->location)));
 	}
-
-	/*
-	 * If needed, generate ALTER FOREIGN TABLE ALTER COLUMN statement to add
-	 * per-column foreign data wrapper options to this column after creation.
-	 */
-	if (column->fdwoptions != NIL)
-	{
-		AlterTableStmt *stmt;
-		AlterTableCmd *cmd;
-
-		cmd = makeNode(AlterTableCmd);
-		cmd->subtype = AT_AlterColumnGenericOptions;
-		cmd->name = column->colname;
-		cmd->def = (Node *) column->fdwoptions;
-		cmd->behavior = DROP_RESTRICT;
-		cmd->missing_ok = false;
-
-		stmt = makeNode(AlterTableStmt);
-		stmt->relation = cxt->relation;
-		stmt->cmds = NIL;
-		stmt->objtype = OBJECT_FOREIGN_TABLE;
-		stmt->cmds = lappend(stmt->cmds, cmd);
-
-		cxt->alist = lappend(cxt->alist, stmt);
-	}
 }
 
 /*
@@ -977,7 +944,6 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 		relation->rd_rel->relkind != RELKIND_VIEW &&
 		relation->rd_rel->relkind != RELKIND_MATVIEW &&
 		relation->rd_rel->relkind != RELKIND_COMPOSITE_TYPE &&
-		relation->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 		relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -2492,7 +2458,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 					rel = table_openrv(inh, AccessShareLock);
 					/* check user requested inheritance from valid relkind */
 					if (rel->rd_rel->relkind != RELKIND_RELATION &&
-						rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 						rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 						ereport(ERROR,
 								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -2634,7 +2599,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 					rel = table_openrv(inh, AccessShareLock);
 					/* check user requested inheritance from valid relkind */
 					if (rel->rd_rel->relkind != RELKIND_RELATION &&
-						rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 						rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 						ereport(ERROR,
 								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -3325,12 +3289,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 
 	/* Set up CreateStmtContext */
 	cxt.pstate = pstate;
-	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		cxt.stmtType = "ALTER FOREIGN TABLE";
-		cxt.isforeign = true;
-	}
-	else
 	{
 		cxt.stmtType = "ALTER TABLE";
 		cxt.isforeign = false;

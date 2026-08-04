@@ -38,8 +38,6 @@
 #include "catalog/pg_default_acl.h"
 #include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_foreign_data_wrapper.h"
-#include "catalog/pg_foreign_server.h"
 #include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
@@ -59,7 +57,6 @@
 #include "commands/extension.h"
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
-#include "foreign/foreign.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_func.h"
@@ -241,12 +238,6 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 			break;
 		case OBJECT_TABLESPACE:
 			whole_mask = ACL_ALL_RIGHTS_TABLESPACE;
-			break;
-		case OBJECT_FDW:
-			whole_mask = ACL_ALL_RIGHTS_FDW;
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			whole_mask = ACL_ALL_RIGHTS_FOREIGN_SERVER;
 			break;
 		case OBJECT_EVENT_TRIGGER:
 			elog(ERROR, "grantable rights not supported for event triggers");
@@ -486,14 +477,6 @@ ExecuteGrantStmt(GrantStmt *stmt)
 			all_privileges = ACL_ALL_RIGHTS_TYPE;
 			errormsg = gettext_noop("invalid privilege type %s for type");
 			break;
-		case OBJECT_FDW:
-			all_privileges = ACL_ALL_RIGHTS_FDW;
-			errormsg = gettext_noop("invalid privilege type %s for foreign-data wrapper");
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			all_privileges = ACL_ALL_RIGHTS_FOREIGN_SERVER;
-			errormsg = gettext_noop("invalid privilege type %s for foreign server");
-			break;
 		default:
 			elog(ERROR, "unrecognized GrantStmt.objtype: %d",
 				 (int) stmt->objtype);
@@ -572,12 +555,6 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 		case OBJECT_DOMAIN:
 		case OBJECT_TYPE:
 			ExecGrant_Type(istmt);
-			break;
-		case OBJECT_FDW:
-			ExecGrant_Fdw(istmt);
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			ExecGrant_ForeignServer(istmt);
 			break;
 		case OBJECT_FUNCTION:
 		case OBJECT_PROCEDURE:
@@ -737,24 +714,6 @@ objectNamesToOids(ObjectType objtype, List *objnames)
 				objects = lappend_oid(objects, spcoid);
 			}
 			break;
-		case OBJECT_FDW:
-			foreach(cell, objnames)
-			{
-				char	   *fdwname = strVal(lfirst(cell));
-				Oid			fdwid = get_foreign_data_wrapper_oid(fdwname, false);
-
-				objects = lappend_oid(objects, fdwid);
-			}
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			foreach(cell, objnames)
-			{
-				char	   *srvname = strVal(lfirst(cell));
-				Oid			srvid = get_foreign_server_oid(srvname, false);
-
-				objects = lappend_oid(objects, srvid);
-			}
-			break;
 		default:
 			elog(ERROR, "unrecognized GrantStmt.objtype: %d",
 				 (int) objtype);
@@ -791,11 +750,9 @@ objectsInSchemaToOids(ObjectType objtype, List *nspnames)
 				objects = list_concat(objects, objs);
 				objs = getRelationsInNamespace(namespaceId, RELKIND_VIEW);
 				objects = list_concat(objects, objs);
-				objs = getRelationsInNamespace(namespaceId, RELKIND_MATVIEW);
-				objects = list_concat(objects, objs);
-				objs = getRelationsInNamespace(namespaceId, RELKIND_FOREIGN_TABLE);
-				objects = list_concat(objects, objs);
-				objs = getRelationsInNamespace(namespaceId, RELKIND_PARTITIONED_TABLE);
+			objs = getRelationsInNamespace(namespaceId, RELKIND_MATVIEW);
+			objects = list_concat(objects, objs);
+			objs = getRelationsInNamespace(namespaceId, RELKIND_PARTITIONED_TABLE);
 				objects = list_concat(objects, objs);
 				break;
 			case OBJECT_SEQUENCE:
@@ -1490,12 +1447,6 @@ RemoveRoleFromObjectACL(Oid roleid, Oid classid, Oid objid)
 			case TableSpaceRelationId:
 				istmt.objtype = OBJECT_TABLESPACE;
 				break;
-			case ForeignServerRelationId:
-				istmt.objtype = OBJECT_FOREIGN_SERVER;
-				break;
-			case ForeignDataWrapperRelationId:
-				istmt.objtype = OBJECT_FDW;
-				break;
 			default:
 				elog(ERROR, "unexpected object class %u", classid);
 				break;
@@ -2189,258 +2140,6 @@ ExecGrant_Database(InternalGrant *istmt)
 
 		/* Update the shared dependency ACL info */
 		updateAclDependencies(DatabaseRelationId, pg_database_tuple->oid, 0,
-							  ownerId,
-							  noldmembers, oldmembers,
-							  nnewmembers, newmembers);
-
-		ReleaseSysCache(tuple);
-
-		pfree(new_acl);
-
-		/* prevent error when processing duplicate objects */
-		CommandCounterIncrement();
-	}
-
-	table_close(relation, RowExclusiveLock);
-}
-
-static void
-ExecGrant_Fdw(InternalGrant *istmt)
-{
-	Relation	relation;
-	ListCell   *cell;
-
-	if (istmt->all_privs && istmt->privileges == ACL_NO_RIGHTS)
-		istmt->privileges = ACL_ALL_RIGHTS_FDW;
-
-	relation = table_open(ForeignDataWrapperRelationId, RowExclusiveLock);
-
-	foreach(cell, istmt->objects)
-	{
-		Oid			fdwid = lfirst_oid(cell);
-		Form_pg_foreign_data_wrapper pg_fdw_tuple;
-		Datum		aclDatum;
-		bool		isNull;
-		AclMode		avail_goptions;
-		AclMode		this_privileges;
-		Acl		   *old_acl;
-		Acl		   *new_acl;
-		Oid			grantorId;
-		Oid			ownerId;
-		HeapTuple	tuple;
-		HeapTuple	newtuple;
-		Datum		values[Natts_pg_foreign_data_wrapper];
-		bool		nulls[Natts_pg_foreign_data_wrapper];
-		bool		replaces[Natts_pg_foreign_data_wrapper];
-		int			noldmembers;
-		int			nnewmembers;
-		Oid		   *oldmembers;
-		Oid		   *newmembers;
-
-		tuple = SearchSysCache1(FOREIGNDATAWRAPPEROID,
-								ObjectIdGetDatum(fdwid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for foreign-data wrapper %u", fdwid);
-
-		pg_fdw_tuple = (Form_pg_foreign_data_wrapper) GETSTRUCT(tuple);
-
-		/*
-		 * Get owner ID and working copy of existing ACL. If there's no ACL,
-		 * substitute the proper default.
-		 */
-		ownerId = pg_fdw_tuple->fdwowner;
-		aclDatum = SysCacheGetAttr(FOREIGNDATAWRAPPEROID, tuple,
-								   Anum_pg_foreign_data_wrapper_fdwacl,
-								   &isNull);
-		if (isNull)
-		{
-			old_acl = acldefault(OBJECT_FDW, ownerId);
-			/* There are no old member roles according to the catalogs */
-			noldmembers = 0;
-			oldmembers = NULL;
-		}
-		else
-		{
-			old_acl = DatumGetAclPCopy(aclDatum);
-			/* Get the roles mentioned in the existing ACL */
-			noldmembers = aclmembers(old_acl, &oldmembers);
-		}
-
-		/* Determine ID to do the grant as, and available grant options */
-		select_best_grantor(GetUserId(), istmt->privileges,
-							old_acl, ownerId,
-							&grantorId, &avail_goptions);
-
-		/*
-		 * Restrict the privileges to what we can actually grant, and emit the
-		 * standards-mandated warning and error messages.
-		 */
-		this_privileges =
-			restrict_and_check_grant(istmt->is_grant, avail_goptions,
-									 istmt->all_privs, istmt->privileges,
-									 fdwid, grantorId, OBJECT_FDW,
-									 NameStr(pg_fdw_tuple->fdwname),
-									 0, NULL);
-
-		/*
-		 * Generate new ACL.
-		 */
-		new_acl = merge_acl_with_grant(old_acl, istmt->is_grant,
-									   istmt->grant_option, istmt->behavior,
-									   istmt->grantees, this_privileges,
-									   grantorId, ownerId);
-
-		/*
-		 * We need the members of both old and new ACLs so we can correct the
-		 * shared dependency information.
-		 */
-		nnewmembers = aclmembers(new_acl, &newmembers);
-
-		/* finished building new ACL value, now insert it */
-		MemSet(values, 0, sizeof(values));
-		MemSet(nulls, false, sizeof(nulls));
-		MemSet(replaces, false, sizeof(replaces));
-
-		replaces[Anum_pg_foreign_data_wrapper_fdwacl - 1] = true;
-		values[Anum_pg_foreign_data_wrapper_fdwacl - 1] = PointerGetDatum(new_acl);
-
-		newtuple = heap_modify_tuple(tuple, RelationGetDescr(relation), values,
-									 nulls, replaces);
-
-		CatalogTupleUpdate(relation, &newtuple->t_self, newtuple);
-
-		/* Update initial privileges for extensions */
-		recordExtensionInitPriv(fdwid, ForeignDataWrapperRelationId, 0,
-								new_acl);
-
-		/* Update the shared dependency ACL info */
-		updateAclDependencies(ForeignDataWrapperRelationId,
-							  pg_fdw_tuple->oid, 0,
-							  ownerId,
-							  noldmembers, oldmembers,
-							  nnewmembers, newmembers);
-
-		ReleaseSysCache(tuple);
-
-		pfree(new_acl);
-
-		/* prevent error when processing duplicate objects */
-		CommandCounterIncrement();
-	}
-
-	table_close(relation, RowExclusiveLock);
-}
-
-static void
-ExecGrant_ForeignServer(InternalGrant *istmt)
-{
-	Relation	relation;
-	ListCell   *cell;
-
-	if (istmt->all_privs && istmt->privileges == ACL_NO_RIGHTS)
-		istmt->privileges = ACL_ALL_RIGHTS_FOREIGN_SERVER;
-
-	relation = table_open(ForeignServerRelationId, RowExclusiveLock);
-
-	foreach(cell, istmt->objects)
-	{
-		Oid			srvid = lfirst_oid(cell);
-		Form_pg_foreign_server pg_server_tuple;
-		Datum		aclDatum;
-		bool		isNull;
-		AclMode		avail_goptions;
-		AclMode		this_privileges;
-		Acl		   *old_acl;
-		Acl		   *new_acl;
-		Oid			grantorId;
-		Oid			ownerId;
-		HeapTuple	tuple;
-		HeapTuple	newtuple;
-		Datum		values[Natts_pg_foreign_server];
-		bool		nulls[Natts_pg_foreign_server];
-		bool		replaces[Natts_pg_foreign_server];
-		int			noldmembers;
-		int			nnewmembers;
-		Oid		   *oldmembers;
-		Oid		   *newmembers;
-
-		tuple = SearchSysCache1(FOREIGNSERVEROID, ObjectIdGetDatum(srvid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for foreign server %u", srvid);
-
-		pg_server_tuple = (Form_pg_foreign_server) GETSTRUCT(tuple);
-
-		/*
-		 * Get owner ID and working copy of existing ACL. If there's no ACL,
-		 * substitute the proper default.
-		 */
-		ownerId = pg_server_tuple->srvowner;
-		aclDatum = SysCacheGetAttr(FOREIGNSERVEROID, tuple,
-								   Anum_pg_foreign_server_srvacl,
-								   &isNull);
-		if (isNull)
-		{
-			old_acl = acldefault(OBJECT_FOREIGN_SERVER, ownerId);
-			/* There are no old member roles according to the catalogs */
-			noldmembers = 0;
-			oldmembers = NULL;
-		}
-		else
-		{
-			old_acl = DatumGetAclPCopy(aclDatum);
-			/* Get the roles mentioned in the existing ACL */
-			noldmembers = aclmembers(old_acl, &oldmembers);
-		}
-
-		/* Determine ID to do the grant as, and available grant options */
-		select_best_grantor(GetUserId(), istmt->privileges,
-							old_acl, ownerId,
-							&grantorId, &avail_goptions);
-
-		/*
-		 * Restrict the privileges to what we can actually grant, and emit the
-		 * standards-mandated warning and error messages.
-		 */
-		this_privileges =
-			restrict_and_check_grant(istmt->is_grant, avail_goptions,
-									 istmt->all_privs, istmt->privileges,
-									 srvid, grantorId, OBJECT_FOREIGN_SERVER,
-									 NameStr(pg_server_tuple->srvname),
-									 0, NULL);
-
-		/*
-		 * Generate new ACL.
-		 */
-		new_acl = merge_acl_with_grant(old_acl, istmt->is_grant,
-									   istmt->grant_option, istmt->behavior,
-									   istmt->grantees, this_privileges,
-									   grantorId, ownerId);
-
-		/*
-		 * We need the members of both old and new ACLs so we can correct the
-		 * shared dependency information.
-		 */
-		nnewmembers = aclmembers(new_acl, &newmembers);
-
-		/* finished building new ACL value, now insert it */
-		MemSet(values, 0, sizeof(values));
-		MemSet(nulls, false, sizeof(nulls));
-		MemSet(replaces, false, sizeof(replaces));
-
-		replaces[Anum_pg_foreign_server_srvacl - 1] = true;
-		values[Anum_pg_foreign_server_srvacl - 1] = PointerGetDatum(new_acl);
-
-		newtuple = heap_modify_tuple(tuple, RelationGetDescr(relation), values,
-									 nulls, replaces);
-
-		CatalogTupleUpdate(relation, &newtuple->t_self, newtuple);
-
-		/* Update initial privileges for extensions */
-		recordExtensionInitPriv(srvid, ForeignServerRelationId, 0, new_acl);
-
-		/* Update the shared dependency ACL info */
-		updateAclDependencies(ForeignServerRelationId,
-							  pg_server_tuple->oid, 0,
 							  ownerId,
 							  noldmembers, oldmembers,
 							  nnewmembers, newmembers);
@@ -3349,15 +3048,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_EXTENSION:
 						msg = gettext_noop("permission denied for extension %s");
 						break;
-					case OBJECT_FDW:
-						msg = gettext_noop("permission denied for foreign-data wrapper %s");
-						break;
-					case OBJECT_FOREIGN_SERVER:
-						msg = gettext_noop("permission denied for foreign server %s");
-						break;
-					case OBJECT_FOREIGN_TABLE:
-						msg = gettext_noop("permission denied for foreign table %s");
-						break;
 					case OBJECT_FUNCTION:
 						msg = gettext_noop("permission denied for function %s");
 						break;
@@ -3437,7 +3127,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_TABCONSTRAINT:
 					case OBJECT_TRANSFORM:
 					case OBJECT_TRIGGER:
-					case OBJECT_USER_MAPPING:
 						elog(ERROR, "unsupported object type %d", objtype);
 				}
 
@@ -3472,15 +3161,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 						break;
 					case OBJECT_EXTENSION:
 						msg = gettext_noop("must be owner of extension %s");
-						break;
-					case OBJECT_FDW:
-						msg = gettext_noop("must be owner of foreign-data wrapper %s");
-						break;
-					case OBJECT_FOREIGN_SERVER:
-						msg = gettext_noop("must be owner of foreign server %s");
-						break;
-					case OBJECT_FOREIGN_TABLE:
-						msg = gettext_noop("must be owner of foreign table %s");
 						break;
 					case OBJECT_FUNCTION:
 						msg = gettext_noop("must be owner of function %s");
@@ -3569,7 +3249,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_PUBLICATION_REL:
 					case OBJECT_ROLE:
 					case OBJECT_TRANSFORM:
-					case OBJECT_USER_MAPPING:
 						elog(ERROR, "unsupported object type %d", objtype);
 				}
 
@@ -3657,10 +3336,6 @@ pg_aclmask(ObjectType objtype, Oid table_oid, AttrNumber attnum, Oid roleid,
 			return ACL_NO_RIGHTS;
 		case OBJECT_TABLESPACE:
 			return pg_tablespace_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_FDW:
-			return pg_foreign_data_wrapper_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_FOREIGN_SERVER:
-			return pg_foreign_server_aclmask(table_oid, roleid, mask, how);
 		case OBJECT_EVENT_TRIGGER:
 			elog(ERROR, "grantable rights not supported for event triggers");
 			/* not reached, but keep compiler quiet */
@@ -4335,130 +4010,6 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 }
 
 /*
- * Exported routine for examining a user's privileges for a foreign
- * data wrapper
- */
-AclMode
-pg_foreign_data_wrapper_aclmask(Oid fdw_oid, Oid roleid,
-								AclMode mask, AclMaskHow how)
-{
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	Form_pg_foreign_data_wrapper fdwForm;
-
-	/* Bypass permission checks for superusers */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Must get the FDW's tuple from pg_foreign_data_wrapper
-	 */
-	tuple = SearchSysCache1(FOREIGNDATAWRAPPEROID, ObjectIdGetDatum(fdw_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign-data wrapper with OID %u does not exist",
-						fdw_oid)));
-	fdwForm = (Form_pg_foreign_data_wrapper) GETSTRUCT(tuple);
-
-	/*
-	 * Normal case: get the FDW's ACL from pg_foreign_data_wrapper
-	 */
-	ownerId = fdwForm->fdwowner;
-
-	aclDatum = SysCacheGetAttr(FOREIGNDATAWRAPPEROID, tuple,
-							   Anum_pg_foreign_data_wrapper_fdwacl, &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_FDW, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast rel's ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
-}
-
-/*
- * Exported routine for examining a user's privileges for a foreign
- * server.
- */
-AclMode
-pg_foreign_server_aclmask(Oid srv_oid, Oid roleid,
-						  AclMode mask, AclMaskHow how)
-{
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	Form_pg_foreign_server srvForm;
-
-	/* Bypass permission checks for superusers */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Must get the FDW's tuple from pg_foreign_data_wrapper
-	 */
-	tuple = SearchSysCache1(FOREIGNSERVEROID, ObjectIdGetDatum(srv_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign server with OID %u does not exist",
-						srv_oid)));
-	srvForm = (Form_pg_foreign_server) GETSTRUCT(tuple);
-
-	/*
-	 * Normal case: get the foreign server's ACL from pg_foreign_server
-	 */
-	ownerId = srvForm->srvowner;
-
-	aclDatum = SysCacheGetAttr(FOREIGNSERVEROID, tuple,
-							   Anum_pg_foreign_server_srvacl, &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_FOREIGN_SERVER, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast rel's ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
-}
-
-/*
  * Exported routine for examining a user's privileges for a type.
  */
 AclMode
@@ -4771,31 +4322,6 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 		return ACLCHECK_NO_PRIV;
 }
 
-/*
- * Exported routine for checking a user's access privileges to a foreign
- * data wrapper
- */
-AclResult
-pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
-{
-	if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-/*
- * Exported routine for checking a user's access privileges to a foreign
- * server
- */
-AclResult
-pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
-{
-	if (pg_foreign_server_aclmask(srv_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
 
 /*
  * Exported routine for checking a user's access privileges to a type
@@ -5086,60 +4612,6 @@ pg_opfamily_ownercheck(Oid opf_oid, Oid roleid)
 						opf_oid)));
 
 	ownerId = ((Form_pg_opfamily) GETSTRUCT(tuple))->opfowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a foreign-data wrapper (specified by OID).
- */
-bool
-pg_foreign_data_wrapper_ownercheck(Oid srv_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(FOREIGNDATAWRAPPEROID, ObjectIdGetDatum(srv_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign-data wrapper with OID %u does not exist",
-						srv_oid)));
-
-	ownerId = ((Form_pg_foreign_data_wrapper) GETSTRUCT(tuple))->fdwowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a foreign server (specified by OID).
- */
-bool
-pg_foreign_server_ownercheck(Oid srv_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(FOREIGNSERVEROID, ObjectIdGetDatum(srv_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("foreign server with OID %u does not exist",
-						srv_oid)));
-
-	ownerId = ((Form_pg_foreign_server) GETSTRUCT(tuple))->srvowner;
 
 	ReleaseSysCache(tuple);
 
@@ -5649,53 +5121,6 @@ recordExtObjInitPriv(Oid objoid, Oid classoid)
 		}
 
 		aclDatum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	/* pg_foreign_data_wrapper */
-	else if (classoid == ForeignDataWrapperRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(FOREIGNDATAWRAPPEROID,
-								ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for foreign data wrapper %u",
-				 objoid);
-
-		aclDatum = SysCacheGetAttr(FOREIGNDATAWRAPPEROID, tuple,
-								   Anum_pg_foreign_data_wrapper_fdwacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	/* pg_foreign_server */
-	else if (classoid == ForeignServerRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(FOREIGNSERVEROID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for foreign server %u",
-				 objoid);
-
-		aclDatum = SysCacheGetAttr(FOREIGNSERVEROID, tuple,
-								   Anum_pg_foreign_server_srvacl,
 								   &isNull);
 
 		/* Add the record, if any, for the top-level object */

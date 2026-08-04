@@ -3253,13 +3253,6 @@ check_default_partition_contents(Relation parent, Relation default_rel,
 		 */
 		if (part_rel->rd_rel->relkind != RELKIND_RELATION)
 		{
-			if (part_rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-				ereport(WARNING,
-						(errcode(ERRCODE_CHECK_VIOLATION),
-						 errmsg("skipped scanning foreign table \"%s\" which is a partition of default partition \"%s\"",
-								RelationGetRelationName(part_rel),
-								RelationGetRelationName(default_rel))));
-
 			if (RelationGetRelid(default_rel) != RelationGetRelid(part_rel))
 				table_close(part_rel, NoLock);
 

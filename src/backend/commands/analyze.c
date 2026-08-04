@@ -35,11 +35,18 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_statistic_ext.h"
 #include "commands/dbcommands.h"
+
+/*
+ * Row acquisition function type.  Originally introduced for foreign tables,
+ * now also used by ordinary table sampling.
+ */
+typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
+									  HeapTuple *rows, int targrows,
+									  double *totalrows, double *totaldeadrows);
 #include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/vacuum.h"
 #include "executor/executor.h"
-#include "foreign/fdwapi.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_oper.h"
@@ -204,31 +211,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 		acquirefunc = acquire_sample_rows;
 		/* Also get regular table's size */
 		relpages = RelationGetNumberOfBlocks(onerel);
-	}
-	else if (onerel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		/*
-		 * For a foreign table, call the FDW's hook function to see whether it
-		 * supports analysis.
-		 */
-		FdwRoutine *fdwroutine;
-		bool		ok = false;
-
-		fdwroutine = GetFdwRoutineForRelation(onerel, false);
-
-		if (fdwroutine->AnalyzeForeignTable != NULL)
-			ok = fdwroutine->AnalyzeForeignTable(onerel,
-												 &acquirefunc,
-												 &relpages);
-
-		if (!ok)
-		{
-			ereport(WARNING,
-					(errmsg("skipping \"%s\" --- cannot analyze this foreign table",
-							RelationGetRelationName(onerel))));
-			relation_close(onerel, ShareUpdateExclusiveLock);
-			return;
-		}
 	}
 	else if (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 	{
@@ -1481,30 +1463,6 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 			/* Regular table, so use the regular row acquisition function */
 			acquirefunc = acquire_sample_rows;
 			relpages = RelationGetNumberOfBlocks(childrel);
-		}
-		else if (childrel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-		{
-			/*
-			 * For a foreign table, call the FDW's hook function to see
-			 * whether it supports analysis.
-			 */
-			FdwRoutine *fdwroutine;
-			bool		ok = false;
-
-			fdwroutine = GetFdwRoutineForRelation(childrel, false);
-
-			if (fdwroutine->AnalyzeForeignTable != NULL)
-				ok = fdwroutine->AnalyzeForeignTable(childrel,
-													 &acquirefunc,
-													 &relpages);
-
-			if (!ok)
-			{
-				/* ignore, but release the lock on it */
-				Assert(childrel != onerel);
-				table_close(childrel, AccessShareLock);
-				continue;
-			}
 		}
 		else
 		{

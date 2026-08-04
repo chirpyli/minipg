@@ -316,8 +316,17 @@ CREATE VIEW tststats.v AS SELECT * FROM tststats.t;
 CREATE MATERIALIZED VIEW tststats.mv AS SELECT * FROM tststats.t;
 CREATE TYPE tststats.ty AS (a int, b int, c text);
 CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
+               ^
 CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extstats_dummy_fdw;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extsta...
+               ^
 CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVER extstats_dummy_srv;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVE...
+               ^
 CREATE TABLE tststats.pt (a int, b int, c text) PARTITION BY RANGE (a, b);
 CREATE TABLE tststats.pt1 PARTITION OF tststats.pt FOR VALUES FROM (-10, -10) TO (10, 10);
 CREATE STATISTICS tststats.s1 ON a, b FROM tststats.t;
@@ -331,6 +340,7 @@ CREATE STATISTICS tststats.s5 ON a, b FROM tststats.mv;
 CREATE STATISTICS tststats.s6 ON a, b FROM tststats.ty;
 ERROR:  relation "ty" is not a table, foreign table, or materialized view
 CREATE STATISTICS tststats.s7 ON a, b FROM tststats.f;
+ERROR:  relation "tststats.f" does not exist
 CREATE STATISTICS tststats.s8 ON a, b FROM tststats.pt;
 CREATE STATISTICS tststats.s9 ON a, b FROM tststats.pt1;
 DO $$
@@ -344,16 +354,17 @@ END;
 $$;
 NOTICE:  stats on toast table not created
 DROP SCHEMA tststats CASCADE;
-NOTICE:  drop cascades to 7 other objects
+NOTICE:  drop cascades to 6 other objects
 DETAIL:  drop cascades to table tststats.t
 drop cascades to sequence tststats.s
 drop cascades to view tststats.v
 drop cascades to materialized view tststats.mv
 drop cascades to type tststats.ty
-drop cascades to foreign table tststats.f
 drop cascades to table tststats.pt
 DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
-NOTICE:  drop cascades to server extstats_dummy_srv
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
+             ^
 -- n-distinct tests
 CREATE TABLE ndistinct (
     filler1 TEXT,

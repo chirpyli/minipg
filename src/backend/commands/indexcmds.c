@@ -682,17 +682,6 @@ DefineIndex(Oid relationId,
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
-		case RELKIND_FOREIGN_TABLE:
-
-			/*
-			 * Custom error message for FOREIGN TABLE since the term is close
-			 * to a regular table and can confuse the user.
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot create index on foreign table \"%s\"",
-							RelationGetRelationName(rel))));
-			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -1281,28 +1270,6 @@ DefineIndex(Oid relationId,
 				SetUserIdAndSecContext(childrel->rd_rel->relowner,
 									   child_save_sec_context | SECURITY_RESTRICTED_OPERATION);
 				child_save_nestlevel = NewGUCNestLevel();
-
-				/*
-				 * Don't try to create indexes on foreign tables, though. Skip
-				 * those if a regular index, or fail if trying to create a
-				 * constraint index.
-				 */
-				if (childrel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-				{
-					if (stmt->unique || stmt->primary)
-						ereport(ERROR,
-								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-								 errmsg("cannot create unique index on partitioned table \"%s\"",
-										RelationGetRelationName(rel)),
-								 errdetail("Table \"%s\" contains partitions that are foreign tables.",
-										   RelationGetRelationName(rel))));
-
-					AtEOXact_GUC(false, child_save_nestlevel);
-					SetUserIdAndSecContext(child_save_userid,
-										   child_save_sec_context);
-					table_close(childrel, lockmode);
-					continue;
-				}
 
 				childidxs = RelationGetIndexList(childrel);
 				attmap =

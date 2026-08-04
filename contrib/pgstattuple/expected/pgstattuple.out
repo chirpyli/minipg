@@ -167,19 +167,32 @@ ERROR:  relation "test_view" is not a btree index
 select pgstathashindex('test_view');
 ERROR:  relation "test_view" is not a hash index
 create foreign data wrapper dummy;
+ERROR:  syntax error at or near "foreign"
+LINE 1: create foreign data wrapper dummy;
+               ^
 create server dummy_server foreign data wrapper dummy;
+ERROR:  syntax error at or near "server"
+LINE 1: create server dummy_server foreign data wrapper dummy;
+               ^
 create foreign table test_foreign_table () server dummy_server;
+ERROR:  syntax error at or near "foreign"
+LINE 1: create foreign table test_foreign_table () server dummy_serv...
+               ^
 -- these should all fail
 select pgstattuple('test_foreign_table');
-ERROR:  "test_foreign_table" (foreign table) is not supported
+ERROR:  relation "test_foreign_table" does not exist
 select pgstattuple_approx('test_foreign_table');
-ERROR:  "test_foreign_table" is not a table, materialized view, or TOAST table
+ERROR:  relation "test_foreign_table" does not exist
+LINE 1: select pgstattuple_approx('test_foreign_table');
+                                  ^
 select pg_relpages('test_foreign_table');
-ERROR:  "test_foreign_table" is not a table, index, materialized view, sequence, or TOAST table
+ERROR:  relation "test_foreign_table" does not exist
 select pgstatindex('test_foreign_table');
-ERROR:  relation "test_foreign_table" is not a btree index
+ERROR:  relation "test_foreign_table" does not exist
 select pgstathashindex('test_foreign_table');
-ERROR:  relation "test_foreign_table" is not a hash index
+ERROR:  relation "test_foreign_table" does not exist
+LINE 1: select pgstathashindex('test_foreign_table');
+                               ^
 -- a partition of a partitioned table should work though
 create table test_partition partition of test_partitioned for values from (1) to (100);
 select pgstattuple('test_partition');
@@ -265,5 +278,14 @@ drop sequence test_sequence;
 drop table test_partitioned;
 drop view test_view;
 drop foreign table test_foreign_table;
+ERROR:  syntax error at or near "foreign"
+LINE 1: drop foreign table test_foreign_table;
+             ^
 drop server dummy_server;
+ERROR:  syntax error at or near "server"
+LINE 1: drop server dummy_server;
+             ^
 drop foreign data wrapper dummy;
+ERROR:  syntax error at or near "foreign"
+LINE 1: drop foreign data wrapper dummy;
+             ^

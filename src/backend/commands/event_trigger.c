@@ -958,9 +958,6 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_DOMAIN:
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_EXTENSION:
-		case OBJECT_FDW:
-		case OBJECT_FOREIGN_SERVER:
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_FUNCTION:
 		case OBJECT_INDEX:
 		case OBJECT_LANGUAGE:
@@ -984,7 +981,6 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
 		case OBJECT_TYPE:
-		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
 			return true;
 
@@ -1034,9 +1030,6 @@ EventTriggerSupportsObjectClass(ObjectClass objclass)
 		case OCLASS_TRIGGER:
 		case OCLASS_SCHEMA:
 		case OCLASS_STATISTIC_EXT:
-		case OCLASS_FDW:
-		case OCLASS_FOREIGN_SERVER:
-		case OCLASS_USER_MAPPING:
 		case OCLASS_DEFACL:
 		case OCLASS_EXTENSION:
 		case OCLASS_POLICY:
@@ -2041,10 +2034,6 @@ stringify_grant_objtype(ObjectType objtype)
 			return "DATABASE";
 		case OBJECT_DOMAIN:
 			return "DOMAIN";
-		case OBJECT_FDW:
-			return "FOREIGN DATA WRAPPER";
-		case OBJECT_FOREIGN_SERVER:
-			return "FOREIGN SERVER";
 		case OBJECT_FUNCTION:
 			return "FUNCTION";
 		case OBJECT_LANGUAGE:
@@ -2075,7 +2064,6 @@ stringify_grant_objtype(ObjectType objtype)
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_EXTENSION:
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_INDEX:
 		case OBJECT_MATVIEW:
 		case OBJECT_OPCLASS:
@@ -2091,7 +2079,6 @@ stringify_grant_objtype(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
 			elog(ERROR, "unsupported object type: %d", (int) objtype);
 	}
@@ -2119,10 +2106,6 @@ stringify_adefprivs_objtype(ObjectType objtype)
 			return "DATABASES";
 		case OBJECT_DOMAIN:
 			return "DOMAINS";
-		case OBJECT_FDW:
-			return "FOREIGN DATA WRAPPERS";
-		case OBJECT_FOREIGN_SERVER:
-			return "FOREIGN SERVERS";
 		case OBJECT_FUNCTION:
 			return "FUNCTIONS";
 		case OBJECT_LANGUAGE:
@@ -2153,7 +2136,6 @@ stringify_adefprivs_objtype(ObjectType objtype)
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_EXTENSION:
-		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_INDEX:
 		case OBJECT_MATVIEW:
 		case OBJECT_OPCLASS:
@@ -2169,7 +2151,6 @@ stringify_adefprivs_objtype(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 		case OBJECT_TRANSFORM:
 		case OBJECT_TRIGGER:
-		case OBJECT_USER_MAPPING:
 		case OBJECT_VIEW:
 			elog(ERROR, "unsupported object type: %d", (int) objtype);
 	}

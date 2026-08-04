@@ -40,6 +40,9 @@ SELECT r.rolname, s.srvname, m.umoptions
  JOIN pg_foreign_server s ON (s.oid = m.umserver)
  ORDER BY 2, 1;
 $$ LANGUAGE SQL;
+ERROR:  relation "pg_user_mapping" does not exist
+LINE 5:  FROM pg_user_mapping m
+              ^
 --
 -- We test creation and use of these role names to ensure that the server
 -- correctly distinguishes role keywords from quoted names that look like
@@ -698,210 +701,323 @@ SELECT p.proname, r.rolname
 
 -- CREATE USER MAPPING
 CREATE FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "FOREIGN"
+LINE 1: CREATE FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv1 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv1 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv2 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv2 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv3 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv3 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv4 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv4 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv5 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv5 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv6 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv6 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv7 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv7 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv8 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv8 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv9 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv9 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE SERVER sv10 FOREIGN DATA WRAPPER test_wrapper;
+ERROR:  syntax error at or near "SERVER"
+LINE 1: CREATE SERVER sv10 FOREIGN DATA WRAPPER test_wrapper;
+               ^
 CREATE USER MAPPING FOR CURRENT_USER SERVER sv1 OPTIONS (user 'CURRENT_USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR CURRENT_USER SERVER sv1 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR "current_user" SERVER sv2 OPTIONS (user '"current_user"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "current_user" SERVER sv2 OPTIONS (u...
+                            ^
 CREATE USER MAPPING FOR CURRENT_ROLE SERVER sv3 OPTIONS (user 'CURRENT_ROLE');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR CURRENT_ROLE SERVER sv3 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR USER SERVER sv4 OPTIONS (user 'USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR USER SERVER sv4 OPTIONS (user 'USER'...
+                            ^
 CREATE USER MAPPING FOR "user" SERVER sv5 OPTIONS (user '"USER"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "user" SERVER sv5 OPTIONS (user '"US...
+                            ^
 CREATE USER MAPPING FOR SESSION_USER SERVER sv6 OPTIONS (user 'SESSION_USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR SESSION_USER SERVER sv6 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR PUBLIC SERVER sv7 OPTIONS (user 'PUBLIC');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR PUBLIC SERVER sv7 OPTIONS (user 'PUB...
+                            ^
 CREATE USER MAPPING FOR "Public" SERVER sv8 OPTIONS (user '"Public"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "Public" SERVER sv8 OPTIONS (user '"...
+                            ^
 CREATE USER MAPPING FOR regress_testrolx SERVER sv9 OPTIONS (user 'regress_testrolx');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR regress_testrolx SERVER sv9 OPTIONS ...
+                            ^
 CREATE USER MAPPING FOR nonexistent SERVER sv10 OPTIONS (user 'nonexistent'); -- error;
-ERROR:  role "nonexistent" does not exist
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR nonexistent SERVER sv10 OPTIONS (use...
+                            ^
 SELECT * FROM chkumapping();
-      umname      | umserver |         umoptions         
-------------------+----------+---------------------------
- regress_testrol2 | sv1      | {user=CURRENT_USER}
- current_user     | sv2      | {"user=\"current_user\""}
- regress_testrol2 | sv3      | {user=CURRENT_ROLE}
- regress_testrol2 | sv4      | {user=USER}
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(9 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- ALTER USER MAPPING
 ALTER USER MAPPING FOR CURRENT_USER SERVER sv1
  OPTIONS (SET user 'CURRENT_USER_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR CURRENT_USER SERVER sv1
+                           ^
 ALTER USER MAPPING FOR "current_user" SERVER sv2
  OPTIONS (SET user '"current_user"_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR "current_user" SERVER sv2
+                           ^
 ALTER USER MAPPING FOR CURRENT_ROLE SERVER sv3
  OPTIONS (SET user 'CURRENT_ROLE_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR CURRENT_ROLE SERVER sv3
+                           ^
 ALTER USER MAPPING FOR USER SERVER sv4
  OPTIONS (SET user 'USER_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR USER SERVER sv4
+                           ^
 ALTER USER MAPPING FOR "user" SERVER sv5
  OPTIONS (SET user '"user"_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR "user" SERVER sv5
+                           ^
 ALTER USER MAPPING FOR SESSION_USER SERVER sv6
  OPTIONS (SET user 'SESSION_USER_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR SESSION_USER SERVER sv6
+                           ^
 ALTER USER MAPPING FOR PUBLIC SERVER sv7
  OPTIONS (SET user 'public_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR PUBLIC SERVER sv7
+                           ^
 ALTER USER MAPPING FOR "Public" SERVER sv8
  OPTIONS (SET user '"Public"_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR "Public" SERVER sv8
+                           ^
 ALTER USER MAPPING FOR regress_testrolx SERVER sv9
  OPTIONS (SET user 'regress_testrolx_alt');
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR regress_testrolx SERVER sv9
+                           ^
 ALTER USER MAPPING FOR nonexistent SERVER sv10
  OPTIONS (SET user 'nonexistent_alt'); -- error
-ERROR:  role "nonexistent" does not exist
+ERROR:  syntax error at or near "FOR"
+LINE 1: ALTER USER MAPPING FOR nonexistent SERVER sv10
+                           ^
 SELECT * FROM chkumapping();
-      umname      | umserver |           umoptions           
-------------------+----------+-------------------------------
- regress_testrol2 | sv1      | {user=CURRENT_USER_alt}
- current_user     | sv2      | {"user=\"current_user\"_alt"}
- regress_testrol2 | sv3      | {user=CURRENT_ROLE_alt}
- regress_testrol2 | sv4      | {user=USER_alt}
- user             | sv5      | {"user=\"user\"_alt"}
- regress_testrol1 | sv6      | {user=SESSION_USER_alt}
-                  | sv7      | {user=public_alt}
- Public           | sv8      | {"user=\"Public\"_alt"}
- regress_testrolx | sv9      | {user=regress_testrolx_alt}
-(9 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- DROP USER MAPPING
 DROP USER MAPPING FOR CURRENT_USER SERVER sv1;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR CURRENT_USER SERVER sv1;
+                          ^
 DROP USER MAPPING FOR "current_user" SERVER sv2;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR "current_user" SERVER sv2;
+                          ^
 DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3;
+                          ^
 DROP USER MAPPING FOR USER SERVER sv4;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR USER SERVER sv4;
+                          ^
 DROP USER MAPPING FOR "user" SERVER sv5;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR "user" SERVER sv5;
+                          ^
 DROP USER MAPPING FOR SESSION_USER SERVER sv6;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR SESSION_USER SERVER sv6;
+                          ^
 DROP USER MAPPING FOR PUBLIC SERVER sv7;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR PUBLIC SERVER sv7;
+                          ^
 DROP USER MAPPING FOR "Public" SERVER sv8;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR "Public" SERVER sv8;
+                          ^
 DROP USER MAPPING FOR regress_testrolx SERVER sv9;
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR regress_testrolx SERVER sv9;
+                          ^
 DROP USER MAPPING FOR nonexistent SERVER sv10;  -- error
-ERROR:  role "nonexistent" does not exist
+ERROR:  syntax error at or near "FOR"
+LINE 1: DROP USER MAPPING FOR nonexistent SERVER sv10;
+                          ^
 SELECT * FROM chkumapping();
- umname | umserver | umoptions 
---------+----------+-----------
-(0 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 CREATE USER MAPPING FOR CURRENT_USER SERVER sv1 OPTIONS (user 'CURRENT_USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR CURRENT_USER SERVER sv1 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR "current_user" SERVER sv2 OPTIONS (user '"current_user"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "current_user" SERVER sv2 OPTIONS (u...
+                            ^
 CREATE USER MAPPING FOR CURRENT_ROLE SERVER sv3 OPTIONS (user 'CURRENT_ROLE');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR CURRENT_ROLE SERVER sv3 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR USER SERVER sv4 OPTIONS (user 'USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR USER SERVER sv4 OPTIONS (user 'USER'...
+                            ^
 CREATE USER MAPPING FOR "user" SERVER sv5 OPTIONS (user '"USER"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "user" SERVER sv5 OPTIONS (user '"US...
+                            ^
 CREATE USER MAPPING FOR SESSION_USER SERVER sv6 OPTIONS (user 'SESSION_USER');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR SESSION_USER SERVER sv6 OPTIONS (use...
+                            ^
 CREATE USER MAPPING FOR PUBLIC SERVER sv7 OPTIONS (user 'PUBLIC');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR PUBLIC SERVER sv7 OPTIONS (user 'PUB...
+                            ^
 CREATE USER MAPPING FOR "Public" SERVER sv8 OPTIONS (user '"Public"');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR "Public" SERVER sv8 OPTIONS (user '"...
+                            ^
 CREATE USER MAPPING FOR regress_testrolx SERVER sv9 OPTIONS (user 'regress_testrolx');
+ERROR:  syntax error at or near "FOR"
+LINE 1: CREATE USER MAPPING FOR regress_testrolx SERVER sv9 OPTIONS ...
+                            ^
 SELECT * FROM chkumapping();
-      umname      | umserver |         umoptions         
-------------------+----------+---------------------------
- regress_testrol2 | sv1      | {user=CURRENT_USER}
- current_user     | sv2      | {"user=\"current_user\""}
- regress_testrol2 | sv3      | {user=CURRENT_ROLE}
- regress_testrol2 | sv4      | {user=USER}
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(9 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- DROP USER MAPPING IF EXISTS
 DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER sv1;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER sv1;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |         umoptions         
-------------------+----------+---------------------------
- current_user     | sv2      | {"user=\"current_user\""}
- regress_testrol2 | sv3      | {user=CURRENT_ROLE}
- regress_testrol2 | sv4      | {user=USER}
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(8 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR "current_user" SERVER sv2;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR "current_user" SERVER sv2;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- regress_testrol2 | sv3      | {user=CURRENT_ROLE}
- regress_testrol2 | sv4      | {user=USER}
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(7 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER sv3;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER sv3;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- regress_testrol2 | sv4      | {user=USER}
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(6 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR USER SERVER sv4;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR USER SERVER sv4;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- user             | sv5      | {"user=\"USER\""}
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(5 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR "user" SERVER sv5;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR "user" SERVER sv5;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- regress_testrol1 | sv6      | {user=SESSION_USER}
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(4 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR SESSION_USER SERVER sv6;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR SESSION_USER SERVER sv6;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
-                  | sv7      | {user=PUBLIC}
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(3 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR PUBLIC SERVER sv7;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR PUBLIC SERVER sv7;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- Public           | sv8      | {"user=\"Public\""}
- regress_testrolx | sv9      | {user=regress_testrolx}
-(2 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR "Public" SERVER sv8;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR "Public" SERVER sv8;
+                          ^
 SELECT * FROM chkumapping();
-      umname      | umserver |        umoptions        
-------------------+----------+-------------------------
- regress_testrolx | sv9      | {user=regress_testrolx}
-(1 row)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR regress_testrolx SERVER sv9;
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR regress_testrolx SERVER sv9;
+                          ^
 SELECT * FROM chkumapping();
- umname | umserver | umoptions 
---------+----------+-----------
-(0 rows)
-
+ERROR:  function chkumapping() does not exist
+LINE 1: SELECT * FROM chkumapping();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP USER MAPPING IF EXISTS FOR nonexistent SERVER sv10;  -- error
-NOTICE:  role "nonexistent" does not exist, skipping
+ERROR:  syntax error at or near "IF"
+LINE 1: DROP USER MAPPING IF EXISTS FOR nonexistent SERVER sv10;
+                          ^
 -- GRANT/REVOKE
 GRANT regress_testrol0 TO pg_signal_backend; -- success
 SET ROLE pg_signal_backend; --success

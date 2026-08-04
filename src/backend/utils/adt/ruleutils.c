@@ -62,6 +62,7 @@
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
+#include "utils/tuplestore.h"
 #include "utils/guc.h"
 #include "utils/hsearch.h"
 #include "utils/lsyscache.h"
@@ -4940,8 +4941,6 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	/* Set up referent for INDEX_VAR Vars, if needed */
 	if (IsA(plan, IndexOnlyScan))
 		dpns->index_tlist = ((IndexOnlyScan *) plan)->indextlist;
-	else if (IsA(plan, ForeignScan))
-		dpns->index_tlist = ((ForeignScan *) plan)->fdw_scan_tlist;
 	else if (IsA(plan, CustomScan))
 		dpns->index_tlist = ((CustomScan *) plan)->custom_scan_tlist;
 	else
@@ -11938,4 +11937,83 @@ get_range_partbound_string(List *bound_datums)
 	appendStringInfoChar(buf, ')');
 
 	return buf->data;
+}
+
+
+/*
+ * deflist_to_tuplestore - Helper function to convert DefElem list to
+ * tuplestore usable in SRF.
+ */
+static void
+deflist_to_tuplestore(ReturnSetInfo *rsinfo, List *options)
+{
+	ListCell   *cell;
+	TupleDesc	tupdesc;
+	Tuplestorestate *tupstore;
+	Datum		values[2];
+	bool		nulls[2];
+	MemoryContext per_query_ctx;
+	MemoryContext oldcontext;
+
+	/* check to see if caller supports us returning a tuplestore */
+	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("set-valued function called in context that cannot accept a set")));
+	if (!(rsinfo->allowedModes & SFRM_Materialize) ||
+		rsinfo->expectedDesc == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("materialize mode required, but it is not allowed in this context")));
+
+	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
+	oldcontext = MemoryContextSwitchTo(per_query_ctx);
+
+	/*
+	 * Now prepare the result set.
+	 */
+	tupdesc = CreateTupleDescCopy(rsinfo->expectedDesc);
+	tupstore = tuplestore_begin_heap(true, false, work_mem);
+	rsinfo->returnMode = SFRM_Materialize;
+	rsinfo->setResult = tupstore;
+	rsinfo->setDesc = tupdesc;
+
+	foreach(cell, options)
+	{
+		DefElem    *def = lfirst(cell);
+
+		values[0] = CStringGetTextDatum(def->defname);
+		nulls[0] = false;
+		if (def->arg)
+		{
+			values[1] = CStringGetTextDatum(strVal(def->arg));
+			nulls[1] = false;
+		}
+		else
+		{
+			values[1] = (Datum) 0;
+			nulls[1] = true;
+		}
+		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
+	}
+
+	/* clean up and return the tuplestore */
+	tuplestore_donestoring(tupstore);
+
+	MemoryContextSwitchTo(oldcontext);
+}
+
+/*
+ * Convert options array to name/value table.  Useful for information
+ * schema and pg_dump.
+ */
+Datum
+pg_options_to_table(PG_FUNCTION_ARGS)
+{
+	Datum		array = PG_GETARG_DATUM(0);
+
+	deflist_to_tuplestore((ReturnSetInfo *) fcinfo->resultinfo,
+						  untransformRelOptions(array));
+
+	return (Datum) 0;
 }

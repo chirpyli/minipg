@@ -35,7 +35,6 @@ OBJS = \
 	event_trigger.o \
 	explain.o \
 	extension.o \
-	foreigncmds.o \
 	functioncmds.o \
 	indexcmds.o \
 	lockcmds.o \

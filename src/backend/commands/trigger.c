@@ -272,35 +272,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 							RelationGetRelationName(rel)),
 					 errdetail("Views cannot have TRUNCATE triggers.")));
 	}
-	else if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		if (stmt->timing != TRIGGER_TYPE_BEFORE &&
-			stmt->timing != TRIGGER_TYPE_AFTER)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is a foreign table",
-							RelationGetRelationName(rel)),
-					 errdetail("Foreign tables cannot have INSTEAD OF triggers.")));
-
-		if (TRIGGER_FOR_TRUNCATE(stmt->events))
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is a foreign table",
-							RelationGetRelationName(rel)),
-					 errdetail("Foreign tables cannot have TRUNCATE triggers.")));
-
-		/*
-		 * We disallow constraint triggers to protect the assumption that
-		 * triggers on FKs can't be deferred.  See notes with AfterTriggers
-		 * data structures, below.
-		 */
-		if (stmt->isconstraint)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is a foreign table",
-							RelationGetRelationName(rel)),
-					 errdetail("Foreign tables cannot have constraint triggers.")));
-	}
 	else
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -427,13 +398,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 			 * below.  If we later allow naming OLD and NEW ROW variables,
 			 * adjustments will be needed below.
 			 */
-
-			if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is a foreign table",
-								RelationGetRelationName(rel)),
-						 errdetail("Triggers on foreign tables cannot have transition tables.")));
 
 			if (rel->rd_rel->relkind == RELKIND_VIEW)
 				ereport(ERROR,
@@ -1276,7 +1240,6 @@ RemoveTriggerById(Oid trigOid)
 
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
 		rel->rd_rel->relkind != RELKIND_VIEW &&
-		rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 		rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -1382,7 +1345,6 @@ RangeVarCallbackForRenameTrigger(const RangeVar *rv, Oid relid, Oid oldrelid,
 
 	/* only tables and views can have triggers */
 	if (form->relkind != RELKIND_RELATION && form->relkind != RELKIND_VIEW &&
-		form->relkind != RELKIND_FOREIGN_TABLE &&
 		form->relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -2378,15 +2340,6 @@ ExecARInsertTriggers(EState *estate, ResultRelInfo *relinfo,
 {
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
 
-	if (relinfo->ri_FdwRoutine && transition_capture &&
-		transition_capture->tcs_insert_new_table)
-	{
-		Assert(relinfo->ri_RootResultRelInfo);
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot collect transition tuples from child foreign tables")));
-	}
-
 	if ((trigdesc && trigdesc->trig_insert_after_row) ||
 		(transition_capture && transition_capture->tcs_insert_new_table))
 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_INSERT,
@@ -2617,15 +2570,6 @@ ExecARDeleteTriggers(EState *estate, ResultRelInfo *relinfo,
 					 TransitionCaptureState *transition_capture)
 {
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
-
-	if (relinfo->ri_FdwRoutine && transition_capture &&
-		transition_capture->tcs_delete_old_table)
-	{
-		Assert(relinfo->ri_RootResultRelInfo);
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot collect transition tuples from child foreign tables")));
-	}
 
 	if ((trigdesc && trigdesc->trig_delete_after_row) ||
 		(transition_capture && transition_capture->tcs_delete_old_table))
@@ -2930,16 +2874,6 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 					 TransitionCaptureState *transition_capture)
 {
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
-
-	if (relinfo->ri_FdwRoutine && transition_capture &&
-		(transition_capture->tcs_update_old_table ||
-		 transition_capture->tcs_update_new_table))
-	{
-		Assert(relinfo->ri_RootResultRelInfo);
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot collect transition tuples from child foreign tables")));
-	}
 
 	if ((trigdesc && trigdesc->trig_update_after_row) ||
 		(transition_capture &&
@@ -4373,13 +4307,6 @@ afterTriggerInvokeEvents(AfterTriggerEventList *events,
 						ExecDropSingleTupleTableSlot(slot2);
 						slot1 = slot2 = NULL;
 					}
-					if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-					{
-						slot1 = MakeSingleTupleTableSlot(rel->rd_att,
-														 &TTSOpsMinimalTuple);
-						slot2 = MakeSingleTupleTableSlot(rel->rd_att,
-														 &TTSOpsMinimalTuple);
-					}
 				}
 
 				/*
@@ -5793,10 +5720,8 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 			break;
 	}
 
-	if (!(relkind == RELKIND_FOREIGN_TABLE && row_trigger))
-		new_event.ate_flags = (row_trigger && event == TRIGGER_EVENT_UPDATE) ?
-			AFTER_TRIGGER_2CTID : AFTER_TRIGGER_1CTID;
-	/* else, we'll initialize ate_flags for each trigger */
+	new_event.ate_flags = (row_trigger && event == TRIGGER_EVENT_UPDATE) ?
+		AFTER_TRIGGER_2CTID : AFTER_TRIGGER_1CTID;
 
 	tgtype_level = (row_trigger ? TRIGGER_TYPE_ROW : TRIGGER_TYPE_STATEMENT);
 
@@ -5812,18 +5737,6 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 		if (!TriggerEnabled(estate, relinfo, trigger, event,
 							modifiedCols, oldslot, newslot))
 			continue;
-
-		if (relkind == RELKIND_FOREIGN_TABLE && row_trigger)
-		{
-			if (fdw_tuplestore == NULL)
-			{
-				fdw_tuplestore = GetCurrentFDWTuplestore();
-				new_event.ate_flags = AFTER_TRIGGER_FDW_FETCH;
-			}
-			else
-				/* subsequent event for the same tuple */
-				new_event.ate_flags = AFTER_TRIGGER_FDW_REUSE;
-		}
 
 		/*
 		 * If the trigger is a foreign key enforcement trigger, there are

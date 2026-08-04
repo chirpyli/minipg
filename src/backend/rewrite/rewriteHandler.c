@@ -27,7 +27,7 @@
 #include "catalog/pg_type.h"
 #include "commands/trigger.h"
 #include "executor/executor.h"
-#include "foreign/fdwapi.h"
+
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -2772,7 +2772,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	base_rte = rt_fetch(rtr->rtindex, viewquery->rtable);
 	if (base_rte->rtekind != RTE_RELATION ||
 		(base_rte->relkind != RELKIND_RELATION &&
-		 base_rte->relkind != RELKIND_FOREIGN_TABLE &&
 		 base_rte->relkind != RELKIND_VIEW &&
 		 base_rte->relkind != RELKIND_PARTITIONED_TABLE))
 		return gettext_noop("Views that do not select from a single table or view are not automatically updatable.");
@@ -3000,28 +2999,6 @@ relation_is_updatable(Oid reloid,
 				return events;
 			}
 		}
-	}
-
-	/* If this is a foreign table, check which update events it supports */
-	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
-	{
-		FdwRoutine *fdwroutine = GetFdwRoutineForRelation(rel, false);
-
-		if (fdwroutine->IsForeignRelUpdatable != NULL)
-			events |= fdwroutine->IsForeignRelUpdatable(rel);
-		else
-		{
-			/* Assume presence of executor functions is sufficient */
-			if (fdwroutine->ExecForeignInsert != NULL)
-				events |= (1 << CMD_INSERT);
-			if (fdwroutine->ExecForeignUpdate != NULL)
-				events |= (1 << CMD_UPDATE);
-			if (fdwroutine->ExecForeignDelete != NULL)
-				events |= (1 << CMD_DELETE);
-		}
-
-		relation_close(rel, AccessShareLock);
-		return events;
 	}
 
 	/* Check if this is an automatically updatable view */

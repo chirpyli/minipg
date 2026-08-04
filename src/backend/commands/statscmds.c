@@ -132,7 +132,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 		/* Restrict to allowed relation types */
 		if (rel->rd_rel->relkind != RELKIND_RELATION &&
 			rel->rd_rel->relkind != RELKIND_MATVIEW &&
-			rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),

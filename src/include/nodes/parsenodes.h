@@ -639,7 +639,6 @@ typedef struct ColumnDef
 	CollateClause *collClause;	/* untransformed COLLATE spec, if any */
 	Oid			collOid;		/* collation OID (InvalidOid if not set) */
 	List	   *constraints;	/* other constraints on column */
-	List	   *fdwoptions;		/* per-column FDW options */
 	int			location;		/* parse location, or -1 if none/unknown */
 } ColumnDef;
 
@@ -1736,9 +1735,6 @@ typedef enum ObjectType
 	OBJECT_DOMCONSTRAINT,
 	OBJECT_EVENT_TRIGGER,
 	OBJECT_EXTENSION,
-	OBJECT_FDW,
-	OBJECT_FOREIGN_SERVER,
-	OBJECT_FOREIGN_TABLE,
 	OBJECT_FUNCTION,
 	OBJECT_INDEX,
 	OBJECT_LANGUAGE,
@@ -1764,7 +1760,6 @@ typedef enum ObjectType
 	OBJECT_TRANSFORM,
 	OBJECT_TRIGGER,
 	OBJECT_TYPE,
-	OBJECT_USER_MAPPING,
 	OBJECT_VIEW
 } ObjectType;
 
@@ -2308,116 +2303,6 @@ typedef struct AlterExtensionContentsStmt
 	Node	   *object;			/* Qualified name of the object */
 } AlterExtensionContentsStmt;
 
-/* ----------------------
- *		Create/Alter FOREIGN DATA WRAPPER Statements
- * ----------------------
- */
-
-typedef struct CreateFdwStmt
-{
-	NodeTag		type;
-	char	   *fdwname;		/* foreign-data wrapper name */
-	List	   *func_options;	/* HANDLER/VALIDATOR options */
-	List	   *options;		/* generic options to FDW */
-} CreateFdwStmt;
-
-typedef struct AlterFdwStmt
-{
-	NodeTag		type;
-	char	   *fdwname;		/* foreign-data wrapper name */
-	List	   *func_options;	/* HANDLER/VALIDATOR options */
-	List	   *options;		/* generic options to FDW */
-} AlterFdwStmt;
-
-/* ----------------------
- *		Create/Alter FOREIGN SERVER Statements
- * ----------------------
- */
-
-typedef struct CreateForeignServerStmt
-{
-	NodeTag		type;
-	char	   *servername;		/* server name */
-	char	   *servertype;		/* optional server type */
-	char	   *version;		/* optional server version */
-	char	   *fdwname;		/* FDW name */
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-	List	   *options;		/* generic options to server */
-} CreateForeignServerStmt;
-
-typedef struct AlterForeignServerStmt
-{
-	NodeTag		type;
-	char	   *servername;		/* server name */
-	char	   *version;		/* optional server version */
-	List	   *options;		/* generic options to server */
-	bool		has_version;	/* version specified */
-} AlterForeignServerStmt;
-
-/* ----------------------
- *		Create FOREIGN TABLE Statement
- * ----------------------
- */
-
-typedef struct CreateForeignTableStmt
-{
-	CreateStmt	base;
-	char	   *servername;
-	List	   *options;
-} CreateForeignTableStmt;
-
-/* ----------------------
- *		Create/Drop USER MAPPING Statements
- * ----------------------
- */
-
-typedef struct CreateUserMappingStmt
-{
-	NodeTag		type;
-	RoleSpec   *user;			/* user role */
-	char	   *servername;		/* server name */
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-	List	   *options;		/* generic options to server */
-} CreateUserMappingStmt;
-
-typedef struct AlterUserMappingStmt
-{
-	NodeTag		type;
-	RoleSpec   *user;			/* user role */
-	char	   *servername;		/* server name */
-	List	   *options;		/* generic options to server */
-} AlterUserMappingStmt;
-
-typedef struct DropUserMappingStmt
-{
-	NodeTag		type;
-	RoleSpec   *user;			/* user role */
-	char	   *servername;		/* server name */
-	bool		missing_ok;		/* ignore missing mappings */
-} DropUserMappingStmt;
-
-/* ----------------------
- *		Import Foreign Schema Statement
- * ----------------------
- */
-
-typedef enum ImportForeignSchemaType
-{
-	FDW_IMPORT_SCHEMA_ALL,		/* all relations wanted */
-	FDW_IMPORT_SCHEMA_LIMIT_TO, /* include only listed tables in import */
-	FDW_IMPORT_SCHEMA_EXCEPT	/* exclude listed tables from import */
-} ImportForeignSchemaType;
-
-typedef struct ImportForeignSchemaStmt
-{
-	NodeTag		type;
-	char	   *server_name;	/* FDW server name */
-	char	   *remote_schema;	/* remote schema name to query */
-	char	   *local_schema;	/* local schema to create objects in */
-	ImportForeignSchemaType list_type;	/* type of table list */
-	List	   *table_list;		/* List of RangeVar */
-	List	   *options;		/* list of options to pass to FDW */
-} ImportForeignSchemaStmt;
 
 /*----------------------
  *		Create POLICY Statement

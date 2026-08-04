@@ -117,9 +117,6 @@ static Plan *set_subqueryscan_references(PlannerInfo *root,
 										 int rtoffset);
 static bool trivial_subqueryscan(SubqueryScan *plan);
 static Plan *clean_up_removed_plan_level(Plan *parent, Plan *child);
-static void set_foreignscan_references(PlannerInfo *root,
-									   ForeignScan *fscan,
-									   int rtoffset);
 static void set_customscan_references(PlannerInfo *root,
 									  CustomScan *cscan,
 									  int rtoffset);
@@ -756,9 +753,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 								  rtoffset, NUM_EXEC_QUAL(plan));
 			}
 			break;
-		case T_ForeignScan:
-			set_foreignscan_references(root, (ForeignScan *) plan, rtoffset);
-			break;
 		case T_CustomScan:
 			set_customscan_references(root, (CustomScan *) plan, rtoffset);
 			break;
@@ -1345,88 +1339,6 @@ clean_up_removed_plan_level(Plan *parent, Plan *child)
 	apply_tlist_labeling(child->targetlist, parent->targetlist);
 
 	return child;
-}
-
-/*
- * set_foreignscan_references
- *	   Do set_plan_references processing on a ForeignScan
- */
-static void
-set_foreignscan_references(PlannerInfo *root,
-						   ForeignScan *fscan,
-						   int rtoffset)
-{
-	/* Adjust scanrelid if it's valid */
-	if (fscan->scan.scanrelid > 0)
-		fscan->scan.scanrelid += rtoffset;
-
-	if (fscan->fdw_scan_tlist != NIL || fscan->scan.scanrelid == 0)
-	{
-		/*
-		 * Adjust tlist, qual, fdw_exprs, fdw_recheck_quals to reference
-		 * foreign scan tuple
-		 */
-		indexed_tlist *itlist = build_tlist_index(fscan->fdw_scan_tlist);
-
-		fscan->scan.plan.targetlist = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->scan.plan.targetlist,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset,
-						   NUM_EXEC_TLIST((Plan *) fscan));
-		fscan->scan.plan.qual = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->scan.plan.qual,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset,
-						   NUM_EXEC_QUAL((Plan *) fscan));
-		fscan->fdw_exprs = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->fdw_exprs,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset,
-						   NUM_EXEC_QUAL((Plan *) fscan));
-		fscan->fdw_recheck_quals = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->fdw_recheck_quals,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset,
-						   NUM_EXEC_QUAL((Plan *) fscan));
-		pfree(itlist);
-		/* fdw_scan_tlist itself just needs fix_scan_list() adjustments */
-		fscan->fdw_scan_tlist =
-			fix_scan_list(root, fscan->fdw_scan_tlist,
-						  rtoffset, NUM_EXEC_TLIST((Plan *) fscan));
-	}
-	else
-	{
-		/*
-		 * Adjust tlist, qual, fdw_exprs, fdw_recheck_quals in the standard
-		 * way
-		 */
-		fscan->scan.plan.targetlist =
-			fix_scan_list(root, fscan->scan.plan.targetlist,
-						  rtoffset, NUM_EXEC_TLIST((Plan *) fscan));
-		fscan->scan.plan.qual =
-			fix_scan_list(root, fscan->scan.plan.qual,
-						  rtoffset, NUM_EXEC_QUAL((Plan *) fscan));
-		fscan->fdw_exprs =
-			fix_scan_list(root, fscan->fdw_exprs,
-						  rtoffset, NUM_EXEC_QUAL((Plan *) fscan));
-		fscan->fdw_recheck_quals =
-			fix_scan_list(root, fscan->fdw_recheck_quals,
-						  rtoffset, NUM_EXEC_QUAL((Plan *) fscan));
-	}
-
-	fscan->fs_relids = offset_relid_set(fscan->fs_relids, rtoffset);
-
-	/* Adjust resultRelation if it's valid */
-	if (fscan->resultRelation > 0)
-		fscan->resultRelation += rtoffset;
 }
 
 /*

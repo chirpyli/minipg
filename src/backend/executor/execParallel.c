@@ -29,7 +29,6 @@
 #include "executor/nodeAppend.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeCustom.h"
-#include "executor/nodeForeignscan.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
 #include "executor/nodeIncrementalSort.h"
@@ -249,11 +248,6 @@ ExecParallelEstimate(PlanState *planstate, ExecParallelEstimateContext *e)
 				ExecIndexOnlyScanEstimate((IndexOnlyScanState *) planstate,
 										  e->pcxt);
 			break;
-		case T_ForeignScanState:
-			if (planstate->plan->parallel_aware)
-				ExecForeignScanEstimate((ForeignScanState *) planstate,
-										e->pcxt);
-			break;
 		case T_AppendState:
 			if (planstate->plan->parallel_aware)
 				ExecAppendEstimate((AppendState *) planstate,
@@ -472,11 +466,6 @@ ExecParallelInitializeDSM(PlanState *planstate,
 			if (planstate->plan->parallel_aware)
 				ExecIndexOnlyScanInitializeDSM((IndexOnlyScanState *) planstate,
 											   d->pcxt);
-			break;
-		case T_ForeignScanState:
-			if (planstate->plan->parallel_aware)
-				ExecForeignScanInitializeDSM((ForeignScanState *) planstate,
-											 d->pcxt);
 			break;
 		case T_AppendState:
 			if (planstate->plan->parallel_aware)
@@ -942,11 +931,6 @@ ExecParallelReInitializeDSM(PlanState *planstate,
 				ExecIndexOnlyScanReInitializeDSM((IndexOnlyScanState *) planstate,
 												 pcxt);
 			break;
-		case T_ForeignScanState:
-			if (planstate->plan->parallel_aware)
-				ExecForeignScanReInitializeDSM((ForeignScanState *) planstate,
-											   pcxt);
-			break;
 		case T_AppendState:
 			if (planstate->plan->parallel_aware)
 				ExecAppendReInitializeDSM((AppendState *) planstate, pcxt);
@@ -1248,11 +1232,6 @@ ExecParallelInitializeWorker(PlanState *planstate, ParallelWorkerContext *pwcxt)
 			if (planstate->plan->parallel_aware)
 				ExecIndexOnlyScanInitializeWorker((IndexOnlyScanState *) planstate,
 												  pwcxt);
-			break;
-		case T_ForeignScanState:
-			if (planstate->plan->parallel_aware)
-				ExecForeignScanInitializeWorker((ForeignScanState *) planstate,
-												pwcxt);
 			break;
 		case T_AppendState:
 			if (planstate->plan->parallel_aware)

@@ -2491,21 +2491,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			context.paramids = bms_add_members(context.paramids, scan_params);
 			break;
 
-		case T_ForeignScan:
-			{
-				ForeignScan *fscan = (ForeignScan *) plan;
-
-				finalize_primnode((Node *) fscan->fdw_exprs,
-								  &context);
-				finalize_primnode((Node *) fscan->fdw_recheck_quals,
-								  &context);
-
-				/* We assume fdw_scan_tlist cannot contain Params */
-				context.paramids = bms_add_members(context.paramids,
-												   scan_params);
-			}
-			break;
-
 		case T_CustomScan:
 			{
 				CustomScan *cscan = (CustomScan *) plan;

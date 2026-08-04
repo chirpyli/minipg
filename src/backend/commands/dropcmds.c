@@ -437,17 +437,9 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 			{
 				msg = gettext_noop("rule \"%s\" for relation \"%s\" does not exist, skipping");
 				name = strVal(llast(castNode(List, object)));
-				args = NameListToString(list_truncate(list_copy(castNode(List, object)),
-													  list_length(castNode(List, object)) - 1));
+			args = NameListToString(list_truncate(list_copy(castNode(List, object)),
+												  list_length(castNode(List, object)) - 1));
 			}
-			break;
-		case OBJECT_FDW:
-			msg = gettext_noop("foreign-data wrapper \"%s\" does not exist, skipping");
-			name = strVal((Value *) object);
-			break;
-		case OBJECT_FOREIGN_SERVER:
-			msg = gettext_noop("server \"%s\" does not exist, skipping");
-			name = strVal((Value *) object);
 			break;
 		case OBJECT_OPCLASS:
 			{
