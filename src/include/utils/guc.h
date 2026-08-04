@@ -268,8 +268,6 @@ extern int	num_temp_buffers;
 
 extern char *cluster_name;
 extern PGDLLIMPORT char *ConfigFileName;
-extern char *HbaFileName;
-extern char *IdentFileName;
 extern char *external_pid_file;
 
 extern PGDLLIMPORT char *application_name;

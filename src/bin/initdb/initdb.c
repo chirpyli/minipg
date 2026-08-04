@@ -79,15 +79,6 @@
 /* Ideally this would be in a .h file, but it hardly seems worth the trouble */
 extern const char *select_default_timezone(const char *share_path);
 
-static const char *const auth_methods_host[] = {
-	"trust", "reject", "scram-sha-256", "password",
-	NULL
-};
-static const char *const auth_methods_local[] = {
-	"trust", "reject", "scram-sha-256", "password",
-	NULL
-};
-
 /*
  * these values are passed in by makefile defines
  */
@@ -107,8 +98,6 @@ static char *username = NULL;
 static bool pwprompt = false;
 static char *pwfilename = NULL;
 static char *superuser_password = NULL;
-static const char *authmethodhost = NULL;
-static const char *authmethodlocal = NULL;
 static bool debug = false;
 static bool noclean = false;
 static bool noinstructions = false;
@@ -125,8 +114,6 @@ static int	wal_segment_size_mb;
 static const char *progname;
 static int	encodingid;
 static char *bki_file;
-static char *hba_file;
-static char *ident_file;
 static char *conf_file;
 static char *info_schema_file;
 static char *features_file;
@@ -149,16 +136,6 @@ static int	n_connections = 10;
 static int	n_buffers = 50;
 static const char *dynamic_shared_memory_type = NULL;
 static const char *default_timezone = NULL;
-
-/*
- * Warning messages for authentication methods
- */
-#define AUTHTRUST_WARNING \
-"# CAUTION: Configuring the system for local \"trust\" authentication\n" \
-"# allows any local user to connect as any PostgreSQL user, including\n" \
-"# the database superuser.  If you do not trust all your local users,\n" \
-"# use another authentication method.\n"
-static bool authwarning = false;
 
 /*
  * Centralized knowledge of switches to pass to backend
@@ -1058,98 +1035,7 @@ setup_config(void)
 	free(conflines);
 
 
-	/* pg_hba.conf */
-
-	conflines = readfile(hba_file);
-
-#ifndef HAVE_UNIX_SOCKETS
-	conflines = filter_lines_with_token(conflines, "@remove-line-for-nolocal@");
-#else
-	conflines = replace_token(conflines, "@remove-line-for-nolocal@", "");
-#endif
-
-#ifdef HAVE_IPV6
-
-	/*
-	 * Probe to see if there is really any platform support for IPv6, and
-	 * comment out the relevant pg_hba line if not.  This avoids runtime
-	 * warnings if getaddrinfo doesn't actually cope with IPv6.  Particularly
-	 * useful on Windows, where executables built on a machine with IPv6 may
-	 * have to run on a machine without.
-	 */
-	{
-		struct addrinfo *gai_result;
-		struct addrinfo hints;
-		int			err = 0;
-
-		/* for best results, this code should match parse_hba_line() */
-		hints.ai_flags = AI_NUMERICHOST;
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = 0;
-		hints.ai_protocol = 0;
-		hints.ai_addrlen = 0;
-		hints.ai_canonname = NULL;
-		hints.ai_addr = NULL;
-		hints.ai_next = NULL;
-
-		if (err != 0 ||
-			getaddrinfo("::1", NULL, &hints, &gai_result) != 0)
-		{
-			conflines = replace_token(conflines,
-									  "host    all             all             ::1",
-									  "#host    all             all             ::1");
-			conflines = replace_token(conflines,
-									  "host    replication     all             ::1",
-									  "#host    replication     all             ::1");
-		}
-	}
-#else							/* !HAVE_IPV6 */
-	/* If we didn't compile IPV6 support at all, always comment it out */
-	conflines = replace_token(conflines,
-							  "host    all             all             ::1",
-							  "#host    all             all             ::1");
-	conflines = replace_token(conflines,
-							  "host    replication     all             ::1",
-							  "#host    replication     all             ::1");
-#endif							/* HAVE_IPV6 */
-
-	/* Replace default authentication methods */
-	conflines = replace_token(conflines,
-							  "@authmethodhost@",
-							  authmethodhost);
-	conflines = replace_token(conflines,
-							  "@authmethodlocal@",
-							  authmethodlocal);
-
-	conflines = replace_token(conflines,
-							  "@authcomment@",
-							  (strcmp(authmethodlocal, "trust") == 0 || strcmp(authmethodhost, "trust") == 0) ? AUTHTRUST_WARNING : "");
-
-	snprintf(path, sizeof(path), "%s/pg_hba.conf", pg_data);
-
-	writefile(path, conflines);
-	if (chmod(path, pg_file_create_mode) != 0)
-	{
-		pg_log_error("could not change permissions of \"%s\": %m", path);
-		exit(1);
-	}
-
-	free(conflines);
-
-	/* pg_ident.conf */
-
-	conflines = readfile(ident_file);
-
-	snprintf(path, sizeof(path), "%s/pg_ident.conf", pg_data);
-
-	writefile(path, conflines);
-	if (chmod(path, pg_file_create_mode) != 0)
-	{
-		pg_log_error("could not change permissions of \"%s\": %m", path);
-		exit(1);
-	}
-
-	free(conflines);
+	/* minipg: pg_hba.conf / pg_ident.conf 已移除，不再生成这些认证配置文件。 */
 
 	check_ok();
 }
@@ -2043,51 +1929,6 @@ usage(const char *progname)
 	printf(_("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
 }
 
-static void
-check_authmethod_unspecified(const char **authmethod)
-{
-	if (*authmethod == NULL)
-	{
-		authwarning = true;
-		*authmethod = "trust";
-	}
-}
-
-static void
-check_authmethod_valid(const char *authmethod, const char *const *valid_methods, const char *conntype)
-{
-	const char *const *p;
-
-	for (p = valid_methods; *p; p++)
-	{
-		if (strcmp(authmethod, *p) == 0)
-			return;
-		/* with space = param */
-		if (strchr(authmethod, ' '))
-			if (strncmp(authmethod, *p, (authmethod - strchr(authmethod, ' '))) == 0)
-				return;
-	}
-
-	pg_log_error("invalid authentication method \"%s\" for \"%s\" connections",
-				 authmethod, conntype);
-	exit(1);
-}
-
-static void
-check_need_password(const char *authmethodlocal, const char *authmethodhost)
-{
-	if ((strcmp(authmethodlocal, "password") == 0 ||
-		 strcmp(authmethodlocal, "scram-sha-256") == 0) &&
-		(strcmp(authmethodhost, "password") == 0 ||
-		 strcmp(authmethodhost, "scram-sha-256") == 0) &&
-		!(pwprompt || pwfilename))
-	{
-		pg_log_error("must specify a password for the superuser to enable password authentication");
-		exit(1);
-	}
-}
-
-
 void
 setup_pgdata(void)
 {
@@ -2252,8 +2093,6 @@ void
 setup_data_file_paths(void)
 {
 	set_input(&bki_file, "postgres.bki");
-	set_input(&hba_file, "pg_hba.conf.sample");
-	set_input(&ident_file, "pg_ident.conf.sample");
 	set_input(&conf_file, "postgresql.conf.sample");
 	set_input(&info_schema_file, "information_schema.sql");
 	set_input(&features_file, "sql_features.txt");
@@ -2267,20 +2106,16 @@ setup_data_file_paths(void)
 				"VERSION=%s\n"
 				"PGDATA=%s\nshare_path=%s\nPGPATH=%s\n"
 				"POSTGRES_SUPERUSERNAME=%s\nPOSTGRES_BKI=%s\n"
-				"POSTGRESQL_CONF_SAMPLE=%s\n"
-				"PG_HBA_SAMPLE=%s\nPG_IDENT_SAMPLE=%s\n",
+				"POSTGRESQL_CONF_SAMPLE=%s\n",
 				PG_VERSION,
 				pg_data, share_path, bin_path,
 				username, bki_file,
-				conf_file,
-				hba_file, ident_file);
+				conf_file);
 		if (show_setting)
 			exit(0);
 	}
 
 	check_input(bki_file);
-	check_input(hba_file);
-	check_input(ident_file);
 	check_input(conf_file);
 	check_input(info_schema_file);
 	check_input(features_file);
@@ -2636,9 +2471,6 @@ main(int argc, char *argv[])
 		{"lc-time", required_argument, NULL, 6},
 		{"lc-messages", required_argument, NULL, 7},
 		{"no-locale", no_argument, NULL, 8},
-		{"auth", required_argument, NULL, 'A'},
-		{"auth-local", required_argument, NULL, 10},
-		{"auth-host", required_argument, NULL, 11},
 		{"pwprompt", no_argument, NULL, 'W'},
 		{"pwfile", required_argument, NULL, 9},
 		{"username", required_argument, NULL, 'U'},
@@ -2702,15 +2534,6 @@ main(int argc, char *argv[])
 	{
 		switch (c)
 		{
-			case 'A':
-				authmethodlocal = authmethodhost = pg_strdup(optarg);
-				break;
-			case 10:
-				authmethodlocal = pg_strdup(optarg);
-				break;
-			case 11:
-				authmethodhost = pg_strdup(optarg);
-				break;
 			case 'D':
 				pg_data = pg_strdup(optarg);
 				break;
@@ -2845,14 +2668,6 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	check_authmethod_unspecified(&authmethodlocal);
-	check_authmethod_unspecified(&authmethodhost);
-
-	check_authmethod_valid(authmethodlocal, auth_methods_local, "local");
-	check_authmethod_valid(authmethodhost, auth_methods_host, "host");
-
-	check_need_password(authmethodlocal, authmethodhost);
-
 	/* set wal segment size */
 	if (str_wal_segment_size_mb == NULL)
 		wal_segment_size_mb = (DEFAULT_XLOG_SEG_SIZE) / (1024 * 1024);
@@ -2926,14 +2741,6 @@ main(int argc, char *argv[])
 	}
 	else
 		printf(_("\nSync to disk skipped.\nThe data directory might become corrupt if the operating system crashes.\n"));
-
-	if (authwarning)
-	{
-		printf("\n");
-		pg_log_warning("enabling \"trust\" authentication for local connections");
-		fprintf(stderr, _("You can change this by editing pg_hba.conf or using the option -A, or\n"
-						  "--auth-local and --auth-host, the next time you run initdb.\n"));
-	}
 
 	if (!noinstructions)
 	{

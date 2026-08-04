@@ -20,7 +20,6 @@ OBJS = \
 	be-fsstubs.o \
 	be-secure.o \
 	crypt.o \
-	hba.o \
 	ifaddr.o \
 	pqcomm.o \
 	pqformat.o \

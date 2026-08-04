@@ -1147,28 +1147,6 @@ PostmasterMain(int argc, char *argv[])
 	 */
 	autovac_init();
 
-	/*
-	 * Load configuration files for client authentication.
-	 */
-	if (!load_hba())
-	{
-		/*
-		 * It makes no sense to continue if we fail to load the HBA file,
-		 * since there is no way to connect to the database in this case.
-		 */
-		ereport(FATAL,
-				(errmsg("could not load pg_hba.conf")));
-	}
-	if (!load_ident())
-	{
-		/*
-		 * We can start up without the IDENT file, although it means that you
-		 * cannot log in using any of the authentication methods that need a
-		 * user name mapping. load_ident() already logged the details of error
-		 * to the log.
-		 */
-	}
-
 #ifdef HAVE_PTHREAD_IS_THREADED_NP
 
 	/*
@@ -2484,15 +2462,7 @@ SIGHUP_handler(SIGNAL_ARGS)
 		if (PgStatPID != 0)
 			signal_child(PgStatPID, SIGHUP);
 
-		/* Reload authentication config files too */
-		if (!load_hba())
-			ereport(LOG,
-			/* translator: %s is a configuration file */
-					(errmsg("%s was not reloaded", "pg_hba.conf")));
-
-		if (!load_ident())
-			ereport(LOG,
-					(errmsg("%s was not reloaded", "pg_ident.conf")));
+		/* minipg: pg_hba.conf / pg_ident.conf 已移除，无需重载认证配置文件 */
 	}
 
 	errno = save_errno;

@@ -105,8 +105,6 @@
 #include "utils/varlena.h"
 
 #define CONFIG_FILENAME "postgresql.conf"
-#define HBA_FILENAME	"pg_hba.conf"
-#define IDENT_FILENAME	"pg_ident.conf"
 
 /*
  * Precision with which REAL type guc values are to be printed for GUC
@@ -544,8 +542,6 @@ int			num_temp_buffers = 1024;
 
 char	   *cluster_name = "";
 char	   *ConfigFileName;
-char	   *HbaFileName;
-char	   *IdentFileName;
 char	   *external_pid_file;
 
 char	   *pgstat_temp_directory;
@@ -4079,28 +4075,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hba_file", PGC_POSTMASTER, FILE_LOCATIONS,
-			gettext_noop("Sets the server's \"hba\" configuration file."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&HbaFileName,
-		NULL,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"ident_file", PGC_POSTMASTER, FILE_LOCATIONS,
-			gettext_noop("Sets the server's \"ident\" configuration file."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&IdentFileName,
-		NULL,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"external_pid_file", PGC_POSTMASTER, FILE_LOCATIONS,
 			gettext_noop("Writes the postmaster PID to the specified file."),
 			NULL,
@@ -5477,50 +5451,8 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 	pg_timezone_abbrev_initialize();
 
 	/*
-	 * Figure out where pg_hba.conf is, and make sure the path is absolute.
+	 * minipg: pg_hba.conf / pg_ident.conf 已移除，不再定位这些配置文件的路径。
 	 */
-	if (HbaFileName)
-		fname = make_absolute_path(HbaFileName);
-	else if (configdir)
-	{
-		fname = guc_malloc(FATAL,
-						   strlen(configdir) + strlen(HBA_FILENAME) + 2);
-		sprintf(fname, "%s/%s", configdir, HBA_FILENAME);
-	}
-	else
-	{
-		write_stderr("%s does not know where to find the \"hba\" configuration file.\n"
-					 "This can be specified as \"hba_file\" in \"%s\", "
-					 "or by the -D invocation option, or by the "
-					 "PGDATA environment variable.\n",
-					 progname, ConfigFileName);
-		return false;
-	}
-	SetConfigOption("hba_file", fname, PGC_POSTMASTER, PGC_S_OVERRIDE);
-	free(fname);
-
-	/*
-	 * Likewise for pg_ident.conf.
-	 */
-	if (IdentFileName)
-		fname = make_absolute_path(IdentFileName);
-	else if (configdir)
-	{
-		fname = guc_malloc(FATAL,
-						   strlen(configdir) + strlen(IDENT_FILENAME) + 2);
-		sprintf(fname, "%s/%s", configdir, IDENT_FILENAME);
-	}
-	else
-	{
-		write_stderr("%s does not know where to find the \"ident\" configuration file.\n"
-					 "This can be specified as \"ident_file\" in \"%s\", "
-					 "or by the -D invocation option, or by the "
-					 "PGDATA environment variable.\n",
-					 progname, ConfigFileName);
-		return false;
-	}
-	SetConfigOption("ident_file", fname, PGC_POSTMASTER, PGC_S_OVERRIDE);
-	free(fname);
 
 	free(configdir);
 

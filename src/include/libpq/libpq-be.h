@@ -24,8 +24,8 @@
 #endif
 
 #include "datatype/timestamp.h"
-#include "libpq/hba.h"
 #include "libpq/pqcomm.h"
+#include "nodes/pg_list.h"
 
 
 typedef enum CAC_state
@@ -94,11 +94,6 @@ typedef struct Port
 	 * the GUC should be used as application can change it afterward.
 	 */
 	char	   *application_name;
-
-	/*
-	 * Information that needs to be held during the authentication cycle.
-	 */
-	HbaLine    *hba;
 
 	/*
 	 * Authenticated identity.  The meaning of this identifier is dependent on
