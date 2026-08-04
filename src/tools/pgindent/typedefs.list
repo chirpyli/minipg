@@ -152,7 +152,6 @@ AttrMissing
 AttrNumber
 AttributeOpts
 AuthRequest
-AutoPrewarmSharedState
 AutoVacOpts
 AutoVacuumShmemStruct
 AutoVacuumWorkItem
@@ -1996,7 +1995,6 @@ PrepParallelRestorePtrType
 PrepareStmt
 PreparedStatement
 PresortedKeyData
-PrewarmType
 PrintExtraTocPtrType
 PrintTocDataPtrType
 PrintfArgType

@@ -133,18 +133,18 @@
 
 **目的**：minipg 面向数据库内核学习，contrib 中大量扩展属于业务计算、外部集成、安全运维、过程语言桥接、全文检索等，与内核学习无关，予以删除；保留能"观察数据库内部运行状态"及"演示内核扩展机制"的扩展。
 
-**保留的 12 个扩展（约 22,750 行）**：
-- 内核观察类（看内部状态）：`pageinspect`（直接读 heap/btree 页面字节）、`pg_buffercache`（共享缓冲区内容）、`pg_freespacemap`（空闲空间映射）、`pg_visibility`（可见性映射）、`pgstattuple`（死元组/膨胀）、`pg_stat_statements`（SQL 代价统计）、`pg_prewarm`（预加载）、`pg_surgery`（页面修复）、`pgrowlocks`（行锁）、`amcheck`（btree/heap 一致性校验）
+**保留的 11 个扩展（约 22,750 行）**：
+- 内核观察类（看内部状态）：`pageinspect`（直接读 heap/btree 页面字节）、`pg_buffercache`（共享缓冲区内容）、`pg_freespacemap`（空闲空间映射）、`pg_visibility`（可见性映射）、`pgstattuple`（死元组/膨胀）、`pg_stat_statements`（SQL 代价统计）、`pg_surgery`（页面修复）、`pgrowlocks`（行锁）、`amcheck`（btree/heap 一致性校验）
 - 示例型（演示扩展机制）：`bloom`（最小最完整的自定义访问方法 AM 示例）、`spi`（服务端过程语言接口示例）
 
-**删除的 44 个扩展（约 122,670 行）及删除理由**：
+**删除的 45 个扩展（约 122,670 行）及删除理由**：
 - 过程语言桥接（随"存储过程"裁剪）：`bool_plperl`、`hstore_plperl`、`jsonb_plperl`、`hstore_plpython`、`jsonb_plpython`、`ltree_plpython`
 - 外部系统集成 / FDW：`dblink`、`postgres_fdw`、`file_fdw`、`xml2`
 - 业务计算与数据类型：`pgcrypto`、`cube`、`earthdistance`、`seg`、`isn`、`hstore`、`ltree`、`citext`、`intarray`、`fuzzystrmatch`、`tablefunc`、`uuid-ossp`
 - 全文检索相关（随 snowball/tsearch 裁剪）：`dict_int`、`dict_xsyn`、`unaccent`
 - 安全 / 运维 / 部署：`sepgsql`、`passwordcheck`、`auth_delay`、`sslinfo`、`adminpack`、`old_snapshot`、`start-scripts`、`oid2name`、`vacuumlo`
 - 测试 / 复制调试：`test_decoding`（依赖 replication）、`tcn`
-- 其他边缘：`btree_gin`、`btree_gist`、`auto_explain`、`lo`、`pg_trgm`、`tsm_system_rows`、`tsm_system_time`、`intagg`
+- 其他边缘：`btree_gin`、`btree_gist`、`auto_explain`、`lo`、`pg_trgm`、`tsm_system_rows`、`tsm_system_time`、`intagg`、`pg_prewarm`（预加载辅助工具，与内核学习无关且非核心能力，纯扩展无内核依赖）
 
 **修改的文件**：
 - `contrib/Makefile`：SUBDIRS 仅保留 12 个扩展；移除原来基于 `with_ssl`/`with_uuid`/`with_libxml`/`with_selinux`/`with_perl`/`with_python` 的条件子目录块（这些选项不再向 contrib 加入扩展，但核心代码仍可能使用这些 configure 选项，故未改动 `configure`）。
@@ -550,3 +550,24 @@
 
 **注意事项**：裁剪后务必做**干净重建**（删除 `src/backend/jit/*.o` 残留对象）再回归；实测若保留旧 `jit.o`（其引用已删的 `jit_enabled` 等符号，但链接器因 SUBDIRS 已移除未重编、旧对象仍被链入），会在运行期引发 server 进程 SIGSEGV，表现为 `make check` 大面积 "server process terminated by signal 11"（如 numeric/select_distinct 等测试输出被截断）。该崩溃为陈旧对象混链所致，与 JIT 功能删除本身无关——干净重建后即消失。
 
+
+## 裁剪：移除 pg_prewarm 扩展
+
+**目的**：`pg_prewarm` 提供 `pg_prewarm()`（把表/索引块主动载入 OS cache 或 `shared_buffers`）及 `autoprewarm` 后台进程（重启后按记录预热），属性能优化辅助工具，与数据库内核核心机制（存储/执行/索引/事务）正交，对内核学习无直接价值。
+
+**为什么可以删**：
+- `pg_prewarm` 是纯 `contrib` 扩展，源码全在 `contrib/pg_prewarm/`（`pg_prewarm.c` + `autoprewarm.c`）。
+- 主代码树 `src/` 中无任何 `CREATE EXTENSION` 或函数调用依赖它（唯一命中 `src/tools/pgindent/typedefs.list` 仅为代码格式化工具的类型清单，不影响运行期）。
+- `autoprewarm` 仅当在 `shared_preload_libraries` 中显式配置才启动，默认即非必需。
+
+**删除的目录与文件**：
+- `contrib/pg_prewarm/`（pg_prewarm.c、autoprewarm.c、pg_prewarm--1.0.sql、pg_prewarm.control、Makefile、meson.build、sql/、expected/）
+- `doc/src/sgml/pgprewarm.sgml`
+
+**修改的文件**：
+- `contrib/Makefile`：SUBDIRS 移除 `pg_prewarm`，保留扩展注释同步去除
+- `doc/src/sgml/filelist.sgml`：移除 `pgprewarm` 实体声明
+- `doc/src/sgml/contrib.sgml`：移除 `&pgprewarm;` 引用
+- `src/tools/pgindent/typedefs.list`：移除 `AutoPrewarmSharedState`、`PrewarmType` 类型条目
+
+**验证**：`make -C contrib` 不再构建 pg_prewarm；全仓库扫描 `pg_prewarm`/`autoprewarm`/`PrewarmType`/`AutoPrewarm`/`pg_prewarm(` 等功能符号（除文档与 CHANGE.md 说明文字外）在 C/H 源码中残留为 0 处。

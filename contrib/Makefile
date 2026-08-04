@@ -10,7 +10,6 @@ SUBDIRS = \
 		pageinspect	\
 		pg_buffercache	\
 		pg_freespacemap \
-		pg_prewarm	\
 		pg_stat_statements \
 		pg_surgery	\
 		pgrowlocks	\
@@ -33,7 +32,7 @@ SUBDIRS = \
 #   bool_plperl hstore_plperl jsonb_plperl hstore_plpython jsonb_plpython
 #   ltree_plpython start-scripts
 # 保留的均为内核观察类（pageinspect/pg_buffercache/pg_freespacemap/
-# pg_visibility/pgstattuple/pg_stat_statements/pg_surgery/pg_prewarm/
+# pg_visibility/pgstattuple/pg_stat_statements/pg_surgery/
 # pgrowlocks/amcheck）及示例型（bloom 自定义 AM、spi 服务端接口）。
 
 $(recurse)
