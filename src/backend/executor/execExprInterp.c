@@ -75,7 +75,6 @@
 #include "utils/memutils.h"
 #include "utils/timestamp.h"
 #include "utils/typcache.h"
-#include "utils/xml.h"
 
 /*
  * Use computed-goto-based opcode dispatch when computed gotos are available.
@@ -480,7 +479,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_CONVERT_ROWTYPE,
 		&&CASE_EEOP_SCALARARRAYOP,
 		&&CASE_EEOP_HASHED_SCALARARRAYOP,
-		&&CASE_EEOP_XMLEXPR,
 		&&CASE_EEOP_AGGREF,
 		&&CASE_EEOP_GROUPING_FUNC,
 		&&CASE_EEOP_WINDOW_FUNC,
@@ -1527,14 +1525,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex for an inline implementation */
 			ExecEvalConstraintCheck(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_XMLEXPR)
-		{
-			/* too complex for an inline implementation */
-			ExecEvalXmlExpr(state, op);
 
 			EEO_NEXT();
 		}
@@ -3761,221 +3751,6 @@ ExecEvalConstraintCheck(ExprState *state, ExprEvalStep *op)
 }
 
 /*
- * Evaluate the various forms of XmlExpr.
- *
- * Arguments have been evaluated into named_argvalue/named_argnull
- * and/or argvalue/argnull arrays.
- */
-void
-ExecEvalXmlExpr(ExprState *state, ExprEvalStep *op)
-{
-	XmlExpr    *xexpr = op->d.xmlexpr.xexpr;
-	Datum		value;
-
-	*op->resnull = true;		/* until we get a result */
-	*op->resvalue = (Datum) 0;
-
-	switch (xexpr->op)
-	{
-		case IS_XMLCONCAT:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.argvalue;
-				bool	   *argnull = op->d.xmlexpr.argnull;
-				List	   *values = NIL;
-
-				for (int i = 0; i < list_length(xexpr->args); i++)
-				{
-					if (!argnull[i])
-						values = lappend(values, DatumGetPointer(argvalue[i]));
-				}
-
-				if (values != NIL)
-				{
-					*op->resvalue = PointerGetDatum(xmlconcat(values));
-					*op->resnull = false;
-				}
-			}
-			break;
-
-		case IS_XMLFOREST:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.named_argvalue;
-				bool	   *argnull = op->d.xmlexpr.named_argnull;
-				StringInfoData buf;
-				ListCell   *lc;
-				ListCell   *lc2;
-				int			i;
-
-				initStringInfo(&buf);
-
-				i = 0;
-				forboth(lc, xexpr->named_args, lc2, xexpr->arg_names)
-				{
-					Expr	   *e = (Expr *) lfirst(lc);
-					char	   *argname = strVal(lfirst(lc2));
-
-					if (!argnull[i])
-					{
-						value = argvalue[i];
-						appendStringInfo(&buf, "<%s>%s</%s>",
-										 argname,
-										 map_sql_value_to_xml_value(value,
-																	exprType((Node *) e), true),
-										 argname);
-						*op->resnull = false;
-					}
-					i++;
-				}
-
-				if (!*op->resnull)
-				{
-					text	   *result;
-
-					result = cstring_to_text_with_len(buf.data, buf.len);
-					*op->resvalue = PointerGetDatum(result);
-				}
-
-				pfree(buf.data);
-			}
-			break;
-
-		case IS_XMLELEMENT:
-			*op->resvalue = PointerGetDatum(xmlelement(xexpr,
-													   op->d.xmlexpr.named_argvalue,
-													   op->d.xmlexpr.named_argnull,
-													   op->d.xmlexpr.argvalue,
-													   op->d.xmlexpr.argnull));
-			*op->resnull = false;
-			break;
-
-		case IS_XMLPARSE:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.argvalue;
-				bool	   *argnull = op->d.xmlexpr.argnull;
-				text	   *data;
-				bool		preserve_whitespace;
-
-				/* arguments are known to be text, bool */
-				Assert(list_length(xexpr->args) == 2);
-
-				if (argnull[0])
-					return;
-				value = argvalue[0];
-				data = DatumGetTextPP(value);
-
-				if (argnull[1]) /* probably can't happen */
-					return;
-				value = argvalue[1];
-				preserve_whitespace = DatumGetBool(value);
-
-				*op->resvalue = PointerGetDatum(xmlparse(data,
-														 xexpr->xmloption,
-														 preserve_whitespace));
-				*op->resnull = false;
-			}
-			break;
-
-		case IS_XMLPI:
-			{
-				text	   *arg;
-				bool		isnull;
-
-				/* optional argument is known to be text */
-				Assert(list_length(xexpr->args) <= 1);
-
-				if (xexpr->args)
-				{
-					isnull = op->d.xmlexpr.argnull[0];
-					if (isnull)
-						arg = NULL;
-					else
-						arg = DatumGetTextPP(op->d.xmlexpr.argvalue[0]);
-				}
-				else
-				{
-					arg = NULL;
-					isnull = false;
-				}
-
-				*op->resvalue = PointerGetDatum(xmlpi(xexpr->name,
-													  arg,
-													  isnull,
-													  op->resnull));
-			}
-			break;
-
-		case IS_XMLROOT:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.argvalue;
-				bool	   *argnull = op->d.xmlexpr.argnull;
-				xmltype    *data;
-				text	   *version;
-				int			standalone;
-
-				/* arguments are known to be xml, text, int */
-				Assert(list_length(xexpr->args) == 3);
-
-				if (argnull[0])
-					return;
-				data = DatumGetXmlP(argvalue[0]);
-
-				if (argnull[1])
-					version = NULL;
-				else
-					version = DatumGetTextPP(argvalue[1]);
-
-				Assert(!argnull[2]);	/* always present */
-				standalone = DatumGetInt32(argvalue[2]);
-
-				*op->resvalue = PointerGetDatum(xmlroot(data,
-														version,
-														standalone));
-				*op->resnull = false;
-			}
-			break;
-
-		case IS_XMLSERIALIZE:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.argvalue;
-				bool	   *argnull = op->d.xmlexpr.argnull;
-
-				/* argument type is known to be xml */
-				Assert(list_length(xexpr->args) == 1);
-
-				if (argnull[0])
-					return;
-				value = argvalue[0];
-
-				*op->resvalue = PointerGetDatum(xmltotext_with_xmloption(DatumGetXmlP(value),
-																		 xexpr->xmloption));
-				*op->resnull = false;
-			}
-			break;
-
-		case IS_DOCUMENT:
-			{
-				Datum	   *argvalue = op->d.xmlexpr.argvalue;
-				bool	   *argnull = op->d.xmlexpr.argnull;
-
-				/* optional argument is known to be xml */
-				Assert(list_length(xexpr->args) == 1);
-
-				if (argnull[0])
-					return;
-				value = argvalue[0];
-
-				*op->resvalue =
-					BoolGetDatum(xml_is_document(DatumGetXmlP(value)));
-				*op->resnull = false;
-			}
-			break;
-
-		default:
-			elog(ERROR, "unrecognized XML operation");
-			break;
-	}
-}
-
 /*
  * ExecEvalGroupingFunc
  *

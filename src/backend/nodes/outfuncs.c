@@ -642,15 +642,6 @@ _outFunctionScan(StringInfo str, const FunctionScan *node)
 	WRITE_BOOL_FIELD(funcordinality);
 }
 
-static void
-_outTableFuncScan(StringInfo str, const TableFuncScan *node)
-{
-	WRITE_NODE_TYPE("TABLEFUNCSCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_NODE_FIELD(tablefunc);
-}
 
 static void
 _outValuesScan(StringInfo str, const ValuesScan *node)
@@ -1078,25 +1069,6 @@ _outRangeVar(StringInfo str, const RangeVar *node)
 	WRITE_LOCATION_FIELD(location);
 }
 
-static void
-_outTableFunc(StringInfo str, const TableFunc *node)
-{
-	WRITE_NODE_TYPE("TABLEFUNC");
-
-	WRITE_NODE_FIELD(ns_uris);
-	WRITE_NODE_FIELD(ns_names);
-	WRITE_NODE_FIELD(docexpr);
-	WRITE_NODE_FIELD(rowexpr);
-	WRITE_NODE_FIELD(colnames);
-	WRITE_NODE_FIELD(coltypes);
-	WRITE_NODE_FIELD(coltypmods);
-	WRITE_NODE_FIELD(colcollations);
-	WRITE_NODE_FIELD(colexprs);
-	WRITE_NODE_FIELD(coldefexprs);
-	WRITE_BITMAPSET_FIELD(notnulls);
-	WRITE_INT_FIELD(ordinalitycol);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outIntoClause(StringInfo str, const IntoClause *node)
@@ -1579,21 +1551,6 @@ _outSQLValueFunction(StringInfo str, const SQLValueFunction *node)
 	WRITE_LOCATION_FIELD(location);
 }
 
-static void
-_outXmlExpr(StringInfo str, const XmlExpr *node)
-{
-	WRITE_NODE_TYPE("XMLEXPR");
-
-	WRITE_ENUM_FIELD(op, XmlExprOp);
-	WRITE_STRING_FIELD(name);
-	WRITE_NODE_FIELD(named_args);
-	WRITE_NODE_FIELD(arg_names);
-	WRITE_NODE_FIELD(args);
-	WRITE_ENUM_FIELD(xmloption, XmlOptionType);
-	WRITE_OID_FIELD(type);
-	WRITE_INT_FIELD(typmod);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outNullTest(StringInfo str, const NullTest *node)
@@ -2921,16 +2878,6 @@ _outLockingClause(StringInfo str, const LockingClause *node)
 	WRITE_ENUM_FIELD(waitPolicy, LockWaitPolicy);
 }
 
-static void
-_outXmlSerialize(StringInfo str, const XmlSerialize *node)
-{
-	WRITE_NODE_TYPE("XMLSERIALIZE");
-
-	WRITE_ENUM_FIELD(xmloption, XmlOptionType);
-	WRITE_NODE_FIELD(expr);
-	WRITE_NODE_FIELD(typeName);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outTriggerTransition(StringInfo str, const TriggerTransition *node)
@@ -3269,9 +3216,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 		case RTE_FUNCTION:
 			WRITE_NODE_FIELD(functions);
 			WRITE_BOOL_FIELD(funcordinality);
-			break;
-		case RTE_TABLEFUNC:
-			WRITE_NODE_FIELD(tablefunc);
 			break;
 		case RTE_VALUES:
 			WRITE_NODE_FIELD(values_lists);
@@ -3614,33 +3558,7 @@ _outRangeTableSample(StringInfo str, const RangeTableSample *node)
 	WRITE_LOCATION_FIELD(location);
 }
 
-static void
-_outRangeTableFunc(StringInfo str, const RangeTableFunc *node)
-{
-	WRITE_NODE_TYPE("RANGETABLEFUNC");
 
-	WRITE_BOOL_FIELD(lateral);
-	WRITE_NODE_FIELD(docexpr);
-	WRITE_NODE_FIELD(rowexpr);
-	WRITE_NODE_FIELD(namespaces);
-	WRITE_NODE_FIELD(columns);
-	WRITE_NODE_FIELD(alias);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outRangeTableFuncCol(StringInfo str, const RangeTableFuncCol *node)
-{
-	WRITE_NODE_TYPE("RANGETABLEFUNCCOL");
-
-	WRITE_STRING_FIELD(colname);
-	WRITE_NODE_FIELD(typeName);
-	WRITE_BOOL_FIELD(for_ordinality);
-	WRITE_BOOL_FIELD(is_not_null);
-	WRITE_NODE_FIELD(colexpr);
-	WRITE_NODE_FIELD(coldefexpr);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outConstraint(StringInfo str, const Constraint *node)
@@ -3919,9 +3837,6 @@ outNode(StringInfo str, const void *obj)
 			case T_FunctionScan:
 				_outFunctionScan(str, obj);
 				break;
-			case T_TableFuncScan:
-				_outTableFuncScan(str, obj);
-				break;
 			case T_ValuesScan:
 				_outValuesScan(str, obj);
 				break;
@@ -4014,9 +3929,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_RangeVar:
 				_outRangeVar(str, obj);
-				break;
-			case T_TableFunc:
-				_outTableFunc(str, obj);
 				break;
 			case T_IntoClause:
 				_outIntoClause(str, obj);
@@ -4119,9 +4031,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SQLValueFunction:
 				_outSQLValueFunction(str, obj);
-				break;
-			case T_XmlExpr:
-				_outXmlExpr(str, obj);
 				break;
 			case T_NullTest:
 				_outNullTest(str, obj);
@@ -4480,12 +4389,6 @@ outNode(StringInfo str, const void *obj)
 			case T_RangeTableSample:
 				_outRangeTableSample(str, obj);
 				break;
-			case T_RangeTableFunc:
-				_outRangeTableFunc(str, obj);
-				break;
-			case T_RangeTableFuncCol:
-				_outRangeTableFuncCol(str, obj);
-				break;
 			case T_Constraint:
 				_outConstraint(str, obj);
 				break;
@@ -4500,9 +4403,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_LockingClause:
 				_outLockingClause(str, obj);
-				break;
-			case T_XmlSerialize:
-				_outXmlSerialize(str, obj);
 				break;
 			case T_ForeignKeyCacheInfo:
 				_outForeignKeyCacheInfo(str, obj);

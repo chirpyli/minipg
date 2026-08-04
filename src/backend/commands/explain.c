@@ -37,7 +37,6 @@
 #include "utils/snapmgr.h"
 #include "utils/tuplesort.h"
 #include "utils/typcache.h"
-#include "utils/xml.h"
 
 
 /* Hook for plugins to get control in ExplainOneQuery() */
@@ -47,7 +46,6 @@ ExplainOneQuery_hook_type ExplainOneQuery_hook = NULL;
 explain_get_index_name_hook_type explain_get_index_name_hook = NULL;
 
 
-/* OR-able flags for ExplainXMLTag() */
 #define X_OPENING 0
 #define X_CLOSING 1
 #define X_CLOSE_IMMEDIATE 2
@@ -145,7 +143,6 @@ static void ExplainSaveGroup(ExplainState *es, int depth, int *state_save);
 static void ExplainRestoreGroup(ExplainState *es, int depth, int *state_save);
 static void ExplainDummyGroup(const char *objtype, const char *labelname,
 							  ExplainState *es);
-static void ExplainXMLTag(const char *tagname, int flags, ExplainState *es);
 static void ExplainIndentText(ExplainState *es);
 static void ExplainJSONLineEnding(ExplainState *es);
 static void ExplainYAMLLineStarting(ExplainState *es);
@@ -203,8 +200,6 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 
 			if (strcmp(p, "text") == 0)
 				es->format = EXPLAIN_FORMAT_TEXT;
-			else if (strcmp(p, "xml") == 0)
-				es->format = EXPLAIN_FORMAT_XML;
 			else if (strcmp(p, "json") == 0)
 				es->format = EXPLAIN_FORMAT_JSON;
 			else if (strcmp(p, "yaml") == 0)
@@ -328,24 +323,6 @@ ExplainResultDesc(ExplainStmt *stmt)
 	ListCell   *lc;
 	Oid			result_type = TEXTOID;
 
-	/* Check for XML format option */
-	foreach(lc, stmt->options)
-	{
-		DefElem    *opt = (DefElem *) lfirst(lc);
-
-		if (strcmp(opt->defname, "format") == 0)
-		{
-			char	   *p = defGetString(opt);
-
-			if (strcmp(p, "xml") == 0)
-				result_type = XMLOID;
-			else
-				result_type = TEXTOID;
-			/* don't "break", as ExplainQuery will use the last value */
-		}
-	}
-
-	/* Need a tuple descriptor representing a single TEXT or XML column */
 	tupdesc = CreateTemplateTupleDesc(1);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "QUERY PLAN",
 					   result_type, -1, 0);
@@ -952,7 +929,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_TidRangeScan:
 		case T_SubqueryScan:
 		case T_FunctionScan:
-		case T_TableFuncScan:
 		case T_ValuesScan:
 		case T_CteScan:
 		case T_NamedTuplestoreScan:
@@ -1124,9 +1100,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			break;
 		case T_FunctionScan:
 			pname = sname = "Function Scan";
-			break;
-		case T_TableFuncScan:
-			pname = sname = "Table Function Scan";
 			break;
 		case T_ValuesScan:
 			pname = sname = "Values Scan";
@@ -1322,7 +1295,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_TidRangeScan:
 		case T_SubqueryScan:
 		case T_FunctionScan:
-		case T_TableFuncScan:
 		case T_ValuesScan:
 		case T_CteScan:
 		case T_WorkTableScan:
@@ -1736,20 +1708,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 				/* We rely on show_expression to insert commas as needed */
 				show_expression((Node *) fexprs,
 								"Function Call", planstate, ancestors,
-								es->verbose, es);
-			}
-			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			break;
-		case T_TableFuncScan:
-			if (es->verbose)
-			{
-				TableFunc  *tablefunc = ((TableFuncScan *) plan)->tablefunc;
-
-				show_expression((Node *) tablefunc,
-								"Table Function Call", planstate, ancestors,
 								es->verbose, es);
 			}
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
@@ -3642,11 +3600,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 				objecttag = "Function Name";
 			}
 			break;
-		case T_TableFuncScan:
-			Assert(rte->rtekind == RTE_TABLEFUNC);
-			objectname = "xmltable";
-			objecttag = "Table Function Name";
-			break;
 		case T_ValuesScan:
 			Assert(rte->rtekind == RTE_VALUES);
 			break;
@@ -4125,22 +4078,6 @@ ExplainPropertyList(const char *qlabel, List *data, ExplainState *es)
 			appendStringInfoChar(es->str, '\n');
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			ExplainXMLTag(qlabel, X_OPENING, es);
-			foreach(lc, data)
-			{
-				char	   *str;
-
-				appendStringInfoSpaces(es->str, es->indent * 2 + 2);
-				appendStringInfoString(es->str, "<Item>");
-				str = escape_xml((const char *) lfirst(lc));
-				appendStringInfoString(es->str, str);
-				pfree(str);
-				appendStringInfoString(es->str, "</Item>\n");
-			}
-			ExplainXMLTag(qlabel, X_CLOSING, es);
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			ExplainJSONLineEnding(es);
 			appendStringInfoSpaces(es->str, es->indent * 2);
@@ -4183,10 +4120,8 @@ ExplainPropertyListNested(const char *qlabel, List *data, ExplainState *es)
 	switch (es->format)
 	{
 		case EXPLAIN_FORMAT_TEXT:
-		case EXPLAIN_FORMAT_XML:
 			ExplainPropertyList(qlabel, data, es);
 			return;
-
 		case EXPLAIN_FORMAT_JSON:
 			ExplainJSONLineEnding(es);
 			appendStringInfoSpaces(es->str, es->indent * 2);
@@ -4239,20 +4174,6 @@ ExplainProperty(const char *qlabel, const char *unit, const char *value,
 				appendStringInfo(es->str, "%s: %s %s\n", qlabel, value, unit);
 			else
 				appendStringInfo(es->str, "%s: %s\n", qlabel, value);
-			break;
-
-		case EXPLAIN_FORMAT_XML:
-			{
-				char	   *str;
-
-				appendStringInfoSpaces(es->str, es->indent * 2);
-				ExplainXMLTag(qlabel, X_OPENING | X_NOWHITESPACE, es);
-				str = escape_xml(value);
-				appendStringInfoString(es->str, str);
-				pfree(str);
-				ExplainXMLTag(qlabel, X_CLOSING | X_NOWHITESPACE, es);
-				appendStringInfoChar(es->str, '\n');
-			}
 			break;
 
 		case EXPLAIN_FORMAT_JSON:
@@ -4355,11 +4276,6 @@ ExplainOpenGroup(const char *objtype, const char *labelname,
 			/* nothing to do */
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			ExplainXMLTag(objtype, X_OPENING, es);
-			es->indent++;
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			ExplainJSONLineEnding(es);
 			appendStringInfoSpaces(es->str, 2 * es->indent);
@@ -4418,11 +4334,6 @@ ExplainCloseGroup(const char *objtype, const char *labelname,
 			/* nothing to do */
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			es->indent--;
-			ExplainXMLTag(objtype, X_CLOSING, es);
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			es->indent--;
 			appendStringInfoChar(es->str, '\n');
@@ -4465,10 +4376,6 @@ ExplainOpenSetAsideGroup(const char *objtype, const char *labelname,
 			/* nothing to do */
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			es->indent += depth;
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			es->grouping_stack = lcons_int(0, es->grouping_stack);
 			es->indent += depth;
@@ -4503,10 +4410,6 @@ ExplainSaveGroup(ExplainState *es, int depth, int *state_save)
 			/* nothing to do */
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			es->indent -= depth;
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			es->indent -= depth;
 			*state_save = linitial_int(es->grouping_stack);
@@ -4531,10 +4434,6 @@ ExplainRestoreGroup(ExplainState *es, int depth, int *state_save)
 	{
 		case EXPLAIN_FORMAT_TEXT:
 			/* nothing to do */
-			break;
-
-		case EXPLAIN_FORMAT_XML:
-			es->indent += depth;
 			break;
 
 		case EXPLAIN_FORMAT_JSON:
@@ -4562,10 +4461,6 @@ ExplainDummyGroup(const char *objtype, const char *labelname, ExplainState *es)
 	{
 		case EXPLAIN_FORMAT_TEXT:
 			/* nothing to do */
-			break;
-
-		case EXPLAIN_FORMAT_XML:
-			ExplainXMLTag(objtype, X_CLOSE_IMMEDIATE, es);
 			break;
 
 		case EXPLAIN_FORMAT_JSON:
@@ -4610,12 +4505,6 @@ ExplainBeginOutput(ExplainState *es)
 			/* nothing to do */
 			break;
 
-		case EXPLAIN_FORMAT_XML:
-			appendStringInfoString(es->str,
-								   "<explain xmlns=\"http://www.postgresql.org/2009/explain\">\n");
-			es->indent++;
-			break;
-
 		case EXPLAIN_FORMAT_JSON:
 			/* top-level structure is an array of plans */
 			appendStringInfoChar(es->str, '[');
@@ -4639,11 +4528,6 @@ ExplainEndOutput(ExplainState *es)
 	{
 		case EXPLAIN_FORMAT_TEXT:
 			/* nothing to do */
-			break;
-
-		case EXPLAIN_FORMAT_XML:
-			es->indent--;
-			appendStringInfoString(es->str, "</explain>");
 			break;
 
 		case EXPLAIN_FORMAT_JSON:
@@ -4671,7 +4555,6 @@ ExplainSeparatePlans(ExplainState *es)
 			appendStringInfoChar(es->str, '\n');
 			break;
 
-		case EXPLAIN_FORMAT_XML:
 		case EXPLAIN_FORMAT_JSON:
 		case EXPLAIN_FORMAT_YAML:
 			/* nothing to do */
@@ -4679,36 +4562,6 @@ ExplainSeparatePlans(ExplainState *es)
 	}
 }
 
-/*
- * Emit opening or closing XML tag.
- *
- * "flags" must contain X_OPENING, X_CLOSING, or X_CLOSE_IMMEDIATE.
- * Optionally, OR in X_NOWHITESPACE to suppress the whitespace we'd normally
- * add.
- *
- * XML restricts tag names more than our other output formats, eg they can't
- * contain white space or slashes.  Replace invalid characters with dashes,
- * so that for example "I/O Read Time" becomes "I-O-Read-Time".
- */
-static void
-ExplainXMLTag(const char *tagname, int flags, ExplainState *es)
-{
-	const char *s;
-	const char *valid = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
-
-	if ((flags & X_NOWHITESPACE) == 0)
-		appendStringInfoSpaces(es->str, 2 * es->indent);
-	appendStringInfoCharMacro(es->str, '<');
-	if ((flags & X_CLOSING) != 0)
-		appendStringInfoCharMacro(es->str, '/');
-	for (s = tagname; *s; s++)
-		appendStringInfoChar(es->str, strchr(valid, *s) ? *s : '-');
-	if ((flags & X_CLOSE_IMMEDIATE) != 0)
-		appendStringInfoString(es->str, " /");
-	appendStringInfoCharMacro(es->str, '>');
-	if ((flags & X_NOWHITESPACE) == 0)
-		appendStringInfoCharMacro(es->str, '\n');
-}
 
 /*
  * Indent a text-format line.

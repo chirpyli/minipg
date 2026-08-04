@@ -75,11 +75,6 @@ extern ParseNamespaceItem *addRangeTableEntryForValues(ParseState *pstate,
 													   Alias *alias,
 													   bool lateral,
 													   bool inFromCl);
-extern ParseNamespaceItem *addRangeTableEntryForTableFunc(ParseState *pstate,
-														  TableFunc *tf,
-														  Alias *alias,
-														  bool lateral,
-														  bool inFromCl);
 extern ParseNamespaceItem *addRangeTableEntryForJoin(ParseState *pstate,
 													 List *colnames,
 													 ParseNamespaceColumn *nscolumns,

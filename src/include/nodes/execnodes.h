@@ -1799,31 +1799,6 @@ typedef struct ValuesScanState
 } ValuesScanState;
 
 /* ----------------
- *		TableFuncScanState node
- *
- * Used in table-expression functions like XMLTABLE.
- * ----------------
- */
-typedef struct TableFuncScanState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	ExprState  *docexpr;		/* state for document expression */
-	ExprState  *rowexpr;		/* state for row-generating expression */
-	List	   *colexprs;		/* state for column-generating expression */
-	List	   *coldefexprs;	/* state for column default expressions */
-	List	   *ns_names;		/* same as TableFunc.ns_names */
-	List	   *ns_uris;		/* list of states of namespace URI exprs */
-	Bitmapset  *notnulls;		/* nullability flag for each output column */
-	void	   *opaque;			/* table builder private space */
-	const struct TableFuncRoutine *routine; /* table builder methods */
-	FmgrInfo   *in_functions;	/* input function for each column */
-	Oid		   *typioparams;	/* typioparam for each column */
-	int64		ordinal;		/* row number to be output next */
-	MemoryContext perTableCxt;	/* per-table context */
-	Tuplestorestate *tupstore;	/* output tuple store */
-} TableFuncScanState;
-
-/* ----------------
  *	 CteScanState information
  *
  *		CteScan nodes are used to scan a CommonTableExpr query.

@@ -415,20 +415,6 @@ CREATE TABLE partitioned (
 ) PARTITION BY RANGE (immut_func(a));
 DROP FUNCTION immut_func(int);
 
--- prevent using columns of unsupported types in key (type must have a btree operator class)
-CREATE TABLE partitioned (
-	a xml
-) PARTITION BY LIST (a);
-CREATE TABLE partitioned (
-	a xml
-) PARTITION BY LIST (a);
-CREATE TABLE partitioned (
-	a xml
-) PARTITION BY RANGE (a);
-CREATE TABLE partitioned (
-	a xml
-) PARTITION BY RANGE (a);
-
 -- cannot add NO INHERIT constraints to partitioned tables
 CREATE TABLE partitioned (
 	a int,

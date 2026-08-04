@@ -136,10 +136,6 @@
 # OIDS 100 - 199
 
 
-{ oid => '142', array_type_oid => '143', descr => 'XML content',
-  typname => 'xml', typlen => '-1', typbyval => 'f', typcategory => 'U',
-  typinput => 'xml_in', typoutput => 'xml_out', typreceive => 'xml_recv',
-  typsend => 'xml_send', typalign => 'i', typstorage => 'x' },
 { oid => '194', descr => 'string representing an internal node tree',
   typname => 'pg_node_tree', typlen => '-1', typbyval => 'f',
   typcategory => 'S', typinput => 'pg_node_tree_in',

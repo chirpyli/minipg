@@ -1985,91 +1985,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
  * Add an entry for a table function to the pstate's range table (p_rtable).
  * Then, construct and return a ParseNamespaceItem for the new RTE.
  *
- * This is much like addRangeTableEntry() except that it makes a tablefunc RTE.
- */
-ParseNamespaceItem *
-addRangeTableEntryForTableFunc(ParseState *pstate,
-							   TableFunc *tf,
-							   Alias *alias,
-							   bool lateral,
-							   bool inFromCl)
-{
-	RangeTblEntry *rte = makeNode(RangeTblEntry);
-	char	   *refname = alias ? alias->aliasname : pstrdup("xmltable");
-	Alias	   *eref;
-	int			numaliases;
-
-	Assert(pstate != NULL);
-
-	/* Disallow more columns than will fit in a tuple */
-	if (list_length(tf->colnames) > MaxTupleAttributeNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_COLUMNS),
-				 errmsg("functions in FROM can return at most %d columns",
-						MaxTupleAttributeNumber),
-				 parser_errposition(pstate,
-									exprLocation((Node *) tf))));
-	Assert(list_length(tf->coltypes) == list_length(tf->colnames));
-	Assert(list_length(tf->coltypmods) == list_length(tf->colnames));
-	Assert(list_length(tf->colcollations) == list_length(tf->colnames));
-
-	rte->rtekind = RTE_TABLEFUNC;
-	rte->relid = InvalidOid;
-	rte->subquery = NULL;
-	rte->tablefunc = tf;
-	rte->coltypes = tf->coltypes;
-	rte->coltypmods = tf->coltypmods;
-	rte->colcollations = tf->colcollations;
-	rte->alias = alias;
-
-	eref = alias ? copyObject(alias) : makeAlias(refname, NIL);
-	numaliases = list_length(eref->colnames);
-
-	/* fill in any unspecified alias columns */
-	if (numaliases < list_length(tf->colnames))
-		eref->colnames = list_concat(eref->colnames,
-									 list_copy_tail(tf->colnames, numaliases));
-
-	if (numaliases > list_length(tf->colnames))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("%s function has %d columns available but %d columns specified",
-						"XMLTABLE", list_length(tf->colnames), numaliases)));
-
-	rte->eref = eref;
-
-	/*
-	 * Set flags and access permissions.
-	 *
-	 * Tablefuncs are never checked for access rights (at least, not by the
-	 * RTE permissions mechanism).
-	 */
-	rte->lateral = lateral;
-	rte->inh = false;			/* never true for tablefunc RTEs */
-	rte->inFromCl = inFromCl;
-
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
-	rte->selectedCols = NULL;
-	rte->insertedCols = NULL;
-	rte->updatedCols = NULL;
-	rte->extraUpdatedCols = NULL;
-
-	/*
-	 * Add completed RTE to pstate's range table list, so that we know its
-	 * index.  But we don't add it to the join list --- caller must do that if
-	 * appropriate.
-	 */
-	pstate->p_rtable = lappend(pstate->p_rtable, rte);
-
-	/*
-	 * Build a ParseNamespaceItem, but don't add it to the pstate's namespace
-	 * list --- caller must do that if appropriate.
-	 */
-	return buildNSItemFromLists(rte, list_length(pstate->p_rtable),
-								rte->coltypes, rte->coltypmods,
-								rte->colcollations);
-}
 
 /*
  * Add an entry for a VALUES list to the pstate's range table (p_rtable).
@@ -2906,7 +2821,6 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 				}
 			}
 			break;
-		case RTE_TABLEFUNC:
 		case RTE_VALUES:
 		case RTE_CTE:
 		case RTE_NAMEDTUPLESTORE:
@@ -3272,7 +3186,6 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 			}
 			break;
 		case RTE_SUBQUERY:
-		case RTE_TABLEFUNC:
 		case RTE_VALUES:
 		case RTE_CTE:
 

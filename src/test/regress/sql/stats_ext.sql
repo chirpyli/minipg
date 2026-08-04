@@ -45,7 +45,6 @@ CREATE STATISTICS tst ON a FROM (VALUES (x)) AS foo;
 CREATE STATISTICS tst ON a FROM foo NATURAL JOIN bar;
 CREATE STATISTICS tst ON a FROM (SELECT * FROM ext_stats_test) AS foo;
 CREATE STATISTICS tst ON a FROM ext_stats_test s TABLESAMPLE system (x);
-CREATE STATISTICS tst ON a FROM XMLTABLE('foo' PASSING 'bar' COLUMNS a text);
 CREATE FUNCTION tftest(int) returns table(a int, b int) as $$
 SELECT $1, $1+i FROM generate_series(1,5) g(i);
 $$ LANGUAGE sql IMMUTABLE STRICT;

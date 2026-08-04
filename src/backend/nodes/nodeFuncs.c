@@ -211,14 +211,6 @@ exprType(const Node *expr)
 		case T_SQLValueFunction:
 			type = ((const SQLValueFunction *) expr)->type;
 			break;
-		case T_XmlExpr:
-			if (((const XmlExpr *) expr)->op == IS_DOCUMENT)
-				type = BOOLOID;
-			else if (((const XmlExpr *) expr)->op == IS_XMLSERIALIZE)
-				type = TEXTOID;
-			else
-				type = XMLOID;
-			break;
 		case T_NullTest:
 			type = BOOLOID;
 			break;
@@ -921,18 +913,6 @@ exprCollation(const Node *expr)
 			else
 				coll = InvalidOid;
 			break;
-		case T_XmlExpr:
-
-			/*
-			 * XMLSERIALIZE returns text from non-collatable inputs, so its
-			 * collation is always default.  The other cases return boolean or
-			 * XML, which are non-collatable.
-			 */
-			if (((const XmlExpr *) expr)->op == IS_XMLSERIALIZE)
-				coll = DEFAULT_COLLATION_OID;
-			else
-				coll = InvalidOid;
-			break;
 		case T_NullTest:
 			/* NullTest's result is boolean ... */
 			coll = InvalidOid;	/* ... so it has no collation */
@@ -1146,11 +1126,6 @@ exprSetCollation(Node *expr, Oid collation)
 				   (collation == C_COLLATION_OID) :
 				   (collation == InvalidOid));
 			break;
-		case T_XmlExpr:
-			Assert((((XmlExpr *) expr)->op == IS_XMLSERIALIZE) ?
-				   (collation == DEFAULT_COLLATION_OID) :
-				   (collation == InvalidOid));
-			break;
 		case T_NullTest:
 			/* NullTest's result is boolean ... */
 			Assert(!OidIsValid(collation)); /* ... so never set a collation */
@@ -1265,9 +1240,6 @@ exprLocation(const Node *expr)
 	{
 		case T_RangeVar:
 			loc = ((const RangeVar *) expr)->location;
-			break;
-		case T_TableFunc:
-			loc = ((const TableFunc *) expr)->location;
 			break;
 		case T_Var:
 			loc = ((const Var *) expr)->location;
@@ -1433,15 +1405,6 @@ exprLocation(const Node *expr)
 			/* function keyword should always be the first thing */
 			loc = ((const SQLValueFunction *) expr)->location;
 			break;
-		case T_XmlExpr:
-			{
-				const XmlExpr *xexpr = (const XmlExpr *) expr;
-
-				/* consider both function name and leftmost arg */
-				loc = leftmostLoc(xexpr->location,
-								  exprLocation((Node *) xexpr->args));
-			}
-			break;
 		case T_NullTest:
 			{
 				const NullTest *nexpr = (const NullTest *) expr;
@@ -1576,10 +1539,6 @@ exprLocation(const Node *expr)
 		case T_FunctionParameter:
 			/* just use typename's location */
 			loc = exprLocation((Node *) ((const FunctionParameter *) expr)->argType);
-			break;
-		case T_XmlSerialize:
-			/* XMLSERIALIZE keyword should always be the first thing */
-			loc = ((const XmlSerialize *) expr)->location;
 			break;
 		case T_GroupingSet:
 			loc = ((const GroupingSet *) expr)->location;
@@ -1720,7 +1679,7 @@ set_sa_opfuncid(ScalarArrayOpExpr *opexpr)
  * for themselves, in case additional checks should be made, or because they
  * have special rules about which parts of the tree need to be visited.
  *
- * Note: we ignore MinMaxExpr, SQLValueFunction, XmlExpr, CoerceToDomain,
+ * Note: we ignore MinMaxExpr, SQLValueFunction, CoerceToDomain,
  * and NextValueExpr nodes, because they do not contain SQL function OIDs.
  * However, they can invoke SQL-visible functions, so callers should take
  * thought about how to treat them.
@@ -2146,17 +2105,6 @@ expression_tree_walker(Node *node,
 			return walker(((CoalesceExpr *) node)->args, context);
 		case T_MinMaxExpr:
 			return walker(((MinMaxExpr *) node)->args, context);
-		case T_XmlExpr:
-			{
-				XmlExpr    *xexpr = (XmlExpr *) node;
-
-				if (walker(xexpr->named_args, context))
-					return true;
-				/* we assume walker doesn't care about arg_names */
-				if (walker(xexpr->args, context))
-					return true;
-			}
-			break;
 		case T_NullTest:
 			return walker(((NullTest *) node)->arg, context);
 		case T_BooleanTest:
@@ -2317,22 +2265,6 @@ expression_tree_walker(Node *node,
 										   walker, context))
 					return true;
 				if (walker((Node *) tsc->repeatable, context))
-					return true;
-			}
-			break;
-		case T_TableFunc:
-			{
-				TableFunc  *tf = (TableFunc *) node;
-
-				if (walker(tf->ns_uris, context))
-					return true;
-				if (walker(tf->docexpr, context))
-					return true;
-				if (walker(tf->rowexpr, context))
-					return true;
-				if (walker(tf->colexprs, context))
-					return true;
-				if (walker(tf->coldefexprs, context))
 					return true;
 			}
 			break;
@@ -2512,10 +2444,6 @@ range_table_entry_walker(RangeTblEntry *rte,
 			break;
 		case RTE_FUNCTION:
 			if (walker(rte->functions, context))
-				return true;
-			break;
-		case RTE_TABLEFUNC:
-			if (walker(rte->tablefunc, context))
 				return true;
 			break;
 		case RTE_VALUES:
@@ -3002,18 +2930,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_XmlExpr:
-			{
-				XmlExpr    *xexpr = (XmlExpr *) node;
-				XmlExpr    *newnode;
-
-				FLATCOPY(newnode, xexpr, XmlExpr);
-				MUTATE(newnode->named_args, xexpr->named_args, List *);
-				/* assume mutator does not care about arg_names */
-				MUTATE(newnode->args, xexpr->args, List *);
-				return (Node *) newnode;
-			}
-			break;
 		case T_NullTest:
 			{
 				NullTest   *ntest = (NullTest *) node;
@@ -3261,20 +3177,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_TableFunc:
-			{
-				TableFunc  *tf = (TableFunc *) node;
-				TableFunc  *newnode;
-
-				FLATCOPY(newnode, tf, TableFunc);
-				MUTATE(newnode->ns_uris, tf->ns_uris, List *);
-				MUTATE(newnode->docexpr, tf->docexpr, Node *);
-				MUTATE(newnode->rowexpr, tf->rowexpr, Node *);
-				MUTATE(newnode->colexprs, tf->colexprs, List *);
-				MUTATE(newnode->coldefexprs, tf->coldefexprs, List *);
-				return (Node *) newnode;
-			}
-			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -3439,9 +3341,6 @@ range_table_mutator(List *rtable,
 			case RTE_FUNCTION:
 				MUTATE(newrte->functions, rte->functions, List *);
 				break;
-			case RTE_TABLEFUNC:
-				MUTATE(newrte->tablefunc, rte->tablefunc, TableFunc *);
-				break;
 			case RTE_VALUES:
 				MUTATE(newrte->values_lists, rte->values_lists, List *);
 				break;
@@ -3596,17 +3495,6 @@ raw_expression_tree_walker(Node *node,
 			return walker(((CoalesceExpr *) node)->args, context);
 		case T_MinMaxExpr:
 			return walker(((MinMaxExpr *) node)->args, context);
-		case T_XmlExpr:
-			{
-				XmlExpr    *xexpr = (XmlExpr *) node;
-
-				if (walker(xexpr->named_args, context))
-					return true;
-				/* we assume walker doesn't care about arg_names */
-				if (walker(xexpr->args, context))
-					return true;
-			}
-			break;
 		case T_NullTest:
 			return walker(((NullTest *) node)->arg, context);
 		case T_BooleanTest:
@@ -3881,32 +3769,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_RangeTableFunc:
-			{
-				RangeTableFunc *rtf = (RangeTableFunc *) node;
-
-				if (walker(rtf->docexpr, context))
-					return true;
-				if (walker(rtf->rowexpr, context))
-					return true;
-				if (walker(rtf->namespaces, context))
-					return true;
-				if (walker(rtf->columns, context))
-					return true;
-				if (walker(rtf->alias, context))
-					return true;
-			}
-			break;
-		case T_RangeTableFuncCol:
-			{
-				RangeTableFuncCol *rtfc = (RangeTableFuncCol *) node;
-
-				if (walker(rtfc->colexpr, context))
-					return true;
-				if (walker(rtfc->coldefexpr, context))
-					return true;
-			}
-			break;
 		case T_TypeName:
 			{
 				TypeName   *tn = (TypeName *) node;
@@ -3944,16 +3806,6 @@ raw_expression_tree_walker(Node *node,
 			return walker(((GroupingSet *) node)->content, context);
 		case T_LockingClause:
 			return walker(((LockingClause *) node)->lockedRels, context);
-		case T_XmlSerialize:
-			{
-				XmlSerialize *xs = (XmlSerialize *) node;
-
-				if (walker(xs->expr, context))
-					return true;
-				if (walker(xs->typeName, context))
-					return true;
-			}
-			break;
 		case T_WithClause:
 			return walker(((WithClause *) node)->ctes, context);
 		case T_InferClause:

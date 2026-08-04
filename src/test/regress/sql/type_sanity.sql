@@ -566,10 +566,8 @@ SELECT oid, typname, typtype, typelem, typarray, typarray
                      'regnamespace', 'regcollation']::regtype[]) AND
     -- Discard types that do not accept input values as these cannot be
     -- tested easily.
-    -- Note: XML might be disabled at compile-time.
     oid != ALL(ARRAY['pg_node_tree',
-                     'pg_ndistinct', 'pg_dependencies', 'pg_mcv_list',
-                     'xml']::regtype[]) AND
+                     'pg_ndistinct', 'pg_dependencies', 'pg_mcv_list']::regtype[]) AND
     -- Discard arrays.
     NOT EXISTS (SELECT 1 FROM pg_type u WHERE u.typarray = t.oid)
     -- Exclude everything from the table created above.  This checks

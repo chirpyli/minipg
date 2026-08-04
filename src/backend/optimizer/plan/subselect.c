@@ -2437,11 +2437,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			}
 			break;
 
-		case T_TableFuncScan:
-			finalize_primnode((Node *) ((TableFuncScan *) plan)->tablefunc,
-							  &context);
-			context.paramids = bms_add_members(context.paramids, scan_params);
-			break;
 
 		case T_ValuesScan:
 			finalize_primnode((Node *) ((ValuesScan *) plan)->values_lists,

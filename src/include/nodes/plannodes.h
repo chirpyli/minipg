@@ -563,16 +563,6 @@ typedef struct ValuesScan
 } ValuesScan;
 
 /* ----------------
- *		TableFunc scan node
- * ----------------
- */
-typedef struct TableFuncScan
-{
-	Scan		scan;
-	TableFunc  *tablefunc;		/* table function node */
-} TableFuncScan;
-
-/* ----------------
  *		CteScan node
  * ----------------
  */

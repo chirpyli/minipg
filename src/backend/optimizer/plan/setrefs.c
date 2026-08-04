@@ -496,7 +496,6 @@ add_rte_to_flat_rtable(PlannerGlobal *glob, RangeTblEntry *rte)
 	newrte->joinrightcols = NIL;
 	newrte->join_using_alias = NULL;
 	newrte->functions = NIL;
-	newrte->tablefunc = NULL;
 	newrte->values_lists = NIL;
 	newrte->coltypes = NIL;
 	newrte->coltypmods = NIL;
@@ -700,22 +699,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 								  rtoffset, NUM_EXEC_QUAL(plan));
 				splan->functions =
 					fix_scan_list(root, splan->functions, rtoffset, 1);
-			}
-			break;
-		case T_TableFuncScan:
-			{
-				TableFuncScan *splan = (TableFuncScan *) plan;
-
-				splan->scan.scanrelid += rtoffset;
-				splan->scan.plan.targetlist =
-					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
-				splan->scan.plan.qual =
-					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
-				splan->tablefunc = (TableFunc *)
-					fix_scan_expr(root, (Node *) splan->tablefunc,
-								  rtoffset, 1);
 			}
 			break;
 		case T_ValuesScan:

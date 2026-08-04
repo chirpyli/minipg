@@ -10,3 +10,7 @@
 
 ## 注意事项
 -  /home/postgres/works/my-github/minipg项目目录下，可以执行rm某个文件的操作，但是不能把整个项目删除，只有确认该文件可被裁剪才可以执行rm操作
+
+
+## 参考
+- postgres源码：/home/postgres/works/opensource/postgres ， 该postgres源码为minipg项目裁剪前的源码，在分析minipg项目时，可以参考该postgres源码

@@ -513,8 +513,6 @@
 { aggfnoid => 'bit_xor(bit)', aggtransfn => 'bitxor', aggcombinefn => 'bitxor',
   aggtranstype => 'bit' },
 
-# xml
-{ aggfnoid => 'xmlagg', aggtransfn => 'xmlconcat2', aggtranstype => 'xml' },
 
 # array
 { aggfnoid => 'array_agg(anynonarray)', aggtransfn => 'array_agg_transfn',

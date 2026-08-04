@@ -117,25 +117,6 @@ _equalRangeVar(const RangeVar *a, const RangeVar *b)
 	return true;
 }
 
-static bool
-_equalTableFunc(const TableFunc *a, const TableFunc *b)
-{
-	COMPARE_NODE_FIELD(ns_uris);
-	COMPARE_NODE_FIELD(ns_names);
-	COMPARE_NODE_FIELD(docexpr);
-	COMPARE_NODE_FIELD(rowexpr);
-	COMPARE_NODE_FIELD(colnames);
-	COMPARE_NODE_FIELD(coltypes);
-	COMPARE_NODE_FIELD(coltypmods);
-	COMPARE_NODE_FIELD(colcollations);
-	COMPARE_NODE_FIELD(colexprs);
-	COMPARE_NODE_FIELD(coldefexprs);
-	COMPARE_BITMAPSET_FIELD(notnulls);
-	COMPARE_SCALAR_FIELD(ordinalitycol);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 static bool
 _equalIntoClause(const IntoClause *a, const IntoClause *b)
@@ -665,21 +646,6 @@ _equalSQLValueFunction(const SQLValueFunction *a, const SQLValueFunction *b)
 	return true;
 }
 
-static bool
-_equalXmlExpr(const XmlExpr *a, const XmlExpr *b)
-{
-	COMPARE_SCALAR_FIELD(op);
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(named_args);
-	COMPARE_NODE_FIELD(arg_names);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_SCALAR_FIELD(xmloption);
-	COMPARE_SCALAR_FIELD(type);
-	COMPARE_SCALAR_FIELD(typmod);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 static bool
 _equalNullTest(const NullTest *a, const NullTest *b)
@@ -2557,33 +2523,7 @@ _equalRangeTableSample(const RangeTableSample *a, const RangeTableSample *b)
 	return true;
 }
 
-static bool
-_equalRangeTableFunc(const RangeTableFunc *a, const RangeTableFunc *b)
-{
-	COMPARE_SCALAR_FIELD(lateral);
-	COMPARE_NODE_FIELD(docexpr);
-	COMPARE_NODE_FIELD(rowexpr);
-	COMPARE_NODE_FIELD(namespaces);
-	COMPARE_NODE_FIELD(columns);
-	COMPARE_NODE_FIELD(alias);
-	COMPARE_LOCATION_FIELD(location);
 
-	return true;
-}
-
-static bool
-_equalRangeTableFuncCol(const RangeTableFuncCol *a, const RangeTableFuncCol *b)
-{
-	COMPARE_STRING_FIELD(colname);
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_SCALAR_FIELD(for_ordinality);
-	COMPARE_SCALAR_FIELD(is_not_null);
-	COMPARE_NODE_FIELD(colexpr);
-	COMPARE_NODE_FIELD(coldefexpr);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 
 static bool
@@ -2711,7 +2651,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_NODE_FIELD(join_using_alias);
 	COMPARE_NODE_FIELD(functions);
 	COMPARE_SCALAR_FIELD(funcordinality);
-	COMPARE_NODE_FIELD(tablefunc);
 	COMPARE_NODE_FIELD(values_lists);
 	COMPARE_STRING_FIELD(ctename);
 	COMPARE_SCALAR_FIELD(ctelevelsup);
@@ -2908,16 +2847,6 @@ _equalCommonTableExpr(const CommonTableExpr *a, const CommonTableExpr *b)
 	return true;
 }
 
-static bool
-_equalXmlSerialize(const XmlSerialize *a, const XmlSerialize *b)
-{
-	COMPARE_SCALAR_FIELD(xmloption);
-	COMPARE_NODE_FIELD(expr);
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 static bool
 _equalRoleSpec(const RoleSpec *a, const RoleSpec *b)
@@ -3123,8 +3052,6 @@ equal(const void *a, const void *b)
 		case T_RangeVar:
 			retval = _equalRangeVar(a, b);
 			break;
-		case T_TableFunc:
-			retval = _equalTableFunc(a, b);
 			break;
 		case T_IntoClause:
 			retval = _equalIntoClause(a, b);
@@ -3228,8 +3155,6 @@ equal(const void *a, const void *b)
 		case T_SQLValueFunction:
 			retval = _equalSQLValueFunction(a, b);
 			break;
-		case T_XmlExpr:
-			retval = _equalXmlExpr(a, b);
 			break;
 		case T_NullTest:
 			retval = _equalNullTest(a, b);
@@ -3728,12 +3653,6 @@ equal(const void *a, const void *b)
 		case T_RangeTableSample:
 			retval = _equalRangeTableSample(a, b);
 			break;
-		case T_RangeTableFunc:
-			retval = _equalRangeTableFunc(a, b);
-			break;
-		case T_RangeTableFuncCol:
-			retval = _equalRangeTableFuncCol(a, b);
-			break;
 		case T_TypeName:
 			retval = _equalTypeName(a, b);
 			break;
@@ -3803,8 +3722,6 @@ equal(const void *a, const void *b)
 		case T_AccessPriv:
 			retval = _equalAccessPriv(a, b);
 			break;
-		case T_XmlSerialize:
-			retval = _equalXmlSerialize(a, b);
 			break;
 		case T_RoleSpec:
 			retval = _equalRoleSpec(a, b);

@@ -72,7 +72,6 @@
 #include "utils/syscache.h"
 #include "utils/typcache.h"
 #include "utils/varlena.h"
-#include "utils/xml.h"
 
 /* ----------
  * Pretty formatting constants
@@ -463,8 +462,6 @@ static void get_const_expr(Const *constval, deparse_context *context,
 static void get_const_collation(Const *constval, deparse_context *context);
 static void simple_quote_literal(StringInfo buf, const char *val);
 static void get_sublink_expr(SubLink *sublink, deparse_context *context);
-static void get_tablefunc(TableFunc *tf, deparse_context *context,
-						  bool showimplicit);
 static void get_from_clause(Query *query, const char *prefix,
 							deparse_context *context);
 static void get_from_clause_item(Node *jtnode, Query *query,
@@ -4406,8 +4403,6 @@ set_relation_column_names(deparse_namespace *dpns, RangeTblEntry *rte,
 		colinfo->printaliases = changed_any;
 	else if (rte->rtekind == RTE_FUNCTION)
 		colinfo->printaliases = true;
-	else if (rte->rtekind == RTE_TABLEFUNC)
-		colinfo->printaliases = false;
 	else if (rte->alias && rte->alias->colnames != NIL)
 		colinfo->printaliases = true;
 	else
@@ -7717,7 +7712,6 @@ get_name_for_var_field(Var *var, int fieldno,
 			/* else fall through to inspect the expression */
 			break;
 		case RTE_FUNCTION:
-		case RTE_TABLEFUNC:
 
 			/*
 			 * We couldn't get here unless a function is declared with one of
@@ -8151,7 +8145,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_CoalesceExpr:
 		case T_MinMaxExpr:
 		case T_SQLValueFunction:
-		case T_XmlExpr:
 		case T_NextValueExpr:
 		case T_NullIfExpr:
 		case T_Aggref:
@@ -8270,7 +8263,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
 				case T_MinMaxExpr:	/* own parentheses */
-				case T_XmlExpr: /* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_GroupingFunc:	/* own parentheses */
@@ -8322,7 +8314,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
 				case T_MinMaxExpr:	/* own parentheses */
-				case T_XmlExpr: /* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_GroupingFunc:	/* own parentheses */
@@ -9193,160 +9184,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_XmlExpr:
-			{
-				XmlExpr    *xexpr = (XmlExpr *) node;
-				bool		needcomma = false;
-				ListCell   *arg;
-				ListCell   *narg;
-				Const	   *con;
-
-				switch (xexpr->op)
-				{
-					case IS_XMLCONCAT:
-						appendStringInfoString(buf, "XMLCONCAT(");
-						break;
-					case IS_XMLELEMENT:
-						appendStringInfoString(buf, "XMLELEMENT(");
-						break;
-					case IS_XMLFOREST:
-						appendStringInfoString(buf, "XMLFOREST(");
-						break;
-					case IS_XMLPARSE:
-						appendStringInfoString(buf, "XMLPARSE(");
-						break;
-					case IS_XMLPI:
-						appendStringInfoString(buf, "XMLPI(");
-						break;
-					case IS_XMLROOT:
-						appendStringInfoString(buf, "XMLROOT(");
-						break;
-					case IS_XMLSERIALIZE:
-						appendStringInfoString(buf, "XMLSERIALIZE(");
-						break;
-					case IS_DOCUMENT:
-						break;
-				}
-				if (xexpr->op == IS_XMLPARSE || xexpr->op == IS_XMLSERIALIZE)
-				{
-					if (xexpr->xmloption == XMLOPTION_DOCUMENT)
-						appendStringInfoString(buf, "DOCUMENT ");
-					else
-						appendStringInfoString(buf, "CONTENT ");
-				}
-				if (xexpr->name)
-				{
-					appendStringInfo(buf, "NAME %s",
-									 quote_identifier(map_xml_name_to_sql_identifier(xexpr->name)));
-					needcomma = true;
-				}
-				if (xexpr->named_args)
-				{
-					if (xexpr->op != IS_XMLFOREST)
-					{
-						if (needcomma)
-							appendStringInfoString(buf, ", ");
-						appendStringInfoString(buf, "XMLATTRIBUTES(");
-						needcomma = false;
-					}
-					forboth(arg, xexpr->named_args, narg, xexpr->arg_names)
-					{
-						Node	   *e = (Node *) lfirst(arg);
-						char	   *argname = strVal(lfirst(narg));
-
-						if (needcomma)
-							appendStringInfoString(buf, ", ");
-						get_rule_expr((Node *) e, context, true);
-						appendStringInfo(buf, " AS %s",
-										 quote_identifier(map_xml_name_to_sql_identifier(argname)));
-						needcomma = true;
-					}
-					if (xexpr->op != IS_XMLFOREST)
-						appendStringInfoChar(buf, ')');
-				}
-				if (xexpr->args)
-				{
-					if (needcomma)
-						appendStringInfoString(buf, ", ");
-					switch (xexpr->op)
-					{
-						case IS_XMLCONCAT:
-						case IS_XMLELEMENT:
-						case IS_XMLFOREST:
-						case IS_XMLPI:
-						case IS_XMLSERIALIZE:
-							/* no extra decoration needed */
-							get_rule_expr((Node *) xexpr->args, context, true);
-							break;
-						case IS_XMLPARSE:
-							Assert(list_length(xexpr->args) == 2);
-
-							get_rule_expr((Node *) linitial(xexpr->args),
-										  context, true);
-
-							con = lsecond_node(Const, xexpr->args);
-							Assert(!con->constisnull);
-							if (DatumGetBool(con->constvalue))
-								appendStringInfoString(buf,
-													   " PRESERVE WHITESPACE");
-							else
-								appendStringInfoString(buf,
-													   " STRIP WHITESPACE");
-							break;
-						case IS_XMLROOT:
-							Assert(list_length(xexpr->args) == 3);
-
-							get_rule_expr((Node *) linitial(xexpr->args),
-										  context, true);
-
-							appendStringInfoString(buf, ", VERSION ");
-							con = (Const *) lsecond(xexpr->args);
-							if (IsA(con, Const) &&
-								con->constisnull)
-								appendStringInfoString(buf, "NO VALUE");
-							else
-								get_rule_expr((Node *) con, context, false);
-
-							con = lthird_node(Const, xexpr->args);
-							if (con->constisnull)
-								 /* suppress STANDALONE NO VALUE */ ;
-							else
-							{
-								switch (DatumGetInt32(con->constvalue))
-								{
-									case XML_STANDALONE_YES:
-										appendStringInfoString(buf,
-															   ", STANDALONE YES");
-										break;
-									case XML_STANDALONE_NO:
-										appendStringInfoString(buf,
-															   ", STANDALONE NO");
-										break;
-									case XML_STANDALONE_NO_VALUE:
-										appendStringInfoString(buf,
-															   ", STANDALONE NO VALUE");
-										break;
-									default:
-										break;
-								}
-							}
-							break;
-						case IS_DOCUMENT:
-							get_rule_expr_paren((Node *) xexpr->args, context, false, node);
-							break;
-					}
-
-				}
-				if (xexpr->op == IS_XMLSERIALIZE)
-					appendStringInfo(buf, " AS %s",
-									 format_type_with_typemod(xexpr->type,
-															  xexpr->typmod));
-				if (xexpr->op == IS_DOCUMENT)
-					appendStringInfoString(buf, " IS DOCUMENT");
-				else
-					appendStringInfoChar(buf, ')');
-			}
-			break;
 
 		case T_NullTest:
 			{
@@ -9613,8 +9450,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_TableFunc:
-			get_tablefunc((TableFunc *) node, context, showimplicit);
 			break;
 
 		default:
@@ -9720,7 +9555,6 @@ looks_like_function(Node *node)
 		case T_CoalesceExpr:
 		case T_MinMaxExpr:
 		case T_SQLValueFunction:
-		case T_XmlExpr:
 			/* these are all accepted by func_expr_common_subexpr */
 			return true;
 		default:
@@ -10289,12 +10123,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoChar(buf, ')');
 			return true;
 
-		case F_XMLEXISTS:
-			/* XMLEXISTS ... extra parens because args are c_expr */
-			appendStringInfoString(buf, "XMLEXISTS((");
-			get_rule_expr((Node *) linitial(expr->args), context, false);
-			appendStringInfoString(buf, ") PASSING (");
-			get_rule_expr((Node *) lsecond(expr->args), context, false);
 			appendStringInfoString(buf, "))");
 			return true;
 	}
@@ -10670,108 +10498,6 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 
 
 /* ----------
- * get_tablefunc			- Parse back a table function
- * ----------
- */
-static void
-get_tablefunc(TableFunc *tf, deparse_context *context, bool showimplicit)
-{
-	StringInfo	buf = context->buf;
-
-	/* XMLTABLE is the only existing implementation.  */
-
-	appendStringInfoString(buf, "XMLTABLE(");
-
-	if (tf->ns_uris != NIL)
-	{
-		ListCell   *lc1,
-				   *lc2;
-		bool		first = true;
-
-		appendStringInfoString(buf, "XMLNAMESPACES (");
-		forboth(lc1, tf->ns_uris, lc2, tf->ns_names)
-		{
-			Node	   *expr = (Node *) lfirst(lc1);
-			Value	   *ns_node = (Value *) lfirst(lc2);
-
-			if (!first)
-				appendStringInfoString(buf, ", ");
-			else
-				first = false;
-
-			if (ns_node != NULL)
-			{
-				get_rule_expr(expr, context, showimplicit);
-				appendStringInfo(buf, " AS %s",
-								 quote_identifier(strVal(ns_node)));
-			}
-			else
-			{
-				appendStringInfoString(buf, "DEFAULT ");
-				get_rule_expr(expr, context, showimplicit);
-			}
-		}
-		appendStringInfoString(buf, "), ");
-	}
-
-	appendStringInfoChar(buf, '(');
-	get_rule_expr((Node *) tf->rowexpr, context, showimplicit);
-	appendStringInfoString(buf, ") PASSING (");
-	get_rule_expr((Node *) tf->docexpr, context, showimplicit);
-	appendStringInfoChar(buf, ')');
-
-	if (tf->colexprs != NIL)
-	{
-		ListCell   *l1;
-		ListCell   *l2;
-		ListCell   *l3;
-		ListCell   *l4;
-		ListCell   *l5;
-		int			colnum = 0;
-
-		appendStringInfoString(buf, " COLUMNS ");
-		forfive(l1, tf->colnames, l2, tf->coltypes, l3, tf->coltypmods,
-				l4, tf->colexprs, l5, tf->coldefexprs)
-		{
-			char	   *colname = strVal(lfirst(l1));
-			Oid			typid = lfirst_oid(l2);
-			int32		typmod = lfirst_int(l3);
-			Node	   *colexpr = (Node *) lfirst(l4);
-			Node	   *coldefexpr = (Node *) lfirst(l5);
-			bool		ordinality = (tf->ordinalitycol == colnum);
-			bool		notnull = bms_is_member(colnum, tf->notnulls);
-
-			if (colnum > 0)
-				appendStringInfoString(buf, ", ");
-			colnum++;
-
-			appendStringInfo(buf, "%s %s", quote_identifier(colname),
-							 ordinality ? "FOR ORDINALITY" :
-							 format_type_with_typemod(typid, typmod));
-			if (ordinality)
-				continue;
-
-			if (coldefexpr != NULL)
-			{
-				appendStringInfoString(buf, " DEFAULT (");
-				get_rule_expr((Node *) coldefexpr, context, showimplicit);
-				appendStringInfoChar(buf, ')');
-			}
-			if (colexpr != NULL)
-			{
-				appendStringInfoString(buf, " PATH (");
-				get_rule_expr((Node *) colexpr, context, showimplicit);
-				appendStringInfoChar(buf, ')');
-			}
-			if (notnull)
-				appendStringInfoString(buf, " NOT NULL");
-		}
-	}
-
-	appendStringInfoChar(buf, ')');
-}
-
-/* ----------
  * get_from_clause			- Parse back a FROM clause
  *
  * "prefix" is the keyword that denotes the start of the list of FROM
@@ -11003,8 +10729,6 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 				if (rte->funcordinality)
 					appendStringInfoString(buf, " WITH ORDINALITY");
 				break;
-			case RTE_TABLEFUNC:
-				get_tablefunc(rte->tablefunc, context, true);
 				break;
 			case RTE_VALUES:
 				/* Values list RTE */

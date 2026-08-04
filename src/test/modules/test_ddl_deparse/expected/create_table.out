@@ -28,7 +28,6 @@ CREATE TABLE datatype_table (
     v_bit4         BIT(4),
     v_varbit       VARBIT,
     v_varbit4      VARBIT(4),
-    v_xml          XML,
     v_uuid         UUID,
     v_pg_snapshot  pg_snapshot,
     v_enum         ENUM_TEST,

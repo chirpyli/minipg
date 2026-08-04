@@ -293,9 +293,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 			case RTE_FUNCTION:
 				JumbleExpr(jstate, (Node *) rte->functions);
 				break;
-			case RTE_TABLEFUNC:
-				JumbleExpr(jstate, (Node *) rte->tablefunc);
-				break;
 			case RTE_VALUES:
 				JumbleExpr(jstate, (Node *) rte->values_lists);
 				break;
@@ -613,15 +610,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				APP_JUMB(svf->typmod);
 			}
 			break;
-		case T_XmlExpr:
-			{
-				XmlExpr    *xexpr = (XmlExpr *) node;
-
-				APP_JUMB(xexpr->op);
-				JumbleExpr(jstate, (Node *) xexpr->named_args);
-				JumbleExpr(jstate, (Node *) xexpr->args);
-			}
-			break;
 		case T_NullTest:
 			{
 				NullTest   *nt = (NullTest *) node;
@@ -803,15 +791,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				RangeTblFunction *rtfunc = (RangeTblFunction *) node;
 
 				JumbleExpr(jstate, rtfunc->funcexpr);
-			}
-			break;
-		case T_TableFunc:
-			{
-				TableFunc  *tablefunc = (TableFunc *) node;
-
-				JumbleExpr(jstate, tablefunc->docexpr);
-				JumbleExpr(jstate, tablefunc->rowexpr);
-				JumbleExpr(jstate, (Node *) tablefunc->colexprs);
 			}
 			break;
 		case T_TableSampleClause:

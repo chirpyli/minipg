@@ -103,7 +103,6 @@
 #include "utils/tzparser.h"
 #include "utils/inval.h"
 #include "utils/varlena.h"
-#include "utils/xml.h"
 
 #define CONFIG_FILENAME "postgresql.conf"
 #define HBA_FILENAME	"pg_hba.conf"
@@ -353,23 +352,6 @@ static const struct config_enum_entry track_function_options[] = {
 StaticAssertDecl(lengthof(track_function_options) == (TRACK_FUNC_ALL + 2),
 				 "array length mismatch");
 
-static const struct config_enum_entry xmlbinary_options[] = {
-	{"base64", XMLBINARY_BASE64, false},
-	{"hex", XMLBINARY_HEX, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(xmlbinary_options) == (XMLBINARY_HEX + 2),
-				 "array length mismatch");
-
-static const struct config_enum_entry xmloption_options[] = {
-	{"content", XMLOPTION_CONTENT, false},
-	{"document", XMLOPTION_DOCUMENT, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(xmloption_options) == (XMLOPTION_CONTENT + 2),
-				 "array length mismatch");
 
 /*
  * Although only "on", "off", and "safe_encoding" are documented, we
@@ -4474,26 +4456,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		NULL, assign_xlog_sync_method, NULL
 	},
 
-	{
-		{"xmlbinary", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets how binary values are to be encoded in XML."),
-			NULL
-		},
-		&xmlbinary,
-		XMLBINARY_BASE64, xmlbinary_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"xmloption", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets whether XML data in implicit parsing and serialization "
-						 "operations is to be considered as documents or content fragments."),
-			NULL
-		},
-		&xmloption,
-		XMLOPTION_CONTENT, xmloption_options,
-		NULL, NULL, NULL
-	},
 
 	{
 		{"huge_pages", PGC_POSTMASTER, RESOURCES_MEM,

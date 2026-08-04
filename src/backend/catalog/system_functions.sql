@@ -231,18 +231,6 @@ CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
  IMMUTABLE PARALLEL SAFE COST 1
 RETURN ($1, ($1 + $2)) overlaps ($3, $4);
 
-CREATE OR REPLACE FUNCTION xpath(text, xml)
- RETURNS xml[]
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN xpath($1, $2, '{}'::text[]);
-
-CREATE OR REPLACE FUNCTION xpath_exists(text, xml)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN xpath_exists($1, $2, '{}'::text[]);
-
 CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
  RETURNS void
  LANGUAGE sql

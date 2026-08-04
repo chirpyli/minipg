@@ -234,7 +234,6 @@ typedef enum ExprEvalOp
 	EEOP_CONVERT_ROWTYPE,
 	EEOP_SCALARARRAYOP,
 	EEOP_HASHED_SCALARARRAYOP,
-	EEOP_XMLEXPR,
 	EEOP_AGGREF,
 	EEOP_GROUPING_FUNC,
 	EEOP_WINDOW_FUNC,
@@ -590,18 +589,6 @@ typedef struct ExprEvalStep
 			PGFunction	hash_fn_addr;	/* actual call address */
 		}			hashedscalararrayop;
 
-		/* for EEOP_XMLEXPR */
-		struct
-		{
-			XmlExpr    *xexpr;	/* original expression node */
-			/* workspace for evaluating named args, if any */
-			Datum	   *named_argvalue;
-			bool	   *named_argnull;
-			/* workspace for evaluating unnamed args, if any */
-			Datum	   *argvalue;
-			bool	   *argnull;
-		}			xmlexpr;
-
 		/* for EEOP_AGGREF */
 		struct
 		{
@@ -765,7 +752,6 @@ extern void ExecEvalHashedScalarArrayOp(ExprState *state, ExprEvalStep *op,
 										ExprContext *econtext);
 extern void ExecEvalConstraintNotNull(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalConstraintCheck(ExprState *state, ExprEvalStep *op);
-extern void ExecEvalXmlExpr(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalGroupingFunc(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalSubPlan(ExprState *state, ExprEvalStep *op,
 							ExprContext *econtext);

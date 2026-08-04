@@ -407,10 +407,6 @@
 
 { castsource => 'bool', casttarget => 'text', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
-{ castsource => 'xml', casttarget => 'text', castfunc => '0',
-  castcontext => 'a', castmethod => 'b' },
-{ castsource => 'text', casttarget => 'xml', castfunc => 'xml',
-  castcontext => 'e', castmethod => 'f' },
 
 # Cross-category casts to and from VARCHAR
 # We support all the same casts as for TEXT.
@@ -418,10 +414,6 @@
 
 { castsource => 'bool', casttarget => 'varchar', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
-{ castsource => 'xml', casttarget => 'varchar', castfunc => '0',
-  castcontext => 'a', castmethod => 'b' },
-{ castsource => 'varchar', casttarget => 'xml', castfunc => 'xml',
-  castcontext => 'e', castmethod => 'f' },
 
 # Cross-category casts to and from BPCHAR
 # We support all the same casts as for TEXT.
@@ -429,10 +421,6 @@
 
 { castsource => 'bool', casttarget => 'bpchar', castfunc => 'text(bool)',
   castcontext => 'a', castmethod => 'f' },
-{ castsource => 'xml', casttarget => 'bpchar', castfunc => '0',
-  castcontext => 'a', castmethod => 'b' },
-{ castsource => 'bpchar', casttarget => 'xml', castfunc => 'xml',
-  castcontext => 'e', castmethod => 'f' },
 
 # Length-coercion functions
 { castsource => 'bpchar', casttarget => 'bpchar',

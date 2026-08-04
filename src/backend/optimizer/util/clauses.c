@@ -402,8 +402,8 @@ contain_mutable_functions_walker(Node *node, void *context)
 	/*
 	 * It should be safe to treat MinMaxExpr as immutable, because it will
 	 * depend on a non-cross-type btree comparison function, and those should
-	 * always be immutable.  Treating XmlExpr as immutable is more dubious,
-	 * and treating CoerceToDomain as immutable is outright dangerous.  But we
+	 * always be immutable.  Treating CoerceToDomain as immutable is outright
+	 * dangerous.  But we
 	 * have done so historically, and changing this would probably cause more
 	 * problems than it would fix.  In practice, if you have a non-immutable
 	 * domain constraint you are in for pain anyhow.
@@ -574,7 +574,7 @@ contain_volatile_functions_walker(Node *node, void *context)
 
 	/*
 	 * See notes in contain_mutable_functions_walker about why we treat
-	 * MinMaxExpr, XmlExpr, and CoerceToDomain as immutable, while
+	 * MinMaxExpr and CoerceToDomain as immutable, while
 	 * SQLValueFunction is stable.  Hence, none of them are of interest here.
 	 */
 
@@ -648,7 +648,7 @@ contain_volatile_functions_not_nextval_walker(Node *node, void *context)
 
 	/*
 	 * See notes in contain_mutable_functions_walker about why we treat
-	 * MinMaxExpr, XmlExpr, and CoerceToDomain as immutable, while
+	 * MinMaxExpr and CoerceToDomain as immutable, while
 	 * SQLValueFunction is stable.  Hence, none of them are of interest here.
 	 * Also, since we're intentionally ignoring nextval(), presumably we
 	 * should ignore NextValueExpr.
@@ -791,8 +791,7 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 
 	/*
 	 * It should be OK to treat MinMaxExpr as parallel-safe, since btree
-	 * opclass support functions are generally parallel-safe.  XmlExpr is a
-	 * bit more dubious but we can probably get away with it.  We err on the
+	 * opclass support functions are generally parallel-safe.  We err on the
 	 * side of caution by treating CoerceToDomain as parallel-restricted.
 	 * (Note: in principle that's wrong because a domain constraint could
 	 * contain a parallel-unsafe function; but useful constraints probably
@@ -1063,8 +1062,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 	else if (IsA(node, CoalesceExpr))
 		return true;
 	else if (IsA(node, MinMaxExpr))
-		return true;
-	else if (IsA(node, XmlExpr))
 		return true;
 	else if (IsA(node, NullTest))
 		return true;

@@ -379,7 +379,6 @@ markTargetListOrigin(ParseState *pstate, TargetEntry *tle,
 		case RTE_JOIN:
 		case RTE_FUNCTION:
 		case RTE_VALUES:
-		case RTE_TABLEFUNC:
 		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 			/* not a simple relation, leave it unmarked */
@@ -1623,6 +1622,43 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 
 					return expandRecordVariable(&mypstate, (Var *) expr, 0);
 				}
+			/* else fall through to inspect the expression */
+		}
+		break;
+		case RTE_CTE:
+			/* CTE reference: examine subquery's output expr */
+			if (!rte->self_reference)
+			{
+				CommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
+				TargetEntry *ste;
+
+				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
+				if (ste == NULL || ste->resjunk)
+					elog(ERROR, "CTE %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				expr = (Node *) ste->expr;
+				if (IsA(expr, Var))
+				{
+					/*
+					 * Recurse into the CTE to see what its Var refers to. We
+					 * have to build an additional level of ParseState to keep
+					 * in step with varlevelsup in the CTE; furthermore it
+					 * could be an outer CTE (compare SUBQUERY case above).
+					 */
+					ParseState	mypstate = {0};
+					Index		levelsup;
+
+					/* this loop must work, since GetCTEForRTE did */
+					for (levelsup = 0;
+						 levelsup < rte->ctelevelsup + netlevelsup;
+						 levelsup++)
+						pstate = pstate->parentParseState;
+					mypstate.parentParseState = pstate;
+					mypstate.p_rtable = ((Query *) cte->ctequery)->rtable;
+					/* don't bother filling the rest of the fake pstate */
+
+					return expandRecordVariable(&mypstate, (Var *) expr, 0);
+				}
 				/* else fall through to inspect the expression */
 			}
 			break;
@@ -1643,13 +1679,6 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 			 * its result columns as RECORD, which is not allowed.
 			 */
 			break;
-		case RTE_TABLEFUNC:
-
-			/*
-			 * Table function cannot have columns with RECORD type.
-			 */
-			break;
-		case RTE_CTE:
 			/* CTE reference: examine subquery's output expr */
 			if (!rte->self_reference)
 			{
@@ -1941,42 +1970,9 @@ FigureColnameInternal(Node *node, char **name)
 					return 2;
 				case SVFOP_CURRENT_SCHEMA:
 					*name = "current_schema";
-					return 2;
-			}
-			break;
-		case T_XmlExpr:
-			/* make SQL/XML functions act like a regular function */
-			switch (((XmlExpr *) node)->op)
-			{
-				case IS_XMLCONCAT:
-					*name = "xmlconcat";
-					return 2;
-				case IS_XMLELEMENT:
-					*name = "xmlelement";
-					return 2;
-				case IS_XMLFOREST:
-					*name = "xmlforest";
-					return 2;
-				case IS_XMLPARSE:
-					*name = "xmlparse";
-					return 2;
-				case IS_XMLPI:
-					*name = "xmlpi";
-					return 2;
-				case IS_XMLROOT:
-					*name = "xmlroot";
-					return 2;
-				case IS_XMLSERIALIZE:
-					*name = "xmlserialize";
-					return 2;
-				case IS_DOCUMENT:
-					/* nothing */
-					break;
-			}
-			break;
-		case T_XmlSerialize:
-			*name = "xmlserialize";
 			return 2;
+		}
+		break;
 		default:
 			break;
 	}

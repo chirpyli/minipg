@@ -887,13 +887,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 			rte->functions = (List *)
 				preprocess_expression(root, (Node *) rte->functions, kind);
 		}
-		else if (rte->rtekind == RTE_TABLEFUNC)
-		{
-			/* Preprocess the function expression(s) fully */
-			kind = rte->lateral ? EXPRKIND_TABLEFUNC_LATERAL : EXPRKIND_TABLEFUNC;
-			rte->tablefunc = (TableFunc *)
-				preprocess_expression(root, (Node *) rte->tablefunc, kind);
-		}
 		else if (rte->rtekind == RTE_VALUES)
 		{
 			/* Preprocess the values lists fully */

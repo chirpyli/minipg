@@ -527,30 +527,6 @@ _readRangeVar(void)
 	READ_DONE();
 }
 
-/*
- * _readTableFunc
- */
-static TableFunc *
-_readTableFunc(void)
-{
-	READ_LOCALS(TableFunc);
-
-	READ_NODE_FIELD(ns_uris);
-	READ_NODE_FIELD(ns_names);
-	READ_NODE_FIELD(docexpr);
-	READ_NODE_FIELD(rowexpr);
-	READ_NODE_FIELD(colnames);
-	READ_NODE_FIELD(coltypes);
-	READ_NODE_FIELD(coltypmods);
-	READ_NODE_FIELD(colcollations);
-	READ_NODE_FIELD(colexprs);
-	READ_NODE_FIELD(coldefexprs);
-	READ_BITMAPSET_FIELD(notnulls);
-	READ_INT_FIELD(ordinalitycol);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
 
 static IntoClause *
 _readIntoClause(void)
@@ -1157,26 +1133,6 @@ _readSQLValueFunction(void)
 	READ_DONE();
 }
 
-/*
- * _readXmlExpr
- */
-static XmlExpr *
-_readXmlExpr(void)
-{
-	READ_LOCALS(XmlExpr);
-
-	READ_ENUM_FIELD(op, XmlExprOp);
-	READ_STRING_FIELD(name);
-	READ_NODE_FIELD(named_args);
-	READ_NODE_FIELD(arg_names);
-	READ_NODE_FIELD(args);
-	READ_ENUM_FIELD(xmloption, XmlOptionType);
-	READ_OID_FIELD(type);
-	READ_INT_FIELD(typmod);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
 
 /*
  * _readNullTest
@@ -1457,18 +1413,6 @@ _readRangeTblEntry(void)
 		case RTE_FUNCTION:
 			READ_NODE_FIELD(functions);
 			READ_BOOL_FIELD(funcordinality);
-			break;
-		case RTE_TABLEFUNC:
-			READ_NODE_FIELD(tablefunc);
-			/* The RTE must have a copy of the column type info, if any */
-			if (local_node->tablefunc)
-			{
-				TableFunc  *tf = local_node->tablefunc;
-
-				local_node->coltypes = tf->coltypes;
-				local_node->coltypmods = tf->coltypmods;
-				local_node->colcollations = tf->colcollations;
-			}
 			break;
 		case RTE_VALUES:
 			READ_NODE_FIELD(values_lists);
@@ -2001,20 +1945,6 @@ _readValuesScan(void)
 	READ_DONE();
 }
 
-/*
- * _readTableFuncScan
- */
-static TableFuncScan *
-_readTableFuncScan(void)
-{
-	READ_LOCALS(TableFuncScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_NODE_FIELD(tablefunc);
-
-	READ_DONE();
-}
 
 /*
  * _readCteScan
@@ -2752,8 +2682,6 @@ parseNodeString(void)
 		return_value = _readRangeVar();
 	else if (MATCH("INTOCLAUSE", 10))
 		return_value = _readIntoClause();
-	else if (MATCH("TABLEFUNC", 9))
-		return_value = _readTableFunc();
 	else if (MATCH("VAR", 3))
 		return_value = _readVar();
 	else if (MATCH("CONST", 5))
@@ -2816,8 +2744,6 @@ parseNodeString(void)
 		return_value = _readMinMaxExpr();
 	else if (MATCH("SQLVALUEFUNCTION", 16))
 		return_value = _readSQLValueFunction();
-	else if (MATCH("XMLEXPR", 7))
-		return_value = _readXmlExpr();
 	else if (MATCH("NULLTEST", 8))
 		return_value = _readNullTest();
 	else if (MATCH("BOOLEANTEST", 11))
@@ -2902,8 +2828,6 @@ parseNodeString(void)
 		return_value = _readFunctionScan();
 	else if (MATCH("VALUESSCAN", 10))
 		return_value = _readValuesScan();
-	else if (MATCH("TABLEFUNCSCAN", 13))
-		return_value = _readTableFuncScan();
 	else if (MATCH("CTESCAN", 7))
 		return_value = _readCteScan();
 	else if (MATCH("NAMEDTUPLESTORESCAN", 19))

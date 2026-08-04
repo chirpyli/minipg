@@ -84,8 +84,7 @@ OBJS = \
 	version.o \
 	windowfuncs.o \
 	xid.o \
-	xid8funcs.o \
-	xml.o
+	xid8funcs.o
 
 clean distclean maintainer-clean:
 	rm -f lex.backup

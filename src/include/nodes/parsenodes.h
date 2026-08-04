@@ -582,39 +582,6 @@ typedef struct RangeFunction
 } RangeFunction;
 
 /*
- * RangeTableFunc - raw form of "table functions" such as XMLTABLE
- */
-typedef struct RangeTableFunc
-{
-	NodeTag		type;
-	bool		lateral;		/* does it have LATERAL prefix? */
-	Node	   *docexpr;		/* document expression */
-	Node	   *rowexpr;		/* row generator expression */
-	List	   *namespaces;		/* list of namespaces as ResTarget */
-	List	   *columns;		/* list of RangeTableFuncCol */
-	Alias	   *alias;			/* table alias & optional column aliases */
-	int			location;		/* token location, or -1 if unknown */
-} RangeTableFunc;
-
-/*
- * RangeTableFuncCol - one column in a RangeTableFunc->columns
- *
- * If for_ordinality is true (FOR ORDINALITY), then the column is an int4
- * column and the rest of the fields are ignored.
- */
-typedef struct RangeTableFuncCol
-{
-	NodeTag		type;
-	char	   *colname;		/* name of generated column */
-	TypeName   *typeName;		/* type of generated column */
-	bool		for_ordinality; /* does it have FOR ORDINALITY? */
-	bool		is_not_null;	/* does it have NOT NULL? */
-	Node	   *colexpr;		/* column filter expression */
-	Node	   *coldefexpr;		/* column default value expression */
-	int			location;		/* token location, or -1 if unknown */
-} RangeTableFuncCol;
-
-/*
  * RangeTableSample - TABLESAMPLE appearing in a raw FROM clause
  *
  * This node, appearing only in raw parse trees, represents
@@ -765,18 +732,6 @@ typedef struct LockingClause
 	LockClauseStrength strength;
 	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
 } LockingClause;
-
-/*
- * XMLSERIALIZE (in raw parse tree only)
- */
-typedef struct XmlSerialize
-{
-	NodeTag		type;
-	XmlOptionType xmloption;	/* DOCUMENT or CONTENT */
-	Node	   *expr;
-	TypeName   *typeName;
-	int			location;		/* token location, or -1 if unknown */
-} XmlSerialize;
 
 /* Partitioning related definitions */
 
@@ -972,7 +927,6 @@ typedef enum RTEKind
 	RTE_SUBQUERY,				/* subquery in FROM */
 	RTE_JOIN,					/* join */
 	RTE_FUNCTION,				/* function in FROM */
-	RTE_TABLEFUNC,				/* TableFunc(.., column list) */
 	RTE_VALUES,					/* VALUES (<exprlist>), (<exprlist>), ... */
 	RTE_CTE,					/* common table expr (WITH list element) */
 	RTE_NAMEDTUPLESTORE,		/* tuplestore, e.g. for AFTER triggers */
@@ -1089,11 +1043,6 @@ typedef struct RangeTblEntry
 	bool		funcordinality; /* is this called WITH ORDINALITY? */
 
 	/*
-	 * Fields valid for a TableFunc RTE (else NULL):
-	 */
-	TableFunc  *tablefunc;
-
-	/*
 	 * Fields valid for a values RTE (else NIL):
 	 */
 	List	   *values_lists;	/* list of expression lists */
@@ -1106,7 +1055,7 @@ typedef struct RangeTblEntry
 	bool		self_reference; /* is this a recursive self-reference? */
 
 	/*
-	 * Fields valid for CTE, VALUES, ENR, and TableFunc RTEs (else NIL):
+	 * Fields valid for CTE, VALUES, and ENR RTEs (else NIL):
 	 *
 	 * We need these for CTE RTEs so that the types of self-referential
 	 * columns are well-defined.  For VALUES RTEs, storing these explicitly
@@ -1114,9 +1063,7 @@ typedef struct RangeTblEntry
 	 * ENRs, we store the types explicitly here (we could get the information
 	 * from the catalogs if 'relid' was supplied, but we'd still need these
 	 * for TupleDesc-based ENRs, so we might as well always store the type
-	 * info here).  For TableFuncs, these fields are redundant with data in
-	 * the TableFunc node, but keeping them here allows some code sharing with
-	 * the other cases.
+	 * info here).
 	 *
 	 * For ENRs only, we have to consider the possibility of dropped columns.
 	 * A dropped column is included in these lists, but it will have zeroes in
