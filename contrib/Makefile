@@ -10,7 +10,6 @@ SUBDIRS = \
 		pageinspect	\
 		pg_buffercache	\
 		pg_freespacemap \
-		pg_stat_statements \
 		pg_surgery	\
 		pgrowlocks	\
 		pgstattuple	\
