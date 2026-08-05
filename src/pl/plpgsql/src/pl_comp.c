@@ -1750,7 +1750,6 @@ plpgsql_parse_cwordtype(List *idents)
 	if (classStruct->relkind != RELKIND_RELATION &&
 		classStruct->relkind != RELKIND_SEQUENCE &&
 		classStruct->relkind != RELKIND_VIEW &&
-		classStruct->relkind != RELKIND_MATVIEW &&
 		classStruct->relkind != RELKIND_COMPOSITE_TYPE &&
 		classStruct->relkind != RELKIND_PARTITIONED_TABLE)
 		goto done;

@@ -392,7 +392,6 @@ typedef enum NodeTag
 	T_AlterExtensionContentsStmt,
 	T_CreateEventTrigStmt,
 	T_AlterEventTrigStmt,
-	T_RefreshMatViewStmt,
 	T_ReplicaIdentityStmt,
 	T_AlterSystemStmt,
 	T_CreateTransformStmt,

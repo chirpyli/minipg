@@ -1739,7 +1739,6 @@ typedef enum ObjectType
 	OBJECT_INDEX,
 	OBJECT_LANGUAGE,
 	OBJECT_LARGEOBJECT,
-	OBJECT_MATVIEW,
 	OBJECT_OPCLASS,
 	OBJECT_OPERATOR,
 	OBJECT_OPFAMILY,
@@ -3097,22 +3096,10 @@ typedef struct CreateTableAsStmt
 	NodeTag		type;
 	Node	   *query;			/* the query (see comments above) */
 	IntoClause *into;			/* destination table */
-	ObjectType	objtype;		/* OBJECT_TABLE or OBJECT_MATVIEW */
+	ObjectType	objtype;		/* OBJECT_TABLE */
 	bool		is_select_into; /* it was written as SELECT INTO */
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 } CreateTableAsStmt;
-
-/* ----------------------
- *		REFRESH MATERIALIZED VIEW Statement
- * ----------------------
- */
-typedef struct RefreshMatViewStmt
-{
-	NodeTag		type;
-	bool		concurrent;		/* allow concurrent access? */
-	bool		skipData;		/* true for WITH NO DATA */
-	RangeVar   *relation;		/* relation to insert into */
-} RefreshMatViewStmt;
 
 /* ----------------------
  * Checkpoint Statement

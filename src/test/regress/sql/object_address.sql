@@ -26,7 +26,6 @@ CREATE TABLE addr_nsp.parttable (
 	a int PRIMARY KEY
 ) PARTITION BY RANGE (a);
 CREATE VIEW addr_nsp.genview AS SELECT * from addr_nsp.gentable;
-CREATE MATERIALIZED VIEW addr_nsp.genmatview AS SELECT * FROM addr_nsp.gentable;
 CREATE TYPE addr_nsp.gencomptype AS (a int);
 CREATE TYPE addr_nsp.genenum AS ENUM ('one', 'two');
 CREATE FOREIGN TABLE addr_nsp.genftable (a int) SERVER addr_fserv;
@@ -62,7 +61,7 @@ DECLARE
 	objtype text;
 BEGIN
 	FOR objtype IN VALUES ('toast table'), ('index column'), ('sequence column'),
-		('toast table column'), ('view column'), ('materialized view column')
+		('toast table column'), ('view column')
 	LOOP
 		BEGIN
 			PERFORM pg_get_object_address(objtype, '{one}', '{}');
@@ -87,7 +86,7 @@ DECLARE
 BEGIN
 	FOR objtype IN VALUES
 		('table'), ('index'), ('sequence'), ('view'),
-		('materialized view'), ('foreign table'),
+		('foreign table'),
 		('table column'), ('foreign table column'),
 		('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
 		('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
@@ -151,7 +150,6 @@ WITH objects (type, name, args) AS (VALUES
 				('sequence', '{addr_nsp, gentable_a_seq}', '{}'),
 				-- toast table
 				('view', '{addr_nsp, genview}', '{}'),
-				('materialized view', '{addr_nsp, genmatview}', '{}'),
 				('foreign table', '{addr_nsp, genftable}', '{}'),
 				('table column', '{addr_nsp, gentable, b}', '{}'),
 				('foreign table column', '{addr_nsp, genftable, a}', '{}'),

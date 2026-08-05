@@ -960,7 +960,6 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_INDEX:
 		case OBJECT_LANGUAGE:
 		case OBJECT_LARGEOBJECT:
-		case OBJECT_MATVIEW:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPERATOR:
 		case OBJECT_OPFAMILY:

@@ -33,7 +33,6 @@
 #include "access/xact.h"
 #include "commands/copy.h"
 #include "commands/createas.h"
-#include "commands/matview.h"
 #include "executor/functions.h"
 #include "executor/tqueue.h"
 #include "executor/tstoreReceiver.h"

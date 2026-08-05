@@ -2316,8 +2316,7 @@ heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
 	 * If the new tuple is too big for storage or contains already toasted
 	 * out-of-line attributes from some other relation, invoke the toaster.
 	 */
-	if (relation->rd_rel->relkind != RELKIND_RELATION &&
-		relation->rd_rel->relkind != RELKIND_MATVIEW)
+	if (relation->rd_rel->relkind != RELKIND_RELATION)
 	{
 		/* toast table entries should never be recursively toasted */
 		Assert(!HeapTupleHasExternal(tup));
@@ -3117,8 +3116,7 @@ l1:
 	 * because we need to look at the contents of the tuple, but it's OK to
 	 * release the content lock on the buffer first.
 	 */
-	if (relation->rd_rel->relkind != RELKIND_RELATION &&
-		relation->rd_rel->relkind != RELKIND_MATVIEW)
+	if (relation->rd_rel->relkind != RELKIND_RELATION)
 	{
 		/* toast table entries should never be recursively toasted */
 		Assert(!HeapTupleHasExternal(&tp));
@@ -3766,8 +3764,7 @@ l2:
 	 * We need to invoke the toaster if there are already any out-of-line
 	 * toasted values present, or if the new tuple is over-threshold.
 	 */
-	if (relation->rd_rel->relkind != RELKIND_RELATION &&
-		relation->rd_rel->relkind != RELKIND_MATVIEW)
+	if (relation->rd_rel->relkind != RELKIND_RELATION)
 	{
 		/* toast table entries should never be recursively toasted */
 		Assert(!HeapTupleHasExternal(&oldtup));

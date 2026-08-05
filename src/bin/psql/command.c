@@ -5123,11 +5123,6 @@ get_create_object_cmd(EditableObjectType obj_type, Oid oid,
 					 */
 					switch (relkind[0])
 					{
-#ifdef NOT_USED
-						case RELKIND_MATVIEW:
-							appendPQExpBufferStr(buf, "CREATE OR REPLACE MATERIALIZED VIEW ");
-							break;
-#endif
 						case RELKIND_VIEW:
 							appendPQExpBufferStr(buf, "CREATE OR REPLACE VIEW ");
 							break;

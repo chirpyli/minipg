@@ -1139,7 +1139,6 @@ permissionsList(const char *pattern)
 					  "  CASE c.relkind"
 					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_MATVIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
 					  " END as \"%s\",\n"
@@ -1168,9 +1167,8 @@ permissionsList(const char *pattern)
 						 "     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n"
 						 "WHERE c.relkind IN ("
 						 CppAsString2(RELKIND_RELATION) ","
-						 CppAsString2(RELKIND_VIEW) ","
-						 CppAsString2(RELKIND_MATVIEW) ","
-						 CppAsString2(RELKIND_SEQUENCE) ","
+					 CppAsString2(RELKIND_VIEW) ","
+					 CppAsString2(RELKIND_SEQUENCE) ","
 						 CppAsString2(RELKIND_PARTITIONED_TABLE) ")\n");
 
 	/*
@@ -1962,7 +1960,6 @@ describeOneTableDetails(const char *schemaname,
 	/* Identify whether we should print collation, nullable, default vals */
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
-		tableinfo.relkind == RELKIND_MATVIEW ||
 		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
 		tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 		show_column_details = true;
@@ -2031,8 +2028,7 @@ describeOneTableDetails(const char *schemaname,
 		if (pset.sversion >= 140000 &&
 			!pset.hide_compression &&
 			(tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
-			 tableinfo.relkind == RELKIND_MATVIEW))
+			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE))
 		{
 			appendPQExpBufferStr(&buf, ",\n  a.attcompression AS attcompression");
 			attcompression_col = cols++;
@@ -2042,10 +2038,9 @@ describeOneTableDetails(const char *schemaname,
 		if (tableinfo.relkind == RELKIND_RELATION ||
 			tableinfo.relkind == RELKIND_INDEX ||
 			tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
-			tableinfo.relkind == RELKIND_MATVIEW ||
 			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 		{
-			appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
+		appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
 			attstattarget_col = cols++;
 		}
 
@@ -2053,12 +2048,11 @@ describeOneTableDetails(const char *schemaname,
 		 * In 9.0+, we have column comments for: relations, views, composite
 		 * types, and foreign tables (cf. CommentObject() in comment.c).
 		 */
-		if (tableinfo.relkind == RELKIND_RELATION ||
-			tableinfo.relkind == RELKIND_VIEW ||
-			tableinfo.relkind == RELKIND_MATVIEW ||
-			tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
-			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
-		{
+	if (tableinfo.relkind == RELKIND_RELATION ||
+		tableinfo.relkind == RELKIND_VIEW ||
+		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
+		tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+	{
 			appendPQExpBufferStr(&buf, ",\n  pg_catalog.col_description(a.attrelid, a.attnum)");
 			attdescr_col = cols++;
 		}
@@ -2087,14 +2081,6 @@ describeOneTableDetails(const char *schemaname,
 		case RELKIND_VIEW:
 			printfPQExpBuffer(&title, _("View \"%s.%s\""),
 							  schemaname, relationname);
-			break;
-		case RELKIND_MATVIEW:
-			if (tableinfo.relpersistence == 'u')
-				printfPQExpBuffer(&title, _("Unlogged materialized view \"%s.%s\""),
-								  schemaname, relationname);
-			else
-				printfPQExpBuffer(&title, _("Materialized view \"%s.%s\""),
-								  schemaname, relationname);
 			break;
 		case RELKIND_INDEX:
 			if (tableinfo.relpersistence == 'u')
@@ -2470,7 +2456,6 @@ describeOneTableDetails(const char *schemaname,
 	}
 	/* If you add relkinds here, see also "Finish printing..." stanza below */
 	else if (tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == RELKIND_MATVIEW ||
 			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
 			 tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
 			 tableinfo.relkind == RELKIND_TOASTVALUE)
@@ -2926,7 +2911,7 @@ describeOneTableDetails(const char *schemaname,
 		}
 
 		/* print rules */
-		if (tableinfo.hasrules && tableinfo.relkind != RELKIND_MATVIEW)
+		if (tableinfo.hasrules)
 		{
 			if (pset.sversion >= 80300)
 			{
@@ -3057,8 +3042,7 @@ describeOneTableDetails(const char *schemaname,
 	}
 
 	/* Get view_def if table is a view or materialized view */
-	if ((tableinfo.relkind == RELKIND_VIEW ||
-		 tableinfo.relkind == RELKIND_MATVIEW) && verbose)
+	if (tableinfo.relkind == RELKIND_VIEW && verbose)
 	{
 		PGresult   *result;
 
@@ -3297,7 +3281,6 @@ describeOneTableDetails(const char *schemaname,
 	 * Finish printing the footer information about a table.
 	 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
-		tableinfo.relkind == RELKIND_MATVIEW ||
 		tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
 		tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
 		tableinfo.relkind == RELKIND_TOASTVALUE)
@@ -3453,8 +3436,7 @@ describeOneTableDetails(const char *schemaname,
 		}
 
 		if (verbose &&
-			(tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == RELKIND_MATVIEW) &&
+			tableinfo.relkind == RELKIND_RELATION &&
 
 		/*
 		 * No need to display default values; we already display a REPLICA
@@ -3475,8 +3457,8 @@ describeOneTableDetails(const char *schemaname,
 			printTableAddFooter(&cont, buf.data);
 		}
 
-		/* OIDs, if verbose and not a materialized view */
-		if (verbose && tableinfo.relkind != RELKIND_MATVIEW && tableinfo.hasoids)
+		/* OIDs, if verbose */
+		if (verbose && tableinfo.hasoids)
 			printTableAddFooter(&cont, _("Has OIDs: yes"));
 
 		/* Tablespace info */
@@ -3534,7 +3516,6 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
 {
 	/* relkinds for which we support tablespaces */
 	if (relkind == RELKIND_RELATION ||
-		relkind == RELKIND_MATVIEW ||
 		relkind == RELKIND_INDEX ||
 		relkind == RELKIND_PARTITIONED_TABLE ||
 		relkind == RELKIND_PARTITIONED_INDEX ||
@@ -3889,7 +3870,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  "  CASE c.relkind"
 					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_MATVIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_INDEX) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
@@ -3997,8 +3977,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	}
 	if (showViews)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_VIEW) ",");
-	if (showMatViews)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_MATVIEW) ",");
 	if (showIndexes)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ","
 							 CppAsString2(RELKIND_PARTITIONED_INDEX) ",");

@@ -2119,9 +2119,6 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		 * In that case this test would need to be postponed till after we've
 		 * opened the rel, so that we could check its state.
 		 */
-		if (rte->relkind == RELKIND_MATVIEW)
-			continue;
-
 		/*
 		 * In INSERT ... ON CONFLICT, ignore the EXCLUDED pseudo-relation;
 		 * even if it points to a view, we needn't expand it, and should not

@@ -3933,18 +3933,6 @@ _copyCreateTableAsStmt(const CreateTableAsStmt *from)
 	return newnode;
 }
 
-static RefreshMatViewStmt *
-_copyRefreshMatViewStmt(const RefreshMatViewStmt *from)
-{
-	RefreshMatViewStmt *newnode = makeNode(RefreshMatViewStmt);
-
-	COPY_SCALAR_FIELD(concurrent);
-	COPY_SCALAR_FIELD(skipData);
-	COPY_NODE_FIELD(relation);
-
-	return newnode;
-}
-
 static ReplicaIdentityStmt *
 _copyReplicaIdentityStmt(const ReplicaIdentityStmt *from)
 {
@@ -5091,9 +5079,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateTableAsStmt:
 			retval = _copyCreateTableAsStmt(from);
-			break;
-		case T_RefreshMatViewStmt:
-			retval = _copyRefreshMatViewStmt(from);
 			break;
 		case T_ReplicaIdentityStmt:
 			retval = _copyReplicaIdentityStmt(from);

@@ -552,8 +552,6 @@ ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
--- Check materialized views
-CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab;
 -- Dependency lookup before and after the follow-up REINDEX commands.
 -- These should remain consistent.
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
@@ -565,12 +563,10 @@ WHERE classid = 'pg_class'::regclass AND
             'concur_reindex_ind1'::regclass,
 	    'concur_reindex_ind2'::regclass,
 	    'concur_reindex_ind3'::regclass,
-	    'concur_reindex_ind4'::regclass,
-	    'concur_reindex_matview'::regclass)
+	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
 REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
 REINDEX TABLE CONCURRENTLY concur_reindex_tab;
-REINDEX TABLE CONCURRENTLY concur_reindex_matview;
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
        deptype
@@ -580,8 +576,7 @@ WHERE classid = 'pg_class'::regclass AND
             'concur_reindex_ind1'::regclass,
 	    'concur_reindex_ind2'::regclass,
 	    'concur_reindex_ind3'::regclass,
-	    'concur_reindex_ind4'::regclass,
-	    'concur_reindex_matview'::regclass)
+	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
 -- Check that comments are preserved
 CREATE TABLE testcomment (i int);
@@ -777,7 +772,6 @@ REINDEX SCHEMA CONCURRENTLY pg_catalog;
 
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
-DROP MATERIALIZED VIEW concur_reindex_matview;
 DROP TABLE concur_reindex_tab, concur_reindex_tab2;
 
 -- Check handling of invalid indexes
@@ -901,8 +895,6 @@ INSERT INTO table1 SELECT generate_series(1,400);
 CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT NOT NULL);
 INSERT INTO table2 SELECT generate_series(1,400), 'abc';
 CREATE INDEX ON table2(col2);
-CREATE MATERIALIZED VIEW matview AS SELECT col1 FROM table2;
-CREATE INDEX ON matview(col1);
 CREATE VIEW view AS SELECT col2 FROM table2;
 CREATE TABLE reindex_before AS
 SELECT oid, relname, relfilenode, relkind, reltoastrelid

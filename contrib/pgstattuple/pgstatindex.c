@@ -668,11 +668,10 @@ check_relation_relkind(Relation rel)
 {
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
 		rel->rd_rel->relkind != RELKIND_INDEX &&
-		rel->rd_rel->relkind != RELKIND_MATVIEW &&
 		rel->rd_rel->relkind != RELKIND_SEQUENCE &&
 		rel->rd_rel->relkind != RELKIND_TOASTVALUE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a table, index, materialized view, sequence, or TOAST table",
+				 errmsg("\"%s\" is not a table, index, sequence, or TOAST table",
 						RelationGetRelationName(rel))));
 }

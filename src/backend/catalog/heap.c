@@ -429,7 +429,6 @@ heap_create(const char *relname,
 
 			case RELKIND_RELATION:
 			case RELKIND_TOASTVALUE:
-			case RELKIND_MATVIEW:
 				table_relation_set_new_filenode(rel, &rel->rd_node,
 												relpersistence,
 												relfrozenxid, relminmxid);
@@ -1027,7 +1026,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 	switch (relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_MATVIEW:
 		case RELKIND_INDEX:
 		case RELKIND_TOASTVALUE:
 			/* The relation is real, but as yet empty */
@@ -1246,7 +1244,7 @@ heap_create_with_catalog(const char *relname,
 		/* Use binary-upgrade override for pg_class.oid/relfilenode? */
 		if (IsBinaryUpgrade &&
 			(relkind == RELKIND_RELATION || relkind == RELKIND_SEQUENCE ||
-			 relkind == RELKIND_VIEW || relkind == RELKIND_MATVIEW ||
+			 relkind == RELKIND_VIEW ||
 			 relkind == RELKIND_COMPOSITE_TYPE ||
 			 relkind == RELKIND_PARTITIONED_TABLE))
 		{
@@ -1287,7 +1285,6 @@ heap_create_with_catalog(const char *relname,
 		{
 		case RELKIND_RELATION:
 		case RELKIND_VIEW:
-		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
 			relacl = get_user_default_acl(OBJECT_TABLE, ownerid,
 											  relnamespace);
@@ -1488,8 +1485,7 @@ heap_create_with_catalog(const char *relname,
 		 * No need to add an explicit dependency for the toast table, as the
 		 * main table depends on it.
 		 */
-		if (relkind == RELKIND_RELATION ||
-			relkind == RELKIND_MATVIEW)
+		if (relkind == RELKIND_RELATION)
 		{
 			ObjectAddressSet(referenced, AccessMethodRelationId, accessmtd);
 			add_exact_object_address(&referenced, addrs);

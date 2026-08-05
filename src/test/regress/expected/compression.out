@@ -179,31 +179,6 @@ SELECT pg_column_compression(f1) FROM cmdata2;
  
 (1 row)
 
--- test compression with materialized view
-CREATE MATERIALIZED VIEW compressmv(x) AS SELECT * FROM cmdata1;
-\d+ compressmv
-                                Materialized view "public.compressmv"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- x      | text |           |          |         | extended |             |              | 
-View definition:
- SELECT cmdata1.f1 AS x
-   FROM cmdata1;
-
-SELECT pg_column_compression(f1) FROM cmdata1;
- pg_column_compression 
------------------------
- lz4
- lz4
-(2 rows)
-
-SELECT pg_column_compression(x) FROM compressmv;
- pg_column_compression 
------------------------
- lz4
- lz4
-(2 rows)
-
 -- test compression with partition
 CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1);
 CREATE TABLE cmpart1 PARTITION OF cmpart FOR VALUES WITH (MODULUS 2, REMAINDER 0);
@@ -265,17 +240,6 @@ ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default;
  Column |       Type        | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
 --------+-------------------+-----------+----------+---------+---------+-------------+--------------+-------------
  f1     | character varying |           |          |         | plain   |             |              | 
-
--- test alter compression method for materialized views
-ALTER MATERIALIZED VIEW compressmv ALTER COLUMN x SET COMPRESSION lz4;
-\d+ compressmv
-                                Materialized view "public.compressmv"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- x      | text |           |          |         | extended | lz4         |              | 
-View definition:
- SELECT cmdata1.f1 AS x
-   FROM cmdata1;
 
 -- test alter compression method for partitioned tables
 ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz;

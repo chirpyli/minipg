@@ -2848,7 +2848,6 @@ SET ROLE TO regress_display_role;
 CREATE TABLE tbl_heap_psql(f1 int, f2 char(100)) using heap_psql;
 CREATE TABLE tbl_heap(f1 int, f2 char(100)) using heap;
 CREATE VIEW view_heap_psql AS SELECT f1 from tbl_heap_psql;
-CREATE MATERIALIZED VIEW mat_view_heap_psql USING heap_psql AS SELECT f1 from tbl_heap_psql;
 \d+ tbl_heap_psql
                               Table "tableam_display.tbl_heap_psql"
  Column |      Type      | Collation | Nullable | Default | Storage  | Stats target | Description 
@@ -2880,16 +2879,15 @@ Access method: heap_psql
  f2     | character(100) |           |          |         | extended |              | 
 Access method: heap
 
--- AM is displayed for tables, indexes and materialized views.
+-- AM is displayed for tables and indexes.
 \d+
                                                            List of relations
-     Schema      |        Name        |       Type        |        Owner         | Persistence | Access method |  Size   | Description 
+    Schema      |        Name        |       Type        |        Owner         | Persistence | Access method |  Size   | Description 
 -----------------+--------------------+-------------------+----------------------+-------------+---------------+---------+-------------
- tableam_display | mat_view_heap_psql | materialized view | regress_display_role | permanent   | heap_psql     | 0 bytes | 
  tableam_display | tbl_heap           | table             | regress_display_role | permanent   | heap          | 0 bytes | 
  tableam_display | tbl_heap_psql      | table             | regress_display_role | permanent   | heap_psql     | 0 bytes | 
  tableam_display | view_heap_psql     | view              | regress_display_role | permanent   |               | 0 bytes | 
-(4 rows)
+(3 rows)
 
 \dt+
                                                   List of relations
@@ -2901,10 +2899,9 @@ Access method: heap
 
 \dm+
                                                            List of relations
-     Schema      |        Name        |       Type        |        Owner         | Persistence | Access method |  Size   | Description 
+    Schema      |        Name        |       Type        |        Owner         | Persistence | Access method |  Size   | Description 
 -----------------+--------------------+-------------------+----------------------+-------------+---------------+---------+-------------
- tableam_display | mat_view_heap_psql | materialized view | regress_display_role | permanent   | heap_psql     | 0 bytes | 
-(1 row)
+(0 rows)
 
 -- But not for views and sequences.
 \dv+
@@ -2917,22 +2914,20 @@ Access method: heap
 \set HIDE_TABLEAM on
 \d+
                                                    List of relations
-     Schema      |        Name        |       Type        |        Owner         | Persistence |  Size   | Description 
+    Schema      |        Name        |       Type        |        Owner         | Persistence |  Size   | Description 
 -----------------+--------------------+-------------------+----------------------+-------------+---------+-------------
- tableam_display | mat_view_heap_psql | materialized view | regress_display_role | permanent   | 0 bytes | 
  tableam_display | tbl_heap           | table             | regress_display_role | permanent   | 0 bytes | 
  tableam_display | tbl_heap_psql      | table             | regress_display_role | permanent   | 0 bytes | 
  tableam_display | view_heap_psql     | view              | regress_display_role | permanent   | 0 bytes | 
-(4 rows)
+(3 rows)
 
 RESET ROLE;
 RESET search_path;
 DROP SCHEMA tableam_display CASCADE;
-NOTICE:  drop cascades to 4 other objects
+NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to table tableam_display.tbl_heap_psql
 drop cascades to table tableam_display.tbl_heap
 drop cascades to view tableam_display.view_heap_psql
-drop cascades to materialized view tableam_display.mat_view_heap_psql
 DROP ACCESS METHOD heap_psql;
 DROP ROLE regress_display_role;
 -- test numericlocale (as best we can without control of psql's locale)

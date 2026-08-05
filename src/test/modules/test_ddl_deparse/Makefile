@@ -22,8 +22,7 @@ REGRESS = test_ddl_deparse \
 	comment_on \
 	alter_sequence \
 	alter_type_enum \
-	opfamily \
-	matviews
+	opfamily
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config

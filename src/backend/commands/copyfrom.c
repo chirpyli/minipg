@@ -564,11 +564,6 @@ CopyFrom(CopyFromState cstate)
 					 errmsg("cannot copy to view \"%s\"",
 							RelationGetRelationName(cstate->rel)),
 					 errhint("To enable copying to a view, provide an INSTEAD OF INSERT trigger.")));
-		else if (cstate->rel->rd_rel->relkind == RELKIND_MATVIEW)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot copy to materialized view \"%s\"",
-							RelationGetRelationName(cstate->rel))));
 		else if (cstate->rel->rd_rel->relkind == RELKIND_SEQUENCE)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),

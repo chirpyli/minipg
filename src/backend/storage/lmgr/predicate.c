@@ -495,8 +495,7 @@ static inline bool
 PredicateLockingNeededForRelation(Relation relation)
 {
 	return !(relation->rd_id < FirstBootstrapObjectId ||
-			 RelationUsesLocalBuffers(relation) ||
-			 relation->rd_rel->relkind == RELKIND_MATVIEW);
+			 RelationUsesLocalBuffers(relation));
 }
 
 /*

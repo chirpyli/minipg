@@ -46,7 +46,6 @@ SecLabelSupportsObjectType(ObjectType objtype)
 		case OBJECT_FUNCTION:
 		case OBJECT_LANGUAGE:
 		case OBJECT_LARGEOBJECT:
-		case OBJECT_MATVIEW:
 		case OBJECT_PROCEDURE:
 		case OBJECT_PUBLICATION:
 		case OBJECT_ROLE:
@@ -173,7 +172,6 @@ ExecSecLabelStmt(SecLabelStmt *stmt)
 			 */
 			if (relation->rd_rel->relkind != RELKIND_RELATION &&
 				relation->rd_rel->relkind != RELKIND_VIEW &&
-				relation->rd_rel->relkind != RELKIND_MATVIEW &&
 			relation->rd_rel->relkind != RELKIND_COMPOSITE_TYPE &&
 			relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 				ereport(ERROR,

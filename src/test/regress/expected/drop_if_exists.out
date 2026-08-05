@@ -284,8 +284,6 @@ DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP INDEX IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP MATERIALIZED VIEW IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP OPERATOR IF EXISTS no_such_schema.+ (int, int);
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP OPERATOR IF EXISTS + (no_such_type, no_such_type);

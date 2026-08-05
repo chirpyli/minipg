@@ -41,7 +41,6 @@
 #include "commands/explain.h"
 #include "commands/extension.h"
 #include "commands/lockcmds.h"
-#include "commands/matview.h"
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
 #include "commands/proclang.h"
@@ -186,7 +185,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
 		case T_IndexStmt:
-		case T_RefreshMatViewStmt:
 		case T_RenameStmt:
 		case T_RuleStmt:
 		case T_SecLabelStmt:
@@ -1387,10 +1385,9 @@ ProcessUtilitySlow(ParseState *pstate,
 						{
 							char		relkind = get_rel_relkind(lfirst_oid(lc));
 
-							if (relkind != RELKIND_RELATION &&
-								relkind != RELKIND_MATVIEW &&
-								relkind != RELKIND_PARTITIONED_TABLE)
-								elog(ERROR, "unexpected relkind \"%c\" on partition \"%s\"",
+						if (relkind != RELKIND_RELATION &&
+							relkind != RELKIND_PARTITIONED_TABLE)
+							elog(ERROR, "unexpected relkind \"%c\" on partition \"%s\"",
 									 relkind, stmt->relation->relname);
 						}
 						list_free(inheritors);
@@ -1505,27 +1502,6 @@ ProcessUtilitySlow(ParseState *pstate,
 			case T_CreateTableAsStmt:
 				address = ExecCreateTableAs(pstate, (CreateTableAsStmt *) parsetree,
 											params, queryEnv, qc);
-				break;
-
-			case T_RefreshMatViewStmt:
-
-				/*
-				 * REFRESH CONCURRENTLY executes some DDL commands internally.
-				 * Inhibit DDL command collection here to avoid those commands
-				 * from showing up in the deparsed command queue.  The refresh
-				 * command itself is queued, which is enough.
-				 */
-				EventTriggerInhibitCommandCollection();
-				PG_TRY();
-				{
-					address = ExecRefreshMatView((RefreshMatViewStmt *) parsetree,
-												 queryString, params, qc);
-				}
-				PG_FINALLY();
-				{
-					EventTriggerUndoInhibitCommandCollection();
-				}
-				PG_END_TRY();
 				break;
 
 			case T_CreateTrigStmt:
@@ -1791,7 +1767,6 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 		case OBJECT_TABLE:
 		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
 			RemoveRelations(stmt);
 			break;
 		default:
@@ -2097,9 +2072,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_VIEW:
 			tag = CMDTAG_ALTER_VIEW;
 			break;
-		case OBJECT_MATVIEW:
-			tag = CMDTAG_ALTER_MATERIALIZED_VIEW;
-			break;
 		case OBJECT_PUBLICATION:
 			tag = CMDTAG_ALTER_PUBLICATION;
 			break;
@@ -2307,9 +2279,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_VIEW:
 					tag = CMDTAG_DROP_VIEW;
-					break;
-				case OBJECT_MATVIEW:
-					tag = CMDTAG_DROP_MATERIALIZED_VIEW;
 					break;
 				case OBJECT_INDEX:
 					tag = CMDTAG_DROP_INDEX;
@@ -2599,16 +2568,9 @@ CreateCommandTag(Node *parsetree)
 					else
 						tag = CMDTAG_CREATE_TABLE_AS;
 					break;
-				case OBJECT_MATVIEW:
-					tag = CMDTAG_CREATE_MATERIALIZED_VIEW;
-					break;
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}
-			break;
-
-		case T_RefreshMatViewStmt:
-			tag = CMDTAG_REFRESH_MATERIALIZED_VIEW;
 			break;
 
 		case T_AlterSystemStmt:
@@ -3197,10 +3159,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateTableAsStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_RefreshMatViewStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

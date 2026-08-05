@@ -1326,7 +1326,6 @@ extractRelOptions(HeapTuple tuple, TupleDesc tupdesc,
 	{
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
-		case RELKIND_MATVIEW:
 			options = heap_reloptions(classForm->relkind, datum, false);
 			break;
 		case RELKIND_PARTITIONED_TABLE:
@@ -1959,7 +1958,6 @@ heap_reloptions(char relkind, Datum reloptions, bool validate)
 			}
 			return (bytea *) rdopts;
 		case RELKIND_RELATION:
-		case RELKIND_MATVIEW:
 			return default_reloptions(reloptions, validate, RELOPT_KIND_HEAP);
 		default:
 			/* other relkinds are not supported */

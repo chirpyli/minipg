@@ -38,7 +38,6 @@ OBJS = \
 	functioncmds.o \
 	indexcmds.o \
 	lockcmds.o \
-	matview.o \
 	opclasscmds.o \
 	operatorcmds.o \
 	portalcmds.o \

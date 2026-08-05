@@ -76,12 +76,6 @@ ALTER TABLE cmdata2 ALTER COLUMN f1 SET STORAGE plain;
 INSERT INTO cmdata2 VALUES (repeat('123456789', 800));
 SELECT pg_column_compression(f1) FROM cmdata2;
 
--- test compression with materialized view
-CREATE MATERIALIZED VIEW compressmv(x) AS SELECT * FROM cmdata1;
-\d+ compressmv
-SELECT pg_column_compression(f1) FROM cmdata1;
-SELECT pg_column_compression(x) FROM compressmv;
-
 -- test compression with partition
 CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1);
 CREATE TABLE cmpart1 PARTITION OF cmpart FOR VALUES WITH (MODULUS 2, REMAINDER 0);
@@ -111,10 +105,6 @@ SELECT pg_column_compression(f1) FROM cmdata;
 
 ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default;
 \d+ cmdata2
-
--- test alter compression method for materialized views
-ALTER MATERIALIZED VIEW compressmv ALTER COLUMN x SET COMPRESSION lz4;
-\d+ compressmv
 
 -- test alter compression method for partitioned tables
 ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz;

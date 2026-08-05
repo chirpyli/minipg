@@ -606,7 +606,6 @@ heapam_relation_set_new_filenode(Relation rel,
 	if (persistence == RELPERSISTENCE_UNLOGGED)
 	{
 		Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
-			   rel->rd_rel->relkind == RELKIND_MATVIEW ||
 			   rel->rd_rel->relkind == RELKIND_TOASTVALUE);
 		smgrcreate(srel, INIT_FORKNUM, false);
 		log_smgrcreate(newrnode, INIT_FORKNUM);

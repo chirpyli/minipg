@@ -320,7 +320,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_TABLE:
 		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
 		case OBJECT_INDEX:
 			return RenameRelation(stmt);
 
@@ -468,7 +467,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
 			address = AlterTableNamespace(stmt,
 										  oldSchemaAddr ? &oldNspOid : NULL);
 			break;

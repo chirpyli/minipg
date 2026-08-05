@@ -46,7 +46,6 @@
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_publication.h"
-#include "commands/matview.h"
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/nodeSubplan.h"
@@ -844,13 +843,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 					break;
 			}
 			break;
-		case RELKIND_MATVIEW:
-			if (!MatViewIncrementalMaintenanceIsEnabled())
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot change materialized view \"%s\"",
-								RelationGetRelationName(resultRel))));
-			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -904,14 +896,6 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot lock rows in view \"%s\"",
-							RelationGetRelationName(rel))));
-			break;
-		case RELKIND_MATVIEW:
-			/* Allow referencing a matview, but not actual locking clauses */
-			if (markType != ROW_MARK_REFERENCE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot lock rows in materialized view \"%s\"",
 							RelationGetRelationName(rel))));
 			break;
 		default:

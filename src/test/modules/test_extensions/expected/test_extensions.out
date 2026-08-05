@@ -208,10 +208,6 @@ CREATE COLLATION ext_cine_coll
 CREATE EXTENSION test_ext_cine;  -- fail
 ERROR:  syntax error at or near "FOREIGN"
 DROP COLLATION ext_cine_coll;
-CREATE MATERIALIZED VIEW ext_cine_mv AS SELECT 11 AS f1;
-CREATE EXTENSION test_ext_cine;  -- fail
-ERROR:  syntax error at or near "FOREIGN"
-DROP MATERIALIZED VIEW ext_cine_mv;
 CREATE FOREIGN DATA WRAPPER dummy;
 ERROR:  syntax error at or near "FOREIGN"
 LINE 1: CREATE FOREIGN DATA WRAPPER dummy;

@@ -19,13 +19,10 @@ SELECT * FROM test_extdep_commands;
   CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
   ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
  
-  CREATE MATERIALIZED VIEW d AS SELECT * FROM a
-  ALTER MATERIALIZED VIEW d DEPENDS ON EXTENSION test_ext5
- 
   CREATE INDEX e ON a (a1)
   ALTER INDEX e DEPENDS ON EXTENSION test_ext5
   RESET search_path
-(17 rows)
+(14 rows)
 
 -- First, test that dependent objects go away when the extension is dropped.
 SELECT * FROM test_extdep_commands \gexec
@@ -41,9 +38,6 @@ SELECT * FROM test_extdep_commands \gexec
  CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
  ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
 
- CREATE MATERIALIZED VIEW d AS SELECT * FROM a
- ALTER MATERIALIZED VIEW d DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
@@ -55,13 +49,12 @@ SELECT deptype, p.*
  WHERE refclassid = 'pg_extension'::regclass AND
        refobjid = (SELECT oid FROM pg_extension WHERE extname = 'test_ext5')
 ORDER BY type;
- deptype |       type        |  schema  | name |    identity     
----------+-------------------+----------+------+-----------------
- x       | function          | test_ext |      | test_ext.b()
- x       | index             | test_ext | e    | test_ext.e
- x       | materialized view | test_ext | d    | test_ext.d
- x       | trigger           |          |      | c on test_ext.a
-(4 rows)
+ deptype |   type   |  schema  | name |    identity     
+---------+----------+----------+------+-----------------
+ x       | function | test_ext |      | test_ext.b()
+ x       | index    | test_ext | e    | test_ext.e
+ x       | trigger  |          |      | c on test_ext.a
+(3 rows)
 
 DROP EXTENSION test_ext5;
 -- anything still depending on the table?
@@ -90,18 +83,12 @@ SELECT * FROM test_extdep_commands \gexec
  CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
  ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
 
- CREATE MATERIALIZED VIEW d AS SELECT * FROM a
- ALTER MATERIALIZED VIEW d DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
 DROP TABLE test_ext.a;		-- should fail, require cascade
-ERROR:  cannot drop table test_ext.a because other objects depend on it
-DETAIL:  materialized view test_ext.d depends on table test_ext.a
-HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP TABLE test_ext.a CASCADE;
-NOTICE:  drop cascades to materialized view test_ext.d
+ERROR:  table "a" does not exist
 -- anything still depending on the extension?  Should be only function b()
 SELECT deptype, i.*
   FROM pg_catalog.pg_depend, pg_identify_object(classid, objid, objsubid) i
@@ -128,16 +115,12 @@ SELECT * FROM test_extdep_commands \gexec
  CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
  ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
 
- CREATE MATERIALIZED VIEW d AS SELECT * FROM a
- ALTER MATERIALIZED VIEW d DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
 SET search_path TO test_ext;
 DROP TRIGGER c ON a;
 DROP FUNCTION b();
-DROP MATERIALIZED VIEW d;
 DROP INDEX e;
 SELECT deptype, i.*
   FROM pg_catalog.pg_depend, pg_identify_object(classid, objid, objsubid) i
@@ -168,21 +151,16 @@ SELECT * FROM test_extdep_commands \gexec
  CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
  ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
 
- CREATE MATERIALIZED VIEW d AS SELECT * FROM a
- ALTER MATERIALIZED VIEW d DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
 SET search_path TO test_ext;
 ALTER FUNCTION b() NO DEPENDS ON EXTENSION test_ext5;
 ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5;
-ALTER MATERIALIZED VIEW d NO DEPENDS ON EXTENSION test_ext5;
 ALTER INDEX e NO DEPENDS ON EXTENSION test_ext5;
 DROP EXTENSION test_ext5;
 DROP TRIGGER c ON a;
 DROP FUNCTION b();
-DROP MATERIALIZED VIEW d;
 DROP INDEX e;
 DROP SCHEMA test_ext CASCADE;
 NOTICE:  drop cascades to table a

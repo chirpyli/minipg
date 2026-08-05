@@ -366,12 +366,6 @@ BeginCopyTo(ParseState *pstate,
 					 errmsg("cannot copy from view \"%s\"",
 							RelationGetRelationName(rel)),
 					 errhint("Try the COPY (SELECT ...) TO variant.")));
-		else if (rel->rd_rel->relkind == RELKIND_MATVIEW)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot copy from materialized view \"%s\"",
-							RelationGetRelationName(rel)),
-					 errhint("Try the COPY (SELECT ...) TO variant.")));
 	else if (rel->rd_rel->relkind == RELKIND_SEQUENCE)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),

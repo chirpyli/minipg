@@ -2017,8 +2017,7 @@ do_autovacuum(void)
 		bool		doanalyze;
 		bool		wraparound;
 
-		if (classForm->relkind != RELKIND_RELATION &&
-			classForm->relkind != RELKIND_MATVIEW)
+		if (classForm->relkind != RELKIND_RELATION)
 			continue;
 
 		relid = classForm->oid;
@@ -2196,8 +2195,7 @@ do_autovacuum(void)
 		 * counter wraparound, the pg_class entry we have now might be
 		 * completely unrelated to the one we saw before.
 		 */
-		if (!((classForm->relkind == RELKIND_RELATION ||
-			   classForm->relkind == RELKIND_MATVIEW) &&
+		if (!((classForm->relkind == RELKIND_RELATION) &&
 			  classForm->relpersistence == RELPERSISTENCE_TEMP))
 		{
 			UnlockRelationOid(relid, AccessExclusiveLock);
@@ -2708,7 +2706,6 @@ extract_autovac_opts(HeapTuple tup, TupleDesc pg_class_desc)
 	AutoVacOpts *av;
 
 	Assert(((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_RELATION ||
-		   ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_MATVIEW ||
 		   ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_TOASTVALUE);
 
 	relopts = extractRelOptions(tup, pg_class_desc, NULL);

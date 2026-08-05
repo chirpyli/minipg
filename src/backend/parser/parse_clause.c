@@ -892,10 +892,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		rel = transformFromClauseItem(pstate, rts->relation,
 									  top_nsitem, namespace);
 		rte = (*top_nsitem)->p_rte;
-		/* We only support this on plain relations and matviews */
+		/* We only support this on plain relations */
 		if (rte->rtekind != RTE_RELATION ||
 			(rte->relkind != RELKIND_RELATION &&
-			 rte->relkind != RELKIND_MATVIEW &&
 			 rte->relkind != RELKIND_PARTITIONED_TABLE))
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

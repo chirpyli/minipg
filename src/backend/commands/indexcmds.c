@@ -678,14 +678,13 @@ DefineIndex(Oid relationId,
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is not a table or materialized view",
+					errmsg("\"%s\" is not a table",
 							RelationGetRelationName(rel))));
 			break;
 	}
@@ -2976,15 +2975,14 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		Oid			relid = classtuple->oid;
 
 		/*
-		 * Only regular tables and matviews can have indexes, so ignore any
+		 * Only regular tables can have indexes, so ignore any
 		 * other kind of relation.
 		 *
 		 * Partitioned tables/indexes are skipped but matching leaf partitions
 		 * are processed.
 		 */
-		if (classtuple->relkind != RELKIND_RELATION &&
-			classtuple->relkind != RELKIND_MATVIEW)
-			continue;
+			if (classtuple->relkind != RELKIND_RELATION)
+				continue;
 
 		/* Skip temp tables of other backends; we can't reindex them at all */
 		if (classtuple->relpersistence == RELPERSISTENCE_TEMP &&
@@ -3394,7 +3392,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 	switch (relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_MATVIEW:
 		case RELKIND_TOASTVALUE:
 			{
 				/*

@@ -470,7 +470,6 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
 		case RELKIND_VIEW:
-		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
 			amoptsfn = NULL;
 			break;
@@ -1127,7 +1126,6 @@ retry:
 			break;
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
-		case RELKIND_MATVIEW:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
@@ -3510,16 +3508,12 @@ RelationBuildLocalRelation(const char *relname,
 			break;
 	}
 
-	/* if it's a materialized view, it's not populated initially */
-	if (relkind == RELKIND_MATVIEW)
-		rel->rd_rel->relispopulated = false;
-	else
-		rel->rd_rel->relispopulated = true;
+	/* relations are populated initially */
+	rel->rd_rel->relispopulated = true;
 
 	/* set replica identity -- system catalogs and non-tables don't have one */
 	if (!IsCatalogNamespace(relnamespace) &&
 		(relkind == RELKIND_RELATION ||
-		 relkind == RELKIND_MATVIEW ||
 		 relkind == RELKIND_PARTITIONED_TABLE))
 		rel->rd_rel->relreplident = REPLICA_IDENTITY_DEFAULT;
 	else
@@ -3563,8 +3557,7 @@ RelationBuildLocalRelation(const char *relname,
 
 	if (relkind == RELKIND_RELATION ||
 		relkind == RELKIND_SEQUENCE ||
-		relkind == RELKIND_TOASTVALUE ||
-		relkind == RELKIND_MATVIEW)
+		relkind == RELKIND_TOASTVALUE)
 		RelationInitTableAccessMethod(rel);
 
 	/*
@@ -3670,7 +3663,6 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
-		case RELKIND_MATVIEW:
 			table_relation_set_new_filenode(relation, &newrnode,
 											persistence,
 											&freezeXid, &minmulti);
@@ -4120,8 +4112,7 @@ RelationCacheInitializePhase3(void)
 		if (relation->rd_tableam == NULL &&
 			(relation->rd_rel->relkind == RELKIND_RELATION ||
 			 relation->rd_rel->relkind == RELKIND_SEQUENCE ||
-			 relation->rd_rel->relkind == RELKIND_TOASTVALUE ||
-			 relation->rd_rel->relkind == RELKIND_MATVIEW))
+			 relation->rd_rel->relkind == RELKIND_TOASTVALUE))
 		{
 			RelationInitTableAccessMethod(relation);
 			Assert(relation->rd_tableam != NULL);
@@ -6026,8 +6017,7 @@ load_relcache_init_file(bool shared)
 			/* Load table AM data */
 			if (rel->rd_rel->relkind == RELKIND_RELATION ||
 				rel->rd_rel->relkind == RELKIND_SEQUENCE ||
-				rel->rd_rel->relkind == RELKIND_TOASTVALUE ||
-				rel->rd_rel->relkind == RELKIND_MATVIEW)
+				rel->rd_rel->relkind == RELKIND_TOASTVALUE)
 				RelationInitTableAccessMethod(rel);
 
 			Assert(rel->rd_index == NULL);

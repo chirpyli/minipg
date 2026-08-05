@@ -283,7 +283,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
-		CreateMatViewStmt RefreshMatViewStmt CreateAmStmt
+		CreateAmStmt
 		CreatePublicationStmt AlterPublicationStmt
 		CreateSubscriptionStmt AlterSubscriptionStmt DropSubscriptionStmt
 
@@ -890,7 +890,6 @@ stmt:
 			| CreateDomainStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
-			| CreateMatViewStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
 			| CreatePublicationStmt
@@ -926,7 +925,6 @@ stmt:
 			| IndexStmt
 			| InsertStmt
 			| ListenStmt
-			| RefreshMatViewStmt
 			| LoadStmt
 			| LockStmt
 			| NotifyStmt
@@ -1626,46 +1624,6 @@ AlterTableStmt:
 					n->cmds = $6;
 					n->objtype = OBJECT_VIEW;
 					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-		|	ALTER MATERIALIZED VIEW qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $4;
-					n->cmds = $5;
-					n->objtype = OBJECT_MATVIEW;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-		|	ALTER MATERIALIZED VIEW IF_P EXISTS qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $6;
-					n->cmds = $7;
-					n->objtype = OBJECT_MATVIEW;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-		|	ALTER MATERIALIZED VIEW ALL IN_P TABLESPACE name SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $7;
-					n->objtype = OBJECT_MATVIEW;
-					n->roles = NIL;
-					n->new_tablespacename = $10;
-					n->nowait = $11;
-					$$ = (Node *)n;
-				}
-		|	ALTER MATERIALIZED VIEW ALL IN_P TABLESPACE name OWNED BY role_list SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $7;
-					n->objtype = OBJECT_MATVIEW;
-					n->roles = $10;
-					n->new_tablespacename = $13;
-					n->nowait = $14;
 					$$ = (Node *)n;
 				}
 		;
@@ -3783,78 +3741,8 @@ opt_with_data:
 		;
 
 
-/*****************************************************************************
- *
- *		QUERY :
- *				CREATE MATERIALIZED VIEW relname AS SelectStmt
- *
- *****************************************************************************/
-
-CreateMatViewStmt:
-		CREATE OptNoLog MATERIALIZED VIEW create_mv_target AS SelectStmt opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ctas->query = $7;
-					ctas->into = $5;
-					ctas->objtype = OBJECT_MATVIEW;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = false;
-					/* cram additional flags into the IntoClause */
-					$5->rel->relpersistence = $2;
-					$5->skipData = !($8);
-					$$ = (Node *) ctas;
-				}
-		| CREATE OptNoLog MATERIALIZED VIEW IF_P NOT EXISTS create_mv_target AS SelectStmt opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ctas->query = $10;
-					ctas->into = $8;
-					ctas->objtype = OBJECT_MATVIEW;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = true;
-					/* cram additional flags into the IntoClause */
-					$8->rel->relpersistence = $2;
-					$8->skipData = !($11);
-					$$ = (Node *) ctas;
-				}
-		;
-
-create_mv_target:
-			qualified_name opt_column_list table_access_method_clause opt_reloptions OptTableSpace
-				{
-					$$ = makeNode(IntoClause);
-					$$->rel = $1;
-					$$->colNames = $2;
-					$$->accessMethod = $3;
-					$$->options = $4;
-					$$->onCommit = ONCOMMIT_NOOP;
-					$$->tableSpaceName = $5;
-					$$->viewQuery = NULL;		/* filled at analysis time */
-					$$->skipData = false;		/* might get changed later */
-				}
-		;
-
 OptNoLog:	UNLOGGED					{ $$ = RELPERSISTENCE_UNLOGGED; }
 			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
-		;
-
-
-/*****************************************************************************
- *
- *		QUERY :
- *				REFRESH MATERIALIZED VIEW qualified_name
- *
- *****************************************************************************/
-
-RefreshMatViewStmt:
-			REFRESH MATERIALIZED VIEW opt_concurrently qualified_name opt_with_data
-				{
-					RefreshMatViewStmt *n = makeNode(RefreshMatViewStmt);
-					n->concurrent = $4;
-					n->relation = $5;
-					n->skipData = !($6);
-					$$ = (Node *) n;
-				}
 		;
 
 
@@ -5374,7 +5262,6 @@ object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
 			| SEQUENCE								{ $$ = OBJECT_SEQUENCE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
-			| MATERIALIZED VIEW						{ $$ = OBJECT_MATVIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
 			| COLLATION								{ $$ = OBJECT_COLLATION; }
 			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
@@ -7278,26 +7165,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-			| ALTER MATERIALIZED VIEW qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_MATVIEW;
-					n->relation = $4;
-					n->subname = NULL;
-					n->newname = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW IF_P EXISTS qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_MATVIEW;
-					n->relation = $6;
-					n->subname = NULL;
-					n->newname = $9;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 			| ALTER INDEX qualified_name RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -7359,28 +7226,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->relation = $5;
 					n->subname = $8;
 					n->newname = $10;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW qualified_name RENAME opt_column name TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_COLUMN;
-					n->relationType = OBJECT_MATVIEW;
-					n->relation = $4;
-					n->subname = $7;
-					n->newname = $9;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW IF_P EXISTS qualified_name RENAME opt_column name TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_COLUMN;
-					n->relationType = OBJECT_MATVIEW;
-					n->relation = $6;
-					n->subname = $9;
-					n->newname = $11;
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
@@ -7541,15 +7386,6 @@ AlterObjectDependsStmt:
 					n->object = (Node *) list_make1(makeString($3));
 					n->extname = makeString($10);
 					n->remove = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW qualified_name opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_MATVIEW;
-					n->relation = $4;
-					n->extname = makeString($9);
-					n->remove = $5;
 					$$ = (Node *)n;
 				}
 			| ALTER INDEX qualified_name opt_no DEPENDS ON EXTENSION name
@@ -7733,24 +7569,6 @@ AlterObjectSchemaStmt:
 					n->objectType = OBJECT_VIEW;
 					n->relation = $5;
 					n->newschema = $8;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_MATVIEW;
-					n->relation = $4;
-					n->newschema = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER MATERIALIZED VIEW IF_P EXISTS qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_MATVIEW;
-					n->relation = $6;
-					n->newschema = $9;
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
@@ -9157,8 +8975,6 @@ ExplainableStmt:
 			| DeleteStmt
 			| DeclareCursorStmt
 			| CreateAsStmt
-			| CreateMatViewStmt
-			| RefreshMatViewStmt
 			| ExecuteStmt					/* by default all are $$=$1 */
 		;
 

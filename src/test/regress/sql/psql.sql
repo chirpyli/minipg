@@ -487,13 +487,12 @@ CREATE ACCESS METHOD heap_psql TYPE TABLE HANDLER heap_tableam_handler;
 CREATE TABLE tbl_heap_psql(f1 int, f2 char(100)) using heap_psql;
 CREATE TABLE tbl_heap(f1 int, f2 char(100)) using heap;
 CREATE VIEW view_heap_psql AS SELECT f1 from tbl_heap_psql;
-CREATE MATERIALIZED VIEW mat_view_heap_psql USING heap_psql AS SELECT f1 from tbl_heap_psql;
 \d+ tbl_heap_psql
 \d+ tbl_heap
 \set HIDE_TABLEAM off
 \d+ tbl_heap_psql
 \d+ tbl_heap
--- AM is displayed for tables, indexes and materialized views.
+-- AM is displayed for tables and indexes.
 \d+
 \dt+
 \dm+

@@ -918,10 +918,9 @@ get_all_vacuum_rels(int options)
 		 * to be performed, caller will decide whether to process or ignore
 		 * them.
 		 */
-		if (classForm->relkind != RELKIND_RELATION &&
-			classForm->relkind != RELKIND_MATVIEW &&
-			classForm->relkind != RELKIND_PARTITIONED_TABLE)
-			continue;
+			if (classForm->relkind != RELKIND_RELATION &&
+				classForm->relkind != RELKIND_PARTITIONED_TABLE)
+				continue;
 
 		/*
 		 * Build VacuumRelation(s) specifying the table OIDs to be processed.
@@ -1518,10 +1517,9 @@ vac_update_datfrozenxid(void)
 		 * Only consider relations able to hold unfrozen XIDs (anything else
 		 * should have InvalidTransactionId in relfrozenxid anyway).
 		 */
-		if (classForm->relkind != RELKIND_RELATION &&
-			classForm->relkind != RELKIND_MATVIEW &&
-			classForm->relkind != RELKIND_TOASTVALUE)
-		{
+			if (classForm->relkind != RELKIND_RELATION &&
+				classForm->relkind != RELKIND_TOASTVALUE)
+			{
 			Assert(!TransactionIdIsValid(relfrozenxid));
 			Assert(!MultiXactIdIsValid(relminmxid));
 			continue;
@@ -1953,7 +1951,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	 * Check that it's of a vacuumable relkind.
 	 */
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
-		rel->rd_rel->relkind != RELKIND_MATVIEW &&
 		rel->rd_rel->relkind != RELKIND_TOASTVALUE &&
 		rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 	{

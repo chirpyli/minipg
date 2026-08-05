@@ -530,7 +530,7 @@ static const struct object_type_map
 		"view", OBJECT_VIEW
 	},
 	{
-		"materialized view", OBJECT_MATVIEW
+		"view", OBJECT_VIEW
 	},
 	{
 		"composite type", -1
@@ -792,9 +792,8 @@ get_object_address(ObjectType objtype, Node *object,
 		{
 			case OBJECT_INDEX:
 			case OBJECT_SEQUENCE:
-			case OBJECT_TABLE:
-			case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
+		case OBJECT_TABLE:
+		case OBJECT_VIEW:
 			address =
 				get_relation_by_qualified_name(objtype, castNode(List, object),
 											   &relation, lockmode,
@@ -1180,13 +1179,6 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 						 errmsg("\"%s\" is not a view",
 								RelationGetRelationName(relation))));
 			break;
-		case OBJECT_MATVIEW:
-			if (relation->rd_rel->relkind != RELKIND_MATVIEW)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is not a materialized view",
-						RelationGetRelationName(relation))));
-		break;
 	default:
 		elog(ERROR, "unrecognized objtype: %d", (int) objtype);
 		break;
@@ -1967,7 +1959,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_TABLE:
 		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
 		case OBJECT_INDEX:
 		case OBJECT_COLUMN:
 		case OBJECT_ATTRIBUTE:
@@ -2079,7 +2070,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
-		case OBJECT_MATVIEW:
 		case OBJECT_COLUMN:
 		case OBJECT_RULE:
 		case OBJECT_TRIGGER:
@@ -3518,10 +3508,6 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 			appendStringInfo(buffer, _("view %s"),
 							 relname);
 			break;
-		case RELKIND_MATVIEW:
-			appendStringInfo(buffer, _("materialized view %s"),
-							 relname);
-			break;
 		case RELKIND_COMPOSITE_TYPE:
 			appendStringInfo(buffer, _("composite type %s"),
 							 relname);
@@ -4003,9 +3989,6 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId,
 			break;
 		case RELKIND_VIEW:
 			appendStringInfoString(buffer, "view");
-			break;
-		case RELKIND_MATVIEW:
-			appendStringInfoString(buffer, "materialized view");
 			break;
 		case RELKIND_COMPOSITE_TYPE:
 			appendStringInfoString(buffer, "composite type");
@@ -5202,8 +5185,6 @@ get_relkind_objtype(char relkind)
 			return OBJECT_SEQUENCE;
 		case RELKIND_VIEW:
 			return OBJECT_VIEW;
-		case RELKIND_MATVIEW:
-			return OBJECT_MATVIEW;
 		case RELKIND_TOASTVALUE:
 			return OBJECT_TABLE;
 		default:

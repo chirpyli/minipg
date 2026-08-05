@@ -2023,7 +2023,6 @@ GlobalVisHorizonKindForRel(Relation rel)
 	 */
 	Assert(!rel ||
 		   rel->rd_rel->relkind == RELKIND_RELATION ||
-		   rel->rd_rel->relkind == RELKIND_MATVIEW ||
 		   rel->rd_rel->relkind == RELKIND_TOASTVALUE);
 
 	if (rel == NULL || rel->rd_rel->relisshared || RecoveryInProgress())

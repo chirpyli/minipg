@@ -120,10 +120,6 @@ CREATE VIEW tableam_view_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
 -- CREATE SEQUENCE doesn't support USING
 CREATE SEQUENCE tableam_seq_heap2 USING heap2;
 
--- CREATE MATERIALIZED VIEW does support USING
-CREATE MATERIALIZED VIEW tableam_tblmv_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
-SELECT f1 FROM tableam_tblmv_heap2 ORDER BY f1;
-
 -- CREATE TABLE ..  PARTITION BY doesn't not support USING
 CREATE TABLE tableam_parted_heap2 (a text, b int) PARTITION BY list (a) USING heap2;
 
@@ -170,7 +166,6 @@ SET LOCAL default_table_access_method = 'heap2';
 CREATE TABLE tableam_tbl_heapx(f1 int);
 CREATE TABLE tableam_tblas_heapx AS SELECT * FROM tableam_tbl_heapx;
 SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;
-CREATE MATERIALIZED VIEW tableam_tblmv_heapx USING heap2 AS SELECT * FROM tableam_tbl_heapx;
 CREATE TABLE tableam_parted_heapx (a text, b int) PARTITION BY list (a);
 CREATE TABLE tableam_parted_1_heapx PARTITION OF tableam_parted_heapx FOR VALUES IN ('a', 'b');
 
@@ -181,7 +176,7 @@ CREATE TABLE tableam_parted_2_heapx PARTITION OF tableam_parted_heapx FOR VALUES
 CREATE VIEW tableam_view_heapx AS SELECT * FROM tableam_tbl_heapx;
 CREATE SEQUENCE tableam_seq_heapx;
 
--- Verify that new AM was used for tables, matviews, but not for sequences, views and fdws
+-- Verify that new AM was used for tables, but not for sequences, views and fdws
 SELECT
     pc.relkind,
     pa.amname,

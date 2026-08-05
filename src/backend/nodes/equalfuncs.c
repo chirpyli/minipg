@@ -1711,16 +1711,6 @@ _equalCreateTableAsStmt(const CreateTableAsStmt *a, const CreateTableAsStmt *b)
 }
 
 static bool
-_equalRefreshMatViewStmt(const RefreshMatViewStmt *a, const RefreshMatViewStmt *b)
-{
-	COMPARE_SCALAR_FIELD(concurrent);
-	COMPARE_SCALAR_FIELD(skipData);
-	COMPARE_NODE_FIELD(relation);
-
-	return true;
-}
-
-static bool
 _equalReplicaIdentityStmt(const ReplicaIdentityStmt *a, const ReplicaIdentityStmt *b)
 {
 	COMPARE_SCALAR_FIELD(identity_type);
@@ -3210,9 +3200,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateTableAsStmt:
 			retval = _equalCreateTableAsStmt(a, b);
-			break;
-		case T_RefreshMatViewStmt:
-			retval = _equalRefreshMatViewStmt(a, b);
 			break;
 		case T_ReplicaIdentityStmt:
 			retval = _equalReplicaIdentityStmt(a, b);

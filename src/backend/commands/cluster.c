@@ -410,20 +410,6 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 		check_index_is_clusterable(OldHeap, indexOid, recheck, AccessExclusiveLock);
 
 	/*
-	 * Quietly ignore the request if this is a materialized view which has not
-	 * been populated from its query. No harm is done because there is no data
-	 * to deal with, and we don't want to throw an error if this is part of a
-	 * multi-relation request -- for example, CLUSTER was run on the entire
-	 * database.
-	 */
-	if (OldHeap->rd_rel->relkind == RELKIND_MATVIEW &&
-		!RelationIsPopulated(OldHeap))
-	{
-		relation_close(OldHeap, AccessExclusiveLock);
-		goto out;
-	}
-
-	/*
 	 * All predicate locks on the tuples or pages are about to be made
 	 * invalid, because we move tuples around.  Promote them to relation
 	 * locks.  Predicate locks on indexes will be promoted when they are

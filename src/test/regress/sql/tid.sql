@@ -10,15 +10,6 @@ TRUNCATE tid_tab;
 
 -- Tests for currtid2() with various relation kinds
 
--- Materialized view
-CREATE MATERIALIZED VIEW tid_matview AS SELECT a FROM tid_tab;
-SELECT currtid2('tid_matview'::text, '(0,1)'::tid); -- fails
-INSERT INTO tid_tab VALUES (1);
-REFRESH MATERIALIZED VIEW tid_matview;
-SELECT currtid2('tid_matview'::text, '(0,1)'::tid); -- ok
-DROP MATERIALIZED VIEW tid_matview;
-TRUNCATE tid_tab;
-
 -- Sequence
 CREATE SEQUENCE tid_seq;
 SELECT currtid2('tid_seq'::text, '(0,1)'::tid); -- ok

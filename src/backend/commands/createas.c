@@ -34,7 +34,6 @@
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
 #include "commands/createas.h"
-#include "commands/matview.h"
 #include "commands/prepare.h"
 #include "commands/tablecmds.h"
 #include "commands/view.h"
@@ -90,9 +89,9 @@ create_ctas_internal(List *attrList, IntoClause *into)
 	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
 	ObjectAddress intoRelationAddr;
 
-	/* This code supports both CREATE TABLE AS and CREATE MATERIALIZED VIEW */
+	/* This code supports CREATE TABLE AS / SELECT INTO */
 	is_matview = (into->viewQuery != NULL);
-	relkind = is_matview ? RELKIND_MATVIEW : RELKIND_RELATION;
+	relkind = RELKIND_RELATION;
 
 	/*
 	 * Create the target relation by faking up a CREATE TABLE parsetree and
@@ -532,13 +531,6 @@ intorel_startup(DestReceiver *self, int operation, TupleDesc typeinfo)
 	intoRelationDesc = table_open(intoRelationAddr.objectId, AccessExclusiveLock);
 
 	/*
-	 * Tentatively mark the target as populated, if it's a matview and we're
-	 * going to fill it; otherwise, no change needed.
-	 */
-	if (is_matview && !into->skipData)
-		SetMatViewPopulatedState(intoRelationDesc, true);
-
-	/*
 	 * Fill private fields of myState for use by later routines
 	 */
 	myState->rel = intoRelationDesc;
@@ -621,3 +613,102 @@ intorel_destroy(DestReceiver *self)
 {
 	pfree(self);
 }
+
+
+/*
+ * transientrel support — used by SELECT INTO / COPY to divert query output
+ * into a transient (newly created) relation.  This mechanism is also used by
+ * the DestTransientRel destination (see tcop/dest.c).  It is independent of
+ * materialized views.
+ */
+
+typedef struct
+{
+	DestReceiver pub;			/* publicly-known function pointers */
+	Relation	transientrel;	/* relation to write to */
+	Oid			transientoid;	/* OID of relation to write to */
+	CommandId	output_cid;		/* cmin to insert in output tuples */
+	int			ti_options;		/* table_tuple_insert performance options */
+	BulkInsertState bistate;	/* bulk insert state */
+} DR_transientrel;
+
+static void transientrel_startup(DestReceiver *self, int operation,
+								  TupleDesc typeinfo);
+static bool transientrel_receive(TupleTableSlot *slot, DestReceiver *self);
+static void transientrel_shutdown(DestReceiver *self);
+static void transientrel_destroy(DestReceiver *self);
+
+DestReceiver *
+CreateTransientRelDestReceiver(Oid transientoid)
+{
+	DR_transientrel *self = (DR_transientrel *) palloc0(sizeof(DR_transientrel));
+
+	self->pub.receiveSlot = transientrel_receive;
+	self->pub.rStartup = transientrel_startup;
+	self->pub.rShutdown = transientrel_shutdown;
+	self->pub.rDestroy = transientrel_destroy;
+	self->pub.mydest = DestTransientRel;
+	self->transientoid = transientoid;
+
+	return (DestReceiver *) self;
+}
+
+static void
+transientrel_startup(DestReceiver *self, int operation, TupleDesc typeinfo)
+{
+	DR_transientrel *myState = (DR_transientrel *) self;
+	Relation	transientrel;
+
+	transientrel = table_open(myState->transientoid, NoLock);
+
+	/*
+	 * Fill private fields of myState for use by later routines
+	 */
+	myState->transientrel = transientrel;
+	myState->output_cid = GetCurrentCommandId(true);
+	myState->ti_options = TABLE_INSERT_SKIP_FSM | TABLE_INSERT_FROZEN;
+	myState->bistate = GetBulkInsertState();
+
+	/*
+	 * Valid smgr_targblock implies something already wrote to the relation.
+	 * This may be harmless, but this function hasn't planned for it.
+	 */
+	Assert(RelationGetTargetBlock(transientrel) == InvalidBlockNumber);
+}
+
+static bool
+transientrel_receive(TupleTableSlot *slot, DestReceiver *self)
+{
+	DR_transientrel *myState = (DR_transientrel *) self;
+
+	table_tuple_insert(myState->transientrel,
+					   slot,
+					   myState->output_cid,
+					   myState->ti_options,
+					   myState->bistate);
+
+	/* We know this is a newly created relation, so there are no indexes */
+
+	return true;
+}
+
+static void
+transientrel_shutdown(DestReceiver *self)
+{
+	DR_transientrel *myState = (DR_transientrel *) self;
+
+	FreeBulkInsertState(myState->bistate);
+
+	table_finish_bulk_insert(myState->transientrel, myState->ti_options);
+
+	/* close transientrel, but keep lock until commit */
+	table_close(myState->transientrel, NoLock);
+	myState->transientrel = NULL;
+}
+
+static void
+transientrel_destroy(DestReceiver *self)
+{
+	pfree(self);
+}
+

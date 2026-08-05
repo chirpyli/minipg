@@ -356,8 +356,7 @@ typedef struct StdRdOptions
  */
 #define RelationIsUsedAsCatalogTable(relation)	\
 	((relation)->rd_options && \
-	 ((relation)->rd_rel->relkind == RELKIND_RELATION || \
-	  (relation)->rd_rel->relkind == RELKIND_MATVIEW) ? \
+	 ((relation)->rd_rel->relkind == RELKIND_RELATION) ? \
 	 ((StdRdOptions *) (relation)->rd_options)->user_catalog_table : false)
 
 /*

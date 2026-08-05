@@ -157,7 +157,6 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 #define		  RELKIND_SEQUENCE		  'S'	/* sequence object */
 #define		  RELKIND_TOASTVALUE	  't'	/* for out-of-line values */
 #define		  RELKIND_VIEW			  'v'	/* view */
-#define		  RELKIND_MATVIEW		  'm'	/* materialized view */
 #define		  RELKIND_COMPOSITE_TYPE  'c'	/* composite type */
 #define		  RELKIND_PARTITIONED_TABLE 'p' /* partitioned table */
 #define		  RELKIND_PARTITIONED_INDEX 'I' /* partitioned index */
@@ -188,8 +187,7 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 	((relkind) == RELKIND_RELATION || \
 	 (relkind) == RELKIND_INDEX || \
 	 (relkind) == RELKIND_SEQUENCE || \
-	 (relkind) == RELKIND_TOASTVALUE || \
-	 (relkind) == RELKIND_MATVIEW)
+	 (relkind) == RELKIND_TOASTVALUE)
 
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */

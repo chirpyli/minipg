@@ -285,11 +285,10 @@ pgstattuple_approx_internal(Oid relid, FunctionCallInfo fcinfo)
 	 * map.
 	 */
 	if (!(rel->rd_rel->relkind == RELKIND_RELATION ||
-		  rel->rd_rel->relkind == RELKIND_MATVIEW ||
 		  rel->rd_rel->relkind == RELKIND_TOASTVALUE))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("\"%s\" is not a table, materialized view, or TOAST table",
+				 errmsg("\"%s\" is not a table or TOAST table",
 						RelationGetRelationName(rel))));
 
 	if (rel->rd_rel->relam != HEAP_TABLE_AM_OID)

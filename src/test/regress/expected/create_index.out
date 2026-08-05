@@ -890,8 +890,6 @@ ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
--- Check materialized views
-CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab;
 -- Dependency lookup before and after the follow-up REINDEX commands.
 -- These should remain consistent.
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
@@ -903,24 +901,21 @@ WHERE classid = 'pg_class'::regclass AND
             'concur_reindex_ind1'::regclass,
 	    'concur_reindex_ind2'::regclass,
 	    'concur_reindex_ind3'::regclass,
-	    'concur_reindex_ind4'::regclass,
-	    'concur_reindex_matview'::regclass)
+	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
-                   obj                    |                           objref                           | deptype 
-------------------------------------------+------------------------------------------------------------+---------
- index concur_reindex_ind1                | constraint concur_reindex_ind1 on table concur_reindex_tab | i
- index concur_reindex_ind2                | column c2 of table concur_reindex_tab                      | a
- index concur_reindex_ind3                | column c1 of table concur_reindex_tab                      | a
- index concur_reindex_ind3                | table concur_reindex_tab                                   | a
- index concur_reindex_ind4                | column c1 of table concur_reindex_tab                      | a
- index concur_reindex_ind4                | column c2 of table concur_reindex_tab                      | a
- materialized view concur_reindex_matview | schema public                                              | n
- table concur_reindex_tab                 | schema public                                              | n
-(8 rows)
+            obj            |                           objref                           | deptype 
+---------------------------+------------------------------------------------------------+---------
+ index concur_reindex_ind1 | constraint concur_reindex_ind1 on table concur_reindex_tab | i
+ index concur_reindex_ind2 | column c2 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | table concur_reindex_tab                                   | a
+ index concur_reindex_ind4 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind4 | column c2 of table concur_reindex_tab                      | a
+ table concur_reindex_tab  | schema public                                              | n
+(7 rows)
 
 REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
 REINDEX TABLE CONCURRENTLY concur_reindex_tab;
-REINDEX TABLE CONCURRENTLY concur_reindex_matview;
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
        deptype
@@ -930,20 +925,18 @@ WHERE classid = 'pg_class'::regclass AND
             'concur_reindex_ind1'::regclass,
 	    'concur_reindex_ind2'::regclass,
 	    'concur_reindex_ind3'::regclass,
-	    'concur_reindex_ind4'::regclass,
-	    'concur_reindex_matview'::regclass)
+	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
-                   obj                    |                           objref                           | deptype 
-------------------------------------------+------------------------------------------------------------+---------
- index concur_reindex_ind1                | constraint concur_reindex_ind1 on table concur_reindex_tab | i
- index concur_reindex_ind2                | column c2 of table concur_reindex_tab                      | a
- index concur_reindex_ind3                | column c1 of table concur_reindex_tab                      | a
- index concur_reindex_ind3                | table concur_reindex_tab                                   | a
- index concur_reindex_ind4                | column c1 of table concur_reindex_tab                      | a
- index concur_reindex_ind4                | column c2 of table concur_reindex_tab                      | a
- materialized view concur_reindex_matview | schema public                                              | n
- table concur_reindex_tab                 | schema public                                              | n
-(8 rows)
+            obj            |                           objref                           | deptype 
+---------------------------+------------------------------------------------------------+---------
+ index concur_reindex_ind1 | constraint concur_reindex_ind1 on table concur_reindex_tab | i
+ index concur_reindex_ind2 | column c2 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | table concur_reindex_tab                                   | a
+ index concur_reindex_ind4 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind4 | column c2 of table concur_reindex_tab                      | a
+ table concur_reindex_tab  | schema public                                              | n
+(7 rows)
 
 -- Check that comments are preserved
 CREATE TABLE testcomment (i int);
@@ -1332,7 +1325,6 @@ Indexes:
 Referenced by:
     TABLE "concur_reindex_tab2" CONSTRAINT "concur_reindex_tab2_c1_fkey" FOREIGN KEY (c1) REFERENCES concur_reindex_tab(c1)
 
-DROP MATERIALIZED VIEW concur_reindex_matview;
 DROP TABLE concur_reindex_tab, concur_reindex_tab2;
 -- Check handling of invalid indexes
 CREATE TABLE concur_reindex_tab4 (c1 int);
@@ -1551,8 +1543,6 @@ INSERT INTO table1 SELECT generate_series(1,400);
 CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT NOT NULL);
 INSERT INTO table2 SELECT generate_series(1,400), 'abc';
 CREATE INDEX ON table2(col2);
-CREATE MATERIALIZED VIEW matview AS SELECT col1 FROM table2;
-CREATE INDEX ON matview(col1);
 CREATE VIEW view AS SELECT col2 FROM table2;
 CREATE TABLE reindex_before AS
 SELECT oid, relname, relfilenode, relkind, reltoastrelid
@@ -1579,8 +1569,6 @@ SELECT  b.relname,
   ORDER BY 1;
        relname        | relkind |           case           
 ----------------------+---------+--------------------------
- matview              | m       | relfilenode is unchanged
- matview_col1_idx     | i       | relfilenode has changed
  pg_toast_TABLE       | t       | relfilenode is unchanged
  pg_toast_TABLE_index | i       | relfilenode has changed
  table1               | r       | relfilenode is unchanged
@@ -1591,7 +1579,7 @@ SELECT  b.relname,
  table2_col2_idx      | i       | relfilenode has changed
  table2_pkey          | i       | relfilenode has changed
  view                 | v       | relfilenode is unchanged
-(12 rows)
+(10 rows)
 
 REINDEX SCHEMA schema_to_reindex;
 BEGIN;
@@ -1607,10 +1595,9 @@ REINDEX TABLE pg_toast.pg_toast_1260;
 REINDEX INDEX pg_toast.pg_toast_1260_index;
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;
-NOTICE:  drop cascades to 6 other objects
+NOTICE:  drop cascades to 5 other objects
 DETAIL:  drop cascades to table table1
 drop cascades to table table2
-drop cascades to materialized view matview
 drop cascades to view view
 drop cascades to table reindex_before
 drop cascades to table reindex_after

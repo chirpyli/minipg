@@ -981,7 +981,6 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_MATVIEW:
 		case RELKIND_TOASTVALUE:
 			table_relation_estimate_size(rel, attr_widths, pages, tuples,
 										 allvisfrac);

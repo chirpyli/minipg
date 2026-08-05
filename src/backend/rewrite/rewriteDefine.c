@@ -263,7 +263,6 @@ DefineQueryRewrite(const char *rulename,
 	 * blocks them for users.  Don't mention them in the error message.
 	 */
 	if (event_relation->rd_rel->relkind != RELKIND_RELATION &&
-		event_relation->rd_rel->relkind != RELKIND_MATVIEW &&
 		event_relation->rd_rel->relkind != RELKIND_VIEW &&
 		event_relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
@@ -360,9 +359,8 @@ DefineQueryRewrite(const char *rulename,
 		 */
 		checkRuleResultList(query->targetList,
 							RelationGetDescr(event_relation),
-							true,
-							event_relation->rd_rel->relkind !=
-							RELKIND_MATVIEW);
+						true,
+						true);
 
 		/*
 		 * ... there must not be another ON SELECT rule already ...
@@ -410,9 +408,8 @@ DefineQueryRewrite(const char *rulename,
 		 * Also ensure the relation isn't being manipulated in any outer SQL
 		 * command of our own session.
 		 */
-		if (event_relation->rd_rel->relkind != RELKIND_VIEW &&
-			event_relation->rd_rel->relkind != RELKIND_MATVIEW)
-		{
+			if (event_relation->rd_rel->relkind != RELKIND_VIEW)
+			{
 			TableScanDesc scanDesc;
 			Snapshot	snapshot;
 			TupleTableSlot *slot;

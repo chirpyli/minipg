@@ -145,9 +145,9 @@ ERROR:  "test_partitioned" (partitioned table) is not supported
 select pgstattuple('test_partitioned_index');
 ERROR:  "test_partitioned_index" (partitioned index) is not supported
 select pgstattuple_approx('test_partitioned');
-ERROR:  "test_partitioned" is not a table, materialized view, or TOAST table
+ERROR:  "test_partitioned" is not a table or TOAST table
 select pg_relpages('test_partitioned');
-ERROR:  "test_partitioned" is not a table, index, materialized view, sequence, or TOAST table
+ERROR:  "test_partitioned" is not a table, index, sequence, or TOAST table
 select pgstatindex('test_partitioned');
 ERROR:  relation "test_partitioned" is not a btree index
 select pgstathashindex('test_partitioned');
@@ -159,9 +159,9 @@ create view test_view as select 1;
 select pgstattuple('test_view');
 ERROR:  "test_view" (view) is not supported
 select pgstattuple_approx('test_view');
-ERROR:  "test_view" is not a table, materialized view, or TOAST table
+ERROR:  "test_view" is not a table or TOAST table
 select pg_relpages('test_view');
-ERROR:  "test_view" is not a table, index, materialized view, sequence, or TOAST table
+ERROR:  "test_view" is not a table, index, sequence, or TOAST table
 select pgstatindex('test_view');
 ERROR:  relation "test_view" is not a btree index
 select pgstathashindex('test_view');
@@ -273,7 +273,7 @@ ERROR:  relation "test_sequence" is not a btree index
 select pgstathashindex('test_sequence');
 ERROR:  relation "test_sequence" is not a hash index
 select pgstattuple_approx('test_sequence');
-ERROR:  "test_sequence" is not a table, materialized view, or TOAST table
+ERROR:  "test_sequence" is not a table or TOAST table
 drop sequence test_sequence;
 drop table test_partitioned;
 drop view test_view;

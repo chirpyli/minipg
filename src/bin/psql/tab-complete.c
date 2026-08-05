@@ -477,7 +477,7 @@ static const SchemaQuery Query_for_list_of_views = {
 
 static const SchemaQuery Query_for_list_of_matviews = {
 	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind IN (" CppAsString2(RELKIND_MATVIEW) ")",
+	.selcondition = "1=0",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -546,7 +546,6 @@ static const SchemaQuery Query_for_list_of_selectables = {
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
 	CppAsString2(RELKIND_SEQUENCE) ", "
 	CppAsString2(RELKIND_VIEW) ", "
-	CppAsString2(RELKIND_MATVIEW) ", "
 	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
@@ -572,8 +571,7 @@ static const SchemaQuery Query_for_list_of_analyzables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ", "
-	CppAsString2(RELKIND_MATVIEW) ")",
+	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -584,8 +582,7 @@ static const SchemaQuery Query_for_list_of_indexables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ", "
-	CppAsString2(RELKIND_MATVIEW) ")",
+	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -601,8 +598,7 @@ static const SchemaQuery Query_for_list_of_indexables = {
 static const SchemaQuery Query_for_list_of_clusterables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_MATVIEW) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",

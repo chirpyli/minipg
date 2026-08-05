@@ -1,67 +1,72 @@
 CREATE TABLE heaptest (a integer, b text);
 REVOKE ALL ON heaptest FROM PUBLIC;
+ERROR:  syntax error at or near "REVOKE"
+LINE 1: REVOKE ALL ON heaptest FROM PUBLIC;
+        ^
 -- Check that invalid skip option is rejected
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'rope');
-ERROR:  invalid skip option
-HINT:  Valid skip options are "all-visible", "all-frozen", and "none".
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check specifying invalid block ranges when verifying an empty table
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 5, endblock := 8);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that valid options are not rejected nor corruption reported
 -- for an empty table, and that skip enum-like parameter is case-insensitive
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'None');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'All-Frozen');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'All-Visible');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'NONE');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'ALL-FROZEN');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'ALL-VISIBLE');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Add some data so subsequent tests are not entirely trivial
 INSERT INTO heaptest (a, b)
 	(SELECT gs, repeat('x', gs)
@@ -69,69 +74,86 @@ INSERT INTO heaptest (a, b)
 -- Check that valid options are not rejected nor corruption reported
 -- for a non-empty table
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 CREATE ROLE regress_heaptest_role;
+ERROR:  syntax error at or near "ROLE"
+LINE 1: CREATE ROLE regress_heaptest_role;
+               ^
 -- verify permissions are checked (error due to function not callable)
 SET ROLE regress_heaptest_role;
+ERROR:  role "regress_heaptest_role" does not exist
 SELECT * FROM verify_heapam(relation := 'heaptest');
-ERROR:  permission denied for function verify_heapam
+ERROR:  function verify_heapam(relation => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest');
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 RESET ROLE;
 GRANT EXECUTE ON FUNCTION verify_heapam(regclass, boolean, boolean, text, bigint, bigint) TO regress_heaptest_role;
+ERROR:  syntax error at or near "GRANT"
+LINE 1: GRANT EXECUTE ON FUNCTION verify_heapam(regclass, boolean, b...
+        ^
 -- verify permissions are now sufficient
 SET ROLE regress_heaptest_role;
+ERROR:  role "regress_heaptest_role" does not exist
 SELECT * FROM verify_heapam(relation := 'heaptest');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest');
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 RESET ROLE;
 -- Check specifying invalid block ranges when verifying a non-empty table.
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 10000);
-ERROR:  ending block number must be between 0 and 0
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 10000, endblock := 11000);
-ERROR:  starting block number must be between 0 and 0
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Vacuum freeze to change the xids encountered in subsequent tests
 VACUUM (FREEZE, DISABLE_PAGE_SKIPPING) heaptest;
 -- Check that valid options are not rejected nor corruption reported
 -- for a non-empty frozen table
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
+LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that partitioned tables (the parent ones) which don't have visibility
 -- maps are rejected
 CREATE TABLE test_partitioned (a int, b text default repeat('x', 5000))
@@ -139,45 +161,57 @@ CREATE TABLE test_partitioned (a int, b text default repeat('x', 5000))
 SELECT * FROM verify_heapam('test_partitioned',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  "test_partitioned" is not a table, materialized view, or TOAST table
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_partitioned',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that valid options are not rejected nor corruption reported
 -- for an empty partition table (the child one)
 CREATE TABLE test_partition partition OF test_partitioned FOR VALUES IN (1);
 SELECT * FROM verify_heapam('test_partition',
 							startblock := NULL,
 							endblock := NULL);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_partition',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that valid options are not rejected nor corruption reported
 -- for a non-empty partition table (the child one)
 INSERT INTO test_partitioned (a) (SELECT 1 FROM generate_series(1,1000) gs);
 SELECT * FROM verify_heapam('test_partition',
 							startblock := NULL,
 							endblock := NULL);
- blkno | offnum | attnum | msg 
--------+--------+--------+-----
-(0 rows)
-
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_partition',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that indexes are rejected
 CREATE INDEX test_index ON test_partition (a);
 SELECT * FROM verify_heapam('test_index',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  "test_index" is not a table, materialized view, or TOAST table
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_index',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that views are rejected
 CREATE VIEW test_view AS SELECT 1;
 SELECT * FROM verify_heapam('test_view',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  "test_view" is not a table, materialized view, or TOAST table
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_view',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that sequences are rejected
 CREATE SEQUENCE test_sequence;
 SELECT * FROM verify_heapam('test_sequence',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  "test_sequence" is not a table, materialized view, or TOAST table
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+LINE 1: SELECT * FROM verify_heapam('test_sequence',
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that foreign tables are rejected
 CREATE FOREIGN DATA WRAPPER dummy;
 ERROR:  syntax error at or near "FOREIGN"
@@ -194,12 +228,19 @@ LINE 1: CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_serv...
 SELECT * FROM verify_heapam('test_foreign_table',
 							startblock := NULL,
 							endblock := NULL);
-ERROR:  relation "test_foreign_table" does not exist
+ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
 LINE 1: SELECT * FROM verify_heapam('test_foreign_table',
-                                    ^
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- cleanup
 DROP TABLE heaptest;
 DROP TABLE test_partition;
 DROP TABLE test_partitioned;
 DROP OWNED BY regress_heaptest_role; -- permissions
+ERROR:  syntax error at or near "OWNED"
+LINE 1: DROP OWNED BY regress_heaptest_role;
+             ^
 DROP ROLE regress_heaptest_role;
+ERROR:  syntax error at or near "ROLE"
+LINE 1: DROP ROLE regress_heaptest_role;
+             ^

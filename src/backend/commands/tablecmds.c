@@ -250,12 +250,6 @@ static const struct dropmsgstrings dropmsgstringarray[] = {
 		gettext_noop("view \"%s\" does not exist, skipping"),
 		gettext_noop("\"%s\" is not a view"),
 	gettext_noop("Use DROP VIEW to remove a view.")},
-	{RELKIND_MATVIEW,
-		ERRCODE_UNDEFINED_TABLE,
-		gettext_noop("materialized view \"%s\" does not exist"),
-		gettext_noop("materialized view \"%s\" does not exist, skipping"),
-		gettext_noop("\"%s\" is not a materialized view"),
-	gettext_noop("Use DROP MATERIALIZED VIEW to remove a materialized view.")},
 	{RELKIND_INDEX,
 		ERRCODE_UNDEFINED_OBJECT,
 		gettext_noop("index \"%s\" does not exist"),
@@ -300,7 +294,6 @@ struct DropRelationCallbackState
 /* Alter table target-type flags for ATSimplePermissions */
 #define		ATT_TABLE				0x0001
 #define		ATT_VIEW				0x0002
-#define		ATT_MATVIEW				0x0004
 #define		ATT_INDEX				0x0008
 #define		ATT_COMPOSITE_TYPE		0x0010
 #define		ATT_FOREIGN_TABLE		0x0020
@@ -892,8 +885,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	}
 	else if (relkind == RELKIND_RELATION ||
-			 relkind == RELKIND_TOASTVALUE ||
-			 relkind == RELKIND_MATVIEW)
+			 relkind == RELKIND_TOASTVALUE)
 		accessMethod = default_table_access_method;
 
 	/* look up the access method, verify it is for a table */
@@ -1314,10 +1306,6 @@ RemoveRelations(DropStmt *drop)
 
 		case OBJECT_VIEW:
 			relkind = RELKIND_VIEW;
-			break;
-
-		case OBJECT_MATVIEW:
-			relkind = RELKIND_MATVIEW;
 			break;
 
 		default:
@@ -3250,7 +3238,6 @@ renameatt_check(Oid myrelid, Form_pg_class classform, bool recursing)
 	 */
 	if (relkind != RELKIND_RELATION &&
 		relkind != RELKIND_VIEW &&
-		relkind != RELKIND_MATVIEW &&
 		relkind != RELKIND_COMPOSITE_TYPE &&
 		relkind != RELKIND_INDEX &&
 		relkind != RELKIND_PARTITIONED_INDEX &&
@@ -4460,25 +4447,25 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_SetStatistics:	/* ALTER COLUMN SET STATISTICS */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW | ATT_INDEX | ATT_PARTITIONED_INDEX | ATT_FOREIGN_TABLE);
+			ATSimplePermissions(rel, ATT_TABLE | ATT_INDEX | ATT_PARTITIONED_INDEX | ATT_FOREIGN_TABLE);
 			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
 		case AT_SetOptions:		/* ALTER COLUMN SET ( options ) */
 		case AT_ResetOptions:	/* ALTER COLUMN RESET ( options ) */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW | ATT_FOREIGN_TABLE);
+			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			/* This command never recurses */
 			pass = AT_PASS_MISC;
 			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW | ATT_FOREIGN_TABLE);
+			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
 		case AT_SetCompression: /* ALTER COLUMN SET COMPRESSION */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW);
+			ATSimplePermissions(rel, ATT_TABLE);
 			/* This command never recurses */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
@@ -4539,7 +4526,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_ClusterOn:		/* CLUSTER ON */
 		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW);
+			ATSimplePermissions(rel, ATT_TABLE);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
@@ -4579,7 +4566,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_SetTableSpace:	/* SET TABLESPACE */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW | ATT_INDEX |
+			ATSimplePermissions(rel, ATT_TABLE | ATT_INDEX |
 								ATT_PARTITIONED_INDEX);
 			/* This command never recurses */
 			ATPrepSetTableSpace(tab, rel, cmd->name, lockmode);
@@ -4588,7 +4575,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_SetRelOptions:	/* SET (...) */
 		case AT_ResetRelOptions:	/* RESET (...) */
 		case AT_ReplaceRelOptions:	/* reset them all, then set just these */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_MATVIEW | ATT_INDEX);
+			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_INDEX);
 			/* This command never recurses */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
@@ -4619,7 +4606,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 		case AT_ReplicaIdentity:	/* REPLICA IDENTITY ... */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_MATVIEW);
+			ATSimplePermissions(rel, ATT_TABLE);
 			pass = AT_PASS_MISC;
 			/* This command never recurses */
 			/* No command-specific prep needed */
@@ -4749,8 +4736,7 @@ ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode,
 		 */
 		if (((tab->relkind == RELKIND_RELATION ||
 			  tab->relkind == RELKIND_PARTITIONED_TABLE) &&
-			 tab->partition_constraint == NULL) ||
-			tab->relkind == RELKIND_MATVIEW)
+			 tab->partition_constraint == NULL))
 			AlterTableCreateToastTable(tab->relid, (Datum) 0, lockmode);
 	}
 }
@@ -5908,9 +5894,6 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_VIEW:
 			actual_target = ATT_VIEW;
 			break;
-		case RELKIND_MATVIEW:
-			actual_target = ATT_MATVIEW;
-			break;
 		case RELKIND_INDEX:
 			actual_target = ATT_INDEX;
 			break;
@@ -5963,32 +5946,23 @@ ATWrongRelkindError(Relation rel, int allowed_targets)
 		case ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE:
 			msg = _("\"%s\" is not a table, view, or foreign table");
 			break;
-		case ATT_TABLE | ATT_VIEW | ATT_MATVIEW | ATT_INDEX:
-			msg = _("\"%s\" is not a table, view, materialized view, or index");
+		case ATT_TABLE | ATT_VIEW | ATT_INDEX:
+			msg = _("\"%s\" is not a table, view, or index");
 			break;
-		case ATT_TABLE | ATT_MATVIEW:
-			msg = _("\"%s\" is not a table or materialized view");
+		case ATT_TABLE | ATT_INDEX:
+			msg = _("\"%s\" is not a table or index");
 			break;
-		case ATT_TABLE | ATT_MATVIEW | ATT_INDEX:
-			msg = _("\"%s\" is not a table, materialized view, or index");
+		case ATT_TABLE | ATT_INDEX | ATT_PARTITIONED_INDEX:
+			msg = _("\"%s\" is not a table, index, or partitioned index");
 			break;
-		case ATT_TABLE | ATT_MATVIEW | ATT_INDEX | ATT_PARTITIONED_INDEX:
-			msg = _("\"%s\" is not a table, materialized view, index, or partitioned index");
-			break;
-		case ATT_TABLE | ATT_MATVIEW | ATT_INDEX | ATT_PARTITIONED_INDEX | ATT_FOREIGN_TABLE:
-			msg = _("\"%s\" is not a table, materialized view, index, partitioned index, or foreign table");
-			break;
-		case ATT_TABLE | ATT_MATVIEW | ATT_FOREIGN_TABLE:
-			msg = _("\"%s\" is not a table, materialized view, or foreign table");
+		case ATT_TABLE | ATT_INDEX | ATT_PARTITIONED_INDEX | ATT_FOREIGN_TABLE:
+			msg = _("\"%s\" is not a table, index, partitioned index, or foreign table");
 			break;
 		case ATT_TABLE | ATT_FOREIGN_TABLE:
 			msg = _("\"%s\" is not a table or foreign table");
 			break;
 		case ATT_TABLE | ATT_COMPOSITE_TYPE | ATT_FOREIGN_TABLE:
 			msg = _("\"%s\" is not a table, composite type, or foreign table");
-			break;
-		case ATT_TABLE | ATT_MATVIEW | ATT_INDEX | ATT_FOREIGN_TABLE:
-			msg = _("\"%s\" is not a table, materialized view, index, or foreign table");
 			break;
 		case ATT_TABLE | ATT_PARTITIONED_INDEX:
 			msg = _("\"%s\" is not a table or partitioned index");
@@ -13217,7 +13191,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 	{
 		case RELKIND_RELATION:
 		case RELKIND_VIEW:
-		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
 			/* ok to change owner */
 			break;
@@ -13366,7 +13339,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		 */
 		if (tuple_class->relkind == RELKIND_RELATION ||
 			tuple_class->relkind == RELKIND_PARTITIONED_TABLE ||
-			tuple_class->relkind == RELKIND_MATVIEW ||
 			tuple_class->relkind == RELKIND_TOASTVALUE)
 		{
 			List	   *index_oid_list;
@@ -13602,7 +13574,6 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	{
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
-		case RELKIND_MATVIEW:
 			(void) heap_reloptions(rel->rd_rel->relkind, newOptions, true);
 			break;
 		case RELKIND_PARTITIONED_TABLE:
@@ -13806,7 +13777,6 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 	else
 	{
 		Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
-			   rel->rd_rel->relkind == RELKIND_MATVIEW ||
 			   rel->rd_rel->relkind == RELKIND_TOASTVALUE);
 		table_relation_copy_data(rel, &newrnode);
 	}
@@ -13900,8 +13870,7 @@ AlterTableMoveAll(AlterTableMoveAllStmt *stmt)
 	List	   *role_oids = roleSpecsToIds(stmt->roles);
 
 	/* Ensure we were not asked to move something we can't */
-	if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_INDEX &&
-		stmt->objtype != OBJECT_MATVIEW)
+	if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_INDEX)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("only tables, indexes, and materialized views exist in tablespaces")));
@@ -13984,9 +13953,7 @@ AlterTableMoveAll(AlterTableMoveAllStmt *stmt)
 			 relForm->relkind != RELKIND_PARTITIONED_TABLE) ||
 			(stmt->objtype == OBJECT_INDEX &&
 			 relForm->relkind != RELKIND_INDEX &&
-			 relForm->relkind != RELKIND_PARTITIONED_INDEX) ||
-			(stmt->objtype == OBJECT_MATVIEW &&
-			 relForm->relkind != RELKIND_MATVIEW))
+			 relForm->relkind != RELKIND_PARTITIONED_INDEX))
 			continue;
 
 		/* Check if we are only moving objects owned by certain roles */
@@ -16191,7 +16158,7 @@ RangeVarCallbackOwnsTable(const RangeVar *relation,
 	if (!relkind)
 		return;
 	if (relkind != RELKIND_RELATION && relkind != RELKIND_TOASTVALUE &&
-		relkind != RELKIND_MATVIEW && relkind != RELKIND_PARTITIONED_TABLE)
+		relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or materialized view", relation->relname)));
@@ -16331,11 +16298,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a view", rv->relname)));
 
-	if (reltype == OBJECT_MATVIEW && relkind != RELKIND_MATVIEW)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a materialized view", rv->relname)));
-
 	if (reltype == OBJECT_TYPE && relkind != RELKIND_COMPOSITE_TYPE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -16365,7 +16327,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	if (IsA(stmt, AlterObjectSchemaStmt) &&
 		relkind != RELKIND_RELATION &&
 		relkind != RELKIND_VIEW &&
-		relkind != RELKIND_MATVIEW &&
 		relkind != RELKIND_SEQUENCE &&
 		relkind != RELKIND_PARTITIONED_TABLE)
 		ereport(ERROR,

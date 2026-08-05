@@ -148,12 +148,6 @@ CREATE EXTENSION test_ext_cine;  -- fail
 
 DROP COLLATION ext_cine_coll;
 
-CREATE MATERIALIZED VIEW ext_cine_mv AS SELECT 11 AS f1;
-
-CREATE EXTENSION test_ext_cine;  -- fail
-
-DROP MATERIALIZED VIEW ext_cine_mv;
-
 CREATE FOREIGN DATA WRAPPER dummy;
 
 CREATE SERVER ext_cine_srv FOREIGN DATA WRAPPER dummy;

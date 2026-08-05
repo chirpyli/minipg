@@ -242,7 +242,6 @@ DROP FUNCTION IF EXISTS no_such_schema.foo();
 DROP FUNCTION IF EXISTS foo(no_such_type);
 DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 DROP INDEX IF EXISTS no_such_schema.foo;
-DROP MATERIALIZED VIEW IF EXISTS no_such_schema.foo;
 DROP OPERATOR IF EXISTS no_such_schema.+ (int, int);
 DROP OPERATOR IF EXISTS + (no_such_type, no_such_type);
 DROP OPERATOR IF EXISTS + (no_such_schema.no_such_type, no_such_schema.no_such_type);
