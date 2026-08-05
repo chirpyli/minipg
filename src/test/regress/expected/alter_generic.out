@@ -200,22 +200,12 @@ SELECT n.nspname, oprname, a.rolname,
 --
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
-CREATE OPERATOR CLASS alt_opc1 FOR TYPE uuid USING hash AS STORAGE uuid;
-CREATE OPERATOR CLASS alt_opc2 FOR TYPE uuid USING hash AS STORAGE uuid;
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf2;  -- failed (name conflict)
 ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp1"
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3;  -- OK
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- OK
-ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc2;  -- failed (name conflict)
-ERROR:  operator class "alt_opc2" for access method "hash" already exists in schema "alt_nsp1"
-ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc3;  -- OK
-ALTER OPERATOR CLASS alt_opc2 USING hash SET SCHEMA alt_nsp2;  -- OK
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
-CREATE OPERATOR CLASS alt_opc1 FOR TYPE macaddr USING hash AS STORAGE macaddr;
-ERROR:  type "macaddr" does not exist
-CREATE OPERATOR CLASS alt_opc2 FOR TYPE macaddr USING hash AS STORAGE macaddr;
-ERROR:  type "macaddr" does not exist
 ALTER OPERATOR FAMILY alt_opf3 USING hash RENAME TO alt_opf4;	-- failed (not owner)
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf4;  -- OK
 ERROR:  operator family "alt_opf4" for access method "hash" already exists in schema "alt_nsp1"
@@ -223,13 +213,6 @@ ALTER OPERATOR FAMILY alt_opf3 USING hash SET SCHEMA alt_nsp2;  -- failed (not o
 ERROR:  operator family "alt_opf3" does not exist for access method "hash"
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp2"
-ALTER OPERATOR CLASS alt_opc3 USING hash RENAME TO alt_opc4;	-- failed (not owner)
-ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc4;  -- OK
-ERROR:  operator class "alt_opc1" does not exist for access method "hash"
-ALTER OPERATOR CLASS alt_opc3 USING hash SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  operator class "alt_opc3" does not exist for access method "hash"
-ALTER OPERATOR CLASS alt_opc2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
-ERROR:  operator class "alt_opc2" does not exist for access method "hash"
 SELECT nspname, opfname, amname, rolname
   FROM pg_opfamily o, pg_am m, pg_namespace n, pg_authid a
   WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid AND o.opfowner = a.oid
@@ -249,11 +232,9 @@ SELECT nspname, opcname, amname, rolname
   WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid AND o.opcowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, opcname;
- nspname  | opcname  | amname | rolname  
-----------+----------+--------+----------
- alt_nsp1 | alt_opc4 | hash   | postgres
- alt_nsp2 | alt_opc2 | hash   | postgres
-(2 rows)
+ nspname | opcname | amname | rolname 
+---------+---------+--------+---------
+(0 rows)
 
 -- ALTER OPERATOR FAMILY ... ADD/DROP
 -- Should work. Textbook case of CREATE / ALTER ADD / ALTER DROP / DROP
@@ -493,7 +474,7 @@ DROP LANGUAGE alt_lang2 CASCADE;
 ERROR:  language "alt_lang2" does not exist
 DROP LANGUAGE alt_lang3 CASCADE;
 DROP SCHEMA alt_nsp1 CASCADE;
-NOTICE:  drop cascades to 17 other objects
+NOTICE:  drop cascades to 15 other objects
 DETAIL:  drop cascades to function alt_func4(integer)
 drop cascades to function alt_agg4(integer)
 drop cascades to function alt_func1(integer)
@@ -505,8 +486,6 @@ drop cascades to conversion alt_conv1
 drop cascades to conversion alt_conv2
 drop cascades to operator @-@(integer,integer)
 drop cascades to operator family alt_opf4 for access method hash
-drop cascades to operator family alt_opc1 for access method hash
-drop cascades to operator family alt_opc2 for access method hash
 drop cascades to operator family alt_opf1 for access method hash
 drop cascades to operator family alt_opf2 for access method hash
 drop cascades to table alt_regress_1

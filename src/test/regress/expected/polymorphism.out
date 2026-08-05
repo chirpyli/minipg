@@ -52,22 +52,6 @@ select polyf(stavalues1) from pg_statistic;  -- fail, can't infer element type
 ERROR:  return type anyarray is not supported for SQL functions
 CONTEXT:  SQL function "polyf" during inlining
 drop function polyf(x anyarray);
--- fail, can't infer type:
-create function polyf(x anyelement) returns anyrange as $$
-  select array[x + 1, x + 2]
-$$ language sql;
-ERROR:  cannot determine result data type
-DETAIL:  A result of type anyrange requires at least one input of type anyrange or anymultirange.
-create function polyf(x anyrange) returns anyarray as $$
-  select array[lower(x), upper(x)]
-$$ language sql;
-select polyf(int4range(42, 49)) as int, polyf(float8range(4.5, 7.8)) as num;
-   int   |    num    
----------+-----------
- {42,49} | {4.5,7.8}
-(1 row)
-
-drop function polyf(x anyrange);
 create function polyf(x anycompatible, y anycompatible) returns anycompatiblearray as $$
   select array[x, y]
 $$ language sql;
@@ -78,68 +62,6 @@ select polyf(2, 4) as int, polyf(2, 4.5) as num;
 (1 row)
 
 drop function polyf(x anycompatible, y anycompatible);
-create function polyf(x anycompatiblerange, y anycompatible, z anycompatible) returns anycompatiblearray as $$
-  select array[lower(x), upper(x), y, z]
-$$ language sql;
-select polyf(int4range(42, 49), 11, 2::smallint) as int, polyf(float8range(4.5, 7.8), 7.8, 11::real) as num;
-     int      |       num        
---------------+------------------
- {42,49,11,2} | {4.5,7.8,7.8,11}
-(1 row)
-
-select polyf(int4range(42, 49), 11, 4.5) as fail;  -- range type doesn't fit
-ERROR:  function polyf(int4range, integer, numeric) does not exist
-LINE 1: select polyf(int4range(42, 49), 11, 4.5) as fail;
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-drop function polyf(x anycompatiblerange, y anycompatible, z anycompatible);
-create function polyf(x anycompatiblemultirange, y anycompatible, z anycompatible) returns anycompatiblearray as $$
-  select array[lower(x), upper(x), y, z]
-$$ language sql;
-select polyf(multirange(int4range(42, 49)), 11, 2::smallint) as int, polyf(multirange(float8range(4.5, 7.8)), 7.8, 11::real) as num;
-     int      |       num        
---------------+------------------
- {42,49,11,2} | {4.5,7.8,7.8,11}
-(1 row)
-
-select polyf(multirange(int4range(42, 49)), 11, 4.5) as fail;  -- range type doesn't fit
-ERROR:  function polyf(int4multirange, integer, numeric) does not exist
-LINE 1: select polyf(multirange(int4range(42, 49)), 11, 4.5) as fail...
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-drop function polyf(x anycompatiblemultirange, y anycompatible, z anycompatible);
--- fail, can't infer type:
-create function polyf(x anycompatible) returns anycompatiblerange as $$
-  select array[x + 1, x + 2]
-$$ language sql;
-ERROR:  cannot determine result data type
-DETAIL:  A result of type anycompatiblerange requires at least one input of type anycompatiblerange or anycompatiblemultirange.
-create function polyf(x anycompatiblerange, y anycompatiblearray) returns anycompatiblerange as $$
-  select x
-$$ language sql;
-select polyf(int4range(42, 49), array[11]) as int, polyf(float8range(4.5, 7.8), array[7]) as num;
-   int   |    num    
----------+-----------
- [42,49) | [4.5,7.8)
-(1 row)
-
-drop function polyf(x anycompatiblerange, y anycompatiblearray);
--- fail, can't infer type:
-create function polyf(x anycompatible) returns anycompatiblemultirange as $$
-  select array[x + 1, x + 2]
-$$ language sql;
-ERROR:  cannot determine result data type
-DETAIL:  A result of type anycompatiblemultirange requires at least one input of type anycompatiblerange or anycompatiblemultirange.
-create function polyf(x anycompatiblemultirange, y anycompatiblearray) returns anycompatiblemultirange as $$
-  select x
-$$ language sql;
-select polyf(multirange(int4range(42, 49)), array[11]) as int, polyf(multirange(float8range(4.5, 7.8)), array[7]) as num;
-    int    |     num     
------------+-------------
- {[42,49)} | {[4.5,7.8)}
-(1 row)
-
-drop function polyf(x anycompatiblemultirange, y anycompatiblearray);
 create function polyf(a anyelement, b anyarray,
                       c anycompatible, d anycompatible,
                       OUT x anyarray, OUT y anycompatiblearray)
@@ -173,72 +95,6 @@ LINE 2:   from polyf(11, array[1, 2.2], 42, 34.5);
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function polyf(a anyelement, b anyarray,
                     c anycompatible, d anycompatible);
-create function polyf(anyrange) returns anymultirange
-as 'select multirange($1);' language sql;
-select polyf(int4range(1,10));
-  polyf   
-----------
- {[1,10)}
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type because input has type unknown
-drop function polyf(anyrange);
-create function polyf(anymultirange) returns anyelement
-as 'select lower($1);' language sql;
-select polyf(int4multirange(int4range(1,10), int4range(20,30)));
- polyf 
--------
-     1
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type because input has type unknown
-drop function polyf(anymultirange);
-create function polyf(anycompatiblerange) returns anycompatiblemultirange
-as 'select multirange($1);' language sql;
-select polyf(int4range(1,10));
-  polyf   
-----------
- {[1,10)}
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type anycompatiblerange because input has type unknown
-drop function polyf(anycompatiblerange);
-create function polyf(anymultirange) returns anyrange
-as 'select range_merge($1);' language sql;
-select polyf(int4multirange(int4range(1,10), int4range(20,30)));
- polyf  
---------
- [1,30)
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type because input has type unknown
-drop function polyf(anymultirange);
-create function polyf(anycompatiblemultirange) returns anycompatiblerange
-as 'select range_merge($1);' language sql;
-select polyf(int4multirange(int4range(1,10), int4range(20,30)));
- polyf  
---------
- [1,30)
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type anycompatiblerange because input has type unknown
-drop function polyf(anycompatiblemultirange);
-create function polyf(anycompatiblemultirange) returns anycompatible
-as 'select lower($1);' language sql;
-select polyf(int4multirange(int4range(1,10), int4range(20,30)));
- polyf 
--------
-     1
-(1 row)
-
-select polyf(null);
-ERROR:  could not determine polymorphic type anycompatiblemultirange because input has type unknown
-drop function polyf(anycompatiblemultirange);
 --
 -- Polymorphic aggregate tests
 --
@@ -956,8 +812,6 @@ select * from array_in('{1,2,3}','int4'::regtype,-1);  -- this not
 ERROR:  function "array_in" in FROM has unsupported return type anyarray
 LINE 1: select * from array_in('{1,2,3}','int4'::regtype,-1);
                       ^
-select anyrange_in('[10,20)','int4range'::regtype,-1);
-ERROR:  cannot accept a value of type anyrange
 -- test variadic polymorphic functions
 create function myleast(variadic anyarray) returns anyelement as $$
   select min($1[i]) from generate_subscripts($1,1) g(i)
@@ -1895,103 +1749,6 @@ LINE 1: select x, pg_typeof(x) from anyctest(11, 12) x;
                                     ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function anyctest(anycompatible, anycompatiblearray);
-create function anyctest(anycompatible, anycompatiblerange)
-returns anycompatiblerange as $$
-  select $2
-$$ language sql;
-select x, pg_typeof(x) from anyctest(11, int4range(4,7)) x;
-   x   | pg_typeof 
--------+-----------
- [4,7) | int4range
-(1 row)
-
-select x, pg_typeof(x) from anyctest(11, numrange(4,7)) x;
-   x   | pg_typeof 
--------+-----------
- [4,7) | numrange
-(1 row)
-
-select x, pg_typeof(x) from anyctest(11, 12) x;  -- fail
-ERROR:  function anyctest(integer, integer) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(11, 12) x;
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-select x, pg_typeof(x) from anyctest(11.2, int4range(4,7)) x;  -- fail
-ERROR:  function anyctest(numeric, int4range) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(11.2, int4range(4,7)) x...
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-select x, pg_typeof(x) from anyctest(11.2, '[4,7)') x;  -- fail
-ERROR:  could not determine polymorphic type anycompatiblerange because input has type unknown
-drop function anyctest(anycompatible, anycompatiblerange);
-create function anyctest(anycompatiblerange, anycompatiblerange)
-returns anycompatible as $$
-  select lower($1) + upper($2)
-$$ language sql;
-select x, pg_typeof(x) from anyctest(int4range(11,12), int4range(4,7)) x;
- x  | pg_typeof 
-----+-----------
- 18 | integer
-(1 row)
-
-select x, pg_typeof(x) from anyctest(int4range(11,12), numrange(4,7)) x; -- fail
-ERROR:  function anyctest(int4range, numrange) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(int4range(11,12), numra...
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-drop function anyctest(anycompatiblerange, anycompatiblerange);
--- fail, can't infer result type:
-create function anyctest(anycompatible)
-returns anycompatiblerange as $$
-  select $1
-$$ language sql;
-ERROR:  cannot determine result data type
-DETAIL:  A result of type anycompatiblerange requires at least one input of type anycompatiblerange or anycompatiblemultirange.
-create function anyctest(anycompatible, anycompatiblemultirange)
-returns anycompatiblemultirange as $$
-  select $2
-$$ language sql;
-select x, pg_typeof(x) from anyctest(11, multirange(int4range(4,7))) x;
-    x    |   pg_typeof    
----------+----------------
- {[4,7)} | int4multirange
-(1 row)
-
-select x, pg_typeof(x) from anyctest(11, multirange(numrange(4,7))) x;
-    x    |   pg_typeof   
----------+---------------
- {[4,7)} | nummultirange
-(1 row)
-
-select x, pg_typeof(x) from anyctest(11, 12) x;  -- fail
-ERROR:  function anyctest(integer, integer) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(11, 12) x;
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-select x, pg_typeof(x) from anyctest(11.2, multirange(int4range(4,7))) x;  -- fail
-ERROR:  function anyctest(numeric, int4multirange) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(11.2, multirange(int4ra...
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-select x, pg_typeof(x) from anyctest(11.2, '{[4,7)}') x;  -- fail
-ERROR:  could not determine polymorphic type anycompatiblemultirange because input has type unknown
-drop function anyctest(anycompatible, anycompatiblemultirange);
-create function anyctest(anycompatiblemultirange, anycompatiblemultirange)
-returns anycompatible as $$
-  select lower($1) + upper($2)
-$$ language sql;
-select x, pg_typeof(x) from anyctest(multirange(int4range(11,12)), multirange(int4range(4,7))) x;
- x  | pg_typeof 
-----+-----------
- 18 | integer
-(1 row)
-
-select x, pg_typeof(x) from anyctest(multirange(int4range(11,12)), multirange(numrange(4,7))) x; -- fail
-ERROR:  function anyctest(int4multirange, nummultirange) does not exist
-LINE 1: select x, pg_typeof(x) from anyctest(multirange(int4range(11...
-                                    ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-drop function anyctest(anycompatiblemultirange, anycompatiblemultirange);
 -- fail, can't infer result type:
 create function anyctest(anycompatible)
 returns anycompatiblemultirange as $$

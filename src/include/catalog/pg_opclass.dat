@@ -177,15 +177,6 @@
 { opcmethod => 'hash', opcname => 'bpchar_pattern_ops',
   opcfamily => 'hash/bpchar_pattern_ops', opcintype => 'bpchar',
   opcdefault => 'f' },
-
-
-
-
-
-{ opcmethod => 'btree', opcname => 'uuid_ops', opcfamily => 'btree/uuid_ops',
-  opcintype => 'uuid' },
-{ opcmethod => 'hash', opcname => 'uuid_ops', opcfamily => 'hash/uuid_ops',
-  opcintype => 'uuid' },
 { opcmethod => 'btree', opcname => 'pg_lsn_ops',
   opcfamily => 'btree/pg_lsn_ops', opcintype => 'pg_lsn' },
 { opcmethod => 'hash', opcname => 'pg_lsn_ops', opcfamily => 'hash/pg_lsn_ops',

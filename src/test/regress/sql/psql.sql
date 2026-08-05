@@ -1237,7 +1237,6 @@ set search_path to default;
 \dAo+ btree float_ops
 
 \dAp+ btree float_ops
-\dAp * pg_catalog.uuid_ops
 
 -- check \df, \do with argument specifications
 \df *sqrt

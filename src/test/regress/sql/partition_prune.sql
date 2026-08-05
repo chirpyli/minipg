@@ -1033,14 +1033,6 @@ explain (costs off) select * from pp_recpart where a = '(1,2)'::pp_rectype;
 drop table pp_recpart;
 drop type pp_rectype;
 
--- range type partition key
-create table pp_intrangepart (a int4range) partition by list (a);
-create table pp_intrangepart12 partition of pp_intrangepart for values in ('[1,2]');
-create table pp_intrangepart2inf partition of pp_intrangepart for values in ('[2,)');
-explain (costs off) select * from pp_intrangepart where a = '[1,2]'::int4range;
-explain (costs off) select * from pp_intrangepart where a = '(1,2)'::int4range;
-drop table pp_intrangepart;
-
 --
 -- Ensure the enable_partition_prune GUC properly disables partition pruning.
 --

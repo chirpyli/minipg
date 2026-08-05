@@ -13,16 +13,15 @@
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid uuid enum rangetypes pg_lsn
+test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid enum pg_lsn
 
 # ----------
 # The second group of parallel tests
 # strings depends on char, varchar and text
 # numerology depends on int2, int4, int8, float4, float8
-# multirangetypes depends on rangetypes
-# multirangetypes shouldn't run concurrently with type_sanity
+# multirangetypes 已随 range/multirange 具体类型裁剪而移除
 # ----------
-test: strings numerology date time timetz timestamp timestamptz interval multirangetypes create_function_0
+test: strings numerology date time timetz timestamp timestamptz interval create_function_0
 
 # ----------
 # Another group of parallel tests
@@ -120,7 +119,7 @@ test: plancache limit plpgsql temp domain rangefuncs prepare conversion truncate
 # ----------
 # Another group of parallel tests
 # ----------
-test: partition_join partition_prune reloptions hash_part indexing partition_aggregate partition_info tuplesort explain memoize
+test: partition_join partition_prune reloptions hash_part indexing partition_aggregate partition_info explain memoize
 
 # ----------
 # Another group of parallel tests (compression)

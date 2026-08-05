@@ -147,17 +147,6 @@ FROM   (VALUES (NULL::timestamp), ('2017-08-22 00:09:59.518762'),
 WHERE  timestamp_hash(v)::bit(32) != timestamp_hash_extended(v, 0)::bit(32)
        OR timestamp_hash(v)::bit(32) = timestamp_hash_extended(v, 1)::bit(32);
 
-SELECT v as value, uuid_hash(v)::bit(32) as standard,
-       uuid_hash_extended(v, 0)::bit(32) as extended0,
-       uuid_hash_extended(v, 1)::bit(32) as extended1
-FROM   (VALUES (NULL::uuid), ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
-        ('5a9ba4ac-8d6f-11e7-bb31-be2e44b06b34'),
-        ('99c6705c-d939-461c-a3c9-1690ad64ed7b'),
-        ('7deed3ca-8d6f-11e7-bb31-be2e44b06b34'),
-        ('9ad46d4f-6f2a-4edd-aadb-745993928e1e')) x(v)
-WHERE  uuid_hash(v)::bit(32) != uuid_hash_extended(v, 0)::bit(32)
-       OR uuid_hash(v)::bit(32) = uuid_hash_extended(v, 1)::bit(32);
-
 SELECT v as value, pg_lsn_hash(v)::bit(32) as standard,
        pg_lsn_hash_extended(v, 0)::bit(32) as extended0,
        pg_lsn_hash_extended(v, 1)::bit(32) as extended1
@@ -175,25 +164,6 @@ WHERE  hashenum(v)::bit(32) != hashenumextended(v, 0)::bit(32)
        OR hashenum(v)::bit(32) = hashenumextended(v, 1)::bit(32);
 DROP TYPE mood;
 
-
-SELECT v as value, hash_range(v)::bit(32) as standard,
-       hash_range_extended(v, 0)::bit(32) as extended0,
-       hash_range_extended(v, 1)::bit(32) as extended1
-FROM   (VALUES (int4range(10, 20)), (int4range(23, 43)),
-        (int4range(5675, 550273)),
-        (int4range(550274, 1550274)), (int4range(1550275, 208112489))) x(v)
-WHERE  hash_range(v)::bit(32) != hash_range_extended(v, 0)::bit(32)
-       OR hash_range(v)::bit(32) = hash_range_extended(v, 1)::bit(32);
-
-SELECT v as value, hash_multirange(v)::bit(32) as standard,
-	   hash_multirange_extended(v, 0)::bit(32) as extended0,
-	   hash_multirange_extended(v, 1)::bit(32) as extended1
-FROM   (VALUES ('{[10,20)}'::int4multirange), ('{[23, 43]}'::int4multirange),
-         ('{[5675, 550273)}'::int4multirange),
-		 ('{[550274, 1550274)}'::int4multirange),
-		 ('{[1550275, 208112489)}'::int4multirange)) x(v)
-WHERE  hash_multirange(v)::bit(32) != hash_multirange_extended(v, 0)::bit(32)
-       OR hash_multirange(v)::bit(32) = hash_multirange_extended(v, 1)::bit(32);
 
 CREATE TYPE hash_test_t1 AS (a int, b text);
 SELECT v as value, hash_record(v)::bit(32) as standard,

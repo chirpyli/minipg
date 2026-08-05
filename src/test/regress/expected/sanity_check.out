@@ -79,8 +79,6 @@ num_exp_sqrt|t
 num_exp_sub|t
 num_input_test|f
 num_result|f
-nummultirange_test|t
-numrange_test|t
 onek|t
 onek2|t
 person|f
@@ -141,7 +139,6 @@ pg_trigger|t
 pg_type|t
 ramp|f
 real_city|f
-reservations|f
 road|t
 shighway|t
 slow_emp4000|f
@@ -160,10 +157,8 @@ tableam_tbl_heap2|f
 tableam_tblas_heap2|f
 tenk1|t
 tenk2|t
-test_range_elem|t
 testjsonb|f
 text_tbl|f
-textrange_test|t
 time_tbl|f
 timestamp_tbl|f
 timestamptz_tbl|f

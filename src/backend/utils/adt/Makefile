@@ -45,12 +45,8 @@ OBJS = \
 	like.o \
 	like_support.o \
 	lockfuncs.o \
-	mac.o \
-	mac8.o \
 	mcxtfuncs.o \
 	misc.o \
-	multirangetypes.o \
-	multirangetypes_selfuncs.o \
 	name.o \
 	numeric.o \
 	numutils.o \
@@ -58,26 +54,26 @@ OBJS = \
 	oracle_compat.o \
 	orderedsetaggs.o \
 	partitionfuncs.o \
+	multirangetypes.o \
+	multirangetypes_selfuncs.o \
 	pg_locale.o \
 	pg_lsn.o \
-	pg_upgrade_support.o \
 	pgstatfuncs.o \
 	pseudotypes.o \
 	quote.o \
-	rangetypes.o \
-	rangetypes_selfuncs.o \
-	rangetypes_typanalyze.o \
 	regexp.o \
 	regproc.o \
 	ri_triggers.o \
 	rowtypes.o \
 	ruleutils.o \
+	rangetypes.o \
+	rangetypes_selfuncs.o \
+	rangetypes_typanalyze.o \
 	selfuncs_geo.o \
 	selfuncs.o \
 	tid.o \
 	timestamp.o \
 	trigfuncs.o \
-	uuid.o \
 	varbit.o \
 	varchar.o \
 	varlena.o \

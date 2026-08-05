@@ -1603,21 +1603,6 @@ select f1(stavalues1) from pg_statistic;  -- fail, can't infer element type
 
 drop function f1(x anyarray);
 
--- fail, can't infer type:
-create function f1(x anyelement) returns anyrange as $$
-begin
-  return array[x + 1, x + 2];
-end$$ language plpgsql;
-
-create function f1(x anyrange) returns anyarray as $$
-begin
-  return array[lower(x), upper(x)];
-end$$ language plpgsql;
-
-select f1(int4range(42, 49)) as int, f1(float8range(4.5, 7.8)) as num;
-
-drop function f1(x anyrange);
-
 create function f1(x anycompatible, y anycompatible) returns anycompatiblearray as $$
 begin
   return array[x, y];
@@ -1626,32 +1611,6 @@ end$$ language plpgsql;
 select f1(2, 4) as int, f1(2, 4.5) as num;
 
 drop function f1(x anycompatible, y anycompatible);
-
-create function f1(x anycompatiblerange, y anycompatible, z anycompatible) returns anycompatiblearray as $$
-begin
-  return array[lower(x), upper(x), y, z];
-end$$ language plpgsql;
-
-select f1(int4range(42, 49), 11, 2::smallint) as int, f1(float8range(4.5, 7.8), 7.8, 11::real) as num;
-
-select f1(int4range(42, 49), 11, 4.5) as fail;  -- range type doesn't fit
-
-drop function f1(x anycompatiblerange, y anycompatible, z anycompatible);
-
--- fail, can't infer type:
-create function f1(x anycompatible) returns anycompatiblerange as $$
-begin
-  return array[x + 1, x + 2];
-end$$ language plpgsql;
-
-create function f1(x anycompatiblerange, y anycompatiblearray) returns anycompatiblerange as $$
-begin
-  return x;
-end$$ language plpgsql;
-
-select f1(int4range(42, 49), array[11]) as int, f1(float8range(4.5, 7.8), array[7]) as num;
-
-drop function f1(x anycompatiblerange, y anycompatiblearray);
 
 create function f1(a anyelement, b anyarray,
                    c anycompatible, d anycompatible,
@@ -1754,18 +1713,6 @@ select * from duplic(42);
 select * from duplic('foo'::text);
 
 drop function duplic(anyelement);
-
-create function duplic(in i anycompatiblerange, out j anycompatible, out k anycompatiblearray) as $$
-begin
-  j := lower(i);
-  k := array[lower(i),upper(i)];
-  return;
-end$$ language plpgsql;
-
-select * from duplic(int4range(42,49));
-select * from duplic(textrange('aaa', 'bbb'));
-
-drop function duplic(anycompatiblerange);
 
 --
 -- test PERFORM

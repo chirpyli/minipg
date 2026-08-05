@@ -1289,38 +1289,6 @@ SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists WHERE a = 1 OR b = '
 
 SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists WHERE a IS NULL AND (b = ''x'' OR d = ''x'')');
 
--- mcv with pass-by-ref fixlen types, e.g. uuid
-CREATE TABLE mcv_lists_uuid (
-    a UUID,
-    b UUID,
-    c UUID
-)
-WITH (autovacuum_enabled = off);
-
-INSERT INTO mcv_lists_uuid (a, b, c)
-     SELECT
-         md5(mod(i,100)::text)::uuid,
-         md5(mod(i,50)::text)::uuid,
-         md5(mod(i,25)::text)::uuid
-     FROM generate_series(1,5000) s(i);
-
-ANALYZE mcv_lists_uuid;
-
-SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists_uuid WHERE a = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND b = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc''');
-
-SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists_uuid WHERE a = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND b = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND c = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc''');
-
-CREATE STATISTICS mcv_lists_uuid_stats (mcv) ON a, b, c
-  FROM mcv_lists_uuid;
-
-ANALYZE mcv_lists_uuid;
-
-SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists_uuid WHERE a = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND b = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc''');
-
-SELECT * FROM check_estimated_rows('SELECT * FROM mcv_lists_uuid WHERE a = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND b = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc'' AND c = ''1679091c-5a88-0faf-6fb5-e6087eb1b2dc''');
-
-DROP TABLE mcv_lists_uuid;
-
 -- mcv with arrays
 CREATE TABLE mcv_lists_arrays (
     a TEXT[],

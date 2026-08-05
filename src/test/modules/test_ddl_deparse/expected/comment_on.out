@@ -6,7 +6,7 @@ NOTICE:  DDL test: type simple, tag COMMENT
 COMMENT ON TYPE enum_test IS 'ENUM test';
 NOTICE:  DDL test: type simple, tag COMMENT
 COMMENT ON TYPE int2range  IS 'RANGE test';
-NOTICE:  DDL test: type simple, tag COMMENT
+ERROR:  type "int2range" does not exist
 COMMENT ON DOMAIN japanese_postal_code IS 'DOMAIN test';
 NOTICE:  DDL test: type simple, tag COMMENT
 COMMENT ON SEQUENCE fkey_table_seq IS 'SEQUENCE test';

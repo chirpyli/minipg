@@ -523,7 +523,6 @@ CREATE TABLE tab_core_types AS SELECT
   'abc'::refcursor,
   '1 2'::int2vector,
   '1 2'::oidvector,
-  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
   '11'::xid8,
   'pg_class'::regclass,
   'regtype'::regtype type,
@@ -539,20 +538,7 @@ CREATE TABLE tab_core_types AS SELECT
   'now'::information_schema.time_stamp,
   'YES'::information_schema.yes_or_no,
   'venus'::planets,
-  'i16'::insenum,
-  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
-  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
-  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
-  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
-  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
-  '(2020-01-02, 2021-02-03)'::daterange,
-  '{(2020-01-02, 2021-02-03)}'::datemultirange,
-  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
-  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
-  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
-  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
-  arrayrange(ARRAY[1,2], ARRAY[2,1]),
-  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]));
+  'i16'::insenum;
 
 -- Sanity check on the previous table, checking that all core types are
 -- included in this table.

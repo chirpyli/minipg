@@ -5069,17 +5069,6 @@ List of access methods
  btree | float_ops       | real                 | double precision      |      3 | in_range(real,real,double precision,boolean,boolean)
 (8 rows)
 
-\dAp * pg_catalog.uuid_ops
-                            List of support functions of operator families
-  AM   | Operator family | Registered left type | Registered right type | Number |      Function      
--------+-----------------+----------------------+-----------------------+--------+--------------------
- btree | uuid_ops        | uuid                 | uuid                  |      1 | uuid_cmp
- btree | uuid_ops        | uuid                 | uuid                  |      2 | uuid_sortsupport
- btree | uuid_ops        | uuid                 | uuid                  |      4 | btequalimage
- hash  | uuid_ops        | uuid                 | uuid                  |      1 | uuid_hash
- hash  | uuid_ops        | uuid                 | uuid                  |      2 | uuid_hash_extended
-(5 rows)
-
 -- check \df, \do with argument specifications
 \df *sqrt
                              List of functions

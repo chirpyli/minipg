@@ -187,7 +187,6 @@ distprep:
 	$(MAKE) -C replication	repl_gram.c repl_scanner.c syncrep_gram.c syncrep_scanner.c
 	$(MAKE) -C storage/lmgr	lwlocknames.h lwlocknames.c
 	$(MAKE) -C utils	distprep
-	$(MAKE) -C utils/adt	jsonpath_gram.c jsonpath_scan.c
 	$(MAKE) -C utils/misc	guc-file.c
 
 
@@ -290,11 +289,9 @@ maintainer-clean: distclean
 	      replication/repl_scanner.c \
 	      replication/syncrep_gram.c \
 	      replication/syncrep_scanner.c \
-	      storage/lmgr/lwlocknames.c \
-	      storage/lmgr/lwlocknames.h \
-	      utils/adt/jsonpath_gram.c \
-	      utils/adt/jsonpath_scan.c \
-	      utils/misc/guc-file.c
+      storage/lmgr/lwlocknames.c \
+      storage/lmgr/lwlocknames.h \
+      utils/misc/guc-file.c
 
 
 ##########################################################################

@@ -15,7 +15,3 @@ CREATE FUNCTION text_w_default_out(text_w_default)
 CREATE TYPE employee_type AS (name TEXT, salary NUMERIC);
 
 CREATE TYPE enum_test AS ENUM ('foo', 'bar', 'baz');
-
-CREATE TYPE int2range AS RANGE (
-  SUBTYPE = int2
-);
