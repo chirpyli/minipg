@@ -13,7 +13,6 @@ OBJS = \
 	committsdesc.o \
 	dbasedesc.o \
 	genericdesc.o \
-	gindesc.o \
 	hashdesc.o \
 	heapdesc.o \
 	logicalmsgdesc.o \

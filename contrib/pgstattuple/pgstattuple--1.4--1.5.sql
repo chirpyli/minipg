@@ -40,12 +40,6 @@ LANGUAGE C STRICT PARALLEL SAFE;
 
 /* New stuff in 1.1 begins here */
 
-CREATE OR REPLACE FUNCTION pgstatginindex(IN relname regclass,
-    OUT version INT4,
-    OUT pending_pages INT4,
-    OUT pending_tuples BIGINT)
-AS 'MODULE_PATHNAME', 'pgstatginindex_v1_5'
-LANGUAGE C STRICT PARALLEL SAFE;
 
 
 /* New stuff in 1.2 begins here */

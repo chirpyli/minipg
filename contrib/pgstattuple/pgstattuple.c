@@ -271,9 +271,6 @@ pgstat_relation(Relation rel, FunctionCallInfo fcinfo)
 				case HASH_AM_OID:
 					return pgstat_index(rel, HASH_METAPAGE + 1,
 										pgstat_hash_page, fcinfo);
-			case GIN_AM_OID:
-				err = "gin index";
-				break;
 			default:
 					err = "unknown index";
 					break;

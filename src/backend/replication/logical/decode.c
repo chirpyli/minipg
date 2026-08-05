@@ -171,7 +171,6 @@ LogicalDecodingProcessRecord(LogicalDecodingContext *ctx, XLogReaderState *recor
 		case RM_RELMAP_ID:
 		case RM_BTREE_ID:
 		case RM_HASH_ID:
-		case RM_GIN_ID:
 		case RM_SEQ_ID:
 		case RM_COMMIT_TS_ID:
 		case RM_REPLORIGIN_ID:

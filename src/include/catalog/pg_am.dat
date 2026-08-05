@@ -18,10 +18,6 @@
 { oid => '403', oid_symbol => 'BTREE_AM_OID',
   descr => 'b-tree index access method',
   amname => 'btree', amhandler => 'bthandler', amtype => 'i' },
-{ oid => '2742', oid_symbol => 'GIN_AM_OID',
-  amname => 'gin',
-  amhandler => 'ginhandler', amtype => 'i' },
-
 { oid => '405', oid_symbol => 'HASH_AM_OID',
   descr => 'hash index access method',
   amname => 'hash', amhandler => 'hashhandler', amtype => 'i' },

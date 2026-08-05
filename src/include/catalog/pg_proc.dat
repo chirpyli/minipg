@@ -840,14 +840,6 @@
   proname => 'hashhandler', provolatile => 'v',
   prorettype => 'index_am_handler', proargtypes => 'internal',
   prosrc => 'hashhandler' },
-{ oid => '333', descr => 'gin index access method handler',
-  proname => 'ginhandler', provolatile => 'v', prorettype => 'index_am_handler',
-  proargtypes => 'internal', prosrc => 'ginhandler' },
-
-
-
-
-
 
 
 { oid => '338', descr => 'validate an operator class',

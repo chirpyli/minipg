@@ -6,7 +6,6 @@
 ALTER FUNCTION pgstattuple(text) PARALLEL SAFE;
 ALTER FUNCTION pgstatindex(text) PARALLEL SAFE;
 ALTER FUNCTION pg_relpages(text) PARALLEL SAFE;
-ALTER FUNCTION pgstatginindex(regclass) PARALLEL SAFE;
 ALTER FUNCTION pgstattuple(regclass) PARALLEL SAFE;
 ALTER FUNCTION pgstatindex(regclass) PARALLEL SAFE;
 ALTER FUNCTION pg_relpages(regclass) PARALLEL SAFE;

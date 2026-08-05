@@ -1082,7 +1082,6 @@
 
 
 
-# gin array_ops
 
 
 
@@ -1121,7 +1120,6 @@
 
 
 # GIN tsvector_ops
-
 
 
 # btree tsquery_ops

@@ -104,19 +104,13 @@ select amname, prop, pg_indexam_has_property(a.oid, prop) as p
  btree  | can_exclude   | t
  btree  | can_include   | t
  btree  | bogus         | 
- gin    | can_order     | f
- gin    | can_unique    | f
- gin    | can_multi_col | t
- gin    | can_exclude   | f
- gin    | can_include   | f
- gin    | bogus         | 
  hash   | can_order     | f
  hash   | can_unique    | f
  hash   | can_multi_col | f
  hash   | can_exclude   | t
  hash   | can_include   | f
  hash   | bogus         | 
-(18 rows)
+(12 rows)
 
 --
 -- additional checks for pg_index_column_has_property

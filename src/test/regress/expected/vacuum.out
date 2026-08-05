@@ -152,8 +152,6 @@ CREATE INDEX btree_pvactst ON pvactst USING btree (i);
 ERROR:  relation "pvactst" does not exist
 CREATE INDEX hash_pvactst ON pvactst USING hash (i);
 ERROR:  relation "pvactst" does not exist
-CREATE INDEX gin_pvactst ON pvactst USING gin (a);
-ERROR:  relation "pvactst" does not exist
 CREATE INDEX gist_pvactst ON pvactst USING gist (p);
 ERROR:  relation "pvactst" does not exist
 CREATE INDEX spgist_pvactst ON pvactst USING spgist (p);
