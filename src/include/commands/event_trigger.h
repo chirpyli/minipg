@@ -79,13 +79,11 @@ extern void EventTriggerCollectAlterTableSubcmd(Node *subcmd,
 												ObjectAddress address);
 extern void EventTriggerAlterTableEnd(void);
 
-extern void EventTriggerCollectGrant(InternalGrant *istmt);
 extern void EventTriggerCollectAlterOpFam(AlterOpFamilyStmt *stmt,
 										  Oid opfamoid, List *operators,
 										  List *procedures);
 extern void EventTriggerCollectCreateOpClass(CreateOpClassStmt *stmt,
 											 Oid opcoid, List *operators,
 											 List *procedures);
-extern void EventTriggerCollectAlterDefPrivs(AlterDefaultPrivilegesStmt *stmt);
 
 #endif							/* EVENT_TRIGGER_H */

@@ -285,105 +285,84 @@ ROLLBACK;
 
 -- privileges tests
 
-CREATE USER regress_seq_user;
 
 -- nextval
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT SELECT ON seq3 TO regress_seq_user;
 SELECT nextval('seq3');
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT nextval('seq3');
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT USAGE ON seq3 TO regress_seq_user;
 SELECT nextval('seq3');
 ROLLBACK;
 
 -- currval
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT SELECT ON seq3 TO regress_seq_user;
 SELECT currval('seq3');
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT currval('seq3');
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT USAGE ON seq3 TO regress_seq_user;
 SELECT currval('seq3');
 ROLLBACK;
 
 -- lastval
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT SELECT ON seq3 TO regress_seq_user;
 SELECT lastval();
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT lastval();
 ROLLBACK;
 
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
 SELECT nextval('seq3');
-REVOKE ALL ON seq3 FROM regress_seq_user;
-GRANT USAGE ON seq3 TO regress_seq_user;
 SELECT lastval();
 ROLLBACK;
 
 -- setval
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 CREATE SEQUENCE seq3;
-REVOKE ALL ON seq3 FROM regress_seq_user;
 SAVEPOINT save;
 SELECT setval('seq3', 5);
 ROLLBACK TO save;
-GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT setval('seq3', 5);
 SELECT nextval('seq3');
 ROLLBACK;
 
 -- ALTER SEQUENCE
 BEGIN;
-SET LOCAL SESSION AUTHORIZATION regress_seq_user;
+SET LOCAL SESSION;
 ALTER SEQUENCE sequence_test2 START WITH 1;
 ROLLBACK;
 
@@ -396,7 +375,6 @@ SELECT * FROM information_schema.sequences WHERE sequence_name IN
    'serialtest2_f4_seq', 'serialtest2_f5_seq', 'serialtest2_f6_seq')
   ORDER BY sequence_name ASC;
 
-DROP USER regress_seq_user;
 DROP SEQUENCE seq;
 
 -- cache tests

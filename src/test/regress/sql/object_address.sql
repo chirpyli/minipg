@@ -34,7 +34,6 @@ CREATE AGGREGATE addr_nsp.genaggr(int4) (sfunc = int4pl, stype = int4);
 CREATE DOMAIN addr_nsp.gendomain AS int4 CONSTRAINT domconstr CHECK (value > 0);
 CREATE FUNCTION addr_nsp.trig() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN END; $$;
 CREATE TRIGGER t BEFORE INSERT ON addr_nsp.gentable FOR EACH ROW EXECUTE PROCEDURE addr_nsp.trig();
-CREATE POLICY genpol ON addr_nsp.gentable;
 CREATE PROCEDURE addr_nsp.proc(int4) LANGUAGE SQL AS $$ $$;
 CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
 CREATE USER MAPPING FOR regress_addr_user SERVER "integer";
@@ -193,7 +192,6 @@ WITH objects (type, name, args) AS (VALUES
 				('default acl', '{regress_addr_user}', '{r}'),
 				-- extension
 				-- event trigger
-				('policy', '{addr_nsp, gentable, genpol}', '{}'),
 				('transform', '{int}', '{sql}'),
 				('access method', '{btree}', '{}'),
 				('publication', '{addr_pub}', '{}'),
@@ -264,7 +262,6 @@ WITH objects (classid, objid, objsubid) AS (VALUES
     ('pg_default_acl'::regclass, 0, 0), -- no default ACL
     ('pg_extension'::regclass, 0, 0), -- no extension
     ('pg_event_trigger'::regclass, 0, 0), -- no event trigger
-    ('pg_policy'::regclass, 0, 0), -- no policy
     ('pg_publication'::regclass, 0, 0), -- no publication
     ('pg_publication_rel'::regclass, 0, 0), -- no publication relation
     ('pg_subscription'::regclass, 0, 0), -- no subscription

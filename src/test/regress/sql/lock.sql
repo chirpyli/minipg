@@ -13,9 +13,6 @@ CREATE VIEW lock_view3 AS SELECT * from lock_view2;
 CREATE VIEW lock_view4 AS SELECT (select a from lock_tbl1a limit 1) from lock_tbl1;
 CREATE VIEW lock_view5 AS SELECT * from lock_tbl1 where a in (select * from lock_tbl1a);
 CREATE VIEW lock_view6 AS SELECT * from (select * from lock_tbl1) sub;
-CREATE ROLE regress_rol_lock1;
-ALTER ROLE regress_rol_lock1 SET search_path = lock_schema1;
-GRANT USAGE ON SCHEMA lock_schema1 TO regress_rol_lock1;
 
 -- Try all valid lock options; also try omitting the optional TABLE keyword.
 BEGIN TRANSACTION;
@@ -103,8 +100,6 @@ ROLLBACK;
 
 -- Child tables are locked without granting explicit permission to do so as
 -- long as we have permission to lock the parent.
-GRANT UPDATE ON TABLE lock_tbl1 TO regress_rol_lock1;
-SET ROLE regress_rol_lock1;
 -- fail when child locked directly
 BEGIN;
 LOCK TABLE lock_tbl2;
@@ -115,7 +110,6 @@ ROLLBACK;
 BEGIN;
 LOCK TABLE ONLY lock_tbl1;
 ROLLBACK;
-RESET ROLE;
 
 --
 -- Clean up
@@ -131,7 +125,6 @@ DROP TABLE lock_tbl2;
 DROP TABLE lock_tbl1;
 DROP TABLE lock_tbl1a;
 DROP SCHEMA lock_schema1 CASCADE;
-DROP ROLE regress_rol_lock1;
 
 
 -- atomic ops tests

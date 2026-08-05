@@ -34,6 +34,7 @@ SELECT pg_drop_replication_slot('regression_slot_p');
 -- test switching between slots in a session
 SELECT 'init' FROM pg_create_logical_replication_slot('regression_slot1', 'test_decoding', true);
 
+DROP TABLE IF EXISTS replication_example;
 CREATE TABLE replication_example(id SERIAL PRIMARY KEY, somedata int, text varchar(120));
 BEGIN;
 INSERT INTO replication_example(somedata, text) VALUES (1, 1);

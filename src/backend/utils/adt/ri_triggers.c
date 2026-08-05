@@ -49,7 +49,6 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
-#include "utils/rls.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
@@ -1355,18 +1354,6 @@ RI_Initial_Check(Trigger *trigger, Relation fk_rel, Relation pk_rel)
 	if (!ExecCheckRTPerms(list_make2(fkrte, pkrte), false))
 		return false;
 
-	/*
-	 * Also punt if RLS is enabled on either table unless this role has the
-	 * bypassrls right or is the table owner of the table(s) involved which
-	 * have RLS enabled.
-	 */
-	if (!has_bypassrls_privilege(GetUserId()) &&
-		((pk_rel->rd_rel->relrowsecurity &&
-		  !pg_class_ownercheck(pkrte->relid, GetUserId())) ||
-		 (fk_rel->rd_rel->relrowsecurity &&
-		  !pg_class_ownercheck(fkrte->relid, GetUserId()))))
-		return false;
-
 	/*----------
 	 * The query string built is:
 	 *	SELECT fk.keycols FROM [ONLY] relname fk
@@ -2452,7 +2439,7 @@ ri_ReportViolation(const RI_ConstraintInfo *riinfo,
 	 */
 	if (partgone)
 		has_perm = true;
-	else if (check_enable_rls(rel_oid, InvalidOid, true) != RLS_ENABLED)
+	else
 	{
 		aclresult = pg_class_aclcheck(rel_oid, GetUserId(), ACL_SELECT);
 		if (aclresult != ACLCHECK_OK)
@@ -2473,8 +2460,6 @@ ri_ReportViolation(const RI_ConstraintInfo *riinfo,
 			}
 		}
 	}
-	else
-		has_perm = false;
 
 	if (has_perm)
 	{

@@ -1304,82 +1304,12 @@ AclMode
 aclmask(const Acl *acl, Oid roleid, Oid ownerId,
 		AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	AclMode		remaining;
-	AclItem    *aidat;
-	int			i,
-				num;
-
 	/*
-	 * Null ACL should not happen, since caller should have inserted
-	 * appropriate default
+	 * minipg: 权限（ACL）机制已裁剪。所有对象访问一律视为授予所请求的全部
+	 * 权限，即任何连接用户都等同于超级用户。因此直接返回调用方所求的掩码，
+	 * 而不再对 ACL 进行实际计算。
 	 */
-	if (acl == NULL)
-		elog(ERROR, "null ACL");
-
-	check_acl(acl);
-
-	/* Quick exit for mask == 0 */
-	if (mask == 0)
-		return 0;
-
-	result = 0;
-
-	/* Owner always implicitly has all grant options */
-	if ((mask & ACLITEM_ALL_GOPTION_BITS) &&
-		has_privs_of_role(roleid, ownerId))
-	{
-		result = mask & ACLITEM_ALL_GOPTION_BITS;
-		if ((how == ACLMASK_ALL) ? (result == mask) : (result != 0))
-			return result;
-	}
-
-	num = ACL_NUM(acl);
-	aidat = ACL_DAT(acl);
-
-	/*
-	 * Check privileges granted directly to roleid or to public
-	 */
-	for (i = 0; i < num; i++)
-	{
-		AclItem    *aidata = &aidat[i];
-
-		if (aidata->ai_grantee == ACL_ID_PUBLIC ||
-			aidata->ai_grantee == roleid)
-		{
-			result |= aidata->ai_privs & mask;
-			if ((how == ACLMASK_ALL) ? (result == mask) : (result != 0))
-				return result;
-		}
-	}
-
-	/*
-	 * Check privileges granted indirectly via role memberships. We do this in
-	 * a separate pass to minimize expensive indirect membership tests.  In
-	 * particular, it's worth testing whether a given ACL entry grants any
-	 * privileges still of interest before we perform the has_privs_of_role
-	 * test.
-	 */
-	remaining = mask & ~result;
-	for (i = 0; i < num; i++)
-	{
-		AclItem    *aidata = &aidat[i];
-
-		if (aidata->ai_grantee == ACL_ID_PUBLIC ||
-			aidata->ai_grantee == roleid)
-			continue;			/* already checked it */
-
-		if ((aidata->ai_privs & remaining) &&
-			has_privs_of_role(roleid, aidata->ai_grantee))
-		{
-			result |= aidata->ai_privs & mask;
-			if ((how == ACLMASK_ALL) ? (result == mask) : (result != 0))
-				return result;
-			remaining = mask & ~result;
-		}
-	}
-
-	return result;
+	return mask;
 }
 
 

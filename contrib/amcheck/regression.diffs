@@ -1,0 +1,652 @@
+diff -U3 /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check.out /home/postgres/works/my-github/minipg/contrib/amcheck/results/check.out
+--- /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check.out	2026-07-31 11:39:21.000000000 +0800
++++ /home/postgres/works/my-github/minipg/contrib/amcheck/results/check.out	2026-08-05 10:46:44.332407249 +0800
+@@ -1 +1,2 @@
+ CREATE EXTENSION amcheck;
++ERROR:  syntax error at or near "REVOKE"
+diff -U3 /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check_btree.out /home/postgres/works/my-github/minipg/contrib/amcheck/results/check_btree.out
+--- /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check_btree.out	2026-08-03 17:05:46.480400284 +0800
++++ /home/postgres/works/my-github/minipg/contrib/amcheck/results/check_btree.out	2026-08-05 10:46:44.896410070 +0800
+@@ -15,119 +15,137 @@
+ CREATE UNIQUE INDEX bttest_multi_idx ON bttest_multi
+ USING btree (id) INCLUDE (data);
+ CREATE ROLE regress_bttest_role;
++ERROR:  syntax error at or near "ROLE"
++LINE 1: CREATE ROLE regress_bttest_role;
++               ^
+ -- verify permissions are checked (error due to function not callable)
+ SET ROLE regress_bttest_role;
++ERROR:  role "regress_bttest_role" does not exist
+ SELECT bt_index_check('bttest_a_idx'::regclass);
+-ERROR:  permission denied for function bt_index_check
++ERROR:  function bt_index_check(regclass) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx'::regclass);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check('bttest_a_idx'::regclass);
+-ERROR:  permission denied for function bt_index_parent_check
++ERROR:  function bt_index_parent_check(regclass) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_a_idx'::regclass);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ RESET ROLE;
+ -- we, intentionally, don't check relation permissions - it's useful
+ -- to run this cluster-wide with a restricted account, and as tested
+ -- above explicit permission has to be granted for that.
+ GRANT EXECUTE ON FUNCTION bt_index_check(regclass) TO regress_bttest_role;
++ERROR:  syntax error at or near "GRANT"
++LINE 1: GRANT EXECUTE ON FUNCTION bt_index_check(regclass) TO regres...
++        ^
+ GRANT EXECUTE ON FUNCTION bt_index_parent_check(regclass) TO regress_bttest_role;
++ERROR:  syntax error at or near "GRANT"
++LINE 1: GRANT EXECUTE ON FUNCTION bt_index_parent_check(regclass) TO...
++        ^
+ GRANT EXECUTE ON FUNCTION bt_index_check(regclass, boolean) TO regress_bttest_role;
++ERROR:  syntax error at or near "GRANT"
++LINE 1: GRANT EXECUTE ON FUNCTION bt_index_check(regclass, boolean) ...
++        ^
+ GRANT EXECUTE ON FUNCTION bt_index_parent_check(regclass, boolean) TO regress_bttest_role;
++ERROR:  syntax error at or near "GRANT"
++LINE 1: GRANT EXECUTE ON FUNCTION bt_index_parent_check(regclass, bo...
++        ^
+ SET ROLE regress_bttest_role;
++ERROR:  role "regress_bttest_role" does not exist
+ SELECT bt_index_check('bttest_a_idx');
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check('bttest_a_idx');
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_parent_check(unknown) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_a_idx');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ RESET ROLE;
+ -- verify plain tables are rejected (error)
+ SELECT bt_index_check('bttest_a');
+-ERROR:  "bttest_a" is not an index
++ERROR:  function bt_index_check(unknown) does not exist
++LINE 1: SELECT bt_index_check('bttest_a');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check('bttest_a');
+-ERROR:  "bttest_a" is not an index
++ERROR:  function bt_index_parent_check(unknown) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_a');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- verify non-existing indexes are rejected (error)
+ SELECT bt_index_check(17);
+-ERROR:  could not open relation with OID 17
++ERROR:  function bt_index_check(integer) does not exist
++LINE 1: SELECT bt_index_check(17);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check(17);
+-ERROR:  could not open relation with OID 17
++ERROR:  function bt_index_parent_check(integer) does not exist
++LINE 1: SELECT bt_index_parent_check(17);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- verify wrong index types are rejected (error)
+ -- normal check outside of xact
+ SELECT bt_index_check('bttest_a_idx');
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- more expansive tests
+ SELECT bt_index_check('bttest_a_idx', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check('bttest_b_idx', true);
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_parent_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_b_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ BEGIN;
+ SELECT bt_index_check('bttest_a_idx');
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT bt_index_parent_check('bttest_b_idx');
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ -- make sure we don't have any leftover locks
+ SELECT * FROM pg_locks
+ WHERE relation = ANY(ARRAY['bttest_a', 'bttest_a_idx', 'bttest_b', 'bttest_b_idx']::regclass[])
+     AND pid = pg_backend_pid();
+- locktype | database | relation | page | tuple | virtualxid | transactionid | classid | objid | objsubid | virtualtransaction | pid | mode | granted | fastpath | waitstart 
+-----------+----------+----------+------+-------+------------+---------------+---------+-------+----------+--------------------+-----+------+---------+----------+-----------
+-(0 rows)
+-
++ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ COMMIT;
+ -- Deduplication
+ TRUNCATE bttest_a;
+ INSERT INTO bttest_a SELECT 42 FROM generate_series(1, 2000);
+ SELECT bt_index_check('bttest_a_idx', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- normal check outside of xact for index with included columns
+ SELECT bt_index_check('bttest_multi_idx');
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown) does not exist
++LINE 1: SELECT bt_index_check('bttest_multi_idx');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- more expansive tests for index with included columns
+ SELECT bt_index_parent_check('bttest_multi_idx', true, true);
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_parent_check(unknown, boolean, boolean) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_multi_idx', true, true)...
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- repeat expansive tests for index built using insertions
+ TRUNCATE bttest_multi;
+ INSERT INTO bttest_multi SELECT i, i%2  FROM generate_series(1, 100000) as i;
+ SELECT bt_index_parent_check('bttest_multi_idx', true, true);
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_parent_check(unknown, boolean, boolean) does not exist
++LINE 1: SELECT bt_index_parent_check('bttest_multi_idx', true, true)...
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ --
+ -- Test for multilevel page deletion/downlink present checks, and rootdescend
+ -- checks
+@@ -139,11 +157,10 @@
+ DELETE FROM delete_test_table WHERE a < 79990;
+ VACUUM delete_test_table;
+ SELECT bt_index_parent_check('delete_test_table_pkey', true);
+- bt_index_parent_check 
+------------------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_parent_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_parent_check('delete_test_table_pkey', true)...
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ --
+ -- BUG #15597: must not assume consistent input toasting state when forming
+ -- tuple.  Bloom filter must fingerprint normalized index tuple representation.
+@@ -166,17 +183,17 @@
+ INSERT INTO toast_bug SELECT repeat('a', 2200);
+ -- Should not get false positive report of corruption:
+ SELECT bt_index_check('toasty', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('toasty', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ --
+ -- Check that index expressions and predicates are run as the table's owner
+ --
+ TRUNCATE bttest_a;
+ INSERT INTO bttest_a SELECT * FROM generate_series(1, 1000);
+ ALTER TABLE bttest_a OWNER TO regress_bttest_role;
++ERROR:  role "regress_bttest_role" does not exist
+ -- A dummy index function checking current_user
+ CREATE FUNCTION ifun(int8) RETURNS int8 AS $$
+ BEGIN
+@@ -187,12 +204,13 @@
+ $$ LANGUAGE plpgsql IMMUTABLE;
+ CREATE INDEX bttest_a_expr_idx ON bttest_a ((ifun(id) + ifun(0)))
+ 	WHERE ifun(id + 10) > ifun(10);
++ERROR:  ifun(10) called by postgres
++CONTEXT:  PL/pgSQL function ifun(bigint) line 3 at ASSERT
+ SELECT bt_index_check('bttest_a_expr_idx', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('bttest_a_expr_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check support of both 1B and 4B header sizes of short varlena datum
+ CREATE TABLE varlena_bug (v text);
+ ALTER TABLE varlena_bug ALTER column v SET storage plain;
+@@ -200,21 +218,19 @@
+ COPY varlena_bug from stdin;
+ CREATE INDEX varlena_bug_idx on varlena_bug(v);
+ SELECT bt_index_check('varlena_bug_idx', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('varlena_bug_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Also check that we compress varlena values, which were previously stored
+ -- uncompressed in index.
+ INSERT INTO varlena_bug VALUES (repeat('Test', 250));
+ ALTER TABLE varlena_bug ALTER COLUMN v SET STORAGE extended;
+ SELECT bt_index_check('varlena_bug_idx', true);
+- bt_index_check 
+-----------------
+- 
+-(1 row)
+-
++ERROR:  function bt_index_check(unknown, boolean) does not exist
++LINE 1: SELECT bt_index_check('varlena_bug_idx', true);
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- cleanup
+ DROP TABLE bttest_a;
+ DROP TABLE bttest_b;
+@@ -223,5 +239,11 @@
+ DROP TABLE toast_bug;
+ DROP FUNCTION ifun(int8);
+ DROP OWNED BY regress_bttest_role; -- permissions
++ERROR:  syntax error at or near "OWNED"
++LINE 1: DROP OWNED BY regress_bttest_role;
++             ^
+ DROP ROLE regress_bttest_role;
++ERROR:  syntax error at or near "ROLE"
++LINE 1: DROP ROLE regress_bttest_role;
++             ^
+ DROP TABLE varlena_bug;
+diff -U3 /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check_heap.out /home/postgres/works/my-github/minipg/contrib/amcheck/results/check_heap.out
+--- /home/postgres/works/my-github/minipg/contrib/amcheck/expected/check_heap.out	2026-08-04 18:24:26.912395802 +0800
++++ /home/postgres/works/my-github/minipg/contrib/amcheck/results/check_heap.out	2026-08-05 10:46:44.935410266 +0800
+@@ -1,67 +1,72 @@
+ CREATE TABLE heaptest (a integer, b text);
+ REVOKE ALL ON heaptest FROM PUBLIC;
++ERROR:  syntax error at or near "REVOKE"
++LINE 1: REVOKE ALL ON heaptest FROM PUBLIC;
++        ^
+ -- Check that invalid skip option is rejected
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'rope');
+-ERROR:  invalid skip option
+-HINT:  Valid skip options are "all-visible", "all-frozen", and "none".
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check specifying invalid block ranges when verifying an empty table
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 5, endblock := 8);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that valid options are not rejected nor corruption reported
+ -- for an empty table, and that skip enum-like parameter is case-insensitive
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'None');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'All-Frozen');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'All-Visible');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'NONE');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'ALL-FROZEN');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'ALL-VISIBLE');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Add some data so subsequent tests are not entirely trivial
+ INSERT INTO heaptest (a, b)
+ 	(SELECT gs, repeat('x', gs)
+@@ -69,69 +74,86 @@
+ -- Check that valid options are not rejected nor corruption reported
+ -- for a non-empty table
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ CREATE ROLE regress_heaptest_role;
++ERROR:  syntax error at or near "ROLE"
++LINE 1: CREATE ROLE regress_heaptest_role;
++               ^
+ -- verify permissions are checked (error due to function not callable)
+ SET ROLE regress_heaptest_role;
++ERROR:  role "regress_heaptest_role" does not exist
+ SELECT * FROM verify_heapam(relation := 'heaptest');
+-ERROR:  permission denied for function verify_heapam
++ERROR:  function verify_heapam(relation => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest');
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ RESET ROLE;
+ GRANT EXECUTE ON FUNCTION verify_heapam(regclass, boolean, boolean, text, bigint, bigint) TO regress_heaptest_role;
++ERROR:  syntax error at or near "GRANT"
++LINE 1: GRANT EXECUTE ON FUNCTION verify_heapam(regclass, boolean, b...
++        ^
+ -- verify permissions are now sufficient
+ SET ROLE regress_heaptest_role;
++ERROR:  role "regress_heaptest_role" does not exist
+ SELECT * FROM verify_heapam(relation := 'heaptest');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest');
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ RESET ROLE;
+ -- Check specifying invalid block ranges when verifying a non-empty table.
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 10000);
+-ERROR:  ending block number must be between 0 and 0
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 10000, endblock := 11000);
+-ERROR:  starting block number must be between 0 and 0
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Vacuum freeze to change the xids encountered in subsequent tests
+ VACUUM (FREEZE, DISABLE_PAGE_SKIPPING) heaptest;
+ -- Check that valid options are not rejected nor corruption reported
+ -- for a non-empty frozen table
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'none');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-frozen');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', skip := 'all-visible');
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, skip => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', skip := ...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ SELECT * FROM verify_heapam(relation := 'heaptest', startblock := 0, endblock := 0);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(relation => unknown, startblock => integer, endblock => integer) does not exist
++LINE 1: SELECT * FROM verify_heapam(relation := 'heaptest', startblo...
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that partitioned tables (the parent ones) which don't have visibility
+ -- maps are rejected
+ CREATE TABLE test_partitioned (a int, b text default repeat('x', 5000))
+@@ -139,45 +161,57 @@
+ SELECT * FROM verify_heapam('test_partitioned',
+ 							startblock := NULL,
+ 							endblock := NULL);
+-ERROR:  "test_partitioned" is not a table, materialized view, or TOAST table
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_partitioned',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that valid options are not rejected nor corruption reported
+ -- for an empty partition table (the child one)
+ CREATE TABLE test_partition partition OF test_partitioned FOR VALUES IN (1);
+ SELECT * FROM verify_heapam('test_partition',
+ 							startblock := NULL,
+ 							endblock := NULL);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_partition',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that valid options are not rejected nor corruption reported
+ -- for a non-empty partition table (the child one)
+ INSERT INTO test_partitioned (a) (SELECT 1 FROM generate_series(1,1000) gs);
+ SELECT * FROM verify_heapam('test_partition',
+ 							startblock := NULL,
+ 							endblock := NULL);
+- blkno | offnum | attnum | msg 
+--------+--------+--------+-----
+-(0 rows)
+-
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_partition',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that indexes are rejected
+ CREATE INDEX test_index ON test_partition (a);
+ SELECT * FROM verify_heapam('test_index',
+ 							startblock := NULL,
+ 							endblock := NULL);
+-ERROR:  "test_index" is not a table, materialized view, or TOAST table
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_index',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that views are rejected
+ CREATE VIEW test_view AS SELECT 1;
+ SELECT * FROM verify_heapam('test_view',
+ 							startblock := NULL,
+ 							endblock := NULL);
+-ERROR:  "test_view" is not a table, materialized view, or TOAST table
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_view',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that sequences are rejected
+ CREATE SEQUENCE test_sequence;
+ SELECT * FROM verify_heapam('test_sequence',
+ 							startblock := NULL,
+ 							endblock := NULL);
+-ERROR:  "test_sequence" is not a table, materialized view, or TOAST table
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
++LINE 1: SELECT * FROM verify_heapam('test_sequence',
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- Check that foreign tables are rejected
+ CREATE FOREIGN DATA WRAPPER dummy;
+ ERROR:  syntax error at or near "FOREIGN"
+@@ -194,12 +228,19 @@
+ SELECT * FROM verify_heapam('test_foreign_table',
+ 							startblock := NULL,
+ 							endblock := NULL);
+-ERROR:  relation "test_foreign_table" does not exist
++ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
+ LINE 1: SELECT * FROM verify_heapam('test_foreign_table',
+-                                    ^
++                      ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ -- cleanup
+ DROP TABLE heaptest;
+ DROP TABLE test_partition;
+ DROP TABLE test_partitioned;
+ DROP OWNED BY regress_heaptest_role; -- permissions
++ERROR:  syntax error at or near "OWNED"
++LINE 1: DROP OWNED BY regress_heaptest_role;
++             ^
+ DROP ROLE regress_heaptest_role;
++ERROR:  syntax error at or near "ROLE"
++LINE 1: DROP ROLE regress_heaptest_role;
++             ^

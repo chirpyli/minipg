@@ -21,7 +21,6 @@ AS 'MODULE_PATHNAME', 'verify_heapam'
 LANGUAGE C;
 
 -- Don't want this to be available to public
-REVOKE ALL ON FUNCTION verify_heapam(regclass,
 									 boolean,
 									 boolean,
 									 text,

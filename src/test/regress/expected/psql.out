@@ -5583,9 +5583,9 @@ List of schemas
 (0 rows)
 
 \dp "no.such.access.privilege"
-                            Access privileges
- Schema | Name | Type | Access privileges | Column privileges | Policies 
---------+------+------+-------------------+-------------------+----------
+                      Access privileges
+ Schema | Name | Type | Access privileges | Column privileges 
+--------+------+------+-------------------+-------------------
 (0 rows)
 
 \dP "no.such.partitioned.relation"
@@ -5764,9 +5764,9 @@ cross-database references are not implemented: "no.such.schema"."no.such.languag
 (0 rows)
 
 \dp "no.such.schema"."no.such.access.privilege"
-                            Access privileges
- Schema | Name | Type | Access privileges | Column privileges | Policies 
---------+------+------+-------------------+-------------------+----------
+                      Access privileges
+ Schema | Name | Type | Access privileges | Column privileges 
+--------+------+------+-------------------+-------------------
 (0 rows)
 
 \dP "no.such.schema"."no.such.partitioned.relation"
@@ -5899,9 +5899,9 @@ LINE 5: FROM pg_catalog.pg_ts_template t
 (0 rows)
 
 \dp regression."no.such.schema"."no.such.access.privilege"
-                            Access privileges
- Schema | Name | Type | Access privileges | Column privileges | Policies 
---------+------+------+-------------------+-------------------+----------
+                      Access privileges
+ Schema | Name | Type | Access privileges | Column privileges 
+--------+------+------+-------------------+-------------------
 (0 rows)
 
 \dP regression."no.such.schema"."no.such.partitioned.relation"

@@ -61,7 +61,6 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/partcache.h"
-#include "utils/rls.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 
@@ -589,158 +588,10 @@ ExecCheckRTPerms(List *rangeTable, bool ereport_on_violation)
 bool
 ExecCheckRTEPerms(RangeTblEntry *rte)
 {
-	AclMode		requiredPerms;
-	AclMode		relPerms;
-	AclMode		remainingPerms;
-	Oid			relOid;
-	Oid			userid;
-
 	/*
-	 * Only plain-relation RTEs need to be checked here.  Function RTEs are
-	 * checked when the function is prepared for execution.  Join, subquery,
-	 * and special RTEs need no checks.
+	 * minipg: 权限（ACL）机制已裁剪，所有对象访问一律放行，等同于以超级用户
+	 * 身份执行。因此不再对单个 RangeTblEntry 做权限检查，直接返回 true。
 	 */
-	if (rte->rtekind != RTE_RELATION)
-		return true;
-
-	/*
-	 * No work if requiredPerms is empty.
-	 */
-	requiredPerms = rte->requiredPerms;
-	if (requiredPerms == 0)
-		return true;
-
-	relOid = rte->relid;
-
-	/*
-	 * userid to check as: current user unless we have a setuid indication.
-	 *
-	 * Note: GetUserId() is presently fast enough that there's no harm in
-	 * calling it separately for each RTE.  If that stops being true, we could
-	 * call it once in ExecCheckRTPerms and pass the userid down from there.
-	 * But for now, no need for the extra clutter.
-	 */
-	userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
-
-	/*
-	 * We must have *all* the requiredPerms bits, but some of the bits can be
-	 * satisfied from column-level rather than relation-level permissions.
-	 * First, remove any bits that are satisfied by relation permissions.
-	 */
-	relPerms = pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL);
-	remainingPerms = requiredPerms & ~relPerms;
-	if (remainingPerms != 0)
-	{
-		int			col = -1;
-
-		/*
-		 * If we lack any permissions that exist only as relation permissions,
-		 * we can fail straight away.
-		 */
-		if (remainingPerms & ~(ACL_SELECT | ACL_INSERT | ACL_UPDATE))
-			return false;
-
-		/*
-		 * Check to see if we have the needed privileges at column level.
-		 *
-		 * Note: failures just report a table-level error; it would be nicer
-		 * to report a column-level error if we have some but not all of the
-		 * column privileges.
-		 */
-		if (remainingPerms & ACL_SELECT)
-		{
-			/*
-			 * When the query doesn't explicitly reference any columns (for
-			 * example, SELECT COUNT(*) FROM table), allow the query if we
-			 * have SELECT on any column of the rel, as per SQL spec.
-			 */
-			if (bms_is_empty(rte->selectedCols))
-			{
-				if (pg_attribute_aclcheck_all(relOid, userid, ACL_SELECT,
-											  ACLMASK_ANY) != ACLCHECK_OK)
-					return false;
-			}
-
-			while ((col = bms_next_member(rte->selectedCols, col)) >= 0)
-			{
-				/* bit #s are offset by FirstLowInvalidHeapAttributeNumber */
-				AttrNumber	attno = col + FirstLowInvalidHeapAttributeNumber;
-
-				if (attno == InvalidAttrNumber)
-				{
-					/* Whole-row reference, must have priv on all cols */
-					if (pg_attribute_aclcheck_all(relOid, userid, ACL_SELECT,
-												  ACLMASK_ALL) != ACLCHECK_OK)
-						return false;
-				}
-				else
-				{
-					if (pg_attribute_aclcheck(relOid, attno, userid,
-											  ACL_SELECT) != ACLCHECK_OK)
-						return false;
-				}
-			}
-		}
-
-		/*
-		 * Basically the same for the mod columns, for both INSERT and UPDATE
-		 * privilege as specified by remainingPerms.
-		 */
-		if (remainingPerms & ACL_INSERT && !ExecCheckRTEPermsModified(relOid,
-																	  userid,
-																	  rte->insertedCols,
-																	  ACL_INSERT))
-			return false;
-
-		if (remainingPerms & ACL_UPDATE && !ExecCheckRTEPermsModified(relOid,
-																	  userid,
-																	  rte->updatedCols,
-																	  ACL_UPDATE))
-			return false;
-	}
-	return true;
-}
-
-/*
- * ExecCheckRTEPermsModified
- *		Check INSERT or UPDATE access permissions for a single RTE (these
- *		are processed uniformly).
- */
-static bool
-ExecCheckRTEPermsModified(Oid relOid, Oid userid, Bitmapset *modifiedCols,
-						  AclMode requiredPerms)
-{
-	int			col = -1;
-
-	/*
-	 * When the query doesn't explicitly update any columns, allow the query
-	 * if we have permission on any column of the rel.  This is to handle
-	 * SELECT FOR UPDATE as well as possible corner cases in UPDATE.
-	 */
-	if (bms_is_empty(modifiedCols))
-	{
-		if (pg_attribute_aclcheck_all(relOid, userid, requiredPerms,
-									  ACLMASK_ANY) != ACLCHECK_OK)
-			return false;
-	}
-
-	while ((col = bms_next_member(modifiedCols, col)) >= 0)
-	{
-		/* bit #s are offset by FirstLowInvalidHeapAttributeNumber */
-		AttrNumber	attno = col + FirstLowInvalidHeapAttributeNumber;
-
-		if (attno == InvalidAttrNumber)
-		{
-			/* whole-row reference can't happen here */
-			elog(ERROR, "whole-row update is not implemented");
-		}
-		else
-		{
-			if (pg_attribute_aclcheck(relOid, attno, userid,
-									  requiredPerms) != ACLCHECK_OK)
-				return false;
-		}
-	}
 	return true;
 }
 
@@ -2067,14 +1918,6 @@ ExecBuildSlotValueDescription(Oid reloid,
 	AclResult	aclresult;
 	bool		table_perm = false;
 	bool		any_perm = false;
-
-	/*
-	 * Check if RLS is enabled and should be active for the relation; if so,
-	 * then don't return anything.  Otherwise, go through normal permission
-	 * checks.
-	 */
-	if (check_enable_rls(reloid, InvalidOid, true) == RLS_ENABLED)
-		return NULL;
 
 	initStringInfo(&buf);
 

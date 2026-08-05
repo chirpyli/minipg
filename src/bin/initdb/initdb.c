@@ -1135,10 +1135,8 @@ setup_auth(FILE *cmdfd)
 	const char *const *line;
 	static const char *const pg_authid_setup[] = {
 		/*
-		 * The authid table shouldn't be readable except through views, to
-		 * ensure passwords are not publicly visible.
+		 * minipg: 权限机制已裁剪，所有用户等效超级用户，无需撤销 public 权限。
 		 */
-		"REVOKE ALL ON pg_authid FROM public;\n\n",
 		NULL
 	};
 
@@ -1395,9 +1393,6 @@ setup_privileges(FILE *cmdfd)
 		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
 		CppAsString2(RELKIND_SEQUENCE) ")"
 		"  AND relacl IS NULL;\n\n",
-		"GRANT USAGE ON SCHEMA pg_catalog TO PUBLIC;\n\n",
-		"GRANT CREATE, USAGE ON SCHEMA public TO PUBLIC;\n\n",
-		"REVOKE ALL ON pg_largeobject FROM PUBLIC;\n\n",
 		"INSERT INTO pg_init_privs "
 		"  (objoid, classoid, objsubid, initprivs, privtype)"
 		"    SELECT"
@@ -1570,14 +1565,6 @@ make_template0(FILE *cmdfd)
 		"UPDATE pg_database SET datlastsysoid = "
 		"    (SELECT oid FROM pg_database "
 		"    WHERE datname = 'template0');\n\n",
-
-		/*
-		 * Explicitly revoke public create-schema and create-temp-table
-		 * privileges in template1 and template0; else the latter would be on
-		 * by default
-		 */
-		"REVOKE CREATE,TEMPORARY ON DATABASE template1 FROM public;\n\n",
-		"REVOKE CREATE,TEMPORARY ON DATABASE template0 FROM public;\n\n",
 
 		"COMMENT ON DATABASE template0 IS 'unmodifiable empty database';\n\n",
 

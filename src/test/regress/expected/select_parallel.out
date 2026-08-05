@@ -980,12 +980,6 @@ SELECT make_record(x) FROM (SELECT generate_series(1, 5) x) ss ORDER BY x;
 ROLLBACK TO SAVEPOINT settings;
 DROP function make_record(n int);
 -- test the sanity of parallel query after the active role is dropped.
-drop role if exists regress_parallel_worker;
-NOTICE:  role "regress_parallel_worker" does not exist, skipping
-create role regress_parallel_worker;
-set role regress_parallel_worker;
-reset session authorization;
-drop role regress_parallel_worker;
 set force_parallel_mode = 1;
 select count(*) from tenk1;
  count 
@@ -994,7 +988,6 @@ select count(*) from tenk1;
 (1 row)
 
 reset force_parallel_mode;
-reset role;
 -- Window function calculation can't be pushed to workers.
 explain (costs off, verbose)
   select count(*) from tenk1 a where (unique1, two) in
@@ -1165,38 +1158,40 @@ SELECT 1 FROM tenk1_vw_sec
 ERROR:  current transaction is aborted, commands ignored until end of transaction block
 rollback;
 -- test that function option SET ROLE works in parallel workers.
-create role regress_parallel_worker;
 create function set_and_report_role() returns text as
   $$ select current_setting('role') $$ language sql parallel safe
-  set role = regress_parallel_worker;
 create function set_role_and_error(int) returns int as
   $$ select 1 / $1 $$ language sql parallel safe
-  set role = regress_parallel_worker;
 set force_parallel_mode = 0;
+ERROR:  syntax error at or near "create"
+LINE 3: create function set_role_and_error(int) returns int as
+        ^
 select set_and_report_role();
-   set_and_report_role   
--------------------------
- regress_parallel_worker
-(1 row)
-
+ERROR:  function set_and_report_role() does not exist
+LINE 1: select set_and_report_role();
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select set_role_and_error(0);
-ERROR:  division by zero
-CONTEXT:  SQL function "set_role_and_error" statement 1
+ERROR:  function set_role_and_error(integer) does not exist
+LINE 1: select set_role_and_error(0);
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 set force_parallel_mode = 1;
 select set_and_report_role();
-   set_and_report_role   
--------------------------
- regress_parallel_worker
-(1 row)
-
+ERROR:  function set_and_report_role() does not exist
+LINE 1: select set_and_report_role();
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select set_role_and_error(0);
-ERROR:  division by zero
-CONTEXT:  SQL function "set_role_and_error" statement 1
-parallel worker
+ERROR:  function set_role_and_error(integer) does not exist
+LINE 1: select set_role_and_error(0);
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 reset force_parallel_mode;
 drop function set_and_report_role();
+ERROR:  function set_and_report_role() does not exist
 drop function set_role_and_error(int);
-drop role regress_parallel_worker;
+ERROR:  function set_role_and_error(integer) does not exist
 -- don't freeze in ParallelFinish while holding an LWLock
 BEGIN;
 CREATE FUNCTION my_cmp (int4, int4)

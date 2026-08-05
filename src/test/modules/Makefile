@@ -8,7 +8,6 @@ SUBDIRS = \
 		  commit_ts \
 		  delay_execution \
 		  dummy_index_am \
-		  dummy_seclabel \
 		  libpq_pipeline \
 		  plsample \
 		  snapshot_too_old \
@@ -22,9 +21,7 @@ SUBDIRS = \
 		  test_predtest \
 		  test_rbtree \
 		  test_regex \
-		  test_rls_hooks \
 		  test_shm_mq \
-		  unsafe_tests \
 		  worker_spi
 
 $(recurse)

@@ -269,15 +269,10 @@ ALTER TABLE itest7 ALTER COLUMN a RESTART;
 ALTER TABLE itest7 ALTER COLUMN a DROP IDENTITY;
 
 -- privileges
-CREATE USER regress_identity_user1;
 CREATE TABLE itest8 (a int GENERATED ALWAYS AS IDENTITY, b text);
-GRANT SELECT, INSERT ON itest8 TO regress_identity_user1;
-SET ROLE regress_identity_user1;
 INSERT INTO itest8 DEFAULT VALUES;
 SELECT * FROM itest8;
-RESET ROLE;
 DROP TABLE itest8;
-DROP USER regress_identity_user1;
 
 -- multiple steps in ALTER TABLE
 CREATE TABLE itest8 (f1 int);

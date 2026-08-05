@@ -255,38 +255,34 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
 		AlterEventTrigStmt AlterCollationStmt
 		AlterDatabaseStmt AlterDatabaseSetStmt AlterDomainStmt AlterEnumStmt
-		AlterGroupStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
 		AlterOperatorStmt AlterTypeStmt AlterSeqStmt AlterSystemStmt AlterTableStmt
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
-		AlterRoleStmt AlterRoleSetStmt AlterPolicyStmt AlterStatsStmt
-		AlterDefaultPrivilegesStmt DefACLAction
+		AlterStatsStmt
 		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
 		ConstraintsSetStmt CopyStmt CreateAsStmt CreateCastStmt
-		CreateDomainStmt CreateExtensionStmt CreateGroupStmt CreateOpClassStmt
+		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
 		CreateAssertionStmt CreateTransformStmt CreateTrigStmt CreateEventTrigStmt
-		CreateUserStmt CreateRoleStmt CreatePolicyStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
-		DropCastStmt DropRoleStmt
+		DropCastStmt
 		DropdbStmt DropTableSpaceStmt
 		DropTransformStmt
 		ExplainStmt FetchStmt
-		GrantStmt GrantRoleStmt IndexStmt InsertStmt
+		IndexStmt InsertStmt
 		ListenStmt LoadStmt LockStmt NotifyStmt ExplainableStmt PreparableStmt
 		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
-		RemoveFuncStmt RemoveOperStmt RenameStmt ReturnStmt RevokeStmt RevokeRoleStmt
+		RemoveFuncStmt RemoveOperStmt RenameStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SecLabelStmt SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UnlistenStmt UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
-		DropOwnedStmt ReassignOwnedStmt
 		CreateMatViewStmt RefreshMatViewStmt CreateAmStmt
 		CreatePublicationStmt AlterPublicationStmt
 		CreateSubscriptionStmt AlterSubscriptionStmt DropSubscriptionStmt
@@ -325,10 +321,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				opt_transaction_chain
 %type <ival>	opt_nowait_or_skip
 
-%type <list>	OptRoleList AlterOptRoleList
-%type <defelt>	CreateOptRoleElem AlterOptRoleElem
-
-%type <str>		opt_in_database
 
 %type <str>		OptSchemaName
 %type <list>	OptSchemaEltList
@@ -361,22 +353,10 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %type <str>		all_Op MathOp
 
-%type <str>		row_security_cmd RowSecurityDefaultForCmd
-%type <boolean> RowSecurityDefaultPermissive
-%type <node>	RowSecurityOptionalWithCheck RowSecurityOptionalExpr
-%type <list>	RowSecurityDefaultToRole RowSecurityOptionalToRole
 
 %type <str>		iso_level opt_encoding
-%type <rolespec> grantee
-%type <list>	grantee_list
-%type <accesspriv> privilege
-%type <list>	privileges privilege_list
-%type <privtarget> privilege_target
 %type <objwithargs> function_with_argtypes aggregate_with_argtypes operator_with_argtypes
 %type <list>	function_with_argtypes_list aggregate_with_argtypes_list operator_with_argtypes_list
-%type <ival>	defacl_privilege_target
-%type <defelt>	DefACLOption
-%type <list>	DefACLOptionList
 %type <node>	vacuum_relation
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
@@ -536,7 +516,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <str>		var_name type_function_name param_name
 %type <str>		createdb_opt_name plassign_target
 %type <node>	var_value zone_value
-%type <rolespec> RoleSpec opt_granted_by
+%type <rolespec> RoleSpec
 
 %type <keyword> unreserved_keyword type_func_name_keyword
 %type <keyword> col_name_keyword reserved_keyword
@@ -664,7 +644,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	ORDER ORDINALITY OTHERS OUT_P OUTER_P
 	OVER OVERLAPS OVERLAY OVERRIDING OWNED OWNER
 
-	PARALLEL PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS POLICY
+	PARALLEL PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
 	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM PUBLICATION
 
@@ -876,27 +856,22 @@ stmt:
 			| AlterCollationStmt
 			| AlterDatabaseStmt
 			| AlterDatabaseSetStmt
-			| AlterDefaultPrivilegesStmt
 			| AlterDomainStmt
 			| AlterEnumStmt
 			| AlterExtensionStmt
 			| AlterExtensionContentsStmt
 			| AlterFunctionStmt
-			| AlterGroupStmt
 			| AlterObjectDependsStmt
 			| AlterObjectSchemaStmt
 			| AlterOwnerStmt
 			| AlterOperatorStmt
 			| AlterTypeStmt
-			| AlterPolicyStmt
 			| AlterSeqStmt
 			| AlterSystemStmt
 			| AlterTableStmt
 			| AlterTblSpcStmt
 			| AlterCompositeTypeStmt
 			| AlterPublicationStmt
-			| AlterRoleSetStmt
-			| AlterRoleStmt
 			| AlterSubscriptionStmt
 			| AlterStatsStmt
 			| AnalyzeStmt
@@ -915,13 +890,11 @@ stmt:
 			| CreateDomainStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
-			| CreateGroupStmt
 			| CreateMatViewStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
 			| CreatePublicationStmt
 			| AlterOpFamilyStmt
-			| CreatePolicyStmt
 			| CreatePLangStmt
 			| CreateSchemaStmt
 			| CreateSeqStmt
@@ -932,8 +905,6 @@ stmt:
 			| CreateTransformStmt
 			| CreateTrigStmt
 			| CreateEventTrigStmt
-			| CreateRoleStmt
-			| CreateUserStmt
 			| CreatedbStmt
 			| DeallocateStmt
 			| DeclareCursorStmt
@@ -944,18 +915,14 @@ stmt:
 			| DropCastStmt
 			| DropOpClassStmt
 			| DropOpFamilyStmt
-			| DropOwnedStmt
 			| DropStmt
 			| DropSubscriptionStmt
 			| DropTableSpaceStmt
 			| DropTransformStmt
-			| DropRoleStmt
 			| DropdbStmt
 			| ExecuteStmt
 			| ExplainStmt
 			| FetchStmt
-			| GrantStmt
-			| GrantRoleStmt
 			| IndexStmt
 			| InsertStmt
 			| ListenStmt
@@ -964,14 +931,11 @@ stmt:
 			| LockStmt
 			| NotifyStmt
 			| PrepareStmt
-			| ReassignOwnedStmt
 			| ReindexStmt
 			| RemoveAggrStmt
 			| RemoveFuncStmt
 			| RemoveOperStmt
 			| RenameStmt
-			| RevokeStmt
-			| RevokeRoleStmt
 			| RuleStmt
 			| SecLabelStmt
 			| SelectStmt
@@ -1004,338 +968,6 @@ CallStmt:	CALL func_application
 
 /*****************************************************************************
  *
- * Create a new Postgres DBMS role
- *
- *****************************************************************************/
-
-CreateRoleStmt:
-			CREATE ROLE RoleId opt_with OptRoleList
-				{
-					CreateRoleStmt *n = makeNode(CreateRoleStmt);
-					n->stmt_type = ROLESTMT_ROLE;
-					n->role = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-
-opt_with:	WITH
-			| WITH_LA
-			| /*EMPTY*/
-		;
-
-/*
- * Options for CREATE ROLE and ALTER ROLE (also used by CREATE/ALTER USER
- * for backwards compatibility).  Note: the only option required by SQL99
- * is "WITH ADMIN name".
- */
-OptRoleList:
-			OptRoleList CreateOptRoleElem			{ $$ = lappend($1, $2); }
-			| /* EMPTY */							{ $$ = NIL; }
-		;
-
-AlterOptRoleList:
-			AlterOptRoleList AlterOptRoleElem		{ $$ = lappend($1, $2); }
-			| /* EMPTY */							{ $$ = NIL; }
-		;
-
-AlterOptRoleElem:
-			PASSWORD Sconst
-				{
-					$$ = makeDefElem("password",
-									 (Node *)makeString($2), @1);
-				}
-			| PASSWORD NULL_P
-				{
-					$$ = makeDefElem("password", NULL, @1);
-				}
-			| ENCRYPTED PASSWORD Sconst
-				{
-					/*
-					 * These days, passwords are always stored in encrypted
-					 * form, so there is no difference between PASSWORD and
-					 * ENCRYPTED PASSWORD.
-					 */
-					$$ = makeDefElem("password",
-									 (Node *)makeString($3), @1);
-				}
-			| UNENCRYPTED PASSWORD Sconst
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("UNENCRYPTED PASSWORD is no longer supported"),
-							 errhint("Remove UNENCRYPTED to store the password in encrypted form instead."),
-							 parser_errposition(@1)));
-				}
-			| INHERIT
-				{
-					$$ = makeDefElem("inherit", (Node *)makeInteger(true), @1);
-				}
-			| CONNECTION LIMIT SignedIconst
-				{
-					$$ = makeDefElem("connectionlimit", (Node *)makeInteger($3), @1);
-				}
-			| VALID UNTIL Sconst
-				{
-					$$ = makeDefElem("validUntil", (Node *)makeString($3), @1);
-				}
-		/*	Supported but not documented for roles, for use by ALTER GROUP. */
-			| USER role_list
-				{
-					$$ = makeDefElem("rolemembers", (Node *)$2, @1);
-				}
-			| IDENT
-				{
-					/*
-					 * We handle identifiers that aren't parser keywords with
-					 * the following special-case codes, to avoid bloating the
-					 * size of the main parser.
-					 */
-					if (strcmp($1, "superuser") == 0)
-						$$ = makeDefElem("superuser", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "nosuperuser") == 0)
-						$$ = makeDefElem("superuser", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "createrole") == 0)
-						$$ = makeDefElem("createrole", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "nocreaterole") == 0)
-						$$ = makeDefElem("createrole", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "replication") == 0)
-						$$ = makeDefElem("isreplication", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "noreplication") == 0)
-						$$ = makeDefElem("isreplication", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "createdb") == 0)
-						$$ = makeDefElem("createdb", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "nocreatedb") == 0)
-						$$ = makeDefElem("createdb", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "login") == 0)
-						$$ = makeDefElem("canlogin", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "nologin") == 0)
-						$$ = makeDefElem("canlogin", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "bypassrls") == 0)
-						$$ = makeDefElem("bypassrls", (Node *)makeInteger(true), @1);
-					else if (strcmp($1, "nobypassrls") == 0)
-						$$ = makeDefElem("bypassrls", (Node *)makeInteger(false), @1);
-					else if (strcmp($1, "noinherit") == 0)
-					{
-						/*
-						 * Note that INHERIT is a keyword, so it's handled by main parser, but
-						 * NOINHERIT is handled here.
-						 */
-						$$ = makeDefElem("inherit", (Node *)makeInteger(false), @1);
-					}
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("unrecognized role option \"%s\"", $1),
-									 parser_errposition(@1)));
-				}
-		;
-
-CreateOptRoleElem:
-			AlterOptRoleElem			{ $$ = $1; }
-			/* The following are not supported by ALTER ROLE/USER/GROUP */
-			| SYSID Iconst
-				{
-					$$ = makeDefElem("sysid", (Node *)makeInteger($2), @1);
-				}
-			| ADMIN role_list
-				{
-					$$ = makeDefElem("adminmembers", (Node *)$2, @1);
-				}
-			| ROLE role_list
-				{
-					$$ = makeDefElem("rolemembers", (Node *)$2, @1);
-				}
-			| IN_P ROLE role_list
-				{
-					$$ = makeDefElem("addroleto", (Node *)$3, @1);
-				}
-			| IN_P GROUP_P role_list
-				{
-					$$ = makeDefElem("addroleto", (Node *)$3, @1);
-				}
-		;
-
-
-/*****************************************************************************
- *
- * Create a new Postgres DBMS user (role with implied login ability)
- *
- *****************************************************************************/
-
-CreateUserStmt:
-			CREATE USER RoleId opt_with OptRoleList
-				{
-					CreateRoleStmt *n = makeNode(CreateRoleStmt);
-					n->stmt_type = ROLESTMT_USER;
-					n->role = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-
-/*****************************************************************************
- *
- * Alter a postgresql DBMS role
- *
- *****************************************************************************/
-
-AlterRoleStmt:
-			ALTER ROLE RoleSpec opt_with AlterOptRoleList
-				 {
-					AlterRoleStmt *n = makeNode(AlterRoleStmt);
-					n->role = $3;
-					n->action = +1;	/* add, if there are members */
-					n->options = $5;
-					$$ = (Node *)n;
-				 }
-			| ALTER USER RoleSpec opt_with AlterOptRoleList
-				 {
-					AlterRoleStmt *n = makeNode(AlterRoleStmt);
-					n->role = $3;
-					n->action = +1;	/* add, if there are members */
-					n->options = $5;
-					$$ = (Node *)n;
-				 }
-		;
-
-opt_in_database:
-			   /* EMPTY */					{ $$ = NULL; }
-			| IN_P DATABASE name	{ $$ = $3; }
-		;
-
-AlterRoleSetStmt:
-			ALTER ROLE RoleSpec opt_in_database SetResetClause
-				{
-					AlterRoleSetStmt *n = makeNode(AlterRoleSetStmt);
-					n->role = $3;
-					n->database = $4;
-					n->setstmt = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER ROLE ALL opt_in_database SetResetClause
-				{
-					AlterRoleSetStmt *n = makeNode(AlterRoleSetStmt);
-					n->role = NULL;
-					n->database = $4;
-					n->setstmt = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER USER RoleSpec opt_in_database SetResetClause
-				{
-					AlterRoleSetStmt *n = makeNode(AlterRoleSetStmt);
-					n->role = $3;
-					n->database = $4;
-					n->setstmt = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER USER ALL opt_in_database SetResetClause
-				{
-					AlterRoleSetStmt *n = makeNode(AlterRoleSetStmt);
-					n->role = NULL;
-					n->database = $4;
-					n->setstmt = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-
-/*****************************************************************************
- *
- * Drop a postgresql DBMS role
- *
- * XXX Ideally this would have CASCADE/RESTRICT options, but a role
- * might own objects in multiple databases, and there is presently no way to
- * implement cascading to other databases.  So we always behave as RESTRICT.
- *****************************************************************************/
-
-DropRoleStmt:
-			DROP ROLE role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->missing_ok = false;
-					n->roles = $3;
-					$$ = (Node *)n;
-				}
-			| DROP ROLE IF_P EXISTS role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->missing_ok = true;
-					n->roles = $5;
-					$$ = (Node *)n;
-				}
-			| DROP USER role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->missing_ok = false;
-					n->roles = $3;
-					$$ = (Node *)n;
-				}
-			| DROP USER IF_P EXISTS role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->roles = $5;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| DROP GROUP_P role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->missing_ok = false;
-					n->roles = $3;
-					$$ = (Node *)n;
-				}
-			| DROP GROUP_P IF_P EXISTS role_list
-				{
-					DropRoleStmt *n = makeNode(DropRoleStmt);
-					n->missing_ok = true;
-					n->roles = $5;
-					$$ = (Node *)n;
-				}
-			;
-
-
-/*****************************************************************************
- *
- * Create a postgresql group (role without login ability)
- *
- *****************************************************************************/
-
-CreateGroupStmt:
-			CREATE GROUP_P RoleId opt_with OptRoleList
-				{
-					CreateRoleStmt *n = makeNode(CreateRoleStmt);
-					n->stmt_type = ROLESTMT_GROUP;
-					n->role = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-
-/*****************************************************************************
- *
- * Alter a postgresql group
- *
- *****************************************************************************/
-
-AlterGroupStmt:
-			ALTER GROUP_P RoleSpec add_drop USER role_list
-				{
-					AlterRoleStmt *n = makeNode(AlterRoleStmt);
-					n->role = $3;
-					n->action = $4;
-					n->options = list_make1(makeDefElem("rolemembers",
-														(Node *)$6, @6));
-					$$ = (Node *)n;
-				}
-		;
-
-add_drop:	ADD_P									{ $$ = +1; }
-			| DROP									{ $$ = -1; }
-		;
 
 
 /*****************************************************************************
@@ -1422,7 +1054,6 @@ schema_stmt:
 			| IndexStmt
 			| CreateSeqStmt
 			| CreateTrigStmt
-			| GrantStmt
 			| ViewStmt
 		;
 
@@ -2585,34 +2216,6 @@ alter_table_cmd:
 					AlterTableCmd *n = makeNode(AlterTableCmd);
 					n->subtype = AT_ReplicaIdentity;
 					n->def = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE ROW LEVEL SECURITY */
-			| ENABLE_P ROW LEVEL SECURITY
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableRowSecurity;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> DISABLE ROW LEVEL SECURITY */
-			| DISABLE_P ROW LEVEL SECURITY
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DisableRowSecurity;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> FORCE ROW LEVEL SECURITY */
-			| FORCE ROW LEVEL SECURITY
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ForceRowSecurity;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> NO FORCE ROW LEVEL SECURITY */
-			| NO FORCE ROW LEVEL SECURITY
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_NoForceRowSecurity;
 					$$ = (Node *)n;
 				}
 			| alter_generic_options
@@ -4829,100 +4432,6 @@ generic_option_arg:
 
 		;
 
-/*****************************************************************************
- *
- *		QUERIES:
- *				CREATE POLICY name ON table
- *					[AS { PERMISSIVE | RESTRICTIVE } ]
- *					[FOR { SELECT | INSERT | UPDATE | DELETE } ]
- *					[TO role, ...]
- *					[USING (qual)] [WITH CHECK (with check qual)]
- *				ALTER POLICY name ON table [TO role, ...]
- *					[USING (qual)] [WITH CHECK (with check qual)]
- *
- *****************************************************************************/
-
-CreatePolicyStmt:
-			CREATE POLICY name ON qualified_name RowSecurityDefaultPermissive
-				RowSecurityDefaultForCmd RowSecurityDefaultToRole
-				RowSecurityOptionalExpr RowSecurityOptionalWithCheck
-				{
-					CreatePolicyStmt *n = makeNode(CreatePolicyStmt);
-					n->policy_name = $3;
-					n->table = $5;
-					n->permissive = $6;
-					n->cmd_name = $7;
-					n->roles = $8;
-					n->qual = $9;
-					n->with_check = $10;
-					$$ = (Node *) n;
-				}
-		;
-
-AlterPolicyStmt:
-			ALTER POLICY name ON qualified_name RowSecurityOptionalToRole
-				RowSecurityOptionalExpr RowSecurityOptionalWithCheck
-				{
-					AlterPolicyStmt *n = makeNode(AlterPolicyStmt);
-					n->policy_name = $3;
-					n->table = $5;
-					n->roles = $6;
-					n->qual = $7;
-					n->with_check = $8;
-					$$ = (Node *) n;
-				}
-		;
-
-RowSecurityOptionalExpr:
-			USING '(' a_expr ')'	{ $$ = $3; }
-			| /* EMPTY */			{ $$ = NULL; }
-		;
-
-RowSecurityOptionalWithCheck:
-			WITH CHECK '(' a_expr ')'		{ $$ = $4; }
-			| /* EMPTY */					{ $$ = NULL; }
-		;
-
-RowSecurityDefaultToRole:
-			TO role_list			{ $$ = $2; }
-			| /* EMPTY */			{ $$ = list_make1(makeRoleSpec(ROLESPEC_PUBLIC, -1)); }
-		;
-
-RowSecurityOptionalToRole:
-			TO role_list			{ $$ = $2; }
-			| /* EMPTY */			{ $$ = NULL; }
-		;
-
-RowSecurityDefaultPermissive:
-			AS IDENT
-				{
-					if (strcmp($2, "permissive") == 0)
-						$$ = true;
-					else if (strcmp($2, "restrictive") == 0)
-						$$ = false;
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("unrecognized row security option \"%s\"", $2),
-								 errhint("Only PERMISSIVE or RESTRICTIVE policies are supported currently."),
-									 parser_errposition(@2)));
-
-				}
-			| /* EMPTY */			{ $$ = true; }
-		;
-
-RowSecurityDefaultForCmd:
-			FOR row_security_cmd	{ $$ = $2; }
-			| /* EMPTY */			{ $$ = "all"; }
-		;
-
-row_security_cmd:
-			ALL				{ $$ = "all"; }
-		|	SELECT			{ $$ = "select"; }
-		|	INSERT			{ $$ = "insert"; }
-		|	UPDATE			{ $$ = "update"; }
-		|	DELETE_P		{ $$ = "delete"; }
-		;
 
 /*****************************************************************************
  *
@@ -5729,31 +5238,6 @@ DropOpFamilyStmt:
 /*****************************************************************************
  *
  *		QUERY:
- *
- *		DROP OWNED BY username [, username ...] [ RESTRICT | CASCADE ]
- *		REASSIGN OWNED BY username [, username ...] TO username
- *
- *****************************************************************************/
-DropOwnedStmt:
-			DROP OWNED BY role_list opt_drop_behavior
-				{
-					DropOwnedStmt *n = makeNode(DropOwnedStmt);
-					n->roles = $4;
-					n->behavior = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-ReassignOwnedStmt:
-			REASSIGN OWNED BY role_list TO RoleSpec
-				{
-					ReassignOwnedStmt *n = makeNode(ReassignOwnedStmt);
-					n->roles = $4;
-					n->newrole = $6;
-					$$ = (Node *)n;
-				}
-		;
-
 /*****************************************************************************
  *
  *		QUERY:
@@ -5922,8 +5406,7 @@ drop_type_name:
 
 /* object types attached to a table */
 object_type_name_on_any_name:
-			POLICY									{ $$ = OBJECT_POLICY; }
-			| RULE									{ $$ = OBJECT_RULE; }
+			RULE									{ $$ = OBJECT_RULE; }
 			| TRIGGER								{ $$ = OBJECT_TRIGGER; }
 		;
 
@@ -6421,431 +5904,6 @@ opt_from_in:	from_in
  *
  *****************************************************************************/
 
-GrantStmt:	GRANT privileges ON privilege_target TO grantee_list
-			opt_grant_grant_option opt_granted_by
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = true;
-					n->privileges = $2;
-					n->targtype = ($4)->targtype;
-					n->objtype = ($4)->objtype;
-					n->objects = ($4)->objs;
-					n->grantees = $6;
-					n->grant_option = $7;
-					n->grantor = $8;
-					$$ = (Node*)n;
-				}
-		;
-
-RevokeStmt:
-			REVOKE privileges ON privilege_target
-			FROM grantee_list opt_granted_by opt_drop_behavior
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = false;
-					n->grant_option = false;
-					n->privileges = $2;
-					n->targtype = ($4)->targtype;
-					n->objtype = ($4)->objtype;
-					n->objects = ($4)->objs;
-					n->grantees = $6;
-					n->grantor = $7;
-					n->behavior = $8;
-					$$ = (Node *)n;
-				}
-			| REVOKE GRANT OPTION FOR privileges ON privilege_target
-			FROM grantee_list opt_granted_by opt_drop_behavior
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = false;
-					n->grant_option = true;
-					n->privileges = $5;
-					n->targtype = ($7)->targtype;
-					n->objtype = ($7)->objtype;
-					n->objects = ($7)->objs;
-					n->grantees = $9;
-					n->grantor = $10;
-					n->behavior = $11;
-					$$ = (Node *)n;
-				}
-		;
-
-
-/*
- * Privilege names are represented as strings; the validity of the privilege
- * names gets checked at execution.  This is a bit annoying but we have little
- * choice because of the syntactic conflict with lists of role names in
- * GRANT/REVOKE.  What's more, we have to call out in the "privilege"
- * production any reserved keywords that need to be usable as privilege names.
- */
-
-/* either ALL [PRIVILEGES] or a list of individual privileges */
-privileges: privilege_list
-				{ $$ = $1; }
-			| ALL
-				{ $$ = NIL; }
-			| ALL PRIVILEGES
-				{ $$ = NIL; }
-			| ALL '(' columnList ')'
-				{
-					AccessPriv *n = makeNode(AccessPriv);
-					n->priv_name = NULL;
-					n->cols = $3;
-					$$ = list_make1(n);
-				}
-			| ALL PRIVILEGES '(' columnList ')'
-				{
-					AccessPriv *n = makeNode(AccessPriv);
-					n->priv_name = NULL;
-					n->cols = $4;
-					$$ = list_make1(n);
-				}
-		;
-
-privilege_list:	privilege							{ $$ = list_make1($1); }
-			| privilege_list ',' privilege			{ $$ = lappend($1, $3); }
-		;
-
-privilege:	SELECT opt_column_list
-			{
-				AccessPriv *n = makeNode(AccessPriv);
-				n->priv_name = pstrdup($1);
-				n->cols = $2;
-				$$ = n;
-			}
-		| REFERENCES opt_column_list
-			{
-				AccessPriv *n = makeNode(AccessPriv);
-				n->priv_name = pstrdup($1);
-				n->cols = $2;
-				$$ = n;
-			}
-		| CREATE opt_column_list
-			{
-				AccessPriv *n = makeNode(AccessPriv);
-				n->priv_name = pstrdup($1);
-				n->cols = $2;
-				$$ = n;
-			}
-		| ColId opt_column_list
-			{
-				AccessPriv *n = makeNode(AccessPriv);
-				n->priv_name = $1;
-				n->cols = $2;
-				$$ = n;
-			}
-		;
-
-
-/* Don't bother trying to fold the first two rules into one using
- * opt_table.  You're going to get conflicts.
- */
-privilege_target:
-			qualified_name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_TABLE;
-					n->objs = $1;
-					$$ = n;
-				}
-			| TABLE qualified_name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_TABLE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| SEQUENCE qualified_name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_SEQUENCE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| FUNCTION function_with_argtypes_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_FUNCTION;
-					n->objs = $2;
-					$$ = n;
-				}
-			| PROCEDURE function_with_argtypes_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_PROCEDURE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| ROUTINE function_with_argtypes_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_ROUTINE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| DATABASE name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_DATABASE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| DOMAIN_P any_name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_DOMAIN;
-					n->objs = $2;
-					$$ = n;
-				}
-			| LANGUAGE name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_LANGUAGE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| LARGE_P OBJECT_P NumericOnly_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_LARGEOBJECT;
-					n->objs = $3;
-					$$ = n;
-				}
-			| SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_SCHEMA;
-					n->objs = $2;
-					$$ = n;
-				}
-			| TABLESPACE name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_TABLESPACE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| TYPE_P any_name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_OBJECT;
-					n->objtype = OBJECT_TYPE;
-					n->objs = $2;
-					$$ = n;
-				}
-			| ALL TABLES IN_P SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
-					n->objtype = OBJECT_TABLE;
-					n->objs = $5;
-					$$ = n;
-				}
-			| ALL SEQUENCES IN_P SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
-					n->objtype = OBJECT_SEQUENCE;
-					n->objs = $5;
-					$$ = n;
-				}
-			| ALL FUNCTIONS IN_P SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
-					n->objtype = OBJECT_FUNCTION;
-					n->objs = $5;
-					$$ = n;
-				}
-			| ALL PROCEDURES IN_P SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
-					n->objtype = OBJECT_PROCEDURE;
-					n->objs = $5;
-					$$ = n;
-				}
-			| ALL ROUTINES IN_P SCHEMA name_list
-				{
-					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
-					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
-					n->objtype = OBJECT_ROUTINE;
-					n->objs = $5;
-					$$ = n;
-				}
-		;
-
-
-grantee_list:
-			grantee									{ $$ = list_make1($1); }
-			| grantee_list ',' grantee				{ $$ = lappend($1, $3); }
-		;
-
-grantee:
-			RoleSpec								{ $$ = $1; }
-			| GROUP_P RoleSpec						{ $$ = $2; }
-		;
-
-
-opt_grant_grant_option:
-			WITH GRANT OPTION { $$ = true; }
-			| /*EMPTY*/ { $$ = false; }
-		;
-
-/*****************************************************************************
- *
- * GRANT and REVOKE ROLE statements
- *
- *****************************************************************************/
-
-GrantRoleStmt:
-			GRANT privilege_list TO role_list opt_grant_admin_option opt_granted_by
-				{
-					GrantRoleStmt *n = makeNode(GrantRoleStmt);
-					n->is_grant = true;
-					n->granted_roles = $2;
-					n->grantee_roles = $4;
-					n->admin_opt = $5;
-					n->grantor = $6;
-					$$ = (Node*)n;
-				}
-		;
-
-RevokeRoleStmt:
-			REVOKE privilege_list FROM role_list opt_granted_by opt_drop_behavior
-				{
-					GrantRoleStmt *n = makeNode(GrantRoleStmt);
-					n->is_grant = false;
-					n->admin_opt = false;
-					n->granted_roles = $2;
-					n->grantee_roles = $4;
-					n->behavior = $6;
-					$$ = (Node*)n;
-				}
-			| REVOKE ADMIN OPTION FOR privilege_list FROM role_list opt_granted_by opt_drop_behavior
-				{
-					GrantRoleStmt *n = makeNode(GrantRoleStmt);
-					n->is_grant = false;
-					n->admin_opt = true;
-					n->granted_roles = $5;
-					n->grantee_roles = $7;
-					n->behavior = $9;
-					$$ = (Node*)n;
-				}
-		;
-
-opt_grant_admin_option: WITH ADMIN OPTION				{ $$ = true; }
-			| /*EMPTY*/									{ $$ = false; }
-		;
-
-opt_granted_by: GRANTED BY RoleSpec						{ $$ = $3; }
-			| /*EMPTY*/									{ $$ = NULL; }
-		;
-
-/*****************************************************************************
- *
- * ALTER DEFAULT PRIVILEGES statement
- *
- *****************************************************************************/
-
-AlterDefaultPrivilegesStmt:
-			ALTER DEFAULT PRIVILEGES DefACLOptionList DefACLAction
-				{
-					AlterDefaultPrivilegesStmt *n = makeNode(AlterDefaultPrivilegesStmt);
-					n->options = $4;
-					n->action = (GrantStmt *) $5;
-					$$ = (Node*)n;
-				}
-		;
-
-DefACLOptionList:
-			DefACLOptionList DefACLOption			{ $$ = lappend($1, $2); }
-			| /* EMPTY */							{ $$ = NIL; }
-		;
-
-DefACLOption:
-			IN_P SCHEMA name_list
-				{
-					$$ = makeDefElem("schemas", (Node *)$3, @1);
-				}
-			| FOR ROLE role_list
-				{
-					$$ = makeDefElem("roles", (Node *)$3, @1);
-				}
-			| FOR USER role_list
-				{
-					$$ = makeDefElem("roles", (Node *)$3, @1);
-				}
-		;
-
-/*
- * This should match GRANT/REVOKE, except that individual target objects
- * are not mentioned and we only allow a subset of object types.
- */
-DefACLAction:
-			GRANT privileges ON defacl_privilege_target TO grantee_list
-			opt_grant_grant_option
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = true;
-					n->privileges = $2;
-					n->targtype = ACL_TARGET_DEFAULTS;
-					n->objtype = $4;
-					n->objects = NIL;
-					n->grantees = $6;
-					n->grant_option = $7;
-					$$ = (Node*)n;
-				}
-			| REVOKE privileges ON defacl_privilege_target
-			FROM grantee_list opt_drop_behavior
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = false;
-					n->grant_option = false;
-					n->privileges = $2;
-					n->targtype = ACL_TARGET_DEFAULTS;
-					n->objtype = $4;
-					n->objects = NIL;
-					n->grantees = $6;
-					n->behavior = $7;
-					$$ = (Node *)n;
-				}
-			| REVOKE GRANT OPTION FOR privileges ON defacl_privilege_target
-			FROM grantee_list opt_drop_behavior
-				{
-					GrantStmt *n = makeNode(GrantStmt);
-					n->is_grant = false;
-					n->grant_option = true;
-					n->privileges = $5;
-					n->targtype = ACL_TARGET_DEFAULTS;
-					n->objtype = $7;
-					n->objects = NIL;
-					n->grantees = $9;
-					n->behavior = $10;
-					$$ = (Node *)n;
-				}
-		;
-
-defacl_privilege_target:
-			TABLES			{ $$ = OBJECT_TABLE; }
-			| FUNCTIONS		{ $$ = OBJECT_FUNCTION; }
-			| ROUTINES		{ $$ = OBJECT_FUNCTION; }
-			| SEQUENCES		{ $$ = OBJECT_SEQUENCE; }
-			| TYPES_P		{ $$ = OBJECT_TYPE; }
-			| SCHEMAS		{ $$ = OBJECT_SCHEMA; }
-		;
 
 
 /*****************************************************************************
@@ -8113,26 +7171,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->object = (Node *) lcons(makeString($6), $4);
 					n->newname = $9;
 					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER POLICY name ON qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_POLICY;
-					n->relation = $5;
-					n->subname = $3;
-					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER POLICY IF_P EXISTS name ON qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_POLICY;
-					n->relation = $7;
-					n->subname = $5;
-					n->newname = $10;
-					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
 			| ALTER PROCEDURE function_with_argtypes RENAME TO name
@@ -14494,7 +13532,7 @@ unreserved_keyword:
 			| DOCUMENT_P
 			| DOMAIN_P
 			| DOUBLE_P
-			| DROP
+			| DROP									{ $$ = -1; }
 			| EACH
 			| ENABLE_P
 			| ENCODING
@@ -14606,7 +13644,6 @@ unreserved_keyword:
 			| PASSING
 			| PASSWORD
 			| PLANS
-			| POLICY
 			| PRECEDING
 			| PREPARE
 			| PREPARED
@@ -15023,7 +14060,7 @@ bare_label_keyword:
 			| DOCUMENT_P
 			| DOMAIN_P
 			| DOUBLE_P
-			| DROP
+			| DROP									{ $$ = -1; }
 			| EACH
 			| ELSE
 			| ENABLE_P
@@ -15173,7 +14210,6 @@ bare_label_keyword:
 			| PASSWORD
 			| PLACING
 			| PLANS
-			| POLICY
 			| POSITION
 			| PRECEDING
 			| PREPARE
@@ -15319,6 +14355,15 @@ bare_label_keyword:
 			| ZONE
 		;
 
+opt_with:	WITH
+			| WITH_LA
+			| /*EMPTY*/
+		;
+
+add_drop:	ADD_P									{ $$ = +1; }
+			| DROP									{ $$ = -1; }
+		;
+
 %%
 
 /*
@@ -15326,6 +14371,7 @@ bare_label_keyword:
  * ignore the passed yylloc and instead use the last token position
  * available from the scanner.
  */
+
 static void
 base_yyerror(YYLTYPE *yylloc, core_yyscan_t yyscanner, const char *msg)
 {

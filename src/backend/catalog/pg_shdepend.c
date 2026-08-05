@@ -48,7 +48,6 @@
 #include "commands/defrem.h"
 #include "commands/event_trigger.h"
 #include "commands/extension.h"
-#include "commands/policy.h"
 #include "commands/proclang.h"
 #include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
@@ -1252,8 +1251,6 @@ storeObjectDescription(StringInfo descs,
 				appendStringInfo(descs, _("owner of %s"), objdesc);
 			else if (deptype == SHARED_DEPENDENCY_ACL)
 				appendStringInfo(descs, _("privileges for %s"), objdesc);
-			else if (deptype == SHARED_DEPENDENCY_POLICY)
-				appendStringInfo(descs, _("target of %s"), objdesc);
 			else if (deptype == SHARED_DEPENDENCY_TABLESPACE)
 				appendStringInfo(descs, _("tablespace for %s"), objdesc);
 			else
@@ -1411,41 +1408,10 @@ shdepDropOwned(List *roleids, DropBehavior behavior)
 				case SHARED_DEPENDENCY_INVALID:
 					elog(ERROR, "unexpected dependency type");
 					break;
-				case SHARED_DEPENDENCY_ACL:
-					RemoveRoleFromObjectACL(roleid,
-											sdepForm->classid,
-											sdepForm->objid);
-					break;
-				case SHARED_DEPENDENCY_POLICY:
-
-					/*
-					 * Try to remove role from policy; if unable to, remove
-					 * policy.
-					 */
-					if (!RemoveRoleFromObjectPolicy(roleid,
-													sdepForm->classid,
-													sdepForm->objid))
-					{
-						obj.classId = sdepForm->classid;
-						obj.objectId = sdepForm->objid;
-						obj.objectSubId = sdepForm->objsubid;
-
-						/*
-						 * Acquire lock on object, then verify this dependency
-						 * is still relevant.  If not, the object might have
-						 * been dropped or the policy modified.  Ignore the
-						 * object in that case.
-						 */
-						AcquireDeletionLock(&obj, 0);
-						if (!systable_recheck_tuple(scan, tuple))
-						{
-							ReleaseDeletionLock(&obj);
-							break;
-						}
-						add_exact_object_address(&obj, deleteobjs);
-					}
-					break;
-				case SHARED_DEPENDENCY_OWNER:
+		case SHARED_DEPENDENCY_ACL:
+			/* minipg: 权限机制已裁剪，不再存在对象级角色 ACL 依赖。 */
+			break;
+		case SHARED_DEPENDENCY_OWNER:
 					/* If a local object, save it for deletion below */
 					if (sdepForm->dbid == MyDatabaseId)
 					{

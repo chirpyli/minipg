@@ -1743,7 +1743,6 @@ typedef enum ObjectType
 	OBJECT_OPCLASS,
 	OBJECT_OPERATOR,
 	OBJECT_OPFAMILY,
-	OBJECT_POLICY,
 	OBJECT_PROCEDURE,
 	OBJECT_PUBLICATION,
 	OBJECT_PUBLICATION_REL,
@@ -1859,10 +1858,6 @@ typedef enum AlterTableType
 	AT_AddOf,					/* OF <type_name> */
 	AT_DropOf,					/* NOT OF */
 	AT_ReplicaIdentity,			/* REPLICA IDENTITY */
-	AT_EnableRowSecurity,		/* ENABLE ROW SECURITY */
-	AT_DisableRowSecurity,		/* DISABLE ROW SECURITY */
-	AT_ForceRowSecurity,		/* FORCE ROW SECURITY */
-	AT_NoForceRowSecurity,		/* NO FORCE ROW SECURITY */
 	AT_GenericOptions,			/* OPTIONS (...) */
 	AT_AttachPartition,			/* ATTACH PARTITION */
 	AT_DetachPartition,			/* DETACH PARTITION */
@@ -1945,22 +1940,6 @@ typedef enum GrantTargetType
 	ACL_TARGET_DEFAULTS			/* ALTER DEFAULT PRIVILEGES */
 } GrantTargetType;
 
-typedef struct GrantStmt
-{
-	NodeTag		type;
-	bool		is_grant;		/* true = GRANT, false = REVOKE */
-	GrantTargetType targtype;	/* type of the grant target */
-	ObjectType	objtype;		/* kind of object being operated on */
-	List	   *objects;		/* list of RangeVar nodes, ObjectWithArgs
-								 * nodes, or plain names (as Value strings) */
-	List	   *privileges;		/* list of AccessPriv nodes */
-	/* privileges == NIL denotes ALL PRIVILEGES */
-	List	   *grantees;		/* list of RoleSpec nodes */
-	bool		grant_option;	/* grant or revoke grant option */
-	RoleSpec   *grantor;
-	DropBehavior behavior;		/* drop behavior (for REVOKE) */
-} GrantStmt;
-
 /*
  * ObjectWithArgs represents a function/procedure/operator name plus parameter
  * identification.
@@ -2000,37 +1979,6 @@ typedef struct AccessPriv
 	char	   *priv_name;		/* string name of privilege */
 	List	   *cols;			/* list of Value strings */
 } AccessPriv;
-
-/* ----------------------
- *		Grant/Revoke Role Statement
- *
- * Note: because of the parsing ambiguity with the GRANT <privileges>
- * statement, granted_roles is a list of AccessPriv; the execution code
- * should complain if any column lists appear.  grantee_roles is a list
- * of role names, as Value strings.
- * ----------------------
- */
-typedef struct GrantRoleStmt
-{
-	NodeTag		type;
-	List	   *granted_roles;	/* list of roles to be granted/revoked */
-	List	   *grantee_roles;	/* list of member roles to add/delete */
-	bool		is_grant;		/* true = GRANT, false = REVOKE */
-	bool		admin_opt;		/* with admin option */
-	RoleSpec   *grantor;		/* set grantor to other than current role */
-	DropBehavior behavior;		/* drop behavior (for REVOKE) */
-} GrantRoleStmt;
-
-/* ----------------------
- *	Alter Default Privileges Statement
- * ----------------------
- */
-typedef struct AlterDefaultPrivilegesStmt
-{
-	NodeTag		type;
-	List	   *options;		/* list of DefElem */
-	GrantStmt  *action;			/* GRANT/REVOKE action (with objects=NIL) */
-} AlterDefaultPrivilegesStmt;
 
 /* ----------------------
  *		Copy Statement
@@ -2308,32 +2256,6 @@ typedef struct AlterExtensionContentsStmt
  *		Create POLICY Statement
  *----------------------
  */
-typedef struct CreatePolicyStmt
-{
-	NodeTag		type;
-	char	   *policy_name;	/* Policy's name */
-	RangeVar   *table;			/* the table name the policy applies to */
-	char	   *cmd_name;		/* the command name the policy applies to */
-	bool		permissive;		/* restrictive or permissive policy */
-	List	   *roles;			/* the roles associated with the policy */
-	Node	   *qual;			/* the policy's condition */
-	Node	   *with_check;		/* the policy's WITH CHECK condition. */
-} CreatePolicyStmt;
-
-/*----------------------
- *		Alter POLICY Statement
- *----------------------
- */
-typedef struct AlterPolicyStmt
-{
-	NodeTag		type;
-	char	   *policy_name;	/* Policy's name */
-	RangeVar   *table;			/* the table name the policy applies to */
-	List	   *roles;			/* the roles associated with the policy */
-	Node	   *qual;			/* the policy's condition */
-	Node	   *with_check;		/* the policy's WITH CHECK condition. */
-} AlterPolicyStmt;
-
 /*----------------------
  *		Create ACCESS METHOD Statement
  *----------------------
@@ -2413,53 +2335,6 @@ typedef struct CreatePLangStmt
 	List	   *plvalidator;	/* optional validator function (qual. name) */
 	bool		pltrusted;		/* PL is trusted */
 } CreatePLangStmt;
-
-/* ----------------------
- *	Create/Alter/Drop Role Statements
- *
- * Note: these node types are also used for the backwards-compatible
- * Create/Alter/Drop User/Group statements.  In the ALTER and DROP cases
- * there's really no need to distinguish what the original spelling was,
- * but for CREATE we mark the type because the defaults vary.
- * ----------------------
- */
-typedef enum RoleStmtType
-{
-	ROLESTMT_ROLE,
-	ROLESTMT_USER,
-	ROLESTMT_GROUP
-} RoleStmtType;
-
-typedef struct CreateRoleStmt
-{
-	NodeTag		type;
-	RoleStmtType stmt_type;		/* ROLE/USER/GROUP */
-	char	   *role;			/* role name */
-	List	   *options;		/* List of DefElem nodes */
-} CreateRoleStmt;
-
-typedef struct AlterRoleStmt
-{
-	NodeTag		type;
-	RoleSpec   *role;			/* role */
-	List	   *options;		/* List of DefElem nodes */
-	int			action;			/* +1 = add members, -1 = drop members */
-} AlterRoleStmt;
-
-typedef struct AlterRoleSetStmt
-{
-	NodeTag		type;
-	RoleSpec   *role;			/* role */
-	char	   *database;		/* database name, or NULL */
-	VariableSetStmt *setstmt;	/* SET or RESET subcommand */
-} AlterRoleSetStmt;
-
-typedef struct DropRoleStmt
-{
-	NodeTag		type;
-	List	   *roles;			/* List of roles to remove */
-	bool		missing_ok;		/* skip error if a role is missing? */
-} DropRoleStmt;
 
 /* ----------------------
  *		{Create|Alter} SEQUENCE Statement
@@ -3391,26 +3266,6 @@ typedef struct DeallocateStmt
 	char	   *name;			/* The name of the plan to remove */
 	/* NULL means DEALLOCATE ALL */
 } DeallocateStmt;
-
-/*
- *		DROP OWNED statement
- */
-typedef struct DropOwnedStmt
-{
-	NodeTag		type;
-	List	   *roles;
-	DropBehavior behavior;
-} DropOwnedStmt;
-
-/*
- *		REASSIGN OWNED statement
- */
-typedef struct ReassignOwnedStmt
-{
-	NodeTag		type;
-	List	   *roles;
-	RoleSpec   *newrole;
-} ReassignOwnedStmt;
 
 typedef struct CreatePublicationStmt
 {

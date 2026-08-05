@@ -16,4 +16,3 @@ AS 'MODULE_PATHNAME', 'bt_index_parent_check'
 LANGUAGE C STRICT PARALLEL RESTRICTED;
 
 -- Don't want this to be available to public
-REVOKE ALL ON FUNCTION bt_index_parent_check(regclass, boolean, boolean) FROM PUBLIC;

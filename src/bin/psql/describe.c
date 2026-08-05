@@ -1164,71 +1164,6 @@ permissionsList(const char *pattern)
 						  "  ), E'\\n') AS \"%s\"",
 						  gettext_noop("Column privileges"));
 
-	if (pset.sversion >= 90500 && pset.sversion < 100000)
-		appendPQExpBuffer(&buf,
-						  ",\n  pg_catalog.array_to_string(ARRAY(\n"
-						  "    SELECT polname\n"
-						  "    || CASE WHEN polcmd != '*' THEN\n"
-						  "           E' (' || polcmd || E'):'\n"
-						  "       ELSE E':'\n"
-						  "       END\n"
-						  "    || CASE WHEN polqual IS NOT NULL THEN\n"
-						  "           E'\\n  (u): ' || pg_catalog.pg_get_expr(polqual, polrelid)\n"
-						  "       ELSE E''\n"
-						  "       END\n"
-						  "    || CASE WHEN polwithcheck IS NOT NULL THEN\n"
-						  "           E'\\n  (c): ' || pg_catalog.pg_get_expr(polwithcheck, polrelid)\n"
-						  "       ELSE E''\n"
-						  "       END"
-						  "    || CASE WHEN polroles <> '{0}' THEN\n"
-						  "           E'\\n  to: ' || pg_catalog.array_to_string(\n"
-						  "               ARRAY(\n"
-						  "                   SELECT rolname\n"
-						  "                   FROM pg_catalog.pg_roles\n"
-						  "                   WHERE oid = ANY (polroles)\n"
-						  "                   ORDER BY 1\n"
-						  "               ), E', ')\n"
-						  "       ELSE E''\n"
-						  "       END\n"
-						  "    FROM pg_catalog.pg_policy pol\n"
-						  "    WHERE polrelid = c.oid), E'\\n')\n"
-						  "    AS \"%s\"",
-						  gettext_noop("Policies"));
-
-	if (pset.sversion >= 100000)
-		appendPQExpBuffer(&buf,
-						  ",\n  pg_catalog.array_to_string(ARRAY(\n"
-						  "    SELECT polname\n"
-						  "    || CASE WHEN NOT polpermissive THEN\n"
-						  "       E' (RESTRICTIVE)'\n"
-						  "       ELSE '' END\n"
-						  "    || CASE WHEN polcmd != '*' THEN\n"
-						  "           E' (' || polcmd || E'):'\n"
-						  "       ELSE E':'\n"
-						  "       END\n"
-						  "    || CASE WHEN polqual IS NOT NULL THEN\n"
-						  "           E'\\n  (u): ' || pg_catalog.pg_get_expr(polqual, polrelid)\n"
-						  "       ELSE E''\n"
-						  "       END\n"
-						  "    || CASE WHEN polwithcheck IS NOT NULL THEN\n"
-						  "           E'\\n  (c): ' || pg_catalog.pg_get_expr(polwithcheck, polrelid)\n"
-						  "       ELSE E''\n"
-						  "       END"
-						  "    || CASE WHEN polroles <> '{0}' THEN\n"
-						  "           E'\\n  to: ' || pg_catalog.array_to_string(\n"
-						  "               ARRAY(\n"
-						  "                   SELECT rolname\n"
-						  "                   FROM pg_catalog.pg_roles\n"
-						  "                   WHERE oid = ANY (polroles)\n"
-						  "                   ORDER BY 1\n"
-						  "               ), E', ')\n"
-						  "       ELSE E''\n"
-						  "       END\n"
-						  "    FROM pg_catalog.pg_policy pol\n"
-						  "    WHERE polrelid = c.oid), E'\\n')\n"
-						  "    AS \"%s\"",
-						  gettext_noop("Policies"));
-
 	appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_class c\n"
 						 "     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n"
 						 "WHERE c.relkind IN ("
@@ -1716,7 +1651,8 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, "
+						  "c.relhastriggers, "
+						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, c.relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident, am.amname\n"
@@ -1734,8 +1670,9 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, "
-						  "c.relhasoids, c.relispartition, %s, c.reltablespace, "
+						  "c.relhastriggers, "
+						  "false AS relrowsecurity, false AS relforcerowsecurity, "
+						  "false AS relhasoids, c.relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1751,8 +1688,9 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, "
-						  "c.relhasoids, false as relispartition, %s, c.reltablespace, "
+						  "c.relhastriggers, "
+						  "false AS relrowsecurity, false AS relforcerowsecurity, "
+						  "false AS relhasoids, false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1768,7 +1706,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, c.relhasoids, "
+						  "c.relhastriggers, false, false, false AS relhasoids, "
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident\n"
@@ -1785,7 +1723,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, c.relhasoids, "
+						  "c.relhastriggers, false, false, false AS relhasoids, "
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
@@ -1802,7 +1740,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, c.relhasoids, "
+						  "c.relhastriggers, false, false, false AS relhasoids, "
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1818,7 +1756,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, c.relhasoids, "
+						  "c.relhastriggers, false, false, false AS relhasoids, "
 						  "false as relispartition, %s, c.reltablespace\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -2807,89 +2745,6 @@ describeOneTableDetails(const char *schemaname,
 
 					printTableAddFooter(&cont, buf.data);
 				}
-			}
-			PQclear(result);
-		}
-
-		/* print any row-level policies */
-		if (pset.sversion >= 90500)
-		{
-			printfPQExpBuffer(&buf, "SELECT pol.polname,");
-			if (pset.sversion >= 100000)
-				appendPQExpBufferStr(&buf,
-									 " pol.polpermissive,\n");
-			else
-				appendPQExpBufferStr(&buf,
-									 " 't' as polpermissive,\n");
-			appendPQExpBuffer(&buf,
-							  "  CASE WHEN pol.polroles = '{0}' THEN NULL ELSE pg_catalog.array_to_string(array(select rolname from pg_catalog.pg_roles where oid = any (pol.polroles) order by 1),',') END,\n"
-							  "  pg_catalog.pg_get_expr(pol.polqual, pol.polrelid),\n"
-							  "  pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid),\n"
-							  "  CASE pol.polcmd\n"
-							  "    WHEN 'r' THEN 'SELECT'\n"
-							  "    WHEN 'a' THEN 'INSERT'\n"
-							  "    WHEN 'w' THEN 'UPDATE'\n"
-							  "    WHEN 'd' THEN 'DELETE'\n"
-							  "    END AS cmd\n"
-							  "FROM pg_catalog.pg_policy pol\n"
-							  "WHERE pol.polrelid = '%s' ORDER BY 1;",
-							  oid);
-
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			/*
-			 * Handle cases where RLS is enabled and there are policies, or
-			 * there aren't policies, or RLS isn't enabled but there are
-			 * policies
-			 */
-			if (tableinfo.rowsecurity && !tableinfo.forcerowsecurity && tuples > 0)
-				printTableAddFooter(&cont, _("Policies:"));
-
-			if (tableinfo.rowsecurity && tableinfo.forcerowsecurity && tuples > 0)
-				printTableAddFooter(&cont, _("Policies (forced row security enabled):"));
-
-			if (tableinfo.rowsecurity && !tableinfo.forcerowsecurity && tuples == 0)
-				printTableAddFooter(&cont, _("Policies (row security enabled): (none)"));
-
-			if (tableinfo.rowsecurity && tableinfo.forcerowsecurity && tuples == 0)
-				printTableAddFooter(&cont, _("Policies (forced row security enabled): (none)"));
-
-			if (!tableinfo.rowsecurity && tuples > 0)
-				printTableAddFooter(&cont, _("Policies (row security disabled):"));
-
-			/* Might be an empty set - that's ok */
-			for (i = 0; i < tuples; i++)
-			{
-				printfPQExpBuffer(&buf, "    POLICY \"%s\"",
-								  PQgetvalue(result, i, 0));
-
-				if (*(PQgetvalue(result, i, 1)) == 'f')
-					appendPQExpBufferStr(&buf, " AS RESTRICTIVE");
-
-				if (!PQgetisnull(result, i, 5))
-					appendPQExpBuffer(&buf, " FOR %s",
-									  PQgetvalue(result, i, 5));
-
-				if (!PQgetisnull(result, i, 2))
-				{
-					appendPQExpBuffer(&buf, "\n      TO %s",
-									  PQgetvalue(result, i, 2));
-				}
-
-				if (!PQgetisnull(result, i, 3))
-					appendPQExpBuffer(&buf, "\n      USING (%s)",
-									  PQgetvalue(result, i, 3));
-
-				if (!PQgetisnull(result, i, 4))
-					appendPQExpBuffer(&buf, "\n      WITH CHECK (%s)",
-									  PQgetvalue(result, i, 4));
-
-				printTableAddFooter(&cont, buf.data);
-
 			}
 			PQclear(result);
 		}

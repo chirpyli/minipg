@@ -19,6 +19,3 @@ AS 'MODULE_PATHNAME', 'pg_truncate_visibility_map'
 LANGUAGE C STRICT
 PARALLEL UNSAFE;  -- let's not make this any more dangerous
 
-REVOKE ALL ON FUNCTION pg_check_frozen(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_check_visible(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_truncate_visibility_map(regclass) FROM PUBLIC;

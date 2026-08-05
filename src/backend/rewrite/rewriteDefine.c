@@ -28,7 +28,6 @@
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/storage.h"
-#include "commands/policy.h"
 #include "commands/tablecmds.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -472,17 +471,7 @@ DefineQueryRewrite(const char *rulename,
 						 errmsg("could not convert table \"%s\" to a view because it has parent tables",
 								RelationGetRelationName(event_relation))));
 
-			if (event_relation->rd_rel->relrowsecurity)
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("could not convert table \"%s\" to a view because it has row security enabled",
-								RelationGetRelationName(event_relation))));
 
-			if (relation_has_policies(event_relation))
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("could not convert table \"%s\" to a view because it has row security policies",
-								RelationGetRelationName(event_relation))));
 
 			RelisBecomingView = true;
 		}

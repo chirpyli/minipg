@@ -4,10 +4,8 @@
 
 -- Clean up in case a prior regression run failed
 SET client_min_messages TO 'warning';
-DROP ROLE IF EXISTS regress_alter_table_user1;
 RESET client_min_messages;
 
-CREATE USER regress_alter_table_user1;
 
 --
 -- add attribute
@@ -190,12 +188,10 @@ ALTER INDEX part_attmp_pkey RENAME TO part_attmp_index;
 ALTER INDEX part_attmp1_pkey RENAME TO part_attmp1_index;
 ALTER TABLE part_attmp RENAME TO part_at2tmp;
 ALTER TABLE part_attmp1 RENAME TO part_at2tmp1;
-SET ROLE regress_alter_table_user1;
 ALTER INDEX part_attmp_index RENAME TO fail;
 ALTER INDEX part_attmp1_index RENAME TO fail;
 ALTER TABLE part_at2tmp RENAME TO fail;
 ALTER TABLE part_at2tmp1 RENAME TO fail;
-RESET ROLE;
 DROP TABLE part_at2tmp;
 
 --
@@ -227,9 +223,7 @@ ALTER INDEX IF EXISTS __attmp_onek_unique1 RENAME TO onek_unique1;
 ALTER INDEX onek_unique1 RENAME TO attmp_onek_unique1;
 ALTER INDEX attmp_onek_unique1 RENAME TO onek_unique1;
 
-SET ROLE regress_alter_table_user1;
 ALTER INDEX onek_unique1 RENAME TO fail;  -- permission denied
-RESET ROLE;
 
 -- rename statements with mismatching statement and object types
 CREATE TABLE alter_idx_rename_test (a INT);
@@ -266,9 +260,7 @@ DROP TABLE alter_idx_rename_test_2;
 CREATE VIEW attmp_view (unique1) AS SELECT unique1 FROM tenk1;
 ALTER TABLE attmp_view RENAME TO attmp_view_new;
 
-SET ROLE regress_alter_table_user1;
 ALTER VIEW attmp_view_new RENAME TO fail;  -- permission denied
-RESET ROLE;
 
 -- hack to ensure we get an indexscan here
 set enable_seqscan to off;
@@ -310,7 +302,7 @@ ALTER TABLE ONLY constraint_rename_test RENAME CONSTRAINT con1 TO con1foo; -- fa
 ALTER TABLE constraint_rename_test RENAME CONSTRAINT con1 TO con1foo; -- ok
 \d constraint_rename_test
 \d constraint_rename_test2
-ALTER TABLE constraint_rename_test ADD CONSTRAINT con2 CHECK (b > 0) NO INHERIT;
+ALTER TABLE constraint_rename_test ADD CONSTRAINT con2 CHECK (b > 0);
 ALTER TABLE ONLY constraint_rename_test RENAME CONSTRAINT con2 TO con2foo; -- ok
 ALTER TABLE constraint_rename_test RENAME CONSTRAINT con2foo TO con2bar; -- ok
 \d constraint_rename_test
@@ -414,12 +406,12 @@ ALTER TABLE attmp7 ADD CONSTRAINT identity CHECK (b = boo(b));
 ALTER TABLE attmp3 ADD CONSTRAINT IDENTITY check (b = boo(b)) NOT VALID;
 ALTER TABLE attmp3 VALIDATE CONSTRAINT identity;
 
--- A NO INHERIT constraint should not be looked for in children during VALIDATE CONSTRAINT
+-- A constraint should not be looked for in children during VALIDATE CONSTRAINT
 create table parent_noinh_convalid (a int);
 create table child_noinh_convalid () inherits (parent_noinh_convalid);
 insert into parent_noinh_convalid values (1);
 insert into child_noinh_convalid values (1);
-alter table parent_noinh_convalid add constraint check_a_is_2 check (a = 2) no inherit not valid;
+alter table parent_noinh_convalid add constraint check_a_is_2 check (a = 2) not valid;
 -- fail, because of the row in parent
 alter table parent_noinh_convalid validate constraint check_a_is_2;
 delete from only parent_noinh_convalid;
@@ -449,7 +441,7 @@ DROP TABLE attmp2;
 -- NOT VALID with plan invalidation -- ensure we don't use a constraint for
 -- exclusion until validated
 set constraint_exclusion TO 'partition';
-create table nv_parent (d date, check (false) no inherit not valid);
+create table nv_parent (d date, check (false) not valid);
 -- not valid constraint added at creation time should automatically become valid
 \d nv_parent
 
@@ -623,35 +615,35 @@ drop table atacc3;
 drop table atacc2;
 drop table atacc1;
 
--- same things with one created with INHERIT
+-- same things with one created with
 create table atacc1 (test int);
 create table atacc2 (test2 int);
 create table atacc3 (test3 int) inherits (atacc1, atacc2);
-alter table atacc3 no inherit atacc2;
+alter table atacc3 atacc2;
 -- fail
-alter table atacc3 no inherit atacc2;
+alter table atacc3 atacc2;
 -- make sure it really isn't a child
 insert into atacc3 (test2) values (3);
 select test2 from atacc2;
 -- fail due to missing constraint
 alter table atacc2 add constraint foo check (test2>0);
-alter table atacc3 inherit atacc2;
+alter table atacc3 atacc2;
 -- fail due to missing column
 alter table atacc3 rename test2 to testx;
-alter table atacc3 inherit atacc2;
+alter table atacc3 atacc2;
 -- fail due to mismatched data type
 alter table atacc3 add test2 bool;
-alter table atacc3 inherit atacc2;
+alter table atacc3 atacc2;
 alter table atacc3 drop test2;
 -- succeed
 alter table atacc3 add test2 int;
 update atacc3 set test2 = 4 where test2 is null;
 alter table atacc3 add constraint foo check (test2>0);
-alter table atacc3 inherit atacc2;
+alter table atacc3 atacc2;
 -- fail due to duplicates and circular inheritance
-alter table atacc3 inherit atacc2;
-alter table atacc2 inherit atacc3;
-alter table atacc2 inherit atacc2;
+alter table atacc3 atacc2;
+alter table atacc2 atacc3;
+alter table atacc2 atacc2;
 -- test that we really are a child now (should see 4 not 3 and cascade should go through)
 select test2 from atacc2;
 drop table atacc2 cascade;
@@ -662,14 +654,14 @@ drop table atacc1;
 create table atacc1 (test int);
 create table atacc2 (test2 int) inherits (atacc1);
 -- ok:
-alter table atacc1 add constraint foo check (test>0) no inherit;
+alter table atacc1 add constraint foo check (test>0);
 -- check constraint is not there on child
 insert into atacc2 (test) values (-3);
 -- check constraint is there on parent
 insert into atacc1 (test) values (-3);
 insert into atacc1 (test) values (3);
 -- fail, violating row:
-alter table atacc2 add constraint foo check (test>0) no inherit;
+alter table atacc2 add constraint foo check (test>0);
 drop table atacc2;
 drop table atacc1;
 
@@ -1554,32 +1546,32 @@ CREATE TABLE test_inh_check (a float check (a > 10.2), b float);
 CREATE TABLE test_inh_check_child() INHERITS(test_inh_check);
 \d test_inh_check
 \d test_inh_check_child
-select relname, conname, coninhcount, conislocal, connoinherit
+select relname, conname, coninhcount, conislocal, conno
   from pg_constraint c, pg_class r
   where relname like 'test_inh_check%' and c.conrelid = r.oid
   order by 1, 2;
 ALTER TABLE test_inh_check ALTER COLUMN a TYPE numeric;
 \d test_inh_check
 \d test_inh_check_child
-select relname, conname, coninhcount, conislocal, connoinherit
+select relname, conname, coninhcount, conislocal, conno
   from pg_constraint c, pg_class r
   where relname like 'test_inh_check%' and c.conrelid = r.oid
   order by 1, 2;
--- also try noinherit, local, and local+inherited cases
-ALTER TABLE test_inh_check ADD CONSTRAINT bnoinherit CHECK (b > 100) NO INHERIT;
+-- also try no, local, and local+inherited cases
+ALTER TABLE test_inh_check ADD CONSTRAINT bno CHECK (b > 100);
 ALTER TABLE test_inh_check_child ADD CONSTRAINT blocal CHECK (b < 1000);
 ALTER TABLE test_inh_check_child ADD CONSTRAINT bmerged CHECK (b > 1);
 ALTER TABLE test_inh_check ADD CONSTRAINT bmerged CHECK (b > 1);
 \d test_inh_check
 \d test_inh_check_child
-select relname, conname, coninhcount, conislocal, connoinherit
+select relname, conname, coninhcount, conislocal, conno
   from pg_constraint c, pg_class r
   where relname like 'test_inh_check%' and c.conrelid = r.oid
   order by 1, 2;
 ALTER TABLE test_inh_check ALTER COLUMN b TYPE numeric;
 \d test_inh_check
 \d test_inh_check_child
-select relname, conname, coninhcount, conislocal, connoinherit
+select relname, conname, coninhcount, conislocal, conno
   from pg_constraint c, pg_class r
   where relname like 'test_inh_check%' and c.conrelid = r.oid
   order by 1, 2;
@@ -1596,9 +1588,9 @@ CREATE TABLE test_type_diff2 (int_two int2, int_four int4, int_eight int8);
 CREATE TABLE test_type_diff2_c1 (int_four int4, int_eight int8, int_two int2);
 CREATE TABLE test_type_diff2_c2 (int_eight int8, int_two int2, int_four int4);
 CREATE TABLE test_type_diff2_c3 (int_two int2, int_four int4, int_eight int8);
-ALTER TABLE test_type_diff2_c1 INHERIT test_type_diff2;
-ALTER TABLE test_type_diff2_c2 INHERIT test_type_diff2;
-ALTER TABLE test_type_diff2_c3 INHERIT test_type_diff2;
+ALTER TABLE test_type_diff2_c1 test_type_diff2;
+ALTER TABLE test_type_diff2_c2 test_type_diff2;
+ALTER TABLE test_type_diff2_c3 test_type_diff2;
 INSERT INTO test_type_diff2_c1 VALUES (1, 2, 3);
 INSERT INTO test_type_diff2_c2 VALUES (4, 5, 6);
 INSERT INTO test_type_diff2_c3 VALUES (7, 8, 9);
@@ -2370,11 +2362,11 @@ CREATE TABLE nonpartitioned (
 	a int,
 	b int
 );
-ALTER TABLE partitioned INHERIT nonpartitioned;
-ALTER TABLE nonpartitioned INHERIT partitioned;
+ALTER TABLE partitioned nonpartitioned;
+ALTER TABLE nonpartitioned partitioned;
 
--- cannot add NO INHERIT constraint to partitioned tables
-ALTER TABLE partitioned ADD CONSTRAINT chk_a CHECK (a > 0) NO INHERIT;
+-- cannot add constraint to partitioned tables
+ALTER TABLE partitioned ADD CONSTRAINT chk_a CHECK (a > 0);
 
 DROP TABLE partitioned, nonpartitioned;
 
@@ -2404,19 +2396,12 @@ DROP TABLE fail_part;
 ALTER TABLE list_parted ATTACH PARTITION nonexistent FOR VALUES IN (1);
 
 -- check ownership of the source table
-CREATE ROLE regress_test_me;
-CREATE ROLE regress_test_not_me;
 CREATE TABLE not_owned_by_me (LIKE list_parted);
-ALTER TABLE not_owned_by_me OWNER TO regress_test_not_me;
-SET SESSION AUTHORIZATION regress_test_me;
 CREATE TABLE owned_by_me (
 	a int
 ) PARTITION BY LIST (a);
 ALTER TABLE owned_by_me ATTACH PARTITION not_owned_by_me FOR VALUES IN (1);
-RESET SESSION AUTHORIZATION;
 DROP TABLE owned_by_me, not_owned_by_me;
-DROP ROLE regress_test_not_me;
-DROP ROLE regress_test_me;
 
 -- check that the table being attached is not part of regular inheritance
 CREATE TABLE parent (LIKE list_parted);
@@ -2848,14 +2833,14 @@ ALTER TABLE list_parted2 ALTER b SET NOT NULL, ADD CONSTRAINT check_a2 CHECK (a 
 ALTER TABLE part_2 ALTER b DROP NOT NULL;
 ALTER TABLE part_2 DROP CONSTRAINT check_a2;
 
--- Doesn't make sense to add NO INHERIT constraints on partitioned tables
-ALTER TABLE list_parted2 add constraint check_b2 check (b <> 'zz') NO INHERIT;
+-- Doesn't make sense to add constraints on partitioned tables
+ALTER TABLE list_parted2 add constraint check_b2 check (b <> 'zz');
 
 -- check that a partition cannot participate in regular inheritance
 CREATE TABLE inh_test () INHERITS (part_2);
 CREATE TABLE inh_test (LIKE part_2);
-ALTER TABLE inh_test INHERIT part_2;
-ALTER TABLE part_2 INHERIT inh_test;
+ALTER TABLE inh_test part_2;
+ALTER TABLE part_2 inh_test;
 
 -- cannot drop or alter type of partition key columns of lower level
 -- partitioned tables; for example, part_5, which is list_parted2's
@@ -2913,7 +2898,6 @@ ALTER TABLE attmp ALTER COLUMN i RESET (n_distinct_inherited);
 ANALYZE attmp;
 DROP TABLE attmp;
 
-DROP USER regress_alter_table_user1;
 
 -- check that violating rows are correctly reported when attaching as the
 -- default partition

@@ -481,11 +481,8 @@ select 1 where false;
 \pset expanded off
 
 CREATE SCHEMA tableam_display;
-CREATE ROLE regress_display_role;
-ALTER SCHEMA tableam_display OWNER TO regress_display_role;
 SET search_path TO tableam_display;
 CREATE ACCESS METHOD heap_psql TYPE TABLE HANDLER heap_tableam_handler;
-SET ROLE TO regress_display_role;
 -- Use only relations with a physical size of zero.
 CREATE TABLE tbl_heap_psql(f1 int, f2 char(100)) using heap_psql;
 CREATE TABLE tbl_heap(f1 int, f2 char(100)) using heap;
@@ -504,11 +501,9 @@ CREATE MATERIALIZED VIEW mat_view_heap_psql USING heap_psql AS SELECT f1 from tb
 \dv+
 \set HIDE_TABLEAM on
 \d+
-RESET ROLE;
 RESET search_path;
 DROP SCHEMA tableam_display CASCADE;
 DROP ACCESS METHOD heap_psql;
-DROP ROLE regress_display_role;
 
 -- test numericlocale (as best we can without control of psql's locale)
 
@@ -1161,11 +1156,8 @@ select 1/(15-unique2) from tenk1 order by unique2 limit 19;
 \unset FETCH_COUNT
 
 create schema testpart;
-create role regress_partitioning_role;
 
-alter schema testpart owner to regress_partitioning_role;
 
-set role to regress_partitioning_role;
 
 -- run test inside own schema and hide other partitions
 set search_path to testpart;
@@ -1226,8 +1218,6 @@ drop schema testpart;
 
 set search_path to default;
 
-set role to default;
-drop role regress_partitioning_role;
 
 -- \d on toast table (use pg_statistic's toast table, which has a known name)
 \d pg_toast.pg_toast_2619
@@ -1337,8 +1327,6 @@ drop role regress_partitioning_role;
 \dFt host.regression.pg_catalog.ispell
 \dFt regression$.pg_catalog.ispell
 \dFt nonesuch.pg_catalog.ispell
-\dg nonesuch.pg_database_owner
-\dg regression.pg_database_owner
 \dL host.regression.plpgsql
 \dL *.plpgsql
 \dL nonesuch.plpgsql
@@ -1397,7 +1385,6 @@ drop role regress_partitioning_role;
 \dFd "no.such.text.search.dictionary"
 \dFp "no.such.text.search.parser"
 \dFt "no.such.text.search.template"
-\dg "no.such.role"
 \dL "no.such.language"
 \dn "no.such.schema"
 \do "no.such.operator"
@@ -1438,7 +1425,6 @@ drop role regress_partitioning_role;
 \dFd "no.such.schema"."no.such.text.search.dictionary"
 \dFp "no.such.schema"."no.such.text.search.parser"
 \dFt "no.such.schema"."no.such.text.search.template"
-\dg "no.such.schema"."no.such.role"
 \dL "no.such.schema"."no.such.language"
 \do "no.such.schema"."no.such.operator"
 \dO "no.such.schema"."no.such.collation"

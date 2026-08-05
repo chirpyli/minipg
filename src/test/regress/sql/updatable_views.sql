@@ -425,22 +425,13 @@ DROP TABLE base_tbl CASCADE;
 
 -- permissions checks
 
-CREATE USER regress_view_user1;
-CREATE USER regress_view_user2;
 
-SET SESSION AUTHORIZATION regress_view_user1;
 CREATE TABLE base_tbl(a int, b text, c float);
 INSERT INTO base_tbl VALUES (1, 'Row 1', 1.0);
 CREATE VIEW rw_view1 AS SELECT b AS bb, c AS cc, a AS aa FROM base_tbl;
 INSERT INTO rw_view1 VALUES ('Row 2', 2.0, 2);
 
-GRANT SELECT ON base_tbl TO regress_view_user2;
-GRANT SELECT ON rw_view1 TO regress_view_user2;
-GRANT UPDATE (a,c) ON base_tbl TO regress_view_user2;
-GRANT UPDATE (bb,cc) ON rw_view1 TO regress_view_user2;
-RESET SESSION AUTHORIZATION;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 CREATE VIEW rw_view2 AS SELECT b AS bb, c AS cc, a AS aa FROM base_tbl;
 SELECT * FROM base_tbl; -- ok
 SELECT * FROM rw_view1; -- ok
@@ -460,13 +451,8 @@ UPDATE rw_view2 SET bb=bb; -- not allowed
 DELETE FROM base_tbl; -- not allowed
 DELETE FROM rw_view1; -- not allowed
 DELETE FROM rw_view2; -- not allowed
-RESET SESSION AUTHORIZATION;
 
-SET SESSION AUTHORIZATION regress_view_user1;
-GRANT INSERT, DELETE ON base_tbl TO regress_view_user2;
-RESET SESSION AUTHORIZATION;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 INSERT INTO base_tbl VALUES (3, 'Row 3', 3.0); -- ok
 INSERT INTO rw_view1 VALUES ('Row 4', 4.0, 4); -- not allowed
 INSERT INTO rw_view2 VALUES ('Row 4', 4.0, 4); -- ok
@@ -474,14 +460,8 @@ DELETE FROM base_tbl WHERE a=1; -- ok
 DELETE FROM rw_view1 WHERE aa=2; -- not allowed
 DELETE FROM rw_view2 WHERE aa=2; -- ok
 SELECT * FROM base_tbl;
-RESET SESSION AUTHORIZATION;
 
-SET SESSION AUTHORIZATION regress_view_user1;
-REVOKE INSERT, DELETE ON base_tbl FROM regress_view_user2;
-GRANT INSERT, DELETE ON rw_view1 TO regress_view_user2;
-RESET SESSION AUTHORIZATION;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 INSERT INTO base_tbl VALUES (5, 'Row 5', 5.0); -- not allowed
 INSERT INTO rw_view1 VALUES ('Row 5', 5.0, 5); -- ok
 INSERT INTO rw_view2 VALUES ('Row 6', 6.0, 6); -- not allowed
@@ -489,7 +469,6 @@ DELETE FROM base_tbl WHERE a=3; -- not allowed
 DELETE FROM rw_view1 WHERE aa=3; -- ok
 DELETE FROM rw_view2 WHERE aa=4; -- not allowed
 SELECT * FROM base_tbl;
-RESET SESSION AUTHORIZATION;
 
 DROP TABLE base_tbl CASCADE;
 
@@ -498,79 +477,56 @@ DROP TABLE base_tbl CASCADE;
 CREATE TABLE base_tbl(a int, b text, c float);
 INSERT INTO base_tbl VALUES (1, 'Row 1', 1.0);
 
-SET SESSION AUTHORIZATION regress_view_user1;
 CREATE VIEW rw_view1 AS SELECT * FROM base_tbl;
 SELECT * FROM rw_view1;  -- not allowed
 SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
 UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
 
-SET SESSION AUTHORIZATION regress_view_user2;
 CREATE VIEW rw_view2 AS SELECT * FROM rw_view1;
 SELECT * FROM rw_view2;  -- not allowed
 SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
 
-RESET SESSION AUTHORIZATION;
-GRANT SELECT ON base_tbl TO regress_view_user1;
 
-SET SESSION AUTHORIZATION regress_view_user1;
 SELECT * FROM rw_view1;
 SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
 UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
 
-SET SESSION AUTHORIZATION regress_view_user2;
 SELECT * FROM rw_view2;  -- not allowed
 SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
 
-SET SESSION AUTHORIZATION regress_view_user1;
-GRANT SELECT ON rw_view1 TO regress_view_user2;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 SELECT * FROM rw_view2;
 SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
 
-RESET SESSION AUTHORIZATION;
-GRANT UPDATE ON base_tbl TO regress_view_user1;
 
-SET SESSION AUTHORIZATION regress_view_user1;
 SELECT * FROM rw_view1;
 SELECT * FROM rw_view1 FOR UPDATE;
 UPDATE rw_view1 SET b = 'foo' WHERE a = 1;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 SELECT * FROM rw_view2;
 SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
 
-SET SESSION AUTHORIZATION regress_view_user1;
-GRANT UPDATE ON rw_view1 TO regress_view_user2;
 
-SET SESSION AUTHORIZATION regress_view_user2;
 SELECT * FROM rw_view2;
 SELECT * FROM rw_view2 FOR UPDATE;
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;
 
-RESET SESSION AUTHORIZATION;
-REVOKE UPDATE ON base_tbl FROM regress_view_user1;
 
-SET SESSION AUTHORIZATION regress_view_user1;
 SELECT * FROM rw_view1;
 SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
 UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
 
-SET SESSION AUTHORIZATION regress_view_user2;
 SELECT * FROM rw_view2;
 SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
 UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
 
-RESET SESSION AUTHORIZATION;
 
 DROP TABLE base_tbl CASCADE;
 
-DROP USER regress_view_user1;
-DROP USER regress_view_user2;
 
 -- column defaults
 
@@ -1406,19 +1362,12 @@ drop view uv_iocu_view;
 drop table uv_iocu_tab;
 
 -- ON CONFLICT DO UPDATE permissions checks
-create user regress_view_user1;
-create user regress_view_user2;
 
-set session authorization regress_view_user1;
 create table base_tbl(a int unique, b text, c float);
 insert into base_tbl values (1,'xxx',1.0);
 create view rw_view1 as select b as bb, c as cc, a as aa from base_tbl;
 
-grant select (aa,bb) on rw_view1 to regress_view_user2;
-grant insert on rw_view1 to regress_view_user2;
-grant update (bb) on rw_view1 to regress_view_user2;
 
-set session authorization regress_view_user2;
 insert into rw_view1 values ('yyy',2.0,1)
   on conflict (aa) do update set bb = excluded.cc; -- Not allowed
 insert into rw_view1 values ('yyy',2.0,1)
@@ -1429,32 +1378,23 @@ insert into rw_view1 values ('zzz',2.0,1)
   on conflict (aa) do update set bb = rw_view1.bb||'xxx'; -- OK
 insert into rw_view1 values ('zzz',2.0,1)
   on conflict (aa) do update set cc = 3.0; -- Not allowed
-reset session authorization;
 select * from base_tbl;
 
-set session authorization regress_view_user1;
-grant select (a,b) on base_tbl to regress_view_user2;
-grant insert (a,b) on base_tbl to regress_view_user2;
-grant update (a,b) on base_tbl to regress_view_user2;
 
-set session authorization regress_view_user2;
 create view rw_view2 as select b as bb, c as cc, a as aa from base_tbl;
 insert into rw_view2 (aa,bb) values (1,'xxx')
   on conflict (aa) do update set bb = excluded.bb; -- Not allowed
 create view rw_view3 as select b as bb, a as aa from base_tbl;
 insert into rw_view3 (aa,bb) values (1,'xxx')
   on conflict (aa) do update set bb = excluded.bb; -- OK
-reset session authorization;
 select * from base_tbl;
 
-set session authorization regress_view_user2;
 create view rw_view4 as select aa, bb, cc FROM rw_view1;
 insert into rw_view4 (aa,bb) values (1,'yyy')
   on conflict (aa) do update set bb = excluded.bb; -- Not allowed
 create view rw_view5 as select aa, bb FROM rw_view1;
 insert into rw_view5 (aa,bb) values (1,'yyy')
   on conflict (aa) do update set bb = excluded.bb; -- OK
-reset session authorization;
 select * from base_tbl;
 
 drop view rw_view5;
@@ -1463,8 +1403,6 @@ drop view rw_view3;
 drop view rw_view2;
 drop view rw_view1;
 drop table base_tbl;
-drop user regress_view_user1;
-drop user regress_view_user2;
 
 -- Test single- and multi-row inserts with table and view defaults.
 -- Table defaults should be used, unless overridden by view defaults.

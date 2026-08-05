@@ -20,12 +20,7 @@ DROP TABLE sitmp1;
 -- SELECT INTO and INSERT permission, if owner is not allowed to insert.
 --
 CREATE SCHEMA selinto_schema;
-CREATE USER regress_selinto_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE regress_selinto_user
-	  REVOKE INSERT ON TABLES FROM regress_selinto_user;
-GRANT ALL ON SCHEMA selinto_schema TO public;
 
-SET SESSION AUTHORIZATION regress_selinto_user;
 -- WITH DATA, passes.
 CREATE TABLE selinto_schema.tbl_withdata1 (a)
   AS SELECT generate_series(1,3) WITH DATA;
@@ -52,17 +47,11 @@ CREATE TABLE selinto_schema.tbl_nodata3 (a) AS
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
   CREATE TABLE selinto_schema.tbl_nodata4 (a) AS
   EXECUTE data_sel WITH NO DATA;
-RESET SESSION AUTHORIZATION;
 
-ALTER DEFAULT PRIVILEGES FOR ROLE regress_selinto_user
-	  GRANT INSERT ON TABLES TO regress_selinto_user;
 
-SET SESSION AUTHORIZATION regress_selinto_user;
-RESET SESSION AUTHORIZATION;
 
 DEALLOCATE data_sel;
 DROP SCHEMA selinto_schema CASCADE;
-DROP USER regress_selinto_user;
 
 -- Tests for WITH NO DATA and column name consistency
 CREATE TABLE ctas_base (i int, j int);

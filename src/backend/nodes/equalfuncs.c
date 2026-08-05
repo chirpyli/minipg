@@ -1129,22 +1129,6 @@ _equalAlterDomainStmt(const AlterDomainStmt *a, const AlterDomainStmt *b)
 }
 
 static bool
-_equalGrantStmt(const GrantStmt *a, const GrantStmt *b)
-{
-	COMPARE_SCALAR_FIELD(is_grant);
-	COMPARE_SCALAR_FIELD(targtype);
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_NODE_FIELD(objects);
-	COMPARE_NODE_FIELD(privileges);
-	COMPARE_NODE_FIELD(grantees);
-	COMPARE_SCALAR_FIELD(grant_option);
-	COMPARE_NODE_FIELD(grantor);
-	COMPARE_SCALAR_FIELD(behavior);
-
-	return true;
-}
-
-static bool
 _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 {
 	COMPARE_NODE_FIELD(objname);
@@ -1160,28 +1144,6 @@ _equalAccessPriv(const AccessPriv *a, const AccessPriv *b)
 {
 	COMPARE_STRING_FIELD(priv_name);
 	COMPARE_NODE_FIELD(cols);
-
-	return true;
-}
-
-static bool
-_equalGrantRoleStmt(const GrantRoleStmt *a, const GrantRoleStmt *b)
-{
-	COMPARE_NODE_FIELD(granted_roles);
-	COMPARE_NODE_FIELD(grantee_roles);
-	COMPARE_SCALAR_FIELD(is_grant);
-	COMPARE_SCALAR_FIELD(admin_opt);
-	COMPARE_NODE_FIELD(grantor);
-	COMPARE_SCALAR_FIELD(behavior);
-
-	return true;
-}
-
-static bool
-_equalAlterDefaultPrivilegesStmt(const AlterDefaultPrivilegesStmt *a, const AlterDefaultPrivilegesStmt *b)
-{
-	COMPARE_NODE_FIELD(options);
-	COMPARE_NODE_FIELD(action);
 
 	return true;
 }
@@ -1979,45 +1941,6 @@ _equalCreatePLangStmt(const CreatePLangStmt *a, const CreatePLangStmt *b)
 }
 
 static bool
-_equalCreateRoleStmt(const CreateRoleStmt *a, const CreateRoleStmt *b)
-{
-	COMPARE_SCALAR_FIELD(stmt_type);
-	COMPARE_STRING_FIELD(role);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterRoleStmt(const AlterRoleStmt *a, const AlterRoleStmt *b)
-{
-	COMPARE_NODE_FIELD(role);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(action);
-
-	return true;
-}
-
-static bool
-_equalAlterRoleSetStmt(const AlterRoleSetStmt *a, const AlterRoleSetStmt *b)
-{
-	COMPARE_NODE_FIELD(role);
-	COMPARE_STRING_FIELD(database);
-	COMPARE_NODE_FIELD(setstmt);
-
-	return true;
-}
-
-static bool
-_equalDropRoleStmt(const DropRoleStmt *a, const DropRoleStmt *b)
-{
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
 _equalLockStmt(const LockStmt *a, const LockStmt *b)
 {
 	COMPARE_NODE_FIELD(relations);
@@ -2110,24 +2033,6 @@ _equalDeallocateStmt(const DeallocateStmt *a, const DeallocateStmt *b)
 }
 
 static bool
-_equalDropOwnedStmt(const DropOwnedStmt *a, const DropOwnedStmt *b)
-{
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_SCALAR_FIELD(behavior);
-
-	return true;
-}
-
-static bool
-_equalReassignOwnedStmt(const ReassignOwnedStmt *a, const ReassignOwnedStmt *b)
-{
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_NODE_FIELD(newrole);
-
-	return true;
-}
-
-static bool
 _equalCreatePublicationStmt(const CreatePublicationStmt *a,
 							const CreatePublicationStmt *b)
 {
@@ -2188,31 +2093,6 @@ _equalDropSubscriptionStmt(const DropSubscriptionStmt *a,
 	return true;
 }
 
-static bool
-_equalCreatePolicyStmt(const CreatePolicyStmt *a, const CreatePolicyStmt *b)
-{
-	COMPARE_STRING_FIELD(policy_name);
-	COMPARE_NODE_FIELD(table);
-	COMPARE_STRING_FIELD(cmd_name);
-	COMPARE_SCALAR_FIELD(permissive);
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_NODE_FIELD(qual);
-	COMPARE_NODE_FIELD(with_check);
-
-	return true;
-}
-
-static bool
-_equalAlterPolicyStmt(const AlterPolicyStmt *a, const AlterPolicyStmt *b)
-{
-	COMPARE_STRING_FIELD(policy_name);
-	COMPARE_NODE_FIELD(table);
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_NODE_FIELD(qual);
-	COMPARE_NODE_FIELD(with_check);
-
-	return true;
-}
 
 static bool
 _equalAExpr(const A_Expr *a, const A_Expr *b)
@@ -3181,15 +3061,6 @@ equal(const void *a, const void *b)
 		case T_AlterDomainStmt:
 			retval = _equalAlterDomainStmt(a, b);
 			break;
-		case T_GrantStmt:
-			retval = _equalGrantStmt(a, b);
-			break;
-		case T_GrantRoleStmt:
-			retval = _equalGrantRoleStmt(a, b);
-			break;
-		case T_AlterDefaultPrivilegesStmt:
-			retval = _equalAlterDefaultPrivilegesStmt(a, b);
-			break;
 		case T_DeclareCursorStmt:
 			retval = _equalDeclareCursorStmt(a, b);
 			break;
@@ -3403,18 +3274,6 @@ equal(const void *a, const void *b)
 		case T_CreatePLangStmt:
 			retval = _equalCreatePLangStmt(a, b);
 			break;
-		case T_CreateRoleStmt:
-			retval = _equalCreateRoleStmt(a, b);
-			break;
-		case T_AlterRoleStmt:
-			retval = _equalAlterRoleStmt(a, b);
-			break;
-		case T_AlterRoleSetStmt:
-			retval = _equalAlterRoleSetStmt(a, b);
-			break;
-		case T_DropRoleStmt:
-			retval = _equalDropRoleStmt(a, b);
-			break;
 		case T_LockStmt:
 			retval = _equalLockStmt(a, b);
 			break;
@@ -3444,18 +3303,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_DeallocateStmt:
 			retval = _equalDeallocateStmt(a, b);
-			break;
-		case T_DropOwnedStmt:
-			retval = _equalDropOwnedStmt(a, b);
-			break;
-		case T_ReassignOwnedStmt:
-			retval = _equalReassignOwnedStmt(a, b);
-			break;
-		case T_CreatePolicyStmt:
-			retval = _equalCreatePolicyStmt(a, b);
-			break;
-		case T_AlterPolicyStmt:
-			retval = _equalAlterPolicyStmt(a, b);
 			break;
 		case T_CreatePublicationStmt:
 			retval = _equalCreatePublicationStmt(a, b);

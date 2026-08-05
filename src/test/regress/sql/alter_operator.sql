@@ -85,16 +85,12 @@ ALTER OPERATOR === (boolean, boolean) SET (NEGATOR = !==);
 ALTER OPERATOR & (bit, bit) SET ("Restrict" = _int_contsel, "Join" = _int_contjoinsel);
 
 --
--- Test permission check. Must be owner to ALTER OPERATOR.
+-- Test permission check. Must be OPERATOR.
 --
-CREATE USER regress_alter_op_user;
-SET SESSION AUTHORIZATION regress_alter_op_user;
 
 ALTER OPERATOR === (boolean, boolean) SET (RESTRICT = NONE);
 
 -- Clean up
-RESET SESSION AUTHORIZATION;
-DROP USER regress_alter_op_user;
 DROP OPERATOR === (boolean, boolean);
 DROP FUNCTION customcontsel(internal, oid, internal, integer);
 DROP FUNCTION alter_op_test_fn(boolean, boolean);

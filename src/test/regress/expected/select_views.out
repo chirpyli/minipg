@@ -19,7 +19,6 @@ SELECT * FROM toyemp WHERE name = 'sharon';
 --
 -- Test for Leaky view scenario
 --
-CREATE ROLE regress_alice;
 CREATE FUNCTION f_leak (text)
        RETURNS bool LANGUAGE 'plpgsql' COST 0.0000001
        AS 'BEGIN RAISE NOTICE ''f_leak => %'', $1; RETURN true; END';
@@ -71,16 +70,9 @@ CREATE VIEW my_credit_card_usage_normal AS
        SELECT * FROM my_credit_card_secure l NATURAL JOIN credit_usage r;
 CREATE VIEW my_credit_card_usage_secure WITH (security_barrier) AS
        SELECT * FROM my_credit_card_secure l NATURAL JOIN credit_usage r;
-GRANT SELECT ON my_property_normal TO public;
-GRANT SELECT ON my_property_secure TO public;
-GRANT SELECT ON my_credit_card_normal TO public;
-GRANT SELECT ON my_credit_card_secure TO public;
-GRANT SELECT ON my_credit_card_usage_normal TO public;
-GRANT SELECT ON my_credit_card_usage_secure TO public;
 --
 -- Run leaky view scenarios
 --
-SET SESSION AUTHORIZATION regress_alice;
 --
 -- scenario: if a qualifier with tiny-cost is given, it shall be launched
 --           prior to the security policy of the view.
@@ -89,10 +81,9 @@ SELECT * FROM my_property_normal WHERE f_leak(passwd);
 NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => hamburger
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal WHERE f_leak(passwd);
                       QUERY PLAN                      
@@ -102,11 +93,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal WHERE f_leak(passwd);
 (2 rows)
 
 SELECT * FROM my_property_secure WHERE f_leak(passwd);
-NOTICE:  f_leak => passwd123
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_secure WHERE f_leak(passwd);
                  QUERY PLAN                  
@@ -129,10 +118,9 @@ NOTICE:  f_leak => passwd
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => passwd
 NOTICE:  f_leak => hamburger
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal v
 		WHERE f_leak('passwd') AND f_leak(passwd);
@@ -145,13 +133,11 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal v
 SELECT * FROM my_property_secure v
 		WHERE f_leak('passwd') AND f_leak(passwd);
 NOTICE:  f_leak => passwd
-NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => passwd
 NOTICE:  f_leak => passwd
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_secure v
 		WHERE f_leak('passwd') AND f_leak(passwd);
@@ -170,12 +156,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_property_secure v
 --
 SELECT * FROM my_credit_card_normal WHERE f_leak(cnum);
 NOTICE:  f_leak => 1111-2222-3333-4444
-NOTICE:  f_leak => 5555-6666-7777-8888
-NOTICE:  f_leak => 9801-2345-6789-0123
- cid |     name      |       tel        |  passwd   |        cnum         | climit 
------+---------------+------------------+-----------+---------------------+--------
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000
-(1 row)
+ cid | name | tel | passwd | cnum | climit 
+-----+------+-----+--------+------+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_normal WHERE f_leak(cnum);
                  QUERY PLAN                  
@@ -190,11 +173,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_normal WHERE f_leak(cnum);
 (7 rows)
 
 SELECT * FROM my_credit_card_secure WHERE f_leak(cnum);
-NOTICE:  f_leak => 1111-2222-3333-4444
- cid |     name      |       tel        |  passwd   |        cnum         | climit 
------+---------------+------------------+-----------+---------------------+--------
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000
-(1 row)
+ cid | name | tel | passwd | cnum | climit 
+-----+------+-----+--------+------+--------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_secure WHERE f_leak(cnum);
                     QUERY PLAN                     
@@ -216,13 +197,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_secure WHERE f_leak(cnum);
 --
 SELECT * FROM my_credit_card_usage_normal
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
-NOTICE:  f_leak => 1111-2222-3333-4444
- cid |     name      |       tel        |  passwd   |        cnum         | climit |    ymd     | usage 
------+---------------+------------------+-----------+---------------------+--------+------------+-------
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-05-2011 |    90
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-18-2011 |   110
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-21-2011 |   200
-(3 rows)
+ cid | name | tel | passwd | cnum | climit | ymd | usage 
+-----+------+-----+--------+------+--------+-----+-------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_normal
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
@@ -245,15 +222,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_normal
 
 SELECT * FROM my_credit_card_usage_secure
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
-NOTICE:  f_leak => 1111-2222-3333-4444
-NOTICE:  f_leak => 1111-2222-3333-4444
-NOTICE:  f_leak => 1111-2222-3333-4444
- cid |     name      |       tel        |  passwd   |        cnum         | climit |    ymd     | usage 
------+---------------+------------------+-----------+---------------------+--------+------------+-------
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-05-2011 |    90
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-18-2011 |   110
- 101 | regress_alice | +81-12-3456-7890 | passwd123 | 1111-2222-3333-4444 |   4000 | 10-21-2011 |   200
-(3 rows)
+ cid | name | tel | passwd | cnum | climit | ymd | usage 
+-----+------+-----+--------+------+--------+-----+-------
+(0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_secure
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
@@ -284,38 +255,28 @@ EXECUTE p1;
 NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => hamburger
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXECUTE p2;
-NOTICE:  f_leak => passwd123
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
-RESET SESSION AUTHORIZATION;
 ALTER VIEW my_property_normal SET (security_barrier=true);
 ALTER VIEW my_property_secure SET (security_barrier=false);
-SET SESSION AUTHORIZATION regress_alice;
 EXECUTE p1;		-- To be perform as a view with security-barrier
-NOTICE:  f_leak => passwd123
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 EXECUTE p2;		-- To be perform as a view without security-barrier
 NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => hamburger
- cid |     name      |       tel        |  passwd   
------+---------------+------------------+-----------
- 101 | regress_alice | +81-12-3456-7890 | passwd123
-(1 row)
+ cid | name | tel | passwd 
+-----+------+-----+--------
+(0 rows)
 
 -- Cleanup.
-RESET SESSION AUTHORIZATION;
-DROP ROLE regress_alice;

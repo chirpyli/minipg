@@ -9388,16 +9388,6 @@
   prorettype => 'bool', proargtypes => 'regclass',
   prosrc => 'pg_relation_is_publishable' },
 
-# rls
-{ oid => '3298',
-  descr => 'row security for current context active on table by table oid',
-  proname => 'row_security_active', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'oid', prosrc => 'row_security_active' },
-{ oid => '3299',
-  descr => 'row security for current context active on table by table name',
-  proname => 'row_security_active', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'text', prosrc => 'row_security_active_name' },
-
 # pg_config
 { oid => '3400', descr => 'pg_config binary as a function',
   proname => 'pg_config', prorows => '23', proretset => 't', provolatile => 's',

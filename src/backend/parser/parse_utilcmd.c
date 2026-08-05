@@ -103,7 +103,6 @@ typedef struct
 	List	   *views;			/* CREATE VIEW items */
 	List	   *indexes;		/* CREATE INDEX items */
 	List	   *triggers;		/* CREATE TRIGGER items */
-	List	   *grants;			/* GRANT items */
 } CreateSchemaStmtContext;
 
 
@@ -3792,7 +3791,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	cxt.views = NIL;
 	cxt.indexes = NIL;
 	cxt.triggers = NIL;
-	cxt.grants = NIL;
 
 	/*
 	 * Run through each schema element in the schema element list. Separate
@@ -3857,10 +3855,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 				}
 				break;
 
-			case T_GrantStmt:
-				cxt.grants = lappend(cxt.grants, element);
-				break;
-
 			default:
 				elog(ERROR, "unrecognized node type: %d",
 					 (int) nodeTag(element));
@@ -3873,7 +3867,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	result = list_concat(result, cxt.views);
 	result = list_concat(result, cxt.indexes);
 	result = list_concat(result, cxt.triggers);
-	result = list_concat(result, cxt.grants);
 
 	return result;
 }

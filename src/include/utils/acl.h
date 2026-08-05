@@ -226,11 +226,6 @@ extern void initialize_acl(void);
 /*
  * prototypes for functions in aclchk.c
  */
-extern void ExecuteGrantStmt(GrantStmt *stmt);
-extern void ExecAlterDefaultPrivilegesStmt(ParseState *pstate, AlterDefaultPrivilegesStmt *stmt);
-
-extern void RemoveRoleFromObjectACL(Oid roleid, Oid classid, Oid objid);
-
 extern AclMode pg_attribute_aclmask(Oid table_oid, AttrNumber attnum,
 									Oid roleid, AclMode mask, AclMaskHow how);
 extern AclMode pg_attribute_aclmask_ext(Oid table_oid, AttrNumber attnum,

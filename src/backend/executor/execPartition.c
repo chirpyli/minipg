@@ -30,7 +30,6 @@
 #include "utils/acl.h"
 #include "utils/lsyscache.h"
 #include "utils/partcache.h"
-#include "utils/rls.h"
 #include "utils/ruleutils.h"
 
 
@@ -1335,9 +1334,6 @@ ExecBuildSlotPartitionKeyDescription(Relation rel,
 	int			i;
 	Oid			relid = RelationGetRelid(rel);
 	AclResult	aclresult;
-
-	if (check_enable_rls(relid, InvalidOid, true) == RLS_ENABLED)
-		return NULL;
 
 	/* If the user has table-level access, just go build the description. */
 	aclresult = pg_class_aclcheck(relid, GetUserId(), ACL_SELECT);

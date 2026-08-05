@@ -540,26 +540,15 @@ drop table mlparted5;
 create table key_desc (a int, b int) partition by list ((a+0));
 create table key_desc_1 partition of key_desc for values in (1) partition by range (b);
 
-create user regress_insert_other_user;
-grant select (a) on key_desc_1 to regress_insert_other_user;
-grant insert on key_desc to regress_insert_other_user;
 
-set role regress_insert_other_user;
 -- no key description is shown
 insert into key_desc values (1, 1);
 
-reset role;
-grant select (b) on key_desc_1 to regress_insert_other_user;
-set role regress_insert_other_user;
 -- key description (b)=(1) is now shown
 insert into key_desc values (1, 1);
 
 -- key description is not shown if key contains expression
 insert into key_desc values (2, 1);
-reset role;
-revoke all on key_desc from regress_insert_other_user;
-revoke all on key_desc_1 from regress_insert_other_user;
-drop role regress_insert_other_user;
 drop table key_desc, key_desc_1;
 
 -- test minvalue/maxvalue restrictions
@@ -624,19 +613,10 @@ insert into brtrigpartcon1 values (1, 'hi there');
 -- check that the message shows the appropriate column description in a
 -- situation where the partitioned table is not the primary ModifyTable node
 create table inserttest3 (f1 text default 'foo', f2 text default 'bar', f3 int);
-create role regress_coldesc_role;
-grant insert on inserttest3 to regress_coldesc_role;
-grant insert on brtrigpartcon to regress_coldesc_role;
-revoke select on brtrigpartcon from regress_coldesc_role;
-set role regress_coldesc_role;
 with result as (insert into brtrigpartcon values (1, 'hi there') returning 1)
   insert into inserttest3 (f3) select * from result;
-reset role;
 
 -- cleanup
-revoke all on inserttest3 from regress_coldesc_role;
-revoke all on brtrigpartcon from regress_coldesc_role;
-drop role regress_coldesc_role;
 drop table inserttest3;
 drop table brtrigpartcon;
 drop function brtrigpartcon1trigf();

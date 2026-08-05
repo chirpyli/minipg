@@ -438,19 +438,6 @@ RAISE NOTICE '% - sql_drop', tg_tag;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE EVENT TRIGGER start_rls_command ON ddl_command_start
-    WHEN TAG IN ('CREATE POLICY', 'ALTER POLICY', 'DROP POLICY') EXECUTE PROCEDURE start_command();
-
-CREATE EVENT TRIGGER end_rls_command ON ddl_command_end
-    WHEN TAG IN ('CREATE POLICY', 'ALTER POLICY', 'DROP POLICY') EXECUTE PROCEDURE end_command();
-
-CREATE EVENT TRIGGER sql_drop_command ON sql_drop
-    WHEN TAG IN ('DROP POLICY') EXECUTE PROCEDURE drop_sql_command();
-
-CREATE POLICY p1 ON event_trigger_test USING (FALSE);
-ALTER POLICY p1 ON event_trigger_test USING (TRUE);
-ALTER POLICY p1 ON event_trigger_test RENAME TO p2;
-DROP POLICY p2 ON event_trigger_test;
 
 -- Check the object addresses of all the event triggers.
 SELECT

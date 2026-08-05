@@ -31,7 +31,6 @@
  */
 
 CREATE SCHEMA information_schema;
-GRANT USAGE ON SCHEMA information_schema TO PUBLIC;
 SET search_path TO information_schema;
 
 
@@ -215,7 +214,6 @@ CREATE DOMAIN sql_identifier AS name;
 CREATE VIEW information_schema_catalog_name AS
     SELECT CAST(current_database() AS sql_identifier) AS catalog_name;
 
-GRANT SELECT ON information_schema_catalog_name TO PUBLIC;
 
 
 /*
@@ -259,7 +257,6 @@ CREATE VIEW applicable_roles AS
          JOIN pg_authid b ON (m.roleid = b.oid)
     WHERE pg_has_role(a.oid, 'USAGE');
 
-GRANT SELECT ON applicable_roles TO PUBLIC;
 
 
 /*
@@ -272,7 +269,6 @@ CREATE VIEW administrable_role_authorizations AS
     FROM applicable_roles
     WHERE is_grantable = 'YES';
 
-GRANT SELECT ON administrable_role_authorizations TO PUBLIC;
 
 
 /*
@@ -373,7 +369,6 @@ CREATE VIEW attributes AS
           AND (pg_has_role(c.relowner, 'USAGE')
                OR has_type_privilege(c.reltype, 'USAGE'));
 
-GRANT SELECT ON attributes TO PUBLIC;
 
 
 /*
@@ -397,7 +392,6 @@ CREATE VIEW character_sets AS
     ORDER BY char_length(c.collname) DESC, c.collname ASC -- prefer full/canonical name
     LIMIT 1;
 
-GRANT SELECT ON character_sets TO PUBLIC;
 
 
 /*
@@ -423,7 +417,6 @@ CREATE VIEW check_constraint_routine_usage AS
       AND p.pronamespace = np.oid
       AND pg_has_role(p.proowner, 'USAGE');
 
-GRANT SELECT ON check_constraint_routine_usage TO PUBLIC;
 
 
 /*
@@ -461,7 +454,6 @@ CREATE VIEW check_constraints AS
       AND r.relkind IN ('r', 'p')
       AND pg_has_role(r.relowner, 'USAGE');
 
-GRANT SELECT ON check_constraints TO PUBLIC;
 
 
 /*
@@ -478,7 +470,6 @@ CREATE VIEW collations AS
     WHERE c.collnamespace = nc.oid
           AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()));
 
-GRANT SELECT ON collations TO PUBLIC;
 
 
 /*
@@ -497,7 +488,6 @@ CREATE VIEW collation_character_set_applicability AS
     WHERE c.collnamespace = nc.oid
           AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()));
 
-GRANT SELECT ON collation_character_set_applicability TO PUBLIC;
 
 
 /*
@@ -528,7 +518,6 @@ CREATE VIEW column_column_usage AS
           AND ad.attgenerated <> ''
           AND pg_has_role(c.relowner, 'USAGE');
 
-GRANT SELECT ON column_column_usage TO PUBLIC;
 
 
 /*
@@ -558,7 +547,6 @@ CREATE VIEW column_domain_usage AS
           AND NOT a.attisdropped
           AND pg_has_role(t.typowner, 'USAGE');
 
-GRANT SELECT ON column_domain_usage TO PUBLIC;
 
 
 /*
@@ -632,7 +620,6 @@ CREATE VIEW column_privileges AS
                OR pg_has_role(grantee.oid, 'USAGE')
                OR grantee.rolname = 'PUBLIC');
 
-GRANT SELECT ON column_privileges TO PUBLIC;
 
 
 /*
@@ -661,7 +648,6 @@ CREATE VIEW column_udt_usage AS
           AND c.relkind in ('r', 'v', 'f', 'p')
           AND pg_has_role(coalesce(bt.typowner, t.typowner), 'USAGE');
 
-GRANT SELECT ON column_udt_usage TO PUBLIC;
 
 
 /*
@@ -791,7 +777,6 @@ CREATE VIEW columns AS
                OR has_column_privilege(c.oid, a.attnum,
                                        'SELECT, INSERT, UPDATE, REFERENCES'));
 
-GRANT SELECT ON columns TO PUBLIC;
 
 
 /*
@@ -843,7 +828,6 @@ CREATE VIEW constraint_column_usage AS
 
     WHERE pg_has_role(x.tblowner, 'USAGE');
 
-GRANT SELECT ON constraint_column_usage TO PUBLIC;
 
 
 /*
@@ -876,7 +860,6 @@ CREATE VIEW constraint_table_usage AS
           AND r.relkind IN ('r', 'p')
           AND pg_has_role(r.relowner, 'USAGE');
 
-GRANT SELECT ON constraint_table_usage TO PUBLIC;
 
 
 -- 5.25 DATA_TYPE_PRIVILEGES view appears later.
@@ -921,7 +904,6 @@ CREATE VIEW domain_constraints AS
           AND (pg_has_role(t.typowner, 'USAGE')
                OR has_type_privilege(t.oid, 'USAGE'));
 
-GRANT SELECT ON domain_constraints TO PUBLIC;
 
 
 /*
@@ -946,7 +928,6 @@ CREATE VIEW domain_udt_usage AS
           AND t.typtype = 'd'
           AND pg_has_role(bt.typowner, 'USAGE');
 
-GRANT SELECT ON domain_udt_usage TO PUBLIC;
 
 
 /*
@@ -1032,7 +1013,6 @@ CREATE VIEW domains AS
     WHERE (pg_has_role(t.typowner, 'USAGE')
            OR has_type_privilege(t.oid, 'USAGE'));
 
-GRANT SELECT ON domains TO PUBLIC;
 
 
 -- 5.30 ELEMENT_TYPES view appears later.
@@ -1048,7 +1028,6 @@ CREATE VIEW enabled_roles AS
     FROM pg_authid a
     WHERE pg_has_role(a.oid, 'USAGE');
 
-GRANT SELECT ON enabled_roles TO PUBLIC;
 
 
 /*
@@ -1099,7 +1078,6 @@ CREATE VIEW key_column_usage AS
                OR has_column_privilege(roid, a.attnum,
                                        'SELECT, INSERT, UPDATE, REFERENCES'));
 
-GRANT SELECT ON key_column_usage TO PUBLIC;
 
 
 /*
@@ -1190,7 +1168,6 @@ CREATE VIEW parameters AS
                      has_function_privilege(p.oid, 'EXECUTE'))) AS ss
     WHERE t.oid = (ss.x).x AND t.typnamespace = nt.oid;
 
-GRANT SELECT ON parameters TO PUBLIC;
 
 
 /*
@@ -1276,7 +1253,6 @@ CREATE VIEW referential_constraints AS
           OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
           OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') ;
 
-GRANT SELECT ON referential_constraints TO PUBLIC;
 
 
 /*
@@ -1297,7 +1273,6 @@ CREATE VIEW role_column_grants AS
     WHERE grantor IN (SELECT role_name FROM enabled_roles)
           OR grantee IN (SELECT role_name FROM enabled_roles);
 
-GRANT SELECT ON role_column_grants TO PUBLIC;
 
 
 -- 5.43 ROLE_ROUTINE_GRANTS view is based on 5.50 ROUTINE_PRIVILEGES and is defined there instead.
@@ -1353,7 +1328,6 @@ CREATE VIEW routine_column_usage AS
           AND d.refobjsubid = a.attnum
           AND pg_has_role(t.relowner, 'USAGE');
 
-GRANT SELECT ON routine_column_usage TO PUBLIC;
 
 
 /*
@@ -1405,7 +1379,6 @@ CREATE VIEW routine_privileges AS
                OR pg_has_role(grantee.oid, 'USAGE')
                OR grantee.rolname = 'PUBLIC');
 
-GRANT SELECT ON routine_privileges TO PUBLIC;
 
 
 /*
@@ -1428,7 +1401,6 @@ CREATE VIEW role_routine_grants AS
     WHERE grantor IN (SELECT role_name FROM enabled_roles)
           OR grantee IN (SELECT role_name FROM enabled_roles);
 
-GRANT SELECT ON role_routine_grants TO PUBLIC;
 
 
 /*
@@ -1457,7 +1429,6 @@ CREATE VIEW routine_routine_usage AS
           AND p.prokind IN ('f', 'p') AND p1.prokind IN ('f', 'p')
           AND pg_has_role(p1.proowner, 'USAGE');
 
-GRANT SELECT ON routine_routine_usage TO PUBLIC;
 
 
 /*
@@ -1489,7 +1460,6 @@ CREATE VIEW routine_sequence_usage AS
           AND s.relkind = 'S'
           AND pg_has_role(s.relowner, 'USAGE');
 
-GRANT SELECT ON routine_sequence_usage TO PUBLIC;
 
 
 /*
@@ -1521,7 +1491,6 @@ CREATE VIEW routine_table_usage AS
           AND t.relkind IN ('r', 'v', 'f', 'p')
           AND pg_has_role(t.relowner, 'USAGE');
 
-GRANT SELECT ON routine_table_usage TO PUBLIC;
 
 
 /*
@@ -1639,7 +1608,6 @@ CREATE VIEW routines AS
     WHERE (pg_has_role(p.proowner, 'USAGE')
            OR has_function_privilege(p.oid, 'EXECUTE'));
 
-GRANT SELECT ON routines TO PUBLIC;
 
 
 /*
@@ -1660,7 +1628,6 @@ CREATE VIEW schemata AS
           AND (pg_has_role(n.nspowner, 'USAGE')
                OR has_schema_privilege(n.oid, 'CREATE, USAGE'));
 
-GRANT SELECT ON schemata TO PUBLIC;
 
 
 /*
@@ -1690,7 +1657,6 @@ CREATE VIEW sequences AS
           AND (pg_has_role(c.relowner, 'USAGE')
                OR has_sequence_privilege(c.oid, 'SELECT, UPDATE, USAGE') );
 
-GRANT SELECT ON sequences TO PUBLIC;
 
 
 /*
@@ -1710,7 +1676,6 @@ CREATE TABLE sql_features (
 
 -- Will be filled with external data by initdb.
 
-GRANT SELECT ON sql_features TO PUBLIC;
 
 
 /*
@@ -1742,7 +1707,6 @@ INSERT INTO sql_implementation_info VALUES ('13',    'SERVER NAME', NULL, '', NU
 INSERT INTO sql_implementation_info VALUES ('94',    'SPECIAL CHARACTERS', NULL, '', 'all non-ASCII characters allowed');
 INSERT INTO sql_implementation_info VALUES ('46',    'TRANSACTION CAPABLE', 2, NULL, 'both DML and DDL');
 
-GRANT SELECT ON sql_implementation_info TO PUBLIC;
 
 
 /*
@@ -1813,7 +1777,6 @@ UPDATE sql_sizing
         comments = 'Might be less, depending on character set.'
     WHERE supported_value = 63;
 
-GRANT SELECT ON sql_sizing TO PUBLIC;
 
 
 /*
@@ -1886,7 +1849,6 @@ CREATE VIEW table_constraints AS
                OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') );
 
-GRANT SELECT ON table_constraints TO PUBLIC;
 
 
 /*
@@ -1937,7 +1899,6 @@ CREATE VIEW table_privileges AS
                OR pg_has_role(grantee.oid, 'USAGE')
                OR grantee.rolname = 'PUBLIC');
 
-GRANT SELECT ON table_privileges TO PUBLIC;
 
 
 /*
@@ -1958,7 +1919,6 @@ CREATE VIEW role_table_grants AS
     WHERE grantor IN (SELECT role_name FROM enabled_roles)
           OR grantee IN (SELECT role_name FROM enabled_roles);
 
-GRANT SELECT ON role_table_grants TO PUBLIC;
 
 
 /*
@@ -2004,7 +1964,6 @@ CREATE VIEW tables AS
                OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') );
 
-GRANT SELECT ON tables TO PUBLIC;
 
 
 /*
@@ -2084,7 +2043,6 @@ CREATE VIEW triggered_update_columns AS
                -- SELECT privilege omitted, per SQL standard
                OR has_column_privilege(c.oid, a.attnum, 'INSERT, UPDATE, REFERENCES') );
 
-GRANT SELECT ON triggered_update_columns TO PUBLIC;
 
 
 /*
@@ -2193,7 +2151,6 @@ CREATE VIEW triggers AS
                OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') );
 
-GRANT SELECT ON triggers TO PUBLIC;
 
 
 /*
@@ -2235,7 +2192,6 @@ CREATE VIEW udt_privileges AS
                OR pg_has_role(grantee.oid, 'USAGE')
                OR grantee.rolname = 'PUBLIC');
 
-GRANT SELECT ON udt_privileges TO PUBLIC;
 
 
 /*
@@ -2255,7 +2211,6 @@ CREATE VIEW role_udt_grants AS
     WHERE grantor IN (SELECT role_name FROM enabled_roles)
           OR grantee IN (SELECT role_name FROM enabled_roles);
 
-GRANT SELECT ON role_udt_grants TO PUBLIC;
 
 
 /*
@@ -2357,7 +2312,6 @@ CREATE VIEW usage_privileges AS
                OR pg_has_role(grantee.oid, 'USAGE')
                OR grantee.rolname = 'PUBLIC');
 
-GRANT SELECT ON usage_privileges TO PUBLIC;
 
 
 /*
@@ -2378,7 +2332,6 @@ CREATE VIEW role_usage_grants AS
     WHERE grantor IN (SELECT role_name FROM enabled_roles)
           OR grantee IN (SELECT role_name FROM enabled_roles);
 
-GRANT SELECT ON role_usage_grants TO PUBLIC;
 
 
 /*
@@ -2425,7 +2378,6 @@ CREATE VIEW user_defined_types AS
           AND (pg_has_role(t.typowner, 'USAGE')
                OR has_type_privilege(t.oid, 'USAGE'));
 
-GRANT SELECT ON user_defined_types TO PUBLIC;
 
 
 /*
@@ -2464,7 +2416,6 @@ CREATE VIEW view_column_usage AS
           AND dt.refobjsubid = a.attnum
           AND pg_has_role(t.relowner, 'USAGE');
 
-GRANT SELECT ON view_column_usage TO PUBLIC;
 
 
 /*
@@ -2505,7 +2456,6 @@ CREATE VIEW view_routine_usage AS
           AND p.pronamespace = np.oid
           AND pg_has_role(p.proowner, 'USAGE');
 
-GRANT SELECT ON view_routine_usage TO PUBLIC;
 
 
 /*
@@ -2540,7 +2490,6 @@ CREATE VIEW view_table_usage AS
           AND t.relkind IN ('r', 'v', 'f', 'p')
           AND pg_has_role(t.relowner, 'USAGE');
 
-GRANT SELECT ON view_table_usage TO PUBLIC;
 
 
 /*
@@ -2606,7 +2555,6 @@ CREATE VIEW views AS
                OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') );
 
-GRANT SELECT ON views TO PUBLIC;
 
 
 -- The following views have dependencies that force them to appear out of order.
@@ -2636,7 +2584,6 @@ CREATE VIEW data_type_privileges AS
         SELECT specific_schema, specific_name, 'ROUTINE'::text, dtd_identifier FROM routines
       ) AS x (objschema, objname, objtype, objdtdid);
 
-GRANT SELECT ON data_type_privileges TO PUBLIC;
 
 
 /*
@@ -2733,6 +2680,5 @@ CREATE VIEW element_types AS
               ( SELECT object_schema, object_name, object_type, dtd_identifier
                     FROM data_type_privileges );
 
-GRANT SELECT ON element_types TO PUBLIC;
 
 

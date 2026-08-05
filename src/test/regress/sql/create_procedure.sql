@@ -255,16 +255,8 @@ DROP PROCEDURE nonexistent();
 
 -- privileges
 
-CREATE USER regress_cp_user1;
-GRANT INSERT ON cp_test TO regress_cp_user1;
-REVOKE EXECUTE ON PROCEDURE ptest1(text) FROM PUBLIC;
-SET ROLE regress_cp_user1;
 CALL ptest1('a');  -- error
-RESET ROLE;
-GRANT EXECUTE ON PROCEDURE ptest1(text) TO regress_cp_user1;
-SET ROLE regress_cp_user1;
 CALL ptest1('a');  -- ok
-RESET ROLE;
 
 
 -- ROUTINE syntax
@@ -286,4 +278,3 @@ DROP PROCEDURE ptest2;
 
 DROP TABLE cp_test;
 
-DROP USER regress_cp_user1;

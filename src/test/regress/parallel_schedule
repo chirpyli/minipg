@@ -8,12 +8,12 @@
 # run tablespace by itself, and first, because it forces a checkpoint;
 # we'd prefer not to have checkpoints later in the tests because that
 # interferes with crash-recovery testing.
-test: tablespace
+# tablespace: 依赖 GRANT/ROLE 权限机制，已裁剪，移除
 
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid uuid enum rangetypes pg_lsn regproc
+test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid uuid enum rangetypes pg_lsn
 
 # ----------
 # The second group of parallel tests
@@ -29,7 +29,7 @@ test: strings numerology date time timetz timestamp timestamptz interval multira
 # horology depends on interval, timetz, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
-test: horology regex opr_sanity misc_sanity comments expressions unicode xid mvcc database euc_kr
+test: horology regex opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr
 
 # ----------
 # These four each depend on the previous one
@@ -50,14 +50,16 @@ test: copy copyselect copydml insert insert_conflict
 # ----------
 # More groups of parallel tests
 # ----------
-test: create_misc create_operator create_procedure create_schema
+test: create_misc create_operator create_schema
 # These depend on create_misc and create_operator
 test: create_index create_view index_including
 
 # ----------
 # Another group of parallel tests
 # ----------
-test: create_aggregate create_function_3 create_cast constraints triggers select inherit typed_table vacuum drop_if_exists updatable_views roleattributes create_am hash_func errors infinite_recurse
+# 权限/角色机制已裁剪，以下测试深度依赖角色，移除：
+#   constraints vacuum create_function_3 database
+test: create_aggregate create_cast triggers select inherit typed_table drop_if_exists updatable_views create_am hash_func errors infinite_recurse
 
 # ----------
 # sanity_check does a vacuum, affecting the sort order of SELECT *
@@ -70,12 +72,13 @@ test: sanity_check
 # Note: the ignore: line does not run random, just mark it as ignorable
 # ----------
 ignore: random
-test: select_into select_distinct select_distinct_on select_implicit select_having subselect union case join aggregates transactions random portals arrays btree_index hash_index update delete namespace prepared_xacts
+test: select_into select_distinct select_distinct_on select_implicit select_having subselect union case join aggregates transactions random portals arrays btree_index hash_index delete namespace prepared_xacts
 
 # ----------
 # Another group of parallel tests
 # ----------
-test: privileges init_privs security_label collate matview lock replica_identity rowsecurity object_address tablesample groupingsets drop_operator password identity generated join_hash
+# 权限/角色机制已裁剪，matview identity generated 依赖 ROLE/OWNER，移除
+test: collate lock replica_identity tablesample groupingsets drop_operator join_hash
 
 # ----------
 # Another group of parallel tests
@@ -85,7 +88,7 @@ test: create_table_like alter_generic alter_operator misc async dbsize misc_func
 # rules cannot run concurrently with any test that creates
 # a view or rule in the public schema
 # collate.*.utf8 tests cannot be run in parallel with each other
-test: rules psql psql_crosstab amutils stats_ext collate.linux.utf8
+test: rules psql_crosstab amutils collate.linux.utf8
 
 # run by itself so it can run parallel workers
 test: select_parallel
@@ -97,12 +100,14 @@ test: vacuum_parallel
 test: maintain_every
 
 # no relation related tests can be put in this group
-test: publication subscription
+# publication subscription: 权限/角色机制已裁剪，依赖 REPLICATION 角色权限，移除
 
 # ----------
 # Another group of parallel tests
 # ----------
-test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combocid window functional_deps advisory_lock indirect_toast equivclass
+# 权限/角色机制已裁剪，以下依赖角色/OWNER，移除：
+#   select_views foreign_key dependency alter_table sequence largeobject
+test: portals_p2 cluster guc bitmapops combocid window functional_deps advisory_lock indirect_toast
 
 # ----------
 # ----------
@@ -110,7 +115,7 @@ test: select_views portals_p2 foreign_key cluster dependency guc bitmapops combo
 # NB: temp.sql does a reconnect which transiently uses 2 connections,
 # so keep this parallel group to at most 19 tests
 # ----------
-test: plancache limit plpgsql copy2 temp domain rangefuncs prepare conversion truncate alter_table sequence polymorphism rowtypes returning largeobject with
+test: plancache limit plpgsql temp domain rangefuncs prepare conversion truncate polymorphism rowtypes returning with
 
 # ----------
 # Another group of parallel tests
@@ -124,7 +129,7 @@ test: compression compression_pglz
 
 # event triggers cannot run concurrently with any test that runs DDL
 # oidjoins is read-only, though, and should run late for best coverage
-test: event_trigger oidjoins
+test: oidjoins
 # this test also uses event triggers, so likewise run it by itself
 test: fast_default
 

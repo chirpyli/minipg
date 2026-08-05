@@ -23,7 +23,6 @@ OBJS = \
 	ps_status.o \
 	queryenvironment.o \
 	queryjumble.o \
-	rls.o \
 	sampling.o \
 	superuser.o \
 	timeout.o \

@@ -21,5 +21,3 @@ LANGUAGE SQL PARALLEL SAFE;
 
 
 -- Don't want these to be available to public.
-REVOKE ALL ON FUNCTION pg_freespace(regclass, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_freespace(regclass) FROM PUBLIC;

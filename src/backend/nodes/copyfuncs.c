@@ -3235,24 +3235,6 @@ _copyAlterDomainStmt(const AlterDomainStmt *from)
 	return newnode;
 }
 
-static GrantStmt *
-_copyGrantStmt(const GrantStmt *from)
-{
-	GrantStmt  *newnode = makeNode(GrantStmt);
-
-	COPY_SCALAR_FIELD(is_grant);
-	COPY_SCALAR_FIELD(targtype);
-	COPY_SCALAR_FIELD(objtype);
-	COPY_NODE_FIELD(objects);
-	COPY_NODE_FIELD(privileges);
-	COPY_NODE_FIELD(grantees);
-	COPY_SCALAR_FIELD(grant_option);
-	COPY_NODE_FIELD(grantor);
-	COPY_SCALAR_FIELD(behavior);
-
-	return newnode;
-}
-
 static ObjectWithArgs *
 _copyObjectWithArgs(const ObjectWithArgs *from)
 {
@@ -3273,32 +3255,6 @@ _copyAccessPriv(const AccessPriv *from)
 
 	COPY_STRING_FIELD(priv_name);
 	COPY_NODE_FIELD(cols);
-
-	return newnode;
-}
-
-static GrantRoleStmt *
-_copyGrantRoleStmt(const GrantRoleStmt *from)
-{
-	GrantRoleStmt *newnode = makeNode(GrantRoleStmt);
-
-	COPY_NODE_FIELD(granted_roles);
-	COPY_NODE_FIELD(grantee_roles);
-	COPY_SCALAR_FIELD(is_grant);
-	COPY_SCALAR_FIELD(admin_opt);
-	COPY_NODE_FIELD(grantor);
-	COPY_SCALAR_FIELD(behavior);
-
-	return newnode;
-}
-
-static AlterDefaultPrivilegesStmt *
-_copyAlterDefaultPrivilegesStmt(const AlterDefaultPrivilegesStmt *from)
-{
-	AlterDefaultPrivilegesStmt *newnode = makeNode(AlterDefaultPrivilegesStmt);
-
-	COPY_NODE_FIELD(options);
-	COPY_NODE_FIELD(action);
 
 	return newnode;
 }
@@ -4245,53 +4201,6 @@ _copyCreatePLangStmt(const CreatePLangStmt *from)
 	return newnode;
 }
 
-static CreateRoleStmt *
-_copyCreateRoleStmt(const CreateRoleStmt *from)
-{
-	CreateRoleStmt *newnode = makeNode(CreateRoleStmt);
-
-	COPY_SCALAR_FIELD(stmt_type);
-	COPY_STRING_FIELD(role);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterRoleStmt *
-_copyAlterRoleStmt(const AlterRoleStmt *from)
-{
-	AlterRoleStmt *newnode = makeNode(AlterRoleStmt);
-
-	COPY_NODE_FIELD(role);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(action);
-
-	return newnode;
-}
-
-static AlterRoleSetStmt *
-_copyAlterRoleSetStmt(const AlterRoleSetStmt *from)
-{
-	AlterRoleSetStmt *newnode = makeNode(AlterRoleSetStmt);
-
-	COPY_NODE_FIELD(role);
-	COPY_STRING_FIELD(database);
-	COPY_NODE_FIELD(setstmt);
-
-	return newnode;
-}
-
-static DropRoleStmt *
-_copyDropRoleStmt(const DropRoleStmt *from)
-{
-	DropRoleStmt *newnode = makeNode(DropRoleStmt);
-
-	COPY_NODE_FIELD(roles);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
 static LockStmt *
 _copyLockStmt(const LockStmt *from)
 {
@@ -4398,58 +4307,6 @@ _copyDeallocateStmt(const DeallocateStmt *from)
 	DeallocateStmt *newnode = makeNode(DeallocateStmt);
 
 	COPY_STRING_FIELD(name);
-
-	return newnode;
-}
-
-static DropOwnedStmt *
-_copyDropOwnedStmt(const DropOwnedStmt *from)
-{
-	DropOwnedStmt *newnode = makeNode(DropOwnedStmt);
-
-	COPY_NODE_FIELD(roles);
-	COPY_SCALAR_FIELD(behavior);
-
-	return newnode;
-}
-
-static ReassignOwnedStmt *
-_copyReassignOwnedStmt(const ReassignOwnedStmt *from)
-{
-	ReassignOwnedStmt *newnode = makeNode(ReassignOwnedStmt);
-
-	COPY_NODE_FIELD(roles);
-	COPY_NODE_FIELD(newrole);
-
-	return newnode;
-}
-
-static CreatePolicyStmt *
-_copyCreatePolicyStmt(const CreatePolicyStmt *from)
-{
-	CreatePolicyStmt *newnode = makeNode(CreatePolicyStmt);
-
-	COPY_STRING_FIELD(policy_name);
-	COPY_NODE_FIELD(table);
-	COPY_STRING_FIELD(cmd_name);
-	COPY_SCALAR_FIELD(permissive);
-	COPY_NODE_FIELD(roles);
-	COPY_NODE_FIELD(qual);
-	COPY_NODE_FIELD(with_check);
-
-	return newnode;
-}
-
-static AlterPolicyStmt *
-_copyAlterPolicyStmt(const AlterPolicyStmt *from)
-{
-	AlterPolicyStmt *newnode = makeNode(AlterPolicyStmt);
-
-	COPY_STRING_FIELD(policy_name);
-	COPY_NODE_FIELD(table);
-	COPY_NODE_FIELD(roles);
-	COPY_NODE_FIELD(qual);
-	COPY_NODE_FIELD(with_check);
 
 	return newnode;
 }
@@ -5085,15 +4942,6 @@ copyObjectImpl(const void *from)
 		case T_AlterDomainStmt:
 			retval = _copyAlterDomainStmt(from);
 			break;
-		case T_GrantStmt:
-			retval = _copyGrantStmt(from);
-			break;
-		case T_GrantRoleStmt:
-			retval = _copyGrantRoleStmt(from);
-			break;
-		case T_AlterDefaultPrivilegesStmt:
-			retval = _copyAlterDefaultPrivilegesStmt(from);
-			break;
 		case T_DeclareCursorStmt:
 			retval = _copyDeclareCursorStmt(from);
 			break;
@@ -5307,18 +5155,6 @@ copyObjectImpl(const void *from)
 		case T_CreatePLangStmt:
 			retval = _copyCreatePLangStmt(from);
 			break;
-		case T_CreateRoleStmt:
-			retval = _copyCreateRoleStmt(from);
-			break;
-		case T_AlterRoleStmt:
-			retval = _copyAlterRoleStmt(from);
-			break;
-		case T_AlterRoleSetStmt:
-			retval = _copyAlterRoleSetStmt(from);
-			break;
-		case T_DropRoleStmt:
-			retval = _copyDropRoleStmt(from);
-			break;
 		case T_LockStmt:
 			retval = _copyLockStmt(from);
 			break;
@@ -5348,18 +5184,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_DeallocateStmt:
 			retval = _copyDeallocateStmt(from);
-			break;
-		case T_DropOwnedStmt:
-			retval = _copyDropOwnedStmt(from);
-			break;
-		case T_ReassignOwnedStmt:
-			retval = _copyReassignOwnedStmt(from);
-			break;
-		case T_CreatePolicyStmt:
-			retval = _copyCreatePolicyStmt(from);
-			break;
-		case T_AlterPolicyStmt:
-			retval = _copyAlterPolicyStmt(from);
 			break;
 		case T_CreatePublicationStmt:
 			retval = _copyCreatePublicationStmt(from);

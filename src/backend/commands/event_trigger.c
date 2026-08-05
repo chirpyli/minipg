@@ -97,8 +97,6 @@ static Oid	insert_event_trigger_tuple(const char *trigname, const char *eventnam
 static void validate_ddl_tags(const char *filtervar, List *taglist);
 static void validate_table_rewrite_tags(const char *filtervar, List *taglist);
 static void EventTriggerInvoke(List *fn_oid_list, EventTriggerData *trigdata);
-static const char *stringify_grant_objtype(ObjectType objtype);
-static const char *stringify_adefprivs_objtype(ObjectType objtype);
 
 /*
  * Create an event trigger.
@@ -966,7 +964,6 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_OPCLASS:
 		case OBJECT_OPERATOR:
 		case OBJECT_OPFAMILY:
-		case OBJECT_POLICY:
 		case OBJECT_PROCEDURE:
 		case OBJECT_PUBLICATION:
 		case OBJECT_PUBLICATION_REL:
@@ -1032,7 +1029,6 @@ EventTriggerSupportsObjectClass(ObjectClass objclass)
 		case OCLASS_STATISTIC_EXT:
 		case OCLASS_DEFACL:
 		case OCLASS_EXTENSION:
-		case OCLASS_POLICY:
 		case OCLASS_PUBLICATION:
 		case OCLASS_PUBLICATION_REL:
 		case OCLASS_SUBSCRIPTION:
@@ -1647,52 +1643,6 @@ EventTriggerAlterTableEnd(void)
 }
 
 /*
- * EventTriggerCollectGrant
- *		Save data about a GRANT/REVOKE command being executed
- *
- * This function creates a copy of the InternalGrant, as the original might
- * not have the right lifetime.
- */
-void
-EventTriggerCollectGrant(InternalGrant *istmt)
-{
-	MemoryContext oldcxt;
-	CollectedCommand *command;
-	InternalGrant *icopy;
-	ListCell   *cell;
-
-	/* ignore if event trigger context not set, or collection disabled */
-	if (!currentEventTriggerState ||
-		currentEventTriggerState->commandCollectionInhibited)
-		return;
-
-	oldcxt = MemoryContextSwitchTo(currentEventTriggerState->cxt);
-
-	/*
-	 * This is tedious, but necessary.
-	 */
-	icopy = palloc(sizeof(InternalGrant));
-	memcpy(icopy, istmt, sizeof(InternalGrant));
-	icopy->objects = list_copy(istmt->objects);
-	icopy->grantees = list_copy(istmt->grantees);
-	icopy->col_privs = NIL;
-	foreach(cell, istmt->col_privs)
-		icopy->col_privs = lappend(icopy->col_privs, copyObject(lfirst(cell)));
-
-	/* Now collect it, using the copied InternalGrant */
-	command = palloc(sizeof(CollectedCommand));
-	command->type = SCT_Grant;
-	command->in_extension = creating_extension;
-	command->d.grant.istmt = icopy;
-	command->parsetree = NULL;
-
-	currentEventTriggerState->commandList =
-		lappend(currentEventTriggerState->commandList, command);
-
-	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
  * EventTriggerCollectAlterOpFam
  *		Save data about an ALTER OPERATOR FAMILY ADD/DROP command being
  *		executed
@@ -1756,35 +1706,6 @@ EventTriggerCollectCreateOpClass(CreateOpClassStmt *stmt, Oid opcoid,
 	currentEventTriggerState->commandList =
 		lappend(currentEventTriggerState->commandList, command);
 
-	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
- * EventTriggerCollectAlterDefPrivs
- *		Save data about an ALTER DEFAULT PRIVILEGES command being
- *		executed
- */
-void
-EventTriggerCollectAlterDefPrivs(AlterDefaultPrivilegesStmt *stmt)
-{
-	MemoryContext oldcxt;
-	CollectedCommand *command;
-
-	/* ignore if event trigger context not set, or collection disabled */
-	if (!currentEventTriggerState ||
-		currentEventTriggerState->commandCollectionInhibited)
-		return;
-
-	oldcxt = MemoryContextSwitchTo(currentEventTriggerState->cxt);
-
-	command = palloc0(sizeof(CollectedCommand));
-	command->type = SCT_AlterDefaultPrivileges;
-	command->d.defprivs.objtype = stmt->action->objtype;
-	command->in_extension = creating_extension;
-	command->parsetree = (Node *) copyObject(stmt);
-
-	currentEventTriggerState->commandList =
-		lappend(currentEventTriggerState->commandList, command);
 	MemoryContextSwitchTo(oldcxt);
 }
 
@@ -1962,48 +1883,6 @@ pg_event_trigger_ddl_commands(PG_FUNCTION_ARGS)
 				}
 				break;
 
-			case SCT_AlterDefaultPrivileges:
-				/* classid */
-				nulls[i++] = true;
-				/* objid */
-				nulls[i++] = true;
-				/* objsubid */
-				nulls[i++] = true;
-				/* command tag */
-				values[i++] = CStringGetTextDatum(CreateCommandName(cmd->parsetree));
-				/* object_type */
-				values[i++] = CStringGetTextDatum(stringify_adefprivs_objtype(cmd->d.defprivs.objtype));
-				/* schema */
-				nulls[i++] = true;
-				/* identity */
-				nulls[i++] = true;
-				/* in_extension */
-				values[i++] = BoolGetDatum(cmd->in_extension);
-				/* command */
-				values[i++] = PointerGetDatum(cmd);
-				break;
-
-			case SCT_Grant:
-				/* classid */
-				nulls[i++] = true;
-				/* objid */
-				nulls[i++] = true;
-				/* objsubid */
-				nulls[i++] = true;
-				/* command tag */
-				values[i++] = CStringGetTextDatum(cmd->d.grant.istmt->is_grant ?
-												  "GRANT" : "REVOKE");
-				/* object_type */
-				values[i++] = CStringGetTextDatum(stringify_grant_objtype(cmd->d.grant.istmt->objtype));
-				/* schema */
-				nulls[i++] = true;
-				/* identity */
-				nulls[i++] = true;
-				/* in_extension */
-				values[i++] = BoolGetDatum(cmd->in_extension);
-				/* command */
-				values[i++] = PointerGetDatum(cmd);
-				break;
 		}
 
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
@@ -2013,147 +1892,4 @@ pg_event_trigger_ddl_commands(PG_FUNCTION_ARGS)
 	tuplestore_donestoring(tupstore);
 
 	PG_RETURN_VOID();
-}
-
-/*
- * Return the ObjectType as a string, as it would appear in GRANT and
- * REVOKE commands.
- */
-static const char *
-stringify_grant_objtype(ObjectType objtype)
-{
-	switch (objtype)
-	{
-		case OBJECT_COLUMN:
-			return "COLUMN";
-		case OBJECT_TABLE:
-			return "TABLE";
-		case OBJECT_SEQUENCE:
-			return "SEQUENCE";
-		case OBJECT_DATABASE:
-			return "DATABASE";
-		case OBJECT_DOMAIN:
-			return "DOMAIN";
-		case OBJECT_FUNCTION:
-			return "FUNCTION";
-		case OBJECT_LANGUAGE:
-			return "LANGUAGE";
-		case OBJECT_LARGEOBJECT:
-			return "LARGE OBJECT";
-		case OBJECT_SCHEMA:
-			return "SCHEMA";
-		case OBJECT_PROCEDURE:
-			return "PROCEDURE";
-		case OBJECT_ROUTINE:
-			return "ROUTINE";
-		case OBJECT_TABLESPACE:
-			return "TABLESPACE";
-		case OBJECT_TYPE:
-			return "TYPE";
-			/* these currently aren't used */
-		case OBJECT_ACCESS_METHOD:
-		case OBJECT_AGGREGATE:
-		case OBJECT_AMOP:
-		case OBJECT_AMPROC:
-		case OBJECT_ATTRIBUTE:
-		case OBJECT_CAST:
-		case OBJECT_COLLATION:
-		case OBJECT_CONVERSION:
-		case OBJECT_DEFAULT:
-		case OBJECT_DEFACL:
-		case OBJECT_DOMCONSTRAINT:
-		case OBJECT_EVENT_TRIGGER:
-		case OBJECT_EXTENSION:
-		case OBJECT_INDEX:
-		case OBJECT_MATVIEW:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPERATOR:
-		case OBJECT_OPFAMILY:
-		case OBJECT_POLICY:
-		case OBJECT_PUBLICATION:
-		case OBJECT_PUBLICATION_REL:
-		case OBJECT_ROLE:
-		case OBJECT_RULE:
-		case OBJECT_STATISTIC_EXT:
-		case OBJECT_SUBSCRIPTION:
-		case OBJECT_TABCONSTRAINT:
-		case OBJECT_TRANSFORM:
-		case OBJECT_TRIGGER:
-		case OBJECT_VIEW:
-			elog(ERROR, "unsupported object type: %d", (int) objtype);
-	}
-
-	return "???";				/* keep compiler quiet */
-}
-
-/*
- * Return the ObjectType as a string; as above, but use the spelling
- * in ALTER DEFAULT PRIVILEGES commands instead.  Generally this is just
- * the plural.
- */
-static const char *
-stringify_adefprivs_objtype(ObjectType objtype)
-{
-	switch (objtype)
-	{
-		case OBJECT_COLUMN:
-			return "COLUMNS";
-		case OBJECT_TABLE:
-			return "TABLES";
-		case OBJECT_SEQUENCE:
-			return "SEQUENCES";
-		case OBJECT_DATABASE:
-			return "DATABASES";
-		case OBJECT_DOMAIN:
-			return "DOMAINS";
-		case OBJECT_FUNCTION:
-			return "FUNCTIONS";
-		case OBJECT_LANGUAGE:
-			return "LANGUAGES";
-		case OBJECT_LARGEOBJECT:
-			return "LARGE OBJECTS";
-		case OBJECT_SCHEMA:
-			return "SCHEMAS";
-		case OBJECT_PROCEDURE:
-			return "PROCEDURES";
-		case OBJECT_ROUTINE:
-			return "ROUTINES";
-		case OBJECT_TABLESPACE:
-			return "TABLESPACES";
-		case OBJECT_TYPE:
-			return "TYPES";
-			/* these currently aren't used */
-		case OBJECT_ACCESS_METHOD:
-		case OBJECT_AGGREGATE:
-		case OBJECT_AMOP:
-		case OBJECT_AMPROC:
-		case OBJECT_ATTRIBUTE:
-		case OBJECT_CAST:
-		case OBJECT_COLLATION:
-		case OBJECT_CONVERSION:
-		case OBJECT_DEFAULT:
-		case OBJECT_DEFACL:
-		case OBJECT_DOMCONSTRAINT:
-		case OBJECT_EVENT_TRIGGER:
-		case OBJECT_EXTENSION:
-		case OBJECT_INDEX:
-		case OBJECT_MATVIEW:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPERATOR:
-		case OBJECT_OPFAMILY:
-		case OBJECT_POLICY:
-		case OBJECT_PUBLICATION:
-		case OBJECT_PUBLICATION_REL:
-		case OBJECT_ROLE:
-		case OBJECT_RULE:
-		case OBJECT_STATISTIC_EXT:
-		case OBJECT_SUBSCRIPTION:
-		case OBJECT_TABCONSTRAINT:
-		case OBJECT_TRANSFORM:
-		case OBJECT_TRIGGER:
-		case OBJECT_VIEW:
-			elog(ERROR, "unsupported object type: %d", (int) objtype);
-	}
-
-	return "???";				/* keep compiler quiet */
 }

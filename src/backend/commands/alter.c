@@ -41,7 +41,6 @@
 #include "commands/defrem.h"
 #include "commands/event_trigger.h"
 #include "commands/extension.h"
-#include "commands/policy.h"
 #include "commands/proclang.h"
 #include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
@@ -312,9 +311,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_DATABASE:
 			return RenameDatabase(stmt->subname, stmt->newname);
 
-		case OBJECT_ROLE:
-			return RenameRole(stmt->subname, stmt->newname);
-
 		case OBJECT_SCHEMA:
 			return RenameSchema(stmt->subname, stmt->newname);
 
@@ -339,8 +335,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_TRIGGER:
 			return renametrig(stmt);
 
-		case OBJECT_POLICY:
-			return rename_policy(stmt);
 
 		case OBJECT_DOMAIN:
 		case OBJECT_TYPE:
@@ -612,7 +606,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_DEFACL:
 		case OCLASS_EXTENSION:
 		case OCLASS_EVENT_TRIGGER:
-		case OCLASS_POLICY:
 		case OCLASS_PUBLICATION:
 		case OCLASS_PUBLICATION_REL:
 		case OCLASS_SUBSCRIPTION:

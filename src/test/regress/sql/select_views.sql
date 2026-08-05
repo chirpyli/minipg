@@ -12,7 +12,6 @@ SELECT * FROM toyemp WHERE name = 'sharon';
 --
 -- Test for Leaky view scenario
 --
-CREATE ROLE regress_alice;
 
 CREATE FUNCTION f_leak (text)
        RETURNS bool LANGUAGE 'plpgsql' COST 0.0000001
@@ -73,17 +72,10 @@ CREATE VIEW my_credit_card_usage_normal AS
 CREATE VIEW my_credit_card_usage_secure WITH (security_barrier) AS
        SELECT * FROM my_credit_card_secure l NATURAL JOIN credit_usage r;
 
-GRANT SELECT ON my_property_normal TO public;
-GRANT SELECT ON my_property_secure TO public;
-GRANT SELECT ON my_credit_card_normal TO public;
-GRANT SELECT ON my_credit_card_secure TO public;
-GRANT SELECT ON my_credit_card_usage_normal TO public;
-GRANT SELECT ON my_credit_card_usage_secure TO public;
 
 --
 -- Run leaky view scenarios
 --
-SET SESSION AUTHORIZATION regress_alice;
 
 --
 -- scenario: if a qualifier with tiny-cost is given, it shall be launched
@@ -143,13 +135,9 @@ PREPARE p1 AS SELECT * FROM my_property_normal WHERE f_leak(passwd);
 PREPARE p2 AS SELECT * FROM my_property_secure WHERE f_leak(passwd);
 EXECUTE p1;
 EXECUTE p2;
-RESET SESSION AUTHORIZATION;
 ALTER VIEW my_property_normal SET (security_barrier=true);
 ALTER VIEW my_property_secure SET (security_barrier=false);
-SET SESSION AUTHORIZATION regress_alice;
 EXECUTE p1;		-- To be perform as a view with security-barrier
 EXECUTE p2;		-- To be perform as a view without security-barrier
 
 -- Cleanup.
-RESET SESSION AUTHORIZATION;
-DROP ROLE regress_alice;

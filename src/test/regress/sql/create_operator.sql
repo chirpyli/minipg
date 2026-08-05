@@ -63,11 +63,7 @@ SELECT 3<=/**/2, 2>=/**/3, 2<>/**/2;
 
 -- Should fail. CREATE OPERATOR requires USAGE on SCHEMA
 BEGIN TRANSACTION;
-CREATE ROLE regress_rol_op1;
 CREATE SCHEMA schema_op1;
-GRANT USAGE ON SCHEMA schema_op1 TO PUBLIC;
-REVOKE USAGE ON SCHEMA schema_op1 FROM regress_rol_op1;
-SET ROLE regress_rol_op1;
 CREATE OPERATOR schema_op1.#*# (
    rightarg = int8,
    procedure = factorial
@@ -130,15 +126,11 @@ CREATE OPERATOR #@%# (
 
 -- Should fail. CREATE OPERATOR requires USAGE on TYPE
 BEGIN TRANSACTION;
-CREATE ROLE regress_rol_op3;
 CREATE TYPE type_op3 AS ENUM ('new', 'open', 'closed');
 CREATE FUNCTION fn_op3(type_op3, int8)
 RETURNS int8 AS $$
     SELECT NULL::int8;
 $$ LANGUAGE sql IMMUTABLE;
-REVOKE USAGE ON TYPE type_op3 FROM regress_rol_op3;
-REVOKE USAGE ON TYPE type_op3 FROM PUBLIC;  -- Need to do this so that regress_rol_op3 is not allowed USAGE via PUBLIC
-SET ROLE regress_rol_op3;
 CREATE OPERATOR #*# (
    leftarg = type_op3,
    rightarg = int8,
@@ -148,15 +140,11 @@ ROLLBACK;
 
 -- Should fail. CREATE OPERATOR requires USAGE on TYPE (need to check separately for rightarg)
 BEGIN TRANSACTION;
-CREATE ROLE regress_rol_op4;
 CREATE TYPE type_op4 AS ENUM ('new', 'open', 'closed');
 CREATE FUNCTION fn_op4(int8, type_op4)
 RETURNS int8 AS $$
     SELECT NULL::int8;
 $$ LANGUAGE sql IMMUTABLE;
-REVOKE USAGE ON TYPE type_op4 FROM regress_rol_op4;
-REVOKE USAGE ON TYPE type_op4 FROM PUBLIC;  -- Need to do this so that regress_rol_op3 is not allowed USAGE via PUBLIC
-SET ROLE regress_rol_op4;
 CREATE OPERATOR #*# (
    leftarg = int8,
    rightarg = type_op4,
@@ -166,15 +154,11 @@ ROLLBACK;
 
 -- Should fail. CREATE OPERATOR requires EXECUTE on function
 BEGIN TRANSACTION;
-CREATE ROLE regress_rol_op5;
 CREATE TYPE type_op5 AS ENUM ('new', 'open', 'closed');
 CREATE FUNCTION fn_op5(int8, int8)
 RETURNS int8 AS $$
     SELECT NULL::int8;
 $$ LANGUAGE sql IMMUTABLE;
-REVOKE EXECUTE ON FUNCTION fn_op5(int8, int8) FROM regress_rol_op5;
-REVOKE EXECUTE ON FUNCTION fn_op5(int8, int8) FROM PUBLIC;-- Need to do this so that regress_rol_op3 is not allowed EXECUTE via PUBLIC
-SET ROLE regress_rol_op5;
 CREATE OPERATOR #*# (
    leftarg = int8,
    rightarg = int8,
@@ -184,15 +168,11 @@ ROLLBACK;
 
 -- Should fail. CREATE OPERATOR requires USAGE on return TYPE
 BEGIN TRANSACTION;
-CREATE ROLE regress_rol_op6;
 CREATE TYPE type_op6 AS ENUM ('new', 'open', 'closed');
 CREATE FUNCTION fn_op6(int8, int8)
 RETURNS type_op6 AS $$
     SELECT NULL::type_op6;
 $$ LANGUAGE sql IMMUTABLE;
-REVOKE USAGE ON TYPE type_op6 FROM regress_rol_op6;
-REVOKE USAGE ON TYPE type_op6 FROM PUBLIC;  -- Need to do this so that regress_rol_op3 is not allowed USAGE via PUBLIC
-SET ROLE regress_rol_op6;
 CREATE OPERATOR #*# (
    leftarg = int8,
    rightarg = int8,

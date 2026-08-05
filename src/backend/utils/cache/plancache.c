@@ -70,7 +70,6 @@
 #include "utils/inval.h"
 #include "utils/memutils.h"
 #include "utils/resowner_private.h"
-#include "utils/rls.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
 
@@ -210,7 +209,6 @@ CreateCachedPlan(RawStmt *raw_parse_tree,
 	plansource->search_path = NULL;
 	plansource->query_context = NULL;
 	plansource->rewriteRoleId = InvalidOid;
-	plansource->rewriteRowSecurity = false;
 	plansource->dependsOnRLS = false;
 	plansource->gplan = NULL;
 	plansource->is_oneshot = false;
@@ -278,7 +276,6 @@ CreateOneShotCachedPlan(RawStmt *raw_parse_tree,
 	plansource->search_path = NULL;
 	plansource->query_context = NULL;
 	plansource->rewriteRoleId = InvalidOid;
-	plansource->rewriteRowSecurity = false;
 	plansource->dependsOnRLS = false;
 	plansource->gplan = NULL;
 	plansource->is_oneshot = true;
@@ -398,7 +395,6 @@ CompleteCachedPlan(CachedPlanSource *plansource,
 
 		/* Update RLS info as well. */
 		plansource->rewriteRoleId = GetUserId();
-		plansource->rewriteRowSecurity = row_security;
 
 		/*
 		 * Also save the current search_path in the query_context.  (This
@@ -600,8 +596,7 @@ RevalidateCachedQuery(CachedPlanSource *plansource,
 	 * it if either the role or the row_security setting has changed.
 	 */
 	if (plansource->is_valid && plansource->dependsOnRLS &&
-		(plansource->rewriteRoleId != GetUserId() ||
-		 plansource->rewriteRowSecurity != row_security))
+		plansource->rewriteRoleId != GetUserId())
 		plansource->is_valid = false;
 
 	/*
@@ -752,7 +747,6 @@ RevalidateCachedQuery(CachedPlanSource *plansource,
 
 	/* Update RLS info as well. */
 	plansource->rewriteRoleId = GetUserId();
-	plansource->rewriteRowSecurity = row_security;
 
 	/*
 	 * Also save the current search_path in the query_context.  (This should
@@ -1568,7 +1562,6 @@ CopyCachedPlan(CachedPlanSource *plansource)
 		newsource->search_path = CopyOverrideSearchPath(plansource->search_path);
 	newsource->query_context = querytree_context;
 	newsource->rewriteRoleId = plansource->rewriteRoleId;
-	newsource->rewriteRowSecurity = plansource->rewriteRowSecurity;
 	newsource->dependsOnRLS = plansource->dependsOnRLS;
 
 	newsource->gplan = NULL;

@@ -27,9 +27,6 @@ SET ROLE regress_user_ast;
 INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 1, 'foo');
 ERROR:  permission denied for table pg_description
 RESET ROLE;
--- policy on system catalog
-CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%');
-ERROR:  permission denied: "pg_description" is a system catalog
 -- reserved schema name
 CREATE SCHEMA pg_foo;
 ERROR:  unacceptable schema name "pg_foo"
@@ -115,10 +112,6 @@ SET ROLE regress_user_ast;
 INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 3, 'foo');
 ERROR:  permission denied for table pg_description
 RESET ROLE;
--- policy on system catalog
-BEGIN;
-CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%');
-ROLLBACK;
 -- reserved schema name
 BEGIN;
 CREATE SCHEMA pg_foo;

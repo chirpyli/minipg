@@ -63,10 +63,6 @@ typedef enum DependencyType
  * created for the owner of an object; hence two objects may be linked by
  * one or the other, but not both, of these dependency types.)
  *
- * (d) a SHARED_DEPENDENCY_POLICY entry means that the referenced object is
- * a role mentioned in a policy object.  The referenced object must be a
- * pg_authid entry.
- *
  * (e) a SHARED_DEPENDENCY_TABLESPACE entry means that the referenced
  * object is a tablespace mentioned in a relation without storage.  The
  * referenced object must be a pg_tablespace entry.  (Relations that have
@@ -81,7 +77,6 @@ typedef enum SharedDependencyType
 	SHARED_DEPENDENCY_PIN = 'p',
 	SHARED_DEPENDENCY_OWNER = 'o',
 	SHARED_DEPENDENCY_ACL = 'a',
-	SHARED_DEPENDENCY_POLICY = 'r',
 	SHARED_DEPENDENCY_TABLESPACE = 't',
 	SHARED_DEPENDENCY_INVALID = 0
 } SharedDependencyType;
@@ -121,7 +116,6 @@ typedef enum ObjectClass
 	OCLASS_DEFACL,				/* pg_default_acl */
 	OCLASS_EXTENSION,			/* pg_extension */
 	OCLASS_EVENT_TRIGGER,		/* pg_event_trigger */
-	OCLASS_POLICY,				/* pg_policy */
 	OCLASS_PUBLICATION,			/* pg_publication */
 	OCLASS_PUBLICATION_REL,		/* pg_publication_rel */
 	OCLASS_SUBSCRIPTION,		/* pg_subscription */

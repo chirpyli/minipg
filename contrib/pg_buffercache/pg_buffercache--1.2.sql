@@ -17,5 +17,3 @@ CREATE VIEW pg_buffercache AS
 	 pinning_backends int4);
 
 -- Don't want these to be available to public.
-REVOKE ALL ON FUNCTION pg_buffercache_pages() FROM PUBLIC;
-REVOKE ALL ON pg_buffercache FROM PUBLIC;

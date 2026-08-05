@@ -6,10 +6,8 @@
 
 -- All objects made in this test are in temp_func_test schema
 
-CREATE USER regress_unpriv_user;
 
 CREATE SCHEMA temp_func_test;
-GRANT ALL ON SCHEMA temp_func_test TO public;
 
 SET search_path TO temp_func_test, public;
 
@@ -61,22 +59,22 @@ SELECT proname, provolatile FROM pg_proc
 		     'functest_B_4'::regproc) ORDER BY proname;
 
 --
--- SECURITY DEFINER | INVOKER
+-- | INVOKER
 --
 CREATE FUNCTION functest_C_1(int) RETURNS bool LANGUAGE 'sql'
        AS 'SELECT $1 > 0';
 CREATE FUNCTION functest_C_2(int) RETURNS bool LANGUAGE 'sql'
-       SECURITY DEFINER AS 'SELECT $1 = 0';
+ AS 'SELECT $1 = 0';
 CREATE FUNCTION functest_C_3(int) RETURNS bool LANGUAGE 'sql'
-       SECURITY INVOKER AS 'SELECT $1 < 0';
+ AS 'SELECT $1 < 0';
 SELECT proname, prosecdef FROM pg_proc
        WHERE oid in ('functest_C_1'::regproc,
                      'functest_C_2'::regproc,
                      'functest_C_3'::regproc) ORDER BY proname;
 
 ALTER FUNCTION functest_C_1(int) IMMUTABLE;	-- unrelated change, no effect
-ALTER FUNCTION functest_C_2(int) SECURITY INVOKER;
-ALTER FUNCTION functest_C_3(int) SECURITY DEFINER;
+ALTER FUNCTION functest_C_2(int);
+ALTER FUNCTION functest_C_3(int);
 SELECT proname, prosecdef FROM pg_proc
        WHERE oid in ('functest_C_1'::regproc,
                      'functest_C_2'::regproc,
@@ -104,11 +102,8 @@ SELECT proname, proleakproof FROM pg_proc
        WHERE oid in ('functest_E_1'::regproc,
                      'functest_E_2'::regproc) ORDER BY proname;
 
--- it takes superuser privilege to turn on leakproof, but not to turn off
-ALTER FUNCTION functest_E_1(int) OWNER TO regress_unpriv_user;
-ALTER FUNCTION functest_E_2(int) OWNER TO regress_unpriv_user;
+-- it takes privilege to turn on leakproof, but not to turn off
 
-SET SESSION AUTHORIZATION regress_unpriv_user;
 SET search_path TO temp_func_test, public;
 ALTER FUNCTION functest_E_1(int) NOT LEAKPROOF;
 ALTER FUNCTION functest_E_2(int) LEAKPROOF;
@@ -116,7 +111,6 @@ ALTER FUNCTION functest_E_2(int) LEAKPROOF;
 CREATE FUNCTION functest_E_3(int) RETURNS bool LANGUAGE 'sql'
        LEAKPROOF AS 'SELECT $1 < 200';	-- fail
 
-RESET SESSION AUTHORIZATION;
 
 --
 -- CALLED ON NULL INPUT | RETURNS NULL ON NULL INPUT | STRICT
@@ -400,5 +394,4 @@ SELECT double_append(array_append(ARRAY[q1], q2), q3)
 
 -- Cleanup
 DROP SCHEMA temp_func_test CASCADE;
-DROP USER regress_unpriv_user;
 RESET search_path;

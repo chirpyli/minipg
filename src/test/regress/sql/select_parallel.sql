@@ -370,15 +370,9 @@ ROLLBACK TO SAVEPOINT settings;
 DROP function make_record(n int);
 
 -- test the sanity of parallel query after the active role is dropped.
-drop role if exists regress_parallel_worker;
-create role regress_parallel_worker;
-set role regress_parallel_worker;
-reset session authorization;
-drop role regress_parallel_worker;
 set force_parallel_mode = 1;
 select count(*) from tenk1;
 reset force_parallel_mode;
-reset role;
 
 -- Window function calculation can't be pushed to workers.
 explain (costs off, verbose)
@@ -464,15 +458,12 @@ SELECT 1 FROM tenk1_vw_sec
 rollback;
 
 -- test that function option SET ROLE works in parallel workers.
-create role regress_parallel_worker;
 
 create function set_and_report_role() returns text as
   $$ select current_setting('role') $$ language sql parallel safe
-  set role = regress_parallel_worker;
 
 create function set_role_and_error(int) returns int as
   $$ select 1 / $1 $$ language sql parallel safe
-  set role = regress_parallel_worker;
 
 set force_parallel_mode = 0;
 select set_and_report_role();
@@ -484,7 +475,6 @@ reset force_parallel_mode;
 
 drop function set_and_report_role();
 drop function set_role_and_error(int);
-drop role regress_parallel_worker;
 
 -- don't freeze in ParallelFinish while holding an LWLock
 BEGIN;

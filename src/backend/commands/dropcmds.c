@@ -419,15 +419,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 													  list_length(castNode(List, object)) - 1));
 			}
 			break;
-		case OBJECT_POLICY:
-			if (!owningrel_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("policy \"%s\" for relation \"%s\" does not exist, skipping");
-				name = strVal(llast(castNode(List, object)));
-				args = NameListToString(list_truncate(list_copy(castNode(List, object)),
-													  list_length(castNode(List, object)) - 1));
-			}
-			break;
 		case OBJECT_EVENT_TRIGGER:
 			msg = gettext_noop("event trigger \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);

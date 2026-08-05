@@ -43,7 +43,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
-#include "catalog/pg_policy.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_publication.h"
 #include "catalog/pg_publication_rel.h"
@@ -58,7 +57,6 @@
 #include "commands/defrem.h"
 #include "commands/event_trigger.h"
 #include "commands/extension.h"
-#include "commands/policy.h"
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -427,20 +425,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"policy",
-		PolicyRelationId,
-		PolicyOidIndexId,
-		-1,
-		-1,
-		Anum_pg_policy_oid,
-		Anum_pg_policy_polname,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
-		false
-	},
-	{
 		"event trigger",
 		EventTriggerRelationId,
 		EventTriggerOidIndexId,
@@ -680,10 +664,6 @@ static const struct object_type_map
 	{
 		"event trigger", OBJECT_EVENT_TRIGGER
 	},
-	/* OCLASS_POLICY */
-	{
-		"policy", OBJECT_POLICY
-	},
 	/* OCLASS_PUBLICATION */
 	{
 		"publication", OBJECT_PUBLICATION
@@ -835,7 +815,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_RULE:
 			case OBJECT_TRIGGER:
 			case OBJECT_TABCONSTRAINT:
-			case OBJECT_POLICY:
 				address = get_object_address_relobject(objtype, castNode(List, object),
 													   &relation, missing_ok);
 				break;
@@ -1274,13 +1253,6 @@ get_object_address_relobject(ObjectType objtype, List *object,
 			address.classId = ConstraintRelationId;
 			address.objectId = relation ?
 				get_relation_constraint_oid(reloid, depname, missing_ok) :
-				InvalidOid;
-			address.objectSubId = 0;
-			break;
-		case OBJECT_POLICY:
-			address.classId = PolicyRelationId;
-			address.objectId = relation ?
-				get_relation_policy_oid(reloid, depname, missing_ok) :
 				InvalidOid;
 			address.objectSubId = 0;
 			break;
@@ -2111,7 +2083,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 		case OBJECT_COLUMN:
 		case OBJECT_RULE:
 		case OBJECT_TRIGGER:
-		case OBJECT_POLICY:
 		case OBJECT_TABCONSTRAINT:
 			if (!pg_class_ownercheck(RelationGetRelid(relation), roleid))
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
@@ -3388,52 +3359,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_POLICY:
-			{
-				Relation	policy_rel;
-				ScanKeyData skey[1];
-				SysScanDesc sscan;
-				HeapTuple	tuple;
-				Form_pg_policy form_policy;
-				StringInfoData rel;
-
-				policy_rel = table_open(PolicyRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_policy_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				sscan = systable_beginscan(policy_rel, PolicyOidIndexId,
-										   true, NULL, 1, skey);
-
-				tuple = systable_getnext(sscan);
-
-				if (!HeapTupleIsValid(tuple))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for policy %u",
-							 object->objectId);
-
-					systable_endscan(sscan);
-					table_close(policy_rel, AccessShareLock);
-					break;
-				}
-
-				form_policy = (Form_pg_policy) GETSTRUCT(tuple);
-
-				initStringInfo(&rel);
-				getRelationDescription(&rel, form_policy->polrelid, false);
-
-				/* translator: second %s is, e.g., "table %s" */
-				appendStringInfo(&buffer, _("policy %s on %s"),
-								 NameStr(form_policy->polname), rel.data);
-				pfree(rel.data);
-				systable_endscan(sscan);
-				table_close(policy_rel, AccessShareLock);
-				break;
-			}
-
 		case OCLASS_PUBLICATION:
 			{
 				char	   *pubname = get_publication_name(object->objectId,
@@ -4007,10 +3932,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_EVENT_TRIGGER:
 			appendStringInfoString(&buffer, "event trigger");
-			break;
-
-		case OCLASS_POLICY:
-			appendStringInfoString(&buffer, "policy");
 			break;
 
 		case OCLASS_PUBLICATION:
@@ -4997,46 +4918,13 @@ getObjectIdentityParts(const ObjectAddress *object,
 				appendStringInfoString(&buffer, quote_identifier(evtname));
 				if (objname)
 					*objname = list_make1(evtname);
-				ReleaseSysCache(tup);
-				break;
-			}
+			ReleaseSysCache(tup);
+			break;
+		}
 
-		case OCLASS_POLICY:
-			{
-				Relation	polDesc;
-				HeapTuple	tup;
-				Form_pg_policy policy;
-
-				polDesc = table_open(PolicyRelationId, AccessShareLock);
-
-				tup = get_catalog_object_by_oid(polDesc, Anum_pg_policy_oid,
-												object->objectId);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for policy %u",
-							 object->objectId);
-
-					table_close(polDesc, AccessShareLock);
-					break;
-				}
-
-				policy = (Form_pg_policy) GETSTRUCT(tup);
-
-				appendStringInfo(&buffer, "%s on ",
-								 quote_identifier(NameStr(policy->polname)));
-				getRelationIdentity(&buffer, policy->polrelid, objname, false);
-				if (objname)
-					*objname = lappend(*objname, pstrdup(NameStr(policy->polname)));
-
-				table_close(polDesc, AccessShareLock);
-				break;
-			}
-
-		case OCLASS_PUBLICATION:
-			{
-				char	   *pubname;
+	case OCLASS_PUBLICATION:
+		{
+			char	   *pubname;
 
 				pubname = get_publication_name(object->objectId, missing_ok);
 				if (pubname)

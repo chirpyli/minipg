@@ -98,7 +98,6 @@
 #include "utils/portal.h"
 #include "utils/ps_status.h"
 #include "utils/queryjumble.h"
-#include "utils/rls.h"
 #include "utils/snapmgr.h"
 #include "utils/tzparser.h"
 #include "utils/inval.h"
@@ -512,7 +511,6 @@ bool		log_statement_stats = false;	/* this is sort of all three above
 											 * together */
 bool		log_btree_build_stats = false;
 
-bool		row_security;
 bool		check_function_bodies = true;
 
 /*
@@ -1612,15 +1610,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&XactDeferrable,
 		false,
 		check_transaction_deferrable, NULL, NULL
-	},
-	{
-		{"row_security", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Enable row security."),
-			gettext_noop("When enabled, row security will be applied to all users.")
-		},
-		&row_security,
-		true,
-		NULL, NULL, NULL
 	},
 	{
 		{"check_function_bodies", PGC_USERSET, CLIENT_CONN_STATEMENT,

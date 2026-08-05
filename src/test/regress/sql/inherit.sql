@@ -240,10 +240,10 @@ alter table parent1 alter column f2 type bigint;  -- ok
 create table p1(ff1 int);
 alter table p1 add constraint p1chk check (ff1 > 0) no inherit;
 alter table p1 add constraint p2chk check (ff1 > 10);
--- connoinherit should be true for NO INHERIT constraint
+--- connoinherit should be true for NO INHERIT constraint
 select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.connoinherit from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname = 'p1' order by 1,2;
 
--- Test that child does not inherit NO INHERIT constraints
+--- Test that child does not inherit NO INHERIT constraints
 create table c1 () inherits (p1);
 \d p1
 \d c1
@@ -490,7 +490,7 @@ insert into invalid_check_con_child values(0); -- fail
 
 select conrelid::regclass::text as relname, conname,
        convalidated, conislocal, coninhcount, connoinherit
-from pg_constraint where conname like 'inh\_check\_constraint%'
+ from pg_constraint where conname like 'inh\_check\_constraint%'
 order by 1, 2;
 
 -- We don't drop the invalid_check_con* tables, to test dump/reload with
@@ -932,10 +932,6 @@ create index on permtest_parent (left(c, 3));
 insert into permtest_parent
   select 1, 'a', left(md5(i::text), 5) from generate_series(0, 100) i;
 analyze permtest_parent;
-create role regress_no_child_access;
-revoke all on permtest_grandchild from regress_no_child_access;
-grant select on permtest_parent to regress_no_child_access;
-set session authorization regress_no_child_access;
 -- without stats access, these queries would produce hash join plans:
 explain (costs off)
   select * from permtest_parent p1 inner join permtest_parent p2
@@ -943,10 +939,6 @@ explain (costs off)
 explain (costs off)
   select * from permtest_parent p1 inner join permtest_parent p2
   on p1.a = p2.a and left(p1.c, 3) ~ 'a1$';
-reset session authorization;
-revoke all on permtest_parent from regress_no_child_access;
-grant select(a,c) on permtest_parent to regress_no_child_access;
-set session authorization regress_no_child_access;
 explain (costs off)
   select p2.a, p1.c from permtest_parent p1 inner join permtest_parent p2
   on p1.a = p2.a and p1.c ~ 'a1$';
@@ -954,9 +946,6 @@ explain (costs off)
 explain (costs off)
   select p2.a, p1.c from permtest_parent p1 inner join permtest_parent p2
   on p1.a = p2.a and left(p1.c, 3) ~ 'a1$';
-reset session authorization;
-revoke all on permtest_parent from regress_no_child_access;
-drop role regress_no_child_access;
 drop table permtest_parent;
 
 -- Verify that constraint errors across partition root / child are

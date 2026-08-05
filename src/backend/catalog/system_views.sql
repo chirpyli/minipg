@@ -47,7 +47,6 @@ CREATE VIEW pg_shadow AS
     ON (pg_authid.oid = setrole AND setdatabase = 0)
     WHERE rolcanlogin;
 
-REVOKE ALL ON pg_shadow FROM public;
 
 CREATE VIEW pg_group AS
     SELECT
@@ -69,41 +68,6 @@ CREATE VIEW pg_user AS
         valuntil,
         useconfig
     FROM pg_shadow;
-
-CREATE VIEW pg_policies AS
-    SELECT
-        N.nspname AS schemaname,
-        C.relname AS tablename,
-        pol.polname AS policyname,
-        CASE
-            WHEN pol.polpermissive THEN
-                'PERMISSIVE'
-            ELSE
-                'RESTRICTIVE'
-        END AS permissive,
-        CASE
-            WHEN pol.polroles = '{0}' THEN
-                string_to_array('public', '')
-            ELSE
-                ARRAY
-                (
-                    SELECT rolname
-                    FROM pg_catalog.pg_authid
-                    WHERE oid = ANY (pol.polroles) ORDER BY 1
-                )
-        END AS roles,
-        CASE pol.polcmd
-            WHEN 'r' THEN 'SELECT'
-            WHEN 'a' THEN 'INSERT'
-            WHEN 'w' THEN 'UPDATE'
-            WHEN 'd' THEN 'DELETE'
-            WHEN '*' THEN 'ALL'
-        END AS cmd,
-        pg_catalog.pg_get_expr(pol.polqual, pol.polrelid) AS qual,
-        pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid) AS with_check
-    FROM pg_catalog.pg_policy pol
-    JOIN pg_catalog.pg_class C ON (C.oid = pol.polrelid)
-    LEFT JOIN pg_catalog.pg_namespace N ON (N.oid = C.relnamespace);
 
 CREATE VIEW pg_rules AS
     SELECT
@@ -132,8 +96,7 @@ CREATE VIEW pg_tables AS
         T.spcname AS tablespace,
         C.relhasindex AS hasindexes,
         C.relhasrules AS hasrules,
-        C.relhastriggers AS hastriggers,
-        C.relrowsecurity AS rowsecurity
+        C.relhastriggers AS hastriggers
     FROM pg_class C LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
          LEFT JOIN pg_tablespace T ON (T.oid = C.reltablespace)
     WHERE C.relkind IN ('r', 'p');
@@ -248,10 +211,8 @@ CREATE VIEW pg_stats WITH (security_barrier) AS
          JOIN pg_attribute a ON (c.oid = attrelid AND attnum = s.staattnum)
          LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
     WHERE NOT attisdropped
-    AND has_column_privilege(c.oid, a.attnum, 'select')
-    AND (c.relrowsecurity = false OR NOT row_security_active(c.oid));
+    AND has_column_privilege(c.oid, a.attnum, 'select');
 
-REVOKE ALL ON pg_statistic FROM public;
 
 CREATE VIEW pg_stats_ext WITH (security_barrier) AS
     SELECT cn.nspname AS schemaname,
@@ -283,8 +244,7 @@ CREATE VIEW pg_stats_ext WITH (security_barrier) AS
                             array_agg(base_frequency) AS most_common_base_freqs
                      FROM pg_mcv_list_items(sd.stxdmcv)
                    ) m ON sd.stxdmcv IS NOT NULL
-    WHERE pg_has_role(c.relowner, 'USAGE')
-    AND (c.relrowsecurity = false OR NOT row_security_active(c.oid));
+    WHERE pg_has_role(c.relowner, 'USAGE');
 
 CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
     SELECT cn.nspname AS schemaname,
@@ -353,11 +313,9 @@ CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
              SELECT unnest(pg_get_statisticsobjdef_expressions(s.oid)) AS expr,
                     unnest(sd.stxdexpr)::pg_statistic AS a
          ) stat ON (stat.expr IS NOT NULL)
-    WHERE pg_has_role(c.relowner, 'USAGE')
-    AND (c.relrowsecurity = false OR NOT row_security_active(c.oid));
+    WHERE pg_has_role(c.relowner, 'USAGE');
 
 -- unprivileged users may read pg_statistic_ext but not pg_statistic_ext_data
-REVOKE ALL ON pg_statistic_ext_data FROM public;
 
 CREATE VIEW pg_publication_tables AS
     SELECT
@@ -588,13 +546,10 @@ CREATE RULE pg_settings_n AS
     ON UPDATE TO pg_settings
     DO INSTEAD NOTHING;
 
-GRANT SELECT, UPDATE ON pg_settings TO PUBLIC;
 
 CREATE VIEW pg_file_settings AS
    SELECT * FROM pg_show_all_file_settings() AS A;
 
-REVOKE ALL ON pg_file_settings FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION pg_show_all_file_settings() FROM PUBLIC;
 
 CREATE VIEW pg_timezone_abbrevs AS
     SELECT * FROM pg_timezone_abbrevs();
@@ -605,20 +560,14 @@ CREATE VIEW pg_timezone_names AS
 CREATE VIEW pg_config AS
     SELECT * FROM pg_config();
 
-REVOKE ALL ON pg_config FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION pg_config() FROM PUBLIC;
 
 CREATE VIEW pg_shmem_allocations AS
     SELECT * FROM pg_get_shmem_allocations();
 
-REVOKE ALL ON pg_shmem_allocations FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION pg_get_shmem_allocations() FROM PUBLIC;
 
 CREATE VIEW pg_backend_memory_contexts AS
     SELECT * FROM pg_get_backend_memory_contexts();
 
-REVOKE ALL ON pg_backend_memory_contexts FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION pg_get_backend_memory_contexts() FROM PUBLIC;
 
 -- Statistics views
 
@@ -1195,11 +1144,3 @@ CREATE VIEW pg_stat_progress_copy AS
 CREATE VIEW pg_replication_origin_status AS
     SELECT *
     FROM pg_show_replication_origin_status();
-
-REVOKE ALL ON pg_replication_origin_status FROM public;
-
--- All columns of pg_subscription except subconninfo are publicly readable.
-REVOKE ALL ON pg_subscription FROM public;
-GRANT SELECT (oid, subdbid, subname, subowner, subenabled, subbinary,
-              substream, subslotname, subsynccommit, subpublications)
-    ON pg_subscription TO public;

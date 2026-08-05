@@ -105,13 +105,9 @@ WHERE pg_class.oid=indexrelid
 	AND indisclustered;
 
 -- Verify that clustering all tables does in fact cluster the right ones
-CREATE USER regress_clstr_user;
 CREATE TABLE clstr_1 (a INT PRIMARY KEY);
 CREATE TABLE clstr_2 (a INT PRIMARY KEY);
 CREATE TABLE clstr_3 (a INT PRIMARY KEY);
-ALTER TABLE clstr_1 OWNER TO regress_clstr_user;
-ALTER TABLE clstr_3 OWNER TO regress_clstr_user;
-GRANT SELECT ON clstr_2 TO regress_clstr_user;
 INSERT INTO clstr_1 VALUES (2);
 INSERT INTO clstr_1 VALUES (1);
 INSERT INTO clstr_2 VALUES (2);
@@ -141,7 +137,6 @@ INSERT INTO clstr_3 VALUES (1);
 
 -- this user can only cluster clstr_1 and clstr_3, but the latter
 -- has not been clustered
-SET SESSION AUTHORIZATION regress_clstr_user;
 CLUSTER;
 SELECT * FROM clstr_1 UNION ALL
   SELECT * FROM clstr_2 UNION ALL
@@ -194,7 +189,6 @@ cluster clstr_temp using clstr_temp_pkey;
 select * from clstr_temp;
 drop table clstr_temp;
 
-RESET SESSION AUTHORIZATION;
 
 -- check clustering an empty table
 DROP TABLE clustertest;
@@ -277,4 +271,3 @@ DROP TABLE clstr_3;
 DROP TABLE clstr_4;
 DROP TABLE clstr_expression;
 
-DROP USER regress_clstr_user;

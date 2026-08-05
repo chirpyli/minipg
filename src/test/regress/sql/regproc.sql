@@ -4,7 +4,6 @@
 
 /* If objects exist, return oids */
 
-CREATE ROLE regress_regrole_test;
 
 -- without schemaname
 
@@ -55,7 +54,6 @@ SELECT to_regnamespace('"pg_catalog"');
 
 /* If objects don't exist, raise errors. */
 
-DROP ROLE regress_regrole_test;
 
 -- without schemaname
 

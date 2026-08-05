@@ -208,9 +208,7 @@ SELECT * FROM mvtest_v;
 SELECT * FROM mvtest_mv_v;
 DROP TABLE mvtest_v CASCADE;
 
--- make sure running as superuser works when MV owned by another role (bug #11208)
-CREATE ROLE regress_user_mvtest;
-SET ROLE regress_user_mvtest;
+-- make sure running as works when MV owned by another role (bug #11208)
 -- this test case also checks for ambiguity in the queries issued by
 -- refresh_by_match_merge(), by choosing column names that intentionally
 -- duplicate all the aliases used in those queries
@@ -225,11 +223,9 @@ CREATE MATERIALIZED VIEW mvtest_mv_foo AS SELECT * FROM mvtest_foo_data;
 CREATE MATERIALIZED VIEW mvtest_mv_foo AS SELECT * FROM mvtest_foo_data;
 CREATE MATERIALIZED VIEW IF NOT EXISTS mvtest_mv_foo AS SELECT * FROM mvtest_foo_data;
 CREATE UNIQUE INDEX ON mvtest_mv_foo (i);
-RESET ROLE;
 REFRESH MATERIALIZED VIEW mvtest_mv_foo;
 REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_foo;
 DROP OWNED BY regress_user_mvtest CASCADE;
-DROP ROLE regress_user_mvtest;
 
 -- Concurrent refresh requires a unique index on the materialized
 -- view. Test what happens if it's dropped during the refresh.
@@ -264,12 +260,7 @@ ROLLBACK;
 
 -- INSERT privileges if relation owner is not allowed to insert.
 CREATE SCHEMA matview_schema;
-CREATE USER regress_matview_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE regress_matview_user
-  REVOKE INSERT ON TABLES FROM regress_matview_user;
-GRANT ALL ON SCHEMA matview_schema TO public;
 
-SET SESSION AUTHORIZATION regress_matview_user;
 CREATE MATERIALIZED VIEW matview_schema.mv_withdata1 (a) AS
   SELECT generate_series(1, 10) WITH DATA;
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
@@ -282,13 +273,9 @@ EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
   CREATE MATERIALIZED VIEW matview_schema.mv_nodata2 (a) AS
   SELECT generate_series(1, 10) WITH NO DATA;
 REFRESH MATERIALIZED VIEW matview_schema.mv_nodata2;
-RESET SESSION AUTHORIZATION;
 
-ALTER DEFAULT PRIVILEGES FOR ROLE regress_matview_user
-  GRANT INSERT ON TABLES TO regress_matview_user;
 
 DROP SCHEMA matview_schema CASCADE;
-DROP USER regress_matview_user;
 
 -- CREATE MATERIALIZED VIEW ... IF NOT EXISTS
 CREATE MATERIALIZED VIEW matview_ine_tab AS SELECT 1;

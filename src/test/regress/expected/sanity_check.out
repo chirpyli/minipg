@@ -27,15 +27,10 @@ bt_txt_heap|t
 c|f
 c_star|f
 char_tbl|f
-check2_tbl|f
-check_tbl|f
 city|f
-copy_tbl|f
 d|f
 d_star|f
 date_tbl|f
-default_tbl|f
-defaultexpr_tbl|f
 dept|f
 dupindexcols|t
 e_star|f
@@ -53,7 +48,6 @@ hash_name_heap|t
 hash_txt_heap|t
 hobbies_r|f
 ihighway|t
-insert_tbl|f
 int2_tbl|f
 int4_tbl|f
 int8_tbl|f
@@ -89,8 +83,6 @@ nummultirange_test|t
 numrange_test|t
 onek|t
 onek2|t
-past_inh_parent|f
-past_parted|f
 person|f
 persons|f
 persons2|t
@@ -127,7 +119,6 @@ pg_opclass|t
 pg_operator|t
 pg_opfamily|t
 pg_partitioned_table|t
-pg_policy|t
 pg_proc|t
 pg_publication|t
 pg_publication_rel|t
@@ -150,8 +141,6 @@ pg_trigger|t
 pg_type|t
 ramp|f
 real_city|f
-regress_constr_partition1|t
-regress_constr_partitioned|t
 reservations|f
 road|t
 shighway|t

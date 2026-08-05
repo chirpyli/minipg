@@ -65,11 +65,3 @@ LANGUAGE C STRICT
 PARALLEL UNSAFE;  -- let's not make this any more dangerous
 
 -- Don't want these to be available to public.
-REVOKE ALL ON FUNCTION pg_visibility_map(regclass, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_visibility(regclass, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_visibility_map(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_visibility(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_visibility_map_summary(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_check_frozen(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_check_visible(regclass) FROM PUBLIC;
-REVOKE ALL ON FUNCTION pg_truncate_visibility_map(regclass) FROM PUBLIC;

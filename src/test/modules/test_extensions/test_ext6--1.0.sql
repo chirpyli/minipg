@@ -1,1 +1,2 @@
-grant usage on schema @extschema@ to public;
+-- minipg: 权限机制已裁剪，GRANT 语句已从语法移除；此扩展脚本原仅含
+-- "grant usage on schema @extschema@ to public;"，现留空以使 CREATE EXTENSION 可用。

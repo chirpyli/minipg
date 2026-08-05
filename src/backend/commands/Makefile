@@ -41,7 +41,6 @@ OBJS = \
 	matview.o \
 	opclasscmds.o \
 	operatorcmds.o \
-	policy.o \
 	portalcmds.o \
 	prepare.o \
 	proclang.o \

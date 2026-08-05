@@ -20,11 +20,9 @@ REGRESS = test_ddl_deparse \
 	create_trigger \
 	create_rule \
 	comment_on \
-	alter_function \
 	alter_sequence \
 	alter_type_enum \
 	opfamily \
-	defprivs \
 	matviews
 
 ifdef USE_PGXS

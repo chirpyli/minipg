@@ -34,7 +34,6 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
-#include "utils/rls.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
@@ -202,10 +201,6 @@ BuildIndexValueDescription(Relation indexRelation,
 	idxrec = indexRelation->rd_index;
 	indrelid = idxrec->indrelid;
 	Assert(indexrelid == idxrec->indexrelid);
-
-	/* RLS check- if RLS is enabled then we don't return anything. */
-	if (check_enable_rls(indrelid, InvalidOid, true) == RLS_ENABLED)
-		return NULL;
 
 	/* Table-level SELECT is enough, if the user has it */
 	aclresult = pg_class_aclcheck(indrelid, GetUserId(), ACL_SELECT);

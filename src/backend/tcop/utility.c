@@ -42,7 +42,6 @@
 #include "commands/extension.h"
 #include "commands/lockcmds.h"
 #include "commands/matview.h"
-#include "commands/policy.h"
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
 #include "commands/proclang.h"
@@ -137,7 +136,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterCollationStmt:
 		case T_AlterDatabaseSetStmt:
 		case T_AlterDatabaseStmt:
-		case T_AlterDefaultPrivilegesStmt:
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
 		case T_AlterEventTrigStmt:
@@ -149,10 +147,7 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterOpFamilyStmt:
 		case T_AlterOperatorStmt:
 		case T_AlterOwnerStmt:
-		case T_AlterPolicyStmt:
 		case T_AlterPublicationStmt:
-		case T_AlterRoleSetStmt:
-		case T_AlterRoleStmt:
 		case T_AlterSeqStmt:
 		case T_AlterStatsStmt:
 		case T_AlterSubscriptionStmt:
@@ -173,10 +168,8 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
 		case T_CreatePLangStmt:
-		case T_CreatePolicyStmt:
 		case T_CreatePublicationStmt:
 		case T_CreateRangeStmt:
-		case T_CreateRoleStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateSeqStmt:
 		case T_CreateStatsStmt:
@@ -188,16 +181,11 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateTrigStmt:
 		case T_CreatedbStmt:
 		case T_DefineStmt:
-		case T_DropOwnedStmt:
-		case T_DropRoleStmt:
 		case T_DropStmt:
 		case T_DropSubscriptionStmt:
 		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
-		case T_GrantRoleStmt:
-		case T_GrantStmt:
 		case T_IndexStmt:
-		case T_ReassignOwnedStmt:
 		case T_RefreshMatViewStmt:
 		case T_RenameStmt:
 		case T_RuleStmt:
@@ -751,11 +739,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			DeallocateQuery((DeallocateStmt *) parsetree);
 			break;
 
-		case T_GrantRoleStmt:
-			/* no event triggers for global objects */
-			GrantRole((GrantRoleStmt *) parsetree);
-			break;
-
 		case T_CreatedbStmt:
 			/* no event triggers for global objects */
 			PreventInTransactionBlock(isTopLevel, "CREATE DATABASE");
@@ -884,34 +867,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			AlterEventTrigger((AlterEventTrigStmt *) parsetree);
 			break;
 
-			/*
-			 * ******************************** ROLE statements ****
-			 */
-		case T_CreateRoleStmt:
-			/* no event triggers for global objects */
-			CreateRole(pstate, (CreateRoleStmt *) parsetree);
-			break;
-
-		case T_AlterRoleStmt:
-			/* no event triggers for global objects */
-			AlterRole((AlterRoleStmt *) parsetree);
-			break;
-
-		case T_AlterRoleSetStmt:
-			/* no event triggers for global objects */
-			AlterRoleSet((AlterRoleSetStmt *) parsetree);
-			break;
-
-		case T_DropRoleStmt:
-			/* no event triggers for global objects */
-			DropRole((DropRoleStmt *) parsetree);
-			break;
-
-		case T_ReassignOwnedStmt:
-			/* no event triggers for global objects */
-			ReassignOwnedObjects((ReassignOwnedStmt *) parsetree);
-			break;
-
 		case T_LockStmt:
 
 			/*
@@ -943,21 +898,8 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 			/*
 			 * The following statements are supported by Event Triggers only
-			 * in some cases, so we "fast path" them in the other cases.
-			 */
-
-		case T_GrantStmt:
-			{
-				GrantStmt  *stmt = (GrantStmt *) parsetree;
-
-				if (EventTriggerSupportsObjectType(stmt->objtype))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecuteGrantStmt(stmt);
-			}
-			break;
+		 * in some cases, so we "fast path" them in the other cases.
+		 */
 
 		case T_DropStmt:
 			{
@@ -1679,31 +1621,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CommentObject((CommentStmt *) parsetree);
 				break;
 
-			case T_GrantStmt:
-				ExecuteGrantStmt((GrantStmt *) parsetree);
-				/* commands are stashed in ExecGrantStmt_oids */
-				commandCollected = true;
-				break;
-
-			case T_DropOwnedStmt:
-				DropOwnedObjects((DropOwnedStmt *) parsetree);
-				/* no commands stashed for DROP */
-				commandCollected = true;
-				break;
-
-			case T_AlterDefaultPrivilegesStmt:
-				ExecAlterDefaultPrivilegesStmt(pstate, (AlterDefaultPrivilegesStmt *) parsetree);
-				EventTriggerCollectAlterDefPrivs((AlterDefaultPrivilegesStmt *) parsetree);
-				commandCollected = true;
-				break;
-
-			case T_CreatePolicyStmt:	/* CREATE POLICY */
-				address = CreatePolicy((CreatePolicyStmt *) parsetree);
-				break;
-
-			case T_AlterPolicyStmt: /* ALTER POLICY */
-				address = AlterPolicy((AlterPolicyStmt *) parsetree);
-				break;
 
 			case T_SecLabelStmt:
 				address = ExecSecLabelStmt((SecLabelStmt *) parsetree);
@@ -2135,9 +2052,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_OPFAMILY:
 			tag = CMDTAG_ALTER_OPERATOR_FAMILY;
 			break;
-		case OBJECT_POLICY:
-			tag = CMDTAG_ALTER_POLICY;
-			break;
 		case OBJECT_PROCEDURE:
 			tag = CMDTAG_ALTER_PROCEDURE;
 			break;
@@ -2462,9 +2376,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_OPFAMILY:
 					tag = CMDTAG_DROP_OPERATOR_FAMILY;
 					break;
-				case OBJECT_POLICY:
-					tag = CMDTAG_DROP_POLICY;
-					break;
 				case OBJECT_TRANSFORM:
 					tag = CMDTAG_DROP_TRANSFORM;
 					break;
@@ -2548,26 +2459,6 @@ CreateCommandTag(Node *parsetree)
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}
-			break;
-
-		case T_GrantStmt:
-			{
-				GrantStmt  *stmt = (GrantStmt *) parsetree;
-
-				tag = (stmt->is_grant) ? CMDTAG_GRANT : CMDTAG_REVOKE;
-			}
-			break;
-
-		case T_GrantRoleStmt:
-			{
-				GrantRoleStmt *stmt = (GrantRoleStmt *) parsetree;
-
-				tag = (stmt->is_grant) ? CMDTAG_GRANT_ROLE : CMDTAG_REVOKE_ROLE;
-			}
-			break;
-
-		case T_AlterDefaultPrivilegesStmt:
-			tag = CMDTAG_ALTER_DEFAULT_PRIVILEGES;
 			break;
 
 		case T_DefineStmt:
@@ -2786,30 +2677,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_LANGUAGE;
 			break;
 
-		case T_CreateRoleStmt:
-			tag = CMDTAG_CREATE_ROLE;
-			break;
-
-		case T_AlterRoleStmt:
-			tag = CMDTAG_ALTER_ROLE;
-			break;
-
-		case T_AlterRoleSetStmt:
-			tag = CMDTAG_ALTER_ROLE;
-			break;
-
-		case T_DropRoleStmt:
-			tag = CMDTAG_DROP_ROLE;
-			break;
-
-		case T_DropOwnedStmt:
-			tag = CMDTAG_DROP_OWNED;
-			break;
-
-		case T_ReassignOwnedStmt:
-			tag = CMDTAG_REASSIGN_OWNED;
-			break;
-
 		case T_LockStmt:
 			tag = CMDTAG_LOCK_TABLE;
 			break;
@@ -2860,13 +2727,7 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
 			break;
 
-		case T_CreatePolicyStmt:
-			tag = CMDTAG_CREATE_POLICY;
-			break;
 
-		case T_AlterPolicyStmt:
-			tag = CMDTAG_ALTER_POLICY;
-			break;
 
 		case T_CreateAmStmt:
 			tag = CMDTAG_CREATE_ACCESS_METHOD;
@@ -3216,18 +3077,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_GrantStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_GrantRoleStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterDefaultPrivilegesStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_DefineStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -3391,30 +3240,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_CreateRoleStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterRoleStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterRoleSetStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_DropRoleStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_DropOwnedStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_ReassignOwnedStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_LockStmt:
 			lev = LOGSTMT_ALL;
 			break;
@@ -3455,13 +3280,7 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_CreatePolicyStmt:
-			lev = LOGSTMT_DDL;
-			break;
 
-		case T_AlterPolicyStmt:
-			lev = LOGSTMT_DDL;
-			break;
 
 			lev = LOGSTMT_DDL;
 			break;

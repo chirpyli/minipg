@@ -1664,18 +1664,6 @@ SELECT * FROM tststats.priv_test_view t
  WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL); -- Should not leak
 DELETE FROM tststats.priv_test_view WHERE a <<< 0 AND b <<< 0; -- Should not leak
 
--- Grant table access, but hide all data with RLS
-RESET SESSION AUTHORIZATION;
-ALTER TABLE tststats.priv_test_tbl ENABLE ROW LEVEL SECURITY;
-CREATE POLICY priv_test_tbl_pol ON tststats.priv_test_tbl USING (2 * a < 0);
-GRANT SELECT, DELETE ON tststats.priv_test_tbl TO regress_stats_user1;
-
--- Should now have direct table access, but see nothing and leak nothing
-SET SESSION AUTHORIZATION regress_stats_user1;
-SELECT * FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0; -- Should not leak
-SELECT * FROM tststats.priv_test_tbl t
- WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL); -- Should not leak
-DELETE FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0; -- Should not leak
 
 -- Create plain inheritance parent table with no access permissions
 RESET SESSION AUTHORIZATION;
@@ -1689,18 +1677,6 @@ SELECT * FROM tststats.priv_test_parent_tbl t
  WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL); -- Permission denied
 DELETE FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0; -- Permission denied
 
--- Grant table access to parent, but hide all data with RLS
-RESET SESSION AUTHORIZATION;
-ALTER TABLE tststats.priv_test_parent_tbl ENABLE ROW LEVEL SECURITY;
-CREATE POLICY priv_test_parent_tbl_pol ON tststats.priv_test_parent_tbl USING (2 * a < 0);
-GRANT SELECT, DELETE ON tststats.priv_test_parent_tbl TO regress_stats_user1;
-
--- Should now have direct table access to parent, but see nothing and leak nothing
-SET SESSION AUTHORIZATION regress_stats_user1;
-SELECT * FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0; -- Should not leak
-SELECT * FROM tststats.priv_test_parent_tbl t
- WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL); -- Should not leak
-DELETE FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0; -- Should not leak
 
 -- privilege checks for pg_stats_ext and pg_stats_ext_exprs
 RESET SESSION AUTHORIZATION;

@@ -30,8 +30,6 @@ SET ROLE regress_user_ast;
 INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 1, 'foo');
 RESET ROLE;
 
--- policy on system catalog
-CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%');
 
 -- reserved schema name
 CREATE SCHEMA pg_foo;
@@ -118,10 +116,6 @@ SET ROLE regress_user_ast;
 INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 3, 'foo');
 RESET ROLE;
 
--- policy on system catalog
-BEGIN;
-CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%');
-ROLLBACK;
 
 -- reserved schema name
 BEGIN;

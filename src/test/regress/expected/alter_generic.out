@@ -3,21 +3,13 @@
 --
 -- Clean up in case a prior regression run failed
 SET client_min_messages TO 'warning';
-DROP ROLE IF EXISTS regress_alter_generic_user1;
-DROP ROLE IF EXISTS regress_alter_generic_user2;
-DROP ROLE IF EXISTS regress_alter_generic_user3;
 RESET client_min_messages;
-CREATE USER regress_alter_generic_user3;
-CREATE USER regress_alter_generic_user2;
-CREATE USER regress_alter_generic_user1 IN ROLE regress_alter_generic_user3;
 CREATE SCHEMA alt_nsp1;
 CREATE SCHEMA alt_nsp2;
-GRANT ALL ON SCHEMA alt_nsp1, alt_nsp2 TO public;
 SET search_path = alt_nsp1, public;
 --
 -- Function and Aggregate
 --
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 CREATE FUNCTION alt_func1(int) RETURNS int LANGUAGE sql
   AS 'SELECT $1 + 1';
 CREATE FUNCTION alt_func2(int) RETURNS int LANGUAGE sql
@@ -30,26 +22,17 @@ CREATE AGGREGATE alt_agg2 (
 );
 ALTER AGGREGATE alt_func1(int) RENAME TO alt_func3;  -- failed (not aggregate)
 ERROR:  function alt_func1(integer) is not an aggregate
-ALTER AGGREGATE alt_func1(int) OWNER TO regress_alter_generic_user3;  -- failed (not aggregate)
-ERROR:  function alt_func1(integer) is not an aggregate
 ALTER AGGREGATE alt_func1(int) SET SCHEMA alt_nsp2;  -- failed (not aggregate)
 ERROR:  function alt_func1(integer) is not an aggregate
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func2;  -- failed (name conflict)
 ERROR:  function alt_func2(integer) already exists in schema "alt_nsp1"
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func3;  -- OK
-ALTER FUNCTION alt_func2(int) OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER FUNCTION alt_func2(int) OWNER TO regress_alter_generic_user3;  -- OK
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp1;  -- OK, already there
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp2;  -- OK
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg2;   -- failed (name conflict)
 ERROR:  function alt_agg2(integer) already exists in schema "alt_nsp1"
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg3;   -- OK
-ALTER AGGREGATE alt_agg2(int) OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER AGGREGATE alt_agg2(int) OWNER TO regress_alter_generic_user3;  -- OK
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
 CREATE FUNCTION alt_func1(int) RETURNS int LANGUAGE sql
   AS 'SELECT $1 + 2';
 CREATE FUNCTION alt_func2(int) RETURNS int LANGUAGE sql
@@ -61,43 +44,34 @@ CREATE AGGREGATE alt_agg2 (
   sfunc1 = int4mi, basetype = int4, stype1 = int4, initcond = -100
 );
 ALTER FUNCTION alt_func3(int) RENAME TO alt_func4;	-- failed (not owner)
-ERROR:  must be owner of function alt_func3
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func4;	-- OK
-ALTER FUNCTION alt_func3(int) OWNER TO regress_alter_generic_user2;	-- failed (not owner)
-ERROR:  must be owner of function alt_func3
-ALTER FUNCTION alt_func2(int) OWNER TO regress_alter_generic_user3;	-- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  function alt_func4(integer) already exists in schema "alt_nsp1"
 ALTER FUNCTION alt_func3(int) SET SCHEMA alt_nsp2;      -- failed (not owner)
-ERROR:  must be owner of function alt_func3
+ERROR:  function alt_func3(integer) does not exist
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp2;	-- failed (name conflicts)
 ERROR:  function alt_func2(integer) already exists in schema "alt_nsp2"
 ALTER AGGREGATE alt_agg3(int) RENAME TO alt_agg4;   -- failed (not owner)
-ERROR:  must be owner of function alt_agg3
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg4;   -- OK
-ALTER AGGREGATE alt_agg3(int) OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of function alt_agg3
-ALTER AGGREGATE alt_agg2(int) OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  function alt_agg4(integer) already exists in schema "alt_nsp1"
 ALTER AGGREGATE alt_agg3(int) SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of function alt_agg3
+ERROR:  aggregate alt_agg3(integer) does not exist
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  function alt_agg2(integer) already exists in schema "alt_nsp2"
-RESET SESSION AUTHORIZATION;
 SELECT n.nspname, proname, prorettype::regtype, prokind, a.rolname
   FROM pg_proc p, pg_namespace n, pg_authid a
   WHERE p.pronamespace = n.oid AND p.proowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, proname;
- nspname  |  proname  | prorettype | prokind |           rolname           
-----------+-----------+------------+---------+-----------------------------
- alt_nsp1 | alt_agg2  | integer    | a       | regress_alter_generic_user2
- alt_nsp1 | alt_agg3  | integer    | a       | regress_alter_generic_user1
- alt_nsp1 | alt_agg4  | integer    | a       | regress_alter_generic_user2
- alt_nsp1 | alt_func2 | integer    | f       | regress_alter_generic_user2
- alt_nsp1 | alt_func3 | integer    | f       | regress_alter_generic_user1
- alt_nsp1 | alt_func4 | integer    | f       | regress_alter_generic_user2
- alt_nsp2 | alt_agg2  | integer    | a       | regress_alter_generic_user3
- alt_nsp2 | alt_func2 | integer    | f       | regress_alter_generic_user3
+ nspname  |  proname  | prorettype | prokind | rolname  
+----------+-----------+------------+---------+----------
+ alt_nsp1 | alt_agg1  | integer    | a       | postgres
+ alt_nsp1 | alt_agg2  | integer    | a       | postgres
+ alt_nsp1 | alt_agg4  | integer    | a       | postgres
+ alt_nsp1 | alt_func1 | integer    | f       | postgres
+ alt_nsp1 | alt_func2 | integer    | f       | postgres
+ alt_nsp1 | alt_func4 | integer    | f       | postgres
+ alt_nsp2 | alt_agg2  | integer    | a       | postgres
+ alt_nsp2 | alt_func2 | integer    | f       | postgres
 (8 rows)
 
 --
@@ -107,42 +81,32 @@ SELECT n.nspname, proname, prorettype::regtype, prokind, a.rolname
 --
 -- Conversion
 --
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 CREATE CONVERSION alt_conv2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv2;  -- failed (name conflict)
 ERROR:  conversion "alt_conv2" already exists in schema "alt_nsp1"
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv3;  -- OK
-ALTER CONVERSION alt_conv2 OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER CONVERSION alt_conv2 OWNER TO regress_alter_generic_user3;  -- OK
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
 CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 CREATE CONVERSION alt_conv2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 ALTER CONVERSION alt_conv3 RENAME TO alt_conv4;  -- failed (not owner)
-ERROR:  must be owner of conversion alt_conv3
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv4;  -- OK
-ALTER CONVERSION alt_conv3 OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of conversion alt_conv3
-ALTER CONVERSION alt_conv2 OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  conversion "alt_conv4" already exists in schema "alt_nsp1"
 ALTER CONVERSION alt_conv3 SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of conversion alt_conv3
+ERROR:  conversion "alt_conv3" does not exist
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  conversion "alt_conv2" already exists in schema "alt_nsp2"
-RESET SESSION AUTHORIZATION;
 SELECT n.nspname, c.conname, a.rolname
   FROM pg_conversion c, pg_namespace n, pg_authid a
   WHERE c.connamespace = n.oid AND c.conowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, conname;
- nspname  |  conname  |           rolname           
-----------+-----------+-----------------------------
- alt_nsp1 | alt_conv2 | regress_alter_generic_user2
- alt_nsp1 | alt_conv3 | regress_alter_generic_user1
- alt_nsp1 | alt_conv4 | regress_alter_generic_user2
- alt_nsp2 | alt_conv2 | regress_alter_generic_user3
+ nspname  |  conname  | rolname  
+----------+-----------+----------
+ alt_nsp1 | alt_conv1 | postgres
+ alt_nsp1 | alt_conv2 | postgres
+ alt_nsp1 | alt_conv4 | postgres
+ alt_nsp2 | alt_conv2 | postgres
 (4 rows)
 
 --
@@ -193,62 +157,42 @@ LINE 1: SELECT srvname FROM pg_foreign_server WHERE srvname like 'al...
 --
 CREATE LANGUAGE alt_lang1 HANDLER plpgsql_call_handler;
 CREATE LANGUAGE alt_lang2 HANDLER plpgsql_call_handler;
-ALTER LANGUAGE alt_lang1 OWNER TO regress_alter_generic_user1;  -- OK
-ALTER LANGUAGE alt_lang2 OWNER TO regress_alter_generic_user2;  -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 ALTER LANGUAGE alt_lang1 RENAME TO alt_lang2;   -- failed (name conflict)
 ERROR:  language "alt_lang2" already exists
 ALTER LANGUAGE alt_lang2 RENAME TO alt_lang3;   -- failed (not owner)
-ERROR:  must be owner of language alt_lang2
 ALTER LANGUAGE alt_lang1 RENAME TO alt_lang3;   -- OK
-ALTER LANGUAGE alt_lang2 OWNER TO regress_alter_generic_user3;  -- failed (not owner)
-ERROR:  must be owner of language alt_lang2
-ALTER LANGUAGE alt_lang3 OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER LANGUAGE alt_lang3 OWNER TO regress_alter_generic_user3;  -- OK
-RESET SESSION AUTHORIZATION;
+ERROR:  language "alt_lang3" already exists
 SELECT lanname, a.rolname
   FROM pg_language l, pg_authid a
   WHERE l.lanowner = a.oid AND l.lanname like 'alt_lang%'
   ORDER BY lanname;
-  lanname  |           rolname           
------------+-----------------------------
- alt_lang2 | regress_alter_generic_user2
- alt_lang3 | regress_alter_generic_user3
+  lanname  | rolname  
+-----------+----------
+ alt_lang1 | postgres
+ alt_lang3 | postgres
 (2 rows)
 
 --
 -- Operator
 --
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 CREATE OPERATOR @-@ ( leftarg = int4, rightarg = int4, procedure = int4mi );
 CREATE OPERATOR @+@ ( leftarg = int4, rightarg = int4, procedure = int4pl );
-ALTER OPERATOR @+@(int4, int4) OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER OPERATOR @+@(int4, int4) OWNER TO regress_alter_generic_user3;  -- OK
 ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;           -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
 CREATE OPERATOR @-@ ( leftarg = int4, rightarg = int4, procedure = int4mi );
-ALTER OPERATOR @+@(int4, int4) OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of operator @+@
-ALTER OPERATOR @-@(int4, int4) OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
 ALTER OPERATOR @+@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (not owner)
-ERROR:  must be owner of operator @+@
 -- can't test this: the error message includes the raw oid of namespace
 -- ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (name conflict)
-RESET SESSION AUTHORIZATION;
 SELECT n.nspname, oprname, a.rolname,
     oprleft::regtype, oprright::regtype, oprcode::regproc
   FROM pg_operator o, pg_namespace n, pg_authid a
   WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, oprname;
- nspname  | oprname |           rolname           | oprleft | oprright | oprcode 
-----------+---------+-----------------------------+---------+----------+---------
- alt_nsp1 | @+@     | regress_alter_generic_user3 | integer | integer  | int4pl
- alt_nsp1 | @-@     | regress_alter_generic_user2 | integer | integer  | int4mi
- alt_nsp2 | @-@     | regress_alter_generic_user1 | integer | integer  | int4mi
+ nspname  | oprname | rolname  | oprleft | oprright | oprcode 
+----------+---------+----------+---------+----------+---------
+ alt_nsp1 | @-@     | postgres | integer | integer  | int4mi
+ alt_nsp2 | @+@     | postgres | integer | integer  | int4pl
+ alt_nsp2 | @-@     | postgres | integer | integer  | int4mi
 (3 rows)
 
 --
@@ -256,77 +200,48 @@ SELECT n.nspname, oprname, a.rolname,
 --
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
-ALTER OPERATOR FAMILY alt_opf1 USING hash OWNER TO regress_alter_generic_user1;
-ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user1;
 CREATE OPERATOR CLASS alt_opc1 FOR TYPE uuid USING hash AS STORAGE uuid;
 CREATE OPERATOR CLASS alt_opc2 FOR TYPE uuid USING hash AS STORAGE uuid;
-ALTER OPERATOR CLASS alt_opc1 USING hash OWNER TO regress_alter_generic_user1;
-ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user1;
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf2;  -- failed (name conflict)
 ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp1"
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3;  -- OK
-ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user3;  -- OK
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- OK
 ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc2;  -- failed (name conflict)
 ERROR:  operator class "alt_opc2" for access method "hash" already exists in schema "alt_nsp1"
 ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc3;  -- OK
-ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user3;  -- OK
 ALTER OPERATOR CLASS alt_opc2 USING hash SET SCHEMA alt_nsp2;  -- OK
-RESET SESSION AUTHORIZATION;
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
-ALTER OPERATOR FAMILY alt_opf1 USING hash OWNER TO regress_alter_generic_user2;
-ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user2;
 CREATE OPERATOR CLASS alt_opc1 FOR TYPE macaddr USING hash AS STORAGE macaddr;
 ERROR:  type "macaddr" does not exist
 CREATE OPERATOR CLASS alt_opc2 FOR TYPE macaddr USING hash AS STORAGE macaddr;
 ERROR:  type "macaddr" does not exist
-ALTER OPERATOR CLASS alt_opc1 USING hash OWNER TO regress_alter_generic_user2;
-ERROR:  operator class "alt_opc1" does not exist for access method "hash"
-ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user2;
-ERROR:  operator class "alt_opc2" does not exist for access method "hash"
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
 ALTER OPERATOR FAMILY alt_opf3 USING hash RENAME TO alt_opf4;	-- failed (not owner)
-ERROR:  must be owner of operator family alt_opf3
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf4;  -- OK
-ALTER OPERATOR FAMILY alt_opf3 USING hash OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of operator family alt_opf3
-ALTER OPERATOR FAMILY alt_opf2 USING hash OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  operator family "alt_opf4" for access method "hash" already exists in schema "alt_nsp1"
 ALTER OPERATOR FAMILY alt_opf3 USING hash SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of operator family alt_opf3
+ERROR:  operator family "alt_opf3" does not exist for access method "hash"
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp2"
 ALTER OPERATOR CLASS alt_opc3 USING hash RENAME TO alt_opc4;	-- failed (not owner)
-ERROR:  must be owner of operator class alt_opc3
 ALTER OPERATOR CLASS alt_opc1 USING hash RENAME TO alt_opc4;  -- OK
 ERROR:  operator class "alt_opc1" does not exist for access method "hash"
-ALTER OPERATOR CLASS alt_opc3 USING hash OWNER TO regress_alter_generic_user2;  -- failed (not owner)
-ERROR:  must be owner of operator class alt_opc3
-ALTER OPERATOR CLASS alt_opc2 USING hash OWNER TO regress_alter_generic_user3;  -- failed (no role membership)
-ERROR:  operator class "alt_opc2" does not exist for access method "hash"
 ALTER OPERATOR CLASS alt_opc3 USING hash SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  must be owner of operator class alt_opc3
+ERROR:  operator class "alt_opc3" does not exist for access method "hash"
 ALTER OPERATOR CLASS alt_opc2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  operator class "alt_opc2" does not exist for access method "hash"
-RESET SESSION AUTHORIZATION;
 SELECT nspname, opfname, amname, rolname
   FROM pg_opfamily o, pg_am m, pg_namespace n, pg_authid a
   WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid AND o.opfowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
 	AND NOT opfname LIKE 'alt_opc%'
   ORDER BY nspname, opfname;
- nspname  | opfname  | amname |           rolname           
-----------+----------+--------+-----------------------------
- alt_nsp1 | alt_opf2 | hash   | regress_alter_generic_user2
- alt_nsp1 | alt_opf3 | hash   | regress_alter_generic_user1
- alt_nsp1 | alt_opf4 | hash   | regress_alter_generic_user2
- alt_nsp2 | alt_opf2 | hash   | regress_alter_generic_user3
+ nspname  | opfname  | amname | rolname  
+----------+----------+--------+----------
+ alt_nsp1 | alt_opf1 | hash   | postgres
+ alt_nsp1 | alt_opf2 | hash   | postgres
+ alt_nsp1 | alt_opf4 | hash   | postgres
+ alt_nsp2 | alt_opf2 | hash   | postgres
 (4 rows)
 
 SELECT nspname, opcname, amname, rolname
@@ -334,10 +249,10 @@ SELECT nspname, opcname, amname, rolname
   WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid AND o.opcowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, opcname;
- nspname  | opcname  | amname |           rolname           
-----------+----------+--------+-----------------------------
- alt_nsp1 | alt_opc3 | hash   | regress_alter_generic_user1
- alt_nsp2 | alt_opc2 | hash   | regress_alter_generic_user3
+ nspname  | opcname  | amname | rolname  
+----------+----------+--------+----------
+ alt_nsp1 | alt_opc4 | hash   | postgres
+ alt_nsp2 | alt_opc2 | hash   | postgres
 (2 rows)
 
 -- ALTER OPERATOR FAMILY ... ADD/DROP
@@ -379,27 +294,17 @@ ERROR:  invalid function number 6, must be between 1 and 5
 ALTER OPERATOR FAMILY alt_opf4 USING btree ADD STORAGE invalid_storage; -- Ensure STORAGE is not a part of ALTER OPERATOR FAMILY
 ERROR:  STORAGE cannot be specified in ALTER OPERATOR FAMILY
 DROP OPERATOR FAMILY alt_opf4 USING btree;
--- Should fail. Need to be SUPERUSER to do ALTER OPERATOR FAMILY .. ADD / DROP
+-- Should fail. Need to be to do ALTER OPERATOR FAMILY .. ADD / DROP
 BEGIN TRANSACTION;
-CREATE ROLE regress_alter_generic_user5 NOSUPERUSER;
 CREATE OPERATOR FAMILY alt_opf5 USING btree;
-SET ROLE regress_alter_generic_user5;
 ALTER OPERATOR FAMILY alt_opf5 USING btree ADD OPERATOR 1 < (int4, int2), FUNCTION 1 btint42cmp(int4, int2);
-ERROR:  must be superuser to alter an operator family
-RESET ROLE;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 DROP OPERATOR FAMILY alt_opf5 USING btree;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- Should fail. Need rights to namespace for ALTER OPERATOR FAMILY .. ADD / DROP
 BEGIN TRANSACTION;
-CREATE ROLE regress_alter_generic_user6;
 CREATE SCHEMA alt_nsp6;
-REVOKE ALL ON SCHEMA alt_nsp6 FROM regress_alter_generic_user6;
 CREATE OPERATOR FAMILY alt_nsp6.alt_opf6 USING btree;
-SET ROLE regress_alter_generic_user6;
 ALTER OPERATOR FAMILY alt_nsp6.alt_opf6 USING btree ADD OPERATOR 1 < (int4, int2);
-ERROR:  permission denied for schema alt_nsp6
 ROLLBACK;
 -- Should fail. Only two arguments required for ALTER OPERATOR FAMILY ... DROP OPERATOR
 CREATE OPERATOR FAMILY alt_opf7 USING btree;
@@ -543,44 +448,34 @@ DROP OPERATOR FAMILY alt_opf19 USING btree;
 --
 -- Statistics
 --
-SET SESSION AUTHORIZATION regress_alter_generic_user1;
 CREATE TABLE alt_regress_1 (a INTEGER, b INTEGER);
 CREATE STATISTICS alt_stat1 ON a, b FROM alt_regress_1;
 CREATE STATISTICS alt_stat2 ON a, b FROM alt_regress_1;
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat2;   -- failed (name conflict)
 ERROR:  statistics object "alt_stat2" already exists in schema "alt_nsp1"
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat3;   -- OK
-ALTER STATISTICS alt_stat2 OWNER TO regress_alter_generic_user2;  -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user2"
-ALTER STATISTICS alt_stat2 OWNER TO regress_alter_generic_user3;  -- OK
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;    -- OK
-SET SESSION AUTHORIZATION regress_alter_generic_user2;
 CREATE TABLE alt_regress_2 (a INTEGER, b INTEGER);
 CREATE STATISTICS alt_stat1 ON a, b FROM alt_regress_2;
 CREATE STATISTICS alt_stat2 ON a, b FROM alt_regress_2;
 ALTER STATISTICS alt_stat3 RENAME TO alt_stat4;    -- failed (not owner)
-ERROR:  must be owner of statistics object alt_stat3
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat4;    -- OK
-ALTER STATISTICS alt_stat3 OWNER TO regress_alter_generic_user2; -- failed (not owner)
-ERROR:  must be owner of statistics object alt_stat3
-ALTER STATISTICS alt_stat2 OWNER TO regress_alter_generic_user3; -- failed (no role membership)
-ERROR:  must be member of role "regress_alter_generic_user3"
+ERROR:  statistics object "alt_stat4" already exists in schema "alt_nsp1"
 ALTER STATISTICS alt_stat3 SET SCHEMA alt_nsp2;		-- failed (not owner)
-ERROR:  must be owner of statistics object alt_stat3
+ERROR:  statistics object "alt_stat3" does not exist
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;		-- failed (name conflict)
 ERROR:  statistics object "alt_stat2" already exists in schema "alt_nsp2"
-RESET SESSION AUTHORIZATION;
 SELECT nspname, stxname, rolname
   FROM pg_statistic_ext s, pg_namespace n, pg_authid a
  WHERE s.stxnamespace = n.oid AND s.stxowner = a.oid
    AND n.nspname in ('alt_nsp1', 'alt_nsp2')
  ORDER BY nspname, stxname;
- nspname  |  stxname  |           rolname           
-----------+-----------+-----------------------------
- alt_nsp1 | alt_stat2 | regress_alter_generic_user2
- alt_nsp1 | alt_stat3 | regress_alter_generic_user1
- alt_nsp1 | alt_stat4 | regress_alter_generic_user2
- alt_nsp2 | alt_stat2 | regress_alter_generic_user3
+ nspname  |  stxname  | rolname  
+----------+-----------+----------
+ alt_nsp1 | alt_stat1 | postgres
+ alt_nsp1 | alt_stat2 | postgres
+ alt_nsp1 | alt_stat4 | postgres
+ alt_nsp2 | alt_stat2 | postgres
 (4 rows)
 
 ---
@@ -595,34 +490,32 @@ ERROR:  syntax error at or near "FOREIGN"
 LINE 1: DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
              ^
 DROP LANGUAGE alt_lang2 CASCADE;
+ERROR:  language "alt_lang2" does not exist
 DROP LANGUAGE alt_lang3 CASCADE;
 DROP SCHEMA alt_nsp1 CASCADE;
-NOTICE:  drop cascades to 18 other objects
-DETAIL:  drop cascades to function alt_func3(integer)
-drop cascades to function alt_agg3(integer)
-drop cascades to function alt_func4(integer)
-drop cascades to function alt_func2(integer)
+NOTICE:  drop cascades to 17 other objects
+DETAIL:  drop cascades to function alt_func4(integer)
 drop cascades to function alt_agg4(integer)
+drop cascades to function alt_func1(integer)
+drop cascades to function alt_func2(integer)
+drop cascades to function alt_agg1(integer)
 drop cascades to function alt_agg2(integer)
-drop cascades to conversion alt_conv3
 drop cascades to conversion alt_conv4
+drop cascades to conversion alt_conv1
 drop cascades to conversion alt_conv2
-drop cascades to operator @+@(integer,integer)
 drop cascades to operator @-@(integer,integer)
-drop cascades to operator family alt_opf3 for access method hash
+drop cascades to operator family alt_opf4 for access method hash
 drop cascades to operator family alt_opc1 for access method hash
 drop cascades to operator family alt_opc2 for access method hash
-drop cascades to operator family alt_opf4 for access method hash
+drop cascades to operator family alt_opf1 for access method hash
 drop cascades to operator family alt_opf2 for access method hash
 drop cascades to table alt_regress_1
 drop cascades to table alt_regress_2
 DROP SCHEMA alt_nsp2 CASCADE;
-NOTICE:  drop cascades to 5 other objects
+NOTICE:  drop cascades to 6 other objects
 DETAIL:  drop cascades to function alt_nsp2.alt_func2(integer)
 drop cascades to function alt_nsp2.alt_agg2(integer)
 drop cascades to conversion alt_nsp2.alt_conv2
 drop cascades to operator alt_nsp2.@-@(integer,integer)
+drop cascades to operator alt_nsp2.@+@(integer,integer)
 drop cascades to operator family alt_nsp2.alt_opf2 for access method hash
-DROP USER regress_alter_generic_user1;
-DROP USER regress_alter_generic_user2;
-DROP USER regress_alter_generic_user3;
