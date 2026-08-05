@@ -6,10 +6,12 @@
 ## 不可被裁剪的部分
 
 - btree、hash索引
+- 事务
 
 
 ## 注意事项
 -  /home/postgres/works/my-github/minipg项目目录下，可以执行rm某个文件的操作，但是不能把整个项目删除，只有确认该文件可被裁剪才可以执行rm操作
+- 不建议使用perl或python等脚本修改代码
 
 
 ## 参考

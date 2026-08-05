@@ -304,10 +304,8 @@ IsSharedRelation(Oid relationId)
 		relationId == SubscriptionNameIndexId)
 		return true;
 	/* These are their toast tables and toast indexes */
-	if (relationId == PgAuthidToastTable ||
+	if (		relationId == PgAuthidToastTable ||
 		relationId == PgAuthidToastIndex ||
-		relationId == PgDatabaseToastTable ||
-		relationId == PgDatabaseToastIndex ||
 		relationId == PgDbRoleSettingToastTable ||
 		relationId == PgDbRoleSettingToastIndex ||
 		relationId == PgReplicationOriginToastTable ||

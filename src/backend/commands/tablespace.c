@@ -325,7 +325,6 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 		DirectFunctionCall1(namein, CStringGetDatum(stmt->tablespacename));
 	values[Anum_pg_tablespace_spcowner - 1] =
 		ObjectIdGetDatum(ownerId);
-	nulls[Anum_pg_tablespace_spcacl - 1] = true;
 
 	/* Generate new proposed spcoptions (text array) */
 	newOptions = transformRelOptions((Datum) 0,

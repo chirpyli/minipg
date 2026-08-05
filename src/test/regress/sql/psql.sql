@@ -1245,7 +1245,6 @@ set search_path to default;
 \df int*pl
 \df int*pl int4
 \df int*pl * pg_catalog.int8
-\df acl* aclitem[]
 \df has_database_privilege oid text
 \df has_database_privilege oid text -
 \dfa bit* small*

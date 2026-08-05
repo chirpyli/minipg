@@ -410,21 +410,6 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 		repl_repl[Anum_pg_namespace_nspowner - 1] = true;
 		repl_val[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(newOwnerId);
 
-		/*
-		 * Determine the modified ACL for the new owner.  This is only
-		 * necessary when the ACL is non-null.
-		 */
-		aclDatum = SysCacheGetAttr(NAMESPACENAME, tup,
-								   Anum_pg_namespace_nspacl,
-								   &isNull);
-		if (!isNull)
-		{
-			newAcl = aclnewowner(DatumGetAclP(aclDatum),
-								 nspForm->nspowner, newOwnerId);
-			repl_repl[Anum_pg_namespace_nspacl - 1] = true;
-			repl_val[Anum_pg_namespace_nspacl - 1] = PointerGetDatum(newAcl);
-		}
-
 		newtuple = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
 
 		CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);

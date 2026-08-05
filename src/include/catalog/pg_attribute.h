@@ -173,9 +173,6 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
 	/* NOTE: The following fields are not present in tuple descriptors. */
 
-	/* Column-level access permissions */
-	aclitem		attacl[1] BKI_DEFAULT(_null_);
-
 	/* Column-level options */
 	text		attoptions[1] BKI_DEFAULT(_null_);
 

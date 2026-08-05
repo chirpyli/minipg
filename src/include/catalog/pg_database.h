@@ -71,8 +71,6 @@ CATALOG(pg_database,1262,DatabaseRelationId) BKI_SHARED_RELATION BKI_ROWTYPE_OID
 	Oid			dattablespace BKI_LOOKUP(pg_tablespace);
 
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	/* access permissions */
-	aclitem		datacl[1];
 #endif
 } FormData_pg_database;
 
@@ -82,10 +80,6 @@ CATALOG(pg_database,1262,DatabaseRelationId) BKI_SHARED_RELATION BKI_ROWTYPE_OID
  * ----------------
  */
 typedef FormData_pg_database *Form_pg_database;
-
-DECLARE_TOAST(pg_database, 4177, 4178);
-#define PgDatabaseToastTable 4177
-#define PgDatabaseToastIndex 4178
 
 DECLARE_UNIQUE_INDEX(pg_database_datname_index, 2671, on pg_database using btree(datname name_ops));
 #define DatabaseNameIndexId  2671

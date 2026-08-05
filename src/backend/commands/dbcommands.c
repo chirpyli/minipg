@@ -578,13 +578,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	new_record[Anum_pg_database_datminmxid - 1] = TransactionIdGetDatum(src_minmxid);
 	new_record[Anum_pg_database_dattablespace - 1] = ObjectIdGetDatum(dst_deftablespace);
 
-	/*
-	 * We deliberately set datacl to default (NULL), rather than copying it
-	 * from the template database.  Copying it would be a bad idea when the
-	 * owner is not the same as the template's owner.
-	 */
-	new_record_nulls[Anum_pg_database_datacl - 1] = true;
-
 	tuple = heap_form_tuple(RelationGetDescr(pg_database_rel),
 							new_record, new_record_nulls);
 
@@ -1791,22 +1784,6 @@ AlterDatabaseOwner(const char *dbname, Oid newOwnerId)
 
 		repl_repl[Anum_pg_database_datdba - 1] = true;
 		repl_val[Anum_pg_database_datdba - 1] = ObjectIdGetDatum(newOwnerId);
-
-		/*
-		 * Determine the modified ACL for the new owner.  This is only
-		 * necessary when the ACL is non-null.
-		 */
-		aclDatum = heap_getattr(tuple,
-								Anum_pg_database_datacl,
-								RelationGetDescr(rel),
-								&isNull);
-		if (!isNull)
-		{
-			newAcl = aclnewowner(DatumGetAclP(aclDatum),
-								 datForm->datdba, newOwnerId);
-			repl_repl[Anum_pg_database_datacl - 1] = true;
-			repl_val[Anum_pg_database_datacl - 1] = PointerGetDatum(newAcl);
-		}
 
 		newtuple = heap_modify_tuple(tuple, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
 		CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);

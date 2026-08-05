@@ -52,8 +52,6 @@ CATALOG(pg_language,2612,LanguageRelationId)
 	Oid			lanvalidator BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_proc);
 
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	/* Access privileges */
-	aclitem		lanacl[1] BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_language;
 
@@ -63,8 +61,6 @@ CATALOG(pg_language,2612,LanguageRelationId)
  * ----------------
  */
 typedef FormData_pg_language *Form_pg_language;
-
-DECLARE_TOAST(pg_language, 4157, 4158);
 
 DECLARE_UNIQUE_INDEX(pg_language_name_index, 2681, on pg_language using btree(lanname name_ops));
 #define LanguageNameIndexId  2681

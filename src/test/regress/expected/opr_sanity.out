@@ -1309,10 +1309,7 @@ ORDER BY 1;
 -------+---------------+-------------------------------------
    378 | array_append  | append element onto end of array
    379 | array_prepend | prepend element onto front of array
-  1035 | aclinsert     | add/update ACL item
-  1036 | aclremove     | remove ACL item
-  1037 | aclcontains   | contains
-(5 rows)
+(2 rows)
 
 -- Operators that are commutator pairs should have identical volatility
 -- and leakproofness markings on their implementation functions.

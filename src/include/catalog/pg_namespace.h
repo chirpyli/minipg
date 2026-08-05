@@ -38,10 +38,6 @@ CATALOG(pg_namespace,2615,NamespaceRelationId)
 
 	NameData	nspname;
 	Oid			nspowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
-
-#ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	aclitem		nspacl[1];
-#endif
 } FormData_pg_namespace;
 
 /* ----------------
@@ -50,8 +46,6 @@ CATALOG(pg_namespace,2615,NamespaceRelationId)
  * ----------------
  */
 typedef FormData_pg_namespace *Form_pg_namespace;
-
-DECLARE_TOAST(pg_namespace, 4163, 4164);
 
 DECLARE_UNIQUE_INDEX(pg_namespace_nspname_index, 2684, on pg_namespace using btree(nspname name_ops));
 #define NamespaceNameIndexId  2684

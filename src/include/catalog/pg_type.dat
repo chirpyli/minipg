@@ -196,10 +196,6 @@
   typcategory => 'X', typinput => 'unknownin', typoutput => 'unknownout',
   typreceive => 'unknownrecv', typsend => 'unknownsend', typalign => 'c' },
 
-{ oid => '1033', array_type_oid => '1034', descr => 'access control list',
-  typname => 'aclitem', typlen => '12', typbyval => 'f', typcategory => 'U',
-  typinput => 'aclitemin', typoutput => 'aclitemout', typreceive => '-',
-  typsend => '-', typalign => 'i' },
 { oid => '1042', array_type_oid => '1014',
   descr => 'char(length), blank-padded string, fixed storage length',
   typname => 'bpchar', typlen => '-1', typbyval => 'f', typcategory => 'S',

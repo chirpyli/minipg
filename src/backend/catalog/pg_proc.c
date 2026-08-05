@@ -554,7 +554,6 @@ ProcedureCreate(const char *procedureName,
 		 */
 		replaces[Anum_pg_proc_oid - 1] = false;
 		replaces[Anum_pg_proc_proowner - 1] = false;
-		replaces[Anum_pg_proc_proacl - 1] = false;
 
 		/* Okay, do it... */
 		tup = heap_modify_tuple(oldtup, tupDesc, values, nulls, replaces);
@@ -567,14 +566,6 @@ ProcedureCreate(const char *procedureName,
 	{
 		/* Creating a new procedure */
 		Oid			newOid;
-
-		/* First, get default permissions and set up proacl */
-		proacl = get_user_default_acl(OBJECT_FUNCTION, proowner,
-									  procNamespace);
-		if (proacl != NULL)
-			values[Anum_pg_proc_proacl - 1] = PointerGetDatum(proacl);
-		else
-			nulls[Anum_pg_proc_proacl - 1] = true;
 
 		newOid = GetNewOidWithIndex(rel, ProcedureOidIndexId,
 									Anum_pg_proc_oid);

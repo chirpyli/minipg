@@ -177,8 +177,6 @@
 { opcmethod => 'hash', opcname => 'bpchar_pattern_ops',
   opcfamily => 'hash/bpchar_pattern_ops', opcintype => 'bpchar',
   opcdefault => 'f' },
-{ opcmethod => 'hash', opcname => 'aclitem_ops',
-  opcfamily => 'hash/aclitem_ops', opcintype => 'aclitem' },
 
 
 

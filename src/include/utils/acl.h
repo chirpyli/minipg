@@ -59,6 +59,14 @@ typedef struct AclItem
 } AclItem;
 
 /*
+ * aclitem 类型已从 minipg 的 SQL/存储/类型注册层彻底移除（见 CHANGE.md）。
+ * 此处保留 AclItem 内部结构定义与 ACLITEMOID 占位宏，仅用于兼容 acl.c 中
+ * 已无任何 SQL 调用入口的遗留函数（aclitemin/acldefault/aclexplode 等），
+ * 它们不再被任何 catalog 字段或 SQL 函数引用，属于无害死代码。
+ */
+#define ACLITEMOID	InvalidOid
+
+/*
  * The upper 16 bits of the ai_privs field of an AclItem are the grant option
  * bits, and the lower 16 bits are the actual privileges.  We use "rights"
  * to mean the combined grant option and privilege bits fields.

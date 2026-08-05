@@ -1379,107 +1379,14 @@ setup_collation(FILE *cmdfd)
 static void
 setup_privileges(FILE *cmdfd)
 {
-	char	  **line;
-	char	  **priv_lines;
-	static char *privileges_setup[] = {
-		"UPDATE pg_class "
-		"  SET relacl = (SELECT array_agg(a.acl) FROM "
-		" (SELECT E'=r/\"$POSTGRES_SUPERUSERNAME\"' as acl "
-		"  UNION SELECT unnest(pg_catalog.acldefault("
-		"    CASE WHEN relkind = " CppAsString2(RELKIND_SEQUENCE) " THEN 's' "
-		"         ELSE 'r' END::\"char\"," CppAsString2(BOOTSTRAP_SUPERUSERID) "::oid))"
-		" ) as a) "
-		"  WHERE relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
-		CppAsString2(RELKIND_SEQUENCE) ")"
-		"  AND relacl IS NULL;\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        oid,"
-		"        (SELECT oid FROM pg_class WHERE relname = 'pg_class'),"
-		"        0,"
-		"        relacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_class"
-		"    WHERE"
-		"        relacl IS NOT NULL"
-		"        AND relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
-		CppAsString2(RELKIND_SEQUENCE) ");\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        pg_class.oid,"
-		"        (SELECT oid FROM pg_class WHERE relname = 'pg_class'),"
-		"        pg_attribute.attnum,"
-		"        pg_attribute.attacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_class"
-		"        JOIN pg_attribute ON (pg_class.oid = pg_attribute.attrelid)"
-		"    WHERE"
-		"        pg_attribute.attacl IS NOT NULL"
-		"        AND pg_class.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
-		CppAsString2(RELKIND_SEQUENCE) ");\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        oid,"
-		"        (SELECT oid FROM pg_class WHERE relname = 'pg_proc'),"
-		"        0,"
-		"        proacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_proc"
-		"    WHERE"
-		"        proacl IS NOT NULL;\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        oid,"
-		"        (SELECT oid FROM pg_class WHERE relname = 'pg_type'),"
-		"        0,"
-		"        typacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_type"
-		"    WHERE"
-		"        typacl IS NOT NULL;\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        oid,"
-		"        (SELECT oid FROM pg_class WHERE relname = 'pg_language'),"
-		"        0,"
-		"        lanacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_language"
-		"    WHERE"
-		"        lanacl IS NOT NULL;\n\n",
-		"INSERT INTO pg_init_privs "
-		"  (objoid, classoid, objsubid, initprivs, privtype)"
-		"    SELECT"
-		"        oid,"
-		"        (SELECT oid FROM pg_class WHERE "
-		"         relname = 'pg_largeobject_metadata'),"
-		"        0,"
-		"        lomacl,"
-		"        'i'"
-		"    FROM"
-		"        pg_largeobject_metadata"
-		"    WHERE"
-		"        lomacl IS NOT NULL;\n\n",
-	NULL
-	};
-
-	priv_lines = replace_token(privileges_setup, "$POSTGRES_SUPERUSERNAME",
-							   escape_quotes(username));
-	for (line = priv_lines; *line != NULL; line++)
-		PG_CMD_PUTS(*line);
+	/*
+	 * minipg 已将 aclitem 类型从 SQL/存储/类型注册层彻底移除，权限子系统以
+	 * "恒放行" 直通语义运行（见 mydoc/CHANGE.md）。pg_class.relacl、
+	 * pg_attribute.attacl、pg_proc.proacl、pg_type.typacl、pg_language.lanacl、
+	 * pg_largeobject_metadata.lomacl 等权限字段与 pg_init_privs.initprivs 字段
+	 * 均已删除，acldefault() 等函数亦不再注册，因此此处不再需要初始化任何
+	 * 权限数据，设为空实现。
+	 */
 }
 
 /*

@@ -118,8 +118,6 @@
   opfmethod => 'hash', opfname => 'text_pattern_ops' },
 { oid => '2231',
   opfmethod => 'hash', opfname => 'bpchar_pattern_ops' },
-{ oid => '2235',
-  opfmethod => 'hash', opfname => 'aclitem_ops' },
 
 { oid => '2968',
   opfmethod => 'btree', opfname => 'uuid_ops' },

@@ -64,7 +64,6 @@ LargeObjectCreate(Oid loid)
 	values[Anum_pg_largeobject_metadata_oid - 1] = ObjectIdGetDatum(loid_new);
 	values[Anum_pg_largeobject_metadata_lomowner - 1]
 		= ObjectIdGetDatum(GetUserId());
-	nulls[Anum_pg_largeobject_metadata_lomacl - 1] = true;
 
 	ntup = heap_form_tuple(RelationGetDescr(pg_lo_meta),
 						   values, nulls);

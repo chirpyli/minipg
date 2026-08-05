@@ -515,8 +515,6 @@ static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
 static void TryReuseForeignKey(Oid oldId, Constraint *con);
 static ObjectAddress ATExecAlterColumnGenericOptions(Relation rel, const char *colName,
 													 List *options, LOCKMODE lockmode);
-static void change_owner_fix_column_acls(Oid relationOid,
-										 Oid oldOwnerId, Oid newOwnerId);
 static void change_owner_recurse_to_sequences(Oid relationOid,
 											  Oid newOwnerId, LOCKMODE lockmode);
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
@@ -13337,34 +13335,11 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		repl_repl[Anum_pg_class_relowner - 1] = true;
 		repl_val[Anum_pg_class_relowner - 1] = ObjectIdGetDatum(newOwnerId);
 
-		/*
-		 * Determine the modified ACL for the new owner.  This is only
-		 * necessary when the ACL is non-null.
-		 */
-		aclDatum = SysCacheGetAttr(RELOID, tuple,
-								   Anum_pg_class_relacl,
-								   &isNull);
-		if (!isNull)
-		{
-			newAcl = aclnewowner(DatumGetAclP(aclDatum),
-								 tuple_class->relowner, newOwnerId);
-			repl_repl[Anum_pg_class_relacl - 1] = true;
-			repl_val[Anum_pg_class_relacl - 1] = PointerGetDatum(newAcl);
-		}
-
 		newtuple = heap_modify_tuple(tuple, RelationGetDescr(class_rel), repl_val, repl_null, repl_repl);
 
 		CatalogTupleUpdate(class_rel, &newtuple->t_self, newtuple);
 
 		heap_freetuple(newtuple);
-
-		/*
-		 * We must similarly update any per-column ACLs to reflect the new
-		 * owner; for neatness reasons that's split out as a subroutine.
-		 */
-		change_owner_fix_column_acls(relationOid,
-									 tuple_class->relowner,
-									 newOwnerId);
 
 		/*
 		 * Update owner dependency reference, if any.  A composite type has
@@ -13424,69 +13399,9 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 }
 
 /*
- * change_owner_fix_column_acls
+ * change_owner_recurse_to_sequences
  *
- * Helper function for ATExecChangeOwner.  Scan the columns of the table
- * and fix any non-null column ACLs to reflect the new owner.
- */
-static void
-change_owner_fix_column_acls(Oid relationOid, Oid oldOwnerId, Oid newOwnerId)
-{
-	Relation	attRelation;
-	SysScanDesc scan;
-	ScanKeyData key[1];
-	HeapTuple	attributeTuple;
-
-	attRelation = table_open(AttributeRelationId, RowExclusiveLock);
-	ScanKeyInit(&key[0],
-				Anum_pg_attribute_attrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relationOid));
-	scan = systable_beginscan(attRelation, AttributeRelidNumIndexId,
-							  true, NULL, 1, key);
-	while (HeapTupleIsValid(attributeTuple = systable_getnext(scan)))
-	{
-		Form_pg_attribute att = (Form_pg_attribute) GETSTRUCT(attributeTuple);
-		Datum		repl_val[Natts_pg_attribute];
-		bool		repl_null[Natts_pg_attribute];
-		bool		repl_repl[Natts_pg_attribute];
-		Acl		   *newAcl;
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	newtuple;
-
-		/* Ignore dropped columns */
-		if (att->attisdropped)
-			continue;
-
-		aclDatum = heap_getattr(attributeTuple,
-								Anum_pg_attribute_attacl,
-								RelationGetDescr(attRelation),
-								&isNull);
-		/* Null ACLs do not require changes */
-		if (isNull)
-			continue;
-
-		memset(repl_null, false, sizeof(repl_null));
-		memset(repl_repl, false, sizeof(repl_repl));
-
-		newAcl = aclnewowner(DatumGetAclP(aclDatum),
-							 oldOwnerId, newOwnerId);
-		repl_repl[Anum_pg_attribute_attacl - 1] = true;
-		repl_val[Anum_pg_attribute_attacl - 1] = PointerGetDatum(newAcl);
-
-		newtuple = heap_modify_tuple(attributeTuple,
-									 RelationGetDescr(attRelation),
-									 repl_val, repl_null, repl_repl);
-
-		CatalogTupleUpdate(attRelation, &newtuple->t_self, newtuple);
-
-		heap_freetuple(newtuple);
-	}
-	systable_endscan(scan);
-	table_close(attRelation, RowExclusiveLock);
-}
-
+ * Helper function for ATExecChangeOwner.  Examines pg_depend searching
 /*
  * change_owner_recurse_to_sequences
  *

@@ -35,11 +35,6 @@ CATALOG(pg_default_acl,826,DefaultAclRelationId)
 	Oid			defaclnamespace BKI_LOOKUP_OPT(pg_namespace);	/* OID of namespace, or
 																 * 0 for all */
 	char		defaclobjtype;	/* see DEFACLOBJ_xxx constants below */
-
-#ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	aclitem		defaclacl[1] BKI_FORCE_NOT_NULL;	/* permissions to add at
-													 * CREATE time */
-#endif
 } FormData_pg_default_acl;
 
 /* ----------------
@@ -48,8 +43,6 @@ CATALOG(pg_default_acl,826,DefaultAclRelationId)
  * ----------------
  */
 typedef FormData_pg_default_acl *Form_pg_default_acl;
-
-DECLARE_TOAST(pg_default_acl, 4143, 4144);
 
 DECLARE_UNIQUE_INDEX(pg_default_acl_role_nsp_obj_index, 827, on pg_default_acl using btree(defaclrole oid_ops, defaclnamespace oid_ops, defaclobjtype char_ops));
 #define DefaultAclRoleNspObjIndexId 827

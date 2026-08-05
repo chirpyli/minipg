@@ -3869,19 +3869,6 @@ AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId)
 	repl_repl[Anum_pg_type_typowner - 1] = true;
 	repl_val[Anum_pg_type_typowner - 1] = ObjectIdGetDatum(newOwnerId);
 
-	aclDatum = heap_getattr(tup,
-							Anum_pg_type_typacl,
-							RelationGetDescr(rel),
-							&isNull);
-	/* Null ACLs do not require changes */
-	if (!isNull)
-	{
-		newAcl = aclnewowner(DatumGetAclP(aclDatum),
-							 typTup->typowner, newOwnerId);
-		repl_repl[Anum_pg_type_typacl - 1] = true;
-		repl_val[Anum_pg_type_typacl - 1] = PointerGetDatum(newAcl);
-	}
-
 	tup = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null,
 							repl_repl);
 

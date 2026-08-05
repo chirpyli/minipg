@@ -812,8 +812,7 @@ InsertPgAttributeTuples(Relation pg_attribute_rel,
 		else
 			slot[slotCount]->tts_isnull[Anum_pg_attribute_attoptions - 1] = true;
 
-		/* start out with empty permissions and empty options */
-		slot[slotCount]->tts_isnull[Anum_pg_attribute_attacl - 1] = true;
+		/* start out with empty options */
 		slot[slotCount]->tts_isnull[Anum_pg_attribute_attfdwoptions - 1] = true;
 		slot[slotCount]->tts_isnull[Anum_pg_attribute_attmissingval - 1] = true;
 
@@ -981,10 +980,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relrewrite - 1] = ObjectIdGetDatum(rd_rel->relrewrite);
 	values[Anum_pg_class_relfrozenxid - 1] = TransactionIdGetDatum(rd_rel->relfrozenxid);
 	values[Anum_pg_class_relminmxid - 1] = MultiXactIdGetDatum(rd_rel->relminmxid);
-	if (relacl != (Datum) 0)
-		values[Anum_pg_class_relacl - 1] = relacl;
-	else
-		nulls[Anum_pg_class_relacl - 1] = true;
 	if (reloptions != (Datum) 0)
 		values[Anum_pg_class_reloptions - 1] = reloptions;
 	else

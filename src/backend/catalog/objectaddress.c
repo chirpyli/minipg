@@ -216,7 +216,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_database_datname,
 		InvalidAttrNumber,
 		Anum_pg_database_datdba,
-		Anum_pg_database_datacl,
+		InvalidAttrNumber,
 		OBJECT_DATABASE,
 		true
 	},
@@ -258,7 +258,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_proc_proname,
 		Anum_pg_proc_pronamespace,
 		Anum_pg_proc_proowner,
-		Anum_pg_proc_proacl,
+		InvalidAttrNumber,
 		OBJECT_FUNCTION,
 		false
 	},
@@ -272,7 +272,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_language_lanname,
 		InvalidAttrNumber,
 		Anum_pg_language_lanowner,
-		Anum_pg_language_lanacl,
+		InvalidAttrNumber,
 		OBJECT_LANGUAGE,
 		true
 	},
@@ -286,7 +286,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		Anum_pg_largeobject_metadata_lomowner,
-		Anum_pg_largeobject_metadata_lomacl,
+		InvalidAttrNumber,
 		OBJECT_LARGEOBJECT,
 		false
 	},
@@ -370,7 +370,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_namespace_nspname,
 		InvalidAttrNumber,
 		Anum_pg_namespace_nspowner,
-		Anum_pg_namespace_nspacl,
+		InvalidAttrNumber,
 		OBJECT_SCHEMA,
 		true
 	},
@@ -384,7 +384,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_class_relname,
 		Anum_pg_class_relnamespace,
 		Anum_pg_class_relowner,
-		Anum_pg_class_relacl,
+		InvalidAttrNumber,
 		OBJECT_TABLE,
 		true
 	},
@@ -398,7 +398,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_tablespace_spcname,
 		InvalidAttrNumber,
 		Anum_pg_tablespace_spcowner,
-		Anum_pg_tablespace_spcacl,
+		InvalidAttrNumber,
 		OBJECT_TABLESPACE,
 		true
 	},
@@ -448,7 +448,7 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_type_typname,
 		Anum_pg_type_typnamespace,
 		Anum_pg_type_typowner,
-		Anum_pg_type_typacl,
+		InvalidAttrNumber,
 		OBJECT_TYPE,
 		true
 	},

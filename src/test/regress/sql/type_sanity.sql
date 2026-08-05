@@ -523,7 +523,6 @@ CREATE TABLE tab_core_types AS SELECT
   'abc'::refcursor,
   '1 2'::int2vector,
   '1 2'::oidvector,
-  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
   '11'::xid8,
   'pg_class'::regclass,

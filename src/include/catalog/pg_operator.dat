@@ -863,19 +863,6 @@
 { oid => '965', descr => 'exponentiation',
   oprname => '^', oprleft => 'float8', oprright => 'float8',
   oprresult => 'float8', oprcode => 'dpow' },
-{ oid => '966', descr => 'add/update ACL item',
-  oprname => '+', oprleft => '_aclitem', oprright => 'aclitem',
-  oprresult => '_aclitem', oprcode => 'aclinsert' },
-{ oid => '967', descr => 'remove ACL item',
-  oprname => '-', oprleft => '_aclitem', oprright => 'aclitem',
-  oprresult => '_aclitem', oprcode => 'aclremove' },
-{ oid => '968', descr => 'contains',
-  oprname => '@>', oprleft => '_aclitem', oprright => 'aclitem',
-  oprresult => 'bool', oprcode => 'aclcontains' },
-{ oid => '974', descr => 'equal',
-  oprname => '=', oprcanhash => 't', oprleft => 'aclitem',
-  oprright => 'aclitem', oprresult => 'bool', oprcom => '=(aclitem,aclitem)',
-  oprcode => 'aclitemeq', oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
 
 # additional geometric operators - thomas 1997-07-09
 

@@ -122,9 +122,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 
 	/* procedure-local GUC settings */
 	text		proconfig[1] BKI_DEFAULT(_null_);
-
-	/* access permissions */
-	aclitem		proacl[1] BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_proc;
 

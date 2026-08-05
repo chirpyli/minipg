@@ -613,44 +613,7 @@ static AclMode
 pg_aclmask(ObjectType objtype, Oid table_oid, AttrNumber attnum, Oid roleid,
 		   AclMode mask, AclMaskHow how)
 {
-	switch (objtype)
-	{
-		case OBJECT_COLUMN:
-			return
-				pg_class_aclmask(table_oid, roleid, mask, how) |
-				pg_attribute_aclmask(table_oid, attnum, roleid, mask, how);
-		case OBJECT_TABLE:
-		case OBJECT_SEQUENCE:
-			return pg_class_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_DATABASE:
-			return pg_database_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_FUNCTION:
-			return pg_proc_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_LANGUAGE:
-			return pg_language_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_LARGEOBJECT:
-			return pg_largeobject_aclmask_snapshot(table_oid, roleid,
-												   mask, how, NULL);
-		case OBJECT_SCHEMA:
-			return pg_namespace_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_STATISTIC_EXT:
-			elog(ERROR, "grantable rights not supported for statistics objects");
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-		case OBJECT_TABLESPACE:
-			return pg_tablespace_aclmask(table_oid, roleid, mask, how);
-		case OBJECT_EVENT_TRIGGER:
-			elog(ERROR, "grantable rights not supported for event triggers");
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-		case OBJECT_TYPE:
-			return pg_type_aclmask(table_oid, roleid, mask, how);
-		default:
-			elog(ERROR, "unrecognized objtype: %d",
-				 (int) objtype);
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-	}
+	return mask;
 }
 
 
@@ -677,8 +640,7 @@ AclMode
 pg_attribute_aclmask(Oid table_oid, AttrNumber attnum, Oid roleid,
 					 AclMode mask, AclMaskHow how)
 {
-	return pg_attribute_aclmask_ext(table_oid, attnum, roleid,
-									mask, how, NULL);
+	return mask;
 }
 
 /*
@@ -691,102 +653,7 @@ AclMode
 pg_attribute_aclmask_ext(Oid table_oid, AttrNumber attnum, Oid roleid,
 						 AclMode mask, AclMaskHow how, bool *is_missing)
 {
-	AclMode		result;
-	HeapTuple	classTuple;
-	HeapTuple	attTuple;
-	Form_pg_class classForm;
-	Form_pg_attribute attributeForm;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/*
-	 * First, get the column's ACL from its pg_attribute entry
-	 */
-	attTuple = SearchSysCache2(ATTNUM,
-							   ObjectIdGetDatum(table_oid),
-							   Int16GetDatum(attnum));
-	if (!HeapTupleIsValid(attTuple))
-	{
-		if (is_missing != NULL)
-		{
-			/* return "no privileges" instead of throwing an error */
-			*is_missing = true;
-			return 0;
-		}
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("attribute %d of relation with OID %u does not exist",
-							attnum, table_oid)));
-	}
-
-	attributeForm = (Form_pg_attribute) GETSTRUCT(attTuple);
-
-	/* Check dropped columns, too */
-	if (attributeForm->attisdropped)
-	{
-		if (is_missing != NULL)
-		{
-			/* return "no privileges" instead of throwing an error */
-			*is_missing = true;
-			ReleaseSysCache(attTuple);
-			return 0;
-		}
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("attribute %d of relation with OID %u does not exist",
-							attnum, table_oid)));
-	}
-
-	aclDatum = SysCacheGetAttr(ATTNUM, attTuple, Anum_pg_attribute_attacl,
-							   &isNull);
-
-	/*
-	 * Here we hard-wire knowledge that the default ACL for a column grants no
-	 * privileges, so that we can fall out quickly in the very common case
-	 * where attacl is null.
-	 */
-	if (isNull)
-	{
-		ReleaseSysCache(attTuple);
-		return 0;
-	}
-
-	/*
-	 * Must get the relation's ownerId from pg_class.  Since we already found
-	 * a pg_attribute entry, the only likely reason for this to fail is that a
-	 * concurrent DROP of the relation committed since then (which could only
-	 * happen if we don't have lock on the relation).  We prefer to report "no
-	 * privileges" rather than failing in such a case, so as to avoid unwanted
-	 * failures in has_column_privilege() tests.
-	 */
-	classTuple = SearchSysCache1(RELOID, ObjectIdGetDatum(table_oid));
-	if (!HeapTupleIsValid(classTuple))
-	{
-		ReleaseSysCache(attTuple);
-		return 0;
-	}
-	classForm = (Form_pg_class) GETSTRUCT(classTuple);
-
-	ownerId = classForm->relowner;
-
-	ReleaseSysCache(classTuple);
-
-	/* detoast column's ACL if necessary */
-	acl = DatumGetAclP(aclDatum);
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(attTuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -796,7 +663,7 @@ AclMode
 pg_class_aclmask(Oid table_oid, Oid roleid,
 				 AclMode mask, AclMaskHow how)
 {
-	return pg_class_aclmask_ext(table_oid, roleid, mask, how, NULL);
+	return mask;
 }
 
 /*
@@ -809,115 +676,7 @@ AclMode
 pg_class_aclmask_ext(Oid table_oid, Oid roleid, AclMode mask,
 					 AclMaskHow how, bool *is_missing)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Form_pg_class classForm;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/*
-	 * Must get the relation's tuple from pg_class
-	 */
-	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(table_oid));
-	if (!HeapTupleIsValid(tuple))
-	{
-		if (is_missing != NULL)
-		{
-			/* return "no privileges" instead of throwing an error */
-			*is_missing = true;
-			return 0;
-		}
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_TABLE),
-					 errmsg("relation with OID %u does not exist",
-							table_oid)));
-	}
-
-	classForm = (Form_pg_class) GETSTRUCT(tuple);
-
-	/*
-	 * Deny anyone permission to update a system catalog unless
-	 * pg_authid.rolsuper is set.
-	 *
-	 * As of 7.4 we have some updatable system views; those shouldn't be
-	 * protected in this way.  Assume the view rules can take care of
-	 * themselves.  ACL_USAGE is if we ever have system sequences.
-	 */
-	if ((mask & (ACL_INSERT | ACL_UPDATE | ACL_DELETE | ACL_TRUNCATE | ACL_USAGE)) &&
-		IsSystemClass(table_oid, classForm) &&
-		classForm->relkind != RELKIND_VIEW &&
-		!superuser_arg(roleid))
-		mask &= ~(ACL_INSERT | ACL_UPDATE | ACL_DELETE | ACL_TRUNCATE | ACL_USAGE);
-
-	/*
-	 * Otherwise, superusers bypass all permission-checking.
-	 */
-	if (superuser_arg(roleid))
-	{
-		ReleaseSysCache(tuple);
-		return mask;
-	}
-
-	/*
-	 * Normal case: get the relation's ACL from pg_class
-	 */
-	ownerId = classForm->relowner;
-
-	aclDatum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relacl,
-							   &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		switch (classForm->relkind)
-		{
-			case RELKIND_SEQUENCE:
-				acl = acldefault(OBJECT_SEQUENCE, ownerId);
-				break;
-			default:
-				acl = acldefault(OBJECT_TABLE, ownerId);
-				break;
-		}
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast rel's ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	/*
-	 * Check if ACL_SELECT is being checked and, if so, and not set already as
-	 * part of the result, then check if the user is a member of the
-	 * pg_read_all_data role, which allows read access to all relations.
-	 */
-	if (mask & ACL_SELECT && !(result & ACL_SELECT) &&
-		has_privs_of_role(roleid, ROLE_PG_READ_ALL_DATA))
-		result |= ACL_SELECT;
-
-	/*
-	 * Check if ACL_INSERT, ACL_UPDATE, or ACL_DELETE is being checked and, if
-	 * so, and not set already as part of the result, then check if the user
-	 * is a member of the pg_write_all_data role, which allows
-	 * INSERT/UPDATE/DELETE access to all relations (except system catalogs,
-	 * which requires superuser, see above).
-	 */
-	if (mask & (ACL_INSERT | ACL_UPDATE | ACL_DELETE) &&
-		!(result & (ACL_INSERT | ACL_UPDATE | ACL_DELETE)) &&
-		has_privs_of_role(roleid, ROLE_PG_WRITE_ALL_DATA))
-		result |= (mask & (ACL_INSERT | ACL_UPDATE | ACL_DELETE));
-
-	return result;
+	return mask;
 }
 
 /*
@@ -927,51 +686,7 @@ AclMode
 pg_database_aclmask(Oid db_oid, Oid roleid,
 					AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Get the database's ACL from pg_database
-	 */
-	tuple = SearchSysCache1(DATABASEOID, ObjectIdGetDatum(db_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_DATABASE),
-				 errmsg("database with OID %u does not exist", db_oid)));
-
-	ownerId = ((Form_pg_database) GETSTRUCT(tuple))->datdba;
-
-	aclDatum = SysCacheGetAttr(DATABASEOID, tuple, Anum_pg_database_datacl,
-							   &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_DATABASE, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -981,51 +696,7 @@ AclMode
 pg_proc_aclmask(Oid proc_oid, Oid roleid,
 				AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Get the function's ACL from pg_proc
-	 */
-	tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(proc_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("function with OID %u does not exist", proc_oid)));
-
-	ownerId = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
-
-	aclDatum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proacl,
-							   &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_FUNCTION, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -1035,51 +706,7 @@ AclMode
 pg_language_aclmask(Oid lang_oid, Oid roleid,
 					AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Get the language's ACL from pg_language
-	 */
-	tuple = SearchSysCache1(LANGOID, ObjectIdGetDatum(lang_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("language with OID %u does not exist", lang_oid)));
-
-	ownerId = ((Form_pg_language) GETSTRUCT(tuple))->lanowner;
-
-	aclDatum = SysCacheGetAttr(LANGOID, tuple, Anum_pg_language_lanacl,
-							   &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_LANGUAGE, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -1099,69 +726,7 @@ pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
 								AclMode mask, AclMaskHow how,
 								Snapshot snapshot)
 {
-	AclMode		result;
-	Relation	pg_lo_meta;
-	ScanKeyData entry[1];
-	SysScanDesc scan;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Get the largeobject's ACL from pg_largeobject_metadata
-	 */
-	pg_lo_meta = table_open(LargeObjectMetadataRelationId,
-							AccessShareLock);
-
-	ScanKeyInit(&entry[0],
-				Anum_pg_largeobject_metadata_oid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(lobj_oid));
-
-	scan = systable_beginscan(pg_lo_meta,
-							  LargeObjectMetadataOidIndexId, true,
-							  snapshot, 1, entry);
-
-	tuple = systable_getnext(scan);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("large object %u does not exist", lobj_oid)));
-
-	ownerId = ((Form_pg_largeobject_metadata) GETSTRUCT(tuple))->lomowner;
-
-	aclDatum = heap_getattr(tuple, Anum_pg_largeobject_metadata_lomacl,
-							RelationGetDescr(pg_lo_meta), &isNull);
-
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_LARGEOBJECT, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	systable_endscan(scan);
-
-	table_close(pg_lo_meta, AccessShareLock);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -1171,89 +736,7 @@ AclMode
 pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
 					 AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * If we have been assigned this namespace as a temp namespace, check to
-	 * make sure we have CREATE TEMP permission on the database, and if so act
-	 * as though we have all standard (but not GRANT OPTION) permissions on
-	 * the namespace.  If we don't have CREATE TEMP, act as though we have
-	 * only USAGE (and not CREATE) rights.
-	 *
-	 * This may seem redundant given the check in InitTempTableNamespace, but
-	 * it really isn't since current user ID may have changed since then. The
-	 * upshot of this behavior is that a SECURITY DEFINER function can create
-	 * temp tables that can then be accessed (if permission is granted) by
-	 * code in the same session that doesn't have permissions to create temp
-	 * tables.
-	 *
-	 * XXX Would it be safe to ereport a special error message as
-	 * InitTempTableNamespace does?  Returning zero here means we'll get a
-	 * generic "permission denied for schema pg_temp_N" message, which is not
-	 * remarkably user-friendly.
-	 */
-	if (isTempNamespace(nsp_oid))
-	{
-		if (pg_database_aclcheck(MyDatabaseId, roleid,
-								 ACL_CREATE_TEMP) == ACLCHECK_OK)
-			return mask & ACL_ALL_RIGHTS_SCHEMA;
-		else
-			return mask & ACL_USAGE;
-	}
-
-	/*
-	 * Get the schema's ACL from pg_namespace
-	 */
-	tuple = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(nsp_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_SCHEMA),
-				 errmsg("schema with OID %u does not exist", nsp_oid)));
-
-	ownerId = ((Form_pg_namespace) GETSTRUCT(tuple))->nspowner;
-
-	aclDatum = SysCacheGetAttr(NAMESPACEOID, tuple, Anum_pg_namespace_nspacl,
-							   &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_SCHEMA, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	/*
-	 * Check if ACL_USAGE is being checked and, if so, and not set already as
-	 * part of the result, then check if the user is a member of the
-	 * pg_read_all_data or pg_write_all_data roles, which allow usage access
-	 * to all schemas.
-	 */
-	if (mask & ACL_USAGE && !(result & ACL_USAGE) &&
-		(has_privs_of_role(roleid, ROLE_PG_READ_ALL_DATA) ||
-		 has_privs_of_role(roleid, ROLE_PG_WRITE_ALL_DATA)))
-		result |= ACL_USAGE;
-	return result;
+	return mask;
 }
 
 /*
@@ -1263,53 +746,7 @@ AclMode
 pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 					  AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Get the tablespace's ACL from pg_tablespace
-	 */
-	tuple = SearchSysCache1(TABLESPACEOID, ObjectIdGetDatum(spc_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("tablespace with OID %u does not exist", spc_oid)));
-
-	ownerId = ((Form_pg_tablespace) GETSTRUCT(tuple))->spcowner;
-
-	aclDatum = SysCacheGetAttr(TABLESPACEOID, tuple,
-							   Anum_pg_tablespace_spcacl,
-							   &isNull);
-
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_TABLESPACE, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -1318,75 +755,7 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 AclMode
 pg_type_aclmask(Oid type_oid, Oid roleid, AclMode mask, AclMaskHow how)
 {
-	AclMode		result;
-	HeapTuple	tuple;
-	Datum		aclDatum;
-	bool		isNull;
-	Acl		   *acl;
-	Oid			ownerId;
-
-	Form_pg_type typeForm;
-
-	/* Bypass permission checks for superusers */
-	if (superuser_arg(roleid))
-		return mask;
-
-	/*
-	 * Must get the type's tuple from pg_type
-	 */
-	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("type with OID %u does not exist",
-						type_oid)));
-	typeForm = (Form_pg_type) GETSTRUCT(tuple);
-
-	/*
-	 * "True" array types don't manage permissions of their own; consult the
-	 * element type instead.
-	 */
-	if (IsTrueArrayType(typeForm))
-	{
-		Oid			elttype_oid = typeForm->typelem;
-
-		ReleaseSysCache(tuple);
-
-		tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(elttype_oid));
-		/* this case is not a user-facing error, so elog not ereport */
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for type %u", elttype_oid);
-		typeForm = (Form_pg_type) GETSTRUCT(tuple);
-	}
-
-	/*
-	 * Now get the type's owner and ACL from the tuple
-	 */
-	ownerId = typeForm->typowner;
-
-	aclDatum = SysCacheGetAttr(TYPEOID, tuple,
-							   Anum_pg_type_typacl, &isNull);
-	if (isNull)
-	{
-		/* No ACL, so build default ACL */
-		acl = acldefault(OBJECT_TYPE, ownerId);
-		aclDatum = (Datum) 0;
-	}
-	else
-	{
-		/* detoast rel's ACL if necessary */
-		acl = DatumGetAclP(aclDatum);
-	}
-
-	result = aclmask(acl, roleid, ownerId, mask, how);
-
-	/* if we have a detoasted copy, free it */
-	if (acl && (Pointer) acl != DatumGetPointer(aclDatum))
-		pfree(acl);
-
-	ReleaseSysCache(tuple);
-
-	return result;
+	return mask;
 }
 
 /*
@@ -1447,78 +816,7 @@ AclResult
 pg_attribute_aclcheck_all(Oid table_oid, Oid roleid, AclMode mode,
 						  AclMaskHow how)
 {
-	AclResult	result;
-	HeapTuple	classTuple;
-	Form_pg_class classForm;
-	AttrNumber	nattrs;
-	AttrNumber	curr_att;
-
-	/*
-	 * Must fetch pg_class row to check number of attributes.  As in
-	 * pg_attribute_aclmask, we prefer to return "no privileges" instead of
-	 * throwing an error if we get any unexpected lookup errors.
-	 */
-	classTuple = SearchSysCache1(RELOID, ObjectIdGetDatum(table_oid));
-	if (!HeapTupleIsValid(classTuple))
-		return ACLCHECK_NO_PRIV;
-	classForm = (Form_pg_class) GETSTRUCT(classTuple);
-
-	nattrs = classForm->relnatts;
-
-	ReleaseSysCache(classTuple);
-
-	/*
-	 * Initialize result in case there are no non-dropped columns.  We want to
-	 * report failure in such cases for either value of 'how'.
-	 */
-	result = ACLCHECK_NO_PRIV;
-
-	for (curr_att = 1; curr_att <= nattrs; curr_att++)
-	{
-		HeapTuple	attTuple;
-		AclMode		attmask;
-
-		attTuple = SearchSysCache2(ATTNUM,
-								   ObjectIdGetDatum(table_oid),
-								   Int16GetDatum(curr_att));
-		if (!HeapTupleIsValid(attTuple))
-			continue;
-
-		/* ignore dropped columns */
-		if (((Form_pg_attribute) GETSTRUCT(attTuple))->attisdropped)
-		{
-			ReleaseSysCache(attTuple);
-			continue;
-		}
-
-		/*
-		 * Here we hard-wire knowledge that the default ACL for a column
-		 * grants no privileges, so that we can fall out quickly in the very
-		 * common case where attacl is null.
-		 */
-		if (heap_attisnull(attTuple, Anum_pg_attribute_attacl, NULL))
-			attmask = 0;
-		else
-			attmask = pg_attribute_aclmask(table_oid, curr_att, roleid,
-										   mode, ACLMASK_ANY);
-
-		ReleaseSysCache(attTuple);
-
-		if (attmask != 0)
-		{
-			result = ACLCHECK_OK;
-			if (how == ACLMASK_ANY)
-				break;			/* succeed on any success */
-		}
-		else
-		{
-			result = ACLCHECK_NO_PRIV;
-			if (how == ACLMASK_ALL)
-				break;			/* fail on any failure */
-		}
-	}
-
-	return result;
+	return ACLCHECK_OK;
 }
 
 /*
@@ -2204,28 +1502,7 @@ has_bypassrls_privilege(Oid roleid)
 static Acl *
 get_default_acl_internal(Oid roleId, Oid nsp_oid, char objtype)
 {
-	Acl		   *result = NULL;
-	HeapTuple	tuple;
-
-	tuple = SearchSysCache3(DEFACLROLENSPOBJ,
-							ObjectIdGetDatum(roleId),
-							ObjectIdGetDatum(nsp_oid),
-							CharGetDatum(objtype));
-
-	if (HeapTupleIsValid(tuple))
-	{
-		Datum		aclDatum;
-		bool		isNull;
-
-		aclDatum = SysCacheGetAttr(DEFACLROLENSPOBJ, tuple,
-								   Anum_pg_default_acl_defaclacl,
-								   &isNull);
-		if (!isNull)
-			result = DatumGetAclPCopy(aclDatum);
-		ReleaseSysCache(tuple);
-	}
-
-	return result;
+	return NULL;
 }
 
 /*
@@ -2239,74 +1516,7 @@ get_default_acl_internal(Oid roleId, Oid nsp_oid, char objtype)
 Acl *
 get_user_default_acl(ObjectType objtype, Oid ownerId, Oid nsp_oid)
 {
-	Acl		   *result;
-	Acl		   *glob_acl;
-	Acl		   *schema_acl;
-	Acl		   *def_acl;
-	char		defaclobjtype;
-
-	/*
-	 * Use NULL during bootstrap, since pg_default_acl probably isn't there
-	 * yet.
-	 */
-	if (IsBootstrapProcessingMode())
-		return NULL;
-
-	/* Check if object type is supported in pg_default_acl */
-	switch (objtype)
-	{
-		case OBJECT_TABLE:
-			defaclobjtype = DEFACLOBJ_RELATION;
-			break;
-
-		case OBJECT_SEQUENCE:
-			defaclobjtype = DEFACLOBJ_SEQUENCE;
-			break;
-
-		case OBJECT_FUNCTION:
-			defaclobjtype = DEFACLOBJ_FUNCTION;
-			break;
-
-		case OBJECT_TYPE:
-			defaclobjtype = DEFACLOBJ_TYPE;
-			break;
-
-		case OBJECT_SCHEMA:
-			defaclobjtype = DEFACLOBJ_NAMESPACE;
-			break;
-
-		default:
-			return NULL;
-	}
-
-	/* Look up the relevant pg_default_acl entries */
-	glob_acl = get_default_acl_internal(ownerId, InvalidOid, defaclobjtype);
-	schema_acl = get_default_acl_internal(ownerId, nsp_oid, defaclobjtype);
-
-	/* Quick out if neither entry exists */
-	if (glob_acl == NULL && schema_acl == NULL)
-		return NULL;
-
-	/* We need to know the hard-wired default value, too */
-	def_acl = acldefault(objtype, ownerId);
-
-	/* If there's no global entry, substitute the hard-wired default */
-	if (glob_acl == NULL)
-		glob_acl = def_acl;
-
-	/* Merge in any per-schema privileges */
-	result = aclmerge(glob_acl, schema_acl, ownerId);
-
-	/*
-	 * For efficiency, we want to return NULL if the result equals default.
-	 * This requires sorting both arrays to get an accurate comparison.
-	 */
-	aclitemsort(result);
-	aclitemsort(def_acl);
-	if (aclequal(result, def_acl))
-		result = NULL;
-
-	return result;
+	return NULL;
 }
 
 /*
@@ -2316,21 +1526,7 @@ void
 recordDependencyOnNewAcl(Oid classId, Oid objectId, int32 objsubId,
 						 Oid ownerId, Acl *acl)
 {
-	int			nmembers;
-	Oid		   *members;
-
-	/* Nothing to do if ACL is defaulted */
-	if (acl == NULL)
-		return;
-
-	/* Extract roles mentioned in ACL */
-	nmembers = aclmembers(acl, &members);
-
-	/* Update the shared dependency ACL info */
-	updateAclDependencies(classId, objectId, objsubId,
-						  ownerId,
-						  0, NULL,
-						  nmembers, members);
+	return;
 }
 
 /*
@@ -2345,244 +1541,7 @@ recordDependencyOnNewAcl(Oid classId, Oid objectId, int32 objsubId,
 void
 recordExtObjInitPriv(Oid objoid, Oid classoid)
 {
-	/*
-	 * pg_class / pg_attribute
-	 *
-	 * If this is a relation then we need to see if there are any sub-objects
-	 * (eg: columns) for it and, if so, be sure to call
-	 * recordExtensionInitPrivWorker() for each one.
-	 */
-	if (classoid == RelationRelationId)
-	{
-		Form_pg_class pg_class_tuple;
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for relation %u", objoid);
-		pg_class_tuple = (Form_pg_class) GETSTRUCT(tuple);
-
-		/*
-		 * Indexes don't have permissions, neither do the pg_class rows for
-		 * composite types.  (These cases are unreachable given the
-		 * restrictions in ALTER EXTENSION ADD, but let's check anyway.)
-		 */
-		if (pg_class_tuple->relkind == RELKIND_INDEX ||
-			pg_class_tuple->relkind == RELKIND_PARTITIONED_INDEX ||
-			pg_class_tuple->relkind == RELKIND_COMPOSITE_TYPE)
-		{
-			ReleaseSysCache(tuple);
-			return;
-		}
-
-		/*
-		 * If this isn't a sequence then it's possibly going to have
-		 * column-level ACLs associated with it.
-		 */
-		if (pg_class_tuple->relkind != RELKIND_SEQUENCE)
-		{
-			AttrNumber	curr_att;
-			AttrNumber	nattrs = pg_class_tuple->relnatts;
-
-			for (curr_att = 1; curr_att <= nattrs; curr_att++)
-			{
-				HeapTuple	attTuple;
-				Datum		attaclDatum;
-
-				attTuple = SearchSysCache2(ATTNUM,
-										   ObjectIdGetDatum(objoid),
-										   Int16GetDatum(curr_att));
-
-				if (!HeapTupleIsValid(attTuple))
-					continue;
-
-				/* ignore dropped columns */
-				if (((Form_pg_attribute) GETSTRUCT(attTuple))->attisdropped)
-				{
-					ReleaseSysCache(attTuple);
-					continue;
-				}
-
-				attaclDatum = SysCacheGetAttr(ATTNUM, attTuple,
-											  Anum_pg_attribute_attacl,
-											  &isNull);
-
-				/* no need to do anything for a NULL ACL */
-				if (isNull)
-				{
-					ReleaseSysCache(attTuple);
-					continue;
-				}
-
-				recordExtensionInitPrivWorker(objoid, classoid, curr_att,
-											  DatumGetAclP(attaclDatum));
-
-				ReleaseSysCache(attTuple);
-			}
-		}
-
-		aclDatum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	/* pg_language */
-	else if (classoid == LanguageRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(LANGOID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for language %u", objoid);
-
-		aclDatum = SysCacheGetAttr(LANGOID, tuple, Anum_pg_language_lanacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	else if (classoid == LargeObjectRelationId)
-	{
-		/* For large objects, we must consult pg_largeobject_metadata */
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-		ScanKeyData entry[1];
-		SysScanDesc scan;
-		Relation	relation;
-
-		/*
-		 * Note: this is dead code, given that we don't allow large objects to
-		 * be made extension members.  But it seems worth carrying in case
-		 * some future caller of this function has need for it.
-		 */
-		relation = table_open(LargeObjectMetadataRelationId, RowExclusiveLock);
-
-		/* There's no syscache for pg_largeobject_metadata */
-		ScanKeyInit(&entry[0],
-					Anum_pg_largeobject_metadata_oid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(objoid));
-
-		scan = systable_beginscan(relation,
-								  LargeObjectMetadataOidIndexId, true,
-								  NULL, 1, entry);
-
-		tuple = systable_getnext(scan);
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "could not find tuple for large object %u", objoid);
-
-		aclDatum = heap_getattr(tuple,
-								Anum_pg_largeobject_metadata_lomacl,
-								RelationGetDescr(relation), &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		systable_endscan(scan);
-	}
-	/* pg_namespace */
-	else if (classoid == NamespaceRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for schema %u", objoid);
-
-		aclDatum = SysCacheGetAttr(NAMESPACEOID, tuple,
-								   Anum_pg_namespace_nspacl, &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	/* pg_proc */
-	else if (classoid == ProcedureRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for function %u", objoid);
-
-		aclDatum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	/* pg_type */
-	else if (classoid == TypeRelationId)
-	{
-		Datum		aclDatum;
-		bool		isNull;
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(objoid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for type %u", objoid);
-
-		aclDatum = SysCacheGetAttr(TYPEOID, tuple, Anum_pg_type_typacl,
-								   &isNull);
-
-		/* Add the record, if any, for the top-level object */
-		if (!isNull)
-			recordExtensionInitPrivWorker(objoid, classoid, 0,
-										  DatumGetAclP(aclDatum));
-
-		ReleaseSysCache(tuple);
-	}
-	else if (classoid == AccessMethodRelationId ||
-			 classoid == AggregateRelationId ||
-			 classoid == CastRelationId ||
-			 classoid == CollationRelationId ||
-			 classoid == ConversionRelationId ||
-			 classoid == EventTriggerRelationId ||
-			 classoid == OperatorRelationId ||
-			 classoid == OperatorClassRelationId ||
-			 classoid == OperatorFamilyRelationId ||
-			 classoid == NamespaceRelationId ||
-			 classoid == TransformRelationId
-		)
-	{
-		/* no ACL for these object types, so do nothing. */
-	}
-
-	/*
-	 * complain if we are given a class OID for a class that extensions don't
-	 * support or that we don't recognize.
-	 */
-	else
-	{
-		elog(ERROR, "unrecognized or unsupported class OID: %u", classoid);
-	}
+	return;
 }
 
 /*
@@ -2704,97 +1663,5 @@ recordExtensionInitPriv(Oid objoid, Oid classoid, int objsubid, Acl *new_acl)
 static void
 recordExtensionInitPrivWorker(Oid objoid, Oid classoid, int objsubid, Acl *new_acl)
 {
-	Relation	relation;
-	ScanKeyData key[3];
-	SysScanDesc scan;
-	HeapTuple	tuple;
-	HeapTuple	oldtuple;
-
-	relation = table_open(InitPrivsRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_init_privs_objoid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(objoid));
-	ScanKeyInit(&key[1],
-				Anum_pg_init_privs_classoid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(classoid));
-	ScanKeyInit(&key[2],
-				Anum_pg_init_privs_objsubid,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(objsubid));
-
-	scan = systable_beginscan(relation, InitPrivsObjIndexId, true,
-							  NULL, 3, key);
-
-	/* There should exist only one entry or none. */
-	oldtuple = systable_getnext(scan);
-
-	/* If we find an entry, update it with the latest ACL. */
-	if (HeapTupleIsValid(oldtuple))
-	{
-		Datum		values[Natts_pg_init_privs];
-		bool		nulls[Natts_pg_init_privs];
-		bool		replace[Natts_pg_init_privs];
-
-		/* If we have a new ACL to set, then update the row with it. */
-		if (new_acl)
-		{
-			MemSet(values, 0, sizeof(values));
-			MemSet(nulls, false, sizeof(nulls));
-			MemSet(replace, false, sizeof(replace));
-
-			values[Anum_pg_init_privs_initprivs - 1] = PointerGetDatum(new_acl);
-			replace[Anum_pg_init_privs_initprivs - 1] = true;
-
-			oldtuple = heap_modify_tuple(oldtuple, RelationGetDescr(relation),
-										 values, nulls, replace);
-
-			CatalogTupleUpdate(relation, &oldtuple->t_self, oldtuple);
-		}
-		else
-		{
-			/* new_acl is NULL, so delete the entry we found. */
-			CatalogTupleDelete(relation, &oldtuple->t_self);
-		}
-	}
-	else
-	{
-		Datum		values[Natts_pg_init_privs];
-		bool		nulls[Natts_pg_init_privs];
-
-		/*
-		 * Only add a new entry if the new ACL is non-NULL.
-		 *
-		 * If we are passed in a NULL ACL and no entry exists, we can just
-		 * fall through and do nothing.
-		 */
-		if (new_acl)
-		{
-			/* No entry found, so add it. */
-			MemSet(nulls, false, sizeof(nulls));
-
-			values[Anum_pg_init_privs_objoid - 1] = ObjectIdGetDatum(objoid);
-			values[Anum_pg_init_privs_classoid - 1] = ObjectIdGetDatum(classoid);
-			values[Anum_pg_init_privs_objsubid - 1] = Int32GetDatum(objsubid);
-
-			/* This function only handles initial privileges of extensions */
-			values[Anum_pg_init_privs_privtype - 1] =
-				CharGetDatum(INITPRIVS_EXTENSION);
-
-			values[Anum_pg_init_privs_initprivs - 1] = PointerGetDatum(new_acl);
-
-			tuple = heap_form_tuple(RelationGetDescr(relation), values, nulls);
-
-			CatalogTupleInsert(relation, tuple);
-		}
-	}
-
-	systable_endscan(scan);
-
-	/* prevent error when processing objects multiple times */
-	CommandCounterIncrement();
-
-	table_close(relation, RowExclusiveLock);
+	return;
 }

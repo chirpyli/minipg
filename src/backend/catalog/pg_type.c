@@ -125,7 +125,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(InvalidOid);
 	nulls[Anum_pg_type_typdefaultbin - 1] = true;
 	nulls[Anum_pg_type_typdefault - 1] = true;
-	nulls[Anum_pg_type_typacl - 1] = true;
 
 	/* Use binary-upgrade override for pg_type.oid? */
 	if (IsBinaryUpgrade)
@@ -399,19 +398,6 @@ TypeCreate(Oid newTypeOid,
 		nulls[Anum_pg_type_typdefault - 1] = true;
 
 	/*
-	 * Initialize the type's ACL, too.  But dependent types don't get one.
-	 */
-	if (isDependentType)
-		typacl = NULL;
-	else
-		typacl = get_user_default_acl(OBJECT_TYPE, ownerId,
-									  typeNamespace);
-	if (typacl != NULL)
-		values[Anum_pg_type_typacl - 1] = PointerGetDatum(typacl);
-	else
-		nulls[Anum_pg_type_typacl - 1] = true;
-
-	/*
 	 * open pg_type and prepare to insert or update a row.
 	 *
 	 * NOTE: updating will not work correctly in bootstrap mode; but we don't
@@ -580,14 +566,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 							 RelationGetDescr(typeCatalog), &isNull);
 		if (!isNull)
 			defaultExpr = stringToNode(TextDatumGetCString(datum));
-	}
-	/* Extract typacl if caller didn't pass it */
-	if (typacl == NULL)
-	{
-		datum = heap_getattr(typeTuple, Anum_pg_type_typacl,
-							 RelationGetDescr(typeCatalog), &isNull);
-		if (!isNull)
-			typacl = DatumGetAclPCopy(datum);
 	}
 
 	/* If rebuild, first flush old dependencies, except extension deps */

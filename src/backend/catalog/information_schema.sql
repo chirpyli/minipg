@@ -578,9 +578,14 @@ CREATE VIEW column_privileges AS
                   pr_c.prtype,
                   pr_c.grantable,
                   pr_c.relowner
-           FROM (SELECT oid, relname, relnamespace, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).*
-                 FROM pg_class
-                 WHERE relkind IN ('r', 'v', 'f', 'p')
+           FROM (SELECT cc.oid, cc.relname, cc.relnamespace, cc.relowner,
+                        cc.relowner AS grantor,
+                        0 AS grantee,
+                        p.prtype,
+                        true AS grantable
+                 FROM pg_class cc
+                      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) AS p(prtype)
+                 WHERE cc.relkind IN ('r', 'v', 'f', 'p')
                 ) pr_c (oid, relname, relnamespace, relowner, grantor, grantee, prtype, grantable),
                 pg_attribute a
            WHERE a.attrelid = pr_c.oid
@@ -595,10 +600,15 @@ CREATE VIEW column_privileges AS
                   pr_a.prtype,
                   pr_a.grantable,
                   c.relowner
-           FROM (SELECT attrelid, attname, (aclexplode(coalesce(attacl, acldefault('c', relowner)))).*
-                 FROM pg_attribute a JOIN pg_class cc ON (a.attrelid = cc.oid)
-                 WHERE attnum > 0
-                       AND NOT attisdropped
+           FROM (SELECT a.attrelid, a.attname,
+                        c.relowner AS grantor,
+                        0 AS grantee,
+                        p.prtype,
+                        true AS grantable
+                 FROM pg_attribute a JOIN pg_class c ON (a.attrelid = c.oid)
+                      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) AS p(prtype)
+                 WHERE a.attnum > 0
+                       AND NOT a.attisdropped
                 ) pr_a (attrelid, attname, grantor, grantee, prtype, grantable),
                 pg_class c
            WHERE pr_a.attrelid = c.oid
@@ -1361,7 +1371,12 @@ CREATE VIEW routine_privileges AS
                   THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
 
     FROM (
-            SELECT oid, proname, proowner, pronamespace, (aclexplode(coalesce(proacl, acldefault('f', proowner)))).* FROM pg_proc
+            SELECT oid, proname, proowner, pronamespace,
+                   proowner AS grantor,
+                   0 AS grantee,
+                   'EXECUTE' AS prtype,
+                   true AS grantable
+            FROM pg_proc
          ) p (oid, proname, proowner, pronamespace, grantor, grantee, prtype, grantable),
          pg_namespace n,
          pg_authid u_grantor,
@@ -1880,7 +1895,13 @@ CREATE VIEW table_privileges AS
            CAST(CASE WHEN c.prtype = 'SELECT' THEN 'YES' ELSE 'NO' END AS yes_or_no) AS with_hierarchy
 
     FROM (
-            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+            SELECT oid, relname, relnamespace, relkind, relowner,
+                   relowner AS grantor,
+                   0 AS grantee,
+                   p.prtype,
+                   true AS grantable
+            FROM pg_class
+                 CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) AS p(prtype)
          ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
          pg_namespace nc,
          pg_authid u_grantor,
@@ -2173,7 +2194,12 @@ CREATE VIEW udt_privileges AS
                   THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
 
     FROM (
-            SELECT oid, typname, typnamespace, typtype, typowner, (aclexplode(coalesce(typacl, acldefault('T', typowner)))).* FROM pg_type
+            SELECT oid, typname, typnamespace, typtype, typowner,
+                   typowner AS grantor,
+                   0 AS grantee,
+                   'USAGE' AS prtype,
+                   true AS grantable
+            FROM pg_type
          ) AS t (oid, typname, typnamespace, typtype, typowner, grantor, grantee, prtype, grantable),
          pg_namespace n,
          pg_authid u_grantor,
@@ -2257,7 +2283,12 @@ CREATE VIEW usage_privileges AS
                   THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
 
     FROM (
-            SELECT oid, typname, typnamespace, typtype, typowner, (aclexplode(coalesce(typacl, acldefault('T', typowner)))).* FROM pg_type
+            SELECT oid, typname, typnamespace, typtype, typowner,
+                   typowner AS grantor,
+                   0 AS grantee,
+                   'USAGE' AS prtype,
+                   true AS grantable
+            FROM pg_type
          ) AS t (oid, typname, typnamespace, typtype, typowner, grantor, grantee, prtype, grantable),
          pg_namespace n,
          pg_authid u_grantor,
@@ -2293,7 +2324,13 @@ CREATE VIEW usage_privileges AS
                   THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
 
     FROM (
-            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+            SELECT oid, relname, relnamespace, relkind, relowner,
+                   relowner AS grantor,
+                   0 AS grantee,
+                   p.prtype,
+                   true AS grantable
+            FROM pg_class
+                 CROSS JOIN unnest(ARRAY['SELECT','UPDATE','USAGE']) AS p(prtype)
          ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
          pg_namespace n,
          pg_authid u_grantor,

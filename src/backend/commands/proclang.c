@@ -117,7 +117,6 @@ CreateProceduralLanguage(CreatePLangStmt *stmt)
 	values[Anum_pg_language_lanplcallfoid - 1] = ObjectIdGetDatum(handlerOid);
 	values[Anum_pg_language_laninline - 1] = ObjectIdGetDatum(inlineOid);
 	values[Anum_pg_language_lanvalidator - 1] = ObjectIdGetDatum(valOid);
-	nulls[Anum_pg_language_lanacl - 1] = true;
 
 	/* Check for pre-existing definition */
 	oldtup = SearchSysCache1(LANGNAME, PointerGetDatum(languageName));
@@ -145,7 +144,6 @@ CreateProceduralLanguage(CreatePLangStmt *stmt)
 		 */
 		replaces[Anum_pg_language_oid - 1] = false;
 		replaces[Anum_pg_language_lanowner - 1] = false;
-		replaces[Anum_pg_language_lanacl - 1] = false;
 
 		/* Okay, do it... */
 		tup = heap_modify_tuple(oldtup, tupDesc, values, nulls, replaces);

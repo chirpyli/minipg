@@ -1003,11 +1003,6 @@
   amoprighttype => 'bpchar', amopstrategy => '1', amopopr => '=(bpchar,bpchar)',
   amopmethod => 'hash' },
 
-# aclitem_ops
-{ amopfamily => 'hash/aclitem_ops', amoplefttype => 'aclitem',
-  amoprighttype => 'aclitem', amopstrategy => '1',
-  amopopr => '=(aclitem,aclitem)', amopmethod => 'hash' },
-
 # uuid_ops
 { amopfamily => 'hash/uuid_ops', amoplefttype => 'uuid',
   amoprighttype => 'uuid', amopstrategy => '1', amopopr => '=(uuid,uuid)',

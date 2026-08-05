@@ -85,11 +85,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 	namestrcpy(&nname, nspName);
 	values[Anum_pg_namespace_nspname - 1] = NameGetDatum(&nname);
 	values[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(ownerId);
-	if (nspacl != NULL)
-		values[Anum_pg_namespace_nspacl - 1] = PointerGetDatum(nspacl);
-	else
-		nulls[Anum_pg_namespace_nspacl - 1] = true;
-
 
 	tup = heap_form_tuple(tupDesc, values, nulls);
 
