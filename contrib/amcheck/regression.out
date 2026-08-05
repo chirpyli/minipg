@@ -1,3 +1,0 @@
-test check                        ... FAILED        7 ms
-test check_btree                  ... FAILED      558 ms
-test check_heap                   ... FAILED       32 ms

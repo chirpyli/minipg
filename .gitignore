@@ -54,3 +54,9 @@ compile_commands.json
 
 # configure backup files
 pg_config.h.in~
+
+# regression test run artifacts
+regression.out
+regression.diffs
+results/
+tmp_check/
