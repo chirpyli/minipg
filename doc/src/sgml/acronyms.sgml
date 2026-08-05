@@ -220,15 +220,6 @@
    </varlistentry>
 
    <varlistentry>
-    <term><acronym>GEQO</acronym></term>
-    <listitem>
-     <para>
-      <link linkend="geqo">Genetic Query Optimizer</link>
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
     <term><acronym>GIN</acronym></term>
     <listitem>
      <para>

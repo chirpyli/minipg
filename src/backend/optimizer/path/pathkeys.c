@@ -79,7 +79,8 @@ make_canonical_pathkey(PlannerInfo *root,
 
 	/*
 	 * Be sure canonical pathkeys are allocated in the main planning context.
-	 * Not an issue in normal planning, but it is for GEQO.
+	 * Not an issue in normal planning, but it is when a join-search plugin is
+	 * active.
 	 */
 	oldcontext = MemoryContextSwitchTo(root->planner_cxt);
 

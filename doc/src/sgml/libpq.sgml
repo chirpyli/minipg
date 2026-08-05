@@ -1280,9 +1280,9 @@ postgresql://%2Fvar%2Flib%2Fpostgresql/dbname
       <listitem>
        <para>
         Specifies command-line options to send to the server at connection
-        start.  For example, setting this to <literal>-c geqo=off</literal> sets the
-        session's value of the <varname>geqo</varname> parameter to
-        <literal>off</literal>.  Spaces within this string are considered to
+        start.  For example, setting this to <literal>-c statement_timeout=5min</literal>
+        sets the session's value of the <varname>statement_timeout</varname>
+        parameter.  Spaces within this string are considered to
         separate command-line arguments, unless escaped with a backslash
         (<literal>\</literal>); write <literal>\\</literal> to represent a literal
         backslash.  For a detailed discussion of the available
@@ -8017,10 +8017,9 @@ myEventProc(PGEventId evtId, void *evtInfo, void *passThrough)
     <listitem>
      <para>
       <indexterm>
-       <primary><envar>PGGEQO</envar></primary>
+       <primary><envar>PGxxx</envar></primary>
       </indexterm>
-      <envar>PGGEQO</envar> sets the default mode for the genetic query
-      optimizer.  (Equivalent to <literal>SET geqo TO ...</literal>.)
+      (Reserved for future use.)
      </para>
     </listitem>
    </itemizedlist>

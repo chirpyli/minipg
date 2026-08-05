@@ -346,11 +346,9 @@
      In some situations, examining each possible way in which a query
      can be executed would take an excessive amount of time and memory.
      In particular, this occurs when executing queries
-     involving large numbers of join operations. In order to determine
-     a reasonable (not necessarily optimal) query plan in a reasonable amount
-     of time, <productname>PostgreSQL</productname> uses a <firstterm>Genetic
-     Query Optimizer</firstterm> (see <xref linkend="geqo"/>) when the number of joins
-     exceeds a threshold (see <xref linkend="guc-geqo-threshold"/>).
+     involving large numbers of join operations. Planning time grows rapidly
+     with the number of relations to be joined, so for queries joining very
+     many relations the planner may take a long time to find a plan.
     </para>
    </note>
 
@@ -440,10 +438,9 @@
     </para>
 
     <para>
-     If the query uses fewer than <xref linkend="guc-geqo-threshold"/>
-     relations, a near-exhaustive search is conducted to find the best
-     join sequence.  The planner preferentially considers joins between any
-     two relations for which there exists a corresponding join clause in the
+     The planner conducts a search to find the best join sequence.  The
+     planner preferentially considers joins between any two relations for
+     which there exists a corresponding join clause in the
      <literal>WHERE</literal> qualification (i.e., for
      which a restriction like <literal>where rel1.attr1=rel2.attr2</literal>
      exists). Join pairs with no join clause are considered only when there
@@ -454,9 +451,8 @@
     </para>
 
     <para>
-     When <varname>geqo_threshold</varname> is exceeded, the join
-     sequences considered are determined by heuristics, as described
-     in <xref linkend="geqo"/>.  Otherwise the process is the same.
+     The same process is used regardless of the number of relations being
+     joined.
     </para>
 
     <para>

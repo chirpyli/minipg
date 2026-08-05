@@ -733,15 +733,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	}
 
 	/*
-	 * This would be a convenient time to check access permissions for all
-	 * relations mentioned in the query, since it would be better to fail now,
-	 * before doing any detailed planning.  However, for historical reasons,
-	 * we leave this to be done at executor startup.
-	 *
-	 * minipg: 权限（ACL）机制已裁剪，所有对象访问一律放行（以单一固定
-	 * superuser 身份执行），因此不再做任何权限预检。
-	 */
-	/*
 	 * Preprocess RowMark information.  We need to do this after subquery
 	 * pullup, so that all base relations are present.
 	 */

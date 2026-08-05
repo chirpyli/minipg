@@ -7,11 +7,10 @@ These directories take the Query structure returned by the parser, and
 generate a plan used by the executor.  The /plan directory generates the
 actual output plan, the /path code generates all possible ways to join the
 tables, and /prep handles various preprocessing steps for special cases.
-/util is utility stuff.  /geqo is the separate "genetic optimization" planner
---- it does a semi-random search through the join tree space, rather than
-exhaustively considering all possible join trees.  (But each join considered
-by /geqo is given to /path to create paths for, so we consider all possible
-implementation paths for each specific join pair even in GEQO mode.)
+/util is utility stuff.  /path is where the standard dynamic-programming
+join search lives.  (Each join considered by the planner is given to /path to
+create paths for, so we consider all possible implementation paths for each
+specific join pair.)
 
 
 Paths and Join Pairs
@@ -104,7 +103,7 @@ cheapest Path.
 For each planning problem, therefore, we will have a list of relations
 that are either base rels or joinrels constructed per sub-join-lists.
 We can join these rels together in any order the planner sees fit.
-The standard (non-GEQO) planner does this as follows:
+The standard planner does this as follows:
 
 Consider joining each RelOptInfo to each other RelOptInfo for which there
 is a usable joinclause, and generate a Path for each possible join method
@@ -324,7 +323,7 @@ set up for recursive handling of subqueries
       find seqscan and all index paths for each base relation
       find selectivity of columns used in joins
      make_rel_from_joinlist()
-      hand off join subproblems to a plugin, GEQO, or standard_join_search()
+      hand off join subproblems to a plugin or standard_join_search()
 ------standard_join_search()
       call join_search_one_level() for each level of join tree needed
       join_search_one_level():

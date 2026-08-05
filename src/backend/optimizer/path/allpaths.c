@@ -32,7 +32,6 @@
 #include "optimizer/appendinfo.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
-#include "optimizer/geqo.h"
 #include "optimizer/inherit.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/pathnode.h"
@@ -58,8 +57,6 @@ typedef struct pushdown_safety_info
 } pushdown_safety_info;
 
 /* These parameters are set by GUC */
-bool		enable_geqo = false;	/* just in case GUC doesn't set it */
-int			geqo_threshold;
 int			min_parallel_table_scan_size;
 int			min_parallel_index_scan_size;
 
@@ -2837,7 +2834,7 @@ make_rel_from_joinlist(PlannerInfo *root, List *joinlist)
 	{
 		/*
 		 * Consider the different orders in which we could join the rels,
-		 * using a plugin, GEQO, or the regular join search code.
+		 * using a plugin or the regular join search code.
 		 *
 		 * We put the initial_rels list into a PlannerInfo field because
 		 * has_legal_joinclause() needs to look at it (ugly :-().
@@ -2846,8 +2843,6 @@ make_rel_from_joinlist(PlannerInfo *root, List *joinlist)
 
 		if (join_search_hook)
 			return (*join_search_hook) (root, levels_needed, initial_rels);
-		else if (enable_geqo && levels_needed >= geqo_threshold)
-			return geqo(root, levels_needed, initial_rels);
 		else
 			return standard_join_search(root, levels_needed, initial_rels);
 	}
@@ -2880,7 +2875,7 @@ make_rel_from_joinlist(PlannerInfo *root, List *joinlist)
  * Note to plugin authors: the functions invoked during standard_join_search()
  * modify root->join_rel_list and root->join_rel_hash.  If you want to do more
  * than one join-order search, you'll probably need to save and restore the
- * original states of those data structures.  See geqo_eval() for an example.
+ * original states of those data structures.
  */
 RelOptInfo *
 standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)

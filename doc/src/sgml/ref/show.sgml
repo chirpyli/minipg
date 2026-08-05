@@ -153,12 +153,12 @@ SHOW DateStyle;
   </para>
 
   <para>
-   Show the current setting of the parameter <varname>geqo</varname>:
+   Show the current setting of the parameter <varname>server_version</varname>:
 <programlisting>
-SHOW geqo;
- geqo
-------
- on
+SHOW server_version;
+ server_version
+----------------
+ 14.0
 (1 row)
 </programlisting>
   </para>

@@ -223,7 +223,7 @@ struct PlannerInfo
 	 * hash table for faster lookups.  The hash table is present and valid
 	 * when join_rel_hash is not NULL.  Note that we still maintain the list
 	 * even when using the hash table for lookups; this simplifies life for
-	 * GEQO.
+	 * join-search plugins.
 	 */
 	List	   *join_rel_list;	/* list of join-relation RelOptInfos */
 	struct HTAB *join_rel_hash; /* optional hashtable for join relations */
@@ -372,7 +372,7 @@ struct PlannerInfo
 	bool	   *isAltSubplan;	/* array corresponding to glob->subplans */
 	bool	   *isUsedSubplan;	/* array corresponding to glob->subplans */
 
-	/* optional private data for join_search_hook, e.g., GEQO */
+	/* optional private data for join_search_hook */
 	void	   *join_search_private;
 
 	/* Does this query modify any partition key columns? */

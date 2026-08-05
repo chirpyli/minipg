@@ -315,19 +315,18 @@ createdb -T template0 <replaceable>dbname</replaceable>
   </para>
 
   <para>
-   For example, if for some reason you want to disable the
-   <acronym>GEQO</acronym> optimizer for a given database, you'd
-   ordinarily have to either disable it for all databases or make sure
-   that every connecting client is careful to issue <literal>SET geqo
-   TO off</literal>.  To make this setting the default within a particular
-   database, you can execute the command:
+   For example, if for some reason you want to change a planner parameter
+   for a given database, you'd ordinarily have to either change it for all
+   databases or make sure that every connecting client is careful to issue
+   the appropriate <literal>SET</literal> command.  To make the setting the
+   default within a particular database, you can execute the command:
 <programlisting>
-ALTER DATABASE mydb SET geqo TO off;
+ALTER DATABASE mydb SET join_collapse_limit TO 1;
 </programlisting>
    This will save the setting (but not set it immediately).  In
    subsequent connections to this database it will appear as though
-   <literal>SET geqo TO off;</literal> had been executed just before the
-   session started.
+   <literal>SET join_collapse_limit TO 1;</literal> had been executed just
+   before the session started.
    Note that users can still alter this setting during their sessions; it
    will only be the default.  To undo any such setting, use
    <literal>ALTER DATABASE <replaceable>dbname</replaceable> RESET

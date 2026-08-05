@@ -252,10 +252,6 @@ static const PQEnvironmentOption EnvironmentOptions[] =
 	{
 		"PGTZ", "timezone"
 	},
-	/* internal performance-related settings */
-	{
-		"PGGEQO", "geqo"
-	},
 	{
 		NULL, NULL
 	}

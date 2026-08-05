@@ -1085,7 +1085,8 @@ innerrel_is_unique(PlannerInfo *root,
 	{
 		/*
 		 * Cache the positive result for future probes, being sure to keep it
-		 * in the planner_cxt even if we are working in GEQO.
+		 * in the planner_cxt even if we are working in a join-search plugin's
+		 * temporary planning cycle.
 		 *
 		 * Note: one might consider trying to isolate the minimal subset of
 		 * the outerrels that proved the innerrel unique.  But it's not worth
@@ -1109,9 +1110,10 @@ innerrel_is_unique(PlannerInfo *root,
 		 *
 		 * However, in normal planning mode, caching this knowledge is totally
 		 * pointless; it won't be queried again, because we build up joinrels
-		 * from smaller to larger.  It is useful in GEQO mode, where the
-		 * knowledge can be carried across successive planning attempts; and
-		 * it's likely to be useful when using join-search plugins, too. Hence
+		 * from smaller to larger.  It is useful when a join-search plugin is
+		 * active, where the knowledge can be carried across successive
+		 * planning attempts; and it's likely to be useful when using
+		 * join-search plugins, too. Hence
 		 * cache when join_search_private is non-NULL.  (Yeah, that's a hack,
 		 * but it seems reasonable.)
 		 *

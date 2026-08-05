@@ -55,7 +55,6 @@
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
 #include "optimizer/cost.h"
-#include "optimizer/geqo.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/paths.h"
 #include "optimizer/planmain.h"
@@ -693,8 +692,6 @@ const char *const config_group_names[] =
 	gettext_noop("Query Tuning / Planner Method Configuration"),
 	/* QUERY_TUNING_COST */
 	gettext_noop("Query Tuning / Planner Cost Constants"),
-	/* QUERY_TUNING_GEQO */
-	gettext_noop("Query Tuning / Genetic Query Optimizer"),
 	/* QUERY_TUNING_OTHER */
 	gettext_noop("Query Tuning / Other Planner Options"),
 	/* LOGGING_WHERE */
@@ -1085,17 +1082,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_EXPLAIN
 		},
 		&enable_async_append,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("Enables genetic query optimization."),
-			gettext_noop("This algorithm attempts to do planning without "
-						 "exhaustive searching."),
-			GUC_EXPLAIN
-		},
-		&enable_geqo,
 		true,
 		NULL, NULL, NULL
 	},
@@ -1983,46 +1969,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&join_collapse_limit,
 		8, 1, INT_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo_threshold", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("Sets the threshold of FROM items beyond which GEQO is used."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&geqo_threshold,
-		12, 2, INT_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo_effort", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("GEQO: effort is used to set the default for other GEQO parameters."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&Geqo_effort,
-		DEFAULT_GEQO_EFFORT, MIN_GEQO_EFFORT, MAX_GEQO_EFFORT,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo_pool_size", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("GEQO: number of individuals in the population."),
-			gettext_noop("Zero selects a suitable default value."),
-			GUC_EXPLAIN
-		},
-		&Geqo_pool_size,
-		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo_generations", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("GEQO: number of iterations of the algorithm."),
-			gettext_noop("Zero selects a suitable default value."),
-			GUC_EXPLAIN
-		},
-		&Geqo_generations,
-		0, 0, INT_MAX,
 		NULL, NULL, NULL
 	},
 
@@ -3412,28 +3358,6 @@ static struct config_real ConfigureNamesReal[] =
 		},
 		&cursor_tuple_fraction,
 		DEFAULT_CURSOR_TUPLE_FRACTION, 0.0, 1.0,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"geqo_selection_bias", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("GEQO: selective pressure within the population."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&Geqo_selection_bias,
-		DEFAULT_GEQO_SELECTION_BIAS,
-		MIN_GEQO_SELECTION_BIAS, MAX_GEQO_SELECTION_BIAS,
-		NULL, NULL, NULL
-	},
-	{
-		{"geqo_seed", PGC_USERSET, QUERY_TUNING_GEQO,
-			gettext_noop("GEQO: seed for random path selection."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&Geqo_seed,
-		0.0, 0.0, 1.0,
 		NULL, NULL, NULL
 	},
 

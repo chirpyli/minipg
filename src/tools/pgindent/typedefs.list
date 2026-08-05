@@ -351,7 +351,6 @@ CheckPointStmt
 CheckpointStatsData
 CheckpointerRequest
 CheckpointerShmemStruct
-Chromosome
 CkptSortItem
 CkptTsStatus
 ClientAuthentication_hook_type
@@ -596,7 +595,6 @@ EVP_MD
 EVP_MD_CTX
 EVP_PKEY
 EachState
-Edge
 EditableObjectType
 ElementsState
 EnableTimeoutParams
@@ -915,7 +913,6 @@ GatherMergePath
 GatherMergeState
 GatherPath
 GatherState
-Gene
 GeneratePruningStepsContext
 GenerationBlock
 GenerationChunk
@@ -923,7 +920,6 @@ GenerationContext
 GenerationPointer
 GenericCosts
 GenericXLogState
-GeqoPrivateData
 GetForeignJoinPaths_function
 GetForeignModifyBatchSize_function
 GetForeignPaths_function

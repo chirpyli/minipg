@@ -1444,14 +1444,12 @@ SELECT * FROM a, b, c WHERE a.id = b.id AND b.ref = c.id;
    exponentially as the number of tables expands.  Beyond ten or so input
    tables it's no longer practical to do an exhaustive search of all the
    possibilities, and even for six or seven tables planning might take an
-   annoyingly long time.  When there are too many input tables, the
-   <productname>PostgreSQL</productname> planner will switch from exhaustive
-   search to a <firstterm>genetic</firstterm> probabilistic search
-   through a limited number of possibilities.  (The switch-over threshold is
-   set by the <xref linkend="guc-geqo-threshold"/> run-time
-   parameter.)
-   The genetic search takes less time, but it won't
-   necessarily find the best possible plan.
+   annoyingly long time.  The
+   <productname>PostgreSQL</productname> planner considers all possible join
+   orders, which is a cost that grows rapidly with the number of input tables.
+   For queries joining very many tables you may need to adjust planner limits
+   such as <varname>join_collapse_limit</varname> and
+   <varname>from_collapse_limit</varname> to keep planning time reasonable.
   </para>
 
   <para>

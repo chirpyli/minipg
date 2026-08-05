@@ -352,7 +352,7 @@ postgres -c log_connections=yes -c log_destination='syslog'
       command; specifically, the <option>-c</option> flag must be specified.
       For example,
 <programlisting>
-env PGOPTIONS="-c geqo=off -c statement_timeout=5min" psql
+env PGOPTIONS="-c statement_timeout=5min" psql
 </programlisting>
      </para>
 
@@ -5559,160 +5559,6 @@ ANY <replaceable class="parameter">num_sync</replaceable> ( <replaceable class="
      </variablelist>
 
     </sect2>
-     <sect2 id="runtime-config-query-geqo">
-     <title>Genetic Query Optimizer</title>
-
-     <para>
-      The genetic query optimizer (GEQO) is an algorithm that does query
-      planning using heuristic searching.  This reduces planning time for
-      complex queries (those joining many relations), at the cost of producing
-      plans that are sometimes inferior to those found by the normal
-      exhaustive-search algorithm.
-      For more information see <xref linkend="geqo"/>.
-     </para>
-
-     <variablelist>
-
-     <varlistentry id="guc-geqo" xreflabel="geqo">
-      <term><varname>geqo</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary>genetic query optimization</primary>
-      </indexterm>
-      <indexterm>
-       <primary>GEQO</primary>
-       <see>genetic query optimization</see>
-      </indexterm>
-      <indexterm>
-       <primary><varname>geqo</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Enables or disables genetic query optimization.
-        This is on by default.  It is usually best not to turn it off in
-        production; the <varname>geqo_threshold</varname> variable provides
-        more granular control of GEQO.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-threshold" xreflabel="geqo_threshold">
-      <term><varname>geqo_threshold</varname> (<type>integer</type>)
-      <indexterm>
-       <primary><varname>geqo_threshold</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Use genetic query optimization to plan queries with at least
-        this many <literal>FROM</literal> items involved. (Note that a
-        <literal>FULL OUTER JOIN</literal> construct counts as only one <literal>FROM</literal>
-        item.) The default is 12. For simpler queries it is usually best
-        to use the regular, exhaustive-search planner, but for queries with
-        many tables the exhaustive search takes too long, often
-        longer than the penalty of executing a suboptimal plan.  Thus,
-        a threshold on the size of the query is a convenient way to manage
-        use of GEQO.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-effort" xreflabel="geqo_effort">
-      <term><varname>geqo_effort</varname> (<type>integer</type>)
-      <indexterm>
-       <primary><varname>geqo_effort</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Controls the trade-off between planning time and query plan
-        quality in GEQO. This variable must be an integer in the
-        range from 1 to 10. The default value is five. Larger values
-        increase the time spent doing query planning, but also
-        increase the likelihood that an efficient query plan will be
-        chosen.
-       </para>
-
-       <para>
-        <varname>geqo_effort</varname> doesn't actually do anything
-        directly; it is only used to compute the default values for
-        the other variables that influence GEQO behavior (described
-        below). If you prefer, you can set the other parameters by
-        hand instead.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-pool-size" xreflabel="geqo_pool_size">
-      <term><varname>geqo_pool_size</varname> (<type>integer</type>)
-      <indexterm>
-       <primary><varname>geqo_pool_size</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Controls the pool size used by GEQO, that is the
-        number of individuals in the genetic population.  It must be
-        at least two, and useful values are typically 100 to 1000.  If
-        it is set to zero (the default setting) then a suitable
-        value is chosen based on <varname>geqo_effort</varname> and
-        the number of tables in the query.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-generations" xreflabel="geqo_generations">
-      <term><varname>geqo_generations</varname> (<type>integer</type>)
-      <indexterm>
-       <primary><varname>geqo_generations</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Controls the number of generations used by GEQO, that is
-        the number of iterations of the algorithm.  It must
-        be at least one, and useful values are in the same range as
-        the pool size.  If it is set to zero (the default setting)
-        then a suitable value is chosen based on
-        <varname>geqo_pool_size</varname>.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-selection-bias" xreflabel="geqo_selection_bias">
-      <term><varname>geqo_selection_bias</varname> (<type>floating point</type>)
-      <indexterm>
-       <primary><varname>geqo_selection_bias</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Controls the selection bias used by GEQO. The selection bias
-        is the selective pressure within the population. Values can be
-        from 1.50 to 2.00; the latter is the default.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-geqo-seed" xreflabel="geqo_seed">
-      <term><varname>geqo_seed</varname> (<type>floating point</type>)
-      <indexterm>
-       <primary><varname>geqo_seed</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Controls the initial value of the random number generator used
-        by GEQO to select random paths through the join order search space.
-        The value can range from zero (the default) to one.  Varying the
-        value changes the set of join paths explored, and may result in a
-        better or worse best path being found.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     </variablelist>
-    </sect2>
      <sect2 id="runtime-config-query-other">
      <title>Other Planner Options</title>
 
@@ -5833,12 +5679,6 @@ SELECT * FROM parent WHERE key = 2400;
         yield inferior query plans.  The default is eight.
         For more information see <xref linkend="explicit-joins"/>.
        </para>
-
-       <para>
-        Setting this value to <xref linkend="guc-geqo-threshold"/> or more
-        may trigger use of the GEQO planner, resulting in non-optimal
-        plans.  See <xref linkend="runtime-config-query-geqo"/>.
-       </para>
       </listitem>
      </varlistentry>
 
@@ -5884,12 +5724,6 @@ SELECT * FROM parent WHERE key = 2400;
         temporarily set this variable to 1, and then specify the join
         order they desire explicitly.
         For more information see <xref linkend="explicit-joins"/>.
-       </para>
-
-       <para>
-        Setting this value to <xref linkend="guc-geqo-threshold"/> or more
-        may trigger use of the GEQO planner, resulting in non-optimal
-        plans.  See <xref linkend="runtime-config-query-geqo"/>.
        </para>
       </listitem>
      </varlistentry>

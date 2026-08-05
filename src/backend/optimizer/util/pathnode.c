@@ -1666,14 +1666,14 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 		return NULL;
 
 	/*
-	 * When called during GEQO join planning, we are in a short-lived memory
-	 * context.  We must make sure that the path and any subsidiary data
-	 * structures created for a baserel survive the GEQO cycle, else the
-	 * baserel is trashed for future GEQO cycles.  On the other hand, when we
-	 * are creating those for a joinrel during GEQO, we don't want them to
-	 * clutter the main planning context.  Upshot is that the best solution is
-	 * to explicitly allocate memory in the same context the given RelOptInfo
-	 * is in.
+	 * When called during a join-search plugin's temporary planning cycle, we
+	 * are in a short-lived memory context.  We must make sure that the path
+	 * and any subsidiary data structures created for a baserel survive that
+	 * cycle, else the baserel is trashed for future cycles.  On the other
+	 * hand, when we are creating those for a joinrel during such a cycle, we
+	 * don't want them to clutter the main planning context.  Upshot is that
+	 * the best solution is to explicitly allocate memory in the same context
+	 * the given RelOptInfo is in.
 	 */
 	oldcontext = MemoryContextSwitchTo(GetMemoryChunkContext(rel));
 
@@ -1697,8 +1697,9 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 	pathnode->subpath = subpath;
 
 	/*
-	 * Under GEQO, the sjinfo might be short-lived, so we'd better make copies
-	 * of data structures we extract from it.
+	 * Under a join-search plugin's temporary planning cycle, the sjinfo might
+	 * be short-lived, so we'd better make copies of data structures we extract
+	 * from it.
 	 */
 	pathnode->in_operators = copyObject(sjinfo->semi_operators);
 	pathnode->uniq_exprs = copyObject(sjinfo->semi_rhs_exprs);

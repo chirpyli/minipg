@@ -481,7 +481,10 @@ find_join_rel(PlannerInfo *root, Relids relids)
 static void
 add_join_rel(PlannerInfo *root, RelOptInfo *joinrel)
 {
-	/* GEQO requires us to append the new joinrel to the end of the list! */
+	/*
+	 * New joinrels must be appended to the end of the list.  Some callers
+	 * (e.g. join-search plugins) rely on the list only growing at the tail.
+	 */
 	root->join_rel_list = lappend(root->join_rel_list, joinrel);
 
 	/* store it into the auxiliary hashtable if there is one. */
@@ -1503,8 +1506,9 @@ get_joinrel_parampathinfo(PlannerInfo *root, RelOptInfo *joinrel,
 	 * And now we can build the ParamPathInfo.  No point in saving the
 	 * input-pair-dependent clause list, though.
 	 *
-	 * Note: in GEQO mode, we'll be called in a temporary memory context, but
-	 * the joinrel structure is there too, so no problem.
+	 * Note: when called during a join-search plugin's temporary planning
+	 * cycle, we may be in a short-lived memory context, but the joinrel
+	 * structure is there too, so no problem.
 	 */
 	ppi = makeNode(ParamPathInfo);
 	ppi->ppi_req_outer = required_outer;
