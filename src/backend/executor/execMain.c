@@ -71,9 +71,6 @@ ExecutorRun_hook_type ExecutorRun_hook = NULL;
 ExecutorFinish_hook_type ExecutorFinish_hook = NULL;
 ExecutorEnd_hook_type ExecutorEnd_hook = NULL;
 
-/* Hook for plugin to get control in ExecCheckRTPerms() */
-ExecutorCheckPerms_hook_type ExecutorCheckPerms_hook = NULL;
-
 /* decls for local routines only used within this module */
 static void InitPlan(QueryDesc *queryDesc, int eflags);
 static void CheckValidRowMarkRel(Relation rel, RowMarkType markType);
@@ -85,9 +82,6 @@ static void ExecutePlan(QueryDesc *queryDesc,
 						uint64 numberTuples,
 						ScanDirection direction,
 						DestReceiver *dest);
-static bool ExecCheckRTEPermsModified(Oid relOid, Oid userid,
-									  Bitmapset *modifiedCols,
-									  AclMode requiredPerms);
 static void ExecCheckXactReadOnly(PlannedStmt *plannedstmt);
 static char *ExecBuildSlotValueDescription(Oid reloid,
 										   TupleTableSlot *slot,
@@ -542,60 +536,6 @@ ExecutorRewind(QueryDesc *queryDesc)
 
 
 /*
- * ExecCheckRTPerms
- *		Check access permissions for all relations listed in a range table.
- *
- * Returns true if permissions are adequate.  Otherwise, throws an appropriate
- * error if ereport_on_violation is true, or simply returns false otherwise.
- *
- * Note that this does NOT address row-level security policies (aka: RLS).  If
- * rows will be returned to the user as a result of this permission check
- * passing, then RLS also needs to be consulted (and check_enable_rls()).
- *
- * See rewrite/rowsecurity.c.
- */
-bool
-ExecCheckRTPerms(List *rangeTable, bool ereport_on_violation)
-{
-	ListCell   *l;
-	bool		result = true;
-
-	foreach(l, rangeTable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
-
-		result = ExecCheckRTEPerms(rte);
-		if (!result)
-		{
-			Assert(rte->rtekind == RTE_RELATION);
-			if (ereport_on_violation)
-				aclcheck_error(ACLCHECK_NO_PRIV, get_relkind_objtype(get_rel_relkind(rte->relid)),
-							   get_rel_name(rte->relid));
-			return false;
-		}
-	}
-
-	if (ExecutorCheckPerms_hook)
-		result = (*ExecutorCheckPerms_hook) (rangeTable,
-											 ereport_on_violation);
-	return result;
-}
-
-/*
- * ExecCheckRTEPerms
- *		Check access permissions for a single RTE.
- */
-bool
-ExecCheckRTEPerms(RangeTblEntry *rte)
-{
-	/*
-	 * minipg: 权限（ACL）机制已裁剪，所有对象访问一律放行，等同于以超级用户
-	 * 身份执行。因此不再对单个 RangeTblEntry 做权限检查，直接返回 true。
-	 */
-	return true;
-}
-
-/*
  * Check that the query does not imply any writes to non-temp tables;
  * unless we're in parallel mode, in which case don't even allow writes
  * to temp tables.
@@ -653,11 +593,6 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	TupleDesc	tupType;
 	ListCell   *l;
 	int			i;
-
-	/*
-	 * Do permissions checks
-	 */
-	ExecCheckRTPerms(rangeTable, true);
 
 	/*
 	 * initialize the node's execution state

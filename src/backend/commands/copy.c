@@ -195,7 +195,6 @@ DoCopy(ParseState *pstate, const CopyStmt *stmt,
 			else
 				rte->selectedCols = bms_add_member(rte->selectedCols, attno);
 		}
-		ExecCheckRTPerms(pstate->p_rtable, true);
 	}
 	else
 	{

@@ -13532,7 +13532,7 @@ unreserved_keyword:
 			| DOCUMENT_P
 			| DOMAIN_P
 			| DOUBLE_P
-			| DROP									{ $$ = -1; }
+			| DROP
 			| EACH
 			| ENABLE_P
 			| ENCODING
@@ -14060,7 +14060,7 @@ bare_label_keyword:
 			| DOCUMENT_P
 			| DOMAIN_P
 			| DOUBLE_P
-			| DROP									{ $$ = -1; }
+			| DROP
 			| EACH
 			| ELSE
 			| ENABLE_P

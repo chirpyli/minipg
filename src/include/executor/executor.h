@@ -80,10 +80,6 @@ extern PGDLLIMPORT ExecutorFinish_hook_type ExecutorFinish_hook;
 typedef void (*ExecutorEnd_hook_type) (QueryDesc *queryDesc);
 extern PGDLLIMPORT ExecutorEnd_hook_type ExecutorEnd_hook;
 
-/* Hook for plugins to get control in ExecCheckRTPerms() */
-typedef bool (*ExecutorCheckPerms_hook_type) (List *, bool);
-extern PGDLLIMPORT ExecutorCheckPerms_hook_type ExecutorCheckPerms_hook;
-
 
 /*
  * prototypes from functions in execAmi.c
@@ -196,8 +192,6 @@ extern void standard_ExecutorFinish(QueryDesc *queryDesc);
 extern void ExecutorEnd(QueryDesc *queryDesc);
 extern void standard_ExecutorEnd(QueryDesc *queryDesc);
 extern void ExecutorRewind(QueryDesc *queryDesc);
-extern bool ExecCheckRTPerms(List *rangeTable, bool ereport_on_violation);
-extern bool ExecCheckRTEPerms(RangeTblEntry *rte);
 extern void CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 								   OnConflictAction onConflictAction);
 extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation);

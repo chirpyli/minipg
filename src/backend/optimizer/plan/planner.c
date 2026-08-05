@@ -738,29 +738,9 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	 * before doing any detailed planning.  However, for historical reasons,
 	 * we leave this to be done at executor startup.
 	 *
-	 * Note, however, that we do need to check access permissions for any view
-	 * relations mentioned in the query, in order to prevent information being
-	 * leaked by selectivity estimation functions, which only check view owner
-	 * permissions on underlying tables (see all_rows_selectable() and its
-	 * callers).  This is a little ugly, because it means that access
-	 * permissions for views will be checked twice, which is another reason
-	 * why it would be better to do all the ACL checks here.
+	 * minipg: 权限（ACL）机制已裁剪，所有对象访问一律放行（以单一固定
+	 * superuser 身份执行），因此不再做任何权限预检。
 	 */
-	foreach(l, parse->rtable)
-	{
-		RangeTblEntry *rte = lfirst_node(RangeTblEntry, l);
-
-		if (rte->relkind == RELKIND_VIEW)
-		{
-			bool		result;
-
-			result = ExecCheckRTEPerms(rte);
-			if (!result)
-				aclcheck_error(ACLCHECK_NO_PRIV, OBJECT_VIEW,
-							   get_rel_name(rte->relid));
-		}
-	}
-
 	/*
 	 * Preprocess RowMark information.  We need to do this after subquery
 	 * pullup, so that all base relations are present.
