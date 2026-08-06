@@ -269,7 +269,6 @@ do_compile(FunctionCallInfo fcinfo,
 {
 	Form_pg_proc procStruct = (Form_pg_proc) GETSTRUCT(procTup);
 	bool		is_dml_trigger = CALLED_AS_TRIGGER(fcinfo);
-	bool		is_event_trigger = CALLED_AS_EVENT_TRIGGER(fcinfo);
 	Datum		prosrcdatum;
 	bool		isnull;
 	char	   *proc_source;
@@ -361,8 +360,6 @@ do_compile(FunctionCallInfo fcinfo,
 
 	if (is_dml_trigger)
 		function->fn_is_trigger = PLPGSQL_DML_TRIGGER;
-	else if (is_event_trigger)
-		function->fn_is_trigger = PLPGSQL_EVENT_TRIGGER;
 	else
 		function->fn_is_trigger = PLPGSQL_NOT_TRIGGER;
 
@@ -554,7 +551,7 @@ do_compile(FunctionCallInfo fcinfo,
 				if (rettypeid == VOIDOID ||
 					rettypeid == RECORDOID)
 					 /* okay */ ;
-				else if (rettypeid == TRIGGEROID || rettypeid == EVENT_TRIGGEROID)
+				else if (rettypeid == TRIGGEROID)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("trigger functions can only be called as triggers")));
@@ -724,48 +721,11 @@ do_compile(FunctionCallInfo fcinfo,
 
 			break;
 
-		case PLPGSQL_EVENT_TRIGGER:
-			function->fn_rettype = VOIDOID;
-			function->fn_retbyval = false;
-			function->fn_retistuple = true;
-			function->fn_retisdomain = false;
-			function->fn_retset = false;
-
-			/* shouldn't be any declared arguments */
-			if (procStruct->pronargs != 0)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-						 errmsg("event trigger functions cannot have declared arguments")));
-
-			/* Add the variable tg_event */
-			var = plpgsql_build_variable("tg_event", 0,
-										 plpgsql_build_datatype(TEXTOID,
-																-1,
-																function->fn_input_collation,
-																NULL),
-										 true);
-			Assert(var->dtype == PLPGSQL_DTYPE_VAR);
-			var->dtype = PLPGSQL_DTYPE_PROMISE;
-			((PLpgSQL_var *) var)->promise = PLPGSQL_PROMISE_TG_EVENT;
-
-			/* Add the variable tg_tag */
-			var = plpgsql_build_variable("tg_tag", 0,
-										 plpgsql_build_datatype(TEXTOID,
-																-1,
-																function->fn_input_collation,
-																NULL),
-										 true);
-			Assert(var->dtype == PLPGSQL_DTYPE_VAR);
-			var->dtype = PLPGSQL_DTYPE_PROMISE;
-			((PLpgSQL_var *) var)->promise = PLPGSQL_PROMISE_TG_TAG;
-
-			break;
-
 		default:
 			elog(ERROR, "unrecognized function typecode: %d",
 				 (int) function->fn_is_trigger);
 			break;
-	}
+		}
 
 	/* Remember if function is STABLE/IMMUTABLE */
 	function->fn_readonly = (procStruct->provolatile != PROVOLATILE_VOLATILE);
@@ -2460,7 +2420,6 @@ compute_function_hashkey(FunctionCallInfo fcinfo,
 
 	/* get call context */
 	hashkey->isTrigger = CALLED_AS_TRIGGER(fcinfo);
-	hashkey->isEventTrigger = CALLED_AS_EVENT_TRIGGER(fcinfo);
 
 	/*
 	 * If DML trigger, include trigger's OID in the hash, so that each trigger

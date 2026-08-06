@@ -97,9 +97,6 @@ extern bool listExtensionContents(const char *pattern);
 /* \dX */
 extern bool listExtendedStats(const char *pattern);
 
-/* \dy */
-extern bool listEventTriggers(const char *pattern, bool verbose);
-
 /* \dRp */
 bool		listPublications(const char *pattern);
 

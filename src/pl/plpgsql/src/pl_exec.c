@@ -1148,76 +1148,6 @@ plpgsql_exec_trigger(PLpgSQL_function *func,
 	return rettup;
 }
 
-/* ----------
- * plpgsql_exec_event_trigger		Called by the call handler for
- *				event trigger execution.
- * ----------
- */
-void
-plpgsql_exec_event_trigger(PLpgSQL_function *func, EventTriggerData *trigdata)
-{
-	PLpgSQL_execstate estate;
-	ErrorContextCallback plerrcontext;
-	int			rc;
-
-	/*
-	 * Setup the execution state
-	 */
-	plpgsql_estate_setup(&estate, func, NULL, NULL, NULL);
-	estate.evtrigdata = trigdata;
-
-	/*
-	 * Setup error traceback support for ereport()
-	 */
-	plerrcontext.callback = plpgsql_exec_error_callback;
-	plerrcontext.arg = &estate;
-	plerrcontext.previous = error_context_stack;
-	error_context_stack = &plerrcontext;
-
-	/*
-	 * Make local execution copies of all the datums
-	 */
-	estate.err_text = gettext_noop("during initialization of execution state");
-	copy_plpgsql_datums(&estate, func);
-
-	/*
-	 * Let the instrumentation plugin peek at this function
-	 */
-	if (*plpgsql_plugin_ptr && (*plpgsql_plugin_ptr)->func_beg)
-		((*plpgsql_plugin_ptr)->func_beg) (&estate, func);
-
-	/*
-	 * Now call the toplevel block of statements
-	 */
-	estate.err_text = NULL;
-	rc = exec_toplevel_block(&estate, func->action);
-	if (rc != PLPGSQL_RC_RETURN)
-	{
-		estate.err_text = NULL;
-		ereport(ERROR,
-				(errcode(ERRCODE_S_R_E_FUNCTION_EXECUTED_NO_RETURN_STATEMENT),
-				 errmsg("control reached end of trigger procedure without RETURN")));
-	}
-
-	estate.err_text = gettext_noop("during function exit");
-
-	/*
-	 * Let the instrumentation plugin peek at this function
-	 */
-	if (*plpgsql_plugin_ptr && (*plpgsql_plugin_ptr)->func_end)
-		((*plpgsql_plugin_ptr)->func_end) (&estate, func);
-
-	/* Clean up any leftover temporary memory */
-	plpgsql_destroy_econtext(&estate);
-	exec_eval_cleanup(&estate);
-	/* stmt_mcontext will be destroyed when function's main context is */
-
-	/*
-	 * Pop the error context stack
-	 */
-	error_context_stack = plerrcontext.previous;
-}
-
 /*
  * error context callback to let us supply a call-stack traceback
  */
@@ -1487,18 +1417,6 @@ plpgsql_fulfill_promise(PLpgSQL_execstate *estate,
 			{
 				assign_simple_var(estate, var, (Datum) 0, true, false);
 			}
-			break;
-
-		case PLPGSQL_PROMISE_TG_EVENT:
-			if (estate->evtrigdata == NULL)
-				elog(ERROR, "event trigger promise is not in an event trigger function");
-			assign_text_var(estate, var, estate->evtrigdata->event);
-			break;
-
-		case PLPGSQL_PROMISE_TG_TAG:
-			if (estate->evtrigdata == NULL)
-				elog(ERROR, "event trigger promise is not in an event trigger function");
-			assign_text_var(estate, var, GetCommandTagName(estate->evtrigdata->tag));
 			break;
 
 		default:
@@ -3937,7 +3855,6 @@ plpgsql_estate_setup(PLpgSQL_execstate *estate,
 
 	estate->func = func;
 	estate->trigdata = NULL;
-	estate->evtrigdata = NULL;
 
 	estate->retval = (Datum) 0;
 	estate->retisnull = true;

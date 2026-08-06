@@ -38,7 +38,6 @@
 #include "catalog/pg_depend.h"
 #include "catalog/pg_description.h"
 #include "catalog/pg_enum.h"
-#include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
@@ -385,28 +384,6 @@ static const struct cachedesc cacheinfo[] = {
 		{
 			Anum_pg_enum_enumtypid,
 			Anum_pg_enum_enumlabel,
-			0,
-			0
-		},
-		8
-	},
-	{EventTriggerRelationId,	/* EVENTTRIGGERNAME */
-		EventTriggerNameIndexId,
-		1,
-		{
-			Anum_pg_event_trigger_evtname,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{EventTriggerRelationId,	/* EVENTTRIGGEROID */
-		EventTriggerOidIndexId,
-		1,
-		{
-			Anum_pg_event_trigger_oid,
-			0,
 			0,
 			0
 		},

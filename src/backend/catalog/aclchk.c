@@ -36,7 +36,6 @@
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_default_acl.h"
-#include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
@@ -53,7 +52,6 @@
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
-#include "commands/event_trigger.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
@@ -206,10 +204,6 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 		case OBJECT_TABLESPACE:
 			whole_mask = ACL_ALL_RIGHTS_TABLESPACE;
 			break;
-		case OBJECT_EVENT_TRIGGER:
-			elog(ERROR, "grantable rights not supported for event triggers");
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
 		case OBJECT_TYPE:
 			whole_mask = ACL_ALL_RIGHTS_TYPE;
 			break;
@@ -347,9 +341,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_DOMAIN:
 						msg = gettext_noop("permission denied for domain %s");
 						break;
-					case OBJECT_EVENT_TRIGGER:
-						msg = gettext_noop("permission denied for event trigger %s");
-						break;
 					case OBJECT_EXTENSION:
 						msg = gettext_noop("permission denied for extension %s");
 						break;
@@ -456,9 +447,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 						break;
 					case OBJECT_DOMAIN:
 						msg = gettext_noop("must be owner of domain %s");
-						break;
-					case OBJECT_EVENT_TRIGGER:
-						msg = gettext_noop("must be owner of event trigger %s");
 						break;
 					case OBJECT_EXTENSION:
 						msg = gettext_noop("must be owner of extension %s");
@@ -1036,33 +1024,6 @@ pg_opfamily_ownercheck(Oid opf_oid, Oid roleid)
 						opf_oid)));
 
 	ownerId = ((Form_pg_opfamily) GETSTRUCT(tuple))->opfowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for an event trigger (specified by OID).
- */
-bool
-pg_event_trigger_ownercheck(Oid et_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(EVENTTRIGGEROID, ObjectIdGetDatum(et_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("event trigger with OID %u does not exist",
-						et_oid)));
-
-	ownerId = ((Form_pg_event_trigger) GETSTRUCT(tuple))->evtowner;
 
 	ReleaseSysCache(tuple);
 

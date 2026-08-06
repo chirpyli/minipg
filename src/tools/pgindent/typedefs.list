@@ -618,13 +618,6 @@ ErrorContextCallback
 ErrorData
 EstimateDSMForeignScan_function
 EstimationInfo
-EventTriggerCacheEntry
-EventTriggerCacheItem
-EventTriggerCacheStateType
-EventTriggerData
-EventTriggerEvent
-EventTriggerInfo
-EventTriggerQueryState
 ExceptionLabelMap
 ExceptionMap
 ExclusiveBackupState

@@ -27,7 +27,6 @@
 #include "catalog/pg_subscription_rel.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/subscriptioncmds.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -1174,7 +1173,6 @@ DropSubscription(DropSubscriptionStmt *stmt, bool isTopLevel)
 		PreventInTransactionBlock(isTopLevel, "DROP SUBSCRIPTION");
 
 	ObjectAddressSet(myself, SubscriptionRelationId, subid);
-	EventTriggerSQLDropAddObject(&myself, true, true);
 
 	/* Remove the tuple from catalog. */
 	CatalogTupleDelete(rel, &tup->t_self);

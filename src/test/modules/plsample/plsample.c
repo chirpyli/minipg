@@ -17,7 +17,6 @@
 
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
-#include "commands/event_trigger.h"
 #include "commands/trigger.h"
 #include "funcapi.h"
 #include "utils/builtins.h"
@@ -50,14 +49,6 @@ plsample_call_handler(PG_FUNCTION_ARGS)
 			 * This function has been called as a trigger function, where
 			 * (TriggerData *) fcinfo->context includes the information of the
 			 * context.
-			 */
-		}
-		else if (CALLED_AS_EVENT_TRIGGER(fcinfo))
-		{
-			/*
-			 * This function is called as an event trigger function, where
-			 * (EventTriggerData *) fcinfo->context includes the information
-			 * of the context.
 			 */
 		}
 		else

@@ -31,7 +31,6 @@ OBJS = \
 	define.o \
 	discard.o \
 	dropcmds.o \
-	event_trigger.o \
 	explain.o \
 	extension.o \
 	functioncmds.o \

@@ -132,8 +132,6 @@ SELECT pg_get_object_address('server', '{one}', '{}');
 SELECT pg_get_object_address('server', '{one,two}', '{}');
 SELECT pg_get_object_address('extension', '{one}', '{}');
 SELECT pg_get_object_address('extension', '{one,two}', '{}');
-SELECT pg_get_object_address('event trigger', '{one}', '{}');
-SELECT pg_get_object_address('event trigger', '{one,two}', '{}');
 SELECT pg_get_object_address('access method', '{one}', '{}');
 SELECT pg_get_object_address('access method', '{one,two}', '{}');
 SELECT pg_get_object_address('publication', '{one}', '{}');
@@ -187,10 +185,9 @@ WITH objects (type, name, args) AS (VALUES
 				('server', '{addr_fserv}', '{}'),
 				('user mapping', '{regress_addr_user}', '{integer}'),
 				('default acl', '{regress_addr_user,public}', '{r}'),
-				('default acl', '{regress_addr_user}', '{r}'),
-				-- extension
-				-- event trigger
-				('transform', '{int}', '{sql}'),
+			('default acl', '{regress_addr_user}', '{r}'),
+			-- extension
+			('transform', '{int}', '{sql}'),
 				('access method', '{btree}', '{}'),
 				('publication', '{addr_pub}', '{}'),
 				('publication relation', '{addr_nsp, gentable}', '{addr_pub}'),
@@ -259,7 +256,6 @@ WITH objects (classid, objid, objsubid) AS (VALUES
     ('pg_user_mapping'::regclass, 0, 0), -- no user mapping
     ('pg_default_acl'::regclass, 0, 0), -- no default ACL
     ('pg_extension'::regclass, 0, 0), -- no extension
-    ('pg_event_trigger'::regclass, 0, 0), -- no event trigger
     ('pg_publication'::regclass, 0, 0), -- no publication
     ('pg_publication_rel'::regclass, 0, 0), -- no publication relation
     ('pg_subscription'::regclass, 0, 0), -- no subscription

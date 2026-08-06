@@ -11,5 +11,4 @@
 CREATE TRANSFORM FOR int LANGUAGE SQL (
     FROM SQL WITH FUNCTION varchar_support(internal),
     TO SQL WITH FUNCTION int4recv(internal));
-NOTICE:  DDL test: type simple, tag CREATE TRANSFORM
 DROP TRANSFORM FOR int LANGUAGE SQL;

@@ -15,7 +15,6 @@ include $(top_builddir)/src/Makefile.global
 OBJS = \
 	attoptcache.o \
 	catcache.o \
-	evtcache.o \
 	inval.o \
 	lsyscache.o \
 	partcache.o \

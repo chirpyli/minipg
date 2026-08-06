@@ -267,12 +267,6 @@ plpgsql_call_handler(PG_FUNCTION_ARGS)
 		if (CALLED_AS_TRIGGER(fcinfo))
 			retval = PointerGetDatum(plpgsql_exec_trigger(func,
 														  (TriggerData *) fcinfo->context));
-		else if (CALLED_AS_EVENT_TRIGGER(fcinfo))
-		{
-			plpgsql_exec_event_trigger(func,
-									   (EventTriggerData *) fcinfo->context);
-			/* there's no return value in this case */
-		}
 		else
 			retval = plpgsql_exec_function(func, fcinfo,
 										   NULL, NULL,
@@ -450,7 +444,6 @@ plpgsql_validator(PG_FUNCTION_ARGS)
 	char	  **argnames;
 	char	   *argmodes;
 	bool		is_dml_trigger = false;
-	bool		is_event_trigger = false;
 	int			i;
 
 	if (!CheckFunctionValidatorAccess(fcinfo->flinfo->fn_oid, funcoid))
@@ -470,8 +463,6 @@ plpgsql_validator(PG_FUNCTION_ARGS)
 	{
 		if (proc->prorettype == TRIGGEROID)
 			is_dml_trigger = true;
-		else if (proc->prorettype == EVENT_TRIGGEROID)
-			is_event_trigger = true;
 		else if (proc->prorettype != RECORDOID &&
 				 proc->prorettype != VOIDOID &&
 				 !IsPolymorphicType(proc->prorettype))
@@ -505,7 +496,6 @@ plpgsql_validator(PG_FUNCTION_ARGS)
 		FmgrInfo	flinfo;
 		int			rc;
 		TriggerData trigdata;
-		EventTriggerData etrigdata;
 
 		/*
 		 * Connect to SPI manager (is this needed for compilation?)
@@ -527,12 +517,6 @@ plpgsql_validator(PG_FUNCTION_ARGS)
 			MemSet(&trigdata, 0, sizeof(trigdata));
 			trigdata.type = T_TriggerData;
 			fake_fcinfo->context = (Node *) &trigdata;
-		}
-		else if (is_event_trigger)
-		{
-			MemSet(&etrigdata, 0, sizeof(etrigdata));
-			etrigdata.type = T_EventTriggerData;
-			fake_fcinfo->context = (Node *) &etrigdata;
 		}
 
 		/* Test-compile the function */

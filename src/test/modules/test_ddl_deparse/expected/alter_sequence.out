@@ -6,10 +6,7 @@ ALTER SEQUENCE fkey_table_seq
   START 20
   CACHE 1
   NO CYCLE;
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE
 ALTER SEQUENCE fkey_table_seq
   RENAME TO fkey_table_seq_renamed;
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE
 ALTER SEQUENCE fkey_table_seq_renamed
   SET SCHEMA foo;
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE

@@ -7,7 +7,7 @@ EXTENSION = test_ddl_deparse
 DATA = test_ddl_deparse--1.0.sql
 
 # test_ddl_deparse must be first
-REGRESS = test_ddl_deparse \
+REGRESS = \
 	create_schema \
 	create_type \
 	create_conversion \

@@ -36,7 +36,6 @@
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/discard.h"
-#include "commands/event_trigger.h"
 #include "commands/explain.h"
 #include "commands/extension.h"
 #include "commands/lockcmds.h"
@@ -135,7 +134,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterDatabaseStmt:
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
-		case T_AlterEventTrigStmt:
 		case T_AlterExtensionContentsStmt:
 		case T_AlterExtensionStmt:
 		case T_AlterFunctionStmt:
@@ -159,7 +157,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateConversionStmt:
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
-		case T_CreateEventTrigStmt:
 		case T_CreateExtensionStmt:
 		case T_CreateFunctionStmt:
 		case T_CreateOpClassStmt:
@@ -851,16 +848,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			DiscardCommand((DiscardStmt *) parsetree, isTopLevel);
 			break;
 
-		case T_CreateEventTrigStmt:
-			/* no event triggers on event triggers */
-			CreateEventTrigger((CreateEventTrigStmt *) parsetree);
-			break;
-
-		case T_AlterEventTrigStmt:
-			/* no event triggers on event triggers */
-			AlterEventTrigger((AlterEventTrigStmt *) parsetree);
-			break;
-
 		case T_LockStmt:
 
 			/*
@@ -899,12 +886,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				DropStmt   *stmt = (DropStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->removeType))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecDropStmt(stmt, isTopLevel);
+				ExecDropStmt(stmt, isTopLevel);
 			}
 			break;
 
@@ -912,12 +894,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				RenameStmt *stmt = (RenameStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->renameType))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecRenameStmt(stmt);
+				ExecRenameStmt(stmt);
 			}
 			break;
 
@@ -925,12 +902,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				AlterObjectDependsStmt *stmt = (AlterObjectDependsStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->objectType))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecAlterObjectDependsStmt(stmt, NULL);
+				ExecAlterObjectDependsStmt(stmt, NULL);
 			}
 			break;
 
@@ -938,12 +910,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->objectType))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecAlterObjectSchemaStmt(stmt, NULL);
+				ExecAlterObjectSchemaStmt(stmt, NULL);
 			}
 			break;
 
@@ -951,12 +918,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				AlterOwnerStmt *stmt = (AlterOwnerStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->objectType))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecAlterOwnerStmt(stmt);
+				ExecAlterOwnerStmt(stmt);
 			}
 			break;
 
@@ -964,12 +926,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				CommentStmt *stmt = (CommentStmt *) parsetree;
 
-				if (EventTriggerSupportsObjectType(stmt->objtype))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					CommentObject(stmt);
+				CommentObject(stmt);
 				break;
 			}
 
@@ -1008,20 +965,8 @@ ProcessUtilitySlow(ParseState *pstate,
 {
 	Node	   *parsetree = pstmt->utilityStmt;
 	bool		isTopLevel = (context == PROCESS_UTILITY_TOPLEVEL);
-	bool		isCompleteQuery = (context != PROCESS_UTILITY_SUBCOMMAND);
-	bool		needCleanup;
-	bool		commandCollected = false;
 	ObjectAddress address;
 	ObjectAddress secondaryObject = InvalidObjectAddress;
-
-	/* All event trigger calls are done only when isCompleteQuery is true */
-	needCleanup = isCompleteQuery && EventTriggerBeginCompleteQuery();
-
-	/* PG_TRY block is to ensure we call EventTriggerEndCompleteQuery */
-	PG_TRY();
-	{
-		if (isCompleteQuery)
-			EventTriggerDDLCommandStart(parsetree);
 
 		switch (nodeTag(parsetree))
 		{
@@ -1033,12 +978,6 @@ ProcessUtilitySlow(ParseState *pstate,
 									queryString,
 									pstmt->stmt_location,
 									pstmt->stmt_len);
-
-				/*
-				 * EventTriggerCollectSimpleCommand called by
-				 * CreateSchemaCommand
-				 */
-				commandCollected = true;
 				break;
 
 			case T_CreateStmt:
@@ -1075,9 +1014,6 @@ ProcessUtilitySlow(ParseState *pstate,
 													 RELKIND_RELATION,
 													 InvalidOid, NULL,
 													 queryString);
-							EventTriggerCollectSimpleCommand(address,
-															 secondaryObject,
-															 stmt);
 
 							/*
 							 * Let NewRelationCreateToastTable decide if this
@@ -1153,7 +1089,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					 * The multiple commands generated here are stashed
 					 * individually, so disable collection below.
 					 */
-					commandCollected = true;
 				}
 				break;
 
@@ -1200,26 +1135,17 @@ ProcessUtilitySlow(ParseState *pstate,
 						atcontext.queryString = queryString;
 						atcontext.relid = relid;
 						atcontext.params = params;
-						atcontext.queryEnv = queryEnv;
+					atcontext.queryEnv = queryEnv;
 
-						/* ... ensure we have an event trigger context ... */
-						EventTriggerAlterTableStart(parsetree);
-						EventTriggerAlterTableRelid(relid);
-
-						/* ... and do it */
-						AlterTable(atstmt, lockmode, &atcontext);
-
-						/* done */
-						EventTriggerAlterTableEnd();
-					}
-					else
+					/* ... and do it */
+					AlterTable(atstmt, lockmode, &atcontext);
+				}
+				else
 						ereport(NOTICE,
 								(errmsg("relation \"%s\" does not exist, skipping",
 										atstmt->relation->relname)));
 				}
 
-				/* ALTER TABLE stashes commands internally */
-				commandCollected = true;
 				break;
 
 			case T_AlterDomainStmt:
@@ -1391,7 +1317,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					stmt = transformIndexStmt(relid, stmt, queryString);
 
 					/* ... and do it */
-					EventTriggerAlterTableStart(parsetree);
 					address =
 						DefineIndex(relid,	/* OID of heap relation */
 									stmt,
@@ -1403,16 +1328,6 @@ ProcessUtilitySlow(ParseState *pstate,
 									true,	/* check_not_in_use */
 									false,	/* skip_build */
 									false); /* quiet */
-
-					/*
-					 * Add the CREATE INDEX node itself to stash right away;
-					 * if there were any commands stashed in the ALTER TABLE
-					 * code, we need them to appear after this one.
-					 */
-					EventTriggerCollectSimpleCommand(address, secondaryObject,
-													 parsetree);
-					commandCollected = true;
-					EventTriggerAlterTableEnd();
 				}
 				break;
 
@@ -1452,14 +1367,8 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_ViewStmt:	/* CREATE VIEW */
-				EventTriggerAlterTableStart(parsetree);
 				address = DefineView((ViewStmt *) parsetree, queryString,
 									 pstmt->stmt_location, pstmt->stmt_len);
-				EventTriggerCollectSimpleCommand(address, secondaryObject,
-												 parsetree);
-				/* stashed internally */
-				commandCollected = true;
-				EventTriggerAlterTableEnd();
 				break;
 
 			case T_CreateFunctionStmt:	/* CREATE FUNCTION */
@@ -1507,18 +1416,10 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_CreateOpClassStmt:
 				DefineOpClass((CreateOpClassStmt *) parsetree);
-				/* command is stashed in DefineOpClass */
-				commandCollected = true;
 				break;
 
 			case T_CreateOpFamilyStmt:
 				address = DefineOpFamily((CreateOpFamilyStmt *) parsetree);
-
-				/*
-				 * DefineOpFamily calls EventTriggerCollectSimpleCommand
-				 * directly.
-				 */
-				commandCollected = true;
 				break;
 
 			case T_CreateTransformStmt:
@@ -1527,20 +1428,14 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_AlterOpFamilyStmt:
 				AlterOpFamily((AlterOpFamilyStmt *) parsetree);
-				/* commands are stashed in AlterOpFamily */
-				commandCollected = true;
 				break;
 
 			case T_AlterTableMoveAllStmt:
 				AlterTableMoveAll((AlterTableMoveAllStmt *) parsetree);
-				/* commands are stashed in AlterTableMoveAll */
-				commandCollected = true;
 				break;
 
 			case T_DropStmt:
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
-				/* no commands stashed for DROP */
-				commandCollected = true;
 				break;
 
 			case T_RenameStmt:
@@ -1586,12 +1481,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_AlterPublicationStmt:
 				AlterPublication((AlterPublicationStmt *) parsetree);
-
-				/*
-				 * AlterPublication calls EventTriggerCollectSimpleCommand
-				 * directly
-				 */
-				commandCollected = true;
 				break;
 
 			case T_CreateSubscriptionStmt:
@@ -1606,8 +1495,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_DropSubscriptionStmt:
 				DropSubscription((DropSubscriptionStmt *) parsetree, isTopLevel);
-				/* no commands stashed for DROP */
-				commandCollected = true;
 				break;
 
 			case T_CreateStatsStmt:
@@ -1649,32 +1536,11 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = AlterCollation((AlterCollationStmt *) parsetree);
 				break;
 
-			default:
-				elog(ERROR, "unrecognized node type: %d",
-					 (int) nodeTag(parsetree));
-				break;
+		default:
+			elog(ERROR, "unrecognized node type: %d",
+				 (int) nodeTag(parsetree));
+			break;
 		}
-
-		/*
-		 * Remember the object so that ddl_command_end event triggers have
-		 * access to it.
-		 */
-		if (!commandCollected)
-			EventTriggerCollectSimpleCommand(address, secondaryObject,
-											 parsetree);
-
-		if (isCompleteQuery)
-		{
-			EventTriggerSQLDrop(parsetree);
-			EventTriggerDDLCommandEnd(parsetree);
-		}
-	}
-	PG_FINALLY();
-	{
-		if (needCleanup)
-			EventTriggerEndCompleteQuery();
-	}
-	PG_END_TRY();
 }
 
 /*
@@ -1696,13 +1562,6 @@ ProcessUtilityForAlterTable(Node *stmt, AlterTableUtilityContext *context)
 {
 	PlannedStmt *wrapper;
 
-	/*
-	 * For event triggers, we must "close" the current complex-command set,
-	 * and start a new one afterwards; this is needed to ensure the ordering
-	 * of command events is consistent with the way they were executed.
-	 */
-	EventTriggerAlterTableEnd();
-
 	/* Create a suitable wrapper */
 	wrapper = makeNode(PlannedStmt);
 	wrapper->commandType = CMD_UTILITY;
@@ -1719,9 +1578,6 @@ ProcessUtilityForAlterTable(Node *stmt, AlterTableUtilityContext *context)
 				   context->queryEnv,
 				   None_Receiver,
 				   NULL);
-
-	EventTriggerAlterTableStart(context->pstmt->utilityStmt);
-	EventTriggerAlterTableRelid(context->relid);
 }
 
 /*
@@ -2023,9 +1879,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TRIGGER:
 			tag = CMDTAG_ALTER_TRIGGER;
 			break;
-		case OBJECT_EVENT_TRIGGER:
-			tag = CMDTAG_ALTER_EVENT_TRIGGER;
-			break;
 			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
 			break;
 			tag = CMDTAG_ALTER_TEXT_SEARCH_DICTIONARY;
@@ -2301,9 +2154,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TRIGGER:
 					tag = CMDTAG_DROP_TRIGGER;
 					break;
-				case OBJECT_EVENT_TRIGGER:
-					tag = CMDTAG_DROP_EVENT_TRIGGER;
-					break;
 			case OBJECT_RULE:
 				tag = CMDTAG_DROP_RULE;
 				break;
@@ -2575,14 +2425,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateTrigStmt:
 			tag = CMDTAG_CREATE_TRIGGER;
-			break;
-
-		case T_CreateEventTrigStmt:
-			tag = CMDTAG_CREATE_EVENT_TRIGGER;
-			break;
-
-		case T_AlterEventTrigStmt:
-			tag = CMDTAG_ALTER_EVENT_TRIGGER;
 			break;
 
 		case T_CreatePLangStmt:
@@ -3118,14 +2960,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateTrigStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateEventTrigStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterEventTrigStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

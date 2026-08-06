@@ -33,33 +33,6 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE FUNCTION log_rewrite() RETURNS event_trigger
-LANGUAGE plpgsql as
-$func$
-
-declare
-   this_schema text;
-begin
-    select into this_schema relnamespace::regnamespace::text
-    from pg_class
-    where oid = pg_event_trigger_table_rewrite_oid();
-    if this_schema = 'fast_default'
-    then
-        RAISE NOTICE 'rewriting table % for reason %',
-          pg_event_trigger_table_rewrite_oid()::regclass,
-          pg_event_trigger_table_rewrite_reason();
-    end if;
-end;
-$func$;
-
-CREATE TABLE has_volatile AS
-SELECT * FROM generate_series(1,10) id;
-
-
-CREATE EVENT TRIGGER has_volatile_rewrite
-                  ON table_rewrite
-   EXECUTE PROCEDURE log_rewrite();
-
 -- only the last of these should trigger a rewrite
 ALTER TABLE has_volatile ADD col1 int;
 ALTER TABLE has_volatile ADD col2 int DEFAULT 1;
@@ -605,8 +578,6 @@ DROP FUNCTION set(name);
 DROP FUNCTION comp();
 DROP TABLE m;
 DROP TABLE has_volatile;
-DROP EVENT TRIGGER has_volatile_rewrite;
-DROP FUNCTION log_rewrite;
 DROP SCHEMA fast_default;
 
 -- Leave a table with an active fast default in place, for pg_upgrade testing

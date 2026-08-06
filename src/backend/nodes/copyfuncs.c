@@ -4102,30 +4102,6 @@ _copyCreateTrigStmt(const CreateTrigStmt *from)
 	return newnode;
 }
 
-static CreateEventTrigStmt *
-_copyCreateEventTrigStmt(const CreateEventTrigStmt *from)
-{
-	CreateEventTrigStmt *newnode = makeNode(CreateEventTrigStmt);
-
-	COPY_STRING_FIELD(trigname);
-	COPY_STRING_FIELD(eventname);
-	COPY_NODE_FIELD(whenclause);
-	COPY_NODE_FIELD(funcname);
-
-	return newnode;
-}
-
-static AlterEventTrigStmt *
-_copyAlterEventTrigStmt(const AlterEventTrigStmt *from)
-{
-	AlterEventTrigStmt *newnode = makeNode(AlterEventTrigStmt);
-
-	COPY_STRING_FIELD(trigname);
-	COPY_SCALAR_FIELD(tgenabled);
-
-	return newnode;
-}
-
 static CreatePLangStmt *
 _copyCreatePLangStmt(const CreatePLangStmt *from)
 {
@@ -5073,12 +5049,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateTrigStmt:
 			retval = _copyCreateTrigStmt(from);
-			break;
-		case T_CreateEventTrigStmt:
-			retval = _copyCreateEventTrigStmt(from);
-			break;
-		case T_AlterEventTrigStmt:
-			retval = _copyAlterEventTrigStmt(from);
 			break;
 		case T_CreatePLangStmt:
 			retval = _copyCreatePLangStmt(from);

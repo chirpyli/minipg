@@ -34,7 +34,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_default_acl.h"
 #include "catalog/pg_enum.h"
-#include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
@@ -55,7 +54,6 @@
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
@@ -425,20 +423,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"event trigger",
-		EventTriggerRelationId,
-		EventTriggerOidIndexId,
-		EVENTTRIGGEROID,
-		EVENTTRIGGERNAME,
-		Anum_pg_event_trigger_oid,
-		Anum_pg_event_trigger_evtname,
-		InvalidAttrNumber,
-		Anum_pg_event_trigger_evtowner,
-		InvalidAttrNumber,
-		OBJECT_EVENT_TRIGGER,
-		true
-	},
-	{
 		"type",
 		TypeRelationId,
 		TypeOidIndexId,
@@ -660,10 +644,6 @@ static const struct object_type_map
 	{
 		"extension", OBJECT_EXTENSION
 	},
-	/* OCLASS_EVENT_TRIGGER */
-	{
-		"event trigger", OBJECT_EVENT_TRIGGER
-	},
 	/* OCLASS_PUBLICATION */
 	{
 		"publication", OBJECT_PUBLICATION
@@ -842,7 +822,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_ROLE:
 			case OBJECT_SCHEMA:
 		case OBJECT_LANGUAGE:
-		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_ACCESS_METHOD:
 		case OBJECT_PUBLICATION:
 		case OBJECT_SUBSCRIPTION:
@@ -1097,16 +1076,11 @@ get_object_address_unqualified(ObjectType objtype,
 			address.objectSubId = 0;
 			break;
 		case OBJECT_LANGUAGE:
-			address.classId = LanguageRelationId;
+		address.classId = LanguageRelationId;
 		address.objectId = get_language_oid(name, missing_ok);
 		address.objectSubId = 0;
 		break;
-	case OBJECT_EVENT_TRIGGER:
-		address.classId = EventTriggerRelationId;
-			address.objectId = get_event_trigger_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_PUBLICATION:
+	case OBJECT_PUBLICATION:
 			address.classId = PublicationRelationId;
 			address.objectId = get_publication_oid(name, missing_ok);
 			address.objectSubId = 0;
@@ -1967,7 +1941,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_STATISTIC_EXT:
 		case OBJECT_ACCESS_METHOD:
 		case OBJECT_DATABASE:
-		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_EXTENSION:
 		case OBJECT_LANGUAGE:
 		case OBJECT_PUBLICATION:
@@ -2145,11 +2118,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
 						   strVal((Value *) object));
 		break;
-	case OBJECT_EVENT_TRIGGER:
-		if (!pg_event_trigger_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
 		case OBJECT_LANGUAGE:
 			if (!pg_language_ownercheck(address.objectId, roleid))
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
@@ -3323,31 +3291,12 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 							 object->objectId);
 					break;
 				}
-				appendStringInfo(&buffer, _("extension %s"), extname);
-				break;
-			}
-
-		case OCLASS_EVENT_TRIGGER:
-			{
-				HeapTuple	tup;
-
-				tup = SearchSysCache1(EVENTTRIGGEROID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for event trigger %u",
-							 object->objectId);
-					break;
-				}
-				appendStringInfo(&buffer, _("event trigger %s"),
-								 NameStr(((Form_pg_event_trigger) GETSTRUCT(tup))->evtname));
-				ReleaseSysCache(tup);
-				break;
-			}
+			appendStringInfo(&buffer, _("extension %s"), extname);
+			break;
+		}
 
 		case OCLASS_PUBLICATION:
-			{
+		{
 				char	   *pubname = get_publication_name(object->objectId,
 														   missing_ok);
 
@@ -3910,12 +3859,8 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 		break;
 
 		case OCLASS_EXTENSION:
-			appendStringInfoString(&buffer, "extension");
-			break;
-
-		case OCLASS_EVENT_TRIGGER:
-			appendStringInfoString(&buffer, "event trigger");
-			break;
+		appendStringInfoString(&buffer, "extension");
+		break;
 
 		case OCLASS_PUBLICATION:
 			appendStringInfoString(&buffer, "publication");
@@ -4875,30 +4820,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 				appendStringInfoString(&buffer, quote_identifier(extname));
 				if (objname)
 					*objname = list_make1(extname);
-				break;
-			}
-
-		case OCLASS_EVENT_TRIGGER:
-			{
-				HeapTuple	tup;
-				Form_pg_event_trigger trigForm;
-				char	   *evtname;
-
-				tup = SearchSysCache1(EVENTTRIGGEROID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for event trigger %u",
-							 object->objectId);
-					break;
-				}
-				trigForm = (Form_pg_event_trigger) GETSTRUCT(tup);
-				evtname = pstrdup(NameStr(trigForm->evtname));
-				appendStringInfoString(&buffer, quote_identifier(evtname));
-				if (objname)
-					*objname = list_make1(evtname);
-			ReleaseSysCache(tup);
 			break;
 		}
 

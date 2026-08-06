@@ -252,7 +252,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
-		AlterEventTrigStmt AlterCollationStmt
+		AlterCollationStmt
 		AlterDatabaseStmt AlterDatabaseSetStmt AlterDomainStmt AlterEnumStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
 		AlterOperatorStmt AlterTypeStmt AlterSeqStmt AlterSystemStmt AlterTableStmt
@@ -265,7 +265,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
-		CreateAssertionStmt CreateTransformStmt CreateTrigStmt CreateEventTrigStmt
+		CreateAssertionStmt CreateTransformStmt CreateTrigStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
 		DropCastStmt
@@ -334,10 +334,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <str>		TransitionRelName
 %type <boolean>	TransitionRowOrTable TransitionOldOrNew
 %type <node>	TriggerTransition
-
-%type <list>	event_trigger_when_list event_trigger_value_list
-%type <defelt>	event_trigger_when_item
-%type <chr>		enable_trigger
 
 %type <str>		copy_file_name
 				access_method_clause attr_name
@@ -845,9 +841,7 @@ toplevel_stmt:
 			| TransactionStmtLegacy
 		;
 
-stmt:
-			AlterEventTrigStmt
-			| AlterCollationStmt
+stmt:	AlterCollationStmt
 			| AlterDatabaseStmt
 			| AlterDatabaseSetStmt
 			| AlterDomainStmt
@@ -896,7 +890,6 @@ stmt:
 			| CreateTableSpaceStmt
 			| CreateTransformStmt
 			| CreateTrigStmt
-			| CreateEventTrigStmt
 			| CreatedbStmt
 			| DeallocateStmt
 			| DeclareCursorStmt
@@ -4500,74 +4493,6 @@ ConstraintAttributeElem:
 
 /*****************************************************************************
  *
- *		QUERIES :
- *				CREATE EVENT TRIGGER ...
- *				ALTER EVENT TRIGGER ...
- *
- *****************************************************************************/
-
-CreateEventTrigStmt:
-			CREATE EVENT TRIGGER name ON ColLabel
-			EXECUTE FUNCTION_or_PROCEDURE func_name '(' ')'
-				{
-					CreateEventTrigStmt *n = makeNode(CreateEventTrigStmt);
-					n->trigname = $4;
-					n->eventname = $6;
-					n->whenclause = NULL;
-					n->funcname = $9;
-					$$ = (Node *)n;
-				}
-		  | CREATE EVENT TRIGGER name ON ColLabel
-			WHEN event_trigger_when_list
-			EXECUTE FUNCTION_or_PROCEDURE func_name '(' ')'
-				{
-					CreateEventTrigStmt *n = makeNode(CreateEventTrigStmt);
-					n->trigname = $4;
-					n->eventname = $6;
-					n->whenclause = $8;
-					n->funcname = $11;
-					$$ = (Node *)n;
-				}
-		;
-
-event_trigger_when_list:
-		  event_trigger_when_item
-			{ $$ = list_make1($1); }
-		| event_trigger_when_list AND event_trigger_when_item
-			{ $$ = lappend($1, $3); }
-		;
-
-event_trigger_when_item:
-		ColId IN_P '(' event_trigger_value_list ')'
-			{ $$ = makeDefElem($1, (Node *) $4, @1); }
-		;
-
-event_trigger_value_list:
-		  SCONST
-			{ $$ = list_make1(makeString($1)); }
-		| event_trigger_value_list ',' SCONST
-			{ $$ = lappend($1, makeString($3)); }
-		;
-
-AlterEventTrigStmt:
-			ALTER EVENT TRIGGER name enable_trigger
-				{
-					AlterEventTrigStmt *n = makeNode(AlterEventTrigStmt);
-					n->trigname = $4;
-					n->tgenabled = $5;
-					$$ = (Node *) n;
-				}
-		;
-
-enable_trigger:
-			ENABLE_P					{ $$ = TRIGGER_FIRES_ON_ORIGIN; }
-			| ENABLE_P REPLICA			{ $$ = TRIGGER_FIRES_ON_REPLICA; }
-			| ENABLE_P ALWAYS			{ $$ = TRIGGER_FIRES_ALWAYS; }
-			| DISABLE_P					{ $$ = TRIGGER_DISABLED; }
-		;
-
-/*****************************************************************************
- *
  *		QUERY :
  *				CREATE ASSERTION ...
  *
@@ -5198,7 +5123,6 @@ object_type_name:
 
 drop_type_name:
 			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
-			| EVENT TRIGGER							{ $$ = OBJECT_EVENT_TRIGGER; }
 			| EXTENSION								{ $$ = OBJECT_EXTENSION; }
 			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
 			| PUBLICATION							{ $$ = OBJECT_PUBLICATION; }
@@ -7064,14 +6988,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER EVENT TRIGGER name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_EVENT_TRIGGER;
-					n->object = (Node *) makeString($4);
-					n->newname = $7;
-					$$ = (Node *)n;
-				}
 			| ALTER ROLE RoleId RENAME TO RoleId
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -7571,14 +7487,6 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					n->objectType = OBJECT_STATISTIC_EXT;
 					n->object = (Node *) $3;
 					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EVENT TRIGGER name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_EVENT_TRIGGER;
-					n->object = (Node *) makeString($4);
-					n->newowner = $7;
 					$$ = (Node *)n;
 				}
 			| ALTER PUBLICATION name OWNER TO RoleSpec

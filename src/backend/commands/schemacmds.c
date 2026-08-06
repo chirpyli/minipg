@@ -25,7 +25,6 @@
 #include "catalog/pg_authid.h"
 #include "catalog/pg_namespace.h"
 #include "commands/dbcommands.h"
-#include "commands/event_trigger.h"
 #include "commands/schemacmds.h"
 #include "miscadmin.h"
 #include "parser/parse_utilcmd.h"
@@ -183,8 +182,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	 * wrong.
 	 */
 	ObjectAddressSet(address, NamespaceRelationId, namespaceId);
-	EventTriggerCollectSimpleCommand(address, InvalidObjectAddress,
-									 (Node *) stmt);
 
 	/*
 	 * Examine the list of commands embedded in the CREATE SCHEMA command, and

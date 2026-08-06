@@ -1859,26 +1859,6 @@ _equalCreateTrigStmt(const CreateTrigStmt *a, const CreateTrigStmt *b)
 }
 
 static bool
-_equalCreateEventTrigStmt(const CreateEventTrigStmt *a, const CreateEventTrigStmt *b)
-{
-	COMPARE_STRING_FIELD(trigname);
-	COMPARE_STRING_FIELD(eventname);
-	COMPARE_NODE_FIELD(whenclause);
-	COMPARE_NODE_FIELD(funcname);
-
-	return true;
-}
-
-static bool
-_equalAlterEventTrigStmt(const AlterEventTrigStmt *a, const AlterEventTrigStmt *b)
-{
-	COMPARE_STRING_FIELD(trigname);
-	COMPARE_SCALAR_FIELD(tgenabled);
-
-	return true;
-}
-
-static bool
 _equalCreatePLangStmt(const CreatePLangStmt *a, const CreatePLangStmt *b)
 {
 	COMPARE_SCALAR_FIELD(replace);
@@ -3202,12 +3182,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateTrigStmt:
 			retval = _equalCreateTrigStmt(a, b);
-			break;
-		case T_CreateEventTrigStmt:
-			retval = _equalCreateEventTrigStmt(a, b);
-			break;
-		case T_AlterEventTrigStmt:
-			retval = _equalAlterEventTrigStmt(a, b);
 			break;
 		case T_CreatePLangStmt:
 			retval = _equalCreatePLangStmt(a, b);

@@ -34,7 +34,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_default_acl.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_event_trigger.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
@@ -55,7 +54,6 @@
 #include "catalog/pg_type.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/extension.h"
 #include "commands/publicationcmds.h"
 #include "commands/sequence.h"
@@ -159,7 +157,6 @@ static const Oid object_classes[] = {
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
 	DefaultAclRelationId,		/* OCLASS_DEFACL */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
-	EventTriggerRelationId,		/* OCLASS_EVENT_TRIGGER */
 	PublicationRelationId,		/* OCLASS_PUBLICATION */
 	PublicationRelRelationId,	/* OCLASS_PUBLICATION_REL */
 	SubscriptionRelationId,		/* OCLASS_SUBSCRIPTION */
@@ -208,32 +205,6 @@ deleteObjectsInList(ObjectAddresses *targetObjects, Relation *depRel,
 					int flags)
 {
 	int			i;
-
-	/*
-	 * Keep track of objects for event triggers, if necessary.
-	 */
-	if (trackDroppedObjectsNeeded() && !(flags & PERFORM_DELETION_INTERNAL))
-	{
-		for (i = 0; i < targetObjects->numrefs; i++)
-		{
-			const ObjectAddress *thisobj = &targetObjects->refs[i];
-			const ObjectAddressExtra *extra = &targetObjects->extras[i];
-			bool		original = false;
-			bool		normal = false;
-
-			if (extra->flags & DEPFLAG_ORIGINAL)
-				original = true;
-			if (extra->flags & DEPFLAG_NORMAL)
-				normal = true;
-			if (extra->flags & DEPFLAG_REVERSE)
-				normal = true;
-
-			if (EventTriggerSupportsObjectClass(getObjectClass(thisobj)))
-			{
-				EventTriggerSQLDropAddObject(thisobj, original, normal);
-			}
-		}
-	}
 
 	/*
 	 * Delete all the objects in the proper order, except that if told to, we
@@ -1477,7 +1448,6 @@ doDeletion(const ObjectAddress *object, int flags)
 		case OCLASS_AMPROC:
 		case OCLASS_SCHEMA:
 		case OCLASS_DEFACL:
-		case OCLASS_EVENT_TRIGGER:
 		case OCLASS_TRANSFORM:
 			DropObjectById(object);
 			break;
@@ -2793,9 +2763,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case ExtensionRelationId:
 			return OCLASS_EXTENSION;
-
-		case EventTriggerRelationId:
-			return OCLASS_EVENT_TRIGGER;
 
 		case PublicationRelationId:
 			return OCLASS_PUBLICATION;

@@ -28,9 +28,9 @@
 #include "catalog/pg_publication.h"
 #include "catalog/pg_publication_rel.h"
 #include "catalog/pg_type.h"
+#include "catalog/dependency.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/publicationcmds.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -336,8 +336,6 @@ AlterPublicationOptions(AlterPublicationStmt *stmt, Relation rel,
 	}
 
 	ObjectAddressSet(obj, PublicationRelationId, pubform->oid);
-	EventTriggerCollectSimpleCommand(obj, InvalidObjectAddress,
-									 (Node *) stmt);
 
 	InvokeObjectPostAlterHook(PublicationRelationId, pubform->oid, 0);
 }
@@ -675,9 +673,6 @@ PublicationAddTables(Oid pubid, List *rels, bool if_not_exists,
 		obj = publication_add_relation(pubid, rel, if_not_exists);
 		if (stmt)
 		{
-			EventTriggerCollectSimpleCommand(obj, InvalidObjectAddress,
-											 (Node *) stmt);
-
 			InvokeObjectPostCreateHook(PublicationRelRelationId,
 									   obj.objectId, 0);
 		}

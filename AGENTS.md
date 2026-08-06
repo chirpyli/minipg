@@ -16,3 +16,4 @@
 
 ## 参考
 - postgres源码：/home/postgres/works/opensource/postgres ， 该postgres源码为minipg项目裁剪前的源码，在分析minipg项目时，可以参考该postgres源码
+- 在制定裁剪方案时，可参考postgres的该功能的历史提交记录，以便于对比分析，另外可以分析该功能是在哪个版本中引入的，以便于分析该功能的引入原因，去判断裁剪方案。

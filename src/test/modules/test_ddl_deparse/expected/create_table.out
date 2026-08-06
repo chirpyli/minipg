@@ -34,15 +34,6 @@ CREATE TABLE datatype_table (
     PRIMARY KEY (id),
     UNIQUE (id_big)
 );
-NOTICE:  DDL test: type simple, tag CREATE SEQUENCE
-NOTICE:  DDL test: type simple, tag CREATE SEQUENCE
-NOTICE:  DDL test: type simple, tag CREATE SEQUENCE
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
-NOTICE:  DDL test: type simple, tag CREATE INDEX
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE
-NOTICE:  DDL test: type simple, tag ALTER SEQUENCE
 -- Constraint definitions
 CREATE TABLE IF NOT EXISTS fkey_table (
     id           INT NOT NULL DEFAULT nextval('fkey_table_seq'::REGCLASS),
@@ -57,45 +48,30 @@ CREATE TABLE IF NOT EXISTS fkey_table (
       REFERENCES datatype_table(id_big),
     EXCLUDE USING btree (check_col_2 WITH =)
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
-NOTICE:  DDL test: type simple, tag CREATE INDEX
-NOTICE:  DDL test: type alter table, tag ALTER TABLE
-NOTICE:    subcommand: ADD CONSTRAINT (and recurse)
-NOTICE:    subcommand: ADD CONSTRAINT (and recurse)
 -- Typed table
 CREATE TABLE employees OF employee_type (
     PRIMARY KEY (name),
     salary WITH OPTIONS DEFAULT 1000
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type alter table, tag ALTER TABLE
-NOTICE:    subcommand: SET NOT NULL
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 -- Inheritance
 CREATE TABLE person (
     id          INT NOT NULL PRIMARY KEY,
 	name 		text,
 	age			int4
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 CREATE TABLE emp (
 	salary 		int4,
 	manager 	name
 ) INHERITS (person);
-NOTICE:  DDL test: type simple, tag CREATE TABLE
 CREATE TABLE student (
 	gpa 		float8
 ) INHERITS (person);
-NOTICE:  DDL test: type simple, tag CREATE TABLE
 CREATE TABLE stud_emp (
 	percent 	int4
 ) INHERITS (emp, student);
 NOTICE:  merging multiple inherited definitions of column "id"
 NOTICE:  merging multiple inherited definitions of column "name"
 NOTICE:  merging multiple inherited definitions of column "age"
-NOTICE:  DDL test: type simple, tag CREATE TABLE
 -- Storage parameters
 CREATE TABLE storage (
     id INT
@@ -103,39 +79,26 @@ CREATE TABLE storage (
     fillfactor = 10,
     autovacuum_enabled = FALSE
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
 -- LIKE
 CREATE TABLE like_datatype_table (
   LIKE datatype_table
   EXCLUDING ALL
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
 CREATE TABLE like_fkey_table (
   LIKE fkey_table
   INCLUDING DEFAULTS
   INCLUDING INDEXES
   INCLUDING STORAGE
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type alter table, tag ALTER TABLE
-NOTICE:    subcommand: ALTER COLUMN SET DEFAULT (precooked)
-NOTICE:  DDL test: type simple, tag CREATE INDEX
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 -- Volatile table types
 CREATE TEMP TABLE temp_table (
     id INT PRIMARY KEY
 );
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 CREATE TEMP TABLE temp_table_commit_delete (
     id INT PRIMARY KEY
 )
 ON COMMIT DELETE ROWS;
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 CREATE TEMP TABLE temp_table_commit_drop (
     id INT PRIMARY KEY
 )
 ON COMMIT DROP;
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX

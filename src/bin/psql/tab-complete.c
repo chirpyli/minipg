@@ -942,11 +942,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "   FROM pg_catalog.pg_prepared_statements "\
 "  WHERE substring(pg_catalog.quote_ident(name),1,%d)='%s'"
 
-#define Query_for_list_of_event_triggers \
-" SELECT pg_catalog.quote_ident(evtname) "\
-"   FROM pg_catalog.pg_event_trigger "\
-"  WHERE substring(pg_catalog.quote_ident(evtname),1,%d)='%s'"
-
 #define Query_for_list_of_tablesample_methods \
 " SELECT pg_catalog.quote_ident(proname) "\
 "   FROM pg_catalog.pg_proc "\
@@ -1065,7 +1060,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"DEFAULT PRIVILEGES", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, NULL, THING_NO_SHOW},
 	{"DOMAIN", NULL, NULL, &Query_for_list_of_domains},
-	{"EVENT TRIGGER", NULL, NULL, NULL},
 	{"EXTENSION", Query_for_list_of_extensions},
 	{"FOREIGN DATA WRAPPER", NULL, NULL, NULL},
 	{"FOREIGN TABLE", NULL, NULL, NULL},
@@ -1717,18 +1711,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER", "DATABASE", MatchAny, "SET", "TABLESPACE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
 
-	/* ALTER EVENT TRIGGER */
-	else if (Matches("ALTER", "EVENT", "TRIGGER"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
-
-	/* ALTER EVENT TRIGGER <name> */
-	else if (Matches("ALTER", "EVENT", "TRIGGER", MatchAny))
-		COMPLETE_WITH("DISABLE", "ENABLE", "OWNER TO", "RENAME TO");
-
-	/* ALTER EVENT TRIGGER <name> ENABLE */
-	else if (Matches("ALTER", "EVENT", "TRIGGER", MatchAny, "ENABLE"))
-		COMPLETE_WITH("REPLICA", "ALWAYS");
-
 	/* ALTER EXTENSION <name> */
 	else if (Matches("ALTER", "EXTENSION", MatchAny))
 		COMPLETE_WITH("ADD", "DROP", "UPDATE", "SET SCHEMA");
@@ -2352,9 +2334,9 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("COMMENT"))
 		COMPLETE_WITH("ON");
 	else if (Matches("COMMENT", "ON"))
-		COMPLETE_WITH("ACCESS METHOD", "CAST", "COLLATION", "CONVERSION",
-					  "DATABASE", "EVENT TRIGGER", "EXTENSION",
-					  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
+		COMPLETE_WITH(				  "ACCESS METHOD", "CAST", "COLLATION", "CONVERSION",
+				  "DATABASE", "EXTENSION",
+				  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
 					  "INDEX", "LANGUAGE", "POLICY", "PUBLICATION", "RULE",
 					  "SCHEMA", "SEQUENCE", "STATISTICS", "SUBSCRIPTION",
 					  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
@@ -2379,8 +2361,6 @@ psql_completion(const char *text, int start, int end)
 	}
 	else if (Matches("COMMENT", "ON", "MATERIALIZED", "VIEW"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews, NULL);
-	else if (Matches("COMMENT", "ON", "EVENT", "TRIGGER"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
 	else if (Matches("COMMENT", "ON", MatchAny, MatchAnyExcept("IS")) ||
 			 Matches("COMMENT", "ON", MatchAny, MatchAny, MatchAnyExcept("IS")) ||
 			 Matches("COMMENT", "ON", MatchAny, MatchAny, MatchAny, MatchAnyExcept("IS")))
@@ -3015,21 +2995,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("CREATE", "MATERIALIZED", "VIEW", MatchAny, "AS"))
 		COMPLETE_WITH("SELECT");
 
-/* CREATE EVENT TRIGGER */
-	else if (Matches("CREATE", "EVENT"))
-		COMPLETE_WITH("TRIGGER");
-	/* Complete CREATE EVENT TRIGGER <name> with ON */
-	else if (Matches("CREATE", "EVENT", "TRIGGER", MatchAny))
-		COMPLETE_WITH("ON");
-	/* Complete CREATE EVENT TRIGGER <name> ON with event_type */
-	else if (Matches("CREATE", "EVENT", "TRIGGER", MatchAny, "ON"))
-		COMPLETE_WITH("ddl_command_start", "ddl_command_end", "sql_drop");
-
-	/*
-	 * Complete CREATE EVENT TRIGGER <name> ON <event_type>.  EXECUTE FUNCTION
-	 * is the recommended grammar instead of EXECUTE PROCEDURE in version 11
-	 * and upwards.
-	 */
 	else if (Matches("CREATE", "EVENT", "TRIGGER", MatchAny, "ON", MatchAny))
 	{
 		if (pset.sversion >= 110000)
@@ -3183,12 +3148,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("METHOD");
 	else if (Matches("DROP", "ACCESS", "METHOD"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
-
-	/* DROP EVENT TRIGGER */
-	else if (Matches("DROP", "EVENT"))
-		COMPLETE_WITH("TRIGGER");
-	else if (Matches("DROP", "EVENT", "TRIGGER"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
 
 	/* DROP POLICY <name>  */
 	else if (Matches("DROP", "POLICY"))
@@ -3999,8 +3958,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_statistics, NULL);
 	else if (TailMatchesCS("\\dm*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews, NULL);
-	else if (TailMatchesCS("\\dy*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
 
 	/* must be at end of \d alternatives: */
 	else if (TailMatchesCS("\\d*"))

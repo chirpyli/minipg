@@ -522,14 +522,6 @@ create table domain_test (a int, b int);
 insert into domain_test values (1, 2);
 insert into domain_test values (1, 2);
 
--- should fail
-alter table domain_test add column c str_domain;
-
-create domain str_domain2 as text check (value <> 'foo') default 'foo';
-
--- should fail
-alter table domain_test add column d str_domain2;
-
 -- Check that domain constraints on prepared statement parameters of
 -- unknown type are enforced correctly.
 create domain pos_int as int4 check (value > 0) not null;

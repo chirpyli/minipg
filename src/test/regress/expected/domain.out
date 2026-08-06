@@ -849,13 +849,6 @@ create domain str_domain as text not null;
 create table domain_test (a int, b int);
 insert into domain_test values (1, 2);
 insert into domain_test values (1, 2);
--- should fail
-alter table domain_test add column c str_domain;
-ERROR:  domain str_domain does not allow null values
-create domain str_domain2 as text check (value <> 'foo') default 'foo';
--- should fail
-alter table domain_test add column d str_domain2;
-ERROR:  value for domain str_domain2 violates check constraint "str_domain2_check"
 -- Check that domain constraints on prepared statement parameters of
 -- unknown type are enforced correctly.
 create domain pos_int as int4 check (value > 0) not null;

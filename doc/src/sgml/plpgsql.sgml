@@ -4643,14 +4643,6 @@ CREATE TRIGGER emp_audit_del
    </example>
 
 </sect2>
-
-  <sect2 id="plpgsql-event-trigger">
-   <title>Triggers on Events</title>
-
-   <para>
-    <application>PL/pgSQL</application> can be used to define
-    <link linkend="event-triggers">event triggers</link>.
-    <productname>PostgreSQL</productname> requires that a function that
     is to be called as an event trigger must be declared as a function with
     no arguments and a return type of <literal>event_trigger</literal>.
    </para>

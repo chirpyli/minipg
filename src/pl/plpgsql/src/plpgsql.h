@@ -17,7 +17,6 @@
 #define PLPGSQL_H
 
 #include "access/xact.h"
-#include "commands/event_trigger.h"
 #include "commands/trigger.h"
 #include "executor/spi.h"
 #include "utils/expandedrecord.h"
@@ -923,7 +922,6 @@ typedef struct PLpgSQL_func_hashkey
 	Oid			funcOid;
 
 	bool		isTrigger;		/* true if called as a DML trigger */
-	bool		isEventTrigger; /* true if called as an event trigger */
 
 	/* be careful that pad bytes in this struct get zeroed! */
 
@@ -955,7 +953,6 @@ typedef struct PLpgSQL_func_hashkey
 typedef enum PLpgSQL_trigtype
 {
 	PLPGSQL_DML_TRIGGER,
-	PLPGSQL_EVENT_TRIGGER,
 	PLPGSQL_NOT_TRIGGER
 } PLpgSQL_trigtype;
 
@@ -1022,7 +1019,6 @@ typedef struct PLpgSQL_execstate
 	PLpgSQL_function *func;		/* function being executed */
 
 	TriggerData *trigdata;		/* if regular trigger, data about firing */
-	EventTriggerData *evtrigdata;	/* if event trigger, data about firing */
 
 	Datum		retval;
 	bool		retisnull;
@@ -1261,8 +1257,6 @@ extern Datum plpgsql_exec_function(PLpgSQL_function *func,
 								   bool atomic);
 extern HeapTuple plpgsql_exec_trigger(PLpgSQL_function *func,
 									  TriggerData *trigdata);
-extern void plpgsql_exec_event_trigger(PLpgSQL_function *func,
-									   EventTriggerData *trigdata);
 extern void plpgsql_xact_cb(XactEvent event, void *arg);
 extern void plpgsql_subxact_cb(SubXactEvent event, SubTransactionId mySubid,
 							   SubTransactionId parentSubid, void *arg);

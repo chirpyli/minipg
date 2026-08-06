@@ -49,7 +49,6 @@
 #include "commands/cluster.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/sequence.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -84,6 +83,14 @@
 #include "storage/smgr.h"
 #include "tcop/utility.h"
 #include "utils/acl.h"
+
+/*
+ * AT_REWRITE_* flags for tab->rewrite, previously defined in event_trigger.h.
+ * Retained here because they drive ALTER TABLE rewrite logic, not event
+ * triggers themselves.
+ */
+#define AT_REWRITE_DEFAULT_VAL		0x02
+#define AT_REWRITE_COLUMN_REWRITE	0x04
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/inval.h"
@@ -3987,8 +3994,6 @@ AlterTableInternal(Oid relid, List *cmds, bool recurse)
 
 	rel = relation_open(relid, lockmode);
 
-	EventTriggerAlterTableRelid(relid);
-
 	ATController(NULL, rel, cmds, recurse, lockmode, NULL);
 }
 
@@ -5015,8 +5020,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 	/*
 	 * Report the subcommand to interested event triggers.
 	 */
-	if (cmd)
-		EventTriggerCollectAlterTableSubcmd((Node *) cmd, address);
 
 	/*
 	 * Bump the command counter to ensure the next subcommand in the sequence
@@ -5285,10 +5288,6 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 *
 			 * And fire it only once.
 			 */
-			if (parsetree)
-				EventTriggerTableRewrite((Node *) parsetree,
-										 tab->relid,
-										 tab->rewrite);
 
 			/*
 			 * Create transient table that will receive the modified data.
@@ -12230,7 +12229,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 		case OCLASS_TBLSPACE:
 		case OCLASS_DEFACL:
 			case OCLASS_EXTENSION:
-			case OCLASS_EVENT_TRIGGER:
 			case OCLASS_PUBLICATION:
 			case OCLASS_PUBLICATION_REL:
 			case OCLASS_SUBSCRIPTION:
@@ -13956,10 +13954,8 @@ AlterTableMoveAll(AlterTableMoveAllStmt *stmt)
 
 		cmds = lappend(cmds, cmd);
 
-		EventTriggerAlterTableStart((Node *) stmt);
 		/* OID is set by AlterTableInternal */
 		AlterTableInternal(lfirst_oid(l), cmds, false);
-		EventTriggerAlterTableEnd();
 	}
 
 	return new_tablespaceoid;

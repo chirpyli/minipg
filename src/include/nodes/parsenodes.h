@@ -2293,31 +2293,6 @@ typedef struct CreateTrigStmt
 } CreateTrigStmt;
 
 /* ----------------------
- *		Create EVENT TRIGGER Statement
- * ----------------------
- */
-typedef struct CreateEventTrigStmt
-{
-	NodeTag		type;
-	char	   *trigname;		/* TRIGGER's name */
-	char	   *eventname;		/* event's identifier */
-	List	   *whenclause;		/* list of DefElems indicating filtering */
-	List	   *funcname;		/* qual. name of function to call */
-} CreateEventTrigStmt;
-
-/* ----------------------
- *		Alter EVENT TRIGGER Statement
- * ----------------------
- */
-typedef struct AlterEventTrigStmt
-{
-	NodeTag		type;
-	char	   *trigname;		/* TRIGGER's name */
-	char		tgenabled;		/* trigger's firing configuration WRT
-								 * session_replication_role */
-} AlterEventTrigStmt;
-
-/* ----------------------
  *		Create LANGUAGE Statements
  * ----------------------
  */

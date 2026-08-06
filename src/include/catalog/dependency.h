@@ -115,7 +115,6 @@ typedef enum ObjectClass
 	OCLASS_TBLSPACE,			/* pg_tablespace */
 	OCLASS_DEFACL,				/* pg_default_acl */
 	OCLASS_EXTENSION,			/* pg_extension */
-	OCLASS_EVENT_TRIGGER,		/* pg_event_trigger */
 	OCLASS_PUBLICATION,			/* pg_publication */
 	OCLASS_PUBLICATION_REL,		/* pg_publication_rel */
 	OCLASS_SUBSCRIPTION,		/* pg_subscription */

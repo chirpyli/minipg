@@ -38,7 +38,6 @@
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "miscadmin.h"
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
@@ -313,10 +312,6 @@ CreateOpFamily(CreateOpFamilyStmt *stmt, const char *opfname,
 
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, false);
-
-	/* Report the new operator family to possibly interested event triggers */
-	EventTriggerCollectSimpleCommand(myself, InvalidObjectAddress,
-									 (Node *) stmt);
 
 	/* Post creation hook for new operator family */
 	InvokeObjectPostCreateHook(OperatorFamilyRelationId, opfamilyoid, 0);
@@ -712,9 +707,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	storeProcedures(stmt->opfamilyname, amoid, opfamilyoid,
 					procedures, false);
 
-	/* let event triggers know what happened */
-	EventTriggerCollectCreateOpClass(stmt, opclassoid, operators, procedures);
-
 	/*
 	 * Create dependencies for the opclass proper.  Note: we do not need a
 	 * dependency link to the AM, because that exists through the opfamily.
@@ -1017,11 +1009,7 @@ AlterOpFamilyAdd(AlterOpFamilyStmt *stmt, Oid amoid, Oid opfamilyoid,
 	storeOperators(stmt->opfamilyname, amoid, opfamilyoid,
 				   operators, true);
 	storeProcedures(stmt->opfamilyname, amoid, opfamilyoid,
-					procedures, true);
-
-	/* make information available to event triggers */
-	EventTriggerCollectAlterOpFam(stmt, opfamilyoid,
-								  operators, procedures);
+						procedures, true);
 }
 
 /*
@@ -1095,10 +1083,6 @@ AlterOpFamilyDrop(AlterOpFamilyStmt *stmt, Oid amoid, Oid opfamilyoid,
 	 */
 	dropOperators(stmt->opfamilyname, amoid, opfamilyoid, operators);
 	dropProcedures(stmt->opfamilyname, amoid, opfamilyoid, procedures);
-
-	/* make information available to event triggers */
-	EventTriggerCollectAlterOpFam(stmt, opfamilyoid,
-								  operators, procedures);
 }
 
 

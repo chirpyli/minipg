@@ -24,7 +24,6 @@
 #include "catalog/objectaccess.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
-#include "catalog/pg_event_trigger.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_largeobject_metadata.h"
@@ -39,7 +38,6 @@
 #include "commands/conversioncmds.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/event_trigger.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
 #include "commands/publicationcmds.h"
@@ -74,9 +72,6 @@ report_name_conflict(Oid classId, const char *name)
 
 	switch (classId)
 	{
-		case EventTriggerRelationId:
-			msgfmt = gettext_noop("event trigger \"%s\" already exists");
-			break;
 		case LanguageRelationId:
 			msgfmt = gettext_noop("language \"%s\" already exists");
 			break;
@@ -341,7 +336,6 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_AGGREGATE:
 		case OBJECT_COLLATION:
 		case OBJECT_CONVERSION:
-		case OBJECT_EVENT_TRIGGER:
 		case OBJECT_FUNCTION:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPFAMILY:
@@ -602,7 +596,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_TBLSPACE:
 		case OCLASS_DEFACL:
 		case OCLASS_EXTENSION:
-		case OCLASS_EVENT_TRIGGER:
 		case OCLASS_PUBLICATION:
 		case OCLASS_PUBLICATION_REL:
 		case OCLASS_SUBSCRIPTION:
@@ -790,10 +783,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_DOMAIN:		/* same as TYPE */
 			return AlterTypeOwner(castNode(List, stmt->object), newowner, stmt->objectType);
 			break;
-
-		case OBJECT_EVENT_TRIGGER:
-			return AlterEventTriggerOwner(strVal((Value *) stmt->object),
-										  newowner);
 
 		case OBJECT_PUBLICATION:
 			return AlterPublicationOwner(strVal((Value *) stmt->object),
