@@ -8,10 +8,14 @@ CREATE RULE rule_1 AS
   TO datatype_table
   DO NOTHING;
 
+CREATE TABLE rule_target_table (
+    id INT PRIMARY KEY
+);
+
 CREATE RULE rule_2 AS
   ON UPDATE
   TO datatype_table
-  DO INSERT INTO unlogged_table (id) VALUES(NEW.id);
+  DO INSERT INTO rule_target_table (id) VALUES(NEW.id);
 
 CREATE RULE rule_3 AS
   ON DELETE

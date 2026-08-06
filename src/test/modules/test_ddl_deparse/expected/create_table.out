@@ -122,11 +122,6 @@ NOTICE:    subcommand: ALTER COLUMN SET DEFAULT (precooked)
 NOTICE:  DDL test: type simple, tag CREATE INDEX
 NOTICE:  DDL test: type simple, tag CREATE INDEX
 -- Volatile table types
-CREATE UNLOGGED TABLE unlogged_table (
-    id INT PRIMARY KEY
-);
-NOTICE:  DDL test: type simple, tag CREATE TABLE
-NOTICE:  DDL test: type simple, tag CREATE INDEX
 CREATE TEMP TABLE temp_table (
     id INT PRIMARY KEY
 );

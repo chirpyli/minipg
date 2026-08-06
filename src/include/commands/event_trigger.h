@@ -35,7 +35,6 @@ typedef struct EventTriggerData
  * pg_event_trigger_table_rewrite_reason() uses these values, so make sure to
  * update the documentation when changing this list.
  */
-#define AT_REWRITE_ALTER_PERSISTENCE	0x01
 #define AT_REWRITE_DEFAULT_VAL			0x02
 #define AT_REWRITE_COLUMN_REWRITE		0x04
 

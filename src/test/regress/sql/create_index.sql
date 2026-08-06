@@ -100,9 +100,9 @@ CREATE INDEX hash_f8_index ON hash_f8_heap USING hash (random float8_ops) WITH (
 CREATE INDEX hash_i4_partial_index ON hash_i4_heap USING hash (seqno)
   WHERE seqno = 9999;
 
-CREATE UNLOGGED TABLE unlogged_hash_table (id int4);
-CREATE INDEX unlogged_hash_index ON unlogged_hash_table USING hash (id int4_ops);
-DROP TABLE unlogged_hash_table;
+CREATE TABLE hash_index_table (id int4);
+CREATE INDEX hash_index ON hash_index_table USING hash (id int4_ops);
+DROP TABLE hash_index_table;
 
 -- CREATE INDEX hash_ovfl_index ON hash_ovfl_heap USING hash (x int4_ops);
 

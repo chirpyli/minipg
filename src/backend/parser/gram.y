@@ -1992,20 +1992,6 @@ alter_table_cmd:
 					n->name = NULL;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> SET LOGGED */
-			| SET LOGGED
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetLogged;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> SET UNLOGGED */
-			| SET UNLOGGED
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetUnLogged;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> ENABLE TRIGGER <trig> */
 			| ENABLE_P TRIGGER name
 				{
@@ -2903,7 +2889,6 @@ OptTemp:	TEMPORARY					{ $$ = RELPERSISTENCE_TEMP; }
 							 parser_errposition(@1)));
 					$$ = RELPERSISTENCE_TEMP;
 				}
-			| UNLOGGED					{ $$ = RELPERSISTENCE_UNLOGGED; }
 			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
 		;
 
@@ -3674,8 +3659,7 @@ AlterStatsStmt:
 				}
 			;
 
-OptNoLog:	UNLOGGED					{ $$ = RELPERSISTENCE_UNLOGGED; }
-			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
+OptNoLog:	/*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
 		;
 
 

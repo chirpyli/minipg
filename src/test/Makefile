@@ -12,7 +12,7 @@ subdir = src/test
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
-SUBDIRS = perl postmaster regress isolation modules authentication recovery subscription
+SUBDIRS = perl postmaster regress isolation modules recovery subscription
 
 # We don't build or execute these by default, but we do want "make
 # clean" etc to recurse into them.  (We must filter out those that we

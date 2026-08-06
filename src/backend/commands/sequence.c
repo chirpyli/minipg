@@ -133,12 +133,6 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	bool		pgs_nulls[Natts_pg_sequence];
 	int			i;
 
-	/* Unlogged sequences are not implemented -- not clear if useful. */
-	if (seq->sequence->relpersistence == RELPERSISTENCE_UNLOGGED)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("unlogged sequences are not supported")));
-
 	/*
 	 * If if_not_exists was given and a relation with the same name already
 	 * exists, bail out. (Note: we needn't check this when not if_not_exists,

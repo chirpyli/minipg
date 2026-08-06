@@ -529,12 +529,6 @@ DefineView(ViewStmt *stmt, const char *queryString,
 							"names than columns")));
 	}
 
-	/* Unlogged views are not sensible. */
-	if (stmt->view->relpersistence == RELPERSISTENCE_UNLOGGED)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("views cannot be unlogged because they do not have storage")));
-
 	/*
 	 * If the user didn't explicitly ask for a temporary view, check whether
 	 * we need one implicitly.  We allow TEMP to be inserted automatically as

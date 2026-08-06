@@ -186,18 +186,12 @@ get_altertable_subcmdtypes(PG_FUNCTION_ARGS)
 			case AT_ClusterOn:
 				strtype = "CLUSTER";
 				break;
-			case AT_DropCluster:
-				strtype = "DROP CLUSTER";
-				break;
-			case AT_SetLogged:
-				strtype = "SET LOGGED";
-				break;
-			case AT_SetUnLogged:
-				strtype = "SET UNLOGGED";
-				break;
-			case AT_DropOids:
-				strtype = "DROP OIDS";
-				break;
+		case AT_DropCluster:
+			strtype = "DROP CLUSTER";
+			break;
+		case AT_DropOids:
+			strtype = "DROP OIDS";
+			break;
 			case AT_SetTableSpace:
 				strtype = "SET TABLESPACE";
 				break;

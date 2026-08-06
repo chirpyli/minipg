@@ -14,13 +14,14 @@ Indexes:
     "idx" btree (f1)
 
 CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4);
+ERROR:  compression method lz4 not supported
+DETAIL:  This functionality requires the server to be built with lz4 support.
+HINT:  You need to rebuild PostgreSQL using --with-lz4.
 INSERT INTO cmdata1 VALUES(repeat('1234567890', 1004));
+ERROR:  relation "cmdata1" does not exist
+LINE 1: INSERT INTO cmdata1 VALUES(repeat('1234567890', 1004));
+                    ^
 \d+ cmdata1
-                                        Table "public.cmdata1"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | lz4         |              | 
-
 -- verify stored compression method in the data
 SELECT pg_column_compression(f1) FROM cmdata;
  pg_column_compression 
@@ -29,11 +30,9 @@ SELECT pg_column_compression(f1) FROM cmdata;
 (1 row)
 
 SELECT pg_column_compression(f1) FROM cmdata1;
- pg_column_compression 
------------------------
- lz4
-(1 row)
-
+ERROR:  relation "cmdata1" does not exist
+LINE 1: SELECT pg_column_compression(f1) FROM cmdata1;
+                                              ^
 -- decompress data slice
 SELECT SUBSTR(f1, 200, 5) FROM cmdata;
  substr 
@@ -42,11 +41,9 @@ SELECT SUBSTR(f1, 200, 5) FROM cmdata;
 (1 row)
 
 SELECT SUBSTR(f1, 2000, 50) FROM cmdata1;
-                       substr                       
-----------------------------------------------------
- 01234567890123456789012345678901234567890123456789
-(1 row)
-
+ERROR:  relation "cmdata1" does not exist
+LINE 1: SELECT SUBSTR(f1, 2000, 50) FROM cmdata1;
+                                         ^
 -- copy with table creation
 CREATE TABLE cmmove1 (LIKE cmdata INCLUDING ALL);
 INSERT INTO cmmove1 SELECT * FROM cmdata;
@@ -68,22 +65,23 @@ SELECT pg_column_compression(f1) FROM cmmove1;
 CREATE TABLE cmmove3(f1 text COMPRESSION pglz);
 INSERT INTO cmmove3 SELECT * FROM cmdata;
 INSERT INTO cmmove3 SELECT * FROM cmdata1;
+ERROR:  relation "cmdata1" does not exist
+LINE 1: INSERT INTO cmmove3 SELECT * FROM cmdata1;
+                                          ^
 SELECT pg_column_compression(f1) FROM cmmove3;
  pg_column_compression 
 -----------------------
  pglz
- lz4
-(2 rows)
+(1 row)
 
 -- test LIKE INCLUDING COMPRESSION
 CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION);
+ERROR:  relation "cmdata1" does not exist
+LINE 1: CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION);
+                                   ^
 \d+ cmdata2
-                                        Table "public.cmdata2"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | lz4         |              | 
-
 DROP TABLE cmdata2;
+ERROR:  table "cmdata2" does not exist
 -- try setting compression for incompressible data type
 CREATE TABLE cmdata2 (f1 int COMPRESSION pglz);
 ERROR:  column data type integer does not support compression
@@ -97,10 +95,13 @@ SELECT pg_column_compression(f1) FROM cmmove2;
 (1 row)
 
 UPDATE cmmove2 SET f1 = cmdata1.f1 FROM cmdata1;
+ERROR:  relation "cmdata1" does not exist
+LINE 1: UPDATE cmmove2 SET f1 = cmdata1.f1 FROM cmdata1;
+                                                ^
 SELECT pg_column_compression(f1) FROM cmmove2;
  pg_column_compression 
 -----------------------
- lz4
+ pglz
 (1 row)
 
 -- test externally stored compressed data
@@ -115,20 +116,17 @@ SELECT pg_column_compression(f1) FROM cmdata2;
 (1 row)
 
 INSERT INTO cmdata1 SELECT large_val() || repeat('a', 4000);
+ERROR:  relation "cmdata1" does not exist
+LINE 1: INSERT INTO cmdata1 SELECT large_val() || repeat('a', 4000);
+                    ^
 SELECT pg_column_compression(f1) FROM cmdata1;
- pg_column_compression 
------------------------
- lz4
- lz4
-(2 rows)
-
+ERROR:  relation "cmdata1" does not exist
+LINE 1: SELECT pg_column_compression(f1) FROM cmdata1;
+                                              ^
 SELECT SUBSTR(f1, 200, 5) FROM cmdata1;
- substr 
---------
- 01234
- 8f14e
-(2 rows)
-
+ERROR:  relation "cmdata1" does not exist
+LINE 1: SELECT SUBSTR(f1, 200, 5) FROM cmdata1;
+                                       ^
 SELECT SUBSTR(f1, 200, 5) FROM cmdata2;
  substr 
 --------
@@ -184,28 +182,34 @@ SELECT pg_column_compression(f1) FROM cmdata2;
 
 -- test compression with partition
 CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1);
+ERROR:  compression method lz4 not supported
+DETAIL:  This functionality requires the server to be built with lz4 support.
+HINT:  You need to rebuild PostgreSQL using --with-lz4.
 CREATE TABLE cmpart1 PARTITION OF cmpart FOR VALUES WITH (MODULUS 2, REMAINDER 0);
+ERROR:  relation "cmpart" does not exist
 CREATE TABLE cmpart2(f1 text COMPRESSION pglz);
 ALTER TABLE cmpart ATTACH PARTITION cmpart2 FOR VALUES WITH (MODULUS 2, REMAINDER 1);
+ERROR:  relation "cmpart" does not exist
 INSERT INTO cmpart VALUES (repeat('123456789', 1004));
+ERROR:  relation "cmpart" does not exist
+LINE 1: INSERT INTO cmpart VALUES (repeat('123456789', 1004));
+                    ^
 INSERT INTO cmpart VALUES (repeat('123456789', 4004));
+ERROR:  relation "cmpart" does not exist
+LINE 1: INSERT INTO cmpart VALUES (repeat('123456789', 4004));
+                    ^
 SELECT pg_column_compression(f1) FROM cmpart1;
- pg_column_compression 
------------------------
- lz4
-(1 row)
-
+ERROR:  relation "cmpart1" does not exist
+LINE 1: SELECT pg_column_compression(f1) FROM cmpart1;
+                                              ^
 SELECT pg_column_compression(f1) FROM cmpart2;
  pg_column_compression 
 -----------------------
- pglz
-(1 row)
+(0 rows)
 
 -- test compression with inheritance, error
 CREATE TABLE cminh() INHERITS(cmdata, cmdata1);
-NOTICE:  merging multiple inherited definitions of column "f1"
-ERROR:  column "f1" has a compression method conflict
-DETAIL:  pglz versus lz4
+ERROR:  relation "cmdata1" does not exist
 CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata);
 NOTICE:  merging column "f1" with inherited definition
 ERROR:  column "f1" has a compression method conflict
@@ -213,20 +217,25 @@ DETAIL:  pglz versus lz4
 -- test default_toast_compression GUC
 SET default_toast_compression = '';
 ERROR:  invalid value for parameter "default_toast_compression": ""
-HINT:  Available values: pglz, lz4.
+HINT:  Available values: pglz.
 SET default_toast_compression = 'I do not exist compression';
 ERROR:  invalid value for parameter "default_toast_compression": "I do not exist compression"
-HINT:  Available values: pglz, lz4.
+HINT:  Available values: pglz.
 SET default_toast_compression = 'lz4';
+ERROR:  invalid value for parameter "default_toast_compression": "lz4"
+HINT:  Available values: pglz.
 SET default_toast_compression = 'pglz';
 -- test alter compression method
 ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4;
+ERROR:  compression method lz4 not supported
+DETAIL:  This functionality requires the server to be built with lz4 support.
+HINT:  You need to rebuild PostgreSQL using --with-lz4.
 INSERT INTO cmdata VALUES (repeat('123456789', 4004));
 \d+ cmdata
                                         Table "public.cmdata"
  Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
 --------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | lz4         |              | 
+ f1     | text |           |          |         | extended | pglz        |              | 
 Indexes:
     "idx" btree (f1)
 
@@ -234,7 +243,7 @@ SELECT pg_column_compression(f1) FROM cmdata;
  pg_column_compression 
 -----------------------
  pglz
- lz4
+ pglz
 (2 rows)
 
 ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default;
@@ -246,30 +255,35 @@ ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default;
 
 -- test alter compression method for partitioned tables
 ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz;
+ERROR:  relation "cmpart1" does not exist
 ALTER TABLE cmpart2 ALTER COLUMN f1 SET COMPRESSION lz4;
+ERROR:  compression method lz4 not supported
+DETAIL:  This functionality requires the server to be built with lz4 support.
+HINT:  You need to rebuild PostgreSQL using --with-lz4.
 -- new data should be compressed with the current compression method
 INSERT INTO cmpart VALUES (repeat('123456789', 1004));
+ERROR:  relation "cmpart" does not exist
+LINE 1: INSERT INTO cmpart VALUES (repeat('123456789', 1004));
+                    ^
 INSERT INTO cmpart VALUES (repeat('123456789', 4004));
+ERROR:  relation "cmpart" does not exist
+LINE 1: INSERT INTO cmpart VALUES (repeat('123456789', 4004));
+                    ^
 SELECT pg_column_compression(f1) FROM cmpart1;
- pg_column_compression 
------------------------
- lz4
- pglz
-(2 rows)
-
+ERROR:  relation "cmpart1" does not exist
+LINE 1: SELECT pg_column_compression(f1) FROM cmpart1;
+                                              ^
 SELECT pg_column_compression(f1) FROM cmpart2;
  pg_column_compression 
 -----------------------
- pglz
- lz4
-(2 rows)
+(0 rows)
 
 -- VACUUM FULL does not recompress
 SELECT pg_column_compression(f1) FROM cmdata;
  pg_column_compression 
 -----------------------
  pglz
- lz4
+ pglz
 (2 rows)
 
 VACUUM FULL cmdata;
@@ -277,15 +291,22 @@ SELECT pg_column_compression(f1) FROM cmdata;
  pg_column_compression 
 -----------------------
  pglz
- lz4
+ pglz
 (2 rows)
 
 -- test expression index
 DROP TABLE cmdata2;
 CREATE TABLE cmdata2 (f1 TEXT COMPRESSION pglz, f2 TEXT COMPRESSION lz4);
+ERROR:  compression method lz4 not supported
+DETAIL:  This functionality requires the server to be built with lz4 support.
+HINT:  You need to rebuild PostgreSQL using --with-lz4.
 CREATE UNIQUE INDEX idx1 ON cmdata2 ((f1 || f2));
+ERROR:  relation "cmdata2" does not exist
 INSERT INTO cmdata2 VALUES((SELECT array_agg(md5(g::TEXT))::TEXT FROM
 generate_series(1, 50) g), VERSION());
+ERROR:  relation "cmdata2" does not exist
+LINE 1: INSERT INTO cmdata2 VALUES((SELECT array_agg(md5(g::TEXT))::...
+                    ^
 -- check data is ok
 SELECT length(f1) FROM cmdata;
  length 
@@ -295,12 +316,9 @@ SELECT length(f1) FROM cmdata;
 (2 rows)
 
 SELECT length(f1) FROM cmdata1;
- length 
---------
-  10040
-  12449
-(2 rows)
-
+ERROR:  relation "cmdata1" does not exist
+LINE 1: SELECT length(f1) FROM cmdata1;
+                               ^
 SELECT length(f1) FROM cmmove1;
  length 
 --------
@@ -317,8 +335,7 @@ SELECT length(f1) FROM cmmove3;
  length 
 --------
   10000
-  10040
-(2 rows)
+(1 row)
 
 CREATE TABLE badcompresstbl (a text COMPRESSION I_Do_Not_Exist_Compression); -- fails
 ERROR:  invalid compression method "i_do_not_exist_compression"

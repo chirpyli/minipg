@@ -95,13 +95,6 @@ is( $node_publisher->psql(
 	'update to temporary table without replica identity with FOR ALL TABLES publication'
 );
 
-is( $node_publisher->psql(
-		'postgres',
-		"CREATE UNLOGGED TABLE tu1 AS SELECT 1 AS a; UPDATE tu1 SET a = 2;"),
-	0,
-	'update to unlogged table without replica identity with FOR ALL TABLES publication'
-);
-
 $node_publisher->stop('fast');
 
 # Bug #16643 - https://postgr.es/m/16643-eaadeb2a1a58d28c@postgresql.org

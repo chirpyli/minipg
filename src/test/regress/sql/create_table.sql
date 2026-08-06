@@ -244,21 +244,15 @@ CREATE TYPE unknown_comptype AS (
 	u unknown    -- fail
 );
 
-CREATE UNLOGGED TABLE unlogged1 (a int primary key);			-- OK
 CREATE TEMPORARY TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname ~ '^unlogged\d' ORDER BY relname;
-REINDEX INDEX unlogged1_pkey;
 REINDEX INDEX unlogged2_pkey;
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname ~ '^unlogged\d' ORDER BY relname;
 DROP TABLE unlogged2;
-INSERT INTO unlogged1 VALUES (42);
-CREATE UNLOGGED TABLE public.unlogged2 (a int primary key);		-- also OK
-CREATE UNLOGGED TABLE pg_temp.unlogged3 (a int primary key);	-- not OK
 CREATE TABLE pg_temp.implicitly_temp (a int primary key);		-- OK
 CREATE TEMP TABLE explicitly_temp (a int primary key);			-- also OK
 CREATE TEMP TABLE pg_temp.doubly_temp (a int primary key);		-- also OK
 CREATE TEMP TABLE public.temp_to_perm (a int primary key);		-- not OK
-DROP TABLE unlogged1, public.unlogged2;
 
 -- create an extra wide table to test for issues related to that
 -- (temporarily hide query, to avoid the long CREATE TABLE stmt)

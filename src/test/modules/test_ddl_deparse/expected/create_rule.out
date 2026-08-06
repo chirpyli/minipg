@@ -6,10 +6,15 @@ CREATE RULE rule_1 AS
   TO datatype_table
   DO NOTHING;
 NOTICE:  DDL test: type simple, tag CREATE RULE
+CREATE TABLE rule_target_table (
+    id INT PRIMARY KEY
+);
+NOTICE:  DDL test: type simple, tag CREATE TABLE
+NOTICE:  DDL test: type simple, tag CREATE INDEX
 CREATE RULE rule_2 AS
   ON UPDATE
   TO datatype_table
-  DO INSERT INTO unlogged_table (id) VALUES(NEW.id);
+  DO INSERT INTO rule_target_table (id) VALUES(NEW.id);
 NOTICE:  DDL test: type simple, tag CREATE RULE
 CREATE RULE rule_3 AS
   ON DELETE

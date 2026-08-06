@@ -1037,7 +1037,6 @@ retry:
 	relation->rd_droppedSubid = InvalidSubTransactionId;
 	switch (relation->rd_rel->relpersistence)
 	{
-		case RELPERSISTENCE_UNLOGGED:
 		case RELPERSISTENCE_PERMANENT:
 			relation->rd_backend = InvalidBackendId;
 			relation->rd_islocaltemp = false;
@@ -3493,7 +3492,6 @@ RelationBuildLocalRelation(const char *relname,
 	rel->rd_rel->relpersistence = relpersistence;
 	switch (relpersistence)
 	{
-		case RELPERSISTENCE_UNLOGGED:
 		case RELPERSISTENCE_PERMANENT:
 			rel->rd_backend = InvalidBackendId;
 			rel->rd_islocaltemp = false;

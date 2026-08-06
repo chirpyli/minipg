@@ -1832,8 +1832,6 @@ typedef enum AlterTableType
 	AT_ChangeOwner,				/* change owner */
 	AT_ClusterOn,				/* CLUSTER ON */
 	AT_DropCluster,				/* SET WITHOUT CLUSTER */
-	AT_SetLogged,				/* SET LOGGED */
-	AT_SetUnLogged,				/* SET UNLOGGED */
 	AT_DropOids,				/* SET WITHOUT OIDS */
 	AT_SetTableSpace,			/* SET TABLESPACE */
 	AT_SetRelOptions,			/* SET (...) -- AM specific parameters */

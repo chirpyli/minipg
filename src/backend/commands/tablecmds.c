@@ -173,8 +173,6 @@ typedef struct AlteredTableInfo
 	bool		verify_new_notnull; /* T if we should recheck NOT NULL */
 	int			rewrite;		/* Reason for forced rewrite, if any */
 	Oid			newTableSpace;	/* new tablespace; 0 means no change */
-	bool		chgPersistence; /* T if SET LOGGED/UNLOGGED is used */
-	char		newrelpersistence;	/* if above is true */
 	Expr	   *partition_constraint;	/* for attach partition validation */
 	/* true, if validating default due to some other attach/detach */
 	bool		validate_default;
@@ -513,7 +511,6 @@ static void change_owner_recurse_to_sequences(Oid relationOid,
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
 									 LOCKMODE lockmode);
 static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
-static bool ATPrepChangePersistence(Relation rel, bool toLogged);
 static void ATPrepSetTableSpace(AlteredTableInfo *tab, Relation rel,
 								const char *tablespacename, LOCKMODE lockmode);
 static void ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode);
@@ -4219,15 +4216,10 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_DropCluster:	/* Uses MVCC in getIndexes() */
 			case AT_SetOptions: /* Uses MVCC in getTableAttrs() */
 			case AT_ResetOptions:	/* Uses MVCC in getTableAttrs() */
-				cmd_lockmode = ShareUpdateExclusiveLock;
-				break;
+			cmd_lockmode = ShareUpdateExclusiveLock;
+			break;
 
-			case AT_SetLogged:
-			case AT_SetUnLogged:
-				cmd_lockmode = AccessExclusiveLock;
-				break;
-
-			case AT_ValidateConstraint: /* Uses MVCC in getConstraints() */
+		case AT_ValidateConstraint: /* Uses MVCC in getConstraints() */
 				cmd_lockmode = ShareUpdateExclusiveLock;
 				break;
 
@@ -4529,36 +4521,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATSimplePermissions(rel, ATT_TABLE);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
-		case AT_SetLogged:		/* SET LOGGED */
-			ATSimplePermissions(rel, ATT_TABLE);
-			if (tab->chgPersistence)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot change persistence setting twice")));
-			tab->chgPersistence = ATPrepChangePersistence(rel, true);
-			/* force rewrite if necessary; see comment in ATRewriteTables */
-			if (tab->chgPersistence)
-			{
-				tab->rewrite |= AT_REWRITE_ALTER_PERSISTENCE;
-				tab->newrelpersistence = RELPERSISTENCE_PERMANENT;
-			}
-			pass = AT_PASS_MISC;
-			break;
-		case AT_SetUnLogged:	/* SET UNLOGGED */
-			ATSimplePermissions(rel, ATT_TABLE);
-			if (tab->chgPersistence)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot change persistence setting twice")));
-			tab->chgPersistence = ATPrepChangePersistence(rel, false);
-			/* force rewrite if necessary; see comment in ATRewriteTables */
-			if (tab->chgPersistence)
-			{
-				tab->rewrite |= AT_REWRITE_ALTER_PERSISTENCE;
-				tab->newrelpersistence = RELPERSISTENCE_UNLOGGED;
-			}
 			pass = AT_PASS_MISC;
 			break;
 		case AT_DropOids:		/* SET WITHOUT OIDS */
@@ -4919,9 +4881,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
 			ATExecDropCluster(rel, lockmode);
-			break;
-		case AT_SetLogged:		/* SET LOGGED */
-		case AT_SetUnLogged:	/* SET UNLOGGED */
 			break;
 		case AT_DropOids:		/* SET WITHOUT OIDS */
 			/* nothing to do here, oid columns don't exist anymore */
@@ -5311,11 +5270,9 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 				NewTableSpace = OldHeap->rd_rel->reltablespace;
 
 			/*
-			 * Select persistence of transient table (same as original unless
-			 * user requested a change)
+			 * Select persistence of transient table (same as original)
 			 */
-			persistence = tab->chgPersistence ?
-				tab->newrelpersistence : OldHeap->rd_rel->relpersistence;
+			persistence = OldHeap->rd_rel->relpersistence;
 
 			table_close(OldHeap, NoLock);
 
@@ -5865,8 +5822,6 @@ ATGetQueueEntry(List **wqueue, Relation rel)
 	tab->rel = NULL;			/* set later */
 	tab->relkind = rel->rd_rel->relkind;
 	tab->oldDesc = CreateTupleDescCopyConstr(RelationGetDescr(rel));
-	tab->newrelpersistence = RELPERSISTENCE_PERMANENT;
-	tab->chgPersistence = false;
 
 	*wqueue = lappend(*wqueue, tab);
 
@@ -15463,132 +15418,6 @@ ATExecSetCompression(AlteredTableInfo *tab,
 	return address;
 }
 
-
-/*
- * Preparation phase for SET LOGGED/UNLOGGED
- *
- * This verifies that we're not trying to change a temp table.  Also,
- * existing foreign key constraints are checked to avoid ending up with
- * permanent tables referencing unlogged tables.
- *
- * Return value is false if the operation is a no-op (in which case the
- * checks are skipped), otherwise true.
- */
-static bool
-ATPrepChangePersistence(Relation rel, bool toLogged)
-{
-	Relation	pg_constraint;
-	HeapTuple	tuple;
-	SysScanDesc scan;
-	ScanKeyData skey[1];
-
-	/*
-	 * Disallow changing status for a temp table.  Also verify whether we can
-	 * get away with doing nothing; in such cases we don't need to run the
-	 * checks below, either.
-	 */
-	switch (rel->rd_rel->relpersistence)
-	{
-		case RELPERSISTENCE_TEMP:
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("cannot change logged status of table \"%s\" because it is temporary",
-							RelationGetRelationName(rel)),
-					 errtable(rel)));
-			break;
-		case RELPERSISTENCE_PERMANENT:
-			if (toLogged)
-				/* nothing to do */
-				return false;
-			break;
-		case RELPERSISTENCE_UNLOGGED:
-			if (!toLogged)
-				/* nothing to do */
-				return false;
-			break;
-	}
-
-	/*
-	 * Check that the table is not part any publication when changing to
-	 * UNLOGGED as UNLOGGED tables can't be published.
-	 */
-	if (!toLogged &&
-		list_length(GetRelationPublications(RelationGetRelid(rel))) > 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("cannot change table \"%s\" to unlogged because it is part of a publication",
-						RelationGetRelationName(rel)),
-				 errdetail("Unlogged relations cannot be replicated.")));
-
-	/*
-	 * Check existing foreign key constraints to preserve the invariant that
-	 * permanent tables cannot reference unlogged ones.  Self-referencing
-	 * foreign keys can safely be ignored.
-	 */
-	pg_constraint = table_open(ConstraintRelationId, AccessShareLock);
-
-	/*
-	 * Scan conrelid if changing to permanent, else confrelid.  This also
-	 * determines whether a useful index exists.
-	 */
-	ScanKeyInit(&skey[0],
-				toLogged ? Anum_pg_constraint_conrelid :
-				Anum_pg_constraint_confrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(rel)));
-	scan = systable_beginscan(pg_constraint,
-							  toLogged ? ConstraintRelidTypidNameIndexId : InvalidOid,
-							  true, NULL, 1, skey);
-
-	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
-	{
-		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(tuple);
-
-		if (con->contype == CONSTRAINT_FOREIGN)
-		{
-			Oid			foreignrelid;
-			Relation	foreignrel;
-
-			/* the opposite end of what we used as scankey */
-			foreignrelid = toLogged ? con->confrelid : con->conrelid;
-
-			/* ignore if self-referencing */
-			if (RelationGetRelid(rel) == foreignrelid)
-				continue;
-
-			foreignrel = relation_open(foreignrelid, AccessShareLock);
-
-			if (toLogged)
-			{
-				if (!RelationIsPermanent(foreignrel))
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("could not change table \"%s\" to logged because it references unlogged table \"%s\"",
-									RelationGetRelationName(rel),
-									RelationGetRelationName(foreignrel)),
-							 errtableconstraint(rel, NameStr(con->conname))));
-			}
-			else
-			{
-				if (RelationIsPermanent(foreignrel))
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("could not change table \"%s\" to unlogged because it references logged table \"%s\"",
-									RelationGetRelationName(rel),
-									RelationGetRelationName(foreignrel)),
-							 errtableconstraint(rel, NameStr(con->conname))));
-			}
-
-			relation_close(foreignrel, AccessShareLock);
-		}
-	}
-
-	systable_endscan(scan);
-
-	table_close(pg_constraint, AccessShareLock);
-
-	return true;
-}
 
 /*
  * Execute ALTER TABLE SET SCHEMA

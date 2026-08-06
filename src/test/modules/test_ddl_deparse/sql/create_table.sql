@@ -106,10 +106,6 @@ CREATE TABLE like_fkey_table (
 
 
 -- Volatile table types
-CREATE UNLOGGED TABLE unlogged_table (
-    id INT PRIMARY KEY
-);
-
 CREATE TEMP TABLE temp_table (
     id INT PRIMARY KEY
 );

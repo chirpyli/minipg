@@ -130,10 +130,6 @@ RelationCreateStorage(RelFileNode rnode, char relpersistence)
 			backend = BackendIdForTempRelations();
 			needs_wal = false;
 			break;
-		case RELPERSISTENCE_UNLOGGED:
-			backend = InvalidBackendId;
-			needs_wal = false;
-			break;
 		case RELPERSISTENCE_PERMANENT:
 			backend = InvalidBackendId;
 			needs_wal = true;
