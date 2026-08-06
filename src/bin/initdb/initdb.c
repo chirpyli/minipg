@@ -115,8 +115,6 @@ static const char *progname;
 static int	encodingid;
 static char *bki_file;
 static char *conf_file;
-static char *info_schema_file;
-static char *features_file;
 static char *system_constraints_file;
 static char *system_functions_file;
 static char *system_views_file;
@@ -125,7 +123,6 @@ static bool made_new_pgdata = false;
 static bool found_existing_pgdata = false;
 static bool made_new_xlogdir = false;
 static bool found_existing_xlogdir = false;
-static char infoversion[100];
 static bool caught_signal = false;
 static bool output_failed = false;
 static int	output_errno = 0;
@@ -207,9 +204,6 @@ static void setup_depend(FILE *cmdfd);
 static void setup_run_file(FILE *cmdfd, const char *filename);
 static void setup_description(FILE *cmdfd);
 static void setup_collation(FILE *cmdfd);
-static void setup_privileges(FILE *cmdfd);
-static void set_info_version(void);
-static void setup_schema(FILE *cmdfd);
 static void load_plpgsql(FILE *cmdfd);
 static void vacuum_db(FILE *cmdfd);
 static void make_template0(FILE *cmdfd);
@@ -1358,86 +1352,6 @@ setup_collation(FILE *cmdfd)
 }
 
 /*
- * Set up privileges
- *
- * We mark most system catalogs as world-readable.  We don't currently have
- * to touch functions, languages, or databases, because their default
- * permissions are OK.
- *
- * Some objects may require different permissions by default, so we
- * make sure we don't overwrite privilege sets that have already been
- * set (NOT NULL).
- *
- * Also populate pg_init_privs to save what the privileges are at init
- * time.  This is used by pg_dump to allow users to change privileges
- * on catalog objects and to have those privilege changes preserved
- * across dump/reload and pg_upgrade.
- *
- * Note that pg_init_privs is only for per-database objects and therefore
- * we don't include databases or tablespaces.
- */
-static void
-setup_privileges(FILE *cmdfd)
-{
-	/*
-	 * minipg 已将 aclitem 类型从 SQL/存储/类型注册层彻底移除，权限子系统以
-	 * "恒放行" 直通语义运行（见 mydoc/CHANGE.md）。pg_class.relacl、
-	 * pg_attribute.attacl、pg_proc.proacl、pg_type.typacl、pg_language.lanacl、
-	 * pg_largeobject_metadata.lomacl 等权限字段与 pg_init_privs.initprivs 字段
-	 * 均已删除，acldefault() 等函数亦不再注册，因此此处不再需要初始化任何
-	 * 权限数据，设为空实现。
-	 */
-}
-
-/*
- * extract the strange version of version required for information schema
- * (09.08.0007abc)
- */
-static void
-set_info_version(void)
-{
-	char	   *letterversion;
-	long		major = 0,
-				minor = 0,
-				micro = 0;
-	char	   *endptr;
-	char	   *vstr = pg_strdup(PG_VERSION);
-	char	   *ptr;
-
-	ptr = vstr + (strlen(vstr) - 1);
-	while (ptr != vstr && (*ptr < '0' || *ptr > '9'))
-		ptr--;
-	letterversion = ptr + 1;
-	major = strtol(vstr, &endptr, 10);
-	if (*endptr)
-		minor = strtol(endptr + 1, &endptr, 10);
-	if (*endptr)
-		micro = strtol(endptr + 1, &endptr, 10);
-	snprintf(infoversion, sizeof(infoversion), "%02ld.%02ld.%04ld%s",
-			 major, minor, micro, letterversion);
-}
-
-/*
- * load info schema and populate from features file
- */
-static void
-setup_schema(FILE *cmdfd)
-{
-	setup_run_file(cmdfd, info_schema_file);
-
-	PG_CMD_PRINTF("UPDATE information_schema.sql_implementation_info "
-				  "  SET character_value = '%s' "
-				  "  WHERE implementation_info_name = 'DBMS VERSION';\n\n",
-				  infoversion);
-
-	PG_CMD_PRINTF("COPY information_schema.sql_features "
-				  "  (feature_id, feature_name, sub_feature_id, "
-				  "  sub_feature_name, is_supported, comments) "
-				  " FROM E'%s';\n\n",
-				  escape_quotes(features_file));
-}
-
-/*
  * load PL/pgSQL server-side language
  */
 static void
@@ -1988,8 +1902,6 @@ setup_data_file_paths(void)
 {
 	set_input(&bki_file, "postgres.bki");
 	set_input(&conf_file, "postgresql.conf.sample");
-	set_input(&info_schema_file, "information_schema.sql");
-	set_input(&features_file, "sql_features.txt");
 	set_input(&system_constraints_file, "system_constraints.sql");
 	set_input(&system_functions_file, "system_functions.sql");
 	set_input(&system_views_file, "system_views.sql");
@@ -2011,8 +1923,6 @@ setup_data_file_paths(void)
 
 	check_input(bki_file);
 	check_input(conf_file);
-	check_input(info_schema_file);
-	check_input(features_file);
 	check_input(system_constraints_file);
 	check_input(system_functions_file);
 	check_input(system_views_file);
@@ -2333,10 +2243,6 @@ initialize_data_directory(void)
 
 	setup_collation(cmdfd);
 
-	setup_privileges(cmdfd);
-
-	setup_schema(cmdfd);
-
 	load_plpgsql(cmdfd);
 
 	vacuum_db(cmdfd);
@@ -2605,8 +2511,6 @@ main(int argc, char *argv[])
 			 "by user \"%s\".\n"
 			 "This user must also own the server process.\n\n"),
 		   effective_user);
-
-	set_info_version();
 
 	setup_data_file_paths();
 

@@ -7,9 +7,9 @@ DECLARE
 	loops int := 0;
 BEGIN
 	LOOP
-		visible := table_name IS NOT NULL
-			FROM information_schema.tables
-			WHERE table_schema = 'schema4' AND table_name = 'counted';
+		visible := EXISTS (
+			SELECT 1 FROM pg_tables
+			WHERE schemaname = 'schema4' AND tablename = 'counted');
 		IF visible OR loops > 120 * 10 THEN EXIT; END IF;
 		PERFORM pg_sleep(0.1);
 		loops := loops + 1;

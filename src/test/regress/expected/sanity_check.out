@@ -54,8 +54,6 @@ interval_tbl|f
 invalid_check_con|f
 invalid_check_con_child|f
 iportaltest|f
-log_table|f
-main_table|f
 mlparted|f
 mlparted1|f
 mlparted11|f
@@ -138,10 +136,6 @@ real_city|f
 road|t
 shighway|t
 slow_emp4000|f
-sql_features|f
-sql_implementation_info|f
-sql_parts|f
-sql_sizing|f
 stud_emp|f
 student|f
 tableam_parted_a_heap2|f
@@ -159,11 +153,6 @@ timestamp_tbl|f
 timestamptz_tbl|f
 timetz_tbl|f
 tmp|f
-trigger_parted|t
-trigger_parted_p1|t
-trigger_parted_p1_1|t
-trigger_parted_p2|t
-trigger_parted_p2_2|t
 varchar_tbl|f
 view_base_table|t
 -- restore normal output mode
