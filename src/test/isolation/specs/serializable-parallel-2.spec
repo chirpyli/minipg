@@ -3,7 +3,8 @@
 
 setup
 {
-	CREATE TABLE foo AS SELECT generate_series(1, 100)::int a;
+	CREATE TABLE foo (a int);
+	INSERT INTO foo SELECT generate_series(1, 100)::int a;
 	CREATE INDEX ON foo(a);
 	ALTER TABLE foo SET (parallel_workers = 2);
 }

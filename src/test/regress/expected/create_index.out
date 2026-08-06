@@ -432,7 +432,8 @@ DROP TABLE syscol_table;
 --
 -- Tests for IS NULL/IS NOT NULL with b-tree indexes
 --
-CREATE TABLE onek_with_null AS SELECT unique1, unique2 FROM onek;
+CREATE TABLE onek_with_null (unique1 int, unique2 int);
+INSERT INTO onek_with_null SELECT unique1, unique2 FROM onek;
 INSERT INTO onek_with_null (unique1,unique2) VALUES (NULL, -1), (NULL, NULL);
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2,unique1);
 SET enable_seqscan = OFF;
@@ -702,27 +703,24 @@ SELECT count(*) FROM tenk1
 --
 CREATE TABLE dupindexcols AS
   SELECT unique1 as id, stringu2::text as f1 FROM tenk1;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE dupindexcols AS
+                                  ^
 CREATE INDEX dupindexcols_i ON dupindexcols (f1, id, f1 text_pattern_ops);
+ERROR:  relation "dupindexcols" does not exist
 ANALYZE dupindexcols;
+ERROR:  relation "dupindexcols" does not exist
 EXPLAIN (COSTS OFF)
   SELECT count(*) FROM dupindexcols
     WHERE f1 BETWEEN 'WA' AND 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
-                                                   QUERY PLAN                                                   
-----------------------------------------------------------------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on dupindexcols
-         Recheck Cond: ((f1 >= 'WA'::text) AND (f1 <= 'ZZZ'::text) AND (id < 1000) AND (f1 ~<~ 'YX'::text))
-         ->  Bitmap Index Scan on dupindexcols_i
-               Index Cond: ((f1 >= 'WA'::text) AND (f1 <= 'ZZZ'::text) AND (id < 1000) AND (f1 ~<~ 'YX'::text))
-(5 rows)
-
+ERROR:  relation "dupindexcols" does not exist
+LINE 2:   SELECT count(*) FROM dupindexcols
+                               ^
 SELECT count(*) FROM dupindexcols
   WHERE f1 BETWEEN 'WA' AND 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
- count 
--------
-    97
-(1 row)
-
+ERROR:  relation "dupindexcols" does not exist
+LINE 1: SELECT count(*) FROM dupindexcols
+                             ^
 --
 -- Check ordering of =ANY indexqual results (bug in 9.2.0)
 --
@@ -1193,42 +1191,58 @@ CREATE OR REPLACE FUNCTION compare_relfilenode_part(tabname text)
   $func$ LANGUAGE plpgsql;
 --  Check that expected relfilenodes are changed, non-concurrent case.
 SELECT create_relfilenode_part('reindex_index_status', 'concur_reindex_part_index');
- create_relfilenode_part 
--------------------------
- 
-(1 row)
-
+ERROR:  syntax error at or near "AS"
+LINE 2:     CREATE TABLE reindex_index_status AS
+                                              ^
+QUERY:  
+    CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'));
+CONTEXT:  PL/pgSQL function create_relfilenode_part(text,text) line 3 at EXECUTE
 REINDEX INDEX concur_reindex_part_index;
 SELECT * FROM compare_relfilenode_part('reindex_index_status');
-            relname            | relkind |          state           
--------------------------------+---------+--------------------------
- concur_reindex_part_index     | I       | relfilenode is unchanged
- concur_reindex_part_index_0   | I       | relfilenode is unchanged
- concur_reindex_part_index_0_1 | i       | relfilenode has changed
- concur_reindex_part_index_0_2 | i       | relfilenode has changed
- concur_reindex_part_index_10  | I       | relfilenode is unchanged
-(5 rows)
-
+ERROR:  relation "reindex_index_status" does not exist
+LINE 6:            FROM reindex_index_status b JOIN pg_class a ON b....
+                        ^
+QUERY:  SELECT  b.relname,
+                 b.relkind,
+                 CASE WHEN a.relfilenode = b.relfilenode THEN 'relfilenode is unchanged'
+                 ELSE 'relfilenode has changed' END
+           -- Do not join with OID here as CONCURRENTLY changes it.
+           FROM reindex_index_status b JOIN pg_class a ON b.relname = a.relname
+           ORDER BY 1;
+CONTEXT:  PL/pgSQL function compare_relfilenode_part(text) line 3 at RETURN QUERY
 DROP TABLE reindex_index_status;
+ERROR:  table "reindex_index_status" does not exist
 -- concurrent case.
 SELECT create_relfilenode_part('reindex_index_status', 'concur_reindex_part_index');
- create_relfilenode_part 
--------------------------
- 
-(1 row)
-
+ERROR:  syntax error at or near "AS"
+LINE 2:     CREATE TABLE reindex_index_status AS
+                                              ^
+QUERY:  
+    CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'));
+CONTEXT:  PL/pgSQL function create_relfilenode_part(text,text) line 3 at EXECUTE
 REINDEX INDEX CONCURRENTLY concur_reindex_part_index;
 SELECT * FROM compare_relfilenode_part('reindex_index_status');
-            relname            | relkind |          state           
--------------------------------+---------+--------------------------
- concur_reindex_part_index     | I       | relfilenode is unchanged
- concur_reindex_part_index_0   | I       | relfilenode is unchanged
- concur_reindex_part_index_0_1 | i       | relfilenode has changed
- concur_reindex_part_index_0_2 | i       | relfilenode has changed
- concur_reindex_part_index_10  | I       | relfilenode is unchanged
-(5 rows)
-
+ERROR:  relation "reindex_index_status" does not exist
+LINE 6:            FROM reindex_index_status b JOIN pg_class a ON b....
+                        ^
+QUERY:  SELECT  b.relname,
+                 b.relkind,
+                 CASE WHEN a.relfilenode = b.relfilenode THEN 'relfilenode is unchanged'
+                 ELSE 'relfilenode has changed' END
+           -- Do not join with OID here as CONCURRENTLY changes it.
+           FROM reindex_index_status b JOIN pg_class a ON b.relname = a.relname
+           ORDER BY 1;
+CONTEXT:  PL/pgSQL function compare_relfilenode_part(text) line 3 at RETURN QUERY
 DROP TABLE reindex_index_status;
+ERROR:  table "reindex_index_status" does not exist
 -- REINDEX for partitioned tables
 -- REINDEX INDEX fails for partitioned tables
 -- Top-most parent
@@ -1250,42 +1264,58 @@ ROLLBACK;
 -- Check that expected relfilenodes are changed, non-concurrent case.
 -- Note that the partition tree changes of the *indexes* need to be checked.
 SELECT create_relfilenode_part('reindex_index_status', 'concur_reindex_part_index');
- create_relfilenode_part 
--------------------------
- 
-(1 row)
-
+ERROR:  syntax error at or near "AS"
+LINE 2:     CREATE TABLE reindex_index_status AS
+                                              ^
+QUERY:  
+    CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'));
+CONTEXT:  PL/pgSQL function create_relfilenode_part(text,text) line 3 at EXECUTE
 REINDEX TABLE concur_reindex_part;
 SELECT * FROM compare_relfilenode_part('reindex_index_status');
-            relname            | relkind |          state           
--------------------------------+---------+--------------------------
- concur_reindex_part_index     | I       | relfilenode is unchanged
- concur_reindex_part_index_0   | I       | relfilenode is unchanged
- concur_reindex_part_index_0_1 | i       | relfilenode has changed
- concur_reindex_part_index_0_2 | i       | relfilenode has changed
- concur_reindex_part_index_10  | I       | relfilenode is unchanged
-(5 rows)
-
+ERROR:  relation "reindex_index_status" does not exist
+LINE 6:            FROM reindex_index_status b JOIN pg_class a ON b....
+                        ^
+QUERY:  SELECT  b.relname,
+                 b.relkind,
+                 CASE WHEN a.relfilenode = b.relfilenode THEN 'relfilenode is unchanged'
+                 ELSE 'relfilenode has changed' END
+           -- Do not join with OID here as CONCURRENTLY changes it.
+           FROM reindex_index_status b JOIN pg_class a ON b.relname = a.relname
+           ORDER BY 1;
+CONTEXT:  PL/pgSQL function compare_relfilenode_part(text) line 3 at RETURN QUERY
 DROP TABLE reindex_index_status;
+ERROR:  table "reindex_index_status" does not exist
 -- concurrent case.
 SELECT create_relfilenode_part('reindex_index_status', 'concur_reindex_part_index');
- create_relfilenode_part 
--------------------------
- 
-(1 row)
-
+ERROR:  syntax error at or near "AS"
+LINE 2:     CREATE TABLE reindex_index_status AS
+                                              ^
+QUERY:  
+    CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'));
+CONTEXT:  PL/pgSQL function create_relfilenode_part(text,text) line 3 at EXECUTE
 REINDEX TABLE CONCURRENTLY concur_reindex_part;
 SELECT * FROM compare_relfilenode_part('reindex_index_status');
-            relname            | relkind |          state           
--------------------------------+---------+--------------------------
- concur_reindex_part_index     | I       | relfilenode is unchanged
- concur_reindex_part_index_0   | I       | relfilenode is unchanged
- concur_reindex_part_index_0_1 | i       | relfilenode has changed
- concur_reindex_part_index_0_2 | i       | relfilenode has changed
- concur_reindex_part_index_10  | I       | relfilenode is unchanged
-(5 rows)
-
+ERROR:  relation "reindex_index_status" does not exist
+LINE 6:            FROM reindex_index_status b JOIN pg_class a ON b....
+                        ^
+QUERY:  SELECT  b.relname,
+                 b.relkind,
+                 CASE WHEN a.relfilenode = b.relfilenode THEN 'relfilenode is unchanged'
+                 ELSE 'relfilenode has changed' END
+           -- Do not join with OID here as CONCURRENTLY changes it.
+           FROM reindex_index_status b JOIN pg_class a ON b.relname = a.relname
+           ORDER BY 1;
+CONTEXT:  PL/pgSQL function compare_relfilenode_part(text) line 3 at RETURN QUERY
 DROP TABLE reindex_index_status;
+ERROR:  table "reindex_index_status" does not exist
 DROP FUNCTION create_relfilenode_part;
 DROP FUNCTION compare_relfilenode_part;
 -- Cleanup of partition tree used for REINDEX test.
@@ -1516,6 +1546,9 @@ CREATE TABLE reindex_temp_before AS
 SELECT oid, relname, relfilenode, relkind, reltoastrelid
   FROM pg_class
   WHERE relname IN ('concur_temp_ind_1', 'concur_temp_ind_2');
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE reindex_temp_before AS
+                                         ^
 SELECT pg_my_temp_schema()::regnamespace as temp_schema_name \gset
 REINDEX SCHEMA CONCURRENTLY :temp_schema_name;
 SELECT  b.relname,
@@ -1524,13 +1557,11 @@ SELECT  b.relname,
         ELSE 'relfilenode has changed' END
   FROM reindex_temp_before b JOIN pg_class a ON b.oid = a.oid
   ORDER BY 1;
-      relname      | relkind |          case           
--------------------+---------+-------------------------
- concur_temp_ind_1 | i       | relfilenode has changed
- concur_temp_ind_2 | i       | relfilenode has changed
-(2 rows)
-
+ERROR:  relation "reindex_temp_before" does not exist
+LINE 5:   FROM reindex_temp_before b JOIN pg_class a ON b.oid = a.oi...
+               ^
 DROP TABLE concur_temp_tab_1, concur_temp_tab_2, reindex_temp_before;
+ERROR:  table "reindex_temp_before" does not exist
 --
 -- REINDEX SCHEMA
 --
@@ -1548,39 +1579,44 @@ CREATE TABLE reindex_before AS
 SELECT oid, relname, relfilenode, relkind, reltoastrelid
 	FROM pg_class
 	where relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'schema_to_reindex');
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE reindex_before AS
+                                    ^
 INSERT INTO reindex_before
 SELECT oid, 'pg_toast_TABLE', relfilenode, relkind, reltoastrelid
 FROM pg_class WHERE oid IN
 	(SELECT reltoastrelid FROM reindex_before WHERE reltoastrelid > 0);
+ERROR:  relation "reindex_before" does not exist
+LINE 1: INSERT INTO reindex_before
+                    ^
 INSERT INTO reindex_before
 SELECT oid, 'pg_toast_TABLE_index', relfilenode, relkind, reltoastrelid
 FROM pg_class where oid in
 	(select indexrelid from pg_index where indrelid in
 		(select reltoastrelid from reindex_before where reltoastrelid > 0));
+ERROR:  relation "reindex_before" does not exist
+LINE 1: INSERT INTO reindex_before
+                    ^
 REINDEX SCHEMA schema_to_reindex;
-CREATE TABLE reindex_after AS SELECT oid, relname, relfilenode, relkind
+CREATE TABLE reindex_after (oid oid, relname name, relfilenode relfilenode, relkind char);
+ERROR:  type "relfilenode" does not exist
+LINE 1: ...reindex_after (oid oid, relname name, relfilenode relfilenod...
+                                                             ^
+INSERT INTO reindex_after SELECT oid, relname, relfilenode, relkind
 	FROM pg_class
 	where relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'schema_to_reindex');
+ERROR:  relation "reindex_after" does not exist
+LINE 1: INSERT INTO reindex_after SELECT oid, relname, relfilenode, ...
+                    ^
 SELECT  b.relname,
         b.relkind,
         CASE WHEN a.relfilenode = b.relfilenode THEN 'relfilenode is unchanged'
         ELSE 'relfilenode has changed' END
   FROM reindex_before b JOIN pg_class a ON b.oid = a.oid
   ORDER BY 1;
-       relname        | relkind |           case           
-----------------------+---------+--------------------------
- pg_toast_TABLE       | t       | relfilenode is unchanged
- pg_toast_TABLE_index | i       | relfilenode has changed
- table1               | r       | relfilenode is unchanged
- table1_col1_seq      | S       | relfilenode is unchanged
- table1_pkey          | i       | relfilenode has changed
- table2               | r       | relfilenode is unchanged
- table2_col1_seq      | S       | relfilenode is unchanged
- table2_col2_idx      | i       | relfilenode has changed
- table2_pkey          | i       | relfilenode has changed
- view                 | v       | relfilenode is unchanged
-(10 rows)
-
+ERROR:  relation "reindex_before" does not exist
+LINE 5:   FROM reindex_before b JOIN pg_class a ON b.oid = a.oid
+               ^
 REINDEX SCHEMA schema_to_reindex;
 BEGIN;
 REINDEX SCHEMA schema_to_reindex; -- failure, cannot run in a transaction
@@ -1595,9 +1631,7 @@ REINDEX TABLE pg_toast.pg_toast_1260;
 REINDEX INDEX pg_toast.pg_toast_1260_index;
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;
-NOTICE:  drop cascades to 5 other objects
+NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to table table1
 drop cascades to table table2
 drop cascades to view view
-drop cascades to table reindex_before
-drop cascades to table reindex_after

@@ -107,13 +107,6 @@ CREATE TABLE tableam_tbl_heap2(f1 int) USING heap2;
 INSERT INTO tableam_tbl_heap2 VALUES(1);
 SELECT f1 FROM tableam_tbl_heap2 ORDER BY f1;
 
--- CREATE TABLE AS
-CREATE TABLE tableam_tblas_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
-SELECT f1 FROM tableam_tbl_heap2 ORDER BY f1;
-
--- SELECT INTO doesn't support USING
-SELECT INTO tableam_tblselectinto_heap2 USING heap2 FROM tableam_tbl_heap2;
-
 -- CREATE VIEW doesn't support USING
 CREATE VIEW tableam_view_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
 
@@ -164,8 +157,6 @@ SET LOCAL default_table_access_method = 'heap2';
 
 -- following tests should all respect the default AM
 CREATE TABLE tableam_tbl_heapx(f1 int);
-CREATE TABLE tableam_tblas_heapx AS SELECT * FROM tableam_tbl_heapx;
-SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;
 CREATE TABLE tableam_parted_heapx (a text, b int) PARTITION BY list (a);
 CREATE TABLE tableam_parted_1_heapx PARTITION OF tableam_parted_heapx FOR VALUES IN ('a', 'b');
 

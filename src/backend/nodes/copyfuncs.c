@@ -1333,26 +1333,6 @@ _copyRangeVar(const RangeVar *from)
 /*
 
 /*
- * _copyIntoClause
- */
-static IntoClause *
-_copyIntoClause(const IntoClause *from)
-{
-	IntoClause *newnode = makeNode(IntoClause);
-
-	COPY_NODE_FIELD(rel);
-	COPY_NODE_FIELD(colNames);
-	COPY_STRING_FIELD(accessMethod);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(onCommit);
-	COPY_STRING_FIELD(tableSpaceName);
-	COPY_NODE_FIELD(viewQuery);
-	COPY_SCALAR_FIELD(skipData);
-
-	return newnode;
-}
-
-/*
  * We don't need a _copyExpr because Expr is an abstract supertype which
  * should never actually get instantiated.  Also, since it has no common
  * fields except NodeTag, there's no need for a helper routine to factor
@@ -3116,7 +3096,6 @@ _copySelectStmt(const SelectStmt *from)
 	SelectStmt *newnode = makeNode(SelectStmt);
 
 	COPY_NODE_FIELD(distinctClause);
-	COPY_NODE_FIELD(intoClause);
 	COPY_NODE_FIELD(targetList);
 	COPY_NODE_FIELD(fromClause);
 	COPY_NODE_FIELD(whereClause);
@@ -3919,20 +3898,6 @@ _copyExplainStmt(const ExplainStmt *from)
 	return newnode;
 }
 
-static CreateTableAsStmt *
-_copyCreateTableAsStmt(const CreateTableAsStmt *from)
-{
-	CreateTableAsStmt *newnode = makeNode(CreateTableAsStmt);
-
-	COPY_NODE_FIELD(query);
-	COPY_NODE_FIELD(into);
-	COPY_SCALAR_FIELD(objtype);
-	COPY_SCALAR_FIELD(is_select_into);
-	COPY_SCALAR_FIELD(if_not_exists);
-
-	return newnode;
-}
-
 static ReplicaIdentityStmt *
 _copyReplicaIdentityStmt(const ReplicaIdentityStmt *from)
 {
@@ -4690,9 +4655,6 @@ copyObjectImpl(const void *from)
 		case T_RangeVar:
 			retval = _copyRangeVar(from);
 			break;
-		case T_IntoClause:
-			retval = _copyIntoClause(from);
-			break;
 		case T_Var:
 			retval = _copyVar(from);
 			break;
@@ -5076,9 +5038,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ExplainStmt:
 			retval = _copyExplainStmt(from);
-			break;
-		case T_CreateTableAsStmt:
-			retval = _copyCreateTableAsStmt(from);
 			break;
 		case T_ReplicaIdentityStmt:
 			retval = _copyReplicaIdentityStmt(from);

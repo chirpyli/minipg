@@ -233,7 +233,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	StatsElem			*selem;
 	Alias				*alias;
 	RangeVar			*range;
-	IntoClause			*into;
 	WithClause			*with;
 	InferClause			*infer;
 	OnConflictClause	*onconflict;
@@ -261,7 +260,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		AlterCompositeTypeStmt
 		AlterStatsStmt
 		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
-		ConstraintsSetStmt CopyStmt CreateAsStmt CreateCastStmt
+		ConstraintsSetStmt CopyStmt CreateCastStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
@@ -400,9 +399,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <node>	grouping_sets_clause
 %type <node>	opt_publication_for_tables publication_for_tables
 
-
-%type <range>	OptTempTableName
-%type <into>	into_clause create_as_target create_mv_target
 
 %type <defelt>	createfunc_opt_item common_func_opt_item dostmt_opt_item
 %type <fun_param> func_arg func_arg_with_default table_func_column aggr_arg
@@ -883,7 +879,6 @@ stmt:
 			| ConstraintsSetStmt
 			| CopyStmt
 			| CreateAmStmt
-			| CreateAsStmt
 			| CreateAssertionStmt
 			| CreateCastStmt
 			| CreateConversionStmt
@@ -3678,68 +3673,6 @@ AlterStatsStmt:
 					$$ = (Node *)n;
 				}
 			;
-
-/*****************************************************************************
- *
- *		QUERY :
- *				CREATE TABLE relname AS SelectStmt [ WITH [NO] DATA ]
- *
- *
- * Note: SELECT ... INTO is a now-deprecated alternative for this.
- *
- *****************************************************************************/
-
-CreateAsStmt:
-		CREATE OptTemp TABLE create_as_target AS SelectStmt opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ctas->query = $6;
-					ctas->into = $4;
-					ctas->objtype = OBJECT_TABLE;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = false;
-					/* cram additional flags into the IntoClause */
-					$4->rel->relpersistence = $2;
-					$4->skipData = !($7);
-					$$ = (Node *) ctas;
-				}
-		| CREATE OptTemp TABLE IF_P NOT EXISTS create_as_target AS SelectStmt opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ctas->query = $9;
-					ctas->into = $7;
-					ctas->objtype = OBJECT_TABLE;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = true;
-					/* cram additional flags into the IntoClause */
-					$7->rel->relpersistence = $2;
-					$7->skipData = !($10);
-					$$ = (Node *) ctas;
-				}
-		;
-
-create_as_target:
-			qualified_name opt_column_list table_access_method_clause
-			OptWith OnCommitOption OptTableSpace
-				{
-					$$ = makeNode(IntoClause);
-					$$->rel = $1;
-					$$->colNames = $2;
-					$$->accessMethod = $3;
-					$$->options = $4;
-					$$->onCommit = $5;
-					$$->tableSpaceName = $6;
-					$$->viewQuery = NULL;
-					$$->skipData = false;		/* might get changed later */
-				}
-		;
-
-opt_with_data:
-			WITH DATA_P								{ $$ = true; }
-			| WITH NO DATA_P						{ $$ = false; }
-			| /*EMPTY*/								{ $$ = true; }
-		;
-
 
 OptNoLog:	UNLOGGED					{ $$ = RELPERSISTENCE_UNLOGGED; }
 			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
@@ -8974,7 +8907,6 @@ ExplainableStmt:
 			| UpdateStmt
 			| DeleteStmt
 			| DeclareCursorStmt
-			| CreateAsStmt
 			| ExecuteStmt					/* by default all are $$=$1 */
 		;
 
@@ -9019,40 +8951,6 @@ ExecuteStmt: EXECUTE name execute_param_clause
 					n->name = $2;
 					n->params = $3;
 					$$ = (Node *) n;
-				}
-			| CREATE OptTemp TABLE create_as_target AS
-				EXECUTE name execute_param_clause opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ExecuteStmt *n = makeNode(ExecuteStmt);
-					n->name = $7;
-					n->params = $8;
-					ctas->query = (Node *) n;
-					ctas->into = $4;
-					ctas->objtype = OBJECT_TABLE;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = false;
-					/* cram additional flags into the IntoClause */
-					$4->rel->relpersistence = $2;
-					$4->skipData = !($9);
-					$$ = (Node *) ctas;
-				}
-			| CREATE OptTemp TABLE IF_P NOT EXISTS create_as_target AS
-				EXECUTE name execute_param_clause opt_with_data
-				{
-					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-					ExecuteStmt *n = makeNode(ExecuteStmt);
-					n->name = $10;
-					n->params = $11;
-					ctas->query = (Node *) n;
-					ctas->into = $7;
-					ctas->objtype = OBJECT_TABLE;
-					ctas->is_select_into = false;
-					ctas->if_not_exists = true;
-					/* cram additional flags into the IntoClause */
-					$7->rel->relpersistence = $2;
-					$7->skipData = !($12);
-					$$ = (Node *) ctas;
 				}
 		;
 
@@ -9580,34 +9478,32 @@ select_clause:
  */
 simple_select:
 			SELECT opt_all_clause opt_target_list
-			into_clause from_clause where_clause
+			from_clause where_clause
 			group_clause having_clause window_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->targetList = $3;
-					n->intoClause = $4;
-					n->fromClause = $5;
-					n->whereClause = $6;
-					n->groupClause = ($7)->list;
-					n->groupDistinct = ($7)->distinct;
-					n->havingClause = $8;
-					n->windowClause = $9;
+					n->fromClause = $4;
+					n->whereClause = $5;
+					n->groupClause = ($6)->list;
+					n->groupDistinct = ($6)->distinct;
+					n->havingClause = $7;
+					n->windowClause = $8;
 					$$ = (Node *)n;
 				}
 			| SELECT distinct_clause target_list
-			into_clause from_clause where_clause
+			from_clause where_clause
 			group_clause having_clause window_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->distinctClause = $2;
 					n->targetList = $3;
-					n->intoClause = $4;
-					n->fromClause = $5;
-					n->whereClause = $6;
-					n->groupClause = ($7)->list;
-					n->groupDistinct = ($7)->distinct;
-					n->havingClause = $8;
-					n->windowClause = $9;
+					n->fromClause = $4;
+					n->whereClause = $5;
+					n->groupClause = ($6)->list;
+					n->groupDistinct = ($6)->distinct;
+					n->havingClause = $7;
+					n->windowClause = $8;
 					$$ = (Node *)n;
 				}
 			| values_clause							{ $$ = $1; }
@@ -9760,82 +9656,14 @@ opt_with_clause:
 		| /*EMPTY*/								{ $$ = NULL; }
 		;
 
-into_clause:
-			INTO OptTempTableName
-				{
-					$$ = makeNode(IntoClause);
-					$$->rel = $2;
-					$$->colNames = NIL;
-					$$->options = NIL;
-					$$->onCommit = ONCOMMIT_NOOP;
-					$$->tableSpaceName = NULL;
-					$$->viewQuery = NULL;
-					$$->skipData = false;
-				}
-			| /*EMPTY*/
-				{ $$ = NULL; }
 		;
 
 /*
  * Redundancy here is needed to avoid shift/reduce conflicts,
  * since TEMP is not a reserved word.  See also OptTemp.
  */
-OptTempTableName:
-			TEMPORARY opt_table qualified_name
-				{
-					$$ = $3;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| TEMP opt_table qualified_name
-				{
-					$$ = $3;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| LOCAL TEMPORARY opt_table qualified_name
-				{
-					$$ = $4;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| LOCAL TEMP opt_table qualified_name
-				{
-					$$ = $4;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| GLOBAL TEMPORARY opt_table qualified_name
-				{
-					ereport(WARNING,
-							(errmsg("GLOBAL is deprecated in temporary table creation"),
-							 parser_errposition(@1)));
-					$$ = $4;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| GLOBAL TEMP opt_table qualified_name
-				{
-					ereport(WARNING,
-							(errmsg("GLOBAL is deprecated in temporary table creation"),
-							 parser_errposition(@1)));
-					$$ = $4;
-					$$->relpersistence = RELPERSISTENCE_TEMP;
-				}
-			| UNLOGGED opt_table qualified_name
-				{
-					$$ = $3;
-					$$->relpersistence = RELPERSISTENCE_UNLOGGED;
-				}
-			| TABLE qualified_name
-				{
-					$$ = $2;
-					$$->relpersistence = RELPERSISTENCE_PERMANENT;
-				}
-			| qualified_name
-				{
-					$$ = $1;
-					$$->relpersistence = RELPERSISTENCE_PERMANENT;
-				}
-		;
-
 opt_table:	TABLE
-			| /*EMPTY*/
+		| /*EMPTY*/
 		;
 
 set_quantifier:

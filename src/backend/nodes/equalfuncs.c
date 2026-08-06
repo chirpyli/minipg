@@ -118,21 +118,6 @@ _equalRangeVar(const RangeVar *a, const RangeVar *b)
 }
 
 
-static bool
-_equalIntoClause(const IntoClause *a, const IntoClause *b)
-{
-	COMPARE_NODE_FIELD(rel);
-	COMPARE_NODE_FIELD(colNames);
-	COMPARE_STRING_FIELD(accessMethod);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(onCommit);
-	COMPARE_STRING_FIELD(tableSpaceName);
-	COMPARE_NODE_FIELD(viewQuery);
-	COMPARE_SCALAR_FIELD(skipData);
-
-	return true;
-}
-
 /*
  * We don't need an _equalExpr because Expr is an abstract supertype which
  * should never actually get instantiated.  Also, since it has no common
@@ -1023,7 +1008,6 @@ static bool
 _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 {
 	COMPARE_NODE_FIELD(distinctClause);
-	COMPARE_NODE_FIELD(intoClause);
 	COMPARE_NODE_FIELD(targetList);
 	COMPARE_NODE_FIELD(fromClause);
 	COMPARE_NODE_FIELD(whereClause);
@@ -1694,18 +1678,6 @@ _equalExplainStmt(const ExplainStmt *a, const ExplainStmt *b)
 {
 	COMPARE_NODE_FIELD(query);
 	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalCreateTableAsStmt(const CreateTableAsStmt *a, const CreateTableAsStmt *b)
-{
-	COMPARE_NODE_FIELD(query);
-	COMPARE_NODE_FIELD(into);
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_SCALAR_FIELD(is_select_into);
-	COMPARE_SCALAR_FIELD(if_not_exists);
 
 	return true;
 }
@@ -2822,10 +2794,6 @@ equal(const void *a, const void *b)
 		case T_RangeVar:
 			retval = _equalRangeVar(a, b);
 			break;
-			break;
-		case T_IntoClause:
-			retval = _equalIntoClause(a, b);
-			break;
 		case T_Var:
 			retval = _equalVar(a, b);
 			break;
@@ -3197,9 +3165,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ExplainStmt:
 			retval = _equalExplainStmt(a, b);
-			break;
-		case T_CreateTableAsStmt:
-			retval = _equalCreateTableAsStmt(a, b);
 			break;
 		case T_ReplicaIdentityStmt:
 			retval = _equalReplicaIdentityStmt(a, b);

@@ -71,7 +71,7 @@ test: sanity_check
 # Note: the ignore: line does not run random, just mark it as ignorable
 # ----------
 ignore: random
-test: select_into select_distinct select_distinct_on select_implicit select_having subselect union case join aggregates transactions random portals arrays btree_index hash_index delete namespace prepared_xacts
+test: select_distinct select_distinct_on select_implicit select_having subselect union case join aggregates transactions random portals arrays btree_index hash_index delete namespace prepared_xacts
 
 # ----------
 # Another group of parallel tests

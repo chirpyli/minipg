@@ -3199,54 +3199,33 @@ select * from int4_tbl a full join int4_tbl b on false;
 -- test for ability to use a cartesian join when necessary
 --
 create temp table q1 as select 1 as q1;
+ERROR:  syntax error at or near "as"
+LINE 1: create temp table q1 as select 1 as q1;
+                             ^
 create temp table q2 as select 0 as q2;
+ERROR:  syntax error at or near "as"
+LINE 1: create temp table q2 as select 0 as q2;
+                             ^
 analyze q1;
+ERROR:  relation "q1" does not exist
 analyze q2;
+ERROR:  relation "q2" does not exist
 explain (costs off)
 select * from
   tenk1 join int4_tbl on f1 = twothousand,
   q1, q2
 where q1 = thousand or q2 = thousand;
-                               QUERY PLAN                               
-------------------------------------------------------------------------
- Hash Join
-   Hash Cond: (tenk1.twothousand = int4_tbl.f1)
-   ->  Nested Loop
-         ->  Nested Loop
-               ->  Seq Scan on q1
-               ->  Seq Scan on q2
-         ->  Bitmap Heap Scan on tenk1
-               Recheck Cond: ((q1.q1 = thousand) OR (q2.q2 = thousand))
-               ->  BitmapOr
-                     ->  Bitmap Index Scan on tenk1_thous_tenthous
-                           Index Cond: (thousand = q1.q1)
-                     ->  Bitmap Index Scan on tenk1_thous_tenthous
-                           Index Cond: (thousand = q2.q2)
-   ->  Hash
-         ->  Seq Scan on int4_tbl
-(15 rows)
-
+ERROR:  relation "q1" does not exist
+LINE 4:   q1, q2
+          ^
 explain (costs off)
 select * from
   tenk1 join int4_tbl on f1 = twothousand,
   q1, q2
 where thousand = (q1 + q2);
-                          QUERY PLAN                          
---------------------------------------------------------------
- Hash Join
-   Hash Cond: (tenk1.twothousand = int4_tbl.f1)
-   ->  Nested Loop
-         ->  Nested Loop
-               ->  Seq Scan on q1
-               ->  Seq Scan on q2
-         ->  Bitmap Heap Scan on tenk1
-               Recheck Cond: (thousand = (q1.q1 + q2.q2))
-               ->  Bitmap Index Scan on tenk1_thous_tenthous
-                     Index Cond: (thousand = (q1.q1 + q2.q2))
-   ->  Hash
-         ->  Seq Scan on int4_tbl
-(12 rows)
-
+ERROR:  relation "q1" does not exist
+LINE 4:   q1, q2
+          ^
 --
 -- test ability to generate a suitable plan for a star-schema query
 --
@@ -6106,42 +6085,41 @@ LINE 1: select 1 from tenk1 a, lateral (select max(a.unique1) from i...
                                                ^
 -- check behavior of LATERAL in UPDATE/DELETE
 create temp table xx1 as select f1 as x1, -f1 as x2 from int4_tbl;
+ERROR:  syntax error at or near "as"
+LINE 1: create temp table xx1 as select f1 as x1, -f1 as x2 from int...
+                              ^
 -- error, can't do this:
 update xx1 set x2 = f1 from (select * from int4_tbl where f1 = x1) ss;
-ERROR:  column "x1" does not exist
-LINE 1: ... set x2 = f1 from (select * from int4_tbl where f1 = x1) ss;
-                                                                ^
-HINT:  There is a column named "x1" in table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: update xx1 set x2 = f1 from (select * from int4_tbl where f1...
+               ^
 update xx1 set x2 = f1 from (select * from int4_tbl where f1 = xx1.x1) ss;
-ERROR:  invalid reference to FROM-clause entry for table "xx1"
-LINE 1: ...t x2 = f1 from (select * from int4_tbl where f1 = xx1.x1) ss...
-                                                             ^
-HINT:  There is an entry for table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: update xx1 set x2 = f1 from (select * from int4_tbl where f1...
+               ^
 -- can't do it even with LATERAL:
 update xx1 set x2 = f1 from lateral (select * from int4_tbl where f1 = x1) ss;
-ERROR:  invalid reference to FROM-clause entry for table "xx1"
-LINE 1: ...= f1 from lateral (select * from int4_tbl where f1 = x1) ss;
-                                                                ^
-HINT:  There is an entry for table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: update xx1 set x2 = f1 from lateral (select * from int4_tbl ...
+               ^
 -- we might in future allow something like this, but for now it's an error:
 update xx1 set x2 = f1 from xx1, lateral (select * from int4_tbl where f1 = x1) ss;
-ERROR:  table name "xx1" specified more than once
+ERROR:  relation "xx1" does not exist
+LINE 1: update xx1 set x2 = f1 from xx1, lateral (select * from int4...
+               ^
 -- also errors:
 delete from xx1 using (select * from int4_tbl where f1 = x1) ss;
-ERROR:  column "x1" does not exist
-LINE 1: ...te from xx1 using (select * from int4_tbl where f1 = x1) ss;
-                                                                ^
-HINT:  There is a column named "x1" in table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: delete from xx1 using (select * from int4_tbl where f1 = x1)...
+                    ^
 delete from xx1 using (select * from int4_tbl where f1 = xx1.x1) ss;
-ERROR:  invalid reference to FROM-clause entry for table "xx1"
-LINE 1: ...from xx1 using (select * from int4_tbl where f1 = xx1.x1) ss...
-                                                             ^
-HINT:  There is an entry for table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: delete from xx1 using (select * from int4_tbl where f1 = xx1...
+                    ^
 delete from xx1 using lateral (select * from int4_tbl where f1 = x1) ss;
-ERROR:  invalid reference to FROM-clause entry for table "xx1"
-LINE 1: ...xx1 using lateral (select * from int4_tbl where f1 = x1) ss;
-                                                                ^
-HINT:  There is an entry for table "xx1", but it cannot be referenced from this part of the query.
+ERROR:  relation "xx1" does not exist
+LINE 1: delete from xx1 using lateral (select * from int4_tbl where ...
+                    ^
 --
 -- test LATERAL reference propagation down a multi-level inheritance hierarchy
 -- produced for a multi-level partitioned table hierarchy.
@@ -6680,29 +6658,21 @@ where exists (select 1 from tenk1 t3
 
 -- ... unless it actually is unique
 create table j3 as select unique1, tenthous from onek;
+ERROR:  syntax error at or near "as"
+LINE 1: create table j3 as select unique1, tenthous from onek;
+                        ^
 vacuum analyze j3;
+ERROR:  relation "j3" does not exist
 create unique index on j3(unique1, tenthous);
+ERROR:  relation "j3" does not exist
 explain (verbose, costs off)
 select t1.unique1, t2.hundred
 from onek t1, tenk1 t2
 where exists (select 1 from j3
               where j3.unique1 = t1.unique1 and j3.tenthous = t2.hundred)
       and t1.unique1 < 1;
-                               QUERY PLAN                               
-------------------------------------------------------------------------
- Nested Loop
-   Output: t1.unique1, t2.hundred
-   ->  Nested Loop
-         Output: t1.unique1, j3.tenthous
-         ->  Index Only Scan using onek_unique1 on public.onek t1
-               Output: t1.unique1
-               Index Cond: (t1.unique1 < 1)
-         ->  Index Only Scan using j3_unique1_tenthous_idx on public.j3
-               Output: j3.unique1, j3.tenthous
-               Index Cond: (j3.unique1 = t1.unique1)
-   ->  Index Only Scan using tenk1_hundred on public.tenk1 t2
-         Output: t2.hundred
-         Index Cond: (t2.hundred = j3.tenthous)
-(13 rows)
-
+ERROR:  relation "j3" does not exist
+LINE 4: where exists (select 1 from j3
+                                    ^
 drop table j3;
+ERROR:  table "j3" does not exist

@@ -513,7 +513,8 @@ create function expensivefunc(int) returns int
 language plpgsql immutable strict cost 10000
 as $$begin return $1; end$$;
 
-create temp table t3 as select generate_series(-1000,1000) as x;
+create temp table t3 (x int);
+insert into t3 select generate_series(-1000,1000);
 create index t3i on t3 (expensivefunc(x));
 analyze t3;
 

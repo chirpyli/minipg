@@ -1052,21 +1052,6 @@ _outRangeVar(StringInfo str, const RangeVar *node)
 
 
 static void
-_outIntoClause(StringInfo str, const IntoClause *node)
-{
-	WRITE_NODE_TYPE("INTOCLAUSE");
-
-	WRITE_NODE_FIELD(rel);
-	WRITE_NODE_FIELD(colNames);
-	WRITE_STRING_FIELD(accessMethod);
-	WRITE_NODE_FIELD(options);
-	WRITE_ENUM_FIELD(onCommit, OnCommitAction);
-	WRITE_STRING_FIELD(tableSpaceName);
-	WRITE_NODE_FIELD(viewQuery);
-	WRITE_BOOL_FIELD(skipData);
-}
-
-static void
 _outVar(StringInfo str, const Var *node)
 {
 	WRITE_NODE_TYPE("VAR");
@@ -2731,7 +2716,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_TYPE("SELECT");
 
 	WRITE_NODE_FIELD(distinctClause);
-	WRITE_NODE_FIELD(intoClause);
 	WRITE_NODE_FIELD(targetList);
 	WRITE_NODE_FIELD(fromClause);
 	WRITE_NODE_FIELD(whereClause);
@@ -3869,9 +3853,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_RangeVar:
 				_outRangeVar(str, obj);
-				break;
-			case T_IntoClause:
-				_outIntoClause(str, obj);
 				break;
 			case T_Var:
 				_outVar(str, obj);

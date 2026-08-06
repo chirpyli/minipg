@@ -167,8 +167,14 @@ SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
 
 CREATE TABLE distinct_group_1 AS
 SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE distinct_group_1 AS
+                                      ^
 CREATE TABLE distinct_group_2 AS
 SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE distinct_group_2 AS
+                                      ^
 SET enable_hashagg=TRUE;
 -- Produce results with hash aggregation.
 SET enable_sort=FALSE;
@@ -183,29 +189,37 @@ SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
 
 CREATE TABLE distinct_hash_1 AS
 SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE distinct_hash_1 AS
+                                     ^
 CREATE TABLE distinct_hash_2 AS
 SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE distinct_hash_2 AS
+                                     ^
 SET enable_sort=TRUE;
 SET work_mem TO DEFAULT;
 -- Compare results
 (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
   UNION ALL
 (SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
- ?column? 
-----------
-(0 rows)
-
+ERROR:  relation "distinct_hash_1" does not exist
+LINE 1: (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct...
+                       ^
 (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
   UNION ALL
 (SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
- ?column? 
-----------
-(0 rows)
-
+ERROR:  relation "distinct_hash_1" does not exist
+LINE 1: (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct...
+                       ^
 DROP TABLE distinct_hash_1;
+ERROR:  table "distinct_hash_1" does not exist
 DROP TABLE distinct_hash_2;
+ERROR:  table "distinct_hash_2" does not exist
 DROP TABLE distinct_group_1;
+ERROR:  table "distinct_group_1" does not exist
 DROP TABLE distinct_group_2;
+ERROR:  table "distinct_group_2" does not exist
 --
 -- Also, some tests of IS DISTINCT FROM, which doesn't quite deserve its
 -- very own regression file.

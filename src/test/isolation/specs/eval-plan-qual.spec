@@ -31,8 +31,9 @@ setup
  INSERT INTO table_a VALUES (1, 'tableAValue');
  INSERT INTO table_b VALUES (1, 'tableBValue');
 
- CREATE TABLE jointest AS SELECT generate_series(1,10) AS id, 0 AS data;
- CREATE INDEX ON jointest(id);
+CREATE TABLE jointest (id int, data int);
+INSERT INTO jointest SELECT generate_series(1,10) AS id, 0 AS data;
+CREATE INDEX ON jointest(id);
 
  CREATE TABLE parttbl (a int, b int, c int,
    d int GENERATED ALWAYS AS (a + b) STORED) PARTITION BY LIST (a);

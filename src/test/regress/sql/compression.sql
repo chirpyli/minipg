@@ -21,7 +21,8 @@ SELECT SUBSTR(f1, 200, 5) FROM cmdata;
 SELECT SUBSTR(f1, 2000, 50) FROM cmdata1;
 
 -- copy with table creation
-SELECT * INTO cmmove1 FROM cmdata;
+CREATE TABLE cmmove1 (LIKE cmdata INCLUDING ALL);
+INSERT INTO cmmove1 SELECT * FROM cmdata;
 \d+ cmmove1
 SELECT pg_column_compression(f1) FROM cmmove1;
 

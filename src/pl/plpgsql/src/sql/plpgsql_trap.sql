@@ -31,7 +31,8 @@ select trap_zero_divide(0);
 select trap_zero_divide(100000);
 select trap_zero_divide(-100);
 
-create table match_source as
+create table match_source (id int, data int, ten int);
+insert into match_source
   select x as id, x*10 as data, x/10 as ten from generate_series(1,100) x;
 
 create function trap_matching_test(int) returns int as $$

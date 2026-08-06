@@ -17,7 +17,11 @@ SET enable_indexscan TO on;
 -- for the moment, we don't want index-only scans here
 SET enable_indexonlyscan TO off;
 -- save counters
-CREATE TABLE prevstats AS
+CREATE TABLE prevstats (
+  seq_scan bigint, seq_tup_read bigint, idx_scan bigint, idx_tup_fetch bigint,
+  heap_blks bigint, idx_blks bigint, snap_ts timestamptz
+);
+INSERT INTO prevstats
 SELECT t.seq_scan, t.seq_tup_read, t.idx_scan, t.idx_tup_fetch,
        (b.heap_blks_read + b.heap_blks_hit) AS heap_blks,
        (b.idx_blks_read + b.idx_blks_hit) AS idx_blks,

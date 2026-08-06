@@ -24,7 +24,8 @@ SELECT exec(
 SELECT exec(
     format($outer$COMMENT ON ROLE REGRESS_JUSTFORCOMMENTS IS %L$outer$,
            iamalongfunction()));
-CREATE TABLE iamalargetable AS SELECT iamalongfunction() longfunctionoutput;
+CREATE TABLE iamalargetable (longfunctionoutput text);
+INSERT INTO iamalargetable SELECT iamalongfunction() longfunctionoutput;
 
 -- verify toast usage
 SELECT pg_relation_size((SELECT reltoastrelid FROM pg_class WHERE oid = 'pg_proc'::regclass)) > 0;

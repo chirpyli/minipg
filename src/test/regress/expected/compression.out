@@ -48,12 +48,15 @@ SELECT SUBSTR(f1, 2000, 50) FROM cmdata1;
 (1 row)
 
 -- copy with table creation
-SELECT * INTO cmmove1 FROM cmdata;
+CREATE TABLE cmmove1 (LIKE cmdata INCLUDING ALL);
+INSERT INTO cmmove1 SELECT * FROM cmdata;
 \d+ cmmove1
                                         Table "public.cmmove1"
  Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
 --------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended |             |              | 
+ f1     | text |           |          |         | extended | pglz        |              | 
+Indexes:
+    "cmmove1_f1_idx" btree (f1)
 
 SELECT pg_column_compression(f1) FROM cmmove1;
  pg_column_compression 

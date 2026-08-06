@@ -33,7 +33,6 @@
 #include "commands/comment.h"
 #include "commands/conversioncmds.h"
 #include "commands/copy.h"
-#include "commands/createas.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/discard.h"
@@ -174,7 +173,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
 		case T_CreateSubscriptionStmt:
-		case T_CreateTableAsStmt:
 		case T_CreateTableSpaceStmt:
 		case T_CreateTransformStmt:
 		case T_CreateTrigStmt:
@@ -727,7 +725,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 		case T_ExecuteStmt:
 			ExecuteQuery(pstate,
-						 (ExecuteStmt *) parsetree, NULL,
+						 (ExecuteStmt *) parsetree,
 						 params,
 						 dest, qc);
 			break;
@@ -1497,14 +1495,9 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_AlterSeqStmt:
 				address = AlterSequence(pstate, (AlterSeqStmt *) parsetree);
-				break;
+			break;
 
-			case T_CreateTableAsStmt:
-				address = ExecCreateTableAs(pstate, (CreateTableAsStmt *) parsetree,
-											params, queryEnv, qc);
-				break;
-
-			case T_CreateTrigStmt:
+		case T_CreateTrigStmt:
 				address = CreateTrigger((CreateTrigStmt *) parsetree,
 										queryString, InvalidOid, InvalidOid,
 										InvalidOid, InvalidOid, InvalidOid,
@@ -1950,14 +1943,8 @@ UtilityContainsQuery(Node *parsetree)
 		case T_ExplainStmt:
 			qry = castNode(Query, ((ExplainStmt *) parsetree)->query);
 			if (qry->commandType == CMD_UTILITY)
-				return UtilityContainsQuery(qry->utilityStmt);
-			return qry;
-
-		case T_CreateTableAsStmt:
-			qry = castNode(Query, ((CreateTableAsStmt *) parsetree)->query);
-			if (qry->commandType == CMD_UTILITY)
-				return UtilityContainsQuery(qry->utilityStmt);
-			return qry;
+			return UtilityContainsQuery(qry->utilityStmt);
+		return qry;
 
 		default:
 			return NULL;
@@ -2559,20 +2546,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_EXPLAIN;
 			break;
 
-		case T_CreateTableAsStmt:
-			switch (((CreateTableAsStmt *) parsetree)->objtype)
-			{
-				case OBJECT_TABLE:
-					if (((CreateTableAsStmt *) parsetree)->is_select_into)
-						tag = CMDTAG_SELECT_INTO;
-					else
-						tag = CMDTAG_CREATE_TABLE_AS;
-					break;
-				default:
-					tag = CMDTAG_UNKNOWN;
-			}
-			break;
-
 		case T_AlterSystemStmt:
 			tag = CMDTAG_ALTER_SYSTEM;
 			break;
@@ -2906,10 +2879,7 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_SelectStmt:
-			if (((SelectStmt *) parsetree)->intoClause)
-				lev = LOGSTMT_DDL;	/* SELECT INTO */
-			else
-				lev = LOGSTMT_ALL;
+			lev = LOGSTMT_ALL;
 			break;
 
 		case T_PLAssignStmt:
@@ -3156,10 +3126,6 @@ GetCommandLogLevel(Node *parsetree)
 				/* Plain EXPLAIN isn't so interesting */
 				lev = LOGSTMT_ALL;
 			}
-			break;
-
-		case T_CreateTableAsStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_AlterSystemStmt:

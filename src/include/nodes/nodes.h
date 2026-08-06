@@ -195,7 +195,6 @@ typedef enum NodeTag
 	T_JoinExpr,
 	T_FromExpr,
 	T_OnConflictExpr,
-	T_IntoClause,
 
 	/*
 	 * TAGS FOR EXPRESSION STATE NODES (execnodes.h)
@@ -346,7 +345,6 @@ typedef enum NodeTag
 	T_DropdbStmt,
 	T_VacuumStmt,
 	T_ExplainStmt,
-	T_CreateTableAsStmt,
 	T_CreateSeqStmt,
 	T_AlterSeqStmt,
 	T_VariableSetStmt,

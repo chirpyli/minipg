@@ -1926,8 +1926,13 @@ select * from
 create table gs_data_1 as
 select g%1000 as g1000, g%100 as g100, g%10 as g10, g
    from generate_series(0,1999) g;
+ERROR:  syntax error at or near "as"
+LINE 1: create table gs_data_1 as
+                               ^
 analyze gs_data_1;
+ERROR:  relation "gs_data_1" does not exist
 alter table gs_data_1 set (autovacuum_enabled = 'false');
+ERROR:  relation "gs_data_1" does not exist
 update pg_class set reltuples = 10 where relname='gs_data_1';
 set work_mem='64kB';
 -- Produce results with sorting.
@@ -1936,62 +1941,43 @@ set enable_hashagg = false;
 explain (costs off)
 select g100, g10, sum(g::numeric), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
-             QUERY PLAN             
-------------------------------------
- GroupAggregate
-   Group Key: g1000, g100, g10
-   Group Key: g1000, g100
-   Group Key: g1000
-   Group Key: ()
-   Sort Key: g100, g10
-     Group Key: g100, g10
-     Group Key: g100
-   Sort Key: g10, g1000
-     Group Key: g10, g1000
-     Group Key: g10
-   ->  Sort
-         Sort Key: g1000, g100, g10
-         ->  Seq Scan on gs_data_1
-(14 rows)
-
+ERROR:  relation "gs_data_1" does not exist
+LINE 3: from gs_data_1 group by cube (g1000, g100,g10);
+             ^
 create table gs_group_1 as
 select g100, g10, sum(g::numeric), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
+ERROR:  syntax error at or near "as"
+LINE 1: create table gs_group_1 as
+                                ^
 -- Produce results with hash aggregation.
 set enable_hashagg = true;
 set enable_sort = false;
 explain (costs off)
 select g100, g10, sum(g::numeric), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
-          QUERY PLAN          
-------------------------------
- MixedAggregate
-   Hash Key: g1000, g100, g10
-   Hash Key: g1000, g100
-   Hash Key: g1000
-   Hash Key: g100, g10
-   Hash Key: g100
-   Hash Key: g10, g1000
-   Hash Key: g10
-   Group Key: ()
-   ->  Seq Scan on gs_data_1
-(10 rows)
-
+ERROR:  relation "gs_data_1" does not exist
+LINE 3: from gs_data_1 group by cube (g1000, g100,g10);
+             ^
 create table gs_hash_1 as
 select g100, g10, sum(g::numeric), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
+ERROR:  syntax error at or near "as"
+LINE 1: create table gs_hash_1 as
+                               ^
 set enable_sort = true;
 set work_mem to default;
 -- Compare results
 (select * from gs_hash_1 except select * from gs_group_1)
   union all
 (select * from gs_group_1 except select * from gs_hash_1);
- g100 | g10 | sum | count | max 
-------+-----+-----+-------+-----
-(0 rows)
-
+ERROR:  relation "gs_hash_1" does not exist
+LINE 1: (select * from gs_hash_1 except select * from gs_group_1)
+                       ^
 drop table gs_group_1;
+ERROR:  table "gs_group_1" does not exist
 drop table gs_hash_1;
+ERROR:  table "gs_hash_1" does not exist
 -- GROUP BY DISTINCT
 -- "normal" behavior...
 select a, b, c

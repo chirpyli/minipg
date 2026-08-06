@@ -2110,16 +2110,6 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 			continue;
 
 		/*
-		 * Always ignore RIR rules for materialized views referenced in
-		 * queries.  (This does not prevent refreshing MVs, since they aren't
-		 * referenced in their own query definitions.)
-		 *
-		 * Note: in the future we might want to allow MVs to be conditionally
-		 * expanded as if they were regular views, if they are not scannable.
-		 * In that case this test would need to be postponed till after we've
-		 * opened the rel, so that we could check its state.
-		 */
-		/*
 		 * In INSERT ... ON CONFLICT, ignore the EXCLUDED pseudo-relation;
 		 * even if it points to a view, we needn't expand it, and should not
 		 * because we want the RTE to remain of RTE_RELATION type.  Otherwise,

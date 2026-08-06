@@ -174,7 +174,8 @@ CREATE EXTENSION test_ext_cine;  -- fail
 
 DROP TABLE ext_cine_tab1;
 
-CREATE TABLE ext_cine_tab2 AS SELECT 42 AS y;
+CREATE TABLE ext_cine_tab2 (y int);
+INSERT INTO ext_cine_tab2 SELECT 42 AS y;
 
 CREATE EXTENSION test_ext_cine;  -- fail
 

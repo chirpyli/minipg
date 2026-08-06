@@ -207,15 +207,13 @@ SELECT count(*)
 FROM test_missing_target x, test_missing_target y
 	WHERE x.a = y.a
 	GROUP BY x.b ORDER BY x.b;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE test_missing_target2 AS
+                                          ^
 SELECT * FROM test_missing_target2;
- count 
--------
-     1
-     2
-     3
-     4
-(4 rows)
-
+ERROR:  relation "test_missing_target2" does not exist
+LINE 1: SELECT * FROM test_missing_target2;
+                      ^
 --  Functions and expressions
 --   w/ existing GROUP BY target
 SELECT a%2, count(b) FROM test_missing_target
@@ -324,15 +322,16 @@ SELECT count(x.b)
 FROM test_missing_target x, test_missing_target y
 	WHERE x.a = y.a
 	GROUP BY x.b/2 ORDER BY x.b/2;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE test_missing_target3 AS
+                                          ^
 SELECT * FROM test_missing_target3;
- count 
--------
-     1
-     5
-     4
-(3 rows)
-
+ERROR:  relation "test_missing_target3" does not exist
+LINE 1: SELECT * FROM test_missing_target3;
+                      ^
 --   Cleanup
 DROP TABLE test_missing_target;
 DROP TABLE test_missing_target2;
+ERROR:  table "test_missing_target2" does not exist
 DROP TABLE test_missing_target3;
+ERROR:  table "test_missing_target3" does not exist

@@ -8,14 +8,16 @@
 
 INSERT INTO tenk2 SELECT * FROM tenk1;
 
-CREATE TABLE onek2 AS SELECT * FROM onek;
+CREATE TABLE onek2 (LIKE onek INCLUDING ALL);
+INSERT INTO onek2 SELECT * FROM onek;
+
+CREATE TABLE tmp (LIKE tenk1 INCLUDING ALL);
+INSERT INTO tmp SELECT * FROM tenk1;
 
 INSERT INTO fast_emp4000 SELECT * FROM slow_emp4000;
 
-SELECT *
-   INTO TABLE Bprime
-   FROM tenk1
-   WHERE unique2 < 1000;
+CREATE TABLE Bprime (LIKE tenk1);
+INSERT INTO Bprime SELECT * FROM tenk1 WHERE unique2 < 1000;
 
 INSERT INTO hobbies_r (name, person)
    SELECT 'posthacking', p.name

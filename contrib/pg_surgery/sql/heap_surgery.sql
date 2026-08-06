@@ -68,7 +68,8 @@ select heap_force_kill('htab2'::regclass, ARRAY['(0, 3)']::tid[]);
 -- materialized view.
 -- note that we don't commit the transaction, so autovacuum can't interfere.
 begin;
-create table mvw as select a from generate_series(1, 3) a;
+create table mvw (a int);
+insert into mvw select a from generate_series(1, 3) a;
 
 select * from mvw where xmin = 2;
 select heap_force_freeze('mvw'::regclass, ARRAY['(0, 3)']::tid[]);

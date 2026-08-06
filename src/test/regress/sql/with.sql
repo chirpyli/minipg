@@ -1405,7 +1405,8 @@ SELECT * FROM t LIMIT 10;
 SELECT * FROM y;
 
 -- data-modifying WITH containing INSERT...ON CONFLICT DO UPDATE
-CREATE TABLE withz AS SELECT i AS k, (i || ' v')::text v FROM generate_series(1, 16, 3) i;
+CREATE TABLE withz (k int, v text);
+INSERT INTO withz SELECT i AS k, (i || ' v')::text v FROM generate_series(1, 16, 3) i;
 ALTER TABLE withz ADD UNIQUE (k);
 
 WITH t AS (

@@ -64,7 +64,6 @@ typedef struct ExplainState
 /* Hook for plugins to get control in ExplainOneQuery() */
 typedef void (*ExplainOneQuery_hook_type) (Query *query,
 										   int cursorOptions,
-										   IntoClause *into,
 										   ExplainState *es,
 										   const char *queryString,
 										   ParamListInfo params,
@@ -83,12 +82,12 @@ extern ExplainState *NewExplainState(void);
 
 extern TupleDesc ExplainResultDesc(ExplainStmt *stmt);
 
-extern void ExplainOneUtility(Node *utilityStmt, IntoClause *into,
-							  ExplainState *es, const char *queryString,
+extern void ExplainOneUtility(Node *utilityStmt, ExplainState *es,
+							  const char *queryString,
 							  ParamListInfo params, QueryEnvironment *queryEnv);
 
-extern void ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into,
-						   ExplainState *es, const char *queryString,
+extern void ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
+						   const char *queryString,
 						   ParamListInfo params, QueryEnvironment *queryEnv,
 						   const instr_time *planduration,
 						   const BufferUsage *bufusage);

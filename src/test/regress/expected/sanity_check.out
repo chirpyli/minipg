@@ -32,7 +32,6 @@ d|f
 d_star|f
 date_tbl|f
 dept|f
-dupindexcols|t
 e_star|f
 emp|f
 equipment_r|f
@@ -137,7 +136,6 @@ pg_tablespace|t
 pg_transform|t
 pg_trigger|t
 pg_type|t
-ramp|f
 real_city|f
 road|t
 shighway|t
@@ -154,7 +152,6 @@ tableam_parted_c_heap2|f
 tableam_parted_d_heap2|f
 tableam_parted_heap2|f
 tableam_tbl_heap2|f
-tableam_tblas_heap2|f
 tenk1|t
 tenk2|t
 testjsonb|f

@@ -84,8 +84,6 @@ static Query *transformDeclareCursorStmt(ParseState *pstate,
 										 DeclareCursorStmt *stmt);
 static Query *transformExplainStmt(ParseState *pstate,
 								   ExplainStmt *stmt);
-static Query *transformCreateTableAsStmt(ParseState *pstate,
-										 CreateTableAsStmt *stmt);
 static Query *transformCallStmt(ParseState *pstate,
 								CallStmt *stmt);
 static void transformLockingClause(ParseState *pstate, Query *qry,
@@ -236,35 +234,6 @@ transformTopLevelStmt(ParseState *pstate, RawStmt *parseTree)
 static Query *
 transformOptionalSelectInto(ParseState *pstate, Node *parseTree)
 {
-	if (IsA(parseTree, SelectStmt))
-	{
-		SelectStmt *stmt = (SelectStmt *) parseTree;
-
-		/* If it's a set-operation tree, drill down to leftmost SelectStmt */
-		while (stmt && stmt->op != SETOP_NONE)
-			stmt = stmt->larg;
-		Assert(stmt && IsA(stmt, SelectStmt) && stmt->larg == NULL);
-
-		if (stmt->intoClause)
-		{
-			CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
-
-			ctas->query = parseTree;
-			ctas->into = stmt->intoClause;
-			ctas->objtype = OBJECT_TABLE;
-			ctas->is_select_into = true;
-
-			/*
-			 * Remove the intoClause from the SelectStmt.  This makes it safe
-			 * for transformSelectStmt to complain if it finds intoClause set
-			 * (implying that the INTO appeared in a disallowed place).
-			 */
-			stmt->intoClause = NULL;
-
-			parseTree = (Node *) ctas;
-		}
-	}
-
 	return transformStmt(pstate, parseTree);
 }
 
@@ -353,11 +322,6 @@ transformStmt(ParseState *pstate, Node *parseTree)
 										  (ExplainStmt *) parseTree);
 			break;
 
-		case T_CreateTableAsStmt:
-			result = transformCreateTableAsStmt(pstate,
-												(CreateTableAsStmt *) parseTree);
-			break;
-
 		case T_CallStmt:
 			result = transformCallStmt(pstate,
 									   (CallStmt *) parseTree);
@@ -421,7 +385,6 @@ stmt_requires_parse_analysis(RawStmt *parseTree)
 			 */
 		case T_DeclareCursorStmt:
 		case T_ExplainStmt:
-		case T_CreateTableAsStmt:
 		case T_CallStmt:
 			result = true;
 			break;
@@ -745,8 +708,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 		int			sublist_length = -1;
 		bool		lateral = false;
 
-		Assert(selectStmt->intoClause == NULL);
-
 		foreach(lc, selectStmt->valuesLists)
 		{
 			List	   *sublist = (List *) lfirst(lc);
@@ -867,7 +828,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 		List	   *valuesLists = selectStmt->valuesLists;
 
 		Assert(list_length(valuesLists) == 1);
-		Assert(selectStmt->intoClause == NULL);
 
 		/*
 		 * Do basic expression transformation (same as a ROW() expr, but allow
@@ -1301,14 +1261,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
 	}
 
-	/* Complain if we get called from someplace where INTO is not allowed */
-	if (stmt->intoClause)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("SELECT ... INTO is not allowed here"),
-				 parser_errposition(pstate,
-									exprLocation((Node *) stmt->intoClause))));
-
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
 
@@ -1446,7 +1398,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 
 	/* Most SELECT stuff doesn't apply in a VALUES clause */
 	Assert(stmt->distinctClause == NIL);
-	Assert(stmt->intoClause == NULL);
 	Assert(stmt->targetList == NIL);
 	Assert(stmt->fromClause == NIL);
 	Assert(stmt->whereClause == NULL);
@@ -1687,12 +1638,6 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 		leftmostSelect = leftmostSelect->larg;
 	Assert(leftmostSelect && IsA(leftmostSelect, SelectStmt) &&
 		   leftmostSelect->larg == NULL);
-	if (leftmostSelect->intoClause)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("SELECT ... INTO is not allowed here"),
-				 parser_errposition(pstate,
-									exprLocation((Node *) leftmostSelect->intoClause))));
 
 	/*
 	 * We need to extract ORDER BY and other top-level clauses here and not
@@ -1960,12 +1905,6 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 	/*
 	 * Validity-check both leaf and internal SELECTs for disallowed ops.
 	 */
-	if (stmt->intoClause)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("INTO is only allowed on first SELECT of UNION/INTERSECT/EXCEPT"),
-				 parser_errposition(pstate,
-									exprLocation((Node *) stmt->intoClause))));
 
 	/* We don't support FOR UPDATE/SHARE with set ops at the moment. */
 	if (stmt->lockingClause)
@@ -2910,31 +2849,6 @@ transformExplainStmt(ParseState *pstate, ExplainStmt *stmt)
 	return result;
 }
 
-
-/*
- * transformCreateTableAsStmt -
- *	transform a CREATE TABLE AS, SELECT ... INTO, or CREATE MATERIALIZED VIEW
- *	Statement
- *
- * As with DECLARE CURSOR and EXPLAIN, transform the contained statement now.
- */
-static Query *
-transformCreateTableAsStmt(ParseState *pstate, CreateTableAsStmt *stmt)
-{
-	Query	   *result;
-	Query	   *query;
-
-	/* transform contained query, not allowing SELECT INTO */
-	query = transformStmt(pstate, stmt->query);
-	stmt->query = (Node *) query;
-
-	/* represent the command as a utility Query */
-	result = makeNode(Query);
-	result->commandType = CMD_UTILITY;
-	result->utilityStmt = (Node *) stmt;
-
-	return result;
-}
 
 /*
  * transform a CallStmt

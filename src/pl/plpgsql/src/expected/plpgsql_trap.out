@@ -56,7 +56,8 @@ NOTICE:  should see this only if -100 <> 0
 NOTICE:  should see this only if -100 fits in smallint
 ERROR:  -100 is less than zero
 CONTEXT:  PL/pgSQL function trap_zero_divide(integer) line 12 at RAISE
-create table match_source as
+create table match_source (id int, data int, ten int);
+insert into match_source
   select x as id, x*10 as data, x/10 as ten from generate_series(1,100) x;
 create function trap_matching_test(int) returns int as $$
 declare x int;

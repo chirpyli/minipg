@@ -91,7 +91,6 @@ UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = 
 PREPARE test AS UPDATE writetest SET a = 0; -- ok
 EXECUTE test; -- fail
 SELECT * FROM writetest, temptest; -- ok
-CREATE TABLE test AS SELECT * FROM writetest; -- fail
 
 START TRANSACTION READ WRITE;
 DROP TABLE writetest; -- ok

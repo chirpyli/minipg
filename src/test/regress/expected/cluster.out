@@ -448,21 +448,25 @@ ERROR:  cannot cluster a partitioned table
 DROP TABLE clstrpart;
 -- Test CLUSTER with external tuplesorting
 create table clstr_4 as select * from tenk1;
+ERROR:  syntax error at or near "as"
+LINE 1: create table clstr_4 as select * from tenk1;
+                             ^
 create index cluster_sort on clstr_4 (hundred, thousand, tenthous);
+ERROR:  relation "clstr_4" does not exist
 -- ensure we don't use the index in CLUSTER nor the checking SELECTs
 set enable_indexscan = off;
 -- Use external sort:
 set maintenance_work_mem = '1MB';
 cluster clstr_4 using cluster_sort;
+ERROR:  relation "clstr_4" does not exist
 select * from
 (select hundred, lag(hundred) over () as lhundred,
         thousand, lag(thousand) over () as lthousand,
         tenthous, lag(tenthous) over () as ltenthous from clstr_4) ss
 where row(hundred, thousand, tenthous) <= row(lhundred, lthousand, ltenthous);
- hundred | lhundred | thousand | lthousand | tenthous | ltenthous 
----------+----------+----------+-----------+----------+-----------
-(0 rows)
-
+ERROR:  relation "clstr_4" does not exist
+LINE 4: ...tenthous, lag(tenthous) over () as ltenthous from clstr_4) s...
+                                                             ^
 reset enable_indexscan;
 reset maintenance_work_mem;
 -- test CLUSTER on expression index
@@ -591,4 +595,5 @@ DROP TABLE clstr_1;
 DROP TABLE clstr_2;
 DROP TABLE clstr_3;
 DROP TABLE clstr_4;
+ERROR:  table "clstr_4" does not exist
 DROP TABLE clstr_expression;

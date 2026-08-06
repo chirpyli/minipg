@@ -49,15 +49,21 @@ end;
 $func$;
 CREATE TABLE has_volatile AS
 SELECT * FROM generate_series(1,10) id;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE has_volatile AS
+                                  ^
 CREATE EVENT TRIGGER has_volatile_rewrite
                   ON table_rewrite
    EXECUTE PROCEDURE log_rewrite();
 -- only the last of these should trigger a rewrite
 ALTER TABLE has_volatile ADD col1 int;
+ERROR:  relation "has_volatile" does not exist
 ALTER TABLE has_volatile ADD col2 int DEFAULT 1;
+ERROR:  relation "has_volatile" does not exist
 ALTER TABLE has_volatile ADD col3 timestamptz DEFAULT current_timestamp;
+ERROR:  relation "has_volatile" does not exist
 ALTER TABLE has_volatile ADD col4 int DEFAULT (random() * 10000)::int;
-NOTICE:  rewriting table has_volatile for reason 2
+ERROR:  relation "has_volatile" does not exist
 -- Test a large sample of different datatypes
 CREATE TABLE T(pk INT NOT NULL PRIMARY KEY, c_int INT DEFAULT 1);
 SELECT set('t');
@@ -592,36 +598,19 @@ SELECT comp();
 CREATE TABLE t1 AS
 SELECT 1::int AS a , 2::int AS b
 FROM generate_series(1,20) q;
+ERROR:  syntax error at or near "AS"
+LINE 1: CREATE TABLE t1 AS
+                        ^
 ALTER TABLE t1 ADD COLUMN c text;
+ERROR:  relation "t1" does not exist
 SELECT a,
        stddev(cast((SELECT sum(1) FROM generate_series(1,20) x) AS float4))
           OVER (PARTITION BY a,b,c ORDER BY b)
        AS z
 FROM t1;
- a | z 
----+---
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
- 1 | 0
-(20 rows)
-
+ERROR:  relation "t1" does not exist
+LINE 5: FROM t1;
+             ^
 DROP TABLE T;
 -- test that we account for missing columns without defaults correctly
 -- in expand_tuple, and that rows are correctly expanded for triggers
@@ -928,10 +917,12 @@ DROP TABLE follower;
 DROP TABLE leader;
 DROP FUNCTION test_trigger();
 DROP TABLE t1;
+ERROR:  table "t1" does not exist
 DROP FUNCTION set(name);
 DROP FUNCTION comp();
 DROP TABLE m;
 DROP TABLE has_volatile;
+ERROR:  table "has_volatile" does not exist
 DROP EVENT TRIGGER has_volatile_rewrite;
 DROP FUNCTION log_rewrite;
 DROP SCHEMA fast_default;

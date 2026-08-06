@@ -482,7 +482,6 @@ CreateStatsStmt
 CreateStmt
 CreateStmtContext
 CreateSubscriptionStmt
-CreateTableAsStmt
 CreateTableSpaceStmt
 CreateTransformStmt
 CreateTrigStmt
@@ -1150,7 +1149,6 @@ IntegerSet
 InternalDefaultACL
 InternalGrant
 Interval
-IntoClause
 InvalMessageArray
 InvalidationMsgsGroup
 IpcMemoryId

@@ -244,9 +244,6 @@ CREATE TYPE unknown_comptype AS (
 	u unknown    -- fail
 );
 
--- invalid: non-lowercase quoted reloptions identifiers
-CREATE TABLE tas_case WITH ("Fillfactor" = 10) AS SELECT 1 a;
-
 CREATE UNLOGGED TABLE unlogged1 (a int primary key);			-- OK
 CREATE TEMPORARY TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname ~ '^unlogged\d' ORDER BY relname;
@@ -262,19 +259,6 @@ CREATE TEMP TABLE explicitly_temp (a int primary key);			-- also OK
 CREATE TEMP TABLE pg_temp.doubly_temp (a int primary key);		-- also OK
 CREATE TEMP TABLE public.temp_to_perm (a int primary key);		-- not OK
 DROP TABLE unlogged1, public.unlogged2;
-
-CREATE TABLE as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
-CREATE TABLE as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
-CREATE TABLE IF NOT EXISTS as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
-DROP TABLE as_select1;
-
-PREPARE select1 AS SELECT 1 as a;
-CREATE TABLE as_select1 AS EXECUTE select1;
-CREATE TABLE as_select1 AS EXECUTE select1;
-SELECT * FROM as_select1;
-CREATE TABLE IF NOT EXISTS as_select1 AS EXECUTE select1;
-DROP TABLE as_select1;
-DEALLOCATE select1;
 
 -- create an extra wide table to test for issues related to that
 -- (temporarily hide query, to avoid the long CREATE TABLE stmt)

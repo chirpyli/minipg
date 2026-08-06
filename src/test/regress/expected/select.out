@@ -295,6 +295,9 @@ RESET enable_sort;
 SELECT two, stringu1, ten, string4
    INTO TABLE tmp
    FROM onek;
+ERROR:  syntax error at or near "INTO"
+LINE 2:    INTO TABLE tmp
+           ^
 --
 -- awk '{print $1,$2;}' person.data |
 -- awk '{if(NF!=2){print $3,$2;}else{print;}}' - emp.data |

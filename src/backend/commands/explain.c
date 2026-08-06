@@ -15,7 +15,6 @@
 
 #include "access/xact.h"
 #include "catalog/pg_type.h"
-#include "commands/createas.h"
 #include "commands/defrem.h"
 #include "commands/prepare.h"
 #include "executor/nodeHash.h"
@@ -51,7 +50,7 @@ explain_get_index_name_hook_type explain_get_index_name_hook = NULL;
 #define X_NOWHITESPACE 4
 
 static void ExplainOneQuery(Query *query, int cursorOptions,
-							IntoClause *into, ExplainState *es,
+							ExplainState *es,
 							const char *queryString, ParamListInfo params,
 							QueryEnvironment *queryEnv);
 static void report_triggers(ResultRelInfo *rInfo, bool show_relname,
@@ -269,7 +268,7 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 		foreach(l, rewritten)
 		{
 			ExplainOneQuery(lfirst_node(Query, l),
-							CURSOR_OPT_PARALLEL_OK, NULL, es,
+							CURSOR_OPT_PARALLEL_OK, es,
 							pstate->p_sourcetext, params, pstate->p_queryEnv);
 
 			/* Separate plans with an appropriate separator */
@@ -330,26 +329,24 @@ ExplainResultDesc(ExplainStmt *stmt)
 /*
  * ExplainOneQuery -
  *	  print out the execution plan for one Query
- *
- * "into" is NULL unless we are explaining the contents of a CreateTableAsStmt.
  */
 static void
 ExplainOneQuery(Query *query, int cursorOptions,
-				IntoClause *into, ExplainState *es,
+				ExplainState *es,
 				const char *queryString, ParamListInfo params,
 				QueryEnvironment *queryEnv)
 {
 	/* planner will not cope with utility statements */
 	if (query->commandType == CMD_UTILITY)
 	{
-		ExplainOneUtility(query->utilityStmt, into, es, queryString, params,
+		ExplainOneUtility(query->utilityStmt, es, queryString, params,
 						  queryEnv);
 		return;
 	}
 
 	/* if an advisor plugin is present, let it manage things */
 	if (ExplainOneQuery_hook)
-		(*ExplainOneQuery_hook) (query, cursorOptions, into, es,
+		(*ExplainOneQuery_hook) (query, cursorOptions, es,
 								 queryString, params, queryEnv);
 	else
 	{
@@ -377,7 +374,7 @@ ExplainOneQuery(Query *query, int cursorOptions,
 		}
 
 		/* run it (if needed) and produce output */
-		ExplainOnePlan(plan, into, es, queryString, params, queryEnv,
+		ExplainOnePlan(plan, es, queryString, params, queryEnv,
 					   &planduration, (es->buffers ? &bufusage : NULL));
 	}
 }
@@ -388,50 +385,19 @@ ExplainOneQuery(Query *query, int cursorOptions,
  *	  (In general, utility statements don't have plans, but there are some
  *	  we treat as special cases)
  *
- * "into" is NULL unless we are explaining the contents of a CreateTableAsStmt.
- *
  * This is exported because it's called back from prepare.c in the
  * EXPLAIN EXECUTE case.  In that case, we'll be dealing with a statement
  * that's in the plan cache, so we have to ensure we don't modify it.
  */
 void
-ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
+ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 				  const char *queryString, ParamListInfo params,
 				  QueryEnvironment *queryEnv)
 {
 	if (utilityStmt == NULL)
 		return;
 
-	if (IsA(utilityStmt, CreateTableAsStmt))
-	{
-		/*
-		 * We have to rewrite the contained SELECT and then pass it back to
-		 * ExplainOneQuery.  Copy to be safe in the EXPLAIN EXECUTE case.
-		 */
-		CreateTableAsStmt *ctas = (CreateTableAsStmt *) utilityStmt;
-		List	   *rewritten;
-
-		/*
-		 * Check if the relation exists or not.  This is done at this stage to
-		 * avoid query planning or execution.
-		 */
-		if (CreateTableAsRelExists(ctas))
-		{
-			if (ctas->objtype == OBJECT_TABLE)
-				ExplainDummyGroup("CREATE TABLE AS", NULL, es);
-			else
-				elog(ERROR, "unexpected object type: %d",
-					 (int) ctas->objtype);
-			return;
-		}
-
-		rewritten = QueryRewrite(castNode(Query, copyObject(ctas->query)));
-		Assert(list_length(rewritten) == 1);
-		ExplainOneQuery(linitial_node(Query, rewritten),
-						CURSOR_OPT_PARALLEL_OK, ctas->into, es,
-						queryString, params, queryEnv);
-	}
-	else if (IsA(utilityStmt, DeclareCursorStmt))
+	if (IsA(utilityStmt, DeclareCursorStmt))
 	{
 		/*
 		 * Likewise for DECLARE CURSOR.
@@ -447,11 +413,11 @@ ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
 		rewritten = QueryRewrite(castNode(Query, copyObject(dcs->query)));
 		Assert(list_length(rewritten) == 1);
 		ExplainOneQuery(linitial_node(Query, rewritten),
-						dcs->options, NULL, es,
+						dcs->options, es,
 						queryString, params, queryEnv);
 	}
 	else if (IsA(utilityStmt, ExecuteStmt))
-		ExplainExecuteQuery((ExecuteStmt *) utilityStmt, into, es,
+		ExplainExecuteQuery((ExecuteStmt *) utilityStmt, es,
 							queryString, params, queryEnv);
 	else if (IsA(utilityStmt, NotifyStmt))
 	{
@@ -475,15 +441,12 @@ ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
  *		given a planned query, execute it if needed, and then print
  *		EXPLAIN output
  *
- * "into" is NULL unless we are explaining the contents of a CreateTableAsStmt,
- * in which case executing the query should result in creating that table.
- *
  * This is exported because it's called back from prepare.c in the
  * EXPLAIN EXECUTE case, and because an index advisor plugin would need
  * to call it.
  */
 void
-ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
+ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 			   const char *queryString, ParamListInfo params,
 			   QueryEnvironment *queryEnv, const instr_time *planduration,
 			   const BufferUsage *bufusage)
@@ -522,13 +485,9 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	UpdateActiveSnapshotCommandId();
 
 	/*
-	 * Normally we discard the query's output, but if explaining CREATE TABLE
-	 * AS, we'd better use the appropriate tuple receiver.
+	 * Normally we discard the query's output.
 	 */
-	if (into)
-		dest = CreateIntoRelDestReceiver(into);
-	else
-		dest = None_Receiver;
+	dest = None_Receiver;
 
 	/* Create a QueryDesc for the query */
 	queryDesc = CreateQueryDesc(plannedstmt, queryString,
@@ -540,8 +499,6 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 		eflags = 0;				/* default run-to-completion flags */
 	else
 		eflags = EXEC_FLAG_EXPLAIN_ONLY;
-	if (into)
-		eflags |= GetIntoRelEFlags(into);
 
 	/* call ExecutorStart to prepare the plan for execution */
 	ExecutorStart(queryDesc, eflags);
@@ -551,11 +508,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	{
 		ScanDirection dir;
 
-		/* EXPLAIN ANALYZE CREATE TABLE AS WITH NO DATA is weird */
-		if (into && into->skipData)
-			dir = NoMovementScanDirection;
-		else
-			dir = ForwardScanDirection;
+		dir = ForwardScanDirection;
 
 		/* run the plan */
 		ExecutorRun(queryDesc, dir, 0L, true);

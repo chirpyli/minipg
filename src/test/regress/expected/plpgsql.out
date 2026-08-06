@@ -3432,6 +3432,9 @@ NOTICE:  after loop, c2 = <NULL>
 -- try updating the cursor's current row
 create temp table forc_test as
   select n as i, n as j from generate_series(1,10) n;
+ERROR:  syntax error at or near "as"
+LINE 1: create temp table forc_test as
+                                    ^
 create or replace function forc01() returns void as $$
 declare
   c cursor for select * from forc_test;
@@ -3443,36 +3446,15 @@ begin
 end;
 $$ language plpgsql;
 select forc01();
-NOTICE:  1, 1
-NOTICE:  2, 2
-NOTICE:  3, 3
-NOTICE:  4, 4
-NOTICE:  5, 5
-NOTICE:  6, 6
-NOTICE:  7, 7
-NOTICE:  8, 8
-NOTICE:  9, 9
-NOTICE:  10, 10
- forc01 
---------
- 
-(1 row)
-
+ERROR:  relation "forc_test" does not exist
+LINE 1: select * from forc_test
+                      ^
+QUERY:  select * from forc_test
+CONTEXT:  PL/pgSQL function forc01() line 5 at FOR over cursor
 select * from forc_test;
-  i   | j  
-------+----
-  100 |  2
-  200 |  4
-  300 |  6
-  400 |  8
-  500 | 10
-  600 | 12
-  700 | 14
-  800 | 16
-  900 | 18
- 1000 | 20
-(10 rows)
-
+ERROR:  relation "forc_test" does not exist
+LINE 1: select * from forc_test;
+                      ^
 -- same, with a cursor whose portal name doesn't match variable name
 create or replace function forc01() returns void as $$
 declare
@@ -3489,36 +3471,15 @@ begin
 end;
 $$ language plpgsql;
 select forc01();
-NOTICE:  100, 2
-NOTICE:  200, 4
-NOTICE:  300, 6
-NOTICE:  400, 8
-NOTICE:  500, 10
-NOTICE:  600, 12
-NOTICE:  700, 14
-NOTICE:  800, 16
-NOTICE:  900, 18
-NOTICE:  1000, 20
- forc01 
---------
- 
-(1 row)
-
+ERROR:  relation "forc_test" does not exist
+LINE 1: select * from forc_test
+                      ^
+QUERY:  select * from forc_test
+CONTEXT:  PL/pgSQL function forc01() line 6 at OPEN
 select * from forc_test;
-   i    | j  
---------+----
-  10000 |  4
-  20000 |  8
-  30000 | 12
-  40000 | 16
-  50000 | 20
-  60000 | 24
-  70000 | 28
-  80000 | 32
-  90000 | 36
- 100000 | 40
-(10 rows)
-
+ERROR:  relation "forc_test" does not exist
+LINE 1: select * from forc_test;
+                      ^
 drop function forc01();
 -- fail because cursor has no query bound to it
 create or replace function forc_bad() returns void as $$
@@ -4188,10 +4149,22 @@ begin
   return query select 10 into no_such_table;
 end;
 $$ language plpgsql;
+ERROR:  syntax error at or near "into"
+LINE 4:   return query select 10 into no_such_table;
+                                 ^
 select * from rttest();
-ERROR:  SELECT INTO query does not return tuples
-CONTEXT:  SQL statement "select 10 into no_such_table"
-PL/pgSQL function rttest() line 3 at RETURN QUERY
+NOTICE:  t 2
+NOTICE:  f 0
+NOTICE:  t 2
+NOTICE:  f 0
+ rttest 
+--------
+     10
+     20
+     10
+     20
+(4 rows)
+
 create or replace function rttest()
 returns setof int as $$
 begin
@@ -4199,9 +4172,11 @@ begin
 end;
 $$ language plpgsql;
 select * from rttest();
-ERROR:  SELECT INTO query does not return tuples
-CONTEXT:  SQL statement "select 10 into no_such_table"
-PL/pgSQL function rttest() line 3 at RETURN QUERY
+ERROR:  syntax error at or near "into"
+LINE 1: select 10 into no_such_table
+                  ^
+QUERY:  select 10 into no_such_table
+CONTEXT:  PL/pgSQL function rttest() line 3 at RETURN QUERY
 select * from no_such_table;
 ERROR:  relation "no_such_table" does not exist
 LINE 1: select * from no_such_table;

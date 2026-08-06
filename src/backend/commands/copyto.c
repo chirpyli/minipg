@@ -460,14 +460,7 @@ BeginCopyTo(ParseState *pstate,
 
 		query = linitial_node(Query, rewritten);
 
-		/* The grammar allows SELECT INTO, but we don't support that */
-		if (query->utilityStmt != NULL &&
-			IsA(query->utilityStmt, CreateTableAsStmt))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("COPY (SELECT INTO) is not supported")));
-
-		/* The only other utility command we could see is NOTIFY */
+		/* The only utility command we could see is NOTIFY */
 		if (query->utilityStmt != NULL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

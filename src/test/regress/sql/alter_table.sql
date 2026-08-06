@@ -1073,15 +1073,6 @@ drop table atacc2;
 create index "testing_idx" on atacc1(a);
 create index "testing_idx" on atacc1("........pg.dropped.1........");
 
--- test create as and select into
-insert into atacc1 values (21, 22, 23);
-create table attest1 as select * from atacc1;
-select * from attest1;
-drop table attest1;
-select * into attest2 from atacc1;
-select * from attest2;
-drop table attest2;
-
 -- try dropping all columns
 alter table atacc1 drop c;
 alter table atacc1 drop d;
@@ -2026,7 +2017,8 @@ DROP TYPE test_typex;
 -- behind a table to test pg_upgrade with. The table has a composite type
 -- column in it, and the composite type has a dropped attribute.
 CREATE TYPE test_type3 AS (a int);
-CREATE TABLE test_tbl3 (c) AS SELECT '(1)'::test_type3;
+CREATE TABLE test_tbl3 (c test_type3);
+INSERT INTO test_tbl3 SELECT '(1)'::test_type3;
 ALTER TYPE test_type3 DROP ATTRIBUTE a, ADD ATTRIBUTE b int;
 
 CREATE TYPE test_type_empty AS ();

@@ -350,7 +350,8 @@ DROP TABLE syscol_table;
 -- Tests for IS NULL/IS NOT NULL with b-tree indexes
 --
 
-CREATE TABLE onek_with_null AS SELECT unique1, unique2 FROM onek;
+CREATE TABLE onek_with_null (unique1 int, unique2 int);
+INSERT INTO onek_with_null SELECT unique1, unique2 FROM onek;
 INSERT INTO onek_with_null (unique1,unique2) VALUES (NULL, -1), (NULL, NULL);
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2,unique1);
 
@@ -910,7 +911,8 @@ FROM pg_class where oid in
 	(select indexrelid from pg_index where indrelid in
 		(select reltoastrelid from reindex_before where reltoastrelid > 0));
 REINDEX SCHEMA schema_to_reindex;
-CREATE TABLE reindex_after AS SELECT oid, relname, relfilenode, relkind
+CREATE TABLE reindex_after (oid oid, relname name, relfilenode relfilenode, relkind char);
+INSERT INTO reindex_after SELECT oid, relname, relfilenode, relkind
 	FROM pg_class
 	where relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'schema_to_reindex');
 SELECT  b.relname,

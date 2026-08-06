@@ -70,19 +70,18 @@ SELECT * FROM temptest;
 DROP TABLE temptest;
 BEGIN;
 CREATE TEMP TABLE temptest(col) ON COMMIT DELETE ROWS AS SELECT 1;
+ERROR:  syntax error at or near ")"
+LINE 1: CREATE TEMP TABLE temptest(col) ON COMMIT DELETE ROWS AS SEL...
+                                      ^
 SELECT * FROM temptest;
- col 
------
-   1
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COMMIT;
 SELECT * FROM temptest;
- col 
------
-(0 rows)
-
+ERROR:  relation "temptest" does not exist
+LINE 1: SELECT * FROM temptest;
+                      ^
 DROP TABLE temptest;
+ERROR:  table "temptest" does not exist
 -- Test ON COMMIT DROP
 BEGIN;
 CREATE TEMP TABLE temptest(col int) ON COMMIT DROP;
@@ -102,12 +101,11 @@ LINE 1: SELECT * FROM temptest;
                       ^
 BEGIN;
 CREATE TEMP TABLE temptest(col) ON COMMIT DROP AS SELECT 1;
+ERROR:  syntax error at or near ")"
+LINE 1: CREATE TEMP TABLE temptest(col) ON COMMIT DROP AS SELECT 1;
+                                      ^
 SELECT * FROM temptest;
- col 
------
-   1
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COMMIT;
 SELECT * FROM temptest;
 ERROR:  relation "temptest" does not exist
@@ -137,7 +135,9 @@ LINE 1: SELECT * FROM temptest;
 CREATE TABLE temptest(col int) ON COMMIT DELETE ROWS;
 ERROR:  ON COMMIT can only be used on temporary tables
 CREATE TABLE temptest(col) ON COMMIT DELETE ROWS AS SELECT 1;
-ERROR:  ON COMMIT can only be used on temporary tables
+ERROR:  syntax error at or near ")"
+LINE 1: CREATE TABLE temptest(col) ON COMMIT DELETE ROWS AS SELECT 1...
+                                 ^
 -- Test foreign keys
 BEGIN;
 CREATE TEMP TABLE temptest1(col int PRIMARY KEY);

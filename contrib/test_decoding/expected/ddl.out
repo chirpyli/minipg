@@ -256,7 +256,8 @@ ORDER BY 1,2;
 
 -- check updates of primary keys work correctly
 BEGIN;
-CREATE TABLE spoolme AS SELECT g.i FROM generate_series(1, 5000) g(i);
+CREATE TABLE spoolme (i int);
+INSERT INTO spoolme SELECT g.i FROM generate_series(1, 5000) g(i);
 UPDATE tr_etoomuch SET id = -id WHERE id = 5000;
 UPDATE tr_oddlength SET id = 'x', data = 'quux';
 UPDATE tr_oddlength SET id = 'yy', data = 'a';

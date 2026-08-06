@@ -7,8 +7,8 @@
 # (from before the insert) in place.
 
 setup {
-    create table smalltbl
-        as select i as id from generate_series(1,20) i;
+    create table smalltbl (id int);
+    insert into smalltbl select i as id from generate_series(1,20) i;
     alter table smalltbl set (autovacuum_enabled = off);
 }
 setup {

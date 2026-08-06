@@ -2741,31 +2741,7 @@ _SPI_execute_plan(SPIPlanPtr plan, const SPIExecuteOptions *options,
 				 * Some utility statements return a row count, even though the
 				 * tuples are not returned to the caller.
 				 */
-				if (IsA(stmt->utilityStmt, CreateTableAsStmt))
-				{
-					CreateTableAsStmt *ctastmt = (CreateTableAsStmt *) stmt->utilityStmt;
-
-					if (qc.commandTag == CMDTAG_SELECT)
-						_SPI_current->processed = qc.nprocessed;
-					else
-					{
-						/*
-						 * Must be an IF NOT EXISTS that did nothing, or a
-						 * CREATE ... WITH NO DATA.
-						 */
-						Assert(ctastmt->if_not_exists ||
-							   ctastmt->into->skipData);
-						_SPI_current->processed = 0;
-					}
-
-					/*
-					 * For historical reasons, if CREATE TABLE AS was spelled
-					 * as SELECT INTO, return a special return code.
-					 */
-					if (ctastmt->is_select_into)
-						res = SPI_OK_SELINTO;
-				}
-				else if (IsA(stmt->utilityStmt, CopyStmt))
+				if (IsA(stmt->utilityStmt, CopyStmt))
 				{
 					Assert(qc.commandTag == CMDTAG_COPY);
 					_SPI_current->processed = qc.nprocessed;

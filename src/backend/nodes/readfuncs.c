@@ -528,22 +528,6 @@ _readRangeVar(void)
 }
 
 
-static IntoClause *
-_readIntoClause(void)
-{
-	READ_LOCALS(IntoClause);
-
-	READ_NODE_FIELD(rel);
-	READ_NODE_FIELD(colNames);
-	READ_STRING_FIELD(accessMethod);
-	READ_NODE_FIELD(options);
-	READ_ENUM_FIELD(onCommit, OnCommitAction);
-	READ_STRING_FIELD(tableSpaceName);
-	READ_NODE_FIELD(viewQuery);
-	READ_BOOL_FIELD(skipData);
-
-	READ_DONE();
-}
 
 /*
  * _readVar
@@ -2656,8 +2640,6 @@ parseNodeString(void)
 		return_value = _readAlias();
 	else if (MATCH("RANGEVAR", 8))
 		return_value = _readRangeVar();
-	else if (MATCH("INTOCLAUSE", 10))
-		return_value = _readIntoClause();
 	else if (MATCH("VAR", 3))
 		return_value = _readVar();
 	else if (MATCH("CONST", 5))

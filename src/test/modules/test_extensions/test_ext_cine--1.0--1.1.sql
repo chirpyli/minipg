@@ -20,7 +20,8 @@ CREATE SEQUENCE IF NOT EXISTS ext_cine_seq;
 
 CREATE TABLE IF NOT EXISTS ext_cine_tab1 (x int);
 
-CREATE TABLE IF NOT EXISTS ext_cine_tab2 AS SELECT 42 AS y;
+CREATE TABLE IF NOT EXISTS ext_cine_tab2 (y int);
+INSERT INTO ext_cine_tab2 SELECT 42 AS y;
 
 -- just to verify the script ran
 CREATE TABLE ext_cine_tab3 (z int);

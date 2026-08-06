@@ -1590,7 +1590,6 @@ typedef struct SelectStmt
 	 */
 	List	   *distinctClause; /* NULL, list of DISTINCT ON exprs, or
 								 * lcons(NIL,NIL) for all (SELECT DISTINCT) */
-	IntoClause *intoClause;		/* target for SELECT INTO */
 	List	   *targetList;		/* the target list (of ResTarget) */
 	List	   *fromClause;		/* the FROM clause */
 	Node	   *whereClause;	/* WHERE qualification */
@@ -3077,29 +3076,6 @@ typedef struct ExplainStmt
 	Node	   *query;			/* the query (see comments above) */
 	List	   *options;		/* list of DefElem nodes */
 } ExplainStmt;
-
-/* ----------------------
- *		CREATE TABLE AS Statement (a/k/a SELECT INTO)
- *
- * A query written as CREATE TABLE AS will produce this node type natively.
- * A query written as SELECT ... INTO will be transformed to this form during
- * parse analysis.
- * A query written as CREATE MATERIALIZED view will produce this node type,
- * during parse analysis, since it needs all the same data.
- *
- * The "query" field is handled similarly to EXPLAIN, though note that it
- * can be a SELECT or an EXECUTE, but not other DML statements.
- * ----------------------
- */
-typedef struct CreateTableAsStmt
-{
-	NodeTag		type;
-	Node	   *query;			/* the query (see comments above) */
-	IntoClause *into;			/* destination table */
-	ObjectType	objtype;		/* OBJECT_TABLE */
-	bool		is_select_into; /* it was written as SELECT INTO */
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-} CreateTableAsStmt;
 
 /* ----------------------
  * Checkpoint Statement

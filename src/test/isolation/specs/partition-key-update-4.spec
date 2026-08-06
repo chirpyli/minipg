@@ -15,7 +15,8 @@ setup
   -- Setup to test concurrent handling of GetTupleForTrigger().
   --
   CREATE TABLE footrg (a int, b text) PARTITION BY LIST(a);
-  CREATE TABLE triglog as select * from footrg;
+  CREATE TABLE triglog (LIKE footrg INCLUDING ALL);
+  INSERT INTO triglog SELECT * FROM footrg;
   CREATE TABLE footrg1 PARTITION OF footrg FOR VALUES IN (1);
   CREATE TABLE footrg2 PARTITION OF footrg FOR VALUES IN (2);
   INSERT INTO footrg VALUES (1, 'ABC');

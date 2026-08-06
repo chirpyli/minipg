@@ -48,7 +48,8 @@ begin a.c1[1].i := 11; raise notice 'a = %, a.c1[1].i = %', a, a.c1[1].i; end$$;
 do $$ declare a int[];
 begin a := array_agg(x) from (values(1),(2),(3)) v(x); raise notice 'a = %', a; end$$;
 
-create temp table onecol as select array[1,2] as f1;
+create temp table onecol (f1 int[]);
+insert into onecol select array[1,2] as f1;
 
 do $$ declare a int[];
 begin a := f1 from onecol; raise notice 'a = %', a; end$$;

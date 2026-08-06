@@ -1442,10 +1442,6 @@ exprLocation(const Node *expr)
 			/* just use argument's location */
 			loc = exprLocation((Node *) ((const TargetEntry *) expr)->expr);
 			break;
-		case T_IntoClause:
-			/* use the contained RangeVar's location --- close enough */
-			loc = exprLocation((Node *) ((const IntoClause *) expr)->rel);
-			break;
 		case T_List:
 			{
 				/* report location of first list member that has a location */
@@ -3512,20 +3508,8 @@ raw_expression_tree_walker(Node *node,
 				if (walker(join->alias, context))
 					return true;
 				/* using list is deemed uninteresting */
-			}
-			break;
-		case T_IntoClause:
-			{
-				IntoClause *into = (IntoClause *) node;
-
-				if (walker(into->rel, context))
-					return true;
-				/* colNames, options are deemed uninteresting */
-				/* viewQuery should be null in raw parsetree, but check it */
-				if (walker(into->viewQuery, context))
-					return true;
-			}
-			break;
+					}
+		break;
 		case T_List:
 			foreach(temp, (List *) node)
 			{
@@ -3590,8 +3574,6 @@ raw_expression_tree_walker(Node *node,
 				SelectStmt *stmt = (SelectStmt *) node;
 
 				if (walker(stmt->distinctClause, context))
-					return true;
-				if (walker(stmt->intoClause, context))
 					return true;
 				if (walker(stmt->targetList, context))
 					return true;

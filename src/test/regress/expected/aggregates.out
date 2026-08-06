@@ -2738,27 +2738,32 @@ set enable_sort to default;
 set work_mem='64kB';
 create table agg_data_2k as
 select g from generate_series(0, 1999) g;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_data_2k as
+                                 ^
 analyze agg_data_2k;
+ERROR:  relation "agg_data_2k" does not exist
 create table agg_data_20k as
 select g from generate_series(0, 19999) g;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_data_20k as
+                                  ^
 analyze agg_data_20k;
+ERROR:  relation "agg_data_20k" does not exist
 -- Produce results with sorting.
 set enable_hashagg = false;
 explain (costs off)
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
   from agg_data_20k group by g%10000;
-              QUERY PLAN              
---------------------------------------
- GroupAggregate
-   Group Key: ((g % 10000))
-   ->  Sort
-         Sort Key: ((g % 10000))
-         ->  Seq Scan on agg_data_20k
-(5 rows)
-
+ERROR:  relation "agg_data_20k" does not exist
+LINE 3:   from agg_data_20k group by g%10000;
+               ^
 create table agg_group_1 as
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
   from agg_data_20k group by g%10000;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_group_1 as
+                                 ^
 create table agg_group_2 as
 select * from
   (values (100), (300), (500)) as r(a),
@@ -2769,28 +2774,36 @@ select * from
     from agg_data_2k
     where g < r.a
     group by g/2) as s;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_group_2 as
+                                 ^
 create table agg_group_3 as
 select (g/2)::numeric as c1, sum(7::int4) as c2, count(*) as c3
   from agg_data_2k group by g/2;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_group_3 as
+                                 ^
 create table agg_group_4 as
 select (g/2)::numeric as c1, array_agg(g::numeric) as c2, count(*) as c3
   from agg_data_2k group by g/2;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_group_4 as
+                                 ^
 -- Produce results with hash aggregation
 set enable_hashagg = true;
 set enable_sort = false;
 explain (costs off)
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
   from agg_data_20k group by g%10000;
-           QUERY PLAN           
---------------------------------
- HashAggregate
-   Group Key: (g % 10000)
-   ->  Seq Scan on agg_data_20k
-(3 rows)
-
+ERROR:  relation "agg_data_20k" does not exist
+LINE 3:   from agg_data_20k group by g%10000;
+               ^
 create table agg_hash_1 as
 select g%10000 as c1, sum(g::numeric) as c2, count(*) as c3
   from agg_data_20k group by g%10000;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_hash_1 as
+                                ^
 create table agg_hash_2 as
 select * from
   (values (100), (300), (500)) as r(a),
@@ -2801,48 +2814,61 @@ select * from
     from agg_data_2k
     where g < r.a
     group by g/2) as s;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_hash_2 as
+                                ^
 create table agg_hash_3 as
 select (g/2)::numeric as c1, sum(7::int4) as c2, count(*) as c3
   from agg_data_2k group by g/2;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_hash_3 as
+                                ^
 create table agg_hash_4 as
 select (g/2)::numeric as c1, array_agg(g::numeric) as c2, count(*) as c3
   from agg_data_2k group by g/2;
+ERROR:  syntax error at or near "as"
+LINE 1: create table agg_hash_4 as
+                                ^
 set enable_sort = true;
 set work_mem to default;
 -- Compare group aggregation results to hash aggregation results
 (select * from agg_hash_1 except select * from agg_group_1)
   union all
 (select * from agg_group_1 except select * from agg_hash_1);
- c1 | c2 | c3 
-----+----+----
-(0 rows)
-
+ERROR:  relation "agg_hash_1" does not exist
+LINE 1: (select * from agg_hash_1 except select * from agg_group_1)
+                       ^
 (select * from agg_hash_2 except select * from agg_group_2)
   union all
 (select * from agg_group_2 except select * from agg_hash_2);
- a | c1 | c2 | c3 
----+----+----+----
-(0 rows)
-
+ERROR:  relation "agg_hash_2" does not exist
+LINE 1: (select * from agg_hash_2 except select * from agg_group_2)
+                       ^
 (select * from agg_hash_3 except select * from agg_group_3)
   union all
 (select * from agg_group_3 except select * from agg_hash_3);
- c1 | c2 | c3 
-----+----+----
-(0 rows)
-
+ERROR:  relation "agg_hash_3" does not exist
+LINE 1: (select * from agg_hash_3 except select * from agg_group_3)
+                       ^
 (select * from agg_hash_4 except select * from agg_group_4)
   union all
 (select * from agg_group_4 except select * from agg_hash_4);
- c1 | c2 | c3 
-----+----+----
-(0 rows)
-
+ERROR:  relation "agg_hash_4" does not exist
+LINE 1: (select * from agg_hash_4 except select * from agg_group_4)
+                       ^
 drop table agg_group_1;
+ERROR:  table "agg_group_1" does not exist
 drop table agg_group_2;
+ERROR:  table "agg_group_2" does not exist
 drop table agg_group_3;
+ERROR:  table "agg_group_3" does not exist
 drop table agg_group_4;
+ERROR:  table "agg_group_4" does not exist
 drop table agg_hash_1;
+ERROR:  table "agg_hash_1" does not exist
 drop table agg_hash_2;
+ERROR:  table "agg_hash_2" does not exist
 drop table agg_hash_3;
+ERROR:  table "agg_hash_3" does not exist
 drop table agg_hash_4;
+ERROR:  table "agg_hash_4" does not exist

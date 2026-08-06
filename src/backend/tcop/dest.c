@@ -32,7 +32,6 @@
 #include "access/printtup.h"
 #include "access/xact.h"
 #include "commands/copy.h"
-#include "commands/createas.h"
 #include "executor/functions.h"
 #include "executor/tqueue.h"
 #include "executor/tstoreReceiver.h"
@@ -137,17 +136,11 @@ CreateDestReceiver(CommandDest dest)
 		case DestTuplestore:
 			return CreateTuplestoreDestReceiver();
 
-		case DestIntoRel:
-			return CreateIntoRelDestReceiver(NULL);
-
 		case DestCopyOut:
 			return CreateCopyDestReceiver();
 
 		case DestSQLFunction:
 			return CreateSQLFunctionDestReceiver();
-
-		case DestTransientRel:
-			return CreateTransientRelDestReceiver(InvalidOid);
 
 		case DestTupleQueue:
 			return CreateTupleQueueDestReceiver(NULL);
@@ -201,10 +194,8 @@ EndCommand(const QueryCompletion *qc, CommandDest dest, bool force_undecorated_o
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestIntoRel:
 		case DestCopyOut:
 		case DestSQLFunction:
-		case DestTransientRel:
 		case DestTupleQueue:
 			break;
 	}
@@ -246,10 +237,8 @@ NullCommand(CommandDest dest)
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestIntoRel:
 		case DestCopyOut:
 		case DestSQLFunction:
-		case DestTransientRel:
 		case DestTupleQueue:
 			break;
 	}
@@ -289,10 +278,8 @@ ReadyForQuery(CommandDest dest)
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestIntoRel:
 		case DestCopyOut:
 		case DestSQLFunction:
-		case DestTransientRel:
 		case DestTupleQueue:
 			break;
 	}

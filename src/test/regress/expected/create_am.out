@@ -117,19 +117,6 @@ SELECT f1 FROM tableam_tbl_heap2 ORDER BY f1;
   1
 (1 row)
 
--- CREATE TABLE AS
-CREATE TABLE tableam_tblas_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
-SELECT f1 FROM tableam_tbl_heap2 ORDER BY f1;
- f1 
-----
-  1
-(1 row)
-
--- SELECT INTO doesn't support USING
-SELECT INTO tableam_tblselectinto_heap2 USING heap2 FROM tableam_tbl_heap2;
-ERROR:  syntax error at or near "USING"
-LINE 1: SELECT INTO tableam_tblselectinto_heap2 USING heap2 FROM tab...
-                                                ^
 -- CREATE VIEW doesn't support USING
 CREATE VIEW tableam_view_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;
 ERROR:  syntax error at or near "USING"
@@ -172,10 +159,9 @@ ORDER BY 3, 1, 2;
  r       | heap2  | tableam_parted_b_heap2
  r       | heap2  | tableam_parted_d_heap2
  r       | heap2  | tableam_tbl_heap2
- r       | heap2  | tableam_tblas_heap2
  t       | heap2  | toast for tableam_parted_b_heap2
  t       | heap2  | toast for tableam_parted_d_heap2
-(6 rows)
+(5 rows)
 
 -- Show dependencies onto AM - there shouldn't be any for toast
 SELECT pg_describe_object(classid,objid,objsubid) AS obj
@@ -187,18 +173,15 @@ ORDER BY classid, objid, objsubid;
              obj              
 ------------------------------
  table tableam_tbl_heap2
- table tableam_tblas_heap2
  table tableam_parted_b_heap2
  table tableam_parted_d_heap2
-(4 rows)
+(3 rows)
 
 -- Second, create objects in the new AM by changing the default AM
 BEGIN;
 SET LOCAL default_table_access_method = 'heap2';
 -- following tests should all respect the default AM
 CREATE TABLE tableam_tbl_heapx(f1 int);
-CREATE TABLE tableam_tblas_heapx AS SELECT * FROM tableam_tbl_heapx;
-SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;
 CREATE TABLE tableam_parted_heapx (a text, b int) PARTITION BY list (a);
 CREATE TABLE tableam_parted_1_heapx PARTITION OF tableam_parted_heapx FOR VALUES IN ('a', 'b');
 -- but an explicitly set AM overrides it
@@ -219,17 +202,15 @@ FROM pg_class AS pc
     LEFT JOIN pg_am AS pa ON (pa.oid = pc.relam)
 WHERE pc.relname LIKE 'tableam_%_heapx'
 ORDER BY 3, 1, 2;
- relkind | amname |           relname           
----------+--------+-----------------------------
+ relkind | amname |        relname         
+---------+--------+------------------------
  r       | heap2  | tableam_parted_1_heapx
  r       | heap   | tableam_parted_2_heapx
  p       |        | tableam_parted_heapx
  S       |        | tableam_seq_heapx
  r       | heap2  | tableam_tbl_heapx
- r       | heap2  | tableam_tblas_heapx
- r       | heap2  | tableam_tblselectinto_heapx
  v       |        | tableam_view_heapx
-(8 rows)
+(6 rows)
 
 -- don't want to keep those tables, nor the default
 ROLLBACK;
@@ -249,7 +230,6 @@ ERROR:  access method "btree" is not of type TABLE
 DROP ACCESS METHOD heap2;
 ERROR:  cannot drop access method heap2 because other objects depend on it
 DETAIL:  table tableam_tbl_heap2 depends on access method heap2
-table tableam_tblas_heap2 depends on access method heap2
 table tableam_parted_b_heap2 depends on access method heap2
 table tableam_parted_d_heap2 depends on access method heap2
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.

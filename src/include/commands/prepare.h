@@ -38,11 +38,11 @@ typedef struct
 extern void PrepareQuery(ParseState *pstate, PrepareStmt *stmt,
 						 int stmt_location, int stmt_len);
 extern void ExecuteQuery(ParseState *pstate,
-						 ExecuteStmt *stmt, IntoClause *intoClause,
+						 ExecuteStmt *stmt,
 						 ParamListInfo params,
 						 DestReceiver *dest, QueryCompletion *qc);
 extern void DeallocateQuery(DeallocateStmt *stmt);
-extern void ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into,
+extern void ExplainExecuteQuery(ExecuteStmt *execstmt,
 								ExplainState *es, const char *queryString,
 								ParamListInfo params, QueryEnvironment *queryEnv);
 

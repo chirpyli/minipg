@@ -20,7 +20,6 @@
 
 #include "access/xact.h"
 #include "catalog/pg_type.h"
-#include "commands/createas.h"
 #include "commands/prepare.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -174,15 +173,10 @@ PrepareQuery(ParseState *pstate, PrepareStmt *stmt,
 
 /*
  * ExecuteQuery --- implement the 'EXECUTE' utility statement.
- *
- * This code also supports CREATE TABLE ... AS EXECUTE.  That case is
- * indicated by passing a non-null intoClause.  The DestReceiver is already
- * set up correctly for CREATE TABLE AS, but we still have to make a few
- * other adjustments here.
  */
 void
 ExecuteQuery(ParseState *pstate,
-			 ExecuteStmt *stmt, IntoClause *intoClause,
+			 ExecuteStmt *stmt,
 			 ParamListInfo params,
 			 DestReceiver *dest, QueryCompletion *qc)
 {
@@ -242,47 +236,10 @@ ExecuteQuery(ParseState *pstate,
 					  cplan);
 
 	/*
-	 * For CREATE TABLE ... AS EXECUTE, we must verify that the prepared
-	 * statement is one that produces tuples.  Currently we insist that it be
-	 * a plain old SELECT.  In future we might consider supporting other
-	 * things such as INSERT ... RETURNING, but there are a couple of issues
-	 * to be settled first, notably how WITH NO DATA should be handled in such
-	 * a case (do we really want to suppress execution?) and how to pass down
-	 * the OID-determining eflags (PortalStart won't handle them in such a
-	 * case, and for that matter it's not clear the executor will either).
-	 *
-	 * For CREATE TABLE ... AS EXECUTE, we also have to ensure that the proper
-	 * eflags and fetch count are passed to PortalStart/PortalRun.
+	 * Plain old EXECUTE.
 	 */
-	if (intoClause)
-	{
-		PlannedStmt *pstmt;
-
-		if (list_length(plan_list) != 1)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("prepared statement is not a SELECT")));
-		pstmt = linitial_node(PlannedStmt, plan_list);
-		if (pstmt->commandType != CMD_SELECT)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("prepared statement is not a SELECT")));
-
-		/* Set appropriate eflags */
-		eflags = GetIntoRelEFlags(intoClause);
-
-		/* And tell PortalRun whether to run to completion or not */
-		if (intoClause->skipData)
-			count = 0;
-		else
-			count = FETCH_ALL;
-	}
-	else
-	{
-		/* Plain old EXECUTE */
-		eflags = 0;
-		count = FETCH_ALL;
-	}
+	eflags = 0;
+	count = FETCH_ALL;
 
 	/*
 	 * Run the portal as appropriate.
@@ -602,7 +559,7 @@ DropAllPreparedStatements(void)
  * not the original PREPARE; we get the latter string from the plancache.
  */
 void
-ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into, ExplainState *es,
+ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainState *es,
 					const char *queryString, ParamListInfo params,
 					QueryEnvironment *queryEnv)
 {
@@ -673,10 +630,10 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into, ExplainState *es,
 		PlannedStmt *pstmt = lfirst_node(PlannedStmt, p);
 
 		if (pstmt->commandType != CMD_UTILITY)
-			ExplainOnePlan(pstmt, into, es, query_string, paramLI, queryEnv,
+			ExplainOnePlan(pstmt, es, query_string, paramLI, queryEnv,
 						   &planduration, (es->buffers ? &bufusage : NULL));
 		else
-			ExplainOneUtility(pstmt->utilityStmt, into, es, query_string,
+			ExplainOneUtility(pstmt->utilityStmt, es, query_string,
 							  paramLI, queryEnv);
 
 		/* No need for CommandCounterIncrement, as ExplainOnePlan did it */

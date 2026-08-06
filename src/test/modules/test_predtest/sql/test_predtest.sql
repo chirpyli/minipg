@@ -6,7 +6,8 @@ CREATE EXTENSION test_predtest;
 -- Test data
 
 -- all combinations of four boolean values
-create table booleans as
+create table booleans (x bool, y bool, z bool, w bool);
+insert into booleans
 select
   case i%3 when 0 then true when 1 then false else null end as x,
   case (i/3)%3 when 0 then true when 1 then false else null end as y,
@@ -15,7 +16,8 @@ select
 from generate_series(0, 3*3*3*3-1) i;
 
 -- all combinations of two integers 0..9, plus null
-create table integers as
+create table integers (x int, y int);
+insert into integers
 select
   case i%11 when 10 then null else i%11 end as x,
   case (i/11)%11 when 10 then null else (i/11)%11 end as y
