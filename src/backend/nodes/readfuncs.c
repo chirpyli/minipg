@@ -292,20 +292,6 @@ _readQuery(void)
 }
 
 /*
- * _readNotifyStmt
- */
-static NotifyStmt *
-_readNotifyStmt(void)
-{
-	READ_LOCALS(NotifyStmt);
-
-	READ_STRING_FIELD(conditionname);
-	READ_STRING_FIELD(payload);
-
-	READ_DONE();
-}
-
-/*
  * _readDeclareCursorStmt
  */
 static DeclareCursorStmt *
@@ -2736,8 +2722,6 @@ parseNodeString(void)
 		return_value = _readRangeTblFunction();
 	else if (MATCH("TABLESAMPLECLAUSE", 17))
 		return_value = _readTableSampleClause();
-	else if (MATCH("NOTIFY", 6))
-		return_value = _readNotifyStmt();
 	else if (MATCH("DEFELEM", 7))
 		return_value = _readDefElem();
 	else if (MATCH("DECLARECURSOR", 13))

@@ -1297,11 +1297,7 @@ PortalRunMulti(Portal portal,
 			 *
 			 * We must not set a snapshot here for utility commands (if one is
 			 * needed, PortalRunUtility will do it).  If a utility command is
-			 * alone in a portal then everything's fine.  The only case where
-			 * a utility command can be part of a longer list is that rules
-			 * are allowed to include NotifyStmt.  NotifyStmt doesn't care
-			 * whether it has a snapshot or not, so we just leave the current
-			 * snapshot alone if we have one.
+			 * alone in a portal then everything's fine.
 			 */
 			if (pstmt->canSetTag)
 			{
@@ -1312,7 +1308,6 @@ PortalRunMulti(Portal portal,
 			}
 			else
 			{
-				Assert(IsA(pstmt->utilityStmt, NotifyStmt));
 				/* stmt added by rewrite cannot set tag */
 				PortalRunUtility(portal, pstmt, isTopLevel, false,
 								 altdest, NULL);
@@ -1745,9 +1740,6 @@ PlannedStmtRequiresSnapshot(PlannedStmt *pstmt)
 		IsA(utilityStmt, ConstraintsSetStmt) ||
 	/* efficiency hacks from here down */
 		IsA(utilityStmt, FetchStmt) ||
-		IsA(utilityStmt, ListenStmt) ||
-		IsA(utilityStmt, NotifyStmt) ||
-		IsA(utilityStmt, UnlistenStmt) ||
 		IsA(utilityStmt, CheckPointStmt))
 		return false;
 

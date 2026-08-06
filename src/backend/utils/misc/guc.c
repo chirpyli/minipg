@@ -41,7 +41,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_authid.h"
 #include "catalog/storage.h"
-#include "commands/async.h"
 #include "commands/prepare.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -1449,17 +1448,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&autovacuum_start_daemon,
 		true,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"trace_notify", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("Generates debugging output for LISTEN and NOTIFY."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&Trace_notify,
-		false,
 		NULL, NULL, NULL
 	},
 

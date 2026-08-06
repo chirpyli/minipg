@@ -2791,37 +2791,6 @@ typedef struct RuleStmt
 } RuleStmt;
 
 /* ----------------------
- *		Notify Statement
- * ----------------------
- */
-typedef struct NotifyStmt
-{
-	NodeTag		type;
-	char	   *conditionname;	/* condition name to notify */
-	char	   *payload;		/* the payload string, or NULL if none */
-} NotifyStmt;
-
-/* ----------------------
- *		Listen Statement
- * ----------------------
- */
-typedef struct ListenStmt
-{
-	NodeTag		type;
-	char	   *conditionname;	/* condition name to listen on */
-} ListenStmt;
-
-/* ----------------------
- *		Unlisten Statement
- * ----------------------
- */
-typedef struct UnlistenStmt
-{
-	NodeTag		type;
-	char	   *conditionname;	/* name to unlisten on, or NULL for all */
-} UnlistenStmt;
-
-/* ----------------------
  *		{Begin|Commit|Rollback} Transaction Statement
  * ----------------------
  */

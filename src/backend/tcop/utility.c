@@ -27,7 +27,6 @@
 #include "catalog/pg_inherits.h"
 #include "catalog/toasting.h"
 #include "commands/alter.h"
-#include "commands/async.h"
 #include "commands/cluster.h"
 #include "commands/collationcmds.h"
 #include "commands/comment.h"
@@ -236,7 +235,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_FetchStmt:
 		case T_LoadStmt:
 		case T_PrepareStmt:
-		case T_UnlistenStmt:
 		case T_VariableSetStmt:
 			{
 				/*
@@ -291,24 +289,8 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				 * These commands don't modify any data and are safe to run in
 				 * a parallel worker.
 				 */
-				return COMMAND_IS_STRICTLY_READ_ONLY;
-			}
-
-		case T_ListenStmt:
-		case T_NotifyStmt:
-			{
-				/*
-				 * NOTIFY requires an XID assignment, so it can't be permitted
-				 * on a standby. Perhaps LISTEN could, since without NOTIFY it
-				 * would be OK to just do nothing, at least until promotion,
-				 * but we currently prohibit it lest the user get the wrong
-				 * idea.
-				 *
-				 * (We do allow T_UnlistenStmt on a standby, though, because
-				 * it's a no-op.)
-				 */
-				return COMMAND_OK_IN_READ_ONLY_TXN;
-			}
+			return COMMAND_IS_STRICTLY_READ_ONLY;
+		}
 
 		case T_LockStmt:
 			{
@@ -750,53 +732,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			/* no event triggers for global objects */
 			PreventInTransactionBlock(isTopLevel, "DROP DATABASE");
 			DropDatabase(pstate, (DropdbStmt *) parsetree);
-			break;
-
-			/* Query-level asynchronous notification */
-		case T_NotifyStmt:
-			{
-				NotifyStmt *stmt = (NotifyStmt *) parsetree;
-
-				Async_Notify(stmt->conditionname, stmt->payload);
-			}
-			break;
-
-		case T_ListenStmt:
-			{
-				ListenStmt *stmt = (ListenStmt *) parsetree;
-
-				CheckRestrictedOperation("LISTEN");
-
-				/*
-				 * We don't allow LISTEN in background processes, as there is
-				 * no mechanism for them to collect NOTIFY messages, so they'd
-				 * just block cleanout of the async SLRU indefinitely.
-				 * (Authors of custom background workers could bypass this
-				 * restriction by calling Async_Listen directly, but then it's
-				 * on them to provide some mechanism to process the message
-				 * queue.)  Note there seems no reason to forbid UNLISTEN.
-				 */
-				if (MyBackendType != B_BACKEND)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					/* translator: %s is name of a SQL command, eg LISTEN */
-							 errmsg("cannot execute %s within a background process",
-									"LISTEN")));
-
-				Async_Listen(stmt->conditionname);
-			}
-			break;
-
-		case T_UnlistenStmt:
-			{
-				UnlistenStmt *stmt = (UnlistenStmt *) parsetree;
-
-				CheckRestrictedOperation("UNLISTEN");
-				if (stmt->conditionname)
-					Async_Unlisten(stmt->conditionname);
-				else
-					Async_UnlistenAll();
-			}
 			break;
 
 		case T_LoadStmt:
@@ -2338,18 +2273,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_DROP_DATABASE;
 			break;
 
-		case T_NotifyStmt:
-			tag = CMDTAG_NOTIFY;
-			break;
-
-		case T_ListenStmt:
-			tag = CMDTAG_LISTEN;
-			break;
-
-		case T_UnlistenStmt:
-			tag = CMDTAG_UNLISTEN;
-			break;
-
 		case T_LoadStmt:
 			tag = CMDTAG_LOAD;
 			break;
@@ -2890,18 +2813,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_DropdbStmt:
 			lev = LOGSTMT_DDL;
-			break;
-
-		case T_NotifyStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_ListenStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_UnlistenStmt:
-			lev = LOGSTMT_ALL;
 			break;
 
 		case T_LoadStmt:

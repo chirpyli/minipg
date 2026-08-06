@@ -2692,15 +2692,6 @@ _outAlterStatsStmt(StringInfo str, const AlterStatsStmt *node)
 }
 
 static void
-_outNotifyStmt(StringInfo str, const NotifyStmt *node)
-{
-	WRITE_NODE_TYPE("NOTIFY");
-
-	WRITE_STRING_FIELD(conditionname);
-	WRITE_STRING_FIELD(payload);
-}
-
-static void
 _outDeclareCursorStmt(StringInfo str, const DeclareCursorStmt *node)
 {
 	WRITE_NODE_TYPE("DECLARECURSOR");
@@ -2923,7 +2914,6 @@ _outQuery(StringInfo str, const Query *node)
 		{
 			case T_CreateStmt:
 			case T_IndexStmt:
-			case T_NotifyStmt:
 			case T_DeclareCursorStmt:
 				WRITE_NODE_FIELD(utilityStmt);
 				break;
@@ -4177,9 +4167,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_AlterStatsStmt:
 				_outAlterStatsStmt(str, obj);
-				break;
-			case T_NotifyStmt:
-				_outNotifyStmt(str, obj);
 				break;
 			case T_DeclareCursorStmt:
 				_outDeclareCursorStmt(str, obj);

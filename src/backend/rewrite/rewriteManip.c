@@ -990,24 +990,13 @@ AddQual(Query *parsetree, Node *qual)
 	if (parsetree->commandType == CMD_UTILITY)
 	{
 		/*
-		 * There's noplace to put the qual on a utility statement.
-		 *
-		 * If it's a NOTIFY, silently ignore the qual; this means that the
-		 * NOTIFY will execute, whether or not there are any qualifying rows.
-		 * While clearly wrong, this is much more useful than refusing to
-		 * execute the rule at all, and extra NOTIFY events are harmless for
-		 * typical uses of NOTIFY.
-		 *
-		 * If it isn't a NOTIFY, error out, since unconditional execution of
-		 * other utility stmts is unlikely to be wanted.  (This case is not
-		 * currently allowed anyway, but keep the test for safety.)
+		 * There's noplace to put the qual on a utility statement.  LISTEN/
+		 * NOTIFY/UNLISTEN are not supported in minipg (see mydoc/CHANGE.md),
+		 * so unconditionally reject conditional utility statements here.
 		 */
-		if (parsetree->utilityStmt && IsA(parsetree->utilityStmt, NotifyStmt))
-			return;
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("conditional utility statements are not implemented")));
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("conditional utility statements are not implemented")));
 	}
 
 	if (parsetree->setOperations != NULL)

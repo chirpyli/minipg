@@ -15,7 +15,6 @@
 #include "postgres.h"
 
 #include "access/xact.h"
-#include "commands/async.h"
 #include "miscadmin.h"
 #include "nodes/memnodes.h"
 #include "storage/ipc.h"

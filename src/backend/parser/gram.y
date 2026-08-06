@@ -273,12 +273,12 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		DropTransformStmt
 		ExplainStmt FetchStmt
 		IndexStmt InsertStmt
-		ListenStmt LoadStmt LockStmt NotifyStmt ExplainableStmt PreparableStmt
+		LoadStmt LockStmt ExplainableStmt PreparableStmt
 		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
 		RemoveFuncStmt RemoveOperStmt RenameStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
-		UnlistenStmt UpdateStmt VacuumStmt
+		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
@@ -909,12 +909,10 @@ stmt:	AlterCollationStmt
 			| ExplainStmt
 			| FetchStmt
 			| IndexStmt
-			| InsertStmt
-			| ListenStmt
-			| LoadStmt
-			| LockStmt
-			| NotifyStmt
-			| PrepareStmt
+		| InsertStmt
+		| LoadStmt
+		| LockStmt
+		| PrepareStmt
 			| ReindexStmt
 			| RemoveAggrStmt
 			| RemoveFuncStmt
@@ -923,9 +921,8 @@ stmt:	AlterCollationStmt
 			| RuleStmt
 			| SelectStmt
 			| TransactionStmt
-			| TruncateStmt
-			| UnlistenStmt
-			| UpdateStmt
+		| TruncateStmt
+		| UpdateStmt
 			| VacuumStmt
 			| VariableResetStmt
 			| VariableSetStmt
@@ -7758,7 +7755,6 @@ RuleActionStmt:
 			| InsertStmt
 			| UpdateStmt
 			| DeleteStmt
-			| NotifyStmt
 		;
 
 RuleActionStmtOrEmpty:
@@ -7782,47 +7778,12 @@ opt_instead:
 /*****************************************************************************
  *
  *		QUERY:
- *				NOTIFY <identifier> can appear both in rule bodies and
- *				as a query-level command
+ *				LISTEN / NOTIFY / UNLISTEN are not supported in minipg
+ *				(see mydoc/CHANGE.md); the grammar keywords are retained
+ *				only as reserved fallback keywords to keep check_keywords.pl
+ *				consistent with kwlist.h.
  *
  *****************************************************************************/
-
-NotifyStmt: NOTIFY ColId notify_payload
-				{
-					NotifyStmt *n = makeNode(NotifyStmt);
-					n->conditionname = $2;
-					n->payload = $3;
-					$$ = (Node *)n;
-				}
-		;
-
-notify_payload:
-			',' Sconst							{ $$ = $2; }
-			| /*EMPTY*/							{ $$ = NULL; }
-		;
-
-ListenStmt: LISTEN ColId
-				{
-					ListenStmt *n = makeNode(ListenStmt);
-					n->conditionname = $2;
-					$$ = (Node *)n;
-				}
-		;
-
-UnlistenStmt:
-			UNLISTEN ColId
-				{
-					UnlistenStmt *n = makeNode(UnlistenStmt);
-					n->conditionname = $2;
-					$$ = (Node *)n;
-				}
-			| UNLISTEN '*'
-				{
-					UnlistenStmt *n = makeNode(UnlistenStmt);
-					n->conditionname = NULL;
-					$$ = (Node *)n;
-				}
-		;
 
 
 /*****************************************************************************

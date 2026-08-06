@@ -34,7 +34,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_enum.h"
 #include "catalog/storage.h"
-#include "commands/async.h"
 #include "commands/tablecmds.h"
 #include "commands/trigger.h"
 #include "executor/spi.h"
@@ -2161,14 +2160,6 @@ CommitTransaction(void)
 	AtEOXact_LargeObject(true);
 
 	/*
-	 * Insert notifications sent by NOTIFY commands into the queue.  This
-	 * should be late in the pre-commit sequence to minimize time spent
-	 * holding the notify-insertion lock.  However, this could result in
-	 * creating a snapshot, so we must do it before serializable cleanup.
-	 */
-	PreCommit_Notify();
-
-	/*
 	 * Mark serializable transaction as complete for predicate locking
 	 * purposes.  This should be done as late as we can put it and still allow
 	 * errors to be raised for failure patterns found at commit.  This is not
@@ -2280,13 +2271,6 @@ CommitTransaction(void)
 	 * attempt to access affected files.
 	 */
 	smgrDoPendingDeletes(true);
-
-	/*
-	 * Send out notification signals to other backends (and do other
-	 * post-commit NOTIFY cleanup).  This must not happen until after our
-	 * transaction is fully done from the viewpoint of other backends.
-	 */
-	AtCommit_Notify();
 
 	/*
 	 * Everything after this should be purely internal-to-this-backend
@@ -2410,8 +2394,6 @@ PrepareTransaction(void)
 	/* close large objects before lower-level cleanup */
 	AtEOXact_LargeObject(true);
 
-	/* NOTIFY requires no work at this point */
-
 	/*
 	 * Mark serializable transaction as complete for predicate locking
 	 * purposes.  This should be done as late as we can put it and still allow
@@ -2494,7 +2476,6 @@ PrepareTransaction(void)
 	 */
 	StartPrepare(gxact);
 
-	AtPrepare_Notify();
 	AtPrepare_Locks();
 	AtPrepare_PredicateLocks();
 	AtPrepare_PgStat();
@@ -2733,7 +2714,6 @@ AbortTransaction(void)
 	AtAbort_Portals();
 	smgrDoPendingSyncs(false, is_parallel_worker);
 	AtEOXact_LargeObject(false);
-	AtAbort_Notify();
 	AtEOXact_RelationMap(false, is_parallel_worker);
 	AtAbort_Twophase();
 
@@ -4916,7 +4896,6 @@ CommitSubTransaction(void)
 						s->parent->curTransactionOwner);
 	AtEOSubXact_LargeObject(true, s->subTransactionId,
 							s->parent->subTransactionId);
-	AtSubCommit_Notify();
 
 	CallSubXactCallbacks(SUBXACT_EVENT_COMMIT_SUB, s->subTransactionId,
 						 s->parent->subTransactionId);
@@ -5084,7 +5063,6 @@ AbortSubTransaction(void)
 						   s->parent->curTransactionOwner);
 		AtEOSubXact_LargeObject(false, s->subTransactionId,
 								s->parent->subTransactionId);
-		AtSubAbort_Notify();
 
 		/* Advertise the fact that we aborted in pg_xact. */
 		(void) RecordTransactionAbort(true);

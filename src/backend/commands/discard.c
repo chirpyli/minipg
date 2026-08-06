@@ -15,7 +15,6 @@
 
 #include "access/xact.h"
 #include "catalog/namespace.h"
-#include "commands/async.h"
 #include "commands/discard.h"
 #include "commands/prepare.h"
 #include "commands/sequence.h"
@@ -70,7 +69,6 @@ DiscardAll(bool isTopLevel)
 	SetPGVariable("session_authorization", NIL, false);
 	ResetAllOptions();
 	DropAllPreparedStatements();
-	Async_UnlistenAll();
 	LockReleaseAll(USER_LOCKMETHOD, true);
 	ResetPlanCache();
 	ResetTempTableNamespace();

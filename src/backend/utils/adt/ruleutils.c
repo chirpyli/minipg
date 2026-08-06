@@ -6906,25 +6906,11 @@ get_utility_query_def(Query *query, deparse_context *context)
 {
 	StringInfo	buf = context->buf;
 
-	if (query->utilityStmt && IsA(query->utilityStmt, NotifyStmt))
-	{
-		NotifyStmt *stmt = (NotifyStmt *) query->utilityStmt;
-
-		appendContextKeyword(context, "",
-							 0, PRETTYINDENT_STD, 1);
-		appendStringInfo(buf, "NOTIFY %s",
-						 quote_identifier(stmt->conditionname));
-		if (stmt->payload)
-		{
-			appendStringInfoString(buf, ", ");
-			simple_quote_literal(buf, stmt->payload);
-		}
-	}
-	else
-	{
-		/* Currently only NOTIFY utility commands can appear in rules */
-		elog(ERROR, "unexpected utility statement type");
-	}
+	/*
+	 * LISTEN/NOTIFY/UNLISTEN are not supported in minipg (see mydoc/CHANGE.md),
+	 * so no utility statement can appear in a rule body anymore.
+	 */
+	elog(ERROR, "unexpected utility statement type");
 }
 
 /*

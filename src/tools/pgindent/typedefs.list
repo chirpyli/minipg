@@ -1310,7 +1310,7 @@ ListDictionary
 ListParsedLex
 ListenAction
 ListenActionKind
-ListenStmt
+
 LoadStmt
 LocalBufferLookupEnt
 LocalPgBackendStatus
@@ -1476,7 +1476,7 @@ NonEmptyRange
 Notification
 NotificationHash
 NotificationList
-NotifyStmt
+
 Nsrt
 NullIfExpr
 NullTest
@@ -2741,7 +2741,7 @@ Unique
 UniquePath
 UniquePathMethod
 UniqueState
-UnlistenStmt
+
 UnpackTarState
 UnresolvedTup
 UnresolvedTupData

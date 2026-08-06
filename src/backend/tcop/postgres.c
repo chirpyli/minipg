@@ -40,7 +40,6 @@
 #include "access/printtup.h"
 #include "access/xact.h"
 #include "catalog/pg_type.h"
-#include "commands/async.h"
 #include "commands/prepare.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -503,10 +502,6 @@ ProcessClientReadInterrupt(bool blocked)
 		/* Process sinval catchup interrupts, if any */
 		if (catchupInterruptPending)
 			ProcessCatchupInterrupt();
-
-		/* Process notify interrupts, if any */
-		if (notifyInterruptPending)
-			ProcessNotifyInterrupt(true);
 	}
 	else if (ProcDiePending)
 	{
@@ -4465,13 +4460,8 @@ PostgresMain(int argc, char *argv[],
 				/*
 				 * Process incoming notifies (including self-notifies), if
 				 * any, and send relevant messages to the client.  Doing it
-				 * here helps ensure stable behavior in tests: if any notifies
-				 * were received during the just-finished transaction, they'll
-				 * be seen by the client before ReadyForQuery is.
+				 * here helps ensure stable behavior in tests.
 				 */
-				if (notifyInterruptPending)
-					ProcessNotifyInterrupt(false);
-
 				pgstat_report_stat(false);
 
 				set_ps_display("idle");

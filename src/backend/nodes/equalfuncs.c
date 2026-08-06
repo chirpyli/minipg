@@ -1451,31 +1451,6 @@ _equalRuleStmt(const RuleStmt *a, const RuleStmt *b)
 }
 
 static bool
-_equalNotifyStmt(const NotifyStmt *a, const NotifyStmt *b)
-{
-	COMPARE_STRING_FIELD(conditionname);
-	COMPARE_STRING_FIELD(payload);
-
-	return true;
-}
-
-static bool
-_equalListenStmt(const ListenStmt *a, const ListenStmt *b)
-{
-	COMPARE_STRING_FIELD(conditionname);
-
-	return true;
-}
-
-static bool
-_equalUnlistenStmt(const UnlistenStmt *a, const UnlistenStmt *b)
-{
-	COMPARE_STRING_FIELD(conditionname);
-
-	return true;
-}
-
-static bool
 _equalTransactionStmt(const TransactionStmt *a, const TransactionStmt *b)
 {
 	COMPARE_SCALAR_FIELD(kind);
@@ -3065,15 +3040,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_RuleStmt:
 			retval = _equalRuleStmt(a, b);
-			break;
-		case T_NotifyStmt:
-			retval = _equalNotifyStmt(a, b);
-			break;
-		case T_ListenStmt:
-			retval = _equalListenStmt(a, b);
-			break;
-		case T_UnlistenStmt:
-			retval = _equalUnlistenStmt(a, b);
 			break;
 		case T_TransactionStmt:
 			retval = _equalTransactionStmt(a, b);

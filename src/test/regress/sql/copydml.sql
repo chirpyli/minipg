@@ -66,7 +66,7 @@ create rule qqq as on delete to copydml_test where old.t <> 'f' do instead inser
 copy (delete from copydml_test) to stdout;
 drop rule qqq on copydml_test;
 
-create rule qqq as on insert to copydml_test do instead notify copydml_test;
+create rule qqq as on insert to copydml_test do instead nothing;
 copy (insert into copydml_test default values) to stdout;
 drop rule qqq on copydml_test;
 

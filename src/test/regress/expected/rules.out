@@ -2903,7 +2903,6 @@ select * from rules_log;
  33 |   0 | new | 16
 (16 rows)
 
-create rule r4 as on delete to rules_src do notify rules_src_deletion;
 --
 -- Ensure an aliased target relation for insert is correctly deparsed.
 --
@@ -2932,9 +2931,6 @@ Rules:
     ON UPDATE TO rules_src DO  VALUES (old.f1,old.f2,'old'::text), (new.f1,new.f2,'new'::text)
     r3 AS
     ON INSERT TO rules_src DO  INSERT INTO rules_log (f1, f2, tag, id) VALUES (NULL::integer,NULL::integer,'-'::text,DEFAULT), (new.f1,new.f2,'new'::text,DEFAULT)
-    r4 AS
-    ON DELETE TO rules_src DO
- NOTIFY rules_src_deletion
     r5 AS
     ON INSERT TO rules_src DO INSTEAD  INSERT INTO rules_log AS trgt (f1, f2)  SELECT new.f1,
             new.f2

@@ -22,7 +22,6 @@
 #include "access/subtrans.h"
 #include "access/syncscan.h"
 #include "access/twophase.h"
-#include "commands/async.h"
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "postmaster/autovacuum.h"
@@ -142,7 +141,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
-		size = add_size(size, AsyncShmemSize());
 
 		/* freeze the addin request size and include it */
 		addin_request_allowed = false;
@@ -253,7 +251,6 @@ CreateSharedMemoryAndSemaphores(void)
 	SnapMgrInit();
 	BTreeShmemInit();
 	SyncScanShmemInit();
-	AsyncShmemInit();
 
 	/* Initialize dynamic shared memory facilities. */
 	if (!IsUnderPostmaster)

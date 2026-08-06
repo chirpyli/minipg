@@ -24,7 +24,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_enum.h"
 #include "catalog/storage.h"
-#include "commands/async.h"
 #include "executor/execParallel.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -1193,27 +1192,10 @@ HandleParallelMessage(ParallelContext *pcxt, int i, StringInfo msg)
 				/* Not an error, so restore previous context stack. */
 				error_context_stack = save_error_context_stack;
 
-				break;
-			}
+			break;
+		}
 
-		case 'A':				/* NotifyResponse */
-			{
-				/* Propagate NotifyResponse. */
-				int32		pid;
-				const char *channel;
-				const char *payload;
-
-				pid = pq_getmsgint(msg, 4);
-				channel = pq_getmsgrawstring(msg);
-				payload = pq_getmsgrawstring(msg);
-				pq_endmessage(msg);
-
-				NotifyMyFrontEnd(channel, payload, pid);
-
-				break;
-			}
-
-		case 'X':				/* Terminate, indicating clean exit */
+	case 'X':				/* Terminate, indicating clean exit */
 			{
 				shm_mq_detach(pcxt->worker[i].error_mqh);
 				pcxt->worker[i].error_mqh = NULL;

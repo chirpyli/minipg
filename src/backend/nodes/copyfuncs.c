@@ -3620,37 +3620,6 @@ _copyRuleStmt(const RuleStmt *from)
 	return newnode;
 }
 
-static NotifyStmt *
-_copyNotifyStmt(const NotifyStmt *from)
-{
-	NotifyStmt *newnode = makeNode(NotifyStmt);
-
-	COPY_STRING_FIELD(conditionname);
-	COPY_STRING_FIELD(payload);
-
-	return newnode;
-}
-
-static ListenStmt *
-_copyListenStmt(const ListenStmt *from)
-{
-	ListenStmt *newnode = makeNode(ListenStmt);
-
-	COPY_STRING_FIELD(conditionname);
-
-	return newnode;
-}
-
-static UnlistenStmt *
-_copyUnlistenStmt(const UnlistenStmt *from)
-{
-	UnlistenStmt *newnode = makeNode(UnlistenStmt);
-
-	COPY_STRING_FIELD(conditionname);
-
-	return newnode;
-}
-
 static TransactionStmt *
 _copyTransactionStmt(const TransactionStmt *from)
 {
@@ -4932,15 +4901,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_RuleStmt:
 			retval = _copyRuleStmt(from);
-			break;
-		case T_NotifyStmt:
-			retval = _copyNotifyStmt(from);
-			break;
-		case T_ListenStmt:
-			retval = _copyListenStmt(from);
-			break;
-		case T_UnlistenStmt:
-			retval = _copyUnlistenStmt(from);
 			break;
 		case T_TransactionStmt:
 			retval = _copyTransactionStmt(from);

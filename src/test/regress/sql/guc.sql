@@ -178,11 +178,9 @@ SELECT relname FROM pg_class WHERE relname = 'reset_test';
 -- do changes
 DECLARE foo CURSOR WITH HOLD FOR SELECT 1;
 PREPARE foo AS SELECT 1;
-LISTEN foo_event;
 SET vacuum_cost_delay = 13;
 CREATE TEMP TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
 -- look changes
-SELECT pg_listening_channels();
 SELECT name FROM pg_prepared_statements;
 SELECT name FROM pg_cursors;
 SHOW vacuum_cost_delay;
@@ -191,7 +189,6 @@ SELECT current_user = 'regress_guc_user';
 -- discard everything
 DISCARD ALL;
 -- look again
-SELECT pg_listening_channels();
 SELECT name FROM pg_prepared_statements;
 SELECT name FROM pg_cursors;
 SHOW vacuum_cost_delay;

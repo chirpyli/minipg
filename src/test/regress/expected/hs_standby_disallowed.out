@@ -113,11 +113,6 @@ BEGIN;
 LOCK hs1 IN ACCESS EXCLUSIVE MODE;
 ERROR:  cannot execute LOCK TABLE during recovery
 COMMIT;
--- Listen
-listen a;
-ERROR:  cannot execute LISTEN during recovery
-notify a;
-ERROR:  cannot execute NOTIFY during recovery
 -- disallowed commands
 ANALYZE hs1;
 ERROR:  cannot execute ANALYZE during recovery

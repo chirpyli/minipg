@@ -1505,7 +1505,7 @@ psql_completion(const char *text, int start, int end)
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "REVOKE", "ROLLBACK",
 		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
-		"TABLE", "TRUNCATE", "UNLISTEN", "UPDATE", "VACUUM", "VALUES", "WITH",
+		"TABLE", "TRUNCATE", "UPDATE", "VACUUM", "VALUES", "WITH",
 		NULL
 	};
 
@@ -3781,10 +3781,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("RESTART IDENTITY", "CONTINUE IDENTITY", "CASCADE", "RESTRICT");
 	else if (HeadMatches("TRUNCATE") && TailMatches("IDENTITY"))
 		COMPLETE_WITH("CASCADE", "RESTRICT");
-
-/* UNLISTEN */
-	else if (Matches("UNLISTEN"))
-		COMPLETE_WITH_QUERY("SELECT pg_catalog.quote_ident(channel) FROM pg_catalog.pg_listening_channels() AS channel WHERE substring(pg_catalog.quote_ident(channel),1,%d)='%s' UNION SELECT '*'");
 
 /* UPDATE --- can be inside EXPLAIN, RULE, etc */
 	/* If prev. word is UPDATE suggest a list of tables */

@@ -85,10 +85,6 @@ BEGIN;
 LOCK hs1 IN ACCESS EXCLUSIVE MODE;
 COMMIT;
 
--- Listen
-listen a;
-notify a;
-
 -- disallowed commands
 
 ANALYZE hs1;

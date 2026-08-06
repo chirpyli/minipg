@@ -419,13 +419,6 @@ ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 	else if (IsA(utilityStmt, ExecuteStmt))
 		ExplainExecuteQuery((ExecuteStmt *) utilityStmt, es,
 							queryString, params, queryEnv);
-	else if (IsA(utilityStmt, NotifyStmt))
-	{
-		if (es->format == EXPLAIN_FORMAT_TEXT)
-			appendStringInfoString(es->str, "NOTIFY\n");
-		else
-			ExplainDummyGroup("Notify", NULL, es);
-	}
 	else
 	{
 		if (es->format == EXPLAIN_FORMAT_TEXT)
