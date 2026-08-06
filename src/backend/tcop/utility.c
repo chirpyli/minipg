@@ -152,7 +152,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CommentStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateAmStmt:
-		case T_CreateCastStmt:
 		case T_CreateConversionStmt:
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
@@ -1342,12 +1341,8 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_CreateConversionStmt:
-				address = CreateConversionCommand((CreateConversionStmt *) parsetree);
-				break;
-
-			case T_CreateCastStmt:
-				address = CreateCast((CreateCastStmt *) parsetree);
-				break;
+			address = CreateConversionCommand((CreateConversionStmt *) parsetree);
+			break;
 
 			case T_CreateOpClassStmt:
 				DefineOpClass((CreateOpClassStmt *) parsetree);
@@ -2374,10 +2369,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_CONVERSION;
 			break;
 
-		case T_CreateCastStmt:
-			tag = CMDTAG_CREATE_CAST;
-			break;
-
 		case T_CreateOpClassStmt:
 			tag = CMDTAG_CREATE_OPERATOR_CLASS;
 			break;
@@ -2899,10 +2890,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateConversionStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateCastStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

@@ -4316,6 +4316,9 @@ create function sql_to_date(integer) returns date as $$
 select $1::text::date
 $$ language sql immutable strict;
 create cast (integer as date) with function sql_to_date(integer) as assignment;
+ERROR:  syntax error at or near "cast"
+LINE 1: create cast (integer as date) with function sql_to_date(inte...
+               ^
 create function cast_invoker(integer) returns date as $$
 begin
   return $1;
@@ -4354,8 +4357,7 @@ select cast_invoker(20150718);
 
 select cast_invoker(-1); -- fails
 ERROR:  invalid input syntax for type date: "-1"
-CONTEXT:  SQL function "sql_to_date" statement 1
-PL/pgSQL function cast_invoker(integer) while casting return value to function's return type
+CONTEXT:  PL/pgSQL function cast_invoker(integer) while casting return value to function's return type
 rollback to savepoint s1;
 select cast_invoker(20150719);
  cast_invoker 
@@ -4372,7 +4374,6 @@ select cast_invoker(20150720);
 commit;
 drop function cast_invoker(integer);
 drop function sql_to_date(integer) cascade;
-NOTICE:  drop cascades to cast from integer to date
 -- Test handling of cast cache inside DO blocks
 -- (to check the original crash case, this must be a cast not previously
 -- used in this session)

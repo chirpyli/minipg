@@ -3095,20 +3095,6 @@ typedef struct CreateConversionStmt
 } CreateConversionStmt;
 
 /* ----------------------
- *	CREATE CAST Statement
- * ----------------------
- */
-typedef struct CreateCastStmt
-{
-	NodeTag		type;
-	TypeName   *sourcetype;
-	TypeName   *targettype;
-	ObjectWithArgs *func;
-	CoercionContext context;
-	bool		inout;
-} CreateCastStmt;
-
-/* ----------------------
  *	CREATE TRANSFORM Statement
  * ----------------------
  */

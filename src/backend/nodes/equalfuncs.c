@@ -1900,18 +1900,6 @@ _equalCreateConversionStmt(const CreateConversionStmt *a, const CreateConversion
 }
 
 static bool
-_equalCreateCastStmt(const CreateCastStmt *a, const CreateCastStmt *b)
-{
-	COMPARE_NODE_FIELD(sourcetype);
-	COMPARE_NODE_FIELD(targettype);
-	COMPARE_NODE_FIELD(func);
-	COMPARE_SCALAR_FIELD(context);
-	COMPARE_SCALAR_FIELD(inout);
-
-	return true;
-}
-
-static bool
 _equalPrepareStmt(const PrepareStmt *a, const PrepareStmt *b)
 {
 	COMPARE_STRING_FIELD(name);
@@ -3169,9 +3157,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateConversionStmt:
 			retval = _equalCreateConversionStmt(a, b);
-			break;
-		case T_CreateCastStmt:
-			retval = _equalCreateCastStmt(a, b);
 			break;
 		case T_PrepareStmt:
 			retval = _equalPrepareStmt(a, b);

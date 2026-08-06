@@ -334,7 +334,13 @@ create function myinthash(myint) returns integer strict immutable language
 NOTICE:  argument type myint is only a shell
 create type myint (input = myintin, output = myintout, like = int4);
 create cast (int4 as myint) without function;
+ERROR:  syntax error at or near "cast"
+LINE 1: create cast (int4 as myint) without function;
+               ^
 create cast (myint as int4) without function;
+ERROR:  syntax error at or near "cast"
+LINE 1: create cast (myint as int4) without function;
+               ^
 create function myinteq(myint, myint) returns bool as $$
 begin
   if $1 is null and $2 is null then
@@ -344,6 +350,7 @@ begin
   end if;
 end;
 $$ language plpgsql immutable;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 create operator = (
   leftarg    = myint,
   rightarg   = myint,
@@ -354,12 +361,16 @@ create operator = (
   join       = eqjoinsel,
   merges
 );
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 create operator class myint_ops
 default for type myint using hash as
   operator    1   =  (myint, myint),
   function    1   myinthash(myint);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 create table inttest (a myint);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 insert into inttest values (null), (0::myint), (1::myint);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- Test EEOP_HASHED_SCALARARRAYOP against EEOP_SCALARARRAYOP.  Ensure the
 -- result of non-hashed vs hashed is the same.
 select
@@ -367,25 +378,13 @@ select
   a in (1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as not_hashed,
   a in (1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint,9::myint) as hashed
 from inttest;
- a | not_hashed | hashed 
----+------------+--------
-   |            | 
- 0 | f          | f
- 1 | t          | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 select
   a,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint) as not_hashed,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as hashed
  from inttest;
- a | not_hashed | hashed 
----+------------+--------
-   | t          | t
- 0 |            | 
- 1 | t          | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- Now make the equal function return false when given two NULLs
 create or replace function myinteq(myint, myint) returns bool as $$
 begin
@@ -396,6 +395,7 @@ begin
   end if;
 end;
 $$ language plpgsql immutable;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- And try the same again to ensure EEOP_HASHED_SCALARARRAYOP does the same
 -- thing as EEOP_SCALARARRAYOP.
 select
@@ -403,25 +403,13 @@ select
   a in (1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as not_hashed,
   a in (1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint,9::myint) as hashed
 from inttest;
- a | not_hashed | hashed 
----+------------+--------
-   |            | 
- 0 | f          | f
- 1 | t          | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 select
   a,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint) as not_hashed,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as hashed
  from inttest;
- a | not_hashed | hashed 
----+------------+--------
-   |            | 
- 0 |            | 
- 1 | t          | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- Try again with an equality function that treats NULLs as equal to 0.
 create or replace function myinteq(myint, myint) returns bool as $$
 begin
@@ -432,6 +420,7 @@ begin
   end if;
 end;
 $$ language plpgsql immutable;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 select
   a,
   a in (1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as not_hashed,
@@ -439,23 +428,11 @@ select
   a in (0::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint) as not_hashed_zero,
   a in (0::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as hashed_zero
 from inttest;
- a | not_hashed | hashed | not_hashed_zero | hashed_zero 
----+------------+--------+-----------------+-------------
-   | f          | f      | t               | t
- 0 | f          | f      | t               | t
- 1 | t          | t      | t               | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 select
   a,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint) as not_hashed,
   a in (null::myint,1::myint,2::myint,3::myint,4::myint,5::myint,6::myint,7::myint,8::myint) as hashed
  from inttest;
- a | not_hashed | hashed 
----+------------+--------
-   | f          | f
- 0 | t          | t
- 1 | t          | t
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 rollback;

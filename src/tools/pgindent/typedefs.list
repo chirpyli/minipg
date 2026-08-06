@@ -453,7 +453,6 @@ Counters
 CoverExt
 CoverPos
 CreateAmStmt
-CreateCastStmt
 CreateConversionStmt
 CreateDomainStmt
 CreateEnumStmt

@@ -4149,20 +4149,6 @@ _copyCreateConversionStmt(const CreateConversionStmt *from)
 	return newnode;
 }
 
-static CreateCastStmt *
-_copyCreateCastStmt(const CreateCastStmt *from)
-{
-	CreateCastStmt *newnode = makeNode(CreateCastStmt);
-
-	COPY_NODE_FIELD(sourcetype);
-	COPY_NODE_FIELD(targettype);
-	COPY_NODE_FIELD(func);
-	COPY_SCALAR_FIELD(context);
-	COPY_SCALAR_FIELD(inout);
-
-	return newnode;
-}
-
 static PrepareStmt *
 _copyPrepareStmt(const PrepareStmt *from)
 {
@@ -5030,9 +5016,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateConversionStmt:
 			retval = _copyCreateConversionStmt(from);
-			break;
-		case T_CreateCastStmt:
-			retval = _copyCreateCastStmt(from);
 			break;
 		case T_PrepareStmt:
 			retval = _copyPrepareStmt(from);

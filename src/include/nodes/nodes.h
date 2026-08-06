@@ -360,7 +360,6 @@ typedef enum NodeTag
 	T_AlterDatabaseStmt,
 	T_AlterDatabaseSetStmt,
 	T_CreateConversionStmt,
-	T_CreateCastStmt,
 	T_CreateOpClassStmt,
 	T_CreateOpFamilyStmt,
 	T_AlterOpFamilyStmt,

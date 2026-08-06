@@ -260,7 +260,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		AlterCompositeTypeStmt
 		AlterStatsStmt
 		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
-		ConstraintsSetStmt CopyStmt CreateCastStmt
+		ConstraintsSetStmt CopyStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
@@ -268,7 +268,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		CreateAssertionStmt CreateTransformStmt CreateTrigStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
-		DropCastStmt
 		DropdbStmt DropTableSpaceStmt
 		DropTransformStmt
 		ExplainStmt FetchStmt
@@ -308,7 +307,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				transaction_mode_item
 				create_extension_opt_item alter_extension_opt_item
 
-%type <ival>	opt_lock lock_type cast_context
+%type <ival>	opt_lock lock_type
 %type <str>		utility_option_name
 %type <defelt>	utility_option_elem
 %type <list>	utility_option_list
@@ -872,7 +871,6 @@ stmt:	AlterCollationStmt
 			| CopyStmt
 			| CreateAmStmt
 			| CreateAssertionStmt
-			| CreateCastStmt
 			| CreateConversionStmt
 			| CreateDomainStmt
 			| CreateExtensionStmt
@@ -897,7 +895,6 @@ stmt:	AlterCollationStmt
 			| DeleteStmt
 			| DiscardStmt
 			| DoStmt
-			| DropCastStmt
 			| DropOpClassStmt
 			| DropOpFamilyStmt
 			| DropStmt
@@ -6453,59 +6450,6 @@ dostmt_opt_item:
  *		CREATE CAST / DROP CAST
  *
  *****************************************************************************/
-
-CreateCastStmt: CREATE CAST '(' Typename AS Typename ')'
-					WITH FUNCTION function_with_argtypes cast_context
-				{
-					CreateCastStmt *n = makeNode(CreateCastStmt);
-					n->sourcetype = $4;
-					n->targettype = $6;
-					n->func = $10;
-					n->context = (CoercionContext) $11;
-					n->inout = false;
-					$$ = (Node *)n;
-				}
-			| CREATE CAST '(' Typename AS Typename ')'
-					WITHOUT FUNCTION cast_context
-				{
-					CreateCastStmt *n = makeNode(CreateCastStmt);
-					n->sourcetype = $4;
-					n->targettype = $6;
-					n->func = NULL;
-					n->context = (CoercionContext) $10;
-					n->inout = false;
-					$$ = (Node *)n;
-				}
-			| CREATE CAST '(' Typename AS Typename ')'
-					WITH INOUT cast_context
-				{
-					CreateCastStmt *n = makeNode(CreateCastStmt);
-					n->sourcetype = $4;
-					n->targettype = $6;
-					n->func = NULL;
-					n->context = (CoercionContext) $10;
-					n->inout = true;
-					$$ = (Node *)n;
-				}
-		;
-
-cast_context:  AS IMPLICIT_P					{ $$ = COERCION_IMPLICIT; }
-		| AS ASSIGNMENT							{ $$ = COERCION_ASSIGNMENT; }
-		| /*EMPTY*/								{ $$ = COERCION_EXPLICIT; }
-		;
-
-
-DropCastStmt: DROP CAST opt_if_exists '(' Typename AS Typename ')' opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_CAST;
-					n->objects = list_make1(list_make2($5, $7));
-					n->behavior = $9;
-					n->missing_ok = $3;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
 
 opt_if_exists: IF_P EXISTS						{ $$ = true; }
 		| /*EMPTY*/								{ $$ = false; }

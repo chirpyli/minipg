@@ -169,9 +169,13 @@ DROP LANGUAGE IF EXISTS test_language_exists;
 NOTICE:  language "test_language_exists" does not exist, skipping
 -- cast
 DROP CAST (text AS text);
-ERROR:  cast from type text to type text does not exist
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST (text AS text);
+             ^
 DROP CAST IF EXISTS (text AS text);
-NOTICE:  cast from type text to type text does not exist, skipping
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST IF EXISTS (text AS text);
+             ^
 -- trigger
 DROP TRIGGER test_trigger_exists ON test_exists;
 ERROR:  trigger "test_trigger_exists" for table "test_exists" does not exist
@@ -259,13 +263,21 @@ NOTICE:  type "no_such_type" does not exist, skipping
 DROP AGGREGATE IF EXISTS foo(no_such_schema.no_such_type);
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP CAST IF EXISTS (INTEGER AS no_such_type2);
-NOTICE:  type "no_such_type2" does not exist, skipping
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST IF EXISTS (INTEGER AS no_such_type2);
+             ^
 DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
-NOTICE:  type "no_such_type1" does not exist, skipping
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
+             ^
 DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
+             ^
 DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "CAST"
+LINE 1: DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
+             ^
 DROP COLLATION IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP CONVERSION IF EXISTS no_such_schema.foo;

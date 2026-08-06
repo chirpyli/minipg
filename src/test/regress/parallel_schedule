@@ -59,7 +59,7 @@ test: create_index create_view index_including
 # 权限/角色机制已裁剪，以下测试深度依赖角色，移除：
 #   constraints vacuum create_function_3 database
 # information_schema 已裁剪，triggers/updatable_views 深度依赖 information_schema，移除
-test: create_aggregate create_cast select inherit typed_table drop_if_exists create_am hash_func errors infinite_recurse
+test: create_aggregate select inherit typed_table drop_if_exists create_am hash_func errors infinite_recurse
 
 # ----------
 # sanity_check does a vacuum, affecting the sort order of SELECT *
