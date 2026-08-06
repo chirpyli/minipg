@@ -378,9 +378,6 @@ CollInfo
 CollateClause
 CollateExpr
 CollateStrength
-CollectedATSubcmd
-CollectedCommand
-CollectedCommandType
 ColorTrgm
 ColorTrgmInfo
 ColumnCompareData

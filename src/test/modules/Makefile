@@ -13,7 +13,6 @@ SUBDIRS = \
 		  snapshot_too_old \
 		  test_bloomfilter \
 		  test_custom_types \
-		  test_ddl_deparse \
 		  test_escape \
 		  test_extensions \
 		  test_integerset \

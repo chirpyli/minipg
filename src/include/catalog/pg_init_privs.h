@@ -65,8 +65,8 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_init_privs_o_c_o_index, 3395, on pg_init_privs usin
 /*
  * It is important to know if the initial privileges are from initdb or from an
  * extension.  This enum is used to provide that differentiation and the two
- * places which populate this table (initdb and during CREATE EXTENSION, see
- * recordExtensionInitPriv()) know to use the correct values.
+ * places which populate this table (initdb and during CREATE EXTENSION) know
+ * to use the correct values.
  */
 
 typedef enum InitPrivsType

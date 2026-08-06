@@ -254,18 +254,6 @@
   proname => 'version', provolatile => 's', prorettype => 'text',
   proargtypes => '', prosrc => 'pgsql_version' },
 
-{ oid => '86', descr => 'I/O',
-  proname => 'pg_ddl_command_in', prorettype => 'pg_ddl_command',
-  proargtypes => 'cstring', prosrc => 'pg_ddl_command_in' },
-{ oid => '87', descr => 'I/O',
-  proname => 'pg_ddl_command_out', prorettype => 'cstring',
-  proargtypes => 'pg_ddl_command', prosrc => 'pg_ddl_command_out' },
-{ oid => '88', descr => 'I/O',
-  proname => 'pg_ddl_command_recv', prorettype => 'pg_ddl_command',
-  proargtypes => 'internal', prosrc => 'pg_ddl_command_recv' },
-{ oid => '90', descr => 'I/O',
-  proname => 'pg_ddl_command_send', prorettype => 'bytea',
-  proargtypes => 'pg_ddl_command', prosrc => 'pg_ddl_command_send' },
 
 # OIDS 100 - 199
 

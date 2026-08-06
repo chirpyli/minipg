@@ -361,19 +361,6 @@ pg_node_tree_send(PG_FUNCTION_ARGS)
 }
 
 /*
- * pg_ddl_command
- *
- * Like pg_node_tree, pg_ddl_command isn't really a pseudotype; it's here
- * for the same reasons as that one.
- *
- * We don't have any good way to output this type directly, so punt
- * for output as well as input.
- */
-PSEUDOTYPE_DUMMY_IO_FUNCS(pg_ddl_command);
-PSEUDOTYPE_DUMMY_BINARY_IO_FUNCS(pg_ddl_command);
-
-
-/*
  * Dummy I/O functions for various other pseudotypes.
  */
 PSEUDOTYPE_DUMMY_IO_FUNCS(any);

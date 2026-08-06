@@ -3518,16 +3518,6 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 		 * OK, add the dependency.
 		 */
 		recordDependencyOn(&object, &extension, DEPENDENCY_EXTENSION);
-
-		/*
-		 * Also record the initial ACL on the object, if any.
-		 *
-		 * Note that this will handle the object's ACLs, as well as any ACLs
-		 * on object subIds.  (In other words, when the object is a table,
-		 * this will record the table's ACL and the ACLs for the columns on
-		 * the table, if any).
-		 */
-		recordExtObjInitPriv(object.objectId, object.classId);
 	}
 	else
 	{
@@ -3555,16 +3545,6 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 		 */
 		if (object.classId == RelationRelationId)
 			extension_config_remove(extension.objectId, object.objectId);
-
-		/*
-		 * Remove all the initial ACLs, if any.
-		 *
-		 * Note that this will remove the object's ACLs, as well as any ACLs
-		 * on object subIds.  (In other words, when the object is a table,
-		 * this will remove the table's ACL and the ACLs for the columns on
-		 * the table, if any).
-		 */
-		removeExtObjInitPriv(object.objectId, object.classId);
 	}
 
 	InvokeObjectPostAlterHook(ExtensionRelationId, extension.objectId, 0);

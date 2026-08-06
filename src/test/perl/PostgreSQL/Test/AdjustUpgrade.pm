@@ -78,7 +78,7 @@ sub adjust_database_contents
 
 	# remove dbs of modules known to cause pg_upgrade to fail
 	# anything not builtin and incompatible should clean up its own db
-	foreach my $bad_module ('test_ddl_deparse', 'tsearch2')
+	foreach my $bad_module ('tsearch2')
 	{
 		if ($dbnames{"contrib_regression_$bad_module"})
 		{
