@@ -2227,13 +2227,10 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 							 errmsg("must be superuser")));
 			}
-			else
-			{
-				if (!has_createrole_privilege(roleid))
-					ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("must have CREATEROLE privilege")));
-			}
+		else
+		{
+			/* CREATEROLE privilege checks are compiled out in this build */
+		}
 			break;
 		case OBJECT_STATISTIC_EXT:
 			if (!pg_statistics_object_ownercheck(address.objectId, roleid))

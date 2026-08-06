@@ -647,11 +647,6 @@ ProcedureCreate(const char *procedureName,
 	if (!is_update)
 		recordDependencyOnOwner(ProcedureRelationId, retval, proowner);
 
-	/* dependency on any roles mentioned in ACL */
-	if (!is_update)
-		recordDependencyOnNewAcl(ProcedureRelationId, retval, 0,
-								 proowner, proacl);
-
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, is_update);
 

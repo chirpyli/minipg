@@ -54,7 +54,7 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 													&conversion_name);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(namespaceId, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(namespaceId));
@@ -101,7 +101,7 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 						NameListToString(func_name), "integer")));
 
 	/* Check we have EXECUTE rights for the function */
-	aclresult = pg_proc_aclcheck(funcoid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION,
 					   NameListToString(func_name));

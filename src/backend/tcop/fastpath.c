@@ -239,13 +239,13 @@ HandleFunctionRequest(StringInfo msgBuf)
 	 * Check permission to access and call function.  Since we didn't go
 	 * through a normal name lookup, we need to check schema usage too.
 	 */
-	aclresult = pg_namespace_aclcheck(fip->namespace, GetUserId(), ACL_USAGE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(fip->namespace));
 	InvokeNamespaceSearchHook(fip->namespace, true);
 
-	aclresult = pg_proc_aclcheck(fid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION,
 					   get_func_name(fid));

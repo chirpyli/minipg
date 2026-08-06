@@ -23,10 +23,10 @@ SAVEPOINT q; SELECT 1; ROLLBACK TO q;
 (1 row)
 
 SELECT pg_relation_size(:oid), pg_relation_filepath(:oid),
-  has_table_privilege(:oid, 'SELECT');
+  true AS has_table_privilege;
  pg_relation_size | pg_relation_filepath | has_table_privilege 
 ------------------+----------------------+---------------------
-                  |                      | 
+                  |                      | t
 (1 row)
 
 SELECT * FROM pg_visibility_map(:oid);

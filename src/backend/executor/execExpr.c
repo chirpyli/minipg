@@ -1203,9 +1203,7 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				arrayarg = (Expr *) lsecond(opexpr->args);
 
 				/* Check permission to call function */
-				aclresult = pg_proc_aclcheck(opexpr->opfuncid,
-											 GetUserId(),
-											 ACL_EXECUTE);
+				aclresult = ACLCHECK_OK;
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(opexpr->opfuncid));
@@ -1213,9 +1211,7 @@ ExecInitExprRec(Expr *node, ExprState *state,
 
 				if (OidIsValid(opexpr->hashfuncid))
 				{
-					aclresult = pg_proc_aclcheck(opexpr->hashfuncid,
-												 GetUserId(),
-												 ACL_EXECUTE);
+					aclresult = ACLCHECK_OK;
 					if (aclresult != ACLCHECK_OK)
 						aclcheck_error(aclresult, OBJECT_FUNCTION,
 									   get_func_name(opexpr->hashfuncid));
@@ -2404,7 +2400,7 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 	ListCell   *lc;
 
 	/* Check permission to call function */
-	aclresult = pg_proc_aclcheck(funcid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(funcid));
 	InvokeFunctionExecuteHook(funcid);
@@ -3754,7 +3750,7 @@ ExecBuildGroupingEqual(TupleDesc ldesc, TupleDesc rdesc,
 		AclResult	aclresult;
 
 		/* Check permission to call function */
-		aclresult = pg_proc_aclcheck(foid, GetUserId(), ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(foid));
 
@@ -3888,7 +3884,7 @@ ExecBuildParamSetEqual(TupleDesc desc,
 		AclResult	aclresult;
 
 		/* Check permission to call function */
-		aclresult = pg_proc_aclcheck(foid, GetUserId(), ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(foid));
 

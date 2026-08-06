@@ -2438,15 +2438,13 @@ ri_ReportViolation(const RI_ConstraintInfo *riinfo,
 		has_perm = true;
 	else
 	{
-		aclresult = pg_class_aclcheck(rel_oid, GetUserId(), ACL_SELECT);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 		{
 			/* Try for column-level permissions */
 			for (int idx = 0; idx < riinfo->nkeys; idx++)
 			{
-				aclresult = pg_attribute_aclcheck(rel_oid, attnums[idx],
-												  GetUserId(),
-												  ACL_SELECT);
+				aclresult = ACLCHECK_OK;
 
 				/* No access to the key */
 				if (aclresult != ACLCHECK_OK)

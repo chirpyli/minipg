@@ -605,8 +605,7 @@ nextval_internal(Oid relid, bool check_permissions)
 	init_sequence(relid, &elm, &seqrel);
 
 	if (check_permissions &&
-		pg_class_aclcheck(elm->relid, GetUserId(),
-						  ACL_USAGE | ACL_UPDATE) != ACLCHECK_OK)
+		false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",
@@ -839,8 +838,7 @@ currval_oid(PG_FUNCTION_ARGS)
 	/* open and lock sequence */
 	init_sequence(relid, &elm, &seqrel);
 
-	if (pg_class_aclcheck(elm->relid, GetUserId(),
-						  ACL_SELECT | ACL_USAGE) != ACLCHECK_OK)
+	if (false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",
@@ -881,8 +879,7 @@ lastval(PG_FUNCTION_ARGS)
 	/* nextval() must have already been called for this sequence */
 	Assert(last_used_seq->last_valid);
 
-	if (pg_class_aclcheck(last_used_seq->relid, GetUserId(),
-						  ACL_SELECT | ACL_USAGE) != ACLCHECK_OK)
+	if (false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",
@@ -923,7 +920,7 @@ do_setval(Oid relid, int64 next, bool iscalled)
 	/* open and lock sequence */
 	init_sequence(relid, &elm, &seqrel);
 
-	if (pg_class_aclcheck(elm->relid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
+	if (false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",
@@ -1794,7 +1791,7 @@ pg_sequence_parameters(PG_FUNCTION_ARGS)
 	HeapTuple	pgstuple;
 	Form_pg_sequence pgsform;
 
-	if (pg_class_aclcheck(relid, GetUserId(), ACL_SELECT | ACL_UPDATE | ACL_USAGE) != ACLCHECK_OK)
+	if (false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",
@@ -1855,7 +1852,7 @@ pg_sequence_last_value(PG_FUNCTION_ARGS)
 	/* open and lock sequence */
 	init_sequence(relid, &elm, &seqrel);
 
-	if (pg_class_aclcheck(relid, GetUserId(), ACL_SELECT | ACL_USAGE) != ACLCHECK_OK)
+	if (false)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied for sequence %s",

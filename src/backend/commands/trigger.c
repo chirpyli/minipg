@@ -306,16 +306,14 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 	/* permission checks */
 	if (!isInternal)
 	{
-		aclresult = pg_class_aclcheck(RelationGetRelid(rel), GetUserId(),
-									  ACL_TRIGGER);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, get_relkind_objtype(rel->rd_rel->relkind),
 						   RelationGetRelationName(rel));
 
 		if (OidIsValid(constrrelid))
 		{
-			aclresult = pg_class_aclcheck(constrrelid, GetUserId(),
-										  ACL_TRIGGER);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, get_relkind_objtype(get_rel_relkind(constrrelid)),
 							   get_rel_name(constrrelid));
@@ -651,7 +649,7 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 		funcoid = LookupFuncName(stmt->funcname, 0, NULL, false);
 	if (!isInternal)
 	{
-		aclresult = pg_proc_aclcheck(funcoid, GetUserId(), ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION,
 						   NameListToString(stmt->funcname));

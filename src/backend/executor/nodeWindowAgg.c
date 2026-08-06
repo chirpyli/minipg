@@ -2487,8 +2487,7 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 		wfuncstate->wfuncno = wfuncno;
 
 		/* Check permission to call window function */
-		aclresult = pg_proc_aclcheck(wfunc->winfnoid, GetUserId(),
-									 ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION,
 						   get_func_name(wfunc->winfnoid));
@@ -2770,8 +2769,7 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 		aggOwner = ((Form_pg_proc) GETSTRUCT(procTuple))->proowner;
 		ReleaseSysCache(procTuple);
 
-		aclresult = pg_proc_aclcheck(transfn_oid, aggOwner,
-									 ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION,
 						   get_func_name(transfn_oid));
@@ -2779,8 +2777,7 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 
 		if (OidIsValid(invtransfn_oid))
 		{
-			aclresult = pg_proc_aclcheck(invtransfn_oid, aggOwner,
-										 ACL_EXECUTE);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, OBJECT_FUNCTION,
 							   get_func_name(invtransfn_oid));
@@ -2789,8 +2786,7 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 
 		if (OidIsValid(finalfn_oid))
 		{
-			aclresult = pg_proc_aclcheck(finalfn_oid, aggOwner,
-										 ACL_EXECUTE);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, OBJECT_FUNCTION,
 							   get_func_name(finalfn_oid));

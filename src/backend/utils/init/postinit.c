@@ -286,8 +286,7 @@ CheckMyDatabase(const char *name, bool am_superuser, bool override_allow_connect
 		 * and save a few cycles.)
 		 */
 		if (!am_superuser && !override_allow_connections &&
-			pg_database_aclcheck(MyDatabaseId, GetUserId(),
-								 ACL_CONNECT) != ACLCHECK_OK)
+			false)
 			ereport(FATAL,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("permission denied for database \"%s\"", name),

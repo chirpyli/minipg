@@ -292,8 +292,7 @@ currtid_internal(Relation rel, ItemPointer tid)
 
 	result = (ItemPointer) palloc(sizeof(ItemPointerData));
 
-	aclresult = pg_class_aclcheck(RelationGetRelid(rel), GetUserId(),
-								  ACL_SELECT);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, get_relkind_objtype(rel->rd_rel->relkind),
 					   RelationGetRelationName(rel));

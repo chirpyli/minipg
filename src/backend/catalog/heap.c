@@ -1286,12 +1286,10 @@ heap_create_with_catalog(const char *relname,
 		case RELKIND_RELATION:
 		case RELKIND_VIEW:
 		case RELKIND_PARTITIONED_TABLE:
-			relacl = get_user_default_acl(OBJECT_TABLE, ownerid,
-											  relnamespace);
+			relacl = NULL;
 				break;
 			case RELKIND_SEQUENCE:
-				relacl = get_user_default_acl(OBJECT_SEQUENCE, ownerid,
-											  relnamespace);
+				relacl = NULL;
 				break;
 			default:
 				relacl = NULL;
@@ -1462,8 +1460,6 @@ heap_create_with_catalog(const char *relname,
 		ObjectAddressSet(myself, RelationRelationId, relid);
 
 		recordDependencyOnOwner(RelationRelationId, relid, ownerid);
-
-		recordDependencyOnNewAcl(RelationRelationId, relid, 0, ownerid, relacl);
 
 		recordDependencyOnCurrentExtension(&myself, false);
 

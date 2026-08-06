@@ -625,37 +625,12 @@ pg_aclmask(ObjectType objtype, Oid table_oid, AttrNumber attnum, Oid roleid,
 /*
  * Exported routine for examining a user's privileges for a column
  *
- * Note: this considers only privileges granted specifically on the column.
- * It is caller's responsibility to take relation-level privileges into account
- * as appropriate.  (For the same reason, we have no special case for
- * superuser-ness here.)
- */
-AclMode
-pg_attribute_aclmask(Oid table_oid, AttrNumber attnum, Oid roleid,
-					 AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a column
- *
  * Does the bulk of the work for pg_attribute_aclmask(), and allows other
  * callers to avoid the missing attribute ERROR when is_missing is non-NULL.
  */
 AclMode
 pg_attribute_aclmask_ext(Oid table_oid, AttrNumber attnum, Oid roleid,
 						 AclMode mask, AclMaskHow how, bool *is_missing)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a table
- */
-AclMode
-pg_class_aclmask(Oid table_oid, Oid roleid,
-				 AclMode mask, AclMaskHow how)
 {
 	return mask;
 }
@@ -673,84 +648,7 @@ pg_class_aclmask_ext(Oid table_oid, Oid roleid, AclMode mask,
 	return mask;
 }
 
-/*
- * Exported routine for examining a user's privileges for a database
- */
-AclMode
-pg_database_aclmask(Oid db_oid, Oid roleid,
-					AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
 
-/*
- * Exported routine for examining a user's privileges for a function
- */
-AclMode
-pg_proc_aclmask(Oid proc_oid, Oid roleid,
-				AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a language
- */
-AclMode
-pg_language_aclmask(Oid lang_oid, Oid roleid,
-					AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a largeobject
- *
- * When a large object is opened for reading, it is opened relative to the
- * caller's snapshot, but when it is opened for writing, a current
- * MVCC snapshot will be used.  See doc/src/sgml/lobj.sgml.  This function
- * takes a snapshot argument so that the permissions check can be made
- * relative to the same snapshot that will be used to read the underlying
- * data.  The caller will actually pass NULL for an instantaneous MVCC
- * snapshot, since all we do with the snapshot argument is pass it through
- * to systable_beginscan().
- */
-AclMode
-pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
-								AclMode mask, AclMaskHow how,
-								Snapshot snapshot)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a namespace
- */
-AclMode
-pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
-					 AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a tablespace
- */
-AclMode
-pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
-					  AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
-
-/*
- * Exported routine for examining a user's privileges for a type.
- */
-AclMode
-pg_type_aclmask(Oid type_oid, Oid roleid, AclMode mask, AclMaskHow how)
-{
-	return mask;
-}
 
 /*
  * Exported routine for checking a user's access privileges to a column
@@ -762,12 +660,7 @@ pg_type_aclmask(Oid type_oid, Oid roleid, AclMode mask, AclMaskHow how)
  * As with pg_attribute_aclmask, only privileges granted directly on the
  * column are considered here.
  */
-AclResult
-pg_attribute_aclcheck(Oid table_oid, AttrNumber attnum,
-					  Oid roleid, AclMode mode)
-{
-	return pg_attribute_aclcheck_ext(table_oid, attnum, roleid, mode, NULL);
-}
+
 
 
 /*
@@ -816,19 +709,6 @@ pg_attribute_aclcheck_all(Oid table_oid, Oid roleid, AclMode mode,
 /*
  * Exported routine for checking a user's access privileges to a table
  *
- * Returns ACLCHECK_OK if the user has any of the privileges identified by
- * 'mode'; otherwise returns a suitable error code (in practice, always
- * ACLCHECK_NO_PRIV).
- */
-AclResult
-pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
-{
-	return pg_class_aclcheck_ext(table_oid, roleid, mode, NULL);
-}
-
-/*
- * Exported routine for checking a user's access privileges to a table
- *
  * Does the bulk of the work for pg_class_aclcheck(), and allows other
  * callers to avoid the missing relation ERROR when is_missing is non-NULL.
  */
@@ -843,40 +723,26 @@ pg_class_aclcheck_ext(Oid table_oid, Oid roleid,
 		return ACLCHECK_NO_PRIV;
 }
 
-/*
- * Exported routine for checking a user's access privileges to a database
- */
-AclResult
-pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
-{
-	if (pg_database_aclmask(db_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
+
 
 /*
- * Exported routine for checking a user's access privileges to a function
+ * Exported routine for examining a user's privileges for a largeobject
+ *
+ * When a large object is opened for reading, it is opened relative to the
+ * caller's snapshot, but when it is opened for writing, a current
+ * MVCC snapshot will be used.  See doc/src/sgml/lobj.sgml.  This function
+ * takes a snapshot argument so that the permissions check can be made
+ * relative to the same snapshot that will be used to read the underlying
+ * data.  The caller will actually pass NULL for an instantaneous MVCC
+ * snapshot, since all we do with the snapshot argument is pass it through
+ * to systable_beginscan().
  */
-AclResult
-pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
+AclMode
+pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
+								AclMode mask, AclMaskHow how,
+								Snapshot snapshot)
 {
-	if (pg_proc_aclmask(proc_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-/*
- * Exported routine for checking a user's access privileges to a language
- */
-AclResult
-pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
-{
-	if (pg_language_aclmask(lang_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+	return mask;
 }
 
 /*
@@ -888,43 +754,6 @@ pg_largeobject_aclcheck_snapshot(Oid lobj_oid, Oid roleid, AclMode mode,
 {
 	if (pg_largeobject_aclmask_snapshot(lobj_oid, roleid, mode,
 										ACLMASK_ANY, snapshot) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-/*
- * Exported routine for checking a user's access privileges to a namespace
- */
-AclResult
-pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
-{
-	if (pg_namespace_aclmask(nsp_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-/*
- * Exported routine for checking a user's access privileges to a tablespace
- */
-AclResult
-pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
-{
-	if (pg_tablespace_aclmask(spc_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-
-/*
- * Exported routine for checking a user's access privileges to a type
- */
-AclResult
-pg_type_aclcheck(Oid type_oid, Oid roleid, AclMode mode)
-{
-	if (pg_type_aclmask(type_oid, roleid, mode, ACLMASK_ANY) != 0)
 		return ACLCHECK_OK;
 	else
 		return ACLCHECK_NO_PRIV;
@@ -1450,78 +1279,7 @@ pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid)
  * (We don't handle that consideration here because we want to give a
  * separate error message for such cases, so the caller has to deal with it.)
  */
-bool
-has_createrole_privilege(Oid roleid)
-{
-	bool		result = false;
-	HeapTuple	utup;
 
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	utup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-	if (HeapTupleIsValid(utup))
-	{
-		result = ((Form_pg_authid) GETSTRUCT(utup))->rolcreaterole;
-		ReleaseSysCache(utup);
-	}
-	return result;
-}
-
-bool
-has_bypassrls_privilege(Oid roleid)
-{
-	bool		result = false;
-	HeapTuple	utup;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	utup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-	if (HeapTupleIsValid(utup))
-	{
-		result = ((Form_pg_authid) GETSTRUCT(utup))->rolbypassrls;
-		ReleaseSysCache(utup);
-	}
-	return result;
-}
-
-/*
- * Fetch pg_default_acl entry for given role, namespace and object type
- * (object type must be given in pg_default_acl's encoding).
- * Returns NULL if no such entry.
- */
-static Acl *
-get_default_acl_internal(Oid roleId, Oid nsp_oid, char objtype)
-{
-	return NULL;
-}
-
-/*
- * Get default permissions for newly created object within given schema
- *
- * Returns NULL if built-in system defaults should be used.
- *
- * If the result is not NULL, caller must call recordDependencyOnNewAcl
- * once the OID of the new object is known.
- */
-Acl *
-get_user_default_acl(ObjectType objtype, Oid ownerId, Oid nsp_oid)
-{
-	return NULL;
-}
-
-/*
- * Record dependencies on roles mentioned in a new object's ACL.
- */
-void
-recordDependencyOnNewAcl(Oid classId, Oid objectId, int32 objsubId,
-						 Oid ownerId, Acl *acl)
-{
-	return;
-}
 
 /*
  * Record initial privileges for the top-level object passed in.

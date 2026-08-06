@@ -1336,7 +1336,7 @@ ExecBuildSlotPartitionKeyDescription(Relation rel,
 	AclResult	aclresult;
 
 	/* If the user has table-level access, just go build the description. */
-	aclresult = pg_class_aclcheck(relid, GetUserId(), ACL_SELECT);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 	{
 		/*
@@ -1352,9 +1352,7 @@ ExecBuildSlotPartitionKeyDescription(Relation rel,
 			 * detail rather than try to figure out what column(s) the
 			 * expression includes and if the user has SELECT rights on them.
 			 */
-			if (attnum == InvalidAttrNumber ||
-				pg_attribute_aclcheck(relid, attnum, GetUserId(),
-									  ACL_SELECT) != ACLCHECK_OK)
+			if (attnum == InvalidAttrNumber)
 				return NULL;
 		}
 	}

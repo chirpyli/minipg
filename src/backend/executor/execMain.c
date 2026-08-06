@@ -1849,7 +1849,7 @@ ExecBuildSlotValueDescription(Oid reloid,
 	 * rights on.  Additionally, we always include columns the user provided
 	 * data for.
 	 */
-	aclresult = pg_class_aclcheck(reloid, GetUserId(), ACL_SELECT);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 	{
 		/* Set up the buffer for the column list */
@@ -1881,8 +1881,7 @@ ExecBuildSlotValueDescription(Oid reloid,
 			 * for the column.  If not, omit this column from the error
 			 * message.
 			 */
-			aclresult = pg_attribute_aclcheck(reloid, att->attnum,
-											  GetUserId(), ACL_SELECT);
+			aclresult = ACLCHECK_OK;
 			if (bms_is_member(att->attnum - FirstLowInvalidHeapAttributeNumber,
 							  modifiedCols) || aclresult == ACLCHECK_OK)
 			{

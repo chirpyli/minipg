@@ -288,7 +288,7 @@ LockTableAclCheck(Oid reloid, LOCKMODE lockmode, Oid userid)
 	else
 		aclmask = ACL_UPDATE | ACL_DELETE | ACL_TRUNCATE;
 
-	aclresult = pg_class_aclcheck(reloid, userid, aclmask);
+	aclresult = ACLCHECK_OK;
 
 	return aclresult;
 }

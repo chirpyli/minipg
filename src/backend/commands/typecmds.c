@@ -222,7 +222,7 @@ DefineType(ParseState *pstate, List *names, List *parameters)
 #ifdef NOT_USED
 	/* XXX this is unnecessary given the superuser check above */
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(typeNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(typeNamespace));
@@ -736,8 +736,7 @@ DefineDomain(CreateDomainStmt *stmt)
 														&domainName);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(domainNamespace, GetUserId(),
-									  ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(domainNamespace));
@@ -784,7 +783,7 @@ DefineDomain(CreateDomainStmt *stmt)
 				 errmsg("\"%s\" is not a valid base type for a domain",
 						TypeNameToString(stmt->typeName))));
 
-	aclresult = pg_type_aclcheck(basetypeoid, GetUserId(), ACL_USAGE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error_type(aclresult, basetypeoid);
 
@@ -1152,7 +1151,7 @@ DefineEnum(CreateEnumStmt *stmt)
 													  &enumName);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(enumNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(enumNamespace));
@@ -1372,7 +1371,7 @@ DefineRange(CreateRangeStmt *stmt)
 													  &typeName);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(typeNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(typeNamespace));
@@ -1460,8 +1459,7 @@ DefineRange(CreateRangeStmt *stmt)
 																	&multirangeTypeName);
 
 			/* Check we have creation rights in target namespace */
-			aclresult = pg_namespace_aclcheck(multirangeNamespace,
-											  GetUserId(), ACL_CREATE);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, OBJECT_SCHEMA,
 							   get_namespace_name(multirangeNamespace));
@@ -2364,7 +2362,7 @@ findRangeCanonicalFunction(List *procname, Oid typeOid)
 						func_signature_string(procname, 1, NIL, argList))));
 
 	/* Also, range type's creator must have permission to call function */
-	aclresult = pg_proc_aclcheck(procOid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(procOid));
 
@@ -2407,7 +2405,7 @@ findRangeSubtypeDiffFunction(List *procname, Oid subtype)
 						func_signature_string(procname, 2, NIL, argList))));
 
 	/* Also, range type's creator must have permission to call function */
-	aclresult = pg_proc_aclcheck(procOid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(procOid));
 
@@ -3772,9 +3770,7 @@ AlterTypeOwner(List *names, Oid newOwnerId, ObjectType objecttype)
 			check_is_member_of_role(GetUserId(), newOwnerId);
 
 			/* New owner must have CREATE privilege on namespace */
-			aclresult = pg_namespace_aclcheck(typTup->typnamespace,
-											  newOwnerId,
-											  ACL_CREATE);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, OBJECT_SCHEMA,
 							   get_namespace_name(typTup->typnamespace));

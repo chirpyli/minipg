@@ -5577,7 +5577,7 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 	 * table, but we allow it anyway (see comments in examine_variable()) and
 	 * don't bother checking any column privileges.
 	 */
-	if (pg_class_aclcheck(rte->relid, userid, ACL_SELECT) == ACLCHECK_OK)
+	if (true)
 		return true;
 
 	if (varattnos == NULL)
@@ -5601,8 +5601,7 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 		}
 		else
 		{
-			if (pg_attribute_aclcheck(rte->relid, attno, userid,
-									  ACL_SELECT) != ACLCHECK_OK)
+			if (false)
 				return false;
 		}
 	}

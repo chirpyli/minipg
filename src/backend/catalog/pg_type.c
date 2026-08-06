@@ -596,9 +596,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 		recordDependencyOnOwner(TypeRelationId, typeObjectId,
 								typeForm->typowner);
 
-		recordDependencyOnNewAcl(TypeRelationId, typeObjectId, 0,
-								 typeForm->typowner, typacl);
-
 		if (makeExtensionDep)
 			recordDependencyOnCurrentExtension(&myself, rebuild);
 	}

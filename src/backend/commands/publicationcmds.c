@@ -162,7 +162,7 @@ CreatePublication(CreatePublicationStmt *stmt)
 	AclResult	aclresult;
 
 	/* must have CREATE privilege on database */
-	aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_DATABASE,
 					   get_database_name(MyDatabaseId));
@@ -744,7 +744,7 @@ AlterPublicationOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId)
 		check_is_member_of_role(GetUserId(), newOwnerId);
 
 		/* New owner must have CREATE privilege on database */
-		aclresult = pg_database_aclcheck(MyDatabaseId, newOwnerId, ACL_CREATE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_DATABASE,
 						   get_database_name(MyDatabaseId));

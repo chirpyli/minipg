@@ -955,16 +955,14 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 	 */
 	if (relation->rd_rel->relkind == RELKIND_COMPOSITE_TYPE)
 	{
-		aclresult = pg_type_aclcheck(relation->rd_rel->reltype, GetUserId(),
-									 ACL_USAGE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_TYPE,
 						   RelationGetRelationName(relation));
 	}
 	else
 	{
-		aclresult = pg_class_aclcheck(RelationGetRelid(relation), GetUserId(),
-									  ACL_SELECT);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, get_relkind_objtype(relation->rd_rel->relkind),
 						   RelationGetRelationName(relation));

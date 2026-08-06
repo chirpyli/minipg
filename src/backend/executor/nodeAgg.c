@@ -3762,8 +3762,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
 
 		/* Check permission to call aggregate function */
-		aclresult = pg_proc_aclcheck(aggref->aggfnoid, GetUserId(),
-									 ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_AGGREGATE,
 						   get_func_name(aggref->aggfnoid));
@@ -3829,8 +3828,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 			if (OidIsValid(finalfn_oid))
 			{
-				aclresult = pg_proc_aclcheck(finalfn_oid, aggOwner,
-											 ACL_EXECUTE);
+				aclresult = ACLCHECK_OK;
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(finalfn_oid));
@@ -3838,8 +3836,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			}
 			if (OidIsValid(serialfn_oid))
 			{
-				aclresult = pg_proc_aclcheck(serialfn_oid, aggOwner,
-											 ACL_EXECUTE);
+				aclresult = ACLCHECK_OK;
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(serialfn_oid));
@@ -3847,8 +3844,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			}
 			if (OidIsValid(deserialfn_oid))
 			{
-				aclresult = pg_proc_aclcheck(deserialfn_oid, aggOwner,
-											 ACL_EXECUTE);
+				aclresult = ACLCHECK_OK;
 				if (aclresult != ACLCHECK_OK)
 					aclcheck_error(aclresult, OBJECT_FUNCTION,
 								   get_func_name(deserialfn_oid));
@@ -3926,8 +3922,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			else
 				transfn_oid = aggform->aggtransfn;
 
-			aclresult = pg_proc_aclcheck(transfn_oid, aggOwner,
-										 ACL_EXECUTE);
+			aclresult = ACLCHECK_OK;
 			if (aclresult != ACLCHECK_OK)
 				aclcheck_error(aclresult, OBJECT_FUNCTION,
 							   get_func_name(transfn_oid));

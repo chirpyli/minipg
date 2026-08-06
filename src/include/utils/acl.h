@@ -194,10 +194,6 @@ typedef enum
  * routines used internally
  */
 extern Acl *acldefault(ObjectType objtype, Oid ownerId);
-extern Acl *get_user_default_acl(ObjectType objtype, Oid ownerId,
-								 Oid nsp_oid);
-extern void recordDependencyOnNewAcl(Oid classId, Oid objectId, int32 objsubId,
-									 Oid ownerId, Acl *acl);
 
 extern Acl *aclupdate(const Acl *old_acl, const AclItem *mod_aip,
 					  int modechg, Oid ownerId, DropBehavior behavior);
@@ -219,7 +215,6 @@ extern bool is_member_of_role_nosuper(Oid member, Oid role);
 extern bool is_admin_of_role(Oid member, Oid role);
 extern void check_is_member_of_role(Oid member, Oid role);
 extern Oid	get_role_oid(const char *rolename, bool missing_ok);
-extern Oid	get_role_oid_or_public(const char *rolename);
 extern Oid	get_rolespec_oid(const RoleSpec *role, bool missing_ok);
 extern void check_rolespec_name(const RoleSpec *role, const char *detail_msg);
 extern HeapTuple get_rolespec_tuple(const RoleSpec *role);
@@ -234,52 +229,29 @@ extern void initialize_acl(void);
 /*
  * prototypes for functions in aclchk.c
  */
-extern AclMode pg_attribute_aclmask(Oid table_oid, AttrNumber attnum,
-									Oid roleid, AclMode mask, AclMaskHow how);
 extern AclMode pg_attribute_aclmask_ext(Oid table_oid, AttrNumber attnum,
 										Oid roleid, AclMode mask,
 										AclMaskHow how, bool *is_missing);
-extern AclMode pg_class_aclmask(Oid table_oid, Oid roleid,
-								AclMode mask, AclMaskHow how);
 extern AclMode pg_class_aclmask_ext(Oid table_oid, Oid roleid,
 									AclMode mask, AclMaskHow how,
 									bool *is_missing);
-extern AclMode pg_database_aclmask(Oid db_oid, Oid roleid,
-								   AclMode mask, AclMaskHow how);
-extern AclMode pg_proc_aclmask(Oid proc_oid, Oid roleid,
-							   AclMode mask, AclMaskHow how);
-extern AclMode pg_language_aclmask(Oid lang_oid, Oid roleid,
-								   AclMode mask, AclMaskHow how);
-extern AclMode pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
-											   AclMode mask, AclMaskHow how, Snapshot snapshot);
-extern AclMode pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
-									AclMode mask, AclMaskHow how);
-extern AclMode pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
-									 AclMode mask, AclMaskHow how);
-extern AclMode pg_type_aclmask(Oid type_oid, Oid roleid,
-							   AclMode mask, AclMaskHow how);
 
-extern AclResult pg_attribute_aclcheck(Oid table_oid, AttrNumber attnum,
-									   Oid roleid, AclMode mode);
 extern AclResult pg_attribute_aclcheck_ext(Oid table_oid, AttrNumber attnum,
 										   Oid roleid, AclMode mode,
 										   bool *is_missing);
 extern AclResult pg_attribute_aclcheck_all(Oid table_oid, Oid roleid,
 										   AclMode mode, AclMaskHow how);
-extern AclResult pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode);
 extern AclResult pg_class_aclcheck_ext(Oid table_oid, Oid roleid,
 									   AclMode mode, bool *is_missing);
-extern AclResult pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode);
-extern AclResult pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode);
-extern AclResult pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode);
-extern AclResult pg_largeobject_aclcheck_snapshot(Oid lang_oid, Oid roleid,
-												  AclMode mode, Snapshot snapshot);
-extern AclResult pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode);
-extern AclResult pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode);
-extern AclResult pg_type_aclcheck(Oid type_oid, Oid roleid, AclMode mode);
 
 extern void aclcheck_error(AclResult aclerr, ObjectType objtype,
 						   const char *objectname);
+
+extern AclMode pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
+											   AclMode mask, AclMaskHow how,
+											   Snapshot snapshot);
+extern AclResult pg_largeobject_aclcheck_snapshot(Oid lobj_oid, Oid roleid,
+												  AclMode mode, Snapshot snapshot);
 
 extern void aclcheck_error_col(AclResult aclerr, ObjectType objtype,
 							   const char *objectname, const char *colname);
@@ -309,7 +281,5 @@ extern bool pg_extension_ownercheck(Oid ext_oid, Oid roleid);
 extern bool pg_publication_ownercheck(Oid pub_oid, Oid roleid);
 extern bool pg_subscription_ownercheck(Oid sub_oid, Oid roleid);
 extern bool pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid);
-extern bool has_createrole_privilege(Oid roleid);
-extern bool has_bypassrls_privilege(Oid roleid);
 
 #endif							/* ACL_H */

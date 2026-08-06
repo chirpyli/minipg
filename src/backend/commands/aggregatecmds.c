@@ -104,7 +104,7 @@ DefineAggregate(ParseState *pstate,
 	aggNamespace = QualifiedNameGetCreationNamespace(name, &aggName);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(aggNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(aggNamespace));

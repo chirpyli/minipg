@@ -951,7 +951,7 @@ extension_is_trusted(ExtensionControlFile *control)
 	if (!control->trusted)
 		return false;
 	/* Allow if user has CREATE privilege on current database */
-	aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult == ACLCHECK_OK)
 		return true;
 	return false;
@@ -2966,7 +2966,7 @@ AlterExtensionNamespace(const char *extensionName, const char *newschema, Oid *o
 					   extensionName);
 
 	/* Permission check: must have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(nspOid, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA, newschema);
 

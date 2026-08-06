@@ -203,7 +203,7 @@ BuildIndexValueDescription(Relation indexRelation,
 	Assert(indexrelid == idxrec->indexrelid);
 
 	/* Table-level SELECT is enough, if the user has it */
-	aclresult = pg_class_aclcheck(indrelid, GetUserId(), ACL_SELECT);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 	{
 		/*
@@ -220,9 +220,7 @@ BuildIndexValueDescription(Relation indexRelation,
 			 * to figure out what column(s) the expression includes and if the
 			 * user has SELECT rights on them.
 			 */
-			if (attnum == InvalidAttrNumber ||
-				pg_attribute_aclcheck(indrelid, attnum, GetUserId(),
-									  ACL_SELECT) != ACLCHECK_OK)
+			if (attnum == InvalidAttrNumber)
 			{
 				/* No access, so clean up and return */
 				return NULL;

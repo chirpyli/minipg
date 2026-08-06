@@ -64,8 +64,7 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 				 errmsg("schema \"%s\" already exists", nspName)));
 
 	if (!isTemp)
-		nspacl = get_user_default_acl(OBJECT_SCHEMA, ownerId,
-									  InvalidOid);
+		nspacl = NULL;
 	else
 		nspacl = NULL;
 
@@ -100,9 +99,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 
 	/* dependency on owner */
 	recordDependencyOnOwner(NamespaceRelationId, nspoid, ownerId);
-
-	/* dependencies on roles mentioned in default ACL */
-	recordDependencyOnNewAcl(NamespaceRelationId, nspoid, 0, ownerId, nspacl);
 
 	/* dependency on extension ... but not for magic temp schemas */
 	if (!isTemp)

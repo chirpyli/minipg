@@ -624,8 +624,7 @@ get_other_operator(List *otherOp, Oid otherLeftTypeId, Oid otherRightTypeId,
 
 	/* not in catalogs, different from operator, so make shell */
 
-	aclresult = pg_namespace_aclcheck(otherNamespace, GetUserId(),
-									  ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(otherNamespace));

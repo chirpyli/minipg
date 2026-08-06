@@ -126,11 +126,7 @@ CREATE VIEW pg_sequences AS
         S.seqincrement AS increment_by,
         S.seqcycle AS cycle,
         S.seqcache AS cache_size,
-        CASE
-            WHEN has_sequence_privilege(C.oid, 'SELECT,USAGE'::text)
-                THEN pg_sequence_last_value(C.oid)
-            ELSE NULL
-        END AS last_value
+        pg_sequence_last_value(C.oid) AS last_value
     FROM pg_sequence S JOIN pg_class C ON (C.oid = S.seqrelid)
          LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
     WHERE NOT pg_is_other_temp_schema(N.oid)
@@ -197,8 +193,7 @@ CREATE VIEW pg_stats WITH (security_barrier) AS
     FROM pg_statistic s JOIN pg_class c ON (c.oid = s.starelid)
          JOIN pg_attribute a ON (c.oid = attrelid AND attnum = s.staattnum)
          LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
-    WHERE NOT attisdropped
-    AND has_column_privilege(c.oid, a.attnum, 'select');
+    WHERE NOT attisdropped;
 
 
 CREATE VIEW pg_stats_ext WITH (security_barrier) AS
@@ -231,7 +226,7 @@ CREATE VIEW pg_stats_ext WITH (security_barrier) AS
                             array_agg(base_frequency) AS most_common_base_freqs
                      FROM pg_mcv_list_items(sd.stxdmcv)
                    ) m ON sd.stxdmcv IS NOT NULL
-    WHERE pg_has_role(c.relowner, 'USAGE');
+    WHERE true;
 
 CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
     SELECT cn.nspname AS schemaname,
@@ -300,7 +295,7 @@ CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
              SELECT unnest(pg_get_statisticsobjdef_expressions(s.oid)) AS expr,
                     unnest(sd.stxdexpr)::pg_statistic AS a
          ) stat ON (stat.expr IS NOT NULL)
-    WHERE pg_has_role(c.relowner, 'USAGE');
+    WHERE true;
 
 -- unprivileged users may read pg_statistic_ext but not pg_statistic_ext_data
 

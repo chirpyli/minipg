@@ -90,7 +90,7 @@ DefineOperator(List *names, List *parameters)
 	oprNamespace = QualifiedNameGetCreationNamespace(names, &oprName);
 
 	/* Check we have creation rights in target namespace */
-	aclresult = pg_namespace_aclcheck(oprNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(oprNamespace));
@@ -187,14 +187,14 @@ DefineOperator(List *names, List *parameters)
 
 	if (typeName1)
 	{
-		aclresult = pg_type_aclcheck(typeId1, GetUserId(), ACL_USAGE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error_type(aclresult, typeId1);
 	}
 
 	if (typeName2)
 	{
-		aclresult = pg_type_aclcheck(typeId2, GetUserId(), ACL_USAGE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error_type(aclresult, typeId2);
 	}
@@ -225,13 +225,13 @@ DefineOperator(List *names, List *parameters)
 	 * necessary, since EXECUTE will be checked at any attempted use of the
 	 * operator, but it seems like a good idea anyway.
 	 */
-	aclresult = pg_proc_aclcheck(functionOid, GetUserId(), ACL_EXECUTE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_FUNCTION,
 					   NameListToString(functionName));
 
 	rettype = get_func_rettype(functionOid);
-	aclresult = pg_type_aclcheck(rettype, GetUserId(), ACL_USAGE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error_type(aclresult, rettype);
 
@@ -310,7 +310,7 @@ ValidateRestrictionEstimator(List *restrictionName)
 	{
 		AclResult	aclresult;
 
-		aclresult = pg_proc_aclcheck(restrictionOid, GetUserId(), ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION,
 						   NameListToString(restrictionName));
@@ -379,7 +379,7 @@ ValidateJoinEstimator(List *joinName)
 	{
 		AclResult	aclresult;
 
-		aclresult = pg_proc_aclcheck(joinOid, GetUserId(), ACL_EXECUTE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_FUNCTION,
 						   NameListToString(joinName));

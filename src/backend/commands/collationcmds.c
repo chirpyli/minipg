@@ -75,7 +75,7 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 
 	collNamespace = QualifiedNameGetCreationNamespace(names, &collName);
 
-	aclresult = pg_namespace_aclcheck(collNamespace, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_SCHEMA,
 					   get_namespace_name(collNamespace));

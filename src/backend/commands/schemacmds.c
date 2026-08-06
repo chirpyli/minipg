@@ -94,7 +94,7 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	 * The latter provision guards against "giveaway" attacks.  Note that a
 	 * superuser will always have both of these privileges a fortiori.
 	 */
-	aclresult = pg_database_aclcheck(MyDatabaseId, saved_uid, ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_DATABASE,
 					   get_database_name(MyDatabaseId));
@@ -277,7 +277,7 @@ RenameSchema(const char *oldname, const char *newname)
 					   oldname);
 
 	/* must have CREATE privilege on database */
-	aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(), ACL_CREATE);
+	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, OBJECT_DATABASE,
 					   get_database_name(MyDatabaseId));
@@ -398,8 +398,7 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 		 * schemas.  Because superusers will always have this right, we need
 		 * no special case for them.
 		 */
-		aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(),
-										 ACL_CREATE);
+		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, OBJECT_DATABASE,
 						   get_database_name(MyDatabaseId));
