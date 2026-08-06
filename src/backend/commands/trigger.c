@@ -5737,41 +5737,6 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 			continue;
 
 		/*
-		 * If the trigger is a foreign key enforcement trigger, there are
-		 * certain cases where we can skip queueing the event because we can
-		 * tell by inspection that the FK constraint will still pass.
-		 */
-		if (TRIGGER_FIRED_BY_UPDATE(event) || TRIGGER_FIRED_BY_DELETE(event))
-		{
-			switch (RI_FKey_trigger_type(trigger->tgfoid))
-			{
-				case RI_TRIGGER_PK:
-					/* Update or delete on trigger's PK table */
-					if (!RI_FKey_pk_upd_check_required(trigger, rel,
-													   oldslot, newslot))
-					{
-						/* skip queuing this event */
-						continue;
-					}
-					break;
-
-				case RI_TRIGGER_FK:
-					/* Update on trigger's FK table */
-					if (!RI_FKey_fk_upd_check_required(trigger, rel,
-													   oldslot, newslot))
-					{
-						/* skip queuing this event */
-						continue;
-					}
-					break;
-
-				case RI_TRIGGER_NONE:
-					/* Not an FK trigger */
-					break;
-			}
-		}
-
-		/*
 		 * If the trigger is a deferred unique constraint check trigger, only
 		 * queue it if the unique constraint was potentially violated, which
 		 * we know from index insertion time.

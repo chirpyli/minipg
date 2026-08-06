@@ -25,7 +25,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_default_acl.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
@@ -1558,20 +1557,12 @@ shdepReassignOwned(List *roleids, Oid newrole)
 					 * owned sequences, etc when we happen to visit them
 					 * before their parent table.
 					 */
-					ATExecChangeOwner(sdepForm->objid, newrole, true, AccessExclusiveLock);
-					break;
-
-				case DefaultAclRelationId:
-
-					/*
-					 * Ignore default ACLs; they should be handled by DROP
-					 * OWNED, not REASSIGN OWNED.
-					 */
+				ATExecChangeOwner(sdepForm->objid, newrole, true, AccessExclusiveLock);
 				break;
 
-				case PublicationRelationId:
-					AlterPublicationOwner_oid(sdepForm->objid, newrole);
-					break;
+			case PublicationRelationId:
+				AlterPublicationOwner_oid(sdepForm->objid, newrole);
+				break;
 
 				case SubscriptionRelationId:
 					AlterSubscriptionOwner_oid(sdepForm->objid, newrole);

@@ -1515,7 +1515,7 @@ psql_completion(const char *text, int start, int end)
 		"\\connect", "\\conninfo", "\\C", "\\cd", "\\copy",
 		"\\copyright", "\\crosstabview",
 		"\\d", "\\da", "\\dA", "\\dAc", "\\dAf", "\\dAo", "\\dAp",
-		"\\db", "\\dc", "\\dC", "\\dd", "\\ddp", "\\dD",
+		"\\db", "\\dc", "\\dC", "\\dd", "\\dD",
 		"\\dE", "\\df",
 		"\\dF", "\\dFd", "\\dFp", "\\dFt", "\\dg", "\\di", "\\dl", "\\dL",
 		"\\dm", "\\dn", "\\do", "\\dO", "\\dp", "\\dP", "\\dPi", "\\dPt",

@@ -769,10 +769,7 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				success = listCasts(pattern, show_verbose);
 				break;
 			case 'd':
-				if (strncmp(cmd, "ddp", 3) == 0)
-					success = listDefaultACLs(pattern);
-				else
-					success = objectDescription(pattern, show_system);
+				success = objectDescription(pattern, show_system);
 				break;
 			case 'D':
 				success = listDomains(pattern, show_verbose, show_system);

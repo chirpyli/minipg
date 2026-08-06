@@ -1242,7 +1242,11 @@ ERROR:  table "test_ex_constraints" does not exist
 -- Test non-inheritable foreign key constraints
 CREATE TABLE test_primary_constraints(id int PRIMARY KEY);
 CREATE TABLE test_foreign_constraints(id1 int REFERENCES test_primary_constraints(id));
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE test_foreign_constraints(id1 int REFERENCES tes...
+                                                      ^
 CREATE TABLE test_foreign_constraints_inh () INHERITS (test_foreign_constraints);
+ERROR:  relation "test_foreign_constraints" does not exist
 \d+ test_primary_constraints
                          Table "public.test_primary_constraints"
  Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
@@ -1250,43 +1254,34 @@ CREATE TABLE test_foreign_constraints_inh () INHERITS (test_foreign_constraints)
  id     | integer |           | not null |         | plain   |              | 
 Indexes:
     "test_primary_constraints_pkey" PRIMARY KEY, btree (id)
-Referenced by:
-    TABLE "test_foreign_constraints" CONSTRAINT "test_foreign_constraints_id1_fkey" FOREIGN KEY (id1) REFERENCES test_primary_constraints(id)
 
 \d+ test_foreign_constraints
-                         Table "public.test_foreign_constraints"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- id1    | integer |           |          |         | plain   |              | 
-Foreign-key constraints:
-    "test_foreign_constraints_id1_fkey" FOREIGN KEY (id1) REFERENCES test_primary_constraints(id)
-Child tables: test_foreign_constraints_inh
-
 ALTER TABLE test_foreign_constraints DROP CONSTRAINT test_foreign_constraints_id1_fkey;
+ERROR:  relation "test_foreign_constraints" does not exist
 \d+ test_foreign_constraints
-                         Table "public.test_foreign_constraints"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- id1    | integer |           |          |         | plain   |              | 
-Child tables: test_foreign_constraints_inh
-
 \d+ test_foreign_constraints_inh
-                       Table "public.test_foreign_constraints_inh"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- id1    | integer |           |          |         | plain   |              | 
-Inherits: test_foreign_constraints
-
 DROP TABLE test_foreign_constraints_inh;
+ERROR:  table "test_foreign_constraints_inh" does not exist
 DROP TABLE test_foreign_constraints;
+ERROR:  table "test_foreign_constraints" does not exist
 DROP TABLE test_primary_constraints;
 -- Test foreign key behavior
 create table inh_fk_1 (a int primary key);
 insert into inh_fk_1 values (1), (2), (3);
 create table inh_fk_2 (x int primary key, y int references inh_fk_1 on delete cascade);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: create table inh_fk_2 (x int primary key, y int references i...
+                                                        ^
 insert into inh_fk_2 values (11, 1), (22, 2), (33, 3);
+ERROR:  relation "inh_fk_2" does not exist
+LINE 1: insert into inh_fk_2 values (11, 1), (22, 2), (33, 3);
+                    ^
 create table inh_fk_2_child () inherits (inh_fk_2);
+ERROR:  relation "inh_fk_2" does not exist
 insert into inh_fk_2_child values (111, 1), (222, 2);
+ERROR:  relation "inh_fk_2_child" does not exist
+LINE 1: insert into inh_fk_2_child values (111, 1), (222, 2);
+                    ^
 delete from inh_fk_1 where a = 1;
 select * from inh_fk_1 order by 1;
  a 
@@ -1296,15 +1291,11 @@ select * from inh_fk_1 order by 1;
 (2 rows)
 
 select * from inh_fk_2 order by 1, 2;
-  x  | y 
------+---
-  22 | 2
-  33 | 3
- 111 | 1
- 222 | 2
-(4 rows)
-
+ERROR:  relation "inh_fk_2" does not exist
+LINE 1: select * from inh_fk_2 order by 1, 2;
+                      ^
 drop table inh_fk_1, inh_fk_2, inh_fk_2_child;
+ERROR:  table "inh_fk_2" does not exist
 -- Test that parent and child CHECK constraints can be created in either order
 create table p1(f1 int);
 create table p1_c1() inherits(p1);

@@ -18,7 +18,6 @@
 #include "catalog/pg_attribute_d.h"
 #include "catalog/pg_cast_d.h"
 #include "catalog/pg_class_d.h"
-#include "catalog/pg_default_acl_d.h"
 #include "common.h"
 #include "common/logging.h"
 #include "describe.h"
@@ -1194,87 +1193,6 @@ permissionsList(const char *pattern)
 
 	myopt.nullPrint = NULL;
 	printfPQExpBuffer(&buf, _("Access privileges"));
-	myopt.title = buf.data;
-	myopt.translate_header = true;
-	myopt.translate_columns = translate_columns;
-	myopt.n_translate_columns = lengthof(translate_columns);
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	termPQExpBuffer(&buf);
-	PQclear(res);
-	return true;
-}
-
-
-/*
- * \ddp
- *
- * List Default ACLs.  The pattern can match either schema or role name.
- */
-bool
-listDefaultACLs(const char *pattern)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-	static const bool translate_columns[] = {false, false, true, false};
-
-	if (pset.sversion < 90000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support altering default privileges.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	initPQExpBuffer(&buf);
-
-	printfPQExpBuffer(&buf,
-					  "SELECT pg_catalog.pg_get_userbyid(d.defaclrole) AS \"%s\",\n"
-					  "  n.nspname AS \"%s\",\n"
-					  "  CASE d.defaclobjtype WHEN '%c' THEN '%s' WHEN '%c' THEN '%s' WHEN '%c' THEN '%s' WHEN '%c' THEN '%s' WHEN '%c' THEN '%s' END AS \"%s\",\n"
-					  "  ",
-					  gettext_noop("Owner"),
-					  gettext_noop("Schema"),
-					  DEFACLOBJ_RELATION,
-					  gettext_noop("table"),
-					  DEFACLOBJ_SEQUENCE,
-					  gettext_noop("sequence"),
-					  DEFACLOBJ_FUNCTION,
-					  gettext_noop("function"),
-					  DEFACLOBJ_TYPE,
-					  gettext_noop("type"),
-					  DEFACLOBJ_NAMESPACE,
-					  gettext_noop("schema"),
-					  gettext_noop("Type"));
-
-	printACLColumn(&buf, "d.defaclacl");
-
-	appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_default_acl d\n"
-						 "     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								NULL,
-								"n.nspname",
-								"pg_catalog.pg_get_userbyid(d.defaclrole)",
-								NULL,
-								NULL, 3))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2, 3;");
-
-	res = PSQLexec(buf.data);
-	if (!res)
-	{
-		termPQExpBuffer(&buf);
-		return false;
-	}
-
-	myopt.nullPrint = NULL;
-	printfPQExpBuffer(&buf, _("Default access privileges"));
 	myopt.title = buf.data;
 	myopt.translate_header = true;
 	myopt.translate_columns = translate_columns;

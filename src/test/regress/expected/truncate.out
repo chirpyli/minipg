@@ -31,68 +31,64 @@ SELECT * FROM truncate_a;
 
 -- Test foreign-key checks
 CREATE TABLE trunc_b (a int REFERENCES truncate_a);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE trunc_b (a int REFERENCES truncate_a);
+                                    ^
 CREATE TABLE trunc_c (a serial PRIMARY KEY);
 CREATE TABLE trunc_d (a int REFERENCES trunc_c);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE trunc_d (a int REFERENCES trunc_c);
+                                    ^
 CREATE TABLE trunc_e (a int REFERENCES truncate_a, b int REFERENCES trunc_c);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE trunc_e (a int REFERENCES truncate_a, b int REF...
+                                    ^
 TRUNCATE TABLE truncate_a;		-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_b" references "truncate_a".
-HINT:  Truncate table "trunc_b" at the same time, or use TRUNCATE ... CASCADE.
 TRUNCATE TABLE truncate_a,trunc_b;		-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_e" references "truncate_a".
-HINT:  Truncate table "trunc_e" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_b" does not exist
 TRUNCATE TABLE truncate_a,trunc_b,trunc_e;	-- ok
+ERROR:  relation "trunc_b" does not exist
 TRUNCATE TABLE truncate_a,trunc_e;		-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_b" references "truncate_a".
-HINT:  Truncate table "trunc_b" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_e" does not exist
 TRUNCATE TABLE trunc_c;		-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_d" references "trunc_c".
-HINT:  Truncate table "trunc_d" at the same time, or use TRUNCATE ... CASCADE.
 TRUNCATE TABLE trunc_c,trunc_d;		-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_e" references "trunc_c".
-HINT:  Truncate table "trunc_e" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE trunc_c,trunc_d,trunc_e;	-- ok
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE trunc_c,trunc_d,trunc_e,truncate_a;	-- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_b" references "truncate_a".
-HINT:  Truncate table "trunc_b" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE trunc_c,trunc_d,trunc_e,truncate_a,trunc_b;	-- ok
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE truncate_a RESTRICT; -- fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_b" references "truncate_a".
-HINT:  Truncate table "trunc_b" at the same time, or use TRUNCATE ... CASCADE.
 TRUNCATE TABLE truncate_a CASCADE;  -- ok
-NOTICE:  truncate cascades to table "trunc_b"
-NOTICE:  truncate cascades to table "trunc_e"
 -- circular references
 ALTER TABLE truncate_a ADD FOREIGN KEY (col1) REFERENCES trunc_c;
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: ALTER TABLE truncate_a ADD FOREIGN KEY (col1) REFERENCES tru...
+                                   ^
 -- Add some data to verify that truncating actually works ...
 INSERT INTO trunc_c VALUES (1);
 INSERT INTO truncate_a VALUES (1);
 INSERT INTO trunc_b VALUES (1);
+ERROR:  relation "trunc_b" does not exist
+LINE 1: INSERT INTO trunc_b VALUES (1);
+                    ^
 INSERT INTO trunc_d VALUES (1);
+ERROR:  relation "trunc_d" does not exist
+LINE 1: INSERT INTO trunc_d VALUES (1);
+                    ^
 INSERT INTO trunc_e VALUES (1,1);
+ERROR:  relation "trunc_e" does not exist
+LINE 1: INSERT INTO trunc_e VALUES (1,1);
+                    ^
 TRUNCATE TABLE trunc_c;
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "truncate_a" references "trunc_c".
-HINT:  Truncate table "truncate_a" at the same time, or use TRUNCATE ... CASCADE.
 TRUNCATE TABLE trunc_c,truncate_a;
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_d" references "trunc_c".
-HINT:  Truncate table "trunc_d" at the same time, or use TRUNCATE ... CASCADE.
 TRUNCATE TABLE trunc_c,truncate_a,trunc_d;
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_e" references "trunc_c".
-HINT:  Truncate table "trunc_e" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE trunc_c,truncate_a,trunc_d,trunc_e;
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "trunc_b" references "truncate_a".
-HINT:  Truncate table "trunc_b" at the same time, or use TRUNCATE ... CASCADE.
+ERROR:  relation "trunc_d" does not exist
 TRUNCATE TABLE trunc_c,truncate_a,trunc_d,trunc_e,trunc_b;
+ERROR:  relation "trunc_d" does not exist
 -- Verify that truncating did actually work
 SELECT * FROM truncate_a
    UNION ALL
@@ -101,26 +97,29 @@ SELECT * FROM truncate_a
  SELECT * FROM trunc_b
    UNION ALL
  SELECT * FROM trunc_d;
- col1 
-------
-(0 rows)
-
+ERROR:  relation "trunc_b" does not exist
+LINE 5:  SELECT * FROM trunc_b
+                       ^
 SELECT * FROM trunc_e;
- a | b 
----+---
-(0 rows)
-
+ERROR:  relation "trunc_e" does not exist
+LINE 1: SELECT * FROM trunc_e;
+                      ^
 -- Add data again to test TRUNCATE ... CASCADE
 INSERT INTO trunc_c VALUES (1);
 INSERT INTO truncate_a VALUES (1);
 INSERT INTO trunc_b VALUES (1);
+ERROR:  relation "trunc_b" does not exist
+LINE 1: INSERT INTO trunc_b VALUES (1);
+                    ^
 INSERT INTO trunc_d VALUES (1);
+ERROR:  relation "trunc_d" does not exist
+LINE 1: INSERT INTO trunc_d VALUES (1);
+                    ^
 INSERT INTO trunc_e VALUES (1,1);
+ERROR:  relation "trunc_e" does not exist
+LINE 1: INSERT INTO trunc_e VALUES (1,1);
+                    ^
 TRUNCATE TABLE trunc_c CASCADE;  -- ok
-NOTICE:  truncate cascades to table "truncate_a"
-NOTICE:  truncate cascades to table "trunc_d"
-NOTICE:  truncate cascades to table "trunc_e"
-NOTICE:  truncate cascades to table "trunc_b"
 SELECT * FROM truncate_a
    UNION ALL
  SELECT * FROM trunc_c
@@ -128,16 +127,15 @@ SELECT * FROM truncate_a
  SELECT * FROM trunc_b
    UNION ALL
  SELECT * FROM trunc_d;
- col1 
-------
-(0 rows)
-
+ERROR:  relation "trunc_b" does not exist
+LINE 5:  SELECT * FROM trunc_b
+                       ^
 SELECT * FROM trunc_e;
- a | b 
----+---
-(0 rows)
-
+ERROR:  relation "trunc_e" does not exist
+LINE 1: SELECT * FROM trunc_e;
+                      ^
 DROP TABLE truncate_a,trunc_c,trunc_b,trunc_d,trunc_e CASCADE;
+ERROR:  table "trunc_b" does not exist
 -- Test TRUNCATE with inheritance
 CREATE TABLE trunc_f (col1 integer primary key);
 INSERT INTO trunc_f VALUES (1);
@@ -363,35 +361,44 @@ DROP FUNCTION trunctrigger();
 CREATE SEQUENCE truncate_a_id1 START WITH 33;
 CREATE TABLE truncate_a (id serial,
                          id1 integer default nextval('truncate_a_id1'));
+ERROR:  relation "truncate_a" already exists
 ALTER SEQUENCE truncate_a_id1 OWNED BY truncate_a.id1;
+ERROR:  column "id1" of relation "truncate_a" does not exist
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 SELECT * FROM truncate_a;
- id | id1 
-----+-----
-  1 |  33
-  2 |  34
-(2 rows)
+ col1 
+------
+    1
+(1 row)
 
 TRUNCATE truncate_a;
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 SELECT * FROM truncate_a;
- id | id1 
-----+-----
-  3 |  35
-  4 |  36
-(2 rows)
+ col1 
+------
+(0 rows)
 
 TRUNCATE truncate_a RESTART IDENTITY;
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 SELECT * FROM truncate_a;
- id | id1 
-----+-----
-  1 |  33
-  2 |  34
-(2 rows)
+ col1 
+------
+(0 rows)
 
 CREATE TABLE truncate_b (id int GENERATED ALWAYS AS IDENTITY (START WITH 44));
 INSERT INTO truncate_b DEFAULT VALUES;
@@ -427,29 +434,29 @@ SELECT * FROM truncate_b;
 BEGIN;
 TRUNCATE truncate_a RESTART IDENTITY;
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 SELECT * FROM truncate_a;
- id | id1 
-----+-----
-  1 |  33
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 INSERT INTO truncate_a DEFAULT VALUES;
+ERROR:  null value in column "col1" of relation "truncate_a" violates not-null constraint
+DETAIL:  Failing row contains (null).
 SELECT * FROM truncate_a;
- id | id1 
-----+-----
-  1 |  33
-  2 |  34
-  3 |  35
-  4 |  36
-(4 rows)
+ col1 
+------
+(0 rows)
 
 DROP TABLE truncate_a;
 SELECT nextval('truncate_a_id1'); -- fail, seq should have been dropped
-ERROR:  relation "truncate_a_id1" does not exist
-LINE 1: SELECT nextval('truncate_a_id1');
-                       ^
+ nextval 
+---------
+      33
+(1 row)
+
 -- partitioned table
 CREATE TABLE truncparted (a int, b char) PARTITION BY LIST (a);
 -- error, can't truncate a partitioned table
@@ -484,63 +491,74 @@ $$;
 CREATE TABLE truncprim (a int PRIMARY KEY);
 CREATE TABLE truncpart (a int REFERENCES truncprim)
   PARTITION BY RANGE (a);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE truncpart (a int REFERENCES truncprim)
+                                      ^
 CREATE TABLE truncpart_1 PARTITION OF truncpart FOR VALUES FROM (0) TO (100);
+ERROR:  relation "truncpart" does not exist
 CREATE TABLE truncpart_2 PARTITION OF truncpart FOR VALUES FROM (100) TO (200)
   PARTITION BY RANGE (a);
+ERROR:  relation "truncpart" does not exist
 CREATE TABLE truncpart_2_1 PARTITION OF truncpart_2 FOR VALUES FROM (100) TO (150);
+ERROR:  relation "truncpart_2" does not exist
 CREATE TABLE truncpart_2_d PARTITION OF truncpart_2 DEFAULT;
+ERROR:  relation "truncpart_2" does not exist
 TRUNCATE TABLE truncprim;	-- should fail
-ERROR:  cannot truncate a table referenced in a foreign key constraint
-DETAIL:  Table "truncpart" references "truncprim".
-HINT:  Truncate table "truncpart" at the same time, or use TRUNCATE ... CASCADE.
 select tp_ins_data();
- tp_ins_data 
--------------
- 
-(1 row)
-
+ERROR:  relation "truncpart" does not exist
+LINE 1: INSERT INTO truncpart VALUES (1), (100), (150)
+                    ^
+QUERY:  INSERT INTO truncpart VALUES (1), (100), (150)
+CONTEXT:  PL/pgSQL function tp_ins_data() line 4 at SQL statement
 -- should truncate everything
 TRUNCATE TABLE truncprim, truncpart;
+ERROR:  relation "truncpart" does not exist
 select * from tp_chk_data();
- pktb | pkval | fktb | fkval 
-------+-------+------+-------
-(0 rows)
-
+ERROR:  relation "truncpart" does not exist
+LINE 3:     FROM truncprim pk FULL JOIN truncpart fk USING (a)
+                                        ^
+QUERY:  SELECT
+      pk.tableoid::regclass, pk.a, fk.tableoid::regclass, fk.a
+    FROM truncprim pk FULL JOIN truncpart fk USING (a)
+    ORDER BY 2, 4
+CONTEXT:  PL/pgSQL function tp_chk_data() line 3 at RETURN QUERY
 select tp_ins_data();
- tp_ins_data 
--------------
- 
-(1 row)
-
+ERROR:  relation "truncpart" does not exist
+LINE 1: INSERT INTO truncpart VALUES (1), (100), (150)
+                    ^
+QUERY:  INSERT INTO truncpart VALUES (1), (100), (150)
+CONTEXT:  PL/pgSQL function tp_ins_data() line 4 at SQL statement
 -- should truncate everything
 TRUNCATE TABLE truncprim CASCADE;
-NOTICE:  truncate cascades to table "truncpart"
-NOTICE:  truncate cascades to table "truncpart_1"
-NOTICE:  truncate cascades to table "truncpart_2"
-NOTICE:  truncate cascades to table "truncpart_2_1"
-NOTICE:  truncate cascades to table "truncpart_2_d"
 SELECT * FROM tp_chk_data();
- pktb | pkval | fktb | fkval 
-------+-------+------+-------
-(0 rows)
-
+ERROR:  relation "truncpart" does not exist
+LINE 3:     FROM truncprim pk FULL JOIN truncpart fk USING (a)
+                                        ^
+QUERY:  SELECT
+      pk.tableoid::regclass, pk.a, fk.tableoid::regclass, fk.a
+    FROM truncprim pk FULL JOIN truncpart fk USING (a)
+    ORDER BY 2, 4
+CONTEXT:  PL/pgSQL function tp_chk_data() line 3 at RETURN QUERY
 SELECT tp_ins_data();
- tp_ins_data 
--------------
- 
-(1 row)
-
+ERROR:  relation "truncpart" does not exist
+LINE 1: INSERT INTO truncpart VALUES (1), (100), (150)
+                    ^
+QUERY:  INSERT INTO truncpart VALUES (1), (100), (150)
+CONTEXT:  PL/pgSQL function tp_ins_data() line 4 at SQL statement
 -- should truncate all partitions
 TRUNCATE TABLE truncpart;
+ERROR:  relation "truncpart" does not exist
 SELECT * FROM tp_chk_data();
-   pktb    | pkval | fktb | fkval 
------------+-------+------+-------
- truncprim |     1 |      |      
- truncprim |   100 |      |      
- truncprim |   150 |      |      
-(3 rows)
-
+ERROR:  relation "truncpart" does not exist
+LINE 3:     FROM truncprim pk FULL JOIN truncpart fk USING (a)
+                                        ^
+QUERY:  SELECT
+      pk.tableoid::regclass, pk.a, fk.tableoid::regclass, fk.a
+    FROM truncprim pk FULL JOIN truncpart fk USING (a)
+    ORDER BY 2, 4
+CONTEXT:  PL/pgSQL function tp_chk_data() line 3 at RETURN QUERY
 DROP TABLE truncprim, truncpart;
+ERROR:  table "truncpart" does not exist
 DROP FUNCTION tp_ins_data(), tp_chk_data();
 -- test cascade when referencing a partitioned table
 CREATE TABLE trunc_a (a INT PRIMARY KEY) PARTITION BY RANGE (a);
@@ -557,32 +575,41 @@ CREATE TABLE ref_b (
     b INT PRIMARY KEY,
     a INT REFERENCES trunc_a(a) ON DELETE CASCADE
 );
+ERROR:  foreign key constraints are not supported in minipg
+LINE 3:     a INT REFERENCES trunc_a(a) ON DELETE CASCADE
+                  ^
 INSERT INTO ref_b VALUES (10, 0), (50, 5), (100, 10), (150, 15);
+ERROR:  relation "ref_b" does not exist
+LINE 1: INSERT INTO ref_b VALUES (10, 0), (50, 5), (100, 10), (150, ...
+                    ^
 TRUNCATE TABLE trunc_a1 CASCADE;
-NOTICE:  truncate cascades to table "ref_b"
 SELECT a FROM ref_b;
- a 
----
-(0 rows)
-
+ERROR:  relation "ref_b" does not exist
+LINE 1: SELECT a FROM ref_b;
+                      ^
 DROP TABLE ref_b;
+ERROR:  table "ref_b" does not exist
 -- truncate a partition cascading to a partitioned table
 CREATE TABLE ref_c (
     c INT PRIMARY KEY,
     a INT REFERENCES trunc_a(a) ON DELETE CASCADE
 ) PARTITION BY RANGE (c);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 3:     a INT REFERENCES trunc_a(a) ON DELETE CASCADE
+                  ^
 CREATE TABLE ref_c1 PARTITION OF ref_c FOR VALUES FROM (100) TO (200);
+ERROR:  relation "ref_c" does not exist
 CREATE TABLE ref_c2 PARTITION OF ref_c FOR VALUES FROM (200) TO (300);
+ERROR:  relation "ref_c" does not exist
 INSERT INTO ref_c VALUES (100, 10), (150, 15), (200, 20), (250, 25);
+ERROR:  relation "ref_c" does not exist
+LINE 1: INSERT INTO ref_c VALUES (100, 10), (150, 15), (200, 20), (2...
+                    ^
 TRUNCATE TABLE trunc_a21 CASCADE;
-NOTICE:  truncate cascades to table "ref_c"
-NOTICE:  truncate cascades to table "ref_c1"
-NOTICE:  truncate cascades to table "ref_c2"
 SELECT a as "from table ref_c" FROM ref_c;
- from table ref_c 
-------------------
-(0 rows)
-
+ERROR:  relation "ref_c" does not exist
+LINE 1: SELECT a as "from table ref_c" FROM ref_c;
+                                            ^
 SELECT a as "from table trunc_a" FROM trunc_a ORDER BY a;
  from table trunc_a 
 --------------------
@@ -592,3 +619,4 @@ SELECT a as "from table trunc_a" FROM trunc_a ORDER BY a;
 (3 rows)
 
 DROP TABLE trunc_a, ref_c;
+ERROR:  table "ref_c" does not exist

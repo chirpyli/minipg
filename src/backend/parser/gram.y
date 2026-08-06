@@ -1919,17 +1919,16 @@ alter_table_cmd:
 			/* ALTER TABLE <name> ALTER CONSTRAINT ... */
 			| ALTER CONSTRAINT name ConstraintAttributeSpec
 				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					Constraint *c = makeNode(Constraint);
-					n->subtype = AT_AlterConstraint;
-					n->def = (Node *) c;
-					c->contype = CONSTR_FOREIGN; /* others not supported, yet */
-					c->conname = $3;
-					processCASbits($4, @4, "FOREIGN KEY",
-									&c->deferrable,
-									&c->initdeferred,
-									NULL, NULL, yyscanner);
-					$$ = (Node *)n;
+					/*
+					 * Foreign-key constraints are not supported in minipg.
+					 * Only foreign-key constraints have deferrable attributes,
+					 * so this ALTER CONSTRAINT syntax is rejected entirely.
+					 */
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("foreign key constraints are not supported in minipg"),
+							 parser_errposition(@1)));
+					$$ = NULL;
 				}
 			/* ALTER TABLE <name> VALIDATE CONSTRAINT ... */
 			| VALIDATE CONSTRAINT name
@@ -3131,18 +3130,12 @@ ColConstraintElem:
 				}
 			| REFERENCES qualified_name opt_column_list key_match key_actions
 				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_FOREIGN;
-					n->location = @1;
-					n->pktable			= $2;
-					n->fk_attrs			= NIL;
-					n->pk_attrs			= $3;
-					n->fk_matchtype		= $4;
-					n->fk_upd_action	= (char) ($5 >> 8);
-					n->fk_del_action	= (char) ($5 & 0xFF);
-					n->skip_validation  = false;
-					n->initially_valid  = true;
-					$$ = (Node *)n;
+					/* Foreign-key constraints are not supported in minipg. */
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("foreign key constraints are not supported in minipg"),
+							 parser_errposition(@1)));
+					$$ = NULL;
 				}
 		;
 
@@ -3342,21 +3335,12 @@ ConstraintElem:
 			| FOREIGN KEY '(' columnList ')' REFERENCES qualified_name
 				opt_column_list key_match key_actions ConstraintAttributeSpec
 				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_FOREIGN;
-					n->location = @1;
-					n->pktable			= $7;
-					n->fk_attrs			= $4;
-					n->pk_attrs			= $8;
-					n->fk_matchtype		= $9;
-					n->fk_upd_action	= (char) ($10 >> 8);
-					n->fk_del_action	= (char) ($10 & 0xFF);
-					processCASbits($11, @11, "FOREIGN KEY",
-								   &n->deferrable, &n->initdeferred,
-								   &n->skip_validation, NULL,
-								   yyscanner);
-					n->initially_valid = !n->skip_validation;
-					$$ = (Node *)n;
+					/* Foreign-key constraints are not supported in minipg. */
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("foreign key constraints are not supported in minipg"),
+							 parser_errposition(@1)));
+					$$ = NULL;
 				}
 		;
 

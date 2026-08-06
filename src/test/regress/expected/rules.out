@@ -2518,6 +2518,9 @@ create table rule_and_refint_t3 (
 	foreign key (id3a, id3b) references rule_and_refint_t1 (id1a, id1b),
 	foreign key (id3a, id3c) references rule_and_refint_t2 (id2a, id2c)
 );
+ERROR:  foreign key constraints are not supported in minipg
+LINE 7:  foreign key (id3a, id3b) references rule_and_refint_t1 (id1...
+         ^
 insert into rule_and_refint_t1 values (1, 11);
 insert into rule_and_refint_t1 values (1, 12);
 insert into rule_and_refint_t1 values (2, 21);
@@ -2527,26 +2530,42 @@ insert into rule_and_refint_t2 values (1, 12);
 insert into rule_and_refint_t2 values (2, 21);
 insert into rule_and_refint_t2 values (2, 22);
 insert into rule_and_refint_t3 values (1, 11, 11, 'row1');
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 11, 11, 'row1');
+                    ^
 insert into rule_and_refint_t3 values (1, 11, 12, 'row2');
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 11, 12, 'row2');
+                    ^
 insert into rule_and_refint_t3 values (1, 12, 11, 'row3');
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 12, 11, 'row3');
+                    ^
 insert into rule_and_refint_t3 values (1, 12, 12, 'row4');
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 12, 12, 'row4');
+                    ^
 insert into rule_and_refint_t3 values (1, 11, 13, 'row5');
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3c_fkey"
-DETAIL:  Key (id3a, id3c)=(1, 13) is not present in table "rule_and_refint_t2".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 11, 13, 'row5');
+                    ^
 insert into rule_and_refint_t3 values (1, 13, 11, 'row6');
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3b_fkey"
-DETAIL:  Key (id3a, id3b)=(1, 13) is not present in table "rule_and_refint_t1".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 13, 11, 'row6');
+                    ^
 -- Ordinary table
 insert into rule_and_refint_t3 values (1, 13, 11, 'row6')
   on conflict do nothing;
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3b_fkey"
-DETAIL:  Key (id3a, id3b)=(1, 13) is not present in table "rule_and_refint_t1".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 13, 11, 'row6')
+                    ^
 -- rule not fired, so fk violation
 insert into rule_and_refint_t3 values (1, 13, 11, 'row6')
   on conflict (id3a, id3b, id3c) do update
   set id3b = excluded.id3b;
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3b_fkey"
-DETAIL:  Key (id3a, id3b)=(1, 13) is not present in table "rule_and_refint_t1".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 13, 11, 'row6')
+                    ^
 -- rule fired, so unsupported
 insert into shoelace values ('sl9', 0, 'pink', 35.0, 'inch', 0.0)
   on conflict (sl_name) do update
@@ -2561,12 +2580,15 @@ create rule rule_and_refint_t3_ins as on insert to rule_and_refint_t3
 	where (((rule_and_refint_t3.id3a = new.id3a)
 	and (rule_and_refint_t3.id3b = new.id3b))
 	and (rule_and_refint_t3.id3c = new.id3c));
+ERROR:  relation "rule_and_refint_t3" does not exist
 insert into rule_and_refint_t3 values (1, 11, 13, 'row7');
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3c_fkey"
-DETAIL:  Key (id3a, id3c)=(1, 13) is not present in table "rule_and_refint_t2".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 11, 13, 'row7');
+                    ^
 insert into rule_and_refint_t3 values (1, 13, 11, 'row8');
-ERROR:  insert or update on table "rule_and_refint_t3" violates foreign key constraint "rule_and_refint_t3_id3a_id3b_fkey"
-DETAIL:  Key (id3a, id3b)=(1, 13) is not present in table "rule_and_refint_t1".
+ERROR:  relation "rule_and_refint_t3" does not exist
+LINE 1: insert into rule_and_refint_t3 values (1, 13, 11, 'row8');
+                    ^
 --
 -- disallow dropping a view's rule (bug #5072)
 --

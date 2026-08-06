@@ -4496,25 +4496,12 @@ RelationGetFKeyList(Relation relation)
 	while (HeapTupleIsValid(htup = systable_getnext(conscan)))
 	{
 		Form_pg_constraint constraint = (Form_pg_constraint) GETSTRUCT(htup);
-		ForeignKeyCacheInfo *info;
 
-		/* consider only foreign keys */
+		/* Foreign-key constraints are not supported in minipg. */
 		if (constraint->contype != CONSTRAINT_FOREIGN)
 			continue;
 
-		info = makeNode(ForeignKeyCacheInfo);
-		info->conoid = constraint->oid;
-		info->conrelid = constraint->conrelid;
-		info->confrelid = constraint->confrelid;
-
-		DeconstructFkConstraintRow(htup, &info->nkeys,
-								   info->conkey,
-								   info->confkey,
-								   info->conpfeqop,
-								   NULL, NULL);
-
-		/* Add FK's node to the result list */
-		result = lappend(result, info);
+		/* FK rows should never exist; the branch above always continues. */
 	}
 
 	systable_endscan(conscan);

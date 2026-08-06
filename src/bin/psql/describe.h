@@ -40,9 +40,6 @@ extern bool listDbRoleSettings(const char *pattern, const char *pattern2);
 /* \z (or \dp) */
 extern bool permissionsList(const char *pattern);
 
-/* \ddp */
-extern bool listDefaultACLs(const char *pattern);
-
 /* \dd */
 extern bool objectDescription(const char *pattern, bool showSystem);
 

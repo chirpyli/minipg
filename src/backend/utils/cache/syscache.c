@@ -34,7 +34,6 @@
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
-#include "catalog/pg_default_acl.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_description.h"
 #include "catalog/pg_enum.h"
@@ -355,17 +354,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		4
-	},
-	{DefaultAclRelationId,		/* DEFACLROLENSPOBJ */
-		DefaultAclRoleNspObjIndexId,
-		3,
-		{
-			Anum_pg_default_acl_defaclrole,
-			Anum_pg_default_acl_defaclnamespace,
-			Anum_pg_default_acl_defaclobjtype,
-			0
-		},
-		8
 	},
 	{EnumRelationId,			/* ENUMOID */
 		EnumOidIndexId,

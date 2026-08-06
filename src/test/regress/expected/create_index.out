@@ -886,6 +886,9 @@ CREATE INDEX concur_reindex_ind4 ON concur_reindex_tab(c1, c1, c2);
 -- Create table for check on foreign key dependence switch with indexes swapped
 ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
+ERROR:  foreign key constraints are not supported in minipg
+LINE 1: CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_r...
+                                                 ^
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
 -- Dependency lookup before and after the follow-up REINDEX commands.
@@ -1352,10 +1355,9 @@ Indexes:
     "concur_reindex_ind2" btree (c2)
     "concur_reindex_ind3" UNIQUE, btree (abs(c1))
     "concur_reindex_ind4" btree (c1, c1, c2)
-Referenced by:
-    TABLE "concur_reindex_tab2" CONSTRAINT "concur_reindex_tab2_c1_fkey" FOREIGN KEY (c1) REFERENCES concur_reindex_tab(c1)
 
 DROP TABLE concur_reindex_tab, concur_reindex_tab2;
+ERROR:  table "concur_reindex_tab2" does not exist
 -- Check handling of invalid indexes
 CREATE TABLE concur_reindex_tab4 (c1 int);
 INSERT INTO concur_reindex_tab4 VALUES (1), (1), (2);

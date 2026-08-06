@@ -32,10 +32,8 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_default_acl.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_namespace.h"
@@ -155,7 +153,6 @@ static const Oid object_classes[] = {
 	AuthIdRelationId,			/* OCLASS_ROLE */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
-	DefaultAclRelationId,		/* OCLASS_DEFACL */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
 	PublicationRelationId,		/* OCLASS_PUBLICATION */
 	PublicationRelRelationId,	/* OCLASS_PUBLICATION_REL */
@@ -193,7 +190,6 @@ static bool object_address_present_add_flags(const ObjectAddress *object,
 static bool stack_address_present_add_flags(const ObjectAddress *object,
 											int flags,
 											ObjectAddressStack *stack);
-static void DeleteInitPrivs(const ObjectAddress *object);
 
 
 /*
@@ -1329,14 +1325,12 @@ deleteOneObject(const ObjectAddress *object, Relation *depRel, int flags)
 
 
 	/*
-	 * Delete any comments, or initial privileges associated
-	 * with this object.  (This is a convenient place to do these things,
-	 * rather than having every object type know to do it.)  As above, all
-	 * these functions must remove records for sub-objects too if the subid is
-	 * zero.
+	 * Delete any comments associated with this object.  (This is a convenient
+	 * place to do this, rather than having every object type know to do it.)
+	 * As above, all these functions must remove records for sub-objects too
+	 * if the subid is zero.
 	 */
 	DeleteComments(object->objectId, object->classId, object->objectSubId);
-	DeleteInitPrivs(object);
 
 	/*
 	 * CommandCounterIncrement here to ensure that preceding changes are all
@@ -1447,7 +1441,6 @@ doDeletion(const ObjectAddress *object, int flags)
 		case OCLASS_AMOP:
 		case OCLASS_AMPROC:
 		case OCLASS_SCHEMA:
-		case OCLASS_DEFACL:
 		case OCLASS_TRANSFORM:
 			DropObjectById(object);
 			break;
@@ -2758,9 +2751,6 @@ getObjectClass(const ObjectAddress *object)
 		case TableSpaceRelationId:
 			return OCLASS_TBLSPACE;
 
-		case DefaultAclRelationId:
-			return OCLASS_DEFACL;
-
 		case ExtensionRelationId:
 			return OCLASS_EXTENSION;
 
@@ -2780,48 +2770,4 @@ getObjectClass(const ObjectAddress *object)
 	/* shouldn't get here */
 	elog(ERROR, "unrecognized object class: %u", object->classId);
 	return OCLASS_CLASS;		/* keep compiler quiet */
-}
-
-/*
- * delete initial ACL for extension objects
- */
-static void
-DeleteInitPrivs(const ObjectAddress *object)
-{
-	Relation	relation;
-	ScanKeyData key[3];
-	int			nkeys;
-	SysScanDesc scan;
-	HeapTuple	oldtuple;
-
-	relation = table_open(InitPrivsRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_init_privs_objoid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(object->objectId));
-	ScanKeyInit(&key[1],
-				Anum_pg_init_privs_classoid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(object->classId));
-	if (object->objectSubId != 0)
-	{
-		ScanKeyInit(&key[2],
-					Anum_pg_init_privs_objsubid,
-					BTEqualStrategyNumber, F_INT4EQ,
-					Int32GetDatum(object->objectSubId));
-		nkeys = 3;
-	}
-	else
-		nkeys = 2;
-
-	scan = systable_beginscan(relation, InitPrivsObjIndexId, true,
-							  NULL, nkeys, key);
-
-	while (HeapTupleIsValid(oldtuple = systable_getnext(scan)))
-		CatalogTupleDelete(relation, &oldtuple->t_self);
-
-	systable_endscan(scan);
-
-	table_close(relation, RowExclusiveLock);
 }

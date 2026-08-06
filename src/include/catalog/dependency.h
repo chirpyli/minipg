@@ -113,7 +113,6 @@ typedef enum ObjectClass
 	OCLASS_ROLE,				/* pg_authid */
 	OCLASS_DATABASE,			/* pg_database */
 	OCLASS_TBLSPACE,			/* pg_tablespace */
-	OCLASS_DEFACL,				/* pg_default_acl */
 	OCLASS_EXTENSION,			/* pg_extension */
 	OCLASS_PUBLICATION,			/* pg_publication */
 	OCLASS_PUBLICATION_REL,		/* pg_publication_rel */

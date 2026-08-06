@@ -32,7 +32,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_default_acl.h"
 #include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
@@ -217,20 +216,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		OBJECT_DATABASE,
 		true
-	},
-	{
-		"default ACL",
-		DefaultAclRelationId,
-		DefaultAclOidIndexId,
-		-1,
-		-1,
-		Anum_pg_default_acl_oid,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_DEFACL,
-		false
 	},
 	{
 		"extension",
@@ -636,10 +621,6 @@ static const struct object_type_map
 	{
 		"tablespace", OBJECT_TABLESPACE
 	},
-	/* OCLASS_DEFACL */
-	{
-		"default acl", OBJECT_DEFACL
-	},
 	/* OCLASS_EXTENSION */
 	{
 		"extension", OBJECT_EXTENSION
@@ -696,8 +677,6 @@ static ObjectAddress get_object_address_opf_member(ObjectType objtype,
 static ObjectAddress get_object_address_publication_rel(List *object,
 														Relation *relp,
 														bool missing_ok);
-static ObjectAddress get_object_address_defacl(List *object,
-											   bool missing_ok);
 static const ObjectPropertyType *get_object_property_data(Oid class_id);
 
 static void getRelationDescription(StringInfo buffer, Oid relid,
@@ -908,10 +887,6 @@ get_object_address(ObjectType objtype, Node *object,
 			address = get_object_address_publication_rel(castNode(List, object),
 															 &relation,
 															 missing_ok);
-				break;
-			case OBJECT_DEFACL:
-				address = get_object_address_defacl(castNode(List, object),
-													missing_ok);
 				break;
 			case OBJECT_STATISTIC_EXT:
 				address.classId = StatisticExtRelationId;
@@ -1622,121 +1597,6 @@ get_object_address_publication_rel(List *object,
 }
 
 /*
- * Find the ObjectAddress for a default ACL.
- */
-static ObjectAddress
-get_object_address_defacl(List *object, bool missing_ok)
-{
-	HeapTuple	tp;
-	Oid			userid;
-	Oid			schemaid;
-	char	   *username;
-	char	   *schema;
-	char		objtype;
-	char	   *objtype_str;
-	ObjectAddress address;
-
-	ObjectAddressSet(address, DefaultAclRelationId, InvalidOid);
-
-	/*
-	 * First figure out the textual attributes so that they can be used for
-	 * error reporting.
-	 */
-	username = strVal(lsecond(object));
-	if (list_length(object) >= 3)
-		schema = (char *) strVal(lthird(object));
-	else
-		schema = NULL;
-
-	/*
-	 * Decode defaclobjtype.  Only first char is considered; the rest of the
-	 * string, if any, is blissfully ignored.
-	 */
-	objtype = ((char *) strVal(linitial(object)))[0];
-	switch (objtype)
-	{
-		case DEFACLOBJ_RELATION:
-			objtype_str = "tables";
-			break;
-		case DEFACLOBJ_SEQUENCE:
-			objtype_str = "sequences";
-			break;
-		case DEFACLOBJ_FUNCTION:
-			objtype_str = "functions";
-			break;
-		case DEFACLOBJ_TYPE:
-			objtype_str = "types";
-			break;
-		case DEFACLOBJ_NAMESPACE:
-			objtype_str = "schemas";
-			break;
-		default:
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("unrecognized default ACL object type \"%c\"", objtype),
-					 errhint("Valid object types are \"%c\", \"%c\", \"%c\", \"%c\", \"%c\".",
-							 DEFACLOBJ_RELATION,
-							 DEFACLOBJ_SEQUENCE,
-							 DEFACLOBJ_FUNCTION,
-							 DEFACLOBJ_TYPE,
-							 DEFACLOBJ_NAMESPACE)));
-	}
-
-	/*
-	 * Look up user ID.  Behave as "default ACL not found" if the user doesn't
-	 * exist.
-	 */
-	tp = SearchSysCache1(AUTHNAME,
-						 CStringGetDatum(username));
-	if (!HeapTupleIsValid(tp))
-		goto not_found;
-	userid = ((Form_pg_authid) GETSTRUCT(tp))->oid;
-	ReleaseSysCache(tp);
-
-	/*
-	 * If a schema name was given, look up its OID.  If it doesn't exist,
-	 * behave as "default ACL not found".
-	 */
-	if (schema)
-	{
-		schemaid = get_namespace_oid(schema, true);
-		if (schemaid == InvalidOid)
-			goto not_found;
-	}
-	else
-		schemaid = InvalidOid;
-
-	/* Finally, look up the pg_default_acl object */
-	tp = SearchSysCache3(DEFACLROLENSPOBJ,
-						 ObjectIdGetDatum(userid),
-						 ObjectIdGetDatum(schemaid),
-						 CharGetDatum(objtype));
-	if (!HeapTupleIsValid(tp))
-		goto not_found;
-
-	address.objectId = ((Form_pg_default_acl) GETSTRUCT(tp))->oid;
-	ReleaseSysCache(tp);
-
-	return address;
-
-not_found:
-	if (!missing_ok)
-	{
-		if (schema)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("default ACL for user \"%s\" in schema \"%s\" on %s does not exist",
-							username, schema, objtype_str)));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("default ACL for user \"%s\" on %s does not exist",
-							username, objtype_str)));
-	}
-	return address;
-}
-
-/*
  * Convert an array of TEXT into a List of string Values, as emitted by the
  * parser, which is what get_object_address uses as input.
  */
@@ -1889,12 +1749,11 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	 */
 	switch (type)
 	{
-		case OBJECT_DOMCONSTRAINT:
-		case OBJECT_CAST:
-		case OBJECT_PUBLICATION_REL:
-		case OBJECT_DEFACL:
-		case OBJECT_TRANSFORM:
-			if (list_length(args) != 1)
+			case OBJECT_DOMCONSTRAINT:
+			case OBJECT_CAST:
+			case OBJECT_PUBLICATION_REL:
+			case OBJECT_TRANSFORM:
+				if (list_length(args) != 1)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("argument list length must be exactly %d", 1)));
@@ -1964,10 +1823,7 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 			objnode = (Node *) list_make2(typename, linitial(args));
 			break;
 		case OBJECT_PUBLICATION_REL:
-		objnode = (Node *) list_make2(name, linitial(args));
-		break;
-	case OBJECT_DEFACL:
-			objnode = (Node *) lcons(linitial(args), name);
+			objnode = (Node *) list_make2(name, linitial(args));
 			break;
 		case OBJECT_AMOP:
 		case OBJECT_AMPROC:
@@ -3171,114 +3027,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 			break;
 		}
 
-		case OCLASS_DEFACL:
-		{
-				Relation	defaclrel;
-				ScanKeyData skey[1];
-				SysScanDesc rcscan;
-				HeapTuple	tup;
-				Form_pg_default_acl defacl;
-				char	   *rolename;
-				char	   *nspname;
-
-				defaclrel = table_open(DefaultAclRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_default_acl_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				rcscan = systable_beginscan(defaclrel, DefaultAclOidIndexId,
-											true, NULL, 1, skey);
-
-				tup = systable_getnext(rcscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for default ACL %u",
-							 object->objectId);
-
-					systable_endscan(rcscan);
-					table_close(defaclrel, AccessShareLock);
-					break;
-				}
-
-				defacl = (Form_pg_default_acl) GETSTRUCT(tup);
-
-				rolename = GetUserNameFromId(defacl->defaclrole, false);
-
-				if (OidIsValid(defacl->defaclnamespace))
-					nspname = get_namespace_name(defacl->defaclnamespace);
-				else
-					nspname = NULL;
-
-				switch (defacl->defaclobjtype)
-				{
-					case DEFACLOBJ_RELATION:
-						if (nspname)
-							appendStringInfo(&buffer,
-											 _("default privileges on new relations belonging to role %s in schema %s"),
-											 rolename, nspname);
-						else
-							appendStringInfo(&buffer,
-											 _("default privileges on new relations belonging to role %s"),
-											 rolename);
-						break;
-					case DEFACLOBJ_SEQUENCE:
-						if (nspname)
-							appendStringInfo(&buffer,
-											 _("default privileges on new sequences belonging to role %s in schema %s"),
-											 rolename, nspname);
-						else
-							appendStringInfo(&buffer,
-											 _("default privileges on new sequences belonging to role %s"),
-											 rolename);
-						break;
-					case DEFACLOBJ_FUNCTION:
-						if (nspname)
-							appendStringInfo(&buffer,
-											 _("default privileges on new functions belonging to role %s in schema %s"),
-											 rolename, nspname);
-						else
-							appendStringInfo(&buffer,
-											 _("default privileges on new functions belonging to role %s"),
-											 rolename);
-						break;
-					case DEFACLOBJ_TYPE:
-						if (nspname)
-							appendStringInfo(&buffer,
-											 _("default privileges on new types belonging to role %s in schema %s"),
-											 rolename, nspname);
-						else
-							appendStringInfo(&buffer,
-											 _("default privileges on new types belonging to role %s"),
-											 rolename);
-						break;
-					case DEFACLOBJ_NAMESPACE:
-						Assert(!nspname);
-						appendStringInfo(&buffer,
-										 _("default privileges on new schemas belonging to role %s"),
-										 rolename);
-						break;
-					default:
-						/* shouldn't get here */
-						if (nspname)
-							appendStringInfo(&buffer,
-											 _("default privileges belonging to role %s in schema %s"),
-											 rolename, nspname);
-						else
-							appendStringInfo(&buffer,
-											 _("default privileges belonging to role %s"),
-											 rolename);
-						break;
-				}
-
-				systable_endscan(rcscan);
-				table_close(defaclrel, AccessShareLock);
-				break;
-			}
-
 		case OCLASS_EXTENSION:
 			{
 				char	   *extname;
@@ -3852,10 +3600,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_TBLSPACE:
 			appendStringInfoString(&buffer, "tablespace");
-		break;
-
-	case OCLASS_DEFACL:
-		appendStringInfoString(&buffer, "default acl");
 		break;
 
 		case OCLASS_EXTENSION:
@@ -4716,94 +4460,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 								   quote_identifier(tblspace));
 			break;
 		}
-
-		case OCLASS_DEFACL:
-		{
-				Relation	defaclrel;
-				ScanKeyData skey[1];
-				SysScanDesc rcscan;
-				HeapTuple	tup;
-				Form_pg_default_acl defacl;
-				char	   *schema;
-				char	   *username;
-
-				defaclrel = table_open(DefaultAclRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_default_acl_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				rcscan = systable_beginscan(defaclrel, DefaultAclOidIndexId,
-											true, NULL, 1, skey);
-
-				tup = systable_getnext(rcscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for default ACL %u",
-							 object->objectId);
-
-					systable_endscan(rcscan);
-					table_close(defaclrel, AccessShareLock);
-					break;
-
-				}
-
-				defacl = (Form_pg_default_acl) GETSTRUCT(tup);
-
-				username = GetUserNameFromId(defacl->defaclrole, false);
-				appendStringInfo(&buffer,
-								 "for role %s",
-								 quote_identifier(username));
-
-				if (OidIsValid(defacl->defaclnamespace))
-				{
-					schema = get_namespace_name_or_temp(defacl->defaclnamespace);
-					appendStringInfo(&buffer,
-									 " in schema %s",
-									 quote_identifier(schema));
-				}
-				else
-					schema = NULL;
-
-				switch (defacl->defaclobjtype)
-				{
-					case DEFACLOBJ_RELATION:
-						appendStringInfoString(&buffer,
-											   " on tables");
-						break;
-					case DEFACLOBJ_SEQUENCE:
-						appendStringInfoString(&buffer,
-											   " on sequences");
-						break;
-					case DEFACLOBJ_FUNCTION:
-						appendStringInfoString(&buffer,
-											   " on functions");
-						break;
-					case DEFACLOBJ_TYPE:
-						appendStringInfoString(&buffer,
-											   " on types");
-						break;
-					case DEFACLOBJ_NAMESPACE:
-						appendStringInfoString(&buffer,
-											   " on schemas");
-						break;
-				}
-
-				if (objname)
-				{
-					*objname = list_make1(username);
-					if (schema)
-						*objname = lappend(*objname, schema);
-					*objargs = list_make1(psprintf("%c", defacl->defaclobjtype));
-				}
-
-				systable_endscan(rcscan);
-				table_close(defaclrel, AccessShareLock);
-				break;
-			}
 
 		case OCLASS_EXTENSION:
 			{

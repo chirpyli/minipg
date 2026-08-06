@@ -28,6 +28,7 @@ c|f
 c_star|f
 char_tbl|f
 city|f
+concur_reindex_tab|t
 d|f
 d_star|f
 date_tbl|f
@@ -47,6 +48,7 @@ hash_name_heap|t
 hash_txt_heap|t
 hobbies_r|f
 ihighway|t
+inh_fk_1|t
 int2_tbl|f
 int4_tbl|f
 int8_tbl|f
@@ -97,14 +99,12 @@ pg_constraint|t
 pg_conversion|t
 pg_database|t
 pg_db_role_setting|t
-pg_default_acl|t
 pg_depend|t
 pg_description|t
 pg_enum|t
 pg_extension|t
 pg_index|t
 pg_inherits|t
-pg_init_privs|t
 pg_language|t
 pg_largeobject|t
 pg_largeobject_metadata|t

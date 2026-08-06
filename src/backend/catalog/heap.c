@@ -101,7 +101,6 @@ static void AddNewRelationTuple(Relation pg_class_desc,
 								char relkind,
 								TransactionId relfrozenxid,
 								TransactionId relminmxid,
-								Datum relacl,
 								Datum reloptions);
 static ObjectAddress AddNewRelationType(const char *typeName,
 										Oid typeNamespace,
@@ -930,16 +929,14 @@ AddNewAttributeTuples(Oid new_rel_oid,
  * Caller has already opened and locked pg_class.
  * Tuple data is taken from new_rel_desc->rd_rel, except for the
  * variable-width fields which are not present in a cached reldesc.
- * relacl and reloptions are passed in Datum form (to avoid having
- * to reference the data types in heap.h).  Pass (Datum) 0 to set them
- * to NULL.
+ * reloptions is passed in Datum form (to avoid having to reference
+ * the data type in heap.h).  Pass (Datum) 0 to set it to NULL.
  * --------------------------------
  */
 void
 InsertPgClassTuple(Relation pg_class_desc,
 				   Relation new_rel_desc,
 				   Oid new_rel_oid,
-				   Datum relacl,
 				   Datum reloptions)
 {
 	Form_pg_class rd_rel = new_rel_desc->rd_rel;
@@ -1012,7 +1009,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 					char relkind,
 					TransactionId relfrozenxid,
 					TransactionId relminmxid,
-					Datum relacl,
 					Datum reloptions)
 {
 	Form_pg_class new_rel_reltup;
@@ -1062,7 +1058,7 @@ AddNewRelationTuple(Relation pg_class_desc,
 
 	/* Now build and insert the tuple */
 	InsertPgClassTuple(pg_class_desc, new_rel_desc, new_rel_oid,
-					   relacl, reloptions);
+					   reloptions);
 }
 
 
@@ -1138,8 +1134,6 @@ AddNewRelationType(const char *typeName,
  *	mapped_relation: true if the relation will use the relfilenode map
  *	oncommit: ON COMMIT marking (only relevant if it's a temp table)
  *	reloptions: reloptions in Datum form, or (Datum) 0 if none
- *	use_user_acl: true if should look for user-defined default permissions;
- *		if false, relacl is always set NULL
  *	allow_system_table_mods: true to allow creation in system namespaces
  *	is_internal: is this a system-generated catalog?
  *
@@ -1167,7 +1161,6 @@ heap_create_with_catalog(const char *relname,
 						 bool mapped_relation,
 						 OnCommitAction oncommit,
 						 Datum reloptions,
-						 bool use_user_acl,
 						 bool allow_system_table_mods,
 						 bool is_internal,
 						 Oid relrewrite,
@@ -1175,7 +1168,6 @@ heap_create_with_catalog(const char *relname,
 {
 	Relation	pg_class_desc;
 	Relation	new_rel_desc;
-	Acl		   *relacl;
 	Oid			existing_relid;
 	Oid			old_type_oid;
 	Oid			new_type_oid;
@@ -1275,29 +1267,6 @@ heap_create_with_catalog(const char *relname,
 	 * can't accidentally vary in their lock mode or acquisition timing.
 	 */
 	LockRelationOid(relid, AccessExclusiveLock);
-
-	/*
-	 * Determine the relation's initial permissions.
-	 */
-	if (use_user_acl)
-	{
-		switch (relkind)
-		{
-		case RELKIND_RELATION:
-		case RELKIND_VIEW:
-		case RELKIND_PARTITIONED_TABLE:
-			relacl = NULL;
-				break;
-			case RELKIND_SEQUENCE:
-				relacl = NULL;
-				break;
-			default:
-				relacl = NULL;
-				break;
-		}
-	}
-	else
-		relacl = NULL;
 
 	/*
 	 * Create the relcache entry (mostly dummy at this point) and the physical
@@ -1426,7 +1395,6 @@ heap_create_with_catalog(const char *relname,
 						relkind,
 						relfrozenxid,
 						relminmxid,
-						PointerGetDatum(relacl),
 						reloptions);
 
 	/*

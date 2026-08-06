@@ -63,7 +63,6 @@ OBJS = \
 	quote.o \
 	regexp.o \
 	regproc.o \
-	ri_triggers.o \
 	rowtypes.o \
 	ruleutils.o \
 	rangetypes.o \

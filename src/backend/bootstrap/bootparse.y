@@ -235,7 +235,6 @@ Boot_CreateStmt:
 													  mapped_relation,
 													  ONCOMMIT_NOOP,
 													  (Datum) 0,
-													  false,
 													  true,
 													  false,
 													  InvalidOid,

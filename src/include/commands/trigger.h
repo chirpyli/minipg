@@ -254,24 +254,4 @@ extern void AfterTriggerEndSubXact(bool isCommit);
 extern void AfterTriggerSetState(ConstraintsSetStmt *stmt);
 extern bool AfterTriggerPendingOnRel(Oid relid);
 
-
-/*
- * in utils/adt/ri_triggers.c
- */
-extern bool RI_FKey_pk_upd_check_required(Trigger *trigger, Relation pk_rel,
-										  TupleTableSlot *old_slot, TupleTableSlot *new_slot);
-extern bool RI_FKey_fk_upd_check_required(Trigger *trigger, Relation fk_rel,
-										  TupleTableSlot *old_slot, TupleTableSlot *new_slot);
-extern bool RI_Initial_Check(Trigger *trigger,
-							 Relation fk_rel, Relation pk_rel);
-extern void RI_PartitionRemove_Check(Trigger *trigger, Relation fk_rel,
-									 Relation pk_rel);
-
-/* result values for RI_FKey_trigger_type: */
-#define RI_TRIGGER_PK	1		/* is a trigger on the PK relation */
-#define RI_TRIGGER_FK	2		/* is a trigger on the FK relation */
-#define RI_TRIGGER_NONE 0		/* is not an RI trigger function */
-
-extern int	RI_FKey_trigger_type(Oid tgfoid);
-
 #endif							/* TRIGGER_H */

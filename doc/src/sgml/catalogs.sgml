@@ -123,15 +123,10 @@
      <row>
       <entry><link linkend="catalog-pg-db-role-setting"><structname>pg_db_role_setting</structname></link></entry>
       <entry>per-role and per-database settings</entry>
-     </row>
+    </row>
 
-     <row>
-      <entry><link linkend="catalog-pg-default-acl"><structname>pg_default_acl</structname></link></entry>
-      <entry>default privileges for object types</entry>
-     </row>
-
-     <row>
-      <entry><link linkend="catalog-pg-depend"><structname>pg_depend</structname></link></entry>
+    <row>
+     <entry><link linkend="catalog-pg-depend"><structname>pg_depend</structname></link></entry>
       <entry>dependencies between database objects</entry>
      </row>
 
@@ -173,15 +168,10 @@
      <row>
       <entry><link linkend="catalog-pg-inherits"><structname>pg_inherits</structname></link></entry>
       <entry>table inheritance hierarchy</entry>
-     </row>
+    </row>
 
-     <row>
-      <entry><link linkend="catalog-pg-init-privs"><structname>pg_init_privs</structname></link></entry>
-      <entry>object initial privileges</entry>
-     </row>
-
-     <row>
-      <entry><link linkend="catalog-pg-language"><structname>pg_language</structname></link></entry>
+    <row>
+     <entry><link linkend="catalog-pg-language"><structname>pg_language</structname></link></entry>
       <entry>languages for writing functions</entry>
      </row>
 

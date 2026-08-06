@@ -254,7 +254,6 @@ WITH objects (classid, objid, objsubid) AS (VALUES
     ('pg_foreign_data_wrapper'::regclass, 0, 0), -- no FDW
     ('pg_foreign_server'::regclass, 0, 0), -- no server
     ('pg_user_mapping'::regclass, 0, 0), -- no user mapping
-    ('pg_default_acl'::regclass, 0, 0), -- no default ACL
     ('pg_extension'::regclass, 0, 0), -- no extension
     ('pg_publication'::regclass, 0, 0), -- no publication
     ('pg_publication_rel'::regclass, 0, 0), -- no publication relation

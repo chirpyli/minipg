@@ -232,7 +232,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\dC[+]  [PATTERN]      list casts\n"));
 	fprintf(output, _("  \\dd[S]  [PATTERN]      show object descriptions not displayed elsewhere\n"));
 	fprintf(output, _("  \\dD[S+] [PATTERN]      list domains\n"));
-	fprintf(output, _("  \\ddp    [PATTERN]      list default privileges\n"));
 	fprintf(output, _("  \\df[anptw][S+] [FUNCPTRN [TYPEPTRN ...]]\n"
 					  "                         list [only agg/normal/procedure/trigger/window] functions\n"));
 	fprintf(output, _("  \\dF[+]  [PATTERN]      list text search configurations\n"));

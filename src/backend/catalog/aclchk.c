@@ -35,9 +35,7 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_default_acl.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_init_privs.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_largeobject_metadata.h"
@@ -401,7 +399,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_ATTRIBUTE:
 					case OBJECT_CAST:
 					case OBJECT_DEFAULT:
-					case OBJECT_DEFACL:
 					case OBJECT_DOMCONSTRAINT:
 					case OBJECT_PUBLICATION_REL:
 					case OBJECT_ROLE:
@@ -519,7 +516,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_ATTRIBUTE:
 					case OBJECT_CAST:
 					case OBJECT_DEFAULT:
-					case OBJECT_DEFACL:
 					case OBJECT_DOMCONSTRAINT:
 					case OBJECT_PUBLICATION_REL:
 					case OBJECT_ROLE:
