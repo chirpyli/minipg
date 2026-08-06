@@ -52,11 +52,9 @@
 #include "catalog/pg_range.h"
 #include "catalog/pg_replication_origin.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_seclabel.h"
 #include "catalog/pg_sequence.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_shdescription.h"
-#include "catalog/pg_shseclabel.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_statistic_ext_data.h"
@@ -1439,8 +1437,6 @@ RelationInvalidatesSnapshotsOnly(Oid relid)
 		case SharedDependRelationId:
 		case DescriptionRelationId:
 		case SharedDescriptionRelationId:
-		case SecLabelRelationId:
-		case SharedSecLabelRelationId:
 			return true;
 		default:
 			break;

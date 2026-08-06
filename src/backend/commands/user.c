@@ -27,7 +27,6 @@
 #include "catalog/pg_db_role_setting.h"
 #include "commands/comment.h"
 #include "commands/dbcommands.h"
-#include "commands/seclabel.h"
 #include "commands/user.h"
 #include "libpq/crypt.h"
 #include "miscadmin.h"

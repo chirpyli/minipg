@@ -57,7 +57,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_publication.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_shseclabel.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
@@ -111,7 +110,6 @@ static const FormData_pg_attribute Desc_pg_database[Natts_pg_database] = {Schema
 static const FormData_pg_attribute Desc_pg_authid[Natts_pg_authid] = {Schema_pg_authid};
 static const FormData_pg_attribute Desc_pg_auth_members[Natts_pg_auth_members] = {Schema_pg_auth_members};
 static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_index};
-static const FormData_pg_attribute Desc_pg_shseclabel[Natts_pg_shseclabel] = {Schema_pg_shseclabel};
 static const FormData_pg_attribute Desc_pg_subscription[Natts_pg_subscription] = {Schema_pg_subscription};
 
 /*
@@ -3819,8 +3817,8 @@ RelationCacheInitialize(void)
  *		RelationCacheInitializePhase2
  *
  *		This is called to prepare for access to shared catalogs during startup.
- *		We must at least set up nailed reldescs for pg_database, pg_authid,
- *		pg_auth_members, and pg_shseclabel. Ideally we'd like to have reldescs
+	 *		We must at least set up nailed reldescs for pg_database, pg_authid,
+	 *		pg_auth_members, and pg_subscription. Ideally we'd like to have reldescs
  *		for their indexes, too.  We attempt to load this information from the
  *		shared relcache init file.  If that's missing or broken, just make
  *		phony entries for the catalogs themselves.
@@ -3860,12 +3858,10 @@ RelationCacheInitializePhase2(void)
 				  Natts_pg_authid, Desc_pg_authid);
 		formrdesc("pg_auth_members", AuthMemRelation_Rowtype_Id, true,
 				  Natts_pg_auth_members, Desc_pg_auth_members);
-		formrdesc("pg_shseclabel", SharedSecLabelRelation_Rowtype_Id, true,
-				  Natts_pg_shseclabel, Desc_pg_shseclabel);
 		formrdesc("pg_subscription", SubscriptionRelation_Rowtype_Id, true,
 				  Natts_pg_subscription, Desc_pg_subscription);
 
-#define NUM_CRITICAL_SHARED_RELS	5	/* fix if you change list above */
+#define NUM_CRITICAL_SHARED_RELS	4	/* fix if you change list above */
 	}
 
 	MemoryContextSwitchTo(oldcxt);
@@ -3986,9 +3982,7 @@ RelationCacheInitializePhase3(void)
 	 * non-shared catalogs at all.  Autovacuum calls InitPostgres with a
 	 * database OID, so it instead depends on DatabaseOidIndexId.  We also
 	 * need to nail up some indexes on pg_authid and pg_auth_members for use
-	 * during client authentication.  SharedSecLabelObjectIndexId isn't
-	 * critical for the core system, but authentication hooks might be
-	 * interested in it.
+	 * during client authentication.
 	 */
 	if (!criticalSharedRelcachesBuilt)
 	{
@@ -4002,10 +3996,8 @@ RelationCacheInitializePhase3(void)
 							AuthIdRelationId);
 		load_critical_index(AuthMemMemRoleIndexId,
 							AuthMemRelationId);
-		load_critical_index(SharedSecLabelObjectIndexId,
-							SharedSecLabelRelationId);
 
-#define NUM_CRITICAL_SHARED_INDEXES 6	/* fix if you change list above */
+#define NUM_CRITICAL_SHARED_INDEXES 5	/* fix if you change list above */
 
 		criticalSharedRelcachesBuilt = true;
 	}
@@ -6400,10 +6392,8 @@ write_item(const void *data, Size len, FILE *fp)
 bool
 RelationIdIsInInitFile(Oid relationId)
 {
-	if (relationId == SharedSecLabelRelationId ||
-		relationId == TriggerRelidNameIndexId ||
-		relationId == DatabaseNameIndexId ||
-		relationId == SharedSecLabelObjectIndexId)
+	if (relationId == TriggerRelidNameIndexId ||
+		relationId == DatabaseNameIndexId)
 	{
 		/*
 		 * If this Assert fails, we don't need the applicable special case

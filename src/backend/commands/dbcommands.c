@@ -44,7 +44,6 @@
 #include "commands/dbcommands.h"
 #include "commands/dbcommands_xlog.h"
 #include "commands/defrem.h"
-#include "commands/seclabel.h"
 #include "commands/tablespace.h"
 #include "common/file_perm.h"
 #include "mb/pg_wchar.h"
@@ -933,10 +932,9 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 				 errdetail_busy_db(notherbackends, npreparedxacts)));
 
 	/*
-	 * Delete any comments or security labels associated with the database.
+	 * Delete any comments associated with the database.
 	 */
 	DeleteSharedComments(db_id, DatabaseRelationId);
-	DeleteSharedSecurityLabel(db_id, DatabaseRelationId);
 
 	/*
 	 * Remove settings associated with this database

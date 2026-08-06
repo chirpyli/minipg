@@ -45,7 +45,6 @@
 #include "commands/proclang.h"
 #include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
-#include "commands/seclabel.h"
 #include "commands/sequence.h"
 #include "commands/subscriptioncmds.h"
 #include "commands/tablecmds.h"
@@ -185,7 +184,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_IndexStmt:
 		case T_RenameStmt:
 		case T_RuleStmt:
-		case T_SecLabelStmt:
 		case T_TruncateStmt:
 		case T_ViewStmt:
 			{
@@ -975,19 +973,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 				break;
 			}
 
-		case T_SecLabelStmt:
-			{
-				SecLabelStmt *stmt = (SecLabelStmt *) parsetree;
-
-				if (EventTriggerSupportsObjectType(stmt->objtype))
-					ProcessUtilitySlow(pstate, pstmt, queryString,
-									   context, params, queryEnv,
-									   dest, qc);
-				else
-					ExecSecLabelStmt(stmt);
-				break;
-			}
-
 		default:
 			/* All other statement types have event trigger support */
 			ProcessUtilitySlow(pstate, pstmt, queryString,
@@ -1590,10 +1575,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CommentObject((CommentStmt *) parsetree);
 				break;
 
-
-			case T_SecLabelStmt:
-				address = ExecSecLabelStmt((SecLabelStmt *) parsetree);
-				break;
 
 			case T_CreateAmStmt:
 				address = CreateAccessMethod((CreateAmStmt *) parsetree);
@@ -2357,10 +2338,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_COMMENT;
 			break;
 
-		case T_SecLabelStmt:
-			tag = CMDTAG_SECURITY_LABEL;
-			break;
-
 		case T_CopyStmt:
 			tag = CMDTAG_COPY;
 			break;
@@ -2935,10 +2912,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CommentStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_SecLabelStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

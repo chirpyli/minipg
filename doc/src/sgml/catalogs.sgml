@@ -259,12 +259,6 @@
       <entry><link linkend="catalog-pg-rewrite"><structname>pg_rewrite</structname></link></entry>
       <entry>query rewrite rules</entry>
      </row>
-
-     <row>
-      <entry><link linkend="catalog-pg-seclabel"><structname>pg_seclabel</structname></link></entry>
-      <entry>security labels on database objects</entry>
-     </row>
-
      <row>
       <entry><link linkend="catalog-pg-sequence"><structname>pg_sequence</structname></link></entry>
       <entry>information about sequences</entry>
@@ -278,13 +272,6 @@
      <row>
       <entry><link linkend="catalog-pg-shdescription"><structname>pg_shdescription</structname></link></entry>
       <entry>comments on shared objects</entry>
-     </row>
-
-     <row>
-      <entry><link linkend="catalog-pg-shseclabel"><structname>pg_shseclabel</structname></link></entry>
-      <entry>security labels on shared database objects</entry>
-     </row>
-
      <row>
       <entry><link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link></entry>
       <entry>planner statistics</entry>
@@ -6530,96 +6517,6 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
   </note>
 
  </sect1>
-
- <sect1 id="catalog-pg-seclabel">
-  <title><structname>pg_seclabel</structname></title>
-
-  <indexterm zone="catalog-pg-seclabel">
-   <primary>pg_seclabel</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_seclabel</structname> stores security
-   labels on database objects.  Security labels can be manipulated
-   with the <link linkend="sql-security-label"><command>SECURITY LABEL</command></link> command.  For an easier
-   way to view security labels, see <xref linkend="view-pg-seclabels"/>.
-  </para>
-
-  <para>
-   See also <link linkend="catalog-pg-shseclabel"><structname>pg_shseclabel</structname></link>,
-   which performs a similar function for security labels of database objects
-   that are shared across a database cluster.
-  </para>
-
-  <table>
-   <title><structname>pg_seclabel</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objoid</structfield> <type>oid</type>
-       (references any OID column)
-      </para>
-      <para>
-       The OID of the object this security label pertains to
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>classoid</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-class"><structname>pg_class</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the system catalog this object appears in
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objsubid</structfield> <type>int4</type>
-      </para>
-      <para>
-       For a security label on a table column, this is the column number (the
-       <structfield>objoid</structfield> and <structfield>classoid</structfield> refer to
-       the table itself).  For all other object types, this column is
-       zero.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>provider</structfield> <type>text</type>
-      </para>
-      <para>
-       The label provider associated with this label.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>label</structfield> <type>text</type>
-      </para>
-      <para>
-       The security label applied to this object.
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
-
  <sect1 id="catalog-pg-sequence">
   <title><structname>pg_sequence</structname></title>
 
@@ -6994,91 +6891,6 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
   </table>
 
  </sect1>
-
- <sect1 id="catalog-pg-shseclabel">
-  <title><structname>pg_shseclabel</structname></title>
-
-  <indexterm zone="catalog-pg-shseclabel">
-   <primary>pg_shseclabel</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_shseclabel</structname> stores security
-   labels on shared database objects.  Security labels can be manipulated
-   with the <link linkend="sql-security-label"><command>SECURITY LABEL</command></link> command.  For an easier
-   way to view security labels, see <xref linkend="view-pg-seclabels"/>.
-  </para>
-
-  <para>
-   See also <link linkend="catalog-pg-seclabel"><structname>pg_seclabel</structname></link>,
-   which performs a similar function for security labels involving objects
-   within a single database.
-  </para>
-
-  <para>
-   Unlike most system catalogs, <structname>pg_shseclabel</structname>
-   is shared across all databases of a cluster: there is only one
-   copy of <structname>pg_shseclabel</structname> per cluster, not
-   one per database.
-  </para>
-
-  <table>
-   <title><structname>pg_shseclabel</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objoid</structfield> <type>oid</type>
-       (references any OID column)
-      </para>
-      <para>
-       The OID of the object this security label pertains to
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>classoid</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-class"><structname>pg_class</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the system catalog this object appears in
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>provider</structfield> <type>text</type>
-      </para>
-      <para>
-       The label provider associated with this label.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>label</structfield> <type>text</type>
-      </para>
-      <para>
-       The security label applied to this object.
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
-
  <sect1 id="catalog-pg-statistic">
   <title><structname>pg_statistic</structname></title>
 
@@ -9451,10 +9263,6 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
       <entry>rules</entry>
      </row>
 
-     <row>
-      <entry><link linkend="view-pg-seclabels"><structname>pg_seclabels</structname></link></entry>
-      <entry>security labels</entry>
-     </row>
 
      <row>
       <entry><link linkend="view-pg-sequences"><structname>pg_sequences</structname></link></entry>
@@ -11860,120 +11668,6 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
   </para>
 
  </sect1>
-
- <sect1 id="view-pg-seclabels">
-  <title><structname>pg_seclabels</structname></title>
-
-  <indexterm zone="view-pg-seclabels">
-   <primary>pg_seclabels</primary>
-  </indexterm>
-
-  <para>
-   The view <structname>pg_seclabels</structname> provides information about
-   security labels.  It as an easier-to-query version of the
-   <link linkend="catalog-pg-seclabel"><structname>pg_seclabel</structname></link> catalog.
-  </para>
-
-  <table>
-   <title><structname>pg_seclabels</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objoid</structfield> <type>oid</type>
-       (references any OID column)
-      </para>
-      <para>
-       The OID of the object this security label pertains to
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>classoid</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-class"><structname>pg_class</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the system catalog this object appears in
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objsubid</structfield> <type>int4</type>
-      </para>
-      <para>
-       For a security label on a table column, this is the column number (the
-       <structfield>objoid</structfield> and <structfield>classoid</structfield> refer to
-       the table itself).  For all other object types, this column is
-       zero.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objtype</structfield> <type>text</type>
-      </para>
-      <para>
-       The type of object to which this label applies, as text.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objnamespace</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-namespace"><structname>pg_namespace</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the namespace for this object, if applicable;
-       otherwise NULL.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>objname</structfield> <type>text</type>
-      </para>
-      <para>
-       The name of the object to which this label applies, as text.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>provider</structfield> <type>text</type>
-       (references <link linkend="catalog-pg-seclabel"><structname>pg_seclabel</structname></link>.<structfield>provider</structfield>)
-      </para>
-      <para>
-       The label provider associated with this label.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>label</structfield> <type>text</type>
-       (references <link linkend="catalog-pg-seclabel"><structname>pg_seclabel</structname></link>.<structfield>label</structfield>)
-      </para>
-      <para>
-       The security label applied to this object.
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
-
  <sect1 id="view-pg-sequences">
   <title><structname>pg_sequences</structname></title>
 

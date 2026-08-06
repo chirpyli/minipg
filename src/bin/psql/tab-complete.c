@@ -1510,7 +1510,7 @@ psql_completion(const char *text, int start, int end)
 		"MOVE", "NOTIFY", "PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "REVOKE", "ROLLBACK",
-		"SAVEPOINT", "SECURITY LABEL", "SELECT", "SET", "SHOW", "START",
+		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
 		"TABLE", "TRUNCATE", "UNLISTEN", "UPDATE", "VACUUM", "VALUES", "WITH",
 		NULL
 	};
@@ -3670,23 +3670,6 @@ psql_completion(const char *text, int start, int end)
 		else if (TailMatches("TABLESPACE"))
 			COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
 	}
-
-/* SECURITY LABEL */
-	else if (Matches("SECURITY"))
-		COMPLETE_WITH("LABEL");
-	else if (Matches("SECURITY", "LABEL"))
-		COMPLETE_WITH("ON", "FOR");
-	else if (Matches("SECURITY", "LABEL", "FOR", MatchAny))
-		COMPLETE_WITH("ON");
-	else if (Matches("SECURITY", "LABEL", "ON") ||
-			 Matches("SECURITY", "LABEL", "FOR", MatchAny, "ON"))
-		COMPLETE_WITH("TABLE", "COLUMN", "AGGREGATE", "DATABASE", "DOMAIN",
-					  "EVENT TRIGGER", "FOREIGN TABLE", "FUNCTION",
-					  "LARGE OBJECT", "MATERIALIZED VIEW", "LANGUAGE",
-					  "PUBLICATION", "PROCEDURE", "ROLE", "ROUTINE", "SCHEMA",
-					  "SEQUENCE", "SUBSCRIPTION", "TABLESPACE", "TYPE", "VIEW");
-	else if (Matches("SECURITY", "LABEL", "ON", MatchAny, MatchAny))
-		COMPLETE_WITH("IS");
 
 /* SELECT */
 	/* naah . . . */

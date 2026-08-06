@@ -277,7 +277,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
 		RemoveFuncStmt RemoveOperStmt RenameStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
-		SecLabelStmt SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
+		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UnlistenStmt UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt CreateConversionStmt
@@ -532,8 +532,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <str>		OptTableSpace OptConsTableSpace
 %type <rolespec> OptTableSpaceOwner
 %type <ival>	opt_check_option
-
-%type <str>		opt_provider security_label
 
 
 %type <node>	func_application func_expr_common_subexpr
@@ -930,7 +928,6 @@ stmt:
 			| RemoveOperStmt
 			| RenameStmt
 			| RuleStmt
-			| SecLabelStmt
 			| SelectStmt
 			| TransactionStmt
 			| TruncateStmt
@@ -5422,125 +5419,6 @@ comment_text:
 		;
 
 
-/*****************************************************************************
- *
- *  SECURITY LABEL [FOR <provider>] ON <object> IS <label>
- *
- *  As with COMMENT ON, <object> can refer to various types of database
- *  objects (e.g. TABLE, COLUMN, etc.).
- *
- *****************************************************************************/
-
-SecLabelStmt:
-			SECURITY LABEL opt_provider ON object_type_any_name any_name
-			IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = $5;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON COLUMN any_name
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_COLUMN;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON object_type_name name
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = $5;
-					n->object = (Node *) makeString($6);
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON TYPE_P Typename
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_TYPE;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON DOMAIN_P Typename
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_DOMAIN;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON AGGREGATE aggregate_with_argtypes
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_AGGREGATE;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON FUNCTION function_with_argtypes
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_FUNCTION;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON LARGE_P OBJECT_P NumericOnly
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_LARGEOBJECT;
-					n->object = (Node *) $7;
-					n->label = $9;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON PROCEDURE function_with_argtypes
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_PROCEDURE;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-			| SECURITY LABEL opt_provider ON ROUTINE function_with_argtypes
-			  IS security_label
-				{
-					SecLabelStmt *n = makeNode(SecLabelStmt);
-					n->provider = $3;
-					n->objtype = OBJECT_ROUTINE;
-					n->object = (Node *) $6;
-					n->label = $8;
-					$$ = (Node *) n;
-				}
-		;
-
-opt_provider:	FOR NonReservedWord_or_Sconst	{ $$ = $2; }
-				| /* EMPTY */					{ $$ = NULL; }
-		;
-
-security_label:	Sconst				{ $$ = $1; }
-				| NULL_P			{ $$ = NULL; }
-		;
 
 /*****************************************************************************
  *

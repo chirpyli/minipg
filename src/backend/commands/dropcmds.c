@@ -88,9 +88,9 @@ RemoveObjects(DropStmt *stmt)
 		}
 
 		/*
-		 * Although COMMENT ON FUNCTION, SECURITY LABEL ON FUNCTION, etc. are
-		 * happy to operate on an aggregate as on any other function, we have
-		 * historically not allowed this for DROP FUNCTION.
+		 * Although COMMENT ON FUNCTION, etc. are happy to operate on an
+		 * aggregate as on any other function, we have historically not allowed
+		 * this for DROP FUNCTION.
 		 */
 		if (stmt->removeType == OBJECT_FUNCTION)
 		{

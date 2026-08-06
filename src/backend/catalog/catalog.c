@@ -35,7 +35,6 @@
 #include "catalog/pg_replication_origin.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_shdescription.h"
-#include "catalog/pg_shseclabel.h"
 #include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
@@ -278,7 +277,6 @@ IsSharedRelation(Oid relationId)
 		relationId == DatabaseRelationId ||
 		relationId == SharedDescriptionRelationId ||
 		relationId == SharedDependRelationId ||
-		relationId == SharedSecLabelRelationId ||
 		relationId == TableSpaceRelationId ||
 		relationId == DbRoleSettingRelationId ||
 		relationId == ReplicationOriginRelationId ||
@@ -294,7 +292,6 @@ IsSharedRelation(Oid relationId)
 		relationId == SharedDescriptionObjIndexId ||
 		relationId == SharedDependDependerIndexId ||
 		relationId == SharedDependReferenceIndexId ||
-		relationId == SharedSecLabelObjectIndexId ||
 		relationId == TablespaceOidIndexId ||
 		relationId == TablespaceNameIndexId ||
 		relationId == DbRoleSettingDatidRolidIndexId ||
@@ -312,8 +309,6 @@ IsSharedRelation(Oid relationId)
 		relationId == PgReplicationOriginToastIndex ||
 		relationId == PgShdescriptionToastTable ||
 		relationId == PgShdescriptionToastIndex ||
-		relationId == PgShseclabelToastTable ||
-		relationId == PgShseclabelToastIndex ||
 		relationId == PgSubscriptionToastTable ||
 		relationId == PgSubscriptionToastIndex ||
 		relationId == PgTablespaceToastTable ||

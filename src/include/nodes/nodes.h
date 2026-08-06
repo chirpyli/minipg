@@ -384,7 +384,6 @@ typedef enum NodeTag
 	T_AlterEnumStmt,
 	T_AlterTableSpaceOptionsStmt,
 	T_AlterTableMoveAllStmt,
-	T_SecLabelStmt,
 	T_CreateExtensionStmt,
 	T_AlterExtensionStmt,
 	T_AlterExtensionContentsStmt,

@@ -58,7 +58,6 @@
 #include "commands/event_trigger.h"
 #include "commands/extension.h"
 #include "commands/publicationcmds.h"
-#include "commands/seclabel.h"
 #include "commands/sequence.h"
 #include "commands/trigger.h"
 #include "commands/typecmds.h"
@@ -1359,14 +1358,13 @@ deleteOneObject(const ObjectAddress *object, Relation *depRel, int flags)
 
 
 	/*
-	 * Delete any comments, security labels, or initial privileges associated
+	 * Delete any comments, or initial privileges associated
 	 * with this object.  (This is a convenient place to do these things,
 	 * rather than having every object type know to do it.)  As above, all
 	 * these functions must remove records for sub-objects too if the subid is
 	 * zero.
 	 */
 	DeleteComments(object->objectId, object->classId, object->objectSubId);
-	DeleteSecurityLabel(object);
 	DeleteInitPrivs(object);
 
 	/*

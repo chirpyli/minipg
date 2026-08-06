@@ -2314,8 +2314,6 @@ ScannerCallbackState
 SchemaQuery
 SecBuffer
 SecBufferDesc
-SecLabelItem
-SecLabelStmt
 SeenRelsEntry
 SelectLimit
 SelectStmt

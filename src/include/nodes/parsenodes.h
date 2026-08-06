@@ -2480,18 +2480,6 @@ typedef struct CommentStmt
 	char	   *comment;		/* Comment to insert, or NULL to remove */
 } CommentStmt;
 
-/* ----------------------
- *				SECURITY LABEL Statement
- * ----------------------
- */
-typedef struct SecLabelStmt
-{
-	NodeTag		type;
-	ObjectType	objtype;		/* Object's type */
-	Node	   *object;			/* Qualified name of the object */
-	char	   *provider;		/* Label provider (or NULL) */
-	char	   *label;			/* New security label to be assigned */
-} SecLabelStmt;
 
 /* ----------------------
  *		Declare Cursor Statement
