@@ -589,24 +589,6 @@
   amoprighttype => 'time', amopstrategy => '5', amopopr => '>(time,time)',
   amopmethod => 'btree' },
 
-# btree timetz_ops
-
-{ amopfamily => 'btree/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '1', amopopr => '<(timetz,timetz)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '2',
-  amopopr => '<=(timetz,timetz)', amopmethod => 'btree' },
-{ amopfamily => 'btree/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '3', amopopr => '=(timetz,timetz)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '4',
-  amopopr => '>=(timetz,timetz)', amopmethod => 'btree' },
-{ amopfamily => 'btree/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '5', amopopr => '>(timetz,timetz)',
-  amopmethod => 'btree' },
-
 # btree interval_ops
 
 { amopfamily => 'btree/interval_ops', amoplefttype => 'interval',
@@ -936,11 +918,6 @@
 { amopfamily => 'hash/timestamptz_ops', amoplefttype => 'timestamptz',
   amoprighttype => 'timestamptz', amopstrategy => '1',
   amopopr => '=(timestamptz,timestamptz)', amopmethod => 'hash' },
-
-# timetz_ops
-{ amopfamily => 'hash/timetz_ops', amoplefttype => 'timetz',
-  amoprighttype => 'timetz', amopstrategy => '1', amopopr => '=(timetz,timetz)',
-  amopmethod => 'hash' },
 
 # timestamp_ops
 { amopfamily => 'hash/timestamp_ops', amoplefttype => 'timestamp',

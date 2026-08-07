@@ -881,7 +881,6 @@ map_typename_pattern(const char *pattern)
 		"int4[]", "integer[]",
 		"int8[]", "bigint[]",
 		"time[]", "time without time zone[]",
-		"timetz[]", "time with time zone[]",
 		"timestamp[]", "timestamp without time zone[]",
 		"timestamptz[]", "timestamp with time zone[]",
 		"varbit[]", "bit varying[]",

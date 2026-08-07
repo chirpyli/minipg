@@ -4368,7 +4368,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 		case DATEOID:
 		case INTERVALOID:
 		case TIMEOID:
-		case TIMETZOID:
 			*scaledvalue = convert_timevalue_to_scalar(value, valuetypid,
 													   &failure);
 			*scaledlobound = convert_timevalue_to_scalar(lobound, boundstypid,
@@ -4766,13 +4765,6 @@ convert_timevalue_to_scalar(Datum value, Oid typid, bool *failure)
 			}
 		case TIMEOID:
 			return DatumGetTimeADT(value);
-		case TIMETZOID:
-			{
-				TimeTzADT  *timetz = DatumGetTimeTzADTP(value);
-
-				/* use GMT-equivalent time */
-				return (double) (timetz->time + (timetz->zone * 1000000.0));
-			}
 	}
 
 	*failure = true;

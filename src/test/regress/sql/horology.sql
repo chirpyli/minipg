@@ -108,8 +108,6 @@ SELECT (timestamp without time zone 'tomorrow' > 'now') as "True";
 -- to enable support for SQL99 timestamp type syntax.
 SELECT date '1994-01-01' + time '11:00' AS "Jan_01_1994_11am";
 SELECT date '1994-01-01' + time '10:00' AS "Jan_01_1994_10am";
-SELECT date '1994-01-01' + timetz '11:00-5' AS "Jan_01_1994_8am";
-SELECT timestamptz(date '1994-01-01', time with time zone '11:00-5') AS "Jan_01_1994_8am";
 
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMP_TBL;
 SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMP_TBL;
@@ -179,10 +177,6 @@ SELECT t.d1 AS t, i.f1 AS i, t.d1 + i.f1 AS "add", t.d1 - i.f1 AS "subtract"
 
 SELECT t.f1 AS t, i.f1 AS i, t.f1 + i.f1 AS "add", t.f1 - i.f1 AS "subtract"
   FROM TIME_TBL t, INTERVAL_TBL i
-  ORDER BY 1,2;
-
-SELECT t.f1 AS t, i.f1 AS i, t.f1 + i.f1 AS "add", t.f1 - i.f1 AS "subtract"
-  FROM TIMETZ_TBL t, INTERVAL_TBL i
   ORDER BY 1,2;
 
 -- SQL9x OVERLAPS operator

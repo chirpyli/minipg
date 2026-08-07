@@ -9012,12 +9012,6 @@ get_rule_expr(Node *node, deparse_context *context,
 					case SVFOP_CURRENT_DATE:
 						appendStringInfoString(buf, "CURRENT_DATE");
 						break;
-					case SVFOP_CURRENT_TIME:
-						appendStringInfoString(buf, "CURRENT_TIME");
-						break;
-					case SVFOP_CURRENT_TIME_N:
-						appendStringInfo(buf, "CURRENT_TIME(%d)", svf->typmod);
-						break;
 					case SVFOP_CURRENT_TIMESTAMP:
 						appendStringInfoString(buf, "CURRENT_TIMESTAMP");
 						break;
@@ -9789,10 +9783,8 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 	{
 		case F_TIMEZONE_INTERVAL_TIMESTAMP:
 		case F_TIMEZONE_INTERVAL_TIMESTAMPTZ:
-		case F_TIMEZONE_INTERVAL_TIMETZ:
 		case F_TIMEZONE_TEXT_TIMESTAMP:
 		case F_TIMEZONE_TEXT_TIMESTAMPTZ:
-		case F_TIMEZONE_TEXT_TIMETZ:
 			/* AT TIME ZONE ... note reversed argument order */
 			appendStringInfoChar(buf, '(');
 			get_rule_expr_paren((Node *) lsecond(expr->args), context, false,
@@ -9811,7 +9803,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 		case F_OVERLAPS_TIMESTAMP_INTERVAL_TIMESTAMP_TIMESTAMP:
 		case F_OVERLAPS_TIMESTAMP_TIMESTAMP_TIMESTAMP_INTERVAL:
 		case F_OVERLAPS_TIMESTAMP_TIMESTAMP_TIMESTAMP_TIMESTAMP:
-		case F_OVERLAPS_TIMETZ_TIMETZ_TIMETZ_TIMETZ:
 		case F_OVERLAPS_TIME_INTERVAL_TIME_INTERVAL:
 		case F_OVERLAPS_TIME_INTERVAL_TIME_TIME:
 		case F_OVERLAPS_TIME_TIME_TIME_INTERVAL:
@@ -9830,7 +9821,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 
 		case F_EXTRACT_TEXT_DATE:
 		case F_EXTRACT_TEXT_TIME:
-		case F_EXTRACT_TEXT_TIMETZ:
 		case F_EXTRACT_TEXT_TIMESTAMP:
 		case F_EXTRACT_TEXT_TIMESTAMPTZ:
 		case F_EXTRACT_TEXT_INTERVAL:
@@ -9940,17 +9930,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 				appendStringInfoString(buf, " FOR ");
 				get_rule_expr((Node *) lthird(expr->args), context, false);
 			}
-			appendStringInfoChar(buf, ')');
-			return true;
-
-		case F_SUBSTRING_TEXT_TEXT_TEXT:
-			/* SUBSTRING SIMILAR/ESCAPE */
-			appendStringInfoString(buf, "SUBSTRING(");
-			get_rule_expr((Node *) linitial(expr->args), context, false);
-			appendStringInfoString(buf, " SIMILAR ");
-			get_rule_expr((Node *) lsecond(expr->args), context, false);
-			appendStringInfoString(buf, " ESCAPE ");
-			get_rule_expr((Node *) lthird(expr->args), context, false);
 			appendStringInfoChar(buf, ')');
 			return true;
 

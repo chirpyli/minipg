@@ -2494,10 +2494,6 @@ ExecEvalSQLValueFunction(ExprState *state, ExprEvalStep *op)
 		case SVFOP_CURRENT_DATE:
 			*op->resvalue = DateADTGetDatum(GetSQLCurrentDate());
 			break;
-		case SVFOP_CURRENT_TIME:
-		case SVFOP_CURRENT_TIME_N:
-			*op->resvalue = TimeTzADTPGetDatum(GetSQLCurrentTime(svf->typmod));
-			break;
 		case SVFOP_CURRENT_TIMESTAMP:
 		case SVFOP_CURRENT_TIMESTAMP_N:
 			*op->resvalue = TimestampTzGetDatum(GetSQLCurrentTimestamp(svf->typmod));

@@ -4300,55 +4300,17 @@ parse_datetime(text *date_txt, text *fmt, Oid collid, bool strict,
 	}
 	else if (flags & DCH_TIMED)
 	{
-		if (flags & DCH_ZONED)
-		{
-			TimeTzADT  *result = palloc(sizeof(TimeTzADT));
+		TimeADT		result;
 
-			if (tm.tm_zone)
-			{
-				int			dterr = DecodeTimezone(unconstify(char *, tm.tm_zone), tz);
+		if (tm2time(&tm, fsec, &result) != 0)
+			RETURN_ERROR(ereport(ERROR,
+								 (errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+								  errmsg("time out of range"))));
 
-				if (dterr)
-					RETURN_ERROR(DateTimeParseError(dterr, text_to_cstring(date_txt), "timetz"));
-			}
-			else
-			{
-				/*
-				 * Time zone is present in format string, but not in input
-				 * string.  Assuming do_to_timestamp() triggers no error this
-				 * should be possible only in non-strict case.
-				 */
-				Assert(!strict);
+		AdjustTimeForTypmod(&result, *typmod);
 
-				RETURN_ERROR(ereport(ERROR,
-									 (errcode(ERRCODE_INVALID_DATETIME_FORMAT),
-									  errmsg("missing time zone in input string for type timetz"))));
-			}
-
-			if (tm2timetz(&tm, fsec, *tz, result) != 0)
-				RETURN_ERROR(ereport(ERROR,
-									 (errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
-									  errmsg("timetz out of range"))));
-
-			AdjustTimeForTypmod(&result->time, *typmod);
-
-			*typid = TIMETZOID;
-			return TimeTzADTPGetDatum(result);
-		}
-		else
-		{
-			TimeADT		result;
-
-			if (tm2time(&tm, fsec, &result) != 0)
-				RETURN_ERROR(ereport(ERROR,
-									 (errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
-									  errmsg("time out of range"))));
-
-			AdjustTimeForTypmod(&result, *typmod);
-
-			*typid = TIMEOID;
-			return TimeADTGetDatum(result);
-		}
+		*typid = TIMEOID;
+		return TimeADTGetDatum(result);
 	}
 	else
 	{

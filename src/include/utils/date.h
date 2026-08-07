@@ -24,12 +24,6 @@ typedef int32 DateADT;
 
 typedef int64 TimeADT;
 
-typedef struct
-{
-	TimeADT		time;			/* all time units other than months and years */
-	int32		zone;			/* numeric time zone, in seconds */
-} TimeTzADT;
-
 /*
  * Infinity and minus infinity must be the max and min values of DateADT.
  */
@@ -52,19 +46,15 @@ typedef struct
 
 #define DatumGetDateADT(X)	  ((DateADT) DatumGetInt32(X))
 #define DatumGetTimeADT(X)	  ((TimeADT) DatumGetInt64(X))
-#define DatumGetTimeTzADTP(X) ((TimeTzADT *) DatumGetPointer(X))
 
 #define DateADTGetDatum(X)	  Int32GetDatum(X)
 #define TimeADTGetDatum(X)	  Int64GetDatum(X)
-#define TimeTzADTPGetDatum(X) PointerGetDatum(X)
 
 #define PG_GETARG_DATEADT(n)	 DatumGetDateADT(PG_GETARG_DATUM(n))
 #define PG_GETARG_TIMEADT(n)	 DatumGetTimeADT(PG_GETARG_DATUM(n))
-#define PG_GETARG_TIMETZADT_P(n) DatumGetTimeTzADTP(PG_GETARG_DATUM(n))
 
 #define PG_RETURN_DATEADT(x)	 return DateADTGetDatum(x)
 #define PG_RETURN_TIMEADT(x)	 return TimeADTGetDatum(x)
-#define PG_RETURN_TIMETZADT_P(x) return TimeTzADTPGetDatum(x)
 
 
 /* date.c */
@@ -77,12 +67,9 @@ extern int32 date_cmp_timestamptz_internal(DateADT dateVal, TimestampTz dt2);
 
 extern void EncodeSpecialDate(DateADT dt, char *str);
 extern DateADT GetSQLCurrentDate(void);
-extern TimeTzADT *GetSQLCurrentTime(int32 typmod);
 extern TimeADT GetSQLLocalTime(int32 typmod);
 extern int	time2tm(TimeADT time, struct pg_tm *tm, fsec_t *fsec);
-extern int	timetz2tm(TimeTzADT *time, struct pg_tm *tm, fsec_t *fsec, int *tzp);
 extern int	tm2time(struct pg_tm *tm, fsec_t fsec, TimeADT *result);
-extern int	tm2timetz(struct pg_tm *tm, fsec_t fsec, int tz, TimeTzADT *result);
 extern bool time_overflows(int hour, int min, int sec, fsec_t fsec);
 extern bool float_time_overflows(int hour, int min, double sec);
 extern void AdjustTimeForTypmod(TimeADT *time, int32 typmod);

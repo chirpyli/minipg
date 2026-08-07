@@ -150,7 +150,6 @@ text_tbl|f
 time_tbl|f
 timestamp_tbl|f
 timestamptz_tbl|f
-timetz_tbl|f
 tmp|f
 varchar_tbl|f
 view_base_table|t

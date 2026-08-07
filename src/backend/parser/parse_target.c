@@ -1937,10 +1937,6 @@ FigureColnameInternal(Node *node, char **name)
 				case SVFOP_CURRENT_DATE:
 					*name = "current_date";
 					return 2;
-				case SVFOP_CURRENT_TIME:
-				case SVFOP_CURRENT_TIME_N:
-					*name = "current_time";
-					return 2;
 				case SVFOP_CURRENT_TIMESTAMP:
 				case SVFOP_CURRENT_TIMESTAMP_N:
 					*name = "current_timestamp";

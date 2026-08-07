@@ -21,11 +21,11 @@ test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txi
 # numerology depends on int2, int4, int8, float4, float8
 # multirangetypes 已随 range/multirange 具体类型裁剪而移除
 # ----------
-test: strings numerology date time timetz timestamp timestamptz interval create_function_0
+test: strings numerology date time timestamp timestamptz interval create_function_0
 
 # ----------
 # Another group of parallel tests
-# horology depends on interval, timetz, timestamp, timestamptz
+# horology depends on interval, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
 test: horology opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr

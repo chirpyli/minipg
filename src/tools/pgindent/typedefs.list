@@ -2631,7 +2631,6 @@ TimeLineHistoryEntry
 TimeLineID
 TimeOffset
 TimeStamp
-TimeTzADT
 TimeZoneAbbrevTable
 TimeoutId
 TimeoutType

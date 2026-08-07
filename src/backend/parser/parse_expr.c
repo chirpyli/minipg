@@ -2211,13 +2211,6 @@ transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
 		case SVFOP_CURRENT_DATE:
 			svf->type = DATEOID;
 			break;
-		case SVFOP_CURRENT_TIME:
-			svf->type = TIMETZOID;
-			break;
-		case SVFOP_CURRENT_TIME_N:
-			svf->type = TIMETZOID;
-			svf->typmod = anytime_typmod_check(true, svf->typmod);
-			break;
 		case SVFOP_CURRENT_TIMESTAMP:
 			svf->type = TIMESTAMPTZOID;
 			break;

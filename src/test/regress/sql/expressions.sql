@@ -11,9 +11,7 @@
 SELECT date(now())::text = current_date::text;
 
 
--- current_time / localtime
-SELECT now()::timetz::text = current_time::text;
-SELECT now()::timetz(4)::text = current_time(4)::text;
+-- localtime
 SELECT now()::time::text = localtime::text;
 SELECT now()::time(3)::text = localtime(3)::text;
 

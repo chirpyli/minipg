@@ -260,13 +260,6 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 				buf = pstrdup("time without time zone");
 			break;
 
-		case TIMETZOID:
-			if (with_typemod)
-				buf = printTypmod("time", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("time with time zone");
-			break;
-
 		case TIMESTAMPOID:
 			if (with_typemod)
 				buf = printTypmod("timestamp", typemod, typeform->typmodout);

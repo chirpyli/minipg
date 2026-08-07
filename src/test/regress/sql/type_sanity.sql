@@ -499,7 +499,7 @@ WHERE p1.rngmultitypid IS NULL OR p1.rngmultitypid = 0;
 -- Create a table that holds all the known in-core data types and leave it
 -- around so as pg_upgrade is able to test their binary compatibility.
 CREATE TABLE tab_core_types (
-  c1 date, c2 time, c3 timestamp, c4 timetz, c5 timestamptz, c6 interval,
+  c1 date, c2 time, c3 timestamp, c5 timestamptz, c6 interval,
   c7 text, c8 text, c9 text, c10 int2, c11 int4, c12 int8, c13 float4,
   c14 float8, c15 numeric, c16 "char", c17 bpchar, c18 varchar, c19 name,
   c20 text, c21 bool, c22 bytea, c23 bit, c24 varbit, c25 numeric,
@@ -514,7 +514,6 @@ INSERT INTO tab_core_types SELECT
   'today'::date,
   'now'::time,
   'now'::timestamp,
-  'now'::timetz,
   'now'::timestamptz,
   '12 seconds'::interval,
   '{"reason":"because"}'::text,

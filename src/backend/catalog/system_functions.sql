@@ -120,12 +120,6 @@ CREATE OR REPLACE FUNCTION timedate_pl(time, date)
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN $2 + $1;
 
-CREATE OR REPLACE FUNCTION timetzdate_pl(timetz, date)
- RETURNS timestamptz
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
 CREATE OR REPLACE FUNCTION interval_pl_time(interval, time)
  RETURNS time
  LANGUAGE sql
@@ -134,12 +128,6 @@ RETURN $2 + $1;
 
 CREATE OR REPLACE FUNCTION interval_pl_date(interval, date)
  RETURNS timestamp
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
-CREATE OR REPLACE FUNCTION interval_pl_timetz(interval, timetz)
- RETURNS timetz
  LANGUAGE sql
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN $2 + $1;

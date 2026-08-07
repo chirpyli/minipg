@@ -238,16 +238,6 @@
   typmodin => 'intervaltypmodin', typmodout => 'intervaltypmodout',
   typalign => 'd' },
 
-# OIDS 1200 - 1299
-
-{ oid => '1266', array_type_oid => '1270',
-  descr => 'time of day with time zone',
-  typname => 'timetz', typlen => '12', typbyval => 'f', typcategory => 'D',
-  typinput => 'timetz_in', typoutput => 'timetz_out',
-  typreceive => 'timetz_recv', typsend => 'timetz_send',
-  typmodin => 'timetztypmodin', typmodout => 'timetztypmodout',
-  typalign => 'd' },
-
 # OIDS 1500 - 1599
 
 { oid => '1560', array_type_oid => '1561', descr => 'fixed-length bit string',

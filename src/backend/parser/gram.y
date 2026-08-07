@@ -591,7 +591,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
 	COST CREATE CROSS CSV CUBE CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
-	CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE
+	CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPENDS DEPTH DESC
@@ -10570,18 +10570,20 @@ ConstDatetime:
 			| TIME '(' Iconst ')' opt_timezone
 				{
 					if ($5)
-						$$ = SystemTypeName("timetz");
-					else
-						$$ = SystemTypeName("time");
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("time with time zone is not supported")));
+					$$ = SystemTypeName("time");
 					$$->typmods = list_make1(makeIntConst($3, @3));
 					$$->location = @1;
 				}
 			| TIME opt_timezone
 				{
 					if ($2)
-						$$ = SystemTypeName("timetz");
-					else
-						$$ = SystemTypeName("time");
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("time with time zone is not supported")));
+					$$ = SystemTypeName("time");
 					$$->location = @1;
 				}
 		;
@@ -11431,14 +11433,6 @@ func_expr_common_subexpr:
 			| CURRENT_DATE
 				{
 					$$ = makeSQLValueFunction(SVFOP_CURRENT_DATE, -1, @1);
-				}
-			| CURRENT_TIME
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_TIME, -1, @1);
-				}
-			| CURRENT_TIME '(' Iconst ')'
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_TIME_N, $3, @1);
 				}
 			| CURRENT_TIMESTAMP
 				{
@@ -13127,7 +13121,6 @@ reserved_keyword:
 			| CURRENT_CATALOG
 			| CURRENT_DATE
 			| CURRENT_ROLE
-			| CURRENT_TIME
 			| CURRENT_TIMESTAMP
 			| CURRENT_USER
 			| DEFAULT
@@ -13277,7 +13270,6 @@ bare_label_keyword:
 			| CURRENT_DATE
 			| CURRENT_ROLE
 			| CURRENT_SCHEMA
-			| CURRENT_TIME
 			| CURRENT_TIMESTAMP
 			| CURRENT_USER
 			| CURSOR
