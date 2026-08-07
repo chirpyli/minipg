@@ -1794,7 +1794,7 @@ select sum(1/ten) filter (where ten > 0) from tenk1;
  1000
 (1 row)
 
-select ten, sum(distinct four) filter (where four::text ~ '123') from onek a
+select ten, sum(distinct four) filter (where four::text LIKE '%123%') from onek a
 group by ten;
  ten | sum 
 -----+-----

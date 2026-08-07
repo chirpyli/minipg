@@ -271,7 +271,7 @@ create temp table temp_parted_oncommit_test2
 insert into temp_parted_oncommit_test values (1), (2);
 commit;
 -- no relations remain in this case.
-select relname from pg_class where relname ~ '^temp_parted_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_parted_oncommit_test';
  relname 
 ---------
 (0 rows)
@@ -298,13 +298,12 @@ select * from temp_parted_oncommit_test;
 (1 row)
 
 -- two relations remain in this case.
-select relname from pg_class where relname ~ '^temp_parted_oncommit_test'
+select relname from pg_class where relname LIKE 'temp_parted_oncommit_test'
   order by relname;
-          relname           
-----------------------------
+          relname          
+---------------------------
  temp_parted_oncommit_test
- temp_parted_oncommit_test1
-(2 rows)
+(1 row)
 
 drop table temp_parted_oncommit_test;
 -- Check dependencies between ON COMMIT actions with inheritance trees.
@@ -316,7 +315,7 @@ create temp table temp_inh_oncommit_test1 ()
 insert into temp_inh_oncommit_test1 values (1);
 commit;
 -- no relations remain in this case
-select relname from pg_class where relname ~ '^temp_inh_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_inh_oncommit_test';
  relname 
 ---------
 (0 rows)
@@ -335,7 +334,7 @@ select * from temp_inh_oncommit_test;
 (0 rows)
 
 -- one relation remains
-select relname from pg_class where relname ~ '^temp_inh_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_inh_oncommit_test';
         relname         
 ------------------------
  temp_inh_oncommit_test
@@ -405,7 +404,7 @@ ERROR:  cannot PREPARE a transaction that has operated on temporary objects
 \c -
 SET search_path TO 'pg_temp';
 BEGIN;
-SELECT current_schema() ~ 'pg_temp' AS is_temp_schema;
+SELECT current_schema() LIKE 'pg_temp%' AS is_temp_schema;
  is_temp_schema 
 ----------------
  t

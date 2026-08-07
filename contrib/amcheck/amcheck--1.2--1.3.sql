@@ -20,10 +20,5 @@ RETURNS SETOF record
 AS 'MODULE_PATHNAME', 'verify_heapam'
 LANGUAGE C;
 
--- Don't want this to be available to public
-									 boolean,
-									 boolean,
-									 text,
-									 bigint,
-									 bigint)
-FROM PUBLIC;
+-- Don't want this to be available to public;
+-- REVOKE removed (DCL not supported in minipg)

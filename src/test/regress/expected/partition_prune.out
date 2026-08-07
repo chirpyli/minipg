@@ -1494,54 +1494,6 @@ explain (costs off) select * from coercepart where a in ('ab', to_char(125, '999
          Filter: ((a)::text = ANY ((ARRAY['ab'::character varying, (to_char(125, '999'::text))::character varying])::text[]))
 (7 rows)
 
-explain (costs off) select * from coercepart where a ~ any ('{ab}');
-                     QUERY PLAN                     
-----------------------------------------------------
- Append
-   ->  Seq Scan on coercepart_ab coercepart_1
-         Filter: ((a)::text ~ ANY ('{ab}'::text[]))
-   ->  Seq Scan on coercepart_bc coercepart_2
-         Filter: ((a)::text ~ ANY ('{ab}'::text[]))
-   ->  Seq Scan on coercepart_cd coercepart_3
-         Filter: ((a)::text ~ ANY ('{ab}'::text[]))
-(7 rows)
-
-explain (costs off) select * from coercepart where a !~ all ('{ab}');
-                     QUERY PLAN                      
------------------------------------------------------
- Append
-   ->  Seq Scan on coercepart_ab coercepart_1
-         Filter: ((a)::text !~ ALL ('{ab}'::text[]))
-   ->  Seq Scan on coercepart_bc coercepart_2
-         Filter: ((a)::text !~ ALL ('{ab}'::text[]))
-   ->  Seq Scan on coercepart_cd coercepart_3
-         Filter: ((a)::text !~ ALL ('{ab}'::text[]))
-(7 rows)
-
-explain (costs off) select * from coercepart where a ~ any ('{ab,bc}');
-                      QUERY PLAN                       
--------------------------------------------------------
- Append
-   ->  Seq Scan on coercepart_ab coercepart_1
-         Filter: ((a)::text ~ ANY ('{ab,bc}'::text[]))
-   ->  Seq Scan on coercepart_bc coercepart_2
-         Filter: ((a)::text ~ ANY ('{ab,bc}'::text[]))
-   ->  Seq Scan on coercepart_cd coercepart_3
-         Filter: ((a)::text ~ ANY ('{ab,bc}'::text[]))
-(7 rows)
-
-explain (costs off) select * from coercepart where a !~ all ('{ab,bc}');
-                       QUERY PLAN                       
---------------------------------------------------------
- Append
-   ->  Seq Scan on coercepart_ab coercepart_1
-         Filter: ((a)::text !~ ALL ('{ab,bc}'::text[]))
-   ->  Seq Scan on coercepart_bc coercepart_2
-         Filter: ((a)::text !~ ALL ('{ab,bc}'::text[]))
-   ->  Seq Scan on coercepart_cd coercepart_3
-         Filter: ((a)::text !~ ALL ('{ab,bc}'::text[]))
-(7 rows)
-
 explain (costs off) select * from coercepart where a = any ('{ab,bc}');
                       QUERY PLAN                       
 -------------------------------------------------------
@@ -2348,6 +2300,34 @@ drop table list_part;
 -- This removes enough info that you might wonder why bother with EXPLAIN
 -- ANALYZE at all.  The answer is that we need to see '(never executed)'
 -- notations because that's the only way to verify runtime pruning.
+create or replace function replace_digits_after(str text, prefix text, repl text)
+returns text language plpgsql immutable strict as $$
+declare
+    pos int;
+    i int;
+    digit_start int;
+    digit_end int;
+begin
+    pos := strpos(str, prefix);
+    if pos = 0 then
+        return str;
+    end if;
+    i := pos + length(prefix);
+    while i <= length(str) and substr(str, i, 1) not between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    if i > length(str) then
+        return str;
+    end if;
+    digit_start := i;
+    while i <= length(str) and substr(str, i, 1) between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    digit_end := i - 1;
+    return substr(str, 1, digit_start - 1) || repl ||
+           substr(str, digit_end + 1);
+end;
+$$;
 create function explain_parallel_append(text) returns setof text
 language plpgsql as
 $$
@@ -2358,9 +2338,10 @@ begin
         execute format('explain (analyze, costs off, summary off, timing off) %s',
             $1)
     loop
-        ln := regexp_replace(ln, 'Workers Launched: \d+', 'Workers Launched: N');
-        ln := regexp_replace(ln, 'actual rows=\d+ loops=\d+', 'actual rows=N loops=N');
-        ln := regexp_replace(ln, 'Rows Removed by Filter: \d+', 'Rows Removed by Filter: N');
+        ln := replace_digits_after(ln, 'Workers Launched: ', 'N');
+        ln := replace_digits_after(ln, ' rows=', 'N');
+        ln := replace_digits_after(ln, ' loops=', 'N');
+        ln := replace_digits_after(ln, 'Rows Removed by Filter: ', 'N');
         return next ln;
     end loop;
 end;

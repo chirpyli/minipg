@@ -47,17 +47,17 @@ TABLE city;
 SELECT *
    INTO TABLE ramp
    FROM road
-   WHERE name ~ '.*Ramp';
+   WHERE name LIKE '%Ramp';
 
 INSERT INTO ihighway
    SELECT *
    FROM road
-   WHERE name ~ 'I- .*';
+   WHERE name LIKE 'I- %';
 
 INSERT INTO shighway
    SELECT *
    FROM road
-   WHERE name ~ 'State Hwy.*';
+   WHERE name LIKE 'State Hwy%';
 
 UPDATE shighway
    SET surface = 'asphalt';

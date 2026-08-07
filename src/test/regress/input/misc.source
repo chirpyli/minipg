@@ -93,7 +93,7 @@ SELECT *
 
 SELECT class, a
    FROM c_star* x
-   WHERE x.c ~ text 'hi';
+   WHERE x.c LIKE text '%hi%';
 
 SELECT class, b, c
    FROM d_star* x

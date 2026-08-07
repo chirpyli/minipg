@@ -5,13 +5,13 @@ PGFILEDESC = "test_decoding - example of a logical decoding output plugin"
 
 # test_decoding: rewrite/permissions/replorigin 依赖 CREATE ROLE/SET ROLE 等
 # 权限机制，权限已裁剪，移除；replorigin 在 ISOLATION 中同样移除。
-REGRESS = ddl xact toast decoding_in_xact \
-	decoding_into_rel binary prepared time messages \
-	spill slot truncate stream stats twophase twophase_stream
-ISOLATION = mxact delayed_startup ondisk_startup concurrent_ddl_dml \
-	oldest_xmin snapshot_transfer subxact_without_top concurrent_stream \
-	twophase_snapshot catalog_change_snapshot skip_snapshot_restore \
-	invalidation_distribution
+# 此外 test_decoding 测试大量使用 regex/regexp_* 函数，regex 已被裁剪，
+# 因此回归测试和隔离测试全部禁用。
+REGRESS =
+#ISOLATION = mxact delayed_startup ondisk_startup concurrent_ddl_dml \
+#	oldest_xmin snapshot_transfer subxact_without_top concurrent_stream \
+#	twophase_snapshot catalog_change_snapshot skip_snapshot_restore \
+#	invalidation_distribution
 
 REGRESS_OPTS = --temp-config $(top_srcdir)/contrib/test_decoding/logical.conf
 ISOLATION_OPTS = --temp-config $(top_srcdir)/contrib/test_decoding/logical.conf

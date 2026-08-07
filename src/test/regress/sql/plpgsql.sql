@@ -1300,13 +1300,13 @@ insert into PSlot values ('PS.first.d6', 'PF1_1', '', 'WS.106.3b');
 update PSlot set backlink = 'WS.001.1a' where slotname = 'PS.base.a1';
 update PSlot set backlink = 'WS.001.1b' where slotname = 'PS.base.a3';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 update PSlot set backlink = 'WS.001.2a' where slotname = 'PS.base.a3';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 update PSlot set backlink = 'WS.001.1b' where slotname = 'PS.base.a2';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 
 --
 -- Same procedure for 2b-3b but this time updating the WSlot instead
@@ -1316,13 +1316,13 @@ select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
 update WSlot set backlink = 'PS.base.a4' where slotname = 'WS.001.2b';
 update WSlot set backlink = 'PS.base.a6' where slotname = 'WS.001.3a';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 update WSlot set backlink = 'PS.base.a6' where slotname = 'WS.001.3b';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 update WSlot set backlink = 'PS.base.a5' where slotname = 'WS.001.3a';
 select * from WSlot where roomno = '001' order by slotname;
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
 
 insert into PField values ('PF1_2', 'Phonelines first floor');
 

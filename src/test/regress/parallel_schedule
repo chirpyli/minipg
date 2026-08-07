@@ -28,7 +28,7 @@ test: strings numerology date time timetz timestamp timestamptz interval create_
 # horology depends on interval, timetz, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
-test: horology regex opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr
+test: horology opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr
 
 # ----------
 # These four each depend on the previous one

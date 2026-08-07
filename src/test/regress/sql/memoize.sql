@@ -4,6 +4,36 @@
 -- machines.  Let's just replace the number with an 'N'.  In order to allow us
 -- to perform validation when the measure was zero, we replace a zero value
 -- with "Zero".  All other numbers are replaced with 'N'.
+
+create or replace function replace_digits_after(str text, prefix text, repl text)
+returns text language plpgsql immutable strict as $$
+declare
+    pos int;
+    i int;
+    digit_start int;
+    digit_end int;
+begin
+    pos := strpos(str, prefix);
+    if pos = 0 then
+        return str;
+    end if;
+    i := pos + length(prefix);
+    while i <= length(str) and substr(str, i, 1) not between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    if i > length(str) then
+        return str;
+    end if;
+    digit_start := i;
+    while i <= length(str) and substr(str, i, 1) between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    digit_end := i - 1;
+    return substr(str, 1, digit_start - 1) || repl ||
+           substr(str, digit_end + 1);
+end;
+$$;
+
 create function explain_memoize(query text, hide_hitmiss bool) returns setof text
 language plpgsql as
 $$
@@ -15,16 +45,16 @@ begin
             query)
     loop
         if hide_hitmiss = true then
-                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
-                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
-                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
-                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+                ln := replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := replace_digits_after(ln, 'Hits: ', 'N');
+                ln := replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := replace_digits_after(ln, 'Misses: ', 'N');
         end if;
-        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
-        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
-        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
-	ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
-	ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := replace_digits_after(ln, 'Evictions: ', 'N');
+        ln := replace_digits_after(ln, 'Memory Usage: ', 'N');
+        ln := replace_digits_after(ln, 'Heap Fetches: ', 'N');
+        ln := replace_digits_after(ln, 'loops=', 'N');
         return next ln;
     end loop;
 end;

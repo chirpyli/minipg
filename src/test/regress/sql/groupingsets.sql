@@ -297,7 +297,7 @@ group by (ten) having grouping(ten) >= 0
 order by 2,1;
 
 -- FILTER queries
-select ten, sum(distinct four) filter (where four::text ~ '123') from onek a
+select ten, sum(distinct four) filter (where four::text LIKE '%123%') from onek a
 group by rollup(ten);
 
 -- More rescan tests

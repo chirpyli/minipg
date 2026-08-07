@@ -1097,8 +1097,6 @@ WHERE o1.oprnegate = o2.oid AND o1.oprname <= o2.oprname
 ORDER BY 1, 2;
  op1  | op2  
 ------+------
- !~   | ~
- !~*  | ~*
  !~~  | ~~
  !~~* | ~~*
  *<   | *>=
@@ -1109,7 +1107,7 @@ ORDER BY 1, 2;
  <>   | =
  ~<=~ | ~>~
  ~<~  | ~>=~
-(12 rows)
+(10 rows)
 
 -- A mergejoinable or hashjoinable operator must be binary, must return
 -- boolean, and must have a commutator (itself, unless it's a cross-type

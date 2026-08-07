@@ -13,13 +13,11 @@ SUBDIRS = \
 		  snapshot_too_old \
 		  test_bloomfilter \
 		  test_custom_types \
-		  test_escape \
 		  test_extensions \
 		  test_integerset \
 		  test_misc \
 		  test_predtest \
 		  test_rbtree \
-		  test_regex \
 		  test_shm_mq \
 		  worker_spi
 

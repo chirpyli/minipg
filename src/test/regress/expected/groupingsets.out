@@ -915,7 +915,7 @@ order by 2,1;
 (10 rows)
 
 -- FILTER queries
-select ten, sum(distinct four) filter (where four::text ~ '123') from onek a
+select ten, sum(distinct four) filter (where four::text LIKE '%123%') from onek a
 group by rollup(ten);
  ten | sum 
 -----+-----

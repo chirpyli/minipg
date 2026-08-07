@@ -60,8 +60,6 @@ typedef enum
 {
 	Pattern_Type_Like,
 	Pattern_Type_Like_IC,
-	Pattern_Type_Regex,
-	Pattern_Type_Regex_IC,
 	Pattern_Type_Prefix
 } Pattern_Type;
 
@@ -97,9 +95,6 @@ static Selectivity prefix_selectivity(PlannerInfo *root,
 									  Const *prefixcon);
 static Selectivity like_selectivity(const char *patt, int pattlen,
 									bool case_insensitive);
-static Selectivity regex_selectivity(const char *patt, int pattlen,
-									 bool case_insensitive,
-									 int fixed_prefix_len);
 static int	pattern_char_isalpha(char c, bool is_multibyte,
 								 pg_locale_t locale, bool locale_is_c);
 static Const *make_greater_string(const Const *str_const, FmgrInfo *ltproc,
@@ -128,23 +123,9 @@ texticlike_support(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(like_regex_support(rawreq, Pattern_Type_Like_IC));
 }
 
-Datum
-textregexeq_support(PG_FUNCTION_ARGS)
-{
-	Node	   *rawreq = (Node *) PG_GETARG_POINTER(0);
-
-	PG_RETURN_POINTER(like_regex_support(rawreq, Pattern_Type_Regex));
-}
-
-Datum
-texticregexeq_support(PG_FUNCTION_ARGS)
-{
-	Node	   *rawreq = (Node *) PG_GETARG_POINTER(0);
-
-	PG_RETURN_POINTER(like_regex_support(rawreq, Pattern_Type_Regex_IC));
-}
-
-/* Common code for the above */
+/*
+ * Common code for the above
+ */
 static Node *
 like_regex_support(Node *rawreq, Pattern_Type ptype)
 {
@@ -760,23 +741,6 @@ patternsel(PG_FUNCTION_ARGS, Pattern_Type ptype, bool negate)
 							 negate);
 }
 
-/*
- *		regexeqsel		- Selectivity of regular-expression pattern match.
- */
-Datum
-regexeqsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Regex, false));
-}
-
-/*
- *		icregexeqsel	- Selectivity of case-insensitive regex match.
- */
-Datum
-icregexeqsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Regex_IC, false));
-}
 
 /*
  *		likesel			- Selectivity of LIKE pattern match.
@@ -797,7 +761,6 @@ prefixsel(PG_FUNCTION_ARGS)
 }
 
 /*
- *
  *		iclikesel			- Selectivity of ILIKE pattern match.
  */
 Datum
@@ -806,23 +769,6 @@ iclikesel(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Like_IC, false));
 }
 
-/*
- *		regexnesel		- Selectivity of regular-expression pattern non-match.
- */
-Datum
-regexnesel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Regex, true));
-}
-
-/*
- *		icregexnesel	- Selectivity of case-insensitive regex non-match.
- */
-Datum
-icregexnesel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Regex_IC, true));
-}
 
 /*
  *		nlikesel		- Selectivity of LIKE pattern non-match.
@@ -852,23 +798,6 @@ patternjoinsel(PG_FUNCTION_ARGS, Pattern_Type ptype, bool negate)
 	return negate ? (1.0 - DEFAULT_MATCH_SEL) : DEFAULT_MATCH_SEL;
 }
 
-/*
- *		regexeqjoinsel	- Join selectivity of regular-expression pattern match.
- */
-Datum
-regexeqjoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Regex, false));
-}
-
-/*
- *		icregexeqjoinsel	- Join selectivity of case-insensitive regex match.
- */
-Datum
-icregexeqjoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Regex_IC, false));
-}
 
 /*
  *		likejoinsel			- Join selectivity of LIKE pattern match.
@@ -897,23 +826,6 @@ iclikejoinsel(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Like_IC, false));
 }
 
-/*
- *		regexnejoinsel	- Join selectivity of regex non-match.
- */
-Datum
-regexnejoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Regex, true));
-}
-
-/*
- *		icregexnejoinsel	- Join selectivity of case-insensitive regex non-match.
- */
-Datum
-icregexnejoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Regex_IC, true));
-}
 
 /*
  *		nlikejoinsel		- Join selectivity of LIKE pattern non-match.
@@ -925,15 +837,13 @@ nlikejoinsel(PG_FUNCTION_ARGS)
 }
 
 /*
- *		icnlikejoinsel		- Join selectivity of ILIKE pattern non-match.
+ *		icnlikejoinsel		- Selectivity of ILIKE pattern non-match.
  */
 Datum
 icnlikejoinsel(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Like_IC, true));
 }
-
-
 /*-------------------------------------------------------------------------
  *
  * Pattern analysis functions
@@ -1070,73 +980,6 @@ like_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
 	return Pattern_Prefix_None;
 }
 
-static Pattern_Prefix_Status
-regex_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
-				   Const **prefix_const, Selectivity *rest_selec)
-{
-	Oid			typeid = patt_const->consttype;
-	char	   *prefix;
-	bool		exact;
-
-	/*
-	 * Should be unnecessary, there are no bytea regex operators defined. As
-	 * such, it should be noted that the rest of this function has *not* been
-	 * made safe for binary (possibly NULL containing) strings.
-	 */
-	if (typeid == BYTEAOID)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("regular-expression matching not supported on type bytea")));
-
-	/* Use the regexp machinery to extract the prefix, if any */
-	prefix = regexp_fixed_prefix(DatumGetTextPP(patt_const->constvalue),
-								 case_insensitive, collation,
-								 &exact);
-
-	if (prefix == NULL)
-	{
-		*prefix_const = NULL;
-
-		if (rest_selec != NULL)
-		{
-			char	   *patt = TextDatumGetCString(patt_const->constvalue);
-
-			*rest_selec = regex_selectivity(patt, strlen(patt),
-											case_insensitive,
-											0);
-			pfree(patt);
-		}
-
-		return Pattern_Prefix_None;
-	}
-
-	*prefix_const = string_to_const(prefix, typeid);
-
-	if (rest_selec != NULL)
-	{
-		if (exact)
-		{
-			/* Exact match, so there's no additional selectivity */
-			*rest_selec = 1.0;
-		}
-		else
-		{
-			char	   *patt = TextDatumGetCString(patt_const->constvalue);
-
-			*rest_selec = regex_selectivity(patt, strlen(patt),
-											case_insensitive,
-											strlen(prefix));
-			pfree(patt);
-		}
-	}
-
-	pfree(prefix);
-
-	if (exact)
-		return Pattern_Prefix_Exact;	/* pattern specifies exact match */
-	else
-		return Pattern_Prefix_Partial;
-}
 
 static Pattern_Prefix_Status
 pattern_fixed_prefix(Const *patt, Pattern_Type ptype, Oid collation,
@@ -1153,14 +996,6 @@ pattern_fixed_prefix(Const *patt, Pattern_Type ptype, Oid collation,
 		case Pattern_Type_Like_IC:
 			result = like_fixed_prefix(patt, true, collation,
 									   prefix, rest_selec);
-			break;
-		case Pattern_Type_Regex:
-			result = regex_fixed_prefix(patt, false, collation,
-										prefix, rest_selec);
-			break;
-		case Pattern_Type_Regex_IC:
-			result = regex_fixed_prefix(patt, true, collation,
-										prefix, rest_selec);
 			break;
 		case Pattern_Type_Prefix:
 			/* Prefix type work is trivial.  */
@@ -1330,138 +1165,6 @@ like_selectivity(const char *patt, int pattlen, bool case_insensitive)
 	return sel;
 }
 
-static Selectivity
-regex_selectivity_sub(const char *patt, int pattlen, bool case_insensitive)
-{
-	Selectivity sel = 1.0;
-	int			paren_depth = 0;
-	int			paren_pos = 0;	/* dummy init to keep compiler quiet */
-	int			pos;
-
-	/* since this function recurses, it could be driven to stack overflow */
-	check_stack_depth();
-
-	for (pos = 0; pos < pattlen; pos++)
-	{
-		if (patt[pos] == '(')
-		{
-			if (paren_depth == 0)
-				paren_pos = pos;	/* remember start of parenthesized item */
-			paren_depth++;
-		}
-		else if (patt[pos] == ')' && paren_depth > 0)
-		{
-			paren_depth--;
-			if (paren_depth == 0)
-				sel *= regex_selectivity_sub(patt + (paren_pos + 1),
-											 pos - (paren_pos + 1),
-											 case_insensitive);
-		}
-		else if (patt[pos] == '|' && paren_depth == 0)
-		{
-			/*
-			 * If unquoted | is present at paren level 0 in pattern, we have
-			 * multiple alternatives; sum their probabilities.
-			 */
-			sel += regex_selectivity_sub(patt + (pos + 1),
-										 pattlen - (pos + 1),
-										 case_insensitive);
-			break;				/* rest of pattern is now processed */
-		}
-		else if (patt[pos] == '[')
-		{
-			bool		negclass = false;
-
-			if (patt[++pos] == '^')
-			{
-				negclass = true;
-				pos++;
-			}
-			if (patt[pos] == ']')	/* ']' at start of class is not special */
-				pos++;
-			while (pos < pattlen && patt[pos] != ']')
-				pos++;
-			if (paren_depth == 0)
-				sel *= (negclass ? (1.0 - CHAR_RANGE_SEL) : CHAR_RANGE_SEL);
-		}
-		else if (patt[pos] == '.')
-		{
-			if (paren_depth == 0)
-				sel *= ANY_CHAR_SEL;
-		}
-		else if (patt[pos] == '*' ||
-				 patt[pos] == '?' ||
-				 patt[pos] == '+')
-		{
-			/* Ought to be smarter about quantifiers... */
-			if (paren_depth == 0)
-				sel *= PARTIAL_WILDCARD_SEL;
-		}
-		else if (patt[pos] == '{')
-		{
-			while (pos < pattlen && patt[pos] != '}')
-				pos++;
-			if (paren_depth == 0)
-				sel *= PARTIAL_WILDCARD_SEL;
-		}
-		else if (patt[pos] == '\\')
-		{
-			/* backslash quotes the next character */
-			pos++;
-			if (pos >= pattlen)
-				break;
-			if (paren_depth == 0)
-				sel *= FIXED_CHAR_SEL;
-		}
-		else
-		{
-			if (paren_depth == 0)
-				sel *= FIXED_CHAR_SEL;
-		}
-	}
-	/* Could get sel > 1 if multiple wildcards */
-	if (sel > 1.0)
-		sel = 1.0;
-	return sel;
-}
-
-static Selectivity
-regex_selectivity(const char *patt, int pattlen, bool case_insensitive,
-				  int fixed_prefix_len)
-{
-	Selectivity sel;
-
-	/* If patt doesn't end with $, consider it to have a trailing wildcard */
-	if (pattlen > 0 && patt[pattlen - 1] == '$' &&
-		(pattlen == 1 || patt[pattlen - 2] != '\\'))
-	{
-		/* has trailing $ */
-		sel = regex_selectivity_sub(patt, pattlen - 1, case_insensitive);
-	}
-	else
-	{
-		/* no trailing $ */
-		sel = regex_selectivity_sub(patt, pattlen, case_insensitive);
-		sel *= FULL_WILDCARD_SEL;
-	}
-
-	/*
-	 * If there's a fixed prefix, discount its selectivity.  We have to be
-	 * careful here since a very long prefix could result in pow's result
-	 * underflowing to zero (in which case "sel" probably has as well).
-	 */
-	if (fixed_prefix_len > 0)
-	{
-		double		prefixsel = pow(FIXED_CHAR_SEL, fixed_prefix_len);
-
-		if (prefixsel > 0.0)
-			sel /= prefixsel;
-	}
-
-	/* Make sure result stays in range */
-	CLAMP_PROBABILITY(sel);
-	return sel;
-}
 
 /*
  * Check whether char is a letter (and, hence, subject to case-folding)

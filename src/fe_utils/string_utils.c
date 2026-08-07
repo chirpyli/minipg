@@ -959,7 +959,7 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
 	initPQExpBuffer(&namebuf);
 
 	/*
-	 * Convert shell-style 'pattern' into the regular expression(s) we want to
+	 * Convert shell-style 'pattern' into the LIKE pattern(s) we want to
 	 * execute.  Quoting/escaping into SQL literal format will be done below
 	 * using appendStringLiteralConn().
 	 */
@@ -979,52 +979,44 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
 	 * is >= v12 then we need to force it through explicit COLLATE clauses,
 	 * otherwise the "C" collation attached to "name" catalog columns wins.
 	 */
-	if (namevar && namebuf.len > 2)
+	if (namevar && namebuf.len > 0)
 	{
 		/* We have a name pattern, so constrain the namevar(s) */
 
-		/* Optimize away a "*" pattern */
-		if (strcmp(namebuf.data, "^(.*)$") != 0)
+		/* Optimize away a "%" pattern (matches everything) */
+		if (strcmp(namebuf.data, "%") != 0)
 		{
 			WHEREAND();
 			if (altnamevar)
 			{
 				appendPQExpBuffer(buf,
-								  "(%s OPERATOR(pg_catalog.~) ", namevar);
+								  "(%s LIKE ", namevar);
 				appendStringLiteralConn(buf, namebuf.data, conn);
-				if (PQserverVersion(conn) >= 120000)
-					appendPQExpBufferStr(buf, " COLLATE pg_catalog.default");
 				appendPQExpBuffer(buf,
-								  "\n        OR %s OPERATOR(pg_catalog.~) ",
+								  "\n        OR %s LIKE ",
 								  altnamevar);
 				appendStringLiteralConn(buf, namebuf.data, conn);
-				if (PQserverVersion(conn) >= 120000)
-					appendPQExpBufferStr(buf, " COLLATE pg_catalog.default");
 				appendPQExpBufferStr(buf, ")\n");
 			}
 			else
 			{
-				appendPQExpBuffer(buf, "%s OPERATOR(pg_catalog.~) ", namevar);
+				appendPQExpBuffer(buf, "%s LIKE ", namevar);
 				appendStringLiteralConn(buf, namebuf.data, conn);
-				if (PQserverVersion(conn) >= 120000)
-					appendPQExpBufferStr(buf, " COLLATE pg_catalog.default");
 				appendPQExpBufferChar(buf, '\n');
 			}
 		}
 	}
 
-	if (schemavar && schemabuf.len > 2)
+	if (schemavar && schemabuf.len > 0)
 	{
 		/* We have a schema pattern, so constrain the schemavar */
 
-		/* Optimize away a "*" pattern */
-		if (strcmp(schemabuf.data, "^(.*)$") != 0 && schemavar)
+		/* Optimize away a "%" pattern (matches everything) */
+		if (strcmp(schemabuf.data, "%") != 0 && schemavar)
 		{
 			WHEREAND();
-			appendPQExpBuffer(buf, "%s OPERATOR(pg_catalog.~) ", schemavar);
+			appendPQExpBuffer(buf, "%s LIKE ", schemavar);
 			appendStringLiteralConn(buf, schemabuf.data, conn);
-			if (PQserverVersion(conn) >= 120000)
-				appendPQExpBufferStr(buf, " COLLATE pg_catalog.default");
 			appendPQExpBufferChar(buf, '\n');
 		}
 	}
@@ -1046,10 +1038,9 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
 }
 
 /*
- * Transform a possibly qualified shell-style object name pattern into up to
- * three SQL-style regular expressions, converting quotes, lower-casing
- * unquoted letters, and adjusting shell-style wildcard characters into regexp
- * notation.
+ * Transform a possibly qualified shell-style object name pattern into SQL
+ * LIKE patterns, converting quotes, lower-casing unquoted letters, and
+ * adjusting shell-style wildcard characters (* → %, ? → _).
  *
  * If the dbnamebuf and schemabuf arguments are non-NULL, and the pattern
  * contains two or more dbname/schema/name separators, we parse the portions of
@@ -1067,13 +1058,10 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
  * namebuf, though they will be counted.  Callers should always check the value
  * returned by reference in dotcnt and handle this error case appropriately.
  *
- * We surround the regexps with "^(...)$" to force them to match whole strings,
- * as per SQL practice.  We have to have parens in case strings contain "|",
- * else the "^" and "$" will be bound into the first and last alternatives
- * which is not what we want.  Whether this is done for dbnamebuf is controlled
- * by the want_literal_dbname parameter.
+ * LIKE patterns match the whole string by default, so we don't need anchors
+ * or parens unlike regex-based matching.
  *
- * The regexps we parse into the buffers are appended to the data (if any)
+ * The patterns we parse into the buffers are appended to the data (if any)
  * already present.  If we parse fewer fields than the number of buffers we
  * were given, the extra buffers are unaltered.
  *
@@ -1082,14 +1070,14 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
  * pattern, if any.  Can be NULL.
  * schemabuf: output parameter receiving the schema name portion of the
  * pattern, if any.  Can be NULL.
- * namebuf: output parameter receiving the database name portion of the
+ * namebuf: output parameter receiving the name portion of the
  * pattern, if any.  Can be NULL.
  * pattern: user-specified pattern option, or NULL if none ("*" is implied).
- * force_escape: always quote regexp special characters, even outside
+ * force_escape: always quote LIKE special characters, even outside
  * double quotes (else they are quoted only between double quotes).
- * want_literal_dbname: if true, regexp special characters within the database
+ * want_literal_dbname: if true, LIKE special characters within the database
  * name portion of the pattern will not be escaped, nor will the dbname be
- * converted into a regular expression.
+ * converted.
  * dotcnt: output parameter receiving the number of separators parsed from the
  * pattern.
  */
@@ -1134,7 +1122,6 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 	else
 		left = false;
 	initPQExpBuffer(curbuf);
-	appendPQExpBufferStr(curbuf, "^(");
 	while (*cp)
 	{
 		char		ch = *cp;
@@ -1164,14 +1151,14 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 		}
 		else if (!inquotes && ch == '*')
 		{
-			appendPQExpBufferStr(curbuf, ".*");
+			appendPQExpBufferChar(curbuf, '%');
 			if (left)
 				appendPQExpBufferChar(&left_literal, '*');
 			cp++;
 		}
 		else if (!inquotes && ch == '?')
 		{
-			appendPQExpBufferChar(curbuf, '.');
+			appendPQExpBufferChar(curbuf, '_');
 			if (left)
 				appendPQExpBufferChar(&left_literal, '?');
 			cp++;
@@ -1183,10 +1170,8 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 				(*dotcnt)++;
 			if (curbuf < maxbuf)
 			{
-				appendPQExpBufferStr(curbuf, ")$");
 				curbuf++;
 				initPQExpBuffer(curbuf);
-				appendPQExpBufferStr(curbuf, "^(");
 				cp++;
 			}
 			else
@@ -1195,13 +1180,9 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 		else if (ch == '$')
 		{
 			/*
-			 * Dollar is always quoted, whether inside quotes or not. The
-			 * reason is that it's allowed in SQL identifiers, so there's a
-			 * significant use-case for treating it literally, while because
-			 * we anchor the pattern automatically there is no use-case for
-			 * having it possess its regexp meaning.
+			 * Dollar is a literal character in LIKE patterns.
 			 */
-			appendPQExpBufferStr(curbuf, "\\$");
+			appendPQExpBufferChar(curbuf, '$');
 			if (left)
 				appendPQExpBufferChar(&left_literal, '$');
 			cp++;
@@ -1212,17 +1193,17 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 			 * Ordinary data character, transfer to pattern
 			 *
 			 * Inside double quotes, or at all times if force_escape is true,
-			 * quote regexp special characters with a backslash to avoid
-			 * regexp errors.  Outside quotes, however, let them pass through
-			 * as-is; this lets knowledgeable users build regexp expressions
+			 * quote LIKE special characters with a backslash to avoid
+			 * LIKE pattern errors.  Outside quotes, however, let them pass
+			 * through as-is; this lets knowledgeable users build patterns
 			 * that are more powerful than shell-style patterns.
 			 *
 			 * As an exception to that, though, always quote "[]", as that's
 			 * much more likely to be an attempt to write an array type name
-			 * than it is to be the start of a regexp bracket expression.
+			 * than it is to be the start of a bracket expression.
 			 */
 			if ((inquotes || force_escape) &&
-				strchr("|*+?()[]{}.^$\\", ch))
+				strchr("%_\\", ch))
 				appendPQExpBufferChar(curbuf, '\\');
 			else if (ch == '[' && cp[1] == ']')
 				appendPQExpBufferChar(curbuf, '\\');
@@ -1235,7 +1216,7 @@ patternToSQLRegex(int encoding, PQExpBuffer dbnamebuf, PQExpBuffer schemabuf,
 			}
 		}
 	}
-	appendPQExpBufferStr(curbuf, ")$");
+
 
 	if (namebuf)
 	{

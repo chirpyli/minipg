@@ -573,7 +573,7 @@ select * from rtest_t8;
 ---+---
 (0 rows)
 
-insert into rtest_t4 select * from rtest_t9 where b ~ 'and t8';
+insert into rtest_t4 select * from rtest_t9 where b LIKE '%and t8%';
 select * from rtest_t4;
  a  |                  b                  
 ----+-------------------------------------
@@ -843,7 +843,7 @@ select * from rtest_view3;
 (3 rows)
 
 delete from rtest_view3;
-insert into rtest_view3 select * from rtest_vview2 where a != 5 and b !~ '2';
+insert into rtest_view3 select * from rtest_vview2 where a != 5 and b NOT LIKE '%2%';
 select * from rtest_view3;
  a |   b    
 ---+--------
@@ -1836,7 +1836,7 @@ pg_stat_sys_indexes| SELECT pg_stat_all_indexes.relid,
     pg_stat_all_indexes.idx_tup_read,
     pg_stat_all_indexes.idx_tup_fetch
    FROM pg_stat_all_indexes
-  WHERE ((pg_stat_all_indexes.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_all_indexes.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_stat_all_indexes.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_all_indexes.schemaname ~~ 'pg_toast%'::text));
 pg_stat_sys_tables| SELECT pg_stat_all_tables.relid,
     pg_stat_all_tables.schemaname,
     pg_stat_all_tables.relname,
@@ -1861,7 +1861,7 @@ pg_stat_sys_tables| SELECT pg_stat_all_tables.relid,
     pg_stat_all_tables.analyze_count,
     pg_stat_all_tables.autoanalyze_count
    FROM pg_stat_all_tables
-  WHERE ((pg_stat_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_all_tables.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_stat_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_all_tables.schemaname ~~ 'pg_toast%'::text));
 pg_stat_user_functions| SELECT p.oid AS funcid,
     n.nspname AS schemaname,
     p.proname AS funcname,
@@ -1880,7 +1880,7 @@ pg_stat_user_indexes| SELECT pg_stat_all_indexes.relid,
     pg_stat_all_indexes.idx_tup_read,
     pg_stat_all_indexes.idx_tup_fetch
    FROM pg_stat_all_indexes
-  WHERE ((pg_stat_all_indexes.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_all_indexes.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_stat_all_indexes.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_all_indexes.schemaname !~~ 'pg_toast%'::text));
 pg_stat_user_tables| SELECT pg_stat_all_tables.relid,
     pg_stat_all_tables.schemaname,
     pg_stat_all_tables.relname,
@@ -1905,7 +1905,7 @@ pg_stat_user_tables| SELECT pg_stat_all_tables.relid,
     pg_stat_all_tables.analyze_count,
     pg_stat_all_tables.autoanalyze_count
    FROM pg_stat_all_tables
-  WHERE ((pg_stat_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_all_tables.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_stat_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_all_tables.schemaname !~~ 'pg_toast%'::text));
 pg_stat_wal| SELECT w.wal_records,
     w.wal_fpi,
     w.wal_bytes,
@@ -1961,7 +1961,7 @@ pg_stat_xact_sys_tables| SELECT pg_stat_xact_all_tables.relid,
     pg_stat_xact_all_tables.n_tup_del,
     pg_stat_xact_all_tables.n_tup_hot_upd
    FROM pg_stat_xact_all_tables
-  WHERE ((pg_stat_xact_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_xact_all_tables.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_stat_xact_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_stat_xact_all_tables.schemaname ~~ 'pg_toast%'::text));
 pg_stat_xact_user_functions| SELECT p.oid AS funcid,
     n.nspname AS schemaname,
     p.proname AS funcname,
@@ -1983,7 +1983,7 @@ pg_stat_xact_user_tables| SELECT pg_stat_xact_all_tables.relid,
     pg_stat_xact_all_tables.n_tup_del,
     pg_stat_xact_all_tables.n_tup_hot_upd
    FROM pg_stat_xact_all_tables
-  WHERE ((pg_stat_xact_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_xact_all_tables.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_stat_xact_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_stat_xact_all_tables.schemaname !~~ 'pg_toast%'::text));
 pg_statio_all_indexes| SELECT c.oid AS relid,
     i.oid AS indexrelid,
     n.nspname AS schemaname,
@@ -2030,14 +2030,14 @@ pg_statio_sys_indexes| SELECT pg_statio_all_indexes.relid,
     pg_statio_all_indexes.idx_blks_read,
     pg_statio_all_indexes.idx_blks_hit
    FROM pg_statio_all_indexes
-  WHERE ((pg_statio_all_indexes.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_indexes.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_indexes.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_indexes.schemaname ~~ 'pg_toast%'::text));
 pg_statio_sys_sequences| SELECT pg_statio_all_sequences.relid,
     pg_statio_all_sequences.schemaname,
     pg_statio_all_sequences.relname,
     pg_statio_all_sequences.blks_read,
     pg_statio_all_sequences.blks_hit
    FROM pg_statio_all_sequences
-  WHERE ((pg_statio_all_sequences.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_sequences.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_sequences.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_sequences.schemaname ~~ 'pg_toast%'::text));
 pg_statio_sys_tables| SELECT pg_statio_all_tables.relid,
     pg_statio_all_tables.schemaname,
     pg_statio_all_tables.relname,
@@ -2050,7 +2050,7 @@ pg_statio_sys_tables| SELECT pg_statio_all_tables.relid,
     pg_statio_all_tables.tidx_blks_read,
     pg_statio_all_tables.tidx_blks_hit
    FROM pg_statio_all_tables
-  WHERE ((pg_statio_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_tables.schemaname ~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_tables.schemaname = ANY (ARRAY['pg_catalog'::name, 'information_schema'::name])) OR (pg_statio_all_tables.schemaname ~~ 'pg_toast%'::text));
 pg_statio_user_indexes| SELECT pg_statio_all_indexes.relid,
     pg_statio_all_indexes.indexrelid,
     pg_statio_all_indexes.schemaname,
@@ -2059,14 +2059,14 @@ pg_statio_user_indexes| SELECT pg_statio_all_indexes.relid,
     pg_statio_all_indexes.idx_blks_read,
     pg_statio_all_indexes.idx_blks_hit
    FROM pg_statio_all_indexes
-  WHERE ((pg_statio_all_indexes.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_indexes.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_indexes.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_indexes.schemaname !~~ 'pg_toast%'::text));
 pg_statio_user_sequences| SELECT pg_statio_all_sequences.relid,
     pg_statio_all_sequences.schemaname,
     pg_statio_all_sequences.relname,
     pg_statio_all_sequences.blks_read,
     pg_statio_all_sequences.blks_hit
    FROM pg_statio_all_sequences
-  WHERE ((pg_statio_all_sequences.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_sequences.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_sequences.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_sequences.schemaname !~~ 'pg_toast%'::text));
 pg_statio_user_tables| SELECT pg_statio_all_tables.relid,
     pg_statio_all_tables.schemaname,
     pg_statio_all_tables.relname,
@@ -2079,7 +2079,7 @@ pg_statio_user_tables| SELECT pg_statio_all_tables.relid,
     pg_statio_all_tables.tidx_blks_read,
     pg_statio_all_tables.tidx_blks_hit
    FROM pg_statio_all_tables
-  WHERE ((pg_statio_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_tables.schemaname !~ '^pg_toast'::text));
+  WHERE ((pg_statio_all_tables.schemaname <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])) AND (pg_statio_all_tables.schemaname !~~ 'pg_toast%'::text));
 pg_stats| SELECT n.nspname AS schemaname,
     c.relname AS tablename,
     a.attname,

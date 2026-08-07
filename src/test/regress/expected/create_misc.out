@@ -38,18 +38,18 @@ TABLE city;
 SELECT *
    INTO TABLE ramp
    FROM road
-   WHERE name ~ '.*Ramp';
+   WHERE name LIKE '%Ramp';
 ERROR:  syntax error at or near "INTO"
 LINE 2:    INTO TABLE ramp
            ^
 INSERT INTO ihighway
    SELECT *
    FROM road
-   WHERE name ~ 'I- .*';
+   WHERE name LIKE 'I- %';
 INSERT INTO shighway
    SELECT *
    FROM road
-   WHERE name ~ 'State Hwy.*';
+   WHERE name LIKE 'State Hwy%';
 UPDATE shighway
    SET surface = 'asphalt';
 INSERT INTO a_star (class, a) VALUES ('a', 1);

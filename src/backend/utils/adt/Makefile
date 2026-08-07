@@ -61,7 +61,6 @@ OBJS = \
 	pgstatfuncs.o \
 	pseudotypes.o \
 	quote.o \
-	regexp.o \
 	regproc.o \
 	rowtypes.o \
 	ruleutils.o \

@@ -18,18 +18,79 @@ declare
 begin
     for ln in execute $1
     loop
-        -- Replace any numeric word with just 'N'
-        ln := regexp_replace(ln, '-?\m\d+\M', 'N', 'g');
-        -- In sort output, the above won't match units-suffixed numbers
-        ln := regexp_replace(ln, '\m\d+kB', 'NkB', 'g');
+        /*
+         * Replace digit sequences that are at word boundaries
+         * (preceded and followed by non-[a-zA-Z0-9_] chars).
+         * Also handle digits before 'kB' by special-casing them.
+         */
+        ln := mask_word_digits(ln);
+        -- Normalize negative masked values to positive, since
+        -- whether a query identifier is negative depends on the hash
+        ln := replace(ln, '-N', 'N');
         -- Ignore text-mode buffers output because it varies depending
         -- on the system state
-        CONTINUE WHEN (ln ~ ' +Buffers: .*');
+        CONTINUE WHEN (ln like '   Buffers:%');
         -- Ignore text-mode "Planning:" line because whether it's output
         -- varies depending on the system state
         CONTINUE WHEN (ln = 'Planning:');
         return next ln;
     end loop;
+end;
+$$;
+
+create function is_word_char(c char) returns boolean
+language plpgsql immutable strict as
+$$
+begin
+    return (c between 'a' and 'z') or (c between 'A' and 'Z') or
+           (c between '0' and '9') or (c = '_');
+end;
+$$;
+
+create function mask_word_digits(input text) returns text
+language plpgsql immutable strict as
+$$
+declare
+    result text := '';
+    i int := 1;
+    c char;
+    j int;
+begin
+    while i <= length(input) loop
+        c := substr(input, i, 1);
+        if c between '0' and '9' then
+            -- Check word boundary before this digit
+            if i = 1 or not is_word_char(substr(input, i-1, 1)) then
+                -- Find end of digit run
+                j := i;
+                while j <= length(input) and substr(input, j, 1) between '0' and '9' loop
+                    j := j + 1;
+                end loop;
+                -- Check word boundary after digit run
+                -- Also allow 'kB' suffix (sort memory output)
+                if j > length(input) then
+                    -- EOL: word boundary
+                    result := result || 'N';
+                    i := j;
+                    continue;
+                elsif j+1 <= length(input) and
+                      substr(input, j, 1) = 'k' and substr(input, j+1, 1) = 'B' then
+                    -- Digit run followed by kB: mask digits
+                    result := result || 'N';
+                    i := j;
+                    continue;
+                elsif not is_word_char(substr(input, j, 1)) then
+                    -- Followed by non-word char: word boundary
+                    result := result || 'N';
+                    i := j;
+                    continue;
+                end if;
+            end if;
+        end if;
+        result := result || c;
+        i := i + 1;
+    end loop;
+    return result;
 end;
 $$;
 

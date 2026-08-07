@@ -245,9 +245,9 @@ CREATE TYPE unknown_comptype AS (
 );
 
 CREATE TEMPORARY TABLE unlogged2 (a int primary key);			-- OK
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname ~ '^unlogged\d' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 REINDEX INDEX unlogged2_pkey;
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname ~ '^unlogged\d' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 DROP TABLE unlogged2;
 CREATE TABLE pg_temp.implicitly_temp (a int primary key);		-- OK
 CREATE TEMP TABLE explicitly_temp (a int primary key);			-- also OK

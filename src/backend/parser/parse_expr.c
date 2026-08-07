@@ -179,7 +179,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 						break;
 					case AEXPR_LIKE:
 					case AEXPR_ILIKE:
-					case AEXPR_SIMILAR:
 						/* we can transform these just like AEXPR_OP */
 						result = transformAExprOp(pstate, a);
 						break;

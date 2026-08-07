@@ -3,6 +3,34 @@
 -- machines.  Let's just replace the number with an 'N'.  In order to allow us
 -- to perform validation when the measure was zero, we replace a zero value
 -- with "Zero".  All other numbers are replaced with 'N'.
+create or replace function replace_digits_after(str text, prefix text, repl text)
+returns text language plpgsql immutable strict as $$
+declare
+    pos int;
+    i int;
+    digit_start int;
+    digit_end int;
+begin
+    pos := strpos(str, prefix);
+    if pos = 0 then
+        return str;
+    end if;
+    i := pos + length(prefix);
+    while i <= length(str) and substr(str, i, 1) not between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    if i > length(str) then
+        return str;
+    end if;
+    digit_start := i;
+    while i <= length(str) and substr(str, i, 1) between '0' and '9' loop
+        i := i + 1;
+    end loop;
+    digit_end := i - 1;
+    return substr(str, 1, digit_start - 1) || repl ||
+           substr(str, digit_end + 1);
+end;
+$$;
 create function explain_memoize(query text, hide_hitmiss bool) returns setof text
 language plpgsql as
 $$
@@ -14,16 +42,16 @@ begin
             query)
     loop
         if hide_hitmiss = true then
-                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
-                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
-                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
-                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+                ln := replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := replace_digits_after(ln, 'Hits: ', 'N');
+                ln := replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := replace_digits_after(ln, 'Misses: ', 'N');
         end if;
-        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
-        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
-        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
-	ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
-	ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := replace_digits_after(ln, 'Evictions: ', 'N');
+        ln := replace_digits_after(ln, 'Memory Usage: ', 'N');
+        ln := replace_digits_after(ln, 'Heap Fetches: ', 'N');
+        ln := replace_digits_after(ln, 'loops=', 'N');
         return next ln;
     end loop;
 end;
@@ -45,7 +73,7 @@ WHERE t2.unique1 < 1000;', false);
          ->  Memoize (actual rows=1 loops=N)
                Cache Key: t2.twenty
                Cache Mode: logical
-               Hits: 980  Misses: 20  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+               Hits: 980  Misses: 20  Evictions: Zero  Overflows: N  Memory Usage: NkB
                ->  Index Only Scan using tenk1_unique1 on tenk1 t1 (actual rows=1 loops=N)
                      Index Cond: (unique1 = t2.twenty)
                      Heap Fetches: N
@@ -76,7 +104,7 @@ WHERE t1.unique1 < 1000;', false);
          ->  Memoize (actual rows=1 loops=N)
                Cache Key: t1.twenty
                Cache Mode: binary
-               Hits: 980  Misses: 20  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+               Hits: 980  Misses: 20  Evictions: Zero  Overflows: N  Memory Usage: NkB
                ->  Index Only Scan using tenk1_unique1 on tenk1 t2 (actual rows=1 loops=N)
                      Index Cond: (unique1 = t1.twenty)
                      Heap Fetches: N
@@ -114,7 +142,7 @@ ON t1.x = t2.t::numeric AND t1.t::numeric = t2.x;', false);
    ->  Memoize (actual rows=2 loops=N)
          Cache Key: t1.x, (t1.t)::numeric
          Cache Mode: logical
-         Hits: 20  Misses: 20  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+         Hits: 20  Misses: 20  Evictions: Zero  Overflows: N  Memory Usage: NkB
          ->  Index Only Scan using expr_key_idx_x_t on expr_key t2 (actual rows=2 loops=N)
                Index Cond: (x = (t1.t)::numeric)
                Filter: (t1.x = (t)::numeric)
@@ -163,7 +191,7 @@ SELECT * FROM flt f1 INNER JOIN flt f2 ON f1.f = f2.f;', false);
    ->  Memoize (actual rows=2 loops=N)
          Cache Key: f1.f
          Cache Mode: logical
-         Hits: 1  Misses: 1  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+         Hits: 1  Misses: 1  Evictions: Zero  Overflows: N  Memory Usage: NkB
          ->  Index Only Scan using flt_f_idx on flt f2 (actual rows=2 loops=N)
                Index Cond: (f = f1.f)
                Heap Fetches: N
@@ -180,7 +208,7 @@ SELECT * FROM flt f1 INNER JOIN flt f2 ON f1.f >= f2.f;', false);
    ->  Memoize (actual rows=2 loops=N)
          Cache Key: f1.f
          Cache Mode: binary
-         Hits: 0  Misses: 2  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+         Hits: 0  Misses: 2  Evictions: Zero  Overflows: N  Memory Usage: NkB
          ->  Index Only Scan using flt_f_idx on flt f2 (actual rows=2 loops=N)
                Index Cond: (f <= f1.f)
                Heap Fetches: N
@@ -206,7 +234,7 @@ SELECT * FROM strtest s1 INNER JOIN strtest s2 ON s1.n >= s2.n;', false);
    ->  Memoize (actual rows=4 loops=N)
          Cache Key: s1.n
          Cache Mode: binary
-         Hits: 3  Misses: 3  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+         Hits: 3  Misses: 3  Evictions: Zero  Overflows: N  Memory Usage: NkB
          ->  Index Scan using strtest_n_idx on strtest s2 (actual rows=4 loops=N)
                Index Cond: (n <= s1.n)
 (8 rows)
@@ -221,7 +249,7 @@ SELECT * FROM strtest s1 INNER JOIN strtest s2 ON s1.t >= s2.t;', false);
    ->  Memoize (actual rows=4 loops=N)
          Cache Key: s1.t
          Cache Mode: binary
-         Hits: 3  Misses: 3  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+         Hits: 3  Misses: 3  Evictions: Zero  Overflows: N  Memory Usage: NkB
          ->  Index Scan using strtest_t_idx on strtest s2 (actual rows=4 loops=N)
                Index Cond: (t <= s1.t)
 (8 rows)
@@ -248,7 +276,7 @@ SELECT * FROM prt t1 INNER JOIN prt t2 ON t1.a = t2.a;', false);
          ->  Memoize (actual rows=4 loops=N)
                Cache Key: t1_1.a
                Cache Mode: logical
-               Hits: 3  Misses: 1  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+               Hits: 3  Misses: 1  Evictions: Zero  Overflows: N  Memory Usage: NkB
                ->  Index Only Scan using iprt_p1_a on prt_p1 t2_1 (actual rows=4 loops=N)
                      Index Cond: (a = t1_1.a)
                      Heap Fetches: N
@@ -258,7 +286,7 @@ SELECT * FROM prt t1 INNER JOIN prt t2 ON t1.a = t2.a;', false);
          ->  Memoize (actual rows=4 loops=N)
                Cache Key: t1_2.a
                Cache Mode: logical
-               Hits: 3  Misses: 1  Evictions: Zero  Overflows: 0  Memory Usage: NkB
+               Hits: 3  Misses: 1  Evictions: Zero  Overflows: N  Memory Usage: NkB
                ->  Index Only Scan using iprt_p2_a on prt_p2 t2_2 (actual rows=4 loops=N)
                      Index Cond: (a = t1_2.a)
                      Heap Fetches: N

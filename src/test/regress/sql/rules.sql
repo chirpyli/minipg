@@ -337,7 +337,7 @@ select * from rtest_t6;
 select * from rtest_t7;
 select * from rtest_t8;
 
-insert into rtest_t4 select * from rtest_t9 where b ~ 'and t8';
+insert into rtest_t4 select * from rtest_t9 where b LIKE '%and t8%';
 
 select * from rtest_t4;
 select * from rtest_t5;
@@ -463,7 +463,7 @@ insert into rtest_view3 select * from rtest_vview1 where a < 7;
 select * from rtest_view3;
 delete from rtest_view3;
 
-insert into rtest_view3 select * from rtest_vview2 where a != 5 and b !~ '2';
+insert into rtest_view3 select * from rtest_vview2 where a != 5 and b NOT LIKE '%2%';
 select * from rtest_view3;
 delete from rtest_view3;
 

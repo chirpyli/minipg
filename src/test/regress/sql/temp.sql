@@ -211,7 +211,7 @@ create temp table temp_parted_oncommit_test2
 insert into temp_parted_oncommit_test values (1), (2);
 commit;
 -- no relations remain in this case.
-select relname from pg_class where relname ~ '^temp_parted_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_parted_oncommit_test';
 -- Using ON COMMIT DELETE on a partitioned table does not remove
 -- all rows if partitions preserve their data.
 begin;
@@ -229,7 +229,7 @@ commit;
 -- preserved.
 select * from temp_parted_oncommit_test;
 -- two relations remain in this case.
-select relname from pg_class where relname ~ '^temp_parted_oncommit_test'
+select relname from pg_class where relname LIKE 'temp_parted_oncommit_test'
   order by relname;
 drop table temp_parted_oncommit_test;
 
@@ -242,7 +242,7 @@ create temp table temp_inh_oncommit_test1 ()
 insert into temp_inh_oncommit_test1 values (1);
 commit;
 -- no relations remain in this case
-select relname from pg_class where relname ~ '^temp_inh_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_inh_oncommit_test';
 -- Data on the parent is removed, and the child goes away.
 begin;
 create temp table temp_inh_oncommit_test (a int) on commit delete rows;
@@ -253,7 +253,7 @@ insert into temp_inh_oncommit_test values (1);
 commit;
 select * from temp_inh_oncommit_test;
 -- one relation remains
-select relname from pg_class where relname ~ '^temp_inh_oncommit_test';
+select relname from pg_class where relname LIKE 'temp_inh_oncommit_test';
 drop table temp_inh_oncommit_test;
 
 -- Tests with two-phase commit
@@ -309,5 +309,5 @@ prepare transaction 'twophase_tab';
 \c -
 SET search_path TO 'pg_temp';
 BEGIN;
-SELECT current_schema() ~ 'pg_temp' AS is_temp_schema;
+SELECT current_schema() LIKE 'pg_temp%' AS is_temp_schema;
 PREPARE TRANSACTION 'twophase_search';

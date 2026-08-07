@@ -20,7 +20,7 @@ all: pg_config.h pg_config_ext.h pg_config_os.h
 SUBDIRS = access bootstrap catalog commands common datatype \
 	executor fe_utils \
 	lib libpq mb nodes optimizer parser partitioning postmaster \
-	regex replication rewrite \
+	replication rewrite \
 	statistics storage tcop \
 	utils port port/atomics portability
 

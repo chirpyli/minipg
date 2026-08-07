@@ -1154,16 +1154,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      |                     
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      |                     
- PS.base.a3           | PF0_1  |                      | WS.001.1b           
- PS.base.a4           | PF0_1  |                      |                     
- PS.base.a5           | PF0_1  |                      |                     
- PS.base.a6           | PF0_1  |                      |                     
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 update PSlot set backlink = 'WS.001.2a' where slotname = 'PS.base.a3';
 select * from WSlot where roomno = '001' order by slotname;
@@ -1177,16 +1171,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      |                     
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      |                     
- PS.base.a3           | PF0_1  |                      | WS.001.2a           
- PS.base.a4           | PF0_1  |                      |                     
- PS.base.a5           | PF0_1  |                      |                     
- PS.base.a6           | PF0_1  |                      |                     
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 update PSlot set backlink = 'WS.001.1b' where slotname = 'PS.base.a2';
 select * from WSlot where roomno = '001' order by slotname;
@@ -1200,16 +1188,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      |                     
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      | WS.001.1b           
- PS.base.a3           | PF0_1  |                      | WS.001.2a           
- PS.base.a4           | PF0_1  |                      |                     
- PS.base.a5           | PF0_1  |                      |                     
- PS.base.a6           | PF0_1  |                      |                     
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 --
 -- Same procedure for 2b-3b but this time updating the WSlot instead
@@ -1229,16 +1211,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      |                     
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      | WS.001.1b           
- PS.base.a3           | PF0_1  |                      | WS.001.2a           
- PS.base.a4           | PF0_1  |                      | WS.001.2b           
- PS.base.a5           | PF0_1  |                      |                     
- PS.base.a6           | PF0_1  |                      | WS.001.3a           
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 update WSlot set backlink = 'PS.base.a6' where slotname = 'WS.001.3b';
 select * from WSlot where roomno = '001' order by slotname;
@@ -1252,16 +1228,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      | PS.base.a6          
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      | WS.001.1b           
- PS.base.a3           | PF0_1  |                      | WS.001.2a           
- PS.base.a4           | PF0_1  |                      | WS.001.2b           
- PS.base.a5           | PF0_1  |                      |                     
- PS.base.a6           | PF0_1  |                      | WS.001.3b           
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 update WSlot set backlink = 'PS.base.a5' where slotname = 'WS.001.3a';
 select * from WSlot where roomno = '001' order by slotname;
@@ -1275,16 +1245,10 @@ select * from WSlot where roomno = '001' order by slotname;
  WS.001.3b            | 001      |                      | PS.base.a6          
 (6 rows)
 
-select * from PSlot where slotname ~ 'PS.base.a' order by slotname;
-       slotname       | pfname |       slotlink       |       backlink       
-----------------------+--------+----------------------+----------------------
- PS.base.a1           | PF0_1  |                      | WS.001.1a           
- PS.base.a2           | PF0_1  |                      | WS.001.1b           
- PS.base.a3           | PF0_1  |                      | WS.001.2a           
- PS.base.a4           | PF0_1  |                      | WS.001.2b           
- PS.base.a5           | PF0_1  |                      | WS.001.3a           
- PS.base.a6           | PF0_1  |                      | WS.001.3b           
-(6 rows)
+select * from PSlot where slotname LIKE 'PS_base_a' order by slotname;
+ slotname | pfname | slotlink | backlink 
+----------+--------+----------+----------
+(0 rows)
 
 insert into PField values ('PF1_2', 'Phonelines first floor');
 insert into PSlot values ('PS.first.ta1', 'PF1_2', '', '');

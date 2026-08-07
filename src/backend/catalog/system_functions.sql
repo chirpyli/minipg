@@ -42,12 +42,6 @@ CREATE OR REPLACE FUNCTION rpad(text, integer)
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN rpad($1, $2, ' ');
 
-CREATE OR REPLACE FUNCTION "substring"(text, text, text)
- RETURNS text
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN substring($1, similar_to_escape($2, $3));
-
 CREATE OR REPLACE FUNCTION bit_length(bit)
  RETURNS integer
  LANGUAGE sql

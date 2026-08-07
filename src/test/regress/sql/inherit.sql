@@ -935,17 +935,17 @@ analyze permtest_parent;
 -- without stats access, these queries would produce hash join plans:
 explain (costs off)
   select * from permtest_parent p1 inner join permtest_parent p2
-  on p1.a = p2.a and p1.c ~ 'a1$';
+  on p1.a = p2.a and p1.c LIKE '%a1';
 explain (costs off)
   select * from permtest_parent p1 inner join permtest_parent p2
-  on p1.a = p2.a and left(p1.c, 3) ~ 'a1$';
+  on p1.a = p2.a and left(p1.c, 3) LIKE '%a1';
 explain (costs off)
   select p2.a, p1.c from permtest_parent p1 inner join permtest_parent p2
-  on p1.a = p2.a and p1.c ~ 'a1$';
+  on p1.a = p2.a and p1.c LIKE '%a1';
 -- we will not have access to the expression index's stats here:
 explain (costs off)
   select p2.a, p1.c from permtest_parent p1 inner join permtest_parent p2
-  on p1.a = p2.a and left(p1.c, 3) ~ 'a1$';
+  on p1.a = p2.a and left(p1.c, 3) LIKE '%a1';
 drop table permtest_parent;
 
 -- Verify that constraint errors across partition root / child are

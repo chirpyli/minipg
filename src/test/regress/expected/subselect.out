@@ -1553,12 +1553,22 @@ insert into sq_limit values
 create function explain_sq_limit() returns setof text language plpgsql as
 $$
 declare ln text;
+    pos int;
+    i int;
 begin
     for ln in
         explain (analyze, summary off, timing off, costs off)
         select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3
     loop
-        ln := regexp_replace(ln, 'Memory: \S*',  'Memory: xxx');
+        pos := position('Memory: ' in ln);
+        if pos > 0 then
+            i := pos + length('Memory: ');
+            while i <= length(ln) and substr(ln, i, 1) <> ' ' loop
+                i := i + 1;
+            end loop;
+            ln := substr(ln, 1, pos + length('Memory: ') - 1) || 'xxx' ||
+                  substr(ln, i);
+        end if;
         return next ln;
     end loop;
 end;

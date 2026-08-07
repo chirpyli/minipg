@@ -661,7 +661,7 @@ select min(unique1) filter (where unique1 > 100) from tenk1;
 
 select sum(1/ten) filter (where ten > 0) from tenk1;
 
-select ten, sum(distinct four) filter (where four::text ~ '123') from onek a
+select ten, sum(distinct four) filter (where four::text LIKE '%123%') from onek a
 group by ten;
 
 select ten, sum(distinct four) filter (where four > 10) from onek a

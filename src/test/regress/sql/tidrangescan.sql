@@ -19,7 +19,7 @@ INSERT INTO tidrangescan SELECT i,repeat('x', 100) FROM generate_series(1,200) A
 -- we get the same layout with all CPU architectures and smaller than standard
 -- page sizes.
 DELETE FROM tidrangescan
-WHERE substring(ctid::text FROM ',(\d+)\)')::integer > 10 OR substring(ctid::text FROM '\((\d+),')::integer > 2;
+WHERE substring(ctid::text, position(',' in ctid::text) + 1, length(ctid::text) - position(',' in ctid::text) - 1)::integer > 10 OR substring(ctid::text, 2, position(',' in ctid::text) - 2)::integer > 2;
 VACUUM tidrangescan;
 
 -- range scans with upper bound

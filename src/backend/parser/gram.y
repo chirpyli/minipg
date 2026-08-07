@@ -646,7 +646,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	SAVEPOINT SCHEMA SCHEMAS SCROLL SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
-	SIMILAR SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P STABLE STANDALONE_P
+	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P STABLE STANDALONE_P
 	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRICT_P STRIP_P
 	SUBSCRIPTION SUBSTRING SUPPORT SYMMETRIC SYSID SYSTEM_P
 
@@ -703,8 +703,8 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %right		NOT
 %nonassoc	IS ISNULL NOTNULL	/* IS sets precedence for IS NULL, etc */
 %nonassoc	'<' '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
-%nonassoc	BETWEEN IN_P LIKE ILIKE SIMILAR NOT_LA
-%nonassoc	ESCAPE			/* ESCAPE must be just above LIKE/ILIKE/SIMILAR */
+%nonassoc	BETWEEN IN_P LIKE ILIKE NOT_LA
+%nonassoc	ESCAPE			/* ESCAPE must be just above LIKE/ILIKE */
 /*
  * To support target_el without AS, it used to be necessary to assign IDENT an
  * explicit precedence just less than Op.  While that's not really necessary
@@ -10827,43 +10827,6 @@ a_expr:		c_expr									{ $$ = $1; }
 												   $1, (Node *) n, @2);
 				}
 
-			| a_expr SIMILAR TO a_expr							%prec SIMILAR
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("similar_to_escape"),
-											   list_make1($4),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_SIMILAR, "~",
-												   $1, (Node *) n, @2);
-				}
-			| a_expr SIMILAR TO a_expr ESCAPE a_expr			%prec SIMILAR
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("similar_to_escape"),
-											   list_make2($4, $6),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_SIMILAR, "~",
-												   $1, (Node *) n, @2);
-				}
-			| a_expr NOT_LA SIMILAR TO a_expr					%prec NOT_LA
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("similar_to_escape"),
-											   list_make1($5),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_SIMILAR, "!~",
-												   $1, (Node *) n, @2);
-				}
-			| a_expr NOT_LA SIMILAR TO a_expr ESCAPE a_expr		%prec NOT_LA
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("similar_to_escape"),
-											   list_make2($5, $7),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_SIMILAR, "!~",
-												   $1, (Node *) n, @2);
-				}
-
 			/* NullTest clause
 			 * Define SQL-style Null test clause.
 			 * Allow two forms described in the standard:
@@ -11989,14 +11952,6 @@ subquery_Op:
 					{ $$ = list_make1(makeString("~~*")); }
 			| NOT_LA ILIKE
 					{ $$ = list_make1(makeString("!~~*")); }
-/* cannot put SIMILAR TO here, because SIMILAR TO is a hack.
- * the regular expression is preprocessed by a function (similar_to_escape),
- * and the ~ operator for posix regular expressions is used.
- *        x SIMILAR TO y     ->    x ~ similar_to_escape(y)
- * this transformation is made on the fly by the parser upwards.
- * however the SubLink structure which handles any/some/all stuff
- * is not ready for such a thing.
- */
 			;
 
 expr_list:	a_expr
@@ -12134,6 +12089,8 @@ position_list:
  * We could in theory map that to a different function internally, but
  * since we still support the SQL:1999 version, we don't.  However,
  * ruleutils.c will reverse-list the call in the newer style.
+ * (SIMILAR TO syntax and the regex-based variant are not supported in
+ * this build.)
  */
 substr_list:
 			a_expr FROM a_expr FOR a_expr
@@ -12147,13 +12104,6 @@ substr_list:
 				}
 			| a_expr FROM a_expr
 				{
-					/*
-					 * Because we aren't restricting data types here, this
-					 * syntax can end up resolving to textregexsubstr().
-					 * We've historically allowed that to happen, so continue
-					 * to accept it.  However, ruleutils.c will reverse-list
-					 * such a call in regular function call syntax.
-					 */
 					$$ = list_make2($1, $3);
 				}
 			| a_expr FOR a_expr
@@ -12172,10 +12122,6 @@ substr_list:
 					$$ = list_make3($1, makeIntConst(1, -1),
 									makeTypeCast($3,
 												 SystemTypeName("int4"), -1));
-				}
-			| a_expr SIMILAR a_expr ESCAPE a_expr
-				{
-					$$ = list_make3($1, $3, $5);
 				}
 		;
 
@@ -13150,7 +13096,6 @@ type_func_name_keyword:
 			| OUTER_P
 			| OVERLAPS
 			| RIGHT
-			| SIMILAR
 			| TABLESAMPLE
 			| VERBOSE
 		;
@@ -13577,7 +13522,6 @@ bare_label_keyword:
 			| SETS
 			| SHARE
 			| SHOW
-			| SIMILAR
 			| SIMPLE
 			| SKIP
 			| SMALLINT

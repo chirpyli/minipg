@@ -958,6 +958,45 @@ extension_is_trusted(ExtensionControlFile *control)
 }
 
 /*
+ * Remove lines that begin with '\' (meta-command lines) from the given SQL
+ * text, using simple string scanning instead of the original regex approach.
+ */
+static char *
+remove_metacommand_lines(const char *input)
+{
+	char	   *result;
+	const char *src;
+	char	   *dst;
+	size_t		len = strlen(input);
+
+	result = palloc(len + 1);
+	src = input;
+	dst = result;
+
+	while (*src)
+	{
+		bool		is_metacommand = (*src == '\\');
+
+		/* copy or skip characters until end of line */
+		while (*src && *src != '\n')
+		{
+			if (!is_metacommand)
+				*dst++ = *src;
+			src++;
+		}
+		/* copy the newline if we were copying the line */
+		if (*src == '\n')
+		{
+			if (!is_metacommand)
+				*dst++ = *src;
+			src++;
+		}
+	}
+	*dst = '\0';
+	return result;
+}
+
+/*
  * Execute the appropriate script file for installing or updating the extension
  *
  * If from_version isn't NULL, it's an update
@@ -1099,19 +1138,16 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
 		const char *quoting_relevant_chars = "\"$'\\";
 
 		/* We use various functions that want to operate on text datums */
-		t_sql = CStringGetTextDatum(c_sql);
 
 		/*
-		 * Reduce any lines beginning with "\echo" to empty.  This allows
-		 * scripts to contain messages telling people not to run them via
-		 * psql, which has been found to be necessary due to old habits.
+		 * Remove lines beginning with '\' (e.g. \echo ... \quit). These
+		 * meta-command lines tell psql users not to source the extension
+		 * SQL directly. We strip them using simple string scanning since
+		 * regex has been removed.
 		 */
-		t_sql = DirectFunctionCall4Coll(textregexreplace,
-										C_COLLATION_OID,
-										t_sql,
-										CStringGetTextDatum("^\\\\echo.*$"),
-										CStringGetTextDatum(""),
-										CStringGetTextDatum("ng"));
+		c_sql = remove_metacommand_lines(c_sql);
+
+		t_sql = CStringGetTextDatum(c_sql);
 
 		/*
 		 * If the script uses @extowner@, substitute the calling username.
