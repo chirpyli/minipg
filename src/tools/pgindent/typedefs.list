@@ -140,7 +140,6 @@ ArraySubWorkspace
 ArrayType
 AsyncQueueControl
 AsyncQueueEntry
-AsyncRequest
 AttInMetadata
 AttStatsSlot
 AttoptCacheEntry

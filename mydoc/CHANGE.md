@@ -727,3 +727,44 @@
 **验证**：`make` 全量编译 + `make install` + `initdb` 均通过（initdb 不再依赖 WITH 语法）；`make check` 中 initdb 阶段已正常。剩余 `make check` 失败均为使用普通 WITH 子句的测试（见上待清理项），非 CTE 执行路径问题。
 
 **保留项说明**：`PlannedStmt.hasModifyingCTE` 字段保留（WITH 语法删除后恒为 false，删除会牵连 copyfuncs/outfuncs/readfuncs/execMain/pquery 等多处序列化代码，收益低、风险高，故保留为空字段）。
+
+---
+
+## 裁剪：异步 Append（Asynchronous Append）整机制
+
+**裁剪日期**：2026-08-07
+
+**裁剪原因**：异步 Append 是 PG14 引入、仅针对 foreign-table 异步扫描（如 postgres_fdw）的并行拉取优化特性。在 minipg 中该机制是未接线的空框架——`execAsync.c` 所有 `switch` 无 `case`，真正产生异步 I/O 的节点（foreign-table 异步扫描）不存在，运行时永不进入异步路径。属学习价值低的边缘特性，且不影响 btree/hash 索引与事务等不可裁剪部分。将其作为完整单元移除。
+
+**删除的文件**：
+- `src/backend/executor/execAsync.c`（异步执行支撑层，协议分发壳）
+- `src/include/executor/execAsync.h`（对应头文件）
+- `src/backend/executor/Makefile`：移除 `execAsync.o` 编译项
+
+**修改的文件（按模块）**：
+
+优化器：
+- `src/backend/optimizer/plan/createplan.c`：删除 `is_async_capable_plan()` 声明与定义、`consider_async` 局部变量、`nasyncplans` 局部变量、async 子计划判定块（`consider_async && is_async_capable_plan(...)`）、`plan->nasyncplans` 赋值
+- `src/backend/optimizer/path/costsize.c`：删除全局变量 `enable_async_append`
+- `src/include/optimizer/cost.h`：删除 `enable_async_append` 外部声明
+- `src/backend/utils/misc/guc.c`：删除 `enable_async_append` GUC 定义
+- `src/backend/utils/misc/postgresql.conf.sample`：删除 `#enable_async_append = on` 样例行
+
+执行器 / 节点定义：
+- `src/backend/executor/nodeAppend.c`：删除全部异步函数 `ExecAppendAsyncBegin`/`ExecAppendAsyncGetNext`/`ExecAppendAsyncRequest`/`ExecAppendAsyncEventWait`/`ExecAsyncAppendResponse`/`classify_matching_subplans`，删除 `#include "executor/execAsync.h"`、4 个 static 声明；删除 `ExecInitAppend` 中 async 子计划收集与 `AsyncRequest[]` 初始化、`ExecAppend` 主循环 async 分支（A 取数 / C 事件等待）、`ExecReScanAppend` 中 `as_valid_asyncplans` free 与 Reset async state 块、`choose_next_subplan_locally` 中 async 引用；保留同步 Append 主循环、同步 `as_syncdone` 字段与全部同步路径
+- `src/include/executor/nodeAppend.h`：删除 `ExecAsyncAppendResponse` 声明
+- `src/include/nodes/execnodes.h`：删除 `AsyncRequest` 结构体、`PlanState.async_capable`、`AppendState` 中全部异步字段（`as_asyncplans`/`as_nasyncplans`/`as_asyncrequests`/`as_asyncresults`/`as_nasyncresults`/`as_nasyncremain`/`as_needrequest`/`as_eventset`/`as_valid_asyncplans`）；保留 `as_syncdone` 用于同步路径
+- `src/include/nodes/plannodes.h`：删除 `Plan.async_capable`、`Append.nasyncplans`
+- `src/backend/executor/execAmi.c`：删除 `ExecSupportsBackwardScan` 中 `nasyncplans > 0` 判断（保留 foreach 向后扫描检查）
+- `src/backend/executor/execProcnode.c`：`InstrAlloc` 第三参数由 `result->async_capable` 改为 `false`
+- `src/backend/commands/explain.c`：删除 "Async " 前缀标注与 `Async Capable` 属性输出
+
+序列化 / 展示：
+- `src/backend/nodes/outfuncs.c`：删除 `_outPlanInfo` 的 `async_capable`、`_outAppend` 的 `nasyncplans`
+- `src/backend/nodes/readfuncs.c`：删除 `_readPlanInfo` 的 `async_capable`、`_readAppend` 的 `nasyncplans`
+- `src/backend/nodes/copyfuncs.c`：删除 `CopyPlan` 的 `async_capable`、`CopyAppend` 的 `nasyncplans`
+- `src/tools/pgindent/typedefs.list`：删除 `AsyncRequest` 类型行
+
+**保留说明**：`src/backend/executor/README` 中整段"Asynchronous Execution"说明（含协议描述）已删除；`typedefs.list` 中的 `ForeignAsyncRequest_function`（属 FDW 机制，与本次无关）保留。
+
+**验证**：`make -C src` 全量编译通过；异步相关符号（`execAsync`/`ExecAsync`/`AsyncRequest`/`async_capable`/`nasyncplans`/`enable_async_append`/`as_async`/`as_nasyncremain`/`as_needrequest`/`as_eventset`/`as_valid_asyncplans`/`consider_async`/`is_async_capable_plan`/`Async Capable`）在 `src` 内除无关的 `ForeignAsyncRequest_function` 外已全部清除。运行时行为不变（异步路径本不会被触发），同步 Append 路径完整保留。

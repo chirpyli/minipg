@@ -57,7 +57,6 @@
 
 #include "postgres.h"
 
-#include "executor/execAsync.h"
 #include "executor/execdebug.h"
 #include "executor/execPartition.h"
 #include "executor/nodeAppend.h"
@@ -88,11 +87,6 @@ static bool choose_next_subplan_locally(AppendState *node);
 static bool choose_next_subplan_for_leader(AppendState *node);
 static bool choose_next_subplan_for_worker(AppendState *node);
 static void mark_invalid_subplans_as_finished(AppendState *node);
-static void ExecAppendAsyncBegin(AppendState *node);
-static bool ExecAppendAsyncGetNext(AppendState *node, TupleTableSlot **result);
-static bool ExecAppendAsyncRequest(AppendState *node, TupleTableSlot **result);
-static void ExecAppendAsyncEventWait(AppendState *node);
-static void classify_matching_subplans(AppendState *node);
 
 /* ----------------------------------------------------------------
  *		ExecInitAppend
@@ -111,9 +105,7 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	AppendState *appendstate = makeNode(AppendState);
 	PlanState **appendplanstates;
 	Bitmapset  *validsubplans;
-	Bitmapset  *asyncplans;
 	int			nplans;
-	int			nasyncplans;
 	int			firstvalid;
 	int			i,
 				j;
@@ -204,24 +196,11 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	 * While at it, find out the first valid partial plan.
 	 */
 	j = 0;
-	asyncplans = NULL;
-	nasyncplans = 0;
 	firstvalid = nplans;
 	i = -1;
 	while ((i = bms_next_member(validsubplans, i)) >= 0)
 	{
 		Plan	   *initNode = (Plan *) list_nth(node->appendplans, i);
-
-		/*
-		 * Record async subplans.  When executing EvalPlanQual, we treat them
-		 * as sync ones; don't do this when initializing an EvalPlanQual plan
-		 * tree.
-		 */
-		if (initNode->async_capable && estate->es_epq_active == NULL)
-		{
-			asyncplans = bms_add_member(asyncplans, j);
-			nasyncplans++;
-		}
 
 		/*
 		 * Record the lowest appendplans index which is a valid partial plan.
@@ -235,45 +214,6 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	appendstate->as_first_partial_plan = firstvalid;
 	appendstate->appendplans = appendplanstates;
 	appendstate->as_nplans = nplans;
-
-	/* Initialize async state */
-	appendstate->as_asyncplans = asyncplans;
-	appendstate->as_nasyncplans = nasyncplans;
-	appendstate->as_asyncrequests = NULL;
-	appendstate->as_asyncresults = NULL;
-	appendstate->as_nasyncresults = 0;
-	appendstate->as_nasyncremain = 0;
-	appendstate->as_needrequest = NULL;
-	appendstate->as_eventset = NULL;
-	appendstate->as_valid_asyncplans = NULL;
-
-	if (nasyncplans > 0)
-	{
-		appendstate->as_asyncrequests = (AsyncRequest **)
-			palloc0(nplans * sizeof(AsyncRequest *));
-
-		i = -1;
-		while ((i = bms_next_member(asyncplans, i)) >= 0)
-		{
-			AsyncRequest *areq;
-
-			areq = palloc(sizeof(AsyncRequest));
-			areq->requestor = (PlanState *) appendstate;
-			areq->requestee = appendplanstates[i];
-			areq->request_index = i;
-			areq->callback_pending = false;
-			areq->request_complete = false;
-			areq->result = NULL;
-
-			appendstate->as_asyncrequests[i] = areq;
-		}
-
-		appendstate->as_asyncresults = (TupleTableSlot **)
-			palloc0(nasyncplans * sizeof(TupleTableSlot *));
-
-		if (appendstate->as_valid_subplans != NULL)
-			classify_matching_subplans(appendstate);
-	}
 
 	/*
 	 * Miscellaneous initialization
@@ -312,15 +252,11 @@ ExecAppend(PlanState *pstate)
 		if (node->as_nplans == 0)
 			return ExecClearTuple(node->ps.ps_ResultTupleSlot);
 
-		/* If there are any async subplans, begin executing them. */
-		if (node->as_nasyncplans > 0)
-			ExecAppendAsyncBegin(node);
-
 		/*
 		 * If no sync subplan has been chosen, we must choose one before
 		 * proceeding.
 		 */
-		if (!node->choose_next_subplan(node) && node->as_nasyncremain == 0)
+		if (!node->choose_next_subplan(node))
 			return ExecClearTuple(node->ps.ps_ResultTupleSlot);
 
 		Assert(node->as_syncdone ||
@@ -336,17 +272,6 @@ ExecAppend(PlanState *pstate)
 		PlanState  *subnode;
 
 		CHECK_FOR_INTERRUPTS();
-
-		/*
-		 * try to get a tuple from an async subplan if any
-		 */
-		if (node->as_syncdone || !bms_is_empty(node->as_needrequest))
-		{
-			if (ExecAppendAsyncGetNext(node, &result))
-				return result;
-			Assert(!node->as_syncdone);
-			Assert(bms_is_empty(node->as_needrequest));
-		}
 
 		/*
 		 * figure out which sync subplan we are currently processing
@@ -370,15 +295,9 @@ ExecAppend(PlanState *pstate)
 		}
 
 		/*
-		 * wait or poll for async events if any. We do this before checking
-		 * for the end of iteration, because it might drain the remaining
-		 * async subplans.
+		 * choose new sync subplan; if no sync subplans, we're done
 		 */
-		if (node->as_nasyncremain > 0)
-			ExecAppendAsyncEventWait(node);
-
-		/* choose new sync subplan; if no sync/async subplans, we're done */
-		if (!node->choose_next_subplan(node) && node->as_nasyncremain == 0)
+		if (!node->choose_next_subplan(node))
 			return ExecClearTuple(node->ps.ps_ResultTupleSlot);
 	}
 }
@@ -414,7 +333,6 @@ ExecEndAppend(AppendState *node)
 void
 ExecReScanAppend(AppendState *node)
 {
-	int			nasyncplans = node->as_nasyncplans;
 	int			i;
 
 	/*
@@ -428,11 +346,6 @@ ExecReScanAppend(AppendState *node)
 	{
 		bms_free(node->as_valid_subplans);
 		node->as_valid_subplans = NULL;
-		if (nasyncplans > 0)
-		{
-			bms_free(node->as_valid_asyncplans);
-			node->as_valid_asyncplans = NULL;
-		}
 	}
 
 	for (i = 0; i < node->as_nplans; i++)
@@ -448,29 +361,10 @@ ExecReScanAppend(AppendState *node)
 
 		/*
 		 * If chgParam of subnode is not null then plan will be re-scanned by
-		 * first ExecProcNode or by first ExecAsyncRequest.
+		 * first ExecProcNode.
 		 */
 		if (subnode->chgParam == NULL)
 			ExecReScan(subnode);
-	}
-
-	/* Reset async state */
-	if (nasyncplans > 0)
-	{
-		i = -1;
-		while ((i = bms_next_member(node->as_asyncplans, i)) >= 0)
-		{
-			AsyncRequest *areq = node->as_asyncrequests[i];
-
-			areq->callback_pending = false;
-			areq->request_complete = false;
-			areq->result = NULL;
-		}
-
-		node->as_nasyncresults = 0;
-		node->as_nasyncremain = 0;
-		bms_free(node->as_needrequest);
-		node->as_needrequest = NULL;
 	}
 
 	/* Let choose_next_subplan_* function handle setting the first subplan */
@@ -583,12 +477,7 @@ choose_next_subplan_locally(AppendState *node)
 	 */
 	if (whichplan == INVALID_SUBPLAN_INDEX)
 	{
-		if (node->as_nasyncplans > 0)
-		{
-			/* We'd have filled as_valid_subplans already */
-			Assert(node->as_valid_subplans);
-		}
-		else if (node->as_valid_subplans == NULL)
+		if (node->as_valid_subplans == NULL)
 			node->as_valid_subplans =
 				ExecFindMatchingSubPlans(node->as_prune_state);
 
@@ -605,9 +494,7 @@ choose_next_subplan_locally(AppendState *node)
 
 	if (nextplan < 0)
 	{
-		/* Set as_syncdone if in async mode */
-		if (node->as_nasyncplans > 0)
-			node->as_syncdone = true;
+		node->as_syncdone = true;
 		return false;
 	}
 
@@ -852,364 +739,3 @@ mark_invalid_subplans_as_finished(AppendState *node)
 	}
 }
 
-/* ----------------------------------------------------------------
- *						Asynchronous Append Support
- * ----------------------------------------------------------------
- */
-
-/* ----------------------------------------------------------------
- *		ExecAppendAsyncBegin
- *
- *		Begin executing designed async-capable subplans.
- * ----------------------------------------------------------------
- */
-static void
-ExecAppendAsyncBegin(AppendState *node)
-{
-	int			i;
-
-	/* Backward scan is not supported by async-aware Appends. */
-	Assert(ScanDirectionIsForward(node->ps.state->es_direction));
-
-	/* We should never be called when there are no subplans */
-	Assert(node->as_nplans > 0);
-
-	/* We should never be called when there are no async subplans. */
-	Assert(node->as_nasyncplans > 0);
-
-	/* If we've yet to determine the valid subplans then do so now. */
-	if (node->as_valid_subplans == NULL)
-	{
-		node->as_valid_subplans =
-			ExecFindMatchingSubPlans(node->as_prune_state);
-
-		classify_matching_subplans(node);
-	}
-
-	/* Initialize state variables. */
-	node->as_syncdone = bms_is_empty(node->as_valid_subplans);
-	node->as_nasyncremain = bms_num_members(node->as_valid_asyncplans);
-
-	/* Nothing to do if there are no valid async subplans. */
-	if (node->as_nasyncremain == 0)
-		return;
-
-	/* Make a request for each of the valid async subplans. */
-	i = -1;
-	while ((i = bms_next_member(node->as_valid_asyncplans, i)) >= 0)
-	{
-		AsyncRequest *areq = node->as_asyncrequests[i];
-
-		Assert(areq->request_index == i);
-		Assert(!areq->callback_pending);
-
-		/* Do the actual work. */
-		ExecAsyncRequest(areq);
-	}
-}
-
-/* ----------------------------------------------------------------
- *		ExecAppendAsyncGetNext
- *
- *		Get the next tuple from any of the asynchronous subplans.
- * ----------------------------------------------------------------
- */
-static bool
-ExecAppendAsyncGetNext(AppendState *node, TupleTableSlot **result)
-{
-	*result = NULL;
-
-	/* We should never be called when there are no valid async subplans. */
-	Assert(node->as_nasyncremain > 0);
-
-	/* Request a tuple asynchronously. */
-	if (ExecAppendAsyncRequest(node, result))
-		return true;
-
-	while (node->as_nasyncremain > 0)
-	{
-		CHECK_FOR_INTERRUPTS();
-
-		/* Wait or poll for async events. */
-		ExecAppendAsyncEventWait(node);
-
-		/* Request a tuple asynchronously. */
-		if (ExecAppendAsyncRequest(node, result))
-			return true;
-
-		/* Break from loop if there's any sync subplan that isn't complete. */
-		if (!node->as_syncdone)
-			break;
-	}
-
-	/*
-	 * If all sync subplans are complete, we're totally done scanning the
-	 * given node.  Otherwise, we're done with the asynchronous stuff but must
-	 * continue scanning the sync subplans.
-	 */
-	if (node->as_syncdone)
-	{
-		Assert(node->as_nasyncremain == 0);
-		*result = ExecClearTuple(node->ps.ps_ResultTupleSlot);
-		return true;
-	}
-
-	return false;
-}
-
-/* ----------------------------------------------------------------
- *		ExecAppendAsyncRequest
- *
- *		Request a tuple asynchronously.
- * ----------------------------------------------------------------
- */
-static bool
-ExecAppendAsyncRequest(AppendState *node, TupleTableSlot **result)
-{
-	Bitmapset  *needrequest;
-	int			i;
-
-	/* Nothing to do if there are no async subplans needing a new request. */
-	if (bms_is_empty(node->as_needrequest))
-	{
-		Assert(node->as_nasyncresults == 0);
-		return false;
-	}
-
-	/*
-	 * If there are any asynchronously-generated results that have not yet
-	 * been returned, we have nothing to do; just return one of them.
-	 */
-	if (node->as_nasyncresults > 0)
-	{
-		--node->as_nasyncresults;
-		*result = node->as_asyncresults[node->as_nasyncresults];
-		return true;
-	}
-
-	/* Make a new request for each of the async subplans that need it. */
-	needrequest = node->as_needrequest;
-	node->as_needrequest = NULL;
-	i = -1;
-	while ((i = bms_next_member(needrequest, i)) >= 0)
-	{
-		AsyncRequest *areq = node->as_asyncrequests[i];
-
-		/* Do the actual work. */
-		ExecAsyncRequest(areq);
-	}
-	bms_free(needrequest);
-
-	/* Return one of the asynchronously-generated results if any. */
-	if (node->as_nasyncresults > 0)
-	{
-		--node->as_nasyncresults;
-		*result = node->as_asyncresults[node->as_nasyncresults];
-		return true;
-	}
-
-	return false;
-}
-
-/* ----------------------------------------------------------------
- *		ExecAppendAsyncEventWait
- *
- *		Wait or poll for file descriptor events and fire callbacks.
- * ----------------------------------------------------------------
- */
-static void
-ExecAppendAsyncEventWait(AppendState *node)
-{
-	int			nevents = node->as_nasyncplans + 2;
-	long		timeout = node->as_syncdone ? -1 : 0;
-	WaitEvent	occurred_event[EVENT_BUFFER_SIZE];
-	int			noccurred;
-	int			i;
-
-	/* We should never be called when there are no valid async subplans. */
-	Assert(node->as_nasyncremain > 0);
-
-	Assert(node->as_eventset == NULL);
-	node->as_eventset = CreateWaitEventSet(CurrentMemoryContext, nevents);
-	PG_TRY();
-	{
-		AddWaitEventToSet(node->as_eventset, WL_EXIT_ON_PM_DEATH, PGINVALID_SOCKET,
-						  NULL, NULL);
-
-		/* Give each waiting subplan a chance to add an event. */
-		i = -1;
-		while ((i = bms_next_member(node->as_asyncplans, i)) >= 0)
-		{
-			AsyncRequest *areq = node->as_asyncrequests[i];
-
-			if (areq->callback_pending)
-				ExecAsyncConfigureWait(areq);
-		}
-
-		/*
-		 * No need for further processing if none of the subplans configured
-		 * any events.
-		 */
-		if (GetNumRegisteredWaitEvents(node->as_eventset) == 1)
-			noccurred = 0;
-		else
-		{
-			/*
-			 * Add the process latch to the set, so that we wake up to process
-			 * the standard interrupts with CHECK_FOR_INTERRUPTS().
-			 *
-			 * NOTE: For historical reasons, it's important that this is added
-			 * to the WaitEventSet after the ExecAsyncConfigureWait() calls.
-			 * Namely, postgres_fdw calls "GetNumRegisteredWaitEvents(set) ==
-			 * 1" to check if any other events are in the set.  That's a poor
-			 * design, it's questionable for postgres_fdw to be doing that in
-			 * the first place, but we cannot change it now.  The pattern has
-			 * possibly been copied to other extensions too.
-			 */
-			AddWaitEventToSet(node->as_eventset, WL_LATCH_SET, PGINVALID_SOCKET,
-							  MyLatch, NULL);
-
-			/* Return at most EVENT_BUFFER_SIZE events in one call. */
-			if (nevents > EVENT_BUFFER_SIZE)
-				nevents = EVENT_BUFFER_SIZE;
-
-			/*
-			 * If the timeout is -1, wait until at least one event occurs.  If
-			 * the timeout is 0, poll for events, but do not wait at all.
-			 */
-			noccurred = WaitEventSetWait(node->as_eventset, timeout,
-										 occurred_event, nevents,
-										 WAIT_EVENT_APPEND_READY);
-		}
-	}
-	PG_FINALLY();
-	{
-		FreeWaitEventSet(node->as_eventset);
-		node->as_eventset = NULL;
-	}
-	PG_END_TRY();
-	if (noccurred == 0)
-		return;
-
-	/* Deliver notifications. */
-	for (i = 0; i < noccurred; i++)
-	{
-		WaitEvent  *w = &occurred_event[i];
-
-		/*
-		 * Each waiting subplan should have registered its wait event with
-		 * user_data pointing back to its AsyncRequest.
-		 */
-		if ((w->events & WL_SOCKET_READABLE) != 0)
-		{
-			AsyncRequest *areq = (AsyncRequest *) w->user_data;
-
-			if (areq->callback_pending)
-			{
-				/*
-				 * Mark it as no longer needing a callback.  We must do this
-				 * before dispatching the callback in case the callback resets
-				 * the flag.
-				 */
-				areq->callback_pending = false;
-
-				/* Do the actual work. */
-				ExecAsyncNotify(areq);
-			}
-		}
-
-		/* Handle standard interrupts */
-		if ((w->events & WL_LATCH_SET) != 0)
-		{
-			ResetLatch(MyLatch);
-			CHECK_FOR_INTERRUPTS();
-		}
-	}
-}
-
-/* ----------------------------------------------------------------
- *		ExecAsyncAppendResponse
- *
- *		Receive a response from an asynchronous request we made.
- * ----------------------------------------------------------------
- */
-void
-ExecAsyncAppendResponse(AsyncRequest *areq)
-{
-	AppendState *node = (AppendState *) areq->requestor;
-	TupleTableSlot *slot = areq->result;
-
-	/* The result should be a TupleTableSlot or NULL. */
-	Assert(slot == NULL || IsA(slot, TupleTableSlot));
-
-	/* Nothing to do if the request is pending. */
-	if (!areq->request_complete)
-	{
-		/* The request would have been pending for a callback. */
-		Assert(areq->callback_pending);
-		return;
-	}
-
-	/* If the result is NULL or an empty slot, there's nothing more to do. */
-	if (TupIsNull(slot))
-	{
-		/* The ending subplan wouldn't have been pending for a callback. */
-		Assert(!areq->callback_pending);
-		--node->as_nasyncremain;
-		return;
-	}
-
-	/* Save result so we can return it. */
-	Assert(node->as_nasyncresults < node->as_nasyncplans);
-	node->as_asyncresults[node->as_nasyncresults++] = slot;
-
-	/*
-	 * Mark the subplan that returned a result as ready for a new request.  We
-	 * don't launch another one here immediately because it might complete.
-	 */
-	node->as_needrequest = bms_add_member(node->as_needrequest,
-										  areq->request_index);
-}
-
-/* ----------------------------------------------------------------
- *		classify_matching_subplans
- *
- *		Classify the node's as_valid_subplans into sync ones and
- *		async ones, adjust it to contain sync ones only, and save
- *		async ones in the node's as_valid_asyncplans.
- * ----------------------------------------------------------------
- */
-static void
-classify_matching_subplans(AppendState *node)
-{
-	Bitmapset  *valid_asyncplans;
-
-	Assert(node->as_valid_asyncplans == NULL);
-
-	/* Nothing to do if there are no valid subplans. */
-	if (bms_is_empty(node->as_valid_subplans))
-	{
-		node->as_syncdone = true;
-		node->as_nasyncremain = 0;
-		return;
-	}
-
-	/* Nothing to do if there are no valid async subplans. */
-	if (!bms_overlap(node->as_valid_subplans, node->as_asyncplans))
-	{
-		node->as_nasyncremain = 0;
-		return;
-	}
-
-	/* Get valid async subplans. */
-	valid_asyncplans = bms_copy(node->as_asyncplans);
-	valid_asyncplans = bms_int_members(valid_asyncplans,
-									   node->as_valid_subplans);
-
-	/* Adjust the valid subplans to contain sync subplans only. */
-	node->as_valid_subplans = bms_del_members(node->as_valid_subplans,
-											  valid_asyncplans);
-
-	/* Save valid async subplans. */
-	node->as_valid_asyncplans = valid_asyncplans;
-}

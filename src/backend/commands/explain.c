@@ -1164,8 +1164,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		}
 		if (plan->parallel_aware)
 			appendStringInfoString(es->str, "Parallel ");
-		if (plan->async_capable)
-			appendStringInfoString(es->str, "Async ");
 		appendStringInfoString(es->str, pname);
 		es->indent++;
 	}
@@ -1185,7 +1183,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		if (custom_name)
 			ExplainPropertyText("Custom Plan Provider", custom_name, es);
 		ExplainPropertyBool("Parallel Aware", plan->parallel_aware, es);
-		ExplainPropertyBool("Async Capable", plan->async_capable, es);
 	}
 
 	switch (nodeTag(plan))

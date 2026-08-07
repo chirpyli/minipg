@@ -332,7 +332,6 @@ _outPlanInfo(StringInfo str, const Plan *node)
 	WRITE_INT_FIELD(plan_width);
 	WRITE_BOOL_FIELD(parallel_aware);
 	WRITE_BOOL_FIELD(parallel_safe);
-	WRITE_BOOL_FIELD(async_capable);
 	WRITE_INT_FIELD(plan_node_id);
 	WRITE_NODE_FIELD(targetlist);
 	WRITE_NODE_FIELD(qual);
@@ -430,7 +429,6 @@ _outAppend(StringInfo str, const Append *node)
 
 	WRITE_BITMAPSET_FIELD(apprelids);
 	WRITE_NODE_FIELD(appendplans);
-	WRITE_INT_FIELD(nasyncplans);
 	WRITE_INT_FIELD(first_partial_plan);
 	WRITE_NODE_FIELD(part_prune_info);
 }

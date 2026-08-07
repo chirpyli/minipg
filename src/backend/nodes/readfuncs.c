@@ -1458,7 +1458,6 @@ ReadCommonPlan(Plan *local_node)
 	READ_INT_FIELD(plan_width);
 	READ_BOOL_FIELD(parallel_aware);
 	READ_BOOL_FIELD(parallel_safe);
-	READ_BOOL_FIELD(async_capable);
 	READ_INT_FIELD(plan_node_id);
 	READ_NODE_FIELD(targetlist);
 	READ_NODE_FIELD(qual);
@@ -1554,7 +1553,6 @@ _readAppend(void)
 
 	READ_BITMAPSET_FIELD(apprelids);
 	READ_NODE_FIELD(appendplans);
-	READ_INT_FIELD(nasyncplans);
 	READ_INT_FIELD(first_partial_plan);
 	READ_NODE_FIELD(part_prune_info);
 
