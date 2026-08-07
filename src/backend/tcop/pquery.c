@@ -226,10 +226,7 @@ ChoosePortalStrategy(List *stmts)
 			{
 				if (query->commandType == CMD_SELECT)
 				{
-					if (query->hasModifyingCTE)
-						return PORTAL_ONE_MOD_WITH;
-					else
-						return PORTAL_ONE_SELECT;
+					return PORTAL_ONE_SELECT;
 				}
 				if (query->commandType == CMD_UTILITY)
 				{

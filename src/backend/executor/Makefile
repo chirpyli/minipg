@@ -38,7 +38,6 @@ OBJS = \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \
 	nodeBitmapOr.o \
-	nodeCtescan.o \
 	nodeCustom.o \
 	nodeFunctionscan.o \
 	nodeGather.o \
@@ -59,11 +58,11 @@ OBJS = \
 	nodeNamedtuplestorescan.o \
 	nodeNestloop.o \
 	nodeProjectSet.o \
-	nodeRecursiveunion.o \
 	nodeResult.o \
 	nodeSamplescan.o \
 	nodeSeqscan.o \
 	nodeSetOp.o \
+	spi.o \
 	nodeSort.o \
 	nodeSubplan.o \
 	nodeSubqueryscan.o \
@@ -72,8 +71,6 @@ OBJS = \
 	nodeUnique.o \
 	nodeValuesscan.o \
 	nodeWindowAgg.o \
-	nodeWorktablescan.o \
-	spi.o \
 	tqueue.o \
 	tstoreReceiver.o
 

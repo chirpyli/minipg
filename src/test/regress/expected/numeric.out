@@ -665,13 +665,12 @@ SELECT t1.id1, t1.result, t2.expected
 -- * separately from the num_data framework used above, because some input
 -- * combinations will throw errors.
 -- ******************************
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan'))
 SELECT x1, x2,
   x1 + x2 AS sum,
   x1 - x2 AS diff,
   x1 * x2 AS prod
-FROM v AS v1(x1), v AS v2(x2);
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v2(x2);
     x1     |    x2     |    sum    |   diff    |   prod    
 -----------+-----------+-----------+-----------+-----------
          0 |         0 |         0 |         0 |         0
@@ -725,56 +724,55 @@ FROM v AS v1(x1), v AS v2(x2);
        NaN |       NaN |       NaN |       NaN |       NaN
 (49 rows)
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan'))
 SELECT x1, x2,
   x1 / x2 AS quot,
   x1 % x2 AS mod,
   div(x1, x2) AS div
-FROM v AS v1(x1), v AS v2(x2) WHERE x2 != 0;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v2(x2) WHERE x2 != 0;
     x1     |    x2     |          quot           | mod  |    div    
 -----------+-----------+-------------------------+------+-----------
          0 |         1 |  0.00000000000000000000 |    0 |         0
-         1 |         1 |  1.00000000000000000000 |    0 |         1
-        -1 |         1 | -1.00000000000000000000 |    0 |        -1
-       4.2 |         1 |      4.2000000000000000 |  0.2 |         4
-  Infinity |         1 |                Infinity |  NaN |  Infinity
- -Infinity |         1 |               -Infinity |  NaN | -Infinity
-       NaN |         1 |                     NaN |  NaN |       NaN
          0 |        -1 |  0.00000000000000000000 |    0 |         0
-         1 |        -1 | -1.00000000000000000000 |    0 |        -1
-        -1 |        -1 |  1.00000000000000000000 |    0 |         1
-       4.2 |        -1 |     -4.2000000000000000 |  0.2 |        -4
-  Infinity |        -1 |               -Infinity |  NaN | -Infinity
- -Infinity |        -1 |                Infinity |  NaN |  Infinity
-       NaN |        -1 |                     NaN |  NaN |       NaN
          0 |       4.2 |  0.00000000000000000000 |  0.0 |         0
-         1 |       4.2 |  0.23809523809523809524 |  1.0 |         0
-        -1 |       4.2 | -0.23809523809523809524 | -1.0 |         0
-       4.2 |       4.2 |  1.00000000000000000000 |  0.0 |         1
-  Infinity |       4.2 |                Infinity |  NaN |  Infinity
- -Infinity |       4.2 |               -Infinity |  NaN | -Infinity
-       NaN |       4.2 |                     NaN |  NaN |       NaN
          0 |  Infinity |                       0 |    0 |         0
-         1 |  Infinity |                       0 |    1 |         0
-        -1 |  Infinity |                       0 |   -1 |         0
-       4.2 |  Infinity |                       0 |  4.2 |         0
-  Infinity |  Infinity |                     NaN |  NaN |       NaN
- -Infinity |  Infinity |                     NaN |  NaN |       NaN
-       NaN |  Infinity |                     NaN |  NaN |       NaN
          0 | -Infinity |                       0 |    0 |         0
-         1 | -Infinity |                       0 |    1 |         0
-        -1 | -Infinity |                       0 |   -1 |         0
-       4.2 | -Infinity |                       0 |  4.2 |         0
-  Infinity | -Infinity |                     NaN |  NaN |       NaN
- -Infinity | -Infinity |                     NaN |  NaN |       NaN
-       NaN | -Infinity |                     NaN |  NaN |       NaN
          0 |       NaN |                     NaN |  NaN |       NaN
+         1 |         1 |  1.00000000000000000000 |    0 |         1
+         1 |        -1 | -1.00000000000000000000 |    0 |        -1
+         1 |       4.2 |  0.23809523809523809524 |  1.0 |         0
+         1 |  Infinity |                       0 |    1 |         0
+         1 | -Infinity |                       0 |    1 |         0
          1 |       NaN |                     NaN |  NaN |       NaN
+        -1 |         1 | -1.00000000000000000000 |    0 |        -1
+        -1 |        -1 |  1.00000000000000000000 |    0 |         1
+        -1 |       4.2 | -0.23809523809523809524 | -1.0 |         0
+        -1 |  Infinity |                       0 |   -1 |         0
+        -1 | -Infinity |                       0 |   -1 |         0
         -1 |       NaN |                     NaN |  NaN |       NaN
+       4.2 |         1 |      4.2000000000000000 |  0.2 |         4
+       4.2 |        -1 |     -4.2000000000000000 |  0.2 |        -4
+       4.2 |       4.2 |  1.00000000000000000000 |  0.0 |         1
+       4.2 |  Infinity |                       0 |  4.2 |         0
+       4.2 | -Infinity |                       0 |  4.2 |         0
        4.2 |       NaN |                     NaN |  NaN |       NaN
+  Infinity |         1 |                Infinity |  NaN |  Infinity
+  Infinity |        -1 |               -Infinity |  NaN | -Infinity
+  Infinity |       4.2 |                Infinity |  NaN |  Infinity
+  Infinity |  Infinity |                     NaN |  NaN |       NaN
+  Infinity | -Infinity |                     NaN |  NaN |       NaN
   Infinity |       NaN |                     NaN |  NaN |       NaN
+ -Infinity |         1 |               -Infinity |  NaN | -Infinity
+ -Infinity |        -1 |                Infinity |  NaN |  Infinity
+ -Infinity |       4.2 |               -Infinity |  NaN | -Infinity
+ -Infinity |  Infinity |                     NaN |  NaN |       NaN
+ -Infinity | -Infinity |                     NaN |  NaN |       NaN
  -Infinity |       NaN |                     NaN |  NaN |       NaN
+       NaN |         1 |                     NaN |  NaN |       NaN
+       NaN |        -1 |                     NaN |  NaN |       NaN
+       NaN |       4.2 |                     NaN |  NaN |       NaN
+       NaN |  Infinity |                     NaN |  NaN |       NaN
+       NaN | -Infinity |                     NaN |  NaN |       NaN
        NaN |       NaN |                     NaN |  NaN |       NaN
 (42 rows)
 
@@ -814,10 +812,8 @@ SELECT div('nan'::numeric, '0');
 
 SELECT div('0'::numeric, '0');
 ERROR:  division by zero
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan'))
 SELECT x, -x as minusx, abs(x), floor(x), ceil(x), sign(x), numeric_inc(x) as inc
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan')) AS v(x);
      x     |  minusx   |   abs    |   floor   |   ceil    | sign |    inc    
 -----------+-----------+----------+-----------+-----------+------+-----------
          0 |         0 |        0 |         0 |         0 |    0 |         1
@@ -830,10 +826,8 @@ FROM v;
        NaN |       NaN |      NaN |       NaN |       NaN |  NaN |       NaN
 (8 rows)
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan'))
 SELECT x, round(x), round(x,1) as round1, trunc(x), trunc(x,1) as trunc1
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan')) AS v(x);
      x     |   round   |  round1   |   trunc   |  trunc1   
 -----------+-----------+-----------+-----------+-----------
          0 |         0 |       0.0 |         0 |       0.0
@@ -847,12 +841,10 @@ FROM v;
 (8 rows)
 
 -- the large values fall into the numeric abbreviation code's maximal classes
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('1e340'),('-1e340'),
-         ('inf'),('-inf'),('nan'),
-         ('inf'),('-inf'),('nan'))
 SELECT substring(x::text, 1, 32)
-FROM v ORDER BY x;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('1e340'),('-1e340'),
+         ('inf'),('-inf'),('nan'),
+         ('inf'),('-inf'),('nan')) AS v(x) ORDER BY x;
             substring             
 ----------------------------------
  -Infinity
@@ -870,10 +862,8 @@ FROM v ORDER BY x;
  NaN
 (13 rows)
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('4.2'),('inf'),('nan'))
 SELECT x, sqrt(x)
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('4.2'),('inf'),('nan')) AS v(x);
     x     |       sqrt        
 ----------+-------------------
         0 | 0.000000000000000
@@ -887,13 +877,11 @@ SELECT sqrt('-1'::numeric);
 ERROR:  cannot take square root of a negative number
 SELECT sqrt('-inf'::numeric);
 ERROR:  cannot take square root of a negative number
-WITH v(x) AS
-  (VALUES('1'::numeric),('4.2'),('inf'),('nan'))
 SELECT x,
   log(x),
   log10(x),
   ln(x)
-FROM v;
+FROM (VALUES('1'::numeric),('4.2'),('inf'),('nan')) AS v(x);
     x     |        log         |       log10        |         ln         
 ----------+--------------------+--------------------+--------------------
         1 | 0.0000000000000000 | 0.0000000000000000 | 0.0000000000000000
@@ -908,11 +896,10 @@ SELECT ln('-1'::numeric);
 ERROR:  cannot take logarithm of a negative number
 SELECT ln('-inf'::numeric);
 ERROR:  cannot take logarithm of a negative number
-WITH v(x) AS
-  (VALUES('2'::numeric),('4.2'),('inf'),('nan'))
 SELECT x1, x2,
   log(x1, x2)
-FROM v AS v1(x1), v AS v2(x2);
+FROM (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v1(x1),
+     (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v2(x2);
     x1    |    x2    |        log         
 ----------+----------+--------------------
         2 |        2 | 1.0000000000000000
@@ -947,11 +934,10 @@ SELECT log('inf'::numeric, '-inf');
 ERROR:  cannot take logarithm of a negative number
 SELECT log('-inf'::numeric, 'inf');
 ERROR:  cannot take logarithm of a negative number
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan'))
 SELECT x1, x2,
   power(x1, x2)
-FROM v AS v1(x1), v AS v2(x2) WHERE x1 != 0 OR x2 >= 0;
+FROM (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan')) AS v2(x2) WHERE x1 != 0 OR x2 >= 0;
     x1    |    x2    |        power        
 ----------+----------+---------------------
         0 |        0 |  1.0000000000000000
@@ -1927,13 +1913,11 @@ SELECT to_char(val, '9.999EEEE')				FROM num_data;
  -2.493e+07
 (10 rows)
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, '9.999EEEE') as numeric,
   to_char(val::float8, '9.999EEEE') as float8,
   to_char(val::float4, '9.999EEEE') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
     val     |  numeric   |   float8   |   float4   
 ------------+------------+------------+------------
           0 |  0.000e+00 |  0.000e+00 |  0.000e+00
@@ -1945,12 +1929,10 @@ FROM v;
         NaN |  #.####### |  #.####### |  #.#######
 (7 rows)
 
-WITH v(exp) AS
-  (VALUES(-16379),(-16378),(-1234),(-789),(-45),(-5),(-4),(-3),(-2),(-1),(0),
-         (1),(2),(3),(4),(5),(38),(275),(2345),(45678),(131070),(131071))
 SELECT exp,
   to_char(('1.2345e'||exp)::numeric, '9.999EEEE') as numeric
-FROM v;
+FROM (VALUES(-16379),(-16378),(-1234),(-789),(-45),(-5),(-4),(-3),(-2),(-1),(0),
+         (1),(2),(3),(4),(5),(38),(275),(2345),(45678),(131070),(131071)) AS v(exp);
   exp   |    numeric     
 --------+----------------
  -16379 |  1.235e-16379
@@ -1977,13 +1959,11 @@ FROM v;
  131071 |  1.235e+131071
 (22 rows)
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, 'MI9999999999.99') as numeric,
   to_char(val::float8, 'MI9999999999.99') as float8,
   to_char(val::float4, 'MI9999999999.99') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
     val     |    numeric     |     float8     |     float4     
 ------------+----------------+----------------+----------------
           0 |            .00 |            .00 |            .00
@@ -1995,13 +1975,11 @@ FROM v;
         NaN |         NaN    |         NaN    |         NaN
 (7 rows)
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, 'MI99.99') as numeric,
   to_char(val::float8, 'MI99.99') as float8,
   to_char(val::float4, 'MI99.99') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
     val     | numeric | float8 | float4 
 ------------+---------+--------+--------
           0 |    .00  |    .00 |    .00

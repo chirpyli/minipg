@@ -651,19 +651,6 @@ select pg_get_ruledef(oid, true) from pg_rewrite
 
 -- test extraction of FieldSelect field names (get_name_for_var_field)
 
-create view tt24v as
-with cte as materialized (select r from (values(1,2),(3,4)) r)
-select (r).column2 as col_a, (rr).column2 as col_b from
-  cte join (select rr from (values(1,7),(3,8)) rr limit 2) ss
-  on (r).column1 = (rr).column1;
-select pg_get_viewdef('tt24v', true);
-create view tt25v as
-with cte as materialized (select pg_get_keywords() k)
-select (k).word from cte;
-select pg_get_viewdef('tt25v', true);
--- also check cases seen only in EXPLAIN
-explain (verbose, costs off)
-select * from tt24v;
 explain (verbose, costs off)
 select (r).column2 from (select r from (values(1,2),(3,4)) r limit 1) ss;
 

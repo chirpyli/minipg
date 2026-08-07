@@ -102,14 +102,6 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 		return;
 
 	/*
-	 * Reject if query contains any CTEs; there's no way to build an indexscan
-	 * on one so we couldn't succeed here.  (If the CTEs are unreferenced,
-	 * that's not true, but it doesn't seem worth expending cycles to check.)
-	 */
-	if (parse->cteList)
-		return;
-
-	/*
 	 * We also restrict the query to reference exactly one table, since join
 	 * conditions can't be handled reasonably.  (We could perhaps handle a
 	 * query containing cartesian-product joins, but it hardly seems worth the

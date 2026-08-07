@@ -430,7 +430,7 @@ transformRangeSubselect(ParseState *pstate, RangeSubselect *r)
 	/*
 	 * Analyze and transform the subquery.
 	 */
-	query = parse_sub_analyze(r->subquery, pstate, NULL,
+	query = parse_sub_analyze(r->subquery, pstate,
 							  isLockedRefname(pstate, r->alias->aliasname),
 							  true);
 
@@ -781,31 +781,22 @@ transformRangeTableSample(ParseState *pstate, RangeTableSample *rts)
 /*
  * getNSItemForSpecialRelationTypes
  *
- * If given RangeVar refers to a CTE or an EphemeralNamedRelation,
+ * If given RangeVar refers to an EphemeralNamedRelation,
  * build and return an appropriate ParseNamespaceItem, otherwise return NULL
  */
 static ParseNamespaceItem *
 getNSItemForSpecialRelationTypes(ParseState *pstate, RangeVar *rv)
 {
-	ParseNamespaceItem *nsitem;
-	CommonTableExpr *cte;
-	Index		levelsup;
-
 	/*
-	 * if it is a qualified name, it can't be a CTE or tuplestore reference
+	 * if it is a qualified name, it can't be a tuplestore reference
 	 */
 	if (rv->schemaname)
 		return NULL;
 
-	cte = scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
-	if (cte)
-		nsitem = addRangeTableEntryForCTE(pstate, cte, levelsup, rv, true);
-	else if (scanNameSpaceForENR(pstate, rv->relname))
-		nsitem = addRangeTableEntryForENR(pstate, rv, true);
-	else
-		nsitem = NULL;
+	if (scanNameSpaceForENR(pstate, rv->relname))
+		return addRangeTableEntryForENR(pstate, rv, true);
 
-	return nsitem;
+	return NULL;
 }
 
 /*

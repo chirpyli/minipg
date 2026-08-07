@@ -240,9 +240,6 @@ struct PlannerInfo
 
 	List	   *init_plans;		/* init SubPlans for query */
 
-	List	   *cte_plan_ids;	/* per-CTE-item list of subplan IDs (or -1 if
-								 * no subplan was made for that CTE) */
-
 	List	   *multiexpr_params;	/* List of Lists of Params for MULTIEXPR
 									 * subquery outputs */
 
@@ -1812,19 +1809,6 @@ typedef struct SetOpPath
 	int			firstFlag;		/* flag value for first input relation */
 	double		numGroups;		/* estimated number of groups in input */
 } SetOpPath;
-
-/*
- * RecursiveUnionPath represents a recursive UNION node
- */
-typedef struct RecursiveUnionPath
-{
-	Path		path;
-	Path	   *leftpath;		/* paths representing input sources */
-	Path	   *rightpath;
-	List	   *distinctList;	/* SortGroupClauses identifying target cols */
-	int			wtParam;		/* ID of Param representing work table */
-	double		numGroups;		/* estimated number of groups in input */
-} RecursiveUnionPath;
 
 /*
  * LockRowsPath represents acquiring row locks for SELECT FOR UPDATE/SHARE

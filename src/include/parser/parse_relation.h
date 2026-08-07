@@ -22,9 +22,6 @@ extern ParseNamespaceItem *refnameNamespaceItem(ParseState *pstate,
 												const char *refname,
 												int location,
 												int *sublevels_up);
-extern CommonTableExpr *scanNameSpaceForCTE(ParseState *pstate,
-											const char *refname,
-											Index *ctelevelsup);
 extern bool scanNameSpaceForENR(ParseState *pstate, const char *refname);
 extern void checkNameSpaceConflicts(ParseState *pstate, List *namespace1,
 									List *namespace2);
@@ -34,8 +31,6 @@ extern ParseNamespaceItem *GetNSItemByRangeTablePosn(ParseState *pstate,
 extern RangeTblEntry *GetRTEByRangeTablePosn(ParseState *pstate,
 											 int varno,
 											 int sublevels_up);
-extern CommonTableExpr *GetCTEForRTE(ParseState *pstate, RangeTblEntry *rte,
-									 int rtelevelsup);
 extern Node *scanNSItemForColumn(ParseState *pstate, ParseNamespaceItem *nsitem,
 								 int sublevels_up, const char *colname,
 								 int location);
@@ -86,11 +81,6 @@ extern ParseNamespaceItem *addRangeTableEntryForJoin(ParseState *pstate,
 													 Alias *joinalias,
 													 Alias *alias,
 													 bool inFromCl);
-extern ParseNamespaceItem *addRangeTableEntryForCTE(ParseState *pstate,
-													CommonTableExpr *cte,
-													Index levelsup,
-													RangeVar *rv,
-													bool inFromCl);
 extern ParseNamespaceItem *addRangeTableEntryForENR(ParseState *pstate,
 													RangeVar *rv,
 													bool inFromCl);

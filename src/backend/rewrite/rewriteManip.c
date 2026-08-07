@@ -749,11 +749,6 @@ IncrementVarSublevelsUp_walker(Node *node,
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) node;
 
-		if (rte->rtekind == RTE_CTE)
-		{
-			if (rte->ctelevelsup >= context->min_sublevels_up)
-				rte->ctelevelsup += context->delta_sublevels_up;
-		}
 		return false;			/* allow range_table_walker to continue */
 	}
 	if (IsA(node, Query))

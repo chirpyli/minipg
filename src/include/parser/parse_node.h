@@ -125,16 +125,6 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  * of this parse level.  This makes p_lateral_only namespace items visible,
  * whereas they are not visible when p_lateral_active is FALSE.
  *
- * p_ctenamespace: list of CommonTableExprs (WITH items) that are visible
- * at the moment.  This is entirely different from p_namespace because a CTE
- * is not an RTE, rather "visibility" means you could make an RTE from it.
- *
- * p_future_ctes: list of CommonTableExprs (WITH items) that are not yet
- * visible due to scope rules.  This is used to help improve error messages.
- *
- * p_parent_cte: CommonTableExpr that immediately contains the current query,
- * if any.
- *
  * p_target_relation: target relation, if query is INSERT, UPDATE, or DELETE.
  *
  * p_target_nsitem: target relation's ParseNamespaceItem.
@@ -186,9 +176,6 @@ struct ParseState
 	List	   *p_namespace;	/* currently-referenceable RTEs (List of
 								 * ParseNamespaceItem) */
 	bool		p_lateral_active;	/* p_lateral_only items visible? */
-	List	   *p_ctenamespace; /* current namespace for common table exprs */
-	List	   *p_future_ctes;	/* common table exprs not yet in namespace */
-	CommonTableExpr *p_parent_cte;	/* this query's containing CTE */
 	Relation	p_target_relation;	/* INSERT/UPDATE/DELETE target rel */
 	ParseNamespaceItem *p_target_nsitem;	/* target rel's NSItem, or NULL */
 	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
@@ -209,7 +196,7 @@ struct ParseState
 	bool		p_hasWindowFuncs;
 	bool		p_hasTargetSRFs;
 	bool		p_hasSubLinks;
-	bool		p_hasModifyingCTE;
+
 
 	Node	   *p_last_srf;		/* most recent set-returning func/op found */
 

@@ -2074,29 +2074,6 @@ create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
- * create_ctescan_path
- *	  Creates a path corresponding to a scan of a non-self-reference CTE,
- *	  returning the pathnode.
- */
-Path *
-create_ctescan_path(PlannerInfo *root, RelOptInfo *rel, Relids required_outer)
-{
-	Path	   *pathnode = makeNode(Path);
-
-	pathnode->pathtype = T_CteScan;
-	pathnode->parent = rel;
-	pathnode->pathtarget = rel->reltarget;
-	pathnode->param_info = get_baserel_parampathinfo(root, rel,
-													 required_outer);
-	pathnode->parallel_aware = false;
-	pathnode->parallel_safe = rel->consider_parallel;
-	pathnode->parallel_workers = 0;
-	pathnode->pathkeys = NIL;	/* XXX for now, result is always unordered */
-
-	cost_ctescan(pathnode, root, rel, pathnode->param_info);
-
-	return pathnode;
-}
 
 /*
  * create_namedtuplestorescan_path
@@ -2150,32 +2127,6 @@ create_resultscan_path(PlannerInfo *root, RelOptInfo *rel,
 	return pathnode;
 }
 
-/*
- * create_worktablescan_path
- *	  Creates a path corresponding to a scan of a self-reference CTE,
- *	  returning the pathnode.
- */
-Path *
-create_worktablescan_path(PlannerInfo *root, RelOptInfo *rel,
-						  Relids required_outer)
-{
-	Path	   *pathnode = makeNode(Path);
-
-	pathnode->pathtype = T_WorkTableScan;
-	pathnode->parent = rel;
-	pathnode->pathtarget = rel->reltarget;
-	pathnode->param_info = get_baserel_parampathinfo(root, rel,
-													 required_outer);
-	pathnode->parallel_aware = false;
-	pathnode->parallel_safe = rel->consider_parallel;
-	pathnode->parallel_workers = 0;
-	pathnode->pathkeys = NIL;	/* result is always unordered */
-
-	/* Cost is the same as for a regular CTE scan */
-	cost_ctescan(pathnode, root, rel, pathnode->param_info);
-
-	return pathnode;
-}
 
 /*
  * calc_nestloop_required_outer
@@ -3348,55 +3299,6 @@ create_setop_path(PlannerInfo *root,
 	return pathnode;
 }
 
-/*
- * create_recursiveunion_path
- *	  Creates a pathnode that represents a recursive UNION node
- *
- * 'rel' is the parent relation associated with the result
- * 'leftpath' is the source of data for the non-recursive term
- * 'rightpath' is the source of data for the recursive term
- * 'target' is the PathTarget to be computed
- * 'distinctList' is a list of SortGroupClause's representing the grouping
- * 'wtParam' is the ID of Param representing work table
- * 'numGroups' is the estimated number of groups
- *
- * For recursive UNION ALL, distinctList is empty and numGroups is zero
- */
-RecursiveUnionPath *
-create_recursiveunion_path(PlannerInfo *root,
-						   RelOptInfo *rel,
-						   Path *leftpath,
-						   Path *rightpath,
-						   PathTarget *target,
-						   List *distinctList,
-						   int wtParam,
-						   double numGroups)
-{
-	RecursiveUnionPath *pathnode = makeNode(RecursiveUnionPath);
-
-	pathnode->path.pathtype = T_RecursiveUnion;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = target;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	pathnode->path.parallel_safe = rel->consider_parallel &&
-		leftpath->parallel_safe && rightpath->parallel_safe;
-	/* Foolish, but we'll do it like joins for now: */
-	pathnode->path.parallel_workers = leftpath->parallel_workers;
-	/* RecursiveUnion result is always unsorted */
-	pathnode->path.pathkeys = NIL;
-
-	pathnode->leftpath = leftpath;
-	pathnode->rightpath = rightpath;
-	pathnode->distinctList = distinctList;
-	pathnode->wtParam = wtParam;
-	pathnode->numGroups = numGroups;
-
-	cost_recursive_union(&pathnode->path, leftpath, rightpath);
-
-	return pathnode;
-}
 
 /*
  * create_lockrows_path

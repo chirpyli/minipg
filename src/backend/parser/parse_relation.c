@@ -252,60 +252,6 @@ scanNameSpaceForRelid(ParseState *pstate, Oid relid, int location)
 	return result;
 }
 
-/*
- * Search the query's CTE namespace for a CTE matching the given unqualified
- * refname.  Return the CTE (and its levelsup count) if a match, or NULL
- * if no match.  We need not worry about multiple matches, since parse_cte.c
- * rejects WITH lists containing duplicate CTE names.
- */
-CommonTableExpr *
-scanNameSpaceForCTE(ParseState *pstate, const char *refname,
-					Index *ctelevelsup)
-{
-	Index		levelsup;
-
-	for (levelsup = 0;
-		 pstate != NULL;
-		 pstate = pstate->parentParseState, levelsup++)
-	{
-		ListCell   *lc;
-
-		foreach(lc, pstate->p_ctenamespace)
-		{
-			CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-
-			if (strcmp(cte->ctename, refname) == 0)
-			{
-				*ctelevelsup = levelsup;
-				return cte;
-			}
-		}
-	}
-	return NULL;
-}
-
-/*
- * Search for a possible "future CTE", that is one that is not yet in scope
- * according to the WITH scoping rules.  This has nothing to do with valid
- * SQL semantics, but it's important for error reporting purposes.
- */
-static bool
-isFutureCTE(ParseState *pstate, const char *refname)
-{
-	for (; pstate != NULL; pstate = pstate->parentParseState)
-	{
-		ListCell   *lc;
-
-		foreach(lc, pstate->p_future_ctes)
-		{
-			CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-
-			if (strcmp(cte->ctename, refname) == 0)
-				return true;
-		}
-	}
-	return false;
-}
 
 /*
  * Search the query's ephemeral named relation namespace for a relation
@@ -337,34 +283,16 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 {
 	const char *refname = relation->relname;
 	Oid			relId = InvalidOid;
-	CommonTableExpr *cte = NULL;
 	bool		isenr = false;
-	Index		ctelevelsup = 0;
 	Index		levelsup;
 
-	/*
-	 * If it's an unqualified name, check for possible CTE matches. A CTE
-	 * hides any real relation matches.  If no CTE, look for a matching
-	 * relation.
-	 *
-	 * NB: It's not critical that RangeVarGetRelid return the correct answer
-	 * here in the face of concurrent DDL.  If it doesn't, the worst case
-	 * scenario is a less-clear error message.  Also, the tables involved in
-	 * the query are already locked, which reduces the number of cases in
-	 * which surprising behavior can occur.  So we do the name lookup
-	 * unlocked.
-	 */
 	if (!relation->schemaname)
-	{
-		cte = scanNameSpaceForCTE(pstate, refname, &ctelevelsup);
-		if (!cte)
-			isenr = scanNameSpaceForENR(pstate, refname);
-	}
+		isenr = scanNameSpaceForENR(pstate, refname);
 
-	if (!cte && !isenr)
+	if (!isenr)
 		relId = RangeVarGetRelid(relation, NoLock, true);
 
-	/* Now look for RTEs matching either the relation/CTE/ENR or the alias */
+	/* Now look for RTEs matching either the relation/ENR or the alias */
 	for (levelsup = 0;
 		 pstate != NULL;
 		 pstate = pstate->parentParseState, levelsup++)
@@ -378,11 +306,6 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 			if (rte->rtekind == RTE_RELATION &&
 				OidIsValid(relId) &&
 				rte->relid == relId)
-				return rte;
-			if (rte->rtekind == RTE_CTE &&
-				cte != NULL &&
-				rte->ctelevelsup + levelsup == ctelevelsup &&
-				strcmp(rte->ctename, refname) == 0)
 				return rte;
 			if (rte->rtekind == RTE_NAMEDTUPLESTORE &&
 				isenr &&
@@ -525,38 +448,6 @@ GetRTEByRangeTablePosn(ParseState *pstate,
 	}
 	Assert(varno > 0 && varno <= list_length(pstate->p_rtable));
 	return rt_fetch(varno, pstate->p_rtable);
-}
-
-/*
- * Fetch the CTE for a CTE-reference RTE.
- *
- * rtelevelsup is the number of query levels above the given pstate that the
- * RTE came from.
- */
-CommonTableExpr *
-GetCTEForRTE(ParseState *pstate, RangeTblEntry *rte, int rtelevelsup)
-{
-	Index		levelsup;
-	ListCell   *lc;
-
-	Assert(rte->rtekind == RTE_CTE);
-	levelsup = rte->ctelevelsup + rtelevelsup;
-	while (levelsup-- > 0)
-	{
-		pstate = pstate->parentParseState;
-		if (!pstate)			/* shouldn't happen */
-			elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
-	}
-	foreach(lc, pstate->p_ctenamespace)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-
-		if (strcmp(cte->ctename, rte->ctename) == 0)
-			return cte;
-	}
-	/* shouldn't happen */
-	elog(ERROR, "could not find CTE \"%s\"", rte->ctename);
-	return NULL;				/* keep compiler quiet */
 }
 
 /*
@@ -1363,25 +1254,10 @@ parserOpenTable(ParseState *pstate, const RangeVar *relation, int lockmode)
 							relation->schemaname, relation->relname)));
 		else
 		{
-			/*
-			 * An unqualified name might have been meant as a reference to
-			 * some not-yet-in-scope CTE.  The bare "does not exist" message
-			 * has proven remarkably unhelpful for figuring out such problems,
-			 * so we take pains to offer a specific hint.
-			 */
-			if (isFutureCTE(pstate, relation->relname))
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_TABLE),
-						 errmsg("relation \"%s\" does not exist",
-								relation->relname),
-						 errdetail("There is a WITH item named \"%s\", but it cannot be referenced from this part of the query.",
-								   relation->relname),
-						 errhint("Use WITH RECURSIVE, or re-order the WITH items to remove forward references.")));
-			else
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_TABLE),
-						 errmsg("relation \"%s\" does not exist",
-								relation->relname)));
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_TABLE),
+					 errmsg("relation \"%s\" does not exist",
+							relation->relname)));
 		}
 	}
 	cancel_parser_errposition_callback(&pcbstate);
@@ -2180,157 +2056,6 @@ addRangeTableEntryForJoin(ParseState *pstate,
 }
 
 /*
- * Add an entry for a CTE reference to the pstate's range table (p_rtable).
- * Then, construct and return a ParseNamespaceItem for the new RTE.
- *
- * This is much like addRangeTableEntry() except that it makes a CTE RTE.
- */
-ParseNamespaceItem *
-addRangeTableEntryForCTE(ParseState *pstate,
-						 CommonTableExpr *cte,
-						 Index levelsup,
-						 RangeVar *rv,
-						 bool inFromCl)
-{
-	RangeTblEntry *rte = makeNode(RangeTblEntry);
-	Alias	   *alias = rv->alias;
-	char	   *refname = alias ? alias->aliasname : cte->ctename;
-	Alias	   *eref;
-	int			numaliases;
-	int			varattno;
-	ListCell   *lc;
-	int			n_dontexpand_columns = 0;
-	ParseNamespaceItem *psi;
-
-	Assert(pstate != NULL);
-
-	rte->rtekind = RTE_CTE;
-	rte->ctename = cte->ctename;
-	rte->ctelevelsup = levelsup;
-
-	/* Self-reference if and only if CTE's parse analysis isn't completed */
-	rte->self_reference = !IsA(cte->ctequery, Query);
-	Assert(cte->cterecursive || !rte->self_reference);
-	/* Bump the CTE's refcount if this isn't a self-reference */
-	if (!rte->self_reference)
-		cte->cterefcount++;
-
-	/*
-	 * We throw error if the CTE is INSERT/UPDATE/DELETE without RETURNING.
-	 * This won't get checked in case of a self-reference, but that's OK
-	 * because data-modifying CTEs aren't allowed to be recursive anyhow.
-	 */
-	if (IsA(cte->ctequery, Query))
-	{
-		Query	   *ctequery = (Query *) cte->ctequery;
-
-		if (ctequery->commandType != CMD_SELECT &&
-			ctequery->returningList == NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("WITH query \"%s\" does not have a RETURNING clause",
-							cte->ctename),
-					 parser_errposition(pstate, rv->location)));
-	}
-
-	rte->coltypes = list_copy(cte->ctecoltypes);
-	rte->coltypmods = list_copy(cte->ctecoltypmods);
-	rte->colcollations = list_copy(cte->ctecolcollations);
-
-	rte->alias = alias;
-	if (alias)
-		eref = copyObject(alias);
-	else
-		eref = makeAlias(refname, NIL);
-	numaliases = list_length(eref->colnames);
-
-	/* fill in any unspecified alias columns */
-	varattno = 0;
-	foreach(lc, cte->ctecolnames)
-	{
-		varattno++;
-		if (varattno > numaliases)
-			eref->colnames = lappend(eref->colnames, lfirst(lc));
-	}
-	if (varattno < numaliases)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("table \"%s\" has %d columns available but %d columns specified",
-						refname, varattno, numaliases)));
-
-	rte->eref = eref;
-
-	if (cte->search_clause)
-	{
-		rte->eref->colnames = lappend(rte->eref->colnames, makeString(cte->search_clause->search_seq_column));
-		if (cte->search_clause->search_breadth_first)
-			rte->coltypes = lappend_oid(rte->coltypes, RECORDOID);
-		else
-			rte->coltypes = lappend_oid(rte->coltypes, RECORDARRAYOID);
-		rte->coltypmods = lappend_int(rte->coltypmods, -1);
-		rte->colcollations = lappend_oid(rte->colcollations, InvalidOid);
-
-		n_dontexpand_columns += 1;
-	}
-
-	if (cte->cycle_clause)
-	{
-		rte->eref->colnames = lappend(rte->eref->colnames, makeString(cte->cycle_clause->cycle_mark_column));
-		rte->coltypes = lappend_oid(rte->coltypes, cte->cycle_clause->cycle_mark_type);
-		rte->coltypmods = lappend_int(rte->coltypmods, cte->cycle_clause->cycle_mark_typmod);
-		rte->colcollations = lappend_oid(rte->colcollations, cte->cycle_clause->cycle_mark_collation);
-
-		rte->eref->colnames = lappend(rte->eref->colnames, makeString(cte->cycle_clause->cycle_path_column));
-		rte->coltypes = lappend_oid(rte->coltypes, RECORDARRAYOID);
-		rte->coltypmods = lappend_int(rte->coltypmods, -1);
-		rte->colcollations = lappend_oid(rte->colcollations, InvalidOid);
-
-		n_dontexpand_columns += 2;
-	}
-
-	/*
-	 * Set flags and access permissions.
-	 *
-	 * Subqueries are never checked for access rights.
-	 */
-	rte->lateral = false;
-	rte->inh = false;			/* never true for subqueries */
-	rte->inFromCl = inFromCl;
-
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
-	rte->selectedCols = NULL;
-	rte->insertedCols = NULL;
-	rte->updatedCols = NULL;
-	rte->extraUpdatedCols = NULL;
-
-	/*
-	 * Add completed RTE to pstate's range table list, so that we know its
-	 * index.  But we don't add it to the join list --- caller must do that if
-	 * appropriate.
-	 */
-	pstate->p_rtable = lappend(pstate->p_rtable, rte);
-
-	/*
-	 * Build a ParseNamespaceItem, but don't add it to the pstate's namespace
-	 * list --- caller must do that if appropriate.
-	 */
-	psi = buildNSItemFromLists(rte, list_length(pstate->p_rtable),
-							   rte->coltypes, rte->coltypmods,
-							   rte->colcollations);
-
-	/*
-	 * The columns added by search and cycle clauses are not included in star
-	 * expansion in queries contained in the CTE.
-	 */
-	if (rte->ctelevelsup > 0)
-		for (int i = 0; i < n_dontexpand_columns; i++)
-			psi->p_nscolumns[list_length(psi->p_names->colnames) - 1 - i].p_dontexpand = true;
-
-	return psi;
-}
-
-/*
  * Add an entry for an ephemeral named relation reference to the pstate's
  * range table (p_rtable).
  * Then, construct and return a ParseNamespaceItem for the new RTE.
@@ -2822,10 +2547,9 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 			}
 			break;
 		case RTE_VALUES:
-		case RTE_CTE:
 		case RTE_NAMEDTUPLESTORE:
 			{
-				/* Tablefunc, Values, CTE, or ENR RTE */
+				/* Tablefunc, Values, or ENR RTE */
 				ListCell   *aliasp_item = list_head(rte->eref->colnames);
 				ListCell   *lct;
 				ListCell   *lcm;
@@ -3187,13 +2911,12 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 			break;
 		case RTE_SUBQUERY:
 		case RTE_VALUES:
-		case RTE_CTE:
-
-			/*
-			 * Subselect, Table Functions, Values, CTE RTEs never have dropped
-			 * columns
-			 */
-			result = false;
+			{
+				/*
+				 * Subselect, Values RTEs never have dropped columns
+				 */
+				result = false;
+			}
 			break;
 		case RTE_NAMEDTUPLESTORE:
 			{

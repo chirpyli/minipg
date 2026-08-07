@@ -714,35 +714,9 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 								  rtoffset, 1);
 			}
 			break;
-		case T_CteScan:
-			{
-				CteScan    *splan = (CteScan *) plan;
-
-				splan->scan.scanrelid += rtoffset;
-				splan->scan.plan.targetlist =
-					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
-				splan->scan.plan.qual =
-					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
-			}
-			break;
 		case T_NamedTuplestoreScan:
 			{
 				NamedTuplestoreScan *splan = (NamedTuplestoreScan *) plan;
-
-				splan->scan.scanrelid += rtoffset;
-				splan->scan.plan.targetlist =
-					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
-				splan->scan.plan.qual =
-					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
-			}
-			break;
-		case T_WorkTableScan:
-			{
-				WorkTableScan *splan = (WorkTableScan *) plan;
 
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
@@ -1068,11 +1042,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			return set_mergeappend_references(root,
 											  (MergeAppend *) plan,
 											  rtoffset);
-		case T_RecursiveUnion:
-			/* This doesn't evaluate targetlist or check quals either */
-			set_dummy_tlist_references(plan, rtoffset);
-			Assert(plan->qual == NIL);
-			break;
 		case T_BitmapAnd:
 			{
 				BitmapAnd  *splan = (BitmapAnd *) plan;

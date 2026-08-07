@@ -338,14 +338,6 @@ DefineQueryRewrite(const char *rulename,
 					 errmsg("rules on SELECT must have action INSTEAD SELECT")));
 
 		/*
-		 * ... it cannot contain data-modifying WITH ...
-		 */
-		if (query->hasModifyingCTE)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("rules on SELECT must not contain data-modifying statements in WITH")));
-
-		/*
 		 * ... there can be no rule qual, ...
 		 */
 		if (event_qual != NULL)
@@ -821,14 +813,6 @@ setRuleCheckAsUser_Query(Query *qry, Oid userid)
 		}
 		else
 			rte->checkAsUser = userid;
-	}
-
-	/* Recurse into subquery-in-WITH */
-	foreach(l, qry->cteList)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(l);
-
-		setRuleCheckAsUser_Query(castNode(Query, cte->ctequery), userid);
 	}
 
 	/* If there are sublinks, search for them and process their RTEs */

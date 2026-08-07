@@ -39,7 +39,6 @@
 #include "rewrite/rewriteDefine.h"
 #include "rewrite/rewriteHandler.h"
 #include "rewrite/rewriteManip.h"
-#include "rewrite/rewriteSearchCycle.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
@@ -286,17 +285,9 @@ AcquireRewriteLocks(Query *parsetree,
 		}
 	}
 
-	/* Recurse into subqueries in WITH */
-	foreach(l, parsetree->cteList)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(l);
-
-		AcquireRewriteLocks((Query *) cte->ctequery, forExecute, false);
-	}
-
 	/*
 	 * Recurse into sublink subqueries, too.  But we already did the ones in
-	 * the rtable and cteList.
+	 * the rtable.
 	 */
 	if (parsetree->hasSubLinks)
 		query_tree_walker(parsetree, acquireLocksOnSubLinks, &context,
@@ -545,68 +536,6 @@ rewriteRuleAction(Query *parsetree,
 				sub_action->hasSubLinks =
 					checkExprHasSubLink((Node *) newjointree);
 		}
-	}
-
-	/*
-	 * If the original query has any CTEs, copy them into the rule action. But
-	 * we don't need them for a utility action.
-	 */
-	if (parsetree->cteList != NIL && sub_action->commandType != CMD_UTILITY)
-	{
-		/*
-		 * Annoying implementation restriction: because CTEs are identified by
-		 * name within a cteList, we can't merge a CTE from the original query
-		 * if it has the same name as any CTE in the rule action.
-		 *
-		 * This could possibly be fixed by using some sort of internally
-		 * generated ID, instead of names, to link CTE RTEs to their CTEs.
-		 * However, decompiling the results would be quite confusing; note the
-		 * merge of hasRecursive flags below, which could change the apparent
-		 * semantics of such redundantly-named CTEs.
-		 */
-		foreach(lc, parsetree->cteList)
-		{
-			CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-			ListCell   *lc2;
-
-			foreach(lc2, sub_action->cteList)
-			{
-				CommonTableExpr *cte2 = (CommonTableExpr *) lfirst(lc2);
-
-				if (strcmp(cte->ctename, cte2->ctename) == 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("WITH query name \"%s\" appears in both a rule action and the query being rewritten",
-									cte->ctename)));
-			}
-		}
-
-		/*
-		 * OK, it's safe to combine the CTE lists.  Beware that RewriteQuery
-		 * knows we concatenate the lists in this order.
-		 */
-		sub_action->cteList = list_concat(sub_action->cteList,
-										  copyObject(parsetree->cteList));
-		/* ... and don't forget about the associated flags */
-		sub_action->hasRecursive |= parsetree->hasRecursive;
-		sub_action->hasModifyingCTE |= parsetree->hasModifyingCTE;
-
-		/*
-		 * If rule_action is different from sub_action (i.e., the rule action
-		 * is an INSERT...SELECT), then we might have just added some
-		 * data-modifying CTEs that are not at the top query level.  This is
-		 * disallowed by the parser and we mustn't generate such trees here
-		 * either, so throw an error.
-		 *
-		 * Conceivably such cases could be supported by attaching the original
-		 * query's CTEs to rule_action not sub_action.  But to do that, we'd
-		 * have to increment ctelevelsup in RTEs and SubLinks copied from the
-		 * original query.  For now, it doesn't seem worth the trouble.
-		 */
-		if (sub_action->hasModifyingCTE && rule_action != sub_action)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("INSERT...SELECT rule actions are not supported for queries having data-modifying statements in WITH")));
 	}
 
 	/*
@@ -2051,23 +1980,6 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 	ListCell   *lc;
 
 	/*
-	 * Expand SEARCH and CYCLE clauses in CTEs.
-	 *
-	 * This is just a convenient place to do this, since we are already
-	 * looking at each Query.
-	 */
-	foreach(lc, parsetree->cteList)
-	{
-		CommonTableExpr *cte = lfirst_node(CommonTableExpr, lc);
-
-		if (cte->search_clause || cte->cycle_clause)
-		{
-			cte = rewriteSearchAndCycle(cte);
-			lfirst(lc) = cte;
-		}
-	}
-
-	/*
 	 * don't try to convert this into a foreach loop, because rtable list can
 	 * get changed each time through...
 	 */
@@ -2193,24 +2105,9 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		table_close(rel, NoLock);
 	}
 
-	/* Recurse into subqueries in WITH */
-	foreach(lc, parsetree->cteList)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-
-		cte->ctequery = (Node *)
-			fireRIRrules((Query *) cte->ctequery, activeRIRs);
-
-		/*
-		 * While we are here, make sure the query is marked as having row
-		 * security if any of its CTEs do.
-		 */
-		parsetree->hasRowSecurity |= ((Query *) cte->ctequery)->hasRowSecurity;
-	}
-
 	/*
 	 * Recurse into sublink subqueries, too.  But we already did the ones in
-	 * the rtable and cteList.
+	 * the rtable.
 	 */
 	if (parsetree->hasSubLinks)
 	{
@@ -2606,9 +2503,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 
 	if (viewquery->setOperations != NULL)
 		return gettext_noop("Views containing UNION, INTERSECT, or EXCEPT are not automatically updatable.");
-
-	if (viewquery->cteList != NIL)
-		return gettext_noop("Views containing WITH are not automatically updatable.");
 
 	if (viewquery->limitOffset != NULL || viewquery->limitCount != NULL)
 		return gettext_noop("Views containing LIMIT or OFFSET are not automatically updatable.");
@@ -3607,92 +3501,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 	List	   *rewritten = NIL;
 	ListCell   *lc1;
 
-	/*
-	 * First, recursively process any insert/update/delete statements in WITH
-	 * clauses.  (We have to do this first because the WITH clauses may get
-	 * copied into rule actions below.)
-	 *
-	 * Any new WITH clauses from rule actions are processed when we recurse
-	 * into product queries below.  However, when recursing, we must take care
-	 * to avoid rewriting a CTE query more than once (because expanding
-	 * generated columns in the targetlist more than once would fail).  Since
-	 * new CTEs from product queries are added to the start of the list (see
-	 * rewriteRuleAction), we just skip the last num_ctes_processed items.
-	 */
-	foreach(lc1, parsetree->cteList)
-	{
-		CommonTableExpr *cte = lfirst_node(CommonTableExpr, lc1);
-		Query	   *ctequery = castNode(Query, cte->ctequery);
-		int			i = foreach_current_index(lc1);
-		List	   *newstuff;
-
-		/* Skip already-processed CTEs at the end of the list */
-		if (i >= list_length(parsetree->cteList) - num_ctes_processed)
-			break;
-
-		if (ctequery->commandType == CMD_SELECT)
-			continue;
-
-		newstuff = RewriteQuery(ctequery, rewrite_events, 0, 0);
-
-		/*
-		 * Currently we can only handle unconditional, single-statement DO
-		 * INSTEAD rules correctly; we have to get exactly one non-utility
-		 * Query out of the rewrite operation to stuff back into the CTE node.
-		 */
-		if (list_length(newstuff) == 1)
-		{
-			/* Must check it's not a utility command */
-			ctequery = linitial_node(Query, newstuff);
-			if (!(ctequery->commandType == CMD_SELECT ||
-				  ctequery->commandType == CMD_UPDATE ||
-				  ctequery->commandType == CMD_INSERT ||
-				  ctequery->commandType == CMD_DELETE))
-			{
-				/*
-				 * Currently it could only be NOTIFY; this error message will
-				 * need work if we ever allow other utility commands in rules.
-				 */
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("DO INSTEAD NOTIFY rules are not supported for data-modifying statements in WITH")));
-			}
-			/* WITH queries should never be canSetTag */
-			Assert(!ctequery->canSetTag);
-			/* Push the single Query back into the CTE node */
-			cte->ctequery = (Node *) ctequery;
-		}
-		else if (newstuff == NIL)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("DO INSTEAD NOTHING rules are not supported for data-modifying statements in WITH")));
-		}
-		else
-		{
-			ListCell   *lc2;
-
-			/* examine queries to determine which error message to issue */
-			foreach(lc2, newstuff)
-			{
-				Query	   *q = (Query *) lfirst(lc2);
-
-				if (q->querySource == QSRC_QUAL_INSTEAD_RULE)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("conditional DO INSTEAD rules are not supported for data-modifying statements in WITH")));
-				if (q->querySource == QSRC_NON_INSTEAD_RULE)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("DO ALSO rules are not supported for data-modifying statements in WITH")));
-			}
-
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("multi-statement DO INSTEAD rules are not supported for data-modifying statements in WITH")));
-		}
-	}
-	num_ctes_processed = list_length(parsetree->cteList);
 
 	/*
 	 * If the statement is an insert, update, or delete, adjust its targetlist
@@ -4119,22 +3927,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 	 * restructuring so that a CTE list can be shared across multiple Query
 	 * and PlannableStatement nodes.
 	 */
-	if (parsetree->cteList != NIL)
-	{
-		int			qcount = 0;
-
-		foreach(lc1, rewritten)
-		{
-			Query	   *q = (Query *) lfirst(lc1);
-
-			if (q->commandType != CMD_UTILITY)
-				qcount++;
-		}
-		if (qcount > 1)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("WITH cannot be used in a query that is rewritten by rules into multiple queries")));
-	}
 
 	return rewritten;
 }

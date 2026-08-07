@@ -334,7 +334,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	if ((cursorOptions & CURSOR_OPT_PARALLEL_OK) != 0 &&
 		IsUnderPostmaster &&
 		parse->commandType == CMD_SELECT &&
-		!parse->hasModifyingCTE &&
 		max_parallel_workers_per_gather > 0 &&
 		!IsParallelWorker())
 	{
@@ -505,7 +504,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	result->commandType = parse->commandType;
 	result->queryId = parse->queryId;
 	result->hasReturning = (parse->returningList != NIL);
-	result->hasModifyingCTE = parse->hasModifyingCTE;
 	result->canSetTag = parse->canSetTag;
 	result->transientPlan = glob->transientPlan;
 	result->dependsOnRole = glob->dependsOnRole;
@@ -583,7 +581,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	root->outer_params = NULL;
 	root->planner_cxt = CurrentMemoryContext;
 	root->init_plans = NIL;
-	root->cte_plan_ids = NIL;
 	root->multiexpr_params = NIL;
 	root->eq_classes = NIL;
 	root->ec_merging_done = false;
@@ -610,12 +607,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	root->non_recursive_path = NULL;
 	root->partColsUpdated = false;
 
-	/*
-	 * If there is a WITH list, process each WITH query and either convert it
-	 * to RTE_SUBQUERY RTE(s) or build an initplan SubPlan structure for it.
-	 */
-	if (parse->cteList)
-		SS_process_ctes(root);
 
 	/*
 	 * If the FROM clause is empty, replace it with a dummy RTE_RESULT RTE, so

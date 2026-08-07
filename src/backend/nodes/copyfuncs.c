@@ -279,32 +279,6 @@ _copyMergeAppend(const MergeAppend *from)
 }
 
 /*
- * _copyRecursiveUnion
- */
-static RecursiveUnion *
-_copyRecursiveUnion(const RecursiveUnion *from)
-{
-	RecursiveUnion *newnode = makeNode(RecursiveUnion);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(wtParam);
-	COPY_SCALAR_FIELD(numCols);
-	COPY_POINTER_FIELD(dupColIdx, from->numCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(dupOperators, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(dupCollations, from->numCols * sizeof(Oid));
-	COPY_SCALAR_FIELD(numGroups);
-
-	return newnode;
-}
-
-/*
  * _copyBitmapAnd
  */
 static BitmapAnd *
@@ -673,28 +647,6 @@ _copyValuesScan(const ValuesScan *from)
 }
 
 /*
- * _copyCteScan
- */
-static CteScan *
-_copyCteScan(const CteScan *from)
-{
-	CteScan    *newnode = makeNode(CteScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(ctePlanId);
-	COPY_SCALAR_FIELD(cteParam);
-
-	return newnode;
-}
-
-/*
  * _copyNamedTuplestoreScan
  */
 static NamedTuplestoreScan *
@@ -714,28 +666,6 @@ _copyNamedTuplestoreScan(const NamedTuplestoreScan *from)
 
 	return newnode;
 }
-
-/*
- * _copyWorkTableScan
- */
-static WorkTableScan *
-_copyWorkTableScan(const WorkTableScan *from)
-{
-	WorkTableScan *newnode = makeNode(WorkTableScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(wtParam);
-
-	return newnode;
-}
-
 
 /*
  * _copyCustomScan
@@ -2353,9 +2283,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_NODE_FIELD(functions);
 	COPY_SCALAR_FIELD(funcordinality);
 	COPY_NODE_FIELD(values_lists);
-	COPY_STRING_FIELD(ctename);
-	COPY_SCALAR_FIELD(ctelevelsup);
-	COPY_SCALAR_FIELD(self_reference);
 	COPY_NODE_FIELD(coltypes);
 	COPY_NODE_FIELD(coltypmods);
 	COPY_NODE_FIELD(colcollations);
@@ -2481,18 +2408,6 @@ _copyRowMarkClause(const RowMarkClause *from)
 	return newnode;
 }
 
-static WithClause *
-_copyWithClause(const WithClause *from)
-{
-	WithClause *newnode = makeNode(WithClause);
-
-	COPY_NODE_FIELD(ctes);
-	COPY_SCALAR_FIELD(recursive);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
 static InferClause *
 _copyInferClause(const InferClause *from)
 {
@@ -2516,60 +2431,6 @@ _copyOnConflictClause(const OnConflictClause *from)
 	COPY_NODE_FIELD(targetList);
 	COPY_NODE_FIELD(whereClause);
 	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-static CTESearchClause *
-_copyCTESearchClause(const CTESearchClause *from)
-{
-	CTESearchClause *newnode = makeNode(CTESearchClause);
-
-	COPY_NODE_FIELD(search_col_list);
-	COPY_SCALAR_FIELD(search_breadth_first);
-	COPY_STRING_FIELD(search_seq_column);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-static CTECycleClause *
-_copyCTECycleClause(const CTECycleClause *from)
-{
-	CTECycleClause *newnode = makeNode(CTECycleClause);
-
-	COPY_NODE_FIELD(cycle_col_list);
-	COPY_STRING_FIELD(cycle_mark_column);
-	COPY_NODE_FIELD(cycle_mark_value);
-	COPY_NODE_FIELD(cycle_mark_default);
-	COPY_STRING_FIELD(cycle_path_column);
-	COPY_LOCATION_FIELD(location);
-	COPY_SCALAR_FIELD(cycle_mark_type);
-	COPY_SCALAR_FIELD(cycle_mark_typmod);
-	COPY_SCALAR_FIELD(cycle_mark_collation);
-	COPY_SCALAR_FIELD(cycle_mark_neop);
-
-	return newnode;
-}
-
-static CommonTableExpr *
-_copyCommonTableExpr(const CommonTableExpr *from)
-{
-	CommonTableExpr *newnode = makeNode(CommonTableExpr);
-
-	COPY_STRING_FIELD(ctename);
-	COPY_NODE_FIELD(aliascolnames);
-	COPY_SCALAR_FIELD(ctematerialized);
-	COPY_NODE_FIELD(ctequery);
-	COPY_NODE_FIELD(search_clause);
-	COPY_NODE_FIELD(cycle_clause);
-	COPY_LOCATION_FIELD(location);
-	COPY_SCALAR_FIELD(cterecursive);
-	COPY_SCALAR_FIELD(cterefcount);
-	COPY_NODE_FIELD(ctecolnames);
-	COPY_NODE_FIELD(ctecoltypes);
-	COPY_NODE_FIELD(ctecoltypmods);
-	COPY_NODE_FIELD(ctecolcollations);
 
 	return newnode;
 }
@@ -3001,12 +2862,9 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(hasTargetSRFs);
 	COPY_SCALAR_FIELD(hasSubLinks);
 	COPY_SCALAR_FIELD(hasDistinctOn);
-	COPY_SCALAR_FIELD(hasRecursive);
-	COPY_SCALAR_FIELD(hasModifyingCTE);
 	COPY_SCALAR_FIELD(hasForUpdate);
 	COPY_SCALAR_FIELD(hasRowSecurity);
 	COPY_SCALAR_FIELD(isReturn);
-	COPY_NODE_FIELD(cteList);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);
 	COPY_NODE_FIELD(targetList);
@@ -3055,7 +2913,6 @@ _copyInsertStmt(const InsertStmt *from)
 	COPY_NODE_FIELD(selectStmt);
 	COPY_NODE_FIELD(onConflictClause);
 	COPY_NODE_FIELD(returningList);
-	COPY_NODE_FIELD(withClause);
 	COPY_SCALAR_FIELD(override);
 
 	return newnode;
@@ -3070,7 +2927,6 @@ _copyDeleteStmt(const DeleteStmt *from)
 	COPY_NODE_FIELD(usingClause);
 	COPY_NODE_FIELD(whereClause);
 	COPY_NODE_FIELD(returningList);
-	COPY_NODE_FIELD(withClause);
 
 	return newnode;
 }
@@ -3085,7 +2941,6 @@ _copyUpdateStmt(const UpdateStmt *from)
 	COPY_NODE_FIELD(whereClause);
 	COPY_NODE_FIELD(fromClause);
 	COPY_NODE_FIELD(returningList);
-	COPY_NODE_FIELD(withClause);
 
 	return newnode;
 }
@@ -3109,7 +2964,6 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(limitCount);
 	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(lockingClause);
-	COPY_NODE_FIELD(withClause);
 	COPY_SCALAR_FIELD(op);
 	COPY_SCALAR_FIELD(all);
 	COPY_NODE_FIELD(larg);
@@ -4431,9 +4285,6 @@ copyObjectImpl(const void *from)
 		case T_MergeAppend:
 			retval = _copyMergeAppend(from);
 			break;
-		case T_RecursiveUnion:
-			retval = _copyRecursiveUnion(from);
-			break;
 		case T_BitmapAnd:
 			retval = _copyBitmapAnd(from);
 			break;
@@ -4482,14 +4333,8 @@ copyObjectImpl(const void *from)
 		case T_ValuesScan:
 			retval = _copyValuesScan(from);
 			break;
-		case T_CteScan:
-			retval = _copyCteScan(from);
-			break;
 		case T_NamedTuplestoreScan:
 			retval = _copyNamedTuplestoreScan(from);
-			break;
-		case T_WorkTableScan:
-			retval = _copyWorkTableScan(from);
 			break;
 		case T_CustomScan:
 			retval = _copyCustomScan(from);
@@ -5140,23 +4985,11 @@ copyObjectImpl(const void *from)
 		case T_RowMarkClause:
 			retval = _copyRowMarkClause(from);
 			break;
-		case T_WithClause:
-			retval = _copyWithClause(from);
-			break;
 		case T_InferClause:
 			retval = _copyInferClause(from);
 			break;
 		case T_OnConflictClause:
 			retval = _copyOnConflictClause(from);
-			break;
-		case T_CTESearchClause:
-			retval = _copyCTESearchClause(from);
-			break;
-		case T_CTECycleClause:
-			retval = _copyCTECycleClause(from);
-			break;
-		case T_CommonTableExpr:
-			retval = _copyCommonTableExpr(from);
 			break;
 		case T_ObjectWithArgs:
 			retval = _copyObjectWithArgs(from);

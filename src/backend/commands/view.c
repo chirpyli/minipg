@@ -448,11 +448,6 @@ DefineView(ViewStmt *stmt, const char *queryString,
 	 * DefineQueryRewrite(), but that function will complain about a bogus ON
 	 * SELECT rule, and we'd rather the message complain about a view.
 	 */
-	if (viewParse->hasModifyingCTE)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("views must not contain data-modifying statements in WITH")));
-
 	/*
 	 * If the user specified the WITH CHECK OPTION, add it to the list of
 	 * reloptions.

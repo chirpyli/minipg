@@ -466,9 +466,6 @@ create table mlparted4 (like mlparted);
 alter table mlparted4 drop a;
 alter table mlparted4 add a int not null;
 alter table mlparted attach partition mlparted4 for values from (1, 30) to (1, 40);
-with ins (a, b, c) as
-  (insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *)
-  select a, b, min(c), max(c) from ins group by a, b order by 1;
 
 alter table mlparted add c text;
 create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
@@ -613,8 +610,6 @@ insert into brtrigpartcon1 values (1, 'hi there');
 -- check that the message shows the appropriate column description in a
 -- situation where the partitioned table is not the primary ModifyTable node
 create table inserttest3 (f1 text default 'foo', f2 text default 'bar', f3 int);
-with result as (insert into brtrigpartcon values (1, 'hi there') returning 1)
-  insert into inserttest3 (f3) select * from result;
 
 -- cleanup
 drop table inserttest3;

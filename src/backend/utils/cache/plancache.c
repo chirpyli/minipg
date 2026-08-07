@@ -1351,7 +1351,7 @@ CachedPlanAllowsSimpleValidityCheck(CachedPlanSource *plansource,
 
 		if (query->commandType == CMD_UTILITY)
 			return false;
-		if (query->rtable || query->cteList || query->hasSubLinks)
+		if (query->rtable || query->hasSubLinks)
 			return false;
 	}
 
@@ -1852,17 +1852,9 @@ ScanQueryForLocks(Query *parsetree, bool acquire)
 		}
 	}
 
-	/* Recurse into subquery-in-WITH */
-	foreach(lc, parsetree->cteList)
-	{
-		CommonTableExpr *cte = lfirst_node(CommonTableExpr, lc);
-
-		ScanQueryForLocks(castNode(Query, cte->ctequery), acquire);
-	}
-
 	/*
 	 * Recurse into sublink subqueries, too.  But we already did the ones in
-	 * the rtable and cteList.
+	 * the rtable.
 	 */
 	if (parsetree->hasSubLinks)
 	{

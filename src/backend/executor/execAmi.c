@@ -21,7 +21,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeCtescan.h"
 #include "executor/nodeCustom.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
@@ -42,7 +41,6 @@
 #include "executor/nodeNamedtuplestorescan.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
-#include "executor/nodeRecursiveunion.h"
 #include "executor/nodeResult.h"
 #include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
@@ -55,7 +53,6 @@
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
 #include "executor/nodeWindowAgg.h"
-#include "executor/nodeWorktablescan.h"
 #include "nodes/extensible.h"
 #include "nodes/nodeFuncs.h"
 #include "nodes/pathnodes.h"
@@ -149,8 +146,6 @@ ExecReScan(PlanState *node)
 			ExecReScanMergeAppend((MergeAppendState *) node);
 			break;
 
-		case T_RecursiveUnionState:
-			ExecReScanRecursiveUnion((RecursiveUnionState *) node);
 			break;
 
 		case T_BitmapAndState:
@@ -213,16 +208,12 @@ ExecReScan(PlanState *node)
 			ExecReScanValuesScan((ValuesScanState *) node);
 			break;
 
-		case T_CteScanState:
-			ExecReScanCteScan((CteScanState *) node);
 			break;
 
 		case T_NamedTuplestoreScanState:
 			ExecReScanNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
-		case T_WorkTableScanState:
-			ExecReScanWorkTableScan((WorkTableScanState *) node);
 			break;
 
 		case T_CustomScanState:
@@ -570,7 +561,6 @@ ExecSupportsBackwardScan(Plan *node)
 		case T_TidRangeScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
-		case T_CteScan:
 		case T_Material:
 		case T_Sort:
 			/* these don't evaluate tlist */
@@ -637,9 +627,7 @@ ExecMaterializesOutput(NodeTag plantype)
 	{
 		case T_Material:
 		case T_FunctionScan:
-		case T_CteScan:
 		case T_NamedTuplestoreScan:
-		case T_WorkTableScan:
 		case T_Sort:
 			return true;
 

@@ -17,7 +17,6 @@ OBJS = \
 	rewriteHandler.o \
 	rewriteManip.o \
 	rewriteRemove.o \
-	rewriteSearchCycle.o \
 	rewriteSupport.o
 
 include $(top_srcdir)/src/backend/common.mk

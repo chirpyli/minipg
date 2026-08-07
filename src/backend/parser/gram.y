@@ -172,7 +172,6 @@ static List *makeOrderedSetArgs(List *directargs, List *orderedargs,
 static void insertSelectOptions(SelectStmt *stmt,
 								List *sortClause, List *lockingClause,
 								SelectLimit *limitClause,
-								WithClause *withClause,
 								core_yyscan_t yyscanner);
 static Node *makeSetOp(SetOperation op, bool all, Node *larg, Node *rarg);
 static Node *doNegate(Node *n, int location);
@@ -192,7 +191,6 @@ static void SplitColQualList(List *qualList,
 static void processCASbits(int cas_bits, int location, const char *constrType,
 			   bool *deferrable, bool *initdeferred, bool *not_valid,
 			   bool *no_inherit, core_yyscan_t yyscanner);
-static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %}
 
@@ -233,7 +231,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	StatsElem			*selem;
 	Alias				*alias;
 	RangeVar			*range;
-	WithClause			*with;
+	Node				*with;
 	InferClause			*infer;
 	OnConflictClause	*onconflict;
 	A_Indices			*aind;
@@ -460,7 +458,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <list>	row explicit_row implicit_row type_list array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
 %type <list>	when_clause_list
-%type <node>	opt_search_clause opt_cycle_clause
 %type <ival>	sub_type opt_materialized
 %type <value>	NumericOnly
 %type <list>	NumericOnly_list
@@ -531,10 +528,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %type <node>	func_application func_expr_common_subexpr
 %type <node>	func_expr func_expr_windowless
-%type <node>	common_table_expr
-%type <with>	with_clause opt_with_clause
-%type <list>	cte_list
-
 %type <list>	within_group_clause
 %type <node>	filter_clause
 %type <list>	window_clause window_definition_list opt_partition_clause
@@ -7927,42 +7920,6 @@ ViewStmt: CREATE OptTemp VIEW qualified_name opt_column_list opt_reloptions
 					n->withCheckOption = $11;
 					$$ = (Node *) n;
 				}
-		| CREATE OptTemp RECURSIVE VIEW qualified_name '(' columnList ')' opt_reloptions
-				AS SelectStmt opt_check_option
-				{
-					ViewStmt *n = makeNode(ViewStmt);
-					n->view = $5;
-					n->view->relpersistence = $2;
-					n->aliases = $7;
-					n->query = makeRecursiveViewSelect(n->view->relname, n->aliases, $11);
-					n->replace = false;
-					n->options = $9;
-					n->withCheckOption = $12;
-					if (n->withCheckOption != NO_CHECK_OPTION)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("WITH CHECK OPTION not supported on recursive views"),
-								 parser_errposition(@12)));
-					$$ = (Node *) n;
-				}
-		| CREATE OR REPLACE OptTemp RECURSIVE VIEW qualified_name '(' columnList ')' opt_reloptions
-				AS SelectStmt opt_check_option
-				{
-					ViewStmt *n = makeNode(ViewStmt);
-					n->view = $7;
-					n->view->relpersistence = $4;
-					n->aliases = $9;
-					n->query = makeRecursiveViewSelect(n->view->relname, n->aliases, $13);
-					n->replace = true;
-					n->options = $11;
-					n->withCheckOption = $14;
-					if (n->withCheckOption != NO_CHECK_OPTION)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("WITH CHECK OPTION not supported on recursive views"),
-								 parser_errposition(@14)));
-					$$ = (Node *) n;
-				}
 		;
 
 opt_check_option:
@@ -8658,14 +8615,13 @@ DeallocateStmt: DEALLOCATE name
  *****************************************************************************/
 
 InsertStmt:
-			opt_with_clause INSERT INTO insert_target insert_rest
+			INSERT INTO insert_target insert_rest
 			opt_on_conflict returning_clause
 				{
-					$5->relation = $4;
-					$5->onConflictClause = $6;
-					$5->returningList = $7;
-					$5->withClause = $1;
-					$$ = (Node *) $5;
+					$4->relation = $3;
+					$4->onConflictClause = $5;
+					$4->returningList = $6;
+					$$ = (Node *) $4;
 				}
 		;
 
@@ -8808,15 +8764,14 @@ returning_clause:
  *
  *****************************************************************************/
 
-DeleteStmt: opt_with_clause DELETE_P FROM relation_expr_opt_alias
+DeleteStmt: DELETE_P FROM relation_expr_opt_alias
 			using_clause where_or_current_clause returning_clause
 				{
 					DeleteStmt *n = makeNode(DeleteStmt);
-					n->relation = $4;
-					n->usingClause = $5;
-					n->whereClause = $6;
-					n->returningList = $7;
-					n->withClause = $1;
+					n->relation = $3;
+					n->usingClause = $4;
+					n->whereClause = $5;
+					n->returningList = $6;
 					$$ = (Node *)n;
 				}
 		;
@@ -8877,19 +8832,18 @@ opt_nowait_or_skip:
  *
  *****************************************************************************/
 
-UpdateStmt: opt_with_clause UPDATE relation_expr_opt_alias
+UpdateStmt: UPDATE relation_expr_opt_alias
 			SET set_clause_list
 			from_clause
 			where_or_current_clause
 			returning_clause
 				{
 					UpdateStmt *n = makeNode(UpdateStmt);
-					n->relation = $3;
-					n->targetList = $5;
-					n->fromClause = $6;
-					n->whereClause = $7;
-					n->returningList = $8;
-					n->withClause = $1;
+					n->relation = $2;
+					n->targetList = $4;
+					n->fromClause = $5;
+					n->whereClause = $6;
+					n->returningList = $7;
 					$$ = (Node *)n;
 				}
 		;
@@ -9048,7 +9002,7 @@ select_no_parens:
 			| select_clause sort_clause
 				{
 					insertSelectOptions((SelectStmt *) $1, $2, NIL,
-										NULL, NULL,
+										NULL,
 										yyscanner);
 					$$ = $1;
 				}
@@ -9056,7 +9010,6 @@ select_no_parens:
 				{
 					insertSelectOptions((SelectStmt *) $1, $2, $3,
 										$4,
-										NULL,
 										yyscanner);
 					$$ = $1;
 				}
@@ -9064,41 +9017,8 @@ select_no_parens:
 				{
 					insertSelectOptions((SelectStmt *) $1, $2, $4,
 										$3,
-										NULL,
 										yyscanner);
 					$$ = $1;
-				}
-			| with_clause select_clause
-				{
-					insertSelectOptions((SelectStmt *) $2, NULL, NIL,
-										NULL,
-										$1,
-										yyscanner);
-					$$ = $2;
-				}
-			| with_clause select_clause sort_clause
-				{
-					insertSelectOptions((SelectStmt *) $2, $3, NIL,
-										NULL,
-										$1,
-										yyscanner);
-					$$ = $2;
-				}
-			| with_clause select_clause opt_sort_clause for_locking_clause opt_select_limit
-				{
-					insertSelectOptions((SelectStmt *) $2, $3, $4,
-										$5,
-										$1,
-										yyscanner);
-					$$ = $2;
-				}
-			| with_clause select_clause opt_sort_clause select_limit opt_for_locking_clause
-				{
-					insertSelectOptions((SelectStmt *) $2, $3, $5,
-										$4,
-										$1,
-										yyscanner);
-					$$ = $2;
 				}
 		;
 
@@ -9197,122 +9117,6 @@ simple_select:
 				{
 					$$ = makeSetOp(SETOP_EXCEPT, $3 == SET_QUANTIFIER_ALL, $1, $4);
 				}
-		;
-
-/*
- * SQL standard WITH clause looks like:
- *
- * WITH [ RECURSIVE ] <query name> [ (<column>,...) ]
- *		AS (query) [ SEARCH or CYCLE clause ]
- *
- * Recognizing WITH_LA here allows a CTE to be named TIME or ORDINALITY.
- */
-with_clause:
-		WITH cte_list
-			{
-				$$ = makeNode(WithClause);
-				$$->ctes = $2;
-				$$->recursive = false;
-				$$->location = @1;
-			}
-		| WITH_LA cte_list
-			{
-				$$ = makeNode(WithClause);
-				$$->ctes = $2;
-				$$->recursive = false;
-				$$->location = @1;
-			}
-		| WITH RECURSIVE cte_list
-			{
-				$$ = makeNode(WithClause);
-				$$->ctes = $3;
-				$$->recursive = true;
-				$$->location = @1;
-			}
-		;
-
-cte_list:
-		common_table_expr						{ $$ = list_make1($1); }
-		| cte_list ',' common_table_expr		{ $$ = lappend($1, $3); }
-		;
-
-common_table_expr:  name opt_name_list AS opt_materialized '(' PreparableStmt ')' opt_search_clause opt_cycle_clause
-			{
-				CommonTableExpr *n = makeNode(CommonTableExpr);
-				n->ctename = $1;
-				n->aliascolnames = $2;
-				n->ctematerialized = $4;
-				n->ctequery = $6;
-				n->search_clause = castNode(CTESearchClause, $8);
-				n->cycle_clause = castNode(CTECycleClause, $9);
-				n->location = @1;
-				$$ = (Node *) n;
-			}
-		;
-
-opt_materialized:
-		MATERIALIZED							{ $$ = CTEMaterializeAlways; }
-		| NOT MATERIALIZED						{ $$ = CTEMaterializeNever; }
-		| /*EMPTY*/								{ $$ = CTEMaterializeDefault; }
-		;
-
-opt_search_clause:
-		SEARCH DEPTH FIRST_P BY columnList SET ColId
-			{
-				CTESearchClause *n = makeNode(CTESearchClause);
-				n->search_col_list = $5;
-				n->search_breadth_first = false;
-				n->search_seq_column = $7;
-				n->location = @1;
-				$$ = (Node *) n;
-			}
-		| SEARCH BREADTH FIRST_P BY columnList SET ColId
-			{
-				CTESearchClause *n = makeNode(CTESearchClause);
-				n->search_col_list = $5;
-				n->search_breadth_first = true;
-				n->search_seq_column = $7;
-				n->location = @1;
-				$$ = (Node *) n;
-			}
-		| /*EMPTY*/
-			{
-				$$ = NULL;
-			}
-		;
-
-opt_cycle_clause:
-		CYCLE columnList SET ColId TO AexprConst DEFAULT AexprConst USING ColId
-			{
-				CTECycleClause *n = makeNode(CTECycleClause);
-				n->cycle_col_list = $2;
-				n->cycle_mark_column = $4;
-				n->cycle_mark_value = $6;
-				n->cycle_mark_default = $8;
-				n->cycle_path_column = $10;
-				n->location = @1;
-				$$ = (Node *) n;
-			}
-		| CYCLE columnList SET ColId USING ColId
-			{
-				CTECycleClause *n = makeNode(CTECycleClause);
-				n->cycle_col_list = $2;
-				n->cycle_mark_column = $4;
-				n->cycle_mark_value = makeBoolAConst(true, -1);
-				n->cycle_mark_default = makeBoolAConst(false, -1);
-				n->cycle_path_column = $6;
-				n->location = @1;
-				$$ = (Node *) n;
-			}
-		| /*EMPTY*/
-			{
-				$$ = NULL;
-			}
-		;
-
-opt_with_clause:
-		with_clause								{ $$ = $1; }
-		| /*EMPTY*/								{ $$ = NULL; }
 		;
 
 		;
@@ -13963,7 +13767,6 @@ static void
 insertSelectOptions(SelectStmt *stmt,
 					List *sortClause, List *lockingClause,
 					SelectLimit *limitClause,
-					WithClause *withClause,
 					core_yyscan_t yyscanner)
 {
 	Assert(IsA(stmt, SelectStmt));
@@ -14027,15 +13830,6 @@ insertSelectOptions(SelectStmt *stmt,
 			}
 		}
 		stmt->limitOption = limitClause->limitOption;
-	}
-	if (withClause)
-	{
-		if (stmt->withClause)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("multiple WITH clauses not allowed"),
-					 parser_errposition(exprLocation((Node *) withClause))));
-		stmt->withClause = withClause;
 	}
 }
 
@@ -14385,66 +14179,6 @@ processCASbits(int cas_bits, int location, const char *constrType,
 	}
 }
 
-/*----------
- * Recursive view transformation
- *
- * Convert
- *
- *     CREATE RECURSIVE VIEW relname (aliases) AS query
- *
- * to
- *
- *     CREATE VIEW relname (aliases) AS
- *         WITH RECURSIVE relname (aliases) AS (query)
- *         SELECT aliases FROM relname
- *
- * Actually, just the WITH ... part, which is then inserted into the original
- * view definition as the query.
- * ----------
- */
-static Node *
-makeRecursiveViewSelect(char *relname, List *aliases, Node *query)
-{
-	SelectStmt *s = makeNode(SelectStmt);
-	WithClause *w = makeNode(WithClause);
-	CommonTableExpr *cte = makeNode(CommonTableExpr);
-	List	   *tl = NIL;
-	ListCell   *lc;
-
-	/* create common table expression */
-	cte->ctename = relname;
-	cte->aliascolnames = aliases;
-	cte->ctematerialized = CTEMaterializeDefault;
-	cte->ctequery = query;
-	cte->location = -1;
-
-	/* create WITH clause and attach CTE */
-	w->recursive = true;
-	w->ctes = list_make1(cte);
-	w->location = -1;
-
-	/* create target list for the new SELECT from the alias list of the
-	 * recursive view specification */
-	foreach (lc, aliases)
-	{
-		ResTarget *rt = makeNode(ResTarget);
-
-		rt->name = NULL;
-		rt->indirection = NIL;
-		rt->val = makeColumnRef(strVal(lfirst(lc)), NIL, -1, 0);
-		rt->location = -1;
-
-		tl = lappend(tl, rt);
-	}
-
-	/* create new SELECT combining WITH clause, target list, and fake FROM
-	 * clause */
-	s->withClause = w;
-	s->targetList = tl;
-	s->fromClause = list_make1(makeRangeVar(NULL, relname, -1));
-
-	return (Node *) s;
-}
 
 /* parser_init()
  * Initialize to parse one query string

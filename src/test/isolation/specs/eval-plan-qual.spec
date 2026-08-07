@@ -86,16 +86,6 @@ step tocdsext1 { UPDATE accounts_ext SET accountid = 'cds' WHERE accountid = 'ch
 # wx2, d2, then d1 checks that delete handles a vanishing row correctly
 step d1		{ DELETE FROM accounts WHERE accountid = 'checking' AND balance < 1500 RETURNING balance; }
 
-# upsert tests are to check writable-CTE cases
-step upsert1	{
-	WITH upsert AS
-	  (UPDATE accounts SET balance = balance + 500
-	   WHERE accountid = 'savings'
-	   RETURNING accountid)
-	INSERT INTO accounts SELECT 'savings', 500
-	  WHERE NOT EXISTS (SELECT 1 FROM upsert);
-}
-
 # Tests for Tid / Tid Range Scan
 step tid1 { UPDATE accounts SET balance = balance + 100 WHERE ctid = '(0,1)' RETURNING accountid, balance; }
 step tidrange1 { UPDATE accounts SET balance = balance + 100 WHERE ctid BETWEEN '(0,1)' AND '(0,1)' RETURNING accountid, balance; }
@@ -208,20 +198,8 @@ step wx2	{ UPDATE accounts SET balance = balance + 450 WHERE accountid = 'checki
 step wy2	{ UPDATE accounts SET balance = balance + 1000 WHERE accountid = 'checking' AND balance < 1000  RETURNING balance; }
 step d2		{ DELETE FROM accounts WHERE accountid = 'checking'; }
 
-step upsert2	{
-	WITH upsert AS
-	  (UPDATE accounts SET balance = balance + 1234
-	   WHERE accountid = 'savings'
-	   RETURNING accountid)
-	INSERT INTO accounts SELECT 'savings', 1234
-	  WHERE NOT EXISTS (SELECT 1 FROM upsert);
-}
 step wx2_ext	{ UPDATE accounts_ext SET balance = balance + 450; }
 step readp2		{ SELECT tableoid::regclass, ctid, * FROM p WHERE b IN (0, 1) AND c = 0 FOR UPDATE; }
-step returningp1 {
-	WITH u AS ( UPDATE p SET b = b WHERE a > 0 RETURNING * )
-	  SELECT * FROM u;
-}
 step writep3b	{ UPDATE p SET b = -b WHERE c = 0; }
 step writep4b	{ UPDATE p SET b = -4 WHERE c = 0; }
 step deletep4	{ DELETE FROM p WHERE c = 0; }
@@ -235,10 +213,6 @@ step readforss	{
 step updateforcip2	{
 	UPDATE table_a SET value = COALESCE(value, (SELECT text 'newValue')) WHERE id = 1;
 }
-step updateforcip3	{
-	WITH d(val) AS (SELECT text 'newValue' FROM generate_series(1,1))
-	UPDATE table_a SET value = COALESCE(value, (SELECT val FROM d)) WHERE id = 1;
-}
 step wrtwcte	{ UPDATE table_a SET value = 'tableAValue2' WHERE id = 1; }
 step wrjt	{ UPDATE jointest SET data = 42 WHERE id = 7; }
 
@@ -250,35 +224,6 @@ step tidsucceed2 { UPDATE accounts SET balance = balance + 200 WHERE ctid = '(0,
 step conditionalpartupdate	{
 	update parttbl set c = -c where b < 10;
 }
-
-step complexpartupdate	{
-	with u as (update parttbl set b = b + 1 returning parttbl.*)
-	update parttbl p set b = u.b + 100 from u where p.a = u.a;
-}
-
-step complexpartupdate_route_err1 {
-	with u as (update another_parttbl set a = 1 returning another_parttbl.*)
-	update parttbl p set a = u.a from u where p.a = u.a and p.c = 1 returning p.*;
-}
-
-step complexpartupdate_route {
-	with u as (update another_parttbl set a = 1 returning another_parttbl.*)
-	update parttbl p set a = p.b from u where p.a = u.a and p.c = 1 returning p.*;
-}
-
-step complexpartupdate_doesnt_route {
-	with u as (update another_parttbl set a = 1 returning another_parttbl.*)
-	update parttbl p set a = 3 - p.b from u where p.a = u.a and p.c = 1 returning p.*;
-}
-
-# Use writable CTEs to create self-updated rows, that then are
-# (updated|deleted). The *fail versions of the tests additionally
-# perform an update, via a function, in a different command, to test
-# behaviour relating to that.
-step updwcte  { WITH doup AS (UPDATE accounts SET balance = balance + 1100 WHERE accountid = 'checking' RETURNING *) UPDATE accounts a SET balance = doup.balance + 100 FROM doup RETURNING *; }
-step updwctefail  { WITH doup AS (UPDATE accounts SET balance = balance + 1100 WHERE accountid = 'checking' RETURNING *, update_checking(999)) UPDATE accounts a SET balance = doup.balance + 100 FROM doup RETURNING *; }
-step delwcte  { WITH doup AS (UPDATE accounts SET balance = balance + 1100 WHERE accountid = 'checking' RETURNING *) DELETE FROM accounts a USING doup RETURNING *; }
-step delwctefail  { WITH doup AS (UPDATE accounts SET balance = balance + 1100 WHERE accountid = 'checking' RETURNING *, update_checking(999)) DELETE FROM accounts a USING doup RETURNING *; }
 
 # Check that nested EPQ works correctly
 step wnested2 {
@@ -309,27 +254,6 @@ step read_ext	{ SELECT * FROM accounts_ext ORDER BY accountid; }
 step read_a		{ SELECT * FROM table_a ORDER BY id; }
 step read_part	{ SELECT * FROM parttbl ORDER BY a, c; }
 
-# this test exercises EvalPlanQual with a CTE, cf bug #14328
-step readwcte	{
-	WITH
-	    cte1 AS (
-	      SELECT id FROM table_b WHERE value = 'tableBValue'
-	    ),
-	    cte2 AS (
-	      SELECT * FROM table_a
-	      WHERE id = (SELECT id FROM cte1)
-	      FOR UPDATE
-	    )
-	SELECT * FROM cte2;
-}
-
-# this test exercises a different CTE misbehavior, cf bug #14870
-step multireadwcte	{
-	WITH updated AS (
-	  UPDATE table_a SET value = 'tableAValue3' WHERE id = 1 RETURNING id
-	)
-	SELECT (SELECT id FROM updated) AS subid, * FROM updated;
-}
 
 teardown	{ COMMIT; }
 
@@ -360,22 +284,8 @@ permutation wx1 wxext1 wxext1 wnested2 c1 c2 read
 permutation wx1 tocds1 wnested2 c1 c2 read
 permutation wx1 tocdsext1 wnested2 c1 c2 read
 
-# test that an update to a self-modified row is ignored when
-# previously updated by the same cid
-permutation wx1 updwcte c1 c2 read
-# test that an update to a self-modified row throws error when
-# previously updated by a different cid
-permutation wx1 updwctefail c1 c2 read
-# test that a delete to a self-modified row is ignored when
-# previously updated by the same cid
-permutation wx1 delwcte c1 c2 read
-# test that a delete to a self-modified row throws error when
-# previously updated by a different cid
-permutation wx1 delwctefail c1 c2 read
 
-permutation upsert1 upsert2 c1 c2 read
 permutation readp1 writep1 readp2 c1 c2
-permutation writep2 returningp1 c1 c2
 permutation writep3a writep3b c1 c2
 permutation writep4a writep4b c1 c2 readp
 permutation writep4a deletep4 c1 c2 readp
@@ -384,11 +294,8 @@ permutation wx2 lockwithvalues c2 c1 read
 permutation wx2_ext partiallock_ext c2 c1 read_ext
 permutation updateforss readforss c1 c2
 permutation updateforcip updateforcip2 c1 c2 read_a
-permutation updateforcip updateforcip3 c1 c2 read_a
-permutation wrtwcte readwcte c1 c2
 permutation wrjt selectjoinforupdate c2 c1
 permutation wrjt selectresultforupdate c2 c1
-permutation wrtwcte multireadwcte c1 c2
 permutation tid1 tid2 c1 c2 read
 permutation tid1 tidsucceed2 c1 c2 read
 permutation tidrange1 tidrange2 c1 c2 read
@@ -396,9 +303,5 @@ permutation tidrange1 tidrange2 c1 c2 read
 permutation tid1 tid2 r1 c2 read
 
 permutation simplepartupdate conditionalpartupdate c1 c2 read_part
-permutation simplepartupdate complexpartupdate c1 c2 read_part
-permutation simplepartupdate_route1to2 complexpartupdate_route_err1 c1 c2 read_part
-permutation simplepartupdate_noroute complexpartupdate_route c1 c2 read_part
-permutation simplepartupdate_noroute complexpartupdate_doesnt_route c1 c2 read_part
 
 permutation sys1 sysupd2 c1 c2

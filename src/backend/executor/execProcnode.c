@@ -79,7 +79,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeCtescan.h"
 #include "executor/nodeCustom.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
@@ -100,7 +99,6 @@
 #include "executor/nodeNamedtuplestorescan.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
-#include "executor/nodeRecursiveunion.h"
 #include "executor/nodeResult.h"
 #include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
@@ -113,7 +111,6 @@
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
 #include "executor/nodeWindowAgg.h"
-#include "executor/nodeWorktablescan.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 
@@ -186,10 +183,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 													   estate, eflags);
 			break;
 
-		case T_RecursiveUnion:
-			result = (PlanState *) ExecInitRecursiveUnion((RecursiveUnion *) node,
-														  estate, eflags);
-			break;
 
 		case T_BitmapAnd:
 			result = (PlanState *) ExecInitBitmapAnd((BitmapAnd *) node,
@@ -259,20 +252,12 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 													  estate, eflags);
 			break;
 
-		case T_CteScan:
-			result = (PlanState *) ExecInitCteScan((CteScan *) node,
-												   estate, eflags);
-			break;
 
 		case T_NamedTuplestoreScan:
 			result = (PlanState *) ExecInitNamedTuplestoreScan((NamedTuplestoreScan *) node,
 															   estate, eflags);
 			break;
 
-		case T_WorkTableScan:
-			result = (PlanState *) ExecInitWorkTableScan((WorkTableScan *) node,
-														 estate, eflags);
-			break;
 
 
 		case T_CustomScan:
@@ -589,9 +574,6 @@ ExecEndNode(PlanState *node)
 			ExecEndMergeAppend((MergeAppendState *) node);
 			break;
 
-		case T_RecursiveUnionState:
-			ExecEndRecursiveUnion((RecursiveUnionState *) node);
-			break;
 
 		case T_BitmapAndState:
 			ExecEndBitmapAnd((BitmapAndState *) node);
@@ -656,17 +638,11 @@ ExecEndNode(PlanState *node)
 			ExecEndValuesScan((ValuesScanState *) node);
 			break;
 
-		case T_CteScanState:
-			ExecEndCteScan((CteScanState *) node);
-			break;
 
 		case T_NamedTuplestoreScanState:
 			ExecEndNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
-		case T_WorkTableScanState:
-			ExecEndWorkTableScan((WorkTableScanState *) node);
-			break;
 
 
 		case T_CustomScanState:

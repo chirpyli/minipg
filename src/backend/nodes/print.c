@@ -280,15 +280,11 @@ print_rt(const List *rtable)
 				printf("%d\t%s\t[rangefunction]",
 					   i, rte->eref->aliasname);
 				break;
-			case RTE_VALUES:
-				printf("%d\t%s\t[values list]",
-					   i, rte->eref->aliasname);
-				break;
-			case RTE_CTE:
-				printf("%d\t%s\t[cte]",
-					   i, rte->eref->aliasname);
-				break;
-			case RTE_NAMEDTUPLESTORE:
+		case RTE_VALUES:
+			printf("%d\t%s\t[values list]",
+				   i, rte->eref->aliasname);
+			break;
+		case RTE_NAMEDTUPLESTORE:
 				printf("%d\t%s\t[tuplestore]",
 					   i, rte->eref->aliasname);
 				break;

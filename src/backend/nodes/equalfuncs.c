@@ -923,12 +923,9 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(hasTargetSRFs);
 	COMPARE_SCALAR_FIELD(hasSubLinks);
 	COMPARE_SCALAR_FIELD(hasDistinctOn);
-	COMPARE_SCALAR_FIELD(hasRecursive);
-	COMPARE_SCALAR_FIELD(hasModifyingCTE);
 	COMPARE_SCALAR_FIELD(hasForUpdate);
 	COMPARE_SCALAR_FIELD(hasRowSecurity);
 	COMPARE_SCALAR_FIELD(isReturn);
-	COMPARE_NODE_FIELD(cteList);
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
@@ -973,7 +970,6 @@ _equalInsertStmt(const InsertStmt *a, const InsertStmt *b)
 	COMPARE_NODE_FIELD(selectStmt);
 	COMPARE_NODE_FIELD(onConflictClause);
 	COMPARE_NODE_FIELD(returningList);
-	COMPARE_NODE_FIELD(withClause);
 	COMPARE_SCALAR_FIELD(override);
 
 	return true;
@@ -986,7 +982,6 @@ _equalDeleteStmt(const DeleteStmt *a, const DeleteStmt *b)
 	COMPARE_NODE_FIELD(usingClause);
 	COMPARE_NODE_FIELD(whereClause);
 	COMPARE_NODE_FIELD(returningList);
-	COMPARE_NODE_FIELD(withClause);
 
 	return true;
 }
@@ -999,7 +994,6 @@ _equalUpdateStmt(const UpdateStmt *a, const UpdateStmt *b)
 	COMPARE_NODE_FIELD(whereClause);
 	COMPARE_NODE_FIELD(fromClause);
 	COMPARE_NODE_FIELD(returningList);
-	COMPARE_NODE_FIELD(withClause);
 
 	return true;
 }
@@ -1021,7 +1015,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(limitCount);
 	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(lockingClause);
-	COMPARE_NODE_FIELD(withClause);
 	COMPARE_SCALAR_FIELD(op);
 	COMPARE_SCALAR_FIELD(all);
 	COMPARE_NODE_FIELD(larg);
@@ -2326,9 +2319,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_NODE_FIELD(functions);
 	COMPARE_SCALAR_FIELD(funcordinality);
 	COMPARE_NODE_FIELD(values_lists);
-	COMPARE_STRING_FIELD(ctename);
-	COMPARE_SCALAR_FIELD(ctelevelsup);
-	COMPARE_SCALAR_FIELD(self_reference);
 	COMPARE_NODE_FIELD(coltypes);
 	COMPARE_NODE_FIELD(coltypmods);
 	COMPARE_NODE_FIELD(colcollations);
@@ -2441,16 +2431,6 @@ _equalRowMarkClause(const RowMarkClause *a, const RowMarkClause *b)
 }
 
 static bool
-_equalWithClause(const WithClause *a, const WithClause *b)
-{
-	COMPARE_NODE_FIELD(ctes);
-	COMPARE_SCALAR_FIELD(recursive);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalInferClause(const InferClause *a, const InferClause *b)
 {
 	COMPARE_NODE_FIELD(indexElems);
@@ -2469,54 +2449,6 @@ _equalOnConflictClause(const OnConflictClause *a, const OnConflictClause *b)
 	COMPARE_NODE_FIELD(targetList);
 	COMPARE_NODE_FIELD(whereClause);
 	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalCTESearchClause(const CTESearchClause *a, const CTESearchClause *b)
-{
-	COMPARE_NODE_FIELD(search_col_list);
-	COMPARE_SCALAR_FIELD(search_breadth_first);
-	COMPARE_STRING_FIELD(search_seq_column);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalCTECycleClause(const CTECycleClause *a, const CTECycleClause *b)
-{
-	COMPARE_NODE_FIELD(cycle_col_list);
-	COMPARE_STRING_FIELD(cycle_mark_column);
-	COMPARE_NODE_FIELD(cycle_mark_value);
-	COMPARE_NODE_FIELD(cycle_mark_default);
-	COMPARE_STRING_FIELD(cycle_path_column);
-	COMPARE_LOCATION_FIELD(location);
-	COMPARE_SCALAR_FIELD(cycle_mark_type);
-	COMPARE_SCALAR_FIELD(cycle_mark_typmod);
-	COMPARE_SCALAR_FIELD(cycle_mark_collation);
-	COMPARE_SCALAR_FIELD(cycle_mark_neop);
-
-	return true;
-}
-
-static bool
-_equalCommonTableExpr(const CommonTableExpr *a, const CommonTableExpr *b)
-{
-	COMPARE_STRING_FIELD(ctename);
-	COMPARE_NODE_FIELD(aliascolnames);
-	COMPARE_SCALAR_FIELD(ctematerialized);
-	COMPARE_NODE_FIELD(ctequery);
-	COMPARE_NODE_FIELD(search_clause);
-	COMPARE_NODE_FIELD(cycle_clause);
-	COMPARE_LOCATION_FIELD(location);
-	COMPARE_SCALAR_FIELD(cterecursive);
-	COMPARE_SCALAR_FIELD(cterefcount);
-	COMPARE_NODE_FIELD(ctecolnames);
-	COMPARE_NODE_FIELD(ctecoltypes);
-	COMPARE_NODE_FIELD(ctecoltypmods);
-	COMPARE_NODE_FIELD(ctecolcollations);
 
 	return true;
 }
@@ -3281,23 +3213,11 @@ equal(const void *a, const void *b)
 		case T_RowMarkClause:
 			retval = _equalRowMarkClause(a, b);
 			break;
-		case T_WithClause:
-			retval = _equalWithClause(a, b);
-			break;
 		case T_InferClause:
 			retval = _equalInferClause(a, b);
 			break;
 		case T_OnConflictClause:
 			retval = _equalOnConflictClause(a, b);
-			break;
-		case T_CTESearchClause:
-			retval = _equalCTESearchClause(a, b);
-			break;
-		case T_CTECycleClause:
-			retval = _equalCTECycleClause(a, b);
-			break;
-		case T_CommonTableExpr:
-			retval = _equalCommonTableExpr(a, b);
 			break;
 		case T_ObjectWithArgs:
 			retval = _equalObjectWithArgs(a, b);

@@ -1896,60 +1896,6 @@ select pg_get_ruledef(oid, true) from pg_rewrite
 (1 row)
 
 -- test extraction of FieldSelect field names (get_name_for_var_field)
-create view tt24v as
-with cte as materialized (select r from (values(1,2),(3,4)) r)
-select (r).column2 as col_a, (rr).column2 as col_b from
-  cte join (select rr from (values(1,7),(3,8)) rr limit 2) ss
-  on (r).column1 = (rr).column1;
-select pg_get_viewdef('tt24v', true);
-                       pg_get_viewdef                       
-------------------------------------------------------------
-  WITH cte AS MATERIALIZED (                               +
-          SELECT r.*::record AS r                          +
-            FROM ( VALUES (1,2), (3,4)) r                  +
-         )                                                 +
-  SELECT (cte.r).column2 AS col_a,                         +
-     (ss.rr).column2 AS col_b                              +
-    FROM cte                                               +
-      JOIN ( SELECT rr.*::record AS rr                     +
-            FROM ( VALUES (1,7), (3,8)) rr                 +
-          LIMIT 2) ss ON (cte.r).column1 = (ss.rr).column1;
-(1 row)
-
-create view tt25v as
-with cte as materialized (select pg_get_keywords() k)
-select (k).word from cte;
-select pg_get_viewdef('tt25v', true);
-             pg_get_viewdef             
-----------------------------------------
-  WITH cte AS MATERIALIZED (           +
-          SELECT pg_get_keywords() AS k+
-         )                             +
-  SELECT (cte.k).word AS word          +
-    FROM cte;
-(1 row)
-
--- also check cases seen only in EXPLAIN
-explain (verbose, costs off)
-select * from tt24v;
-                                        QUERY PLAN                                        
-------------------------------------------------------------------------------------------
- Hash Join
-   Output: (cte.r).column2, ((ROW("*VALUES*".column1, "*VALUES*".column2))).column2
-   Hash Cond: (((ROW("*VALUES*".column1, "*VALUES*".column2))).column1 = (cte.r).column1)
-   CTE cte
-     ->  Values Scan on "*VALUES*_1"
-           Output: ROW("*VALUES*_1".column1, "*VALUES*_1".column2)
-   ->  Limit
-         Output: (ROW("*VALUES*".column1, "*VALUES*".column2))
-         ->  Values Scan on "*VALUES*"
-               Output: ROW("*VALUES*".column1, "*VALUES*".column2)
-   ->  Hash
-         Output: cte.r
-         ->  CTE Scan on cte
-               Output: cte.r
-(14 rows)
-
 explain (verbose, costs off)
 select (r).column2 from (select r from (values(1,2),(3,4)) r limit 1) ss;
                             QUERY PLAN                             
@@ -2062,7 +2008,7 @@ drop cascades to view aliased_view_2
 drop cascades to view aliased_view_3
 drop cascades to view aliased_view_4
 DROP SCHEMA testviewschm2 CASCADE;
-NOTICE:  drop cascades to 77 other objects
+NOTICE:  drop cascades to 75 other objects
 DETAIL:  drop cascades to table t1
 drop cascades to view temporal1
 drop cascades to view temporal2
@@ -2134,8 +2080,6 @@ drop cascades to view tt201v
 drop cascades to view tt21v
 drop cascades to view tt22v
 drop cascades to view tt23v
-drop cascades to view tt24v
-drop cascades to view tt25v
 drop cascades to view tt26v
 drop cascades to table tt26
 drop cascades to table tt27v_tbl

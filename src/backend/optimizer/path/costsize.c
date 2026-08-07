@@ -1539,53 +1539,6 @@ cost_valuesscan(Path *path, PlannerInfo *root,
 }
 
 /*
- * cost_ctescan
- *	  Determines and returns the cost of scanning a CTE RTE.
- *
- * Note: this is used for both self-reference and regular CTEs; the
- * possible cost differences are below the threshold of what we could
- * estimate accurately anyway.  Note that the costs of evaluating the
- * referenced CTE query are added into the final plan as initplan costs,
- * and should NOT be counted here.
- */
-void
-cost_ctescan(Path *path, PlannerInfo *root,
-			 RelOptInfo *baserel, ParamPathInfo *param_info)
-{
-	Cost		startup_cost = 0;
-	Cost		run_cost = 0;
-	QualCost	qpqual_cost;
-	Cost		cpu_per_tuple;
-
-	/* Should only be applied to base relations that are CTEs */
-	Assert(baserel->relid > 0);
-	Assert(baserel->rtekind == RTE_CTE);
-
-	/* Mark the path with the correct row estimate */
-	if (param_info)
-		path->rows = param_info->ppi_rows;
-	else
-		path->rows = baserel->rows;
-
-	/* Charge one CPU tuple cost per row for tuplestore manipulation */
-	cpu_per_tuple = cpu_tuple_cost;
-
-	/* Add scanning CPU costs */
-	get_restriction_qual_cost(root, baserel, param_info, &qpqual_cost);
-
-	startup_cost += qpqual_cost.startup;
-	cpu_per_tuple += cpu_tuple_cost + qpqual_cost.per_tuple;
-	run_cost += cpu_per_tuple * baserel->tuples;
-
-	/* tlist eval costs are paid per output row, not per tuple scanned */
-	startup_cost += path->pathtarget->cost.startup;
-	run_cost += path->pathtarget->cost.per_tuple * path->rows;
-
-	path->startup_cost = startup_cost;
-	path->total_cost = startup_cost + run_cost;
-}
-
-/*
  * cost_namedtuplestorescan
  *	  Determines and returns the cost of scanning a named tuplestore.
  */
@@ -1656,85 +1609,7 @@ cost_resultscan(Path *path, PlannerInfo *root,
 	path->total_cost = startup_cost + run_cost;
 }
 
-/*
- * cost_recursive_union
- *	  Determines and returns the cost of performing a recursive union,
- *	  and also the estimated output size.
- *
- * We are given Paths for the nonrecursive and recursive terms.
- */
 void
-cost_recursive_union(Path *runion, Path *nrterm, Path *rterm)
-{
-	Cost		startup_cost;
-	Cost		total_cost;
-	double		total_rows;
-
-	/* We probably have decent estimates for the non-recursive term */
-	startup_cost = nrterm->startup_cost;
-	total_cost = nrterm->total_cost;
-	total_rows = nrterm->rows;
-
-	/*
-	 * We arbitrarily assume that about 10 recursive iterations will be
-	 * needed, and that we've managed to get a good fix on the cost and output
-	 * size of each one of them.  These are mighty shaky assumptions but it's
-	 * hard to see how to do better.
-	 */
-	total_cost += 10 * rterm->total_cost;
-	total_rows += 10 * rterm->rows;
-
-	/*
-	 * Also charge cpu_tuple_cost per row to account for the costs of
-	 * manipulating the tuplestores.  (We don't worry about possible
-	 * spill-to-disk costs.)
-	 */
-	total_cost += cpu_tuple_cost * total_rows;
-
-	runion->startup_cost = startup_cost;
-	runion->total_cost = total_cost;
-	runion->rows = total_rows;
-	runion->pathtarget->width = Max(nrterm->pathtarget->width,
-									rterm->pathtarget->width);
-}
-
-/*
- * cost_tuplesort
- *	  Determines and returns the cost of sorting a relation using tuplesort,
- *    not including the cost of reading the input data.
- *
- * If the total volume of data to sort is less than sort_mem, we will do
- * an in-memory sort, which requires no I/O and about t*log2(t) tuple
- * comparisons for t tuples.
- *
- * If the total volume exceeds sort_mem, we switch to a tape-style merge
- * algorithm.  There will still be about t*log2(t) tuple comparisons in
- * total, but we will also need to write and read each tuple once per
- * merge pass.  We expect about ceil(logM(r)) merge passes where r is the
- * number of initial runs formed and M is the merge order used by tuplesort.c.
- * Since the average initial run should be about sort_mem, we have
- *		disk traffic = 2 * relsize * ceil(logM(p / sort_mem))
- *		cpu = comparison_cost * t * log2(t)
- *
- * If the sort is bounded (i.e., only the first k result tuples are needed)
- * and k tuples can fit into sort_mem, we use a heap method that keeps only
- * k tuples in the heap; this will require about t*log2(k) tuple comparisons.
- *
- * The disk traffic is assumed to be 3/4ths sequential and 1/4th random
- * accesses (XXX can't we refine that guess?)
- *
- * By default, we charge two operator evals per tuple comparison, which should
- * be in the right ballpark in most cases.  The caller can tweak this by
- * specifying nonzero comparison_cost; typically that's used for any extra
- * work that has to be done to prepare the inputs to the comparison operators.
- *
- * 'tuples' is the number of tuples in the relation
- * 'width' is the average tuple width in bytes
- * 'comparison_cost' is the extra cost per comparison, if any
- * 'sort_mem' is the number of kilobytes of work memory allowed for the sort
- * 'limit_tuples' is the bound on the number of output tuples; -1 if no bound
- */
-static void
 cost_tuplesort(Cost *startup_cost, Cost *run_cost,
 			   double tuples, int width,
 			   Cost comparison_cost, int sort_mem,
@@ -4188,8 +4063,6 @@ cost_rescan(PlannerInfo *root, Path *path,
 				*rescan_total_cost = path->total_cost;
 			}
 			break;
-		case T_CteScan:
-		case T_WorkTableScan:
 			{
 				/*
 				 * These plan types materialize their final result in a
@@ -5592,33 +5465,6 @@ set_values_size_estimates(PlannerInfo *root, RelOptInfo *rel)
  *
  * We set the same fields as set_baserel_size_estimates.
  */
-void
-set_cte_size_estimates(PlannerInfo *root, RelOptInfo *rel, double cte_rows)
-{
-	RangeTblEntry *rte;
-
-	/* Should only be applied to base relations that are CTE references */
-	Assert(rel->relid > 0);
-	rte = planner_rt_fetch(rel->relid, root);
-	Assert(rte->rtekind == RTE_CTE);
-
-	if (rte->self_reference)
-	{
-		/*
-		 * In a self-reference, arbitrarily assume the average worktable size
-		 * is about 10 times the nonrecursive term's size.
-		 */
-		rel->tuples = 10 * cte_rows;
-	}
-	else
-	{
-		/* Otherwise just believe the CTE's rowcount estimate */
-		rel->tuples = cte_rows;
-	}
-
-	/* Now estimate number of output rows, etc */
-	set_baserel_size_estimates(root, rel);
-}
 
 /*
  * set_namedtuplestore_size_estimates

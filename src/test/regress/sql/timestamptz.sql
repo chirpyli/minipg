@@ -389,12 +389,6 @@ set TimeZone to 'America/New_York';
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33);
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33, '+2');
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33, '-2');
-WITH tzs (tz) AS (VALUES
-    ('+1'), ('+1:'), ('+1:0'), ('+100'), ('+1:00'), ('+01:00'),
-    ('+10'), ('+1000'), ('+10:'), ('+10:0'), ('+10:00'), ('+10:00:'),
-    ('+10:00:1'), ('+10:00:01'),
-    ('+10:00:10'))
-     SELECT make_timestamptz(2010, 2, 27, 3, 45, 00, tz), tz FROM tzs;
 
 -- these should fail
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33, '2');

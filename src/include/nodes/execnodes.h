@@ -1325,32 +1325,6 @@ typedef struct MergeAppendState
 } MergeAppendState;
 
 /* ----------------
- *	 RecursiveUnionState information
- *
- *		RecursiveUnionState is used for performing a recursive union.
- *
- *		recursing			T when we're done scanning the non-recursive term
- *		intermediate_empty	T if intermediate_table is currently empty
- *		working_table		working table (to be scanned by recursive term)
- *		intermediate_table	current recursive output (next generation of WT)
- * ----------------
- */
-typedef struct RecursiveUnionState
-{
-	PlanState	ps;				/* its first field is NodeTag */
-	bool		recursing;
-	bool		intermediate_empty;
-	Tuplestorestate *working_table;
-	Tuplestorestate *intermediate_table;
-	/* Remaining fields are unused in UNION ALL case */
-	Oid		   *eqfuncoids;		/* per-grouping-field equality fns */
-	FmgrInfo   *hashfunctions;	/* per-grouping-field hash fns */
-	MemoryContext tempContext;	/* short-term context for comparisons */
-	TupleHashTable hashtable;	/* hash table for tuples already seen */
-	MemoryContext tableContext; /* memory context containing hash table */
-} RecursiveUnionState;
-
-/* ----------------
  *	 BitmapAndState information
  * ----------------
  */
@@ -1790,29 +1764,6 @@ typedef struct ValuesScanState
 } ValuesScanState;
 
 /* ----------------
- *	 CteScanState information
- *
- *		CteScan nodes are used to scan a CommonTableExpr query.
- *
- * Multiple CteScan nodes can read out from the same CTE query.  We use
- * a tuplestore to hold rows that have been read from the CTE query but
- * not yet consumed by all readers.
- * ----------------
- */
-typedef struct CteScanState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	int			eflags;			/* capability flags to pass to tuplestore */
-	int			readptr;		/* index of my tuplestore read pointer */
-	PlanState  *cteplanstate;	/* PlanState for the CTE query itself */
-	/* Link to the "leader" CteScanState (possibly this same node) */
-	struct CteScanState *leader;
-	/* The remaining fields are only valid in the "leader" CteScanState */
-	Tuplestorestate *cte_table; /* rows already read from the CTE query */
-	bool		eof_cte;		/* reached end of CTE query? */
-} CteScanState;
-
-/* ----------------
  *	 NamedTuplestoreScanState information
  *
  *		NamedTuplestoreScan nodes are used to scan a Tuplestore created and
@@ -1829,20 +1780,6 @@ typedef struct NamedTuplestoreScanState
 	TupleDesc	tupdesc;		/* format of the tuples in the tuplestore */
 	Tuplestorestate *relation;	/* the rows */
 } NamedTuplestoreScanState;
-
-/* ----------------
- *	 WorkTableScanState information
- *
- *		WorkTableScan nodes are used to scan the work table created by
- *		a RecursiveUnion node.  We locate the RecursiveUnion node
- *		during executor startup.
- * ----------------
- */
-typedef struct WorkTableScanState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	RecursiveUnionState *rustate;
-} WorkTableScanState;
 
 /* ----------------
  *	 CustomScanState information

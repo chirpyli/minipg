@@ -872,9 +872,7 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_SubqueryScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
-		case T_CteScan:
 		case T_NamedTuplestoreScan:
-		case T_WorkTableScan:
 			*rels_used = bms_add_member(*rels_used,
 										((Scan *) plan)->scanrelid);
 			break;
@@ -983,9 +981,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_MergeAppend:
 			pname = sname = "Merge Append";
 			break;
-		case T_RecursiveUnion:
-			pname = sname = "Recursive Union";
-			break;
 		case T_BitmapAnd:
 			pname = sname = "BitmapAnd";
 			break;
@@ -1042,14 +1037,8 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_ValuesScan:
 			pname = sname = "Values Scan";
 			break;
-		case T_CteScan:
-			pname = sname = "CTE Scan";
-			break;
 		case T_NamedTuplestoreScan:
 			pname = sname = "Named Tuplestore Scan";
-			break;
-		case T_WorkTableScan:
-			pname = sname = "WorkTable Scan";
 			break;
 		case T_CustomScan:
 			sname = "Custom Scan";
@@ -1209,8 +1198,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_SubqueryScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
-		case T_CteScan:
-		case T_WorkTableScan:
 			ExplainScanTarget((Scan *) plan, es);
 			break;
 		case T_CustomScan:
@@ -1543,9 +1530,7 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			/* FALLTHROUGH */
 		case T_SeqScan:
 		case T_ValuesScan:
-		case T_CteScan:
 		case T_NamedTuplestoreScan:
-		case T_WorkTableScan:
 		case T_SubqueryScan:
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
 			if (plan->qual)
@@ -1925,10 +1910,8 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 	/* The tlist of an Append isn't real helpful, so suppress it */
 	if (IsA(plan, Append))
 		return;
-	/* Likewise for MergeAppend and RecursiveUnion */
+	/* Likewise for MergeAppend */
 	if (IsA(plan, MergeAppend))
-		return;
-	if (IsA(plan, RecursiveUnion))
 		return;
 
 	/*
@@ -3483,24 +3466,10 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 		case T_ValuesScan:
 			Assert(rte->rtekind == RTE_VALUES);
 			break;
-		case T_CteScan:
-			/* Assert it's on a non-self-reference CTE */
-			Assert(rte->rtekind == RTE_CTE);
-			Assert(!rte->self_reference);
-			objectname = rte->ctename;
-			objecttag = "CTE Name";
-			break;
 		case T_NamedTuplestoreScan:
 			Assert(rte->rtekind == RTE_NAMEDTUPLESTORE);
 			objectname = rte->enrname;
 			objecttag = "Tuplestore Name";
-			break;
-		case T_WorkTableScan:
-			/* Assert it's on a self-reference CTE */
-			Assert(rte->rtekind == RTE_CTE);
-			Assert(rte->self_reference);
-			objectname = rte->ctename;
-			objecttag = "CTE Name";
 			break;
 		default:
 			break;

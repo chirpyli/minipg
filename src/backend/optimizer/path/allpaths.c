@@ -106,14 +106,10 @@ static void set_function_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								  RangeTblEntry *rte);
 static void set_values_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								RangeTblEntry *rte);
-static void set_cte_pathlist(PlannerInfo *root, RelOptInfo *rel,
-							 RangeTblEntry *rte);
 static void set_namedtuplestore_pathlist(PlannerInfo *root, RelOptInfo *rel,
 										 RangeTblEntry *rte);
 static void set_result_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								RangeTblEntry *rte);
-static void set_worktable_pathlist(PlannerInfo *root, RelOptInfo *rel,
-								   RangeTblEntry *rte);
 static RelOptInfo *make_rel_from_joinlist(PlannerInfo *root, List *joinlist);
 static bool subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 									  pushdown_safety_info *safetyInfo);
@@ -413,18 +409,6 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 			case RTE_VALUES:
 				set_values_size_estimates(root, rel);
 				break;
-			case RTE_CTE:
-
-				/*
-				 * CTEs don't support making a choice between parameterized
-				 * and unparameterized paths, so just go ahead and build their
-				 * paths immediately.
-				 */
-				if (rte->self_reference)
-					set_worktable_pathlist(root, rel, rte);
-				else
-					set_cte_pathlist(root, rel, rte);
-				break;
 			case RTE_NAMEDTUPLESTORE:
 				/* Might as well just build the path immediately */
 				set_namedtuplestore_pathlist(root, rel, rte);
@@ -488,9 +472,6 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			case RTE_VALUES:
 				/* Values list */
 				set_values_pathlist(root, rel, rte);
-				break;
-			case RTE_CTE:
-				/* CTE reference --- fully handled during set_rel_size */
 				break;
 			case RTE_NAMEDTUPLESTORE:
 				/* tuplestore reference --- fully handled during set_rel_size */
@@ -663,17 +644,6 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 			if (!is_parallel_safe(root, (Node *) rte->values_lists))
 				return;
 			break;
-
-		case RTE_CTE:
-
-			/*
-			 * CTE tuplestores aren't shared among parallel workers, so we
-			 * force all CTE scans to happen in the leader.  Also, populating
-			 * the CTE would require executing a subplan that's not available
-			 * in the worker, might be parallel-restricted, and must get
-			 * executed only once.
-			 */
-			return;
 
 		case RTE_NAMEDTUPLESTORE:
 
@@ -2310,71 +2280,6 @@ set_values_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 
 
 /*
- * set_cte_pathlist
- *		Build the (single) access path for a non-self-reference CTE RTE
- *
- * There's no need for a separate set_cte_size phase, since we don't
- * support join-qual-parameterized paths for CTEs.
- */
-static void
-set_cte_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	Plan	   *cteplan;
-	PlannerInfo *cteroot;
-	Index		levelsup;
-	int			ndx;
-	ListCell   *lc;
-	int			plan_id;
-	Relids		required_outer;
-
-	/*
-	 * Find the referenced CTE, and locate the plan previously made for it.
-	 */
-	levelsup = rte->ctelevelsup;
-	cteroot = root;
-	while (levelsup-- > 0)
-	{
-		cteroot = cteroot->parent_root;
-		if (!cteroot)			/* shouldn't happen */
-			elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
-	}
-
-	/*
-	 * Note: cte_plan_ids can be shorter than cteList, if we are still working
-	 * on planning the CTEs (ie, this is a side-reference from another CTE).
-	 * So we mustn't use forboth here.
-	 */
-	ndx = 0;
-	foreach(lc, cteroot->parse->cteList)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
-
-		if (strcmp(cte->ctename, rte->ctename) == 0)
-			break;
-		ndx++;
-	}
-	if (lc == NULL)				/* shouldn't happen */
-		elog(ERROR, "could not find CTE \"%s\"", rte->ctename);
-	if (ndx >= list_length(cteroot->cte_plan_ids))
-		elog(ERROR, "could not find plan for CTE \"%s\"", rte->ctename);
-	plan_id = list_nth_int(cteroot->cte_plan_ids, ndx);
-	if (plan_id <= 0)
-		elog(ERROR, "no plan was made for CTE \"%s\"", rte->ctename);
-	cteplan = (Plan *) list_nth(root->glob->subplans, plan_id - 1);
-
-	/* Mark rel with estimated output rows, width, etc */
-	set_cte_size_estimates(root, rel, cteplan->plan_rows);
-
-	/*
-	 * We don't support pushing join clauses into the quals of a CTE scan, but
-	 * it could still have required parameterization due to LATERAL refs in
-	 * its tlist.
-	 */
-	required_outer = rel->lateral_relids;
-
-	/* Generate appropriate path */
-	add_path(rel, create_ctescan_path(root, rel, required_outer));
-}
 
 /*
  * set_namedtuplestore_pathlist
@@ -2437,54 +2342,6 @@ set_result_pathlist(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
- * set_worktable_pathlist
- *		Build the (single) access path for a self-reference CTE RTE
- *
- * There's no need for a separate set_worktable_size phase, since we don't
- * support join-qual-parameterized paths for CTEs.
- */
-static void
-set_worktable_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	Path	   *ctepath;
-	PlannerInfo *cteroot;
-	Index		levelsup;
-	Relids		required_outer;
-
-	/*
-	 * We need to find the non-recursive term's path, which is in the plan
-	 * level that's processing the recursive UNION, which is one level *below*
-	 * where the CTE comes from.
-	 */
-	levelsup = rte->ctelevelsup;
-	if (levelsup == 0)			/* shouldn't happen */
-		elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
-	levelsup--;
-	cteroot = root;
-	while (levelsup-- > 0)
-	{
-		cteroot = cteroot->parent_root;
-		if (!cteroot)			/* shouldn't happen */
-			elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
-	}
-	ctepath = cteroot->non_recursive_path;
-	if (!ctepath)				/* shouldn't happen */
-		elog(ERROR, "could not find path for CTE \"%s\"", rte->ctename);
-
-	/* Mark rel with estimated output rows, width, etc */
-	set_cte_size_estimates(root, rel, ctepath->rows);
-
-	/*
-	 * We don't support pushing join clauses into the quals of a worktable
-	 * scan, but it could still have required parameterization due to LATERAL
-	 * refs in its tlist.  (I'm not sure this is actually possible given the
-	 * restrictions on recursive references, but it's easy enough to support.)
-	 */
-	required_outer = rel->lateral_relids;
-
-	/* Generate appropriate path */
-	add_path(rel, create_worktablescan_path(root, rel, required_outer));
-}
 
 /*
  * generate_gather_paths
@@ -3870,17 +3727,11 @@ print_path(PlannerInfo *root, Path *path, int indent)
 				case T_ValuesScan:
 					ptype = "ValuesScan";
 					break;
-				case T_CteScan:
-					ptype = "CteScan";
-					break;
 				case T_NamedTuplestoreScan:
 					ptype = "NamedTuplestoreScan";
 					break;
 				case T_Result:
 					ptype = "Result";
-					break;
-				case T_WorkTableScan:
-					ptype = "WorkTableScan";
 					break;
 				default:
 					ptype = "???Path";
@@ -3994,9 +3845,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 		case T_SetOpPath:
 			ptype = "SetOp";
 			subpath = ((SetOpPath *) path)->subpath;
-			break;
-		case T_RecursiveUnionPath:
-			ptype = "RecursiveUnion";
 			break;
 		case T_LockRowsPath:
 			ptype = "LockRows";

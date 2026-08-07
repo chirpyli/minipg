@@ -281,27 +281,6 @@ typedef struct MergeAppend
 } MergeAppend;
 
 /* ----------------
- *	RecursiveUnion node -
- *		Generate a recursive union of two subplans.
- *
- * The "outer" subplan is always the non-recursive term, and the "inner"
- * subplan is the recursive term.
- * ----------------
- */
-typedef struct RecursiveUnion
-{
-	Plan		plan;
-	int			wtParam;		/* ID of Param representing work table */
-	/* Remaining fields are zero/null in UNION ALL case */
-	int			numCols;		/* number of columns to check for
-								 * duplicate-ness */
-	AttrNumber *dupColIdx;		/* their indexes in the target list */
-	Oid		   *dupOperators;	/* equality operators to compare with */
-	Oid		   *dupCollations;
-	long		numGroups;		/* estimated number of groups in input */
-} RecursiveUnion;
-
-/* ----------------
  *	 BitmapAnd node -
  *		Generate the intersection of the results of sub-plans.
  *
@@ -561,17 +540,6 @@ typedef struct ValuesScan
 } ValuesScan;
 
 /* ----------------
- *		CteScan node
- * ----------------
- */
-typedef struct CteScan
-{
-	Scan		scan;
-	int			ctePlanId;		/* ID of init SubPlan for CTE */
-	int			cteParam;		/* ID of Param representing CTE output */
-} CteScan;
-
-/* ----------------
  *		NamedTuplestoreScan node
  * ----------------
  */
@@ -580,16 +548,6 @@ typedef struct NamedTuplestoreScan
 	Scan		scan;
 	char	   *enrname;		/* Name given to Ephemeral Named Relation */
 } NamedTuplestoreScan;
-
-/* ----------------
- *		WorkTableScan node
- * ----------------
- */
-typedef struct WorkTableScan
-{
-	Scan		scan;
-	int			wtParam;		/* ID of Param representing work table */
-} WorkTableScan;
 
 /* ----------------
  *	   CustomScan node

@@ -640,21 +640,19 @@ SELECT t1.id1, t1.result, t2.expected
 -- * combinations will throw errors.
 -- ******************************
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan'))
 SELECT x1, x2,
   x1 + x2 AS sum,
   x1 - x2 AS diff,
   x1 * x2 AS prod
-FROM v AS v1(x1), v AS v2(x2);
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v2(x2);
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan'))
 SELECT x1, x2,
   x1 / x2 AS quot,
   x1 % x2 AS mod,
   div(x1, x2) AS div
-FROM v AS v1(x1), v AS v2(x2) WHERE x2 != 0;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('-1'),('4.2'),('inf'),('-inf'),('nan')) AS v2(x2) WHERE x2 != 0;
 
 SELECT 'inf'::numeric / '0';
 SELECT '-inf'::numeric / '0';
@@ -669,49 +667,38 @@ SELECT div('-inf'::numeric, '0');
 SELECT div('nan'::numeric, '0');
 SELECT div('0'::numeric, '0');
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan'))
 SELECT x, -x as minusx, abs(x), floor(x), ceil(x), sign(x), numeric_inc(x) as inc
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan')) AS v(x);
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan'))
 SELECT x, round(x), round(x,1) as round1, trunc(x), trunc(x,1) as trunc1
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan')) AS v(x);
 
 -- the large values fall into the numeric abbreviation code's maximal classes
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('1e340'),('-1e340'),
-         ('inf'),('-inf'),('nan'),
-         ('inf'),('-inf'),('nan'))
 SELECT substring(x::text, 1, 32)
-FROM v ORDER BY x;
+FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('1e340'),('-1e340'),
+         ('inf'),('-inf'),('nan'),
+         ('inf'),('-inf'),('nan')) AS v(x) ORDER BY x;
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('4.2'),('inf'),('nan'))
 SELECT x, sqrt(x)
-FROM v;
+FROM (VALUES('0'::numeric),('1'),('4.2'),('inf'),('nan')) AS v(x);
 
 SELECT sqrt('-1'::numeric);
 SELECT sqrt('-inf'::numeric);
 
-WITH v(x) AS
-  (VALUES('1'::numeric),('4.2'),('inf'),('nan'))
 SELECT x,
   log(x),
   log10(x),
   ln(x)
-FROM v;
+FROM (VALUES('1'::numeric),('4.2'),('inf'),('nan')) AS v(x);
 
 SELECT ln('0'::numeric);
 SELECT ln('-1'::numeric);
 SELECT ln('-inf'::numeric);
 
-WITH v(x) AS
-  (VALUES('2'::numeric),('4.2'),('inf'),('nan'))
 SELECT x1, x2,
   log(x1, x2)
-FROM v AS v1(x1), v AS v2(x2);
+FROM (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v1(x1),
+     (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v2(x2);
 
 SELECT log('0'::numeric, '10');
 SELECT log('10'::numeric, '0');
@@ -721,11 +708,10 @@ SELECT log('inf'::numeric, '0');
 SELECT log('inf'::numeric, '-inf');
 SELECT log('-inf'::numeric, 'inf');
 
-WITH v(x) AS
-  (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan'))
 SELECT x1, x2,
   power(x1, x2)
-FROM v AS v1(x1), v AS v2(x2) WHERE x1 != 0 OR x2 >= 0;
+FROM (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan')) AS v1(x1),
+     (VALUES('0'::numeric),('1'),('2'),('4.2'),('inf'),('nan')) AS v2(x2) WHERE x1 != 0 OR x2 >= 0;
 
 SELECT power('0'::numeric, '-1');
 SELECT power('0'::numeric, '-inf');
@@ -970,36 +956,28 @@ SELECT to_char(val, '999999SG9999999999')			FROM num_data;
 SELECT to_char(val, 'FM9999999999999999.999999999999999')	FROM num_data;
 SELECT to_char(val, '9.999EEEE')				FROM num_data;
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, '9.999EEEE') as numeric,
   to_char(val::float8, '9.999EEEE') as float8,
   to_char(val::float4, '9.999EEEE') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
 
-WITH v(exp) AS
-  (VALUES(-16379),(-16378),(-1234),(-789),(-45),(-5),(-4),(-3),(-2),(-1),(0),
-         (1),(2),(3),(4),(5),(38),(275),(2345),(45678),(131070),(131071))
 SELECT exp,
   to_char(('1.2345e'||exp)::numeric, '9.999EEEE') as numeric
-FROM v;
+FROM (VALUES(-16379),(-16378),(-1234),(-789),(-45),(-5),(-4),(-3),(-2),(-1),(0),
+         (1),(2),(3),(4),(5),(38),(275),(2345),(45678),(131070),(131071)) AS v(exp);
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, 'MI9999999999.99') as numeric,
   to_char(val::float8, 'MI9999999999.99') as float8,
   to_char(val::float4, 'MI9999999999.99') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
 
-WITH v(val) AS
-  (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan'))
 SELECT val,
   to_char(val, 'MI99.99') as numeric,
   to_char(val::float8, 'MI99.99') as float8,
   to_char(val::float4, 'MI99.99') as float4
-FROM v;
+FROM (VALUES('0'::numeric),('-4.2'),('4.2e9'),('1.2e-5'),('inf'),('-inf'),('nan')) AS v(val);
 
 SELECT to_char('100'::numeric, 'FM999.9');
 SELECT to_char('100'::numeric, 'FM999.');

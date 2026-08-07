@@ -134,7 +134,6 @@ typedef struct
  *
  * subplans is a list of Plan trees for SubPlans and CTEs (it's only used
  * in the PlannedStmt case).
- * ctes is a list of CommonTableExpr nodes (only used in the Query case).
  * appendrels, if not null (it's only used in the PlannedStmt case), is an
  * array of AppendRelInfo nodes, indexed by child relid.  We use that to map
  * child-table Vars to their inheritance parents.
@@ -160,7 +159,6 @@ typedef struct
 	List	   *rtable_names;	/* Parallel list of names for RTEs */
 	List	   *rtable_columns; /* Parallel list of deparse_columns structs */
 	List	   *subplans;		/* List of Plan trees for SubPlans */
-	List	   *ctes;			/* List of CommonTableExpr nodes */
 	AppendRelInfo **appendrels; /* Array of AppendRelInfo nodes, or NULL */
 	/* Workspace for column alias assignment: */
 	bool		unique_using;	/* Are we making USING names globally unique */
@@ -375,8 +373,6 @@ static void identify_join_columns(JoinExpr *j, RangeTblEntry *jrte,
 								  deparse_columns *colinfo);
 static char *get_rtable_name(int rtindex, deparse_context *context);
 static void set_deparse_plan(deparse_namespace *dpns, Plan *plan);
-static Plan *find_recursive_union(deparse_namespace *dpns,
-								  WorkTableScan *wtscan);
 static void push_child_plan(deparse_namespace *dpns, Plan *plan,
 							deparse_namespace *save_dpns);
 static void pop_child_plan(deparse_namespace *dpns,
@@ -393,7 +389,6 @@ static void get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 						  TupleDesc resultDesc, bool colNamesVisible,
 						  int prettyFlags, int wrapColumn, int startIndent);
 static void get_values_def(List *values_lists, deparse_context *context);
-static void get_with_clause(Query *query, deparse_context *context);
 static void get_select_query_def(Query *query, deparse_context *context,
 								 TupleDesc resultDesc, bool colNamesVisible);
 static void get_insert_query_def(Query *query, deparse_context *context,
@@ -1048,7 +1043,6 @@ pg_get_triggerdef_worker(Oid trigid, bool pretty)
 		memset(&dpns, 0, sizeof(dpns));
 		dpns.rtable = list_make2(oldrte, newrte);
 		dpns.subplans = NIL;
-		dpns.ctes = NIL;
 		dpns.appendrels = NULL;
 		set_rtable_names(&dpns, NIL, NULL);
 		set_simple_column_names(&dpns);
@@ -3491,7 +3485,6 @@ deparse_context_for(const char *aliasname, Oid relid)
 	/* Build one-element rtable */
 	dpns->rtable = list_make1(rte);
 	dpns->subplans = NIL;
-	dpns->ctes = NIL;
 	dpns->appendrels = NULL;
 	set_rtable_names(dpns, NIL, NULL);
 	set_simple_column_names(dpns);
@@ -3524,7 +3517,6 @@ deparse_context_for_plan_tree(PlannedStmt *pstmt, List *rtable_names)
 	dpns->rtable = pstmt->rtable;
 	dpns->rtable_names = rtable_names;
 	dpns->subplans = pstmt->subplans;
-	dpns->ctes = NIL;
 	if (pstmt->appendRelations)
 	{
 		/* Set up the array, indexed by child relid */
@@ -3613,7 +3605,6 @@ select_rtable_names_for_explain(List *rtable, Bitmapset *rels_used)
 	memset(&dpns, 0, sizeof(dpns));
 	dpns.rtable = rtable;
 	dpns.subplans = NIL;
-	dpns.ctes = NIL;
 	dpns.appendrels = NULL;
 	set_rtable_names(&dpns, NIL, rels_used);
 	/* We needn't bother computing column aliases yet */
@@ -3790,7 +3781,6 @@ set_deparse_for_query(deparse_namespace *dpns, Query *query,
 	memset(dpns, 0, sizeof(deparse_namespace));
 	dpns->rtable = query->rtable;
 	dpns->subplans = NIL;
-	dpns->ctes = query->cteList;
 	dpns->appendrels = NULL;
 
 	/* Assign a unique relation alias to each RTE */
@@ -4800,9 +4790,6 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	/*
 	 * For a SubqueryScan, pretend the subplan is INNER referent.  (We don't
 	 * use OUTER because that could someday conflict with the normal meaning.)
-	 * Likewise, for a CteScan, pretend the subquery's plan is INNER referent.
-	 * For a WorkTableScan, locate the parent RecursiveUnion plan node and use
-	 * that as INNER referent.
 	 *
 	 * For ON CONFLICT .. UPDATE we just need the inner tlist to point to the
 	 * excluded expression's tlist. (Similar to the SubqueryScan we don't want
@@ -4811,12 +4798,6 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	 */
 	if (IsA(plan, SubqueryScan))
 		dpns->inner_plan = ((SubqueryScan *) plan)->subplan;
-	else if (IsA(plan, CteScan))
-		dpns->inner_plan = list_nth(dpns->subplans,
-									((CteScan *) plan)->ctePlanId - 1);
-	else if (IsA(plan, WorkTableScan))
-		dpns->inner_plan = find_recursive_union(dpns,
-												(WorkTableScan *) plan);
 	else if (IsA(plan, ModifyTable))
 		dpns->inner_plan = plan;
 	else
@@ -4836,29 +4817,6 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 		dpns->index_tlist = ((CustomScan *) plan)->custom_scan_tlist;
 	else
 		dpns->index_tlist = NIL;
-}
-
-/*
- * Locate the ancestor plan node that is the RecursiveUnion generating
- * the WorkTableScan's work table.  We can match on wtParam, since that
- * should be unique within the plan tree.
- */
-static Plan *
-find_recursive_union(deparse_namespace *dpns, WorkTableScan *wtscan)
-{
-	ListCell   *lc;
-
-	foreach(lc, dpns->ancestors)
-	{
-		Plan	   *ancestor = (Plan *) lfirst(lc);
-
-		if (IsA(ancestor, RecursiveUnion) &&
-			((RecursiveUnion *) ancestor)->wtParam == wtscan->wtParam)
-			return ancestor;
-	}
-	elog(ERROR, "could not find RecursiveUnion for WorkTableScan with wtParam %d",
-		 wtscan->wtParam);
-	return NULL;
 }
 
 /*
@@ -5345,145 +5303,6 @@ get_values_def(List *values_lists, deparse_context *context)
 }
 
 /* ----------
- * get_with_clause			- Parse back a WITH clause
- * ----------
- */
-static void
-get_with_clause(Query *query, deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	const char *sep;
-	ListCell   *l;
-
-	if (query->cteList == NIL)
-		return;
-
-	if (PRETTY_INDENT(context))
-	{
-		context->indentLevel += PRETTYINDENT_STD;
-		appendStringInfoChar(buf, ' ');
-	}
-
-	if (query->hasRecursive)
-		sep = "WITH RECURSIVE ";
-	else
-		sep = "WITH ";
-	foreach(l, query->cteList)
-	{
-		CommonTableExpr *cte = (CommonTableExpr *) lfirst(l);
-
-		appendStringInfoString(buf, sep);
-		appendStringInfoString(buf, quote_identifier(cte->ctename));
-		if (cte->aliascolnames)
-		{
-			bool		first = true;
-			ListCell   *col;
-
-			appendStringInfoChar(buf, '(');
-			foreach(col, cte->aliascolnames)
-			{
-				if (first)
-					first = false;
-				else
-					appendStringInfoString(buf, ", ");
-				appendStringInfoString(buf,
-									   quote_identifier(strVal(lfirst(col))));
-			}
-			appendStringInfoChar(buf, ')');
-		}
-		appendStringInfoString(buf, " AS ");
-		switch (cte->ctematerialized)
-		{
-			case CTEMaterializeDefault:
-				break;
-			case CTEMaterializeAlways:
-				appendStringInfoString(buf, "MATERIALIZED ");
-				break;
-			case CTEMaterializeNever:
-				appendStringInfoString(buf, "NOT MATERIALIZED ");
-				break;
-		}
-		appendStringInfoChar(buf, '(');
-		if (PRETTY_INDENT(context))
-			appendContextKeyword(context, "", 0, 0, 0);
-		get_query_def((Query *) cte->ctequery, buf, context->namespaces, NULL,
-					  true,
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
-		if (PRETTY_INDENT(context))
-			appendContextKeyword(context, "", 0, 0, 0);
-		appendStringInfoChar(buf, ')');
-
-		if (cte->search_clause)
-		{
-			bool		first = true;
-			ListCell   *lc;
-
-			appendStringInfo(buf, " SEARCH %s FIRST BY ",
-							 cte->search_clause->search_breadth_first ? "BREADTH" : "DEPTH");
-
-			foreach(lc, cte->search_clause->search_col_list)
-			{
-				if (first)
-					first = false;
-				else
-					appendStringInfoString(buf, ", ");
-				appendStringInfoString(buf,
-									   quote_identifier(strVal(lfirst(lc))));
-			}
-
-			appendStringInfo(buf, " SET %s", quote_identifier(cte->search_clause->search_seq_column));
-		}
-
-		if (cte->cycle_clause)
-		{
-			bool		first = true;
-			ListCell   *lc;
-
-			appendStringInfoString(buf, " CYCLE ");
-
-			foreach(lc, cte->cycle_clause->cycle_col_list)
-			{
-				if (first)
-					first = false;
-				else
-					appendStringInfoString(buf, ", ");
-				appendStringInfoString(buf,
-									   quote_identifier(strVal(lfirst(lc))));
-			}
-
-			appendStringInfo(buf, " SET %s", quote_identifier(cte->cycle_clause->cycle_mark_column));
-
-			{
-				Const	   *cmv = castNode(Const, cte->cycle_clause->cycle_mark_value);
-				Const	   *cmd = castNode(Const, cte->cycle_clause->cycle_mark_default);
-
-				if (!(cmv->consttype == BOOLOID && !cmv->constisnull && DatumGetBool(cmv->constvalue) == true &&
-					  cmd->consttype == BOOLOID && !cmd->constisnull && DatumGetBool(cmd->constvalue) == false))
-				{
-					appendStringInfoString(buf, " TO ");
-					get_rule_expr(cte->cycle_clause->cycle_mark_value, context, false);
-					appendStringInfoString(buf, " DEFAULT ");
-					get_rule_expr(cte->cycle_clause->cycle_mark_default, context, false);
-				}
-			}
-
-			appendStringInfo(buf, " USING %s", quote_identifier(cte->cycle_clause->cycle_path_column));
-		}
-
-		sep = ", ";
-	}
-
-	if (PRETTY_INDENT(context))
-	{
-		context->indentLevel -= PRETTYINDENT_STD;
-		appendContextKeyword(context, "", 0, 0, 0);
-	}
-	else
-		appendStringInfoChar(buf, ' ');
-}
-
-/* ----------
  * get_select_query_def			- Parse back a SELECT parsetree
  * ----------
  */
@@ -5496,9 +5315,6 @@ get_select_query_def(Query *query, deparse_context *context,
 	List	   *save_windowtlist;
 	bool		force_colno;
 	ListCell   *l;
-
-	/* Insert the WITH clause if given */
-	get_with_clause(query, context);
 
 	/* Set up context for possible window functions */
 	save_windowclause = context->windowClause;
@@ -5993,8 +5809,7 @@ get_setop_query(Node *setOp, Query *query, deparse_context *context,
 		 * (That shouldn't happen unless one of the other clauses is also
 		 * present, see transformSetOperationTree; but let's be safe.)
 		 */
-		need_paren = (subquery->cteList ||
-					  subquery->sortClause ||
+		need_paren = (subquery->sortClause ||
 					  subquery->rowMarks ||
 					  subquery->limitOffset ||
 					  subquery->limitCount ||
@@ -6435,9 +6250,6 @@ get_insert_query_def(Query *query, deparse_context *context,
 	ListCell   *l;
 	List	   *strippedexprs;
 
-	/* Insert the WITH clause if given */
-	get_with_clause(query, context);
-
 	/*
 	 * If it's an INSERT ... SELECT or multi-row VALUES, there will be a
 	 * single RTE for the SELECT or VALUES.  Plain VALUES has neither.
@@ -6647,9 +6459,6 @@ get_update_query_def(Query *query, deparse_context *context,
 	StringInfo	buf = context->buf;
 	RangeTblEntry *rte;
 
-	/* Insert the WITH clause if given */
-	get_with_clause(query, context);
-
 	/*
 	 * Start the query with UPDATE relname SET
 	 */
@@ -6856,9 +6665,6 @@ get_delete_query_def(Query *query, deparse_context *context,
 	StringInfo	buf = context->buf;
 	RangeTblEntry *rte;
 
-	/* Insert the WITH clause if given */
-	get_with_clause(query, context);
-
 	/*
 	 * Start the query with DELETE FROM relname
 	 */
@@ -7040,15 +6846,15 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 	/*
 	 * The planner will sometimes emit Vars referencing resjunk elements of a
 	 * subquery's target list (this is currently only possible if it chooses
-	 * to generate a "physical tlist" for a SubqueryScan or CteScan node).
+	 * to generate a "physical tlist" for a SubqueryScan node).
 	 * Although we prefer to print subquery-referencing Vars using the
 	 * subquery's alias, that's not possible for resjunk items since they have
 	 * no alias.  So in that case, drill down to the subplan and print the
 	 * contents of the referenced tlist item.  This works because in a plan
-	 * tree, such Vars can only occur in a SubqueryScan or CteScan node, and
+	 * tree, such Vars can only occur in a SubqueryScan node, and
 	 * we'll have set dpns->inner_plan to reference the child plan node.
 	 */
-	if ((rte->rtekind == RTE_SUBQUERY || rte->rtekind == RTE_CTE) &&
+	if (rte->rtekind == RTE_SUBQUERY &&
 		attnum > list_length(rte->eref->colnames) &&
 		dpns->inner_plan)
 	{
@@ -7593,116 +7399,6 @@ get_name_for_var_field(Var *var, int fieldno,
 			 * We couldn't get here unless a function is declared with one of
 			 * its result columns as RECORD, which is not allowed.
 			 */
-			break;
-		case RTE_CTE:
-			/* CTE reference: examine subquery's output expr */
-			{
-				CommonTableExpr *cte = NULL;
-				Index		ctelevelsup;
-				ListCell   *lc;
-
-				/*
-				 * Try to find the referenced CTE using the namespace stack.
-				 */
-				ctelevelsup = rte->ctelevelsup + netlevelsup;
-				if (ctelevelsup >= list_length(context->namespaces))
-					lc = NULL;
-				else
-				{
-					deparse_namespace *ctedpns;
-
-					ctedpns = (deparse_namespace *)
-						list_nth(context->namespaces, ctelevelsup);
-					foreach(lc, ctedpns->ctes)
-					{
-						cte = (CommonTableExpr *) lfirst(lc);
-						if (strcmp(cte->ctename, rte->ctename) == 0)
-							break;
-					}
-				}
-				if (lc != NULL)
-				{
-					Query	   *ctequery = (Query *) cte->ctequery;
-					TargetEntry *ste = get_tle_by_resno(GetCTETargetList(cte),
-														attnum);
-
-					if (ste == NULL || ste->resjunk)
-						elog(ERROR, "CTE %s does not have attribute %d",
-							 rte->eref->aliasname, attnum);
-					expr = (Node *) ste->expr;
-					if (IsA(expr, Var))
-					{
-						/*
-						 * Recurse into the CTE to see what its Var refers to.
-						 * We have to build an additional level of namespace
-						 * to keep in step with varlevelsup in the CTE;
-						 * furthermore it could be an outer CTE (compare
-						 * SUBQUERY case above).
-						 */
-						List	   *save_nslist = context->namespaces;
-						List	   *parent_namespaces;
-						deparse_namespace mydpns;
-						const char *result;
-
-						parent_namespaces = list_copy_tail(context->namespaces,
-														   ctelevelsup);
-
-						set_deparse_for_query(&mydpns, ctequery,
-											  parent_namespaces);
-
-						context->namespaces = lcons(&mydpns, parent_namespaces);
-
-						result = get_name_for_var_field((Var *) expr, fieldno,
-														0, context);
-
-						context->namespaces = save_nslist;
-
-						return result;
-					}
-					/* else fall through to inspect the expression */
-				}
-				else
-				{
-					/*
-					 * We're deparsing a Plan tree so we don't have a CTE
-					 * list.  But the only places we'd normally see a Var
-					 * directly referencing a CTE RTE are in CteScan or
-					 * WorkTableScan plan nodes.  For those cases,
-					 * set_deparse_plan arranged for dpns->inner_plan to be
-					 * the plan node that emits the CTE or RecursiveUnion
-					 * result, and we can look at its tlist instead.  As
-					 * above, this can fail if the CTE has been proven empty,
-					 * in which case fall back to "fN".
-					 */
-					TargetEntry *tle;
-					deparse_namespace save_dpns;
-					const char *result;
-
-					if (!dpns->inner_plan)
-					{
-						char	   *dummy_name = palloc(32);
-
-						Assert(dpns->plan && IsA(dpns->plan, Result));
-						snprintf(dummy_name, 32, "f%d", fieldno);
-						return dummy_name;
-					}
-					Assert(dpns->plan && (IsA(dpns->plan, CteScan) ||
-										  IsA(dpns->plan, WorkTableScan)));
-
-					tle = get_tle_by_resno(dpns->inner_tlist, attnum);
-					if (!tle)
-						elog(ERROR, "bogus varattno for subquery var: %d",
-							 attnum);
-					Assert(netlevelsup == 0);
-					push_child_plan(dpns, dpns->inner_plan, &save_dpns);
-
-					result = get_name_for_var_field((Var *) tle->expr, fieldno,
-													levelsup, context);
-
-					pop_child_plan(dpns, &save_dpns);
-					return result;
-				}
-			}
 			break;
 	}
 
@@ -10331,7 +10027,6 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 			need_paren = false;
 			break;
 
-		case CTE_SUBLINK:		/* shouldn't occur in a SubLink */
 		default:
 			elog(ERROR, "unrecognized sublink type: %d",
 				 (int) sublink->subLinkType);
@@ -10584,15 +10279,11 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 				if (rte->funcordinality)
 					appendStringInfoString(buf, " WITH ORDINALITY");
 				break;
-				break;
 			case RTE_VALUES:
 				/* Values list RTE */
 				appendStringInfoChar(buf, '(');
 				get_values_def(rte->values_lists, context);
 				appendStringInfoChar(buf, ')');
-				break;
-			case RTE_CTE:
-				appendStringInfoString(buf, quote_identifier(rte->ctename));
 				break;
 			default:
 				elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
@@ -10787,16 +10478,6 @@ get_rte_alias(RangeTblEntry *rte, int varno, bool use_as,
 	{
 		/* Alias is syntactically required for SUBQUERY and VALUES */
 		printalias = true;
-	}
-	else if (rte->rtekind == RTE_CTE)
-	{
-		/*
-		 * No need to print alias if it's same as CTE name (this would
-		 * normally be the case, but not if set_rtable_names had to resolve a
-		 * conflict).
-		 */
-		if (strcmp(refname, rte->ctename) != 0)
-			printalias = true;
 	}
 
 	if (printalias)
@@ -11253,27 +10934,6 @@ generate_relation_name(Oid relid, List *namespaces)
 		elog(ERROR, "cache lookup failed for relation %u", relid);
 	reltup = (Form_pg_class) GETSTRUCT(tp);
 	relname = NameStr(reltup->relname);
-
-	/* Check for conflicting CTE name */
-	need_qual = false;
-	foreach(nslist, namespaces)
-	{
-		deparse_namespace *dpns = (deparse_namespace *) lfirst(nslist);
-		ListCell   *ctlist;
-
-		foreach(ctlist, dpns->ctes)
-		{
-			CommonTableExpr *cte = (CommonTableExpr *) lfirst(ctlist);
-
-			if (strcmp(cte->ctename, relname) == 0)
-			{
-				need_qual = true;
-				break;
-			}
-		}
-		if (need_qual)
-			break;
-	}
 
 	/* Otherwise, qualify the name if not visible in search path */
 	if (!need_qual)

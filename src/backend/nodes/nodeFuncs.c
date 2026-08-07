@@ -1539,23 +1539,11 @@ exprLocation(const Node *expr)
 		case T_GroupingSet:
 			loc = ((const GroupingSet *) expr)->location;
 			break;
-		case T_WithClause:
-			loc = ((const WithClause *) expr)->location;
-			break;
 		case T_InferClause:
 			loc = ((const InferClause *) expr)->location;
 			break;
 		case T_OnConflictClause:
 			loc = ((const OnConflictClause *) expr)->location;
-			break;
-		case T_CTESearchClause:
-			loc = ((const CTESearchClause *) expr)->location;
-			break;
-		case T_CTECycleClause:
-			loc = ((const CTECycleClause *) expr)->location;
-			break;
-		case T_CommonTableExpr:
-			loc = ((const CommonTableExpr *) expr)->location;
 			break;
 		case T_PlaceHolderVar:
 			/* just use argument's location */
@@ -1897,7 +1885,6 @@ expression_tree_walker(Node *node,
 		case T_NextValueExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
-		case T_CTESearchClause:
 			/* primitive node types with no expression subnodes */
 			break;
 		case T_WithCheckOption:
@@ -2126,33 +2113,6 @@ expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_CTECycleClause:
-			{
-				CTECycleClause *cc = (CTECycleClause *) node;
-
-				if (walker(cc->cycle_mark_value, context))
-					return true;
-				if (walker(cc->cycle_mark_default, context))
-					return true;
-			}
-			break;
-		case T_CommonTableExpr:
-			{
-				CommonTableExpr *cte = (CommonTableExpr *) node;
-
-				/*
-				 * Invoke the walker on the CTE's Query node, so it can
-				 * recurse into the sub-query if it wants to.
-				 */
-				if (walker(cte->ctequery, context))
-					return true;
-
-				if (walker(cte->search_clause, context))
-					return true;
-				if (walker(cte->cycle_clause, context))
-					return true;
-			}
-			break;
 		case T_List:
 			foreach(temp, (List *) node)
 			{
@@ -2368,11 +2328,6 @@ query_tree_walker(Query *query,
 	 * flags etc.) and therefore should be handled at Query level similarly.
 	 */
 
-	if (!(flags & QTW_IGNORE_CTE_SUBQUERIES))
-	{
-		if (walker((Node *) query->cteList, context))
-			return true;
-	}
 	if (!(flags & QTW_IGNORE_RANGE_TABLE))
 	{
 		if (range_table_walker(query->rtable, walker, context, flags))
@@ -2446,7 +2401,6 @@ range_table_entry_walker(RangeTblEntry *rte,
 			if (walker(rte->values_lists, context))
 				return true;
 			break;
-		case RTE_CTE:
 		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 			/* nothing to do */
@@ -2589,7 +2543,6 @@ expression_tree_mutator(Node *node,
 		case T_NextValueExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
-		case T_CTESearchClause:
 			return (Node *) copyObject(node);
 		case T_WithCheckOption:
 			{
@@ -2982,36 +2935,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_CTECycleClause:
-			{
-				CTECycleClause *cc = (CTECycleClause *) node;
-				CTECycleClause *newnode;
-
-				FLATCOPY(newnode, cc, CTECycleClause);
-				MUTATE(newnode->cycle_mark_value, cc->cycle_mark_value, Node *);
-				MUTATE(newnode->cycle_mark_default, cc->cycle_mark_default, Node *);
-				return (Node *) newnode;
-			}
-			break;
-		case T_CommonTableExpr:
-			{
-				CommonTableExpr *cte = (CommonTableExpr *) node;
-				CommonTableExpr *newnode;
-
-				FLATCOPY(newnode, cte, CommonTableExpr);
-
-				/*
-				 * Also invoke the mutator on the CTE's Query node, so it can
-				 * recurse into the sub-query if it wants to.
-				 */
-				MUTATE(newnode->ctequery, cte->ctequery, Node *);
-
-				MUTATE(newnode->search_clause, cte->search_clause, CTESearchClause *);
-				MUTATE(newnode->cycle_clause, cte->cycle_clause, CTECycleClause *);
-
-				return (Node *) newnode;
-			}
-			break;
 		case T_List:
 			{
 				/*
@@ -3277,10 +3200,6 @@ query_tree_mutator(Query *query,
 	 * therefore should be handled at Query level similarly.
 	 */
 
-	if (!(flags & QTW_IGNORE_CTE_SUBQUERIES))
-		MUTATE(query->cteList, query->cteList, List *);
-	else						/* else copy CTE list as-is */
-		query->cteList = copyObject(query->cteList);
 	query->rtable = range_table_mutator(query->rtable,
 										mutator, context, flags);
 	return query;
@@ -3340,11 +3259,10 @@ range_table_mutator(List *rtable,
 			case RTE_VALUES:
 				MUTATE(newrte->values_lists, rte->values_lists, List *);
 				break;
-			case RTE_CTE:
-			case RTE_NAMEDTUPLESTORE:
-			case RTE_RESULT:
-				/* nothing to do */
-				break;
+		case RTE_NAMEDTUPLESTORE:
+		case RTE_RESULT:
+			/* nothing to do */
+			break;
 		}
 		MUTATE(newrte->securityQuals, rte->securityQuals, List *);
 		newrt = lappend(newrt, newrte);
@@ -3410,9 +3328,7 @@ query_or_expression_tree_mutator(Node *node,
  * boundaries: we descend to everything that's possibly interesting.
  *
  * Currently, the node type coverage here extends only to DML statements
- * (SELECT/INSERT/UPDATE/DELETE) and nodes that can appear in them, because
- * this is used mainly during analysis of CTEs, and only DML statements can
- * appear in CTEs.
+ * (SELECT/INSERT/UPDATE/DELETE) and nodes that can appear in them.
  */
 bool
 raw_expression_tree_walker(Node *node,
@@ -3531,8 +3447,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->returningList, context))
 					return true;
-				if (walker(stmt->withClause, context))
-					return true;
 			}
 			break;
 		case T_DeleteStmt:
@@ -3546,8 +3460,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(stmt->whereClause, context))
 					return true;
 				if (walker(stmt->returningList, context))
-					return true;
-				if (walker(stmt->withClause, context))
 					return true;
 			}
 			break;
@@ -3565,7 +3477,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->returningList, context))
 					return true;
-				if (walker(stmt->withClause, context))
 					return true;
 			}
 			break;
@@ -3597,7 +3508,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->lockingClause, context))
 					return true;
-				if (walker(stmt->withClause, context))
 					return true;
 				if (walker(stmt->larg, context))
 					return true;
@@ -3788,8 +3698,6 @@ raw_expression_tree_walker(Node *node,
 			return walker(((GroupingSet *) node)->content, context);
 		case T_LockingClause:
 			return walker(((LockingClause *) node)->lockedRels, context);
-		case T_WithClause:
-			return walker(((WithClause *) node)->ctes, context);
 		case T_InferClause:
 			{
 				InferClause *stmt = (InferClause *) node;
@@ -3812,9 +3720,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_CommonTableExpr:
-			/* search_clause and cycle_clause are not interesting here */
-			return walker(((CommonTableExpr *) node)->ctequery, context);
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));

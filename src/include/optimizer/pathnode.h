@@ -109,14 +109,10 @@ extern Path *create_functionscan_path(PlannerInfo *root, RelOptInfo *rel,
 									  List *pathkeys, Relids required_outer);
 extern Path *create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,
 									Relids required_outer);
-extern Path *create_ctescan_path(PlannerInfo *root, RelOptInfo *rel,
-								 Relids required_outer);
 extern Path *create_namedtuplestorescan_path(PlannerInfo *root, RelOptInfo *rel,
-											 Relids required_outer);
+											Relids required_outer);
 extern Path *create_resultscan_path(PlannerInfo *root, RelOptInfo *rel,
 									Relids required_outer);
-extern Path *create_worktablescan_path(PlannerInfo *root, RelOptInfo *rel,
-									   Relids required_outer);
 
 extern Relids calc_nestloop_required_outer(Relids outerrelids,
 										   Relids outer_paramrels,
@@ -234,14 +230,6 @@ extern SetOpPath *create_setop_path(PlannerInfo *root,
 									int firstFlag,
 									double numGroups,
 									double outputRows);
-extern RecursiveUnionPath *create_recursiveunion_path(PlannerInfo *root,
-													  RelOptInfo *rel,
-													  Path *leftpath,
-													  Path *rightpath,
-													  PathTarget *target,
-													  List *distinctList,
-													  int wtParam,
-													  double numGroups);
 extern LockRowsPath *create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
 										  Path *subpath, List *rowMarks, int epqParam);
 extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,

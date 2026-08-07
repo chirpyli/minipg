@@ -244,7 +244,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 
 	APP_JUMB(query->commandType);
 	/* resultRelation is usually predictable from commandType */
-	JumbleExpr(jstate, (Node *) query->cteList);
 	JumbleRangeTable(jstate, query->rtable);
 	JumbleExpr(jstate, (Node *) query->jointree);
 	JumbleExpr(jstate, (Node *) query->targetList);
@@ -295,15 +294,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 				break;
 			case RTE_VALUES:
 				JumbleExpr(jstate, (Node *) rte->values_lists);
-				break;
-			case RTE_CTE:
-
-				/*
-				 * Depending on the CTE name here isn't ideal, but it's the
-				 * only info we have to identify the referenced WITH item.
-				 */
-				APP_JUMB_STRING(rte->ctename);
-				APP_JUMB(rte->ctelevelsup);
 				break;
 			case RTE_NAMEDTUPLESTORE:
 				APP_JUMB_STRING(rte->enrname);
@@ -764,16 +754,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) wc->orderClause);
 				JumbleExpr(jstate, wc->startOffset);
 				JumbleExpr(jstate, wc->endOffset);
-			}
-			break;
-		case T_CommonTableExpr:
-			{
-				CommonTableExpr *cte = (CommonTableExpr *) node;
-
-				/* we store the string name because RTE_CTE RTEs need it */
-				APP_JUMB_STRING(cte->ctename);
-				APP_JUMB(cte->ctematerialized);
-				JumbleQueryInternal(jstate, castNode(Query, cte->ctequery));
 			}
 			break;
 		case T_SetOperationStmt:

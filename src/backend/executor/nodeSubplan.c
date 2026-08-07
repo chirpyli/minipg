@@ -74,8 +74,6 @@ ExecSubPlan(SubPlanState *node,
 	*isNull = false;
 
 	/* Sanity checks */
-	if (subplan->subLinkType == CTE_SUBLINK)
-		elog(ERROR, "CTE subplans should not be executed via ExecSubPlan");
 	if (subplan->setParam != NIL && subplan->subLinkType != MULTIEXPR_SUBLINK)
 		elog(ERROR, "cannot set parent params from subquery");
 
@@ -861,8 +859,7 @@ ExecInitSubPlan(SubPlan *subplan, PlanState *parent)
 	 * Note that we don't set parent->chgParam here: the parent plan hasn't
 	 * been run yet, so no need to force it to re-run.
 	 */
-	if (subplan->setParam != NIL && subplan->parParam == NIL &&
-		subplan->subLinkType != CTE_SUBLINK)
+	if (subplan->setParam != NIL && subplan->parParam == NIL)
 	{
 		ListCell   *lst;
 
@@ -1089,8 +1086,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 	if (subLinkType == ANY_SUBLINK ||
 		subLinkType == ALL_SUBLINK)
 		elog(ERROR, "ANY/ALL subselect unsupported as initplan");
-	if (subLinkType == CTE_SUBLINK)
-		elog(ERROR, "CTE subplans should not be executed via ExecSetParamPlan");
 	if (subplan->parParam || node->args)
 		elog(ERROR, "correlated subplans should not be executed via ExecSetParamPlan");
 
@@ -1293,19 +1288,13 @@ ExecReScanSetParamPlan(SubPlanState *node, PlanState *parent)
 
 	/*
 	 * Mark this subplan's output parameters as needing recalculation.
-	 *
-	 * CTE subplans are never executed via parameter recalculation; instead
-	 * they get run when called by nodeCtescan.c.  So don't mark the output
-	 * parameter of a CTE subplan as dirty, but do set the chgParam bit for it
-	 * so that dependent plan nodes will get told to rescan.
 	 */
 	foreach(l, subplan->setParam)
 	{
 		int			paramid = lfirst_int(l);
 		ParamExecData *prm = &(estate->es_param_exec_vals[paramid]);
 
-		if (subplan->subLinkType != CTE_SUBLINK)
-			prm->execPlan = node;
+		prm->execPlan = node;
 
 		parent->chgParam = bms_add_member(parent->chgParam, paramid);
 	}

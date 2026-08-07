@@ -931,7 +931,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	subroot->outer_params = NULL;
 	subroot->planner_cxt = CurrentMemoryContext;
 	subroot->init_plans = NIL;
-	subroot->cte_plan_ids = NIL;
 	subroot->multiexpr_params = NIL;
 	subroot->eq_classes = NIL;
 	subroot->ec_merging_done = false;
@@ -950,9 +949,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	subroot->hasRecursion = false;
 	subroot->wt_param_id = -1;
 	subroot->non_recursive_path = NULL;
-
-	/* No CTEs to worry about */
-	Assert(subquery->cteList == NIL);
 
 	/*
 	 * If the FROM clause is empty, replace it with a dummy RTE_RESULT RTE, so
@@ -1129,12 +1125,11 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 				case RTE_VALUES:
 					child_rte->lateral = true;
 					break;
-				case RTE_JOIN:
-				case RTE_CTE:
-				case RTE_NAMEDTUPLESTORE:
-				case RTE_RESULT:
-					/* these can't contain any lateral references */
-					break;
+			case RTE_JOIN:
+			case RTE_NAMEDTUPLESTORE:
+			case RTE_RESULT:
+				/* these can't contain any lateral references */
+				break;
 			}
 		}
 	}
@@ -1455,8 +1450,7 @@ is_simple_subquery(PlannerInfo *root, Query *subquery, RangeTblEntry *rte,
 		subquery->distinctClause ||
 		subquery->limitOffset ||
 		subquery->limitCount ||
-		subquery->hasForUpdate ||
-		subquery->cteList)
+		subquery->hasForUpdate)
 		return false;
 
 	/*
@@ -1860,8 +1854,7 @@ is_simple_union_all(Query *subquery)
 	if (subquery->sortClause ||
 		subquery->limitOffset ||
 		subquery->limitCount ||
-		subquery->rowMarks ||
-		subquery->cteList)
+		subquery->rowMarks)
 		return false;
 
 	/* Recursively check the tree of set operations */
@@ -2176,7 +2169,6 @@ replace_vars_in_jointree(Node *jtnode,
 												context);
 						break;
 					case RTE_JOIN:
-					case RTE_CTE:
 					case RTE_NAMEDTUPLESTORE:
 					case RTE_RESULT:
 						/* these shouldn't be marked LATERAL */

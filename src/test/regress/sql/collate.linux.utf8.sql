@@ -255,13 +255,6 @@ select x < y from collate_test10; -- fail
 select x || y from collate_test10; -- ok, because || is not collation aware
 select x, y from collate_test10 order by x || y; -- not so ok
 
--- collation mismatch between recursive and non-recursive term
-WITH RECURSIVE foo(x) AS
-   (SELECT x FROM (VALUES('a' COLLATE "en_US"),('b')) t(x)
-   UNION ALL
-   SELECT (x || 'c') COLLATE "de_DE" FROM foo WHERE length(x) < 10)
-SELECT * FROM foo;
-
 
 -- casting
 

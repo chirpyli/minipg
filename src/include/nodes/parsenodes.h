@@ -135,14 +135,10 @@ typedef struct Query
 	bool		hasTargetSRFs;	/* has set-returning functions in tlist */
 	bool		hasSubLinks;	/* has subquery SubLink */
 	bool		hasDistinctOn;	/* distinctClause is from DISTINCT ON */
-	bool		hasRecursive;	/* WITH RECURSIVE was specified */
-	bool		hasModifyingCTE;	/* has INSERT/UPDATE/DELETE in WITH */
 	bool		hasForUpdate;	/* FOR [KEY] UPDATE/SHARE was specified */
 	bool		hasRowSecurity; /* rewriter has applied some RLS policy */
 
 	bool		isReturn;		/* is a RETURN statement */
-
-	List	   *cteList;		/* WITH list (of CommonTableExpr's) */
 
 	List	   *rtable;			/* list of range table entries */
 	FromExpr   *jointree;		/* table join tree (FROM and WHERE clauses) */
@@ -926,7 +922,6 @@ typedef enum RTEKind
 	RTE_JOIN,					/* join */
 	RTE_FUNCTION,				/* function in FROM */
 	RTE_VALUES,					/* VALUES (<exprlist>), (<exprlist>), ... */
-	RTE_CTE,					/* common table expr (WITH list element) */
 	RTE_NAMEDTUPLESTORE,		/* tuplestore, e.g. for AFTER triggers */
 	RTE_RESULT					/* RTE represents an empty FROM clause; such
 								 * RTEs are added by the planner, they're not
@@ -1046,22 +1041,13 @@ typedef struct RangeTblEntry
 	List	   *values_lists;	/* list of expression lists */
 
 	/*
-	 * Fields valid for a CTE RTE (else NULL/zero):
-	 */
-	char	   *ctename;		/* name of the WITH list item */
-	Index		ctelevelsup;	/* number of query levels up */
-	bool		self_reference; /* is this a recursive self-reference? */
-
-	/*
-	 * Fields valid for CTE, VALUES, and ENR RTEs (else NIL):
+	 * Fields valid for VALUES and ENR RTEs (else NIL):
 	 *
-	 * We need these for CTE RTEs so that the types of self-referential
-	 * columns are well-defined.  For VALUES RTEs, storing these explicitly
-	 * saves having to re-determine the info by scanning the values_lists. For
-	 * ENRs, we store the types explicitly here (we could get the information
-	 * from the catalogs if 'relid' was supplied, but we'd still need these
-	 * for TupleDesc-based ENRs, so we might as well always store the type
-	 * info here).
+	 * For VALUES RTEs, storing these explicitly saves having to re-determine
+	 * the info by scanning the values_lists. For ENRs, we store the types
+	 * explicitly here (we could get the information from the catalogs if
+	 * 'relid' was supplied, but we'd still need these for TupleDesc-based
+	 * ENRs, so we might as well always store the type info here).
 	 *
 	 * For ENRs only, we have to consider the possibility of dropped columns.
 	 * A dropped column is included in these lists, but it will have zeroes in
@@ -1356,21 +1342,6 @@ typedef struct RowMarkClause
 } RowMarkClause;
 
 /*
- * WithClause -
- *	   representation of WITH clause
- *
- * Note: WithClause does not propagate into the Query representation;
- * but CommonTableExpr does.
- */
-typedef struct WithClause
-{
-	NodeTag		type;
-	List	   *ctes;			/* list of CommonTableExprs */
-	bool		recursive;		/* true = WITH RECURSIVE */
-	int			location;		/* token location, or -1 if unknown */
-} WithClause;
-
-/*
  * InferClause -
  *		ON CONFLICT unique index inference clause
  *
@@ -1400,71 +1371,6 @@ typedef struct OnConflictClause
 	Node	   *whereClause;	/* qualifications */
 	int			location;		/* token location, or -1 if unknown */
 } OnConflictClause;
-
-/*
- * CommonTableExpr -
- *	   representation of WITH list element
- */
-
-typedef enum CTEMaterialize
-{
-	CTEMaterializeDefault,		/* no option specified */
-	CTEMaterializeAlways,		/* MATERIALIZED */
-	CTEMaterializeNever			/* NOT MATERIALIZED */
-} CTEMaterialize;
-
-typedef struct CTESearchClause
-{
-	NodeTag		type;
-	List	   *search_col_list;
-	bool		search_breadth_first;
-	char	   *search_seq_column;
-	int			location;
-} CTESearchClause;
-
-typedef struct CTECycleClause
-{
-	NodeTag		type;
-	List	   *cycle_col_list;
-	char	   *cycle_mark_column;
-	Node	   *cycle_mark_value;
-	Node	   *cycle_mark_default;
-	char	   *cycle_path_column;
-	int			location;
-	/* These fields are set during parse analysis: */
-	Oid			cycle_mark_type;	/* common type of _value and _default */
-	int			cycle_mark_typmod;
-	Oid			cycle_mark_collation;
-	Oid			cycle_mark_neop;	/* <> operator for type */
-} CTECycleClause;
-
-typedef struct CommonTableExpr
-{
-	NodeTag		type;
-	char	   *ctename;		/* query name (never qualified) */
-	List	   *aliascolnames;	/* optional list of column names */
-	CTEMaterialize ctematerialized; /* is this an optimization fence? */
-	/* SelectStmt/InsertStmt/etc before parse analysis, Query afterwards: */
-	Node	   *ctequery;		/* the CTE's subquery */
-	CTESearchClause *search_clause;
-	CTECycleClause *cycle_clause;
-	int			location;		/* token location, or -1 if unknown */
-	/* These fields are set during parse analysis: */
-	bool		cterecursive;	/* is this CTE actually recursive? */
-	int			cterefcount;	/* number of RTEs referencing this CTE
-								 * (excluding internal self-references) */
-	List	   *ctecolnames;	/* list of output column names */
-	List	   *ctecoltypes;	/* OID list of output column type OIDs */
-	List	   *ctecoltypmods;	/* integer list of output column typmods */
-	List	   *ctecolcollations;	/* OID list of column collation OIDs */
-} CommonTableExpr;
-
-/* Convenience macro to get the output tlist of a CTE's query */
-#define GetCTETargetList(cte) \
-	(AssertMacro(IsA((cte)->ctequery, Query)), \
-	 ((Query *) (cte)->ctequery)->commandType == CMD_SELECT ? \
-	 ((Query *) (cte)->ctequery)->targetList : \
-	 ((Query *) (cte)->ctequery)->returningList)
 
 /*
  * TriggerTransition -
@@ -1526,7 +1432,6 @@ typedef struct InsertStmt
 	Node	   *selectStmt;		/* the source SELECT/VALUES, or NULL */
 	OnConflictClause *onConflictClause; /* ON CONFLICT clause */
 	List	   *returningList;	/* list of expressions to return */
-	WithClause *withClause;		/* WITH clause */
 	OverridingKind override;	/* OVERRIDING clause */
 } InsertStmt;
 
@@ -1541,7 +1446,6 @@ typedef struct DeleteStmt
 	List	   *usingClause;	/* optional using clause for more tables */
 	Node	   *whereClause;	/* qualifications */
 	List	   *returningList;	/* list of expressions to return */
-	WithClause *withClause;		/* WITH clause */
 } DeleteStmt;
 
 /* ----------------------
@@ -1556,7 +1460,6 @@ typedef struct UpdateStmt
 	Node	   *whereClause;	/* qualifications */
 	List	   *fromClause;		/* optional from clause for more tables */
 	List	   *returningList;	/* list of expressions to return */
-	WithClause *withClause;		/* WITH clause */
 } UpdateStmt;
 
 /* ----------------------
@@ -1616,7 +1519,6 @@ typedef struct SelectStmt
 	Node	   *limitCount;		/* # of result tuples to return */
 	LimitOption limitOption;	/* limit type */
 	List	   *lockingClause;	/* FOR UPDATE (list of LockingClause's) */
-	WithClause *withClause;		/* WITH clause */
 
 	/*
 	 * These fields are used only in upper-level SelectStmts.

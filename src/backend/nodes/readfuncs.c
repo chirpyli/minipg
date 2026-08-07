@@ -259,12 +259,9 @@ _readQuery(void)
 	READ_BOOL_FIELD(hasTargetSRFs);
 	READ_BOOL_FIELD(hasSubLinks);
 	READ_BOOL_FIELD(hasDistinctOn);
-	READ_BOOL_FIELD(hasRecursive);
-	READ_BOOL_FIELD(hasModifyingCTE);
 	READ_BOOL_FIELD(hasForUpdate);
 	READ_BOOL_FIELD(hasRowSecurity);
 	READ_BOOL_FIELD(isReturn);
-	READ_NODE_FIELD(cteList);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
@@ -393,69 +390,6 @@ _readRowMarkClause(void)
 	READ_ENUM_FIELD(strength, LockClauseStrength);
 	READ_ENUM_FIELD(waitPolicy, LockWaitPolicy);
 	READ_BOOL_FIELD(pushedDown);
-
-	READ_DONE();
-}
-
-/*
- * _readCTESearchClause
- */
-static CTESearchClause *
-_readCTESearchClause(void)
-{
-	READ_LOCALS(CTESearchClause);
-
-	READ_NODE_FIELD(search_col_list);
-	READ_BOOL_FIELD(search_breadth_first);
-	READ_STRING_FIELD(search_seq_column);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readCTECycleClause
- */
-static CTECycleClause *
-_readCTECycleClause(void)
-{
-	READ_LOCALS(CTECycleClause);
-
-	READ_NODE_FIELD(cycle_col_list);
-	READ_STRING_FIELD(cycle_mark_column);
-	READ_NODE_FIELD(cycle_mark_value);
-	READ_NODE_FIELD(cycle_mark_default);
-	READ_STRING_FIELD(cycle_path_column);
-	READ_LOCATION_FIELD(location);
-	READ_OID_FIELD(cycle_mark_type);
-	READ_INT_FIELD(cycle_mark_typmod);
-	READ_OID_FIELD(cycle_mark_collation);
-	READ_OID_FIELD(cycle_mark_neop);
-
-	READ_DONE();
-}
-
-/*
- * _readCommonTableExpr
- */
-static CommonTableExpr *
-_readCommonTableExpr(void)
-{
-	READ_LOCALS(CommonTableExpr);
-
-	READ_STRING_FIELD(ctename);
-	READ_NODE_FIELD(aliascolnames);
-	READ_ENUM_FIELD(ctematerialized, CTEMaterialize);
-	READ_NODE_FIELD(ctequery);
-	READ_NODE_FIELD(search_clause);
-	READ_NODE_FIELD(cycle_clause);
-	READ_LOCATION_FIELD(location);
-	READ_BOOL_FIELD(cterecursive);
-	READ_INT_FIELD(cterefcount);
-	READ_NODE_FIELD(ctecolnames);
-	READ_NODE_FIELD(ctecoltypes);
-	READ_NODE_FIELD(ctecoltypmods);
-	READ_NODE_FIELD(ctecolcollations);
 
 	READ_DONE();
 }
@@ -1390,14 +1324,6 @@ _readRangeTblEntry(void)
 			READ_NODE_FIELD(coltypmods);
 			READ_NODE_FIELD(colcollations);
 			break;
-		case RTE_CTE:
-			READ_STRING_FIELD(ctename);
-			READ_UINT_FIELD(ctelevelsup);
-			READ_BOOL_FIELD(self_reference);
-			READ_NODE_FIELD(coltypes);
-			READ_NODE_FIELD(coltypmods);
-			READ_NODE_FIELD(colcollations);
-			break;
 		case RTE_NAMEDTUPLESTORE:
 			READ_STRING_FIELD(enrname);
 			READ_FLOAT_FIELD(enrtuples);
@@ -1657,25 +1583,6 @@ _readMergeAppend(void)
 	READ_DONE();
 }
 
-/*
- * _readRecursiveUnion
- */
-static RecursiveUnion *
-_readRecursiveUnion(void)
-{
-	READ_LOCALS(RecursiveUnion);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_INT_FIELD(wtParam);
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(dupColIdx, local_node->numCols);
-	READ_OID_ARRAY(dupOperators, local_node->numCols);
-	READ_OID_ARRAY(dupCollations, local_node->numCols);
-	READ_LONG_FIELD(numGroups);
-
-	READ_DONE();
-}
 
 /*
  * _readBitmapAnd
@@ -1914,21 +1821,6 @@ _readValuesScan(void)
 }
 
 
-/*
- * _readCteScan
- */
-static CteScan *
-_readCteScan(void)
-{
-	READ_LOCALS(CteScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_INT_FIELD(ctePlanId);
-	READ_INT_FIELD(cteParam);
-
-	READ_DONE();
-}
 
 /*
  * _readNamedTuplestoreScan
@@ -1945,20 +1837,6 @@ _readNamedTuplestoreScan(void)
 	READ_DONE();
 }
 
-/*
- * _readWorkTableScan
- */
-static WorkTableScan *
-_readWorkTableScan(void)
-{
-	READ_LOCALS(WorkTableScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_INT_FIELD(wtParam);
-
-	READ_DONE();
-}
 
 
 /*
@@ -2614,12 +2492,6 @@ parseNodeString(void)
 		return_value = _readWindowClause();
 	else if (MATCH("ROWMARKCLAUSE", 13))
 		return_value = _readRowMarkClause();
-	else if (MATCH("CTESEARCHCLAUSE", 15))
-		return_value = _readCTESearchClause();
-	else if (MATCH("CTECYCLECLAUSE", 14))
-		return_value = _readCTECycleClause();
-	else if (MATCH("COMMONTABLEEXPR", 15))
-		return_value = _readCommonTableExpr();
 	else if (MATCH("SETOPERATIONSTMT", 16))
 		return_value = _readSetOperationStmt();
 	else if (MATCH("ALIAS", 5))
@@ -2740,8 +2612,6 @@ parseNodeString(void)
 		return_value = _readAppend();
 	else if (MATCH("MERGEAPPEND", 11))
 		return_value = _readMergeAppend();
-	else if (MATCH("RECURSIVEUNION", 14))
-		return_value = _readRecursiveUnion();
 	else if (MATCH("BITMAPAND", 9))
 		return_value = _readBitmapAnd();
 	else if (MATCH("BITMAPOR", 8))
@@ -2770,12 +2640,8 @@ parseNodeString(void)
 		return_value = _readFunctionScan();
 	else if (MATCH("VALUESSCAN", 10))
 		return_value = _readValuesScan();
-	else if (MATCH("CTESCAN", 7))
-		return_value = _readCteScan();
 	else if (MATCH("NAMEDTUPLESTORESCAN", 19))
 		return_value = _readNamedTuplestoreScan();
-	else if (MATCH("WORKTABLESCAN", 13))
-		return_value = _readWorkTableScan();
 	else if (MATCH("CUSTOMSCAN", 10))
 		return_value = _readCustomScan();
 	else if (MATCH("JOIN", 4))

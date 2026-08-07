@@ -452,20 +452,6 @@ _outMergeAppend(StringInfo str, const MergeAppend *node)
 	WRITE_NODE_FIELD(part_prune_info);
 }
 
-static void
-_outRecursiveUnion(StringInfo str, const RecursiveUnion *node)
-{
-	WRITE_NODE_TYPE("RECURSIVEUNION");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_INT_FIELD(wtParam);
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(dupColIdx, node->numCols);
-	WRITE_OID_ARRAY(dupOperators, node->numCols);
-	WRITE_OID_ARRAY(dupCollations, node->numCols);
-	WRITE_LONG_FIELD(numGroups);
-}
 
 static void
 _outBitmapAnd(StringInfo str, const BitmapAnd *node)
@@ -651,16 +637,6 @@ _outValuesScan(StringInfo str, const ValuesScan *node)
 	WRITE_NODE_FIELD(values_lists);
 }
 
-static void
-_outCteScan(StringInfo str, const CteScan *node)
-{
-	WRITE_NODE_TYPE("CTESCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_INT_FIELD(ctePlanId);
-	WRITE_INT_FIELD(cteParam);
-}
 
 static void
 _outNamedTuplestoreScan(StringInfo str, const NamedTuplestoreScan *node)
@@ -672,15 +648,6 @@ _outNamedTuplestoreScan(StringInfo str, const NamedTuplestoreScan *node)
 	WRITE_STRING_FIELD(enrname);
 }
 
-static void
-_outWorkTableScan(StringInfo str, const WorkTableScan *node)
-{
-	WRITE_NODE_TYPE("WORKTABLESCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_INT_FIELD(wtParam);
-}
 
 
 static void
@@ -2063,19 +2030,6 @@ _outSetOpPath(StringInfo str, const SetOpPath *node)
 	WRITE_FLOAT_FIELD(numGroups, "%.0f");
 }
 
-static void
-_outRecursiveUnionPath(StringInfo str, const RecursiveUnionPath *node)
-{
-	WRITE_NODE_TYPE("RECURSIVEUNIONPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(leftpath);
-	WRITE_NODE_FIELD(rightpath);
-	WRITE_NODE_FIELD(distinctList);
-	WRITE_INT_FIELD(wtParam);
-	WRITE_FLOAT_FIELD(numGroups, "%.0f");
-}
 
 static void
 _outLockRowsPath(StringInfo str, const LockRowsPath *node)
@@ -2210,7 +2164,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(join_rel_list);
 	WRITE_INT_FIELD(join_cur_level);
 	WRITE_NODE_FIELD(init_plans);
-	WRITE_NODE_FIELD(cte_plan_ids);
 	WRITE_NODE_FIELD(multiexpr_params);
 	WRITE_NODE_FIELD(eq_classes);
 	WRITE_BOOL_FIELD(ec_merging_done);
@@ -2720,7 +2673,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(limitCount);
 	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(lockingClause);
-	WRITE_NODE_FIELD(withClause);
 	WRITE_ENUM_FIELD(op, SetOperation);
 	WRITE_BOOL_FIELD(all);
 	WRITE_NODE_FIELD(larg);
@@ -2931,12 +2883,9 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_BOOL_FIELD(hasTargetSRFs);
 	WRITE_BOOL_FIELD(hasSubLinks);
 	WRITE_BOOL_FIELD(hasDistinctOn);
-	WRITE_BOOL_FIELD(hasRecursive);
-	WRITE_BOOL_FIELD(hasModifyingCTE);
 	WRITE_BOOL_FIELD(hasForUpdate);
 	WRITE_BOOL_FIELD(hasRowSecurity);
 	WRITE_BOOL_FIELD(isReturn);
-	WRITE_NODE_FIELD(cteList);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);
 	WRITE_NODE_FIELD(targetList);
@@ -3027,63 +2976,9 @@ _outRowMarkClause(StringInfo str, const RowMarkClause *node)
 	WRITE_BOOL_FIELD(pushedDown);
 }
 
-static void
-_outWithClause(StringInfo str, const WithClause *node)
-{
-	WRITE_NODE_TYPE("WITHCLAUSE");
 
-	WRITE_NODE_FIELD(ctes);
-	WRITE_BOOL_FIELD(recursive);
-	WRITE_LOCATION_FIELD(location);
-}
 
-static void
-_outCTESearchClause(StringInfo str, const CTESearchClause *node)
-{
-	WRITE_NODE_TYPE("CTESEARCHCLAUSE");
 
-	WRITE_NODE_FIELD(search_col_list);
-	WRITE_BOOL_FIELD(search_breadth_first);
-	WRITE_STRING_FIELD(search_seq_column);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outCTECycleClause(StringInfo str, const CTECycleClause *node)
-{
-	WRITE_NODE_TYPE("CTECYCLECLAUSE");
-
-	WRITE_NODE_FIELD(cycle_col_list);
-	WRITE_STRING_FIELD(cycle_mark_column);
-	WRITE_NODE_FIELD(cycle_mark_value);
-	WRITE_NODE_FIELD(cycle_mark_default);
-	WRITE_STRING_FIELD(cycle_path_column);
-	WRITE_LOCATION_FIELD(location);
-	WRITE_OID_FIELD(cycle_mark_type);
-	WRITE_INT_FIELD(cycle_mark_typmod);
-	WRITE_OID_FIELD(cycle_mark_collation);
-	WRITE_OID_FIELD(cycle_mark_neop);
-}
-
-static void
-_outCommonTableExpr(StringInfo str, const CommonTableExpr *node)
-{
-	WRITE_NODE_TYPE("COMMONTABLEEXPR");
-
-	WRITE_STRING_FIELD(ctename);
-	WRITE_NODE_FIELD(aliascolnames);
-	WRITE_ENUM_FIELD(ctematerialized, CTEMaterialize);
-	WRITE_NODE_FIELD(ctequery);
-	WRITE_NODE_FIELD(search_clause);
-	WRITE_NODE_FIELD(cycle_clause);
-	WRITE_LOCATION_FIELD(location);
-	WRITE_BOOL_FIELD(cterecursive);
-	WRITE_INT_FIELD(cterefcount);
-	WRITE_NODE_FIELD(ctecolnames);
-	WRITE_NODE_FIELD(ctecoltypes);
-	WRITE_NODE_FIELD(ctecoltypmods);
-	WRITE_NODE_FIELD(ctecolcollations);
-}
 
 static void
 _outSetOperationStmt(StringInfo str, const SetOperationStmt *node)
@@ -3136,14 +3031,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 			break;
 		case RTE_VALUES:
 			WRITE_NODE_FIELD(values_lists);
-			WRITE_NODE_FIELD(coltypes);
-			WRITE_NODE_FIELD(coltypmods);
-			WRITE_NODE_FIELD(colcollations);
-			break;
-		case RTE_CTE:
-			WRITE_STRING_FIELD(ctename);
-			WRITE_UINT_FIELD(ctelevelsup);
-			WRITE_BOOL_FIELD(self_reference);
 			WRITE_NODE_FIELD(coltypes);
 			WRITE_NODE_FIELD(coltypmods);
 			WRITE_NODE_FIELD(colcollations);
@@ -3702,9 +3589,6 @@ outNode(StringInfo str, const void *obj)
 			case T_MergeAppend:
 				_outMergeAppend(str, obj);
 				break;
-			case T_RecursiveUnion:
-				_outRecursiveUnion(str, obj);
-				break;
 			case T_BitmapAnd:
 				_outBitmapAnd(str, obj);
 				break;
@@ -3753,15 +3637,9 @@ outNode(StringInfo str, const void *obj)
 			case T_ValuesScan:
 				_outValuesScan(str, obj);
 				break;
-			case T_CteScan:
-				_outCteScan(str, obj);
-				break;
 			case T_NamedTuplestoreScan:
 				_outNamedTuplestoreScan(str, obj);
 				break;
-			case T_WorkTableScan:
-			_outWorkTableScan(str, obj);
-			break;
 		case T_CustomScan:
 				_outCustomScan(str, obj);
 				break;
@@ -4059,9 +3937,6 @@ outNode(StringInfo str, const void *obj)
 			case T_SetOpPath:
 				_outSetOpPath(str, obj);
 				break;
-			case T_RecursiveUnionPath:
-				_outRecursiveUnionPath(str, obj);
-				break;
 			case T_LockRowsPath:
 				_outLockRowsPath(str, obj);
 				break;
@@ -4211,18 +4086,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_RowMarkClause:
 				_outRowMarkClause(str, obj);
-				break;
-			case T_WithClause:
-				_outWithClause(str, obj);
-				break;
-			case T_CTESearchClause:
-				_outCTESearchClause(str, obj);
-				break;
-			case T_CTECycleClause:
-				_outCTECycleClause(str, obj);
-				break;
-			case T_CommonTableExpr:
-				_outCommonTableExpr(str, obj);
 				break;
 			case T_SetOperationStmt:
 				_outSetOperationStmt(str, obj);

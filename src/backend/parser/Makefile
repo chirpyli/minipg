@@ -19,7 +19,6 @@ OBJS = \
 	parse_clause.o \
 	parse_coerce.o \
 	parse_collate.o \
-	parse_cte.o \
 	parse_enr.o \
 	parse_expr.o \
 	parse_func.o \

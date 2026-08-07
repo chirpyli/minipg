@@ -383,44 +383,6 @@ markTargetListOrigin(ParseState *pstate, TargetEntry *tle,
 		case RTE_RESULT:
 			/* not a simple relation, leave it unmarked */
 			break;
-		case RTE_CTE:
-
-			/*
-			 * CTE reference: copy up from the subquery, if possible. If the
-			 * RTE is a recursive self-reference then we can't do anything
-			 * because we haven't finished analyzing it yet. However, it's no
-			 * big loss because we must be down inside the recursive term of a
-			 * recursive CTE, and so any markings on the current targetlist
-			 * are not going to affect the results anyway.
-			 */
-			if (attnum != InvalidAttrNumber && !rte->self_reference)
-			{
-				CommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
-				TargetEntry *ste;
-				List	   *tl = GetCTETargetList(cte);
-				int			extra_cols = 0;
-
-				/*
-				 * RTE for CTE will already have the search and cycle columns
-				 * added, but the subquery won't, so skip looking those up.
-				 */
-				if (cte->search_clause)
-					extra_cols += 1;
-				if (cte->cycle_clause)
-					extra_cols += 2;
-				if (extra_cols &&
-					attnum > list_length(tl) &&
-					attnum <= list_length(tl) + extra_cols)
-					break;
-
-				ste = get_tle_by_resno(tl, attnum);
-				if (ste == NULL || ste->resjunk)
-					elog(ERROR, "CTE %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				tle->resorigtbl = ste->resorigtbl;
-				tle->resorigcol = ste->resorigcol;
-			}
-			break;
 	}
 }
 
@@ -1625,43 +1587,6 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 			/* else fall through to inspect the expression */
 		}
 		break;
-		case RTE_CTE:
-			/* CTE reference: examine subquery's output expr */
-			if (!rte->self_reference)
-			{
-				CommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
-				TargetEntry *ste;
-
-				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
-				if (ste == NULL || ste->resjunk)
-					elog(ERROR, "CTE %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				expr = (Node *) ste->expr;
-				if (IsA(expr, Var))
-				{
-					/*
-					 * Recurse into the CTE to see what its Var refers to. We
-					 * have to build an additional level of ParseState to keep
-					 * in step with varlevelsup in the CTE; furthermore it
-					 * could be an outer CTE (compare SUBQUERY case above).
-					 */
-					ParseState	mypstate = {0};
-					Index		levelsup;
-
-					/* this loop must work, since GetCTEForRTE did */
-					for (levelsup = 0;
-						 levelsup < rte->ctelevelsup + netlevelsup;
-						 levelsup++)
-						pstate = pstate->parentParseState;
-					mypstate.parentParseState = pstate;
-					mypstate.p_rtable = ((Query *) cte->ctequery)->rtable;
-					/* don't bother filling the rest of the fake pstate */
-
-					return expandRecordVariable(&mypstate, (Var *) expr, 0);
-				}
-				/* else fall through to inspect the expression */
-			}
-			break;
 		case RTE_JOIN:
 			/* Join RTE --- recursively inspect the alias variable */
 			Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
@@ -1678,42 +1603,6 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 			 * We couldn't get here unless a function is declared with one of
 			 * its result columns as RECORD, which is not allowed.
 			 */
-			break;
-			/* CTE reference: examine subquery's output expr */
-			if (!rte->self_reference)
-			{
-				CommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
-				TargetEntry *ste;
-
-				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
-				if (ste == NULL || ste->resjunk)
-					elog(ERROR, "CTE %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				expr = (Node *) ste->expr;
-				if (IsA(expr, Var))
-				{
-					/*
-					 * Recurse into the CTE to see what its Var refers to. We
-					 * have to build an additional level of ParseState to keep
-					 * in step with varlevelsup in the CTE; furthermore it
-					 * could be an outer CTE (compare SUBQUERY case above).
-					 */
-					ParseState	mypstate = {0};
-					Index		levelsup;
-
-					/* this loop must work, since GetCTEForRTE did */
-					for (levelsup = 0;
-						 levelsup < rte->ctelevelsup + netlevelsup;
-						 levelsup++)
-						pstate = pstate->parentParseState;
-					mypstate.parentParseState = pstate;
-					mypstate.p_rtable = ((Query *) cte->ctequery)->rtable;
-					/* don't bother filling the rest of the fake pstate */
-
-					return expandRecordVariable(&mypstate, (Var *) expr, 0);
-				}
-				/* else fall through to inspect the expression */
-			}
 			break;
 	}
 
@@ -1893,7 +1782,6 @@ FigureColnameInternal(Node *node, char **name)
 				case ALL_SUBLINK:
 				case ANY_SUBLINK:
 				case ROWCOMPARE_SUBLINK:
-				case CTE_SUBLINK:
 					break;
 			}
 			break;

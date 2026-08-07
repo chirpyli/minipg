@@ -775,10 +775,6 @@ drop table cchild;
 -- temporarily disable fancy output, so view changes create less diff noise
 \a\t
 
-SELECT viewname, definition FROM pg_views
-WHERE schemaname IN ('pg_catalog', 'public')
-ORDER BY viewname;
-
 SELECT tablename, rulename, definition FROM pg_rules
 WHERE schemaname IN ('pg_catalog', 'public')
 ORDER BY tablename, rulename;
@@ -1040,16 +1036,6 @@ select * from rules_log;
 create rule r5 as on insert to rules_src do instead insert into rules_log AS trgt SELECT NEW.* RETURNING trgt.f1, trgt.f2;
 create rule r6 as on update to rules_src do instead UPDATE rules_log AS trgt SET tag = 'updated' WHERE trgt.f1 = new.f1;
 
---
--- Check deparse disambiguation of INSERT/UPDATE/DELETE targets.
---
-create rule r7 as on delete to rules_src do instead
-  with wins as (insert into int4_tbl as trgt values (0) returning *),
-       wupd as (update int4_tbl trgt set f1 = f1+1 returning *),
-       wdel as (delete from int4_tbl trgt where f1 = 0 returning *)
-  insert into rules_log AS trgt select old.* from wins, wupd, wdel
-  returning trgt.f1, trgt.f2;
-
 -- check display of all rules added above
 \d+ rules_src
 
@@ -1202,23 +1188,17 @@ SELECT tablename, rulename, definition FROM pg_rules
 -- ensure explain works for on insert conflict rules
 explain (costs off) INSERT INTO hats VALUES ('h8', 'forbidden') RETURNING *;
 
--- ensure upserting into a rule, with a CTE (different offsets!) works
-WITH data(hat_name, hat_color) AS MATERIALIZED (
-    VALUES ('h8', 'green'),
-        ('h9', 'blue'),
-        ('h7', 'forbidden')
-)
+-- ensure upserting into a rule works
 INSERT INTO hats
-    SELECT * FROM data
+    SELECT * FROM (VALUES ('h8', 'green'),
+        ('h9', 'blue'),
+        ('h7', 'forbidden')) AS data(hat_name, hat_color)
 RETURNING *;
 EXPLAIN (costs off)
-WITH data(hat_name, hat_color) AS MATERIALIZED (
-    VALUES ('h8', 'green'),
-        ('h9', 'blue'),
-        ('h7', 'forbidden')
-)
 INSERT INTO hats
-    SELECT * FROM data
+    SELECT * FROM (VALUES ('h8', 'green'),
+        ('h9', 'blue'),
+        ('h7', 'forbidden')) AS data(hat_name, hat_color)
 RETURNING *;
 SELECT * FROM hat_data WHERE hat_name IN ('h8', 'h9', 'h7') ORDER BY hat_name;
 

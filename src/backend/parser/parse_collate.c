@@ -109,8 +109,7 @@ assign_query_collations(ParseState *pstate, Query *query)
 	(void) query_tree_walker(query,
 							 assign_query_collations_walker,
 							 (void *) pstate,
-							 QTW_IGNORE_RANGE_TABLE |
-							 QTW_IGNORE_CTE_SUBQUERIES);
+							 QTW_IGNORE_RANGE_TABLE);
 }
 
 /*

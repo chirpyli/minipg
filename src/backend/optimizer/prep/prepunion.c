@@ -52,10 +52,6 @@ static RelOptInfo *recurse_set_operations(Node *setOp, PlannerInfo *root,
 										  int flag, List *refnames_tlist,
 										  List **pTargetList,
 										  double *pNumGroups);
-static RelOptInfo *generate_recursion_path(SetOperationStmt *setOp,
-										   PlannerInfo *root,
-										   List *refnames_tlist,
-										   List **pTargetList);
 static RelOptInfo *generate_union_paths(SetOperationStmt *op, PlannerInfo *root,
 										List *refnames_tlist,
 										List **pTargetList);
@@ -151,27 +147,18 @@ plan_set_operations(PlannerInfo *root)
 	/*
 	 * If the topmost node is a recursive union, it needs special processing.
 	 */
-	if (root->hasRecursion)
-	{
-		setop_rel = generate_recursion_path(topop, root,
-											leftmostQuery->targetList,
-											&top_tlist);
-	}
-	else
-	{
-		/*
-		 * Recurse on setOperations tree to generate paths for set ops. The
-		 * final output paths should have just the column types shown as the
-		 * output from the top-level node, plus possibly resjunk working
-		 * columns (we can rely on upper-level nodes to deal with that).
-		 */
-		setop_rel = recurse_set_operations((Node *) topop, root,
-										   topop->colTypes, topop->colCollations,
-										   true, -1,
-										   leftmostQuery->targetList,
-										   &top_tlist,
-										   NULL);
-	}
+	/*
+	 * Recurse on setOperations tree to generate paths for set ops. The
+	 * final output paths should have just the column types shown as the
+	 * output from the top-level node, plus possibly resjunk working
+	 * columns (we can rely on upper-level nodes to deal with that).
+	 */
+	setop_rel = recurse_set_operations((Node *) topop, root,
+									   topop->colTypes, topop->colCollations,
+									   true, -1,
+									   leftmostQuery->targetList,
+									   &top_tlist,
+									   NULL);
 
 	/* Must return the built tlist into root->processed_tlist. */
 	root->processed_tlist = top_tlist;
@@ -425,112 +412,6 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 	postprocess_setop_rel(root, rel);
 
 	return rel;
-}
-
-/*
- * Generate paths for a recursive UNION node
- */
-static RelOptInfo *
-generate_recursion_path(SetOperationStmt *setOp, PlannerInfo *root,
-						List *refnames_tlist,
-						List **pTargetList)
-{
-	RelOptInfo *result_rel;
-	Path	   *path;
-	RelOptInfo *lrel,
-			   *rrel;
-	Path	   *lpath;
-	Path	   *rpath;
-	List	   *lpath_tlist;
-	List	   *rpath_tlist;
-	List	   *tlist;
-	List	   *groupList;
-	double		dNumGroups;
-
-	/* Parser should have rejected other cases */
-	if (setOp->op != SETOP_UNION)
-		elog(ERROR, "only UNION queries can be recursive");
-	/* Worktable ID should be assigned */
-	Assert(root->wt_param_id >= 0);
-
-	/*
-	 * Unlike a regular UNION node, process the left and right inputs
-	 * separately without any intention of combining them into one Append.
-	 */
-	lrel = recurse_set_operations(setOp->larg, root,
-								  setOp->colTypes, setOp->colCollations,
-								  false, -1,
-								  refnames_tlist,
-								  &lpath_tlist,
-								  NULL);
-	lpath = lrel->cheapest_total_path;
-	/* The right path will want to look at the left one ... */
-	root->non_recursive_path = lpath;
-	rrel = recurse_set_operations(setOp->rarg, root,
-								  setOp->colTypes, setOp->colCollations,
-								  false, -1,
-								  refnames_tlist,
-								  &rpath_tlist,
-								  NULL);
-	rpath = rrel->cheapest_total_path;
-	root->non_recursive_path = NULL;
-
-	/*
-	 * Generate tlist for RecursiveUnion path node --- same as in Append cases
-	 */
-	tlist = generate_append_tlist(setOp->colTypes, setOp->colCollations, false,
-								  list_make2(lpath_tlist, rpath_tlist),
-								  refnames_tlist);
-
-	*pTargetList = tlist;
-
-	/* Build result relation. */
-	result_rel = fetch_upper_rel(root, UPPERREL_SETOP,
-								 bms_union(lrel->relids, rrel->relids));
-	result_rel->reltarget = create_pathtarget(root, tlist);
-
-	/*
-	 * If UNION, identify the grouping operators
-	 */
-	if (setOp->all)
-	{
-		groupList = NIL;
-		dNumGroups = 0;
-	}
-	else
-	{
-		/* Identify the grouping semantics */
-		groupList = generate_setop_grouplist(setOp, tlist);
-
-		/* We only support hashing here */
-		if (!grouping_is_hashable(groupList))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("could not implement recursive UNION"),
-					 errdetail("All column datatypes must be hashable.")));
-
-		/*
-		 * For the moment, take the number of distinct groups as equal to the
-		 * total input size, ie, the worst case.
-		 */
-		dNumGroups = lpath->rows + rpath->rows * 10;
-	}
-
-	/*
-	 * And make the path node.
-	 */
-	path = (Path *) create_recursiveunion_path(root,
-											   result_rel,
-											   lpath,
-											   rpath,
-											   result_rel->reltarget,
-											   groupList,
-											   root->wt_param_id,
-											   dNumGroups);
-
-	add_path(result_rel, path);
-	postprocess_setop_rel(root, result_rel);
-	return result_rel;
 }
 
 /*

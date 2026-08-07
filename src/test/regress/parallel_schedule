@@ -120,7 +120,7 @@ test: portals_p2 cluster guc bitmapops combocid window functional_deps advisory_
 # so keep this parallel group to at most 19 tests
 # ----------
 # information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
-test: plancache limit plpgsql temp domain rangefuncs prepare conversion truncate polymorphism returning with
+test: plancache limit plpgsql temp domain rangefuncs prepare conversion truncate polymorphism returning
 
 # ----------
 # Another group of parallel tests

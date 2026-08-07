@@ -792,49 +792,31 @@ select last_value(salary) over(order by enroll_date groups between 1 following a
 	salary, enroll_date from empsalary;
 
 -- Show differences in offset interpretation between ROWS, RANGE, and GROUPS
-WITH cte (x) AS (
-        SELECT * FROM generate_series(1, 35, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (SELECT * FROM generate_series(1, 35, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x rows between 1 preceding and 1 following);
 
-WITH cte (x) AS (
-        SELECT * FROM generate_series(1, 35, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (SELECT * FROM generate_series(1, 35, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x range between 1 preceding and 1 following);
 
-WITH cte (x) AS (
-        SELECT * FROM generate_series(1, 35, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (SELECT * FROM generate_series(1, 35, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x groups between 1 preceding and 1 following);
 
-WITH cte (x) AS (
-        select 1 union all select 1 union all select 1 union all
-        SELECT * FROM generate_series(5, 49, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (select 1 union all select 1 union all select 1 union all
+        SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x rows between 1 preceding and 1 following);
 
-WITH cte (x) AS (
-        select 1 union all select 1 union all select 1 union all
-        SELECT * FROM generate_series(5, 49, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (select 1 union all select 1 union all select 1 union all
+        SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x range between 1 preceding and 1 following);
 
-WITH cte (x) AS (
-        select 1 union all select 1 union all select 1 union all
-        SELECT * FROM generate_series(5, 49, 2)
-)
 SELECT x, (sum(x) over w)
-FROM cte
+FROM (select 1 union all select 1 union all select 1 union all
+        SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x groups between 1 preceding and 1 following);
 
 -- with UNION
@@ -1160,22 +1142,20 @@ CREATE AGGREGATE sum_int_randomrestart (int4)
 	minvfunc = sum_int_randrestart_minvfunc
 );
 
-WITH
-vs AS (
+CREATE TEMP TABLE vs (i int, v int4);
+INSERT INTO vs
 	SELECT i, (random() * 100)::int4 AS v
-	FROM generate_series(1, 100) AS i
-),
-sum_following AS (
-	SELECT i, SUM(v) OVER
-		(ORDER BY i DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS s
-	FROM vs
-)
+	FROM generate_series(1, 100) AS i;
+
 SELECT DISTINCT
 	sum_following.s = sum_int_randomrestart(v) OVER fwd AS eq1,
 	-sum_following.s = sum_int_randomrestart(-v) OVER fwd AS eq2,
 	100*3+(vs.i-1)*3 = length(logging_agg_nonstrict(''::text) OVER fwd) AS eq3
 FROM vs
-JOIN sum_following ON sum_following.i = vs.i
+JOIN (SELECT i, SUM(v) OVER
+		(ORDER BY i DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS s
+      FROM vs) sum_following
+  ON sum_following.i = vs.i
 WINDOW fwd AS (
 	ORDER BY vs.i ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
 );

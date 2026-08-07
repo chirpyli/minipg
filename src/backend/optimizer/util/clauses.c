@@ -4548,7 +4548,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 		querytree->hasWindowFuncs ||
 		querytree->hasTargetSRFs ||
 		querytree->hasSubLinks ||
-		querytree->cteList ||
 		querytree->rtable ||
 		querytree->jointree->fromlist ||
 		querytree->jointree->quals ||

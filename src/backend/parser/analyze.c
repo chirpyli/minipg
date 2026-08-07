@@ -36,7 +36,6 @@
 #include "parser/parse_clause.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_collate.h"
-#include "parser/parse_cte.h"
 #include "parser/parse_expr.h"
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
@@ -71,8 +70,6 @@ static Query *transformValuesClause(ParseState *pstate, SelectStmt *stmt);
 static Query *transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt);
 static Node *transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 									   bool isTopLevel, List **targetlist);
-static void determineRecursiveColTypes(ParseState *pstate,
-									   Node *larg, List *nrtargetlist);
 static Query *transformReturnStmt(ParseState *pstate, ReturnStmt *stmt);
 static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt);
 static List *transformReturningList(ParseState *pstate, List *returningList);
@@ -182,14 +179,12 @@ parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
  */
 Query *
 parse_sub_analyze(Node *parseTree, ParseState *parentParseState,
-				  CommonTableExpr *parentCTE,
 				  bool locked_from_parent,
 				  bool resolve_unknowns)
 {
 	ParseState *pstate = make_parsestate(parentParseState);
 	Query	   *query;
 
-	pstate->p_parent_cte = parentCTE;
 	pstate->p_locked_from_parent = locked_from_parent;
 	pstate->p_resolve_unknowns = resolve_unknowns;
 
@@ -435,14 +430,6 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 
 	qry->commandType = CMD_DELETE;
 
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
-
 	/* set up range table with just the result rel */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
 										 stmt->relation->inh,
@@ -515,19 +502,8 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	bool		isOnConflictUpdate;
 	AclMode		targetPerms;
 
-	/* There can't be any outer WITH to worry about */
-	Assert(pstate->p_ctenamespace == NIL);
-
 	qry->commandType = CMD_INSERT;
 	pstate->p_is_insert = true;
-
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
 
 	qry->override = stmt->override;
 
@@ -547,8 +523,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 									  selectStmt->sortClause != NIL ||
 									  selectStmt->limitOffset != NULL ||
 									  selectStmt->limitCount != NULL ||
-									  selectStmt->lockingClause != NIL ||
-									  selectStmt->withClause != NULL));
+									  selectStmt->lockingClause != NIL));
 
 	/*
 	 * If a non-nil rangetable/namespace was passed in, and we are doing
@@ -1253,14 +1228,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	qry->commandType = CMD_SELECT;
 
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
-
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
 
@@ -1405,14 +1372,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	Assert(stmt->havingClause == NULL);
 	Assert(stmt->windowClause == NIL);
 	Assert(stmt->op == SETOP_NONE);
-
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
 
 	/*
 	 * For each row of VALUES, transform the raw expressions.
@@ -1607,7 +1566,6 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 	Node	   *limitOffset;
 	Node	   *limitCount;
 	List	   *lockingClause;
-	WithClause *withClause;
 	Node	   *node;
 	ListCell   *left_tlist,
 			   *lct,
@@ -1648,13 +1606,11 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 	limitOffset = stmt->limitOffset;
 	limitCount = stmt->limitCount;
 	lockingClause = stmt->lockingClause;
-	withClause = stmt->withClause;
 
 	stmt->sortClause = NIL;
 	stmt->limitOffset = NULL;
 	stmt->limitCount = NULL;
 	stmt->lockingClause = NIL;
-	stmt->withClause = NULL;
 
 	/* We don't support FOR UPDATE/SHARE with set ops at the moment. */
 	if (lockingClause)
@@ -1665,14 +1621,6 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 				 errmsg("%s is not allowed with UNION/INTERSECT/EXCEPT",
 						LCS_asString(((LockingClause *)
 									  linitial(lockingClause))->strength))));
-
-	/* Process the WITH clause independently of all else */
-	if (withClause)
-	{
-		qry->hasRecursive = withClause->recursive;
-		qry->cteList = transformWithClause(pstate, withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
 
 	/*
 	 * Recursively transform the components of the tree.
@@ -1931,7 +1879,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 	{
 		Assert(stmt->larg != NULL && stmt->rarg != NULL);
 		if (stmt->sortClause || stmt->limitOffset || stmt->limitCount ||
-			stmt->lockingClause || stmt->withClause)
+			stmt->lockingClause)
 			isLeaf = true;
 		else
 			isLeaf = false;
@@ -1961,7 +1909,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		 * namespace list.
 		 */
 		selectQuery = parse_sub_analyze((Node *) stmt, pstate,
-										NULL, false, false);
+										false, false);
 
 		/*
 		 * Check for bogus references to Vars on the current query level (but
@@ -2021,8 +1969,6 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		ListCell   *ltl;
 		ListCell   *rtl;
 		const char *context;
-		bool recursive = (pstate->p_parent_cte &&
-						  pstate->p_parent_cte->cterecursive);
 
 		context = (stmt->op == SETOP_UNION ? "UNION" :
 				   (stmt->op == SETOP_INTERSECT ? "INTERSECT" :
@@ -2037,15 +1983,6 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		op->larg = transformSetOperationTree(pstate, stmt->larg,
 											 false,
 											 &ltargetlist);
-
-		/*
-		 * If we are processing a recursive union query, now is the time to
-		 * examine the non-recursive term's output columns and mark the
-		 * containing CTE as having those result columns.  We should do this
-		 * only at the topmost setop of the CTE, of course.
-		 */
-		if (isTopLevel && recursive)
-			determineRecursiveColTypes(pstate, op->larg, ltargetlist);
 
 		/*
 		 * Recursively transform the right child node.
@@ -2176,9 +2113,8 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 				setup_parser_errposition_callback(&pcbstate, pstate,
 												  bestlocation);
 
-				/* If it's a recursive union, we need to require hashing support. */
 				op->groupClauses = lappend(op->groupClauses,
-										   makeSortGroupClauseForSetOp(rescoltype, recursive));
+										   makeSortGroupClauseForSetOp(rescoltype, false));
 
 				cancel_parser_errposition_callback(&pcbstate);
 			}
@@ -2208,60 +2144,6 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		return (Node *) op;
 	}
 }
-
-/*
- * Process the outputs of the non-recursive term of a recursive union
- * to set up the parent CTE's columns
- */
-static void
-determineRecursiveColTypes(ParseState *pstate, Node *larg, List *nrtargetlist)
-{
-	Node	   *node;
-	int			leftmostRTI;
-	Query	   *leftmostQuery;
-	List	   *targetList;
-	ListCell   *left_tlist;
-	ListCell   *nrtl;
-	int			next_resno;
-
-	/*
-	 * Find leftmost leaf SELECT
-	 */
-	node = larg;
-	while (node && IsA(node, SetOperationStmt))
-		node = ((SetOperationStmt *) node)->larg;
-	Assert(node && IsA(node, RangeTblRef));
-	leftmostRTI = ((RangeTblRef *) node)->rtindex;
-	leftmostQuery = rt_fetch(leftmostRTI, pstate->p_rtable)->subquery;
-	Assert(leftmostQuery != NULL);
-
-	/*
-	 * Generate dummy targetlist using column names of leftmost select and
-	 * dummy result expressions of the non-recursive term.
-	 */
-	targetList = NIL;
-	next_resno = 1;
-
-	forboth(nrtl, nrtargetlist, left_tlist, leftmostQuery->targetList)
-	{
-		TargetEntry *nrtle = (TargetEntry *) lfirst(nrtl);
-		TargetEntry *lefttle = (TargetEntry *) lfirst(left_tlist);
-		char	   *colName;
-		TargetEntry *tle;
-
-		Assert(!lefttle->resjunk);
-		colName = pstrdup(lefttle->resname);
-		tle = makeTargetEntry(nrtle->expr,
-							  next_resno++,
-							  colName,
-							  false);
-		targetList = lappend(targetList, tle);
-	}
-
-	/* Now build CTE's output column info using dummy targetlist */
-	analyzeCTETargetList(pstate, pstate->p_parent_cte, targetList);
-}
-
 
 /*
  * transformReturnStmt -
@@ -2306,14 +2188,6 @@ transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt)
 
 	qry->commandType = CMD_UPDATE;
 	pstate->p_is_insert = false;
-
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
 
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
 										 stmt->relation->inh,
@@ -2771,16 +2645,6 @@ transformDeclareCursorStmt(ParseState *pstate, DeclareCursorStmt *stmt)
 		query->commandType != CMD_SELECT)
 		elog(ERROR, "unexpected non-SELECT command in DECLARE CURSOR");
 
-	/*
-	 * We also disallow data-modifying WITH in a cursor.  (This could be
-	 * allowed, but the semantics of when the updates occur might be
-	 * surprising.)
-	 */
-	if (query->hasModifyingCTE)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("DECLARE CURSOR must not contain data-modifying statements in WITH")));
-
 	/* FOR UPDATE and WITH HOLD are not compatible */
 	if (query->rowMarks != NIL && (stmt->options & CURSOR_OPT_HOLD))
 		ereport(ERROR,
@@ -3217,18 +3081,9 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
 									 errmsg("%s cannot be applied to VALUES",
 											LCS_asString(lc->strength)),
-									 parser_errposition(pstate, thisrel->location)));
-							break;
-						case RTE_CTE:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a WITH query",
-											LCS_asString(lc->strength)),
-									 parser_errposition(pstate, thisrel->location)));
-							break;
-						case RTE_NAMEDTUPLESTORE:
+								 parser_errposition(pstate, thisrel->location)));
+						break;
+					case RTE_NAMEDTUPLESTORE:
 							ereport(ERROR,
 									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							/*------

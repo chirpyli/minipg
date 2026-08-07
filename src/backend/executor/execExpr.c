@@ -2788,9 +2788,6 @@ ExecInitWholeRowVar(ExprEvalStep *scratch, Var *variable, ExprState *state)
 			case T_SubqueryScanState:
 				subplan = ((SubqueryScanState *) parent)->subplan;
 				break;
-			case T_CteScanState:
-				subplan = ((CteScanState *) parent)->cteplanstate;
-				break;
 			default:
 				break;
 		}

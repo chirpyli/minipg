@@ -59,17 +59,6 @@ select * from vw_ord;
  1 | 1 | 11 |   1
 (1 row)
 
-select definition from pg_views where viewname='vw_ord';
-                               definition                                
--------------------------------------------------------------------------
-  SELECT v.n,                                                           +
-     z.a,                                                               +
-     z.b,                                                               +
-     z.ord                                                              +
-    FROM (( VALUES (1)) v(n)                                            +
-      JOIN rngfunct(1) WITH ORDINALITY z(a, b, ord) ON ((v.n = z.ord)));
-(1 row)
-
 drop view vw_ord;
 -- multiple functions
 select * from rows from(rngfunct(1),rngfunct(2)) with ordinality as z(a,b,c,d,ord);
@@ -84,19 +73,6 @@ select * from vw_ord;
  n | a | b  | c | d  | ord 
 ---+---+----+---+----+-----
  1 | 1 | 11 | 2 | 22 |   1
-(1 row)
-
-select definition from pg_views where viewname='vw_ord';
-                                              definition                                               
--------------------------------------------------------------------------------------------------------
-  SELECT v.n,                                                                                         +
-     z.a,                                                                                             +
-     z.b,                                                                                             +
-     z.c,                                                                                             +
-     z.d,                                                                                             +
-     z.ord                                                                                            +
-    FROM (( VALUES (1)) v(n)                                                                          +
-      JOIN ROWS FROM(rngfunct(1), rngfunct(2)) WITH ORDINALITY z(a, b, c, d, ord) ON ((v.n = z.ord)));
 (1 row)
 
 drop view vw_ord;
@@ -137,15 +113,6 @@ select * from vw_ord;
  20 | bar |    
 (2 rows)
 
-select definition from pg_views where viewname='vw_ord';
-                                       definition                                       
-----------------------------------------------------------------------------------------
-  SELECT z.a,                                                                          +
-     z.b,                                                                              +
-     z.c                                                                               +
-    FROM UNNEST(ARRAY[10, 20], ARRAY['foo'::text, 'bar'::text], ARRAY[1.0]) z(a, b, c);
-(1 row)
-
 drop view vw_ord;
 create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) as z(a,b,c);
 select * from vw_ord;
@@ -155,15 +122,6 @@ select * from vw_ord;
  20 | bar |    
 (2 rows)
 
-select definition from pg_views where viewname='vw_ord';
-                                       definition                                       
-----------------------------------------------------------------------------------------
-  SELECT z.a,                                                                          +
-     z.b,                                                                              +
-     z.c                                                                               +
-    FROM UNNEST(ARRAY[10, 20], ARRAY['foo'::text, 'bar'::text], ARRAY[1.0]) z(a, b, c);
-(1 row)
-
 drop view vw_ord;
 create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(1,2)) as z(a,b,c);
 select * from vw_ord;
@@ -172,15 +130,6 @@ select * from vw_ord;
  10 | foo | 1
  20 | bar | 2
 (2 rows)
-
-select definition from pg_views where viewname='vw_ord';
-                                                      definition                                                      
-----------------------------------------------------------------------------------------------------------------------
-  SELECT z.a,                                                                                                        +
-     z.b,                                                                                                            +
-     z.c                                                                                                             +
-    FROM ROWS FROM(unnest(ARRAY[10, 20]), unnest(ARRAY['foo'::text, 'bar'::text]), generate_series(1, 2)) z(a, b, c);
-(1 row)
 
 drop view vw_ord;
 -- ordinality and multiple functions vs. rewind and reverse scan
@@ -2361,18 +2310,6 @@ create type rngfunc2 as (a integer, b text);
 drop type rngfunc2;
 -- check handling of functions pulled up into function RTEs (bug #17227)
 -- check detection of mismatching record types with a const-folded expression
-with a(b) as (values (row(1,2,3)))
-select * from a, coalesce(b) as c(d int, e int);  -- fail
-ERROR:  function return row and query-specified return row do not match
-DETAIL:  Returned row contains 3 attributes, but query expects 2.
-with a(b) as (values (row(1,2,3)))
-select * from a, coalesce(b) as c(d int, e int, f int, g int);  -- fail
-ERROR:  function return row and query-specified return row do not match
-DETAIL:  Returned row contains 3 attributes, but query expects 4.
-with a(b) as (values (row(1,2,3)))
-select * from a, coalesce(b) as c(d int, e int, f float);  -- fail
-ERROR:  function return row and query-specified return row do not match
-DETAIL:  Returned type integer at ordinal position 3, but query expects double precision.
 select * from int8_tbl, coalesce(row(1)) as (a int, b int);  -- fail
 ERROR:  function return row and query-specified return row do not match
 DETAIL:  Returned row contains 1 attribute, but query expects 2.

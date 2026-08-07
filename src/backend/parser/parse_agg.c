@@ -810,23 +810,6 @@ check_agg_arguments_walker(Node *node,
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) node;
 
-		if (rte->rtekind == RTE_CTE)
-		{
-			int			ctelevelsup = rte->ctelevelsup;
-
-			/* convert levelsup to frame of reference of original query */
-			ctelevelsup -= context->sublevels_up;
-			/* ignore local CTEs of subqueries */
-			if (ctelevelsup >= 0)
-			{
-				if (context->min_ctelevel < 0 ||
-					context->min_ctelevel > ctelevelsup)
-				{
-					context->min_ctelevel = ctelevelsup;
-					context->min_cte = rte;
-				}
-			}
-		}
 		return false;			/* allow range_table_walker to continue */
 	}
 	if (IsA(node, Query))
@@ -1183,7 +1166,7 @@ parseCheckAggregates(ParseState *pstate, Query *qry)
 
 		if (rte->rtekind == RTE_JOIN)
 			hasJoinRTEs = true;
-		else if (rte->rtekind == RTE_CTE && rte->self_reference)
+		else if (false)
 			hasSelfRefRTEs = true;
 	}
 

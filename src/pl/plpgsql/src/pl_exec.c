@@ -7944,7 +7944,6 @@ exec_is_simple_query(PLpgSQL_expr *expr)
 		query->hasWindowFuncs ||
 		query->hasTargetSRFs ||
 		query->hasSubLinks ||
-		query->cteList ||
 		query->jointree->fromlist ||
 		query->jointree->quals ||
 		query->groupClause ||

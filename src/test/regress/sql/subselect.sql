@@ -373,8 +373,6 @@ select (select (a.*)::text) from view_a a;
 --
 
 select q from (select max(f1) from int4_tbl group by f1 order by f1) q;
-with q as (select max(f1) from int4_tbl group by f1 order by f1)
-  select q from q;
 
 --
 -- Test case for sublinks pulled up into joinaliasvars lists in an
@@ -415,9 +413,8 @@ insert into upsert values(1, 'val') on conflict (key) do update set val = 'seen 
 
 select * from upsert;
 
-with aa as (select 'int4_tbl' u from int4_tbl limit 1)
 insert into upsert values (1, 'x'), (999, 'y')
-on conflict (key) do update set val = (select u from aa)
+on conflict (key) do update set val = (select u from (select 'int4_tbl' u from int4_tbl limit 1) aa)
 returning *;
 
 --
@@ -609,32 +606,6 @@ select count(*) from
     select * from onek i1 where i1.unique1 = o.unique1
     except
     select * from onek i2 where i2.unique1 = o.unique2
-  ) ss
-where o.ten = 1;
-
---
--- Test rescan of a RecursiveUnion node
---
-explain (costs off)
-select sum(o.four), sum(ss.a) from
-  onek o cross join lateral (
-    with recursive x(a) as
-      (select o.four as a
-       union
-       select a + 1 from x
-       where a < 10)
-    select * from x
-  ) ss
-where o.ten = 1;
-
-select sum(o.four), sum(ss.a) from
-  onek o cross join lateral (
-    with recursive x(a) as
-      (select o.four as a
-       union
-       select a + 1 from x
-       where a < 10)
-    select * from x
   ) ss
 where o.ten = 1;
 
@@ -854,96 +825,3 @@ move forward all in c1;
 fetch backward all in c1;
 
 commit;
-
---
--- Tests for CTE inlining behavior
---
-
--- Basic subquery that can be inlined
-explain (verbose, costs off)
-with x as (select * from (select f1 from subselect_tbl) ss)
-select * from x where f1 = 1;
-
--- Explicitly request materialization
-explain (verbose, costs off)
-with x as materialized (select * from (select f1 from subselect_tbl) ss)
-select * from x where f1 = 1;
-
--- Stable functions are safe to inline
-explain (verbose, costs off)
-with x as (select * from (select f1, now() from subselect_tbl) ss)
-select * from x where f1 = 1;
-
--- Volatile functions prevent inlining
-explain (verbose, costs off)
-with x as (select * from (select f1, random() from subselect_tbl) ss)
-select * from x where f1 = 1;
-
--- SELECT FOR UPDATE cannot be inlined
-explain (verbose, costs off)
-with x as (select * from (select f1 from subselect_tbl for update) ss)
-select * from x where f1 = 1;
-
--- Multiply-referenced CTEs are inlined only when requested
-explain (verbose, costs off)
-with x as (select * from (select f1, now() as n from subselect_tbl) ss)
-select * from x, x x2 where x.n = x2.n;
-
-explain (verbose, costs off)
-with x as not materialized (select * from (select f1, now() as n from subselect_tbl) ss)
-select * from x, x x2 where x.n = x2.n;
-
--- Multiply-referenced CTEs can't be inlined if they contain outer self-refs
-explain (verbose, costs off)
-with recursive x(a) as
-  ((values ('a'), ('b'))
-   union all
-   (with z as not materialized (select * from x)
-    select z.a || z1.a as a from z cross join z as z1
-    where length(z.a || z1.a) < 5))
-select * from x;
-
-with recursive x(a) as
-  ((values ('a'), ('b'))
-   union all
-   (with z as not materialized (select * from x)
-    select z.a || z1.a as a from z cross join z as z1
-    where length(z.a || z1.a) < 5))
-select * from x;
-
-explain (verbose, costs off)
-with recursive x(a) as
-  ((values ('a'), ('b'))
-   union all
-   (with z as not materialized (select * from x)
-    select z.a || z.a as a from z
-    where length(z.a || z.a) < 5))
-select * from x;
-
-with recursive x(a) as
-  ((values ('a'), ('b'))
-   union all
-   (with z as not materialized (select * from x)
-    select z.a || z.a as a from z
-    where length(z.a || z.a) < 5))
-select * from x;
-
--- Check handling of outer references
-explain (verbose, costs off)
-with x as (select * from int4_tbl)
-select * from (with y as (select * from x) select * from y) ss;
-
-explain (verbose, costs off)
-with x as materialized (select * from int4_tbl)
-select * from (with y as (select * from x) select * from y) ss;
-
--- Ensure that we inline the currect CTE when there are
--- multiple CTEs with the same name
-explain (verbose, costs off)
-with x as (select 1 as y)
-select * from (with x as (select 2 as y) select * from x) ss;
-
--- Row marks are not pushed into CTEs
-explain (verbose, costs off)
-with x as (select * from subselect_tbl)
-select * from x for update;
