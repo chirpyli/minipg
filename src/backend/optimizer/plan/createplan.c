@@ -110,8 +110,6 @@ static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
 static Plan *create_groupingsets_plan(PlannerInfo *root, GroupingSetsPath *best_path);
 static Result *create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path);
 static WindowAgg *create_windowagg_plan(PlannerInfo *root, WindowAggPath *best_path);
-static SetOp *create_setop_plan(PlannerInfo *root, SetOpPath *best_path,
-								int flags);
 static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
 									  int flags);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
@@ -275,9 +273,6 @@ static Unique *make_unique_from_pathkeys(Plan *lefttree,
 										 List *pathkeys, int numCols);
 static Gather *make_gather(List *qptlist, List *qpqual,
 						   int nworkers, int rescan_param, bool single_copy, Plan *subplan);
-static SetOp *make_setop(SetOpCmd cmd, SetOpStrategy strategy, Plan *lefttree,
-						 List *distinctList, AttrNumber flagColIdx, int firstFlag,
-						 long numGroups);
 static LockRows *make_lockrows(Plan *lefttree, List *rowMarks, int epqParam);
 static Result *make_result(List *tlist, Node *resconstantqual, Plan *subplan);
 static ProjectSet *make_project_set(List *tlist, Plan *subplan);
@@ -484,12 +479,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_WindowAgg:
 			plan = (Plan *) create_windowagg_plan(root,
 												  (WindowAggPath *) best_path);
-			break;
-		case T_SetOp:
-			plan = (Plan *) create_setop_plan(root,
-											  (SetOpPath *) best_path,
-											  flags);
-			break;
 			break;
 		case T_LockRows:
 			plan = (Plan *) create_lockrows_plan(root,
@@ -2545,42 +2534,6 @@ create_windowagg_plan(PlannerInfo *root, WindowAggPath *best_path)
 						  wc->inRangeAsc,
 						  wc->inRangeNullsFirst,
 						  subplan);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
-/*
- * create_setop_plan
- *
- *	  Create a SetOp plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static SetOp *
-create_setop_plan(PlannerInfo *root, SetOpPath *best_path, int flags)
-{
-	SetOp	   *plan;
-	Plan	   *subplan;
-	long		numGroups;
-
-	/*
-	 * SetOp doesn't project, so tlist requirements pass through; moreover we
-	 * need grouping columns to be labeled.
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath,
-								  flags | CP_LABEL_TLIST);
-
-	/* Convert numGroups to long int --- but 'ware overflow! */
-	numGroups = (long) Min(best_path->numGroups, (double) LONG_MAX);
-
-	plan = make_setop(best_path->cmd,
-					  best_path->strategy,
-					  subplan,
-					  best_path->distinctList,
-					  best_path->flagColIdx,
-					  best_path->firstFlag,
-					  numGroups);
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -6150,62 +6103,6 @@ make_gather(List *qptlist,
 	return node;
 }
 
-/*
- * distinctList is a list of SortGroupClauses, identifying the targetlist
- * items that should be considered by the SetOp filter.  The input path must
- * already be sorted accordingly.
- */
-static SetOp *
-make_setop(SetOpCmd cmd, SetOpStrategy strategy, Plan *lefttree,
-		   List *distinctList, AttrNumber flagColIdx, int firstFlag,
-		   long numGroups)
-{
-	SetOp	   *node = makeNode(SetOp);
-	Plan	   *plan = &node->plan;
-	int			numCols = list_length(distinctList);
-	int			keyno = 0;
-	AttrNumber *dupColIdx;
-	Oid		   *dupOperators;
-	Oid		   *dupCollations;
-	ListCell   *slitem;
-
-	plan->targetlist = lefttree->targetlist;
-	plan->qual = NIL;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-
-	/*
-	 * convert SortGroupClause list into arrays of attr indexes and equality
-	 * operators, as wanted by executor
-	 */
-	dupColIdx = (AttrNumber *) palloc(sizeof(AttrNumber) * numCols);
-	dupOperators = (Oid *) palloc(sizeof(Oid) * numCols);
-	dupCollations = (Oid *) palloc(sizeof(Oid) * numCols);
-
-	foreach(slitem, distinctList)
-	{
-		SortGroupClause *sortcl = (SortGroupClause *) lfirst(slitem);
-		TargetEntry *tle = get_sortgroupclause_tle(sortcl, plan->targetlist);
-
-		dupColIdx[keyno] = tle->resno;
-		dupOperators[keyno] = sortcl->eqop;
-		dupCollations[keyno] = exprCollation((Node *) tle->expr);
-		Assert(OidIsValid(dupOperators[keyno]));
-		keyno++;
-	}
-
-	node->cmd = cmd;
-	node->strategy = strategy;
-	node->numCols = numCols;
-	node->dupColIdx = dupColIdx;
-	node->dupOperators = dupOperators;
-	node->dupCollations = dupCollations;
-	node->flagColIdx = flagColIdx;
-	node->firstFlag = firstFlag;
-	node->numGroups = numGroups;
-
-	return node;
-}
 
 /*
  * make_lockrows
@@ -6397,7 +6294,6 @@ is_projection_capable_path(Path *path)
 		case T_Sort:
 		case T_IncrementalSort:
 		case T_Unique:
-		case T_SetOp:
 		case T_LockRows:
 		case T_Limit:
 		case T_ModifyTable:
@@ -6441,7 +6337,6 @@ is_projection_capable_plan(Plan *plan)
 		case T_Memoize:
 		case T_Sort:
 		case T_Unique:
-		case T_SetOp:
 		case T_LockRows:
 		case T_Limit:
 		case T_ModifyTable:

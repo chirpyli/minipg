@@ -74,22 +74,12 @@ copy (select * from test1 join test2 using (id)) to stdout;
 -- Test UNION SELECT
 --
 copy (select t from test1 where id = 1 UNION select * from v_test1 ORDER BY 1) to stdout;
-a
-v_a
-v_b
-v_c
-v_d
-v_e
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 --
 -- Test subselect
 --
 copy (select * from (select t from test1 where id = 1 UNION select * from v_test1 ORDER BY 1) t1) to stdout;
-a
-v_a
-v_b
-v_c
-v_d
-v_e
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 --
 -- Test headers, CSV and quotes
 --

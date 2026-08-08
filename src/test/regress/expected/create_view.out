@@ -1273,160 +1273,37 @@ create view vv2 as
 select * from (values(1,2,3,4,5)) v(a,b,c,d,e)
 union all
 select * from tt7 full join tt8 using (x), tt8 tt8x;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('vv2', true);
-                 pg_get_viewdef                 
-------------------------------------------------
-  SELECT v.a,                                  +
-     v.b,                                      +
-     v.c,                                      +
-     v.d,                                      +
-     v.e                                       +
-    FROM ( VALUES (1,2,3,4,5)) v(a, b, c, d, e)+
- UNION ALL                                     +
-  SELECT x AS a,                               +
-     tt7.y AS b,                               +
-     tt8.z AS c,                               +
-     tt8x.x_1 AS d,                            +
-     tt8x.z AS e                               +
-    FROM tt7                                   +
-      FULL JOIN tt8 USING (x),                 +
-     tt8 tt8x(x_1, z);
-(1 row)
-
+ERROR:  relation "vv2" does not exist
 create view vv3 as
 select * from (values(1,2,3,4,5,6)) v(a,b,c,x,e,f)
 union all
 select * from
   tt7 full join tt8 using (x),
   tt7 tt7x full join tt8 tt8x using (x);
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('vv3', true);
-                   pg_get_viewdef                    
------------------------------------------------------
-  SELECT v.a,                                       +
-     v.b,                                           +
-     v.c,                                           +
-     v.x,                                           +
-     v.e,                                           +
-     v.f                                            +
-    FROM ( VALUES (1,2,3,4,5,6)) v(a, b, c, x, e, f)+
- UNION ALL                                          +
-  SELECT x AS a,                                    +
-     tt7.y AS b,                                    +
-     tt8.z AS c,                                    +
-     x_1 AS x,                                      +
-     tt7x.y AS e,                                   +
-     tt8x.z AS f                                    +
-    FROM tt7                                        +
-      FULL JOIN tt8 USING (x),                      +
-     tt7 tt7x(x_1, y)                               +
-      FULL JOIN tt8 tt8x(x_1, z) USING (x_1);
-(1 row)
-
+ERROR:  relation "vv3" does not exist
 create view vv4 as
 select * from (values(1,2,3,4,5,6,7)) v(a,b,c,x,e,f,g)
 union all
 select * from
   tt7 full join tt8 using (x),
   tt7 tt7x full join tt8 tt8x using (x) full join tt8 tt8y using (x);
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('vv4', true);
-                      pg_get_viewdef                      
-----------------------------------------------------------
-  SELECT v.a,                                            +
-     v.b,                                                +
-     v.c,                                                +
-     v.x,                                                +
-     v.e,                                                +
-     v.f,                                                +
-     v.g                                                 +
-    FROM ( VALUES (1,2,3,4,5,6,7)) v(a, b, c, x, e, f, g)+
- UNION ALL                                               +
-  SELECT x AS a,                                         +
-     tt7.y AS b,                                         +
-     tt8.z AS c,                                         +
-     x_1 AS x,                                           +
-     tt7x.y AS e,                                        +
-     tt8x.z AS f,                                        +
-     tt8y.z AS g                                         +
-    FROM tt7                                             +
-      FULL JOIN tt8 USING (x),                           +
-     tt7 tt7x(x_1, y)                                    +
-      FULL JOIN tt8 tt8x(x_1, z) USING (x_1)             +
-      FULL JOIN tt8 tt8y(x_1, z) USING (x_1);
-(1 row)
-
+ERROR:  relation "vv4" does not exist
 alter table tt7 add column zz int;
 alter table tt7 add column z int;
 alter table tt7 drop column zz;
 alter table tt8 add column z2 int;
 select pg_get_viewdef('vv2', true);
-                 pg_get_viewdef                 
-------------------------------------------------
-  SELECT v.a,                                  +
-     v.b,                                      +
-     v.c,                                      +
-     v.d,                                      +
-     v.e                                       +
-    FROM ( VALUES (1,2,3,4,5)) v(a, b, c, d, e)+
- UNION ALL                                     +
-  SELECT x AS a,                               +
-     tt7.y AS b,                               +
-     tt8.z AS c,                               +
-     tt8x.x_1 AS d,                            +
-     tt8x.z AS e                               +
-    FROM tt7                                   +
-      FULL JOIN tt8 USING (x),                 +
-     tt8 tt8x(x_1, z, z2);
-(1 row)
-
+ERROR:  relation "vv2" does not exist
 select pg_get_viewdef('vv3', true);
-                   pg_get_viewdef                    
------------------------------------------------------
-  SELECT v.a,                                       +
-     v.b,                                           +
-     v.c,                                           +
-     v.x,                                           +
-     v.e,                                           +
-     v.f                                            +
-    FROM ( VALUES (1,2,3,4,5,6)) v(a, b, c, x, e, f)+
- UNION ALL                                          +
-  SELECT x AS a,                                    +
-     tt7.y AS b,                                    +
-     tt8.z AS c,                                    +
-     x_1 AS x,                                      +
-     tt7x.y AS e,                                   +
-     tt8x.z AS f                                    +
-    FROM tt7                                        +
-      FULL JOIN tt8 USING (x),                      +
-     tt7 tt7x(x_1, y, z)                            +
-      FULL JOIN tt8 tt8x(x_1, z, z2) USING (x_1);
-(1 row)
-
+ERROR:  relation "vv3" does not exist
 select pg_get_viewdef('vv4', true);
-                      pg_get_viewdef                      
-----------------------------------------------------------
-  SELECT v.a,                                            +
-     v.b,                                                +
-     v.c,                                                +
-     v.x,                                                +
-     v.e,                                                +
-     v.f,                                                +
-     v.g                                                 +
-    FROM ( VALUES (1,2,3,4,5,6,7)) v(a, b, c, x, e, f, g)+
- UNION ALL                                               +
-  SELECT x AS a,                                         +
-     tt7.y AS b,                                         +
-     tt8.z AS c,                                         +
-     x_1 AS x,                                           +
-     tt7x.y AS e,                                        +
-     tt8x.z AS f,                                        +
-     tt8y.z AS g                                         +
-    FROM tt7                                             +
-      FULL JOIN tt8 USING (x),                           +
-     tt7 tt7x(x_1, y, z)                                 +
-      FULL JOIN tt8 tt8x(x_1, z, z2) USING (x_1)         +
-      FULL JOIN tt8 tt8y(x_1, z, z2) USING (x_1);
-(1 row)
-
+ERROR:  relation "vv4" does not exist
 -- Implicit coercions in a JOIN USING create issues similar to FULL JOIN
 create table tt7a (x date, xx int, y int);
 alter table tt7a drop column xx;
@@ -1435,26 +1312,9 @@ create view vv2a as
 select * from (values(now(),2,3,now(),5)) v(a,b,c,d,e)
 union all
 select * from tt7a left join tt8a using (x), tt8a tt8ax;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('vv2a', true);
-                     pg_get_viewdef                     
---------------------------------------------------------
-  SELECT v.a,                                          +
-     v.b,                                              +
-     v.c,                                              +
-     v.d,                                              +
-     v.e                                               +
-    FROM ( VALUES (now(),2,3,now(),5)) v(a, b, c, d, e)+
- UNION ALL                                             +
-  SELECT x AS a,                                       +
-     tt7a.y AS b,                                      +
-     tt8a.z AS c,                                      +
-     tt8ax.x_1 AS d,                                   +
-     tt8ax.z AS e                                      +
-    FROM tt7a                                          +
-      LEFT JOIN tt8a USING (x),                        +
-     tt8a tt8ax(x_1, z);
-(1 row)
-
+ERROR:  relation "vv2a" does not exist
 --
 -- Also check dropping a column that existed when the view was made
 --
@@ -1720,26 +1580,13 @@ create view tt18v as
   select * from int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxz;
 NOTICE:  identifier "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxy" will be truncated to "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 NOTICE:  identifier "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxz" will be truncated to "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('tt18v', true);
-                                  pg_get_viewdef                                   
------------------------------------------------------------------------------------
-  SELECT xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.q1,      +
-     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.q2           +
-    FROM int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx +
- UNION ALL                                                                        +
-  SELECT xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.q1,      +
-     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.q2           +
-    FROM int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-(1 row)
-
+ERROR:  relation "tt18v" does not exist
 explain (costs off) select * from tt18v;
-                                         QUERY PLAN                                         
---------------------------------------------------------------------------------------------
- Append
-   ->  Seq Scan on int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   ->  Seq Scan on int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_1
-(3 rows)
-
+ERROR:  relation "tt18v" does not exist
+LINE 1: explain (costs off) select * from tt18v;
+                                          ^
 -- check display of ScalarArrayOp with a sub-select
 select 'foo'::text = any(array['abc','def','foo']::text[]);
  ?column? 
@@ -1871,30 +1718,14 @@ create view tt23v (col_a, col_b) as
 select q1 as other_name1, q2 as other_name2 from int8_tbl
 union
 select 42, 43;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select pg_get_viewdef('tt23v', true);
-        pg_get_viewdef         
--------------------------------
-  SELECT int8_tbl.q1 AS col_a,+
-     int8_tbl.q2 AS col_b     +
-    FROM int8_tbl             +
- UNION                        +
-  SELECT 42 AS col_a,         +
-     43 AS col_b;
-(1 row)
-
+ERROR:  relation "tt23v" does not exist
 select pg_get_ruledef(oid, true) from pg_rewrite
   where ev_class = 'tt23v'::regclass and ev_type = '1';
-                         pg_get_ruledef                          
------------------------------------------------------------------
- CREATE RULE "_RETURN" AS                                       +
-     ON SELECT TO tt23v DO INSTEAD  SELECT int8_tbl.q1 AS col_a,+
-     int8_tbl.q2 AS col_b                                       +
-    FROM int8_tbl                                               +
- UNION                                                          +
-  SELECT 42 AS col_a,                                           +
-     43 AS col_b;
-(1 row)
-
+ERROR:  relation "tt23v" does not exist
+LINE 2:   where ev_class = 'tt23v'::regclass and ev_type = '1';
+                           ^
 -- test extraction of FieldSelect field names (get_name_for_var_field)
 explain (verbose, costs off)
 select (r).column2 from (select r from (values(1,2),(3,4)) r limit 1) ss;
@@ -2008,7 +1839,7 @@ drop cascades to view aliased_view_2
 drop cascades to view aliased_view_3
 drop cascades to view aliased_view_4
 DROP SCHEMA testviewschm2 CASCADE;
-NOTICE:  drop cascades to 75 other objects
+NOTICE:  drop cascades to 69 other objects
 DETAIL:  drop cascades to table t1
 drop cascades to view temporal1
 drop cascades to view temporal2
@@ -2052,12 +1883,8 @@ drop cascades to view vv1
 drop cascades to view v4
 drop cascades to table tt7
 drop cascades to table tt8
-drop cascades to view vv2
-drop cascades to view vv3
-drop cascades to view vv4
 drop cascades to table tt7a
 drop cascades to table tt8a
-drop cascades to view vv2a
 drop cascades to table tt9
 drop cascades to table tt10
 drop cascades to view vv5
@@ -2073,13 +1900,11 @@ drop cascades to view tt15v
 drop cascades to view tt16v
 drop cascades to view tt17v
 drop cascades to table tt15v_log
-drop cascades to view tt18v
 drop cascades to view tt19v
 drop cascades to view tt20v
 drop cascades to view tt201v
 drop cascades to view tt21v
 drop cascades to view tt22v
-drop cascades to view tt23v
 drop cascades to view tt26v
 drop cascades to table tt26
 drop cascades to table tt27v_tbl

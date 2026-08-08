@@ -97,9 +97,7 @@ SELECT * FROM truncate_a
  SELECT * FROM trunc_b
    UNION ALL
  SELECT * FROM trunc_d;
-ERROR:  relation "trunc_b" does not exist
-LINE 5:  SELECT * FROM trunc_b
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT * FROM trunc_e;
 ERROR:  relation "trunc_e" does not exist
 LINE 1: SELECT * FROM trunc_e;
@@ -127,9 +125,7 @@ SELECT * FROM truncate_a
  SELECT * FROM trunc_b
    UNION ALL
  SELECT * FROM trunc_d;
-ERROR:  relation "trunc_b" does not exist
-LINE 5:  SELECT * FROM trunc_b
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT * FROM trunc_e;
 ERROR:  relation "trunc_e" does not exist
 LINE 1: SELECT * FROM trunc_e;

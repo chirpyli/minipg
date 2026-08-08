@@ -1033,34 +1033,6 @@ _copyHash(const Hash *from)
 	return newnode;
 }
 
-/*
- * _copySetOp
- */
-static SetOp *
-_copySetOp(const SetOp *from)
-{
-	SetOp	   *newnode = makeNode(SetOp);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(cmd);
-	COPY_SCALAR_FIELD(strategy);
-	COPY_SCALAR_FIELD(numCols);
-	COPY_POINTER_FIELD(dupColIdx, from->numCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(dupOperators, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(dupCollations, from->numCols * sizeof(Oid));
-	COPY_SCALAR_FIELD(flagColIdx);
-	COPY_SCALAR_FIELD(firstFlag);
-	COPY_SCALAR_FIELD(numGroups);
-
-	return newnode;
-}
 
 /*
  * _copyLockRows
@@ -2880,7 +2852,6 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(limitCount);
 	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(rowMarks);
-	COPY_NODE_FIELD(setOperations);
 	COPY_NODE_FIELD(constraintDeps);
 	COPY_NODE_FIELD(withCheckOptions);
 	COPY_LOCATION_FIELD(stmt_location);
@@ -2962,30 +2933,10 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(limitCount);
 	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(lockingClause);
-	COPY_SCALAR_FIELD(op);
-	COPY_SCALAR_FIELD(all);
-	COPY_NODE_FIELD(larg);
-	COPY_NODE_FIELD(rarg);
 
 	return newnode;
 }
 
-static SetOperationStmt *
-_copySetOperationStmt(const SetOperationStmt *from)
-{
-	SetOperationStmt *newnode = makeNode(SetOperationStmt);
-
-	COPY_SCALAR_FIELD(op);
-	COPY_SCALAR_FIELD(all);
-	COPY_NODE_FIELD(larg);
-	COPY_NODE_FIELD(rarg);
-	COPY_NODE_FIELD(colTypes);
-	COPY_NODE_FIELD(colTypmods);
-	COPY_NODE_FIELD(colCollations);
-	COPY_NODE_FIELD(groupClauses);
-
-	return newnode;
-}
 
 static ReturnStmt *
 _copyReturnStmt(const ReturnStmt *from)
@@ -4376,9 +4327,6 @@ copyObjectImpl(const void *from)
 		case T_Hash:
 			retval = _copyHash(from);
 			break;
-		case T_SetOp:
-			retval = _copySetOp(from);
-			break;
 		case T_LockRows:
 			retval = _copyLockRows(from);
 			break;
@@ -4631,9 +4579,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_SelectStmt:
 			retval = _copySelectStmt(from);
-			break;
-		case T_SetOperationStmt:
-			retval = _copySetOperationStmt(from);
 			break;
 		case T_ReturnStmt:
 			retval = _copyReturnStmt(from);

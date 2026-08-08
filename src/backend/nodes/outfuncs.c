@@ -858,34 +858,6 @@ _outHash(StringInfo str, const Hash *node)
 	WRITE_FLOAT_FIELD(rows_total, "%.0f");
 }
 
-static void
-_outSetOp(StringInfo str, const SetOp *node)
-{
-	WRITE_NODE_TYPE("SETOP");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_ENUM_FIELD(cmd, SetOpCmd);
-	WRITE_ENUM_FIELD(strategy, SetOpStrategy);
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(dupColIdx, node->numCols);
-	WRITE_OID_ARRAY(dupOperators, node->numCols);
-	WRITE_OID_ARRAY(dupCollations, node->numCols);
-	WRITE_INT_FIELD(flagColIdx);
-	WRITE_INT_FIELD(firstFlag);
-	WRITE_LONG_FIELD(numGroups);
-}
-
-static void
-_outLockRows(StringInfo str, const LockRows *node)
-{
-	WRITE_NODE_TYPE("LOCKROWS");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_NODE_FIELD(rowMarks);
-	WRITE_INT_FIELD(epqParam);
-}
 
 static void
 _outLimit(StringInfo str, const Limit *node)
@@ -901,6 +873,17 @@ _outLimit(StringInfo str, const Limit *node)
 	WRITE_ATTRNUMBER_ARRAY(uniqColIdx, node->uniqNumCols);
 	WRITE_OID_ARRAY(uniqOperators, node->uniqNumCols);
 	WRITE_OID_ARRAY(uniqCollations, node->uniqNumCols);
+}
+
+static void
+_outLockRows(StringInfo str, const LockRows *node)
+{
+	WRITE_NODE_TYPE("LOCKROWS");
+
+	_outPlanInfo(str, (const Plan *) node);
+
+	WRITE_NODE_FIELD(rowMarks);
+	WRITE_INT_FIELD(epqParam);
 }
 
 static void
@@ -2012,21 +1995,6 @@ _outWindowAggPath(StringInfo str, const WindowAggPath *node)
 	WRITE_NODE_FIELD(winclause);
 }
 
-static void
-_outSetOpPath(StringInfo str, const SetOpPath *node)
-{
-	WRITE_NODE_TYPE("SETOPPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_ENUM_FIELD(cmd, SetOpCmd);
-	WRITE_ENUM_FIELD(strategy, SetOpStrategy);
-	WRITE_NODE_FIELD(distinctList);
-	WRITE_INT_FIELD(flagColIdx);
-	WRITE_INT_FIELD(firstFlag);
-	WRITE_FLOAT_FIELD(numGroups, "%.0f");
-}
 
 
 static void
@@ -2671,10 +2639,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(limitCount);
 	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(lockingClause);
-	WRITE_ENUM_FIELD(op, SetOperation);
-	WRITE_BOOL_FIELD(all);
-	WRITE_NODE_FIELD(larg);
-	WRITE_NODE_FIELD(rarg);
 }
 
 static void
@@ -2901,7 +2865,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(limitCount);
 	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(rowMarks);
-	WRITE_NODE_FIELD(setOperations);
 	WRITE_NODE_FIELD(constraintDeps);
 	WRITE_NODE_FIELD(withCheckOptions);
 	WRITE_LOCATION_FIELD(stmt_location);
@@ -2978,20 +2941,6 @@ _outRowMarkClause(StringInfo str, const RowMarkClause *node)
 
 
 
-static void
-_outSetOperationStmt(StringInfo str, const SetOperationStmt *node)
-{
-	WRITE_NODE_TYPE("SETOPERATIONSTMT");
-
-	WRITE_ENUM_FIELD(op, SetOperation);
-	WRITE_BOOL_FIELD(all);
-	WRITE_NODE_FIELD(larg);
-	WRITE_NODE_FIELD(rarg);
-	WRITE_NODE_FIELD(colTypes);
-	WRITE_NODE_FIELD(colTypmods);
-	WRITE_NODE_FIELD(colCollations);
-	WRITE_NODE_FIELD(groupClauses);
-}
 
 static void
 _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
@@ -3680,9 +3629,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Hash:
 				_outHash(str, obj);
 				break;
-			case T_SetOp:
-				_outSetOp(str, obj);
-				break;
 			case T_LockRows:
 				_outLockRows(str, obj);
 				break;
@@ -3932,9 +3878,6 @@ outNode(StringInfo str, const void *obj)
 			case T_WindowAggPath:
 				_outWindowAggPath(str, obj);
 				break;
-			case T_SetOpPath:
-				_outSetOpPath(str, obj);
-				break;
 			case T_LockRowsPath:
 				_outLockRowsPath(str, obj);
 				break;
@@ -4084,9 +4027,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_RowMarkClause:
 				_outRowMarkClause(str, obj);
-				break;
-			case T_SetOperationStmt:
-				_outSetOperationStmt(str, obj);
 				break;
 			case T_RangeTblEntry:
 				_outRangeTblEntry(str, obj);

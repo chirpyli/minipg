@@ -436,38 +436,15 @@ CREATE TABLE fail () INHERITS (partitioned2);
 ERROR:  cannot inherit from partitioned table "partitioned2"
 -- Partition key in describe output
 \d partitioned
-      Partitioned table "public.partitioned"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- a      | integer |           |          | 
- b      | integer |           |          | 
- c      | text    |           |          | 
- d      | text    |           |          | 
-Partition key: RANGE (a oid_ops, plusone(b), c, d COLLATE "C")
-Number of partitions: 0
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 \d+ partitioned2
-                          Partitioned table "public.partitioned2"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- a      | integer |           |          |         | plain    |              | 
- b      | text    |           |          |         | extended |              | 
-Partition key: RANGE (((a + 1)), substr(b, 1, 5))
-Number of partitions: 0
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 INSERT INTO partitioned2 VALUES (1, 'hello');
 ERROR:  no partition of relation "partitioned2" found for row
 DETAIL:  Partition key of the failing row contains ((a + 1), substr(b, 1, 5)) = (2, hello).
 CREATE TABLE part2_1 PARTITION OF partitioned2 FOR VALUES FROM (-1, 'aaaaa') TO (100, 'ccccc');
 \d+ part2_1
-                                  Table "public.part2_1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- a      | integer |           |          |         | plain    |              | 
- b      | text    |           |          |         | extended |              | 
-Partition of: partitioned2 FOR VALUES FROM ('-1', 'aaaaa') TO (100, 'ccccc')
-Partition constraint: (((a + 1) IS NOT NULL) AND (substr(b, 1, 5) IS NOT NULL) AND (((a + 1) > '-1'::integer) OR (((a + 1) = '-1'::integer) AND (substr(b, 1, 5) >= 'aaaaa'::text))) AND (((a + 1) < 100) OR (((a + 1) = 100) AND (substr(b, 1, 5) < 'ccccc'::text))))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE partitioned, partitioned2;
 -- check reference to partitioned table's rowtype in partition descriptor
 create table partitioned (a int, b int)
@@ -501,14 +478,7 @@ select * from partitioned where partitioned = '(1,2)'::partitioned;
 (2 rows)
 
 \d+ partitioned1
-                               Table "public.partitioned1"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
- b      | integer |           |          |         | plain   |              | 
-Partition of: partitioned FOR VALUES IN ('(1,2)')
-Partition constraint: (((partitioned1.*)::partitioned IS DISTINCT FROM NULL) AND ((partitioned1.*)::partitioned = '(1,2)'::partitioned))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table partitioned;
 -- check that dependencies of partition columns are handled correctly
 create domain intdom1 as int;
@@ -558,16 +528,7 @@ CREATE TABLE part_p2 PARTITION OF list_parted FOR VALUES IN (2);
 CREATE TABLE part_p3 PARTITION OF list_parted FOR VALUES IN ((2+1));
 CREATE TABLE part_null PARTITION OF list_parted FOR VALUES IN (null);
 \d+ list_parted
-                          Partitioned table "public.list_parted"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
-Partition key: LIST (a)
-Partitions: part_null FOR VALUES IN (NULL),
-            part_p1 FOR VALUES IN (1),
-            part_p2 FOR VALUES IN (2),
-            part_p3 FOR VALUES IN (3)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- forbidden expressions for partition bound with list partitioned table
 CREATE TABLE part_bogus_expr_fail PARTITION OF list_parted FOR VALUES IN (somename);
 ERROR:  cannot use column reference in partition bound expression
@@ -967,13 +928,7 @@ ERROR:  null value in column "b" of relation "parted_notnull_inh_test1" violates
 DETAIL:  Failing row contains (1, null).
 -- note that while b's default is overriden, a's default is preserved
 \d parted_notnull_inh_test1
-      Table "public.parted_notnull_inh_test1"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- a      | integer |           | not null | 1
- b      | integer |           | not null | 1
-Partition of: parted_notnull_inh_test FOR VALUES IN (1)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table parted_notnull_inh_test;
 -- check that collations are assigned in partition bound expressions
 create table parted_boolean_col (a bool, b text) partition by list(a);
@@ -1006,104 +961,36 @@ create table test_part_coll_cast2 partition of test_part_coll_posix for values f
 drop table test_part_coll_posix;
 -- Partition bound in describe output
 \d+ part_b
-                                   Table "public.part_b"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- a      | text    |           |          |         | extended |              | 
- b      | integer |           | not null | 1       | plain    |              | 
-Partition of: parted FOR VALUES IN ('b')
-Partition constraint: ((a IS NOT NULL) AND (a = 'b'::text))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- Both partition bound and partition key in describe output
 \d+ part_c
-                             Partitioned table "public.part_c"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- a      | text    |           |          |         | extended |              | 
- b      | integer |           | not null | 0       | plain    |              | 
-Partition of: parted FOR VALUES IN ('c')
-Partition constraint: ((a IS NOT NULL) AND (a = 'c'::text))
-Partition key: RANGE (b)
-Partitions: part_c_1_10 FOR VALUES FROM (1) TO (10)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- a level-2 partition's constraint will include the parent's expressions
 \d+ part_c_1_10
-                                Table "public.part_c_1_10"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- a      | text    |           |          |         | extended |              | 
- b      | integer |           | not null | 0       | plain    |              | 
-Partition of: part_c FOR VALUES FROM (1) TO (10)
-Partition constraint: ((a IS NOT NULL) AND (a = 'c'::text) AND (b IS NOT NULL) AND (b >= 1) AND (b < 10))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- Show partition count in the parent's describe output
 -- Tempted to include \d+ output listing partitions with bound info but
 -- output could vary depending on the order in which partition oids are
 -- returned.
 \d parted
-         Partitioned table "public.parted"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- a      | text    |           |          | 
- b      | integer |           | not null | 0
-Partition key: LIST (a)
-Number of partitions: 3 (Use \d+ to list them.)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 \d hash_parted
-      Partitioned table "public.hash_parted"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- a      | integer |           |          | 
-Partition key: HASH (a)
-Number of partitions: 4 (Use \d+ to list them.)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- check that we get the expected partition constraints
 CREATE TABLE range_parted4 (a int, b int, c int) PARTITION BY RANGE (abs(a), abs(b), c);
 CREATE TABLE unbounded_range_part PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (MAXVALUE, MAXVALUE, MAXVALUE);
 \d+ unbounded_range_part
-                           Table "public.unbounded_range_part"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
- b      | integer |           |          |         | plain   |              | 
- c      | integer |           |          |         | plain   |              | 
-Partition of: range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (MAXVALUE, MAXVALUE, MAXVALUE)
-Partition constraint: ((abs(a) IS NOT NULL) AND (abs(b) IS NOT NULL) AND (c IS NOT NULL))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE unbounded_range_part;
 CREATE TABLE range_parted4_1 PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (1, MAXVALUE, MAXVALUE);
 \d+ range_parted4_1
-                              Table "public.range_parted4_1"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
- b      | integer |           |          |         | plain   |              | 
- c      | integer |           |          |         | plain   |              | 
-Partition of: range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (1, MAXVALUE, MAXVALUE)
-Partition constraint: ((abs(a) IS NOT NULL) AND (abs(b) IS NOT NULL) AND (c IS NOT NULL) AND (abs(a) <= 1))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 CREATE TABLE range_parted4_2 PARTITION OF range_parted4 FOR VALUES FROM (3, 4, 5) TO (6, 7, MAXVALUE);
 \d+ range_parted4_2
-                              Table "public.range_parted4_2"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
- b      | integer |           |          |         | plain   |              | 
- c      | integer |           |          |         | plain   |              | 
-Partition of: range_parted4 FOR VALUES FROM (3, 4, 5) TO (6, 7, MAXVALUE)
-Partition constraint: ((abs(a) IS NOT NULL) AND (abs(b) IS NOT NULL) AND (c IS NOT NULL) AND ((abs(a) > 3) OR ((abs(a) = 3) AND (abs(b) > 4)) OR ((abs(a) = 3) AND (abs(b) = 4) AND (c >= 5))) AND ((abs(a) < 6) OR ((abs(a) = 6) AND (abs(b) <= 7))))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 CREATE TABLE range_parted4_3 PARTITION OF range_parted4 FOR VALUES FROM (6, 8, MINVALUE) TO (9, MAXVALUE, MAXVALUE);
 \d+ range_parted4_3
-                              Table "public.range_parted4_3"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           |          |         | plain   |              | 
- b      | integer |           |          |         | plain   |              | 
- c      | integer |           |          |         | plain   |              | 
-Partition of: range_parted4 FOR VALUES FROM (6, 8, MINVALUE) TO (9, MAXVALUE, MAXVALUE)
-Partition constraint: ((abs(a) IS NOT NULL) AND (abs(b) IS NOT NULL) AND (c IS NOT NULL) AND ((abs(a) > 6) OR ((abs(a) = 6) AND (abs(b) >= 8))) AND (abs(a) <= 9))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE range_parted4;
 -- user-defined operator class in partition key
 CREATE FUNCTION my_int4_sort(int4,int4) RETURNS int LANGUAGE sql
@@ -1132,40 +1019,20 @@ SELECT obj_description('parted_col_comment'::regclass);
 (1 row)
 
 \d+ parted_col_comment
-                        Partitioned table "public.parted_col_comment"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target |  Description  
---------+---------+-----------+----------+---------+----------+--------------+---------------
- a      | integer |           |          |         | plain    |              | Partition key
- b      | text    |           |          |         | extended |              | 
-Partition key: LIST (a)
-Number of partitions: 0
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE parted_col_comment;
 -- list partitioning on array type column
 CREATE TABLE arrlp (a int[]) PARTITION BY LIST (a);
 CREATE TABLE arrlp12 PARTITION OF arrlp FOR VALUES IN ('{1}', '{2}');
 \d+ arrlp12
-                                   Table "public.arrlp12"
- Column |   Type    | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+-----------+-----------+----------+---------+----------+--------------+-------------
- a      | integer[] |           |          |         | extended |              | 
-Partition of: arrlp FOR VALUES IN ('{1}', '{2}')
-Partition constraint: ((a IS NOT NULL) AND ((a = '{1}'::integer[]) OR (a = '{2}'::integer[])))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE arrlp;
 -- partition on boolean column
 create table boolspart (a bool) partition by list (a);
 create table boolspart_t partition of boolspart for values in (true);
 create table boolspart_f partition of boolspart for values in (false);
 \d+ boolspart
-                           Partitioned table "public.boolspart"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | boolean |           |          |         | plain   |              | 
-Partition key: LIST (a)
-Partitions: boolspart_f FOR VALUES IN (false),
-            boolspart_t FOR VALUES IN (true)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table boolspart;
 -- partitions mixing temporary and permanent relations
 create table perm_parted (a int) partition by list (a);
@@ -1239,32 +1106,7 @@ create index part_column_drop_d_expr on part_column_drop((d = 2));
 create table part_column_drop_1_10 partition of
   part_column_drop for values from (1) to (10);
 \d part_column_drop
-    Partitioned table "public.part_column_drop"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- id     | integer |           |          | 
- d      | integer |           |          | 
- b      | integer |           |          | 
-Partition key: RANGE (id)
-Indexes:
-    "part_column_drop_b_expr" btree ((b = 1))
-    "part_column_drop_b_pred" btree (b) WHERE b = 1
-    "part_column_drop_d_expr" btree ((d = 2))
-    "part_column_drop_d_pred" btree (d) WHERE d = 2
-Number of partitions: 1 (Use \d+ to list them.)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 \d part_column_drop_1_10
-       Table "public.part_column_drop_1_10"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- id     | integer |           |          | 
- d      | integer |           |          | 
- b      | integer |           |          | 
-Partition of: part_column_drop FOR VALUES FROM (1) TO (10)
-Indexes:
-    "part_column_drop_1_10_b_idx" btree (b) WHERE b = 1
-    "part_column_drop_1_10_d_idx" btree (d) WHERE d = 2
-    "part_column_drop_1_10_expr_idx" btree ((b = 1))
-    "part_column_drop_1_10_expr_idx1" btree ((d = 2))
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table part_column_drop;

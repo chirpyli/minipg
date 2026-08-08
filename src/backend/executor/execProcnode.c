@@ -102,7 +102,6 @@
 #include "executor/nodeResult.h"
 #include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
-#include "executor/nodeSetOp.h"
 #include "executor/nodeSort.h"
 #include "executor/nodeSubplan.h"
 #include "executor/nodeSubqueryscan.h"
@@ -339,11 +338,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_Hash:
 			result = (PlanState *) ExecInitHash((Hash *) node,
 												estate, eflags);
-			break;
-
-		case T_SetOp:
-			result = (PlanState *) ExecInitSetOp((SetOp *) node,
-												 estate, eflags);
 			break;
 
 		case T_LockRows:
@@ -700,10 +694,6 @@ ExecEndNode(PlanState *node)
 
 		case T_HashState:
 			ExecEndHash((HashState *) node);
-			break;
-
-		case T_SetOpState:
-			ExecEndSetOp((SetOpState *) node);
 			break;
 
 		case T_LockRowsState:

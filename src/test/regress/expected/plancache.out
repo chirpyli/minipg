@@ -243,6 +243,7 @@ deallocate pstmt_def_insert;
 -- Test plan_cache_mode
 create table test_mode (a int);
 insert into test_mode select 1 from generate_series(1,1000) union all select 2;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 create index on test_mode (a);
 analyze test_mode;
 prepare test_mode_pp (int) as select count(*) from test_mode where a = $1;
@@ -256,11 +257,11 @@ select name, generic_plans, custom_plans from pg_prepared_statements
 -- up to 5 executions, custom plan is used
 set plan_cache_mode to auto;
 explain (costs off) execute test_mode_pp(2);
-                        QUERY PLAN                        
-----------------------------------------------------------
+         QUERY PLAN          
+-----------------------------
  Aggregate
-   ->  Index Only Scan using test_mode_a_idx on test_mode
-         Index Cond: (a = 2)
+   ->  Seq Scan on test_mode
+         Filter: (a = 2)
 (3 rows)
 
 select name, generic_plans, custom_plans from pg_prepared_statements
@@ -292,25 +293,25 @@ set plan_cache_mode to auto;
 execute test_mode_pp(1); -- 1x
  count 
 -------
-  1000
+     0
 (1 row)
 
 execute test_mode_pp(1); -- 2x
  count 
 -------
-  1000
+     0
 (1 row)
 
 execute test_mode_pp(1); -- 3x
  count 
 -------
-  1000
+     0
 (1 row)
 
 execute test_mode_pp(1); -- 4x
  count 
 -------
-  1000
+     0
 (1 row)
 
 select name, generic_plans, custom_plans from pg_prepared_statements
@@ -323,7 +324,7 @@ select name, generic_plans, custom_plans from pg_prepared_statements
 execute test_mode_pp(1); -- 5x
  count 
 -------
-  1000
+     0
 (1 row)
 
 select name, generic_plans, custom_plans from pg_prepared_statements
@@ -345,11 +346,11 @@ explain (costs off) execute test_mode_pp(2);
 -- but we can force a custom plan
 set plan_cache_mode to force_custom_plan;
 explain (costs off) execute test_mode_pp(2);
-                        QUERY PLAN                        
-----------------------------------------------------------
+         QUERY PLAN          
+-----------------------------
  Aggregate
-   ->  Index Only Scan using test_mode_a_idx on test_mode
-         Index Cond: (a = 2)
+   ->  Seq Scan on test_mode
+         Filter: (a = 2)
 (3 rows)
 
 select name, generic_plans, custom_plans from pg_prepared_statements

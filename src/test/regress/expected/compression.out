@@ -6,13 +6,7 @@ CREATE TABLE cmdata(f1 text COMPRESSION pglz);
 CREATE INDEX idx ON cmdata(f1);
 INSERT INTO cmdata VALUES(repeat('1234567890', 1000));
 \d+ cmdata
-                                        Table "public.cmdata"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | pglz        |              | 
-Indexes:
-    "idx" btree (f1)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4);
 ERROR:  compression method lz4 not supported
 DETAIL:  This functionality requires the server to be built with lz4 support.
@@ -48,13 +42,7 @@ LINE 1: SELECT SUBSTR(f1, 2000, 50) FROM cmdata1;
 CREATE TABLE cmmove1 (LIKE cmdata INCLUDING ALL);
 INSERT INTO cmmove1 SELECT * FROM cmdata;
 \d+ cmmove1
-                                        Table "public.cmmove1"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | pglz        |              | 
-Indexes:
-    "cmmove1_f1_idx" btree (f1)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT pg_column_compression(f1) FROM cmmove1;
  pg_column_compression 
 -----------------------
@@ -137,42 +125,22 @@ DROP TABLE cmdata2;
 --test column type update varlena/non-varlena
 CREATE TABLE cmdata2 (f1 int);
 \d+ cmdata2
-                                         Table "public.cmdata2"
- Column |  Type   | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
---------+---------+-----------+----------+---------+---------+-------------+--------------+-------------
- f1     | integer |           |          |         | plain   |             |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE cmdata2 ALTER COLUMN f1 TYPE varchar;
 \d+ cmdata2
-                                              Table "public.cmdata2"
- Column |       Type        | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+-------------------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | character varying |           |          |         | extended |             |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE cmdata2 ALTER COLUMN f1 TYPE int USING f1::integer;
 \d+ cmdata2
-                                         Table "public.cmdata2"
- Column |  Type   | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
---------+---------+-----------+----------+---------+---------+-------------+--------------+-------------
- f1     | integer |           |          |         | plain   |             |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 --changing column storage should not impact the compression method
 --but the data should not be compressed
 ALTER TABLE cmdata2 ALTER COLUMN f1 TYPE varchar;
 ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION pglz;
 \d+ cmdata2
-                                              Table "public.cmdata2"
- Column |       Type        | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+-------------------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | character varying |           |          |         | extended | pglz        |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE cmdata2 ALTER COLUMN f1 SET STORAGE plain;
 \d+ cmdata2
-                                              Table "public.cmdata2"
- Column |       Type        | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
---------+-------------------+-----------+----------+---------+---------+-------------+--------------+-------------
- f1     | character varying |           |          |         | plain   | pglz        |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 INSERT INTO cmdata2 VALUES (repeat('123456789', 800));
 SELECT pg_column_compression(f1) FROM cmdata2;
  pg_column_compression 
@@ -232,13 +200,7 @@ DETAIL:  This functionality requires the server to be built with lz4 support.
 HINT:  You need to rebuild PostgreSQL using --with-lz4.
 INSERT INTO cmdata VALUES (repeat('123456789', 4004));
 \d+ cmdata
-                                        Table "public.cmdata"
- Column | Type | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
---------+------+-----------+----------+---------+----------+-------------+--------------+-------------
- f1     | text |           |          |         | extended | pglz        |              | 
-Indexes:
-    "idx" btree (f1)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT pg_column_compression(f1) FROM cmdata;
  pg_column_compression 
 -----------------------
@@ -248,11 +210,7 @@ SELECT pg_column_compression(f1) FROM cmdata;
 
 ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default;
 \d+ cmdata2
-                                              Table "public.cmdata2"
- Column |       Type        | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
---------+-------------------+-----------+----------+---------+---------+-------------+--------------+-------------
- f1     | character varying |           |          |         | plain   |             |              | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- test alter compression method for partitioned tables
 ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz;
 ERROR:  relation "cmpart1" does not exist

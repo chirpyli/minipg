@@ -1696,8 +1696,8 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 		parse->commandType == CMD_SELECT)
 	{
 		tlist = parse->targetList;
-		/* tlist is modifiable unless it's a dummy in a setop query */
-		tlist_is_modifiable = (parse->setOperations == NULL);
+		/* tlist is modifiable for a normal SELECT */
+		tlist_is_modifiable = true;
 	}
 	else if (parse &&
 			 (parse->commandType == CMD_INSERT ||

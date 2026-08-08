@@ -1859,17 +1859,7 @@ from
    union all select null, 43) ss
 window w as
   (order by x asc nulls first range between 2 preceding and 2 following);
- x | y  | first_value | last_value 
----+----+-------------+------------
-   | 42 |          42 |         43
-   | 43 |          42 |         43
- 1 |  1 |           1 |          3
- 2 |  2 |           1 |          4
- 3 |  3 |           1 |          5
- 4 |  4 |           2 |          5
- 5 |  5 |           3 |          5
-(7 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select x, y,
        first_value(y) over w,
        last_value(y) over w
@@ -1879,17 +1869,7 @@ from
    union all select null, 43) ss
 window w as
   (order by x asc nulls last range between 2 preceding and 2 following);
- x | y  | first_value | last_value 
----+----+-------------+------------
- 1 |  1 |           1 |          3
- 2 |  2 |           1 |          4
- 3 |  3 |           1 |          5
- 4 |  4 |           2 |          5
- 5 |  5 |           3 |          5
-   | 42 |          42 |         43
-   | 43 |          42 |         43
-(7 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select x, y,
        first_value(y) over w,
        last_value(y) over w
@@ -1899,17 +1879,7 @@ from
    union all select null, 43) ss
 window w as
   (order by x desc nulls first range between 2 preceding and 2 following);
- x | y  | first_value | last_value 
----+----+-------------+------------
-   | 43 |          43 |         42
-   | 42 |          43 |         42
- 5 |  5 |           5 |          3
- 4 |  4 |           5 |          2
- 3 |  3 |           5 |          1
- 2 |  2 |           4 |          1
- 1 |  1 |           3 |          1
-(7 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 select x, y,
        first_value(y) over w,
        last_value(y) over w
@@ -1919,17 +1889,7 @@ from
    union all select null, 43) ss
 window w as
   (order by x desc nulls last range between 2 preceding and 2 following);
- x | y  | first_value | last_value 
----+----+-------------+------------
- 5 |  5 |           5 |          3
- 4 |  4 |           5 |          2
- 3 |  3 |           5 |          1
- 2 |  2 |           4 |          1
- 1 |  1 |           3 |          1
-   | 42 |          42 |         43
-   | 43 |          42 |         43
-(7 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- Check overflow behavior for various integer sizes
 select x, last_value(x) over (order by x::smallint range between current row and 2147450884 following)
 from generate_series(32764, 32766) x;
@@ -2922,110 +2882,20 @@ SELECT x, (sum(x) over w)
 FROM (select 1 union all select 1 union all select 1 union all
         SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x rows between 1 preceding and 1 following);
- x  | sum 
-----+-----
-  1 |   2
-  1 |   3
-  1 |   7
-  5 |  13
-  7 |  21
-  9 |  27
- 11 |  33
- 13 |  39
- 15 |  45
- 17 |  51
- 19 |  57
- 21 |  63
- 23 |  69
- 25 |  75
- 27 |  81
- 29 |  87
- 31 |  93
- 33 |  99
- 35 | 105
- 37 | 111
- 39 | 117
- 41 | 123
- 43 | 129
- 45 | 135
- 47 | 141
- 49 |  96
-(26 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT x, (sum(x) over w)
 FROM (select 1 union all select 1 union all select 1 union all
         SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x range between 1 preceding and 1 following);
- x  | sum 
-----+-----
-  1 |   3
-  1 |   3
-  1 |   3
-  5 |   5
-  7 |   7
-  9 |   9
- 11 |  11
- 13 |  13
- 15 |  15
- 17 |  17
- 19 |  19
- 21 |  21
- 23 |  23
- 25 |  25
- 27 |  27
- 29 |  29
- 31 |  31
- 33 |  33
- 35 |  35
- 37 |  37
- 39 |  39
- 41 |  41
- 43 |  43
- 45 |  45
- 47 |  47
- 49 |  49
-(26 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT x, (sum(x) over w)
 FROM (select 1 union all select 1 union all select 1 union all
         SELECT * FROM generate_series(5, 49, 2)) AS cte(x)
 WINDOW w AS (ORDER BY x groups between 1 preceding and 1 following);
- x  | sum 
-----+-----
-  1 |   8
-  1 |   8
-  1 |   8
-  5 |  15
-  7 |  21
-  9 |  27
- 11 |  33
- 13 |  39
- 15 |  45
- 17 |  51
- 19 |  57
- 21 |  63
- 23 |  69
- 25 |  75
- 27 |  81
- 29 |  87
- 31 |  93
- 33 |  99
- 35 | 105
- 37 | 111
- 39 | 117
- 41 | 123
- 43 | 129
- 45 | 135
- 47 | 141
- 49 |  96
-(26 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- with UNION
 SELECT count(*) OVER (PARTITION BY four) FROM (SELECT * FROM tenk1 UNION ALL SELECT * FROM tenk2)s LIMIT 0;
- count 
--------
-(0 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- check some degenerate cases
 create temp table t1 (f1 int, f2 int8);
 insert into t1 values (1,1),(1,2),(2,2);

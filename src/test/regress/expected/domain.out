@@ -266,17 +266,7 @@ explain (verbose, costs off)
 create rule silly as on delete to dcomptable do instead
   update dcomptable set d1.r = (d1).r - 1, d1.i = (d1).i + 1 where (d1).i > 0;
 \d+ dcomptable
-                                  Table "public.dcomptable"
- Column |   Type    | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+-----------+-----------+----------+---------+----------+--------------+-------------
- d1     | dcomptype |           |          |         | extended |              | 
-Indexes:
-    "dcomptable_d1_key" UNIQUE CONSTRAINT, btree (d1)
-Rules:
-    silly AS
-    ON DELETE TO dcomptable DO INSTEAD  UPDATE dcomptable SET d1.r = (dcomptable.d1).r - 1::double precision, d1.i = (dcomptable.d1).i + 1::double precision
-  WHERE (dcomptable.d1).i > 0::double precision
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 create function makedcomp(r float8, i float8) returns dcomptype
 as 'select row(r, i)' language sql;
 select makedcomp(1,2);
@@ -426,17 +416,7 @@ create rule silly as on delete to dcomptable do instead
   update dcomptable set d1[1].r = d1[1].r - 1, d1[1].i = d1[1].i + 1
     where d1[1].i > 0;
 \d+ dcomptable
-                                  Table "public.dcomptable"
- Column |    Type    | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+------------+-----------+----------+---------+----------+--------------+-------------
- d1     | dcomptypea |           |          |         | extended |              | 
-Indexes:
-    "dcomptable_d1_key" UNIQUE CONSTRAINT, btree (d1)
-Rules:
-    silly AS
-    ON DELETE TO dcomptable DO INSTEAD  UPDATE dcomptable SET d1[1].r = dcomptable.d1[1].r - 1::double precision, d1[1].i = dcomptable.d1[1].i + 1::double precision
-  WHERE dcomptable.d1[1].i > 0::double precision
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table dcomptable;
 drop type comptype cascade;
 NOTICE:  drop cascades to type dcomptypea

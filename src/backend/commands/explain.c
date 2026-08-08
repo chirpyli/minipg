@@ -1112,24 +1112,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Unique:
 			pname = sname = "Unique";
 			break;
-		case T_SetOp:
-			sname = "SetOp";
-			switch (((SetOp *) plan)->strategy)
-			{
-				case SETOP_SORTED:
-					pname = "SetOp";
-					strategy = "Sorted";
-					break;
-				case SETOP_HASHED:
-					pname = "HashSetOp";
-					strategy = "Hashed";
-					break;
-				default:
-					pname = "SetOp ???";
-					strategy = "???";
-					break;
-			}
-			break;
 		case T_LockRows:
 			pname = sname = "LockRows";
 			break;
@@ -1280,34 +1262,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 				}
 				else
 					ExplainPropertyText("Join Type", jointype, es);
-			}
-			break;
-		case T_SetOp:
-			{
-				const char *setopcmd;
-
-				switch (((SetOp *) plan)->cmd)
-				{
-					case SETOPCMD_INTERSECT:
-						setopcmd = "Intersect";
-						break;
-					case SETOPCMD_INTERSECT_ALL:
-						setopcmd = "Intersect All";
-						break;
-					case SETOPCMD_EXCEPT:
-						setopcmd = "Except";
-						break;
-					case SETOPCMD_EXCEPT_ALL:
-						setopcmd = "Except All";
-						break;
-					default:
-						setopcmd = "???";
-						break;
-				}
-				if (es->format == EXPLAIN_FORMAT_TEXT)
-					appendStringInfo(es->str, " %s", setopcmd);
-				else
-					ExplainPropertyText("Command", setopcmd, es);
 			}
 			break;
 		default:

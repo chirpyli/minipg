@@ -203,15 +203,11 @@ SET work_mem TO DEFAULT;
 (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
   UNION ALL
 (SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-ERROR:  relation "distinct_hash_1" does not exist
-LINE 1: (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct...
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
   UNION ALL
 (SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-ERROR:  relation "distinct_hash_1" does not exist
-LINE 1: (SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct...
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE distinct_hash_1;
 ERROR:  table "distinct_hash_1" does not exist
 DROP TABLE distinct_hash_2;

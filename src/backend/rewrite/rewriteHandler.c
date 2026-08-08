@@ -520,10 +520,6 @@ rewriteRuleAction(Query *parsetree,
 			 * we could push the joining and quals down to the member
 			 * statements of the setop?)
 			 */
-			if (sub_action->setOperations != NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("conditional UNION/INTERSECT/EXCEPT statements are not implemented")));
 
 			sub_action->jointree->fromlist =
 				list_concat(newjointree, sub_action->jointree->fromlist);
@@ -2500,9 +2496,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 
 	if (viewquery->havingQual != NULL)
 		return gettext_noop("Views containing HAVING are not automatically updatable.");
-
-	if (viewquery->setOperations != NULL)
-		return gettext_noop("Views containing UNION, INTERSECT, or EXCEPT are not automatically updatable.");
 
 	if (viewquery->limitOffset != NULL || viewquery->limitCount != NULL)
 		return gettext_noop("Views containing LIMIT or OFFSET are not automatically updatable.");

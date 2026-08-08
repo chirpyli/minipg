@@ -173,7 +173,6 @@ static void insertSelectOptions(SelectStmt *stmt,
 								List *sortClause, List *lockingClause,
 								SelectLimit *limitClause,
 								core_yyscan_t yyscanner);
-static Node *makeSetOp(SetOperation op, bool all, Node *larg, Node *rarg);
 static Node *doNegate(Node *n, int location);
 static void doNegateFloat(Value *v);
 static Node *makeAndExpr(Node *lexpr, Node *rexpr, int location);
@@ -9105,18 +9104,29 @@ simple_select:
 					n->fromClause = list_make1($2);
 					$$ = (Node *)n;
 				}
-			| select_clause UNION set_quantifier select_clause
-				{
-					$$ = makeSetOp(SETOP_UNION, $3 == SET_QUANTIFIER_ALL, $1, $4);
-				}
-			| select_clause INTERSECT set_quantifier select_clause
-				{
-					$$ = makeSetOp(SETOP_INTERSECT, $3 == SET_QUANTIFIER_ALL, $1, $4);
-				}
-			| select_clause EXCEPT set_quantifier select_clause
-				{
-					$$ = makeSetOp(SETOP_EXCEPT, $3 == SET_QUANTIFIER_ALL, $1, $4);
-				}
+		/*
+		 * Set operations (UNION/INTERSECT/EXCEPT) are not supported in
+		 * minipg; emit a friendly error at parse time rather than allowing
+		 * a confusing syntax error.
+		 */
+		| select_clause UNION set_quantifier select_clause
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
+			}
+		| select_clause INTERSECT set_quantifier select_clause
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
+			}
+		| select_clause EXCEPT set_quantifier select_clause
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
+			}
 		;
 
 		;
@@ -13831,18 +13841,6 @@ insertSelectOptions(SelectStmt *stmt,
 		}
 		stmt->limitOption = limitClause->limitOption;
 	}
-}
-
-static Node *
-makeSetOp(SetOperation op, bool all, Node *larg, Node *rarg)
-{
-	SelectStmt *n = makeNode(SelectStmt);
-
-	n->op = op;
-	n->all = all;
-	n->larg = (SelectStmt *) larg;
-	n->rarg = (SelectStmt *) rarg;
-	return (Node *) n;
 }
 
 /* SystemFuncName()

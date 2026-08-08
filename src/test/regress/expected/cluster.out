@@ -255,16 +255,7 @@ CLUSTER clstr_2 USING clstr_2_pkey;
 SELECT * FROM clstr_1 UNION ALL
   SELECT * FROM clstr_2 UNION ALL
   SELECT * FROM clstr_3;
- a 
----
- 1
- 2
- 1
- 2
- 2
- 1
-(6 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- revert to the original state
 DELETE FROM clstr_1;
 DELETE FROM clstr_2;
@@ -281,16 +272,7 @@ CLUSTER;
 SELECT * FROM clstr_1 UNION ALL
   SELECT * FROM clstr_2 UNION ALL
   SELECT * FROM clstr_3;
- a 
----
- 1
- 2
- 1
- 2
- 2
- 1
-(6 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- cluster a single table using the indisclustered bit previously set
 DELETE FROM clstr_1;
 INSERT INTO clstr_1 VALUES (2);

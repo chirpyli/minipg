@@ -60,7 +60,6 @@ OBJS = \
 	nodeResult.o \
 	nodeSamplescan.o \
 	nodeSeqscan.o \
-	nodeSetOp.o \
 	spi.o \
 	nodeSort.o \
 	nodeSubplan.o \

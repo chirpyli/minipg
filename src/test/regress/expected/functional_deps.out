@@ -205,28 +205,30 @@ UNION
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
-ERROR:  cannot drop constraint articles_pkey on table articles because other objects depend on it
-DETAIL:  view fdv3 depends on constraint articles_pkey on table articles
-HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP VIEW fdv3;
+ERROR:  view "fdv3" does not exist
 CREATE TEMP VIEW fdv4 AS
 SELECT * FROM articles WHERE title IN (SELECT title FROM articles GROUP BY id);
+ERROR:  column "articles.title" must appear in the GROUP BY clause or be used in an aggregate function
+LINE 2: SELECT * FROM articles WHERE title IN (SELECT title FROM art...
+                                                      ^
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
-ERROR:  cannot drop constraint articles_pkey on table articles because other objects depend on it
-DETAIL:  view fdv4 depends on constraint articles_pkey on table articles
-HINT:  Use DROP ... CASCADE to drop the dependent objects too.
+ERROR:  constraint "articles_pkey" of relation "articles" does not exist
 DROP VIEW fdv4;
+ERROR:  view "fdv4" does not exist
 -- prepared query plans: this results in failure on reuse
 PREPARE foo AS
   SELECT id, keywords, title, body, created
   FROM articles
   GROUP BY id;
-EXECUTE foo;
- id | keywords | title | body | created 
-----+----------+-------+------+---------
-(0 rows)
-
-ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT;
-EXECUTE foo;  -- fail
 ERROR:  column "articles.keywords" must appear in the GROUP BY clause or be used in an aggregate function
+LINE 2:   SELECT id, keywords, title, body, created
+                     ^
+EXECUTE foo;
+ERROR:  prepared statement "foo" does not exist
+ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT;
+ERROR:  constraint "articles_pkey" of relation "articles" does not exist
+EXECUTE foo;  -- fail
+ERROR:  prepared statement "foo" does not exist

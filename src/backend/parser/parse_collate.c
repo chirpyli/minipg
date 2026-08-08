@@ -128,13 +128,6 @@ assign_query_collations_walker(Node *node, ParseState *pstate)
 	if (node == NULL)
 		return false;
 
-	/*
-	 * We don't want to recurse into a set-operations tree; it's already been
-	 * fully processed in transformSetOperationStmt.
-	 */
-	if (IsA(node, SetOperationStmt))
-		return false;
-
 	if (IsA(node, List))
 		assign_list_collations(pstate, (List *) node);
 	else

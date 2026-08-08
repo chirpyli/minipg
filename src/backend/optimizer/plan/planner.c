@@ -198,7 +198,6 @@ static PathTarget *make_group_input_target(PlannerInfo *root,
 static PathTarget *make_partial_grouping_target(PlannerInfo *root,
 												PathTarget *grouping_target,
 												Node *havingQual);
-static List *postprocess_setop_tlist(List *new_tlist, List *orig_tlist);
 static List *select_active_windows(PlannerInfo *root, WindowFuncLists *wflists);
 static PathTarget *make_window_input_target(PlannerInfo *root,
 											PathTarget *final_target,
@@ -636,15 +635,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	 * query.
 	 */
 	pull_up_subqueries(root);
-
-	/*
-	 * If this is a simple UNION ALL query, flatten it into an appendrel. We
-	 * do this now because it requires applying pull_up_subqueries to the leaf
-	 * queries of the UNION ALL, which weren't touched above because they
-	 * weren't referenced by the jointree (they will be after we do this).
-	 */
-	if (parse->setOperations)
-		flatten_simple_union_all(root);
 
 	/*
 	 * Survey the rangetable to see what kinds of entries are present.  We can
@@ -1216,75 +1206,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	/* Make tuple_fraction accessible to lower-level routines */
 	root->tuple_fraction = tuple_fraction;
 
-	if (parse->setOperations)
-	{
-		/*
-		 * If there's a top-level ORDER BY, assume we have to fetch all the
-		 * tuples.  This might be too simplistic given all the hackery below
-		 * to possibly avoid the sort; but the odds of accurate estimates here
-		 * are pretty low anyway.  XXX try to get rid of this in favor of
-		 * letting plan_set_operations generate both fast-start and
-		 * cheapest-total paths.
-		 */
-		if (parse->sortClause)
-			root->tuple_fraction = 0.0;
-
-		/*
-		 * Construct Paths for set operations.  The results will not need any
-		 * work except perhaps a top-level sort and/or LIMIT.  Note that any
-		 * special work for recursive unions is the responsibility of
-		 * plan_set_operations.
-		 */
-		current_rel = plan_set_operations(root);
-
-		/*
-		 * We should not need to call preprocess_targetlist, since we must be
-		 * in a SELECT query node.  Instead, use the processed_tlist returned
-		 * by plan_set_operations (since this tells whether it returned any
-		 * resjunk columns!), and transfer any sort key information from the
-		 * original tlist.
-		 */
-		Assert(parse->commandType == CMD_SELECT);
-
-		/* for safety, copy processed_tlist instead of modifying in-place */
-		root->processed_tlist =
-			postprocess_setop_tlist(copyObject(root->processed_tlist),
-									parse->targetList);
-
-		/* Also extract the PathTarget form of the setop result tlist */
-		final_target = current_rel->cheapest_total_path->pathtarget;
-
-		/* And check whether it's parallel safe */
-		final_target_parallel_safe =
-			is_parallel_safe(root, (Node *) final_target->exprs);
-
-		/* The setop result tlist couldn't contain any SRFs */
-		Assert(!parse->hasTargetSRFs);
-		final_targets = final_targets_contain_srfs = NIL;
-
-		/*
-		 * Can't handle FOR [KEY] UPDATE/SHARE here (parser should have
-		 * checked already, but let's make sure).
-		 */
-		if (parse->rowMarks)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			/*------
-			  translator: %s is a SQL row locking clause such as FOR UPDATE */
-					 errmsg("%s is not allowed with UNION/INTERSECT/EXCEPT",
-							LCS_asString(linitial_node(RowMarkClause,
-													   parse->rowMarks)->strength))));
-
-		/*
-		 * Calculate pathkeys that represent result ordering requirements
-		 */
-		Assert(parse->distinctClause == NIL);
-		root->sort_pathkeys = make_pathkeys_for_sortclauses(root,
-															parse->sortClause,
-															root->processed_tlist);
-	}
-	else
-	{
 		/* No set operations, do regular planning */
 		PathTarget *sort_input_target;
 		List	   *sort_input_targets;
@@ -1305,7 +1226,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		grouping_sets_data *gset_data = NULL;
 		standard_qp_extra qp_extra;
 
-		/* A recursive query should always have setOperations */
+		/* A recursive query (WITH RECURSIVE) is handled separately */
 		Assert(!root->hasRecursion);
 
 		/* Preprocess grouping sets and GROUP BY clause, if any */
@@ -1581,7 +1502,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			current_rel = create_distinct_paths(root,
 												current_rel);
 		}
-	}							/* end of if (setOperations) */
 
 	/*
 	 * If ORDER BY was given, consider ways to implement that, and generate a
@@ -4797,43 +4717,6 @@ mark_partial_aggref(Aggref *agg, AggSplit aggsplit)
 	}
 }
 
-/*
- * postprocess_setop_tlist
- *	  Fix up targetlist returned by plan_set_operations().
- *
- * We need to transpose sort key info from the orig_tlist into new_tlist.
- * NOTE: this would not be good enough if we supported resjunk sort keys
- * for results of set operations --- then, we'd need to project a whole
- * new tlist to evaluate the resjunk columns.  For now, just ereport if we
- * find any resjunk columns in orig_tlist.
- */
-static List *
-postprocess_setop_tlist(List *new_tlist, List *orig_tlist)
-{
-	ListCell   *l;
-	ListCell   *orig_tlist_item = list_head(orig_tlist);
-
-	foreach(l, new_tlist)
-	{
-		TargetEntry *new_tle = lfirst_node(TargetEntry, l);
-		TargetEntry *orig_tle;
-
-		/* ignore resjunk columns in setop result */
-		if (new_tle->resjunk)
-			continue;
-
-		Assert(orig_tlist_item != NULL);
-		orig_tle = lfirst_node(TargetEntry, orig_tlist_item);
-		orig_tlist_item = lnext(orig_tlist, orig_tlist_item);
-		if (orig_tle->resjunk)	/* should not happen */
-			elog(ERROR, "resjunk output columns are not implemented");
-		Assert(new_tle->resno == orig_tle->resno);
-		new_tle->ressortgroupref = orig_tle->ressortgroupref;
-	}
-	if (orig_tlist_item != NULL)
-		elog(ERROR, "resjunk output columns are not implemented");
-	return new_tlist;
-}
 
 /*
  * select_active_windows

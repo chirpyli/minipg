@@ -260,7 +260,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleExpr(jstate, query->limitCount);
 	APP_JUMB(query->limitOption);
 	JumbleRowMarks(jstate, query->rowMarks);
-	JumbleExpr(jstate, query->setOperations);
 }
 
 /*
@@ -754,16 +753,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) wc->orderClause);
 				JumbleExpr(jstate, wc->startOffset);
 				JumbleExpr(jstate, wc->endOffset);
-			}
-			break;
-		case T_SetOperationStmt:
-			{
-				SetOperationStmt *setop = (SetOperationStmt *) node;
-
-				APP_JUMB(setop->op);
-				APP_JUMB(setop->all);
-				JumbleExpr(jstate, setop->larg);
-				JumbleExpr(jstate, setop->rarg);
 			}
 			break;
 		case T_RangeTblFunction:

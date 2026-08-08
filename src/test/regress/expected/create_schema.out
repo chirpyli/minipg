@@ -98,11 +98,7 @@ ERROR:  schema "regress_create_schema_role" does not exist
 CREATE SCHEMA regress_schema_1
   CREATE TABLE regress_schema_1.tab (id int);
 \d regress_schema_1.tab
-           Table "regress_schema_1.tab"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- id     | integer |           |          | 
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP SCHEMA regress_schema_1 CASCADE;
 NOTICE:  drop cascades to table regress_schema_1.tab
 -- Clean up

@@ -1210,7 +1210,6 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 	 * don't.)
 	 */
 	if (query->commandType != CMD_SELECT ||
-		query->setOperations ||
 		query->hasAggs ||
 		query->groupingSets ||
 		query->hasWindowFuncs ||
@@ -2355,7 +2354,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 		case T_Sort:
 		case T_IncrementalSort:
 		case T_Unique:
-		case T_SetOp:
 		case T_Group:
 			/* no node-type-specific fields need fixing */
 			break;

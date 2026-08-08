@@ -3102,17 +3102,6 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 			sub_qry = getInsertSelectQuery(top_subqry, NULL);
 
 			/*
-			 * If the sub_qry is a setop, we cannot attach any qualifications
-			 * to it, because the planner won't notice them.  This could
-			 * perhaps be relaxed someday, but for now, we may as well reject
-			 * such a rule immediately.
-			 */
-			if (sub_qry->setOperations != NULL && *whereClause != NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("conditional UNION/INTERSECT/EXCEPT statements are not implemented")));
-
-			/*
 			 * Validate action's use of OLD/NEW, qual too
 			 */
 			has_old =
@@ -3189,15 +3178,6 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 			{
 				RangeTblRef *rtr;
 
-				/*
-				 * If sub_qry is a setop, manipulating its jointree will do no
-				 * good at all, because the jointree is dummy. (This should be
-				 * a can't-happen case because of prior tests.)
-				 */
-				if (sub_qry->setOperations != NULL)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("conditional UNION/INTERSECT/EXCEPT statements are not implemented")));
 				/* hackishly add OLD to the already-built FROM clause */
 				rtr = makeNode(RangeTblRef);
 				rtr->rtindex = oldnsitem->p_rtindex;

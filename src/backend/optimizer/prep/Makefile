@@ -16,7 +16,6 @@ OBJS = \
 	prepagg.o \
 	prepjointree.o \
 	prepqual.o \
-	preptlist.o \
-	prepunion.o
+	preptlist.o
 
 include $(top_srcdir)/src/backend/common.mk

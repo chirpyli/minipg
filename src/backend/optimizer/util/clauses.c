@@ -4559,7 +4559,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 		querytree->sortClause ||
 		querytree->limitOffset ||
 		querytree->limitCount ||
-		querytree->setOperations ||
 		list_length(querytree->targetList) != 1)
 		goto fail;
 

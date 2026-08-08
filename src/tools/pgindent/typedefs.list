@@ -2327,14 +2327,6 @@ SetConstraintStateData
 SetConstraintTriggerData
 SetExprState
 SetFunctionReturnMode
-SetOp
-SetOpCmd
-SetOpPath
-SetOpState
-SetOpStatePerGroup
-SetOpStrategy
-SetOperation
-SetOperationStmt
 SetQuantifier
 SetToDefault
 SetupWorkerPtrType

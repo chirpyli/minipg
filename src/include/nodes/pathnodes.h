@@ -1795,20 +1795,6 @@ typedef struct WindowAggPath
 	WindowClause *winclause;	/* WindowClause we'll be using */
 } WindowAggPath;
 
-/*
- * SetOpPath represents a set-operation, that is INTERSECT or EXCEPT
- */
-typedef struct SetOpPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	SetOpCmd	cmd;			/* what to do, see nodes.h */
-	SetOpStrategy strategy;		/* how to do it, see nodes.h */
-	List	   *distinctList;	/* SortGroupClauses identifying target cols */
-	AttrNumber	flagColIdx;		/* where is the flag column, if any */
-	int			firstFlag;		/* flag value for first input relation */
-	double		numGroups;		/* estimated number of groups in input */
-} SetOpPath;
 
 /*
  * LockRowsPath represents acquiring row locks for SELECT FOR UPDATE/SHARE

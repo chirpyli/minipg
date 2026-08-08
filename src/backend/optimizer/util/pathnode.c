@@ -3236,68 +3236,6 @@ create_windowagg_path(PlannerInfo *root,
 	return pathnode;
 }
 
-/*
- * create_setop_path
- *	  Creates a pathnode that represents computation of INTERSECT or EXCEPT
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'cmd' is the specific semantics (INTERSECT or EXCEPT, with/without ALL)
- * 'strategy' is the implementation strategy (sorted or hashed)
- * 'distinctList' is a list of SortGroupClause's representing the grouping
- * 'flagColIdx' is the column number where the flag column will be, if any
- * 'firstFlag' is the flag value for the first input relation when hashing;
- *		or -1 when sorting
- * 'numGroups' is the estimated number of distinct groups
- * 'outputRows' is the estimated number of output rows
- */
-SetOpPath *
-create_setop_path(PlannerInfo *root,
-				  RelOptInfo *rel,
-				  Path *subpath,
-				  SetOpCmd cmd,
-				  SetOpStrategy strategy,
-				  List *distinctList,
-				  AttrNumber flagColIdx,
-				  int firstFlag,
-				  double numGroups,
-				  double outputRows)
-{
-	SetOpPath  *pathnode = makeNode(SetOpPath);
-
-	pathnode->path.pathtype = T_SetOp;
-	pathnode->path.parent = rel;
-	/* SetOp doesn't project, so use source path's pathtarget */
-	pathnode->path.pathtarget = subpath->pathtarget;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	pathnode->path.parallel_safe = rel->consider_parallel &&
-		subpath->parallel_safe;
-	pathnode->path.parallel_workers = subpath->parallel_workers;
-	/* SetOp preserves the input sort order if in sort mode */
-	pathnode->path.pathkeys =
-		(strategy == SETOP_SORTED) ? subpath->pathkeys : NIL;
-
-	pathnode->subpath = subpath;
-	pathnode->cmd = cmd;
-	pathnode->strategy = strategy;
-	pathnode->distinctList = distinctList;
-	pathnode->flagColIdx = flagColIdx;
-	pathnode->firstFlag = firstFlag;
-	pathnode->numGroups = numGroups;
-
-	/*
-	 * Charge one cpu_operator_cost per comparison per input tuple. We assume
-	 * all columns get compared at most of the tuples.
-	 */
-	pathnode->path.startup_cost = subpath->startup_cost;
-	pathnode->path.total_cost = subpath->total_cost +
-		cpu_operator_cost * subpath->rows * list_length(distinctList);
-	pathnode->path.rows = outputRows;
-
-	return pathnode;
-}
 
 
 /*

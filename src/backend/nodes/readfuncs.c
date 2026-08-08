@@ -279,7 +279,6 @@ _readQuery(void)
 	READ_NODE_FIELD(limitCount);
 	READ_ENUM_FIELD(limitOption, LimitOption);
 	READ_NODE_FIELD(rowMarks);
-	READ_NODE_FIELD(setOperations);
 	READ_NODE_FIELD(constraintDeps);
 	READ_NODE_FIELD(withCheckOptions);
 	READ_LOCATION_FIELD(stmt_location);
@@ -394,25 +393,6 @@ _readRowMarkClause(void)
 	READ_DONE();
 }
 
-/*
- * _readSetOperationStmt
- */
-static SetOperationStmt *
-_readSetOperationStmt(void)
-{
-	READ_LOCALS(SetOperationStmt);
-
-	READ_ENUM_FIELD(op, SetOperation);
-	READ_BOOL_FIELD(all);
-	READ_NODE_FIELD(larg);
-	READ_NODE_FIELD(rarg);
-	READ_NODE_FIELD(colTypes);
-	READ_NODE_FIELD(colTypmods);
-	READ_NODE_FIELD(colCollations);
-	READ_NODE_FIELD(groupClauses);
-
-	READ_DONE();
-}
 
 
 /*
@@ -2186,28 +2166,6 @@ _readHash(void)
 	READ_DONE();
 }
 
-/*
- * _readSetOp
- */
-static SetOp *
-_readSetOp(void)
-{
-	READ_LOCALS(SetOp);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_ENUM_FIELD(cmd, SetOpCmd);
-	READ_ENUM_FIELD(strategy, SetOpStrategy);
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(dupColIdx, local_node->numCols);
-	READ_OID_ARRAY(dupOperators, local_node->numCols);
-	READ_OID_ARRAY(dupCollations, local_node->numCols);
-	READ_INT_FIELD(flagColIdx);
-	READ_INT_FIELD(firstFlag);
-	READ_LONG_FIELD(numGroups);
-
-	READ_DONE();
-}
 
 /*
  * _readLockRows
@@ -2490,8 +2448,6 @@ parseNodeString(void)
 		return_value = _readWindowClause();
 	else if (MATCH("ROWMARKCLAUSE", 13))
 		return_value = _readRowMarkClause();
-	else if (MATCH("SETOPERATIONSTMT", 16))
-		return_value = _readSetOperationStmt();
 	else if (MATCH("ALIAS", 5))
 		return_value = _readAlias();
 	else if (MATCH("RANGEVAR", 8))
@@ -2672,8 +2628,6 @@ parseNodeString(void)
 		return_value = _readGatherMerge();
 	else if (MATCH("HASH", 4))
 		return_value = _readHash();
-	else if (MATCH("SETOP", 5))
-		return_value = _readSetOp();
 	else if (MATCH("LOCKROWS", 8))
 		return_value = _readLockRows();
 	else if (MATCH("LIMIT", 5))

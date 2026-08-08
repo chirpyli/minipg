@@ -5354,11 +5354,15 @@ AS $$
     RETURN NULL;
   END;
 $$;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+LINE 8:     SELECT level1_no
+            ^
 CREATE TRIGGER transition_table_level1_ri_parent_upd_trigger
   AFTER UPDATE ON transition_table_level1
   REFERENCING OLD TABLE AS d NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level1_ri_parent_upd_func();
+ERROR:  function transition_table_level1_ri_parent_upd_func() does not exist
 CREATE FUNCTION transition_table_level2_ri_child_insupd_func()
   RETURNS TRIGGER
   LANGUAGE plpgsql
@@ -5429,8 +5433,6 @@ ERROR:  RI error
 CONTEXT:  PL/pgSQL function transition_table_level1_ri_parent_del_func() line 6 at RAISE
 UPDATE transition_table_level1 SET level1_no = -1
   WHERE level1_no = 30;
-ERROR:  RI error
-CONTEXT:  PL/pgSQL function transition_table_level1_ri_parent_upd_func() line 15 at RAISE
 INSERT INTO transition_table_level2 (level2_no, parent_no)
   VALUES (10000, 10000);
 ERROR:  RI error
@@ -5525,14 +5527,17 @@ BEGIN
        FROM (SELECT * FROM new_test UNION ALL SELECT * FROM new_test) ss);
     RETURN NULL;
 END$$;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+LINE 6:       (SELECT COUNT(*)
+              ^
 CREATE TRIGGER my_trigger AFTER UPDATE ON multi_test
   REFERENCING NEW TABLE AS new_test OLD TABLE as old_test
   FOR EACH STATEMENT EXECUTE PROCEDURE multi_test_trig();
+ERROR:  function multi_test_trig() does not exist
 UPDATE multi_test SET i = i;
-NOTICE:  count = 1
-NOTICE:  count union = 2
 DROP TABLE multi_test;
 DROP FUNCTION multi_test_trig();
+ERROR:  function multi_test_trig() does not exist
 --
 -- Check type parsing and record fetching from partitioned tables
 --

@@ -25,7 +25,6 @@ extern void replace_empty_jointree(Query *parse);
 extern void pull_up_sublinks(PlannerInfo *root);
 extern void preprocess_function_rtes(PlannerInfo *root);
 extern void pull_up_subqueries(PlannerInfo *root);
-extern void flatten_simple_union_all(PlannerInfo *root);
 extern void reduce_outer_joins(PlannerInfo *root);
 extern void remove_useless_result_rtes(PlannerInfo *root);
 extern Relids get_relids_in_jointree(Node *jtnode, bool include_joins);
@@ -46,11 +45,6 @@ extern PlanRowMark *get_plan_rowmark(List *rowmarks, Index rtindex);
 extern void get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit,
 								 AggClauseCosts *agg_costs);
 extern void preprocess_aggrefs(PlannerInfo *root, Node *clause);
-
-/*
- * prototypes for prepunion.c
- */
-extern RelOptInfo *plan_set_operations(PlannerInfo *root);
 
 
 #endif							/* PREP_H */

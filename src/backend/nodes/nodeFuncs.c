@@ -1815,8 +1815,8 @@ check_functions_in_node(Node *node, check_function_callback checker,
  * stage.  In particular, it handles List nodes since a cnf-ified qual clause
  * will have List structure at the top level, and it handles TargetEntry nodes
  * so that a scan of a target list can be handled without additional code.
- * Also, RangeTblRef, FromExpr, JoinExpr, and SetOperationStmt nodes are
- * handled, so that query jointrees and setOperation trees can be processed
+ * Also, RangeTblRef, FromExpr, and JoinExpr nodes are
+ * handled, so that query jointrees can be processed
  * without additional code.
  *
  * expression_tree_walker will handle SubLink nodes by recursing normally
@@ -2173,18 +2173,6 @@ expression_tree_walker(Node *node,
 				 */
 			}
 			break;
-		case T_SetOperationStmt:
-			{
-				SetOperationStmt *setop = (SetOperationStmt *) node;
-
-				if (walker(setop->larg, context))
-					return true;
-				if (walker(setop->rarg, context))
-					return true;
-
-				/* groupClauses are deemed uninteresting */
-			}
-			break;
 		case T_IndexClause:
 			{
 				IndexClause *iclause = (IndexClause *) node;
@@ -2271,8 +2259,6 @@ query_tree_walker(Query *query,
 	if (walker((Node *) query->returningList, context))
 		return true;
 	if (walker((Node *) query->jointree, context))
-		return true;
-	if (walker(query->setOperations, context))
 		return true;
 	if (walker(query->havingQual, context))
 		return true;
@@ -3008,18 +2994,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_SetOperationStmt:
-			{
-				SetOperationStmt *setop = (SetOperationStmt *) node;
-				SetOperationStmt *newnode;
-
-				FLATCOPY(newnode, setop, SetOperationStmt);
-				MUTATE(newnode->larg, setop->larg, Node *);
-				MUTATE(newnode->rarg, setop->rarg, Node *);
-				/* We do not mutate groupClauses by default */
-				return (Node *) newnode;
-			}
-			break;
 		case T_IndexClause:
 			{
 				IndexClause *iclause = (IndexClause *) node;
@@ -3146,7 +3120,6 @@ query_tree_mutator(Query *query,
 	MUTATE(query->onConflict, query->onConflict, OnConflictExpr *);
 	MUTATE(query->returningList, query->returningList, List *);
 	MUTATE(query->jointree, query->jointree, FromExpr *);
-	MUTATE(query->setOperations, query->setOperations, Node *);
 	MUTATE(query->havingQual, query->havingQual, Node *);
 	MUTATE(query->limitOffset, query->limitOffset, Node *);
 	MUTATE(query->limitCount, query->limitCount, Node *);
@@ -3508,10 +3481,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->lockingClause, context))
 					return true;
-					return true;
-				if (walker(stmt->larg, context))
-					return true;
-				if (walker(stmt->rarg, context))
 					return true;
 			}
 			break;

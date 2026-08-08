@@ -2536,36 +2536,13 @@ FROM (SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1) u;
-                                                                                      QUERY PLAN                                                                                       
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Finalize Aggregate
-   Output: variance(tenk1.unique1), sum((tenk1.unique1)::bigint), regr_count((tenk1.unique1)::double precision, (tenk1.unique1)::double precision)
-   ->  Gather
-         Output: (PARTIAL variance(tenk1.unique1)), (PARTIAL sum((tenk1.unique1)::bigint)), (PARTIAL regr_count((tenk1.unique1)::double precision, (tenk1.unique1)::double precision))
-         Workers Planned: 4
-         ->  Partial Aggregate
-               Output: PARTIAL variance(tenk1.unique1), PARTIAL sum((tenk1.unique1)::bigint), PARTIAL regr_count((tenk1.unique1)::double precision, (tenk1.unique1)::double precision)
-               ->  Parallel Append
-                     ->  Parallel Seq Scan on public.tenk1
-                           Output: tenk1.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_1
-                           Output: tenk1_1.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_2
-                           Output: tenk1_2.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_3
-                           Output: tenk1_3.unique1
-(16 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT variance(unique1::int4), sum(unique1::int8), regr_count(unique1::float8, unique1::float8)
 FROM (SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1) u;
-       variance       |    sum    | regr_count 
-----------------------+-----------+------------
- 8333541.588539713493 | 199980000 |      40000
-(1 row)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- variance(int8) covers numeric_combine
 -- avg(numeric) covers numeric_avg_combine
 EXPLAIN (COSTS OFF, VERBOSE)
@@ -2574,36 +2551,13 @@ FROM (SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1) u;
-                                               QUERY PLAN                                               
---------------------------------------------------------------------------------------------------------
- Finalize Aggregate
-   Output: variance((tenk1.unique1)::bigint), avg((tenk1.unique1)::numeric)
-   ->  Gather
-         Output: (PARTIAL variance((tenk1.unique1)::bigint)), (PARTIAL avg((tenk1.unique1)::numeric))
-         Workers Planned: 4
-         ->  Partial Aggregate
-               Output: PARTIAL variance((tenk1.unique1)::bigint), PARTIAL avg((tenk1.unique1)::numeric)
-               ->  Parallel Append
-                     ->  Parallel Seq Scan on public.tenk1
-                           Output: tenk1.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_1
-                           Output: tenk1_1.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_2
-                           Output: tenk1_2.unique1
-                     ->  Parallel Seq Scan on public.tenk1 tenk1_3
-                           Output: tenk1_3.unique1
-(16 rows)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT variance(unique1::int8), avg(unique1::numeric)
 FROM (SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1
       UNION ALL SELECT * FROM tenk1) u;
-       variance       |          avg          
-----------------------+-----------------------
- 8333541.588539713493 | 4999.5000000000000000
-(1 row)
-
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ROLLBACK;
 -- test coverage for dense_rank
 SELECT dense_rank(x) WITHIN GROUP (ORDER BY x) FROM (VALUES (1),(1),(2),(2),(3),(3)) v(x) GROUP BY (x) ORDER BY 1;
@@ -2835,27 +2789,19 @@ set work_mem to default;
 (select * from agg_hash_1 except select * from agg_group_1)
   union all
 (select * from agg_group_1 except select * from agg_hash_1);
-ERROR:  relation "agg_hash_1" does not exist
-LINE 1: (select * from agg_hash_1 except select * from agg_group_1)
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 (select * from agg_hash_2 except select * from agg_group_2)
   union all
 (select * from agg_group_2 except select * from agg_hash_2);
-ERROR:  relation "agg_hash_2" does not exist
-LINE 1: (select * from agg_hash_2 except select * from agg_group_2)
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 (select * from agg_hash_3 except select * from agg_group_3)
   union all
 (select * from agg_group_3 except select * from agg_hash_3);
-ERROR:  relation "agg_hash_3" does not exist
-LINE 1: (select * from agg_hash_3 except select * from agg_group_3)
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 (select * from agg_hash_4 except select * from agg_group_4)
   union all
 (select * from agg_group_4 except select * from agg_hash_4);
-ERROR:  relation "agg_hash_4" does not exist
-LINE 1: (select * from agg_hash_4 except select * from agg_group_4)
-                       ^
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 drop table agg_group_1;
 ERROR:  table "agg_group_1" does not exist
 drop table agg_group_2;

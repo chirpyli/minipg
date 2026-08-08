@@ -5321,8 +5321,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 		 * problematic, but we check that later because there is a possibility
 		 * of learning something even with it.
 		 */
-		if (subquery->setOperations ||
-			subquery->groupClause ||
+		if (subquery->groupClause ||
 			subquery->groupingSets)
 			return;
 

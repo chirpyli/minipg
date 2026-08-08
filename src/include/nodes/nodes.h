@@ -79,7 +79,6 @@ typedef enum NodeTag
 	T_Gather,
 	T_GatherMerge,
 	T_Hash,
-	T_SetOp,
 	T_LockRows,
 	T_Limit,
 	/* these aren't subclasses of Plan: */
@@ -133,7 +132,6 @@ typedef enum NodeTag
 	T_GatherState,
 	T_GatherMergeState,
 	T_HashState,
-	T_SetOpState,
 	T_LockRowsState,
 	T_LimitState,
 
@@ -244,7 +242,6 @@ typedef enum NodeTag
 	T_GroupingSetsPath,
 	T_MinMaxAggPath,
 	T_WindowAggPath,
-	T_SetOpPath,
 	T_LockRowsPath,
 	T_ModifyTablePath,
 	T_LimitPath,
@@ -311,7 +308,6 @@ typedef enum NodeTag
 	T_AlterTableStmt,
 	T_AlterTableCmd,
 	T_AlterDomainStmt,
-	T_SetOperationStmt,
 	T_ClosePortalStmt,
 	T_ClusterStmt,
 	T_CopyStmt,
@@ -751,26 +747,6 @@ typedef enum AggSplit
 #define DO_AGGSPLIT_SKIPFINAL(as)	(((as) & AGGSPLITOP_SKIPFINAL) != 0)
 #define DO_AGGSPLIT_SERIALIZE(as)	(((as) & AGGSPLITOP_SERIALIZE) != 0)
 #define DO_AGGSPLIT_DESERIALIZE(as) (((as) & AGGSPLITOP_DESERIALIZE) != 0)
-
-/*
- * SetOpCmd and SetOpStrategy -
- *	  overall semantics and execution strategies for SetOp plan nodes
- *
- * This is needed in both pathnodes.h and plannodes.h, so put it here...
- */
-typedef enum SetOpCmd
-{
-	SETOPCMD_INTERSECT,
-	SETOPCMD_INTERSECT_ALL,
-	SETOPCMD_EXCEPT,
-	SETOPCMD_EXCEPT_ALL
-} SetOpCmd;
-
-typedef enum SetOpStrategy
-{
-	SETOP_SORTED,				/* input must be sorted */
-	SETOP_HASHED				/* use internal hashtable */
-} SetOpStrategy;
 
 /*
  * OnConflictAction -

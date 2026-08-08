@@ -170,9 +170,6 @@ typedef struct Query
 
 	List	   *rowMarks;		/* a list of RowMarkClause's */
 
-	Node	   *setOperations;	/* set-operation tree if this is top level of
-								 * a UNION/INTERSECT/EXCEPT query */
-
 	List	   *constraintDeps; /* a list of pg_constraint OIDs that the query
 								 * depends on to be semantically valid */
 
@@ -1475,14 +1472,6 @@ typedef struct UpdateStmt
  * whether it is a simple or compound SELECT.
  * ----------------------
  */
-typedef enum SetOperation
-{
-	SETOP_NONE = 0,
-	SETOP_UNION,
-	SETOP_INTERSECT,
-	SETOP_EXCEPT
-} SetOperation;
-
 typedef struct SelectStmt
 {
 	NodeTag		type;
@@ -1520,55 +1509,11 @@ typedef struct SelectStmt
 	LimitOption limitOption;	/* limit type */
 	List	   *lockingClause;	/* FOR UPDATE (list of LockingClause's) */
 
-	/*
-	 * These fields are used only in upper-level SelectStmts.
-	 */
-	SetOperation op;			/* type of set op */
-	bool		all;			/* ALL specified? */
-	struct SelectStmt *larg;	/* left child */
-	struct SelectStmt *rarg;	/* right child */
 	/* Eventually add fields for CORRESPONDING spec here */
 } SelectStmt;
 
 
 /* ----------------------
- *		Set Operation node for post-analysis query trees
- *
- * After parse analysis, a SELECT with set operations is represented by a
- * top-level Query node containing the leaf SELECTs as subqueries in its
- * range table.  Its setOperations field shows the tree of set operations,
- * with leaf SelectStmt nodes replaced by RangeTblRef nodes, and internal
- * nodes replaced by SetOperationStmt nodes.  Information about the output
- * column types is added, too.  (Note that the child nodes do not necessarily
- * produce these types directly, but we've checked that their output types
- * can be coerced to the output column type.)  Also, if it's not UNION ALL,
- * information about the types' sort/group semantics is provided in the form
- * of a SortGroupClause list (same representation as, eg, DISTINCT).
- * The resolved common column collations are provided too; but note that if
- * it's not UNION ALL, it's okay for a column to not have a common collation,
- * so a member of the colCollations list could be InvalidOid even though the
- * column has a collatable type.
- * ----------------------
- */
-typedef struct SetOperationStmt
-{
-	NodeTag		type;
-	SetOperation op;			/* type of set op */
-	bool		all;			/* ALL specified? */
-	Node	   *larg;			/* left child */
-	Node	   *rarg;			/* right child */
-	/* Eventually add fields for CORRESPONDING spec here */
-
-	/* Fields derived during parse analysis: */
-	List	   *colTypes;		/* OID list of output column type OIDs */
-	List	   *colTypmods;		/* integer list of output column typmods */
-	List	   *colCollations;	/* OID list of output column collation OIDs */
-	List	   *groupClauses;	/* a list of SortGroupClause's */
-	/* groupClauses is NIL if UNION ALL, but must be set otherwise */
-} SetOperationStmt;
-
-
-/*
  * RETURN statement (inside SQL function body)
  */
 typedef struct ReturnStmt

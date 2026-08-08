@@ -729,11 +729,7 @@ CREATE VIEW pg_stat_database AS
             pg_stat_get_db_sessions_fatal(D.oid) AS sessions_fatal,
             pg_stat_get_db_sessions_killed(D.oid) AS sessions_killed,
             pg_stat_get_db_stat_reset_time(D.oid) AS stats_reset
-    FROM (
-        SELECT 0 AS oid, NULL::name AS datname
-        UNION ALL
-        SELECT oid, datname FROM pg_database
-    ) D;
+    FROM pg_database D;
 
 CREATE VIEW pg_stat_database_conflicts AS
     SELECT

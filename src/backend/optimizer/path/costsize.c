@@ -5364,8 +5364,7 @@ set_subquery_size_estimates(PlannerInfo *root, RelOptInfo *rel)
 		 * In either case, we just leave the width estimate zero until
 		 * set_rel_width fixes it.
 		 */
-		if (IsA(texpr, Var) &&
-			subroot->parse->setOperations == NULL)
+		if (IsA(texpr, Var))
 		{
 			Var		   *var = (Var *) texpr;
 			RelOptInfo *subrel = find_base_rel(subroot, var->varno);

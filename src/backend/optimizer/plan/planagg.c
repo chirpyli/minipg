@@ -87,7 +87,6 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 	if (!parse->hasAggs)
 		return;
 
-	Assert(!parse->setOperations);	/* shouldn't get here if a setop */
 	Assert(parse->rowMarks == NIL); /* nor if FOR UPDATE */
 
 	/*

@@ -44,7 +44,6 @@
 #include "executor/nodeResult.h"
 #include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
-#include "executor/nodeSetOp.h"
 #include "executor/nodeSort.h"
 #include "executor/nodeSubplan.h"
 #include "executor/nodeSubqueryscan.h"
@@ -266,10 +265,6 @@ ExecReScan(PlanState *node)
 
 		case T_HashState:
 			ExecReScanHash((HashState *) node);
-			break;
-
-		case T_SetOpState:
-			ExecReScanSetOp((SetOpState *) node);
 			break;
 
 		case T_LockRowsState:

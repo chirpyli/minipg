@@ -113,8 +113,6 @@ static void set_result_pathlist(PlannerInfo *root, RelOptInfo *rel,
 static RelOptInfo *make_rel_from_joinlist(PlannerInfo *root, List *joinlist);
 static bool subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 									  pushdown_safety_info *safetyInfo);
-static bool recurse_pushdown_safe(Node *setOp, Query *topquery,
-								  pushdown_safety_info *safetyInfo);
 static void check_output_expressions(Query *subquery,
 									 pushdown_safety_info *safetyInfo);
 static void compare_tlist_datatypes(List *tlist, List *colTypes,
@@ -125,8 +123,6 @@ static bool qual_is_pushdown_safe(Query *subquery, Index rti,
 								  pushdown_safety_info *safetyInfo);
 static void subquery_push_qual(Query *subquery,
 							   RangeTblEntry *rte, Index rti, Node *qual);
-static void recurse_push_qual(Node *setOp, Query *topquery,
-							  RangeTblEntry *rte, Index rti, Node *qual);
 static void remove_unused_subquery_outputs(Query *subquery, RelOptInfo *rel);
 
 
@@ -2908,8 +2904,6 @@ static bool
 subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 						  pushdown_safety_info *safetyInfo)
 {
-	SetOperationStmt *topop;
-
 	/* Check point 1 */
 	if (subquery->limitOffset != NULL || subquery->limitCount != NULL)
 		return false;
@@ -2925,74 +2919,14 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 		safetyInfo->unsafeVolatile = true;
 
 	/*
-	 * If we're at a leaf query, check for unsafe expressions in its target
-	 * list, and mark any unsafe ones in unsafeColumns[].  (Non-leaf nodes in
-	 * setop trees have only simple Vars in their tlists, so no need to check
-	 * them.)
+	 * Check for unsafe expressions in its target list, and mark any unsafe
+	 * ones in unsafeColumns[].
 	 */
-	if (subquery->setOperations == NULL)
-		check_output_expressions(subquery, safetyInfo);
+	check_output_expressions(subquery, safetyInfo);
 
-	/* Are we at top level, or looking at a setop component? */
-	if (subquery == topquery)
-	{
-		/* Top level, so check any component queries */
-		if (subquery->setOperations != NULL)
-			if (!recurse_pushdown_safe(subquery->setOperations, topquery,
-									   safetyInfo))
-				return false;
-	}
-	else
-	{
-		/* Setop component must not have more components (too weird) */
-		if (subquery->setOperations != NULL)
-			return false;
-		/* Check whether setop component output types match top level */
-		topop = castNode(SetOperationStmt, topquery->setOperations);
-		Assert(topop);
-		compare_tlist_datatypes(subquery->targetList,
-								topop->colTypes,
-								safetyInfo);
-	}
 	return true;
 }
 
-/*
- * Helper routine to recurse through setOperations tree
- */
-static bool
-recurse_pushdown_safe(Node *setOp, Query *topquery,
-					  pushdown_safety_info *safetyInfo)
-{
-	if (IsA(setOp, RangeTblRef))
-	{
-		RangeTblRef *rtr = (RangeTblRef *) setOp;
-		RangeTblEntry *rte = rt_fetch(rtr->rtindex, topquery->rtable);
-		Query	   *subquery = rte->subquery;
-
-		Assert(subquery != NULL);
-		return subquery_is_pushdown_safe(subquery, topquery, safetyInfo);
-	}
-	else if (IsA(setOp, SetOperationStmt))
-	{
-		SetOperationStmt *op = (SetOperationStmt *) setOp;
-
-		/* EXCEPT is no good (point 2 for subquery_is_pushdown_safe) */
-		if (op->op == SETOP_EXCEPT)
-			return false;
-		/* Else recurse */
-		if (!recurse_pushdown_safe(op->larg, topquery, safetyInfo))
-			return false;
-		if (!recurse_pushdown_safe(op->rarg, topquery, safetyInfo))
-			return false;
-	}
-	else
-	{
-		elog(ERROR, "unrecognized node type: %d",
-			 (int) nodeTag(setOp));
-	}
-	return true;
-}
 
 /*
  * check_output_expressions - check subquery's output expressions for safety
@@ -3078,45 +3012,6 @@ check_output_expressions(Query *subquery, pushdown_safety_info *safetyInfo)
 	}
 }
 
-/*
- * For subqueries using UNION/UNION ALL/INTERSECT/INTERSECT ALL, we can
- * push quals into each component query, but the quals can only reference
- * subquery columns that suffer no type coercions in the set operation.
- * Otherwise there are possible semantic gotchas.  So, we check the
- * component queries to see if any of them have output types different from
- * the top-level setop outputs.  unsafeColumns[k] is set true if column k
- * has different type in any component.
- *
- * We don't have to care about typmods here: the only allowed difference
- * between set-op input and output typmods is input is a specific typmod
- * and output is -1, and that does not require a coercion.
- *
- * tlist is a subquery tlist.
- * colTypes is an OID list of the top-level setop's output column types.
- * safetyInfo->unsafeColumns[] is the result array.
- */
-static void
-compare_tlist_datatypes(List *tlist, List *colTypes,
-						pushdown_safety_info *safetyInfo)
-{
-	ListCell   *l;
-	ListCell   *colType = list_head(colTypes);
-
-	foreach(l, tlist)
-	{
-		TargetEntry *tle = (TargetEntry *) lfirst(l);
-
-		if (tle->resjunk)
-			continue;			/* ignore resjunk columns */
-		if (colType == NULL)
-			elog(ERROR, "wrong number of tlist entries");
-		if (exprType((Node *) tle->expr) != lfirst_oid(colType))
-			safetyInfo->unsafeColumns[tle->resno] = true;
-		colType = lnext(colTypes, colType);
-	}
-	if (colType != NULL)
-		elog(ERROR, "wrong number of tlist entries");
-}
 
 /*
  * targetIsInAllPartitionLists
@@ -3266,17 +3161,9 @@ qual_is_pushdown_safe(Query *subquery, Index rti, RestrictInfo *rinfo,
 static void
 subquery_push_qual(Query *subquery, RangeTblEntry *rte, Index rti, Node *qual)
 {
-	if (subquery->setOperations != NULL)
-	{
-		/* Recurse to push it separately to each component query */
-		recurse_push_qual(subquery->setOperations, subquery,
-						  rte, rti, qual);
-	}
-	else
-	{
-		/*
-		 * We need to replace Vars in the qual (which must refer to outputs of
-		 * the subquery) with copies of the subquery's targetlist expressions.
+	/*
+	 * We need to replace Vars in the qual (which must refer to outputs of
+	 * the subquery) with copies of the subquery's targetlist expressions.
 		 * Note that at this point, any uplevel Vars in the qual should have
 		 * been replaced with Params, so they need no work.
 		 *
@@ -3304,41 +3191,10 @@ subquery_push_qual(Query *subquery, RangeTblEntry *rte, Index rti, Node *qual)
 		 * since we can't be pushing down any aggregates that weren't there
 		 * before, and we don't push down subselects at all.
 		 */
-	}
-}
+		 }
 
-/*
- * Helper routine to recurse through setOperations tree
- */
-static void
-recurse_push_qual(Node *setOp, Query *topquery,
-				  RangeTblEntry *rte, Index rti, Node *qual)
-{
-	if (IsA(setOp, RangeTblRef))
-	{
-		RangeTblRef *rtr = (RangeTblRef *) setOp;
-		RangeTblEntry *subrte = rt_fetch(rtr->rtindex, topquery->rtable);
-		Query	   *subquery = subrte->subquery;
-
-		Assert(subquery != NULL);
-		subquery_push_qual(subquery, rte, rti, qual);
-	}
-	else if (IsA(setOp, SetOperationStmt))
-	{
-		SetOperationStmt *op = (SetOperationStmt *) setOp;
-
-		recurse_push_qual(op->larg, topquery, rte, rti, qual);
-		recurse_push_qual(op->rarg, topquery, rte, rti, qual);
-	}
-	else
-	{
-		elog(ERROR, "unrecognized node type: %d",
-			 (int) nodeTag(setOp));
-	}
-}
-
-/*****************************************************************************
- *			SIMPLIFYING SUBQUERY TARGETLISTS
+		 /*****************************************************************************
+		 *			SIMPLIFYING SUBQUERY TARGETLISTS
  *****************************************************************************/
 
 /*
@@ -3362,14 +3218,6 @@ remove_unused_subquery_outputs(Query *subquery, RelOptInfo *rel)
 {
 	Bitmapset  *attrs_used = NULL;
 	ListCell   *lc;
-
-	/*
-	 * Do nothing if subquery has UNION/INTERSECT/EXCEPT: in principle we
-	 * could update all the child SELECTs' tlists, but it seems not worth the
-	 * trouble presently.
-	 */
-	if (subquery->setOperations)
-		return;
 
 	/*
 	 * If subquery has regular DISTINCT (not DISTINCT ON), we're wasting our
@@ -3841,10 +3689,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 		case T_WindowAggPath:
 			ptype = "WindowAgg";
 			subpath = ((WindowAggPath *) path)->subpath;
-			break;
-		case T_SetOpPath:
-			ptype = "SetOp";
-			subpath = ((SetOpPath *) path)->subpath;
 			break;
 		case T_LockRowsPath:
 			ptype = "LockRows";

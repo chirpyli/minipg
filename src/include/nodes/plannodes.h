@@ -881,25 +881,6 @@ typedef struct Hash
 } Hash;
 
 /* ----------------
- *		setop node
- * ----------------
- */
-typedef struct SetOp
-{
-	Plan		plan;
-	SetOpCmd	cmd;			/* what to do, see nodes.h */
-	SetOpStrategy strategy;		/* how to do it, see nodes.h */
-	int			numCols;		/* number of columns to check for
-								 * duplicate-ness */
-	AttrNumber *dupColIdx;		/* their indexes in the target list */
-	Oid		   *dupOperators;	/* equality operators to compare with */
-	Oid		   *dupCollations;
-	AttrNumber	flagColIdx;		/* where is the flag column, if any */
-	int			firstFlag;		/* flag value for first input relation */
-	long		numGroups;		/* estimated number of groups in input */
-} SetOp;
-
-/* ----------------
  *		lock-rows node
  *
  * rowMarks identifies the rels to be locked by this node; it should be

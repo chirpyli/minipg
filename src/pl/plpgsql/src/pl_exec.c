@@ -7953,8 +7953,7 @@ exec_is_simple_query(PLpgSQL_expr *expr)
 		query->distinctClause ||
 		query->sortClause ||
 		query->limitOffset ||
-		query->limitCount ||
-		query->setOperations)
+		query->limitCount)
 		return false;
 
 	/*

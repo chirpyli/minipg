@@ -943,7 +943,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(limitCount);
 	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(rowMarks);
-	COMPARE_NODE_FIELD(setOperations);
 	COMPARE_NODE_FIELD(constraintDeps);
 	COMPARE_NODE_FIELD(withCheckOptions);
 	COMPARE_LOCATION_FIELD(stmt_location);
@@ -1015,28 +1014,10 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(limitCount);
 	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(lockingClause);
-	COMPARE_SCALAR_FIELD(op);
-	COMPARE_SCALAR_FIELD(all);
-	COMPARE_NODE_FIELD(larg);
-	COMPARE_NODE_FIELD(rarg);
 
 	return true;
 }
 
-static bool
-_equalSetOperationStmt(const SetOperationStmt *a, const SetOperationStmt *b)
-{
-	COMPARE_SCALAR_FIELD(op);
-	COMPARE_SCALAR_FIELD(all);
-	COMPARE_NODE_FIELD(larg);
-	COMPARE_NODE_FIELD(rarg);
-	COMPARE_NODE_FIELD(colTypes);
-	COMPARE_NODE_FIELD(colTypmods);
-	COMPARE_NODE_FIELD(colCollations);
-	COMPARE_NODE_FIELD(groupClauses);
-
-	return true;
-}
 
 static bool
 _equalReturnStmt(const ReturnStmt *a, const ReturnStmt *b)
@@ -2861,9 +2842,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_SelectStmt:
 			retval = _equalSelectStmt(a, b);
-			break;
-		case T_SetOperationStmt:
-			retval = _equalSetOperationStmt(a, b);
 			break;
 		case T_ReturnStmt:
 			retval = _equalReturnStmt(a, b);

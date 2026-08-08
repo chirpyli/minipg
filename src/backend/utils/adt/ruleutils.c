@@ -405,9 +405,6 @@ static void get_basic_select_query(Query *query, deparse_context *context,
 								   TupleDesc resultDesc, bool colNamesVisible);
 static void get_target_list(List *targetList, deparse_context *context,
 							TupleDesc resultDesc, bool colNamesVisible);
-static void get_setop_query(Node *setOp, Query *query,
-							deparse_context *context,
-							TupleDesc resultDesc, bool colNamesVisible);
 static Node *get_rule_sortgroupclause(Index ref, List *tlist,
 									  bool force_colno,
 									  deparse_context *context);
@@ -5323,22 +5320,10 @@ get_select_query_def(Query *query, deparse_context *context,
 	context->windowTList = query->targetList;
 
 	/*
-	 * If the Query node has a setOperations tree, then it's the top level of
-	 * a UNION/INTERSECT/EXCEPT query; only the WITH, ORDER BY and LIMIT
-	 * fields are interesting in the top query itself.
+	 * Decompile the top-level query body.
 	 */
-	if (query->setOperations)
-	{
-		get_setop_query(query->setOperations, query, context, resultDesc,
-						colNamesVisible);
-		/* ORDER BY clauses must be simple in this case */
-		force_colno = true;
-	}
-	else
-	{
-		get_basic_select_query(query, context, resultDesc, colNamesVisible);
-		force_colno = false;
-	}
+	get_basic_select_query(query, context, resultDesc, colNamesVisible);
+	force_colno = false;
 
 	/* Add the ORDER BY clause if given */
 	if (query->sortClause != NIL)
@@ -5784,139 +5769,6 @@ get_target_list(List *targetList, deparse_context *context,
 	pfree(targetbuf.data);
 }
 
-static void
-get_setop_query(Node *setOp, Query *query, deparse_context *context,
-				TupleDesc resultDesc, bool colNamesVisible)
-{
-	StringInfo	buf = context->buf;
-	bool		need_paren;
-
-	/* Guard against excessively long or deeply-nested queries */
-	CHECK_FOR_INTERRUPTS();
-	check_stack_depth();
-
-	if (IsA(setOp, RangeTblRef))
-	{
-		RangeTblRef *rtr = (RangeTblRef *) setOp;
-		RangeTblEntry *rte = rt_fetch(rtr->rtindex, query->rtable);
-		Query	   *subquery = rte->subquery;
-
-		Assert(subquery != NULL);
-
-		/*
-		 * We need parens if WITH, ORDER BY, FOR UPDATE, or LIMIT; see gram.y.
-		 * Also add parens if the leaf query contains its own set operations.
-		 * (That shouldn't happen unless one of the other clauses is also
-		 * present, see transformSetOperationTree; but let's be safe.)
-		 */
-		need_paren = (subquery->sortClause ||
-					  subquery->rowMarks ||
-					  subquery->limitOffset ||
-					  subquery->limitCount ||
-					  subquery->setOperations);
-		if (need_paren)
-			appendStringInfoChar(buf, '(');
-		get_query_def(subquery, buf, context->namespaces, resultDesc,
-					  colNamesVisible,
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
-		if (need_paren)
-			appendStringInfoChar(buf, ')');
-	}
-	else if (IsA(setOp, SetOperationStmt))
-	{
-		SetOperationStmt *op = (SetOperationStmt *) setOp;
-		int			subindent;
-
-		/*
-		 * We force parens when nesting two SetOperationStmts, except when the
-		 * lefthand input is another setop of the same kind.  Syntactically,
-		 * we could omit parens in rather more cases, but it seems best to use
-		 * parens to flag cases where the setop operator changes.  If we use
-		 * parens, we also increase the indentation level for the child query.
-		 *
-		 * There are some cases in which parens are needed around a leaf query
-		 * too, but those are more easily handled at the next level down (see
-		 * code above).
-		 */
-		if (IsA(op->larg, SetOperationStmt))
-		{
-			SetOperationStmt *lop = (SetOperationStmt *) op->larg;
-
-			if (op->op == lop->op && op->all == lop->all)
-				need_paren = false;
-			else
-				need_paren = true;
-		}
-		else
-			need_paren = false;
-
-		if (need_paren)
-		{
-			appendStringInfoChar(buf, '(');
-			subindent = PRETTYINDENT_STD;
-			appendContextKeyword(context, "", subindent, 0, 0);
-		}
-		else
-			subindent = 0;
-
-		get_setop_query(op->larg, query, context, resultDesc, colNamesVisible);
-
-		if (need_paren)
-			appendContextKeyword(context, ") ", -subindent, 0, 0);
-		else if (PRETTY_INDENT(context))
-			appendContextKeyword(context, "", -subindent, 0, 0);
-		else
-			appendStringInfoChar(buf, ' ');
-
-		switch (op->op)
-		{
-			case SETOP_UNION:
-				appendStringInfoString(buf, "UNION ");
-				break;
-			case SETOP_INTERSECT:
-				appendStringInfoString(buf, "INTERSECT ");
-				break;
-			case SETOP_EXCEPT:
-				appendStringInfoString(buf, "EXCEPT ");
-				break;
-			default:
-				elog(ERROR, "unrecognized set op: %d",
-					 (int) op->op);
-		}
-		if (op->all)
-			appendStringInfoString(buf, "ALL ");
-
-		/* Always parenthesize if RHS is another setop */
-		need_paren = IsA(op->rarg, SetOperationStmt);
-
-		/*
-		 * The indentation code here is deliberately a bit different from that
-		 * for the lefthand input, because we want the line breaks in
-		 * different places.
-		 */
-		if (need_paren)
-		{
-			appendStringInfoChar(buf, '(');
-			subindent = PRETTYINDENT_STD;
-		}
-		else
-			subindent = 0;
-		appendContextKeyword(context, "", subindent, 0, 0);
-
-		get_setop_query(op->rarg, query, context, resultDesc, false);
-
-		if (PRETTY_INDENT(context))
-			context->indentLevel -= subindent;
-		if (need_paren)
-			appendContextKeyword(context, ")", 0, 0, 0);
-	}
-	else
-	{
-		elog(ERROR, "unrecognized node type: %d",
-			 (int) nodeTag(setOp));
-	}
-}
 
 /*
  * Display a sort/group clause.

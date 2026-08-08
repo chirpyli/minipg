@@ -2031,6 +2031,8 @@ select * from testrngfunc();
 create or replace function testrngfunc() returns setof rngfunc_type as $$
   select 1, 2 union select 3, 4 order by 1;
 $$ language sql immutable;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+CONTEXT:  SQL function "testrngfunc"
 explain (verbose, costs off)
 select testrngfunc();
        QUERY PLAN        
@@ -2043,34 +2045,23 @@ select testrngfunc();
 select testrngfunc();
    testrngfunc   
 -----------------
- (1.000000,2.00)
- (3.000000,4.00)
-(2 rows)
+ (7.136178,7.14)
+(1 row)
 
 explain (verbose, costs off)
 select * from testrngfunc();
-                        QUERY PLAN                        
-----------------------------------------------------------
- Subquery Scan on "*SELECT*"
-   Output: "*SELECT*"."?column?", "*SELECT*"."?column?_1"
-   ->  Unique
-         Output: (1), (2)
-         ->  Sort
-               Output: (1), (2)
-               Sort Key: (1), (2)
-               ->  Append
-                     ->  Result
-                           Output: 1, 2
-                     ->  Result
-                           Output: 3, 4
-(12 rows)
+             QUERY PLAN              
+-------------------------------------
+ Function Scan on public.testrngfunc
+   Output: f1, f2
+   Function Call: testrngfunc()
+(3 rows)
 
 select * from testrngfunc();
     f1    |  f2  
 ----------+------
- 1.000000 | 2.00
- 3.000000 | 4.00
-(2 rows)
+ 7.136178 | 7.14
+(1 row)
 
 -- Check a couple of error cases while we're here
 select * from testrngfunc() as t(f1 int8,f2 int8);  -- fail, composite result
@@ -2183,34 +2174,26 @@ drop table users;
 create or replace function rngfuncbar() returns setof text as
 $$ select 'foo'::varchar union all select 'bar'::varchar ; $$
 language sql stable;
+ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+CONTEXT:  SQL function "rngfuncbar"
 select rngfuncbar();
- rngfuncbar 
-------------
- foo
- bar
-(2 rows)
-
+ERROR:  function rngfuncbar() does not exist
+LINE 1: select rngfuncbar();
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from rngfuncbar();
- rngfuncbar 
-------------
- foo
- bar
-(2 rows)
-
+ERROR:  function rngfuncbar() does not exist
+LINE 1: select * from rngfuncbar();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- this function is now inlinable, too:
 explain (verbose, costs off) select * from rngfuncbar();
-                   QUERY PLAN                   
-------------------------------------------------
- Result
-   Output: ('foo'::character varying)
-   ->  Append
-         ->  Result
-               Output: 'foo'::character varying
-         ->  Result
-               Output: 'bar'::character varying
-(7 rows)
-
+ERROR:  function rngfuncbar() does not exist
+LINE 1: explain (verbose, costs off) select * from rngfuncbar();
+                                                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function rngfuncbar();
+ERROR:  function rngfuncbar() does not exist
 -- check handling of a SQL function with multiple OUT params (bug #5777)
 create or replace function rngfuncbar(out integer, out numeric) as
 $$ select (1, 2.1) $$ language sql;

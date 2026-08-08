@@ -766,8 +766,7 @@ query_supports_distinctness(Query *query)
 		query->groupClause != NIL ||
 		query->groupingSets != NIL ||
 		query->hasAggs ||
-		query->havingQual ||
-		query->setOperations)
+		query->havingQual)
 		return true;
 
 	return false;
@@ -927,46 +926,6 @@ query_is_distinct_for_with_collations(Query *query, List *distinct_cols)
 			return true;
 	}
 
-	/*
-	 * UNION, INTERSECT, EXCEPT guarantee uniqueness of the whole output row,
-	 * except with ALL.
-	 */
-	if (query->setOperations)
-	{
-		SetOperationStmt *topop = castNode(SetOperationStmt, query->setOperations);
-
-		Assert(topop->op != SETOP_NONE);
-
-		if (!topop->all)
-		{
-			ListCell   *lg;
-
-			/* We're good if all the nonjunk output columns are in colnos */
-			lg = list_head(topop->groupClauses);
-			foreach(l, query->targetList)
-			{
-				TargetEntry *tle = (TargetEntry *) lfirst(l);
-				SortGroupClause *sgc;
-
-				if (tle->resjunk)
-					continue;	/* ignore resjunk columns */
-
-				/* non-resjunk columns should have grouping clauses */
-				Assert(lg != NULL);
-				sgc = (SortGroupClause *) lfirst(lg);
-				lg = lnext(topop->groupClauses, lg);
-
-				dcinfo = distinct_col_search(tle->resno, distinct_cols);
-				if (dcinfo == NULL ||
-					!equality_ops_are_compatible(dcinfo->opid, sgc->eqop) ||
-					!collations_agree_on_equality(dcinfo->collid,
-												  exprCollation((Node *) tle->expr)))
-					break;		/* exit early if no match */
-			}
-			if (l == NULL)		/* had matches for all? */
-				return true;
-		}
-	}
 
 	/*
 	 * XXX Are there any other cases in which we can easily see the result

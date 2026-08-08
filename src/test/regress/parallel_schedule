@@ -74,7 +74,7 @@ test: sanity_check
 ignore: random
 # information_schema 已裁剪，join 引用 information_schema.cardinal_number，移除
 # CREATE TABLE AS (CTAS) 语法已裁剪，random 测试依赖该语法，移除
-test: select_distinct select_distinct_on select_implicit select_having subselect union case aggregates transactions portals arrays btree_index hash_index delete namespace prepared_xacts
+test: select_distinct select_distinct_on select_implicit select_having subselect case aggregates transactions portals arrays btree_index hash_index delete namespace prepared_xacts
 
 # ----------
 # Another group of parallel tests

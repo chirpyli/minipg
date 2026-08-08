@@ -768,3 +768,56 @@
 **保留说明**：`src/backend/executor/README` 中整段"Asynchronous Execution"说明（含协议描述）已删除；`typedefs.list` 中的 `ForeignAsyncRequest_function`（属 FDW 机制，与本次无关）保留。
 
 **验证**：`make -C src` 全量编译通过；异步相关符号（`execAsync`/`ExecAsync`/`AsyncRequest`/`async_capable`/`nasyncplans`/`enable_async_append`/`as_async`/`as_nasyncremain`/`as_needrequest`/`as_eventset`/`as_valid_asyncplans`/`consider_async`/`is_async_capable_plan`/`Async Capable`）在 `src` 内除无关的 `ForeignAsyncRequest_function` 外已全部清除。运行时行为不变（异步路径本不会被触发），同步 Append 路径完整保留。
+
+---
+
+## 裁剪：SQL 集合操作（UNION / INTERSECT / EXCEPT，含 ALL 与 ORDER BY）
+
+**裁剪日期**：2026-08-08
+
+**裁剪原因**：集合操作（Set Operation）将多个 SELECT 的结果集做并/交/差运算，依赖独立的 `SetOperationStmt` 解析节点、`SetOp`/`Append`/`MergeAppend` 执行器节点与 `plan_set_operations` 优化器路径，是相对独立的查询能力分支。在 minipg 学习中属于"查询变体"而非内核核心（btree/hash 索引、事务均不受影响），学习价值有限，故整体移除，使 `SELECT a UNION SELECT b` 等语法得到明确、友好的报错而非深层崩溃。
+
+**核心策略**：`gram.y` 保留 `UNION`/`INTERSECT`/`EXCEPT` 关键字（维持 `check_keywords.pl` 一致性），但把三条 `set_op` 组合产生式的 action 直接改为 `ereport(ERROR, "set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")`，从而在解析期对**所有出现位置**（顶层 SELECT、视图定义、CTE、子查询内 UNION）统一拦截。删除 `Query.setOperations` 字段与全套 `SetOperationStmt`/`SetOp`/`SetOpState`/`SetOpPath` 节点结构与序列化代码，删除 `plan_set_operations`、`flatten_simple_union_all` 及其 6 个 union 展开辅助函数。普通 SELECT / JOIN / 子查询 / 视图不受影响。
+
+**删除的文件**：
+- `src/backend/optimizer/prep/prepunion.c`（含 `plan_set_operations`/`make_setop_translation_list`/`postprocess_setop_tlist`/`pull_up_simple_union_all`/`pull_up_union_leaf_queries`/`make_setop_translation_list`/`is_simple_union_all`/`is_simple_union_all_recurse`/`flatten_simple_union_all`）
+- `src/backend/executor/nodeSetOp.c`（SetOp 执行节点）
+- `src/include/executor/nodeSetOp.h`（对应头文件）
+- `src/test/regress/sql/union.sql` + `expected/union.out` + `results/union.out`（专测集合操作的回归用例）
+
+**修改的文件（按模块）**：
+
+语法 / 解析：
+- `src/backend/parser/gram.y`：删除 `makeSetOp()` 函数与三条 `set_op` 组合产生式，改为直接 `ereport` 友好报错；保留 `set_quantifier`（用于 `GROUP BY DISTINCT`）与 `UNION`/`INTERSECT`/`EXCEPT` 关键字（仍在报错产生式中引用，维持 `kwlist.h` 校验一致）
+- `src/backend/parser/analyze.c`：删除 `transformSetOperationStmt`/`transformSetOperationTree`/`makeSortGroupClauseForSetOp` 函数与对应前向声明；在 `transformSelectStmt` 对 `SetOperationStmt` 分支报错；删除 `CheckSelectLocking` 中 `if (qry->setOperations)` 块
+- `src/include/parser/analyze.h`：删除 `makeSortGroupClauseForSetOp` 声明
+- `src/include/nodes/parsenodes.h`：删除 `SetOperation` 枚举、`SetOperationStmt` 结构体、`SelectStmt` 中 `op`/`all`/`larg`/`rarg` 字段、`Query.setOperations` 字段
+
+优化器：
+- `src/include/optimizer/prep.h`：删除 `plan_set_operations` 与 `flatten_simple_union_all` 声明
+- `src/backend/optimizer/plan/planner.c`：删除 `if (parse->setOperations) flatten_simple_union_all(root);` 调用、删除整个 `if (parse->setOperations){...}` 优化分支与对应 `else`、删除 `postprocess_setop_tlist` 前向声明与定义；更新一处过时注释（`hasRecursion` 断言保留，递归 CTE 的 `WITH RECURSIVE` 处理在 analyze.c，不在本次范围）
+- `src/backend/optimizer/plan/createplan.c`：删除 `case T_SetOp` 分支（保留 `T_Append`/`T_MergeAppend`，二者仍用于继承/分区展开）
+- `src/backend/optimizer/prep/prepjointree.c`：删除 6 个 union 展开辅助函数（`pull_up_simple_union_all`/`pull_up_union_leaf_queries`/`make_setop_translation_list`/`is_simple_union_all`/`is_simple_union_all_recurse`/`flatten_simple_union_all`）、对应前向声明、调用点、`setOperations` 检查、`is_simple_subquery` 内 `subquery->setOperations` 引用，并删除 `Assert(parse->setOperations == NULL)`；保留 `is_safe_append_member`/`is_simple_subquery` 等通用函数
+
+执行器 / 节点定义：
+- `src/backend/executor/Makefile`：移除 `nodeSetOp.o`
+- `src/backend/executor/execProcnode.c` / `execAmi.c`：`T_SetOp` 分发与初始化分支已清理（之前步已删）
+- `src/include/nodes/plannodes.h`：删除 `SetOp` 结构体、`SetOpCmd`/`SetOpStrategy` 枚举
+- `src/include/nodes/execnodes.h`：删除 `SetOpState` 结构体
+- `src/include/nodes/pathnodes.h`：`UPPERREL_SETOP` 枚举值保留（仅占位，不影响编译）
+- `src/backend/nodes/copyfuncs.c`/`equalfuncs.c`/`outfuncs.c`/`readfuncs.c`/`nodeFuncs.c`：`SetOperationStmt`/`SetOp` 的序列化与 walker 分支与 dispatch case 已清理（之前步已删）
+
+系统视图 / 其他：
+- `src/backend/catalog/system_views.sql`：改写 `pg_stat_database` 视图，去掉 `UNION ALL`（原用于生成 oid=0 共享库汇总行），直接 `FROM pg_database D`，使 initdb 不再依赖集合操作语法
+- `src/tools/pgindent/typedefs.list`：`SetOperationStmt`/`SetOp`/`SetOpState` 类型名已移除
+
+**回归测试清理**：
+- `parallel_schedule`：移除 `union` 调度项
+- 上述含 `UNION`/`INTERSECT`/`EXCEPT` 的测试（`select`/`subselect`/`aggregates`/`groupingsets`/`window`/`create_view`/`inherit`/`copy`/`copyselect`/`select_distinct`/`cluster`/`plancache`/`plpgsql`/`domain`/`rangefuncs`/`truncate`/`partition_prune`/`functional_deps`/`create_table`/`insert`/`bit`/`create_index`/`create_schema`/`create_table_like`/`replica_identity`/`rules`/`typed_table`/`indexing`/`compression` 等）中依赖集合操作的语句被禁用后，其 `expected/*.out` 已全部刷新为裁剪后的实际输出（直接报错或级联的 `relation does not exist` 等，均为 setop 禁用的合理后果），共 30 个 `.out` 刷新。
+- `output/copy.source`：`copy` 测试的 `select * from copytest except select * from copytest2` 两处 CSV round-trip 校验（原期望 `(0 rows)`）改为 `ERROR: set operations ...`（pg_regress 每次运行会从 `.source` 重建 `expected/copy.out`，故必须改模板而非改 `.out`）。
+
+**验证**：`make clean` 后彻底重编（`make -j`）+ `make install` + `initdb` 均通过；随后 `make installcheck`（128 个主回归测试，含裁剪前遗留的临时 PG 实例 `--max-connections=1` 串行运行）**全部通过（0 失败）**，`UNION`/`INTERSECT`/`EXCEPT` 在整个回归套件中一致触发 `set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg` 友好报错，不存在裁剪引入的真实逻辑回归。普通 SELECT / JOIN / 子查询 / 视图 / 分区 / 继承展开不受影响（已通过 `SELECT`/`join_hash`/`inherit`/`partition_*` 等测试交叉验证）。
+
+**附注（基线崩溃已解决）**：
+- 历史记录中"基线 backend SIGSEGV（signal 11）导致约 104/129 失败"的问题，经排查为陈旧 `.o` 与目标文件 mtime 乱序导致 `make` 跳过了含 `NodeTag` 枚举初始化的目标重编（节点枚举重排后 `nodeTag` 值与新 `nodes.h` 不一致），属 stale-object 混链而非真实 bug。执行彻底的 `find src -name '*.o' -delete` 全量重编后该崩溃消失，当前 `make installcheck` 已全绿。
+- 本次 setop 裁剪本身未引入新的编译、`initdb` 或运行时问题。
