@@ -39,7 +39,6 @@
 #include "postgres.h"
 
 #include "executor/execdebug.h"
-#include "executor/execPartition.h"
 #include "executor/nodeMergeAppend.h"
 #include "lib/binaryheap.h"
 #include "miscadmin.h"
@@ -81,56 +80,16 @@ ExecInitMergeAppend(MergeAppend *node, EState *estate, int eflags)
 	mergestate->ps.state = estate;
 	mergestate->ps.ExecProcNode = ExecMergeAppend;
 
-	/* If run-time partition pruning is enabled, then set that up now */
-	if (node->part_prune_info != NULL)
-	{
-		PartitionPruneState *prunestate;
+	nplans = list_length(node->mergeplans);
 
-		/* We may need an expression context to evaluate partition exprs */
-		ExecAssignExprContext(estate, &mergestate->ps);
-
-		prunestate = ExecCreatePartitionPruneState(&mergestate->ps,
-												   node->part_prune_info);
-		mergestate->ms_prune_state = prunestate;
-
-		/* Perform an initial partition prune, if required. */
-		if (prunestate->do_initial_prune)
-		{
-			/* Determine which subplans survive initial pruning */
-			validsubplans = ExecFindInitialMatchingSubPlans(prunestate,
-															list_length(node->mergeplans));
-
-			nplans = bms_num_members(validsubplans);
-		}
-		else
-		{
-			/* We'll need to initialize all subplans */
-			nplans = list_length(node->mergeplans);
-			Assert(nplans > 0);
-			validsubplans = bms_add_range(NULL, 0, nplans - 1);
-		}
-
-		/*
-		 * When no run-time pruning is required and there's at least one
-		 * subplan, we can fill as_valid_subplans immediately, preventing
-		 * later calls to ExecFindMatchingSubPlans.
-		 */
-		if (!prunestate->do_exec_prune && nplans > 0)
-			mergestate->ms_valid_subplans = bms_add_range(NULL, 0, nplans - 1);
-	}
-	else
-	{
-		nplans = list_length(node->mergeplans);
-
-		/*
-		 * When run-time partition pruning is not enabled we can just mark all
-		 * subplans as valid; they must also all be initialized.
-		 */
-		Assert(nplans > 0);
-		mergestate->ms_valid_subplans = validsubplans =
-			bms_add_range(NULL, 0, nplans - 1);
-		mergestate->ms_prune_state = NULL;
-	}
+	/*
+	 * We can just mark all subplans as valid; they must also all be
+	 * initialized.
+	 */
+	Assert(nplans > 0);
+	mergestate->ms_valid_subplans = validsubplans =
+		bms_add_range(NULL, 0, nplans - 1);
+	mergestate->ms_prune_state = NULL;
 
 	mergeplanstates = (PlanState **) palloc(nplans * sizeof(PlanState *));
 	mergestate->mergeplans = mergeplanstates;
@@ -222,15 +181,6 @@ ExecMergeAppend(PlanState *pstate)
 		/* Nothing to do if all subplans were pruned */
 		if (node->ms_nplans == 0)
 			return ExecClearTuple(node->ps.ps_ResultTupleSlot);
-
-		/*
-		 * If we've yet to determine the valid subplans then do so now.  If
-		 * run-time pruning is disabled then the valid subplans will always be
-		 * set to all subplans.
-		 */
-		if (node->ms_valid_subplans == NULL)
-			node->ms_valid_subplans =
-				ExecFindMatchingSubPlans(node->ms_prune_state);
 
 		/*
 		 * First time through: pull the first tuple from each valid subplan,
@@ -352,19 +302,6 @@ void
 ExecReScanMergeAppend(MergeAppendState *node)
 {
 	int			i;
-
-	/*
-	 * If any PARAM_EXEC Params used in pruning expressions have changed, then
-	 * we'd better unset the valid subplans so that they are reselected for
-	 * the new parameter values.
-	 */
-	if (node->ms_prune_state &&
-		bms_overlap(node->ps.chgParam,
-					node->ms_prune_state->execparamids))
-	{
-		bms_free(node->ms_valid_subplans);
-		node->ms_valid_subplans = NULL;
-	}
 
 	for (i = 0; i < node->ms_nplans; i++)
 	{

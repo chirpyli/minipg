@@ -56,18 +56,8 @@ select pgstathashindex('test_pkey');
 
 select pgstatindex('test_hashidx');
 
--- check that using any of these functions with unsupported relations will fail
-create table test_partitioned (a int) partition by range (a);
-create index test_partitioned_index on test_partitioned(a);
-create index test_partitioned_hash_index on test_partitioned using hash(a);
--- these should all fail
-select pgstattuple('test_partitioned');
-select pgstattuple('test_partitioned_index');
-select pgstattuple_approx('test_partitioned');
-select pg_relpages('test_partitioned');
-select pgstatindex('test_partitioned');
-select pgstathashindex('test_partitioned');
-select pgstathashindex('test_partitioned_hash_index');
+-- 分区功能已在 minipg 中裁剪（不支持 CREATE TABLE ... PARTITION BY），
+-- 因此不再测试 pgstattuple 系列函数对分区表/分区索引的报错场景。
 
 create view test_view as select 1;
 -- these should all fail
@@ -87,27 +77,12 @@ select pg_relpages('test_foreign_table');
 select pgstatindex('test_foreign_table');
 select pgstathashindex('test_foreign_table');
 
--- a partition of a partitioned table should work though
-create table test_partition partition of test_partitioned for values from (1) to (100);
-select pgstattuple('test_partition');
-select pgstattuple_approx('test_partition');
-select pg_relpages('test_partition');
+-- 分区功能已在 minipg 中裁剪，不再测试分区子表及其索引的 pgstattuple 调用。
 
 -- toast tables should work
 select pgstattuple((select reltoastrelid from pg_class where relname = 'test'));
 select pgstattuple_approx((select reltoastrelid from pg_class where relname = 'test'));
 select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
-
--- not for the index calls though, of course
-select pgstatindex('test_partition');
-select pgstathashindex('test_partition');
-
--- an actual index of a partitioned table should work though
-create index test_partition_idx on test_partition(a);
-create index test_partition_hash_idx on test_partition using hash (a);
--- these should work
-select pgstatindex('test_partition_idx');
-select pgstathashindex('test_partition_hash_idx');
 
 -- these should work for sequences
 create sequence test_sequence;
@@ -120,7 +95,6 @@ select pgstathashindex('test_sequence');
 select pgstattuple_approx('test_sequence');
 
 drop sequence test_sequence;
-drop table test_partitioned;
 drop view test_view;
 drop foreign table test_foreign_table;
 drop server dummy_server;

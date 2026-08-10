@@ -5,98 +5,86 @@
 SELECT b.*
    FROM bt_i4_heap b
    WHERE b.seqno < 1;
- seqno |   random   
--------+------------
-     0 | 1935401906
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_i4_heap b
    WHERE b.seqno >= 9999;
- seqno |   random   
--------+------------
-  9999 | 1227676208
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_i4_heap b
    WHERE b.seqno = 4500;
- seqno |   random   
--------+------------
-  4500 | 2080851358
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_name_heap b
    WHERE b.seqno < '1'::name;
- seqno |   random   
--------+------------
- 0     | 1935401906
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_name_heap b
    WHERE b.seqno >= '9999'::name;
- seqno |   random   
--------+------------
- 9999  | 1227676208
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_name_heap b
    WHERE b.seqno = '4500'::name;
- seqno |   random   
--------+------------
- 4500  | 2080851358
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_txt_heap b
    WHERE b.seqno < '1'::text;
- seqno |   random   
--------+------------
- 0     | 1935401906
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_txt_heap b
    WHERE b.seqno >= '9999'::text;
- seqno |   random   
--------+------------
- 9999  | 1227676208
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_txt_heap b
    WHERE b.seqno = '4500'::text;
- seqno |   random   
--------+------------
- 4500  | 2080851358
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_f8_heap b
    WHERE b.seqno < '1'::float8;
- seqno |   random   
--------+------------
-     0 | 1935401906
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_f8_heap b
    WHERE b.seqno >= '9999'::float8;
- seqno |   random   
--------+------------
-  9999 | 1227676208
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 SELECT b.*
    FROM bt_f8_heap b
    WHERE b.seqno = '4500'::float8;
- seqno |   random   
--------+------------
-  4500 | 2080851358
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- Check correct optimization of LIKE (special index operator support)
@@ -327,7 +315,12 @@ ERROR:  "btree_tall_idx2" is not a table or foreign table
 DROP INDEX btree_tall_idx2;
 -- Partitioned index
 CREATE TABLE btree_part (id int4) PARTITION BY RANGE (id);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE btree_part (id int4) PARTITION BY RANGE (id);
+                                          ^
 CREATE INDEX btree_part_idx ON btree_part(id);
+ERROR:  relation "btree_part" does not exist
 ALTER INDEX btree_part_idx ALTER COLUMN id SET (n_distinct=100);
-ERROR:  "btree_part_idx" is not a table or foreign table
+ERROR:  relation "btree_part_idx" does not exist
 DROP TABLE btree_part;
+ERROR:  table "btree_part" does not exist

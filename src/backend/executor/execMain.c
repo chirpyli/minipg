@@ -59,7 +59,6 @@
 #include "utils/backend_status.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
-#include "utils/partcache.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 
@@ -781,7 +780,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 	switch (resultRel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			CheckCmdReplicaIdentity(resultRel, operation);
 
 			/*
@@ -874,7 +872,6 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
 		case RELKIND_SEQUENCE:
@@ -971,11 +968,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	 * this field is filled in ExecInitModifyTable().
 	 */
 	resultRelInfo->ri_RootResultRelInfo = partition_root_rri;
-	resultRelInfo->ri_RootToPartitionMap = NULL;	/* set by
-													 * ExecInitRoutingInfo */
-	resultRelInfo->ri_PartitionTupleSlot = NULL;	/* ditto */
-	resultRelInfo->ri_ChildToRootMap = NULL;
-	resultRelInfo->ri_ChildToRootMapValid = false;
 	resultRelInfo->ri_CopyMultiInsertBuffer = NULL;
 }
 
@@ -1407,126 +1399,6 @@ ExecRelCheck(ResultRelInfo *resultRelInfo,
 
 	/* NULL result means no error */
 	return NULL;
-}
-
-/*
- * ExecPartitionCheck --- check that tuple meets the partition constraint.
- *
- * Returns true if it meets the partition constraint.  If the constraint
- * fails and we're asked to emit an error, do so and don't return; otherwise
- * return false.
- */
-bool
-ExecPartitionCheck(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
-				   EState *estate, bool emitError)
-{
-	ExprContext *econtext;
-	bool		success;
-
-	/*
-	 * If first time through, build expression state tree for the partition
-	 * check expression.  (In the corner case where the partition check
-	 * expression is empty, ie there's a default partition and nothing else,
-	 * we'll be fooled into executing this code each time through.  But it's
-	 * pretty darn cheap in that case, so we don't worry about it.)
-	 */
-	if (resultRelInfo->ri_PartitionCheckExpr == NULL)
-	{
-		/*
-		 * Ensure that the qual tree and prepared expression are in the
-		 * query-lifespan context.
-		 */
-		MemoryContext oldcxt = MemoryContextSwitchTo(estate->es_query_cxt);
-		List	   *qual = RelationGetPartitionQual(resultRelInfo->ri_RelationDesc);
-
-		resultRelInfo->ri_PartitionCheckExpr = ExecPrepareCheck(qual, estate);
-		MemoryContextSwitchTo(oldcxt);
-	}
-
-	/*
-	 * We will use the EState's per-tuple context for evaluating constraint
-	 * expressions (creating it if it's not already there).
-	 */
-	econtext = GetPerTupleExprContext(estate);
-
-	/* Arrange for econtext's scan tuple to be the tuple under test */
-	econtext->ecxt_scantuple = slot;
-
-	/*
-	 * As in case of the catalogued constraints, we treat a NULL result as
-	 * success here, not a failure.
-	 */
-	success = ExecCheck(resultRelInfo->ri_PartitionCheckExpr, econtext);
-
-	/* if asked to emit error, don't actually return on failure */
-	if (!success && emitError)
-		ExecPartitionCheckEmitError(resultRelInfo, slot, estate);
-
-	return success;
-}
-
-/*
- * ExecPartitionCheckEmitError - Form and emit an error message after a failed
- * partition constraint check.
- */
-void
-ExecPartitionCheckEmitError(ResultRelInfo *resultRelInfo,
-							TupleTableSlot *slot,
-							EState *estate)
-{
-	Oid			root_relid;
-	TupleDesc	tupdesc;
-	char	   *val_desc;
-	Bitmapset  *modifiedCols;
-
-	/*
-	 * If the tuple has been routed, it's been converted to the partition's
-	 * rowtype, which might differ from the root table's.  We must convert it
-	 * back to the root table's rowtype so that val_desc in the error message
-	 * matches the input tuple.
-	 */
-	if (resultRelInfo->ri_RootResultRelInfo)
-	{
-		ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
-		TupleDesc	old_tupdesc;
-		AttrMap    *map;
-
-		root_relid = RelationGetRelid(rootrel->ri_RelationDesc);
-		tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
-
-		old_tupdesc = RelationGetDescr(resultRelInfo->ri_RelationDesc);
-		/* a reverse map */
-		map = build_attrmap_by_name_if_req(old_tupdesc, tupdesc);
-
-		/*
-		 * Partition-specific slot's tupdesc can't be changed, so allocate a
-		 * new one.
-		 */
-		if (map != NULL)
-			slot = execute_attr_map_slot(map, slot,
-										 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
-		modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
-								 ExecGetUpdatedCols(rootrel, estate));
-	}
-	else
-	{
-		root_relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
-		tupdesc = RelationGetDescr(resultRelInfo->ri_RelationDesc);
-		modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
-								 ExecGetUpdatedCols(resultRelInfo, estate));
-	}
-
-	val_desc = ExecBuildSlotValueDescription(root_relid,
-											 slot,
-											 tupdesc,
-											 modifiedCols,
-											 64);
-	ereport(ERROR,
-			(errcode(ERRCODE_CHECK_VIOLATION),
-			 errmsg("new row for relation \"%s\" violates partition constraint",
-					RelationGetRelationName(resultRelInfo->ri_RelationDesc)),
-			 val_desc ? errdetail("Failing row contains %s.", val_desc) : 0,
-			 errtable(resultRelInfo->ri_RelationDesc)));
 }
 
 /*

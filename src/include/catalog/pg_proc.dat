@@ -2910,13 +2910,6 @@
   proname => 'pg_get_statisticsobjdef_expressions', provolatile => 's',
   prorettype => '_text', proargtypes => 'oid',
   prosrc => 'pg_get_statisticsobjdef_expressions' },
-{ oid => '3352', descr => 'partition key description',
-  proname => 'pg_get_partkeydef', provolatile => 's', prorettype => 'text',
-  proargtypes => 'oid', prosrc => 'pg_get_partkeydef' },
-{ oid => '3408', descr => 'partition constraint description',
-  proname => 'pg_get_partition_constraintdef', provolatile => 's',
-  prorettype => 'text', proargtypes => 'oid',
-  prosrc => 'pg_get_partition_constraintdef' },
 { oid => '1662', descr => 'trigger description',
   proname => 'pg_get_triggerdef', provolatile => 's', prorettype => 'text',
   proargtypes => 'oid', prosrc => 'pg_get_triggerdef' },
@@ -8554,30 +8547,6 @@
   proargnames => '{tablespace,name,size,modification}',
   prosrc => 'pg_ls_tmpdir_1arg' },
 
-# hash partitioning constraint function
-{ oid => '5028', descr => 'hash partition CHECK constraint',
-  proname => 'satisfies_hash_partition', provariadic => 'any',
-  proisstrict => 'f', prorettype => 'bool', proargtypes => 'oid int4 int4 any',
-  proargmodes => '{i,i,i,v}', prosrc => 'satisfies_hash_partition' },
-
-# information about a partition tree
-{ oid => '3423', descr => 'view partition tree tables',
-  proname => 'pg_partition_tree', prorows => '1000', proretset => 't',
-  provolatile => 'v', prorettype => 'record', proargtypes => 'regclass',
-  proallargtypes => '{regclass,regclass,regclass,bool,int4}',
-  proargmodes => '{i,o,o,o,o}',
-  proargnames => '{rootrelid,relid,parentrelid,isleaf,level}',
-  prosrc => 'pg_partition_tree' },
-{ oid => '3425', descr => 'view ancestors of the partition',
-  proname => 'pg_partition_ancestors', prorows => '10', proretset => 't',
-  provolatile => 'v', prorettype => 'regclass', proargtypes => 'regclass',
-  proallargtypes => '{regclass,regclass}', proargmodes => '{i,o}',
-  proargnames => '{partitionid,relid}', prosrc => 'pg_partition_ancestors' },
-
-# function to get the top-most partition root parent
-{ oid => '3424', descr => 'get top-most partition root parent',
-  proname => 'pg_partition_root', prorettype => 'regclass',
-  proargtypes => 'regclass', prosrc => 'pg_partition_root' },
 
 { oid => '4350', descr => 'Unicode normalization',
   proname => 'normalize', prorettype => 'text', proargtypes => 'text text',

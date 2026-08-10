@@ -32,9 +32,13 @@ ERROR:  "tid_ind" is an index
 DROP INDEX tid_ind;
 -- Partitioned table, no storage
 CREATE TABLE tid_part (a int) PARTITION BY RANGE (a);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE tid_part (a int) PARTITION BY RANGE (a);
+                                      ^
 SELECT currtid2('tid_part'::text, '(0,1)'::tid); -- fails
-ERROR:  cannot look at latest visible tid for relation "public.tid_part"
+ERROR:  relation "tid_part" does not exist
 DROP TABLE tid_part;
+ERROR:  table "tid_part" does not exist
 -- Views
 -- ctid not defined in the view
 CREATE VIEW tid_view_no_ctid AS SELECT a FROM tid_tab;

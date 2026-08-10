@@ -7,8 +7,8 @@ OBJS = \
 	$(WIN32RES) \
 	delay_execution.o
 
-ISOLATION = partition-addition \
-	    partition-removal-1
+# ISOLATION 用例 partition-addition / partition-removal-1 已随分区功能裁剪而移除
+ISOLATION =
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config

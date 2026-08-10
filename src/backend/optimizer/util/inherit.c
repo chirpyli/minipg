@@ -16,7 +16,6 @@
 
 #include "access/sysattr.h"
 #include "access/table.h"
-#include "catalog/partition.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -31,15 +30,9 @@
 #include "optimizer/prep.h"
 #include "optimizer/restrictinfo.h"
 #include "parser/parsetree.h"
-#include "partitioning/partdesc.h"
-#include "partitioning/partprune.h"
 #include "utils/rel.h"
 
 
-static void expand_partitioned_rtentry(PlannerInfo *root, RelOptInfo *relinfo,
-									   RangeTblEntry *parentrte,
-									   Index parentRTindex, Relation parentrel,
-									   PlanRowMark *top_parentrc, LOCKMODE lockmode);
 static void expand_single_inheritance_child(PlannerInfo *root,
 											RangeTblEntry *parentrte,
 											Index parentRTindex, Relation parentrel,
@@ -134,26 +127,9 @@ expand_inherited_rtentry(PlannerInfo *root, RelOptInfo *rel,
 	}
 
 	/* Scan the inheritance set and expand it */
-	if (oldrelation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 	{
 		/*
-		 * Partitioned table, so set up for partitioning.
-		 */
-		Assert(rte->relkind == RELKIND_PARTITIONED_TABLE);
-
-		/*
-		 * Recursively expand and lock the partitions.  While at it, also
-		 * extract the partition key columns of all the partitioned tables.
-		 */
-		expand_partitioned_rtentry(root, rel, rte, rti,
-								   oldrelation, oldrc, lockmode);
-	}
-	else
-	{
-		/*
-		 * Ordinary table, so process traditional-inheritance children.  (Note
-		 * that partitioned tables are not allowed to have inheritance
-		 * children, so it's not possible for both cases to apply.)
+		 * Process traditional-inheritance children.
 		 */
 		List	   *inhOIDs;
 		ListCell   *l;
@@ -302,120 +278,6 @@ expand_inherited_rtentry(PlannerInfo *root, RelOptInfo *rel,
 	table_close(oldrelation, NoLock);
 }
 
-/*
- * expand_partitioned_rtentry
- *		Recursively expand an RTE for a partitioned table.
- */
-static void
-expand_partitioned_rtentry(PlannerInfo *root, RelOptInfo *relinfo,
-						   RangeTblEntry *parentrte,
-						   Index parentRTindex, Relation parentrel,
-						   PlanRowMark *top_parentrc, LOCKMODE lockmode)
-{
-	PartitionDesc partdesc;
-	Bitmapset  *live_parts;
-	int			num_live_parts;
-	int			i;
-
-	check_stack_depth();
-
-	Assert(parentrte->inh);
-
-	partdesc = PartitionDirectoryLookup(root->glob->partition_directory,
-										parentrel);
-
-	/* A partitioned table should always have a partition descriptor. */
-	Assert(partdesc);
-
-	/*
-	 * Note down whether any partition key cols are being updated. Though it's
-	 * the root partitioned table's updatedCols we are interested in, we
-	 * instead use parentrte to get the updatedCols. This is convenient
-	 * because parentrte already has the root partrel's updatedCols translated
-	 * to match the attribute ordering of parentrel.
-	 */
-	if (!root->partColsUpdated)
-		root->partColsUpdated =
-			has_partition_attrs(parentrel, parentrte->updatedCols, NULL);
-
-	/* Nothing further to do here if there are no partitions. */
-	if (partdesc->nparts == 0)
-		return;
-
-	/*
-	 * Perform partition pruning using restriction clauses assigned to parent
-	 * relation.  live_parts will contain PartitionDesc indexes of partitions
-	 * that survive pruning.  Below, we will initialize child objects for the
-	 * surviving partitions.
-	 */
-	live_parts = prune_append_rel_partitions(relinfo);
-
-	/* Expand simple_rel_array and friends to hold child objects. */
-	num_live_parts = bms_num_members(live_parts);
-	if (num_live_parts > 0)
-		expand_planner_arrays(root, num_live_parts);
-
-	/*
-	 * We also store partition RelOptInfo pointers in the parent relation.
-	 * Since we're palloc0'ing, slots corresponding to pruned partitions will
-	 * contain NULL.
-	 */
-	Assert(relinfo->part_rels == NULL);
-	relinfo->part_rels = (RelOptInfo **)
-		palloc0(relinfo->nparts * sizeof(RelOptInfo *));
-
-	/*
-	 * Create a child RTE for each live partition.  Note that unlike
-	 * traditional inheritance, we don't need a child RTE for the partitioned
-	 * table itself, because it's not going to be scanned.
-	 */
-	i = -1;
-	while ((i = bms_next_member(live_parts, i)) >= 0)
-	{
-		Oid			childOID = partdesc->oids[i];
-		Relation	childrel;
-		RangeTblEntry *childrte;
-		Index		childRTindex;
-		RelOptInfo *childrelinfo;
-
-		/*
-		 * Open rel, acquiring required locks.  If a partition was recently
-		 * detached and subsequently dropped, then opening it will fail.  In
-		 * this case, behave as though the partition had been pruned.
-		 */
-		childrel = try_table_open(childOID, lockmode);
-		if (childrel == NULL)
-			continue;
-
-		/*
-		 * Temporary partitions belonging to other sessions should have been
-		 * disallowed at definition, but for paranoia's sake, let's double
-		 * check.
-		 */
-		if (RELATION_IS_OTHER_TEMP(childrel))
-			elog(ERROR, "temporary relation from another session found as partition");
-
-		/* Create RTE and AppendRelInfo, plus PlanRowMark if needed. */
-		expand_single_inheritance_child(root, parentrte, parentRTindex,
-										parentrel, top_parentrc, childrel,
-										&childrte, &childRTindex);
-
-		/* Create the otherrel RelOptInfo too. */
-		childrelinfo = build_simple_rel(root, childRTindex, relinfo);
-		relinfo->part_rels[i] = childrelinfo;
-		relinfo->all_partrels = bms_add_members(relinfo->all_partrels,
-												childrelinfo->relids);
-
-		/* If this child is itself partitioned, recurse */
-		if (childrel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-			expand_partitioned_rtentry(root, childrelinfo,
-									   childrte, childRTindex,
-									   childrel, top_parentrc, lockmode);
-
-		/* Close child relation, but keep locks */
-		table_close(childrel, NoLock);
-	}
-}
 
 /*
  * expand_single_inheritance_child

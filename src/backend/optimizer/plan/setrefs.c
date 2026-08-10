@@ -1428,28 +1428,6 @@ set_append_references(PlannerInfo *root,
 
 	aplan->apprelids = offset_relid_set(aplan->apprelids, rtoffset);
 
-	if (aplan->part_prune_info)
-	{
-		foreach(l, aplan->part_prune_info->prune_infos)
-		{
-			List	   *prune_infos = lfirst(l);
-			ListCell   *l2;
-
-			foreach(l2, prune_infos)
-			{
-				PartitionedRelPruneInfo *pinfo = lfirst(l2);
-
-				pinfo->rtindex += rtoffset;
-				pinfo->initial_pruning_steps =
-					fix_scan_list(root, pinfo->initial_pruning_steps,
-								  rtoffset, 1);
-				pinfo->exec_pruning_steps =
-					fix_scan_list(root, pinfo->exec_pruning_steps,
-								  rtoffset, 1);
-			}
-		}
-	}
-
 	/* We don't need to recurse to lefttree or righttree ... */
 	Assert(aplan->plan.lefttree == NULL);
 	Assert(aplan->plan.righttree == NULL);
@@ -1505,28 +1483,6 @@ set_mergeappend_references(PlannerInfo *root,
 	set_dummy_tlist_references((Plan *) mplan, rtoffset);
 
 	mplan->apprelids = offset_relid_set(mplan->apprelids, rtoffset);
-
-	if (mplan->part_prune_info)
-	{
-		foreach(l, mplan->part_prune_info->prune_infos)
-		{
-			List	   *prune_infos = lfirst(l);
-			ListCell   *l2;
-
-			foreach(l2, prune_infos)
-			{
-				PartitionedRelPruneInfo *pinfo = lfirst(l2);
-
-				pinfo->rtindex += rtoffset;
-				pinfo->initial_pruning_steps =
-					fix_scan_list(root, pinfo->initial_pruning_steps,
-								  rtoffset, 1);
-				pinfo->exec_pruning_steps =
-					fix_scan_list(root, pinfo->exec_pruning_steps,
-								  rtoffset, 1);
-			}
-		}
-	}
 
 	/* We don't need to recurse to lefttree or righttree ... */
 	Assert(mplan->plan.lefttree == NULL);

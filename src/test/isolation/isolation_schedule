@@ -23,29 +23,28 @@ test: deadlock-hard
 test: deadlock-soft
 test: deadlock-soft-2
 test: deadlock-parallel
-test: detach-partition-concurrently-1
-test: detach-partition-concurrently-2
-test: detach-partition-concurrently-3
-test: detach-partition-concurrently-4
+# detach-partition-concurrently-1 已随分区功能裁剪而移除
+# detach-partition-concurrently-2 已随分区功能裁剪而移除
+# detach-partition-concurrently-3 已随分区功能裁剪而移除
+# detach-partition-concurrently-4 已随分区功能裁剪而移除
 test: fk-contention
 test: fk-deadlock
 test: fk-deadlock2
-test: fk-partitioned-1
-test: fk-partitioned-2
-test: eval-plan-qual
+# fk-partitioned-1/fk-partitioned-2 已随分区功能裁剪而移除
+# eval-plan-qual 已随表继承(INHERITS)功能裁剪而移除
 test: eval-plan-qual-trigger
 test: inplace-inval
 # intra-grant-inplace / intra-grant-inplace-db: 依赖 GRANT 锁机制，权限已裁剪，移除
 test: lock-update-delete
 test: lock-update-traversal
-test: inherit-temp
+# inherit-temp 已随表继承(INHERITS)功能裁剪而移除
 test: temp-schema-cleanup
 test: insert-conflict-do-nothing
 test: insert-conflict-do-nothing-2
 test: insert-conflict-do-update
 test: insert-conflict-do-update-2
 # insert-conflict-do-update-3: 依赖 writable CTE (WITH ... AS (INSERT ... ON CONFLICT DO UPDATE))，WITH 语法已裁剪，移除
-test: insert-conflict-do-update-4
+# insert-conflict-do-update-4 已随分区功能裁剪而移除
 test: insert-conflict-specconflict
 test: delete-abort-savept
 test: delete-abort-savept-2
@@ -62,7 +61,7 @@ test: propagate-lock-delete
 test: tuplelock-conflict
 test: tuplelock-update
 test: tuplelock-upgrade-no-deadlock
-test: tuplelock-partition
+# tuplelock-partition 已随分区功能裁剪而移除
 test: freeze-the-dead
 test: nowait
 test: nowait-2
@@ -78,22 +77,22 @@ test: multiple-cic
 test: alter-table-1
 test: alter-table-2
 test: alter-table-3
-test: alter-table-4
+# alter-table-4 已随表继承(INHERITS)功能裁剪而移除
 test: create-trigger
 test: sequence-ddl
 
 test: vacuum-reltuples
 test: timeouts
-test: vacuum-concurrent-drop
+# vacuum-concurrent-drop 已随分区功能裁剪而移除
 # vacuum-conflict: 依赖 ROLE/OWNER TO 权限锁冲突，权限已裁剪，移除
-test: vacuum-skip-locked
+# vacuum-skip-locked 已随分区功能裁剪而移除
 test: predicate-hash
-test: partition-concurrent-attach
-test: partition-drop-index-locking
-test: partition-key-update-1
-test: partition-key-update-2
-test: partition-key-update-3
-test: partition-key-update-4
+# partition-concurrent-attach 已随分区功能裁剪而移除
+# partition-drop-index-locking 已随分区功能裁剪而移除
+# partition-key-update-1 已随分区功能裁剪而移除
+# partition-key-update-2 已随分区功能裁剪而移除
+# partition-key-update-3 已随分区功能裁剪而移除
+# partition-key-update-4 已随分区功能裁剪而移除
 test: plpgsql-toast
 # truncate-conflict: 依赖 GRANT/ROLE/SET ROLE 权限锁冲突，权限已裁剪，移除
 test: serializable-parallel

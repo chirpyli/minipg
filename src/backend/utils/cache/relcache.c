@@ -44,7 +44,6 @@
 #include "catalog/catalog.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
-#include "catalog/partition.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_attrdef.h"
@@ -468,7 +467,6 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
 		case RELKIND_VIEW:
-		case RELKIND_PARTITIONED_TABLE:
 			amoptsfn = NULL;
 			break;
 		case RELKIND_INDEX:
@@ -1099,18 +1097,6 @@ retry:
 	relation->rd_fkeylist = NIL;
 	relation->rd_fkeyvalid = false;
 
-	/* partitioning data is not loaded till asked for */
-	relation->rd_partkey = NULL;
-	relation->rd_partkeycxt = NULL;
-	relation->rd_partdesc = NULL;
-	relation->rd_partdesc_nodetached = NULL;
-	relation->rd_partdesc_nodetached_xmin = InvalidTransactionId;
-	relation->rd_pdcxt = NULL;
-	relation->rd_pddcxt = NULL;
-	relation->rd_partcheck = NIL;
-	relation->rd_partcheckvalid = false;
-	relation->rd_partcheckcxt = NULL;
-
 	/*
 	 * initialize access method information
 	 */
@@ -1132,7 +1118,6 @@ retry:
 			break;
 		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
-		case RELKIND_PARTITIONED_TABLE:
 			Assert(relation->rd_rel->relam == InvalidOid);
 			break;
 	}
@@ -2079,22 +2064,6 @@ RelationClose(Relation relation)
 	/* Note: no locking manipulations needed */
 	RelationDecrementReferenceCount(relation);
 
-	/*
-	 * If the relation is no longer open in this session, we can clean up any
-	 * stale partition descriptors it has.  This is unlikely, so check to see
-	 * if there are child contexts before expending a call to mcxt.c.
-	 */
-	if (RelationHasReferenceCountZero(relation))
-	{
-		if (relation->rd_pdcxt != NULL &&
-			relation->rd_pdcxt->firstchild != NULL)
-			MemoryContextDeleteChildren(relation->rd_pdcxt);
-
-		if (relation->rd_pddcxt != NULL &&
-			relation->rd_pddcxt->firstchild != NULL)
-			MemoryContextDeleteChildren(relation->rd_pddcxt);
-	}
-
 #ifdef RELCACHE_FORCE_RELEASE
 	if (RelationHasReferenceCountZero(relation) &&
 		relation->rd_createSubid == InvalidSubTransactionId &&
@@ -2370,14 +2339,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		MemoryContextDelete(relation->rd_indexcxt);
 	if (relation->rd_rulescxt)
 		MemoryContextDelete(relation->rd_rulescxt);
-	if (relation->rd_partkeycxt)
-		MemoryContextDelete(relation->rd_partkeycxt);
-	if (relation->rd_pdcxt)
-		MemoryContextDelete(relation->rd_pdcxt);
-	if (relation->rd_pddcxt)
-		MemoryContextDelete(relation->rd_pddcxt);
-	if (relation->rd_partcheckcxt)
-		MemoryContextDelete(relation->rd_partcheckcxt);
 	pfree(relation);
 }
 
@@ -2534,7 +2495,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 		Oid			save_relid = RelationGetRelid(relation);
 		bool		keep_tupdesc;
 		bool		keep_rules;
-		bool		keep_partkey;
 
 		/* Build temporary entry, but don't link it into hashtable */
 		newrel = RelationBuildDesc(save_relid, false);
@@ -2572,8 +2532,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 
 		keep_tupdesc = equalTupleDescs(relation->rd_att, newrel->rd_att);
 		keep_rules = equalRuleLocks(relation->rd_rules, newrel->rd_rules);
-		/* partkey is immutable once set up, so we can always keep it */
-		keep_partkey = (relation->rd_partkey != NULL);
 
 		/*
 		 * Perform swapping of the relcache entry contents.  Within this
@@ -2628,59 +2586,8 @@ RelationClearRelation(Relation relation, bool rebuild)
 		SWAPFIELD(Oid, rd_toastoid);
 		/* pgstat_info must be preserved */
 		SWAPFIELD(struct PgStat_TableStatus *, pgstat_info);
-		/* preserve old partition key if we have one */
-		if (keep_partkey)
-		{
-			SWAPFIELD(PartitionKey, rd_partkey);
-			SWAPFIELD(MemoryContext, rd_partkeycxt);
-		}
-		if (newrel->rd_pdcxt != NULL || newrel->rd_pddcxt != NULL)
-		{
-			/*
-			 * We are rebuilding a partitioned relation with a non-zero
-			 * reference count, so we must keep the old partition descriptor
-			 * around, in case there's a PartitionDirectory with a pointer to
-			 * it.  This means we can't free the old rd_pdcxt yet.  (This is
-			 * necessary because RelationGetPartitionDesc hands out direct
-			 * pointers to the relcache's data structure, unlike our usual
-			 * practice which is to hand out copies.  We'd have the same
-			 * problem with rd_partkey, except that we always preserve that
-			 * once created.)
-			 *
-			 * To ensure that it's not leaked completely, re-attach it to the
-			 * new reldesc, or make it a child of the new reldesc's rd_pdcxt
-			 * in the unlikely event that there is one already.  (Compare hack
-			 * in RelationBuildPartitionDesc.)  RelationClose will clean up
-			 * any such contexts once the reference count reaches zero.
-			 *
-			 * In the case where the reference count is zero, this code is not
-			 * reached, which should be OK because in that case there should
-			 * be no PartitionDirectory with a pointer to the old entry.
-			 *
-			 * Note that newrel and relation have already been swapped, so the
-			 * "old" partition descriptor is actually the one hanging off of
-			 * newrel.
-			 */
-			relation->rd_partdesc = NULL;	/* ensure rd_partdesc is invalid */
-			relation->rd_partdesc_nodetached = NULL;
-			relation->rd_partdesc_nodetached_xmin = InvalidTransactionId;
-			if (relation->rd_pdcxt != NULL) /* probably never happens */
-				MemoryContextSetParent(newrel->rd_pdcxt, relation->rd_pdcxt);
-			else
-				relation->rd_pdcxt = newrel->rd_pdcxt;
-			if (relation->rd_pddcxt != NULL)
-				MemoryContextSetParent(newrel->rd_pddcxt, relation->rd_pddcxt);
-			else
-				relation->rd_pddcxt = newrel->rd_pddcxt;
-			/* drop newrel's pointers so we don't destroy it below */
-			newrel->rd_partdesc = NULL;
-			newrel->rd_partdesc_nodetached = NULL;
-			newrel->rd_partdesc_nodetached_xmin = InvalidTransactionId;
-			newrel->rd_pdcxt = NULL;
-			newrel->rd_pddcxt = NULL;
-		}
 
-#undef SWAPFIELD
+		#undef SWAPFIELD
 
 		/* And now we can throw away the temporary entry */
 		RelationDestroyRelation(newrel, !keep_tupdesc);
@@ -3509,8 +3416,7 @@ RelationBuildLocalRelation(const char *relname,
 
 	/* set replica identity -- system catalogs and non-tables don't have one */
 	if (!IsCatalogNamespace(relnamespace) &&
-		(relkind == RELKIND_RELATION ||
-		 relkind == RELKIND_PARTITIONED_TABLE))
+		relkind == RELKIND_RELATION)
 		rel->rd_rel->relreplident = REPLICA_IDENTITY_DEFAULT;
 	else
 		rel->rd_rel->relreplident = REPLICA_IDENTITY_NOTHING;
@@ -4470,9 +4376,8 @@ RelationGetFKeyList(Relation relation)
 	if (relation->rd_fkeyvalid)
 		return relation->rd_fkeylist;
 
-	/* Fast path: non-partitioned tables without triggers can't have FKs */
-	if (!relation->rd_rel->relhastriggers &&
-		relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+	/* Fast path: tables without triggers can't have FKs */
+	if (!relation->rd_rel->relhastriggers)
 		return NIL;
 
 	/*
@@ -5444,20 +5349,6 @@ GetRelationPublicationActions(Relation relation)
 
 	/* Fetch the publication membership info. */
 	puboids = GetRelationPublications(RelationGetRelid(relation));
-	if (relation->rd_rel->relispartition)
-	{
-		/* Add publications that the ancestors are in too. */
-		List	   *ancestors = get_partition_ancestors(RelationGetRelid(relation));
-		ListCell   *lc;
-
-		foreach(lc, ancestors)
-		{
-			Oid			ancestor = lfirst_oid(lc);
-
-			puboids = list_concat_unique_oid(puboids,
-											 GetRelationPublications(ancestor));
-		}
-	}
 	puboids = list_concat_unique_oid(puboids, GetAllTablesPublications());
 
 	foreach(lc, puboids)
@@ -6022,16 +5913,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_rulescxt = NULL;
 		rel->trigdesc = NULL;
 		rel->rd_rsdesc = NULL;
-		rel->rd_partkey = NULL;
-		rel->rd_partkeycxt = NULL;
-		rel->rd_partdesc = NULL;
-		rel->rd_partdesc_nodetached = NULL;
-		rel->rd_partdesc_nodetached_xmin = InvalidTransactionId;
-		rel->rd_pdcxt = NULL;
-		rel->rd_pddcxt = NULL;
-		rel->rd_partcheck = NIL;
-		rel->rd_partcheckvalid = false;
-		rel->rd_partcheckcxt = NULL;
 		rel->rd_indexprs = NIL;
 		rel->rd_indpred = NIL;
 		rel->rd_exclops = NULL;

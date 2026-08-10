@@ -1328,14 +1328,10 @@ extractRelOptions(HeapTuple tuple, TupleDesc tupdesc,
 		case RELKIND_TOASTVALUE:
 			options = heap_reloptions(classForm->relkind, datum, false);
 			break;
-		case RELKIND_PARTITIONED_TABLE:
-			options = partitioned_table_reloptions(datum, false);
-			break;
 		case RELKIND_VIEW:
 			options = view_reloptions(datum, false);
 			break;
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			options = index_reloptions(amoptions, datum, false);
 			break;
 		default:

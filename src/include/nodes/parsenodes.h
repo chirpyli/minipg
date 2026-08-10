@@ -26,7 +26,6 @@
 #include "nodes/lockoptions.h"
 #include "nodes/primnodes.h"
 #include "nodes/value.h"
-#include "partitioning/partdefs.h"
 
 
 typedef enum OverridingKind
@@ -723,104 +722,6 @@ typedef struct LockingClause
 	LockClauseStrength strength;
 	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
 } LockingClause;
-
-/* Partitioning related definitions */
-
-/*
- * PartitionElem - parse-time representation of a single partition key
- *
- * expr can be either a raw expression tree or a parse-analyzed expression.
- * We don't store these on-disk, though.
- */
-typedef struct PartitionElem
-{
-	NodeTag		type;
-	char	   *name;			/* name of column to partition on, or NULL */
-	Node	   *expr;			/* expression to partition on, or NULL */
-	List	   *collation;		/* name of collation; NIL = default */
-	List	   *opclass;		/* name of desired opclass; NIL = default */
-	int			location;		/* token location, or -1 if unknown */
-} PartitionElem;
-
-/*
- * PartitionSpec - parse-time representation of a partition key specification
- *
- * This represents the key space we will be partitioning on.
- */
-typedef struct PartitionSpec
-{
-	NodeTag		type;
-	char	   *strategy;		/* partitioning strategy ('hash', 'list' or
-								 * 'range') */
-	List	   *partParams;		/* List of PartitionElems */
-	int			location;		/* token location, or -1 if unknown */
-} PartitionSpec;
-
-/* Internal codes for partitioning strategies */
-#define PARTITION_STRATEGY_HASH		'h'
-#define PARTITION_STRATEGY_LIST		'l'
-#define PARTITION_STRATEGY_RANGE	'r'
-
-/*
- * PartitionBoundSpec - a partition bound specification
- *
- * This represents the portion of the partition key space assigned to a
- * particular partition.  These are stored on disk in pg_class.relpartbound.
- */
-struct PartitionBoundSpec
-{
-	NodeTag		type;
-
-	char		strategy;		/* see PARTITION_STRATEGY codes above */
-	bool		is_default;		/* is it a default partition bound? */
-
-	/* Partitioning info for HASH strategy: */
-	int			modulus;
-	int			remainder;
-
-	/* Partitioning info for LIST strategy: */
-	List	   *listdatums;		/* List of Consts (or A_Consts in raw tree) */
-
-	/* Partitioning info for RANGE strategy: */
-	List	   *lowerdatums;	/* List of PartitionRangeDatums */
-	List	   *upperdatums;	/* List of PartitionRangeDatums */
-
-	int			location;		/* token location, or -1 if unknown */
-};
-
-/*
- * PartitionRangeDatum - one of the values in a range partition bound
- *
- * This can be MINVALUE, MAXVALUE or a specific bounded value.
- */
-typedef enum PartitionRangeDatumKind
-{
-	PARTITION_RANGE_DATUM_MINVALUE = -1,	/* less than any other value */
-	PARTITION_RANGE_DATUM_VALUE = 0,	/* a specific (bounded) value */
-	PARTITION_RANGE_DATUM_MAXVALUE = 1	/* greater than any other value */
-} PartitionRangeDatumKind;
-
-typedef struct PartitionRangeDatum
-{
-	NodeTag		type;
-
-	PartitionRangeDatumKind kind;
-	Node	   *value;			/* Const (or A_Const in raw tree), if kind is
-								 * PARTITION_RANGE_DATUM_VALUE, else NULL */
-
-	int			location;		/* token location, or -1 if unknown */
-} PartitionRangeDatum;
-
-/*
- * PartitionCmd - info for ALTER TABLE/INDEX ATTACH/DETACH PARTITION commands
- */
-typedef struct PartitionCmd
-{
-	NodeTag		type;
-	RangeVar   *name;			/* name of partition to attach/detach */
-	PartitionBoundSpec *bound;	/* FOR VALUES, if attaching */
-	bool		concurrent;
-} PartitionCmd;
 
 /****************************************************************************
  *	Nodes for a Query tree
@@ -1700,9 +1601,6 @@ typedef enum AlterTableType
 	AT_DropOf,					/* NOT OF */
 	AT_ReplicaIdentity,			/* REPLICA IDENTITY */
 	AT_GenericOptions,			/* OPTIONS (...) */
-	AT_AttachPartition,			/* ATTACH PARTITION */
-	AT_DetachPartition,			/* DETACH PARTITION */
-	AT_DetachPartitionFinalize, /* DETACH PARTITION FINALIZE */
 	AT_AddIdentity,				/* ADD IDENTITY */
 	AT_SetIdentity,				/* SET identity column options */
 	AT_DropIdentity,			/* DROP IDENTITY */
@@ -1898,8 +1796,6 @@ typedef struct CreateStmt
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
 	List	   *inhRelations;	/* relations to inherit from (list of
 								 * RangeVar) */
-	PartitionBoundSpec *partbound;	/* FOR VALUES clause */
-	PartitionSpec *partspec;	/* PARTITION BY clause */
 	TypeName   *ofTypename;		/* OF typename */
 	List	   *constraints;	/* constraints (list of Constraint nodes) */
 	List	   *options;		/* options from WITH clause */

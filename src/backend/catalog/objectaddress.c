@@ -1099,8 +1099,7 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 	switch (objtype)
 	{
 		case OBJECT_INDEX:
-			if (relation->rd_rel->relkind != RELKIND_INDEX &&
-				relation->rd_rel->relkind != RELKIND_PARTITIONED_INDEX)
+			if (relation->rd_rel->relkind != RELKIND_INDEX)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("\"%s\" is not an index",
@@ -1114,8 +1113,7 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 								RelationGetRelationName(relation))));
 			break;
 		case OBJECT_TABLE:
-			if (relation->rd_rel->relkind != RELKIND_RELATION &&
-				relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+			if (relation->rd_rel->relkind != RELKIND_RELATION)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("\"%s\" is not a table",
@@ -3181,12 +3179,10 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 	switch (relForm->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			appendStringInfo(buffer, _("table %s"),
 							 relname);
 			break;
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			appendStringInfo(buffer, _("index %s"),
 							 relname);
 			break;
@@ -3660,11 +3656,9 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId,
 	switch (relForm->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			appendStringInfoString(buffer, "table");
 			break;
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			appendStringInfoString(buffer, "index");
 			break;
 		case RELKIND_SEQUENCE:
@@ -4750,10 +4744,8 @@ get_relkind_objtype(char relkind)
 	switch (relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			return OBJECT_TABLE;
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			return OBJECT_INDEX;
 		case RELKIND_SEQUENCE:
 			return OBJECT_SEQUENCE;

@@ -19,7 +19,7 @@ all: pg_config.h pg_config_ext.h pg_config_os.h
 # Subdirectories containing installable headers
 SUBDIRS = access bootstrap catalog commands common datatype \
 	executor fe_utils \
-	lib libpq mb nodes optimizer parser partitioning postmaster \
+	lib libpq mb nodes optimizer parser postmaster \
 	replication rewrite \
 	statistics storage tcop \
 	utils port port/atomics portability

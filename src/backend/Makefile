@@ -18,7 +18,7 @@ top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
 SUBDIRS = access bootstrap catalog parser commands executor lib libpq \
-	main nodes optimizer partitioning port postmaster \
+	main nodes optimizer port postmaster \
 	replication rewrite \
 	statistics storage tcop utils $(top_builddir)/src/timezone
 

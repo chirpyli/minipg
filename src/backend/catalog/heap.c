@@ -46,7 +46,6 @@
 #include "catalog/heap.h"
 #include "catalog/index.h"
 #include "catalog/objectaccess.h"
-#include "catalog/partition.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_collation.h"
@@ -72,7 +71,6 @@
 #include "parser/parse_expr.h"
 #include "parser/parse_relation.h"
 #include "parser/parsetree.h"
-#include "partitioning/partdesc.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"
 #include "storage/smgr.h"
@@ -82,7 +80,6 @@
 #include "utils/fmgroids.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
-#include "utils/partcache.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
@@ -416,8 +413,6 @@ heap_create(const char *relname,
 		{
 			case RELKIND_VIEW:
 			case RELKIND_COMPOSITE_TYPE:
-			case RELKIND_PARTITIONED_TABLE:
-			case RELKIND_PARTITIONED_INDEX:
 				Assert(false);
 				break;
 
@@ -1237,8 +1232,7 @@ heap_create_with_catalog(const char *relname,
 		if (IsBinaryUpgrade &&
 			(relkind == RELKIND_RELATION || relkind == RELKIND_SEQUENCE ||
 			 relkind == RELKIND_VIEW ||
-			 relkind == RELKIND_COMPOSITE_TYPE ||
-			 relkind == RELKIND_PARTITIONED_TABLE))
+			 relkind == RELKIND_COMPOSITE_TYPE))
 		{
 			if (!OidIsValid(binary_upgrade_next_heap_pg_class_oid))
 				ereport(ERROR,
@@ -1299,8 +1293,7 @@ heap_create_with_catalog(const char *relname,
 	 */
 	if (!(relkind == RELKIND_SEQUENCE ||
 		  relkind == RELKIND_TOASTVALUE ||
-		  relkind == RELKIND_INDEX ||
-		  relkind == RELKIND_PARTITIONED_INDEX))
+		  relkind == RELKIND_INDEX))
 	{
 		Oid			new_array_oid;
 		ObjectAddress new_type_addr;
@@ -1898,25 +1891,6 @@ heap_drop_with_catalog(Oid relid)
 	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relid);
-	if (((Form_pg_class) GETSTRUCT(tuple))->relispartition)
-	{
-		/*
-		 * We have to lock the parent if the partition is being detached,
-		 * because it's possible that some query still has a partition
-		 * descriptor that includes this partition.
-		 */
-		parentOid = get_partition_parent(relid, true);
-		LockRelationOid(parentOid, AccessExclusiveLock);
-
-		/*
-		 * If this is not the default partition, dropping it will change the
-		 * default partition's partition constraint, so we must lock it.
-		 */
-		defaultPartOid = get_default_partition_oid(parentOid);
-		if (OidIsValid(defaultPartOid) && relid != defaultPartOid)
-			LockRelationOid(defaultPartOid, AccessExclusiveLock);
-	}
-
 	ReleaseSysCache(tuple);
 
 	/*
@@ -1940,18 +1914,6 @@ heap_drop_with_catalog(Oid relid)
 	CheckTableForSerializableConflictIn(rel);
 
 	/*
-	/*
-	 * If a partitioned table, delete the pg_partitioned_table tuple.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		RemovePartitionKeyByRelId(relid);
-
-	/*
-	 * If the relation being dropped is the default partition itself,
-	 * invalidate its entry in pg_partitioned_table.
-	 */
-	if (relid == defaultPartOid)
-		update_default_partition_oid(parentOid, InvalidOid);
 
 	/*
 	 * Schedule unlinking of the relation's physical files at commit.
@@ -2466,17 +2428,6 @@ StoreRelCheck(Relation rel, const char *ccname, Node *expr,
 		attNos = NULL;
 
 	/*
-	 * Partitioned tables do not contain any rows themselves, so a NO INHERIT
-	 * constraint makes no sense.
-	 */
-	if (is_no_inherit &&
-		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("cannot add NO INHERIT constraint to partitioned table \"%s\"",
-						RelationGetRelationName(rel))));
-
-	/*
 	 * Create the Check Constraint
 	 */
 	constrOid =
@@ -2905,7 +2856,7 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 		 * the relation is a partition, all inherited constraints are always
 		 * non-local, including those that were merged.
 		 */
-		if (is_local && !con->conislocal && !rel->rd_rel->relispartition)
+		if (is_local && !con->conislocal)
 			allow_merge = true;
 
 		if (!found || !allow_merge)
@@ -2950,23 +2901,10 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 		tup = heap_copytuple(tup);
 		con = (Form_pg_constraint) GETSTRUCT(tup);
 
-		/*
-		 * In case of partitions, an inherited constraint must be inherited
-		 * only once since it cannot have multiple parents and it is never
-		 * considered local.
-		 */
-		if (rel->rd_rel->relispartition)
-		{
-			con->coninhcount = 1;
-			con->conislocal = false;
-		}
+		if (is_local)
+			con->conislocal = true;
 		else
-		{
-			if (is_local)
-				con->conislocal = true;
-			else
-				con->coninhcount++;
-		}
+			con->coninhcount++;
 
 		if (is_no_inherit)
 		{
@@ -3388,13 +3326,6 @@ heap_truncate_one_rel(Relation rel)
 {
 	Oid			toastrelid;
 
-	/*
-	 * Truncate the relation.  Partitioned tables have no storage, so there is
-	 * nothing to do for them here.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		return;
-
 	/* Truncate the underlying relation */
 	table_relation_nontransactional_truncate(rel);
 
@@ -3446,8 +3377,7 @@ heap_truncate_check_FKs(List *relations, bool tempTables)
 	{
 		Relation	rel = lfirst(cell);
 
-		if (rel->rd_rel->relhastriggers ||
-			rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
+		if (rel->rd_rel->relhastriggers)
 			oids = lappend_oid(oids, RelationGetRelid(rel));
 	}
 
@@ -3646,244 +3576,3 @@ restart:
 	return result;
 }
 
-/*
- * StorePartitionKey
- *		Store information about the partition key rel into the catalog
- */
-void
-StorePartitionKey(Relation rel,
-				  char strategy,
-				  int16 partnatts,
-				  AttrNumber *partattrs,
-				  List *partexprs,
-				  Oid *partopclass,
-				  Oid *partcollation)
-{
-	int			i;
-	int2vector *partattrs_vec;
-	oidvector  *partopclass_vec;
-	oidvector  *partcollation_vec;
-	Datum		partexprDatum;
-	Relation	pg_partitioned_table;
-	HeapTuple	tuple;
-	Datum		values[Natts_pg_partitioned_table];
-	bool		nulls[Natts_pg_partitioned_table];
-	ObjectAddress myself;
-	ObjectAddress referenced;
-	ObjectAddresses *addrs;
-
-	Assert(rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
-
-	/* Copy the partition attribute numbers, opclass OIDs into arrays */
-	partattrs_vec = buildint2vector(partattrs, partnatts);
-	partopclass_vec = buildoidvector(partopclass, partnatts);
-	partcollation_vec = buildoidvector(partcollation, partnatts);
-
-	/* Convert the expressions (if any) to a text datum */
-	if (partexprs)
-	{
-		char	   *exprString;
-
-		exprString = nodeToString(partexprs);
-		partexprDatum = CStringGetTextDatum(exprString);
-		pfree(exprString);
-	}
-	else
-		partexprDatum = (Datum) 0;
-
-	pg_partitioned_table = table_open(PartitionedRelationId, RowExclusiveLock);
-
-	MemSet(nulls, false, sizeof(nulls));
-
-	/* Only this can ever be NULL */
-	if (!partexprDatum)
-		nulls[Anum_pg_partitioned_table_partexprs - 1] = true;
-
-	values[Anum_pg_partitioned_table_partrelid - 1] = ObjectIdGetDatum(RelationGetRelid(rel));
-	values[Anum_pg_partitioned_table_partstrat - 1] = CharGetDatum(strategy);
-	values[Anum_pg_partitioned_table_partnatts - 1] = Int16GetDatum(partnatts);
-	values[Anum_pg_partitioned_table_partdefid - 1] = ObjectIdGetDatum(InvalidOid);
-	values[Anum_pg_partitioned_table_partattrs - 1] = PointerGetDatum(partattrs_vec);
-	values[Anum_pg_partitioned_table_partclass - 1] = PointerGetDatum(partopclass_vec);
-	values[Anum_pg_partitioned_table_partcollation - 1] = PointerGetDatum(partcollation_vec);
-	values[Anum_pg_partitioned_table_partexprs - 1] = partexprDatum;
-
-	tuple = heap_form_tuple(RelationGetDescr(pg_partitioned_table), values, nulls);
-
-	CatalogTupleInsert(pg_partitioned_table, tuple);
-	table_close(pg_partitioned_table, RowExclusiveLock);
-
-	/* Mark this relation as dependent on a few things as follows */
-	addrs = new_object_addresses();
-	ObjectAddressSet(myself, RelationRelationId, RelationGetRelid(rel));
-
-	/* Operator class and collation per key column */
-	for (i = 0; i < partnatts; i++)
-	{
-		ObjectAddressSet(referenced, OperatorClassRelationId, partopclass[i]);
-		add_exact_object_address(&referenced, addrs);
-
-		/* The default collation is pinned, so don't bother recording it */
-		if (OidIsValid(partcollation[i]) &&
-			partcollation[i] != DEFAULT_COLLATION_OID)
-		{
-			ObjectAddressSet(referenced, CollationRelationId, partcollation[i]);
-			add_exact_object_address(&referenced, addrs);
-		}
-	}
-
-	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
-	free_object_addresses(addrs);
-
-	/*
-	 * The partitioning columns are made internally dependent on the table,
-	 * because we cannot drop any of them without dropping the whole table.
-	 * (ATExecDropColumn independently enforces that, but it's not bulletproof
-	 * so we need the dependencies too.)
-	 */
-	for (i = 0; i < partnatts; i++)
-	{
-		if (partattrs[i] == 0)
-			continue;			/* ignore expressions here */
-
-		ObjectAddressSubSet(referenced, RelationRelationId,
-							RelationGetRelid(rel), partattrs[i]);
-		recordDependencyOn(&referenced, &myself, DEPENDENCY_INTERNAL);
-	}
-
-	/*
-	 * Also consider anything mentioned in partition expressions.  External
-	 * references (e.g. functions) get NORMAL dependencies.  Table columns
-	 * mentioned in the expressions are handled the same as plain partitioning
-	 * columns, i.e. they become internally dependent on the whole table.
-	 */
-	if (partexprs)
-		recordDependencyOnSingleRelExpr(&myself,
-										(Node *) partexprs,
-										RelationGetRelid(rel),
-										DEPENDENCY_NORMAL,
-										DEPENDENCY_INTERNAL,
-										true /* reverse the self-deps */ );
-
-	/*
-	 * We must invalidate the relcache so that the next
-	 * CommandCounterIncrement() will cause the same to be rebuilt using the
-	 * information in just created catalog entry.
-	 */
-	CacheInvalidateRelcache(rel);
-}
-
-/*
- *	RemovePartitionKeyByRelId
- *		Remove pg_partitioned_table entry for a relation
- */
-void
-RemovePartitionKeyByRelId(Oid relid)
-{
-	Relation	rel;
-	HeapTuple	tuple;
-
-	rel = table_open(PartitionedRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCache1(PARTRELID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for partition key of relation %u",
-			 relid);
-
-	CatalogTupleDelete(rel, &tuple->t_self);
-
-	ReleaseSysCache(tuple);
-	table_close(rel, RowExclusiveLock);
-}
-
-/*
- * StorePartitionBound
- *		Update pg_class tuple of rel to store the partition bound and set
- *		relispartition to true
- *
- * If this is the default partition, also update the default partition OID in
- * pg_partitioned_table.
- *
- * Also, invalidate the parent's relcache, so that the next rebuild will load
- * the new partition's info into its partition descriptor.  If there is a
- * default partition, we must invalidate its relcache entry as well.
- */
-void
-StorePartitionBound(Relation rel, Relation parent, PartitionBoundSpec *bound)
-{
-	Relation	classRel;
-	HeapTuple	tuple,
-				newtuple;
-	Datum		new_val[Natts_pg_class];
-	bool		new_null[Natts_pg_class],
-				new_repl[Natts_pg_class];
-	Oid			defaultPartOid;
-
-	/* Update pg_class tuple */
-	classRel = table_open(RelationRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheCopy1(RELOID,
-								ObjectIdGetDatum(RelationGetRelid(rel)));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u",
-			 RelationGetRelid(rel));
-
-#ifdef USE_ASSERT_CHECKING
-	{
-		Form_pg_class classForm;
-		bool		isnull;
-
-		classForm = (Form_pg_class) GETSTRUCT(tuple);
-		Assert(!classForm->relispartition);
-		(void) SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relpartbound,
-							   &isnull);
-		Assert(isnull);
-	}
-#endif
-
-	/* Fill in relpartbound value */
-	memset(new_val, 0, sizeof(new_val));
-	memset(new_null, false, sizeof(new_null));
-	memset(new_repl, false, sizeof(new_repl));
-	new_val[Anum_pg_class_relpartbound - 1] = CStringGetTextDatum(nodeToString(bound));
-	new_null[Anum_pg_class_relpartbound - 1] = false;
-	new_repl[Anum_pg_class_relpartbound - 1] = true;
-	newtuple = heap_modify_tuple(tuple, RelationGetDescr(classRel),
-								 new_val, new_null, new_repl);
-	/* Also set the flag */
-	((Form_pg_class) GETSTRUCT(newtuple))->relispartition = true;
-
-	/*
-	 * We already checked for no inheritance children, but reset
-	 * relhassubclass in case it was left over.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_RELATION && rel->rd_rel->relhassubclass)
-		((Form_pg_class) GETSTRUCT(newtuple))->relhassubclass = false;
-
-	CatalogTupleUpdate(classRel, &newtuple->t_self, newtuple);
-	heap_freetuple(newtuple);
-	table_close(classRel, RowExclusiveLock);
-
-	/*
-	 * If we're storing bounds for the default partition, update
-	 * pg_partitioned_table too.
-	 */
-	if (bound->is_default)
-		update_default_partition_oid(RelationGetRelid(parent),
-									 RelationGetRelid(rel));
-
-	/* Make these updates visible */
-	CommandCounterIncrement();
-
-	/*
-	 * The partition constraint for the default partition depends on the
-	 * partition bounds of every other partition, so we must invalidate the
-	 * relcache entry for that partition every time a partition is added or
-	 * removed.
-	 */
-	defaultPartOid =
-		get_default_oid_from_partdesc(RelationGetPartitionDesc(parent, true));
-	if (OidIsValid(defaultPartOid))
-		CacheInvalidateRelcacheByRelid(defaultPartOid);
-
-	CacheInvalidateRelcache(parent);
-}

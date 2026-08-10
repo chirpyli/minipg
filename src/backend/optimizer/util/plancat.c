@@ -41,14 +41,12 @@
 #include "optimizer/prep.h"
 #include "parser/parse_relation.h"
 #include "parser/parsetree.h"
-#include "partitioning/partdesc.h"
 #include "rewrite/rewriteManip.h"
 #include "statistics/statistics.h"
 #include "storage/bufmgr.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
-#include "utils/partcache.h"
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
@@ -72,13 +70,6 @@ static List *get_relation_constraints(PlannerInfo *root,
 static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
 							   Relation heapRelation);
 static List *get_relation_statistics(RelOptInfo *rel, Relation relation);
-static void set_relation_partition_info(PlannerInfo *root, RelOptInfo *rel,
-										Relation relation);
-static PartitionScheme find_partition_scheme(PlannerInfo *root, Relation rel);
-static void set_baserel_partition_key_exprs(Relation relation,
-											RelOptInfo *rel);
-static void set_baserel_partition_constraint(Relation relation,
-											 RelOptInfo *rel);
 
 
 /*
@@ -464,13 +455,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 		relation->rd_tableam->scan_set_tidrange != NULL &&
 		relation->rd_tableam->scan_getnextslot_tidrange != NULL)
 		rel->amflags |= AMFLAG_HAS_TID_RANGE;
-
-	/*
-	 * Collect info about relation's partitioning scheme, if any. Only
-	 * inheritance parents may be partitioned.
-	 */
-	if (inhparent && relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		set_relation_partition_info(root, rel, relation);
 
 	table_close(relation, NoLock);
 
@@ -1277,16 +1261,6 @@ get_relation_constraints(PlannerInfo *root,
 				}
 			}
 		}
-	}
-
-	/*
-	 * Add partitioning constraints, if requested.
-	 */
-	if (include_partition && relation->rd_rel->relispartition)
-	{
-		/* make sure rel->partition_qual is set */
-		set_baserel_partition_constraint(relation, rel);
-		result = list_concat(result, rel->partition_qual);
 	}
 
 	table_close(relation, NoLock);
@@ -2279,237 +2253,3 @@ get_dependent_generated_columns(PlannerInfo *root, Index rti,
 	return dependentCols;
 }
 
-/*
- * set_relation_partition_info
- *
- * Set partitioning scheme and related information for a partitioned table.
- */
-static void
-set_relation_partition_info(PlannerInfo *root, RelOptInfo *rel,
-							Relation relation)
-{
-	PartitionDesc partdesc;
-
-	/*
-	 * Create the PartitionDirectory infrastructure if we didn't already.
-	 */
-	if (root->glob->partition_directory == NULL)
-	{
-		root->glob->partition_directory =
-			CreatePartitionDirectory(CurrentMemoryContext, true);
-	}
-
-	partdesc = PartitionDirectoryLookup(root->glob->partition_directory,
-										relation);
-	rel->part_scheme = find_partition_scheme(root, relation);
-	Assert(partdesc != NULL && rel->part_scheme != NULL);
-	rel->boundinfo = partdesc->boundinfo;
-	rel->nparts = partdesc->nparts;
-	set_baserel_partition_key_exprs(relation, rel);
-	set_baserel_partition_constraint(relation, rel);
-}
-
-/*
- * find_partition_scheme
- *
- * Find or create a PartitionScheme for this Relation.
- */
-static PartitionScheme
-find_partition_scheme(PlannerInfo *root, Relation relation)
-{
-	PartitionKey partkey = RelationGetPartitionKey(relation);
-	ListCell   *lc;
-	int			partnatts,
-				i;
-	PartitionScheme part_scheme;
-
-	/* A partitioned table should have a partition key. */
-	Assert(partkey != NULL);
-
-	partnatts = partkey->partnatts;
-
-	/* Search for a matching partition scheme and return if found one. */
-	foreach(lc, root->part_schemes)
-	{
-		part_scheme = lfirst(lc);
-
-		/* Match partitioning strategy and number of keys. */
-		if (partkey->strategy != part_scheme->strategy ||
-			partnatts != part_scheme->partnatts)
-			continue;
-
-		/* Match partition key type properties. */
-		if (memcmp(partkey->partopfamily, part_scheme->partopfamily,
-				   sizeof(Oid) * partnatts) != 0 ||
-			memcmp(partkey->partopcintype, part_scheme->partopcintype,
-				   sizeof(Oid) * partnatts) != 0 ||
-			memcmp(partkey->partcollation, part_scheme->partcollation,
-				   sizeof(Oid) * partnatts) != 0)
-			continue;
-
-		/*
-		 * Length and byval information should match when partopcintype
-		 * matches.
-		 */
-		Assert(memcmp(partkey->parttyplen, part_scheme->parttyplen,
-					  sizeof(int16) * partnatts) == 0);
-		Assert(memcmp(partkey->parttypbyval, part_scheme->parttypbyval,
-					  sizeof(bool) * partnatts) == 0);
-
-		/*
-		 * If partopfamily and partopcintype matched, must have the same
-		 * partition comparison functions.  Note that we cannot reliably
-		 * Assert the equality of function structs themselves for they might
-		 * be different across PartitionKey's, so just Assert for the function
-		 * OIDs.
-		 */
-#ifdef USE_ASSERT_CHECKING
-		for (i = 0; i < partkey->partnatts; i++)
-			Assert(partkey->partsupfunc[i].fn_oid ==
-				   part_scheme->partsupfunc[i].fn_oid);
-#endif
-
-		/* Found matching partition scheme. */
-		return part_scheme;
-	}
-
-	/*
-	 * Did not find matching partition scheme. Create one copying relevant
-	 * information from the relcache. We need to copy the contents of the
-	 * array since the relcache entry may not survive after we have closed the
-	 * relation.
-	 */
-	part_scheme = (PartitionScheme) palloc0(sizeof(PartitionSchemeData));
-	part_scheme->strategy = partkey->strategy;
-	part_scheme->partnatts = partkey->partnatts;
-
-	part_scheme->partopfamily = (Oid *) palloc(sizeof(Oid) * partnatts);
-	memcpy(part_scheme->partopfamily, partkey->partopfamily,
-		   sizeof(Oid) * partnatts);
-
-	part_scheme->partopcintype = (Oid *) palloc(sizeof(Oid) * partnatts);
-	memcpy(part_scheme->partopcintype, partkey->partopcintype,
-		   sizeof(Oid) * partnatts);
-
-	part_scheme->partcollation = (Oid *) palloc(sizeof(Oid) * partnatts);
-	memcpy(part_scheme->partcollation, partkey->partcollation,
-		   sizeof(Oid) * partnatts);
-
-	part_scheme->parttyplen = (int16 *) palloc(sizeof(int16) * partnatts);
-	memcpy(part_scheme->parttyplen, partkey->parttyplen,
-		   sizeof(int16) * partnatts);
-
-	part_scheme->parttypbyval = (bool *) palloc(sizeof(bool) * partnatts);
-	memcpy(part_scheme->parttypbyval, partkey->parttypbyval,
-		   sizeof(bool) * partnatts);
-
-	part_scheme->partsupfunc = (FmgrInfo *)
-		palloc(sizeof(FmgrInfo) * partnatts);
-	for (i = 0; i < partnatts; i++)
-		fmgr_info_copy(&part_scheme->partsupfunc[i], &partkey->partsupfunc[i],
-					   CurrentMemoryContext);
-
-	/* Add the partitioning scheme to PlannerInfo. */
-	root->part_schemes = lappend(root->part_schemes, part_scheme);
-
-	return part_scheme;
-}
-
-/*
- * set_baserel_partition_key_exprs
- *
- * Builds partition key expressions for the given base relation and fills
- * rel->partexprs.
- */
-static void
-set_baserel_partition_key_exprs(Relation relation,
-								RelOptInfo *rel)
-{
-	PartitionKey partkey = RelationGetPartitionKey(relation);
-	int			partnatts;
-	int			cnt;
-	List	  **partexprs;
-	ListCell   *lc;
-	Index		varno = rel->relid;
-
-	Assert(IS_SIMPLE_REL(rel) && rel->relid > 0);
-
-	/* A partitioned table should have a partition key. */
-	Assert(partkey != NULL);
-
-	partnatts = partkey->partnatts;
-	partexprs = (List **) palloc(sizeof(List *) * partnatts);
-	lc = list_head(partkey->partexprs);
-
-	for (cnt = 0; cnt < partnatts; cnt++)
-	{
-		Expr	   *partexpr;
-		AttrNumber	attno = partkey->partattrs[cnt];
-
-		if (attno != InvalidAttrNumber)
-		{
-			/* Single column partition key is stored as a Var node. */
-			Assert(attno > 0);
-
-			partexpr = (Expr *) makeVar(varno, attno,
-										partkey->parttypid[cnt],
-										partkey->parttypmod[cnt],
-										partkey->parttypcoll[cnt], 0);
-		}
-		else
-		{
-			if (lc == NULL)
-				elog(ERROR, "wrong number of partition key expressions");
-
-			/* Re-stamp the expression with given varno. */
-			partexpr = (Expr *) copyObject(lfirst(lc));
-			ChangeVarNodes((Node *) partexpr, 1, varno, 0);
-			lc = lnext(partkey->partexprs, lc);
-		}
-
-		/* Base relations have a single expression per key. */
-		partexprs[cnt] = list_make1(partexpr);
-	}
-
-	rel->partexprs = partexprs;
-
-	/*
-	 * A base relation does not have nullable partition key expressions, since
-	 * no outer join is involved.  We still allocate an array of empty
-	 * expression lists to keep partition key expression handling code simple.
-	 * See build_joinrel_partition_info() and match_expr_to_partition_keys().
-	 */
-	rel->nullable_partexprs = (List **) palloc0(sizeof(List *) * partnatts);
-}
-
-/*
- * set_baserel_partition_constraint
- *
- * Builds the partition constraint for the given base relation and sets it
- * in the given RelOptInfo.  All Var nodes are restamped with the relid of the
- * given relation.
- */
-static void
-set_baserel_partition_constraint(Relation relation, RelOptInfo *rel)
-{
-	List	   *partconstr;
-
-	if (rel->partition_qual)	/* already done */
-		return;
-
-	/*
-	 * Run the partition quals through const-simplification similar to check
-	 * constraints.  We skip canonicalize_qual, though, because partition
-	 * quals should be in canonical form already; also, since the qual is in
-	 * implicit-AND format, we'd have to explicitly convert it to explicit-AND
-	 * format and back again.
-	 */
-	partconstr = RelationGetPartitionQual(relation);
-	if (partconstr)
-	{
-		partconstr = (List *) expression_planner((Expr *) partconstr);
-		if (rel->relid != 1)
-			ChangeVarNodes((Node *) partconstr, 1, rel->relid, 0);
-		rel->partition_qual = partconstr;
-	}
-}

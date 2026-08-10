@@ -63,17 +63,8 @@ SELECT * FROM heap_tuple_infomask_flags(x'0010'::int, 0);
 
 DROP TABLE test1;
 
--- check that using any of these functions with a partitioned table or index
--- would fail
-create table test_partitioned (a int) partition by range (a);
-create index test_partitioned_index on test_partitioned (a);
-select get_raw_page('test_partitioned', 0); -- error about partitioned table
-select get_raw_page('test_partitioned_index', 0); -- error about partitioned index
-
--- a regular table which is a member of a partition set should work though
-create table test_part1 partition of test_partitioned for values from ( 1 ) to (100);
-select get_raw_page('test_part1', 0); -- get farther and error about empty table
-drop table test_partitioned;
+-- 分区功能已在 minipg 中裁剪（不支持 CREATE TABLE ... PARTITION BY），
+-- 因此此处不再测试对分区表/分区索引调用 pageinspect 函数的报错场景。
 
 -- check null bitmap alignment for table whose number of attributes is multiple of 8
 create table test8 (f1 int, f2 int, f3 int, f4 int, f5 int, f6 int, f7 int, f8 int);

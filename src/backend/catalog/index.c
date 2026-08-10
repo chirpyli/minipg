@@ -41,7 +41,6 @@
 #include "catalog/heap.h"
 #include "catalog/index.h"
 #include "catalog/objectaccess.h"
-#include "catalog/partition.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -214,8 +213,7 @@ index_check_primary_key(Relation heapRel,
 	 * have faith that the parser rejected multiple pkey clauses; and CREATE
 	 * INDEX doesn't have a way to say PRIMARY KEY, so it's no problem either.
 	 */
-	if ((is_alter_table || heapRel->rd_rel->relispartition) &&
-		relationHasPrimaryKey(heapRel))
+	if (is_alter_table && relationHasPrimaryKey(heapRel))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
@@ -741,10 +739,7 @@ index_create(Relation heapRelation,
 	/* constraint flags can only be set when a constraint is requested */
 	Assert((constr_flags == 0) ||
 		   ((flags & INDEX_CREATE_ADD_CONSTRAINT) != 0));
-	/* partitioned indexes must never be "built" by themselves */
-	Assert(!partitioned || (flags & INDEX_CREATE_SKIP_BUILD));
-
-	relkind = partitioned ? RELKIND_PARTITIONED_INDEX : RELKIND_INDEX;
+	relkind = RELKIND_INDEX;
 	is_exclusion = (indexInfo->ii_ExclusionOps != NULL);
 
 	pg_class = table_open(RelationRelationId, RowExclusiveLock);
@@ -965,7 +960,6 @@ index_create(Relation heapRelation,
 	 */
 	indexRelation->rd_rel->relowner = heapRelation->rd_rel->relowner;
 	indexRelation->rd_rel->relam = accessMethodObjectId;
-	indexRelation->rd_rel->relispartition = OidIsValid(parentIndexRelid);
 
 	/*
 	 * store index's pg_class entry
@@ -1547,10 +1541,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	namestrcpy(&oldClassForm->relname, oldName);
 
 	/* Swap the partition flags to track inheritance properly */
-	isPartition = newClassForm->relispartition;
-	newClassForm->relispartition = oldClassForm->relispartition;
-	oldClassForm->relispartition = isPartition;
-
 	CatalogTupleUpdate(pg_class, &oldClassTuple->t_self, oldClassTuple);
 	CatalogTupleUpdate(pg_class, &newClassTuple->t_self, newClassTuple);
 
@@ -1718,20 +1708,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 
 		systable_endscan(sd);
 		table_close(description, NoLock);
-	}
-
-	/*
-	 * Swap inheritance relationship with parent index
-	 */
-	if (get_rel_relispartition(oldIndexId))
-	{
-		List	   *ancestors = get_partition_ancestors(oldIndexId);
-		Oid			parentIndexRelid = linitial_oid(ancestors);
-
-		DeleteInheritsTuple(oldIndexId, parentIndexRelid, false, NULL);
-		StoreSingleInheritance(newIndexId, parentIndexRelid, 1);
-
-		list_free(ancestors);
 	}
 
 	/*
@@ -2336,8 +2312,7 @@ index_drop(Oid indexId, bool concurrent, bool concurrent_lock_mode)
 	/*
 	 * Schedule physical removal of the files (if any)
 	 */
-	if (userIndexRelation->rd_rel->relkind != RELKIND_PARTITIONED_INDEX)
-		RelationDropStorage(userIndexRelation);
+	RelationDropStorage(userIndexRelation);
 
 	/*
 	 * Close and flush the index's relcache entry, to ensure relcache doesn't
@@ -2885,9 +2860,6 @@ index_update_stats(Relation rel,
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "could not find tuple for relation %u", relid);
 	rd_rel = (Form_pg_class) GETSTRUCT(tuple);
-
-	/* Should this be a more comprehensive test? */
-	Assert(rd_rel->relkind != RELKIND_PARTITIONED_INDEX);
 
 	/* Apply required updates, if any, to copied tuple */
 
@@ -3654,14 +3626,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 									 iRel->rd_rel->relam);
 
 	/*
-	 * Partitioned indexes should never get processed here, as they have no
-	 * physical storage.
-	 */
-	if (iRel->rd_rel->relkind == RELKIND_PARTITIONED_INDEX)
-		elog(ERROR, "cannot reindex partitioned index \"%s.%s\"",
-			 get_namespace_name(RelationGetNamespace(iRel)),
-			 RelationGetRelationName(iRel));
-
 	/*
 	 * Don't allow reindex on temp tables of other backends ... their local
 	 * buffer manager is not going to cope.
@@ -3918,15 +3882,6 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 	/* if relation is gone, leave */
 	if (!rel)
 		return false;
-
-	/*
-	 * Partitioned tables should never get processed here, as they have no
-	 * physical storage.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		elog(ERROR, "cannot reindex partitioned table \"%s.%s\"",
-			 get_namespace_name(RelationGetNamespace(rel)),
-			 RelationGetRelationName(rel));
 
 	toast_relid = rel->rd_rel->reltoastrelid;
 

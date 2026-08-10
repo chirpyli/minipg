@@ -17,7 +17,6 @@ OBJS = \
 	catcache.o \
 	inval.o \
 	lsyscache.o \
-	partcache.o \
 	plancache.o \
 	relcache.o \
 	relfilenodemap.o \

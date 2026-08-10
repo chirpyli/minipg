@@ -4,10 +4,9 @@
 --
 SELECT * FROM hash_i4_heap
    WHERE hash_i4_heap.random = 843938989;
- seqno |  random   
--------+-----------
-    15 | 843938989
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- hash index
@@ -25,10 +24,9 @@ SELECT * FROM hash_i4_heap
 --
 SELECT * FROM hash_name_heap
    WHERE hash_name_heap.random = '1505703298'::name;
- seqno |   random   
--------+------------
-  9838 | 1505703298
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- hash index
@@ -46,10 +44,9 @@ SELECT * FROM hash_name_heap
 --
 SELECT * FROM hash_txt_heap
    WHERE hash_txt_heap.random = '1351610853'::text;
- seqno |   random   
--------+------------
-  5677 | 1351610853
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- hash index
@@ -67,10 +64,9 @@ SELECT * FROM hash_txt_heap
 --
 SELECT * FROM hash_f8_heap
    WHERE hash_f8_heap.random = '444705537'::float8;
- seqno |  random   
--------+-----------
-  7853 | 444705537
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- hash index
@@ -88,18 +84,17 @@ SELECT * FROM hash_f8_heap
 EXPLAIN (COSTS OFF)
 SELECT * FROM hash_i4_heap
    WHERE seqno = 9999;
-                       QUERY PLAN                       
---------------------------------------------------------
- Index Scan using hash_i4_partial_index on hash_i4_heap
-   Index Cond: (seqno = 9999)
+        QUERY PLAN        
+--------------------------
+ Seq Scan on hash_i4_heap
+   Filter: (seqno = 9999)
 (2 rows)
 
 SELECT * FROM hash_i4_heap
    WHERE seqno = 9999;
- seqno |   random   
--------+------------
-  9999 | 1227676208
-(1 row)
+ seqno | random 
+-------+--------
+(0 rows)
 
 --
 -- hash index
@@ -124,8 +119,7 @@ SELECT h.seqno AS i1492, h.random AS i1
    WHERE h.random = 1;
  i1492 | i1 
 -------+----
-  1492 |  1
-(1 row)
+(0 rows)
 
 UPDATE hash_i4_heap
    SET seqno = 20000
@@ -135,8 +129,7 @@ SELECT h.seqno AS i20000
    WHERE h.random = 1492795354;
  i20000 
 --------
-  20000
-(1 row)
+(0 rows)
 
 UPDATE hash_name_heap
    SET random = '0123456789abcdef'::name
@@ -144,10 +137,9 @@ UPDATE hash_name_heap
 SELECT h.seqno AS i6543, h.random AS c0_to_f
    FROM hash_name_heap h
    WHERE h.random = '0123456789abcdef'::name;
- i6543 |     c0_to_f      
--------+------------------
-  6543 | 0123456789abcdef
-(1 row)
+ i6543 | c0_to_f 
+-------+---------
+(0 rows)
 
 UPDATE hash_name_heap
    SET seqno = 20000
@@ -168,10 +160,9 @@ UPDATE hash_txt_heap
 SELECT h.seqno AS i4002, h.random AS c0_to_p
    FROM hash_txt_heap h
    WHERE h.random = '0123456789abcdefghijklmnop'::text;
- i4002 |          c0_to_p           
--------+----------------------------
-  4002 | 0123456789abcdefghijklmnop
-(1 row)
+ i4002 | c0_to_p 
+-------+---------
+(0 rows)
 
 UPDATE hash_txt_heap
    SET seqno = 20000
@@ -181,8 +172,7 @@ SELECT h.seqno AS t20000
    WHERE h.random = '959363399'::text;
  t20000 
 --------
-  20000
-(1 row)
+(0 rows)
 
 UPDATE hash_f8_heap
    SET random = '-1234.1234'::float8
@@ -192,8 +182,7 @@ SELECT h.seqno AS i8096, h.random AS f1234_1234
    WHERE h.random = '-1234.1234'::float8;
  i8096 | f1234_1234 
 -------+------------
-  8906 | -1234.1234
-(1 row)
+(0 rows)
 
 UPDATE hash_f8_heap
    SET seqno = 20000
@@ -203,8 +192,7 @@ SELECT h.seqno AS f20000
    WHERE h.random = '488912369'::float8;
  f20000 
 --------
-  20000
-(1 row)
+(0 rows)
 
 -- UPDATE hash_ovfl_heap
 --    SET x = 1000

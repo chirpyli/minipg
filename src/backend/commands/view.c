@@ -232,7 +232,6 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		 */
 		createStmt->relation = relation;
 		createStmt->tableElts = attrList;
-		createStmt->inhRelations = NIL;
 		createStmt->constraints = NIL;
 		createStmt->options = options;
 		createStmt->oncommit = ONCOMMIT_NOOP;

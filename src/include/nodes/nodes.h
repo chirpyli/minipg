@@ -84,10 +84,6 @@ typedef enum NodeTag
 	/* these aren't subclasses of Plan: */
 	T_NestLoopParam,
 	T_PlanRowMark,
-	T_PartitionPruneInfo,
-	T_PartitionedRelPruneInfo,
-	T_PartitionPruneStepOp,
-	T_PartitionPruneStepCombine,
 	T_PlanInvalItem,
 
 	/*
@@ -431,11 +427,6 @@ typedef enum NodeTag
 	T_OnConflictClause,
 	T_RoleSpec,
 	T_TriggerTransition,
-	T_PartitionElem,
-	T_PartitionSpec,
-	T_PartitionBoundSpec,
-	T_PartitionRangeDatum,
-	T_PartitionCmd,
 	T_VacuumRelation,
 
 	/*

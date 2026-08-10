@@ -2,8 +2,8 @@ CREATE TABLE test_hash (a int, b text);
 INSERT INTO test_hash VALUES (1, 'one');
 CREATE INDEX test_hash_a_idx ON test_hash USING hash (a);
 
-CREATE TABLE test_hash_part (a int, b int) PARTITION BY RANGE (a);
-CREATE INDEX test_hash_part_idx ON test_hash_part USING hash(b);
+-- 分区功能已在 minipg 中裁剪（不支持 CREATE TABLE ... PARTITION BY），
+-- 因此不再创建分区表及其上的 hash 索引进行测试。
 
 \x
 
@@ -24,7 +24,6 @@ SELECT * FROM hash_bitmap_info('test_hash_a_idx', 3);
 SELECT * FROM hash_bitmap_info('test_hash_a_idx', 4);
 SELECT * FROM hash_bitmap_info('test_hash_a_idx', 5);
 SELECT * FROM hash_bitmap_info('test_hash_a_idx', 6);
-SELECT * FROM hash_bitmap_info('test_hash_part_idx', 1); -- error
 
 
 SELECT magic, version, ntuples, bsize, bmsize, bmshift, maxbucket, highmask,
@@ -110,4 +109,3 @@ SELECT hash_page_stats(decode(repeat('00', :block_size), 'hex'));
 SELECT hash_page_type(decode(repeat('00', :block_size), 'hex'));
 
 DROP TABLE test_hash;
-DROP TABLE test_hash_part;

@@ -231,8 +231,6 @@ typedef struct ModifyTable
 	List	   *exclRelTlist;	/* tlist of the EXCLUDED pseudo relation */
 } ModifyTable;
 
-struct PartitionPruneInfo;		/* forward reference to struct below */
-
 /* ----------------
  *	 Append node -
  *		Generate the concatenation of the results of sub-plans.
@@ -249,9 +247,6 @@ typedef struct Append
 	 * 'appendplans' from this index onwards are partial plans.
 	 */
 	int			first_partial_plan;
-
-	/* Info for run-time subplan pruning; NULL if we're not doing that */
-	struct PartitionPruneInfo *part_prune_info;
 } Append;
 
 /* ----------------
@@ -270,8 +265,6 @@ typedef struct MergeAppend
 	Oid		   *sortOperators;	/* OIDs of operators to sort them by */
 	Oid		   *collations;		/* OIDs of collations */
 	bool	   *nullsFirst;		/* NULLS FIRST/LAST directions */
-	/* Info for run-time subplan pruning; NULL if we're not doing that */
-	struct PartitionPruneInfo *part_prune_info;
 } MergeAppend;
 
 /* ----------------
@@ -1009,152 +1002,6 @@ typedef struct PlanRowMark
 	bool		isParent;		/* true if this is a "dummy" parent entry */
 } PlanRowMark;
 
-
-/*
- * Node types to represent partition pruning information.
- */
-
-/*
- * PartitionPruneInfo - Details required to allow the executor to prune
- * partitions.
- *
- * Here we store mapping details to allow translation of a partitioned table's
- * index as returned by the partition pruning code into subplan indexes for
- * plan types which support arbitrary numbers of subplans, such as Append.
- * We also store various details to tell the executor when it should be
- * performing partition pruning.
- *
- * Each PartitionedRelPruneInfo describes the partitioning rules for a single
- * partitioned table (a/k/a level of partitioning).  Since a partitioning
- * hierarchy could contain multiple levels, we represent it by a List of
- * PartitionedRelPruneInfos, where the first entry represents the topmost
- * partitioned table and additional entries represent non-leaf child
- * partitions, ordered such that parents appear before their children.
- * Then, since an Append-type node could have multiple partitioning
- * hierarchies among its children, we have an unordered List of those Lists.
- *
- * prune_infos			List of Lists containing PartitionedRelPruneInfo nodes,
- *						one sublist per run-time-prunable partition hierarchy
- *						appearing in the parent plan node's subplans.
- * other_subplans		Indexes of any subplans that are not accounted for
- *						by any of the PartitionedRelPruneInfo nodes in
- *						"prune_infos".  These subplans must not be pruned.
- */
-typedef struct PartitionPruneInfo
-{
-	NodeTag		type;
-	List	   *prune_infos;
-	Bitmapset  *other_subplans;
-} PartitionPruneInfo;
-
-/*
- * PartitionedRelPruneInfo - Details required to allow the executor to prune
- * partitions for a single partitioned table.
- *
- * subplan_map[] and subpart_map[] are indexed by partition index of the
- * partitioned table referenced by 'rtindex', the partition index being the
- * order that the partitions are defined in the table's PartitionDesc.  For a
- * leaf partition p, subplan_map[p] contains the zero-based index of the
- * partition's subplan in the parent plan's subplan list; it is -1 if the
- * partition is non-leaf or has been pruned.  For a non-leaf partition p,
- * subpart_map[p] contains the zero-based index of that sub-partition's
- * PartitionedRelPruneInfo in the hierarchy's PartitionedRelPruneInfo list;
- * it is -1 if the partition is a leaf or has been pruned.  Note that subplan
- * indexes, as stored in 'subplan_map', are global across the parent plan
- * node, but partition indexes are valid only within a particular hierarchy.
- * relid_map[p] contains the partition's OID, or 0 if the partition was pruned.
- */
-typedef struct PartitionedRelPruneInfo
-{
-	NodeTag		type;
-	Index		rtindex;		/* RT index of partition rel for this level */
-	Bitmapset  *present_parts;	/* Indexes of all partitions which subplans or
-								 * subparts are present for */
-	int			nparts;			/* Length of the following arrays: */
-	int		   *subplan_map;	/* subplan index by partition index, or -1 */
-	int		   *subpart_map;	/* subpart index by partition index, or -1 */
-	Oid		   *relid_map;		/* relation OID by partition index, or 0 */
-
-	/*
-	 * initial_pruning_steps shows how to prune during executor startup (i.e.,
-	 * without use of any PARAM_EXEC Params); it is NIL if no startup pruning
-	 * is required.  exec_pruning_steps shows how to prune with PARAM_EXEC
-	 * Params; it is NIL if no per-scan pruning is required.
-	 */
-	List	   *initial_pruning_steps;	/* List of PartitionPruneStep */
-	List	   *exec_pruning_steps; /* List of PartitionPruneStep */
-	Bitmapset  *execparamids;	/* All PARAM_EXEC Param IDs in
-								 * exec_pruning_steps */
-} PartitionedRelPruneInfo;
-
-/*
- * Abstract Node type for partition pruning steps (there are no concrete
- * Nodes of this type).
- *
- * step_id is the global identifier of the step within its pruning context.
- */
-typedef struct PartitionPruneStep
-{
-	NodeTag		type;
-	int			step_id;
-} PartitionPruneStep;
-
-/*
- * PartitionPruneStepOp - Information to prune using a set of mutually ANDed
- *							OpExpr clauses
- *
- * This contains information extracted from up to partnatts OpExpr clauses,
- * where partnatts is the number of partition key columns.  'opstrategy' is the
- * strategy of the operator in the clause matched to the last partition key.
- * 'exprs' contains expressions which comprise the lookup key to be passed to
- * the partition bound search function.  'cmpfns' contains the OIDs of
- * comparison functions used to compare aforementioned expressions with
- * partition bounds.  Both 'exprs' and 'cmpfns' contain the same number of
- * items, up to partnatts items.
- *
- * Once we find the offset of a partition bound using the lookup key, we
- * determine which partitions to include in the result based on the value of
- * 'opstrategy'.  For example, if it were equality, we'd return just the
- * partition that would contain that key or a set of partitions if the key
- * didn't consist of all partitioning columns.  For non-equality strategies,
- * we'd need to include other partitions as appropriate.
- *
- * 'nullkeys' is the set containing the offset of the partition keys (0 to
- * partnatts - 1) that were matched to an IS NULL clause.  This is only
- * considered for hash partitioning as we need to pass which keys are null
- * to the hash partition bound search function.  It is never possible to
- * have an expression be present in 'exprs' for a given partition key and
- * the corresponding bit set in 'nullkeys'.
- */
-typedef struct PartitionPruneStepOp
-{
-	PartitionPruneStep step;
-
-	StrategyNumber opstrategy;
-	List	   *exprs;
-	List	   *cmpfns;
-	Bitmapset  *nullkeys;
-} PartitionPruneStepOp;
-
-/*
- * PartitionPruneStepCombine - Information to prune using a BoolExpr clause
- *
- * For BoolExpr clauses, we combine the set of partitions determined for each
- * of the argument clauses.
- */
-typedef enum PartitionPruneCombineOp
-{
-	PARTPRUNE_COMBINE_UNION,
-	PARTPRUNE_COMBINE_INTERSECT
-} PartitionPruneCombineOp;
-
-typedef struct PartitionPruneStepCombine
-{
-	PartitionPruneStep step;
-
-	PartitionPruneCombineOp combineOp;
-	List	   *source_stepids;
-} PartitionPruneStepCombine;
 
 
 /*

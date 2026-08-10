@@ -3253,21 +3253,19 @@ describeOneTableDetails(const char *schemaname,
 			printfPQExpBuffer(&buf,
 							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
 							  " inhdetachpending,"
-							  " pg_catalog.pg_get_expr(c.relpartbound, c.oid)\n"
+							  " NULL\n"
 							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
 							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT',"
-							  " c.oid::pg_catalog.regclass::pg_catalog.text;",
+							  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
 							  oid);
 		else if (pset.sversion >= 100000)
 			printfPQExpBuffer(&buf,
 							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
 							  " false AS inhdetachpending,"
-							  " pg_catalog.pg_get_expr(c.relpartbound, c.oid)\n"
+							  " NULL\n"
 							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
 							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT',"
-							  " c.oid::pg_catalog.regclass::pg_catalog.text;",
+							  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
 							  oid);
 		else if (pset.sversion >= 80300)
 			printfPQExpBuffer(&buf,
@@ -4118,9 +4116,6 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_PARTITIONED_INDEX) ",");
 	appendPQExpBufferStr(&buf, "''");	/* dummy */
 	appendPQExpBufferStr(&buf, ")\n");
-
-	appendPQExpBufferStr(&buf, !showNested && !pattern ?
-						 " AND NOT c.relispartition\n" : "");
 
 	if (!pattern)
 		appendPQExpBufferStr(&buf, "      AND n.nspname <> 'pg_catalog'\n"

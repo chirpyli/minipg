@@ -358,15 +358,7 @@ SELECT p.name, p.age FROM person* p;
  trisha  |  88
  uma     |  78
  velma   |  68
- sharon  |  25
- sam     |  30
- bill    |  20
- fred    |  28
- larry   |  60
- jeff    |  23
- cim     |  30
- linda   |  19
-(58 rows)
+(50 rows)
 
 --
 -- awk '{print $1,$2;}' person.data |
@@ -397,7 +389,6 @@ SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
  leah    |  68
  paula   |  68
  velma   |  68
- larry   |  60
  carina  |  58
  jane    |  58
  juanita |  58
@@ -415,19 +406,12 @@ SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
  teresa  |  38
  sally   |  34
  alex    |  30
- cim     |  30
- sam     |  30
- fred    |  28
  jean    |  28
  melissa |  28
  nan     |  28
  lita    |  25
- sharon  |  25
  denise  |  24
- jeff    |  23
- bill    |  20
  joe     |  20
- linda   |  19
  sandra  |  19
  diane   |  18
  edna    |  18
@@ -436,7 +420,7 @@ SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
  pat     |  18
  fanny   |   8
  mary    |   8
-(58 rows)
+(50 rows)
 
 --
 -- Test some cases involving whole-row Var referencing a subquery
@@ -952,13 +936,17 @@ select * from (values (2),(null),(1)) v(k) where k = k;
 -- Test partitioned tables with no partitions, which should be handled the
 -- same as the non-inheritance case when expanding its RTE.
 create table list_parted_tbl (a int,b int) partition by list (a);
+ERROR:  syntax error at or near "partition"
+LINE 1: create table list_parted_tbl (a int,b int) partition by list...
+                                                   ^
 create table list_parted_tbl1 partition of list_parted_tbl
   for values in (1) partition by list(b);
+ERROR:  syntax error at or near "partition"
+LINE 1: create table list_parted_tbl1 partition of list_parted_tbl
+                                      ^
 explain (costs off) select * from list_parted_tbl;
-        QUERY PLAN        
---------------------------
- Result
-   One-Time Filter: false
-(2 rows)
-
+ERROR:  relation "list_parted_tbl" does not exist
+LINE 1: explain (costs off) select * from list_parted_tbl;
+                                          ^
 drop table list_parted_tbl;
+ERROR:  table "list_parted_tbl" does not exist

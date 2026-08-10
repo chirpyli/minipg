@@ -23,23 +23,8 @@ ROLLBACK;
 -- check that using the module's functions with unsupported relations will fail
 --
 
--- partitioned tables (the parent ones) don't have visibility maps
-create table test_partitioned (a int) partition by list (a);
--- these should all fail
-select pg_visibility('test_partitioned', 0);
-select pg_visibility_map('test_partitioned');
-select pg_visibility_map_summary('test_partitioned');
-select pg_check_frozen('test_partitioned');
-select pg_truncate_visibility_map('test_partitioned');
-
-create table test_partition partition of test_partitioned for values in (1);
-create index test_index on test_partition (a);
--- indexes do not, so these all fail
-select pg_visibility('test_index', 0);
-select pg_visibility_map('test_index');
-select pg_visibility_map_summary('test_index');
-select pg_check_frozen('test_index');
-select pg_truncate_visibility_map('test_index');
+-- 分区功能已在 minipg 中裁剪（不支持 CREATE TABLE ... PARTITION BY），
+-- 因此不再测试 pg_visibility 系列函数对分区表/分区索引的报错场景。
 
 create view test_view as select 1;
 -- views do not have VMs, so these all fail
@@ -85,14 +70,7 @@ insert into regular_table values (1), (2);
 refresh materialized view matview_visibility_test;
 select count(*) > 0 from pg_visibility('matview_visibility_test');
 
--- regular tables which are part of a partition *do* have visibility maps
-insert into test_partition values (1);
-vacuum (disable_page_skipping) test_partition;
-select count(*) > 0 from pg_visibility('test_partition', 0);
-select count(*) > 0 from pg_visibility_map('test_partition');
-select count(*) > 0 from pg_visibility_map_summary('test_partition');
-select * from pg_check_frozen('test_partition'); -- hopefully none
-select pg_truncate_visibility_map('test_partition');
+-- 分区功能已在 minipg 中裁剪，不再测试分区子表的可见性映射。
 
 -- test copy freeze
 create table copyfreeze (a int, b char(1500));
@@ -171,7 +149,6 @@ select * from pg_visibility_map('copyfreeze');
 select * from pg_check_frozen('copyfreeze');
 
 -- cleanup
-drop table test_partitioned;
 drop view test_view;
 drop sequence test_sequence;
 drop foreign table test_foreign_table;

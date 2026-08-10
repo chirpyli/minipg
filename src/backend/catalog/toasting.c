@@ -404,12 +404,6 @@ static bool
 needs_toast_table(Relation rel)
 {
 	/*
-	 * No need to create a TOAST table for partitioned tables.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		return false;
-
-	/*
 	 * We cannot allow toasting a shared relation after initdb (because
 	 * there's no way to mark it toasted in other databases' pg_class).
 	 */

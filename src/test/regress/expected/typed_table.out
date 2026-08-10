@@ -32,7 +32,9 @@ ALTER TABLE persons ALTER COLUMN name TYPE varchar;
 ERROR:  cannot alter column type of typed table
 CREATE TABLE stuff (id int);
 ALTER TABLE persons INHERIT stuff;
-ERROR:  cannot change inheritance of typed table
+ERROR:  syntax error at or near "INHERIT"
+LINE 1: ALTER TABLE persons INHERIT stuff;
+                            ^
 CREATE TABLE personsx OF person_type (myname WITH OPTIONS NOT NULL); -- error
 ERROR:  column "myname" does not exist
 CREATE TABLE persons2 OF person_type (

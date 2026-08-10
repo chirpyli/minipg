@@ -25,7 +25,6 @@
 #include "catalog/index.h"
 #include "catalog/indexing.h"
 #include "catalog/objectaccess.h"
-#include "catalog/partition.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_proc.h"
@@ -35,7 +34,6 @@
 #include "commands/defrem.h"
 #include "commands/trigger.h"
 #include "executor/executor.h"
-#include "executor/execPartition.h"
 #include "miscadmin.h"
 #include "nodes/bitmapset.h"
 #include "nodes/makefuncs.h"
@@ -45,7 +43,6 @@
 #include "parser/parse_func.h"
 #include "parser/parse_relation.h"
 #include "parser/parsetree.h"
-#include "partitioning/partdesc.h"
 #include "pgstat.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/bufmgr.h"
@@ -1097,100 +1094,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 	/*
 	 * Lastly, create the trigger on child relations, if needed.
 	 */
-	if (partition_recurse)
-	{
-		PartitionDesc partdesc = RelationGetPartitionDesc(rel, true);
-		List	   *idxs = NIL;
-		List	   *childTbls = NIL;
-		ListCell   *l;
-		int			i;
-		MemoryContext oldcxt,
-					perChildCxt;
-
-		perChildCxt = AllocSetContextCreate(CurrentMemoryContext,
-											"part trig clone",
-											ALLOCSET_SMALL_SIZES);
-
-		/*
-		 * When a trigger is being created associated with an index, we'll
-		 * need to associate the trigger in each child partition with the
-		 * corresponding index on it.
-		 */
-		if (OidIsValid(indexOid))
-		{
-			ListCell   *l;
-			List	   *idxs = NIL;
-
-			idxs = find_inheritance_children(indexOid, ShareRowExclusiveLock);
-			foreach(l, idxs)
-				childTbls = lappend_oid(childTbls,
-										IndexGetRelation(lfirst_oid(l),
-														 false));
-		}
-
-		oldcxt = MemoryContextSwitchTo(perChildCxt);
-
-		/* Iterate to create the trigger on each existing partition */
-		for (i = 0; i < partdesc->nparts; i++)
-		{
-			Oid			indexOnChild = InvalidOid;
-			ListCell   *l2;
-			CreateTrigStmt *childStmt;
-			Relation	childTbl;
-			Node	   *qual;
-
-			childTbl = table_open(partdesc->oids[i], ShareRowExclusiveLock);
-
-			/* Find which of the child indexes is the one on this partition */
-			if (OidIsValid(indexOid))
-			{
-				forboth(l, idxs, l2, childTbls)
-				{
-					if (lfirst_oid(l2) == partdesc->oids[i])
-					{
-						indexOnChild = lfirst_oid(l);
-						break;
-					}
-				}
-				if (!OidIsValid(indexOnChild))
-					elog(ERROR, "failed to find index matching index \"%s\" in partition \"%s\"",
-						 get_rel_name(indexOid),
-						 get_rel_name(partdesc->oids[i]));
-			}
-
-			/*
-			 * Initialize our fabricated parse node by copying the original
-			 * one, then resetting fields that we pass separately.
-			 */
-			childStmt = (CreateTrigStmt *) copyObject(stmt);
-			childStmt->funcname = NIL;
-			childStmt->whenClause = NULL;
-
-			/* If there is a WHEN clause, create a modified copy of it */
-			qual = copyObject(whenClause);
-			qual = (Node *)
-				map_partition_varattnos((List *) qual, PRS2_OLD_VARNO,
-										childTbl, rel);
-			qual = (Node *)
-				map_partition_varattnos((List *) qual, PRS2_NEW_VARNO,
-										childTbl, rel);
-
-			CreateTriggerFiringOn(childStmt, queryString,
-								  partdesc->oids[i], refRelOid,
-								  InvalidOid, indexOnChild,
-								  funcoid, trigoid, qual,
-								  isInternal, true, trigger_fires_when);
-
-			table_close(childTbl, NoLock);
-
-			MemoryContextReset(perChildCxt);
-		}
-
-		MemoryContextSwitchTo(oldcxt);
-		MemoryContextDelete(perChildCxt);
-		list_free(idxs);
-		list_free(childTbls);
-	}
 
 	/* Keep lock on target rel until end of xact */
 	table_close(rel, NoLock);
@@ -1587,25 +1490,6 @@ EnableDisableTriggerNew(Relation rel, const char *tgname,
 		 * value of tgenabled than the parent's trigger and thus might need to
 		 * be changed.
 		 */
-		if (recurse &&
-			rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE &&
-			(TRIGGER_FOR_ROW(oldtrig->tgtype)))
-		{
-			PartitionDesc partdesc = RelationGetPartitionDesc(rel, true);
-			int			i;
-
-			for (i = 0; i < partdesc->nparts; i++)
-			{
-				Relation	part;
-
-				part = relation_open(partdesc->oids[i], lockmode);
-				EnableDisableTriggerNew(part, NameStr(oldtrig->tgname),
-										fires_when, skip_system, recurse,
-										lockmode);
-				table_close(part, NoLock);	/* keep lock till commit */
-			}
-		}
-
 		InvokeObjectPostAlterHook(TriggerRelationId,
 								  oldtrig->oid, 0);
 	}
@@ -2304,21 +2188,6 @@ ExecBRInsertTriggers(EState *estate, ResultRelInfo *relinfo,
 		else if (newtuple != oldtuple)
 		{
 			ExecForceStoreHeapTuple(newtuple, slot, false);
-
-			/*
-			 * After a tuple in a partition goes through a trigger, the user
-			 * could have changed the partition key enough that the tuple no
-			 * longer fits the partition.  Verify that.
-			 */
-			if (trigger->tgisclone &&
-				!ExecPartitionCheck(relinfo, slot, estate, false))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("moving row to another partition during a BEFORE FOR EACH ROW trigger is not supported"),
-						 errdetail("Before executing trigger \"%s\", the row was to be in partition \"%s.%s\".",
-								   trigger->tgname,
-								   get_namespace_name(RelationGetNamespace(relinfo->ri_RelationDesc)),
-								   RelationGetRelationName(relinfo->ri_RelationDesc))));
 
 			if (should_free)
 				heap_freetuple(oldtuple);
@@ -5556,7 +5425,7 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 	if (row_trigger && transition_capture != NULL)
 	{
 		TupleTableSlot *original_insert_tuple = transition_capture->tcs_original_insert_tuple;
-		TupleConversionMap *map = ExecGetChildToRootMap(relinfo);
+		TupleConversionMap *map = NULL;
 		bool		delete_old_table = transition_capture->tcs_delete_old_table;
 		bool		update_old_table = transition_capture->tcs_update_old_table;
 		bool		update_new_table = transition_capture->tcs_update_new_table;

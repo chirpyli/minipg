@@ -20,7 +20,6 @@
 #include "catalog/pg_index.h"
 #include "catalog/pg_publication.h"
 #include "nodes/bitmapset.h"
-#include "partitioning/partdefs.h"
 #include "rewrite/prs2lock.h"
 #include "storage/block.h"
 #include "storage/relfilenode.h"
@@ -119,32 +118,6 @@ typedef struct RelationData
 	/* data managed by RelationGetFKeyList: */
 	List	   *rd_fkeylist;	/* list of ForeignKeyCacheInfo (see below) */
 	bool		rd_fkeyvalid;	/* true if list has been computed */
-
-	/* data managed by RelationGetPartitionKey: */
-	PartitionKey rd_partkey;	/* partition key, or NULL */
-	MemoryContext rd_partkeycxt;	/* private context for rd_partkey, if any */
-
-	/* data managed by RelationGetPartitionDesc: */
-	PartitionDesc rd_partdesc;	/* partition descriptor, or NULL */
-	MemoryContext rd_pdcxt;		/* private context for rd_partdesc, if any */
-
-	/* Same as above, for partdescs that omit detached partitions */
-	PartitionDesc rd_partdesc_nodetached;	/* partdesc w/o detached parts */
-	MemoryContext rd_pddcxt;	/* for rd_partdesc_nodetached, if any */
-
-	/*
-	 * pg_inherits.xmin of the partition that was excluded in
-	 * rd_partdesc_nodetached.  This informs a future user of that partdesc:
-	 * if this value is not in progress for the active snapshot, then the
-	 * partdesc can be used, otherwise they have to build a new one.  (This
-	 * matches what find_inheritance_children_extended would do).
-	 */
-	TransactionId rd_partdesc_nodetached_xmin;
-
-	/* data managed by RelationGetPartitionQual: */
-	List	   *rd_partcheck;	/* partition CHECK quals */
-	bool		rd_partcheckvalid;	/* true if list has been computed */
-	MemoryContext rd_partcheckcxt;	/* private cxt for rd_partcheck, if any */
 
 	/* data managed by RelationGetIndexList: */
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */

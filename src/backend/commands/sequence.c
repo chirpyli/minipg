@@ -208,7 +208,6 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	}
 
 	stmt->relation = seq->sequence;
-	stmt->inhRelations = NIL;
 	stmt->constraints = NIL;
 	stmt->options = NIL;
 	stmt->oncommit = ONCOMMIT_NOOP;

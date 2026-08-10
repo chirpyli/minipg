@@ -211,22 +211,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 		/* Also get regular table's size */
 		relpages = RelationGetNumberOfBlocks(onerel);
 	}
-	else if (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		/*
-		 * For partitioned tables, we want to do the recursive ANALYZE below.
-		 */
-	}
-	else
-	{
-		/* No need for a WARNING if we already complained during VACUUM */
-		if (!(params->options & VACOPT_VACUUM))
-			ereport(WARNING,
-					(errmsg("skipping \"%s\" --- cannot analyze non-tables or special system tables",
-							RelationGetRelationName(onerel))));
-		relation_close(onerel, ShareUpdateExclusiveLock);
-		return;
-	}
 
 	/*
 	 * OK, let's do it.  First, initialize progress reporting.
@@ -235,12 +219,10 @@ analyze_rel(Oid relid, RangeVar *relation,
 								  RelationGetRelid(onerel));
 
 	/*
-	 * Do the normal non-recursive ANALYZE.  We can skip this for partitioned
-	 * tables, which don't contain any rows.
+	 * Do the normal non-recursive ANALYZE.
 	 */
-	if (onerel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
-		do_analyze_rel(onerel, params, va_cols, acquirefunc,
-					   relpages, false, in_outer_xact, elevel);
+	do_analyze_rel(onerel, params, va_cols, acquirefunc,
+				   relpages, false, in_outer_xact, elevel);
 
 	/*
 	 * If there are child tables, do recursive ANALYZE.
@@ -404,19 +386,9 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	 * an explicit column list in the ANALYZE command, however.
 	 *
 	 * If we are doing a recursive scan, we don't want to touch the parent's
-	 * indexes at all.  If we're processing a partitioned table, we need to
-	 * know if there are any indexes, but we don't want to process them.
+	 * indexes at all.
 	 */
-	if (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		List *idxs = RelationGetIndexList(onerel);
-
-		Irel = NULL;
-		nindexes = 0;
-		hasindex = idxs != NIL;
-		list_free(idxs);
-	}
-	else if (!inh)
+	if (!inh)
 	{
 		vac_open_indexes(onerel, AccessShareLock, &nindexes, &Irel);
 		hasindex = nindexes > 0;
@@ -606,7 +578,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 		 * For partitioned tables that's pointless (the non-leaf tables are
 		 * always empty), so we store stats representing the whole tree.
 		 */
-		build_ext_stats = (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE) ? inh : (!inh);
+		build_ext_stats = !inh;
 
 		/*
 		 * Build extended statistics (if there are any).
@@ -670,24 +642,10 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 								in_outer_xact);
 		}
 	}
-	else if (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		/*
-		 * Partitioned tables don't have storage, so we don't set any fields
-		 * in their pg_class entries except for reltuples and relhasindex.
-		 */
-		CommandCounterIncrement();
-		vac_update_relstats(onerel, -1, totalrows,
-							0, hasindex, InvalidTransactionId,
-							InvalidMultiXactId,
-							in_outer_xact);
-	}
 
 	/*
 	 * Now report ANALYZE to the stats collector.  For regular tables, we do
-	 * it only if not doing inherited stats.  For partitioned tables, we only
-	 * do it for inherited stats. (We're never called for not-inherited stats
-	 * on partitioned tables anyway.)
+	 * it only if not doing inherited stats.
 	 *
 	 * Reset the changes_since_analyze counter only if we analyzed all
 	 * columns; otherwise, there is still work for auto-analyze to do.
@@ -695,8 +653,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	if (!inh)
 		pgstat_report_analyze(onerel, totalrows, totaldeadrows,
 							  (va_cols == NIL));
-	else if (onerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		pgstat_report_analyze(onerel, 0, 0, (va_cols == NIL));
 
 	/*
 	 * If this isn't part of VACUUM ANALYZE, let index AMs do cleanup.
@@ -1468,7 +1424,6 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 			 * ignore, but release the lock on it.  don't try to unlock the
 			 * passed-in relation
 			 */
-			Assert(childrel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
 			if (childrel != onerel)
 				table_close(childrel, AccessShareLock);
 			else

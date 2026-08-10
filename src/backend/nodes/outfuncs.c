@@ -430,7 +430,6 @@ _outAppend(StringInfo str, const Append *node)
 	WRITE_BITMAPSET_FIELD(apprelids);
 	WRITE_NODE_FIELD(appendplans);
 	WRITE_INT_FIELD(first_partial_plan);
-	WRITE_NODE_FIELD(part_prune_info);
 }
 
 static void
@@ -447,7 +446,6 @@ _outMergeAppend(StringInfo str, const MergeAppend *node)
 	WRITE_OID_ARRAY(sortOperators, node->numCols);
 	WRITE_OID_ARRAY(collations, node->numCols);
 	WRITE_BOOL_ARRAY(nullsFirst, node->numCols);
-	WRITE_NODE_FIELD(part_prune_info);
 }
 
 
@@ -908,53 +906,6 @@ _outPlanRowMark(StringInfo str, const PlanRowMark *node)
 	WRITE_ENUM_FIELD(strength, LockClauseStrength);
 	WRITE_ENUM_FIELD(waitPolicy, LockWaitPolicy);
 	WRITE_BOOL_FIELD(isParent);
-}
-
-static void
-_outPartitionPruneInfo(StringInfo str, const PartitionPruneInfo *node)
-{
-	WRITE_NODE_TYPE("PARTITIONPRUNEINFO");
-
-	WRITE_NODE_FIELD(prune_infos);
-	WRITE_BITMAPSET_FIELD(other_subplans);
-}
-
-static void
-_outPartitionedRelPruneInfo(StringInfo str, const PartitionedRelPruneInfo *node)
-{
-	WRITE_NODE_TYPE("PARTITIONEDRELPRUNEINFO");
-
-	WRITE_UINT_FIELD(rtindex);
-	WRITE_BITMAPSET_FIELD(present_parts);
-	WRITE_INT_FIELD(nparts);
-	WRITE_INT_ARRAY(subplan_map, node->nparts);
-	WRITE_INT_ARRAY(subpart_map, node->nparts);
-	WRITE_OID_ARRAY(relid_map, node->nparts);
-	WRITE_NODE_FIELD(initial_pruning_steps);
-	WRITE_NODE_FIELD(exec_pruning_steps);
-	WRITE_BITMAPSET_FIELD(execparamids);
-}
-
-static void
-_outPartitionPruneStepOp(StringInfo str, const PartitionPruneStepOp *node)
-{
-	WRITE_NODE_TYPE("PARTITIONPRUNESTEPOP");
-
-	WRITE_INT_FIELD(step.step_id);
-	WRITE_INT_FIELD(opstrategy);
-	WRITE_NODE_FIELD(exprs);
-	WRITE_NODE_FIELD(cmpfns);
-	WRITE_BITMAPSET_FIELD(nullkeys);
-}
-
-static void
-_outPartitionPruneStepCombine(StringInfo str, const PartitionPruneStepCombine *node)
-{
-	WRITE_NODE_TYPE("PARTITIONPRUNESTEPCOMBINE");
-
-	WRITE_INT_FIELD(step.step_id);
-	WRITE_ENUM_FIELD(combineOp, PartitionPruneCombineOp);
-	WRITE_NODE_FIELD(source_stepids);
 }
 
 static void
@@ -2213,10 +2164,7 @@ _outRelOptInfo(StringInfo str, const RelOptInfo *node)
 	WRITE_UINT_FIELD(baserestrict_min_security);
 	WRITE_NODE_FIELD(joininfo);
 	WRITE_BOOL_FIELD(has_eclass_joins);
-	WRITE_BOOL_FIELD(consider_partitionwise_join);
 	WRITE_BITMAPSET_FIELD(top_parent_relids);
-	WRITE_BOOL_FIELD(partbounds_merged);
-	WRITE_BITMAPSET_FIELD(all_partrels);
 }
 
 static void
@@ -2535,9 +2483,6 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(tableElts);
-	WRITE_NODE_FIELD(inhRelations);
-	WRITE_NODE_FIELD(partspec);
-	WRITE_NODE_FIELD(partbound);
 	WRITE_NODE_FIELD(ofTypename);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_NODE_FIELD(options);
@@ -3441,53 +3386,6 @@ _outForeignKeyCacheInfo(StringInfo str, const ForeignKeyCacheInfo *node)
 	WRITE_OID_ARRAY(conpfeqop, node->nkeys);
 }
 
-static void
-_outPartitionElem(StringInfo str, const PartitionElem *node)
-{
-	WRITE_NODE_TYPE("PARTITIONELEM");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_NODE_FIELD(expr);
-	WRITE_NODE_FIELD(collation);
-	WRITE_NODE_FIELD(opclass);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outPartitionSpec(StringInfo str, const PartitionSpec *node)
-{
-	WRITE_NODE_TYPE("PARTITIONSPEC");
-
-	WRITE_STRING_FIELD(strategy);
-	WRITE_NODE_FIELD(partParams);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outPartitionBoundSpec(StringInfo str, const PartitionBoundSpec *node)
-{
-	WRITE_NODE_TYPE("PARTITIONBOUNDSPEC");
-
-	WRITE_CHAR_FIELD(strategy);
-	WRITE_BOOL_FIELD(is_default);
-	WRITE_INT_FIELD(modulus);
-	WRITE_INT_FIELD(remainder);
-	WRITE_NODE_FIELD(listdatums);
-	WRITE_NODE_FIELD(lowerdatums);
-	WRITE_NODE_FIELD(upperdatums);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outPartitionRangeDatum(StringInfo str, const PartitionRangeDatum *node)
-{
-	WRITE_NODE_TYPE("PARTITIONRANGEDATUM");
-
-	WRITE_ENUM_FIELD(kind, PartitionRangeDatumKind);
-	WRITE_NODE_FIELD(value);
-	WRITE_LOCATION_FIELD(location);
-}
-
 /*
  * outNode -
  *	  converts a Node into ascii string and append it to 'str'
@@ -3640,18 +3538,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_PlanRowMark:
 				_outPlanRowMark(str, obj);
-				break;
-			case T_PartitionPruneInfo:
-				_outPartitionPruneInfo(str, obj);
-				break;
-			case T_PartitionedRelPruneInfo:
-				_outPartitionedRelPruneInfo(str, obj);
-				break;
-			case T_PartitionPruneStepOp:
-				_outPartitionPruneStepOp(str, obj);
-				break;
-			case T_PartitionPruneStepCombine:
-				_outPartitionPruneStepCombine(str, obj);
 				break;
 			case T_PlanInvalItem:
 				_outPlanInvalItem(str, obj);
@@ -4105,18 +3991,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_TriggerTransition:
 				_outTriggerTransition(str, obj);
-				break;
-			case T_PartitionElem:
-				_outPartitionElem(str, obj);
-				break;
-			case T_PartitionSpec:
-				_outPartitionSpec(str, obj);
-				break;
-			case T_PartitionBoundSpec:
-				_outPartitionBoundSpec(str, obj);
-				break;
-			case T_PartitionRangeDatum:
-				_outPartitionRangeDatum(str, obj);
 				break;
 
 			default:

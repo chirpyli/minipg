@@ -20,6 +20,12 @@
 #include "nodes/parsenodes.h"
 #include "storage/block.h"
 
+/*
+ * Partitioning support has been removed from this build.  This macro is
+ * retained (and always evaluates false) so that the remaining planner code
+ * keeps compiling; the partition-specific branches it guards are dead.
+ */
+#define IS_PARTITIONED_REL(rel) (false)
 
 /*
  * Relids
@@ -128,7 +134,6 @@ typedef struct PlannerGlobal
 
 	char		maxParallelHazard;	/* worst PROPARALLEL hazard level */
 
-	PartitionDirectory partition_directory; /* partition descriptors */
 } PlannerGlobal;
 
 /* macro for fetching the Plan associated with a SubPlan node */
@@ -295,9 +300,6 @@ struct PlannerInfo
 	List	   *distinct_pathkeys;	/* distinctClause pathkeys, if any */
 	List	   *sort_pathkeys;	/* sortClause pathkeys, if any */
 
-	List	   *part_schemes;	/* Canonicalised partition schemes used in the
-								 * query. */
-
 	List	   *initial_rels;	/* RelOptInfos we are now trying to join */
 
 	/* Use fetch_upper_rel() to get any particular upper rel */
@@ -385,38 +387,6 @@ struct PlannerInfo
 #define planner_rt_fetch(rti, root) \
 	((root)->simple_rte_array ? (root)->simple_rte_array[rti] : \
 	 rt_fetch(rti, (root)->parse->rtable))
-
-/*
- * If multiple relations are partitioned the same way, all such partitions
- * will have a pointer to the same PartitionScheme.  A list of PartitionScheme
- * objects is attached to the PlannerInfo.  By design, the partition scheme
- * incorporates only the general properties of the partition method (LIST vs.
- * RANGE, number of partitioning columns and the type information for each)
- * and not the specific bounds.
- *
- * We store the opclass-declared input data types instead of the partition key
- * datatypes since the former rather than the latter are used to compare
- * partition bounds. Since partition key data types and the opclass declared
- * input data types are expected to be binary compatible (per ResolveOpClass),
- * both of those should have same byval and length properties.
- */
-typedef struct PartitionSchemeData
-{
-	char		strategy;		/* partition strategy */
-	int16		partnatts;		/* number of partition attributes */
-	Oid		   *partopfamily;	/* OIDs of operator families */
-	Oid		   *partopcintype;	/* OIDs of opclass declared input data types */
-	Oid		   *partcollation;	/* OIDs of partitioning collations */
-
-	/* Cached information about partition key data types. */
-	int16	   *parttyplen;
-	bool	   *parttypbyval;
-
-	/* Cached information about partition comparison functions. */
-	struct FmgrInfo *partsupfunc;
-}			PartitionSchemeData;
-
-typedef struct PartitionSchemeData *PartitionScheme;
 
 /*----------
  * RelOptInfo
@@ -730,47 +700,9 @@ typedef struct RelOptInfo
 								 * involving this rel */
 	bool		has_eclass_joins;	/* T means joininfo is incomplete */
 
-	/* used by partitionwise joins: */
-	bool		consider_partitionwise_join;	/* consider partitionwise join
-												 * paths? (if partitioned rel) */
 	Relids		top_parent_relids;	/* Relids of topmost parents (if "other"
 									 * rel) */
-
-	/* used for partitioned relations: */
-	PartitionScheme part_scheme;	/* Partitioning scheme */
-	int			nparts;			/* Number of partitions; -1 if not yet set; in
-								 * case of a join relation 0 means it's
-								 * considered unpartitioned */
-	struct PartitionBoundInfoData *boundinfo;	/* Partition bounds */
-	bool		partbounds_merged;	/* True if partition bounds were created
-									 * by partition_bounds_merge() */
-	List	   *partition_qual; /* Partition constraint, if not the root */
-	struct RelOptInfo **part_rels;	/* Array of RelOptInfos of partitions,
-									 * stored in the same order as bounds */
-	Relids		all_partrels;	/* Relids set of all partition relids */
-	List	  **partexprs;		/* Non-nullable partition key expressions */
-	List	  **nullable_partexprs; /* Nullable partition key expressions */
 } RelOptInfo;
-
-/*
- * Is given relation partitioned?
- *
- * It's not enough to test whether rel->part_scheme is set, because it might
- * be that the basic partitioning properties of the input relations matched
- * but the partition bounds did not.  Also, if we are able to prove a rel
- * dummy (empty), we should henceforth treat it as unpartitioned.
- */
-#define IS_PARTITIONED_REL(rel) \
-	((rel)->part_scheme && (rel)->boundinfo && (rel)->nparts > 0 && \
-	 (rel)->part_rels && !IS_DUMMY_REL(rel))
-
-/*
- * Convenience macro to make sure that a partitioned relation has all the
- * required members set.
- */
-#define REL_HAS_ALL_PART_PROPS(rel)	\
-	((rel)->part_scheme && (rel)->boundinfo && (rel)->nparts > 0 && \
-	 (rel)->part_rels && (rel)->partexprs && (rel)->nullable_partexprs)
 
 /*
  * IndexOptInfo

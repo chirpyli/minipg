@@ -23,7 +23,6 @@ OBJS = \
 	namespace.o \
 	objectaccess.o \
 	objectaddress.o \
-	partition.o \
 	pg_aggregate.o \
 	pg_cast.o \
 	pg_collation.o \

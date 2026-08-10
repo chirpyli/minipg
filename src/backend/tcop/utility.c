@@ -1034,24 +1034,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					ListCell   *cell;
 
 					/*
-					 * Disallow ALTER TABLE .. DETACH CONCURRENTLY in a
-					 * transaction block or function.  (Perhaps it could be
-					 * allowed in a procedure, but don't hold your breath.)
-					 */
-					foreach(cell, atstmt->cmds)
-					{
-						AlterTableCmd *cmd = (AlterTableCmd *) lfirst(cell);
-
-						/* Disallow DETACH CONCURRENTLY in a transaction block */
-						if (cmd->subtype == AT_DetachPartition)
-						{
-							if (((PartitionCmd *) cmd->def)->concurrent)
-								PreventInTransactionBlock(isTopLevel,
-														  "ALTER TABLE ... DETACH CONCURRENTLY");
-						}
-					}
-
-					/*
 					 * Figure out lock mode, and acquire lock.  This also does
 					 * basic permissions checks, so that we won't wait for a
 					 * lock on (for example) a relation on which we have no

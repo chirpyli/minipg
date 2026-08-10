@@ -47,7 +47,6 @@
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "commands/trigger.h"
-#include "executor/execPartition.h"
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "miscadmin.h"
@@ -75,12 +74,6 @@ static bool ExecOnConflictUpdate(ModifyTableState *mtstate,
 								 EState *estate,
 								 bool canSetTag,
 								 TupleTableSlot **returning);
-static TupleTableSlot *ExecPrepareTupleRouting(ModifyTableState *mtstate,
-											   EState *estate,
-											   PartitionTupleRouting *proute,
-											   ResultRelInfo *targetRelInfo,
-											   TupleTableSlot *slot,
-											   ResultRelInfo **partRelInfo);
 
 /*
  * Verify that the tuples to be produced by INSERT match the
@@ -682,22 +675,7 @@ ExecInsert(ModifyTableState *mtstate,
 	TransitionCaptureState *ar_insert_trig_tcs;
 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
 	OnConflictAction onconflict = node->onConflictAction;
-	PartitionTupleRouting *proute = mtstate->mt_partition_tuple_routing;
 	MemoryContext oldContext;
-
-	/*
-	 * If the input result relation is a partitioned table, find the leaf
-	 * partition to insert the tuple into.
-	 */
-	if (proute)
-	{
-		ResultRelInfo *partRelInfo;
-
-		slot = ExecPrepareTupleRouting(mtstate, estate, proute,
-									   resultRelInfo, slot,
-									   &partRelInfo);
-		resultRelInfo = partRelInfo;
-	}
 
 	ExecMaterializeSlot(slot);
 
@@ -777,17 +755,6 @@ ExecInsert(ModifyTableState *mtstate,
 		 */
 		if (resultRelationDesc->rd_att->constr)
 			ExecConstraints(resultRelInfo, slot, estate);
-
-		/*
-		 * Also check the tuple against the partition constraint, if there is
-		 * one; except that if we got here via tuple-routing, we don't need to
-		 * if there's no BR trigger defined on the partition.
-		 */
-		if (resultRelationDesc->rd_rel->relispartition &&
-			(resultRelInfo->ri_RootResultRelInfo == NULL ||
-			 (resultRelInfo->ri_TrigDesc &&
-			  resultRelInfo->ri_TrigDesc->trig_insert_before_row)))
-			ExecPartitionCheck(resultRelInfo, slot, estate, true);
 
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
 		{
@@ -1297,166 +1264,6 @@ ldelete:;
 	return NULL;
 }
 
-/*
- * ExecCrossPartitionUpdate --- Move an updated tuple to another partition.
- *
- * This works by first deleting the old tuple from the current partition,
- * followed by inserting the new tuple into the root parent table, that is,
- * mtstate->rootResultRelInfo.  It will be re-routed from there to the
- * correct partition.
- *
- * Returns true if the tuple has been successfully moved, or if it's found
- * that the tuple was concurrently deleted so there's nothing more to do
- * for the caller.
- *
- * False is returned if the tuple we're trying to move is found to have been
- * concurrently updated.  In that case, the caller must to check if the
- * updated tuple that's returned in *retry_slot still needs to be re-routed,
- * and call this function again or perform a regular update accordingly.
- */
-static bool
-ExecCrossPartitionUpdate(ModifyTableState *mtstate,
-						 ResultRelInfo *resultRelInfo,
-						 ItemPointer tupleid, HeapTuple oldtuple,
-						 TupleTableSlot *slot, TupleTableSlot *planSlot,
-						 EPQState *epqstate, bool canSetTag,
-						 TupleTableSlot **retry_slot,
-						 TupleTableSlot **inserted_tuple)
-{
-	EState	   *estate = mtstate->ps.state;
-	TupleConversionMap *tupconv_map;
-	bool		tuple_deleted;
-	TupleTableSlot *epqslot = NULL;
-
-	*inserted_tuple = NULL;
-	*retry_slot = NULL;
-
-	/*
-	 * Disallow an INSERT ON CONFLICT DO UPDATE that causes the original row
-	 * to migrate to a different partition.  Maybe this can be implemented
-	 * some day, but it seems a fringe feature with little redeeming value.
-	 */
-	if (((ModifyTable *) mtstate->ps.plan)->onConflictAction == ONCONFLICT_UPDATE)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("invalid ON UPDATE specification"),
-				 errdetail("The result tuple would appear in a different partition than the original tuple.")));
-
-	/*
-	 * When an UPDATE is run directly on a leaf partition, simply fail with a
-	 * partition constraint violation error.
-	 */
-	if (resultRelInfo == mtstate->rootResultRelInfo)
-		ExecPartitionCheckEmitError(resultRelInfo, slot, estate);
-
-	/* Initialize tuple routing info if not already done. */
-	if (mtstate->mt_partition_tuple_routing == NULL)
-	{
-		Relation	rootRel = mtstate->rootResultRelInfo->ri_RelationDesc;
-		MemoryContext oldcxt;
-
-		/* Things built here have to last for the query duration. */
-		oldcxt = MemoryContextSwitchTo(estate->es_query_cxt);
-
-		mtstate->mt_partition_tuple_routing =
-			ExecSetupPartitionTupleRouting(estate, rootRel);
-
-		/*
-		 * Before a partition's tuple can be re-routed, it must first be
-		 * converted to the root's format, so we'll need a slot for storing
-		 * such tuples.
-		 */
-		Assert(mtstate->mt_root_tuple_slot == NULL);
-		mtstate->mt_root_tuple_slot = table_slot_create(rootRel, NULL);
-
-		MemoryContextSwitchTo(oldcxt);
-	}
-
-	/*
-	 * Row movement, part 1.  Delete the tuple, but skip RETURNING processing.
-	 * We want to return rows from INSERT.
-	 */
-	ExecDelete(mtstate, resultRelInfo, tupleid, oldtuple, planSlot,
-			   epqstate, estate,
-			   false,			/* processReturning */
-			   false,			/* canSetTag */
-			   true,			/* changingPart */
-			   &tuple_deleted, &epqslot);
-
-	/*
-	 * For some reason if DELETE didn't happen (e.g. trigger prevented it, or
-	 * it was already deleted by self, or it was concurrently deleted by
-	 * another transaction), then we should skip the insert as well;
-	 * otherwise, an UPDATE could cause an increase in the total number of
-	 * rows across all partitions, which is clearly wrong.
-	 *
-	 * For a normal UPDATE, the case where the tuple has been the subject of a
-	 * concurrent UPDATE or DELETE would be handled by the EvalPlanQual
-	 * machinery, but for an UPDATE that we've translated into a DELETE from
-	 * this partition and an INSERT into some other partition, that's not
-	 * available, because CTID chains can't span relation boundaries.  We
-	 * mimic the semantics to a limited extent by skipping the INSERT if the
-	 * DELETE fails to find a tuple.  This ensures that two concurrent
-	 * attempts to UPDATE the same tuple at the same time can't turn one tuple
-	 * into two, and that an UPDATE of a just-deleted tuple can't resurrect
-	 * it.
-	 */
-	if (!tuple_deleted)
-	{
-		/*
-		 * epqslot will be typically NULL.  But when ExecDelete() finds that
-		 * another transaction has concurrently updated the same row, it
-		 * re-fetches the row, skips the delete, and epqslot is set to the
-		 * re-fetched tuple slot.  In that case, we need to do all the checks
-		 * again.
-		 */
-		if (TupIsNull(epqslot))
-			return true;
-		else
-		{
-			/* Fetch the most recent version of old tuple. */
-			TupleTableSlot *oldSlot;
-
-			/* ... but first, make sure ri_oldTupleSlot is initialized. */
-			if (unlikely(!resultRelInfo->ri_projectNewInfoValid))
-				ExecInitUpdateProjection(mtstate, resultRelInfo);
-			oldSlot = resultRelInfo->ri_oldTupleSlot;
-			if (!table_tuple_fetch_row_version(resultRelInfo->ri_RelationDesc,
-											   tupleid,
-											   SnapshotAny,
-											   oldSlot))
-				elog(ERROR, "failed to fetch tuple being updated");
-			*retry_slot = ExecGetUpdateNewTuple(resultRelInfo, epqslot,
-												oldSlot);
-			return false;
-		}
-	}
-
-	/*
-	 * resultRelInfo is one of the per-relation resultRelInfos.  So we should
-	 * convert the tuple into root's tuple descriptor if needed, since
-	 * ExecInsert() starts the search from root.
-	 */
-	tupconv_map = ExecGetChildToRootMap(resultRelInfo);
-	if (tupconv_map != NULL)
-		slot = execute_attr_map_slot(tupconv_map->attrMap,
-									 slot,
-									 mtstate->mt_root_tuple_slot);
-
-	/* Tuple routing starts from the root table. */
-	*inserted_tuple = ExecInsert(mtstate, mtstate->rootResultRelInfo, slot,
-								 planSlot, estate, canSetTag);
-
-	/*
-	 * Reset the transition state that may possibly have been written by
-	 * INSERT.
-	 */
-	if (mtstate->mt_transition_capture)
-		mtstate->mt_transition_capture->tcs_original_insert_tuple = NULL;
-
-	/* We're done moving. */
-	return true;
-}
 
 /* ----------------------------------------------------------------
  *		ExecUpdate
@@ -1541,7 +1348,6 @@ ExecUpdate(ModifyTableState *mtstate,
 	{
 		ItemPointerData lockedtid;
 		LockTupleMode lockmode;
-		bool		partition_constraint_failed;
 		bool		update_indexes;
 
 		/*
@@ -1571,20 +1377,8 @@ lreplace:
 		/* ensure slot is independent, consider e.g. EPQ */
 		ExecMaterializeSlot(slot);
 
-		/*
-		 * If partition constraint fails, this row might get moved to another
-		 * partition, in which case we should check the RLS CHECK policy just
-		 * before inserting into the new partition, rather than doing it here.
-		 * This is because a trigger on that partition might again change the
-		 * row.  So skip the WCO checks if the partition constraint fails.
-		 */
-		partition_constraint_failed =
-			resultRelationDesc->rd_rel->relispartition &&
-			!ExecPartitionCheck(resultRelInfo, slot, estate, false);
-
 		/* Check any RLS UPDATE WITH CHECK policies */
-		if (!partition_constraint_failed &&
-			resultRelInfo->ri_WithCheckOptions != NIL)
+		if (resultRelInfo->ri_WithCheckOptions != NIL)
 		{
 			/*
 			 * ExecWithCheckOptions() will skip any WCOs which are not of the
@@ -1595,40 +1389,7 @@ lreplace:
 		}
 
 		/*
-		 * If a partition check failed, try to move the row into the right
-		 * partition.
-		 */
-		if (partition_constraint_failed)
-		{
-			TupleTableSlot *inserted_tuple,
-					   *retry_slot;
-			bool		retry;
-
-			/*
-			 * ExecCrossPartitionUpdate will first DELETE the row from the
-			 * partition it's currently in and then insert it back into the
-			 * root table, which will re-route it to the correct partition.
-			 * The first part may have to be repeated if it is detected that
-			 * the tuple we're trying to move has been concurrently updated.
-			 */
-			retry = !ExecCrossPartitionUpdate(mtstate, resultRelInfo, tupleid,
-											  oldtuple, slot, planSlot,
-											  epqstate, canSetTag,
-											  &retry_slot, &inserted_tuple);
-			if (retry)
-			{
-				slot = retry_slot;
-				goto lreplace;
-			}
-
-			return inserted_tuple;
-		}
-
-		/*
-		 * Check the constraints of the tuple.  We've already checked the
-		 * partition constraint above; however, we must still ensure the tuple
-		 * passes all other constraints, so we will call ExecConstraints() and
-		 * have it validate all remaining checks.
+		 * Check the constraints of the tuple.
 		 */
 		if (resultRelationDesc->rd_att->constr)
 			ExecConstraints(resultRelInfo, slot, estate);
@@ -2150,59 +1911,6 @@ ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
  * This also sets the transition table information in mtstate based on the
  * selected partition.
  */
-static TupleTableSlot *
-ExecPrepareTupleRouting(ModifyTableState *mtstate,
-						EState *estate,
-						PartitionTupleRouting *proute,
-						ResultRelInfo *targetRelInfo,
-						TupleTableSlot *slot,
-						ResultRelInfo **partRelInfo)
-{
-	ResultRelInfo *partrel;
-	TupleConversionMap *map;
-
-	/*
-	 * Lookup the target partition's ResultRelInfo.  If ExecFindPartition does
-	 * not find a valid partition for the tuple in 'slot' then an error is
-	 * raised.  An error may also be raised if the found partition is not a
-	 * valid target for INSERTs.  This is required since a partitioned table
-	 * UPDATE to another partition becomes a DELETE+INSERT.
-	 */
-	partrel = ExecFindPartition(mtstate, targetRelInfo, proute, slot, estate);
-
-	/*
-	 * If we're capturing transition tuples, we might need to convert from the
-	 * partition rowtype to root partitioned table's rowtype.  But if there
-	 * are no BEFORE triggers on the partition that could change the tuple, we
-	 * can just remember the original unconverted tuple to avoid a needless
-	 * round trip conversion.
-	 */
-	if (mtstate->mt_transition_capture != NULL)
-	{
-		bool		has_before_insert_row_trig;
-
-		has_before_insert_row_trig = (partrel->ri_TrigDesc &&
-									  partrel->ri_TrigDesc->trig_insert_before_row);
-
-		mtstate->mt_transition_capture->tcs_original_insert_tuple =
-			!has_before_insert_row_trig ? slot : NULL;
-	}
-
-	/*
-	 * Convert the tuple, if necessary.
-	 */
-	map = partrel->ri_RootToPartitionMap;
-	if (map != NULL)
-	{
-		TupleTableSlot *new_slot = partrel->ri_PartitionTupleSlot;
-
-		slot = execute_attr_map_slot(map->attrMap, slot, new_slot);
-	}
-
-	*partRelInfo = partrel;
-	return slot;
-}
-
 /* ----------------------------------------------------------------
  *	   ExecModifyTable
  *
@@ -2334,15 +2042,13 @@ ExecModifyTable(PlanState *pstate)
 			bool		isNull;
 
 			relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
-			if (relkind == RELKIND_RELATION ||
-				relkind == RELKIND_PARTITIONED_TABLE)
+			if (relkind == RELKIND_RELATION)
 			{
 				/*
 				 * ri_RowIdAttNo refers to a ctid attribute.  See the comment
 				 * in ExecInitModifyTable().
 				 */
-				Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo) ||
-					   relkind == RELKIND_PARTITIONED_TABLE);
+				Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
 				datum = ExecGetJunkAttribute(slot,
 											 resultRelInfo->ri_RowIdAttNo,
 											 &isNull);
@@ -2674,23 +2380,17 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			char		relkind;
 
 			relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
-			if (relkind == RELKIND_RELATION ||
-				relkind == RELKIND_PARTITIONED_TABLE)
+			if (relkind == RELKIND_RELATION)
 			{
 				resultRelInfo->ri_RowIdAttNo =
 					ExecFindJunkAttributeInTlist(subplan->targetlist, "ctid");
 
 				/*
 				 * For heap relations, a ctid junk attribute must be present.
-				 * Partitioned tables should only appear here when all leaf
-				 * partitions were pruned, in which case no rows can be
-				 * produced and ctid is not needed.
 				 */
-			if (relkind == RELKIND_PARTITIONED_TABLE)
-				Assert(nrels == 1);
-			else if (!AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
-				elog(ERROR, "could not find junk ctid column");
-		}
+				if (!AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
+					elog(ERROR, "could not find junk ctid column");
+			}
 		else
 		{
 				/* Other valid target relkinds must provide wholerow */
@@ -2725,16 +2425,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 
 	/* Get the root target relation */
 	rel = mtstate->rootResultRelInfo->ri_RelationDesc;
-
-	/*
-	 * Build state for tuple routing if it's a partitioned INSERT.  An UPDATE
-	 * might need this too, but only if it actually moves tuples between
-	 * partitions; in that case setup is done by ExecCrossPartitionUpdate.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE &&
-		operation == CMD_INSERT)
-		mtstate->mt_partition_tuple_routing =
-			ExecSetupPartitionTupleRouting(estate, rel);
 
 	/*
 	 * Initialize any WITH CHECK OPTION constraints if needed.
@@ -2996,18 +2686,6 @@ ExecEndModifyTable(ModifyTableState *node)
 			ExecDropSingleTupleTableSlot(resultRelInfo->ri_Slots[j]);
 			ExecDropSingleTupleTableSlot(resultRelInfo->ri_PlanSlots[j]);
 		}
-	}
-
-	/*
-	 * Close all the partitioned tables, leaf partitions, and their indices
-	 * and release the slot used for tuple routing, if set.
-	 */
-	if (node->mt_partition_tuple_routing)
-	{
-		ExecCleanupTupleRouting(node, node->mt_partition_tuple_routing);
-
-		if (node->mt_root_tuple_slot)
-			ExecDropSingleTupleTableSlot(node->mt_root_tuple_slot);
 	}
 
 	/*

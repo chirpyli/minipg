@@ -222,6 +222,24 @@ SELECT * FROM tenk1 a JOIN tenk1 b ON a.unique1 = b.unique1
 WHERE my_int_eq(a.unique2, 42);
                   QUERY PLAN                  
 ----------------------------------------------
+ Merge Join
+   Merge Cond: (a.unique1 = b.unique1)
+   ->  Sort
+         Sort Key: a.unique1
+         ->  Seq Scan on tenk1 a
+               Filter: my_int_eq(unique2, 42)
+   ->  Sort
+         Sort Key: b.unique1
+         ->  Seq Scan on tenk1 b
+(9 rows)
+
+-- With support function that knows it's int4eq, we get a different plan
+ALTER FUNCTION my_int_eq(int, int) SUPPORT test_support_func;
+EXPLAIN (COSTS OFF)
+SELECT * FROM tenk1 a JOIN tenk1 b ON a.unique1 = b.unique1
+WHERE my_int_eq(a.unique2, 42);
+                  QUERY PLAN                  
+----------------------------------------------
  Hash Join
    Hash Cond: (b.unique1 = a.unique1)
    ->  Seq Scan on tenk1 b
@@ -230,20 +248,6 @@ WHERE my_int_eq(a.unique2, 42);
                Filter: my_int_eq(unique2, 42)
 (6 rows)
 
--- With support function that knows it's int4eq, we get a different plan
-ALTER FUNCTION my_int_eq(int, int) SUPPORT test_support_func;
-EXPLAIN (COSTS OFF)
-SELECT * FROM tenk1 a JOIN tenk1 b ON a.unique1 = b.unique1
-WHERE my_int_eq(a.unique2, 42);
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Seq Scan on tenk1 a
-         Filter: my_int_eq(unique2, 42)
-   ->  Index Scan using tenk1_unique1 on tenk1 b
-         Index Cond: (unique1 = a.unique1)
-(5 rows)
-
 -- Also test non-default rowcount estimate
 CREATE FUNCTION my_gen_series(int, int) RETURNS SETOF integer
   LANGUAGE internal STRICT IMMUTABLE PARALLEL SAFE
@@ -251,22 +255,26 @@ CREATE FUNCTION my_gen_series(int, int) RETURNS SETOF integer
   SUPPORT test_support_func;
 EXPLAIN (COSTS OFF)
 SELECT * FROM tenk1 a JOIN my_gen_series(1,1000) g ON a.unique1 = g;
-               QUERY PLAN               
-----------------------------------------
- Hash Join
-   Hash Cond: (g.g = a.unique1)
-   ->  Function Scan on my_gen_series g
-   ->  Hash
+                  QUERY PLAN                  
+----------------------------------------------
+ Merge Join
+   Merge Cond: (g.g = a.unique1)
+   ->  Sort
+         Sort Key: g.g
+         ->  Function Scan on my_gen_series g
+   ->  Sort
+         Sort Key: a.unique1
          ->  Seq Scan on tenk1 a
-(5 rows)
+(8 rows)
 
 EXPLAIN (COSTS OFF)
 SELECT * FROM tenk1 a JOIN my_gen_series(1,10) g ON a.unique1 = g;
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Function Scan on my_gen_series g
-   ->  Index Scan using tenk1_unique1 on tenk1 a
-         Index Cond: (unique1 = g.g)
-(4 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Hash Join
+   Hash Cond: (a.unique1 = g.g)
+   ->  Seq Scan on tenk1 a
+   ->  Hash
+         ->  Function Scan on my_gen_series g
+(5 rows)
 

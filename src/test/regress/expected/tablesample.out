@@ -194,30 +194,23 @@ EXPLAIN (COSTS OFF)
 -- check inheritance behavior
 explain (costs off)
   select count(*) from person tablesample bernoulli (100);
-                   QUERY PLAN                    
--------------------------------------------------
+                QUERY PLAN                 
+-------------------------------------------
  Aggregate
-   ->  Append
-         ->  Sample Scan on person person_1
-               Sampling: bernoulli ('100'::real)
-         ->  Sample Scan on emp person_2
-               Sampling: bernoulli ('100'::real)
-         ->  Sample Scan on student person_3
-               Sampling: bernoulli ('100'::real)
-         ->  Sample Scan on stud_emp person_4
-               Sampling: bernoulli ('100'::real)
-(10 rows)
+   ->  Sample Scan on person
+         Sampling: bernoulli ('100'::real)
+(3 rows)
 
 select count(*) from person tablesample bernoulli (100);
  count 
 -------
-    58
+    50
 (1 row)
 
 select count(*) from person;
  count 
 -------
-    58
+    50
 (1 row)
 
 -- check that collations get assigned within the tablesample arguments
@@ -310,17 +303,21 @@ LINE 1: ...CT q.* FROM (SELECT * FROM test_tablesample) as q TABLESAMPL...
                                                              ^
 -- check partitioned tables support tablesample
 create table parted_sample (a int) partition by list (a);
+ERROR:  syntax error at or near "partition"
+LINE 1: create table parted_sample (a int) partition by list (a);
+                                           ^
 create table parted_sample_1 partition of parted_sample for values in (1);
+ERROR:  syntax error at or near "partition"
+LINE 1: create table parted_sample_1 partition of parted_sample for ...
+                                     ^
 create table parted_sample_2 partition of parted_sample for values in (2);
+ERROR:  syntax error at or near "partition"
+LINE 1: create table parted_sample_2 partition of parted_sample for ...
+                                     ^
 explain (costs off)
   select * from parted_sample tablesample bernoulli (100);
-                QUERY PLAN                 
--------------------------------------------
- Append
-   ->  Sample Scan on parted_sample_1
-         Sampling: bernoulli ('100'::real)
-   ->  Sample Scan on parted_sample_2
-         Sampling: bernoulli ('100'::real)
-(5 rows)
-
+ERROR:  relation "parted_sample" does not exist
+LINE 2:   select * from parted_sample tablesample bernoulli (100);
+                        ^
 drop table parted_sample, parted_sample_1, parted_sample_2;
+ERROR:  table "parted_sample" does not exist

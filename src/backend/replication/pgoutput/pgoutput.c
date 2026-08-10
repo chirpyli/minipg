@@ -13,7 +13,6 @@
 #include "postgres.h"
 
 #include "access/tupconvert.h"
-#include "catalog/partition.h"
 #include "catalog/pg_publication.h"
 #include "commands/defrem.h"
 #include "fmgr.h"

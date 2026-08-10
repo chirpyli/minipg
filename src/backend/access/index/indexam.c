@@ -201,8 +201,7 @@ index_close(Relation relation, LOCKMODE lockmode)
 static inline void
 validate_relation_kind(Relation r)
 {
-	if (r->rd_rel->relkind != RELKIND_INDEX &&
-		r->rd_rel->relkind != RELKIND_PARTITIONED_INDEX)
+	if (r->rd_rel->relkind != RELKIND_INDEX)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not an index",

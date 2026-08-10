@@ -22,7 +22,6 @@
 #include "nodes/params.h"
 #include "nodes/plannodes.h"
 #include "nodes/tidbitmap.h"
-#include "partitioning/partdefs.h"
 #include "storage/condition_variable.h"
 #include "utils/hsearch.h"
 #include "utils/queryenvironment.h"
@@ -488,31 +487,11 @@ typedef struct ResultRelInfo
 	/* ON CONFLICT evaluation state */
 	OnConflictSetState *ri_onConflict;
 
-	/* partition check expression state (NULL if not set up yet) */
-	ExprState  *ri_PartitionCheckExpr;
-
 	/*
-	 * Information needed by child result relations
-	 *
 	 * ri_RootResultRelInfo gives the target relation mentioned in the query.
-	 * Used as the root for tuple routing and/or transition capture.
-	 *
-	 * ri_RootToPartitionMap and ri_PartitionTupleSlot, initialized by
-	 * ExecInitRoutingInfo, are non-NULL if the relation is a partition to
-	 * route tuples into and has a different tuple format than the root table.
+	 * Used as the root for transition capture.
 	 */
 	struct ResultRelInfo *ri_RootResultRelInfo;
-	TupleConversionMap *ri_RootToPartitionMap;
-	TupleTableSlot *ri_PartitionTupleSlot;
-
-	/*
-	 * Map to convert child result relation tuples to the format of the table
-	 * actually mentioned in the query (called "root").  Computed only if
-	 * needed.  A NULL map value indicates that no conversion is needed, so we
-	 * must have a separate flag to show if the map has been computed.
-	 */
-	TupleConversionMap *ri_ChildToRootMap;
-	bool		ri_ChildToRootMapValid;
 
 	/* for use by copyfrom.c when performing multi-inserts */
 	struct CopyMultiInsertBuffer *ri_CopyMultiInsertBuffer;
@@ -566,8 +545,6 @@ typedef struct EState
 	List	   *es_opened_result_relations; /* List of non-NULL entries in
 											 * es_result_relations in no
 											 * specific order */
-
-	PartitionDirectory es_partition_directory;	/* for PartitionDesc lookup */
 
 	/*
 	 * The following list contains ResultRelInfos created by the tuple routing
@@ -1212,15 +1189,6 @@ typedef struct ModifyTableState
 	Oid			mt_lastResultOid;	/* last-seen value of tableoid */
 	int			mt_lastResultIndex; /* corresponding index in resultRelInfo[] */
 	HTAB	   *mt_resultOidHash;	/* optional hash table to speed lookups */
-
-	/*
-	 * Slot for storing tuples in the root partitioned table's rowtype during
-	 * an UPDATE of a partitioned table.
-	 */
-	TupleTableSlot *mt_root_tuple_slot;
-
-	/* Tuple-routing support info */
-	struct PartitionTupleRouting *mt_partition_tuple_routing;
 
 	/* controls transition table population for specified operation */
 	struct TransitionCaptureState *mt_transition_capture;

@@ -51,13 +51,11 @@
 #include "access/tableam.h"
 #include "access/transam.h"
 #include "executor/executor.h"
-#include "executor/execPartition.h"
 #include "executor/nodeModifyTable.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parsetree.h"
-#include "partitioning/partdesc.h"
 #include "storage/lmgr.h"
 #include "utils/builtins.h"
 #include "utils/memutils.h"
@@ -204,12 +202,6 @@ FreeExecutorState(EState *estate)
 		/* FreeExprContext removed the list link for us */
 	}
 
-	/* release partition directory, if allocated */
-	if (estate->es_partition_directory)
-	{
-		DestroyPartitionDirectory(estate->es_partition_directory);
-		estate->es_partition_directory = NULL;
-	}
 
 	/*
 	 * Free the per-query memory context, thereby releasing all working
@@ -1220,95 +1212,38 @@ ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo)
 	return relInfo->ri_ReturningSlot;
 }
 
-/*
- * Return the map needed to convert given child result relation's tuples to
- * the rowtype of the query's main target ("root") relation.  Note that a
- * NULL result is valid and means that no conversion is needed.
- */
-TupleConversionMap *
-ExecGetChildToRootMap(ResultRelInfo *resultRelInfo)
-{
-	/* If we didn't already do so, compute the map for this child. */
-	if (!resultRelInfo->ri_ChildToRootMapValid)
-	{
-		ResultRelInfo *rootRelInfo = resultRelInfo->ri_RootResultRelInfo;
-
-		if (rootRelInfo)
-			resultRelInfo->ri_ChildToRootMap =
-				convert_tuples_by_name(RelationGetDescr(resultRelInfo->ri_RelationDesc),
-									   RelationGetDescr(rootRelInfo->ri_RelationDesc));
-		else					/* this isn't a child result rel */
-			resultRelInfo->ri_ChildToRootMap = NULL;
-
-		resultRelInfo->ri_ChildToRootMapValid = true;
-	}
-
-	return resultRelInfo->ri_ChildToRootMap;
-}
-
 /* Return a bitmap representing columns being inserted */
 Bitmapset *
 ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate)
 {
-	/*
-	 * The columns are stored in the range table entry.  If this ResultRelInfo
-	 * represents a partition routing target, and doesn't have an entry of its
-	 * own in the range table, fetch the parent's RTE and map the columns to
-	 * the order they are in the partition.
-	 */
+	RangeTblEntry *rte;
+
 	if (relinfo->ri_RangeTableIndex != 0)
-	{
-		RangeTblEntry *rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
-
-		return rte->insertedCols;
-	}
+		rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
 	else if (relinfo->ri_RootResultRelInfo)
-	{
-		ResultRelInfo *rootRelInfo = relinfo->ri_RootResultRelInfo;
-		RangeTblEntry *rte = exec_rt_fetch(rootRelInfo->ri_RangeTableIndex, estate);
-
-		if (relinfo->ri_RootToPartitionMap != NULL)
-			return execute_attr_map_cols(relinfo->ri_RootToPartitionMap->attrMap,
-										 rte->insertedCols);
-		else
-			return rte->insertedCols;
-	}
+		rte = exec_rt_fetch(relinfo->ri_RootResultRelInfo->ri_RangeTableIndex,
+							estate);
 	else
-	{
-		/*
-		 * The relation isn't in the range table and it isn't a partition
-		 * routing target.  This ResultRelInfo must've been created only for
-		 * firing triggers and the relation is not being inserted into.  (See
-		 * ExecGetTriggerResultRel.)
-		 */
 		return NULL;
-	}
+
+	return rte->insertedCols;
 }
 
 /* Return a bitmap representing columns being updated */
 Bitmapset *
 ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate)
 {
-	/* see ExecGetInsertedCols() */
+	RangeTblEntry *rte;
+
 	if (relinfo->ri_RangeTableIndex != 0)
-	{
-		RangeTblEntry *rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
-
-		return rte->updatedCols;
-	}
+		rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
 	else if (relinfo->ri_RootResultRelInfo)
-	{
-		ResultRelInfo *rootRelInfo = relinfo->ri_RootResultRelInfo;
-		RangeTblEntry *rte = exec_rt_fetch(rootRelInfo->ri_RangeTableIndex, estate);
-
-		if (relinfo->ri_RootToPartitionMap != NULL)
-			return execute_attr_map_cols(relinfo->ri_RootToPartitionMap->attrMap,
-										 rte->updatedCols);
-		else
-			return rte->updatedCols;
-	}
+		rte = exec_rt_fetch(relinfo->ri_RootResultRelInfo->ri_RangeTableIndex,
+							estate);
 	else
 		return NULL;
+
+	return rte->updatedCols;
 }
 
 /* Return a bitmap representing generated columns being updated */

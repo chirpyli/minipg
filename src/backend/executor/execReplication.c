@@ -444,8 +444,6 @@ ExecSimpleRelationInsert(ResultRelInfo *resultRelInfo,
 		/* Check the constraints of the tuple */
 		if (rel->rd_att->constr)
 			ExecConstraints(resultRelInfo, slot, estate);
-		if (rel->rd_rel->relispartition)
-			ExecPartitionCheck(resultRelInfo, slot, estate, true);
 
 		/* OK, store the tuple and create index entries for it */
 		simple_table_tuple_insert(resultRelInfo->ri_RelationDesc, slot);
@@ -516,8 +514,6 @@ ExecSimpleRelationUpdate(ResultRelInfo *resultRelInfo,
 		/* Check the constraints of the tuple */
 		if (rel->rd_att->constr)
 			ExecConstraints(resultRelInfo, slot, estate);
-		if (rel->rd_rel->relispartition)
-			ExecPartitionCheck(resultRelInfo, slot, estate, true);
 
 		simple_table_tuple_update(rel, tid, slot, estate->es_snapshot,
 								  &update_indexes);
@@ -582,12 +578,6 @@ CheckCmdReplicaIdentity(Relation rel, CmdType cmd)
 	PublicationActions *pubactions;
 
 	/*
-	 * Skip checking the replica identity for partitioned tables, because the
-	 * operations are actually performed on the leaf partitions.
-	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		return;
-
 	/* We only need to do checks for UPDATE and DELETE. */
 	if (cmd != CMD_UPDATE && cmd != CMD_DELETE)
 		return;
@@ -627,7 +617,7 @@ void
 CheckSubscriptionRelkind(char relkind, const char *nspname,
 						 const char *relname)
 {
-	if (relkind != RELKIND_RELATION && relkind != RELKIND_PARTITIONED_TABLE)
+	if (relkind != RELKIND_RELATION)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot use relation \"%s.%s\" as logical replication target",

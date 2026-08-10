@@ -16,17 +16,22 @@ CREATE VIEW iexit AS
 	interpt_pp(ih.thepath, r.thepath) AS exit
    FROM ihighway ih, ramp r
    WHERE ih.thepath ## r.thepath;
-ERROR:  relation "ramp" does not exist
+ERROR:  relation "ihighway" does not exist
 LINE 4:    FROM ihighway ih, ramp r
-                             ^
+                ^
 CREATE VIEW toyemp AS
    SELECT name, age, location, 12*salary AS annualsal
    FROM emp;
+ERROR:  relation "emp" does not exist
+LINE 3:    FROM emp;
+                ^
 -- Test comments
 COMMENT ON VIEW noview IS 'no view';
 ERROR:  relation "noview" does not exist
 COMMENT ON VIEW toyemp IS 'is a view';
+ERROR:  relation "toyemp" does not exist
 COMMENT ON VIEW toyemp IS NULL;
+ERROR:  relation "toyemp" does not exist
 -- These views are left around mainly to exercise special cases in pg_dump.
 CREATE TABLE view_base_table (key int PRIMARY KEY, data varchar(20));
 CREATE VIEW key_dependent_view AS

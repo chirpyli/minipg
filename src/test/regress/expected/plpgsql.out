@@ -5542,10 +5542,25 @@ ERROR:  function multi_test_trig() does not exist
 -- Check type parsing and record fetching from partitioned tables
 --
 CREATE TABLE partitioned_table (a int, b text) PARTITION BY LIST (a);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE partitioned_table (a int, b text) PARTITION BY ...
+                                                       ^
 CREATE TABLE pt_part1 PARTITION OF partitioned_table FOR VALUES IN (1);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE pt_part1 PARTITION OF partitioned_table FOR VAL...
+                              ^
 CREATE TABLE pt_part2 PARTITION OF partitioned_table FOR VALUES IN (2);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE pt_part2 PARTITION OF partitioned_table FOR VAL...
+                              ^
 INSERT INTO partitioned_table VALUES (1, 'Row 1');
+ERROR:  relation "partitioned_table" does not exist
+LINE 1: INSERT INTO partitioned_table VALUES (1, 'Row 1');
+                    ^
 INSERT INTO partitioned_table VALUES (2, 'Row 2');
+ERROR:  relation "partitioned_table" does not exist
+LINE 1: INSERT INTO partitioned_table VALUES (2, 'Row 2');
+                    ^
 CREATE OR REPLACE FUNCTION get_from_partitioned_table(partitioned_table.a%type)
 RETURNS partitioned_table AS $$
 DECLARE
@@ -5556,13 +5571,12 @@ BEGIN
     SELECT * INTO result FROM partitioned_table WHERE a = a_val;
     RETURN result;
 END; $$ LANGUAGE plpgsql;
-NOTICE:  type reference partitioned_table.a%TYPE converted to integer
+ERROR:  relation "partitioned_table" does not exist
 SELECT * FROM get_from_partitioned_table(1) AS t;
- a |   b   
----+-------
- 1 | Row 1
-(1 row)
-
+ERROR:  function get_from_partitioned_table(integer) does not exist
+LINE 1: SELECT * FROM get_from_partitioned_table(1) AS t;
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 CREATE OR REPLACE FUNCTION list_partitioned_table()
 RETURNS SETOF partitioned_table.a%TYPE AS $$
 DECLARE
@@ -5575,14 +5589,12 @@ BEGIN
     END LOOP;
     RETURN;
 END; $$ LANGUAGE plpgsql;
-NOTICE:  type reference partitioned_table.a%TYPE converted to integer
+ERROR:  relation "partitioned_table" does not exist
 SELECT * FROM list_partitioned_table() AS t;
- t 
----
- 1
- 2
-(2 rows)
-
+ERROR:  function list_partitioned_table() does not exist
+LINE 1: SELECT * FROM list_partitioned_table() AS t;
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 --
 -- Check argument name is used instead of $n in error message
 --

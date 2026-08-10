@@ -1553,18 +1553,6 @@ exprLocation(const Node *expr)
 			/* just use nested expr's location */
 			loc = exprLocation((Node *) ((const InferenceElem *) expr)->expr);
 			break;
-		case T_PartitionElem:
-			loc = ((const PartitionElem *) expr)->location;
-			break;
-		case T_PartitionSpec:
-			loc = ((const PartitionSpec *) expr)->location;
-			break;
-		case T_PartitionBoundSpec:
-			loc = ((const PartitionBoundSpec *) expr)->location;
-			break;
-		case T_PartitionRangeDatum:
-			loc = ((const PartitionRangeDatum *) expr)->location;
-			break;
 		default:
 			/* for any other node type it's just unknown... */
 			loc = -1;
@@ -2145,17 +2133,6 @@ expression_tree_walker(Node *node,
 				if (walker(onconflict->exclRelTlist, context))
 					return true;
 			}
-			break;
-		case T_PartitionPruneStepOp:
-			{
-				PartitionPruneStepOp *opstep = (PartitionPruneStepOp *) node;
-
-				if (walker((Node *) opstep->exprs, context))
-					return true;
-			}
-			break;
-		case T_PartitionPruneStepCombine:
-			/* no expression subnodes */
 			break;
 		case T_JoinExpr:
 			{
@@ -2967,20 +2944,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_PartitionPruneStepOp:
-			{
-				PartitionPruneStepOp *opstep = (PartitionPruneStepOp *) node;
-				PartitionPruneStepOp *newnode;
-
-				FLATCOPY(newnode, opstep, PartitionPruneStepOp);
-				MUTATE(newnode->exprs, opstep->exprs, List *);
-
-				return (Node *) newnode;
-			}
-			break;
-		case T_PartitionPruneStepCombine:
-			/* no expression sub-nodes */
-			return (Node *) copyObject(node);
 		case T_JoinExpr:
 			{
 				JoinExpr   *join = (JoinExpr *) node;

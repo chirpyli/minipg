@@ -42,8 +42,6 @@
 #include "optimizer/tlist.h"
 #include "parser/parse_clause.h"
 #include "parser/parsetree.h"
-#include "partitioning/partbounds.h"
-#include "partitioning/partprune.h"
 #include "rewrite/rewriteManip.h"
 #include "utils/lsyscache.h"
 
@@ -844,17 +842,6 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 	Assert(IS_SIMPLE_REL(rel));
 
 	/*
-	 * If this is a partitioned baserel, set the consider_partitionwise_join
-	 * flag; currently, we only consider partitionwise joins with the baserel
-	 * if its targetlist doesn't contain a whole-row Var.
-	 */
-	if (enable_partitionwise_join &&
-		rel->reloptkind == RELOPT_BASEREL &&
-		rte->relkind == RELKIND_PARTITIONED_TABLE &&
-		rel->attr_needed[InvalidAttrNumber - rel->min_attr] == NULL)
-		rel->consider_partitionwise_join = true;
-
-	/*
 	 * Initialize to compute size estimates for whole append relation.
 	 *
 	 * We handle width estimates by weighting the widths of different child
@@ -957,20 +944,6 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		 * because attr_needed is only examined for base relations not
 		 * otherrels.  So we just leave the child's attr_needed empty.
 		 */
-
-		/*
-		 * If we consider partitionwise joins with the parent rel, do the same
-		 * for partitioned child rels.
-		 *
-		 * Note: here we abuse the consider_partitionwise_join flag by setting
-		 * it for child rels that are not themselves partitioned.  We do so to
-		 * tell try_partitionwise_join() that the child rel is sufficiently
-		 * valid to be used as a per-partition input, even if it later gets
-		 * proven to be dummy.  (It's not usable until we've set up the
-		 * reltarget and EC entries, which we just did.)
-		 */
-		if (rel->consider_partitionwise_join)
-			childrel->consider_partitionwise_join = true;
 
 		/*
 		 * If parallelism is allowable for this query in general, see whether
@@ -1571,27 +1544,6 @@ generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 	 * this is relevant, build pathkey descriptions of the partition ordering,
 	 * for both forward and reverse scans.
 	 */
-	if (rel->part_scheme != NULL && IS_SIMPLE_REL(rel) &&
-		partitions_are_ordered(rel->boundinfo, rel->nparts))
-	{
-		partition_pathkeys = build_partition_pathkeys(root, rel,
-													  ForwardScanDirection,
-													  &partition_pathkeys_partial);
-
-		partition_pathkeys_desc = build_partition_pathkeys(root, rel,
-														   BackwardScanDirection,
-														   &partition_pathkeys_desc_partial);
-
-		/*
-		 * You might think we should truncate_useless_pathkeys here, but
-		 * allowing partition keys which are a subset of the query's pathkeys
-		 * can often be useful.  For example, consider a table partitioned by
-		 * RANGE (a, b), and a query with ORDER BY a, b, c.  If we have child
-		 * paths that can produce the a, b, c ordering (perhaps via indexes on
-		 * (a, b, c)) then it works to consider the appendrel output as
-		 * ordered by a, b, c.
-		 */
-	}
 
 	/* Now consider each interesting sort ordering */
 	foreach(lcp, all_child_pathkeys)
@@ -2782,9 +2734,6 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 		{
 			rel = (RelOptInfo *) lfirst(lc);
 
-			/* Create paths for partitionwise joins. */
-			generate_partitionwise_join_paths(root, rel);
-
 			/*
 			 * Except for the topmost scan/join rel, consider gathering
 			 * partial paths.  We'll do the same for the topmost scan/join rel
@@ -3426,87 +3375,6 @@ compute_parallel_worker(RelOptInfo *rel, double heap_pages, double index_pages,
 }
 
 /*
- * generate_partitionwise_join_paths
- * 		Create paths representing partitionwise join for given partitioned
- * 		join relation.
- *
- * This must not be called until after we are done adding paths for all
- * child-joins. Otherwise, add_path might delete a path to which some path
- * generated here has a reference.
- */
-void
-generate_partitionwise_join_paths(PlannerInfo *root, RelOptInfo *rel)
-{
-	List	   *live_children = NIL;
-	int			cnt_parts;
-	int			num_parts;
-	RelOptInfo **part_rels;
-
-	/* Handle only join relations here. */
-	if (!IS_JOIN_REL(rel))
-		return;
-
-	/* We've nothing to do if the relation is not partitioned. */
-	if (!IS_PARTITIONED_REL(rel))
-		return;
-
-	/* The relation should have consider_partitionwise_join set. */
-	Assert(rel->consider_partitionwise_join);
-
-	/* Guard against stack overflow due to overly deep partition hierarchy. */
-	check_stack_depth();
-
-	num_parts = rel->nparts;
-	part_rels = rel->part_rels;
-
-	/* Collect non-dummy child-joins. */
-	for (cnt_parts = 0; cnt_parts < num_parts; cnt_parts++)
-	{
-		RelOptInfo *child_rel = part_rels[cnt_parts];
-
-		/* If it's been pruned entirely, it's certainly dummy. */
-		if (child_rel == NULL)
-			continue;
-
-		/* Make partitionwise join paths for this partitioned child-join. */
-		generate_partitionwise_join_paths(root, child_rel);
-
-		/* If we failed to make any path for this child, we must give up. */
-		if (child_rel->pathlist == NIL)
-		{
-			/*
-			 * Mark the parent joinrel as unpartitioned so that later
-			 * functions treat it correctly.
-			 */
-			rel->nparts = 0;
-			return;
-		}
-
-		/* Else, identify the cheapest path for it. */
-		set_cheapest(child_rel);
-
-		/* Dummy children need not be scanned, so ignore those. */
-		if (IS_DUMMY_REL(child_rel))
-			continue;
-
-#ifdef OPTIMIZER_DEBUG
-		debug_print_rel(root, child_rel);
-#endif
-
-		live_children = lappend(live_children, child_rel);
-	}
-
-	/* If all child-joins are dummy, parent join is also dummy. */
-	if (!live_children)
-	{
-		mark_dummy_rel(rel);
-		return;
-	}
-
-	/* Build additional paths for this rel from child-join paths. */
-	add_paths_to_append_rel(root, rel, live_children);
-	list_free(live_children);
-}
 
 
 /*****************************************************************************

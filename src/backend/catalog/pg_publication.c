@@ -24,7 +24,6 @@
 #include "catalog/index.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
-#include "catalog/partition.h"
 #include "catalog/objectaccess.h"
 #include "catalog/objectaddress.h"
 #include "catalog/pg_inherits.h"
@@ -50,9 +49,8 @@
 static void
 check_publication_add_relation(Relation targetrel)
 {
-	/* Must be a regular or partitioned table */
-	if (RelationGetForm(targetrel)->relkind != RELKIND_RELATION &&
-		RelationGetForm(targetrel)->relkind != RELKIND_PARTITIONED_TABLE)
+	/* Must be a regular table */
+	if (RelationGetForm(targetrel)->relkind != RELKIND_RELATION)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("\"%s\" is not a table",
@@ -98,8 +96,7 @@ check_publication_add_relation(Relation targetrel)
 static bool
 is_publishable_class(Oid relid, Form_pg_class reltuple)
 {
-	return (reltuple->relkind == RELKIND_RELATION ||
-			reltuple->relkind == RELKIND_PARTITIONED_TABLE) &&
+	return (reltuple->relkind == RELKIND_RELATION) &&
 		!IsCatalogRelationOid(relid) &&
 		reltuple->relpersistence == RELPERSISTENCE_PERMANENT &&
 		relid >= FirstNormalObjectId;
@@ -121,9 +118,6 @@ filter_partitions(List *relids)
 		bool		skip = false;
 		List	   *ancestors = NIL;
 		Oid			relid = lfirst_oid(lc);
-
-		if (get_rel_relispartition(relid))
-			ancestors = get_partition_ancestors(relid);
 
 		foreach(lc2, ancestors)
 		{
@@ -184,31 +178,7 @@ List *
 GetPubPartitionOptionRelations(List *result, PublicationPartOpt pub_partopt,
 							   Oid relid)
 {
-	if (get_rel_relkind(relid) == RELKIND_PARTITIONED_TABLE &&
-		pub_partopt != PUBLICATION_PART_ROOT)
-	{
-		List	   *all_parts = find_all_inheritors(relid, NoLock,
-													NULL);
-
-		if (pub_partopt == PUBLICATION_PART_ALL)
-			result = list_concat(result, all_parts);
-		else if (pub_partopt == PUBLICATION_PART_LEAF)
-		{
-			ListCell   *lc;
-
-			foreach(lc, all_parts)
-			{
-				Oid			partOid = lfirst_oid(lc);
-
-				if (get_rel_relkind(partOid) != RELKIND_PARTITIONED_TABLE)
-					result = lappend_oid(result, partOid);
-			}
-		}
-		else
-			Assert(false);
-	}
-	else
-		result = lappend_oid(result, relid);
+	result = lappend_oid(result, relid);
 
 	return result;
 }
@@ -434,34 +404,11 @@ GetAllTablesPublicationRelations(bool pubviaroot)
 		Form_pg_class relForm = (Form_pg_class) GETSTRUCT(tuple);
 		Oid			relid = relForm->oid;
 
-		if (is_publishable_class(relid, relForm) &&
-			!(relForm->relispartition && pubviaroot))
+		if (is_publishable_class(relid, relForm))
 			result = lappend_oid(result, relid);
 	}
 
 	table_endscan(scan);
-
-	if (pubviaroot)
-	{
-		ScanKeyInit(&key[0],
-					Anum_pg_class_relkind,
-					BTEqualStrategyNumber, F_CHAREQ,
-					CharGetDatum(RELKIND_PARTITIONED_TABLE));
-
-		scan = table_beginscan_catalog(classRel, 1, key);
-
-		while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
-		{
-			Form_pg_class relForm = (Form_pg_class) GETSTRUCT(tuple);
-			Oid			relid = relForm->oid;
-
-			if (is_publishable_class(relid, relForm) &&
-				!relForm->relispartition)
-				result = lappend_oid(result, relid);
-		}
-
-		table_endscan(scan);
-	}
 
 	table_close(classRel, AccessShareLock);
 	return result;

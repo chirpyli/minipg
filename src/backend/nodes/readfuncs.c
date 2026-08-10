@@ -1534,7 +1534,6 @@ _readAppend(void)
 	READ_BITMAPSET_FIELD(apprelids);
 	READ_NODE_FIELD(appendplans);
 	READ_INT_FIELD(first_partial_plan);
-	READ_NODE_FIELD(part_prune_info);
 
 	READ_DONE();
 }
@@ -1556,7 +1555,6 @@ _readMergeAppend(void)
 	READ_OID_ARRAY(sortOperators, local_node->numCols);
 	READ_OID_ARRAY(collations, local_node->numCols);
 	READ_BOOL_ARRAY(nullsFirst, local_node->numCols);
-	READ_NODE_FIELD(part_prune_info);
 
 	READ_DONE();
 }
@@ -2238,61 +2236,6 @@ _readPlanRowMark(void)
 	READ_DONE();
 }
 
-static PartitionPruneInfo *
-_readPartitionPruneInfo(void)
-{
-	READ_LOCALS(PartitionPruneInfo);
-
-	READ_NODE_FIELD(prune_infos);
-	READ_BITMAPSET_FIELD(other_subplans);
-
-	READ_DONE();
-}
-
-static PartitionedRelPruneInfo *
-_readPartitionedRelPruneInfo(void)
-{
-	READ_LOCALS(PartitionedRelPruneInfo);
-
-	READ_UINT_FIELD(rtindex);
-	READ_BITMAPSET_FIELD(present_parts);
-	READ_INT_FIELD(nparts);
-	READ_INT_ARRAY(subplan_map, local_node->nparts);
-	READ_INT_ARRAY(subpart_map, local_node->nparts);
-	READ_OID_ARRAY(relid_map, local_node->nparts);
-	READ_NODE_FIELD(initial_pruning_steps);
-	READ_NODE_FIELD(exec_pruning_steps);
-	READ_BITMAPSET_FIELD(execparamids);
-
-	READ_DONE();
-}
-
-static PartitionPruneStepOp *
-_readPartitionPruneStepOp(void)
-{
-	READ_LOCALS(PartitionPruneStepOp);
-
-	READ_INT_FIELD(step.step_id);
-	READ_INT_FIELD(opstrategy);
-	READ_NODE_FIELD(exprs);
-	READ_NODE_FIELD(cmpfns);
-	READ_BITMAPSET_FIELD(nullkeys);
-
-	READ_DONE();
-}
-
-static PartitionPruneStepCombine *
-_readPartitionPruneStepCombine(void)
-{
-	READ_LOCALS(PartitionPruneStepCombine);
-
-	READ_INT_FIELD(step.step_id);
-	READ_ENUM_FIELD(combineOp, PartitionPruneCombineOp);
-	READ_NODE_FIELD(source_stepids);
-
-	READ_DONE();
-}
-
 /*
  * _readPlanInvalItem
  */
@@ -2374,41 +2317,6 @@ _readExtensibleNode(void)
 
 	/* deserialize the private fields */
 	methods->nodeRead(local_node);
-
-	READ_DONE();
-}
-
-/*
- * _readPartitionBoundSpec
- */
-static PartitionBoundSpec *
-_readPartitionBoundSpec(void)
-{
-	READ_LOCALS(PartitionBoundSpec);
-
-	READ_CHAR_FIELD(strategy);
-	READ_BOOL_FIELD(is_default);
-	READ_INT_FIELD(modulus);
-	READ_INT_FIELD(remainder);
-	READ_NODE_FIELD(listdatums);
-	READ_NODE_FIELD(lowerdatums);
-	READ_NODE_FIELD(upperdatums);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readPartitionRangeDatum
- */
-static PartitionRangeDatum *
-_readPartitionRangeDatum(void)
-{
-	READ_LOCALS(PartitionRangeDatum);
-
-	READ_ENUM_FIELD(kind, PartitionRangeDatumKind);
-	READ_NODE_FIELD(value);
-	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
 }
@@ -2636,14 +2544,6 @@ parseNodeString(void)
 		return_value = _readNestLoopParam();
 	else if (MATCH("PLANROWMARK", 11))
 		return_value = _readPlanRowMark();
-	else if (MATCH("PARTITIONPRUNEINFO", 18))
-		return_value = _readPartitionPruneInfo();
-	else if (MATCH("PARTITIONEDRELPRUNEINFO", 23))
-		return_value = _readPartitionedRelPruneInfo();
-	else if (MATCH("PARTITIONPRUNESTEPOP", 20))
-		return_value = _readPartitionPruneStepOp();
-	else if (MATCH("PARTITIONPRUNESTEPCOMBINE", 25))
-		return_value = _readPartitionPruneStepCombine();
 	else if (MATCH("PLANINVALITEM", 13))
 		return_value = _readPlanInvalItem();
 	else if (MATCH("SUBPLAN", 7))
@@ -2652,10 +2552,6 @@ parseNodeString(void)
 		return_value = _readAlternativeSubPlan();
 	else if (MATCH("EXTENSIBLENODE", 14))
 		return_value = _readExtensibleNode();
-	else if (MATCH("PARTITIONBOUNDSPEC", 18))
-		return_value = _readPartitionBoundSpec();
-	else if (MATCH("PARTITIONRANGEDATUM", 19))
-		return_value = _readPartitionRangeDatum();
 	else
 	{
 		elog(ERROR, "badly formatted node string \"%.32s\"...", token);

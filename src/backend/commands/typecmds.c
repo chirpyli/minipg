@@ -2539,7 +2539,6 @@ DefineCompositeType(RangeVar *typevar, List *coldeflist)
 	 */
 	createStmt->relation = typevar;
 	createStmt->tableElts = coldeflist;
-	createStmt->inhRelations = NIL;
 	createStmt->constraints = NIL;
 	createStmt->options = NIL;
 	createStmt->oncommit = ONCOMMIT_NOOP;

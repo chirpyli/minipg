@@ -39,7 +39,6 @@
 #include "optimizer/tlist.h"
 #include "parser/parse_clause.h"
 #include "parser/parsetree.h"
-#include "partitioning/partprune.h"
 #include "tcop/tcopprot.h"
 #include "utils/lsyscache.h"
 
@@ -1058,7 +1057,6 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 	List	   *subplans = NIL;
 	ListCell   *subpaths;
 	RelOptInfo *rel = best_path->path.parent;
-	PartitionPruneInfo *partpruneinfo = NULL;
 	int			nodenumsortkeys = 0;
 	AttrNumber *nodeSortColIdx = NULL;
 	Oid		   *nodeSortOperators = NULL;
@@ -1196,38 +1194,8 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 		subplans = lappend(subplans, subplan);
 	}
 
-	/*
-	 * If any quals exist, they may be useful to perform further partition
-	 * pruning during execution.  Gather information needed by the executor to
-	 * do partition pruning.
-	 */
-	if (enable_partition_pruning)
-	{
-		List	   *prunequal;
-
-		prunequal = extract_actual_clauses(rel->baserestrictinfo, false);
-
-		if (best_path->path.param_info)
-		{
-			List	   *prmquals = best_path->path.param_info->ppi_clauses;
-
-			prmquals = extract_actual_clauses(prmquals, false);
-			prmquals = (List *) replace_nestloop_params(root,
-														(Node *) prmquals);
-
-			prunequal = list_concat(prunequal, prmquals);
-		}
-
-		if (prunequal != NIL)
-			partpruneinfo =
-				make_partition_pruneinfo(root, rel,
-										 best_path->subpaths,
-										 prunequal);
-	}
-
 	plan->appendplans = subplans;
 	plan->first_partial_plan = best_path->first_partial_path;
-	plan->part_prune_info = partpruneinfo;
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -1267,7 +1235,6 @@ create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
 	List	   *subplans = NIL;
 	ListCell   *subpaths;
 	RelOptInfo *rel = best_path->path.parent;
-	PartitionPruneInfo *partpruneinfo = NULL;
 
 	/*
 	 * We don't have the actual creation of the MergeAppend node split out
@@ -1360,36 +1327,7 @@ create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
 		subplans = lappend(subplans, subplan);
 	}
 
-	/*
-	 * If any quals exist, they may be useful to perform further partition
-	 * pruning during execution.  Gather information needed by the executor to
-	 * do partition pruning.
-	 */
-	if (enable_partition_pruning)
-	{
-		List	   *prunequal;
-
-		prunequal = extract_actual_clauses(rel->baserestrictinfo, false);
-
-		if (best_path->path.param_info)
-		{
-			List	   *prmquals = best_path->path.param_info->ppi_clauses;
-
-			prmquals = extract_actual_clauses(prmquals, false);
-			prmquals = (List *) replace_nestloop_params(root,
-														(Node *) prmquals);
-
-			prunequal = list_concat(prunequal, prmquals);
-		}
-
-		if (prunequal != NIL)
-			partpruneinfo = make_partition_pruneinfo(root, rel,
-													 best_path->subpaths,
-													 prunequal);
-	}
-
 	node->mergeplans = subplans;
-	node->part_prune_info = partpruneinfo;
 
 	/*
 	 * If prepare_sort_from_pathkeys added sort columns, but we were told to

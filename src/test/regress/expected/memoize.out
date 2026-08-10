@@ -63,19 +63,19 @@ SELECT explain_memoize('
 SELECT COUNT(*),AVG(t1.unique1) FROM tenk1 t1
 INNER JOIN tenk1 t2 ON t1.unique1 = t2.twenty
 WHERE t2.unique1 < 1000;', false);
-                                      explain_memoize                                      
--------------------------------------------------------------------------------------------
+                                      explain_memoize                                       
+--------------------------------------------------------------------------------------------
  Aggregate (actual rows=1 loops=N)
-   ->  Nested Loop (actual rows=1000 loops=N)
-         ->  Seq Scan on tenk1 t2 (actual rows=1000 loops=N)
-               Filter: (unique1 < 1000)
-               Rows Removed by Filter: 9000
-         ->  Memoize (actual rows=1 loops=N)
-               Cache Key: t2.twenty
-               Cache Mode: logical
-               Hits: 980  Misses: 20  Evictions: Zero  Overflows: N  Memory Usage: NkB
-               ->  Index Only Scan using tenk1_unique1 on tenk1 t1 (actual rows=1 loops=N)
-                     Index Cond: (unique1 = t2.twenty)
+   ->  Merge Join (actual rows=1000 loops=N)
+         Merge Cond: (t2.twenty = t1.unique1)
+         ->  Sort (actual rows=1000 loops=N)
+               Sort Key: t2.twenty
+               Sort Method: quicksort  Memory: 71kB
+               ->  Seq Scan on tenk1 t2 (actual rows=1000 loops=N)
+                     Filter: (unique1 < 1000)
+                     Rows Removed by Filter: 9000
+         ->  Materialize (actual rows=1001 loops=N)
+               ->  Index Only Scan using tenk1_unique1 on tenk1 t1 (actual rows=21 loops=N)
                      Heap Fetches: N
 (12 rows)
 
@@ -94,21 +94,17 @@ SELECT COUNT(*),AVG(t2.unique1) FROM tenk1 t1,
 LATERAL (SELECT t2.unique1 FROM tenk1 t2
          WHERE t1.twenty = t2.unique1 OFFSET 0) t2
 WHERE t1.unique1 < 1000;', false);
-                                      explain_memoize                                      
--------------------------------------------------------------------------------------------
+                                   explain_memoize                                   
+-------------------------------------------------------------------------------------
  Aggregate (actual rows=1 loops=N)
    ->  Nested Loop (actual rows=1000 loops=N)
          ->  Seq Scan on tenk1 t1 (actual rows=1000 loops=N)
                Filter: (unique1 < 1000)
                Rows Removed by Filter: 9000
-         ->  Memoize (actual rows=1 loops=N)
-               Cache Key: t1.twenty
-               Cache Mode: binary
-               Hits: 980  Misses: 20  Evictions: Zero  Overflows: N  Memory Usage: NkB
-               ->  Index Only Scan using tenk1_unique1 on tenk1 t2 (actual rows=1 loops=N)
-                     Index Cond: (unique1 = t1.twenty)
-                     Heap Fetches: N
-(12 rows)
+         ->  Index Only Scan using tenk1_unique1 on tenk1 t2 (actual rows=1 loops=N)
+               Index Cond: (unique1 = t1.twenty)
+               Heap Fetches: N
+(8 rows)
 
 -- And check we get the expected results.
 SELECT COUNT(*),AVG(t2.unique1) FROM tenk1 t1,
@@ -159,21 +155,17 @@ SELECT explain_memoize('
 SELECT COUNT(*),AVG(t1.unique1) FROM tenk1 t1
 INNER JOIN tenk1 t2 ON t1.unique1 = t2.thousand
 WHERE t2.unique1 < 1200;', true);
-                                      explain_memoize                                      
--------------------------------------------------------------------------------------------
+                                   explain_memoize                                   
+-------------------------------------------------------------------------------------
  Aggregate (actual rows=1 loops=N)
    ->  Nested Loop (actual rows=1200 loops=N)
          ->  Seq Scan on tenk1 t2 (actual rows=1200 loops=N)
                Filter: (unique1 < 1200)
                Rows Removed by Filter: 8800
-         ->  Memoize (actual rows=1 loops=N)
-               Cache Key: t2.thousand
-               Cache Mode: logical
-               Hits: N  Misses: N  Evictions: N  Overflows: 0  Memory Usage: NkB
-               ->  Index Only Scan using tenk1_unique1 on tenk1 t1 (actual rows=1 loops=N)
-                     Index Cond: (unique1 = t2.thousand)
-                     Heap Fetches: N
-(12 rows)
+         ->  Index Only Scan using tenk1_unique1 on tenk1 t1 (actual rows=1 loops=N)
+               Index Cond: (unique1 = t2.thousand)
+               Heap Fetches: N
+(8 rows)
 
 CREATE TABLE flt (f float);
 CREATE INDEX flt_f_idx ON flt (f);
@@ -258,41 +250,41 @@ DROP TABLE strtest;
 -- Ensure memoize works with partitionwise join
 SET enable_partitionwise_join TO on;
 CREATE TABLE prt (a int) PARTITION BY RANGE(a);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE prt (a int) PARTITION BY RANGE(a);
+                                 ^
 CREATE TABLE prt_p1 PARTITION OF prt FOR VALUES FROM (0) TO (10);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE prt_p1 PARTITION OF prt FOR VALUES FROM (0) TO ...
+                            ^
 CREATE TABLE prt_p2 PARTITION OF prt FOR VALUES FROM (10) TO (20);
+ERROR:  syntax error at or near "PARTITION"
+LINE 1: CREATE TABLE prt_p2 PARTITION OF prt FOR VALUES FROM (10) TO...
+                            ^
 INSERT INTO prt VALUES (0), (0), (0), (0);
+ERROR:  relation "prt" does not exist
+LINE 1: INSERT INTO prt VALUES (0), (0), (0), (0);
+                    ^
 INSERT INTO prt VALUES (10), (10), (10), (10);
+ERROR:  relation "prt" does not exist
+LINE 1: INSERT INTO prt VALUES (10), (10), (10), (10);
+                    ^
 CREATE INDEX iprt_p1_a ON prt_p1 (a);
+ERROR:  relation "prt_p1" does not exist
 CREATE INDEX iprt_p2_a ON prt_p2 (a);
+ERROR:  relation "prt_p2" does not exist
 ANALYZE prt;
+ERROR:  relation "prt" does not exist
 SELECT explain_memoize('
 SELECT * FROM prt t1 INNER JOIN prt t2 ON t1.a = t2.a;', false);
-                                     explain_memoize                                      
-------------------------------------------------------------------------------------------
- Append (actual rows=32 loops=N)
-   ->  Nested Loop (actual rows=16 loops=N)
-         ->  Index Only Scan using iprt_p1_a on prt_p1 t1_1 (actual rows=4 loops=N)
-               Heap Fetches: N
-         ->  Memoize (actual rows=4 loops=N)
-               Cache Key: t1_1.a
-               Cache Mode: logical
-               Hits: 3  Misses: 1  Evictions: Zero  Overflows: N  Memory Usage: NkB
-               ->  Index Only Scan using iprt_p1_a on prt_p1 t2_1 (actual rows=4 loops=N)
-                     Index Cond: (a = t1_1.a)
-                     Heap Fetches: N
-   ->  Nested Loop (actual rows=16 loops=N)
-         ->  Index Only Scan using iprt_p2_a on prt_p2 t1_2 (actual rows=4 loops=N)
-               Heap Fetches: N
-         ->  Memoize (actual rows=4 loops=N)
-               Cache Key: t1_2.a
-               Cache Mode: logical
-               Hits: 3  Misses: 1  Evictions: Zero  Overflows: N  Memory Usage: NkB
-               ->  Index Only Scan using iprt_p2_a on prt_p2 t2_2 (actual rows=4 loops=N)
-                     Index Cond: (a = t1_2.a)
-                     Heap Fetches: N
-(21 rows)
-
+ERROR:  relation "prt" does not exist
+LINE 2: SELECT * FROM prt t1 INNER JOIN prt t2 ON t1.a = t2.a;
+                      ^
+QUERY:  explain (analyze, costs off, summary off, timing off) 
+SELECT * FROM prt t1 INNER JOIN prt t2 ON t1.a = t2.a;
+CONTEXT:  PL/pgSQL function explain_memoize(text,boolean) line 5 at FOR over EXECUTE statement
 DROP TABLE prt;
+ERROR:  table "prt" does not exist
 RESET enable_partitionwise_join;
 -- Exercise Memoize code that flushes the cache when a parameter changes which
 -- is not part of the cache key.
@@ -304,22 +296,19 @@ WHERE unique1 < 3
 	SELECT 1 FROM tenk1 t1
 	INNER JOIN tenk1 t2 ON t1.unique1 = t2.hundred
 	WHERE t0.ten = t1.twenty AND t0.two <> t2.four OFFSET 0);
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                        QUERY PLAN                        
+----------------------------------------------------------
  Index Scan using tenk1_unique1 on tenk1 t0
    Index Cond: (unique1 < 3)
    Filter: (SubPlan 1)
    SubPlan 1
      ->  Nested Loop
+           ->  Index Scan using tenk1_unique1 on tenk1 t1
+                 Filter: (t0.ten = twenty)
            ->  Index Scan using tenk1_hundred on tenk1 t2
+                 Index Cond: (hundred = t1.unique1)
                  Filter: (t0.two <> four)
-           ->  Memoize
-                 Cache Key: t2.hundred
-                 Cache Mode: logical
-                 ->  Index Scan using tenk1_unique1 on tenk1 t1
-                       Index Cond: (unique1 = t2.hundred)
-                       Filter: (t0.ten = twenty)
-(13 rows)
+(10 rows)
 
 -- Ensure the above query returns the correct result
 SELECT unique1 FROM tenk1 t0
@@ -354,17 +343,15 @@ WHERE t1.unique1 < 1000;
    ->  Gather
          Workers Planned: 2
          ->  Partial Aggregate
-               ->  Nested Loop
-                     ->  Parallel Bitmap Heap Scan on tenk1 t1
-                           Recheck Cond: (unique1 < 1000)
-                           ->  Bitmap Index Scan on tenk1_unique1
-                                 Index Cond: (unique1 < 1000)
-                     ->  Memoize
-                           Cache Key: t1.twenty
-                           Cache Mode: logical
+               ->  Merge Join
+                     Merge Cond: (t1.twenty = t2.unique1)
+                     ->  Sort
+                           Sort Key: t1.twenty
+                           ->  Parallel Seq Scan on tenk1 t1
+                                 Filter: (unique1 < 1000)
+                     ->  Materialize
                            ->  Index Only Scan using tenk1_unique1 on tenk1 t2
-                                 Index Cond: (unique1 = t1.twenty)
-(14 rows)
+(12 rows)
 
 -- And ensure the parallel plan gives us the correct results.
 SELECT COUNT(*),AVG(t2.unique1) FROM tenk1 t1,

@@ -53,7 +53,6 @@ OBJS = \
 	oid.o \
 	oracle_compat.o \
 	orderedsetaggs.o \
-	partitionfuncs.o \
 	multirangetypes.o \
 	multirangetypes_selfuncs.o \
 	pg_locale.o \
