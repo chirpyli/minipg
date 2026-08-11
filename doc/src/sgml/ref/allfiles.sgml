@@ -59,7 +59,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY copyTable          SYSTEM "copy.sgml">
 <!ENTITY createAccessMethod SYSTEM "create_access_method.sgml">
 <!ENTITY createAggregate    SYSTEM "create_aggregate.sgml">
-<!ENTITY createCast         SYSTEM "create_cast.sgml">
 <!ENTITY createCollation    SYSTEM "create_collation.sgml">
 <!ENTITY createConversion   SYSTEM "create_conversion.sgml">
 <!ENTITY createDatabase     SYSTEM "create_database.sgml">
@@ -105,7 +104,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY do                 SYSTEM "do.sgml">
 <!ENTITY dropAccessMethod   SYSTEM "drop_access_method.sgml">
 <!ENTITY dropAggregate      SYSTEM "drop_aggregate.sgml">
-<!ENTITY dropCast           SYSTEM "drop_cast.sgml">
 <!ENTITY dropCollation      SYSTEM "drop_collation.sgml">
 <!ENTITY dropConversion     SYSTEM "drop_conversion.sgml">
 <!ENTITY dropDatabase       SYSTEM "drop_database.sgml">
@@ -152,11 +150,9 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY grant              SYSTEM "grant.sgml">
 <!ENTITY importForeignSchema SYSTEM "import_foreign_schema.sgml">
 <!ENTITY insert             SYSTEM "insert.sgml">
-<!ENTITY listen             SYSTEM "listen.sgml">
 <!ENTITY load               SYSTEM "load.sgml">
 <!ENTITY lock               SYSTEM "lock.sgml">
 <!ENTITY move               SYSTEM "move.sgml">
-<!ENTITY notify             SYSTEM "notify.sgml">
 <!ENTITY prepare            SYSTEM "prepare.sgml">
 <!ENTITY prepareTransaction SYSTEM "prepare_transaction.sgml">
 <!ENTITY reassignOwned      SYSTEM "reassign_owned.sgml">
@@ -179,7 +175,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY show               SYSTEM "show.sgml">
 <!ENTITY startTransaction   SYSTEM "start_transaction.sgml">
 <!ENTITY truncate           SYSTEM "truncate.sgml">
-<!ENTITY unlisten           SYSTEM "unlisten.sgml">
 <!ENTITY update             SYSTEM "update.sgml">
 <!ENTITY vacuum             SYSTEM "vacuum.sgml">
 <!ENTITY values             SYSTEM "values.sgml">

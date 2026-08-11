@@ -95,11 +95,6 @@ Item
 </row>
 
 <row>
- <entry><filename>pg_notify</filename></entry>
- <entry>Subdirectory containing LISTEN/NOTIFY status data</entry>
-</row>
-
-<row>
  <entry><filename>pg_replslot</filename></entry>
  <entry>Subdirectory containing replication slot data</entry>
 </row>

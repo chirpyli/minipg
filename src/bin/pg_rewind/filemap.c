@@ -133,9 +133,6 @@ static const char *excludeDirContents[] =
 	/* Contents removed on startup, see dsm_cleanup_for_mmap(). */
 	"pg_dynshmem",				/* defined as PG_DYNSHMEM_DIR */
 
-	/* Contents removed on startup, see AsyncShmemInit(). */
-	"pg_notify",
-
 	/*
 	 * Old contents are loaded for possible debugging but are not required for
 	 * normal operation, see SerialInit().

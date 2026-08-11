@@ -21745,7 +21745,6 @@ SELECT * FROM pg_ls_dir('.') WITH ORDINALITY AS t(ls,n);
  pg_serial       |  1
  pg_twophase     |  2
  postmaster.opts |  3
- pg_notify       |  4
  postgresql.conf |  5
  pg_tblspc       |  6
  logfile         |  7
@@ -22120,37 +22119,6 @@ SELECT * FROM pg_ls_dir('.') WITH ORDINALITY AS t(ls,n);
         available (see <xref linkend="jit"/>) and the
         <xref linkend="guc-jit"/> configuration parameter is set to
         <literal>on</literal>.
-       </para></entry>
-      </row>
-
-      <row>
-       <entry role="func_table_entry"><para role="func_signature">
-        <indexterm>
-         <primary>pg_listening_channels</primary>
-        </indexterm>
-        <function>pg_listening_channels</function> ()
-        <returnvalue>setof text</returnvalue>
-       </para>
-       <para>
-        Returns the set of names of asynchronous notification channels that
-        the current session is listening to.
-       </para></entry>
-      </row>
-
-      <row>
-       <entry role="func_table_entry"><para role="func_signature">
-        <indexterm>
-         <primary>pg_notification_queue_usage</primary>
-        </indexterm>
-        <function>pg_notification_queue_usage</function> ()
-        <returnvalue>double precision</returnvalue>
-       </para>
-       <para>
-        Returns the fraction (0&ndash;1) of the asynchronous notification
-        queue's maximum size that is currently occupied by notifications that
-        are waiting to be processed.
-        See <xref linkend="sql-listen"/> and <xref linkend="sql-notify"/>
-        for more information.
        </para></entry>
       </row>
 

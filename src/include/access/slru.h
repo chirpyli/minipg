@@ -71,7 +71,7 @@ typedef struct SlruSharedData
 	/*
 	 * Optional array of WAL flush LSNs associated with entries in the SLRU
 	 * pages.  If not zero/NULL, we must flush WAL before writing pages (true
-	 * for pg_xact, false for multixact, pg_subtrans, pg_notify).  group_lsn[]
+	 * for pg_xact, false for multixact, pg_subtrans).  group_lsn[]
 	 * has lsn_groups_per_page entries per buffer slot, each containing the
 	 * highest LSN known for a contiguous group of SLRU entries on that slot's
 	 * page.
@@ -113,7 +113,7 @@ typedef struct SlruCtlData
 
 	/*
 	 * Which sync handler function to use when handing sync requests over to
-	 * the checkpointer.  SYNC_HANDLER_NONE to disable fsync (eg pg_notify).
+	 * the checkpointer.  SYNC_HANDLER_NONE to disable fsync.
 	 */
 	SyncRequestHandler sync_handler;
 
