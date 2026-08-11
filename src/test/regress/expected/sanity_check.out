@@ -15,6 +15,7 @@ aggtest|f
 array_index_op_test|f
 array_op_test|f
 bit_defaults|f
+boolindex|t
 bprime|f
 bt_f8_heap|t
 bt_i4_heap|t
@@ -32,6 +33,7 @@ extra_wide_table|f
 fast_emp4000|f
 float4_tbl|f
 float8_tbl|f
+foo|t
 func_index_heap|t
 hash_f8_heap|t
 hash_i4_heap|t
@@ -46,6 +48,7 @@ iportaltest|f
 mlparted2|f
 mlparted5_b|f
 mlparted5a|f
+nocols|f
 num_data|f
 num_exp_add|t
 num_exp_div|t
@@ -115,6 +118,7 @@ real_city|f
 returningwrtest2|f
 road|t
 slow_emp4000|f
+snapshot_test|f
 tableam_tbl_heap2|f
 tenk1|t
 tenk2|t
@@ -123,6 +127,7 @@ text_tbl|f
 time_tbl|f
 timestamp_tbl|f
 timestamptz_tbl|f
+tmptz|t
 varchar_tbl|f
 view_base_table|t
 -- restore normal output mode

@@ -38,7 +38,7 @@ test: inplace-inval
 test: lock-update-delete
 test: lock-update-traversal
 # inherit-temp 已随表继承(INHERITS)功能裁剪而移除
-test: temp-schema-cleanup
+# temp-schema-cleanup 已随临时表功能裁剪而移除（CREATE TEMPORARY TABLE 不再支持）
 test: insert-conflict-do-nothing
 test: insert-conflict-do-nothing-2
 test: insert-conflict-do-update

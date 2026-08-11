@@ -201,7 +201,7 @@ DELETE FROM INSERT_TBL;
 
 ALTER SEQUENCE INSERT_SEQ RESTART WITH 4;
 
-CREATE TEMP TABLE tmp (xd INT, yd TEXT, zd INT);
+CREATE TABLE tmp (xd INT, yd TEXT, zd INT);
 
 INSERT INTO tmp VALUES (null, 'Y', null);
 INSERT INTO tmp VALUES (5, '!check failed', null);
@@ -434,8 +434,8 @@ DROP TABLE parted_fk_naming;
 -- indexes (without constraints) on the partitioned table.  Ideally these should
 -- fail, but we don't dare change released behavior, so instead cope with it at
 -- DETACH time.
-CREATE TEMP TABLE t (a integer, b integer) PARTITION BY HASH (a, b);
-CREATE TEMP TABLE tp (a integer, b integer, PRIMARY KEY (a, b), UNIQUE (b, a));
+CREATE TABLE t (a integer, b integer) PARTITION BY HASH (a, b);
+CREATE TABLE tp (a integer, b integer, PRIMARY KEY (a, b), UNIQUE (b, a));
 ALTER TABLE t ATTACH PARTITION tp FOR VALUES WITH (MODULUS 1, REMAINDER 0);
 CREATE UNIQUE INDEX t_a_idx ON t (a, b);
 CREATE UNIQUE INDEX t_b_idx ON t (b, a);
@@ -447,15 +447,15 @@ SELECT conname, conparentid, conislocal, coninhcount
   ORDER BY conname DESC;
 DROP TABLE t, tp;
 
-CREATE TEMP TABLE t (a integer) PARTITION BY LIST (a);
-CREATE TEMP TABLE tp (a integer PRIMARY KEY);
+CREATE TABLE t (a integer) PARTITION BY LIST (a);
+CREATE TABLE tp (a integer PRIMARY KEY);
 CREATE UNIQUE INDEX t_a_idx ON t (a);
 ALTER TABLE t ATTACH PARTITION tp FOR VALUES IN (1);
 ALTER TABLE t DETACH PARTITION tp;
 DROP TABLE t, tp;
 
-CREATE TEMP TABLE t (a integer) PARTITION BY LIST (a);
-CREATE TEMP TABLE tp (a integer PRIMARY KEY);
+CREATE TABLE t (a integer) PARTITION BY LIST (a);
+CREATE TABLE tp (a integer PRIMARY KEY);
 CREATE UNIQUE INDEX t_a_idx ON ONLY t (a);
 ALTER TABLE t ATTACH PARTITION tp FOR VALUES IN (1);
 ALTER TABLE t DETACH PARTITION tp;

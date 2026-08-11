@@ -64,7 +64,7 @@ select '0:1:'::pg_snapshot;
 select '12:13:0'::pg_snapshot;
 select '12:16:14,13'::pg_snapshot;
 
-create temp table snapshot_test (
+CREATE TABLE snapshot_test (
 	nr	integer,
 	snap	pg_snapshot
 );

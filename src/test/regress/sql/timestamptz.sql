@@ -566,7 +566,7 @@ SELECT '2014-10-25 23:00:00 UTC'::timestamptz AT TIME ZONE 'MSK';
 --
 -- Test that AT TIME ZONE isn't misoptimized when using an index (bug #14504)
 --
-create temp table tmptz (f1 timestamptz primary key);
+CREATE TABLE tmptz (f1 timestamptz primary key);
 insert into tmptz values ('2017-01-18 00:00+00');
 explain (costs off)
 select * from tmptz where f1 at time zone 'utc' = '2017-01-18 00:00';

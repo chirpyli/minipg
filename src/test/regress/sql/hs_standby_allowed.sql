@@ -75,7 +75,6 @@ set synchronous_commit = on;
 show synchronous_commit;
 reset synchronous_commit;
 
-discard temp;
 discard all;
 
 -- CURSOR commands

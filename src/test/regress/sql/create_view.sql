@@ -88,21 +88,21 @@ CREATE SCHEMA temp_view_test
 
 SET search_path TO temp_view_test, public;
 
-CREATE TEMPORARY TABLE temp_table (a int, id int);
+CREATE TABLE temp_table (a int, id int);
 
 -- should be created in temp_view_test schema
 CREATE VIEW v1 AS SELECT * FROM base_table;
 -- should be created in temp object schema
 CREATE VIEW v1_temp AS SELECT * FROM temp_table;
 -- should be created in temp object schema
-CREATE TEMP VIEW v2_temp AS SELECT * FROM base_table;
+CREATE VIEW v2_temp AS SELECT * FROM base_table;
 -- should be created in temp_views schema
 CREATE VIEW temp_view_test.v2 AS SELECT * FROM base_table;
 -- should fail
 CREATE VIEW temp_view_test.v3_temp AS SELECT * FROM temp_table;
 -- should fail
 CREATE SCHEMA test_view_schema
-    CREATE TEMP VIEW testview AS SELECT 1;
+    CREATE VIEW testview AS SELECT 1;
 
 -- joins: if any of the join relations are temporary, the view
 -- should also be temporary
@@ -142,7 +142,7 @@ CREATE VIEW v12_temp AS SELECT true FROM v11_temp;
 
 -- a view should also be temporary if it references a temporary sequence
 CREATE SEQUENCE seq1;
-CREATE TEMPORARY SEQUENCE seq1_temp;
+CREATEORARY SEQUENCE seq1_temp;
 CREATE VIEW v9 AS SELECT seq1.is_called FROM seq1;
 CREATE VIEW v13_temp AS SELECT seq1_temp.is_called FROM seq1_temp;
 
@@ -160,7 +160,7 @@ SET search_path TO testviewschm2, public;
 
 CREATE TABLE t1 (num int, name text);
 CREATE TABLE t2 (num2 int, value text);
-CREATE TEMP TABLE tt (num2 int, value text);
+CREATE TABLE tt (num2 int, value text);
 
 CREATE VIEW nontemp1 AS SELECT * FROM t1 CROSS JOIN t2;
 CREATE VIEW temporal1 AS SELECT * FROM t1 CROSS JOIN tt;
@@ -184,7 +184,7 @@ CREATE TABLE tbl1 ( a int, b int);
 CREATE TABLE tbl2 (c int, d int);
 CREATE TABLE tbl3 (e int, f int);
 CREATE TABLE tbl4 (g int, h int);
-CREATE TEMP TABLE tmptbl (i int, j int);
+CREATE TABLE tmptbl (i int, j int);
 
 --Should be in testviewschm2
 CREATE   VIEW  pubview AS SELECT * FROM tbl1 WHERE tbl1.a

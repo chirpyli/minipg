@@ -395,7 +395,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <typnam>	func_return func_type
 
 %type <boolean>  opt_trusted opt_restart_seqs
-%type <ival>	 OptTemp
 %type <ival>	 OptNoLog
 %type <oncommit> OnCommitOption
 
@@ -1398,7 +1397,7 @@ CheckPointStmt:
 
 /*****************************************************************************
  *
- * DISCARD { ALL | TEMP | PLANS | SEQUENCES }
+ * DISCARD { ALL | PLANS | SEQUENCES }
  *
  *****************************************************************************/
 
@@ -1407,18 +1406,6 @@ DiscardStmt:
 				{
 					DiscardStmt *n = makeNode(DiscardStmt);
 					n->target = DISCARD_ALL;
-					$$ = (Node *) n;
-				}
-			| DISCARD TEMP
-				{
-					DiscardStmt *n = makeNode(DiscardStmt);
-					n->target = DISCARD_TEMP;
-					$$ = (Node *) n;
-				}
-			| DISCARD TEMPORARY
-				{
-					DiscardStmt *n = makeNode(DiscardStmt);
-					n->target = DISCARD_TEMP;
 					$$ = (Node *) n;
 				}
 			| DISCARD PLANS
@@ -2492,108 +2479,76 @@ copy_generic_opt_arg_list_item:
  *
  *****************************************************************************/
 
-CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
+CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 			table_access_method_clause OptWith
 			OnCommitOption OptTableSpace
 			{
 				CreateStmt *n = makeNode(CreateStmt);
-				$4->relpersistence = $2;
-				n->relation = $4;
-				n->tableElts = $6;
+				$3->relpersistence = RELPERSISTENCE_PERMANENT;
+				n->relation = $3;
+				n->tableElts = $5;
 				n->ofTypename = NULL;
 				n->constraints = NIL;
-				n->accessMethod = $8;
-				n->options = $9;
-				n->oncommit = $10;
-				n->tablespacename = $11;
+				n->accessMethod = $7;
+				n->options = $8;
+				n->oncommit = $9;
+				n->tablespacename = $10;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
 			}
-		| CREATE OptTemp TABLE IF_P NOT EXISTS qualified_name '('
+		| CREATE TABLE IF_P NOT EXISTS qualified_name '('
 			OptTableElementList ')' table_access_method_clause
 			OptWith OnCommitOption OptTableSpace
 			{
 				CreateStmt *n = makeNode(CreateStmt);
-				$7->relpersistence = $2;
-				n->relation = $7;
-				n->tableElts = $9;
+				$6->relpersistence = RELPERSISTENCE_PERMANENT;
+				n->relation = $6;
+				n->tableElts = $8;
 				n->ofTypename = NULL;
 				n->constraints = NIL;
-				n->accessMethod = $11;
-				n->options = $12;
-				n->oncommit = $13;
-				n->tablespacename = $14;
+				n->accessMethod = $10;
+				n->options = $11;
+				n->oncommit = $12;
+				n->tablespacename = $13;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
 			}
-		| CREATE OptTemp TABLE qualified_name OF any_name
+		| CREATE TABLE qualified_name OF any_name
 			OptTypedTableElementList table_access_method_clause
 			OptWith OnCommitOption OptTableSpace
 			{
 				CreateStmt *n = makeNode(CreateStmt);
-				$4->relpersistence = $2;
-				n->relation = $4;
-				n->tableElts = $7;
-				n->ofTypename = makeTypeNameFromNameList($6);
-				n->ofTypename->location = @6;
+				$3->relpersistence = RELPERSISTENCE_PERMANENT;
+				n->relation = $3;
+				n->tableElts = $6;
+				n->ofTypename = makeTypeNameFromNameList($5);
+				n->ofTypename->location = @5;
 				n->constraints = NIL;
-				n->accessMethod = $8;
-				n->options = $9;
-				n->oncommit = $10;
-				n->tablespacename = $11;
+				n->accessMethod = $7;
+				n->options = $8;
+				n->oncommit = $9;
+				n->tablespacename = $10;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
 			}
-		| CREATE OptTemp TABLE IF_P NOT EXISTS qualified_name OF any_name
+		| CREATE TABLE IF_P NOT EXISTS qualified_name OF any_name
 			OptTypedTableElementList table_access_method_clause
 			OptWith OnCommitOption OptTableSpace
 			{
 				CreateStmt *n = makeNode(CreateStmt);
-				$7->relpersistence = $2;
-				n->relation = $7;
-				n->tableElts = $10;
-				n->ofTypename = makeTypeNameFromNameList($9);
-				n->ofTypename->location = @9;
+				$6->relpersistence = RELPERSISTENCE_PERMANENT;
+				n->relation = $6;
+				n->tableElts = $9;
+				n->ofTypename = makeTypeNameFromNameList($8);
+				n->ofTypename->location = @8;
 				n->constraints = NIL;
-				n->accessMethod = $11;
-				n->options = $12;
-				n->oncommit = $13;
-				n->tablespacename = $14;
+				n->accessMethod = $10;
+				n->options = $11;
+				n->oncommit = $12;
+				n->tablespacename = $13;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
 			}
-		;
-
-/*
- * Redundancy here is needed to avoid shift/reduce conflicts,
- * since TEMP is not a reserved word.  See also OptTempTableName.
- *
- * NOTE: we accept both GLOBAL and LOCAL options.  They currently do nothing,
- * but future versions might consider GLOBAL to request SQL-spec-compliant
- * temp table behavior, so warn about that.  Since we have no modules the
- * LOCAL keyword is really meaningless; furthermore, some other products
- * implement LOCAL as meaning the same as our default temp table behavior,
- * so we'll probably continue to treat LOCAL as a noise word.
- */
-OptTemp:	TEMPORARY					{ $$ = RELPERSISTENCE_TEMP; }
-			| TEMP						{ $$ = RELPERSISTENCE_TEMP; }
-			| LOCAL TEMPORARY			{ $$ = RELPERSISTENCE_TEMP; }
-			| LOCAL TEMP				{ $$ = RELPERSISTENCE_TEMP; }
-			| GLOBAL TEMPORARY
-				{
-					ereport(WARNING,
-							(errmsg("GLOBAL is deprecated in temporary table creation"),
-							 parser_errposition(@1)));
-					$$ = RELPERSISTENCE_TEMP;
-				}
-			| GLOBAL TEMP
-				{
-					ereport(WARNING,
-							(errmsg("GLOBAL is deprecated in temporary table creation"),
-							 parser_errposition(@1)));
-					$$ = RELPERSISTENCE_TEMP;
-				}
-			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
 		;
 
 OptTableElementList:
@@ -3302,22 +3257,22 @@ OptNoLog:	/*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
  *****************************************************************************/
 
 CreateSeqStmt:
-			CREATE OptTemp SEQUENCE qualified_name OptSeqOptList
+			CREATE SEQUENCE qualified_name OptSeqOptList
 				{
 					CreateSeqStmt *n = makeNode(CreateSeqStmt);
-					$4->relpersistence = $2;
-					n->sequence = $4;
-					n->options = $5;
+					$3->relpersistence = RELPERSISTENCE_PERMANENT;
+					n->sequence = $3;
+					n->options = $4;
 					n->ownerId = InvalidOid;
 					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
-			| CREATE OptTemp SEQUENCE IF_P NOT EXISTS qualified_name OptSeqOptList
+			| CREATE SEQUENCE IF_P NOT EXISTS qualified_name OptSeqOptList
 				{
 					CreateSeqStmt *n = makeNode(CreateSeqStmt);
-					$7->relpersistence = $2;
-					n->sequence = $7;
-					n->options = $8;
+					$6->relpersistence = RELPERSISTENCE_PERMANENT;
+					n->sequence = $6;
+					n->options = $7;
 					n->ownerId = InvalidOid;
 					n->if_not_exists = true;
 					$$ = (Node *)n;
@@ -7558,37 +7513,37 @@ opt_transaction_chain:
 /*****************************************************************************
  *
  *	QUERY:
- *		CREATE [ OR REPLACE ] [ TEMP ] VIEW <viewname> '('target-list ')'
+ *		CREATE [ OR REPLACE ] VIEW <viewname> '('target-list ')'
  *			AS <query> [ WITH [ CASCADED | LOCAL ] CHECK OPTION ]
  *
  *****************************************************************************/
 
-ViewStmt: CREATE OptTemp VIEW qualified_name opt_column_list opt_reloptions
+ViewStmt: CREATE VIEW qualified_name opt_column_list opt_reloptions
 				AS SelectStmt opt_check_option
 				{
 					ViewStmt *n = makeNode(ViewStmt);
-					n->view = $4;
-					n->view->relpersistence = $2;
-					n->aliases = $5;
-					n->query = $8;
+					n->view = $3;
+					n->view->relpersistence = RELPERSISTENCE_PERMANENT;
+					n->aliases = $4;
+					n->query = $7;
 					n->replace = false;
-					n->options = $6;
-					n->withCheckOption = $9;
+					n->options = $5;
+					n->withCheckOption = $8;
 					$$ = (Node *) n;
 				}
-		| CREATE OR REPLACE OptTemp VIEW qualified_name opt_column_list opt_reloptions
-				AS SelectStmt opt_check_option
-				{
-					ViewStmt *n = makeNode(ViewStmt);
-					n->view = $6;
-					n->view->relpersistence = $4;
-					n->aliases = $7;
-					n->query = $10;
+		| CREATE OR REPLACE VIEW qualified_name opt_column_list opt_reloptions
+			AS SelectStmt opt_check_option
+			{
+				ViewStmt *n = makeNode(ViewStmt);
+				n->view = $5;
+				n->view->relpersistence = RELPERSISTENCE_PERMANENT;
+				n->aliases = $6;
+					n->query = $9;
 					n->replace = true;
-					n->options = $8;
-					n->withCheckOption = $11;
+					n->options = $7;
+					n->withCheckOption = $10;
 					$$ = (Node *) n;
-				}
+			}
 		;
 
 opt_check_option:
@@ -8802,8 +8757,7 @@ simple_select:
 		;
 
 /*
- * Redundancy here is needed to avoid shift/reduce conflicts,
- * since TEMP is not a reserved word.  See also OptTemp.
+ * Redundancy here is needed to avoid shift/reduce conflicts.
  */
 opt_table:	TABLE
 		| /*EMPTY*/

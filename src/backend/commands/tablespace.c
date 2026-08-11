@@ -1142,12 +1142,7 @@ GetDefaultTablespace(char relpersistence, bool partitioned)
 {
 	Oid			result;
 
-	/* The temp-table case is handled elsewhere */
-	if (relpersistence == RELPERSISTENCE_TEMP)
-	{
-		PrepareTempTablespaces();
-		return GetNextTempTableSpace();
-	}
+	(void) relpersistence;		/* 临时表已裁剪，relpersistence 恒为 PERMANENT */
 
 	/* Fast path for default_tablespace == "" */
 	if (default_tablespace == NULL || default_tablespace[0] == '\0')

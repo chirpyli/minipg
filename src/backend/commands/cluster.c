@@ -647,10 +647,8 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	if (isNull)
 		reloptions = (Datum) 0;
 
-	if (relpersistence == RELPERSISTENCE_TEMP)
-		namespaceid = LookupCreationNamespace("pg_temp");
-	else
-		namespaceid = RelationGetNamespace(OldHeap);
+	(void) relpersistence;		/* 临时表已裁剪，relpersistence 恒为 PERMANENT */
+	namespaceid = RelationGetNamespace(OldHeap);
 
 	/*
 	 * Create the new heap, using a temporary name in the same namespace as

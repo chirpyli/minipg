@@ -93,12 +93,8 @@ RangeVarCallbackForLockTable(const RangeVar *rv, Oid relid, Oid oldrelid,
 						rv->relname)));
 
 	/*
-	 * Make note if a temporary relation has been accessed in this
-	 * transaction.
+	 * 临时表已裁剪，不再需要记录事务访问临时命名空间标记。
 	 */
-	relpersistence = get_rel_persistence(relid);
-	if (relpersistence == RELPERSISTENCE_TEMP)
-		MyXactFlags |= XACT_FLAGS_ACCESSEDTEMPNAMESPACE;
 
 	/* Check permissions. */
 	aclresult = LockTableAclCheck(relid, lockmode, GetUserId());

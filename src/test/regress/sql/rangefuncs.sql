@@ -15,13 +15,13 @@ select * from unnest(array['a','b']) with ordinality as z(a,ord);
 select a,ord from unnest(array[1.0::float8]) with ordinality as z(a,ord);
 select * from unnest(array[1.0::float8]) with ordinality as z(a,ord);
 -- ordinality vs. views
-create temporary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord);
+CREATEorary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord);
 select * from vw_ord;
 drop view vw_ord;
 
 -- multiple functions
 select * from rows from(rngfunct(1),rngfunct(2)) with ordinality as z(a,b,c,d,ord);
-create temporary view vw_ord as select * from (values (1)) v(n) join rows from(rngfunct(1),rngfunct(2)) with ordinality as z(a,b,c,d,ord) on (n=ord);
+CREATEorary view vw_ord as select * from (values (1)) v(n) join rows from(rngfunct(1),rngfunct(2)) with ordinality as z(a,b,c,d,ord) on (n=ord);
 select * from vw_ord;
 drop view vw_ord;
 
@@ -30,13 +30,13 @@ select * from unnest(array[10,20],array['foo','bar'],array[1.0]);
 select * from unnest(array[10,20],array['foo','bar'],array[1.0]) with ordinality as z(a,b,c,ord);
 select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) with ordinality as z(a,b,c,ord);
 select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(101,102)) with ordinality as z(a,b,c,ord);
-create temporary view vw_ord as select * from unnest(array[10,20],array['foo','bar'],array[1.0]) as z(a,b,c);
+CREATEorary view vw_ord as select * from unnest(array[10,20],array['foo','bar'],array[1.0]) as z(a,b,c);
 select * from vw_ord;
 drop view vw_ord;
-create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) as z(a,b,c);
+CREATEorary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) as z(a,b,c);
 select * from vw_ord;
 drop view vw_ord;
-create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(1,2)) as z(a,b,c);
+CREATEorary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(1,2)) as z(a,b,c);
 select * from vw_ord;
 drop view vw_ord;
 
@@ -199,7 +199,7 @@ select * from rows from(getrngfunc9(1),getrngfunc8(1),
                     getrngfunc5(1),getrngfunc4(1),getrngfunc3(1),getrngfunc2(1),getrngfunc1(1))
               with ordinality as t1(a,b,c,d,e,f,g,h,i,j,k,l,m,o,p,q,r,s,t,u);
 
-create temporary view vw_rngfunc as
+CREATEorary view vw_rngfunc as
   select * from rows from(getrngfunc9(1),
                       getrngfunc7(1) AS (rngfuncid int, rngfuncsubid int, rngfuncname text),
                       getrngfunc1(1))
@@ -222,8 +222,8 @@ DROP TABLE rngfunc2;
 DROP TABLE rngfunc;
 
 -- Rescan tests --
-CREATE TEMPORARY SEQUENCE rngfunc_rescan_seq1;
-CREATE TEMPORARY SEQUENCE rngfunc_rescan_seq2;
+CREATEORARY SEQUENCE rngfunc_rescan_seq1;
+CREATEORARY SEQUENCE rngfunc_rescan_seq2;
 CREATE TYPE rngfunc_rescan_t AS (i integer, s bigint);
 
 CREATE FUNCTION rngfunc_sql(int,int) RETURNS setof rngfunc_rescan_t AS 'SELECT i, nextval(''rngfunc_rescan_seq1'') FROM generate_series($1,$2) i;' LANGUAGE SQL;
@@ -443,7 +443,7 @@ DROP FUNCTION rngfunc();
 -- some tests on SQL functions with RETURNING
 --
 
-create temp table tt(f1 serial, data text);
+CREATE TABLE tt(f1 serial, data text);
 
 create function insert_tt(text) returns int as
 $$ insert into tt(data) values($1) returning f1 $$
@@ -487,7 +487,7 @@ select insert_tt2('foolme','barme') limit 1;
 select * from tt;
 
 -- and rules work
-create temp table tt_log(f1 int, data text);
+CREATE TABLE tt_log(f1 int, data text);
 
 create rule insert_tt_rule as on insert to tt do also
   insert into tt_log values(new.*);
@@ -544,7 +544,7 @@ select * from array_to_set(array['one', 'two']) as t(f1 point,f2 text);
 explain (verbose, costs off)
   select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
 
-create temp table rngfunc(f1 int8, f2 int8);
+CREATE TABLE rngfunc(f1 int8, f2 int8);
 
 create function testrngfunc() returns record as $$
   insert into rngfunc values (1,2) returning *;
@@ -637,7 +637,7 @@ drop type rngfunc_type cascade;
 -- Check some cases involving added/dropped columns in a rowtype result
 --
 
-create temp table users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
+CREATE TABLE users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
 insert into users values ('id',1,'email',true,11,true);
 insert into users values ('id2',2,'email2',true,12,true);
 alter table users drop column todrop;
@@ -662,7 +662,7 @@ SELECT * FROM ROWS FROM(generate_series(10,11), get_users()) WITH ORDINALITY;
 SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;
 
 -- check that we can cope with post-parsing changes in rowtypes
-create temp view usersview as
+CREATE VIEW usersview as
 SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;
 
 select * from usersview;

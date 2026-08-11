@@ -28,18 +28,13 @@ create extension test_ext7;
 alter extension test_ext7 update to '2.0';
 \dx+ test_ext7
 
--- test handling of temp objects created by extensions
+-- test handling of objects created by extensions
+-- 注：minipg 已移除临时表功能，原测试依赖临时对象的场景已改写为永久对象
 create extension test_ext8;
 
--- \dx+ would expose a variable pg_temp_nn schema name, so we can't use it here
--- Skipped: regexp_replace to normalize temporary schema names requires regex,
+-- \dx+ would expose a variable schema name, so we can't use it here
+-- Skipped: regexp_replace to normalize schema names requires regex,
 -- which has been removed from minipg.
--- select regexp_replace(pg_describe_object(classid, objid, objsubid),
---                       'pg_temp_\d+', 'pg_temp', 'g') as "Object description"
--- from pg_depend
--- where refclassid = 'pg_extension'::regclass and deptype = 'e' and
---   refobjid = (select oid from pg_extension where extname = 'test_ext8')
--- order by 1;
 select 'skipped: requires regex'::text as "Object description";
 
 -- Should be possible to drop and recreate this extension
@@ -47,57 +42,40 @@ drop extension test_ext8;
 create extension test_ext8;
 
 -- Skipped: regexp_replace requires regex, which has been removed from minipg.
--- select regexp_replace(pg_describe_object(classid, objid, objsubid),
---                       'pg_temp_\d+', 'pg_temp', 'g') as "Object description"
--- from pg_depend
--- where refclassid = 'pg_extension'::regclass and deptype = 'e' and
---   refobjid = (select oid from pg_extension where extname = 'test_ext8')
--- order by 1;
 select 'skipped: requires regex'::text as "Object description";
 
--- here we want to start a new session and wait till old one is gone
-select pg_backend_pid() as oldpid \gset
-\c -
-do 'declare c int = 0;
-begin
-  while (select count(*) from pg_stat_activity where pid = '
-    :'oldpid'
-  ') > 0 loop c := c + 1; perform pg_stat_clear_snapshot(); end loop;
-  raise log ''test_extensions looped % times'', c;
-end';
-
--- extension should now contain no temp objects
+-- extension should now contain the created objects
 \dx+ test_ext8
 
 -- dropping it should still work
 drop extension test_ext8;
 
--- Test creation of extension in temporary schema with two-phase commit,
--- which should not work.  This function wrapper is useful for portability.
+-- Test creation of extension in a non-default (regular) schema with two-phase
+-- commit, which should work.  This function wrapper is useful for portability.
+-- 注：minipg 已移除临时表/TEMP 命名空间，原 "temporary schema" 场景改为普通 schema。
 
--- Avoid noise caused by CONTEXT and NOTICE messages including the temporary
--- schema name.
+-- Avoid noise caused by CONTEXT and NOTICE messages including the schema name.
 \set SHOW_CONTEXT never
 SET client_min_messages TO 'warning';
--- First enforce presence of temporary schema.
-CREATE TEMP TABLE test_ext4_tab ();
-CREATE OR REPLACE FUNCTION create_extension_with_temp_schema()
+CREATE SCHEMA test_ext4_ns;
+CREATE OR REPLACE FUNCTION create_extension_with_schema()
   RETURNS VOID AS $$
   DECLARE
-    tmpschema text;
+    myschema text;
     query text;
   BEGIN
-    SELECT INTO tmpschema pg_my_temp_schema()::regnamespace;
-    query := 'CREATE EXTENSION test_ext4 SCHEMA ' || tmpschema || ' CASCADE;';
+    SELECT INTO myschema 'test_ext4_ns';
+    query := 'CREATE EXTENSION test_ext4 SCHEMA ' || myschema || ' CASCADE;';
     RAISE NOTICE 'query %', query;
     EXECUTE query;
   END; $$ LANGUAGE plpgsql;
 BEGIN;
-SELECT create_extension_with_temp_schema();
+SELECT create_extension_with_schema();
 PREPARE TRANSACTION 'twophase_extension';
 -- Clean up
-DROP TABLE test_ext4_tab;
-DROP FUNCTION create_extension_with_temp_schema();
+ROLLBACK PREPARED 'twophase_extension';
+DROP SCHEMA test_ext4_ns CASCADE;
+DROP FUNCTION create_extension_with_schema();
 RESET client_min_messages;
 \unset SHOW_CONTEXT
 

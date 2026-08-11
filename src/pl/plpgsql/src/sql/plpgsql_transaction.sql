@@ -376,7 +376,8 @@ SELECT * FROM test1;
 
 
 -- detoast result of simple expression after commit
-CREATE TEMP TABLE test4(f1 text);
+-- 注：minipg 已移除临时表，原 CREATE TEMP TABLE 改为普通表
+CREATE TABLE test4(f1 text);
 ALTER TABLE test4 ALTER COLUMN f1 SET STORAGE EXTERNAL; -- disable compression
 INSERT INTO test4 SELECT repeat('xyzzy', 2000);
 

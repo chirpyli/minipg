@@ -313,7 +313,6 @@ CREATE TABLE foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INT
 
 -- long line to be truncated on the left, many lines
 CREATE
-TEMPORARY
 TABLE
 foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
 id4 INT4
@@ -328,7 +327,6 @@ NULL)
 
 -- long line to be truncated on the right, many lines
 CREATE
-TEMPORARY
 TABLE
 foo(
 id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL, id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY)
@@ -336,7 +334,6 @@ id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL, id INT4
 
 -- long line to be truncated both ways, many lines
 CREATE
-TEMPORARY
 TABLE
 foo
 (id
@@ -347,7 +344,6 @@ idv INT4 UNIQUE NOT NULL);
 
 -- more than 10 lines...
 CREATE
-TEMPORARY
 TABLE
 foo
 (id

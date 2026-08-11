@@ -164,14 +164,6 @@ SET special."weird name" = 'foo';  -- could be allowed, but we choose not to
 SHOW special."weird name";
 
 --
--- Test DISCARD TEMP
---
-CREATE TEMP TABLE reset_test ( data text ) ON COMMIT DELETE ROWS;
-SELECT relname FROM pg_class WHERE relname = 'reset_test';
-DISCARD TEMP;
-SELECT relname FROM pg_class WHERE relname = 'reset_test';
-
---
 -- Test DISCARD ALL
 --
 
@@ -179,7 +171,7 @@ SELECT relname FROM pg_class WHERE relname = 'reset_test';
 DECLARE foo CURSOR WITH HOLD FOR SELECT 1;
 PREPARE foo AS SELECT 1;
 SET vacuum_cost_delay = 13;
-CREATE TEMP TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
+CREATE TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
 -- look changes
 SELECT name FROM pg_prepared_statements;
 SELECT name FROM pg_cursors;

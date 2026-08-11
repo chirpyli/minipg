@@ -37,7 +37,7 @@ SELECT * FROM aggtest;
 -- Read-only tests
 
 CREATE TABLE writetest (a int);
-CREATE TEMPORARY TABLE temptest (a int);
+CREATE TABLE temptest (a int);
 
 BEGIN;
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE; -- ok
@@ -395,7 +395,7 @@ $$ begin return 1/x; end $$;
 CREATE FUNCTION create_temp_tab() RETURNS text
 LANGUAGE plpgsql AS $$
 BEGIN
-  CREATE TEMP TABLE new_table (f1 float8);
+  CREATE TABLE new_table (f1 float8);
   -- case of interest is that we fail while holding an open
   -- relcache reference to new_table
   INSERT INTO new_table SELECT invert(0.0);
@@ -512,7 +512,7 @@ DROP TABLE trans_abc;
 -- tests rely on the fact that psql will not break SQL commands apart at a
 -- backslash-quoted semicolon, but will send them as one Query.
 
-create temp table i_table (f1 int);
+CREATE TABLE i_table (f1 int);
 
 -- psql will show only the last result in a multi-statement Query
 SELECT 1\; SELECT 2\; SELECT 3;

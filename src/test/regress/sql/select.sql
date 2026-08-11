@@ -149,7 +149,7 @@ UNION ALL
 TABLE int8_tbl;
 
 -- corner case: VALUES with no columns
-CREATE TEMP TABLE nocols();
+CREATE TABLE nocols();
 INSERT INTO nocols DEFAULT VALUES;
 SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 
@@ -157,7 +157,7 @@ SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 -- Test ORDER BY options
 --
 
-CREATE TEMP TABLE foo (f1 int);
+CREATE TABLE foo (f1 int);
 
 INSERT INTO foo VALUES (42),(3),(10),(7),(null),(null),(1);
 

@@ -526,14 +526,6 @@ DefineView(ViewStmt *stmt, const char *queryString,
 	 * schema name.
 	 */
 	view = copyObject(stmt->view);	/* don't corrupt original command */
-	if (view->relpersistence == RELPERSISTENCE_PERMANENT
-		&& isQueryUsingTempRelation(viewParse))
-	{
-		view->relpersistence = RELPERSISTENCE_TEMP;
-		ereport(NOTICE,
-				(errmsg("view \"%s\" will be a temporary view",
-						view->relname)));
-	}
 
 	/*
 	 * Create the view relation

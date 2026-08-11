@@ -1893,7 +1893,6 @@ do_autovacuum(void)
 	TableScanDesc relScan;
 	Form_pg_database dbForm;
 	List	   *table_oids = NIL;
-	List	   *orphan_oids = NIL;
 	HASHCTL		ctl;
 	HTAB	   *table_toast_map;
 	ListCell   *volatile cell;
@@ -2022,31 +2021,6 @@ do_autovacuum(void)
 
 		relid = classForm->oid;
 
-		/*
-		 * Check if it is a temp table (presumably, of some other backend's).
-		 * We cannot safely process other backends' temp tables.
-		 */
-		if (classForm->relpersistence == RELPERSISTENCE_TEMP)
-		{
-			/*
-			 * We just ignore it if the owning backend is still active and
-			 * using the temporary schema.  Also, for safety, ignore it if the
-			 * namespace doesn't exist or isn't a temp namespace after all.
-			 */
-			if (checkTempNamespaceStatus(classForm->relnamespace) == TEMP_NAMESPACE_IDLE)
-			{
-				/*
-				 * The table seems to be orphaned -- although it might be that
-				 * the owning backend has already deleted it and exited; our
-				 * pg_class scan snapshot is not necessarily up-to-date
-				 * anymore, so we could be looking at a committed-dead entry.
-				 * Remember it so we can try to delete it later.
-				 */
-				orphan_oids = lappend_oid(orphan_oids, relid);
-			}
-			continue;
-		}
-
 		/* Fetch reloptions and the pgstat entry for this table */
 		relopts = extract_autovac_opts(tuple, pg_class_desc);
 		tabentry = get_pgstat_tabentry_relid(relid, classForm->relisshared,
@@ -2147,117 +2121,6 @@ do_autovacuum(void)
 
 	table_endscan(relScan);
 	table_close(classRel, AccessShareLock);
-
-	/*
-	 * Recheck orphan temporary tables, and if they still seem orphaned, drop
-	 * them.  We'll eat a transaction per dropped table, which might seem
-	 * excessive, but we should only need to do anything as a result of a
-	 * previous backend crash, so this should not happen often enough to
-	 * justify "optimizing".  Using separate transactions ensures that we
-	 * don't bloat the lock table if there are many temp tables to be dropped,
-	 * and it ensures that we don't lose work if a deletion attempt fails.
-	 */
-	foreach(cell, orphan_oids)
-	{
-		Oid			relid = lfirst_oid(cell);
-		Form_pg_class classForm;
-		ObjectAddress object;
-
-		/*
-		 * Check for user-requested abort.
-		 */
-		CHECK_FOR_INTERRUPTS();
-
-		/*
-		 * Try to lock the table.  If we can't get the lock immediately,
-		 * somebody else is using (or dropping) the table, so it's not our
-		 * concern anymore.  Having the lock prevents race conditions below.
-		 */
-		if (!ConditionalLockRelationOid(relid, AccessExclusiveLock))
-			continue;
-
-		/*
-		 * Re-fetch the pg_class tuple and re-check whether it still seems to
-		 * be an orphaned temp table.  If it's not there or no longer the same
-		 * relation, ignore it.
-		 */
-		tuple = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(relid));
-		if (!HeapTupleIsValid(tuple))
-		{
-			/* be sure to drop useless lock so we don't bloat lock table */
-			UnlockRelationOid(relid, AccessExclusiveLock);
-			continue;
-		}
-		classForm = (Form_pg_class) GETSTRUCT(tuple);
-
-		/*
-		 * Make all the same tests made in the loop above.  In event of OID
-		 * counter wraparound, the pg_class entry we have now might be
-		 * completely unrelated to the one we saw before.
-		 */
-		if (!((classForm->relkind == RELKIND_RELATION) &&
-			  classForm->relpersistence == RELPERSISTENCE_TEMP))
-		{
-			UnlockRelationOid(relid, AccessExclusiveLock);
-			continue;
-		}
-
-		if (checkTempNamespaceStatus(classForm->relnamespace) != TEMP_NAMESPACE_IDLE)
-		{
-			UnlockRelationOid(relid, AccessExclusiveLock);
-			continue;
-		}
-
-		/*
-		 * Try to lock the temp namespace, too.  Even though we have lock on
-		 * the table itself, there's a risk of deadlock against an incoming
-		 * backend trying to clean out the temp namespace, in case this table
-		 * has dependencies (such as sequences) that the backend's
-		 * performDeletion call might visit in a different order.  If we can
-		 * get AccessShareLock on the namespace, that's sufficient to ensure
-		 * we're not running concurrently with RemoveTempRelations.  If we
-		 * can't, back off and let RemoveTempRelations do its thing.
-		 */
-		if (!ConditionalLockDatabaseObject(NamespaceRelationId,
-										   classForm->relnamespace, 0,
-										   AccessShareLock))
-		{
-			UnlockRelationOid(relid, AccessExclusiveLock);
-			continue;
-		}
-
-		/* OK, let's delete it */
-		ereport(LOG,
-				(errmsg("autovacuum: dropping orphan temp table \"%s.%s.%s\"",
-						get_database_name(MyDatabaseId),
-						get_namespace_name(classForm->relnamespace),
-						NameStr(classForm->relname))));
-
-		/*
-		 * Deletion might involve TOAST table access, so ensure we have a
-		 * valid snapshot.
-		 */
-		PushActiveSnapshot(GetTransactionSnapshot());
-
-		object.classId = RelationRelationId;
-		object.objectId = relid;
-		object.objectSubId = 0;
-		performDeletion(&object, DROP_CASCADE,
-						PERFORM_DELETION_INTERNAL |
-						PERFORM_DELETION_QUIETLY |
-						PERFORM_DELETION_SKIP_EXTENSIONS);
-
-		/*
-		 * To commit the deletion, end current transaction and start a new
-		 * one.  Note this also releases the locks we took.
-		 */
-		PopActiveSnapshot();
-		CommitTransactionCommand();
-		StartTransactionCommand();
-
-		/* StartTransactionCommand changed current memory context */
-		MemoryContextSwitchTo(AutovacMemCxt);
-	}
 
 	/*
 	 * Create a buffer access strategy object for VACUUM to use.  We want to

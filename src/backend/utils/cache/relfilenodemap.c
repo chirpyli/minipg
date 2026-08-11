@@ -216,9 +216,6 @@ RelidByRelfilenode(Oid reltablespace, Oid relfilenode)
 		{
 			Form_pg_class classform = (Form_pg_class) GETSTRUCT(ntp);
 
-			if (classform->relpersistence == RELPERSISTENCE_TEMP)
-				continue;
-
 			if (found)
 				elog(ERROR,
 					 "unexpected duplicate for tablespace %u, relfilenode %u",

@@ -10765,7 +10765,6 @@ AlterTableMoveAll(AlterTableMoveAllStmt *stmt)
 		 */
 		if (IsCatalogNamespace(relForm->relnamespace) ||
 			relForm->relisshared ||
-			isAnyTempNamespace(relForm->relnamespace) ||
 			IsToastNamespace(relForm->relnamespace))
 			continue;
 

@@ -36,8 +36,9 @@ SELECT * FROM test1;
 (1 row)
 
 -- Check that plan revalidation doesn't prevent setting transaction properties
--- (bug #18059).  This test must include the first temp-object creation in
+-- (bug #18059).  This test must include the first object creation in
 -- this script, or it won't exercise the bug scenario.  Hence we put it early.
+-- 注：minipg 已移除临时表，原 CREATE TEMP TABLE 改为普通表。
 CREATE PROCEDURE test_proc3a()
 LANGUAGE plpgsql
 AS $$
@@ -49,7 +50,7 @@ END;
 $$;
 CALL test_proc3a();
 NOTICE:  done
-CREATE TEMP TABLE tt1(f1 int);
+CREATE TABLE tt1(f1 int);
 CALL test_proc3a();
 NOTICE:  done
 -- nested CALL

@@ -381,7 +381,6 @@ LINE 1: ...L, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 I...
                                                              ^
 -- long line to be truncated on the left, many lines
 CREATE
-TEMPORARY
 TABLE
 foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
 id4 INT4
@@ -394,21 +393,19 @@ NOT
 NULL)
 ;
 ERROR:  syntax error at or near "NUL"
-LINE 4: ...OT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
+LINE 3: ...OT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
                                                                    ^
 -- long line to be truncated on the right, many lines
 CREATE
-TEMPORARY
 TABLE
 foo(
 id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL, id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY)
 ;
 ERROR:  syntax error at or near "NUL"
-LINE 5: id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQ...
+LINE 4: id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQ...
                         ^
 -- long line to be truncated both ways, many lines
 CREATE
-TEMPORARY
 TABLE
 foo
 (id
@@ -417,11 +414,10 @@ UNIQUE NOT NULL, idx INT4 UNIQUE NOT NULL, idy INT4 UNIQUE NOT NULL, id2 TEXT NO
 idz INT4 UNIQUE NOT NULL,
 idv INT4 UNIQUE NOT NULL);
 ERROR:  syntax error at or near "NUL"
-LINE 7: ...L, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 I...
+LINE 6: ...L, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 I...
                                                              ^
 -- more than 10 lines...
 CREATE
-TEMPORARY
 TABLE
 foo
 (id
@@ -443,5 +439,5 @@ UNIQUE
 NOT
 NULL);
 ERROR:  syntax error at or near "NUL"
-LINE 16: ...L, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 I...
+LINE 15: ...L, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 I...
                                                               ^

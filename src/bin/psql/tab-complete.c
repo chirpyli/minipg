@@ -374,7 +374,7 @@ static const SchemaQuery Query_for_list_of_datatypes = {
 	.selcondition = "(t.typrelid = 0 "
 	" OR (SELECT c.relkind = " CppAsString2(RELKIND_COMPOSITE_TYPE)
 	"     FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid)) "
-	"AND t.typname !~ '^_'",
+	"AND t.typname NOT LIKE '\\_%' ESCAPE '\\'",
 	.viscondition = "pg_catalog.pg_type_is_visible(t.oid)",
 	.namespace = "t.typnamespace",
 	.result = "pg_catalog.format_type(t.oid, NULL)",
@@ -386,7 +386,7 @@ static const SchemaQuery Query_for_list_of_composite_datatypes = {
 	/* selcondition --- only get composite types */
 	.selcondition = "(SELECT c.relkind = " CppAsString2(RELKIND_COMPOSITE_TYPE)
 	" FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid) "
-	"AND t.typname !~ '^_'",
+	"AND t.typname NOT LIKE '\\_%' ESCAPE '\\'",
 	.viscondition = "pg_catalog.pg_type_is_visible(t.oid)",
 	.namespace = "t.typnamespace",
 	.result = "pg_catalog.format_type(t.oid, NULL)",
@@ -1087,11 +1087,7 @@ static const pgsql_thing_t words_after_create[] = {
 	{"SYSTEM", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"TABLE", NULL, NULL, &Query_for_list_of_tables},
 	{"TABLESPACE", Query_for_list_of_tablespaces},
-	{"TEMP", NULL, NULL, NULL, THING_NO_DROP | THING_NO_ALTER}, /* for CREATE TEMP TABLE
-																 * ... */
 	{"TEMPLATE", Query_for_list_of_ts_templates, NULL, NULL, THING_NO_SHOW},
-	{"TEMPORARY", NULL, NULL, NULL, THING_NO_DROP | THING_NO_ALTER},	/* for CREATE TEMPORARY
-																		 * TABLE ... */
 	{"TEXT SEARCH", NULL, NULL, NULL},
 	{"TRANSFORM", NULL, NULL, NULL},
 	{"TRIGGER", "SELECT pg_catalog.quote_ident(tgname) FROM pg_catalog.pg_trigger WHERE substring(pg_catalog.quote_ident(tgname),1,%d)='%s' AND NOT tgisinternal"},
@@ -2658,12 +2654,10 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
 
 /* CREATE SEQUENCE --- is allowed inside CREATE SCHEMA, so use TailMatches */
-	else if (TailMatches("CREATE", "SEQUENCE", MatchAny) ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY", "SEQUENCE", MatchAny))
+	else if (TailMatches("CREATE", "SEQUENCE", MatchAny))
 		COMPLETE_WITH("INCREMENT BY", "MINVALUE", "MAXVALUE", "NO", "CACHE",
 					  "CYCLE", "OWNED BY", "START WITH");
-	else if (TailMatches("CREATE", "SEQUENCE", MatchAny, "NO") ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY", "SEQUENCE", MatchAny, "NO"))
+	else if (TailMatches("CREATE", "SEQUENCE", MatchAny, "NO"))
 		COMPLETE_WITH("MINVALUE", "MAXVALUE", "CYCLE");
 
 /* CREATE SERVER <name> */
@@ -2682,9 +2676,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
 
 /* CREATE TABLE --- is allowed inside CREATE SCHEMA, so use TailMatches */
-	/* Complete "CREATE TEMP/TEMPORARY" with the possible temp objects */
-	else if (TailMatches("CREATE", "TEMP|TEMPORARY"))
-		COMPLETE_WITH("SEQUENCE", "TABLE", "VIEW");
 	/* Complete "CREATE UNLOGGED" with TABLE or MATVIEW */
 	else if (TailMatches("CREATE", "UNLOGGED"))
 		COMPLETE_WITH("TABLE", "MATERIALIZED VIEW");
@@ -2698,31 +2689,23 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatches("PARTITION", "OF", MatchAny))
 		COMPLETE_WITH("FOR VALUES", "DEFAULT");
 	/* Complete CREATE TABLE <name> with '(', OF or PARTITION OF */
-	else if (TailMatches("CREATE", "TABLE", MatchAny) ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "TABLE", MatchAny))
+	else if (TailMatches("CREATE", "TABLE", MatchAny))
 		COMPLETE_WITH("(", "OF", "PARTITION OF");
 	/* Complete CREATE TABLE <name> OF with list of composite types */
-	else if (TailMatches("CREATE", "TABLE", MatchAny, "OF") ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "TABLE", MatchAny, "OF"))
+	else if (TailMatches("CREATE", "TABLE", MatchAny, "OF"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_composite_datatypes, NULL);
 	/* Complete CREATE TABLE name (...) with supported options */
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)") ||
 			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)"))
 		COMPLETE_WITH("INHERITS (", "PARTITION BY", "USING", "TABLESPACE", "WITH (");
-	else if (TailMatches("CREATE", "TEMP|TEMPORARY", "TABLE", MatchAny, "(*)"))
-		COMPLETE_WITH("INHERITS (", "ON COMMIT", "PARTITION BY",
-					  "TABLESPACE", "WITH (");
 	/* Complete CREATE TABLE (...) USING with table access methods */
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)", "USING") ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "TABLE", MatchAny, "(*)", "USING"))
+			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)", "USING"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_table_access_methods);
 	/* Complete CREATE TABLE (...) WITH with storage parameters */
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)", "WITH", "(") ||
-			 TailMatches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "TABLE", MatchAny, "(*)", "WITH", "("))
+			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)", "WITH", "("))
 		COMPLETE_WITH_LIST(table_storage_parameters);
-	/* Complete CREATE TABLE ON COMMIT with actions */
-	else if (TailMatches("CREATE", "TEMP|TEMPORARY", "TABLE", MatchAny, "(*)", "ON", "COMMIT"))
-		COMPLETE_WITH("DELETE ROWS", "DROP", "PRESERVE ROWS");
 
 /* CREATE TABLESPACE */
 	else if (Matches("CREATE", "TABLESPACE", MatchAny))
@@ -3073,7 +3056,7 @@ psql_completion(const char *text, int start, int end)
 
 /* DISCARD */
 	else if (Matches("DISCARD"))
-		COMPLETE_WITH("ALL", "PLANS", "SEQUENCES", "TEMP");
+		COMPLETE_WITH("ALL", "PLANS", "SEQUENCES");
 
 /* DO */
 	else if (Matches("DO"))

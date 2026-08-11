@@ -251,7 +251,7 @@ CREATE COLLATION case_coll ("Lc_Collate" = "POSIX", "Lc_Ctype" = "POSIX");
 
 -- 9.1 bug with useless COLLATE in an expression subject to length coercion
 
-CREATE TEMP TABLE vctable (f1 varchar(25));
+CREATE TABLE vctable (f1 varchar(25));
 INSERT INTO vctable VALUES ('foo' COLLATE "C");
 
 

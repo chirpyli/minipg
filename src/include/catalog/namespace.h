@@ -39,16 +39,6 @@ typedef struct _FuncCandidateList
 }		   *FuncCandidateList;
 
 /*
- * Result of checkTempNamespaceStatus
- */
-typedef enum TempNamespaceStatus
-{
-	TEMP_NAMESPACE_NOT_TEMP,	/* nonexistent, or non-temp namespace */
-	TEMP_NAMESPACE_IDLE,		/* exists, belongs to no active session */
-	TEMP_NAMESPACE_IN_USE		/* belongs to some active session */
-} TempNamespaceStatus;
-
-/*
  *	Structure for xxxOverrideSearchPath functions
  *
  * The generation counter is private to namespace.c and shouldn't be touched
@@ -141,20 +131,6 @@ extern Oid	QualifiedNameGetCreationNamespace(List *names, char **objname_p);
 extern RangeVar *makeRangeVarFromNameList(List *names);
 extern char *NameListToString(List *names);
 extern char *NameListToQuotedString(List *names);
-
-extern bool isTempNamespace(Oid namespaceId);
-extern bool isTempToastNamespace(Oid namespaceId);
-extern bool isTempOrTempToastNamespace(Oid namespaceId);
-extern bool isAnyTempNamespace(Oid namespaceId);
-extern bool isOtherTempNamespace(Oid namespaceId);
-extern TempNamespaceStatus checkTempNamespaceStatus(Oid namespaceId);
-extern int	GetTempNamespaceBackendId(Oid namespaceId);
-extern Oid	GetTempToastNamespace(void);
-extern void GetTempNamespaceState(Oid *tempNamespaceId,
-								  Oid *tempToastNamespaceId);
-extern void SetTempNamespaceState(Oid tempNamespaceId,
-								  Oid tempToastNamespaceId);
-extern void ResetTempTableNamespace(void);
 
 extern OverrideSearchPath *GetOverrideSearchPath(MemoryContext context);
 extern OverrideSearchPath *CopyOverrideSearchPath(OverrideSearchPath *path);

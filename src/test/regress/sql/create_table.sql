@@ -187,15 +187,11 @@ CREATE TYPE unknown_comptype AS (
 	u unknown    -- fail
 );
 
-CREATE TEMPORARY TABLE unlogged2 (a int primary key);			-- OK
+CREATE TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 REINDEX INDEX unlogged2_pkey;
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 DROP TABLE unlogged2;
-CREATE TABLE pg_temp.implicitly_temp (a int primary key);		-- OK
-CREATE TEMP TABLE explicitly_temp (a int primary key);			-- also OK
-CREATE TEMP TABLE pg_temp.doubly_temp (a int primary key);		-- also OK
-CREATE TEMP TABLE public.temp_to_perm (a int primary key);		-- not OK
 
 -- create an extra wide table to test for issues related to that
 -- (temporarily hide query, to avoid the long CREATE TABLE stmt)
@@ -213,11 +209,11 @@ CREATE TABLE withoid() WITH (oids);
 CREATE TABLE withoid() WITH (oids = true);
 
 -- but explicitly not adding oids is still supported
-CREATE TEMP TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
-CREATE TEMP TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;
+CREATE TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
+CREATE TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;
 
 -- temporary tables are ignored by pg_filenode_relation().
-CREATE TEMP TABLE relation_filenode_check(c1 int);
+CREATE TABLE relation_filenode_check(c1 int);
 SELECT relpersistence,
   pg_filenode_relation (reltablespace, pg_relation_filenode(oid))
   FROM pg_class

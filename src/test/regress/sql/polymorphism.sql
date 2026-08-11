@@ -408,7 +408,7 @@ CREATE AGGREGATE mysum2(anyelement,anyelement) (SFUNC = sum3,
   STYPE = anyelement, INITCOND = '0');
 
 -- create test data for polymorphic aggregates
-create temp table t(f1 int, f2 int[], f3 text);
+CREATE TABLE t(f1 int, f2 int[], f3 text);
 insert into t values(1,array[1],'a');
 insert into t values(1,array[11],'b');
 insert into t values(1,array[111],'c');

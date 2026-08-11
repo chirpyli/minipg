@@ -2,7 +2,7 @@
 -- WINDOW FUNCTIONS
 --
 
-CREATE TEMPORARY TABLE empsalary (
+CREATE TABLE empsalary (
     depname varchar,
     empno bigint,
     salary int,
@@ -271,7 +271,7 @@ SELECT sum(unique1) over
 	unique1
 FROM tenk1 WHERE unique1 < 10;
 
-CREATE TEMP VIEW v_window AS
+CREATE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following) as sum_rows
 	FROM generate_series(1, 10) i;
 
@@ -279,7 +279,7 @@ SELECT * FROM v_window;
 
 SELECT pg_get_viewdef('v_window');
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude current row) as sum_rows FROM generate_series(1, 10) i;
 
@@ -287,7 +287,7 @@ SELECT * FROM v_window;
 
 SELECT pg_get_viewdef('v_window');
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude group) as sum_rows FROM generate_series(1, 10) i;
 
@@ -295,7 +295,7 @@ SELECT * FROM v_window;
 
 SELECT pg_get_viewdef('v_window');
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude ties) as sum_rows FROM generate_series(1, 10) i;
 
@@ -303,7 +303,7 @@ SELECT * FROM v_window;
 
 SELECT pg_get_viewdef('v_window');
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude no others) as sum_rows FROM generate_series(1, 10) i;
 
@@ -311,7 +311,7 @@ SELECT * FROM v_window;
 
 SELECT pg_get_viewdef('v_window');
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i groups between 1 preceding and 1 following) as sum_rows FROM generate_series(1, 10) i;
 
 SELECT * FROM v_window;
@@ -320,7 +320,7 @@ SELECT pg_get_viewdef('v_window');
 
 DROP VIEW v_window;
 
-CREATE TEMP VIEW v_window AS
+CREATE VIEW v_window AS
 	SELECT i, min(i) over (order by i range between '1 day' preceding and '10 days' following) as min_i
   FROM generate_series(now(), now()+'100 days'::interval, '1 hour') i;
 
@@ -519,7 +519,7 @@ from generate_series(-9223372036854775806, -9223372036854775804) x;
 
 -- Test in_range for other numeric datatypes
 
-create temp table numerics(
+CREATE TABLE numerics(
     id int,
     f_float4 float4,
     f_float8 float8,
@@ -619,7 +619,7 @@ window w as (order by f_numeric range between
 
 -- Test in_range for other datetime datatypes
 
-create temp table datetimes(
+CREATE TABLE datetimes(
     id int,
     f_time time,
     f_interval interval,
@@ -823,7 +823,7 @@ WINDOW w AS (ORDER BY x groups between 1 preceding and 1 following);
 SELECT count(*) OVER (PARTITION BY four) FROM (SELECT * FROM tenk1 UNION ALL SELECT * FROM tenk2)s LIMIT 0;
 
 -- check some degenerate cases
-create temp table t1 (f1 int, f2 int8);
+CREATE TABLE t1 (f1 int, f2 int8);
 insert into t1 values (1,1),(1,2),(2,2);
 
 select f1, sum(f1) over (partition by f1
@@ -1142,7 +1142,7 @@ CREATE AGGREGATE sum_int_randomrestart (int4)
 	minvfunc = sum_int_randrestart_minvfunc
 );
 
-CREATE TEMP TABLE vs (i int, v int4);
+CREATE TABLE vs (i int, v int4);
 INSERT INTO vs
 	SELECT i, (random() * 100)::int4 AS v
 	FROM generate_series(1, 100) AS i;
@@ -1314,12 +1314,14 @@ SELECT array_agg(i) OVER w
 WINDOW w AS (ORDER BY i ROWS BETWEEN (('foo' < 'foobar')::integer) PRECEDING AND CURRENT ROW);
 
 -- test mutator (fails when inlined if expressions are not mutated)
-CREATE FUNCTION pg_temp.f(group_size BIGINT) RETURNS SETOF integer[]
+-- minipg 已移除临时表/临时 schema 功能，故将 pg_temp 临时函数改为普通 schema 下的函数
+CREATE FUNCTION f(group_size BIGINT) RETURNS SETOF integer[]
 AS $$
     SELECT array_agg(s) OVER w
       FROM generate_series(1,5) s
     WINDOW w AS (ORDER BY s ROWS BETWEEN CURRENT ROW AND GROUP_SIZE FOLLOWING)
 $$ LANGUAGE SQL STABLE;
 
-EXPLAIN (costs off) SELECT * FROM pg_temp.f(2);
-SELECT * FROM pg_temp.f(2);
+EXPLAIN (costs off) SELECT * FROM f(2);
+SELECT * FROM f(2);
+DROP FUNCTION f(BIGINT);

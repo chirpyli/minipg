@@ -1,12 +1,12 @@
 -- from http://www.depesz.com/index.php/2010/04/19/getting-unique-elements/
-CREATE TEMP TABLE articles (
+CREATE TABLE articles (
     id int CONSTRAINT articles_pkey PRIMARY KEY,
     keywords text,
     title text UNIQUE NOT NULL,
     body text UNIQUE,
     created date
 );
-CREATE TEMP TABLE articles_in_category (
+CREATE TABLE articles_in_category (
     article_id int,
     category_id int,
     changed date,
@@ -97,8 +97,8 @@ ERROR:  column "aic.changed" must appear in the GROUP BY clause or be used in an
 LINE 1: SELECT aic.changed
                ^
 -- example from documentation
-CREATE TEMP TABLE products (product_id int, name text, price numeric);
-CREATE TEMP TABLE sales (product_id int, units int);
+CREATE TABLE products (product_id int, name text, price numeric);
+CREATE TABLE sales (product_id int, units int);
 -- OK
 SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
     FROM products p LEFT JOIN sales s USING (product_id)
@@ -124,7 +124,7 @@ SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
 (0 rows)
 
 -- Drupal example, http://drupal.org/node/555530
-CREATE TEMP TABLE node (
+CREATE TABLE node (
     nid SERIAL,
     vid integer NOT NULL default '0',
     type varchar(32) NOT NULL default '',
@@ -135,7 +135,7 @@ CREATE TEMP TABLE node (
     -- snip
     PRIMARY KEY (nid, vid)
 );
-CREATE TEMP TABLE users (
+CREATE TABLE users (
     uid integer NOT NULL default '0',
     name varchar(60) NOT NULL default '',
     pass varchar(32) NOT NULL default '',
@@ -163,7 +163,7 @@ GROUP BY u.uid;
 
 -- Check views and dependencies
 -- fail
-CREATE TEMP VIEW fdv1 AS
+CREATE VIEW fdv1 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY body;
@@ -171,7 +171,7 @@ ERROR:  column "articles.id" must appear in the GROUP BY clause or be used in an
 LINE 2: SELECT id, keywords, title, body, created
                ^
 -- OK
-CREATE TEMP VIEW fdv1 AS
+CREATE VIEW fdv1 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id;
@@ -182,7 +182,7 @@ DETAIL:  view fdv1 depends on constraint articles_pkey on table articles
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP VIEW fdv1;
 -- multiple dependencies
-CREATE TEMP VIEW fdv2 AS
+CREATE VIEW fdv2 AS
 SELECT a.id, a.keywords, a.title, aic.category_id, aic.changed
 FROM articles AS a JOIN articles_in_category AS aic ON a.id = aic.article_id
 WHERE aic.category_id in (14,62,70,53,138)
@@ -197,7 +197,7 @@ DETAIL:  view fdv2 depends on constraint articles_in_category_pkey on table arti
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP VIEW fdv2;
 -- nested queries
-CREATE TEMP VIEW fdv3 AS
+CREATE VIEW fdv3 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id
@@ -209,7 +209,7 @@ ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
 DROP VIEW fdv3;
 ERROR:  view "fdv3" does not exist
-CREATE TEMP VIEW fdv4 AS
+CREATE VIEW fdv4 AS
 SELECT * FROM articles WHERE title IN (SELECT title FROM articles GROUP BY id);
 ERROR:  column "articles.title" must appear in the GROUP BY clause or be used in an aggregate function
 LINE 2: SELECT * FROM articles WHERE title IN (SELECT title FROM art...

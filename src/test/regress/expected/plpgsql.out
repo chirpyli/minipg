@@ -1984,7 +1984,7 @@ drop table perform_test;
 --
 -- Test proper snapshot handling in simple expressions
 --
-create temp table users(login text, id serial);
+CREATE TABLE users(login text, id serial);
 create function sp_id_user(a_login text) returns int as $$
 declare x int;
 begin
@@ -2565,8 +2565,12 @@ select multi_datum_use(42);
 -- Note that a data-modifying query is quasi strict (disallow multi rows)
 -- by default in the planned case, but not in EXECUTE.
 --
-create temp table foo (f1 int, f2 int);
+CREATE TABLE foo (f1 int, f2 int);
+ERROR:  relation "foo" already exists
 insert into foo values (1,2), (3,4);
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into foo values (1,2), (3,4);
+                                  ^
 create or replace function stricttest() returns void as $$
 declare x record;
 begin
@@ -2575,12 +2579,11 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-NOTICE:  x.f1 = 5, x.f2 = 6
- stricttest 
-------------
- 
-(1 row)
-
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into foo values(5,6) returning *
+                                 ^
+QUERY:  insert into foo values(5,6) returning *
+CONTEXT:  PL/pgSQL function stricttest() line 5 at SQL statement
 create or replace function stricttest() returns void as $$
 declare x record;
 begin
@@ -2589,8 +2592,10 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-ERROR:  query returned more than one row
-HINT:  Make sure the query returns a single row, or use LIMIT 1.
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into foo values(7,8),(9,10) returning *
+                                 ^
+QUERY:  insert into foo values(7,8),(9,10) returning *
 CONTEXT:  PL/pgSQL function stricttest() line 5 at SQL statement
 create or replace function stricttest() returns void as $$
 declare x record;
@@ -2600,12 +2605,11 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-NOTICE:  x.f1 = 5, x.f2 = 6
- stricttest 
-------------
- 
-(1 row)
-
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into foo values(5,6) returning *
+                                 ^
+QUERY:  insert into foo values(5,6) returning *
+CONTEXT:  PL/pgSQL function stricttest() line 5 at EXECUTE
 create or replace function stricttest() returns void as $$
 declare x record;
 begin
@@ -2614,22 +2618,23 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-NOTICE:  x.f1 = 7, x.f2 = 8
- stricttest 
-------------
- 
-(1 row)
-
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into foo values(7,8),(9,10) returning *
+                                 ^
+QUERY:  insert into foo values(7,8),(9,10) returning *
+CONTEXT:  PL/pgSQL function stricttest() line 5 at EXECUTE
 select * from foo;
- f1 | f2 
-----+----
-  1 |  2
-  3 |  4
-  5 |  6
-  5 |  6
-  7 |  8
-  9 | 10
-(6 rows)
+ f1 
+----
+ 42
+  3
+ 10
+  7
+   
+   
+  1
+  1
+(8 rows)
 
 create or replace function stricttest() returns void as $$
 declare x record;
@@ -2639,12 +2644,9 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-NOTICE:  x.f1 = 3, x.f2 = 4
- stricttest 
-------------
- 
-(1 row)
-
+ERROR:  record "x" has no field "f2"
+CONTEXT:  SQL expression "x.f2"
+PL/pgSQL function stricttest() line 6 at RAISE
 create or replace function stricttest() returns void as $$
 declare x record;
 begin
@@ -2674,12 +2676,9 @@ begin
   raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
 end$$ language plpgsql;
 select stricttest();
-NOTICE:  x.f1 = 3, x.f2 = 4
- stricttest 
-------------
- 
-(1 row)
-
+ERROR:  record "x" has no field "f2"
+CONTEXT:  SQL expression "x.f2"
+PL/pgSQL function stricttest() line 6 at RAISE
 create or replace function stricttest() returns void as $$
 declare x record;
 begin
@@ -3394,11 +3393,11 @@ NOTICE:  after loop, c2 = <NULL>
 (1 row)
 
 -- try updating the cursor's current row
-create temp table forc_test as
+CREATE TABLE forc_test as
   select n as i, n as j from generate_series(1,10) n;
 ERROR:  syntax error at or near "as"
-LINE 1: create temp table forc_test as
-                                    ^
+LINE 1: CREATE TABLE forc_test as
+                               ^
 create or replace function forc01() returns void as $$
 declare
   c cursor for select * from forc_test;
@@ -4825,7 +4824,7 @@ drop type xy_tuple;
 --
 -- Assorted tests for array subscript assignment
 --
-create temp table rtype (id int, ar text[]);
+CREATE TABLE rtype (id int, ar text[]);
 create function arrayassign1() returns text[] language plpgsql as $$
 declare
  r record;

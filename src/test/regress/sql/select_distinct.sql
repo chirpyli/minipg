@@ -104,7 +104,7 @@ DROP TABLE distinct_group_2;
 -- very own regression file.
 --
 
-CREATE TEMP TABLE disttable (f1 integer);
+CREATE TABLE disttable (f1 integer);
 INSERT INTO DISTTABLE VALUES(1);
 INSERT INTO DISTTABLE VALUES(2);
 INSERT INTO DISTTABLE VALUES(3);

@@ -61,7 +61,8 @@ select trap_matching_test(0);
 select trap_matching_test(100000);
 select trap_matching_test(1);
 
-create temp table foo (f1 int);
+-- 注：minipg 已移除临时表，原 create temp table 改为普通表
+create table foo (f1 int);
 
 create function subxact_rollback_semantics() returns int as $$
 declare x int;

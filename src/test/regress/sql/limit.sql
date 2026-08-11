@@ -97,7 +97,7 @@ SELECT
 -- with ORDER BY and LIMIT.
 --
 
-create temp sequence testseq;
+CREATE SEQUENCE testseq;
 
 explain (verbose, costs off)
 select unique1, unique2, nextval('testseq')

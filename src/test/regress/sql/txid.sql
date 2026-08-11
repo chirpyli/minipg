@@ -14,7 +14,7 @@ select '0:1:'::txid_snapshot;
 select '12:13:0'::txid_snapshot;
 select '12:16:14,13'::txid_snapshot;
 
-create temp table snapshot_test (
+CREATE TABLE snapshot_test (
 	nr	integer,
 	snap	txid_snapshot
 );

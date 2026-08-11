@@ -2,7 +2,7 @@ create extension pg_surgery;
 
 -- create a normal heap table and insert some rows.
 -- use a temp table so that vacuum behavior doesn't depend on global xmin
-create temp table htab (a int);
+CREATE TABLE htab (a int);
 insert into htab values (100), (200), (300), (400), (500);
 
 -- test empty TID array
@@ -39,7 +39,7 @@ select heap_force_freeze('htab'::regclass, ARRAY['(0, 0)', '(0, 6)']::tid[]);
 
 -- set up a new table with a redirected line pointer
 -- use a temp table so that vacuum behavior doesn't depend on global xmin
-create temp table htab2(a int);
+CREATE TABLE htab2(a int);
 insert into htab2 values (100);
 update htab2 set a = 200;
 vacuum htab2;

@@ -151,10 +151,7 @@ hashbuild(Relation heap, Relation index, IndexInfo *indexInfo)
 	 * metapage, nor the first bitmap page.
 	 */
 	sort_threshold = (maintenance_work_mem * 1024L) / BLCKSZ;
-	if (index->rd_rel->relpersistence != RELPERSISTENCE_TEMP)
-		sort_threshold = Min(sort_threshold, NBuffers);
-	else
-		sort_threshold = Min(sort_threshold, NLocBuffer);
+	sort_threshold = Min(sort_threshold, NBuffers);
 
 	if (num_buckets >= (uint32) sort_threshold)
 		buildstate.spool = _h_spoolinit(heap, index, num_buckets);

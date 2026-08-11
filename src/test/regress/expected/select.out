@@ -493,7 +493,7 @@ UNION ALL
 TABLE int8_tbl;
 ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- corner case: VALUES with no columns
-CREATE TEMP TABLE nocols();
+CREATE TABLE nocols();
 INSERT INTO nocols DEFAULT VALUES;
 SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 --
@@ -502,7 +502,7 @@ SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 --
 -- Test ORDER BY options
 --
-CREATE TEMP TABLE foo (f1 int);
+CREATE TABLE foo (f1 int);
 INSERT INTO foo VALUES (42),(3),(10),(7),(null),(null),(1);
 SELECT * FROM foo ORDER BY f1;
  f1 

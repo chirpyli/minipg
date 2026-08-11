@@ -6,7 +6,7 @@
 
 create type complex as (r float8, i float8);
 
-create temp table fullname (first text, last text);
+CREATE TABLE fullname (first text, last text);
 
 -- Nested composite
 
@@ -31,7 +31,7 @@ select '[]'::fullname;          -- bad
 select ' (Joe,Blow)  '::fullname;  -- ok, extra whitespace
 select '(Joe,Blow) /'::fullname;  -- bad
 
-create temp table quadtable(f1 int, q quad);
+CREATE TABLE quadtable(f1 int, q quad);
 
 insert into quadtable values (1, ((3.3,4.4),(5.5,6.6)));
 insert into quadtable values (2, ((null,4.4),(5.5,6.6)));
@@ -42,7 +42,7 @@ select f1, q.c1 from quadtable;		-- fails, q is a table reference
 
 select f1, (q).c1, (qq.q).c1.i from quadtable qq;
 
-create temp table people (fn fullname, bd date);
+CREATE TABLE people (fn fullname, bd date);
 
 insert into people values ('(Joe,Blow)', '1984-01-10');
 
@@ -73,7 +73,7 @@ select * from quadtable;
 -- composite values don't cause problems.  The large f1 value will
 -- be toasted inside pp, it must still work after being copied to people.
 
-create temp table pp (f1 text);
+CREATE TABLE pp (f1 text);
 insert into pp values (repeat('abcdefghijkl', 100000));
 
 insert into people select ('Jim', f1, null)::fullname, current_date from pp;
@@ -156,7 +156,7 @@ where (998, 5000) < (thousand, hundred)
 order by thousand, hundred;
 
 -- Test case for bug #14010: indexed row comparisons fail with nulls
-create temp table test_table (a text, b text);
+CREATE TABLE test_table (a text, b text);
 insert into test_table values ('a', 'b');
 insert into test_table select 'a', null from generate_series(1,1000);
 insert into test_table values ('b', 'a');
@@ -203,7 +203,7 @@ select row(1,1.1) = any (array[ row(7,7.7), row(1,1.0), row(0,0.0) ]);
 
 -- Check behavior with a non-comparable rowtype
 create type cantcompare as (p point, r float8);
-create temp table cc (f1 cantcompare);
+CREATE TABLE cc (f1 cantcompare);
 insert into cc values('("(1,2)",3)');
 insert into cc values('("(4,5)",6)');
 select * from cc order by f1; -- fail, but should complain about cantcompare
@@ -358,7 +358,7 @@ rollback;
 -- parameters for SQL functions
 --
 
-create temp table compos (f1 int, f2 text);
+CREATE TABLE compos (f1 int, f2 text);
 
 create function fcompos1(v compos) returns void as $$
 insert into compos values (v);  -- fail

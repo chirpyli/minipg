@@ -208,7 +208,7 @@ SELECT r1.*, r2.*
 (45 rows)
 
 -- Test intervals that are large enough to overflow 64 bits in comparisons
-CREATE TEMP TABLE INTERVAL_TBL_OF (f1 interval);
+CREATE TABLE INTERVAL_TBL_OF (f1 interval);
 INSERT INTO INTERVAL_TBL_OF (f1) VALUES
   ('2147483647 days 2147483647 months'),
   ('2147483647 days -2147483648 months'),

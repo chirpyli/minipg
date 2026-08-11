@@ -159,30 +159,23 @@ CREATE TYPE unknown_comptype AS (
 	u unknown    -- fail
 );
 ERROR:  column "u" has pseudo-type unknown
-CREATE TEMPORARY TABLE unlogged2 (a int primary key);			-- OK
+CREATE TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
     relname     | relkind | relpersistence 
 ----------------+---------+----------------
- unlogged2      | r       | t
- unlogged2_pkey | i       | t
+ unlogged2      | r       | p
+ unlogged2_pkey | i       | p
 (2 rows)
 
 REINDEX INDEX unlogged2_pkey;
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
     relname     | relkind | relpersistence 
 ----------------+---------+----------------
- unlogged2      | r       | t
- unlogged2_pkey | i       | t
+ unlogged2      | r       | p
+ unlogged2_pkey | i       | p
 (2 rows)
 
 DROP TABLE unlogged2;
-CREATE TABLE pg_temp.implicitly_temp (a int primary key);		-- OK
-CREATE TEMP TABLE explicitly_temp (a int primary key);			-- also OK
-CREATE TEMP TABLE pg_temp.doubly_temp (a int primary key);		-- also OK
-CREATE TEMP TABLE public.temp_to_perm (a int primary key);		-- not OK
-ERROR:  cannot create temporary relation in non-temporary schema
-LINE 1: CREATE TEMP TABLE public.temp_to_perm (a int primary key);
-                          ^
 -- create an extra wide table to test for issues related to that
 -- (temporarily hide query, to avoid the long CREATE TABLE stmt)
 \set ECHO none
@@ -203,17 +196,17 @@ ERROR:  tables declared WITH OIDS are not supported
 CREATE TABLE withoid() WITH (oids = true);
 ERROR:  tables declared WITH OIDS are not supported
 -- but explicitly not adding oids is still supported
-CREATE TEMP TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
-CREATE TEMP TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;
+CREATE TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
+CREATE TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;
 -- temporary tables are ignored by pg_filenode_relation().
-CREATE TEMP TABLE relation_filenode_check(c1 int);
+CREATE TABLE relation_filenode_check(c1 int);
 SELECT relpersistence,
   pg_filenode_relation (reltablespace, pg_relation_filenode(oid))
   FROM pg_class
   WHERE relname = 'relation_filenode_check';
- relpersistence | pg_filenode_relation 
-----------------+----------------------
- t              | 
+ relpersistence |  pg_filenode_relation   
+----------------+-------------------------
+ p              | relation_filenode_check
 (1 row)
 
 DROP TABLE relation_filenode_check;

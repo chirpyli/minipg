@@ -3457,15 +3457,13 @@ get_namespace_name(Oid nspid)
 /*
  * get_namespace_name_or_temp
  *		As above, but if it is this backend's temporary namespace, return
- *		"pg_temp" instead.
+ *		"pg_temp" instead.  Temporary namespaces are no longer supported, so
+ *		this is equivalent to get_namespace_name.
  */
 char *
 get_namespace_name_or_temp(Oid nspid)
 {
-	if (isTempNamespace(nspid))
-		return "pg_temp";
-	else
-		return get_namespace_name(nspid);
+	return get_namespace_name(nspid);
 }
 
 /*				---------- PG_RANGE CACHES ----------				 */

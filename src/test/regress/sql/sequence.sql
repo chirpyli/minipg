@@ -148,9 +148,9 @@ SELECT * FROM serialTest1;
 --
 -- Check dependencies of serial and ordinary sequences
 --
-CREATE TEMP SEQUENCE myseq2;
-CREATE TEMP SEQUENCE myseq3;
-CREATE TEMP TABLE t1 (
+CREATE SEQUENCE myseq2;
+CREATE SEQUENCE myseq3;
+CREATE TABLE t1 (
   f1 serial,
   f2 int DEFAULT nextval('myseq2'),
   f3 int DEFAULT nextval('myseq3'::text)
@@ -272,7 +272,7 @@ DROP SEQUENCE seq2;
 SELECT lastval();
 
 -- Test sequences in read-only transactions
-CREATE TEMPORARY SEQUENCE sequence_test_temp1;
+CREATEORARY SEQUENCE sequence_test_temp1;
 START TRANSACTION READ ONLY;
 SELECT nextval('sequence_test_temp1');  -- ok
 SELECT nextval('sequence_test2');  -- error

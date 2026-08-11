@@ -44,7 +44,7 @@ DiscardCommand(DiscardStmt *stmt, bool isTopLevel)
 			break;
 
 		case DISCARD_TEMP:
-			ResetTempTableNamespace();
+			/* Temporary tables are no longer supported. */
 			break;
 
 		default:
@@ -71,6 +71,5 @@ DiscardAll(bool isTopLevel)
 	DropAllPreparedStatements();
 	LockReleaseAll(USER_LOCKMETHOD, true);
 	ResetPlanCache();
-	ResetTempTableNamespace();
 	ResetSequenceCaches();
 }

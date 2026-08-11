@@ -2582,8 +2582,7 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 				continue;
 
 		/* Skip temp tables of other backends; we can't reindex them at all */
-		if (classtuple->relpersistence == RELPERSISTENCE_TEMP &&
-			!isTempNamespace(classtuple->relnamespace))
+		if (classtuple->relpersistence == RELPERSISTENCE_TEMP)
 			continue;
 
 		/* Check user/system classification, and optionally skip */

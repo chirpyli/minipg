@@ -215,21 +215,14 @@ IsCatalogNamespace(Oid namespaceId)
 
 /*
  * IsToastNamespace
- *		True iff namespace is pg_toast or my temporary-toast-table namespace.
+ *		True iff namespace is pg_toast.
  *
  *		Does not perform any catalog accesses.
- *
- * Note: this will return false for temporary-toast-table namespaces belonging
- * to other backends.  Those are treated the same as other backends' regular
- * temp table namespaces, and access is prevented where appropriate.
- * If you need to check for those, you may be able to use isAnyTempNamespace,
- * but beware that that does involve a catalog access.
  */
 bool
 IsToastNamespace(Oid namespaceId)
 {
-	return (namespaceId == PG_TOAST_NAMESPACE) ||
-		isTempToastNamespace(namespaceId);
+	return (namespaceId == PG_TOAST_NAMESPACE);
 }
 
 
@@ -465,18 +458,9 @@ GetNewRelFileNode(Oid reltablespace, Relation pg_class, char relpersistence)
 	 */
 	Assert(!IsBinaryUpgrade);
 
-	switch (relpersistence)
-	{
-		case RELPERSISTENCE_TEMP:
-			backend = BackendIdForTempRelations();
-			break;
-		case RELPERSISTENCE_PERMANENT:
-			backend = InvalidBackendId;
-			break;
-		default:
-			elog(ERROR, "invalid relpersistence: %c", relpersistence);
-			return InvalidOid;	/* placate compiler */
-	}
+	(void) relpersistence;		/* 临时表已裁剪，relpersistence 恒为 PERMANENT */
+
+	backend = InvalidBackendId;
 
 	/* This logic should match RelationInitPhysicalAddr */
 	rnode.node.spcNode = reltablespace ? reltablespace : MyDatabaseTableSpace;

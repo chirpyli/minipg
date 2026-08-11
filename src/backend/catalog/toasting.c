@@ -236,13 +236,11 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	TupleDescAttr(tupdesc, 2)->attcompression = InvalidCompressionMethod;
 
 	/*
-	 * Toast tables for regular relations go in pg_toast; those for temp
-	 * relations go into the per-backend temp-toast-table namespace.
+	 * Toast tables always go in pg_toast; temporary relations (which had
+	 * their own per-backend temp-toast-table namespace) are no longer
+	 * supported.
 	 */
-	if (isTempOrTempToastNamespace(rel->rd_rel->relnamespace))
-		namespaceid = GetTempToastNamespace();
-	else
-		namespaceid = PG_TOAST_NAMESPACE;
+	namespaceid = PG_TOAST_NAMESPACE;
 
 	/* Toast table is shared if and only if its parent is. */
 	shared_relation = rel->rd_rel->relisshared;

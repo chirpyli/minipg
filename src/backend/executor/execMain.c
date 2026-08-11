@@ -561,9 +561,6 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 		if ((rte->requiredPerms & (~ACL_SELECT)) == 0)
 			continue;
 
-		if (isTempNamespace(get_rel_namespace(rte->relid)))
-			continue;
-
 		PreventCommandIfReadOnly(CreateCommandName((Node *) plannedstmt));
 	}
 

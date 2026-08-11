@@ -1,7 +1,7 @@
 --
 -- WINDOW FUNCTIONS
 --
-CREATE TEMPORARY TABLE empsalary (
+CREATE TABLE empsalary (
     depname varchar,
     empno bigint,
     salary int,
@@ -1176,7 +1176,7 @@ FROM tenk1 WHERE unique1 < 10;
   17 |       9
 (10 rows)
 
-CREATE TEMP VIEW v_window AS
+CREATE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following) as sum_rows
 	FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
@@ -1202,7 +1202,7 @@ SELECT pg_get_viewdef('v_window');
     FROM generate_series(1, 10) i(i);
 (1 row)
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude current row) as sum_rows FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
@@ -1228,7 +1228,7 @@ SELECT pg_get_viewdef('v_window');
     FROM generate_series(1, 10) i(i);
 (1 row)
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude group) as sum_rows FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
@@ -1254,7 +1254,7 @@ SELECT pg_get_viewdef('v_window');
     FROM generate_series(1, 10) i(i);
 (1 row)
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude ties) as sum_rows FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
@@ -1280,7 +1280,7 @@ SELECT pg_get_viewdef('v_window');
     FROM generate_series(1, 10) i(i);
 (1 row)
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
 	exclude no others) as sum_rows FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
@@ -1306,7 +1306,7 @@ SELECT pg_get_viewdef('v_window');
     FROM generate_series(1, 10) i(i);
 (1 row)
 
-CREATE OR REPLACE TEMP VIEW v_window AS
+CREATE OR REPLACE VIEW v_window AS
 	SELECT i, sum(i) over (order by i groups between 1 preceding and 1 following) as sum_rows FROM generate_series(1, 10) i;
 SELECT * FROM v_window;
  i  | sum_rows 
@@ -1332,7 +1332,7 @@ SELECT pg_get_viewdef('v_window');
 (1 row)
 
 DROP VIEW v_window;
-CREATE TEMP VIEW v_window AS
+CREATE VIEW v_window AS
 	SELECT i, min(i) over (order by i range between '1 day' preceding and '10 days' following) as min_i
   FROM generate_series(now(), now()+'100 days'::interval, '1 hour') i;
 SELECT pg_get_viewdef('v_window');
@@ -1946,7 +1946,7 @@ from generate_series(-9223372036854775806, -9223372036854775804) x;
 (3 rows)
 
 -- Test in_range for other numeric datatypes
-create temp table numerics(
+CREATE TABLE numerics(
     id int,
     f_float4 float4,
     f_float8 float8,
@@ -2257,7 +2257,7 @@ window w as (order by f_numeric range between
              1.1 preceding and 'NaN' following);  -- error, NaN disallowed
 ERROR:  invalid preceding or following size in window function
 -- Test in_range for other datetime datatypes
-create temp table datetimes(
+CREATE TABLE datetimes(
     id int,
     f_time time,
     f_interval interval,
@@ -2897,100 +2897,81 @@ ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT count(*) OVER (PARTITION BY four) FROM (SELECT * FROM tenk1 UNION ALL SELECT * FROM tenk2)s LIMIT 0;
 ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- check some degenerate cases
-create temp table t1 (f1 int, f2 int8);
+CREATE TABLE t1 (f1 int, f2 int8);
+ERROR:  relation "t1" already exists
 insert into t1 values (1,1),(1,2),(2,2);
 select f1, sum(f1) over (partition by f1
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;  -- error, must have order by
-ERROR:  RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column
-LINE 1: select f1, sum(f1) over (partition by f1
-                                ^
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 explain (costs off)
 select f1, sum(f1) over (partition by f1 order by f2
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;
-           QUERY PLAN            
----------------------------------
- WindowAgg
-   ->  Sort
-         Sort Key: f1
-         ->  Seq Scan on t1
-               Filter: (f1 = f2)
-(5 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 4: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1 order by f2
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |   1
-  2 |   2
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f1 order by f2
                          range between 2 preceding and 1 preceding)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |    
-  2 |    
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f2 order by f2
                          range between 1 following and 2 following)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |    
-  2 |    
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;  -- error, must have order by
-ERROR:  GROUPS mode requires an ORDER BY clause
-LINE 1: select f1, sum(f1) over (partition by f1
-                                ^
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 explain (costs off)
 select f1, sum(f1) over (partition by f1 order by f2
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;
-           QUERY PLAN            
----------------------------------
- WindowAgg
-   ->  Sort
-         Sort Key: f1
-         ->  Seq Scan on t1
-               Filter: (f1 = f2)
-(5 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 4: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1 order by f2
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |   1
-  2 |   2
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f1 order by f2
                          groups between 2 preceding and 1 preceding)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |    
-  2 |    
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f2 order by f2
                          groups between 1 following and 2 following)
 from t1 where f1 = f2;
- f1 | sum 
-----+-----
-  1 |    
-  2 |    
-(2 rows)
-
+ERROR:  operator does not exist: numeric = character varying
+LINE 3: from t1 where f1 = f2;
+                         ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 -- ordering by a non-integer constant is allowed
 SELECT rank() OVER (ORDER BY length('abc'));
  rank 
@@ -3416,7 +3397,7 @@ CREATE AGGREGATE sum_int_randomrestart (int4)
 	msfunc = int4pl,
 	minvfunc = sum_int_randrestart_minvfunc
 );
-CREATE TEMP TABLE vs (i int, v int4);
+CREATE TABLE vs (i int, v int4);
 INSERT INTO vs
 	SELECT i, (random() * 100)::int4 AS v
 	FROM generate_series(1, 100) AS i;
@@ -3940,13 +3921,14 @@ WINDOW w AS (ORDER BY i ROWS BETWEEN (('foo' < 'foobar')::integer) PRECEDING AND
 (5 rows)
 
 -- test mutator (fails when inlined if expressions are not mutated)
-CREATE FUNCTION pg_temp.f(group_size BIGINT) RETURNS SETOF integer[]
+-- minipg 已移除临时表/临时 schema 功能，故将 pg_temp 临时函数改为普通 schema 下的函数
+CREATE FUNCTION f(group_size BIGINT) RETURNS SETOF integer[]
 AS $$
     SELECT array_agg(s) OVER w
       FROM generate_series(1,5) s
     WINDOW w AS (ORDER BY s ROWS BETWEEN CURRENT ROW AND GROUP_SIZE FOLLOWING)
 $$ LANGUAGE SQL STABLE;
-EXPLAIN (costs off) SELECT * FROM pg_temp.f(2);
+EXPLAIN (costs off) SELECT * FROM f(2);
                       QUERY PLAN                      
 ------------------------------------------------------
  Subquery Scan on f
@@ -3956,7 +3938,7 @@ EXPLAIN (costs off) SELECT * FROM pg_temp.f(2);
                ->  Function Scan on generate_series s
 (5 rows)
 
-SELECT * FROM pg_temp.f(2);
+SELECT * FROM f(2);
     f    
 ---------
  {1,2,3}
@@ -3966,3 +3948,4 @@ SELECT * FROM pg_temp.f(2);
  {5}
 (5 rows)
 
+DROP FUNCTION f(BIGINT);

@@ -812,7 +812,7 @@ describeTypes(const char *pattern, bool verbose, bool showSystem)
 		if (pset.sversion >= 80300)
 			appendPQExpBufferStr(&buf, "  AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_type el WHERE el.oid = t.typelem AND el.typarray = t.oid)\n");
 		else
-			appendPQExpBufferStr(&buf, "  AND t.typname !~ '^_'\n");
+			appendPQExpBufferStr(&buf, "  AND t.typname NOT LIKE '\\_%' ESCAPE '\\'\n");
 	}
 
 	if (!showSystem && !pattern)
@@ -1177,7 +1177,7 @@ permissionsList(const char *pattern)
 	 */
 	if (!validateSQLNamePattern(&buf, pattern, true, false,
 								"n.nspname", "c.relname", NULL,
-								"n.nspname !~ '^pg_' AND pg_catalog.pg_table_is_visible(c.oid)",
+								"n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' AND pg_catalog.pg_table_is_visible(c.oid)",
 								NULL, 3))
 		return false;
 
@@ -3537,7 +3537,7 @@ describeRoles(const char *pattern, bool verbose, bool showSystem)
 		appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_roles r\n");
 
 		if (!showSystem && !pattern)
-			appendPQExpBufferStr(&buf, "WHERE r.rolname !~ '^pg_'\n");
+			appendPQExpBufferStr(&buf, "WHERE r.rolname NOT LIKE 'pg\\_%' ESCAPE '\\'\n");
 
 		if (!validateSQLNamePattern(&buf, pattern, false, false,
 									NULL, "r.rolname", NULL, NULL,
@@ -3905,7 +3905,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 
 	if (!showSystem && !pattern)
 		appendPQExpBufferStr(&buf, "      AND n.nspname <> 'pg_catalog'\n"
-							 "      AND n.nspname !~ '^pg_toast'\n"
+							 "      AND n.nspname NOT LIKE 'pg_toast%'\n"
 							 "      AND n.nspname <> 'information_schema'\n");
 
 	if (!validateSQLNamePattern(&buf, pattern, true, false,
@@ -4119,7 +4119,7 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 
 	if (!pattern)
 		appendPQExpBufferStr(&buf, "      AND n.nspname <> 'pg_catalog'\n"
-							 "      AND n.nspname !~ '^pg_toast'\n"
+							 "      AND n.nspname NOT LIKE 'pg_toast%'\n"
 							 "      AND n.nspname <> 'information_schema'\n");
 
 	if (!validateSQLNamePattern(&buf, pattern, true, false,
@@ -4747,7 +4747,7 @@ listSchemas(const char *pattern, bool verbose, bool showSystem)
 
 	if (!showSystem && !pattern)
 		appendPQExpBufferStr(&buf,
-							 "WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'\n");
+							 "WHERE n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' AND n.nspname <> 'information_schema'\n");
 
 	if (!validateSQLNamePattern(&buf, pattern,
 								!showSystem && !pattern, false,

@@ -500,7 +500,7 @@ select 'y123'::dtop; -- fail
 select 'yz23'::dtop; -- fail
 select 'xz23'::dtop; -- fail
 
-create temp table dtest(f1 dtop);
+CREATE TABLE dtest(f1 dtop);
 
 insert into dtest values('x123');
 insert into dtest values('x1234'); -- fail, implicit coercion
@@ -671,7 +671,7 @@ create domain orderedpair as int[2] check (value[1] < value[2]);
 select array[1,2]::orderedpair;
 select array[2,1]::orderedpair;  -- fail
 
-create temp table op (f1 orderedpair);
+CREATE TABLE op (f1 orderedpair);
 insert into op values (array[1,2]);
 insert into op values (array[2,1]);  -- fail
 

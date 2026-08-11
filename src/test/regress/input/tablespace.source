@@ -122,7 +122,7 @@ SELECT relid, parentrelid, level FROM pg_partition_tree('tbspace_reindex_part_in
   ORDER BY relid, level;
 -- Track the original tablespace, relfilenode and OID of each index
 -- in the tree.
-CREATE TEMP TABLE reindex_temp_before AS
+CREATE TABLE reindex_temp_before AS
   SELECT oid, relname, relfilenode, reltablespace
   FROM pg_class
     WHERE relname ~ 'tbspace_reindex_part_index';

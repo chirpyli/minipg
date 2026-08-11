@@ -196,7 +196,7 @@ REINDEX INDEX hash_split_index;
 DROP TABLE hash_split_heap;
 
 -- Index on temp table.
-CREATE TEMP TABLE hash_temp_heap (x int, y int);
+CREATE TABLE hash_temp_heap (x int, y int);
 INSERT INTO hash_temp_heap VALUES (1,1);
 CREATE INDEX hash_idx ON hash_temp_heap USING hash (x);
 DROP TABLE hash_temp_heap CASCADE;

@@ -978,26 +978,7 @@ pg_relation_filepath(PG_FUNCTION_ARGS)
 	}
 
 	/* Determine owning backend. */
-	switch (relform->relpersistence)
-	{
-		case RELPERSISTENCE_PERMANENT:
-			backend = InvalidBackendId;
-			break;
-		case RELPERSISTENCE_TEMP:
-			if (isTempOrTempToastNamespace(relform->relnamespace))
-				backend = BackendIdForTempRelations();
-			else
-			{
-				/* Do it the hard way. */
-				backend = GetTempNamespaceBackendId(relform->relnamespace);
-				Assert(backend != InvalidBackendId);
-			}
-			break;
-		default:
-			elog(ERROR, "invalid relpersistence: %c", relform->relpersistence);
-			backend = InvalidBackendId; /* placate compiler */
-			break;
-	}
+	backend = InvalidBackendId;
 
 	ReleaseSysCache(tuple);
 

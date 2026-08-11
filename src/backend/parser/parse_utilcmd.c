@@ -206,8 +206,7 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 * are earlier in the search path.  But a local temp table is effectively
 	 * specified to be in pg_temp, so no need for anything extra in that case.
 	 */
-	if (stmt->relation->schemaname == NULL
-		&& stmt->relation->relpersistence != RELPERSISTENCE_TEMP)
+	if (stmt->relation->schemaname == NULL)
 		stmt->relation->schemaname = get_namespace_name(namespaceid);
 
 	/* Set up CreateStmtContext */

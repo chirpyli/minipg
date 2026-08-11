@@ -30,7 +30,7 @@ ROLLBACK;
 
 -- DDL
 
-create temporary table hstemp1 (col1 integer);
+CREATE TABLE hstemp1 (col1 integer);
 BEGIN;
 drop table hs2;
 ROLLBACK;

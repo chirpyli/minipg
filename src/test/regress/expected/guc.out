@@ -549,29 +549,14 @@ DETAIL:  Custom parameter names must be two or more simple identifiers separated
 SHOW special."weird name";
 ERROR:  unrecognized configuration parameter "special.weird name"
 --
--- Test DISCARD TEMP
---
-CREATE TEMP TABLE reset_test ( data text ) ON COMMIT DELETE ROWS;
-SELECT relname FROM pg_class WHERE relname = 'reset_test';
-  relname   
-------------
- reset_test
-(1 row)
-
-DISCARD TEMP;
-SELECT relname FROM pg_class WHERE relname = 'reset_test';
- relname 
----------
-(0 rows)
-
---
 -- Test DISCARD ALL
 --
 -- do changes
 DECLARE foo CURSOR WITH HOLD FOR SELECT 1;
 PREPARE foo AS SELECT 1;
 SET vacuum_cost_delay = 13;
-CREATE TEMP TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
+CREATE TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
+ERROR:  ON COMMIT can only be used on temporary tables
 -- look changes
 SELECT name FROM pg_prepared_statements;
  name 
@@ -594,8 +579,7 @@ SHOW vacuum_cost_delay;
 SELECT relname from pg_class where relname = 'tmp_foo';
  relname 
 ---------
- tmp_foo
-(1 row)
+(0 rows)
 
 SELECT current_user = 'regress_guc_user';
  ?column? 

@@ -2,7 +2,7 @@
 -- Tests to exercise the plan caching/invalidation mechanism
 --
 
-CREATE TEMP TABLE pcachetest AS SELECT * FROM int8_tbl;
+CREATE TABLE pcachetest AS SELECT * FROM int8_tbl;
 
 -- create and use a cached plan
 PREPARE prepstmt AS SELECT * FROM pcachetest;
@@ -22,7 +22,7 @@ EXECUTE prepstmt2(123);
 
 -- recreate the temp table (this demonstrates that the raw plan is
 -- purely textual and doesn't depend on OIDs, for instance)
-CREATE TEMP TABLE pcachetest AS SELECT * FROM int8_tbl ORDER BY 2;
+CREATE TABLE pcachetest AS SELECT * FROM int8_tbl ORDER BY 2;
 
 EXECUTE prepstmt;
 EXECUTE prepstmt2(123);
@@ -42,14 +42,14 @@ EXECUTE prepstmt2(123);
 
 -- Try it with a view, which isn't directly used in the resulting plan
 -- but should trigger invalidation anyway
-CREATE TEMP VIEW pcacheview AS
+CREATE VIEW pcacheview AS
   SELECT * FROM pcachetest;
 
 PREPARE vprep AS SELECT * FROM pcacheview;
 
 EXECUTE vprep;
 
-CREATE OR REPLACE TEMP VIEW pcacheview AS
+CREATE OR REPLACE VIEW pcacheview AS
   SELECT q1, q2/2 AS q2 FROM pcachetest;
 
 EXECUTE vprep;
@@ -59,7 +59,7 @@ EXECUTE vprep;
 create function cache_test(int) returns int as $$
 declare total int;
 begin
-	create temp table t1(f1 int);
+	CREATE TABLE t1(f1 int);
 	insert into t1 values($1);
 	insert into t1 values(11);
 	insert into t1 values(12);
@@ -76,7 +76,7 @@ select cache_test(3);
 
 -- Check invalidation of plpgsql "simple expression"
 
-create temp view v1 as
+CREATE VIEW v1 as
   select 2+2 as f1;
 
 create function cache_test_2() returns int as $$
@@ -86,11 +86,11 @@ end$$ language plpgsql;
 
 select cache_test_2();
 
-create or replace temp view v1 as
+CREATE OR REPLACE VIEW v1 as
   select 2+2+4 as f1;
 select cache_test_2();
 
-create or replace temp view v1 as
+CREATE OR REPLACE VIEW v1 as
   select 2+2+4+(select max(unique1) from tenk1) as f1;
 select cache_test_2();
 
@@ -128,7 +128,7 @@ reset search_path;
 
 -- Check that invalidation deals with regclass constants
 
-create temp sequence seq;
+CREATE SEQUENCE seq;
 
 prepare p2 as select nextval('seq');
 
@@ -136,7 +136,7 @@ execute p2;
 
 drop sequence seq;
 
-create temp sequence seq;
+CREATE SEQUENCE seq;
 
 execute p2;
 
@@ -147,8 +147,8 @@ create function cachebug() returns void as $$
 declare r int;
 begin
   drop table if exists temptable cascade;
-  create temp table temptable as select * from generate_series(1,3) as f1;
-  create temp view vv as select * from temptable;
+  CREATE TABLE temptable as select * from generate_series(1,3) as f1;
+  CREATE VIEW vv as select * from temptable;
   for r in select * from vv loop
     raise notice '%', r;
   end loop;

@@ -124,20 +124,8 @@ RelationCreateStorage(RelFileNode rnode, char relpersistence)
 
 	Assert(!IsInParallelMode());	/* couldn't update pendingSyncHash */
 
-	switch (relpersistence)
-	{
-		case RELPERSISTENCE_TEMP:
-			backend = BackendIdForTempRelations();
-			needs_wal = false;
-			break;
-		case RELPERSISTENCE_PERMANENT:
-			backend = InvalidBackendId;
-			needs_wal = true;
-			break;
-		default:
-			elog(ERROR, "invalid relpersistence: %c", relpersistence);
-			return NULL;		/* placate compiler */
-	}
+	backend = InvalidBackendId;
+	needs_wal = true;
 
 	srel = smgropen(rnode, backend);
 	smgrcreate(srel, MAIN_FORKNUM, false);

@@ -129,7 +129,7 @@ rollback;
 
 -- \gexec
 
-create temporary table gexec_test(a int, b text, c date, d float);
+CREATE TABLE gexec_test(a int, b text, c date, d float);
 select format('create index on gexec_test(%I)', attname)
 from pg_attribute
 where attrelid = 'gexec_test'::regclass and attnum > 0

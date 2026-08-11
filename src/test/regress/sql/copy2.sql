@@ -1,4 +1,4 @@
-CREATE TEMP TABLE x (
+CREATE TABLE x (
 	a serial,
 	b int,
 	c text not null default 'stuff',
@@ -143,7 +143,7 @@ COPY x TO stdout;
 COPY x (c, e) TO stdout;
 COPY x (b, e) TO stdout WITH NULL 'I''m null';
 
-CREATE TEMP TABLE y (
+CREATE TABLE y (
 	col1 text,
 	col2 text
 );
@@ -171,7 +171,7 @@ COPY y TO stdout (FORMAT CSV, FORCE_QUOTE *);
 
 --test that we read consecutive LFs properly
 
-CREATE TEMP TABLE testnl (a int, b text, c int);
+CREATE TABLE testnl (a int, b text, c int);
 
 COPY testnl FROM stdin CSV;
 1,"a field with two LFs
@@ -180,7 +180,7 @@ inside",2
 \.
 
 -- test end of copy marker
-CREATE TEMP TABLE testeoc (a text);
+CREATE TABLE testeoc (a text);
 
 COPY testeoc FROM stdin CSV;
 a\.
@@ -193,7 +193,7 @@ COPY testeoc TO stdout CSV;
 
 -- test handling of nonstandard null marker that violates escaping rules
 
-CREATE TEMP TABLE testnull(a int, b text);
+CREATE TABLE testnull(a int, b text);
 INSERT INTO testnull VALUES (1, E'\\0'), (NULL, NULL);
 
 COPY testnull TO stdout WITH NULL AS E'\\0';
@@ -298,7 +298,7 @@ SELECT * FROM vistest;
 COMMIT;
 SELECT * FROM vistest;
 -- Test FORCE_NOT_NULL and FORCE_NULL options
-CREATE TEMP TABLE forcetest (
+CREATE TABLE forcetest (
     a INT NOT NULL,
     b TEXT NOT NULL,
     c TEXT,

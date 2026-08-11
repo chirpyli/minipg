@@ -144,8 +144,8 @@ select count(distinct ss.ten) from
 -- Luca Pireddu and Michael Fuhr.
 --
 
-CREATE TEMP TABLE foo (id integer);
-CREATE TEMP TABLE bar (id1 integer, id2 integer);
+CREATE TABLE foo (id integer);
+CREATE TABLE bar (id1 integer, id2 integer);
 
 INSERT INTO foo VALUES (1);
 
@@ -240,19 +240,19 @@ DROP TABLE orderstest cascade;
 -- hasSubLinks flag correctly.  Per example from Kyle Bateman.
 --
 
-create temp table parts (
+CREATE TABLE parts (
     partnum     text,
     cost        float8
 );
 
-create temp table shipped (
+CREATE TABLE shipped (
     ttype       char(2),
     ordnum      int4,
     partnum     text,
     value       float8
 );
 
-create temp view shipped_view as
+CREATE VIEW shipped_view as
     select * from shipped where ttype = 'wt';
 
 create rule shipped_view_insert as on insert to shipped_view do instead
@@ -304,10 +304,10 @@ select * from (
 -- pointless.)
 --
 
-create temp table numeric_table (num_col numeric);
+CREATE TABLE numeric_table (num_col numeric);
 insert into numeric_table values (1), (1.000000000000000000001), (2), (3);
 
-create temp table float_table (float_col float8);
+CREATE TABLE float_table (float_col float8);
 insert into float_table values (1), (2), (3);
 
 select * from float_table
@@ -320,19 +320,19 @@ select * from numeric_table
 -- Test case for bug #4290: bogus calculation of subplan param sets
 --
 
-create temp table ta (id int primary key, val int);
+CREATE TABLE ta (id int primary key, val int);
 
 insert into ta values(1,1);
 insert into ta values(2,2);
 
-create temp table tb (id int primary key, aval int);
+CREATE TABLE tb (id int primary key, aval int);
 
 insert into tb values(1,1);
 insert into tb values(2,1);
 insert into tb values(3,2);
 insert into tb values(4,2);
 
-create temp table tc (id int primary key, aid int);
+CREATE TABLE tc (id int primary key, aid int);
 
 insert into tc values(1,1);
 insert into tc values(2,2);
@@ -346,7 +346,7 @@ from tc;
 -- Test case for 8.3 "failed to locate grouping columns" bug
 --
 
-create temp table t1 (f1 numeric(14,0), f2 varchar(30));
+CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
 
 select * from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
@@ -357,10 +357,10 @@ group by f1,f2,fs;
 -- Test case for bug #5514 (mishandling of whole-row Vars in subselects)
 --
 
-create temp table table_a(id integer);
+CREATE TABLE table_a(id integer);
 insert into table_a values (42);
 
-create temp view view_a as select * from table_a;
+CREATE VIEW view_a as select * from table_a;
 
 select view_a from view_a;
 select (select view_a) from view_a;
@@ -407,7 +407,7 @@ from
 --
 -- Test case for subselect within UPDATE of INSERT...ON CONFLICT DO UPDATE
 --
-create temp table upsert(key int4 primary key, val text);
+CREATE TABLE upsert(key int4 primary key, val text);
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'not seen';
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'seen with subselect ' || (select f1 from int4_tbl where f1 != 0 limit 1)::text;
 
@@ -421,13 +421,13 @@ returning *;
 -- Test case for cross-type partial matching in hashed subplan (bug #7597)
 --
 
-create temp table outer_7597 (f1 int4, f2 int4);
+CREATE TABLE outer_7597 (f1 int4, f2 int4);
 insert into outer_7597 values (0, 0);
 insert into outer_7597 values (1, 0);
 insert into outer_7597 values (0, null);
 insert into outer_7597 values (1, null);
 
-create temp table inner_7597(c1 int8, c2 int8);
+CREATE TABLE inner_7597(c1 int8, c2 int8);
 insert into inner_7597 values(0, null);
 
 select * from outer_7597 where (f1, f2) not in (select * from inner_7597);
@@ -438,13 +438,13 @@ select * from outer_7597 where (f1, f2) not in (select * from inner_7597);
 -- (otherwise it would error in texteq())
 --
 
-create temp table outer_text (f1 text, f2 text);
+CREATE TABLE outer_text (f1 text, f2 text);
 insert into outer_text values ('a', 'a');
 insert into outer_text values ('b', 'a');
 insert into outer_text values ('a', null);
 insert into outer_text values ('b', null);
 
-create temp table inner_text (c1 text, c2 text);
+CREATE TABLE inner_text (c1 text, c2 text);
 insert into inner_text values ('a', null);
 insert into inner_text values ('123', '456');
 
@@ -534,9 +534,9 @@ where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
 
 -- It's possible for the same EXISTS to get resolved both ways
-create temp table exists_tbl (c1 int, c2 int, c3 int) partition by list (c1);
-create temp table exists_tbl_null partition of exists_tbl for values in (null);
-create temp table exists_tbl_def partition of exists_tbl default;
+CREATE TABLE exists_tbl (c1 int, c2 int, c3 int) partition by list (c1);
+CREATE TABLE exists_tbl_null partition of exists_tbl for values in (null);
+CREATE TABLE exists_tbl_def partition of exists_tbl default;
 insert into exists_tbl select x, x/2, x+1 from generate_series(0,10) x;
 analyze exists_tbl;
 explain (costs off)
@@ -612,8 +612,8 @@ where o.ten = 1;
 --
 -- Check we don't misoptimize a NOT IN where the subquery returns no rows.
 --
-create temp table notinouter (a int);
-create temp table notininner (b int not null);
+CREATE TABLE notinouter (a int);
+CREATE TABLE notininner (b int not null);
 insert into notinouter values (null), (1);
 
 select * from notinouter where a not in (select b from notininner);
@@ -621,7 +621,7 @@ select * from notinouter where a not in (select b from notininner);
 --
 -- Check we behave sanely in corner case of empty SELECT list (bug #8648)
 --
-create temp table nocolumns();
+CREATE TABLE nocolumns();
 select exists(select * from nocolumns);
 
 --
@@ -708,7 +708,7 @@ where b and f1 >= 0;
 -- Check that volatile quals aren't pushed down past a DISTINCT:
 -- nextval() should not be called more than the nominal number of times
 --
-create temp sequence ts1;
+CREATE SEQUENCE ts1;
 
 select * from
   (select distinct ten from tenk1) ss

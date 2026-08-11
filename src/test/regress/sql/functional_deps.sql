@@ -1,6 +1,6 @@
 -- from http://www.depesz.com/index.php/2010/04/19/getting-unique-elements/
 
-CREATE TEMP TABLE articles (
+CREATE TABLE articles (
     id int CONSTRAINT articles_pkey PRIMARY KEY,
     keywords text,
     title text UNIQUE NOT NULL,
@@ -8,7 +8,7 @@ CREATE TEMP TABLE articles (
     created date
 );
 
-CREATE TEMP TABLE articles_in_category (
+CREATE TABLE articles_in_category (
     article_id int,
     category_id int,
     changed date,
@@ -82,8 +82,8 @@ GROUP BY aic.article_id;
 
 -- example from documentation
 
-CREATE TEMP TABLE products (product_id int, name text, price numeric);
-CREATE TEMP TABLE sales (product_id int, units int);
+CREATE TABLE products (product_id int, name text, price numeric);
+CREATE TABLE sales (product_id int, units int);
 
 -- OK
 SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
@@ -105,7 +105,7 @@ SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
 
 -- Drupal example, http://drupal.org/node/555530
 
-CREATE TEMP TABLE node (
+CREATE TABLE node (
     nid SERIAL,
     vid integer NOT NULL default '0',
     type varchar(32) NOT NULL default '',
@@ -117,7 +117,7 @@ CREATE TEMP TABLE node (
     PRIMARY KEY (nid, vid)
 );
 
-CREATE TEMP TABLE users (
+CREATE TABLE users (
     uid integer NOT NULL default '0',
     name varchar(60) NOT NULL default '',
     pass varchar(32) NOT NULL default '',
@@ -142,13 +142,13 @@ GROUP BY u.uid;
 -- Check views and dependencies
 
 -- fail
-CREATE TEMP VIEW fdv1 AS
+CREATE VIEW fdv1 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY body;
 
 -- OK
-CREATE TEMP VIEW fdv1 AS
+CREATE VIEW fdv1 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id;
@@ -160,7 +160,7 @@ DROP VIEW fdv1;
 
 
 -- multiple dependencies
-CREATE TEMP VIEW fdv2 AS
+CREATE VIEW fdv2 AS
 SELECT a.id, a.keywords, a.title, aic.category_id, aic.changed
 FROM articles AS a JOIN articles_in_category AS aic ON a.id = aic.article_id
 WHERE aic.category_id in (14,62,70,53,138)
@@ -174,7 +174,7 @@ DROP VIEW fdv2;
 
 -- nested queries
 
-CREATE TEMP VIEW fdv3 AS
+CREATE VIEW fdv3 AS
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id
@@ -188,7 +188,7 @@ ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
 DROP VIEW fdv3;
 
 
-CREATE TEMP VIEW fdv4 AS
+CREATE VIEW fdv4 AS
 SELECT * FROM articles WHERE title IN (SELECT title FROM articles GROUP BY id);
 
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail

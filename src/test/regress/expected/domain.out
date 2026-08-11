@@ -805,7 +805,7 @@ select 'yz23'::dtop; -- fail
 ERROR:  value for domain dtop violates check constraint "dinter_check"
 select 'xz23'::dtop; -- fail
 ERROR:  value for domain dtop violates check constraint "dtop_check"
-create temp table dtest(f1 dtop);
+CREATE TABLE dtest(f1 dtop);
 insert into dtest values('x123');
 insert into dtest values('x1234'); -- fail, implicit coercion
 ERROR:  value too long for type character varying(4)
@@ -1006,7 +1006,7 @@ select array[1,2]::orderedpair;
 
 select array[2,1]::orderedpair;  -- fail
 ERROR:  value for domain orderedpair violates check constraint "orderedpair_check"
-create temp table op (f1 orderedpair);
+CREATE TABLE op (f1 orderedpair);
 insert into op values (array[1,2]);
 insert into op values (array[2,1]);  -- fail
 ERROR:  value for domain orderedpair violates check constraint "orderedpair_check"

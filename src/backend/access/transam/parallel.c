@@ -85,8 +85,6 @@ typedef struct FixedParallelState
 	Oid			session_user_id;
 	Oid			outer_user_id;
 	Oid			current_user_id;
-	Oid			temp_namespace_id;
-	Oid			temp_toast_namespace_id;
 	int			sec_context;
 	bool		authenticated_user_is_superuser;
 	bool		session_user_is_superuser;
@@ -338,8 +336,6 @@ InitializeParallelDSM(ParallelContext *pcxt)
 	fps->authenticated_user_is_superuser = GetAuthenticatedUserIsSuperuser();
 	fps->session_user_is_superuser = GetSessionUserIsSuperuser();
 	fps->role_is_superuser = session_auth_is_superuser;
-	GetTempNamespaceState(&fps->temp_namespace_id,
-						  &fps->temp_toast_namespace_id);
 	fps->parallel_leader_pgproc = MyProc;
 	fps->parallel_leader_pid = MyProcPid;
 	fps->parallel_leader_backend_id = MyBackendId;
@@ -1480,10 +1476,6 @@ ParallelWorkerMain(Datum main_arg)
 	 * restricted context.)
 	 */
 	SetUserIdAndSecContext(fps->current_user_id, fps->sec_context);
-
-	/* Restore temp-namespace state to ensure search path matches leader's. */
-	SetTempNamespaceState(fps->temp_namespace_id,
-						  fps->temp_toast_namespace_id);
 
 	/* Restore pending syncs. */
 	pendingsyncsspace = shm_toc_lookup(toc, PARALLEL_KEY_PENDING_SYNCS,

@@ -1,7 +1,7 @@
 --
 -- Tests for some likely failure cases with combo cmin/cmax mechanism
 --
-CREATE TEMP TABLE combocidtest (foobar int);
+CREATE TABLE combocidtest (foobar int);
 
 BEGIN;
 

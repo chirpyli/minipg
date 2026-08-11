@@ -363,7 +363,7 @@ SELECT voidtest2(11,22);
 -- currently, we can inline voidtest2 but not voidtest1
 EXPLAIN (verbose, costs off) SELECT voidtest2(11,22);
 
-CREATE TEMP TABLE sometable(f1 int);
+CREATE TABLE sometable(f1 int);
 
 CREATE FUNCTION voidtest3(a int) RETURNS VOID LANGUAGE SQL AS
 $$ INSERT INTO sometable VALUES(a + 1) $$;
