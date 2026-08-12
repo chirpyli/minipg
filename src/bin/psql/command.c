@@ -27,7 +27,6 @@
 #include "fe_utils/string_utils.h"
 #include "help.h"
 #include "input.h"
-#include "large_obj.h"
 #include "libpq-fe.h"
 #include "libpq/pqcomm.h"
 #include "mainloop.h"
@@ -97,8 +96,6 @@ static backslashResult exec_command_if(PsqlScanState scan_state, ConditionalStac
 									   PQExpBuffer query_buf);
 static backslashResult exec_command_list(PsqlScanState scan_state, bool active_branch,
 										 const char *cmd);
-static backslashResult exec_command_lo(PsqlScanState scan_state, bool active_branch,
-									   const char *cmd);
 static backslashResult exec_command_out(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_print(PsqlScanState scan_state, bool active_branch,
 										  PQExpBuffer query_buf, PQExpBuffer previous_buf);
@@ -361,8 +358,6 @@ exec_command(const char *cmd,
 	else if (strcmp(cmd, "l") == 0 || strcmp(cmd, "list") == 0 ||
 			 strcmp(cmd, "l+") == 0 || strcmp(cmd, "list+") == 0)
 		status = exec_command_list(scan_state, active_branch, cmd);
-	else if (strncmp(cmd, "lo_", 3) == 0)
-		status = exec_command_lo(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "o") == 0 || strcmp(cmd, "out") == 0)
 		status = exec_command_out(scan_state, active_branch);
 	else if (strcmp(cmd, "p") == 0 || strcmp(cmd, "print") == 0)
@@ -770,9 +765,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			case 'g':
 				/* no longer distinct from \du */
 				success = describeRoles(pattern, show_verbose, show_system);
-				break;
-			case 'l':
-				success = do_lo_list();
 				break;
 			case 'L':
 				success = listLanguages(pattern, show_verbose, show_system);
@@ -1831,82 +1823,6 @@ exec_command_list(PsqlScanState scan_state, bool active_branch, const char *cmd)
 		ignore_slash_options(scan_state);
 
 	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
-}
-
-/*
- * \lo_* -- large object operations
- */
-static backslashResult
-exec_command_lo(PsqlScanState scan_state, bool active_branch, const char *cmd)
-{
-	backslashResult status = PSQL_CMD_SKIP_LINE;
-	bool		success = true;
-
-	if (active_branch)
-	{
-		char	   *opt1,
-				   *opt2;
-
-		opt1 = psql_scan_slash_option(scan_state,
-									  OT_NORMAL, NULL, true);
-		opt2 = psql_scan_slash_option(scan_state,
-									  OT_NORMAL, NULL, true);
-
-		if (strcmp(cmd + 3, "export") == 0)
-		{
-			if (!opt2)
-			{
-				pg_log_error("\\%s: missing required argument", cmd);
-				success = false;
-			}
-			else
-			{
-				expand_tilde(&opt2);
-				success = do_lo_export(opt1, opt2);
-			}
-		}
-
-		else if (strcmp(cmd + 3, "import") == 0)
-		{
-			if (!opt1)
-			{
-				pg_log_error("\\%s: missing required argument", cmd);
-				success = false;
-			}
-			else
-			{
-				expand_tilde(&opt1);
-				success = do_lo_import(opt1, opt2);
-			}
-		}
-
-		else if (strcmp(cmd + 3, "list") == 0)
-			success = do_lo_list();
-
-		else if (strcmp(cmd + 3, "unlink") == 0)
-		{
-			if (!opt1)
-			{
-				pg_log_error("\\%s: missing required argument", cmd);
-				success = false;
-			}
-			else
-				success = do_lo_unlink(opt1);
-		}
-
-		else
-			status = PSQL_CMD_UNKNOWN;
-
-		free(opt1);
-		free(opt2);
-	}
-	else
-		ignore_slash_options(scan_state);
-
-	if (!success)
-		status = PSQL_CMD_ERROR;
-
-	return status;
 }
 
 /*

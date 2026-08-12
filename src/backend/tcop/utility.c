@@ -1722,9 +1722,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_LANGUAGE:
 			tag = CMDTAG_ALTER_LANGUAGE;
 			break;
-		case OBJECT_LARGEOBJECT:
-			tag = CMDTAG_ALTER_LARGE_OBJECT;
-			break;
 		case OBJECT_OPCLASS:
 			tag = CMDTAG_ALTER_OPERATOR_CLASS;
 			break;

@@ -25,8 +25,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_language.h"
-#include "catalog/pg_largeobject.h"
-#include "catalog/pg_largeobject_metadata.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_opfamily.h"
@@ -584,7 +582,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_CONSTRAINT:
 		case OCLASS_DEFAULT:
 		case OCLASS_LANGUAGE:
-		case OCLASS_LARGEOBJECT:
 		case OCLASS_AM:
 		case OCLASS_AMOP:
 		case OCLASS_AMPROC:
@@ -797,7 +794,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_CONVERSION:
 		case OBJECT_FUNCTION:
 		case OBJECT_LANGUAGE:
-		case OBJECT_LARGEOBJECT:
 		case OBJECT_OPERATOR:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPFAMILY:
@@ -818,14 +814,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 											 false);
 				Assert(relation == NULL);
 				classId = address.classId;
-
-				/*
-				 * XXX - get_object_address returns Oid of pg_largeobject
-				 * catalog for OBJECT_LARGEOBJECT because of historical
-				 * reasons.  Fix up it here.
-				 */
-				if (classId == LargeObjectRelationId)
-					classId = LargeObjectMetadataRelationId;
 
 				catalog = table_open(classId, RowExclusiveLock);
 
@@ -969,14 +957,6 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 
 		UnlockTuple(rel, &oldtup->t_self, InplaceUpdateTupleLock);
 
-		/*
-		 * Update owner dependency reference.  When working on a large object,
-		 * we have to translate back to the OID conventionally used for LOs'
-		 * classId.
-		 */
-		if (classId == LargeObjectMetadataRelationId)
-			classId = LargeObjectRelationId;
-
 		changeDependencyOnOwner(classId, objectId, new_ownerId);
 
 		/* Release memory */
@@ -987,14 +967,6 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 	else
 	{
 		UnlockTuple(rel, &oldtup->t_self, InplaceUpdateTupleLock);
-
-		/*
-		 * No need to change anything.  But when working on a large object, we
-		 * have to translate back to the OID conventionally used for LOs'
-		 * classId, or the post-alter hook (if any) will get confused.
-		 */
-		if (classId == LargeObjectMetadataRelationId)
-			classId = LargeObjectRelationId;
 	}
 
 	InvokeObjectPostAlterHook(classId, objectId, 0);

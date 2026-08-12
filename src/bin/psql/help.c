@@ -239,7 +239,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\dFt[+] [PATTERN]      list text search templates\n"));
 	fprintf(output, _("  \\dg[S+] [PATTERN]      list roles\n"));
 	fprintf(output, _("  \\di[S+] [PATTERN]      list indexes\n"));
-	fprintf(output, _("  \\dl                    list large objects, same as \\lo_list\n"));
 	fprintf(output, _("  \\dL[S+] [PATTERN]      list procedural languages\n"));
 	fprintf(output, _("  \\dm[S+] [PATTERN]      list materialized views\n"));
 	fprintf(output, _("  \\dn[S+] [PATTERN]      list schemas\n"));
@@ -310,12 +309,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\set [NAME [VALUE]]    set internal variable, or list all if no parameters\n"));
 	fprintf(output, _("  \\unset NAME            unset (delete) internal variable\n"));
 	fprintf(output, "\n");
-
-	fprintf(output, _("Large Objects\n"));
-	fprintf(output, _("  \\lo_export LOBOID FILE\n"
-					  "  \\lo_import FILE [COMMENT]\n"
-					  "  \\lo_list\n"
-					  "  \\lo_unlink LOBOID      large object operations\n"));
 
 	ClosePager(output);
 }

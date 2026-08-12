@@ -759,11 +759,7 @@ acldefault(ObjectType objtype, Oid ownerId)
 			world_default = ACL_USAGE;
 			owner_default = ACL_ALL_RIGHTS_LANGUAGE;
 			break;
-		case OBJECT_LARGEOBJECT:
-			world_default = ACL_NO_RIGHTS;
-			owner_default = ACL_ALL_RIGHTS_LARGEOBJECT;
-			break;
-		case OBJECT_SCHEMA:
+			case OBJECT_SCHEMA:
 			world_default = ACL_NO_RIGHTS;
 			owner_default = ACL_ALL_RIGHTS_SCHEMA;
 			break;
@@ -851,9 +847,6 @@ acldefault_sql(PG_FUNCTION_ARGS)
 			break;
 		case 'l':
 			objtype = OBJECT_LANGUAGE;
-			break;
-		case 'L':
-			objtype = OBJECT_LARGEOBJECT;
 			break;
 		case 'n':
 			objtype = OBJECT_SCHEMA;

@@ -32,7 +32,6 @@ OBJS = \
 	pg_depend.o \
 	pg_enum.o \
 	pg_inherits.o \
-	pg_largeobject.o \
 	pg_namespace.o \
 	pg_operator.o \
 	pg_proc.o \
@@ -54,7 +53,7 @@ CATALOG_HEADERS := \
 	pg_proc.h pg_type.h pg_attribute.h pg_class.h \
 	pg_attrdef.h pg_constraint.h pg_inherits.h pg_index.h pg_operator.h \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
-	pg_language.h pg_largeobject_metadata.h pg_largeobject.h pg_aggregate.h \
+	pg_language.h pg_aggregate.h \
 	pg_statistic.h pg_statistic_ext.h pg_statistic_ext_data.h \
 	pg_rewrite.h pg_trigger.h pg_description.h \
 	pg_cast.h pg_enum.h pg_namespace.h pg_conversion.h pg_depend.h \

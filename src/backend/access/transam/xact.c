@@ -37,7 +37,6 @@
 #include "commands/tablecmds.h"
 #include "commands/trigger.h"
 #include "executor/spi.h"
-#include "libpq/be-fsstubs.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
@@ -2156,9 +2155,6 @@ CommitTransaction(void)
 	 */
 	smgrDoPendingSyncs(true, is_parallel_worker);
 
-	/* close large objects before lower-level cleanup */
-	AtEOXact_LargeObject(true);
-
 	/*
 	 * Mark serializable transaction as complete for predicate locking
 	 * purposes.  This should be done as late as we can put it and still allow
@@ -2390,9 +2386,6 @@ PrepareTransaction(void)
 	 * committed-but-broken files after a crash and COMMIT PREPARED.
 	 */
 	smgrDoPendingSyncs(true, false);
-
-	/* close large objects before lower-level cleanup */
-	AtEOXact_LargeObject(true);
 
 	/*
 	 * Mark serializable transaction as complete for predicate locking
@@ -2713,7 +2706,6 @@ AbortTransaction(void)
 	AfterTriggerEndXact(false); /* 'false' means it's abort */
 	AtAbort_Portals();
 	smgrDoPendingSyncs(false, is_parallel_worker);
-	AtEOXact_LargeObject(false);
 	AtEOXact_RelationMap(false, is_parallel_worker);
 	AtAbort_Twophase();
 
@@ -4894,8 +4886,6 @@ CommitSubTransaction(void)
 						s->parent->subTransactionId,
 						s->parent->nestingLevel,
 						s->parent->curTransactionOwner);
-	AtEOSubXact_LargeObject(true, s->subTransactionId,
-							s->parent->subTransactionId);
 
 	CallSubXactCallbacks(SUBXACT_EVENT_COMMIT_SUB, s->subTransactionId,
 						 s->parent->subTransactionId);
@@ -5061,8 +5051,6 @@ AbortSubTransaction(void)
 						   s->parent->subTransactionId,
 						   s->curTransactionOwner,
 						   s->parent->curTransactionOwner);
-		AtEOSubXact_LargeObject(false, s->subTransactionId,
-								s->parent->subTransactionId);
 
 		/* Advertise the fact that we aborted in pg_xact. */
 		(void) RecordTransactionAbort(true);

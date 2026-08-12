@@ -4682,14 +4682,6 @@ CommentStmt:
 					n->comment = $9;
 					$$ = (Node *) n;
 				}
-			| COMMENT ON LARGE_P OBJECT_P NumericOnly IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_LARGEOBJECT;
-					n->object = (Node *) $5;
-					n->comment = $7;
-					$$ = (Node *) n;
-				}
 			| COMMENT ON CAST '(' Typename AS Typename ')' IS comment_text
 				{
 					CommentStmt *n = makeNode(CommentStmt);
@@ -6716,14 +6708,6 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
 					n->objectType = OBJECT_LANGUAGE;
 					n->object = (Node *) makeString($4);
-					n->newowner = $7;
-					$$ = (Node *)n;
-				}
-			| ALTER LARGE_P OBJECT_P NumericOnly OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_LARGEOBJECT;
-					n->object = (Node *) $4;
 					n->newowner = $7;
 					$$ = (Node *)n;
 				}

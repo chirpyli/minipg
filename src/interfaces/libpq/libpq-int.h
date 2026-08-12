@@ -221,24 +221,6 @@ typedef struct pgParameterStatus
 	/* Note: name and value are stored in same malloc block as struct is */
 } pgParameterStatus;
 
-/* large-object-access data ... allocated only if large-object code is used. */
-typedef struct pgLobjfuncs
-{
-	Oid			fn_lo_open;		/* OID of backend function lo_open		*/
-	Oid			fn_lo_close;	/* OID of backend function lo_close		*/
-	Oid			fn_lo_creat;	/* OID of backend function lo_creat		*/
-	Oid			fn_lo_create;	/* OID of backend function lo_create	*/
-	Oid			fn_lo_unlink;	/* OID of backend function lo_unlink	*/
-	Oid			fn_lo_lseek;	/* OID of backend function lo_lseek		*/
-	Oid			fn_lo_lseek64;	/* OID of backend function lo_lseek64	*/
-	Oid			fn_lo_tell;		/* OID of backend function lo_tell		*/
-	Oid			fn_lo_tell64;	/* OID of backend function lo_tell64	*/
-	Oid			fn_lo_truncate; /* OID of backend function lo_truncate	*/
-	Oid			fn_lo_truncate64;	/* OID of function lo_truncate64 */
-	Oid			fn_lo_read;		/* OID of backend function LOread		*/
-	Oid			fn_lo_write;	/* OID of backend function LOwrite		*/
-} PGlobjfuncs;
-
 /* PGdataValue represents a data field value being passed to a row processor.
  * It could be either text or binary data; text data is not zero-terminated.
  * A SQL NULL is represented by len < 0; then value is still valid but there
@@ -417,7 +399,6 @@ struct pg_conn
 	PGTernaryBool in_hot_standby;	/* in_hot_standby */
 	PGVerbosity verbosity;		/* error/notice message verbosity */
 	PGContextVisibility show_context;	/* whether to show CONTEXT field */
-	PGlobjfuncs *lobjfuncs;		/* private state for large-object access fns */
 
 	/*
 	 * Buffer for data received from backend and not yet processed.

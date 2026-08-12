@@ -35,8 +35,6 @@
 #include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
-#include "catalog/pg_largeobject.h"
-#include "catalog/pg_largeobject_metadata.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -64,7 +62,6 @@
 #include "parser/parse_oper.h"
 #include "parser/parse_type.h"
 #include "rewrite/rewriteSupport.h"
-#include "storage/large_object.h"
 #include "storage/lmgr.h"
 #include "storage/sinval.h"
 #include "utils/acl.h"
@@ -258,20 +255,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		OBJECT_LANGUAGE,
 		true
-	},
-	{
-		"large object metadata",
-		LargeObjectMetadataRelationId,
-		LargeObjectMetadataOidIndexId,
-		-1,
-		-1,
-		Anum_pg_largeobject_metadata_oid,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		Anum_pg_largeobject_metadata_lomowner,
-		InvalidAttrNumber,
-		OBJECT_LARGEOBJECT,
-		false
 	},
 	{
 		"operator class",
@@ -569,10 +552,6 @@ static const struct object_type_map
 	{
 		"language", OBJECT_LANGUAGE
 	},
-	/* OCLASS_LARGEOBJECT */
-	{
-		"large object", OBJECT_LARGEOBJECT
-	},
 	/* OCLASS_OPERATOR */
 	{
 		"operator", OBJECT_OPERATOR
@@ -841,19 +820,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_AMOP:
 			case OBJECT_AMPROC:
 				address = get_object_address_opf_member(objtype, castNode(List, object), missing_ok);
-				break;
-			case OBJECT_LARGEOBJECT:
-				address.classId = LargeObjectRelationId;
-				address.objectId = oidparse(object);
-				address.objectSubId = 0;
-				if (!LargeObjectExists(address.objectId))
-				{
-					if (!missing_ok)
-						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_OBJECT),
-								 errmsg("large object %u does not exist",
-										address.objectId)));
-				}
 				break;
 			case OBJECT_CAST:
 				{
@@ -1676,24 +1642,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 					 errmsg("name or argument lists may not contain nulls")));
 		typename = typeStringToTypeName(TextDatumGetCString(elems[0]));
 	}
-	else if (type == OBJECT_LARGEOBJECT)
-	{
-		Datum	   *elems;
-		bool	   *nulls;
-		int			nelems;
-
-		deconstruct_array(namearr, TEXTOID, -1, false, TYPALIGN_INT,
-						  &elems, &nulls, &nelems);
-		if (nelems != 1)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("name list length must be exactly %d", 1)));
-		if (nulls[0])
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("large object OID may not be null")));
-		objnode = (Node *) makeFloat(TextDatumGetCString(elems[0]));
-	}
 	else
 	{
 		name = textarray_to_strvaluelist(namearr);
@@ -1840,9 +1788,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 				objnode = (Node *) owa;
 				break;
 			}
-		case OBJECT_LARGEOBJECT:
-			/* already handled above */
-			break;
 			/* no default, to let compiler warn about missing case */
 	}
 
@@ -1986,14 +1931,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 			if (!pg_opfamily_ownercheck(address.objectId, roleid))
 				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
 							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_LARGEOBJECT:
-			if (!lo_compat_privileges &&
-				!pg_largeobject_ownercheck(address.objectId, roleid))
-				ereport(ERROR,
-						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("must be owner of large object %u",
-								address.objectId)));
 			break;
 		case OBJECT_CAST:
 			{
@@ -2621,13 +2558,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 									 get_language_name(object->objectId, false));
 				break;
 			}
-
-		case OCLASS_LARGEOBJECT:
-			if (!LargeObjectExists(object->objectId))
-				break;
-			appendStringInfo(&buffer, _("large object %u"),
-							 object->objectId);
-			break;
 
 		case OCLASS_OPERATOR:
 			{
@@ -3538,10 +3468,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "language");
 			break;
 
-		case OCLASS_LARGEOBJECT:
-			appendStringInfoString(&buffer, "large object");
-			break;
-
 		case OCLASS_OPERATOR:
 			appendStringInfoString(&buffer, "operator");
 			break;
@@ -4075,15 +4001,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 				ReleaseSysCache(langTup);
 				break;
 			}
-		case OCLASS_LARGEOBJECT:
-			if (!LargeObjectExists(object->objectId))
-				break;
-			appendStringInfo(&buffer, "%u",
-							 object->objectId);
-			if (objname)
-				*objname = list_make1(psprintf("%u", object->objectId));
-			break;
-
 		case OCLASS_OPERATOR:
 			{
 				bits16		flags = FORMAT_OPERATOR_FORCE_QUALIFY | FORMAT_OPERATOR_INVALID_AS_NULL;

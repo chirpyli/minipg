@@ -34,7 +34,6 @@ OBJS = \
 	fe-auth-scram.o \
 	fe-connect.o \
 	fe-exec.o \
-	fe-lobj.o \
 	fe-misc.o \
 	fe-print.o \
 	fe-protocol3.o \

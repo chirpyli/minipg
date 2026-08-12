@@ -32,7 +32,6 @@ OBJS = \
 	describe.o \
 	help.o \
 	input.o \
-	large_obj.o \
 	mainloop.o \
 	prompt.o \
 	psqlscanslash.o \

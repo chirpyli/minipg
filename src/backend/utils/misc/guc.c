@@ -77,7 +77,6 @@
 #include "storage/bufmgr.h"
 #include "storage/dsm_impl.h"
 #include "storage/fd.h"
-#include "storage/large_object.h"
 #include "storage/pg_shmem.h"
 #include "storage/predicate.h"
 #include "storage/proc.h"
@@ -1798,17 +1797,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NOT_IN_SAMPLE
 		},
 		&allow_in_place_tablespaces,
-		false,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"lo_compat_privileges", PGC_SUSET, COMPAT_OPTIONS_PREVIOUS,
-			gettext_noop("Enables backward compatibility mode for privilege checks on large objects."),
-			gettext_noop("Skips privilege checks when reading or modifying large objects, "
-						 "for compatibility with PostgreSQL releases prior to 9.0.")
-		},
-		&lo_compat_privileges,
 		false,
 		NULL, NULL, NULL
 	},

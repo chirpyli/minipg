@@ -37,8 +37,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
-#include "catalog/pg_largeobject.h"
-#include "catalog/pg_largeobject_metadata.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -182,9 +180,6 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 			break;
 		case OBJECT_LANGUAGE:
 			whole_mask = ACL_ALL_RIGHTS_LANGUAGE;
-			break;
-		case OBJECT_LARGEOBJECT:
-			whole_mask = ACL_ALL_RIGHTS_LARGEOBJECT;
 			break;
 		case OBJECT_SCHEMA:
 			whole_mask = ACL_ALL_RIGHTS_SCHEMA;
@@ -341,9 +336,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_LANGUAGE:
 						msg = gettext_noop("permission denied for language %s");
 						break;
-					case OBJECT_LARGEOBJECT:
-						msg = gettext_noop("permission denied for large object %s");
-						break;
 					case OBJECT_OPCLASS:
 						msg = gettext_noop("permission denied for operator class %s");
 						break;
@@ -446,9 +438,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 						break;
 					case OBJECT_LANGUAGE:
 						msg = gettext_noop("must be owner of language %s");
-						break;
-					case OBJECT_LARGEOBJECT:
-						msg = gettext_noop("must be owner of large object %s");
 						break;
 					case OBJECT_OPCLASS:
 						msg = gettext_noop("must be owner of operator class %s");
@@ -700,40 +689,6 @@ pg_class_aclcheck_ext(Oid table_oid, Oid roleid,
 
 
 /*
- * Exported routine for examining a user's privileges for a largeobject
- *
- * When a large object is opened for reading, it is opened relative to the
- * caller's snapshot, but when it is opened for writing, a current
- * MVCC snapshot will be used.  See doc/src/sgml/lobj.sgml.  This function
- * takes a snapshot argument so that the permissions check can be made
- * relative to the same snapshot that will be used to read the underlying
- * data.  The caller will actually pass NULL for an instantaneous MVCC
- * snapshot, since all we do with the snapshot argument is pass it through
- * to systable_beginscan().
- */
-AclMode
-pg_largeobject_aclmask_snapshot(Oid lobj_oid, Oid roleid,
-								AclMode mask, AclMaskHow how,
-								Snapshot snapshot)
-{
-	return mask;
-}
-
-/*
- * Exported routine for checking a user's access privileges to a largeobject
- */
-AclResult
-pg_largeobject_aclcheck_snapshot(Oid lobj_oid, Oid roleid, AclMode mode,
-								 Snapshot snapshot)
-{
-	if (pg_largeobject_aclmask_snapshot(lobj_oid, roleid, mode,
-										ACLMASK_ANY, snapshot) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
-}
-
-/*
  * Ownership check for a relation (specified by OID).
  */
 bool
@@ -859,52 +814,6 @@ pg_language_ownercheck(Oid lan_oid, Oid roleid)
 	ownerId = ((Form_pg_language) GETSTRUCT(tuple))->lanowner;
 
 	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a largeobject (specified by OID)
- *
- * This is only used for operations like ALTER LARGE OBJECT that are always
- * relative to an up-to-date snapshot.
- */
-bool
-pg_largeobject_ownercheck(Oid lobj_oid, Oid roleid)
-{
-	Relation	pg_lo_meta;
-	ScanKeyData entry[1];
-	SysScanDesc scan;
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	/* There's no syscache for pg_largeobject_metadata */
-	pg_lo_meta = table_open(LargeObjectMetadataRelationId,
-							AccessShareLock);
-
-	ScanKeyInit(&entry[0],
-				Anum_pg_largeobject_metadata_oid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(lobj_oid));
-
-	scan = systable_beginscan(pg_lo_meta,
-							  LargeObjectMetadataOidIndexId, true,
-							  NULL, 1, entry);
-
-	tuple = systable_getnext(scan);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("large object %u does not exist", lobj_oid)));
-
-	ownerId = ((Form_pg_largeobject_metadata) GETSTRUCT(tuple))->lomowner;
-
-	systable_endscan(scan);
-	table_close(pg_lo_meta, AccessShareLock);
 
 	return has_privs_of_role(roleid, ownerId);
 }

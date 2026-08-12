@@ -28,7 +28,6 @@ SUBDIRS = access bootstrap catalog commands common datatype \
 install: all installdirs
 # These headers are needed by the public headers of the interfaces.
 	$(INSTALL_DATA) $(srcdir)/postgres_ext.h   '$(DESTDIR)$(includedir)'
-	$(INSTALL_DATA) $(srcdir)/libpq/libpq-fs.h '$(DESTDIR)$(includedir)/libpq'
 	$(INSTALL_DATA) pg_config.h     '$(DESTDIR)$(includedir)'
 	$(INSTALL_DATA) pg_config_ext.h '$(DESTDIR)$(includedir)'
 	$(INSTALL_DATA) pg_config_os.h  '$(DESTDIR)$(includedir)'
@@ -68,7 +67,7 @@ installdirs:
 
 
 uninstall:
-	rm -f $(addprefix '$(DESTDIR)$(includedir)'/, pg_config.h pg_config_ext.h pg_config_os.h pg_config_manual.h postgres_ext.h libpq/libpq-fs.h)
+	rm -f $(addprefix '$(DESTDIR)$(includedir)'/, pg_config.h pg_config_ext.h pg_config_os.h pg_config_manual.h postgres_ext.h)
 	rm -f $(addprefix '$(DESTDIR)$(includedir_internal)'/, c.h port.h postgres_fe.h libpq/pqcomm.h)
 # heuristic...
 	rm -rf $(addprefix '$(DESTDIR)$(includedir_server)'/, $(SUBDIRS) *.h)

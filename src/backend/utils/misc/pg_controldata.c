@@ -298,11 +298,9 @@ pg_control_init(PG_FUNCTION_ARGS)
 					   INT4OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 8, "max_toast_chunk_size",
 					   INT4OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 9, "large_object_chunk_size",
-					   INT4OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 10, "float8_pass_by_value",
+	TupleDescInitEntry(tupdesc, (AttrNumber) 9, "float8_pass_by_value",
 					   BOOLOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 11, "data_page_checksum_version",
+	TupleDescInitEntry(tupdesc, (AttrNumber) 10, "data_page_checksum_version",
 					   INT4OID, -1, 0);
 	tupdesc = BlessTupleDesc(tupdesc);
 
@@ -338,14 +336,11 @@ pg_control_init(PG_FUNCTION_ARGS)
 	values[7] = Int32GetDatum(ControlFile->toast_max_chunk_size);
 	nulls[7] = false;
 
-	values[8] = Int32GetDatum(ControlFile->loblksize);
+	values[8] = BoolGetDatum(ControlFile->float8ByVal);
 	nulls[8] = false;
 
-	values[9] = BoolGetDatum(ControlFile->float8ByVal);
+	values[9] = Int32GetDatum(ControlFile->data_checksum_version);
 	nulls[9] = false;
-
-	values[10] = Int32GetDatum(ControlFile->data_checksum_version);
-	nulls[10] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);
 

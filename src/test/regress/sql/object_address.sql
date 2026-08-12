@@ -115,9 +115,6 @@ $$;
 -- these object types cannot be qualified names
 SELECT pg_get_object_address('language', '{one}', '{}');
 SELECT pg_get_object_address('language', '{one,two}', '{}');
-SELECT pg_get_object_address('large object', '{123}', '{}');
-SELECT pg_get_object_address('large object', '{123,456}', '{}');
-SELECT pg_get_object_address('large object', '{blargh}', '{}');
 SELECT pg_get_object_address('schema', '{one}', '{}');
 SELECT pg_get_object_address('schema', '{one,two}', '{}');
 SELECT pg_get_object_address('role', '{one}', '{}');
@@ -165,7 +162,6 @@ WITH objects (type, name, args) AS (VALUES
 				('conversion', '{pg_catalog, koi8_r_to_mic}', '{}'),
 				('default value', '{addr_nsp, gentable, b}', '{}'),
 				('language', '{plpgsql}', '{}'),
-				-- large object
 				('operator', '{+}', '{int4, int4}'),
 				('operator class', '{btree, int4_ops}', '{}'),
 				('operator family', '{btree, integer_ops}', '{}'),
@@ -237,7 +233,6 @@ WITH objects (classid, objid, objsubid) AS (VALUES
     ('pg_conversion'::regclass, 0, 0), -- no conversion
     ('pg_attrdef'::regclass, 0, 0), -- no default attribute
     ('pg_language'::regclass, 0, 0), -- no language
-    ('pg_largeobject'::regclass, 0, 0), -- no large object, no error
     ('pg_operator'::regclass, 0, 0), -- no operator
     ('pg_opclass'::regclass, 0, 0), -- no opclass, no need to check for no access method
     ('pg_opfamily'::regclass, 0, 0), -- no opfamily

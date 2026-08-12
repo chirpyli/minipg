@@ -436,11 +436,6 @@ pqDropServerData(PGconn *conn)
 	conn->in_hot_standby = PG_BOOL_UNKNOWN;
 	conn->sversion = 0;
 
-	/* Drop large-object lookup data */
-	if (conn->lobjfuncs)
-		free(conn->lobjfuncs);
-	conn->lobjfuncs = NULL;
-
 	/* Reset assorted other per-connection state */
 	conn->last_sqlstate[0] = '\0';
 	conn->auth_req_received = false;

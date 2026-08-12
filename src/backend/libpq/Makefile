@@ -17,7 +17,6 @@ include $(top_builddir)/src/Makefile.global
 OBJS = \
 	auth-scram.o \
 	auth.o \
-	be-fsstubs.o \
 	be-secure.o \
 	crypt.o \
 	ifaddr.o \

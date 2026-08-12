@@ -27,8 +27,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
-#include "catalog/pg_largeobject.h"
-#include "catalog/pg_largeobject_metadata.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -1574,7 +1572,6 @@ shdepReassignOwned(List *roleids, Oid newrole)
 				case OperatorRelationId:
 				case ProcedureRelationId:
 				case LanguageRelationId:
-				case LargeObjectRelationId:
 				case OperatorFamilyRelationId:
 				case OperatorClassRelationId:
 				case ExtensionRelationId:
@@ -1584,9 +1581,6 @@ shdepReassignOwned(List *roleids, Oid newrole)
 					{
 						Oid			classId = sdepForm->classid;
 						Relation	catalog;
-
-						if (classId == LargeObjectRelationId)
-							classId = LargeObjectMetadataRelationId;
 
 						catalog = table_open(classId, RowExclusiveLock);
 
