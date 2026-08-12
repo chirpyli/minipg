@@ -2131,13 +2131,10 @@ index_drop(Oid indexId, bool concurrent, bool concurrent_lock_mode)
 	LOCKMODE	lockmode;
 
 	/*
-	 * A temporary relation uses a non-concurrent DROP.  Other backends can't
-	 * access a temporary relation, so there's no harm in grabbing a stronger
-	 * lock (see comments in RemoveRelations), and a non-concurrent DROP is
-	 * more efficient.
+	 * A non-concurrent DROP is more efficient than a concurrent one, and this
+	 * build does not support temporary relations, so the concurrent/temp
+	 * trade-off considered upstream does not apply here.
 	 */
-	Assert(get_rel_persistence(indexId) != RELPERSISTENCE_TEMP ||
-		   (!concurrent && !concurrent_lock_mode));
 
 	/*
 	 * To drop an index safely, we must grab exclusive lock on its parent
@@ -3020,13 +3017,6 @@ index_build(Relation heapRelation,
 	 * created it, or truncated twice in a subsequent transaction, the
 	 * relfilenode won't change, and nothing needs to be done here.
 	 */
-	if (indexRelation->rd_rel->relpersistence == RELPERSISTENCE_UNLOGGED &&
-		!smgrexists(RelationGetSmgr(indexRelation), INIT_FORKNUM))
-	{
-		smgrcreate(RelationGetSmgr(indexRelation), INIT_FORKNUM, false);
-		log_smgrcreate(&indexRelation->rd_node, INIT_FORKNUM);
-		indexRelation->rd_indam->ambuildempty(indexRelation);
-	}
 
 	/*
 	 * If we found any potentially broken HOT chains, mark the index as not
@@ -3848,9 +3838,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
  * performance, other callers should include the flag only after transforming
  * the data in a manner that risks a change in constraint validity.
  *
- * REINDEX_REL_FORCE_INDEXES_UNLOGGED: if true, set the persistence of the
- * rebuilt indexes to unlogged.
- *
  * REINDEX_REL_FORCE_INDEXES_PERMANENT: if true, set the persistence of the
  * rebuilt indexes to permanent.
  *
@@ -3908,9 +3895,7 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 	 * Compute persistence of indexes: same as that of owning rel, unless
 	 * caller specified otherwise.
 	 */
-	if (flags & REINDEX_REL_FORCE_INDEXES_UNLOGGED)
-		persistence = RELPERSISTENCE_UNLOGGED;
-	else if (flags & REINDEX_REL_FORCE_INDEXES_PERMANENT)
+	if (flags & REINDEX_REL_FORCE_INDEXES_PERMANENT)
 		persistence = RELPERSISTENCE_PERMANENT;
 	else
 		persistence = rel->rd_rel->relpersistence;

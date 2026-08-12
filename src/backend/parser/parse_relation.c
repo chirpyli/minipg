@@ -3340,12 +3340,10 @@ isQueryUsingTempRelation_walker(Node *node, void *context)
 
 			if (rte->rtekind == RTE_RELATION)
 			{
-				Relation	rel = table_open(rte->relid, AccessShareLock);
-				char		relpersistence = rel->rd_rel->relpersistence;
-
-				table_close(rel, AccessShareLock);
-				if (relpersistence == RELPERSISTENCE_TEMP)
-					return true;
+				/*
+				 * Temporary relations are not supported in this build, so a
+				 * relation reference can never be a temp relation.
+				 */
 			}
 		}
 

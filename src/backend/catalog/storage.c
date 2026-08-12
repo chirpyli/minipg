@@ -467,8 +467,7 @@ RelationCopyStorage(SMgrRelation src, SMgrRelation dst,
 	 * treated the same as normal relation, changes need to be WAL logged and
 	 * it needs to be synced to disk.
 	 */
-	copying_initfork = relpersistence == RELPERSISTENCE_UNLOGGED &&
-		forkNum == INIT_FORKNUM;
+	copying_initfork = false;
 
 	/*
 	 * We need to log the copied data in WAL iff WAL archiving/streaming is

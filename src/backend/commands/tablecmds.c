@@ -195,11 +195,11 @@ typedef struct AlteredTableInfo
 typedef struct NewConstraint
 {
 	char	   *name;			/* Constraint name, or NULL if none */
-	ConstrType	contype;		/* CHECK or FOREIGN */
-	Oid			refrelid;		/* PK rel, if FOREIGN */
-	Oid			refindid;		/* OID of PK's index, if FOREIGN */
-	Oid			conid;			/* OID of pg_constraint entry, if FOREIGN */
-	Node	   *qual;			/* Check expr or CONSTR_FOREIGN Constraint */
+	ConstrType	contype;		/* CHECK */
+	Oid			refrelid;		/* unused (was PK rel for FOREIGN) */
+	Oid			refindid;		/* unused (was PK's index OID for FOREIGN) */
+	Oid			conid;			/* unused (was pg_constraint OID for FOREIGN) */
+	Node	   *qual;			/* Check expr */
 	ExprState  *qualstate;		/* Execution state for CHECK expr */
 } NewConstraint;
 
@@ -457,7 +457,6 @@ static void RebuildConstraintComment(AlteredTableInfo *tab, int pass,
 									 Oid objid, Relation rel, List *domname,
 									 const char *conname);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static void TryReuseForeignKey(Oid oldId, Constraint *con);
 static ObjectAddress ATExecAlterColumnGenericOptions(Relation rel, const char *colName,
 													 List *options, LOCKMODE lockmode);
 static void change_owner_recurse_to_sequences(Oid relationOid,
@@ -554,8 +553,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	/*
 	 * Check consistency of arguments
 	 */
-	if (stmt->oncommit != ONCOMMIT_NOOP
-		&& stmt->relation->relpersistence != RELPERSISTENCE_TEMP)
+	if (stmt->oncommit != ONCOMMIT_NOOP)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("ON COMMIT can only be used on temporary tables")));
@@ -565,22 +563,11 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	/*
 	 * Look up the namespace in which we are supposed to create the relation,
 	 * check we have permission to create there, lock it against concurrent
-	 * drop, and mark stmt->relation as RELPERSISTENCE_TEMP if a temporary
-	 * namespace is selected.
+	 * drop.  (Temporary relations are not supported in this build, so the
+	 * relation is always permanent.)
 	 */
 	namespaceId =
 		RangeVarGetAndCheckCreationNamespace(stmt->relation, NoLock, NULL);
-
-	/*
-	 * Security check: disallow creating temp tables from security-restricted
-	 * code.  This is needed because calling code might not expect untrusted
-	 * tables to appear in pg_temp at the front of its search path.
-	 */
-	if (stmt->relation->relpersistence == RELPERSISTENCE_TEMP
-		&& InSecurityRestrictedOperation())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("cannot create temporary table within security-restricted operation")));
 
 	/*
 	 * Determine the lockmode to use when scanning parents.  A self-exclusive
@@ -1048,11 +1035,11 @@ RemoveRelations(DropStmt *drop)
 		}
 
 		/*
-		 * Decide if concurrent mode needs to be used here or not.  The
-		 * callback retrieved the rel's persistence for us.
+		 * Decide if concurrent mode needs to be used here or not.  (Relations
+		 * are always permanent in this build, so concurrent mode is allowed
+		 * whenever requested.)
 		 */
-		if (drop->concurrent &&
-			state.actual_relpersistence != RELPERSISTENCE_TEMP)
+		if (drop->concurrent)
 		{
 			Assert(list_length(drop->objects) == 1 &&
 				   drop->removeType == OBJECT_INDEX);
@@ -1979,35 +1966,9 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 							RelationGetRelationName(relation))));
 
 		/*
-		 * If the parent is permanent, so must be all of its partitions.  Note
-		 * that inheritance allows that case.
+		 * Temporary relations are not supported in this build, so there is no
+		 * need to validate permanent/temporary inheritance compatibility.
 		 */
-		if (is_partition &&
-			relation->rd_rel->relpersistence != RELPERSISTENCE_TEMP &&
-			relpersistence == RELPERSISTENCE_TEMP)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot create a temporary relation as partition of permanent relation \"%s\"",
-							RelationGetRelationName(relation))));
-
-		/* Permanent rels cannot inherit from temporary ones */
-		if (relpersistence != RELPERSISTENCE_TEMP &&
-			relation->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg(!is_partition
-							? "cannot inherit from temporary relation \"%s\""
-							: "cannot create a permanent relation as partition of temporary relation \"%s\"",
-							RelationGetRelationName(relation))));
-
-		/* If existing rel is temp, it must belong to this session */
-		if (relation->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-			!relation->rd_islocaltemp)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg(!is_partition
-							? "cannot inherit from temporary relation of another session"
-							: "cannot create as partition of temporary relation of another session")));
 
 		/*
 		 * We should have an UNDER permission flag for this, but for now,
@@ -4962,15 +4923,6 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 		if (!RELKIND_HAS_STORAGE(tab->relkind))
 			continue;
 
-		foreach(lcon, tab->constraints)
-		{
-			NewConstraint *con = lfirst(lcon);
-
-			/* Foreign-key constraints are not supported in minipg. */
-			if (con->contype == CONSTR_FOREIGN)
-				continue;
-		}
-
 		if (rel)
 			table_close(rel, NoLock);
 	}
@@ -5060,9 +5012,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 			case CONSTR_CHECK:
 				needscan = true;
 				con->qualstate = ExecPrepareExpr((Expr *) con->qual, estate);
-				break;
-			case CONSTR_FOREIGN:
-				/* Nothing to do here */
 				break;
 			default:
 				elog(ERROR, "unrecognized constraint type: %d",
@@ -5311,9 +5260,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 											con->name,
 											RelationGetRelationName(oldrel)),
 									 errtableconstraint(oldrel, con->name)));
-						break;
-					case CONSTR_FOREIGN:
-						/* Nothing to do here */
 						break;
 					default:
 						elog(ERROR, "unrecognized constraint type: %d",
@@ -8062,9 +8008,9 @@ ATExecAddConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	Assert(IsA(newConstraint, Constraint));
 
 	/*
-	 * Currently, we only expect to see CONSTR_CHECK and CONSTR_FOREIGN nodes
-	 * arriving here (see the preprocessing done in parse_utilcmd.c).  Use a
-	 * switch anyway to make it easier to add more code later.
+	 * Currently, we only expect to see CONSTR_CHECK nodes arriving here (see
+	 * the preprocessing done in parse_utilcmd.c).  Use a switch anyway to make
+	 * it easier to add more code later.
 	 */
 	switch (newConstraint->contype)
 	{
@@ -8073,13 +8019,6 @@ ATExecAddConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 				ATAddCheckConstraint(wqueue, tab, rel,
 									 newConstraint, recurse, false, is_readd,
 									 lockmode);
-			break;
-
-		case CONSTR_FOREIGN:
-			/* Foreign-key constraints are not supported in minipg. */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("foreign key constraints are not supported in minipg")));
 			break;
 
 		default:
@@ -9776,10 +9715,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 					Constraint *con = castNode(Constraint, cmd->def);
 
 					con->old_pktable_oid = refRelId;
-					/* rewriting neither side of a FK */
-					if (con->contype == CONSTR_FOREIGN &&
-						!rewrite && tab->rewrite == 0)
-						TryReuseForeignKey(oldId, con);
 					con->reset_default_tblspc = true;
 					cmd->subtype = AT_ReAddConstraint;
 					tab->subcmds[AT_PASS_OLD_CONSTR] =
@@ -9931,50 +9866,6 @@ TryReuseIndex(Oid oldId, IndexStmt *stmt)
 	}
 }
 
-/*
- * Subroutine for ATPostAlterTypeParse().
- *
- * Stash the old P-F equality operator into the Constraint node, for possible
- * use by ATAddForeignKeyConstraint() in determining whether revalidation of
- * this constraint can be skipped.
- */
-static void
-TryReuseForeignKey(Oid oldId, Constraint *con)
-{
-	HeapTuple	tup;
-	Datum		adatum;
-	bool		isNull;
-	ArrayType  *arr;
-	Oid		   *rawarr;
-	int			numkeys;
-	int			i;
-
-	Assert(con->contype == CONSTR_FOREIGN);
-	Assert(con->old_conpfeqop == NIL);	/* already prepared this node */
-
-	tup = SearchSysCache1(CONSTROID, ObjectIdGetDatum(oldId));
-	if (!HeapTupleIsValid(tup)) /* should not happen */
-		elog(ERROR, "cache lookup failed for constraint %u", oldId);
-
-	adatum = SysCacheGetAttr(CONSTROID, tup,
-							 Anum_pg_constraint_conpfeqop, &isNull);
-	if (isNull)
-		elog(ERROR, "null conpfeqop for constraint %u", oldId);
-	arr = DatumGetArrayTypeP(adatum);	/* ensure not toasted */
-	numkeys = ARR_DIMS(arr)[0];
-	/* test follows the one in ri_FetchConstraintInfo() */
-	if (ARR_NDIM(arr) != 1 ||
-		ARR_HASNULL(arr) ||
-		ARR_ELEMTYPE(arr) != OIDOID)
-		elog(ERROR, "conpfeqop is not a 1-D Oid array");
-	rawarr = (Oid *) ARR_DATA_PTR(arr);
-
-	/* stash a List of the operator Oids in our Constraint node */
-	for (i = 0; i < numkeys; i++)
-		con->old_conpfeqop = lappend_oid(con->old_conpfeqop, rawarr[i]);
-
-	ReleaseSysCache(tup);
-}
 /*
  * ALTER TABLE OWNER
  *
@@ -10870,12 +10761,9 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 			smgrcreate(dstrel, forkNum, false);
 
 			/*
-			 * WAL log creation if the relation is persistent, or this is the
-			 * init fork of an unlogged relation.
+			 * WAL log creation if the relation is persistent.
 			 */
-			if (RelationIsPermanent(rel) ||
-				(rel->rd_rel->relpersistence == RELPERSISTENCE_UNLOGGED &&
-				 forkNum == INIT_FORKNUM))
+			if (RelationIsPermanent(rel))
 				log_smgrcreate(&newrnode, forkNum);
 			RelationCopyStorage(RelationGetSmgr(rel), dstrel, forkNum,
 								rel->rd_rel->relpersistence);
@@ -10962,27 +10850,10 @@ ATExecAddInherit(Relation child_rel, RangeVar *parent, LOCKMODE lockmode)
 	 */
 	ATSimplePermissions(parent_rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 
-	/* Permanent rels cannot inherit from temporary ones */
-	if (parent_rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-		child_rel->rd_rel->relpersistence != RELPERSISTENCE_TEMP)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot inherit from temporary relation \"%s\"",
-						RelationGetRelationName(parent_rel))));
-
-	/* If parent rel is temp, it must belong to this session */
-	if (parent_rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-		!parent_rel->rd_islocaltemp)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot inherit from temporary relation of another session")));
-
-	/* Ditto for the child */
-	if (child_rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-		!child_rel->rd_islocaltemp)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot inherit to temporary relation of another session")));
+	/*
+	 * Temporary relations are not supported in this build, so there is no
+	 * need to validate permanent/temporary inheritance compatibility.
+	 */
 
 	/* Prevent partitioned tables from becoming inheritance parents */
 	if (parent_rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
@@ -13235,34 +13106,7 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
 		HeapTuple	copyTuple;
 		Form_pg_constraint copy_con;
 
-		if (con->contype == CONSTRAINT_FOREIGN)
-		{
-			NewConstraint *newcon;
-			Constraint *fkconstraint;
-
-			/* Queue validation for phase 3 */
-			fkconstraint = makeNode(Constraint);
-			/* for now this is all we need */
-			fkconstraint->conname = constrName;
-
-			newcon = (NewConstraint *) palloc0(sizeof(NewConstraint));
-			newcon->name = constrName;
-			newcon->contype = CONSTR_FOREIGN;
-			newcon->refrelid = con->confrelid;
-			newcon->refindid = con->conindid;
-			newcon->conid = con->oid;
-			newcon->qual = (Node *) fkconstraint;
-
-			/* Find or create work queue entry for this table */
-			tab = ATGetQueueEntry(wqueue, rel);
-			tab->constraints = lappend(tab->constraints, newcon);
-
-			/*
-			 * We disallow creating invalid foreign keys to or from
-			 * partitioned tables, so ignoring the recursion bit is okay.
-			 */
-		}
-		else if (con->contype == CONSTRAINT_CHECK)
+		if (con->contype == CONSTRAINT_CHECK)
 		{
 			List	   *children = NIL;
 			ListCell   *child;

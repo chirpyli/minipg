@@ -2083,12 +2083,6 @@ do_autovacuum(void)
 		bool		doanalyze;
 		bool		wraparound;
 
-		/*
-		 * We cannot safely process other backends' temp tables, so skip 'em.
-		 */
-		if (classForm->relpersistence == RELPERSISTENCE_TEMP)
-			continue;
-
 		relid = classForm->oid;
 
 		/*

@@ -79,7 +79,6 @@ typedef struct
 	bool		isalter;		/* true if altering existing table */
 	List	   *columns;		/* ColumnDef items */
 	List	   *ckconstraints;	/* CHECK constraints */
-	List	   *fkconstraints;	/* FOREIGN KEY constraints */
 	List	   *ixconstraints;	/* index-creating constraints */
 	List	   *likeclauses;	/* LIKE clauses that need post-processing */
 	List	   *blist;			/* "before list" of things to do before
@@ -119,9 +118,6 @@ static List *get_opclass(Oid opclass, Oid actual_datatype);
 static void transformIndexConstraints(CreateStmtContext *cxt);
 static IndexStmt *transformIndexConstraint(Constraint *constraint,
 										   CreateStmtContext *cxt);
-static void transformFKConstraints(CreateStmtContext *cxt,
-								   bool skipValidation,
-								   bool isAddConstraint);
 static void transformCheckConstraints(CreateStmtContext *cxt,
 									  bool skipValidation);
 static void transformConstraintAttrs(CreateStmtContext *cxt,
@@ -218,7 +214,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.isalter = false;
 	cxt.columns = NIL;
 	cxt.ckconstraints = NIL;
-	cxt.fkconstraints = NIL;
 	cxt.ixconstraints = NIL;
 	cxt.likeclauses = NIL;
 	cxt.blist = NIL;
@@ -287,11 +282,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 * self-referential FK.
 	 */
 	cxt.alist = list_concat(cxt.alist, cxt.likeclauses);
-
-	/*
-	 * Postprocess foreign-key constraints.
-	 */
-	transformFKConstraints(&cxt, true, false);
 
 	/*
 	 * Postprocess check constraints.
@@ -742,22 +732,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				elog(ERROR, "column exclusion constraints are not supported");
 				break;
 
-			case CONSTR_FOREIGN:
-				if (cxt->isforeign)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("foreign key constraints are not supported on foreign tables"),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
-
-				/*
-				 * Fill in the current attribute's name and throw it into the
-				 * list of FK constraints to be processed later.
-				 */
-				constraint->fk_attrs = list_make1(makeString(column->colname));
-				cxt->fkconstraints = lappend(cxt->fkconstraints, constraint);
-				break;
-
 			case CONSTR_ATTR_DEFERRABLE:
 			case CONSTR_ATTR_NOT_DEFERRABLE:
 			case CONSTR_ATTR_DEFERRED:
@@ -838,16 +812,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 
 		case CONSTR_CHECK:
 			cxt->ckconstraints = lappend(cxt->ckconstraints, constraint);
-			break;
-
-		case CONSTR_FOREIGN:
-			if (cxt->isforeign)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("foreign key constraints are not supported on foreign tables"),
-						 parser_errposition(cxt->pstate,
-											constraint->location)));
-			cxt->fkconstraints = lappend(cxt->fkconstraints, constraint);
 			break;
 
 		case CONSTR_NULL:
@@ -2573,69 +2537,6 @@ transformCheckConstraints(CreateStmtContext *cxt, bool skipValidation)
 }
 
 /*
- * transformFKConstraints
- *		handle FOREIGN KEY constraints
- */
-static void
-transformFKConstraints(CreateStmtContext *cxt,
-					   bool skipValidation, bool isAddConstraint)
-{
-	ListCell   *fkclist;
-
-	if (cxt->fkconstraints == NIL)
-		return;
-
-	/*
-	 * If CREATE TABLE or adding a column with NULL default, we can safely
-	 * skip validation of FK constraints, and nonetheless mark them valid.
-	 * (This will override any user-supplied NOT VALID flag.)
-	 */
-	if (skipValidation)
-	{
-		foreach(fkclist, cxt->fkconstraints)
-		{
-			Constraint *constraint = (Constraint *) lfirst(fkclist);
-
-			constraint->skip_validation = true;
-			constraint->initially_valid = true;
-		}
-	}
-
-	/*
-	 * For CREATE TABLE or ALTER TABLE ADD COLUMN, gin up an ALTER TABLE ADD
-	 * CONSTRAINT command to execute after the basic command is complete. (If
-	 * called from ADD CONSTRAINT, that routine will add the FK constraints to
-	 * its own subcommand list.)
-	 *
-	 * Note: the ADD CONSTRAINT command must also execute after any index
-	 * creation commands.  Thus, this should run after
-	 * transformIndexConstraints, so that the CREATE INDEX commands are
-	 * already in cxt->alist.  See also the handling of cxt->likeclauses.
-	 */
-	if (!isAddConstraint)
-	{
-		AlterTableStmt *alterstmt = makeNode(AlterTableStmt);
-
-		alterstmt->relation = cxt->relation;
-		alterstmt->cmds = NIL;
-		alterstmt->objtype = OBJECT_TABLE;
-
-		foreach(fkclist, cxt->fkconstraints)
-		{
-			Constraint *constraint = (Constraint *) lfirst(fkclist);
-			AlterTableCmd *altercmd = makeNode(AlterTableCmd);
-
-			altercmd->subtype = AT_AddConstraint;
-			altercmd->name = NULL;
-			altercmd->def = (Node *) constraint;
-			alterstmt->cmds = lappend(alterstmt->cmds, altercmd);
-		}
-
-		cxt->alist = lappend(cxt->alist, alterstmt);
-	}
-}
-
-/*
  * transformIndexStmt - parse analysis for CREATE INDEX and ALTER TABLE
  *
  * Note: this is a no-op for an index not using either index expressions or
@@ -3131,7 +3032,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 	cxt.isalter = true;
 	cxt.columns = NIL;
 	cxt.ckconstraints = NIL;
-	cxt.fkconstraints = NIL;
 	cxt.ixconstraints = NIL;
 	cxt.likeclauses = NIL;
 	cxt.blist = NIL;
@@ -3180,11 +3080,7 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 				 * The original AddConstraint cmd node doesn't go to newcmds
 				 */
 				if (IsA(cmd->def, Constraint))
-				{
 					transformTableConstraint(&cxt, (Constraint *) cmd->def);
-					if (((Constraint *) cmd->def)->contype == CONSTR_FOREIGN)
-						skipValidation = false;
-				}
 				else
 					elog(ERROR, "unrecognized node type: %d",
 						 (int) nodeTag(cmd->def));
@@ -3345,7 +3241,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 
 	/* Postprocess constraints */
 	transformIndexConstraints(&cxt);
-	transformFKConstraints(&cxt, skipValidation, true);
 	transformCheckConstraints(&cxt, false);
 
 	/*
@@ -3384,15 +3279,8 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 	}
 	cxt.alist = NIL;
 
-	/* Append any CHECK or FK constraints to the commands list */
+	/* Append any CHECK constraints to the commands list */
 	foreach(l, cxt.ckconstraints)
-	{
-		newcmd = makeNode(AlterTableCmd);
-		newcmd->subtype = AT_AddConstraint;
-		newcmd->def = (Node *) lfirst(l);
-		newcmds = lappend(newcmds, newcmd);
-	}
-	foreach(l, cxt.fkconstraints)
 	{
 		newcmd = makeNode(AlterTableCmd);
 		newcmd->subtype = AT_AddConstraint;
@@ -3436,8 +3324,7 @@ transformConstraintAttrs(CreateStmtContext *cxt, List *constraintList)
 	((node) != NULL &&						\
 	 ((node)->contype == CONSTR_PRIMARY ||	\
 	  (node)->contype == CONSTR_UNIQUE ||	\
-	  (node)->contype == CONSTR_EXCLUSION || \
-	  (node)->contype == CONSTR_FOREIGN))
+	  (node)->contype == CONSTR_EXCLUSION))
 
 	foreach(clist, constraintList)
 	{

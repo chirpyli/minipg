@@ -603,15 +603,6 @@ heapam_relation_set_new_filenode(Relation rel,
 	 * while replaying, for example, XLOG_DBASE_CREATE or XLOG_TBLSPC_CREATE
 	 * record. Therefore, logging is necessary even if wal_level=minimal.
 	 */
-	if (persistence == RELPERSISTENCE_UNLOGGED)
-	{
-		Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
-			   rel->rd_rel->relkind == RELKIND_TOASTVALUE);
-		smgrcreate(srel, INIT_FORKNUM, false);
-		log_smgrcreate(newrnode, INIT_FORKNUM);
-		smgrimmedsync(srel, INIT_FORKNUM);
-	}
-
 	smgrclose(srel);
 }
 
@@ -658,12 +649,9 @@ heapam_relation_copy_data(Relation rel, const RelFileNode *newrnode)
 			smgrcreate(dstrel, forkNum, false);
 
 			/*
-			 * WAL log creation if the relation is persistent, or this is the
-			 * init fork of an unlogged relation.
+			 * WAL log creation if the relation is persistent.
 			 */
-			if (RelationIsPermanent(rel) ||
-				(rel->rd_rel->relpersistence == RELPERSISTENCE_UNLOGGED &&
-				 forkNum == INIT_FORKNUM))
+			if (RelationIsPermanent(rel))
 				log_smgrcreate(newrnode, forkNum);
 			RelationCopyStorage(RelationGetSmgr(rel), dstrel, forkNum,
 								rel->rd_rel->relpersistence);

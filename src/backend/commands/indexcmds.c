@@ -584,16 +584,11 @@ DefineIndex(Oid relationId,
 								 GUC_ACTION_SAVE, true, 0, false);
 
 	/*
-	 * Force non-concurrent build on temporary relations, even if CONCURRENTLY
-	 * was requested.  Other backends can't access a temporary relation, so
-	 * there's no harm in grabbing a stronger lock, and a non-concurrent DROP
-	 * is more efficient.  Do this before any use of the concurrent option is
-	 * done.
+	 * Decide whether to build the index concurrently.  This build does not
+	 * support temporary relations, so CONCURRENTLY is honored whenever
+	 * requested.
 	 */
-	if (stmt->concurrent && get_rel_persistence(relationId) != RELPERSISTENCE_TEMP)
-		concurrent = true;
-	else
-		concurrent = false;
+	concurrent = stmt->concurrent;
 
 	/*
 	 * Start progress report.  If we're building a partition, this was already
@@ -2333,8 +2328,7 @@ ReindexIndex(RangeVar *indexRelation, ReindexParams *params, bool isTopLevel)
 
 	if (relkind == RELKIND_PARTITIONED_INDEX)
 		ReindexPartitions(indOid, params, isTopLevel);
-	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0 &&
-			 persistence != RELPERSISTENCE_TEMP)
+	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 		ReindexRelationConcurrently(indOid, params);
 	else
 	{
@@ -2442,8 +2436,7 @@ ReindexTable(RangeVar *relation, ReindexParams *params, bool isTopLevel)
 
 	if (get_rel_relkind(heapOid) == RELKIND_PARTITIONED_TABLE)
 		ReindexPartitions(heapOid, params, isTopLevel);
-	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0 &&
-			 get_rel_persistence(heapOid) != RELPERSISTENCE_TEMP)
+	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 	{
 		result = ReindexRelationConcurrently(heapOid, params);
 
@@ -2580,10 +2573,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		 */
 			if (classtuple->relkind != RELKIND_RELATION)
 				continue;
-
-		/* Skip temp tables of other backends; we can't reindex them at all */
-		if (classtuple->relpersistence == RELPERSISTENCE_TEMP)
-			continue;
 
 		/* Check user/system classification, and optionally skip */
 		if (objectKind == REINDEX_OBJECT_SYSTEM &&
@@ -2854,8 +2843,7 @@ ReindexMultipleInternal(List *relids, ReindexParams *params)
 		Assert(relkind != RELKIND_PARTITIONED_INDEX &&
 			   relkind != RELKIND_PARTITIONED_TABLE);
 
-		if ((params->options & REINDEXOPT_CONCURRENTLY) != 0 &&
-			relpersistence != RELPERSISTENCE_TEMP)
+		if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 		{
 			ReindexParams newparams = *params;
 
@@ -3284,10 +3272,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 					 RelationGetIndexPredicate(indexRel) == NIL);
 		idx->tableId = RelationGetRelid(heapRel);
 		idx->amId = indexRel->rd_rel->relam;
-
-		/* This function shouldn't be called for temporary relations. */
-		if (indexRel->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
-			elog(ERROR, "cannot reindex a temporary table concurrently");
 
 		pgstat_progress_start_command(PROGRESS_COMMAND_CREATE_INDEX,
 									  idx->tableId);

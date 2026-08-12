@@ -1390,9 +1390,7 @@ finish_heap_swap(Oid OIDOldHeap, Oid OIDNewHeap,
 	 * Ensure that the indexes have the same persistence as the parent
 	 * relation.
 	 */
-	if (newrelpersistence == RELPERSISTENCE_UNLOGGED)
-		reindex_flags |= REINDEX_REL_FORCE_INDEXES_UNLOGGED;
-	else if (newrelpersistence == RELPERSISTENCE_PERMANENT)
+	if (newrelpersistence == RELPERSISTENCE_PERMANENT)
 		reindex_flags |= REINDEX_REL_FORCE_INDEXES_PERMANENT;
 
 	/* Report that we are now reindexing relations */

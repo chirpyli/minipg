@@ -601,11 +601,12 @@ RelationGetSmgr(Relation rel)
  * RELATION_IS_OTHER_TEMP
  *		Test for a temporary relation that belongs to some other session.
  *
+ * This build does not support temporary relations, so this is always false.
+ *
  * Beware of multiple eval of argument
  */
 #define RELATION_IS_OTHER_TEMP(relation) \
-	((relation)->rd_rel->relpersistence == RELPERSISTENCE_TEMP && \
-	 !(relation)->rd_islocaltemp)
+	(false)
 
 
 /*

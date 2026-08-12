@@ -92,9 +92,8 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 
 	/*
 	 * Look up, check permissions on, and lock the creation namespace; also
-	 * check for a preexisting view with the same name.  This will also set
-	 * relation->relpersistence to RELPERSISTENCE_TEMP if the selected
-	 * namespace is temporary.
+	 * check for a preexisting view with the same name.  (Temporary relations
+	 * are not supported in this build, so the relation is always permanent.)
 	 */
 	lockmode = replace ? AccessExclusiveLock : NoLock;
 	(void) RangeVarGetAndCheckCreationNamespace(relation, lockmode, &viewOid);

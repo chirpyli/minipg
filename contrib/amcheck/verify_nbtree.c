@@ -413,25 +413,16 @@ btree_index_checkable(Relation rel)
 
 /*
  * Check if B-Tree index relation should have a file for its main relation
- * fork.  Verification uses this to skip unlogged indexes when in hot standby
- * mode, where there is simply nothing to verify.  We behave as if the
- * relation is empty.
+ * fork.  In this build unlogged relations are not supported, so there is
+ * always something to verify.  We behave as if the relation is empty only
+ * when it actually is.
  *
  * NB: Caller should call btree_index_checkable() before calling here.
  */
 static inline bool
 btree_index_mainfork_expected(Relation rel)
 {
-	if (rel->rd_rel->relpersistence != RELPERSISTENCE_UNLOGGED ||
-		!RecoveryInProgress())
-		return true;
-
-	ereport(DEBUG1,
-			(errcode(ERRCODE_READ_ONLY_SQL_TRANSACTION),
-			 errmsg("cannot verify unlogged index \"%s\" during recovery, skipping",
-					RelationGetRelationName(rel))));
-
-	return false;
+	return true;
 }
 
 /*
