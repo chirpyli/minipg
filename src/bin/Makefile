@@ -15,7 +15,6 @@ include $(top_builddir)/src/Makefile.global
 
 SUBDIRS = \
 	initdb \
-	pg_basebackup \
 	pg_config \
 	pg_controldata \
 	pg_ctl \

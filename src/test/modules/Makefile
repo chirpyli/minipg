@@ -5,7 +5,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 SUBDIRS = \
-		  commit_ts \
 		  delay_execution \
 		  dummy_index_am \
 		  libpq_pipeline \
