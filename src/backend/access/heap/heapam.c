@@ -277,8 +277,7 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 	 * Note that table_block_parallelscan_initialize has a very similar test;
 	 * if you change this, consider changing that one, too.
 	 */
-	if (!RelationUsesLocalBuffers(scan->rs_base.rs_rd) &&
-		scan->rs_nblocks > NBuffers / 4)
+	if (scan->rs_nblocks > NBuffers / 4)
 	{
 		allow_strat = (scan->rs_base.rs_flags & SO_ALLOW_STRAT) != 0;
 		allow_sync = (scan->rs_base.rs_flags & SO_ALLOW_SYNC) != 0;

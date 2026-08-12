@@ -1957,21 +1957,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	}
 
 	/*
-	 * Silently ignore tables that are temp tables of other backends ---
-	 * trying to vacuum these will lead to great unhappiness, since their
-	 * contents are probably not up-to-date on disk.  (We don't throw a
-	 * warning here; it would just lead to chatter during a database-wide
-	 * VACUUM.)
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-	{
-		relation_close(rel, lmode);
-		PopActiveSnapshot();
-		CommitTransactionCommand();
-		return false;
-	}
-
-	/*
 	 * Silently ignore partitioned tables as there is no work to be done.  The
 	 * useful work is on their child partitions, which have been queued up for
 	 * us separately.

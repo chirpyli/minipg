@@ -494,8 +494,7 @@ static void ReleasePredicateLocksLocal(void);
 static inline bool
 PredicateLockingNeededForRelation(Relation relation)
 {
-	return !(relation->rd_id < FirstBootstrapObjectId ||
-			 RelationUsesLocalBuffers(relation));
+	return !(relation->rd_id < FirstBootstrapObjectId);
 }
 
 /*

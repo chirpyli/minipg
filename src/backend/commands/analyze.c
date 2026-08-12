@@ -181,18 +181,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 	}
 
 	/*
-	 * Silently ignore tables that are temp tables of other backends ---
-	 * trying to analyze these is rather pointless, since their contents are
-	 * probably not up-to-date on disk.  (We don't throw a warning here; it
-	 * would just lead to chatter during a database-wide ANALYZE.)
-	 */
-	if (RELATION_IS_OTHER_TEMP(onerel))
-	{
-		relation_close(onerel, ShareUpdateExclusiveLock);
-		return;
-	}
-
-	/*
 	 * We can ANALYZE any table except pg_statistic. See update_attstats
 	 */
 	if (RelationGetRelid(onerel) == StatisticRelationId)
@@ -1401,15 +1389,6 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 
 		/* We already got the needed lock */
 		childrel = table_open(childOID, NoLock);
-
-		/* Ignore if temp table of another backend */
-		if (RELATION_IS_OTHER_TEMP(childrel))
-		{
-			/* ... but release the lock on it */
-			Assert(childrel != onerel);
-			table_close(childrel, AccessShareLock);
-			continue;
-		}
 
 		/* Check table type (MATVIEW can't happen, but might as well allow) */
 		if (childrel->rd_rel->relkind == RELKIND_RELATION)

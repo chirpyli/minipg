@@ -711,14 +711,6 @@ DefineIndex(Oid relationId,
 	}
 
 	/*
-	 * Don't try to CREATE INDEX on temp tables of other backends.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot create indexes on temporary tables of other sessions")));
-
-	/*
 	 * Unless our caller vouches for having checked this already, insist that
 	 * the table not be in use by our own session, either.  Otherwise we might
 	 * fail to make entries in the new index (for instance, if an INSERT or

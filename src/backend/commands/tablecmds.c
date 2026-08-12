@@ -1297,20 +1297,6 @@ ExecuteTruncate(TruncateStmt *stmt)
 
 				/*
 				 * It is possible that the parent table has children that are
-				 * temp tables of other backends.  We cannot safely access
-				 * such tables (because of buffering issues), and the best
-				 * thing to do is to silently ignore them.  Note that this
-				 * check is the same as one of the checks done in
-				 * truncate_check_activity() called below, still it is kept
-				 * here for simplicity.
-				 */
-				if (RELATION_IS_OTHER_TEMP(rel))
-				{
-					table_close(rel, lockmode);
-					continue;
-				}
-
-				/*
 				 * Inherited TRUNCATE commands perform access permission
 				 * checks on the parent table only. So we skip checking the
 				 * children's permissions and don't call
@@ -1715,15 +1701,6 @@ truncate_check_perms(Oid relid, Form_pg_class reltuple)
 static void
 truncate_check_activity(Relation rel)
 {
-	/*
-	 * Don't allow truncate on temp tables of other backends ... their local
-	 * buffer manager is not going to cope.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot truncate temporary tables of other sessions")));
-
 	/*
 	 * Also check for active uses of the relation in the current transaction,
 	 * including open scans and pending AFTER trigger events.
@@ -2787,15 +2764,6 @@ CheckRelationTableSpaceMove(Relation rel, Oid newTableSpaceId)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("only shared relations can be placed in pg_global tablespace")));
 
-	/*
-	 * Do not allow moving temp tables of other backends ... their local
-	 * buffer manager is not going to cope.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move temporary tables of other sessions")));
-
 	return true;
 }
 
@@ -3511,17 +3479,6 @@ CheckTableNotInUse(Relation rel, const char *stmt)
 static void
 CheckAlterTableIsSafe(Relation rel)
 {
-	/*
-	 * Don't allow ALTER on temp tables of other backends.  Their local buffer
-	 * manager is not going to cope if we need to change the table's contents.
-	 * Even if we don't, there may be optimizations that assume temp tables
-	 * aren't subject to such interference.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter temporary tables of other sessions")));
-
 	/*
 	 * Also check for active uses of the relation in the current transaction,
 	 * including open scans and pending AFTER trigger events.
@@ -4807,17 +4764,6 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("cannot rewrite table \"%s\" used as a catalog table",
 								RelationGetRelationName(OldHeap))));
-
-			/*
-			 * Don't allow rewrite on temp tables of other backends ... their
-			 * local buffer manager is not going to cope.  (This is redundant
-			 * with the check in CheckAlterTableIsSafe, but for safety we'll
-			 * check here too.)
-			 */
-			if (RELATION_IS_OTHER_TEMP(OldHeap))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot rewrite temporary tables of other sessions")));
 
 			/*
 			 * Select destination tablespace (same as original unless user

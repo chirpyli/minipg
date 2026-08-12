@@ -581,9 +581,12 @@ RelationGetSmgr(Relation rel)
 /*
  * RelationUsesLocalBuffers
  *		True if relation's pages are stored in local buffers.
+ *
+ * This build does not support temporary relations (whose pages are the only
+ * ones stored in local buffers), so this is always false.
  */
 #define RelationUsesLocalBuffers(relation) \
-	((relation)->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
+	(false)
 
 /*
  * RELATION_IS_LOCAL
@@ -596,17 +599,6 @@ RelationGetSmgr(Relation rel)
 #define RELATION_IS_LOCAL(relation) \
 	((relation)->rd_islocaltemp || \
 	 (relation)->rd_createSubid != InvalidSubTransactionId)
-
-/*
- * RELATION_IS_OTHER_TEMP
- *		Test for a temporary relation that belongs to some other session.
- *
- * This build does not support temporary relations, so this is always false.
- *
- * Beware of multiple eval of argument
- */
-#define RELATION_IS_OTHER_TEMP(relation) \
-	(false)
 
 
 /*

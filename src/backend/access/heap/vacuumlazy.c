@@ -3493,23 +3493,7 @@ lazy_space_alloc(LVRelState *vacrel, int nworkers, BlockNumber nblocks)
 	 */
 	if (nworkers >= 0 && vacrel->nindexes > 1 && vacrel->do_index_vacuuming)
 	{
-		/*
-		 * Since parallel workers cannot access data in temporary tables, we
-		 * can't perform parallel vacuum on them.
-		 */
-		if (RelationUsesLocalBuffers(vacrel->rel))
-		{
-			/*
-			 * Give warning only if the user explicitly tries to perform a
-			 * parallel vacuum on the temporary table.
-			 */
-			if (nworkers > 0)
-				ereport(WARNING,
-						(errmsg("disabling parallel option of vacuum on \"%s\" --- cannot vacuum temporary tables in parallel",
-								vacrel->relname)));
-		}
-		else
-			vacrel->lps = begin_parallel_vacuum(vacrel, nblocks, nworkers);
+		vacrel->lps = begin_parallel_vacuum(vacrel, nblocks, nworkers);
 
 		/* If parallel mode started, we're done */
 		if (ParallelVacuumIsActive(vacrel))

@@ -168,18 +168,6 @@ expand_inherited_rtentry(PlannerInfo *root, RelOptInfo *rel,
 			else
 				newrelation = oldrelation;
 
-			/*
-			 * It is possible that the parent table has children that are temp
-			 * tables of other backends.  We cannot safely access such tables
-			 * (because of buffering issues), and the best thing to do seems
-			 * to be to silently ignore them.
-			 */
-			if (childOID != parentOID && RELATION_IS_OTHER_TEMP(newrelation))
-			{
-				table_close(newrelation, lockmode);
-				continue;
-			}
-
 			/* Create RTE and AppendRelInfo, plus PlanRowMark if needed. */
 			expand_single_inheritance_child(root, rte, rti, oldrelation,
 											oldrc, newrelation,

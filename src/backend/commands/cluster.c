@@ -137,15 +137,6 @@ cluster(ParseState *pstate, ClusterStmt *stmt, bool isTopLevel)
 											RangeVarCallbackOwnsTable, NULL);
 		rel = table_open(tableOid, NoLock);
 
-		/*
-		 * Reject clustering a remote temp table ... their local buffer
-		 * manager is not going to cope.
-		 */
-		if (RELATION_IS_OTHER_TEMP(rel))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot cluster temporary tables of other sessions")));
-
 		if (stmt->indexname == NULL)
 		{
 			ListCell   *index;
@@ -328,20 +319,6 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 			goto out;
 		}
 
-		/*
-		 * Silently skip a temp table for a remote session.  Only doing this
-		 * check in the "recheck" case is appropriate (which currently means
-		 * somebody is executing a database-wide CLUSTER), because there is
-		 * another check in cluster() which will stop any attempt to cluster
-		 * remote temp tables by name.  There is another check in cluster_rel
-		 * which is redundant, but we leave it for extra safety.
-		 */
-		if (RELATION_IS_OTHER_TEMP(OldHeap))
-		{
-			relation_close(OldHeap, AccessExclusiveLock);
-			goto out;
-		}
-
 		if (OidIsValid(indexOid))
 		{
 			/*
@@ -374,22 +351,6 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot cluster a shared catalog")));
-
-	/*
-	 * Don't process temp tables of other backends ... their local buffer
-	 * manager is not going to cope.
-	 */
-	if (RELATION_IS_OTHER_TEMP(OldHeap))
-	{
-		if (OidIsValid(indexOid))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot cluster temporary tables of other sessions")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot vacuum temporary tables of other sessions")));
-	}
 
 	/*
 	 * Also check for active uses of the relation in the current transaction,

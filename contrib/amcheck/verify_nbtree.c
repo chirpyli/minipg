@@ -396,13 +396,6 @@ btree_index_checkable(Relation rel)
 				 errdetail("Relation \"%s\" is not a B-Tree index.",
 						   RelationGetRelationName(rel))));
 
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions"),
-				 errdetail("Index \"%s\" is associated with temporary relation.",
-						   RelationGetRelationName(rel))));
-
 	if (!rel->rd_index->indisvalid)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

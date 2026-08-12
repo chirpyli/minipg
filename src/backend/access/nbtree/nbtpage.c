@@ -1071,8 +1071,7 @@ _bt_lockbuf(Relation rel, Buffer buf, int access)
 	 * detect cases where the pointer gets dereferenced with no _current_
 	 * lock/pin held, though.
 	 */
-	if (!RelationUsesLocalBuffers(rel))
-		VALGRIND_MAKE_MEM_DEFINED(BufferGetPage(buf), BLCKSZ);
+	VALGRIND_MAKE_MEM_DEFINED(BufferGetPage(buf), BLCKSZ);
 }
 
 /*
@@ -1090,8 +1089,7 @@ _bt_unlockbuf(Relation rel, Buffer buf)
 	/* LockBuffer() asserts that pin is held by this backend */
 	LockBuffer(buf, BUFFER_LOCK_UNLOCK);
 
-	if (!RelationUsesLocalBuffers(rel))
-		VALGRIND_MAKE_MEM_NOACCESS(BufferGetPage(buf), BLCKSZ);
+	VALGRIND_MAKE_MEM_NOACCESS(BufferGetPage(buf), BLCKSZ);
 }
 
 /*
@@ -1108,8 +1106,7 @@ _bt_conditionallockbuf(Relation rel, Buffer buf)
 	if (!ConditionalLockBuffer(buf))
 		return false;
 
-	if (!RelationUsesLocalBuffers(rel))
-		VALGRIND_MAKE_MEM_DEFINED(BufferGetPage(buf), BLCKSZ);
+	VALGRIND_MAKE_MEM_DEFINED(BufferGetPage(buf), BLCKSZ);
 
 	return true;
 }

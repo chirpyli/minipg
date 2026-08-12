@@ -596,22 +596,8 @@ PrefetchBuffer(Relation reln, ForkNumber forkNum, BlockNumber blockNum)
 	Assert(RelationIsValid(reln));
 	Assert(BlockNumberIsValid(blockNum));
 
-	if (RelationUsesLocalBuffers(reln))
-	{
-		/* see comments in ReadBufferExtended */
-		if (RELATION_IS_OTHER_TEMP(reln))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot access temporary tables of other sessions")));
-
-		/* pass it off to localbuf.c */
-		return PrefetchLocalBuffer(RelationGetSmgr(reln), forkNum, blockNum);
-	}
-	else
-	{
-		/* pass it to the shared buffer version */
-		return PrefetchSharedBuffer(RelationGetSmgr(reln), forkNum, blockNum);
-	}
+	/* pass it to the shared buffer version */
+	return PrefetchSharedBuffer(RelationGetSmgr(reln), forkNum, blockNum);
 }
 
 /*
@@ -760,16 +746,6 @@ ReadBufferExtended(Relation reln, ForkNumber forkNum, BlockNumber blockNum,
 {
 	bool		hit;
 	Buffer		buf;
-
-	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(reln))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions")));
 
 	/*
 	 * Read the buffer, and update pgstat counters to reflect a cache hit or
@@ -3601,47 +3577,6 @@ FlushRelationBuffers(Relation rel)
 {
 	int			i;
 	BufferDesc *bufHdr;
-
-	if (RelationUsesLocalBuffers(rel))
-	{
-		for (i = 0; i < NLocBuffer; i++)
-		{
-			uint32		buf_state;
-
-			bufHdr = GetLocalBufferDescriptor(i);
-			if (RelFileNodeEquals(bufHdr->tag.rnode, rel->rd_node) &&
-				((buf_state = pg_atomic_read_u32(&bufHdr->state)) &
-				 (BM_VALID | BM_DIRTY)) == (BM_VALID | BM_DIRTY))
-			{
-				ErrorContextCallback errcallback;
-				Page		localpage;
-
-				localpage = (char *) LocalBufHdrGetBlock(bufHdr);
-
-				/* Setup error traceback support for ereport() */
-				errcallback.callback = local_buffer_write_error_callback;
-				errcallback.arg = (void *) bufHdr;
-				errcallback.previous = error_context_stack;
-				error_context_stack = &errcallback;
-
-				PageSetChecksumInplace(localpage, bufHdr->tag.blockNum);
-
-				smgrwrite(RelationGetSmgr(rel),
-						  bufHdr->tag.forkNum,
-						  bufHdr->tag.blockNum,
-						  localpage,
-						  false);
-
-				buf_state &= ~(BM_DIRTY | BM_JUST_DIRTIED);
-				pg_atomic_unlocked_write_u32(&bufHdr->state, buf_state);
-
-				/* Pop the error context stack */
-				error_context_stack = errcallback.previous;
-			}
-		}
-
-		return;
-	}
 
 	/* Make sure we can handle the pin inside the loop */
 	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);

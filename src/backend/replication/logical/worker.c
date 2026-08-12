@@ -1725,16 +1725,6 @@ apply_handle_truncate(StringInfo s)
 				/* find_all_inheritors already got lock */
 				childrel = table_open(childrelid, NoLock);
 
-				/*
-				 * Ignore temp tables of other backends.  See similar code in
-				 * ExecuteTruncate().
-				 */
-				if (RELATION_IS_OTHER_TEMP(childrel))
-				{
-					table_close(childrel, lockmode);
-					continue;
-				}
-
 				rels = lappend(rels, childrel);
 				part_rels = lappend(part_rels, childrel);
 				relids = lappend_oid(relids, childrelid);

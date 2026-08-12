@@ -395,7 +395,6 @@ table_block_parallelscan_initialize(Relation rel, ParallelTableScanDesc pscan)
 	bpscan->phs_nblocks = RelationGetNumberOfBlocks(rel);
 	/* compare phs_syncscan initialization to similar logic in initscan */
 	bpscan->base.phs_syncscan = synchronize_seqscans &&
-		!RelationUsesLocalBuffers(rel) &&
 		bpscan->phs_nblocks > NBuffers / 4;
 	SpinLockInit(&bpscan->phs_mutex);
 	bpscan->phs_startblock = InvalidBlockNumber;

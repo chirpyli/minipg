@@ -177,16 +177,6 @@ get_raw_page_internal(text *relname, ForkNumber forknum, BlockNumber blkno)
 				 errmsg("cannot get raw page from partitioned index \"%s\"",
 						RelationGetRelationName(rel))));
 
-	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions")));
-
 	if (blkno >= RelationGetNumberOfBlocksInFork(rel, forknum))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),

@@ -1857,12 +1857,6 @@ pg_sequence_last_value(PG_FUNCTION_ARGS)
 				 errmsg("permission denied for sequence %s",
 						RelationGetRelationName(seqrel))));
 
-	/*
-	 * We return NULL for other sessions' temporary sequences.  The
-	 * pg_sequences system view already filters those out, but this offers a
-	 * defense against ERRORs in case someone invokes this function directly.
-	 */
-	if (!RELATION_IS_OTHER_TEMP(seqrel))
 	{
 		Buffer		buf;
 		HeapTupleData seqtuple;

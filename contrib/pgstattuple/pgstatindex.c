@@ -211,16 +211,6 @@ pgstatindex_impl(Relation rel, FunctionCallInfo fcinfo)
 						RelationGetRelationName(rel))));
 
 	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions")));
-
-	/*
 	 * A !indisready index could lead to ERRCODE_DATA_CORRUPTED later, so exit
 	 * early.  We're capable of assessing an indisready&&!indisvalid index,
 	 * but the results could be confusing.  For example, the index's size
@@ -505,16 +495,6 @@ pgstathashindex(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("relation \"%s\" is not a hash index",
 						RelationGetRelationName(rel))));
-
-	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary indexes of other sessions")));
 
 	/* see pgstatindex_impl */
 	if (!rel->rd_index->indisvalid)

@@ -211,16 +211,6 @@ bt_page_stats_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 				 errmsg("\"%s\" is not a %s index",
 						RelationGetRelationName(rel), "btree")));
 
-	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions")));
-
 	if (blkno < 0 || blkno > MaxBlockNumber)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -483,16 +473,6 @@ bt_page_items_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 					 errmsg("\"%s\" is not a %s index",
 							RelationGetRelationName(rel), "btree")));
 
-		/*
-		 * Reject attempts to read non-local temporary relations; we would be
-		 * likely to get wrong data since we have no visibility into the
-		 * owning session's local buffers.
-		 */
-		if (RELATION_IS_OTHER_TEMP(rel))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot access temporary tables of other sessions")));
-
 		if (blkno < 0 || blkno > MaxBlockNumber)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -718,16 +698,6 @@ bt_metap(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a %s index",
 						RelationGetRelationName(rel), "btree")));
-
-	/*
-	 * Reject attempts to read non-local temporary relations; we would be
-	 * likely to get wrong data since we have no visibility into the owning
-	 * session's local buffers.
-	 */
-	if (RELATION_IS_OTHER_TEMP(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot access temporary tables of other sessions")));
 
 	buffer = ReadBuffer(rel, 0);
 	LockBuffer(buffer, BUFFER_LOCK_SHARE);

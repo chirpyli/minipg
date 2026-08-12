@@ -3616,16 +3616,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 									 iRel->rd_rel->relam);
 
 	/*
-	/*
-	 * Don't allow reindex on temp tables of other backends ... their local
-	 * buffer manager is not going to cope.
-	 */
-	if (RELATION_IS_OTHER_TEMP(iRel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot reindex temporary tables of other sessions")));
-
-	/*
 	 * Don't allow reindex of an invalid index on TOAST table.  This is a
 	 * leftover from a failed REINDEX CONCURRENTLY, and if rebuilt it would
 	 * not be possible to drop it anymore.

@@ -69,10 +69,6 @@ relation_open(Oid relationId, LOCKMODE lockmode)
 		   IsBootstrapProcessingMode() ||
 		   CheckRelationLockedByMe(r, AccessShareLock, true));
 
-	/* Make note that we've accessed a temporary relation */
-	if (RelationUsesLocalBuffers(r))
-		MyXactFlags |= XACT_FLAGS_ACCESSEDTEMPNAMESPACE;
-
 	pgstat_initstats(r);
 
 	return r;
@@ -118,10 +114,6 @@ try_relation_open(Oid relationId, LOCKMODE lockmode)
 	/* If we didn't get the lock ourselves, assert that caller holds one */
 	Assert(lockmode != NoLock ||
 		   CheckRelationLockedByMe(r, AccessShareLock, true));
-
-	/* Make note that we've accessed a temporary relation */
-	if (RelationUsesLocalBuffers(r))
-		MyXactFlags |= XACT_FLAGS_ACCESSEDTEMPNAMESPACE;
 
 	pgstat_initstats(r);
 
