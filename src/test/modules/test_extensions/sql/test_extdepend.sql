@@ -4,22 +4,22 @@
 
 -- Common setup for all tests
 CREATE TABLE test_extdep_commands (command text);
-COPY test_extdep_commands FROM stdin;
- CREATE SCHEMA test_ext
- CREATE EXTENSION test_ext5 SCHEMA test_ext
- SET search_path TO test_ext
- CREATE TABLE a (a1 int)
-
- CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS\n   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
- ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
-
- CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
- ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
-
- CREATE INDEX e ON a (a1)
- ALTER INDEX e DEPENDS ON EXTENSION test_ext5
- RESET search_path
-\.
+INSERT INTO test_extdep_commands (command) VALUES
+ (' CREATE SCHEMA test_ext'),
+ (' CREATE EXTENSION test_ext5 SCHEMA test_ext'),
+ (' SET search_path TO test_ext'),
+ (' CREATE TABLE a (a1 int)'),
+ (''),
+ (' CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
+   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$'),
+ (' ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5'),
+ (''),
+ (' CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()'),
+ (' ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5'),
+ (''),
+ (' CREATE INDEX e ON a (a1)'),
+ (' ALTER INDEX e DEPENDS ON EXTENSION test_ext5'),
+ (' RESET search_path');
 
 SELECT * FROM test_extdep_commands;
 -- First, test that dependent objects go away when the extension is dropped.

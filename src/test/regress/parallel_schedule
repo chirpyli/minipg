@@ -47,7 +47,8 @@ test: create_table
 # ----------
 # copy 已随表继承(INHERITS)功能裁剪而移除（依赖 emp/student/stud_emp 继承表）
 # insert_conflict 已随表继承(INHERITS)功能裁剪而移除
-test: copyselect copydml insert
+# copyselect/copydml 已随 SQL COPY 命令裁剪而移除
+test: insert
 
 # ----------
 # More groups of parallel tests

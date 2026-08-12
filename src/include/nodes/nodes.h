@@ -306,7 +306,6 @@ typedef enum NodeTag
 	T_AlterDomainStmt,
 	T_ClosePortalStmt,
 	T_ClusterStmt,
-	T_CopyStmt,
 	T_CreateStmt,
 	T_DefineStmt,
 	T_DropStmt,

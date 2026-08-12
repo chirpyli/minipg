@@ -138,7 +138,7 @@ ERROR:  negative substring length not allowed
 --- Bit operations
 DROP TABLE varbit_table;
 CREATE TABLE varbit_table (a BIT VARYING(16), b BIT VARYING(16));
-COPY varbit_table FROM stdin;
+\set ECHO none
 SELECT a, b, ~a AS "~ a", a & b AS "a & b",
        a | b AS "a | b", a # b AS "a # b" FROM varbit_table;
         a         |        b         |       ~ a        |      a & b       |      a | b       |      a # b       
@@ -190,7 +190,7 @@ DROP TABLE varbit_table;
 --- Bit operations
 DROP TABLE bit_table;
 CREATE TABLE bit_table (a BIT(16), b BIT(16));
-COPY bit_table FROM stdin;
+\set ECHO none
 SELECT a,b,~a AS "~ a",a & b AS "a & b",
 	a|b AS "a | b", a # b AS "a # b" FROM bit_table;
         a         |        b         |       ~ a        |      a & b       |      a | b       |      a # b       

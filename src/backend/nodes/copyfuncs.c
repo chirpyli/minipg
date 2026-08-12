@@ -3024,23 +3024,6 @@ _copyClusterStmt(const ClusterStmt *from)
 	return newnode;
 }
 
-static CopyStmt *
-_copyCopyStmt(const CopyStmt *from)
-{
-	CopyStmt   *newnode = makeNode(CopyStmt);
-
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(query);
-	COPY_NODE_FIELD(attlist);
-	COPY_SCALAR_FIELD(is_from);
-	COPY_SCALAR_FIELD(is_program);
-	COPY_STRING_FIELD(filename);
-	COPY_NODE_FIELD(options);
-	COPY_NODE_FIELD(whereClause);
-
-	return newnode;
-}
-
 /*
  * CopyCreateStmtFields
  *
@@ -4464,9 +4447,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ClusterStmt:
 			retval = _copyClusterStmt(from);
-			break;
-		case T_CopyStmt:
-			retval = _copyCopyStmt(from);
 			break;
 		case T_CreateStmt:
 			retval = _copyCreateStmt(from);

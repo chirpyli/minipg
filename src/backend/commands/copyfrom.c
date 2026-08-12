@@ -712,8 +712,8 @@ CopyFrom(CopyFromState cstate)
 		 * expressions in WHERE clause.  Similarly to the trigger case above,
 		 * such expressions may query the table we're inserting into.
 		 *
-		 * Note: the whereClause was already preprocessed in DoCopy(), so it's
-		 * okay to use contain_volatile_functions() directly.
+		 * Note: the whereClause was already preprocessed in ProcessCopyOptions(),
+		 * so it's okay to use contain_volatile_functions() directly.
 		 */
 		insertMethod = CIM_SINGLE;
 	}

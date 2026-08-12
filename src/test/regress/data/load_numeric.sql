@@ -1,0 +1,12 @@
+INSERT INTO width_bucket_test (operand_num) VALUES (-5.2);
+INSERT INTO width_bucket_test (operand_num) VALUES (-0.0000000001);
+INSERT INTO width_bucket_test (operand_num) VALUES (0.000000000001);
+INSERT INTO width_bucket_test (operand_num) VALUES (1);
+INSERT INTO width_bucket_test (operand_num) VALUES (1.99999999999999);
+INSERT INTO width_bucket_test (operand_num) VALUES (2);
+INSERT INTO width_bucket_test (operand_num) VALUES (2.00000000000001);
+INSERT INTO width_bucket_test (operand_num) VALUES (3);
+INSERT INTO width_bucket_test (operand_num) VALUES (4);
+INSERT INTO width_bucket_test (operand_num) VALUES (4.5);
+INSERT INTO width_bucket_test (operand_num) VALUES (5);
+INSERT INTO width_bucket_test (operand_num) VALUES (5.5);

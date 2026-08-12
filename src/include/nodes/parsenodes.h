@@ -1719,28 +1719,6 @@ typedef struct AccessPriv
 	List	   *cols;			/* list of Value strings */
 } AccessPriv;
 
-/* ----------------------
- *		Copy Statement
- *
- * We support "COPY relation FROM file", "COPY relation TO file", and
- * "COPY (query) TO file".  In any given CopyStmt, exactly one of "relation"
- * and "query" must be non-NULL.
- * ----------------------
- */
-typedef struct CopyStmt
-{
-	NodeTag		type;
-	RangeVar   *relation;		/* the relation to copy */
-	Node	   *query;			/* the query (SELECT or DML statement with
-								 * RETURNING) to copy, as a raw parse tree */
-	List	   *attlist;		/* List of column names (as Strings), or NIL
-								 * for all columns */
-	bool		is_from;		/* TO or FROM */
-	bool		is_program;		/* is 'filename' a program to popen? */
-	char	   *filename;		/* filename, or NULL for STDIN/STDOUT */
-	List	   *options;		/* List of DefElem nodes */
-	Node	   *whereClause;	/* WHERE condition (or NULL) */
-} CopyStmt;
 
 /* ----------------------
  * SET Statement (includes RESET)

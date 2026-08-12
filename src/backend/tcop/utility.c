@@ -264,23 +264,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_OK_IN_READ_ONLY_TXN;
 			}
 
-		case T_CopyStmt:
-			{
-				CopyStmt   *stmt = (CopyStmt *) parsetree;
-
-				/*
-				 * You might think that COPY FROM is not at all read only, but
-				 * it's OK to copy into a temporary table, because that
-				 * wouldn't change the output of pg_dump.  If the target table
-				 * turns out to be non-temporary, DoCopy itself will call
-				 * PreventCommandIfReadOnly.
-				 */
-				if (stmt->is_from)
-					return COMMAND_OK_IN_READ_ONLY_TXN;
-				else
-					return COMMAND_IS_STRICTLY_READ_ONLY;
-			}
-
 		case T_ExplainStmt:
 		case T_VariableShowStmt:
 			{
@@ -679,18 +662,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 		case T_TruncateStmt:
 			ExecuteTruncate((TruncateStmt *) parsetree);
-			break;
-
-		case T_CopyStmt:
-			{
-				uint64		processed;
-
-				DoCopy(pstate, (CopyStmt *) parsetree,
-					   pstmt->stmt_location, pstmt->stmt_len,
-					   &processed);
-				if (qc)
-					SetQueryCompletion(qc, CMDTAG_COPY, processed);
-			}
 			break;
 
 		case T_PrepareStmt:
@@ -2100,10 +2071,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_COMMENT;
 			break;
 
-		case T_CopyStmt:
-			tag = CMDTAG_COPY;
-			break;
-
 		case T_RenameStmt:
 
 			/*
@@ -2651,13 +2618,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_CommentStmt:
 			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CopyStmt:
-			if (((CopyStmt *) parsetree)->is_from)
-				lev = LOGSTMT_MOD;
-			else
-				lev = LOGSTMT_ALL;
 			break;
 
 		case T_PrepareStmt:

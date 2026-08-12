@@ -1806,11 +1806,9 @@ drop function sp_id_user(text);
 -- tests for refcursors
 --
 create table rc_test (a int, b int);
-copy rc_test from stdin;
-5	10
-50	100
-500	1000
-\.
+\set ECHO none
+\i data/load_plpgsql.sql
+\set ECHO all
 
 create function return_unnamed_refcursor() returns refcursor as $$
 declare

@@ -968,7 +968,6 @@ select \if false \\ (bogus \else \\ 42 \endif \\ forty_two;
 	\c arg1 arg2 arg3 arg4
 	\cd arg1
 	\conninfo
-	\copy arg1 arg2 arg3 arg4 arg5 arg6
 	\copyright
 	SELECT 1 as one, 2, 3 \crosstabview
 	\dt arg1

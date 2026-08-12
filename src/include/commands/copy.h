@@ -56,10 +56,6 @@ typedef struct CopyToStateData *CopyToState;
 
 typedef int (*copy_data_source_cb) (void *outbuf, int minread, int maxread);
 
-extern void DoCopy(ParseState *state, const CopyStmt *stmt,
-				   int stmt_location, int stmt_len,
-				   uint64 *processed);
-
 extern void ProcessCopyOptions(ParseState *pstate, CopyFormatOptions *ops_out, bool is_from, List *options);
 extern CopyFromState BeginCopyFrom(ParseState *pstate, Relation rel, Node *whereClause,
 								   const char *filename,

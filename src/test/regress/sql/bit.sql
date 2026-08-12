@@ -64,18 +64,9 @@ SELECT SUBSTRING('01010101'::varbit FROM -10 FOR -2147483646) AS "error";
 --- Bit operations
 DROP TABLE varbit_table;
 CREATE TABLE varbit_table (a BIT VARYING(16), b BIT VARYING(16));
-COPY varbit_table FROM stdin;
-X0F	X10
-X1F	X11
-X2F	X12
-X3F	X13
-X8F	X04
-X000F	X0010
-X0123	XFFFF
-X2468	X2468
-XFA50	X05AF
-X1234	XFFF5
-\.
+\set ECHO none
+\i data/load_bit_varbit.sql
+\set ECHO all
 
 SELECT a, b, ~a AS "~ a", a & b AS "a & b",
        a | b AS "a | b", a # b AS "a # b" FROM varbit_table;
@@ -88,18 +79,9 @@ DROP TABLE varbit_table;
 --- Bit operations
 DROP TABLE bit_table;
 CREATE TABLE bit_table (a BIT(16), b BIT(16));
-COPY bit_table FROM stdin;
-X0F00	X1000
-X1F00	X1100
-X2F00	X1200
-X3F00	X1300
-X8F00	X0400
-X000F	X0010
-X0123	XFFFF
-X2468	X2468
-XFA50	X05AF
-X1234	XFFF5
-\.
+\set ECHO none
+\i data/load_bit_bit.sql
+\set ECHO all
 
 SELECT a,b,~a AS "~ a",a & b AS "a & b",
 	a|b AS "a | b", a # b AS "a # b" FROM bit_table;

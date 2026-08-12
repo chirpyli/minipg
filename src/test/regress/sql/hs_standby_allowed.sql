@@ -12,9 +12,6 @@ select count(*) as should_be_2 from hs2;
 
 select count(*) as should_be_3 from hs3;
 
-COPY hs1 TO '/tmp/copy_test';
-\! cat /tmp/copy_test
-
 -- Access sequence directly
 select is_called from hsseq;
 

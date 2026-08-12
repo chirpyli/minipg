@@ -20,7 +20,6 @@
 #include "common.h"
 #include "common/logging.h"
 #include "common/string.h"
-#include "copy.h"
 #include "crosstabview.h"
 #include "describe.h"
 #include "fe_utils/cancel.h"
@@ -59,7 +58,6 @@ static backslashResult exec_command_connect(PsqlScanState scan_state, bool activ
 static backslashResult exec_command_cd(PsqlScanState scan_state, bool active_branch,
 									   const char *cmd);
 static backslashResult exec_command_conninfo(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_copy(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_copyright(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_crosstabview(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_d(PsqlScanState scan_state, bool active_branch,
@@ -315,8 +313,6 @@ exec_command(const char *cmd,
 		status = exec_command_cd(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "conninfo") == 0)
 		status = exec_command_conninfo(scan_state, active_branch);
-	else if (pg_strcasecmp(cmd, "copy") == 0)
-		status = exec_command_copy(scan_state, active_branch);
 	else if (strcmp(cmd, "copyright") == 0)
 		status = exec_command_copyright(scan_state, active_branch);
 	else if (strcmp(cmd, "crosstabview") == 0)
@@ -629,28 +625,6 @@ exec_command_conninfo(PsqlScanState scan_state, bool active_branch)
 	}
 
 	return PSQL_CMD_SKIP_LINE;
-}
-
-/*
- * \copy -- run a COPY command
- */
-static backslashResult
-exec_command_copy(PsqlScanState scan_state, bool active_branch)
-{
-	bool		success = true;
-
-	if (active_branch)
-	{
-		char	   *opt = psql_scan_slash_option(scan_state,
-												 OT_WHOLE_LINE, NULL, false);
-
-		success = do_copy(opt);
-		free(opt);
-	}
-	else
-		ignore_slash_whole_line(scan_state);
-
-	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
 }
 
 /*

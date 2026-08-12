@@ -19,8 +19,9 @@ drop domain domaindroptest cascade;
 
 -- Test domain input.
 
--- Note: the point of checking both INSERT and COPY FROM is that INSERT
--- exercises CoerceToDomain while COPY exercises domain_in.
+-- Note: this test originally exercised both INSERT (CoerceToDomain) and
+-- COPY FROM (domain_in) paths. The SQL COPY command has been removed from
+-- minipg, so only the INSERT/CoerceToDomain path is exercised here now.
 
 create domain domainvarchar varchar(5);
 create domain domainnumeric numeric(8,2);
@@ -42,15 +43,6 @@ create table basictest
 INSERT INTO basictest values ('88', 'haha', 'short', '123.12');      -- Good
 INSERT INTO basictest values ('88', 'haha', 'short text', '123.12'); -- Bad varchar
 INSERT INTO basictest values ('88', 'haha', 'short', '123.1212');    -- Truncate numeric
-
--- Test copy
-COPY basictest (testvarchar) FROM stdin; -- fail
-notsoshorttext
-\.
-
-COPY basictest (testvarchar) FROM stdin;
-short
-\.
 
 select * from basictest;
 
@@ -88,15 +80,6 @@ INSERT INTO domarrtest (testint4arr[1], testint4arr[3]) values (11,22);
 select * from domarrtest;
 select testint4arr[1], testchar4arr[2:2] from domarrtest;
 select array_dims(testint4arr), array_dims(testchar4arr) from domarrtest;
-
-COPY domarrtest FROM stdin;
-{3,4}	{q,w,e}
-\N	\N
-\.
-
-COPY domarrtest FROM stdin;	-- fail
-{3,4}	{qwerty,w,e}
-\.
 
 select * from domarrtest;
 
@@ -319,22 +302,6 @@ INSERT INTO nulltest values ('a', NULL, 'c', 'd', 'c');
 INSERT INTO nulltest values ('a', 'b', NULL, 'd', 'c');
 INSERT INTO nulltest values ('a', 'b', 'c', NULL, 'd'); -- Good
 
--- Test copy
-COPY nulltest FROM stdin; --fail
-a	b	\N	d	d
-\.
-
-COPY nulltest FROM stdin; --fail
-a	b	c	d	\N
-\.
-
--- Last row is bad
-COPY nulltest FROM stdin;
-a	b	c	\N	c
-a	b	c	\N	d
-a	b	c	\N	a
-\.
-
 select * from nulltest;
 
 -- Test out coerced (casted) constraints
@@ -377,11 +344,6 @@ insert into defaulttest(col4) values(0); -- fails
 alter table defaulttest alter column col5 drop default;
 insert into defaulttest default values;
 insert into defaulttest default values;
-
--- Test defaults with copy
-COPY defaulttest(col5) FROM stdin;
-42
-\.
 
 select * from defaulttest;
 

@@ -1508,7 +1508,7 @@ psql_completion(const char *text, int start, int end)
 	/* psql's backslash commands. */
 	static const char *const backslash_commands[] = {
 		"\\a",
-		"\\connect", "\\conninfo", "\\C", "\\cd", "\\copy",
+		"\\connect", "\\conninfo", "\\C", "\\cd",
 		"\\copyright", "\\crosstabview",
 		"\\d", "\\da", "\\dA", "\\dAc", "\\dAf", "\\dAo", "\\dAp",
 		"\\db", "\\dc", "\\dC", "\\dd", "\\dD",
@@ -2384,15 +2384,9 @@ psql_completion(const char *text, int start, int end)
 		completion_force_quote = true;	/* COPY requires quoted filename */
 		matches = rl_completion_matches(text, complete_from_files);
 	}
-	else if (Matches("\\copy", MatchAny, "FROM|TO"))
-	{
-		completion_charp = "";
-		completion_force_quote = false;
-		matches = rl_completion_matches(text, complete_from_files);
-	}
 
 	/* Complete COPY <sth> TO <sth> */
-	else if (Matches("COPY|\\copy", MatchAny, "TO", MatchAny))
+	else if (Matches("COPY", MatchAny, "TO", MatchAny))
 		COMPLETE_WITH("WITH (");
 
 	/* Complete COPY <sth> FROM <sth> */

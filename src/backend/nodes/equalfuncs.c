@@ -1145,21 +1145,6 @@ _equalClusterStmt(const ClusterStmt *a, const ClusterStmt *b)
 }
 
 static bool
-_equalCopyStmt(const CopyStmt *a, const CopyStmt *b)
-{
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(query);
-	COMPARE_NODE_FIELD(attlist);
-	COMPARE_SCALAR_FIELD(is_from);
-	COMPARE_SCALAR_FIELD(is_program);
-	COMPARE_STRING_FIELD(filename);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_NODE_FIELD(whereClause);
-
-	return true;
-}
-
-static bool
 _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
@@ -2812,9 +2797,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ClusterStmt:
 			retval = _equalClusterStmt(a, b);
-			break;
-		case T_CopyStmt:
-			retval = _equalCopyStmt(a, b);
 			break;
 		case T_CreateStmt:
 			retval = _equalCreateStmt(a, b);

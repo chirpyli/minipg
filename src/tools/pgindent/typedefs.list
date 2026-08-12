@@ -443,7 +443,6 @@ CopyInsertMethod
 CopyMultiInsertBuffer
 CopyMultiInsertInfo
 CopySource
-CopyStmt
 CopyToState
 CopyToStateData
 Cost

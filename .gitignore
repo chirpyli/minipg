@@ -55,6 +55,16 @@ compile_commands.json
 # configure backup files
 pg_config.h.in~
 
+# autoconf (configure) temporary working files at repo root
+/conf[0-9]*.awk
+/conf[0-9]*
+/confsoXpof/
+/confdefs.h
+/confcache
+/conftest
+/conftest.*
+/conftest.dir/
+
 # regression test run artifacts
 regression.out
 regression.diffs

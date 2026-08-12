@@ -84,8 +84,6 @@ typedef struct _psqlSettings
 	FILE	   *queryFout;		/* where to send the query results */
 	bool		queryFoutPipe;	/* queryFout is from a popen() */
 
-	FILE	   *copyStream;		/* Stream to read/write for \copy command */
-
 	PGresult   *last_error_result;	/* most recent error result, if any */
 
 	printQueryOpt popt;			/* The active print format settings */

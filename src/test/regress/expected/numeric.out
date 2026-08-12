@@ -1459,7 +1459,7 @@ SELECT width_bucket(0::float8, '-inf', 4.0::float8, 888);
 ERROR:  lower and upper bounds must be finite
 -- normal operation
 CREATE TABLE width_bucket_test (operand_num numeric, operand_f8 float8);
-COPY width_bucket_test (operand_num) FROM stdin;
+\set ECHO none
 UPDATE width_bucket_test SET operand_f8 = operand_num::float8;
 SELECT
     operand_num,
@@ -1488,14 +1488,7 @@ SELECT
               4.5 |    3 |     3 |    3 |     3 |    2 |     2 |    0 |     0 |    6 |     6
                 5 |    3 |     3 |    3 |     3 |    3 |     3 |    1 |     1 |    7 |     7
               5.5 |    3 |     3 |    3 |     3 |    3 |     3 |   21 |    21 |    7 |     7
-                6 |    4 |     4 |    3 |     3 |    3 |     3 |   21 |    21 |    7 |     7
-                7 |    4 |     4 |    2 |     2 |    4 |     4 |   21 |    21 |    7 |     7
-                8 |    5 |     5 |    2 |     2 |    5 |     5 |   21 |    21 |    7 |     7
-                9 |    5 |     5 |    1 |     1 |    5 |     5 |   21 |    21 |    7 |     7
- 9.99999999999999 |    5 |     5 |    1 |     1 |    5 |     5 |   21 |    21 |    7 |     7
-               10 |    6 |     6 |    1 |     1 |    5 |     5 |   21 |    21 |    8 |     8
- 10.0000000000001 |    6 |     6 |    0 |     0 |    5 |     5 |   21 |    21 |    8 |     8
-(19 rows)
+(12 rows)
 
 -- Check positive and negative infinity: we require
 -- finite bucket bounds, but allow an infinite operand

@@ -12,23 +12,14 @@ CREATE VIEW gstest1(a,b,v)
 
 CREATE TABLE gstest2 (a integer, b integer, c integer, d integer,
                            e integer, f integer, g integer, h integer);
-copy gstest2 from stdin;
-1	1	1	1	1	1	1	1
-1	1	1	1	1	1	1	2
-1	1	1	1	1	1	2	2
-1	1	1	1	1	2	2	2
-1	1	1	1	2	2	2	2
-1	1	1	2	2	2	2	2
-1	1	2	2	2	2	2	2
-1	2	2	2	2	2	2	2
-2	2	2	2	2	2	2	2
-\.
+\set ECHO none
+\i data/load_gs_gstest2.sql
+\set ECHO all
 
 CREATE TABLE gstest3 (a integer, b integer, c integer, d integer);
-copy gstest3 from stdin;
-1	1	1	1
-2	2	2	2
-\.
+\set ECHO none
+\i data/load_gs_gstest3.sql
+\set ECHO all
 alter table gstest3 add primary key (a);
 
 CREATE TABLE gstest4(id integer, v integer,

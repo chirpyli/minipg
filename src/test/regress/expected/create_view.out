@@ -46,7 +46,7 @@ CREATE VIEW key_dependent_view_no_cols AS
 -- CREATE OR REPLACE VIEW
 --
 CREATE TABLE viewtest_tbl (a int, b int);
-COPY viewtest_tbl FROM stdin;
+\set ECHO none
 CREATE OR REPLACE VIEW viewtest AS
 	SELECT * FROM viewtest_tbl;
 CREATE OR REPLACE VIEW viewtest AS

@@ -72,81 +72,10 @@ select count(*) > 0 from pg_visibility('matview_visibility_test');
 
 -- 分区功能已在 minipg 中裁剪，不再测试分区子表的可见性映射。
 
--- test copy freeze
-create table copyfreeze (a int, b char(1500));
-
--- load all rows via COPY FREEZE and ensure that all pages are set all-visible
--- and all-frozen.
-begin;
-truncate copyfreeze;
-copy copyfreeze from stdin freeze;
-1	'1'
-2	'2'
-3	'3'
-4	'4'
-5	'5'
-6	'6'
-7	'7'
-8	'8'
-9	'9'
-10	'10'
-11	'11'
-12	'12'
-\.
-commit;
-select * from pg_visibility_map('copyfreeze');
-select * from pg_check_frozen('copyfreeze');
-
--- load half the rows via regular COPY and rest via COPY FREEZE. The pages
--- which are touched by regular COPY must not be set all-visible/all-frozen. On
--- the other hand, pages allocated by COPY FREEZE should be marked
--- all-frozen/all-visible.
-begin;
-truncate copyfreeze;
-copy copyfreeze from stdin;
-1	'1'
-2	'2'
-3	'3'
-4	'4'
-5	'5'
-6	'6'
-\.
-copy copyfreeze from stdin freeze;
-7	'7'
-8	'8'
-9	'9'
-10	'10'
-11	'11'
-12	'12'
-\.
-commit;
-select * from pg_visibility_map('copyfreeze');
-select * from pg_check_frozen('copyfreeze');
-
--- Try a mix of regular COPY and COPY FREEZE.
-begin;
-truncate copyfreeze;
-copy copyfreeze from stdin freeze;
-1	'1'
-2	'2'
-3	'3'
-4	'4'
-5	'5'
-\.
-copy copyfreeze from stdin;
-6	'6'
-\.
-copy copyfreeze from stdin freeze;
-7	'7'
-8	'8'
-9	'9'
-10	'10'
-11	'11'
-12	'12'
-\.
-commit;
-select * from pg_visibility_map('copyfreeze');
-select * from pg_check_frozen('copyfreeze');
+-- SQL COPY 命令已在 minipg 中裁剪（见 mydoc/CHANGE.md），
+-- 原"test copy freeze"段专门验证 COPY FREEZE 对可见性映射/冻结页的影响，
+-- 其测试对象 COPY FREEZE 已不存在，故整段删除；仅保留下方 cleanup 中
+-- 对其它对象的可见性验证（表/视图/序列/外表/物化视图）。
 
 -- cleanup
 drop view test_view;
@@ -156,4 +85,3 @@ drop server dummy_server;
 drop foreign data wrapper dummy;
 drop materialized view matview_visibility_test;
 drop table regular_table;
-drop table copyfreeze;

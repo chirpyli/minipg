@@ -16,7 +16,6 @@
 #include "command.h"
 #include "common.h"
 #include "common/logging.h"
-#include "copy.h"
 #include "crosstabview.h"
 #include "fe_utils/cancel.h"
 #include "fe_utils/mbprint.h"
@@ -904,8 +903,6 @@ ProcessResult(PGresult **results)
 
 	for (;;)
 	{
-		ExecStatusType result_status;
-		bool		is_copy;
 		PGresult   *next_result;
 
 		if (!AcceptResult(*results))
@@ -919,122 +916,7 @@ ProcessResult(PGresult **results)
 			break;
 		}
 
-		result_status = PQresultStatus(*results);
-		switch (result_status)
-		{
-			case PGRES_EMPTY_QUERY:
-			case PGRES_COMMAND_OK:
-			case PGRES_TUPLES_OK:
-				is_copy = false;
-				break;
-
-			case PGRES_COPY_OUT:
-			case PGRES_COPY_IN:
-				is_copy = true;
-				break;
-
-			default:
-				/* AcceptResult() should have caught anything else. */
-				is_copy = false;
-				pg_log_error("unexpected PQresultStatus: %d", result_status);
-				break;
-		}
-
-		if (is_copy)
-		{
-			/*
-			 * Marshal the COPY data.  Either subroutine will get the
-			 * connection out of its COPY state, then call PQresultStatus()
-			 * once and report any error.
-			 *
-			 * For COPY OUT, direct the output to pset.copyStream if it's set,
-			 * otherwise to pset.gfname if it's set, otherwise to queryFout.
-			 * For COPY IN, use pset.copyStream as data source if it's set,
-			 * otherwise cur_cmd_source.
-			 */
-			FILE	   *copystream;
-			PGresult   *copy_result;
-
-			SetCancelConn(pset.db);
-			if (result_status == PGRES_COPY_OUT)
-			{
-				bool		need_close = false;
-				bool		is_pipe = false;
-
-				if (pset.copyStream)
-				{
-					/* invoked by \copy */
-					copystream = pset.copyStream;
-				}
-				else if (pset.gfname)
-				{
-					/* invoked by \g */
-					if (openQueryOutputFile(pset.gfname,
-											&copystream, &is_pipe))
-					{
-						need_close = true;
-						if (is_pipe)
-							disable_sigpipe_trap();
-					}
-					else
-						copystream = NULL;	/* discard COPY data entirely */
-				}
-				else
-				{
-					/* fall back to the generic query output stream */
-					copystream = pset.queryFout;
-				}
-
-				success = handleCopyOut(pset.db,
-										copystream,
-										&copy_result)
-					&& success
-					&& (copystream != NULL);
-
-				/*
-				 * Suppress status printing if the report would go to the same
-				 * place as the COPY data just went.  Note this doesn't
-				 * prevent error reporting, since handleCopyOut did that.
-				 */
-				if (copystream == pset.queryFout)
-				{
-					PQclear(copy_result);
-					copy_result = NULL;
-				}
-
-				if (need_close)
-				{
-					/* close \g argument file/pipe */
-					if (is_pipe)
-					{
-						pclose(copystream);
-						restore_sigpipe_trap();
-					}
-					else
-					{
-						fclose(copystream);
-					}
-				}
-			}
-			else
-			{
-				/* COPY IN */
-				copystream = pset.copyStream ? pset.copyStream : pset.cur_cmd_source;
-				success = handleCopyIn(pset.db,
-									   copystream,
-									   PQbinaryTuples(*results),
-									   &copy_result) && success;
-			}
-			ResetCancelConn();
-
-			/*
-			 * Replace the PGRES_COPY_OUT/IN result with COPY command's exit
-			 * status, or with NULL if we want to suppress printing anything.
-			 */
-			PQclear(*results);
-			*results = copy_result;
-		}
-		else if (first_cycle)
+		if (first_cycle)
 		{
 			/* fast path: no COPY commands; PQexec visited all results */
 			break;
@@ -1056,7 +938,6 @@ ProcessResult(PGresult **results)
 
 	SetResultVariables(*results, success);
 
-	/* may need this to recover from conn loss during COPY */
 	if (!first_cycle && !CheckConnection())
 		return false;
 
@@ -1136,12 +1017,6 @@ PrintQueryResults(PGresult *results)
 			break;
 
 		case PGRES_EMPTY_QUERY:
-			success = true;
-			break;
-
-		case PGRES_COPY_OUT:
-		case PGRES_COPY_IN:
-			/* nothing to do here */
 			success = true;
 			break;
 

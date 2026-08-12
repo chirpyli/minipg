@@ -201,7 +201,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, "\n");
 
 	fprintf(output, _("Input/Output\n"));
-	fprintf(output, _("  \\copy ...              perform SQL COPY with data stream to the client host\n"));
 	fprintf(output, _("  \\echo [-n] [STRING]    write string to standard output (-n for no newline)\n"));
 	fprintf(output, _("  \\i FILE                execute commands from file\n"));
 	fprintf(output, _("  \\ir FILE               as \\i, but relative to location of current script\n"));

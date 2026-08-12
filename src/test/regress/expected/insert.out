@@ -1264,16 +1264,10 @@ insert into donothingbrtrig_test values (1, 'foo'), (2, 'bar');
 ERROR:  relation "donothingbrtrig_test" does not exist
 LINE 1: insert into donothingbrtrig_test values (1, 'foo'), (2, 'bar...
                     ^
-copy donothingbrtrig_test from stdout;
-ERROR:  relation "donothingbrtrig_test" does not exist
-1	baz
-2	qux
-\.
-invalid command \.
 select tableoid::regclass, * from donothingbrtrig_test;
-ERROR:  syntax error at or near "1"
-LINE 1: 1 baz
-        ^
+ERROR:  relation "donothingbrtrig_test" does not exist
+LINE 1: select tableoid::regclass, * from donothingbrtrig_test;
+                                          ^
 -- cleanup
 drop table donothingbrtrig_test;
 ERROR:  table "donothingbrtrig_test" does not exist

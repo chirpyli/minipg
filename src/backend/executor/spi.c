@@ -2640,17 +2640,7 @@ _SPI_execute_plan(SPIPlanPtr plan, const SPIExecuteOptions *options,
 			/* Check for unsupported cases. */
 			if (stmt->utilityStmt)
 			{
-				if (IsA(stmt->utilityStmt, CopyStmt))
-				{
-					CopyStmt   *cstmt = (CopyStmt *) stmt->utilityStmt;
-
-					if (cstmt->filename == NULL)
-					{
-						my_res = SPI_ERROR_COPY;
-						goto fail;
-					}
-				}
-				else if (IsA(stmt->utilityStmt, TransactionStmt))
+				if (IsA(stmt->utilityStmt, TransactionStmt))
 				{
 					my_res = SPI_ERROR_TRANSACTION;
 					goto fail;
@@ -2736,16 +2726,6 @@ _SPI_execute_plan(SPIPlanPtr plan, const SPIExecuteOptions *options,
 					_SPI_current->processed = _SPI_current->tuptable->numvals;
 
 				res = SPI_OK_UTILITY;
-
-				/*
-				 * Some utility statements return a row count, even though the
-				 * tuples are not returned to the caller.
-				 */
-				if (IsA(stmt->utilityStmt, CopyStmt))
-				{
-					Assert(qc.commandTag == CMDTAG_COPY);
-					_SPI_current->processed = qc.nprocessed;
-				}
 			}
 
 			/*

@@ -507,12 +507,6 @@ init_execution_state(List *queryTree_list,
 			 */
 			if (stmt->commandType == CMD_UTILITY)
 			{
-				if (IsA(stmt->utilityStmt, CopyStmt) &&
-					((CopyStmt *) stmt->utilityStmt)->filename == NULL)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot COPY to/from client in an SQL function")));
-
 				if (IsA(stmt->utilityStmt, TransactionStmt))
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

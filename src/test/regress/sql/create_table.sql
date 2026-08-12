@@ -252,11 +252,14 @@ DROP TABLE remember_node_subid;
 -- 加载标准回归测试数据（原由 copy.sql/input/copy.source 负责，因 INHERITS 继承
 -- 相关测试(create_table 继承链、copy、misc、create_function_2)已随继承功能裁剪而
 -- 移除，此处改为在 create_table 内直接加载非继承标准表数据，供其余回归测试使用）
--- 使用 \copy（psql 客户端复制）以相对路径读取 data/ 下的数据文件
-\copy aggtest FROM 'data/agg.data'
-\copy onek FROM 'data/onek.data'
-\copy tenk1 FROM 'data/tenk.data'
-\copy slow_emp4000 FROM 'data/rect.data'
-\copy person FROM 'data/person.data'
-\copy dept FROM 'data/dept.data'
-\copy real_city FROM 'data/real_city.data'
+-- 注：SQL COPY 命令与 psql \copy 元命令已随 COPY 功能裁剪而移除，故改用等价的
+-- INSERT 脚本(data/load_*.sql，由 data/*.data 经 COPY 文本格式转换生成)以加载数据
+\set ECHO none
+\i data/load_aggtest.sql
+\i data/load_onek.sql
+\i data/load_tenk1.sql
+\i data/load_slow_emp4000.sql
+\i data/load_person.sql
+\i data/load_dept.sql
+\i data/load_real_city.sql
+\set ECHO all
