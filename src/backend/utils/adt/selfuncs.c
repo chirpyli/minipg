@@ -3924,7 +3924,7 @@ estimate_multivariate_ndistinct(PlannerInfo *root, RelOptInfo *rel,
 	 * So for partitioned tables we do consider extended stats.
 	 */
 	rte = planner_rt_fetch(rel->relid, root);
-	if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+	if (rte->inh)
 		return false;
 
 	/* look for the ndistinct statistics object matching the most vars */
@@ -5169,7 +5169,7 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
 			 * inheritance tree. So for partitioned tables we do consider
 			 * extended stats.
 			 */
-			if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+			if (rte->inh)
 				break;
 
 			/* skip stats without per-expression stats */

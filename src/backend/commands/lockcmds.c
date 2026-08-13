@@ -85,7 +85,7 @@ RangeVarCallbackForLockTable(const RangeVar *rv, Oid relid, Oid oldrelid,
 								 * check */
 
 	/* Currently, we only allow plain tables or views to be locked */
-	if (relkind != RELKIND_RELATION && relkind != RELKIND_PARTITIONED_TABLE &&
+	if (relkind != RELKIND_RELATION &&
 		relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -199,7 +199,7 @@ LockViewRecurse_walker(Node *node, LockViewRecurse_context *context)
 				continue;
 
 			/* Currently, we only allow plain tables or views to be locked. */
-			if (relkind != RELKIND_RELATION && relkind != RELKIND_PARTITIONED_TABLE &&
+			if (relkind != RELKIND_RELATION &&
 				relkind != RELKIND_VIEW)
 				continue;
 

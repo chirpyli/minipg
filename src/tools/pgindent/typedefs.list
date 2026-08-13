@@ -2108,7 +2108,6 @@ RegProcedure
 Regis
 RegisNode
 RegisteredBgWorker
-ReindexErrorInfo
 ReindexIndexInfo
 ReindexObjectType
 ReindexParams

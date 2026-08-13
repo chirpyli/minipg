@@ -130,8 +130,7 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 		rel = relation_openrv((RangeVar *) rln, ShareUpdateExclusiveLock);
 
 		/* Restrict to allowed relation types */
-		if (rel->rd_rel->relkind != RELKIND_RELATION &&
-			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		if (rel->rd_rel->relkind != RELKIND_RELATION)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("relation \"%s\" is not a table, foreign table, or materialized view",

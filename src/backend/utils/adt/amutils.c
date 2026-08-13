@@ -175,8 +175,7 @@ indexam_property(FunctionCallInfo fcinfo,
 		if (!HeapTupleIsValid(tuple))
 			PG_RETURN_NULL();
 		rd_rel = (Form_pg_class) GETSTRUCT(tuple);
-		if (rd_rel->relkind != RELKIND_INDEX &&
-			rd_rel->relkind != RELKIND_PARTITIONED_INDEX)
+		if (rd_rel->relkind != RELKIND_INDEX)
 		{
 			ReleaseSysCache(tuple);
 			PG_RETURN_NULL();

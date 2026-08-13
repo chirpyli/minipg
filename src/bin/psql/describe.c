@@ -1138,7 +1138,7 @@ permissionsList(const char *pattern)
 					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
+					  " WHEN " "'p'" " THEN '%s'"
 					  " END as \"%s\",\n"
 					  "  ",
 					  gettext_noop("Schema"),
@@ -1167,7 +1167,7 @@ permissionsList(const char *pattern)
 						 CppAsString2(RELKIND_RELATION) ","
 					 CppAsString2(RELKIND_VIEW) ","
 					 CppAsString2(RELKIND_SEQUENCE) ","
-						 CppAsString2(RELKIND_PARTITIONED_TABLE) ")\n");
+						 "'p'" ")\n");
 
 	/*
 	 * Unless a schema pattern is specified, we suppress system and temp
@@ -1568,7 +1568,7 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "c.relhastriggers, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, c.relispartition, %s, c.reltablespace, "
+						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident, am.amname\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1587,7 +1587,7 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "c.relhastriggers, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, c.relispartition, %s, c.reltablespace, "
+						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, c.relreplident\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1878,7 +1878,7 @@ describeOneTableDetails(const char *schemaname,
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
 		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
-		tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+		tableinfo.relkind == 'p')
 		show_column_details = true;
 
 	/*
@@ -1923,7 +1923,7 @@ describeOneTableDetails(const char *schemaname,
 		attgenerated_col = cols++;
 	}
 	if (tableinfo.relkind == RELKIND_INDEX ||
-		tableinfo.relkind == RELKIND_PARTITIONED_INDEX)
+		tableinfo.relkind == 'I')
 	{
 		if (pset.sversion >= 110000)
 		{
@@ -1945,7 +1945,7 @@ describeOneTableDetails(const char *schemaname,
 		if (pset.sversion >= 140000 &&
 			!pset.hide_compression &&
 			(tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE))
+			 tableinfo.relkind == 'p'))
 		{
 			appendPQExpBufferStr(&buf, ",\n  a.attcompression AS attcompression");
 			attcompression_col = cols++;
@@ -1954,8 +1954,8 @@ describeOneTableDetails(const char *schemaname,
 		/* stats target, if relevant to relkind */
 		if (tableinfo.relkind == RELKIND_RELATION ||
 			tableinfo.relkind == RELKIND_INDEX ||
-			tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
-			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+			tableinfo.relkind == 'I' ||
+			tableinfo.relkind == 'p')
 		{
 		appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
 			attstattarget_col = cols++;
@@ -1968,7 +1968,7 @@ describeOneTableDetails(const char *schemaname,
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
 		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
-		tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+		tableinfo.relkind == 'p')
 	{
 			appendPQExpBufferStr(&buf, ",\n  pg_catalog.col_description(a.attrelid, a.attnum)");
 			attdescr_col = cols++;
@@ -2007,7 +2007,7 @@ describeOneTableDetails(const char *schemaname,
 				printfPQExpBuffer(&title, _("Index \"%s.%s\""),
 								  schemaname, relationname);
 			break;
-		case RELKIND_PARTITIONED_INDEX:
+		case 'I':
 			if (tableinfo.relpersistence == 'u')
 				printfPQExpBuffer(&title, _("Unlogged partitioned index \"%s.%s\""),
 								  schemaname, relationname);
@@ -2028,7 +2028,7 @@ describeOneTableDetails(const char *schemaname,
 			printfPQExpBuffer(&title, _("Composite type \"%s.%s\""),
 							  schemaname, relationname);
 			break;
-		case RELKIND_PARTITIONED_TABLE:
+		case 'p':
 			if (tableinfo.relpersistence == 'u')
 				printfPQExpBuffer(&title, _("Unlogged partitioned table \"%s.%s\""),
 								  schemaname, relationname);
@@ -2217,7 +2217,7 @@ describeOneTableDetails(const char *schemaname,
 		PQclear(result);
 	}
 
-	if (tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+	if (tableinfo.relkind == 'p')
 	{
 		/* Footer information for a partitioned table (partitioning parent) */
 		PGresult   *result;
@@ -2267,7 +2267,7 @@ describeOneTableDetails(const char *schemaname,
 	}
 
 	if (tableinfo.relkind == RELKIND_INDEX ||
-		tableinfo.relkind == RELKIND_PARTITIONED_INDEX)
+		tableinfo.relkind == 'I')
 	{
 		/* Footer information about an index */
 		PGresult   *result;
@@ -2373,8 +2373,8 @@ describeOneTableDetails(const char *schemaname,
 	}
 	/* If you add relkinds here, see also "Finish printing..." stanza below */
 	else if (tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
-			 tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
+			 tableinfo.relkind == 'p' ||
+			 tableinfo.relkind == 'I' ||
 			 tableinfo.relkind == RELKIND_TOASTVALUE)
 	{
 		/* Footer information about a table */
@@ -2526,10 +2526,10 @@ describeOneTableDetails(const char *schemaname,
 		 * appear in the partitions)
 		 */
 		if (tableinfo.hastriggers ||
-			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+			tableinfo.relkind == 'p')
 		{
 			if (pset.sversion >= 120000 &&
-				(tableinfo.ispartition || tableinfo.relkind == RELKIND_PARTITIONED_TABLE))
+				(tableinfo.ispartition || tableinfo.relkind == 'p'))
 			{
 				/*
 				 * Put the constraints defined in this table first, followed
@@ -2600,7 +2600,7 @@ describeOneTableDetails(const char *schemaname,
 
 		/* print incoming foreign-key references */
 		if (tableinfo.hastriggers ||
-			tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
+			tableinfo.relkind == 'p')
 		{
 			if (pset.sversion >= 120000)
 			{
@@ -3198,8 +3198,8 @@ describeOneTableDetails(const char *schemaname,
 	 * Finish printing the footer information about a table.
 	 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
-		tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
-		tableinfo.relkind == RELKIND_PARTITIONED_INDEX ||
+		tableinfo.relkind == 'p' ||
+		tableinfo.relkind == 'I' ||
 		tableinfo.relkind == RELKIND_TOASTVALUE)
 	{
 		bool		is_partitioned;
@@ -3207,8 +3207,8 @@ describeOneTableDetails(const char *schemaname,
 		int			tuples;
 
 		/* simplify some repeated tests below */
-		is_partitioned = (tableinfo.relkind == RELKIND_PARTITIONED_TABLE ||
-						  tableinfo.relkind == RELKIND_PARTITIONED_INDEX);
+		is_partitioned = (tableinfo.relkind == 'p' ||
+						  tableinfo.relkind == 'I');
 
 
 		/* print tables inherited from (exclude partitioned parents) */
@@ -3216,8 +3216,8 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.oid::pg_catalog.regclass\n"
 						  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
 						  "WHERE c.oid = i.inhparent AND i.inhrelid = '%s'\n"
-						  "  AND c.relkind != " CppAsString2(RELKIND_PARTITIONED_TABLE)
-						  " AND c.relkind != " CppAsString2(RELKIND_PARTITIONED_INDEX)
+						  "  AND c.relkind != " "'p'"
+						  " AND c.relkind != " "'I'"
 						  "\nORDER BY inhseqno;",
 						  oid);
 
@@ -3330,8 +3330,8 @@ describeOneTableDetails(const char *schemaname,
 									  ctw, "", PQgetvalue(result, i, 0));
 				if (!PQgetisnull(result, i, 3))
 					appendPQExpBuffer(&buf, " %s", PQgetvalue(result, i, 3));
-				if (child_relkind == RELKIND_PARTITIONED_TABLE ||
-					child_relkind == RELKIND_PARTITIONED_INDEX)
+				if (child_relkind == 'p' ||
+					child_relkind == 'I')
 					appendPQExpBufferStr(&buf, ", PARTITIONED");
 				if (strcmp(PQgetvalue(result, i, 2), "t") == 0)
 					appendPQExpBufferStr(&buf, " (DETACH PENDING)");
@@ -3432,8 +3432,8 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
 	/* relkinds for which we support tablespaces */
 	if (relkind == RELKIND_RELATION ||
 		relkind == RELKIND_INDEX ||
-		relkind == RELKIND_PARTITIONED_TABLE ||
-		relkind == RELKIND_PARTITIONED_INDEX ||
+		relkind == 'p' ||
+		relkind == 'I' ||
 		relkind == RELKIND_TOASTVALUE)
 	{
 		/*
@@ -3789,8 +3789,8 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_PARTITIONED_INDEX) " THEN '%s'"
+					  " WHEN " "'p'" " THEN '%s'"
+					  " WHEN " "'I'" " THEN '%s'"
 					  " END as \"%s\",\n"
 					  "  pg_catalog.pg_get_userbyid(c.relowner) as \"%s\"",
 					  gettext_noop("Schema"),
@@ -3885,7 +3885,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	if (showTables)
 	{
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_RELATION) ","
-							 CppAsString2(RELKIND_PARTITIONED_TABLE) ",");
+							 "'p'" ",");
 		/* with 'S' or a pattern, allow 't' to match TOAST tables too */
 		if (showSystem || pattern)
 			appendPQExpBufferStr(&buf, CppAsString2(RELKIND_TOASTVALUE) ",");
@@ -3894,7 +3894,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_VIEW) ",");
 	if (showIndexes)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ","
-							 CppAsString2(RELKIND_PARTITIONED_INDEX) ",");
+							 "'I'" ",");
 	if (showSeq)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_SEQUENCE) ",");
 	if (showSystem || pattern)
@@ -4020,8 +4020,8 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 	{
 		appendPQExpBuffer(&buf,
 						  ",\n  CASE c.relkind"
-						  " WHEN " CppAsString2(RELKIND_PARTITIONED_TABLE) " THEN '%s'"
-						  " WHEN " CppAsString2(RELKIND_PARTITIONED_INDEX) " THEN '%s'"
+						  " WHEN " "'p'" " THEN '%s'"
+						  " WHEN " "'I'" " THEN '%s'"
 						  " END as \"%s\"",
 						  gettext_noop("partitioned table"),
 						  gettext_noop("partitioned index"),
@@ -4111,9 +4111,9 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 
 	appendPQExpBufferStr(&buf, "\nWHERE c.relkind IN (");
 	if (showTables)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_PARTITIONED_TABLE) ",");
+		appendPQExpBufferStr(&buf, "'p'" ",");
 	if (showIndexes)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_PARTITIONED_INDEX) ",");
+		appendPQExpBufferStr(&buf, "'I'" ",");
 	appendPQExpBufferStr(&buf, "''");	/* dummy */
 	appendPQExpBufferStr(&buf, ")\n");
 

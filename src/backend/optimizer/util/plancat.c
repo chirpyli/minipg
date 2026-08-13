@@ -121,13 +121,10 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	 * table_open() already rejected indexes and composite types.
 	 */
 	if (!relation->rd_tableam)
-	{
-		if (relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot open relation \"%s\"",
-							RelationGetRelationName(relation))));
-	}
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot open relation \"%s\"",
+						RelationGetRelationName(relation))));
 
 	/* Temporary and unlogged relations are inaccessible during recovery. */
 	if (!RelationIsPermanent(relation) && RecoveryInProgress())
@@ -210,16 +207,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			 * indisready.
 			 */
 			if (!index->indisvalid)
-			{
-				index_close(indexRelation, NoLock);
-				continue;
-			}
-
-			/*
-			 * Ignore partitioned indexes, since they are not usable for
-			 * queries.
-			 */
-			if (indexRelation->rd_rel->relkind == RELKIND_PARTITIONED_INDEX)
 			{
 				index_close(indexRelation, NoLock);
 				continue;
@@ -1550,7 +1537,7 @@ relation_excluded_by_constraints(PlannerInfo *root,
 	 * this is a partitioned table.  In future we might track their
 	 * inheritance status more accurately, allowing this to be refined.
 	 */
-	include_notnull = (!rte->inh || rte->relkind == RELKIND_PARTITIONED_TABLE);
+	include_notnull = !rte->inh;
 
 	/*
 	 * Fetch the appropriate set of constraint expressions.

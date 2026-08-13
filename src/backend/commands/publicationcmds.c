@@ -593,11 +593,9 @@ OpenTableList(List *tables)
 
 		/*
 		 * Add children of this rel, if requested, so that they too are added
-		 * to the publication.  A partitioned table can't have any inheritance
-		 * children other than its partitions, which need not be explicitly
-		 * added to the publication.
+		 * to the publication.
 		 */
-		if (recurse && rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		if (recurse)
 		{
 			List	   *children;
 			ListCell   *child;

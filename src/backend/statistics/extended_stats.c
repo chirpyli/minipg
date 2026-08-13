@@ -1747,7 +1747,7 @@ statext_mcv_clauselist_selectivity(PlannerInfo *root, List *clauses, int varReli
 	 * non-leaf relations, so we build stats only for the inheritance tree.
 	 * So for partitioned tables we do consider extended stats.
 	 */
-	if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+	if (rte->inh)
 		return sel;
 
 	/* check if there's any stats that might be useful for us. */

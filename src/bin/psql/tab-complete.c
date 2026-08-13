@@ -452,16 +452,7 @@ static const SchemaQuery Query_for_list_of_sequences = {
 static const SchemaQuery Query_for_list_of_tables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
-	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
-	.namespace = "c.relnamespace",
-	.result = "pg_catalog.quote_ident(c.relname)",
-};
-
-static const SchemaQuery Query_for_list_of_partitioned_tables = {
-	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind IN (" CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -486,8 +477,7 @@ static const SchemaQuery Query_for_list_of_matviews = {
 static const SchemaQuery Query_for_list_of_indexes = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_INDEX) ", "
-	CppAsString2(RELKIND_PARTITIONED_INDEX) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_INDEX) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -495,7 +485,7 @@ static const SchemaQuery Query_for_list_of_indexes = {
 
 static const SchemaQuery Query_for_list_of_partitioned_indexes = {
 	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind = " CppAsString2(RELKIND_PARTITIONED_INDEX),
+	.selcondition = "1=0",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -510,11 +500,10 @@ static const SchemaQuery Query_for_list_of_relations = {
 	.result = "pg_catalog.quote_ident(c.relname)",
 };
 
-/* partitioned relations */
+/* partitioned relations (none exist in this build) */
 static const SchemaQuery Query_for_list_of_partitioned_relations = {
 	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind IN (" CppAsString2(RELKIND_PARTITIONED_TABLE)
-	", " CppAsString2(RELKIND_PARTITIONED_INDEX) ")",
+	.selcondition = "1=0",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -532,8 +521,7 @@ static const SchemaQuery Query_for_list_of_updatables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_VIEW) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	CppAsString2(RELKIND_VIEW) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -545,8 +533,7 @@ static const SchemaQuery Query_for_list_of_selectables = {
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
 	CppAsString2(RELKIND_SEQUENCE) ", "
-	CppAsString2(RELKIND_VIEW) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	CppAsString2(RELKIND_VIEW) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -556,8 +543,7 @@ static const SchemaQuery Query_for_list_of_selectables = {
 static const SchemaQuery Query_for_list_of_truncatables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -570,8 +556,7 @@ static const SchemaQuery Query_for_list_of_truncatables = {
 static const SchemaQuery Query_for_list_of_analyzables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -581,8 +566,7 @@ static const SchemaQuery Query_for_list_of_analyzables = {
 static const SchemaQuery Query_for_list_of_indexables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
-	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_PARTITIONED_TABLE) ")",
+	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
@@ -970,16 +954,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "    UNION ALL " \
 "   SELECT 'DEFAULT' ) ss "\
 "  WHERE pg_catalog.substring(name,1,%%d)='%%s'"
-
-/* the silly-looking length condition is just to eat up the current word */
-#define Query_for_partition_of_table \
-"SELECT pg_catalog.quote_ident(c2.relname) "\
-"  FROM pg_catalog.pg_class c1, pg_catalog.pg_class c2, pg_catalog.pg_inherits i"\
-" WHERE c1.oid=i.inhparent and i.inhrelid=c2.oid"\
-"       and (%d = pg_catalog.length('%s'))"\
-"       and pg_catalog.quote_ident(c1.relname)='%s'"\
-"       and pg_catalog.pg_table_is_visible(c2.oid)"\
-"       and c2.relispartition = 'true'"
 
 #define Query_for_list_of_cursors \
 " SELECT pg_catalog.quote_ident(name) "\
@@ -2169,14 +2143,9 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("FROM (", "IN (", "WITH (");
 
 	/*
-	 * If we have ALTER TABLE <foo> DETACH PARTITION, provide a list of
-	 * partitions of <foo>.
+	 * If we have ALTER TABLE <foo> DETACH PARTITION, provide the keywords
+	 * following the partition name.
 	 */
-	else if (Matches("ALTER", "TABLE", MatchAny, "DETACH", "PARTITION"))
-	{
-		completion_info_charp = prev3_wd;
-		COMPLETE_WITH_QUERY(Query_for_partition_of_table);
-	}
 	else if (Matches("ALTER", "TABLE", MatchAny, "DETACH", "PARTITION", MatchAny))
 		COMPLETE_WITH("CONCURRENTLY", "FINALIZE");
 
@@ -2676,9 +2645,6 @@ psql_completion(const char *text, int start, int end)
 	/* Complete PARTITION BY with RANGE ( or LIST ( or ... */
 	else if (TailMatches("PARTITION", "BY"))
 		COMPLETE_WITH("RANGE (", "LIST (", "HASH (");
-	/* If we have xxx PARTITION OF, provide a list of partitioned tables */
-	else if (TailMatches("PARTITION", "OF"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_tables, "");
 	/* Limited completion support for partition bound specification */
 	else if (TailMatches("PARTITION", "OF", MatchAny))
 		COMPLETE_WITH("FOR VALUES", "DEFAULT");
@@ -3912,7 +3878,7 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatchesCS("\\dPi*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_indexes, NULL);
 	else if (TailMatchesCS("\\dPt*"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_tables, NULL);
+		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_indexes, NULL);
 	else if (TailMatchesCS("\\dP*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_relations, NULL);
 	else if (TailMatchesCS("\\ds*"))

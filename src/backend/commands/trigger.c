@@ -214,41 +214,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 							RelationGetRelationName(rel)),
 					 errdetail("Tables cannot have INSTEAD OF triggers.")));
 	}
-	else if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		/* Partitioned tables can't have INSTEAD OF triggers */
-		if (stmt->timing != TRIGGER_TYPE_BEFORE &&
-			stmt->timing != TRIGGER_TYPE_AFTER)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is a table",
-							RelationGetRelationName(rel)),
-					 errdetail("Tables cannot have INSTEAD OF triggers.")));
-
-		/*
-		 * FOR EACH ROW triggers have further restrictions
-		 */
-		if (stmt->row)
-		{
-			/*
-			 * Disallow use of transition tables.
-			 *
-			 * Note that we have another restriction about transition tables
-			 * in partitions; search for 'has_superclass' below for an
-			 * explanation.  The check here is just to protect from the fact
-			 * that if we allowed it here, the creation would succeed for a
-			 * partitioned table with no partitions, but would be blocked by
-			 * the other restriction when the first partition was created,
-			 * which is very unfriendly behavior.
-			 */
-			if (stmt->transitionRels != NIL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("\"%s\" is a partitioned table",
-								RelationGetRelationName(rel)),
-						 errdetail("ROW triggers with transition tables are not supported on partitioned tables.")));
-		}
-	}
 	else if (rel->rd_rel->relkind == RELKIND_VIEW)
 	{
 		/*
@@ -318,16 +283,10 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 	}
 
 	/*
-	 * When called on a partitioned table to create a FOR EACH ROW trigger
-	 * that's not internal, we create one trigger for each partition, too.
-	 *
-	 * For that, we'd better hold lock on all of them ahead of time.
+	 * Partitioned tables are not supported in this build (minipg); triggers
+	 * are not recursed to partitions.
 	 */
-	partition_recurse = !isInternal && stmt->row &&
-		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE;
-	if (partition_recurse)
-		list_free(find_all_inheritors(RelationGetRelid(rel),
-									  ShareRowExclusiveLock, NULL));
+	partition_recurse = false;
 
 	/* Compute tgtype */
 	TRIGGER_CLEAR_TYPE(tgtype);
@@ -411,15 +370,9 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 			 */
 			if (TRIGGER_FOR_ROW(tgtype) && has_superclass(rel->rd_id))
 			{
-				/* Use appropriate error message. */
-				if (rel->rd_rel->relispartition)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("ROW triggers with transition tables are not supported on partitions")));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("ROW triggers with transition tables are not supported on inheritance children")));
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("ROW triggers with transition tables are not supported on inheritance children")));
 			}
 
 			if (stmt->timing != TRIGGER_TYPE_AFTER)
@@ -1140,8 +1093,7 @@ RemoveTriggerById(Oid trigOid)
 	rel = table_open(relid, AccessExclusiveLock);
 
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
-		rel->rd_rel->relkind != RELKIND_VIEW &&
-		rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		rel->rd_rel->relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table, view, or foreign table",
@@ -1245,8 +1197,7 @@ RangeVarCallbackForRenameTrigger(const RangeVar *rv, Oid relid, Oid oldrelid,
 	form = (Form_pg_class) GETSTRUCT(tuple);
 
 	/* only tables and views can have triggers */
-	if (form->relkind != RELKIND_RELATION && form->relkind != RELKIND_VIEW &&
-		form->relkind != RELKIND_PARTITIONED_TABLE)
+	if (form->relkind != RELKIND_RELATION && form->relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table, view, or foreign table",

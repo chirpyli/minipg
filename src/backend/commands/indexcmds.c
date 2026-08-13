@@ -95,14 +95,10 @@ static Oid	ReindexTable(RangeVar *relation, ReindexParams *params,
 						 bool isTopLevel);
 static void ReindexMultipleTables(const char *objectName,
 								  ReindexObjectType objectKind, ReindexParams *params);
-static void reindex_error_callback(void *args);
-static void ReindexPartitions(Oid relid, ReindexParams *params,
-							  bool isTopLevel);
 static void ReindexMultipleInternal(List *relids,
 									ReindexParams *params);
 static bool ReindexRelationConcurrently(Oid relationOid,
 										ReindexParams *params);
-static void update_relispartition(Oid relationId, bool newval);
 static inline void set_indexsafe_procflags(void);
 
 /*
@@ -113,16 +109,6 @@ struct ReindexIndexCallbackState
 	ReindexParams params;		/* options from statement */
 	Oid			locked_table_oid;	/* tracks previously locked table */
 };
-
-/*
- * callback arguments for reindex_error_callback()
- */
-typedef struct ReindexErrorInfo
-{
-	char	   *relname;
-	char	   *relnamespace;
-	char		relkind;
-} ReindexErrorInfo;
 
 /*
  * CheckIndexCompatible
@@ -670,7 +656,6 @@ DefineIndex(Oid relationId,
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
 		default:
@@ -682,14 +667,10 @@ DefineIndex(Oid relationId,
 	}
 
 	/*
-	 * Establish behavior for partitioned tables, and verify sanity of
-	 * parameters.
-	 *
-	 * We do not build an actual index in this case; we only create a few
-	 * catalog entries.  The actual indexes are built by recursing for each
-	 * partition.
+	 * Partitioned tables are not supported in this build (minipg); the
+	 * 'partitioned' flag is always false here.
 	 */
-	partitioned = rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE;
+	partitioned = false;
 	if (partitioned)
 	{
 		/*
@@ -2290,7 +2271,6 @@ ReindexIndex(RangeVar *indexRelation, ReindexParams *params, bool isTopLevel)
 	struct ReindexIndexCallbackState state;
 	Oid			indOid;
 	char		persistence;
-	char		relkind;
 
 	/*
 	 * Find and lock index, and check permissions on table; use callback to
@@ -2316,11 +2296,8 @@ ReindexIndex(RangeVar *indexRelation, ReindexParams *params, bool isTopLevel)
 	 * already hold a lock on the index.
 	 */
 	persistence = get_rel_persistence(indOid);
-	relkind = get_rel_relkind(indOid);
 
-	if (relkind == RELKIND_PARTITIONED_INDEX)
-		ReindexPartitions(indOid, params, isTopLevel);
-	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
+	if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 		ReindexRelationConcurrently(indOid, params);
 	else
 	{
@@ -2375,8 +2352,7 @@ RangeVarCallbackForReindexIndex(const RangeVar *relation,
 	relkind = get_rel_relkind(relId);
 	if (!relkind)
 		return;
-	if (relkind != RELKIND_INDEX &&
-		relkind != RELKIND_PARTITIONED_INDEX)
+	if (relkind != RELKIND_INDEX)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not an index", relation->relname)));
@@ -2426,9 +2402,7 @@ ReindexTable(RangeVar *relation, ReindexParams *params, bool isTopLevel)
 									   0,
 									   RangeVarCallbackOwnsTable, NULL);
 
-	if (get_rel_relkind(heapOid) == RELKIND_PARTITIONED_TABLE)
-		ReindexPartitions(heapOid, params, isTopLevel);
-	else if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
+	if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 	{
 		result = ReindexRelationConcurrently(heapOid, params);
 
@@ -2662,119 +2636,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 }
 
 /*
- * Error callback specific to ReindexPartitions().
- */
-static void
-reindex_error_callback(void *arg)
-{
-	ReindexErrorInfo *errinfo = (ReindexErrorInfo *) arg;
-
-	Assert(errinfo->relkind == RELKIND_PARTITIONED_INDEX ||
-		   errinfo->relkind == RELKIND_PARTITIONED_TABLE);
-
-	if (errinfo->relkind == RELKIND_PARTITIONED_TABLE)
-		errcontext("while reindexing partitioned table \"%s.%s\"",
-				   errinfo->relnamespace, errinfo->relname);
-	else if (errinfo->relkind == RELKIND_PARTITIONED_INDEX)
-		errcontext("while reindexing partitioned index \"%s.%s\"",
-				   errinfo->relnamespace, errinfo->relname);
-}
-
-/*
- * ReindexPartitions
- *
- * Reindex a set of partitions, per the partitioned index or table given
- * by the caller.
- */
-static void
-ReindexPartitions(Oid relid, ReindexParams *params, bool isTopLevel)
-{
-	List	   *partitions = NIL;
-	char		relkind = get_rel_relkind(relid);
-	char	   *relname = get_rel_name(relid);
-	char	   *relnamespace = get_namespace_name(get_rel_namespace(relid));
-	MemoryContext reindex_context;
-	List	   *inhoids;
-	ListCell   *lc;
-	ErrorContextCallback errcallback;
-	ReindexErrorInfo errinfo;
-
-	Assert(relkind == RELKIND_PARTITIONED_INDEX ||
-		   relkind == RELKIND_PARTITIONED_TABLE);
-
-	/*
-	 * Check if this runs in a transaction block, with an error callback to
-	 * provide more context under which a problem happens.
-	 */
-	errinfo.relname = pstrdup(relname);
-	errinfo.relnamespace = pstrdup(relnamespace);
-	errinfo.relkind = relkind;
-	errcallback.callback = reindex_error_callback;
-	errcallback.arg = (void *) &errinfo;
-	errcallback.previous = error_context_stack;
-	error_context_stack = &errcallback;
-
-	PreventInTransactionBlock(isTopLevel,
-							  relkind == RELKIND_PARTITIONED_TABLE ?
-							  "REINDEX TABLE" : "REINDEX INDEX");
-
-	/* Pop the error context stack */
-	error_context_stack = errcallback.previous;
-
-	/*
-	 * Create special memory context for cross-transaction storage.
-	 *
-	 * Since it is a child of PortalContext, it will go away eventually even
-	 * if we suffer an error so there is no need for special abort cleanup
-	 * logic.
-	 */
-	reindex_context = AllocSetContextCreate(PortalContext, "Reindex",
-											ALLOCSET_DEFAULT_SIZES);
-
-	/* ShareLock is enough to prevent schema modifications */
-	inhoids = find_all_inheritors(relid, ShareLock, NULL);
-
-	/*
-	 * The list of relations to reindex are the physical partitions of the
-	 * tree so discard any partitioned table or index.
-	 */
-	foreach(lc, inhoids)
-	{
-		Oid			partoid = lfirst_oid(lc);
-		char		partkind = get_rel_relkind(partoid);
-		MemoryContext old_context;
-
-		/*
-		 * This discards partitioned tables, partitioned indexes and foreign
-		 * tables.
-		 */
-		if (!RELKIND_HAS_STORAGE(partkind))
-			continue;
-
-		Assert(partkind == RELKIND_INDEX ||
-			   partkind == RELKIND_RELATION);
-
-		/* Save partition OID */
-		old_context = MemoryContextSwitchTo(reindex_context);
-		partitions = lappend_oid(partitions, partoid);
-		MemoryContextSwitchTo(old_context);
-	}
-
-	/*
-	 * Process each partition listed in a separate transaction.  Note that
-	 * this commits and then starts a new transaction immediately.
-	 */
-	ReindexMultipleInternal(partitions, params);
-
-	/*
-	 * Clean up working storage --- note we must do this after
-	 * StartTransactionCommand, else we might be trying to delete the active
-	 * context!
-	 */
-	MemoryContextDelete(reindex_context);
-}
-
-/*
  * ReindexMultipleInternal
  *
  * Reindex a list of relations, each one being processed in its own
@@ -2827,13 +2688,6 @@ ReindexMultipleInternal(List *relids, ReindexParams *params)
 
 		relkind = get_rel_relkind(relid);
 		relpersistence = get_rel_persistence(relid);
-
-		/*
-		 * Partitioned tables and indexes can never be processed directly, and
-		 * a list of their leaves should be built first.
-		 */
-		Assert(relkind != RELKIND_PARTITIONED_INDEX &&
-			   relkind != RELKIND_PARTITIONED_TABLE);
 
 		if ((params->options & REINDEXOPT_CONCURRENTLY) != 0)
 		{
@@ -3173,8 +3027,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 				break;
 			}
 
-		case RELKIND_PARTITIONED_TABLE:
-		case RELKIND_PARTITIONED_INDEX:
 		default:
 			/* Return error if type of relation is not supported */
 			ereport(ERROR,
@@ -3738,164 +3590,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 	pgstat_progress_end_command();
 
 	return true;
-}
-
-/*
- * Insert or delete an appropriate pg_inherits tuple to make the given index
- * be a partition of the indicated parent index.
- *
- * This also corrects the pg_depend information for the affected index.
- */
-void
-IndexSetParentIndex(Relation partitionIdx, Oid parentOid)
-{
-	Relation	pg_inherits;
-	ScanKeyData key[2];
-	SysScanDesc scan;
-	Oid			partRelid = RelationGetRelid(partitionIdx);
-	HeapTuple	tuple;
-	bool		fix_dependencies;
-
-	/* Make sure this is an index */
-	Assert(partitionIdx->rd_rel->relkind == RELKIND_INDEX ||
-		   partitionIdx->rd_rel->relkind == RELKIND_PARTITIONED_INDEX);
-
-	/*
-	 * Scan pg_inherits for rows linking our index to some parent.
-	 */
-	pg_inherits = relation_open(InheritsRelationId, RowExclusiveLock);
-	ScanKeyInit(&key[0],
-				Anum_pg_inherits_inhrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(partRelid));
-	ScanKeyInit(&key[1],
-				Anum_pg_inherits_inhseqno,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(1));
-	scan = systable_beginscan(pg_inherits, InheritsRelidSeqnoIndexId, true,
-							  NULL, 2, key);
-	tuple = systable_getnext(scan);
-
-	if (!HeapTupleIsValid(tuple))
-	{
-		if (parentOid == InvalidOid)
-		{
-			/*
-			 * No pg_inherits row, and no parent wanted: nothing to do in this
-			 * case.
-			 */
-			fix_dependencies = false;
-		}
-		else
-		{
-			StoreSingleInheritance(partRelid, parentOid, 1);
-			fix_dependencies = true;
-		}
-	}
-	else
-	{
-		Form_pg_inherits inhForm = (Form_pg_inherits) GETSTRUCT(tuple);
-
-		if (parentOid == InvalidOid)
-		{
-			/*
-			 * There exists a pg_inherits row, which we want to clear; do so.
-			 */
-			CatalogTupleDelete(pg_inherits, &tuple->t_self);
-			fix_dependencies = true;
-		}
-		else
-		{
-			/*
-			 * A pg_inherits row exists.  If it's the same we want, then we're
-			 * good; if it differs, that amounts to a corrupt catalog and
-			 * should not happen.
-			 */
-			if (inhForm->inhparent != parentOid)
-			{
-				/* unexpected: we should not get called in this case */
-				elog(ERROR, "bogus pg_inherit row: inhrelid %u inhparent %u",
-					 inhForm->inhrelid, inhForm->inhparent);
-			}
-
-			/* already in the right state */
-			fix_dependencies = false;
-		}
-	}
-
-	/* done with pg_inherits */
-	systable_endscan(scan);
-	relation_close(pg_inherits, RowExclusiveLock);
-
-	/* set relhassubclass if an index partition has been added to the parent */
-	if (OidIsValid(parentOid))
-	{
-		LockRelationOid(parentOid, ShareUpdateExclusiveLock);
-		SetRelationHasSubclass(parentOid, true);
-	}
-
-	/* set relispartition correctly on the partition */
-	update_relispartition(partRelid, OidIsValid(parentOid));
-
-	if (fix_dependencies)
-	{
-		/*
-		 * Insert/delete pg_depend rows.  If setting a parent, add PARTITION
-		 * dependencies on the parent index and the table; if removing a
-		 * parent, delete PARTITION dependencies.
-		 */
-		if (OidIsValid(parentOid))
-		{
-			ObjectAddress partIdx;
-			ObjectAddress parentIdx;
-			ObjectAddress partitionTbl;
-
-			ObjectAddressSet(partIdx, RelationRelationId, partRelid);
-			ObjectAddressSet(parentIdx, RelationRelationId, parentOid);
-			ObjectAddressSet(partitionTbl, RelationRelationId,
-							 partitionIdx->rd_index->indrelid);
-			recordDependencyOn(&partIdx, &parentIdx,
-							   DEPENDENCY_PARTITION_PRI);
-			recordDependencyOn(&partIdx, &partitionTbl,
-							   DEPENDENCY_PARTITION_SEC);
-		}
-		else
-		{
-			deleteDependencyRecordsForClass(RelationRelationId, partRelid,
-											RelationRelationId,
-											DEPENDENCY_PARTITION_PRI);
-			deleteDependencyRecordsForClass(RelationRelationId, partRelid,
-											RelationRelationId,
-											DEPENDENCY_PARTITION_SEC);
-		}
-
-		/* make our updates visible */
-		CommandCounterIncrement();
-	}
-}
-
-/*
- * Subroutine of IndexSetParentIndex to update the relispartition flag of the
- * given index to the given value.
- */
-static void
-update_relispartition(Oid relationId, bool newval)
-{
-	HeapTuple	tup;
-	Relation	classRel;
-	ItemPointerData otid;
-
-	classRel = table_open(RelationRelationId, RowExclusiveLock);
-	tup = SearchSysCacheLockedCopy1(RELOID, ObjectIdGetDatum(relationId));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for relation %u", relationId);
-	otid = tup->t_self;
-	Assert(((Form_pg_class) GETSTRUCT(tup))->relispartition != newval);
-	((Form_pg_class) GETSTRUCT(tup))->relispartition = newval;
-	CatalogTupleUpdate(classRel, &otid, tup);
-	UnlockTuple(classRel, &otid, InplaceUpdateTupleLock);
-	heap_freetuple(tup);
-	table_close(classRel, RowExclusiveLock);
 }
 
 /*

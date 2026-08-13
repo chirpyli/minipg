@@ -168,8 +168,6 @@ extern Size EstimateReindexStateSpace(void);
 extern void SerializeReindexState(Size maxsize, char *start_address);
 extern void RestoreReindexState(void *reindexstate);
 
-extern void IndexSetParentIndex(Relation idx, Oid parentOid);
-
 
 /*
  * itemptr_encode - Encode ItemPointer as int64/int8

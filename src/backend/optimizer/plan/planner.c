@@ -2438,10 +2438,9 @@ remove_useless_groupby_columns(PlannerInfo *root)
 
 		/*
 		 * We must skip inheritance parent tables as some of the child rels
-		 * may cause duplicate rows.  This cannot happen with partitioned
-		 * tables, however.
+		 * may cause duplicate rows.
 		 */
-		if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+		if (rte->inh)
 			continue;
 
 		/* Nothing to do unless this rel has multiple Vars in GROUP BY */

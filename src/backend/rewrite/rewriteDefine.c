@@ -263,8 +263,7 @@ DefineQueryRewrite(const char *rulename,
 	 * blocks them for users.  Don't mention them in the error message.
 	 */
 	if (event_relation->rd_rel->relkind != RELKIND_RELATION &&
-		event_relation->rd_rel->relkind != RELKIND_VIEW &&
-		event_relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		event_relation->rd_rel->relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or view",
@@ -408,20 +407,8 @@ DefineQueryRewrite(const char *rulename,
 
 			CheckTableNotInUse(event_relation, "CREATE RULE");
 
-			if (event_relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot convert partitioned table \"%s\" to a view",
-								RelationGetRelationName(event_relation))));
-
 			/* only case left: */
 			Assert(event_relation->rd_rel->relkind == RELKIND_RELATION);
-
-			if (event_relation->rd_rel->relispartition)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot convert partition \"%s\" to a view",
-								RelationGetRelationName(event_relation))));
 
 			snapshot = RegisterSnapshot(GetLatestSnapshot());
 			scanDesc = table_beginscan(event_relation, snapshot, 0, NULL);
@@ -904,8 +891,7 @@ RangeVarCallbackForRenameRule(const RangeVar *rv, Oid relid, Oid oldrelid,
 
 	/* only tables and views can have rules */
 	if (form->relkind != RELKIND_RELATION &&
-		form->relkind != RELKIND_VIEW &&
-		form->relkind != RELKIND_PARTITIONED_TABLE)
+		form->relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or view", rv->relname)));

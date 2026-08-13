@@ -579,16 +579,6 @@ RelationGetSmgr(Relation rel)
 	   relation->rd_firstRelfilenodeSubid == InvalidSubTransactionId)))
 
 /*
- * RelationUsesLocalBuffers
- *		True if relation's pages are stored in local buffers.
- *
- * This build does not support temporary relations (whose pages are the only
- * ones stored in local buffers), so this is always false.
- */
-#define RelationUsesLocalBuffers(relation) \
-	(false)
-
-/*
  * RELATION_IS_LOCAL
  *		If a rel is either temp or newly created in the current transaction,
  *		it can be assumed to be accessible only to the current backend.

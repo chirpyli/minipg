@@ -110,9 +110,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	/* see REPLICA_IDENTITY_xxx constants */
 	char		relreplident BKI_DEFAULT(n);
 
-	/* is relation a partition? */
-	bool		relispartition BKI_DEFAULT(f);
-
 	/* link to original rel during table rewrite; otherwise 0 */
 	Oid			relrewrite BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_class);
 
@@ -158,8 +155,6 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 #define		  RELKIND_TOASTVALUE	  't'	/* for out-of-line values */
 #define		  RELKIND_VIEW			  'v'	/* view */
 #define		  RELKIND_COMPOSITE_TYPE  'c'	/* composite type */
-#define		  RELKIND_PARTITIONED_TABLE 'p' /* partitioned table */
-#define		  RELKIND_PARTITIONED_INDEX 'I' /* partitioned index */
 
 #define		  RELPERSISTENCE_PERMANENT	'p' /* regular table */
 

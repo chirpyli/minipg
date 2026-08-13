@@ -634,7 +634,6 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 				/* Switch relation if publishing via root. */
 				if (relentry->publish_as_relid != RelationGetRelid(relation))
 				{
-					Assert(relation->rd_rel->relispartition);
 					ancestor = RelationIdGetRelation(relentry->publish_as_relid);
 					relation = ancestor;
 					/* Convert tuple if needed. */
@@ -657,7 +656,6 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 				/* Switch relation if publishing via root. */
 				if (relentry->publish_as_relid != RelationGetRelid(relation))
 				{
-					Assert(relation->rd_rel->relispartition);
 					ancestor = RelationIdGetRelation(relentry->publish_as_relid);
 					relation = ancestor;
 					/* Convert tuples if needed. */
@@ -685,7 +683,6 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 				/* Switch relation if publishing via root. */
 				if (relentry->publish_as_relid != RelationGetRelid(relation))
 				{
-					Assert(relation->rd_rel->relispartition);
 					ancestor = RelationIdGetRelation(relentry->publish_as_relid);
 					relation = ancestor;
 					/* Convert tuple if needed. */
@@ -756,10 +753,6 @@ pgoutput_truncate(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 		 * Don't send partitions if the publication wants to send only the
 		 * root tables through it.
 		 */
-		if (relation->rd_rel->relispartition &&
-			relentry->publish_as_relid != relid)
-			continue;
-
 		relids[nrelids++] = relid;
 		maybe_send_schema(ctx, txn, change, relation, relentry);
 	}
@@ -1108,7 +1101,6 @@ get_rel_sync_entry(PGOutputData *data, Oid relid)
 		ListCell   *lc;
 		Oid			publish_as_relid = relid;
 		int			publish_ancestor_level = 0;
-		bool		am_partition = get_rel_relispartition(relid);
 		char		relkind = get_rel_relkind(relid);
 
 		/* Reload publications if needed before use. */
@@ -1149,13 +1141,6 @@ get_rel_sync_entry(PGOutputData *data, Oid relid)
 			if (pub->alltables)
 			{
 				publish = true;
-				if (pub->pubviaroot && am_partition)
-				{
-					List	   *ancestors = get_partition_ancestors(relid);
-
-					pub_relid = llast_oid(ancestors);
-					ancestor_level = list_length(ancestors);
-				}
 			}
 
 			if (!publish)
@@ -1168,46 +1153,15 @@ get_rel_sync_entry(PGOutputData *data, Oid relid)
 				 * published via this publication, which will be used as the
 				 * relation via which to publish the partition's changes.
 				 */
-				if (am_partition)
-				{
-					List	   *ancestors = get_partition_ancestors(relid);
-					ListCell   *lc2;
-					int			level = 0;
-
-					/*
-					 * Find the "topmost" ancestor that is in this
-					 * publication.
-					 */
-					foreach(lc2, ancestors)
-					{
-						Oid			ancestor = lfirst_oid(lc2);
-
-						level++;
-
-						if (list_member_oid(GetRelationPublications(ancestor),
-											pub->oid))
-						{
-							ancestor_published = true;
-							if (pub->pubviaroot)
-							{
-								pub_relid = ancestor;
-								ancestor_level = level;
-							}
-						}
-					}
-				}
-
 				if (list_member_oid(pubids, pub->oid) || ancestor_published)
 					publish = true;
 			}
 
 			/*
-			 * Don't publish changes for partitioned tables, because
-			 * publishing those of its partitions suffices, unless partition
-			 * changes won't be published due to pubviaroot being set.
+			 * Publish changes for this relation. Partitioned tables are not
+			 * supported in this build (minipg), so relkind is always a leaf.
 			 */
-			if (publish &&
-				(relkind != RELKIND_PARTITIONED_TABLE || pub->pubviaroot))
+			if (publish)
 			{
 				entry->pubactions.pubinsert |= pub->pubactions.pubinsert;
 				entry->pubactions.pubupdate |= pub->pubactions.pubupdate;

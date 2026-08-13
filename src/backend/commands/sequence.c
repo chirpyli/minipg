@@ -1673,8 +1673,7 @@ process_owned_by(Relation seqrel, List *owned_by, bool for_identity)
 
 		/* Must be a regular or foreign table */
 		if (!(tablerel->rd_rel->relkind == RELKIND_RELATION ||
-			  tablerel->rd_rel->relkind == RELKIND_VIEW ||
-			  tablerel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE))
+			  tablerel->rd_rel->relkind == RELKIND_VIEW))
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("referenced relation \"%s\" is not a table or foreign table",

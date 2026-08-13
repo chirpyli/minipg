@@ -470,7 +470,6 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 			amoptsfn = NULL;
 			break;
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			amoptsfn = relation->rd_indam->amoptions;
 			break;
 		default:
@@ -1076,7 +1075,6 @@ retry:
 	switch (relation->rd_rel->relkind)
 	{
 		case RELKIND_INDEX:
-		case RELKIND_PARTITIONED_INDEX:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitIndexAccessInfo(relation);
 			break;
@@ -1956,8 +1954,7 @@ RelationIdGetRelation(Oid relationId)
 			 * and we don't want to use the full-blown procedure because it's
 			 * a headache for indexes that reload itself depends on.
 			 */
-			if (rd->rd_rel->relkind == RELKIND_INDEX ||
-				rd->rd_rel->relkind == RELKIND_PARTITIONED_INDEX)
+			if (rd->rd_rel->relkind == RELKIND_INDEX)
 				RelationReloadIndexInfo(rd);
 			else
 				RelationClearRelation(rd, true);
@@ -2080,8 +2077,7 @@ RelationReloadIndexInfo(Relation relation)
 	Form_pg_class relp;
 
 	/* Should be called only for invalidated, live indexes */
-	Assert((relation->rd_rel->relkind == RELKIND_INDEX ||
-			relation->rd_rel->relkind == RELKIND_PARTITIONED_INDEX) &&
+	Assert((relation->rd_rel->relkind == RELKIND_INDEX) &&
 		   !relation->rd_isvalid &&
 		   relation->rd_droppedSubid == InvalidSubTransactionId);
 
@@ -2385,8 +2381,7 @@ RelationClearRelation(Relation relation, bool rebuild)
 	 * re-read the pg_class row to handle possible physical relocation of the
 	 * index, and we check for pg_index updates too.
 	 */
-	if ((relation->rd_rel->relkind == RELKIND_INDEX ||
-		 relation->rd_rel->relkind == RELKIND_PARTITIONED_INDEX) &&
+	if ((relation->rd_rel->relkind == RELKIND_INDEX) &&
 		relation->rd_refcnt > 0 &&
 		relation->rd_indexcxt != NULL)
 	{

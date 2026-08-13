@@ -863,8 +863,7 @@ add_row_identity_columns(PlannerInfo *root, Index rtindex,
 
 	Assert(commandType == CMD_UPDATE || commandType == CMD_DELETE);
 
-	if (relkind == RELKIND_RELATION ||
-		relkind == RELKIND_PARTITIONED_TABLE)
+	if (relkind == RELKIND_RELATION)
 	{
 		/*
 		 * Emit CTID so that executor can find the row to update or delete.

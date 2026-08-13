@@ -368,26 +368,17 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		switch (rel->rtekind)
 		{
 		case RTE_RELATION:
-			if (rte->relkind == RELKIND_PARTITIONED_TABLE)
+			if (rte->tablesample != NULL)
 			{
-					/*
-					 * We could get here if asked to scan a partitioned table
-					 * with ONLY.  In that case we shouldn't scan any of the
-					 * partitions, so mark it as a dummy rel.
-					 */
-					set_dummy_rel_pathlist(rel);
-				}
-				else if (rte->tablesample != NULL)
-				{
-					/* Sampled relation */
-					set_tablesample_rel_size(root, rel, rte);
-				}
-				else
-				{
-					/* Plain relation */
-					set_plain_rel_size(root, rel, rte);
-				}
-				break;
+				/* Sampled relation */
+				set_tablesample_rel_size(root, rel, rte);
+			}
+			else
+			{
+				/* Plain relation */
+				set_plain_rel_size(root, rel, rte);
+			}
+			break;
 			case RTE_SUBQUERY:
 
 				/*

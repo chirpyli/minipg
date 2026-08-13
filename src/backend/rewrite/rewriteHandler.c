@@ -2532,8 +2532,7 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	base_rte = rt_fetch(rtr->rtindex, viewquery->rtable);
 	if (base_rte->rtekind != RTE_RELATION ||
 		(base_rte->relkind != RELKIND_RELATION &&
-		 base_rte->relkind != RELKIND_VIEW &&
-		 base_rte->relkind != RELKIND_PARTITIONED_TABLE))
+		 base_rte->relkind != RELKIND_VIEW))
 		return gettext_noop("Views that do not select from a single table or view are not automatically updatable.");
 
 	if (base_rte->tablesample)
@@ -2708,8 +2707,7 @@ relation_is_updatable(Oid reloid,
 	}
 
 	/* If the relation is a table, it is always updatable */
-	if (rel->rd_rel->relkind == RELKIND_RELATION ||
-		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
+	if (rel->rd_rel->relkind == RELKIND_RELATION)
 	{
 		relation_close(rel, AccessShareLock);
 		return ALL_EVENTS;
@@ -2801,8 +2799,7 @@ relation_is_updatable(Oid reloid,
 			base_rte = rt_fetch(rtr->rtindex, viewquery->rtable);
 			Assert(base_rte->rtekind == RTE_RELATION);
 
-			if (base_rte->relkind != RELKIND_RELATION &&
-				base_rte->relkind != RELKIND_PARTITIONED_TABLE)
+			if (base_rte->relkind != RELKIND_RELATION)
 			{
 				baseoid = base_rte->relid;
 				outer_reloids = lappend_oid(outer_reloids,

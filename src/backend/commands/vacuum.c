@@ -832,7 +832,11 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 		}
 
 
-		include_parts = (classForm->relkind == RELKIND_PARTITIONED_TABLE);
+		/*
+		 * Partitioned tables are not supported in this build (minipg); we
+		 * never include child partitions during VACUUM/ANALYZE.
+		 */
+		include_parts = false;
 		ReleaseSysCache(tuple);
 
 		/*
@@ -913,12 +917,10 @@ get_all_vacuum_rels(int options)
 			continue;
 
 		/*
-		 * We include partitioned tables here; depending on which operation is
-		 * to be performed, caller will decide whether to process or ignore
-		 * them.
+		 * Partitioned tables are not supported in this build (minipg); only
+		 * regular tables are vacuumable here.
 		 */
-			if (classForm->relkind != RELKIND_RELATION &&
-				classForm->relkind != RELKIND_PARTITIONED_TABLE)
+			if (classForm->relkind != RELKIND_RELATION)
 				continue;
 
 		/*
@@ -1944,8 +1946,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	 * Check that it's of a vacuumable relkind.
 	 */
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
-		rel->rd_rel->relkind != RELKIND_TOASTVALUE &&
-		rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		rel->rd_rel->relkind != RELKIND_TOASTVALUE)
 	{
 		ereport(WARNING,
 				(errmsg("skipping \"%s\" --- cannot vacuum non-tables or special system tables",
@@ -1957,18 +1958,11 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	}
 
 	/*
-	 * Silently ignore partitioned tables as there is no work to be done.  The
-	 * useful work is on their child partitions, which have been queued up for
-	 * us separately.
+	 * Partitioned tables are not supported in this build (minipg); the
+	 * partition-skip logic above is unreachable.
 	 */
-	if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		relation_close(rel, lmode);
-		PopActiveSnapshot();
-		CommitTransactionCommand();
-		/* It's OK to proceed with ANALYZE on this table */
-		return true;
-	}
+
+
 
 	/*
 	 * Get a session-level lock too. This will protect our access to the

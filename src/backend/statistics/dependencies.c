@@ -1402,7 +1402,7 @@ dependencies_clauselist_selectivity(PlannerInfo *root,
 	 * non-leaf relations, so we build stats only for the inheritance tree.
 	 * So for partitioned tables we do consider extended stats.
 	 */
-	if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+	if (rte->inh)
 		return 1.0;
 
 	/* check if there's any stats that might be useful for us. */

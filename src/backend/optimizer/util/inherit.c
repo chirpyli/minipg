@@ -324,14 +324,7 @@ expand_single_inheritance_child(PlannerInfo *root, RangeTblEntry *parentrte,
 	Assert(parentrte->rtekind == RTE_RELATION); /* else this is dubious */
 	childrte->relid = childOID;
 	childrte->relkind = childrel->rd_rel->relkind;
-	/* A partitioned child will need to be expanded further. */
-	if (childrte->relkind == RELKIND_PARTITIONED_TABLE)
-	{
-		Assert(childOID != parentOID);
-		childrte->inh = true;
-	}
-	else
-		childrte->inh = false;
+	childrte->inh = false;
 	childrte->requiredPerms = 0;
 	childrte->securityQuals = NIL;
 
@@ -447,13 +440,6 @@ expand_single_inheritance_child(PlannerInfo *root, RangeTblEntry *parentrte,
 		childrc->strength = top_parentrc->strength;
 		childrc->waitPolicy = top_parentrc->waitPolicy;
 
-		/*
-		 * We mark RowMarks for partitioned child tables as parent RowMarks so
-		 * that the executor ignores them (except their existence means that
-		 * the child tables will be locked using the appropriate mode).
-		 */
-		childrc->isParent = (childrte->relkind == RELKIND_PARTITIONED_TABLE);
-
 		/* Include child's rowmark type in top parent's allMarkTypes */
 		top_parentrc->allMarkTypes |= childrc->allMarkTypes;
 
@@ -472,8 +458,6 @@ expand_single_inheritance_child(PlannerInfo *root, RangeTblEntry *parentrte,
 		root->all_result_relids = bms_add_member(root->all_result_relids,
 												 childRTindex);
 
-		/* Non-leaf partitions don't need any row identity info. */
-		if (childrte->relkind != RELKIND_PARTITIONED_TABLE)
 		{
 			Var		   *rrvar;
 

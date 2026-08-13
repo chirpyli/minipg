@@ -69,8 +69,7 @@ table_slot_callbacks(Relation relation)
 		 * centralize the knowledge that a heap slot is the right thing in
 		 * that case here.
 		 */
-		Assert(relation->rd_rel->relkind == RELKIND_VIEW ||
-			   relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
+		Assert(relation->rd_rel->relkind == RELKIND_VIEW);
 		tts_cb = &TTSOpsVirtual;
 	}
 

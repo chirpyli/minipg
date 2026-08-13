@@ -1318,13 +1318,6 @@ apply_handle_insert_internal(ApplyExecutionData *edata,
 static void
 check_relation_updatable(LogicalRepRelMapEntry *rel)
 {
-	/*
-	 * For partitioned tables, we only need to care if the target partition is
-	 * updatable (aka has PK or RI defined for it).
-	 */
-	if (rel->localrel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		return;
-
 	/* Updatable, no error. */
 	if (rel->updatable)
 		return;
@@ -1702,37 +1695,6 @@ apply_handle_truncate(StringInfo s)
 		relids = lappend_oid(relids, rel->localreloid);
 		if (RelationIsLogicallyLogged(rel->localrel))
 			relids_logged = lappend_oid(relids_logged, rel->localreloid);
-
-		/*
-		 * Truncate partitions if we got a message to truncate a partitioned
-		 * table.
-		 */
-		if (rel->localrel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-		{
-			ListCell   *child;
-			List	   *children = find_all_inheritors(rel->localreloid,
-													   lockmode,
-													   NULL);
-
-			foreach(child, children)
-			{
-				Oid			childrelid = lfirst_oid(child);
-				Relation	childrel;
-
-				if (list_member_oid(relids, childrelid))
-					continue;
-
-				/* find_all_inheritors already got lock */
-				childrel = table_open(childrelid, NoLock);
-
-				rels = lappend(rels, childrel);
-				part_rels = lappend(part_rels, childrel);
-				relids = lappend_oid(relids, childrelid);
-				/* Log this relation only if needed for logical decoding */
-				if (RelationIsLogicallyLogged(childrel))
-					relids_logged = lappend_oid(relids_logged, childrelid);
-			}
-		}
 	}
 
 	/*

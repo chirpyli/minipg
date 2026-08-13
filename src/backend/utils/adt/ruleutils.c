@@ -1318,11 +1318,9 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 	if (!attrsOnly)
 	{
 		if (!isConstraint)
-			appendStringInfo(&buf, "CREATE %sINDEX %s ON %s%s USING %s (",
+			appendStringInfo(&buf, "CREATE %sINDEX %s ON %s USING %s (",
 							 idxrec->indisunique ? "UNIQUE " : "",
 							 quote_identifier(NameStr(idxrelrec->relname)),
-							 idxrelrec->relkind == RELKIND_PARTITIONED_INDEX
-							 && !inherits ? "ONLY " : "",
 							 (prettyFlags & PRETTYFLAG_SCHEMA) ?
 							 generate_relation_name(indrelid, NIL) :
 							 generate_qualified_relation_name(indrelid),
