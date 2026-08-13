@@ -45,7 +45,6 @@ ReplicationSlotAllocationLock		36
 ReplicationSlotControlLock			37
 CommitTsSLRULock					38
 CommitTsLock						39
-ReplicationOriginLock				40
 MultiXactTruncationLock				41
 OldSnapshotTimeMapLock				42
 LogicalRepWorkerLock				43

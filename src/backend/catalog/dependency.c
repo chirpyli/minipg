@@ -40,11 +40,8 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_publication.h"
-#include "catalog/pg_publication_rel.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
@@ -52,7 +49,6 @@
 #include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
-#include "commands/publicationcmds.h"
 #include "commands/sequence.h"
 #include "commands/trigger.h"
 #include "commands/typecmds.h"
@@ -152,9 +148,6 @@ static const Oid object_classes[] = {
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
-	PublicationRelationId,		/* OCLASS_PUBLICATION */
-	PublicationRelRelationId,	/* OCLASS_PUBLICATION_REL */
-	SubscriptionRelationId,		/* OCLASS_SUBSCRIPTION */
 	TransformRelationId			/* OCLASS_TRANSFORM */
 };
 
@@ -1416,14 +1409,6 @@ doDeletion(const ObjectAddress *object, int flags)
 			RemoveExtensionById(object->objectId);
 			break;
 
-		case OCLASS_PUBLICATION_REL:
-			RemovePublicationRelById(object->objectId);
-			break;
-
-		case OCLASS_PUBLICATION:
-			RemovePublicationById(object->objectId);
-			break;
-
 		case OCLASS_CAST:
 		case OCLASS_COLLATION:
 		case OCLASS_CONVERSION:
@@ -1444,7 +1429,6 @@ doDeletion(const ObjectAddress *object, int flags)
 		case OCLASS_ROLE:
 		case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:
-		case OCLASS_SUBSCRIPTION:
 			elog(ERROR, "global objects cannot be deleted by doDeletion");
 			break;
 
@@ -2720,15 +2704,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case ExtensionRelationId:
 			return OCLASS_EXTENSION;
-
-		case PublicationRelationId:
-			return OCLASS_PUBLICATION;
-
-		case PublicationRelRelationId:
-			return OCLASS_PUBLICATION_REL;
-
-		case SubscriptionRelationId:
-			return OCLASS_SUBSCRIPTION;
 
 		case TransformRelationId:
 			return OCLASS_TRANSFORM;

@@ -54,10 +54,8 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_publication.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
@@ -109,7 +107,6 @@ static const FormData_pg_attribute Desc_pg_database[Natts_pg_database] = {Schema
 static const FormData_pg_attribute Desc_pg_authid[Natts_pg_authid] = {Schema_pg_authid};
 static const FormData_pg_attribute Desc_pg_auth_members[Natts_pg_auth_members] = {Schema_pg_auth_members};
 static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_index};
-static const FormData_pg_attribute Desc_pg_subscription[Natts_pg_subscription] = {Schema_pg_subscription};
 
 /*
  *		Hash tables that index the relation cache
@@ -2296,8 +2293,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	bms_free(relation->rd_keyattr);
 	bms_free(relation->rd_pkattr);
 	bms_free(relation->rd_idattr);
-	if (relation->rd_pubactions)
-		pfree(relation->rd_pubactions);
 	if (relation->rd_options)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
@@ -3727,10 +3722,8 @@ RelationCacheInitializePhase2(void)
 				  Natts_pg_authid, Desc_pg_authid);
 		formrdesc("pg_auth_members", AuthMemRelation_Rowtype_Id, true,
 				  Natts_pg_auth_members, Desc_pg_auth_members);
-		formrdesc("pg_subscription", SubscriptionRelation_Rowtype_Id, true,
-				  Natts_pg_subscription, Desc_pg_subscription);
 
-#define NUM_CRITICAL_SHARED_RELS	4	/* fix if you change list above */
+#define NUM_CRITICAL_SHARED_RELS	3	/* fix if you change list above */
 	}
 
 	MemoryContextSwitchTo(oldcxt);
@@ -5289,76 +5282,6 @@ RelationGetExclusionInfo(Relation indexRelation,
 }
 
 /*
- * Get publication actions for the given relation.
- */
-struct PublicationActions *
-GetRelationPublicationActions(Relation relation)
-{
-	List	   *puboids;
-	ListCell   *lc;
-	MemoryContext oldcxt;
-	PublicationActions *pubactions = palloc0(sizeof(PublicationActions));
-
-	/*
-	 * If not publishable, it publishes no actions.  (pgoutput_change() will
-	 * ignore it.)
-	 */
-	if (!is_publishable_relation(relation))
-		return pubactions;
-
-	if (relation->rd_pubactions)
-		return memcpy(pubactions, relation->rd_pubactions,
-					  sizeof(PublicationActions));
-
-	/* Fetch the publication membership info. */
-	puboids = GetRelationPublications(RelationGetRelid(relation));
-	puboids = list_concat_unique_oid(puboids, GetAllTablesPublications());
-
-	foreach(lc, puboids)
-	{
-		Oid			pubid = lfirst_oid(lc);
-		HeapTuple	tup;
-		Form_pg_publication pubform;
-
-		tup = SearchSysCache1(PUBLICATIONOID, ObjectIdGetDatum(pubid));
-
-		if (!HeapTupleIsValid(tup))
-			elog(ERROR, "cache lookup failed for publication %u", pubid);
-
-		pubform = (Form_pg_publication) GETSTRUCT(tup);
-
-		pubactions->pubinsert |= pubform->pubinsert;
-		pubactions->pubupdate |= pubform->pubupdate;
-		pubactions->pubdelete |= pubform->pubdelete;
-		pubactions->pubtruncate |= pubform->pubtruncate;
-
-		ReleaseSysCache(tup);
-
-		/*
-		 * If we know everything is replicated, there is no point to check for
-		 * other publications.
-		 */
-		if (pubactions->pubinsert && pubactions->pubupdate &&
-			pubactions->pubdelete && pubactions->pubtruncate)
-			break;
-	}
-
-	if (relation->rd_pubactions)
-	{
-		pfree(relation->rd_pubactions);
-		relation->rd_pubactions = NULL;
-	}
-
-	/* Now save copy of the actions in the relcache entry. */
-	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-	relation->rd_pubactions = palloc(sizeof(PublicationActions));
-	memcpy(relation->rd_pubactions, pubactions, sizeof(PublicationActions));
-	MemoryContextSwitchTo(oldcxt);
-
-	return pubactions;
-}
-
-/*
  * RelationGetIndexRawAttOptions -- get AM/opclass-specific options for the index
  */
 Datum *
@@ -5898,7 +5821,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_keyattr = NULL;
 		rel->rd_pkattr = NULL;
 		rel->rd_idattr = NULL;
-		rel->rd_pubactions = NULL;
 		rel->rd_statvalid = false;
 		rel->rd_statlist = NIL;
 		rel->rd_fkeyvalid = false;

@@ -267,8 +267,7 @@ extern bool pg_collation_ownercheck(Oid coll_oid, Oid roleid);
 extern bool pg_conversion_ownercheck(Oid conv_oid, Oid roleid);
 extern bool pg_event_trigger_ownercheck(Oid et_oid, Oid roleid);
 extern bool pg_extension_ownercheck(Oid ext_oid, Oid roleid);
-extern bool pg_publication_ownercheck(Oid pub_oid, Oid roleid);
-extern bool pg_subscription_ownercheck(Oid sub_oid, Oid roleid);
+
 extern bool pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid);
 
 #endif							/* ACL_H */

@@ -18,7 +18,6 @@
 #include "access/xlog.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
-#include "catalog/pg_publication.h"
 #include "nodes/bitmapset.h"
 #include "rewrite/prs2lock.h"
 #include "storage/block.h"
@@ -132,8 +131,6 @@ typedef struct RelationData
 	Bitmapset  *rd_keyattr;		/* cols that can be ref'd by foreign keys */
 	Bitmapset  *rd_pkattr;		/* cols included in primary key */
 	Bitmapset  *rd_idattr;		/* included in replica identity index */
-
-	PublicationActions *rd_pubactions;	/* publication actions */
 
 	/*
 	 * rd_options is set whenever rd_rel is loaded into the relcache entry.
@@ -609,13 +606,12 @@ RelationGetSmgr(Relation rel)
 
 /*
  * RelationIsAccessibleInLogicalDecoding
- *		True if we need to log enough information to have access via
- *		decoding snapshot.
+ *
+ * minipg has removed logical replication, so this is always false. Kept as a
+ * macro so that the (now dead) call sites in heap/index/bufmgr/relcache/snapmgr
+ * continue to compile with the branch simply never taken.
  */
-#define RelationIsAccessibleInLogicalDecoding(relation) \
-	(XLogLogicalInfoActive() && \
-	 RelationNeedsWAL(relation) && \
-	 (IsCatalogRelation(relation) || RelationIsUsedAsCatalogTable(relation)))
+#define RelationIsAccessibleInLogicalDecoding(relation) (false)
 
 /*
  * RelationIsLogicallyLogged

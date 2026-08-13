@@ -30,7 +30,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_subscription.h"
 #include "commands/alter.h"
 #include "commands/collationcmds.h"
 #include "commands/conversioncmds.h"
@@ -38,9 +37,7 @@
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
-#include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
-#include "commands/subscriptioncmds.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -72,12 +69,6 @@ report_name_conflict(Oid classId, const char *name)
 	{
 		case LanguageRelationId:
 			msgfmt = gettext_noop("language \"%s\" already exists");
-			break;
-		case PublicationRelationId:
-			msgfmt = gettext_noop("publication \"%s\" already exists");
-			break;
-		case SubscriptionRelationId:
-			msgfmt = gettext_noop("subscription \"%s\" already exists");
 			break;
 		default:
 			elog(ERROR, "unsupported object class %u", classId);
@@ -231,18 +222,6 @@ AlterObjectRename_internal(Relation rel, Oid objectId, const char *new_name)
 
 		IsThereOpFamilyInNamespace(new_name, opf->opfmethod,
 								   opf->opfnamespace);
-	}
-	else if (classId == SubscriptionRelationId)
-	{
-		if (SearchSysCacheExists2(SUBSCRIPTIONNAME, MyDatabaseId,
-								  CStringGetDatum(new_name)))
-			report_name_conflict(classId, new_name);
-
-		/* Also enforce regression testing naming rules, if enabled */
-#ifdef ENFORCE_REGRESSION_TEST_NAME_RESTRICTIONS
-		if (strncmp(new_name, "regress_", 8) != 0)
-			elog(WARNING, "subscriptions created by regression test cases should have names starting with \"regress_\"");
-#endif
 	}
 	else if (nameCacheId >= 0)
 	{
@@ -592,9 +571,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:
 		case OCLASS_EXTENSION:
-		case OCLASS_PUBLICATION:
-		case OCLASS_PUBLICATION_REL:
-		case OCLASS_SUBSCRIPTION:
 		case OCLASS_TRANSFORM:
 			/* ignore object types that don't have schema-qualified names */
 			break;
@@ -779,14 +755,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_DOMAIN:		/* same as TYPE */
 			return AlterTypeOwner(castNode(List, stmt->object), newowner, stmt->objectType);
 			break;
-
-		case OBJECT_PUBLICATION:
-			return AlterPublicationOwner(strVal((Value *) stmt->object),
-										 newowner);
-
-		case OBJECT_SUBSCRIPTION:
-			return AlterSubscriptionOwner(strVal((Value *) stmt->object),
-										  newowner);
 
 			/* Generic cases */
 		case OBJECT_AGGREGATE:

@@ -2183,13 +2183,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 		int			bufflags = 0;
 
 		/*
-		 * If this is a catalog, we need to transmit combo CIDs to properly
-		 * decode, so log that as well.
-		 */
-		if (RelationIsAccessibleInLogicalDecoding(relation))
-			log_heap_new_cid(relation, heaptup);
-
-		/*
 		 * If this is the single and first tuple on page, we can reinit the
 		 * page instead of restoring the whole thing.  Set flag, and hide
 		 * buffer references from XLogInsert.
@@ -10468,4 +10461,20 @@ HeapCheckForSerializableConflictOut(bool visible, Relation relation,
 		return;
 
 	CheckForSerializableConflictOut(relation, xid, snapshot);
+}
+
+/*
+ * ResolveCminCmaxDuringDecoding
+ *
+ * minipg has removed logical replication, so combo CIDs / historic snapshot
+ * tuple cid resolution are no longer needed.  Always report "not resolved".
+ */
+bool
+ResolveCminCmaxDuringDecoding(struct HTAB *tuplecid_data,
+							  Snapshot snapshot,
+							  HeapTuple htup,
+							  Buffer buffer,
+							  CommandId *cmin, CommandId *cmax)
+{
+	return false;
 }

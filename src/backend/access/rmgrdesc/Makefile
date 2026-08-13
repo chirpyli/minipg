@@ -15,11 +15,9 @@ OBJS = \
 	genericdesc.o \
 	hashdesc.o \
 	heapdesc.o \
-	logicalmsgdesc.o \
 	mxactdesc.o \
 	nbtdesc.o \
 	relmapdesc.o \
-	replorigindesc.o \
 	seqdesc.o \
 	smgrdesc.o \
 	standbydesc.o \

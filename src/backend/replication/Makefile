@@ -26,8 +26,6 @@ OBJS = \
 	walreceiverfuncs.o \
 	walsender.o
 
-SUBDIRS = logical
-
 include $(top_srcdir)/src/backend/common.mk
 
 # repl_scanner is compiled as part of repl_gram

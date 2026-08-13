@@ -745,15 +745,6 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 		scratch += sizeof(BlockNumber);
 	}
 
-	/* followed by the record's origin, if any */
-	if ((curinsert_flags & XLOG_INCLUDE_ORIGIN) &&
-		replorigin_session_origin != InvalidRepOriginId)
-	{
-		*(scratch++) = (char) XLR_BLOCK_ID_ORIGIN;
-		memcpy(scratch, &replorigin_session_origin, sizeof(replorigin_session_origin));
-		scratch += sizeof(replorigin_session_origin);
-	}
-
 	/* followed by toplevel XID, if not already included in previous record */
 	if (IsSubTransactionAssignmentPending())
 	{

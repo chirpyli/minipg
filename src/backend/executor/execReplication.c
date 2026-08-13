@@ -571,40 +571,22 @@ ExecSimpleRelationDelete(ResultRelInfo *resultRelInfo,
 
 /*
  * Check if command can be executed with current replica identity.
+ *
+ * minipg has removed logical replication, so the publication-based replica
+ * identity checks are no longer relevant; this is now a no-op.
  */
 void
 CheckCmdReplicaIdentity(Relation rel, CmdType cmd)
 {
-	PublicationActions *pubactions;
-
 	/*
-	/* We only need to do checks for UPDATE and DELETE. */
+	 * We only need to do checks for UPDATE and DELETE in logical replication.
+	 * Since logical replication (and thus publication-based replica identity)
+	 * has been removed, nothing to do here.
+	 */
 	if (cmd != CMD_UPDATE && cmd != CMD_DELETE)
 		return;
 
-	/* If relation has replica identity we are always good. */
-	if (rel->rd_rel->relreplident == REPLICA_IDENTITY_FULL ||
-		OidIsValid(RelationGetReplicaIndex(rel)))
-		return;
-
-	/*
-	 * This is either UPDATE OR DELETE and there is no replica identity.
-	 *
-	 * Check if the table publishes UPDATES or DELETES.
-	 */
-	pubactions = GetRelationPublicationActions(rel);
-	if (cmd == CMD_UPDATE && pubactions->pubupdate)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("cannot update table \"%s\" because it does not have a replica identity and publishes updates",
-						RelationGetRelationName(rel)),
-				 errhint("To enable updating the table, set REPLICA IDENTITY using ALTER TABLE.")));
-	else if (cmd == CMD_DELETE && pubactions->pubdelete)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("cannot delete from table \"%s\" because it does not have a replica identity and publishes deletes",
-						RelationGetRelationName(rel)),
-				 errhint("To enable deleting from the table, set REPLICA IDENTITY using ALTER TABLE.")));
+	return;
 }
 
 

@@ -2,8 +2,6 @@
 
 TAP_TESTS = 1
 
-EXTRA_INSTALL = contrib/test_decoding
-
 ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)

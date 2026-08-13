@@ -801,8 +801,7 @@ logical_begin_heap_rewrite(RewriteState state)
 	 * accessed during logical decoding, if not, we can skip doing any
 	 * additional work.
 	 */
-	state->rs_logical_rewrite =
-		RelationIsAccessibleInLogicalDecoding(state->rs_old_rel);
+	state->rs_logical_rewrite = false;	/* logical decoding removed */
 
 	if (!state->rs_logical_rewrite)
 		return;

@@ -45,7 +45,6 @@
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_publication.h"
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/nodeSubplan.h"

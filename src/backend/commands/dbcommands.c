@@ -38,7 +38,6 @@
 #include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/comment.h"
 #include "commands/dbcommands.h"
@@ -895,19 +894,8 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	}
 
 	/*
-	 * Check if there are subscriptions defined in the target database.
-	 *
-	 * We can't drop them automatically because they might be holding
-	 * resources in other databases/instances.
+	 * Check for other users of the target database (handled elsewhere).
 	 */
-	if ((nsubscriptions = CountDBSubscriptions(db_id)) > 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("database \"%s\" is being used by logical replication subscription",
-						dbname),
-				 errdetail_plural("There is %d subscription.",
-								  "There are %d subscriptions.",
-								  nsubscriptions, nsubscriptions)));
 
 
 	/*

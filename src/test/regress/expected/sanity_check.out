@@ -93,10 +93,7 @@ pg_opclass|t
 pg_operator|t
 pg_opfamily|t
 pg_proc|t
-pg_publication|t
-pg_publication_rel|t
 pg_range|t
-pg_replication_origin|t
 pg_rewrite|t
 pg_sequence|t
 pg_shdepend|t
@@ -104,8 +101,6 @@ pg_shdescription|t
 pg_statistic|t
 pg_statistic_ext|t
 pg_statistic_ext_data|t
-pg_subscription|t
-pg_subscription_rel|t
 pg_tablespace|t
 pg_transform|t
 pg_trigger|t

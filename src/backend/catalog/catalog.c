@@ -32,10 +32,8 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_namespace.h"
-#include "catalog/pg_replication_origin.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_shdescription.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -271,9 +269,7 @@ IsSharedRelation(Oid relationId)
 		relationId == SharedDescriptionRelationId ||
 		relationId == SharedDependRelationId ||
 		relationId == TableSpaceRelationId ||
-		relationId == DbRoleSettingRelationId ||
-		relationId == ReplicationOriginRelationId ||
-		relationId == SubscriptionRelationId)
+		relationId == DbRoleSettingRelationId)
 		return true;
 	/* These are their indexes */
 	if (relationId == AuthIdRolnameIndexId ||
@@ -287,23 +283,15 @@ IsSharedRelation(Oid relationId)
 		relationId == SharedDependReferenceIndexId ||
 		relationId == TablespaceOidIndexId ||
 		relationId == TablespaceNameIndexId ||
-		relationId == DbRoleSettingDatidRolidIndexId ||
-		relationId == ReplicationOriginIdentIndex ||
-		relationId == ReplicationOriginNameIndex ||
-		relationId == SubscriptionObjectIndexId ||
-		relationId == SubscriptionNameIndexId)
+		relationId == DbRoleSettingDatidRolidIndexId)
 		return true;
 	/* These are their toast tables and toast indexes */
 	if (		relationId == PgAuthidToastTable ||
 		relationId == PgAuthidToastIndex ||
 		relationId == PgDbRoleSettingToastTable ||
 		relationId == PgDbRoleSettingToastIndex ||
-		relationId == PgReplicationOriginToastTable ||
-		relationId == PgReplicationOriginToastIndex ||
 		relationId == PgShdescriptionToastTable ||
 		relationId == PgShdescriptionToastIndex ||
-		relationId == PgSubscriptionToastTable ||
-		relationId == PgSubscriptionToastIndex ||
 		relationId == PgTablespaceToastTable ||
 		relationId == PgTablespaceToastIndex)
 		return true;

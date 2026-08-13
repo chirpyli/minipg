@@ -430,9 +430,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_RECOVERY_PAUSE:
 			event_name = "RecoveryPause";
 			break;
-		case WAIT_EVENT_REPLICATION_ORIGIN_DROP:
-			event_name = "ReplicationOriginDrop";
-			break;
 		case WAIT_EVENT_REPLICATION_SLOT_DROP:
 			event_name = "ReplicationSlotDrop";
 			break;

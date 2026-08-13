@@ -299,16 +299,6 @@ CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
 
 -- unprivileged users may read pg_statistic_ext but not pg_statistic_ext_data
 
-CREATE VIEW pg_publication_tables AS
-    SELECT
-        P.pubname AS pubname,
-        N.nspname AS schemaname,
-        C.relname AS tablename
-    FROM pg_publication P,
-         LATERAL pg_get_publication_tables(P.pubname) GPT,
-         pg_class C JOIN pg_namespace N ON (N.oid = C.relnamespace)
-    WHERE C.oid = GPT.relid;
-
 CREATE VIEW pg_locks AS
     SELECT * FROM pg_lock_status() AS L;
 
@@ -644,21 +634,6 @@ CREATE VIEW pg_stat_wal_receiver AS
     FROM pg_stat_get_wal_receiver() s
     WHERE s.pid IS NOT NULL;
 
-CREATE VIEW pg_stat_subscription AS
-    SELECT
-            su.oid AS subid,
-            su.subname,
-            st.pid,
-            st.relid,
-            st.received_lsn,
-            st.last_msg_send_time,
-            st.last_msg_receipt_time,
-            st.latest_end_lsn,
-            st.latest_end_time
-    FROM pg_subscription su
-            LEFT JOIN pg_stat_get_subscription(NULL) st
-                      ON (st.subid = su.oid);
-
 CREATE VIEW pg_replication_slots AS
     SELECT
             L.slot_name,
@@ -940,8 +915,3 @@ CREATE VIEW pg_stat_progress_copy AS
         S.param4 AS tuples_excluded
     FROM pg_stat_get_progress_info('COPY') AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
-
-
-CREATE VIEW pg_replication_origin_status AS
-    SELECT *
-    FROM pg_show_replication_origin_status();

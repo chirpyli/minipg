@@ -8741,9 +8741,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:
 			case OCLASS_EXTENSION:
-			case OCLASS_PUBLICATION:
-			case OCLASS_PUBLICATION_REL:
-			case OCLASS_SUBSCRIPTION:
 			case OCLASS_TRANSFORM:
 
 				/*

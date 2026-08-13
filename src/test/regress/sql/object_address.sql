@@ -43,11 +43,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE regress_addr_user REVOKE DELETE ON TABLES FROM
 CREATE TRANSFORM FOR int LANGUAGE SQL (
 	FROM SQL WITH FUNCTION prsd_lextype(internal),
 	TO SQL WITH FUNCTION int4recv(internal));
--- suppress warning that depends on wal_level
-SET client_min_messages = 'ERROR';
-CREATE PUBLICATION addr_pub FOR TABLE addr_nsp.gentable;
-RESET client_min_messages;
-CREATE SUBSCRIPTION regress_addr_sub CONNECTION '' PUBLICATION bar WITH (connect = false, slot_name = NONE);
 CREATE STATISTICS addr_nsp.gentable_stat ON a, b FROM addr_nsp.gentable;
 
 -- test some error cases
@@ -131,10 +126,6 @@ SELECT pg_get_object_address('extension', '{one}', '{}');
 SELECT pg_get_object_address('extension', '{one,two}', '{}');
 SELECT pg_get_object_address('access method', '{one}', '{}');
 SELECT pg_get_object_address('access method', '{one,two}', '{}');
-SELECT pg_get_object_address('publication', '{one}', '{}');
-SELECT pg_get_object_address('publication', '{one,two}', '{}');
-SELECT pg_get_object_address('subscription', '{one}', '{}');
-SELECT pg_get_object_address('subscription', '{one,two}', '{}');
 
 -- test successful cases
 WITH objects (type, name, args) AS (VALUES
@@ -185,9 +176,6 @@ WITH objects (type, name, args) AS (VALUES
 			-- extension
 			('transform', '{int}', '{sql}'),
 				('access method', '{btree}', '{}'),
-				('publication', '{addr_pub}', '{}'),
-				('publication relation', '{addr_nsp, gentable}', '{addr_pub}'),
-				('subscription', '{regress_addr_sub}', '{}'),
 				('statistics object', '{addr_nsp, gentable_stat}', '{}')
         )
 SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
@@ -203,8 +191,6 @@ SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
 --- Cleanup resources
 ---
 DROP FOREIGN DATA WRAPPER addr_fdw CASCADE;
-DROP PUBLICATION addr_pub;
-DROP SUBSCRIPTION regress_addr_sub;
 
 DROP SCHEMA addr_nsp CASCADE;
 

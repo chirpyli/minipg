@@ -43,7 +43,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
@@ -1041,58 +1040,6 @@ pg_extension_ownercheck(Oid ext_oid, Oid roleid)
 
 	systable_endscan(scan);
 	table_close(pg_extension, AccessShareLock);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a publication (specified by OID).
- */
-bool
-pg_publication_ownercheck(Oid pub_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(PUBLICATIONOID, ObjectIdGetDatum(pub_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("publication with OID %u does not exist", pub_oid)));
-
-	ownerId = ((Form_pg_publication) GETSTRUCT(tuple))->pubowner;
-
-	ReleaseSysCache(tuple);
-
-	return has_privs_of_role(roleid, ownerId);
-}
-
-/*
- * Ownership check for a subscription (specified by OID).
- */
-bool
-pg_subscription_ownercheck(Oid sub_oid, Oid roleid)
-{
-	HeapTuple	tuple;
-	Oid			ownerId;
-
-	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
-		return true;
-
-	tuple = SearchSysCache1(SUBSCRIPTIONOID, ObjectIdGetDatum(sub_oid));
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("subscription with OID %u does not exist", sub_oid)));
-
-	ownerId = ((Form_pg_subscription) GETSTRUCT(tuple))->subowner;
-
-	ReleaseSysCache(tuple);
 
 	return has_privs_of_role(roleid, ownerId);
 }

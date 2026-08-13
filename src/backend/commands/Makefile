@@ -40,11 +40,9 @@ OBJS = \
 	portalcmds.o \
 	prepare.o \
 	proclang.o \
-	publicationcmds.o \
 	schemacmds.o \
 	sequence.o \
 	statscmds.o \
-	subscriptioncmds.o \
 	tablecmds.o \
 	tablespace.o \
 	trigger.o \

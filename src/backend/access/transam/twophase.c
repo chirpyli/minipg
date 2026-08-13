@@ -1114,7 +1114,6 @@ EndPrepare(GlobalTransaction gxact)
 {
 	TwoPhaseFileHeader *hdr;
 	StateFileChunk *record;
-	bool		replorigin;
 
 	/* Add the end sentinel to the list of 2PC records */
 	RegisterTwoPhaseRecord(TWOPHASE_RM_END_ID, 0,
@@ -1125,19 +1124,8 @@ EndPrepare(GlobalTransaction gxact)
 	Assert(hdr->magic == TWOPHASE_MAGIC);
 	hdr->total_len = records.total_len + sizeof(pg_crc32c);
 
-	replorigin = (replorigin_session_origin != InvalidRepOriginId &&
-				  replorigin_session_origin != DoNotReplicateId);
-
-	if (replorigin)
-	{
-		hdr->origin_lsn = replorigin_session_origin_lsn;
-		hdr->origin_timestamp = replorigin_session_origin_timestamp;
-	}
-	else
-	{
-		hdr->origin_lsn = InvalidXLogRecPtr;
-		hdr->origin_timestamp = 0;
-	}
+	hdr->origin_lsn = InvalidXLogRecPtr;
+	hdr->origin_timestamp = 0;
 
 	/*
 	 * If the data size exceeds MaxAllocSize, we won't be able to read it in
@@ -1173,16 +1161,7 @@ EndPrepare(GlobalTransaction gxact)
 	for (record = records.head; record != NULL; record = record->next)
 		XLogRegisterData(record->data, record->len);
 
-	XLogSetRecordFlags(XLOG_INCLUDE_ORIGIN);
-
 	gxact->prepare_end_lsn = XLogInsert(RM_XACT_ID, XLOG_XACT_PREPARE);
-
-	if (replorigin)
-	{
-		/* Move LSNs forward for this replication origin */
-		replorigin_session_advance(replorigin_session_origin_lsn,
-								   gxact->prepare_end_lsn);
-	}
 
 	XLogFlush(gxact->prepare_end_lsn);
 
@@ -2271,14 +2250,6 @@ RecordTransactionCommitPrepared(TransactionId xid,
 {
 	XLogRecPtr	recptr;
 	TimestampTz committs = GetCurrentTimestamp();
-	bool		replorigin;
-
-	/*
-	 * Are we using the replication origins feature?  Or, in other words, are
-	 * we replaying remote actions?
-	 */
-	replorigin = (replorigin_session_origin != InvalidRepOriginId &&
-				  replorigin_session_origin != DoNotReplicateId);
 
 	START_CRIT_SECTION();
 
@@ -2298,26 +2269,15 @@ RecordTransactionCommitPrepared(TransactionId xid,
 								 MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
 								 xid, gid);
 
-
-	if (replorigin)
-		/* Move LSNs forward for this replication origin */
-		replorigin_session_advance(replorigin_session_origin_lsn,
-								   XactLastRecEnd);
-
 	/*
-	 * Record commit timestamp.  The value comes from plain commit timestamp
-	 * if replorigin is not enabled, or replorigin already set a value for us
-	 * in replorigin_session_origin_timestamp otherwise.
+	 * Record commit timestamp.
 	 *
 	 * We don't need to WAL-log anything here, as the commit record written
 	 * above already contains the data.
 	 */
-	if (!replorigin || replorigin_session_origin_timestamp == 0)
-		replorigin_session_origin_timestamp = committs;
-
 	TransactionTreeSetCommitTsData(xid, nchildren, children,
-								   replorigin_session_origin_timestamp,
-								   replorigin_session_origin);
+								   committs,
+								   InvalidRepOriginId);
 
 	/*
 	 * We don't currently try to sleep before flush here ... nor is there any
@@ -2362,14 +2322,6 @@ RecordTransactionAbortPrepared(TransactionId xid,
 							   const char *gid)
 {
 	XLogRecPtr	recptr;
-	bool		replorigin;
-
-	/*
-	 * Are we using the replication origins feature?  Or, in other words, are
-	 * we replaying remote actions?
-	 */
-	replorigin = (replorigin_session_origin != InvalidRepOriginId &&
-				  replorigin_session_origin != DoNotReplicateId);
 
 	/*
 	 * Catch the scenario where we aborted partway through
@@ -2391,11 +2343,6 @@ RecordTransactionAbortPrepared(TransactionId xid,
 								nrels, rels,
 								MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
 								xid, gid);
-
-	if (replorigin)
-		/* Move LSNs forward for this replication origin */
-		replorigin_session_advance(replorigin_session_origin_lsn,
-								   XactLastRecEnd);
 
 	/* Always flush, since we're about to remove the 2PC state file */
 	XLogFlush(recptr);
@@ -2431,6 +2378,8 @@ PrepareRedoAdd(char *buf, XLogRecPtr start_lsn,
 {
 	TwoPhaseFileHeader *hdr = (TwoPhaseFileHeader *) buf;
 	char	   *bufptr;
+
+	(void) origin_id;				/* unused after logical replication removal */
 	const char *gid;
 	GlobalTransaction gxact;
 
@@ -2507,13 +2456,6 @@ PrepareRedoAdd(char *buf, XLogRecPtr start_lsn,
 	/* And insert it into the active array */
 	Assert(TwoPhaseState->numPrepXacts < max_prepared_xacts);
 	TwoPhaseState->prepXacts[TwoPhaseState->numPrepXacts++] = gxact;
-
-	if (origin_id != InvalidRepOriginId)
-	{
-		/* recover apply progress */
-		replorigin_advance(origin_id, hdr->origin_lsn, end_lsn,
-						   false /* backward */ , false /* WAL */ );
-	}
 
 	elog(DEBUG2, "added 2PC data in shared memory for transaction %u", gxact->xid);
 }

@@ -276,8 +276,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
 		CreateAmStmt
-		CreatePublicationStmt AlterPublicationStmt
-		CreateSubscriptionStmt AlterSubscriptionStmt DropSubscriptionStmt
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
@@ -386,7 +384,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	group_by_list
 %type <node>	group_by_item empty_grouping_set rollup_clause cube_clause
 %type <node>	grouping_sets_clause
-%type <node>	opt_publication_for_tables publication_for_tables
 
 
 %type <defelt>	createfunc_opt_item common_func_opt_item dostmt_opt_item
@@ -617,7 +614,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	PARALLEL PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
-	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM PUBLICATION
+	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM
 
 	QUOTE
 
@@ -630,7 +627,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
 	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P STABLE STANDALONE_P
 	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRICT_P STRIP_P
-	SUBSCRIPTION SUBSTRING SUPPORT SYMMETRIC SYSID SYSTEM_P
+	SUBSTRING SUPPORT SYMMETRIC SYSID SYSTEM_P
 
 	TABLE TABLES TABLESAMPLE TABLESPACE TEMP TEMPLATE TEMPORARY TEXT_P THEN
 	TIES TIME TIMESTAMP TO TRAILING TRANSACTION TRANSFORM
@@ -840,8 +837,6 @@ stmt:	AlterCollationStmt
 			| AlterTableStmt
 			| AlterTblSpcStmt
 			| AlterCompositeTypeStmt
-			| AlterPublicationStmt
-			| AlterSubscriptionStmt
 			| AlterStatsStmt
 			| AnalyzeStmt
 			| CallStmt
@@ -858,13 +853,11 @@ stmt:	AlterCollationStmt
 			| CreateFunctionStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
-			| CreatePublicationStmt
 			| AlterOpFamilyStmt
 			| CreatePLangStmt
 			| CreateSchemaStmt
 			| CreateSeqStmt
 			| CreateStmt
-			| CreateSubscriptionStmt
 			| CreateStatsStmt
 			| CreateTableSpaceStmt
 			| CreateTransformStmt
@@ -879,7 +872,6 @@ stmt:	AlterCollationStmt
 			| DropOpClassStmt
 			| DropOpFamilyStmt
 			| DropStmt
-			| DropSubscriptionStmt
 			| DropTableSpaceStmt
 			| DropTransformStmt
 			| DropdbStmt
@@ -4480,7 +4472,6 @@ object_type_name:
 			drop_type_name							{ $$ = $1; }
 			| DATABASE								{ $$ = OBJECT_DATABASE; }
 			| ROLE									{ $$ = OBJECT_ROLE; }
-			| SUBSCRIPTION							{ $$ = OBJECT_SUBSCRIPTION; }
 			| TABLESPACE							{ $$ = OBJECT_TABLESPACE; }
 		;
 
@@ -4488,7 +4479,6 @@ drop_type_name:
 			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
 			| EXTENSION								{ $$ = OBJECT_EXTENSION; }
 			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
-			| PUBLICATION							{ $$ = OBJECT_PUBLICATION; }
 			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
 		;
 
@@ -6090,15 +6080,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER PUBLICATION name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_PUBLICATION;
-					n->object = (Node *) makeString($3);
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER ROUTINE function_with_argtypes RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -6113,15 +6094,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					RenameStmt *n = makeNode(RenameStmt);
 					n->renameType = OBJECT_SCHEMA;
 					n->subname = $3;
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_SUBSCRIPTION;
-					n->object = (Node *) makeString($3);
 					n->newname = $6;
 					n->missing_ok = false;
 					$$ = (Node *)n;
@@ -6783,241 +6755,8 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					n->newowner = $6;
 					$$ = (Node *)n;
 				}
-			| ALTER PUBLICATION name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_PUBLICATION;
-					n->object = (Node *) makeString($3);
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_SUBSCRIPTION;
-					n->object = (Node *) makeString($3);
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-		;
+			;
 
-
-/*****************************************************************************
- *
- * CREATE PUBLICATION name [ FOR TABLE ] [ WITH options ]
- *
- *****************************************************************************/
-
-CreatePublicationStmt:
-			CREATE PUBLICATION name opt_publication_for_tables opt_definition
-				{
-					CreatePublicationStmt *n = makeNode(CreatePublicationStmt);
-					n->pubname = $3;
-					n->options = $5;
-					if ($4 != NULL)
-					{
-						/* FOR TABLE */
-						if (IsA($4, List))
-							n->tables = (List *)$4;
-						/* FOR ALL TABLES */
-						else
-							n->for_all_tables = true;
-					}
-					$$ = (Node *)n;
-				}
-		;
-
-opt_publication_for_tables:
-			publication_for_tables					{ $$ = $1; }
-			| /* EMPTY */							{ $$ = NULL; }
-		;
-
-publication_for_tables:
-			FOR TABLE relation_expr_list
-				{
-					$$ = (Node *) $3;
-				}
-			| FOR ALL TABLES
-				{
-					$$ = (Node *) makeInteger(true);
-				}
-		;
-
-
-/*****************************************************************************
- *
- * ALTER PUBLICATION name SET ( options )
- *
- * ALTER PUBLICATION name ADD TABLE table [, table2]
- *
- * ALTER PUBLICATION name DROP TABLE table [, table2]
- *
- * ALTER PUBLICATION name SET TABLE table [, table2]
- *
- *****************************************************************************/
-
-AlterPublicationStmt:
-			ALTER PUBLICATION name SET definition
-				{
-					AlterPublicationStmt *n = makeNode(AlterPublicationStmt);
-					n->pubname = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER PUBLICATION name ADD_P TABLE relation_expr_list
-				{
-					AlterPublicationStmt *n = makeNode(AlterPublicationStmt);
-					n->pubname = $3;
-					n->tables = $6;
-					n->tableAction = DEFELEM_ADD;
-					$$ = (Node *)n;
-				}
-			| ALTER PUBLICATION name SET TABLE relation_expr_list
-				{
-					AlterPublicationStmt *n = makeNode(AlterPublicationStmt);
-					n->pubname = $3;
-					n->tables = $6;
-					n->tableAction = DEFELEM_SET;
-					$$ = (Node *)n;
-				}
-			| ALTER PUBLICATION name DROP TABLE relation_expr_list
-				{
-					AlterPublicationStmt *n = makeNode(AlterPublicationStmt);
-					n->pubname = $3;
-					n->tables = $6;
-					n->tableAction = DEFELEM_DROP;
-					$$ = (Node *)n;
-				}
-		;
-
-/*****************************************************************************
- *
- * CREATE SUBSCRIPTION name ...
- *
- *****************************************************************************/
-
-CreateSubscriptionStmt:
-			CREATE SUBSCRIPTION name CONNECTION Sconst PUBLICATION name_list opt_definition
-				{
-					CreateSubscriptionStmt *n =
-						makeNode(CreateSubscriptionStmt);
-					n->subname = $3;
-					n->conninfo = $5;
-					n->publication = $7;
-					n->options = $8;
-					$$ = (Node *)n;
-				}
-		;
-
-/*****************************************************************************
- *
- * ALTER SUBSCRIPTION name ...
- *
- *****************************************************************************/
-
-AlterSubscriptionStmt:
-			ALTER SUBSCRIPTION name SET definition
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_OPTIONS;
-					n->subname = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name CONNECTION Sconst
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_CONNECTION;
-					n->subname = $3;
-					n->conninfo = $5;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name REFRESH PUBLICATION opt_definition
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_REFRESH;
-					n->subname = $3;
-					n->options = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name ADD_P PUBLICATION name_list opt_definition
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_ADD_PUBLICATION;
-					n->subname = $3;
-					n->publication = $6;
-					n->options = $7;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name DROP PUBLICATION name_list opt_definition
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_DROP_PUBLICATION;
-					n->subname = $3;
-					n->publication = $6;
-					n->options = $7;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name SET PUBLICATION name_list opt_definition
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_SET_PUBLICATION;
-					n->subname = $3;
-					n->publication = $6;
-					n->options = $7;
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name ENABLE_P
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_ENABLED;
-					n->subname = $3;
-					n->options = list_make1(makeDefElem("enabled",
-											(Node *)makeInteger(true), @1));
-					$$ = (Node *)n;
-				}
-			| ALTER SUBSCRIPTION name DISABLE_P
-				{
-					AlterSubscriptionStmt *n =
-						makeNode(AlterSubscriptionStmt);
-					n->kind = ALTER_SUBSCRIPTION_ENABLED;
-					n->subname = $3;
-					n->options = list_make1(makeDefElem("enabled",
-											(Node *)makeInteger(false), @1));
-					$$ = (Node *)n;
-				}
-		;
-
-/*****************************************************************************
- *
- * DROP SUBSCRIPTION [ IF EXISTS ] name
- *
- *****************************************************************************/
-
-DropSubscriptionStmt: DROP SUBSCRIPTION name opt_drop_behavior
-				{
-					DropSubscriptionStmt *n = makeNode(DropSubscriptionStmt);
-					n->subname = $3;
-					n->missing_ok = false;
-					n->behavior = $4;
-					$$ = (Node *) n;
-				}
-				|  DROP SUBSCRIPTION IF_P EXISTS name opt_drop_behavior
-				{
-					DropSubscriptionStmt *n = makeNode(DropSubscriptionStmt);
-					n->subname = $5;
-					n->missing_ok = true;
-					n->behavior = $6;
-					$$ = (Node *) n;
-				}
-		;
 
 /*****************************************************************************
  *
@@ -12087,7 +11826,6 @@ unreserved_keyword:
 			| PROCEDURE
 			| PROCEDURES
 			| PROGRAM
-			| PUBLICATION
 			| QUOTE
 			| RANGE
 			| READ
@@ -12148,11 +11886,11 @@ unreserved_keyword:
 			| STORED
 			| STRICT_P
 			| STRIP_P
-			| SUBSCRIPTION
 			| SUPPORT
 			| SYSID
 			| SYSTEM_P
 			| TABLES
+
 			| TABLESPACE
 			| TEMP
 			| TEMPLATE
@@ -12652,13 +12390,13 @@ bare_label_keyword:
 			| PROCEDURE
 			| PROCEDURES
 			| PROGRAM
-			| PUBLICATION
 			| QUOTE
 			| RANGE
 			| READ
 			| REAL
 			| REASSIGN
 			| RECHECK
+
 			| RECURSIVE
 			| REF_P
 			| REFERENCES
@@ -12721,7 +12459,6 @@ bare_label_keyword:
 			| STORED
 			| STRICT_P
 			| STRIP_P
-			| SUBSCRIPTION
 			| SUBSTRING
 			| SUPPORT
 			| SYMMETRIC
@@ -12729,6 +12466,7 @@ bare_label_keyword:
 			| SYSTEM_P
 			| TABLE
 			| TABLES
+
 			| TABLESAMPLE
 			| TABLESPACE
 			| TEMP

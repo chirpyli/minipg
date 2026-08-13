@@ -35,10 +35,8 @@ OBJS = \
 	pg_namespace.o \
 	pg_operator.o \
 	pg_proc.o \
-	pg_publication.o \
 	pg_range.o \
 	pg_shdepend.o \
-	pg_subscription.o \
 	pg_type.o \
 	storage.o \
 	toasting.o
@@ -60,10 +58,8 @@ CATALOG_HEADERS := \
 	pg_database.h pg_db_role_setting.h pg_tablespace.h \
 	pg_authid.h pg_auth_members.h pg_shdepend.h pg_shdescription.h \
 	pg_extension.h \
-	pg_replication_origin.h \
 	pg_collation.h pg_range.h pg_transform.h \
-	pg_sequence.h pg_publication.h pg_publication_rel.h pg_subscription.h \
-	pg_subscription_rel.h
+	pg_sequence.h
 
 GENERATED_HEADERS := $(CATALOG_HEADERS:%.h=%_d.h) schemapg.h system_fk_info.h
 

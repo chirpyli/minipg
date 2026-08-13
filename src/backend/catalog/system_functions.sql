@@ -296,56 +296,6 @@ CREATE OR REPLACE FUNCTION
   PARALLEL SAFE;
 
 
-CREATE OR REPLACE FUNCTION pg_logical_slot_get_changes(
-    IN slot_name name, IN upto_lsn pg_lsn, IN upto_nchanges int, VARIADIC options text[] DEFAULT '{}',
-    OUT lsn pg_lsn, OUT xid xid, OUT data text)
-RETURNS SETOF RECORD
-LANGUAGE INTERNAL
-VOLATILE ROWS 1000 COST 1000
-AS 'pg_logical_slot_get_changes';
-
-CREATE OR REPLACE FUNCTION pg_logical_slot_peek_changes(
-    IN slot_name name, IN upto_lsn pg_lsn, IN upto_nchanges int, VARIADIC options text[] DEFAULT '{}',
-    OUT lsn pg_lsn, OUT xid xid, OUT data text)
-RETURNS SETOF RECORD
-LANGUAGE INTERNAL
-VOLATILE ROWS 1000 COST 1000
-AS 'pg_logical_slot_peek_changes';
-
-CREATE OR REPLACE FUNCTION pg_logical_slot_get_binary_changes(
-    IN slot_name name, IN upto_lsn pg_lsn, IN upto_nchanges int, VARIADIC options text[] DEFAULT '{}',
-    OUT lsn pg_lsn, OUT xid xid, OUT data bytea)
-RETURNS SETOF RECORD
-LANGUAGE INTERNAL
-VOLATILE ROWS 1000 COST 1000
-AS 'pg_logical_slot_get_binary_changes';
-
-CREATE OR REPLACE FUNCTION pg_logical_slot_peek_binary_changes(
-    IN slot_name name, IN upto_lsn pg_lsn, IN upto_nchanges int, VARIADIC options text[] DEFAULT '{}',
-    OUT lsn pg_lsn, OUT xid xid, OUT data bytea)
-RETURNS SETOF RECORD
-LANGUAGE INTERNAL
-VOLATILE ROWS 1000 COST 1000
-AS 'pg_logical_slot_peek_binary_changes';
-
-CREATE OR REPLACE FUNCTION pg_create_physical_replication_slot(
-    IN slot_name name, IN immediately_reserve boolean DEFAULT false,
-    IN temporary boolean DEFAULT false,
-    OUT slot_name name, OUT lsn pg_lsn)
-RETURNS RECORD
-LANGUAGE INTERNAL
-STRICT VOLATILE
-AS 'pg_create_physical_replication_slot';
-
-CREATE OR REPLACE FUNCTION pg_create_logical_replication_slot(
-    IN slot_name name, IN plugin name,
-    IN temporary boolean DEFAULT false,
-    IN twophase boolean DEFAULT false,
-    OUT slot_name name, OUT lsn pg_lsn)
-RETURNS RECORD
-LANGUAGE INTERNAL
-STRICT VOLATILE
-AS 'pg_create_logical_replication_slot';
 
 CREATE OR REPLACE FUNCTION
   make_interval(years int4 DEFAULT 0, months int4 DEFAULT 0, weeks int4 DEFAULT 0,

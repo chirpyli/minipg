@@ -41,10 +41,8 @@
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
 #include "commands/proclang.h"
-#include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
 #include "commands/sequence.h"
-#include "commands/subscriptioncmds.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -141,10 +139,8 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterOpFamilyStmt:
 		case T_AlterOperatorStmt:
 		case T_AlterOwnerStmt:
-		case T_AlterPublicationStmt:
 		case T_AlterSeqStmt:
 		case T_AlterStatsStmt:
-		case T_AlterSubscriptionStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
@@ -160,20 +156,17 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
 		case T_CreatePLangStmt:
-		case T_CreatePublicationStmt:
 		case T_CreateRangeStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateSeqStmt:
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
-		case T_CreateSubscriptionStmt:
 		case T_CreateTableSpaceStmt:
 		case T_CreateTransformStmt:
 		case T_CreateTrigStmt:
 		case T_CreatedbStmt:
 		case T_DefineStmt:
 		case T_DropStmt:
-		case T_DropSubscriptionStmt:
 		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
 		case T_IndexStmt:
@@ -1330,28 +1323,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateAccessMethod((CreateAmStmt *) parsetree);
 				break;
 
-			case T_CreatePublicationStmt:
-				address = CreatePublication((CreatePublicationStmt *) parsetree);
-				break;
-
-			case T_AlterPublicationStmt:
-				AlterPublication((AlterPublicationStmt *) parsetree);
-				break;
-
-			case T_CreateSubscriptionStmt:
-				address = CreateSubscription((CreateSubscriptionStmt *) parsetree,
-											 isTopLevel);
-				break;
-
-			case T_AlterSubscriptionStmt:
-				address = AlterSubscription((AlterSubscriptionStmt *) parsetree,
-											isTopLevel);
-				break;
-
-			case T_DropSubscriptionStmt:
-				DropSubscription((DropSubscriptionStmt *) parsetree, isTopLevel);
-				break;
-
 			case T_CreateStatsStmt:
 				{
 					Oid			relid;
@@ -2319,26 +2290,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_ACCESS_METHOD;
 			break;
 
-		case T_CreatePublicationStmt:
-			tag = CMDTAG_CREATE_PUBLICATION;
-			break;
-
-		case T_AlterPublicationStmt:
-			tag = CMDTAG_ALTER_PUBLICATION;
-			break;
-
-		case T_CreateSubscriptionStmt:
-			tag = CMDTAG_CREATE_SUBSCRIPTION;
-			break;
-
-		case T_AlterSubscriptionStmt:
-			tag = CMDTAG_ALTER_SUBSCRIPTION;
-			break;
-
-		case T_DropSubscriptionStmt:
-			tag = CMDTAG_DROP_SUBSCRIPTION;
-			break;
-
 		case T_AlterCollationStmt:
 			tag = CMDTAG_ALTER_COLLATION;
 			break;
@@ -2829,26 +2780,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateAmStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreatePublicationStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterPublicationStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateSubscriptionStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterSubscriptionStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_DropSubscriptionStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

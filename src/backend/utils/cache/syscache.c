@@ -44,10 +44,7 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_publication.h"
-#include "catalog/pg_publication_rel.h"
 #include "catalog/pg_range.h"
-#include "catalog/pg_replication_origin.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_sequence.h"
 #include "catalog/pg_shdepend.h"
@@ -55,8 +52,6 @@
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_statistic_ext_data.h"
-#include "catalog/pg_subscription.h"
-#include "catalog/pg_subscription_rel.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
@@ -497,50 +492,6 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		128
 	},
-	{PublicationRelationId,		/* PUBLICATIONNAME */
-		PublicationNameIndexId,
-		1,
-		{
-			Anum_pg_publication_pubname,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{PublicationRelationId,		/* PUBLICATIONOID */
-		PublicationObjectIndexId,
-		1,
-		{
-			Anum_pg_publication_oid,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{PublicationRelRelationId,	/* PUBLICATIONREL */
-		PublicationRelObjectIndexId,
-		1,
-		{
-			Anum_pg_publication_rel_oid,
-			0,
-			0,
-			0
-		},
-		64
-	},
-	{PublicationRelRelationId,	/* PUBLICATIONRELMAP */
-		PublicationRelPrrelidPrpubidIndexId,
-		2,
-		{
-			Anum_pg_publication_rel_prrelid,
-			Anum_pg_publication_rel_prpubid,
-			0,
-			0
-		},
-		64
-	},
 	{RangeRelationId,			/* RANGEMULTIRANGE */
 		RangeMultirangeTypidIndexId,
 		1,
@@ -585,28 +536,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
-	},
-	{ReplicationOriginRelationId,	/* REPLORIGIDENT */
-		ReplicationOriginIdentIndex,
-		1,
-		{
-			Anum_pg_replication_origin_roident,
-			0,
-			0,
-			0
-		},
-		16
-	},
-	{ReplicationOriginRelationId,	/* REPLORIGNAME */
-		ReplicationOriginNameIndex,
-		1,
-		{
-			Anum_pg_replication_origin_roname,
-			0,
-			0,
-			0
-		},
-		16
 	},
 	{RewriteRelationId,			/* RULERELNAME */
 		RewriteRelRulenameIndexId,
@@ -673,39 +602,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
-	},
-	{SubscriptionRelationId,	/* SUBSCRIPTIONNAME */
-		SubscriptionNameIndexId,
-		2,
-		{
-			Anum_pg_subscription_subdbid,
-			Anum_pg_subscription_subname,
-			0,
-			0
-		},
-		4
-	},
-	{SubscriptionRelationId,	/* SUBSCRIPTIONOID */
-		SubscriptionObjectIndexId,
-		1,
-		{
-			Anum_pg_subscription_oid,
-			0,
-			0,
-			0
-		},
-		4
-	},
-	{SubscriptionRelRelationId, /* SUBSCRIPTIONRELMAP */
-		SubscriptionRelSrrelidSrsubidIndexId,
-		2,
-		{
-			Anum_pg_subscription_rel_srrelid,
-			Anum_pg_subscription_rel_srsubid,
-			0,
-			0
-		},
-		64
 	},
 	{TableSpaceRelationId,		/* TABLESPACEOID */
 		TablespaceOidIndexId,

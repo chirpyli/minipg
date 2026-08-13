@@ -28,8 +28,6 @@
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
-#include "replication/logicallauncher.h"
-#include "replication/origin.h"
 #include "replication/slot.h"
 #include "replication/walreceiver.h"
 #include "replication/walsender.h"
@@ -133,11 +131,9 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, CheckpointerShmemSize());
 		size = add_size(size, AutoVacuumShmemSize());
 		size = add_size(size, ReplicationSlotsShmemSize());
-		size = add_size(size, ReplicationOriginShmemSize());
 		size = add_size(size, WalSndShmemSize());
 		size = add_size(size, WalRcvShmemSize());
 		size = add_size(size, PgArchShmemSize());
-		size = add_size(size, ApplyLauncherShmemSize());
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
@@ -239,11 +235,9 @@ CreateSharedMemoryAndSemaphores(void)
 	CheckpointerShmemInit();
 	AutoVacuumShmemInit();
 	ReplicationSlotsShmemInit();
-	ReplicationOriginShmemInit();
 	WalSndShmemInit();
 	WalRcvShmemInit();
 	PgArchShmemInit();
-	ApplyLauncherShmemInit();
 
 	/*
 	 * Set up other modules that need some shared memory space

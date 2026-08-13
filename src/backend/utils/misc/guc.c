@@ -68,8 +68,6 @@
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
 #include "postmaster/walwriter.h"
-#include "replication/logicallauncher.h"
-#include "replication/reorderbuffer.h"
 #include "replication/slot.h"
 #include "replication/syncrep.h"
 #include "replication/walreceiver.h"
@@ -2141,18 +2139,6 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"logical_decoding_work_mem", PGC_USERSET, RESOURCES_MEM,
-			gettext_noop("Sets the maximum memory to be used for logical decoding."),
-			gettext_noop("This much memory can be used by each internal "
-						 "reorder buffer before spilling to disk."),
-			GUC_UNIT_KB
-		},
-		&logical_decoding_work_mem,
-		65536, 64, MAX_KILOBYTES,
-		NULL, NULL, NULL
-	},
-
 	/*
 	 * We use the hopefully-safely-small value of 100kB as the compiled-in
 	 * default for max_stack_depth.  InitializeGUCOptions will increase it if
@@ -2804,30 +2790,6 @@ static struct config_int ConfigureNamesInt[] =
 		&max_worker_processes,
 		8, 0, MAX_BACKENDS,
 		check_max_worker_processes, NULL, NULL
-	},
-
-	{
-		{"max_logical_replication_workers",
-			PGC_POSTMASTER,
-			REPLICATION_SUBSCRIBERS,
-			gettext_noop("Maximum number of logical replication worker processes."),
-			NULL,
-		},
-		&max_logical_replication_workers,
-		4, 0, MAX_BACKENDS,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"max_sync_workers_per_subscription",
-			PGC_SIGHUP,
-			REPLICATION_SUBSCRIBERS,
-			gettext_noop("Maximum number of table synchronization workers per subscription."),
-			NULL,
-		},
-		&max_sync_workers_per_subscription,
-		2, 0, MAX_BACKENDS,
-		NULL, NULL, NULL
 	},
 
 	{

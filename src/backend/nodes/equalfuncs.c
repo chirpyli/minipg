@@ -1882,67 +1882,6 @@ _equalDeallocateStmt(const DeallocateStmt *a, const DeallocateStmt *b)
 	return true;
 }
 
-static bool
-_equalCreatePublicationStmt(const CreatePublicationStmt *a,
-							const CreatePublicationStmt *b)
-{
-	COMPARE_STRING_FIELD(pubname);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_NODE_FIELD(tables);
-	COMPARE_SCALAR_FIELD(for_all_tables);
-
-	return true;
-}
-
-static bool
-_equalAlterPublicationStmt(const AlterPublicationStmt *a,
-						   const AlterPublicationStmt *b)
-{
-	COMPARE_STRING_FIELD(pubname);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_NODE_FIELD(tables);
-	COMPARE_SCALAR_FIELD(for_all_tables);
-	COMPARE_SCALAR_FIELD(tableAction);
-
-	return true;
-}
-
-static bool
-_equalCreateSubscriptionStmt(const CreateSubscriptionStmt *a,
-							 const CreateSubscriptionStmt *b)
-{
-	COMPARE_STRING_FIELD(subname);
-	COMPARE_STRING_FIELD(conninfo);
-	COMPARE_NODE_FIELD(publication);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterSubscriptionStmt(const AlterSubscriptionStmt *a,
-							const AlterSubscriptionStmt *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_STRING_FIELD(subname);
-	COMPARE_STRING_FIELD(conninfo);
-	COMPARE_NODE_FIELD(publication);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalDropSubscriptionStmt(const DropSubscriptionStmt *a,
-						   const DropSubscriptionStmt *b)
-{
-	COMPARE_STRING_FIELD(subname);
-	COMPARE_SCALAR_FIELD(missing_ok);
-	COMPARE_SCALAR_FIELD(behavior);
-
-	return true;
-}
-
 
 static bool
 _equalAExpr(const A_Expr *a, const A_Expr *b)
@@ -2998,21 +2937,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_DeallocateStmt:
 			retval = _equalDeallocateStmt(a, b);
-			break;
-		case T_CreatePublicationStmt:
-			retval = _equalCreatePublicationStmt(a, b);
-			break;
-		case T_AlterPublicationStmt:
-			retval = _equalAlterPublicationStmt(a, b);
-			break;
-		case T_CreateSubscriptionStmt:
-			retval = _equalCreateSubscriptionStmt(a, b);
-			break;
-		case T_AlterSubscriptionStmt:
-			retval = _equalAlterSubscriptionStmt(a, b);
-			break;
-		case T_DropSubscriptionStmt:
-			retval = _equalDropSubscriptionStmt(a, b);
 			break;
 		case T_A_Expr:
 			retval = _equalAExpr(a, b);

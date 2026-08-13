@@ -54,10 +54,7 @@
 #include "postmaster/startup.h"
 #include "postmaster/walwriter.h"
 #include "replication/basebackup.h"
-#include "replication/logical.h"
-#include "replication/origin.h"
 #include "replication/slot.h"
-#include "replication/snapbuild.h"
 #include "replication/walreceiver.h"
 #include "replication/walsender.h"
 #include "storage/bufmgr.h"
@@ -6980,12 +6977,6 @@ StartupXLOG(void)
 	StartupReplicationSlots();
 
 	/*
-	 * Startup logical state, needs to be setup now so we have proper data
-	 * during crash recovery.
-	 */
-	StartupReorderBuffer();
-
-	/*
 	 * Startup CLOG. This must be done after ShmemVariableCache->nextXid has
 	 * been initialized and before we accept connections or begin WAL replay.
 	 */
@@ -7005,11 +6996,6 @@ StartupXLOG(void)
 	 */
 	if (ControlFile->track_commit_timestamp)
 		StartupCommitTs();
-
-	/*
-	 * Recover knowledge about replay progress of known replication partners.
-	 */
-	StartupReplicationOrigin();
 
 	/*
 	 * Initialize unlogged LSN. On a clean shutdown, it's restored from the
@@ -9658,9 +9644,6 @@ CheckPointGuts(XLogRecPtr checkPointRedo, int flags)
 {
 	CheckPointRelationMap();
 	CheckPointReplicationSlots();
-	CheckPointSnapBuild();
-	CheckPointLogicalRewriteHeap();
-	CheckPointReplicationOrigin();
 
 	/* Write out all dirty data in SLRUs and the main buffer pool */
 	TRACE_POSTGRESQL_BUFFER_CHECKPOINT_START(flags);
@@ -11145,7 +11128,7 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("WAL level not sufficient for making an online backup"),
-				 errhint("wal_level must be set to \"replica\" or \"logical\" at server start.")));
+				 errhint("wal_level must be set to \"replica\" at server start.")));
 
 	if (strlen(backupidstr) > MAXPGPATH)
 		ereport(ERROR,
@@ -11682,7 +11665,7 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("WAL level not sufficient for making an online backup"),
-				 errhint("wal_level must be set to \"replica\" or \"logical\" at server start.")));
+				 errhint("wal_level must be set to \"replica\" at server start.")));
 
 	if (exclusive)
 	{

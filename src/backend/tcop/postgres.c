@@ -3149,21 +3149,6 @@ ProcessInterrupts(void)
 			ereport(FATAL,
 					(errcode(ERRCODE_ADMIN_SHUTDOWN),
 					 errmsg("terminating autovacuum process due to administrator command")));
-		else if (IsLogicalWorker())
-			ereport(FATAL,
-					(errcode(ERRCODE_ADMIN_SHUTDOWN),
-					 errmsg("terminating logical replication worker due to administrator command")));
-		else if (IsLogicalLauncher())
-		{
-			ereport(DEBUG1,
-					(errmsg_internal("logical replication launcher shutting down")));
-
-			/*
-			 * The logical replication launcher can be stopped at any time.
-			 * Use exit status 1 so the background worker is restarted.
-			 */
-			proc_exit(1);
-		}
 		else if (RecoveryConflictPending && RecoveryConflictRetryable)
 		{
 			pgstat_report_recovery_conflict(RecoveryConflictReason);

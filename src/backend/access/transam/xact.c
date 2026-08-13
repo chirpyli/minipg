@@ -41,10 +41,6 @@
 #include "miscadmin.h"
 #include "pg_trace.h"
 #include "pgstat.h"
-#include "replication/logical.h"
-#include "replication/logicallauncher.h"
-#include "replication/origin.h"
-#include "replication/snapbuild.h"
 #include "replication/syncrep.h"
 #include "replication/walsender.h"
 #include "storage/condition_variable.h"
@@ -621,8 +617,7 @@ AssignTransactionId(TransactionState s)
 	 * somewhere inside a wal record, but not in XLogRecord->xl_xid, like in
 	 * xl_standby_locks.
 	 */
-	if (isSubXact && XLogLogicalInfoActive() &&
-		!TopTransactionStateData.didLogXid)
+	if (isSubXact && !TopTransactionStateData.didLogXid)
 		log_unknown_top = true;
 
 	/*
@@ -1236,16 +1231,6 @@ RecordTransactionCommit(void)
 	bool		RelcacheInitFileInval = false;
 	bool		wrote_xlog;
 
-	/*
-	 * Log pending invalidations for logical decoding of in-progress
-	 * transactions.  Normally for DDLs, we log this at each command end,
-	 * however, for certain cases where we directly update the system table
-	 * without a transaction block, the invalidations are not logged till this
-	 * time.
-	 */
-	if (XLogLogicalInfoActive())
-		LogLogicalInvalidations();
-
 	/* Get data needed for commit record */
 	nrels = smgrGetPendingDeletes(true, &rels);
 	nchildren = xactGetCommittedChildren(&children);
@@ -1311,15 +1296,6 @@ RecordTransactionCommit(void)
 	}
 	else
 	{
-		bool		replorigin;
-
-		/*
-		 * Are we using the replication origins feature?  Or, in other words,
-		 * are we replaying remote actions?
-		 */
-		replorigin = (replorigin_session_origin != InvalidRepOriginId &&
-					  replorigin_session_origin != DoNotReplicateId);
-
 		/*
 		 * Begin commit critical section and insert the commit XLOG record.
 		 */
@@ -1356,27 +1332,15 @@ RecordTransactionCommit(void)
 							MyXactFlags,
 							InvalidTransactionId, NULL /* plain commit */ );
 
-		if (replorigin)
-			/* Move LSNs forward for this replication origin */
-			replorigin_session_advance(replorigin_session_origin_lsn,
-									   XactLastRecEnd);
-
 		/*
-		 * Record commit timestamp.  The value comes from plain commit
-		 * timestamp if there's no replication origin; otherwise, the
-		 * timestamp was already set in replorigin_session_origin_timestamp by
-		 * replication.
+		 * Record commit timestamp.
 		 *
 		 * We don't need to WAL-log anything here, as the commit record
 		 * written above already contains the data.
 		 */
-
-		if (!replorigin || replorigin_session_origin_timestamp == 0)
-			replorigin_session_origin_timestamp = xactStopTimestamp;
-
 		TransactionTreeSetCommitTsData(xid, nchildren, children,
-									   replorigin_session_origin_timestamp,
-									   replorigin_session_origin);
+									   xactStopTimestamp,
+									   InvalidRepOriginId);
 	}
 
 	/*
@@ -2283,7 +2247,6 @@ CommitTransaction(void)
 	AtEOXact_HashTables(true);
 	AtEOXact_PgStat(true, is_parallel_worker);
 	AtEOXact_Snapshot(true, false);
-	AtEOXact_ApplyLauncher(true);
 	pgstat_report_xact_timestamp(0);
 
 	CurrentResourceOwner = NULL;
@@ -2687,12 +2650,6 @@ AbortTransaction(void)
 	/* Forget about any active REINDEX. */
 	ResetReindexState(s->nestingLevel);
 
-	/* Reset logical streaming state. */
-	ResetLogicalStreamingState();
-
-	/* Reset snapshot export state. */
-	SnapBuildResetExportedSnapshotState();
-
 	/* If in parallel mode, clean up workers and exit parallel mode. */
 	if (IsInParallelMode())
 	{
@@ -2775,7 +2732,6 @@ AbortTransaction(void)
 		AtEOXact_ComboCid();
 		AtEOXact_HashTables(false);
 		AtEOXact_PgStat(false, is_parallel_worker);
-		AtEOXact_ApplyLauncher(false);
 		pgstat_report_xact_timestamp(0);
 	}
 
@@ -5025,9 +4981,6 @@ AbortSubTransaction(void)
 	/* Forget about any active REINDEX. */
 	ResetReindexState(s->nestingLevel);
 
-	/* Reset logical streaming state. */
-	ResetLogicalStreamingState();
-
 	/*
 	 * No need for SnapBuildResetExportedSnapshotState() here, snapshot
 	 * exports are not supported in subtransactions.
@@ -5542,7 +5495,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 	xl_xact_relfilenodes xl_relfilenodes;
 	xl_xact_invals xl_invals;
 	xl_xact_twophase xl_twophase;
-	xl_xact_origin xl_origin;
 	uint8		info;
 
 	Assert(CritSectionCount > 0);
@@ -5574,10 +5526,9 @@ XactLogCommitRecord(TimestampTz commit_time,
 		xl_xinfo.xinfo |= XACT_COMPLETION_APPLY_FEEDBACK;
 
 	/*
-	 * Relcache invalidations requires information about the current database
-	 * and so does logical decoding.
+	 * Relcache invalidations requires information about the current database.
 	 */
-	if (nmsgs > 0 || XLogLogicalInfoActive())
+	if (nmsgs > 0)
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_DBINFO;
 		xl_dbinfo.dbId = MyDatabaseId;
@@ -5609,17 +5560,7 @@ XactLogCommitRecord(TimestampTz commit_time,
 		xl_twophase.xid = twophase_xid;
 		Assert(twophase_gid != NULL);
 
-		if (XLogLogicalInfoActive())
-			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
-	}
-
-	/* dump transaction origin information */
-	if (replorigin_session_origin != InvalidRepOriginId)
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_ORIGIN;
-
-		xl_origin.origin_lsn = replorigin_session_origin_lsn;
-		xl_origin.origin_timestamp = replorigin_session_origin_timestamp;
+		xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	if (xl_xinfo.xinfo != 0)
@@ -5667,12 +5608,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 			XLogRegisterData(unconstify(char *, twophase_gid), strlen(twophase_gid) + 1);
 	}
 
-	if (xl_xinfo.xinfo & XACT_XINFO_HAS_ORIGIN)
-		XLogRegisterData((char *) (&xl_origin), sizeof(xl_xact_origin));
-
-	/* we allow filtering by xacts */
-	XLogSetRecordFlags(XLOG_INCLUDE_ORIGIN);
-
 	return XLogInsert(RM_XACT_ID, info);
 }
 
@@ -5695,7 +5630,6 @@ XactLogAbortRecord(TimestampTz abort_time,
 	xl_xact_relfilenodes xl_relfilenodes;
 	xl_xact_twophase xl_twophase;
 	xl_xact_dbinfo xl_dbinfo;
-	xl_xact_origin xl_origin;
 
 	uint8		info;
 
@@ -5736,28 +5670,7 @@ XactLogAbortRecord(TimestampTz abort_time,
 		xl_twophase.xid = twophase_xid;
 		Assert(twophase_gid != NULL);
 
-		if (XLogLogicalInfoActive())
-			xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
-	}
-
-	if (TransactionIdIsValid(twophase_xid) && XLogLogicalInfoActive())
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_DBINFO;
-		xl_dbinfo.dbId = MyDatabaseId;
-		xl_dbinfo.tsId = MyDatabaseTableSpace;
-	}
-
-	/*
-	 * Dump transaction origin information only for abort prepared. We need
-	 * this during recovery to update the replication origin progress.
-	 */
-	if ((replorigin_session_origin != InvalidRepOriginId) &&
-		TransactionIdIsValid(twophase_xid))
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_ORIGIN;
-
-		xl_origin.origin_lsn = replorigin_session_origin_lsn;
-		xl_origin.origin_timestamp = replorigin_session_origin_timestamp;
+		xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	if (xl_xinfo.xinfo != 0)
@@ -5798,12 +5711,6 @@ XactLogAbortRecord(TimestampTz abort_time,
 			XLogRegisterData(unconstify(char *, twophase_gid), strlen(twophase_gid) + 1);
 	}
 
-	if (xl_xinfo.xinfo & XACT_XINFO_HAS_ORIGIN)
-		XLogRegisterData((char *) (&xl_origin), sizeof(xl_xact_origin));
-
-	if (TransactionIdIsValid(twophase_xid))
-		XLogSetRecordFlags(XLOG_INCLUDE_ORIGIN);
-
 	return XLogInsert(RM_XACT_ID, info);
 }
 
@@ -5827,13 +5734,7 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 	/* Make sure nextXid is beyond any XID mentioned in the record. */
 	AdvanceNextFullTransactionIdPastXid(max_xid);
 
-	Assert(((parsed->xinfo & XACT_XINFO_HAS_ORIGIN) == 0) ==
-		   (origin_id == InvalidRepOriginId));
-
-	if (parsed->xinfo & XACT_XINFO_HAS_ORIGIN)
-		commit_time = parsed->origin_timestamp;
-	else
-		commit_time = parsed->xact_time;
+	commit_time = parsed->xact_time;
 
 	/* Set the transaction commit timestamp and metadata */
 	TransactionTreeSetCommitTsData(xid, parsed->nsubxacts, parsed->subxacts,
@@ -5891,13 +5792,6 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 		 */
 		if (parsed->xinfo & XACT_XINFO_HAS_AE_LOCKS)
 			StandbyReleaseLockTree(xid, parsed->nsubxacts, parsed->subxacts);
-	}
-
-	if (parsed->xinfo & XACT_XINFO_HAS_ORIGIN)
-	{
-		/* recover apply progress */
-		replorigin_advance(origin_id, parsed->origin_lsn, lsn,
-						   false /* backward */ , false /* WAL */ );
 	}
 
 	/* Make sure files supposed to be dropped are dropped */
@@ -6006,13 +5900,6 @@ xact_redo_abort(xl_xact_parsed_abort *parsed, TransactionId xid,
 		 */
 		if (parsed->xinfo & XACT_XINFO_HAS_AE_LOCKS)
 			StandbyReleaseLockTree(xid, parsed->nsubxacts, parsed->subxacts);
-	}
-
-	if (parsed->xinfo & XACT_XINFO_HAS_ORIGIN)
-	{
-		/* recover apply progress */
-		replorigin_advance(origin_id, parsed->origin_lsn, lsn,
-						   false /* backward */ , false /* WAL */ );
 	}
 
 	/* Make sure files supposed to be dropped are dropped */
@@ -6128,10 +6015,6 @@ xact_redo(XLogReaderState *record)
 bool
 IsSubTransactionAssignmentPending(void)
 {
-	/* wal_level has to be logical */
-	if (!XLogLogicalInfoActive())
-		return false;
-
 	/* we need to be in a transaction state */
 	if (!IsTransactionState())
 		return false;

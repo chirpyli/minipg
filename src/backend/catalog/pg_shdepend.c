@@ -34,7 +34,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
@@ -44,9 +43,7 @@
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
-#include "commands/publicationcmds.h"
 #include "commands/schemacmds.h"
-#include "commands/subscriptioncmds.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "commands/typecmds.h"
@@ -1558,15 +1555,7 @@ shdepReassignOwned(List *roleids, Oid newrole)
 				ATExecChangeOwner(sdepForm->objid, newrole, true, AccessExclusiveLock);
 				break;
 
-			case PublicationRelationId:
-				AlterPublicationOwner_oid(sdepForm->objid, newrole);
-				break;
-
-				case SubscriptionRelationId:
-					AlterSubscriptionOwner_oid(sdepForm->objid, newrole);
-					break;
-
-					/* Generic alter owner cases */
+				/* Generic alter owner cases */
 				case CollationRelationId:
 				case ConversionRelationId:
 				case OperatorRelationId:

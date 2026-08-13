@@ -58,7 +58,7 @@ $$;
 my $initfile = $node->safe_psql('postgres',
 	'SELECT pg_walfile_name(pg_current_wal_insert_lsn())');
 $node->safe_psql('postgres',
-	qq{SELECT pg_logical_emit_message(true, 'test 026', repeat('xyzxz', 123456))}
+	qq{INSERT INTO filler SELECT g, repeat(md5(g::text), 20000) FROM generate_series(1, 200) g}
 );
 #$node->safe_psql('postgres', qq{create table foo ()});
 my $endfile = $node->safe_psql('postgres',
@@ -84,7 +84,7 @@ $node->start;
 $node->safe_psql('postgres',
 	qq{create table foo (a text); insert into foo values ('hello')});
 $node->safe_psql('postgres',
-	qq{SELECT pg_logical_emit_message(true, 'test 026', 'AABBCC')});
+	qq{INSERT INTO filler SELECT g, repeat('AABBCC', 20000) FROM generate_series(1, 200) g});
 
 my $until_lsn = $node->safe_psql('postgres', "SELECT pg_current_wal_lsn()");
 my $caughtup_query =
