@@ -104,7 +104,6 @@
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/fork_process.h"
 #include "postmaster/interrupt.h"
-#include "postmaster/pgarch.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
 #include "storage/fd.h"
@@ -229,7 +228,6 @@ static pid_t StartupPID = 0,
 			CheckpointerPID = 0,
 			WalWriterPID = 0,
 			AutoVacPID = 0,
-			PgArchPID = 0,
 			PgStatPID = 0,
 			SysLoggerPID = 0;
 
@@ -306,7 +304,7 @@ typedef enum
 	PM_WAIT_BACKENDS,			/* waiting for live backends to exit */
 	PM_SHUTDOWN,				/* waiting for checkpointer to do shutdown
 								 * ckpt */
-	PM_SHUTDOWN_2,				/* waiting for archiver and walsenders to
+	PM_SHUTDOWN_2,				/* waiting for walsenders to
 								 * finish */
 	PM_WAIT_DEAD_END,			/* waiting for dead_end children to exit */
 	PM_NO_CHILDREN				/* all important children have exited */
@@ -403,21 +401,7 @@ static pid_t StartChildProcess(AuxProcType type);
 static void StartAutovacuumWorker(void);
 static void InitPostmasterDeathWatchHandle(void);
 
-/*
- * Archiver is allowed to start up at the current postmaster state?
- *
- * If WAL archiving is enabled always, we are allowed to start archiver
- * even during recovery.
- */
-#define PgArchStartupAllowed()	\
-	(((XLogArchivingActive() && pmState == PM_RUN) ||			\
-	  (XLogArchivingAlways() &&									  \
-	   (pmState == PM_RECOVERY || pmState == PM_HOT_STANDBY))) && \
-	 PgArchCanRestart())
-
-
 #define StartupDataBase()		StartChildProcess(StartupProcess)
-#define StartArchiver()			StartChildProcess(ArchiverProcess)
 #define StartBackgroundWriter() StartChildProcess(BgWriterProcess)
 #define StartCheckpointer()		StartChildProcess(CheckpointerProcess)
 #define StartWalWriter()		StartChildProcess(WalWriterProcess)
@@ -502,7 +486,7 @@ PostmasterMain(int argc, char *argv[])
 	 * CAUTION: when changing this list, check for side-effects on the signal
 	 * handling setup of child processes.  See tcop/postgres.c,
 	 * bootstrap/bootstrap.c, postmaster/bgwriter.c, postmaster/walwriter.c,
-	 * postmaster/autovacuum.c, postmaster/pgarch.c, postmaster/pgstat.c,
+	 * postmaster/autovacuum.c, postmaster/pgstat.c,
 	 * postmaster/syslogger.c, postmaster/bgworker.c and
 	 * postmaster/checkpointer.c.
 	 */
@@ -778,9 +762,6 @@ PostmasterMain(int argc, char *argv[])
 					 ReservedBackends, MaxConnections);
 		ExitPostmaster(1);
 	}
-	if (XLogArchiveMode > ARCHIVE_MODE_OFF && wal_level == WAL_LEVEL_MINIMAL)
-		ereport(ERROR,
-				(errmsg("WAL archival cannot be enabled when wal_level is \"minimal\"")));
 
 	/*
 	 * Other one-time internal sanity checks can go here, if they are fast.
@@ -1546,10 +1527,6 @@ ServerLoop(void)
 		if (PgStatPID == 0 &&
 			(pmState == PM_RUN || pmState == PM_HOT_STANDBY))
 			PgStatPID = pgstat_start();
-
-		/* If we have lost the archiver, try to start a new one. */
-		if (PgArchPID == 0 && PgArchStartupAllowed())
-			PgArchPID = StartArchiver();
 
 		/* If we need to signal the autovacuum launcher, do so now */
 		if (avlauncher_needs_signal)
@@ -2393,8 +2370,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 			signal_child(WalWriterPID, SIGHUP);
 		if (AutoVacPID != 0)
 			signal_child(AutoVacPID, SIGHUP);
-		if (PgArchPID != 0)
-			signal_child(PgArchPID, SIGHUP);
 		if (SysLoggerPID != 0)
 			signal_child(SysLoggerPID, SIGHUP);
 		if (PgStatPID != 0)
@@ -2670,8 +2645,6 @@ reaper(SIGNAL_ARGS)
 			 */
 			if (!IsBinaryUpgrade && AutoVacuumingActive() && AutoVacPID == 0)
 				AutoVacPID = StartAutoVacLauncher();
-			if (PgArchStartupAllowed() && PgArchPID == 0)
-				PgArchPID = StartArchiver();
 			if (PgStatPID == 0)
 				PgStatPID = pgstat_start();
 
@@ -2720,15 +2693,10 @@ reaper(SIGNAL_ARGS)
 				 * left (else we'd not be in PM_SHUTDOWN state) but we might
 				 * have dead_end children to wait for.
 				 *
-				 * If we have an archiver subprocess, tell it to do a last
-				 * archive cycle and quit. Likewise, if we have walsender
+				 * If we have walsender
 				 * processes, tell them to send any remaining WAL and quit.
 				 */
 				Assert(Shutdown > NoShutdown);
-
-				/* Waken archiver for the last time */
-				if (PgArchPID != 0)
-					signal_child(PgArchPID, SIGUSR2);
 
 				/*
 				 * Waken walsenders for the last time. No regular backends
@@ -2784,26 +2752,6 @@ reaper(SIGNAL_ARGS)
 			if (!EXIT_STATUS_0(exitstatus))
 				HandleChildCrash(pid, exitstatus,
 								 _("autovacuum launcher process"));
-			continue;
-		}
-
-		/*
-		 * Was it the archiver?  If exit status is zero (normal) or one (FATAL
-		 * exit), we assume everything is all right just like normal backends
-		 * and just try to restart a new one so that we immediately retry
-		 * archiving remaining files. (If fail, we'll try again in future
-		 * cycles of the postmaster's main loop.) Unless we were waiting for
-		 * it to shut down; don't restart it in that case, and
-		 * PostmasterStateMachine() will advance to the next shutdown step.
-		 */
-		if (pid == PgArchPID)
-		{
-			PgArchPID = 0;
-			if (!EXIT_STATUS_0(exitstatus) && !EXIT_STATUS_1(exitstatus))
-				HandleChildCrash(pid, exitstatus,
-								 _("archiver process"));
-			if (PgArchStartupAllowed())
-				PgArchPID = StartArchiver();
 			continue;
 		}
 
@@ -3020,7 +2968,7 @@ CleanupBackend(int pid,
 
 /*
  * HandleChildCrash -- cleanup after failed backend, bgwriter, checkpointer,
- * walwriter, autovacuum, archiver or background worker.
+ * walwriter, autovacuum or background worker.
  *
  * The objectives here are to clean up our local state about the child
  * process, and to signal all other remaining children to quickdie.
@@ -3208,18 +3156,6 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 		signal_child(AutoVacPID, (SendStop ? SIGSTOP : SIGQUIT));
 	}
 
-	/* Take care of the archiver too */
-	if (pid == PgArchPID)
-		PgArchPID = 0;
-	else if (PgArchPID != 0 && take_action)
-	{
-		ereport(DEBUG2,
-				(errmsg_internal("sending %s to process %d",
-								 (SendStop ? "SIGSTOP" : "SIGQUIT"),
-								 (int) PgArchPID)));
-		signal_child(PgArchPID, (SendStop ? SIGSTOP : SIGQUIT));
-	}
-
 	/*
 	 * Force a power-cycle of the pgstat process too.  (This isn't absolutely
 	 * necessary, but it seems like a good idea for robustness, and it
@@ -3368,7 +3304,7 @@ PostmasterStateMachine(void)
 		/* If we're in recovery, also stop startup and walreceiver procs */
 		if (StartupPID != 0)
 			signal_child(StartupPID, SIGTERM);
-		/* checkpointer, archiver, stats, and syslogger may continue for now */
+		/* checkpointer, stats, and syslogger may continue for now */
 
 		/* Now transition to PM_WAIT_BACKENDS state to wait for them to die */
 		pmState = PM_WAIT_BACKENDS;
@@ -3388,7 +3324,7 @@ PostmasterStateMachine(void)
 		 * checkpointer to exit as well, otherwise not. The stats and
 		 * syslogger processes are disregarded since they are not connected to
 		 * shared memory; we also disregard dead_end children here. Walsenders
-		 * and archiver are also disregarded, they will be terminated later
+		 * are also disregarded, they will be terminated later
 		 * after writing the checkpoint record.
 		 */
 		if (CountChildren(BACKEND_TYPE_ALL) == 0 &&
@@ -3408,7 +3344,7 @@ PostmasterStateMachine(void)
 				pmState = PM_WAIT_DEAD_END;
 
 				/*
-				 * We already SIGQUIT'd the archiver and stats processes, if
+				 * We already SIGQUIT'd the stats processes, if
 				 * any, when we started immediate shutdown or entered
 				 * FatalError state.
 				 */
@@ -3441,10 +3377,8 @@ PostmasterStateMachine(void)
 					FatalError = true;
 					pmState = PM_WAIT_DEAD_END;
 
-					/* Kill the walsenders, archiver and stats collector too */
+					/* Kill the walsenders and stats collector too */
 					SignalChildren(SIGQUIT);
-					if (PgArchPID != 0)
-						signal_child(PgArchPID, SIGQUIT);
 					if (PgStatPID != 0)
 						signal_child(PgStatPID, SIGQUIT);
 				}
@@ -3457,10 +3391,9 @@ PostmasterStateMachine(void)
 		/*
 		 * PM_SHUTDOWN_2 state ends when there's no other children than
 		 * dead_end children left. There shouldn't be any regular backends
-		 * left by now anyway; what we're really waiting for is walsenders and
-		 * archiver.
+		 * left by now anyway; what we're really waiting for is walsenders.
 		 */
-		if (PgArchPID == 0 && CountChildren(BACKEND_TYPE_ALL) == 0)
+		if (CountChildren(BACKEND_TYPE_ALL) == 0)
 		{
 			pmState = PM_WAIT_DEAD_END;
 		}
@@ -3470,10 +3403,10 @@ PostmasterStateMachine(void)
 	{
 		/*
 		 * PM_WAIT_DEAD_END state ends when the BackendList is entirely empty
-		 * (ie, no dead_end children remain), and the archiver and stats
-		 * collector are gone too.
+		 * (ie, no dead_end children remain), and the stats
+		 * collector is gone too.
 		 *
-		 * The reason we wait for those two is to protect them against a new
+		 * The reason we wait for these is to protect them against a new
 		 * postmaster starting conflicting subprocesses; this isn't an
 		 * ironclad protection, but it at least helps in the
 		 * shutdown-and-immediately-restart scenario.  Note that they have
@@ -3482,7 +3415,7 @@ PostmasterStateMachine(void)
 		 * FatalError processing.
 		 */
 		if (dlist_is_empty(&BackendList) &&
-			PgArchPID == 0 && PgStatPID == 0)
+			PgStatPID == 0)
 		{
 			/* These other guys should be dead already */
 			Assert(StartupPID == 0);
@@ -3693,8 +3626,6 @@ TerminateChildren(int signal)
 		signal_child(WalWriterPID, signal);
 	if (AutoVacPID != 0)
 		signal_child(AutoVacPID, signal);
-	if (PgArchPID != 0)
-		signal_child(PgArchPID, signal);
 	if (PgStatPID != 0)
 		signal_child(PgStatPID, signal);
 }
@@ -4112,14 +4043,6 @@ sigusr1_handler(SIGNAL_ARGS)
 		BgWriterPID = StartBackgroundWriter();
 
 		/*
-		 * Start the archiver if we're responsible for (re-)archiving received
-		 * files.
-		 */
-		Assert(PgArchPID == 0);
-		if (XLogArchivingAlways())
-			PgArchPID = StartArchiver();
-
-		/*
 		 * If we aren't planning to enter hot standby mode later, treat
 		 * RECOVERY_STARTED as meaning we're out of startup, and report status
 		 * accordingly.
@@ -4379,10 +4302,6 @@ StartChildProcess(AuxProcType type)
 			case StartupProcess:
 				ereport(LOG,
 						(errmsg("could not fork startup process: %m")));
-				break;
-			case ArchiverProcess:
-				ereport(LOG,
-						(errmsg("could not fork archiver process: %m")));
 				break;
 			case BgWriterProcess:
 				ereport(LOG,

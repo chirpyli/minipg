@@ -261,9 +261,6 @@ GetBackendTypeDesc(BackendType backendType)
 		case B_WAL_WRITER:
 			backendDesc = "walwriter";
 			break;
-		case B_ARCHIVER:
-			backendDesc = "archiver";
-			break;
 		case B_STATS_COLLECTOR:
 			backendDesc = "stats collector";
 			break;

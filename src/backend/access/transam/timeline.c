@@ -443,13 +443,6 @@ writeTimeLineHistory(TimeLineID newTLI, TimeLineID parentTLI,
 	TLHistoryFilePath(path, newTLI);
 	Assert(access(path, F_OK) != 0 && errno == ENOENT);
 	durable_rename(tmppath, path, ERROR);
-
-	/* The history file can be archived immediately. */
-	if (XLogArchivingActive())
-	{
-		TLHistoryFileName(histfname, newTLI);
-		XLogArchiveNotify(histfname);
-	}
 }
 
 /*

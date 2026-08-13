@@ -160,12 +160,10 @@ static XLogRecPtr ckpt_start_recptr;
 static double ckpt_cached_elapsed;
 
 static pg_time_t last_checkpoint_time;
-static pg_time_t last_xlog_switch_time;
 
 /* Prototypes for private functions */
 
 static void HandleCheckpointerInterrupts(void);
-static void CheckArchiveTimeout(void);
 static bool IsCheckpointOnSchedule(double progress);
 static bool ImmediateCheckpointRequested(void);
 static bool CompactCheckpointerRequestQueue(void);
@@ -214,7 +212,7 @@ CheckpointerMain(void)
 	/*
 	 * Initialize so that first time-driven event happens at the correct time.
 	 */
-	last_checkpoint_time = last_xlog_switch_time = (pg_time_t) time(NULL);
+	last_checkpoint_time = (pg_time_t) time(NULL);
 
 	/*
 	 * Create a memory context that we will do all our work in.  We do this so
@@ -497,9 +495,6 @@ CheckpointerMain(void)
 			HandleCheckpointerInterrupts();
 		}
 
-		/* Check for archive_timeout and switch xlog files if necessary. */
-		CheckArchiveTimeout();
-
 		/*
 		 * Send off activity statistics to the stats collector.  (The reason
 		 * why we re-use bgwriter-related code for this is that the bgwriter
@@ -528,13 +523,6 @@ CheckpointerMain(void)
 		if (elapsed_secs >= CheckPointTimeout)
 			continue;			/* no sleep for us ... */
 		cur_timeout = CheckPointTimeout - elapsed_secs;
-		if (XLogArchiveTimeout > 0 && !RecoveryInProgress())
-		{
-			elapsed_secs = now - last_xlog_switch_time;
-			if (elapsed_secs >= XLogArchiveTimeout)
-				continue;		/* no sleep for us ... */
-			cur_timeout = Min(cur_timeout, XLogArchiveTimeout - elapsed_secs);
-		}
 
 		(void) WaitLatch(MyLatch,
 						 WL_LATCH_SET | WL_TIMEOUT | WL_EXIT_ON_PM_DEATH,
@@ -592,74 +580,6 @@ HandleCheckpointerInterrupts(void)
 
 		/* Normal exit from the checkpointer is here */
 		proc_exit(0);			/* done */
-	}
-}
-
-/*
- * CheckArchiveTimeout -- check for archive_timeout and switch xlog files
- *
- * This will switch to a new WAL file and force an archive file write if
- * meaningful activity is recorded in the current WAL file. This includes most
- * writes, including just a single checkpoint record, but excludes WAL records
- * that were inserted with the XLOG_MARK_UNIMPORTANT flag being set (like
- * snapshots of running transactions).  Such records, depending on
- * configuration, occur on regular intervals and don't contain important
- * information.  This avoids generating archives with a few unimportant
- * records.
- */
-static void
-CheckArchiveTimeout(void)
-{
-	pg_time_t	now;
-	pg_time_t	last_time;
-	XLogRecPtr	last_switch_lsn;
-
-	if (XLogArchiveTimeout <= 0 || RecoveryInProgress())
-		return;
-
-	now = (pg_time_t) time(NULL);
-
-	/* First we do a quick check using possibly-stale local state. */
-	if ((int) (now - last_xlog_switch_time) < XLogArchiveTimeout)
-		return;
-
-	/*
-	 * Update local state ... note that last_xlog_switch_time is the last time
-	 * a switch was performed *or requested*.
-	 */
-	last_time = GetLastSegSwitchData(&last_switch_lsn);
-
-	last_xlog_switch_time = Max(last_xlog_switch_time, last_time);
-
-	/* Now we can do the real checks */
-	if ((int) (now - last_xlog_switch_time) >= XLogArchiveTimeout)
-	{
-		/*
-		 * Switch segment only when "important" WAL has been logged since the
-		 * last segment switch (last_switch_lsn points to end of segment
-		 * switch occurred in).
-		 */
-		if (GetLastImportantRecPtr() > last_switch_lsn)
-		{
-			XLogRecPtr	switchpoint;
-
-			/* mark switch as unimportant, avoids triggering checkpoints */
-			switchpoint = RequestXLogSwitch(true);
-
-			/*
-			 * If the returned pointer points exactly to a segment boundary,
-			 * assume nothing happened.
-			 */
-			if (XLogSegmentOffset(switchpoint, wal_segment_size) != 0)
-				elog(DEBUG1, "write-ahead log switch forced (archive_timeout=%d)",
-					 XLogArchiveTimeout);
-		}
-
-		/*
-		 * Update state in any case, so we don't retry constantly when the
-		 * system is idle.
-		 */
-		last_xlog_switch_time = now;
 	}
 }
 
@@ -723,8 +643,6 @@ CheckpointWriteDelay(int flags, double progress)
 
 		AbsorbSyncRequests();
 		absorb_counter = WRITES_PER_ABSORB;
-
-		CheckArchiveTimeout();
 
 		/*
 		 * Report interim activity statistics to the stats collector.

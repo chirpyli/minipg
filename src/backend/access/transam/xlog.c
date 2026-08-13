@@ -87,9 +87,6 @@ int			max_wal_size_mb = 1024; /* 1 GB */
 int			min_wal_size_mb = 80;	/* 80 MB */
 int			wal_keep_size_mb = 0;
 int			XLOGbuffers = -1;
-int			XLogArchiveTimeout = 0;
-int			XLogArchiveMode = ARCHIVE_MODE_OFF;
-char	   *XLogArchiveCommand = NULL;
 bool		EnableHotStandby = false;
 bool		fullPageWrites = true;
 bool		wal_log_hints = false;
@@ -150,23 +147,6 @@ const struct config_enum_entry sync_method_options[] = {
 	{NULL, 0, false}
 };
 
-
-/*
- * Although only "on", "off", and "always" are documented,
- * we accept all the likely variants of "on" and "off".
- */
-const struct config_enum_entry archive_mode_options[] = {
-	{"always", ARCHIVE_MODE_ALWAYS, false},
-	{"on", ARCHIVE_MODE_ON, false},
-	{"off", ARCHIVE_MODE_OFF, false},
-	{"true", ARCHIVE_MODE_ON, true},
-	{"false", ARCHIVE_MODE_OFF, true},
-	{"yes", ARCHIVE_MODE_ON, true},
-	{"no", ARCHIVE_MODE_OFF, true},
-	{"1", ARCHIVE_MODE_ON, true},
-	{"0", ARCHIVE_MODE_OFF, true},
-	{NULL, 0, false}
-};
 
 const struct config_enum_entry recovery_target_action_options[] = {
 	{"pause", RECOVERY_TARGET_ACTION_PAUSE, false},
@@ -2646,9 +2626,6 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 
 				LogwrtResult.Flush = LogwrtResult.Write;	/* end of page */
 
-				if (XLogArchivingActive())
-					XLogArchiveNotifySeg(openLogSegNo);
-
 				XLogCtl->lastSegSwitchTime = (pg_time_t) time(NULL);
 				XLogCtl->lastSegSwitchLSN = LogwrtResult.Flush;
 
@@ -4146,13 +4123,10 @@ RemoveOldXlogFiles(XLogSegNo segno, XLogRecPtr lastredoptr, XLogRecPtr endptr)
 		 */
 		if (strcmp(xlde->d_name + 8, lastoff + 8) <= 0)
 		{
-			if (XLogArchiveCheckDone(xlde->d_name))
-			{
-				/* Update the last removed location in shared memory first */
-				UpdateLastRemovedPtr(xlde->d_name);
+			/* Update the last removed location in shared memory first */
+			UpdateLastRemovedPtr(xlde->d_name);
 
-				RemoveXlogFile(xlde->d_name, recycleSegNo, &endlogSegNo);
-			}
+			RemoveXlogFile(xlde->d_name, recycleSegNo, &endlogSegNo);
 		}
 	}
 
@@ -4216,14 +4190,7 @@ RemoveNonParentXlogFiles(XLogRecPtr switchpoint, TimeLineID newTLI)
 		if (strncmp(xlde->d_name, switchseg, 8) < 0 &&
 			strcmp(xlde->d_name + 8, switchseg + 8) > 0)
 		{
-			/*
-			 * If the file has already been marked as .ready, however, don't
-			 * remove it yet. It should be OK to remove it - files that are
-			 * not part of our timeline history are not required for recovery
-			 * - but seems safer to let them be archived and removed later.
-			 */
-			if (!XLogArchiveIsReady(xlde->d_name))
-				RemoveXlogFile(xlde->d_name, recycleSegNo, &endLogSegNo);
+			RemoveXlogFile(xlde->d_name, recycleSegNo, &endLogSegNo);
 		}
 	}
 
@@ -4286,7 +4253,20 @@ RemoveXlogFile(const char *segname, XLogSegNo recycleSegNo,
 		CheckpointStats.ckpt_segs_removed++;
 	}
 
-	XLogArchiveCleanup(segname);
+	/*
+	 * Remove any orphaned archive_status marker files for this segment.
+	 * Active archiving is gone, so these can only be stale leftovers.
+	 */
+	{
+		char		archiveStatusPath[MAXPGPATH];
+
+		snprintf(archiveStatusPath, MAXPGPATH,
+				 XLOGDIR "/archive_status/%s.done", segname);
+		unlink(archiveStatusPath);
+		snprintf(archiveStatusPath, MAXPGPATH,
+				 XLOGDIR "/archive_status/%s.ready", segname);
+		unlink(archiveStatusPath);
+	}
 }
 
 /*
@@ -4337,9 +4317,7 @@ ValidateXLOGDirectoryStructure(void)
 }
 
 /*
- * Remove previous backup history files.  This also retries creation of
- * .ready files for any backup history files for which XLogArchiveNotify
- * failed earlier.
+ * Remove previous backup history files.
  */
 static void
 CleanupBackupHistory(void)
@@ -4354,13 +4332,19 @@ CleanupBackupHistory(void)
 	{
 		if (IsBackupHistoryFileName(xlde->d_name))
 		{
-			if (XLogArchiveCheckDone(xlde->d_name))
+			elog(DEBUG2, "removing WAL backup history file \"%s\"",
+				 xlde->d_name);
+			snprintf(path, sizeof(path), XLOGDIR "/%s", xlde->d_name);
+			unlink(path);
 			{
-				elog(DEBUG2, "removing WAL backup history file \"%s\"",
-					 xlde->d_name);
-				snprintf(path, sizeof(path), XLOGDIR "/%s", xlde->d_name);
-				unlink(path);
-				XLogArchiveCleanup(xlde->d_name);
+				char		archiveStatusPath[MAXPGPATH];
+
+				snprintf(archiveStatusPath, MAXPGPATH,
+						 XLOGDIR "/archive_status/%s.done", xlde->d_name);
+				unlink(archiveStatusPath);
+				snprintf(archiveStatusPath, MAXPGPATH,
+						 XLOGDIR "/archive_status/%s.ready", xlde->d_name);
+				unlink(archiveStatusPath);
 			}
 		}
 	}
@@ -5696,7 +5680,21 @@ exitArchiveRecovery(TimeLineID endTLI, XLogRecPtr endOfLog)
 	 * for the new segment.
 	 */
 	XLogFileName(xlogfname, ThisTimeLineID, startLogSegNo, wal_segment_size);
-	XLogArchiveCleanup(xlogfname);
+
+	/*
+	 * Let's just make real sure there are not stale .ready or .done flags
+	 * posted for the new segment.
+	 */
+	{
+		char		archiveStatusPath[MAXPGPATH];
+
+		snprintf(archiveStatusPath, MAXPGPATH,
+				 XLOGDIR "/archive_status/%s.done", xlogfname);
+		unlink(archiveStatusPath);
+		snprintf(archiveStatusPath, MAXPGPATH,
+				 XLOGDIR "/archive_status/%s.ready", xlogfname);
+		unlink(archiveStatusPath);
+	}
 
 	/*
 	 * Remove the signal files out of the way, so that we don't accidentally
@@ -8099,35 +8097,6 @@ StartupXLOG(void)
 		 * restored from the archive to begin with, it's expected to have a
 		 * .done file).
 		 */
-		if (XLogSegmentOffset(EndOfLog, wal_segment_size) != 0 &&
-			XLogArchivingActive())
-		{
-			char		origfname[MAXFNAMELEN];
-			XLogSegNo	endLogSegNo;
-
-			XLByteToPrevSeg(EndOfLog, endLogSegNo, wal_segment_size);
-			XLogFileName(origfname, EndOfLogTLI, endLogSegNo, wal_segment_size);
-
-			if (!XLogArchiveIsReadyOrDone(origfname))
-			{
-				char		origpath[MAXPGPATH];
-				char		partialfname[MAXFNAMELEN];
-				char		partialpath[MAXPGPATH];
-
-				XLogFilePath(origpath, EndOfLogTLI, endLogSegNo, wal_segment_size);
-				snprintf(partialfname, MAXFNAMELEN, "%s.partial", origfname);
-				snprintf(partialpath, MAXPGPATH, "%s.partial", origpath);
-
-				/*
-				 * Make sure there's no .done or .ready file for the .partial
-				 * file.
-				 */
-				XLogArchiveCleanup(partialfname);
-
-				durable_rename(origpath, partialpath, ERROR);
-				XLogArchiveNotify(partialfname);
-			}
-		}
 	}
 
 	/*
@@ -8774,15 +8743,6 @@ ShutdownXLOG(int code, Datum arg)
 		CreateRestartPoint(CHECKPOINT_IS_SHUTDOWN | CHECKPOINT_IMMEDIATE);
 	else
 	{
-		/*
-		 * If archiving is enabled, rotate the last XLOG file so that all the
-		 * remaining records are archived (postmaster wakes up the archiver
-		 * process one more time at the end of shutdown). The checkpoint
-		 * record will go to the next XLOG file and won't be archived (yet).
-		 */
-		if (XLogArchivingActive() && XLogArchiveCommandSet())
-			RequestXLogSwitch(false);
-
 		CreateCheckPoint(CHECKPOINT_IS_SHUTDOWN | CHECKPOINT_IMMEDIATE);
 	}
 }
@@ -11523,8 +11483,6 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 	char		histfilepath[MAXPGPATH];
 	char		startxlogfilename[MAXFNAMELEN];
 	char		stopxlogfilename[MAXFNAMELEN];
-	char		lastxlogfilename[MAXFNAMELEN];
-	char		histfilename[MAXFNAMELEN];
 	char		backupfrom[20];
 	XLogSegNo	_logSegNo;
 	FILE	   *lfp;
@@ -11848,52 +11806,7 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 	 * clue in anyone who might be doing this interactively.
 	 */
 
-	if (waitforarchive &&
-		((!backup_started_in_recovery && XLogArchivingActive()) ||
-		 (backup_started_in_recovery && XLogArchivingAlways())))
-	{
-		XLByteToPrevSeg(stoppoint, _logSegNo, wal_segment_size);
-		XLogFileName(lastxlogfilename, stoptli, _logSegNo, wal_segment_size);
-
-		XLByteToSeg(startpoint, _logSegNo, wal_segment_size);
-		BackupHistoryFileName(histfilename, stoptli, _logSegNo,
-							  startpoint, wal_segment_size);
-
-		seconds_before_warning = 60;
-		waits = 0;
-
-		while (XLogArchiveIsBusy(lastxlogfilename) ||
-			   XLogArchiveIsBusy(histfilename))
-		{
-			CHECK_FOR_INTERRUPTS();
-
-			if (!reported_waiting && waits > 5)
-			{
-				ereport(NOTICE,
-						(errmsg("base backup done, waiting for required WAL segments to be archived")));
-				reported_waiting = true;
-			}
-
-			pgstat_report_wait_start(WAIT_EVENT_BACKUP_WAIT_WAL_ARCHIVE);
-			pg_usleep(1000000L);
-			pgstat_report_wait_end();
-
-			if (++waits >= seconds_before_warning)
-			{
-				seconds_before_warning *= 2;	/* This wraps in >10 years... */
-				ereport(WARNING,
-						(errmsg("still waiting for all required WAL segments to be archived (%d seconds elapsed)",
-								waits),
-						 errhint("Check that your archive_command is executing properly.  "
-								 "You can safely cancel this backup, "
-								 "but the database backup will not be usable without all the WAL segments.")));
-			}
-		}
-
-		ereport(NOTICE,
-				(errmsg("all required WAL segments have been archived")));
-	}
-	else if (waitforarchive)
+	if (waitforarchive)
 		ereport(NOTICE,
 				(errmsg("WAL archiving is not enabled; you must ensure that all required WAL segments are copied through other means to complete the backup")));
 

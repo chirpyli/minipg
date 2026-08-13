@@ -173,7 +173,6 @@ static bool check_canonical_path(char **newval, void **extra, GucSource source);
 static bool check_timezone_abbreviations(char **newval, void **extra, GucSource source);
 static void assign_timezone_abbreviations(const char *newval, void *extra);
 static void pg_timezone_abbrev_initialize(void);
-static const char *show_archive_command(void);
 static void assign_tcp_keepalives_idle(int newval, void *extra);
 static void assign_tcp_keepalives_interval(int newval, void *extra);
 static void assign_tcp_keepalives_count(int newval, void *extra);
@@ -488,7 +487,6 @@ static struct config_enum_entry default_toast_compression_options[] = {
  * Options for enum values stored in other modules
  */
 extern const struct config_enum_entry wal_level_options[];
-extern const struct config_enum_entry archive_mode_options[];
 extern const struct config_enum_entry recovery_target_action_options[];
 extern const struct config_enum_entry sync_method_options[];
 extern const struct config_enum_entry dynamic_shared_memory_options[];
@@ -1863,17 +1861,6 @@ static struct config_bool ConfigureNamesBool[] =
 
 static struct config_int ConfigureNamesInt[] =
 {
-	{
-		{"archive_timeout", PGC_SIGHUP, WAL_ARCHIVING,
-			gettext_noop("Forces a switch to the next WAL file if a "
-						 "new file has not been started within N seconds."),
-			NULL,
-			GUC_UNIT_S
-		},
-		&XLogArchiveTimeout,
-		0, 0, INT_MAX / 2,
-		NULL, NULL, NULL
-	},
 	{
 		{"post_auth_delay", PGC_BACKEND, DEVELOPER_OPTIONS,
 			gettext_noop("Waits N seconds on connection startup after authentication."),
@@ -3343,16 +3330,6 @@ static struct config_real ConfigureNamesReal[] =
 static struct config_string ConfigureNamesString[] =
 {
 	{
-		{"archive_command", PGC_SIGHUP, WAL_ARCHIVING,
-			gettext_noop("Sets the shell command that will be called to archive a WAL file."),
-			NULL
-		},
-		&XLogArchiveCommand,
-		"",
-		NULL, NULL, show_archive_command
-	},
-
-	{
 		{"restore_command", PGC_SIGHUP, WAL_ARCHIVE_RECOVERY,
 			gettext_noop("Sets the shell command that will be called to retrieve an archived WAL file."),
 			NULL
@@ -4079,16 +4056,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&synchronous_commit,
 		SYNCHRONOUS_COMMIT_ON, synchronous_commit_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"archive_mode", PGC_POSTMASTER, WAL_ARCHIVING,
-			gettext_noop("Allows archiving of WAL files using archive_command."),
-			NULL
-		},
-		&XLogArchiveMode,
-		ARCHIVE_MODE_OFF, archive_mode_options,
 		NULL, NULL, NULL
 	},
 
@@ -10899,15 +10866,6 @@ pg_timezone_abbrev_initialize(void)
 {
 	SetConfigOption("timezone_abbreviations", "Default",
 					PGC_POSTMASTER, PGC_S_DYNAMIC_DEFAULT);
-}
-
-static const char *
-show_archive_command(void)
-{
-	if (XLogArchivingActive())
-		return XLogArchiveCommand;
-	else
-		return "(disabled)";
 }
 
 static void

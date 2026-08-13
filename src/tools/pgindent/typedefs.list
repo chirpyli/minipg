@@ -1829,7 +1829,6 @@ Permutation
 PermutationStep
 PermutationStepBlocker
 PermutationStepBlockerType
-PgArchData
 PgBackendGSSStatus
 PgBackendSSLStatus
 PgBackendStatus

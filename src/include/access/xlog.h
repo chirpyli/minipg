@@ -110,9 +110,7 @@ extern int	max_wal_size_mb;
 extern int	wal_keep_size_mb;
 extern int	max_slot_wal_keep_size_mb;
 extern int	XLOGbuffers;
-extern int	XLogArchiveTimeout;
 extern int	wal_retrieve_retry_interval;
-extern char *XLogArchiveCommand;
 extern bool EnableHotStandby;
 extern bool fullPageWrites;
 extern bool wal_log_hints;
@@ -150,15 +148,6 @@ extern int	CheckPointSegments;
 extern bool StandbyModeRequested;
 extern bool StandbyMode;
 
-/* Archive modes */
-typedef enum ArchiveMode
-{
-	ARCHIVE_MODE_OFF = 0,		/* disabled */
-	ARCHIVE_MODE_ON,			/* enabled while server is running normally */
-	ARCHIVE_MODE_ALWAYS			/* enabled always (even during recovery) */
-} ArchiveMode;
-extern int	XLogArchiveMode;
-
 /* WAL levels */
 typedef enum WalLevel
 {
@@ -184,14 +173,6 @@ typedef enum RecoveryPauseState
 } RecoveryPauseState;
 
 extern PGDLLIMPORT int wal_level;
-
-/* Is WAL archiving enabled (always or only while server is running normally)? */
-#define XLogArchivingActive() \
-	(AssertMacro(XLogArchiveMode == ARCHIVE_MODE_OFF || wal_level >= WAL_LEVEL_REPLICA), XLogArchiveMode > ARCHIVE_MODE_OFF)
-/* Is WAL archiving enabled always (even during recovery)? */
-#define XLogArchivingAlways() \
-	(AssertMacro(XLogArchiveMode == ARCHIVE_MODE_OFF || wal_level >= WAL_LEVEL_REPLICA), XLogArchiveMode == ARCHIVE_MODE_ALWAYS)
-#define XLogArchiveCommandSet() (XLogArchiveCommand[0] != '\0')
 
 /*
  * Is WAL-logging necessary for archival or log-shipping, or can we skip

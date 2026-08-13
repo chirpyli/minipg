@@ -127,7 +127,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, ProcSignalShmemSize());
 		size = add_size(size, CheckpointerShmemSize());
 		size = add_size(size, AutoVacuumShmemSize());
-		size = add_size(size, PgArchShmemSize());
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
@@ -228,7 +227,6 @@ CreateSharedMemoryAndSemaphores(void)
 	ProcSignalShmemInit();
 	CheckpointerShmemInit();
 	AutoVacuumShmemInit();
-	PgArchShmemInit();
 
 	/*
 	 * Set up other modules that need some shared memory space

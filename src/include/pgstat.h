@@ -13,8 +13,11 @@
 
 #include "datatype/timestamp.h"
 #include "portability/instr_time.h"
-#include "postmaster/pgarch.h"	/* for MAX_XFN_CHARS */
+#include "access/xlog_internal.h"	/* for MAXFNAMELEN */
 #include "utils/backend_progress.h" /* for backward compatibility */
+
+/* Maximum length of a WAL file name string (excluding terminating NUL) */
+#define MAX_XFN_CHARS	(MAXFNAMELEN - 1)
 #include "utils/backend_status.h"	/* for backward compatibility */
 #include "utils/hsearch.h"
 #include "utils/relcache.h"

@@ -315,9 +315,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 		case StartupProcess:
 			MyBackendType = B_STARTUP;
 			break;
-		case ArchiverProcess:
-			MyBackendType = B_ARCHIVER;
-			break;
 		case BgWriterProcess:
 			MyBackendType = B_BG_WRITER;
 			break;
@@ -439,10 +436,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 
 		case StartupProcess:
 			StartupProcessMain();
-			proc_exit(1);
-
-		case ArchiverProcess:
-			PgArchiverMain();
 			proc_exit(1);
 
 		case BgWriterProcess:
