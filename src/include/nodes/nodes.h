@@ -424,17 +424,6 @@ typedef enum NodeTag
 	T_VacuumRelation,
 
 	/*
-	 * TAGS FOR REPLICATION GRAMMAR PARSE NODES (replnodes.h)
-	 */
-	T_IdentifySystemCmd,
-	T_BaseBackupCmd,
-	T_CreateReplicationSlotCmd,
-	T_DropReplicationSlotCmd,
-	T_StartReplicationCmd,
-	T_TimeLineHistoryCmd,
-	T_SQLCmd,
-
-	/*
 	 * TAGS FOR RANDOM OTHER STUFF
 	 *
 	 * These are objects that aren't part of parse/plan/execute node tree

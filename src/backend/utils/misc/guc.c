@@ -68,10 +68,6 @@
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
 #include "postmaster/walwriter.h"
-#include "replication/slot.h"
-#include "replication/syncrep.h"
-#include "replication/walreceiver.h"
-#include "replication/walsender.h"
 #include "storage/bufmgr.h"
 #include "storage/dsm_impl.h"
 #include "storage/fd.h"
@@ -97,6 +93,15 @@
 #include "utils/tzparser.h"
 #include "utils/inval.h"
 #include "utils/varlena.h"
+
+/*
+ * GUC variables previously declared in the now-removed replication headers
+ * (walreceiver.h / syncrep.h). They are still needed by the standby recovery
+ * and synchronous-commit machinery, so define them here.
+ */
+bool		hot_standby_feedback = false;
+int			wal_receiver_status_interval = 10;
+int			wal_receiver_timeout = 60000;
 
 #define CONFIG_FILENAME "postgresql.conf"
 
@@ -180,7 +185,6 @@ static const char *show_tcp_user_timeout(void);
 static bool check_maxconnections(int *newval, void **extra, GucSource source);
 static bool check_max_worker_processes(int *newval, void **extra, GucSource source);
 static bool check_autovacuum_max_workers(int *newval, void **extra, GucSource source);
-static bool check_max_wal_senders(int *newval, void **extra, GucSource source);
 static bool check_autovacuum_work_mem(int *newval, void **extra, GucSource source);
 static bool check_effective_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
@@ -208,7 +212,6 @@ static bool check_recovery_target_name(char **newval, void **extra, GucSource so
 static void assign_recovery_target_name(const char *newval, void *extra);
 static bool check_recovery_target_lsn(char **newval, void **extra, GucSource source);
 static void assign_recovery_target_lsn(const char *newval, void *extra);
-static bool check_primary_slot_name(char **newval, void **extra, GucSource source);
 static bool check_default_with_oids(bool *newval, void **extra, GucSource source);
 
 /* Private functions in guc-file.l that need to be called from guc.c */
@@ -1233,15 +1236,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"log_replication_commands", PGC_SUSET, LOGGING_WHAT,
-			gettext_noop("Logs each replication command."),
-			NULL
-		},
-		&log_replication_commands,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"debug_assertions", PGC_INTERNAL, PRESET_OPTIONS,
 			gettext_noop("Shows whether the running server has assertion checks enabled."),
 			NULL,
@@ -1860,15 +1854,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"wal_receiver_create_temp_slot", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets whether a WAL receiver should create a temporary replication slot if no permanent slot is configured."),
-		},
-		&wal_receiver_create_temp_slot,
-		false,
-		NULL, NULL, NULL
-	},
-
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL, NULL
@@ -2447,17 +2432,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"wal_keep_size", PGC_SIGHUP, REPLICATION_SENDING,
-			gettext_noop("Sets the size of WAL files held for standby servers."),
-			NULL,
-			GUC_UNIT_MB
-		},
-		&wal_keep_size_mb,
-		0, 0, MAX_KILOBYTES,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"min_wal_size", PGC_SIGHUP, WAL_CHECKPOINTS,
 			gettext_noop("Sets the minimum size to shrink the WAL to."),
 			NULL,
@@ -2558,51 +2532,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&wal_skip_threshold,
 		2048, 0, MAX_KILOBYTES,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"max_wal_senders", PGC_POSTMASTER, REPLICATION_SENDING,
-			gettext_noop("Sets the maximum number of simultaneously running WAL sender processes."),
-			NULL
-		},
-		&max_wal_senders,
-		10, 0, MAX_BACKENDS,
-		check_max_wal_senders, NULL, NULL
-	},
-
-	{
-		/* see max_wal_senders */
-		{"max_replication_slots", PGC_POSTMASTER, REPLICATION_SENDING,
-			gettext_noop("Sets the maximum number of simultaneously defined replication slots."),
-			NULL
-		},
-		&max_replication_slots,
-		10, 0, MAX_BACKENDS /* XXX? */ ,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"max_slot_wal_keep_size", PGC_SIGHUP, REPLICATION_SENDING,
-			gettext_noop("Sets the maximum WAL size that can be reserved by replication slots."),
-			gettext_noop("Replication slots will be marked as failed, and segments released "
-						 "for deletion or recycling, if this much space is occupied by WAL "
-						 "on disk."),
-			GUC_UNIT_MB
-		},
-		&max_slot_wal_keep_size_mb,
-		-1, -1, MAX_KILOBYTES,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"wal_sender_timeout", PGC_USERSET, REPLICATION_SENDING,
-			gettext_noop("Sets the maximum time to wait for WAL replication."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&wal_sender_timeout,
-		60 * 1000, 0, INT_MAX,
 		NULL, NULL, NULL
 	},
 
@@ -3520,27 +3449,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"primary_conninfo", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the connection string to be used to connect to the sending server."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&PrimaryConnInfo,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"primary_slot_name", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the name of the replication slot to use on the sending server."),
-			NULL
-		},
-		&PrimarySlotName,
-		"",
-		check_primary_slot_name, NULL, NULL
-	},
-
-	{
 		{"client_encoding", PGC_USERSET, CLIENT_CONN_LOCALE,
 			gettext_noop("Sets the client's character set encoding."),
 			NULL,
@@ -3938,17 +3846,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"synchronous_standby_names", PGC_SIGHUP, REPLICATION_PRIMARY,
-			gettext_noop("Number of synchronous standbys and list of names of potential synchronous ones."),
-			NULL,
-			GUC_LIST_INPUT
-		},
-		&SyncRepStandbyNames,
-		"",
-		check_synchronous_standby_names, assign_synchronous_standby_names, NULL
-	},
-
-	{
 		{"application_name", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Sets the application name to be reported in statistics and logs."),
 			NULL,
@@ -4182,7 +4079,7 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&synchronous_commit,
 		SYNCHRONOUS_COMMIT_ON, synchronous_commit_options,
-		NULL, assign_synchronous_commit, NULL
+		NULL, NULL, NULL
 	},
 
 	{
@@ -11095,7 +10992,7 @@ static bool
 check_maxconnections(int *newval, void **extra, GucSource source)
 {
 	if (*newval + autovacuum_max_workers + 1 +
-		max_worker_processes + max_wal_senders > MAX_BACKENDS)
+		max_worker_processes > MAX_BACKENDS)
 		return false;
 	return true;
 }
@@ -11104,16 +11001,7 @@ static bool
 check_autovacuum_max_workers(int *newval, void **extra, GucSource source)
 {
 	if (MaxConnections + *newval + 1 +
-		max_worker_processes + max_wal_senders > MAX_BACKENDS)
-		return false;
-	return true;
-}
-
-static bool
-check_max_wal_senders(int *newval, void **extra, GucSource source)
-{
-	if (MaxConnections + autovacuum_max_workers + 1 +
-		max_worker_processes + *newval > MAX_BACKENDS)
+		max_worker_processes > MAX_BACKENDS)
 		return false;
 	return true;
 }
@@ -11145,7 +11033,7 @@ static bool
 check_max_worker_processes(int *newval, void **extra, GucSource source)
 {
 	if (MaxConnections + autovacuum_max_workers + 1 +
-		*newval + max_wal_senders > MAX_BACKENDS)
+		*newval > MAX_BACKENDS)
 		return false;
 	return true;
 }
@@ -11622,27 +11510,6 @@ assign_recovery_target_lsn(const char *newval, void *extra)
 	}
 	else
 		recoveryTarget = RECOVERY_TARGET_UNSET;
-}
-
-static bool
-check_primary_slot_name(char **newval, void **extra, GucSource source)
-{
-	int			err_code;
-	char	   *err_msg = NULL;
-	char	   *err_hint = NULL;
-
-	if (*newval && strcmp(*newval, "") != 0 &&
-		!ReplicationSlotValidateNameInternal(*newval, &err_code, &err_msg,
-											 &err_hint))
-	{
-		GUC_check_errcode(err_code);
-		GUC_check_errdetail("%s", err_msg);
-		if (err_hint != NULL)
-			GUC_check_errhint("%s", err_hint);
-		return false;
-	}
-
-	return true;
 }
 
 static bool

@@ -80,7 +80,6 @@
 #include "pg_trace.h"
 #include "pgstat.h"
 #include "postmaster/postmaster.h"
-#include "replication/slot.h"
 #include "storage/ipc.h"
 #include "storage/predicate.h"
 #include "storage/proc.h"

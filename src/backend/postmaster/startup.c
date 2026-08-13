@@ -128,35 +128,13 @@ StartupProcShutdownHandler(SIGNAL_ARGS)
 /*
  * Re-read the config file.
  *
- * If one of the critical walreceiver options has changed, flag xlog.c
- * to restart it.
+ * Streaming replication has been removed, so there is no walreceiver to
+ * restart on connection/slot changes; we just reload configuration.
  */
 static void
 StartupRereadConfig(void)
 {
-	char	   *conninfo = pstrdup(PrimaryConnInfo);
-	char	   *slotname = pstrdup(PrimarySlotName);
-	bool		tempSlot = wal_receiver_create_temp_slot;
-	bool		conninfoChanged;
-	bool		slotnameChanged;
-	bool		tempSlotChanged = false;
-
 	ProcessConfigFile(PGC_SIGHUP);
-
-	conninfoChanged = strcmp(conninfo, PrimaryConnInfo) != 0;
-	slotnameChanged = strcmp(slotname, PrimarySlotName) != 0;
-
-	/*
-	 * wal_receiver_create_temp_slot is used only when we have no slot
-	 * configured.  We do not need to track this change if it has no effect.
-	 */
-	if (!slotnameChanged && strcmp(PrimarySlotName, "") == 0)
-		tempSlotChanged = tempSlot != wal_receiver_create_temp_slot;
-	pfree(conninfo);
-	pfree(slotname);
-
-	if (conninfoChanged || slotnameChanged || tempSlotChanged)
-		StartupRequestWalReceiverRestart();
 }
 
 /* Handle various signals that might be sent to the startup process */

@@ -179,7 +179,6 @@ typedef struct ControlFileData
 	bool		wal_log_hints;
 	int			MaxConnections;
 	int			max_worker_processes;
-	int			max_wal_senders;
 	int			max_prepared_xacts;
 	int			max_locks_per_xact;
 	bool		track_commit_timestamp;

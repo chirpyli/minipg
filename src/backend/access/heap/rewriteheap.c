@@ -116,8 +116,6 @@
 #include "lib/ilist.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "replication/logical.h"
-#include "replication/slot.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
 #include "storage/procarray.h"
@@ -1202,8 +1200,9 @@ CheckPointLogicalRewriteHeap(void)
 	 */
 	redo = GetRedoRecPtr();
 
-	/* now check for the restart ptrs from existing slots */
-	cutoff = ReplicationSlotsComputeLogicalRestartLSN();
+	/* Physical/logical replication slots have been removed, so no slot
+	 * contributes a restart LSN; only the redo pointer bounds removals. */
+	cutoff = InvalidXLogRecPtr;
 
 	/* don't start earlier than the restart lsn */
 	if (cutoff != InvalidXLogRecPtr && redo < cutoff)

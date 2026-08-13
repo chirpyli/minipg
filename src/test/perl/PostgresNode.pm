@@ -500,25 +500,6 @@ sub dump_info
 
 # Internal method to set up trusted pg_hba.conf for replication.  Not
 # documented because you shouldn't use it, it's called automatically if needed.
-sub set_replication_conf
-{
-	my ($self) = @_;
-	my $pgdata = $self->data_dir;
-
-	$self->host eq $test_pghost
-	  or croak "set_replication_conf only works with the default host";
-
-	open my $hba, '>>', "$pgdata/pg_hba.conf";
-	print $hba "\n# Allow replication (set up by PostgresNode.pm)\n";
-	if ($TestLib::windows_os && !$TestLib::use_unix_sockets)
-	{
-		print $hba
-		  "host replication all $test_localhost/32 sspi include_realm=1 map=regress\n";
-	}
-	close $hba;
-	return;
-}
-
 =pod
 
 =item $node->init(...)
@@ -594,8 +575,6 @@ sub init
 		{
 			print $conf "wal_level = replica\n";
 		}
-		print $conf "max_wal_senders = 10\n";
-		print $conf "max_replication_slots = 10\n";
 		print $conf "wal_log_hints = on\n";
 		print $conf "hot_standby = on\n";
 		# conservative settings to ensure we can run multiple postmasters:
@@ -603,6 +582,12 @@ sub init
 		print $conf "max_connections = 10\n";
 		# limit disk space consumption, too:
 		print $conf "max_wal_size = 128MB\n";
+	}
+	elsif ($params{has_archiving})
+	{
+		print $conf "wal_level = replica\n";
+		print $conf "wal_log_hints = on\n";
+		print $conf "hot_standby = on\n";
 	}
 	else
 	{
@@ -626,7 +611,6 @@ sub init
 	chmod($self->group_access ? 0640 : 0600, "$pgdata/postgresql.conf")
 	  or die("unable to set permissions for $pgdata/postgresql.conf");
 
-	$self->set_replication_conf if $params{allows_streaming};
 	$self->enable_archiving     if $params{has_archiving};
 	return;
 }
@@ -789,7 +773,7 @@ keyword parameter tar_program.  Note that tablespace tar files aren't
 handled here.
 
 Streaming replication can be enabled on this node by passing the keyword
-parameter has_streaming => 1. This is disabled by default.
+parameter has_restoring => 1. This is disabled by default.
 
 Restoring WAL segments from archives using restore_command can be enabled
 by passing the keyword parameter has_restoring => 1. This is disabled by
@@ -1107,22 +1091,6 @@ sub logrotate
 	print "### Rotating log in node \"$name\"\n";
 	TestLib::system_or_bail('pg_ctl', '-D', $pgdata, '-l', $logfile,
 		'logrotate');
-	return;
-}
-
-# Internal routine to enable streaming replication on a standby node.
-sub enable_streaming
-{
-	my ($self, $root_node) = @_;
-	my $root_connstr = $root_node->connstr;
-	my $name         = $self->name;
-
-	print "### Enabling streaming replication for node \"$name\"\n";
-	$self->append_conf(
-		'postgresql.conf', qq(
-primary_conninfo='$root_connstr'
-));
-	$self->set_standby_mode();
 	return;
 }
 

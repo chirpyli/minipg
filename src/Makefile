@@ -20,7 +20,6 @@ SUBDIRS = \
 	backend/utils/mb/conversion_procs \
 	include \
 	interfaces \
-	backend/replication/libpqwalreceiver \
 	fe_utils \
 	bin \
 	pl \

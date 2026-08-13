@@ -24,7 +24,6 @@
 #include "pgstat.h"
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/postmaster.h"
-#include "replication/slot.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
 #include "utils/acl.h"
@@ -2208,45 +2207,6 @@ pg_stat_reset_slru(PG_FUNCTION_ARGS)
 		target = text_to_cstring(PG_GETARG_TEXT_PP(0));
 
 	pgstat_reset_slru_counter(target);
-
-	PG_RETURN_VOID();
-}
-
-/* Reset replication slots stats (a specific one or all of them). */
-Datum
-pg_stat_reset_replication_slot(PG_FUNCTION_ARGS)
-{
-	char	   *target = NULL;
-
-	if (!PG_ARGISNULL(0))
-	{
-		ReplicationSlot *slot;
-
-		target = text_to_cstring(PG_GETARG_TEXT_PP(0));
-
-		/*
-		 * Check if the slot exists with the given name. It is possible that
-		 * by the time this message is executed the slot is dropped but at
-		 * least this check will ensure that the given name is for a valid
-		 * slot.
-		 */
-		slot = SearchNamedReplicationSlot(target, true);
-
-		if (!slot)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("replication slot \"%s\" does not exist",
-							target)));
-
-		/*
-		 * Nothing to do for physical slots as we collect stats only for
-		 * logical slots.
-		 */
-		if (SlotIsPhysical(slot))
-			PG_RETURN_VOID();
-	}
-
-	pgstat_reset_replslot_counter(target);
 
 	PG_RETURN_VOID();
 }

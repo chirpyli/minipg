@@ -14,7 +14,7 @@ use Time::HiRes qw(usleep);
 sub test_tablespace
 {
 	my $node_primary = PostgreSQL::Test::Cluster->new("primary1");
-	$node_primary->init(allows_streaming => 1);
+	$node_primary->init(has_archiving => 1);
 	$node_primary->start;
 	$node_primary->psql(
 		'postgres',
@@ -32,7 +32,7 @@ sub test_tablespace
 
 	my $node_standby = PostgreSQL::Test::Cluster->new("standby2");
 	$node_standby->init_from_backup($node_primary, $backup_name,
-		has_streaming => 1);
+		has_restoring => 1);
 	$node_standby->append_conf('postgresql.conf',
 		"allow_in_place_tablespaces = on");
 	$node_standby->append_conf('postgresql.conf',
@@ -81,7 +81,7 @@ test_tablespace();
 # consistent state (archive recovery is in progress).
 
 my $node_primary = PostgreSQL::Test::Cluster->new('primary2');
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 $node_primary->start;
 
 # Create tablespace
@@ -98,7 +98,7 @@ my $backup_name = 'my_backup';
 $node_primary->backup($backup_name);
 my $node_standby = PostgreSQL::Test::Cluster->new('standby3');
 $node_standby->init_from_backup($node_primary, $backup_name,
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby->append_conf('postgresql.conf',
 	"allow_in_place_tablespaces = on");
 $node_standby->start;

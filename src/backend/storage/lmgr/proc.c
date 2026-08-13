@@ -41,9 +41,6 @@
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "postmaster/autovacuum.h"
-#include "replication/slot.h"
-#include "replication/syncrep.h"
-#include "replication/walsender.h"
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
 #include "storage/lmgr.h"
@@ -317,8 +314,6 @@ InitProcess(void)
 		procgloballist = &ProcGlobal->autovacFreeProcs;
 	else if (IsBackgroundWorker)
 		procgloballist = &ProcGlobal->bgworkerFreeProcs;
-	else if (am_walsender)
-		procgloballist = &ProcGlobal->walsenderFreeProcs;
 	else
 		procgloballist = &ProcGlobal->freeProcs;
 
@@ -349,11 +344,6 @@ InitProcess(void)
 		 * in the autovacuum case?
 		 */
 		SpinLockRelease(ProcStructLock);
-		if (am_walsender)
-			ereport(FATAL,
-					(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
-					 errmsg("number of requested standby connections exceeds max_wal_senders (currently %d)",
-							max_wal_senders)));
 		ereport(FATAL,
 				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
 				 errmsg("sorry, too many clients already")));
@@ -413,11 +403,6 @@ InitProcess(void)
 	}
 #endif
 	MyProc->recoveryConflictPending = false;
-
-	/* Initialize fields for sync rep */
-	MyProc->waitLSN = 0;
-	MyProc->syncRepState = SYNC_REP_NOT_WAITING;
-	SHMQueueElemInit(&(MyProc->syncRepLinks));
 
 	/* Initialize fields for group XID clearing. */
 	MyProc->procArrayGroupMember = false;
@@ -832,7 +817,6 @@ ProcKill(int code, Datum arg)
 		elog(PANIC, "ProcKill() called in child process");
 
 	/* Make sure we're out of the sync rep lists */
-	SyncRepCleanupAtProcExit();
 
 #ifdef USE_ASSERT_CHECKING
 	{
@@ -853,13 +837,6 @@ ProcKill(int code, Datum arg)
 
 	/* Cancel any pending condition variable sleep, too */
 	ConditionVariableCancelSleep();
-
-	/* Make sure active replication slots are released */
-	if (MyReplicationSlot != NULL)
-		ReplicationSlotRelease();
-
-	/* Also cleanup all the temporary slots. */
-	ReplicationSlotCleanup();
 
 	/*
 	 * Reset MyLatch to the process local one and disown the shared latch, so

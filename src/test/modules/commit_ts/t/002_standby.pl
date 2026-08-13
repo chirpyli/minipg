@@ -12,7 +12,7 @@ use PostgresNode;
 
 my $bkplabel = 'backup';
 my $primary  = get_new_node('primary');
-$primary->init(allows_streaming => 1);
+$primary->init(has_archiving => 1);
 
 $primary->append_conf(
 	'postgresql.conf', qq{
@@ -23,7 +23,7 @@ $primary->start;
 $primary->backup($bkplabel);
 
 my $standby = get_new_node('standby');
-$standby->init_from_backup($primary, $bkplabel, has_streaming => 1);
+$standby->init_from_backup($primary, $bkplabel, has_restoring => 1);
 $standby->start;
 
 for my $i (1 .. 10)

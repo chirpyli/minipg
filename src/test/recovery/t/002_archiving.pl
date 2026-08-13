@@ -12,8 +12,7 @@ use File::Copy;
 # Initialize primary node, doing archives
 my $node_primary = get_new_node('primary');
 $node_primary->init(
-	has_archiving    => 1,
-	allows_streaming => 1);
+	has_archiving => 1);
 my $backup_name = 'my_backup';
 
 # Start it

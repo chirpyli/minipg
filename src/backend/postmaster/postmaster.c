@@ -107,7 +107,6 @@
 #include "postmaster/pgarch.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
-#include "replication/walsender.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/pg_shmem.h"
@@ -132,9 +131,8 @@
  */
 #define BACKEND_TYPE_NORMAL		0x0001	/* normal backend */
 #define BACKEND_TYPE_AUTOVAC	0x0002	/* autovacuum worker process */
-#define BACKEND_TYPE_WALSND		0x0004	/* walsender process */
 #define BACKEND_TYPE_BGWORKER	0x0008	/* bgworker process */
-#define BACKEND_TYPE_ALL		0x000F	/* OR of all the above */
+#define BACKEND_TYPE_ALL		0x000B	/* OR of all the above */
 
 /*
  * List of active backends (or child processes anyway; we don't actually
@@ -230,7 +228,6 @@ static pid_t StartupPID = 0,
 			BgWriterPID = 0,
 			CheckpointerPID = 0,
 			WalWriterPID = 0,
-			WalReceiverPID = 0,
 			AutoVacPID = 0,
 			PgArchPID = 0,
 			PgStatPID = 0,
@@ -352,9 +349,6 @@ static volatile sig_atomic_t start_autovac_launcher = false;
 /* the launcher needs to be signaled to communicate some condition */
 static volatile bool avlauncher_needs_signal = false;
 
-/* received START_WALRECEIVER signal */
-static volatile sig_atomic_t WalReceiverRequested = false;
-
 /* set when there's a worker that needs to be started up */
 static volatile bool StartWorkerNeeded = true;
 static volatile bool HaveCrashedWorker = false;
@@ -407,7 +401,6 @@ static void maybe_start_bgworkers(void);
 static bool CreateOptsFile(int argc, char *argv[], char *fullprogname);
 static pid_t StartChildProcess(AuxProcType type);
 static void StartAutovacuumWorker(void);
-static void MaybeStartWalReceiver(void);
 static void InitPostmasterDeathWatchHandle(void);
 
 /*
@@ -428,7 +421,6 @@ static void InitPostmasterDeathWatchHandle(void);
 #define StartBackgroundWriter() StartChildProcess(BgWriterProcess)
 #define StartCheckpointer()		StartChildProcess(CheckpointerProcess)
 #define StartWalWriter()		StartChildProcess(WalWriterProcess)
-#define StartWalReceiver()		StartChildProcess(WalReceiverProcess)
 
 /* Macros to check exit status of a child process */
 #define EXIT_STATUS_0(st)  ((st) == 0)
@@ -789,9 +781,6 @@ PostmasterMain(int argc, char *argv[])
 	if (XLogArchiveMode > ARCHIVE_MODE_OFF && wal_level == WAL_LEVEL_MINIMAL)
 		ereport(ERROR,
 				(errmsg("WAL archival cannot be enabled when wal_level is \"minimal\"")));
-	if (max_wal_senders > 0 && wal_level == WAL_LEVEL_MINIMAL)
-		ereport(ERROR,
-				(errmsg("WAL streaming (max_wal_senders > 0) requires wal_level \"replica\" or \"logical\"")));
 
 	/*
 	 * Other one-time internal sanity checks can go here, if they are fast.
@@ -1570,10 +1559,6 @@ ServerLoop(void)
 				kill(AutoVacPID, SIGUSR2);
 		}
 
-		/* If we need to start a WAL receiver, try to do that now */
-		if (WalReceiverRequested)
-			MaybeStartWalReceiver();
-
 		/* Get other worker processes running, if needed */
 		if (StartWorkerNeeded || HaveCrashedWorker)
 			maybe_start_bgworkers();
@@ -1937,28 +1922,6 @@ retry1:
 				port->user_name = pstrdup(valptr);
 			else if (strcmp(nameptr, "options") == 0)
 				port->cmdline_options = pstrdup(valptr);
-			else if (strcmp(nameptr, "replication") == 0)
-			{
-				/*
-				 * Due to backward compatibility concerns the replication
-				 * parameter is a hybrid beast which allows the value to be
-				 * either boolean or the string 'database'. The latter
-				 * connects to a specific database which is e.g. required for
-				 * logical decoding while.
-				 */
-				if (strcmp(valptr, "database") == 0)
-				{
-					am_walsender = true;
-					am_db_walsender = true;
-				}
-				else if (!parse_bool(valptr, &am_walsender))
-					ereport(FATAL,
-							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-							 errmsg("invalid value for parameter \"%s\": \"%s\"",
-									"replication",
-									valptr),
-							 errhint("Valid values are: \"false\", 0, \"true\", 1, \"database\".")));
-			}
 			else if (strncmp(nameptr, "_pq_.", 5) == 0)
 			{
 				/*
@@ -2052,21 +2015,7 @@ retry1:
 	if (strlen(port->user_name) >= NAMEDATALEN)
 		port->user_name[NAMEDATALEN - 1] = '\0';
 
-	if (am_walsender)
-		MyBackendType = B_WAL_SENDER;
-	else
-		MyBackendType = B_BACKEND;
-
-	/*
-	 * Normal walsender backends, e.g. for streaming replication, are not
-	 * connected to a particular database. But walsenders used for logical
-	 * replication need to connect to a specific database. We allow streaming
-	 * replication commands to be issued even if connected to a database as it
-	 * can make sense to first make a basebackup and then stream changes
-	 * starting from that.
-	 */
-	if (am_walsender && !am_db_walsender)
-		port->database_name[0] = '\0';
+	MyBackendType = B_BACKEND;
 
 	/*
 	 * Done putting stuff in TopMemoryContext.
@@ -2442,8 +2391,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 			signal_child(CheckpointerPID, SIGHUP);
 		if (WalWriterPID != 0)
 			signal_child(WalWriterPID, SIGHUP);
-		if (WalReceiverPID != 0)
-			signal_child(WalReceiverPID, SIGHUP);
 		if (AutoVacPID != 0)
 			signal_child(AutoVacPID, SIGHUP);
 		if (PgArchPID != 0)
@@ -2822,21 +2769,6 @@ reaper(SIGNAL_ARGS)
 			if (!EXIT_STATUS_0(exitstatus))
 				HandleChildCrash(pid, exitstatus,
 								 _("WAL writer process"));
-			continue;
-		}
-
-		/*
-		 * Was it the wal receiver?  If exit status is zero (normal) or one
-		 * (FATAL exit), we assume everything is all right just like normal
-		 * backends.  (If we need a new wal receiver, we'll start one at the
-		 * next iteration of the postmaster's main loop.)
-		 */
-		if (pid == WalReceiverPID)
-		{
-			WalReceiverPID = 0;
-			if (!EXIT_STATUS_0(exitstatus) && !EXIT_STATUS_1(exitstatus))
-				HandleChildCrash(pid, exitstatus,
-								 _("WAL receiver process"));
 			continue;
 		}
 
@@ -3264,18 +3196,6 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 		signal_child(WalWriterPID, (SendStop ? SIGSTOP : SIGQUIT));
 	}
 
-	/* Take care of the walreceiver too */
-	if (pid == WalReceiverPID)
-		WalReceiverPID = 0;
-	else if (WalReceiverPID != 0 && take_action)
-	{
-		ereport(DEBUG2,
-				(errmsg_internal("sending %s to process %d",
-								 (SendStop ? "SIGSTOP" : "SIGQUIT"),
-								 (int) WalReceiverPID)));
-		signal_child(WalReceiverPID, (SendStop ? SIGSTOP : SIGQUIT));
-	}
-
 	/* Take care of the autovacuum launcher too */
 	if (pid == AutoVacPID)
 		AutoVacPID = 0;
@@ -3434,9 +3354,8 @@ PostmasterStateMachine(void)
 		 */
 		ForgetUnstartedBackgroundWorkers();
 
-		/* Signal all backend children except walsenders */
-		SignalSomeChildren(SIGTERM,
-						   BACKEND_TYPE_ALL - BACKEND_TYPE_WALSND);
+		/* Signal all backend children */
+		SignalSomeChildren(SIGTERM, BACKEND_TYPE_ALL);
 		/* and the autovac launcher too */
 		if (AutoVacPID != 0)
 			signal_child(AutoVacPID, SIGTERM);
@@ -3449,8 +3368,6 @@ PostmasterStateMachine(void)
 		/* If we're in recovery, also stop startup and walreceiver procs */
 		if (StartupPID != 0)
 			signal_child(StartupPID, SIGTERM);
-		if (WalReceiverPID != 0)
-			signal_child(WalReceiverPID, SIGTERM);
 		/* checkpointer, archiver, stats, and syslogger may continue for now */
 
 		/* Now transition to PM_WAIT_BACKENDS state to wait for them to die */
@@ -3474,9 +3391,8 @@ PostmasterStateMachine(void)
 		 * and archiver are also disregarded, they will be terminated later
 		 * after writing the checkpoint record.
 		 */
-		if (CountChildren(BACKEND_TYPE_ALL - BACKEND_TYPE_WALSND) == 0 &&
+		if (CountChildren(BACKEND_TYPE_ALL) == 0 &&
 			StartupPID == 0 &&
-			WalReceiverPID == 0 &&
 			BgWriterPID == 0 &&
 			(CheckpointerPID == 0 ||
 			 (!FatalError && Shutdown < ImmediateShutdown)) &&
@@ -3570,7 +3486,6 @@ PostmasterStateMachine(void)
 		{
 			/* These other guys should be dead already */
 			Assert(StartupPID == 0);
-			Assert(WalReceiverPID == 0);
 			Assert(BgWriterPID == 0);
 			Assert(CheckpointerPID == 0);
 			Assert(WalWriterPID == 0);
@@ -3743,10 +3658,6 @@ SignalSomeChildren(int signal, int target)
 			 * Assign bkend_type for any recently announced WAL Sender
 			 * processes.
 			 */
-			if (bp->bkend_type == BACKEND_TYPE_NORMAL &&
-				IsPostmasterChildWalSender(bp->child_slot))
-				bp->bkend_type = BACKEND_TYPE_WALSND;
-
 			if (!(target & bp->bkend_type))
 				continue;
 		}
@@ -3780,8 +3691,6 @@ TerminateChildren(int signal)
 		signal_child(CheckpointerPID, signal);
 	if (WalWriterPID != 0)
 		signal_child(WalWriterPID, signal);
-	if (WalReceiverPID != 0)
-		signal_child(WalReceiverPID, signal);
 	if (AutoVacPID != 0)
 		signal_child(AutoVacPID, signal);
 	if (PgArchPID != 0)
@@ -4096,11 +4005,8 @@ BackendInitialize(Port *port)
 	 * title for ps.  It's good to do this as early as possible in startup.
 	 */
 	initStringInfo(&ps_data);
-	if (am_walsender)
-		appendStringInfo(&ps_data, "%s ", GetBackendTypeDesc(B_WAL_SENDER));
 	appendStringInfo(&ps_data, "%s ", port->user_name);
-	if (!am_walsender)
-		appendStringInfo(&ps_data, "%s ", port->database_name);
+	appendStringInfo(&ps_data, "%s ", port->database_name);
 	appendStringInfo(&ps_data, "%s", port->remote_host);
 	if (port->remote_port[0] != '\0')
 		appendStringInfo(&ps_data, "(%s)", port->remote_port);
@@ -4295,14 +4201,6 @@ sigusr1_handler(SIGNAL_ARGS)
 		StartAutovacuumWorker();
 	}
 
-	if (CheckPostmasterSignal(PMSIGNAL_START_WALRECEIVER))
-	{
-		/* Startup Process wants us to start the walreceiver process. */
-		/* Start immediately if possible, else remember request for later. */
-		WalReceiverRequested = true;
-		MaybeStartWalReceiver();
-	}
-
 	/*
 	 * Try to advance postmaster's state machine, if a child requests it.
 	 *
@@ -4415,10 +4313,6 @@ CountChildren(int target)
 			 * Assign bkend_type for any recently announced WAL Sender
 			 * processes.
 			 */
-			if (bp->bkend_type == BACKEND_TYPE_NORMAL &&
-				IsPostmasterChildWalSender(bp->child_slot))
-				bp->bkend_type = BACKEND_TYPE_WALSND;
-
 			if (!(target & bp->bkend_type))
 				continue;
 		}
@@ -4501,10 +4395,6 @@ StartChildProcess(AuxProcType type)
 			case WalWriterProcess:
 				ereport(LOG,
 						(errmsg("could not fork WAL writer process: %m")));
-				break;
-			case WalReceiverProcess:
-				ereport(LOG,
-						(errmsg("could not fork WAL receiver process: %m")));
 				break;
 			default:
 				ereport(LOG,
@@ -4613,34 +4503,6 @@ StartAutovacuumWorker(void)
 }
 
 /*
- * MaybeStartWalReceiver
- *		Start the WAL receiver process, if not running and our state allows.
- *
- * Note: if WalReceiverPID is already nonzero, it might seem that we should
- * clear WalReceiverRequested.  However, there's a race condition if the
- * walreceiver terminates and the startup process immediately requests a new
- * one: it's quite possible to get the signal for the request before reaping
- * the dead walreceiver process.  Better to risk launching an extra
- * walreceiver than to miss launching one we need.  (The walreceiver code
- * has logic to recognize that it should go away if not needed.)
- */
-static void
-MaybeStartWalReceiver(void)
-{
-	if (WalReceiverPID == 0 &&
-		(pmState == PM_STARTUP || pmState == PM_RECOVERY ||
-		 pmState == PM_HOT_STANDBY) &&
-		Shutdown <= SmartShutdown)
-	{
-		WalReceiverPID = StartWalReceiver();
-		if (WalReceiverPID != 0)
-			WalReceiverRequested = false;
-		/* else leave the flag set, so we'll try again later */
-	}
-}
-
-
-/*
  * Create the opts file
  */
 static bool
@@ -4691,7 +4553,7 @@ int
 MaxLivePostmasterChildren(void)
 {
 	return 2 * (MaxConnections + autovacuum_max_workers + 1 +
-				max_wal_senders + max_worker_processes);
+				max_worker_processes);
 }
 
 /*

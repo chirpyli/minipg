@@ -52,7 +52,7 @@ sub start_of_page
 }
 
 my $primary = PostgreSQL::Test::Cluster->new('primary');
-$primary->init(allows_streaming => 1, has_archiving => 1);
+$primary->init(has_archiving => 1);
 
 # The configuration is chosen here to minimize the friction with
 # concurrent WAL activity.  checkpoint_timeout avoids noise with
@@ -142,7 +142,7 @@ $standby1->safe_psql('postgres',
 
 # Configure standby2 to stream from just promoted standby1 (it also pulls WAL
 # files from the archive).  It should be able to catch up.
-$standby2->enable_streaming($standby1);
+$standby2->enable_restoring($standby1, 1);
 $standby2->reload;
 $standby1->wait_for_catchup('standby2', 'replay', $standby1->lsn('flush'));
 

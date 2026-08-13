@@ -34,7 +34,6 @@
 #include "miscadmin.h"
 #include "port/pg_bswap.h"
 #include "postmaster/postmaster.h"
-#include "replication/walsender.h"
 #include "storage/ipc.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"

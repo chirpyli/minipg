@@ -32,7 +32,7 @@ sub configure_and_reload
 
 # Setup london node
 my $node_london = get_new_node("london");
-$node_london->init(allows_streaming => 1);
+$node_london->init(has_archiving => 1);
 $node_london->append_conf(
 	'postgresql.conf', qq(
 	max_prepared_transactions = 10
@@ -44,7 +44,7 @@ $node_london->backup('london_backup');
 # Setup paris node
 my $node_paris = get_new_node('paris');
 $node_paris->init_from_backup($node_london, 'london_backup',
-	has_streaming => 1);
+	has_restoring => 1);
 $node_paris->start;
 
 # Switch to synchronous replication in both directions
@@ -233,7 +233,7 @@ $psql_rc = $cur_primary->psql('postgres',
 is($psql_rc, '0', "Restore of prepared transaction on promoted standby");
 
 # restart old primary as new standby
-$cur_standby->enable_streaming($cur_primary);
+$cur_standby->enable_restoring($cur_primary, 1);
 $cur_standby->start;
 
 ###############################################################################
@@ -267,7 +267,7 @@ is($psql_out, '1',
 	"Restore prepared transactions from files with primary down");
 
 # restart old primary as new standby
-$cur_standby->enable_streaming($cur_primary);
+$cur_standby->enable_restoring($cur_primary, 1);
 $cur_standby->start;
 
 $cur_primary->psql('postgres', "COMMIT PREPARED 'xact_009_11'");
@@ -303,7 +303,7 @@ is($psql_out, '1',
 	"Restore prepared transactions from records with primary down");
 
 # restart old primary as new standby
-$cur_standby->enable_streaming($cur_primary);
+$cur_standby->enable_restoring($cur_primary, 1);
 $cur_standby->start;
 
 $cur_primary->psql('postgres', "COMMIT PREPARED 'xact_009_12'");

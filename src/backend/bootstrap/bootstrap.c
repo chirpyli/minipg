@@ -37,7 +37,6 @@
 #include "postmaster/bgwriter.h"
 #include "postmaster/startup.h"
 #include "postmaster/walwriter.h"
-#include "replication/walreceiver.h"
 #include "storage/bufmgr.h"
 #include "storage/bufpage.h"
 #include "storage/condition_variable.h"
@@ -457,10 +456,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 		case WalWriterProcess:
 			InitXLOGAccess();
 			WalWriterMain();
-			proc_exit(1);
-
-		case WalReceiverProcess:
-			WalReceiverMain();
 			proc_exit(1);
 
 		default:

@@ -41,8 +41,6 @@
 #include "miscadmin.h"
 #include "pg_trace.h"
 #include "pgstat.h"
-#include "replication/syncrep.h"
-#include "replication/walsender.h"
 #include "storage/condition_variable.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
@@ -1418,16 +1416,9 @@ RecordTransactionCommit(void)
 	latestXid = TransactionIdLatest(xid, nchildren, children);
 
 	/*
-	 * Wait for synchronous replication, if required. Similar to the decision
-	 * above about using committing asynchronously we only want to wait if
-	 * this backend assigned an xid and wrote WAL.  No need to wait if an xid
-	 * was assigned due to temporary/unlogged tables or due to HOT pruning.
-	 *
-	 * Note that at this stage we have marked clog, but still show as running
-	 * in the procarray and continue to hold locks.
+	 * Synchronous replication has been removed from this build; local WAL
+	 * flush (performed above via XLogFlush) is sufficient.
 	 */
-	if (wrote_xlog && markXidCommitted)
-		SyncRepWaitForLSN(XactLastRecEnd, true);
 
 	/* remember end of last commit record */
 	XactLastCommitEnd = XactLastRecEnd;

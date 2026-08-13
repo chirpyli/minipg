@@ -26,8 +26,8 @@
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "replication/walreceiver.h"
 #include "storage/fd.h"
+#include "storage/latch.h"
 #include "storage/ipc.h"
 #include "storage/smgr.h"
 #include "utils/builtins.h"
@@ -387,24 +387,6 @@ pg_current_wal_flush_lsn(PG_FUNCTION_ARGS)
 	PG_RETURN_LSN(current_recptr);
 }
 
-/*
- * Report the last WAL receive location (same format as pg_start_backup etc)
- *
- * This is useful for determining how much of WAL is guaranteed to be received
- * and synced to disk by walreceiver.
- */
-Datum
-pg_last_wal_receive_lsn(PG_FUNCTION_ARGS)
-{
-	XLogRecPtr	recptr;
-
-	recptr = GetWalRcvFlushRecPtr(NULL, NULL);
-
-	if (recptr == 0)
-		PG_RETURN_NULL();
-
-	PG_RETURN_LSN(recptr);
-}
 
 /*
  * Report the last WAL replay location (same format as pg_start_backup etc)

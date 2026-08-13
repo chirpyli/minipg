@@ -44,7 +44,7 @@ sub find_largest_lsn
 
 # Initialize primary node
 my $primary = get_new_node('primary');
-$primary->init(allows_streaming => 1);
+$primary->init(has_archiving => 1);
 
 # Set shared_buffers to a very low value to enforce discard and flush
 # of PostgreSQL buffers on standby, enforcing other processes than the
@@ -62,7 +62,7 @@ $primary->start;
 # setup/start a standby
 $primary->backup('bkp');
 my $standby = get_new_node('standby');
-$standby->init_from_backup($primary, 'bkp', has_streaming => 1);
+$standby->init_from_backup($primary, 'bkp', has_restoring => 1);
 $standby->start;
 
 # Create base table whose data consistency is checked.

@@ -575,32 +575,6 @@ CREATE VIEW pg_stat_activity AS
         LEFT JOIN pg_database AS D ON (S.datid = D.oid)
         LEFT JOIN pg_authid AS U ON (S.usesysid = U.oid);
 
-CREATE VIEW pg_stat_replication AS
-    SELECT
-            S.pid,
-            S.usesysid,
-            U.rolname AS usename,
-            S.application_name,
-            S.client_addr,
-            S.client_hostname,
-            S.client_port,
-            S.backend_start,
-            S.backend_xmin,
-            W.state,
-            W.sent_lsn,
-            W.write_lsn,
-            W.flush_lsn,
-            W.replay_lsn,
-            W.write_lag,
-            W.flush_lag,
-            W.replay_lag,
-            W.sync_priority,
-            W.sync_state,
-            W.reply_time
-    FROM pg_stat_get_activity(NULL) AS S
-        JOIN pg_stat_get_wal_senders() AS W ON (S.pid = W.pid)
-        LEFT JOIN pg_authid AS U ON (S.usesysid = U.oid);
-
 CREATE VIEW pg_stat_slru AS
     SELECT
             s.name,
@@ -613,62 +587,6 @@ CREATE VIEW pg_stat_slru AS
             s.truncates,
             s.stats_reset
     FROM pg_stat_get_slru() s;
-
-CREATE VIEW pg_stat_wal_receiver AS
-    SELECT
-            s.pid,
-            s.status,
-            s.receive_start_lsn,
-            s.receive_start_tli,
-            s.written_lsn,
-            s.flushed_lsn,
-            s.received_tli,
-            s.last_msg_send_time,
-            s.last_msg_receipt_time,
-            s.latest_end_lsn,
-            s.latest_end_time,
-            s.slot_name,
-            s.sender_host,
-            s.sender_port,
-            s.conninfo
-    FROM pg_stat_get_wal_receiver() s
-    WHERE s.pid IS NOT NULL;
-
-CREATE VIEW pg_replication_slots AS
-    SELECT
-            L.slot_name,
-            L.plugin,
-            L.slot_type,
-            L.datoid,
-            D.datname AS database,
-            L.temporary,
-            L.active,
-            L.active_pid,
-            L.xmin,
-            L.catalog_xmin,
-            L.restart_lsn,
-            L.confirmed_flush_lsn,
-            L.wal_status,
-            L.safe_wal_size,
-            L.two_phase
-    FROM pg_get_replication_slots() AS L
-            LEFT JOIN pg_database D ON (L.datoid = D.oid);
-
-CREATE VIEW pg_stat_replication_slots AS
-    SELECT
-            s.slot_name,
-            s.spill_txns,
-            s.spill_count,
-            s.spill_bytes,
-            s.stream_txns,
-            s.stream_count,
-            s.stream_bytes,
-            s.total_txns,
-            s.total_bytes,
-            s.stats_reset
-    FROM pg_replication_slots as r,
-        LATERAL pg_stat_get_replication_slot(slot_name) as s
-    WHERE r.datoid IS NOT NULL; -- excluding physical slots
 
 CREATE VIEW pg_stat_database AS
     SELECT

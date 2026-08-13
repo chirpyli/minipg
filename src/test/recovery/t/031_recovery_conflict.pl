@@ -14,7 +14,7 @@ plan skip_all => "disabled until after minor releases, due to instability";
 
 # Set up nodes
 my $node_primary = PostgreSQL::Test::Cluster->new('primary');
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 
 my $tablespace1 = "test_recovery_conflict_tblspc";
 
@@ -50,7 +50,7 @@ my $backup_name = 'my_backup';
 $node_primary->backup($backup_name);
 my $node_standby = PostgreSQL::Test::Cluster->new('standby');
 $node_standby->init_from_backup($node_primary, $backup_name,
-	has_streaming => 1);
+	has_restoring => 1);
 
 $node_standby->start;
 

@@ -12,7 +12,7 @@ use TestLib;
 use Test::More tests => 1;
 
 my $node_primary = get_new_node('primary');
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 
 $node_primary->append_conf(
 	'postgresql.conf', qq{
@@ -29,7 +29,7 @@ $node_primary->start;
 $node_primary->backup('primary_backup');
 my $node_standby = get_new_node('standby');
 $node_standby->init_from_backup($node_primary, 'primary_backup',
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby->start;
 
 $node_primary->psql(

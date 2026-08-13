@@ -11,7 +11,7 @@ use Test::More tests => 12;
 
 # Setup primary node
 my $node_primary = get_new_node("primary");
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 $node_primary->append_conf(
 	'postgresql.conf', qq(
 	max_prepared_transactions = 10
@@ -24,7 +24,7 @@ $node_primary->psql('postgres', "CREATE TABLE t_012_tbl (id int)");
 # Setup standby node
 my $node_standby = get_new_node('standby');
 $node_standby->init_from_backup($node_primary, 'primary_backup',
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby->start;
 
 # Switch to synchronous replication
@@ -121,7 +121,7 @@ is($psql_out, '8128', "Visible");
 
 # restore state
 ($node_primary, $node_standby) = ($node_standby, $node_primary);
-$node_standby->enable_streaming($node_primary);
+$node_standby->enable_restoring($node_primary, 1);
 $node_standby->start;
 $node_standby->psql(
 	'postgres',
@@ -168,7 +168,7 @@ is($psql_out, '-1', "Not visible");
 
 # restore state
 ($node_primary, $node_standby) = ($node_standby, $node_primary);
-$node_standby->enable_streaming($node_primary);
+$node_standby->enable_restoring($node_primary, 1);
 $node_standby->start;
 $psql_rc = $node_primary->psql('postgres', "COMMIT PREPARED 'xact_012_1'");
 is($psql_rc, '0',
@@ -205,7 +205,7 @@ is($psql_out, '-1', "Not visible");
 
 # restore state
 ($node_primary, $node_standby) = ($node_standby, $node_primary);
-$node_standby->enable_streaming($node_primary);
+$node_standby->enable_restoring($node_primary, 1);
 $node_standby->start;
 $psql_rc = $node_primary->psql('postgres', "ROLLBACK PREPARED 'xact_012_1'");
 is($psql_rc, '0',

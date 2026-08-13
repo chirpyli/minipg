@@ -16,7 +16,6 @@ my $wal_segsize = 1;
 my $node_primary = PostgreSQL::Test::Cluster->new('primary');
 $node_primary->init(
 	has_archiving => 1,
-	allows_streaming => 1,
 	extra => [ '--wal-segsize' => $wal_segsize ]);
 $node_primary->start;
 my $backup_name = 'my_backup';

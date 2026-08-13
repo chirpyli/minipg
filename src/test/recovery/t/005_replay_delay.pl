@@ -11,7 +11,7 @@ use Test::More tests => 3;
 
 # Initialize primary node
 my $node_primary = get_new_node('primary');
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 $node_primary->start;
 
 # And some content
@@ -26,7 +26,7 @@ $node_primary->backup($backup_name);
 my $node_standby = get_new_node('standby');
 my $delay        = 3;
 $node_standby->init_from_backup($node_primary, $backup_name,
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby->append_conf(
 	'postgresql.conf', qq(
 recovery_min_apply_delay = '${delay}s'
@@ -60,7 +60,7 @@ ok(time() - $primary_insert_time >= $delay,
 # Check that recovery can be paused or resumed expectedly.
 my $node_standby2 = get_new_node('standby2');
 $node_standby2->init_from_backup($node_primary, $backup_name,
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby2->start;
 
 # Recovery is not yet paused.

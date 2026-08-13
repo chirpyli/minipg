@@ -28,7 +28,7 @@ plan tests => 18;
 my $psql_timeout = IPC::Run::timer($TestLib::timeout_default);
 
 my $node = get_new_node('primary');
-$node->init(allows_streaming => 1);
+$node->init(has_archiving => 1);
 $node->start();
 
 # by default PostgresNode doesn't doesn't restart after a crash

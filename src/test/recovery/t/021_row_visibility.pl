@@ -13,7 +13,7 @@ use Config;
 
 # Initialize primary node
 my $node_primary = get_new_node('primary');
-$node_primary->init(allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 $node_primary->append_conf('postgresql.conf', 'max_prepared_transactions=10');
 $node_primary->start;
 
@@ -28,7 +28,7 @@ $node_primary->backup($backup_name);
 # Create streaming standby from backup
 my $node_standby = get_new_node('standby');
 $node_standby->init_from_backup($node_primary, $backup_name,
-	has_streaming => 1);
+	has_restoring => 1);
 $node_standby->append_conf('postgresql.conf', 'max_prepared_transactions=10');
 $node_standby->start;
 

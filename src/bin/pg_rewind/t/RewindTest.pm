@@ -133,16 +133,9 @@ sub setup_cluster
 	# pg_rewind.  This role is used for all the tests, and has
 	# minimal permissions enough to rewind from an online source.
 	$node_primary->init(
-		allows_streaming => 1,
-		extra            => $extra,
-		auth_extra       => [ '--create-role', 'rewind_user' ]);
-
-	# Set wal_keep_size to prevent WAL segment recycling after enforced
-	# checkpoints in the tests.
-	$node_primary->append_conf(
-		'postgresql.conf', qq(
-wal_keep_size = 320MB
-));
+		has_archiving => 1,
+		extra          => $extra,
+		auth_extra     => [ '--create-role', 'rewind_user' ]);
 	return;
 }
 
@@ -176,16 +169,11 @@ sub create_standby
 
 	$node_standby =
 	  get_new_node('standby' . ($extra_name ? "_${extra_name}" : ''));
-	$node_primary->backup('my_backup');
+	$node_primary->backup_fs_hot('my_backup');
 	$node_standby->init_from_backup($node_primary, 'my_backup');
-	my $connstr_primary = $node_primary->connstr();
 
-	$node_standby->append_conf(
-		"postgresql.conf", qq(
-primary_conninfo='$connstr_primary'
-));
-
-	$node_standby->set_standby_mode();
+	# Configure standby to recover from the primary's archive
+	$node_standby->enable_restoring($node_primary, 1);
 
 	# Start standby
 	$node_standby->start;

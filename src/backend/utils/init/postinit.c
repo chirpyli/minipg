@@ -40,7 +40,6 @@
 #include "pgstat.h"
 #include "postmaster/autovacuum.h"
 #include "postmaster/postmaster.h"
-#include "replication/walsender.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
@@ -211,14 +210,9 @@ PerformAuthentication(Port *port)
 		StringInfoData logmsg;
 
 		initStringInfo(&logmsg);
-		if (am_walsender)
-			appendStringInfo(&logmsg, _("replication connection authorized: user=%s"),
-							 port->user_name);
-		else
-			appendStringInfo(&logmsg, _("connection authorized: user=%s"),
-							 port->user_name);
-		if (!am_walsender)
-			appendStringInfo(&logmsg, _(" database=%s"), port->database_name);
+		appendStringInfo(&logmsg, _("connection authorized: user=%s"),
+						 port->user_name);
+		appendStringInfo(&logmsg, _(" database=%s"), port->database_name);
 
 		if (port->application_name != NULL)
 			appendStringInfo(&logmsg, _(" application_name=%s"),
@@ -454,7 +448,7 @@ InitializeMaxBackends(void)
 
 	/* the extra unit accounts for the autovacuum launcher */
 	MaxBackends = MaxConnections + autovacuum_max_workers + 1 +
-		max_worker_processes + max_wal_senders;
+		max_worker_processes;
 
 	/* internal error because the values were all checked previously */
 	if (MaxBackends > MAX_BACKENDS)
@@ -724,16 +718,11 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * If we're trying to shut down, only superusers can connect, and new
 	 * replication connections are not allowed.
 	 */
-	if ((!am_superuser || am_walsender) &&
+	if (!am_superuser &&
 		MyProcPort != NULL &&
 		MyProcPort->canAcceptConnections == CAC_SUPERUSER)
 	{
-		if (am_walsender)
-			ereport(FATAL,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("new replication connections are not allowed during database shutdown")));
-		else
-			ereport(FATAL,
+		ereport(FATAL,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("must be superuser to connect during database shutdown")));
 	}
@@ -759,45 +748,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		ereport(FATAL,
 				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
 				 errmsg("remaining connection slots are reserved for non-replication superuser connections")));
-
-	/* Check replication permissions needed for walsender processes. */
-	if (am_walsender)
-	{
-		Assert(!bootstrap);
-
-		if (!superuser() && !has_rolreplication(GetUserId()))
-			ereport(FATAL,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser or replication role to start walsender")));
-	}
-
-	/*
-	 * If this is a plain walsender only supporting physical replication, we
-	 * don't want to connect to any particular database. Just finish the
-	 * backend startup by processing any options from the startup packet, and
-	 * we're done.
-	 */
-	if (am_walsender && !am_db_walsender)
-	{
-		/* process any options passed in the startup packet */
-		if (MyProcPort != NULL)
-			process_startup_options(MyProcPort, am_superuser);
-
-		/* Apply PostAuthDelay as soon as we've read all options */
-		if (PostAuthDelay > 0)
-			pg_usleep(PostAuthDelay * 1000000L);
-
-		/* initialize client encoding */
-		InitializeClientEncoding();
-
-		/* report this backend in the PgBackendStatus array */
-		pgstat_bestart();
-
-		/* close the transaction we started above */
-		CommitTransactionCommand();
-
-		return;
-	}
 
 	/*
 	 * Set up the global variables holding database id and default tablespace.

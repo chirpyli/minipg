@@ -218,7 +218,6 @@ BackgroundWorkerArray
 BackgroundWorkerHandle
 BackgroundWorkerSlot
 Barrier
-BaseBackupCmd
 BeginDirectModify_function
 BeginForeignInsert_function
 BeginForeignModify_function
@@ -463,7 +462,6 @@ CreateOpFamilyStmt
 CreatePLangStmt
 CreatePolicyStmt
 CreateRangeStmt
-CreateReplicationSlotCmd
 CreateRoleStmt
 CreateSchemaStmt
 CreateSchemaStmtContext
@@ -554,7 +552,6 @@ DomainConstraintType
 DomainIOData
 DropBehavior
 DropOwnedStmt
-DropReplicationSlotCmd
 DropRoleStmt
 DropStmt
 DropTableSpaceStmt
@@ -1044,7 +1041,6 @@ ITEM
 IV
 IdentLine
 IdentifierLookup
-IdentifySystemCmd
 IfStackElem
 ImportForeignSchemaStmt
 ImportForeignSchemaType
@@ -2152,12 +2148,6 @@ ReparameterizeForeignPathByChild_function
 ReplaceVarsFromTargetList_context
 ReplaceVarsNoMatchOption
 ReplicaIdentityStmt
-ReplicationKind
-ReplicationSlot
-ReplicationSlotCtlData
-ReplicationSlotOnDisk
-ReplicationSlotPersistency
-ReplicationSlotPersistentData
 ReplicationState
 ReplicationStateCtl
 ReplicationStateOnDisk
@@ -2235,7 +2225,6 @@ SPLITCOST
 SPNode
 SPNodeData
 SPPageDesc
-SQLCmd
 SQLDropObject
 SQLFunctionCache
 SQLFunctionCachePtr
@@ -2419,7 +2408,6 @@ StackElem
 StartBlobPtrType
 StartBlobsPtrType
 StartDataPtrType
-StartReplicationCmd
 StartupStatusEnum
 StatEntry
 StatExtEntry
@@ -2468,8 +2456,6 @@ SupportRequestSelectivity
 SupportRequestSimplify
 Syn
 SyncOps
-SyncRepConfigData
-SyncRepStandbyData
 SyncRequestHandler
 SyncRequestType
 SysFKRelationship
@@ -2585,7 +2571,6 @@ TidRangeScanState
 TidScan
 TidScanState
 TimeADT
-TimeLineHistoryCmd
 TimeLineHistoryEntry
 TimeLineID
 TimeOffset
@@ -2774,17 +2759,8 @@ WaitEventTimeout
 WaitPMResult
 WalCloseMethod
 WalLevel
-WalRcvData
-WalRcvExecResult
-WalRcvExecStatus
-WalRcvState
-WalRcvStreamOptions
 WalReceiverConn
 WalReceiverFunctionsType
-WalSnd
-WalSndCtlData
-WalSndSendDataCallback
-WalSndState
 WalTimeSample
 WalUsage
 WalWriteMethod
@@ -3563,21 +3539,6 @@ varattrib_1b_e
 varattrib_4b
 vbits
 verifier_context
-walrcv_check_conninfo_fn
-walrcv_connect_fn
-walrcv_create_slot_fn
-walrcv_disconnect_fn
-walrcv_endstreaming_fn
-walrcv_exec_fn
-walrcv_get_backend_pid_fn
-walrcv_get_conninfo_fn
-walrcv_get_senderinfo_fn
-walrcv_identify_system_fn
-walrcv_readtimelinehistoryfile_fn
-walrcv_receive_fn
-walrcv_send_fn
-walrcv_server_version_fn
-walrcv_startstreaming_fn
 wchar2mb_with_len_converter
 wchar_t
 win32_deadchild_waitinfo

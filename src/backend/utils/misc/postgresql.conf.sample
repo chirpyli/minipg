@@ -269,13 +269,6 @@
 
 # Set these on the primary and on any standby that will send replication data.
 
-#max_wal_senders = 10		# max number of walsender processes
-				# (change requires restart)
-#max_replication_slots = 10	# max number of replication slots
-				# (change requires restart)
-#wal_keep_size = 0		# in megabytes; 0 disables
-#max_slot_wal_keep_size = -1	# in megabytes; -1 disables
-#wal_sender_timeout = 60s	# in milliseconds; 0 disables
 #track_commit_timestamp = off	# collect timestamp of transaction commit
 				# (change requires restart)
 
@@ -389,7 +382,7 @@
 					# requires logging_collector to be on.
 
 # This is used when logging to stderr:
-#logging_collector = off		# Enable capturing of stderr and csvlog
+#logging_collector = on		# Enable capturing of stderr and csvlog
 					# into log files. Required to be on for
 					# csvlogs.
 					# (change requires restart)

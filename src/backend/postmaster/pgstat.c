@@ -51,8 +51,6 @@
 #include "postmaster/fork_process.h"
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
-#include "replication/slot.h"
-#include "replication/walsender.h"
 #include "storage/backendid.h"
 #include "storage/dsm.h"
 #include "storage/fd.h"
@@ -1110,24 +1108,6 @@ pgstat_vacuum_stat(void)
 
 	/* Clean up */
 	hash_destroy(htab);
-
-	/*
-	 * Search for all the dead replication slots in stats hashtable and tell
-	 * the stats collector to drop them.
-	 */
-	if (replSlotStatHash)
-	{
-		PgStat_StatReplSlotEntry *slotentry;
-
-		hash_seq_init(&hstat, replSlotStatHash);
-		while ((slotentry = (PgStat_StatReplSlotEntry *) hash_seq_search(&hstat)) != NULL)
-		{
-			CHECK_FOR_INTERRUPTS();
-
-			if (SearchNamedReplicationSlot(NameStr(slotentry->slotname), true) == NULL)
-				pgstat_report_replslot_drop(NameStr(slotentry->slotname));
-		}
-	}
 
 	/*
 	 * Lookup our own database entry; if not found, nothing more to do.

@@ -13,8 +13,7 @@ use Config;
 
 my $primary = get_new_node('primary');
 $primary->init(
-	has_archiving    => 1,
-	allows_streaming => 1);
+	has_archiving => 1);
 $primary->append_conf('postgresql.conf', 'autovacuum = off');
 $primary->start;
 my $primary_data = $primary->data_dir;

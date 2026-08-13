@@ -57,10 +57,6 @@
 #include "postmaster/autovacuum.h"
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
-#include "replication/logicallauncher.h"
-#include "replication/logicalworker.h"
-#include "replication/slot.h"
-#include "replication/walsender.h"
 #include "rewrite/rewriteHandler.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
@@ -191,7 +187,6 @@ static int	InteractiveBackend(StringInfo inBuf);
 static int	interactive_getc(void);
 static int	SocketBackend(StringInfo inBuf);
 static int	ReadCommand(StringInfo inBuf);
-static void forbidden_in_wal_sender(char firstchar);
 static bool check_log_statement(List *stmt_list);
 static int	errdetail_execute(List *raw_parsetree_list);
 static int	errdetail_params(ParamListInfo params);
@@ -4062,13 +4057,9 @@ PostgresMain(int argc, char *argv[],
 	 * an issue for signals that are locally generated, such as SIGALRM and
 	 * SIGPIPE.)
 	 */
-	if (am_walsender)
-		WalSndSignals();
-	else
-	{
-		pqsignal(SIGHUP, SignalHandlerForConfigReload);
-		pqsignal(SIGINT, StatementCancelHandler);	/* cancel current query */
-		pqsignal(SIGTERM, die); /* cancel current query and exit */
+	pqsignal(SIGHUP, SignalHandlerForConfigReload);
+	pqsignal(SIGINT, StatementCancelHandler);	/* cancel current query */
+	pqsignal(SIGTERM, die); /* cancel current query and exit */
 
 		/*
 		 * In a postmaster child backend, replace SignalHandlerForCrashExit
@@ -4101,7 +4092,6 @@ PostgresMain(int argc, char *argv[],
 		 */
 		pqsignal(SIGCHLD, SIG_DFL); /* system() requires this on some
 									 * platforms */
-	}
 
 	if (!IsUnderPostmaster)
 	{
@@ -4176,10 +4166,6 @@ PostgresMain(int argc, char *argv[],
 		on_proc_exit(log_disconnections, 0);
 
 	pgstat_report_connect(MyDatabaseId);
-
-	/* Perform initialization specific to a WAL sender process. */
-	if (am_walsender)
-		InitWalSender();
 
 	/*
 	 * process any libraries that should be preloaded at backend start (this
@@ -4308,23 +4294,7 @@ PostgresMain(int argc, char *argv[],
 		 */
 		AbortCurrentTransaction();
 
-		if (am_walsender)
-			WalSndErrorCleanup();
-
 		PortalErrorCleanup();
-
-		/*
-		 * We can't release replication slots inside AbortTransaction() as we
-		 * need to be able to start and abort transactions while having a slot
-		 * acquired. But we never need to hold them across top level errors,
-		 * so releasing here is fine. There's another cleanup in ProcKill()
-		 * ensuring we'll correctly cleanup on FATAL errors as well.
-		 */
-		if (MyReplicationSlot != NULL)
-			ReplicationSlotRelease();
-
-		/* We also want to cleanup temporary slots on error. */
-		ReplicationSlotCleanup();
 
 		/*
 		 * Now return to normal top-level context and clear ErrorContext for
@@ -4541,13 +4511,7 @@ PostgresMain(int argc, char *argv[],
 					query_string = pq_getmsgstring(&input_message);
 					pq_getmsgend(&input_message);
 
-					if (am_walsender)
-					{
-						if (!exec_replication_command(query_string))
-							exec_simple_query(query_string);
-					}
-					else
-						exec_simple_query(query_string);
+					exec_simple_query(query_string);
 
 					send_ready_for_query = true;
 				}
@@ -4560,7 +4524,6 @@ PostgresMain(int argc, char *argv[],
 					int			numParams;
 					Oid		   *paramTypes = NULL;
 
-					forbidden_in_wal_sender(firstchar);
 
 					/* Set statement_timestamp() */
 					SetCurrentStatementStartTimestamp();
@@ -4582,7 +4545,6 @@ PostgresMain(int argc, char *argv[],
 				break;
 
 			case 'B':			/* bind */
-				forbidden_in_wal_sender(firstchar);
 
 				/* Set statement_timestamp() */
 				SetCurrentStatementStartTimestamp();
@@ -4599,7 +4561,6 @@ PostgresMain(int argc, char *argv[],
 					const char *portal_name;
 					int			max_rows;
 
-					forbidden_in_wal_sender(firstchar);
 
 					/* Set statement_timestamp() */
 					SetCurrentStatementStartTimestamp();
@@ -4613,7 +4574,6 @@ PostgresMain(int argc, char *argv[],
 				break;
 
 			case 'F':			/* fastpath function call */
-				forbidden_in_wal_sender(firstchar);
 
 				/* Set statement_timestamp() */
 				SetCurrentStatementStartTimestamp();
@@ -4650,7 +4610,6 @@ PostgresMain(int argc, char *argv[],
 					int			close_type;
 					const char *close_target;
 
-					forbidden_in_wal_sender(firstchar);
 
 					close_type = pq_getmsgbyte(&input_message);
 					close_target = pq_getmsgstring(&input_message);
@@ -4694,7 +4653,6 @@ PostgresMain(int argc, char *argv[],
 					int			describe_type;
 					const char *describe_target;
 
-					forbidden_in_wal_sender(firstchar);
 
 					/* Set statement_timestamp() (needed for xact) */
 					SetCurrentStatementStartTimestamp();
@@ -4781,29 +4739,6 @@ PostgresMain(int argc, char *argv[],
 								firstchar)));
 		}
 	}							/* end of input-reading loop */
-}
-
-/*
- * Throw an error if we're a WAL sender process.
- *
- * This is used to forbid anything else than simple query protocol messages
- * in a WAL sender process.  'firstchar' specifies what kind of a forbidden
- * message was received, and is used to construct the error message.
- */
-static void
-forbidden_in_wal_sender(char firstchar)
-{
-	if (am_walsender)
-	{
-		if (firstchar == 'F')
-			ereport(ERROR,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("fastpath function calls not supported in a replication connection")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("extended query protocol not supported in a replication connection")));
-	}
 }
 
 

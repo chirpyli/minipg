@@ -53,7 +53,7 @@ sub test_recovery_standby
 
 # Initialize primary node
 my $node_primary = get_new_node('primary');
-$node_primary->init(has_archiving => 1, allows_streaming => 1);
+$node_primary->init(has_archiving => 1);
 
 # Bump the transaction ID epoch.  This is useful to stress the portability
 # of recovery_target_xid parsing.
