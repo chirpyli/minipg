@@ -108,7 +108,6 @@ extern int	wal_segment_size;
 extern int	min_wal_size_mb;
 extern int	max_wal_size_mb;
 extern int	wal_keep_size_mb;
-extern int	max_slot_wal_keep_size_mb;
 extern int	XLOGbuffers;
 extern int	wal_retrieve_retry_interval;
 extern bool EnableHotStandby;
@@ -286,7 +285,6 @@ extern int	XLogFileOpen(XLogSegNo segno);
 extern void CheckXLogRemoved(XLogSegNo segno, TimeLineID tli);
 extern XLogSegNo XLogGetLastRemovedSegno(void);
 extern void XLogSetAsyncXactLSN(XLogRecPtr record);
-extern void XLogSetReplicationSlotMinimumLSN(XLogRecPtr lsn);
 
 extern void xlog_redo(XLogReaderState *record);
 extern void xlog_desc(StringInfo buf, XLogReaderState *record);

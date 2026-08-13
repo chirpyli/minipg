@@ -41,13 +41,10 @@ SyncRepLock							32
 BackgroundWorkerLock				33
 DynamicSharedMemoryControlLock		34
 AutoFileLock						35
-ReplicationSlotAllocationLock		36
-ReplicationSlotControlLock			37
 CommitTsSLRULock					38
 CommitTsLock						39
 MultiXactTruncationLock				41
 OldSnapshotTimeMapLock				42
-LogicalRepWorkerLock				43
 XactTruncationLock					44
 # 45 was XactTruncationLock until removal of BackendRandomLock
 WrapLimitsVacuumLock				46

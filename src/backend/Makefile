@@ -19,7 +19,7 @@ include $(top_builddir)/src/Makefile.global
 
 SUBDIRS = access bootstrap catalog parser commands executor lib libpq \
 	main nodes optimizer port postmaster \
-	replication rewrite \
+	rewrite \
 	statistics storage tcop utils $(top_builddir)/src/timezone
 
 include $(srcdir)/common.mk
@@ -184,7 +184,6 @@ distprep:
 	$(MAKE) -C parser	gram.c gram.h scan.c
 	$(MAKE) -C bootstrap	bootparse.c bootscanner.c
 	$(MAKE) -C catalog	distprep
-	$(MAKE) -C replication	repl_gram.c repl_scanner.c syncrep_gram.c syncrep_scanner.c
 	$(MAKE) -C storage/lmgr	lwlocknames.h lwlocknames.c
 	$(MAKE) -C utils	distprep
 	$(MAKE) -C utils/misc	guc-file.c
@@ -285,12 +284,8 @@ maintainer-clean: distclean
 	      parser/gram.c \
 	      parser/gram.h \
 	      parser/scan.c \
-	      replication/repl_gram.c \
-	      replication/repl_scanner.c \
-	      replication/syncrep_gram.c \
-	      replication/syncrep_scanner.c \
-      storage/lmgr/lwlocknames.c \
-      storage/lmgr/lwlocknames.h \
+	      storage/lmgr/lwlocknames.c \
+	      storage/lmgr/lwlocknames.h \
       utils/misc/guc-file.c
 
 

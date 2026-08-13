@@ -101,7 +101,6 @@ int			wal_level = WAL_LEVEL_MINIMAL;
 int			CommitDelay = 0;	/* precommit delay in microseconds */
 int			CommitSiblings = 5; /* # concurrent xacts needed to sleep */
 int			wal_retrieve_retry_interval = 5000;
-int			max_slot_wal_keep_size_mb = -1;
 bool		track_wal_io_timing = false;
 
 #ifdef WAL_DEBUG
@@ -595,7 +594,6 @@ typedef struct XLogCtlData
 	XLogRecPtr	RedoRecPtr;		/* a recent copy of Insert->RedoRecPtr */
 	FullTransactionId ckptFullXid;	/* nextXid of latest checkpoint */
 	XLogRecPtr	asyncXactLSN;	/* LSN of newest async commit/abort */
-	XLogRecPtr	replicationSlotMinLSN;	/* oldest LSN needed by any slot */
 
 	XLogSegNo	lastRemovedSegNo;	/* latest removed/recycled XLOG segment */
 
@@ -908,9 +906,7 @@ static void LocalSetXLogInsertAllowed(void);
 static void CreateEndOfRecoveryRecord(void);
 static XLogRecPtr CreateOverwriteContrecordRecord(XLogRecPtr aborted_lsn);
 static void CheckPointGuts(XLogRecPtr checkPointRedo, int flags);
-static void KeepLogSeg(XLogRecPtr recptr, XLogRecPtr slotsMinLSN,
-					   XLogSegNo *logSegNo);
-static XLogRecPtr XLogGetReplicationSlotMinimumLSN(void);
+static void KeepLogSeg(XLogRecPtr recptr, XLogSegNo *logSegNo);
 
 static void AdvanceXLInsertBuffer(XLogRecPtr upto, bool opportunistic);
 static bool XLogCheckpointNeeded(XLogSegNo new_segno);
@@ -2751,35 +2747,6 @@ XLogSetAsyncXactLSN(XLogRecPtr asyncXactLSN)
 	 */
 	if (ProcGlobal->walwriterLatch)
 		SetLatch(ProcGlobal->walwriterLatch);
-}
-
-/*
- * Record the LSN up to which we can remove WAL because it's not required by
- * any replication slot.
- */
-void
-XLogSetReplicationSlotMinimumLSN(XLogRecPtr lsn)
-{
-	SpinLockAcquire(&XLogCtl->info_lck);
-	XLogCtl->replicationSlotMinLSN = lsn;
-	SpinLockRelease(&XLogCtl->info_lck);
-}
-
-
-/*
- * Return the oldest LSN we must retain to satisfy the needs of some
- * replication slot.
- */
-static XLogRecPtr
-XLogGetReplicationSlotMinimumLSN(void)
-{
-	XLogRecPtr	retval;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	retval = XLogCtl->replicationSlotMinLSN;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return retval;
 }
 
 /*
@@ -8983,7 +8950,6 @@ CreateCheckPoint(int flags)
 	XLogRecPtr	last_important_lsn;
 	VirtualTransactionId *vxids;
 	int			nvxids;
-	XLogRecPtr	slotsMinReqLSN;
 
 	/*
 	 * An end-of-recovery checkpoint is really a shutdown checkpoint, just
@@ -9198,25 +9164,6 @@ CreateCheckPoint(int flags)
 	END_CRIT_SECTION();
 
 	/*
-	 * Get the current minimum LSN to be used later in the WAL segment
-	 * cleanup.  We may clean up only WAL segments, which are not needed
-	 * according to synchronized LSNs of replication slots.  The slot's LSN
-	 * might be advanced concurrently, so we call this before
-	 * CheckPointReplicationSlots() synchronizes replication slots.
-	 *
-	 * We acquire the Allocation lock to serialize the minimum LSN calculation
-	 * with concurrent slot WAL reservation. This ensures that the WAL
-	 * position being reserved is either included in the miminum LSN or is
-	 * beyond or equal to the redo pointer of the current checkpoint (See
-	 * ReplicationSlotReserveWal for details), thus preventing its removal by
-	 * checkpoints. Note that this lock is required only during checkpoints
-	 * where WAL removal is dictated by the slot's minimum LSN.
-	 */
-	LWLockAcquire(ReplicationSlotAllocationLock, LW_SHARED);
-	slotsMinReqLSN = XLogGetReplicationSlotMinimumLSN();
-	LWLockRelease(ReplicationSlotAllocationLock);
-
-	/*
 	 * In some cases there are groups of actions that must all occur on one
 	 * side or the other of a checkpoint record. Before flushing the
 	 * checkpoint record we must explicitly wait for any backend currently
@@ -9380,7 +9327,7 @@ CreateCheckPoint(int flags)
 	 * prevent the disk holding the xlog from growing full.
 	 */
 	XLByteToSeg(RedoRecPtr, _logSegNo, wal_segment_size);
-	KeepLogSeg(recptr, recptr, &_logSegNo);
+	KeepLogSeg(recptr, &_logSegNo);
 	_logSegNo--;
 	RemoveOldXlogFiles(_logSegNo, RedoRecPtr, recptr);
 
@@ -9608,7 +9555,6 @@ CreateRestartPoint(int flags)
 	XLogRecPtr	endptr;
 	XLogSegNo	_logSegNo;
 	TimestampTz xtime;
-	XLogRecPtr	slotsMinReqLSN;
 
 	/* Get a local copy of the last safe checkpoint record. */
 	SpinLockAcquire(&XLogCtl->info_lck);
@@ -9688,23 +9634,6 @@ CreateRestartPoint(int flags)
 	 */
 	MemSet(&CheckpointStats, 0, sizeof(CheckpointStats));
 	CheckpointStats.ckpt_start_t = GetCurrentTimestamp();
-
-	/*
-	 * Get the current minimum LSN to be used later in the WAL segment
-	 * cleanup.  We may clean up only WAL segments, which are not needed
-	 * according to synchronized LSNs of replication slots.  The slot's LSN
-	 * might be advanced concurrently, so we call this before
-	 * CheckPointReplicationSlots() synchronizes replication slots.
-	 *
-	 * We acquire the Allocation lock to serialize the minimum LSN calculation
-	 * with concurrent slot WAL reservation. This ensures that the WAL
-	 * position being reserved is either included in the miminum LSN or is
-	 * beyond or equal to the redo pointer of the current checkpoint (See
-	 * ReplicationSlotReserveWal for details).
-	 */
-	LWLockAcquire(ReplicationSlotAllocationLock, LW_SHARED);
-	slotsMinReqLSN = XLogGetReplicationSlotMinimumLSN();
-	LWLockRelease(ReplicationSlotAllocationLock);
 
 	if (log_checkpoints)
 		LogCheckpointStart(flags, true);
@@ -9792,7 +9721,7 @@ CreateRestartPoint(int flags)
 	 */
 	replayPtr = GetXLogReplayRecPtr(&replayTLI);
 	endptr = replayPtr;
-	KeepLogSeg(endptr, replayPtr, &_logSegNo);
+	KeepLogSeg(endptr, &_logSegNo);
 	_logSegNo--;
 
 	/*
@@ -9894,7 +9823,6 @@ GetWALAvailability(XLogRecPtr targetLSN)
 	XLogSegNo	oldestSegMaxWalSize;	/* oldest segid kept by max_wal_size */
 	XLogSegNo	oldestSlotSeg;	/* oldest segid kept by slot */
 	uint64		keepSegs;
-	XLogRecPtr	slotsMinReqLSN;
 
 	/*
 	 * slot does not reserve WAL. Either deactivated, or has never been active
@@ -9908,9 +9836,8 @@ GetWALAvailability(XLogRecPtr targetLSN)
 	 * oldestSlotSeg to the current segment.
 	 */
 	currpos = GetXLogWriteRecPtr();
-	slotsMinReqLSN = XLogGetReplicationSlotMinimumLSN();
 	XLByteToSeg(currpos, oldestSlotSeg, wal_segment_size);
-	KeepLogSeg(currpos, slotsMinReqLSN, &oldestSlotSeg);
+	KeepLogSeg(currpos, &oldestSlotSeg);
 
 	/*
 	 * Find the oldest extant segment file. We get 1 until checkpoint removes
@@ -9956,53 +9883,19 @@ GetWALAvailability(XLogRecPtr targetLSN)
 
 /*
  * Retreat *logSegNo to the last segment that we need to retain because of
- * either wal_keep_size or replication slots.
- *
- * This is calculated by subtracting wal_keep_size from the given xlog
- * location, recptr and by making sure that that result is below the
- * requirement of replication slots.  For the latter criterion we do consider
- * the effects of max_slot_wal_keep_size: reserve at most that much space back
- * from recptr.
- *
- * Note about replication slots: if this function calculates a value
- * that's further ahead than what slots need reserved, then affected
- * slots need to be invalidated and this function invoked again.
- * XXX it might be a good idea to rewrite this function so that
- * invalidation is optionally done here, instead.
+ * wal_keep_size. This is calculated by subtracting wal_keep_size from the
+ * given xlog location, recptr.
  */
 static void
-KeepLogSeg(XLogRecPtr recptr, XLogRecPtr slotsMinReqLSN, XLogSegNo *logSegNo)
+KeepLogSeg(XLogRecPtr recptr, XLogSegNo *logSegNo)
 {
 	XLogSegNo	currSegNo;
 	XLogSegNo	segno;
-	XLogRecPtr	keep;
 
 	XLByteToSeg(recptr, currSegNo, wal_segment_size);
 	segno = currSegNo;
 
-	/*
-	 * Calculate how many segments are kept by slots first, adjusting for
-	 * max_slot_wal_keep_size.
-	 */
-	keep = slotsMinReqLSN;
-	if (keep != InvalidXLogRecPtr && keep < recptr)
-	{
-		XLByteToSeg(keep, segno, wal_segment_size);
-
-		/* Cap by max_slot_wal_keep_size ... */
-		if (max_slot_wal_keep_size_mb >= 0)
-		{
-			uint64		slot_keep_segs;
-
-			slot_keep_segs =
-				ConvertToXSegs(max_slot_wal_keep_size_mb, wal_segment_size);
-
-			if (currSegNo - segno > slot_keep_segs)
-				segno = currSegNo - slot_keep_segs;
-		}
-	}
-
-	/* but, keep at least wal_keep_size if that's set */
+	/* keep at least wal_keep_size if that's set */
 	if (wal_keep_size_mb > 0)
 	{
 		uint64		keep_segs;
