@@ -35,7 +35,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_description.h"
 #include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
@@ -47,7 +46,6 @@
 #include "catalog/pg_range.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_shdepend.h"
-#include "catalog/pg_shdescription.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_statistic_ext_data.h"
@@ -1272,8 +1270,6 @@ RelationInvalidatesSnapshotsOnly(Oid relid)
 		case DbRoleSettingRelationId:
 		case DependRelationId:
 		case SharedDependRelationId:
-		case DescriptionRelationId:
-		case SharedDescriptionRelationId:
 			return true;
 		default:
 			break;

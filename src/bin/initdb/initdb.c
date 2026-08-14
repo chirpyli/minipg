@@ -201,7 +201,6 @@ static void setup_auth(FILE *cmdfd);
 static void get_su_pwd(void);
 static void setup_depend(FILE *cmdfd);
 static void setup_run_file(FILE *cmdfd, const char *filename);
-static void setup_description(FILE *cmdfd);
 static void setup_collation(FILE *cmdfd);
 static void vacuum_db(FILE *cmdfd);
 static void make_template0(FILE *cmdfd);
@@ -1310,27 +1309,6 @@ setup_run_file(FILE *cmdfd, const char *filename)
 }
 
 /*
- * fill in extra description data
- */
-static void
-setup_description(FILE *cmdfd)
-{
-	/* Create default descriptions for operator implementation functions */
-	PG_CMD_PUTS("INSERT INTO pg_description "
-				"  SELECT p_oid, 'pg_proc'::regclass, 0, "
-				"    'implementation of ' || oprname || ' operator' "
-				"  FROM ("
-				"    SELECT p.oid as p_oid, o.oid as o_oid, oprname "
-				"    FROM pg_proc p JOIN pg_operator o ON oprcode = p.oid"
-				"  ) funcdescs "
-				"  WHERE NOT EXISTS (SELECT 1 FROM pg_description "
-				"   WHERE objoid = p_oid AND classoid = 'pg_proc'::regclass) "
-				"  AND NOT EXISTS (SELECT 1 FROM pg_description "
-				"   WHERE objoid = o_oid AND classoid = 'pg_operator'::regclass"
-				"         AND description LIKE 'deprecated%');\n\n");
-}
-
-/*
  * populate pg_collation
  */
 static void
@@ -1376,8 +1354,6 @@ make_template0(FILE *cmdfd)
 		"    (SELECT oid FROM pg_database "
 		"    WHERE datname = 'template0');\n\n",
 
-		"COMMENT ON DATABASE template0 IS 'unmodifiable empty database';\n\n",
-
 		/*
 		 * Finally vacuum to clean up dead rows in pg_database
 		 */
@@ -1398,7 +1374,6 @@ make_postgres(FILE *cmdfd)
 	const char *const *line;
 	static const char *const postgres_setup[] = {
 		"CREATE DATABASE postgres;\n\n",
-		"COMMENT ON DATABASE postgres IS 'default administrative connection database';\n\n",
 		NULL
 	};
 
@@ -2227,8 +2202,6 @@ initialize_data_directory(void)
 	 */
 
 	setup_run_file(cmdfd, system_views_file);
-
-	setup_description(cmdfd);
 
 	setup_collation(cmdfd);
 

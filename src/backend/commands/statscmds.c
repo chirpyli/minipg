@@ -26,7 +26,6 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_statistic_ext_data.h"
-#include "commands/comment.h"
 #include "commands/defrem.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -622,11 +621,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 	 * here too, but we'd have to add support for ALTER EXTENSION ADD/DROP
 	 * STATISTICS, which is more work than it seems worth.
 	 */
-
-	/* Add any requested comment */
-	if (stmt->stxcomment != NULL)
-		CreateComments(statoid, StatisticExtRelationId, 0,
-					   stmt->stxcomment);
 
 	/* Return stats object's address */
 	return myself;

@@ -112,14 +112,6 @@ CREATE FUNCTION get_default_test() RETURNS SETOF default_test_row AS '
 
 SELECT * FROM get_default_test();
 
--- Test comments
-COMMENT ON TYPE bad IS 'bad comment';
-COMMENT ON TYPE default_test_row IS 'good comment';
-COMMENT ON TYPE default_test_row IS NULL;
-COMMENT ON COLUMN default_test_row.nope IS 'bad comment';
-COMMENT ON COLUMN default_test_row.f1 IS 'good comment';
-COMMENT ON COLUMN default_test_row.f1 IS NULL;
-
 -- Check shell type create for existing types
 CREATE TYPE text_w_default;		-- should fail
 

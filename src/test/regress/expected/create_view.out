@@ -25,13 +25,6 @@ CREATE VIEW toyemp AS
 ERROR:  relation "emp" does not exist
 LINE 3:    FROM emp;
                 ^
--- Test comments
-COMMENT ON VIEW noview IS 'no view';
-ERROR:  relation "noview" does not exist
-COMMENT ON VIEW toyemp IS 'is a view';
-ERROR:  relation "toyemp" does not exist
-COMMENT ON VIEW toyemp IS NULL;
-ERROR:  relation "toyemp" does not exist
 -- These views are left around mainly to exercise special cases in pg_dump.
 CREATE TABLE view_base_table (key int PRIMARY KEY, data varchar(20));
 CREATE VIEW key_dependent_view AS

@@ -39,7 +39,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_type.h"
-#include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -521,7 +520,6 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 	Relation	relation;
 	TupleDesc	tupleDesc;
 	AclResult	aclresult;
-	char	   *comment;
 	ParseCallbackState pcbstate;
 
 	setup_parser_errposition_callback(&pcbstate, cxt->pstate,
@@ -633,23 +631,6 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 				pstrdup(GetCompressionMethodName(attribute->attcompression));
 		else
 			def->compression = NULL;
-
-		/* Likewise, copy comment if requested */
-		if ((table_like_clause->options & CREATE_TABLE_LIKE_COMMENTS) &&
-			(comment = GetComment(attribute->attrelid,
-								  RelationRelationId,
-								  attribute->attnum)) != NULL)
-		{
-			CommentStmt *stmt = makeNode(CommentStmt);
-
-			stmt->objtype = OBJECT_COLUMN;
-			stmt->object = (Node *) list_make3(makeString(cxt->relation->schemaname),
-											   makeString(cxt->relation->relname),
-											   makeString(def->colname));
-			stmt->comment = comment;
-
-			cxt->alist = lappend(cxt->alist, stmt);
-		}
 	}
 
 	/*
@@ -699,7 +680,6 @@ expandTableLikeClause(RangeVar *heapRel, TableLikeClause *table_like_clause)
 	TupleDesc	tupleDesc;
 	TupleConstr *constr;
 	AttrMap    *attmap;
-	char	   *comment;
 
 	/*
 	 * Open the relation referenced by the LIKE clause.  We should still have
@@ -857,24 +837,6 @@ expandTableLikeClause(RangeVar *heapRel, TableLikeClause *table_like_clause)
 			atsubcmd->subtype = AT_AddConstraint;
 			atsubcmd->def = (Node *) n;
 			atsubcmds = lappend(atsubcmds, atsubcmd);
-
-			/* Copy comment on constraint */
-			if ((table_like_clause->options & CREATE_TABLE_LIKE_COMMENTS) &&
-				(comment = GetComment(get_relation_constraint_oid(RelationGetRelid(relation),
-																  n->conname, false),
-									  ConstraintRelationId,
-									  0)) != NULL)
-			{
-				CommentStmt *stmt = makeNode(CommentStmt);
-
-				stmt->objtype = OBJECT_TABCONSTRAINT;
-				stmt->object = (Node *) list_make3(makeString(heapRel->schemaname),
-												   makeString(heapRel->relname),
-												   makeString(n->conname));
-				stmt->comment = comment;
-
-				result = lappend(result, stmt);
-			}
 		}
 	}
 
@@ -919,18 +881,6 @@ expandTableLikeClause(RangeVar *heapRel, TableLikeClause *table_like_clause)
 												 attmap,
 												 NULL);
 
-			/* Copy comment on index, if requested */
-			if (table_like_clause->options & CREATE_TABLE_LIKE_COMMENTS)
-			{
-				comment = GetComment(parent_index_oid, RelationRelationId, 0);
-
-				/*
-				 * We make use of IndexStmt's idxcomment option, so as not to
-				 * need to know now what name the index will have.
-				 */
-				index_stmt->idxcomment = comment;
-			}
-
 			result = lappend(result, index_stmt);
 
 			index_close(parent_index, AccessShareLock);
@@ -956,18 +906,6 @@ expandTableLikeClause(RangeVar *heapRel, TableLikeClause *table_like_clause)
 													RelationGetRelid(childrel),
 													parent_stat_oid,
 													attmap);
-
-			/* Copy comment on statistics object, if requested */
-			if (table_like_clause->options & CREATE_TABLE_LIKE_COMMENTS)
-			{
-				comment = GetComment(parent_stat_oid, StatisticExtRelationId, 0);
-
-				/*
-				 * We make use of CreateStatsStmt's stxcomment option, so as
-				 * not to need to know now what name the statistics will have.
-				 */
-				stats_stmt->stxcomment = comment;
-			}
 
 			result = lappend(result, stats_stmt);
 		}
@@ -1119,7 +1057,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	else
 		index->tableSpace = NULL;
 	index->excludeOpNames = NIL;
-	index->idxcomment = NULL;
 	index->indexOid = InvalidOid;
 	index->oldNode = InvalidOid;
 	index->oldCreateSubid = InvalidSubTransactionId;
@@ -1527,7 +1464,6 @@ generateClonedExtStatsStmt(RangeVar *heapRel, Oid heapRelid,
 	stats->stat_types = stat_types;
 	stats->exprs = def_names;
 	stats->relations = list_make1(heapRel);
-	stats->stxcomment = NULL;
 	stats->transformed = true;	/* don't need transformStatsStmt again */
 	stats->if_not_exists = false;
 
@@ -1754,7 +1690,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->indexParams = NIL;
 	index->indexIncludingParams = NIL;
 	index->excludeOpNames = NIL;
-	index->idxcomment = NULL;
 	index->indexOid = InvalidOid;
 	index->oldNode = InvalidOid;
 	index->oldCreateSubid = InvalidSubTransactionId;
@@ -2645,20 +2580,17 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 						List **beforeStmts, List **afterStmts)
 {
 	Relation	rel;
-	TupleDesc	tupdesc;
 	ParseState *pstate;
 	CreateStmtContext cxt;
 	List	   *save_alist;
 	ListCell   *lcmd,
 			   *l;
 	List	   *newcmds = NIL;
-	bool		skipValidation = true;
 	AlterTableCmd *newcmd;
 	ParseNamespaceItem *nsitem;
 
 	/* Caller is responsible for locking the relation */
 	rel = relation_open(relid, NoLock);
-	tupdesc = RelationGetDescr(rel);
 
 	/* Set up pstate */
 	pstate = make_parsestate(NULL);
@@ -2705,13 +2637,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 					ColumnDef  *def = castNode(ColumnDef, cmd->def);
 
 					transformColumnDefinition(&cxt, def);
-
-					/*
-					 * If the column has a non-null default, we can't skip
-					 * validation of foreign keys.
-					 */
-					if (def->raw_default != NULL)
-						skipValidation = false;
 
 					/*
 					 * All constraints are processed in other ways. Remove the

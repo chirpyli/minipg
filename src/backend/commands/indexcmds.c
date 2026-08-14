@@ -33,7 +33,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
-#include "commands/comment.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/progress.h"
@@ -1033,12 +1032,6 @@ DefineIndex(Oid relationId,
 	 */
 	AtEOXact_GUC(false, root_save_nestlevel);
 	root_save_nestlevel = NewGUCNestLevel();
-
-	/* Add any requested comment */
-	if (stmt->idxcomment != NULL)
-		CreateComments(indexRelationId, RelationRelationId, 0,
-					   stmt->idxcomment);
-
 
 	AtEOXact_GUC(false, root_save_nestlevel);
 	SetUserIdAndSecContext(root_save_userid, root_save_sec_context);

@@ -2506,7 +2506,6 @@ _outIndexStmt(StringInfo str, const IndexStmt *node)
 	WRITE_NODE_FIELD(options);
 	WRITE_NODE_FIELD(whereClause);
 	WRITE_NODE_FIELD(excludeOpNames);
-	WRITE_STRING_FIELD(idxcomment);
 	WRITE_OID_FIELD(indexOid);
 	WRITE_OID_FIELD(oldNode);
 	WRITE_UINT_FIELD(oldCreateSubid);
@@ -2531,7 +2530,6 @@ _outCreateStatsStmt(StringInfo str, const CreateStatsStmt *node)
 	WRITE_NODE_FIELD(stat_types);
 	WRITE_NODE_FIELD(exprs);
 	WRITE_NODE_FIELD(relations);
-	WRITE_STRING_FIELD(stxcomment);
 	WRITE_BOOL_FIELD(transformed);
 	WRITE_BOOL_FIELD(if_not_exists);
 }

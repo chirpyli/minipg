@@ -253,7 +253,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
 		AlterStatsStmt
-		AnalyzeStmt ClosePortalStmt ClusterStmt CommentStmt
+		AnalyzeStmt ClosePortalStmt ClusterStmt
 		ConstraintsSetStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt
@@ -564,7 +564,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	CACHE CALL CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLOSE
-	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMENTS COMMIT
+	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
 	COST CREATE CROSS CSV CUBE CURRENT_P
@@ -810,7 +810,6 @@ stmt:	AlterCollationStmt
 			| CheckPointStmt
 			| ClosePortalStmt
 			| ClusterStmt
-			| CommentStmt
 			| ConstraintsSetStmt
 			| CreateAmStmt
 			| CreateAssertionStmt
@@ -2515,8 +2514,7 @@ TableLikeOptionList:
 		;
 
 TableLikeOption:
-				COMMENTS			{ $$ = CREATE_TABLE_LIKE_COMMENTS; }
-				| COMPRESSION		{ $$ = CREATE_TABLE_LIKE_COMPRESSION; }
+				COMPRESSION		{ $$ = CREATE_TABLE_LIKE_COMPRESSION; }
 				| CONSTRAINTS		{ $$ = CREATE_TABLE_LIKE_CONSTRAINTS; }
 				| DEFAULTS			{ $$ = CREATE_TABLE_LIKE_DEFAULTS; }
 				| IDENTITY_P		{ $$ = CREATE_TABLE_LIKE_IDENTITY; }
@@ -2804,7 +2802,6 @@ CreateStatsStmt:
 					n->stat_types = $4;
 					n->exprs = $6;
 					n->relations = $8;
-					n->stxcomment = NULL;
 					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
@@ -2816,7 +2813,6 @@ CreateStatsStmt:
 					n->stat_types = $7;
 					n->exprs = $9;
 					n->relations = $11;
-					n->stxcomment = NULL;
 					n->if_not_exists = true;
 					$$ = (Node *)n;
 				}
@@ -4301,162 +4297,6 @@ opt_restart_seqs:
 			| /* EMPTY */				{ $$ = false; }
 		;
 
-/*****************************************************************************
- *
- * COMMENT ON <object> IS <text>
- *
- *****************************************************************************/
-
-CommentStmt:
-			COMMENT ON object_type_any_name any_name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = $3;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON COLUMN any_name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_COLUMN;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON object_type_name name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = $3;
-					n->object = (Node *) makeString($4);
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON TYPE_P Typename IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_TYPE;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON DOMAIN_P Typename IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_DOMAIN;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON AGGREGATE aggregate_with_argtypes IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_AGGREGATE;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON FUNCTION function_with_argtypes IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_FUNCTION;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON OPERATOR operator_with_argtypes IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_OPERATOR;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON CONSTRAINT name ON any_name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_TABCONSTRAINT;
-					n->object = (Node *) lappend($6, makeString($4));
-					n->comment = $8;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON CONSTRAINT name ON DOMAIN_P any_name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_DOMCONSTRAINT;
-					/*
-					 * should use Typename not any_name in the production, but
-					 * there's a shift/reduce conflict if we do that, so fix it
-					 * up here.
-					 */
-					n->object = (Node *) list_make2(makeTypeNameFromNameList($7), makeString($4));
-					n->comment = $9;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON object_type_name_on_any_name name ON any_name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = $3;
-					n->object = (Node *) lappend($6, makeString($4));
-					n->comment = $8;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON PROCEDURE function_with_argtypes IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_PROCEDURE;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON ROUTINE function_with_argtypes IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_ROUTINE;
-					n->object = (Node *) $4;
-					n->comment = $6;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON TRANSFORM FOR Typename LANGUAGE name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_TRANSFORM;
-					n->object = (Node *) list_make2($5, makeString($7));
-					n->comment = $9;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON OPERATOR CLASS any_name USING name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_OPCLASS;
-					n->object = (Node *) lcons(makeString($7), $5);
-					n->comment = $9;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON OPERATOR FAMILY any_name USING name IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_OPFAMILY;
-					n->object = (Node *) lcons(makeString($7), $5);
-					n->comment = $9;
-					$$ = (Node *) n;
-				}
-			| COMMENT ON CAST '(' Typename AS Typename ')' IS comment_text
-				{
-					CommentStmt *n = makeNode(CommentStmt);
-					n->objtype = OBJECT_CAST;
-					n->object = (Node *) list_make2($5, $7);
-					n->comment = $10;
-					$$ = (Node *) n;
-				}
-		;
-
-comment_text:
-			Sconst								{ $$ = $1; }
-			| NULL_P							{ $$ = NULL; }
-		;
-
-
 
 /*****************************************************************************
  *
@@ -4650,7 +4490,6 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->tableSpace = $14;
 					n->whereClause = $15;
 					n->excludeOpNames = NIL;
-					n->idxcomment = NULL;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -4680,7 +4519,6 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->tableSpace = $17;
 					n->whereClause = $18;
 					n->excludeOpNames = NIL;
-					n->idxcomment = NULL;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -11300,7 +11138,6 @@ unreserved_keyword:
 			| CLUSTER
 			| COLUMNS
 			| COMMENT
-			| COMMENTS
 			| COMMIT
 			| COMMITTED
 			| COMPRESSION
@@ -11807,7 +11644,6 @@ bare_label_keyword:
 			| COLUMN
 			| COLUMNS
 			| COMMENT
-			| COMMENTS
 			| COMMIT
 			| COMMITTED
 			| COMPRESSION

@@ -33,7 +33,6 @@
 #include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_shdepend.h"
-#include "catalog/pg_shdescription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -266,7 +265,6 @@ IsSharedRelation(Oid relationId)
 	if (relationId == AuthIdRelationId ||
 		relationId == AuthMemRelationId ||
 		relationId == DatabaseRelationId ||
-		relationId == SharedDescriptionRelationId ||
 		relationId == SharedDependRelationId ||
 		relationId == TableSpaceRelationId ||
 		relationId == DbRoleSettingRelationId)
@@ -278,7 +276,6 @@ IsSharedRelation(Oid relationId)
 		relationId == AuthMemMemRoleIndexId ||
 		relationId == DatabaseNameIndexId ||
 		relationId == DatabaseOidIndexId ||
-		relationId == SharedDescriptionObjIndexId ||
 		relationId == SharedDependDependerIndexId ||
 		relationId == SharedDependReferenceIndexId ||
 		relationId == TablespaceOidIndexId ||
@@ -290,8 +287,6 @@ IsSharedRelation(Oid relationId)
 		relationId == PgAuthidToastIndex ||
 		relationId == PgDbRoleSettingToastTable ||
 		relationId == PgDbRoleSettingToastIndex ||
-		relationId == PgShdescriptionToastTable ||
-		relationId == PgShdescriptionToastIndex ||
 		relationId == PgTablespaceToastTable ||
 		relationId == PgTablespaceToastIndex)
 		return true;

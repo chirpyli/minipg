@@ -78,7 +78,6 @@ pg_conversion|t
 pg_database|t
 pg_db_role_setting|t
 pg_depend|t
-pg_description|t
 pg_enum|t
 pg_extension|t
 pg_index|t
@@ -91,7 +90,6 @@ pg_proc|t
 pg_range|t
 pg_rewrite|t
 pg_shdepend|t
-pg_shdescription|t
 pg_statistic|t
 pg_statistic_ext|t
 pg_statistic_ext_data|t

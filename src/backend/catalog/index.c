@@ -45,7 +45,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_description.h"
 #include "commands/tablecmds.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -1654,52 +1653,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 		}
 
 		systable_endscan(scan);
-	}
-
-	/*
-	 * Move comment if any
-	 */
-	{
-		Relation	description;
-		ScanKeyData skey[3];
-		SysScanDesc sd;
-		HeapTuple	tuple;
-		Datum		values[Natts_pg_description] = {0};
-		bool		nulls[Natts_pg_description] = {0};
-		bool		replaces[Natts_pg_description] = {0};
-
-		values[Anum_pg_description_objoid - 1] = ObjectIdGetDatum(newIndexId);
-		replaces[Anum_pg_description_objoid - 1] = true;
-
-		ScanKeyInit(&skey[0],
-					Anum_pg_description_objoid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(oldIndexId));
-		ScanKeyInit(&skey[1],
-					Anum_pg_description_classoid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(RelationRelationId));
-		ScanKeyInit(&skey[2],
-					Anum_pg_description_objsubid,
-					BTEqualStrategyNumber, F_INT4EQ,
-					Int32GetDatum(0));
-
-		description = table_open(DescriptionRelationId, RowExclusiveLock);
-
-		sd = systable_beginscan(description, DescriptionObjIndexId, true,
-								NULL, 3, skey);
-
-		while ((tuple = systable_getnext(sd)) != NULL)
-		{
-			tuple = heap_modify_tuple(tuple, RelationGetDescr(description),
-									  values, nulls, replaces);
-			CatalogTupleUpdate(description, &tuple->t_self, tuple);
-
-			break;				/* Assume there can be only one match */
-		}
-
-		systable_endscan(sd);
-		table_close(description, NoLock);
 	}
 
 	/*

@@ -1176,16 +1176,6 @@ _equalTruncateStmt(const TruncateStmt *a, const TruncateStmt *b)
 }
 
 static bool
-_equalCommentStmt(const CommentStmt *a, const CommentStmt *b)
-{
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_NODE_FIELD(object);
-	COMPARE_STRING_FIELD(comment);
-
-	return true;
-}
-
-static bool
 _equalFetchStmt(const FetchStmt *a, const FetchStmt *b)
 {
 	COMPARE_SCALAR_FIELD(direction);
@@ -1208,7 +1198,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 	COMPARE_NODE_FIELD(options);
 	COMPARE_NODE_FIELD(whereClause);
 	COMPARE_NODE_FIELD(excludeOpNames);
-	COMPARE_STRING_FIELD(idxcomment);
 	COMPARE_SCALAR_FIELD(indexOid);
 	COMPARE_SCALAR_FIELD(oldNode);
 	COMPARE_SCALAR_FIELD(oldCreateSubid);
@@ -1233,7 +1222,6 @@ _equalCreateStatsStmt(const CreateStatsStmt *a, const CreateStatsStmt *b)
 	COMPARE_NODE_FIELD(stat_types);
 	COMPARE_NODE_FIELD(exprs);
 	COMPARE_NODE_FIELD(relations);
-	COMPARE_STRING_FIELD(stxcomment);
 	COMPARE_SCALAR_FIELD(transformed);
 	COMPARE_SCALAR_FIELD(if_not_exists);
 
@@ -2674,9 +2662,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TruncateStmt:
 			retval = _equalTruncateStmt(a, b);
-			break;
-		case T_CommentStmt:
-			retval = _equalCommentStmt(a, b);
 			break;
 		case T_FetchStmt:
 			retval = _equalFetchStmt(a, b);

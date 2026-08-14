@@ -10,7 +10,6 @@ LANGUAGE C;
 
 -- Access method
 CREATE ACCESS METHOD bloom TYPE INDEX HANDLER blhandler;
-COMMENT ON ACCESS METHOD bloom IS 'bloom index access method';
 
 -- Opclasses
 

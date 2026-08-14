@@ -491,15 +491,6 @@ WHERE p2.oid = p1.prosupport AND
 -----+---------+-----+---------
 (0 rows)
 
--- Insist that all built-in pg_proc entries have descriptions
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1 LEFT JOIN pg_description as d
-     ON p1.tableoid = d.classoid and p1.oid = d.objoid and d.objsubid = 0
-WHERE d.classoid IS NULL AND p1.oid <= 9999;
- oid | proname 
------+---------
-(0 rows)
-
 -- List of built-in leakproof functions
 --
 -- Leakproof functions should only be added after carefully
@@ -1227,15 +1218,6 @@ WHERE p1.oprjoin = p2.oid AND
      p2.proargtypes[4] != 'internal'::regtype);
  oid | oprname | oid | proname 
 -----+---------+-----+---------
-(0 rows)
-
--- Insist that all built-in pg_operator entries have descriptions
-SELECT p1.oid, p1.oprname
-FROM pg_operator as p1 LEFT JOIN pg_description as d
-     ON p1.tableoid = d.classoid and p1.oid = d.objoid and d.objsubid = 0
-WHERE d.classoid IS NULL AND p1.oid <= 9999;
- oid | oprname 
------+---------
 (0 rows)
 
 -- Check that operators' underlying functions have suitable comments,

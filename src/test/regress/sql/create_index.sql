@@ -534,16 +534,6 @@ WHERE classid = 'pg_class'::regclass AND
 	    'concur_reindex_ind3'::regclass,
 	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
--- Check that comments are preserved
-CREATE TABLE testcomment (i int);
-CREATE INDEX testcomment_idx1 ON testcomment (i);
-COMMENT ON INDEX testcomment_idx1 IS 'test comment';
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
-REINDEX TABLE testcomment;
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
-REINDEX TABLE CONCURRENTLY testcomment ;
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
-DROP TABLE testcomment;
 -- Check that indisclustered updates are preserved
 CREATE TABLE concur_clustered(i int);
 CREATE INDEX concur_clustered_i_idx ON concur_clustered(i);

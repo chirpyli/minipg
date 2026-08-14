@@ -10,7 +10,6 @@ LANGUAGE C;
 
 -- Access method
 CREATE ACCESS METHOD dummy_index_am TYPE INDEX HANDLER dihandler;
-COMMENT ON ACCESS METHOD dummy_index_am IS 'dummy index access method';
 
 -- Operator classes
 CREATE OPERATOR CLASS int4_ops

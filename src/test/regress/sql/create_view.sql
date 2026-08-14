@@ -19,11 +19,6 @@ CREATE VIEW toyemp AS
    SELECT name, age, location, 12*salary AS annualsal
    FROM emp;
 
--- Test comments
-COMMENT ON VIEW noview IS 'no view';
-COMMENT ON VIEW toyemp IS 'is a view';
-COMMENT ON VIEW toyemp IS NULL;
-
 -- These views are left around mainly to exercise special cases in pg_dump.
 
 CREATE TABLE view_base_table (key int PRIMARY KEY, data varchar(20));

@@ -29,7 +29,6 @@
 #include "commands/alter.h"
 #include "commands/cluster.h"
 #include "commands/collationcmds.h"
-#include "commands/comment.h"
 #include "commands/conversioncmds.h"
 #include "commands/copy.h"
 #include "commands/dbcommands.h"
@@ -142,7 +141,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
 		case T_AlterTypeStmt:
-		case T_CommentStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateAmStmt:
 		case T_CreateConversionStmt:
@@ -809,14 +807,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_CommentStmt:
-			{
-				CommentStmt *stmt = (CommentStmt *) parsetree;
-
-				CommentObject(stmt);
-				break;
-			}
-
 		default:
 			/* All other statement types have event trigger support */
 			ProcessUtilitySlow(pstate, pstmt, queryString,
@@ -1291,12 +1281,8 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = AlterType((AlterTypeStmt *) parsetree);
 				break;
 
-			case T_CommentStmt:
-				address = CommentObject((CommentStmt *) parsetree);
-				break;
 
-
-			case T_CreateAmStmt:
+				case T_CreateAmStmt:
 				address = CreateAccessMethod((CreateAmStmt *) parsetree);
 				break;
 
@@ -1964,10 +1950,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_TRUNCATE_TABLE;
 			break;
 
-		case T_CommentStmt:
-			tag = CMDTAG_COMMENT;
-			break;
-
 		case T_RenameStmt:
 
 			/*
@@ -2468,10 +2450,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_TruncateStmt:
 			lev = LOGSTMT_MOD;
-			break;
-
-		case T_CommentStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_PrepareStmt:

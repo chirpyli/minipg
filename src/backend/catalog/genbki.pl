@@ -95,6 +95,11 @@ foreach my $header (@ARGV)
 		foreach my $row (@$data)
 		{
 			# Generate entries for pg_description and pg_shdescription.
+			# minipg: if these catalogs have been removed (COMMENT ON
+			# feature trimmed), skip the descr-to-description generation
+			# rather than emitting INSERTs into a nonexistent table.
+			next unless exists $catalog_data{pg_description};
+
 			if (defined $row->{descr})
 			{
 				my %descr = (

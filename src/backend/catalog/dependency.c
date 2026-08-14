@@ -46,7 +46,6 @@
 #include "catalog/pg_transform.h"
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
-#include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/trigger.h"
@@ -1313,14 +1312,6 @@ deleteOneObject(const ObjectAddress *object, Relation *depRel, int flags)
 	deleteSharedDependencyRecordsFor(object->classId, object->objectId,
 									 object->objectSubId);
 
-
-	/*
-	 * Delete any comments associated with this object.  (This is a convenient
-	 * place to do this, rather than having every object type know to do it.)
-	 * As above, all these functions must remove records for sub-objects too
-	 * if the subid is zero.
-	 */
-	DeleteComments(object->objectId, object->classId, object->objectSubId);
 
 	/*
 	 * CommandCounterIncrement here to ensure that preceding changes are all

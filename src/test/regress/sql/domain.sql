@@ -4,7 +4,6 @@
 
 -- Test Comment / Drop
 create domain domaindroptest int4;
-comment on domain domaindroptest is 'About to drop this..';
 
 create domain dependenttypetest domaindroptest;
 
@@ -154,7 +153,6 @@ drop type comptype cascade;
 create type comptype as (r float8, i float8);
 create domain dcomptype as comptype;
 alter domain dcomptype add constraint c1 check ((value).r > 0);
-comment on constraint c1 on domain dcomptype is 'random commentary';
 
 select row(0,1)::dcomptype;  -- fail
 
@@ -163,9 +161,6 @@ alter type comptype alter attribute r type bigint;
 
 alter type comptype drop attribute r;  -- fail
 alter type comptype drop attribute i;
-
-select conname, obj_description(oid, 'pg_constraint') from pg_constraint
-  where contypid = 'dcomptype'::regtype;  -- check comment is still there
 
 drop type comptype cascade;
 

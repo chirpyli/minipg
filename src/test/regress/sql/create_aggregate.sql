@@ -9,11 +9,6 @@ CREATE AGGREGATE newavg (
    initcond1 = '{0,0}'
 );
 
--- test comments
-COMMENT ON AGGREGATE newavg_wrong (int4) IS 'an agg comment';
-COMMENT ON AGGREGATE newavg (int4) IS 'an agg comment';
-COMMENT ON AGGREGATE newavg (int4) IS NULL;
-
 -- without finalfunc; test obsolete spellings 'sfunc1' etc
 CREATE AGGREGATE newsum (
    sfunc1 = int4pl, basetype = int4, stype1 = int4,
@@ -37,10 +32,6 @@ CREATE AGGREGATE newcnt ("any") (
    sfunc = int8inc_any, stype = int8,
    initcond = '0'
 );
-
-COMMENT ON AGGREGATE nosuchagg (*) IS 'should fail';
-COMMENT ON AGGREGATE newcnt (*) IS 'an agg(*) comment';
-COMMENT ON AGGREGATE newcnt ("any") IS 'an agg(any) comment';
 
 -- multi-argument aggregate
 create function sum3(int8,int8,int8) returns int8 as

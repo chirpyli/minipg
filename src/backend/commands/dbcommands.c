@@ -39,7 +39,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_tablespace.h"
-#include "commands/comment.h"
 #include "commands/dbcommands.h"
 #include "commands/dbcommands_xlog.h"
 #include "commands/defrem.h"
@@ -896,11 +895,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 				 errmsg("database \"%s\" is being accessed by other users",
 						dbname),
 				 errdetail_busy_db(notherbackends, npreparedxacts)));
-
-	/*
-	 * Delete any comments associated with the database.
-	 */
-	DeleteSharedComments(db_id, DatabaseRelationId);
 
 	/*
 	 * Remove settings associated with this database

@@ -48,7 +48,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
-#include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/schemacmds.h"
@@ -1757,12 +1756,6 @@ CreateExtensionInternal(char *extensionName,
 								   PointerGetDatum(NULL),
 								   requiredExtensions);
 	extensionOid = address.objectId;
-
-	/*
-	 * Apply any control-file comment on extension
-	 */
-	if (control->comment != NULL)
-		CreateComments(extensionOid, ExtensionRelationId, 0, control->comment);
 
 	/*
 	 * Execute the installation script file

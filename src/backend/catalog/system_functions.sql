@@ -196,46 +196,6 @@ CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
  PARALLEL SAFE STRICT COST 1
 RETURN pg_relation_size($1, 'main');
 
-CREATE OR REPLACE FUNCTION obj_description(oid, name)
- RETURNS text
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-select description from pg_description
-  where objoid = $1 and
-    classoid = (select oid from pg_class where relname = $2 and
-                relnamespace = 'pg_catalog'::regnamespace) and
-    objsubid = 0;
-END;
-
-CREATE OR REPLACE FUNCTION shobj_description(oid, name)
- RETURNS text
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-select description from pg_shdescription
-  where objoid = $1 and
-    classoid = (select oid from pg_class where relname = $2 and
-                relnamespace = 'pg_catalog'::regnamespace);
-END;
-
-CREATE OR REPLACE FUNCTION obj_description(oid)
- RETURNS text
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-select description from pg_description where objoid = $1 and objsubid = 0;
-END;
-
-CREATE OR REPLACE FUNCTION col_description(oid, integer)
- RETURNS text
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT
-BEGIN ATOMIC
-select description from pg_description
-  where objoid = $1 and classoid = 'pg_class'::regclass and objsubid = $2;
-END;
-
 
 CREATE OR REPLACE FUNCTION
   pg_start_backup(label text, fast boolean DEFAULT false, exclusive boolean DEFAULT true)
@@ -353,3 +313,30 @@ AS 'unicode_is_normalized';
 
 
 
+
+
+-- minipg: COMMENT ON 功能已裁剪，pg_description/pg_shdescription 已删除。
+-- 以下描述函数保留签名以兼容 psql \d+ 等客户端查询，但一律返回 NULL。
+CREATE OR REPLACE FUNCTION obj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN NULL::text;
+
+CREATE OR REPLACE FUNCTION obj_description(oid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN NULL::text;
+
+CREATE OR REPLACE FUNCTION col_description(oid, integer)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN NULL::text;
+
+CREATE OR REPLACE FUNCTION shobj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN NULL::text;

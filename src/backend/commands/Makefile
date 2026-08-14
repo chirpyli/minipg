@@ -19,7 +19,6 @@ OBJS = \
 	analyze.o \
 	cluster.o \
 	collationcmds.o \
-	comment.o \
 	constraint.o \
 	conversioncmds.o \
 	copy.o \

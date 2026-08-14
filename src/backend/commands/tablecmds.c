@@ -46,7 +46,6 @@
 #include "catalog/storage_xlog.h"
 #include "catalog/toasting.h"
 #include "commands/cluster.h"
-#include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -425,9 +424,6 @@ static void ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab,
 static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
-static void RebuildConstraintComment(AlteredTableInfo *tab, int pass,
-									 Oid objid, Relation rel, List *domname,
-									 const char *conname);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
 static ObjectAddress ATExecAlterColumnGenericOptions(Relation rel, const char *colName,
 													 List *options, LOCKMODE lockmode);
@@ -4125,9 +4121,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 				AlterDomainAddConstraint(((AlterDomainStmt *) cmd->def)->typeName,
 										 ((AlterDomainStmt *) cmd->def)->def,
 										 NULL);
-			break;
-		case AT_ReAddComment:	/* Re-add existing comment */
-			address = CommentObject((CommentStmt *) cmd->def);
 			break;
 		case AT_AddIndexConstraint: /* ADD CONSTRAINT USING INDEX */
 			address = ATExecAddIndexConstraint(tab, rel, (IndexStmt *) cmd->def,
@@ -8966,8 +8959,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 			if (!rewrite)
 				TryReuseIndex(oldId, stmt);
 			stmt->reset_default_tblspc = true;
-			/* keep the index's comment */
-			stmt->idxcomment = GetComment(oldId, RelationRelationId, 0);
 
 			newcmd = makeNode(AlterTableCmd);
 			newcmd->subtype = AT_ReAddIndex;
@@ -8994,22 +8985,11 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 
 					if (!rewrite)
 						TryReuseIndex(indoid, indstmt);
-					/* keep any comment on the index */
-					indstmt->idxcomment = GetComment(indoid,
-													 RelationRelationId, 0);
 					indstmt->reset_default_tblspc = true;
 
 					cmd->subtype = AT_ReAddIndex;
 					tab->subcmds[AT_PASS_OLD_INDEX] =
 						lappend(tab->subcmds[AT_PASS_OLD_INDEX], cmd);
-
-					/* recreate any comment on the constraint */
-					RebuildConstraintComment(tab,
-											 AT_PASS_OLD_INDEX,
-											 oldId,
-											 rel,
-											 NIL,
-											 indstmt->idxname);
 				}
 				else if (cmd->subtype == AT_AddConstraint)
 				{
@@ -9020,14 +9000,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 					cmd->subtype = AT_ReAddConstraint;
 					tab->subcmds[AT_PASS_OLD_CONSTR] =
 						lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
-
-					/* recreate any comment on the constraint */
-					RebuildConstraintComment(tab,
-											 AT_PASS_OLD_CONSTR,
-											 oldId,
-											 rel,
-											 NIL,
-											 con->conname);
 				}
 				else if (cmd->subtype == AT_SetNotNull)
 				{
@@ -9057,14 +9029,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 				cmd->def = (Node *) stmt;
 				tab->subcmds[AT_PASS_OLD_CONSTR] =
 					lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
-
-				/* recreate any comment on the constraint */
-				RebuildConstraintComment(tab,
-										 AT_PASS_OLD_CONSTR,
-										 oldId,
-										 NULL,
-										 stmt->typeName,
-										 con->conname);
 			}
 			else
 				elog(ERROR, "unexpected statement subtype: %d",
@@ -9074,9 +9038,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 		{
 			CreateStatsStmt *stmt = (CreateStatsStmt *) stm;
 			AlterTableCmd *newcmd;
-
-			/* keep the statistics object's comment */
-			stmt->stxcomment = GetComment(oldId, StatisticExtRelationId, 0);
 
 			newcmd = makeNode(AlterTableCmd);
 			newcmd->subtype = AT_ReAddStatistics;
@@ -9090,56 +9051,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 	}
 
 	relation_close(rel, NoLock);
-}
-
-/*
- * Subroutine for ATPostAlterTypeParse() to recreate any existing comment
- * for a table or domain constraint that is being rebuilt.
- *
- * objid is the OID of the constraint.
- * Pass "rel" for a table constraint, or "domname" (domain's qualified name
- * as a string list) for a domain constraint.
- * (We could dig that info, as well as the conname, out of the pg_constraint
- * entry; but callers already have them so might as well pass them.)
- */
-static void
-RebuildConstraintComment(AlteredTableInfo *tab, int pass, Oid objid,
-						 Relation rel, List *domname,
-						 const char *conname)
-{
-	CommentStmt *cmd;
-	char	   *comment_str;
-	AlterTableCmd *newcmd;
-
-	/* Look for comment for object wanted, and leave if none */
-	comment_str = GetComment(objid, ConstraintRelationId, 0);
-	if (comment_str == NULL)
-		return;
-
-	/* Build CommentStmt node, copying all input data for safety */
-	cmd = makeNode(CommentStmt);
-	if (rel)
-	{
-		cmd->objtype = OBJECT_TABCONSTRAINT;
-		cmd->object = (Node *)
-			list_make3(makeString(get_namespace_name(RelationGetNamespace(rel))),
-					   makeString(pstrdup(RelationGetRelationName(rel))),
-					   makeString(pstrdup(conname)));
-	}
-	else
-	{
-		cmd->objtype = OBJECT_DOMCONSTRAINT;
-		cmd->object = (Node *)
-			list_make2(makeTypeNameFromNameList(copyObject(domname)),
-					   makeString(pstrdup(conname)));
-	}
-	cmd->comment = comment_str;
-
-	/* Append it to list of commands */
-	newcmd = makeNode(AlterTableCmd);
-	newcmd->subtype = AT_ReAddComment;
-	newcmd->def = (Node *) cmd;
-	tab->subcmds[pass] = lappend(tab->subcmds[pass], newcmd);
 }
 
 /*

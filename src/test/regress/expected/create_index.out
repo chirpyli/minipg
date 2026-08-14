@@ -831,31 +831,6 @@ WHERE classid = 'pg_class'::regclass AND
  table concur_reindex_tab  | schema public                                              | n
 (7 rows)
 
--- Check that comments are preserved
-CREATE TABLE testcomment (i int);
-CREATE INDEX testcomment_idx1 ON testcomment (i);
-COMMENT ON INDEX testcomment_idx1 IS 'test comment';
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
- obj_description 
------------------
- test comment
-(1 row)
-
-REINDEX TABLE testcomment;
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
- obj_description 
------------------
- test comment
-(1 row)
-
-REINDEX TABLE CONCURRENTLY testcomment ;
-SELECT obj_description('testcomment_idx1'::regclass, 'pg_class');
- obj_description 
------------------
- test comment
-(1 row)
-
-DROP TABLE testcomment;
 -- Check that indisclustered updates are preserved
 CREATE TABLE concur_clustered(i int);
 CREATE INDEX concur_clustered_i_idx ON concur_clustered(i);

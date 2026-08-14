@@ -646,7 +646,6 @@ typedef struct TableLikeClause
 
 typedef enum TableLikeOption
 {
-	CREATE_TABLE_LIKE_COMMENTS = 1 << 0,
 	CREATE_TABLE_LIKE_COMPRESSION = 1 << 1,
 	CREATE_TABLE_LIKE_CONSTRAINTS = 1 << 2,
 	CREATE_TABLE_LIKE_DEFAULTS = 1 << 3,
@@ -1552,7 +1551,6 @@ typedef enum AlterTableType
 	AT_AddIndexConstraint,		/* add constraint using existing index */
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
-	AT_ReAddComment,			/* internal to commands/tablecmds.c */
 	AT_AlterColumnType,			/* alter column type */
 	AT_AlterColumnGenericOptions,	/* alter column OPTIONS (...) */
 	AT_ChangeOwner,				/* change owner */
@@ -2104,19 +2102,6 @@ typedef struct TruncateStmt
 } TruncateStmt;
 
 /* ----------------------
- *				Comment On Statement
- * ----------------------
- */
-typedef struct CommentStmt
-{
-	NodeTag		type;
-	ObjectType	objtype;		/* Object's type */
-	Node	   *object;			/* Qualified name of the object */
-	char	   *comment;		/* Comment to insert, or NULL to remove */
-} CommentStmt;
-
-
-/* ----------------------
  *		Declare Cursor Statement
  *
  * The "query" field is initially a raw parse tree, and is converted to a
@@ -2204,7 +2189,6 @@ typedef struct IndexStmt
 	List	   *options;		/* WITH clause options: a list of DefElem */
 	Node	   *whereClause;	/* qualification (partial-index predicate) */
 	List	   *excludeOpNames; /* exclusion operator names, or NIL if none */
-	char	   *idxcomment;		/* comment to apply to index, or NULL */
 	Oid			indexOid;		/* OID of an existing index, if any */
 	Oid			oldNode;		/* relfilenode of existing storage, if any */
 	SubTransactionId oldCreateSubid;	/* rd_createSubid of oldNode */
@@ -2233,7 +2217,6 @@ typedef struct CreateStatsStmt
 	List	   *stat_types;		/* stat types (list of Value strings) */
 	List	   *exprs;			/* expressions to build statistics on */
 	List	   *relations;		/* rels to build stats on (list of RangeVar) */
-	char	   *stxcomment;		/* comment to apply to stats, or NULL */
 	bool		transformed;	/* true when transformStatsStmt is finished */
 	bool		if_not_exists;	/* do nothing if stats name already exists */
 } CreateStatsStmt;

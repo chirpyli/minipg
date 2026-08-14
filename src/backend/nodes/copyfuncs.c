@@ -3068,18 +3068,6 @@ _copyTruncateStmt(const TruncateStmt *from)
 	return newnode;
 }
 
-static CommentStmt *
-_copyCommentStmt(const CommentStmt *from)
-{
-	CommentStmt *newnode = makeNode(CommentStmt);
-
-	COPY_SCALAR_FIELD(objtype);
-	COPY_NODE_FIELD(object);
-	COPY_STRING_FIELD(comment);
-
-	return newnode;
-}
-
 static FetchStmt *
 _copyFetchStmt(const FetchStmt *from)
 {
@@ -3107,7 +3095,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_NODE_FIELD(options);
 	COPY_NODE_FIELD(whereClause);
 	COPY_NODE_FIELD(excludeOpNames);
-	COPY_STRING_FIELD(idxcomment);
 	COPY_SCALAR_FIELD(indexOid);
 	COPY_SCALAR_FIELD(oldNode);
 	COPY_SCALAR_FIELD(oldCreateSubid);
@@ -3134,7 +3121,6 @@ _copyCreateStatsStmt(const CreateStatsStmt *from)
 	COPY_NODE_FIELD(stat_types);
 	COPY_NODE_FIELD(exprs);
 	COPY_NODE_FIELD(relations);
-	COPY_STRING_FIELD(stxcomment);
 	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(if_not_exists);
 
@@ -4305,9 +4291,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_TruncateStmt:
 			retval = _copyTruncateStmt(from);
-			break;
-		case T_CommentStmt:
-			retval = _copyCommentStmt(from);
 			break;
 		case T_FetchStmt:
 			retval = _copyFetchStmt(from);

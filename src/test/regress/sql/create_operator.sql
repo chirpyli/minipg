@@ -12,11 +12,6 @@ CREATE OPERATOR #%# (
    procedure = factorial
 );
 
--- Test comments
-COMMENT ON OPERATOR ###### (NONE, int4) IS 'bad prefix';
-COMMENT ON OPERATOR ###### (int4, NONE) IS 'bad postfix';
-COMMENT ON OPERATOR ###### (int4, int8) IS 'bad infix';
-
 -- Check that DROP on a nonexistent op behaves sanely, too
 DROP OPERATOR ###### (NONE, int4);
 DROP OPERATOR ###### (int4, NONE);

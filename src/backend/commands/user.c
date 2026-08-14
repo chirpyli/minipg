@@ -25,7 +25,6 @@
 #include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_db_role_setting.h"
-#include "commands/comment.h"
 #include "commands/dbcommands.h"
 #include "commands/user.h"
 #include "libpq/crypt.h"

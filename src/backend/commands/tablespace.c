@@ -65,7 +65,6 @@
 #include "catalog/objectaccess.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_tablespace.h"
-#include "commands/comment.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "common/file_perm.h"
@@ -470,11 +469,6 @@ DropTableSpace(DropTableSpaceStmt *stmt)
 	CatalogTupleDelete(rel, &tuple->t_self);
 
 	table_endscan(scandesc);
-
-	/*
-	 * Remove any comments on this tablespace.
-	 */
-	DeleteSharedComments(tablespaceoid, TableSpaceRelationId);
 
 	/*
 	 * Remove dependency on owner.

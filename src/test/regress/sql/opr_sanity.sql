@@ -351,12 +351,6 @@ WHERE p2.oid = p1.prosupport AND
     (p2.prorettype != 'internal'::regtype OR p2.proretset OR p2.pronargs != 1
      OR p2.proargtypes[0] != 'internal'::regtype);
 
--- Insist that all built-in pg_proc entries have descriptions
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1 LEFT JOIN pg_description as d
-     ON p1.tableoid = d.classoid and p1.oid = d.objoid and d.objsubid = 0
-WHERE d.classoid IS NULL AND p1.oid <= 9999;
-
 -- List of built-in leakproof functions
 --
 -- Leakproof functions should only be added after carefully
@@ -718,12 +712,6 @@ WHERE p1.oprjoin = p2.oid AND
      p2.proargtypes[2] != 'internal'::regtype OR
      p2.proargtypes[3] != 'int2'::regtype OR
      p2.proargtypes[4] != 'internal'::regtype);
-
--- Insist that all built-in pg_operator entries have descriptions
-SELECT p1.oid, p1.oprname
-FROM pg_operator as p1 LEFT JOIN pg_description as d
-     ON p1.tableoid = d.classoid and p1.oid = d.objoid and d.objsubid = 0
-WHERE d.classoid IS NULL AND p1.oid <= 9999;
 
 -- Check that operators' underlying functions have suitable comments,
 -- namely 'implementation of XXX operator'.  (Note: it's not necessary to
