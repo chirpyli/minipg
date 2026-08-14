@@ -62,17 +62,8 @@ ALTER TABLE pg_description SET SCHEMA public;
 -- reserved tablespace name
 CREATE TABLESPACE pg_foo LOCATION '/no/such/location';
 
--- triggers
-CREATE FUNCTION tf1() RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RETURN NULL;
-END $$;
-
-CREATE TRIGGER t1 BEFORE INSERT ON pg_description EXECUTE FUNCTION tf1();
-ALTER TRIGGER t1 ON pg_description RENAME TO t2;
---DROP TRIGGER t2 ON pg_description;
+-- minipg: PL/pgSQL removed. The original also created a plpgsql trigger on a
+-- system catalog and renamed it; that trigger-based portion is dropped.
 
 -- rules
 CREATE RULE r1 AS ON INSERT TO pg_description DO INSTEAD NOTHING;

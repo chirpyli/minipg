@@ -8,7 +8,6 @@ SUBDIRS = \
 		  delay_execution \
 		  dummy_index_am \
 		  libpq_pipeline \
-		  plsample \
 		  snapshot_too_old \
 		  test_bloomfilter \
 		  test_custom_types \
@@ -17,8 +16,10 @@ SUBDIRS = \
 		  test_misc \
 		  test_predtest \
 		  test_rbtree \
-		  test_shm_mq \
-		  worker_spi
+		  test_shm_mq
+
+# minipg: worker_spi 的回归测试依赖 plpgsql DO 块轮询等待 bgworker 初始化，
+# PL/pgSQL 已裁剪，移除该模块的回归测试。
 
 $(recurse)
 $(recurse_always)

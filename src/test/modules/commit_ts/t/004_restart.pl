@@ -88,22 +88,12 @@ $node_primary->restart;
 # Move commit timestamps across page boundaries.  Things should still
 # be able to work across restarts with those transactions committed while
 # track_commit_timestamp is disabled.
-$node_primary->safe_psql(
-	'postgres',
-	qq(CREATE PROCEDURE consume_xid(cnt int)
-AS \$\$
-DECLARE
-    i int;
-    BEGIN
-        FOR i in 1..cnt LOOP
-            EXECUTE 'SELECT pg_current_xact_id()';
-            COMMIT;
-        END LOOP;
-    END;
-\$\$
-LANGUAGE plpgsql;
-));
-$node_primary->safe_psql('postgres', 'CALL consume_xid(2000)');
+# Consume XIDs before disabling commit timestamps.  Each safe_psql() runs in
+# its own transaction, so repeated calls consume XIDs across page boundaries.
+for (my $i = 0; $i < 2000; $i++)
+{
+	$node_primary->safe_psql('postgres', 'SELECT pg_current_xact_id()');
+}
 
 ($ret, $stdout, $stderr) = $node_primary->psql('postgres',
 	qq[SELECT pg_xact_commit_timestamp('$xid');]);

@@ -481,8 +481,6 @@ HV00N    E    ERRCODE_FDW_UNABLE_TO_ESTABLISH_CONNECTION                     fdw
 
 Section: Class P0 - PL/pgSQL Error
 
-# (PostgreSQL-specific error class)
-P0000    E    ERRCODE_PLPGSQL_ERROR                                          plpgsql_error
 P0001    E    ERRCODE_RAISE_EXCEPTION                                        raise_exception
 P0002    E    ERRCODE_NO_DATA_FOUND                                          no_data_found
 P0003    E    ERRCODE_TOO_MANY_ROWS                                          too_many_rows

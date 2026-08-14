@@ -300,7 +300,6 @@ typedef enum NodeTag
 	T_UpdateStmt,
 	T_SelectStmt,
 	T_ReturnStmt,
-	T_PLAssignStmt,
 	T_AlterTableStmt,
 	T_AlterTableCmd,
 	T_AlterDomainStmt,
@@ -332,7 +331,6 @@ typedef enum NodeTag
 	T_VariableShowStmt,
 	T_DiscardStmt,
 	T_CreateTrigStmt,
-	T_CreatePLangStmt,
 	T_CreateRoleStmt,
 	T_AlterRoleStmt,
 	T_DropRoleStmt,
@@ -373,7 +371,6 @@ typedef enum NodeTag
 	T_CreateAmStmt,
 	T_CreateStatsStmt,
 	T_AlterCollationStmt,
-	T_CallStmt,
 	T_AlterStatsStmt,
 
 	/*

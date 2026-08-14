@@ -125,17 +125,14 @@ select '(0,0)'::point in ('(0,0,0,0)'::box, point(0,0));
 -- evaluated using the planner's constant folding.
 begin;
 
+-- minipg: PL/pgSQL removed; use SQL language functions.
 create function return_int_input(int) returns int as $$
-begin
-	return $1;
-end;
-$$ language plpgsql stable;
+	select $1;
+$$ language sql stable;
 
 create function return_text_input(text) returns text as $$
-begin
-	return $1;
-end;
-$$ language plpgsql stable;
+	select $1;
+$$ language sql stable;
 
 select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1);
 select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, null);
@@ -166,14 +163,9 @@ create cast (int4 as myint) without function;
 create cast (myint as int4) without function;
 
 create function myinteq(myint, myint) returns bool as $$
-begin
-  if $1 is null and $2 is null then
-    return true;
-  else
-    return $1::int = $2::int;
-  end if;
-end;
-$$ language plpgsql immutable;
+  select case when $1 is null and $2 is null then true
+              else $1::int = $2::int end;
+$$ language sql immutable;
 
 create operator = (
   leftarg    = myint,
@@ -210,14 +202,9 @@ select
 
 -- Now make the equal function return false when given two NULLs
 create or replace function myinteq(myint, myint) returns bool as $$
-begin
-  if $1 is null and $2 is null then
-    return false;
-  else
-    return $1::int = $2::int;
-  end if;
-end;
-$$ language plpgsql immutable;
+  select case when $1 is null and $2 is null then false
+              else $1::int = $2::int end;
+$$ language sql immutable;
 
 -- And try the same again to ensure EEOP_HASHED_SCALARARRAYOP does the same
 -- thing as EEOP_SCALARARRAYOP.
@@ -235,14 +222,9 @@ select
 
 -- Try again with an equality function that treats NULLs as equal to 0.
 create or replace function myinteq(myint, myint) returns bool as $$
-begin
-  if $1 is null and $2 is null then
-    return false;
-  else
-    return coalesce($1::int,0) = coalesce($2::int, 0);
-  end if;
-end;
-$$ language plpgsql immutable;
+  select case when $1 is null and $2 is null then false
+              else coalesce($1::int,0) = coalesce($2::int, 0) end;
+$$ language sql immutable;
 
 select
   a,

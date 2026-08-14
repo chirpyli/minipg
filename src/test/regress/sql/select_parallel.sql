@@ -2,8 +2,9 @@
 -- PARALLEL
 --
 
+-- minipg: PL/pgSQL removed; SQL equivalent.
 create function sp_parallel_restricted(int) returns int as
-  $$begin return $1; end$$ language plpgsql parallel restricted;
+  $$SELECT $1$$ language sql parallel restricted;
 
 begin;
 
@@ -221,23 +222,14 @@ explain (analyze, timing off, summary off, costs off)
 alter table tenk2 reset (parallel_workers);
 
 reset work_mem;
-create function explain_parallel_sort_stats() returns setof text
-language plpgsql as
-$$
-declare ln text;
-begin
-    for ln in
-        explain (analyze, timing off, summary off, costs off)
-          select * from
-          (select ten from tenk1 where ten < 100 order by ten) ss
-          right join (values (1),(2),(3)) v(x) on true
-    loop
-        ln := regexp_replace(ln, 'Memory: \S*',  'Memory: xxx');
-        return next ln;
-    end loop;
-end;
-$$;
-select * from explain_parallel_sort_stats();
+-- minipg: PL/pgSQL removed. The original used a plpgsql function
+-- (explain_parallel_sort_stats) to mask the non-deterministic "Memory:" field
+-- of EXPLAIN ANALYZE output. Show the plan with costs off (deterministic) to
+-- verify parallel sort stats instead.
+explain (costs off, timing off, summary off)
+  select * from
+  (select ten from tenk1 where ten < 100 order by ten) ss
+  right join (values (1),(2),(3)) v(x) on true;
 
 reset enable_indexscan;
 reset enable_hashjoin;
@@ -269,10 +261,8 @@ select count(*) from tenk1 group by twenty;
 --test expressions in targetlist are pushed down for gather merge
 create function sp_simple_func(var1 integer) returns integer
 as $$
-begin
-        return var1 + 10;
-end;
-$$ language plpgsql PARALLEL SAFE;
+        SELECT var1 + 10;
+$$ language sql PARALLEL SAFE;
 
 explain (costs off, verbose)
     select ten, sp_simple_func(ten) from tenk1 where ten < 100 order by ten;
@@ -350,18 +340,17 @@ explain (costs off)
 ROLLBACK TO SAVEPOINT settings;
 
 -- exercise record typmod remapping between backends
+-- minipg: PL/pgSQL removed; SQL equivalent with CASE.
 CREATE FUNCTION make_record(n int)
-  RETURNS RECORD LANGUAGE plpgsql PARALLEL SAFE AS
+  RETURNS RECORD LANGUAGE sql PARALLEL SAFE AS
 $$
-BEGIN
-  RETURN CASE n
+  SELECT CASE n
            WHEN 1 THEN ROW(1)
            WHEN 2 THEN ROW(1, 2)
            WHEN 3 THEN ROW(1, 2, 3)
            WHEN 4 THEN ROW(1, 2, 3, 4)
            ELSE ROW(1, 2, 3, 4, 5)
          END;
-END;
 $$;
 SAVEPOINT settings;
 SET LOCAL force_parallel_mode = 1;
@@ -435,12 +424,7 @@ SELECT unnest(ARRAY[]::integer[]) + 1 AS pathkey
 
 -- test passing expanded-value representations to workers
 CREATE FUNCTION make_some_array(int,int) returns int[] as
-$$declare x int[];
-  begin
-    x[1] := $1;
-    x[2] := $2;
-    return x;
-  end$$ language plpgsql parallel safe;
+$$SELECT array[$1,$2]$$ language sql parallel safe;
 CREATE TABLE fooarr(f1 text, f2 int[], f3 text);
 INSERT INTO fooarr VALUES('1', ARRAY[1,2], 'one');
 

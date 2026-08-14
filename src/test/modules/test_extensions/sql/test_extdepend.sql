@@ -10,13 +10,9 @@ INSERT INTO test_extdep_commands (command) VALUES
  (' SET search_path TO test_ext'),
  (' CREATE TABLE a (a1 int)'),
  (''),
- (' CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$'),
- (' ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5'),
- (''),
- (' CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()'),
- (' ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5'),
- (''),
+-- minipg: PL/pgSQL removed. The original also created a plpgsql trigger (b)
+-- and made the trigger/function depend on the extension; that trigger-based
+-- portion is dropped. The index dependency checks below remain.
  (' CREATE INDEX e ON a (a1)'),
  (' ALTER INDEX e DEPENDS ON EXTENSION test_ext5'),
  (' RESET search_path');
@@ -24,8 +20,8 @@ INSERT INTO test_extdep_commands (command) VALUES
 SELECT * FROM test_extdep_commands;
 -- First, test that dependent objects go away when the extension is dropped.
 SELECT * FROM test_extdep_commands \gexec
--- A dependent object made dependent again has no effect
-ALTER FUNCTION test_ext.b() DEPENDS ON EXTENSION test_ext5;
+-- minipg: PL/pgSQL removed. The original also re-marked the plpgsql trigger
+-- function as dependent; that step is dropped.
 -- make sure we have the right dependencies on the extension
 SELECT deptype, p.*
   FROM pg_depend, pg_identify_object(classid, objid, objsubid) AS p

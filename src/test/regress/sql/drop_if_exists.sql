@@ -270,19 +270,6 @@ DROP FUNCTION IF EXISTS test_ambiguous_funcname;
 DROP FUNCTION test_ambiguous_funcname(int);
 DROP FUNCTION test_ambiguous_funcname(text);
 
--- Likewise for procedures.
-CREATE PROCEDURE test_ambiguous_procname(int) as $$ begin end; $$ language plpgsql;
-CREATE PROCEDURE test_ambiguous_procname(text) as $$ begin end; $$ language plpgsql;
-DROP PROCEDURE test_ambiguous_procname;
-DROP PROCEDURE IF EXISTS test_ambiguous_procname;
-
--- Check we get a similar error if we use ROUTINE instead of PROCEDURE.
-DROP ROUTINE IF EXISTS test_ambiguous_procname;
-
--- cleanup
-DROP PROCEDURE test_ambiguous_procname(int);
-DROP PROCEDURE test_ambiguous_procname(text);
-
 -- This test checks both the functionality of 'if exists' and the syntax
 -- of the drop database command.
 drop database test_database_exists (force);

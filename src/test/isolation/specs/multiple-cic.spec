@@ -8,11 +8,12 @@ setup
   CREATE TABLE mcic_two (
 	id int
   );
-  CREATE FUNCTION lck_shr(bigint) RETURNS bool IMMUTABLE LANGUAGE plpgsql AS $$
-     BEGIN PERFORM pg_advisory_lock_shared($1); RETURN true; END;
+  -- minipg: PL/pgSQL removed; SQL equivalents acquire/release advisory locks.
+  CREATE FUNCTION lck_shr(bigint) RETURNS bool IMMUTABLE LANGUAGE sql AS $$
+     SELECT pg_advisory_lock_shared($1) IS NOT NULL;
   $$;
-  CREATE FUNCTION unlck() RETURNS bool IMMUTABLE LANGUAGE plpgsql AS $$
-     BEGIN PERFORM pg_advisory_unlock_all(); RETURN true; END;
+  CREATE FUNCTION unlck() RETURNS bool IMMUTABLE LANGUAGE sql AS $$
+     SELECT pg_advisory_unlock_all() IS NOT NULL;
   $$;
 }
 teardown

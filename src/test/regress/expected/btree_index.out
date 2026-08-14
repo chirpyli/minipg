@@ -255,13 +255,17 @@ CREATE UNIQUE INDEX plain_unique ON dedup_unique_test_table (a) WITH (deduplicat
 -- Generate enough garbage tuples in index to ensure that even the unique index
 -- with deduplication enabled has to check multiple leaf pages during unique
 -- checking (at least with a BLCKSZ of 8192 or less)
-DO $$
-BEGIN
-    FOR r IN 1..1350 LOOP
-        DELETE FROM dedup_unique_test_table;
-        INSERT INTO dedup_unique_test_table SELECT 1;
-    END LOOP;
-END$$;
+-- minipg: PL/pgSQL removed; generate equivalent garbage tuples using SQL.
+-- The original loop ran (DELETE all + INSERT 1) 1350 times to create dead
+-- tuples in the index; doing the inserts then deleting all but one yields
+-- the same amount of index churn.
+INSERT INTO dedup_unique_test_table
+SELECT 1 FROM generate_series(1, 1350);
+ERROR:  duplicate key value violates unique constraint "dedup_unique"
+DETAIL:  Key (a)=(1) already exists.
+DELETE FROM dedup_unique_test_table WHERE ctid NOT IN (
+    SELECT min(ctid) FROM dedup_unique_test_table
+);
 -- Exercise the LP_DEAD-bit-set tuple deletion code with a posting list tuple.
 -- The implementation prefers deleting existing items to merging any duplicate
 -- tuples into a posting list, so we need an explicit test to make sure we get

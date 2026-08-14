@@ -2255,11 +2255,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("AND", "WORK", "TRANSACTION", "TO SAVEPOINT", "PREPARED");
 	else if (Matches("ABORT|END|COMMIT|ROLLBACK", "AND"))
 		COMPLETE_WITH("CHAIN");
-/* CALL */
-	else if (Matches("CALL"))
-		COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_procedures, NULL);
-	else if (Matches("CALL", MatchAny))
-		COMPLETE_WITH("(");
 /* CLOSE */
 	else if (Matches("CLOSE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_cursors

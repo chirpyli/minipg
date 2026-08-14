@@ -32,13 +32,12 @@ values (1,1,b'0000','1'), (2,2,b'0001','1'),
 
 CREATE TABLE gstest_empty (a integer, b integer, v integer);
 
+-- minipg: PL/pgSQL removed; SQL SRF equivalent.
 create function gstest_data(v integer, out a integer, out b integer)
   returns setof record
   as $f$
-    begin
-      return query select v, i from generate_series(1,3) i;
-    end;
-  $f$ language plpgsql;
+    SELECT v, i FROM generate_series(1,3) i;
+  $f$ language sql;
 
 -- basic functionality
 

@@ -1197,13 +1197,7 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 									  &variadicArgType,
 									  &requiredResultType);
 
-	if (stmt->is_procedure)
-	{
-		Assert(!stmt->returnType);
-		prorettype = requiredResultType ? requiredResultType : VOIDOID;
-		returnsSet = false;
-	}
-	else if (stmt->returnType)
+	if (stmt->returnType)
 	{
 		/* explicit RETURNS clause */
 		compute_return_type(stmt->returnType, languageOid,
@@ -1295,7 +1289,7 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 						   prosrc_str,	/* converted to text later */
 						   probin_str,	/* converted to text later */
 						   prosqlbody,
-						   stmt->is_procedure ? PROKIND_PROCEDURE : (isWindowFunc ? PROKIND_WINDOW : PROKIND_FUNCTION),
+						   isWindowFunc ? PROKIND_WINDOW : PROKIND_FUNCTION,
 						   security,
 						   isLeakProof,
 						   isStrict,
@@ -1869,11 +1863,13 @@ ExecuteDoStmt(DoStmt *stmt, bool atomic)
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("no inline code specified")));
 
-	/* if LANGUAGE option wasn't specified, use the default */
+	/* if LANGUAGE option wasn't specified, it must be provided explicitly */
 	if (language_item)
 		language = strVal(language_item->arg);
 	else
-		language = "plpgsql";
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("LANGUAGE must be specified for a DO statement")));
 
 	/* Look up the language and validate permissions */
 	languageTuple = SearchSysCache1(LANGNAME, PointerGetDatum(language));
@@ -1921,254 +1917,6 @@ ExecuteDoStmt(DoStmt *stmt, bool atomic)
 	OidFunctionCall1(laninline, PointerGetDatum(codeblock));
 }
 
-/*
- * Execute CALL statement
- *
- * Inside a top-level CALL statement, transaction-terminating commands such as
- * COMMIT or a PL-specific equivalent are allowed.  The terminology in the SQL
- * standard is that CALL establishes a non-atomic execution context.  Most
- * other commands establish an atomic execution context, in which transaction
- * control actions are not allowed.  If there are nested executions of CALL,
- * we want to track the execution context recursively, so that the nested
- * CALLs can also do transaction control.  Note, however, that for example in
- * CALL -> SELECT -> CALL, the second call cannot do transaction control,
- * because the SELECT in between establishes an atomic execution context.
- *
- * So when ExecuteCallStmt() is called from the top level, we pass in atomic =
- * false (recall that that means transactions = yes).  We then create a
- * CallContext node with content atomic = false, which is passed in the
- * fcinfo->context field to the procedure invocation.  The language
- * implementation should then take appropriate measures to allow or prevent
- * transaction commands based on that information, e.g., call
- * SPI_connect_ext(SPI_OPT_NONATOMIC).  The language should also pass on the
- * atomic flag to any nested invocations to CALL.
- *
- * The expression data structures and execution context that we create
- * within this function are children of the portalContext of the Portal
- * that the CALL utility statement runs in.  Therefore, any pass-by-ref
- * values that we're passing to the procedure will survive transaction
- * commits that might occur inside the procedure.
- */
-void
-ExecuteCallStmt(CallStmt *stmt, ParamListInfo params, bool atomic, DestReceiver *dest)
-{
-	LOCAL_FCINFO(fcinfo, FUNC_MAX_ARGS);
-	ListCell   *lc;
-	FuncExpr   *fexpr;
-	int			nargs;
-	int			i;
-	AclResult	aclresult;
-	FmgrInfo	flinfo;
-	CallContext *callcontext;
-	EState	   *estate;
-	ExprContext *econtext;
-	HeapTuple	tp;
-	PgStat_FunctionCallUsage fcusage;
-	Datum		retval;
 
-	fexpr = stmt->funcexpr;
-	Assert(fexpr);
-	Assert(IsA(fexpr, FuncExpr));
 
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_PROCEDURE, get_func_name(fexpr->funcid));
 
-	/* Prep the context object we'll pass to the procedure */
-	callcontext = makeNode(CallContext);
-	callcontext->atomic = atomic;
-
-	tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(fexpr->funcid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for function %u", fexpr->funcid);
-
-	/*
-	 * If proconfig is set we can't allow transaction commands because of the
-	 * way the GUC stacking works: The transaction boundary would have to pop
-	 * the proconfig setting off the stack.  That restriction could be lifted
-	 * by redesigning the GUC nesting mechanism a bit.
-	 */
-	if (!heap_attisnull(tp, Anum_pg_proc_proconfig, NULL))
-		callcontext->atomic = true;
-
-	/*
-	 * In security definer procedures, we can't allow transaction commands.
-	 * StartTransaction() insists that the security context stack is empty,
-	 * and AbortTransaction() resets the security context.  This could be
-	 * reorganized, but right now it doesn't work.
-	 */
-	if (((Form_pg_proc) GETSTRUCT(tp))->prosecdef)
-		callcontext->atomic = true;
-
-	ReleaseSysCache(tp);
-
-	/* safety check; see ExecInitFunc() */
-	nargs = list_length(fexpr->args);
-	if (nargs > FUNC_MAX_ARGS)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg_plural("cannot pass more than %d argument to a procedure",
-							   "cannot pass more than %d arguments to a procedure",
-							   FUNC_MAX_ARGS,
-							   FUNC_MAX_ARGS)));
-
-	/* Initialize function call structure */
-	InvokeFunctionExecuteHook(fexpr->funcid);
-	fmgr_info(fexpr->funcid, &flinfo);
-	fmgr_info_set_expr((Node *) fexpr, &flinfo);
-	InitFunctionCallInfoData(*fcinfo, &flinfo, nargs, fexpr->inputcollid,
-							 (Node *) callcontext, NULL);
-
-	/*
-	 * Evaluate procedure arguments inside a suitable execution context.  Note
-	 * we can't free this context till the procedure returns.
-	 */
-	estate = CreateExecutorState();
-	estate->es_param_list_info = params;
-	econtext = CreateExprContext(estate);
-
-	/*
-	 * If we're called in non-atomic context, we also have to ensure that the
-	 * argument expressions run with an up-to-date snapshot.  Our caller will
-	 * have provided a current snapshot in atomic contexts, but not in
-	 * non-atomic contexts, because the possibility of a COMMIT/ROLLBACK
-	 * destroying the snapshot makes higher-level management too complicated.
-	 */
-	if (!atomic)
-		PushActiveSnapshot(GetTransactionSnapshot());
-
-	i = 0;
-	foreach(lc, fexpr->args)
-	{
-		ExprState  *exprstate;
-		Datum		val;
-		bool		isnull;
-
-		exprstate = ExecPrepareExpr(lfirst(lc), estate);
-
-		val = ExecEvalExprSwitchContext(exprstate, econtext, &isnull);
-
-		fcinfo->args[i].value = val;
-		fcinfo->args[i].isnull = isnull;
-
-		i++;
-	}
-
-	/* Get rid of temporary snapshot for arguments, if we made one */
-	if (!atomic)
-		PopActiveSnapshot();
-
-	/* Here we actually call the procedure */
-	pgstat_init_function_usage(fcinfo, &fcusage);
-	retval = FunctionCallInvoke(fcinfo);
-	pgstat_end_function_usage(&fcusage, true);
-
-	/* Handle the procedure's outputs */
-	if (fexpr->funcresulttype == VOIDOID)
-	{
-		/* do nothing */
-	}
-	else if (fexpr->funcresulttype == RECORDOID)
-	{
-		/* send tuple to client */
-		HeapTupleHeader td;
-		Oid			tupType;
-		int32		tupTypmod;
-		TupleDesc	retdesc;
-		HeapTupleData rettupdata;
-		TupOutputState *tstate;
-		TupleTableSlot *slot;
-
-		if (fcinfo->isnull)
-			elog(ERROR, "procedure returned null record");
-
-		/*
-		 * Ensure there's an active snapshot whilst we execute whatever's
-		 * involved here.  Note that this is *not* sufficient to make the
-		 * world safe for TOAST pointers to be included in the returned data:
-		 * the referenced data could have gone away while we didn't hold a
-		 * snapshot.  Hence, it's incumbent on PLs that can do COMMIT/ROLLBACK
-		 * to not return TOAST pointers, unless those pointers were fetched
-		 * after the last COMMIT/ROLLBACK in the procedure.
-		 *
-		 * XXX that is a really nasty, hard-to-test requirement.  Is there a
-		 * way to remove it?
-		 */
-		EnsurePortalSnapshotExists();
-
-		td = DatumGetHeapTupleHeader(retval);
-		tupType = HeapTupleHeaderGetTypeId(td);
-		tupTypmod = HeapTupleHeaderGetTypMod(td);
-		retdesc = lookup_rowtype_tupdesc(tupType, tupTypmod);
-
-		tstate = begin_tup_output_tupdesc(dest, retdesc,
-										  &TTSOpsHeapTuple);
-
-		rettupdata.t_len = HeapTupleHeaderGetDatumLength(td);
-		ItemPointerSetInvalid(&(rettupdata.t_self));
-		rettupdata.t_tableOid = InvalidOid;
-		rettupdata.t_data = td;
-
-		slot = ExecStoreHeapTuple(&rettupdata, tstate->slot, false);
-		tstate->dest->receiveSlot(slot, tstate->dest);
-
-		end_tup_output(tstate);
-
-		ReleaseTupleDesc(retdesc);
-	}
-	else
-		elog(ERROR, "unexpected result type for procedure: %u",
-			 fexpr->funcresulttype);
-
-	FreeExecutorState(estate);
-}
-
-/*
- * Construct the tuple descriptor for a CALL statement return
- */
-TupleDesc
-CallStmtResultDesc(CallStmt *stmt)
-{
-	FuncExpr   *fexpr;
-	HeapTuple	tuple;
-	TupleDesc	tupdesc;
-
-	fexpr = stmt->funcexpr;
-
-	tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fexpr->funcid));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for procedure %u", fexpr->funcid);
-
-	tupdesc = build_function_result_tupdesc_t(tuple);
-
-	ReleaseSysCache(tuple);
-
-	/*
-	 * The result of build_function_result_tupdesc_t has the right column
-	 * names, but it just has the declared output argument types, which is the
-	 * wrong thing in polymorphic cases.  Get the correct types by examining
-	 * stmt->outargs.  We intentionally keep the atttypmod as -1 and the
-	 * attcollation as the type's default, since that's always the appropriate
-	 * thing for function outputs; there's no point in considering any
-	 * additional info available from outargs.  Note that tupdesc is null if
-	 * there are no outargs.
-	 */
-	if (tupdesc)
-	{
-		Assert(tupdesc->natts == list_length(stmt->outargs));
-		for (int i = 0; i < tupdesc->natts; i++)
-		{
-			Form_pg_attribute att = TupleDescAttr(tupdesc, i);
-			Node	   *outarg = (Node *) list_nth(stmt->outargs, i);
-
-			TupleDescInitEntry(tupdesc,
-							   i + 1,
-							   NameStr(att->attname),
-							   exprType(outarg),
-							   -1,
-							   0);
-		}
-	}
-
-	return tupdesc;
-}

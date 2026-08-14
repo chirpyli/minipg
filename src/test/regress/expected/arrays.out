@@ -646,22 +646,16 @@ SELECT array_length(array_positions(ARRAY(SELECT 'AAAAAAAAAAAAAAAAAAAAAAAAA'::te
            10
 (1 row)
 
-DO $$
-DECLARE
-  o int;
-  a int[] := ARRAY[1,2,3,2,3,1,2];
-BEGIN
-  o := array_position(a, 2);
-  WHILE o IS NOT NULL
-  LOOP
-    RAISE NOTICE '%', o;
-    o := array_position(a, 2, o + 1);
-  END LOOP;
-END
-$$ LANGUAGE plpgsql;
-NOTICE:  2
-NOTICE:  4
-NOTICE:  7
+-- minipg: PL/pgSQL removed. Rewrite as SQL: positions of value 2 in the array.
+SELECT * FROM unnest(ARRAY[1,2,3,2,3,1,2]) WITH ORDINALITY AS t(v, pos)
+  WHERE v = 2 ORDER BY pos;
+ v | pos 
+---+-----
+ 2 |   2
+ 2 |   4
+ 2 |   7
+(3 rows)
+
 SELECT array_position('[2:4]={1,2,3}'::int[], 1);
  array_position 
 ----------------
@@ -1115,13 +1109,8 @@ insert into arr_pk_tbl(pk, f1[0:2147483647]) values (2, '{}');
 ERROR:  54000
 insert into arr_pk_tbl(pk, f1[-2147483648:2147483647]) values (2, '{}');
 ERROR:  54000
--- also exercise the expanded-array case
-do $$ declare a int[];
-begin
-  a := '[-2147483648:-2147483647]={1,2}'::int[];
-  a[2147483647] := 42;
-end $$;
-ERROR:  54000
+-- minipg: PL/pgSQL removed. The original DO block exercised the expanded-array
+-- subscript-store code path; that plpgsql-only subtest is dropped.
 \set VERBOSITY default
 -- test [not] (like|ilike) (any|all) (...)
 select 'foo' like any (array['%a', '%o']); -- t

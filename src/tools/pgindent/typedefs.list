@@ -459,7 +459,6 @@ CreateFunctionStmt
 CreateOpClassItem
 CreateOpClassStmt
 CreateOpFamilyStmt
-CreatePLangStmt
 CreatePolicyStmt
 CreateRangeStmt
 CreateRoleStmt
@@ -1583,7 +1582,6 @@ PGresult_data
 PHANDLE
 PIO_STATUS_BLOCK
 PLAINTREE
-PLAssignStmt
 PLUID_AND_ATTRIBUTES
 PLcword
 PLpgSQL_case_when
@@ -1617,7 +1615,6 @@ PLpgSQL_stmt_block
 PLpgSQL_stmt_call
 PLpgSQL_stmt_case
 PLpgSQL_stmt_close
-PLpgSQL_stmt_commit
 PLpgSQL_stmt_dynexecute
 PLpgSQL_stmt_dynfors
 PLpgSQL_stmt_execsql
@@ -1637,7 +1634,6 @@ PLpgSQL_stmt_raise
 PLpgSQL_stmt_return
 PLpgSQL_stmt_return_next
 PLpgSQL_stmt_return_query
-PLpgSQL_stmt_rollback
 PLpgSQL_stmt_type
 PLpgSQL_stmt_while
 PLpgSQL_trigtype

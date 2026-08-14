@@ -280,19 +280,9 @@ SELECT array_length(array_positions(ARRAY(SELECT 'AAAAAAAAAAAAAAAAAAAAAAAAA'::te
                                           FROM generate_series(1,100) g(i)),
                                   'AAAAAAAAAAAAAAAAAAAAAAAAA5'), 1);
 
-DO $$
-DECLARE
-  o int;
-  a int[] := ARRAY[1,2,3,2,3,1,2];
-BEGIN
-  o := array_position(a, 2);
-  WHILE o IS NOT NULL
-  LOOP
-    RAISE NOTICE '%', o;
-    o := array_position(a, 2, o + 1);
-  END LOOP;
-END
-$$ LANGUAGE plpgsql;
+-- minipg: PL/pgSQL removed. Rewrite as SQL: positions of value 2 in the array.
+SELECT * FROM unnest(ARRAY[1,2,3,2,3,1,2]) WITH ORDINALITY AS t(v, pos)
+  WHERE v = 2 ORDER BY pos;
 
 SELECT array_position('[2:4]={1,2,3}'::int[], 1);
 SELECT array_positions('[2:4]={1,2,3}'::int[], 1);
@@ -427,12 +417,8 @@ update arr_pk_tbl set f1[2147483646:2147483647] = array[4,2] where pk = 10;
 insert into arr_pk_tbl(pk, f1[0:2147483647]) values (2, '{}');
 insert into arr_pk_tbl(pk, f1[-2147483648:2147483647]) values (2, '{}');
 
--- also exercise the expanded-array case
-do $$ declare a int[];
-begin
-  a := '[-2147483648:-2147483647]={1,2}'::int[];
-  a[2147483647] := 42;
-end $$;
+-- minipg: PL/pgSQL removed. The original DO block exercised the expanded-array
+-- subscript-store code path; that plpgsql-only subtest is dropped.
 
 \set VERBOSITY default
 

@@ -1028,18 +1028,6 @@ _equalReturnStmt(const ReturnStmt *a, const ReturnStmt *b)
 }
 
 static bool
-_equalPLAssignStmt(const PLAssignStmt *a, const PLAssignStmt *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(indirection);
-	COMPARE_SCALAR_FIELD(nnames);
-	COMPARE_NODE_FIELD(val);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalAlterTableStmt(const AlterTableStmt *a, const AlterTableStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
@@ -1120,16 +1108,6 @@ static bool
 _equalClosePortalStmt(const ClosePortalStmt *a, const ClosePortalStmt *b)
 {
 	COMPARE_STRING_FIELD(portalname);
-
-	return true;
-}
-
-static bool
-_equalCallStmt(const CallStmt *a, const CallStmt *b)
-{
-	COMPARE_NODE_FIELD(funccall);
-	COMPARE_NODE_FIELD(funcexpr);
-	COMPARE_NODE_FIELD(outargs);
 
 	return true;
 }
@@ -1785,19 +1763,6 @@ _equalCreateTrigStmt(const CreateTrigStmt *a, const CreateTrigStmt *b)
 	COMPARE_SCALAR_FIELD(deferrable);
 	COMPARE_SCALAR_FIELD(initdeferred);
 	COMPARE_NODE_FIELD(constrrel);
-
-	return true;
-}
-
-static bool
-_equalCreatePLangStmt(const CreatePLangStmt *a, const CreatePLangStmt *b)
-{
-	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_STRING_FIELD(plname);
-	COMPARE_NODE_FIELD(plhandler);
-	COMPARE_NODE_FIELD(plinline);
-	COMPARE_NODE_FIELD(plvalidator);
-	COMPARE_SCALAR_FIELD(pltrusted);
 
 	return true;
 }
@@ -2710,9 +2675,6 @@ equal(const void *a, const void *b)
 		case T_ReturnStmt:
 			retval = _equalReturnStmt(a, b);
 			break;
-		case T_PLAssignStmt:
-			retval = _equalPLAssignStmt(a, b);
-			break;
 		case T_AlterTableStmt:
 			retval = _equalAlterTableStmt(a, b);
 			break;
@@ -2730,9 +2692,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ClosePortalStmt:
 			retval = _equalClosePortalStmt(a, b);
-			break;
-		case T_CallStmt:
-			retval = _equalCallStmt(a, b);
 			break;
 		case T_ClusterStmt:
 			retval = _equalClusterStmt(a, b);
@@ -2907,9 +2866,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateTrigStmt:
 			retval = _equalCreateTrigStmt(a, b);
-			break;
-		case T_CreatePLangStmt:
-			retval = _equalCreatePLangStmt(a, b);
 			break;
 		case T_LockStmt:
 			retval = _equalLockStmt(a, b);

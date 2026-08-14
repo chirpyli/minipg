@@ -253,10 +253,10 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
 		AlterStatsStmt
-		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
+		AnalyzeStmt ClosePortalStmt ClusterStmt CommentStmt
 		ConstraintsSetStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
-		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
+		CreateOpFamilyStmt AlterOpFamilyStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
 		CreateAssertionStmt CreateTransformStmt CreateTrigStmt
@@ -279,7 +279,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
-				PLpgSQL_Expr PLAssignStmt
 
 %type <node>	alter_column_default opclass_item opclass_drop alter_using
 %type <ival>	add_drop opt_asc_desc opt_nulls_order
@@ -332,7 +331,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				opt_index_name cluster_index_specification
 
 %type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
-				opt_class opt_inline_handler opt_validator validator_clause
+				opt_class
 				opt_collate
 
 %type <range>	qualified_name insert_target OptConstrFromTable
@@ -391,7 +390,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <fun_param_mode> arg_class
 %type <typnam>	func_return func_type
 
-%type <boolean>  opt_trusted opt_restart_seqs
+%type <boolean>  opt_restart_seqs
 %type <ival>	 OptNoLog
 %type <oncommit> OnCommitOption
 
@@ -667,10 +666,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
  * something other than the usual list of SQL commands.
  */
 %token		MODE_TYPE_NAME
-%token		MODE_PLPGSQL_EXPR
-%token		MODE_PLPGSQL_ASSIGN1
-%token		MODE_PLPGSQL_ASSIGN2
-%token		MODE_PLPGSQL_ASSIGN3
 
 
 /* Precedence: lowest to highest */
@@ -751,32 +746,6 @@ parse_toplevel:
 			{
 				pg_yyget_extra(yyscanner)->parsetree = list_make1($2);
 			}
-			| MODE_PLPGSQL_EXPR PLpgSQL_Expr
-			{
-				pg_yyget_extra(yyscanner)->parsetree =
-					list_make1(makeRawStmt($2, 0));
-			}
-			| MODE_PLPGSQL_ASSIGN1 PLAssignStmt
-			{
-				PLAssignStmt *n = (PLAssignStmt *) $2;
-				n->nnames = 1;
-				pg_yyget_extra(yyscanner)->parsetree =
-					list_make1(makeRawStmt((Node *) n, 0));
-			}
-			| MODE_PLPGSQL_ASSIGN2 PLAssignStmt
-			{
-				PLAssignStmt *n = (PLAssignStmt *) $2;
-				n->nnames = 2;
-				pg_yyget_extra(yyscanner)->parsetree =
-					list_make1(makeRawStmt((Node *) n, 0));
-			}
-			| MODE_PLPGSQL_ASSIGN3 PLAssignStmt
-			{
-				PLAssignStmt *n = (PLAssignStmt *) $2;
-				n->nnames = 3;
-				pg_yyget_extra(yyscanner)->parsetree =
-					list_make1(makeRawStmt((Node *) n, 0));
-			}
 		;
 
 /*
@@ -839,7 +808,6 @@ stmt:	AlterCollationStmt
 			| AlterCompositeTypeStmt
 			| AlterStatsStmt
 			| AnalyzeStmt
-			| CallStmt
 			| CheckPointStmt
 			| ClosePortalStmt
 			| ClusterStmt
@@ -854,7 +822,6 @@ stmt:	AlterCollationStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
 			| AlterOpFamilyStmt
-			| CreatePLangStmt
 			| CreateSchemaStmt
 			| CreateSeqStmt
 			| CreateStmt
@@ -902,22 +869,10 @@ stmt:	AlterCollationStmt
 				{ $$ = NULL; }
 		;
 
-/*****************************************************************************
- *
- * CALL statement
- *
- *****************************************************************************/
-
-CallStmt:	CALL func_application
-				{
-					CallStmt *n = makeNode(CallStmt);
-					n->funccall = castNode(FuncCall, $2);
-					$$ = (Node *)n;
-				}
-		;
 
 /*****************************************************************************
  *
+
 
 
 /*****************************************************************************
@@ -3149,49 +3104,6 @@ NumericOnly_list:	NumericOnly						{ $$ = list_make1($1); }
 				| NumericOnly_list ',' NumericOnly	{ $$ = lappend($1, $3); }
 		;
 
-/*****************************************************************************
- *
- *		QUERIES :
- *				CREATE [OR REPLACE] [TRUSTED] [PROCEDURAL] LANGUAGE ...
- *				DROP [PROCEDURAL] LANGUAGE ...
- *
- *****************************************************************************/
-
-CreatePLangStmt:
-			CREATE opt_or_replace opt_trusted opt_procedural LANGUAGE name
-			{
-				/*
-				 * We now interpret parameterless CREATE LANGUAGE as
-				 * CREATE EXTENSION.  "OR REPLACE" is silently translated
-				 * to "IF NOT EXISTS", which isn't quite the same, but
-				 * seems more useful than throwing an error.  We just
-				 * ignore TRUSTED, as the previous code would have too.
-				 */
-				CreateExtensionStmt *n = makeNode(CreateExtensionStmt);
-				n->if_not_exists = $2;
-				n->extname = $6;
-				n->options = NIL;
-				$$ = (Node *)n;
-			}
-			| CREATE opt_or_replace opt_trusted opt_procedural LANGUAGE name
-			  HANDLER handler_name opt_inline_handler opt_validator
-			{
-				CreatePLangStmt *n = makeNode(CreatePLangStmt);
-				n->replace = $2;
-				n->plname = $6;
-				n->plhandler = $8;
-				n->plinline = $9;
-				n->plvalidator = $10;
-				n->pltrusted = $3;
-				$$ = (Node *)n;
-			}
-		;
-
-opt_trusted:
-			TRUSTED									{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
 /* This ought to be just func_name, but that causes reduce/reduce conflicts
  * (CREATE LANGUAGE is the only place where func_name isn't followed by '(').
  * Work around by using simple names, instead.
@@ -3199,21 +3111,6 @@ opt_trusted:
 handler_name:
 			name						{ $$ = list_make1(makeString($1)); }
 			| name attrs				{ $$ = lcons(makeString($1), $2); }
-		;
-
-opt_inline_handler:
-			INLINE_P handler_name					{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-validator_clause:
-			VALIDATOR handler_name					{ $$ = $2; }
-			| NO VALIDATOR							{ $$ = NIL; }
-		;
-
-opt_validator:
-			validator_clause						{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
 opt_procedural:
@@ -5072,19 +4969,6 @@ CreateFunctionStmt:
 				{
 					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
 					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = NULL;
-					n->options = $6;
-					n->sql_body = $7;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace PROCEDURE func_name func_args_with_defaults
-			  opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = true;
 					n->replace = $2;
 					n->funcname = $4;
 					n->parameters = $5;
@@ -11492,73 +11376,6 @@ role_list:	RoleSpec
 					{ $$ = list_make1($1); }
 			| role_list ',' RoleSpec
 					{ $$ = lappend($1, $3); }
-		;
-
-
-/*****************************************************************************
- *
- * PL/pgSQL extensions
- *
- * You'd think a PL/pgSQL "expression" should be just an a_expr, but
- * historically it can include just about anything that can follow SELECT.
- * Therefore the returned struct is a SelectStmt.
- *****************************************************************************/
-
-PLpgSQL_Expr: opt_distinct_clause opt_target_list
-			from_clause where_clause
-			group_clause having_clause window_clause
-			opt_sort_clause opt_select_limit opt_for_locking_clause
-				{
-					SelectStmt *n = makeNode(SelectStmt);
-
-					n->distinctClause = $1;
-					n->targetList = $2;
-					n->fromClause = $3;
-					n->whereClause = $4;
-					n->groupClause = ($5)->list;
-					n->groupDistinct = ($5)->distinct;
-					n->havingClause = $6;
-					n->windowClause = $7;
-					n->sortClause = $8;
-					if ($9)
-					{
-						n->limitOffset = $9->limitOffset;
-						n->limitCount = $9->limitCount;
-						if (!n->sortClause &&
-							$9->limitOption == LIMIT_OPTION_WITH_TIES)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("WITH TIES cannot be specified without ORDER BY clause")));
-						n->limitOption = $9->limitOption;
-					}
-					n->lockingClause = $10;
-					$$ = (Node *) n;
-				}
-		;
-
-/*
- * PL/pgSQL Assignment statement: name opt_indirection := PLpgSQL_Expr
- */
-
-PLAssignStmt: plassign_target opt_indirection plassign_equals PLpgSQL_Expr
-				{
-					PLAssignStmt *n = makeNode(PLAssignStmt);
-
-					n->name = $1;
-					n->indirection = check_indirection($2, yyscanner);
-					/* nnames will be filled by calling production */
-					n->val = (SelectStmt *) $4;
-					n->location = @1;
-					$$ = (Node *) n;
-				}
-		;
-
-plassign_target: ColId							{ $$ = $1; }
-			| PARAM								{ $$ = psprintf("$%d", $1); }
-		;
-
-plassign_equals: COLON_EQUALS
-			| '='
 		;
 
 

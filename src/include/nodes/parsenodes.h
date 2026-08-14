@@ -1424,25 +1424,6 @@ typedef struct ReturnStmt
 } ReturnStmt;
 
 
-/* ----------------------
- *		PL/pgSQL Assignment Statement
- *
- * Like SelectStmt, this is transformed into a SELECT Query.
- * However, the targetlist of the result looks more like an UPDATE.
- * ----------------------
- */
-typedef struct PLAssignStmt
-{
-	NodeTag		type;
-
-	char	   *name;			/* initial column name */
-	List	   *indirection;	/* subscripts and field names, if any */
-	int			nnames;			/* number of names to use in ColumnRef */
-	SelectStmt *val;			/* the PL/pgSQL expression to assign */
-	int			location;		/* name's token location, or -1 if unknown */
-} PLAssignStmt;
-
-
 /*****************************************************************************
  *		Other Statements (no optimizations required)
  *
@@ -2011,21 +1992,6 @@ typedef struct CreateTrigStmt
 } CreateTrigStmt;
 
 /* ----------------------
- *		Create LANGUAGE Statements
- * ----------------------
- */
-typedef struct CreatePLangStmt
-{
-	NodeTag		type;
-	bool		replace;		/* T => replace if already exists */
-	char	   *plname;			/* PL name */
-	List	   *plhandler;		/* PL call handler function (qual. name) */
-	List	   *plinline;		/* optional inline function (qual. name) */
-	List	   *plvalidator;	/* optional validator function (qual. name) */
-	bool		pltrusted;		/* PL is trusted */
-} CreatePLangStmt;
-
-/* ----------------------
  *		{Create|Alter} SEQUENCE Statement
  * ----------------------
  */
@@ -2388,29 +2354,6 @@ typedef struct InlineCodeBlock
 	bool		langIsTrusted;	/* trusted property of the language */
 	bool		atomic;			/* atomic execution context */
 } InlineCodeBlock;
-
-/* ----------------------
- *		CALL statement
- *
- * OUT-mode arguments are removed from the transformed funcexpr.  The outargs
- * list contains copies of the expressions for all output arguments, in the
- * order of the procedure's declared arguments.  (outargs is never evaluated,
- * but is useful to the caller as a reference for what to assign to.)
- * ----------------------
- */
-typedef struct CallStmt
-{
-	NodeTag		type;
-	FuncCall   *funccall;		/* from the parser */
-	FuncExpr   *funcexpr;		/* transformed call, with only input args */
-	List	   *outargs;		/* transformed output-argument expressions */
-} CallStmt;
-
-typedef struct CallContext
-{
-	NodeTag		type;
-	bool		atomic;
-} CallContext;
 
 /* ----------------------
  *		Alter Object Rename Statement

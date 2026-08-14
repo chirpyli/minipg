@@ -500,18 +500,12 @@ insert into tt14t values('foo', 'bar', 'baz', '42');
 
 alter table tt14t drop column f2;
 
+-- minipg: PL/pgSQL removed; SQL SRF equivalent.
 create function tt14f() returns setof tt14t as
 $$
-declare
-    rec1 record;
-begin
-    for rec1 in select * from tt14t
-    loop
-        return next rec1;
-    end loop;
-end;
+    SELECT * FROM tt14t;
 $$
-language plpgsql;
+language sql;
 
 create view tt14v as select t.* from tt14f() t;
 

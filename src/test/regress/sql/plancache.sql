@@ -54,45 +54,10 @@ CREATE OR REPLACE VIEW pcacheview AS
 
 EXECUTE vprep;
 
--- Check basic SPI plan invalidation
-
-create function cache_test(int) returns int as $$
-declare total int;
-begin
-	CREATE TABLE t1(f1 int);
-	insert into t1 values($1);
-	insert into t1 values(11);
-	insert into t1 values(12);
-	insert into t1 values(13);
-	select sum(f1) into total from t1;
-	drop table t1;
-	return total;
-end
-$$ language plpgsql;
-
-select cache_test(1);
-select cache_test(2);
-select cache_test(3);
-
--- Check invalidation of plpgsql "simple expression"
-
-CREATE VIEW v1 as
-  select 2+2 as f1;
-
-create function cache_test_2() returns int as $$
-begin
-	return f1 from v1;
-end$$ language plpgsql;
-
-select cache_test_2();
-
-CREATE OR REPLACE VIEW v1 as
-  select 2+2+4 as f1;
-select cache_test_2();
-
-CREATE OR REPLACE VIEW v1 as
-  select 2+2+4+(select max(unique1) from tenk1) as f1;
-select cache_test_2();
+-- minipg: PL/pgSQL removed. The original test began with plpgsql-specific
+-- SPI plan-cache invalidation checks (cache_test, cache_test_2). Those
+-- plpgsql-only checks are dropped; the generic prepared-statement cache tests
+-- below remain.
 
 --- Check that change of search_path is honored when re-using cached plan
 
@@ -140,22 +105,8 @@ CREATE SEQUENCE seq;
 
 execute p2;
 
--- Check DDL via SPI, immediately followed by SPI plan re-use
--- (bug in original coding)
-
-create function cachebug() returns void as $$
-declare r int;
-begin
-  drop table if exists temptable cascade;
-  CREATE TABLE temptable as select * from generate_series(1,3) as f1;
-  CREATE VIEW vv as select * from temptable;
-  for r in select * from vv loop
-    raise notice '%', r;
-  end loop;
-end$$ language plpgsql;
-
-select cachebug();
-select cachebug();
+-- minipg: PL/pgSQL removed. The original "DDL via SPI followed by plan re-use"
+-- check used a plpgsql function (cachebug); that plpgsql-only check is dropped.
 
 -- Check that addition or removal of any partition is correctly dealt with by
 -- default partition table when it is being used in prepared statement.

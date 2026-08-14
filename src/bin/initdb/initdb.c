@@ -203,7 +203,6 @@ static void setup_depend(FILE *cmdfd);
 static void setup_run_file(FILE *cmdfd, const char *filename);
 static void setup_description(FILE *cmdfd);
 static void setup_collation(FILE *cmdfd);
-static void load_plpgsql(FILE *cmdfd);
 static void vacuum_db(FILE *cmdfd);
 static void make_template0(FILE *cmdfd);
 static void make_postgres(FILE *cmdfd);
@@ -1351,15 +1350,6 @@ setup_collation(FILE *cmdfd)
 }
 
 /*
- * load PL/pgSQL server-side language
- */
-static void
-load_plpgsql(FILE *cmdfd)
-{
-	PG_CMD_PUTS("CREATE EXTENSION plpgsql;\n\n");
-}
-
-/*
  * clean everything up in template1
  */
 static void
@@ -2241,8 +2231,6 @@ initialize_data_directory(void)
 	setup_description(cmdfd);
 
 	setup_collation(cmdfd);
-
-	load_plpgsql(cmdfd);
 
 	vacuum_db(cmdfd);
 

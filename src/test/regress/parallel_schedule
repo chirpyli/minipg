@@ -135,13 +135,15 @@ test: portals_p2 guc bitmapops combocid window functional_deps advisory_lock ind
 # ----------
 # information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
 # temp/truncate/returning 已随表继承(INHERITS)功能裁剪而移除
-test: plancache limit plpgsql domain rangefuncs prepare conversion polymorphism
+# plpgsql: PL/pgSQL 已裁剪，移除对应测试条目（纯测试见已删 plpgsql.sql）
+test: plancache limit domain rangefuncs prepare conversion polymorphism
 
 # ----------
 # Another group of parallel tests
 # ----------
 # indexing 已随表继承(INHERITS)/分区功能裁剪而移除
-test: reloptions explain memoize
+# minipg: explain/memoize 依赖 plpgsql 测试桩（explain_filter 等），PL/pgSQL 已裁剪，移除
+test: reloptions
 
 # ----------
 # Another group of parallel tests (compression)
@@ -154,5 +156,4 @@ test: oidjoins
 # this test also uses event triggers, so likewise run it by itself
 # test: fast_default   # 临时注释：minipg 既有 domain/fast-default SIGSEGV（ALTER TABLE ... ADD COLUMN domain default 后端崩溃），与本次 ACL 函数族删除无代码路径关联，单跑通过、仅并行级联崩；待另立任务排查，临时移出以保 check-world 其余全绿
 
-# run stats by itself because its delay may be insufficient under heavy load
-test: stats
+# minipg: stats 依赖 plpgsql 测试桩（wait_for_stats 轮询循环），PL/pgSQL 已裁剪，移除

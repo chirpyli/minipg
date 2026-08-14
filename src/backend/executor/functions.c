@@ -1545,23 +1545,9 @@ check_sql_fn_statements(List *queryTreeLists)
 		{
 			Query	   *query = lfirst_node(Query, lc2);
 
-			/*
-			 * Disallow calling procedures with output arguments.  The current
-			 * implementation would just throw the output values away, unless
-			 * the statement is the last one.  Per SQL standard, we should
-			 * assign the output values by name.  By disallowing this here, we
-			 * preserve an opportunity for future improvement.
-			 */
-			if (query->commandType == CMD_UTILITY &&
-				IsA(query->utilityStmt, CallStmt))
-			{
-				CallStmt   *stmt = (CallStmt *) query->utilityStmt;
-
-				if (stmt->outargs != NIL)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("calling procedures with output arguments is not supported in SQL functions")));
-			}
+			/* no CALL statements can appear here (procedures are unsupported) */
+			Assert(!(query->commandType == CMD_UTILITY &&
+					 IsA(query->utilityStmt, CallStmt)));
 		}
 	}
 }
@@ -1798,12 +1784,12 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 		 * runtime type checking to catch any discrepancy, but it'd be nice to
 		 * do better at parse time.
 		 *
-		 * We must *not* do this for a procedure, however.  Procedures with
-		 * output parameter(s) have rettype RECORD, and the CALL code expects
-		 * to get results corresponding to the list of output parameters, even
-		 * when there's just one parameter that's composite.
+		 * Procedures (which are no longer supported in minipg) had output
+		 * parameter(s) with rettype RECORD, and the CALL code expected results
+		 * corresponding to the list of output parameters.  Since procedures are
+		 * removed, we always apply this coercion for single-column records.
 		 */
-		if (tlistlen == 1 && prokind != PROKIND_PROCEDURE)
+		if (tlistlen == 1)
 		{
 			TargetEntry *tle = (TargetEntry *) linitial(tlist);
 

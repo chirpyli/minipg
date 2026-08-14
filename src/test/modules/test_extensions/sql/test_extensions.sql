@@ -57,25 +57,9 @@ drop extension test_ext8;
 -- Avoid noise caused by CONTEXT and NOTICE messages including the schema name.
 \set SHOW_CONTEXT never
 SET client_min_messages TO 'warning';
-CREATE SCHEMA test_ext4_ns;
-CREATE OR REPLACE FUNCTION create_extension_with_schema()
-  RETURNS VOID AS $$
-  DECLARE
-    myschema text;
-    query text;
-  BEGIN
-    SELECT INTO myschema 'test_ext4_ns';
-    query := 'CREATE EXTENSION test_ext4 SCHEMA ' || myschema || ' CASCADE;';
-    RAISE NOTICE 'query %', query;
-    EXECUTE query;
-  END; $$ LANGUAGE plpgsql;
-BEGIN;
-SELECT create_extension_with_schema();
-PREPARE TRANSACTION 'twophase_extension';
--- Clean up
-ROLLBACK PREPARED 'twophase_extension';
-DROP SCHEMA test_ext4_ns CASCADE;
-DROP FUNCTION create_extension_with_schema();
+-- minipg: PL/pgSQL removed. The original test created test_ext4 inside a 2PC
+-- transaction via a plpgsql function that ran a dynamic CREATE EXTENSION; that
+-- plpgsql-only setup block is dropped.
 RESET client_min_messages;
 \unset SHOW_CONTEXT
 

@@ -21,13 +21,11 @@ INSERT INTO test_table VALUES (1, '42'), (2, '100'), (3, '200');
 SELECT * FROM test_table ORDER BY id;
 
 -- Dummy function used for expression evaluations.
--- Note that this function does not use a SQL-standard function body on
--- purpose, so as external statistics can be loaded from it.
+-- minipg: PL/pgSQL removed; use a SQL function instead.
 CREATE OR REPLACE FUNCTION func_int_custom (p_value int_custom)
-  RETURNS int_custom LANGUAGE plpgsql AS $$
-  BEGIN
-    RETURN p_value;
-  END; $$;
+  RETURNS int_custom LANGUAGE sql AS $$
+    SELECT p_value;
+  $$;
 
 -- Switch type to use typanalyze function that always returns false.
 ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_false);

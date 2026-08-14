@@ -297,17 +297,17 @@ update xacttest set a = max_xacttest() + 10 where a > 0;
 select * from xacttest;
 rollback;
 
--- Now the same test with plpgsql (since it depends on SPI which is different)
-create or replace function max_xacttest() returns smallint language plpgsql as
-'begin return max(a) from xacttest; end' stable;
+-- minipg: PL/pgSQL removed; SQL equivalent of the SPI-dependent version.
+create or replace function max_xacttest() returns smallint language sql as
+'SELECT max(a) FROM xacttest' stable;
 
 begin;
 update xacttest set a = max_xacttest() + 10 where a > 0;
 select * from xacttest;
 rollback;
 
-create or replace function max_xacttest() returns smallint language plpgsql as
-'begin return max(a) from xacttest; end' volatile;
+create or replace function max_xacttest() returns smallint language sql as
+'SELECT max(a) FROM xacttest' volatile;
 
 begin;
 update xacttest set a = max_xacttest() + 10 where a > 0;
@@ -333,23 +333,9 @@ DROP TABLE trans_baz;
 DROP TABLE trans_barbaz;
 
 
--- test case for problems with revalidating an open relation during abort
-create function inverse(int) returns float8 as
-$$
-begin
-  analyze revalidate_bug;
-  return 1::float8/$1;
-exception
-  when division_by_zero then return 0;
-end$$ language plpgsql volatile;
-
-create table revalidate_bug (c float8 unique);
-insert into revalidate_bug values (1);
-insert into revalidate_bug values (inverse(0));
-
-drop table revalidate_bug;
-drop function inverse(int);
-
+-- minipg: PL/pgSQL removed. The original test used a plpgsql function with
+-- exception handling (inverse) to verify open-relation revalidation during
+-- abort; that plpgsql-only check is dropped.
 
 -- verify that cursors created during an aborted subtransaction are
 -- closed, but that we do not rollback the effect of any FETCHs
@@ -387,36 +373,10 @@ fetch from foo;
 abort;
 
 
--- Test for proper cleanup after a failure in a cursor portal
--- that was created in an outer subtransaction
-CREATE FUNCTION invert(x float8) RETURNS float8 LANGUAGE plpgsql AS
-$$ begin return 1/x; end $$;
-
-CREATE FUNCTION create_temp_tab() RETURNS text
-LANGUAGE plpgsql AS $$
-BEGIN
-  CREATE TABLE new_table (f1 float8);
-  -- case of interest is that we fail while holding an open
-  -- relcache reference to new_table
-  INSERT INTO new_table SELECT invert(0.0);
-  RETURN 'foo';
-END $$;
-
-BEGIN;
-DECLARE ok CURSOR FOR SELECT * FROM int8_tbl;
-DECLARE ctt CURSOR FOR SELECT create_temp_tab();
-FETCH ok;
-SAVEPOINT s1;
-FETCH ok;  -- should work
-FETCH ctt; -- error occurs here
-ROLLBACK TO s1;
-FETCH ok;  -- should work
-FETCH ctt; -- must be rejected
-COMMIT;
-
-DROP FUNCTION create_temp_tab();
-DROP FUNCTION invert(x float8);
-
+-- minipg: PL/pgSQL removed. The original test used plpgsql functions (invert,
+-- create_temp_tab) to verify cursor-portal cleanup after a failure inside a
+-- subtransaction that held an open relcache reference; that procedural
+-- subtest is dropped.
 
 -- Tests for AND CHAIN
 

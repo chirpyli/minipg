@@ -51,7 +51,6 @@ CREATE AGGREGATE addr_nsp.genaggr(int4) (sfunc = int4pl, stype = int4);
 CREATE DOMAIN addr_nsp.gendomain AS int4 CONSTRAINT domconstr CHECK (value > 0);
 CREATE FUNCTION addr_nsp.trig() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN END; $$;
 CREATE TRIGGER t BEFORE INSERT ON addr_nsp.gentable FOR EACH ROW EXECUTE PROCEDURE addr_nsp.trig();
-CREATE PROCEDURE addr_nsp.proc(int4) LANGUAGE SQL AS $$ $$;
 CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
 ERROR:  syntax error at or near "SERVER"
 LINE 1: CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
@@ -122,7 +121,7 @@ BEGIN
 		('table'), ('index'), ('sequence'), ('view'),
 		('foreign table'),
 		('table column'), ('foreign table column'),
-		('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
+		('aggregate'), ('function'), ('type'), ('cast'),
 		('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
 		('operator'), ('operator class'), ('operator family'), ('rule'), ('trigger'),
 		('text search parser'), ('text search dictionary'),
@@ -199,12 +198,6 @@ WARNING:  error for function,{addr_nsp,zwei},{}: function addr_nsp.zwei() does n
 WARNING:  error for function,{addr_nsp,zwei},{integer}: function addr_nsp.zwei(integer) does not exist
 WARNING:  error for function,{eins,zwei,drei},{}: cross-database references are not implemented: eins.zwei.drei
 WARNING:  error for function,{eins,zwei,drei},{integer}: cross-database references are not implemented: eins.zwei.drei
-WARNING:  error for procedure,{eins},{}: procedure eins() does not exist
-WARNING:  error for procedure,{eins},{integer}: procedure eins(integer) does not exist
-WARNING:  error for procedure,{addr_nsp,zwei},{}: procedure addr_nsp.zwei() does not exist
-WARNING:  error for procedure,{addr_nsp,zwei},{integer}: procedure addr_nsp.zwei(integer) does not exist
-WARNING:  error for procedure,{eins,zwei,drei},{}: cross-database references are not implemented: eins.zwei.drei
-WARNING:  error for procedure,{eins,zwei,drei},{integer}: cross-database references are not implemented: eins.zwei.drei
 WARNING:  error for type,{eins},{}: type "eins" does not exist
 WARNING:  error for type,{eins},{integer}: type "eins" does not exist
 WARNING:  error for type,{addr_nsp,zwei},{}: name list length must be exactly 1
@@ -400,7 +393,6 @@ WITH objects (type, name, args) AS (VALUES
 				('foreign table column', '{addr_nsp, genftable, a}', '{}'),
 				('aggregate', '{addr_nsp, genaggr}', '{int4}'),
 				('function', '{pg_catalog, pg_identify_object}', '{pg_catalog.oid, pg_catalog.oid, int4}'),
-				('procedure', '{addr_nsp, proc}', '{int4}'),
 				('type', '{pg_catalog._int4}', '{}'),
 				('type', '{addr_nsp.gendomain}', '{}'),
 				('type', '{addr_nsp.gencomptype}', '{}'),
@@ -469,7 +461,6 @@ drop cascades to type genenum
 drop cascades to function genaggr(integer)
 drop cascades to type gendomain
 drop cascades to function trig()
-drop cascades to function proc(integer)
 DROP OWNED BY regress_addr_user;
 DROP USER regress_addr_user;
 --

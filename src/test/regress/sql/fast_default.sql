@@ -390,114 +390,10 @@ FROM t1;
 
 DROP TABLE T;
 
--- test that we account for missing columns without defaults correctly
--- in expand_tuple, and that rows are correctly expanded for triggers
-
-CREATE FUNCTION test_trigger()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-
-begin
-    raise notice 'old tuple: %', OLD::text;
-    if TG_OP = 'DELETE'
-    then
-       return OLD;
-    else
-       return NEW;
-    end if;
-end;
-
-$$;
-
--- 2 new columns, both have defaults
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,3);
-ALTER TABLE t ADD COLUMN x int NOT NULL DEFAULT 4;
-ALTER TABLE t ADD COLUMN y int NOT NULL DEFAULT 5;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, first has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,3);
-ALTER TABLE t ADD COLUMN x int NOT NULL DEFAULT 4;
-ALTER TABLE t ADD COLUMN y int;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, second has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,3);
-ALTER TABLE t ADD COLUMN x int;
-ALTER TABLE t ADD COLUMN y int NOT NULL DEFAULT 5;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, neither has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,3);
-ALTER TABLE t ADD COLUMN x int;
-ALTER TABLE t ADD COLUMN y int;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- same as last 4 tests but here the last original column has a NULL value
--- 2 new columns, both have defaults
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,NULL);
-ALTER TABLE t ADD COLUMN x int NOT NULL DEFAULT 4;
-ALTER TABLE t ADD COLUMN y int NOT NULL DEFAULT 5;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, first has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,NULL);
-ALTER TABLE t ADD COLUMN x int NOT NULL DEFAULT 4;
-ALTER TABLE t ADD COLUMN y int;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, second has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,NULL);
-ALTER TABLE t ADD COLUMN x int;
-ALTER TABLE t ADD COLUMN y int NOT NULL DEFAULT 5;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
-
--- 2 new columns, neither has default
-CREATE TABLE t (id serial PRIMARY KEY, a int, b int, c int);
-INSERT INTO t (a,b,c) VALUES (1,2,NULL);
-ALTER TABLE t ADD COLUMN x int;
-ALTER TABLE t ADD COLUMN y int;
-CREATE TRIGGER a BEFORE UPDATE ON t FOR EACH ROW EXECUTE PROCEDURE test_trigger();
-SELECT * FROM t;
-UPDATE t SET y = 2;
-SELECT * FROM t;
-DROP TABLE t;
+-- minipg: PL/pgSQL removed. The original test verified expand_tuple handling of
+-- missing columns via a plpgsql BEFORE ROW trigger (test_trigger); that
+-- trigger-based section is dropped. The non-trigger fast-default checks below
+-- remain.
 
 -- make sure expanded tuple has correct self pointer
 -- it will be required by the RI trigger doing the cascading delete
@@ -572,7 +468,6 @@ DROP TABLE vtype;
 DROP TABLE vtype2;
 DROP TABLE follower;
 DROP TABLE leader;
-DROP FUNCTION test_trigger();
 DROP TABLE t1;
 DROP FUNCTION set(name);
 DROP FUNCTION comp();

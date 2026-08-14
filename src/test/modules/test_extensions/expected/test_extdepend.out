@@ -9,35 +9,24 @@ INSERT INTO test_extdep_commands (command) VALUES
  (' SET search_path TO test_ext'),
  (' CREATE TABLE a (a1 int)'),
  (''),
- (' CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$'),
- (' ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5'),
- (''),
- (' CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()'),
- (' ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5'),
- (''),
+-- minipg: PL/pgSQL removed. The original also created a plpgsql trigger (b)
+-- and made the trigger/function depend on the extension; that trigger-based
+-- portion is dropped. The index dependency checks below remain.
  (' CREATE INDEX e ON a (a1)'),
  (' ALTER INDEX e DEPENDS ON EXTENSION test_ext5'),
  (' RESET search_path');
 SELECT * FROM test_extdep_commands;
-                                 command                                 
--------------------------------------------------------------------------
+                    command                    
+-----------------------------------------------
   CREATE SCHEMA test_ext
   CREATE EXTENSION test_ext5 SCHEMA test_ext
   SET search_path TO test_ext
   CREATE TABLE a (a1 int)
  
-  CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS               +
-    $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
-  ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
- 
-  CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
-  ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
- 
   CREATE INDEX e ON a (a1)
   ALTER INDEX e DEPENDS ON EXTENSION test_ext5
   RESET search_path
-(14 rows)
+(8 rows)
 
 -- First, test that dependent objects go away when the extension is dropped.
 SELECT * FROM test_extdep_commands \gexec
@@ -46,30 +35,21 @@ SELECT * FROM test_extdep_commands \gexec
  SET search_path TO test_ext
  CREATE TABLE a (a1 int)
 
- CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
- ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
-
- CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
- ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
--- A dependent object made dependent again has no effect
-ALTER FUNCTION test_ext.b() DEPENDS ON EXTENSION test_ext5;
+-- minipg: PL/pgSQL removed. The original also re-marked the plpgsql trigger
+-- function as dependent; that step is dropped.
 -- make sure we have the right dependencies on the extension
 SELECT deptype, p.*
   FROM pg_depend, pg_identify_object(classid, objid, objsubid) AS p
  WHERE refclassid = 'pg_extension'::regclass AND
        refobjid = (SELECT oid FROM pg_extension WHERE extname = 'test_ext5')
 ORDER BY type;
- deptype |   type   |  schema  | name |    identity     
----------+----------+----------+------+-----------------
- x       | function | test_ext |      | test_ext.b()
- x       | index    | test_ext | e    | test_ext.e
- x       | trigger  |          |      | c on test_ext.a
-(3 rows)
+ deptype | type  |  schema  | name |  identity  
+---------+-------+----------+------+------------
+ x       | index | test_ext | e    | test_ext.e
+(1 row)
 
 DROP EXTENSION test_ext5;
 -- anything still depending on the table?
@@ -91,13 +71,6 @@ SELECT * FROM test_extdep_commands \gexec
  SET search_path TO test_ext
  CREATE TABLE a (a1 int)
 
- CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
- ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
-
- CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
- ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
@@ -109,10 +82,9 @@ SELECT deptype, i.*
   FROM pg_catalog.pg_depend, pg_identify_object(classid, objid, objsubid) i
  WHERE refclassid='pg_extension'::regclass AND
  refobjid=(SELECT oid FROM pg_extension WHERE extname='test_ext5');
- deptype |   type   |  schema  | name |   identity   
----------+----------+----------+------+--------------
- x       | function | test_ext |      | test_ext.b()
-(1 row)
+ deptype | type | schema | name | identity 
+---------+------+--------+------+----------
+(0 rows)
 
 DROP EXTENSION test_ext5;
 DROP SCHEMA test_ext CASCADE;
@@ -123,19 +95,14 @@ SELECT * FROM test_extdep_commands \gexec
  SET search_path TO test_ext
  CREATE TABLE a (a1 int)
 
- CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
- ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
-
- CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
- ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
 SET search_path TO test_ext;
 DROP TRIGGER c ON a;
+ERROR:  trigger "c" for table "a" does not exist
 DROP FUNCTION b();
+ERROR:  function b() does not exist
 DROP INDEX e;
 SELECT deptype, i.*
   FROM pg_catalog.pg_depend, pg_identify_object(classid, objid, objsubid) i
@@ -159,23 +126,20 @@ SELECT * FROM test_extdep_commands \gexec
  SET search_path TO test_ext
  CREATE TABLE a (a1 int)
 
- CREATE FUNCTION b() RETURNS TRIGGER LANGUAGE plpgsql AS
-   $$ BEGIN NEW.a1 := NEW.a1 + 42; RETURN NEW; END; $$
- ALTER FUNCTION b() DEPENDS ON EXTENSION test_ext5
-
- CREATE TRIGGER c BEFORE INSERT ON a FOR EACH ROW EXECUTE PROCEDURE b()
- ALTER TRIGGER c ON a DEPENDS ON EXTENSION test_ext5
-
  CREATE INDEX e ON a (a1)
  ALTER INDEX e DEPENDS ON EXTENSION test_ext5
  RESET search_path
 SET search_path TO test_ext;
 ALTER FUNCTION b() NO DEPENDS ON EXTENSION test_ext5;
+ERROR:  function b() does not exist
 ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5;
+ERROR:  trigger "c" for table "a" does not exist
 ALTER INDEX e NO DEPENDS ON EXTENSION test_ext5;
 DROP EXTENSION test_ext5;
 DROP TRIGGER c ON a;
+ERROR:  trigger "c" for table "a" does not exist
 DROP FUNCTION b();
+ERROR:  function b() does not exist
 DROP INDEX e;
 DROP SCHEMA test_ext CASCADE;
 NOTICE:  drop cascades to table a

@@ -32,7 +32,7 @@ test: fk-deadlock
 test: fk-deadlock2
 # fk-partitioned-1/fk-partitioned-2 已随分区功能裁剪而移除
 # eval-plan-qual 已随表继承(INHERITS)功能裁剪而移除
-test: eval-plan-qual-trigger
+# eval-plan-qual-trigger: 依赖 plpgsql 触发器(trig_report)，PL/pgSQL 已裁剪，移除
 test: inplace-inval
 # intra-grant-inplace / intra-grant-inplace-db: 依赖 GRANT 锁机制，权限已裁剪，移除
 test: lock-update-delete
@@ -45,7 +45,7 @@ test: insert-conflict-do-update
 test: insert-conflict-do-update-2
 # insert-conflict-do-update-3: 依赖 writable CTE (WITH ... AS (INSERT ... ON CONFLICT DO UPDATE))，WITH 语法已裁剪，移除
 # insert-conflict-do-update-4 已随分区功能裁剪而移除
-test: insert-conflict-specconflict
+# insert-conflict-specconflict: 依赖 plpgsql 过程语言（blurt_and_lock 带 RAISE NOTICE），PL/pgSQL 已裁剪，移除
 test: delete-abort-savept
 test: delete-abort-savept-2
 test: aborted-keyrevoke
@@ -55,7 +55,7 @@ test: lock-committed-update
 test: lock-committed-keyupdate
 test: update-locked-tuple
 test: reindex-concurrently
-test: reindex-concurrently-toast
+# reindex-concurrently-toast: 依赖 plpgsql DO 块动态重命名 toast 关系，PL/pgSQL 已裁剪，移除
 test: reindex-schema
 test: propagate-lock-delete
 test: tuplelock-conflict
@@ -76,9 +76,9 @@ test: drop-index-concurrently-1
 test: multiple-cic
 test: alter-table-1
 test: alter-table-2
-test: alter-table-3
+# alter-table-3: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 # alter-table-4 已随表继承(INHERITS)功能裁剪而移除
-test: create-trigger
+# create-trigger: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 test: sequence-ddl
 
 test: vacuum-reltuples
@@ -93,7 +93,7 @@ test: predicate-hash
 # partition-key-update-2 已随分区功能裁剪而移除
 # partition-key-update-3 已随分区功能裁剪而移除
 # partition-key-update-4 已随分区功能裁剪而移除
-test: plpgsql-toast
+# plpgsql-toast: 依赖 PL/pgSQL 触发器，PL/pgSQL 已裁剪，移除
 # truncate-conflict: 依赖 GRANT/ROLE/SET ROLE 权限锁冲突，权限已裁剪，移除
 test: serializable-parallel
 test: serializable-parallel-2

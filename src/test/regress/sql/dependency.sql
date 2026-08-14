@@ -47,8 +47,9 @@ DROP OWNED BY regress_dep_user1;
 
 CREATE SCHEMA deptest;
 CREATE TABLE deptest (a serial primary key, b text);
-CREATE FUNCTION deptest_func() RETURNS void LANGUAGE plpgsql
-  AS $$ BEGIN END; $$;
+-- minipg: PL/pgSQL removed; use a no-op SQL function.
+CREATE FUNCTION deptest_func() RETURNS void LANGUAGE sql
+  AS $$ SELECT $$;
 CREATE TYPE deptest_enum AS ENUM ('red');
 CREATE TYPE deptest_range AS RANGE (SUBTYPE = int4);
 

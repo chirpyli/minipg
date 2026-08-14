@@ -493,37 +493,9 @@ execute s1(10);
 execute s1(0); -- should fail
 execute s1(NULL); -- should fail
 
--- Check that domain constraints on plpgsql function parameters, results,
--- and local variables are enforced correctly.
-
-create function doubledecrement(p1 pos_int) returns pos_int as $$
-declare v pos_int;
-begin
-    return p1;
-end$$ language plpgsql;
-
-select doubledecrement(3); -- fail because of implicit null assignment
-
-create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
-declare v pos_int := 0;
-begin
-    return p1;
-end$$ language plpgsql;
-
-select doubledecrement(3); -- fail at initialization assignment
-
-create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
-declare v pos_int := 1;
-begin
-    v := p1 - 1;
-    return v - 1;
-end$$ language plpgsql;
-
-select doubledecrement(null); -- fail before call
-select doubledecrement(0); -- fail before call
-select doubledecrement(1); -- fail at assignment to v
-select doubledecrement(2); -- fail at return
-select doubledecrement(3); -- good
+-- minipg: PL/pgSQL removed. The original test verified domain constraints on
+-- plpgsql function parameters, results, and local variables (doubledecrement);
+-- that plpgsql-specific check is dropped.
 
 -- Check that ALTER DOMAIN tests columns of derived types
 
@@ -585,44 +557,10 @@ drop domain posint cascade;
 -- Check enforcement of domain-related typmod in plpgsql (bug #5717)
 --
 
-create or replace function array_elem_check(numeric) returns numeric as $$
-declare
-  x numeric(4,2)[1];
-begin
-  x[1] := $1;
-  return x[1];
-end$$ language plpgsql;
-
-select array_elem_check(121.00);
-select array_elem_check(1.23456);
-
-create domain mynums as numeric(4,2)[1];
-
-create or replace function array_elem_check(numeric) returns numeric as $$
-declare
-  x mynums;
-begin
-  x[1] := $1;
-  return x[1];
-end$$ language plpgsql;
-
-select array_elem_check(121.00);
-select array_elem_check(1.23456);
-
-create domain mynums2 as mynums;
-
-create or replace function array_elem_check(numeric) returns numeric as $$
-declare
-  x mynums2;
-begin
-  x[1] := $1;
-  return x[1];
-end$$ language plpgsql;
-
-select array_elem_check(121.00);
-select array_elem_check(1.23456);
-
-drop function array_elem_check(numeric);
+-- minipg: PL/pgSQL removed. The original test included plpgsql-only checks
+-- for domain constraint enforcement during plpgsql array-element assignment
+-- (array_elem_check) and during plpgsql variable assignment with changing
+-- constraints (dom_check). Those plpgsql-only checks are dropped.
 
 --
 -- Check enforcement of array-level domain constraints
@@ -640,67 +578,6 @@ insert into op values (array[2,1]);  -- fail
 update op set f1[2] = 3;
 update op set f1[2] = 0;  -- fail
 select * from op;
-
-create or replace function array_elem_check(int) returns int as $$
-declare
-  x orderedpair := '{1,2}';
-begin
-  x[2] := $1;
-  return x[2];
-end$$ language plpgsql;
-
-select array_elem_check(3);
-select array_elem_check(-1);
-
-drop function array_elem_check(int);
-
---
--- Check enforcement of changing constraints in plpgsql
---
-
-create domain di as int;
-
-create function dom_check(int) returns di as $$
-declare d di;
-begin
-  d := $1::di;
-  return d;
-end
-$$ language plpgsql immutable;
-
-select dom_check(0);
-
-alter domain di add constraint pos check (value > 0);
-
-select dom_check(0); -- fail
-
-alter domain di drop constraint pos;
-
-select dom_check(0);
-
--- implicit cast during assignment is a separate code path, test that too
-
-create or replace function dom_check(int) returns di as $$
-declare d di;
-begin
-  d := $1;
-  return d;
-end
-$$ language plpgsql immutable;
-
-select dom_check(0);
-
-alter domain di add constraint pos check (value > 0);
-
-select dom_check(0); -- fail
-
-alter domain di drop constraint pos;
-
-select dom_check(0);
-
-drop function dom_check(int);
-
-drop domain di;
 
 --
 -- Check use of a (non-inline-able) SQL function in a domain constraint;

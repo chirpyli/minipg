@@ -217,20 +217,17 @@ SELECT enum_range(NULL::rainbow, NULL);
 --
 -- User functions, can't test perl/python etc here since may not be compiled.
 --
+-- minipg: PL/pgSQL removed; use SQL language functions.
 CREATE FUNCTION echo_me(anyenum) RETURNS text AS $$
-BEGIN
-RETURN $1::text || 'omg';
-END
-$$ LANGUAGE plpgsql;
+SELECT $1::text || 'omg';
+$$ LANGUAGE sql;
 SELECT echo_me('red'::rainbow);
 --
 -- Concrete function should override generic one
 --
 CREATE FUNCTION echo_me(rainbow) RETURNS text AS $$
-BEGIN
-RETURN $1::text || 'wtf';
-END
-$$ LANGUAGE plpgsql;
+SELECT $1::text || 'wtf';
+$$ LANGUAGE sql;
 SELECT echo_me('red'::rainbow);
 --
 -- If we drop the original generic one, we don't have to qualify the type

@@ -2595,18 +2595,6 @@ _outReturnStmt(StringInfo str, const ReturnStmt *node)
 }
 
 static void
-_outPLAssignStmt(StringInfo str, const PLAssignStmt *node)
-{
-	WRITE_NODE_TYPE("PLASSIGN");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_NODE_FIELD(indirection);
-	WRITE_INT_FIELD(nnames);
-	WRITE_NODE_FIELD(val);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outFuncCall(StringInfo str, const FuncCall *node)
 {
 	WRITE_NODE_TYPE("FUNCCALL");
@@ -3874,9 +3862,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ReturnStmt:
 				_outReturnStmt(str, obj);
-				break;
-			case T_PLAssignStmt:
-				_outPLAssignStmt(str, obj);
 				break;
 			case T_ColumnDef:
 				_outColumnDef(str, obj);

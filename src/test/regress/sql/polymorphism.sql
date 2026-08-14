@@ -444,12 +444,12 @@ select f3, myaggn09a(f1) from t group by f3 order by f3;
 select f3, myaggn10a(f1) from t group by f3 order by f3;
 select mysum2(f1, f1 + 1) from t;
 
--- test inlining of polymorphic SQL functions
+-- minipg: PL/pgSQL removed. The original bleat() raised a NOTICE to observe
+-- which branch of sql_if() was evaluated; as a SQL function it just returns $1.
+-- The inlining correctness is still checked via the returned values below.
 create function bleat(int) returns int as $$
-begin
-  raise notice 'bleat %', $1;
-  return $1;
-end$$ language plpgsql;
+  SELECT $1;
+$$ language sql;
 
 create function sql_if(bool, anyelement, anyelement) returns anyelement as $$
 select case when $1 then $2 else $3 end $$ language sql;
@@ -477,20 +477,15 @@ FROM (VALUES (ARRAY[row(1,2),row(3,4)]), (ARRAY[row(5,6),row(7,8)])) as t(i);
 
 -- another kind of polymorphic aggregate
 
+-- minipg: PL/pgSQL removed; SQL equivalent using CASE.
 create function add_group(grp anyarray, ad anyelement, size integer)
   returns anyarray
   as $$
-begin
-  if grp is null then
-    return array[ad];
-  end if;
-  if array_upper(grp, 1) < size then
-    return grp || ad;
-  end if;
-  return grp;
-end;
+  SELECT CASE WHEN grp IS NULL THEN array[ad]
+             WHEN array_upper(grp, 1) < size THEN grp || ad
+             ELSE grp END;
 $$
-  language plpgsql immutable;
+  language sql immutable;
 
 create aggregate build_group(anyelement, integer) (
   SFUNC = add_group,
@@ -866,15 +861,9 @@ select dfunc(a =>+1);
 select dfunc(a =>/**/1);
 select dfunc(a =>--comment to be removed by psql
   1);
--- need DO to protect the -- from psql
-do $$
-  declare r integer;
-  begin
-    select dfunc(a=>-- comment
-      1) into r;
-    raise info 'r = %', r;
-  end;
-$$;
+-- minipg: PL/pgSQL removed. The original DO block verified the lexer parses
+-- "dfunc(a=>-- comment\n 1)"; replicate with a plain SQL SELECT.
+SELECT dfunc(a=> 1) AS r;
 
 -- check reverse-listing of named-arg calls
 CREATE VIEW dfview AS

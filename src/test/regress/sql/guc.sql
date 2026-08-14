@@ -219,49 +219,10 @@ alter function report_guc(text) reset all;
 
 select report_guc('work_mem'), current_setting('work_mem');
 
--- SET LOCAL is restricted by a function SET option
-create or replace function myfunc(int) returns text as $$
-begin
-  set local work_mem = '2MB';
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-
-select myfunc(0), current_setting('work_mem');
-
-alter function myfunc(int) reset all;
-
-select myfunc(0), current_setting('work_mem');
-
-set work_mem = '3MB';
-
--- but SET isn't
-create or replace function myfunc(int) returns text as $$
-begin
-  set work_mem = '2MB';
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-
-select myfunc(0), current_setting('work_mem');
-
-set work_mem = '3MB';
-
--- it should roll back on error, though
-create or replace function myfunc(int) returns text as $$
-begin
-  set work_mem = '2MB';
-  perform 1/$1;
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-
-select myfunc(0);
-select current_setting('work_mem');
-select myfunc(1), current_setting('work_mem');
+-- minipg: PL/pgSQL removed. The original test used plpgsql functions to verify
+-- SET LOCAL restriction by a function SET option, plain SET inside a function,
+-- and rollback-on-error of function-level SET. Those plpgsql-only checks are
+-- dropped.
 
 -- check current_setting()'s behavior with invalid setting name
 

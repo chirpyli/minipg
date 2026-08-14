@@ -3010,21 +3010,7 @@ extract_query_dependencies_walker(Node *node, PlannerInfo *context)
 			/*
 			 * This logic must handle any utility command for which parse
 			 * analysis was nontrivial (cf. stmt_requires_parse_analysis).
-			 *
-			 * Notably, CALL requires its own processing.
 			 */
-			if (IsA(query->utilityStmt, CallStmt))
-			{
-				CallStmt   *callstmt = (CallStmt *) query->utilityStmt;
-
-				/* We need not examine funccall, just the transformed exprs */
-				(void) extract_query_dependencies_walker((Node *) callstmt->funcexpr,
-														 context);
-				(void) extract_query_dependencies_walker((Node *) callstmt->outargs,
-														 context);
-				return false;
-			}
-
 			/*
 			 * Ignore other utility statements, except those (such as EXPLAIN)
 			 * that contain a parsed-but-not-planned query.  For those, we

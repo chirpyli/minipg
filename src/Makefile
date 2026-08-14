@@ -22,7 +22,6 @@ SUBDIRS = \
 	interfaces \
 	fe_utils \
 	bin \
-	pl \
 	makefiles \
 	test/regress \
 	test/isolation \

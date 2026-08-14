@@ -274,8 +274,8 @@ CREATE FUNCTION mylt (text, text) RETURNS boolean LANGUAGE sql
 CREATE FUNCTION mylt_noninline (text, text) RETURNS boolean LANGUAGE sql
     AS $$ select $1 < $2 limit 1 $$;
 
-CREATE FUNCTION mylt_plpgsql (text, text) RETURNS boolean LANGUAGE plpgsql
-    AS $$ begin return $1 < $2; end $$;
+CREATE FUNCTION mylt_plpgsql (text, text) RETURNS boolean LANGUAGE sql
+    AS $$ select $1 < $2 $$;
 
 SELECT a.b AS a, b.b AS b, a.b < b.b AS lt,
        mylt(a.b, b.b), mylt_noninline(a.b, b.b), mylt_plpgsql(a.b, b.b)
@@ -289,33 +289,8 @@ FROM collate_test1 a, collate_test1 b
 ORDER BY a.b, b.b;
 
 
--- collation override in plpgsql
-
-CREATE FUNCTION mylt2 (x text, y text) RETURNS boolean LANGUAGE plpgsql AS $$
-declare
-  xx text := x;
-  yy text := y;
-begin
-  return xx < yy;
-end
-$$;
-
-SELECT mylt2('a', 'B' collate "en_US") as t, mylt2('a', 'B' collate "C") as f;
-
-CREATE OR REPLACE FUNCTION
-  mylt2 (x text, y text) RETURNS boolean LANGUAGE plpgsql AS $$
-declare
-  xx text COLLATE "POSIX" := x;
-  yy text := y;
-begin
-  return xx < yy;
-end
-$$;
-
-SELECT mylt2('a', 'B') as f;
-SELECT mylt2('a', 'B' collate "C") as fail; -- conflicting collations
-SELECT mylt2('a', 'B' collate "POSIX") as f;
-
+-- minipg: PL/pgSQL removed. The original additionally tested collation
+-- overrides inside plpgsql functions (mylt2); that plpgsql-only block is dropped.
 
 -- polymorphism
 

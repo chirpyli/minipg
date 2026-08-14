@@ -48,36 +48,9 @@ WHERE refclassid = 0 OR refobjid = 0 OR
 -- covered by setup_depend().  That happens because there are no rules in
 -- the pinned data, but initdb creates some intentionally-not-pinned views.
 
-do $$
-declare relnm text;
-  reloid oid;
-  shared bool;
-  lowoid oid;
-  pinned bool;
-begin
-for relnm, reloid, shared in
-  select relname, oid, relisshared from pg_class
-  where EXISTS(
-      SELECT * FROM pg_attribute
-      WHERE attrelid = pg_class.oid AND attname = 'oid')
-    and relkind = 'r' and oid < 16384 order by 1
-loop
-  execute 'select min(oid) from ' || relnm into lowoid;
-  continue when lowoid is null or lowoid >= 16384;
-  if shared then
-    pinned := exists(select 1 from pg_shdepend
-                     where refclassid = reloid and refobjid = lowoid
-                     and deptype = 'p');
-  else
-    pinned := exists(select 1 from pg_depend
-                     where refclassid = reloid and refobjid = lowoid
-                     and deptype = 'p');
-  end if;
-  if not pinned then
-    raise notice '% contains unpinned initdb-created object(s)', relnm;
-  end if;
-end loop;
-end$$;
+-- minipg: PL/pgSQL removed. The original DO block scanned for unpinned
+-- initdb-created objects in system catalogs; that procedural checker is
+-- dropped. (Pinned-object integrity is still maintained by initdb.)
 
 -- **************** pg_class ****************
 

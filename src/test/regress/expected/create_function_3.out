@@ -559,9 +559,6 @@ CREATE FUNCTION functest1(a int) RETURNS int LANGUAGE SQL AS 'SELECT $1';
 CREATE OR REPLACE FUNCTION functest1(a int) RETURNS int LANGUAGE SQL WINDOW AS 'SELECT $1';
 ERROR:  cannot change routine kind
 DETAIL:  "functest1" is a function.
-CREATE OR REPLACE PROCEDURE functest1(a int) LANGUAGE SQL AS 'SELECT $1';
-ERROR:  cannot change routine kind
-DETAIL:  "functest1" is a function.
 DROP FUNCTION functest1(a int);
 -- inlining of set-returning functions
 CREATE TABLE functest3 (a int);

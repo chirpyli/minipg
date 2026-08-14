@@ -640,22 +640,17 @@ select mysum2(f1, f1 + 1) from t;
      38
 (1 row)
 
--- test inlining of polymorphic SQL functions
+-- minipg: PL/pgSQL removed. The original bleat() raised a NOTICE to observe
+-- which branch of sql_if() was evaluated; as a SQL function it just returns $1.
+-- The inlining correctness is still checked via the returned values below.
 create function bleat(int) returns int as $$
-begin
-  raise notice 'bleat %', $1;
-  return $1;
-end$$ language plpgsql;
+  SELECT $1;
+$$ language sql;
 create function sql_if(bool, anyelement, anyelement) returns anyelement as $$
 select case when $1 then $2 else $3 end $$ language sql;
 -- Note this would fail with integer overflow, never mind wrong bleat() output,
 -- if the CASE expression were not successfully inlined
 select f1, sql_if(f1 > 0, bleat(f1), bleat(f1 + 1)) from int4_tbl;
-NOTICE:  bleat 1
-NOTICE:  bleat 123456
-NOTICE:  bleat -123455
-NOTICE:  bleat 2147483647
-NOTICE:  bleat -2147483646
      f1      |   sql_if    
 -------------+-------------
            0 |           1
@@ -697,20 +692,15 @@ FROM (VALUES (ARRAY[row(1,2),row(3,4)]), (ARRAY[row(5,6),row(7,8)])) as t(i);
 (1 row)
 
 -- another kind of polymorphic aggregate
+-- minipg: PL/pgSQL removed; SQL equivalent using CASE.
 create function add_group(grp anyarray, ad anyelement, size integer)
   returns anyarray
   as $$
-begin
-  if grp is null then
-    return array[ad];
-  end if;
-  if array_upper(grp, 1) < size then
-    return grp || ad;
-  end if;
-  return grp;
-end;
+  SELECT CASE WHEN grp IS NULL THEN array[ad]
+             WHEN array_upper(grp, 1) < size THEN grp || ad
+             ELSE grp END;
 $$
-  language plpgsql immutable;
+  language sql immutable;
 create aggregate build_group(anyelement, integer) (
   SFUNC = add_group,
   STYPE = anyarray
@@ -1614,16 +1604,14 @@ select dfunc(a =>--comment to be removed by psql
      1
 (1 row)
 
--- need DO to protect the -- from psql
-do $$
-  declare r integer;
-  begin
-    select dfunc(a=>-- comment
-      1) into r;
-    raise info 'r = %', r;
-  end;
-$$;
-INFO:  r = 1
+-- minipg: PL/pgSQL removed. The original DO block verified the lexer parses
+-- "dfunc(a=>-- comment\n 1)"; replicate with a plain SQL SELECT.
+SELECT dfunc(a=> 1) AS r;
+ r 
+---
+ 1
+(1 row)
+
 -- check reverse-listing of named-arg calls
 CREATE VIEW dfview AS
    SELECT q1, q2,

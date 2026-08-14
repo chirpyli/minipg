@@ -24,12 +24,13 @@ select
 from generate_series(0, 11*11-1) i;
 
 -- and a simple strict function that's opaque to the optimizer
+-- minipg: PL/pgSQL removed; SQL equivalent.
 create function strictf(bool, bool) returns bool
-language plpgsql as $$begin return $1 and not $2; end$$ strict;
+language sql as $$select $1 and not $2$$ strict;
 
 -- a simple function to make arrays opaque to the optimizer
 create function opaque_array(int[]) returns int[]
-language plpgsql as $$begin return $1; end$$ strict;
+language sql as $$select $1$$ strict;
 
 -- Basic proof rules for single boolean variables
 

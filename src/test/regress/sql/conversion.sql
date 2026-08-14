@@ -40,6 +40,10 @@ DROP CONVERSION mydef;
 
 -- Helper function to test a conversion. Uses the test_enc_conversion function
 -- that was created in the create_function_0 test.
+-- minipg: PL/pgSQL removed. Rewrite test_conv as a SQL function. The original
+-- captured the conversion error message via plpgsql exception handling; here we
+-- always use noError = true so the function does not throw. The 'error' column is
+-- therefore NULL for failing inputs (the 'errorat' position is still reported).
 create or replace function test_conv(
   input IN bytea,
   src_encoding IN text,
@@ -48,25 +52,12 @@ create or replace function test_conv(
   result OUT bytea,
   errorat OUT bytea,
   error OUT text)
-language plpgsql as
+language sql as
 $$
-declare
-  validlen int;
-begin
-  -- First try to perform the conversion with noError = false. If that errors out,
-  -- capture the error message, and try again with noError = true. The second call
-  -- should succeed and return the position of the error, return that too.
-  begin
-    select * into validlen, result from test_enc_conversion(input, src_encoding, dst_encoding, false);
-    errorat = NULL;
-    error := NULL;
-  exception when others then
-    error := sqlerrm;
-    select * into validlen, result from test_enc_conversion(input, src_encoding, dst_encoding, true);
-    errorat = substr(input, validlen + 1);
-  end;
-  return;
-end;
+  SELECT result,
+         substr(input, validlen + 1),
+         NULL::text
+  FROM (SELECT * FROM test_enc_conversion(input, src_encoding, dst_encoding, true)) t(validlen, result);
 $$;
 
 

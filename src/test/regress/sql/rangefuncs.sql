@@ -164,8 +164,8 @@ CREATE VIEW vw_getrngfunc AS
 SELECT * FROM vw_getrngfunc;
 DROP VIEW vw_getrngfunc;
 
--- plpgsql, proretset = f, prorettype = b
-CREATE FUNCTION getrngfunc8(int) RETURNS int AS 'DECLARE rngfuncint int; BEGIN SELECT rngfuncid into rngfuncint FROM rngfunc WHERE rngfuncid = $1; RETURN rngfuncint; END;' LANGUAGE plpgsql;
+-- minipg: PL/pgSQL removed; rewrite as SQL functions.
+CREATE FUNCTION getrngfunc8(int) RETURNS int AS 'SELECT rngfuncid FROM rngfunc WHERE rngfuncid = $1;' LANGUAGE SQL;
 SELECT * FROM getrngfunc8(1) AS t1;
 SELECT * FROM getrngfunc8(1) WITH ORDINALITY AS t1(v,o);
 CREATE VIEW vw_getrngfunc AS SELECT * FROM getrngfunc8(1);
@@ -176,7 +176,7 @@ SELECT * FROM vw_getrngfunc;
 DROP VIEW vw_getrngfunc;
 
 -- plpgsql, proretset = f, prorettype = c
-CREATE FUNCTION getrngfunc9(int) RETURNS rngfunc AS 'DECLARE rngfunctup rngfunc%ROWTYPE; BEGIN SELECT * into rngfunctup FROM rngfunc WHERE rngfuncid = $1; RETURN rngfunctup; END;' LANGUAGE plpgsql;
+CREATE FUNCTION getrngfunc9(int) RETURNS rngfunc AS 'SELECT * FROM rngfunc WHERE rngfuncid = $1;' LANGUAGE SQL;
 SELECT * FROM getrngfunc9(1) AS t1;
 SELECT * FROM getrngfunc9(1) WITH ORDINALITY AS t1(a,b,c,o);
 CREATE VIEW vw_getrngfunc AS SELECT * FROM getrngfunc9(1);
@@ -227,8 +227,8 @@ CREATEORARY SEQUENCE rngfunc_rescan_seq2;
 CREATE TYPE rngfunc_rescan_t AS (i integer, s bigint);
 
 CREATE FUNCTION rngfunc_sql(int,int) RETURNS setof rngfunc_rescan_t AS 'SELECT i, nextval(''rngfunc_rescan_seq1'') FROM generate_series($1,$2) i;' LANGUAGE SQL;
--- plpgsql functions use materialize mode
-CREATE FUNCTION rngfunc_mat(int,int) RETURNS setof rngfunc_rescan_t AS 'begin for i in $1..$2 loop return next (i, nextval(''rngfunc_rescan_seq2'')); end loop; end;' LANGUAGE plpgsql;
+-- minipg: PL/pgSQL removed; SQL SRF equivalent (same result as the loop).
+CREATE FUNCTION rngfunc_mat(int,int) RETURNS setof rngfunc_rescan_t AS 'SELECT i, nextval(''rngfunc_rescan_seq2'') FROM generate_series($1,$2) i;' LANGUAGE SQL;
 
 --invokes ExecReScanFunctionScan - all these cases should materialize the function only once
 -- LEFT JOIN on a condition that the planner can't prove to be true is used to ensure the function
@@ -474,17 +474,9 @@ select * from tt;
 select insert_tt2('foolish','barrish') limit 1;
 select * from tt;
 
--- triggers will fire, too
-create function noticetrigger() returns trigger as $$
-begin
-  raise notice 'noticetrigger % %', new.f1, new.data;
-  return null;
-end $$ language plpgsql;
-create trigger tnoticetrigger after insert on tt for each row
-execute procedure noticetrigger();
-
-select insert_tt2('foolme','barme') limit 1;
-select * from tt;
+-- minipg: PL/pgSQL removed. The original used a plpgsql trigger (noticetrigger)
+-- to verify triggers fire inside SQL-function inserts; that trigger subtest is
+-- dropped.
 
 -- and rules work
 CREATE TABLE tt_log(f1 int, data text);

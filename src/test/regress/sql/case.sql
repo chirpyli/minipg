@@ -187,8 +187,9 @@ SELECT * FROM CASE_TBL;
 -- cause problems in concurrent sessions
 BEGIN;
 
+-- minipg: PL/pgSQL removed; SQL function equivalent.
 CREATE FUNCTION vol(text) returns text as
-  'begin return $1; end' language plpgsql volatile;
+  'SELECT $1' language sql volatile;
 
 SELECT CASE
   (CASE vol('bar')
@@ -204,7 +205,7 @@ SELECT CASE
 CREATE DOMAIN foodomain AS text;
 
 CREATE FUNCTION volfoo(text) returns foodomain as
-  'begin return $1::foodomain; end' language plpgsql volatile;
+  'SELECT $1::foodomain' language sql volatile;
 
 CREATE FUNCTION inline_eq(foodomain, foodomain) returns boolean as
   'SELECT CASE $2::text WHEN $1::text THEN true ELSE false END' language sql;
@@ -224,14 +225,10 @@ BEGIN;
 CREATE DOMAIN arrdomain AS int[];
 
 CREATE FUNCTION make_ad(int,int) returns arrdomain as
-  'declare x arrdomain;
-   begin
-     x := array[$1,$2];
-     return x;
-   end' language plpgsql volatile;
+  'SELECT array[$1,$2]::arrdomain' language sql volatile;
 
 CREATE FUNCTION ad_eq(arrdomain, arrdomain) returns boolean as
-  'begin return array_eq($1, $2); end' language plpgsql;
+  'SELECT array_eq($1, $2)' language sql;
 
 CREATE OPERATOR = (procedure = ad_eq,
                    leftarg = arrdomain, rightarg = arrdomain);

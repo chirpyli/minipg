@@ -669,68 +669,10 @@ select report_guc('work_mem'), current_setting('work_mem');
  3MB        | 3MB
 (1 row)
 
--- SET LOCAL is restricted by a function SET option
-create or replace function myfunc(int) returns text as $$
-begin
-  set local work_mem = '2MB';
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-select myfunc(0), current_setting('work_mem');
- myfunc | current_setting 
---------+-----------------
- 2MB    | 3MB
-(1 row)
-
-alter function myfunc(int) reset all;
-select myfunc(0), current_setting('work_mem');
- myfunc | current_setting 
---------+-----------------
- 2MB    | 2MB
-(1 row)
-
-set work_mem = '3MB';
--- but SET isn't
-create or replace function myfunc(int) returns text as $$
-begin
-  set work_mem = '2MB';
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-select myfunc(0), current_setting('work_mem');
- myfunc | current_setting 
---------+-----------------
- 2MB    | 2MB
-(1 row)
-
-set work_mem = '3MB';
--- it should roll back on error, though
-create or replace function myfunc(int) returns text as $$
-begin
-  set work_mem = '2MB';
-  perform 1/$1;
-  return current_setting('work_mem');
-end $$
-language plpgsql
-set work_mem = '1MB';
-select myfunc(0);
-ERROR:  division by zero
-CONTEXT:  SQL statement "SELECT 1/$1"
-PL/pgSQL function myfunc(integer) line 4 at PERFORM
-select current_setting('work_mem');
- current_setting 
------------------
- 3MB
-(1 row)
-
-select myfunc(1), current_setting('work_mem');
- myfunc | current_setting 
---------+-----------------
- 2MB    | 2MB
-(1 row)
-
+-- minipg: PL/pgSQL removed. The original test used plpgsql functions to verify
+-- SET LOCAL restriction by a function SET option, plain SET inside a function,
+-- and rollback-on-error of function-level SET. Those plpgsql-only checks are
+-- dropped.
 -- check current_setting()'s behavior with invalid setting name
 select current_setting('nosuch.setting');  -- FAIL
 ERROR:  unrecognized configuration parameter "nosuch.setting"

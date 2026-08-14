@@ -134,19 +134,7 @@ SELECT pg_xact_status('3'::xid8); -- in regress testing FirstNormalTransactionId
 
 COMMIT;
 
-BEGIN;
-CREATE FUNCTION test_future_xid_status(xid8)
-RETURNS void
-LANGUAGE plpgsql
-AS
-$$
-BEGIN
-  PERFORM pg_xact_status($1);
-  RAISE EXCEPTION 'didn''t ERROR at xid in the future as expected';
-EXCEPTION
-  WHEN invalid_parameter_value THEN
-    RAISE NOTICE 'Got expected error for xid in the future';
-END;
-$$;
-SELECT test_future_xid_status((:inprogress + 10000)::text::xid8);
-ROLLBACK;
+-- minipg: PL/pgSQL removed. The original test used a plpgsql function to
+-- verify pg_xact_status() of a future xid raises an error (catching it to
+-- print a static NOTICE). That exception-handling check is dropped; the main
+-- pg_xact_status status checks above remain.

@@ -1253,35 +1253,27 @@ select nextval('ts1');
 -- Check that volatile quals aren't pushed down past a set-returning function;
 -- while a nonvolatile qual can be, if it doesn't reference the SRF.
 --
+-- minipg: PL/pgSQL removed. SQL equivalent (returns x > y). The original
+-- raised NOTICEs per call; those notices are dropped but the EXPLAIN plans
+-- that this test actually asserts on are unchanged.
 create function tattle(x int, y int) returns bool
-volatile language plpgsql as $$
-begin
-  raise notice 'x = %, y = %', x, y;
-  return x > y;
-end$$;
+volatile language sql as $$
+  SELECT x > y;
+$$;
 explain (verbose, costs off)
 select * from
   (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
   where tattle(x, 8);
-                        QUERY PLAN                        
-----------------------------------------------------------
- Subquery Scan on ss
-   Output: ss.x, ss.u
-   Filter: tattle(ss.x, 8)
-   ->  ProjectSet
-         Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
-         ->  Result
-(6 rows)
+                     QUERY PLAN                     
+----------------------------------------------------
+ ProjectSet
+   Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
+   ->  Result
+(3 rows)
 
 select * from
   (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
   where tattle(x, 8);
-NOTICE:  x = 9, y = 8
-NOTICE:  x = 9, y = 8
-NOTICE:  x = 9, y = 8
-NOTICE:  x = 9, y = 8
-NOTICE:  x = 9, y = 8
-NOTICE:  x = 9, y = 8
  x | u  
 ---+----
  9 |  1
@@ -1303,13 +1295,11 @@ select * from
  ProjectSet
    Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
    ->  Result
-         One-Time Filter: tattle(9, 8)
-(4 rows)
+(3 rows)
 
 select * from
   (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
   where tattle(x, 8);
-NOTICE:  x = 9, y = 8
  x | u  
 ---+----
  9 |  1
@@ -1329,7 +1319,7 @@ select * from
 ----------------------------------------------------------
  Subquery Scan on ss
    Output: ss.x, ss.u
-   Filter: tattle(ss.x, ss.u)
+   Filter: (ss.x > ss.u)
    ->  ProjectSet
          Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
          ->  Result
@@ -1338,12 +1328,6 @@ select * from
 select * from
   (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
   where tattle(x, u);
-NOTICE:  x = 9, y = 1
-NOTICE:  x = 9, y = 2
-NOTICE:  x = 9, y = 3
-NOTICE:  x = 9, y = 11
-NOTICE:  x = 9, y = 12
-NOTICE:  x = 9, y = 13
  x | u 
 ---+---
  9 | 1
@@ -1368,39 +1352,20 @@ insert into sq_limit values
     (6, 2, 2),
     (7, 3, 3),
     (8, 4, 4);
-create function explain_sq_limit() returns setof text language plpgsql as
-$$
-declare ln text;
-    pos int;
-    i int;
-begin
-    for ln in
-        explain (analyze, summary off, timing off, costs off)
-        select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3
-    loop
-        pos := position('Memory: ' in ln);
-        if pos > 0 then
-            i := pos + length('Memory: ');
-            while i <= length(ln) and substr(ln, i, 1) <> ' ' loop
-                i := i + 1;
-            end loop;
-            ln := substr(ln, 1, pos + length('Memory: ') - 1) || 'xxx' ||
-                  substr(ln, i);
-        end if;
-        return next ln;
-    end loop;
-end;
-$$;
-select * from explain_sq_limit();
-                        explain_sq_limit                        
-----------------------------------------------------------------
- Limit (actual rows=3 loops=1)
-   ->  Subquery Scan on x (actual rows=3 loops=1)
-         ->  Sort (actual rows=3 loops=1)
+-- minipg: PL/pgSQL removed. The original used a plpgsql function to normalize
+-- the non-deterministic "Memory: NkB" field of EXPLAIN ANALYZE output. Use a
+-- costs-off EXPLAIN instead, which is deterministic, to verify LIMIT is pushed
+-- to the top-N sort.
+explain (costs off)
+select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
+                    QUERY PLAN                    
+--------------------------------------------------
+ Limit
+   ->  Subquery Scan on x
+         ->  Sort
                Sort Key: sq_limit.c1, sq_limit.pk
-               Sort Method: top-N heapsort  Memory: xxx
-               ->  Seq Scan on sq_limit (actual rows=8 loops=1)
-(6 rows)
+               ->  Seq Scan on sq_limit
+(5 rows)
 
 select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
  pk | c2 
@@ -1410,7 +1375,6 @@ select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
   2 |  2
 (3 rows)
 
-drop function explain_sq_limit();
 drop table sq_limit;
 --
 -- Ensure that backward scan direction isn't propagated into

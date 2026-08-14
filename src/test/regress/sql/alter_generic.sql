@@ -117,23 +117,6 @@ SELECT fdwname FROM pg_foreign_data_wrapper WHERE fdwname like 'alt_fdw%';
 SELECT srvname FROM pg_foreign_server WHERE srvname like 'alt_fserv%';
 
 --
--- Procedural Language
---
-CREATE LANGUAGE alt_lang1 HANDLER plpgsql_call_handler;
-CREATE LANGUAGE alt_lang2 HANDLER plpgsql_call_handler;
-
-
-ALTER LANGUAGE alt_lang1 RENAME TO alt_lang2;   -- failed (name conflict)
-ALTER LANGUAGE alt_lang2 RENAME TO alt_lang3;   -- failed (not owner)
-ALTER LANGUAGE alt_lang1 RENAME TO alt_lang3;   -- OK
-
-
-SELECT lanname, a.rolname
-  FROM pg_language l, pg_authid a
-  WHERE l.lanowner = a.oid AND l.lanname like 'alt_lang%'
-  ORDER BY lanname;
-
---
 -- Operator
 --
 
@@ -398,9 +381,6 @@ SELECT nspname, stxname, rolname
 ---
 DROP FOREIGN DATA WRAPPER alt_fdw2 CASCADE;
 DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
-
-DROP LANGUAGE alt_lang2 CASCADE;
-DROP LANGUAGE alt_lang3 CASCADE;
 
 DROP SCHEMA alt_nsp1 CASCADE;
 DROP SCHEMA alt_nsp2 CASCADE;

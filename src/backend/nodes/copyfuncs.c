@@ -2885,20 +2885,6 @@ _copyReturnStmt(const ReturnStmt *from)
 	return newnode;
 }
 
-static PLAssignStmt *
-_copyPLAssignStmt(const PLAssignStmt *from)
-{
-	PLAssignStmt *newnode = makeNode(PLAssignStmt);
-
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(indirection);
-	COPY_SCALAR_FIELD(nnames);
-	COPY_NODE_FIELD(val);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
 static AlterTableStmt *
 _copyAlterTableStmt(const AlterTableStmt *from)
 {
@@ -2996,18 +2982,6 @@ _copyClosePortalStmt(const ClosePortalStmt *from)
 	ClosePortalStmt *newnode = makeNode(ClosePortalStmt);
 
 	COPY_STRING_FIELD(portalname);
-
-	return newnode;
-}
-
-static CallStmt *
-_copyCallStmt(const CallStmt *from)
-{
-	CallStmt   *newnode = makeNode(CallStmt);
-
-	COPY_NODE_FIELD(funccall);
-	COPY_NODE_FIELD(funcexpr);
-	COPY_NODE_FIELD(outargs);
 
 	return newnode;
 }
@@ -3791,21 +3765,6 @@ _copyCreateTrigStmt(const CreateTrigStmt *from)
 	return newnode;
 }
 
-static CreatePLangStmt *
-_copyCreatePLangStmt(const CreatePLangStmt *from)
-{
-	CreatePLangStmt *newnode = makeNode(CreatePLangStmt);
-
-	COPY_SCALAR_FIELD(replace);
-	COPY_STRING_FIELD(plname);
-	COPY_NODE_FIELD(plhandler);
-	COPY_NODE_FIELD(plinline);
-	COPY_NODE_FIELD(plvalidator);
-	COPY_SCALAR_FIELD(pltrusted);
-
-	return newnode;
-}
-
 static LockStmt *
 _copyLockStmt(const LockStmt *from)
 {
@@ -4355,9 +4314,6 @@ copyObjectImpl(const void *from)
 		case T_ReturnStmt:
 			retval = _copyReturnStmt(from);
 			break;
-		case T_PLAssignStmt:
-			retval = _copyPLAssignStmt(from);
-			break;
 		case T_AlterTableStmt:
 			retval = _copyAlterTableStmt(from);
 			break;
@@ -4375,9 +4331,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ClosePortalStmt:
 			retval = _copyClosePortalStmt(from);
-			break;
-		case T_CallStmt:
-			retval = _copyCallStmt(from);
 			break;
 		case T_ClusterStmt:
 			retval = _copyClusterStmt(from);
@@ -4552,9 +4505,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateTrigStmt:
 			retval = _copyCreateTrigStmt(from);
-			break;
-		case T_CreatePLangStmt:
-			retval = _copyCreatePLangStmt(from);
 			break;
 		case T_LockStmt:
 			retval = _copyLockStmt(from);

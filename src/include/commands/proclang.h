@@ -14,9 +14,6 @@
 #define PROCLANG_H
 
 #include "catalog/objectaddress.h"
-#include "nodes/parsenodes.h"
-
-extern ObjectAddress CreateProceduralLanguage(CreatePLangStmt *stmt);
 
 extern Oid	get_language_oid(const char *langname, bool missing_ok);
 

@@ -54,15 +54,11 @@ raw_parser(const char *str, RawParseMode mode)
 		yyextra.have_lookahead = false;
 	else
 	{
-		/* this array is indexed by RawParseMode enum */
-		static const int mode_token[] = {
-			0,					/* RAW_PARSE_DEFAULT */
-			MODE_TYPE_NAME,		/* RAW_PARSE_TYPE_NAME */
-			MODE_PLPGSQL_EXPR,	/* RAW_PARSE_PLPGSQL_EXPR */
-			MODE_PLPGSQL_ASSIGN1,	/* RAW_PARSE_PLPGSQL_ASSIGN1 */
-			MODE_PLPGSQL_ASSIGN2,	/* RAW_PARSE_PLPGSQL_ASSIGN2 */
-			MODE_PLPGSQL_ASSIGN3	/* RAW_PARSE_PLPGSQL_ASSIGN3 */
-		};
+	/* this array is indexed by RawParseMode enum */
+	static const int mode_token[] = {
+		0,					/* RAW_PARSE_DEFAULT */
+		MODE_TYPE_NAME		/* RAW_PARSE_TYPE_NAME */
+	};
 
 		yyextra.have_lookahead = true;
 		yyextra.lookahead_token = mode_token[mode];

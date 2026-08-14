@@ -40,7 +40,6 @@
 #include "commands/lockcmds.h"
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
-#include "commands/proclang.h"
 #include "commands/schemacmds.h"
 #include "commands/sequence.h"
 #include "commands/tablecmds.h"
@@ -155,7 +154,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateFunctionStmt:
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
-		case T_CreatePLangStmt:
 		case T_CreateRangeStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateSeqStmt:
@@ -194,14 +192,12 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
 
-		case T_CallStmt:
 		case T_DoStmt:
 			{
 				/*
-				 * Commands inside the DO block or the called procedure might
-				 * not be read only, but they'll be checked separately when we
-				 * try to execute them.  Here we only need to worry about the
-				 * DO or CALL command itself.
+				 * Commands inside the DO block might not be read only, but
+				 * they'll be checked separately when we try to execute them.
+				 * Here we only need to worry about the DO command itself.
 				 */
 				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
@@ -705,10 +701,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 				/* Allowed names are restricted if you're not superuser */
 				load_file(stmt->filename, !superuser());
 			}
-			break;
-
-		case T_CallStmt:
-			ExecuteCallStmt(castNode(CallStmt, parsetree), params, isAtomicContext, dest);
 			break;
 
 		case T_ClusterStmt:
@@ -1250,11 +1242,7 @@ ProcessUtilitySlow(ParseState *pstate,
 										InvalidOid, NULL, false, false);
 				break;
 
-			case T_CreatePLangStmt:
-				address = CreateProceduralLanguage((CreatePLangStmt *) parsetree);
-				break;
-
-			case T_CreateDomainStmt:
+				case T_CreateDomainStmt:
 				address = DefineDomain((CreateDomainStmt *) parsetree);
 				break;
 
@@ -1445,12 +1433,6 @@ UtilityReturnsTuples(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_CallStmt:
-			{
-				CallStmt   *stmt = (CallStmt *) parsetree;
-
-				return (stmt->funcexpr->funcresulttype == RECORDOID);
-			}
 		case T_FetchStmt:
 			{
 				FetchStmt  *stmt = (FetchStmt *) parsetree;
@@ -1501,9 +1483,6 @@ UtilityTupleDescriptor(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_CallStmt:
-			return CallStmtResultDesc((CallStmt *) parsetree);
-
 		case T_FetchStmt:
 			{
 				FetchStmt  *stmt = (FetchStmt *) parsetree;
@@ -1768,10 +1747,6 @@ CreateCommandTag(Node *parsetree)
 			break;
 
 		case T_SelectStmt:
-			tag = CMDTAG_SELECT;
-			break;
-
-		case T_PLAssignStmt:
 			tag = CMDTAG_SELECT;
 			break;
 
@@ -2161,10 +2136,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_LOAD;
 			break;
 
-		case T_CallStmt:
-			tag = CMDTAG_CALL;
-			break;
-
 		case T_ClusterStmt:
 			tag = CMDTAG_CLUSTER;
 			break;
@@ -2232,10 +2203,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateTrigStmt:
 			tag = CMDTAG_CREATE_TRIGGER;
-			break;
-
-		case T_CreatePLangStmt:
-			tag = CMDTAG_CREATE_LANGUAGE;
 			break;
 
 		case T_LockStmt:
@@ -2484,10 +2451,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_ALL;
 			break;
 
-		case T_PLAssignStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
 			/* utility statements --- same whether raw or cooked */
 		case T_TransactionStmt:
 			lev = LOGSTMT_ALL;
@@ -2672,10 +2635,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_ALL;
 			break;
 
-		case T_CallStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
 		case T_ClusterStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -2724,10 +2683,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateTrigStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreatePLangStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
