@@ -1176,16 +1176,6 @@ build_column_default(Relation rel, int attrno)
 	Node	   *expr = NULL;
 	Oid			exprtype;
 
-	if (att_tup->attidentity)
-	{
-		NextValueExpr *nve = makeNode(NextValueExpr);
-
-		nve->seqid = getIdentitySequence(RelationGetRelid(rel), attrno, false);
-		nve->typeId = att_tup->atttypid;
-
-		return (Node *) nve;
-	}
-
 	/*
 	 * If relation has a default for this column, fetch that expression.
 	 */

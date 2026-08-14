@@ -35,7 +35,7 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_tablespace.h"
@@ -48,7 +48,6 @@
 #include "commands/cluster.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
-#include "commands/sequence.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -304,13 +303,6 @@ static void RangeVarCallbackForTruncate(const RangeVar *relation,
 static List *MergeAttributes(List *schema, List *supers, char relpersistence,
 							 bool is_partition, List **supconstr);
 static bool MergeCheckConstraint(List *constraints, char *name, Node *expr);
-static void MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel);
-static void MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel);
-static void StoreCatalogInheritance(Oid relationId, List *supers,
-									bool child_is_partition);
-static void StoreCatalogInheritance1(Oid relationId, Oid parentOid,
-									 int32 seqNumber, Relation inhRelation,
-									 bool child_is_partition);
 static int	findAttrByName(const char *attributeName, List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
 								 Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved);
@@ -381,12 +373,7 @@ static bool ConstraintImpliedByRelConstraint(Relation scanrel,
 static ObjectAddress ATExecColumnDefault(Relation rel, const char *colName,
 										 Node *newDefault, LOCKMODE lockmode);
 static ObjectAddress ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
-											   Node *newDefault);
-static ObjectAddress ATExecAddIdentity(Relation rel, const char *colName,
-									   Node *def, LOCKMODE lockmode);
-static ObjectAddress ATExecSetIdentity(Relation rel, const char *colName,
-									   Node *def, LOCKMODE lockmode);
-static ObjectAddress ATExecDropIdentity(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode);
+											  Node *newDefault);
 static void ATPrepDropExpression(Relation rel, AlterTableCmd *cmd, bool recurse, bool recursing, LOCKMODE lockmode);
 static ObjectAddress ATExecDropExpression(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStatistics(Relation rel, const char *colName, int16 colNum,
@@ -461,12 +448,6 @@ static void ATExecEnableDisableTrigger(Relation rel, const char *trigname,
 									   LOCKMODE lockmode);
 static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 									char fires_when, LOCKMODE lockmode);
-static void ATPrepAddInherit(Relation child_rel);
-static ObjectAddress ATExecAddInherit(Relation child_rel, RangeVar *parent, LOCKMODE lockmode);
-static ObjectAddress ATExecDropInherit(Relation rel, RangeVar *parent, LOCKMODE lockmode);
-static void CreateInheritance(Relation child_rel, Relation parent_rel);
-static void RemoveInheritance(Relation child_rel, Relation parent_rel,
-							  bool allow_detached);
 static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
 								   DependencyType deptype);
 static ObjectAddress ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode);
@@ -1364,29 +1345,7 @@ ExecuteTruncateGuts(List *explicit_rels,
 	 */
 	if (restart_seqs)
 	{
-		foreach(cell, rels)
-		{
-			Relation	rel = (Relation) lfirst(cell);
-			List	   *seqlist = getOwnedSequences(RelationGetRelid(rel));
-			ListCell   *seqcell;
-
-			foreach(seqcell, seqlist)
-			{
-				Oid			seq_relid = lfirst_oid(seqcell);
-				Relation	seq_rel;
-
-				seq_rel = relation_open(seq_relid, AccessExclusiveLock);
-
-				/* This check must match AlterSequence! */
-				if (!pg_class_ownercheck(seq_relid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_SEQUENCE,
-								   RelationGetRelationName(seq_rel));
-
-				seq_relids = lappend_oid(seq_relids, seq_relid);
-
-				relation_close(seq_rel, NoLock);
-			}
-		}
+		/* Sequence restart is not supported in this build. */
 	}
 
 	/* Prepare to catch AFTER triggers. */
@@ -1511,14 +1470,9 @@ ExecuteTruncateGuts(List *explicit_rels,
 	}
 
 	/*
-	 * Restart owned sequences if we were asked to.
+	 * Restart owned sequences if we were asked to.  Sequence support has been
+	 * removed from this build, so there are no sequences to restart.
 	 */
-	foreach(cell, seq_relids)
-	{
-		Oid			seq_relid = lfirst_oid(cell);
-
-		ResetSequence(seq_relid);
-	}
 
 	/*
 	 * Write a WAL record to allow this set of actions to be logically
@@ -2482,89 +2436,6 @@ MergeCheckConstraint(List *constraints, char *name, Node *expr)
  *
  * supers is a list of the OIDs of the new relation's direct ancestors.
  */
-static void
-StoreCatalogInheritance(Oid relationId, List *supers,
-						bool child_is_partition)
-{
-	Relation	relation;
-	int32		seqNumber;
-	ListCell   *entry;
-
-	/*
-	 * sanity checks
-	 */
-	AssertArg(OidIsValid(relationId));
-
-	if (supers == NIL)
-		return;
-
-	/*
-	 * Store INHERITS information in pg_inherits using direct ancestors only.
-	 * Also enter dependencies on the direct ancestors, and make sure they are
-	 * marked with relhassubclass = true.
-	 *
-	 * (Once upon a time, both direct and indirect ancestors were found here
-	 * and then entered into pg_ipl.  Since that catalog doesn't exist
-	 * anymore, there's no need to look for indirect ancestors.)
-	 */
-	relation = table_open(InheritsRelationId, RowExclusiveLock);
-
-	seqNumber = 1;
-	foreach(entry, supers)
-	{
-		Oid			parentOid = lfirst_oid(entry);
-
-		StoreCatalogInheritance1(relationId, parentOid, seqNumber, relation,
-								 child_is_partition);
-		seqNumber++;
-	}
-
-	table_close(relation, RowExclusiveLock);
-}
-
-/*
- * Make catalog entries showing relationId as being an inheritance child
- * of parentOid.  inhRelation is the already-opened pg_inherits catalog.
- */
-static void
-StoreCatalogInheritance1(Oid relationId, Oid parentOid,
-						 int32 seqNumber, Relation inhRelation,
-						 bool child_is_partition)
-{
-	ObjectAddress childobject,
-				parentobject;
-
-	/* store the pg_inherits row */
-	StoreSingleInheritance(relationId, parentOid, seqNumber);
-
-	/*
-	 * Store a dependency too
-	 */
-	parentobject.classId = RelationRelationId;
-	parentobject.objectId = parentOid;
-	parentobject.objectSubId = 0;
-	childobject.classId = RelationRelationId;
-	childobject.objectId = relationId;
-	childobject.objectSubId = 0;
-
-	recordDependencyOn(&childobject, &parentobject,
-					   child_dependency_type(child_is_partition));
-
-	/*
-	 * Post creation hook of this inheritance. Since object_access_hook
-	 * doesn't take multiple object identifiers, we relay oid of parent
-	 * relation using auxiliary_id argument.
-	 */
-	InvokeObjectPostAlterHookArg(InheritsRelationId,
-								 relationId, 0,
-								 parentOid, false);
-
-	/*
-	 * Mark the parent as having subclasses.
-	 */
-	SetRelationHasSubclass(parentOid, true);
-}
-
 /*
  * Look for an existing schema entry with the given name.
  *
@@ -3635,9 +3506,6 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_AddIndexConstraint:
 			case AT_ReplicaIdentity:
 			case AT_SetNotNull:
-			case AT_AddIdentity:
-			case AT_DropIdentity:
-			case AT_SetIdentity:
 			case AT_DropExpression:
 			case AT_SetCompression:
 				cmd_lockmode = AccessExclusiveLock;
@@ -3872,22 +3740,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			/* This command never recurses */
 			pass = AT_PASS_ADD_OTHERCONSTR;
-			break;
-		case AT_AddIdentity:
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			pass = AT_PASS_ADD_OTHERCONSTR;
-			break;
-		case AT_SetIdentity:
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			/* This should run after AddIdentity, so do it in MISC pass */
-			pass = AT_PASS_MISC;
-			break;
-		case AT_DropIdentity:
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			pass = AT_PASS_DROP;
 			break;
 		case AT_DropNotNull:	/* ALTER COLUMN DROP NOT NULL */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
@@ -4182,16 +4034,7 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
 									  cur_pass, context);
 			Assert(cmd != NULL);
-			address = ATExecAddIdentity(rel, cmd->name, cmd->def, lockmode);
-			break;
-		case AT_SetIdentity:
-			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
-									  cur_pass, context);
-			Assert(cmd != NULL);
-			address = ATExecSetIdentity(rel, cmd->name, cmd->def, lockmode);
-			break;
-		case AT_DropIdentity:
-			address = ATExecDropIdentity(rel, cmd->name, cmd->missing_ok, lockmode);
+			address = ATExecDropNotNull(rel, cmd->name, lockmode);
 			break;
 		case AT_DropNotNull:	/* ALTER COLUMN DROP NOT NULL */
 			address = ATExecDropNotNull(rel, cmd->name, lockmode);
@@ -5931,21 +5774,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		bool		has_domain_constraints;
 		bool		has_missing = false;
 
-		/*
-		 * For an identity column, we can't use build_column_default(),
-		 * because the sequence ownership isn't set yet.  So do it manually.
-		 */
-		if (colDef->identity)
-		{
-			NextValueExpr *nve = makeNode(NextValueExpr);
-
-			nve->seqid = RangeVarGetRelid(colDef->identitySequence, NoLock, false);
-			nve->typeId = typeOid;
-
-			defval = (Expr *) nve;
-		}
-		else
-			defval = (Expr *) build_column_default(rel, attribute.attnum);
+		defval = (Expr *) build_column_default(rel, attribute.attnum);
 
 		/* Build CoerceToDomain(NULL) expression if needed */
 		has_domain_constraints = DomainHasConstraints(typeOid);
@@ -6609,231 +6438,6 @@ ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
  *
  * Return the address of the affected column.
  */
-static ObjectAddress
-ATExecAddIdentity(Relation rel, const char *colName,
-				  Node *def, LOCKMODE lockmode)
-{
-	Relation	attrelation;
-	HeapTuple	tuple;
-	Form_pg_attribute attTup;
-	AttrNumber	attnum;
-	ObjectAddress address;
-	ColumnDef  *cdef = castNode(ColumnDef, def);
-
-	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = attTup->attnum;
-
-	/* Can't alter a system attribute */
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	/*
-	 * Creating a column as identity implies NOT NULL, so adding the identity
-	 * to an existing column that is not NOT NULL would create a state that
-	 * cannot be reproduced without contortions.
-	 */
-	if (!attTup->attnotnull)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("column \"%s\" of relation \"%s\" must be declared NOT NULL before identity can be added",
-						colName, RelationGetRelationName(rel))));
-
-	if (attTup->attidentity)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("column \"%s\" of relation \"%s\" is already an identity column",
-						colName, RelationGetRelationName(rel))));
-
-	if (attTup->atthasdef)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("column \"%s\" of relation \"%s\" already has a default value",
-						colName, RelationGetRelationName(rel))));
-
-	attTup->attidentity = cdef->identity;
-	CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attTup->attnum);
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	heap_freetuple(tuple);
-
-	table_close(attrelation, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * ALTER TABLE ALTER COLUMN SET { GENERATED or sequence options }
- *
- * Return the address of the affected column.
- */
-static ObjectAddress
-ATExecSetIdentity(Relation rel, const char *colName, Node *def, LOCKMODE lockmode)
-{
-	ListCell   *option;
-	DefElem    *generatedEl = NULL;
-	HeapTuple	tuple;
-	Form_pg_attribute attTup;
-	AttrNumber	attnum;
-	Relation	attrelation;
-	ObjectAddress address;
-
-	foreach(option, castNode(List, def))
-	{
-		DefElem    *defel = lfirst_node(DefElem, option);
-
-		if (strcmp(defel->defname, "generated") == 0)
-		{
-			if (generatedEl)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("conflicting or redundant options")));
-			generatedEl = defel;
-		}
-		else
-			elog(ERROR, "option \"%s\" not recognized",
-				 defel->defname);
-	}
-
-	/*
-	 * Even if there is nothing to change here, we run all the checks.  There
-	 * will be a subsequent ALTER SEQUENCE that relies on everything being
-	 * there.
-	 */
-
-	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = attTup->attnum;
-
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	if (!attTup->attidentity)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("column \"%s\" of relation \"%s\" is not an identity column",
-						colName, RelationGetRelationName(rel))));
-
-	if (generatedEl)
-	{
-		attTup->attidentity = defGetInt32(generatedEl);
-		CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-		InvokeObjectPostAlterHook(RelationRelationId,
-								  RelationGetRelid(rel),
-								  attTup->attnum);
-		ObjectAddressSubSet(address, RelationRelationId,
-							RelationGetRelid(rel), attnum);
-	}
-	else
-		address = InvalidObjectAddress;
-
-	heap_freetuple(tuple);
-	table_close(attrelation, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * ALTER TABLE ALTER COLUMN DROP IDENTITY
- *
- * Return the address of the affected column.
- */
-static ObjectAddress
-ATExecDropIdentity(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode)
-{
-	HeapTuple	tuple;
-	Form_pg_attribute attTup;
-	AttrNumber	attnum;
-	Relation	attrelation;
-	ObjectAddress address;
-	Oid			seqid;
-	ObjectAddress seqaddress;
-
-	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = attTup->attnum;
-
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	if (!attTup->attidentity)
-	{
-		if (!missing_ok)
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("column \"%s\" of relation \"%s\" is not an identity column",
-							colName, RelationGetRelationName(rel))));
-		else
-		{
-			ereport(NOTICE,
-					(errmsg("column \"%s\" of relation \"%s\" is not an identity column, skipping",
-							colName, RelationGetRelationName(rel))));
-			heap_freetuple(tuple);
-			table_close(attrelation, RowExclusiveLock);
-			return InvalidObjectAddress;
-		}
-	}
-
-	attTup->attidentity = '\0';
-	CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attTup->attnum);
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	heap_freetuple(tuple);
-
-	table_close(attrelation, RowExclusiveLock);
-
-	/* drop the internal sequence */
-	seqid = getIdentitySequence(RelationGetRelid(rel), attnum, false);
-	deleteDependencyRecordsForClass(RelationRelationId, seqid,
-									RelationRelationId, DEPENDENCY_INTERNAL);
-	CommandCounterIncrement();
-	seqaddress.classId = RelationRelationId;
-	seqaddress.objectId = seqid;
-	seqaddress.objectSubId = 0;
-	performDeletion(&seqaddress, DROP_RESTRICT, PERFORM_DELETION_INTERNAL);
-
-	return address;
-}
-
 /*
  * ALTER TABLE ALTER COLUMN DROP EXPRESSION
  */
@@ -9622,26 +9226,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 				newOwnerId = tuple_class->relowner;
 				}
 				break;
-				case RELKIND_SEQUENCE:
-			if (!recursing &&
-				tuple_class->relowner != newOwnerId)
-			{
-				/* if it's an owned sequence, disallow changing it by itself */
-				Oid			tableId;
-				int32		colId;
-
-				if (sequenceIsOwned(relationOid, DEPENDENCY_AUTO, &tableId, &colId) ||
-					sequenceIsOwned(relationOid, DEPENDENCY_INTERNAL, &tableId, &colId))
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot change owner of sequence \"%s\"",
-									NameStr(tuple_class->relname)),
-							 errdetail("Sequence \"%s\" is linked to table \"%s\".",
-									   NameStr(tuple_class->relname),
-									   get_rel_name(tableId))));
-			}
-			break;
-		case RELKIND_COMPOSITE_TYPE:
+				case RELKIND_COMPOSITE_TYPE:
 			if (recursing)
 				break;
 			ereport(ERROR,
@@ -10478,695 +10063,7 @@ ATExecEnableDisableRule(Relation rel, const char *rulename,
 	EnableDisableRule(rel, rulename, fires_when);
 }
 
-/*
- * ALTER TABLE INHERIT
- *
- * Add a parent to the child's parents. This verifies that all the columns and
- * check constraints of the parent appear in the child and that they have the
- * same data types and expressions.
- */
-static void
-ATPrepAddInherit(Relation child_rel)
-{
-	if (child_rel->rd_rel->reloftype)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot change inheritance of typed table")));
-}
 
-/*
- * Return the address of the new parent relation.
- */
-static ObjectAddress
-ATExecAddInherit(Relation child_rel, RangeVar *parent, LOCKMODE lockmode)
-{
-	Relation	parent_rel;
-	List	   *children;
-	ObjectAddress address;
-	const char *trigger_name;
-
-	/*
-	 * A self-exclusive lock is needed here.  See the similar case in
-	 * MergeAttributes() for a full explanation.
-	 */
-	parent_rel = table_openrv(parent, ShareUpdateExclusiveLock);
-
-	/*
-	 * Must be owner of both parent and child -- child was checked by
-	 * ATSimplePermissions call in ATPrepCmd
-	 */
-	ATSimplePermissions(parent_rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-
-	/*
-	 * Temporary relations are not supported in this build, so there is no
-	 * need to validate permanent/temporary inheritance compatibility.
-	 */
-
-	/*
-	 * Prevent circularity by seeing if proposed parent inherits from child.
-	 * (In particular, this disallows making a rel inherit from itself.)
-	 *
-	 * This is not completely bulletproof because of race conditions: in
-	 * multi-level inheritance trees, someone else could concurrently be
-	 * making another inheritance link that closes the loop but does not join
-	 * either of the rels we have locked.  Preventing that seems to require
-	 * exclusive locks on the entire inheritance tree, which is a cure worse
-	 * than the disease.  find_all_inheritors() will cope with circularity
-	 * anyway, so don't sweat it too much.
-	 *
-	 * We use weakest lock we can on child's children, namely AccessShareLock.
-	 */
-	children = find_all_inheritors(RelationGetRelid(child_rel),
-								   AccessShareLock, NULL);
-
-	if (list_member_oid(children, RelationGetRelid(parent_rel)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_TABLE),
-				 errmsg("circular inheritance not allowed"),
-				 errdetail("\"%s\" is already a child of \"%s\".",
-						   parent->relname,
-						   RelationGetRelationName(child_rel))));
-
-	/*
-	 * If child_rel has row-level triggers with transition tables, we
-	 * currently don't allow it to become an inheritance child.  See also
-	 * prohibitions in ATExecAttachPartition() and CreateTrigger().
-	 */
-	trigger_name = FindTriggerIncompatibleWithInheritance(child_rel->trigdesc);
-	if (trigger_name != NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("trigger \"%s\" prevents table \"%s\" from becoming an inheritance child",
-						trigger_name, RelationGetRelationName(child_rel)),
-				 errdetail("ROW triggers with transition tables are not supported in inheritance hierarchies.")));
-
-	/* OK to create inheritance */
-	CreateInheritance(child_rel, parent_rel);
-
-	ObjectAddressSet(address, RelationRelationId,
-					 RelationGetRelid(parent_rel));
-
-	/* keep our lock on the parent relation until commit */
-	table_close(parent_rel, NoLock);
-
-	return address;
-}
-
-/*
- * CreateInheritance
- *		Catalog manipulation portion of creating inheritance between a child
- *		table and a parent table.
- *
- * Common to ATExecAddInherit() and ATExecAttachPartition().
- */
-static void
-CreateInheritance(Relation child_rel, Relation parent_rel)
-{
-	Relation	catalogRelation;
-	SysScanDesc scan;
-	ScanKeyData key;
-	HeapTuple	inheritsTuple;
-	int32		inhseqno;
-
-	/* Note: get RowExclusiveLock because we will write pg_inherits below. */
-	catalogRelation = table_open(InheritsRelationId, RowExclusiveLock);
-
-	/*
-	 * Check for duplicates in the list of parents, and determine the highest
-	 * inhseqno already present; we'll use the next one for the new parent.
-	 * Also, if proposed child is a partition, it cannot already be
-	 * inheriting.
-	 *
-	 * Note: we do not reject the case where the child already inherits from
-	 * the parent indirectly; CREATE TABLE doesn't reject comparable cases.
-	 */
-	ScanKeyInit(&key,
-				Anum_pg_inherits_inhrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(child_rel)));
-	scan = systable_beginscan(catalogRelation, InheritsRelidSeqnoIndexId,
-							  true, NULL, 1, &key);
-
-	/* inhseqno sequences start at 1 */
-	inhseqno = 0;
-	while (HeapTupleIsValid(inheritsTuple = systable_getnext(scan)))
-	{
-		Form_pg_inherits inh = (Form_pg_inherits) GETSTRUCT(inheritsTuple);
-
-		if (inh->inhparent == RelationGetRelid(parent_rel))
-			ereport(ERROR,
-					(errcode(ERRCODE_DUPLICATE_TABLE),
-					 errmsg("relation \"%s\" would be inherited from more than once",
-							RelationGetRelationName(parent_rel))));
-
-		if (inh->inhseqno > inhseqno)
-			inhseqno = inh->inhseqno;
-	}
-	systable_endscan(scan);
-
-	/* Match up the columns and bump attinhcount as needed */
-	MergeAttributesIntoExisting(child_rel, parent_rel);
-
-	/* Match up the constraints and bump coninhcount as needed */
-	MergeConstraintsIntoExisting(child_rel, parent_rel);
-
-	/*
-	 * OK, it looks valid.  Make the catalog entries that show inheritance.
-	 */
-	StoreCatalogInheritance1(RelationGetRelid(child_rel),
-							 RelationGetRelid(parent_rel),
-							 inhseqno + 1,
-							 catalogRelation,
-							 false);
-
-	/* Now we're done with pg_inherits */
-	table_close(catalogRelation, RowExclusiveLock);
-}
-
-/*
- * Obtain the source-text form of the constraint expression for a check
- * constraint, given its pg_constraint tuple
- */
-static char *
-decompile_conbin(HeapTuple contup, TupleDesc tupdesc)
-{
-	Form_pg_constraint con;
-	bool		isnull;
-	Datum		attr;
-	Datum		expr;
-
-	con = (Form_pg_constraint) GETSTRUCT(contup);
-	attr = heap_getattr(contup, Anum_pg_constraint_conbin, tupdesc, &isnull);
-	if (isnull)
-		elog(ERROR, "null conbin for constraint %u", con->oid);
-
-	expr = DirectFunctionCall2(pg_get_expr, attr,
-							   ObjectIdGetDatum(con->conrelid));
-	return TextDatumGetCString(expr);
-}
-
-/*
- * Determine whether two check constraints are functionally equivalent
- *
- * The test we apply is to see whether they reverse-compile to the same
- * source string.  This insulates us from issues like whether attributes
- * have the same physical column numbers in parent and child relations.
- */
-static bool
-constraints_equivalent(HeapTuple a, HeapTuple b, TupleDesc tupleDesc)
-{
-	Form_pg_constraint acon = (Form_pg_constraint) GETSTRUCT(a);
-	Form_pg_constraint bcon = (Form_pg_constraint) GETSTRUCT(b);
-
-	if (acon->condeferrable != bcon->condeferrable ||
-		acon->condeferred != bcon->condeferred ||
-		strcmp(decompile_conbin(a, tupleDesc),
-			   decompile_conbin(b, tupleDesc)) != 0)
-		return false;
-	else
-		return true;
-}
-
-/*
- * Check columns in child table match up with columns in parent, and increment
- * their attinhcount.
- *
- * Called by CreateInheritance
- *
- * Currently all parent columns must be found in child. Missing columns are an
- * error.  One day we might consider creating new columns like CREATE TABLE
- * does.  However, that is widely unpopular --- in the common use case of
- * partitioned tables it's a foot-gun.
- *
- * The data type must match exactly. If the parent column is NOT NULL then
- * the child must be as well. Defaults are not compared, however.
- */
-static void
-MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel)
-{
-	Relation	attrrel;
-	AttrNumber	parent_attno;
-	int			parent_natts;
-	TupleDesc	tupleDesc;
-	HeapTuple	tuple;
-
-	attrrel = table_open(AttributeRelationId, RowExclusiveLock);
-
-	tupleDesc = RelationGetDescr(parent_rel);
-	parent_natts = tupleDesc->natts;
-
-	for (parent_attno = 1; parent_attno <= parent_natts; parent_attno++)
-	{
-		Form_pg_attribute attribute = TupleDescAttr(tupleDesc,
-													parent_attno - 1);
-		char	   *attributeName = NameStr(attribute->attname);
-
-		/* Ignore dropped columns in the parent. */
-		if (attribute->attisdropped)
-			continue;
-
-		/* Find same column in child (matching on column name). */
-		tuple = SearchSysCacheCopyAttName(RelationGetRelid(child_rel),
-										  attributeName);
-		if (HeapTupleIsValid(tuple))
-		{
-			/* Check they are same type, typmod, and collation */
-			Form_pg_attribute childatt = (Form_pg_attribute) GETSTRUCT(tuple);
-
-			if (attribute->atttypid != childatt->atttypid ||
-				attribute->atttypmod != childatt->atttypmod)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("child table \"%s\" has different type for column \"%s\"",
-								RelationGetRelationName(child_rel),
-								attributeName)));
-
-			if (attribute->attcollation != childatt->attcollation)
-				ereport(ERROR,
-						(errcode(ERRCODE_COLLATION_MISMATCH),
-						 errmsg("child table \"%s\" has different collation for column \"%s\"",
-								RelationGetRelationName(child_rel),
-								attributeName)));
-
-			/*
-			 * Check child doesn't discard NOT NULL property.  (Other
-			 * constraints are checked elsewhere.)
-			 */
-			if (attribute->attnotnull && !childatt->attnotnull)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("column \"%s\" in child table must be marked NOT NULL",
-								attributeName)));
-
-			/*
-			 * If parent column is generated, child column must be, too.
-			 */
-			if (attribute->attgenerated && !childatt->attgenerated)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("column \"%s\" in child table must be a generated column",
-								attributeName)));
-
-			/*
-			 * Check that both generation expressions match.
-			 *
-			 * The test we apply is to see whether they reverse-compile to the
-			 * same source string.  This insulates us from issues like whether
-			 * attributes have the same physical column numbers in parent and
-			 * child relations.  (See also constraints_equivalent().)
-			 */
-			if (attribute->attgenerated && childatt->attgenerated)
-			{
-				TupleConstr *child_constr = child_rel->rd_att->constr;
-				TupleConstr *parent_constr = parent_rel->rd_att->constr;
-				char	   *child_expr = NULL;
-				char	   *parent_expr = NULL;
-
-				Assert(child_constr != NULL);
-				Assert(parent_constr != NULL);
-
-				for (int i = 0; i < child_constr->num_defval; i++)
-				{
-					if (child_constr->defval[i].adnum == childatt->attnum)
-					{
-						child_expr =
-							TextDatumGetCString(DirectFunctionCall2(pg_get_expr,
-																	CStringGetTextDatum(child_constr->defval[i].adbin),
-																	ObjectIdGetDatum(child_rel->rd_id)));
-						break;
-					}
-				}
-				Assert(child_expr != NULL);
-
-				for (int i = 0; i < parent_constr->num_defval; i++)
-				{
-					if (parent_constr->defval[i].adnum == attribute->attnum)
-					{
-						parent_expr =
-							TextDatumGetCString(DirectFunctionCall2(pg_get_expr,
-																	CStringGetTextDatum(parent_constr->defval[i].adbin),
-																	ObjectIdGetDatum(parent_rel->rd_id)));
-						break;
-					}
-				}
-				Assert(parent_expr != NULL);
-
-				if (strcmp(child_expr, parent_expr) != 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("column \"%s\" in child table has a conflicting generation expression",
-									attributeName)));
-			}
-
-			/*
-			 * OK, bump the child column's inheritance count.  (If we fail
-			 * later on, this change will just roll back.)
-			 */
-			childatt->attinhcount++;
-
-			CatalogTupleUpdate(attrrel, &tuple->t_self, tuple);
-			heap_freetuple(tuple);
-		}
-		else
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("child table is missing column \"%s\"",
-							attributeName)));
-		}
-	}
-
-	table_close(attrrel, RowExclusiveLock);
-}
-
-/*
- * Check constraints in child table match up with constraints in parent,
- * and increment their coninhcount.
- *
- * Constraints that are marked ONLY in the parent are ignored.
- *
- * Called by CreateInheritance
- *
- * Currently all constraints in parent must be present in the child. One day we
- * may consider adding new constraints like CREATE TABLE does.
- *
- * XXX This is O(N^2) which may be an issue with tables with hundreds of
- * constraints. As long as tables have more like 10 constraints it shouldn't be
- * a problem though. Even 100 constraints ought not be the end of the world.
- *
- * XXX See MergeWithExistingConstraint too if you change this code.
- */
-static void
-MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel)
-{
-	Relation	catalog_relation;
-	TupleDesc	tuple_desc;
-	SysScanDesc parent_scan;
-	ScanKeyData parent_key;
-	HeapTuple	parent_tuple;
-
-	catalog_relation = table_open(ConstraintRelationId, RowExclusiveLock);
-	tuple_desc = RelationGetDescr(catalog_relation);
-
-	/* Outer loop scans through the parent's constraint definitions */
-	ScanKeyInit(&parent_key,
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(parent_rel)));
-	parent_scan = systable_beginscan(catalog_relation, ConstraintRelidTypidNameIndexId,
-									 true, NULL, 1, &parent_key);
-
-	while (HeapTupleIsValid(parent_tuple = systable_getnext(parent_scan)))
-	{
-		Form_pg_constraint parent_con = (Form_pg_constraint) GETSTRUCT(parent_tuple);
-		SysScanDesc child_scan;
-		ScanKeyData child_key;
-		HeapTuple	child_tuple;
-		bool		found = false;
-
-		if (parent_con->contype != CONSTRAINT_CHECK)
-			continue;
-
-		/* if the parent's constraint is marked NO INHERIT, it's not inherited */
-		if (parent_con->connoinherit)
-			continue;
-
-		/* Search for a child constraint matching this one */
-		ScanKeyInit(&child_key,
-					Anum_pg_constraint_conrelid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(RelationGetRelid(child_rel)));
-		child_scan = systable_beginscan(catalog_relation, ConstraintRelidTypidNameIndexId,
-										true, NULL, 1, &child_key);
-
-		while (HeapTupleIsValid(child_tuple = systable_getnext(child_scan)))
-		{
-			Form_pg_constraint child_con = (Form_pg_constraint) GETSTRUCT(child_tuple);
-			HeapTuple	child_copy;
-
-			if (child_con->contype != CONSTRAINT_CHECK)
-				continue;
-
-			if (strcmp(NameStr(parent_con->conname),
-					   NameStr(child_con->conname)) != 0)
-				continue;
-
-			if (!constraints_equivalent(parent_tuple, child_tuple, tuple_desc))
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("child table \"%s\" has different definition for check constraint \"%s\"",
-								RelationGetRelationName(child_rel),
-								NameStr(parent_con->conname))));
-
-			/* If the child constraint is "no inherit" then cannot merge */
-			if (child_con->connoinherit)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-						 errmsg("constraint \"%s\" conflicts with non-inherited constraint on child table \"%s\"",
-								NameStr(child_con->conname),
-								RelationGetRelationName(child_rel))));
-
-			/*
-			 * If the child constraint is "not valid" then cannot merge with a
-			 * valid parent constraint
-			 */
-			if (parent_con->convalidated && !child_con->convalidated)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-						 errmsg("constraint \"%s\" conflicts with NOT VALID constraint on child table \"%s\"",
-								NameStr(child_con->conname),
-								RelationGetRelationName(child_rel))));
-
-			/*
-			 * OK, bump the child constraint's inheritance count.  (If we fail
-			 * later on, this change will just roll back.)
-			 */
-			child_copy = heap_copytuple(child_tuple);
-			child_con = (Form_pg_constraint) GETSTRUCT(child_copy);
-			child_con->coninhcount++;
-
-			CatalogTupleUpdate(catalog_relation, &child_copy->t_self, child_copy);
-			heap_freetuple(child_copy);
-
-			found = true;
-			break;
-		}
-
-		systable_endscan(child_scan);
-
-		if (!found)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("child table is missing constraint \"%s\"",
-							NameStr(parent_con->conname))));
-	}
-
-	systable_endscan(parent_scan);
-	table_close(catalog_relation, RowExclusiveLock);
-}
-
-/*
- * ALTER TABLE NO INHERIT
- *
- * Return value is the address of the relation that is no longer parent.
- */
-static ObjectAddress
-ATExecDropInherit(Relation rel, RangeVar *parent, LOCKMODE lockmode)
-{
-	ObjectAddress address;
-	Relation	parent_rel;
-
-	/*
-	 * AccessShareLock on the parent is probably enough, seeing that DROP
-	 * TABLE doesn't lock parent tables at all.  We need some lock since we'll
-	 * be inspecting the parent's schema.
-	 */
-	parent_rel = table_openrv(parent, AccessShareLock);
-
-	/*
-	 * We don't bother to check ownership of the parent table --- ownership of
-	 * the child is presumed enough rights.
-	 */
-
-	/* Off to RemoveInheritance() where most of the work happens */
-	RemoveInheritance(rel, parent_rel, false);
-
-	ObjectAddressSet(address, RelationRelationId,
-					 RelationGetRelid(parent_rel));
-
-	/* keep our lock on the parent relation until commit */
-	table_close(parent_rel, NoLock);
-
-	return address;
-}
-
-/*
- * RemoveInheritance
- *
- * Drop a parent from the child's parents. This just adjusts the attinhcount
- * and attislocal of the columns and removes the pg_inherit and pg_depend
- * entries.  expect_detached is passed down to DeleteInheritsTuple, q.v..
- *
- * If attinhcount goes to 0 then attislocal gets set to true. If it goes back
- * up attislocal stays true, which means if a child is ever removed from a
- * parent then its columns will never be automatically dropped which may
- * surprise. But at least we'll never surprise by dropping columns someone
- * isn't expecting to be dropped which would actually mean data loss.
- *
- * coninhcount and conislocal for inherited constraints are adjusted in
- * exactly the same way.
- *
- * Common to ATExecDropInherit() and ATExecDetachPartition().
- */
-static void
-RemoveInheritance(Relation child_rel, Relation parent_rel, bool expect_detached)
-{
-	Relation	catalogRelation;
-	SysScanDesc scan;
-	ScanKeyData key[3];
-	HeapTuple	attributeTuple,
-				constraintTuple;
-	List	   *connames;
-	bool		found;
-
-	found = DeleteInheritsTuple(RelationGetRelid(child_rel),
-								RelationGetRelid(parent_rel),
-								expect_detached,
-								RelationGetRelationName(child_rel));
-	if (!found)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_TABLE),
-				 errmsg("relation \"%s\" is not a parent of relation \"%s\"",
-						RelationGetRelationName(parent_rel),
-						RelationGetRelationName(child_rel))));
-
-	/*
-	 * Search through child columns looking for ones matching parent rel
-	 */
-	catalogRelation = table_open(AttributeRelationId, RowExclusiveLock);
-	ScanKeyInit(&key[0],
-				Anum_pg_attribute_attrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(child_rel)));
-	scan = systable_beginscan(catalogRelation, AttributeRelidNumIndexId,
-							  true, NULL, 1, key);
-	while (HeapTupleIsValid(attributeTuple = systable_getnext(scan)))
-	{
-		Form_pg_attribute att = (Form_pg_attribute) GETSTRUCT(attributeTuple);
-
-		/* Ignore if dropped or not inherited */
-		if (att->attisdropped)
-			continue;
-		if (att->attinhcount <= 0)
-			continue;
-
-		if (SearchSysCacheExistsAttName(RelationGetRelid(parent_rel),
-										NameStr(att->attname)))
-		{
-			/* Decrement inhcount and possibly set islocal to true */
-			HeapTuple	copyTuple = heap_copytuple(attributeTuple);
-			Form_pg_attribute copy_att = (Form_pg_attribute) GETSTRUCT(copyTuple);
-
-			copy_att->attinhcount--;
-			if (copy_att->attinhcount == 0)
-				copy_att->attislocal = true;
-
-			CatalogTupleUpdate(catalogRelation, &copyTuple->t_self, copyTuple);
-			heap_freetuple(copyTuple);
-		}
-	}
-	systable_endscan(scan);
-	table_close(catalogRelation, RowExclusiveLock);
-
-	/*
-	 * Likewise, find inherited check constraints and disinherit them. To do
-	 * this, we first need a list of the names of the parent's check
-	 * constraints.  (We cheat a bit by only checking for name matches,
-	 * assuming that the expressions will match.)
-	 */
-	catalogRelation = table_open(ConstraintRelationId, RowExclusiveLock);
-	ScanKeyInit(&key[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(parent_rel)));
-	scan = systable_beginscan(catalogRelation, ConstraintRelidTypidNameIndexId,
-							  true, NULL, 1, key);
-
-	connames = NIL;
-
-	while (HeapTupleIsValid(constraintTuple = systable_getnext(scan)))
-	{
-		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(constraintTuple);
-
-		if (con->contype == CONSTRAINT_CHECK)
-			connames = lappend(connames, pstrdup(NameStr(con->conname)));
-	}
-
-	systable_endscan(scan);
-
-	/* Now scan the child's constraints */
-	ScanKeyInit(&key[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(child_rel)));
-	scan = systable_beginscan(catalogRelation, ConstraintRelidTypidNameIndexId,
-							  true, NULL, 1, key);
-
-	while (HeapTupleIsValid(constraintTuple = systable_getnext(scan)))
-	{
-		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(constraintTuple);
-		bool		match;
-		ListCell   *lc;
-
-		if (con->contype != CONSTRAINT_CHECK)
-			continue;
-
-		match = false;
-		foreach(lc, connames)
-		{
-			if (strcmp(NameStr(con->conname), (char *) lfirst(lc)) == 0)
-			{
-				match = true;
-				break;
-			}
-		}
-
-		if (match)
-		{
-			/* Decrement inhcount and possibly set islocal to true */
-			HeapTuple	copyTuple = heap_copytuple(constraintTuple);
-			Form_pg_constraint copy_con = (Form_pg_constraint) GETSTRUCT(copyTuple);
-
-			if (copy_con->coninhcount <= 0) /* shouldn't happen */
-				elog(ERROR, "relation %u has non-inherited constraint \"%s\"",
-					 RelationGetRelid(child_rel), NameStr(copy_con->conname));
-
-			copy_con->coninhcount--;
-			if (copy_con->coninhcount == 0)
-				copy_con->conislocal = true;
-
-			CatalogTupleUpdate(catalogRelation, &copyTuple->t_self, copyTuple);
-			heap_freetuple(copyTuple);
-		}
-	}
-
-	systable_endscan(scan);
-	table_close(catalogRelation, RowExclusiveLock);
-
-	drop_parent_dependency(RelationGetRelid(child_rel),
-						   RelationRelationId,
-						   RelationGetRelid(parent_rel),
-						   child_dependency_type(false));
-
-	/*
-	 * Post alter hook of this inherits. Since object_access_hook doesn't take
-	 * multiple object identifiers, we relay oid of parent relation using
-	 * auxiliary_id argument.
-	 */
-	InvokeObjectPostAlterHookArg(InheritsRelationId,
-								 RelationGetRelid(child_rel), 0,
-								 RelationGetRelid(parent_rel), false);
-}
 
 /*
  * Drop the dependency created by StoreCatalogInheritance1 (CREATE TABLE
@@ -11234,10 +10131,7 @@ ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode)
 	Type		typetuple;
 	Form_pg_type typeform;
 	Oid			typeid;
-	Relation	inheritsRelation,
-				relationRelation;
-	SysScanDesc scan;
-	ScanKeyData key;
+	Relation	relationRelation;
 	AttrNumber	table_attno,
 				type_attno;
 	TupleDesc	typeTupleDesc,
@@ -11251,21 +10145,6 @@ ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode)
 	check_of_type(typetuple);
 	typeform = (Form_pg_type) GETSTRUCT(typetuple);
 	typeid = typeform->oid;
-
-	/* Fail if the table has any inheritance parents. */
-	inheritsRelation = table_open(InheritsRelationId, AccessShareLock);
-	ScanKeyInit(&key,
-				Anum_pg_inherits_inhrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-	scan = systable_beginscan(inheritsRelation, InheritsRelidSeqnoIndexId,
-							  true, NULL, 1, &key);
-	if (HeapTupleIsValid(systable_getnext(scan)))
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("typed tables cannot inherit")));
-	systable_endscan(scan);
-	table_close(inheritsRelation, AccessShareLock);
 
 	/*
 	 * Check the tuple descriptors for compatibility.  Unlike inheritance, we
@@ -11715,21 +10594,6 @@ AlterTableNamespace(AlterObjectSchemaStmt *stmt, Oid *oldschema)
 	oldNspOid = RelationGetNamespace(rel);
 
 	/* If it's an owned sequence, disallow moving it by itself. */
-	if (rel->rd_rel->relkind == RELKIND_SEQUENCE)
-	{
-		Oid			tableId;
-		int32		colId;
-
-		if (sequenceIsOwned(relid, DEPENDENCY_AUTO, &tableId, &colId) ||
-			sequenceIsOwned(relid, DEPENDENCY_INTERNAL, &tableId, &colId))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot move an owned sequence into another schema"),
-					 errdetail("Sequence \"%s\" is linked to table \"%s\".",
-							   RelationGetRelationName(rel),
-							   get_rel_name(tableId))));
-	}
-
 	/* Get and lock schema OID and check its permissions. */
 	newrv = makeRangeVar(stmt->newschema, RelationGetRelationName(rel), -1);
 	nspOid = RangeVarGetAndCheckCreationNamespace(newrv, NoLock, NULL);
@@ -12734,4 +11598,127 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
 	table_close(conrel, RowExclusiveLock);
 
 	return address;
+}
+
+/*
+ * =====================================================================
+ * Inheritance catalog query functions (stubs)
+ *
+ * The pg_inherits system catalog has been removed from minipg, so the
+ * functions below no longer query any catalog.  They behave as if no
+ * inheritance relationships exist, which keeps the many call sites in
+ * TRUNCATE / ALTER TABLE recursion / type coercion / analyze / lockcmds
+ * compiling and running correctly now that inheritance is unsupported.
+ * =====================================================================
+ */
+
+/*
+ * find_inheritance_children
+ *
+ * With no pg_inherits catalog, a relation can have no children.
+ */
+List *
+find_inheritance_children(Oid parentrelId, LOCKMODE lockmode)
+{
+	return find_inheritance_children_extended(parentrelId, true,
+											  lockmode, NULL, NULL);
+}
+
+/*
+ * find_inheritance_children_extended
+ *
+ * Always returns NIL, since inheritance is gone.
+ */
+List *
+find_inheritance_children_extended(Oid parentrelId, bool omit_detached,
+								   LOCKMODE lockmode, bool *detached_exist,
+								   TransactionId *detached_xmin)
+{
+	if (detached_exist)
+		*detached_exist = false;
+	if (detached_xmin)
+		*detached_xmin = InvalidTransactionId;
+	return NIL;
+}
+
+/*
+ * find_all_inheritors
+ *
+ * Returns a single-element list containing only the parent itself, matching
+ * the historical behavior where the parent is always present (callers skip
+ * entries equal to the original relation).  There are never any children.
+ */
+List *
+find_all_inheritors(Oid parentrelId, LOCKMODE lockmode, List **parents)
+{
+	if (parents)
+		*parents = NIL;
+	return list_make1_oid(parentrelId);
+}
+
+/*
+ * has_subclass
+ *
+ * No relation can have subclasses anymore.
+ */
+bool
+has_subclass(Oid relationId)
+{
+	return false;
+}
+
+/*
+ * has_superclass
+ *
+ * No relation can inherit from another anymore.
+ */
+bool
+has_superclass(Oid relationId)
+{
+	return false;
+}
+
+/*
+ * typeInheritsFrom
+ *
+ * Composite types cannot inherit from one another anymore (CREATE TYPE ...
+ * UNDER was removed), so this is always false.
+ */
+bool
+typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
+{
+	return false;
+}
+
+/*
+ * StoreSingleInheritance
+ *
+ * No-op: there is no pg_inherits catalog to insert into.
+ */
+void
+StoreSingleInheritance(Oid relationId, Oid parentOid, int32 seqNumber)
+{
+}
+
+/*
+ * DeleteInheritsTuple
+ *
+ * Always reports "not found", since nothing was ever stored.
+ */
+bool
+DeleteInheritsTuple(Oid inhrelid, Oid inhparent, bool allow_detached,
+				   const char *childname)
+{
+	return false;
+}
+
+/*
+ * PartitionHasPendingDetach
+ *
+ * Partitioning is not supported, so there is never a pending detach.
+ */
+bool
+PartitionHasPendingDetach(Oid partoid)
+{
+	return false;
 }

@@ -408,9 +408,6 @@ SELECT unique1 FROM tenk1 WHERE fivethous =
 	(SELECT unique2 FROM tenk1 WHERE fivethous = 1 LIMIT 1)
 ORDER BY 1;
 
--- test interaction with SRFs
-SELECT * FROM information_schema.foreign_data_wrapper_options
-ORDER BY 1, 2, 3;
 
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT generate_series(1, two), array(select generate_series(1, two))

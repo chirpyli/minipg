@@ -11,7 +11,7 @@
  <para>
   <productname>PostgreSQL</productname> supports a set of experimental facilities which
   are intended to allow extension modules to add new scan types to the system.
-  Unlike a <link linkend="fdwhandler">foreign data wrapper</link>, which is only
+  Unlike a foreign data wrapper, which is only
   responsible for knowing how to scan its own foreign tables, a custom scan
   provider can provide an alternative method of scanning any relation in the
   system.  Typically, the motivation for writing a custom scan provider will

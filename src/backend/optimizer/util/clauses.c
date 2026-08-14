@@ -96,7 +96,6 @@ static bool find_window_functions_walker(Node *node, WindowFuncLists *lists);
 static bool contain_subplans_walker(Node *node, void *context);
 static bool contain_mutable_functions_walker(Node *node, void *context);
 static bool contain_volatile_functions_walker(Node *node, void *context);
-static bool contain_volatile_functions_not_nextval_walker(Node *node, void *context);
 static bool max_parallel_hazard_walker(Node *node,
 									   max_parallel_hazard_context *context);
 static bool contain_nonstrict_functions_walker(Node *node, void *context);
@@ -393,12 +392,6 @@ contain_mutable_functions_walker(Node *node, void *context)
 		return true;
 	}
 
-	if (IsA(node, NextValueExpr))
-	{
-		/* NextValueExpr is volatile */
-		return true;
-	}
-
 	/*
 	 * It should be safe to treat MinMaxExpr as immutable, because it will
 	 * depend on a non-cross-type btree comparison function, and those should
@@ -509,12 +502,6 @@ contain_volatile_functions_walker(Node *node, void *context)
 								context))
 		return true;
 
-	if (IsA(node, NextValueExpr))
-	{
-		/* NextValueExpr is volatile */
-		return true;
-	}
-
 	if (IsA(node, RestrictInfo))
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) node;
@@ -622,51 +609,6 @@ contain_volatile_functions_after_planning(Expr *expr)
  * Special purpose version of contain_volatile_functions() for use in COPY:
  * ignore nextval(), but treat all other functions normally.
  */
-bool
-contain_volatile_functions_not_nextval(Node *clause)
-{
-	return contain_volatile_functions_not_nextval_walker(clause, NULL);
-}
-
-static bool
-contain_volatile_functions_not_nextval_checker(Oid func_id, void *context)
-{
-	return (func_id != F_NEXTVAL &&
-			func_volatile(func_id) == PROVOLATILE_VOLATILE);
-}
-
-static bool
-contain_volatile_functions_not_nextval_walker(Node *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	/* Check for volatile functions in node itself */
-	if (check_functions_in_node(node,
-								contain_volatile_functions_not_nextval_checker,
-								context))
-		return true;
-
-	/*
-	 * See notes in contain_mutable_functions_walker about why we treat
-	 * MinMaxExpr and CoerceToDomain as immutable, while
-	 * SQLValueFunction is stable.  Hence, none of them are of interest here.
-	 * Also, since we're intentionally ignoring nextval(), presumably we
-	 * should ignore NextValueExpr.
-	 */
-
-	/* Recurse to check arguments */
-	if (IsA(node, Query))
-	{
-		/* Recurse into subselects */
-		return query_tree_walker((Query *) node,
-								 contain_volatile_functions_not_nextval_walker,
-								 context, 0);
-	}
-	return expression_tree_walker(node,
-								  contain_volatile_functions_not_nextval_walker,
-								  context);
-}
-
 
 /*****************************************************************************
  *		Check queries for parallel unsafe and/or restricted constructs
@@ -802,12 +744,6 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 	if (IsA(node, CoerceToDomain))
 	{
 		if (max_parallel_hazard_test(PROPARALLEL_RESTRICTED, context))
-			return true;
-	}
-
-	else if (IsA(node, NextValueExpr))
-	{
-		if (max_parallel_hazard_test(PROPARALLEL_UNSAFE, context))
 			return true;
 	}
 
@@ -1253,7 +1189,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 		case T_SQLValueFunction:
 		case T_NullTest:
 		case T_BooleanTest:
-		case T_NextValueExpr:
 		case T_List:
 
 			/*

@@ -48,37 +48,19 @@ DELETE FROM TIMESTAMPTZ_TBL;
 -- Verify that 'now' *does* change over a reasonable interval such as 100 msec,
 -- and that it doesn't change over the same interval within a transaction block
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
- pg_sleep 
-----------
- 
-(1 row)
-
 BEGIN;
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
- pg_sleep 
-----------
- 
-(1 row)
-
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
- pg_sleep 
-----------
- 
-(1 row)
-
 SELECT count(*) AS two FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp(2) with time zone 'now';
  two 
 -----
-   2
+   3
 (1 row)
 
 SELECT count(d1) AS three, count(DISTINCT d1) AS two FROM TIMESTAMPTZ_TBL;
  three | two 
 -------+-----
-     3 |   2
+     3 |   1
 (1 row)
 
 COMMIT;

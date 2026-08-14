@@ -34,14 +34,6 @@ select pg_visibility_map_summary('test_view');
 select pg_check_frozen('test_view');
 select pg_truncate_visibility_map('test_view');
 
-create sequence test_sequence;
--- sequences do not have VMs, so these all fail
-select pg_visibility('test_sequence', 0);
-select pg_visibility_map('test_sequence');
-select pg_visibility_map_summary('test_sequence');
-select pg_check_frozen('test_sequence');
-select pg_truncate_visibility_map('test_sequence');
-
 create foreign data wrapper dummy;
 create server dummy_server foreign data wrapper dummy;
 create foreign table test_foreign_table () server dummy_server;
@@ -79,7 +71,6 @@ select count(*) > 0 from pg_visibility('matview_visibility_test');
 
 -- cleanup
 drop view test_view;
-drop sequence test_sequence;
 drop foreign table test_foreign_table;
 drop server dummy_server;
 drop foreign data wrapper dummy;

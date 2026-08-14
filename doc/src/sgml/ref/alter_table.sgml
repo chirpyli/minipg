@@ -939,8 +939,7 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       on the partition are skipped.
       Note that if the existing table is a foreign table, it is currently not
       allowed to attach the table as a partition of the target table if there
-      are <literal>UNIQUE</literal> indexes on the target table.  (See also
-      <xref linkend="sql-createforeigntable"/>.)  For each user-defined
+      are <literal>UNIQUE</literal> indexes on the target table.  For each user-defined
       row-level trigger that exists in the target table, a corresponding one
       is created in the attached table.
      </para>
@@ -981,8 +980,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
      <para>
       If the new partition is a foreign table, nothing is done to verify
       that all the rows in the foreign table obey the partition constraint.
-      (See the discussion in <xref linkend="sql-createforeigntable"/> about
-      constraints on the foreign table.)
      </para>
 
      <para>

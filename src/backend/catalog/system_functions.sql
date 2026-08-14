@@ -30,18 +30,6 @@
  */
 
 
-CREATE OR REPLACE FUNCTION lpad(text, integer)
- RETURNS text
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN lpad($1, $2, ' ');
-
-CREATE OR REPLACE FUNCTION rpad(text, integer)
- RETURNS text
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN rpad($1, $2, ' ');
-
 CREATE OR REPLACE FUNCTION bit_length(bit)
  RETURNS integer
  LANGUAGE sql
@@ -71,18 +59,6 @@ CREATE OR REPLACE FUNCTION log10(numeric)
  LANGUAGE sql
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN log(10, $1);
-
-CREATE OR REPLACE FUNCTION round(numeric)
- RETURNS numeric
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN round($1, 0);
-
-CREATE OR REPLACE FUNCTION trunc(numeric)
- RETURNS numeric
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN trunc($1, 0);
 
 CREATE OR REPLACE FUNCTION numeric_pl_pg_lsn(numeric, pg_lsn)
  RETURNS pg_lsn
@@ -213,19 +189,6 @@ CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
  IMMUTABLE PARALLEL SAFE COST 1
 RETURN ($1, ($1 + $2)) overlaps ($3, $4);
 
-CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
- RETURNS void
- LANGUAGE sql
- PARALLEL SAFE STRICT COST 1
-RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
-                extract(epoch from clock_timestamp()));
-
-CREATE OR REPLACE FUNCTION pg_sleep_until(timestamptz)
- RETURNS void
- LANGUAGE sql
- PARALLEL SAFE STRICT COST 1
-RETURN pg_sleep(extract(epoch from $1) -
-                extract(epoch from clock_timestamp()));
 
 CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
  RETURNS bigint

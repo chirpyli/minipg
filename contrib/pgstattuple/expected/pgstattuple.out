@@ -196,28 +196,6 @@ select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
            0
 (1 row)
 
--- these should work for sequences
-create sequence test_sequence;
-select count(*) from pgstattuple('test_sequence');
- count 
--------
-     1
-(1 row)
-
-select pg_relpages('test_sequence');
- pg_relpages 
--------------
-           1
-(1 row)
-
--- these should fail for sequences
-select pgstatindex('test_sequence');
-ERROR:  relation "test_sequence" is not a btree index
-select pgstathashindex('test_sequence');
-ERROR:  relation "test_sequence" is not a hash index
-select pgstattuple_approx('test_sequence');
-ERROR:  "test_sequence" is not a table or TOAST table
-drop sequence test_sequence;
 drop view test_view;
 drop foreign table test_foreign_table;
 ERROR:  syntax error at or near "foreign"

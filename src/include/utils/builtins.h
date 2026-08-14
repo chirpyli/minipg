@@ -102,6 +102,7 @@ extern void clean_ipv6_addr(int addr_family, char *addr);
 
 /* numeric.c */
 extern Datum numeric_float8_no_overflow(PG_FUNCTION_ARGS);
+extern Datum numeric_round(PG_FUNCTION_ARGS);
 
 /* format_type.c */
 

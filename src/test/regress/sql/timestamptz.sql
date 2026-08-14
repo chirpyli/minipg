@@ -32,13 +32,10 @@ DELETE FROM TIMESTAMPTZ_TBL;
 -- and that it doesn't change over the same interval within a transaction block
 
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
 
 BEGIN;
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
 SELECT count(*) AS two FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp(2) with time zone 'now';
 SELECT count(d1) AS three, count(DISTINCT d1) AS two FROM TIMESTAMPTZ_TBL;
 COMMIT;

@@ -46,7 +46,7 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_description.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_tablespace.h"
@@ -1006,14 +1006,6 @@ index_create(Relation heapRelation,
 	 * maintain consistency of its index list
 	 */
 	CacheInvalidateRelcache(heapRelation);
-
-	/* update pg_inherits and the parent's relhassubclass, if needed */
-	if (OidIsValid(parentIndexRelid))
-	{
-		StoreSingleInheritance(indexRelationId, parentIndexRelid, 1);
-		LockRelationOid(parentIndexRelid, ShareUpdateExclusiveLock);
-		SetRelationHasSubclass(parentIndexRelid, true);
-	}
 
 	/*
 	 * Register constraint and dependencies for the index.
@@ -2353,11 +2345,6 @@ index_drop(Oid indexId, bool concurrent, bool concurrent_lock_mode)
 	 * fix RELATION relation
 	 */
 	DeleteRelationTuple(indexId);
-
-	/*
-	 * fix INHERITS relation
-	 */
-	DeleteInheritsTuple(indexId, InvalidOid, false, NULL);
 
 	/*
 	 * We are presently too lazy to attempt to compute the new correct value

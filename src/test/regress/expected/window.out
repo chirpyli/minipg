@@ -2900,78 +2900,81 @@ ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 CREATE TABLE t1 (f1 int, f2 int8);
 ERROR:  relation "t1" already exists
 insert into t1 values (1,1),(1,2),(2,2);
+ERROR:  INSERT has more expressions than target columns
+LINE 1: insert into t1 values (1,1),(1,2),(2,2);
+                                 ^
 select f1, sum(f1) over (partition by f1
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;  -- error, must have order by
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 explain (costs off)
 select f1, sum(f1) over (partition by f1 order by f2
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 4: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 2: select f1, sum(f1) over (partition by f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1 order by f2
                          range between 1 preceding and 1 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f1 order by f2
                          range between 2 preceding and 1 preceding)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1, f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f2 order by f2
                          range between 1 following and 2 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1, f2 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;  -- error, must have order by
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 explain (costs off)
 select f1, sum(f1) over (partition by f1 order by f2
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 4: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 2: select f1, sum(f1) over (partition by f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1 order by f2
                          groups between 1 preceding and 1 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f1 order by f2
                          groups between 2 preceding and 1 preceding)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1, f1 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select f1, sum(f1) over (partition by f1, f2 order by f2
                          groups between 1 following and 2 following)
 from t1 where f1 = f2;
-ERROR:  operator does not exist: numeric = character varying
-LINE 3: from t1 where f1 = f2;
-                         ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+ERROR:  function sum(int8_tbl[]) does not exist
+LINE 1: select f1, sum(f1) over (partition by f1, f2 order by f2
+                   ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- ordering by a non-integer constant is allowed
 SELECT rank() OVER (ORDER BY length('abc'));
  rank 

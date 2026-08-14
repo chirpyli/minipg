@@ -84,17 +84,6 @@ select pgstattuple((select reltoastrelid from pg_class where relname = 'test'));
 select pgstattuple_approx((select reltoastrelid from pg_class where relname = 'test'));
 select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
 
--- these should work for sequences
-create sequence test_sequence;
-select count(*) from pgstattuple('test_sequence');
-select pg_relpages('test_sequence');
-
--- these should fail for sequences
-select pgstatindex('test_sequence');
-select pgstathashindex('test_sequence');
-select pgstattuple_approx('test_sequence');
-
-drop sequence test_sequence;
 drop view test_view;
 drop foreign table test_foreign_table;
 drop server dummy_server;

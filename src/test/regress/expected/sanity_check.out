@@ -31,7 +31,6 @@ extra_wide_table|f
 fast_emp4000|f
 float4_tbl|f
 float8_tbl|f
-foo|t
 func_index_heap|t
 hash_f8_heap|t
 hash_i4_heap|t
@@ -46,7 +45,6 @@ iportaltest|f
 mlparted2|f
 mlparted5_b|f
 mlparted5a|f
-nocols|f
 num_data|f
 num_exp_add|t
 num_exp_div|t
@@ -59,7 +57,7 @@ num_exp_sub|t
 num_input_test|f
 num_result|f
 onek|t
-onek2|t
+onek2|f
 person|f
 persons|f
 persons2|t
@@ -84,7 +82,6 @@ pg_description|t
 pg_enum|t
 pg_extension|t
 pg_index|t
-pg_inherits|t
 pg_language|t
 pg_namespace|t
 pg_opclass|t
@@ -93,7 +90,6 @@ pg_opfamily|t
 pg_proc|t
 pg_range|t
 pg_rewrite|t
-pg_sequence|t
 pg_shdepend|t
 pg_shdescription|t
 pg_statistic|t
@@ -109,7 +105,6 @@ returningwrtest2|f
 road|t
 slow_emp4000|f
 snapshot_test|f
-tableam_tbl_heap2|f
 tenk1|t
 tenk2|t
 testjsonb|f
@@ -119,7 +114,6 @@ timestamp_tbl|f
 timestamptz_tbl|f
 tmptz|t
 varchar_tbl|f
-view_base_table|t
 -- restore normal output mode
 \a\t
 --

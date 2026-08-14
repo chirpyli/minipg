@@ -7323,7 +7323,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_CoalesceExpr:
 		case T_MinMaxExpr:
 		case T_SQLValueFunction:
-		case T_NextValueExpr:
 		case T_NullIfExpr:
 		case T_Aggref:
 		case T_GroupingFunc:
@@ -8482,22 +8481,6 @@ get_rule_expr(Node *node, deparse_context *context,
 				else
 					appendStringInfo(buf, "CURRENT OF $%d",
 									 cexpr->cursor_param);
-			}
-			break;
-
-		case T_NextValueExpr:
-			{
-				NextValueExpr *nvexpr = (NextValueExpr *) node;
-
-				/*
-				 * This isn't exactly nextval(), but that seems close enough
-				 * for EXPLAIN's purposes.
-				 */
-				appendStringInfoString(buf, "nextval(");
-				simple_quote_literal(buf,
-									 generate_relation_name(nvexpr->seqid,
-															NIL));
-				appendStringInfoChar(buf, ')');
 			}
 			break;
 

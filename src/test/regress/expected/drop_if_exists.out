@@ -162,11 +162,6 @@ NOTICE:  operator @#@ does not exist, skipping
 CREATE OPERATOR @#@
         (leftarg = int8, rightarg = int8, procedure = int8xor);
 DROP OPERATOR @#@ (int8, int8);
--- language
-DROP LANGUAGE test_language_exists;
-ERROR:  language "test_language_exists" does not exist
-DROP LANGUAGE IF EXISTS test_language_exists;
-NOTICE:  language "test_language_exists" does not exist, skipping
 -- cast
 DROP CAST (text AS text);
 ERROR:  syntax error at or near "CAST"
@@ -210,20 +205,6 @@ CREATE RULE test_rule_exists AS ON INSERT TO test_exists
     DO INSTEAD
     INSERT INTO test_exists VALUES (NEW.a, NEW.b || NEW.a::text);
 DROP RULE test_rule_exists ON test_exists;
--- foreign data wrapper
-DROP FOREIGN DATA WRAPPER test_fdw_exists;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: DROP FOREIGN DATA WRAPPER test_fdw_exists;
-             ^
-DROP FOREIGN DATA WRAPPER IF EXISTS test_fdw_exists;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: DROP FOREIGN DATA WRAPPER IF EXISTS test_fdw_exists;
-             ^
--- foreign server
-DROP SERVER test_server_exists;
-ERROR:  syntax error at or near "SERVER"
-LINE 1: DROP SERVER test_server_exists;
-             ^
 DROP SERVER IF EXISTS test_server_exists;
 ERROR:  syntax error at or near "SERVER"
 LINE 1: DROP SERVER IF EXISTS test_server_exists;
@@ -284,9 +265,6 @@ DROP CONVERSION IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP DOMAIN IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP FOREIGN TABLE IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: DROP FOREIGN TABLE IF EXISTS no_such_schema.foo;
              ^
 DROP FUNCTION IF EXISTS no_such_schema.foo();
 NOTICE:  schema "no_such_schema" does not exist, skipping

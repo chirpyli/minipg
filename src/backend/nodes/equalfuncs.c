@@ -699,15 +699,6 @@ _equalCurrentOfExpr(const CurrentOfExpr *a, const CurrentOfExpr *b)
 }
 
 static bool
-_equalNextValueExpr(const NextValueExpr *a, const NextValueExpr *b)
-{
-	COMPARE_SCALAR_FIELD(seqid);
-	COMPARE_SCALAR_FIELD(typeId);
-
-	return true;
-}
-
-static bool
 _equalInferenceElem(const InferenceElem *a, const InferenceElem *b)
 {
 	COMPARE_NODE_FIELD(expr);
@@ -1593,30 +1584,6 @@ static bool
 _equalAlterSystemStmt(const AlterSystemStmt *a, const AlterSystemStmt *b)
 {
 	COMPARE_NODE_FIELD(setstmt);
-
-	return true;
-}
-
-
-static bool
-_equalCreateSeqStmt(const CreateSeqStmt *a, const CreateSeqStmt *b)
-{
-	COMPARE_NODE_FIELD(sequence);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(ownerId);
-	COMPARE_SCALAR_FIELD(for_identity);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-
-	return true;
-}
-
-static bool
-_equalAlterSeqStmt(const AlterSeqStmt *a, const AlterSeqStmt *b)
-{
-	COMPARE_NODE_FIELD(sequence);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(for_identity);
-	COMPARE_SCALAR_FIELD(missing_ok);
 
 	return true;
 }
@@ -2586,9 +2553,6 @@ equal(const void *a, const void *b)
 		case T_CurrentOfExpr:
 			retval = _equalCurrentOfExpr(a, b);
 			break;
-		case T_NextValueExpr:
-			retval = _equalNextValueExpr(a, b);
-			break;
 		case T_InferenceElem:
 			retval = _equalInferenceElem(a, b);
 			break;
@@ -2821,12 +2785,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterSystemStmt:
 			retval = _equalAlterSystemStmt(a, b);
-			break;
-		case T_CreateSeqStmt:
-			retval = _equalCreateSeqStmt(a, b);
-			break;
-		case T_AlterSeqStmt:
-			retval = _equalAlterSeqStmt(a, b);
 			break;
 		case T_VariableSetStmt:
 			retval = _equalVariableSetStmt(a, b);

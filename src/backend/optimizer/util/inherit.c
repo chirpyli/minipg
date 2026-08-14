@@ -16,7 +16,7 @@
 
 #include "access/sysattr.h"
 #include "access/table.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"

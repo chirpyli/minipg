@@ -98,23 +98,6 @@ SELECT n.nspname, c.conname, a.rolname
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, conname;
 
---
--- Foreign Data Wrapper and Foreign Server
---
-CREATE FOREIGN DATA WRAPPER alt_fdw1;
-CREATE FOREIGN DATA WRAPPER alt_fdw2;
-
-CREATE SERVER alt_fserv1 FOREIGN DATA WRAPPER alt_fdw1;
-CREATE SERVER alt_fserv2 FOREIGN DATA WRAPPER alt_fdw2;
-
-ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw2;  -- failed (name conflict)
-ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw3;  -- OK
-
-ALTER SERVER alt_fserv1 RENAME TO alt_fserv2;   -- failed (name conflict)
-ALTER SERVER alt_fserv1 RENAME TO alt_fserv3;   -- OK
-
-SELECT fdwname FROM pg_foreign_data_wrapper WHERE fdwname like 'alt_fdw%';
-SELECT srvname FROM pg_foreign_server WHERE srvname like 'alt_fserv%';
 
 --
 -- Operator
@@ -379,8 +362,6 @@ SELECT nspname, stxname, rolname
 ---
 --- Cleanup resources
 ---
-DROP FOREIGN DATA WRAPPER alt_fdw2 CASCADE;
-DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
 
 DROP SCHEMA alt_nsp1 CASCADE;
 DROP SCHEMA alt_nsp2 CASCADE;

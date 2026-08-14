@@ -23,7 +23,6 @@ OBJS = \
 	execMain.o \
 	execParallel.o \
 	execProcnode.o \
-	execReplication.o \
 	execSRF.o \
 	execScan.o \
 	execTuples.o \

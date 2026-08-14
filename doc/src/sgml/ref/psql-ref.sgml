@@ -1465,10 +1465,9 @@ testdb=&gt;
         </para>
 
         <para>
-        The <link linkend="sql-alterdefaultprivileges"><command>ALTER DEFAULT
-        PRIVILEGES</command></link> command is used to set default access
+        The <command>ALTER DEFAULT PRIVILEGES</command> command is used to set default access
         privileges.  The meaning of the privilege display is explained in
-        <xref linkend="ddl-priv"/>.
+        the privilege system.
         </para>
         </listitem>
       </varlistentry>
@@ -1785,11 +1784,11 @@ testdb=&gt;
         </para>
 
         <para>
-        The <link linkend="sql-grant"><command>GRANT</command></link> and
-        <link linkend="sql-revoke"><command>REVOKE</command></link>
+        The <command>GRANT</command> and
+        <command>REVOKE</command>
         commands are used to set access privileges.  The meaning of the
         privilege display is explained in
-        <xref linkend="ddl-priv"/>.
+        the privilege system.
         </para>
         </listitem>
       </varlistentry>
@@ -1841,7 +1840,7 @@ testdb=&gt;
         </para>
 
         <para>
-        The <link linkend="sql-alterrole"><command>ALTER ROLE</command></link> and
+        The <command>ALTER ROLE</command> and
         <link linkend="sql-alterdatabase"><command>ALTER DATABASE</command></link>
         commands are used to define per-role and per-database configuration
         settings.

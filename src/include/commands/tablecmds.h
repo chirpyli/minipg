@@ -64,6 +64,32 @@ extern void ExecuteTruncateGuts(List *explicit_rels,
 
 extern void SetRelationHasSubclass(Oid relationId, bool relhassubclass);
 
+/*
+ * The pg_inherits system catalog has been removed from minipg, so the
+ * inheritance-related catalog query functions below are kept only as stubs
+ * that behave as if no inheritance relationships exist.  They are referenced
+ * by several command/optimizer paths (e.g. TRUNCATE, ALTER TABLE recursion,
+ * type coercion) that must keep compiling and running correctly even though
+ * inheritance is no longer supported.
+ */
+extern List *find_inheritance_children(Oid parentrelId, LOCKMODE lockmode);
+extern List *find_inheritance_children_extended(Oid parentrelId, bool omit_detached,
+												LOCKMODE lockmode, bool *detached_exist, TransactionId *detached_xmin);
+
+extern List *find_all_inheritors(Oid parentrelId, LOCKMODE lockmode,
+								 List **parents);
+extern bool has_subclass(Oid relationId);
+extern bool has_superclass(Oid relationId);
+extern bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
+extern void StoreSingleInheritance(Oid relationId, Oid parentOid,
+								   int32 seqNumber);
+extern bool DeleteInheritsTuple(Oid inhrelid, Oid inhparent, bool allow_detached,
+								const char *childname);
+extern bool PartitionHasPendingDetach(Oid partoid);
+
+#include "nodes/pg_list.h"
+#include "storage/lock.h"
+
 extern bool CheckRelationTableSpaceMove(Relation rel, Oid newTableSpaceId);
 extern void SetRelationTableSpace(Relation rel, Oid newTableSpaceId,
 								  Oid newRelFileNode);

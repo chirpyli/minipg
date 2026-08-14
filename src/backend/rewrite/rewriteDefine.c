@@ -25,7 +25,7 @@
 #include "catalog/heap.h"
 #include "catalog/namespace.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/storage.h"
 #include "commands/tablecmds.h"

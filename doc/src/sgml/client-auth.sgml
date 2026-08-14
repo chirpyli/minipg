@@ -12,14 +12,12 @@
   specifies which <productname>PostgreSQL</productname> database user name it
   wants to connect as, much the same way one logs into a Unix computer
   as a particular user. Within the SQL environment the active database
-  user name determines access privileges to database objects &mdash; see
-  <xref linkend="user-manag"/> for more information. Therefore, it is
+  user name determines access privileges to database objects. Therefore, it is
   essential to restrict which database users can connect.
  </para>
 
  <note>
   <para>
-   As explained in <xref linkend="user-manag"/>,
    <productname>PostgreSQL</productname> actually does privilege
    management in terms of <quote>roles</quote>.  In this chapter, we
    consistently use <firstterm>database user</firstterm> to mean <quote>role with the
@@ -1166,9 +1164,7 @@ omicron         bryanh                  guest1
     <productname>PostgreSQL</productname> database passwords are
     separate from operating system user passwords. The password for
     each database user is stored in the <literal>pg_authid</literal> system
-    catalog. Passwords can be managed with the SQL commands
-    <xref linkend="sql-createrole"/> and
-    <xref linkend="sql-alterrole"/>,
+    catalog.     Passwords can be managed with SQL commands,
     e.g., <userinput>CREATE ROLE foo WITH LOGIN PASSWORD 'secret'</userinput>,
     or the <application>psql</application>
     command <literal>\password</literal>.

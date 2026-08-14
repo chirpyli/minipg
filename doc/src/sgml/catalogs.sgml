@@ -146,19 +146,7 @@
      </row>
 
      <row>
-      <entry><link linkend="catalog-pg-foreign-data-wrapper"><structname>pg_foreign_data_wrapper</structname></link></entry>
-      <entry>foreign-data wrapper definitions</entry>
-     </row>
 
-     <row>
-      <entry><link linkend="catalog-pg-foreign-server"><structname>pg_foreign_server</structname></link></entry>
-      <entry>foreign server definitions</entry>
-     </row>
-
-     <row>
-      <entry><link linkend="catalog-pg-foreign-table"><structname>pg_foreign_table</structname></link></entry>
-      <entry>additional foreign table information</entry>
-     </row>
 
      <row>
       <entry><link linkend="catalog-pg-index"><structname>pg_index</structname></link></entry>
@@ -1424,10 +1412,7 @@
    <structname>pg_authid</structname> that blanks out the password field.
   </para>
 
-  <para>
-   <xref linkend="user-manag"/> contains detailed information about user and
-   privilege management.
-  </para>
+
 
   <para>
    Because user identities are cluster-wide,
@@ -2197,7 +2182,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>relacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
 
@@ -3010,7 +2995,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>datacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -3712,284 +3697,6 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
  </sect1>
 
 
- <sect1 id="catalog-pg-foreign-data-wrapper">
-  <title><structname>pg_foreign_data_wrapper</structname></title>
-
-  <indexterm zone="catalog-pg-foreign-data-wrapper">
-   <primary>pg_foreign_data_wrapper</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_foreign_data_wrapper</structname> stores
-   foreign-data wrapper definitions.  A foreign-data wrapper is the
-   mechanism by which external data, residing on foreign servers, is
-   accessed.
-  </para>
-
-  <table>
-   <title><structname>pg_foreign_data_wrapper</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>oid</structfield> <type>oid</type>
-      </para>
-      <para>
-       Row identifier
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwname</structfield> <type>name</type>
-      </para>
-      <para>
-       Name of the foreign-data wrapper
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwowner</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-authid"><structname>pg_authid</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       Owner of the foreign-data wrapper
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwhandler</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-proc"><structname>pg_proc</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       References a handler function that is responsible for
-       supplying execution routines for the foreign-data wrapper.
-       Zero if no handler is provided
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwvalidator</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-proc"><structname>pg_proc</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       References a validator function that is responsible for
-       checking the validity of the options given to the
-       foreign-data wrapper, as well as options for foreign servers and user
-       mappings using the foreign-data wrapper.  Zero if no validator
-       is provided
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwacl</structfield> <type>aclitem[]</type>
-      </para>
-      <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>fdwoptions</structfield> <type>text[]</type>
-      </para>
-      <para>
-       Foreign-data wrapper specific options, as <quote>keyword=value</quote> strings
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
-
-
- <sect1 id="catalog-pg-foreign-server">
-  <title><structname>pg_foreign_server</structname></title>
-
-  <indexterm zone="catalog-pg-foreign-server">
-   <primary>pg_foreign_server</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_foreign_server</structname> stores
-   foreign server definitions.  A foreign server describes a source
-   of external data, such as a remote server.  Foreign
-   servers are accessed via foreign-data wrappers.
-  </para>
-
-  <table>
-   <title><structname>pg_foreign_server</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>oid</structfield> <type>oid</type>
-      </para>
-      <para>
-       Row identifier
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvname</structfield> <type>name</type>
-      </para>
-      <para>
-       Name of the foreign server
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvowner</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-authid"><structname>pg_authid</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       Owner of the foreign server
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvfdw</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-foreign-data-wrapper"><structname>pg_foreign_data_wrapper</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       OID of the foreign-data wrapper of this foreign server
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvtype</structfield> <type>text</type>
-      </para>
-      <para>
-       Type of the server (optional)
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvversion</structfield> <type>text</type>
-      </para>
-      <para>
-       Version of the server (optional)
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvacl</structfield> <type>aclitem[]</type>
-      </para>
-      <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>srvoptions</structfield> <type>text[]</type>
-      </para>
-      <para>
-       Foreign server specific options, as <quote>keyword=value</quote> strings
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
-
-
- <sect1 id="catalog-pg-foreign-table">
-  <title><structname>pg_foreign_table</structname></title>
-
-  <indexterm zone="catalog-pg-foreign-table">
-   <primary>pg_foreign_table</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_foreign_table</structname> contains
-   auxiliary information about foreign tables.  A foreign table is
-   primarily represented by a
-   <link linkend="catalog-pg-class"><structname>pg_class</structname></link>
-   entry, just like a regular table.  Its <structname>pg_foreign_table</structname>
-   entry contains the information that is pertinent only to foreign tables
-   and not any other kind of relation.
-  </para>
-
-  <table>
-   <title><structname>pg_foreign_table</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ftrelid</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-class"><structname>pg_class</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the <link linkend="catalog-pg-class"><structname>pg_class</structname></link> entry for this foreign table
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ftserver</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-foreign-server"><structname>pg_foreign_server</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       OID of the foreign server for this foreign table
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ftoptions</structfield> <type>text[]</type>
-      </para>
-      <para>
-       Foreign table options, as <quote>keyword=value</quote> strings
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
 
 
  <sect1 id="catalog-pg-index">
@@ -4341,8 +4048,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
   <para>
    The catalog <structname>pg_language</structname> registers
    languages in which you can write functions or stored procedures.
-   See <xref linkend="sql-createlanguage"/>
-   and <xref linkend="xplang"/> for more information about language handlers.
+   See <xref linkend="xplang"/> for more information about language handlers.
   </para>
 
   <table>
@@ -4456,7 +4162,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>lanacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -4605,7 +4311,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>lomacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -4676,7 +4382,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>nspacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -5736,7 +5442,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>proacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -7369,7 +7075,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>spcacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
 
@@ -8671,7 +8377,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
        <structfield>typacl</structfield> <type>aclitem[]</type>
       </para>
       <para>
-       Access privileges; see <xref linkend="ddl-priv"/> for details
+       Access privileges; see the privilege system for details
       </para></entry>
      </row>
     </tbody>
@@ -8773,77 +8479,6 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
  </sect1>
 
 
- <sect1 id="catalog-pg-user-mapping">
-  <title><structname>pg_user_mapping</structname></title>
-
-  <indexterm zone="catalog-pg-user-mapping">
-   <primary>pg_user_mapping</primary>
-  </indexterm>
-
-  <para>
-   The catalog <structname>pg_user_mapping</structname> stores
-   the mappings from local user to remote.  Access to this catalog is
-   restricted from normal users, use the view
-   <link linkend="view-pg-user-mappings"><structname>pg_user_mappings</structname></link>
-   instead.
-  </para>
-
-  <table>
-   <title><structname>pg_user_mapping</structname> Columns</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>oid</structfield> <type>oid</type>
-      </para>
-      <para>
-       Row identifier
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>umuser</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-authid"><structname>pg_authid</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       OID of the local role being mapped, or zero if the user mapping is public
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>umserver</structfield> <type>oid</type>
-       (references <link linkend="catalog-pg-foreign-server"><structname>pg_foreign_server</structname></link>.<structfield>oid</structfield>)
-      </para>
-      <para>
-       The OID of the foreign server that contains this mapping
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>umoptions</structfield> <type>text[]</type>
-      </para>
-      <para>
-       User mapping specific options, as <quote>keyword=value</quote> strings
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
- </sect1>
 
 
  <sect1 id="views-overview">

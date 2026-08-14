@@ -249,7 +249,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterCollationStmt
 		AlterDatabaseStmt AlterDatabaseSetStmt AlterDomainStmt AlterEnumStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
-		AlterOperatorStmt AlterTypeStmt AlterSeqStmt AlterSystemStmt AlterTableStmt
+		AlterOperatorStmt AlterTypeStmt AlterSystemStmt AlterTableStmt
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
 		AlterStatsStmt
@@ -257,7 +257,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		ConstraintsSetStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt AlterOpFamilyStmt
-		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
+		CreateSchemaStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
 		CreateAssertionStmt CreateTransformStmt CreateTrigStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
@@ -801,7 +801,6 @@ stmt:	AlterCollationStmt
 			| AlterOwnerStmt
 			| AlterOperatorStmt
 			| AlterTypeStmt
-			| AlterSeqStmt
 			| AlterSystemStmt
 			| AlterTableStmt
 			| AlterTblSpcStmt
@@ -823,7 +822,6 @@ stmt:	AlterCollationStmt
 			| CreateOpFamilyStmt
 			| AlterOpFamilyStmt
 			| CreateSchemaStmt
-			| CreateSeqStmt
 			| CreateStmt
 			| CreateStatsStmt
 			| CreateTableSpaceStmt
@@ -957,7 +955,6 @@ OptSchemaEltList:
 schema_stmt:
 			CreateStmt
 			| IndexStmt
-			| CreateSeqStmt
 			| CreateTrigStmt
 			| ViewStmt
 		;
@@ -1343,7 +1340,7 @@ CheckPointStmt:
 
 /*****************************************************************************
  *
- * DISCARD { ALL | PLANS | SEQUENCES }
+ * DISCARD { ALL | PLANS }
  *
  *****************************************************************************/
 
@@ -1358,12 +1355,6 @@ DiscardStmt:
 				{
 					DiscardStmt *n = makeNode(DiscardStmt);
 					n->target = DISCARD_PLANS;
-					$$ = (Node *) n;
-				}
-			| DISCARD SEQUENCES
-				{
-					DiscardStmt *n = makeNode(DiscardStmt);
-					n->target = DISCARD_SEQUENCES;
 					$$ = (Node *) n;
 				}
 
@@ -1456,24 +1447,6 @@ AlterTableStmt:
 					n->roles = $9;
 					n->new_tablespacename = $12;
 					n->nowait = $13;
-					$$ = (Node *)n;
-				}
-		|	ALTER SEQUENCE qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $3;
-					n->cmds = $4;
-					n->objtype = OBJECT_SEQUENCE;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-		|	ALTER SEQUENCE IF_P EXISTS qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $5;
-					n->cmds = $6;
-					n->objtype = OBJECT_SEQUENCE;
-					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
 		|	ALTER VIEW qualified_name alter_table_cmds
@@ -1641,50 +1614,7 @@ alter_table_cmds:
 					n->def = (Node *) makeString($5);
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> ADD GENERATED ... AS IDENTITY ... */
-			| ALTER opt_column ColId ADD_P GENERATED generated_when AS IDENTITY_P OptParenthesizedSeqOptList
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					Constraint *c = makeNode(Constraint);
-
-					c->contype = CONSTR_IDENTITY;
-					c->generated_when = $6;
-					c->options = $9;
-					c->location = @5;
-
-					n->subtype = AT_AddIdentity;
-					n->name = $3;
-					n->def = (Node *) c;
-
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET <sequence options>/RESET */
-			| ALTER opt_column ColId alter_identity_column_option_list
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetIdentity;
-					n->name = $3;
-					n->def = (Node *) $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP IDENTITY */
-			| ALTER opt_column ColId DROP IDENTITY_P
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropIdentity;
-					n->name = $3;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP IDENTITY IF EXISTS */
-			| ALTER opt_column ColId DROP IDENTITY_P IF_P EXISTS
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropIdentity;
-					n->name = $3;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
+			/* ALTER TABLE <name> ALTER [COLUMN] <c			}
 			/* ALTER TABLE <name> DROP [COLUMN] IF EXISTS <colname> [RESTRICT|CASCADE] */
 			| DROP opt_column IF_P EXISTS ColId opt_drop_behavior
 				{
@@ -2480,17 +2410,8 @@ ColConstraintElem:
 					n->raw_expr = $2;
 					n->cooked_expr = NULL;
 					$$ = (Node *)n;
-				}
-			| GENERATED generated_when AS IDENTITY_P OptParenthesizedSeqOptList
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_IDENTITY;
-					n->generated_when = $2;
-					n->options = $5;
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-			| GENERATED generated_when AS '(' a_expr ')' STORED
+					}
+					| GENERATED generated_when AS '(' a_expr ')' STORED
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_GENERATED;
@@ -2971,49 +2892,6 @@ OptNoLog:	/*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
  *
  *****************************************************************************/
 
-CreateSeqStmt:
-			CREATE SEQUENCE qualified_name OptSeqOptList
-				{
-					CreateSeqStmt *n = makeNode(CreateSeqStmt);
-					$3->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->sequence = $3;
-					n->options = $4;
-					n->ownerId = InvalidOid;
-					n->if_not_exists = false;
-					$$ = (Node *)n;
-				}
-			| CREATE SEQUENCE IF_P NOT EXISTS qualified_name OptSeqOptList
-				{
-					CreateSeqStmt *n = makeNode(CreateSeqStmt);
-					$6->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->sequence = $6;
-					n->options = $7;
-					n->ownerId = InvalidOid;
-					n->if_not_exists = true;
-					$$ = (Node *)n;
-				}
-		;
-
-AlterSeqStmt:
-			ALTER SEQUENCE qualified_name SeqOptList
-				{
-					AlterSeqStmt *n = makeNode(AlterSeqStmt);
-					n->sequence = $3;
-					n->options = $4;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER SEQUENCE IF_P EXISTS qualified_name SeqOptList
-				{
-					AlterSeqStmt *n = makeNode(AlterSeqStmt);
-					n->sequence = $5;
-					n->options = $6;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-
-		;
-
 OptSeqOptList: SeqOptList							{ $$ = $1; }
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
@@ -3065,11 +2943,6 @@ SeqOptElem: AS SimpleTypename
 			| OWNED BY any_name
 				{
 					$$ = makeDefElem("owned_by", (Node *)$3, @1);
-				}
-			| SEQUENCE NAME_P any_name
-				{
-					/* not documented, only used by pg_dump */
-					$$ = makeDefElem("sequence_name", (Node *)$3, @1);
 				}
 			| START opt_with NumericOnly
 				{
@@ -4351,7 +4224,6 @@ DropStmt:	DROP object_type_any_name IF_P EXISTS any_name_list opt_drop_behavior
 /* object types taking any_name/any_name_list */
 object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
-			| SEQUENCE								{ $$ = OBJECT_SEQUENCE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
 			| COLLATION								{ $$ = OBJECT_COLLATION; }
@@ -5928,15 +5800,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER opt_procedural LANGUAGE name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_LANGUAGE;
-					n->object = (Node *) makeString($4);
-					n->newname = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER OPERATOR CLASS any_name USING name RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -6002,27 +5865,7 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-			| ALTER SEQUENCE qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_SEQUENCE;
-					n->relation = $3;
-					n->subname = NULL;
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER SEQUENCE IF_P EXISTS qualified_name RENAME TO name
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_SEQUENCE;
-					n->relation = $5;
-					n->subname = NULL;
-					n->newname = $8;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER VIEW qualified_name RENAME TO name
+				| ALTER VIEW qualified_name RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
 					n->renameType = OBJECT_VIEW;
@@ -6405,25 +6248,7 @@ AlterObjectSchemaStmt:
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER SEQUENCE qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_SEQUENCE;
-					n->relation = $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER SEQUENCE IF_P EXISTS qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_SEQUENCE;
-					n->relation = $5;
-					n->newschema = $8;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER VIEW qualified_name SET SCHEMA name
+				| ALTER VIEW qualified_name SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
 					n->objectType = OBJECT_VIEW;
@@ -6557,14 +6382,6 @@ AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
 					n->objectType = OBJECT_FUNCTION;
 					n->object = (Node *) $3;
 					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER opt_procedural LANGUAGE name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_LANGUAGE;
-					n->object = (Node *) makeString($4);
-					n->newowner = $7;
 					$$ = (Node *)n;
 				}
 			| ALTER OPERATOR operator_with_argtypes OWNER TO RoleSpec
@@ -11679,8 +11496,6 @@ unreserved_keyword:
 			| SEARCH
 			| SECOND_P
 			| SECURITY
-			| SEQUENCE
-			| SEQUENCES
 			| SERIALIZABLE
 			| SERVER
 			| SESSION
@@ -12248,8 +12063,6 @@ bare_label_keyword:
 			| SEARCH
 			| SECURITY
 			| SELECT
-			| SEQUENCE
-			| SEQUENCES
 			| SERIALIZABLE
 			| SERVER
 			| SESSION

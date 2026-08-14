@@ -18,7 +18,6 @@ OBJS = \
 	mxactdesc.o \
 	nbtdesc.o \
 	relmapdesc.o \
-	seqdesc.o \
 	smgrdesc.o \
 	standbydesc.o \
 	tblspcdesc.o \

@@ -1,11 +1,10 @@
 # contrib/spi/Makefile
 
-MODULES = autoinc insert_username moddatetime refint
+MODULES = insert_username moddatetime refint
 
-EXTENSION = autoinc insert_username moddatetime refint
+EXTENSION = insert_username moddatetime refint
 
-DATA = autoinc--1.0.sql \
-       insert_username--1.0.sql \
+DATA = insert_username--1.0.sql \
        moddatetime--1.0.sql \
        refint--1.0.sql
 PGFILEDESC = "spi - examples of using SPI and triggers"

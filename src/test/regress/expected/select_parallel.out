@@ -1113,11 +1113,6 @@ ORDER BY 1;
 (25 rows)
 
 -- test interaction with SRFs
-SELECT * FROM information_schema.foreign_data_wrapper_options
-ORDER BY 1, 2, 3;
-ERROR:  relation "information_schema.foreign_data_wrapper_options" does not exist
-LINE 1: SELECT * FROM information_schema.foreign_data_wrapper_option...
-                      ^
 EXPLAIN (VERBOSE, COSTS OFF)
 SELECT generate_series(1, two), array(select generate_series(1, two))
   FROM tenk1 ORDER BY tenthous;

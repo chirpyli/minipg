@@ -1992,30 +1992,6 @@ typedef struct CreateTrigStmt
 } CreateTrigStmt;
 
 /* ----------------------
- *		{Create|Alter} SEQUENCE Statement
- * ----------------------
- */
-
-typedef struct CreateSeqStmt
-{
-	NodeTag		type;
-	RangeVar   *sequence;		/* the sequence to create */
-	List	   *options;
-	Oid			ownerId;		/* ID of owner, or InvalidOid for default */
-	bool		for_identity;
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-} CreateSeqStmt;
-
-typedef struct AlterSeqStmt
-{
-	NodeTag		type;
-	RangeVar   *sequence;		/* the sequence to alter */
-	List	   *options;
-	bool		for_identity;
-	bool		missing_ok;		/* skip error if a role is missing? */
-} AlterSeqStmt;
-
-/* ----------------------
  *		Create {Aggregate|Operator|Type} Statement
  * ----------------------
  */

@@ -49,7 +49,6 @@
 #include "commands/comment.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
-#include "commands/sequence.h"
 #include "commands/trigger.h"
 #include "commands/typecmds.h"
 #include "miscadmin.h"
@@ -1362,13 +1361,6 @@ doDeletion(const ObjectAddress *object, int flags)
 					else
 						heap_drop_with_catalog(object->objectId);
 				}
-
-				/*
-				 * for a sequence, in addition to dropping the heap, also
-				 * delete pg_sequence tuple
-				 */
-				if (relKind == RELKIND_SEQUENCE)
-					DeleteSequenceTuple(object->objectId);
 				break;
 			}
 
@@ -2008,13 +2000,6 @@ find_expr_references_walker(Node *node,
 		CoerceToDomain *cd = (CoerceToDomain *) node;
 
 		add_object_address(OCLASS_TYPE, cd->resulttype, 0,
-						   context->addrs);
-	}
-	else if (IsA(node, NextValueExpr))
-	{
-		NextValueExpr *nve = (NextValueExpr *) node;
-
-		add_object_address(OCLASS_CLASS, nve->seqid, 0,
 						   context->addrs);
 	}
 	else if (IsA(node, OnConflictExpr))

@@ -1256,17 +1256,14 @@ BeginCopyFrom(ParseState *pstate,
 				 * then it could give the wrong answer when using
 				 * multi-insert. Since database access can be dynamic this is
 				 * hard to test for exactly, so we use the much wider test of
-				 * whether the default expression is volatile. We allow for
-				 * the special case of when the default expression is the
-				 * nextval() of a sequence which in this specific case is
-				 * known to be safe for use with the multi-insert
-				 * optimization. Hence we use this special case function
-				 * checker rather than the standard check for
-				 * contain_volatile_functions().  Note also that we already
-				 * ran the expression through expression_planner().
+				 * whether the default expression is volatile. Since sequence
+				 * support has been removed, there is no special-case
+				 * exemption, so just use the standard volatile-function check.
+				 * Note also that we already ran the expression through
+				 * expression_planner().
 				 */
 				if (!volatile_defexprs)
-					volatile_defexprs = contain_volatile_functions_not_nextval((Node *) defexpr);
+					volatile_defexprs = contain_volatile_functions((Node *) defexpr);
 			}
 		}
 	}

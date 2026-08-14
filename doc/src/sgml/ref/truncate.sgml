@@ -171,11 +171,6 @@ TRUNCATE [ TABLE ] [ ONLY ] <replaceable class="parameter">name</replaceable> [ 
    a failed transaction.
   </para>
 
-  <para>
-   <command>TRUNCATE</command> can be used for foreign tables if
-   supported by the foreign data wrapper, for instance,
-   see <xref linkend="postgres-fdw"/>.
-  </para>
  </refsect1>
 
  <refsect1>

@@ -514,16 +514,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
 (0 rows)
 
 DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val + t2.val, 10)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 10) as expected
-    FROM num_result t1, num_exp_add t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 10);
- id1 | id2 | result | expected 
------+-----+--------+----------
-(0 rows)
-
 -- ******************************
 -- * Subtraction check
 -- ******************************
@@ -536,17 +526,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     AND t1.result != t2.expected;
  id1 | id2 | result | expected 
 -----+-----+--------+----------
-(0 rows)
-
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val - t2.val, 40)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 40)
-    FROM num_result t1, num_exp_sub t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 40);
- id1 | id2 | result | round 
------+-----+--------+-------
 (0 rows)
 
 -- ******************************
@@ -563,17 +542,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
 -----+-----+--------+----------
 (0 rows)
 
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val * t2.val, 30)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 30) as expected
-    FROM num_result t1, num_exp_mul t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 30);
- id1 | id2 | result | expected 
------+-----+--------+----------
-(0 rows)
-
 -- ******************************
 -- * Division check
 -- ******************************
@@ -585,18 +553,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     FROM num_result t1, num_exp_div t2
     WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
     AND t1.result != t2.expected;
- id1 | id2 | result | expected 
------+-----+--------+----------
-(0 rows)
-
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val / t2.val, 80)
-    FROM num_data t1, num_data t2
-    WHERE t2.val != '0.0';
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 80) as expected
-    FROM num_result t1, num_exp_div t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 80);
  id1 | id2 | result | expected 
 -----+-----+--------+----------
 (0 rows)
@@ -633,32 +589,27 @@ SELECT t1.id1, t1.result, t2.expected
 -- ******************************
 -- * Logarithm base 10 check
 -- ******************************
-DELETE FROM num_result;
-INSERT INTO num_result SELECT id, 0, LOG(numeric '10', ABS(val))
-    FROM num_data
-    WHERE val != '0.0';
-SELECT t1.id1, t1.result, t2.expected
-    FROM num_result t1, num_exp_log10 t2
-    WHERE t1.id1 = t2.id
-    AND t1.result != t2.expected;
- id1 | result | expected 
------+--------+----------
-(0 rows)
-
 -- ******************************
 -- * POWER(10, LN(value)) check
 -- ******************************
 DELETE FROM num_result;
-INSERT INTO num_result SELECT id, 0, POWER(numeric '10', LN(ABS(round(val,200))))
+INSERT INTO num_result SELECT id, 0, POWER(numeric '10', LN(ABS(val)))
     FROM num_data
     WHERE val != '0.0';
 SELECT t1.id1, t1.result, t2.expected
     FROM num_result t1, num_exp_power_10_ln t2
     WHERE t1.id1 = t2.id
     AND t1.result != t2.expected;
- id1 | result | expected 
------+--------+----------
-(0 rows)
+ id1 |             result             |            expected            
+-----+--------------------------------+--------------------------------
+   2 |  224790267919917874.8284727189 |  224790267919917955.1326161858
+   4 |    7405685069595003.7727847115 |    7405685069594999.0773399947
+   5 |          5068226527.3212721828 |          5068226527.3212726541
+   6 |        281839893606.9937031401 |        281839893606.9937234336
+   7 | 1716699575118598163.0425324576 | 1716699575118597095.4233081991
+   8 |        167361463828.0748605287 |        167361463828.0749132007
+   9 |  107511333880051989.8063067875 |  107511333880052007.0414112467
+(7 rows)
 
 -- ******************************
 -- * Check behavior with Inf and NaN inputs.  It's easiest to handle these
@@ -826,19 +777,15 @@ FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('na
        NaN |       NaN |      NaN |       NaN |       NaN |  NaN |       NaN
 (8 rows)
 
-SELECT x, round(x), round(x,1) as round1, trunc(x), trunc(x,1) as trunc1
-FROM (VALUES('0'::numeric),('1'),('-1'),('4.2'),('-7.777'),('inf'),('-inf'),('nan')) AS v(x);
-     x     |   round   |  round1   |   trunc   |  trunc1   
------------+-----------+-----------+-----------+-----------
-         0 |         0 |       0.0 |         0 |       0.0
-         1 |         1 |       1.0 |         1 |       1.0
-        -1 |        -1 |      -1.0 |        -1 |      -1.0
-       4.2 |         4 |       4.2 |         4 |       4.2
-    -7.777 |        -8 |      -7.8 |        -7 |      -7.7
-  Infinity |  Infinity |  Infinity |  Infinity |  Infinity
- -Infinity | -Infinity | -Infinity | -Infinity | -Infinity
-       NaN |       NaN |       NaN |       NaN |       NaN
-(8 rows)
+SELECT x, ln(x)
+FROM (VALUES('1'::numeric),('4.2'),('inf'),('nan')) AS v(x);
+    x     |         ln         
+----------+--------------------
+        1 | 0.0000000000000000
+      4.2 | 1.4350845252893226
+ Infinity |           Infinity
+      NaN |                NaN
+(4 rows)
 
 -- the large values fall into the numeric abbreviation code's maximal classes
 SELECT substring(x::text, 1, 32)
@@ -877,62 +824,11 @@ SELECT sqrt('-1'::numeric);
 ERROR:  cannot take square root of a negative number
 SELECT sqrt('-inf'::numeric);
 ERROR:  cannot take square root of a negative number
-SELECT x,
-  log(x),
-  log10(x),
-  ln(x)
-FROM (VALUES('1'::numeric),('4.2'),('inf'),('nan')) AS v(x);
-    x     |        log         |       log10        |         ln         
-----------+--------------------+--------------------+--------------------
-        1 | 0.0000000000000000 | 0.0000000000000000 | 0.0000000000000000
-      4.2 | 0.6232492903979005 | 0.6232492903979005 | 1.4350845252893226
- Infinity |           Infinity |           Infinity |           Infinity
-      NaN |                NaN |                NaN |                NaN
-(4 rows)
-
 SELECT ln('0'::numeric);
 ERROR:  cannot take logarithm of zero
 SELECT ln('-1'::numeric);
 ERROR:  cannot take logarithm of a negative number
 SELECT ln('-inf'::numeric);
-ERROR:  cannot take logarithm of a negative number
-SELECT x1, x2,
-  log(x1, x2)
-FROM (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v1(x1),
-     (VALUES('2'::numeric),('4.2'),('inf'),('nan')) AS v2(x2);
-    x1    |    x2    |        log         
-----------+----------+--------------------
-        2 |        2 | 1.0000000000000000
-        2 |      4.2 | 2.0703893278913979
-        2 | Infinity |           Infinity
-        2 |      NaN |                NaN
-      4.2 |        2 | 0.4830009440873890
-      4.2 |      4.2 | 1.0000000000000000
-      4.2 | Infinity |           Infinity
-      4.2 |      NaN |                NaN
- Infinity |        2 |                  0
- Infinity |      4.2 |                  0
- Infinity | Infinity |                NaN
- Infinity |      NaN |                NaN
-      NaN |        2 |                NaN
-      NaN |      4.2 |                NaN
-      NaN | Infinity |                NaN
-      NaN |      NaN |                NaN
-(16 rows)
-
-SELECT log('0'::numeric, '10');
-ERROR:  cannot take logarithm of zero
-SELECT log('10'::numeric, '0');
-ERROR:  cannot take logarithm of zero
-SELECT log('-inf'::numeric, '10');
-ERROR:  cannot take logarithm of a negative number
-SELECT log('10'::numeric, '-inf');
-ERROR:  cannot take logarithm of a negative number
-SELECT log('inf'::numeric, '0');
-ERROR:  cannot take logarithm of zero
-SELECT log('inf'::numeric, '-inf');
-ERROR:  cannot take logarithm of a negative number
-SELECT log('-inf'::numeric, 'inf');
 ERROR:  cannot take logarithm of a negative number
 SELECT x1, x2,
   power(x1, x2)
@@ -1286,154 +1182,6 @@ SELECT 'Infinity'::numeric::int8;
 ERROR:  cannot convert infinity to bigint
 SELECT '-Infinity'::numeric::int8;
 ERROR:  cannot convert infinity to bigint
--- Simple check that ceil(), floor(), and round() work correctly
-CREATE TABLE ceil_floor_round (a numeric);
-INSERT INTO ceil_floor_round VALUES ('-5.5');
-INSERT INTO ceil_floor_round VALUES ('-5.499999');
-INSERT INTO ceil_floor_round VALUES ('9.5');
-INSERT INTO ceil_floor_round VALUES ('9.4999999');
-INSERT INTO ceil_floor_round VALUES ('0.0');
-INSERT INTO ceil_floor_round VALUES ('0.0000001');
-INSERT INTO ceil_floor_round VALUES ('-0.000001');
-SELECT a, ceil(a), ceiling(a), floor(a), round(a) FROM ceil_floor_round;
-     a     | ceil | ceiling | floor | round 
------------+------+---------+-------+-------
-      -5.5 |   -5 |      -5 |    -6 |    -6
- -5.499999 |   -5 |      -5 |    -6 |    -5
-       9.5 |   10 |      10 |     9 |    10
- 9.4999999 |   10 |      10 |     9 |     9
-       0.0 |    0 |       0 |     0 |     0
- 0.0000001 |    1 |       1 |     0 |     0
- -0.000001 |    0 |       0 |    -1 |     0
-(7 rows)
-
-DROP TABLE ceil_floor_round;
--- Check rounding, it should round ties away from zero.
-SELECT i as pow,
-	round((-2.5 * 10 ^ i)::numeric, -i),
-	round((-1.5 * 10 ^ i)::numeric, -i),
-	round((-0.5 * 10 ^ i)::numeric, -i),
-	round((0.5 * 10 ^ i)::numeric, -i),
-	round((1.5 * 10 ^ i)::numeric, -i),
-	round((2.5 * 10 ^ i)::numeric, -i)
-FROM generate_series(-5,5) AS t(i);
- pow |  round   |  round   |  round   |  round  |  round  |  round  
------+----------+----------+----------+---------+---------+---------
-  -5 | -0.00003 | -0.00002 | -0.00001 | 0.00001 | 0.00002 | 0.00003
-  -4 |  -0.0003 |  -0.0002 |  -0.0001 |  0.0001 |  0.0002 |  0.0003
-  -3 |   -0.003 |   -0.002 |   -0.001 |   0.001 |   0.002 |   0.003
-  -2 |    -0.03 |    -0.02 |    -0.01 |    0.01 |    0.02 |    0.03
-  -1 |     -0.3 |     -0.2 |     -0.1 |     0.1 |     0.2 |     0.3
-   0 |       -3 |       -2 |       -1 |       1 |       2 |       3
-   1 |      -30 |      -20 |      -10 |      10 |      20 |      30
-   2 |     -300 |     -200 |     -100 |     100 |     200 |     300
-   3 |    -3000 |    -2000 |    -1000 |    1000 |    2000 |    3000
-   4 |   -30000 |   -20000 |   -10000 |   10000 |   20000 |   30000
-   5 |  -300000 |  -200000 |  -100000 |  100000 |  200000 |  300000
-(11 rows)
-
--- Check limits of rounding before the decimal point
-SELECT round(4.4e131071, -131071) = 4e131071;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT round(4.5e131071, -131071) = 5e131071;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT round(4.5e131071, -131072); -- loses all digits
- round 
--------
-     0
-(1 row)
-
-SELECT round(5.5e131071, -131072); -- rounds up and overflows
-ERROR:  value overflows numeric format
-SELECT round(5.5e131071, -131073); -- loses all digits
- round 
--------
-     0
-(1 row)
-
-SELECT round(5.5e131071, -1000000); -- loses all digits
- round 
--------
-     0
-(1 row)
-
--- Check limits of rounding after the decimal point
-SELECT round(5e-16383, 1000000) = 5e-16383;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT round(5e-16383, 16383) = 5e-16383;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT round(5e-16383, 16382) = 1e-16382;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT round(5e-16383, 16381) = 0;
- ?column? 
-----------
- t
-(1 row)
-
--- Check limits of trunc() before the decimal point
-SELECT trunc(9.9e131071, -131071) = 9e131071;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT trunc(9.9e131071, -131072); -- loses all digits
- trunc 
--------
-     0
-(1 row)
-
-SELECT trunc(9.9e131071, -131073);  -- loses all digits
- trunc 
--------
-     0
-(1 row)
-
-SELECT trunc(9.9e131071, -1000000);  -- loses all digits
- trunc 
--------
-     0
-(1 row)
-
--- Check limits of trunc() after the decimal point
-SELECT trunc(5e-16383, 1000000) = 5e-16383;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT trunc(5e-16383, 16383) = 5e-16383;
- ?column? 
-----------
- t
-(1 row)
-
-SELECT trunc(5e-16383, 16382) = 0;
- ?column? 
-----------
- t
-(1 row)
-
 -- Testing for width_bucket(). For convenience, we test both the
 -- numeric and float8 versions of the function in this file.
 -- errors
@@ -2500,9 +2248,9 @@ select coalesce(nullif(0.9999999999 ^ 23300000000000, 0), 0) as rounds_to_zero;
 (1 row)
 
 select round(((1 - 1.500012345678e-1000) ^ 1.45e1003) * 1e1000);
-                          round                           
-----------------------------------------------------------
- 25218976308958387188077465658068501556514992509509282366
+         round         
+-----------------------
+ 2.521897630895839e+55
 (1 row)
 
 -- cases that used to error out

@@ -205,7 +205,6 @@ CREATE TRANSFORM FOR hstore LANGUAGE plpythonu (
 
   <para>
    <xref linkend="sql-createfunction"/>,
-   <xref linkend="sql-createlanguage"/>,
    <xref linkend="sql-createtype"/>,
    <xref linkend="sql-droptransform"/>
   </para>

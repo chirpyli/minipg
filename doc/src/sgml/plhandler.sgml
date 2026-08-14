@@ -185,8 +185,6 @@
     The procedural languages included in the standard distribution
     are good references when trying to write your own language handler.
     Look into the <filename>src/pl</filename> subdirectory of the source tree.
-    The <xref linkend="sql-createlanguage"/>
-    reference page also has some useful details.
    </para>
 
  </chapter>

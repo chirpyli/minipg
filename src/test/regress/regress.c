@@ -18,6 +18,7 @@
 
 #include <math.h>
 #include <signal.h>
+#include <time.h>
 
 #include "access/detoast.h"
 #include "access/htup_details.h"
@@ -26,7 +27,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
-#include "commands/sequence.h"
 #include "commands/trigger.h"
 #include "common/pg_lzcompress.h"
 #include "executor/executor.h"
@@ -244,9 +244,9 @@ ttdummy(PG_FUNCTION_ARGS)
 		return PointerGetDatum(NULL);
 	}
 
-	newoff = DirectFunctionCall1(nextval, CStringGetTextDatum("ttdummy_seq"));
-	/* nextval now returns int64; coerce down to int32 */
-	newoff = Int32GetDatum((int32) DatumGetInt64(newoff));
+	/* Sequence support was removed from this build; derive an offset from
+	 * the current time instead. */
+	newoff = Int32GetDatum((int32) time(NULL));
 
 	/* Connect to SPI manager */
 	if ((ret = SPI_connect()) < 0)

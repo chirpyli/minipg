@@ -41,7 +41,6 @@ OBJS = \
 	prepare.o \
 	proclang.o \
 	schemacmds.o \
-	sequence.o \
 	statscmds.o \
 	tablecmds.o \
 	tablespace.o \

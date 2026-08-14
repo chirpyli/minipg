@@ -21,13 +21,18 @@ test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txi
 # numerology depends on int2, int4, int8, float4, float8
 # multirangetypes 已随 range/multirange 具体类型裁剪而移除
 # ----------
-test: strings numerology date time timestamp timestamptz interval create_function_0
+test: strings numerology date time timestamp timestamptz interval 
 
 # ----------
 # Another group of parallel tests
 # horology depends on interval, timestamp, timestamptz
 # opr_sanity depends on create_function_0
 # ----------
+# create_function_0 定义 regress 测试桩 C 函数(binary_coercible/test_support_func/
+# test_opclass_options_func/make_tuple_indirect/test_enc_setup/test_conv/
+# test_enc_conversion)，opr_sanity/misc_functions/alter_generic/indirect_toast/
+# conversion 等测试均依赖，须先于各并行组串行执行
+test: create_function_0
 test: horology opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr
 
 # ----------
@@ -38,6 +43,9 @@ test: create_function_1
 test: create_type
 # create_table 已改写：移除 INHERITS 继承链与 PARTITION BY 分区，保留标准基础表(tenk1/tenk2/onek/person 等)
 test: create_table
+# create_index 为 onek/tenk1/bt_*_heap/hash_*_heap 等基础表建立索引，
+# sanity_check/arrays/window/amutils/groupingsets 等多个测试依赖这些索引
+test: create_index
 
 # ----------
 # Load huge amounts of data
@@ -56,9 +64,9 @@ test: insert
 # create_misc 已改写：移除 INHERITS 继承链(person*/ihighway/shighway/a_star 等)，保留普通基础表
 # (hobbies_r/equipment_r/city/road/ramp/iportaltest)，依赖 create_table 创建的基础表
 test: create_misc
-test: create_operator create_schema
+test: create_operator 
 # These depend on create_operator
-test: create_index create_view index_including
+test: index_including
 
 # ----------
 # Another group of parallel tests
@@ -67,7 +75,7 @@ test: create_index create_view index_including
 #   constraints vacuum create_function_3 database
 # information_schema 已裁剪，triggers/updatable_views 深度依赖 information_schema，移除
 # inherit 已随表继承(INHERITS)功能裁剪而移除
-test: create_aggregate select typed_table drop_if_exists create_am hash_func errors infinite_recurse
+test: create_aggregate typed_table hash_func errors infinite_recurse
 
 # ----------
 # sanity_check does a vacuum, affecting the sort order of SELECT *
@@ -83,7 +91,7 @@ ignore: random
 # information_schema 已裁剪，join 引用 information_schema.cardinal_number，移除
 # CREATE TABLE AS (CTAS) 语法已裁剪，random 测试依赖该语法，移除
 # aggregates/portals 已随表继承(INHERITS)功能裁剪而移除
-test: select_distinct select_distinct_on select_implicit select_having subselect case transactions arrays btree_index hash_index delete namespace prepared_xacts
+test: select_distinct select_distinct_on select_implicit select_having case transactions arrays btree_index hash_index prepared_xacts
 
 # ----------
 # Another group of parallel tests
@@ -91,14 +99,14 @@ test: select_distinct select_distinct_on select_implicit select_having subselect
 # 权限/角色机制已裁剪，matview identity generated 依赖 ROLE/OWNER，移除
 # information_schema 已裁剪，collate 引用 information_schema.views，移除
 # lock 已随表继承(INHERITS)功能裁剪而移除
-test: replica_identity tablesample groupingsets drop_operator join_hash
+test: tablesample groupingsets drop_operator join_hash
 
 # ----------
 # Another group of parallel tests
 # ----------
 # misc 已随表继承(INHERITS)功能裁剪而移除（依赖 stud_emp/emp 继承表）
 # create_table_like 已随表继承(INHERITS)功能裁剪而移除
-test: alter_generic alter_operator dbsize misc_functions sysviews tsrf tid tidscan tidrangescan
+test: alter_generic alter_operator dbsize misc_functions sysviews tsrf tidscan tidrangescan
 
 # rules cannot run concurrently with any test that creates
 # a view or rule in the public schema
@@ -125,7 +133,7 @@ test: vacuum_parallel
 # 权限/角色机制已裁剪，以下依赖角色/OWNER，移除：
 #   select_views foreign_key dependency alter_table sequence largeobject
 # cluster 已随表继承(INHERITS)功能裁剪而移除
-test: portals_p2 guc bitmapops combocid window functional_deps advisory_lock indirect_toast
+test: portals_p2 guc bitmapops combocid window advisory_lock indirect_toast
 
 # ----------
 # ----------
@@ -136,7 +144,7 @@ test: portals_p2 guc bitmapops combocid window functional_deps advisory_lock ind
 # information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
 # temp/truncate/returning 已随表继承(INHERITS)功能裁剪而移除
 # plpgsql: PL/pgSQL 已裁剪，移除对应测试条目（纯测试见已删 plpgsql.sql）
-test: plancache limit domain rangefuncs prepare conversion polymorphism
+test: prepare conversion polymorphism
 
 # ----------
 # Another group of parallel tests

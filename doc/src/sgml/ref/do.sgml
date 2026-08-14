@@ -129,7 +129,6 @@ END$$;
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="sql-createlanguage"/></member>
   </simplelist>
  </refsect1>
 </refentry>

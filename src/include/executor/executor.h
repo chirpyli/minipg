@@ -620,29 +620,6 @@ extern void check_exclusion_constraint(Relation heap, Relation index,
 									   EState *estate, bool newIndex);
 
 /*
- * prototypes from functions in execReplication.c
- */
-extern bool RelationFindReplTupleByIndex(Relation rel, Oid idxoid,
-										 LockTupleMode lockmode,
-										 TupleTableSlot *searchslot,
-										 TupleTableSlot *outslot);
-extern bool RelationFindReplTupleSeq(Relation rel, LockTupleMode lockmode,
-									 TupleTableSlot *searchslot, TupleTableSlot *outslot);
-
-extern void ExecSimpleRelationInsert(ResultRelInfo *resultRelInfo,
-									 EState *estate, TupleTableSlot *slot);
-extern void ExecSimpleRelationUpdate(ResultRelInfo *resultRelInfo,
-									 EState *estate, EPQState *epqstate,
-									 TupleTableSlot *searchslot, TupleTableSlot *slot);
-extern void ExecSimpleRelationDelete(ResultRelInfo *resultRelInfo,
-									 EState *estate, EPQState *epqstate,
-									 TupleTableSlot *searchslot);
-extern void CheckCmdReplicaIdentity(Relation rel, CmdType cmd);
-
-extern void CheckSubscriptionRelkind(char relkind, const char *nspname,
-									 const char *relname);
-
-/*
  * prototypes from functions in nodeModifyTable.c
  */
 extern TupleTableSlot *ExecGetUpdateNewTuple(ResultRelInfo *relinfo,

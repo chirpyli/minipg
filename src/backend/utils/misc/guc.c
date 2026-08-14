@@ -727,7 +727,6 @@ const char *const config_group_names[] =
 	gettext_noop("Customized Options"),
 	/* DEVELOPER_OPTIONS */
 	gettext_noop("Developer Options"),
-	/* help_config wants this array to be null-terminated */
 	NULL
 };
 
@@ -4465,7 +4464,7 @@ discard_stack_value(struct config_generic *gconf, config_var_value *val)
 
 
 /*
- * Fetch the sorted array pointer (exported for help_config.c's use ONLY)
+ * Fetch the sorted array pointer
  */
 struct config_generic **
 get_guc_variables(void)

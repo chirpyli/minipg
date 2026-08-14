@@ -229,9 +229,6 @@ exprType(const Node *expr)
 		case T_CurrentOfExpr:
 			type = BOOLOID;
 			break;
-		case T_NextValueExpr:
-			type = ((const NextValueExpr *) expr)->typeId;
-			break;
 		case T_InferenceElem:
 			{
 				const InferenceElem *n = (const InferenceElem *) expr;
@@ -934,10 +931,6 @@ exprCollation(const Node *expr)
 			/* CurrentOfExpr's result is boolean ... */
 			coll = InvalidOid;	/* ... so it has no collation */
 			break;
-		case T_NextValueExpr:
-			/* NextValueExpr's result is an integer type ... */
-			coll = InvalidOid;	/* ... so it has no collation */
-			break;
 		case T_InferenceElem:
 			coll = exprCollation((Node *) ((const InferenceElem *) expr)->expr);
 			break;
@@ -1145,10 +1138,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_CurrentOfExpr:
 			/* CurrentOfExpr's result is boolean ... */
-			Assert(!OidIsValid(collation)); /* ... so never set a collation */
-			break;
-		case T_NextValueExpr:
-			/* NextValueExpr's result is an integer type ... */
 			Assert(!OidIsValid(collation)); /* ... so never set a collation */
 			break;
 		default:
@@ -1870,7 +1859,6 @@ expression_tree_walker(Node *node,
 		case T_CoerceToDomainValue:
 		case T_SetToDefault:
 		case T_CurrentOfExpr:
-		case T_NextValueExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
@@ -2503,7 +2491,6 @@ expression_tree_mutator(Node *node,
 		case T_CoerceToDomainValue:
 		case T_SetToDefault:
 		case T_CurrentOfExpr:
-		case T_NextValueExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);

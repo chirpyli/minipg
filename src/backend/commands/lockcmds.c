@@ -17,7 +17,7 @@
 #include "access/table.h"
 #include "access/xact.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "commands/lockcmds.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"

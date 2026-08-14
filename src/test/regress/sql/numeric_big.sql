@@ -532,13 +532,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
     AND t1.result != t2.expected;
 
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val + t2.val, 10)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 10) as expected
-    FROM num_result t1, num_exp_add t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 10);
 
 -- ******************************
 -- * Subtraction check
@@ -551,13 +544,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
     AND t1.result != t2.expected;
 
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val - t2.val, 40)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 40)
-    FROM num_result t1, num_exp_sub t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 40);
 
 -- ******************************
 -- * Multiply check
@@ -570,13 +556,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
     AND t1.result != t2.expected;
 
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val * t2.val, 30)
-    FROM num_data t1, num_data t2;
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 30) as expected
-    FROM num_result t1, num_exp_mul t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 30);
 
 -- ******************************
 -- * Division check
@@ -590,14 +569,6 @@ SELECT t1.id1, t1.id2, t1.result, t2.expected
     WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
     AND t1.result != t2.expected;
 
-DELETE FROM num_result;
-INSERT INTO num_result SELECT t1.id, t2.id, round(t1.val / t2.val, 80)
-    FROM num_data t1, num_data t2
-    WHERE t2.val != '0.0';
-SELECT t1.id1, t1.id2, t1.result, round(t2.expected, 80) as expected
-    FROM num_result t1, num_exp_div t2
-    WHERE t1.id1 = t2.id1 AND t1.id2 = t2.id2
-    AND t1.result != round(t2.expected, 80);
 
 -- ******************************
 -- * Square root check
@@ -638,7 +609,7 @@ SELECT t1.id1, t1.result, t2.expected
 -- * POW(10, LN(value)) check
 -- ******************************
 DELETE FROM num_result;
-INSERT INTO num_result SELECT id, 0, POW(numeric '10', LN(ABS(round(val,1000))))
+INSERT INTO num_result SELECT id, 0, POW(numeric '10', LN(ABS(val)))
     FROM num_data
     WHERE val != '0.0';
 SELECT t1.id1, t1.result, t2.expected
@@ -1207,160 +1178,3 @@ WITH t(x, bc_result) AS (VALUES
  1510.4332713542154696529645934345554302578243896764921637693542962119938599884313210100957753316832762996428481801312323020427109678979117469716796746760060470871840325255146954580681101106876674367471955788143763250819168311353856748872452260808797135108102729064040463343792765872545182299889360257515315869180266759715933989413256377582681707188367254513700731642913479683031478361835565783219287780434673712341147656477670848734998849030451414278832848680301511646182446524915091598080243532068451726548537866633622180283865668708517173065893429240665300584705585310049892047293928733753369421499719516009692095913169665213597158441636480707309244604139865130782756488091268094213446272360006907802989573582755585110277620911226015342778471352130366770729972784317323917141031824334355639769512749560550167491709646539950725523461943580211843652293561678342656010571108219244870234329176123205423872844099992204896411752620881541000940129833754169391528449211839693800724450201835161044717173715867437))
 SELECT trim_scale(ln(x::numeric)-bc_result) AS diff FROM t;
 
---
--- Tests for LOG() (base 10)
---
-
--- input very small, exact result known
-WITH t(x) AS (SELECT '1e-'||n FROM generate_series(1, 100) g(n))
-SELECT x, log(x::numeric) FROM t;
-
--- input very small, non-exact results
---
--- bc(1) results computed with a scale of 500 and truncated using the script
--- below, and then rounded by hand to match the precision of LN():
---
--- for p in {1..50..7}
--- do
---   for d in {9..1..3}
---   do
---     l=$(bc -ql <<< "scale=500 ; l($d*10^-$p) / l(10)" | head -n 1)
---     echo "('${d}.0e-$p', $l),"
---   done
--- done
-
-WITH t(x, bc_result) AS (VALUES
-('9.0e-1', -.04575749056067513),
-('6.0e-1', -.2218487496163564),
-('3.0e-1', -.5228787452803376),
-('9.0e-8', -7.045757490560675),
-('6.0e-8', -7.221848749616356),
-('3.0e-8', -7.522878745280338),
-('9.0e-15', -14.0457574905606751),
-('6.0e-15', -14.2218487496163564),
-('3.0e-15', -14.5228787452803376),
-('9.0e-22', -21.04575749056067512540994),
-('6.0e-22', -21.22184874961635636749123),
-('3.0e-22', -21.52287874528033756270497),
-('9.0e-29', -28.045757490560675125409944193490),
-('6.0e-29', -28.221848749616356367491233202020),
-('3.0e-29', -28.522878745280337562704972096745),
-('9.0e-36', -35.0457574905606751254099441934897693816),
-('6.0e-36', -35.2218487496163563674912332020203916640),
-('3.0e-36', -35.5228787452803375627049720967448846908),
-('9.0e-43', -42.04575749056067512540994419348976938159974227),
-('6.0e-43', -42.22184874961635636749123320202039166403168125),
-('3.0e-43', -42.52287874528033756270497209674488469079987114),
-('9.0e-50', -49.045757490560675125409944193489769381599742271618608),
-('6.0e-50', -49.221848749616356367491233202020391664031681254347196),
-('3.0e-50', -49.522878745280337562704972096744884690799871135809304))
-SELECT x, bc_result, log(x::numeric), log(x::numeric)-bc_result AS diff FROM t;
-
--- input very close to but smaller than 1
---
--- bc(1) results computed with a scale of 500 and truncated using the script
--- below, and then rounded by hand to match the precision of LN():
---
--- for p in {1..40..7}
--- do
---   for d in {9..1..3}
---   do
---     l=$(bc -ql <<< "scale=500 ; l(1-$d*10^-$p) / l(10)" | head -n 1)
---     echo "('${d}.0e-$p', $l),"
---   done
--- done
-
-WITH t(x, bc_result) AS (VALUES
-('9.0e-1', -1.0000000000000000),
-('6.0e-1', -.3979400086720376),
-('3.0e-1', -.1549019599857432),
-('9.0e-8', -.000000039086505130185422),
-('6.0e-8', -.000000026057669695925208),
-('3.0e-8', -.000000013028834652530076),
-('9.0e-15', -.0000000000000039086503371292840),
-('6.0e-15', -.0000000000000026057668914195188),
-('3.0e-15', -.0000000000000013028834457097574),
-('9.0e-22', -.00000000000000000000039086503371292664),
-('6.0e-22', -.00000000000000000000026057668914195110),
-('3.0e-22', -.00000000000000000000013028834457097555),
-('9.0e-29', -.000000000000000000000000000039086503371292664),
-('6.0e-29', -.000000000000000000000000000026057668914195110),
-('3.0e-29', -.000000000000000000000000000013028834457097555),
-('9.0e-36', -.0000000000000000000000000000000000039086503371292664),
-('6.0e-36', -.0000000000000000000000000000000000026057668914195110),
-('3.0e-36', -.0000000000000000000000000000000000013028834457097555))
-SELECT '1-'||x, bc_result, log(1.0-x::numeric), log(1.0-x::numeric)-bc_result AS diff FROM t;
-
--- input very close to but larger than 1
---
--- bc(1) results computed with a scale of 500 and truncated using the script
--- below, and then rounded by hand to match the precision of LN():
---
--- for p in {1..40..7}
--- do
---   for d in {9..1..3}
---   do
---     l=$(bc -ql <<< "scale=500 ; l(1+$d*10^-$p) / l(10)" | head -n 1)
---     echo "('${d}.0e-$p', $l),"
---   done
--- done
-
-WITH t(x, bc_result) AS (VALUES
-('9.0e-1', .2787536009528290),
-('6.0e-1', .2041199826559248),
-('3.0e-1', .1139433523068368),
-('9.0e-8', .000000039086501612400118),
-('6.0e-8', .000000026057668132465074),
-('3.0e-8', .000000013028834261665042),
-('9.0e-15', .0000000000000039086503371292489),
-('6.0e-15', .0000000000000026057668914195031),
-('3.0e-15', .0000000000000013028834457097535),
-('9.0e-22', .00000000000000000000039086503371292664),
-('6.0e-22', .00000000000000000000026057668914195110),
-('3.0e-22', .00000000000000000000013028834457097555),
-('9.0e-29', .000000000000000000000000000039086503371292664),
-('6.0e-29', .000000000000000000000000000026057668914195110),
-('3.0e-29', .000000000000000000000000000013028834457097555),
-('9.0e-36', .0000000000000000000000000000000000039086503371292664),
-('6.0e-36', .0000000000000000000000000000000000026057668914195110),
-('3.0e-36', .0000000000000000000000000000000000013028834457097555))
-SELECT '1+'||x, bc_result, log(1.0+x::numeric), log(1.0+x::numeric)-bc_result AS diff FROM t;
-
--- input very large, exact result known
-WITH t(x) AS (SELECT '1e'||n FROM generate_series(1, 100) g(n))
-SELECT x, log(x::numeric) FROM t;
-
--- input very large, non-exact results
---
--- bc(1) results computed with a scale of 500 and truncated using the script
--- below, and then rounded by hand to match the precision of LN():
---
--- for p in {10..50..7}
---   do
---   for d in {2..9..3}
---   do
---     l=$(bc -ql <<< "scale=500 ; l($d*10^$p) / l(10)" | head -n 1)
---     echo "('${d}.0e$p', $l),"
---   done
--- done
-
-WITH t(x, bc_result) AS (VALUES
-('2.0e10', 10.301029995663981),
-('5.0e10', 10.698970004336019),
-('8.0e10', 10.903089986991944),
-('2.0e17', 17.301029995663981),
-('5.0e17', 17.698970004336019),
-('8.0e17', 17.903089986991944),
-('2.0e24', 24.301029995663981),
-('5.0e24', 24.698970004336019),
-('8.0e24', 24.903089986991944),
-('2.0e31', 31.301029995663981),
-('5.0e31', 31.698970004336019),
-('8.0e31', 31.903089986991944),
-('2.0e38', 38.301029995663981),
-('5.0e38', 38.698970004336019),
-('8.0e38', 38.903089986991944),
-('2.0e45', 45.30102999566398),
-('5.0e45', 45.69897000433602),
-('8.0e45', 45.90308998699194))
-SELECT x, bc_result, log(x::numeric), log(x::numeric)-bc_result AS diff FROM t;

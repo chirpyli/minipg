@@ -776,14 +776,7 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 	switch (resultRel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
-			CheckCmdReplicaIdentity(resultRel, operation);
-
-			/*
-			 * For INSERT ON CONFLICT DO UPDATE, additionally check that the
-			 * target relation supports UPDATE.
-			 */
-			if (onConflictAction == ONCONFLICT_UPDATE)
-				CheckCmdReplicaIdentity(resultRel, CMD_UPDATE);
+			/* INSERT/UPDATE/DELETE permission checks are handled elsewhere. */
 			break;
 		case RELKIND_SEQUENCE:
 			ereport(ERROR,

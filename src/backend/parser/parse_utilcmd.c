@@ -41,7 +41,6 @@
 #include "catalog/pg_type.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
-#include "commands/sequence.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "miscadmin.h"
@@ -93,7 +92,6 @@ typedef struct
 typedef struct
 {
 	const char *schemaname;		/* name of schema */
-	List	   *sequences;		/* CREATE SEQUENCE items */
 	List	   *tables;			/* CREATE TABLE items */
 	List	   *views;			/* CREATE VIEW items */
 	List	   *indexes;		/* CREATE INDEX items */
@@ -305,175 +303,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 }
 
 /*
- * generateSerialExtraStmts
- *		Generate CREATE SEQUENCE and ALTER SEQUENCE ... OWNED BY statements
- *		to create the sequence for a serial or identity column.
- *
- * This includes determining the name the sequence will have.  The caller
- * can ask to get back the name components by passing non-null pointers
- * for snamespace_p and sname_p.
- */
-static void
-generateSerialExtraStmts(CreateStmtContext *cxt, ColumnDef *column,
-						 Oid seqtypid, List *seqoptions,
-						 bool for_identity, bool col_exists,
-						 char **snamespace_p, char **sname_p)
-{
-	ListCell   *option;
-	DefElem    *nameEl = NULL;
-	Oid			snamespaceid;
-	char	   *snamespace;
-	char	   *sname;
-	CreateSeqStmt *seqstmt;
-	AlterSeqStmt *altseqstmt;
-	List	   *attnamelist;
-	int			nameEl_idx = -1;
-
-	/* Make a copy of this as we may end up modifying it in the code below */
-	seqoptions = list_copy(seqoptions);
-
-	/*
-	 * Determine namespace and name to use for the sequence.
-	 *
-	 * First, check if a sequence name was passed in as an option.  This is
-	 * used by pg_dump.  Else, generate a name.
-	 *
-	 * Although we use ChooseRelationName, it's not guaranteed that the
-	 * selected sequence name won't conflict; given sufficiently long field
-	 * names, two different serial columns in the same table could be assigned
-	 * the same sequence name, and we'd not notice since we aren't creating
-	 * the sequence quite yet.  In practice this seems quite unlikely to be a
-	 * problem, especially since few people would need two serial columns in
-	 * one table.
-	 */
-	foreach(option, seqoptions)
-	{
-		DefElem    *defel = lfirst_node(DefElem, option);
-
-		if (strcmp(defel->defname, "sequence_name") == 0)
-		{
-			if (nameEl)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("conflicting or redundant options")));
-			nameEl = defel;
-			nameEl_idx = foreach_current_index(option);
-		}
-	}
-
-	if (nameEl)
-	{
-		RangeVar   *rv = makeRangeVarFromNameList(castNode(List, nameEl->arg));
-
-		snamespace = rv->schemaname;
-		if (!snamespace)
-		{
-			/* Given unqualified SEQUENCE NAME, select namespace */
-			if (cxt->rel)
-				snamespaceid = RelationGetNamespace(cxt->rel);
-			else
-				snamespaceid = RangeVarGetCreationNamespace(cxt->relation);
-			snamespace = get_namespace_name(snamespaceid);
-		}
-		sname = rv->relname;
-		/* Remove the SEQUENCE NAME item from seqoptions */
-		seqoptions = list_delete_nth_cell(seqoptions, nameEl_idx);
-	}
-	else
-	{
-		if (cxt->rel)
-			snamespaceid = RelationGetNamespace(cxt->rel);
-		else
-		{
-			snamespaceid = RangeVarGetCreationNamespace(cxt->relation);
-			RangeVarAdjustRelationPersistence(cxt->relation, snamespaceid);
-		}
-		snamespace = get_namespace_name(snamespaceid);
-		sname = ChooseRelationName(cxt->relation->relname,
-								   column->colname,
-								   "seq",
-								   snamespaceid,
-								   false);
-	}
-
-	ereport(DEBUG1,
-			(errmsg_internal("%s will create implicit sequence \"%s\" for serial column \"%s.%s\"",
-							 cxt->stmtType, sname,
-							 cxt->relation->relname, column->colname)));
-
-	/*
-	 * Build a CREATE SEQUENCE command to create the sequence object, and add
-	 * it to the list of things to be done before this CREATE/ALTER TABLE.
-	 */
-	seqstmt = makeNode(CreateSeqStmt);
-	seqstmt->for_identity = for_identity;
-	seqstmt->sequence = makeRangeVar(snamespace, sname, -1);
-	seqstmt->options = seqoptions;
-
-	/*
-	 * If a sequence data type was specified, add it to the options.  Prepend
-	 * to the list rather than append; in case a user supplied their own AS
-	 * clause, the "redundant options" error will point to their occurrence,
-	 * not our synthetic one.
-	 */
-	if (seqtypid)
-		seqstmt->options = lcons(makeDefElem("as",
-											 (Node *) makeTypeNameFromOid(seqtypid, -1),
-											 -1),
-								 seqstmt->options);
-
-	/*
-	 * If this is ALTER ADD COLUMN, make sure the sequence will be owned by
-	 * the table's owner.  The current user might be someone else (perhaps a
-	 * superuser, or someone who's only a member of the owning role), but the
-	 * SEQUENCE OWNED BY mechanisms will bleat unless table and sequence have
-	 * exactly the same owning role.
-	 */
-	if (cxt->rel)
-		seqstmt->ownerId = cxt->rel->rd_rel->relowner;
-	else
-		seqstmt->ownerId = InvalidOid;
-
-	cxt->blist = lappend(cxt->blist, seqstmt);
-
-	/*
-	 * Store the identity sequence name that we decided on.  ALTER TABLE ...
-	 * ADD COLUMN ... IDENTITY needs this so that it can fill the new column
-	 * with values from the sequence, while the association of the sequence
-	 * with the table is not set until after the ALTER TABLE.
-	 */
-	column->identitySequence = seqstmt->sequence;
-
-	/*
-	 * Build an ALTER SEQUENCE ... OWNED BY command to mark the sequence as
-	 * owned by this column, and add it to the appropriate list of things to
-	 * be done along with this CREATE/ALTER TABLE.  In a CREATE or ALTER ADD
-	 * COLUMN, it must be done after the statement because we don't know the
-	 * column's attnum yet.  But if we do have the attnum (in AT_AddIdentity),
-	 * we can do the marking immediately, which improves some ALTER TABLE
-	 * behaviors.
-	 */
-	altseqstmt = makeNode(AlterSeqStmt);
-	altseqstmt->sequence = makeRangeVar(snamespace, sname, -1);
-	attnamelist = list_make3(makeString(snamespace),
-							 makeString(cxt->relation->relname),
-							 makeString(column->colname));
-	altseqstmt->options = list_make1(makeDefElem("owned_by",
-												 (Node *) attnamelist, -1));
-	altseqstmt->for_identity = for_identity;
-
-	if (col_exists)
-		cxt->blist = lappend(cxt->blist, altseqstmt);
-	else
-		cxt->alist = lappend(cxt->alist, altseqstmt);
-
-	if (snamespace_p)
-		*snamespace_p = snamespace;
-	if (sname_p)
-		*sname_p = sname;
-}
-
-/*
  * transformColumnDefinition -
  *		transform a single ColumnDef within CREATE TABLE
  *		Also used in ALTER TABLE ADD COLUMN
@@ -481,120 +310,22 @@ generateSerialExtraStmts(CreateStmtContext *cxt, ColumnDef *column,
 static void
 transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 {
-	bool		is_serial;
 	bool		saw_nullable;
 	bool		saw_default;
-	bool		saw_identity;
 	bool		saw_generated;
 	ListCell   *clist;
 
 	cxt->columns = lappend(cxt->columns, column);
 
-	/* Check for SERIAL pseudo-types */
-	is_serial = false;
-	if (column->typeName
-		&& list_length(column->typeName->names) == 1
-		&& !column->typeName->pct_type)
-	{
-		char	   *typname = strVal(linitial(column->typeName->names));
-
-		if (strcmp(typname, "smallserial") == 0 ||
-			strcmp(typname, "serial2") == 0)
-		{
-			is_serial = true;
-			column->typeName->names = NIL;
-			column->typeName->typeOid = INT2OID;
-		}
-		else if (strcmp(typname, "serial") == 0 ||
-				 strcmp(typname, "serial4") == 0)
-		{
-			is_serial = true;
-			column->typeName->names = NIL;
-			column->typeName->typeOid = INT4OID;
-		}
-		else if (strcmp(typname, "bigserial") == 0 ||
-				 strcmp(typname, "serial8") == 0)
-		{
-			is_serial = true;
-			column->typeName->names = NIL;
-			column->typeName->typeOid = INT8OID;
-		}
-
-		/*
-		 * We have to reject "serial[]" explicitly, because once we've set
-		 * typeid, LookupTypeName won't notice arrayBounds.  We don't need any
-		 * special coding for serial(typmod) though.
-		 */
-		if (is_serial && column->typeName->arrayBounds != NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("array of serial is not implemented"),
-					 parser_errposition(cxt->pstate,
-										column->typeName->location)));
-	}
-
 	/* Do necessary work on the column type declaration */
 	if (column->typeName)
 		transformColumnType(cxt, column);
-
-	/* Special actions for SERIAL pseudo-types */
-	if (is_serial)
-	{
-		char	   *snamespace;
-		char	   *sname;
-		char	   *qstring;
-		A_Const    *snamenode;
-		TypeCast   *castnode;
-		FuncCall   *funccallnode;
-		Constraint *constraint;
-
-		generateSerialExtraStmts(cxt, column,
-								 column->typeName->typeOid, NIL,
-								 false, false,
-								 &snamespace, &sname);
-
-		/*
-		 * Create appropriate constraints for SERIAL.  We do this in full,
-		 * rather than shortcutting, so that we will detect any conflicting
-		 * constraints the user wrote (like a different DEFAULT).
-		 *
-		 * Create an expression tree representing the function call
-		 * nextval('sequencename').  We cannot reduce the raw tree to cooked
-		 * form until after the sequence is created, but there's no need to do
-		 * so.
-		 */
-		qstring = quote_qualified_identifier(snamespace, sname);
-		snamenode = makeNode(A_Const);
-		snamenode->val.type = T_String;
-		snamenode->val.val.str = qstring;
-		snamenode->location = -1;
-		castnode = makeNode(TypeCast);
-		castnode->typeName = SystemTypeName("regclass");
-		castnode->arg = (Node *) snamenode;
-		castnode->location = -1;
-		funccallnode = makeFuncCall(SystemFuncName("nextval"),
-									list_make1(castnode),
-									COERCE_EXPLICIT_CALL,
-									-1);
-		constraint = makeNode(Constraint);
-		constraint->contype = CONSTR_DEFAULT;
-		constraint->location = -1;
-		constraint->raw_expr = (Node *) funccallnode;
-		constraint->cooked_expr = NULL;
-		column->constraints = lappend(column->constraints, constraint);
-
-		constraint = makeNode(Constraint);
-		constraint->contype = CONSTR_NOTNULL;
-		constraint->location = -1;
-		column->constraints = lappend(column->constraints, constraint);
-	}
 
 	/* Process column constraints, if any... */
 	transformConstraintAttrs(cxt, column->constraints);
 
 	saw_nullable = false;
 	saw_default = false;
-	saw_identity = false;
 	saw_generated = false;
 
 	foreach(clist, column->constraints)
@@ -639,49 +370,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				Assert(constraint->cooked_expr == NULL);
 				saw_default = true;
 				break;
-
-			case CONSTR_IDENTITY:
-				{
-					Type		ctype;
-					Oid			typeOid;
-
-					if (cxt->ofType)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("identity columns are not supported on typed tables")));
-
-					ctype = typenameType(cxt->pstate, column->typeName, NULL);
-					typeOid = ((Form_pg_type) GETSTRUCT(ctype))->oid;
-					ReleaseSysCache(ctype);
-
-					if (saw_identity)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("multiple identity specifications for column \"%s\" of table \"%s\"",
-										column->colname, cxt->relation->relname),
-								 parser_errposition(cxt->pstate,
-													constraint->location)));
-
-					generateSerialExtraStmts(cxt, column,
-											 typeOid, constraint->options,
-											 true, false,
-											 NULL, NULL);
-
-					column->identity = constraint->generated_when;
-					saw_identity = true;
-
-					/* An identity column is implicitly NOT NULL */
-					if (saw_nullable && !column->is_not_null)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("conflicting NULL/NOT NULL declarations for column \"%s\" of table \"%s\"",
-										column->colname, cxt->relation->relname),
-								 parser_errposition(cxt->pstate,
-													constraint->location)));
-					column->is_not_null = true;
-					saw_nullable = true;
-					break;
-				}
 
 			case CONSTR_GENERATED:
 				if (cxt->ofType)
@@ -745,26 +433,10 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				break;
 		}
 
-		if (saw_default && saw_identity)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("both default and identity specified for column \"%s\" of table \"%s\"",
-							column->colname, cxt->relation->relname),
-					 parser_errposition(cxt->pstate,
-										constraint->location)));
-
 		if (saw_default && saw_generated)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("both default and generation expression specified for column \"%s\" of table \"%s\"",
-							column->colname, cxt->relation->relname),
-					 parser_errposition(cxt->pstate,
-										constraint->location)));
-
-		if (saw_identity && saw_generated)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("both identity and generation expression specified for column \"%s\" of table \"%s\"",
 							column->colname, cxt->relation->relname),
 					 parser_errposition(cxt->pstate,
 										constraint->location)));
@@ -947,28 +619,6 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 		if (attribute->atthasdef && attribute->attgenerated &&
 			(table_like_clause->options & CREATE_TABLE_LIKE_GENERATED))
 			def->generated = attribute->attgenerated;
-
-		/*
-		 * Copy identity if requested
-		 */
-		if (attribute->attidentity &&
-			(table_like_clause->options & CREATE_TABLE_LIKE_IDENTITY))
-		{
-			Oid			seq_relid;
-			List	   *seq_options;
-
-			/*
-			 * find sequence owned by old column; extract sequence parameters;
-			 * build new create sequence command
-			 */
-			seq_relid = getIdentitySequence(RelationGetRelid(relation), attribute->attnum, false);
-			seq_options = sequence_options(seq_relid);
-			generateSerialExtraStmts(cxt, def,
-									 InvalidOid, seq_options,
-									 true, false,
-									 NULL, NULL);
-			def->identity = attribute->attidentity;
-		}
 
 		/* Likewise, copy storage if requested */
 		if (table_like_clause->options & CREATE_TABLE_LIKE_STORAGE)
@@ -3102,10 +2752,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 										  EXPR_KIND_ALTER_COL_TRANSFORM);
 					}
 
-					/*
-					 * For identity column, create ALTER SEQUENCE command to
-					 * change the data type of the sequence.
-					 */
 					attnum = get_attnum(relid, cmd->name);
 					if (attnum == InvalidAttrNumber)
 						ereport(ERROR,
@@ -3113,114 +2759,11 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 								 errmsg("column \"%s\" of relation \"%s\" does not exist",
 										cmd->name, RelationGetRelationName(rel))));
 
-					if (attnum > 0 &&
-						TupleDescAttr(tupdesc, attnum - 1)->attidentity)
-					{
-						Oid			seq_relid = getIdentitySequence(relid, attnum, false);
-						Oid			typeOid = typenameTypeId(pstate, def->typeName);
-						AlterSeqStmt *altseqstmt = makeNode(AlterSeqStmt);
-
-						altseqstmt->sequence = makeRangeVar(get_namespace_name(get_rel_namespace(seq_relid)),
-															get_rel_name(seq_relid),
-															-1);
-						altseqstmt->options = list_make1(makeDefElem("as", (Node *) makeTypeNameFromOid(typeOid, -1), -1));
-						altseqstmt->for_identity = true;
-						cxt.blist = lappend(cxt.blist, altseqstmt);
-					}
-
 					newcmds = lappend(newcmds, cmd);
 					break;
-				}
-
-			case AT_AddIdentity:
-				{
-					Constraint *def = castNode(Constraint, cmd->def);
-					ColumnDef  *newdef = makeNode(ColumnDef);
-					AttrNumber	attnum;
-
-					newdef->colname = cmd->name;
-					newdef->identity = def->generated_when;
-					cmd->def = (Node *) newdef;
-
-					attnum = get_attnum(relid, cmd->name);
-					if (attnum == InvalidAttrNumber)
-						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_COLUMN),
-								 errmsg("column \"%s\" of relation \"%s\" does not exist",
-										cmd->name, RelationGetRelationName(rel))));
-
-					generateSerialExtraStmts(&cxt, newdef,
-											 get_atttype(relid, attnum),
-											 def->options, true, true,
-											 NULL, NULL);
-
-					newcmds = lappend(newcmds, cmd);
-					break;
-				}
-
-			case AT_SetIdentity:
-				{
-					/*
-					 * Create an ALTER SEQUENCE statement for the internal
-					 * sequence of the identity column.
-					 */
-					ListCell   *lc;
-					List	   *newseqopts = NIL;
-					List	   *newdef = NIL;
-					AttrNumber	attnum;
-					Oid			seq_relid;
-
-					/*
-					 * Split options into those handled by ALTER SEQUENCE and
-					 * those for ALTER TABLE proper.
-					 */
-					foreach(lc, castNode(List, cmd->def))
-					{
-						DefElem    *def = lfirst_node(DefElem, lc);
-
-						if (strcmp(def->defname, "generated") == 0)
-							newdef = lappend(newdef, def);
-						else
-							newseqopts = lappend(newseqopts, def);
 					}
 
-					attnum = get_attnum(relid, cmd->name);
-					if (attnum == InvalidAttrNumber)
-						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_COLUMN),
-								 errmsg("column \"%s\" of relation \"%s\" does not exist",
-										cmd->name, RelationGetRelationName(rel))));
-
-					seq_relid = getIdentitySequence(relid, attnum, true);
-
-					if (seq_relid)
-					{
-						AlterSeqStmt *seqstmt;
-
-						seqstmt = makeNode(AlterSeqStmt);
-						seqstmt->sequence = makeRangeVar(get_namespace_name(get_rel_namespace(seq_relid)),
-														 get_rel_name(seq_relid), -1);
-						seqstmt->options = newseqopts;
-						seqstmt->for_identity = true;
-						seqstmt->missing_ok = false;
-
-						cxt.blist = lappend(cxt.blist, seqstmt);
-					}
-
-					/*
-					 * If column was not an identity column, we just let the
-					 * ALTER TABLE command error out later.  (There are cases
-					 * this fails to cover, but we'll need to restructure
-					 * where creation of the sequence dependency linkage
-					 * happens before we can fix it.)
-					 */
-
-					cmd->def = (Node *) newdef;
-					newcmds = lappend(newcmds, cmd);
-					break;
-				}
-
-				default:
+			default:
 
 				/*
 				 * Currently, we shouldn't actually get here for subcommand
@@ -3491,7 +3034,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	ListCell   *elements;
 
 	cxt.schemaname = schemaName;
-	cxt.sequences = NIL;
 	cxt.tables = NIL;
 	cxt.views = NIL;
 	cxt.indexes = NIL;
@@ -3507,15 +3049,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 
 		switch (nodeTag(element))
 		{
-			case T_CreateSeqStmt:
-				{
-					CreateSeqStmt *elp = (CreateSeqStmt *) element;
-
-					setSchemaName(cxt.schemaname, &elp->sequence->schemaname);
-					cxt.sequences = lappend(cxt.sequences, element);
-				}
-				break;
-
 			case T_CreateStmt:
 				{
 					CreateStmt *elp = (CreateStmt *) element;
@@ -3567,7 +3100,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	}
 
 	result = NIL;
-	result = list_concat(result, cxt.sequences);
 	result = list_concat(result, cxt.tables);
 	result = list_concat(result, cxt.views);
 	result = list_concat(result, cxt.indexes);

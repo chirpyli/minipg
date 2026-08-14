@@ -54,12 +54,12 @@ test: multixact-no-forget
 test: lock-committed-update
 test: lock-committed-keyupdate
 test: update-locked-tuple
-test: reindex-concurrently
+# reindex-concurrently: 依赖 serial 类型，minipg 已裁剪 serial，移除
 # reindex-concurrently-toast: 依赖 plpgsql DO 块动态重命名 toast 关系，PL/pgSQL 已裁剪，移除
 test: reindex-schema
 test: propagate-lock-delete
 test: tuplelock-conflict
-test: tuplelock-update
+# tuplelock-update: 依赖 serial 类型，minipg 已裁剪 serial，移除
 test: tuplelock-upgrade-no-deadlock
 # tuplelock-partition 已随分区功能裁剪而移除
 test: freeze-the-dead
@@ -72,14 +72,13 @@ test: skip-locked
 test: skip-locked-2
 test: skip-locked-3
 test: skip-locked-4
-test: drop-index-concurrently-1
+# drop-index-concurrently-1: 依赖 serial 类型，minipg 已裁剪 serial，移除
 test: multiple-cic
 test: alter-table-1
 test: alter-table-2
 # alter-table-3: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 # alter-table-4 已随表继承(INHERITS)功能裁剪而移除
 # create-trigger: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
-test: sequence-ddl
 
 test: vacuum-reltuples
 test: timeouts

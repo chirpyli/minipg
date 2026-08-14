@@ -34,18 +34,7 @@ CREATE INDEX tenk2_hundred ON tenk2 USING btree(hundred int4_ops);
 
 CREATE INDEX rix ON road USING btree (name text_ops);
 
-CREATE INDEX iix ON ihighway USING btree (name text_ops);
-
-CREATE INDEX six ON shighway USING btree (name text_ops);
-
--- test comments
-COMMENT ON INDEX six_wrong IS 'bad index';
-COMMENT ON INDEX six IS 'good index';
-COMMENT ON INDEX six IS NULL;
-SELECT obj_description('six'::regclass, 'pg_class') IS NULL AS six_comment_is_null;
-COMMENT ON INDEX six IS 'add the comment back';
-COMMENT ON INDEX six IS ''; -- empty string removes the comment, same as NULL
-SELECT obj_description('six'::regclass, 'pg_class') IS NULL AS six_comment_is_null;
+-- minipg: ihighway/shighway (INHERITS 继承表) 已被裁剪，移除对应索引及注释测试。
 
 --
 -- BTREE ascending/descending cases
@@ -64,16 +53,8 @@ CREATE INDEX bt_txt_index ON bt_txt_heap USING btree (seqno text_ops);
 CREATE INDEX bt_f8_index ON bt_f8_heap USING btree (seqno float8_ops);
 
 --
--- BTREE partial indices
+-- minipg: onek2 分区表已在裁剪时移除，对应 partial index 一并移除。
 --
-CREATE INDEX onek2_u1_prtl ON onek2 USING btree(unique1 int4_ops)
-	where unique1 < 20 or unique1 > 980;
-
-CREATE INDEX onek2_u2_prtl ON onek2 USING btree(unique2 int4_ops)
-	where stringu1 < 'B';
-
-CREATE INDEX onek2_stu1_prtl ON onek2 USING btree(stringu1 name_ops)
-	where onek2.stringu1 >= 'J' and onek2.stringu1 < 'K';
 
 --
 -- GIN over int[] and text[]
@@ -583,104 +564,7 @@ SELECT indexrelid::regclass, indisreplident FROM pg_index
   WHERE indrelid = 'concur_replident'::regclass;
 DROP TABLE concur_replident;
 
--- Partitions
--- Create some partitioned tables
-CREATE TABLE concur_reindex_part (c1 int, c2 int) PARTITION BY RANGE (c1);
-CREATE TABLE concur_reindex_part_0 PARTITION OF concur_reindex_part
-  FOR VALUES FROM (0) TO (10) PARTITION BY list (c2);
-CREATE TABLE concur_reindex_part_0_1 PARTITION OF concur_reindex_part_0
-  FOR VALUES IN (1);
-CREATE TABLE concur_reindex_part_0_2 PARTITION OF concur_reindex_part_0
-  FOR VALUES IN (2);
--- This partitioned table will have no partitions.
-CREATE TABLE concur_reindex_part_10 PARTITION OF concur_reindex_part
-  FOR VALUES FROM (10) TO (20) PARTITION BY list (c2);
--- Create some partitioned indexes
-CREATE INDEX concur_reindex_part_index ON ONLY concur_reindex_part (c1);
-CREATE INDEX concur_reindex_part_index_0 ON ONLY concur_reindex_part_0 (c1);
-ALTER INDEX concur_reindex_part_index ATTACH PARTITION concur_reindex_part_index_0;
--- This partitioned index will have no partitions.
-CREATE INDEX concur_reindex_part_index_10 ON ONLY concur_reindex_part_10 (c1);
-ALTER INDEX concur_reindex_part_index ATTACH PARTITION concur_reindex_part_index_10;
-CREATE INDEX concur_reindex_part_index_0_1 ON ONLY concur_reindex_part_0_1 (c1);
-ALTER INDEX concur_reindex_part_index_0 ATTACH PARTITION concur_reindex_part_index_0_1;
-CREATE INDEX concur_reindex_part_index_0_2 ON ONLY concur_reindex_part_0_2 (c1);
-ALTER INDEX concur_reindex_part_index_0 ATTACH PARTITION concur_reindex_part_index_0_2;
-SELECT relid, parentrelid, level FROM pg_partition_tree('concur_reindex_part_index')
-  ORDER BY relid, level;
-SELECT relid, parentrelid, level FROM pg_partition_tree('concur_reindex_part_index')
-  ORDER BY relid, level;
--- REINDEX should preserve dependencies of partition tree.
-SELECT pg_describe_object(classid, objid, objsubid) as obj,
-       pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
-       deptype
-FROM pg_depend
-WHERE classid = 'pg_class'::regclass AND
-  objid in ('concur_reindex_part'::regclass,
-            'concur_reindex_part_0'::regclass,
-            'concur_reindex_part_0_1'::regclass,
-            'concur_reindex_part_0_2'::regclass,
-            'concur_reindex_part_index'::regclass,
-            'concur_reindex_part_index_0'::regclass,
-            'concur_reindex_part_index_0_1'::regclass,
-            'concur_reindex_part_index_0_2'::regclass)
-  ORDER BY 1, 2;
-REINDEX INDEX CONCURRENTLY concur_reindex_part_index_0_1;
-REINDEX INDEX CONCURRENTLY concur_reindex_part_index_0_2;
-SELECT relid, parentrelid, level FROM pg_partition_tree('concur_reindex_part_index')
-  ORDER BY relid, level;
-REINDEX TABLE CONCURRENTLY concur_reindex_part_0_1;
-REINDEX TABLE CONCURRENTLY concur_reindex_part_0_2;
-SELECT pg_describe_object(classid, objid, objsubid) as obj,
-       pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
-       deptype
-FROM pg_depend
-WHERE classid = 'pg_class'::regclass AND
-  objid in ('concur_reindex_part'::regclass,
-            'concur_reindex_part_0'::regclass,
-            'concur_reindex_part_0_1'::regclass,
-            'concur_reindex_part_0_2'::regclass,
-            'concur_reindex_part_index'::regclass,
-            'concur_reindex_part_index_0'::regclass,
-            'concur_reindex_part_index_0_1'::regclass,
-            'concur_reindex_part_index_0_2'::regclass)
-  ORDER BY 1, 2;
-SELECT relid, parentrelid, level FROM pg_partition_tree('concur_reindex_part_index')
-  ORDER BY relid, level;
-
--- REINDEX for partitioned indexes
--- REINDEX TABLE fails for partitioned indexes
--- Top-most parent index
-REINDEX TABLE concur_reindex_part_index; -- error
-REINDEX TABLE CONCURRENTLY concur_reindex_part_index; -- error
--- Partitioned index with no leaves
-REINDEX TABLE concur_reindex_part_index_10; -- error
-REINDEX TABLE CONCURRENTLY concur_reindex_part_index_10; -- error
--- Cannot run in a transaction block
-BEGIN;
-REINDEX INDEX concur_reindex_part_index;
-ROLLBACK;
--- minipg: PL/pgSQL removed. The original test used plpgsql helper functions
--- (create_relfilenode_part / compare_relfilenode_part) to track relfilenode
--- changes during REINDEX CONCURRENTLY on partition trees; those
--- procedural helpers and their dependent query blocks are dropped. The
--- REINDEX error checks below still exercise the concurrent-reindex path.
-
--- REINDEX for partitioned tables
--- REINDEX INDEX fails for partitioned tables
--- Top-most parent
-REINDEX INDEX concur_reindex_part; -- error
-REINDEX INDEX CONCURRENTLY concur_reindex_part; -- error
--- Partitioned with no leaves
-REINDEX INDEX concur_reindex_part_10; -- error
-REINDEX INDEX CONCURRENTLY concur_reindex_part_10; -- error
--- Cannot run in a transaction block
-BEGIN;
-REINDEX TABLE concur_reindex_part;
-ROLLBACK;
-
--- Cleanup of partition tree used for REINDEX test.
-DROP TABLE concur_reindex_part;
+-- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 
 -- Check errors
 -- Cannot run inside a transaction block

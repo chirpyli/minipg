@@ -2107,22 +2107,19 @@ select unnest('11 22 33'::oidvector);
 
 -- Insert/update on a column that is array of composite
 CREATE TABLE t1 (f1 int8_tbl[]);
-ERROR:  relation "t1" already exists
 insert into t1 (f1[5].q1) values(42);
-ERROR:  cannot subscript type numeric because it does not support subscripting
 select * from t1;
- f1 | f2 
-----+----
-(0 rows)
+       f1        
+-----------------
+ [5:5]={"(42,)"}
+(1 row)
 
 update t1 set f1[5].q2 = 43;
-ERROR:  cannot subscript type numeric because it does not support subscripting
-LINE 1: update t1 set f1[5].q2 = 43;
-                      ^
 select * from t1;
- f1 | f2 
-----+----
-(0 rows)
+        f1         
+-------------------
+ [5:5]={"(42,43)"}
+(1 row)
 
 -- Check that arrays of composites are safely detoasted when needed
 CREATE TABLE src (f1 text);

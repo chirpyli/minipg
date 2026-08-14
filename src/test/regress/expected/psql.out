@@ -5511,10 +5511,6 @@ List of access methods
 --------+------+------+-------
 (0 rows)
 
-\des "no.such.foreign.server"
-invalid command \des
-\dew "no.such.foreign.data.wrapper"
-invalid command \dew
 \df "no.such.function"
                        List of functions
  Schema | Name | Result data type | Argument data types | Type 
@@ -5705,10 +5701,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.table
 --------+------+------+-------
 (0 rows)
 
-\des "no.such.schema"."no.such.foreign.server"
-invalid command \des
-\dew "no.such.schema"."no.such.foreign.data.wrapper"
-invalid command \dew
 \df "no.such.schema"."no.such.function"
                        List of functions
  Schema | Name | Result data type | Argument data types | Type 

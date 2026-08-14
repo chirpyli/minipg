@@ -238,7 +238,7 @@ shared_buffers = 128MB
 
      <listitem>
       <para>
-       The <link linkend="sql-alterrole"><command>ALTER ROLE</command></link> command allows both global and
+       The <command>ALTER ROLE</command> command allows both global and
        per-database settings to be overridden with user-specific values.
       </para>
      </listitem>
@@ -1078,8 +1078,7 @@ include_dir 'conf.d'
       </term>
       <listitem>
        <para>
-        When a password is specified in <xref linkend="sql-createrole"/> or
-        <xref linkend="sql-alterrole"/>, this parameter determines the
+        When a password is specified, this parameter determines the
         algorithm to use to encrypt the password.  Possible values are
         <literal>scram-sha-256</literal>, which will encrypt the password with
         SCRAM-SHA-256, and <literal>md5</literal>, which stores the password
@@ -7259,7 +7258,7 @@ CREATE TABLE postgres_log
 COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
 </programlisting>
         It is also possible to access the file as a foreign table, using
-        the supplied <xref linkend="file-fdw"/> module.
+        the supplied <literal>file_fdw</literal> module.
        </para>
 
        <para>

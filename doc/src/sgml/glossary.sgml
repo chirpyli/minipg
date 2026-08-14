@@ -572,10 +572,6 @@
      possible to define a <glossterm linkend="glossary-foreign-server">foreign server</glossterm> and
      <glossterm linkend="glossary-foreign-table">foreign tables</glossterm>.
     </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createforeigndatawrapper"/>.
-    </para>
    </glossdef>
   </glossentry>
 
@@ -604,10 +600,6 @@
      <glossterm linkend="glossary-foreign-data-wrapper">foreign data wrapper</glossterm>
      and have other configuration values in common.
     </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createserver"/>.
-    </para>
    </glossdef>
   </glossentry>
 
@@ -624,10 +616,6 @@
      which will return <glossterm linkend="glossary-result-set">result sets</glossterm>
      structured according to the definition of the
      <glossterm linkend="glossary-foreign-table">foreign table</glossterm>.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createforeigntable"/>.
     </para>
    </glossdef>
   </glossentry>
@@ -700,10 +688,6 @@
      <glossterm linkend="glossary-user">user</glossterm> or
      <glossterm linkend="glossary-role">role</glossterm> to access
      specific objects within the <glossterm linkend="glossary-database">database</glossterm>.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-grant"/>.
     </para>
    </glossdef>
   </glossentry>
@@ -1231,10 +1215,6 @@
      <glossterm linkend="glossary-database">database</glossterm> objects for a
      named list of <glossterm linkend="glossary-role">roles</glossterm>.
     </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-revoke"/>.
-    </para>
    </glossdef>
   </glossentry>
 
@@ -1248,10 +1228,6 @@
      This is often done for convenience or to ensure completeness
      when multiple <glossterm linkend="glossary-user">users</glossterm> need
      the same privileges.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createrole"/>.
     </para>
    </glossdef>
   </glossentry>
@@ -1779,10 +1755,6 @@
      <glossterm linkend="glossary-database">database</glossterm> to credentials
      in a remote data system defined by a
      <glossterm linkend="glossary-foreign-data-wrapper">foreign data wrapper</glossterm>.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createusermapping"/>.
     </para>
    </glossdef>
   </glossentry>

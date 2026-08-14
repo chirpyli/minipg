@@ -1899,20 +1899,6 @@ _copyCurrentOfExpr(const CurrentOfExpr *from)
 	return newnode;
 }
 
- /*
-  * _copyNextValueExpr
-  */
-static NextValueExpr *
-_copyNextValueExpr(const NextValueExpr *from)
-{
-	NextValueExpr *newnode = makeNode(NextValueExpr);
-
-	COPY_SCALAR_FIELD(seqid);
-	COPY_SCALAR_FIELD(typeId);
-
-	return newnode;
-}
-
 /*
  * _copyInferenceElem
  */
@@ -3569,33 +3555,6 @@ _copyAlterSystemStmt(const AlterSystemStmt *from)
 	return newnode;
 }
 
-static CreateSeqStmt *
-_copyCreateSeqStmt(const CreateSeqStmt *from)
-{
-	CreateSeqStmt *newnode = makeNode(CreateSeqStmt);
-
-	COPY_NODE_FIELD(sequence);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(ownerId);
-	COPY_SCALAR_FIELD(for_identity);
-	COPY_SCALAR_FIELD(if_not_exists);
-
-	return newnode;
-}
-
-static AlterSeqStmt *
-_copyAlterSeqStmt(const AlterSeqStmt *from)
-{
-	AlterSeqStmt *newnode = makeNode(AlterSeqStmt);
-
-	COPY_NODE_FIELD(sequence);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(for_identity);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
 static VariableSetStmt *
 _copyVariableSetStmt(const VariableSetStmt *from)
 {
@@ -4212,9 +4171,6 @@ copyObjectImpl(const void *from)
 		case T_CurrentOfExpr:
 			retval = _copyCurrentOfExpr(from);
 			break;
-		case T_NextValueExpr:
-			retval = _copyNextValueExpr(from);
-			break;
 		case T_InferenceElem:
 			retval = _copyInferenceElem(from);
 			break;
@@ -4460,12 +4416,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_AlterSystemStmt:
 			retval = _copyAlterSystemStmt(from);
-			break;
-		case T_CreateSeqStmt:
-			retval = _copyCreateSeqStmt(from);
-			break;
-		case T_AlterSeqStmt:
-			retval = _copyAlterSeqStmt(from);
 			break;
 		case T_VariableSetStmt:
 			retval = _copyVariableSetStmt(from);

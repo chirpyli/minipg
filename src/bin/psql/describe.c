@@ -1752,128 +1752,6 @@ describeOneTableDetails(const char *schemaname,
 	PQclear(res);
 	res = NULL;
 
-	/*
-	 * If it's a sequence, deal with it here separately.
-	 */
-	if (tableinfo.relkind == RELKIND_SEQUENCE)
-	{
-		PGresult   *result = NULL;
-		printQueryOpt myopt = pset.popt;
-		char	   *footers[2] = {NULL, NULL};
-
-		if (pset.sversion >= 100000)
-		{
-			printfPQExpBuffer(&buf,
-							  "SELECT pg_catalog.format_type(seqtypid, NULL) AS \"%s\",\n"
-							  "       seqstart AS \"%s\",\n"
-							  "       seqmin AS \"%s\",\n"
-							  "       seqmax AS \"%s\",\n"
-							  "       seqincrement AS \"%s\",\n"
-							  "       CASE WHEN seqcycle THEN '%s' ELSE '%s' END AS \"%s\",\n"
-							  "       seqcache AS \"%s\"\n",
-							  gettext_noop("Type"),
-							  gettext_noop("Start"),
-							  gettext_noop("Minimum"),
-							  gettext_noop("Maximum"),
-							  gettext_noop("Increment"),
-							  gettext_noop("yes"),
-							  gettext_noop("no"),
-							  gettext_noop("Cycles?"),
-							  gettext_noop("Cache"));
-			appendPQExpBuffer(&buf,
-							  "FROM pg_catalog.pg_sequence\n"
-							  "WHERE seqrelid = '%s';",
-							  oid);
-		}
-		else
-		{
-			printfPQExpBuffer(&buf,
-							  "SELECT 'bigint' AS \"%s\",\n"
-							  "       start_value AS \"%s\",\n"
-							  "       min_value AS \"%s\",\n"
-							  "       max_value AS \"%s\",\n"
-							  "       increment_by AS \"%s\",\n"
-							  "       CASE WHEN is_cycled THEN '%s' ELSE '%s' END AS \"%s\",\n"
-							  "       cache_value AS \"%s\"\n",
-							  gettext_noop("Type"),
-							  gettext_noop("Start"),
-							  gettext_noop("Minimum"),
-							  gettext_noop("Maximum"),
-							  gettext_noop("Increment"),
-							  gettext_noop("yes"),
-							  gettext_noop("no"),
-							  gettext_noop("Cycles?"),
-							  gettext_noop("Cache"));
-			appendPQExpBuffer(&buf, "FROM %s", fmtId(schemaname));
-			/* must be separate because fmtId isn't reentrant */
-			appendPQExpBuffer(&buf, ".%s;", fmtId(relationname));
-		}
-
-		res = PSQLexec(buf.data);
-		if (!res)
-			goto error_return;
-
-		/* Footer information about a sequence */
-
-		/* Get the column that owns this sequence */
-		printfPQExpBuffer(&buf, "SELECT pg_catalog.quote_ident(nspname) || '.' ||"
-						  "\n   pg_catalog.quote_ident(relname) || '.' ||"
-						  "\n   pg_catalog.quote_ident(attname),"
-						  "\n   d.deptype"
-						  "\nFROM pg_catalog.pg_class c"
-						  "\nINNER JOIN pg_catalog.pg_depend d ON c.oid=d.refobjid"
-						  "\nINNER JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace"
-						  "\nINNER JOIN pg_catalog.pg_attribute a ON ("
-						  "\n a.attrelid=c.oid AND"
-						  "\n a.attnum=d.refobjsubid)"
-						  "\nWHERE d.classid='pg_catalog.pg_class'::pg_catalog.regclass"
-						  "\n AND d.refclassid='pg_catalog.pg_class'::pg_catalog.regclass"
-						  "\n AND d.objid='%s'"
-						  "\n AND d.deptype IN ('a', 'i')",
-						  oid);
-
-		result = PSQLexec(buf.data);
-
-		/*
-		 * If we get no rows back, don't show anything (obviously). We should
-		 * never get more than one row back, but if we do, just ignore it and
-		 * don't print anything.
-		 */
-		if (!result)
-			goto error_return;
-		else if (PQntuples(result) == 1)
-		{
-			switch (PQgetvalue(result, 0, 1)[0])
-			{
-				case 'a':
-					footers[0] = psprintf(_("Owned by: %s"),
-										  PQgetvalue(result, 0, 0));
-					break;
-				case 'i':
-					footers[0] = psprintf(_("Sequence for identity column: %s"),
-										  PQgetvalue(result, 0, 0));
-					break;
-			}
-		}
-		PQclear(result);
-
-		printfPQExpBuffer(&title, _("Sequence \"%s.%s\""),
-						  schemaname, relationname);
-
-		myopt.footers = footers;
-		myopt.topt.default_footer = false;
-		myopt.title = title.data;
-		myopt.translate_header = true;
-
-		printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-		if (footers[0])
-			free(footers[0]);
-
-		retval = true;
-		goto error_return;		/* not an error, just return early */
-	}
-
 	/* Identify whether we should print collation, nullable, default vals */
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
@@ -2181,9 +2059,7 @@ describeOneTableDetails(const char *schemaname,
 								 ",\n  pg_catalog.pg_get_partition_constraintdef(c.oid)");
 		appendPQExpBuffer(&buf,
 						  "\nFROM pg_catalog.pg_class c"
-						  " JOIN pg_catalog.pg_inherits i"
-						  " ON c.oid = inhrelid"
-						  "\nWHERE c.oid = '%s';", oid);
+						  "\nWHERE c.oid = '%s' AND false;", oid);
 		result = PSQLexec(buf.data);
 		if (!result)
 			goto error_return;
@@ -3214,11 +3090,9 @@ describeOneTableDetails(const char *schemaname,
 		/* print tables inherited from (exclude partitioned parents) */
 		printfPQExpBuffer(&buf,
 						  "SELECT c.oid::pg_catalog.regclass\n"
-						  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
-						  "WHERE c.oid = i.inhparent AND i.inhrelid = '%s'\n"
-						  "  AND c.relkind != " "'p'"
-						  " AND c.relkind != " "'I'"
-						  "\nORDER BY inhseqno;",
+						  "FROM pg_catalog.pg_class c\n"
+						  "WHERE c.oid = '%s' AND false\n"
+						  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
 						  oid);
 
 		result = PSQLexec(buf.data);
@@ -3248,41 +3122,22 @@ describeOneTableDetails(const char *schemaname,
 			PQclear(result);
 		}
 
-		/* print child tables (with additional info if partitions) */
-		if (pset.sversion >= 140000)
-			printfPQExpBuffer(&buf,
-							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
-							  " inhdetachpending,"
-							  " NULL\n"
-							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
-							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
-							  oid);
-		else if (pset.sversion >= 100000)
-			printfPQExpBuffer(&buf,
-							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
-							  " false AS inhdetachpending,"
-							  " NULL\n"
-							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
-							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
-							  oid);
-		else if (pset.sversion >= 80300)
-			printfPQExpBuffer(&buf,
-							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
-							  " false AS inhdetachpending, NULL\n"
-							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
-							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
-							  oid);
-		else
-			printfPQExpBuffer(&buf,
-							  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
-							  " false AS inhdetachpending, NULL\n"
-							  "FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i\n"
-							  "WHERE c.oid = i.inhrelid AND i.inhparent = '%s'\n"
-							  "ORDER BY c.relname;",
-							  oid);
+		/*
+		 * print child tables (with additional info if partitions)
+		 *
+		 * NOTE: minipg has removed the pg_inherits system catalog (inheritance
+		 * and partitioning are no longer supported), so there can never be any
+		 * child tables.  We emit a query that returns no rows without
+		 * referencing pg_inherits, keeping \d on relations safe.
+		 */
+		printfPQExpBuffer(&buf,
+						  "SELECT c.oid::pg_catalog.regclass, c.relkind,"
+						  " false AS inhdetachpending,"
+						  " NULL\n"
+						  "FROM pg_catalog.pg_class c\n"
+						  "WHERE c.oid = '%s' AND false\n"
+						  "ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;",
+						  oid);
 
 		result = PSQLexec(buf.data);
 		if (!result)
@@ -4073,7 +3928,7 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 
 	if (showNested || pattern)
 		appendPQExpBufferStr(&buf,
-							 "\n     LEFT JOIN pg_catalog.pg_inherits inh ON c.oid = inh.inhrelid");
+							 "\n     LEFT JOIN (SELECT NULL::oid AS inhrelid) inh ON c.oid = inh.inhrelid");
 
 	if (verbose)
 	{

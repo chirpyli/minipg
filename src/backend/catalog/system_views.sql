@@ -114,24 +114,6 @@ CREATE VIEW pg_indexes AS
          LEFT JOIN pg_tablespace T ON (T.oid = I.reltablespace)
     WHERE C.relkind IN ('r', 'm', 'p') AND I.relkind IN ('i', 'I');
 
-CREATE VIEW pg_sequences AS
-    SELECT
-        N.nspname AS schemaname,
-        C.relname AS sequencename,
-        pg_get_userbyid(C.relowner) AS sequenceowner,
-        S.seqtypid::regtype AS data_type,
-        S.seqstart AS start_value,
-        S.seqmin AS min_value,
-        S.seqmax AS max_value,
-        S.seqincrement AS increment_by,
-        S.seqcycle AS cycle,
-        S.seqcache AS cache_size,
-        pg_sequence_last_value(C.oid) AS last_value
-    FROM pg_sequence S JOIN pg_class C ON (C.oid = S.seqrelid)
-         LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
-    WHERE NOT pg_is_other_temp_schema(N.oid)
-          AND relkind = 'S';
-
 CREATE VIEW pg_stats WITH (security_barrier) AS
     SELECT
         nspname AS schemaname,
@@ -522,28 +504,6 @@ CREATE VIEW pg_statio_sys_indexes AS
 
 CREATE VIEW pg_statio_user_indexes AS
     SELECT * FROM pg_statio_all_indexes
-    WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND
-          schemaname NOT LIKE 'pg_toast%';
-
-CREATE VIEW pg_statio_all_sequences AS
-    SELECT
-            C.oid AS relid,
-            N.nspname AS schemaname,
-            C.relname AS relname,
-            pg_stat_get_blocks_fetched(C.oid) -
-                    pg_stat_get_blocks_hit(C.oid) AS blks_read,
-            pg_stat_get_blocks_hit(C.oid) AS blks_hit
-    FROM pg_class C
-            LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
-    WHERE C.relkind = 'S';
-
-CREATE VIEW pg_statio_sys_sequences AS
-    SELECT * FROM pg_statio_all_sequences
-    WHERE schemaname IN ('pg_catalog', 'information_schema') OR
-          schemaname LIKE 'pg_toast%';
-
-CREATE VIEW pg_statio_user_sequences AS
-    SELECT * FROM pg_statio_all_sequences
     WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND
           schemaname NOT LIKE 'pg_toast%';
 

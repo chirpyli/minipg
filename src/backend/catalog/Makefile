@@ -31,7 +31,6 @@ OBJS = \
 	pg_db_role_setting.o \
 	pg_depend.o \
 	pg_enum.o \
-	pg_inherits.o \
 	pg_namespace.o \
 	pg_operator.o \
 	pg_proc.o \
@@ -49,7 +48,7 @@ include $(top_srcdir)/src/backend/common.mk
 # there are reputedly other, undocumented ordering dependencies.
 CATALOG_HEADERS := \
 	pg_proc.h pg_type.h pg_attribute.h pg_class.h \
-	pg_attrdef.h pg_constraint.h pg_inherits.h pg_index.h pg_operator.h \
+	pg_attrdef.h pg_constraint.h pg_index.h pg_operator.h \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
 	pg_language.h pg_aggregate.h \
 	pg_statistic.h pg_statistic_ext.h pg_statistic_ext_data.h \
@@ -58,8 +57,7 @@ CATALOG_HEADERS := \
 	pg_database.h pg_db_role_setting.h pg_tablespace.h \
 	pg_authid.h pg_auth_members.h pg_shdepend.h pg_shdescription.h \
 	pg_extension.h \
-	pg_collation.h pg_range.h pg_transform.h \
-	pg_sequence.h
+	pg_collation.h pg_range.h pg_transform.h
 
 GENERATED_HEADERS := $(CATALOG_HEADERS:%.h=%_d.h) schemapg.h system_fk_info.h
 

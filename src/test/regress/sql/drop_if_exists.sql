@@ -155,10 +155,6 @@ CREATE OPERATOR @#@
         (leftarg = int8, rightarg = int8, procedure = int8xor);
 DROP OPERATOR @#@ (int8, int8);
 
--- language
-DROP LANGUAGE test_language_exists;
-DROP LANGUAGE IF EXISTS test_language_exists;
-
 -- cast
 DROP CAST (text AS text);
 DROP CAST IF EXISTS (text AS text);
@@ -193,13 +189,6 @@ CREATE RULE test_rule_exists AS ON INSERT TO test_exists
     INSERT INTO test_exists VALUES (NEW.a, NEW.b || NEW.a::text);
 DROP RULE test_rule_exists ON test_exists;
 
--- foreign data wrapper
-DROP FOREIGN DATA WRAPPER test_fdw_exists;
-DROP FOREIGN DATA WRAPPER IF EXISTS test_fdw_exists;
-
--- foreign server
-DROP SERVER test_server_exists;
-DROP SERVER IF EXISTS test_server_exists;
 
 -- operator class
 DROP OPERATOR CLASS test_operator_class USING btree;
@@ -237,7 +226,6 @@ DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
 DROP COLLATION IF EXISTS no_such_schema.foo;
 DROP CONVERSION IF EXISTS no_such_schema.foo;
 DROP DOMAIN IF EXISTS no_such_schema.foo;
-DROP FOREIGN TABLE IF EXISTS no_such_schema.foo;
 DROP FUNCTION IF EXISTS no_such_schema.foo();
 DROP FUNCTION IF EXISTS foo(no_such_type);
 DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);

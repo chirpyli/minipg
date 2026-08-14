@@ -50,7 +50,7 @@
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_statistic.h"
@@ -104,7 +104,6 @@ static ObjectAddress AddNewRelationType(const char *typeName,
 										Oid ownerid,
 										Oid new_row_type,
 										Oid new_array_type);
-static void RelationRemoveInheritance(Oid relid);
 static Oid	StoreRelCheck(Relation rel, const char *ccname, Node *expr,
 						  bool is_validated, bool is_local, int inhcount,
 						  bool is_no_inherit, bool is_internal);
@@ -346,14 +345,6 @@ heap_create(const char *relname,
 			reltablespace = InvalidOid;
 			break;
 
-		case RELKIND_SEQUENCE:
-
-			/*
-			 * Force reltablespace to zero for sequences, since we don't
-			 * support moving them around into different tablespaces.
-			 */
-			reltablespace = InvalidOid;
-			break;
 		default:
 			break;
 	}
@@ -415,7 +406,6 @@ heap_create(const char *relname,
 				break;
 
 			case RELKIND_INDEX:
-			case RELKIND_SEQUENCE:
 				RelationCreateStorage(rel->rd_node, relpersistence);
 				break;
 
@@ -1021,12 +1011,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 			new_rel_reltup->reltuples = -1;
 			new_rel_reltup->relallvisible = 0;
 			break;
-		case RELKIND_SEQUENCE:
-			/* Sequences always have a known size */
-			new_rel_reltup->relpages = 1;
-			new_rel_reltup->reltuples = 1;
-			new_rel_reltup->relallvisible = 0;
-			break;
 		default:
 			/* Views, etc, have no disk storage */
 			new_rel_reltup->relpages = 0;
@@ -1224,7 +1208,7 @@ heap_create_with_catalog(const char *relname,
 	{
 		/* Use binary-upgrade override for pg_class.oid/relfilenode? */
 		if (IsBinaryUpgrade &&
-			(relkind == RELKIND_RELATION || relkind == RELKIND_SEQUENCE ||
+			(relkind == RELKIND_RELATION ||
 			 relkind == RELKIND_VIEW ||
 			 relkind == RELKIND_COMPOSITE_TYPE))
 		{
@@ -1283,10 +1267,9 @@ heap_create_with_catalog(const char *relname,
 	/*
 	 * Decide whether to create a pg_type entry for the relation's rowtype.
 	 * These types are made except where the use of a relation as such is an
-	 * implementation detail: toast tables, sequences and indexes.
+	 * implementation detail: toast tables and indexes.
 	 */
-	if (!(relkind == RELKIND_SEQUENCE ||
-		  relkind == RELKIND_TOASTVALUE ||
+	if (!(relkind == RELKIND_TOASTVALUE ||
 		  relkind == RELKIND_INDEX))
 	{
 		Oid			new_array_oid;
@@ -1472,40 +1455,6 @@ heap_create_with_catalog(const char *relname,
 	table_close(pg_class_desc, RowExclusiveLock);
 
 	return relid;
-}
-
-/*
- *		RelationRemoveInheritance
- *
- * Formerly, this routine checked for child relations and aborted the
- * deletion if any were found.  Now we rely on the dependency mechanism
- * to check for or delete child relations.  By the time we get here,
- * there are no children and we need only remove any pg_inherits rows
- * linking this relation to its parent(s).
- */
-static void
-RelationRemoveInheritance(Oid relid)
-{
-	Relation	catalogRelation;
-	SysScanDesc scan;
-	ScanKeyData key;
-	HeapTuple	tuple;
-
-	catalogRelation = table_open(InheritsRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&key,
-				Anum_pg_inherits_inhrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-
-	scan = systable_beginscan(catalogRelation, InheritsRelidSeqnoIndexId, true,
-							  NULL, 1, &key);
-
-	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
-		CatalogTupleDelete(catalogRelation, &tuple->t_self);
-
-	systable_endscan(scan);
-	table_close(catalogRelation, RowExclusiveLock);
 }
 
 /*
@@ -1908,8 +1857,6 @@ heap_drop_with_catalog(Oid relid)
 	CheckTableForSerializableConflictIn(rel);
 
 	/*
-
-	/*
 	 * Schedule unlinking of the relation's physical files at commit.
 	 */
 	if (RELKIND_HAS_STORAGE(rel->rd_rel->relkind))
@@ -1935,11 +1882,6 @@ heap_drop_with_catalog(Oid relid)
 	 * safe.)
 	 */
 	RelationForgetRelation(relid);
-
-	/*
-	 * remove inheritance information
-	 */
-	RelationRemoveInheritance(relid);
 
 	/*
 	 * delete statistics

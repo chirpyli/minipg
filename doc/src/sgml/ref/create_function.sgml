@@ -825,7 +825,7 @@ $$  LANGUAGE plpgsql
    <para>
     Another point to keep in mind is that by default, execute privilege
     is granted to <literal>PUBLIC</literal> for newly created functions
-    (see <xref linkend="ddl-priv"/> for more
+    (see the privilege system for more
     information).  Frequently you will wish to restrict use of a security
     definer function to only some users.  To do that, you must revoke
     the default <literal>PUBLIC</literal> privileges and then grant execute
@@ -926,9 +926,7 @@ COMMIT;
   <simplelist type="inline">
    <member><xref linkend="sql-alterfunction"/></member>
    <member><xref linkend="sql-dropfunction"/></member>
-   <member><xref linkend="sql-grant"/></member>
    <member><xref linkend="sql-load"/></member>
-   <member><xref linkend="sql-revoke"/></member>
   </simplelist>
  </refsect1>
 

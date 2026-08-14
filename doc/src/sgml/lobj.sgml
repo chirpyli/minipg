@@ -82,9 +82,8 @@
 
    <para>
     As of <productname>PostgreSQL</productname> 9.0, large objects have an owner
-    and a set of access permissions, which can be managed using
-    <xref linkend="sql-grant"/> and
-    <xref linkend="sql-revoke"/>.
+    and a set of access permissions, which can be managed using SQL
+    <command>GRANT</command> and <command>REVOKE</command> commands.
     <literal>SELECT</literal> privileges are required to read a large
     object, and
     <literal>UPDATE</literal> privileges are required to write or
@@ -673,7 +672,7 @@ SELECT lo_export(image.raster, '/tmp/motd') FROM image
 
   <caution>
    <para>
-    It is possible to <xref linkend="sql-grant"/> use of the
+    It is possible to grant use of the
     server-side <function>lo_import</function>
     and <function>lo_export</function> functions to non-superusers, but
     careful consideration of the security implications is required.  A

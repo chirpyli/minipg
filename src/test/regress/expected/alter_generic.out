@@ -110,49 +110,6 @@ SELECT n.nspname, c.conname, a.rolname
 (4 rows)
 
 --
--- Foreign Data Wrapper and Foreign Server
---
-CREATE FOREIGN DATA WRAPPER alt_fdw1;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: CREATE FOREIGN DATA WRAPPER alt_fdw1;
-               ^
-CREATE FOREIGN DATA WRAPPER alt_fdw2;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: CREATE FOREIGN DATA WRAPPER alt_fdw2;
-               ^
-CREATE SERVER alt_fserv1 FOREIGN DATA WRAPPER alt_fdw1;
-ERROR:  syntax error at or near "SERVER"
-LINE 1: CREATE SERVER alt_fserv1 FOREIGN DATA WRAPPER alt_fdw1;
-               ^
-CREATE SERVER alt_fserv2 FOREIGN DATA WRAPPER alt_fdw2;
-ERROR:  syntax error at or near "SERVER"
-LINE 1: CREATE SERVER alt_fserv2 FOREIGN DATA WRAPPER alt_fdw2;
-               ^
-ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw2;  -- failed (name conflict)
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw2;
-              ^
-ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw3;  -- OK
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw3;
-              ^
-ALTER SERVER alt_fserv1 RENAME TO alt_fserv2;   -- failed (name conflict)
-ERROR:  syntax error at or near "SERVER"
-LINE 1: ALTER SERVER alt_fserv1 RENAME TO alt_fserv2;
-              ^
-ALTER SERVER alt_fserv1 RENAME TO alt_fserv3;   -- OK
-ERROR:  syntax error at or near "SERVER"
-LINE 1: ALTER SERVER alt_fserv1 RENAME TO alt_fserv3;
-              ^
-SELECT fdwname FROM pg_foreign_data_wrapper WHERE fdwname like 'alt_fdw%';
-ERROR:  relation "pg_foreign_data_wrapper" does not exist
-LINE 1: SELECT fdwname FROM pg_foreign_data_wrapper WHERE fdwname li...
-                            ^
-SELECT srvname FROM pg_foreign_server WHERE srvname like 'alt_fserv%';
-ERROR:  relation "pg_foreign_server" does not exist
-LINE 1: SELECT srvname FROM pg_foreign_server WHERE srvname like 'al...
-                            ^
---
 -- Operator
 --
 CREATE OPERATOR @-@ ( leftarg = int4, rightarg = int4, procedure = int4mi );
@@ -442,14 +399,6 @@ SELECT nspname, stxname, rolname
 ---
 --- Cleanup resources
 ---
-DROP FOREIGN DATA WRAPPER alt_fdw2 CASCADE;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: DROP FOREIGN DATA WRAPPER alt_fdw2 CASCADE;
-             ^
-DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
-             ^
 DROP SCHEMA alt_nsp1 CASCADE;
 NOTICE:  drop cascades to 15 other objects
 DETAIL:  drop cascades to function alt_func4(integer)

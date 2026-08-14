@@ -202,8 +202,7 @@ ALTER DATABASE <replaceable class="parameter">name</replaceable> RESET ALL
 
   <para>
    It is also possible to tie a session default to a specific role
-   rather than to a database; see
-   <xref linkend="sql-alterrole"/>.
+   rather than to a database.
    Role-specific settings override database-specific
    ones if there is a conflict.
   </para>

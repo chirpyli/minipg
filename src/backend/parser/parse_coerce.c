@@ -16,7 +16,7 @@
 
 #include "catalog/pg_cast.h"
 #include "catalog/pg_class.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
@@ -505,8 +505,7 @@ coerce_type(ParseState *pstate, Node *node,
 		/* NB: we do NOT want a RelabelType here */
 		return node;
 	}
-	if (typeInheritsFrom(inputTypeId, targetTypeId)
-		|| typeIsOfTypedTable(inputTypeId, targetTypeId))
+	if (typeIsOfTypedTable(inputTypeId, targetTypeId))
 	{
 		/*
 		 * Input class type is a subclass of target, so generate an
@@ -634,8 +633,7 @@ can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
 		/*
 		 * If input is a class type that inherits from target, accept
 		 */
-		if (typeInheritsFrom(inputTypeId, targetTypeId)
-			|| typeIsOfTypedTable(inputTypeId, targetTypeId))
+		if (typeIsOfTypedTable(inputTypeId, targetTypeId))
 			continue;
 
 		/*

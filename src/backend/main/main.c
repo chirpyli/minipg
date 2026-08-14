@@ -29,7 +29,6 @@
 #include "postmaster/postmaster.h"
 #include "storage/spin.h"
 #include "tcop/tcopprot.h"
-#include "utils/help_config.h"
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/ps_status.h"
@@ -144,18 +143,15 @@ main(int argc, char *argv[])
 		}
 
 		/*
-		 * In addition to the above, we allow "--describe-config" and "-C var"
-		 * to be called by root.  This is reasonably safe since these are
-		 * read-only activities.  The -C case is important because pg_ctl may
-		 * try to invoke it while still holding administrator privileges on
-		 * Windows.  Note that while -C can normally be in any argv position,
-		 * if you want to bypass the root check you must put it first.  This
-		 * reduces the risk that we might misinterpret some other mode's -C
-		 * switch as being the postmaster/postgres one.
+		 * We allow "-C var" to be called by root.  This is reasonably safe
+		 * since it is a read-only activity.  This case is important because
+		 * pg_ctl may try to invoke it while still holding administrator
+		 * privileges on Windows.  Note that while -C can normally be in any
+		 * argv position, if you want to bypass the root check you must put it
+		 * first.  This reduces the risk that we might misinterpret some other
+		 * mode's -C switch as being the postmaster/postgres one.
 		 */
-		if (strcmp(argv[1], "--describe-config") == 0)
-			do_check_root = false;
-		else if (argc > 2 && strcmp(argv[1], "-C") == 0)
+		if (argc > 2 && strcmp(argv[1], "-C") == 0)
 			do_check_root = false;
 	}
 
@@ -172,8 +168,6 @@ main(int argc, char *argv[])
 
 	if (argc > 1 && strcmp(argv[1], "--boot") == 0)
 		AuxiliaryProcessMain(argc, argv);	/* does not return */
-	else if (argc > 1 && strcmp(argv[1], "--describe-config") == 0)
-		GucInfoMain();			/* does not return */
 	else if (argc > 1 && strcmp(argv[1], "--single") == 0)
 		PostgresMain(argc, argv,
 					 NULL,		/* no dbname */
@@ -254,7 +248,6 @@ help(const char *progname)
 	printf(_("  -S WORK-MEM        set amount of memory for sorts (in kB)\n"));
 	printf(_("  -V, --version      output version information, then exit\n"));
 	printf(_("  --NAME=VALUE       set run-time parameter\n"));
-	printf(_("  --describe-config  describe configuration parameters, then exit\n"));
 	printf(_("  -?, --help         show this help, then exit\n"));
 
 	printf(_("\nDeveloper options:\n"));

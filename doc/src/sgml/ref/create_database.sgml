@@ -46,8 +46,7 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
   <para>
    To create a database, you must be a superuser or have the special
    <literal>CREATEDB</literal> privilege.
-   See <xref linkend="sql-createrole"/>.
-  </para>
+   </para>
 
   <para>
    By default, the new database will be created by cloning the standard
@@ -237,7 +236,7 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
    <para>
     Database-level configuration parameters (set via <link
     linkend="sql-alterdatabase"><command>ALTER DATABASE</command></link>) and database-level permissions (set via
-    <link linkend="sql-grant"><command>GRANT</command></link>) are not copied from the template database.
+    <command>GRANT</command>) are not copied from the template database.
    </para>
 
   <para>

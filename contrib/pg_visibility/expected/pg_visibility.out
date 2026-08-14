@@ -51,18 +51,6 @@ select pg_check_frozen('test_view');
 ERROR:  "test_view" is not a table or TOAST table
 select pg_truncate_visibility_map('test_view');
 ERROR:  "test_view" is not a table or TOAST table
-create sequence test_sequence;
--- sequences do not have VMs, so these all fail
-select pg_visibility('test_sequence', 0);
-ERROR:  "test_sequence" is not a table or TOAST table
-select pg_visibility_map('test_sequence');
-ERROR:  "test_sequence" is not a table or TOAST table
-select pg_visibility_map_summary('test_sequence');
-ERROR:  "test_sequence" is not a table or TOAST table
-select pg_check_frozen('test_sequence');
-ERROR:  "test_sequence" is not a table or TOAST table
-select pg_truncate_visibility_map('test_sequence');
-ERROR:  "test_sequence" is not a table or TOAST table
 create foreign data wrapper dummy;
 ERROR:  syntax error at or near "foreign"
 LINE 1: create foreign data wrapper dummy;
@@ -152,7 +140,6 @@ LINE 1: select count(*) > 0 from pg_visibility('matview_visibility_t...
 -- 对其它对象的可见性验证（表/视图/序列/外表/物化视图）。
 -- cleanup
 drop view test_view;
-drop sequence test_sequence;
 drop foreign table test_foreign_table;
 ERROR:  syntax error at or near "foreign"
 LINE 1: drop foreign table test_foreign_table;

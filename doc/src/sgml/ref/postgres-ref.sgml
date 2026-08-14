@@ -341,17 +341,6 @@ PostgreSQL documentation
      </varlistentry>
 
      <varlistentry>
-      <term><option>--describe-config</option></term>
-      <listitem>
-       <para>
-        This option dumps out the server's internal configuration variables,
-        descriptions, and defaults in tab-delimited <command>COPY</command> format.
-        It is designed primarily for use by administration tools.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
       <term><option>-?</option></term>
       <term><option>--help</option></term>
       <listitem>

@@ -161,7 +161,6 @@ break is not needed in a wider output rendering.
   &runtime;
   &config;
   &client-auth;
-  &user-manag;
   &manage-ag;
   &charset;
   &maintenance;
@@ -255,7 +254,6 @@ break is not needed in a wider output rendering.
   &sources;
   &nls;
   &plhandler;
-  &fdwhandler;
   &tablesample-method;
   &custom-scan;
   &tableam;

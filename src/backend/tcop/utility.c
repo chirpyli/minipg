@@ -24,7 +24,7 @@
 #include "catalog/catalog.h"
 #include "catalog/index.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_inherits.h"
+#include "commands/tablecmds.h"
 #include "catalog/toasting.h"
 #include "commands/alter.h"
 #include "commands/cluster.h"
@@ -41,7 +41,6 @@
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
 #include "commands/schemacmds.h"
-#include "commands/sequence.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
@@ -138,7 +137,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterOpFamilyStmt:
 		case T_AlterOperatorStmt:
 		case T_AlterOwnerStmt:
-		case T_AlterSeqStmt:
 		case T_AlterStatsStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableSpaceOptionsStmt:
@@ -156,7 +154,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateOpFamilyStmt:
 		case T_CreateRangeStmt:
 		case T_CreateSchemaStmt:
-		case T_CreateSeqStmt:
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
 		case T_CreateTableSpaceStmt:
@@ -1227,15 +1224,7 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = DefineRule((RuleStmt *) parsetree, queryString);
 				break;
 
-			case T_CreateSeqStmt:
-				address = DefineSequence(pstate, (CreateSeqStmt *) parsetree);
-				break;
-
-			case T_AlterSeqStmt:
-				address = AlterSequence(pstate, (AlterSeqStmt *) parsetree);
-			break;
-
-		case T_CreateTrigStmt:
+			case T_CreateTrigStmt:
 				address = CreateTrigger((CreateTrigStmt *) parsetree,
 										queryString, InvalidOid, InvalidOid,
 										InvalidOid, InvalidOid, InvalidOid,
@@ -1409,7 +1398,6 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 			/* fall through */
 
 		case OBJECT_TABLE:
-		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
 			RemoveRelations(stmt);
 			break;
@@ -1668,9 +1656,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_SCHEMA:
 			tag = CMDTAG_ALTER_SCHEMA;
 			break;
-		case OBJECT_SEQUENCE:
-			tag = CMDTAG_ALTER_SEQUENCE;
-			break;
 		case OBJECT_TABLE:
 		case OBJECT_TABCONSTRAINT:
 			tag = CMDTAG_ALTER_TABLE;
@@ -1893,9 +1878,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TABLE:
 					tag = CMDTAG_DROP_TABLE;
 					break;
-				case OBJECT_SEQUENCE:
-					tag = CMDTAG_DROP_SEQUENCE;
-					break;
 				case OBJECT_VIEW:
 					tag = CMDTAG_DROP_VIEW;
 					break;
@@ -2104,14 +2086,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_RULE;
 			break;
 
-		case T_CreateSeqStmt:
-			tag = CMDTAG_CREATE_SEQUENCE;
-			break;
-
-		case T_AlterSeqStmt:
-			tag = CMDTAG_ALTER_SEQUENCE;
-			break;
-
 		case T_DoStmt:
 			tag = CMDTAG_DO;
 			break;
@@ -2188,9 +2162,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case DISCARD_TEMP:
 					tag = CMDTAG_DISCARD_TEMP;
-					break;
-				case DISCARD_SEQUENCES:
-					tag = CMDTAG_DISCARD_SEQUENCES;
 					break;
 				default:
 					tag = CMDTAG_UNKNOWN;
@@ -2600,14 +2571,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_RuleStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateSeqStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterSeqStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

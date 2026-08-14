@@ -442,9 +442,6 @@ static const struct object_type_map
 		"index", OBJECT_INDEX
 	},
 	{
-		"sequence", OBJECT_SEQUENCE
-	},
-	{
 		"toast table", -1
 	},							/* unmapped */
 	{
@@ -461,9 +458,6 @@ static const struct object_type_map
 	},
 	{
 		"index column", -1
-	},							/* unmapped */
-	{
-		"sequence column", -1
 	},							/* unmapped */
 	{
 		"toast table column", -1
@@ -683,7 +677,6 @@ get_object_address(ObjectType objtype, Node *object,
 		switch (objtype)
 		{
 			case OBJECT_INDEX:
-			case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
 			address =
@@ -1006,15 +999,8 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("\"%s\" is not an index",
-								RelationGetRelationName(relation))));
-			break;
-		case OBJECT_SEQUENCE:
-			if (relation->rd_rel->relkind != RELKIND_SEQUENCE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is not a sequence",
-								RelationGetRelationName(relation))));
-			break;
+							RelationGetRelationName(relation))));
+		break;
 		case OBJECT_TABLE:
 			if (relation->rd_rel->relkind != RELKIND_RELATION)
 				ereport(ERROR,
@@ -1618,7 +1604,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	switch (type)
 	{
 		case OBJECT_TABLE:
-		case OBJECT_SEQUENCE:
 		case OBJECT_VIEW:
 		case OBJECT_INDEX:
 		case OBJECT_COLUMN:
@@ -1716,7 +1701,6 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 						 errmsg("must be superuser")));
 			break;
 		case OBJECT_INDEX:
-		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
 		case OBJECT_COLUMN:
@@ -2932,10 +2916,6 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 			appendStringInfo(buffer, _("index %s"),
 							 relname);
 			break;
-		case RELKIND_SEQUENCE:
-			appendStringInfo(buffer, _("sequence %s"),
-							 relname);
-			break;
 		case RELKIND_TOASTVALUE:
 			appendStringInfo(buffer, _("toast table %s"),
 							 relname);
@@ -3390,9 +3370,6 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId,
 			break;
 		case RELKIND_INDEX:
 			appendStringInfoString(buffer, "index");
-			break;
-		case RELKIND_SEQUENCE:
-			appendStringInfoString(buffer, "sequence");
 			break;
 		case RELKIND_TOASTVALUE:
 			appendStringInfoString(buffer, "toast table");
@@ -4409,8 +4386,6 @@ get_relkind_objtype(char relkind)
 			return OBJECT_TABLE;
 		case RELKIND_INDEX:
 			return OBJECT_INDEX;
-		case RELKIND_SEQUENCE:
-			return OBJECT_SEQUENCE;
 		case RELKIND_VIEW:
 			return OBJECT_VIEW;
 		case RELKIND_TOASTVALUE:

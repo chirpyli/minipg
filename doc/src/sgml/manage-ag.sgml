@@ -41,11 +41,7 @@
    Database-level security has two components: access control
    (see <xref linkend="auth-pg-hba-conf"/>), managed at the
    connection level, and authorization control
-   (see <xref linkend="ddl-priv"/>), managed via the grant system.
-   Foreign data wrappers (see <xref linkend="postgres-fdw"/>)
-   allow for objects within one database to act as proxies for objects in
-   other database or clusters.
-   The older dblink module (see <xref linkend="dblink"/>) provides a similar capability.
+   (see the privilege system), managed via the grant system.
    By default, all users can connect to all databases using all connection methods.
   </para>
 
