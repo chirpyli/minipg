@@ -1310,8 +1310,6 @@ describeOneTableDetails(const char *schemaname,
 		bool		hasindex;
 		bool		hasrules;
 		bool		hastriggers;
-		bool		rowsecurity;
-		bool		forcerowsecurity;
 		bool		hasoids;
 		bool		ispartition;
 		Oid			tablespace;
@@ -1499,8 +1497,6 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
 	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 3), "t") == 0;
 	tableinfo.hastriggers = strcmp(PQgetvalue(res, 0, 4), "t") == 0;
-	tableinfo.rowsecurity = strcmp(PQgetvalue(res, 0, 5), "t") == 0;
-	tableinfo.forcerowsecurity = strcmp(PQgetvalue(res, 0, 6), "t") == 0;
 	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 7), "t") == 0;
 	tableinfo.ispartition = strcmp(PQgetvalue(res, 0, 8), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?

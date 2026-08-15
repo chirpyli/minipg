@@ -111,8 +111,6 @@ typedef struct RelationData
 	RuleLock   *rd_rules;		/* rewrite rules */
 	MemoryContext rd_rulescxt;	/* private memory cxt for rd_rules, if any */
 	TriggerDesc *trigdesc;		/* Trigger info, or NULL if rel has none */
-	/* use "struct" here to avoid needing to include rowsecurity.h: */
-	struct RowSecurityDesc *rd_rsdesc;	/* row security policies, or NULL */
 
 	/* data managed by RelationGetFKeyList: */
 	List	   *rd_fkeylist;	/* list of ForeignKeyCacheInfo (see below) */

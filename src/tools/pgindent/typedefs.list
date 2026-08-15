@@ -2176,8 +2176,6 @@ RowExpr
 RowIdentityVarInfo
 RowMarkClause
 RowMarkType
-RowSecurityDesc
-RowSecurityPolicy
 RuleInfo
 RuleLock
 RuleStmt

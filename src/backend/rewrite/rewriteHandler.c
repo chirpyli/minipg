@@ -60,7 +60,6 @@ typedef struct acquireLocksOnSubLinks_context
 typedef struct fireRIRonSubLink_context
 {
 	List	   *activeRIRs;
-	bool		hasRowSecurity;
 } fireRIRonSubLink_context;
 
 static bool acquireLocksOnSubLinks(Node *node,
@@ -478,14 +477,7 @@ rewriteRuleAction(Query *parsetree,
 		}
 	}
 
-	/*
-	 * Also, we might have absorbed some RTEs with RLS conditions into the
-	 * sub_action.  If so, mark it as hasRowSecurity, whether or not those
-	 * RTEs will be referenced after we finish rewriting.  (Note: currently
-	 * this is a no-op because RLS conditions aren't added till later, but it
-	 * seems like good future-proofing to do this anyway.)
-	 */
-	sub_action->hasRowSecurity |= parsetree->hasRowSecurity;
+
 
 	/*
 	 * Each rule action's jointree should be the main parsetree's jointree
@@ -1788,12 +1780,6 @@ ApplyRetrieveRule(Query *parsetree,
 	rule_action = fireRIRrules(rule_action, activeRIRs);
 
 	/*
-	 * Make sure the query is marked as having row security if the view query
-	 * does.
-	 */
-	parsetree->hasRowSecurity |= rule_action->hasRowSecurity;
-
-	/*
 	 * Now, plug the view query in as a subselect, converting the relation's
 	 * original RTE to a subquery RTE.
 	 */
@@ -1934,11 +1920,6 @@ fireRIRonSubLink(Node *node, fireRIRonSubLink_context *context)
 		sub->subselect = (Node *) fireRIRrules((Query *) sub->subselect,
 											   context->activeRIRs);
 
-		/*
-		 * Remember if any of the sublinks have row security.
-		 */
-		context->hasRowSecurity |= ((Query *) sub->subselect)->hasRowSecurity;
-
 		/* Fall through to process lefthand args of SubLink */
 	}
 
@@ -1991,12 +1972,6 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		if (rte->rtekind == RTE_SUBQUERY)
 		{
 			rte->subquery = fireRIRrules(rte->subquery, activeRIRs);
-
-			/*
-			 * While we are here, make sure the query is marked as having row
-			 * security if any of its subqueries do.
-			 */
-			parsetree->hasRowSecurity |= rte->subquery->hasRowSecurity;
 
 			continue;
 		}
@@ -2100,16 +2075,9 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		fireRIRonSubLink_context context;
 
 		context.activeRIRs = activeRIRs;
-		context.hasRowSecurity = false;
 
 		query_tree_walker(parsetree, fireRIRonSubLink, (void *) &context,
 						  QTW_IGNORE_RC_SUBQUERIES);
-
-		/*
-		 * Make sure the query is marked as having row security if any of its
-		 * sublinks do.
-		 */
-		parsetree->hasRowSecurity |= context.hasRowSecurity;
 	}
 
 	return parsetree;
@@ -3360,11 +3328,6 @@ rewriteTargetView(Query *parsetree, Relation view)
 			 */
 			new_rte = rt_fetch(new_rt_index, parsetree->rtable);
 			new_rte->securityQuals = lcons(viewqual, new_rte->securityQuals);
-
-			/*
-			 * Do not set parsetree->hasRowSecurity, because these aren't RLS
-			 * conditions (they aren't affected by enabling/disabling RLS).
-			 */
 
 			/*
 			 * Make sure that the query is marked correctly if the added qual

@@ -933,19 +933,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "        proargtypes[0] = 'pg_catalog.internal'::pg_catalog.regtype AND "\
 "        substring(pg_catalog.quote_ident(proname),1,%d)='%s'"
 
-#define Query_for_list_of_policies \
-" SELECT pg_catalog.quote_ident(polname) "\
-"   FROM pg_catalog.pg_policy "\
-"  WHERE substring(pg_catalog.quote_ident(polname),1,%d)='%s'"
-
-#define Query_for_list_of_tables_for_policy \
-"SELECT pg_catalog.quote_ident(relname) "\
-"  FROM pg_catalog.pg_class"\
-" WHERE (%d = pg_catalog.length('%s'))"\
-"   AND oid IN "\
-"       (SELECT polrelid FROM pg_catalog.pg_policy "\
-"         WHERE pg_catalog.quote_ident(polname)='%s')"
-
 #define Query_for_enum \
 " SELECT name FROM ( "\
 "   SELECT pg_catalog.quote_ident(pg_catalog.unnest(enumvals)) AS name "\
@@ -1048,7 +1035,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"OR REPLACE", NULL, NULL, NULL, THING_NO_DROP | THING_NO_ALTER},
 	{"OWNED", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_ALTER},	/* for DROP OWNED BY ... */
 	{"PARSER", Query_for_list_of_ts_parsers, NULL, NULL, THING_NO_SHOW},
-	{"POLICY", NULL, NULL, NULL},
 	{"PROCEDURE", NULL, NULL, Query_for_list_of_procedures},
 	{"PUBLICATION", NULL, Query_for_list_of_publications},
 	{"ROLE", Query_for_list_of_roles},
@@ -1904,30 +1890,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER MATERIALIZED VIEW xxx SET */
 	else if (Matches("ALTER", "MATERIALIZED", "VIEW", MatchAny, "SET"))
 		COMPLETE_WITH("(", "SCHEMA", "TABLESPACE", "WITHOUT CLUSTER");
-	/* ALTER POLICY <name> */
-	else if (Matches("ALTER", "POLICY"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_policies);
-	/* ALTER POLICY <name> ON */
-	else if (Matches("ALTER", "POLICY", MatchAny))
-		COMPLETE_WITH("ON");
-	/* ALTER POLICY <name> ON <table> */
-	else if (Matches("ALTER", "POLICY", MatchAny, "ON"))
-	{
-		completion_info_charp = prev2_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_tables_for_policy);
-	}
-	/* ALTER POLICY <name> ON <table> - show options */
-	else if (Matches("ALTER", "POLICY", MatchAny, "ON", MatchAny))
-		COMPLETE_WITH("RENAME TO", "TO", "USING (", "WITH CHECK (");
-	/* ALTER POLICY <name> ON <table> TO <role> */
-	else if (Matches("ALTER", "POLICY", MatchAny, "ON", MatchAny, "TO"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_grant_roles);
-	/* ALTER POLICY <name> ON <table> USING ( */
-	else if (Matches("ALTER", "POLICY", MatchAny, "ON", MatchAny, "USING"))
-		COMPLETE_WITH("(");
-	/* ALTER POLICY <name> ON <table> WITH CHECK ( */
-	else if (Matches("ALTER", "POLICY", MatchAny, "ON", MatchAny, "WITH", "CHECK"))
-		COMPLETE_WITH("(");
 
 	/* ALTER RULE <name>, add ON */
 	else if (Matches("ALTER", "RULE", MatchAny))
@@ -2293,7 +2255,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH(				  "ACCESS METHOD", "CAST", "COLLATION", "CONVERSION",
 				  "DATABASE", "EXTENSION",
 				  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
-					  "INDEX", "LANGUAGE", "POLICY", "PUBLICATION", "RULE",
+					  "INDEX", "LANGUAGE", "PUBLICATION", "RULE",
 					  "SCHEMA", "SEQUENCE", "STATISTICS", "SUBSCRIPTION",
 					  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
 					  "COLUMN", "AGGREGATE", "FUNCTION",
@@ -2481,94 +2443,12 @@ psql_completion(const char *text, int start, int end)
 			 TailMatches("INDEX", "ON", MatchAny, "USING"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_index_access_methods);
 	else if (TailMatches("ON", MatchAny, "USING", MatchAny) &&
-			 !TailMatches("POLICY", MatchAny, MatchAny, MatchAny, MatchAny, MatchAny) &&
 			 !TailMatches("FOR", MatchAny, MatchAny, MatchAny))
 		COMPLETE_WITH("(");
 
 	/* CREATE OR REPLACE */
 	else if (Matches("CREATE", "OR"))
 		COMPLETE_WITH("REPLACE");
-
-	/* CREATE POLICY */
-	/* Complete "CREATE POLICY <name> ON" */
-	else if (Matches("CREATE", "POLICY", MatchAny))
-		COMPLETE_WITH("ON");
-	/* Complete "CREATE POLICY <name> ON <table>" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
-	/* Complete "CREATE POLICY <name> ON <table> AS|FOR|TO|USING|WITH CHECK" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny))
-		COMPLETE_WITH("AS", "FOR", "TO", "USING (", "WITH CHECK (");
-	/* CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS"))
-		COMPLETE_WITH("PERMISSIVE", "RESTRICTIVE");
-
-	/*
-	 * CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE
-	 * FOR|TO|USING|WITH CHECK
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny))
-		COMPLETE_WITH("FOR", "TO", "USING", "WITH CHECK");
-	/* CREATE POLICY <name> ON <table> FOR ALL|SELECT|INSERT|UPDATE|DELETE */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "FOR"))
-		COMPLETE_WITH("ALL", "SELECT", "INSERT", "UPDATE", "DELETE");
-	/* Complete "CREATE POLICY <name> ON <table> FOR INSERT TO|WITH CHECK" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "FOR", "INSERT"))
-		COMPLETE_WITH("TO", "WITH CHECK (");
-	/* Complete "CREATE POLICY <name> ON <table> FOR SELECT|DELETE TO|USING" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "FOR", "SELECT|DELETE"))
-		COMPLETE_WITH("TO", "USING (");
-	/* CREATE POLICY <name> ON <table> FOR ALL|UPDATE TO|USING|WITH CHECK */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "FOR", "ALL|UPDATE"))
-		COMPLETE_WITH("TO", "USING (", "WITH CHECK (");
-	/* Complete "CREATE POLICY <name> ON <table> TO <role>" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "TO"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_grant_roles);
-	/* Complete "CREATE POLICY <name> ON <table> USING (" */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "USING"))
-		COMPLETE_WITH("(");
-
-	/*
-	 * CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE FOR
-	 * ALL|SELECT|INSERT|UPDATE|DELETE
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "FOR"))
-		COMPLETE_WITH("ALL", "SELECT", "INSERT", "UPDATE", "DELETE");
-
-	/*
-	 * Complete "CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE FOR
-	 * INSERT TO|WITH CHECK"
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "FOR", "INSERT"))
-		COMPLETE_WITH("TO", "WITH CHECK (");
-
-	/*
-	 * Complete "CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE FOR
-	 * SELECT|DELETE TO|USING"
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "FOR", "SELECT|DELETE"))
-		COMPLETE_WITH("TO", "USING (");
-
-	/*
-	 * CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE FOR
-	 * ALL|UPDATE TO|USING|WITH CHECK
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "FOR", "ALL|UPDATE"))
-		COMPLETE_WITH("TO", "USING (", "WITH CHECK (");
-
-	/*
-	 * Complete "CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE TO
-	 * <role>"
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "TO"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_grant_roles);
-
-	/*
-	 * Complete "CREATE POLICY <name> ON <table> AS PERMISSIVE|RESTRICTIVE
-	 * USING ("
-	 */
-	else if (Matches("CREATE", "POLICY", MatchAny, "ON", MatchAny, "AS", MatchAny, "USING"))
-		COMPLETE_WITH("(");
 
 
 /* CREATE PUBLICATION */
@@ -3051,19 +2931,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("METHOD");
 	else if (Matches("DROP", "ACCESS", "METHOD"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
-
-	/* DROP POLICY <name>  */
-	else if (Matches("DROP", "POLICY"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_policies);
-	/* DROP POLICY <name> ON */
-	else if (Matches("DROP", "POLICY", MatchAny))
-		COMPLETE_WITH("ON");
-	/* DROP POLICY <name> ON <table> */
-	else if (Matches("DROP", "POLICY", MatchAny, "ON"))
-	{
-		completion_info_charp = prev2_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_tables_for_policy);
-	}
 
 	/* DROP RULE */
 	else if (Matches("DROP", "RULE", MatchAny))

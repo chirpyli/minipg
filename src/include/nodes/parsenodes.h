@@ -135,8 +135,6 @@ typedef struct Query
 	bool		hasSubLinks;	/* has subquery SubLink */
 	bool		hasDistinctOn;	/* distinctClause is from DISTINCT ON */
 	bool		hasForUpdate;	/* FOR [KEY] UPDATE/SHARE was specified */
-	bool		hasRowSecurity; /* rewriter has applied some RLS policy */
-
 	bool		isReturn;		/* is a RETURN statement */
 
 	List	   *rtable;			/* list of range table entries */

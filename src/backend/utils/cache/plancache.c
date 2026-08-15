@@ -209,7 +209,6 @@ CreateCachedPlan(RawStmt *raw_parse_tree,
 	plansource->search_path = NULL;
 	plansource->query_context = NULL;
 	plansource->rewriteRoleId = InvalidOid;
-	plansource->dependsOnRLS = false;
 	plansource->gplan = NULL;
 	plansource->is_oneshot = false;
 	plansource->is_complete = false;
@@ -276,7 +275,6 @@ CreateOneShotCachedPlan(RawStmt *raw_parse_tree,
 	plansource->search_path = NULL;
 	plansource->query_context = NULL;
 	plansource->rewriteRoleId = InvalidOid;
-	plansource->dependsOnRLS = false;
 	plansource->gplan = NULL;
 	plansource->is_oneshot = true;
 	plansource->is_complete = false;
@@ -390,10 +388,8 @@ CompleteCachedPlan(CachedPlanSource *plansource,
 		 */
 		extract_query_dependencies((Node *) querytree_list,
 								   &plansource->relationOids,
-								   &plansource->invalItems,
-								   &plansource->dependsOnRLS);
+								   &plansource->invalItems);
 
-		/* Update RLS info as well. */
 		plansource->rewriteRoleId = GetUserId();
 
 		/*
@@ -592,12 +588,6 @@ RevalidateCachedQuery(CachedPlanSource *plansource,
 	}
 
 	/*
-	 * If the query rewrite phase had a possible RLS dependency, we must redo
-	 * it if either the role or the row_security setting has changed.
-	 */
-	if (plansource->is_valid && plansource->dependsOnRLS &&
-		plansource->rewriteRoleId != GetUserId())
-		plansource->is_valid = false;
 
 	/*
 	 * If the query is currently valid, acquire locks on the referenced
@@ -742,11 +732,9 @@ RevalidateCachedQuery(CachedPlanSource *plansource,
 	 */
 	extract_query_dependencies((Node *) qlist,
 							   &plansource->relationOids,
-							   &plansource->invalItems,
-							   &plansource->dependsOnRLS);
+							   &plansource->invalItems);
 
-	/* Update RLS info as well. */
-	plansource->rewriteRoleId = GetUserId();
+		plansource->rewriteRoleId = GetUserId();
 
 	/*
 	 * Also save the current search_path in the query_context.  (This should
@@ -971,7 +959,7 @@ BuildCachedPlan(CachedPlanSource *plansource, List *qlist,
 	 * transient if any plan is marked so.
 	 */
 	plan->planRoleId = GetUserId();
-	plan->dependsOnRole = plansource->dependsOnRLS;
+	plan->dependsOnRole = false;
 	is_transient = false;
 	foreach(lc, plist)
 	{
@@ -1332,8 +1320,6 @@ CachedPlanAllowsSimpleValidityCheck(CachedPlanSource *plansource,
 	 * reject.  These things probably can't ever happen for table-free
 	 * queries, but for safety's sake let's check.
 	 */
-	if (plansource->dependsOnRLS)
-		return false;
 	if (plan->dependsOnRole)
 		return false;
 	if (TransactionIdIsValid(plan->saved_xmin))
@@ -1562,7 +1548,6 @@ CopyCachedPlan(CachedPlanSource *plansource)
 		newsource->search_path = CopyOverrideSearchPath(plansource->search_path);
 	newsource->query_context = querytree_context;
 	newsource->rewriteRoleId = plansource->rewriteRoleId;
-	newsource->dependsOnRLS = plansource->dependsOnRLS;
 
 	newsource->gplan = NULL;
 

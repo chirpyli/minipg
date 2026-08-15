@@ -2961,8 +2961,7 @@ record_plan_type_dependency(PlannerInfo *root, Oid typid)
 void
 extract_query_dependencies(Node *query,
 						   List **relationOids,
-						   List **invalItems,
-						   bool *hasRowSecurity)
+						   List **invalItems)
 {
 	PlannerGlobal glob;
 	PlannerInfo root;
@@ -2972,8 +2971,6 @@ extract_query_dependencies(Node *query,
 	glob.type = T_PlannerGlobal;
 	glob.relationOids = NIL;
 	glob.invalItems = NIL;
-	/* Hack: we use glob.dependsOnRole to collect hasRowSecurity flags */
-	glob.dependsOnRole = false;
 
 	MemSet(&root, 0, sizeof(root));
 	root.type = T_PlannerInfo;
@@ -2983,7 +2980,6 @@ extract_query_dependencies(Node *query,
 
 	*relationOids = glob.relationOids;
 	*invalItems = glob.invalItems;
-	*hasRowSecurity = glob.dependsOnRole;
 }
 
 /*
@@ -3020,10 +3016,6 @@ extract_query_dependencies_walker(Node *node, PlannerInfo *context)
 			if (query == NULL)
 				return false;
 		}
-
-		/* Remember if any Query has RLS quals applied by rewriter */
-		if (query->hasRowSecurity)
-			context->glob->dependsOnRole = true;
 
 		/* Collect relation OIDs in this Query's rtable */
 		foreach(lc, query->rtable)

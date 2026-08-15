@@ -2756,7 +2756,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(hasSubLinks);
 	COPY_SCALAR_FIELD(hasDistinctOn);
 	COPY_SCALAR_FIELD(hasForUpdate);
-	COPY_SCALAR_FIELD(hasRowSecurity);
 	COPY_SCALAR_FIELD(isReturn);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);

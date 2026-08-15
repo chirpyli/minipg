@@ -115,7 +115,6 @@ typedef struct CachedPlanSource
 											 * and planning */
 	MemoryContext query_context;	/* context holding the above, or NULL */
 	Oid			rewriteRoleId;	/* Role ID we did rewriting for */
-	bool		dependsOnRLS;	/* is rewritten query specific to the above? */
 	/* If we have a generic plan, this is a reference-counted link to it: */
 	struct CachedPlan *gplan;	/* generic plan, or NULL if not valid */
 	/* Some state flags: */

@@ -1060,8 +1060,6 @@ retry:
 	else
 		relation->trigdesc = NULL;
 
-	relation->rd_rsdesc = NULL;
-
 	/* foreign key data is not loaded till asked for */
 	relation->rd_fkeylist = NIL;
 	relation->rd_fkeyvalid = false;
@@ -5798,7 +5796,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_rules = NULL;
 		rel->rd_rulescxt = NULL;
 		rel->trigdesc = NULL;
-		rel->rd_rsdesc = NULL;
 		rel->rd_indexprs = NIL;
 		rel->rd_indpred = NIL;
 		rel->rd_exclops = NULL;
