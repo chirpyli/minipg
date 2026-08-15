@@ -161,16 +161,6 @@ describeAccessMethods(const char *pattern, bool verbose)
 	printQueryOpt myopt = pset.popt;
 	static const bool translate_columns[] = {false, true, false, false};
 
-	if (pset.sversion < 90600)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support access methods.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 
 	printfPQExpBuffer(&buf,
@@ -231,16 +221,6 @@ describeTablespaces(const char *pattern, bool verbose)
 	PQExpBufferData buf;
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80000)
-	{
-		char		sverbuf[32];
-
-		pg_log_info("The server (version %s) does not support tablespaces.",
-					formatPGVersionNumber(pset.sversion, false,
-										  sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	initPQExpBuffer(&buf);
 
@@ -345,28 +325,6 @@ describeFunctions(const char *functypes, const char *func_pattern,
 	if (strlen(functypes) != strspn(functypes, "anptwS+"))
 	{
 		pg_log_error("\\df only takes [anptwS+] as options");
-		return true;
-	}
-
-	if (showProcedure && pset.sversion < 110000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("\\df does not take a \"%c\" option with server version %s",
-					 'p',
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
-	if (showWindow && pset.sversion < 80400)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("\\df does not take a \"%c\" option with server version %s",
-					 'w',
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
 		return true;
 	}
 
@@ -3340,16 +3298,6 @@ listDbRoleSettings(const char *pattern, const char *pattern2)
 	printQueryOpt myopt = pset.popt;
 	bool		havewhere;
 
-	if (pset.sversion < 90000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support per-database role settings.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 
 	printfPQExpBuffer(&buf, "SELECT rolname AS \"%s\", datname AS \"%s\",\n"
@@ -3647,16 +3595,6 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 	/*
 	 * Note: Declarative table partitioning is only supported as of Pg 10.0.
 	 */
-	if (pset.sversion < 100000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support declarative table partitioning.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	/* If no relation kind was selected, show them all */
 	if (!showTables && !showIndexes)
 		showTables = showIndexes = true;
@@ -3743,36 +3681,17 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 
 	if (verbose)
 	{
-		if (pset.sversion < 120000)
-		{
-			appendPQExpBufferStr(&buf,
-								 ",\n     LATERAL (WITH RECURSIVE d\n"
-								 "                AS (SELECT inhrelid AS oid, 1 AS level\n"
-								 "                      FROM pg_catalog.pg_inherits\n"
-								 "                     WHERE inhparent = c.oid\n"
-								 "                    UNION ALL\n"
-								 "                    SELECT inhrelid, level + 1\n"
-								 "                      FROM pg_catalog.pg_inherits i\n"
-								 "                           JOIN d ON i.inhparent = d.oid)\n"
-								 "                SELECT pg_catalog.pg_size_pretty(sum(pg_catalog.pg_table_size("
-								 "d.oid))) AS tps,\n"
-								 "                       pg_catalog.pg_size_pretty(sum("
-								 "\n             CASE WHEN d.level = 1"
-								 " THEN pg_catalog.pg_table_size(d.oid) ELSE 0 END)) AS dps\n"
-								 "               FROM d) s");
-		}
-		else
-		{
-			/* PostgreSQL 12 has pg_partition_tree function */
-			appendPQExpBufferStr(&buf,
-								 ",\n     LATERAL (SELECT pg_catalog.pg_size_pretty(sum("
-								 "\n                 CASE WHEN ppt.isleaf AND ppt.level = 1"
-								 "\n                      THEN pg_catalog.pg_table_size(ppt.relid)"
-								 " ELSE 0 END)) AS dps"
-								 ",\n                     pg_catalog.pg_size_pretty(sum("
-								 "pg_catalog.pg_table_size(ppt.relid))) AS tps"
-								 "\n              FROM pg_catalog.pg_partition_tree(c.oid) ppt) s");
-		}
+		/*
+		 * Use pg_partition_tree to compute table and partition sizes.
+		 */
+		appendPQExpBufferStr(&buf,
+							 ",\n     LATERAL (SELECT pg_catalog.pg_size_pretty(sum("
+							 "\n                 CASE WHEN ppt.isleaf AND ppt.level = 1"
+							 "\n                      THEN pg_catalog.pg_table_size(ppt.relid)"
+							 " ELSE 0 END)) AS dps"
+							 ",\n                     pg_catalog.pg_size_pretty(sum("
+							 "pg_catalog.pg_table_size(ppt.relid))) AS tps"
+							 "\n              FROM pg_catalog.pg_partition_tree(c.oid) ppt) s");
 	}
 
 	appendPQExpBufferStr(&buf, "\nWHERE c.relkind IN (");
@@ -4075,16 +3994,6 @@ listExtendedStats(const char *pattern)
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
 
-	if (pset.sversion < 100000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support extended statistics.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 	printfPQExpBuffer(&buf,
 					  "SELECT \n"
@@ -4292,16 +4201,6 @@ listCollations(const char *pattern, bool verbose, bool showSystem)
 	printQueryOpt myopt = pset.popt;
 	static const bool translate_columns[] = {false, false, false, false, false, true, false};
 
-	if (pset.sversion < 90100)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support collations.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 
 	printfPQExpBuffer(&buf,
@@ -4450,16 +4349,6 @@ listTSParsers(const char *pattern, bool verbose)
 	PQExpBufferData buf;
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80300)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support full text search.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	if (verbose)
 		return listTSParsersVerbose(pattern);
@@ -4702,16 +4591,6 @@ listTSDictionaries(const char *pattern, bool verbose)
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
 
-	if (pset.sversion < 80300)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support full text search.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 
 	printfPQExpBuffer(&buf,
@@ -4775,16 +4654,6 @@ listTSTemplates(const char *pattern, bool verbose)
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
 
-	if (pset.sversion < 80300)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support full text search.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
-
 	initPQExpBuffer(&buf);
 
 	if (verbose)
@@ -4847,16 +4716,6 @@ listTSConfigs(const char *pattern, bool verbose)
 	PQExpBufferData buf;
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
-
-	if (pset.sversion < 80300)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support full text search.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	if (verbose)
 		return listTSConfigsVerbose(pattern);
@@ -5059,15 +4918,6 @@ listExtensions(const char *pattern)
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
 
-	if (pset.sversion < 90100)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support extensions.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	initPQExpBuffer(&buf);
 	printfPQExpBuffer(&buf,
@@ -5118,15 +4968,6 @@ listExtensionContents(const char *pattern)
 	PGresult   *res;
 	int			i;
 
-	if (pset.sversion < 90100)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support extensions.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	initPQExpBuffer(&buf);
 	printfPQExpBuffer(&buf,
@@ -5287,15 +5128,6 @@ listPublications(const char *pattern)
 	printQueryOpt myopt = pset.popt;
 	static const bool translate_columns[] = {false, false, false, false, false, false, false, false};
 
-	if (pset.sversion < 100000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support publications.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	initPQExpBuffer(&buf);
 
@@ -5365,15 +5197,6 @@ describePublications(const char *pattern)
 	bool		has_pubtruncate;
 	bool		has_pubviaroot;
 
-	if (pset.sversion < 100000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support publications.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	has_pubtruncate = (pset.sversion >= 110000);
 	has_pubviaroot = (pset.sversion >= 130000);
@@ -5532,16 +5355,6 @@ describeSubscriptions(const char *pattern, bool verbose)
 	printQueryOpt myopt = pset.popt;
 	static const bool translate_columns[] = {false, false, false, false,
 	false, false, false, false};
-
-	if (pset.sversion < 100000)
-	{
-		char		sverbuf[32];
-
-		pg_log_error("The server (version %s) does not support subscriptions.",
-					 formatPGVersionNumber(pset.sversion, false,
-										   sverbuf, sizeof(sverbuf)));
-		return true;
-	}
 
 	initPQExpBuffer(&buf);
 

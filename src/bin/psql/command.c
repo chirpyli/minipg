@@ -1037,21 +1037,7 @@ exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
 													  NULL, true);
 		int			lineno = -1;
 
-		if (pset.sversion < (is_func ? 80400 : 70400))
-		{
-			char		sverbuf[32];
-
-			formatPGVersionNumber(pset.sversion, false,
-								  sverbuf, sizeof(sverbuf));
-			if (is_func)
-				pg_log_error("The server (version %s) does not support editing function source.",
-							 sverbuf);
-			else
-				pg_log_error("The server (version %s) does not support editing view definitions.",
-							 sverbuf);
-			status = PSQL_CMD_ERROR;
-		}
-		else if (!query_buf)
+		if (!query_buf)
 		{
 			pg_log_error("no query buffer");
 			status = PSQL_CMD_ERROR;
@@ -3471,7 +3457,6 @@ connection_warnings(bool in_startup)
 	if (!pset.quiet && !pset.notty)
 	{
 		int			client_ver = PG_VERSION_NUM;
-		char		cverbuf[32];
 		char		sverbuf[32];
 
 		if (pset.sversion != client_ver)
@@ -3494,15 +3479,6 @@ connection_warnings(bool in_startup)
 		/* For version match, only print psql banner on startup. */
 		else if (in_startup)
 			printf("%s (%s)\n", pset.progname, PG_VERSION);
-
-		if (pset.sversion / 100 > client_ver / 100)
-			printf(_("WARNING: %s major version %s, server major version %s.\n"
-					 "         Some psql features might not work.\n"),
-				   pset.progname,
-				   formatPGVersionNumber(client_ver, false,
-										 cverbuf, sizeof(cverbuf)),
-				   formatPGVersionNumber(pset.sversion, false,
-										 sverbuf, sizeof(sverbuf)));
 	}
 }
 
@@ -4935,43 +4911,16 @@ get_create_object_cmd(EditableObjectType obj_type, Oid oid,
 			 * separately.  Materialized views (introduced in 9.3) may have
 			 * arbitrary storage parameter reloptions.
 			 */
-			if (pset.sversion >= 90400)
-			{
-				printfPQExpBuffer(query,
-								  "SELECT nspname, relname, relkind, "
-								  "pg_catalog.pg_get_viewdef(c.oid, true), "
-								  "pg_catalog.array_remove(pg_catalog.array_remove(c.reloptions,'check_option=local'),'check_option=cascaded') AS reloptions, "
-								  "CASE WHEN 'check_option=local' = ANY (c.reloptions) THEN 'LOCAL'::text "
-								  "WHEN 'check_option=cascaded' = ANY (c.reloptions) THEN 'CASCADED'::text ELSE NULL END AS checkoption "
-								  "FROM pg_catalog.pg_class c "
-								  "LEFT JOIN pg_catalog.pg_namespace n "
-								  "ON c.relnamespace = n.oid WHERE c.oid = %u",
-								  oid);
-			}
-			else if (pset.sversion >= 90200)
-			{
-				printfPQExpBuffer(query,
-								  "SELECT nspname, relname, relkind, "
-								  "pg_catalog.pg_get_viewdef(c.oid, true), "
-								  "c.reloptions AS reloptions, "
-								  "NULL AS checkoption "
-								  "FROM pg_catalog.pg_class c "
-								  "LEFT JOIN pg_catalog.pg_namespace n "
-								  "ON c.relnamespace = n.oid WHERE c.oid = %u",
-								  oid);
-			}
-			else
-			{
-				printfPQExpBuffer(query,
-								  "SELECT nspname, relname, relkind, "
-								  "pg_catalog.pg_get_viewdef(c.oid, true), "
-								  "NULL AS reloptions, "
-								  "NULL AS checkoption "
-								  "FROM pg_catalog.pg_class c "
-								  "LEFT JOIN pg_catalog.pg_namespace n "
-								  "ON c.relnamespace = n.oid WHERE c.oid = %u",
-								  oid);
-			}
+			printfPQExpBuffer(query,
+							  "SELECT nspname, relname, relkind, "
+							  "pg_catalog.pg_get_viewdef(c.oid, true), "
+							  "pg_catalog.array_remove(pg_catalog.array_remove(c.reloptions,'check_option=local'),'check_option=cascaded') AS reloptions, "
+							  "CASE WHEN 'check_option=local' = ANY (c.reloptions) THEN 'LOCAL'::text "
+							  "WHEN 'check_option=cascaded' = ANY (c.reloptions) THEN 'CASCADED'::text ELSE NULL END AS checkoption "
+							  "FROM pg_catalog.pg_class c "
+							  "LEFT JOIN pg_catalog.pg_namespace n "
+							  "ON c.relnamespace = n.oid WHERE c.oid = %u",
+							  oid);
 			break;
 	}
 
