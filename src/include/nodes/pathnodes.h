@@ -21,13 +21,6 @@
 #include "storage/block.h"
 
 /*
- * Partitioning support has been removed from this build.  This macro is
- * retained (and always evaluates false) so that the remaining planner code
- * keeps compiling; the partition-specific branches it guards are dead.
- */
-#define IS_PARTITIONED_REL(rel) (false)
-
-/*
  * Relids
  *		Set of relation identifiers (indexes into the rangetable).
  */

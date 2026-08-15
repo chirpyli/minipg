@@ -81,11 +81,6 @@ extern List *find_all_inheritors(Oid parentrelId, LOCKMODE lockmode,
 extern bool has_subclass(Oid relationId);
 extern bool has_superclass(Oid relationId);
 extern bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
-extern void StoreSingleInheritance(Oid relationId, Oid parentOid,
-								   int32 seqNumber);
-extern bool DeleteInheritsTuple(Oid inhrelid, Oid inhparent, bool allow_detached,
-								const char *childname);
-extern bool PartitionHasPendingDetach(Oid partoid);
 
 #include "nodes/pg_list.h"
 #include "storage/lock.h"

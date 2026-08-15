@@ -73,7 +73,6 @@ typedef struct
 	const char *stmtType;		/* "CREATE [FOREIGN] TABLE" or "ALTER TABLE" */
 	RangeVar   *relation;		/* relation to create */
 	Relation	rel;			/* opened/locked rel, if ALTER */
-	bool		isforeign;		/* true if CREATE/ALTER FOREIGN TABLE */
 	bool		isalter;		/* true if altering existing table */
 	List	   *columns;		/* ColumnDef items */
 	List	   *ckconstraints;	/* CHECK constraints */
@@ -203,7 +202,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	/* Set up CreateStmtContext */
 	cxt.pstate = pstate;
 	cxt.stmtType = "CREATE TABLE";
-	cxt.isforeign = false;
 	cxt.relation = stmt->relation;
 	cxt.rel = NULL;
 	cxt.isalter = false;
@@ -277,10 +275,11 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	/*
 	 * Postprocess check constraints.
 	 *
-	 * For regular tables all constraints can be marked valid immediately,
-	 * because the table is new therefore empty. Not so for foreign tables.
+	 * For a new regular table all constraints can be marked valid immediately,
+	 * because the table is new therefore empty. (Foreign tables are not
+	 * supported in minipg, so we always skip validation.)
 	 */
-	transformCheckConstraints(&cxt, !cxt.isforeign);
+	transformCheckConstraints(&cxt, true);
 
 	/*
 	 * Output results.
@@ -388,21 +387,9 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				break;
 
 			case CONSTR_PRIMARY:
-				if (cxt->isforeign)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("primary key constraints are not supported on foreign tables"),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
 				/* FALL THRU */
 
 			case CONSTR_UNIQUE:
-				if (cxt->isforeign)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("unique constraints are not supported on foreign tables"),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
 				if (constraint->keys == NIL)
 					constraint->keys = list_make1(makeString(column->colname));
 				cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
@@ -446,32 +433,14 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 	switch (constraint->contype)
 	{
 		case CONSTR_PRIMARY:
-			if (cxt->isforeign)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("primary key constraints are not supported on foreign tables"),
-						 parser_errposition(cxt->pstate,
-											constraint->location)));
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 			break;
 
 		case CONSTR_UNIQUE:
-			if (cxt->isforeign)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("unique constraints are not supported on foreign tables"),
-						 parser_errposition(cxt->pstate,
-											constraint->location)));
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 			break;
 
 		case CONSTR_EXCLUSION:
-			if (cxt->isforeign)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("exclusion constraints are not supported on foreign tables"),
-						 parser_errposition(cxt->pstate,
-											constraint->location)));
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 			break;
 
@@ -2179,10 +2148,7 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 
 	/* Set up CreateStmtContext */
 	cxt.pstate = pstate;
-	{
-		cxt.stmtType = "ALTER TABLE";
-		cxt.isforeign = false;
-	}
+	cxt.stmtType = "ALTER TABLE";
 	cxt.relation = stmt->relation;
 	cxt.rel = rel;
 	cxt.isalter = true;

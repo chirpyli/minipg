@@ -1262,21 +1262,12 @@ create_append_path(PlannerInfo *root,
 	pathnode->path.pathtarget = rel->reltarget;
 
 	/*
-	 * When generating an Append path for a partitioned table, there may be
-	 * parameterized quals that are useful for run-time pruning.  Hence,
-	 * compute path.param_info the same way as for any other baserel, so that
-	 * such quals will be available for make_partition_pruneinfo().  (This
-	 * would not work right for a non-baserel, ie a scan on a non-leaf child
-	 * partition, and it's not necessary anyway in that case.  Must skip it if
-	 * we don't have "root", too.)
+	 * minipg does not support partitioned tables, so always compute
+	 * param_info the same way as for an appendrel (no run-time pruning
+	 * quals from partitioning).
 	 */
-	if (root && rel->reloptkind == RELOPT_BASEREL && IS_PARTITIONED_REL(rel))
-		pathnode->path.param_info = get_baserel_parampathinfo(root,
-															  rel,
-															  required_outer);
-	else
-		pathnode->path.param_info = get_appendrel_parampathinfo(rel,
-																required_outer);
+	pathnode->path.param_info = get_appendrel_parampathinfo(rel,
+															required_outer);
 
 	pathnode->path.parallel_aware = parallel_aware;
 	pathnode->path.parallel_safe = rel->consider_parallel;

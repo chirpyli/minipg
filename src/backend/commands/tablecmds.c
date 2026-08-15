@@ -289,18 +289,14 @@ struct DropRelationCallbackState
 /*
  * Partition tables are expected to be dropped when the parent partitioned
  * table gets dropped. Hence for partitioning we use AUTO dependency.
- * Otherwise, for regular inheritance use NORMAL dependency.
  */
-#define child_dependency_type(child_is_partition)	\
-	((child_is_partition) ? DEPENDENCY_AUTO : DEPENDENCY_NORMAL)
-
 static void truncate_check_rel(Oid relid, Form_pg_class reltuple);
 static void truncate_check_perms(Oid relid, Form_pg_class reltuple);
 static void truncate_check_activity(Relation rel);
 static void RangeVarCallbackForTruncate(const RangeVar *relation,
 										Oid relId, Oid oldRelId, void *arg);
 static List *MergeAttributes(List *schema, List *supers, char relpersistence,
-							 bool is_partition, List **supconstr);
+							 List **supconstr);
 static bool MergeCheckConstraint(List *constraints, char *name, Node *expr);
 static int	findAttrByName(const char *attributeName, List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
@@ -630,7 +626,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	stmt->tableElts =
 		MergeAttributes(stmt->tableElts, inheritOids,
 						stmt->relation->relpersistence,
-						false,
 						&old_constraints);
 
 	/*
@@ -1031,7 +1026,6 @@ RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid, Oid oldRelOid,
 	HeapTuple	tuple;
 	struct DropRelationCallbackState *state;
 	char		expected_relkind;
-	bool		is_partition;
 	Form_pg_class classform;
 	LOCKMODE	heap_lockmode;
 	bool		invalid_system_index = false;
@@ -1069,7 +1063,6 @@ RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid, Oid oldRelOid,
 	if (!HeapTupleIsValid(tuple))
 		return;					/* concurrently dropped, so nothing to do */
 	classform = (Form_pg_class) GETSTRUCT(tuple);
-	is_partition = false;	/* minipg does not support partitions */
 
 	/* Pass back some data to save lookups in RemoveRelations */
 	state->actual_relkind = classform->relkind;
@@ -1625,7 +1618,6 @@ storage_name(char c)
  *		of ColumnDef's.) It is destructively changed.
  * 'supers' is a list of OIDs of parent relations, already locked by caller.
  * 'relpersistence' is the persistence type of the table.
- * 'is_partition' tells if the table is a partition.
  *
  * Output arguments:
  * 'supconstr' receives a list of constraints belonging to the parents,
@@ -1675,14 +1667,13 @@ storage_name(char c)
  */
 static List *
 MergeAttributes(List *schema, List *supers, char relpersistence,
-				bool is_partition, List **supconstr)
+				List **supconstr)
 {
 	List	   *inhSchema = NIL;
 	List	   *constraints = NIL;
 	bool		have_bogus_defaults = false;
 	int			child_attno;
 	static Node bogus_marker = {0}; /* marks conflicting defaults */
-	List	   *saved_schema = NIL;
 	ListCell   *entry;
 
 	/*
@@ -1720,13 +1711,12 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	{
 		ColumnDef  *coldef = list_nth_node(ColumnDef, schema, coldefpos);
 
-		if (!is_partition && coldef->typeName == NULL)
+		if (coldef->typeName == NULL)
 		{
 			/*
 			 * Typed table column option that does not belong to a column from
 			 * the type.  This works because the columns from the type come
-			 * first in the list.  (We omit this check for partition column
-			 * lists; those are processed separately below.)
+			 * first in the list.
 			 */
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
@@ -1769,11 +1759,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	 * ColumnDefs created for column constraints.  Set them aside for now and
 	 * process them at the end.
 	 */
-	if (is_partition)
-	{
-		saved_schema = schema;
-		schema = NIL;
-	}
 
 	/*
 	 * Scan the parents left-to-right, and merge their attributes to form a
@@ -1802,8 +1787,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 		 * current transaction, such as being used in some manner by an
 		 * enclosing command.
 		 */
-		if (is_partition)
-			CheckTableNotInUse(relation, "CREATE TABLE .. PARTITION OF");
 
 		/*
 		 * We do not allow partitions to participate in regular inheritance.
@@ -2151,12 +2134,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 							newcollid;
 
 				/*
-				 * Partitions have only one parent and have no column
-				 * definitions of their own, so conflict should never occur.
-				 */
-				Assert(!is_partition);
-
-				/*
 				 * Yes, try to merge the two column definitions. They must
 				 * have the same type, typmod, and collation.
 				 */
@@ -2305,50 +2282,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	 * actually exist.  Also, we merge NOT NULL and defaults into each
 	 * corresponding column definition.
 	 */
-	if (is_partition)
-	{
-		foreach(entry, saved_schema)
-		{
-			ColumnDef  *restdef = lfirst(entry);
-			bool		found = false;
-			ListCell   *l;
-
-			foreach(l, schema)
-			{
-				ColumnDef  *coldef = lfirst(l);
-
-				if (strcmp(coldef->colname, restdef->colname) == 0)
-				{
-					found = true;
-					coldef->is_not_null |= restdef->is_not_null;
-
-					/*
-					 * Override the parent's default value for this column
-					 * (coldef->cooked_default) with the partition's local
-					 * definition (restdef->raw_default), if there's one. It
-					 * should be physically impossible to get a cooked default
-					 * in the local definition or a raw default in the
-					 * inherited definition, but make sure they're nulls, for
-					 * future-proofing.
-					 */
-					Assert(restdef->cooked_default == NULL);
-					Assert(coldef->raw_default == NULL);
-					if (restdef->raw_default)
-					{
-						coldef->raw_default = restdef->raw_default;
-						coldef->cooked_default = NULL;
-					}
-				}
-			}
-
-			/* complain for constraints on columns not in parent */
-			if (!found)
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_COLUMN),
-						 errmsg("column \"%s\" does not exist",
-								restdef->colname)));
-		}
-	}
 
 	/*
 	 * If we found any conflicting parent default values, check to make sure
@@ -11601,35 +11534,3 @@ typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 	return false;
 }
 
-/*
- * StoreSingleInheritance
- *
- * No-op: there is no pg_inherits catalog to insert into.
- */
-void
-StoreSingleInheritance(Oid relationId, Oid parentOid, int32 seqNumber)
-{
-}
-
-/*
- * DeleteInheritsTuple
- *
- * Always reports "not found", since nothing was ever stored.
- */
-bool
-DeleteInheritsTuple(Oid inhrelid, Oid inhparent, bool allow_detached,
-				   const char *childname)
-{
-	return false;
-}
-
-/*
- * PartitionHasPendingDetach
- *
- * Partitioning is not supported, so there is never a pending detach.
- */
-bool
-PartitionHasPendingDetach(Oid partoid)
-{
-	return false;
-}

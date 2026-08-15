@@ -1811,33 +1811,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_EXTENSION;
 			break;
 
-			tag = CMDTAG_CREATE_FOREIGN_DATA_WRAPPER;
-			break;
-
-			tag = CMDTAG_ALTER_FOREIGN_DATA_WRAPPER;
-			break;
-
-			tag = CMDTAG_CREATE_SERVER;
-			break;
-
-			tag = CMDTAG_ALTER_SERVER;
-			break;
-
-			tag = CMDTAG_CREATE_USER_MAPPING;
-			break;
-
-			tag = CMDTAG_ALTER_USER_MAPPING;
-			break;
-
-			tag = CMDTAG_DROP_USER_MAPPING;
-			break;
-
-			tag = CMDTAG_CREATE_FOREIGN_TABLE;
-			break;
-
-			tag = CMDTAG_IMPORT_FOREIGN_SCHEMA;
-			break;
-
 		case T_DropStmt:
 			switch (((DropStmt *) parsetree)->removeType)
 			{

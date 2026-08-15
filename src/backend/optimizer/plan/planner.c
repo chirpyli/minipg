@@ -3358,33 +3358,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	PartitionwiseAggregateType patype = PARTITIONWISE_AGGREGATE_NONE;
 
 	/*
-	 * If this is the topmost grouping relation or if the parent relation is
-	 * doing some form of partitionwise aggregation, then we may be able to do
-	 * it at this level also.  However, if the input relation is not
-	 * partitioned, partitionwise aggregate is impossible.
-	 */
-	if (extra->patype != PARTITIONWISE_AGGREGATE_NONE &&
-		IS_PARTITIONED_REL(input_rel))
-	{
-		/*
-		 * If this is the topmost relation or if the parent relation is doing
-		 * full partitionwise aggregation, then we can do full partitionwise
-		 * aggregation provided that the GROUP BY clause contains all of the
-		 * partitioning columns at this level and the collation used by GROUP
-		 * BY matches the partitioning collation.  Otherwise, we can do at
-		 * most partial partitionwise aggregation.  But if partial aggregation
-		 * is not supported in general then we can't use it for partitionwise
-		 * aggregation either.
-		 */
-		if (extra->patype == PARTITIONWISE_AGGREGATE_FULL)
-			patype = PARTITIONWISE_AGGREGATE_FULL;
-		else if ((extra->flags & GROUPING_CAN_PARTIAL_AGG) != 0)
-			patype = PARTITIONWISE_AGGREGATE_PARTIAL;
-		else
-			patype = PARTITIONWISE_AGGREGATE_NONE;
-	}
-
-	/*
 	 * Before generating paths for grouped_rel, we first generate any possible
 	 * partially grouped paths; that way, later code can easily consider both
 	 * parallel and non-parallel approaches to grouping.

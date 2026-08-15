@@ -339,8 +339,6 @@ static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
 									int prettyFlags, bool missing_ok);
 static char *pg_get_statisticsobj_worker(Oid statextid, bool columns_only,
 										 bool missing_ok);
-static char *pg_get_partkeydef_worker(Oid relid, int prettyFlags,
-									  bool attrsOnly, bool missing_ok);
 static char *pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 										 int prettyFlags, bool missing_ok);
 static text *pg_get_expr_worker(text *expr, Oid relid, int prettyFlags);
