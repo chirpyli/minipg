@@ -1702,9 +1702,6 @@ AlterDatabaseOwner(const char *dbname, Oid newOwnerId)
 		Datum		repl_val[Natts_pg_database];
 		bool		repl_null[Natts_pg_database];
 		bool		repl_repl[Natts_pg_database];
-		Acl		   *newAcl;
-		Datum		aclDatum;
-		bool		isNull;
 		HeapTuple	newtuple;
 
 		/* Otherwise, must be owner of the existing object */

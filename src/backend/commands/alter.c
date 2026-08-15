@@ -898,25 +898,6 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 		values[Anum_owner - 1] = ObjectIdGetDatum(new_ownerId);
 		replaces[Anum_owner - 1] = true;
 
-		/*
-		 * Determine the modified ACL for the new owner.  This is only
-		 * necessary when the ACL is non-null.
-		 */
-		if (Anum_acl != InvalidAttrNumber)
-		{
-			datum = heap_getattr(oldtup,
-								 Anum_acl, RelationGetDescr(rel), &isnull);
-			if (!isnull)
-			{
-				Acl		   *newAcl;
-
-				newAcl = aclnewowner(DatumGetAclP(datum),
-									 old_ownerId, new_ownerId);
-				values[Anum_acl - 1] = PointerGetDatum(newAcl);
-				replaces[Anum_acl - 1] = true;
-			}
-		}
-
 		newtup = heap_modify_tuple(oldtup, RelationGetDescr(rel),
 								   values, nulls, replaces);
 

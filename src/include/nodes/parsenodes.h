@@ -1621,15 +1621,6 @@ typedef struct AlterDomainStmt
 
 
 /* ----------------------
- *		Grant|Revoke Statement
- * ----------------------
- */
-typedef enum GrantTargetType
-{
-	ACL_TARGET_OBJECT,			/* grant on specific named object(s) */
-	ACL_TARGET_ALL_IN_SCHEMA,	/* grant on all objects in given schema(s) */
-	ACL_TARGET_DEFAULTS			/* ALTER DEFAULT PRIVILEGES */
-} GrantTargetType;
 
 /*
  * ObjectWithArgs represents a function/procedure/operator name plus parameter
@@ -1659,17 +1650,6 @@ typedef struct ObjectWithArgs
 
 /*
  * An access privilege, with optional list of column names
- * priv_name == NULL denotes ALL PRIVILEGES (only used with a column list)
- * cols == NIL denotes "all columns"
- * Note that simple "ALL PRIVILEGES" is represented as a NIL list, not
- * an AccessPriv with both fields null.
- */
-typedef struct AccessPriv
-{
-	NodeTag		type;
-	char	   *priv_name;		/* string name of privilege */
-	List	   *cols;			/* list of Value strings */
-} AccessPriv;
 
 
 /* ----------------------

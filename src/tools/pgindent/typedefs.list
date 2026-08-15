@@ -15,7 +15,6 @@ A_Indirection
 A_Star
 AbsoluteTime
 AccessMethodInfo
-AccessPriv
 Acl
 AclItem
 AclMaskHow
@@ -518,7 +517,6 @@ DecodedBkpBlock
 DecodingOutputState
 DefElem
 DefElemAction
-DefaultACLInfo
 DefineStmt
 DeleteStmt
 DependencyGenerator
@@ -774,7 +772,6 @@ Form_pg_collation
 Form_pg_constraint
 Form_pg_conversion
 Form_pg_database
-Form_pg_default_acl
 Form_pg_depend
 Form_pg_enum
 Form_pg_event_trigger
@@ -923,8 +920,6 @@ GistVacState
 GlobalTransaction
 GlobalVisState
 GrantRoleStmt
-GrantStmt
-GrantTargetType
 Group
 GroupClause
 GroupPath
@@ -1100,8 +1095,6 @@ Int128AggState
 Int8TransTypeData
 IntRBTreeNode
 IntegerSet
-InternalDefaultACL
-InternalGrant
 Interval
 InvalMessageArray
 InvalidationMsgsGroup

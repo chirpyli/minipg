@@ -1075,14 +1075,6 @@ _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 	return true;
 }
 
-static bool
-_equalAccessPriv(const AccessPriv *a, const AccessPriv *b)
-{
-	COMPARE_STRING_FIELD(priv_name);
-	COMPARE_NODE_FIELD(cols);
-
-	return true;
-}
 
 static bool
 _equalDeclareCursorStmt(const DeclareCursorStmt *a, const DeclareCursorStmt *b)
@@ -2932,9 +2924,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ObjectWithArgs:
 			retval = _equalObjectWithArgs(a, b);
-			break;
-		case T_AccessPriv:
-			retval = _equalAccessPriv(a, b);
 			break;
 			break;
 		case T_RoleSpec:

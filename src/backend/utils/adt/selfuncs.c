@@ -5583,15 +5583,11 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 
 		if (attno == InvalidAttrNumber)
 		{
-			/* Whole-row reference, so must have access to all columns */
-			if (pg_attribute_aclcheck_all(rte->relid, userid, ACL_SELECT,
-										  ACLMASK_ALL) != ACLCHECK_OK)
-				return false;
+			/* minipg: 无列级 ACL，整行引用默认通过 */
 		}
 		else
 		{
-			if (false)
-				return false;
+			/* minipg: 无列级 ACL，单列引用默认通过 */
 		}
 	}
 

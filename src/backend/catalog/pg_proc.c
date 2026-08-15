@@ -102,7 +102,6 @@ ProcedureCreate(const char *procedureName,
 	Oid		   *allParams;
 	char	   *paramModes = NULL;
 	Oid			variadicType = InvalidOid;
-	Acl		   *proacl = NULL;
 	Relation	rel;
 	HeapTuple	tup;
 	HeapTuple	oldtup;

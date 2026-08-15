@@ -607,13 +607,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	if (stmt->ofTypename)
 	{
-		AclResult	aclresult;
-
 		ofTypeId = typenameTypeId(NULL, stmt->ofTypename);
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, ofTypeId);
 	}
 	else
 		ofTypeId = InvalidOid;
@@ -9099,9 +9093,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		Datum		repl_val[Natts_pg_class];
 		bool		repl_null[Natts_pg_class];
 		bool		repl_repl[Natts_pg_class];
-		Acl		   *newAcl;
-		Datum		aclDatum;
-		bool		isNull;
 		HeapTuple	newtuple;
 
 		/* skip permission checks when recursing to index or toast table */

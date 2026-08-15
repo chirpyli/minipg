@@ -2938,16 +2938,6 @@ _copyObjectWithArgs(const ObjectWithArgs *from)
 	return newnode;
 }
 
-static AccessPriv *
-_copyAccessPriv(const AccessPriv *from)
-{
-	AccessPriv *newnode = makeNode(AccessPriv);
-
-	COPY_STRING_FIELD(priv_name);
-	COPY_NODE_FIELD(cols);
-
-	return newnode;
-}
 
 static DeclareCursorStmt *
 _copyDeclareCursorStmt(const DeclareCursorStmt *from)
@@ -4559,9 +4549,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ObjectWithArgs:
 			retval = _copyObjectWithArgs(from);
-			break;
-		case T_AccessPriv:
-			retval = _copyAccessPriv(from);
 			break;
 		case T_RoleSpec:
 			retval = _copyRoleSpec(from);

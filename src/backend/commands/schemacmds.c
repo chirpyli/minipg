@@ -372,11 +372,7 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 		Datum		repl_val[Natts_pg_namespace];
 		bool		repl_null[Natts_pg_namespace];
 		bool		repl_repl[Natts_pg_namespace];
-		Acl		   *newAcl;
-		Datum		aclDatum;
-		bool		isNull;
 		HeapTuple	newtuple;
-		AclResult	aclresult;
 
 		/* Otherwise, must be owner of the existing object */
 		if (!pg_namespace_ownercheck(nspForm->oid, GetUserId()))
@@ -385,20 +381,6 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 
 		/* Must be able to become new owner */
 		check_is_member_of_role(GetUserId(), newOwnerId);
-
-		/*
-		 * must have create-schema rights
-		 *
-		 * NOTE: This is different from other alter-owner checks in that the
-		 * current user is checked for create privileges instead of the
-		 * destination owner.  This is consistent with the CREATE case for
-		 * schemas.  Because superusers will always have this right, we need
-		 * no special case for them.
-		 */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_DATABASE,
-						   get_database_name(MyDatabaseId));
 
 		memset(repl_null, false, sizeof(repl_null));
 		memset(repl_repl, false, sizeof(repl_repl));

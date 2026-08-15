@@ -3804,9 +3804,6 @@ AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId)
 	Datum		repl_val[Natts_pg_type];
 	bool		repl_null[Natts_pg_type];
 	bool		repl_repl[Natts_pg_type];
-	Acl		   *newAcl;
-	Datum		aclDatum;
-	bool		isNull;
 
 	rel = table_open(TypeRelationId, RowExclusiveLock);
 

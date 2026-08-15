@@ -761,14 +761,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "   FROM pg_catalog.pg_roles "\
 "  WHERE substring(pg_catalog.quote_ident(rolname),1,%d)='%s'"
 
-#define Query_for_list_of_grant_roles \
-" SELECT pg_catalog.quote_ident(rolname) "\
-"   FROM pg_catalog.pg_roles "\
-"  WHERE substring(pg_catalog.quote_ident(rolname),1,%d)='%s'"\
-" UNION ALL SELECT 'PUBLIC'"\
-" UNION ALL SELECT 'CURRENT_ROLE'"\
-" UNION ALL SELECT 'CURRENT_USER'"\
-" UNION ALL SELECT 'SESSION_USER'"
 
 /* the silly-looking length condition is just to eat up the current word */
 #define Query_for_index_of_table \
@@ -1456,10 +1448,10 @@ psql_completion(const char *text, int start, int end)
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLOSE", "CLUSTER",
 		"COMMENT", "COMMIT", "COPY", "CREATE", "DEALLOCATE", "DECLARE",
 		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
-		"FETCH", "GRANT", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LISTEN", "LOAD", "LOCK",
+		"FETCH", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LISTEN", "LOAD", "LOCK",
 		"MOVE", "NOTIFY", "PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
-		"RESET", "REVOKE", "ROLLBACK",
+		"RESET", "ROLLBACK",
 		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
 		"TABLE", "TRUNCATE", "UPDATE", "VACUUM", "VALUES", "WITH",
 		NULL
@@ -1783,34 +1775,6 @@ psql_completion(const char *text, int start, int end)
 					  "RENAME TO", "REPLICATION", "RESET", "SET", "SUPERUSER",
 					  "VALID UNTIL");
 
-	/* ALTER DEFAULT PRIVILEGES */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES"))
-		COMPLETE_WITH("FOR ROLE", "IN SCHEMA");
-	/* ALTER DEFAULT PRIVILEGES FOR */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "FOR"))
-		COMPLETE_WITH("ROLE");
-	/* ALTER DEFAULT PRIVILEGES IN */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "IN"))
-		COMPLETE_WITH("SCHEMA");
-	/* ALTER DEFAULT PRIVILEGES FOR ROLE|USER ... */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "FOR", "ROLE|USER",
-					 MatchAny))
-		COMPLETE_WITH("GRANT", "REVOKE", "IN SCHEMA");
-	/* ALTER DEFAULT PRIVILEGES IN SCHEMA ... */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "IN", "SCHEMA",
-					 MatchAny))
-		COMPLETE_WITH("GRANT", "REVOKE", "FOR ROLE");
-	/* ALTER DEFAULT PRIVILEGES IN SCHEMA ... FOR */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "IN", "SCHEMA",
-					 MatchAny, "FOR"))
-		COMPLETE_WITH("ROLE");
-	/* ALTER DEFAULT PRIVILEGES FOR ROLE|USER ... IN SCHEMA ... */
-	/* ALTER DEFAULT PRIVILEGES IN SCHEMA ... FOR ROLE|USER ... */
-	else if (Matches("ALTER", "DEFAULT", "PRIVILEGES", "FOR", "ROLE|USER",
-					 MatchAny, "IN", "SCHEMA", MatchAny) ||
-			 Matches("ALTER", "DEFAULT", "PRIVILEGES", "IN", "SCHEMA",
-					 MatchAny, "FOR", "ROLE|USER", MatchAny))
-		COMPLETE_WITH("GRANT", "REVOKE");
 	/* ALTER DOMAIN <name> */
 	else if (Matches("ALTER", "DOMAIN", MatchAny))
 		COMPLETE_WITH("ADD", "DROP", "OWNER TO", "RENAME", "SET",
@@ -3023,180 +2987,6 @@ psql_completion(const char *text, int start, int end)
 	else if (HeadMatches("FETCH|MOVE") &&
 			 TailMatches("FROM|IN"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_cursors);
-
-/*
- * GRANT and REVOKE are allowed inside CREATE SCHEMA and
- * ALTER DEFAULT PRIVILEGES, so use TailMatches
- */
-	/* Complete GRANT/REVOKE with a list of roles and privileges */
-	else if (TailMatches("GRANT|REVOKE"))
-	{
-		/*
-		 * With ALTER DEFAULT PRIVILEGES, restrict completion to grantable
-		 * privileges (can't grant roles)
-		 */
-		if (HeadMatches("ALTER", "DEFAULT", "PRIVILEGES"))
-			COMPLETE_WITH("SELECT", "INSERT", "UPDATE",
-						  "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER",
-						  "EXECUTE", "USAGE", "ALL");
-		else
-			COMPLETE_WITH_QUERY(Query_for_list_of_roles
-								" UNION SELECT 'SELECT'"
-								" UNION SELECT 'INSERT'"
-								" UNION SELECT 'UPDATE'"
-								" UNION SELECT 'DELETE'"
-								" UNION SELECT 'TRUNCATE'"
-								" UNION SELECT 'REFERENCES'"
-								" UNION SELECT 'TRIGGER'"
-								" UNION SELECT 'CREATE'"
-								" UNION SELECT 'CONNECT'"
-								" UNION SELECT 'TEMPORARY'"
-								" UNION SELECT 'EXECUTE'"
-								" UNION SELECT 'USAGE'"
-								" UNION SELECT 'ALL'");
-	}
-
-	/*
-	 * Complete GRANT/REVOKE <privilege> with "ON", GRANT/REVOKE <role> with
-	 * TO/FROM
-	 */
-	else if (TailMatches("GRANT|REVOKE", MatchAny))
-	{
-		if (TailMatches("SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER|CREATE|CONNECT|TEMPORARY|TEMP|EXECUTE|USAGE|ALL"))
-			COMPLETE_WITH("ON");
-		else if (TailMatches("GRANT", MatchAny))
-			COMPLETE_WITH("TO");
-		else
-			COMPLETE_WITH("FROM");
-	}
-
-	/*
-	 * Complete GRANT/REVOKE <sth> ON with a list of appropriate relations.
-	 *
-	 * Keywords like DATABASE, FUNCTION, LANGUAGE and SCHEMA added to query
-	 * result via UNION; seems to work intuitively.
-	 *
-	 * Note: GRANT/REVOKE can get quite complex; tab-completion as implemented
-	 * here will only work if the privilege list contains exactly one
-	 * privilege.
-	 */
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON"))
-	{
-		/*
-		 * With ALTER DEFAULT PRIVILEGES, restrict completion to the kinds of
-		 * objects supported.
-		 */
-		if (HeadMatches("ALTER", "DEFAULT", "PRIVILEGES"))
-			COMPLETE_WITH("TABLES", "SEQUENCES", "FUNCTIONS", "PROCEDURES", "ROUTINES", "TYPES", "SCHEMAS");
-		else
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_grantables,
-									   " UNION SELECT 'ALL FUNCTIONS IN SCHEMA'"
-									   " UNION SELECT 'ALL PROCEDURES IN SCHEMA'"
-									   " UNION SELECT 'ALL ROUTINES IN SCHEMA'"
-									   " UNION SELECT 'ALL SEQUENCES IN SCHEMA'"
-									   " UNION SELECT 'ALL TABLES IN SCHEMA'"
-									   " UNION SELECT 'DATABASE'"
-									   " UNION SELECT 'DOMAIN'"
-									   " UNION SELECT 'FOREIGN DATA WRAPPER'"
-									   " UNION SELECT 'FOREIGN SERVER'"
-									   " UNION SELECT 'FUNCTION'"
-									   " UNION SELECT 'LANGUAGE'"
-									   " UNION SELECT 'LARGE OBJECT'"
-									   " UNION SELECT 'PROCEDURE'"
-									   " UNION SELECT 'ROUTINE'"
-									   " UNION SELECT 'SCHEMA'"
-									   " UNION SELECT 'SEQUENCE'"
-									   " UNION SELECT 'TABLE'"
-									   " UNION SELECT 'TABLESPACE'"
-									   " UNION SELECT 'TYPE'");
-	}
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", "ALL"))
-		COMPLETE_WITH("FUNCTIONS IN SCHEMA",
-					  "PROCEDURES IN SCHEMA",
-					  "ROUTINES IN SCHEMA",
-					  "SEQUENCES IN SCHEMA",
-					  "TABLES IN SCHEMA");
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", "FOREIGN"))
-		COMPLETE_WITH("DATA WRAPPER", "SERVER");
-
-	/*
-	 * Complete "GRANT/REVOKE * ON DATABASE/DOMAIN/..." with a list of
-	 * appropriate objects.
-	 *
-	 * Complete "GRANT/REVOKE * ON *" with "TO/FROM".
-	 */
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", MatchAny))
-	{
-		if (TailMatches("DATABASE"))
-			COMPLETE_WITH_QUERY(Query_for_list_of_databases);
-		else if (TailMatches("DOMAIN"))
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_domains, NULL);
-		else if (TailMatches("FUNCTION"))
-			COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_functions, NULL);
-		else if (TailMatches("LANGUAGE"))
-			COMPLETE_WITH_QUERY(Query_for_list_of_languages);
-		else if (TailMatches("PROCEDURE"))
-			COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_procedures, NULL);
-		else if (TailMatches("ROUTINE"))
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_routines, NULL);
-		else if (TailMatches("SCHEMA"))
-			COMPLETE_WITH_QUERY(Query_for_list_of_schemas);
-		else if (TailMatches("SEQUENCE"))
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_sequences, NULL);
-		else if (TailMatches("TABLE"))
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_grantables, NULL);
-		else if (TailMatches("TABLESPACE"))
-			COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
-		else if (TailMatches("TYPE"))
-			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_datatypes, NULL);
-		else if (TailMatches("GRANT", MatchAny, MatchAny, MatchAny))
-			COMPLETE_WITH("TO");
-		else
-			COMPLETE_WITH("FROM");
-	}
-
-	/*
-	 * Complete "GRANT/REVOKE ... TO/FROM" with username, PUBLIC,
-	 * CURRENT_ROLE, CURRENT_USER, or SESSION_USER.
-	 */
-	else if ((HeadMatches("GRANT") && TailMatches("TO")) ||
-			 (HeadMatches("REVOKE") && TailMatches("FROM")))
-		COMPLETE_WITH_QUERY(Query_for_list_of_grant_roles);
-	/* Complete "ALTER DEFAULT PRIVILEGES ... GRANT/REVOKE ... TO/FROM */
-	else if (HeadMatches("ALTER", "DEFAULT", "PRIVILEGES") && TailMatches("TO|FROM"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_grant_roles);
-	/* Complete "GRANT/REVOKE ... ON * *" with TO/FROM */
-	else if (HeadMatches("GRANT") && TailMatches("ON", MatchAny, MatchAny))
-		COMPLETE_WITH("TO");
-	else if (HeadMatches("REVOKE") && TailMatches("ON", MatchAny, MatchAny))
-		COMPLETE_WITH("FROM");
-
-	/* Complete "GRANT/REVOKE * ON ALL * IN SCHEMA *" with TO/FROM */
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", "ALL", MatchAny, "IN", "SCHEMA", MatchAny))
-	{
-		if (TailMatches("GRANT", MatchAny, MatchAny, MatchAny, MatchAny, MatchAny, MatchAny, MatchAny))
-			COMPLETE_WITH("TO");
-		else
-			COMPLETE_WITH("FROM");
-	}
-
-	/* Complete "GRANT/REVOKE * ON FOREIGN DATA WRAPPER *" with TO/FROM */
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", "FOREIGN", "DATA", "WRAPPER", MatchAny))
-	{
-		if (TailMatches("GRANT", MatchAny, MatchAny, MatchAny, MatchAny, MatchAny, MatchAny))
-			COMPLETE_WITH("TO");
-		else
-			COMPLETE_WITH("FROM");
-	}
-
-	/* Complete "GRANT/REVOKE * ON FOREIGN SERVER *" with TO/FROM */
-	else if (TailMatches("GRANT|REVOKE", MatchAny, "ON", "FOREIGN", "SERVER", MatchAny))
-	{
-		if (TailMatches("GRANT", MatchAny, MatchAny, MatchAny, MatchAny, MatchAny))
-			COMPLETE_WITH("TO");
-		else
-			COMPLETE_WITH("FROM");
-	}
 
 /* GROUP BY */
 	else if (TailMatches("FROM", MatchAny, "GROUP"))

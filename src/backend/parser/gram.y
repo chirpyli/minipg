@@ -110,13 +110,6 @@
 #define YYMALLOC palloc
 #define YYFREE   pfree
 
-/* Private struct for the result of privilege_target production */
-typedef struct PrivTarget
-{
-	GrantTargetType targtype;
-	ObjectType	objtype;
-	List	   *objs;
-} PrivTarget;
 
 
 /* Private struct for the result of opt_select_limit production */
@@ -235,8 +228,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	OnConflictClause	*onconflict;
 	A_Indices			*aind;
 	ResTarget			*target;
-	struct PrivTarget	*privtarget;
-	AccessPriv			*accesspriv;
 	InsertStmt			*istmt;
 	VariableSetStmt		*vsetstmt;
 	RoleSpec			*rolespec;
@@ -582,7 +573,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
 	FORCE FOREIGN FORWARD FREEZE FROM FULL FUNCTION FUNCTIONS
 
-	GENERATED GLOBAL GRANT GRANTED GREATEST GROUP_P GROUPING GROUPS
+	GENERATED GLOBAL GRANTED GREATEST GROUP_P GROUPING GROUPS
 
 	HANDLER HAVING HEADER_P HOLD HOUR_P
 
@@ -618,7 +609,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCES REFERENCING
 	REFRESH REINDEX RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
-	RESET RESTART RESTRICT RETURN RETURNING RETURNS REVOKE RIGHT ROLE ROLLBACK ROLLUP
+	RESET RESTART RESTRICT RETURN RETURNING RETURNS RIGHT ROLE ROLLBACK ROLLUP
 	ROUTINE ROUTINES ROW ROWS RULE
 
 	SAVEPOINT SCHEMA SCHEMAS SCROLL SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
@@ -11286,7 +11277,6 @@ unreserved_keyword:
 			| RESTRICT
 			| RETURN
 			| RETURNS
-			| REVOKE
 			| ROLE
 			| ROLLBACK
 			| ROLLUP
@@ -11501,7 +11491,6 @@ reserved_keyword:
 			| FOR
 			| FOREIGN
 			| FROM
-			| GRANT
 			| GROUP_P
 			| HAVING
 			| IN_P
@@ -11850,7 +11839,6 @@ bare_label_keyword:
 			| RESTRICT
 			| RETURN
 			| RETURNS
-			| REVOKE
 			| RIGHT
 			| ROLE
 			| ROLLBACK

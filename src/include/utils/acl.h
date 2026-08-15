@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * acl.h
- *	  Definition of (and support for) access control list data structures.
+ *	  Support for access/ownership checking.
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -10,23 +10,15 @@
  * src/include/utils/acl.h
  *
  * NOTES
- *	  An ACL array is simply an array of AclItems, representing the union
- *	  of the privileges represented by the individual items.  A zero-length
- *	  array represents "no privileges".
- *
- *	  The order of items in the array is important as client utilities (in
- *	  particular, pg_dump, though possibly other clients) expect to be able
- *	  to issue GRANTs in the ordering of the items in the array.  The reason
- *	  this matters is that GRANTs WITH GRANT OPTION must be before any GRANTs
- *	  which depend on it.  This happens naturally in the backend during
- *	  operations as we update ACLs in-place, new items are appended, and
- *	  existing entries are only removed if there's no dependency on them (no
- *	  GRANT can been based on it, or, if there was, those GRANTs are also
- *	  removed).
- *
- *	  For backward-compatibility purposes we have to allow null ACL entries
- *	  in system catalogs.  A null ACL will be treated as meaning "default
- *	  protection" (i.e., whatever acldefault() returns).
+ *	  minipg 已移除细粒度 ACL（访问控制列表）的判定与数据运算机制：各系统
+ *	  catalog 的 *acl 列、pg_acl catalog、aclitem 类型运算、GRANT/REVOKE 命令
+ *	  及 pg_default_acl 均已删除，acl.c 中的 ACL 数据函数（acldefault/aclupdate/
+ *	  aclnewowner/aclmask 等）也已一并删除。本头文件仅保留：
+ *	  - Acl/AclItem 类型与 ACL_* 权限位宏（被 GenerateTypeDependencies 等核心
+ *	    类型系统函数的签名以及解析器权限位机制所依赖，仅作为类型/位定义，
+ *	    不再承载任何 ACL 判定语义）；
+ *	  - 所有权检查（ownercheck）与角色成员关系判定所需的声明；
+ *	  - 权限/所有权不足时的标准错误报告（aclcheck_error/aclcheck_error_type）。
  *-------------------------------------------------------------------------
  */
 #ifndef ACL_H
@@ -43,6 +35,7 @@
  * bit meanings are defined there
  */
 
+
 #define ACL_ID_PUBLIC	0		/* placeholder for id in a PUBLIC acl item */
 
 /*
@@ -51,136 +44,69 @@
  * Note: must be same size on all platforms, because the size is hardcoded
  * in the pg_type.h entry for aclitem.
  */
+
 typedef struct AclItem
 {
 	Oid			ai_grantee;		/* ID that this item grants privs to */
 	Oid			ai_grantor;		/* grantor of privs */
-	AclMode		ai_privs;		/* privilege bits */
+	AclMode		ai_privs;		/* privs being granted */
+
+	/*
+	 * Note: ai_grantor is not redundant with the grantor fields in the
+	 * actual ACL SHOW command.  If the _PRIVILEGES functions are ever
+	 * changed to return ACL items rather than strings, this may be
+	 * irrelevant.
+	 */
 } AclItem;
 
-/*
- * aclitem 类型已从 minipg 的 SQL/存储/类型注册层彻底移除（见 CHANGE.md）。
- * 此处保留 AclItem 内部结构定义与 ACLITEMOID 占位宏，仅用于兼容 acl.c 中
- * 已无任何 SQL 调用入口的遗留函数（aclitemin/acldefault/aclexplode 等），
- * 它们不再被任何 catalog 字段或 SQL 函数引用，属于无害死代码。
- */
-#define ACLITEMOID	InvalidOid
+#define ACLITEMOID 1033
 
-/*
- * The upper 16 bits of the ai_privs field of an AclItem are the grant option
- * bits, and the lower 16 bits are the actual privileges.  We use "rights"
- * to mean the combined grant option and privilege bits fields.
- */
-#define ACLITEM_GET_PRIVS(item)    ((item).ai_privs & 0xFFFF)
-#define ACLITEM_GET_GOPTIONS(item) (((item).ai_privs >> 16) & 0xFFFF)
-#define ACLITEM_GET_RIGHTS(item)   ((item).ai_privs)
-
-#define ACL_GRANT_OPTION_FOR(privs) (((AclMode) (privs) & 0xFFFF) << 16)
-#define ACL_OPTION_TO_PRIVS(privs)	(((AclMode) (privs) >> 16) & 0xFFFF)
-
-#define ACLITEM_SET_PRIVS(item,privs) \
-  ((item).ai_privs = ((item).ai_privs & ~((AclMode) 0xFFFF)) | \
-					 ((AclMode) (privs) & 0xFFFF))
-#define ACLITEM_SET_GOPTIONS(item,goptions) \
-  ((item).ai_privs = ((item).ai_privs & ~(((AclMode) 0xFFFF) << 16)) | \
-					 (((AclMode) (goptions) & 0xFFFF) << 16))
-#define ACLITEM_SET_RIGHTS(item,rights) \
-  ((item).ai_privs = (AclMode) (rights))
-
-#define ACLITEM_SET_PRIVS_GOPTIONS(item,privs,goptions) \
-  ((item).ai_privs = ((AclMode) (privs) & 0xFFFF) | \
-					 (((AclMode) (goptions) & 0xFFFF) << 16))
-
-
-#define ACLITEM_ALL_PRIV_BITS		((AclMode) 0xFFFF)
-#define ACLITEM_ALL_GOPTION_BITS	((AclMode) 0xFFFF << 16)
 
 /*
  * Definitions for convenient access to Acl (array of AclItem).
  * These are standard PostgreSQL arrays, but are restricted to have one
  * dimension and no nulls.  We also ignore the lower bound when reading,
  * and set it to one when writing.
- *
- * CAUTION: as of PostgreSQL 7.1, these arrays are toastable (just like all
- * other array types).  Therefore, be careful to detoast them with the
- * macros provided, unless you know for certain that a particular array
- * can't have been toasted.
  */
-
 
 /*
  * Acl			a one-dimensional array of AclItem
  */
-typedef struct ArrayType Acl;
-
-#define ACL_NUM(ACL)			(ARR_DIMS(ACL)[0])
-#define ACL_DAT(ACL)			((AclItem *) ARR_DATA_PTR(ACL))
-#define ACL_N_SIZE(N)			(ARR_OVERHEAD_NONULLS(1) + ((N) * sizeof(AclItem)))
-#define ACL_SIZE(ACL)			ARR_SIZE(ACL)
+typedef AclItem *Acl;
 
 /*
- * fmgr macros for these types
+ * According to the SQL standard, the grantor of a privilege can be
+ * "PUBLIC".  In GPDB, we represent this in the low bit of the grantee id.
+ * Note that this bit is cleared before storing AclItems in the system
+ * catalogs.
  */
-#define DatumGetAclItemP(X)		   ((AclItem *) DatumGetPointer(X))
-#define PG_GETARG_ACLITEM_P(n)	   DatumGetAclItemP(PG_GETARG_DATUM(n))
-#define PG_RETURN_ACLITEM_P(x)	   PG_RETURN_POINTER(x)
+#define ACLITEM_ALL_GRANTEES	((Oid) 0)
 
-#define DatumGetAclP(X)			   ((Acl *) PG_DETOAST_DATUM(X))
-#define DatumGetAclPCopy(X)		   ((Acl *) PG_DETOAST_DATUM_COPY(X))
-#define PG_GETARG_ACL_P(n)		   DatumGetAclP(PG_GETARG_DATUM(n))
-#define PG_GETARG_ACL_P_COPY(n)    DatumGetAclPCopy(PG_GETARG_DATUM(n))
-#define PG_RETURN_ACL_P(x)		   PG_RETURN_POINTER(x)
+#define ACL_GRANT_OPTION_FOR(priv) (1 << (29 - (priv)))
+#define ACL_OPTION_IS_GLOBAL(priv) (1 << (30 - (priv)))
 
-/*
- * ACL modification opcodes for aclupdate
- */
-#define ACL_MODECHG_ADD			1
-#define ACL_MODECHG_DEL			2
-#define ACL_MODECHG_EQL			3
+#define ACL_GRANT_WGO(priv) (priv | ACL_GRANT_OPTION_FOR(priv))
 
-/*
- * External representations of the privilege bits --- aclitemin/aclitemout
- * represent each possible privilege bit with a distinct 1-character code
- */
-#define ACL_INSERT_CHR			'a' /* formerly known as "append" */
-#define ACL_SELECT_CHR			'r' /* formerly known as "read" */
-#define ACL_UPDATE_CHR			'w' /* formerly known as "write" */
-#define ACL_DELETE_CHR			'd'
-#define ACL_TRUNCATE_CHR		'D' /* super-delete, as it were */
-#define ACL_REFERENCES_CHR		'x'
-#define ACL_TRIGGER_CHR			't'
-#define ACL_EXECUTE_CHR			'X'
-#define ACL_USAGE_CHR			'U'
-#define ACL_CREATE_CHR			'C'
-#define ACL_CREATE_TEMP_CHR		'T'
-#define ACL_CONNECT_CHR			'c'
+#define ACL_ALL_RIGHTS_NO_GRANTOpts	0
 
-/* string holding all privilege code chars, in order by bitmask position */
-#define ACL_ALL_RIGHTS_STR	"arwdDxtXUCTc"
-
-/*
- * Bitmasks defining "all rights" for each supported object type
- */
-#define ACL_ALL_RIGHTS_COLUMN		(ACL_INSERT|ACL_SELECT|ACL_UPDATE|ACL_REFERENCES)
-#define ACL_ALL_RIGHTS_RELATION		(ACL_INSERT|ACL_SELECT|ACL_UPDATE|ACL_DELETE|ACL_TRUNCATE|ACL_REFERENCES|ACL_TRIGGER)
-#define ACL_ALL_RIGHTS_SEQUENCE		(ACL_USAGE|ACL_SELECT|ACL_UPDATE)
-#define ACL_ALL_RIGHTS_DATABASE		(ACL_CREATE|ACL_CREATE_TEMP|ACL_CONNECT)
-#define ACL_ALL_RIGHTS_FDW			(ACL_USAGE)
+#define ACL_ALL_RIGHTS_RELATION	(ACL_INSERT|ACL_SELECT|ACL_UPDATE|ACL_DELETE|ACL_TRUNCATE|ACL_REFERENCES|ACL_TRIGGER)
+#define ACL_ALL_RIGHTS_SEQUENCE	(ACL_USAGE|ACL_SELECT|ACL_UPDATE)
+#define ACL_ALL_RIGHTS_DATABASE	(ACL_CREATE|ACL_CREATE_TEMP|ACL_CONNECT)
+#define ACL_ALL_RIGHTS_FDW		(ACL_USAGE)
 #define ACL_ALL_RIGHTS_FOREIGN_SERVER (ACL_USAGE)
-#define ACL_ALL_RIGHTS_FUNCTION		(ACL_EXECUTE)
-#define ACL_ALL_RIGHTS_LANGUAGE		(ACL_USAGE)
-#define ACL_ALL_RIGHTS_SCHEMA		(ACL_USAGE|ACL_CREATE)
-#define ACL_ALL_RIGHTS_TABLESPACE	(ACL_CREATE)
-#define ACL_ALL_RIGHTS_TYPE			(ACL_USAGE)
+#define ACL_ALL_RIGHTS_FUNCTION	(ACL_EXECUTE)
+#define ACL_ALL_RIGHTS_LANGUAGE	(ACL_USAGE)
+#define ACL_ALL_RIGHTS_LARGEOBJECT	(ACL_SELECT|ACL_UPDATE)
+#define ACL_ALL_RIGHTS_NAMESPACE	(ACL_USAGE|ACL_CREATE)
+#define ACL_ALL_RIGHTS_OPSCHEMA	(ACL_USAGE|ACL_CREATE)
+#define ACL_ALL_RIGHTS_TYPE		(ACL_USAGE)
+#define ACL_ALL_RIGHTS_OPCLASS	(ACL_USAGE)
+#define ACL_ALL_RIGHTS_OPFAMILY	(ACL_USAGE)
+#define ACL_ALL_RIGHTS_SCHEMA	(ACL_USAGE|ACL_CREATE)
 
-/* operation codes for pg_*_aclmask */
-typedef enum
-{
-	ACLMASK_ALL,				/* normal case: compute all bits */
-	ACLMASK_ANY					/* return when result is known nonzero */
-} AclMaskHow;
-
-/* result codes for pg_*_aclcheck */
+/*
+ * Result codes for permission-check functions
+ */
 typedef enum
 {
 	ACLCHECK_OK = 0,
@@ -188,26 +114,9 @@ typedef enum
 	ACLCHECK_NOT_OWNER
 } AclResult;
 
-
 /*
- * routines used internally
+ * routines used internally (role membership)
  */
-extern Acl *acldefault(ObjectType objtype, Oid ownerId);
-
-extern Acl *aclupdate(const Acl *old_acl, const AclItem *mod_aip,
-					  int modechg, Oid ownerId, DropBehavior behavior);
-extern Acl *aclnewowner(const Acl *old_acl, Oid oldOwnerId, Oid newOwnerId);
-extern Acl *make_empty_acl(void);
-extern Acl *aclcopy(const Acl *orig_acl);
-extern Acl *aclconcat(const Acl *left_acl, const Acl *right_acl);
-extern Acl *aclmerge(const Acl *left_acl, const Acl *right_acl, Oid ownerId);
-extern void aclitemsort(Acl *acl);
-extern bool aclequal(const Acl *left_acl, const Acl *right_acl);
-
-extern AclMode aclmask(const Acl *acl, Oid roleid, Oid ownerId,
-					   AclMode mask, AclMaskHow how);
-extern int	aclmembers(const Acl *acl, Oid **roleids);
-
 extern bool has_privs_of_role(Oid member, Oid role);
 extern bool is_member_of_role(Oid member, Oid role);
 extern bool is_member_of_role_nosuper(Oid member, Oid role);
@@ -219,38 +128,15 @@ extern void check_rolespec_name(const RoleSpec *role, const char *detail_msg);
 extern HeapTuple get_rolespec_tuple(const RoleSpec *role);
 extern char *get_rolespec_name(const RoleSpec *role);
 
-extern void select_best_grantor(Oid roleId, AclMode privileges,
-								const Acl *acl, Oid ownerId,
-								Oid *grantorId, AclMode *grantOptions);
 
-extern void initialize_acl(void);
+extern bool initialize_acl(void);
 
 /*
- * prototypes for functions in aclchk.c
+ * standardized reporting of aclcheck permission failures
  */
-extern AclMode pg_attribute_aclmask_ext(Oid table_oid, AttrNumber attnum,
-										Oid roleid, AclMode mask,
-										AclMaskHow how, bool *is_missing);
-extern AclMode pg_class_aclmask_ext(Oid table_oid, Oid roleid,
-									AclMode mask, AclMaskHow how,
-									bool *is_missing);
-
-extern AclResult pg_attribute_aclcheck_ext(Oid table_oid, AttrNumber attnum,
-										   Oid roleid, AclMode mode,
-										   bool *is_missing);
-extern AclResult pg_attribute_aclcheck_all(Oid table_oid, Oid roleid,
-										   AclMode mode, AclMaskHow how);
-extern AclResult pg_class_aclcheck_ext(Oid table_oid, Oid roleid,
-									   AclMode mode, bool *is_missing);
-
 extern void aclcheck_error(AclResult aclerr, ObjectType objtype,
 						   const char *objectname);
-
-extern void aclcheck_error_col(AclResult aclerr, ObjectType objtype,
-							   const char *objectname, const char *colname);
-
 extern void aclcheck_error_type(AclResult aclerr, Oid typeOid);
-
 
 /* ownercheck routines just return true (owner) or false (not) */
 extern bool pg_class_ownercheck(Oid class_oid, Oid roleid);

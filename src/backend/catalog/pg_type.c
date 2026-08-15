@@ -213,7 +213,6 @@ TypeCreate(Oid newTypeOid,
 	Oid			typeObjectId;
 	bool		isDependentType;
 	bool		rebuildDeps = false;
-	Acl		   *typacl;
 	HeapTuple	tup;
 	bool		nulls[Natts_pg_type];
 	bool		replaces[Natts_pg_type];
@@ -458,7 +457,7 @@ TypeCreate(Oid newTypeOid,
 								 (defaultTypeBin ?
 								  stringToNode(defaultTypeBin) :
 								  NULL),
-								 typacl,
+								 NULL,
 								 relationKind,
 								 isImplicitArray,
 								 isDependentType,

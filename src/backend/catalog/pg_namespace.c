@@ -51,7 +51,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 	TupleDesc	tupDesc;
 	ObjectAddress myself;
 	int			i;
-	Acl		   *nspacl;
 
 	/* sanity checks */
 	if (!nspName)
@@ -62,11 +61,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_SCHEMA),
 				 errmsg("schema \"%s\" already exists", nspName)));
-
-	if (!isTemp)
-		nspacl = NULL;
-	else
-		nspacl = NULL;
 
 	nspdesc = table_open(NamespaceRelationId, RowExclusiveLock);
 	tupDesc = nspdesc->rd_att;

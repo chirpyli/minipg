@@ -42,7 +42,6 @@ static bool listTSConfigsVerbose(const char *pattern);
 static bool describeOneTSConfig(const char *oid, const char *nspname,
 								const char *cfgname,
 								const char *pnspname, const char *prsname);
-static void printACLColumn(PQExpBuffer buf, const char *colname);
 static bool listOneExtensionContents(const char *extname, const char *oid);
 static bool validateSQLNamePattern(PQExpBuffer buf, const char *pattern,
 								   bool have_where, bool force_escape,
@@ -240,12 +239,6 @@ describeTablespaces(const char *pattern, bool verbose)
 						  gettext_noop("Name"),
 						  gettext_noop("Owner"),
 						  gettext_noop("Location"));
-
-	if (verbose)
-	{
-		appendPQExpBufferStr(&buf, ",\n  ");
-		printACLColumn(&buf, "spcacl");
-	}
 
 	if (verbose && pset.sversion >= 90000)
 		appendPQExpBuffer(&buf,
@@ -474,8 +467,6 @@ describeFunctions(const char *functypes, const char *func_pattern,
 						  gettext_noop("definer"),
 						  gettext_noop("invoker"),
 						  gettext_noop("Security"));
-		appendPQExpBufferStr(&buf, ",\n ");
-		printACLColumn(&buf, "p.proacl");
 		appendPQExpBuffer(&buf,
 						  ",\n l.lanname as \"%s\"",
 						  gettext_noop("Language"));
@@ -741,7 +732,6 @@ describeTypes(const char *pattern, bool verbose, bool showSystem)
 	}
 	if (verbose && pset.sversion >= 90200)
 	{
-		printACLColumn(&buf, "t.typacl");
 		appendPQExpBufferStr(&buf, ",\n  ");
 	}
 
@@ -1023,7 +1013,6 @@ listAllDbs(const char *pattern, bool verbose)
 						  gettext_noop("Collate"),
 						  gettext_noop("Ctype"));
 	appendPQExpBufferStr(&buf, "       ");
-	printACLColumn(&buf, "d.datacl");
 	if (verbose && pset.sversion >= 80200)
 	{
 		appendPQExpBuffer(&buf,
@@ -1067,97 +1056,6 @@ listAllDbs(const char *pattern, bool verbose)
 
 	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
 
-	PQclear(res);
-	return true;
-}
-
-
-/*
- * List Tables' Grant/Revoke Permissions
- * \z (now also \dp -- perhaps more mnemonic)
- */
-bool
-permissionsList(const char *pattern)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-	static const bool translate_columns[] = {false, false, true, false, false, false};
-
-	initPQExpBuffer(&buf);
-
-	/*
-	 * we ignore indexes and toast tables since they have no meaningful rights
-	 */
-	printfPQExpBuffer(&buf,
-					  "SELECT n.nspname as \"%s\",\n"
-					  "  c.relname as \"%s\",\n"
-					  "  CASE c.relkind"
-					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
-					  " WHEN " "'p'" " THEN '%s'"
-					  " END as \"%s\",\n"
-					  "  ",
-					  gettext_noop("Schema"),
-					  gettext_noop("Name"),
-					  gettext_noop("table"),
-					  gettext_noop("view"),
-					  gettext_noop("materialized view"),
-					  gettext_noop("sequence"),
-					  gettext_noop("partitioned table"),
-					  gettext_noop("Type"));
-
-	printACLColumn(&buf, "c.relacl");
-
-	if (pset.sversion >= 80400)
-		appendPQExpBuffer(&buf,
-						  ",\n  pg_catalog.array_to_string(ARRAY(\n"
-						  "    SELECT attname || E':\\n  ' || pg_catalog.array_to_string(attacl, E'\\n  ')\n"
-						  "    FROM pg_catalog.pg_attribute a\n"
-						  "    WHERE attrelid = c.oid AND NOT attisdropped AND attacl IS NOT NULL\n"
-						  "  ), E'\\n') AS \"%s\"",
-						  gettext_noop("Column privileges"));
-
-	appendPQExpBufferStr(&buf, "\nFROM pg_catalog.pg_class c\n"
-						 "     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n"
-						 "WHERE c.relkind IN ("
-						 CppAsString2(RELKIND_RELATION) ","
-					 CppAsString2(RELKIND_VIEW) ","
-					 CppAsString2(RELKIND_SEQUENCE) ","
-						 "'p'" ")\n");
-
-	/*
-	 * Unless a schema pattern is specified, we suppress system and temp
-	 * tables, since they normally aren't very interesting from a permissions
-	 * point of view.  You can see 'em by explicit request though, eg with \z
-	 * pg_catalog.*
-	 */
-	if (!validateSQLNamePattern(&buf, pattern, true, false,
-								"n.nspname", "c.relname", NULL,
-								"n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' AND pg_catalog.pg_table_is_visible(c.oid)",
-								NULL, 3))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2;");
-
-	res = PSQLexec(buf.data);
-	if (!res)
-	{
-		termPQExpBuffer(&buf);
-		return false;
-	}
-
-	myopt.nullPrint = NULL;
-	printfPQExpBuffer(&buf, _("Access privileges"));
-	myopt.title = buf.data;
-	myopt.translate_header = true;
-	myopt.translate_columns = translate_columns;
-	myopt.n_translate_columns = lengthof(translate_columns);
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	termPQExpBuffer(&buf);
 	PQclear(res);
 	return true;
 }
@@ -3773,7 +3671,6 @@ listLanguages(const char *pattern, bool verbose, bool showSystem)
 		if (pset.sversion >= 90000)
 			appendPQExpBuffer(&buf, "l.laninline::pg_catalog.regprocedure AS \"%s\",\n       ",
 							  gettext_noop("Inline handler"));
-		printACLColumn(&buf, "l.lanacl");
 	}
 
 	appendPQExpBuffer(&buf,
@@ -3851,11 +3748,6 @@ listDomains(const char *pattern, bool verbose, bool showSystem)
 
 	if (verbose)
 	{
-		if (pset.sversion >= 90200)
-		{
-			appendPQExpBufferStr(&buf, ",\n  ");
-			printACLColumn(&buf, "t.typacl");
-		}
 		appendPQExpBuffer(&buf,
 						  ",\n       d.description as \"%s\"",
 						  gettext_noop("Description"));
@@ -4296,8 +4188,6 @@ listSchemas(const char *pattern, bool verbose, bool showSystem)
 
 	if (verbose)
 	{
-		appendPQExpBufferStr(&buf, ",\n  ");
-		printACLColumn(&buf, "n.nspacl");
 		appendPQExpBuffer(&buf,
 						  ",\n  pg_catalog.obj_description(n.oid, 'pg_namespace') AS \"%s\"",
 						  gettext_noop("Description"));
@@ -5413,25 +5303,6 @@ describeSubscriptions(const char *pattern, bool verbose)
 	return true;
 }
 
-/*
- * printACLColumn
- *
- * Helper function for consistently formatting ACL (privilege) columns.
- * The proper targetlist entry is appended to buf.  Note lack of any
- * whitespace or comma decoration.
- */
-static void
-printACLColumn(PQExpBuffer buf, const char *colname)
-{
-	if (pset.sversion >= 80100)
-		appendPQExpBuffer(buf,
-						  "pg_catalog.array_to_string(%s, E'\\n') AS \"%s\"",
-						  colname, gettext_noop("Access privileges"));
-	else
-		appendPQExpBuffer(buf,
-						  "pg_catalog.array_to_string(%s, '\\n') AS \"%s\"",
-						  colname, gettext_noop("Access privileges"));
-}
 
 /*
  * \dAc
