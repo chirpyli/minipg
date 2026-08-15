@@ -2520,7 +2520,6 @@ TableFuncRoutine
 TableFuncScan
 TableFuncScanState
 TableInfo
-TableLikeClause
 TableSampleClause
 TableScanDesc
 TableScanDescData

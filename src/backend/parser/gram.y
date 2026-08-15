@@ -501,8 +501,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <keyword> col_name_keyword reserved_keyword
 %type <keyword> bare_label_keyword
 
-%type <node>	TableConstraint TableLikeClause
-%type <ival>	TableLikeOptionList TableLikeOption
+%type <node>	TableConstraint
 %type <str>		column_compression opt_column_compression
 %type <list>	ColQualList
 %type <node>	ColConstraint ColConstraintElem ConstraintAttr
@@ -2229,7 +2228,6 @@ TypedTableElementList:
 
 TableElement:
 			columnDef							{ $$ = $1; }
-			| TableLikeClause					{ $$ = $1; }
 			| TableConstraint					{ $$ = $1; }
 		;
 
@@ -2493,36 +2491,6 @@ ConstraintAttr:
 					n->location = @1;
 					$$ = (Node *)n;
 				}
-		;
-
-
-TableLikeClause:
-			LIKE qualified_name TableLikeOptionList
-				{
-					TableLikeClause *n = makeNode(TableLikeClause);
-					n->relation = $2;
-					n->options = $3;
-					n->relationOid = InvalidOid;
-					$$ = (Node *)n;
-				}
-		;
-
-TableLikeOptionList:
-				TableLikeOptionList INCLUDING TableLikeOption	{ $$ = $1 | $3; }
-				| TableLikeOptionList EXCLUDING TableLikeOption	{ $$ = $1 & ~$3; }
-				| /* EMPTY */						{ $$ = 0; }
-		;
-
-TableLikeOption:
-				COMPRESSION		{ $$ = CREATE_TABLE_LIKE_COMPRESSION; }
-				| CONSTRAINTS		{ $$ = CREATE_TABLE_LIKE_CONSTRAINTS; }
-				| DEFAULTS			{ $$ = CREATE_TABLE_LIKE_DEFAULTS; }
-				| IDENTITY_P		{ $$ = CREATE_TABLE_LIKE_IDENTITY; }
-				| GENERATED			{ $$ = CREATE_TABLE_LIKE_GENERATED; }
-				| INDEXES			{ $$ = CREATE_TABLE_LIKE_INDEXES; }
-				| STATISTICS		{ $$ = CREATE_TABLE_LIKE_STATISTICS; }
-				| STORAGE			{ $$ = CREATE_TABLE_LIKE_STORAGE; }
-				| ALL				{ $$ = CREATE_TABLE_LIKE_ALL; }
 		;
 
 

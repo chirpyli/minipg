@@ -860,7 +860,6 @@ ProcessUtilitySlow(ParseState *pstate,
 			case T_CreateStmt:
 			{
 				List	   *stmts;
-				RangeVar   *table_rv = NULL;
 
 					/* Run parse analysis ... */
 					stmts = transformCreateStmt((CreateStmt *) parsetree,
@@ -882,9 +881,6 @@ ProcessUtilitySlow(ParseState *pstate,
 							CreateStmt *cstmt = (CreateStmt *) stmt;
 							Datum		toast_options;
 							static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
-
-							/* Remember transformed RangeVar for LIKE */
-							table_rv = cstmt->relation;
 
 							/* Create the table itself */
 							address = DefineRelation(cstmt,
@@ -915,23 +911,7 @@ ProcessUtilitySlow(ParseState *pstate,
 						NewRelationCreateToastTable(address.objectId,
 													toast_options);
 					}
-					else if (IsA(stmt, TableLikeClause))
-						{
-							/*
-							 * Do delayed processing of LIKE options.  This
-							 * will result in additional sub-statements for us
-							 * to process.  Those should get done before any
-							 * remaining actions, so prepend them to "stmts".
-							 */
-							TableLikeClause *like = (TableLikeClause *) stmt;
-							List	   *morestmts;
-
-							Assert(table_rv != NULL);
-
-							morestmts = expandTableLikeClause(table_rv, like);
-							stmts = list_concat(morestmts, stmts);
-						}
-						else
+					else
 						{
 							/*
 							 * Recurse for anything else.  Note the recursive

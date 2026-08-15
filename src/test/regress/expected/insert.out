@@ -760,9 +760,9 @@ ERROR:  syntax error at or near "partition"
 LINE 1: ... table mlparted1 (b int not null, a int not null) partition ...
                                                              ^
 create table mlparted11 (like mlparted1);
-ERROR:  relation "mlparted1" does not exist
+ERROR:  syntax error at or near "like"
 LINE 1: create table mlparted11 (like mlparted1);
-                                      ^
+                                 ^
 alter table mlparted11 drop a;
 ERROR:  relation "mlparted11" does not exist
 alter table mlparted11 add a int;
@@ -851,9 +851,9 @@ ERROR:  syntax error at or near "partition"
 LINE 1: create table mlparted3 partition of mlparted for values from...
                                ^
 create table mlparted4 (like mlparted);
-ERROR:  relation "mlparted" does not exist
+ERROR:  syntax error at or near "like"
 LINE 1: create table mlparted4 (like mlparted);
-                                     ^
+                                ^
 alter table mlparted4 drop a;
 ERROR:  relation "mlparted4" does not exist
 alter table mlparted4 add a int not null;

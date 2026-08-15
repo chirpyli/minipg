@@ -2614,16 +2614,6 @@ _outDefElem(StringInfo str, const DefElem *node)
 }
 
 static void
-_outTableLikeClause(StringInfo str, const TableLikeClause *node)
-{
-	WRITE_NODE_TYPE("TABLELIKECLAUSE");
-
-	WRITE_NODE_FIELD(relation);
-	WRITE_UINT_FIELD(options);
-	WRITE_OID_FIELD(relationOid);
-}
-
-static void
 _outLockingClause(StringInfo str, const LockingClause *node)
 {
 	WRITE_NODE_TYPE("LOCKINGCLAUSE");
@@ -3950,9 +3940,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_DefElem:
 				_outDefElem(str, obj);
-				break;
-			case T_TableLikeClause:
-				_outTableLikeClause(str, obj);
 				break;
 			case T_LockingClause:
 				_outLockingClause(str, obj);

@@ -634,30 +634,6 @@ typedef struct ColumnDef
 } ColumnDef;
 
 /*
- * TableLikeClause - CREATE TABLE ( ... LIKE ... ) clause
- */
-typedef struct TableLikeClause
-{
-	NodeTag		type;
-	RangeVar   *relation;
-	bits32		options;		/* OR of TableLikeOption flags */
-	Oid			relationOid;	/* If table has been looked up, its OID */
-} TableLikeClause;
-
-typedef enum TableLikeOption
-{
-	CREATE_TABLE_LIKE_COMPRESSION = 1 << 1,
-	CREATE_TABLE_LIKE_CONSTRAINTS = 1 << 2,
-	CREATE_TABLE_LIKE_DEFAULTS = 1 << 3,
-	CREATE_TABLE_LIKE_GENERATED = 1 << 4,
-	CREATE_TABLE_LIKE_IDENTITY = 1 << 5,
-	CREATE_TABLE_LIKE_INDEXES = 1 << 6,
-	CREATE_TABLE_LIKE_STATISTICS = 1 << 7,
-	CREATE_TABLE_LIKE_STORAGE = 1 << 8,
-	CREATE_TABLE_LIKE_ALL = PG_INT32_MAX
-} TableLikeOption;
-
-/*
  * IndexElem - index parameters (used in CREATE INDEX, and in ON CONFLICT)
  *
  * For a plain index attribute, 'name' is the name of the table column to

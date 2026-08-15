@@ -1129,15 +1129,7 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 	return true;
 }
 
-static bool
-_equalTableLikeClause(const TableLikeClause *a, const TableLikeClause *b)
-{
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_SCALAR_FIELD(options);
-	COMPARE_SCALAR_FIELD(relationOid);
 
-	return true;
-}
 
 static bool
 _equalDefineStmt(const DefineStmt *a, const DefineStmt *b)
@@ -2650,9 +2642,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateStmt:
 			retval = _equalCreateStmt(a, b);
-			break;
-		case T_TableLikeClause:
-			retval = _equalTableLikeClause(a, b);
 			break;
 		case T_DefineStmt:
 			retval = _equalDefineStmt(a, b);

@@ -32,8 +32,6 @@ extern void transformRuleStmt(RuleStmt *stmt, const char *queryString,
 							  List **actions, Node **whereClause);
 extern List *transformCreateSchemaStmtElements(List *schemaElts,
 											   const char *schemaName);
-extern List *expandTableLikeClause(RangeVar *heapRel,
-								   TableLikeClause *table_like_clause);
 extern IndexStmt *generateClonedIndexStmt(RangeVar *heapRel,
 										  Relation source_idx,
 										  const struct AttrMap *attmap,

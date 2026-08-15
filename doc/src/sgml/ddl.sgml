@@ -2779,17 +2779,6 @@ VALUES ('Albany', NULL, NULL, 'NY');
   </para>
 
   <para>
-   One convenient way to create a compatible table that will later be made
-   a new child is to use the <literal>LIKE</literal> clause in <command>CREATE
-   TABLE</command>. This creates a new table with the same columns as
-   the source table. If there are any <literal>CHECK</literal>
-   constraints defined on the source table, the <literal>INCLUDING
-   CONSTRAINTS</literal> option to <literal>LIKE</literal> should be
-   specified, as the new child must have constraints matching the parent
-   to be considered compatible.
-  </para>
-
-  <para>
    A parent table cannot be dropped while any of its children remain. Neither
    can columns or check constraints of child tables be dropped or altered
    if they are inherited
@@ -3332,23 +3321,6 @@ CREATE TABLE measurement_y2008m02 PARTITION OF measurement
      EXCLUSIVE</literal> lock that is required by <command>CREATE TABLE
      ... PARTITION OF</command>, so it is more friendly to concurrent
      operations on the partitioned table.
-     The <literal>CREATE TABLE ... LIKE</literal> option is helpful
-     to avoid tediously repeating the parent table's definition:
-
-<programlisting>
-CREATE TABLE measurement_y2008m02
-  (LIKE measurement INCLUDING DEFAULTS INCLUDING CONSTRAINTS)
-  TABLESPACE fasttablespace;
-
-ALTER TABLE measurement_y2008m02 ADD CONSTRAINT y2008m02
-   CHECK ( logdate &gt;= DATE '2008-02-01' AND logdate &lt; DATE '2008-03-01' );
-
-\copy measurement_y2008m02 from 'measurement_y2008m02'
--- possibly some other data preparation work
-
-ALTER TABLE measurement ATTACH PARTITION measurement_y2008m02
-    FOR VALUES FROM ('2008-02-01') TO ('2008-03-01' );
-</programlisting>
     </para>
 
     <para>
@@ -3860,22 +3832,6 @@ CREATE TABLE measurement_y2008m02 (
     CHECK ( logdate &gt;= DATE '2008-02-01' AND logdate &lt; DATE '2008-03-01' )
 ) INHERITS (measurement);
 </programlisting>
-
-     Alternatively, one may want to create and populate the new child table
-     before adding it to the table hierarchy.  This could allow data to be
-     loaded, checked, and transformed before being made visible to queries on
-     the parent table.
-
-<programlisting>
-CREATE TABLE measurement_y2008m02
-  (LIKE measurement INCLUDING DEFAULTS INCLUDING CONSTRAINTS);
-ALTER TABLE measurement_y2008m02 ADD CONSTRAINT y2008m02
-   CHECK ( logdate &gt;= DATE '2008-02-01' AND logdate &lt; DATE '2008-03-01' );
-\copy measurement_y2008m02 from 'measurement_y2008m02'
--- possibly some other data preparation work
-ALTER TABLE measurement_y2008m02 INHERIT measurement;
-</programlisting>
-    </para>
    </sect3>
 
    <sect3 id="ddl-partitioning-inheritance-caveats">

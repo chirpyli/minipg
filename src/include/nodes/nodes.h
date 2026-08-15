@@ -403,7 +403,6 @@ typedef enum NodeTag
 	T_ObjectWithArgs,
 	T_AccessPriv,
 	T_CreateOpClassItem,
-	T_TableLikeClause,
 	T_FunctionParameter,
 	T_LockingClause,
 	T_RowMarkClause,
