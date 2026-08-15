@@ -19,7 +19,9 @@
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/appendinfo.h"
+#include "optimizer/optimizer.h"
 #include "optimizer/pathnode.h"
+#include "optimizer/restrictinfo.h"
 #include "parser/parsetree.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
@@ -789,7 +791,7 @@ add_row_identity_var(PlannerInfo *root, Var *orig_var,
 
 	/*
 	 * Otherwise, rtindex should reference a leaf target relation that's being
-	 * added to the query during expand_inherited_rtentry().
+	 * added to the query during appendrel expansion.
 	 */
 	Assert(bms_is_member(rtindex, root->leaf_result_relids));
 	Assert(root->append_rel_array[rtindex] != NULL);
@@ -956,4 +958,178 @@ distribute_row_identity_vars(PlannerInfo *root)
 			/* reltarget cost and width will be computed later */
 		}
 	}
+}
+
+
+/*
+ * expand_appendrel_subquery
+ *		Add "other rel" RelOptInfos for the children of an appendrel baserel
+ *
+ * "rel" is a subquery relation that has the rte->inh flag set, meaning it
+ * is a UNION ALL subquery that's been flattened into an appendrel, with
+ * child subqueries listed in root->append_rel_list.  We need to build
+ * a RelOptInfo for each child relation so that we can plan scans on them.
+ *
+ * (Table-inheritance expansion used to live alongside this in inherit.c,
+ * but minipg no longer supports inheritance, so only the UNION ALL case
+ * remains here.)
+ */
+void
+expand_appendrel_subquery(PlannerInfo *root, RelOptInfo *rel,
+						  RangeTblEntry *rte, Index rti)
+{
+	ListCell   *l;
+
+	foreach(l, root->append_rel_list)
+	{
+		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
+		Index		childRTindex = appinfo->child_relid;
+		RangeTblEntry *childrte;
+		RelOptInfo *childrel;
+
+		/* append_rel_list contains all append rels; ignore others */
+		if (appinfo->parent_relid != rti)
+			continue;
+
+		/* find the child RTE, which should already exist */
+		Assert(childRTindex < root->simple_rel_array_size);
+		childrte = root->simple_rte_array[childRTindex];
+		Assert(childrte != NULL);
+
+		/* Build the child RelOptInfo. */
+		childrel = build_simple_rel(root, childRTindex, rel);
+
+		/* Child may itself be an appendrel subquery, in which case recurse. */
+		if (childrte->inh)
+			expand_appendrel_subquery(root, childrel, childrte, childRTindex);
+	}
+}
+
+
+/*
+ * apply_child_basequals
+ *		Populate childrel's base restriction quals from parent rel's quals,
+ *		translating them using appinfo.
+ *
+ * If any of the resulting clauses evaluate to constant false or NULL, we
+ * return false and don't apply any quals.  Caller should mark the relation as
+ * a dummy rel in this case, since it doesn't need to be scanned.
+ *
+ * (This is used by both UNION ALL subquery appendrels and table inheritance;
+ * minipg only supports the UNION ALL case.)
+ */
+bool
+apply_child_basequals(PlannerInfo *root, RelOptInfo *parentrel,
+					  RelOptInfo *childrel, RangeTblEntry *childRTE,
+					  AppendRelInfo *appinfo)
+{
+	List	   *childquals;
+	Index		cq_min_security;
+	ListCell   *lc;
+
+	/*
+	 * The child rel's targetlist might contain non-Var expressions, which
+	 * means that substitution into the quals could produce opportunities for
+	 * const-simplification, and perhaps even pseudoconstant quals. Therefore,
+	 * transform each RestrictInfo separately to see if it reduces to a
+	 * constant or pseudoconstant.  (We must process them separately to keep
+	 * track of the security level of each qual.)
+	 */
+	childquals = NIL;
+	cq_min_security = UINT_MAX;
+	foreach(lc, parentrel->baserestrictinfo)
+	{
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
+		Node	   *childqual;
+		ListCell   *lc2;
+
+		Assert(IsA(rinfo, RestrictInfo));
+		childqual = adjust_appendrel_attrs(root,
+										   (Node *) rinfo->clause,
+										   1, &appinfo);
+		childqual = eval_const_expressions(root, childqual);
+		/* check for flat-out constant */
+		if (childqual && IsA(childqual, Const))
+		{
+			if (((Const *) childqual)->constisnull ||
+				!DatumGetBool(((Const *) childqual)->constvalue))
+			{
+				/* Restriction reduces to constant FALSE or NULL */
+				return false;
+			}
+			/* Restriction reduces to constant TRUE, so drop it */
+			continue;
+		}
+		/* might have gotten an AND clause, if so flatten it */
+		foreach(lc2, make_ands_implicit((Expr *) childqual))
+		{
+			Node	   *onecq = (Node *) lfirst(lc2);
+			bool		pseudoconstant;
+
+			/* check for pseudoconstant (no Vars or volatile functions) */
+			pseudoconstant =
+				!contain_vars_of_level(onecq, 0) &&
+				!contain_volatile_functions(onecq);
+			if (pseudoconstant)
+			{
+				/* tell createplan.c to check for gating quals */
+				root->hasPseudoConstantQuals = true;
+			}
+			/* reconstitute RestrictInfo with appropriate properties */
+			childquals = lappend(childquals,
+								 make_restrictinfo(root,
+												   (Expr *) onecq,
+												   rinfo->is_pushed_down,
+												   rinfo->outerjoin_delayed,
+												   pseudoconstant,
+												   rinfo->security_level,
+												   NULL, NULL, NULL));
+			/* track minimum security level among child quals */
+			cq_min_security = Min(cq_min_security, rinfo->security_level);
+		}
+	}
+
+	/*
+	 * In addition to the quals inherited from the parent, we might have
+	 * securityQuals associated with this particular child node.  (Currently
+	 * this can only happen in appendrels originating from UNION ALL.)  Pull
+	 * any such securityQuals up
+	 * into the baserestrictinfo for the child.  This is similar to
+	 * process_security_barrier_quals() for the parent rel, except that we
+	 * can't make any general deductions from such quals, since they don't
+	 * hold for the whole appendrel.
+	 */
+	if (childRTE->securityQuals)
+	{
+		Index		security_level = 0;
+
+		foreach(lc, childRTE->securityQuals)
+		{
+			List	   *qualset = (List *) lfirst(lc);
+			ListCell   *lc2;
+
+			foreach(lc2, qualset)
+			{
+				Expr	   *qual = (Expr *) lfirst(lc2);
+
+				/* not likely that we'd see constants here, so no check */
+				childquals = lappend(childquals,
+									 make_restrictinfo(root, qual,
+													   true, false, false,
+													   security_level,
+													   NULL, NULL, NULL));
+				cq_min_security = Min(cq_min_security, security_level);
+			}
+			security_level++;
+		}
+		Assert(security_level <= root->qual_security_level);
+	}
+
+	/*
+	 * OK, we've got all the baserestrictinfo quals for this child.
+	 */
+	childrel->baserestrictinfo = childquals;
+	childrel->baserestrict_min_security = cq_min_security;
+
+	return true;
 }

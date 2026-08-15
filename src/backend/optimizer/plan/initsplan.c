@@ -18,9 +18,9 @@
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
+#include "optimizer/appendinfo.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
-#include "optimizer/inherit.h"
 #include "optimizer/joininfo.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/pathnode.h"
@@ -158,9 +158,13 @@ add_other_rels_to_query(PlannerInfo *root)
 		if (rel->reloptkind != RELOPT_BASEREL)
 			continue;
 
-		/* If it's marked as inheritable, look for children. */
-		if (rte->inh)
-			expand_inherited_rtentry(root, rel, rte, rti);
+		/*
+		 * minipg no longer supports table inheritance, so rte->inh only ever
+		 * indicates a flattened UNION ALL subquery (appendrel).  Expand its
+		 * child subqueries into "other" rels.
+		 */
+		if (rte->inh && rte->rtekind == RTE_SUBQUERY)
+			expand_appendrel_subquery(root, rel, rte, rti);
 	}
 }
 

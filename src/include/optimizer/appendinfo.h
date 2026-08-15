@@ -47,4 +47,10 @@ extern void add_row_identity_columns(PlannerInfo *root, Index rtindex,
 									 Relation target_relation);
 extern void distribute_row_identity_vars(PlannerInfo *root);
 
+extern void expand_appendrel_subquery(PlannerInfo *root, RelOptInfo *rel,
+									  RangeTblEntry *rte, Index rti);
+extern bool apply_child_basequals(PlannerInfo *root, RelOptInfo *parentrel,
+								  RelOptInfo *childrel, RangeTblEntry *childRTE,
+								  AppendRelInfo *appinfo);
+
 #endif							/* APPENDINFO_H */

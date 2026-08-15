@@ -5429,9 +5429,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
  *
  * Note that if the relation is an inheritance child relation, securityQuals
  * and access permissions are checked against the inheritance root parent (the
- * relation actually mentioned in the query) --- see the comments in
- * expand_single_inheritance_child() for an explanation of why it has to be
- * done this way.
+ * relation actually mentioned in the query).
  *
  * If varattnos is non-NULL, its attribute numbers should be offset by
  * FirstLowInvalidHeapAttributeNumber so that system attributes can be

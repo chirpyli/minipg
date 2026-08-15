@@ -41,7 +41,6 @@
 #include "optimizer/appendinfo.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
-#include "optimizer/inherit.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/paramassign.h"
 #include "optimizer/pathnode.h"
@@ -676,9 +675,8 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 		/*
 		 * We can also determine the maximum security level required for any
-		 * securityQuals now.  Addition of inheritance-child RTEs won't affect
-		 * this, because child tables don't have their own securityQuals; see
-		 * expand_single_inheritance_child().
+		 * securityQuals now.  Addition of child RTEs won't affect this,
+		 * because child tables don't have their own securityQuals.
 		 */
 		if (rte->securityQuals)
 			root->qual_security_level = Max(root->qual_security_level,

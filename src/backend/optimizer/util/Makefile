@@ -15,7 +15,6 @@ include $(top_builddir)/src/Makefile.global
 OBJS = \
 	appendinfo.o \
 	clauses.o \
-	inherit.o \
 	joininfo.o \
 	orclauses.o \
 	paramassign.o \

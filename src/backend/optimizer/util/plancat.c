@@ -109,8 +109,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 
 	/*
 	 * We need not lock the relation since it was already locked, either by
-	 * the rewriter or when expand_inherited_rtentry() added it to the query's
-	 * rangetable.
+	 * the rewriter or when it was added to the query's rangetable.
 	 */
 	relation = table_open(relationObjectId, NoLock);
 
@@ -616,8 +615,7 @@ infer_arbiter_indexes(PlannerInfo *root)
 
 	/*
 	 * We need not lock the relation since it was already locked, either by
-	 * the rewriter or when expand_inherited_rtentry() added it to the query's
-	 * rangetable.
+	 * the rewriter or when it was added to the query's rangetable.
 	 */
 	varno = root->parse->resultRelation;
 	rte = rt_fetch(varno, root->parse->rtable);

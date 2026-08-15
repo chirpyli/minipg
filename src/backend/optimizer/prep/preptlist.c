@@ -112,7 +112,7 @@ preprocess_targetlist(PlannerInfo *root)
 	 * For non-inherited UPDATE/DELETE, register any junk column(s) needed to
 	 * allow the executor to identify the rows to be updated or deleted.  In
 	 * the inheritance case, we do nothing now, leaving this to be dealt with
-	 * when expand_inherited_rtentry() makes the leaf target relations.  (But
+	 * when appendrel expansion makes the leaf target relations.  (But
 	 * there might not be any leaf target relations, in which case we must do
 	 * this in distribute_row_identity_vars().)
 	 */
@@ -130,7 +130,7 @@ preprocess_targetlist(PlannerInfo *root)
 	 * Add necessary junk columns for rowmarked rels.  These values are needed
 	 * for locking of rels selected FOR UPDATE/SHARE, and to do EvalPlanQual
 	 * rechecking.  See comments for PlanRowMark in plannodes.h.  If you
-	 * change this stanza, see also expand_inherited_rtentry(), which has to
+	 * change this stanza, see also the appendrel expansion path, which has to
 	 * be able to add on junk columns equivalent to these.
 	 *
 	 * (Someday it might be useful to fold these resjunk columns into the
