@@ -35,7 +35,6 @@
 #include "access/visibilitymap.h"
 #include "access/xact.h"
 #include "bootstrap/bootstrap.h"
-#include "catalog/binary_upgrade.h"
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
@@ -82,9 +81,6 @@
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
 #include "utils/tuplesort.h"
-
-/* Potentially set by pg_upgrade_support functions */
-Oid			binary_upgrade_next_index_pg_class_oid = InvalidOid;
 
 /*
  * Pointer-free representation of variables used when reindexing system
@@ -902,22 +898,8 @@ index_create(Relation heapRelation,
 	 */
 	if (!OidIsValid(indexRelationId))
 	{
-		/* Use binary-upgrade override for pg_class.oid/relfilenode? */
-		if (IsBinaryUpgrade)
-		{
-			if (!OidIsValid(binary_upgrade_next_index_pg_class_oid))
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("pg_class index OID value not set when in binary upgrade mode")));
-
-			indexRelationId = binary_upgrade_next_index_pg_class_oid;
-			binary_upgrade_next_index_pg_class_oid = InvalidOid;
-		}
-		else
-		{
 			indexRelationId =
-				GetNewRelFileNode(tableSpaceId, pg_class, relpersistence);
-		}
+			GetNewRelFileNode(tableSpaceId, pg_class, relpersistence);
 	}
 
 	/*

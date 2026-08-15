@@ -97,20 +97,8 @@ installdirs-tests: installdirs
 
 # Get some extra C modules from contrib/spi
 
-all: refint$(DLSUFFIX)
-
-refint$(DLSUFFIX): $(top_builddir)/contrib/spi/refint$(DLSUFFIX)
-	cp $< $@
-
-$(top_builddir)/contrib/spi/refint$(DLSUFFIX): | submake-contrib-spi ;
-
-submake-contrib-spi: | submake-libpgport submake-generated-headers
-	$(MAKE) -C $(top_builddir)/contrib/spi
-
-.PHONY: submake-contrib-spi
 
 
-##
 ## Run tests
 ##
 
@@ -154,7 +142,7 @@ bigcheck: all | temp-install
 
 clean distclean maintainer-clean: clean-lib
 # things built by `all' target
-	rm -f $(OBJS) refint$(DLSUFFIX)
+	rm -f $(OBJS)
 	rm -f pg_regress_main.o pg_regress.o pg_regress$(X)
 # things created by various check targets
 	rm -f $(output_files) $(input_files)

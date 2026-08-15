@@ -1345,9 +1345,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		/*
 		 * Insist on it being a btree.  That's the only kind that supports
 		 * uniqueness at the moment anyway; but we must have an index that
-		 * exactly matches what you'd get from plain ADD CONSTRAINT syntax,
-		 * else dump and reload will produce a different index (breaking
-		 * pg_upgrade in particular).
+		 * exactly matches what you'd get from plain ADD CONSTRAINT syntax.
 		 */
 		if (index_rel->rd_rel->relam != get_index_am_oid(DEFAULT_INDEX_TYPE, false))
 			ereport(ERROR,
@@ -1389,8 +1387,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 				 * While the index would still work as a constraint with
 				 * non-default settings, it might not provide exactly the same
 				 * uniqueness semantics as you'd get from a normally-created
-				 * constraint; and there's also the dump/reload problem
-				 * mentioned above.
+				 * constraint.
 				 */
 				Datum		attoptions =
 				get_attoptions(RelationGetRelid(index_rel), i + 1);

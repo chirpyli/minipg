@@ -17,7 +17,6 @@
 #include "access/htup_details.h"
 #include "access/table.h"
 #include "access/xact.h"
-#include "catalog/binary_upgrade.h"
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
@@ -39,9 +38,6 @@
 
 static char *makeUniqueTypeName(const char *typeName, Oid typeNamespace,
 								bool tryOriginal);
-
-/* Potentially set by pg_upgrade_support functions */
-Oid			binary_upgrade_next_pg_type_oid = InvalidOid;
 
 /* ----------------------------------------------------------------
  *		TypeShellMake
@@ -126,22 +122,8 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	nulls[Anum_pg_type_typdefaultbin - 1] = true;
 	nulls[Anum_pg_type_typdefault - 1] = true;
 
-	/* Use binary-upgrade override for pg_type.oid? */
-	if (IsBinaryUpgrade)
-	{
-		if (!OidIsValid(binary_upgrade_next_pg_type_oid))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_type OID value not set when in binary upgrade mode")));
-
-		typoid = binary_upgrade_next_pg_type_oid;
-		binary_upgrade_next_pg_type_oid = InvalidOid;
-	}
-	else
-	{
-		typoid = GetNewOidWithIndex(pg_type_desc, TypeOidIndexId,
-									Anum_pg_type_oid);
-	}
+	typoid = GetNewOidWithIndex(pg_type_desc, TypeOidIndexId,
+								Anum_pg_type_oid);
 
 	values[Anum_pg_type_oid - 1] = ObjectIdGetDatum(typoid);
 
@@ -453,17 +435,6 @@ TypeCreate(Oid newTypeOid,
 		/* Force the OID if requested by caller */
 		if (OidIsValid(newTypeOid))
 			typeObjectId = newTypeOid;
-		/* Use binary-upgrade override for pg_type.oid, if supplied. */
-		else if (IsBinaryUpgrade)
-		{
-			if (!OidIsValid(binary_upgrade_next_pg_type_oid))
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("pg_type OID value not set when in binary upgrade mode")));
-
-			typeObjectId = binary_upgrade_next_pg_type_oid;
-			binary_upgrade_next_pg_type_oid = InvalidOid;
-		}
 		else
 		{
 			typeObjectId = GetNewOidWithIndex(pg_type_desc, TypeOidIndexId,

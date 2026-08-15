@@ -36,7 +36,6 @@
 #include "access/htup_details.h"
 #include "access/tableam.h"
 #include "access/xact.h"
-#include "catalog/binary_upgrade.h"
 #include "catalog/catalog.h"
 #include "catalog/heap.h"
 #include "catalog/objectaccess.h"
@@ -104,11 +103,6 @@ typedef struct
 	Oid			analyzeOid;
 	Oid			subscriptOid;
 } AlterTypeRecurseParams;
-
-/* Potentially set by pg_upgrade_support functions */
-Oid			binary_upgrade_next_array_pg_type_oid = InvalidOid;
-Oid			binary_upgrade_next_mrng_pg_type_oid = InvalidOid;
-Oid			binary_upgrade_next_mrng_array_pg_type_oid = InvalidOid;
 
 static void makeRangeConstructors(const char *name, Oid namespace,
 								  Oid rangeOid, Oid subtype);
@@ -2422,18 +2416,6 @@ AssignTypeArrayOid(void)
 {
 	Oid			type_array_oid;
 
-	/* Use binary-upgrade override for pg_type.typarray? */
-	if (IsBinaryUpgrade)
-	{
-		if (!OidIsValid(binary_upgrade_next_array_pg_type_oid))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_type array OID value not set when in binary upgrade mode")));
-
-		type_array_oid = binary_upgrade_next_array_pg_type_oid;
-		binary_upgrade_next_array_pg_type_oid = InvalidOid;
-	}
-	else
 	{
 		Relation	pg_type = table_open(TypeRelationId, AccessShareLock);
 
@@ -2455,18 +2437,6 @@ AssignTypeMultirangeOid(void)
 {
 	Oid			type_multirange_oid;
 
-	/* Use binary-upgrade override for pg_type.oid? */
-	if (IsBinaryUpgrade)
-	{
-		if (!OidIsValid(binary_upgrade_next_mrng_pg_type_oid))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_type multirange OID value not set when in binary upgrade mode")));
-
-		type_multirange_oid = binary_upgrade_next_mrng_pg_type_oid;
-		binary_upgrade_next_mrng_pg_type_oid = InvalidOid;
-	}
-	else
 	{
 		Relation	pg_type = table_open(TypeRelationId, AccessShareLock);
 
@@ -2488,18 +2458,6 @@ AssignTypeMultirangeArrayOid(void)
 {
 	Oid			type_multirange_array_oid;
 
-	/* Use binary-upgrade override for pg_type.oid? */
-	if (IsBinaryUpgrade)
-	{
-		if (!OidIsValid(binary_upgrade_next_mrng_array_pg_type_oid))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_type multirange array OID value not set when in binary upgrade mode")));
-
-		type_multirange_array_oid = binary_upgrade_next_mrng_array_pg_type_oid;
-		binary_upgrade_next_mrng_array_pg_type_oid = InvalidOid;
-	}
-	else
 	{
 		Relation	pg_type = table_open(TypeRelationId, AccessShareLock);
 

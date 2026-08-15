@@ -17,7 +17,6 @@
 #include "access/htup_details.h"
 #include "access/table.h"
 #include "access/xact.h"
-#include "catalog/binary_upgrade.h"
 #include "catalog/catalog.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_enum.h"
@@ -31,9 +30,6 @@
 #include "utils/hsearch.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
-
-/* Potentially set by pg_upgrade_support functions */
-Oid			binary_upgrade_next_pg_enum_oid = InvalidOid;
 
 /*
  * Hash table of enum value OIDs created during the current transaction by
@@ -371,27 +367,6 @@ restart:
 	}
 
 	/* Get a new OID for the new label */
-	if (IsBinaryUpgrade)
-	{
-		if (!OidIsValid(binary_upgrade_next_pg_enum_oid))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_enum OID value not set when in binary upgrade mode")));
-
-		/*
-		 * Use binary-upgrade override for pg_enum.oid, if supplied. During
-		 * binary upgrade, all pg_enum.oid's are set this way so they are
-		 * guaranteed to be consistent.
-		 */
-		if (neighbor != NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("ALTER TYPE ADD BEFORE/AFTER is incompatible with binary upgrade")));
-
-		newOid = binary_upgrade_next_pg_enum_oid;
-		binary_upgrade_next_pg_enum_oid = InvalidOid;
-	}
-	else
 	{
 		/*
 		 * Normal case: we need to allocate a new Oid for the value.

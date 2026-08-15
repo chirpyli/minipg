@@ -59,7 +59,6 @@ OBJS = \
 	quotes.o \
 	snprintf.o \
 	strerror.o \
-	tar.o \
 	thread.o
 
 # libpgport.a, libpgport_shlib.a, and libpgport_srv.a contain the same files

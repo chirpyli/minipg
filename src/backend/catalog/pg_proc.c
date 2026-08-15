@@ -670,11 +670,10 @@ ProcedureCreate(const char *procedureName,
 		 * Set per-function configuration parameters so that the validation is
 		 * done with the environment the function expects.  However, if
 		 * check_function_bodies is off, we don't do this, because that would
-		 * create dump ordering hazards that pg_dump doesn't know how to deal
-		 * with.  (For example, a SET clause might refer to a not-yet-created
-		 * text search configuration.)	This means that the validator
-		 * shouldn't complain about anything that might depend on a GUC
-		 * parameter when check_function_bodies is off.
+		 * create dependency ordering hazards.  (For example, a SET clause
+		 * might refer to a not-yet-created text search configuration.)  This
+		 * means that the validator shouldn't complain about anything that
+		 * might depend on a GUC parameter when check_function_bodies is off.
 		 */
 		if (check_function_bodies)
 		{
@@ -765,12 +764,6 @@ fmgr_c_validator(PG_FUNCTION_ARGS)
 
 	if (!CheckFunctionValidatorAccess(fcinfo->flinfo->fn_oid, funcoid))
 		PG_RETURN_VOID();
-
-	/*
-	 * It'd be most consistent to skip the check if !check_function_bodies,
-	 * but the purpose of that switch is to be helpful for pg_dump loading,
-	 * and for pg_dump loading it's much better if we *do* check.
-	 */
 
 	tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcoid));
 	if (!HeapTupleIsValid(tuple))

@@ -18,7 +18,6 @@
 #include "access/heapam.h"
 #include "access/toast_compression.h"
 #include "access/xact.h"
-#include "catalog/binary_upgrade.h"
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
@@ -161,35 +160,8 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	/*
 	 * Check to see whether the table actually needs a TOAST table.
 	 */
-	if (!IsBinaryUpgrade)
-	{
-		/* Normal mode, normal check */
-		if (!needs_toast_table(rel))
-			return false;
-	}
-	else
-	{
-		/*
-		 * In binary-upgrade mode, create a TOAST table if and only if
-		 * pg_upgrade told us to (ie, a TOAST table OID has been provided).
-		 *
-		 * This indicates that the old cluster had a TOAST table for the
-		 * current table.  We must create a TOAST table to receive the old
-		 * TOAST file, even if the table seems not to need one.
-		 *
-		 * Contrariwise, if the old cluster did not have a TOAST table, we
-		 * should be able to get along without one even if the new version's
-		 * needs_toast_table rules suggest we should have one.  There is a lot
-		 * of daylight between where we will create a TOAST table and where
-		 * one is really necessary to avoid failures, so small cross-version
-		 * differences in the when-to-create heuristic shouldn't be a problem.
-		 * If we tried to create a TOAST table anyway, we would have the
-		 * problem that it might take up an OID that will conflict with some
-		 * old-cluster table we haven't seen yet.
-		 */
-		if (!OidIsValid(binary_upgrade_next_toast_pg_class_oid))
-			return false;
-	}
+	if (!needs_toast_table(rel))
+		return false;
 
 	/*
 	 * If requested check lockmode is sufficient. This is a cross check in
