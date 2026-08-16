@@ -126,3 +126,14 @@
 - **（注）**：分区/PL/pgSQL/逻辑复制等裁剪各自的回归测试清理已在对应条目中说明。
 - **（2026-08-16）同步 enum.out / create_index.out 反映历史裁剪后果**：`make check-world` 中 `enum`、`create_index` 失败，根因为早期裁剪未同步 expected——`gram.y` 的列级 `REFERENCES` 与表级 `FOREIGN KEY`（`ColConstraintElem`/`ConstraintElem`/`TableConstraint` 分支）、以及 `ALTER TABLE ... REPLICA IDENTITY` 命令早已被裁，导致 `REFERENCES` 现在在解析阶段即报 `syntax error at or near "REFERENCES"`（而非 `tablecmds.c:4055` 的运行时拒绝文案，该文案现已成为不可达死代码），且 create_index 中 `indisreplident` 测试块因 RI 命令被裁而消失。操作：将 `src/test/regress/results/enum.out`、`results/create_index.out` 覆盖对应 `expected/*.out`（`enum` 改 2 处 REFERENCES 为语法错误；`create_index` 改 1 处 REFERENCES 为语法错误 + 删整段 `indisreplident` 测试块）。注：本次 check_rolespec_name 删除与这 5 个失败**均无关**。
 - **（2026-08-16）固定回归测试 locale 解决 int8/numeric/select_implicit 失败**：`make check-world` 剩余 `int8`/`numeric`/`select_implicit` 三个失败，根因均为**运行环境的非 C locale**（zh_CN.UTF-8）：`to_char(val,'L...')` 在 zh_CN 的 `lc_monetary` 下渲染人民币符号 `￥`（expected 基于 C locale 为空）；`select_implicit` 的 `char(8)` 分组排序在 zh_CN collation 下大小写顺序与 C locale 字节序不同（bbbb/cccc 前移，两个 expected 变体均不匹配）。修复：在 `src/test/regress/GNUmakefile` 的 `REGRESS_OPTS` 加 `--no-locale`，使 `pg_regress` 以 C locale 创建测试库（`pg_regress.c:2023` 设 `LC_COLLATE='C' LC_CTYPE='C'`，`:2028` 设 `lc_monetary TO 'C'`）。该机制为 PG 官方回归标准做法，可移植、不改任何 expected。验证需用户重跑 `make check-world`（本机 `make check` 因安全策略拦截 temp-install 重建且 minipg 有既有 initdb 崩溃，未能自动重跑；代码逻辑已确认可一并消除该 3 个失败）。与不可裁部分零耦合。
+
+## 九、死代码清理（编译器驱动）
+
+- **（2026-08-16）用 `-Wunused-function` 重编后端全量扫描零调用 static 函数**：此前各子系统（逻辑复制/replication、JIT、tsearch、BRIN、sepgsql、FDW/外部表、PL/pgSQL、外键/FK）均为**整文件删除**，故 backend 无 static 残留死函数；但存在两类典型的「函数体随裁剪被删、前向声明/定义残留」死代码。本轮清理：
+  - `src/backend/commands/tablecmds.c`：
+    - 删悬空 static 原型 `ATExecAlterColumnGenericOptions`（FDW 列 `OPTIONS` 执行函数体已随 FDW 裁剪删除，全树零调用、零定义）。
+    - 删零调用 static 函数 `ATExecSetTableSpaceNoStorage`（`ALTER TABLE SET TABLESPACE` 无存储关系的元数据分支，调用者已不可达，编译器 `-Wunused-function` 报 `defined but not used`）。
+    - 删零调用 static 函数 `transformColumnNameList`（FK 列名→attnums/typids 转换，FK 已裁后全树零调用；含对应孤立注释块与前向声明）。
+  - `src/backend/optimizer/path/allpaths.c`：删悬空 static 原型 `compare_tlist_datatypes`（FDW 下推类型安全检查函数体已随 FDW 裁剪删除，全树零调用、零定义）。
+  - 验证：后端 `make -j4 CFLAGS="-O0 -Wunused-function"` 重编 0 告警 0 错误，确认已无零调用 static 函数。
+  - **未裁项（明确留存的「语义降级但存活」代码，非纯死代码）**：replica identity 惰性链 `pg_get_replica_identity_index`（仍注册的公开 SQL 函数）/ `RelationGetReplicaIndex` / `RelationGetIdentityKeyBitmap`，逻辑复制已删后无真实消费者，但 `pg_class.relreplident` 字段被堆 WAL 路径（`ExtractReplicaIdentity`，属事务/不可裁部分）使用，字段须保留；该链属 CHANGE 第六、七条标注的「既有死函数/惰性列」，本轮不裁以避免牵连 catalog 字段与公开函数注册。

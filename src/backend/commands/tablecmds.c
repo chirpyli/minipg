@@ -306,8 +306,6 @@ static void AlterSeqNamespaces(Relation classRel, Relation rel,
 static ObjectAddress ATExecValidateConstraint(List **wqueue,
 											  Relation rel, char *constrName,
 											  bool recurse, bool recursing, LOCKMODE lockmode);
-static int	transformColumnNameList(Oid relId, List *colList,
-									int16 *attnums, Oid *atttypids);
 static void CheckAlterTableIsSafe(Relation rel);
 static void ATController(AlterTableStmt *parsetree,
 						 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
@@ -420,8 +418,6 @@ static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static ObjectAddress ATExecAlterColumnGenericOptions(Relation rel, const char *colName,
-													 List *options, LOCKMODE lockmode);
 static void change_owner_recurse_to_sequences(Oid relationOid,
 											  Oid newOwnerId, LOCKMODE lockmode);
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
@@ -9553,40 +9549,6 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 }
 
 /*
- * Special handling of ALTER TABLE SET TABLESPACE for relations with no
- * storage that have an interest in preserving tablespace.
- *
- * Since these have no storage the tablespace can be updated with a simple
- * metadata only operation to update the tablespace.
- */
-static void
-ATExecSetTableSpaceNoStorage(Relation rel, Oid newTableSpace)
-{
-	/*
-	 * Shouldn't be called on relations having storage; these are processed in
-	 * phase 3.
-	 */
-	Assert(!RELKIND_HAS_STORAGE(rel->rd_rel->relkind));
-
-	/* check if relation can be moved to its new tablespace */
-	if (!CheckRelationTableSpaceMove(rel, newTableSpace))
-	{
-		InvokeObjectPostAlterHook(RelationRelationId,
-								  RelationGetRelid(rel),
-								  0);
-		return;
-	}
-
-	/* Update can be done, so change reltablespace */
-	SetRelationTableSpace(rel, newTableSpace, InvalidOid);
-
-	InvokeObjectPostAlterHook(RelationRelationId, RelationGetRelid(rel), 0);
-
-	/* Make sure the reltablespace change is visible */
-	CommandCounterIncrement();
-}
-
-/*
  * Alter Table ALL ... SET TABLESPACE
  *
  * Allows a user to move all objects of some type in a given tablespace in the
@@ -10954,57 +10916,6 @@ GetAttributeCompression(Oid atttypid, char *compression)
 
 	return cmethod;
 }
-
-
-/*
- * transformColumnNameList - transform list of column names
- *
- * Lookup each name and return its attnum and type OID
- *
- * Note: the name of this function suggests that it's general-purpose,
- * but actually it's only used to look up names appearing in foreign-key
- * clauses.  The error messages would need work to use it in other cases,
- * and perhaps the validity checks as well.
- */
-static int
-transformColumnNameList(Oid relId, List *colList,
-						int16 *attnums, Oid *atttypids)
-{
-	ListCell   *l;
-	int			attnum;
-
-	attnum = 0;
-	foreach(l, colList)
-	{
-		char	   *attname = strVal(lfirst(l));
-		HeapTuple	atttuple;
-		Form_pg_attribute attform;
-
-		atttuple = SearchSysCacheAttName(relId, attname);
-		if (!HeapTupleIsValid(atttuple))
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("column \"%s\" referenced in foreign key constraint does not exist",
-							attname)));
-		attform = (Form_pg_attribute) GETSTRUCT(atttuple);
-		if (attform->attnum < 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("system columns cannot be used in foreign keys")));
-		if (attnum >= INDEX_MAX_KEYS)
-			ereport(ERROR,
-					(errcode(ERRCODE_TOO_MANY_COLUMNS),
-					 errmsg("cannot have more than %d keys in a foreign key",
-							INDEX_MAX_KEYS)));
-		attnums[attnum] = attform->attnum;
-		atttypids[attnum] = attform->atttypid;
-		ReleaseSysCache(atttuple);
-		attnum++;
-	}
-
-	return attnum;
-}
-
 
 /*
  * ATExecValidateConstraint - restored (was removed during FK pruning;

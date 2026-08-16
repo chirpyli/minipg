@@ -111,8 +111,6 @@ static RelOptInfo *make_rel_from_joinlist(PlannerInfo *root, List *joinlist);
 static bool subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 									  pushdown_safety_info *safetyInfo);
 static void check_output_expressions(Query *subquery,
-									 pushdown_safety_info *safetyInfo);
-static void compare_tlist_datatypes(List *tlist, List *colTypes,
 									pushdown_safety_info *safetyInfo);
 static bool targetIsInAllPartitionLists(TargetEntry *tle, Query *query);
 static bool qual_is_pushdown_safe(Query *subquery, Index rti,
