@@ -1,6 +1,6 @@
 # src/test/modules/unsafe_tests/Makefile
 
-REGRESS = rolenames setconfig alter_system_table
+REGRESS = setconfig alter_system_table
 REGRESS_OPTS = \
 	--create-role=regress_authenticated_user_sr \
 	--create-role=regress_authenticated_user_ssa

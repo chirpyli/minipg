@@ -178,10 +178,6 @@ pg_log_backend_memory_contexts(PG_FUNCTION_ARGS)
 	PGPROC	   *proc;
 
 	/* Only allow superusers to log memory contexts. */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be a superuser to log memory contexts")));
 
 	proc = BackendPidGetProc(pid);
 

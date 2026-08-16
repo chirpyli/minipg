@@ -3301,20 +3301,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 			WRITE_NODE_FIELD(where_clause);
 			break;
 
-		case CONSTR_FOREIGN:
-			appendStringInfoString(str, "FOREIGN_KEY");
-			WRITE_NODE_FIELD(pktable);
-			WRITE_NODE_FIELD(fk_attrs);
-			WRITE_NODE_FIELD(pk_attrs);
-			WRITE_CHAR_FIELD(fk_matchtype);
-			WRITE_CHAR_FIELD(fk_upd_action);
-			WRITE_CHAR_FIELD(fk_del_action);
-			WRITE_NODE_FIELD(old_conpfeqop);
-			WRITE_OID_FIELD(old_pktable_oid);
-			WRITE_BOOL_FIELD(skip_validation);
-			WRITE_BOOL_FIELD(initially_valid);
-			break;
-
 		case CONSTR_ATTR_DEFERRABLE:
 			appendStringInfoString(str, "ATTR_DEFERRABLE");
 			break;

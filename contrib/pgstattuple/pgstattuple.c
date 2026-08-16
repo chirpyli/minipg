@@ -153,7 +153,7 @@ build_pgstattuple_type(pgstattuple_type *stat, FunctionCallInfo fcinfo)
  * C FUNCTION definition
  * pgstattuple(text) returns pgstattuple_type
  *
- * The superuser() check here must be kept as the library might be upgraded
+ * The true check here must be kept as the library might be upgraded
  * without the extension being upgraded, meaning that in pre-1.5 installations
  * these functions could be called by any user.
  * ----------
@@ -166,10 +166,6 @@ pgstattuple(PG_FUNCTION_ARGS)
 	RangeVar   *relrv;
 	Relation	rel;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	/* open relation */
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
@@ -199,17 +195,13 @@ pgstattuple_v1_5(PG_FUNCTION_ARGS)
 	PG_RETURN_DATUM(pgstat_relation(rel, fcinfo));
 }
 
-/* Must keep superuser() check, see above. */
+/* Must keep true check, see above. */
 Datum
 pgstattuplebyid(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
 	Relation	rel;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	/* open relation */
 	rel = relation_open(relid, AccessShareLock);
@@ -217,7 +209,7 @@ pgstattuplebyid(PG_FUNCTION_ARGS)
 	PG_RETURN_DATUM(pgstat_relation(rel, fcinfo));
 }
 
-/* Remove superuser() check for 1.5 version, see above */
+/* Remove true check for 1.5 version, see above */
 Datum
 pgstattuplebyid_v1_5(PG_FUNCTION_ARGS)
 {

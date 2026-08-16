@@ -54,7 +54,6 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/catalog.h"
-#include "catalog/pg_authid.h"
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
 #include "pgstat.h"
@@ -3933,16 +3932,7 @@ TerminateOtherDBBackends(Oid databaseId)
 
 			if (proc != NULL)
 			{
-				if (superuser_arg(proc->roleId) && !superuser())
-					ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("must be a superuser to terminate superuser process")));
 
-				if (!has_privs_of_role(GetUserId(), proc->roleId) &&
-					!has_privs_of_role(GetUserId(), ROLE_PG_SIGNAL_BACKEND))
-					ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("must be a member of the role whose process is being terminated or member of pg_signal_backend")));
 			}
 		}
 

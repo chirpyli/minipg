@@ -26,7 +26,6 @@
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_attrdef.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -142,7 +141,7 @@ static const Oid object_classes[] = {
 	TriggerRelationId,			/* OCLASS_TRIGGER */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	StatisticExtRelationId,		/* OCLASS_STATISTIC_EXT */
-	AuthIdRelationId,			/* OCLASS_ROLE */
+	InvalidOid,					/* OCLASS_ROLE (minipg 无 pg_authid) */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
@@ -2664,13 +2663,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case StatisticExtRelationId:
 			return OCLASS_STATISTIC_EXT;
-
-
-
-
-
-		case AuthIdRelationId:
-			return OCLASS_ROLE;
 
 		case DatabaseRelationId:
 			return OCLASS_DATABASE;

@@ -134,10 +134,6 @@ heap_page_items(PG_FUNCTION_ARGS)
 	FuncCallContext *fctx;
 	int			raw_page_size;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	raw_page_size = VARSIZE(raw_page) - VARHDRSZ;
 
@@ -454,10 +450,6 @@ tuple_data_split(PG_FUNCTION_ARGS)
 	if (PG_NARGS() >= 6)
 		do_detoast = PG_GETARG_BOOL(5);
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	if (!raw_data)
 		PG_RETURN_NULL();
@@ -531,10 +523,6 @@ heap_tuple_infomask_flags(PG_FUNCTION_ARGS)
 	TupleDesc	tupdesc;
 	HeapTuple	tuple;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	/* Build a tuple descriptor for our result type */
 	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)

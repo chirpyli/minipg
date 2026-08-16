@@ -301,10 +301,6 @@ ValidateRestrictionEstimator(List *restrictionName)
 	 */
 	if (restrictionOid >= FirstGenbkiObjectId)
 	{
-		if (!superuser())
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to specify a non-built-in restriction estimator function")));
 	}
 	else
 	{
@@ -370,10 +366,6 @@ ValidateJoinEstimator(List *joinName)
 	/* privilege checks are the same as in ValidateRestrictionEstimator */
 	if (joinOid >= FirstGenbkiObjectId)
 	{
-		if (!superuser())
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to specify a non-built-in join estimator function")));
 	}
 	else
 	{

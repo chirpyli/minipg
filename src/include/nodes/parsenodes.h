@@ -1551,20 +1551,12 @@ typedef enum AlterTableType
 	AT_DropInherit,				/* NO INHERIT parent */
 	AT_AddOf,					/* OF <type_name> */
 	AT_DropOf,					/* NOT OF */
-	AT_ReplicaIdentity,			/* REPLICA IDENTITY */
 	AT_GenericOptions,			/* OPTIONS (...) */
 	AT_AddIdentity,				/* ADD IDENTITY */
 	AT_SetIdentity,				/* SET identity column options */
 	AT_DropIdentity,			/* DROP IDENTITY */
 	AT_ReAddStatistics			/* internal to commands/tablecmds.c */
 } AlterTableType;
-
-typedef struct ReplicaIdentityStmt
-{
-	NodeTag		type;
-	char		identity_type;
-	char	   *name;
-} ReplicaIdentityStmt;
 
 typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
 {
@@ -1704,8 +1696,6 @@ typedef struct CreateStmt
 	NodeTag		type;
 	RangeVar   *relation;		/* relation to create */
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	List	   *inhRelations;	/* relations to inherit from (list of
-								 * RangeVar) */
 	TypeName   *ofTypename;		/* OF typename */
 	List	   *constraints;	/* constraints (list of Constraint nodes) */
 	List	   *options;		/* options from WITH clause */
@@ -1728,17 +1718,6 @@ typedef struct CreateStmt
  * node was created (by parsing, or by inheritance from an existing
  * relation).  We should never have both in the same node!
  *
- * FKCONSTR_ACTION_xxx values are stored into pg_constraint.confupdtype
- * and pg_constraint.confdeltype columns; FKCONSTR_MATCH_xxx values are
- * stored into pg_constraint.confmatchtype.  Changing the code values may
- * require an initdb!
- *
- * If skip_validation is true then we skip checking that the existing rows
- * in the table satisfy the constraint, and just install the catalog entries
- * for the constraint.  A new FK constraint is marked as valid iff
- * initially_valid is true.  (Usually skip_validation and initially_valid
- * are inverses, but we can set both true if the table is known empty.)
- *
  * Constraint attributes (DEFERRABLE etc) are initially represented as
  * separate Constraint nodes for simplicity of parsing.  parse_utilcmd.c makes
  * a pass through the constraints list to insert the info into the appropriate
@@ -1758,24 +1737,11 @@ typedef enum ConstrType			/* types of constraints */
 	CONSTR_PRIMARY,
 	CONSTR_UNIQUE,
 	CONSTR_EXCLUSION,
-	CONSTR_FOREIGN,
 	CONSTR_ATTR_DEFERRABLE,		/* attributes for previous constraint node */
 	CONSTR_ATTR_NOT_DEFERRABLE,
 	CONSTR_ATTR_DEFERRED,
 	CONSTR_ATTR_IMMEDIATE
 } ConstrType;
-
-/* Foreign key action codes */
-#define FKCONSTR_ACTION_NOACTION	'a'
-#define FKCONSTR_ACTION_RESTRICT	'r'
-#define FKCONSTR_ACTION_CASCADE		'c'
-#define FKCONSTR_ACTION_SETNULL		'n'
-#define FKCONSTR_ACTION_SETDEFAULT	'd'
-
-/* Foreign key matchtype codes */
-#define FKCONSTR_MATCH_FULL			'f'
-#define FKCONSTR_MATCH_PARTIAL		'p'
-#define FKCONSTR_MATCH_SIMPLE		's'
 
 typedef struct Constraint
 {
@@ -2495,13 +2461,6 @@ typedef struct AlterDatabaseStmt
 	List	   *options;		/* List of DefElem nodes */
 } AlterDatabaseStmt;
 
-typedef struct AlterDatabaseSetStmt
-{
-	NodeTag		type;
-	char	   *dbname;			/* database name */
-	VariableSetStmt *setstmt;	/* SET or RESET subcommand */
-} AlterDatabaseSetStmt;
-
 /* ----------------------
  *		Dropdb Statement
  * ----------------------
@@ -2513,16 +2472,6 @@ typedef struct DropdbStmt
 	bool		missing_ok;		/* skip error if db is missing? */
 	List	   *options;		/* currently only FORCE is supported */
 } DropdbStmt;
-
-/* ----------------------
- *		Alter System Statement
- * ----------------------
- */
-typedef struct AlterSystemStmt
-{
-	NodeTag		type;
-	VariableSetStmt *setstmt;	/* SET subcommand */
-} AlterSystemStmt;
 
 /* ----------------------
  *		Cluster Statement (support pbrown's cluster index implementation)

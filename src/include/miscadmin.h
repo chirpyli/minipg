@@ -31,6 +31,13 @@
 
 #define InvalidPid				(-1)
 
+/*
+ * minipg 没有用户/角色概念，但仍保留"单一超级用户实体"的 OID 作为
+ * 所有数据库对象的 owner。该常量原定义于已删除的 pg_authid 表的 pg_authid_d.h，
+ * 现迁移至此（原 PostgreSQL 中值为 10）。
+ */
+#define BOOTSTRAP_SUPERUSERID	10
+
 
 /*****************************************************************************
  *	  System interrupt and critical section handling
@@ -360,8 +367,6 @@ extern Oid	GetCurrentRoleId(void);
 extern void SetCurrentRoleId(Oid roleid, bool is_superuser);
 
 /* in utils/misc/superuser.c */
-extern bool superuser(void);	/* current user is superuser */
-extern bool superuser_arg(Oid roleid);	/* given user is superuser */
 
 
 /*****************************************************************************

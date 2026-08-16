@@ -31,12 +31,6 @@ extern bool describeOperators(const char *oper_pattern,
 							  char **arg_patterns, int num_arg_patterns,
 							  bool verbose, bool showSystem);
 
-/* \du, \dg */
-extern bool describeRoles(const char *pattern, bool verbose, bool showSystem);
-
-/* \drds */
-extern bool listDbRoleSettings(const char *pattern, const char *pattern2);
-
 /* \z (or \dp) */
 extern bool permissionsList(const char *pattern);
 

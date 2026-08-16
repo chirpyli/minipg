@@ -342,7 +342,7 @@ DefineAggregate(ParseState *pstate,
 	if (transTypeType == TYPTYPE_PSEUDO &&
 		!IsPolymorphicType(transTypeId))
 	{
-		if (transTypeId == INTERNALOID && superuser())
+		if (transTypeId == INTERNALOID && true)
 			 /* okay */ ;
 		else
 			ereport(ERROR,
@@ -383,7 +383,7 @@ DefineAggregate(ParseState *pstate,
 		if (mtransTypeType == TYPTYPE_PSEUDO &&
 			!IsPolymorphicType(mtransTypeId))
 		{
-			if (mtransTypeId == INTERNALOID && superuser())
+			if (mtransTypeId == INTERNALOID && true)
 				 /* okay */ ;
 			else
 				ereport(ERROR,

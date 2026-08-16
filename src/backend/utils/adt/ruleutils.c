@@ -26,7 +26,6 @@
 #include "access/table.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
@@ -2302,8 +2301,6 @@ pg_get_userbyid(PG_FUNCTION_ARGS)
 {
 	Oid			roleid = PG_GETARG_OID(0);
 	Name		result;
-	HeapTuple	roletup;
-	Form_pg_authid role_rec;
 
 	/*
 	 * Allocate space for the result
@@ -2312,110 +2309,11 @@ pg_get_userbyid(PG_FUNCTION_ARGS)
 	memset(NameStr(*result), 0, NAMEDATALEN);
 
 	/*
-	 * Get the pg_authid entry and print the result
+	 * minipg 没有用户/角色概念，所有对象 owner 均为唯一的超级用户 "postgres"。
 	 */
-	roletup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-	if (HeapTupleIsValid(roletup))
-	{
-		role_rec = (Form_pg_authid) GETSTRUCT(roletup);
-		*result = role_rec->rolname;
-		ReleaseSysCache(roletup);
-	}
-	else
-		sprintf(NameStr(*result), "unknown (OID=%u)", roleid);
+	strncpy(NameStr(*result), "postgres", NAMEDATALEN - 1);
 
 	PG_RETURN_NAME(result);
-}
-
-
-/*
- * pg_get_serial_sequence
- *		Get the name of the sequence used by an identity or serial column,
- *		formatted suitably for passing to setval, nextval or currval.
- *		First parameter is not treated as double-quoted, second parameter
- *		is --- see documentation for reason.
- */
-Datum
-pg_get_serial_sequence(PG_FUNCTION_ARGS)
-{
-	text	   *tablename = PG_GETARG_TEXT_PP(0);
-	text	   *columnname = PG_GETARG_TEXT_PP(1);
-	RangeVar   *tablerv;
-	Oid			tableOid;
-	char	   *column;
-	AttrNumber	attnum;
-	Oid			sequenceId = InvalidOid;
-	Relation	depRel;
-	ScanKeyData key[3];
-	SysScanDesc scan;
-	HeapTuple	tup;
-
-	/* Look up table name.  Can't lock it - we might not have privileges. */
-	tablerv = makeRangeVarFromNameList(textToQualifiedNameList(tablename));
-	tableOid = RangeVarGetRelid(tablerv, NoLock, false);
-
-	/* Get the number of the column */
-	column = text_to_cstring(columnname);
-
-	attnum = get_attnum(tableOid, column);
-	if (attnum == InvalidAttrNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						column, tablerv->relname)));
-
-	/* Search the dependency table for the dependent sequence */
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_refclassid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_refobjid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(tableOid));
-	ScanKeyInit(&key[2],
-				Anum_pg_depend_refobjsubid,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(attnum));
-
-	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
-							  NULL, 3, key);
-
-	while (HeapTupleIsValid(tup = systable_getnext(scan)))
-	{
-		Form_pg_depend deprec = (Form_pg_depend) GETSTRUCT(tup);
-
-		/*
-		 * Look for an auto dependency (serial column) or internal dependency
-		 * (identity column) of a sequence on a column.  (We need the relkind
-		 * test because indexes can also have auto dependencies on columns.)
-		 */
-		if (deprec->classid == RelationRelationId &&
-			deprec->objsubid == 0 &&
-			(deprec->deptype == DEPENDENCY_AUTO ||
-			 deprec->deptype == DEPENDENCY_INTERNAL) &&
-			get_rel_relkind(deprec->objid) == RELKIND_SEQUENCE)
-		{
-			sequenceId = deprec->objid;
-			break;
-		}
-	}
-
-	systable_endscan(scan);
-	table_close(depRel, AccessShareLock);
-
-	if (OidIsValid(sequenceId))
-	{
-		char	   *result;
-
-		result = generate_qualified_relation_name(sequenceId);
-
-		PG_RETURN_TEXT_P(string_to_text(result));
-	}
-
-	PG_RETURN_NULL();
 }
 
 

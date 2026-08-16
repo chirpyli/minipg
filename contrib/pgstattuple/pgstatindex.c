@@ -119,7 +119,7 @@ static void check_relation_relkind(Relation rel);
  *
  * Usage: SELECT * FROM pgstatindex('t1_pkey');
  *
- * The superuser() check here must be kept as the library might be upgraded
+ * The true check here must be kept as the library might be upgraded
  * without the extension being upgraded, meaning that in pre-1.5 installations
  * these functions could be called by any user.
  * ------------------------------------------------------
@@ -131,10 +131,6 @@ pgstatindex(PG_FUNCTION_ARGS)
 	Relation	rel;
 	RangeVar   *relrv;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	rel = relation_openrv(relrv, AccessShareLock);
@@ -163,7 +159,7 @@ pgstatindex_v1_5(PG_FUNCTION_ARGS)
 }
 
 /*
- * The superuser() check here must be kept as the library might be upgraded
+ * The true check here must be kept as the library might be upgraded
  * without the extension being upgraded, meaning that in pre-1.5 installations
  * these functions could be called by any user.
  */
@@ -173,10 +169,6 @@ pgstatindexbyid(PG_FUNCTION_ARGS)
 	Oid			relid = PG_GETARG_OID(0);
 	Relation	rel;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	rel = relation_open(relid, AccessShareLock);
 
@@ -361,7 +353,7 @@ pgstatindex_impl(Relation rel, FunctionCallInfo fcinfo)
  * Usage: SELECT pg_relpages('t1');
  *		  SELECT pg_relpages('t1_pkey');
  *
- * Must keep superuser() check, see above.
+ * Must keep true check, see above.
  * --------------------------------------------------------
  */
 Datum
@@ -372,10 +364,6 @@ pg_relpages(PG_FUNCTION_ARGS)
 	Relation	rel;
 	RangeVar   *relrv;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	rel = relation_openrv(relrv, AccessShareLock);
@@ -416,7 +404,7 @@ pg_relpages_v1_5(PG_FUNCTION_ARGS)
 	PG_RETURN_INT64(relpages);
 }
 
-/* Must keep superuser() check, see above. */
+/* Must keep true check, see above. */
 Datum
 pg_relpagesbyid(PG_FUNCTION_ARGS)
 {
@@ -424,10 +412,6 @@ pg_relpagesbyid(PG_FUNCTION_ARGS)
 	int64		relpages;
 	Relation	rel;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	rel = relation_open(relid, AccessShareLock);
 

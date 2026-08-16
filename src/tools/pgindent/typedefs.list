@@ -62,7 +62,6 @@ AllocSetFreeList
 AllocateDesc
 AllocateDescKind
 AlterCollationStmt
-AlterDatabaseSetStmt
 AlterDatabaseStmt
 AlterDefaultPrivilegesStmt
 AlterDomainStmt
@@ -83,7 +82,6 @@ AlterRoleSetStmt
 AlterRoleStmt
 AlterSeqStmt
 AlterStatsStmt
-AlterSystemStmt
 AlterTSConfigType
 AlterTSConfigurationStmt
 AlterTSDictionaryStmt

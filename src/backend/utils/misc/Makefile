@@ -23,7 +23,6 @@ OBJS = \
 	queryenvironment.o \
 	queryjumble.o \
 	sampling.o \
-	superuser.o \
 	timeout.o \
 	tzparser.o
 

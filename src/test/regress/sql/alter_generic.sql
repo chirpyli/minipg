@@ -62,9 +62,9 @@ ALTER AGGREGATE alt_agg3(int) SET SCHEMA alt_nsp2;  -- failed (not owner)
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- failed (name conflict)
 
 
-SELECT n.nspname, proname, prorettype::regtype, prokind, a.rolname
-  FROM pg_proc p, pg_namespace n, pg_authid a
-  WHERE p.pronamespace = n.oid AND p.proowner = a.oid
+SELECT n.nspname, proname, prorettype::regtype, prokind, 'postgres'::name AS rolname
+  FROM pg_proc p, pg_namespace n
+  WHERE p.pronamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, proname;
 
@@ -92,9 +92,9 @@ ALTER CONVERSION alt_conv3 SET SCHEMA alt_nsp2;  -- failed (not owner)
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
 
 
-SELECT n.nspname, c.conname, a.rolname
-  FROM pg_conversion c, pg_namespace n, pg_authid a
-  WHERE c.connamespace = n.oid AND c.conowner = a.oid
+SELECT n.nspname, c.conname, 'postgres'::name AS rolname
+  FROM pg_conversion c, pg_namespace n
+  WHERE c.connamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, conname;
 
@@ -116,9 +116,9 @@ ALTER OPERATOR @+@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (not owner)
 -- ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (name conflict)
 
 
-SELECT n.nspname, oprname, a.rolname,
+SELECT n.nspname, oprname, 'postgres'::name AS rolname,
     oprleft::regtype, oprright::regtype, oprcode::regproc
-  FROM pg_operator o, pg_namespace n, pg_authid a
+  FROM pg_operator o, pg_namespace n
   WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, oprname;
@@ -148,15 +148,15 @@ ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- failed (name 
 
 
 SELECT nspname, opfname, amname, rolname
-  FROM pg_opfamily o, pg_am m, pg_namespace n, pg_authid a
-  WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid AND o.opfowner = a.oid
+  FROM pg_opfamily o, pg_am m, pg_namespace n
+  WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
 	AND NOT opfname LIKE 'alt_opc%'
   ORDER BY nspname, opfname;
 
 SELECT nspname, opcname, amname, rolname
-  FROM pg_opclass o, pg_am m, pg_namespace n, pg_authid a
-  WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid AND o.opcowner = a.oid
+  FROM pg_opclass o, pg_am m, pg_namespace n
+  WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, opcname;
 
@@ -353,8 +353,8 @@ ALTER STATISTICS alt_stat3 SET SCHEMA alt_nsp2;		-- failed (not owner)
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;		-- failed (name conflict)
 
 SELECT nspname, stxname, rolname
-  FROM pg_statistic_ext s, pg_namespace n, pg_authid a
- WHERE s.stxnamespace = n.oid AND s.stxowner = a.oid
+  FROM pg_statistic_ext s, pg_namespace n
+ WHERE s.stxnamespace = n.oid
    AND n.nspname in ('alt_nsp1', 'alt_nsp2')
  ORDER BY nspname, stxname;
 

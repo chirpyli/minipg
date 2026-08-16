@@ -53,14 +53,6 @@ CreateAccessMethod(CreateAmStmt *stmt)
 
 	rel = table_open(AccessMethodRelationId, RowExclusiveLock);
 
-	/* Must be super user */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied to create access method \"%s\"",
-						stmt->amname),
-				 errhint("Must be superuser to create an access method.")));
-
 	/* Check if name is used */
 	amoid = GetSysCacheOid1(AMNAME, Anum_pg_am_oid,
 							CStringGetDatum(stmt->amname));

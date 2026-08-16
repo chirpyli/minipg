@@ -1709,8 +1709,7 @@ describeOneTableDetails(const char *schemaname,
 		PGresult   *result;
 
 		printfPQExpBuffer(&buf,
-						  "SELECT inhparent::pg_catalog.regclass,\n"
-						  "  pg_catalog.pg_get_expr(c.relpartbound, c.oid),\n  ");
+						  "SELECT inhparent::pg_catalog.regclass,\n  ");
 
 		appendPQExpBuffer(&buf,
 						  pset.sversion >= 140000 ? "inhdetachpending" :
@@ -3180,72 +3179,6 @@ add_role_attribute(PQExpBuffer buf, const char *const str)
 
 	appendPQExpBufferStr(buf, str);
 }
-
-/*
- * \drds
- */
-bool
-listDbRoleSettings(const char *pattern, const char *pattern2)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-	bool		havewhere;
-
-	initPQExpBuffer(&buf);
-
-	printfPQExpBuffer(&buf, "SELECT rolname AS \"%s\", datname AS \"%s\",\n"
-					  "pg_catalog.array_to_string(setconfig, E'\\n') AS \"%s\"\n"
-					  "FROM pg_catalog.pg_db_role_setting s\n"
-					  "LEFT JOIN pg_catalog.pg_database d ON d.oid = setdatabase\n"
-					  "LEFT JOIN pg_catalog.pg_roles r ON r.oid = setrole\n",
-					  gettext_noop("Role"),
-					  gettext_noop("Database"),
-					  gettext_noop("Settings"));
-	if (!validateSQLNamePattern(&buf, pattern, false, false,
-								NULL, "r.rolname", NULL, NULL, &havewhere, 1))
-		return false;
-	if (!validateSQLNamePattern(&buf, pattern2, havewhere, false,
-								NULL, "d.datname", NULL, NULL,
-								NULL, 1))
-		return false;
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	/*
-	 * Most functions in this file are content to print an empty table when
-	 * there are no matching objects.  We intentionally deviate from that
-	 * here, but only in !quiet mode, because of the possibility that the user
-	 * is confused about what the two pattern arguments mean.
-	 */
-	if (PQntuples(res) == 0 && !pset.quiet)
-	{
-		if (pattern && pattern2)
-			pg_log_error("Did not find any settings for role \"%s\" and database \"%s\".",
-						 pattern, pattern2);
-		else if (pattern)
-			pg_log_error("Did not find any settings for role \"%s\".",
-						 pattern);
-		else
-			pg_log_error("Did not find any settings.");
-	}
-	else
-	{
-		myopt.nullPrint = NULL;
-		myopt.title = _("List of settings");
-		myopt.translate_header = true;
-
-		printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-	}
-
-	PQclear(res);
-	return true;
-}
-
 
 /*
  * listTables()

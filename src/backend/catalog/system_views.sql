@@ -16,45 +16,38 @@
 
 CREATE VIEW pg_roles AS
     SELECT
-        rolname,
-        rolsuper,
-        rolinherit,
-        rolcreaterole,
-        rolcreatedb,
-        rolcanlogin,
-        rolreplication,
-        rolconnlimit,
-        '********'::text as rolpassword,
-        rolvaliduntil,
-        rolbypassrls,
-        setconfig as rolconfig,
-        pg_authid.oid
-    FROM pg_authid LEFT JOIN pg_db_role_setting s
-    ON (pg_authid.oid = setrole AND setdatabase = 0);
+        'postgres'::name AS rolname,
+        true::bool AS rolsuper,
+        true::bool AS rolinherit,
+        true::bool AS rolcreaterole,
+        true::bool AS rolcreatedb,
+        true::bool AS rolcanlogin,
+        true::bool AS rolreplication,
+        -1::int4 AS rolconnlimit,
+        '********'::text AS rolpassword,
+        NULL::timestamptz AS rolvaliduntil,
+        true::bool AS rolbypassrls,
+        NULL::text[] AS rolconfig,
+        10::oid AS oid;
 
 CREATE VIEW pg_shadow AS
     SELECT
-        rolname AS usename,
-        pg_authid.oid AS usesysid,
-        rolcreatedb AS usecreatedb,
-        rolsuper AS usesuper,
-        rolreplication AS userepl,
-        rolbypassrls AS usebypassrls,
-        rolpassword AS passwd,
-        rolvaliduntil AS valuntil,
-        setconfig AS useconfig
-    FROM pg_authid LEFT JOIN pg_db_role_setting s
-    ON (pg_authid.oid = setrole AND setdatabase = 0)
-    WHERE rolcanlogin;
-
+        'postgres'::name AS usename,
+        10::oid AS usesysid,
+        true::bool AS usecreatedb,
+        true::bool AS usesuper,
+        true::bool AS userepl,
+        true::bool AS usebypassrls,
+        '********'::text AS passwd,
+        NULL::timestamptz AS valuntil,
+        NULL::text[] AS useconfig;
 
 CREATE VIEW pg_group AS
     SELECT
-        rolname AS groname,
-        oid AS grosysid,
-        ARRAY(SELECT member FROM pg_auth_members WHERE roleid = oid) AS grolist
-    FROM pg_authid
-    WHERE NOT rolcanlogin;
+        'postgres'::name AS groname,
+        10::oid AS grosysid,
+        NULL::oid[] AS grolist
+    WHERE false;
 
 CREATE VIEW pg_user AS
     SELECT
@@ -303,9 +296,8 @@ CREATE VIEW pg_available_extension_versions AS
 
 CREATE VIEW pg_prepared_xacts AS
     SELECT P.transaction, P.gid, P.prepared,
-           U.rolname AS owner, D.datname AS database
+           'postgres'::name AS owner, D.datname AS database
     FROM pg_prepared_xact() AS P
-         LEFT JOIN pg_authid U ON P.ownerid = U.oid
          LEFT JOIN pg_database D ON P.dbid = D.oid;
 
 CREATE VIEW pg_prepared_statements AS
@@ -514,7 +506,7 @@ CREATE VIEW pg_stat_activity AS
             S.pid,
             S.leader_pid,
             S.usesysid,
-            U.rolname AS usename,
+            'postgres'::name AS usename,
             S.application_name,
             S.client_addr,
             S.client_hostname,
@@ -532,8 +524,7 @@ CREATE VIEW pg_stat_activity AS
             S.query,
             S.backend_type
     FROM pg_stat_get_activity(NULL) AS S
-        LEFT JOIN pg_database AS D ON (S.datid = D.oid)
-        LEFT JOIN pg_authid AS U ON (S.usesysid = U.oid);
+        LEFT JOIN pg_database AS D ON (S.datid = D.oid);
 
 CREATE VIEW pg_stat_slru AS
     SELECT

@@ -20,13 +20,9 @@
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_auth_members.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_db_role_setting.h"
 #include "commands/dbcommands.h"
 #include "commands/user.h"
-#include "libpq/crypt.h"
 #include "miscadmin.h"
 #include "storage/lmgr.h"
 #include "utils/acl.h"
@@ -35,12 +31,6 @@
 #include "utils/syscache.h"
 #include "utils/timestamp.h"
 
-
-/* GUC parameter */
-int			Password_encryption = PASSWORD_TYPE_SCRAM_SHA_256;
-
-/* Hook to check passwords in CreateRole() and AlterRole() */
-check_password_hook_type check_password_hook = NULL;
 
 /*
  * roleSpecsToIds

@@ -958,9 +958,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	else
 		nulls[Anum_pg_class_reloptions - 1] = true;
 
-	/* relpartbound is set by updating this tuple, if necessary */
-	nulls[Anum_pg_class_relpartbound - 1] = true;
-
 	tup = heap_form_tuple(RelationGetDescr(pg_class_desc), values, nulls);
 
 	/* finally insert the new tuple, update the indexes, and clean up */

@@ -593,11 +593,6 @@ LockGXact(const char *gid, Oid user)
 					 errmsg("prepared transaction with identifier \"%s\" is busy",
 							gid)));
 
-		if (user != gxact->owner && !superuser_arg(user))
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("permission denied to finish prepared transaction"),
-					 errhint("Must be superuser or the user that prepared the transaction.")));
 
 		/*
 		 * Note: it probably would be possible to allow committing from

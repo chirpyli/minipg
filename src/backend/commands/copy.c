@@ -21,7 +21,6 @@
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "access/xact.h"
-#include "catalog/pg_authid.h"
 #include "commands/copy.h"
 #include "commands/defrem.h"
 #include "executor/executor.h"

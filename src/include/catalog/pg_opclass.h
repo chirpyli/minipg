@@ -60,7 +60,7 @@ CATALOG(pg_opclass,2616,OperatorClassRelationId)
 	Oid			opcnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
 	/* opclass owner */
-	Oid			opcowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
+	Oid			opcowner BKI_DEFAULT(10);
 
 	/* containing operator family */
 	Oid			opcfamily BKI_LOOKUP(pg_opfamily);

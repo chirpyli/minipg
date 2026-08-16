@@ -22,7 +22,6 @@
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_namespace.h"
 #include "commands/dbcommands.h"
 #include "commands/schemacmds.h"
@@ -76,14 +75,10 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	/* fill schema name with the user name if not specified */
 	if (!schemaName)
 	{
-		HeapTuple	tuple;
-
-		tuple = SearchSysCache1(AUTHOID, ObjectIdGetDatum(owner_uid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for role %u", owner_uid);
-		schemaName =
-			pstrdup(NameStr(((Form_pg_authid) GETSTRUCT(tuple))->rolname));
-		ReleaseSysCache(tuple);
+		/*
+		 * minipg 没有用户/角色概念，schema 名退化为唯一的角色名 "postgres"。
+		 */
+		schemaName = GetUserNameFromId(owner_uid, false);
 	}
 
 	/*
@@ -98,7 +93,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 		aclcheck_error(aclresult, OBJECT_DATABASE,
 					   get_database_name(MyDatabaseId));
 
-	check_is_member_of_role(saved_uid, owner_uid);
 
 	/* Additional check to protect reserved schema names */
 	if (!allowSystemTableMods && IsReservedName(schemaName))
@@ -379,8 +373,6 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_SCHEMA,
 						   NameStr(nspForm->nspname));
 
-		/* Must be able to become new owner */
-		check_is_member_of_role(GetUserId(), newOwnerId);
 
 		memset(repl_null, false, sizeof(repl_null));
 		memset(repl_repl, false, sizeof(repl_repl));

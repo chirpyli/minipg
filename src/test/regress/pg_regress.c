@@ -2025,13 +2025,12 @@ create_database(const char *dbname)
 		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0%s", dbname,
 					 (nolocale) ? " LC_COLLATE='C' LC_CTYPE='C'" : "");
 	psql_command(dbname,
-				 "ALTER DATABASE \"%s\" SET lc_messages TO 'C';"
-				 "ALTER DATABASE \"%s\" SET lc_monetary TO 'C';"
-				 "ALTER DATABASE \"%s\" SET lc_numeric TO 'C';"
-				 "ALTER DATABASE \"%s\" SET lc_time TO 'C';"
-				 "ALTER DATABASE \"%s\" SET bytea_output TO 'hex';"
-				 "ALTER DATABASE \"%s\" SET timezone_abbreviations TO 'Default';",
-				 dbname, dbname, dbname, dbname, dbname, dbname);
+				 "SET lc_messages TO 'C';"
+				 "SET lc_monetary TO 'C';"
+				 "SET lc_numeric TO 'C';"
+				 "SET lc_time TO 'C';"
+				 "SET bytea_output TO 'hex';"
+				 "SET timezone_abbreviations TO 'Default';");
 
 	/*
 	 * Install any requested extensions.  We use CREATE IF NOT EXISTS so that

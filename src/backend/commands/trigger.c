@@ -1408,11 +1408,6 @@ EnableDisableTriggerNew(Relation rel, const char *tgname,
 			/* system trigger ... ok to process? */
 			if (skip_system)
 				continue;
-			if (!superuser())
-				ereport(ERROR,
-						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("permission denied: \"%s\" is a system trigger",
-								NameStr(oldtrig->tgname))));
 		}
 
 		found = true;

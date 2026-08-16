@@ -1020,20 +1020,17 @@ connectOptions2(PGconn *conn)
 	}
 
 	/*
-	 * If user name was not given, fetch it.  (Most likely, the fetch will
-	 * fail, since the only way we get here is if pg_fe_getauthname() failed
-	 * during conninfo_add_defaults().  But now we want an error message.)
+	 * minipg 无用户/密码概念，任何连接都是超级用户。
+	 * 若用户未显式指定 user，则默认使用固定的 "postgres"，无需依赖
+	 * 操作系统用户名，从而做到免用户名即可连接。
 	 */
 	if (conn->pguser == NULL || conn->pguser[0] == '\0')
 	{
 		if (conn->pguser)
 			free(conn->pguser);
-		conn->pguser = pg_fe_getauthname(&conn->errorMessage);
+		conn->pguser = strdup("postgres");
 		if (!conn->pguser)
-		{
-			conn->status = CONNECTION_BAD;
-			return false;
-		}
+			goto oom_error;
 	}
 
 	/*
@@ -5208,15 +5205,19 @@ conninfo_add_defaults(PQconninfoOption *options, PQExpBuffer errorMessage)
 		}
 
 		/*
-		 * Special handling for "user" option.  Note that if pg_fe_getauthname
-		 * fails, we just leave the value as NULL; there's no need for this to
-		 * be an error condition if the caller provides a user name.  The only
-		 * reason we do this now at all is so that callers of PQconndefaults
-		 * will see a correct default (barring error, of course).
+		 * minipg 无用户概念，user 选项默认固定为 "postgres"，
+		 * 无需依赖操作系统用户名。
 		 */
 		if (strcmp(option->keyword, "user") == 0)
 		{
-			option->val = pg_fe_getauthname(NULL);
+			option->val = strdup("postgres");
+			if (!option->val)
+			{
+				if (errorMessage)
+					appendPQExpBufferStr(errorMessage,
+										 libpq_gettext("out of memory\n"));
+				return false;
+			}
 			continue;
 		}
 	}

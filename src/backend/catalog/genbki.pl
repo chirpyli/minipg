@@ -215,11 +215,12 @@ foreach my $row (@{ $catalog_data{pg_am} })
 }
 
 # role OID lookup
+# minipg 已删除 pg_authid 表，仅保留单一超级用户实体，其 OID 固定为 10
+#（与上游 BOOTSTRAP_SUPERUSERID 一致）。.dat 文件中引用 "postgres" 角色名
+# 的位置（如 proowner、datdba）统一解析为该 OID。
 my %authidoids;
-foreach my $row (@{ $catalog_data{pg_authid} })
-{
-	$authidoids{ $row->{rolname} } = $row->{oid};
-}
+$authidoids{"postgres"} = 10;
+$authidoids{"POSTGRES"} = 10;
 
 # class (relation) OID lookup (note this only covers bootstrap catalogs!)
 my %classoids;

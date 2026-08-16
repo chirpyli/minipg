@@ -1,6 +1,6 @@
 Parsed test spec with 2 sessions
 
 starting permutation: s1u1 s1u2 s1c s2u1 s2u2 s2c
-setup failed: ERROR:  foreign key constraints are not supported in minipg
+setup failed: ERROR:  syntax error at or near "FOREIGN"
 LINE 13:  FOREIGN KEY (AID) REFERENCES A(AID)
           ^

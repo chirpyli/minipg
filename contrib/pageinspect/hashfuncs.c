@@ -197,10 +197,6 @@ hash_page_type(PG_FUNCTION_ARGS)
 	int			pagetype;
 	const char *type;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	page = verify_hash_page(raw_page, 0);
 
@@ -245,10 +241,6 @@ hash_page_stats(PG_FUNCTION_ARGS)
 	HeapTuple	tuple;
 	TupleDesc	tupleDesc;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	page = verify_hash_page(raw_page, LH_BUCKET_PAGE | LH_OVERFLOW_PAGE);
 
@@ -312,10 +304,6 @@ hash_page_items(PG_FUNCTION_ARGS)
 	MemoryContext mctx;
 	struct user_args *uargs;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -414,10 +402,6 @@ hash_bitmap_info(PG_FUNCTION_ARGS)
 	bool		nulls[3];
 	uint32	   *freep;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	indexRel = relation_open(indexRelid, AccessShareLock);
 
@@ -527,10 +511,6 @@ hash_metapage_info(PG_FUNCTION_ARGS)
 	Datum		spares[HASH_MAX_SPLITPOINTS];
 	Datum		mapp[HASH_MAX_BITMAPS];
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	page = verify_hash_page(raw_page, LH_META_PAGE);
 

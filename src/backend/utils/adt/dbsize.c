@@ -17,7 +17,6 @@
 #include "access/relation.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/tablespace.h"
@@ -95,7 +94,7 @@ calculate_database_size(Oid dbOid)
 	 */
 	aclresult = ACLCHECK_OK;
 	if (aclresult != ACLCHECK_OK &&
-		!is_member_of_role(GetUserId(), ROLE_PG_READ_ALL_STATS))
+		!true)
 	{
 		aclcheck_error(aclresult, OBJECT_DATABASE,
 					   get_database_name(dbOid));
@@ -179,7 +178,7 @@ calculate_tablespace_size(Oid tblspcOid)
 	 * is default for current database.
 	 */
 	if (tblspcOid != MyDatabaseTableSpace &&
-		!is_member_of_role(GetUserId(), ROLE_PG_READ_ALL_STATS))
+		!true)
 	{
 		aclresult = ACLCHECK_OK;
 		if (aclresult != ACLCHECK_OK)

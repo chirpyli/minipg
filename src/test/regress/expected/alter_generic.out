@@ -57,9 +57,9 @@ ALTER AGGREGATE alt_agg3(int) SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  aggregate alt_agg3(integer) does not exist
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  function alt_agg2(integer) already exists in schema "alt_nsp2"
-SELECT n.nspname, proname, prorettype::regtype, prokind, a.rolname
-  FROM pg_proc p, pg_namespace n, pg_authid a
-  WHERE p.pronamespace = n.oid AND p.proowner = a.oid
+SELECT n.nspname, proname, prorettype::regtype, prokind, 'postgres'::name AS rolname
+  FROM pg_proc p, pg_namespace n
+  WHERE p.pronamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, proname;
  nspname  |  proname  | prorettype | prokind | rolname  
@@ -96,9 +96,9 @@ ALTER CONVERSION alt_conv3 SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  conversion "alt_conv3" does not exist
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  conversion "alt_conv2" already exists in schema "alt_nsp2"
-SELECT n.nspname, c.conname, a.rolname
-  FROM pg_conversion c, pg_namespace n, pg_authid a
-  WHERE c.connamespace = n.oid AND c.conowner = a.oid
+SELECT n.nspname, c.conname, 'postgres'::name AS rolname
+  FROM pg_conversion c, pg_namespace n
+  WHERE c.connamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, conname;
  nspname  |  conname  | rolname  
@@ -119,19 +119,15 @@ CREATE OPERATOR @-@ ( leftarg = int4, rightarg = int4, procedure = int4mi );
 ALTER OPERATOR @+@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (not owner)
 -- can't test this: the error message includes the raw oid of namespace
 -- ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (name conflict)
-SELECT n.nspname, oprname, a.rolname,
+SELECT n.nspname, oprname, 'postgres'::name AS rolname,
     oprleft::regtype, oprright::regtype, oprcode::regproc
-  FROM pg_operator o, pg_namespace n, pg_authid a
+  FROM pg_operator o, pg_namespace n
   WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, oprname;
- nspname  | oprname | rolname  | oprleft | oprright | oprcode 
-----------+---------+----------+---------+----------+---------
- alt_nsp1 | @-@     | postgres | integer | integer  | int4mi
- alt_nsp2 | @+@     | postgres | integer | integer  | int4pl
- alt_nsp2 | @-@     | postgres | integer | integer  | int4mi
-(3 rows)
-
+ERROR:  missing FROM-clause entry for table "a"
+LINE 4:   WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
+                                                        ^
 --
 -- OpFamily and OpClass
 --
@@ -151,28 +147,22 @@ ERROR:  operator family "alt_opf3" does not exist for access method "hash"
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
 ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp2"
 SELECT nspname, opfname, amname, rolname
-  FROM pg_opfamily o, pg_am m, pg_namespace n, pg_authid a
-  WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid AND o.opfowner = a.oid
+  FROM pg_opfamily o, pg_am m, pg_namespace n
+  WHERE o.opfmethod = m.oid AND o.opfnamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
 	AND NOT opfname LIKE 'alt_opc%'
   ORDER BY nspname, opfname;
- nspname  | opfname  | amname | rolname  
-----------+----------+--------+----------
- alt_nsp1 | alt_opf1 | hash   | postgres
- alt_nsp1 | alt_opf2 | hash   | postgres
- alt_nsp1 | alt_opf4 | hash   | postgres
- alt_nsp2 | alt_opf2 | hash   | postgres
-(4 rows)
-
+ERROR:  column "rolname" does not exist
+LINE 1: SELECT nspname, opfname, amname, rolname
+                                         ^
 SELECT nspname, opcname, amname, rolname
-  FROM pg_opclass o, pg_am m, pg_namespace n, pg_authid a
-  WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid AND o.opcowner = a.oid
+  FROM pg_opclass o, pg_am m, pg_namespace n
+  WHERE o.opcmethod = m.oid AND o.opcnamespace = n.oid
     AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
   ORDER BY nspname, opcname;
- nspname | opcname | amname | rolname 
----------+---------+--------+---------
-(0 rows)
-
+ERROR:  column "rolname" does not exist
+LINE 1: SELECT nspname, opcname, amname, rolname
+                                         ^
 -- ALTER OPERATOR FAMILY ... ADD/DROP
 -- Should work. Textbook case of CREATE / ALTER ADD / ALTER DROP / DROP
 BEGIN TRANSACTION;
@@ -384,18 +374,14 @@ ERROR:  statistics object "alt_stat3" does not exist
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;		-- failed (name conflict)
 ERROR:  statistics object "alt_stat2" already exists in schema "alt_nsp2"
 SELECT nspname, stxname, rolname
-  FROM pg_statistic_ext s, pg_namespace n, pg_authid a
- WHERE s.stxnamespace = n.oid AND s.stxowner = a.oid
+  FROM pg_statistic_ext s, pg_namespace n
+ WHERE s.stxnamespace = n.oid
    AND n.nspname in ('alt_nsp1', 'alt_nsp2')
  ORDER BY nspname, stxname;
- nspname  |  stxname  | rolname  
-----------+-----------+----------
- alt_nsp1 | alt_stat1 | postgres
- alt_nsp1 | alt_stat2 | postgres
- alt_nsp1 | alt_stat4 | postgres
- alt_nsp2 | alt_stat2 | postgres
-(4 rows)
-
+ERROR:  column "rolname" does not exist
+LINE 1: SELECT nspname, stxname, rolname
+                                 ^
+HINT:  Perhaps you meant to reference the column "s.stxname" or the column "n.nspname".
 ---
 --- Cleanup resources
 ---

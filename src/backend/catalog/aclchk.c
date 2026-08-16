@@ -29,7 +29,6 @@
 #include "catalog/objectaccess.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
@@ -358,7 +357,7 @@ pg_class_ownercheck(Oid class_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(class_oid));
@@ -371,7 +370,7 @@ pg_class_ownercheck(Oid class_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -384,7 +383,7 @@ pg_type_ownercheck(Oid type_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_oid));
@@ -397,7 +396,7 @@ pg_type_ownercheck(Oid type_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -410,7 +409,7 @@ pg_oper_ownercheck(Oid oper_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(oper_oid));
@@ -423,7 +422,7 @@ pg_oper_ownercheck(Oid oper_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -436,7 +435,7 @@ pg_proc_ownercheck(Oid proc_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(proc_oid));
@@ -449,7 +448,7 @@ pg_proc_ownercheck(Oid proc_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -462,7 +461,7 @@ pg_language_ownercheck(Oid lan_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(LANGOID, ObjectIdGetDatum(lan_oid));
@@ -475,7 +474,7 @@ pg_language_ownercheck(Oid lan_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -488,7 +487,7 @@ pg_namespace_ownercheck(Oid nsp_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(nsp_oid));
@@ -501,7 +500,7 @@ pg_namespace_ownercheck(Oid nsp_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -514,7 +513,7 @@ pg_tablespace_ownercheck(Oid spc_oid, Oid roleid)
 	Oid			spcowner;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	/* Search syscache for pg_tablespace */
@@ -528,7 +527,7 @@ pg_tablespace_ownercheck(Oid spc_oid, Oid roleid)
 
 	ReleaseSysCache(spctuple);
 
-	return has_privs_of_role(roleid, spcowner);
+	return true;
 }
 
 /*
@@ -541,7 +540,7 @@ pg_opclass_ownercheck(Oid opc_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(CLAOID, ObjectIdGetDatum(opc_oid));
@@ -555,7 +554,7 @@ pg_opclass_ownercheck(Oid opc_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -568,7 +567,7 @@ pg_opfamily_ownercheck(Oid opf_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(OPFAMILYOID, ObjectIdGetDatum(opf_oid));
@@ -582,7 +581,7 @@ pg_opfamily_ownercheck(Oid opf_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -595,7 +594,7 @@ pg_database_ownercheck(Oid db_oid, Oid roleid)
 	Oid			dba;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(DATABASEOID, ObjectIdGetDatum(db_oid));
@@ -608,7 +607,7 @@ pg_database_ownercheck(Oid db_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, dba);
+	return true;
 }
 
 /*
@@ -621,7 +620,7 @@ pg_collation_ownercheck(Oid coll_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(COLLOID, ObjectIdGetDatum(coll_oid));
@@ -634,7 +633,7 @@ pg_collation_ownercheck(Oid coll_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -647,7 +646,7 @@ pg_conversion_ownercheck(Oid conv_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(CONVOID, ObjectIdGetDatum(conv_oid));
@@ -660,7 +659,7 @@ pg_conversion_ownercheck(Oid conv_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -676,7 +675,7 @@ pg_extension_ownercheck(Oid ext_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	/* There's no syscache for pg_extension, so do it the hard way */
@@ -702,7 +701,7 @@ pg_extension_ownercheck(Oid ext_oid, Oid roleid)
 	systable_endscan(scan);
 	table_close(pg_extension, AccessShareLock);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 /*
@@ -715,7 +714,7 @@ pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid)
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (true)
 		return true;
 
 	tuple = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(stat_oid));
@@ -729,7 +728,7 @@ pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
-	return has_privs_of_role(roleid, ownerId);
+	return true;
 }
 
 

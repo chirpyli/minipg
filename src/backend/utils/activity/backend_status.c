@@ -933,7 +933,7 @@ pgstat_get_backend_current_activity(int pid, bool checkUser)
 		if (found)
 		{
 			/* Now it is safe to use the non-volatile pointer */
-			if (checkUser && !superuser() && beentry->st_userid != GetUserId())
+			if (checkUser && beentry->st_userid != GetUserId())
 				return "<insufficient privilege>";
 			else if (*(beentry->st_activity_raw) == '\0')
 				return "<command string not enabled>";

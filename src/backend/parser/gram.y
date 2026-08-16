@@ -238,9 +238,9 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
 		AlterCollationStmt
-		AlterDatabaseStmt AlterDatabaseSetStmt AlterDomainStmt AlterEnumStmt
+		AlterDatabaseStmt AlterDomainStmt AlterEnumStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
-		AlterOperatorStmt AlterTypeStmt AlterSystemStmt AlterTableStmt
+		AlterOperatorStmt AlterTypeStmt AlterTableStmt
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
 		AlterStatsStmt
@@ -275,7 +275,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <ival>	add_drop opt_asc_desc opt_nulls_order
 
 %type <node>	alter_table_cmd alter_type_cmd opt_collate_clause
-	   replica_identity partition_cmd index_partition_cmd
+	   partition_cmd index_partition_cmd
 %type <list>	alter_table_cmds alter_type_cmds
 %type <list>    alter_identity_column_option_list
 %type <defelt>  alter_identity_column_option
@@ -780,7 +780,6 @@ toplevel_stmt:
 
 stmt:	AlterCollationStmt
 			| AlterDatabaseStmt
-			| AlterDatabaseSetStmt
 			| AlterDomainStmt
 			| AlterEnumStmt
 			| AlterExtensionStmt
@@ -791,7 +790,6 @@ stmt:	AlterCollationStmt
 			| AlterOwnerStmt
 			| AlterOperatorStmt
 			| AlterTypeStmt
-			| AlterSystemStmt
 			| AlterTableStmt
 			| AlterTblSpcStmt
 			| AlterCompositeTypeStmt
@@ -1657,22 +1655,8 @@ alter_table_cmds:
 					n->subtype = AT_AddConstraint;
 					n->def = $2;
 					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER CONSTRAINT ... */
-			| ALTER CONSTRAINT name ConstraintAttributeSpec
-				{
-					/*
-					 * Foreign-key constraints are not supported in minipg.
-					 * Only foreign-key constraints have deferrable attributes,
-					 * so this ALTER CONSTRAINT syntax is rejected entirely.
-					 */
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("foreign key constraints are not supported in minipg"),
-							 parser_errposition(@1)));
-					$$ = NULL;
-				}
-			/* ALTER TABLE <name> VALIDATE CONSTRAINT ... */
+					}
+					/* ALTER TABLE <name> VALIDATE CONSTRAINT ... */
 			| VALIDATE CONSTRAINT name
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
@@ -1864,14 +1848,6 @@ alter_table_cmds:
 					n->def = (Node *)$2;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> REPLICA IDENTITY */
-			| REPLICA IDENTITY_P replica_identity
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ReplicaIdentity;
-					n->def = $3;
-					$$ = (Node *)n;
-				}
 			| alter_generic_options
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
@@ -1909,36 +1885,6 @@ alter_using:
 			| /* EMPTY */				{ $$ = NULL; }
 		;
 
-replica_identity:
-			NOTHING
-				{
-					ReplicaIdentityStmt *n = makeNode(ReplicaIdentityStmt);
-					n->identity_type = REPLICA_IDENTITY_NOTHING;
-					n->name = NULL;
-					$$ = (Node *) n;
-				}
-			| FULL
-				{
-					ReplicaIdentityStmt *n = makeNode(ReplicaIdentityStmt);
-					n->identity_type = REPLICA_IDENTITY_FULL;
-					n->name = NULL;
-					$$ = (Node *) n;
-				}
-			| DEFAULT
-				{
-					ReplicaIdentityStmt *n = makeNode(ReplicaIdentityStmt);
-					n->identity_type = REPLICA_IDENTITY_DEFAULT;
-					n->name = NULL;
-					$$ = (Node *) n;
-				}
-			| USING INDEX name
-				{
-					ReplicaIdentityStmt *n = makeNode(ReplicaIdentityStmt);
-					n->identity_type = REPLICA_IDENTITY_INDEX;
-					n->name = $3;
-					$$ = (Node *) n;
-				}
-;
 
 reloptions:
 			'(' reloption_list ')'					{ $$ = $2; }
@@ -2421,17 +2367,8 @@ ColConstraintElem:
 								 parser_errposition(@2)));
 
 					$$ = (Node *)n;
-				}
-			| REFERENCES qualified_name opt_column_list key_match key_actions
-				{
-					/* Foreign-key constraints are not supported in minipg. */
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("foreign key constraints are not supported in minipg"),
-							 parser_errposition(@1)));
-					$$ = NULL;
-				}
-		;
+					}
+					;
 
 generated_when:
 			ALWAYS			{ $$ = ATTRIBUTE_IDENTITY_ALWAYS; }
@@ -2595,16 +2532,6 @@ ConstraintElem:
 								   NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-			| FOREIGN KEY '(' columnList ')' REFERENCES qualified_name
-				opt_column_list key_match key_actions ConstraintAttributeSpec
-				{
-					/* Foreign-key constraints are not supported in minipg. */
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("foreign key constraints are not supported in minipg"),
-							 parser_errposition(@1)));
-					$$ = NULL;
-				}
 		;
 
 opt_no_inherit:	NO INHERIT							{  $$ = true; }
@@ -2629,31 +2556,9 @@ columnElem: ColId
 
 opt_c_include:	INCLUDE '(' columnList ')'			{ $$ = $3; }
 			 |		/* EMPTY */						{ $$ = NIL; }
-		;
+			 ;
 
-key_match:  MATCH FULL
-			{
-				$$ = FKCONSTR_MATCH_FULL;
-			}
-		| MATCH PARTIAL
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("MATCH PARTIAL not yet implemented"),
-						 parser_errposition(@1)));
-				$$ = FKCONSTR_MATCH_PARTIAL;
-			}
-		| MATCH SIMPLE
-			{
-				$$ = FKCONSTR_MATCH_SIMPLE;
-			}
-		| /*EMPTY*/
-			{
-				$$ = FKCONSTR_MATCH_SIMPLE;
-			}
-		;
-
-ExclusionConstraintList:
+			 ExclusionConstraintList:
 			ExclusionConstraintElem					{ $$ = list_make1($1); }
 			| ExclusionConstraintList ',' ExclusionConstraintElem
 													{ $$ = lappend($1, $3); }
@@ -2671,43 +2576,9 @@ ExclusionConstraintElem: index_elem WITH any_operator
 		;
 
 OptWhereClause:
-			WHERE '(' a_expr ')'					{ $$ = $3; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
-
-/*
- * We combine the update and delete actions into one value temporarily
- * for simplicity of parsing, and then break them down again in the
- * calling production.  update is in the left 8 bits, delete in the right.
- * Note that NOACTION is the default.
- */
-key_actions:
-			key_update
-				{ $$ = ($1 << 8) | (FKCONSTR_ACTION_NOACTION & 0xFF); }
-			| key_delete
-				{ $$ = (FKCONSTR_ACTION_NOACTION << 8) | ($1 & 0xFF); }
-			| key_update key_delete
-				{ $$ = ($1 << 8) | ($2 & 0xFF); }
-			| key_delete key_update
-				{ $$ = ($2 << 8) | ($1 & 0xFF); }
-			| /*EMPTY*/
-				{ $$ = (FKCONSTR_ACTION_NOACTION << 8) | (FKCONSTR_ACTION_NOACTION & 0xFF); }
-		;
-
-key_update: ON UPDATE key_action		{ $$ = $3; }
-		;
-
-key_delete: ON DELETE_P key_action		{ $$ = $3; }
-		;
-
-key_action:
-			NO ACTION					{ $$ = FKCONSTR_ACTION_NOACTION; }
-			| RESTRICT					{ $$ = FKCONSTR_ACTION_RESTRICT; }
-			| CASCADE					{ $$ = FKCONSTR_ACTION_CASCADE; }
-			| SET NULL_P				{ $$ = FKCONSTR_ACTION_SETNULL; }
-			| SET DEFAULT				{ $$ = FKCONSTR_ACTION_SETDEFAULT; }
-		;
-
+		WHERE '(' a_expr ')'					{ $$ = $3; }
+		| /*EMPTY*/								{ $$ = NULL; }
+	;
 
 table_access_method_clause:
 			USING name							{ $$ = $2; }
@@ -4195,7 +4066,6 @@ object_type_any_name:
 object_type_name:
 			drop_type_name							{ $$ = $1; }
 			| DATABASE								{ $$ = OBJECT_DATABASE; }
-			| ROLE									{ $$ = OBJECT_ROLE; }
 			| TABLESPACE							{ $$ = OBJECT_TABLESPACE; }
 		;
 
@@ -5588,15 +5458,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER GROUP_P RoleId RENAME TO RoleId
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_ROLE;
-					n->subname = $3;
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER OPERATOR CLASS any_name USING name RENAME TO name
 				{
 					RenameStmt *n = makeNode(RenameStmt);
@@ -5783,24 +5644,6 @@ RenameStmt: ALTER AGGREGATE aggregate_with_argtypes RENAME TO name
 					n->relation = $5;
 					n->subname = $3;
 					n->newname = $8;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER ROLE RoleId RENAME TO RoleId
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_ROLE;
-					n->subname = $3;
-					n->newname = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER USER RoleId RENAME TO RoleId
-				{
-					RenameStmt *n = makeNode(RenameStmt);
-					n->renameType = OBJECT_ROLE;
-					n->subname = $3;
-					n->newname = $6;
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
@@ -6660,20 +6503,11 @@ AlterDatabaseStmt:
 				 }
 		;
 
-AlterDatabaseSetStmt:
-			ALTER DATABASE name SetResetClause
-				{
-					AlterDatabaseSetStmt *n = makeNode(AlterDatabaseSetStmt);
-					n->dbname = $3;
-					n->setstmt = $4;
-					$$ = (Node *)n;
-				}
-		;
 
 
-/*****************************************************************************
- *
- *		DROP DATABASE [ IF EXISTS ] dbname [ [ WITH ] ( options ) ]
+				/*****************************************************************************
+				 *
+				 *		DROP DATABASE [ IF EXISTS ] dbname [ [ WITH ] ( options ) ]
  *
  * This is implicitly CASCADE, no need for drop behavior
  *****************************************************************************/
@@ -6749,27 +6583,6 @@ AlterCollationStmt: ALTER COLLATION any_name REFRESH VERSION_P
 		;
 
 
-/*****************************************************************************
- *
- *		ALTER SYSTEM
- *
- * This is used to change configuration parameters persistently.
- *****************************************************************************/
-
-AlterSystemStmt:
-			ALTER SYSTEM_P SET generic_set
-				{
-					AlterSystemStmt *n = makeNode(AlterSystemStmt);
-					n->setstmt = $4;
-					$$ = (Node *)n;
-				}
-			| ALTER SYSTEM_P RESET generic_reset
-				{
-					AlterSystemStmt *n = makeNode(AlterSystemStmt);
-					n->setstmt = $4;
-					$$ = (Node *)n;
-				}
-		;
 
 
 /*****************************************************************************

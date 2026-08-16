@@ -406,10 +406,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	 *
 	 * XXX re-enable NOT_USED code sections below if you remove this test.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create an operator class")));
 
 	/* Look up the datatype */
 	typeoid = typenameTypeId(NULL, stmt->datatype);
@@ -788,10 +784,6 @@ DefineOpFamily(CreateOpFamilyStmt *stmt)
 	 * Currently, we require superuser privileges to create an opfamily. See
 	 * comments in DefineOpClass.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create an operator family")));
 
 	/* Insert pg_opfamily catalog entry */
 	return CreateOpFamily(stmt, opfname, namespaceoid, amoid);
@@ -848,10 +840,6 @@ AlterOpFamily(AlterOpFamilyStmt *stmt)
 	 *
 	 * XXX re-enable NOT_USED code sections below if you remove this test.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to alter an operator family")));
 
 	/*
 	 * ADD and DROP cases need separate code from here on down.

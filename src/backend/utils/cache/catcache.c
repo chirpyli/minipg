@@ -1185,9 +1185,6 @@ IndexScanOK(CatCache *cache, ScanKey cur_skey)
 			 */
 			return false;
 
-		case AUTHNAME:
-		case AUTHOID:
-		case AUTHMEMMEMROLE:
 		case DATABASEOID:
 
 			/*

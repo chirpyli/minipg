@@ -537,8 +537,6 @@ regress_setenv(PG_FUNCTION_ARGS)
 	char	   *envvar = text_to_cstring(PG_GETARG_TEXT_PP(0));
 	char	   *envval = text_to_cstring(PG_GETARG_TEXT_PP(1));
 
-	if (!superuser())
-		elog(ERROR, "must be superuser to change environment variables");
 
 	if (setenv(envvar, envval, 1) != 0)
 		elog(ERROR, "could not set environment variable: %m");
@@ -554,8 +552,6 @@ wait_pid(PG_FUNCTION_ARGS)
 {
 	int			pid = PG_GETARG_INT32(0);
 
-	if (!superuser())
-		elog(ERROR, "must be superuser to check PID liveness");
 
 	while (kill(pid, 0) == 0)
 	{

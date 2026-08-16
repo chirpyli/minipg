@@ -124,7 +124,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 	switch (nodeTag(parsetree))
 	{
 		case T_AlterCollationStmt:
-		case T_AlterDatabaseSetStmt:
 		case T_AlterDatabaseStmt:
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
@@ -170,21 +169,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 			{
 				/* DDL is not read-only, and neither is TRUNCATE. */
 				return COMMAND_IS_NOT_READ_ONLY;
-			}
-
-		case T_AlterSystemStmt:
-			{
-				/*
-				 * Surprisingly, ALTER SYSTEM meets all our definitions of
-				 * read-only: it changes nothing that affects the output of
-				 * pg_dump, it doesn't write WAL or imperil the application of
-				 * future WAL, and it doesn't depend on any state that needs
-				 * to be synchronized with parallel workers.
-				 *
-				 * So, despite the fact that it writes to a file, it's read
-				 * only!
-				 */
-				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
 
 		case T_DoStmt:
@@ -677,11 +661,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			AlterDatabase(pstate, (AlterDatabaseStmt *) parsetree, isTopLevel);
 			break;
 
-		case T_AlterDatabaseSetStmt:
-			/* no event triggers for global objects */
-			AlterDatabaseSet((AlterDatabaseSetStmt *) parsetree);
-			break;
-
 		case T_DropdbStmt:
 			/* no event triggers for global objects */
 			PreventInTransactionBlock(isTopLevel, "DROP DATABASE");
@@ -694,7 +673,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 				closeAllVfds(); /* probably not necessary... */
 				/* Allowed names are restricted if you're not superuser */
-				load_file(stmt->filename, !superuser());
+				load_file(stmt->filename, false);
 			}
 			break;
 
@@ -708,11 +687,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 		case T_ExplainStmt:
 			ExplainQuery(pstate, (ExplainStmt *) parsetree, params, dest);
-			break;
-
-		case T_AlterSystemStmt:
-			PreventInTransactionBlock(isTopLevel, "ALTER SYSTEM");
-			AlterSystemSetConfigFile((AlterSystemStmt *) parsetree);
 			break;
 
 		case T_VariableSetStmt:
@@ -749,11 +723,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			break;
 
 		case T_CheckPointStmt:
-			if (!superuser())
-				ereport(ERROR,
-						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("must be superuser to do CHECKPOINT")));
-
 			RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_WAIT |
 							  (RecoveryInProgress() ? 0 : CHECKPOINT_FORCE));
 			break;
@@ -2033,10 +2002,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_DATABASE;
 			break;
 
-		case T_AlterDatabaseSetStmt:
-			tag = CMDTAG_ALTER_DATABASE;
-			break;
-
 		case T_DropdbStmt:
 			tag = CMDTAG_DROP_DATABASE;
 			break;
@@ -2058,10 +2023,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_ExplainStmt:
 			tag = CMDTAG_EXPLAIN;
-			break;
-
-		case T_AlterSystemStmt:
-			tag = CMDTAG_ALTER_SYSTEM;
 			break;
 
 		case T_VariableSetStmt:
@@ -2517,10 +2478,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterDatabaseSetStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_DropdbStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -2558,10 +2515,6 @@ GetCommandLogLevel(Node *parsetree)
 				/* Plain EXPLAIN isn't so interesting */
 				lev = LOGSTMT_ALL;
 			}
-			break;
-
-		case T_AlterSystemStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_VariableSetStmt:

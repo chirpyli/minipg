@@ -16,7 +16,6 @@
 
 #include <signal.h>
 
-#include "catalog/pg_authid.h"
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "postmaster/syslogger.h"
@@ -74,14 +73,7 @@ pg_signal_backend(int pid, int sig)
 	 * not advertising a role might have the importance of a superuser-owned
 	 * backend, so treat it that way.
 	 */
-	if ((!OidIsValid(proc->roleId) || superuser_arg(proc->roleId)) &&
-		!superuser())
-		return SIGNAL_BACKEND_NOSUPERUSER;
 
-	/* Users can signal backends they have role membership in. */
-	if (!has_privs_of_role(GetUserId(), proc->roleId) &&
-		!has_privs_of_role(GetUserId(), ROLE_PG_SIGNAL_BACKEND))
-		return SIGNAL_BACKEND_NOPERMISSION;
 
 	/*
 	 * Can the process we just validated above end, followed by the pid being
@@ -265,13 +257,6 @@ pg_reload_conf(PG_FUNCTION_ARGS)
 Datum
 pg_rotate_logfile(PG_FUNCTION_ARGS)
 {
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to rotate log files with adminpack 1.0"),
-		/* translator: %s is a SQL function name */
-				 errhint("Consider using %s, which is part of core, instead.",
-						 "pg_logfile_rotate()")));
 
 	if (!Logging_collector)
 	{

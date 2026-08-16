@@ -161,35 +161,6 @@ AlterObjectRename_internal(Relation rel, Oid objectId, const char *new_name)
 	else
 		namespaceId = InvalidOid;
 
-	/* Permission checks ... superusers can always do it */
-	if (!superuser())
-	{
-		/* Fail if object does not have an explicit owner */
-		if (Anum_owner <= 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to rename %s",
-							getObjectDescriptionOids(classId, objectId))));
-
-		/* Otherwise, must be owner of the existing object */
-		datum = heap_getattr(oldtup, Anum_owner,
-							 RelationGetDescr(rel), &isnull);
-		Assert(!isnull);
-		ownerId = DatumGetObjectId(datum);
-
-		if (!has_privs_of_role(GetUserId(), DatumGetObjectId(ownerId)))
-			aclcheck_error(ACLCHECK_NOT_OWNER, get_object_type(classId, objectId),
-						   old_name);
-
-		/* User must have CREATE privilege on the namespace */
-		if (OidIsValid(namespaceId))
-		{
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_SCHEMA,
-							   get_namespace_name(namespaceId));
-		}
-	}
 
 	/*
 	 * Check for duplicate name (more friendly than unique-index failure).
@@ -639,35 +610,6 @@ AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid)
 	/* Check basic namespace related issues */
 	CheckSetNamespace(oldNspOid, nspOid);
 
-	/* Permission checks ... superusers can always do it */
-	if (!superuser())
-	{
-		Datum		owner;
-		Oid			ownerId;
-		AclResult	aclresult;
-
-		/* Fail if object does not have an explicit owner */
-		if (Anum_owner <= 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to set schema of %s",
-							getObjectDescriptionOids(classId, objid))));
-
-		/* Otherwise, must be owner of the existing object */
-		owner = heap_getattr(tup, Anum_owner, RelationGetDescr(rel), &isnull);
-		Assert(!isnull);
-		ownerId = DatumGetObjectId(owner);
-
-		if (!has_privs_of_role(GetUserId(), ownerId))
-			aclcheck_error(ACLCHECK_NOT_OWNER, get_object_type(classId, objid),
-						   NameStr(*(DatumGetName(name))));
-
-		/* User must have CREATE privilege on new namespace */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_SCHEMA,
-						   get_namespace_name(nspOid));
-	}
 
 	/*
 	 * Check for duplicate name (more friendly than unique-index failure).
@@ -851,44 +793,6 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 		bool	   *nulls;
 		bool	   *replaces;
 
-		/* Superusers can bypass permission checks */
-		if (!superuser())
-		{
-			/* must be owner */
-			if (!has_privs_of_role(GetUserId(), old_ownerId))
-			{
-				char	   *objname;
-				char		namebuf[NAMEDATALEN];
-
-				if (Anum_name != InvalidAttrNumber)
-				{
-					datum = heap_getattr(oldtup, Anum_name,
-										 RelationGetDescr(rel), &isnull);
-					Assert(!isnull);
-					objname = NameStr(*DatumGetName(datum));
-				}
-				else
-				{
-					snprintf(namebuf, sizeof(namebuf), "%u", objectId);
-					objname = namebuf;
-				}
-				aclcheck_error(ACLCHECK_NOT_OWNER, get_object_type(classId, objectId),
-							   objname);
-			}
-			/* Must be able to become new owner */
-			check_is_member_of_role(GetUserId(), new_ownerId);
-
-			/* New owner must have CREATE privilege on namespace */
-			if (OidIsValid(namespaceId))
-			{
-				AclResult	aclresult;
-
-				aclresult = ACLCHECK_OK;
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, OBJECT_SCHEMA,
-								   get_namespace_name(namespaceId));
-			}
-		}
 
 		/* Build a modified tuple */
 		nattrs = RelationGetNumberOfAttributes(rel);

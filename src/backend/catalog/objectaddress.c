@@ -26,7 +26,6 @@
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_attrdef.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -297,12 +296,12 @@ static const ObjectPropertyType ObjectProperty[] =
 	},
 	{
 		"role",
-		AuthIdRelationId,
-		AuthIdOidIndexId,
-		AUTHOID,
-		AUTHNAME,
-		Anum_pg_authid_oid,
-		Anum_pg_authid_rolname,
+		InvalidOid,
+		InvalidOid,
+		0,
+		0,
+		InvalidAttrNumber,
+		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
@@ -947,7 +946,7 @@ get_object_address_unqualified(ObjectType objtype,
 			address.objectSubId = 0;
 			break;
 		case OBJECT_ROLE:
-			address.classId = AuthIdRelationId;
+			address.classId = BOOTSTRAP_SUPERUSERID;
 			address.objectId = get_role_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
@@ -1694,11 +1693,7 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 	switch (objtype)
 	{
 		case OBJECT_ACCESS_METHOD:
-			/* We treat access methods as being owned by superusers */
-			if (!superuser_arg(roleid))
-				ereport(ERROR,
-						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("must be superuser")));
+
 			break;
 		case OBJECT_INDEX:
 		case OBJECT_TABLE:
@@ -1830,17 +1825,7 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 			 * We treat roles as being "owned" by those with CREATEROLE priv,
 			 * except that superusers are only owned by superusers.
 			 */
-			if (superuser_arg(address.objectId))
-			{
-				if (!superuser_arg(roleid))
-					ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("must be superuser")));
-			}
-		else
-		{
-			/* CREATEROLE privilege checks are compiled out in this build */
-		}
+
 			break;
 		case OBJECT_STATISTIC_EXT:
 			if (!pg_statistics_object_ownercheck(address.objectId, roleid))

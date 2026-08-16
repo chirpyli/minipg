@@ -730,13 +730,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "SELECT pg_catalog.quote_ident(nspname) FROM pg_catalog.pg_namespace "\
 " WHERE substring(pg_catalog.quote_ident(nspname),1,%d)='%s'"
 
-#define Query_for_list_of_alter_system_set_vars \
-"SELECT name FROM "\
-" (SELECT pg_catalog.lower(name) AS name FROM pg_catalog.pg_settings "\
-"  WHERE context != 'internal' "\
-"  UNION ALL SELECT 'all') ss "\
-" WHERE substring(name,1,%d)='%s'"
-
 #define Query_for_list_of_set_vars \
 "SELECT name FROM "\
 " (SELECT pg_catalog.lower(name) AS name FROM pg_catalog.pg_settings "\
@@ -1812,13 +1805,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER SERVER <name> VERSION <version> */
 	else if (Matches("ALTER", "SERVER", MatchAny, "VERSION", MatchAny))
 		COMPLETE_WITH("OPTIONS");
-	/* ALTER SYSTEM SET, RESET, RESET ALL */
-	else if (Matches("ALTER", "SYSTEM"))
-		COMPLETE_WITH("SET", "RESET");
-	else if (Matches("ALTER", "SYSTEM", "SET|RESET"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_alter_system_set_vars);
-	else if (Matches("ALTER", "SYSTEM", "SET", MatchAny))
-		COMPLETE_WITH("TO");
 	/* ALTER VIEW <name> */
 	else if (Matches("ALTER", "VIEW", MatchAny))
 		COMPLETE_WITH("ALTER COLUMN", "OWNER TO", "RENAME",
@@ -3254,10 +3240,10 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("TO");
 
 	/*
-	 * Complete ALTER DATABASE|FUNCTION|PROCEDURE|ROLE|ROUTINE|USER ... SET
+	 * Complete ALTER FUNCTION|PROCEDURE|ROLE|ROUTINE|USER ... SET
 	 * <name>
 	 */
-	else if (HeadMatches("ALTER", "DATABASE|FUNCTION|PROCEDURE|ROLE|ROUTINE|USER") &&
+	else if (HeadMatches("ALTER", "FUNCTION|PROCEDURE|ROLE|ROUTINE|USER") &&
 			 TailMatches("SET", MatchAny) &&
 			 !TailMatches("SCHEMA"))
 		COMPLETE_WITH("FROM CURRENT", "TO");

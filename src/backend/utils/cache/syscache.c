@@ -26,14 +26,11 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
-#include "catalog/pg_auth_members.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
@@ -190,50 +187,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
-	},
-	{AuthMemRelationId,			/* AUTHMEMMEMROLE */
-		AuthMemMemRoleIndexId,
-		2,
-		{
-			Anum_pg_auth_members_member,
-			Anum_pg_auth_members_roleid,
-			0,
-			0
-		},
-		8
-	},
-	{AuthMemRelationId,			/* AUTHMEMROLEMEM */
-		AuthMemRoleMemIndexId,
-		2,
-		{
-			Anum_pg_auth_members_roleid,
-			Anum_pg_auth_members_member,
-			0,
-			0
-		},
-		8
-	},
-	{AuthIdRelationId,			/* AUTHNAME */
-		AuthIdRolnameIndexId,
-		1,
-		{
-			Anum_pg_authid_rolname,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{AuthIdRelationId,			/* AUTHOID */
-		AuthIdOidIndexId,
-		1,
-		{
-			Anum_pg_authid_oid,
-			0,
-			0,
-			0
-		},
-		8
 	},
 	{
 		CastRelationId,			/* CASTSOURCETARGET */
@@ -1267,7 +1220,6 @@ RelationInvalidatesSnapshotsOnly(Oid relid)
 {
 	switch (relid)
 	{
-		case DbRoleSettingRelationId:
 		case DependRelationId:
 		case SharedDependRelationId:
 			return true;

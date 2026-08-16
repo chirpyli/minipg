@@ -35,9 +35,7 @@
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/dbcommands_xlog.h"
@@ -328,8 +326,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied to create database")));
-
-	check_is_member_of_role(GetUserId(), datdba);
 
 	/*
 	 * Lookup database (template) to be cloned, and obtain share lock on it.
@@ -759,7 +755,7 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 	if (!(ctype_encoding == encoding ||
 		  ctype_encoding == PG_SQL_ASCII ||
 		  ctype_encoding == -1 ||
-		  (encoding == PG_SQL_ASCII && superuser())))
+		  (encoding == PG_SQL_ASCII && true)))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("encoding \"%s\" does not match locale \"%s\"",
@@ -771,7 +767,7 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 	if (!(collate_encoding == encoding ||
 		  collate_encoding == PG_SQL_ASCII ||
 		  collate_encoding == -1 ||
-		  (encoding == PG_SQL_ASCII && superuser())))
+		  (encoding == PG_SQL_ASCII && true)))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("encoding \"%s\" does not match locale \"%s\"",
@@ -871,10 +867,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 				(errcode(ERRCODE_OBJECT_IN_USE),
 				 errmsg("cannot drop the currently open database")));
 
-	/*
-	 * Check for other users of the target database (handled elsewhere).
-	 */
-
 
 	/*
 	 * Attempt to terminate all existing connections to the target database if
@@ -895,11 +887,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 				 errmsg("database \"%s\" is being accessed by other users",
 						dbname),
 				 errdetail_busy_db(notherbackends, npreparedxacts)));
-
-	/*
-	 * Remove settings associated with this database
-	 */
-	DropSetting(db_id, InvalidOid);
 
 	/*
 	 * Remove shared dependency references for the database.
@@ -1632,32 +1619,6 @@ AlterDatabase(ParseState *pstate, AlterDatabaseStmt *stmt, bool isTopLevel)
 
 
 /*
- * ALTER DATABASE name SET ...
- */
-Oid
-AlterDatabaseSet(AlterDatabaseSetStmt *stmt)
-{
-	Oid			datid = get_database_oid(stmt->dbname, false);
-
-	/*
-	 * Obtain a lock on the database and make sure it didn't go away in the
-	 * meantime.
-	 */
-	shdepLockAndCheckObject(DatabaseRelationId, datid);
-
-	if (!pg_database_ownercheck(datid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-					   stmt->dbname);
-
-	AlterSetting(datid, InvalidOid, stmt->setstmt);
-
-	UnlockSharedObject(DatabaseRelationId, datid, 0, AccessShareLock);
-
-	return datid;
-}
-
-
-/*
  * ALTER DATABASE name OWNER TO newowner
  */
 ObjectAddress
@@ -1709,8 +1670,6 @@ AlterDatabaseOwner(const char *dbname, Oid newOwnerId)
 			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
 						   dbname);
 
-		/* Must be able to become new owner */
-		check_is_member_of_role(GetUserId(), newOwnerId);
 
 		/*
 		 * must have createdb rights
@@ -1895,15 +1854,9 @@ have_createdb_privilege(void)
 	HeapTuple	utup;
 
 	/* Superusers can always do everything */
-	if (superuser())
+	if (true)
 		return true;
 
-	utup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(GetUserId()));
-	if (HeapTupleIsValid(utup))
-	{
-		result = ((Form_pg_authid) GETSTRUCT(utup))->rolcreatedb;
-		ReleaseSysCache(utup);
-	}
 	return result;
 }
 

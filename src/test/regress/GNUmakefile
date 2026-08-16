@@ -103,6 +103,7 @@ installdirs-tests: installdirs
 ##
 
 REGRESS_OPTS = --dlpath=. --max-concurrent-tests=20 --make-testtablespace-dir \
+	--no-locale \
 	$(EXTRA_REGRESS_OPTS)
 
 check: all

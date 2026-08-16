@@ -40,10 +40,6 @@ fsm_page_contents(PG_FUNCTION_ARGS)
 	FSMPage		fsmpage;
 	int			i;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	page = get_page_from_raw(raw_page);
 

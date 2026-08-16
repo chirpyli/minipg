@@ -233,11 +233,6 @@ extern void recordDependencyOnTablespace(Oid classId, Oid objectId,
 extern void changeDependencyOnTablespace(Oid classId, Oid objectId,
 										 Oid newTablespaceId);
 
-extern void updateAclDependencies(Oid classId, Oid objectId, int32 objectSubId,
-								  Oid ownerId,
-								  int noldmembers, Oid *oldmembers,
-								  int nnewmembers, Oid *newmembers);
-
 extern bool checkSharedDependencies(Oid classId, Oid objectId,
 									char **detail_msg, char **detail_log_msg);
 

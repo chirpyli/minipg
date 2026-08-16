@@ -30,7 +30,7 @@ CATALOG(pg_extension,3079,ExtensionRelationId)
 {
 	Oid			oid;			/* oid */
 	NameData	extname;		/* extension name */
-	Oid			extowner BKI_LOOKUP(pg_authid); /* extension owner */
+	Oid			extowner BKI_DEFAULT(10); /* extension owner */
 	Oid			extnamespace BKI_LOOKUP(pg_namespace);	/* namespace of
 														 * contained objects */
 	bool		extrelocatable; /* if true, allow ALTER EXTENSION SET SCHEMA */

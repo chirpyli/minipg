@@ -536,7 +536,7 @@ DROP FUNCTION echo_me(rainbow);
 --
 CREATE TABLE enumtest_parent (id rainbow PRIMARY KEY);
 CREATE TABLE enumtest_child (parent rainbow REFERENCES enumtest_parent);
-ERROR:  foreign key constraints are not supported in minipg
+ERROR:  syntax error at or near "REFERENCES"
 LINE 1: CREATE TABLE enumtest_child (parent rainbow REFERENCES enumt...
                                                     ^
 INSERT INTO enumtest_parent VALUES ('red');
@@ -554,7 +554,7 @@ DELETE FROM enumtest_parent;  -- fail
 --
 CREATE TYPE bogus AS ENUM('good', 'bad', 'ugly');
 CREATE TABLE enumtest_bogus_child(parent bogus REFERENCES enumtest_parent);
-ERROR:  foreign key constraints are not supported in minipg
+ERROR:  syntax error at or near "REFERENCES"
 LINE 1: CREATE TABLE enumtest_bogus_child(parent bogus REFERENCES en...
                                                        ^
 DROP TYPE bogus;

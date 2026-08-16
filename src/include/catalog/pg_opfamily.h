@@ -40,7 +40,7 @@ CATALOG(pg_opfamily,2753,OperatorFamilyRelationId)
 	Oid			opfnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
 	/* opfamily owner */
-	Oid			opfowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
+	Oid			opfowner BKI_DEFAULT(10);
 } FormData_pg_opfamily;
 
 /* ----------------

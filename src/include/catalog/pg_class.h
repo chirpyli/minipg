@@ -47,7 +47,7 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	Oid			reloftype BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_type);
 
 	/* class owner */
-	Oid			relowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
+	Oid			relowner BKI_DEFAULT(10);
 
 	/* access method; 0 if not a table / index */
 	Oid			relam BKI_DEFAULT(heap) BKI_LOOKUP_OPT(pg_am);
@@ -122,9 +122,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	/* NOTE: These fields are not present in a relcache entry's rd_rel field. */
 	/* access-method-specific options */
 	text		reloptions[1] BKI_DEFAULT(_null_);
-
-	/* partition bound node tree */
-	pg_node_tree relpartbound BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_class;
 

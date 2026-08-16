@@ -147,10 +147,6 @@ get_raw_page_internal(text *relname, ForkNumber forknum, BlockNumber blkno)
 	char	   *raw_page_data;
 	Buffer		buf;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	rel = relation_openrv(relrv, AccessShareLock);
@@ -252,10 +248,6 @@ page_header(PG_FUNCTION_ARGS)
 	PageHeader	page;
 	XLogRecPtr	lsn;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	page = (PageHeader) get_page_from_raw(raw_page);
 
@@ -312,10 +304,6 @@ page_checksum_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 	int64		blkno = (ext_version == PAGEINSPECT_V1_8 ? PG_GETARG_UINT32(1) : PG_GETARG_INT64(1));
 	Page		page;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	if (blkno < 0 || blkno > MaxBlockNumber)
 		ereport(ERROR,

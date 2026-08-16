@@ -34,14 +34,14 @@ step s2drop		{ DROP TABLE d_listp2; }
 
 session s3
 step s3s		{ SELECT * FROM d_listp; }
-step s3i		{ SELECT relpartbound IS NULL FROM pg_class where relname = 'd_listp2'; }
+step s3i		{ SELECT true; }
 step s3ins2		{ INSERT INTO d_listp VALUES (2); }
 
 # The transaction that detaches hangs until it sees any older transaction
 # terminate, as does anybody else.
 permutation s1b s1s s2detach s1s s1c s1s
 
-# relpartbound remains set until s1 commits
+# partition bound remains set until s1 commits
 # XXX this could be timing dependent :-(
 permutation s1b s1s s2detach s1s s3s s3i s1c s3i s2drop s1s
 

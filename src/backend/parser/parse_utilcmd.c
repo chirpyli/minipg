@@ -77,7 +77,6 @@ typedef struct
 	List	   *columns;		/* ColumnDef items */
 	List	   *ckconstraints;	/* CHECK constraints */
 	List	   *ixconstraints;	/* index-creating constraints */
-	List	   *likeclauses;	/* LIKE clauses that need post-processing */
 	List	   *blist;			/* "before list" of things to do before
 								 * creating the table */
 	List	   *alist;			/* "after list" of things to do after creating
@@ -208,7 +207,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.columns = NIL;
 	cxt.ckconstraints = NIL;
 	cxt.ixconstraints = NIL;
-	cxt.likeclauses = NIL;
 	cxt.blist = NIL;
 	cxt.alist = NIL;
 	cxt.pkey = NULL;
@@ -257,20 +255,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 * Postprocess constraints that give rise to index definitions.
 	 */
 	transformIndexConstraints(&cxt);
-
-	/*
-	 * Re-consideration of LIKE clauses should happen after creation of
-	 * indexes, but before creation of foreign keys.  This order is critical
-	 * because a LIKE clause may attempt to create a primary key.  If there's
-	 * also a pkey in the main CREATE TABLE list, creation of that will not
-	 * check for a duplicate at runtime (since index_check_primary_key()
-	 * expects that we rejected dups here).  Creation of the LIKE-generated
-	 * pkey behaves like ALTER TABLE ADD, so it will check, but obviously that
-	 * only works if it happens second.  On the other hand, we want to make
-	 * pkeys before foreign key constraints, in case the user tries to make a
-	 * self-referential FK.
-	 */
-	cxt.alist = list_concat(cxt.alist, cxt.likeclauses);
 
 	/*
 	 * Postprocess check constraints.
@@ -2152,7 +2136,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 	cxt.columns = NIL;
 	cxt.ckconstraints = NIL;
 	cxt.ixconstraints = NIL;
-	cxt.likeclauses = NIL;
 	cxt.blist = NIL;
 	cxt.alist = NIL;
 	cxt.pkey = NULL;

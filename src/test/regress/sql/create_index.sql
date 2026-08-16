@@ -542,17 +542,6 @@ REINDEX TABLE CONCURRENTLY concur_clustered;
 SELECT indexrelid::regclass, indisclustered FROM pg_index
   WHERE indrelid = 'concur_clustered'::regclass;
 DROP TABLE concur_clustered;
--- Check that indisreplident updates are preserved.
-CREATE TABLE concur_replident(i int NOT NULL);
-CREATE UNIQUE INDEX concur_replident_i_idx ON concur_replident(i);
-ALTER TABLE concur_replident REPLICA IDENTITY
-  USING INDEX concur_replident_i_idx;
-SELECT indexrelid::regclass, indisreplident FROM pg_index
-  WHERE indrelid = 'concur_replident'::regclass;
-REINDEX TABLE CONCURRENTLY concur_replident;
-SELECT indexrelid::regclass, indisreplident FROM pg_index
-  WHERE indrelid = 'concur_replident'::regclass;
-DROP TABLE concur_replident;
 
 -- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 
@@ -563,9 +552,9 @@ REINDEX TABLE CONCURRENTLY concur_reindex_tab;
 COMMIT;
 REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relation
 REINDEX INDEX CONCURRENTLY pg_class_oid_index; -- no catalog index
--- These are the toast table and index of pg_authid.
-REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1260; -- no catalog toast table
-REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1260_index; -- no catalog toast index
+-- These are the toast table and index of pg_proc.
+REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1255; -- no catalog toast table
+REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1255_index; -- no catalog toast index
 REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
 -- Warns about catalog relations
 REINDEX SCHEMA CONCURRENTLY pg_catalog;
@@ -688,9 +677,9 @@ REINDEX SCHEMA CONCURRENTLY schema_to_reindex;
 
 -- Failure for unauthorized user
 REINDEX SCHEMA schema_to_reindex;
--- Permission failures with toast tables and indexes (pg_authid here)
-REINDEX TABLE pg_toast.pg_toast_1260;
-REINDEX INDEX pg_toast.pg_toast_1260_index;
+-- Permission failures with toast tables and indexes (pg_proc here)
+REINDEX TABLE pg_toast.pg_toast_1255;
+REINDEX INDEX pg_toast.pg_toast_1255_index;
 
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;

@@ -29,9 +29,7 @@
 #include "access/xlog.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_tablespace.h"
 #include "libpq/auth.h"
 #include "libpq/libpq-be.h"
@@ -64,7 +62,6 @@
 
 static HeapTuple GetDatabaseTuple(const char *dbname);
 static HeapTuple GetDatabaseTupleByOid(Oid dboid);
-static void PerformAuthentication(Port *port);
 static void CheckMyDatabase(const char *name, bool am_superuser, bool override_allow_connections);
 static void InitCommunication(void);
 static void ShutdownPostgres(int code, Datum arg);
@@ -73,9 +70,7 @@ static void LockTimeoutHandler(void);
 static void IdleInTransactionSessionTimeoutHandler(void);
 static void IdleSessionTimeoutHandler(void);
 static void ClientCheckTimeoutHandler(void);
-static bool ThereIsAtLeastOneRole(void);
 static void process_startup_options(Port *port, bool am_superuser);
-static void process_settings(Oid databaseid, Oid roleid);
 
 
 /*** InitPostgres support ***/
@@ -177,55 +172,10 @@ GetDatabaseTupleByOid(Oid dboid)
 
 
 /*
- * PerformAuthentication -- authenticate a remote client
- *
- * returns: nothing.  Will not return at all if there's any failure.
+ * minipg 已移除基于主机的认证与 PerformAuthentication 包装函数。
+ * 连接接纳改在 InitPostgres 中直接调用 ClientAuthentication() 完成握手
+ *（其内部因 pg_hba.conf 被裁剪而无条件信任放行）。
  */
-static void
-PerformAuthentication(Port *port)
-{
-	/* This should be set already, but let's make sure */
-	ClientAuthInProgress = true;	/* limit visibility of log messages */
-
-	/*
-	 * Set up a timeout in case a buggy or malicious client fails to respond
-	 * during authentication.  Since we're inside a transaction and might do
-	 * database access, we have to use the statement_timeout infrastructure.
-	 */
-	enable_timeout_after(STATEMENT_TIMEOUT, AuthenticationTimeout * 1000);
-
-	/*
-	 * Now perform authentication exchange.
-	 */
-	set_ps_display("authentication");
-	ClientAuthentication(port); /* might not return, if failure */
-
-	/*
-	 * Done with authentication.  Disable the timeout, and log if needed.
-	 */
-	disable_timeout(STATEMENT_TIMEOUT, false);
-
-	if (Log_connections)
-	{
-		StringInfoData logmsg;
-
-		initStringInfo(&logmsg);
-		appendStringInfo(&logmsg, _("connection authorized: user=%s"),
-						 port->user_name);
-		appendStringInfo(&logmsg, _(" database=%s"), port->database_name);
-
-		if (port->application_name != NULL)
-			appendStringInfo(&logmsg, _(" application_name=%s"),
-							 port->application_name);
-
-		ereport(LOG, errmsg_internal("%s", logmsg.data));
-		pfree(logmsg.data);
-	}
-
-	set_ps_display("startup");
-
-	ClientAuthInProgress = false;	/* client_min_messages is active now */
-}
 
 
 /*
@@ -676,56 +626,25 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * In standalone mode and in autovacuum worker processes, we use a fixed
 	 * ID, otherwise we figure it out from the authenticated user name.
 	 */
-	if (bootstrap || IsAutoVacuumWorkerProcess())
-	{
-		InitializeSessionUserIdStandalone();
-		am_superuser = true;
-	}
-	else if (!IsUnderPostmaster)
-	{
-		InitializeSessionUserIdStandalone();
-		am_superuser = true;
-		if (!ThereIsAtLeastOneRole())
-			ereport(WARNING,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("no roles are defined in this database system"),
-					 errhint("You should immediately run CREATE USER \"%s\" SUPERUSER;.",
-							 username != NULL ? username : "postgres")));
-	}
-	else if (IsBackgroundWorker)
-	{
-		if (username == NULL && !OidIsValid(useroid))
-		{
-			InitializeSessionUserIdStandalone();
-			am_superuser = true;
-		}
-		else
-		{
-			InitializeSessionUserId(username, useroid);
-			am_superuser = superuser();
-		}
-	}
-	else
-	{
-		/* normal multiuser case */
-		Assert(MyProcPort != NULL);
-		PerformAuthentication(MyProcPort);
-		InitializeSessionUserId(username, useroid);
-		am_superuser = superuser();
-	}
+	/*
+	 * minipg 没有用户/角色概念，任何连接都直接以超级用户身份操作，无需
+	 * 认证或权限检查。所有后端路径都走恒 superuser 的旁路（与 standalone
+	 * 语义一致），不再查询 pg_authid。
+	 *
+	 * 为了兼容客户端协议，仍调用 ClientAuthentication() 发送 AUTH_REQ_OK
+	 * 完成连接握手（因 pg_hba.conf 已被裁剪，该函数内部无条件信任放行），
+	 * 但不做任何身份查询。
+	 */
+	if (MyProcPort != NULL)
+		ClientAuthentication(MyProcPort);
+
+	InitializeSessionUserIdStandalone();
+	am_superuser = true;
 
 	/*
-	 * If we're trying to shut down, only superusers can connect, and new
-	 * replication connections are not allowed.
+	 * minipg 不存在"shutdown 期间仅超管可连"的限制判断，因为所有连接都是
+	 * 超级用户。此处不再做 am_superuser 相关检查。
 	 */
-	if (!am_superuser &&
-		MyProcPort != NULL &&
-		MyProcPort->canAcceptConnections == CAC_SUPERUSER)
-	{
-		ereport(FATAL,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to connect during database shutdown")));
-	}
 
 	/*
 	 * Binary upgrades only allowed super-user connections
@@ -926,9 +845,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 */
 	RelationCacheInitializePhase3();
 
-	/* set up ACL framework (so CheckMyDatabase can check permissions) */
-	initialize_acl();
-
 	/*
 	 * Re-read the pg_database row for our database, check permissions and set
 	 * up database-specific GUC settings.  We can't do this until all the
@@ -945,9 +861,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 */
 	if (MyProcPort != NULL)
 		process_startup_options(MyProcPort, am_superuser);
-
-	/* Process pg_db_role_setting options */
-	process_settings(MyDatabaseId, GetSessionUserId());
 
 	/* Apply PostAuthDelay as soon as we've read all options */
 	if (PostAuthDelay > 0)
@@ -1040,36 +953,6 @@ process_startup_options(Port *port, bool am_superuser)
 }
 
 /*
- * Load GUC settings from pg_db_role_setting.
- *
- * We try specific settings for the database/role combination, as well as
- * general for this database and for this user.
- */
-static void
-process_settings(Oid databaseid, Oid roleid)
-{
-	Relation	relsetting;
-	Snapshot	snapshot;
-
-	if (!IsUnderPostmaster)
-		return;
-
-	relsetting = table_open(DbRoleSettingRelationId, AccessShareLock);
-
-	/* read all the settings under the same snapshot for efficiency */
-	snapshot = RegisterSnapshot(GetCatalogSnapshot(DbRoleSettingRelationId));
-
-	/* Later settings are ignored if set earlier. */
-	ApplySetting(snapshot, databaseid, roleid, relsetting, PGC_S_DATABASE_USER);
-	ApplySetting(snapshot, InvalidOid, roleid, relsetting, PGC_S_USER);
-	ApplySetting(snapshot, databaseid, InvalidOid, relsetting, PGC_S_DATABASE);
-	ApplySetting(snapshot, InvalidOid, InvalidOid, relsetting, PGC_S_GLOBAL);
-
-	UnregisterSnapshot(snapshot);
-	table_close(relsetting, AccessShareLock);
-}
-
-/*
  * Backend-shutdown callback.  Do cleanup that we want to be sure happens
  * before all the supporting modules begin to nail their doors shut via
  * their own callbacks.
@@ -1150,25 +1033,4 @@ ClientCheckTimeoutHandler(void)
 	CheckClientConnectionPending = true;
 	InterruptPending = true;
 	SetLatch(MyLatch);
-}
-
-/*
- * Returns true if at least one role is defined in this database cluster.
- */
-static bool
-ThereIsAtLeastOneRole(void)
-{
-	Relation	pg_authid_rel;
-	TableScanDesc scan;
-	bool		result;
-
-	pg_authid_rel = table_open(AuthIdRelationId, AccessShareLock);
-
-	scan = table_beginscan_catalog(pg_authid_rel, 0, NULL);
-	result = (heap_getnext(scan, ForwardScanDirection) != NULL);
-
-	table_endscan(scan);
-	table_close(pg_authid_rel, AccessShareLock);
-
-	return result;
 }

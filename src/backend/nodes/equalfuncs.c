@@ -1495,15 +1495,6 @@ _equalAlterDatabaseStmt(const AlterDatabaseStmt *a, const AlterDatabaseStmt *b)
 }
 
 static bool
-_equalAlterDatabaseSetStmt(const AlterDatabaseSetStmt *a, const AlterDatabaseSetStmt *b)
-{
-	COMPARE_STRING_FIELD(dbname);
-	COMPARE_NODE_FIELD(setstmt);
-
-	return true;
-}
-
-static bool
 _equalDropdbStmt(const DropdbStmt *a, const DropdbStmt *b)
 {
 	COMPARE_STRING_FIELD(dbname);
@@ -1538,23 +1529,6 @@ _equalExplainStmt(const ExplainStmt *a, const ExplainStmt *b)
 {
 	COMPARE_NODE_FIELD(query);
 	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalReplicaIdentityStmt(const ReplicaIdentityStmt *a, const ReplicaIdentityStmt *b)
-{
-	COMPARE_SCALAR_FIELD(identity_type);
-	COMPARE_STRING_FIELD(name);
-
-	return true;
-}
-
-static bool
-_equalAlterSystemStmt(const AlterSystemStmt *a, const AlterSystemStmt *b)
-{
-	COMPARE_NODE_FIELD(setstmt);
 
 	return true;
 }
@@ -2730,9 +2704,6 @@ equal(const void *a, const void *b)
 		case T_AlterDatabaseStmt:
 			retval = _equalAlterDatabaseStmt(a, b);
 			break;
-		case T_AlterDatabaseSetStmt:
-			retval = _equalAlterDatabaseSetStmt(a, b);
-			break;
 		case T_DropdbStmt:
 			retval = _equalDropdbStmt(a, b);
 			break;
@@ -2744,12 +2715,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ExplainStmt:
 			retval = _equalExplainStmt(a, b);
-			break;
-		case T_ReplicaIdentityStmt:
-			retval = _equalReplicaIdentityStmt(a, b);
-			break;
-		case T_AlterSystemStmt:
-			retval = _equalAlterSystemStmt(a, b);
 			break;
 		case T_VariableSetStmt:
 			retval = _equalVariableSetStmt(a, b);

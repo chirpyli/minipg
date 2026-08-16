@@ -15,10 +15,8 @@ include $(top_builddir)/src/Makefile.global
 # be-fsstubs is here for historical reasons, probably belongs elsewhere
 
 OBJS = \
-	auth-scram.o \
 	auth.o \
 	be-secure.o \
-	crypt.o \
 	ifaddr.o \
 	pqcomm.o \
 	pqformat.o \

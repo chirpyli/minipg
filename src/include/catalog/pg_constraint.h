@@ -185,12 +185,6 @@ DECLARE_ARRAY_FOREIGN_KEY((confrelid, confkey), pg_attribute, (attrelid, attnum)
 #define CONSTRAINT_TRIGGER			't'
 #define CONSTRAINT_EXCLUSION		'x'
 
-/*
- * Valid values for confupdtype and confdeltype are the FKCONSTR_ACTION_xxx
- * constants defined in parsenodes.h.  Valid values for confmatchtype are
- * the FKCONSTR_MATCH_xxx constants defined in parsenodes.h.
- */
-
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
 /*

@@ -27,10 +27,7 @@
 #include "access/transam.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_auth_members.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_db_role_setting.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_tablespace.h"
@@ -262,32 +259,20 @@ bool
 IsSharedRelation(Oid relationId)
 {
 	/* These are the shared catalogs (look for BKI_SHARED_RELATION) */
-	if (relationId == AuthIdRelationId ||
-		relationId == AuthMemRelationId ||
-		relationId == DatabaseRelationId ||
+	if (relationId == DatabaseRelationId ||
 		relationId == SharedDependRelationId ||
-		relationId == TableSpaceRelationId ||
-		relationId == DbRoleSettingRelationId)
+		relationId == TableSpaceRelationId)
 		return true;
 	/* These are their indexes */
-	if (relationId == AuthIdRolnameIndexId ||
-		relationId == AuthIdOidIndexId ||
-		relationId == AuthMemRoleMemIndexId ||
-		relationId == AuthMemMemRoleIndexId ||
-		relationId == DatabaseNameIndexId ||
+	if (relationId == DatabaseNameIndexId ||
 		relationId == DatabaseOidIndexId ||
 		relationId == SharedDependDependerIndexId ||
 		relationId == SharedDependReferenceIndexId ||
 		relationId == TablespaceOidIndexId ||
-		relationId == TablespaceNameIndexId ||
-		relationId == DbRoleSettingDatidRolidIndexId)
+		relationId == TablespaceNameIndexId)
 		return true;
 	/* These are their toast tables and toast indexes */
-	if (		relationId == PgAuthidToastTable ||
-		relationId == PgAuthidToastIndex ||
-		relationId == PgDbRoleSettingToastTable ||
-		relationId == PgDbRoleSettingToastIndex ||
-		relationId == PgTablespaceToastTable ||
+	if (relationId == PgTablespaceToastTable ||
 		relationId == PgTablespaceToastIndex)
 		return true;
 	return false;
@@ -519,10 +504,6 @@ pg_nextoid(PG_FUNCTION_ARGS)
 	 * modify), just checking for superuser ought to not obstruct valid
 	 * usecases.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to call pg_nextoid()")));
 
 	rel = table_open(reloid, RowExclusiveLock);
 	idx = index_open(idxoid, RowExclusiveLock);

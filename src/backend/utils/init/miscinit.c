@@ -30,7 +30,6 @@
 
 #include "access/htup_details.h"
 #include "access/parallel.h"
-#include "catalog/pg_authid.h"
 #include "common/file_perm.h"
 #include "libpq/libpq.h"
 #include "libpq/pqsignal.h"
@@ -668,144 +667,37 @@ SetUserIdAndContext(Oid userid, bool sec_def_context)
 
 /*
  * Check whether specified role has explicit REPLICATION privilege
+ *
+ * minipg 无角色概念，恒为真。
  */
 bool
 has_rolreplication(Oid roleid)
 {
-	bool		result = false;
-	HeapTuple	utup;
-
-	utup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-	if (HeapTupleIsValid(utup))
-	{
-		result = ((Form_pg_authid) GETSTRUCT(utup))->rolreplication;
-		ReleaseSysCache(utup);
-	}
-	return result;
+	return true;
 }
 
 /*
  * Initialize user identity during normal backend startup
+ *
+ * minipg 没有用户/角色概念，任何连接都直接以超级用户身份操作，不再查询
+ * pg_authid。实现退化为与 InitializeSessionUserIdStandalone 相同的语义。
  */
 void
 InitializeSessionUserId(const char *rolename, Oid roleid)
 {
-	HeapTuple	roleTup;
-	Form_pg_authid rform;
-	char	   *rname;
-	bool		is_superuser;
-
 	/*
-	 * In a parallel worker, we don't have to do anything here.
-	 * ParallelWorkerMain already set our output variables, and we aren't
-	 * going to enforce either rolcanlogin or rolconnlimit.  Furthermore, we
-	 * don't really want to perform a catalog lookup for the role: we don't
-	 * want to fail if it's been dropped.
+	 * 在并行 worker 中 ParallelWorkerMain 已设置好输出变量，无需重复执行。
 	 */
 	if (InitializingParallelWorker)
 		return;
 
-	/*
-	 * Don't do scans if we're bootstrapping, none of the system catalogs
-	 * exist yet, and they should be owned by postgres anyway.
-	 */
-	AssertState(!IsBootstrapProcessingMode());
+	AssertState(!OidIsValid(AuthenticatedUserId));
 
-	/*
-	 * Make sure syscache entries are flushed for recent catalog changes. This
-	 * allows us to find roles that were created on-the-fly during
-	 * authentication.
-	 */
-	AcceptInvalidationMessages();
+	AuthenticatedUserId = BOOTSTRAP_SUPERUSERID;
+	AuthenticatedUserIsSuperuser = true;
 
-	/*
-	 * Look up the role, either by name if that's given or by OID if not.
-	 */
-	if (rolename != NULL)
-	{
-		roleTup = SearchSysCache1(AUTHNAME, PointerGetDatum(rolename));
-		if (!HeapTupleIsValid(roleTup))
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
-					 errmsg("role \"%s\" does not exist", rolename)));
-	}
-	else
-	{
-		roleTup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-		if (!HeapTupleIsValid(roleTup))
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
-					 errmsg("role with OID %u does not exist", roleid)));
-	}
-
-	rform = (Form_pg_authid) GETSTRUCT(roleTup);
-	roleid = rform->oid;
-	rname = NameStr(rform->rolname);
-	is_superuser = rform->rolsuper;
-
-	SetAuthenticatedUserId(roleid, is_superuser);
-
-	/*
-	 * Set SessionUserId and related variables, including "role", via the GUC
-	 * mechanisms.
-	 *
-	 * Note: ideally we would use PGC_S_DYNAMIC_DEFAULT here, so that
-	 * session_authorization could subsequently be changed from
-	 * pg_db_role_setting entries.  Instead, session_authorization in
-	 * pg_db_role_setting has no effect.  Changing that would require solving
-	 * two problems:
-	 *
-	 * 1. If pg_db_role_setting has values for both session_authorization and
-	 * role, we could not be sure which order those would be applied in, and
-	 * it would matter.
-	 *
-	 * 2. Sites may have years-old session_authorization entries.  There's not
-	 * been any particular reason to remove them.  Ending the dormancy of
-	 * those entries could seriously change application behavior, so only a
-	 * major release should do that.
-	 */
-	SetConfigOption("session_authorization", rname,
-					PGC_BACKEND, PGC_S_OVERRIDE);
-
-	/*
-	 * These next checks are not enforced when in standalone mode, so that
-	 * there is a way to recover from sillinesses like "UPDATE pg_authid SET
-	 * rolcanlogin = false;".
-	 */
-	if (IsUnderPostmaster)
-	{
-		/*
-		 * Is role allowed to login at all?
-		 */
-		if (!rform->rolcanlogin)
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
-					 errmsg("role \"%s\" is not permitted to log in",
-							rname)));
-
-		/*
-		 * Check connection limit for this role.  We enforce the limit only
-		 * for regular backends, since other process types have their own
-		 * PGPROC pools.
-		 *
-		 * There is a race condition here --- we create our PGPROC before
-		 * checking for other PGPROCs.  If two backends did this at about the
-		 * same time, they might both think they were over the limit, while
-		 * ideally one should succeed and one fail.  Getting that to work
-		 * exactly seems more trouble than it is worth, however; instead we
-		 * just document that the connection limit is approximate.
-		 */
-		if (rform->rolconnlimit >= 0 &&
-			AmRegularBackendProcess() &&
-			!is_superuser &&
-			CountUserBackends(roleid) > rform->rolconnlimit)
-			ereport(FATAL,
-					(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
-					 errmsg("too many connections for role \"%s\"",
-							rname)));
-	}
-
-	ReleaseSysCache(roleTup);
+	SetSessionAuthorization(BOOTSTRAP_SUPERUSERID, true);
+	SetCurrentRoleId(InvalidOid, false);
 }
 
 
@@ -920,28 +812,13 @@ SetCurrentRoleId(Oid roleid, bool is_superuser)
 /*
  * Get user name from user oid, returns NULL for nonexistent roleid if noerr
  * is true.
+ *
+ * minipg 仅有一个固定角色名 "postgres"。
  */
 char *
 GetUserNameFromId(Oid roleid, bool noerr)
 {
-	HeapTuple	tuple;
-	char	   *result;
-
-	tuple = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-	if (!HeapTupleIsValid(tuple))
-	{
-		if (!noerr)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("invalid role OID: %u", roleid)));
-		result = NULL;
-	}
-	else
-	{
-		result = pstrdup(NameStr(((Form_pg_authid) GETSTRUCT(tuple))->rolname));
-		ReleaseSysCache(tuple);
-	}
-	return result;
+	return pstrdup("postgres");
 }
 
 

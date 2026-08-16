@@ -439,10 +439,6 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 	Oid			nspid = PG_GETARG_OID(0);
 	int			ncreated = 0;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to import system collations")));
 
 	if (!SearchSysCacheExists1(NAMESPACEOID, ObjectIdGetDatum(nspid)))
 		ereport(ERROR,

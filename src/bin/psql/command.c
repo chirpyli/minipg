@@ -759,10 +759,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 						break;
 				}
 				break;
-			case 'g':
-				/* no longer distinct from \du */
-				success = describeRoles(pattern, show_verbose, show_system);
-				break;
 			case 'L':
 				success = listLanguages(pattern, show_verbose, show_system);
 				break;
@@ -804,22 +800,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			case 'E':
 				success = listTables(&cmd[1], pattern, show_verbose, show_system);
 				break;
-			case 'r':
-				if (cmd[2] == 'd' && cmd[3] == 's')
-				{
-					char	   *pattern2 = NULL;
-
-					if (pattern)
-						pattern2 = psql_scan_slash_option(scan_state,
-														  OT_NORMAL, NULL, true);
-					success = listDbRoleSettings(pattern, pattern2);
-
-					if (pattern2)
-						free(pattern2);
-				}
-				else
-					status = PSQL_CMD_UNKNOWN;
-				break;
 			case 'R':
 				switch (cmd[2])
 				{
@@ -835,9 +815,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 					default:
 						status = PSQL_CMD_UNKNOWN;
 				}
-				break;
-			case 'u':
-				success = describeRoles(pattern, show_verbose, show_system);
 				break;
 			case 'F':			/* text search subsystem */
 				switch (cmd[2])

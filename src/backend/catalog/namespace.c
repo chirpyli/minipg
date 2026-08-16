@@ -25,7 +25,6 @@
 #include "access/xlog.h"
 #include "catalog/dependency.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_namespace.h"
@@ -2871,22 +2870,15 @@ recomputeNamespacePath(void)
 		if (strcmp(curname, "$user") == 0)
 		{
 			/* $user --- substitute namespace matching user name, if any */
-			HeapTuple	tuple;
+			char	   *rname;
 
-			tuple = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
-			if (HeapTupleIsValid(tuple))
-			{
-				char	   *rname;
-
-				rname = NameStr(((Form_pg_authid) GETSTRUCT(tuple))->rolname);
-				namespaceId = get_namespace_oid(rname, true);
-				ReleaseSysCache(tuple);
-				if (OidIsValid(namespaceId) &&
-					!list_member_oid(oidlist, namespaceId) &&
+			rname = GetUserNameFromId(roleid, false);
+			namespaceId = get_namespace_oid(rname, true);
+			if (OidIsValid(namespaceId) &&
+				!list_member_oid(oidlist, namespaceId) &&
 				true &&
-					InvokeNamespaceSearchHook(namespaceId, false))
-					oidlist = lappend_oid(oidlist, namespaceId);
-			}
+				InvokeNamespaceSearchHook(namespaceId, false))
+				oidlist = lappend_oid(oidlist, namespaceId);
 		}
 		else
 		{
@@ -3134,9 +3126,6 @@ InitializeSearchPath(void)
 		 * the meaning of the special string $user.)
 		 */
 		CacheRegisterSyscacheCallback(NAMESPACEOID,
-									  NamespaceCallback,
-									  (Datum) 0);
-		CacheRegisterSyscacheCallback(AUTHOID,
 									  NamespaceCallback,
 									  (Datum) 0);
 		/* Force search path to be recomputed on next use */

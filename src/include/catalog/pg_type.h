@@ -44,7 +44,7 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 	Oid			typnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
 	/* type owner */
-	Oid			typowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
+	Oid			typowner BKI_DEFAULT(10);
 
 	/*
 	 * For a fixed-size type, typlen is the number of bytes we use to

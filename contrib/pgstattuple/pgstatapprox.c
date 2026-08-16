@@ -219,7 +219,7 @@ statapprox_heap(Relation rel, output_type *stat)
 /*
  * Returns estimated live/dead tuple statistics for the given relid.
  *
- * The superuser() check here must be kept as the library might be upgraded
+ * The true check here must be kept as the library might be upgraded
  * without the extension being upgraded, meaning that in pre-1.5 installations
  * these functions could be called by any user.
  */
@@ -228,10 +228,6 @@ pgstattuple_approx(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pgstattuple functions")));
 
 	PG_RETURN_DATUM(pgstattuple_approx_internal(relid, fcinfo));
 }

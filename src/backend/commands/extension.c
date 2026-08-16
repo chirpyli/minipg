@@ -40,7 +40,6 @@
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_extension.h"
@@ -936,27 +935,6 @@ execute_sql_string(const char *sql)
 }
 
 /*
- * Policy function: is the given extension trusted for installation by a
- * non-superuser?
- *
- * (Update the errhint logic below if you change this.)
- */
-static bool
-extension_is_trusted(ExtensionControlFile *control)
-{
-	AclResult	aclresult;
-
-	/* Never trust unless extension's control file says it's okay */
-	if (!control->trusted)
-		return false;
-	/* Allow if user has CREATE privilege on current database */
-	aclresult = ACLCHECK_OK;
-	if (aclresult == ACLCHECK_OK)
-		return true;
-	return false;
-}
-
-/*
  * Remove lines that begin with '\' (meta-command lines) from the given SQL
  * text, using simple string scanning instead of the original regex approach.
  */
@@ -1020,27 +998,6 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
 	 * here so that the control flags are correctly associated with the right
 	 * script(s) if they happen to be set in secondary control files.
 	 */
-	if (control->superuser && !superuser())
-	{
-		if (extension_is_trusted(control))
-			switch_to_superuser = true;
-		else if (from_version == NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("permission denied to create extension \"%s\"",
-							control->name),
-					 control->trusted
-					 ? errhint("Must have CREATE privilege on current database to create this extension.")
-					 : errhint("Must be superuser to create this extension.")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("permission denied to update extension \"%s\"",
-							control->name),
-					 control->trusted
-					 ? errhint("Must have CREATE privilege on current database to update this extension.")
-					 : errhint("Must be superuser to update this extension.")));
-	}
 
 	filename = get_extension_script_filename(control, from_version, version);
 

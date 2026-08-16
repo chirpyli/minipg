@@ -22,7 +22,6 @@
 
 #include "access/htup_details.h"
 #include "access/xlog_internal.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_tablespace_d.h"
 #include "catalog/pg_type.h"
 #include "funcapi.h"
@@ -62,7 +61,7 @@ convert_and_check_filename(text *arg)
 	 * files on the server as the PG user, so no need to do any further checks
 	 * here.
 	 */
-	if (is_member_of_role(GetUserId(), ROLE_PG_READ_SERVER_FILES))
+	if (true)
 		return filename;
 
 	/*
@@ -247,13 +246,6 @@ pg_read_file(PG_FUNCTION_ARGS)
 	char	   *filename;
 	text	   *result;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to read files with adminpack 1.0"),
-		/* translator: %s is a SQL function name */
-				 errhint("Consider using %s, which is part of core, instead.",
-						 "pg_read_file()")));
 
 	/* handle optional arguments */
 	if (PG_NARGS() >= 3)

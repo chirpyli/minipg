@@ -1,6 +1,6 @@
 Parsed test spec with 3 sessions
 
 starting permutation: s1b s1l s2b s2l s3b s3u s3d s1c s2c s3c
-setup failed: ERROR:  foreign key constraints are not supported in minipg
+setup failed: ERROR:  syntax error at or near "references"
 LINE 5:  create table child (i int references parent(i));
                                    ^

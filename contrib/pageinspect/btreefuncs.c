@@ -197,10 +197,6 @@ bt_page_stats_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 	char	   *values[11];
 	BTPageStat	stat;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pageinspect functions")));
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	rel = relation_openrv(relrv, AccessShareLock);
@@ -449,10 +445,6 @@ bt_page_items_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 	MemoryContext mctx;
 	struct user_args *uargs;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pageinspect functions")));
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -573,10 +565,6 @@ bt_page_items_bytea(PG_FUNCTION_ARGS)
 	FuncCallContext *fctx;
 	struct user_args *uargs;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use raw page functions")));
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -685,10 +673,6 @@ bt_metap(PG_FUNCTION_ARGS)
 	Page		page;
 	HeapTuple	tuple;
 
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to use pageinspect functions")));
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	rel = relation_openrv(relrv, AccessShareLock);

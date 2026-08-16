@@ -3441,17 +3441,6 @@ _copyAlterDatabaseStmt(const AlterDatabaseStmt *from)
 	return newnode;
 }
 
-static AlterDatabaseSetStmt *
-_copyAlterDatabaseSetStmt(const AlterDatabaseSetStmt *from)
-{
-	AlterDatabaseSetStmt *newnode = makeNode(AlterDatabaseSetStmt);
-
-	COPY_STRING_FIELD(dbname);
-	COPY_NODE_FIELD(setstmt);
-
-	return newnode;
-}
-
 static DropdbStmt *
 _copyDropdbStmt(const DropdbStmt *from)
 {
@@ -3495,27 +3484,6 @@ _copyExplainStmt(const ExplainStmt *from)
 
 	COPY_NODE_FIELD(query);
 	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static ReplicaIdentityStmt *
-_copyReplicaIdentityStmt(const ReplicaIdentityStmt *from)
-{
-	ReplicaIdentityStmt *newnode = makeNode(ReplicaIdentityStmt);
-
-	COPY_SCALAR_FIELD(identity_type);
-	COPY_STRING_FIELD(name);
-
-	return newnode;
-}
-
-static AlterSystemStmt *
-_copyAlterSystemStmt(const AlterSystemStmt *from)
-{
-	AlterSystemStmt *newnode = makeNode(AlterSystemStmt);
-
-	COPY_NODE_FIELD(setstmt);
 
 	return newnode;
 }
@@ -4355,9 +4323,6 @@ copyObjectImpl(const void *from)
 		case T_AlterDatabaseStmt:
 			retval = _copyAlterDatabaseStmt(from);
 			break;
-		case T_AlterDatabaseSetStmt:
-			retval = _copyAlterDatabaseSetStmt(from);
-			break;
 		case T_DropdbStmt:
 			retval = _copyDropdbStmt(from);
 			break;
@@ -4369,12 +4334,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ExplainStmt:
 			retval = _copyExplainStmt(from);
-			break;
-		case T_ReplicaIdentityStmt:
-			retval = _copyReplicaIdentityStmt(from);
-			break;
-		case T_AlterSystemStmt:
-			retval = _copyAlterSystemStmt(from);
 			break;
 		case T_VariableSetStmt:
 			retval = _copyVariableSetStmt(from);

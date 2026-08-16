@@ -23,14 +23,9 @@
 #include <sys/select.h>
 #endif
 
-#include "commands/user.h"
-#include "common/ip.h"
-#include "common/scram-common.h"
 #include "libpq/auth.h"
-#include "libpq/crypt.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
-#include "libpq/scram.h"
 #include "miscadmin.h"
 #include "port/pg_bswap.h"
 #include "postmaster/postmaster.h"
@@ -83,6 +78,12 @@ ClientAuthentication(Port *port)
 
 	if (status == STATUS_OK)
 		sendAuthRequest(port, AUTH_REQ_OK, NULL, 0);
+
+	/*
+	 * 认证已成功完成，复位全局标志，使后续 NOTICE/WARNING 等级的消息
+	 * 能够正常发往客户端（should_output_to_client 依赖此标志）。
+	 */
+	ClientAuthInProgress = false;
 }
 
 

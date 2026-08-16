@@ -39,7 +39,7 @@ CATALOG(pg_operator,2617,OperatorRelationId)
 	Oid			oprnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
 	/* operator owner */
-	Oid			oprowner BKI_DEFAULT(POSTGRES) BKI_LOOKUP(pg_authid);
+	Oid			oprowner BKI_DEFAULT(10);
 
 	/* 'l' for prefix or 'b' for infix */
 	char		oprkind BKI_DEFAULT(b);

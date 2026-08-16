@@ -712,10 +712,6 @@ interpret_func_support(DefElem *defel)
 	 * you be superuser to specify a support function, so privilege on the
 	 * support function is moot.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to specify a support function")));
 
 	return procOid;
 }
@@ -1142,10 +1138,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	}
 	else
 	{
-		/* if untrusted language, must be superuser */
-		if (!superuser())
-			aclcheck_error(ACLCHECK_NO_PRIV, OBJECT_LANGUAGE,
-						   NameStr(languageStruct->lanname));
 	}
 
 	languageValidator = languageStruct->lanvalidator;
@@ -1157,10 +1149,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	 * leakproof functions can see tuples which have not yet been filtered out
 	 * by security barrier views or row-level security policies.
 	 */
-	if (isLeakProof && !superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("only superuser can define a leakproof function")));
 
 	if (transformDefElem)
 	{
@@ -1435,10 +1423,6 @@ AlterFunction(ParseState *pstate, AlterFunctionStmt *stmt)
 	if (leakproof_item)
 	{
 		procForm->proleakproof = intVal(leakproof_item->arg);
-		if (procForm->proleakproof && !superuser())
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("only superuser can define a leakproof function")));
 	}
 	if (cost_item)
 	{
@@ -1897,10 +1881,6 @@ ExecuteDoStmt(DoStmt *stmt, bool atomic)
 	}
 	else
 	{
-		/* if untrusted language, must be superuser */
-		if (!superuser())
-			aclcheck_error(ACLCHECK_NO_PRIV, OBJECT_LANGUAGE,
-						   NameStr(languageStruct->lanname));
 	}
 
 	/* get the handler function's OID */

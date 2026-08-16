@@ -16,7 +16,6 @@
 
 #include "access/htup_details.h"
 #include "access/xlog.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_type.h"
 #include "common/ip.h"
 #include "funcapi.h"
@@ -33,7 +32,7 @@
 
 #define UINT32_ACCESS_ONCE(var)		 ((uint32)(*((volatile uint32 *)&(var))))
 
-#define HAS_PGSTAT_PERMISSIONS(role)	 (is_member_of_role(GetUserId(), ROLE_PG_READ_ALL_STATS) || has_privs_of_role(GetUserId(), role))
+#define HAS_PGSTAT_PERMISSIONS(role)	 (true)
 
 /* Global bgwriter statistics, from bgwriter.c */
 extern PgStat_MsgBgWriter bgwriterStats;

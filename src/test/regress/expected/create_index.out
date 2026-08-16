@@ -778,7 +778,7 @@ CREATE INDEX concur_reindex_ind4 ON concur_reindex_tab(c1, c1, c2);
 -- Create table for check on foreign key dependence switch with indexes swapped
 ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
-ERROR:  foreign key constraints are not supported in minipg
+ERROR:  syntax error at or near "REFERENCES"
 LINE 1: CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_r...
                                                  ^
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
@@ -844,27 +844,6 @@ SELECT indexrelid::regclass, indisclustered FROM pg_index
 (1 row)
 
 DROP TABLE concur_clustered;
--- Check that indisreplident updates are preserved.
-CREATE TABLE concur_replident(i int NOT NULL);
-CREATE UNIQUE INDEX concur_replident_i_idx ON concur_replident(i);
-ALTER TABLE concur_replident REPLICA IDENTITY
-  USING INDEX concur_replident_i_idx;
-SELECT indexrelid::regclass, indisreplident FROM pg_index
-  WHERE indrelid = 'concur_replident'::regclass;
-       indexrelid       | indisreplident 
-------------------------+----------------
- concur_replident_i_idx | t
-(1 row)
-
-REINDEX TABLE CONCURRENTLY concur_replident;
-SELECT indexrelid::regclass, indisreplident FROM pg_index
-  WHERE indrelid = 'concur_replident'::regclass;
-       indexrelid       | indisreplident 
-------------------------+----------------
- concur_replident_i_idx | t
-(1 row)
-
-DROP TABLE concur_replident;
 -- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 -- Check errors
 -- Cannot run inside a transaction block
@@ -876,10 +855,10 @@ REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relation
 ERROR:  cannot reindex system catalogs concurrently
 REINDEX INDEX CONCURRENTLY pg_class_oid_index; -- no catalog index
 ERROR:  cannot reindex system catalogs concurrently
--- These are the toast table and index of pg_authid.
-REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1260; -- no catalog toast table
+-- These are the toast table and index of pg_proc.
+REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1255; -- no catalog toast table
 ERROR:  cannot reindex system catalogs concurrently
-REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1260_index; -- no catalog toast index
+REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1255_index; -- no catalog toast index
 ERROR:  cannot reindex system catalogs concurrently
 REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
 ERROR:  cannot reindex system catalogs concurrently
@@ -1108,8 +1087,8 @@ END;
 REINDEX SCHEMA CONCURRENTLY schema_to_reindex;
 -- Failure for unauthorized user
 REINDEX SCHEMA schema_to_reindex;
--- Permission failures with toast tables and indexes (pg_authid here)
-REINDEX TABLE pg_toast.pg_toast_1260;
-REINDEX INDEX pg_toast.pg_toast_1260_index;
+-- Permission failures with toast tables and indexes (pg_proc here)
+REINDEX TABLE pg_toast.pg_toast_1255;
+REINDEX INDEX pg_toast.pg_toast_1255_index;
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;

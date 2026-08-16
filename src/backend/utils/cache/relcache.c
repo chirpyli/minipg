@@ -47,8 +47,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_attrdef.h"
-#include "catalog/pg_auth_members.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_namespace.h"
@@ -104,8 +102,6 @@ static const FormData_pg_attribute Desc_pg_attribute[Natts_pg_attribute] = {Sche
 static const FormData_pg_attribute Desc_pg_proc[Natts_pg_proc] = {Schema_pg_proc};
 static const FormData_pg_attribute Desc_pg_type[Natts_pg_type] = {Schema_pg_type};
 static const FormData_pg_attribute Desc_pg_database[Natts_pg_database] = {Schema_pg_database};
-static const FormData_pg_attribute Desc_pg_authid[Natts_pg_authid] = {Schema_pg_authid};
-static const FormData_pg_attribute Desc_pg_auth_members[Natts_pg_auth_members] = {Schema_pg_auth_members};
 static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_index};
 
 /*
@@ -3258,8 +3254,6 @@ RelationBuildLocalRelation(const char *relname,
 	switch (relid)
 	{
 		case DatabaseRelationId:
-		case AuthIdRelationId:
-		case AuthMemRelationId:
 		case RelationRelationId:
 		case AttributeRelationId:
 		case ProcedureRelationId:
@@ -3716,12 +3710,8 @@ RelationCacheInitializePhase2(void)
 	{
 		formrdesc("pg_database", DatabaseRelation_Rowtype_Id, true,
 				  Natts_pg_database, Desc_pg_database);
-		formrdesc("pg_authid", AuthIdRelation_Rowtype_Id, true,
-				  Natts_pg_authid, Desc_pg_authid);
-		formrdesc("pg_auth_members", AuthMemRelation_Rowtype_Id, true,
-				  Natts_pg_auth_members, Desc_pg_auth_members);
 
-#define NUM_CRITICAL_SHARED_RELS	3	/* fix if you change list above */
+#define NUM_CRITICAL_SHARED_RELS	1	/* fix if you change list above */
 	}
 
 	MemoryContextSwitchTo(oldcxt);
@@ -3850,14 +3840,8 @@ RelationCacheInitializePhase3(void)
 							DatabaseRelationId);
 		load_critical_index(DatabaseOidIndexId,
 							DatabaseRelationId);
-		load_critical_index(AuthIdRolnameIndexId,
-							AuthIdRelationId);
-		load_critical_index(AuthIdOidIndexId,
-							AuthIdRelationId);
-		load_critical_index(AuthMemMemRoleIndexId,
-							AuthMemRelationId);
 
-#define NUM_CRITICAL_SHARED_INDEXES 5	/* fix if you change list above */
+#define NUM_CRITICAL_SHARED_INDEXES 2	/* fix if you change list above */
 
 		criticalSharedRelcachesBuilt = true;
 	}

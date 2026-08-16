@@ -21,7 +21,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
@@ -68,7 +67,6 @@ typedef struct
 	SharedDependencyObjectType objtype;
 } ShDependObjectInfo;
 
-static void getOidListDiff(Oid *list1, int *nlist1, Oid *list2, int *nlist2);
 static Oid	classIdGetDbId(Oid classId);
 static void shdepChangeDep(Relation sdepRel,
 						   Oid classid, Oid objid, int32 objsubid,
@@ -151,18 +149,13 @@ recordSharedDependencyOn(ObjectAddress *depender,
 void
 recordDependencyOnOwner(Oid classId, Oid objectId, Oid owner)
 {
-	ObjectAddress myself,
-				referenced;
-
-	myself.classId = classId;
-	myself.objectId = objectId;
-	myself.objectSubId = 0;
-
-	referenced.classId = AuthIdRelationId;
-	referenced.objectId = owner;
-	referenced.objectSubId = 0;
-
-	recordSharedDependencyOn(&myself, &referenced, SHARED_DEPENDENCY_OWNER);
+	/*
+	 * minipg 没有角色/用户概念，所有对象都固定归超级用户所有，
+	 * 不存在角色被删除导致对象成为孤儿的风险，因此无需记录 owner
+	 * 共享依赖。若仍按原逻辑写入 classId = BOOTSTRAP_SUPERUSERID(10)
+	 * 的记录，恢复共享依赖时会因 classId=10 无法识别而 FATAL。
+	 */
+	return;
 }
 
 /*
@@ -299,40 +292,11 @@ shdepChangeDep(Relation sdepRel,
 void
 changeDependencyOnOwner(Oid classId, Oid objectId, Oid newOwnerId)
 {
-	Relation	sdepRel;
-
-	sdepRel = table_open(SharedDependRelationId, RowExclusiveLock);
-
-	/* Adjust the SHARED_DEPENDENCY_OWNER entry */
-	shdepChangeDep(sdepRel,
-				   classId, objectId, 0,
-				   AuthIdRelationId, newOwnerId,
-				   SHARED_DEPENDENCY_OWNER);
-
-	/*----------
-	 * There should never be a SHARED_DEPENDENCY_ACL entry for the owner,
-	 * so get rid of it if there is one.  This can happen if the new owner
-	 * was previously granted some rights to the object.
-	 *
-	 * This step is analogous to aclnewowner's removal of duplicate entries
-	 * in the ACL.  We have to do it to handle this scenario:
-	 *		A grants some rights on an object to B
-	 *		ALTER OWNER changes the object's owner to B
-	 *		ALTER OWNER changes the object's owner to C
-	 * The third step would remove all mention of B from the object's ACL,
-	 * but we'd still have a SHARED_DEPENDENCY_ACL for B if we did not do
-	 * things this way.
-	 *
-	 * The rule against having a SHARED_DEPENDENCY_ACL entry for the owner
-	 * allows us to fix things up in just this one place, without having
-	 * to make the various ALTER OWNER routines each know about it.
-	 *----------
+	/*
+	 * minipg 没有角色/用户概念，ALTER OWNER 无意义（owner 永远为超级用
+	 * 户），且 ACL 机制已删除，因此无需调整任何共享依赖记录。
 	 */
-	shdepDropDependency(sdepRel, classId, objectId, 0, true,
-						AuthIdRelationId, newOwnerId,
-						SHARED_DEPENDENCY_ACL);
-
-	table_close(sdepRel, RowExclusiveLock);
+	return;
 }
 
 /*
@@ -385,155 +349,6 @@ changeDependencyOnTablespace(Oid classId, Oid objectId, Oid newTablespaceId)
 							SHARED_DEPENDENCY_INVALID);
 
 	table_close(sdepRel, RowExclusiveLock);
-}
-
-/*
- * getOidListDiff
- *		Helper for updateAclDependencies.
- *
- * Takes two Oid arrays and removes elements that are common to both arrays,
- * leaving just those that are in one input but not the other.
- * We assume both arrays have been sorted and de-duped.
- */
-static void
-getOidListDiff(Oid *list1, int *nlist1, Oid *list2, int *nlist2)
-{
-	int			in1,
-				in2,
-				out1,
-				out2;
-
-	in1 = in2 = out1 = out2 = 0;
-	while (in1 < *nlist1 && in2 < *nlist2)
-	{
-		if (list1[in1] == list2[in2])
-		{
-			/* skip over duplicates */
-			in1++;
-			in2++;
-		}
-		else if (list1[in1] < list2[in2])
-		{
-			/* list1[in1] is not in list2 */
-			list1[out1++] = list1[in1++];
-		}
-		else
-		{
-			/* list2[in2] is not in list1 */
-			list2[out2++] = list2[in2++];
-		}
-	}
-
-	/* any remaining list1 entries are not in list2 */
-	while (in1 < *nlist1)
-	{
-		list1[out1++] = list1[in1++];
-	}
-
-	/* any remaining list2 entries are not in list1 */
-	while (in2 < *nlist2)
-	{
-		list2[out2++] = list2[in2++];
-	}
-
-	*nlist1 = out1;
-	*nlist2 = out2;
-}
-
-/*
- * updateAclDependencies
- *		Update the pg_shdepend info for an object's ACL during GRANT/REVOKE.
- *
- * classId, objectId, objsubId: identify the object whose ACL this is
- * ownerId: role owning the object
- * noldmembers, oldmembers: array of roleids appearing in old ACL
- * nnewmembers, newmembers: array of roleids appearing in new ACL
- *
- * We calculate the differences between the new and old lists of roles,
- * and then insert or delete from pg_shdepend as appropriate.
- *
- * Note that we can't just insert all referenced roles blindly during GRANT,
- * because we would end up with duplicate registered dependencies.  We could
- * check for existence of the tuples before inserting, but that seems to be
- * more expensive than what we are doing here.  Likewise we can't just delete
- * blindly during REVOKE, because the user may still have other privileges.
- * It is also possible that REVOKE actually adds dependencies, due to
- * instantiation of a formerly implicit default ACL (although at present,
- * all such dependencies should be for the owning role, which we ignore here).
- *
- * NOTE: Both input arrays must be sorted and de-duped.  (Typically they
- * are extracted from an ACL array by aclmembers(), which takes care of
- * both requirements.)	The arrays are pfreed before return.
- */
-void
-updateAclDependencies(Oid classId, Oid objectId, int32 objsubId,
-					  Oid ownerId,
-					  int noldmembers, Oid *oldmembers,
-					  int nnewmembers, Oid *newmembers)
-{
-	Relation	sdepRel;
-	int			i;
-
-	/*
-	 * Remove entries that are common to both lists; those represent existing
-	 * dependencies we don't need to change.
-	 *
-	 * OK to overwrite the inputs since we'll pfree them anyway.
-	 */
-	getOidListDiff(oldmembers, &noldmembers, newmembers, &nnewmembers);
-
-	if (noldmembers > 0 || nnewmembers > 0)
-	{
-		sdepRel = table_open(SharedDependRelationId, RowExclusiveLock);
-
-		/* Add new dependencies that weren't already present */
-		for (i = 0; i < nnewmembers; i++)
-		{
-			Oid			roleid = newmembers[i];
-
-			/*
-			 * Skip the owner: he has an OWNER shdep entry instead. (This is
-			 * not just a space optimization; it makes ALTER OWNER easier. See
-			 * notes in changeDependencyOnOwner.)
-			 */
-			if (roleid == ownerId)
-				continue;
-
-			/* Skip pinned roles; they don't need dependency entries */
-			if (isSharedObjectPinned(AuthIdRelationId, roleid, sdepRel))
-				continue;
-
-			shdepAddDependency(sdepRel, classId, objectId, objsubId,
-							   AuthIdRelationId, roleid,
-							   SHARED_DEPENDENCY_ACL);
-		}
-
-		/* Drop no-longer-used old dependencies */
-		for (i = 0; i < noldmembers; i++)
-		{
-			Oid			roleid = oldmembers[i];
-
-			/* Skip the owner, same as above */
-			if (roleid == ownerId)
-				continue;
-
-			/* Skip pinned roles */
-			if (isSharedObjectPinned(AuthIdRelationId, roleid, sdepRel))
-				continue;
-
-			shdepDropDependency(sdepRel, classId, objectId, objsubId,
-								false,	/* exact match on objsubId */
-								AuthIdRelationId, roleid,
-								SHARED_DEPENDENCY_ACL);
-		}
-
-		table_close(sdepRel, RowExclusiveLock);
-	}
-
-	if (oldmembers)
-		pfree(oldmembers);
-	if (newmembers)
-		pfree(newmembers);
 }
 
 /*
@@ -1159,14 +974,6 @@ shdepLockAndCheckObject(Oid classId, Oid objectId)
 
 	switch (classId)
 	{
-		case AuthIdRelationId:
-			if (!SearchSysCacheExists1(AUTHOID, ObjectIdGetDatum(objectId)))
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("role %u was concurrently dropped",
-								objectId)));
-			break;
-
 		case TableSpaceRelationId:
 			{
 				/* For lack of a syscache on pg_tablespace, do this: */
@@ -1353,11 +1160,11 @@ shdepDropOwned(List *roleids, DropBehavior behavior)
 		HeapTuple	tuple;
 
 		/* Doesn't work for pinned objects */
-		if (isSharedObjectPinned(AuthIdRelationId, roleid, sdepRel))
+		if (isSharedObjectPinned(BOOTSTRAP_SUPERUSERID, roleid, sdepRel))
 		{
 			ObjectAddress obj;
 
-			obj.classId = AuthIdRelationId;
+			obj.classId = BOOTSTRAP_SUPERUSERID;
 			obj.objectId = roleid;
 			obj.objectSubId = 0;
 
@@ -1371,7 +1178,7 @@ shdepDropOwned(List *roleids, DropBehavior behavior)
 		ScanKeyInit(&key[0],
 					Anum_pg_shdepend_refclassid,
 					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(AuthIdRelationId));
+					ObjectIdGetDatum(BOOTSTRAP_SUPERUSERID));
 		ScanKeyInit(&key[1],
 					Anum_pg_shdepend_refobjid,
 					BTEqualStrategyNumber, F_OIDEQ,
@@ -1469,11 +1276,11 @@ shdepReassignOwned(List *roleids, Oid newrole)
 		Oid			roleid = lfirst_oid(cell);
 
 		/* Refuse to work on pinned roles */
-		if (isSharedObjectPinned(AuthIdRelationId, roleid, sdepRel))
+		if (isSharedObjectPinned(BOOTSTRAP_SUPERUSERID, roleid, sdepRel))
 		{
 			ObjectAddress obj;
 
-			obj.classId = AuthIdRelationId;
+			obj.classId = BOOTSTRAP_SUPERUSERID;
 			obj.objectId = roleid;
 			obj.objectSubId = 0;
 
@@ -1491,7 +1298,7 @@ shdepReassignOwned(List *roleids, Oid newrole)
 		ScanKeyInit(&key[0],
 					Anum_pg_shdepend_refclassid,
 					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(AuthIdRelationId));
+					ObjectIdGetDatum(BOOTSTRAP_SUPERUSERID));
 		ScanKeyInit(&key[1],
 					Anum_pg_shdepend_refobjid,
 					BTEqualStrategyNumber, F_OIDEQ,

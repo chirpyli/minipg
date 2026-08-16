@@ -60,7 +60,6 @@
 #endif
 
 #include "access/xlog_internal.h"
-#include "catalog/pg_authid_d.h"
 #include "catalog/pg_class_d.h" /* pgrminclude ignore */
 #include "catalog/pg_collation_d.h"
 #include "common/file_perm.h"
@@ -197,7 +196,6 @@ static void set_null_conf(void);
 static void test_config_settings(void);
 static void setup_config(void);
 static void bootstrap_template1(void);
-static void setup_auth(FILE *cmdfd);
 static void get_su_pwd(void);
 static void setup_depend(FILE *cmdfd);
 static void setup_run_file(FILE *cmdfd, const char *filename);
@@ -1118,28 +1116,6 @@ bootstrap_template1(void)
 }
 
 /*
- * set up the shadow password table
- */
-static void
-setup_auth(FILE *cmdfd)
-{
-	const char *const *line;
-	static const char *const pg_authid_setup[] = {
-		/*
-		 * minipg: 权限机制已裁剪，所有用户等效超级用户，无需撤销 public 权限。
-		 */
-		NULL
-	};
-
-	for (line = pg_authid_setup; *line != NULL; line++)
-		PG_CMD_PUTS(*line);
-
-	if (superuser_password)
-		PG_CMD_PRINTF("ALTER USER \"%s\" WITH PASSWORD E'%s';\n\n",
-					  username, escape_quotes(superuser_password));
-}
-
-/*
  * get the superuser password if required
  */
 static void
@@ -1278,8 +1254,6 @@ setup_depend(FILE *cmdfd)
 
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_collation;\n\n",
-		"INSERT INTO pg_shdepend SELECT 0,0,0,0, tableoid,oid, 'p' "
-		" FROM pg_authid;\n\n",
 		NULL
 	};
 
@@ -2187,8 +2161,6 @@ initialize_data_directory(void)
 			 DEVNULL);
 
 	PG_CMD_OPEN;
-
-	setup_auth(cmdfd);
 
 	setup_run_file(cmdfd, system_constraints_file);
 

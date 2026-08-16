@@ -40,7 +40,6 @@
 #include "catalog/heap.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -205,10 +204,6 @@ DefineType(ParseState *pstate, List *names, List *parameters)
 	 *
 	 * XXX re-enable NOT_USED code sections below if you remove this test.
 	 */
-	if (!superuser())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create a base type")));
 
 	/* Convert list of names to a name and namespace */
 	typeNamespace = QualifiedNameGetCreationNamespace(names, &typeName);
@@ -982,18 +977,12 @@ DefineDomain(CreateDomainStmt *stmt)
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("exclusion constraints not possible for domains")));
-				break;
+						 break;
 
-			case CONSTR_FOREIGN:
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("foreign key constraints not possible for domains")));
-				break;
-
-			case CONSTR_ATTR_DEFERRABLE:
-			case CONSTR_ATTR_NOT_DEFERRABLE:
-			case CONSTR_ATTR_DEFERRED:
-			case CONSTR_ATTR_IMMEDIATE:
+						 case CONSTR_ATTR_DEFERRABLE:
+						 case CONSTR_ATTR_NOT_DEFERRABLE:
+						 case CONSTR_ATTR_DEFERRED:
+						 case CONSTR_ATTR_IMMEDIATE:
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("specifying constraint deferrability not supported for domains")));
@@ -2949,12 +2938,6 @@ AlterDomainAddConstraint(List *names, Node *newConstraint,
 					 errmsg("exclusion constraints not possible for domains")));
 			break;
 
-		case CONSTR_FOREIGN:
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("foreign key constraints not possible for domains")));
-			break;
-
 		case CONSTR_ATTR_DEFERRABLE:
 		case CONSTR_ATTR_NOT_DEFERRABLE:
 		case CONSTR_ATTR_DEFERRED:
@@ -3716,22 +3699,6 @@ AlterTypeOwner(List *names, Oid newOwnerId, ObjectType objecttype)
 	 */
 	if (typTup->typowner != newOwnerId)
 	{
-		/* Superusers can always do it */
-		if (!superuser())
-		{
-			/* Otherwise, must be owner of the existing object */
-			if (!pg_type_ownercheck(typTup->oid, GetUserId()))
-				aclcheck_error_type(ACLCHECK_NOT_OWNER, typTup->oid);
-
-			/* Must be able to become new owner */
-			check_is_member_of_role(GetUserId(), newOwnerId);
-
-			/* New owner must have CREATE privilege on namespace */
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_SCHEMA,
-							   get_namespace_name(typTup->typnamespace));
-		}
 
 		AlterTypeOwner_oid(typeOid, newOwnerId, true);
 	}
@@ -4231,10 +4198,6 @@ AlterType(AlterTypeStmt *stmt)
 	 */
 	if (requireSuper)
 	{
-		if (!superuser())
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to alter a type")));
 	}
 	else
 	{
