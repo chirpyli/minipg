@@ -74,7 +74,6 @@ typedef enum
 	CONNECTION_NEEDED,			/* Internal state: connect() needed */
 	CONNECTION_CHECK_WRITABLE,	/* Checking if session is read-write. */
 	CONNECTION_CONSUME,			/* Consuming any extra messages. */
-	CONNECTION_GSS_STARTUP,		/* This state is no longer used. */
 	CONNECTION_CHECK_TARGET,	/* Checking target server properties. */
 	CONNECTION_CHECK_STANDBY	/* Checking if server is in standby mode. */
 } ConnStatusType;

@@ -87,29 +87,45 @@ LINE 1: alter table rename;
                           ^
 -- no such relation
 alter table nonesuch rename to newnonesuch;
-ERROR:  relation "nonesuch" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table nonesuch rename to newnonesuch;
+                             ^
 -- no such relation
 alter table nonesuch rename to stud_emp;
-ERROR:  relation "nonesuch" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table nonesuch rename to stud_emp;
+                             ^
 -- conflict
 alter table stud_emp rename to aggtest;
-ERROR:  relation "stud_emp" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table stud_emp rename to aggtest;
+                             ^
 -- self-conflict
 alter table stud_emp rename to stud_emp;
-ERROR:  relation "stud_emp" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table stud_emp rename to stud_emp;
+                             ^
 -- attribute renaming
 -- no such relation
 alter table nonesuchrel rename column nonesuchatt to newnonesuchatt;
-ERROR:  relation "nonesuchrel" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table nonesuchrel rename column nonesuchatt to newnone...
+                                ^
 -- no such attribute
 alter table emp rename column nonesuchatt to newnonesuchatt;
-ERROR:  relation "emp" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table emp rename column nonesuchatt to newnonesuchatt;
+                        ^
 -- conflict
 alter table emp rename column salary to manager;
-ERROR:  relation "emp" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table emp rename column salary to manager;
+                        ^
 -- conflict
 alter table emp rename column salary to ctid;
-ERROR:  relation "emp" does not exist
+ERROR:  syntax error at or near "rename"
+LINE 1: alter table emp rename column salary to ctid;
+                        ^
 --
 -- TRANSACTION STUFF
 -- not in a xact

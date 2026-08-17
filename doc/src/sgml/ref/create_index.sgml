@@ -549,8 +549,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
     <listitem>
     <para>
      Defines the number of table blocks that make up one block range for
-     each entry of a <acronym>BRIN</acronym> index (see <xref linkend="brin-intro"/>
-     for more details).  The default is <literal>128</literal>.
+     each entry of a <acronym>BRIN</acronym> index.  The default is <literal>128</literal>.
     </para>
     </listitem>
    </varlistentry>
@@ -565,7 +564,6 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
     <para>
      Defines whether a summarization run is queued for the previous page
      range whenever an insertion is detected on the next one.
-     See <xref linkend="brin-operation"/> for more details.
      The default is <literal>off</literal>.
     </para>
     </listitem>

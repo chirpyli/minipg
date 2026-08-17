@@ -18,11 +18,10 @@
 #include "libpq/pqcomm.h"		/* pgrminclude ignore */
 
 
-#ifdef	HAVE_UNIX_SOCKETS
-#define IS_AF_UNIX(fam) ((fam) == AF_UNIX)
-#else
+/*
+ * minipg 不支持 Unix-domain socket，地址族恒不为 AF_UNIX。
+ */
 #define IS_AF_UNIX(fam) (0)
-#endif
 
 extern int	pg_getaddrinfo_all(const char *hostname, const char *servname,
 							   const struct addrinfo *hintp,

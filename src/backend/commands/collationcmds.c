@@ -53,7 +53,6 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 {
 	char	   *collName;
 	Oid			collNamespace;
-	AclResult	aclresult;
 	ListCell   *pl;
 	DefElem    *fromEl = NULL;
 	DefElem    *localeEl = NULL;
@@ -73,11 +72,6 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 	ObjectAddress address;
 
 	collNamespace = QualifiedNameGetCreationNamespace(names, &collName);
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(collNamespace));
 
 	foreach(pl, parameters)
 	{
@@ -213,7 +207,6 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 
 	newoid = CollationCreate(collName,
 							 collNamespace,
-							 GetUserId(),
 							 collprovider,
 							 collisdeterministic,
 							 collencoding,
@@ -288,10 +281,6 @@ AlterCollation(AlterCollationStmt *stmt)
 
 	rel = table_open(CollationRelationId, RowExclusiveLock);
 	collOid = get_collation_oid(stmt->collname, false);
-
-	if (!pg_collation_ownercheck(collOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_COLLATION,
-					   NameListToString(stmt->collname));
 
 	tup = SearchSysCacheCopy1(COLLOID, ObjectIdGetDatum(collOid));
 	if (!HeapTupleIsValid(tup))
@@ -520,7 +509,7 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 			 * always want to add on new locales without a lot of chatter
 			 * about existing ones.
 			 */
-			collid = CollationCreate(localebuf, nspid, GetUserId(),
+			collid = CollationCreate(localebuf, nspid,
 									 COLLPROVIDER_LIBC, true, enc,
 									 localebuf, localebuf,
 									 get_collation_actual_version(COLLPROVIDER_LIBC, localebuf),
@@ -581,7 +570,7 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 			char	   *alias = aliases[i].alias;
 			int			enc = aliases[i].enc;
 
-			collid = CollationCreate(alias, nspid, GetUserId(),
+			collid = CollationCreate(alias, nspid,
 									 COLLPROVIDER_LIBC, true, enc,
 									 locale, locale,
 									 get_collation_actual_version(COLLPROVIDER_LIBC, locale),

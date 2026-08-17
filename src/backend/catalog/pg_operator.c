@@ -244,7 +244,6 @@ OperatorShellMake(const char *operatorName,
 	namestrcpy(&oname, operatorName);
 	values[Anum_pg_operator_oprname - 1] = NameGetDatum(&oname);
 	values[Anum_pg_operator_oprnamespace - 1] = ObjectIdGetDatum(operatorNamespace);
-	values[Anum_pg_operator_oprowner - 1] = ObjectIdGetDatum(GetUserId());
 	values[Anum_pg_operator_oprkind - 1] = CharGetDatum(leftTypeId ? 'b' : 'l');
 	values[Anum_pg_operator_oprcanmerge - 1] = BoolGetDatum(false);
 	values[Anum_pg_operator_oprcanhash - 1] = BoolGetDatum(false);
@@ -427,8 +426,6 @@ OperatorCreate(const char *operatorName,
 	 * such shell.
 	 */
 	if (OidIsValid(operatorObjectId) &&
-		!pg_oper_ownercheck(operatorObjectId, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
 					   operatorName);
 
 	/*
@@ -447,8 +444,6 @@ OperatorCreate(const char *operatorName,
 
 		/* Permission check: must own other operator */
 		if (OidIsValid(commutatorId) &&
-			!pg_oper_ownercheck(commutatorId, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
 						   NameListToString(commutatorName));
 
 		/*
@@ -472,8 +467,6 @@ OperatorCreate(const char *operatorName,
 
 		/* Permission check: must own other operator */
 		if (OidIsValid(negatorId) &&
-			!pg_oper_ownercheck(negatorId, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
 						   NameListToString(negatorName));
 	}
 	else
@@ -493,7 +486,6 @@ OperatorCreate(const char *operatorName,
 	namestrcpy(&oname, operatorName);
 	values[Anum_pg_operator_oprname - 1] = NameGetDatum(&oname);
 	values[Anum_pg_operator_oprnamespace - 1] = ObjectIdGetDatum(operatorNamespace);
-	values[Anum_pg_operator_oprowner - 1] = ObjectIdGetDatum(GetUserId());
 	values[Anum_pg_operator_oprkind - 1] = CharGetDatum(leftTypeId ? 'b' : 'l');
 	values[Anum_pg_operator_oprcanmerge - 1] = BoolGetDatum(canMerge);
 	values[Anum_pg_operator_oprcanhash - 1] = BoolGetDatum(canHash);
@@ -623,11 +615,6 @@ get_other_operator(List *otherOp, Oid otherLeftTypeId, Oid otherRightTypeId,
 	}
 
 	/* not in catalogs, different from operator, so make shell */
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(otherNamespace));
 
 	other_oid = OperatorShellMake(otherName,
 								  otherNamespace,
@@ -856,10 +843,6 @@ makeOperatorDependencies(HeapTuple tuple,
 
 	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
 	free_object_addresses(addrs);
-
-	/* Dependency on owner */
-	recordDependencyOnOwner(OperatorRelationId, oper->oid,
-							oper->oprowner);
 
 	/* Dependency on extension */
 	if (makeExtensionDep)

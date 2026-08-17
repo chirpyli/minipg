@@ -21,7 +21,6 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
-
 #include "libpq/pqformat.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
@@ -95,6 +94,10 @@ typname##_send(PG_FUNCTION_ARGS) \
 } \
 \
 extern int no_such_variable
+
+#include "fmgr.h"
+extern Datum fdw_handler_in(PG_FUNCTION_ARGS);
+extern Datum fdw_handler_out(PG_FUNCTION_ARGS);
 
 
 /*

@@ -66,7 +66,6 @@ DefineOperator(List *names, List *parameters)
 {
 	char	   *oprName;
 	Oid			oprNamespace;
-	AclResult	aclresult;
 	bool		canMerge = false;	/* operator merges */
 	bool		canHash = false;	/* operator hashes */
 	List	   *functionName = NIL; /* function for operator */
@@ -74,7 +73,6 @@ DefineOperator(List *names, List *parameters)
 	TypeName   *typeName2 = NULL;	/* second type name */
 	Oid			typeId1 = InvalidOid;	/* types converted to OID */
 	Oid			typeId2 = InvalidOid;
-	Oid			rettype;
 	List	   *commutatorName = NIL;	/* optional commutator operator name */
 	List	   *negatorName = NIL;	/* optional negator operator name */
 	List	   *restrictionName = NIL;	/* optional restrict. sel. function */
@@ -88,12 +86,6 @@ DefineOperator(List *names, List *parameters)
 
 	/* Convert list of names to a name and namespace */
 	oprNamespace = QualifiedNameGetCreationNamespace(names, &oprName);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(oprNamespace));
 
 	/*
 	 * loop over the definition list and extract the information we need.
@@ -185,20 +177,6 @@ DefineOperator(List *names, List *parameters)
 				 errmsg("operator right argument type must be specified"),
 				 errdetail("Postfix operators are not supported.")));
 
-	if (typeName1)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, typeId1);
-	}
-
-	if (typeName2)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, typeId2);
-	}
-
 	/*
 	 * Look up the operator's underlying function.
 	 */
@@ -219,21 +197,6 @@ DefineOperator(List *names, List *parameters)
 		nargs = 2;
 	}
 	functionOid = LookupFuncName(functionName, nargs, typeId, false);
-
-	/*
-	 * We require EXECUTE rights for the function.  This isn't strictly
-	 * necessary, since EXECUTE will be checked at any attempted use of the
-	 * operator, but it seems like a good idea anyway.
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION,
-					   NameListToString(functionName));
-
-	rettype = get_func_rettype(functionOid);
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, rettype);
 
 	/*
 	 * Look up restriction and join estimators if specified
@@ -299,19 +262,6 @@ ValidateRestrictionEstimator(List *restrictionName)
 	 *
 	 * If it is built-in, only require EXECUTE rights.
 	 */
-	if (restrictionOid >= FirstGenbkiObjectId)
-	{
-	}
-	else
-	{
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION,
-						   NameListToString(restrictionName));
-	}
-
 	return restrictionOid;
 }
 
@@ -362,20 +312,6 @@ ValidateJoinEstimator(List *joinName)
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("join estimator function %s must return type %s",
 						NameListToString(joinName), "float8")));
-
-	/* privilege checks are the same as in ValidateRestrictionEstimator */
-	if (joinOid >= FirstGenbkiObjectId)
-	{
-	}
-	else
-	{
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION,
-						   NameListToString(joinName));
-	}
 
 	return joinOid;
 }
@@ -504,9 +440,6 @@ AlterOperator(AlterOperatorStmt *stmt)
 	}
 
 	/* Check permissions. Must be owner. */
-	if (!pg_oper_ownercheck(oprId, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
-					   NameStr(oprForm->oprname));
 
 	/*
 	 * Look up restriction and join estimators if specified

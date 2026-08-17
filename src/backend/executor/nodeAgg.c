@@ -3731,11 +3731,9 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		int			numDirectArgs;
 		HeapTuple	aggTuple;
 		Form_pg_aggregate aggform;
-		AclResult	aclresult;
 		Oid			finalfn_oid;
 		Oid			serialfn_oid,
 					deserialfn_oid;
-		Oid			aggOwner;
 		Expr	   *finalfnexpr;
 		Oid			aggtranstype;
 
@@ -3761,11 +3759,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 				 aggref->aggfnoid);
 		aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
 
-		/* Check permission to call aggregate function */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_AGGREGATE,
-						   get_func_name(aggref->aggfnoid));
 		InvokeFunctionExecuteHook(aggref->aggfnoid);
 
 		/* planner recorded transition state type in the Aggref itself */
@@ -3816,38 +3809,16 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		/* Check that aggregate owner has permission to call component fns */
 		{
-			HeapTuple	procTuple;
-
-			procTuple = SearchSysCache1(PROCOID,
-										ObjectIdGetDatum(aggref->aggfnoid));
-			if (!HeapTupleIsValid(procTuple))
-				elog(ERROR, "cache lookup failed for function %u",
-					 aggref->aggfnoid);
-			aggOwner = ((Form_pg_proc) GETSTRUCT(procTuple))->proowner;
-			ReleaseSysCache(procTuple);
-
 			if (OidIsValid(finalfn_oid))
 			{
-				aclresult = ACLCHECK_OK;
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, OBJECT_FUNCTION,
-								   get_func_name(finalfn_oid));
 				InvokeFunctionExecuteHook(finalfn_oid);
 			}
 			if (OidIsValid(serialfn_oid))
 			{
-				aclresult = ACLCHECK_OK;
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, OBJECT_FUNCTION,
-								   get_func_name(serialfn_oid));
 				InvokeFunctionExecuteHook(serialfn_oid);
 			}
 			if (OidIsValid(deserialfn_oid))
 			{
-				aclresult = ACLCHECK_OK;
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, OBJECT_FUNCTION,
-								   get_func_name(deserialfn_oid));
 				InvokeFunctionExecuteHook(deserialfn_oid);
 			}
 		}
@@ -3922,10 +3893,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			else
 				transfn_oid = aggform->aggtransfn;
 
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_FUNCTION,
-							   get_func_name(transfn_oid));
 			InvokeFunctionExecuteHook(transfn_oid);
 
 			/*

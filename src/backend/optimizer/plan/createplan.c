@@ -6141,10 +6141,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 				 List *rowMarks, OnConflictExpr *onconflict, int epqParam)
 {
 	ModifyTable *node = makeNode(ModifyTable);
-	bool		transition_tables = false;
-	bool		transition_tables_valid = false;
-	ListCell   *lc;
-	int			i;
 
 	Assert(operation == CMD_UPDATE ?
 		   list_length(resultRelations) == list_length(updateColnosLists) :

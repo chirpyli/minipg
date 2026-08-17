@@ -44,6 +44,8 @@
 #include "utils/pg_lsn.h"
 #include "utils/sortsupport.h"
 
+extern Datum numeric_trunc(PG_FUNCTION_ARGS);
+
 /* ----------
  * Uncomment the following to enable compilation of dump_numeric()
  * and dump_var() and to get a dump of any result produced by make_result().

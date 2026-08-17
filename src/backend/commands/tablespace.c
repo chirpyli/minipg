@@ -216,15 +216,8 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	HeapTuple	tuple;
 	Oid			tablespaceoid;
 	char	   *location;
-	Oid			ownerId;
 	Datum		newOptions;
 	bool		in_place;
-
-	/* However, the eventual owner of the tablespace need not be */
-	if (stmt->owner)
-		ownerId = get_rolespec_oid(stmt->owner, false);
-	else
-		ownerId = GetUserId();
 
 	/* Unix-ify the offered path, and strip any trailing slashes */
 	location = pstrdup(stmt->location);
@@ -313,8 +306,6 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	values[Anum_pg_tablespace_oid - 1] = ObjectIdGetDatum(tablespaceoid);
 	values[Anum_pg_tablespace_spcname - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(stmt->tablespacename));
-	values[Anum_pg_tablespace_spcowner - 1] =
-		ObjectIdGetDatum(ownerId);
 
 	/* Generate new proposed spcoptions (text array) */
 	newOptions = transformRelOptions((Datum) 0,
@@ -331,9 +322,6 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	CatalogTupleInsert(rel, tuple);
 
 	heap_freetuple(tuple);
-
-	/* Record dependency on owner */
-	recordDependencyOnOwner(TableSpaceRelationId, tablespaceoid, ownerId);
 
 	/* Post creation hook for new tablespace */
 	InvokeObjectPostCreateHook(TableSpaceRelationId, tablespaceoid, 0);
@@ -430,17 +418,6 @@ DropTableSpace(DropTableSpaceStmt *stmt)
 
 	spcform = (Form_pg_tablespace) GETSTRUCT(tuple);
 	tablespaceoid = spcform->oid;
-
-	/* Must be tablespace owner */
-	if (!pg_tablespace_ownercheck(tablespaceoid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_TABLESPACE,
-					   tablespacename);
-
-	/* Disallow drop of the standard tablespaces, even by superuser */
-	if (tablespaceoid == GLOBALTABLESPACE_OID ||
-		tablespaceoid == DEFAULTTABLESPACE_OID)
-		aclcheck_error(ACLCHECK_NO_PRIV, OBJECT_TABLESPACE,
-					   tablespacename);
 
 	/* Check for pg_shdepend entries depending on this tablespace */
 	if (checkSharedDependencies(TableSpaceRelationId, tablespaceoid,
@@ -907,90 +884,6 @@ remove_tablespace_symlink(const char *linkloc)
 	}
 }
 
-/*
- * Rename a tablespace
- */
-ObjectAddress
-RenameTableSpace(const char *oldname, const char *newname)
-{
-	Oid			tspId;
-	Relation	rel;
-	ScanKeyData entry[1];
-	TableScanDesc scan;
-	HeapTuple	tup;
-	HeapTuple	newtuple;
-	Form_pg_tablespace newform;
-	ObjectAddress address;
-
-	/* Search pg_tablespace */
-	rel = table_open(TableSpaceRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&entry[0],
-				Anum_pg_tablespace_spcname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(oldname));
-	scan = table_beginscan_catalog(rel, 1, entry);
-	tup = heap_getnext(scan, ForwardScanDirection);
-	if (!HeapTupleIsValid(tup))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("tablespace \"%s\" does not exist",
-						oldname)));
-
-	newtuple = heap_copytuple(tup);
-	newform = (Form_pg_tablespace) GETSTRUCT(newtuple);
-	tspId = newform->oid;
-
-	table_endscan(scan);
-
-	/* Must be owner */
-	if (!pg_tablespace_ownercheck(tspId, GetUserId()))
-		aclcheck_error(ACLCHECK_NO_PRIV, OBJECT_TABLESPACE, oldname);
-
-	/* Validate new name */
-	if (!allowSystemTableMods && IsReservedName(newname))
-		ereport(ERROR,
-				(errcode(ERRCODE_RESERVED_NAME),
-				 errmsg("unacceptable tablespace name \"%s\"", newname),
-				 errdetail("The prefix \"pg_\" is reserved for system tablespaces.")));
-
-	/*
-	 * If built with appropriate switch, whine when regression-testing
-	 * conventions for tablespace names are violated.
-	 */
-#ifdef ENFORCE_REGRESSION_TEST_NAME_RESTRICTIONS
-	if (strncmp(newname, "regress_", 8) != 0)
-		elog(WARNING, "tablespaces created by regression test cases should have names starting with \"regress_\"");
-#endif
-
-	/* Make sure the new name doesn't exist */
-	ScanKeyInit(&entry[0],
-				Anum_pg_tablespace_spcname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(newname));
-	scan = table_beginscan_catalog(rel, 1, entry);
-	tup = heap_getnext(scan, ForwardScanDirection);
-	if (HeapTupleIsValid(tup))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("tablespace \"%s\" already exists",
-						newname)));
-
-	table_endscan(scan);
-
-	/* OK, update the entry */
-	namestrcpy(&(newform->spcname), newname);
-
-	CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);
-
-	InvokeObjectPostAlterHook(TableSpaceRelationId, tspId, 0);
-
-	ObjectAddressSet(address, TableSpaceRelationId, tspId);
-
-	table_close(rel, NoLock);
-
-	return address;
-}
 
 /*
  * Alter table space options
@@ -1027,11 +920,6 @@ AlterTableSpaceOptions(AlterTableSpaceOptionsStmt *stmt)
 						stmt->tablespacename)));
 
 	tablespaceoid = ((Form_pg_tablespace) GETSTRUCT(tup))->oid;
-
-	/* Must be owner of the existing object */
-	if (!pg_tablespace_ownercheck(tablespaceoid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_TABLESPACE,
-					   stmt->tablespacename);
 
 	/* Generate new proposed spcoptions (text array) */
 	datum = heap_getattr(tup, Anum_pg_tablespace_spcoptions,
@@ -1212,7 +1100,6 @@ check_temp_tablespaces(char **newval, void **extra, GucSource source)
 		{
 			char	   *curname = (char *) lfirst(l);
 			Oid			curoid;
-			AclResult	aclresult;
 
 			/* Allow an empty string (signifying database default) */
 			if (curname[0] == '\0')
@@ -1246,15 +1133,6 @@ check_temp_tablespaces(char **newval, void **extra, GucSource source)
 			{
 				/* InvalidOid signifies database's default tablespace */
 				tblSpcs[numSpcs++] = InvalidOid;
-				continue;
-			}
-
-			/* Check permissions, similarly complaining only if interactive */
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-			{
-				if (source >= PGC_S_INTERACTIVE)
-					aclcheck_error(aclresult, OBJECT_TABLESPACE, curname);
 				continue;
 			}
 
@@ -1349,7 +1227,6 @@ PrepareTempTablespaces(void)
 	{
 		char	   *curname = (char *) lfirst(l);
 		Oid			curoid;
-		AclResult	aclresult;
 
 		/* Allow an empty string (signifying database default) */
 		if (curname[0] == '\0')
@@ -1377,11 +1254,6 @@ PrepareTempTablespaces(void)
 			tblSpcs[numSpcs++] = InvalidOid;
 			continue;
 		}
-
-		/* Check permissions similarly */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			continue;
 
 		tblSpcs[numSpcs++] = curoid;
 	}

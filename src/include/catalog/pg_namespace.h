@@ -37,7 +37,6 @@ CATALOG(pg_namespace,2615,NamespaceRelationId)
 	Oid			oid;			/* oid */
 
 	NameData	nspname;
-	Oid			nspowner BKI_DEFAULT(10);
 } FormData_pg_namespace;
 
 /* ----------------

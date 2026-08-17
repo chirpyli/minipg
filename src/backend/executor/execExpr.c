@@ -1194,7 +1194,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				Expr	   *arrayarg;
 				FmgrInfo   *finfo;
 				FunctionCallInfo fcinfo;
-				AclResult	aclresult;
 				FmgrInfo   *hash_finfo;
 				FunctionCallInfo hash_fcinfo;
 
@@ -1202,19 +1201,10 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				scalararg = (Expr *) linitial(opexpr->args);
 				arrayarg = (Expr *) lsecond(opexpr->args);
 
-				/* Check permission to call function */
-				aclresult = ACLCHECK_OK;
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, OBJECT_FUNCTION,
-								   get_func_name(opexpr->opfuncid));
 				InvokeFunctionExecuteHook(opexpr->opfuncid);
 
 				if (OidIsValid(opexpr->hashfuncid))
 				{
-					aclresult = ACLCHECK_OK;
-					if (aclresult != ACLCHECK_OK)
-						aclcheck_error(aclresult, OBJECT_FUNCTION,
-									   get_func_name(opexpr->hashfuncid));
 					InvokeFunctionExecuteHook(opexpr->hashfuncid);
 				}
 
@@ -2381,16 +2371,11 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 			 Oid inputcollid, ExprState *state)
 {
 	int			nargs = list_length(args);
-	AclResult	aclresult;
 	FmgrInfo   *flinfo;
 	FunctionCallInfo fcinfo;
 	int			argno;
 	ListCell   *lc;
 
-	/* Check permission to call function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(funcid));
 	InvokeFunctionExecuteHook(funcid);
 
 	/*
@@ -3732,12 +3717,6 @@ ExecBuildGroupingEqual(TupleDesc ldesc, TupleDesc rdesc,
 		Oid			collid = collations[natt];
 		FmgrInfo   *finfo;
 		FunctionCallInfo fcinfo;
-		AclResult	aclresult;
-
-		/* Check permission to call function */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(foid));
 
 		InvokeFunctionExecuteHook(foid);
 
@@ -3866,12 +3845,6 @@ ExecBuildParamSetEqual(TupleDesc desc,
 		Oid			collid = collations[attno];
 		FmgrInfo   *finfo;
 		FunctionCallInfo fcinfo;
-		AclResult	aclresult;
-
-		/* Check permission to call function */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(foid));
 
 		InvokeFunctionExecuteHook(foid);
 

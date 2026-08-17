@@ -163,8 +163,6 @@ extern ObjectAddress CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *que
 extern void RemoveTriggerById(Oid trigOid);
 extern Oid	get_trigger_oid(Oid relid, const char *name, bool missing_ok);
 
-extern ObjectAddress renametrig(RenameStmt *stmt);
-
 extern void EnableDisableTriggerNew(Relation rel, const char *tgname,
 									char fires_when, bool skip_system, bool recurse,
 									LOCKMODE lockmode);

@@ -43,7 +43,6 @@
 #include "commands/prepare.h"
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
-#include "commands/user.h"
 #include "commands/vacuum.h"
 #include "commands/variable.h"
 #include "common/string.h"
@@ -192,7 +191,6 @@ static void assign_pgstat_temp_directory(const char *newval, void *extra);
 static bool check_application_name(char **newval, void **extra, GucSource source);
 static void assign_application_name(const char *newval, void *extra);
 static bool check_cluster_name(char **newval, void **extra, GucSource source);
-static const char *show_unix_socket_permissions(void);
 static const char *show_log_file_mode(void);
 static const char *show_data_directory_mode(void);
 static const char *show_in_hot_standby(void);
@@ -2036,21 +2034,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"unix_socket_permissions", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the access permissions of the Unix-domain socket."),
-			gettext_noop("Unix-domain sockets use the usual Unix file system "
-						 "permission set. The parameter value is expected "
-						 "to be a numeric mode specification in the form "
-						 "accepted by the chmod and umask system calls. "
-						 "(To use the customary octal format the number must "
-						 "start with a 0 (zero).)")
-		},
-		&Unix_socket_permissions,
-		0777, 0000, 0777,
-		NULL, NULL, show_unix_socket_permissions
-	},
-
-	{
 		{"log_file_mode", PGC_SIGHUP, LOGGING_WHERE,
 			gettext_noop("Sets the file permissions for log files."),
 			gettext_noop("The parameter value is expected "
@@ -3727,32 +3710,6 @@ static struct config_string ConfigureNamesString[] =
 		&timezone_abbreviations_string,
 		NULL,
 		check_timezone_abbreviations, assign_timezone_abbreviations, NULL
-	},
-
-	{
-		{"unix_socket_group", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the owning group of the Unix-domain socket."),
-			gettext_noop("The owning user of the socket is always the user "
-						 "that starts the server.")
-		},
-		&Unix_socket_group,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"unix_socket_directories", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the directories where Unix-domain sockets will be created."),
-			NULL,
-			GUC_LIST_INPUT | GUC_LIST_QUOTE | GUC_SUPERUSER_ONLY
-		},
-		&Unix_socket_directories,
-#ifdef HAVE_UNIX_SOCKETS
-		DEFAULT_PGSOCKET_DIR,
-#else
-		"",
-#endif
-		NULL, NULL, NULL
 	},
 
 	{
@@ -10729,15 +10686,6 @@ check_cluster_name(char **newval, void **extra, GucSource source)
 	pg_clean_ascii(*newval);
 
 	return true;
-}
-
-static const char *
-show_unix_socket_permissions(void)
-{
-	static char buf[12];
-
-	snprintf(buf, sizeof(buf), "%04o", Unix_socket_permissions);
-	return buf;
 }
 
 static const char *

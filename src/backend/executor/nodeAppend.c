@@ -85,7 +85,6 @@ static TupleTableSlot *ExecAppend(PlanState *pstate);
 static bool choose_next_subplan_locally(AppendState *node);
 static bool choose_next_subplan_for_leader(AppendState *node);
 static bool choose_next_subplan_for_worker(AppendState *node);
-static void mark_invalid_subplans_as_finished(AppendState *node);
 
 /* ----------------------------------------------------------------
  *		ExecInitAppend
@@ -638,23 +637,4 @@ choose_next_subplan_for_worker(AppendState *node)
  * This function should only be called for parallel Append with run-time
  * pruning enabled.
  */
-static void
-mark_invalid_subplans_as_finished(AppendState *node)
-{
-	int			i;
-
-	/* Only valid to call this while in parallel Append mode */
-	Assert(node->as_pstate);
-
-	/* Nothing to do if all plans are valid */
-	if (bms_num_members(node->as_valid_subplans) == node->as_nplans)
-		return;
-
-	/* Mark all non-valid plans as finished */
-	for (i = 0; i < node->as_nplans; i++)
-	{
-		if (!bms_is_member(i, node->as_valid_subplans))
-			node->as_pstate->pa_finished[i] = true;
-	}
-}
 

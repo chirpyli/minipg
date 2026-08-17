@@ -735,7 +735,7 @@
    BRIN indexes have five basic support functions, one of which is optional,
    as shown in <xref linkend="xindex-brin-support-table"/>.  Some versions of
    the basic functions require additional support functions to be provided.
-   (For more information see <xref linkend="brin-extensibility"/>.)
+   (For more information see the BRIN documentation.)
   </para>
 
    <table tocentry="1" id="xindex-brin-support-table">

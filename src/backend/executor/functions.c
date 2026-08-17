@@ -1548,6 +1548,7 @@ check_sql_fn_statements(List *queryTreeLists)
 			/* no CALL statements can appear here (procedures are unsupported) */
 			Assert(!(query->commandType == CMD_UTILITY &&
 					 IsA(query->utilityStmt, CallStmt)));
+			(void) query;			/* keep compiler quiet when Assert() is empty */
 		}
 	}
 }

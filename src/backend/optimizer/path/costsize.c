@@ -1608,7 +1608,7 @@ cost_resultscan(Path *path, PlannerInfo *root,
 	path->total_cost = startup_cost + run_cost;
 }
 
-void
+static void
 cost_tuplesort(Cost *startup_cost, Cost *run_cost,
 			   double tuples, int width,
 			   Cost comparison_cost, int sort_mem,

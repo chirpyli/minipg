@@ -697,13 +697,8 @@ init_sexpr(Oid foid, Oid input_collation, Expr *node,
 		   SetExprState *sexpr, PlanState *parent,
 		   MemoryContext sexprCxt, bool allowSRF, bool needDescForSRF)
 {
-	AclResult	aclresult;
 	size_t		numargs = list_length(sexpr->args);
 
-	/* Check permission to call function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(foid));
 	InvokeFunctionExecuteHook(foid);
 
 	/*

@@ -34,9 +34,6 @@ CATALOG(pg_database,1262,DatabaseRelationId) BKI_SHARED_RELATION BKI_ROWTYPE_OID
 	/* database name */
 	NameData	datname;
 
-	/* owner of database */
-	Oid			datdba BKI_DEFAULT(10);
-
 	/* character encoding */
 	int32		encoding;
 

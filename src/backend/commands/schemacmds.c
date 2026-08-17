@@ -34,8 +34,6 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 
-static void AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId);
-
 /*
  * CREATE SCHEMA
  *
@@ -58,7 +56,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	int			save_sec_context;
 	int			save_nestlevel;
 	char	   *nsp = namespace_search_path;
-	AclResult	aclresult;
 	ObjectAddress address;
 	StringInfoData pathbuf;
 
@@ -80,18 +77,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 		 */
 		schemaName = GetUserNameFromId(owner_uid, false);
 	}
-
-	/*
-	 * To create a schema, must have schema-create privilege on the current
-	 * database and must be able to become the target role (this does not
-	 * imply that the target role itself must have create-schema privilege).
-	 * The latter provision guards against "giveaway" attacks.  Note that a
-	 * superuser will always have both of these privileges a fortiori.
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_DATABASE,
-					   get_database_name(MyDatabaseId));
 
 
 	/* Additional check to protect reserved schema names */
@@ -232,165 +217,4 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 }
 
 
-/*
- * Rename schema
- */
-ObjectAddress
-RenameSchema(const char *oldname, const char *newname)
-{
-	Oid			nspOid;
-	HeapTuple	tup;
-	Relation	rel;
-	AclResult	aclresult;
-	ObjectAddress address;
-	Form_pg_namespace nspform;
 
-	rel = table_open(NamespaceRelationId, RowExclusiveLock);
-
-	tup = SearchSysCacheCopy1(NAMESPACENAME, CStringGetDatum(oldname));
-	if (!HeapTupleIsValid(tup))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_SCHEMA),
-				 errmsg("schema \"%s\" does not exist", oldname)));
-
-	nspform = (Form_pg_namespace) GETSTRUCT(tup);
-	nspOid = nspform->oid;
-
-	/* make sure the new name doesn't exist */
-	if (OidIsValid(get_namespace_oid(newname, true)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_SCHEMA),
-				 errmsg("schema \"%s\" already exists", newname)));
-
-	/* must be owner */
-	if (!pg_namespace_ownercheck(nspOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_SCHEMA,
-					   oldname);
-
-	/* must have CREATE privilege on database */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_DATABASE,
-					   get_database_name(MyDatabaseId));
-
-	if (!allowSystemTableMods && IsReservedName(newname))
-		ereport(ERROR,
-				(errcode(ERRCODE_RESERVED_NAME),
-				 errmsg("unacceptable schema name \"%s\"", newname),
-				 errdetail("The prefix \"pg_\" is reserved for system schemas.")));
-
-	/* rename */
-	namestrcpy(&nspform->nspname, newname);
-	CatalogTupleUpdate(rel, &tup->t_self, tup);
-
-	InvokeObjectPostAlterHook(NamespaceRelationId, nspOid, 0);
-
-	ObjectAddressSet(address, NamespaceRelationId, nspOid);
-
-	table_close(rel, NoLock);
-	heap_freetuple(tup);
-
-	return address;
-}
-
-void
-AlterSchemaOwner_oid(Oid oid, Oid newOwnerId)
-{
-	HeapTuple	tup;
-	Relation	rel;
-
-	rel = table_open(NamespaceRelationId, RowExclusiveLock);
-
-	tup = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(oid));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for schema %u", oid);
-
-	AlterSchemaOwner_internal(tup, rel, newOwnerId);
-
-	ReleaseSysCache(tup);
-
-	table_close(rel, RowExclusiveLock);
-}
-
-
-/*
- * Change schema owner
- */
-ObjectAddress
-AlterSchemaOwner(const char *name, Oid newOwnerId)
-{
-	Oid			nspOid;
-	HeapTuple	tup;
-	Relation	rel;
-	ObjectAddress address;
-	Form_pg_namespace nspform;
-
-	rel = table_open(NamespaceRelationId, RowExclusiveLock);
-
-	tup = SearchSysCache1(NAMESPACENAME, CStringGetDatum(name));
-	if (!HeapTupleIsValid(tup))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_SCHEMA),
-				 errmsg("schema \"%s\" does not exist", name)));
-
-	nspform = (Form_pg_namespace) GETSTRUCT(tup);
-	nspOid = nspform->oid;
-
-	AlterSchemaOwner_internal(tup, rel, newOwnerId);
-
-	ObjectAddressSet(address, NamespaceRelationId, nspOid);
-
-	ReleaseSysCache(tup);
-
-	table_close(rel, RowExclusiveLock);
-
-	return address;
-}
-
-static void
-AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
-{
-	Form_pg_namespace nspForm;
-
-	Assert(tup->t_tableOid == NamespaceRelationId);
-	Assert(RelationGetRelid(rel) == NamespaceRelationId);
-
-	nspForm = (Form_pg_namespace) GETSTRUCT(tup);
-
-	/*
-	 * If the new owner is the same as the existing owner, consider the
-	 * command to have succeeded.  This is for dump restoration purposes.
-	 */
-	if (nspForm->nspowner != newOwnerId)
-	{
-		Datum		repl_val[Natts_pg_namespace];
-		bool		repl_null[Natts_pg_namespace];
-		bool		repl_repl[Natts_pg_namespace];
-		HeapTuple	newtuple;
-
-		/* Otherwise, must be owner of the existing object */
-		if (!pg_namespace_ownercheck(nspForm->oid, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_SCHEMA,
-						   NameStr(nspForm->nspname));
-
-
-		memset(repl_null, false, sizeof(repl_null));
-		memset(repl_repl, false, sizeof(repl_repl));
-
-		repl_repl[Anum_pg_namespace_nspowner - 1] = true;
-		repl_val[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(newOwnerId);
-
-		newtuple = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
-
-		CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);
-
-		heap_freetuple(newtuple);
-
-		/* Update owner dependency reference */
-		changeDependencyOnOwner(NamespaceRelationId, nspForm->oid,
-								newOwnerId);
-	}
-
-	InvokeObjectPostAlterHook(NamespaceRelationId,
-							  nspForm->oid, 0);
-}

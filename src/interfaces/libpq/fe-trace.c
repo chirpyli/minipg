@@ -714,7 +714,6 @@ pqTraceOutputNoTypeByteMessage(PGconn *conn, const char *message)
 			pqTraceOutputInt32(conn->Pfdebug, message, &logCursor, false);
 			pqTraceOutputInt32(conn->Pfdebug, message, &logCursor, false);
 			break;
-		case 8:					/* GSSENCRequest or SSLRequest */
 			/* These messages do not reach here. */
 		default:
 			fprintf(conn->Pfdebug, "Unknown message: length is %d", length);

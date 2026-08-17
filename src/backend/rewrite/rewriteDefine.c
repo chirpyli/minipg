@@ -46,8 +46,6 @@
 
 static void checkRuleResultList(List *targetList, TupleDesc resultDesc,
 								bool isSelect, bool requireColumnNameMatch);
-static bool setRuleCheckAsUser_walker(Node *node, Oid *context);
-static void setRuleCheckAsUser_Query(Query *qry, Oid userid);
 
 
 /*
@@ -278,9 +276,6 @@ DefineQueryRewrite(const char *rulename,
 	/*
 	 * Check user has permission to apply rules to this relation.
 	 */
-	if (!pg_class_ownercheck(event_relid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(event_relation->rd_rel->relkind),
-					   RelationGetRelationName(event_relation));
 
 	/*
 	 * No rule actions that modify OLD or NEW
@@ -750,63 +745,6 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 				 errmsg("RETURNING list has too few entries")));
 }
 
-/*
- * setRuleCheckAsUser
- *		Recursively scan a query or expression tree and set the checkAsUser
- *		field to the given userid in all rtable entries.
- *
- * Note: for a view (ON SELECT rule), the checkAsUser field of the OLD
- * RTE entry will be overridden when the view rule is expanded, and the
- * checkAsUser field of the NEW entry is irrelevant because that entry's
- * requiredPerms bits will always be zero.  However, for other types of rules
- * it's important to set these fields to match the rule owner.  So we just set
- * them always.
- */
-void
-setRuleCheckAsUser(Node *node, Oid userid)
-{
-	(void) setRuleCheckAsUser_walker(node, &userid);
-}
-
-static bool
-setRuleCheckAsUser_walker(Node *node, Oid *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Query))
-	{
-		setRuleCheckAsUser_Query((Query *) node, *context);
-		return false;
-	}
-	return expression_tree_walker(node, setRuleCheckAsUser_walker,
-								  (void *) context);
-}
-
-static void
-setRuleCheckAsUser_Query(Query *qry, Oid userid)
-{
-	ListCell   *l;
-
-	/* Set all the RTEs in this query node */
-	foreach(l, qry->rtable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
-
-		if (rte->rtekind == RTE_SUBQUERY)
-		{
-			/* Recurse into subquery in FROM */
-			setRuleCheckAsUser_Query(rte->subquery, userid);
-		}
-		else
-			rte->checkAsUser = userid;
-	}
-
-	/* If there are sublinks, search for them and process their RTEs */
-	if (qry->hasSubLinks)
-		query_tree_walker(qry, setRuleCheckAsUser_walker, (void *) &userid,
-						  QTW_IGNORE_RC_SUBQUERIES);
-}
-
 
 /*
  * Change the firing semantics of an existing rule.
@@ -817,7 +755,6 @@ EnableDisableRule(Relation rel, const char *rulename,
 {
 	Relation	pg_rewrite_desc;
 	Oid			owningRel = RelationGetRelid(rel);
-	Oid			eventRelationOid;
 	HeapTuple	ruletup;
 	Form_pg_rewrite ruleform;
 	bool		changed = false;
@@ -840,11 +777,7 @@ EnableDisableRule(Relation rel, const char *rulename,
 	/*
 	 * Verify that the user has appropriate permissions.
 	 */
-	eventRelationOid = ruleform->ev_class;
-	Assert(eventRelationOid == owningRel);
-	if (!pg_class_ownercheck(eventRelationOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(get_rel_relkind(eventRelationOid)),
-					   get_rel_name(eventRelationOid));
+	Assert(ruleform->ev_class == owningRel);
 
 	/*
 	 * Change ev_enabled if it is different from the desired new state.
@@ -876,130 +809,4 @@ EnableDisableRule(Relation rel, const char *rulename,
 /*
  * Perform permissions and integrity checks before acquiring a relation lock.
  */
-static void
-RangeVarCallbackForRenameRule(const RangeVar *rv, Oid relid, Oid oldrelid,
-							  void *arg)
-{
-	HeapTuple	tuple;
-	Form_pg_class form;
 
-	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tuple))
-		return;					/* concurrently dropped */
-	form = (Form_pg_class) GETSTRUCT(tuple);
-
-	/* only tables and views can have rules */
-	if (form->relkind != RELKIND_RELATION &&
-		form->relkind != RELKIND_VIEW)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a table or view", rv->relname)));
-
-	if (!allowSystemTableMods && IsSystemClass(relid, form))
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied: \"%s\" is a system catalog",
-						rv->relname)));
-
-	/* you must own the table to rename one of its rules */
-	if (!pg_class_ownercheck(relid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(get_rel_relkind(relid)), rv->relname);
-
-	ReleaseSysCache(tuple);
-}
-
-/*
- * Rename an existing rewrite rule.
- */
-ObjectAddress
-RenameRewriteRule(RangeVar *relation, const char *oldName,
-				  const char *newName)
-{
-	Oid			relid;
-	Relation	targetrel;
-	Relation	pg_rewrite_desc;
-	HeapTuple	ruletup;
-	Form_pg_rewrite ruleform;
-	Oid			ruleOid;
-	ObjectAddress address;
-
-	/*
-	 * Look up name, check permissions, and acquire lock (which we will NOT
-	 * release until end of transaction).
-	 */
-	relid = RangeVarGetRelidExtended(relation, AccessExclusiveLock,
-									 0,
-									 RangeVarCallbackForRenameRule,
-									 NULL);
-
-	/* Have lock already, so just need to build relcache entry. */
-	targetrel = relation_open(relid, NoLock);
-
-	/* Prepare to modify pg_rewrite */
-	pg_rewrite_desc = table_open(RewriteRelationId, RowExclusiveLock);
-
-	/* Fetch the rule's entry (it had better exist) */
-	ruletup = SearchSysCacheCopy2(RULERELNAME,
-								  ObjectIdGetDatum(relid),
-								  PointerGetDatum(oldName));
-	if (!HeapTupleIsValid(ruletup))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("rule \"%s\" for relation \"%s\" does not exist",
-						oldName, RelationGetRelationName(targetrel))));
-	ruleform = (Form_pg_rewrite) GETSTRUCT(ruletup);
-	ruleOid = ruleform->oid;
-
-	/* rule with the new name should not already exist */
-	if (IsDefinedRewriteRule(relid, newName))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("rule \"%s\" for relation \"%s\" already exists",
-						newName, RelationGetRelationName(targetrel))));
-
-	/*
-	 * We disallow renaming ON SELECT rules, because they should always be
-	 * named "_RETURN".
-	 */
-	if (ruleform->ev_type == CMD_SELECT + '0')
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("renaming an ON SELECT rule is not allowed")));
-
-	/*
-	 * Conversely, if it's not an ON SELECT rule then it must *not* be named
-	 * _RETURN.
-	 */
-	if (strcmp(newName, ViewSelectRuleName) == 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("non-view rule for \"%s\" must not be named \"%s\"",
-						RelationGetRelationName(targetrel),
-						ViewSelectRuleName)));
-
-	/* OK, do the update */
-	namestrcpy(&(ruleform->rulename), newName);
-
-	CatalogTupleUpdate(pg_rewrite_desc, &ruletup->t_self, ruletup);
-
-	InvokeObjectPostAlterHook(RewriteRelationId, ruleOid, 0);
-
-	heap_freetuple(ruletup);
-	table_close(pg_rewrite_desc, RowExclusiveLock);
-
-	/*
-	 * Invalidate relation's relcache entry so that other backends (and this
-	 * one too!) are sent SI message to make them rebuild relcache entries.
-	 * (Ideally this should happen automatically...)
-	 */
-	CacheInvalidateRelcache(targetrel);
-
-	ObjectAddressSet(address, RewriteRelationId, ruleOid);
-
-	/*
-	 * Close rel, but keep exclusive lock!
-	 */
-	relation_close(targetrel, NoLock);
-
-	return address;
-}

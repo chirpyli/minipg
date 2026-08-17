@@ -3109,10 +3109,6 @@ autovac_report_workitem(AutoVacuumWorkItem *workitem,
 	char		blk[12 + 2];
 	int			len;
 
-	switch (workitem->avw_type)
-	{
-	}
-
 	/*
 	 * Report the qualified name of the relation, and the block number if any
 	 */

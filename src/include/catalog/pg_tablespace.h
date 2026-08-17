@@ -31,9 +31,6 @@ CATALOG(pg_tablespace,1213,TableSpaceRelationId) BKI_SHARED_RELATION
 	Oid			oid;			/* oid */
 	NameData	spcname;		/* tablespace name */
 
-	/* owner of tablespace */
-	Oid			spcowner BKI_DEFAULT(10);
-
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
 	text		spcoptions[1];	/* per-tablespace options */
 #endif

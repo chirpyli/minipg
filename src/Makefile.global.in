@@ -179,11 +179,8 @@ bitcodedir = $(pkglibdir)/bitcode
 #
 # Records the choice of the various --enable-xxx and --with-xxx options.
 
-with_perl	= @with_perl@
-with_python	= @with_python@
 with_tcl	= @with_tcl@
 with_readline	= @with_readline@
-with_selinux	= @with_selinux@
 with_systemd	= @with_systemd@
 with_libxml	= @with_libxml@
 with_libxslt	= @with_libxslt@
@@ -196,13 +193,6 @@ enable_dtrace	= @enable_dtrace@
 enable_coverage	= @enable_coverage@
 enable_tap_tests	= @enable_tap_tests@
 enable_thread_safety	= @enable_thread_safety@
-
-python_includespec	= @python_includespec@
-python_libdir		= @python_libdir@
-python_libspec		= @python_libspec@
-python_additional_libs	= @python_additional_libs@
-python_majorversion	= @python_majorversion@
-python_version		= @python_version@
 
 
 TCLSH			= @TCLSH@
@@ -312,11 +302,6 @@ ifneq (@PERL@,)
 else
     PERL		= $(missing) perl
 endif
-perl_archlibexp		= @perl_archlibexp@
-perl_privlibexp		= @perl_privlibexp@
-perl_includespec	= @perl_includespec@
-perl_embed_ccflags	= @perl_embed_ccflags@
-perl_embed_ldflags	= @perl_embed_ldflags@
 
 # Miscellaneous
 
@@ -325,7 +310,6 @@ LN_S	= @LN_S@
 MSGFMT  = @MSGFMT@
 MSGFMT_FLAGS = @MSGFMT_FLAGS@
 MSGMERGE = @MSGMERGE@
-PYTHON	= @PYTHON@
 TAR	= @TAR@
 XGETTEXT = @XGETTEXT@
 

@@ -66,7 +66,6 @@ RemoveObjects(DropStmt *stmt)
 		ObjectAddress address;
 		Node	   *object = lfirst(cell1);
 		Relation	relation = NULL;
-		Oid			namespaceId;
 
 		/* Get an ObjectAddress for the object. */
 		address = get_object_address(stmt->removeType,
@@ -101,13 +100,6 @@ RemoveObjects(DropStmt *stmt)
 								NameListToString(castNode(ObjectWithArgs, object)->objname)),
 						 errhint("Use DROP AGGREGATE to drop aggregate functions.")));
 		}
-
-		/* Check permissions. */
-		namespaceId = get_object_namespace(&address);
-		if (!OidIsValid(namespaceId) ||
-			!pg_namespace_ownercheck(namespaceId, GetUserId()))
-			check_object_ownership(GetUserId(), stmt->removeType, address,
-								   object, relation);
 
 		/* Release any relcache reference count, but keep lock until commit. */
 		if (relation)

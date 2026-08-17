@@ -314,8 +314,6 @@ static char *passwordFromFile(const char *hostname, const char *port, const char
 							  const char *username, const char *pgpassfile);
 static void pgpassfileWarning(PGconn *conn);
 static void default_threadlock(int acquire);
-static bool sslVerifyProtocolVersion(const char *version);
-static bool sslVerifyProtocolRange(const char *min, const char *max);
 static bool parse_int_param(const char *value, int *result, PGconn *conn,
 							const char *context);
 
@@ -946,10 +944,6 @@ connectOptions2(PGconn *conn)
 		else if (ch->host != NULL && ch->host[0] != '\0')
 		{
 			ch->type = CHT_HOST_NAME;
-#ifdef HAVE_UNIX_SOCKETS
-			if (is_unixsock_path(ch->host))
-				ch->type = CHT_UNIX_SOCKET;
-#endif
 		}
 		else
 		{
@@ -960,14 +954,6 @@ connectOptions2(PGconn *conn)
 			 * This bit selects the default host location.  If you change
 			 * this, see also pg_regress.
 			 */
-#ifdef HAVE_UNIX_SOCKETS
-			if (DEFAULT_PGSOCKET_DIR[0])
-			{
-				ch->host = strdup(DEFAULT_PGSOCKET_DIR);
-				ch->type = CHT_UNIX_SOCKET;
-			}
-			else
-#endif
 			{
 				ch->host = strdup(DefaultHost);
 				ch->type = CHT_HOST_NAME;
@@ -1414,21 +1400,6 @@ getHostaddr(PGconn *conn, char *host_addr, int host_addr_len)
 static void
 emitHostIdentityInfo(PGconn *conn, const char *host_addr)
 {
-#ifdef HAVE_UNIX_SOCKETS
-	if (IS_AF_UNIX(conn->raddr.addr.ss_family))
-	{
-		char		service[NI_MAXHOST];
-
-		pg_getnameinfo_all(&conn->raddr.addr, conn->raddr.salen,
-						   NULL, 0,
-						   service, sizeof(service),
-						   NI_NUMERICSERV);
-		appendPQExpBuffer(&conn->errorMessage,
-						  libpq_gettext("connection to server on socket \"%s\" failed: "),
-						  service);
-	}
-	else
-#endif							/* HAVE_UNIX_SOCKETS */
 	{
 		const char *displayed_host;
 		const char *displayed_port;
@@ -1478,12 +1449,6 @@ connectFailureMessage(PGconn *conn, int errorno)
 					  "%s\n",
 					  SOCK_STRERROR(errorno, sebuf, sizeof(sebuf)));
 
-#ifdef HAVE_UNIX_SOCKETS
-	if (IS_AF_UNIX(conn->raddr.addr.ss_family))
-		appendPQExpBufferStr(&conn->errorMessage,
-							 libpq_gettext("\tIs the server running locally and accepting connections on that socket?\n"));
-	else
-#endif
 		appendPQExpBufferStr(&conn->errorMessage,
 							 libpq_gettext("\tIs the server running on that host and accepting TCP/IP connections?\n"));
 }
@@ -2011,9 +1976,7 @@ PQconnectPoll(PGconn *conn)
 			break;
 
 			/* Special cases: proceed without waiting. */
-		case CONNECTION_SSL_STARTUP:
 		case CONNECTION_NEEDED:
-		case CONNECTION_GSS_STARTUP:
 		case CONNECTION_CHECK_TARGET:
 			break;
 
@@ -2133,39 +2096,9 @@ keep_going:						/* We will come back to here until there is
 				}
 				break;
 
-			case CHT_UNIX_SOCKET:
-#ifdef HAVE_UNIX_SOCKETS
-				conn->addrlist_family = hint.ai_family = AF_UNIX;
-				UNIXSOCK_PATH(portstr, thisport, ch->host);
-				if (strlen(portstr) >= UNIXSOCK_PATH_BUFLEN)
-				{
-					appendPQExpBuffer(&conn->errorMessage,
-									  libpq_gettext("Unix-domain socket path \"%s\" is too long (maximum %d bytes)\n"),
-									  portstr,
-									  (int) (UNIXSOCK_PATH_BUFLEN - 1));
-					goto keep_going;
 				}
 
-				/*
-				 * NULL hostname tells pg_getaddrinfo_all to parse the service
-				 * name as a Unix-domain socket path.
-				 */
-				ret = pg_getaddrinfo_all(NULL, portstr, &hint,
-										 &conn->addrlist);
-				if (ret || !conn->addrlist)
-				{
-					appendPQExpBuffer(&conn->errorMessage,
-									  libpq_gettext("could not translate Unix-domain socket path \"%s\" to address: %s\n"),
-									  portstr, gai_strerror(ret));
-					goto keep_going;
-				}
-#else
-				Assert(false);
-#endif
-				break;
-		}
-
-		/* OK, scan this addrlist for a working server address */
+				/* OK, scan this addrlist for a working server address */
 		conn->addr_cur = conn->addrlist;
 		reset_connection_state_machine = true;
 		conn->try_next_host = false;
@@ -2611,15 +2544,6 @@ keep_going:						/* We will come back to here until there is
 				conn->status = CONNECTION_AWAITING_RESPONSE;
 				return PGRES_POLLING_READING;
 			}
-
-			/*
-			 * This build supports no transport encryption, so these states are
-			 * never entered.
-			 */
-		case CONNECTION_SSL_STARTUP:
-		case CONNECTION_GSS_STARTUP:
-			/* unreachable */
-			goto error_return;
 
 			/*
 			 * Handle authentication exchange: wait for postmaster messages
@@ -6464,72 +6388,6 @@ pgpassfileWarning(PGconn *conn)
 							  conn->pgpassfile);
 	}
 }
-
-/*
- * Check if the SSL protocol value given in input is valid or not.
- * This is used as a sanity check routine for the connection parameters
- * ssl_min_protocol_version and ssl_max_protocol_version.
- */
-static bool
-sslVerifyProtocolVersion(const char *version)
-{
-	/*
-	 * An empty string and a NULL value are considered valid as it is
-	 * equivalent to ignoring the parameter.
-	 */
-	if (!version || strlen(version) == 0)
-		return true;
-
-	if (pg_strcasecmp(version, "TLSv1") == 0 ||
-		pg_strcasecmp(version, "TLSv1.1") == 0 ||
-		pg_strcasecmp(version, "TLSv1.2") == 0 ||
-		pg_strcasecmp(version, "TLSv1.3") == 0)
-		return true;
-
-	/* anything else is wrong */
-	return false;
-}
-
-
-/*
- * Ensure that the SSL protocol range given in input is correct.  The check
- * is performed on the input string to keep it TLS backend agnostic.  Input
- * to this function is expected verified with sslVerifyProtocolVersion().
- */
-static bool
-sslVerifyProtocolRange(const char *min, const char *max)
-{
-	Assert(sslVerifyProtocolVersion(min) &&
-		   sslVerifyProtocolVersion(max));
-
-	/* If at least one of the bounds is not set, the range is valid */
-	if (min == NULL || max == NULL || strlen(min) == 0 || strlen(max) == 0)
-		return true;
-
-	/*
-	 * If the minimum version is the lowest one we accept, then all options
-	 * for the maximum are valid.
-	 */
-	if (pg_strcasecmp(min, "TLSv1") == 0)
-		return true;
-
-	/*
-	 * The minimum bound is valid, and cannot be TLSv1, so using TLSv1 for the
-	 * maximum is incorrect.
-	 */
-	if (pg_strcasecmp(max, "TLSv1") == 0)
-		return false;
-
-	/*
-	 * At this point we know that we have a mix of TLSv1.1 through 1.3
-	 * versions.
-	 */
-	if (pg_strcasecmp(min, max) > 0)
-		return false;
-
-	return true;
-}
-
 
 /*
  * Obtain user's home directory, return in given buffer

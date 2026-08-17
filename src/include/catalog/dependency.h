@@ -222,11 +222,6 @@ extern void recordSharedDependencyOn(ObjectAddress *depender,
 extern void deleteSharedDependencyRecordsFor(Oid classId, Oid objectId,
 											 int32 objectSubId);
 
-extern void recordDependencyOnOwner(Oid classId, Oid objectId, Oid owner);
-
-extern void changeDependencyOnOwner(Oid classId, Oid objectId,
-									Oid newOwnerId);
-
 extern void recordDependencyOnTablespace(Oid classId, Oid objectId,
 										 Oid tablespace);
 
@@ -243,7 +238,5 @@ extern void copyTemplateDependencies(Oid templateDbId, Oid newDbId);
 extern void dropDatabaseDependencies(Oid databaseId);
 
 extern void shdepDropOwned(List *relids, DropBehavior behavior);
-
-extern void shdepReassignOwned(List *relids, Oid newrole);
 
 #endif							/* DEPENDENCY_H */

@@ -46,9 +46,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	/* OID of entry in pg_type for underlying composite type, if any */
 	Oid			reloftype BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_type);
 
-	/* class owner */
-	Oid			relowner BKI_DEFAULT(10);
-
 	/* access method; 0 if not a table / index */
 	Oid			relam BKI_DEFAULT(heap) BKI_LOOKUP_OPT(pg_am);
 

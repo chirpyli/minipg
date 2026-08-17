@@ -687,7 +687,7 @@ fmgr_security_definer(PG_FUNCTION_ARGS)
 		procedureStruct = (Form_pg_proc) GETSTRUCT(tuple);
 
 		if (procedureStruct->prosecdef)
-			fcache->userid = procedureStruct->proowner;
+			fcache->userid = GetUserId();
 
 		datum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proconfig,
 								&isnull);
@@ -2037,7 +2037,6 @@ CheckFunctionValidatorAccess(Oid validatorOid, Oid functionOid)
 	HeapTuple	langTup;
 	Form_pg_proc procStruct;
 	Form_pg_language langStruct;
-	AclResult	aclresult;
 
 	/*
 	 * Get the function's pg_proc entry.  Throw a user-facing error for bad
@@ -2065,21 +2064,6 @@ CheckFunctionValidatorAccess(Oid validatorOid, Oid functionOid)
 				 errmsg("language validation function %u called for language %u instead of %u",
 						validatorOid, procStruct->prolang,
 						langStruct->lanvalidator)));
-
-	/* first validate that we have permissions to use the language */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_LANGUAGE,
-					   NameStr(langStruct->lanname));
-
-	/*
-	 * Check whether we are allowed to execute the function itself. If we can
-	 * execute it, there should be no possible side-effect of
-	 * compiling/validation that execution can't have.
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, NameStr(procStruct->proname));
 
 	ReleaseSysCache(procTup);
 	ReleaseSysCache(langTup);

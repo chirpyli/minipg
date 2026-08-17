@@ -70,7 +70,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 	NameData	stxname;
 	Oid			statoid;
 	Oid			namespaceId;
-	Oid			stxowner = GetUserId();
 	HeapTuple	htup;
 	Datum		values[Natts_pg_statistic_ext];
 	bool		nulls[Natts_pg_statistic_ext];
@@ -142,10 +141,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 		 * different relation than a previous lookup by the caller, so we must
 		 * perform this check even when check_rights == false.
 		 */
-		if (!pg_class_ownercheck(RelationGetRelid(rel), stxowner))
-			aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(rel->rd_rel->relkind),
-						   RelationGetRelationName(rel));
-
 		/* Creating statistics on system catalogs is not allowed */
 		if (!allowSystemTableMods && IsSystemRelation(rel))
 			ereport(ERROR,
@@ -176,20 +171,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 											  namespaceId);
 	}
 	namestrcpy(&stxname, namestr);
-
-	/*
-	 * Check we have creation rights in target namespace.  Skip check if
-	 * caller doesn't want it.
-	 */
-	if (check_rights)
-	{
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_SCHEMA,
-						   get_namespace_name(namespaceId));
-	}
 
 	/*
 	 * Deal with the possibility that the statistics object already exists.
@@ -517,7 +498,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 	values[Anum_pg_statistic_ext_stxname - 1] = NameGetDatum(&stxname);
 	values[Anum_pg_statistic_ext_stxnamespace - 1] = ObjectIdGetDatum(namespaceId);
 	values[Anum_pg_statistic_ext_stxstattarget - 1] = Int32GetDatum(-1);
-	values[Anum_pg_statistic_ext_stxowner - 1] = ObjectIdGetDatum(stxowner);
 	values[Anum_pg_statistic_ext_stxkeys - 1] = PointerGetDatum(stxkeys);
 	values[Anum_pg_statistic_ext_stxkind - 1] = PointerGetDatum(stxkind);
 
@@ -614,8 +594,6 @@ CreateStatistics(CreateStatsStmt *stmt, bool check_rights)
 	ObjectAddressSet(parentobject, NamespaceRelationId, namespaceId);
 	recordDependencyOn(&myself, &parentobject, DEPENDENCY_NORMAL);
 
-	recordDependencyOnOwner(StatisticExtRelationId, statoid, stxowner);
-
 	/*
 	 * XXX probably there should be a recordDependencyOnCurrentExtension call
 	 * here too, but we'd have to add support for ALTER EXTENSION ADD/DROP
@@ -694,11 +672,6 @@ AlterStatistics(AlterStatsStmt *stmt)
 	oldtup = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(stxoid));
 	if (!HeapTupleIsValid(oldtup))
 		elog(ERROR, "cache lookup failed for extended statistics object %u", stxoid);
-
-	/* Must be owner of the existing statistics object */
-	if (!pg_statistics_object_ownercheck(stxoid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_STATISTIC_EXT,
-					   NameListToString(stmt->defnames));
 
 	/* Build new tuple. */
 	memset(repl_val, 0, sizeof(repl_val));

@@ -166,14 +166,11 @@ transformFromClause(ParseState *pstate, List *frmList)
  *	  to check for namespace conflict; we assume that the namespace was
  *	  initially empty in these cases.)
  *
- *	  Finally, we mark the relation as requiring the permissions specified
- *	  by requiredPerms.
- *
  *	  Returns the rangetable index of the target relation.
  */
 int
 setTargetTable(ParseState *pstate, RangeVar *relation,
-			   bool inh, bool alsoSource, AclMode requiredPerms)
+			   bool inh, bool alsoSource)
 {
 	ParseNamespaceItem *nsitem;
 
@@ -211,17 +208,6 @@ setTargetTable(ParseState *pstate, RangeVar *relation,
 
 	/* remember the RTE/nsitem as being the query target */
 	pstate->p_target_nsitem = nsitem;
-
-	/*
-	 * Override addRangeTableEntry's default ACL_SELECT permissions check, and
-	 * instead mark target table as requiring exactly the specified
-	 * permissions.
-	 *
-	 * If we find an explicit reference to the rel later during parse
-	 * analysis, we will add the ACL_SELECT bit back again; see
-	 * markVarForSelectPriv and its callers.
-	 */
-	nsitem->p_rte->requiredPerms = requiredPerms;
 
 	/*
 	 * If UPDATE/DELETE, add table to joinlist and namespace.
@@ -2991,7 +2977,6 @@ transformOnConflictArbiter(ParseState *pstate,
 													   false, constraint);
 
 			/* Make sure the rel as a whole is marked for SELECT access */
-			rte->requiredPerms |= ACL_SELECT;
 			/* Mark the constrained columns as requiring SELECT access */
 			rte->selectedCols = bms_add_members(rte->selectedCols, conattnos);
 		}

@@ -523,7 +523,6 @@ CopyFrom(CopyFromState cstate)
 {
 	ResultRelInfo *resultRelInfo;
 	ResultRelInfo *target_resultRelInfo;
-	ResultRelInfo *prevResultRelInfo = NULL;
 	EState	   *estate = CreateExecutorState(); /* for ExecConstraints() */
 	ModifyTableState *mtstate;
 	ExprContext *econtext;
@@ -870,7 +869,9 @@ CopyFrom(CopyFromState cstate)
 				 * the tuple.
 				 */
 			if (resultRelInfo->ri_RelationDesc->rd_att->constr)
+			{
 				ExecConstraints(resultRelInfo, myslot, estate);
+			}
 
 				/*
 				 * Also check the tuple against the partition constraint, if

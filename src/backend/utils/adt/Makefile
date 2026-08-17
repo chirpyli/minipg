@@ -39,7 +39,6 @@ OBJS = \
 	formatting.o \
 	genfile.o \
 	int.o \
-	ipaddr.o \
 	int8.o \
 	json_escape.o \
 	like.o \

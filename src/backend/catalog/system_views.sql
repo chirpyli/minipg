@@ -76,7 +76,6 @@ CREATE VIEW pg_views AS
     SELECT
         N.nspname AS schemaname,
         C.relname AS viewname,
-        pg_get_userbyid(C.relowner) AS viewowner,
         pg_get_viewdef(C.oid) AS definition
     FROM pg_class C LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
     WHERE C.relkind = 'v';
@@ -85,7 +84,6 @@ CREATE VIEW pg_tables AS
     SELECT
         N.nspname AS schemaname,
         C.relname AS tablename,
-        pg_get_userbyid(C.relowner) AS tableowner,
         T.spcname AS tablespace,
         C.relhasindex AS hasindexes,
         C.relhasrules AS hasrules,
@@ -176,7 +174,6 @@ CREATE VIEW pg_stats_ext WITH (security_barrier) AS
            c.relname AS tablename,
            sn.nspname AS statistics_schemaname,
            s.stxname AS statistics_name,
-           pg_get_userbyid(s.stxowner) AS statistics_owner,
            ( SELECT array_agg(a.attname ORDER BY a.attnum)
              FROM unnest(s.stxkeys) k
                   JOIN pg_attribute a
@@ -208,7 +205,6 @@ CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
            c.relname AS tablename,
            sn.nspname AS statistics_schemaname,
            s.stxname AS statistics_name,
-           pg_get_userbyid(s.stxowner) AS statistics_owner,
            stat.expr,
            (stat.a).stanullfrac AS null_frac,
            (stat.a).stawidth AS avg_width,

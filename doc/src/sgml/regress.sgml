@@ -257,7 +257,7 @@ make check-world -j8 >/dev/null
    <varname>PG_TEST_EXTRA</varname> to a whitespace-separated list, for
    example:
 <programlisting>
-make check-world PG_TEST_EXTRA='kerberos ldap ssl'
+make check-world PG_TEST_EXTRA='kerberos ldap'
 </programlisting>
    The following values are currently supported:
    <variablelist>
@@ -278,15 +278,6 @@ make check-world PG_TEST_EXTRA='kerberos ldap ssl'
        Runs the test suite under <filename>src/test/ldap</filename>.  This
        requires an <productname>OpenLDAP</productname> installation and opens
        TCP/IP listen sockets.
-      </para>
-     </listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term><literal>ssl</literal></term>
-     <listitem>
-      <para>
-       Runs the test suite under <filename>src/test/ssl</filename>.  This opens TCP/IP listen sockets.
       </para>
      </listitem>
     </varlistentry>

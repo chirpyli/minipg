@@ -347,18 +347,6 @@ pg_fe_sendauth(AuthRequest areq, int payloadlen, PGconn *conn)
 								 libpq_gettext("Kerberos 5 authentication not supported\n"));
 			return STATUS_ERROR;
 
-		case AUTH_REQ_GSS:
-		case AUTH_REQ_GSS_CONT:
-			appendPQExpBufferStr(&conn->errorMessage,
-								 libpq_gettext("GSSAPI authentication not supported\n"));
-			return STATUS_ERROR;
-
-		case AUTH_REQ_SSPI:
-			appendPQExpBufferStr(&conn->errorMessage,
-								 libpq_gettext("SSPI authentication not supported\n"));
-			return STATUS_ERROR;
-
-
 		case AUTH_REQ_CRYPT:
 			appendPQExpBufferStr(&conn->errorMessage,
 								 libpq_gettext("Crypt authentication not supported\n"));

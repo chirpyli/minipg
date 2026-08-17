@@ -99,12 +99,6 @@
 #define PG_TCP_KEEPALIVE_IDLE_STR "TCP_KEEPALIVE"
 #endif
 
-/*
- * Configuration options
- */
-int			Unix_socket_permissions;
-char	   *Unix_socket_group;
-
 /* Where the Unix socket files are (list of palloc'd strings) */
 static List *sock_paths = NIL;
 
@@ -145,11 +139,6 @@ static int	socket_putmessage(char msgtype, const char *s, size_t len);
 static void socket_putmessage_noblock(char msgtype, const char *s, size_t len);
 static int	internal_putbytes(const char *s, size_t len);
 static int	internal_flush(void);
-
-#ifdef HAVE_UNIX_SOCKETS
-static int	Lock_AF_UNIX(const char *unixSocketDir, const char *unixSocketPath);
-static int	Setup_AF_UNIX(const char *sock_path);
-#endif							/* HAVE_UNIX_SOCKETS */
 
 static const PQcommMethods PqCommSocketMethods = {
 	socket_comm_reset,
@@ -260,20 +249,10 @@ socket_close(int code, Datum arg)
 	}
 }
 
-
-
-/*
- * Streams -- wrapper around Unix socket system calls
- *
- *
- *		Stream functions are used for vanilla TCP connection protocol.
- */
-
-
 /*
  * StreamServerPort -- open a "listening" port to accept connections.
  *
- * family should be AF_UNIX or AF_UNSPEC; portNumber is the port number.
+ * family should be AF_UNIX or AF_INET; portNumber is the port number.
  * For AF_UNIX ports, hostName should be NULL and unixSocketDir must be
  * specified.  For TCP ports, hostName is either NULL for all interfaces or
  * the interface to listen on, and unixSocketDir is ignored (can be NULL).
@@ -305,9 +284,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 	int			listen_index = 0;
 	int			added = 0;
 
-#ifdef HAVE_UNIX_SOCKETS
-	char		unixSocketPath[MAXPGPATH];
-#endif
 	int			one = 1;
 
 	/* Initialize hint structure */
@@ -316,28 +292,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 	hint.ai_flags = AI_PASSIVE;
 	hint.ai_socktype = SOCK_STREAM;
 
-#ifdef HAVE_UNIX_SOCKETS
-	if (family == AF_UNIX)
-	{
-		/*
-		 * Create unixSocketPath from portNumber and unixSocketDir and lock
-		 * that file path
-		 */
-		UNIXSOCK_PATH(unixSocketPath, portNumber, unixSocketDir);
-		if (strlen(unixSocketPath) >= UNIXSOCK_PATH_BUFLEN)
-		{
-			ereport(LOG,
-					(errmsg("Unix-domain socket path \"%s\" is too long (maximum %d bytes)",
-							unixSocketPath,
-							(int) (UNIXSOCK_PATH_BUFLEN - 1))));
-			return STATUS_ERROR;
-		}
-		if (Lock_AF_UNIX(unixSocketDir, unixSocketPath) != STATUS_OK)
-			return STATUS_ERROR;
-		service = unixSocketPath;
-	}
-	else
-#endif							/* HAVE_UNIX_SOCKETS */
 	{
 		snprintf(portNumberStr, sizeof(portNumberStr), "%d", portNumber);
 		service = portNumberStr;
@@ -390,17 +344,7 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 			case AF_INET:
 				familyDesc = _("IPv4");
 				break;
-#ifdef HAVE_IPV6
-			case AF_INET6:
-				familyDesc = _("IPv6");
-				break;
-#endif
-#ifdef HAVE_UNIX_SOCKETS
-			case AF_UNIX:
-				familyDesc = _("Unix");
-				break;
-#endif
-			default:
+				default:
 				snprintf(familyDescBuf, sizeof(familyDescBuf),
 						 _("unrecognized address family %d"),
 						 addr->ai_family);
@@ -409,11 +353,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 		}
 
 		/* set up text form of address for log messages */
-#ifdef HAVE_UNIX_SOCKETS
-		if (addr->ai_family == AF_UNIX)
-			addrDesc = unixSocketPath;
-		else
-#endif
 		{
 			pg_getnameinfo_all((const struct sockaddr_storage *) addr->ai_addr,
 							   addr->ai_addrlen,
@@ -454,24 +393,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 			}
 		}
 
-#ifdef IPV6_V6ONLY
-		if (addr->ai_family == AF_INET6)
-		{
-			if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY,
-						   (char *) &one, sizeof(one)) == -1)
-			{
-				ereport(LOG,
-						(errcode_for_socket_access(),
-				/* translator: third %s is IPv4, IPv6, or Unix */
-						 errmsg("%s(%s) failed for %s address \"%s\": %m",
-								"setsockopt", "IPV6_V6ONLY",
-								familyDesc, addrDesc)));
-				closesocket(fd);
-				continue;
-			}
-		}
-#endif
-
 		/*
 		 * Note: This might fail on some OS's, like Linux older than
 		 * 2.4.21-pre3, that don't have the IPV6_V6ONLY socket option, and map
@@ -499,17 +420,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 			continue;
 		}
 
-#ifdef HAVE_UNIX_SOCKETS
-		if (addr->ai_family == AF_UNIX)
-		{
-			if (Setup_AF_UNIX(service) != STATUS_OK)
-			{
-				closesocket(fd);
-				break;
-			}
-		}
-#endif
-
 		/*
 		 * Select appropriate accept-queue length limit.  PG_SOMAXCONN is only
 		 * intended to provide a clamp on the request on platforms where an
@@ -531,17 +441,10 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 			continue;
 		}
 
-#ifdef HAVE_UNIX_SOCKETS
-		if (addr->ai_family == AF_UNIX)
-			ereport(LOG,
-					(errmsg("listening on Unix socket \"%s\"",
-							addrDesc)));
-		else
-#endif
-			ereport(LOG,
-			/* translator: first %s is IPv4 or IPv6 */
-					(errmsg("listening on %s address \"%s\", port %d",
-							familyDesc, addrDesc, (int) portNumber)));
+		ereport(LOG,
+		/* translator: first %s is IPv4 or IPv6 */
+				(errmsg("listening on %s address \"%s\", port %d",
+						familyDesc, addrDesc, (int) portNumber)));
 
 		ListenSocket[listen_index] = fd;
 		added++;
@@ -554,107 +457,6 @@ StreamServerPort(int family, const char *hostName, unsigned short portNumber,
 
 	return STATUS_OK;
 }
-
-
-#ifdef HAVE_UNIX_SOCKETS
-
-/*
- * Lock_AF_UNIX -- configure unix socket file path
- */
-static int
-Lock_AF_UNIX(const char *unixSocketDir, const char *unixSocketPath)
-{
-	/* no lock file for abstract sockets */
-	if (unixSocketPath[0] == '@')
-		return STATUS_OK;
-
-	/*
-	 * Grab an interlock file associated with the socket file.
-	 *
-	 * Note: there are two reasons for using a socket lock file, rather than
-	 * trying to interlock directly on the socket itself.  First, it's a lot
-	 * more portable, and second, it lets us remove any pre-existing socket
-	 * file without race conditions.
-	 */
-	CreateSocketLockFile(unixSocketPath, true, unixSocketDir);
-
-	/*
-	 * Once we have the interlock, we can safely delete any pre-existing
-	 * socket file to avoid failure at bind() time.
-	 */
-	(void) unlink(unixSocketPath);
-
-	/*
-	 * Remember socket file pathnames for later maintenance.
-	 */
-	sock_paths = lappend(sock_paths, pstrdup(unixSocketPath));
-
-	return STATUS_OK;
-}
-
-
-/*
- * Setup_AF_UNIX -- configure unix socket permissions
- */
-static int
-Setup_AF_UNIX(const char *sock_path)
-{
-	/* no file system permissions for abstract sockets */
-	if (sock_path[0] == '@')
-		return STATUS_OK;
-
-	/*
-	 * Fix socket ownership/permission if requested.  Note we must do this
-	 * before we listen() to avoid a window where unwanted connections could
-	 * get accepted.
-	 */
-	Assert(Unix_socket_group);
-	if (Unix_socket_group[0] != '\0')
-	{
-		char	   *endptr;
-		unsigned long val;
-		gid_t		gid;
-
-		val = strtoul(Unix_socket_group, &endptr, 10);
-		if (*endptr == '\0')
-		{						/* numeric group id */
-			gid = val;
-		}
-		else
-		{						/* convert group name to id */
-			struct group *gr;
-
-			gr = getgrnam(Unix_socket_group);
-			if (!gr)
-			{
-				ereport(LOG,
-						(errmsg("group \"%s\" does not exist",
-								Unix_socket_group)));
-				return STATUS_ERROR;
-			}
-			gid = gr->gr_gid;
-		}
-		if (chown(sock_path, -1, gid) == -1)
-		{
-			ereport(LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not set group of file \"%s\": %m",
-							sock_path)));
-			return STATUS_ERROR;
-		}
-	}
-
-	if (chmod(sock_path, Unix_socket_permissions) == -1)
-	{
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not set permissions of file \"%s\": %m",
-						sock_path)));
-		return STATUS_ERROR;
-	}
-	return STATUS_OK;
-}
-#endif							/* HAVE_UNIX_SOCKETS */
 
 
 /*

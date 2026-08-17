@@ -102,10 +102,6 @@ static void transformTableConstraint(CreateStmtContext *cxt,
 									 Constraint *constraint);
 static void transformOfType(CreateStmtContext *cxt,
 							TypeName *ofTypename);
-static CreateStatsStmt *generateClonedExtStatsStmt(RangeVar *heapRel,
-												   Oid heapRelid,
-												   Oid source_statsid,
-												   const AttrMap *attmap);
 static List *get_collation(Oid collation, Oid actual_datatype);
 static List *get_opclass(Oid opclass, Oid actual_datatype);
 static void transformIndexConstraints(CreateStmtContext *cxt);
@@ -868,137 +864,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	return index;
 }
 
-/*
- * Generate a CreateStatsStmt node using information from an already existing
- * extended statistic "source_statsid", for the rel identified by heapRel and
- * heapRelid.
- *
- * stxkeys in the source statistic holds attribute numbers from the parent
- * relation.  Those attnums, along with the attribute numbers referenced by
- * Vars inside the expression tree, are remapped to the new relation's
- * numbering according to attmap.
- */
-static CreateStatsStmt *
-generateClonedExtStatsStmt(RangeVar *heapRel, Oid heapRelid,
-						   Oid source_statsid, const AttrMap *attmap)
-{
-	HeapTuple	ht_stats;
-	Form_pg_statistic_ext statsrec;
-	CreateStatsStmt *stats;
-	List	   *stat_types = NIL;
-	List	   *def_names = NIL;
-	bool		isnull;
-	Datum		datum;
-	ArrayType  *arr;
-	char	   *enabled;
-	int			i;
-
-	Assert(OidIsValid(heapRelid));
-	Assert(heapRel != NULL);
-
-	/*
-	 * Fetch pg_statistic_ext tuple of source statistics object.
-	 */
-	ht_stats = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(source_statsid));
-	if (!HeapTupleIsValid(ht_stats))
-		elog(ERROR, "cache lookup failed for statistics object %u", source_statsid);
-	statsrec = (Form_pg_statistic_ext) GETSTRUCT(ht_stats);
-
-	/* Determine which statistics types exist */
-	datum = SysCacheGetAttr(STATEXTOID, ht_stats,
-							Anum_pg_statistic_ext_stxkind, &isnull);
-	Assert(!isnull);
-	arr = DatumGetArrayTypeP(datum);
-	if (ARR_NDIM(arr) != 1 ||
-		ARR_HASNULL(arr) ||
-		ARR_ELEMTYPE(arr) != CHAROID)
-		elog(ERROR, "stxkind is not a 1-D char array");
-	enabled = (char *) ARR_DATA_PTR(arr);
-	for (i = 0; i < ARR_DIMS(arr)[0]; i++)
-	{
-		if (enabled[i] == STATS_EXT_NDISTINCT)
-			stat_types = lappend(stat_types, makeString("ndistinct"));
-		else if (enabled[i] == STATS_EXT_DEPENDENCIES)
-			stat_types = lappend(stat_types, makeString("dependencies"));
-		else if (enabled[i] == STATS_EXT_MCV)
-			stat_types = lappend(stat_types, makeString("mcv"));
-		else if (enabled[i] == STATS_EXT_EXPRESSIONS)
-			/* expression stats are not exposed to users */
-			continue;
-		else
-			elog(ERROR, "unrecognized statistics kind %c", enabled[i]);
-	}
-
-	/* Determine which columns the statistics are on */
-	for (i = 0; i < statsrec->stxkeys.dim1; i++)
-	{
-		StatsElem  *selem = makeNode(StatsElem);
-		AttrNumber	attnum = statsrec->stxkeys.values[i];
-
-		selem->name =
-			get_attname(heapRelid, attmap->attnums[attnum - 1], false);
-		selem->expr = NULL;
-
-		def_names = lappend(def_names, selem);
-	}
-
-	/*
-	 * Now handle expressions, if there are any. The order (with respect to
-	 * regular attributes) does not really matter for extended stats, so we
-	 * simply append them after simple column references.
-	 *
-	 * XXX Some places during build/estimation treat expressions as if they
-	 * are before attributes, but for the CREATE command that's entirely
-	 * irrelevant.
-	 */
-	datum = SysCacheGetAttr(STATEXTOID, ht_stats,
-							Anum_pg_statistic_ext_stxexprs, &isnull);
-
-	if (!isnull)
-	{
-		ListCell   *lc;
-		List	   *exprs = NIL;
-		char	   *exprsString;
-
-		exprsString = TextDatumGetCString(datum);
-		exprs = (List *) stringToNode(exprsString);
-
-		foreach(lc, exprs)
-		{
-			Node	   *expr = (Node *) lfirst(lc);
-			StatsElem  *selem = makeNode(StatsElem);
-			bool		found_whole_row;
-
-			/* Adjust Vars to match new table's column numbering */
-			expr = map_variable_attnos(expr,
-									   1, 0,
-									   attmap,
-									   InvalidOid,
-									   &found_whole_row);
-
-			selem->name = NULL;
-			selem->expr = expr;
-
-			def_names = lappend(def_names, selem);
-		}
-
-		pfree(exprsString);
-	}
-
-	/* finally, build the output node */
-	stats = makeNode(CreateStatsStmt);
-	stats->defnames = NULL;
-	stats->stat_types = stat_types;
-	stats->exprs = def_names;
-	stats->relations = list_make1(heapRel);
-	stats->transformed = true;	/* don't need transformStatsStmt again */
-	stats->if_not_exists = false;
-
-	/* Clean up */
-	ReleaseSysCache(ht_stats);
-
-	return stats;
-}
 
 /*
  * get_collation		- fetch qualified name of a collation
@@ -1862,8 +1727,6 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 											  makeAlias("new", NIL),
 											  false, false);
 	/* Must override addRangeTableEntry's default access-check flags */
-	oldnsitem->p_rte->requiredPerms = 0;
-	newnsitem->p_rte->requiredPerms = 0;
 
 	/*
 	 * They must be in the namespace too for lookup purposes, but only add the
@@ -1961,8 +1824,6 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 													  AccessShareLock,
 													  makeAlias("new", NIL),
 													  false, false);
-			oldnsitem->p_rte->requiredPerms = 0;
-			newnsitem->p_rte->requiredPerms = 0;
 			addNSItemToQuery(sub_pstate, oldnsitem, false, true, false);
 			addNSItemToQuery(sub_pstate, newnsitem, false, true, false);
 

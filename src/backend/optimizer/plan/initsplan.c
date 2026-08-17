@@ -54,9 +54,6 @@ static List *deconstruct_recurse(PlannerInfo *root, Node *jtnode,
 								 bool below_outer_join,
 								 Relids *qualscope, Relids *inner_join_rels,
 								 List **postponed_qual_list);
-static void process_security_barrier_quals(PlannerInfo *root,
-										   int rti, Relids qualscope,
-										   bool below_outer_join);
 static SpecialJoinInfo *make_outerjoininfo(PlannerInfo *root,
 										   Relids left_rels, Relids right_rels,
 										   Relids inner_join_rels,
@@ -750,12 +747,6 @@ deconstruct_recurse(PlannerInfo *root, Node *jtnode, bool below_outer_join,
 
 		/* qualscope is just the one RTE */
 		*qualscope = bms_make_singleton(varno);
-		/* Deal with any securityQuals attached to the RTE */
-		if (root->qual_security_level > 0)
-			process_security_barrier_quals(root,
-										   varno,
-										   *qualscope,
-										   below_outer_join);
 		/* A single baserel does not create an inner join */
 		*inner_join_rels = NULL;
 		joinlist = list_make1(jtnode);
@@ -1067,65 +1058,6 @@ deconstruct_recurse(PlannerInfo *root, Node *jtnode, bool below_outer_join,
 		joinlist = NIL;			/* keep compiler quiet */
 	}
 	return joinlist;
-}
-
-/*
- * process_security_barrier_quals
- *	  Transfer security-barrier quals into relation's baserestrictinfo list.
- *
- * The rewriter put any relevant security-barrier conditions into the RTE's
- * securityQuals field, but it's now time to copy them into the rel's
- * baserestrictinfo.
- *
- * In inheritance cases, we only consider quals attached to the parent rel
- * here; they will be valid for all children too, so it's okay to consider
- * them for purposes like equivalence class creation.  Quals attached to
- * individual child rels will be dealt with during path creation.
- */
-static void
-process_security_barrier_quals(PlannerInfo *root,
-							   int rti, Relids qualscope,
-							   bool below_outer_join)
-{
-	RangeTblEntry *rte = root->simple_rte_array[rti];
-	Index		security_level = 0;
-	ListCell   *lc;
-
-	/*
-	 * Each element of the securityQuals list has been preprocessed into an
-	 * implicitly-ANDed list of clauses.  All the clauses in a given sublist
-	 * should get the same security level, but successive sublists get higher
-	 * levels.
-	 */
-	foreach(lc, rte->securityQuals)
-	{
-		List	   *qualset = (List *) lfirst(lc);
-		ListCell   *lc2;
-
-		foreach(lc2, qualset)
-		{
-			Node	   *qual = (Node *) lfirst(lc2);
-
-			/*
-			 * We cheat to the extent of passing ojscope = qualscope rather
-			 * than its more logical value of NULL.  The only effect this has
-			 * is to force a Var-free qual to be evaluated at the rel rather
-			 * than being pushed up to top of tree, which we don't want.
-			 */
-			distribute_qual_to_rels(root, qual,
-									below_outer_join,
-									JOIN_INNER,
-									security_level,
-									qualscope,
-									qualscope,
-									NULL,
-									NULL);
-		}
-		security_level++;
-	}
-
-	/* Assert that qual_security_level is higher than anything we just used */
-	Assert(security_level <= root->qual_security_level);
 }
 
 /*

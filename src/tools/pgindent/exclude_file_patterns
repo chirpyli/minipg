@@ -35,9 +35,6 @@ src/interfaces/ecpg/test/.*/
 # (Some versions of dtrace build probes.h files that confuse pgindent, too.)
 src/backend/utils/probes\.h$
 src/include/pg_config\.h$
-src/pl/plperl/ppport\.h$
-src/pl/plperl/SPI\.c$
-src/pl/plperl/Util\.c$
 #
 # Exclude any temporary installations that may be in the tree.
 /tmp_check/

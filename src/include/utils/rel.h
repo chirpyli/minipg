@@ -58,6 +58,7 @@ typedef struct RelationData
 	bool		rd_islocaltemp; /* rel is a temp rel of this session */
 	bool		rd_isnailed;	/* rel is nailed in cache */
 	bool		rd_isvalid;		/* relcache entry is valid */
+	bool		rd_fakeentry;	/* formrdesc-created entry, real data not loaded yet */
 	bool		rd_indexvalid;	/* is rd_indexlist valid? (also rd_pkindex) */
 	bool		rd_statvalid;	/* is rd_statlist valid? */
 

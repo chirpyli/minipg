@@ -2358,9 +2358,6 @@ range_table_entry_walker(RangeTblEntry *rte,
 			break;
 	}
 
-	if (walker(rte->securityQuals, context))
-		return true;
-
 	if (flags & QTW_EXAMINE_RTES_AFTER)
 		if (walker(rte, context))
 			return true;
@@ -3187,7 +3184,6 @@ range_table_mutator(List *rtable,
 			/* nothing to do */
 			break;
 		}
-		MUTATE(newrte->securityQuals, rte->securityQuals, List *);
 		newrt = lappend(newrt, newrte);
 	}
 	return newrt;
@@ -3400,7 +3396,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->returningList, context))
 					return true;
-					return true;
 			}
 			break;
 		case T_SelectStmt:
@@ -3430,7 +3425,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(stmt->limitCount, context))
 					return true;
 				if (walker(stmt->lockingClause, context))
-					return true;
 					return true;
 			}
 			break;

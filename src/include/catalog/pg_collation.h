@@ -33,9 +33,6 @@ CATALOG(pg_collation,3456,CollationRelationId)
 
 	/* OID of namespace containing this collation */
 	Oid			collnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
-
-	/* owner of collation */
-	Oid			collowner BKI_DEFAULT(10);
 	char		collprovider;	/* see constants below */
 	bool		collisdeterministic BKI_DEFAULT(t);
 	int32		collencoding;	/* encoding for this collation; -1 = "all" */
@@ -71,7 +68,6 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_collation_oid_index, 3085, on pg_collation using bt
 
 
 extern Oid	CollationCreate(const char *collname, Oid collnamespace,
-							Oid collowner,
 							char collprovider,
 							bool collisdeterministic,
 							int32 collencoding,

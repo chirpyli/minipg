@@ -37,15 +37,10 @@
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
-#include "commands/schemacmds.h"
 #include "commands/tablecmds.h"
-#include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "commands/typecmds.h"
-#include "commands/user.h"
 #include "miscadmin.h"
 #include "parser/parse_func.h"
-#include "rewrite/rewriteDefine.h"
 #include "storage/lmgr.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
@@ -61,26 +56,6 @@ static Oid	AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid);
  * present in the given namespace.
  */
 static void
-report_name_conflict(Oid classId, const char *name)
-{
-	char	   *msgfmt;
-
-	switch (classId)
-	{
-		case LanguageRelationId:
-			msgfmt = gettext_noop("language \"%s\" already exists");
-			break;
-		default:
-			elog(ERROR, "unsupported object class %u", classId);
-			break;
-	}
-
-	ereport(ERROR,
-			(errcode(ERRCODE_DUPLICATE_OBJECT),
-			 errmsg(msgfmt, name)));
-}
-
-static void
 report_namespace_conflict(Oid classId, const char *name, Oid nspOid)
 {
 	char	   *msgfmt;
@@ -90,13 +65,11 @@ report_namespace_conflict(Oid classId, const char *name, Oid nspOid)
 	switch (classId)
 	{
 		case ConversionRelationId:
-			Assert(OidIsValid(nspOid));
 			msgfmt = gettext_noop("conversion \"%s\" already exists in schema \"%s\"");
 			break;
 		case StatisticExtRelationId:
-			Assert(OidIsValid(nspOid));
-		msgfmt = gettext_noop("statistics object \"%s\" already exists in schema \"%s\"");
-		break;
+			msgfmt = gettext_noop("statistics object \"%s\" already exists in schema \"%s\"");
+			break;
 		default:
 			elog(ERROR, "unsupported object class %u", classId);
 			break;
@@ -105,218 +78,6 @@ report_namespace_conflict(Oid classId, const char *name, Oid nspOid)
 	ereport(ERROR,
 			(errcode(ERRCODE_DUPLICATE_OBJECT),
 			 errmsg(msgfmt, name, get_namespace_name(nspOid))));
-}
-
-/*
- * AlterObjectRename_internal
- *
- * Generic function to rename the given object, for simple cases (won't
- * work for tables, nor other cases where we need to do more than change
- * the name column of a single catalog entry).
- *
- * rel: catalog relation containing object (RowExclusiveLock'd by caller)
- * objectId: OID of object to be renamed
- * new_name: CString representation of new name
- */
-static void
-AlterObjectRename_internal(Relation rel, Oid objectId, const char *new_name)
-{
-	Oid			classId = RelationGetRelid(rel);
-	int			oidCacheId = get_object_catcache_oid(classId);
-	int			nameCacheId = get_object_catcache_name(classId);
-	AttrNumber	Anum_name = get_object_attnum_name(classId);
-	AttrNumber	Anum_namespace = get_object_attnum_namespace(classId);
-	AttrNumber	Anum_owner = get_object_attnum_owner(classId);
-	HeapTuple	oldtup;
-	HeapTuple	newtup;
-	Datum		datum;
-	bool		isnull;
-	Oid			namespaceId;
-	Oid			ownerId;
-	char	   *old_name;
-	AclResult	aclresult;
-	Datum	   *values;
-	bool	   *nulls;
-	bool	   *replaces;
-	NameData	nameattrdata;
-
-	oldtup = SearchSysCache1(oidCacheId, ObjectIdGetDatum(objectId));
-	if (!HeapTupleIsValid(oldtup))
-		elog(ERROR, "cache lookup failed for object %u of catalog \"%s\"",
-			 objectId, RelationGetRelationName(rel));
-
-	datum = heap_getattr(oldtup, Anum_name,
-						 RelationGetDescr(rel), &isnull);
-	Assert(!isnull);
-	old_name = NameStr(*(DatumGetName(datum)));
-
-	/* Get OID of namespace */
-	if (Anum_namespace > 0)
-	{
-		datum = heap_getattr(oldtup, Anum_namespace,
-							 RelationGetDescr(rel), &isnull);
-		Assert(!isnull);
-		namespaceId = DatumGetObjectId(datum);
-	}
-	else
-		namespaceId = InvalidOid;
-
-
-	/*
-	 * Check for duplicate name (more friendly than unique-index failure).
-	 * Since this is just a friendliness check, we can just skip it in cases
-	 * where there isn't suitable support.
-	 */
-	if (classId == ProcedureRelationId)
-	{
-		Form_pg_proc proc = (Form_pg_proc) GETSTRUCT(oldtup);
-
-		IsThereFunctionInNamespace(new_name, proc->pronargs,
-								   &proc->proargtypes, proc->pronamespace);
-	}
-	else if (classId == CollationRelationId)
-	{
-		Form_pg_collation coll = (Form_pg_collation) GETSTRUCT(oldtup);
-
-		IsThereCollationInNamespace(new_name, coll->collnamespace);
-	}
-	else if (classId == OperatorClassRelationId)
-	{
-		Form_pg_opclass opc = (Form_pg_opclass) GETSTRUCT(oldtup);
-
-		IsThereOpClassInNamespace(new_name, opc->opcmethod,
-								  opc->opcnamespace);
-	}
-	else if (classId == OperatorFamilyRelationId)
-	{
-		Form_pg_opfamily opf = (Form_pg_opfamily) GETSTRUCT(oldtup);
-
-		IsThereOpFamilyInNamespace(new_name, opf->opfmethod,
-								   opf->opfnamespace);
-	}
-	else if (nameCacheId >= 0)
-	{
-		if (OidIsValid(namespaceId))
-		{
-			if (SearchSysCacheExists2(nameCacheId,
-									  CStringGetDatum(new_name),
-									  ObjectIdGetDatum(namespaceId)))
-				report_namespace_conflict(classId, new_name, namespaceId);
-		}
-		else
-		{
-			if (SearchSysCacheExists1(nameCacheId,
-									  CStringGetDatum(new_name)))
-				report_name_conflict(classId, new_name);
-		}
-	}
-
-	/* Build modified tuple */
-	values = palloc0(RelationGetNumberOfAttributes(rel) * sizeof(Datum));
-	nulls = palloc0(RelationGetNumberOfAttributes(rel) * sizeof(bool));
-	replaces = palloc0(RelationGetNumberOfAttributes(rel) * sizeof(bool));
-	namestrcpy(&nameattrdata, new_name);
-	values[Anum_name - 1] = NameGetDatum(&nameattrdata);
-	replaces[Anum_name - 1] = true;
-	newtup = heap_modify_tuple(oldtup, RelationGetDescr(rel),
-							   values, nulls, replaces);
-
-	/* Perform actual update */
-	CatalogTupleUpdate(rel, &oldtup->t_self, newtup);
-
-	InvokeObjectPostAlterHook(classId, objectId, 0);
-
-	/* Release memory */
-	pfree(values);
-	pfree(nulls);
-	pfree(replaces);
-	heap_freetuple(newtup);
-
-	ReleaseSysCache(oldtup);
-}
-
-/*
- * Executes an ALTER OBJECT / RENAME TO statement.  Based on the object
- * type, the function appropriate to that type is executed.
- *
- * Return value is the address of the renamed object.
- */
-ObjectAddress
-ExecRenameStmt(RenameStmt *stmt)
-{
-	switch (stmt->renameType)
-	{
-		case OBJECT_TABCONSTRAINT:
-		case OBJECT_DOMCONSTRAINT:
-			return RenameConstraint(stmt);
-
-		case OBJECT_DATABASE:
-			return RenameDatabase(stmt->subname, stmt->newname);
-
-		case OBJECT_SCHEMA:
-			return RenameSchema(stmt->subname, stmt->newname);
-
-		case OBJECT_TABLESPACE:
-			return RenameTableSpace(stmt->subname, stmt->newname);
-
-		case OBJECT_TABLE:
-		case OBJECT_VIEW:
-		case OBJECT_INDEX:
-			return RenameRelation(stmt);
-
-		case OBJECT_COLUMN:
-		case OBJECT_ATTRIBUTE:
-			return renameatt(stmt);
-
-		case OBJECT_RULE:
-			return RenameRewriteRule(stmt->relation, stmt->subname,
-									 stmt->newname);
-
-		case OBJECT_TRIGGER:
-			return renametrig(stmt);
-
-
-		case OBJECT_DOMAIN:
-		case OBJECT_TYPE:
-			return RenameType(stmt);
-
-		case OBJECT_AGGREGATE:
-		case OBJECT_COLLATION:
-		case OBJECT_CONVERSION:
-		case OBJECT_FUNCTION:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPFAMILY:
-		case OBJECT_LANGUAGE:
-		case OBJECT_PROCEDURE:
-		case OBJECT_ROUTINE:
-		case OBJECT_STATISTIC_EXT:
-		case OBJECT_PUBLICATION:
-		case OBJECT_SUBSCRIPTION:
-			{
-				ObjectAddress address;
-				Relation	catalog;
-				Relation	relation;
-
-				address = get_object_address(stmt->renameType,
-											 stmt->object,
-											 &relation,
-											 AccessExclusiveLock, false);
-				Assert(relation == NULL);
-
-				catalog = table_open(address.classId, RowExclusiveLock);
-				AlterObjectRename_internal(catalog,
-										   address.objectId,
-										   stmt->newname);
-				table_close(catalog, RowExclusiveLock);
-
-				return address;
-			}
-
-		default:
-			elog(ERROR, "unrecognized rename stmt type: %d",
-				 (int) stmt->renameType);
-			return InvalidObjectAddress;	/* keep compiler happy */
-	}
 }
 
 /*
@@ -345,8 +106,6 @@ ExecAlterObjectDependsStmt(AlterObjectDependsStmt *stmt, ObjectAddress *refAddre
 	 * the extension owner can drop the object whenever they feel like it,
 	 * which is not considered a problem.
 	 */
-	check_object_ownership(GetUserId(),
-						   stmt->objectType, address, stmt->object, rel);
 
 	/*
 	 * If a relation was involved, it would have been opened and locked. We
@@ -572,7 +331,6 @@ AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid)
 	int			nameCacheId = get_object_catcache_name(classId);
 	AttrNumber	Anum_name = get_object_attnum_name(classId);
 	AttrNumber	Anum_namespace = get_object_attnum_namespace(classId);
-	AttrNumber	Anum_owner = get_object_attnum_owner(classId);
 	Oid			oldNspOid;
 	Datum		name,
 				namespace;
@@ -672,153 +430,4 @@ AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid)
 	InvokeObjectPostAlterHook(classId, objid, 0);
 
 	return oldNspOid;
-}
-
-/*
- * Executes an ALTER OBJECT / OWNER TO statement.  Based on the object
- * type, the function appropriate to that type is executed.
- */
-ObjectAddress
-ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
-{
-	Oid			newowner = get_rolespec_oid(stmt->newowner, false);
-
-	switch (stmt->objectType)
-	{
-		case OBJECT_DATABASE:
-			return AlterDatabaseOwner(strVal((Value *) stmt->object), newowner);
-
-		case OBJECT_SCHEMA:
-			return AlterSchemaOwner(strVal((Value *) stmt->object), newowner);
-
-		case OBJECT_TYPE:
-		case OBJECT_DOMAIN:		/* same as TYPE */
-			return AlterTypeOwner(castNode(List, stmt->object), newowner, stmt->objectType);
-			break;
-
-			/* Generic cases */
-		case OBJECT_AGGREGATE:
-		case OBJECT_COLLATION:
-		case OBJECT_CONVERSION:
-		case OBJECT_FUNCTION:
-		case OBJECT_LANGUAGE:
-		case OBJECT_OPERATOR:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPFAMILY:
-		case OBJECT_PROCEDURE:
-		case OBJECT_ROUTINE:
-		case OBJECT_STATISTIC_EXT:
-		case OBJECT_TABLESPACE:
-			{
-				Relation	catalog;
-				Relation	relation;
-				Oid			classId;
-				ObjectAddress address;
-
-				address = get_object_address(stmt->objectType,
-											 stmt->object,
-											 &relation,
-											 AccessExclusiveLock,
-											 false);
-				Assert(relation == NULL);
-				classId = address.classId;
-
-				catalog = table_open(classId, RowExclusiveLock);
-
-				AlterObjectOwner_internal(catalog, address.objectId, newowner);
-				table_close(catalog, RowExclusiveLock);
-
-				return address;
-			}
-			break;
-
-		default:
-			elog(ERROR, "unrecognized AlterOwnerStmt type: %d",
-				 (int) stmt->objectType);
-			return InvalidObjectAddress;	/* keep compiler happy */
-	}
-}
-
-/*
- * Generic function to change the ownership of a given object, for simple
- * cases (won't work for tables, nor other cases where we need to do more than
- * change the ownership column of a single catalog entry).
- *
- * rel: catalog relation containing object (RowExclusiveLock'd by caller)
- * objectId: OID of object to change the ownership of
- * new_ownerId: OID of new object owner
- */
-void
-AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
-{
-	Oid			classId = RelationGetRelid(rel);
-	AttrNumber	Anum_oid = get_object_attnum_oid(classId);
-	AttrNumber	Anum_owner = get_object_attnum_owner(classId);
-	AttrNumber	Anum_namespace = get_object_attnum_namespace(classId);
-	AttrNumber	Anum_acl = get_object_attnum_acl(classId);
-	AttrNumber	Anum_name = get_object_attnum_name(classId);
-	HeapTuple	oldtup;
-	Datum		datum;
-	bool		isnull;
-	Oid			old_ownerId;
-	Oid			namespaceId = InvalidOid;
-
-	/* Search tuple and lock it. */
-	oldtup =
-		get_catalog_object_by_oid_extended(rel, Anum_oid, objectId, true);
-	if (oldtup == NULL)
-		elog(ERROR, "cache lookup failed for object %u of catalog \"%s\"",
-			 objectId, RelationGetRelationName(rel));
-
-	datum = heap_getattr(oldtup, Anum_owner,
-						 RelationGetDescr(rel), &isnull);
-	Assert(!isnull);
-	old_ownerId = DatumGetObjectId(datum);
-
-	if (Anum_namespace != InvalidAttrNumber)
-	{
-		datum = heap_getattr(oldtup, Anum_namespace,
-							 RelationGetDescr(rel), &isnull);
-		Assert(!isnull);
-		namespaceId = DatumGetObjectId(datum);
-	}
-
-	if (old_ownerId != new_ownerId)
-	{
-		AttrNumber	nattrs;
-		HeapTuple	newtup;
-		Datum	   *values;
-		bool	   *nulls;
-		bool	   *replaces;
-
-
-		/* Build a modified tuple */
-		nattrs = RelationGetNumberOfAttributes(rel);
-		values = palloc0(nattrs * sizeof(Datum));
-		nulls = palloc0(nattrs * sizeof(bool));
-		replaces = palloc0(nattrs * sizeof(bool));
-		values[Anum_owner - 1] = ObjectIdGetDatum(new_ownerId);
-		replaces[Anum_owner - 1] = true;
-
-		newtup = heap_modify_tuple(oldtup, RelationGetDescr(rel),
-								   values, nulls, replaces);
-
-		/* Perform actual update */
-		CatalogTupleUpdate(rel, &newtup->t_self, newtup);
-
-		UnlockTuple(rel, &oldtup->t_self, InplaceUpdateTupleLock);
-
-		changeDependencyOnOwner(classId, objectId, new_ownerId);
-
-		/* Release memory */
-		pfree(values);
-		pfree(nulls);
-		pfree(replaces);
-	}
-	else
-	{
-		UnlockTuple(rel, &oldtup->t_self, InplaceUpdateTupleLock);
-	}
-
-	InvokeObjectPostAlterHook(classId, objectId, 0);
 }

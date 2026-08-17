@@ -1092,44 +1092,6 @@ include_dir 'conf.d'
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-krb-server-keyfile" xreflabel="krb_server_keyfile">
-      <term><varname>krb_server_keyfile</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>krb_server_keyfile</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets the location of the server's Kerberos key file.  The default is
-        <filename>FILE:/usr/local/pgsql/etc/krb5.keytab</filename>
-        (where the directory part is whatever was specified
-        as <varname>sysconfdir</varname> at build time; use
-        <literal>pg_config --sysconfdir</literal> to determine that).
-        If this parameter is set to an empty string, it is ignored and a
-        system-dependent default is used.
-        This parameter can only be set in the
-        <filename>postgresql.conf</filename> file or on the server command line.
-        See <xref linkend="gssapi-auth"/> for more information.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-krb-caseins-users" xreflabel="krb_caseins_users">
-      <term><varname>krb_caseins_users</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>krb_caseins_users</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets whether GSSAPI user names should be treated
-        case-insensitively.
-        The default is <literal>off</literal> (case sensitive). This parameter can only be
-        set in the <filename>postgresql.conf</filename> file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-
      <varlistentry id="guc-db-user-namespace" xreflabel="db_user_namespace">
       <term><varname>db_user_namespace</varname> (<type>boolean</type>)
       <indexterm>
@@ -1184,421 +1146,6 @@ include_dir 'conf.d'
      </variablelist>
      </sect2>
 
-     <sect2 id="runtime-config-connection-ssl">
-     <title>SSL</title>
-
-     <para>
-      See <xref linkend="ssl-tcp"/> for more information about setting up SSL.
-     </para>
-
-     <variablelist>
-     <varlistentry id="guc-ssl" xreflabel="ssl">
-      <term><varname>ssl</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>ssl</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Enables <acronym>SSL</acronym> connections.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is <literal>off</literal>.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-ca-file" xreflabel="ssl_ca_file">
-      <term><varname>ssl_ca_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_ca_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the file containing the SSL server certificate
-        authority (CA).
-        Relative paths are relative to the data directory.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is empty, meaning no CA file is loaded,
-        and client certificate verification is not performed.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-cert-file" xreflabel="ssl_cert_file">
-      <term><varname>ssl_cert_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_cert_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the file containing the SSL server certificate.
-        Relative paths are relative to the data directory.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is <filename>server.crt</filename>.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-crl-file" xreflabel="ssl_crl_file">
-      <term><varname>ssl_crl_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_crl_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the file containing the SSL client certificate
-        revocation list (CRL).
-        Relative paths are relative to the data directory.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is empty, meaning no CRL file is loaded (unless
-        <xref linkend="guc-ssl-crl-dir"/> is set).
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-crl-dir" xreflabel="ssl_crl_dir">
-      <term><varname>ssl_crl_dir</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_crl_dir</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the directory containing the SSL client
-        certificate revocation list (CRL).  Relative paths are relative to the
-        data directory.  This parameter can only be set in
-        the <filename>postgresql.conf</filename> file or on the server command
-        line.  The default is empty, meaning no CRLs are used (unless
-        <xref linkend="guc-ssl-crl-file"/> is set).
-       </para>
-
-       <para>
-        The directory needs to be prepared with the
-        <productname>OpenSSL</productname> command
-        <literal>openssl rehash</literal> or <literal>c_rehash</literal>.  See
-        its documentation for details.
-       </para>
-
-       <para>
-        When using this setting, CRLs in the specified directory are loaded
-        on-demand at connection time.  New CRLs can be added to the directory
-        and will be used immediately.  This is unlike <xref
-        linkend="guc-ssl-crl-file"/>, which causes the CRL in the file to be
-        loaded at server start time or when the configuration is reloaded.
-        Both settings can be used together.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-key-file" xreflabel="ssl_key_file">
-      <term><varname>ssl_key_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_key_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the file containing the SSL server private key.
-        Relative paths are relative to the data directory.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is <filename>server.key</filename>.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-ciphers" xreflabel="ssl_ciphers">
-      <term><varname>ssl_ciphers</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_ciphers</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies a list of <acronym>SSL</acronym> cipher suites that are
-        allowed to be used by SSL connections.  See the
-        <citerefentry><refentrytitle>ciphers</refentrytitle></citerefentry>
-        manual page in the <productname>OpenSSL</productname> package for the
-        syntax of this setting and a list of supported values.  Only
-        connections using TLS version 1.2 and lower are affected.  There is
-        currently no setting that controls the cipher choices used by TLS
-        version 1.3 connections.  The default value is
-        <literal>HIGH:MEDIUM:+3DES:!aNULL</literal>.  The default is usually a
-        reasonable choice unless you have specific security requirements.
-       </para>
-
-       <para>
-        This parameter can only be set in the
-        <filename>postgresql.conf</filename> file or on the server command
-        line.
-       </para>
-
-       <para>
-        Explanation of the default value:
-        <variablelist>
-         <varlistentry>
-          <term><literal>HIGH</literal></term>
-          <listitem>
-           <para>
-            Cipher suites that use ciphers from <literal>HIGH</literal> group (e.g.,
-            AES, Camellia, 3DES)
-           </para>
-          </listitem>
-         </varlistentry>
-
-         <varlistentry>
-          <term><literal>MEDIUM</literal></term>
-          <listitem>
-           <para>
-            Cipher suites that use ciphers from <literal>MEDIUM</literal> group
-            (e.g., RC4, SEED)
-           </para>
-          </listitem>
-         </varlistentry>
-
-         <varlistentry>
-          <term><literal>+3DES</literal></term>
-          <listitem>
-           <para>
-            The <productname>OpenSSL</productname> default order for
-            <literal>HIGH</literal> is problematic because it orders 3DES
-            higher than AES128.  This is wrong because 3DES offers less
-            security than AES128, and it is also much slower.
-            <literal>+3DES</literal> reorders it after all other
-            <literal>HIGH</literal> and <literal>MEDIUM</literal> ciphers.
-           </para>
-          </listitem>
-         </varlistentry>
-
-         <varlistentry>
-          <term><literal>!aNULL</literal></term>
-          <listitem>
-           <para>
-            Disables anonymous cipher suites that do no authentication.  Such
-            cipher suites are vulnerable to <acronym>MITM</acronym> attacks and
-            therefore should not be used.
-           </para>
-          </listitem>
-         </varlistentry>
-        </variablelist>
-       </para>
-
-       <para>
-        Available cipher suite details will vary across
-        <productname>OpenSSL</productname> versions.  Use the command
-        <literal>openssl ciphers -v 'HIGH:MEDIUM:+3DES:!aNULL'</literal> to
-        see actual details for the currently installed
-        <productname>OpenSSL</productname> version.  Note that this list is
-        filtered at run time based on the server key type.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-prefer-server-ciphers" xreflabel="ssl_prefer_server_ciphers">
-      <term><varname>ssl_prefer_server_ciphers</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>ssl_prefer_server_ciphers</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies whether to use the server's SSL cipher preferences, rather
-        than the client's.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is <literal>on</literal>.
-       </para>
-
-       <para>
-        <productname>PostgreSQL</productname> versions before 9.4 do not have
-        this setting and always use the client's preferences.  This setting is
-        mainly for backward compatibility with those versions.  Using the
-        server's preferences is usually better because it is more likely that
-        the server is appropriately configured.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-ecdh-curve" xreflabel="ssl_ecdh_curve">
-      <term><varname>ssl_ecdh_curve</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_ecdh_curve</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the curve to use in <acronym>ECDH</acronym> key
-        exchange.  It needs to be supported by all clients that connect.
-        It does not need to be the same curve used by the server's Elliptic
-        Curve key.
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-        The default is <literal>prime256v1</literal>.
-       </para>
-
-       <para>
-        <productname>OpenSSL</productname> names for the most common curves
-        are:
-        <literal>prime256v1</literal> (NIST P-256),
-        <literal>secp384r1</literal> (NIST P-384),
-        <literal>secp521r1</literal> (NIST P-521).
-        The full list of available curves can be shown with the command
-        <command>openssl ecparam -list_curves</command>.  Not all of them
-        are usable in <acronym>TLS</acronym> though.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-min-protocol-version" xreflabel="ssl_min_protocol_version">
-      <term><varname>ssl_min_protocol_version</varname> (<type>enum</type>)
-      <indexterm>
-       <primary><varname>ssl_min_protocol_version</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets the minimum SSL/TLS protocol version to use.  Valid values are
-        currently: <literal>TLSv1</literal>, <literal>TLSv1.1</literal>,
-        <literal>TLSv1.2</literal>, <literal>TLSv1.3</literal>.  Older
-        versions of the <productname>OpenSSL</productname> library do not
-        support all values; an error will be raised if an unsupported setting
-        is chosen.  Protocol versions before TLS 1.0, namely SSL version 2 and
-        3, are always disabled.
-       </para>
-
-       <para>
-        The default is <literal>TLSv1.2</literal>, which satisfies industry
-        best practices as of this writing.
-       </para>
-
-       <para>
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-max-protocol-version" xreflabel="ssl_max_protocol_version">
-      <term><varname>ssl_max_protocol_version</varname> (<type>enum</type>)
-      <indexterm>
-       <primary><varname>ssl_max_protocol_version</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets the maximum SSL/TLS protocol version to use.  Valid values are as
-        for <xref linkend="guc-ssl-min-protocol-version"/>, with addition of
-        an empty string, which allows any protocol version.  The default is to
-        allow any version.  Setting the maximum protocol version is mainly
-        useful for testing or if some component has issues working with a
-        newer protocol.
-       </para>
-
-       <para>
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-dh-params-file" xreflabel="ssl_dh_params_file">
-      <term><varname>ssl_dh_params_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_dh_params_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of the file containing Diffie-Hellman parameters
-        used for so-called ephemeral DH family of SSL ciphers. The default is
-        empty, in which case compiled-in default DH parameters used. Using
-        custom DH parameters reduces the exposure if an attacker manages to
-        crack the well-known compiled-in DH parameters. You can create your own
-        DH parameters file with the command
-        <command>openssl dhparam -out dhparams.pem 2048</command>.
-       </para>
-
-       <para>
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-passphrase-command" xreflabel="ssl_passphrase_command">
-      <term><varname>ssl_passphrase_command</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_passphrase_command</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets an external command to be invoked when a passphrase for
-        decrypting an SSL file such as a private key needs to be obtained.  By
-        default, this parameter is empty, which means the built-in prompting
-        mechanism is used.
-       </para>
-       <para>
-        The command must print the passphrase to the standard output and exit
-        with code 0.  In the parameter value, <literal>%p</literal> is
-        replaced by a prompt string.  (Write <literal>%%</literal> for a
-        literal <literal>%</literal>.)  Note that the prompt string will
-        probably contain whitespace, so be sure to quote adequately.  A single
-        newline is stripped from the end of the output if present.
-       </para>
-       <para>
-        The command does not actually have to prompt the user for a
-        passphrase.  It can read it from a file, obtain it from a keychain
-        facility, or similar.  It is up to the user to make sure the chosen
-        mechanism is adequately secure.
-       </para>
-       <para>
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-ssl-passphrase-command-supports-reload" xreflabel="ssl_passphrase_command_supports_reload">
-      <term><varname>ssl_passphrase_command_supports_reload</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>ssl_passphrase_command_supports_reload</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        This parameter determines whether the passphrase command set by
-        <varname>ssl_passphrase_command</varname> will also be called during a
-        configuration reload if a key file needs a passphrase.  If this
-        parameter is <literal>off</literal> (the default), then
-        <varname>ssl_passphrase_command</varname> will be ignored during a
-        reload and the SSL configuration will not be reloaded if a passphrase
-        is needed.  That setting is appropriate for a command that requires a
-        TTY for prompting, which might not be available when the server is
-        running.  Setting this parameter to on might be appropriate if the
-        passphrase is obtained from a file, for example.
-       </para>
-       <para>
-        This parameter must be set to <literal>on</literal> when running on
-        <systemitem class="osname">Windows</systemitem> since all connections
-        will perform a configuration reload due to the different process model
-        of that platform.
-       </para>
-       <para>
-        This parameter can only be set in the <filename>postgresql.conf</filename>
-        file or on the server command line.
-       </para>
-      </listitem>
-     </varlistentry>
-    </variablelist>
-    </sect2>
    </sect1>
 
    <sect1 id="runtime-config-resource">
@@ -5442,7 +4989,7 @@ ANY <replaceable class="parameter">num_sync</replaceable> ( <replaceable class="
       <listitem>
        <para>
         Sets the query cost above which JIT compilation is activated, if
-        enabled (see <xref linkend="jit"/>).
+        enabled.
         Performing <acronym>JIT</acronym> costs planning time but can
         accelerate query execution.
         Setting this to <literal>-1</literal> disables JIT compilation.
@@ -5616,8 +5163,7 @@ SELECT * FROM parent WHERE key = 2400;
       <listitem>
        <para>
         Determines whether <acronym>JIT</acronym> compilation may be used by
-        <productname>PostgreSQL</productname>, if available (see <xref
-        linkend="jit"/>).
+        <productname>PostgreSQL</productname>, if available.
         The default is <literal>on</literal>.
        </para>
       </listitem>
@@ -9018,7 +8564,6 @@ SET XML OPTION { DOCUMENT | CONTENT };
         Selects the text search configuration that is used by those variants
         of the text search functions that do not have an explicit argument
         specifying the configuration.
-        See <xref linkend="textsearch"/> for further information.
         The built-in default is <literal>pg_catalog.simple</literal>, but
         <application>initdb</application> will initialize the
         configuration file with a setting that corresponds to the
@@ -9223,8 +8768,7 @@ SET XML OPTION { DOCUMENT | CONTENT };
       </term>
       <listitem>
        <para>
-        This variable is the name of the JIT provider library to be used
-        (see <xref linkend="jit-pluggable"/>).
+        This variable is the name of the JIT provider library to be used.
         The default is <literal>llvmjit</literal>.
         This parameter can only be set at server start.
        </para>
@@ -10089,21 +9633,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-ssl-library" xreflabel="ssl_library">
-      <term><varname>ssl_library</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>ssl_library</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Reports the name of the SSL library that this
-        <productname>PostgreSQL</productname> server was built with (even if
-        SSL is not currently configured or in use on this instance), for
-        example <literal>OpenSSL</literal>, or an empty string if none.
-       </para>
-      </listitem>
-     </varlistentry>
+
 
      <varlistentry id="guc-wal-block-size" xreflabel="wal_block_size">
       <term><varname>wal_block_size</varname> (<type>integer</type>)
@@ -10762,7 +10292,7 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
       <listitem>
        <para>
         Determines whether expressions are JIT compiled, when JIT compilation
-        is activated (see <xref linkend="jit-decision"/>).  The default is
+        is activated.  The default is
         <literal>on</literal>.
        </para>
       </listitem>
@@ -10796,7 +10326,7 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
       <listitem>
        <para>
         Determines whether tuple deforming is JIT compiled, when JIT
-        compilation is activated (see <xref linkend="jit-decision"/>).
+        compilation is activated.
         The default is <literal>on</literal>.
        </para>
       </listitem>
@@ -10895,7 +10425,7 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
        </row>
        <row>
         <entry><option>-l</option></entry>
-        <entry><literal>ssl = on</literal></entry>
+        <entry><literal>listen_addresses = <replaceable>x</replaceable></literal></entry>
        </row>
        <row>
         <entry><option>-N <replaceable>x</replaceable></option></entry>

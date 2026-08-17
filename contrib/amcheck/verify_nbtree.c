@@ -276,12 +276,12 @@ bt_index_check_internal(Oid indrelid, bool parentcheck, bool heapallindexed,
 		heaprel = table_open(heapid, lockmode);
 
 		/*
-		 * Switch to the table owner's userid, so that any index functions are
-		 * run as that user.  Also lock down security-restricted operations
-		 * and arrange to make GUC variable changes local to this command.
+		 * minipg 已移除 owner 机制（恒为超级用户），受限操作直接按当前用户
+		 * 身份执行，不切换到 relowner。锁定 security-restricted 操作并让
+		 * GUC 变量改动仅限本次命令。
 		 */
 		GetUserIdAndSecContext(&save_userid, &save_sec_context);
-		SetUserIdAndSecContext(heaprel->rd_rel->relowner,
+		SetUserIdAndSecContext(GetUserId(),
 							   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 		save_nestlevel = NewGUCNestLevel();
 	}

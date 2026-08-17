@@ -82,7 +82,6 @@ static bool get_db_info(const char *name, LOCKMODE lockmode,
 						Oid *dbLastSysOidP, TransactionId *dbFrozenXidP,
 						MultiXactId *dbMinMultiP,
 						Oid *dbTablespace, char **dbCollate, char **dbCtype);
-static bool have_createdb_privilege(void);
 static void remove_dbtablespaces(Oid db_id);
 static bool check_db_file_conflict(Oid db_id);
 static int	errdetail_busy_db(int notherbackends, int npreparedxacts);
@@ -113,10 +112,8 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	Datum		new_record[Natts_pg_database];
 	bool		new_record_nulls[Natts_pg_database];
 	Oid			dboid;
-	Oid			datdba;
 	ListCell   *option;
 	DefElem    *dtablespacename = NULL;
-	DefElem    *downer = NULL;
 	DefElem    *dtemplate = NULL;
 	DefElem    *dencoding = NULL;
 	DefElem    *dlocale = NULL;
@@ -126,7 +123,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	DefElem    *dallowconnections = NULL;
 	DefElem    *dconnlimit = NULL;
 	char	   *dbname = stmt->dbname;
-	char	   *dbowner = NULL;
 	const char *dbtemplate = NULL;
 	char	   *dbcollate = NULL;
 	char	   *dbctype = NULL;
@@ -152,15 +148,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 						 errmsg("conflicting or redundant options"),
 						 parser_errposition(pstate, defel->location)));
 			dtablespacename = defel;
-		}
-		else if (strcmp(defel->defname, "owner") == 0)
-		{
-			if (downer)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("conflicting or redundant options"),
-						 parser_errposition(pstate, defel->location)));
-			downer = defel;
 		}
 		else if (strcmp(defel->defname, "template") == 0)
 		{
@@ -255,8 +242,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 				 errmsg("conflicting or redundant options"),
 				 errdetail("LOCALE cannot be specified together with LC_COLLATE or LC_CTYPE.")));
 
-	if (downer && downer->arg)
-		dbowner = defGetString(downer);
 	if (dtemplate && dtemplate->arg)
 		dbtemplate = defGetString(dtemplate);
 	if (dencoding && dencoding->arg)
@@ -309,24 +294,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 					 errmsg("invalid connection limit: %d", dbconnlimit)));
 	}
 
-	/* obtain OID of proposed owner */
-	if (dbowner)
-		datdba = get_role_oid(dbowner, false);
-	else
-		datdba = GetUserId();
-
-	/*
-	 * To create a database, must have createdb privilege and must be able to
-	 * become the target role (this does not imply that the target role itself
-	 * must have createdb privilege).  The latter provision guards against
-	 * "giveaway" attacks.  Note that a superuser will always have both of
-	 * these privileges a fortiori.
-	 */
-	if (!have_createdb_privilege())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied to create database")));
-
 	/*
 	 * Lookup database (template) to be cloned, and obtain share lock on it.
 	 * ShareLock allows two CREATE DATABASEs to work from the same template
@@ -365,7 +332,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	 */
 	if (!src_istemplate)
 	{
-		if (!pg_database_ownercheck(src_dboid, GetUserId()))
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("permission denied to copy database \"%s\"",
@@ -439,16 +405,9 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	if (dtablespacename && dtablespacename->arg)
 	{
 		char	   *tablespacename;
-		AclResult	aclresult;
 
 		tablespacename = defGetString(dtablespacename);
 		dst_deftablespace = get_tablespace_oid(tablespacename, false);
-		/* check permissions */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_TABLESPACE,
-						   tablespacename);
-
 		/* pg_global must never be the default tablespace */
 		if (dst_deftablespace == GLOBALTABLESPACE_OID)
 			ereport(ERROR,
@@ -555,7 +514,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	new_record[Anum_pg_database_oid - 1] = ObjectIdGetDatum(dboid);
 	new_record[Anum_pg_database_datname - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(dbname));
-	new_record[Anum_pg_database_datdba - 1] = ObjectIdGetDatum(datdba);
 	new_record[Anum_pg_database_encoding - 1] = Int32GetDatum(encoding);
 	new_record[Anum_pg_database_datcollate - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(dbcollate));
@@ -577,9 +535,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	/*
 	 * Now generate additional catalog entries associated with the new DB
 	 */
-
-	/* Register owner dependency */
-	recordDependencyOnOwner(DatabaseRelationId, dboid, datdba);
 
 	/* Create pg_shdepend entries for objects within database */
 	copyTemplateDependencies(src_dboid, dboid);
@@ -810,7 +765,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	Form_pg_database datform;
 	int			notherbackends;
 	int			npreparedxacts;
-	int			nsubscriptions;
 
 	/*
 	 * Look up the target database's OID, and get exclusive lock on it. We
@@ -844,9 +798,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	/*
 	 * Permission checks
 	 */
-	if (!pg_database_ownercheck(db_id, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-					   dbname);
 
 	/* DROP hook for the database being removed */
 	InvokeObjectDropHook(DatabaseRelationId, db_id, 0);
@@ -972,105 +923,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 }
 
 
-/*
- * Rename database
- */
-ObjectAddress
-RenameDatabase(const char *oldname, const char *newname)
-{
-	Oid			db_id;
-	HeapTuple	newtup;
-	ItemPointerData otid;
-	Relation	rel;
-	int			notherbackends;
-	int			npreparedxacts;
-	ObjectAddress address;
-
-	/*
-	 * Look up the target database's OID, and get exclusive lock on it. We
-	 * need this for the same reasons as DROP DATABASE.
-	 */
-	rel = table_open(DatabaseRelationId, RowExclusiveLock);
-
-	if (!get_db_info(oldname, AccessExclusiveLock, &db_id, NULL, NULL,
-					 NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_DATABASE),
-				 errmsg("database \"%s\" does not exist", oldname)));
-
-	/* must be owner */
-	if (!pg_database_ownercheck(db_id, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-					   oldname);
-
-	/* must have createdb rights */
-	if (!have_createdb_privilege())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied to rename database")));
-
-	/*
-	 * If built with appropriate switch, whine when regression-testing
-	 * conventions for database names are violated.
-	 */
-#ifdef ENFORCE_REGRESSION_TEST_NAME_RESTRICTIONS
-	if (strstr(newname, "regression") == NULL)
-		elog(WARNING, "databases created by regression test cases should have names including \"regression\"");
-#endif
-
-	/*
-	 * Make sure the new name doesn't exist.  See notes for same error in
-	 * CREATE DATABASE.
-	 */
-	if (OidIsValid(get_database_oid(newname, true)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_DATABASE),
-				 errmsg("database \"%s\" already exists", newname)));
-
-	/*
-	 * XXX Client applications probably store the current database somewhere,
-	 * so renaming it could cause confusion.  On the other hand, there may not
-	 * be an actual problem besides a little confusion, so think about this
-	 * and decide.
-	 */
-	if (db_id == MyDatabaseId)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("current database cannot be renamed")));
-
-	/*
-	 * Make sure the database does not have active sessions.  This is the same
-	 * concern as above, but applied to other sessions.
-	 *
-	 * As in CREATE DATABASE, check this after other error conditions.
-	 */
-	if (CountOtherDBBackends(db_id, &notherbackends, &npreparedxacts))
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("database \"%s\" is being accessed by other users",
-						oldname),
-				 errdetail_busy_db(notherbackends, npreparedxacts)));
-
-	/* rename */
-	newtup = SearchSysCacheLockedCopy1(DATABASEOID, ObjectIdGetDatum(db_id));
-	if (!HeapTupleIsValid(newtup))
-		elog(ERROR, "cache lookup failed for database %u", db_id);
-	otid = newtup->t_self;
-	namestrcpy(&(((Form_pg_database) GETSTRUCT(newtup))->datname), newname);
-	CatalogTupleUpdate(rel, &otid, newtup);
-	UnlockTuple(rel, &otid, InplaceUpdateTupleLock);
-
-	InvokeObjectPostAlterHook(DatabaseRelationId, db_id, 0);
-
-	ObjectAddressSet(address, DatabaseRelationId, db_id);
-
-	/*
-	 * Close pg_database, but keep lock till commit.
-	 */
-	table_close(rel, NoLock);
-
-	return address;
-}
 
 
 /*
@@ -1092,7 +944,6 @@ movedb(const char *dbname, const char *tblspcname)
 	bool		new_record_repl[Natts_pg_database];
 	ScanKeyData scankey;
 	SysScanDesc sysscan;
-	AclResult	aclresult;
 	char	   *src_dbpath;
 	char	   *dst_dbpath;
 	DIR		   *dstdir;
@@ -1125,9 +976,6 @@ movedb(const char *dbname, const char *tblspcname)
 	/*
 	 * Permission checks
 	 */
-	if (!pg_database_ownercheck(db_id, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-					   dbname);
 
 	/*
 	 * Obviously can't move the tables of my own database
@@ -1141,14 +989,6 @@ movedb(const char *dbname, const char *tblspcname)
 	 * Get tablespace's oid
 	 */
 	dst_tblspcoid = get_tablespace_oid(tblspcname, false);
-
-	/*
-	 * Permission checks
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_TABLESPACE,
-					   tblspcname);
 
 	/*
 	 * pg_global must never be the default tablespace
@@ -1564,10 +1404,6 @@ AlterDatabase(ParseState *pstate, AlterDatabaseStmt *stmt, bool isTopLevel)
 				errhint("Use DROP DATABASE to drop invalid databases."));
 	}
 
-	if (!pg_database_ownercheck(dboid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-					   stmt->dbname);
-
 	/*
 	 * In order to avoid getting locked out and having to go through
 	 * standalone mode, we refuse to disallow connections to the database
@@ -1618,102 +1454,6 @@ AlterDatabase(ParseState *pstate, AlterDatabaseStmt *stmt, bool isTopLevel)
 }
 
 
-/*
- * ALTER DATABASE name OWNER TO newowner
- */
-ObjectAddress
-AlterDatabaseOwner(const char *dbname, Oid newOwnerId)
-{
-	Oid			db_id;
-	HeapTuple	tuple;
-	Relation	rel;
-	ScanKeyData scankey;
-	SysScanDesc scan;
-	Form_pg_database datForm;
-	ObjectAddress address;
-
-	/*
-	 * Get the old tuple.  We don't need a lock on the database per se,
-	 * because we're not going to do anything that would mess up incoming
-	 * connections.
-	 */
-	rel = table_open(DatabaseRelationId, RowExclusiveLock);
-	ScanKeyInit(&scankey,
-				Anum_pg_database_datname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(dbname));
-	scan = systable_beginscan(rel, DatabaseNameIndexId, true,
-							  NULL, 1, &scankey);
-	tuple = systable_getnext(scan);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_DATABASE),
-				 errmsg("database \"%s\" does not exist", dbname)));
-
-	datForm = (Form_pg_database) GETSTRUCT(tuple);
-	db_id = datForm->oid;
-
-	/*
-	 * If the new owner is the same as the existing owner, consider the
-	 * command to have succeeded.  This is to be consistent with other
-	 * objects.
-	 */
-	if (datForm->datdba != newOwnerId)
-	{
-		Datum		repl_val[Natts_pg_database];
-		bool		repl_null[Natts_pg_database];
-		bool		repl_repl[Natts_pg_database];
-		HeapTuple	newtuple;
-
-		/* Otherwise, must be owner of the existing object */
-		if (!pg_database_ownercheck(db_id, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-						   dbname);
-
-
-		/*
-		 * must have createdb rights
-		 *
-		 * NOTE: This is different from other alter-owner checks in that the
-		 * current user is checked for createdb privileges instead of the
-		 * destination owner.  This is consistent with the CREATE case for
-		 * databases.  Because superusers will always have this right, we need
-		 * no special case for them.
-		 */
-		if (!have_createdb_privilege())
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("permission denied to change owner of database")));
-
-		LockTuple(rel, &tuple->t_self, InplaceUpdateTupleLock);
-
-		memset(repl_null, false, sizeof(repl_null));
-		memset(repl_repl, false, sizeof(repl_repl));
-
-		repl_repl[Anum_pg_database_datdba - 1] = true;
-		repl_val[Anum_pg_database_datdba - 1] = ObjectIdGetDatum(newOwnerId);
-
-		newtuple = heap_modify_tuple(tuple, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
-		CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);
-		UnlockTuple(rel, &tuple->t_self, InplaceUpdateTupleLock);
-
-		heap_freetuple(newtuple);
-
-		/* Update owner dependency reference */
-		changeDependencyOnOwner(DatabaseRelationId, db_id, newOwnerId);
-	}
-
-	InvokeObjectPostAlterHook(DatabaseRelationId, db_id, 0);
-
-	ObjectAddressSet(address, DatabaseRelationId, db_id);
-
-	systable_endscan(scan);
-
-	/* Close pg_database, but keep lock till commit */
-	table_close(rel, NoLock);
-
-	return address;
-}
 
 
 /*
@@ -1800,9 +1540,6 @@ get_db_info(const char *name, LOCKMODE lockmode,
 				/* oid of the database */
 				if (dbIdP)
 					*dbIdP = dbOid;
-				/* oid of the owner */
-				if (ownerIdP)
-					*ownerIdP = dbform->datdba;
 				/* character encoding */
 				if (encodingP)
 					*encodingP = dbform->encoding;
@@ -1842,20 +1579,6 @@ get_db_info(const char *name, LOCKMODE lockmode,
 	}
 
 	table_close(relation, AccessShareLock);
-
-	return result;
-}
-
-/* Check if current user has createdb privileges */
-static bool
-have_createdb_privilege(void)
-{
-	bool		result = false;
-	HeapTuple	utup;
-
-	/* Superusers can always do everything */
-	if (true)
-		return true;
 
 	return result;
 }

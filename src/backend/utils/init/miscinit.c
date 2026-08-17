@@ -402,31 +402,27 @@ ChangeToDataDir(void)
 
 
 /* ----------------------------------------------------------------
- *	User ID state
+ *	用户 ID 状态
  *
- * We have to track several different values associated with the concept
- * of "user ID".
+ * 我们需要跟踪与“用户 ID”这一概念相关联的几个不同取值。
  *
- * AuthenticatedUserId is determined at connection start and never changes.
+ * AuthenticatedUserId 在连接建立时确定，且永远不会改变。
  *
- * SessionUserId is initially the same as AuthenticatedUserId, but can be
- * changed by SET SESSION AUTHORIZATION (if AuthenticatedUserIsSuperuser).
- * This is the ID reported by the SESSION_USER SQL function.
+ * SessionUserId 初始时与 AuthenticatedUserId 相同，但可以通过
+ * SET SESSION AUTHORIZATION 修改（前提是 AuthenticatedUserIsSuperuser）。
+ * 这是由 SESSION_USER SQL 函数所报告的 ID。
  *
- * OuterUserId is the current user ID in effect at the "outer level" (outside
- * any transaction or function).  This is initially the same as SessionUserId,
- * but can be changed by SET ROLE to any role that SessionUserId is a
- * member of.  (XXX rename to something like CurrentRoleId?)
+ * OuterUserId 是“外层级别”（即任何事务或函数之外）当前生效的用户 ID。
+ * 初始时它与 SessionUserId 相同，但可以通过 SET ROLE 修改为
+ * SessionUserId 所属的任何角色。(XXX 是否重命名为 CurrentRoleId 之类？)
  *
- * CurrentUserId is the current effective user ID; this is the one to use
- * for all normal permissions-checking purposes.  At outer level this will
- * be the same as OuterUserId, but it changes during calls to SECURITY
- * DEFINER functions, as well as locally in some specialized commands.
+ * CurrentUserId 是当前有效的用户 ID；这是用于所有常规权限检查所采用的 ID。
+ * 在外层级别它和 OuterUserId 相同，但在调用 SECURITY DEFINER 函数时，
+ * 以及在某些特殊命令的局部范围内，它会发生变化。
  *
- * SecurityRestrictionContext holds flags indicating reason(s) for changing
- * CurrentUserId.  In some cases we need to lock down operations that are
- * not directly controlled by privilege settings, and this provides a
- * convenient way to do it.
+ * SecurityRestrictionContext 持有用于指示修改 CurrentUserId 原因（或多种原因）
+ * 的标志位。在某些情况下，我们需要限制在权限设置中并未直接受控的操作，
+ * 而这就提供了一种便捷的实现方式。
  * ----------------------------------------------------------------
  */
 static Oid	AuthenticatedUserId = InvalidOid;
@@ -662,18 +658,6 @@ SetUserIdAndContext(Oid userid, bool sec_def_context)
 		SecurityRestrictionContext |= SECURITY_LOCAL_USERID_CHANGE;
 	else
 		SecurityRestrictionContext &= ~SECURITY_LOCAL_USERID_CHANGE;
-}
-
-
-/*
- * Check whether specified role has explicit REPLICATION privilege
- *
- * minipg 无角色概念，恒为真。
- */
-bool
-has_rolreplication(Oid roleid)
-{
-	return true;
 }
 
 /*
@@ -1577,10 +1561,4 @@ process_session_preload_libraries(void)
 	load_libraries(local_preload_libraries_string,
 				   "local_preload_libraries",
 				   true);
-}
-
-void
-pg_bindtextdomain(const char *domain)
-{
-	/* minipg 已移除 Native Language Support（ENABLE_NLS），无需绑定翻译域 */
 }

@@ -299,7 +299,6 @@ ProcedureCreate(const char *procedureName,
 	namestrcpy(&procname, procedureName);
 	values[Anum_pg_proc_proname - 1] = NameGetDatum(&procname);
 	values[Anum_pg_proc_pronamespace - 1] = ObjectIdGetDatum(procNamespace);
-	values[Anum_pg_proc_proowner - 1] = ObjectIdGetDatum(proowner);
 	values[Anum_pg_proc_prolang - 1] = ObjectIdGetDatum(languageObjectId);
 	values[Anum_pg_proc_procost - 1] = Float4GetDatum(procost);
 	values[Anum_pg_proc_prorows - 1] = Float4GetDatum(prorows);
@@ -373,10 +372,6 @@ ProcedureCreate(const char *procedureName,
 					(errcode(ERRCODE_DUPLICATE_FUNCTION),
 					 errmsg("function \"%s\" already exists with same argument types",
 							procedureName)));
-		if (!pg_proc_ownercheck(oldproc->oid, proowner))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
-						   procedureName);
-
 		/* Not okay to change routine kind */
 		if (oldproc->prokind != prokind)
 			ereport(ERROR,
@@ -552,7 +547,6 @@ ProcedureCreate(const char *procedureName,
 		 * dependency-update code below has to agree with this decision.
 		 */
 		replaces[Anum_pg_proc_oid - 1] = false;
-		replaces[Anum_pg_proc_proowner - 1] = false;
 
 		/* Okay, do it... */
 		tup = heap_modify_tuple(oldtup, tupDesc, values, nulls, replaces);
@@ -641,10 +635,6 @@ ProcedureCreate(const char *procedureName,
 	if (parameterDefaults)
 		recordDependencyOnExpr(&myself, (Node *) parameterDefaults,
 							   NIL, DEPENDENCY_NORMAL);
-
-	/* dependency on owner */
-	if (!is_update)
-		recordDependencyOnOwner(ProcedureRelationId, retval, proowner);
 
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, is_update);

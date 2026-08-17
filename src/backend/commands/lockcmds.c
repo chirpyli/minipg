@@ -29,7 +29,6 @@
 #include "utils/syscache.h"
 
 static void LockTableRecurse(Oid reloid, LOCKMODE lockmode, bool nowait);
-static AclResult LockTableAclCheck(Oid relid, LOCKMODE lockmode, Oid userid);
 static void RangeVarCallbackForLockTable(const RangeVar *rv, Oid relid,
 										 Oid oldrelid, void *arg);
 static void LockViewRecurse(Oid reloid, LOCKMODE lockmode, bool nowait,
@@ -72,10 +71,7 @@ static void
 RangeVarCallbackForLockTable(const RangeVar *rv, Oid relid, Oid oldrelid,
 							 void *arg)
 {
-	LOCKMODE	lockmode = *(LOCKMODE *) arg;
 	char		relkind;
-	char		relpersistence;
-	AclResult	aclresult;
 
 	if (!OidIsValid(relid))
 		return;					/* doesn't exist, so no permissions check */
@@ -91,15 +87,6 @@ RangeVarCallbackForLockTable(const RangeVar *rv, Oid relid, Oid oldrelid,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or view",
 						rv->relname)));
-
-	/*
-	 * 临时表已裁剪，不再需要记录事务访问临时命名空间标记。
-	 */
-
-	/* Check permissions. */
-	aclresult = LockTableAclCheck(relid, lockmode, GetUserId());
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, get_relkind_objtype(get_rel_relkind(relid)), rv->relname);
 }
 
 /*
@@ -183,7 +170,6 @@ LockViewRecurse_walker(Node *node, LockViewRecurse_context *context)
 		foreach(rtable, query->rtable)
 		{
 			RangeTblEntry *rte = lfirst(rtable);
-			AclResult	aclresult;
 
 			Oid			relid = rte->relid;
 			char		relkind = rte->relkind;
@@ -209,11 +195,6 @@ LockViewRecurse_walker(Node *node, LockViewRecurse_context *context)
 			 */
 			if (list_member_oid(context->ancestor_views, relid))
 				continue;
-
-			/* Check permissions with the view owner's privilege. */
-			aclresult = LockTableAclCheck(relid, context->lockmode, context->viewowner);
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, get_relkind_objtype(relkind), relname);
 
 			/* We have enough rights to lock the relation; do so. */
 			if (!context->nowait)
@@ -256,7 +237,7 @@ LockViewRecurse(Oid reloid, LOCKMODE lockmode, bool nowait,
 
 	context.lockmode = lockmode;
 	context.nowait = nowait;
-	context.viewowner = view->rd_rel->relowner;
+	context.viewowner = GetUserId();
 	context.viewoid = reloid;
 	context.ancestor_views = lappend_oid(ancestor_views, reloid);
 
@@ -265,26 +246,4 @@ LockViewRecurse(Oid reloid, LOCKMODE lockmode, bool nowait,
 	context.ancestor_views = list_delete_last(context.ancestor_views);
 
 	table_close(view, NoLock);
-}
-
-/*
- * Check whether the current user is permitted to lock this relation.
- */
-static AclResult
-LockTableAclCheck(Oid reloid, LOCKMODE lockmode, Oid userid)
-{
-	AclResult	aclresult;
-	AclMode		aclmask;
-
-	/* Verify adequate privilege */
-	if (lockmode == AccessShareLock)
-		aclmask = ACL_SELECT;
-	else if (lockmode == RowExclusiveLock)
-		aclmask = ACL_INSERT | ACL_UPDATE | ACL_DELETE | ACL_TRUNCATE;
-	else
-		aclmask = ACL_UPDATE | ACL_DELETE | ACL_TRUNCATE;
-
-	aclresult = ACLCHECK_OK;
-
-	return aclresult;
 }

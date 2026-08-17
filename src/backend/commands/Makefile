@@ -45,7 +45,6 @@ OBJS = \
 	tablespace.o \
 	trigger.o \
 	typecmds.o \
-	user.o \
 	vacuum.o \
 	variable.o \
 	view.o

@@ -859,11 +859,11 @@ add_row_identity_columns(PlannerInfo *root, Index rtindex,
 						 RangeTblEntry *target_rte,
 						 Relation target_relation)
 {
-	CmdType		commandType = root->parse->commandType;
 	char		relkind = target_relation->rd_rel->relkind;
 	Var		   *var;
 
-	Assert(commandType == CMD_UPDATE || commandType == CMD_DELETE);
+	Assert(root->parse->commandType == CMD_UPDATE ||
+		   root->parse->commandType == CMD_DELETE);
 
 	if (relkind == RELKIND_RELATION)
 	{
@@ -1087,42 +1087,6 @@ apply_child_basequals(PlannerInfo *root, RelOptInfo *parentrel,
 			/* track minimum security level among child quals */
 			cq_min_security = Min(cq_min_security, rinfo->security_level);
 		}
-	}
-
-	/*
-	 * In addition to the quals inherited from the parent, we might have
-	 * securityQuals associated with this particular child node.  (Currently
-	 * this can only happen in appendrels originating from UNION ALL.)  Pull
-	 * any such securityQuals up
-	 * into the baserestrictinfo for the child.  This is similar to
-	 * process_security_barrier_quals() for the parent rel, except that we
-	 * can't make any general deductions from such quals, since they don't
-	 * hold for the whole appendrel.
-	 */
-	if (childRTE->securityQuals)
-	{
-		Index		security_level = 0;
-
-		foreach(lc, childRTE->securityQuals)
-		{
-			List	   *qualset = (List *) lfirst(lc);
-			ListCell   *lc2;
-
-			foreach(lc2, qualset)
-			{
-				Expr	   *qual = (Expr *) lfirst(lc2);
-
-				/* not likely that we'd see constants here, so no check */
-				childquals = lappend(childquals,
-									 make_restrictinfo(root, qual,
-													   true, false, false,
-													   security_level,
-													   NULL, NULL, NULL));
-				cq_min_security = Min(cq_min_security, security_level);
-			}
-			security_level++;
-		}
-		Assert(security_level <= root->qual_security_level);
 	}
 
 	/*

@@ -19,7 +19,6 @@
 #include "nodes/parsenodes.h"
 #include "utils/relcache.h"
 
-extern ObjectAddress ExecRenameStmt(RenameStmt *stmt);
 
 extern ObjectAddress ExecAlterObjectDependsStmt(AlterObjectDependsStmt *stmt,
 												ObjectAddress *refAddress);

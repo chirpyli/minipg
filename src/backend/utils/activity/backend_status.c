@@ -13,6 +13,7 @@
 
 #include "access/xact.h"
 #include "libpq/libpq.h"
+#include "mb/pg_wchar.h"			/* for pg_mbcliplen */
 #include "miscadmin.h"
 #include "pg_trace.h"
 #include "pgstat.h"
@@ -55,12 +56,6 @@ static char *BackendAppnameBuffer = NULL;
 static char *BackendClientHostnameBuffer = NULL;
 static char *BackendActivityBuffer = NULL;
 static Size BackendActivityBufferSize = 0;
-#ifdef USE_SSL
-static PgBackendSSLStatus *BackendSslStatusBuffer = NULL;
-#endif
-#ifdef ENABLE_GSS
-static PgBackendGSSStatus *BackendGssStatusBuffer = NULL;
-#endif
 
 
 /* Status for backends including auxiliary */
@@ -96,16 +91,6 @@ BackendStatusShmemSize(void)
 	/* BackendActivityBuffer: */
 	size = add_size(size,
 					mul_size(pgstat_track_activity_query_size, NumBackendStatSlots));
-#ifdef USE_SSL
-	/* BackendSslStatusBuffer: */
-	size = add_size(size,
-					mul_size(sizeof(PgBackendSSLStatus), NumBackendStatSlots));
-#endif
-#ifdef ENABLE_GSS
-	/* BackendGssStatusBuffer: */
-	size = add_size(size,
-					mul_size(sizeof(PgBackendGSSStatus), NumBackendStatSlots));
-#endif
 	return size;
 }
 
@@ -190,50 +175,6 @@ CreateSharedBackendStatus(void)
 			buffer += pgstat_track_activity_query_size;
 		}
 	}
-
-#ifdef USE_SSL
-	/* Create or attach to the shared SSL status buffer */
-	size = mul_size(sizeof(PgBackendSSLStatus), NumBackendStatSlots);
-	BackendSslStatusBuffer = (PgBackendSSLStatus *)
-		ShmemInitStruct("Backend SSL Status Buffer", size, &found);
-
-	if (!found)
-	{
-		PgBackendSSLStatus *ptr;
-
-		MemSet(BackendSslStatusBuffer, 0, size);
-
-		/* Initialize st_sslstatus pointers. */
-		ptr = BackendSslStatusBuffer;
-		for (i = 0; i < NumBackendStatSlots; i++)
-		{
-			BackendStatusArray[i].st_sslstatus = ptr;
-			ptr++;
-		}
-	}
-#endif
-
-#ifdef ENABLE_GSS
-	/* Create or attach to the shared GSSAPI status buffer */
-	size = mul_size(sizeof(PgBackendGSSStatus), NumBackendStatSlots);
-	BackendGssStatusBuffer = (PgBackendGSSStatus *)
-		ShmemInitStruct("Backend GSS Status Buffer", size, &found);
-
-	if (!found)
-	{
-		PgBackendGSSStatus *ptr;
-
-		MemSet(BackendGssStatusBuffer, 0, size);
-
-		/* Initialize st_gssstatus pointers. */
-		ptr = BackendGssStatusBuffer;
-		for (i = 0; i < NumBackendStatSlots; i++)
-		{
-			BackendStatusArray[i].st_gssstatus = ptr;
-			ptr++;
-		}
-	}
-#endif
 }
 
 /*
@@ -293,12 +234,6 @@ pgstat_bestart(void)
 {
 	volatile PgBackendStatus *vbeentry = MyBEEntry;
 	PgBackendStatus lbeentry;
-#ifdef USE_SSL
-	PgBackendSSLStatus lsslstatus;
-#endif
-#ifdef ENABLE_GSS
-	PgBackendGSSStatus lgssstatus;
-#endif
 
 	/* pgstats state must be initialized from pgstat_beinit() */
 	Assert(vbeentry != NULL);
@@ -319,12 +254,6 @@ pgstat_bestart(void)
 		   sizeof(PgBackendStatus));
 
 	/* These structs can just start from zeroes each time, though */
-#ifdef USE_SSL
-	memset(&lsslstatus, 0, sizeof(lsslstatus));
-#endif
-#ifdef ENABLE_GSS
-	memset(&lgssstatus, 0, sizeof(lgssstatus));
-#endif
 
 	/*
 	 * Now fill in all the fields of lbeentry, except for strings that are
@@ -356,44 +285,6 @@ pgstat_bestart(void)
 			   sizeof(lbeentry.st_clientaddr));
 	else
 		MemSet(&lbeentry.st_clientaddr, 0, sizeof(lbeentry.st_clientaddr));
-
-#ifdef USE_SSL
-	if (MyProcPort && MyProcPort->ssl_in_use)
-	{
-		lbeentry.st_ssl = true;
-		lsslstatus.ssl_bits = be_tls_get_cipher_bits(MyProcPort);
-		strlcpy(lsslstatus.ssl_version, be_tls_get_version(MyProcPort), NAMEDATALEN);
-		strlcpy(lsslstatus.ssl_cipher, be_tls_get_cipher(MyProcPort), NAMEDATALEN);
-		be_tls_get_peer_subject_name(MyProcPort, lsslstatus.ssl_client_dn, NAMEDATALEN);
-		be_tls_get_peer_serial(MyProcPort, lsslstatus.ssl_client_serial, NAMEDATALEN);
-		be_tls_get_peer_issuer_name(MyProcPort, lsslstatus.ssl_issuer_dn, NAMEDATALEN);
-	}
-	else
-	{
-		lbeentry.st_ssl = false;
-	}
-#else
-	lbeentry.st_ssl = false;
-#endif
-
-#ifdef ENABLE_GSS
-	if (MyProcPort && MyProcPort->gss != NULL)
-	{
-		const char *princ = be_gssapi_get_princ(MyProcPort);
-
-		lbeentry.st_gss = true;
-		lgssstatus.gss_auth = be_gssapi_get_auth(MyProcPort);
-		lgssstatus.gss_enc = be_gssapi_get_enc(MyProcPort);
-		if (princ)
-			strlcpy(lgssstatus.gss_princ, princ, NAMEDATALEN);
-	}
-	else
-	{
-		lbeentry.st_gss = false;
-	}
-#else
-	lbeentry.st_gss = false;
-#endif
 
 	lbeentry.st_state = STATE_UNDEFINED;
 	lbeentry.st_progress_command = PROGRESS_COMMAND_INVALID;
@@ -436,13 +327,6 @@ pgstat_bestart(void)
 	lbeentry.st_appname[NAMEDATALEN - 1] = '\0';
 	lbeentry.st_clienthostname[NAMEDATALEN - 1] = '\0';
 	lbeentry.st_activity_raw[pgstat_track_activity_query_size - 1] = '\0';
-
-#ifdef USE_SSL
-	memcpy(lbeentry.st_sslstatus, &lsslstatus, sizeof(PgBackendSSLStatus));
-#endif
-#ifdef ENABLE_GSS
-	memcpy(lbeentry.st_gssstatus, &lgssstatus, sizeof(PgBackendGSSStatus));
-#endif
 
 	PGSTAT_END_WRITE_ACTIVITY(vbeentry);
 
@@ -732,12 +616,6 @@ pgstat_read_current_status(void)
 	char	   *localappname,
 			   *localclienthostname,
 			   *localactivity;
-#ifdef USE_SSL
-	PgBackendSSLStatus *localsslstatus;
-#endif
-#ifdef ENABLE_GSS
-	PgBackendGSSStatus *localgssstatus;
-#endif
 	int			i;
 
 	if (localBackendStatusTable)
@@ -766,16 +644,6 @@ pgstat_read_current_status(void)
 		MemoryContextAllocHuge(backendStatusSnapContext,
 							   (Size) pgstat_track_activity_query_size *
 							   (Size) NumBackendStatSlots);
-#ifdef USE_SSL
-	localsslstatus = (PgBackendSSLStatus *)
-		MemoryContextAlloc(backendStatusSnapContext,
-						   sizeof(PgBackendSSLStatus) * NumBackendStatSlots);
-#endif
-#ifdef ENABLE_GSS
-	localgssstatus = (PgBackendGSSStatus *)
-		MemoryContextAlloc(backendStatusSnapContext,
-						   sizeof(PgBackendGSSStatus) * NumBackendStatSlots);
-#endif
 
 	localNumBackends = 0;
 
@@ -817,20 +685,6 @@ pgstat_read_current_status(void)
 				localentry->backendStatus.st_clienthostname = localclienthostname;
 				strcpy(localactivity, (char *) beentry->st_activity_raw);
 				localentry->backendStatus.st_activity_raw = localactivity;
-#ifdef USE_SSL
-				if (beentry->st_ssl)
-				{
-					memcpy(localsslstatus, beentry->st_sslstatus, sizeof(PgBackendSSLStatus));
-					localentry->backendStatus.st_sslstatus = localsslstatus;
-				}
-#endif
-#ifdef ENABLE_GSS
-				if (beentry->st_gss)
-				{
-					memcpy(localgssstatus, beentry->st_gssstatus, sizeof(PgBackendGSSStatus));
-					localentry->backendStatus.st_gssstatus = localgssstatus;
-				}
-#endif
 			}
 
 			pgstat_end_read_activity(beentry, after_changecount);
@@ -855,12 +709,6 @@ pgstat_read_current_status(void)
 			localappname += NAMEDATALEN;
 			localclienthostname += NAMEDATALEN;
 			localactivity += pgstat_track_activity_query_size;
-#ifdef USE_SSL
-			localsslstatus++;
-#endif
-#ifdef ENABLE_GSS
-			localgssstatus++;
-#endif
 			localNumBackends++;
 		}
 	}

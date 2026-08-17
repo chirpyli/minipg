@@ -497,7 +497,6 @@ add_rte_to_flat_rtable(PlannerGlobal *glob, RangeTblEntry *rte)
 	newrte->coltypes = NIL;
 	newrte->coltypmods = NIL;
 	newrte->colcollations = NIL;
-	newrte->securityQuals = NIL;
 
 	/*
 	 * Also, if it's a subquery RTE, lose the relid that may have been kept to

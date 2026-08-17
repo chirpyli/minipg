@@ -87,7 +87,6 @@ static void AddNewRelationTuple(Relation pg_class_desc,
 								Oid new_rel_oid,
 								Oid new_type_oid,
 								Oid reloftype,
-								Oid relowner,
 								char relkind,
 								TransactionId relfrozenxid,
 								TransactionId relminmxid,
@@ -931,7 +930,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relnamespace - 1] = ObjectIdGetDatum(rd_rel->relnamespace);
 	values[Anum_pg_class_reltype - 1] = ObjectIdGetDatum(rd_rel->reltype);
 	values[Anum_pg_class_reloftype - 1] = ObjectIdGetDatum(rd_rel->reloftype);
-	values[Anum_pg_class_relowner - 1] = ObjectIdGetDatum(rd_rel->relowner);
 	values[Anum_pg_class_relam - 1] = ObjectIdGetDatum(rd_rel->relam);
 	values[Anum_pg_class_relfilenode - 1] = ObjectIdGetDatum(rd_rel->relfilenode);
 	values[Anum_pg_class_reltablespace - 1] = ObjectIdGetDatum(rd_rel->reltablespace);
@@ -978,7 +976,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 					Oid new_rel_oid,
 					Oid new_type_oid,
 					Oid reloftype,
-					Oid relowner,
 					char relkind,
 					TransactionId relfrozenxid,
 					TransactionId relminmxid,
@@ -1012,7 +1009,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 
 	new_rel_reltup->relfrozenxid = relfrozenxid;
 	new_rel_reltup->relminmxid = relminmxid;
-	new_rel_reltup->relowner = relowner;
 	new_rel_reltup->reltype = new_type_oid;
 	new_rel_reltup->reloftype = reloftype;
 
@@ -1329,7 +1325,6 @@ heap_create_with_catalog(const char *relname,
 						relid,
 						new_type_oid,
 						reloftypeid,
-						ownerid,
 						relkind,
 						relfrozenxid,
 						relminmxid,
@@ -1364,8 +1359,6 @@ heap_create_with_catalog(const char *relname,
 		ObjectAddresses *addrs;
 
 		ObjectAddressSet(myself, RelationRelationId, relid);
-
-		recordDependencyOnOwner(RelationRelationId, relid, ownerid);
 
 		recordDependencyOnCurrentExtension(&myself, false);
 

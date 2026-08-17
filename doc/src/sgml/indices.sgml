@@ -406,8 +406,7 @@ SELECT * FROM places ORDER BY location <-> point '(101,456)' LIMIT 10;
 </synopsis>
 
    The BRIN operator classes included in the standard distribution are
-   documented in <xref linkend="brin-builtin-opclasses-table"/>.
-   For more information see <xref linkend="brin"/>.
+   documented in the BRIN documentation.
   </para>
   </sect2>
  </sect1>

@@ -568,7 +568,7 @@ pg_stat_get_progress_info(PG_FUNCTION_ARGS)
 Datum
 pg_stat_get_activity(PG_FUNCTION_ARGS)
 {
-#define PG_STAT_GET_ACTIVITY_COLS	30
+#define PG_STAT_GET_ACTIVITY_COLS	23
 	int			num_backends = pgstat_fetch_stat_numbackends();
 	int			curr_backend;
 	int			pid = PG_ARGISNULL(0) ? -1 : PG_GETARG_INT32(0);
@@ -707,7 +707,7 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 			pfree(clipped_activity);
 
 			/* leader_pid */
-			nulls[28] = true;
+			nulls[21] = true;
 
 			proc = BackendPidGetProc(beentry->st_procpid);
 
@@ -744,8 +744,8 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 				 */
 				if (leader && leader->pid != beentry->st_procpid)
 				{
-					values[28] = Int32GetDatum(leader->pid);
-					nulls[28] = false;
+					values[21] = Int32GetDatum(leader->pid);
+					nulls[21] = false;
 				}
 			}
 
@@ -796,11 +796,7 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				if (beentry->st_clientaddr.addr.ss_family == AF_INET
-#ifdef HAVE_IPV6
-					|| beentry->st_clientaddr.addr.ss_family == AF_INET6
-#endif
-					)
+				if (beentry->st_clientaddr.addr.ss_family == AF_INET)
 				{
 					char		remote_host[NI_MAXHOST];
 					char		remote_port[NI_MAXSERV];
@@ -815,7 +811,6 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 											 NI_NUMERICHOST | NI_NUMERICSERV);
 					if (ret == 0)
 					{
-					clean_ipv6_addr(beentry->st_clientaddr.addr.ss_family, remote_host);
 					values[12] = CStringGetTextDatum(remote_host);
 						if (beentry->st_clienthostname &&
 							beentry->st_clienthostname[0])
@@ -830,18 +825,6 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 						nulls[13] = true;
 						nulls[14] = true;
 					}
-				}
-				else if (beentry->st_clientaddr.addr.ss_family == AF_UNIX)
-				{
-					/*
-					 * Unix sockets always reports NULL for host and -1 for
-					 * port, so it's possible to tell the difference to
-					 * connections we have no permissions to view, or with
-					 * errors.
-					 */
-					nulls[12] = true;
-					nulls[13] = true;
-					values[14] = Int32GetDatum(-1);
 				}
 				else
 				{
@@ -866,56 +849,15 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 				values[17] =
 					CStringGetTextDatum(GetBackendTypeDesc(beentry->st_backendType));
 
-			/* SSL information */
-			if (beentry->st_ssl)
-			{
-				values[18] = BoolGetDatum(true);	/* ssl */
-				values[19] = CStringGetTextDatum(beentry->st_sslstatus->ssl_version);
-				values[20] = CStringGetTextDatum(beentry->st_sslstatus->ssl_cipher);
-				values[21] = Int32GetDatum(beentry->st_sslstatus->ssl_bits);
-
-				if (beentry->st_sslstatus->ssl_client_dn[0])
-					values[22] = CStringGetTextDatum(beentry->st_sslstatus->ssl_client_dn);
-				else
-					nulls[22] = true;
-
-				if (beentry->st_sslstatus->ssl_client_serial[0])
-					values[23] = DirectFunctionCall3(numeric_in,
-													 CStringGetDatum(beentry->st_sslstatus->ssl_client_serial),
-													 ObjectIdGetDatum(InvalidOid),
-													 Int32GetDatum(-1));
-				else
-					nulls[23] = true;
-
-				if (beentry->st_sslstatus->ssl_issuer_dn[0])
-					values[24] = CStringGetTextDatum(beentry->st_sslstatus->ssl_issuer_dn);
-				else
-					nulls[24] = true;
-			}
-			else
-			{
-				values[18] = BoolGetDatum(false);	/* ssl */
-				nulls[19] = nulls[20] = nulls[21] = nulls[22] = nulls[23] = nulls[24] = true;
-			}
-
-			/* GSSAPI information */
-			if (beentry->st_gss)
-			{
-				values[25] = BoolGetDatum(beentry->st_gssstatus->gss_auth); /* gss_auth */
-				values[26] = CStringGetTextDatum(beentry->st_gssstatus->gss_princ);
-				values[27] = BoolGetDatum(beentry->st_gssstatus->gss_enc);	/* GSS Encryption in use */
-			}
-			else
-			{
-				values[25] = BoolGetDatum(false);	/* gss_auth */
-				nulls[26] = true;	/* No GSS principal */
-				values[27] = BoolGetDatum(false);	/* GSS Encryption not in
-													 * use */
-			}
+			/* GSSAPI information (not supported in minipg) */
+			values[18] = BoolGetDatum(false);	/* gss_auth */
+			nulls[19] = true;	/* No GSS principal */
+			values[20] = BoolGetDatum(false);	/* GSS Encryption not in
+												 * use */
 			if (beentry->st_query_id == 0)
-				nulls[29] = true;
+				nulls[22] = true;
 			else
-				values[29] = UInt64GetDatum(beentry->st_query_id);
+				values[22] = UInt64GetDatum(beentry->st_query_id);
 		}
 		else
 		{
@@ -937,13 +879,6 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 			nulls[20] = true;
 			nulls[21] = true;
 			nulls[22] = true;
-			nulls[23] = true;
-			nulls[24] = true;
-			nulls[25] = true;
-			nulls[26] = true;
-			nulls[27] = true;
-			nulls[28] = true;
-			nulls[29] = true;
 		}
 
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
@@ -1157,52 +1092,6 @@ pg_stat_get_backend_start(PG_FUNCTION_ARGS)
 
 
 Datum
-pg_stat_get_backend_client_addr(PG_FUNCTION_ARGS)
-{
-	int32		beid = PG_GETARG_INT32(0);
-	PgBackendStatus *beentry;
-	SockAddr	zero_clientaddr;
-	char		remote_host[NI_MAXHOST];
-	int			ret;
-
-	if ((beentry = pgstat_fetch_stat_beentry(beid)) == NULL)
-		PG_RETURN_NULL();
-
-	else if (!HAS_PGSTAT_PERMISSIONS(beentry->st_userid))
-		PG_RETURN_NULL();
-
-	/* A zeroed client addr means we don't know */
-	memset(&zero_clientaddr, 0, sizeof(zero_clientaddr));
-	if (memcmp(&(beentry->st_clientaddr), &zero_clientaddr,
-			   sizeof(zero_clientaddr)) == 0)
-		PG_RETURN_NULL();
-
-	switch (beentry->st_clientaddr.addr.ss_family)
-	{
-		case AF_INET:
-#ifdef HAVE_IPV6
-		case AF_INET6:
-#endif
-			break;
-		default:
-			PG_RETURN_NULL();
-	}
-
-	remote_host[0] = '\0';
-	ret = pg_getnameinfo_all(&beentry->st_clientaddr.addr,
-							 beentry->st_clientaddr.salen,
-							 remote_host, sizeof(remote_host),
-							 NULL, 0,
-							 NI_NUMERICHOST | NI_NUMERICSERV);
-	if (ret != 0)
-		PG_RETURN_NULL();
-
-	clean_ipv6_addr(beentry->st_clientaddr.addr.ss_family, remote_host);
-
-	PG_RETURN_TEXT_P(CStringGetTextDatum(remote_host));
-}
-
-Datum
 pg_stat_get_backend_client_port(PG_FUNCTION_ARGS)
 {
 	int32		beid = PG_GETARG_INT32(0);
@@ -1226,12 +1115,7 @@ pg_stat_get_backend_client_port(PG_FUNCTION_ARGS)
 	switch (beentry->st_clientaddr.addr.ss_family)
 	{
 		case AF_INET:
-#ifdef HAVE_IPV6
-		case AF_INET6:
-#endif
 			break;
-		case AF_UNIX:
-			PG_RETURN_INT32(-1);
 		default:
 			PG_RETURN_NULL();
 	}
@@ -2276,86 +2160,3 @@ pg_stat_get_archiver(PG_FUNCTION_ARGS)
 	PG_RETURN_DATUM(HeapTupleGetDatum(heap_form_tuple(tupdesc, values, nulls)));
 }
 
-/*
- * Get the statistics for the replication slot. If the slot statistics is not
- * available, return all-zeroes stats.
- */
-Datum
-pg_stat_get_replication_slot(PG_FUNCTION_ARGS)
-{
-#define PG_STAT_GET_REPLICATION_SLOT_COLS 10
-	text	   *slotname_text;
-	NameData	slotname;
-	TupleDesc	tupdesc;
-	Datum		values[PG_STAT_GET_REPLICATION_SLOT_COLS];
-	bool		nulls[PG_STAT_GET_REPLICATION_SLOT_COLS];
-	PgStat_StatReplSlotEntry *slotent;
-	PgStat_StatReplSlotEntry allzero;
-
-	/*
-	 * Function was accidentally marked as non-strict, can't change that post
-	 * release.
-	 */
-	if (PG_ARGISNULL(0))
-		PG_RETURN_NULL();
-
-	slotname_text = PG_GETARG_TEXT_P(0);
-
-	/* Initialise values and NULL flags arrays */
-	MemSet(values, 0, sizeof(values));
-	MemSet(nulls, 0, sizeof(nulls));
-
-	/* Initialise attributes information in the tuple descriptor */
-	tupdesc = CreateTemplateTupleDesc(PG_STAT_GET_REPLICATION_SLOT_COLS);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "slot_name",
-					   TEXTOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 2, "spill_txns",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 3, "spill_count",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 4, "spill_bytes",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 5, "stream_txns",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 6, "stream_count",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 7, "stream_bytes",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 8, "total_txns",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 9, "total_bytes",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 10, "stats_reset",
-					   TIMESTAMPTZOID, -1, 0);
-	BlessTupleDesc(tupdesc);
-
-	namestrcpy(&slotname, text_to_cstring(slotname_text));
-	slotent = pgstat_fetch_replslot(slotname);
-	if (!slotent)
-	{
-		/*
-		 * If the slot is not found, initialise its stats. This is possible if
-		 * the create slot message is lost.
-		 */
-		memset(&allzero, 0, sizeof(PgStat_StatReplSlotEntry));
-		slotent = &allzero;
-	}
-
-	values[0] = CStringGetTextDatum(NameStr(slotname));
-	values[1] = Int64GetDatum(slotent->spill_txns);
-	values[2] = Int64GetDatum(slotent->spill_count);
-	values[3] = Int64GetDatum(slotent->spill_bytes);
-	values[4] = Int64GetDatum(slotent->stream_txns);
-	values[5] = Int64GetDatum(slotent->stream_count);
-	values[6] = Int64GetDatum(slotent->stream_bytes);
-	values[7] = Int64GetDatum(slotent->total_txns);
-	values[8] = Int64GetDatum(slotent->total_bytes);
-
-	if (slotent->stat_reset_timestamp == 0)
-		nulls[9] = true;
-	else
-		values[9] = TimestampTzGetDatum(slotent->stat_reset_timestamp);
-
-	/* Returns the record as Datum */
-	PG_RETURN_DATUM(HeapTupleGetDatum(heap_form_tuple(tupdesc, values, nulls)));
-}

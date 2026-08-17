@@ -470,8 +470,6 @@ rewriteRuleAction(Query *parsetree,
 					/* other RTE types don't contain bare expressions */
 					break;
 			}
-			sub_action->hasSubLinks |=
-				checkExprHasSubLink((Node *) rte->securityQuals);
 			if (sub_action->hasSubLinks)
 				break;			/* no need to keep scanning rtable */
 		}
@@ -1695,13 +1693,6 @@ ApplyRetrieveRule(Query *parsetree,
 			parsetree->rtable = lappend(parsetree->rtable, newrte);
 			parsetree->resultRelation = list_length(parsetree->rtable);
 
-			/*
-			 * There's no need to do permissions checks twice, so wipe out the
-			 * permissions info for the original RTE (we prefer to keep the
-			 * bits set on the result RTE).
-			 */
-			rte->requiredPerms = 0;
-			rte->checkAsUser = InvalidOid;
 			rte->selectedCols = NULL;
 			rte->insertedCols = NULL;
 			rte->updatedCols = NULL;
@@ -1805,15 +1796,11 @@ ApplyRetrieveRule(Query *parsetree,
 	 */
 	subrte = rt_fetch(PRS2_OLD_VARNO, rule_action->rtable);
 	Assert(subrte->relid == relation->rd_id);
-	subrte->requiredPerms = rte->requiredPerms;
-	subrte->checkAsUser = rte->checkAsUser;
 	subrte->selectedCols = rte->selectedCols;
 	subrte->insertedCols = rte->insertedCols;
 	subrte->updatedCols = rte->updatedCols;
 	subrte->extraUpdatedCols = rte->extraUpdatedCols;
 
-	rte->requiredPerms = 0;		/* no permission check on subquery itself */
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1862,7 +1849,6 @@ markQueryForLocking(Query *qry, Node *jtnode,
 		if (rte->rtekind == RTE_RELATION)
 		{
 			applyLockingClause(qry, rti, strength, waitPolicy, pushedDown);
-			rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
 		}
 		else if (rte->rtekind == RTE_SUBQUERY)
 		{
@@ -1944,7 +1930,6 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 {
 	int			origResultRelation = parsetree->resultRelation;
 	int			rt_index;
-	ListCell   *lc;
 
 	/*
 	 * don't try to convert this into a foreach loop, because rtable list can
@@ -3093,21 +3078,6 @@ rewriteTargetView(Query *parsetree, Relation view)
 				   0);
 
 	/*
-	 * Mark the new target RTE for the permissions checks that we want to
-	 * enforce against the view owner, as distinct from the query caller.  At
-	 * the relation level, require the same INSERT/UPDATE/DELETE permissions
-	 * that the query caller needs against the view.  We drop the ACL_SELECT
-	 * bit that is presumably in new_rte->requiredPerms initially.
-	 *
-	 * Note: the original view RTE remains in the query's rangetable list.
-	 * Although it will be unused in the query plan, we need it there so that
-	 * the executor still performs appropriate permissions checks for the
-	 * query caller's use of the view.
-	 */
-	new_rte->checkAsUser = view->rd_rel->relowner;
-	new_rte->requiredPerms = view_rte->requiredPerms;
-
-	/*
 	 * Now for the per-column permissions bits.
 	 *
 	 * Initially, new_rte contains selectedCols permission check bits for all
@@ -3138,14 +3108,6 @@ rewriteTargetView(Query *parsetree, Relation view)
 
 	new_rte->updatedCols = adjust_view_column_set(view_rte->updatedCols,
 												  view_targetlist);
-
-	/*
-	 * Move any security barrier quals from the view RTE onto the new target
-	 * RTE.  Any such quals should now apply to the new target RTE and will
-	 * not reference the original view RTE in the rewritten query.
-	 */
-	new_rte->securityQuals = view_rte->securityQuals;
-	view_rte->securityQuals = NIL;
 
 	/*
 	 * Now update all Vars in the outer query that reference the view to
@@ -3252,7 +3214,6 @@ rewriteTargetView(Query *parsetree, Relation view)
 													   false, false);
 		new_exclRte = new_exclNSItem->p_rte;
 		new_exclRte->relkind = RELKIND_COMPOSITE_TYPE;
-		new_exclRte->requiredPerms = 0;
 		/* other permissions fields in new_exclRte are already empty */
 
 		parsetree->rtable = lappend(parsetree->rtable, new_exclRte);
@@ -3316,28 +3277,7 @@ rewriteTargetView(Query *parsetree, Relation view)
 
 		ChangeVarNodes(viewqual, base_rt_index, new_rt_index, 0);
 
-		if (RelationIsSecurityView(view))
-		{
-			/*
-			 * The view's quals go in front of existing barrier quals: those
-			 * would have come from an outer level of security-barrier view,
-			 * and so must get evaluated later.
-			 *
-			 * Note: the parsetree has been mutated, so the new_rte pointer is
-			 * stale and needs to be re-computed.
-			 */
-			new_rte = rt_fetch(new_rt_index, parsetree->rtable);
-			new_rte->securityQuals = lcons(viewqual, new_rte->securityQuals);
-
-			/*
-			 * Make sure that the query is marked correctly if the added qual
-			 * has sublinks.
-			 */
-			if (!parsetree->hasSubLinks)
-				parsetree->hasSubLinks = checkExprHasSubLink(viewqual);
-		}
-		else
-			AddQual(parsetree, (Node *) viewqual);
+		AddQual(parsetree, (Node *) viewqual);
 	}
 
 	/*
@@ -3442,7 +3382,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 	bool		updatableview = false;
 	Query	   *qual_product = NULL;
 	List	   *rewritten = NIL;
-	ListCell   *lc1;
 
 
 	/*

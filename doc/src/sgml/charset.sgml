@@ -318,7 +318,7 @@ initdb --locale=sv_SE
     <productname>PostgreSQL</productname> speak their preferred language well.
     If messages in your language are currently not available or not fully
     translated, your assistance would be appreciated.  If you want to
-    help, refer to <xref linkend="nls"/> or write to the developers'
+    help, write to the developers'
     mailing list.
    </para>
   </sect2>

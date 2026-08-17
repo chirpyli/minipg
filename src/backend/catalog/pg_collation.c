@@ -44,7 +44,6 @@
  */
 Oid
 CollationCreate(const char *collname, Oid collnamespace,
-				Oid collowner,
 				char collprovider,
 				bool collisdeterministic,
 				int32 collencoding,
@@ -67,7 +66,6 @@ CollationCreate(const char *collname, Oid collnamespace,
 
 	AssertArg(collname);
 	AssertArg(collnamespace);
-	AssertArg(collowner);
 	AssertArg(collcollate);
 	AssertArg(collctype);
 
@@ -180,7 +178,6 @@ CollationCreate(const char *collname, Oid collnamespace,
 	values[Anum_pg_collation_oid - 1] = ObjectIdGetDatum(oid);
 	values[Anum_pg_collation_collname - 1] = NameGetDatum(&name_name);
 	values[Anum_pg_collation_collnamespace - 1] = ObjectIdGetDatum(collnamespace);
-	values[Anum_pg_collation_collowner - 1] = ObjectIdGetDatum(collowner);
 	values[Anum_pg_collation_collprovider - 1] = CharGetDatum(collprovider);
 	values[Anum_pg_collation_collisdeterministic - 1] = BoolGetDatum(collisdeterministic);
 	values[Anum_pg_collation_collencoding - 1] = Int32GetDatum(collencoding);
@@ -209,9 +206,6 @@ CollationCreate(const char *collname, Oid collnamespace,
 	referenced.objectId = collnamespace;
 	referenced.objectSubId = 0;
 	recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-
-	/* create dependency on owner */
-	recordDependencyOnOwner(CollationRelationId, oid, collowner);
 
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, false);

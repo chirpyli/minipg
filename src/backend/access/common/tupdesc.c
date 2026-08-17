@@ -799,7 +799,6 @@ BuildDescForRelation(List *schema)
 	foreach(l, schema)
 	{
 		ColumnDef  *entry = lfirst(l);
-		AclResult	aclresult;
 		Form_pg_attribute att;
 
 		/*
@@ -811,10 +810,6 @@ BuildDescForRelation(List *schema)
 
 		attname = entry->colname;
 		typenameTypeIdAndMod(NULL, entry->typeName, &atttypid, &atttypmod);
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, atttypid);
 
 		attcollation = GetColumnDefCollation(NULL, entry, atttypid);
 		attdim = list_length(entry->typeName->arrayBounds);

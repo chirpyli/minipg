@@ -181,9 +181,6 @@ static char backend_exec[MAXPGPATH];
 static char **replace_token(char **lines,
 							const char *token, const char *replacement);
 
-#ifndef HAVE_UNIX_SOCKETS
-static char **filter_lines_with_token(char **lines, const char *token);
-#endif
 static char **readfile(const char *path);
 static void writefile(char *path, char **lines);
 static FILE *popen_check(const char *command, const char *mode);
@@ -352,36 +349,6 @@ replace_token(char **lines, const char *token, const char *replacement)
 
 	return result;
 }
-
-/*
- * make a copy of lines without any that contain the token
- *
- * a sort of poor man's grep -v
- */
-#ifndef HAVE_UNIX_SOCKETS
-static char **
-filter_lines_with_token(char **lines, const char *token)
-{
-	int			numlines = 1;
-	int			i,
-				src,
-				dst;
-	char	  **result;
-
-	for (i = 0; lines[i]; i++)
-		numlines++;
-
-	result = (char **) pg_malloc(numlines * sizeof(char *));
-
-	for (src = 0, dst = 0; src < numlines; src++)
-	{
-		if (lines[src] == NULL || strstr(lines[src], token) == NULL)
-			result[dst++] = lines[src];
-	}
-
-	return result;
-}
-#endif
 
 /*
  * get the lines from a text file
@@ -884,15 +851,6 @@ setup_config(void)
 				 n_buffers * (BLCKSZ / 1024));
 	conflines = replace_token(conflines, "#shared_buffers = 32MB", repltok);
 
-#ifdef HAVE_UNIX_SOCKETS
-	snprintf(repltok, sizeof(repltok), "#unix_socket_directories = '%s'",
-			 DEFAULT_PGSOCKET_DIR);
-#else
-	snprintf(repltok, sizeof(repltok), "#unix_socket_directories = ''");
-#endif
-	conflines = replace_token(conflines, "#unix_socket_directories = '/tmp'",
-							  repltok);
-
 #if DEF_PGPORT != 5432
 	snprintf(repltok, sizeof(repltok), "#port = %d", DEF_PGPORT);
 	conflines = replace_token(conflines, "#port = 5432", repltok);
@@ -1022,9 +980,6 @@ setup_config(void)
 	}
 
 	free(conflines);
-
-
-	/* minipg: pg_hba.conf / pg_ident.conf 已移除，不再生成这些认证配置文件。 */
 
 	check_ok();
 }
@@ -1293,9 +1248,9 @@ setup_collation(FILE *cmdfd)
 	 * in pg_collation.h.  But add it before reading system collations, so
 	 * that it wins if libc defines a locale named ucs_basic.
 	 */
-	PG_CMD_PRINTF("INSERT INTO pg_collation (oid, collname, collnamespace, collowner, collprovider, collisdeterministic, collencoding, collcollate, collctype)"
-				  "VALUES (pg_nextoid('pg_catalog.pg_collation', 'oid', 'pg_catalog.pg_collation_oid_index'), 'ucs_basic', 'pg_catalog'::regnamespace, %u, '%c', true, %d, 'C', 'C');\n\n",
-				  BOOTSTRAP_SUPERUSERID, COLLPROVIDER_LIBC, PG_UTF8);
+	PG_CMD_PRINTF("INSERT INTO pg_collation (oid, collname, collnamespace, collprovider, collisdeterministic, collencoding, collcollate, collctype)"
+				  "VALUES (pg_nextoid('pg_catalog.pg_collation', 'oid', 'pg_catalog.pg_collation_oid_index'), 'ucs_basic', 'pg_catalog'::regnamespace, '%c', true, %d, 'C', 'C');\n\n",
+				  COLLPROVIDER_LIBC, PG_UTF8);
 
 	/* Now import all collations we can find in the operating system */
 	PG_CMD_PUTS("SELECT pg_import_system_collations('pg_catalog');\n\n");

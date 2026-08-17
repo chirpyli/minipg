@@ -598,7 +598,8 @@ sub init
 	print $conf "port = $port\n";
 	if ($use_tcp)
 	{
-		print $conf "unix_socket_directories = ''\n";
+		# minipg: Unix-domain sockets have been removed, so do not emit the
+		# (now unrecognized) unix_socket_directories parameter.
 		print $conf "listen_addresses = '$host'\n";
 	}
 	else
@@ -835,12 +836,8 @@ port = $port
 ));
 	if ($use_tcp)
 	{
+		# minipg: Unix-domain sockets removed; tcp is the only transport.
 		$self->append_conf('postgresql.conf', "listen_addresses = '$host'");
-	}
-	else
-	{
-		$self->append_conf('postgresql.conf',
-			"unix_socket_directories = '$host'");
 	}
 	$self->enable_streaming($root_node) if $params{has_streaming};
 	$self->enable_restoring($root_node, $params{standby})

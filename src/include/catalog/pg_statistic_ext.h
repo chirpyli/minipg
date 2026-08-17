@@ -42,7 +42,6 @@ CATALOG(pg_statistic_ext,3381,StatisticExtRelationId)
 	Oid			stxnamespace BKI_LOOKUP(pg_namespace);	/* OID of statistics
 														 * object's namespace */
 
-	Oid			stxowner BKI_DEFAULT(10); /* statistics object's owner */
 	int32		stxstattarget BKI_DEFAULT(-1);	/* statistics target */
 
 	/*

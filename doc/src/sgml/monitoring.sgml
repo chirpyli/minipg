@@ -337,23 +337,6 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
       </entry>
      </row>
 
-     <row>
-      <entry><structname>pg_stat_ssl</structname><indexterm><primary>pg_stat_ssl</primary></indexterm></entry>
-      <entry>One row per connection (regular and replication), showing information about
-       SSL used on this connection.
-       See <link linkend="monitoring-pg-stat-ssl-view">
-       <structname>pg_stat_ssl</structname></link> for details.
-      </entry>
-     </row>
-
-     <row>
-      <entry><structname>pg_stat_gssapi</structname><indexterm><primary>pg_stat_gssapi</primary></indexterm></entry>
-      <entry>One row per connection (regular and replication), showing information about
-       GSSAPI authentication and encryption used on this connection.
-       See <link linkend="monitoring-pg-stat-gssapi-view">
-       <structname>pg_stat_gssapi</structname></link> for details.
-      </entry>
-     </row>
 
      <row>
       <entry><structname>pg_stat_progress_analyze</structname><indexterm><primary>pg_stat_progress_analyze</primary></indexterm></entry>
@@ -1170,11 +1153,6 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
       <entry>Waiting to write data to the client.</entry>
      </row>
      <row>
-      <entry><literal>GSSOpenServer</literal></entry>
-      <entry>Waiting to read data from the client while establishing a GSSAPI
-       session.</entry>
-     </row>
-     <row>
       <entry><literal>LibPQWalReceiverConnect</literal></entry>
       <entry>Waiting in WAL receiver to establish connection to remote
        server.</entry>
@@ -1182,10 +1160,6 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
      <row>
       <entry><literal>LibPQWalReceiverReceive</literal></entry>
       <entry>Waiting in WAL receiver to receive data from remote server.</entry>
-     </row>
-     <row>
-      <entry><literal>SSLOpenServer</literal></entry>
-      <entry>Waiting for SSL while attempting connection.</entry>
      </row>
      <row>
       <entry><literal>WalSenderWaitForWAL</literal></entry>
@@ -3054,201 +3028,6 @@ SELECT pid, wait_event_type, wait_event FROM pg_stat_activity WHERE wait_event i
 
  </sect2>
 
- <sect2 id="monitoring-pg-stat-ssl-view">
-  <title><structname>pg_stat_ssl</structname></title>
-
-  <indexterm>
-   <primary>pg_stat_ssl</primary>
-  </indexterm>
-
-  <para>
-   The <structname>pg_stat_ssl</structname> view will contain one row per
-   backend or WAL sender process, showing statistics about SSL usage on
-   this connection. It can be joined to <structname>pg_stat_activity</structname>
-   or <structname>pg_stat_replication</structname> on the
-   <structfield>pid</structfield> column to get more details about the
-   connection.
-  </para>
-
-  <table id="pg-stat-ssl-view" xreflabel="pg_stat_ssl">
-   <title><structname>pg_stat_ssl</structname> View</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>pid</structfield> <type>integer</type>
-      </para>
-      <para>
-       Process ID of a backend or WAL sender process
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ssl</structfield> <type>boolean</type>
-      </para>
-      <para>
-       True if SSL is used on this connection
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>version</structfield> <type>text</type>
-      </para>
-      <para>
-       Version of SSL in use, or NULL if SSL is not in use
-       on this connection
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>cipher</structfield> <type>text</type>
-      </para>
-      <para>
-       Name of SSL cipher in use, or NULL if SSL is not in use
-       on this connection
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>bits</structfield> <type>integer</type>
-      </para>
-      <para>
-       Number of bits in the encryption algorithm used, or NULL
-       if SSL is not used on this connection
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>client_dn</structfield> <type>text</type>
-      </para>
-      <para>
-       Distinguished Name (DN) field from the client certificate
-       used, or NULL if no client certificate was supplied or if SSL
-       is not in use on this connection. This field is truncated if the
-       DN field is longer than <symbol>NAMEDATALEN</symbol> (64 characters
-       in a standard build).
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>client_serial</structfield> <type>numeric</type>
-      </para>
-      <para>
-       Serial number of the client certificate, or NULL if no client
-       certificate was supplied or if SSL is not in use on this connection.  The
-       combination of certificate serial number and certificate issuer uniquely
-       identifies a certificate (unless the issuer erroneously reuses serial
-       numbers).
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>issuer_dn</structfield> <type>text</type>
-      </para>
-      <para>
-       DN of the issuer of the client certificate, or NULL if no client
-       certificate was supplied or if SSL is not in use on this connection.
-       This field is truncated like <structfield>client_dn</structfield>.
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
-
- </sect2>
-
- <sect2 id="monitoring-pg-stat-gssapi-view">
-  <title><structname>pg_stat_gssapi</structname></title>
-
-  <indexterm>
-   <primary>pg_stat_gssapi</primary>
-  </indexterm>
-
-  <para>
-   The <structname>pg_stat_gssapi</structname> view will contain one row per
-   backend, showing information about GSSAPI usage on this connection. It can
-   be joined to <structname>pg_stat_activity</structname> or
-   <structname>pg_stat_replication</structname> on the
-   <structfield>pid</structfield> column to get more details about the
-   connection.
-  </para>
-
-  <table id="pg-stat-gssapi-view" xreflabel="pg_stat_gssapi">
-   <title><structname>pg_stat_gssapi</structname> View</title>
-   <tgroup cols="1">
-    <thead>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       Column Type
-      </para>
-      <para>
-       Description
-      </para></entry>
-     </row>
-    </thead>
-
-    <tbody>
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>pid</structfield> <type>integer</type>
-      </para>
-      <para>
-       Process ID of a backend
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>gss_authenticated</structfield> <type>boolean</type>
-      </para>
-      <para>
-       True if GSSAPI authentication was used for this connection
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>principal</structfield> <type>text</type>
-      </para>
-      <para>
-       Principal used to authenticate this connection, or NULL
-       if GSSAPI was not used to authenticate this connection.  This
-       field is truncated if the principal is longer than
-       <symbol>NAMEDATALEN</symbol> (64 characters in a standard build).
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>encrypted</structfield> <type>boolean</type>
-      </para>
-      <para>
-       True if GSSAPI encryption is in use on this connection
-      </para></entry>
-     </row>
-    </tbody>
-   </tgroup>
-  </table>
-
- </sect2>
 
  <sect2 id="monitoring-pg-stat-archiver-view">
   <title><structname>pg_stat_archiver</structname></title>

@@ -22,6 +22,7 @@
 #include "access/amapi.h"
 #include "access/htup_details.h"
 #include "access/relation.h"
+#include "access/reloptions.h"	/* for untransformRelOptions */
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "catalog/pg_aggregate.h"
@@ -2299,7 +2300,6 @@ pg_get_expr_worker(text *expr, Oid relid, int prettyFlags)
 Datum
 pg_get_userbyid(PG_FUNCTION_ARGS)
 {
-	Oid			roleid = PG_GETARG_OID(0);
 	Name		result;
 
 	/*
@@ -6212,8 +6212,6 @@ get_delete_query_def(Query *query, deparse_context *context,
 static void
 get_utility_query_def(Query *query, deparse_context *context)
 {
-	StringInfo	buf = context->buf;
-
 	/*
 	 * LISTEN/NOTIFY/UNLISTEN are not supported in minipg (see mydoc/CHANGE.md),
 	 * so no utility statement can appear in a rule body anymore.
@@ -10350,8 +10348,7 @@ generate_relation_name(Oid relid, List *namespaces)
 {
 	HeapTuple	tp;
 	Form_pg_class reltup;
-	bool		need_qual;
-	ListCell   *nslist;
+	bool		need_qual = false;
 	char	   *relname;
 	char	   *nspname;
 	char	   *result;

@@ -33,9 +33,6 @@ CATALOG(pg_language,2612,LanguageRelationId)
 	/* Language name */
 	NameData	lanname;
 
-	/* Language's owner */
-	Oid			lanowner BKI_DEFAULT(10);
-
 	/* Is a procedural language */
 	bool		lanispl BKI_DEFAULT(f);
 

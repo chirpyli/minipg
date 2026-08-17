@@ -379,7 +379,6 @@ void
 KeepFileRestoredFromArchive(const char *path, const char *xlogfname)
 {
 	char		xlogfpath[MAXPGPATH];
-	bool		reload = false;
 	struct stat statbuf;
 
 	snprintf(xlogfpath, MAXPGPATH, XLOGDIR "/%s", xlogfname);
@@ -394,9 +393,8 @@ KeepFileRestoredFromArchive(const char *path, const char *xlogfname)
 			ereport(FATAL,
 					(errcode_for_file_access(),
 					 errmsg("could not remove file \"%s\": %m",
-							xlogfpath)));
-		reload = true;
-	}
+					 	xlogfpath)));
+					 }
 
 	durable_rename(path, xlogfpath, ERROR);
 

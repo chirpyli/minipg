@@ -390,7 +390,6 @@ build_client_first_message(fe_scram_state *state)
 	 */
 	if (strcmp(state->sasl_mechanism, SCRAM_SHA_256_PLUS_NAME) == 0)
 	{
-		Assert(conn->ssl_in_use);
 		appendPQExpBufferStr(&buf, "p=tls-server-end-point");
 	}
 #ifdef HAVE_PGTLS_GET_PEER_CERTIFICATE_HASH

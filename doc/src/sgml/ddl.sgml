@@ -1544,39 +1544,7 @@ ALTER TABLE products ALTER COLUMN price TYPE numeric(10,2);
     modified constraints afterwards.
    </para>
   </sect2>
-
-  <sect2>
-   <title>Renaming a Column</title>
-
-   <indexterm>
-    <primary>column</primary>
-    <secondary>renaming</secondary>
-   </indexterm>
-
-   <para>
-    To rename a column:
-<programlisting>
-ALTER TABLE products RENAME COLUMN product_no TO product_number;
-</programlisting>
-   </para>
-  </sect2>
-
-  <sect2>
-   <title>Renaming a Table</title>
-
-   <indexterm>
-    <primary>table</primary>
-    <secondary>renaming</secondary>
-   </indexterm>
-
-   <para>
-    To rename a table:
-<programlisting>
-ALTER TABLE products RENAME TO items;
-</programlisting>
-   </para>
-  </sect2>
- </sect1>
+</sect1>
 
   <title>Row Security Policies</title>
 

@@ -4087,7 +4087,7 @@ SELECT * FROM test;
     The <type>tsvector</type> type represents a document in a form optimized
     for text search; the <type>tsquery</type> type similarly represents
     a text query.
-    <xref linkend="textsearch"/> provides a detailed explanation of this
+    Text search provides a detailed explanation of this
     facility, and <xref linkend="functions-textsearch"/> summarizes the
     related functions and operators.
    </para>
@@ -4103,7 +4103,7 @@ SELECT * FROM test;
      A <type>tsvector</type> value is a sorted list of distinct
      <firstterm>lexemes</firstterm>, which are words that have been
      <firstterm>normalized</firstterm> to merge different variants of the same word
-     (see <xref linkend="textsearch"/> for details).  Sorting and
+     (see the text search documentation for details).  Sorting and
      duplicate-elimination are done automatically during input, as shown in
      this example:
 
@@ -4197,7 +4197,6 @@ SELECT to_tsvector('english', 'The Fat Rats');
  'fat':2 'rat':3
 </programlisting>
 
-     Again, see <xref linkend="textsearch"/> for more detail.
     </para>
 
    </sect2>

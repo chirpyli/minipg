@@ -44,7 +44,6 @@
 #include "commands/tablespace.h"
 #include "commands/trigger.h"
 #include "commands/typecmds.h"
-#include "commands/user.h"
 #include "commands/vacuum.h"
 #include "commands/view.h"
 #include "miscadmin.h"
@@ -162,7 +161,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
 		case T_IndexStmt:
-		case T_RenameStmt:
 		case T_RuleStmt:
 		case T_TruncateStmt:
 		case T_ViewStmt:
@@ -744,14 +742,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_RenameStmt:
-			{
-				RenameStmt *stmt = (RenameStmt *) parsetree;
-
-				ExecRenameStmt(stmt);
-			}
-			break;
-
 		case T_AlterObjectDependsStmt:
 			{
 				AlterObjectDependsStmt *stmt = (AlterObjectDependsStmt *) parsetree;
@@ -770,9 +760,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 		case T_AlterOwnerStmt:
 			{
-				AlterOwnerStmt *stmt = (AlterOwnerStmt *) parsetree;
 
-				ExecAlterOwnerStmt(stmt);
 			}
 			break;
 
@@ -923,7 +911,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					AlterTableStmt *atstmt = (AlterTableStmt *) parsetree;
 					Oid			relid;
 					LOCKMODE	lockmode;
-					ListCell   *cell;
 
 					/*
 					 * Figure out lock mode, and acquire lock.  This also does
@@ -1202,10 +1189,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
 				break;
 
-			case T_RenameStmt:
-				address = ExecRenameStmt((RenameStmt *) parsetree);
-				break;
-
 			case T_AlterObjectDependsStmt:
 				address =
 					ExecAlterObjectDependsStmt((AlterObjectDependsStmt *) parsetree,
@@ -1219,7 +1202,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_AlterOwnerStmt:
-				address = ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
 				break;
 
 			case T_AlterOperatorStmt:
@@ -1872,17 +1854,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_TRUNCATE_TABLE;
 			break;
 
-		case T_RenameStmt:
-
-			/*
-			 * When the column is renamed, the command tag is created from its
-			 * relation type
-			 */
-			tag = AlterObjectTypeCommandTag(((RenameStmt *) parsetree)->renameType == OBJECT_COLUMN ?
-											((RenameStmt *) parsetree)->relationType :
-											((RenameStmt *) parsetree)->renameType);
-			break;
-
 		case T_AlterObjectDependsStmt:
 			tag = AlterObjectTypeCommandTag(((AlterObjectDependsStmt *) parsetree)->objectType);
 			break;
@@ -2391,10 +2362,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_DeallocateStmt:
 			lev = LOGSTMT_ALL;
-			break;
-
-		case T_RenameStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_AlterObjectDependsStmt:

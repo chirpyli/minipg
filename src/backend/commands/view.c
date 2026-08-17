@@ -390,8 +390,6 @@ UpdateRangeTableOfViewParse(Oid viewOid, Query *viewParse)
 	rt_entry2 = nsitem->p_rte;
 
 	/* Must override addRangeTableEntry's default access-check flags */
-	rt_entry1->requiredPerms = 0;
-	rt_entry2->requiredPerms = 0;
 
 	new_rt = lcons(rt_entry1, lcons(rt_entry2, viewParse->rtable));
 

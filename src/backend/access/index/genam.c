@@ -183,7 +183,6 @@ BuildIndexValueDescription(Relation indexRelation,
 	int			i;
 	int			keyno;
 	Oid			indexrelid = RelationGetRelid(indexRelation);
-	Oid			indrelid;
 	AclResult	aclresult;
 
 	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
@@ -199,7 +198,6 @@ BuildIndexValueDescription(Relation indexRelation,
 	 * no access there, check column-level permissions.
 	 */
 	idxrec = indexRelation->rd_index;
-	indrelid = idxrec->indrelid;
 	Assert(indexrelid == idxrec->indexrelid);
 
 	/* Table-level SELECT is enough, if the user has it */

@@ -558,16 +558,6 @@ pqPutMsgEnd(PGconn *conn)
 		 * Unix connections, so those checks are just Asserts.  They'll have
 		 * to become part of the regular if-test if we ever change that.)
 		 */
-		if (conn->raddr.addr.ss_family == AF_UNIX)
-		{
-#ifdef USE_SSL
-			Assert(!conn->ssl_in_use);
-#endif
-#ifdef ENABLE_GSS
-			Assert(!conn->gssenc);
-#endif
-			toSend -= toSend % 8192;
-		}
 
 		if (pqSendSome(conn, toSend) < 0)
 			return EOF;
@@ -753,10 +743,6 @@ retry3:
 	 * data, relying on the SSL layer to detect true EOF.
 	 */
 
-#ifdef USE_SSL
-	if (conn->ssl_in_use)
-		return 0;
-#endif
 
 	switch (pqReadReady(conn))
 	{

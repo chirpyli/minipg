@@ -208,15 +208,6 @@ DefineType(ParseState *pstate, List *names, List *parameters)
 	/* Convert list of names to a name and namespace */
 	typeNamespace = QualifiedNameGetCreationNamespace(names, &typeName);
 
-#ifdef NOT_USED
-	/* XXX this is unnecessary given the superuser check above */
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(typeNamespace));
-#endif
-
 	/*
 	 * Look to see if type already exists.
 	 */
@@ -517,29 +508,13 @@ DefineType(ParseState *pstate, List *names, List *parameters)
 	 * findTypeInputFunction et al, where they could be shared by AlterType.
 	 */
 #ifdef NOT_USED
-	if (inputOid && !pg_proc_ownercheck(inputOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(inputName));
-	if (outputOid && !pg_proc_ownercheck(outputOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(outputName));
-	if (receiveOid && !pg_proc_ownercheck(receiveOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(receiveName));
-	if (sendOid && !pg_proc_ownercheck(sendOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(sendName));
-	if (typmodinOid && !pg_proc_ownercheck(typmodinOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(typmodinName));
-	if (typmodoutOid && !pg_proc_ownercheck(typmodoutOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(typmodoutName));
-	if (analyzeOid && !pg_proc_ownercheck(analyzeOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(analyzeName));
-	if (subscriptOid && !pg_proc_ownercheck(subscriptOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 					   NameListToString(subscriptName));
 #endif
 
@@ -687,7 +662,6 @@ DefineDomain(CreateDomainStmt *stmt)
 	char	   *domainName;
 	char	   *domainArrayName;
 	Oid			domainNamespace;
-	AclResult	aclresult;
 	int16		internalLength;
 	Oid			inputProcedure;
 	Oid			outputProcedure;
@@ -723,12 +697,6 @@ DefineDomain(CreateDomainStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	domainNamespace = QualifiedNameGetCreationNamespace(stmt->domainname,
 														&domainName);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(domainNamespace));
 
 	/*
 	 * Check for collision with an existing type name.  If there is one and
@@ -771,10 +739,6 @@ DefineDomain(CreateDomainStmt *stmt)
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("\"%s\" is not a valid base type for a domain",
 						TypeNameToString(stmt->typeName))));
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, basetypeoid);
 
 	/*
 	 * Collect the properties of the new domain.  Some are inherited from the
@@ -1124,7 +1088,6 @@ DefineEnum(CreateEnumStmt *stmt)
 	char	   *enumName;
 	char	   *enumArrayName;
 	Oid			enumNamespace;
-	AclResult	aclresult;
 	Oid			old_type_oid;
 	Oid			enumArrayOid;
 	ObjectAddress enumTypeAddr;
@@ -1132,12 +1095,6 @@ DefineEnum(CreateEnumStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	enumNamespace = QualifiedNameGetCreationNamespace(stmt->typeName,
 													  &enumName);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(enumNamespace));
 
 	/*
 	 * Check for collision with an existing type name.  If there is one and
@@ -1303,8 +1260,6 @@ checkEnumOwner(HeapTuple tup)
 						format_type_be(typTup->oid))));
 
 	/* Permission check: must own type */
-	if (!pg_type_ownercheck(typTup->oid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typTup->oid);
 }
 
 
@@ -1343,7 +1298,6 @@ DefineRange(CreateRangeStmt *stmt)
 	bool		subtypbyval;
 	char		subtypalign;
 	char		alignment;
-	AclResult	aclresult;
 	ListCell   *lc;
 	ObjectAddress address;
 	ObjectAddress mltrngaddress PG_USED_FOR_ASSERTS_ONLY;
@@ -1352,12 +1306,6 @@ DefineRange(CreateRangeStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	typeNamespace = QualifiedNameGetCreationNamespace(stmt->typeName,
 													  &typeName);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(typeNamespace));
 
 	/*
 	 * Look to see if type already exists.
@@ -1440,12 +1388,6 @@ DefineRange(CreateRangeStmt *stmt)
 			/* we can look up the subtype name immediately */
 			multirangeNamespace = QualifiedNameGetCreationNamespace(defGetQualifiedName(defel),
 																	&multirangeTypeName);
-
-			/* Check we have creation rights in target namespace */
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_SCHEMA,
-							   get_namespace_name(multirangeNamespace));
 		}
 		else
 			ereport(ERROR,
@@ -2316,7 +2258,6 @@ findRangeCanonicalFunction(List *procname, Oid typeOid)
 {
 	Oid			argList[1];
 	Oid			procOid;
-	AclResult	aclresult;
 
 	/*
 	 * Range canonical functions must take and return the range type, and must
@@ -2344,11 +2285,6 @@ findRangeCanonicalFunction(List *procname, Oid typeOid)
 				 errmsg("range canonical function %s must be immutable",
 						func_signature_string(procname, 1, NIL, argList))));
 
-	/* Also, range type's creator must have permission to call function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(procOid));
-
 	return procOid;
 }
 
@@ -2357,7 +2293,6 @@ findRangeSubtypeDiffFunction(List *procname, Oid subtype)
 {
 	Oid			argList[2];
 	Oid			procOid;
-	AclResult	aclresult;
 
 	/*
 	 * Range subtype diff functions must take two arguments of the subtype,
@@ -2386,11 +2321,6 @@ findRangeSubtypeDiffFunction(List *procname, Oid subtype)
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("range subtype diff function %s must be immutable",
 						func_signature_string(procname, 2, NIL, argList))));
-
-	/* Also, range type's creator must have permission to call function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(procOid));
 
 	return procOid;
 }
@@ -3393,8 +3323,6 @@ checkDomainOwner(HeapTuple tup)
 						format_type_be(typTup->oid))));
 
 	/* Permission check: must own type */
-	if (!pg_type_ownercheck(typTup->oid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typTup->oid);
 }
 
 /*
@@ -3552,251 +3480,6 @@ replace_domain_constraint_value(ParseState *pstate, ColumnRef *cref)
 }
 
 
-/*
- * Execute ALTER TYPE RENAME
- */
-ObjectAddress
-RenameType(RenameStmt *stmt)
-{
-	List	   *names = castNode(List, stmt->object);
-	const char *newTypeName = stmt->newname;
-	TypeName   *typename;
-	Oid			typeOid;
-	Relation	rel;
-	HeapTuple	tup;
-	Form_pg_type typTup;
-	ObjectAddress address;
-
-	/* Make a TypeName so we can use standard type lookup machinery */
-	typename = makeTypeNameFromNameList(names);
-	typeOid = typenameTypeId(NULL, typename);
-
-	/* Look up the type in the type table */
-	rel = table_open(TypeRelationId, RowExclusiveLock);
-
-	tup = SearchSysCacheCopy1(TYPEOID, ObjectIdGetDatum(typeOid));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for type %u", typeOid);
-	typTup = (Form_pg_type) GETSTRUCT(tup);
-
-	/* check permissions on type */
-	if (!pg_type_ownercheck(typeOid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typeOid);
-
-	/* ALTER DOMAIN used on a non-domain? */
-	if (stmt->renameType == OBJECT_DOMAIN && typTup->typtype != TYPTYPE_DOMAIN)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("%s is not a domain",
-						format_type_be(typeOid))));
-
-	/*
-	 * If it's a composite type, we need to check that it really is a
-	 * free-standing composite type, and not a table's rowtype. We want people
-	 * to use ALTER TABLE not ALTER TYPE for that case.
-	 */
-	if (typTup->typtype == TYPTYPE_COMPOSITE &&
-		get_rel_relkind(typTup->typrelid) != RELKIND_COMPOSITE_TYPE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("%s is a table's row type",
-						format_type_be(typeOid)),
-				 errhint("Use ALTER TABLE instead.")));
-
-	/* don't allow direct alteration of array types, either */
-	if (IsTrueArrayType(typTup))
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot alter array type %s",
-						format_type_be(typeOid)),
-				 errhint("You can alter type %s, which will alter the array type as well.",
-						 format_type_be(typTup->typelem))));
-
-	/*
-	 * If type is composite we need to rename associated pg_class entry too.
-	 * RenameRelationInternal will call RenameTypeInternal automatically.
-	 */
-	if (typTup->typtype == TYPTYPE_COMPOSITE)
-		RenameRelationInternal(typTup->typrelid, newTypeName, false, false);
-	else
-		RenameTypeInternal(typeOid, newTypeName,
-						   typTup->typnamespace);
-
-	ObjectAddressSet(address, TypeRelationId, typeOid);
-	/* Clean up */
-	table_close(rel, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * Change the owner of a type.
- */
-ObjectAddress
-AlterTypeOwner(List *names, Oid newOwnerId, ObjectType objecttype)
-{
-	TypeName   *typename;
-	Oid			typeOid;
-	Relation	rel;
-	HeapTuple	tup;
-	HeapTuple	newtup;
-	Form_pg_type typTup;
-	AclResult	aclresult;
-	ObjectAddress address;
-
-	rel = table_open(TypeRelationId, RowExclusiveLock);
-
-	/* Make a TypeName so we can use standard type lookup machinery */
-	typename = makeTypeNameFromNameList(names);
-
-	/* Use LookupTypeName here so that shell types can be processed */
-	tup = LookupTypeName(NULL, typename, NULL, false);
-	if (tup == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("type \"%s\" does not exist",
-						TypeNameToString(typename))));
-	typeOid = typeTypeId(tup);
-
-	/* Copy the syscache entry so we can scribble on it below */
-	newtup = heap_copytuple(tup);
-	ReleaseSysCache(tup);
-	tup = newtup;
-	typTup = (Form_pg_type) GETSTRUCT(tup);
-
-	/* Don't allow ALTER DOMAIN on a type */
-	if (objecttype == OBJECT_DOMAIN && typTup->typtype != TYPTYPE_DOMAIN)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("%s is not a domain",
-						format_type_be(typeOid))));
-
-	/*
-	 * If it's a composite type, we need to check that it really is a
-	 * free-standing composite type, and not a table's rowtype. We want people
-	 * to use ALTER TABLE not ALTER TYPE for that case.
-	 */
-	if (typTup->typtype == TYPTYPE_COMPOSITE &&
-		get_rel_relkind(typTup->typrelid) != RELKIND_COMPOSITE_TYPE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("%s is a table's row type",
-						format_type_be(typeOid)),
-				 errhint("Use ALTER TABLE instead.")));
-
-	/* don't allow direct alteration of array types, either */
-	if (IsTrueArrayType(typTup))
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot alter array type %s",
-						format_type_be(typeOid)),
-				 errhint("You can alter type %s, which will alter the array type as well.",
-						 format_type_be(typTup->typelem))));
-
-	/*
-	 * If the new owner is the same as the existing owner, consider the
-	 * command to have succeeded.  This is for dump restoration purposes.
-	 */
-	if (typTup->typowner != newOwnerId)
-	{
-
-		AlterTypeOwner_oid(typeOid, newOwnerId, true);
-	}
-
-	ObjectAddressSet(address, TypeRelationId, typeOid);
-
-	/* Clean up */
-	table_close(rel, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * AlterTypeOwner_oid - change type owner unconditionally
- *
- * This function recurses to handle a pg_class entry, if necessary.  It
- * invokes any necessary access object hooks.  If hasDependEntry is true, this
- * function modifies the pg_shdepend entry appropriately (this should be
- * passed as false only for table rowtypes and array types).
- *
- * This is used by ALTER TABLE/TYPE OWNER commands, as well as by REASSIGN
- * OWNED BY.  It assumes the caller has done all needed check.
- */
-void
-AlterTypeOwner_oid(Oid typeOid, Oid newOwnerId, bool hasDependEntry)
-{
-	Relation	rel;
-	HeapTuple	tup;
-	Form_pg_type typTup;
-
-	rel = table_open(TypeRelationId, RowExclusiveLock);
-
-	tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typeOid));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for type %u", typeOid);
-	typTup = (Form_pg_type) GETSTRUCT(tup);
-
-	/*
-	 * If it's a composite type, invoke ATExecChangeOwner so that we fix up
-	 * the pg_class entry properly.  That will call back to
-	 * AlterTypeOwnerInternal to take care of the pg_type entry(s).
-	 */
-	if (typTup->typtype == TYPTYPE_COMPOSITE)
-		ATExecChangeOwner(typTup->typrelid, newOwnerId, true, AccessExclusiveLock);
-	else
-		AlterTypeOwnerInternal(typeOid, newOwnerId);
-
-	/* Update owner dependency reference */
-	if (hasDependEntry)
-		changeDependencyOnOwner(TypeRelationId, typeOid, newOwnerId);
-
-	InvokeObjectPostAlterHook(TypeRelationId, typeOid, 0);
-
-	ReleaseSysCache(tup);
-	table_close(rel, RowExclusiveLock);
-}
-
-/*
- * AlterTypeOwnerInternal - bare-bones type owner change.
- *
- * This routine simply modifies the owner of a pg_type entry, and recurses
- * to handle a possible array type.
- */
-void
-AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId)
-{
-	Relation	rel;
-	HeapTuple	tup;
-	Form_pg_type typTup;
-	Datum		repl_val[Natts_pg_type];
-	bool		repl_null[Natts_pg_type];
-	bool		repl_repl[Natts_pg_type];
-
-	rel = table_open(TypeRelationId, RowExclusiveLock);
-
-	tup = SearchSysCacheCopy1(TYPEOID, ObjectIdGetDatum(typeOid));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for type %u", typeOid);
-	typTup = (Form_pg_type) GETSTRUCT(tup);
-
-	memset(repl_null, false, sizeof(repl_null));
-	memset(repl_repl, false, sizeof(repl_repl));
-
-	repl_repl[Anum_pg_type_typowner - 1] = true;
-	repl_val[Anum_pg_type_typowner - 1] = ObjectIdGetDatum(newOwnerId);
-
-	tup = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null,
-							repl_repl);
-
-	CatalogTupleUpdate(rel, &tup->t_self, tup);
-
-	/* If it has an array type, update that too */
-	if (OidIsValid(typTup->typarray))
-		AlterTypeOwnerInternal(typTup->typarray, newOwnerId);
-
-	/* Clean up */
-	table_close(rel, RowExclusiveLock);
-}
 
 /*
  * Execute ALTER TYPE SET SCHEMA
@@ -3844,8 +3527,6 @@ AlterTypeNamespace_oid(Oid typeOid, Oid nspOid, ObjectAddresses *objsMoved)
 	Oid			elemOid;
 
 	/* check permissions on type */
-	if (!pg_type_ownercheck(typeOid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typeOid);
 
 	/* don't allow direct alteration of array types */
 	elemOid = get_element_type(typeOid);
@@ -4201,8 +3882,6 @@ AlterType(AlterTypeStmt *stmt)
 	}
 	else
 	{
-		if (!pg_type_ownercheck(typeOid, GetUserId()))
-			aclcheck_error_type(ACLCHECK_NOT_OWNER, typeOid);
 	}
 
 	/*

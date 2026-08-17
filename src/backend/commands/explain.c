@@ -317,7 +317,6 @@ TupleDesc
 ExplainResultDesc(ExplainStmt *stmt)
 {
 	TupleDesc	tupdesc;
-	ListCell   *lc;
 	Oid			result_type = TEXTOID;
 
 	tupdesc = CreateTemplateTupleDesc(1);
@@ -3461,7 +3460,6 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 {
 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
 	const char *operation;
-	const char *foperation;
 	bool		labeltargets;
 	int			j;
 	List	   *idxNames = NIL;
@@ -3471,19 +3469,15 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 	{
 		case CMD_INSERT:
 			operation = "Insert";
-			foperation = "Foreign Insert";
 			break;
 		case CMD_UPDATE:
 			operation = "Update";
-			foperation = "Foreign Update";
 			break;
 		case CMD_DELETE:
 			operation = "Delete";
-			foperation = "Foreign Delete";
 			break;
 		default:
 			operation = "???";
-			foperation = "Foreign ???";
 			break;
 	}
 

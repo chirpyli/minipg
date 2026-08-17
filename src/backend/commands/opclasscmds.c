@@ -280,7 +280,6 @@ CreateOpFamily(CreateOpFamilyStmt *stmt, const char *opfname,
 	namestrcpy(&opfName, opfname);
 	values[Anum_pg_opfamily_opfname - 1] = NameGetDatum(&opfName);
 	values[Anum_pg_opfamily_opfnamespace - 1] = ObjectIdGetDatum(namespaceoid);
-	values[Anum_pg_opfamily_opfowner - 1] = ObjectIdGetDatum(GetUserId());
 
 	tup = heap_form_tuple(rel->rd_att, values, nulls);
 
@@ -306,9 +305,6 @@ CreateOpFamily(CreateOpFamilyStmt *stmt, const char *opfname,
 	referenced.objectId = namespaceoid;
 	referenced.objectSubId = 0;
 	recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-
-	/* dependency on owner */
-	recordDependencyOnOwner(OperatorFamilyRelationId, opfamilyoid, GetUserId());
 
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, false);
@@ -348,7 +344,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	IndexAmRoutine *amroutine;
 	Datum		values[Natts_pg_opclass];
 	bool		nulls[Natts_pg_opclass];
-	AclResult	aclresult;
 	NameData	opcName;
 	ObjectAddress myself,
 				referenced;
@@ -356,12 +351,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	namespaceoid = QualifiedNameGetCreationNamespace(stmt->opclassname,
 													 &opcname);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(namespaceoid));
 
 	/* Get necessary info about access method */
 	tup = SearchSysCache1(AMNAME, CStringGetDatum(stmt->amname));
@@ -413,8 +402,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 #ifdef NOT_USED
 	/* XXX this is unnecessary given the superuser check above */
 	/* Check we have ownership of the datatype */
-	if (!pg_type_ownercheck(typeoid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typeoid);
 #endif
 
 	/*
@@ -505,12 +492,8 @@ DefineOpClass(CreateOpClassStmt *stmt)
 #ifdef NOT_USED
 				/* XXX this is unnecessary given the superuser check above */
 				/* Caller must own operator and its underlying function */
-				if (!pg_oper_ownercheck(operOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
 								   get_opname(operOid));
 				funcOid = get_opcode(operOid);
-				if (!pg_proc_ownercheck(funcOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 								   get_func_name(funcOid));
 #endif
 
@@ -534,8 +517,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 #ifdef NOT_USED
 				/* XXX this is unnecessary given the superuser check above */
 				/* Caller must own function */
-				if (!pg_proc_ownercheck(funcOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 								   get_func_name(funcOid));
 #endif
 				/* Save the info */
@@ -562,8 +543,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 #ifdef NOT_USED
 				/* XXX this is unnecessary given the superuser check above */
 				/* Check we have ownership of the datatype */
-				if (!pg_type_ownercheck(storageoid, GetUserId()))
-					aclcheck_error_type(ACLCHECK_NOT_OWNER, storageoid);
 #endif
 				break;
 			default:
@@ -650,7 +629,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	namestrcpy(&opcName, opcname);
 	values[Anum_pg_opclass_opcname - 1] = NameGetDatum(&opcName);
 	values[Anum_pg_opclass_opcnamespace - 1] = ObjectIdGetDatum(namespaceoid);
-	values[Anum_pg_opclass_opcowner - 1] = ObjectIdGetDatum(GetUserId());
 	values[Anum_pg_opclass_opcfamily - 1] = ObjectIdGetDatum(opfamilyoid);
 	values[Anum_pg_opclass_opcintype - 1] = ObjectIdGetDatum(typeoid);
 	values[Anum_pg_opclass_opcdefault - 1] = BoolGetDatum(stmt->isDefault);
@@ -738,9 +716,6 @@ DefineOpClass(CreateOpClassStmt *stmt)
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 	}
 
-	/* dependency on owner */
-	recordDependencyOnOwner(OperatorClassRelationId, opclassoid, GetUserId());
-
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, false);
 
@@ -763,17 +738,10 @@ DefineOpFamily(CreateOpFamilyStmt *stmt)
 	char	   *opfname;		/* name of opfamily we're creating */
 	Oid			amoid,			/* our AM's oid */
 				namespaceoid;	/* namespace to create opfamily in */
-	AclResult	aclresult;
 
 	/* Convert list of names to a name and namespace */
 	namespaceoid = QualifiedNameGetCreationNamespace(stmt->opfamilyname,
 													 &opfname);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(namespaceoid));
 
 	/* Get access method OID, throwing an error if it doesn't exist. */
 	amoid = get_index_am_oid(stmt->amname, false);
@@ -911,12 +879,8 @@ AlterOpFamilyAdd(AlterOpFamilyStmt *stmt, Oid amoid, Oid opfamilyoid,
 #ifdef NOT_USED
 				/* XXX this is unnecessary given the superuser check above */
 				/* Caller must own operator and its underlying function */
-				if (!pg_oper_ownercheck(operOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_OPERATOR,
 								   get_opname(operOid));
 				funcOid = get_opcode(operOid);
-				if (!pg_proc_ownercheck(funcOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 								   get_func_name(funcOid));
 #endif
 
@@ -945,8 +909,6 @@ AlterOpFamilyAdd(AlterOpFamilyStmt *stmt, Oid amoid, Oid opfamilyoid,
 #ifdef NOT_USED
 				/* XXX this is unnecessary given the superuser check above */
 				/* Caller must own function */
-				if (!pg_proc_ownercheck(funcOid, GetUserId()))
-					aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 								   get_func_name(funcOid));
 #endif
 

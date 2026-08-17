@@ -101,7 +101,7 @@ CALL <replaceable class="parameter">name</replaceable> ( [ <replaceable class="p
   <para>
    <application>PL/pgSQL</application> handles output parameters
    in <command>CALL</command> commands differently;
-   see <xref linkend="plpgsql-statements-calling-procedure"/>.
+   see the PL/pgSQL documentation.
   </para>
  </refsect1>
 

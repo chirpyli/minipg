@@ -726,7 +726,6 @@ index_create(Relation heapRelation,
 	bool		isprimary = (flags & INDEX_CREATE_IS_PRIMARY) != 0;
 	bool		invalid = (flags & INDEX_CREATE_INVALID) != 0;
 	bool		concurrent = (flags & INDEX_CREATE_CONCURRENT) != 0;
-	bool		partitioned = (flags & INDEX_CREATE_PARTITIONED) != 0;
 	char		relkind;
 	TransactionId relfrozenxid;
 	MultiXactId relminmxid;
@@ -939,7 +938,6 @@ index_create(Relation heapRelation,
 	 *
 	 * XXX should have a cleaner way to create cataloged indexes
 	 */
-	indexRelation->rd_rel->relowner = heapRelation->rd_rel->relowner;
 	indexRelation->rd_rel->relam = accessMethodObjectId;
 
 	/*
@@ -1423,7 +1421,7 @@ index_concurrently_build(Oid heapRelationId,
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(heapRel->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
@@ -1483,7 +1481,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 				newIndexTuple;
 	Form_pg_index oldIndexForm,
 				newIndexForm;
-	bool		isPartition;
 	Oid			indexConstraintOid;
 	List	   *constraintOids = NIL;
 	ListCell   *lc;
@@ -2902,7 +2899,7 @@ index_build(Relation heapRelation,
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(heapRelation->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
@@ -3231,7 +3228,7 @@ validate_index(Oid heapId, Oid indexId, Snapshot snapshot)
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(heapRelation->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
@@ -3490,7 +3487,7 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(heapRelation->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 

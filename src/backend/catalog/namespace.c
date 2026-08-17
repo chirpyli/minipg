@@ -461,8 +461,7 @@ RangeVarGetAndCheckCreationNamespace(RangeVar *relation,
 	 */
 	for (;;)
 	{
-		AclResult	aclresult;
-
+	
 		inval_count = SharedInvalidMessageCounter;
 
 		/* Look up creation namespace and check for existing relation. */
@@ -480,12 +479,6 @@ RangeVarGetAndCheckCreationNamespace(RangeVar *relation,
 		 */
 		if (IsBootstrapProcessingMode())
 			break;
-
-		/* Check namespace permissions. */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_SCHEMA,
-						   get_namespace_name(nspid));
 
 		if (retry)
 		{
@@ -508,9 +501,6 @@ RangeVarGetAndCheckCreationNamespace(RangeVar *relation,
 		/* Lock relation, if required if and we have permission. */
 		if (lockmode != NoLock && OidIsValid(relid))
 		{
-			if (!pg_class_ownercheck(relid, GetUserId()))
-				aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(get_rel_relkind(relid)),
-							   relation->relname);
 			if (relid != oldrelid)
 				LockRelationOid(relid, lockmode);
 		}
@@ -2253,16 +2243,11 @@ Oid
 LookupExplicitNamespace(const char *nspname, bool missing_ok)
 {
 	Oid			namespaceId;
-	AclResult	aclresult;
 
 	namespaceId = get_namespace_oid(nspname, missing_ok);
 	if (missing_ok && !OidIsValid(namespaceId))
 		return InvalidOid;
 
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   nspname);
 	/* Schema search hook for this lookup */
 	InvokeNamespaceSearchHook(namespaceId, true);
 
@@ -2280,14 +2265,8 @@ Oid
 LookupCreationNamespace(const char *nspname)
 {
 	Oid			namespaceId;
-	AclResult	aclresult;
 
 	namespaceId = get_namespace_oid(nspname, false);
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   nspname);
 
 	return namespaceId;
 }

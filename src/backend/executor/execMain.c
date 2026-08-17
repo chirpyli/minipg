@@ -547,8 +547,9 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 	ListCell   *l;
 
 	/*
-	 * Fail if write permissions are requested in parallel mode for table
-	 * (temp or non-temp), otherwise fail for any non-temp table.
+	 * minipg 已裁 ACL 判定（RangeTblEntry 不再携带 requiredPerms 权限位），
+	 * 无法再从 RTE 区分 SELECT 与写权限，故直接基于 commandType 做只读 /
+	 * 并行模式下的写操作检查。
 	 */
 	foreach(l, plannedstmt->rtable)
 	{
@@ -557,7 +558,7 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 		if (rte->rtekind != RTE_RELATION)
 			continue;
 
-		if ((rte->requiredPerms & (~ACL_SELECT)) == 0)
+		if (plannedstmt->commandType == CMD_SELECT && !plannedstmt->hasModifyingCTE)
 			continue;
 
 		PreventCommandIfReadOnly(CreateCommandName((Node *) plannedstmt));

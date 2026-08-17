@@ -142,7 +142,6 @@ get_prompt(promptStatus_t status, ConditionalStack cstack)
 						else
 						{
 							if (!host
-								|| strcmp(host, DEFAULT_PGSOCKET_DIR) == 0
 								|| *p == 'm')
 								strlcpy(buf, "[local]", sizeof(buf));
 							else

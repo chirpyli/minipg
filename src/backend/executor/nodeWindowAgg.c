@@ -2459,7 +2459,6 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 		WindowFuncExprState *wfuncstate = (WindowFuncExprState *) lfirst(l);
 		WindowFunc *wfunc = wfuncstate->wfunc;
 		WindowStatePerFunc perfuncstate;
-		AclResult	aclresult;
 		int			i;
 
 		if (wfunc->winref != node->winref)	/* planner screwed up? */
@@ -2486,11 +2485,6 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 		/* Mark WindowFunc state node with assigned index in the result array */
 		wfuncstate->wfuncno = wfuncno;
 
-		/* Check permission to call window function */
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION,
-						   get_func_name(wfunc->winfnoid));
 		InvokeFunctionExecuteHook(wfunc->winfnoid);
 
 		/* Fill in the perfuncstate data */
@@ -2671,7 +2665,6 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 	Form_pg_aggregate aggform;
 	Oid			aggtranstype;
 	AttrNumber	initvalAttNo;
-	AclResult	aclresult;
 	bool		use_ma_code;
 	Oid			transfn_oid,
 				invtransfn_oid,
@@ -2758,38 +2751,15 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 
 	/* Check that aggregate owner has permission to call component fns */
 	{
-		HeapTuple	procTuple;
-		Oid			aggOwner;
-
-		procTuple = SearchSysCache1(PROCOID,
-									ObjectIdGetDatum(wfunc->winfnoid));
-		if (!HeapTupleIsValid(procTuple))
-			elog(ERROR, "cache lookup failed for function %u",
-				 wfunc->winfnoid);
-		aggOwner = ((Form_pg_proc) GETSTRUCT(procTuple))->proowner;
-		ReleaseSysCache(procTuple);
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION,
-						   get_func_name(transfn_oid));
 		InvokeFunctionExecuteHook(transfn_oid);
 
 		if (OidIsValid(invtransfn_oid))
 		{
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_FUNCTION,
-							   get_func_name(invtransfn_oid));
 			InvokeFunctionExecuteHook(invtransfn_oid);
 		}
 
 		if (OidIsValid(finalfn_oid))
 		{
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_FUNCTION,
-							   get_func_name(finalfn_oid));
 			InvokeFunctionExecuteHook(finalfn_oid);
 		}
 	}

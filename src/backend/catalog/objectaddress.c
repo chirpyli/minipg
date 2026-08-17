@@ -87,7 +87,6 @@ typedef struct
 	AttrNumber	attnum_oid;		/* attribute number of oid column */
 	AttrNumber	attnum_name;	/* attnum of name field */
 	AttrNumber	attnum_namespace;	/* attnum of namespace field */
-	AttrNumber	attnum_owner;	/* attnum of owner field */
 	AttrNumber	attnum_acl;		/* attnum of acl field */
 	ObjectType	objtype;		/* OBJECT_* of this object type */
 	bool		is_nsp_name_unique; /* can the nsp/name combination (or name
@@ -108,9 +107,8 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_am_amname,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
-		true
+		OBJECT_ACCESS_METHOD,
+		false
 	},
 	{
 		"access method operator",
@@ -119,7 +117,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		-1,
 		-1,
 		Anum_pg_amop_oid,
-		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
@@ -136,7 +133,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
 		OBJECT_AMPROC,
 		false
 	},
@@ -144,14 +140,13 @@ static const ObjectPropertyType ObjectProperty[] =
 		"cast",
 		CastRelationId,
 		CastOidIndexId,
-		-1,
-		-1,
+		InvalidOid,
+		InvalidOid,
 		Anum_pg_cast_oid,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
+		OBJECT_CAST,
 		false
 	},
 	{
@@ -159,11 +154,10 @@ static const ObjectPropertyType ObjectProperty[] =
 		CollationRelationId,
 		CollationOidIndexId,
 		COLLOID,
-		-1,						/* COLLNAMEENCNSP also takes encoding */
+		InvalidOid,				/* COLLNAMEENCNSP also takes encoding */
 		Anum_pg_collation_oid,
 		Anum_pg_collation_collname,
 		Anum_pg_collation_collnamespace,
-		Anum_pg_collation_collowner,
 		InvalidAttrNumber,
 		OBJECT_COLLATION,
 		true
@@ -173,13 +167,12 @@ static const ObjectPropertyType ObjectProperty[] =
 		ConstraintRelationId,
 		ConstraintOidIndexId,
 		CONSTROID,
-		-1,
+		InvalidOid,
 		Anum_pg_constraint_oid,
 		Anum_pg_constraint_conname,
 		Anum_pg_constraint_connamespace,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
+		OBJECT_TABCONSTRAINT,
 		false
 	},
 	{
@@ -191,7 +184,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_conversion_oid,
 		Anum_pg_conversion_conname,
 		Anum_pg_conversion_connamespace,
-		Anum_pg_conversion_conowner,
 		InvalidAttrNumber,
 		OBJECT_CONVERSION,
 		true
@@ -201,39 +193,36 @@ static const ObjectPropertyType ObjectProperty[] =
 		DatabaseRelationId,
 		DatabaseOidIndexId,
 		DATABASEOID,
-		-1,
+		InvalidOid,
 		Anum_pg_database_oid,
 		Anum_pg_database_datname,
 		InvalidAttrNumber,
-		Anum_pg_database_datdba,
 		InvalidAttrNumber,
 		OBJECT_DATABASE,
-		true
+		false
 	},
 	{
 		"extension",
 		ExtensionRelationId,
 		ExtensionOidIndexId,
-		-1,
-		-1,
+		InvalidOid,
+		InvalidOid,
 		Anum_pg_extension_oid,
 		Anum_pg_extension_extname,
 		InvalidAttrNumber,		/* extension doesn't belong to extnamespace */
-		Anum_pg_extension_extowner,
 		InvalidAttrNumber,
 		OBJECT_EXTENSION,
-		true
+		false
 	},
 	{
 		"function",
 		ProcedureRelationId,
 		ProcedureOidIndexId,
 		PROCOID,
-		-1,						/* PROCNAMEARGSNSP also takes argument types */
+		InvalidOid,				/* PROCNAMEARGSNSP also takes argument types */
 		Anum_pg_proc_oid,
 		Anum_pg_proc_proname,
 		Anum_pg_proc_pronamespace,
-		Anum_pg_proc_proowner,
 		InvalidAttrNumber,
 		OBJECT_FUNCTION,
 		false
@@ -247,35 +236,32 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_language_oid,
 		Anum_pg_language_lanname,
 		InvalidAttrNumber,
-		Anum_pg_language_lanowner,
 		InvalidAttrNumber,
 		OBJECT_LANGUAGE,
-		true
+		false
 	},
 	{
 		"operator class",
 		OperatorClassRelationId,
 		OpclassOidIndexId,
 		CLAOID,
-		-1,						/* CLAAMNAMENSP also takes opcmethod */
+		InvalidOid,				/* CLAAMNAMENSP also takes opcmethod */
 		Anum_pg_opclass_oid,
 		Anum_pg_opclass_opcname,
 		Anum_pg_opclass_opcnamespace,
-		Anum_pg_opclass_opcowner,
 		InvalidAttrNumber,
 		OBJECT_OPCLASS,
-		true
+		false
 	},
 	{
 		"operator",
 		OperatorRelationId,
 		OperatorOidIndexId,
 		OPEROID,
-		-1,						/* OPERNAMENSP also takes left and right type */
+		InvalidOid,				/* OPERNAMENSP also takes left and right type */
 		Anum_pg_operator_oid,
 		Anum_pg_operator_oprname,
 		Anum_pg_operator_oprnamespace,
-		Anum_pg_operator_oprowner,
 		InvalidAttrNumber,
 		OBJECT_OPERATOR,
 		false
@@ -285,41 +271,25 @@ static const ObjectPropertyType ObjectProperty[] =
 		OperatorFamilyRelationId,
 		OpfamilyOidIndexId,
 		OPFAMILYOID,
-		-1,						/* OPFAMILYAMNAMENSP also takes opfmethod */
+		InvalidOid,				/* OPFAMILYAMNAMENSP also takes opfmethod */
 		Anum_pg_opfamily_oid,
 		Anum_pg_opfamily_opfname,
 		Anum_pg_opfamily_opfnamespace,
-		Anum_pg_opfamily_opfowner,
 		InvalidAttrNumber,
 		OBJECT_OPFAMILY,
-		true
-	},
-	{
-		"role",
-		InvalidOid,
-		InvalidOid,
-		0,
-		0,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
-		true
+		false
 	},
 	{
 		"rule",
 		RewriteRelationId,
 		RewriteOidIndexId,
-		-1,
-		-1,
+		InvalidOid,
+		InvalidOid,
 		Anum_pg_rewrite_oid,
 		Anum_pg_rewrite_rulename,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
+		OBJECT_RULE,
 		false
 	},
 	{
@@ -331,10 +301,9 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_namespace_oid,
 		Anum_pg_namespace_nspname,
 		InvalidAttrNumber,
-		Anum_pg_namespace_nspowner,
 		InvalidAttrNumber,
 		OBJECT_SCHEMA,
-		true
+		false
 	},
 	{
 		"relation",
@@ -345,45 +314,47 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_class_oid,
 		Anum_pg_class_relname,
 		Anum_pg_class_relnamespace,
-		Anum_pg_class_relowner,
 		InvalidAttrNumber,
 		OBJECT_TABLE,
-		true
+		false
 	},
 	{
 		"tablespace",
 		TableSpaceRelationId,
 		TablespaceOidIndexId,
 		TABLESPACEOID,
-		-1,
+		InvalidOid,
 		Anum_pg_tablespace_oid,
 		Anum_pg_tablespace_spcname,
 		InvalidAttrNumber,
-		Anum_pg_tablespace_spcowner,
 		InvalidAttrNumber,
 		OBJECT_TABLESPACE,
-		true
+		false
 	},
 	{
 		"transform",
 		TransformRelationId,
 		TransformOidIndexId,
-		TRFOID,
+		InvalidOid,
+		InvalidOid,
+		Anum_pg_transform_oid,
 		InvalidAttrNumber,
-		Anum_pg_transform_oid
+		InvalidAttrNumber,
+		InvalidAttrNumber,
+		OBJECT_TRANSFORM,
+		false
 	},
 	{
 		"trigger",
 		TriggerRelationId,
 		TriggerOidIndexId,
-		-1,
-		-1,
+		InvalidOid,
+		InvalidOid,
 		Anum_pg_trigger_oid,
 		Anum_pg_trigger_tgname,
 		InvalidAttrNumber,
 		InvalidAttrNumber,
-		InvalidAttrNumber,
-		-1,
+		OBJECT_TRIGGER,
 		false
 	},
 	{
@@ -395,10 +366,9 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_type_oid,
 		Anum_pg_type_typname,
 		Anum_pg_type_typnamespace,
-		Anum_pg_type_typowner,
 		InvalidAttrNumber,
 		OBJECT_TYPE,
-		true
+		false
 	},
 	{
 		"extended statistics",
@@ -409,10 +379,9 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_statistic_ext_oid,
 		Anum_pg_statistic_ext_stxname,
 		Anum_pg_statistic_ext_stxnamespace,
-		Anum_pg_statistic_ext_stxowner,
-		InvalidAttrNumber,		/* no ACL (same as relation) */
+		InvalidAttrNumber,
 		OBJECT_STATISTIC_EXT,
-		true
+		false
 	}
 };
 
@@ -1649,7 +1618,12 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 				objnode = (Node *) owa;
 				break;
 			}
-			/* no default, to let compiler warn about missing case */
+		default:
+			/*
+			 * Unsupported object types are handled by the objnode == NULL
+			 * check below, which raises an error.
+			 */
+			break;
 	}
 
 	if (objnode == NULL)
@@ -1683,160 +1657,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	PG_RETURN_DATUM(HeapTupleGetDatum(htup));
 }
 
-/*
- * Check ownership of an object previously identified by get_object_address.
- */
-void
-check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
-					   Node *object, Relation relation)
-{
-	switch (objtype)
-	{
-		case OBJECT_ACCESS_METHOD:
-
-			break;
-		case OBJECT_INDEX:
-		case OBJECT_TABLE:
-		case OBJECT_VIEW:
-		case OBJECT_COLUMN:
-		case OBJECT_RULE:
-		case OBJECT_TRIGGER:
-		case OBJECT_TABCONSTRAINT:
-			if (!pg_class_ownercheck(RelationGetRelid(relation), roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   RelationGetRelationName(relation));
-			break;
-		case OBJECT_DATABASE:
-			if (!pg_database_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_TYPE:
-		case OBJECT_DOMAIN:
-		case OBJECT_ATTRIBUTE:
-			if (!pg_type_ownercheck(address.objectId, roleid))
-				aclcheck_error_type(ACLCHECK_NOT_OWNER, address.objectId);
-			break;
-		case OBJECT_DOMCONSTRAINT:
-			{
-				HeapTuple	tuple;
-				Oid			contypid;
-
-				tuple = SearchSysCache1(CONSTROID,
-										ObjectIdGetDatum(address.objectId));
-				if (!HeapTupleIsValid(tuple))
-					elog(ERROR, "constraint with OID %u does not exist",
-						 address.objectId);
-
-				contypid = ((Form_pg_constraint) GETSTRUCT(tuple))->contypid;
-
-				ReleaseSysCache(tuple);
-
-				/*
-				 * Fallback to type ownership check in this case as this is
-				 * what domain constraints rely on.
-				 */
-				if (!pg_type_ownercheck(contypid, roleid))
-					aclcheck_error_type(ACLCHECK_NOT_OWNER, contypid);
-			}
-			break;
-		case OBJECT_AGGREGATE:
-		case OBJECT_FUNCTION:
-		case OBJECT_PROCEDURE:
-		case OBJECT_ROUTINE:
-			if (!pg_proc_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString((castNode(ObjectWithArgs, object))->objname));
-			break;
-		case OBJECT_OPERATOR:
-			if (!pg_oper_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString((castNode(ObjectWithArgs, object))->objname));
-			break;
-		case OBJECT_SCHEMA:
-			if (!pg_namespace_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_COLLATION:
-			if (!pg_collation_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_CONVERSION:
-			if (!pg_conversion_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_EXTENSION:
-			if (!pg_extension_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-						   strVal((Value *) object));
-		break;
-		case OBJECT_LANGUAGE:
-			if (!pg_language_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_OPCLASS:
-			if (!pg_opclass_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_OPFAMILY:
-			if (!pg_opfamily_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		case OBJECT_CAST:
-			{
-				/* We can only check permissions on the source/target types */
-				TypeName   *sourcetype = linitial_node(TypeName, castNode(List, object));
-				TypeName   *targettype = lsecond_node(TypeName, castNode(List, object));
-				Oid			sourcetypeid = typenameTypeId(NULL, sourcetype);
-				Oid			targettypeid = typenameTypeId(NULL, targettype);
-
-				if (!pg_type_ownercheck(sourcetypeid, roleid)
-					&& !pg_type_ownercheck(targettypeid, roleid))
-					ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("must be owner of type %s or type %s",
-									format_type_be(sourcetypeid),
-									format_type_be(targettypeid))));
-			}
-			break;
-			case OBJECT_TRANSFORM:
-			{
-				TypeName   *typename = linitial_node(TypeName, castNode(List, object));
-				Oid			typeid = typenameTypeId(NULL, typename);
-
-				if (!pg_type_ownercheck(typeid, roleid))
-					aclcheck_error_type(ACLCHECK_NOT_OWNER, typeid);
-			}
-			break;
-		case OBJECT_TABLESPACE:
-			if (!pg_tablespace_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   strVal((Value *) object));
-			break;
-		case OBJECT_ROLE:
-
-			/*
-			 * We treat roles as being "owned" by those with CREATEROLE priv,
-			 * except that superusers are only owned by superusers.
-			 */
-
-			break;
-		case OBJECT_STATISTIC_EXT:
-			if (!pg_statistics_object_ownercheck(address.objectId, roleid))
-				aclcheck_error(ACLCHECK_NOT_OWNER, objtype,
-							   NameListToString(castNode(List, object)));
-			break;
-		default:
-			elog(ERROR, "unrecognized object type: %d",
-				 (int) objtype);
-	}
-}
 
 /*
  * get_object_namespace
@@ -1957,14 +1777,6 @@ get_object_attnum_namespace(Oid class_id)
 	const ObjectPropertyType *prop = get_object_property_data(class_id);
 
 	return prop->attnum_namespace;
-}
-
-AttrNumber
-get_object_attnum_owner(Oid class_id)
-{
-	const ObjectPropertyType *prop = get_object_property_data(class_id);
-
-	return prop->attnum_owner;
 }
 
 AttrNumber

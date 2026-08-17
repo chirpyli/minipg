@@ -116,13 +116,6 @@ ALTER OPERATOR @+@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (not owner)
 -- ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (name conflict)
 
 
-SELECT n.nspname, oprname, 'postgres'::name AS rolname,
-    oprleft::regtype, oprright::regtype, oprcode::regproc
-  FROM pg_operator o, pg_namespace n
-  WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
-    AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
-  ORDER BY nspname, oprname;
-
 --
 -- OpFamily and OpClass
 --

@@ -775,34 +775,6 @@ text_catenate(text *t1, text *t2)
 	return result;
 }
 
-/*
- * charlen_to_bytelen()
- *	Compute the number of bytes occupied by n characters starting at *p
- *
- * The caller shall ensure there are n complete characters.  Callers achieve
- * this by deriving "n" from regmatch_t findings from searching a wchar array.
- * pg_mb2wchar_with_len() skips any trailing incomplete character, so regex
- * matches will end no later than the last complete character.  (The string
- * need not be null-terminated.)
- */
-static int
-charlen_to_bytelen(const char *p, int n)
-{
-	if (pg_database_encoding_max_length() == 1)
-	{
-		/* Optimization for single-byte encodings */
-		return n;
-	}
-	else
-	{
-		const char *s;
-
-		for (s = p; n > 0; n--)
-			s += pg_mblen_unbounded(s); /* caller verified encoding */
-
-		return s - p;
-	}
-}
 
 /*
  * text_substr()

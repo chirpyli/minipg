@@ -14,7 +14,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	aclchk.o \
 	catalog.o \
 	dependency.o \
 	heap.o \

@@ -96,9 +96,6 @@ do
 	# by utils/pg_rusage.h if necessary.
 	test "$f" = src/include/rusagestub.h && continue
 
-	# sepgsql.h depends on headers that aren't there on most platforms.
-	test "$f" = contrib/sepgsql/sepgsql.h && continue
-
 	# These files are not meant to be included standalone, because
 	# they contain lists that might have multiple use-cases.
 	test "$f" = src/include/access/rmgrlist.h && continue

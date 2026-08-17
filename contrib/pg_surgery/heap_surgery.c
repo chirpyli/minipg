@@ -18,7 +18,6 @@
 #include "catalog/pg_proc_d.h"
 #include "miscadmin.h"
 #include "storage/bufmgr.h"
-#include "utils/acl.h"
 #include "utils/rel.h"
 
 PG_MODULE_MAGIC;
@@ -383,12 +382,6 @@ sanity_check_relation(Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("only heap AM is supported")));
-
-	/* Must be owner of the table or superuser. */
-	if (!pg_class_ownercheck(RelationGetRelid(rel), GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER,
-					   get_relkind_objtype(rel->rd_rel->relkind),
-					   RelationGetRelationName(rel));
 }
 
 /*-------------------------------------------------------------------------

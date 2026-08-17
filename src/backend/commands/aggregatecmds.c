@@ -62,7 +62,6 @@ DefineAggregate(ParseState *pstate,
 {
 	char	   *aggName;
 	Oid			aggNamespace;
-	AclResult	aclresult;
 	char		aggKind = AGGKIND_NORMAL;
 	List	   *transfuncName = NIL;
 	List	   *finalfuncName = NIL;
@@ -102,12 +101,6 @@ DefineAggregate(ParseState *pstate,
 
 	/* Convert list of names to a name and namespace */
 	aggNamespace = QualifiedNameGetCreationNamespace(name, &aggName);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(aggNamespace));
 
 	/* Deconstruct the output of the aggr_args grammar production */
 	if (!oldstyle)

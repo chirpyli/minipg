@@ -1364,7 +1364,6 @@ ExpandSingleTable(ParseState *pstate, ParseNamespaceItem *nsitem,
 		 * target relation of UPDATE/DELETE, which cannot be under a join.)
 		 */
 		if (rte->rtekind == RTE_RELATION)
-			rte->requiredPerms |= ACL_SELECT;
 
 		/* Require read access to each column */
 		foreach(l, vars)

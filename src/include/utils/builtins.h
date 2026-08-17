@@ -98,7 +98,6 @@ extern int	pg_inet_net_pton(int af, const char *src,
 /* network.c */
 extern Datum network_scan_first(Datum in);
 extern Datum network_scan_last(Datum in);
-extern void clean_ipv6_addr(int addr_family, char *addr);
 
 /* numeric.c */
 extern Datum numeric_float8_no_overflow(PG_FUNCTION_ARGS);

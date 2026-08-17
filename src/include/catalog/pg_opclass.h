@@ -59,9 +59,6 @@ CATALOG(pg_opclass,2616,OperatorClassRelationId)
 	/* namespace of this opclass */
 	Oid			opcnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
-	/* opclass owner */
-	Oid			opcowner BKI_DEFAULT(10);
-
 	/* containing operator family */
 	Oid			opcfamily BKI_LOOKUP(pg_opfamily);
 

@@ -176,7 +176,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 	Datum		values[Natts_pg_trigger];
 	bool		nulls[Natts_pg_trigger];
 	Relation	rel;
-	AclResult	aclresult;
 	Relation	tgrel;
 	Relation	pgrel;
 	HeapTuple	tuple = NULL;
@@ -189,7 +188,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 				referenced;
 	char	   *oldtablename = NULL;
 	char	   *newtablename = NULL;
-	bool		partition_recurse;
 	bool		trigger_exists = false;
 	Oid			existing_constraint_oid = InvalidOid;
 	bool		existing_isInternal = false;
@@ -265,28 +263,10 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 										   false);
 	}
 
-	/* permission checks */
-	if (!isInternal)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, get_relkind_objtype(rel->rd_rel->relkind),
-						   RelationGetRelationName(rel));
-
-		if (OidIsValid(constrrelid))
-		{
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, get_relkind_objtype(get_rel_relkind(constrrelid)),
-							   get_rel_name(constrrelid));
-		}
-	}
-
 	/*
 	 * Partitioned tables are not supported in this build (minipg); triggers
 	 * are not recursed to partitions.
 	 */
-	partition_recurse = false;
 
 	/* Compute tgtype */
 	TRIGGER_CLEAR_TYPE(tgtype);
@@ -597,13 +577,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 	 */
 	if (!OidIsValid(funcoid))
 		funcoid = LookupFuncName(stmt->funcname, 0, NULL, false);
-	if (!isInternal)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION,
-						   NameListToString(stmt->funcname));
-	}
 	funcrettype = get_func_rettype(funcoid);
 	if (funcrettype != TRIGGEROID)
 		ereport(ERROR,
@@ -1184,167 +1157,6 @@ get_trigger_oid(Oid relid, const char *trigname, bool missing_ok)
 /*
  * Perform permissions and integrity checks before acquiring a relation lock.
  */
-static void
-RangeVarCallbackForRenameTrigger(const RangeVar *rv, Oid relid, Oid oldrelid,
-								 void *arg)
-{
-	HeapTuple	tuple;
-	Form_pg_class form;
-
-	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tuple))
-		return;					/* concurrently dropped */
-	form = (Form_pg_class) GETSTRUCT(tuple);
-
-	/* only tables and views can have triggers */
-	if (form->relkind != RELKIND_RELATION && form->relkind != RELKIND_VIEW)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a table, view, or foreign table",
-						rv->relname)));
-
-	/* you must own the table to rename one of its triggers */
-	if (!pg_class_ownercheck(relid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(get_rel_relkind(relid)), rv->relname);
-	if (!allowSystemTableMods && IsSystemClass(relid, form))
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied: \"%s\" is a system catalog",
-						rv->relname)));
-
-	ReleaseSysCache(tuple);
-}
-
-/*
- *		renametrig		- changes the name of a trigger on a relation
- *
- *		trigger name is changed in trigger catalog.
- *		No record of the previous name is kept.
- *
- *		get proper relrelation from relation catalog (if not arg)
- *		scan trigger catalog
- *				for name conflict (within rel)
- *				for original trigger (if not arg)
- *		modify tgname in trigger tuple
- *		update row in catalog
- */
-ObjectAddress
-renametrig(RenameStmt *stmt)
-{
-	Oid			tgoid;
-	Relation	targetrel;
-	Relation	tgrel;
-	HeapTuple	tuple;
-	SysScanDesc tgscan;
-	ScanKeyData key[2];
-	Oid			relid;
-	ObjectAddress address;
-
-	/*
-	 * Look up name, check permissions, and acquire lock (which we will NOT
-	 * release until end of transaction).
-	 */
-	relid = RangeVarGetRelidExtended(stmt->relation, AccessExclusiveLock,
-									 0,
-									 RangeVarCallbackForRenameTrigger,
-									 NULL);
-
-	/* Have lock already, so just need to build relcache entry. */
-	targetrel = relation_open(relid, NoLock);
-
-	/*
-	 * Scan pg_trigger twice for existing triggers on relation.  We do this in
-	 * order to ensure a trigger does not exist with newname (The unique index
-	 * on tgrelid/tgname would complain anyway) and to ensure a trigger does
-	 * exist with oldname.
-	 *
-	 * NOTE that this is cool only because we have AccessExclusiveLock on the
-	 * relation, so the trigger set won't be changing underneath us.
-	 */
-	tgrel = table_open(TriggerRelationId, RowExclusiveLock);
-
-	/*
-	 * First pass -- look for name conflict
-	 */
-	ScanKeyInit(&key[0],
-				Anum_pg_trigger_tgrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-	ScanKeyInit(&key[1],
-				Anum_pg_trigger_tgname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				PointerGetDatum(stmt->newname));
-	tgscan = systable_beginscan(tgrel, TriggerRelidNameIndexId, true,
-								NULL, 2, key);
-	if (HeapTupleIsValid(tuple = systable_getnext(tgscan)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("trigger \"%s\" for relation \"%s\" already exists",
-						stmt->newname, RelationGetRelationName(targetrel))));
-	systable_endscan(tgscan);
-
-	/*
-	 * Second pass -- look for trigger existing with oldname and update
-	 */
-	ScanKeyInit(&key[0],
-				Anum_pg_trigger_tgrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-	ScanKeyInit(&key[1],
-				Anum_pg_trigger_tgname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				PointerGetDatum(stmt->subname));
-	tgscan = systable_beginscan(tgrel, TriggerRelidNameIndexId, true,
-								NULL, 2, key);
-	if (HeapTupleIsValid(tuple = systable_getnext(tgscan)))
-	{
-		Form_pg_trigger trigform;
-
-		/*
-		 * Update pg_trigger tuple with new tgname.
-		 */
-		tuple = heap_copytuple(tuple);	/* need a modifiable copy */
-		trigform = (Form_pg_trigger) GETSTRUCT(tuple);
-		tgoid = trigform->oid;
-
-		namestrcpy(&trigform->tgname,
-				   stmt->newname);
-
-		CatalogTupleUpdate(tgrel, &tuple->t_self, tuple);
-
-		InvokeObjectPostAlterHook(TriggerRelationId,
-								  tgoid, 0);
-
-		/*
-		 * Invalidate relation's relcache entry so that other backends (and
-		 * this one too!) are sent SI message to make them rebuild relcache
-		 * entries.  (Ideally this should happen automatically...)
-		 */
-		CacheInvalidateRelcache(targetrel);
-	}
-	else
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("trigger \"%s\" for table \"%s\" does not exist",
-						stmt->subname, RelationGetRelationName(targetrel))));
-	}
-
-	ObjectAddressSet(address, TriggerRelationId, tgoid);
-
-	systable_endscan(tgscan);
-
-	table_close(tgrel, RowExclusiveLock);
-
-	/*
-	 * Close rel, but keep exclusive lock!
-	 */
-	relation_close(targetrel, NoLock);
-
-	return address;
-}
-
-
 /*
  * EnableDisableTrigger()
  *
@@ -5346,7 +5158,6 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
 	AfterTriggerEventData new_event;
 	AfterTriggerSharedData new_shared;
-	char		relkind = rel->rd_rel->relkind;
 	int			tgtype_event;
 	int			tgtype_level;
 	int			i;

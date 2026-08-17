@@ -672,15 +672,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 		if (rte->lateral)
 			root->hasLateralRTEs = true;
-
-		/*
-		 * We can also determine the maximum security level required for any
-		 * securityQuals now.  Addition of child RTEs won't affect this,
-		 * because child tables don't have their own securityQuals.
-		 */
-		if (rte->securityQuals)
-			root->qual_security_level = Max(root->qual_security_level,
-											list_length(rte->securityQuals));
 	}
 
 	/*
@@ -827,19 +818,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 			kind = rte->lateral ? EXPRKIND_VALUES_LATERAL : EXPRKIND_VALUES;
 			rte->values_lists = (List *)
 				preprocess_expression(root, (Node *) rte->values_lists, kind);
-		}
-
-		/*
-		 * Process each element of the securityQuals list as if it were a
-		 * separate qual expression (as indeed it is).  We need to do it this
-		 * way to get proper canonicalization of AND/OR structure.  Note that
-		 * this converts each element into an implicit-AND sublist.
-		 */
-		foreach(lcsq, rte->securityQuals)
-		{
-			lfirst(lcsq) = preprocess_expression(root,
-												 (Node *) lfirst(lcsq),
-												 EXPRKIND_QUAL);
 		}
 	}
 
@@ -1171,6 +1149,24 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	RelOptInfo *final_rel;
 	FinalPathExtraData extra;
 	ListCell   *lc;
+	PathTarget *sort_input_target;
+	List	   *sort_input_targets;
+	List	   *sort_input_targets_contain_srfs;
+	bool		sort_input_target_parallel_safe;
+	PathTarget *grouping_target;
+	List	   *grouping_targets;
+	List	   *grouping_targets_contain_srfs;
+	bool		grouping_target_parallel_safe;
+	PathTarget *scanjoin_target;
+	List	   *scanjoin_targets;
+	List	   *scanjoin_targets_contain_srfs;
+	bool		scanjoin_target_parallel_safe;
+	bool		scanjoin_target_same_exprs;
+	bool		have_grouping;
+	WindowFuncLists *wflists = NULL;
+	List	   *activeWindows = NIL;
+	grouping_sets_data *gset_data = NULL;
+	standard_qp_extra qp_extra;
 
 	/* Tweak caller-supplied tuple_fraction if have LIMIT/OFFSET */
 	if (parse->limitCount || parse->limitOffset)
@@ -1186,28 +1182,8 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			limit_tuples = (double) count_est + (double) offset_est;
 	}
 
-	/* Make tuple_fraction accessible to lower-level routines */
-	root->tuple_fraction = tuple_fraction;
-
-		/* No set operations, do regular planning */
-		PathTarget *sort_input_target;
-		List	   *sort_input_targets;
-		List	   *sort_input_targets_contain_srfs;
-		bool		sort_input_target_parallel_safe;
-		PathTarget *grouping_target;
-		List	   *grouping_targets;
-		List	   *grouping_targets_contain_srfs;
-		bool		grouping_target_parallel_safe;
-		PathTarget *scanjoin_target;
-		List	   *scanjoin_targets;
-		List	   *scanjoin_targets_contain_srfs;
-		bool		scanjoin_target_parallel_safe;
-		bool		scanjoin_target_same_exprs;
-		bool		have_grouping;
-		WindowFuncLists *wflists = NULL;
-		List	   *activeWindows = NIL;
-		grouping_sets_data *gset_data = NULL;
-		standard_qp_extra qp_extra;
+		/* Make tuple_fraction accessible to lower-level routines */
+		root->tuple_fraction = tuple_fraction;
 
 		/* A recursive query (WITH RECURSIVE) is handled separately */
 		Assert(!root->hasRecursion);

@@ -808,8 +808,6 @@ check_agg_arguments_walker(Node *node,
 
 	if (IsA(node, RangeTblEntry))
 	{
-		RangeTblEntry *rte = (RangeTblEntry *) node;
-
 		return false;			/* allow range_table_walker to continue */
 	}
 	if (IsA(node, Query))

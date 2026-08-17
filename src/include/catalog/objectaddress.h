@@ -48,10 +48,6 @@ extern ObjectAddress get_object_address_rv(ObjectType objtype, RangeVar *rel,
 										   List *object, Relation *relp,
 										   LOCKMODE lockmode, bool missing_ok);
 
-extern void check_object_ownership(Oid roleid,
-								   ObjectType objtype, ObjectAddress address,
-								   Node *object, Relation relation);
-
 extern Oid	get_object_namespace(const ObjectAddress *address);
 
 extern bool is_objectclass_supported(Oid class_id);
@@ -62,7 +58,6 @@ extern int	get_object_catcache_name(Oid class_id);
 extern AttrNumber get_object_attnum_oid(Oid class_id);
 extern AttrNumber get_object_attnum_name(Oid class_id);
 extern AttrNumber get_object_attnum_namespace(Oid class_id);
-extern AttrNumber get_object_attnum_owner(Oid class_id);
 extern AttrNumber get_object_attnum_acl(Oid class_id);
 extern ObjectType get_object_type(Oid class_id, Oid object_id);
 extern bool get_object_namensp_unique(Oid class_id);

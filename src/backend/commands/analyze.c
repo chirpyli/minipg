@@ -165,22 +165,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 		return;
 
 	/*
-	 * Check if relation needs to be skipped based on ownership.  This check
-	 * happens also when building the relation list to analyze for a manual
-	 * operation, and needs to be done additionally here as ANALYZE could
-	 * happen across multiple transactions where relation ownership could have
-	 * changed in-between.  Make sure to generate only logs for ANALYZE in
-	 * this case.
-	 */
-	if (!vacuum_is_relation_owner(RelationGetRelid(onerel),
-								  onerel->rd_rel,
-								  params->options & VACOPT_ANALYZE))
-	{
-		relation_close(onerel, ShareUpdateExclusiveLock);
-		return;
-	}
-
-	/*
 	 * We can ANALYZE any table except pg_statistic. See update_attstats
 	 */
 	if (RelationGetRelid(onerel) == StatisticRelationId)
@@ -296,7 +280,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(onerel->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 

@@ -7,8 +7,6 @@
 # default to the current directory.
 #
 # Needs to be run after configuring and creating all generated headers.
-# It's advisable to configure --with-perl --with-python, else you're
-# likely to get errors from associated headers.
 #
 # No output if everything is OK, else compiler errors.
 #
@@ -35,8 +33,8 @@ CPPFLAGS=`sed -n 's/^CPPFLAGS[ 	]*=[ 	]*//p' "$MGLOB"`
 CFLAGS=`sed -n 's/^CFLAGS[ 	]*=[ 	]*//p' "$MGLOB"`
 CC=`sed -n 's/^CC[ 	]*=[ 	]*//p' "$MGLOB"`
 PG_SYSROOT=`sed -n 's/^PG_SYSROOT[ 	]*=[ 	]*//p' "$MGLOB"`
-perl_includespec=`sed -n 's/^perl_includespec[ 	]*=[ 	]*//p' "$MGLOB"`
-python_includespec=`sed -n 's/^python_includespec[ 	]*=[ 	]*//p' "$MGLOB"`
+perl_includespec=""
+python_includespec=""
 
 # needed on Darwin
 CPPFLAGS=`echo "$CPPFLAGS" | sed "s|\\\$(PG_SYSROOT)|$PG_SYSROOT|g"`
@@ -92,9 +90,6 @@ do
 	# by utils/pg_rusage.h if necessary.
 	test "$f" = src/include/rusagestub.h && continue
 
-	# sepgsql.h depends on headers that aren't there on most platforms.
-	test "$f" = contrib/sepgsql/sepgsql.h && continue
-
 	# These files are not meant to be included standalone, because
 	# they contain lists that might have multiple use-cases.
 	test "$f" = src/include/access/rmgrlist.h && continue
@@ -106,7 +101,6 @@ do
 	test "$f" = src/include/regex/regerrs.h && continue
 	test "$f" = src/include/tcop/cmdtaglist.h && continue
 	test "$f" = src/pl/plpgsql/src/plerrcodes.h && continue
-	test "$f" = src/pl/plpython/spiexceptions.h && continue
 	test "$f" = src/pl/tcl/pltclerrcodes.h && continue
 
 	# Also not meant to be included standalone.
@@ -127,7 +121,6 @@ do
 	test "$f" = src/include/jit/SectionMemoryManager.h && continue
 
 	# ppport.h is not under our control, so we can't make it standalone.
-	test "$f" = src/pl/plperl/ppport.h && continue
 
 	# regression.h is not actually C, but ECPG code.
 	test "$f" = src/interfaces/ecpg/test/regression.h && continue
@@ -142,10 +135,6 @@ do
 
 	# Some subdirectories need extra -I switches.
 	case "$f" in
-	    src/pl/plperl/*)
-		EXTRAINCLUDES="$perl_includespec" ;;
-	    src/pl/plpython/*)
-		EXTRAINCLUDES="$python_includespec" ;;
 	    src/interfaces/ecpg/*)
 		EXTRAINCLUDES="-I $builddir/src/interfaces/ecpg/include -I $srcdir/src/interfaces/ecpg/include" ;;
 	    *)

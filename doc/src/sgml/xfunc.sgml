@@ -805,8 +805,8 @@ CALL tp1(17, 100.0, NULL);
     <para>
      When calling a procedure from <application>PL/pgSQL</application>,
      instead of writing <literal>NULL</literal> you must write a variable
-     that will receive the procedure's output.  See <xref
-     linkend="plpgsql-statements-calling-procedure"/> for details.
+     that will receive the procedure's output.  See the PL/pgSQL documentation
+     for details.
     </para>
    </sect2>
 

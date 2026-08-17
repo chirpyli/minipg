@@ -315,6 +315,12 @@ case $template in
     *) pgac_cc_list="gcc cc"; pgac_cxx_list="g++ c++";;
 esac
 
+dnl minipg: 上游在此处调用 AC_PROG_AWK 探测 awk 并 AC_SUBST(AWK)，
+dnl 使 Makefile.global.in 中的 @AWK@ 占位符被替换（libpq 的 exports.list
+dnl 生成依赖它）。minipg 裁剪时误删了此宏，导致链接 libpq 时报
+dnl "@AWK@: not found" 与 VERSION script 语法错误。补回以修复构建。
+AC_PROG_AWK
+
 AC_PROG_CC([$pgac_cc_list])
 AC_PROG_CC_C99()
 
@@ -502,13 +508,6 @@ if test "$GCC" = yes -a "$ICC" = no; then
   PGAC_PROG_CC_VAR_OPT(NOT_THE_CFLAGS, [-Wunused-command-line-argument])
   if test -n "$NOT_THE_CFLAGS"; then
     CFLAGS="$CFLAGS -Wno-unused-command-line-argument"
-  fi
-  # Remove clang 12+'s compound-token-split-by-macro, as this causes a lot
-  # of warnings when building plperl because of usages in the Perl headers.
-  NOT_THE_CFLAGS=""
-  PGAC_PROG_CC_VAR_OPT(NOT_THE_CFLAGS, [-Wcompound-token-split-by-macro])
-  if test -n "$NOT_THE_CFLAGS"; then
-    CFLAGS="$CFLAGS -Wno-compound-token-split-by-macro"
   fi
   # Similarly remove clang 15+'s deprecated-non-prototype, as it warns about
   # tree-walking APIs that we can't reasonably change in the back branches.
@@ -739,22 +738,6 @@ AC_SUBST([with_tcl])
 PGAC_ARG_REQ(with, tclconfig, [DIR], [tclConfig.sh is in DIR])
 
 #
-# Optionally build Perl modules (PL/Perl)
-#
-AC_MSG_CHECKING([whether to build Perl modules])
-PGAC_ARG_BOOL(with, perl, no, [build Perl modules (PL/Perl)])
-AC_MSG_RESULT([$with_perl])
-AC_SUBST(with_perl)
-
-#
-# Optionally build Python modules (PL/Python)
-#
-AC_MSG_CHECKING([whether to build Python modules])
-PGAC_ARG_BOOL(with, python, no, [build Python modules (PL/Python)])
-AC_MSG_RESULT([$with_python])
-AC_SUBST(with_python)
-
-#
 # Bonjour
 #
 AC_MSG_CHECKING([whether to build with Bonjour support])
@@ -763,14 +746,6 @@ PGAC_ARG_BOOL(with, bonjour, no,
               [AC_DEFINE([USE_BONJOUR], 1, [Define to 1 to build with Bonjour support. (--with-bonjour)])])
 AC_MSG_RESULT([$with_bonjour])
 
-
-#
-# SELinux
-#
-AC_MSG_CHECKING([whether to build with SELinux support])
-PGAC_ARG_BOOL(with, selinux, no, [build with SELinux support])
-AC_SUBST(with_selinux)
-AC_MSG_RESULT([$with_selinux])
 
 #
 # Systemd
@@ -969,35 +944,6 @@ PGAC_PATH_BISON
 PGAC_PATH_FLEX
 
 PGAC_PATH_PERL
-if test "$with_perl" = yes; then
-  if test -z "$PERL"; then
-    AC_MSG_ERROR([Perl not found])
-  fi
-  PGAC_CHECK_PERL_CONFIGS([archlibexp,privlibexp,useshrplib])
-  if test "$perl_useshrplib" != yes && test "$perl_useshrplib" != true; then
-    AC_MSG_ERROR([cannot build PL/Perl because libperl is not a shared library
-You might have to rebuild your Perl installation.  Refer to the
-documentation for details.  Use --without-perl to disable building
-PL/Perl.])
-  fi
-  # On most platforms, archlibexp is also where the Perl include files live ...
-  perl_includespec="-I$perl_archlibexp/CORE"
-  # ... but on newer macOS versions, we must use -iwithsysroot to look
-  # under $PG_SYSROOT
-  if test \! -f "$perl_archlibexp/CORE/perl.h" ; then
-    if test -f "$PG_SYSROOT$perl_archlibexp/CORE/perl.h" ; then
-      perl_includespec="-iwithsysroot $perl_archlibexp/CORE"
-    fi
-  fi
-  AC_SUBST(perl_includespec)dnl
-  PGAC_CHECK_PERL_EMBED_CCFLAGS
-  PGAC_CHECK_PERL_EMBED_LDFLAGS
-fi
-
-if test "$with_python" = yes; then
-  PGAC_PATH_PYTHON
-  PGAC_CHECK_PYTHON_EMBED_SETUP
-fi
 
 if test x"$cross_compiling" = x"yes" && test -z "$with_system_tzdata"; then
   PGAC_PATH_PROGS(ZIC, zic)
@@ -1137,12 +1083,6 @@ fi
 
 if test "$with_lz4" = yes ; then
   AC_CHECK_LIB(lz4, LZ4_compress_default, [], [AC_MSG_ERROR([library 'lz4' is required for LZ4 support])])
-fi
-
-# for contrib/sepgsql
-if test "$with_selinux" = yes; then
-  AC_CHECK_LIB(selinux, security_compute_create_name, [],
-               [AC_MSG_ERROR([library 'libselinux', version 2.1.10 or newer, is required for SELinux support])])
 fi
 
 # for contrib/uuid-ossp
@@ -1337,7 +1277,9 @@ PGAC_C_BUILTIN_UNREACHABLE
 PGAC_C_COMPUTED_GOTO
 PGAC_STRUCT_TIMEZONE
 PGAC_UNION_SEMUN
-PGAC_STRUCT_SOCKADDR_UN
+dnl minipg: 裁剪 Unix 域套接字 —— 不检测 struct sockaddr_un，使 HAVE_STRUCT_SOCKADDR_UN 不定义，
+dnl 进而 c.h 中 HAVE_UNIX_SOCKETS 不生效，从编译期消除 Unix-domain socket 代码。
+dnl PGAC_STRUCT_SOCKADDR_UN
 PGAC_STRUCT_SOCKADDR_STORAGE
 PGAC_STRUCT_SOCKADDR_STORAGE_MEMBERS
 PGAC_STRUCT_ADDRINFO
@@ -1550,11 +1492,13 @@ AC_CHECK_DECLS(F_FULLFSYNC, [], [], [#include <fcntl.h>])
 
 AC_CHECK_DECLS([RTLD_GLOBAL, RTLD_NOW], [], [], [#include <dlfcn.h>])
 
-AC_CHECK_TYPE([struct sockaddr_in6],
-        [AC_DEFINE(HAVE_IPV6, 1, [Define to 1 if you have support for IPv6.])],
-        [],
-[$ac_includes_default
-#include <netinet/in.h>])
+dnl minipg: 裁剪 IPv6 监听/连接层 —— 不检测 struct sockaddr_in6，使 HAVE_IPV6 不定义，
+dnl 从编译期消除监听/连接侧的 IPv6 代码（inet/cidr 数据类型仍保留 IPv6 地址存储能力）。
+dnl AC_CHECK_TYPE([struct sockaddr_in6],
+dnl         [AC_DEFINE(HAVE_IPV6, 1, [Define to 1 if you have support for IPv6.])],
+dnl         [],
+dnl [$ac_includes_default
+dnl #include <netinet/in.h>])
 
 AC_CACHE_CHECK([for PS_STRINGS], [pgac_cv_var_PS_STRINGS],
 [AC_LINK_IFELSE([AC_LANG_PROGRAM(
@@ -1980,43 +1924,6 @@ Use --without-tcl to disable building PL/Tcl.])
     CPPFLAGS="$CPPFLAGS $TCL_INCLUDE_SPEC"
     AC_CHECK_HEADER(tcl.h, [], [AC_MSG_ERROR([header file <tcl.h> is required for Tcl])])
     CPPFLAGS=$ac_save_CPPFLAGS
-fi
-
-# check for <perl.h>
-if test "$with_perl" = yes; then
-  ac_save_CPPFLAGS=$CPPFLAGS
-  CPPFLAGS="$CPPFLAGS $perl_includespec"
-  AC_CHECK_HEADER(perl.h, [], [AC_MSG_ERROR([header file <perl.h> is required for Perl])],
-                  [#include <EXTERN.h>])
-  # While we're at it, check that we can link to libperl.
-  # On most platforms, if perl.h is there then libperl.so will be too, but at
-  # this writing Debian packages them separately.  There is no known reason to
-  # waste cycles on separate probes for the Tcl or Python libraries, though.
-  # On some Red Hat platforms, the link attempt can fail if we don't use
-  # CFLAGS_SL while building the test program.
-  ac_save_CFLAGS=$CFLAGS
-  CFLAGS="$CFLAGS $CFLAGS_SL"
-  pgac_save_LIBS=$LIBS
-  LIBS="$perl_embed_ldflags"
-  AC_MSG_CHECKING([for libperl])
-  AC_LINK_IFELSE([AC_LANG_PROGRAM([
-#include <EXTERN.h>
-#include <perl.h>
-],  [perl_alloc();])],
-    [AC_MSG_RESULT(yes)],
-    [AC_MSG_RESULT(no)
-     AC_MSG_ERROR([libperl library is required for Perl])])
-  LIBS=$pgac_save_LIBS
-  CFLAGS=$ac_save_CFLAGS
-  CPPFLAGS=$ac_save_CPPFLAGS
-fi
-
-# check for <Python.h>
-if test "$with_python" = yes; then
-  ac_save_CPPFLAGS=$CPPFLAGS
-  CPPFLAGS="$CPPFLAGS $python_includespec"
-  AC_CHECK_HEADER(Python.h, [], [AC_MSG_ERROR([header file <Python.h> is required for Python])])
-  CPPFLAGS=$ac_save_CPPFLAGS
 fi
 
 #

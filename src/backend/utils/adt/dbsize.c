@@ -86,19 +86,6 @@ calculate_database_size(Oid dbOid)
 	struct dirent *direntry;
 	char		dirpath[MAXPGPATH];
 	char		pathname[MAXPGPATH + 21 + sizeof(TABLESPACE_VERSION_DIRECTORY)];
-	AclResult	aclresult;
-
-	/*
-	 * User must have connect privilege for target database or be a member of
-	 * pg_read_all_stats
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK &&
-		!true)
-	{
-		aclcheck_error(aclresult, OBJECT_DATABASE,
-					   get_database_name(dbOid));
-	}
 
 	/* Shared storage in pg_global is not counted */
 
@@ -170,21 +157,6 @@ calculate_tablespace_size(Oid tblspcOid)
 	int64		totalsize = 0;
 	DIR		   *dirdesc;
 	struct dirent *direntry;
-	AclResult	aclresult;
-
-	/*
-	 * User must be a member of pg_read_all_stats or have CREATE privilege for
-	 * target tablespace, either explicitly granted or implicitly because it
-	 * is default for current database.
-	 */
-	if (tblspcOid != MyDatabaseTableSpace &&
-		!true)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_TABLESPACE,
-						   get_tablespace_name(tblspcOid));
-	}
 
 	if (tblspcOid == DEFAULTTABLESPACE_OID)
 		snprintf(tblspcPath, MAXPGPATH, "base");

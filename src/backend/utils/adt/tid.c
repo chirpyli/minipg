@@ -286,16 +286,11 @@ static ItemPointer
 currtid_internal(Relation rel, ItemPointer tid)
 {
 	ItemPointer result;
-	AclResult	aclresult;
 	Snapshot	snapshot;
 	TableScanDesc scan;
 
 	result = (ItemPointer) palloc(sizeof(ItemPointerData));
 
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, get_relkind_objtype(rel->rd_rel->relkind),
-					   RelationGetRelationName(rel));
 
 	if (rel->rd_rel->relkind == RELKIND_VIEW)
 		return currtid_for_view(rel, tid);

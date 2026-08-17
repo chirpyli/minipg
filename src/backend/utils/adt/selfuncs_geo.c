@@ -17,6 +17,13 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
+extern Datum contjoinsel(PG_FUNCTION_ARGS);
+extern Datum contsel(PG_FUNCTION_ARGS);
+extern Datum positionjoinsel(PG_FUNCTION_ARGS);
+extern Datum positionsel(PG_FUNCTION_ARGS);
+extern Datum areajoinsel(PG_FUNCTION_ARGS);
+extern Datum areasel(PG_FUNCTION_ARGS);
 
 #include "catalog/pg_operator.h"
 #include "utils/selfuncs.h"

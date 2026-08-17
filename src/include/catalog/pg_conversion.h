@@ -37,9 +37,6 @@ CATALOG(pg_conversion,2607,ConversionRelationId)
 	/* namespace that the conversion belongs to */
 	Oid			connamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
-	/* owner of the conversion */
-	Oid			conowner BKI_DEFAULT(10);
-
 	/* FOR encoding id */
 	int32		conforencoding BKI_LOOKUP(encoding);
 

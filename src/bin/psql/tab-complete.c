@@ -3081,23 +3081,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("PREPARE", MatchAny, "AS"))
 		COMPLETE_WITH("SELECT", "UPDATE", "INSERT INTO", "DELETE FROM");
 
-/*
- * PREPARE TRANSACTION is missing on purpose. It's intended for transaction
- * managers, not for manual use in interactive sessions.
- */
-
-/* REASSIGN OWNED BY xxx TO yyy */
-	else if (Matches("REASSIGN"))
-		COMPLETE_WITH("OWNED BY");
-	else if (Matches("REASSIGN", "OWNED"))
-		COMPLETE_WITH("BY");
-	else if (Matches("REASSIGN", "OWNED", "BY"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
-	else if (Matches("REASSIGN", "OWNED", "BY", MatchAny))
-		COMPLETE_WITH("TO");
-	else if (Matches("REASSIGN", "OWNED", "BY", MatchAny, "TO"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
-
 /* REFRESH MATERIALIZED VIEW */
 	else if (Matches("REFRESH"))
 		COMPLETE_WITH("MATERIALIZED VIEW");

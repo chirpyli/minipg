@@ -43,9 +43,6 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 	/* OID of namespace containing this type */
 	Oid			typnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
-	/* type owner */
-	Oid			typowner BKI_DEFAULT(10);
-
 	/*
 	 * For a fixed-size type, typlen is the number of bytes we use to
 	 * represent a value of this type, e.g. 4 for an int4.  But for a
@@ -385,9 +382,8 @@ extern void GenerateTypeDependencies(HeapTuple typeTuple,
 									 bool isDependentType,
 									 bool makeExtensionDep,
 									 bool rebuild);
-
 extern void RenameTypeInternal(Oid typeOid, const char *newTypeName,
-							   Oid typeNamespace);
+                                                          Oid typeNamespace);
 
 extern char *makeArrayTypeName(const char *typeName, Oid typeNamespace);
 

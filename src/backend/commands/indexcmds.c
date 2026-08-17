@@ -646,7 +646,7 @@ DefineIndex(Oid relationId,
 	 * already arranged to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&root_save_userid, &root_save_sec_context);
-	SetUserIdAndSecContext(rel->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   root_save_sec_context | SECURITY_RESTRICTED_OPERATION);
 
 	namespaceId = RelationGetNamespace(rel);
@@ -705,16 +705,6 @@ DefineIndex(Oid relationId,
 	 * Skip check if caller doesn't want it.  Also skip check if
 	 * bootstrapping, since permissions machinery may not be working yet.
 	 */
-	if (check_rights && !IsBootstrapProcessingMode())
-	{
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_SCHEMA,
-						   get_namespace_name(namespaceId));
-	}
-
 	/*
 	 * Select tablespace to use.  If not specified, use default tablespace
 	 * (which may in turn default to database's default).
@@ -732,18 +722,6 @@ DefineIndex(Oid relationId,
 		tablespaceId = GetDefaultTablespace(rel->rd_rel->relpersistence,
 											partitioned);
 		/* note InvalidOid is OK in this case */
-	}
-
-	/* Check tablespace permissions */
-	if (check_rights &&
-		OidIsValid(tablespaceId) && tablespaceId != MyDatabaseTableSpace)
-	{
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_TABLESPACE,
-						   get_tablespace_name(tablespaceId));
 	}
 
 	/*
@@ -2207,18 +2185,6 @@ ExecReindex(ParseState *pstate, ReindexStmt *stmt, bool isTopLevel)
 	if (tablespacename != NULL)
 	{
 		params.tablespaceOid = get_tablespace_oid(tablespacename, false);
-
-		/* Check permissions except when moving to database's default */
-		if (OidIsValid(params.tablespaceOid) &&
-			params.tablespaceOid != MyDatabaseTableSpace)
-		{
-			AclResult	aclresult;
-
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_TABLESPACE,
-							   get_tablespace_name(params.tablespaceOid));
-		}
 	}
 	else
 		params.tablespaceOid = InvalidOid;
@@ -2351,8 +2317,6 @@ RangeVarCallbackForReindexIndex(const RangeVar *relation,
 				 errmsg("\"%s\" is not an index", relation->relname)));
 
 	/* Check permissions */
-	if (!pg_class_ownercheck(relId, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_INDEX, relation->relname);
 
 	/* Lock heap before index to avoid deadlock. */
 	if (relId != oldRelId)
@@ -2467,9 +2431,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	{
 		objectOid = get_namespace_oid(objectName, false);
 
-		if (!pg_namespace_ownercheck(objectOid, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_SCHEMA,
-						   objectName);
 	}
 	else
 	{
@@ -2479,9 +2440,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("can only reindex the currently open database")));
-		if (!pg_database_ownercheck(objectOid, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_DATABASE,
-						   objectName);
 	}
 
 	/*
@@ -2539,15 +2497,10 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 			continue;
 
 		/*
-		 * The table can be reindexed if the user is superuser, the table
-		 * owner, or the database/schema owner (but in the latter case, only
-		 * if it's not a shared relation).  pg_class_ownercheck includes the
-		 * superuser case, and depending on objectKind we already know that
-		 * the user has permission to run REINDEX on this database or schema
-		 * per the permission checks at the beginning of this routine.
+		 * minipg 已彻底移除 owner 机制（无角色，恒为超级用户），
+		 * 故不做 owner 权限检查，所有表均可由当前会话（超级用户）reindex。
 		 */
-		if (classtuple->relisshared &&
-			!pg_class_ownercheck(relid, GetUserId()))
+		if (classtuple->relisshared)
 			continue;
 
 		/*
@@ -2660,23 +2613,6 @@ ReindexMultipleInternal(List *relids, ReindexParams *params)
 			PopActiveSnapshot();
 			CommitTransactionCommand();
 			continue;
-		}
-
-		/*
-		 * Check permissions except when moving to database's default if a new
-		 * tablespace is chosen.  Note that this check also happens in
-		 * ExecReindex(), but we do an extra check here as this runs across
-		 * multiple transactions.
-		 */
-		if (OidIsValid(params->tablespaceOid) &&
-			params->tablespaceOid != MyDatabaseTableSpace)
-		{
-			AclResult	aclresult;
-
-			aclresult = ACLCHECK_OK;
-			if (aclresult != ACLCHECK_OK)
-				aclcheck_error(aclresult, OBJECT_TABLESPACE,
-							   get_tablespace_name(params->tablespaceOid));
 		}
 
 		relkind = get_rel_relkind(relid);
@@ -3100,7 +3036,7 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 		 * and arrange to make GUC variable changes local to this command.
 		 */
 		GetUserIdAndSecContext(&save_userid, &save_sec_context);
-		SetUserIdAndSecContext(heapRel->rd_rel->relowner,
+		SetUserIdAndSecContext(GetUserId(),
 							   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 		save_nestlevel = NewGUCNestLevel();
 

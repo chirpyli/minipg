@@ -33,11 +33,6 @@ extern ObjectAddress DefineQueryRewrite(const char *rulename,
 										bool replace,
 										List *action);
 
-extern ObjectAddress RenameRewriteRule(RangeVar *relation, const char *oldName,
-									   const char *newName);
-
-extern void setRuleCheckAsUser(Node *node, Oid userid);
-
 extern void EnableDisableRule(Relation rel, const char *rulename,
 							  char fires_when);
 

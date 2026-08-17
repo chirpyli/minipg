@@ -901,8 +901,6 @@ markRTEForSelectPriv(ParseState *pstate, int rtindex, AttrNumber col)
 
 	if (rte->rtekind == RTE_RELATION)
 	{
-		/* Make sure the rel as a whole is marked for SELECT access */
-		rte->requiredPerms |= ACL_SELECT;
 		/* Must offset the attnum to fit in a bitmapset */
 		rte->selectedCols = bms_add_member(rte->selectedCols,
 										   col - FirstLowInvalidHeapAttributeNumber);
@@ -1327,8 +1325,6 @@ addRangeTableEntry(ParseState *pstate,
 	rte->inh = inh;
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = ACL_SELECT;
-	rte->checkAsUser = InvalidOid;	/* not set-uid by default, either */
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1415,8 +1411,6 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	rte->inh = inh;
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = ACL_SELECT;
-	rte->checkAsUser = InvalidOid;	/* not set-uid by default, either */
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1512,8 +1506,6 @@ addRangeTableEntryForSubquery(ParseState *pstate,
 	rte->inh = false;			/* never true for subqueries */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1835,8 +1827,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 	rte->inh = false;			/* never true for functions */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1921,8 +1911,6 @@ addRangeTableEntryForValues(ParseState *pstate,
 	rte->inh = false;			/* never true for values RTEs */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -2018,8 +2006,6 @@ addRangeTableEntryForJoin(ParseState *pstate,
 	rte->inh = false;			/* never true for joins */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -2143,8 +2129,6 @@ addRangeTableEntryForENR(ParseState *pstate,
 	rte->inh = false;			/* never true for ENRs */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
 	rte->selectedCols = NULL;
 
 	/*
@@ -2802,8 +2786,6 @@ expandNSItemAttrs(ParseState *pstate, ParseNamespaceItem *nsitem,
 	 * to the rangetable.  (This step changes things only for the target
 	 * relation of UPDATE/DELETE, which cannot be under a join.)
 	 */
-	if (rte->rtekind == RTE_RELATION)
-		rte->requiredPerms |= ACL_SELECT;
 
 	forboth(name, names, var, vars)
 	{

@@ -476,7 +476,6 @@ static bool StartBufferIO(BufferDesc *buf, bool forInput);
 static void TerminateBufferIO(BufferDesc *buf, bool clear_dirty,
 							  uint32 set_flag_bits);
 static void shared_buffer_write_error_callback(void *arg);
-static void local_buffer_write_error_callback(void *arg);
 static BufferDesc *BufferAlloc(SMgrRelation smgr,
 							   char relpersistence,
 							   ForkNumber forkNum,
@@ -4556,24 +4555,6 @@ shared_buffer_write_error_callback(void *arg)
 	}
 }
 
-/*
- * Error context callback for errors occurring during local buffer writes.
- */
-static void
-local_buffer_write_error_callback(void *arg)
-{
-	BufferDesc *bufHdr = (BufferDesc *) arg;
-
-	if (bufHdr != NULL)
-	{
-		char	   *path = relpathbackend(bufHdr->tag.rnode, MyBackendId,
-										  bufHdr->tag.forkNum);
-
-		errcontext("writing block %u of relation %s",
-				   bufHdr->tag.blockNum, path);
-		pfree(path);
-	}
-}
 
 /*
  * RelFileNode qsort/bsearch comparator; see RelFileNodeEquals.

@@ -236,8 +236,7 @@ typedef struct pgDataValue
 typedef enum pg_conn_host_type
 {
 	CHT_HOST_NAME,
-	CHT_HOST_ADDRESS,
-	CHT_UNIX_SOCKET
+	CHT_HOST_ADDRESS
 } pg_conn_host_type;
 
 /*
@@ -434,11 +433,8 @@ struct pg_conn
 	PGresult   *result;			/* result being constructed */
 	PGresult   *next_result;	/* next result (used in single-row mode) */
 
-	/* Assorted state for SASL, SSL, GSS, etc */
+	/* Assorted state for SASL, GSS, etc */
 	void	   *sasl_state;
-
-	/* SSL structures */
-	bool		ssl_in_use;
 
 
 	/*
@@ -468,16 +464,6 @@ struct pg_cancel
  * direct use of this array is deprecated; call PQresStatus() instead.
  */
 extern char *const pgresStatus[];
-
-
-#ifdef USE_SSL
-
-#define USER_CERT_FILE		".postgresql/postgresql.crt"
-#define USER_KEY_FILE		".postgresql/postgresql.key"
-#define ROOT_CERT_FILE		".postgresql/root.crt"
-#define ROOT_CRL_FILE		".postgresql/root.crl"
-
-#endif							/* USE_SSL */
 
 /* ----------------
  * Internal functions of libpq

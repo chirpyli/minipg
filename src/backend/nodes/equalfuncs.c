@@ -1265,21 +1265,6 @@ _equalDoStmt(const DoStmt *a, const DoStmt *b)
 }
 
 static bool
-_equalRenameStmt(const RenameStmt *a, const RenameStmt *b)
-{
-	COMPARE_SCALAR_FIELD(renameType);
-	COMPARE_SCALAR_FIELD(relationType);
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(object);
-	COMPARE_STRING_FIELD(subname);
-	COMPARE_STRING_FIELD(newname);
-	COMPARE_SCALAR_FIELD(behavior);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
 _equalAlterObjectDependsStmt(const AlterObjectDependsStmt *a, const AlterObjectDependsStmt *b)
 {
 	COMPARE_SCALAR_FIELD(objectType);
@@ -2108,13 +2093,10 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_SCALAR_FIELD(lateral);
 	COMPARE_SCALAR_FIELD(inh);
 	COMPARE_SCALAR_FIELD(inFromCl);
-	COMPARE_SCALAR_FIELD(requiredPerms);
-	COMPARE_SCALAR_FIELD(checkAsUser);
 	COMPARE_BITMAPSET_FIELD(selectedCols);
 	COMPARE_BITMAPSET_FIELD(insertedCols);
 	COMPARE_BITMAPSET_FIELD(updatedCols);
 	COMPARE_BITMAPSET_FIELD(extraUpdatedCols);
-	COMPARE_NODE_FIELD(securityQuals);
 
 	return true;
 }
@@ -2640,9 +2622,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_DoStmt:
 			retval = _equalDoStmt(a, b);
-			break;
-		case T_RenameStmt:
-			retval = _equalRenameStmt(a, b);
 			break;
 		case T_AlterObjectDependsStmt:
 			retval = _equalAlterObjectDependsStmt(a, b);

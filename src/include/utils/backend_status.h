@@ -31,55 +31,6 @@ typedef enum BackendState
 	STATE_DISABLED
 } BackendState;
 
-
-/* ----------
- * Shared-memory data structures
- * ----------
- */
-
-/*
- * PgBackendSSLStatus
- *
- * For each backend, we keep the SSL status in a separate struct, that
- * is only filled in if SSL is enabled.
- *
- * All char arrays must be null-terminated.
- */
-typedef struct PgBackendSSLStatus
-{
-	/* Information about SSL connection */
-	int			ssl_bits;
-	char		ssl_version[NAMEDATALEN];
-	char		ssl_cipher[NAMEDATALEN];
-	char		ssl_client_dn[NAMEDATALEN];
-
-	/*
-	 * serial number is max "20 octets" per RFC 5280, so this size should be
-	 * fine
-	 */
-	char		ssl_client_serial[NAMEDATALEN];
-
-	char		ssl_issuer_dn[NAMEDATALEN];
-} PgBackendSSLStatus;
-
-/*
- * PgBackendGSSStatus
- *
- * For each backend, we keep the GSS status in a separate struct, that
- * is only filled in if GSS is enabled.
- *
- * All char arrays must be null-terminated.
- */
-typedef struct PgBackendGSSStatus
-{
-	/* Information about GSSAPI connection */
-	char		gss_princ[NAMEDATALEN]; /* GSSAPI Principal used to auth */
-	bool		gss_auth;		/* If GSSAPI authentication was used */
-	bool		gss_enc;		/* If encryption is being used */
-
-} PgBackendGSSStatus;
-
-
 /* ----------
  * PgBackendStatus
  *
@@ -129,14 +80,6 @@ typedef struct PgBackendStatus
 	Oid			st_userid;
 	SockAddr	st_clientaddr;
 	char	   *st_clienthostname;	/* MUST be null-terminated */
-
-	/* Information about SSL connection */
-	bool		st_ssl;
-	PgBackendSSLStatus *st_sslstatus;
-
-	/* Information about GSSAPI connection */
-	bool		st_gss;
-	PgBackendGSSStatus *st_gssstatus;
 
 	/* current state */
 	BackendState st_state;

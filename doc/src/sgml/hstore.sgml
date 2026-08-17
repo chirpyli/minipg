@@ -946,7 +946,7 @@ ALTER TABLE tablename ALTER hstorecol TYPE hstore USING hstorecol || '';
    extensions for PL/Python are
    called <literal>hstore_plpythonu</literal>, <literal>hstore_plpython2u</literal>,
    and <literal>hstore_plpython3u</literal>
-   (see <xref linkend="plpython-python23"/> for the PL/Python naming
+   (see the PL/Python naming
    convention).  If you use them, <type>hstore</type> values are mapped to
    Python dictionaries.
   </para>

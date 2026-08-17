@@ -38,7 +38,6 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 {
 	Oid			namespaceId;
 	char	   *conversion_name;
-	AclResult	aclresult;
 	int			from_encoding;
 	int			to_encoding;
 	Oid			funcoid;
@@ -52,12 +51,6 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	namespaceId = QualifiedNameGetCreationNamespace(stmt->conversion_name,
 													&conversion_name);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(namespaceId));
 
 	/* Check the encoding names */
 	from_encoding = pg_char_to_encoding(from_encoding_name);
@@ -99,12 +92,6 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("encoding conversion function %s must return type %s",
 						NameListToString(func_name), "integer")));
-
-	/* Check we have EXECUTE rights for the function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION,
-					   NameListToString(func_name));
 
 	/*
 	 * Check that the conversion function is suitable for the requested source

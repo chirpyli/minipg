@@ -101,12 +101,6 @@ static const char *progname;
 static char *logfilename;
 static FILE *logfile;
 static char *difffilename;
-static const char *sockdir;
-#ifdef HAVE_UNIX_SOCKETS
-static const char *temp_sockdir;
-static char sockself[MAXPGPATH];
-static char socklock[MAXPGPATH];
-#endif
 
 static _resultmap *resultmap = NULL;
 
@@ -285,83 +279,6 @@ stop_postmaster(void)
 		postmaster_running = false;
 	}
 }
-
-#ifdef HAVE_UNIX_SOCKETS
-/*
- * Remove the socket temporary directory.  pg_regress never waits for a
- * postmaster exit, so it is indeterminate whether the postmaster has yet to
- * unlink the socket and lock file.  Unlink them here so we can proceed to
- * remove the directory.  Ignore errors; leaking a temporary directory is
- * unimportant.  This can run from a signal handler.  The code is not
- * acceptable in a Windows signal handler (see initdb.c:trapsig()), but
- * on Windows, pg_regress does not use Unix sockets by default.
- */
-static void
-remove_temp(void)
-{
-	Assert(temp_sockdir);
-	unlink(sockself);
-	unlink(socklock);
-	rmdir(temp_sockdir);
-}
-
-/*
- * Signal handler that calls remove_temp() and reraises the signal.
- */
-static void
-signal_remove_temp(int signum)
-{
-	remove_temp();
-
-	pqsignal(signum, SIG_DFL);
-	raise(signum);
-}
-
-/*
- * Create a temporary directory suitable for the server's Unix-domain socket.
- * The directory will have mode 0700 or stricter, so no other OS user can open
- * our socket to exploit our use of trust authentication.  Most systems
- * constrain the length of socket paths well below _POSIX_PATH_MAX, so we
- * place the directory under /tmp rather than relative to the possibly-deep
- * current working directory.
- *
- * Compared to using the compiled-in DEFAULT_PGSOCKET_DIR, this also permits
- * testing to work in builds that relocate it to a directory not writable to
- * the build/test user.
- */
-static const char *
-make_temp_sockdir(void)
-{
-	char	   *template = psprintf("%s/pg_regress-XXXXXX",
-									getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
-
-	temp_sockdir = mkdtemp(template);
-	if (temp_sockdir == NULL)
-	{
-		fprintf(stderr, _("%s: could not create directory \"%s\": %s\n"),
-				progname, template, strerror(errno));
-		exit(2);
-	}
-
-	/* Stage file names for remove_temp().  Unsafe in a signal handler. */
-	UNIXSOCK_PATH(sockself, port, temp_sockdir);
-	snprintf(socklock, sizeof(socklock), "%s.lock", sockself);
-
-	/* Remove the directory during clean exit. */
-	atexit(remove_temp);
-
-	/*
-	 * Remove the directory before dying to the usual signals.  Omit SIGQUIT,
-	 * preserving it as a quick, untidy exit.
-	 */
-	pqsignal(SIGHUP, signal_remove_temp);
-	pqsignal(SIGINT, signal_remove_temp);
-	pqsignal(SIGPIPE, signal_remove_temp);
-	pqsignal(SIGTERM, signal_remove_temp);
-
-	return temp_sockdir;
-}
-#endif							/* HAVE_UNIX_SOCKETS */
 
 /*
  * Check whether string matches pattern
@@ -837,20 +754,8 @@ initialize_environment(void)
 		/* PGPORT, see below */
 		/* PGHOST, see below */
 
-#ifdef HAVE_UNIX_SOCKETS
-		if (hostname != NULL)
-			setenv("PGHOST", hostname, 1);
-		else
-		{
-			sockdir = getenv("PG_REGRESS_SOCK_DIR");
-			if (!sockdir)
-				sockdir = make_temp_sockdir();
-			setenv("PGHOST", sockdir, 1);
-		}
-#else
 		Assert(hostname != NULL);
 		setenv("PGHOST", hostname, 1);
-#endif
 		unsetenv("PGHOSTADDR");
 		if (port != -1)
 		{
@@ -900,12 +805,7 @@ initialize_environment(void)
 		if (!pghost)
 		{
 			/* Keep this bit in sync with libpq's default host location: */
-#ifdef HAVE_UNIX_SOCKETS
-			if (DEFAULT_PGSOCKET_DIR[0])
-				 /* do nothing, we'll print "Unix socket" below */ ;
-			else
-#endif
-				pghost = "localhost";	/* DefaultHost in fe-connect.c */
+			pghost = "localhost";	/* DefaultHost in fe-connect.c */
 		}
 
 		if (pghost && pgport)
@@ -2163,19 +2063,8 @@ regression_main(int argc, char *argv[],
 
 	atexit(stop_postmaster);
 
-#if !defined(HAVE_UNIX_SOCKETS)
+	/* minipg connects to the temp postmaster over TCP only. */
 	use_unix_sockets = false;
-#elif defined(WIN32)
-
-	/*
-	 * We don't use Unix-domain sockets on Windows by default, even if the
-	 * build supports them.  (See comment at remove_temp() for a reason.)
-	 * Override at your own risk.
-	 */
-	use_unix_sockets = getenv("PG_TEST_USE_UNIX_SOCKETS") ? true : false;
-#else
-	use_unix_sockets = true;
-#endif
 
 	if (!use_unix_sockets)
 		hostname = "localhost";
@@ -2318,9 +2207,9 @@ regression_main(int argc, char *argv[],
 		/*
 		 * To reduce chances of interference with parallel installations, use
 		 * a port number starting in the private range (49152-65535)
-		 * calculated from the version number.  This aids !HAVE_UNIX_SOCKETS
-		 * systems; elsewhere, the use of a private socket directory already
-		 * prevents interference.
+		 * calculated from the version number.  minipg listens on TCP localhost
+		 * only, so an isolated private port prevents interference with other
+		 * parallel test installations.
 		 */
 		port = 0xC000 | (PG_VERSION_NUM & 0x3FFF);
 
@@ -2441,8 +2330,6 @@ regression_main(int argc, char *argv[],
 			snprintf(buf, sizeof(buf), "%s/data", temp_instance);
 			config_sspi_auth(buf, NULL);
 		}
-#elif !defined(HAVE_UNIX_SOCKETS)
-#error Platform has no means to secure the test installation.
 #endif
 
 		/*
@@ -2484,12 +2371,12 @@ regression_main(int argc, char *argv[],
 		header(_("starting postmaster"));
 		snprintf(buf, sizeof(buf),
 				 "\"%s%spostgres\" -D \"%s/data\" -F%s "
-				 "-c \"listen_addresses=%s\" -k \"%s\" "
+				 "-c \"listen_addresses=%s\" "
 				 "> \"%s/log/postmaster.log\" 2>&1",
 				 bindir ? bindir : "",
 				 bindir ? "/" : "",
 				 temp_instance, debug ? " -d 5" : "",
-				 hostname ? hostname : "", sockdir ? sockdir : "",
+				 hostname ? hostname : "",
 				 outputdir);
 		postmaster_pid = spawn_process(buf);
 		if (postmaster_pid == INVALID_PID)

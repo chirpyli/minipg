@@ -2184,13 +2184,10 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_SCALAR_FIELD(lateral);
 	COPY_SCALAR_FIELD(inh);
 	COPY_SCALAR_FIELD(inFromCl);
-	COPY_SCALAR_FIELD(requiredPerms);
-	COPY_SCALAR_FIELD(checkAsUser);
 	COPY_BITMAPSET_FIELD(selectedCols);
 	COPY_BITMAPSET_FIELD(insertedCols);
 	COPY_BITMAPSET_FIELD(updatedCols);
 	COPY_BITMAPSET_FIELD(extraUpdatedCols);
-	COPY_NODE_FIELD(securityQuals);
 
 	return newnode;
 }
@@ -3163,23 +3160,6 @@ _copyDoStmt(const DoStmt *from)
 	DoStmt	   *newnode = makeNode(DoStmt);
 
 	COPY_NODE_FIELD(args);
-
-	return newnode;
-}
-
-static RenameStmt *
-_copyRenameStmt(const RenameStmt *from)
-{
-	RenameStmt *newnode = makeNode(RenameStmt);
-
-	COPY_SCALAR_FIELD(renameType);
-	COPY_SCALAR_FIELD(relationType);
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(object);
-	COPY_STRING_FIELD(subname);
-	COPY_STRING_FIELD(newname);
-	COPY_SCALAR_FIELD(behavior);
-	COPY_SCALAR_FIELD(missing_ok);
 
 	return newnode;
 }
@@ -4257,9 +4237,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_DoStmt:
 			retval = _copyDoStmt(from);
-			break;
-		case T_RenameStmt:
-			retval = _copyRenameStmt(from);
 			break;
 		case T_AlterObjectDependsStmt:
 			retval = _copyAlterObjectDependsStmt(from);

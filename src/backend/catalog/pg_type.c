@@ -93,7 +93,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	namestrcpy(&name, typeName);
 	values[Anum_pg_type_typname - 1] = NameGetDatum(&name);
 	values[Anum_pg_type_typnamespace - 1] = ObjectIdGetDatum(typeNamespace);
-	values[Anum_pg_type_typowner - 1] = ObjectIdGetDatum(ownerId);
 	values[Anum_pg_type_typlen - 1] = Int16GetDatum(sizeof(int32));
 	values[Anum_pg_type_typbyval - 1] = BoolGetDatum(true);
 	values[Anum_pg_type_typtype - 1] = CharGetDatum(TYPTYPE_PSEUDO);
@@ -334,7 +333,6 @@ TypeCreate(Oid newTypeOid,
 	namestrcpy(&name, typeName);
 	values[Anum_pg_type_typname - 1] = NameGetDatum(&name);
 	values[Anum_pg_type_typnamespace - 1] = ObjectIdGetDatum(typeNamespace);
-	values[Anum_pg_type_typowner - 1] = ObjectIdGetDatum(ownerId);
 	values[Anum_pg_type_typlen - 1] = Int16GetDatum(internalSize);
 	values[Anum_pg_type_typbyval - 1] = BoolGetDatum(passedByValue);
 	values[Anum_pg_type_typtype - 1] = CharGetDatum(typeType);
@@ -401,12 +399,6 @@ TypeCreate(Oid newTypeOid,
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_OBJECT),
 					 errmsg("type \"%s\" already exists", typeName)));
-
-		/*
-		 * shell type must have been created by same owner
-		 */
-		if (typform->typowner != ownerId)
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_TYPE, typeName);
 
 		/* trouble if caller wanted to force the OID */
 		if (OidIsValid(newTypeOid))
@@ -562,9 +554,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 		ObjectAddressSet(referenced, NamespaceRelationId,
 						 typeForm->typnamespace);
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-
-		recordDependencyOnOwner(TypeRelationId, typeObjectId,
-								typeForm->typowner);
 
 		if (makeExtensionDep)
 			recordDependencyOnCurrentExtension(&myself, rebuild);

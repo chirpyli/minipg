@@ -298,7 +298,7 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 	 * arrange to make GUC variable changes local to this command.
 	 */
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	SetUserIdAndSecContext(OldHeap->rd_rel->relowner,
+	SetUserIdAndSecContext(GetUserId(),
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
@@ -313,7 +313,6 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 	if (recheck)
 	{
 		/* Check that the user still owns the relation */
-		if (!pg_class_ownercheck(tableOid, save_userid))
 		{
 			relation_close(OldHeap, AccessExclusiveLock);
 			goto out;
@@ -631,7 +630,7 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 										  InvalidOid,
 										  InvalidOid,
 										  InvalidOid,
-										  OldHeap->rd_rel->relowner,
+										  InvalidOid,
 										  OldHeap->rd_rel->relam,
 										  OldHeapDesc,
 										  NIL,
@@ -1511,7 +1510,6 @@ get_tables_to_cluster(MemoryContext cluster_context)
 	{
 		index = (Form_pg_index) GETSTRUCT(indexTuple);
 
-		if (!pg_class_ownercheck(index->indrelid, GetUserId()))
 			continue;
 
 		/*

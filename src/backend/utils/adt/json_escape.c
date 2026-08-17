@@ -17,6 +17,7 @@
 #include "postgres.h"
 
 #include "lib/stringinfo.h"
+#include "utils/json.h"
 
 /*
  * escape_json

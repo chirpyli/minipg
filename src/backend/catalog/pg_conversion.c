@@ -100,7 +100,6 @@ ConversionCreate(const char *conname, Oid connamespace,
 	values[Anum_pg_conversion_oid - 1] = ObjectIdGetDatum(oid);
 	values[Anum_pg_conversion_conname - 1] = NameGetDatum(&cname);
 	values[Anum_pg_conversion_connamespace - 1] = ObjectIdGetDatum(connamespace);
-	values[Anum_pg_conversion_conowner - 1] = ObjectIdGetDatum(conowner);
 	values[Anum_pg_conversion_conforencoding - 1] = Int32GetDatum(conforencoding);
 	values[Anum_pg_conversion_contoencoding - 1] = Int32GetDatum(contoencoding);
 	values[Anum_pg_conversion_conproc - 1] = ObjectIdGetDatum(conproc);
@@ -126,9 +125,6 @@ ConversionCreate(const char *conname, Oid connamespace,
 	referenced.objectId = connamespace;
 	referenced.objectSubId = 0;
 	recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-
-	/* create dependency on owner */
-	recordDependencyOnOwner(ConversionRelationId, oid, conowner);
 
 	/* dependency on extension */
 	recordDependencyOnCurrentExtension(&myself, false);

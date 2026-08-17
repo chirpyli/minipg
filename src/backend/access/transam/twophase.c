@@ -2368,9 +2368,9 @@ PrepareRedoAdd(char *buf, XLogRecPtr start_lsn,
 {
 	TwoPhaseFileHeader *hdr = (TwoPhaseFileHeader *) buf;
 	char	   *bufptr;
+	const char *gid;
 
 	(void) origin_id;				/* unused after logical replication removal */
-	const char *gid;
 	GlobalTransaction gxact;
 
 	Assert(LWLockHeldByMeInMode(TwoPhaseStateLock, LW_EXCLUSIVE));

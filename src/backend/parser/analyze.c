@@ -412,8 +412,7 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 	/* set up range table with just the result rel */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
 										 stmt->relation->inh,
-										 true,
-										 ACL_DELETE);
+										 true);
 	nsitem = pstate->p_target_nsitem;
 
 	/* there's no DISTINCT in DELETE */
@@ -479,7 +478,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	ListCell   *attnos;
 	ListCell   *lc;
 	bool		isOnConflictUpdate;
-	AclMode		targetPerms;
 
 	qry->commandType = CMD_INSERT;
 	pstate->p_is_insert = true;
@@ -532,11 +530,8 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * mentioned in the SELECT part.  Note that the target table is not added
 	 * to the joinlist or namespace.
 	 */
-	targetPerms = ACL_INSERT;
-	if (isOnConflictUpdate)
-		targetPerms |= ACL_UPDATE;
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 false, false, targetPerms);
+										 false, false);
 
 	/* Validate stmt->cols list, or build default list if no list given */
 	icolumns = checkInsertTargets(pstate, stmt->cols, &attrnos);
@@ -1016,7 +1011,6 @@ transformOnConflictClause(ParseState *pstate,
 		 * (We'll check the actual target relation, instead.)
 		 */
 		exclRte->relkind = RELKIND_COMPOSITE_TYPE;
-		exclRte->requiredPerms = 0;
 		/* other permissions fields in exclRte are already empty */
 
 		/* Create EXCLUDED rel's targetlist for use by EXPLAIN */
@@ -1568,8 +1562,7 @@ transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt)
 
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
 										 stmt->relation->inh,
-										 true,
-										 ACL_UPDATE);
+										 true);
 	nsitem = pstate->p_target_nsitem;
 
 	/* subqueries in FROM cannot access the result relation */
@@ -1968,7 +1961,6 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 				case RTE_RELATION:
 					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
 									   pushedDown);
-					rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
 					break;
 				case RTE_SUBQUERY:
 					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
@@ -2043,7 +2035,6 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 						case RTE_RELATION:
 							applyLockingClause(qry, i, lc->strength,
 											   lc->waitPolicy, pushedDown);
-							rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
 							break;
 						case RTE_SUBQUERY:
 							applyLockingClause(qry, i, lc->strength,

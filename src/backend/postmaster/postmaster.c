@@ -179,9 +179,6 @@ BackgroundWorker *MyBgworkerEntry = NULL;
 /* The socket number we are listening for connections on */
 int			PostPortNumber;
 
-/* The directory names for Unix socket(s) */
-char	   *Unix_socket_directories;
-
 /* The TCP listen address(es) */
 char	   *ListenAddresses;
 
@@ -380,7 +377,7 @@ static void BackendRun(Port *port) pg_attribute_noreturn();
 static void ExitPostmaster(int status) pg_attribute_noreturn();
 static int	ServerLoop(void);
 static int	BackendStartup(Port *port);
-static int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
+static int	ProcessStartupPacket(Port *port, bool ssl_done);
 static void SendNegotiateProtocolVersion(List *unrecognized_protocol_options);
 static void processCancelRequest(Port *port, void *pkt);
 static int	initMasks(fd_set *rmask);
@@ -545,7 +542,7 @@ PostmasterMain(int argc, char *argv[])
 	 * tcop/postgres.c (the option sets should not conflict) and with the
 	 * common help() function in main/main.c.
 	 */
-	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijk:lN:nOPp:r:S:sTt:W:-:")) != -1)
+	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijlN:nOPp:r:S:sTt:W:-:")) != -1)
 	{
 		switch (opt)
 		{
@@ -601,10 +598,6 @@ PostmasterMain(int argc, char *argv[])
 
 			case 'j':
 				/* only used by interactive backend */
-				break;
-
-			case 'k':
-				SetConfigOption("unix_socket_directories", optarg, PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 
 			case 'l':
@@ -778,9 +771,6 @@ PostmasterMain(int argc, char *argv[])
 	 * getopt(3) library so that it will work correctly in subprocesses.
 	 */
 	optind = 1;
-#ifdef HAVE_INT_OPTRESET
-	optreset = 1;				/* some systems need this too */
-#endif
 
 	/* For debugging: display postmaster environment */
 	{
@@ -958,12 +948,12 @@ PostmasterMain(int argc, char *argv[])
 			char	   *curhost = (char *) lfirst(l);
 
 			if (strcmp(curhost, "*") == 0)
-				status = StreamServerPort(AF_UNSPEC, NULL,
+				status = StreamServerPort(AF_INET, NULL,
 										  (unsigned short) PostPortNumber,
 										  NULL,
 										  ListenSocket, MAXLISTEN);
 			else
-				status = StreamServerPort(AF_UNSPEC, curhost,
+				status = StreamServerPort(AF_INET, curhost,
 										  (unsigned short) PostPortNumber,
 										  NULL,
 										  ListenSocket, MAXLISTEN);
@@ -991,59 +981,6 @@ PostmasterMain(int argc, char *argv[])
 		list_free(elemlist);
 		pfree(rawstring);
 	}
-
-
-#ifdef HAVE_UNIX_SOCKETS
-	if (Unix_socket_directories)
-	{
-		char	   *rawstring;
-		List	   *elemlist;
-		ListCell   *l;
-		int			success = 0;
-
-		/* Need a modifiable copy of Unix_socket_directories */
-		rawstring = pstrdup(Unix_socket_directories);
-
-		/* Parse string into list of directories */
-		if (!SplitDirectoriesString(rawstring, ',', &elemlist))
-		{
-			/* syntax error in list */
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("invalid list syntax in parameter \"%s\"",
-							"unix_socket_directories")));
-		}
-
-		foreach(l, elemlist)
-		{
-			char	   *socketdir = (char *) lfirst(l);
-
-			status = StreamServerPort(AF_UNIX, NULL,
-									  (unsigned short) PostPortNumber,
-									  socketdir,
-									  ListenSocket, MAXLISTEN);
-
-			if (status == STATUS_OK)
-			{
-				success++;
-				/* record the first successful Unix socket in lockfile */
-				if (success == 1)
-					AddToDataDirLockFile(LOCK_FILE_LINE_SOCKET_DIR, socketdir);
-			}
-			else
-				ereport(WARNING,
-						(errmsg("could not create Unix-domain socket in directory \"%s\"",
-								socketdir)));
-		}
-
-		if (!success && elemlist != NIL)
-			ereport(FATAL,
-					(errmsg("could not create any Unix-domain sockets")));
-
-		list_free_deep(elemlist);
-		pfree(rawstring);
-	}
-#endif
 
 	/*
 	 * check that we have some socket to listen on
@@ -1653,15 +1590,10 @@ initMasks(fd_set *rmask)
  * send anything to the client, which would typically be appropriate
  * if we detect a communications failure.)
  *
- * Set ssl_done and/or gss_done when negotiation of an encrypted layer
- * (currently, TLS or GSSAPI) is completed. A successful negotiation of either
- * encryption layer sets both flags, but a rejected negotiation sets only the
- * flag for that layer, since the client may wish to try the other one. We
- * should make no assumption here about the order in which the client may make
- * requests.
+ * Set ssl_done when negotiation of an encrypted layer (TLS) is completed.
  */
 static int
-ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done)
+ProcessStartupPacket(Port *port, bool ssl_done)
 {
 	int32		len;
 	char	   *buf;
@@ -1695,7 +1627,7 @@ retry:
 	if (pq_getbytes(((char *) &len) + 1, 3) == EOF)
 	{
 		/* Got a partial length word, so bleat about that */
-		if (!ssl_done && !gss_done)
+		if (!ssl_done)
 			ereport(COMMERROR,
 					(errcode(ERRCODE_PROTOCOL_VIOLATION),
 					 errmsg("incomplete startup packet")));
@@ -1782,60 +1714,9 @@ retry1:
 
 		/*
 		 * regular startup packet, cancel, etc packet should follow, but not
-		 * another SSL negotiation request, and a GSS request should only
-		 * follow if SSL was rejected (client may negotiate in either order)
+		 * another SSL negotiation request
 		 */
 		ssl_done = true;
-		if (SSLok == 'S')
-		{
-			/*
-			 * We are done with SSL and negotiated correctly, so consider the
-			 * same for GSS.
-			 */
-			gss_done = true;
-		}
-		goto retry;
-	}
-	else if (proto == NEGOTIATE_GSS_CODE && !gss_done)
-	{
-		char		GSSok = 'N';
-
-		while (send(port->sock, &GSSok, 1, 0) != 1)
-		{
-			if (errno == EINTR)
-				continue;
-			ereport(COMMERROR,
-					(errcode_for_socket_access(),
-					 errmsg("failed to send GSSAPI negotiation response: %m")));
-			return STATUS_ERROR;	/* close the connection */
-		}
-
-		/*
-		 * At this point we should have no data already buffered.  If we do,
-		 * it was received before we performed the GSS handshake, so it wasn't
-		 * encrypted and indeed may have been injected by a man-in-the-middle.
-		 * We report this case to the client.
-		 */
-		if (pq_buffer_has_data())
-			ereport(FATAL,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("received unencrypted data after GSSAPI encryption request"),
-					 errdetail("This could be either a client-software bug or evidence of an attempted man-in-the-middle attack.")));
-
-		/*
-		 * regular startup packet, cancel, etc packet should follow, but not
-		 * another GSS negotiation request, and an SSL request should only
-		 * follow if GSS was rejected (client may negotiate in either order)
-		 */
-		gss_done = true;
-		if (GSSok == 'G')
-		{
-			/*
-			 * We are done with GSS and negotiated correctly, so consider the
-			 * same for SSL.
-			 */
-			ssl_done = true;
-		}
 		goto retry;
 	}
 
@@ -3905,7 +3786,7 @@ BackendInitialize(Port *port)
 	 * Receive the startup packet (which might turn out to be a cancel request
 	 * packet).
 	 */
-	status = ProcessStartupPacket(port, false, false);
+	status = ProcessStartupPacket(port, false);
 
 	/*
 	 * Disable the timeout, and prevent SIGTERM again.

@@ -10,15 +10,6 @@
  * src/include/utils/acl.h
  *
  * NOTES
- *	  minipg 已移除细粒度 ACL（访问控制列表）的判定与数据运算机制：各系统
- *	  catalog 的 *acl 列、pg_acl catalog、aclitem 类型运算、GRANT/REVOKE 命令
- *	  及 pg_default_acl 均已删除，acl.c 中的 ACL 数据函数（acldefault/aclupdate/
- *	  aclnewowner/aclmask 等）也已一并删除。本头文件仅保留：
- *	  - Acl/AclItem 类型与 ACL_* 权限位宏（被 GenerateTypeDependencies 等核心
- *	    类型系统函数的签名以及解析器权限位机制所依赖，仅作为类型/位定义，
- *	    不再承载任何 ACL 判定语义）；
- *	  - 所有权检查（ownercheck）与角色成员关系判定所需的声明；
- *	  - 权限/所有权不足时的标准错误报告（aclcheck_error/aclcheck_error_type）。
  *-------------------------------------------------------------------------
  */
 #ifndef ACL_H
@@ -30,49 +21,11 @@
 #include "utils/snapshot.h"
 
 
-/*
- * typedef AclMode is declared in parsenodes.h, also the individual privilege
- * bit meanings are defined there
- */
-
-
 #define ACL_ID_PUBLIC	0		/* placeholder for id in a PUBLIC acl item */
-
-/*
- * AclItem
- *
- * Note: must be same size on all platforms, because the size is hardcoded
- * in the pg_type.h entry for aclitem.
- */
-
-typedef struct AclItem
-{
-	Oid			ai_grantee;		/* ID that this item grants privs to */
-	Oid			ai_grantor;		/* grantor of privs */
-	AclMode		ai_privs;		/* privs being granted */
-
-	/*
-	 * Note: ai_grantor is not redundant with the grantor fields in the
-	 * actual ACL SHOW command.  If the _PRIVILEGES functions are ever
-	 * changed to return ACL items rather than strings, this may be
-	 * irrelevant.
-	 */
-} AclItem;
 
 #define ACLITEMOID 1033
 
 
-/*
- * Definitions for convenient access to Acl (array of AclItem).
- * These are standard PostgreSQL arrays, but are restricted to have one
- * dimension and no nulls.  We also ignore the lower bound when reading,
- * and set it to one when writing.
- */
-
-/*
- * Acl			a one-dimensional array of AclItem
- */
-typedef AclItem *Acl;
 
 /*
  * According to the SQL standard, the grantor of a privilege can be
@@ -120,31 +73,4 @@ typedef enum
 extern Oid	get_role_oid(const char *rolename, bool missing_ok);
 extern Oid	get_rolespec_oid(const RoleSpec *role, bool missing_ok);
 extern char *get_rolespec_name(const RoleSpec *role);
-
-
-/*
- * standardized reporting of aclcheck permission failures
- */
-extern void aclcheck_error(AclResult aclerr, ObjectType objtype,
-						   const char *objectname);
-extern void aclcheck_error_type(AclResult aclerr, Oid typeOid);
-
-/* ownercheck routines just return true (owner) or false (not) */
-extern bool pg_class_ownercheck(Oid class_oid, Oid roleid);
-extern bool pg_type_ownercheck(Oid type_oid, Oid roleid);
-extern bool pg_oper_ownercheck(Oid oper_oid, Oid roleid);
-extern bool pg_proc_ownercheck(Oid proc_oid, Oid roleid);
-extern bool pg_language_ownercheck(Oid lan_oid, Oid roleid);
-extern bool pg_namespace_ownercheck(Oid nsp_oid, Oid roleid);
-extern bool pg_tablespace_ownercheck(Oid spc_oid, Oid roleid);
-extern bool pg_opclass_ownercheck(Oid opc_oid, Oid roleid);
-extern bool pg_opfamily_ownercheck(Oid opf_oid, Oid roleid);
-extern bool pg_database_ownercheck(Oid db_oid, Oid roleid);
-extern bool pg_collation_ownercheck(Oid coll_oid, Oid roleid);
-extern bool pg_conversion_ownercheck(Oid conv_oid, Oid roleid);
-extern bool pg_event_trigger_ownercheck(Oid et_oid, Oid roleid);
-extern bool pg_extension_ownercheck(Oid ext_oid, Oid roleid);
-
-extern bool pg_statistics_object_ownercheck(Oid stat_oid, Oid roleid);
-
 #endif							/* ACL_H */

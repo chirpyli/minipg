@@ -77,7 +77,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 	values[Anum_pg_namespace_oid - 1] = ObjectIdGetDatum(nspoid);
 	namestrcpy(&nname, nspName);
 	values[Anum_pg_namespace_nspname - 1] = NameGetDatum(&nname);
-	values[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(ownerId);
 
 	tup = heap_form_tuple(tupDesc, values, nulls);
 
@@ -92,7 +91,6 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 	myself.objectSubId = 0;
 
 	/* dependency on owner */
-	recordDependencyOnOwner(NamespaceRelationId, nspoid, ownerId);
 
 	/* dependency on extension ... but not for magic temp schemas */
 	if (!isTemp)

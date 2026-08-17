@@ -155,8 +155,6 @@ extern bool Db_user_namespace;
 #define AUTH_REQ_CRYPT		4	/* crypt password. Not supported any more. */
 #define AUTH_REQ_MD5		5	/* md5 password */
 #define AUTH_REQ_SCM_CREDS	6	/* transfer SCM credentials */
-#define AUTH_REQ_GSS		7	/* GSSAPI without wrap() */
-#define AUTH_REQ_GSS_CONT	8	/* Continue GSS exchanges */
 #define AUTH_REQ_SSPI		9	/* SSPI negotiate without wrap() */
 #define AUTH_REQ_SASL	   10	/* Begin SASL authentication */
 #define AUTH_REQ_SASL_CONT 11	/* Continue SASL authentication */
@@ -185,10 +183,9 @@ typedef struct CancelRequestPacket
 
 
 /*
- * A client can also start by sending a SSL or GSSAPI negotiation request to
- * get a secure channel.
+ * A client can also start by sending a SSL negotiation request to get a
+ * secure channel.
  */
 #define NEGOTIATE_SSL_CODE PG_PROTOCOL(1234,5679)
-#define NEGOTIATE_GSS_CODE PG_PROTOCOL(1234,5680)
 
 #endif							/* PQCOMM_H */

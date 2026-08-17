@@ -23922,7 +23922,7 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
      <para>
-      Process doubled quote marks in <link linkend="ecpg">ecpg</link>
+      Process doubled quote marks in ecpg
       <acronym>SQL</acronym> command strings correctly (Tom Lane)
       <ulink url="&commit_baseurl;3dfb1942d">&sect;</ulink>
       <ulink url="&commit_baseurl;c16a1bbcf">&sect;</ulink>
@@ -24436,7 +24436,7 @@ Author: Tomas Vondra <tomas.vondra@postgresql.org>
 -->
 
        <para>
-        Allow <link linkend="brin"><acronym>BRIN</acronym></link> indexes
+        Allow <acronym>BRIN</acronym> indexes
         to record multiple min/max values per range (Tomas Vondra)
         <ulink url="&commit_baseurl;ab596105b">&sect;</ulink>
        </para>
@@ -26118,8 +26118,7 @@ Author: Peter Eisentraut <peter@eisentraut.org>
 -->
 
       <para>
-       Add support for the <link
-       linkend="textsearch-snowball-dictionary">stemming</link> of
+       Add support for the stemming of
        languages Armenian, Basque, Catalan, Hindi, Serbian, and Yiddish
        (Peter Eisentraut)
        <ulink url="&commit_baseurl;cbcc8726b">&sect;</ulink>
@@ -26135,8 +26134,8 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Allow <link linkend="textsearch-intro-configurations">tsearch data
-       files</link> to have unlimited line lengths (Tom Lane)
+       Allow tsearch data
+       files to have unlimited line lengths (Tom Lane)
        <ulink url="&commit_baseurl;83b61319a">&sect;</ulink>
       </para>
 
@@ -26642,7 +26641,7 @@ Author: Michael Paquier <michael@paquier.xyz>
    </sect3>
 
    <sect3>
-    <title><link linkend="plpgsql">PL/pgSQL</link></title>
+    <title>PL/pgSQL</title>
 
     <itemizedlist>
 
@@ -26653,9 +26652,7 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Improve PL/pgSQL's <link
-       linkend="plpgsql-expressions">expression</link> and <link
-       linkend="plpgsql-statements-assignment">assignment</link> parsing
+       Improve PL/pgSQL's expression and assignment parsing
        (Tom Lane)
        <ulink url="&commit_baseurl;c9d529848">&sect;</ulink>
       </para>
@@ -26673,9 +26670,8 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Allow plpgsql's <link
-       linkend="plpgsql-control-structures"><literal>RETURN
-       QUERY</literal></link> to execute its query using parallelism
+       Allow plpgsql's <literal>RETURN
+       QUERY</literal> to execute its query using parallelism
        (Tom Lane)
        <ulink url="&commit_baseurl;2f48ede08">&sect;</ulink>
       </para>
@@ -26688,8 +26684,7 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Improve performance of repeated <link
-       linkend="plpgsql-transactions">CALL</link>s within plpgsql
+       Improve performance of repeated CALLs within plpgsql
        procedures (Pavel Stehule, Tom Lane)
        <ulink url="&commit_baseurl;ee895a655">&sect;</ulink>
       </para>
@@ -26773,9 +26768,8 @@ Author: Michael Meskes <meskes@postgresql.org>
       </para>
 
       <para>
-       This is done via <link
-       linkend="ecpg-sql-declare-statement"><literal>DECLARE
-       ... STATEMENT</literal></link>.
+       This is done via <literal>DECLARE
+       ... STATEMENT</literal>.
       </para>
      </listitem>
 

@@ -106,7 +106,6 @@ AggregateCreate(const char *aggName,
 	ObjectAddress myself,
 				referenced;
 	ObjectAddresses *addrs;
-	AclResult	aclresult;
 
 	/* sanity checks (caller should have caught these) */
 	if (!aggName)
@@ -582,32 +581,6 @@ AggregateCreate(const char *aggName,
 	}
 
 	/*
-	 * permission checks on used types
-	 */
-	for (i = 0; i < numArgs; i++)
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, aggArgTypes[i]);
-	}
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, aggTransType);
-
-	if (OidIsValid(aggmTransType))
-	{
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, aggmTransType);
-	}
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, finaltype);
-
-
-	/*
 	 * Everything looks okay.  Try to create the pg_proc entry for the
 	 * aggregate.  (This could fail if there's already a conflicting entry.)
 	 */
@@ -835,7 +808,6 @@ lookup_agg_function(List *fnName,
 	Oid			vatype;
 	Oid		   *true_oid_array;
 	FuncDetailCode fdresult;
-	AclResult	aclresult;
 	int			i;
 
 	/*
@@ -904,11 +876,6 @@ lookup_agg_function(List *fnName,
 							func_signature_string(fnName, nargs,
 												  NIL, true_oid_array))));
 	}
-
-	/* Check aggregate creator has permission to call the function */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_FUNCTION, get_func_name(fnOid));
 
 	return fnOid;
 }

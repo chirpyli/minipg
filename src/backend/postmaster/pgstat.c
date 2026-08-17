@@ -425,12 +425,6 @@ pgstat_init(void)
 	 */
 	for (addr = addrs; addr; addr = addr->ai_next)
 	{
-#ifdef HAVE_UNIX_SOCKETS
-		/* Ignore AF_UNIX sockets, if any are returned. */
-		if (addr->ai_family == AF_UNIX)
-			continue;
-#endif
-
 		if (++tries > 1)
 			ereport(LOG,
 					(errmsg("trying another address for the statistics collector")));

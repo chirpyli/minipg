@@ -2912,13 +2912,10 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 	WRITE_BOOL_FIELD(lateral);
 	WRITE_BOOL_FIELD(inh);
 	WRITE_BOOL_FIELD(inFromCl);
-	WRITE_UINT_FIELD(requiredPerms);
-	WRITE_OID_FIELD(checkAsUser);
 	WRITE_BITMAPSET_FIELD(selectedCols);
 	WRITE_BITMAPSET_FIELD(insertedCols);
 	WRITE_BITMAPSET_FIELD(updatedCols);
 	WRITE_BITMAPSET_FIELD(extraUpdatedCols);
-	WRITE_NODE_FIELD(securityQuals);
 }
 
 static void

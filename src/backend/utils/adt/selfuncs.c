@@ -5449,7 +5449,6 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 {
 	RangeTblEntry *rte = planner_rt_fetch(varno, root);
 	int			varattno;
-	Oid			userid;
 
 	Assert(rte->rtekind == RTE_RELATION);
 
@@ -5540,19 +5539,6 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 		rte = planner_rt_fetch(varno, root);
 		Assert(rte->rtekind == RTE_RELATION);
 	}
-
-	/*
-	 * For all rows to be accessible, there must be no securityQuals from
-	 * security barrier views or RLS policies.
-	 */
-	if (rte->securityQuals != NIL)
-		return false;
-
-	/*
-	 * Use checkAsUser for privilege checks if it's set, in case we're
-	 * accessing the table via a view.
-	 */
-	userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
 
 	/*
 	 * Test for table-level SELECT privilege.

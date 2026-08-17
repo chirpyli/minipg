@@ -21,38 +21,62 @@ CREATE AGGREGATE alt_agg2 (
   sfunc1 = int4mi, basetype = int4, stype1 = int4, initcond = 0
 );
 ALTER AGGREGATE alt_func1(int) RENAME TO alt_func3;  -- failed (not aggregate)
-ERROR:  function alt_func1(integer) is not an aggregate
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER AGGREGATE alt_func1(int) RENAME TO alt_func3;
+                                       ^
 ALTER AGGREGATE alt_func1(int) SET SCHEMA alt_nsp2;  -- failed (not aggregate)
 ERROR:  function alt_func1(integer) is not an aggregate
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func2;  -- failed (name conflict)
-ERROR:  function alt_func2(integer) already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER FUNCTION alt_func1(int) RENAME TO alt_func2;
+                                      ^
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func3;  -- OK
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER FUNCTION alt_func1(int) RENAME TO alt_func3;
+                                      ^
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp1;  -- OK, already there
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp2;  -- OK
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg2;   -- failed (name conflict)
-ERROR:  function alt_agg2(integer) already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg2;
+                                      ^
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg3;   -- OK
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg3;
+                                      ^
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- OK
 CREATE FUNCTION alt_func1(int) RETURNS int LANGUAGE sql
   AS 'SELECT $1 + 2';
+ERROR:  function "alt_func1" already exists with same argument types
 CREATE FUNCTION alt_func2(int) RETURNS int LANGUAGE sql
   AS 'SELECT $1 - 2';
 CREATE AGGREGATE alt_agg1 (
   sfunc1 = int4pl, basetype = int4, stype1 = int4, initcond = 100
 );
+ERROR:  function "alt_agg1" already exists with same argument types
 CREATE AGGREGATE alt_agg2 (
   sfunc1 = int4mi, basetype = int4, stype1 = int4, initcond = -100
 );
 ALTER FUNCTION alt_func3(int) RENAME TO alt_func4;	-- failed (not owner)
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER FUNCTION alt_func3(int) RENAME TO alt_func4;
+                                      ^
 ALTER FUNCTION alt_func1(int) RENAME TO alt_func4;	-- OK
-ERROR:  function alt_func4(integer) already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER FUNCTION alt_func1(int) RENAME TO alt_func4;
+                                      ^
 ALTER FUNCTION alt_func3(int) SET SCHEMA alt_nsp2;      -- failed (not owner)
 ERROR:  function alt_func3(integer) does not exist
 ALTER FUNCTION alt_func2(int) SET SCHEMA alt_nsp2;	-- failed (name conflicts)
 ERROR:  function alt_func2(integer) already exists in schema "alt_nsp2"
 ALTER AGGREGATE alt_agg3(int) RENAME TO alt_agg4;   -- failed (not owner)
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER AGGREGATE alt_agg3(int) RENAME TO alt_agg4;
+                                      ^
 ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg4;   -- OK
-ERROR:  function alt_agg4(integer) already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg4;
+                                      ^
 ALTER AGGREGATE alt_agg3(int) SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  aggregate alt_agg3(integer) does not exist
 ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- failed (name conflict)
@@ -66,13 +90,11 @@ SELECT n.nspname, proname, prorettype::regtype, prokind, 'postgres'::name AS rol
 ----------+-----------+------------+---------+----------
  alt_nsp1 | alt_agg1  | integer    | a       | postgres
  alt_nsp1 | alt_agg2  | integer    | a       | postgres
- alt_nsp1 | alt_agg4  | integer    | a       | postgres
  alt_nsp1 | alt_func1 | integer    | f       | postgres
  alt_nsp1 | alt_func2 | integer    | f       | postgres
- alt_nsp1 | alt_func4 | integer    | f       | postgres
  alt_nsp2 | alt_agg2  | integer    | a       | postgres
  alt_nsp2 | alt_func2 | integer    | f       | postgres
-(8 rows)
+(6 rows)
 
 --
 -- We would test collations here, but it's not possible because the error
@@ -84,14 +106,25 @@ SELECT n.nspname, proname, prorettype::regtype, prokind, 'postgres'::name AS rol
 CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 CREATE CONVERSION alt_conv2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv2;  -- failed (name conflict)
-ERROR:  conversion "alt_conv2" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER CONVERSION alt_conv1 RENAME TO alt_conv2;
+                                   ^
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv3;  -- OK
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER CONVERSION alt_conv1 RENAME TO alt_conv3;
+                                   ^
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- OK
 CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
+ERROR:  conversion "alt_conv1" already exists
 CREATE CONVERSION alt_conv2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
 ALTER CONVERSION alt_conv3 RENAME TO alt_conv4;  -- failed (not owner)
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER CONVERSION alt_conv3 RENAME TO alt_conv4;
+                                   ^
 ALTER CONVERSION alt_conv1 RENAME TO alt_conv4;  -- OK
-ERROR:  conversion "alt_conv4" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER CONVERSION alt_conv1 RENAME TO alt_conv4;
+                                   ^
 ALTER CONVERSION alt_conv3 SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  conversion "alt_conv3" does not exist
 ALTER CONVERSION alt_conv2 SET SCHEMA alt_nsp2;  -- failed (name conflict)
@@ -105,9 +138,8 @@ SELECT n.nspname, c.conname, 'postgres'::name AS rolname
 ----------+-----------+----------
  alt_nsp1 | alt_conv1 | postgres
  alt_nsp1 | alt_conv2 | postgres
- alt_nsp1 | alt_conv4 | postgres
  alt_nsp2 | alt_conv2 | postgres
-(4 rows)
+(3 rows)
 
 --
 -- Operator
@@ -119,29 +151,31 @@ CREATE OPERATOR @-@ ( leftarg = int4, rightarg = int4, procedure = int4mi );
 ALTER OPERATOR @+@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (not owner)
 -- can't test this: the error message includes the raw oid of namespace
 -- ALTER OPERATOR @-@(int4, int4) SET SCHEMA alt_nsp2;   -- failed (name conflict)
-SELECT n.nspname, oprname, 'postgres'::name AS rolname,
-    oprleft::regtype, oprright::regtype, oprcode::regproc
-  FROM pg_operator o, pg_namespace n
-  WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
-    AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
-  ORDER BY nspname, oprname;
-ERROR:  missing FROM-clause entry for table "a"
-LINE 4:   WHERE o.oprnamespace = n.oid AND o.oprowner = a.oid
-                                                        ^
 --
 -- OpFamily and OpClass
 --
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf2;  -- failed (name conflict)
-ERROR:  operator family "alt_opf2" for access method "hash" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf2...
+                                                  ^
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3;  -- OK
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3...
+                                                  ^
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- OK
 CREATE OPERATOR FAMILY alt_opf1 USING hash;
+ERROR:  operator family "alt_opf1" for access method "hash" already exists
 CREATE OPERATOR FAMILY alt_opf2 USING hash;
 ALTER OPERATOR FAMILY alt_opf3 USING hash RENAME TO alt_opf4;	-- failed (not owner)
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER OPERATOR FAMILY alt_opf3 USING hash RENAME TO alt_opf4...
+                                                  ^
 ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf4;  -- OK
-ERROR:  operator family "alt_opf4" for access method "hash" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf4...
+                                                  ^
 ALTER OPERATOR FAMILY alt_opf3 USING hash SET SCHEMA alt_nsp2;  -- failed (not owner)
 ERROR:  operator family "alt_opf3" does not exist for access method "hash"
 ALTER OPERATOR FAMILY alt_opf2 USING hash SET SCHEMA alt_nsp2;  -- failed (name conflict)
@@ -360,15 +394,26 @@ CREATE TABLE alt_regress_1 (a INTEGER, b INTEGER);
 CREATE STATISTICS alt_stat1 ON a, b FROM alt_regress_1;
 CREATE STATISTICS alt_stat2 ON a, b FROM alt_regress_1;
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat2;   -- failed (name conflict)
-ERROR:  statistics object "alt_stat2" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER STATISTICS alt_stat1 RENAME TO alt_stat2;
+                                   ^
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat3;   -- OK
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER STATISTICS alt_stat1 RENAME TO alt_stat3;
+                                   ^
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;    -- OK
 CREATE TABLE alt_regress_2 (a INTEGER, b INTEGER);
 CREATE STATISTICS alt_stat1 ON a, b FROM alt_regress_2;
+ERROR:  statistics object "alt_stat1" already exists
 CREATE STATISTICS alt_stat2 ON a, b FROM alt_regress_2;
 ALTER STATISTICS alt_stat3 RENAME TO alt_stat4;    -- failed (not owner)
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER STATISTICS alt_stat3 RENAME TO alt_stat4;
+                                   ^
 ALTER STATISTICS alt_stat1 RENAME TO alt_stat4;    -- OK
-ERROR:  statistics object "alt_stat4" already exists in schema "alt_nsp1"
+ERROR:  syntax error at or near "RENAME"
+LINE 1: ALTER STATISTICS alt_stat1 RENAME TO alt_stat4;
+                                   ^
 ALTER STATISTICS alt_stat3 SET SCHEMA alt_nsp2;		-- failed (not owner)
 ERROR:  statistics object "alt_stat3" does not exist
 ALTER STATISTICS alt_stat2 SET SCHEMA alt_nsp2;		-- failed (name conflict)
@@ -386,18 +431,14 @@ HINT:  Perhaps you meant to reference the column "s.stxname" or the column "n.ns
 --- Cleanup resources
 ---
 DROP SCHEMA alt_nsp1 CASCADE;
-NOTICE:  drop cascades to 15 other objects
-DETAIL:  drop cascades to function alt_func4(integer)
-drop cascades to function alt_agg4(integer)
-drop cascades to function alt_func1(integer)
-drop cascades to function alt_func2(integer)
+NOTICE:  drop cascades to 11 other objects
+DETAIL:  drop cascades to function alt_func1(integer)
 drop cascades to function alt_agg1(integer)
+drop cascades to function alt_func2(integer)
 drop cascades to function alt_agg2(integer)
-drop cascades to conversion alt_conv4
 drop cascades to conversion alt_conv1
 drop cascades to conversion alt_conv2
 drop cascades to operator @-@(integer,integer)
-drop cascades to operator family alt_opf4 for access method hash
 drop cascades to operator family alt_opf1 for access method hash
 drop cascades to operator family alt_opf2 for access method hash
 drop cascades to table alt_regress_1

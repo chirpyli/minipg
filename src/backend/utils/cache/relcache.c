@@ -809,22 +809,6 @@ RelationBuildRuleLock(Relation relation)
 		MemoryContextSwitchTo(oldcxt);
 		pfree(rule_str);
 
-		/*
-		 * We want the rule's table references to be checked as though by the
-		 * table owner, not the user referencing the rule.  Therefore, scan
-		 * through the rule's actions and set the checkAsUser field on all
-		 * rtable entries.  We have to look at the qual as well, in case it
-		 * contains sublinks.
-		 *
-		 * The reason for doing this when the rule is loaded, rather than when
-		 * it is stored, is that otherwise ALTER TABLE OWNER would have to
-		 * grovel through stored rules to update checkAsUser fields. Scanning
-		 * the rule tree during load is relatively cheap (compared to
-		 * constructing it in the first place), so we do it here.
-		 */
-		setRuleCheckAsUser((Node *) rule->actions, relation->rd_rel->relowner);
-		setRuleCheckAsUser(rule->qual, relation->rd_rel->relowner);
-
 		if (numlocks >= maxlocks)
 		{
 			maxlocks *= 2;
@@ -1724,6 +1708,7 @@ formrdesc(const char *relationName, Oid relationReltype,
 	 * new or temp relations.
 	 */
 	relation->rd_isnailed = true;
+	relation->rd_fakeentry = true;	/* real pg_class data not loaded yet */
 	relation->rd_createSubid = InvalidSubTransactionId;
 	relation->rd_newRelfilenodeSubid = InvalidSubTransactionId;
 	relation->rd_firstRelfilenodeSubid = InvalidSubTransactionId;
@@ -1736,9 +1721,9 @@ formrdesc(const char *relationName, Oid relationReltype,
 	 *
 	 * The data we insert here is pretty incomplete/bogus, but it'll serve to
 	 * get us launched.  RelationCacheInitializePhase3() will read the real
-	 * data from pg_class and replace what we've done here.  Note in
-	 * particular that relowner is left as zero; this cues
-	 * RelationCacheInitializePhase3 that the real data isn't there yet.
+	 * data from pg_class and replace what we've done here.  rd_fakeentry is
+	 * set true to cue RelationCacheInitializePhase3 that the real data isn't
+	 * there yet.
 	 */
 	relation->rd_rel = (Form_pg_class) palloc0(CLASS_TUPLE_SIZE);
 
@@ -3330,8 +3315,6 @@ RelationBuildLocalRelation(const char *relname,
 	rel->rd_rel->relkind = relkind;
 	rel->rd_rel->relnatts = natts;
 	rel->rd_rel->reltype = InvalidOid;
-	/* needed when bootstrapping: */
-	rel->rd_rel->relowner = BOOTSTRAP_SUPERUSERID;
 
 	/* set up persistence and relcache fields dependent on it */
 	rel->rd_rel->relpersistence = relpersistence;
@@ -3849,7 +3832,7 @@ RelationCacheInitializePhase3(void)
 		/*
 		 * If it's a faked-up entry, read the real pg_class tuple.
 		 */
-		if (relation->rd_rel->relowner == InvalidOid)
+		if (relation->rd_fakeentry)
 		{
 			HeapTuple	htup;
 			Form_pg_class relp;
@@ -3883,10 +3866,8 @@ RelationCacheInitializePhase3(void)
 
 			ReleaseSysCache(htup);
 
-			/* relowner had better be OK now, else we'll loop forever */
-			if (relation->rd_rel->relowner == InvalidOid)
-				elog(ERROR, "invalid relowner in pg_class entry for \"%s\"",
-					 RelationGetRelationName(relation));
+			/* Real data is now loaded; clear the fake-entry flag. */
+			relation->rd_fakeentry = false;
 
 			restart = true;
 		}

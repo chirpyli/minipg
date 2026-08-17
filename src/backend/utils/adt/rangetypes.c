@@ -29,6 +29,16 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
+extern Datum tstzrange_subdiff(PG_FUNCTION_ARGS);
+extern Datum tsrange_subdiff(PG_FUNCTION_ARGS);
+extern Datum daterange_subdiff(PG_FUNCTION_ARGS);
+extern Datum numrange_subdiff(PG_FUNCTION_ARGS);
+extern Datum int8range_subdiff(PG_FUNCTION_ARGS);
+extern Datum int4range_subdiff(PG_FUNCTION_ARGS);
+extern Datum daterange_canonical(PG_FUNCTION_ARGS);
+extern Datum int8range_canonical(PG_FUNCTION_ARGS);
+extern Datum int4range_canonical(PG_FUNCTION_ARGS);
 
 #include "access/tupmacs.h"
 #include "common/hashfn.h"

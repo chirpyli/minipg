@@ -1943,7 +1943,6 @@ InsertExtensionTuple(const char *extName, Oid extOwner,
 	values[Anum_pg_extension_oid - 1] = ObjectIdGetDatum(extensionOid);
 	values[Anum_pg_extension_extname - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(extName));
-	values[Anum_pg_extension_extowner - 1] = ObjectIdGetDatum(extOwner);
 	values[Anum_pg_extension_extnamespace - 1] = ObjectIdGetDatum(schemaOid);
 	values[Anum_pg_extension_extrelocatable - 1] = BoolGetDatum(relocatable);
 	values[Anum_pg_extension_extversion - 1] = CStringGetTextDatum(extVersion);
@@ -1964,11 +1963,6 @@ InsertExtensionTuple(const char *extName, Oid extOwner,
 
 	heap_freetuple(tuple);
 	table_close(rel, RowExclusiveLock);
-
-	/*
-	 * Record dependencies on owner, schema, and prerequisite extensions
-	 */
-	recordDependencyOnOwner(ExtensionRelationId, extensionOid, extOwner);
 
 	refobjs = new_object_addresses();
 
@@ -2920,7 +2914,6 @@ AlterExtensionNamespace(const char *extensionName, const char *newschema, Oid *o
 	Oid			extensionOid;
 	Oid			nspOid;
 	Oid			oldNspOid;
-	AclResult	aclresult;
 	Relation	extRel;
 	ScanKeyData key[2];
 	SysScanDesc extScan;
@@ -2940,14 +2933,6 @@ AlterExtensionNamespace(const char *extensionName, const char *newschema, Oid *o
 	 * Permission check: must own extension.  Note that we don't bother to
 	 * check ownership of the individual member objects ...
 	 */
-	if (!pg_extension_ownercheck(extensionOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_EXTENSION,
-					   extensionName);
-
-	/* Permission check: must have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA, newschema);
 
 	/*
 	 * If the schema is currently a member of the extension, disallow moving
@@ -3155,11 +3140,6 @@ ExecAlterExtensionStmt(ParseState *pstate, AlterExtensionStmt *stmt)
 	systable_endscan(extScan);
 
 	table_close(extRel, AccessShareLock);
-
-	/* Permission check: must own extension */
-	if (!pg_extension_ownercheck(extensionOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_EXTENSION,
-					   stmt->extname);
 
 	/*
 	 * Read the primary control file.  Note we assume that it does not contain
@@ -3441,11 +3421,6 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 								   (Node *) makeString(stmt->extname),
 								   &relation, AccessShareLock, false);
 
-	/* Permission check: must own extension */
-	if (!pg_extension_ownercheck(extension.objectId, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_EXTENSION,
-					   stmt->extname);
-
 	/*
 	 * Translate the parser representation that identifies the object into an
 	 * ObjectAddress.  get_object_address() will throw an error if the object
@@ -3458,10 +3433,6 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 	Assert(object.objectSubId == 0);
 	if (objAddr)
 		*objAddr = object;
-
-	/* Permission check: must own target object, too */
-	check_object_ownership(GetUserId(), stmt->objtype, object,
-						   stmt->object, relation);
 
 	/*
 	 * Check existing extension membership.

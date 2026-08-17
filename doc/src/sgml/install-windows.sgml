@@ -279,15 +279,6 @@ $ENV{MSBFLAGS}="/m";
     </varlistentry>
 
     <varlistentry>
-     <term><productname>MIT Kerberos</productname></term>
-     <listitem><para>
-      Required for GSSAPI authentication support. MIT Kerberos can be
-      downloaded from
-      <ulink url="https://web.mit.edu/Kerberos/dist/index.html"></ulink>.
-     </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
      <term><productname>libxml2</productname> and
       <productname>libxslt</productname></term>
      <listitem><para>
@@ -305,15 +296,6 @@ $ENV{MSBFLAGS}="/m";
       method for compressing the table data. Binaries and source can be
       downloaded from
       <ulink url="https://github.com/lz4/lz4/releases"></ulink>.
-     </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term><productname>OpenSSL</productname></term>
-     <listitem><para>
-      Required for SSL support. Binaries can be downloaded from
-      <ulink url="https://slproweb.com/products/Win32OpenSSL.html"></ulink>
-      or source from <ulink url="https://www.openssl.org"></ulink>.
      </para></listitem>
     </varlistentry>
 
@@ -363,8 +345,8 @@ $ENV{MSBFLAGS}="/m";
   </para>
 
   <para>
-   To use a server-side third party library such as <productname>python</productname> or
-   <productname>OpenSSL</productname>, this library <emphasis>must</emphasis> also be
+   To use a server-side third party library such as <productname>python</productname>,
+   this library <emphasis>must</emphasis> also be
    64-bit. There is no support for loading a 32-bit library in a 64-bit
    server. Several of the third party libraries that PostgreSQL supports may
    only be available in 32-bit versions, in which case they cannot be used with

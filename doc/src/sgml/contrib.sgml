@@ -127,9 +127,7 @@ CREATE EXTENSION <replaceable>module_name</replaceable>;
  &pgtrgm;
  &pgvisibility;
  &seg;
- &sepgsql;
  &contrib-spi;
- &sslinfo;
  &tablefunc;
  &tcn;
  &test-decoding;
@@ -137,9 +135,8 @@ CREATE EXTENSION <replaceable>module_name</replaceable>;
  &tsm-system-time;
  &unaccent;
  &uuid-ossp;
- &xml2;
 
-</appendix>
+ </appendix>
 
 <!--
 These are two separate appendixes because it is difficult to mix regular

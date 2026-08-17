@@ -675,7 +675,6 @@ ExecInsert(ModifyTableState *mtstate,
 	TransitionCaptureState *ar_insert_trig_tcs;
 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
 	OnConflictAction onconflict = node->onConflictAction;
-	MemoryContext oldContext;
 
 	ExecMaterializeSlot(slot);
 
@@ -2261,7 +2260,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	List	   *arowmarks;
 	ListCell   *l;
 	int			i;
-	Relation	rel;
 
 	/* check for unsupported flags */
 	Assert(!(eflags & (EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK)));
@@ -2422,9 +2420,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	Assert(AttributeNumberIsValid(mtstate->mt_resultOidAttno) || nrels == 1);
 	mtstate->mt_lastResultOid = InvalidOid; /* force lookup at first tuple */
 	mtstate->mt_lastResultIndex = 0;	/* must be zero if no such attr */
-
-	/* Get the root target relation */
-	rel = mtstate->rootResultRelInfo->ri_RelationDesc;
 
 	/*
 	 * Initialize any WITH CHECK OPTION constraints if needed.

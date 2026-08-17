@@ -77,8 +77,6 @@ static bool subpath_is_hashable(Path *path);
 static bool testexpr_is_hashable(Node *testexpr, List *param_ids);
 static bool test_opexpr_is_hashable(OpExpr *testexpr, List *param_ids);
 static bool hash_ok_operator(OpExpr *expr);
-static bool contain_dml(Node *node);
-static bool contain_dml_walker(Node *node, void *context);
 static bool simplify_EXISTS_query(PlannerInfo *root, Query *query);
 static Query *convert_EXISTS_to_ANY(PlannerInfo *root, Query *subselect,
 									Node **testexpr, List **paramIds);
@@ -874,29 +872,6 @@ hash_ok_operator(OpExpr *expr)
  *
  * We reject SELECT FOR UPDATE/SHARE as well as INSERT etc.
  */
-static bool
-contain_dml(Node *node)
-{
-	return contain_dml_walker(node, NULL);
-}
-
-static bool
-contain_dml_walker(Node *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Query))
-	{
-		Query	   *query = (Query *) node;
-
-		if (query->commandType != CMD_SELECT ||
-			query->rowMarks != NIL)
-			return true;
-
-		return query_tree_walker(query, contain_dml_walker, context, 0);
-	}
-	return expression_tree_walker(node, contain_dml_walker, context);
-}
 
 /*
  * convert_ANY_sublink_to_join: try to convert an ANY SubLink to a join

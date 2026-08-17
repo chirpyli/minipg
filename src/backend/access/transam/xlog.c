@@ -185,9 +185,8 @@ HotStandbyState standbyState = STANDBY_DISABLED;
 
 static XLogRecPtr LastRec;
 
-/* Local copy of WalRcv->flushedUpto / receiveTLI (used by recovery) */
+/* Local copy of WalRcv->flushedUpto (used by recovery) */
 static XLogRecPtr flushedUpto = 0;
-static TimeLineID receiveTLI = 0;
 
 /*
  * Information about a single tablespace, used while restoring a tablespace
@@ -895,7 +894,6 @@ static void ConfirmRecoveryPaused(void);
 static void recoveryPausesHere(bool endOfRecovery);
 static bool recoveryApplyDelay(XLogReaderState *record);
 static void SetLatestXTime(TimestampTz xtime);
-static void SetCurrentChunkStartTime(TimestampTz xtime);
 static void CheckRequiredParameterValues(void);
 static void XLogReportParameters(void);
 static void checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI,
@@ -920,7 +918,6 @@ static int	XLogPageRead(XLogReaderState *xlogreader, XLogRecPtr targetPagePtr,
 						 int reqLen, XLogRecPtr targetRecPtr, char *readBuf);
 static bool WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 										bool fetching_ckpt, XLogRecPtr tliRecPtr);
-static void ResetInstallXLogFileSegmentActive(void);
 static int	emode_for_corrupt_record(int emode, XLogRecPtr RecPtr);
 static void XLogFileClose(void);
 static void PreallocXlogFiles(XLogRecPtr endptr);
@@ -937,7 +934,6 @@ static XLogRecord *ReadRecord(XLogReaderState *xlogreader,
 static void CheckRecoveryConsistency(void);
 static XLogRecord *ReadCheckpointRecord(XLogReaderState *xlogreader,
 										XLogRecPtr RecPtr, int whichChkpt, bool report);
-static bool rescanLatestTimeLine(void);
 static void InitControlFile(uint64 sysidentifier);
 static void WriteControlFile(void);
 static void ReadControlFile(void);
@@ -4494,92 +4490,7 @@ ReadRecord(XLogReaderState *xlogreader, int emode,
 	}
 }
 
-/*
- * Scan for new timelines that might have appeared in the archive since we
- * started recovery.
- *
- * If there are any, the function changes recovery target TLI to the latest
- * one and returns 'true'.
- */
-static bool
-rescanLatestTimeLine(void)
-{
-	List	   *newExpectedTLEs;
-	bool		found;
-	ListCell   *cell;
-	TimeLineID	newtarget;
-	TimeLineID	oldtarget = recoveryTargetTLI;
-	TimeLineHistoryEntry *currentTle = NULL;
 
-	newtarget = findNewestTimeLine(recoveryTargetTLI);
-	if (newtarget == recoveryTargetTLI)
-	{
-		/* No new timelines found */
-		return false;
-	}
-
-	/*
-	 * Determine the list of expected TLIs for the new TLI
-	 */
-
-	newExpectedTLEs = readTimeLineHistory(newtarget);
-
-	/*
-	 * If the current timeline is not part of the history of the new timeline,
-	 * we cannot proceed to it.
-	 */
-	found = false;
-	foreach(cell, newExpectedTLEs)
-	{
-		currentTle = (TimeLineHistoryEntry *) lfirst(cell);
-
-		if (currentTle->tli == recoveryTargetTLI)
-		{
-			found = true;
-			break;
-		}
-	}
-	if (!found)
-	{
-		ereport(LOG,
-				(errmsg("new timeline %u is not a child of database system timeline %u",
-						newtarget,
-						ThisTimeLineID)));
-		return false;
-	}
-
-	/*
-	 * The current timeline was found in the history file, but check that the
-	 * next timeline was forked off from it *after* the current recovery
-	 * location.
-	 */
-	if (currentTle->end < EndRecPtr)
-	{
-		ereport(LOG,
-				(errmsg("new timeline %u forked off current database system timeline %u before current recovery point %X/%X",
-						newtarget,
-						ThisTimeLineID,
-						LSN_FORMAT_ARGS(EndRecPtr))));
-		return false;
-	}
-
-	/* The new timeline history seems valid. Switch target */
-	recoveryTargetTLI = newtarget;
-	list_free_deep(expectedTLEs);
-	expectedTLEs = newExpectedTLEs;
-
-	/*
-	 * As in StartupXLOG(), try to ensure we have all the history files
-	 * between the old target and new target in pg_wal.
-	 */
-	restoreTimeLineHistoryFiles(oldtarget + 1, newtarget);
-
-	ereport(LOG,
-			(errmsg("new target timeline is %u",
-					recoveryTargetTLI)));
-
-	return true;
-}
 
 /*
  * I/O routines for pg_control
@@ -6262,20 +6173,6 @@ GetLatestXTime(void)
 	SpinLockRelease(&XLogCtl->info_lck);
 
 	return xtime;
-}
-
-/*
- * Save timestamp of the next chunk of WAL records to apply.
- *
- * We keep this in XLogCtl, not a simple static variable, so that it can be
- * seen by all backends.
- */
-static void
-SetCurrentChunkStartTime(TimestampTz xtime)
-{
-	SpinLockAcquire(&XLogCtl->info_lck);
-	XLogCtl->currentChunkStartTime = xtime;
-	SpinLockRelease(&XLogCtl->info_lck);
 }
 
 /*
@@ -9549,7 +9446,6 @@ CreateRestartPoint(int flags)
 	XLogRecPtr	lastCheckPointEndPtr;
 	CheckPoint	lastCheckPoint;
 	XLogRecPtr	PriorRedoPtr;
-	XLogRecPtr	receivePtr;
 	XLogRecPtr	replayPtr;
 	TimeLineID	replayTLI;
 	XLogRecPtr	endptr;
@@ -11381,9 +11277,6 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 	FILE	   *lfp;
 	FILE	   *fp;
 	char		ch;
-	int			seconds_before_warning;
-	int			waits = 0;
-	bool		reported_waiting = false;
 	char	   *remaining;
 	char	   *ptr;
 	uint32		hi,
@@ -12424,7 +12317,6 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 {
 	static TimestampTz last_fail_time = 0;
 	TimestampTz now;
-	bool		streaming_reply_sent = false;
 
 	/*-------
 	 * Standby mode is implemented by a state machine:
@@ -12605,15 +12497,6 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 	}
 
 	return false;				/* not reached */
-}
-
-/* Disable WAL file recycling and preallocation. */
-static void
-ResetInstallXLogFileSegmentActive(void)
-{
-	LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
-	XLogCtl->InstallXLogFileSegmentActive = false;
-	LWLockRelease(ControlFileLock);
 }
 
 /*

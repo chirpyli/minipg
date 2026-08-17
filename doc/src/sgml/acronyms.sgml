@@ -185,7 +185,7 @@
     <term><acronym>ECPG</acronym></term>
     <listitem>
      <para>
-      <link linkend="ecpg">Embedded C for PostgreSQL</link>
+      Embedded C for PostgreSQL (<acronym>ECPG</acronym>)
      </para>
     </listitem>
    </varlistentry>
@@ -252,17 +252,6 @@
     <listitem>
      <para>
       <ulink url="https://en.wikipedia.org/wiki/GMT">Greenwich Mean Time</ulink>
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
-    <term><acronym>GSSAPI</acronym></term>
-    <listitem>
-     <para>
-      <ulink
-      url="https://en.wikipedia.org/wiki/Generic_Security_Services_Application_Program_Interface">Generic
-      Security Services Application Programming Interface</ulink>
      </para>
     </listitem>
    </varlistentry>
@@ -644,15 +633,6 @@
      <para>
       <ulink url="https://en.wikipedia.org/wiki/Secure_Shell">Secure
       Shell</ulink>
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
-    <term><acronym>SSL</acronym></term>
-    <listitem>
-     <para>
-      <ulink url="https://en.wikipedia.org/wiki/Secure_Sockets_Layer">Secure Sockets Layer</ulink>
      </para>
     </listitem>
    </varlistentry>

@@ -630,12 +630,13 @@ ORDER BY 2;
 -- modified in the current txn; this should not be considered safe
 BEGIN;
 ALTER TYPE bogus RENAME TO bogon;
+ERROR:  syntax error at or near "TO"
+LINE 1: ALTER TYPE bogus RENAME TO bogon;
+                                ^
 ALTER TYPE bogon ADD VALUE 'bad';
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SELECT 'bad'::bogon;
-ERROR:  unsafe use of new value "bad" of enum type bogon
-LINE 1: SELECT 'bad'::bogon;
-               ^
-HINT:  New enum values must be committed before they can be used.
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- but a renamed value is safe to use later in same transaction
 BEGIN;
@@ -652,23 +653,26 @@ DROP TYPE bogus;
 BEGIN;
 CREATE TYPE bogus AS ENUM('good','bad','ugly');
 ALTER TYPE bogus RENAME TO bogon;
+ERROR:  syntax error at or near "TO"
+LINE 1: ALTER TYPE bogus RENAME TO bogon;
+                                ^
 select enum_range(null::bogon);
-   enum_range    
------------------
- {good,bad,ugly}
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- ideally, we'd allow this usage; but it requires keeping track of whether
 -- the enum type was created in the current transaction, which is expensive
 BEGIN;
 CREATE TYPE bogus AS ENUM('good');
 ALTER TYPE bogus RENAME TO bogon;
+ERROR:  syntax error at or near "TO"
+LINE 1: ALTER TYPE bogus RENAME TO bogon;
+                                ^
 ALTER TYPE bogon ADD VALUE 'bad';
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ALTER TYPE bogon ADD VALUE 'ugly';
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 select enum_range(null::bogon);  -- fails
-ERROR:  unsafe use of new value "bad" of enum type bogon
-HINT:  New enum values must be committed before they can be used.
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 --
 -- Cleanup

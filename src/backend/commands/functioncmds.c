@@ -95,7 +95,6 @@ compute_return_type(TypeName *returnType, Oid languageOid,
 {
 	Oid			rettype;
 	Type		typtup;
-	AclResult	aclresult;
 
 	typtup = LookupTypeName(NULL, returnType, NULL, false);
 
@@ -121,7 +120,6 @@ compute_return_type(TypeName *returnType, Oid languageOid,
 	{
 		char	   *typnam = TypeNameToString(returnType);
 		Oid			namespaceId;
-		AclResult	aclresult;
 		char	   *typname;
 		ObjectAddress address;
 
@@ -151,18 +149,10 @@ compute_return_type(TypeName *returnType, Oid languageOid,
 				 errdetail("Creating a shell type definition.")));
 		namespaceId = QualifiedNameGetCreationNamespace(returnType->names,
 														&typname);
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_SCHEMA,
-						   get_namespace_name(namespaceId));
 		address = TypeShellMake(typname, namespaceId, GetUserId());
 		rettype = address.objectId;
 		Assert(OidIsValid(rettype));
 	}
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, rettype);
 
 	*prorettype_p = rettype;
 	*returnsSet_p = returnType->setof;
@@ -231,7 +221,6 @@ interpret_function_parameter_list(ParseState *pstate,
 		bool		isinput = false;
 		Oid			toid;
 		Type		typtup;
-		AclResult	aclresult;
 
 		/* For our purposes here, a defaulted mode spec is identical to IN */
 		if (fpmode == FUNC_PARAM_DEFAULT)
@@ -271,10 +260,6 @@ interpret_function_parameter_list(ParseState *pstate,
 							TypeNameToString(t))));
 			toid = InvalidOid;	/* keep compiler quiet */
 		}
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error_type(aclresult, toid);
 
 		if (t->setof)
 		{
@@ -1044,7 +1029,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	Node	   *transformDefElem = NULL;
 	char	   *funcname;
 	Oid			namespaceId;
-	AclResult	aclresult;
 	oidvector  *parameterTypes;
 	List	   *parameterTypes_list = NIL;
 	ArrayType  *allParameterTypes;
@@ -1073,12 +1057,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	/* Convert list of names to a name and namespace */
 	namespaceId = QualifiedNameGetCreationNamespace(stmt->funcname,
 													&funcname);
-
-	/* Check we have creation rights in target namespace */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_SCHEMA,
-					   get_namespace_name(namespaceId));
 
 	/* Set default attributes */
 	as_clause = NIL;
@@ -1125,20 +1103,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 
 	languageStruct = (Form_pg_language) GETSTRUCT(languageTuple);
 	languageOid = languageStruct->oid;
-
-	if (languageStruct->lanpltrusted)
-	{
-		/* if trusted language, need USAGE privilege */
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_LANGUAGE,
-						   NameStr(languageStruct->lanname));
-	}
-	else
-	{
-	}
 
 	languageValidator = languageStruct->lanvalidator;
 
@@ -1382,9 +1346,6 @@ AlterFunction(ParseState *pstate, AlterFunctionStmt *stmt)
 	procForm = (Form_pg_proc) GETSTRUCT(tup);
 
 	/* Permission check: must own function */
-	if (!pg_proc_ownercheck(funcOid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, stmt->objtype,
-					   NameListToString(stmt->func->objname));
 
 	if (procForm->prokind == PROKIND_AGGREGATE)
 		ereport(ERROR,
@@ -1555,7 +1516,6 @@ CreateTransform(CreateTransformStmt *stmt)
 	Oid			langid;
 	Oid			fromsqlfuncid;
 	Oid			tosqlfuncid;
-	AclResult	aclresult;
 	Form_pg_proc procstruct;
 	Datum		values[Natts_pg_transform];
 	bool		nulls[Natts_pg_transform];
@@ -1587,21 +1547,10 @@ CreateTransform(CreateTransformStmt *stmt)
 				 errmsg("data type %s is a domain",
 						TypeNameToString(stmt->type_name))));
 
-	if (!pg_type_ownercheck(typeid, GetUserId()))
-		aclcheck_error_type(ACLCHECK_NOT_OWNER, typeid);
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error_type(aclresult, typeid);
-
 	/*
 	 * Get the language
 	 */
 	langid = get_language_oid(stmt->lang, false);
-
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, OBJECT_LANGUAGE, stmt->lang);
 
 	/*
 	 * Get the functions
@@ -1609,13 +1558,6 @@ CreateTransform(CreateTransformStmt *stmt)
 	if (stmt->fromsql)
 	{
 		fromsqlfuncid = LookupFuncWithArgs(OBJECT_FUNCTION, stmt->fromsql, false);
-
-		if (!pg_proc_ownercheck(fromsqlfuncid, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION, NameListToString(stmt->fromsql->objname));
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION, NameListToString(stmt->fromsql->objname));
 
 		tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fromsqlfuncid));
 		if (!HeapTupleIsValid(tuple))
@@ -1635,13 +1577,6 @@ CreateTransform(CreateTransformStmt *stmt)
 	if (stmt->tosql)
 	{
 		tosqlfuncid = LookupFuncWithArgs(OBJECT_FUNCTION, stmt->tosql, false);
-
-		if (!pg_proc_ownercheck(tosqlfuncid, GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION, NameListToString(stmt->tosql->objname));
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_FUNCTION, NameListToString(stmt->tosql->objname));
 
 		tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(tosqlfuncid));
 		if (!HeapTupleIsValid(tuple))
@@ -1868,20 +1803,6 @@ ExecuteDoStmt(DoStmt *stmt, bool atomic)
 	codeblock->langOid = languageStruct->oid;
 	codeblock->langIsTrusted = languageStruct->lanpltrusted;
 	codeblock->atomic = atomic;
-
-	if (languageStruct->lanpltrusted)
-	{
-		/* if trusted language, need USAGE privilege */
-		AclResult	aclresult;
-
-		aclresult = ACLCHECK_OK;
-		if (aclresult != ACLCHECK_OK)
-			aclcheck_error(aclresult, OBJECT_LANGUAGE,
-						   NameStr(languageStruct->lanname));
-	}
-	else
-	{
-	}
 
 	/* get the handler function's OID */
 	laninline = languageStruct->laninline;

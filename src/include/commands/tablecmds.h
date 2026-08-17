@@ -88,17 +88,7 @@ extern bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
 extern bool CheckRelationTableSpaceMove(Relation rel, Oid newTableSpaceId);
 extern void SetRelationTableSpace(Relation rel, Oid newTableSpaceId,
 								  Oid newRelFileNode);
-
-extern ObjectAddress renameatt(RenameStmt *stmt);
-
-extern ObjectAddress RenameConstraint(RenameStmt *stmt);
-
-extern ObjectAddress RenameRelation(RenameStmt *stmt);
-
-extern void RenameRelationInternal(Oid myrelid,
-								   const char *newrelname, bool is_internal,
-								   bool is_index);
-
+extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
 extern void ResetRelRewrite(Oid myrelid);
 
 extern void find_composite_type_dependencies(Oid typeOid,
