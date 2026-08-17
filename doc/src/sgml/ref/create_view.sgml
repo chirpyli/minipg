@@ -320,7 +320,7 @@ CREATE VIEW vista AS SELECT text 'Hello World' AS hello;
 
      <listitem>
       <para>
-       The view's select list must not contain any aggregates, window functions
+       The view's select list must not contain any aggregates
        or set-returning functions.
       </para>
      </listitem>

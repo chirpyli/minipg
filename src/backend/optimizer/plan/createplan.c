@@ -108,7 +108,6 @@ static Unique *create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best
 static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
 static Plan *create_groupingsets_plan(PlannerInfo *root, GroupingSetsPath *best_path);
 static Result *create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path);
-static WindowAgg *create_windowagg_plan(PlannerInfo *root, WindowAggPath *best_path);
 static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
 									  int flags);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
@@ -257,14 +256,7 @@ static Memoize *make_memoize(Plan *lefttree, Oid *hashoperators,
 							 Oid *collations, List *param_exprs,
 							 bool singlerow, bool binary_mode,
 							 uint32 est_entries, Bitmapset *keyparamids);
-static WindowAgg *make_windowagg(List *tlist, Index winref,
-								 int partNumCols, AttrNumber *partColIdx, Oid *partOperators, Oid *partCollations,
-								 int ordNumCols, AttrNumber *ordColIdx, Oid *ordOperators, Oid *ordCollations,
-								 int frameOptions, Node *startOffset, Node *endOffset,
-								 Oid startInRangeFunc, Oid endInRangeFunc,
-								 Oid inRangeColl, bool inRangeAsc, bool inRangeNullsFirst,
-								 Plan *lefttree);
-static Group *make_group(List *tlist, List *qual, int numGroupCols,
+							 static Group *make_group(List *tlist, List *qual, int numGroupCols,
 						 AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
 						 Plan *lefttree);
 static Unique *make_unique_from_sortclauses(Plan *lefttree, List *distinctList);
@@ -474,10 +466,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 				plan = (Plan *) create_agg_plan(root,
 												(AggPath *) best_path);
 			}
-			break;
-		case T_WindowAgg:
-			plan = (Plan *) create_windowagg_plan(root,
-												  (WindowAggPath *) best_path);
 			break;
 		case T_LockRows:
 			plan = (Plan *) create_lockrows_plan(root,
@@ -2372,112 +2360,6 @@ create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path)
 
 	return plan;
 }
-
-/*
- * create_windowagg_plan
- *
- *	  Create a WindowAgg plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static WindowAgg *
-create_windowagg_plan(PlannerInfo *root, WindowAggPath *best_path)
-{
-	WindowAgg  *plan;
-	WindowClause *wc = best_path->winclause;
-	int			numPart = list_length(wc->partitionClause);
-	int			numOrder = list_length(wc->orderClause);
-	Plan	   *subplan;
-	List	   *tlist;
-	int			partNumCols;
-	AttrNumber *partColIdx;
-	Oid		   *partOperators;
-	Oid		   *partCollations;
-	int			ordNumCols;
-	AttrNumber *ordColIdx;
-	Oid		   *ordOperators;
-	Oid		   *ordCollations;
-	ListCell   *lc;
-
-	/*
-	 * Choice of tlist here is motivated by the fact that WindowAgg will be
-	 * storing the input rows of window frames in a tuplestore; it therefore
-	 * behooves us to request a small tlist to avoid wasting space. We do of
-	 * course need grouping columns to be available.
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath,
-								  CP_LABEL_TLIST | CP_SMALL_TLIST);
-
-	tlist = build_path_tlist(root, &best_path->path);
-
-	/*
-	 * Convert SortGroupClause lists into arrays of attr indexes and equality
-	 * operators, as wanted by executor.  (Note: in principle, it's possible
-	 * to drop some of the sort columns, if they were proved redundant by
-	 * pathkey logic.  However, it doesn't seem worth going out of our way to
-	 * optimize such cases.  In any case, we must *not* remove the ordering
-	 * column for RANGE OFFSET cases, as the executor needs that for in_range
-	 * tests even if it's known to be equal to some partitioning column.)
-	 */
-	partColIdx = (AttrNumber *) palloc(sizeof(AttrNumber) * numPart);
-	partOperators = (Oid *) palloc(sizeof(Oid) * numPart);
-	partCollations = (Oid *) palloc(sizeof(Oid) * numPart);
-
-	partNumCols = 0;
-	foreach(lc, wc->partitionClause)
-	{
-		SortGroupClause *sgc = (SortGroupClause *) lfirst(lc);
-		TargetEntry *tle = get_sortgroupclause_tle(sgc, subplan->targetlist);
-
-		Assert(OidIsValid(sgc->eqop));
-		partColIdx[partNumCols] = tle->resno;
-		partOperators[partNumCols] = sgc->eqop;
-		partCollations[partNumCols] = exprCollation((Node *) tle->expr);
-		partNumCols++;
-	}
-
-	ordColIdx = (AttrNumber *) palloc(sizeof(AttrNumber) * numOrder);
-	ordOperators = (Oid *) palloc(sizeof(Oid) * numOrder);
-	ordCollations = (Oid *) palloc(sizeof(Oid) * numOrder);
-
-	ordNumCols = 0;
-	foreach(lc, wc->orderClause)
-	{
-		SortGroupClause *sgc = (SortGroupClause *) lfirst(lc);
-		TargetEntry *tle = get_sortgroupclause_tle(sgc, subplan->targetlist);
-
-		Assert(OidIsValid(sgc->eqop));
-		ordColIdx[ordNumCols] = tle->resno;
-		ordOperators[ordNumCols] = sgc->eqop;
-		ordCollations[ordNumCols] = exprCollation((Node *) tle->expr);
-		ordNumCols++;
-	}
-
-	/* And finally we can make the WindowAgg node */
-	plan = make_windowagg(tlist,
-						  wc->winref,
-						  partNumCols,
-						  partColIdx,
-						  partOperators,
-						  partCollations,
-						  ordNumCols,
-						  ordColIdx,
-						  ordOperators,
-						  ordCollations,
-						  wc->frameOptions,
-						  wc->startOffset,
-						  wc->endOffset,
-						  wc->startInRangeFunc,
-						  wc->endInRangeFunc,
-						  wc->inRangeColl,
-						  wc->inRangeAsc,
-						  wc->inRangeNullsFirst,
-						  subplan);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
 
 /*
  * create_lockrows_plan
@@ -5788,52 +5670,9 @@ make_agg(List *tlist, List *qual,
 	return node;
 }
 
-static WindowAgg *
-make_windowagg(List *tlist, Index winref,
-			   int partNumCols, AttrNumber *partColIdx, Oid *partOperators, Oid *partCollations,
-			   int ordNumCols, AttrNumber *ordColIdx, Oid *ordOperators, Oid *ordCollations,
-			   int frameOptions, Node *startOffset, Node *endOffset,
-			   Oid startInRangeFunc, Oid endInRangeFunc,
-			   Oid inRangeColl, bool inRangeAsc, bool inRangeNullsFirst,
-			   Plan *lefttree)
-{
-	WindowAgg  *node = makeNode(WindowAgg);
-	Plan	   *plan = &node->plan;
-
-	node->winref = winref;
-	node->partNumCols = partNumCols;
-	node->partColIdx = partColIdx;
-	node->partOperators = partOperators;
-	node->partCollations = partCollations;
-	node->ordNumCols = ordNumCols;
-	node->ordColIdx = ordColIdx;
-	node->ordOperators = ordOperators;
-	node->ordCollations = ordCollations;
-	node->frameOptions = frameOptions;
-	node->startOffset = startOffset;
-	node->endOffset = endOffset;
-	node->startInRangeFunc = startInRangeFunc;
-	node->endInRangeFunc = endInRangeFunc;
-	node->inRangeColl = inRangeColl;
-	node->inRangeAsc = inRangeAsc;
-	node->inRangeNullsFirst = inRangeNullsFirst;
-
-	plan->targetlist = tlist;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-	/* WindowAgg nodes never have a qual clause */
-	plan->qual = NIL;
-
-	return node;
-}
-
 static Group *
-make_group(List *tlist,
-		   List *qual,
-		   int numGroupCols,
-		   AttrNumber *grpColIdx,
-		   Oid *grpOperators,
-		   Oid *grpCollations,
+make_group(List *tlist, List *qual, int numGroupCols,
+		   AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
 		   Plan *lefttree)
 {
 	Group	   *node = makeNode(Group);

@@ -873,7 +873,6 @@ find_computable_ec_member(PlannerInfo *root,
 	 */
 	exprvars = pull_var_clause((Node *) exprs,
 							   PVC_INCLUDE_AGGREGATES |
-							   PVC_INCLUDE_WINDOWFUNCS |
 							   PVC_INCLUDE_PLACEHOLDERS);
 
 	foreach(lc, ec->ec_members)
@@ -901,7 +900,6 @@ find_computable_ec_member(PlannerInfo *root,
 		 */
 		emvars = pull_var_clause((Node *) em->em_expr,
 								 PVC_INCLUDE_AGGREGATES |
-								 PVC_INCLUDE_WINDOWFUNCS |
 								 PVC_INCLUDE_PLACEHOLDERS);
 		foreach(lc2, emvars)
 		{
@@ -1333,7 +1331,6 @@ generate_base_implied_equalities_no_const(PlannerInfo *root,
 		EquivalenceMember *cur_em = (EquivalenceMember *) lfirst(lc);
 		List	   *vars = pull_var_clause((Node *) cur_em->em_expr,
 										   PVC_RECURSE_AGGREGATES |
-										   PVC_RECURSE_WINDOWFUNCS |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, ec->ec_relids, false);

@@ -74,7 +74,6 @@ OBJS = \
 	varchar.o \
 	varlena.o \
 	version.o \
-	windowfuncs.o \
 	xid.o \
 	xid8funcs.o
 

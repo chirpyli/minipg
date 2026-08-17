@@ -217,7 +217,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	ObjectWithArgs		*objwithargs;
 	DefElem				*defelt;
 	SortBy				*sortby;
-	WindowDef			*windef;
 	JoinExpr			*jexpr;
 	IndexElem			*ielem;
 	StatsElem			*selem;
@@ -453,9 +452,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <ival>	reindex_target_type reindex_target_multitable
 
-%type <defelt>	copy_generic_opt_elem
-%type <list>	copy_generic_opt_list copy_generic_opt_arg_list
-
 %type <typnam>	Typename SimpleTypename ConstTypename
 				GenericType Numeric opt_float
 				Character ConstCharacter
@@ -485,7 +481,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <str>		column_compression opt_column_compression
 %type <list>	ColQualList
 %type <node>	ColConstraint ColConstraintElem ConstraintAttr
-%type <ival>	key_actions key_delete key_match key_update key_action
 %type <ival>	ConstraintAttributeSpec ConstraintAttributeElem
 %type <str>		ExistingIndex
 
@@ -500,11 +495,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	func_expr func_expr_windowless
 %type <list>	within_group_clause
 %type <node>	filter_clause
-%type <list>	window_clause window_definition_list opt_partition_clause
-%type <windef>	window_definition over_clause window_specification
-				opt_frame_clause frame_extent frame_bound
-%type <ival>	opt_window_exclusion_clause
-%type <str>		opt_existing_window_name
 %type <boolean> opt_if_not_exists
 %type <ival>	generated_when override_kind
 
@@ -7128,7 +7118,7 @@ select_clause:
 simple_select:
 			SELECT opt_all_clause opt_target_list
 			from_clause where_clause
-			group_clause having_clause window_clause
+			group_clause having_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->targetList = $3;
@@ -7137,12 +7127,11 @@ simple_select:
 					n->groupClause = ($6)->list;
 					n->groupDistinct = ($6)->distinct;
 					n->havingClause = $7;
-					n->windowClause = $8;
 					$$ = (Node *)n;
 				}
 			| SELECT distinct_clause target_list
 			from_clause where_clause
-			group_clause having_clause window_clause
+			group_clause having_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->distinctClause = $2;
@@ -7152,7 +7141,6 @@ simple_select:
 					n->groupClause = ($6)->list;
 					n->groupDistinct = ($6)->distinct;
 					n->havingClause = $7;
-					n->windowClause = $8;
 					$$ = (Node *)n;
 				}
 			| values_clause							{ $$ = $1; }
@@ -9253,7 +9241,7 @@ func_application: func_name '(' ')'
  * (Note that many of the special SQL functions wouldn't actually make any
  * sense as functional index entries, but we ignore that consideration here.)
  */
-func_expr: func_application within_group_clause filter_clause over_clause
+func_expr: func_application within_group_clause filter_clause
 				{
 					FuncCall *n = (FuncCall *) $1;
 					/*
@@ -9285,7 +9273,6 @@ func_expr: func_application within_group_clause filter_clause over_clause
 						n->agg_within_group = true;
 					}
 					n->agg_filter = $3;
-					n->over = $4;
 					$$ = (Node *) n;
 				}
 			| func_expr_common_subexpr
@@ -9534,230 +9521,8 @@ filter_clause:
 
 
 /*
- * Window Definitions
+ * Window Definitions - removed (window function feature cropped)
  */
-window_clause:
-			WINDOW window_definition_list			{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-window_definition_list:
-			window_definition						{ $$ = list_make1($1); }
-			| window_definition_list ',' window_definition
-													{ $$ = lappend($1, $3); }
-		;
-
-window_definition:
-			ColId AS window_specification
-				{
-					WindowDef *n = $3;
-					n->name = $1;
-					$$ = n;
-				}
-		;
-
-over_clause: OVER window_specification
-				{ $$ = $2; }
-			| OVER ColId
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->name = $2;
-					n->refname = NULL;
-					n->partitionClause = NIL;
-					n->orderClause = NIL;
-					n->frameOptions = FRAMEOPTION_DEFAULTS;
-					n->startOffset = NULL;
-					n->endOffset = NULL;
-					n->location = @2;
-					$$ = n;
-				}
-			| /*EMPTY*/
-				{ $$ = NULL; }
-		;
-
-window_specification: '(' opt_existing_window_name opt_partition_clause
-						opt_sort_clause opt_frame_clause ')'
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->name = NULL;
-					n->refname = $2;
-					n->partitionClause = $3;
-					n->orderClause = $4;
-					/* copy relevant fields of opt_frame_clause */
-					n->frameOptions = $5->frameOptions;
-					n->startOffset = $5->startOffset;
-					n->endOffset = $5->endOffset;
-					n->location = @1;
-					$$ = n;
-				}
-		;
-
-/*
- * If we see PARTITION, RANGE, ROWS or GROUPS as the first token after the '('
- * of a window_specification, we want the assumption to be that there is
- * no existing_window_name; but those keywords are unreserved and so could
- * be ColIds.  We fix this by making them have the same precedence as IDENT
- * and giving the empty production here a slightly higher precedence, so
- * that the shift/reduce conflict is resolved in favor of reducing the rule.
- * These keywords are thus precluded from being an existing_window_name but
- * are not reserved for any other purpose.
- */
-opt_existing_window_name: ColId						{ $$ = $1; }
-			| /*EMPTY*/				%prec Op		{ $$ = NULL; }
-		;
-
-opt_partition_clause: PARTITION BY expr_list		{ $$ = $3; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-/*
- * For frame clauses, we return a WindowDef, but only some fields are used:
- * frameOptions, startOffset, and endOffset.
- */
-opt_frame_clause:
-			RANGE frame_extent opt_window_exclusion_clause
-				{
-					WindowDef *n = $2;
-					n->frameOptions |= FRAMEOPTION_NONDEFAULT | FRAMEOPTION_RANGE;
-					n->frameOptions |= $3;
-					$$ = n;
-				}
-			| ROWS frame_extent opt_window_exclusion_clause
-				{
-					WindowDef *n = $2;
-					n->frameOptions |= FRAMEOPTION_NONDEFAULT | FRAMEOPTION_ROWS;
-					n->frameOptions |= $3;
-					$$ = n;
-				}
-			| GROUPS frame_extent opt_window_exclusion_clause
-				{
-					WindowDef *n = $2;
-					n->frameOptions |= FRAMEOPTION_NONDEFAULT | FRAMEOPTION_GROUPS;
-					n->frameOptions |= $3;
-					$$ = n;
-				}
-			| /*EMPTY*/
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_DEFAULTS;
-					n->startOffset = NULL;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-		;
-
-frame_extent: frame_bound
-				{
-					WindowDef *n = $1;
-					/* reject invalid cases */
-					if (n->frameOptions & FRAMEOPTION_START_UNBOUNDED_FOLLOWING)
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame start cannot be UNBOUNDED FOLLOWING"),
-								 parser_errposition(@1)));
-					if (n->frameOptions & FRAMEOPTION_START_OFFSET_FOLLOWING)
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame starting from following row cannot end with current row"),
-								 parser_errposition(@1)));
-					n->frameOptions |= FRAMEOPTION_END_CURRENT_ROW;
-					$$ = n;
-				}
-			| BETWEEN frame_bound AND frame_bound
-				{
-					WindowDef *n1 = $2;
-					WindowDef *n2 = $4;
-					/* form merged options */
-					int		frameOptions = n1->frameOptions;
-					/* shift converts START_ options to END_ options */
-					frameOptions |= n2->frameOptions << 1;
-					frameOptions |= FRAMEOPTION_BETWEEN;
-					/* reject invalid cases */
-					if (frameOptions & FRAMEOPTION_START_UNBOUNDED_FOLLOWING)
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame start cannot be UNBOUNDED FOLLOWING"),
-								 parser_errposition(@2)));
-					if (frameOptions & FRAMEOPTION_END_UNBOUNDED_PRECEDING)
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame end cannot be UNBOUNDED PRECEDING"),
-								 parser_errposition(@4)));
-					if ((frameOptions & FRAMEOPTION_START_CURRENT_ROW) &&
-						(frameOptions & FRAMEOPTION_END_OFFSET_PRECEDING))
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame starting from current row cannot have preceding rows"),
-								 parser_errposition(@4)));
-					if ((frameOptions & FRAMEOPTION_START_OFFSET_FOLLOWING) &&
-						(frameOptions & (FRAMEOPTION_END_OFFSET_PRECEDING |
-										 FRAMEOPTION_END_CURRENT_ROW)))
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("frame starting from following row cannot have preceding rows"),
-								 parser_errposition(@4)));
-					n1->frameOptions = frameOptions;
-					n1->endOffset = n2->startOffset;
-					$$ = n1;
-				}
-		;
-
-/*
- * This is used for both frame start and frame end, with output set up on
- * the assumption it's frame start; the frame_extent productions must reject
- * invalid cases.
- */
-frame_bound:
-			UNBOUNDED PRECEDING
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_START_UNBOUNDED_PRECEDING;
-					n->startOffset = NULL;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-			| UNBOUNDED FOLLOWING
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_START_UNBOUNDED_FOLLOWING;
-					n->startOffset = NULL;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-			| CURRENT_P ROW
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_START_CURRENT_ROW;
-					n->startOffset = NULL;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-			| a_expr PRECEDING
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_START_OFFSET_PRECEDING;
-					n->startOffset = $1;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-			| a_expr FOLLOWING
-				{
-					WindowDef *n = makeNode(WindowDef);
-					n->frameOptions = FRAMEOPTION_START_OFFSET_FOLLOWING;
-					n->startOffset = $1;
-					n->endOffset = NULL;
-					$$ = n;
-				}
-		;
-
-opt_window_exclusion_clause:
-			EXCLUDE CURRENT_P ROW	{ $$ = FRAMEOPTION_EXCLUDE_CURRENT_ROW; }
-			| EXCLUDE GROUP_P		{ $$ = FRAMEOPTION_EXCLUDE_GROUP; }
-			| EXCLUDE TIES			{ $$ = FRAMEOPTION_EXCLUDE_TIES; }
-			| EXCLUDE NO OTHERS		{ $$ = 0; }
-			| /*EMPTY*/				{ $$ = 0; }
-		;
-
 
 /*
  * Supporting nonterminals for expressions.

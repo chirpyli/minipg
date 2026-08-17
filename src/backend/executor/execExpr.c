@@ -1059,52 +1059,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_WindowFunc:
-			{
-				WindowFunc *wfunc = (WindowFunc *) node;
-				WindowFuncExprState *wfstate = makeNode(WindowFuncExprState);
-
-				wfstate->wfunc = wfunc;
-
-				if (state->parent && IsA(state->parent, WindowAggState))
-				{
-					WindowAggState *winstate = (WindowAggState *) state->parent;
-					int			nfuncs;
-
-					winstate->funcs = lappend(winstate->funcs, wfstate);
-					nfuncs = ++winstate->numfuncs;
-					if (wfunc->winagg)
-						winstate->numaggs++;
-
-					/* for now initialize agg using old style expressions */
-					wfstate->args = ExecInitExprList(wfunc->args,
-													 state->parent);
-					wfstate->aggfilter = ExecInitExpr(wfunc->aggfilter,
-													  state->parent);
-
-					/*
-					 * Complain if the windowfunc's arguments contain any
-					 * windowfuncs; nested window functions are semantically
-					 * nonsensical.  (This should have been caught earlier,
-					 * but we defend against it here anyway.)
-					 */
-					if (nfuncs != winstate->numfuncs)
-						ereport(ERROR,
-								(errcode(ERRCODE_WINDOWING_ERROR),
-								 errmsg("window function calls cannot be nested")));
-				}
-				else
-				{
-					/* planner messed up */
-					elog(ERROR, "WindowFunc found in non-WindowAgg plan node");
-				}
-
-				scratch.opcode = EEOP_WINDOW_FUNC;
-				scratch.d.window_func.wfstate = wfstate;
-				ExprEvalPushStep(state, &scratch);
-				break;
-			}
-
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -2611,8 +2565,6 @@ expr_setup_walker(Node *node, ExprSetupInfo *info)
 	 * evaluated at all.
 	 */
 	if (IsA(node, Aggref))
-		return false;
-	if (IsA(node, WindowFunc))
 		return false;
 	if (IsA(node, GroupingFunc))
 		return false;

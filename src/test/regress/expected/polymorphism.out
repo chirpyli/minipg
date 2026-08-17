@@ -749,36 +749,6 @@ select first_el_agg_any(x) from generate_series(1,10) x;
                 1
 (1 row)
 
-select first_el_agg_f8(x::float8) over(order by x) from generate_series(1,10) x;
- first_el_agg_f8 
------------------
-               1
-               1
-               1
-               1
-               1
-               1
-               1
-               1
-               1
-               1
-(10 rows)
-
-select first_el_agg_any(x) over(order by x) from generate_series(1,10) x;
- first_el_agg_any 
-------------------
-                1
-                1
-                1
-                1
-                1
-                1
-                1
-                1
-                1
-                1
-(10 rows)
-
 -- check that we can apply functions taking ANYARRAY to pg_stats
 select distinct array_ndims(histogram_bounds) from pg_stats
 where histogram_bounds is not null;

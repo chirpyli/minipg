@@ -1833,8 +1833,6 @@ get_call_expr_argtype(Node *expr, int argnum)
 		args = ((ScalarArrayOpExpr *) expr)->args;
 	else if (IsA(expr, NullIfExpr))
 		args = ((NullIfExpr *) expr)->args;
-	else if (IsA(expr, WindowFunc))
-		args = ((WindowFunc *) expr)->args;
 	else
 		return InvalidOid;
 
@@ -1898,8 +1896,6 @@ get_call_expr_arg_stable(Node *expr, int argnum)
 		args = ((ScalarArrayOpExpr *) expr)->args;
 	else if (IsA(expr, NullIfExpr))
 		args = ((NullIfExpr *) expr)->args;
-	else if (IsA(expr, WindowFunc))
-		args = ((WindowFunc *) expr)->args;
 	else
 		return false;
 

@@ -23616,8 +23616,7 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
      <para>
-      Fix handling of infinite <link
-      linkend="syntax-window-functions">window function</link> ranges
+      Fix handling of infinite window function ranges
       (Tom Lane)
       <ulink url="&commit_baseurl;a4faef8f8">&sect;</ulink>
      </para>
@@ -24669,7 +24668,7 @@ Author: David Rowley <drowley@postgresql.org>
 -->
 
        <para>
-        Allow <link linkend="functions-window">window functions</link>
+        Allow window functions
         to perform incremental sorts (David Rowley)
         <ulink url="&commit_baseurl;62e221e1c">&sect;</ulink>
        </para>
@@ -26523,8 +26522,8 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Allow more flexible data types for default values of <link
-       linkend="functions-window"><function>lead()</function></link>
+       Allow more flexible data types for default values of
+       <function>lead()</function>
        and <function>lag()</function> window functions (Vik Fearing)
        <ulink url="&commit_baseurl;5c292e6b9">&sect;</ulink>
       </para>

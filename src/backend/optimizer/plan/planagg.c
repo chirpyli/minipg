@@ -92,12 +92,11 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 	/*
 	 * Reject unoptimizable cases.
 	 *
-	 * We don't handle GROUP BY or windowing, because our current
+	 * We don't handle GROUP BY, because our current
 	 * implementations of grouping require looking at all the rows anyway, and
 	 * so there's not much point in optimizing MIN/MAX.
 	 */
-	if (parse->groupClause || list_length(parse->groupingSets) > 1 ||
-		parse->hasWindowFuncs)
+	if (parse->groupClause || list_length(parse->groupingSets) > 1)
 		return;
 
 	/*
@@ -470,7 +469,6 @@ static void
 minmax_qp_callback(PlannerInfo *root, void *extra)
 {
 	root->group_pathkeys = NIL;
-	root->window_pathkeys = NIL;
 	root->distinct_pathkeys = NIL;
 
 	root->sort_pathkeys =

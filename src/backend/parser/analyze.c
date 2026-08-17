@@ -444,7 +444,6 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
 
 	qry->hasSubLinks = pstate->p_hasSubLinks;
-	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
 	qry->hasAggs = pstate->p_hasAggs;
 
@@ -1200,9 +1199,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
 
-	/* make WINDOW info available for window functions, too */
-	pstate->p_windowdefs = stmt->windowClause;
-
 	/* process the FROM clause */
 	transformFromClause(pstate, stmt->fromClause);
 
@@ -1275,11 +1271,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 										   stmt->limitOption);
 	qry->limitOption = stmt->limitOption;
 
-	/* transform window clauses after we have seen all window functions */
-	qry->windowClause = transformWindowDefinitions(pstate,
-												   pstate->p_windowdefs,
-												   &qry->targetList);
-
 	/* resolve any still-unresolved output columns as being type text */
 	if (pstate->p_resolve_unknowns)
 		resolveTargetListUnknowns(pstate, qry->targetList);
@@ -1288,7 +1279,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
 
 	qry->hasSubLinks = pstate->p_hasSubLinks;
-	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
 	qry->hasAggs = pstate->p_hasAggs;
 
@@ -1339,7 +1329,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	Assert(stmt->whereClause == NULL);
 	Assert(stmt->groupClause == NIL);
 	Assert(stmt->havingClause == NULL);
-	Assert(stmt->windowClause == NIL);
 
 	/*
 	 * For each row of VALUES, transform the raw expressions.
@@ -1532,7 +1521,6 @@ transformReturnStmt(ParseState *pstate, ReturnStmt *stmt)
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
 	qry->hasSubLinks = pstate->p_hasSubLinks;
-	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
 	qry->hasAggs = pstate->p_hasAggs;
 
@@ -1891,13 +1879,6 @@ CheckSelectLocking(Query *qry, LockClauseStrength strength)
 		/*------
 		  translator: %s is a SQL row locking clause such as FOR UPDATE */
 				 errmsg("%s is not allowed with aggregate functions",
-						LCS_asString(strength))));
-	if (qry->hasWindowFuncs)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with window functions",
 						LCS_asString(strength))));
 	if (qry->hasTargetSRFs)
 		ereport(ERROR,

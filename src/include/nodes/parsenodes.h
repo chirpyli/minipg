@@ -130,7 +130,6 @@ typedef struct Query
 								 * INSERT/UPDATE/DELETE; 0 for SELECT */
 
 	bool		hasAggs;		/* has aggregates in tlist or havingQual */
-	bool		hasWindowFuncs; /* has window functions in tlist */
 	bool		hasTargetSRFs;	/* has set-returning functions in tlist */
 	bool		hasSubLinks;	/* has subquery SubLink */
 	bool		hasDistinctOn;	/* distinctClause is from DISTINCT ON */
@@ -154,8 +153,6 @@ typedef struct Query
 	List	   *groupingSets;	/* a list of GroupingSet's if present */
 
 	Node	   *havingQual;		/* qualifications applied to groups */
-
-	List	   *windowClause;	/* a list of WindowClause's */
 
 	List	   *distinctClause; /* a list of SortGroupClause's */
 
@@ -351,7 +348,6 @@ typedef struct FuncCall
 	List	   *args;			/* the arguments (list of exprs) */
 	List	   *agg_order;		/* ORDER BY (list of SortBy) */
 	Node	   *agg_filter;		/* FILTER clause, if any */
-	struct WindowDef *over;		/* OVER clause, if any */
 	bool		agg_within_group;	/* ORDER BY appeared in WITHIN GROUP */
 	bool		agg_star;		/* argument was really '*' */
 	bool		agg_distinct;	/* arguments were labeled DISTINCT */
@@ -473,65 +469,6 @@ typedef struct SortBy
 	List	   *useOp;			/* name of op to use, if SORTBY_USING */
 	int			location;		/* operator location, or -1 if none/unknown */
 } SortBy;
-
-/*
- * WindowDef - raw representation of WINDOW and OVER clauses
- *
- * For entries in a WINDOW list, "name" is the window name being defined.
- * For OVER clauses, we use "name" for the "OVER window" syntax, or "refname"
- * for the "OVER (window)" syntax, which is subtly different --- the latter
- * implies overriding the window frame clause.
- */
-typedef struct WindowDef
-{
-	NodeTag		type;
-	char	   *name;			/* window's own name */
-	char	   *refname;		/* referenced window name, if any */
-	List	   *partitionClause;	/* PARTITION BY expression list */
-	List	   *orderClause;	/* ORDER BY (list of SortBy) */
-	int			frameOptions;	/* frame_clause options, see below */
-	Node	   *startOffset;	/* expression for starting bound, if any */
-	Node	   *endOffset;		/* expression for ending bound, if any */
-	int			location;		/* parse location, or -1 if none/unknown */
-} WindowDef;
-
-/*
- * frameOptions is an OR of these bits.  The NONDEFAULT and BETWEEN bits are
- * used so that ruleutils.c can tell which properties were specified and
- * which were defaulted; the correct behavioral bits must be set either way.
- * The START_foo and END_foo options must come in pairs of adjacent bits for
- * the convenience of gram.y, even though some of them are useless/invalid.
- */
-#define FRAMEOPTION_NONDEFAULT					0x00001 /* any specified? */
-#define FRAMEOPTION_RANGE						0x00002 /* RANGE behavior */
-#define FRAMEOPTION_ROWS						0x00004 /* ROWS behavior */
-#define FRAMEOPTION_GROUPS						0x00008 /* GROUPS behavior */
-#define FRAMEOPTION_BETWEEN						0x00010 /* BETWEEN given? */
-#define FRAMEOPTION_START_UNBOUNDED_PRECEDING	0x00020 /* start is U. P. */
-#define FRAMEOPTION_END_UNBOUNDED_PRECEDING		0x00040 /* (disallowed) */
-#define FRAMEOPTION_START_UNBOUNDED_FOLLOWING	0x00080 /* (disallowed) */
-#define FRAMEOPTION_END_UNBOUNDED_FOLLOWING		0x00100 /* end is U. F. */
-#define FRAMEOPTION_START_CURRENT_ROW			0x00200 /* start is C. R. */
-#define FRAMEOPTION_END_CURRENT_ROW				0x00400 /* end is C. R. */
-#define FRAMEOPTION_START_OFFSET_PRECEDING		0x00800 /* start is O. P. */
-#define FRAMEOPTION_END_OFFSET_PRECEDING		0x01000 /* end is O. P. */
-#define FRAMEOPTION_START_OFFSET_FOLLOWING		0x02000 /* start is O. F. */
-#define FRAMEOPTION_END_OFFSET_FOLLOWING		0x04000 /* end is O. F. */
-#define FRAMEOPTION_EXCLUDE_CURRENT_ROW			0x08000 /* omit C.R. */
-#define FRAMEOPTION_EXCLUDE_GROUP				0x10000 /* omit C.R. & peers */
-#define FRAMEOPTION_EXCLUDE_TIES				0x20000 /* omit C.R.'s peers */
-
-#define FRAMEOPTION_START_OFFSET \
-	(FRAMEOPTION_START_OFFSET_PRECEDING | FRAMEOPTION_START_OFFSET_FOLLOWING)
-#define FRAMEOPTION_END_OFFSET \
-	(FRAMEOPTION_END_OFFSET_PRECEDING | FRAMEOPTION_END_OFFSET_FOLLOWING)
-#define FRAMEOPTION_EXCLUSION \
-	(FRAMEOPTION_EXCLUDE_CURRENT_ROW | FRAMEOPTION_EXCLUDE_GROUP | \
-	 FRAMEOPTION_EXCLUDE_TIES)
-
-#define FRAMEOPTION_DEFAULTS \
-	(FRAMEOPTION_RANGE | FRAMEOPTION_START_UNBOUNDED_PRECEDING | \
-	 FRAMEOPTION_END_CURRENT_ROW)
 
 /*
  * RangeSubselect - subquery appearing in a FROM clause
@@ -1138,42 +1075,6 @@ typedef struct GroupingSet
 } GroupingSet;
 
 /*
- * WindowClause -
- *		transformed representation of WINDOW and OVER clauses
- *
- * A parsed Query's windowClause list contains these structs.  "name" is set
- * if the clause originally came from WINDOW, and is NULL if it originally
- * was an OVER clause (but note that we collapse out duplicate OVERs).
- * partitionClause and orderClause are lists of SortGroupClause structs.
- * If we have RANGE with offset PRECEDING/FOLLOWING, the semantics of that are
- * specified by startInRangeFunc/inRangeColl/inRangeAsc/inRangeNullsFirst
- * for the start offset, or endInRangeFunc/inRange* for the end offset.
- * winref is an ID number referenced by WindowFunc nodes; it must be unique
- * among the members of a Query's windowClause list.
- * When refname isn't null, the partitionClause is always copied from there;
- * the orderClause might or might not be copied (see copiedOrder); the framing
- * options are never copied, per spec.
- */
-typedef struct WindowClause
-{
-	NodeTag		type;
-	char	   *name;			/* window name (NULL in an OVER clause) */
-	char	   *refname;		/* referenced window name, if any */
-	List	   *partitionClause;	/* PARTITION BY list */
-	List	   *orderClause;	/* ORDER BY list */
-	int			frameOptions;	/* frame_clause options, see WindowDef */
-	Node	   *startOffset;	/* expression for starting bound, if any */
-	Node	   *endOffset;		/* expression for ending bound, if any */
-	Oid			startInRangeFunc;	/* in_range function for startOffset */
-	Oid			endInRangeFunc; /* in_range function for endOffset */
-	Oid			inRangeColl;	/* collation for in_range tests */
-	bool		inRangeAsc;		/* use ASC sort order for in_range tests? */
-	bool		inRangeNullsFirst;	/* nulls sort first for in_range tests? */
-	Index		winref;			/* ID referenced by window functions */
-	bool		copiedOrder;	/* did we copy orderClause from refname? */
-} WindowClause;
-
-/*
  * RowMarkClause -
  *	   parser output representation of FOR [KEY] UPDATE/SHARE clauses
  *
@@ -1343,7 +1244,6 @@ typedef struct SelectStmt
 	List	   *groupClause;	/* GROUP BY clauses */
 	bool		groupDistinct;	/* Is this GROUP BY DISTINCT? */
 	Node	   *havingClause;	/* HAVING conditional-expression */
-	List	   *windowClause;	/* WINDOW window_name AS (...), ... */
 
 	/*
 	 * In a "leaf" node representing a VALUES list, the above fields are all

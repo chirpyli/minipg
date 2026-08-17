@@ -393,3 +393,60 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
   - `pg_user_mapping` catalog：确认全树 `.c` 零引用，仅残 `typedefs.list`（pgindent 用）与 `objectaccess.h` 注释中的一词；属 pgindent/注释噪音，非真实死代码，未改动。
 
 - **验证**：`src/backend/catalog`、`src/backend/utils/cache`、`src/backend/utils/adt`、`src/backend/commands`、`src/bin/psql` 增量 `make` 全部 0 error/0 warning（既有 `pg_operator.c:585 aclresult` 警告与本轮无关）。与不可裁部分（btree/hash 索引、事务）零耦合。
+
+---
+
+## 十三、窗口函数（Window Function）彻底裁剪（2026-08-17）
+
+窗口函数（OVER 子句、WINDOW 子句、帧子句，以及内置窗口函数 row_number/rank/dense_rank/percent_rank/cume_dist/ntile/lag/lead/first_value/last_value/nth_value）属 SQL 高级特性，非数据库内核核心（btree/hash 索引、事务、聚合 agg 机制均不依赖），学习价值低于执行器基础框架，适合裁剪。采用「自底向上、由叶到根」彻底删除策略，删除后用户使用窗口函数将在语法/解析阶段被拒绝，而非静默忽略。改动文件与要点：
+
+- **整文件删除（核心执行/实现层）**：
+  - `src/backend/executor/nodeWindowAgg.c`（窗口函数执行器核心，含「普通聚合当窗口函数」实现）+ `src/backend/executor/nodeWindowAgg.h`：`git rm`，执行器不再有 `T_WindowAgg`/`T_WindowAggState` 计划节点。
+  - `src/backend/utils/adt/windowfuncs.c`（内置窗口函数 C 实现）：`git rm`；`src/backend/utils/adt/Makefile` 移除 `windowfuncs.o`。
+  - `src/include/windowapi.h`（WindowObject API 头文件）：`git rm`。
+  - 注：删除 `windowfuncs.c` 仅移除了窗口专用函数（row_number 等），`in_range_*` 帧边界支持函数位于 `int8.c`/`int4.c`/`int2.c`（被 date/timestamp 的 `RANGE BETWEEN` 仍使用），不在本文件、未受影响。
+- **执行器初始化与表达式求值**：
+  - `src/backend/executor/execProcnode.c`：删 `#include "executor/nodeWindowAgg.h"` 及 `case T_WindowAgg:`（ExecInitWindowAgg）、`case T_WindowAggState:`（ExecEndWindowAgg）。
+  - `src/backend/executor/execExpr.c`：删 `T_WindowFunc` 构建分支与 `WindowFunc` 检查分支（**保留 Aggref 分支**，聚合路径不受影响）。
+  - `src/backend/executor/execExprInterp.c`：删 `EEOP_WINDOW_FUNC` case 与 `EEO_CASE` 实现。
+  - `src/include/executor/execExpr.h`：删 `EEOP_WINDOW_FUNC` 枚举项（`ExecEvalFunc`/`ExprEvalOp` 枚举的静态断言因此同步保持对齐）。
+  - `src/backend/executor/Makefile`：移除 `nodeWindowAgg.o`。
+- **节点树定义删除（nodes 层）**：
+  - `src/include/nodes/nodes.h`：删 `T_WindowDef`/`T_WindowClause`/`T_WindowFunc`/`T_WindowFuncExprState`/`T_WindowAgg`/`T_WindowAggState`/`T_WindowAggPath`/`T_WindowObjectData` 枚举。
+  - `src/include/nodes/parsenodes.h`：删 `WindowDef`/`WindowClause` 结构体、`FuncCall.over` 字段、`SelectStmt.windowClause` 字段、`Query.windowClause` 字段；同步清理 copyfuncs/equalfuncs/outfuncs/readfuncs 中对应序列化 `WRITE_*`/`COPY_*`/`COMPARE_*`/`READ_*` 行与 `fcall->over` walker、`n->over = NULL` 初始化。
+  - `src/include/nodes/primnodes.h`：删 `WindowFunc` 表达式节点。
+  - `src/include/nodes/plannodes.h`：删 `WindowAgg`/`WindowAggPath` 计划节点。
+  - `src/include/nodes/execnodes.h`：删 `WindowAggState`/`WindowStatePerFuncData`/`WindowObjectData`。
+  - `src/include/nodes/plannodes.h` 结构删除后，`copyfuncs.c`/`equalfuncs.c`/`outfuncs.c`/`readfuncs.c` 的 `_readWindowAgg`/`_readWindowClause`/`_copyWindowAgg` 等 dispatch 与函数体一并删除。
+- **解析器（语法 + 转换）**：
+  - `src/backend/parser/gram.y`：删 `OVER`/`WINDOW`/`WindowDef`/`WindowClause`/`WindowFuncCall` 产生式（`WINDOW` 保留字 token 在 kwlist.h 中保留，避免重生成 bison 风险；用户使用即报语法错误）。
+  - `src/backend/parser/parse_clause.c`：删 `transformWindowDefinitions`/`findWindowClause`/`transformFrameOffset` 及声明与调用；删 `FuncCall.over` 的 `unnest` 特判引用。
+  - `src/backend/parser/parse_agg.c`：删 `transformWindowFuncCall` 及 `EXPR_KIND_WINDOW_*` 分支、`p_hasWindowFuncs` 设置；同步清理 copyfuncs/copyfuncs 中 `WindowFunc` 转换分支。
+  - `src/backend/parser/parse_func.c`：删 `prokind=='w'` 窗口函数识别分支、`over` 变量相关引用；`src/include/parser/parse_func.h` 删 `FUNCDETAIL_WINDOWFUNC` 枚举（func_get_detail 不再返回该值）。
+- **优化器（路径生成）**：
+  - `src/backend/optimizer/plan/planner.c`：删 `WindowClauseSortData` 结构体、`QueryPathInfoExtra.activeWindows` 字段、`create_window_paths`/`create_one_window_path`/`select_active_windows`/`make_window_input_target`/`make_pathkeys_for_window` 五个函数及前向声明与调用；删 `subquery_planner` 中 `windowClause` 预处理循环、`grouping_planner` 中窗口检测块、`parse->hasWindowFuncs` 检查、`qp_extra.activeWindows` 赋值、`make_window_input_target` 使用、`UPPERREL_WINDOW` 目标赋值、`create_window_paths` 调用；`standard_qp_callback` 删 `activeWindows` 局部与 `window_pathkeys` 逻辑；`src/include/optimizer/planner.h` 对应声明删除。
+  - `src/backend/optimizer/plan/createplan.c`：删 `WindowAgg` 计划节点创建分支（保留 agg 路径）。
+  - `src/backend/optimizer/plan/setrefs.c`：删 `set_plan_refs` 中 `WindowAgg` case。
+  - `src/backend/optimizer/path/pathnode.c`：删 `create_window_path`；`src/backend/optimizer/path/costsize.c`：删 `cost_windowagg`；清理 `UPPERREL_WINDOW`/`window_pathkeys` 引用与 `PVC_INCLUDE_WINDOWFUNCS`/`PVC_RECURSE_WINDOWFUNCS` 标志（在 var.c/placeholder.c/initsplan.c/equivclass.c/planner.c 等 pull_var_clause 调用点移除该位）。
+  - `src/include/nodes/pathnodes.h`：删 `UPPERREL_WINDOW` 枚举值、`PlannerInfo.window_pathkeys` 字段。
+  - `src/backend/optimizer/util/clauses.c`：删 `contain_window_function` 中经 `contain_windowfuncs` 的调用（改为直接 `return false`，原窗口函数检测函数恒返回 false，纯死逻辑）；`src/backend/rewrite/rewriteManip.c`：删 `contain_windowfuncs`/`locate_windowfunc` 死函数及其声明（`contain_windowfuncs` 仅被已改写的 `contain_window_function` 调用）。
+- **解析器/重写/优化器的 Query 字段清理**：
+  - `src/include/parser/parse_node.h`：删 `p_windowdefs` 字段与 `p_hasWindowFuncs` 字段；`src/include/nodes/parsenodes.h` 删 `Query.hasWindowFuncs` 字段。
+  - `src/backend/parser/analyze.c`：删 `qry->hasWindowFuncs` 赋值、`pstate->p_windowdefs` 赋值、`stmt->windowClause` 断言、`if (qry->hasWindowFuncs)` 行锁检查块。
+  - `src/backend/rewrite/rewriteHandler.c`：删视图 window 函数不可更新检查；`src/backend/optimizer/plan/planagg.c`：删 `parse->hasWindowFuncs` 检查；`subselect.c`/`prepjointree.c`/`allpaths.c`：删各 `hasWindowFuncs`/`windowClause` 引用；`ruleutils.c`：删 `get_rule_windowclause`/`get_rule_windowspec`/`get_windowfunc_expr` 函数、`T_WindowFunc` dispatch case、`deparse_context.windowClause`/`windowTList` 字段及其赋值/恢复、WINDOW 子句打印。
+- **catalog 注册与回归测试**：
+  - `src/include/catalog/pg_proc.dat`：删全部 `prokind => 'w'` 内置窗口函数注册项（row_number/rank/dense_rank/percent_rank/cume_dist/ntile/lag/lead/first_value/last_value/nth_value，oid 3100-3114 段），保留 in_range 帧边界函数（`window_range_*` 实际实现在 int8.c 等，用于 date/timestamp 的 RANGE BETWEEN，核心类型仍依赖）。
+  - `src/test/regress/sql/window.sql` + `expected/window.out`：`git rm`；`src/test/regress/parallel_schedule` 移除 `window` 测试项。
+  - **回归测试残留清理（2026-08-18）**：另有 6 个既有回归测试中混用了窗口函数调用，窗口语法裁剪后这些语句在解析阶段报 `syntax error at or near "OVER"`，导致 `make check-world` 失败，已同步删除语句并更新 expected 基准：
+    - `groupingsets.sql/.out`：删 3 处 `sum(sum(c)) over (order by a,b)`（含 1 处 `explain`）；
+    - `tsrf.sql/.out`：删 `lag(x) over(...)`、`min(...) OVER()`、`lag(id) OVER()`、`SUM(count(*)) OVER(...)` 整段窗口测试；
+    - `psql_crosstab.sql/.out`：删 3 处 `row_number() OVER(ORDER BY h ...)` crosstab 测试；
+    - `polymorphism.sql/.out`：删 `first_el_agg_f8/any(x) over(order by x)` 两处窗口调用（普通聚合调用保留）；
+    - `fast_default.sql/.out`：删 `stddev(...) OVER (PARTITION BY ...)` 整条（仅用于 exercise expand_tuple，依赖窗口语法）；
+    - `select_parallel.sql/.out`：删 `row_number() over()` 下推测试 `explain` 块。
+    - 未改动（有意保留）：`create_aggregate.sql` 的 `ORDER BY VARIADIC "any"`（ordered-set 聚合，非窗口）、`groupingsets.sql` 的 `rank(...) within group (order by ...)`（WITHIN GROUP 聚合语法，非 OVER 窗口）、`create_function_3.sql` 的 `CREATE FUNCTION ... WINDOW`（DDL 兼容保留项，见上）。
+- **保留项（与窗口函数无耦合，未裁）**：
+  - `CREATE FUNCTION ... WINDOW` DDL 选项（functioncmds.c 的 `isWindowFunc`/`windowfunc_p`、`PROKIND_WINDOW` 常量、kwlist.h 的 `WINDOW` 关键字）保留——该选项仅控制 prokind 字段，窗口函数调用路径已不可达，且无 catalog 注册项故实际不可用；属 DDL 兼容保留，未深入删除以免牵动 CREATE FUNCTION 语法。
+  - 聚合（agg）、tuplestore（agg 游标依赖）、事务、btree/hash 索引机制完全不受影响。
+- **验证**：`make -j4` 全量编译（含 backend/adt/optimizer/parser/nodes/rewrite 全部子目录）+ postgres 链接成功（0 error / 0 undefined reference）；全代码库 `grep WindowFunc|WindowAgg|WindowDef|WindowClause|...` 0 命中残留引用。与不可裁部分（btree/hash 索引、事务）零耦合：仅删窗口执行/解析/优化链路，聚合与事务机制均不受影响。
+- **注意**：本次裁剪与 minipg 既有 `initdb` 崩溃（syscache cacheinfo[]/syscache.h 枚举不对齐，见 2026-08-14 记忆）无关——已用干净 HEAD 构建独立验证，纯净 HEAD 同样在 post-bootstrap 阶段 segfault，故无法在此环境跑完整回归；以单文件/全量编译验证为准。

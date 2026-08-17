@@ -1105,9 +1105,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					partialmode = "Simple";
 			}
 			break;
-		case T_WindowAgg:
-			pname = sname = "WindowAgg";
-			break;
 		case T_Unique:
 			pname = sname = "Unique";
 			break;

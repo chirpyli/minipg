@@ -255,7 +255,6 @@ _readQuery(void)
 	READ_NODE_FIELD(utilityStmt);
 	READ_INT_FIELD(resultRelation);
 	READ_BOOL_FIELD(hasAggs);
-	READ_BOOL_FIELD(hasWindowFuncs);
 	READ_BOOL_FIELD(hasTargetSRFs);
 	READ_BOOL_FIELD(hasSubLinks);
 	READ_BOOL_FIELD(hasDistinctOn);
@@ -271,7 +270,6 @@ _readQuery(void)
 	READ_BOOL_FIELD(groupDistinct);
 	READ_NODE_FIELD(groupingSets);
 	READ_NODE_FIELD(havingQual);
-	READ_NODE_FIELD(windowClause);
 	READ_NODE_FIELD(distinctClause);
 	READ_NODE_FIELD(sortClause);
 	READ_NODE_FIELD(limitOffset);
@@ -346,32 +344,6 @@ _readGroupingSet(void)
 	READ_ENUM_FIELD(kind, GroupingSetKind);
 	READ_NODE_FIELD(content);
 	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readWindowClause
- */
-static WindowClause *
-_readWindowClause(void)
-{
-	READ_LOCALS(WindowClause);
-
-	READ_STRING_FIELD(name);
-	READ_STRING_FIELD(refname);
-	READ_NODE_FIELD(partitionClause);
-	READ_NODE_FIELD(orderClause);
-	READ_INT_FIELD(frameOptions);
-	READ_NODE_FIELD(startOffset);
-	READ_NODE_FIELD(endOffset);
-	READ_OID_FIELD(startInRangeFunc);
-	READ_OID_FIELD(endInRangeFunc);
-	READ_OID_FIELD(inRangeColl);
-	READ_BOOL_FIELD(inRangeAsc);
-	READ_BOOL_FIELD(inRangeNullsFirst);
-	READ_UINT_FIELD(winref);
-	READ_BOOL_FIELD(copiedOrder);
 
 	READ_DONE();
 }
@@ -535,28 +507,6 @@ _readGroupingFunc(void)
 	READ_NODE_FIELD(refs);
 	READ_NODE_FIELD(cols);
 	READ_UINT_FIELD(agglevelsup);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readWindowFunc
- */
-static WindowFunc *
-_readWindowFunc(void)
-{
-	READ_LOCALS(WindowFunc);
-
-	READ_OID_FIELD(winfnoid);
-	READ_OID_FIELD(wintype);
-	READ_OID_FIELD(wincollid);
-	READ_OID_FIELD(inputcollid);
-	READ_NODE_FIELD(args);
-	READ_NODE_FIELD(aggfilter);
-	READ_UINT_FIELD(winref);
-	READ_BOOL_FIELD(winstar);
-	READ_BOOL_FIELD(winagg);
 	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
@@ -2038,37 +1988,6 @@ _readAgg(void)
 }
 
 /*
- * _readWindowAgg
- */
-static WindowAgg *
-_readWindowAgg(void)
-{
-	READ_LOCALS(WindowAgg);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_UINT_FIELD(winref);
-	READ_INT_FIELD(partNumCols);
-	READ_ATTRNUMBER_ARRAY(partColIdx, local_node->partNumCols);
-	READ_OID_ARRAY(partOperators, local_node->partNumCols);
-	READ_OID_ARRAY(partCollations, local_node->partNumCols);
-	READ_INT_FIELD(ordNumCols);
-	READ_ATTRNUMBER_ARRAY(ordColIdx, local_node->ordNumCols);
-	READ_OID_ARRAY(ordOperators, local_node->ordNumCols);
-	READ_OID_ARRAY(ordCollations, local_node->ordNumCols);
-	READ_INT_FIELD(frameOptions);
-	READ_NODE_FIELD(startOffset);
-	READ_NODE_FIELD(endOffset);
-	READ_OID_FIELD(startInRangeFunc);
-	READ_OID_FIELD(endInRangeFunc);
-	READ_OID_FIELD(inRangeColl);
-	READ_BOOL_FIELD(inRangeAsc);
-	READ_BOOL_FIELD(inRangeNullsFirst);
-
-	READ_DONE();
-}
-
-/*
  * _readUnique
  */
 static Unique *
@@ -2334,8 +2253,6 @@ parseNodeString(void)
 		return_value = _readSortGroupClause();
 	else if (MATCH("GROUPINGSET", 11))
 		return_value = _readGroupingSet();
-	else if (MATCH("WINDOWCLAUSE", 12))
-		return_value = _readWindowClause();
 	else if (MATCH("ROWMARKCLAUSE", 13))
 		return_value = _readRowMarkClause();
 	else if (MATCH("ALIAS", 5))
@@ -2352,8 +2269,6 @@ parseNodeString(void)
 		return_value = _readAggref();
 	else if (MATCH("GROUPINGFUNC", 12))
 		return_value = _readGroupingFunc();
-	else if (MATCH("WINDOWFUNC", 10))
-		return_value = _readWindowFunc();
 	else if (MATCH("SUBSCRIPTINGREF", 15))
 		return_value = _readSubscriptingRef();
 	else if (MATCH("FUNCEXPR", 8))
@@ -2506,8 +2421,6 @@ parseNodeString(void)
 		return_value = _readGroup();
 	else if (MATCH("AGG", 3))
 		return_value = _readAgg();
-	else if (MATCH("WINDOWAGG", 9))
-		return_value = _readWindowAgg();
 	else if (MATCH("UNIQUE", 6))
 		return_value = _readUnique();
 	else if (MATCH("GATHER", 6))

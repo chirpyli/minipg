@@ -528,8 +528,6 @@ create aggregate first_el_agg_any(anyelement) (
 
 select first_el_agg_f8(x::float8) from generate_series(1,10) x;
 select first_el_agg_any(x) from generate_series(1,10) x;
-select first_el_agg_f8(x::float8) over(order by x) from generate_series(1,10) x;
-select first_el_agg_any(x) over(order by x) from generate_series(1,10) x;
 
 -- check that we can apply functions taking ANYARRAY to pg_stats
 select distinct array_ndims(histogram_bounds) from pg_stats

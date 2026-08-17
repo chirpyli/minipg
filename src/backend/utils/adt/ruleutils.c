@@ -108,8 +108,6 @@ typedef struct
 {
 	StringInfo	buf;			/* output buffer to append to */
 	List	   *namespaces;		/* List of deparse_namespace nodes */
-	List	   *windowClause;	/* Current query level's WINDOW clause */
-	List	   *windowTList;	/* targetlist for resolving WINDOW clause */
 	int			prettyFlags;	/* enabling of pretty-print functions */
 	int			wrapColumn;		/* max line length, or -1 for no limit */
 	int			indentLevel;	/* current indent level for pretty-print */
@@ -408,9 +406,6 @@ static void get_rule_groupingset(GroupingSet *gset, List *targetlist,
 								 bool omit_parens, deparse_context *context);
 static void get_rule_orderby(List *orderList, List *targetList,
 							 bool force_colno, deparse_context *context);
-static void get_rule_windowclause(Query *query, deparse_context *context);
-static void get_rule_windowspec(WindowClause *wc, List *targetList,
-								deparse_context *context);
 static char *get_variable(Var *var, int levelsup, bool istoplevel,
 						  deparse_context *context);
 static void get_special_variable(Node *node, deparse_context *context,
@@ -441,7 +436,6 @@ static void get_agg_expr(Aggref *aggref, deparse_context *context,
 						 Aggref *original_aggref);
 static void get_agg_combine_expr(Node *node, deparse_context *context,
 								 void *callback_arg);
-static void get_windowfunc_expr(WindowFunc *wfunc, deparse_context *context);
 static bool get_func_sql_syntax(FuncExpr *expr, deparse_context *context);
 static void get_coercion_expr(Node *arg, deparse_context *context,
 							  Oid resulttype, int32 resulttypmod,
@@ -1043,8 +1037,6 @@ pg_get_triggerdef_worker(Oid trigid, bool pretty)
 		/* Set up context with one-deep namespace stack */
 		context.buf = &buf;
 		context.namespaces = list_make1(&dpns);
-		context.windowClause = NIL;
-		context.windowTList = NIL;
 		context.varprefix = true;
 		context.prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
 		context.wrapColumn = WRAP_COLUMN_DEFAULT;
@@ -3087,8 +3079,6 @@ deparse_expression_pretty(Node *expr, List *dpcontext,
 	initStringInfo(&buf);
 	context.buf = &buf;
 	context.namespaces = dpcontext;
-	context.windowClause = NIL;
-	context.windowTList = NIL;
 	context.varprefix = forceprefix;
 	context.prettyFlags = prettyFlags;
 	context.wrapColumn = WRAP_COLUMN_DEFAULT;
@@ -4693,8 +4683,6 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 
 		context.buf = buf;
 		context.namespaces = list_make1(&dpns);
-		context.windowClause = NIL;
-		context.windowTList = NIL;
 		context.varprefix = (list_length(query->rtable) != 1);
 		context.prettyFlags = prettyFlags;
 		context.wrapColumn = WRAP_COLUMN_DEFAULT;
@@ -4861,8 +4849,6 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 
 	context.buf = buf;
 	context.namespaces = lcons(&dpns, list_copy(parentnamespace));
-	context.windowClause = NIL;
-	context.windowTList = NIL;
 	context.varprefix = (parentnamespace != NIL ||
 						 list_length(query->rtable) != 1);
 	context.prettyFlags = prettyFlags;
@@ -4958,16 +4944,8 @@ get_select_query_def(Query *query, deparse_context *context,
 					 TupleDesc resultDesc, bool colNamesVisible)
 {
 	StringInfo	buf = context->buf;
-	List	   *save_windowclause;
-	List	   *save_windowtlist;
 	bool		force_colno;
 	ListCell   *l;
-
-	/* Set up context for possible window functions */
-	save_windowclause = context->windowClause;
-	context->windowClause = query->windowClause;
-	save_windowtlist = context->windowTList;
-	context->windowTList = query->targetList;
 
 	/*
 	 * Decompile the top-level query body.
@@ -5071,8 +5049,6 @@ get_select_query_def(Query *query, deparse_context *context,
 		}
 	}
 
-	context->windowClause = save_windowclause;
-	context->windowTList = save_windowtlist;
 }
 
 /*
@@ -5269,10 +5245,6 @@ get_basic_select_query(Query *query, deparse_context *context,
 							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
 		get_rule_expr(query->havingQual, context, false);
 	}
-
-	/* Add the WINDOW clause if needed */
-	if (query->windowClause != NIL)
-		get_rule_windowclause(query, context);
 }
 
 /* ----------
@@ -5465,8 +5437,7 @@ get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
 		 */
 		bool		need_paren = (PRETTY_PAREN(context)
 								  || IsA(expr, FuncExpr)
-								  || IsA(expr, Aggref)
-								  || IsA(expr, WindowFunc));
+								  || IsA(expr, Aggref));
 
 		if (need_paren)
 			appendStringInfoChar(context->buf, '(');
@@ -5593,148 +5564,6 @@ get_rule_orderby(List *orderList, List *targetList,
 	}
 }
 
-/*
- * Display a WINDOW clause.
- *
- * Note that the windowClause list might contain only anonymous window
- * specifications, in which case we should print nothing here.
- */
-static void
-get_rule_windowclause(Query *query, deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	const char *sep;
-	ListCell   *l;
-
-	sep = NULL;
-	foreach(l, query->windowClause)
-	{
-		WindowClause *wc = (WindowClause *) lfirst(l);
-
-		if (wc->name == NULL)
-			continue;			/* ignore anonymous windows */
-
-		if (sep == NULL)
-			appendContextKeyword(context, " WINDOW ",
-								 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		else
-			appendStringInfoString(buf, sep);
-
-		appendStringInfo(buf, "%s AS ", quote_identifier(wc->name));
-
-		get_rule_windowspec(wc, query->targetList, context);
-
-		sep = ", ";
-	}
-}
-
-/*
- * Display a window definition
- */
-static void
-get_rule_windowspec(WindowClause *wc, List *targetList,
-					deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	bool		needspace = false;
-	const char *sep;
-	ListCell   *l;
-
-	appendStringInfoChar(buf, '(');
-	if (wc->refname)
-	{
-		appendStringInfoString(buf, quote_identifier(wc->refname));
-		needspace = true;
-	}
-	/* partition clauses are always inherited, so only print if no refname */
-	if (wc->partitionClause && !wc->refname)
-	{
-		if (needspace)
-			appendStringInfoChar(buf, ' ');
-		appendStringInfoString(buf, "PARTITION BY ");
-		sep = "";
-		foreach(l, wc->partitionClause)
-		{
-			SortGroupClause *grp = (SortGroupClause *) lfirst(l);
-
-			appendStringInfoString(buf, sep);
-			get_rule_sortgroupclause(grp->tleSortGroupRef, targetList,
-									 false, context);
-			sep = ", ";
-		}
-		needspace = true;
-	}
-	/* print ordering clause only if not inherited */
-	if (wc->orderClause && !wc->copiedOrder)
-	{
-		if (needspace)
-			appendStringInfoChar(buf, ' ');
-		appendStringInfoString(buf, "ORDER BY ");
-		get_rule_orderby(wc->orderClause, targetList, false, context);
-		needspace = true;
-	}
-	/* framing clause is never inherited, so print unless it's default */
-	if (wc->frameOptions & FRAMEOPTION_NONDEFAULT)
-	{
-		if (needspace)
-			appendStringInfoChar(buf, ' ');
-		if (wc->frameOptions & FRAMEOPTION_RANGE)
-			appendStringInfoString(buf, "RANGE ");
-		else if (wc->frameOptions & FRAMEOPTION_ROWS)
-			appendStringInfoString(buf, "ROWS ");
-		else if (wc->frameOptions & FRAMEOPTION_GROUPS)
-			appendStringInfoString(buf, "GROUPS ");
-		else
-			Assert(false);
-		if (wc->frameOptions & FRAMEOPTION_BETWEEN)
-			appendStringInfoString(buf, "BETWEEN ");
-		if (wc->frameOptions & FRAMEOPTION_START_UNBOUNDED_PRECEDING)
-			appendStringInfoString(buf, "UNBOUNDED PRECEDING ");
-		else if (wc->frameOptions & FRAMEOPTION_START_CURRENT_ROW)
-			appendStringInfoString(buf, "CURRENT ROW ");
-		else if (wc->frameOptions & FRAMEOPTION_START_OFFSET)
-		{
-			get_rule_expr(wc->startOffset, context, false);
-			if (wc->frameOptions & FRAMEOPTION_START_OFFSET_PRECEDING)
-				appendStringInfoString(buf, " PRECEDING ");
-			else if (wc->frameOptions & FRAMEOPTION_START_OFFSET_FOLLOWING)
-				appendStringInfoString(buf, " FOLLOWING ");
-			else
-				Assert(false);
-		}
-		else
-			Assert(false);
-		if (wc->frameOptions & FRAMEOPTION_BETWEEN)
-		{
-			appendStringInfoString(buf, "AND ");
-			if (wc->frameOptions & FRAMEOPTION_END_UNBOUNDED_FOLLOWING)
-				appendStringInfoString(buf, "UNBOUNDED FOLLOWING ");
-			else if (wc->frameOptions & FRAMEOPTION_END_CURRENT_ROW)
-				appendStringInfoString(buf, "CURRENT ROW ");
-			else if (wc->frameOptions & FRAMEOPTION_END_OFFSET)
-			{
-				get_rule_expr(wc->endOffset, context, false);
-				if (wc->frameOptions & FRAMEOPTION_END_OFFSET_PRECEDING)
-					appendStringInfoString(buf, " PRECEDING ");
-				else if (wc->frameOptions & FRAMEOPTION_END_OFFSET_FOLLOWING)
-					appendStringInfoString(buf, " FOLLOWING ");
-				else
-					Assert(false);
-			}
-			else
-				Assert(false);
-		}
-		if (wc->frameOptions & FRAMEOPTION_EXCLUDE_CURRENT_ROW)
-			appendStringInfoString(buf, "EXCLUDE CURRENT ROW ");
-		else if (wc->frameOptions & FRAMEOPTION_EXCLUDE_GROUP)
-			appendStringInfoString(buf, "EXCLUDE GROUP ");
-		else if (wc->frameOptions & FRAMEOPTION_EXCLUDE_TIES)
-			appendStringInfoString(buf, "EXCLUDE TIES ");
-		/* we will now have a trailing space; remove it */
-		buf->len--;
-	}
-	appendStringInfoChar(buf, ')');
-}
 
 /* ----------
  * get_insert_query_def			- Parse back an INSERT parsetree
@@ -7220,7 +7049,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_NullIfExpr:
 		case T_Aggref:
 		case T_GroupingFunc:
-		case T_WindowFunc:
 		case T_FuncExpr:
 			/* function-like: name(..) or name[..] */
 			return true;
@@ -7337,7 +7165,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_GroupingFunc:	/* own parentheses */
-				case T_WindowFunc:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -7388,7 +7215,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_GroupingFunc:	/* own parentheses */
-				case T_WindowFunc:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -7562,9 +7388,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_WindowFunc:
-			get_windowfunc_expr((WindowFunc *) node, context);
-			break;
 
 		case T_SubscriptingRef:
 			{
@@ -8814,79 +8637,6 @@ get_agg_combine_expr(Node *node, deparse_context *context, void *callback_arg)
 	get_agg_expr(aggref, context, original_aggref);
 }
 
-/*
- * get_windowfunc_expr	- Parse back a WindowFunc node
- */
-static void
-get_windowfunc_expr(WindowFunc *wfunc, deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	Oid			argtypes[FUNC_MAX_ARGS];
-	int			nargs;
-	List	   *argnames;
-	ListCell   *l;
-
-	if (list_length(wfunc->args) > FUNC_MAX_ARGS)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg("too many arguments")));
-	nargs = 0;
-	argnames = NIL;
-	foreach(l, wfunc->args)
-	{
-		Node	   *arg = (Node *) lfirst(l);
-
-		if (IsA(arg, NamedArgExpr))
-			argnames = lappend(argnames, ((NamedArgExpr *) arg)->name);
-		argtypes[nargs] = exprType(arg);
-		nargs++;
-	}
-
-	appendStringInfo(buf, "%s(",
-					 generate_function_name(wfunc->winfnoid, nargs,
-											argnames, argtypes,
-											false, NULL,
-											context->special_exprkind));
-	/* winstar can be set only in zero-argument aggregates */
-	if (wfunc->winstar)
-		appendStringInfoChar(buf, '*');
-	else
-		get_rule_expr((Node *) wfunc->args, context, true);
-
-	if (wfunc->aggfilter != NULL)
-	{
-		appendStringInfoString(buf, ") FILTER (WHERE ");
-		get_rule_expr((Node *) wfunc->aggfilter, context, false);
-	}
-
-	appendStringInfoString(buf, ") OVER ");
-
-	foreach(l, context->windowClause)
-	{
-		WindowClause *wc = (WindowClause *) lfirst(l);
-
-		if (wc->winref == wfunc->winref)
-		{
-			if (wc->name)
-				appendStringInfoString(buf, quote_identifier(wc->name));
-			else
-				get_rule_windowspec(wc, context->windowTList, context);
-			break;
-		}
-	}
-	if (l == NULL)
-	{
-		if (context->windowClause)
-			elog(ERROR, "could not find window clause for winref %u",
-				 wfunc->winref);
-
-		/*
-		 * In EXPLAIN, we don't have window context information available, so
-		 * we have to settle for this:
-		 */
-		appendStringInfoString(buf, "(?)");
-	}
-}
 
 /*
  * get_func_sql_syntax		- Parse back a SQL-syntax function call
@@ -10503,8 +10253,7 @@ generate_function_name(Oid funcid, int nargs, List *argnames, Oid *argtypes,
 	}
 
 	if ((p_result == FUNCDETAIL_NORMAL ||
-		 p_result == FUNCDETAIL_AGGREGATE ||
-		 p_result == FUNCDETAIL_WINDOWFUNC) &&
+		 p_result == FUNCDETAIL_AGGREGATE) &&
 		p_funcid == funcid)
 		nspname = NULL;
 	else

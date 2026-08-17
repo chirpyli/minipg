@@ -51,7 +51,6 @@
 #include "executor/nodeTidscan.h"
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
-#include "executor/nodeWindowAgg.h"
 #include "nodes/extensible.h"
 #include "nodes/nodeFuncs.h"
 #include "nodes/pathnodes.h"
@@ -253,10 +252,6 @@ ExecReScan(PlanState *node)
 
 		case T_AggState:
 			ExecReScanAgg((AggState *) node);
-			break;
-
-		case T_WindowAggState:
-			ExecReScanWindowAgg((WindowAggState *) node);
 			break;
 
 		case T_UniqueState:

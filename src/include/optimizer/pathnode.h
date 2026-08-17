@@ -214,12 +214,6 @@ extern MinMaxAggPath *create_minmaxagg_path(PlannerInfo *root,
 											PathTarget *target,
 											List *mmaggregates,
 											List *quals);
-extern WindowAggPath *create_windowagg_path(PlannerInfo *root,
-											RelOptInfo *rel,
-											Path *subpath,
-											PathTarget *target,
-											List *windowFuncs,
-											WindowClause *winclause);
 extern LockRowsPath *create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
 										  Path *subpath, List *rowMarks, int epqParam);
 extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,

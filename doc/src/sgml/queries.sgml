@@ -1433,48 +1433,6 @@ GROUP BY GROUPING SETS (
   </note>
   </sect2>
 
-  <sect2 id="queries-window">
-   <title>Window Function Processing</title>
-
-   <indexterm zone="queries-window">
-    <primary>window function</primary>
-    <secondary>order of execution</secondary>
-   </indexterm>
-
-   <para>
-    If the query contains any window functions (see
-    <xref linkend="tutorial-window"/>,
-    <xref linkend="functions-window"/> and
-    <xref linkend="syntax-window-functions"/>), these functions are evaluated
-    after any grouping, aggregation, and <literal>HAVING</literal> filtering is
-    performed.  That is, if the query uses any aggregates, <literal>GROUP
-    BY</literal>, or <literal>HAVING</literal>, then the rows seen by the window functions
-    are the group rows instead of the original table rows from
-    <literal>FROM</literal>/<literal>WHERE</literal>.
-   </para>
-
-   <para>
-    When multiple window functions are used, all the window functions having
-    equivalent <literal>PARTITION BY</literal> and <literal>ORDER BY</literal>
-    clauses in their window definitions are guaranteed to see the same
-    ordering of the input rows, even if the <literal>ORDER BY</literal> does
-    not uniquely determine the ordering.
-    However, no guarantees are made about the evaluation of functions having
-    different <literal>PARTITION BY</literal> or <literal>ORDER BY</literal> specifications.
-    (In such cases a sort step is typically required between the passes of
-    window function evaluations, and the sort is not guaranteed to preserve
-    ordering of rows that its <literal>ORDER BY</literal> sees as equivalent.)
-   </para>
-
-   <para>
-    Currently, window functions always require presorted data, and so the
-    query output will be ordered according to one or another of the window
-    functions' <literal>PARTITION BY</literal>/<literal>ORDER BY</literal> clauses.
-    It is not recommended to rely on this, however.  Use an explicit
-    top-level <literal>ORDER BY</literal> clause if you want to be sure the
-    results are sorted in a particular way.
-   </para>
-  </sect2>
  </sect1>
 
 

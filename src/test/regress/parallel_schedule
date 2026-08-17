@@ -133,7 +133,7 @@ test: vacuum_parallel
 # 权限/角色机制已裁剪，以下依赖角色/OWNER，移除：
 #   select_views foreign_key dependency alter_table sequence largeobject
 # cluster 已随表继承(INHERITS)功能裁剪而移除
-test: portals_p2 guc bitmapops combocid window advisory_lock indirect_toast
+test: portals_p2 guc bitmapops combocid advisory_lock indirect_toast
 
 # ----------
 # ----------

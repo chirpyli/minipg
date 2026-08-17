@@ -4562,12 +4562,6 @@ AggCheckCallContext(FunctionCallInfo fcinfo, MemoryContext *aggcontext)
 		}
 		return AGG_CONTEXT_AGGREGATE;
 	}
-	if (fcinfo->context && IsA(fcinfo->context, WindowAggState))
-	{
-		if (aggcontext)
-			*aggcontext = ((WindowAggState *) fcinfo->context)->curaggcontext;
-		return AGG_CONTEXT_WINDOW;
-	}
 
 	/* this is just to prevent "uninitialized variable" warnings */
 	if (aggcontext)
@@ -4589,8 +4583,7 @@ AggCheckCallContext(FunctionCallInfo fcinfo, MemoryContext *aggcontext)
  * function calls AggGetAggref, it will get a precise result.
  *
  * Note that if an aggregate is being used as a window function, this will
- * return NULL.  We could provide a similar function to return the relevant
- * WindowFunc node in such cases, but it's not needed yet.
+ * return NULL.
  */
 Aggref *
 AggGetAggref(FunctionCallInfo fcinfo)

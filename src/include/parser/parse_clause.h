@@ -33,10 +33,6 @@ extern List *transformSortClause(ParseState *pstate, List *orderlist,
 								 List **targetlist, ParseExprKind exprKind,
 								 bool useSQL99);
 
-extern List *transformWindowDefinitions(ParseState *pstate,
-										List *windowdefs,
-										List **targetlist);
-
 extern List *transformDistinctClause(ParseState *pstate,
 									 List **targetlist, List *sortClause, bool is_agg);
 extern List *transformDistinctOnClause(ParseState *pstate, List *distinctlist,

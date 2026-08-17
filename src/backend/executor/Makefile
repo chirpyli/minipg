@@ -66,7 +66,6 @@ OBJS = \
 	nodeTidscan.o \
 	nodeUnique.o \
 	nodeValuesscan.o \
-	nodeWindowAgg.o \
 	tqueue.o \
 	tstoreReceiver.o
 

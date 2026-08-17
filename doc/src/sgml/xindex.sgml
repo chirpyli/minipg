@@ -1281,17 +1281,11 @@ SELECT * FROM mytable ORDER BY somecol USING ~&lt;~;
   <para>
    Another SQL feature that requires even more data-type-specific knowledge
    is the <literal>RANGE</literal> <replaceable>offset</replaceable>
-   <literal>PRECEDING</literal>/<literal>FOLLOWING</literal> framing option
-   for window functions (see <xref linkend="syntax-window-functions"/>).
-   For a query such as
-<programlisting>
-SELECT sum(x) OVER (ORDER BY x RANGE BETWEEN 5 PRECEDING AND 10 FOLLOWING)
-  FROM mytable;
-</programlisting>
-   it is not sufficient to know how to order by <literal>x</literal>;
+   <literal>PRECEDING</literal>/<literal>FOLLOWING</literal> framing option.
+   It is not sufficient to know how to order by <literal>x</literal>;
    the database must also understand how to <quote>subtract 5</quote> or
    <quote>add 10</quote> to the current row's value of <literal>x</literal>
-   to identify the bounds of the current window frame.  Comparing the
+   to identify the bounds of the current frame.  Comparing the
    resulting bounds to other rows' values of <literal>x</literal> is
    possible using the comparison operators provided by the B-tree operator
    class that defines the <literal>ORDER BY</literal> ordering &mdash; but

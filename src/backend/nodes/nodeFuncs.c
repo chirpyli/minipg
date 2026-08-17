@@ -62,9 +62,6 @@ exprType(const Node *expr)
 		case T_GroupingFunc:
 			type = INT4OID;
 			break;
-		case T_WindowFunc:
-			type = ((const WindowFunc *) expr)->wintype;
-			break;
 		case T_SubscriptingRef:
 			type = ((const SubscriptingRef *) expr)->refrestype;
 			break;
@@ -733,8 +730,6 @@ expression_returns_set_walker(Node *node, void *context)
 		return false;
 	if (IsA(node, GroupingFunc))
 		return false;
-	if (IsA(node, WindowFunc))
-		return false;
 
 	return expression_tree_walker(node, expression_returns_set_walker,
 								  context);
@@ -776,9 +771,6 @@ exprCollation(const Node *expr)
 			break;
 		case T_GroupingFunc:
 			coll = InvalidOid;
-			break;
-		case T_WindowFunc:
-			coll = ((const WindowFunc *) expr)->wincollid;
 			break;
 		case T_SubscriptingRef:
 			coll = ((const SubscriptingRef *) expr)->refcollid;
@@ -964,9 +956,6 @@ exprInputCollation(const Node *expr)
 		case T_Aggref:
 			coll = ((const Aggref *) expr)->inputcollid;
 			break;
-		case T_WindowFunc:
-			coll = ((const WindowFunc *) expr)->inputcollid;
-			break;
 		case T_FuncExpr:
 			coll = ((const FuncExpr *) expr)->inputcollid;
 			break;
@@ -1018,9 +1007,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_GroupingFunc:
 			Assert(!OidIsValid(collation));
-			break;
-		case T_WindowFunc:
-			((WindowFunc *) expr)->wincollid = collation;
 			break;
 		case T_SubscriptingRef:
 			((SubscriptingRef *) expr)->refcollid = collation;
@@ -1162,9 +1148,6 @@ exprSetInputCollation(Node *expr, Oid inputcollation)
 		case T_Aggref:
 			((Aggref *) expr)->inputcollid = inputcollation;
 			break;
-		case T_WindowFunc:
-			((WindowFunc *) expr)->inputcollid = inputcollation;
-			break;
 		case T_FuncExpr:
 			((FuncExpr *) expr)->inputcollid = inputcollation;
 			break;
@@ -1245,10 +1228,6 @@ exprLocation(const Node *expr)
 			break;
 		case T_GroupingFunc:
 			loc = ((const GroupingFunc *) expr)->location;
-			break;
-		case T_WindowFunc:
-			/* function name should always be the first thing */
-			loc = ((const WindowFunc *) expr)->location;
 			break;
 		case T_SubscriptingRef:
 			/* just use container argument's location */
@@ -1506,9 +1485,6 @@ exprLocation(const Node *expr)
 			/* just use argument's location (ignore operator, if any) */
 			loc = exprLocation(((const SortBy *) expr)->node);
 			break;
-		case T_WindowDef:
-			loc = ((const WindowDef *) expr)->location;
-			break;
 		case T_RangeTableSample:
 			loc = ((const RangeTableSample *) expr)->location;
 			break;
@@ -1656,14 +1632,6 @@ check_functions_in_node(Node *node, check_function_callback checker,
 				Aggref	   *expr = (Aggref *) node;
 
 				if (checker(expr->aggfnoid, context))
-					return true;
-			}
-			break;
-		case T_WindowFunc:
-			{
-				WindowFunc *expr = (WindowFunc *) node;
-
-				if (checker(expr->winfnoid, context))
 					return true;
 			}
 			break;
@@ -1895,18 +1863,6 @@ expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_WindowFunc:
-			{
-				WindowFunc *expr = (WindowFunc *) node;
-
-				/* recurse directly on List */
-				if (expression_tree_walker((Node *) expr->args,
-										   walker, context))
-					return true;
-				if (walker((Node *) expr->aggfilter, context))
-					return true;
-			}
-			break;
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -2075,20 +2031,6 @@ expression_tree_walker(Node *node,
 		case T_Query:
 			/* Do nothing with a sub-Query, per discussion above */
 			break;
-		case T_WindowClause:
-			{
-				WindowClause *wc = (WindowClause *) node;
-
-				if (walker(wc->partitionClause, context))
-					return true;
-				if (walker(wc->orderClause, context))
-					return true;
-				if (walker(wc->startOffset, context))
-					return true;
-				if (walker(wc->endOffset, context))
-					return true;
-			}
-			break;
 		case T_List:
 			foreach(temp, (List *) node)
 			{
@@ -2241,30 +2183,10 @@ query_tree_walker(Query *query,
 	{
 		if (walker((Node *) query->groupClause, context))
 			return true;
-		if (walker((Node *) query->windowClause, context))
-			return true;
 		if (walker((Node *) query->sortClause, context))
 			return true;
 		if (walker((Node *) query->distinctClause, context))
 			return true;
-	}
-	else
-	{
-		/*
-		 * But we need to walk the expressions under WindowClause nodes even
-		 * if we're not interested in SortGroupClause nodes.
-		 */
-		ListCell   *lc;
-
-		foreach(lc, query->windowClause)
-		{
-			WindowClause *wc = lfirst_node(WindowClause, lc);
-
-			if (walker(wc->startOffset, context))
-				return true;
-			if (walker(wc->endOffset, context))
-				return true;
-		}
 	}
 
 	/*
@@ -2536,17 +2458,6 @@ expression_tree_mutator(Node *node,
 				newnode->refs = list_copy(grouping->refs);
 				newnode->cols = list_copy(grouping->cols);
 
-				return (Node *) newnode;
-			}
-			break;
-		case T_WindowFunc:
-			{
-				WindowFunc *wfunc = (WindowFunc *) node;
-				WindowFunc *newnode;
-
-				FLATCOPY(newnode, wfunc, WindowFunc);
-				MUTATE(newnode->args, wfunc->args, List *);
-				MUTATE(newnode->aggfilter, wfunc->aggfilter, Expr *);
 				return (Node *) newnode;
 			}
 			break;
@@ -2869,19 +2780,6 @@ expression_tree_mutator(Node *node,
 		case T_Query:
 			/* Do nothing with a sub-Query, per discussion above */
 			return node;
-		case T_WindowClause:
-			{
-				WindowClause *wc = (WindowClause *) node;
-				WindowClause *newnode;
-
-				FLATCOPY(newnode, wc, WindowClause);
-				MUTATE(newnode->partitionClause, wc->partitionClause, List *);
-				MUTATE(newnode->orderClause, wc->orderClause, List *);
-				MUTATE(newnode->startOffset, wc->startOffset, Node *);
-				MUTATE(newnode->endOffset, wc->endOffset, Node *);
-				return (Node *) newnode;
-			}
-			break;
 		case T_List:
 			{
 				/*
@@ -3080,32 +2978,8 @@ query_tree_mutator(Query *query,
 	if ((flags & QTW_EXAMINE_SORTGROUP))
 	{
 		MUTATE(query->groupClause, query->groupClause, List *);
-		MUTATE(query->windowClause, query->windowClause, List *);
 		MUTATE(query->sortClause, query->sortClause, List *);
 		MUTATE(query->distinctClause, query->distinctClause, List *);
-	}
-	else
-	{
-		/*
-		 * But we need to mutate the expressions under WindowClause nodes even
-		 * if we're not interested in SortGroupClause nodes.
-		 */
-		List	   *resultlist;
-		ListCell   *temp;
-
-		resultlist = NIL;
-		foreach(temp, query->windowClause)
-		{
-			WindowClause *wc = lfirst_node(WindowClause, temp);
-			WindowClause *newnode;
-
-			FLATCOPY(newnode, wc, WindowClause);
-			MUTATE(newnode->startOffset, wc->startOffset, Node *);
-			MUTATE(newnode->endOffset, wc->endOffset, Node *);
-
-			resultlist = lappend(resultlist, (Node *) newnode);
-		}
-		query->windowClause = resultlist;
 	}
 
 	/*
@@ -3414,8 +3288,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->havingClause, context))
 					return true;
-				if (walker(stmt->windowClause, context))
-					return true;
 				if (walker(stmt->valuesLists, context))
 					return true;
 				if (walker(stmt->sortClause, context))
@@ -3459,8 +3331,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(fcall->agg_order, context))
 					return true;
 				if (walker(fcall->agg_filter, context))
-					return true;
-				if (walker(fcall->over, context))
 					return true;
 				/* function name is deemed uninteresting */
 			}
@@ -3515,20 +3385,6 @@ raw_expression_tree_walker(Node *node,
 			return walker(((CollateClause *) node)->arg, context);
 		case T_SortBy:
 			return walker(((SortBy *) node)->node, context);
-		case T_WindowDef:
-			{
-				WindowDef  *wd = (WindowDef *) node;
-
-				if (walker(wd->partitionClause, context))
-					return true;
-				if (walker(wd->orderClause, context))
-					return true;
-				if (walker(wd->startOffset, context))
-					return true;
-				if (walker(wd->endOffset, context))
-					return true;
-			}
-			break;
 		case T_RangeSubselect:
 			{
 				RangeSubselect *rs = (RangeSubselect *) node;

@@ -850,23 +850,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 		case T_Group:
 			set_upper_references(root, plan, rtoffset);
 			break;
-		case T_WindowAgg:
-			{
-				WindowAgg  *wplan = (WindowAgg *) plan;
-
-				set_upper_references(root, plan, rtoffset);
-
-				/*
-				 * Like Limit node limit/offset expressions, WindowAgg has
-				 * frame offset expressions, which cannot contain subplan
-				 * variable refs, so fix_scan_expr works for them.
-				 */
-				wplan->startOffset =
-					fix_scan_expr(root, wplan->startOffset, rtoffset, 1);
-				wplan->endOffset =
-					fix_scan_expr(root, wplan->endOffset, rtoffset, 1);
-			}
-			break;
 		case T_Result:
 			{
 				Result	   *splan = (Result *) plan;
@@ -1578,11 +1561,6 @@ fix_expr_common(PlannerInfo *root, Node *node)
 	{
 		record_plan_function_dependency(root,
 										((Aggref *) node)->aggfnoid);
-	}
-	else if (IsA(node, WindowFunc))
-	{
-		record_plan_function_dependency(root,
-										((WindowFunc *) node)->winfnoid);
 	}
 	else if (IsA(node, FuncExpr))
 	{

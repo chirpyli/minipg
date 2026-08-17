@@ -2455,9 +2455,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	if (viewquery->hasAggs)
 		return gettext_noop("Views that return aggregate functions are not automatically updatable.");
 
-	if (viewquery->hasWindowFuncs)
-		return gettext_noop("Views that return window functions are not automatically updatable.");
-
 	if (viewquery->hasTargetSRFs)
 		return gettext_noop("Views that return set-returning functions are not automatically updatable.");
 

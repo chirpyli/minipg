@@ -736,32 +736,6 @@ _outAgg(StringInfo str, const Agg *node)
 }
 
 static void
-_outWindowAgg(StringInfo str, const WindowAgg *node)
-{
-	WRITE_NODE_TYPE("WINDOWAGG");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_UINT_FIELD(winref);
-	WRITE_INT_FIELD(partNumCols);
-	WRITE_ATTRNUMBER_ARRAY(partColIdx, node->partNumCols);
-	WRITE_OID_ARRAY(partOperators, node->partNumCols);
-	WRITE_OID_ARRAY(partCollations, node->partNumCols);
-	WRITE_INT_FIELD(ordNumCols);
-	WRITE_ATTRNUMBER_ARRAY(ordColIdx, node->ordNumCols);
-	WRITE_OID_ARRAY(ordOperators, node->ordNumCols);
-	WRITE_OID_ARRAY(ordCollations, node->ordNumCols);
-	WRITE_INT_FIELD(frameOptions);
-	WRITE_NODE_FIELD(startOffset);
-	WRITE_NODE_FIELD(endOffset);
-	WRITE_OID_FIELD(startInRangeFunc);
-	WRITE_OID_FIELD(endInRangeFunc);
-	WRITE_OID_FIELD(inRangeColl);
-	WRITE_BOOL_FIELD(inRangeAsc);
-	WRITE_BOOL_FIELD(inRangeNullsFirst);
-}
-
-static void
 _outGroup(StringInfo str, const Group *node)
 {
 	WRITE_NODE_TYPE("GROUP");
@@ -1034,23 +1008,6 @@ _outGroupingFunc(StringInfo str, const GroupingFunc *node)
 	WRITE_NODE_FIELD(refs);
 	WRITE_NODE_FIELD(cols);
 	WRITE_UINT_FIELD(agglevelsup);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outWindowFunc(StringInfo str, const WindowFunc *node)
-{
-	WRITE_NODE_TYPE("WINDOWFUNC");
-
-	WRITE_OID_FIELD(winfnoid);
-	WRITE_OID_FIELD(wintype);
-	WRITE_OID_FIELD(wincollid);
-	WRITE_OID_FIELD(inputcollid);
-	WRITE_NODE_FIELD(args);
-	WRITE_NODE_FIELD(aggfilter);
-	WRITE_UINT_FIELD(winref);
-	WRITE_BOOL_FIELD(winstar);
-	WRITE_BOOL_FIELD(winagg);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1927,19 +1884,6 @@ _outMinMaxAggPath(StringInfo str, const MinMaxAggPath *node)
 }
 
 static void
-_outWindowAggPath(StringInfo str, const WindowAggPath *node)
-{
-	WRITE_NODE_TYPE("WINDOWAGGPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_NODE_FIELD(winclause);
-}
-
-
-
-static void
 _outLockRowsPath(StringInfo str, const LockRowsPath *node)
 {
 	WRITE_NODE_TYPE("LOCKROWSPATH");
@@ -2089,7 +2033,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(fkey_list);
 	WRITE_NODE_FIELD(query_pathkeys);
 	WRITE_NODE_FIELD(group_pathkeys);
-	WRITE_NODE_FIELD(window_pathkeys);
 	WRITE_NODE_FIELD(distinct_pathkeys);
 	WRITE_NODE_FIELD(sort_pathkeys);
 	WRITE_NODE_FIELD(processed_tlist);
@@ -2566,7 +2509,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(groupClause);
 	WRITE_BOOL_FIELD(groupDistinct);
 	WRITE_NODE_FIELD(havingClause);
-	WRITE_NODE_FIELD(windowClause);
 	WRITE_NODE_FIELD(valuesLists);
 	WRITE_NODE_FIELD(sortClause);
 	WRITE_NODE_FIELD(limitOffset);
@@ -2592,7 +2534,6 @@ _outFuncCall(StringInfo str, const FuncCall *node)
 	WRITE_NODE_FIELD(args);
 	WRITE_NODE_FIELD(agg_order);
 	WRITE_NODE_FIELD(agg_filter);
-	WRITE_NODE_FIELD(over);
 	WRITE_BOOL_FIELD(agg_within_group);
 	WRITE_BOOL_FIELD(agg_star);
 	WRITE_BOOL_FIELD(agg_distinct);
@@ -2753,7 +2694,6 @@ _outQuery(StringInfo str, const Query *node)
 
 	WRITE_INT_FIELD(resultRelation);
 	WRITE_BOOL_FIELD(hasAggs);
-	WRITE_BOOL_FIELD(hasWindowFuncs);
 	WRITE_BOOL_FIELD(hasTargetSRFs);
 	WRITE_BOOL_FIELD(hasSubLinks);
 	WRITE_BOOL_FIELD(hasDistinctOn);
@@ -2769,7 +2709,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_BOOL_FIELD(groupDistinct);
 	WRITE_NODE_FIELD(groupingSets);
 	WRITE_NODE_FIELD(havingQual);
-	WRITE_NODE_FIELD(windowClause);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);
 	WRITE_NODE_FIELD(limitOffset);
@@ -2814,27 +2753,6 @@ _outGroupingSet(StringInfo str, const GroupingSet *node)
 	WRITE_ENUM_FIELD(kind, GroupingSetKind);
 	WRITE_NODE_FIELD(content);
 	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outWindowClause(StringInfo str, const WindowClause *node)
-{
-	WRITE_NODE_TYPE("WINDOWCLAUSE");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_STRING_FIELD(refname);
-	WRITE_NODE_FIELD(partitionClause);
-	WRITE_NODE_FIELD(orderClause);
-	WRITE_INT_FIELD(frameOptions);
-	WRITE_NODE_FIELD(startOffset);
-	WRITE_NODE_FIELD(endOffset);
-	WRITE_OID_FIELD(startInRangeFunc);
-	WRITE_OID_FIELD(endInRangeFunc);
-	WRITE_OID_FIELD(inRangeColl);
-	WRITE_BOOL_FIELD(inRangeAsc);
-	WRITE_BOOL_FIELD(inRangeNullsFirst);
-	WRITE_UINT_FIELD(winref);
-	WRITE_BOOL_FIELD(copiedOrder);
 }
 
 static void
@@ -3164,21 +3082,6 @@ _outSortBy(StringInfo str, const SortBy *node)
 }
 
 static void
-_outWindowDef(StringInfo str, const WindowDef *node)
-{
-	WRITE_NODE_TYPE("WINDOWDEF");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_STRING_FIELD(refname);
-	WRITE_NODE_FIELD(partitionClause);
-	WRITE_NODE_FIELD(orderClause);
-	WRITE_INT_FIELD(frameOptions);
-	WRITE_NODE_FIELD(startOffset);
-	WRITE_NODE_FIELD(endOffset);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outRangeSubselect(StringInfo str, const RangeSubselect *node)
 {
 	WRITE_NODE_TYPE("RANGESUBSELECT");
@@ -3452,9 +3355,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Agg:
 				_outAgg(str, obj);
 				break;
-			case T_WindowAgg:
-				_outWindowAgg(str, obj);
-				break;
 			case T_Group:
 				_outGroup(str, obj);
 				break;
@@ -3511,9 +3411,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_GroupingFunc:
 				_outGroupingFunc(str, obj);
-				break;
-			case T_WindowFunc:
-				_outWindowFunc(str, obj);
 				break;
 			case T_SubscriptingRef:
 				_outSubscriptingRef(str, obj);
@@ -3707,9 +3604,6 @@ outNode(StringInfo str, const void *obj)
 			case T_MinMaxAggPath:
 				_outMinMaxAggPath(str, obj);
 				break;
-			case T_WindowAggPath:
-				_outWindowAggPath(str, obj);
-				break;
 			case T_LockRowsPath:
 				_outLockRowsPath(str, obj);
 				break;
@@ -3851,9 +3745,6 @@ outNode(StringInfo str, const void *obj)
 			case T_GroupingSet:
 				_outGroupingSet(str, obj);
 				break;
-			case T_WindowClause:
-				_outWindowClause(str, obj);
-				break;
 			case T_RowMarkClause:
 				_outRowMarkClause(str, obj);
 				break;
@@ -3901,9 +3792,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SortBy:
 				_outSortBy(str, obj);
-				break;
-			case T_WindowDef:
-				_outWindowDef(str, obj);
 				break;
 			case T_RangeSubselect:
 				_outRangeSubselect(str, obj);

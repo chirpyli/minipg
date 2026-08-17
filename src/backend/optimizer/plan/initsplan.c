@@ -184,9 +184,8 @@ void
 build_base_rel_tlists(PlannerInfo *root, List *final_tlist)
 {
 	List	   *tlist_vars = pull_var_clause((Node *) final_tlist,
-											 PVC_RECURSE_AGGREGATES |
-											 PVC_RECURSE_WINDOWFUNCS |
-											 PVC_INCLUDE_PLACEHOLDERS);
+										 PVC_RECURSE_AGGREGATES |
+										 PVC_INCLUDE_PLACEHOLDERS);
 
 	if (tlist_vars != NIL)
 	{
@@ -1797,7 +1796,6 @@ distribute_qual_to_rels(PlannerInfo *root, Node *clause,
 	{
 		List	   *vars = pull_var_clause(clause,
 										   PVC_RECURSE_AGGREGATES |
-										   PVC_RECURSE_WINDOWFUNCS |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, relids, false);
@@ -2311,7 +2309,6 @@ process_implied_equality(PlannerInfo *root,
 	{
 		List	   *vars = pull_var_clause(clause,
 										   PVC_RECURSE_AGGREGATES |
-										   PVC_RECURSE_WINDOWFUNCS |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, relids, false);

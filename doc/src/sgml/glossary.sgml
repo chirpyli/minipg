@@ -35,13 +35,7 @@
      For more information, see
      <xref linkend="functions-aggregate"/>.
     </para>
-    <glossseealso otherterm="glossary-window-function" />
    </glossdef>
-  </glossentry>
-
-  <glossentry>
-   <glossterm>Analytic function</glossterm>
-   <glosssee otherterm="glossary-window-function" />
   </glossentry>
 
   <glossentry id="glossary-analyze">
@@ -978,12 +972,10 @@
    </glossdef>
    <glossdef>
     <para>
-     In reference to a <glossterm linkend="glossary-window-function">window function</glossterm>
-     in a <glossterm linkend="glossary-query">query</glossterm>,
-     a partition is a user-defined criterion that identifies which neighboring
-     <glossterm linkend="glossary-tuple">rows</glossterm>
-     of the <glossterm linkend="glossary-result-set">query's result set</glossterm>
-     can be considered by the function.
+     In a partitioned table, a partition is a table that is a member of the
+     partitioned table and inherits its column definition; or more generally,
+     a division of a <glossterm linkend="glossary-result-set">result set</glossterm>
+     into subsets based on a user-defined criterion.
     </para>
    </glossdef>
   </glossentry>
@@ -1887,29 +1879,6 @@
    </glossdef>
   </glossentry>
 
-  <glossentry id="glossary-window-function">
-   <glossterm>Window function (routine)</glossterm>
-   <glossdef>
-    <para>
-     A type of <glossterm linkend="glossary-function">function</glossterm>
-     used in a <glossterm linkend="glossary-query">query</glossterm>
-     that applies to a <glossterm linkend="glossary-partition">partition</glossterm>
-     of the query's <glossterm linkend="glossary-result-set">result set</glossterm>;
-     the function's result is based on values found in
-     <glossterm linkend="glossary-tuple">rows</glossterm> of the same partition or frame.
-    </para>
-    <para>
-     All <glossterm linkend="glossary-aggregate">aggregate functions</glossterm>
-     can be used as window functions, but window functions can also be
-     used to, for example, give ranks to each of the rows in the partition.
-     Also known as <firstterm>analytic functions</firstterm>.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="tutorial-window"/>.
-    </para>
-   </glossdef>
-  </glossentry>
 
   <glossentry id="glossary-wal">
    <glossterm>Write-ahead log</glossterm>

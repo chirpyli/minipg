@@ -92,7 +92,6 @@ typedef struct
 } max_parallel_hazard_context;
 
 static bool contain_agg_clause_walker(Node *node, void *context);
-static bool find_window_functions_walker(Node *node, WindowFuncLists *lists);
 static bool contain_subplans_walker(Node *node, void *context);
 static bool contain_mutable_functions_walker(Node *node, void *context);
 static bool contain_volatile_functions_walker(Node *node, void *context);
@@ -206,66 +205,14 @@ contain_agg_clause_walker(Node *node, void *context)
  *
  * Since window functions don't have level fields, but are hard-wired to
  * be associated with the current query level, this is just the same as
- * rewriteManip.c's function.
+ * No longer relevant: window functions have been removed from minipg.
  */
 bool
 contain_window_function(Node *clause)
 {
-	return contain_windowfuncs(clause);
+	return false;
 }
 
-/*
- * find_window_functions
- *	  Locate all the WindowFunc nodes in an expression tree, and organize
- *	  them by winref ID number.
- *
- * Caller must provide an upper bound on the winref IDs expected in the tree.
- */
-WindowFuncLists *
-find_window_functions(Node *clause, Index maxWinRef)
-{
-	WindowFuncLists *lists = palloc(sizeof(WindowFuncLists));
-
-	lists->numWindowFuncs = 0;
-	lists->maxWinRef = maxWinRef;
-	lists->windowFuncs = (List **) palloc0((maxWinRef + 1) * sizeof(List *));
-	(void) find_window_functions_walker(clause, lists);
-	return lists;
-}
-
-static bool
-find_window_functions_walker(Node *node, WindowFuncLists *lists)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, WindowFunc))
-	{
-		WindowFunc *wfunc = (WindowFunc *) node;
-
-		/* winref is unsigned, so one-sided test is OK */
-		if (wfunc->winref > lists->maxWinRef)
-			elog(ERROR, "WindowFunc contains out-of-range winref %u",
-				 wfunc->winref);
-		/* eliminate duplicates, so that we avoid repeated computation */
-		if (!list_member(lists->windowFuncs[wfunc->winref], wfunc))
-		{
-			lists->windowFuncs[wfunc->winref] =
-				lappend(lists->windowFuncs[wfunc->winref], wfunc);
-			lists->numWindowFuncs++;
-		}
-
-		/*
-		 * We assume that the parser checked that there are no window
-		 * functions in the arguments or filter clause.  Hence, we need not
-		 * recurse into them.  (If either the parser or the planner screws up
-		 * on this point, the executor will still catch it; see ExecInitExpr.)
-		 */
-		return false;
-	}
-	Assert(!IsA(node, SubLink));
-	return expression_tree_walker(node, find_window_functions_walker,
-								  (void *) lists);
-}
 
 
 /*****************************************************************************
@@ -748,20 +695,6 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 	}
 
 	/*
-	 * Treat window functions as parallel-restricted because we aren't sure
-	 * whether the input row ordering is fully deterministic, and the output
-	 * of window functions might vary across workers if not.  (In some cases,
-	 * like where the window frame orders by a primary key, we could relax
-	 * this restriction.  But it doesn't currently seem worth expending extra
-	 * effort to do so.)
-	 */
-	else if (IsA(node, WindowFunc))
-	{
-		if (max_parallel_hazard_test(PROPARALLEL_RESTRICTED, context))
-			return true;
-	}
-
-	/*
 	 * As a notational convenience for callers, look through RestrictInfo.
 	 */
 	else if (IsA(node, RestrictInfo))
@@ -905,11 +838,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 		 * A GroupingFunc doesn't evaluate its arguments, and therefore must
 		 * be treated as nonstrict.
 		 */
-		return true;
-	}
-	else if (IsA(node, WindowFunc))
-	{
-		/* a window function could return non-null with null input */
 		return true;
 	}
 	else if (IsA(node, SubscriptingRef))
@@ -2322,59 +2250,8 @@ eval_const_expressions_mutator(Node *node,
 				 * recurse)
 				 */
 				return (Node *) copyObject(param);
-			}
-		case T_WindowFunc:
-			{
-				WindowFunc *expr = (WindowFunc *) node;
-				Oid			funcid = expr->winfnoid;
-				List	   *args;
-				Expr	   *aggfilter;
-				HeapTuple	func_tuple;
-				WindowFunc *newexpr;
-
-				/*
-				 * We can't really simplify a WindowFunc node, but we mustn't
-				 * just fall through to the default processing, because we
-				 * have to apply expand_function_arguments to its argument
-				 * list.  That takes care of inserting default arguments and
-				 * expanding named-argument notation.
-				 */
-				func_tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-				if (!HeapTupleIsValid(func_tuple))
-					elog(ERROR, "cache lookup failed for function %u", funcid);
-
-				args = expand_function_arguments(expr->args,
-												 false, expr->wintype,
-												 func_tuple);
-
-				ReleaseSysCache(func_tuple);
-
-				/* Now, recursively simplify the args (which are a List) */
-				args = (List *)
-					expression_tree_mutator((Node *) args,
-											eval_const_expressions_mutator,
-											(void *) context);
-				/* ... and the filter expression, which isn't */
-				aggfilter = (Expr *)
-					eval_const_expressions_mutator((Node *) expr->aggfilter,
-												   context);
-
-				/* And build the replacement WindowFunc node */
-				newexpr = makeNode(WindowFunc);
-				newexpr->winfnoid = expr->winfnoid;
-				newexpr->wintype = expr->wintype;
-				newexpr->wincollid = expr->wincollid;
-				newexpr->inputcollid = expr->inputcollid;
-				newexpr->args = args;
-				newexpr->aggfilter = aggfilter;
-				newexpr->winref = expr->winref;
-				newexpr->winstar = expr->winstar;
-				newexpr->winagg = expr->winagg;
-				newexpr->location = expr->location;
-
-				return (Node *) newexpr;
-			}
-		case T_FuncExpr:
+				}
+				case T_FuncExpr:
 			{
 				FuncExpr   *expr = (FuncExpr *) node;
 				List	   *args = expr->args;
@@ -4480,7 +4357,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 	if (!IsA(querytree, Query) ||
 		querytree->commandType != CMD_SELECT ||
 		querytree->hasAggs ||
-		querytree->hasWindowFuncs ||
 		querytree->hasTargetSRFs ||
 		querytree->hasSubLinks ||
 		querytree->rtable ||
@@ -4489,7 +4365,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 		querytree->groupClause ||
 		querytree->groupingSets ||
 		querytree->havingQual ||
-		querytree->windowClause ||
 		querytree->distinctClause ||
 		querytree->sortClause ||
 		querytree->limitOffset ||

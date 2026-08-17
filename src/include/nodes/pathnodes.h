@@ -69,7 +69,6 @@ typedef enum UpperRelationKind
 	UPPERREL_PARTIAL_GROUP_AGG, /* result of partial grouping/aggregation, if
 								 * any */
 	UPPERREL_GROUP_AGG,			/* result of grouping/aggregation, if any */
-	UPPERREL_WINDOW,			/* result of window functions, if any */
 	UPPERREL_DISTINCT,			/* result of "SELECT DISTINCT", if any */
 	UPPERREL_ORDERED,			/* result of ORDER BY, if any */
 	UPPERREL_FINAL				/* result of any remaining top-level actions */
@@ -289,7 +288,6 @@ struct PlannerInfo
 	List	   *query_pathkeys; /* desired pathkeys for query_planner() */
 
 	List	   *group_pathkeys; /* groupClause pathkeys, if any */
-	List	   *window_pathkeys;	/* pathkeys of bottom window, if any */
 	List	   *distinct_pathkeys;	/* distinctClause pathkeys, if any */
 	List	   *sort_pathkeys;	/* sortClause pathkeys, if any */
 
@@ -1709,16 +1707,6 @@ typedef struct MinMaxAggPath
 	List	   *mmaggregates;	/* list of MinMaxAggInfo */
 	List	   *quals;			/* HAVING quals, if any */
 } MinMaxAggPath;
-
-/*
- * WindowAggPath represents generic computation of window functions
- */
-typedef struct WindowAggPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	WindowClause *winclause;	/* WindowClause we'll be using */
-} WindowAggPath;
 
 
 /*

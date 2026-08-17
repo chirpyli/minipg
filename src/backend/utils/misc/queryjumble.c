@@ -253,7 +253,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	APP_JUMB(query->groupDistinct);
 	JumbleExpr(jstate, (Node *) query->groupingSets);
 	JumbleExpr(jstate, query->havingQual);
-	JumbleExpr(jstate, (Node *) query->windowClause);
 	JumbleExpr(jstate, (Node *) query->distinctClause);
 	JumbleExpr(jstate, (Node *) query->sortClause);
 	JumbleExpr(jstate, query->limitOffset);
@@ -410,16 +409,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 
 				JumbleExpr(jstate, (Node *) grpnode->refs);
 				APP_JUMB(grpnode->agglevelsup);
-			}
-			break;
-		case T_WindowFunc:
-			{
-				WindowFunc *expr = (WindowFunc *) node;
-
-				APP_JUMB(expr->winfnoid);
-				APP_JUMB(expr->winref);
-				JumbleExpr(jstate, (Node *) expr->args);
-				JumbleExpr(jstate, (Node *) expr->aggfilter);
 			}
 			break;
 		case T_SubscriptingRef:
@@ -733,18 +722,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				GroupingSet *gsnode = (GroupingSet *) node;
 
 				JumbleExpr(jstate, (Node *) gsnode->content);
-			}
-			break;
-		case T_WindowClause:
-			{
-				WindowClause *wc = (WindowClause *) node;
-
-				APP_JUMB(wc->winref);
-				APP_JUMB(wc->frameOptions);
-				JumbleExpr(jstate, (Node *) wc->partitionClause);
-				JumbleExpr(jstate, (Node *) wc->orderClause);
-				JumbleExpr(jstate, wc->startOffset);
-				JumbleExpr(jstate, wc->endOffset);
 			}
 			break;
 		case T_RangeTblFunction:

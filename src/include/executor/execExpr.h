@@ -235,7 +235,6 @@ typedef enum ExprEvalOp
 	EEOP_HASHED_SCALARARRAYOP,
 	EEOP_AGGREF,
 	EEOP_GROUPING_FUNC,
-	EEOP_WINDOW_FUNC,
 	EEOP_SUBPLAN,
 
 	/* aggregation related nodes */
@@ -592,13 +591,6 @@ typedef struct ExprEvalStep
 		{
 			List	   *clauses;	/* integer list of column numbers */
 		}			grouping_func;
-
-		/* for EEOP_WINDOW_FUNC */
-		struct
-		{
-			/* out-of-line state, modified by nodeWindowAgg.c */
-			WindowFuncExprState *wfstate;
-		}			window_func;
 
 		/* for EEOP_SUBPLAN */
 		struct

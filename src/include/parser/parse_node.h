@@ -133,12 +133,6 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  * to process them like UPDATE.  (Note this can change intra-statement, for
  * cases like INSERT ON CONFLICT UPDATE.)
  *
- * p_windowdefs: list of WindowDefs representing WINDOW and OVER clauses.
- * We collect these while transforming expressions and then transform them
- * afterwards (so that any resjunk tlist items needed for the sort/group
- * clauses end up at the end of the query tlist).  A WindowDef's location in
- * this list, counting from 1, is the winref number to use to reference it.
- *
  * p_expr_kind: kind of expression we're currently parsing, as per enum above;
  * EXPR_KIND_NONE when not in an expression.
  *
@@ -154,7 +148,7 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  * p_resolve_unknowns: resolve unknown-type SELECT output columns as type TEXT
  * (this is true by default).
  *
- * p_hasAggs, p_hasWindowFuncs, etc: true if we've found any of the indicated
+ * p_hasAggs, etc: true if we've found any of the indicated
  * constructs in the query.
  *
  * p_last_srf: the set-returning FuncExpr or OpExpr most recently found in
@@ -179,7 +173,6 @@ struct ParseState
 	Relation	p_target_relation;	/* INSERT/UPDATE/DELETE target rel */
 	ParseNamespaceItem *p_target_nsitem;	/* target rel's NSItem, or NULL */
 	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
-	List	   *p_windowdefs;	/* raw representations of window clauses */
 	ParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
 	List	   *p_multiassign_exprs;	/* junk tlist entries for multiassign */
@@ -193,7 +186,6 @@ struct ParseState
 
 	/* Flags telling about things found in the query: */
 	bool		p_hasAggs;
-	bool		p_hasWindowFuncs;
 	bool		p_hasTargetSRFs;
 	bool		p_hasSubLinks;
 

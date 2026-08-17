@@ -609,24 +609,9 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 
 							assign_expr_collations(context->pstate,
 												   (Node *) aggref->aggfilter);
-						}
-						break;
-					case T_WindowFunc:
-						{
-							/*
-							 * WindowFunc requires special processing only for
-							 * its aggfilter clause, as for aggregates.
-							 */
-							WindowFunc *wfunc = (WindowFunc *) node;
-
-							(void) assign_collations_walker((Node *) wfunc->args,
-															&loccontext);
-
-							assign_expr_collations(context->pstate,
-												   (Node *) wfunc->aggfilter);
-						}
-						break;
-					case T_CaseExpr:
+							}
+							break;
+							case T_CaseExpr:
 						{
 							/*
 							 * CaseExpr is a special case because we do not

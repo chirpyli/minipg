@@ -952,37 +952,6 @@ _copyAgg(const Agg *from)
 }
 
 /*
- * _copyWindowAgg
- */
-static WindowAgg *
-_copyWindowAgg(const WindowAgg *from)
-{
-	WindowAgg  *newnode = makeNode(WindowAgg);
-
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	COPY_SCALAR_FIELD(winref);
-	COPY_SCALAR_FIELD(partNumCols);
-	COPY_POINTER_FIELD(partColIdx, from->partNumCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(partOperators, from->partNumCols * sizeof(Oid));
-	COPY_POINTER_FIELD(partCollations, from->partNumCols * sizeof(Oid));
-	COPY_SCALAR_FIELD(ordNumCols);
-	COPY_POINTER_FIELD(ordColIdx, from->ordNumCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(ordOperators, from->ordNumCols * sizeof(Oid));
-	COPY_POINTER_FIELD(ordCollations, from->ordNumCols * sizeof(Oid));
-	COPY_SCALAR_FIELD(frameOptions);
-	COPY_NODE_FIELD(startOffset);
-	COPY_NODE_FIELD(endOffset);
-	COPY_SCALAR_FIELD(startInRangeFunc);
-	COPY_SCALAR_FIELD(endInRangeFunc);
-	COPY_SCALAR_FIELD(inRangeColl);
-	COPY_SCALAR_FIELD(inRangeAsc);
-	COPY_SCALAR_FIELD(inRangeNullsFirst);
-
-	return newnode;
-}
-
-/*
  * _copyUnique
  */
 static Unique *
@@ -1294,28 +1263,6 @@ _copyGroupingFunc(const GroupingFunc *from)
 	COPY_NODE_FIELD(refs);
 	COPY_NODE_FIELD(cols);
 	COPY_SCALAR_FIELD(agglevelsup);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
- * _copyWindowFunc
- */
-static WindowFunc *
-_copyWindowFunc(const WindowFunc *from)
-{
-	WindowFunc *newnode = makeNode(WindowFunc);
-
-	COPY_SCALAR_FIELD(winfnoid);
-	COPY_SCALAR_FIELD(wintype);
-	COPY_SCALAR_FIELD(wincollid);
-	COPY_SCALAR_FIELD(inputcollid);
-	COPY_NODE_FIELD(args);
-	COPY_NODE_FIELD(aggfilter);
-	COPY_SCALAR_FIELD(winref);
-	COPY_SCALAR_FIELD(winstar);
-	COPY_SCALAR_FIELD(winagg);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2260,29 +2207,6 @@ _copyGroupingSet(const GroupingSet *from)
 	return newnode;
 }
 
-static WindowClause *
-_copyWindowClause(const WindowClause *from)
-{
-	WindowClause *newnode = makeNode(WindowClause);
-
-	COPY_STRING_FIELD(name);
-	COPY_STRING_FIELD(refname);
-	COPY_NODE_FIELD(partitionClause);
-	COPY_NODE_FIELD(orderClause);
-	COPY_SCALAR_FIELD(frameOptions);
-	COPY_NODE_FIELD(startOffset);
-	COPY_NODE_FIELD(endOffset);
-	COPY_SCALAR_FIELD(startInRangeFunc);
-	COPY_SCALAR_FIELD(endInRangeFunc);
-	COPY_SCALAR_FIELD(inRangeColl);
-	COPY_SCALAR_FIELD(inRangeAsc);
-	COPY_SCALAR_FIELD(inRangeNullsFirst);
-	COPY_SCALAR_FIELD(winref);
-	COPY_SCALAR_FIELD(copiedOrder);
-
-	return newnode;
-}
-
 static RowMarkClause *
 _copyRowMarkClause(const RowMarkClause *from)
 {
@@ -2399,7 +2323,6 @@ _copyFuncCall(const FuncCall *from)
 	COPY_NODE_FIELD(args);
 	COPY_NODE_FIELD(agg_order);
 	COPY_NODE_FIELD(agg_filter);
-	COPY_NODE_FIELD(over);
 	COPY_SCALAR_FIELD(agg_within_group);
 	COPY_SCALAR_FIELD(agg_star);
 	COPY_SCALAR_FIELD(agg_distinct);
@@ -2503,23 +2426,6 @@ _copySortBy(const SortBy *from)
 	COPY_SCALAR_FIELD(sortby_dir);
 	COPY_SCALAR_FIELD(sortby_nulls);
 	COPY_NODE_FIELD(useOp);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-static WindowDef *
-_copyWindowDef(const WindowDef *from)
-{
-	WindowDef  *newnode = makeNode(WindowDef);
-
-	COPY_STRING_FIELD(name);
-	COPY_STRING_FIELD(refname);
-	COPY_NODE_FIELD(partitionClause);
-	COPY_NODE_FIELD(orderClause);
-	COPY_SCALAR_FIELD(frameOptions);
-	COPY_NODE_FIELD(startOffset);
-	COPY_NODE_FIELD(endOffset);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2746,7 +2652,6 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(utilityStmt);
 	COPY_SCALAR_FIELD(resultRelation);
 	COPY_SCALAR_FIELD(hasAggs);
-	COPY_SCALAR_FIELD(hasWindowFuncs);
 	COPY_SCALAR_FIELD(hasTargetSRFs);
 	COPY_SCALAR_FIELD(hasSubLinks);
 	COPY_SCALAR_FIELD(hasDistinctOn);
@@ -2762,7 +2667,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(groupDistinct);
 	COPY_NODE_FIELD(groupingSets);
 	COPY_NODE_FIELD(havingQual);
-	COPY_NODE_FIELD(windowClause);
 	COPY_NODE_FIELD(distinctClause);
 	COPY_NODE_FIELD(sortClause);
 	COPY_NODE_FIELD(limitOffset);
@@ -2843,7 +2747,6 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(groupClause);
 	COPY_SCALAR_FIELD(groupDistinct);
 	COPY_NODE_FIELD(havingClause);
-	COPY_NODE_FIELD(windowClause);
 	COPY_NODE_FIELD(valuesLists);
 	COPY_NODE_FIELD(sortClause);
 	COPY_NODE_FIELD(limitOffset);
@@ -3931,9 +3834,6 @@ copyObjectImpl(const void *from)
 		case T_Agg:
 			retval = _copyAgg(from);
 			break;
-		case T_WindowAgg:
-			retval = _copyWindowAgg(from);
-			break;
 		case T_Unique:
 			retval = _copyUnique(from);
 			break;
@@ -3979,9 +3879,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_GroupingFunc:
 			retval = _copyGroupingFunc(from);
-			break;
-		case T_WindowFunc:
-			retval = _copyWindowFunc(from);
 			break;
 		case T_SubscriptingRef:
 			retval = _copySubscriptingRef(from);
@@ -4418,9 +4315,6 @@ copyObjectImpl(const void *from)
 		case T_SortBy:
 			retval = _copySortBy(from);
 			break;
-		case T_WindowDef:
-			retval = _copyWindowDef(from);
-			break;
 		case T_RangeSubselect:
 			retval = _copyRangeSubselect(from);
 			break;
@@ -4468,9 +4362,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_GroupingSet:
 			retval = _copyGroupingSet(from);
-			break;
-		case T_WindowClause:
-			retval = _copyWindowClause(from);
 			break;
 		case T_RowMarkClause:
 			retval = _copyRowMarkClause(from);

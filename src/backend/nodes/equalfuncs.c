@@ -221,23 +221,6 @@ _equalGroupingFunc(const GroupingFunc *a, const GroupingFunc *b)
 }
 
 static bool
-_equalWindowFunc(const WindowFunc *a, const WindowFunc *b)
-{
-	COMPARE_SCALAR_FIELD(winfnoid);
-	COMPARE_SCALAR_FIELD(wintype);
-	COMPARE_SCALAR_FIELD(wincollid);
-	COMPARE_SCALAR_FIELD(inputcollid);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(aggfilter);
-	COMPARE_SCALAR_FIELD(winref);
-	COMPARE_SCALAR_FIELD(winstar);
-	COMPARE_SCALAR_FIELD(winagg);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalSubscriptingRef(const SubscriptingRef *a, const SubscriptingRef *b)
 {
 	COMPARE_SCALAR_FIELD(refcontainertype);
@@ -910,7 +893,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(utilityStmt);
 	COMPARE_SCALAR_FIELD(resultRelation);
 	COMPARE_SCALAR_FIELD(hasAggs);
-	COMPARE_SCALAR_FIELD(hasWindowFuncs);
 	COMPARE_SCALAR_FIELD(hasTargetSRFs);
 	COMPARE_SCALAR_FIELD(hasSubLinks);
 	COMPARE_SCALAR_FIELD(hasDistinctOn);
@@ -926,7 +908,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(groupDistinct);
 	COMPARE_NODE_FIELD(groupingSets);
 	COMPARE_NODE_FIELD(havingQual);
-	COMPARE_NODE_FIELD(windowClause);
 	COMPARE_NODE_FIELD(distinctClause);
 	COMPARE_NODE_FIELD(sortClause);
 	COMPARE_NODE_FIELD(limitOffset);
@@ -997,7 +978,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(groupClause);
 	COMPARE_SCALAR_FIELD(groupDistinct);
 	COMPARE_NODE_FIELD(havingClause);
-	COMPARE_NODE_FIELD(windowClause);
 	COMPARE_NODE_FIELD(valuesLists);
 	COMPARE_NODE_FIELD(sortClause);
 	COMPARE_NODE_FIELD(limitOffset);
@@ -1792,7 +1772,6 @@ _equalFuncCall(const FuncCall *a, const FuncCall *b)
 	COMPARE_NODE_FIELD(args);
 	COMPARE_NODE_FIELD(agg_order);
 	COMPARE_NODE_FIELD(agg_filter);
-	COMPARE_NODE_FIELD(over);
 	COMPARE_SCALAR_FIELD(agg_within_group);
 	COMPARE_SCALAR_FIELD(agg_star);
 	COMPARE_SCALAR_FIELD(agg_distinct);
@@ -1900,21 +1879,6 @@ _equalSortBy(const SortBy *a, const SortBy *b)
 	COMPARE_SCALAR_FIELD(sortby_dir);
 	COMPARE_SCALAR_FIELD(sortby_nulls);
 	COMPARE_NODE_FIELD(useOp);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalWindowDef(const WindowDef *a, const WindowDef *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_STRING_FIELD(refname);
-	COMPARE_NODE_FIELD(partitionClause);
-	COMPARE_NODE_FIELD(orderClause);
-	COMPARE_SCALAR_FIELD(frameOptions);
-	COMPARE_NODE_FIELD(startOffset);
-	COMPARE_NODE_FIELD(endOffset);
 	COMPARE_LOCATION_FIELD(location);
 
 	return true;
@@ -2160,27 +2124,6 @@ _equalGroupingSet(const GroupingSet *a, const GroupingSet *b)
 }
 
 static bool
-_equalWindowClause(const WindowClause *a, const WindowClause *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_STRING_FIELD(refname);
-	COMPARE_NODE_FIELD(partitionClause);
-	COMPARE_NODE_FIELD(orderClause);
-	COMPARE_SCALAR_FIELD(frameOptions);
-	COMPARE_NODE_FIELD(startOffset);
-	COMPARE_NODE_FIELD(endOffset);
-	COMPARE_SCALAR_FIELD(startInRangeFunc);
-	COMPARE_SCALAR_FIELD(endInRangeFunc);
-	COMPARE_SCALAR_FIELD(inRangeColl);
-	COMPARE_SCALAR_FIELD(inRangeAsc);
-	COMPARE_SCALAR_FIELD(inRangeNullsFirst);
-	COMPARE_SCALAR_FIELD(winref);
-	COMPARE_SCALAR_FIELD(copiedOrder);
-
-	return true;
-}
-
-static bool
 _equalRowMarkClause(const RowMarkClause *a, const RowMarkClause *b)
 {
 	COMPARE_SCALAR_FIELD(rti);
@@ -2376,9 +2319,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_GroupingFunc:
 			retval = _equalGroupingFunc(a, b);
-			break;
-		case T_WindowFunc:
-			retval = _equalWindowFunc(a, b);
 			break;
 		case T_SubscriptingRef:
 			retval = _equalSubscriptingRef(a, b);
@@ -2803,9 +2743,6 @@ equal(const void *a, const void *b)
 		case T_SortBy:
 			retval = _equalSortBy(a, b);
 			break;
-		case T_WindowDef:
-			retval = _equalWindowDef(a, b);
-			break;
 		case T_RangeSubselect:
 			retval = _equalRangeSubselect(a, b);
 			break;
@@ -2853,9 +2790,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_GroupingSet:
 			retval = _equalGroupingSet(a, b);
-			break;
-		case T_WindowClause:
-			retval = _equalWindowClause(a, b);
 			break;
 		case T_RowMarkClause:
 			retval = _equalRowMarkClause(a, b);

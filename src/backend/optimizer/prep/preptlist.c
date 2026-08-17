@@ -215,7 +215,6 @@ preprocess_targetlist(PlannerInfo *root)
 
 		vars = pull_var_clause((Node *) parse->returningList,
 							   PVC_RECURSE_AGGREGATES |
-							   PVC_RECURSE_WINDOWFUNCS |
 							   PVC_INCLUDE_PLACEHOLDERS);
 		foreach(l, vars)
 		{

@@ -603,14 +603,6 @@ LINE 1: CREATE TABLE t1 AS
                         ^
 ALTER TABLE t1 ADD COLUMN c text;
 ERROR:  relation "t1" does not exist
-SELECT a,
-       stddev(cast((SELECT sum(1) FROM generate_series(1,20) x) AS float4))
-          OVER (PARTITION BY a,b,c ORDER BY b)
-       AS z
-FROM t1;
-ERROR:  relation "t1" does not exist
-LINE 5: FROM t1;
-             ^
 DROP TABLE T;
 -- test that we account for missing columns without defaults correctly
 -- in expand_tuple, and that rows are correctly expanded for triggers

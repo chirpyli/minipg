@@ -282,8 +282,7 @@
      the <literal>RANGE</literal> <replaceable>offset</replaceable>
      <literal>PRECEDING</literal> and <literal>RANGE</literal>
      <replaceable>offset</replaceable> <literal>FOLLOWING</literal>
-     frame bound types (see <xref
-      linkend="syntax-window-functions"/>).  Fundamentally, the extra
+     frame bound types.  Fundamentally, the extra
      information provided is how to add or subtract an
      <replaceable>offset</replaceable> value in a way that is
      compatible with the family's data ordering.

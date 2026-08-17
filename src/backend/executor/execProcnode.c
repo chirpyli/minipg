@@ -109,7 +109,6 @@
 #include "executor/nodeTidscan.h"
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
-#include "executor/nodeWindowAgg.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 
@@ -313,11 +312,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_Agg:
 			result = (PlanState *) ExecInitAgg((Agg *) node,
 											   estate, eflags);
-			break;
-
-		case T_WindowAgg:
-			result = (PlanState *) ExecInitWindowAgg((WindowAgg *) node,
-													 estate, eflags);
 			break;
 
 		case T_Unique:
@@ -682,10 +676,6 @@ ExecEndNode(PlanState *node)
 
 		case T_AggState:
 			ExecEndAgg((AggState *) node);
-			break;
-
-		case T_WindowAggState:
-			ExecEndWindowAgg((WindowAggState *) node);
 			break;
 
 		case T_UniqueState:

@@ -2565,78 +2565,6 @@ cost_agg(Path *path, PlannerInfo *root,
 	path->total_cost = total_cost;
 }
 
-/*
- * cost_windowagg
- *		Determines and returns the cost of performing a WindowAgg plan node,
- *		including the cost of its input.
- *
- * Input is assumed already properly sorted.
- */
-void
-cost_windowagg(Path *path, PlannerInfo *root,
-			   List *windowFuncs, int numPartCols, int numOrderCols,
-			   Cost input_startup_cost, Cost input_total_cost,
-			   double input_tuples)
-{
-	Cost		startup_cost;
-	Cost		total_cost;
-	ListCell   *lc;
-
-	startup_cost = input_startup_cost;
-	total_cost = input_total_cost;
-
-	/*
-	 * Window functions are assumed to cost their stated execution cost, plus
-	 * the cost of evaluating their input expressions, per tuple.  Since they
-	 * may in fact evaluate their inputs at multiple rows during each cycle,
-	 * this could be a drastic underestimate; but without a way to know how
-	 * many rows the window function will fetch, it's hard to do better.  In
-	 * any case, it's a good estimate for all the built-in window functions,
-	 * so we'll just do this for now.
-	 */
-	foreach(lc, windowFuncs)
-	{
-		WindowFunc *wfunc = lfirst_node(WindowFunc, lc);
-		Cost		wfunccost;
-		QualCost	argcosts;
-
-		argcosts.startup = argcosts.per_tuple = 0;
-		add_function_cost(root, wfunc->winfnoid, (Node *) wfunc,
-						  &argcosts);
-		startup_cost += argcosts.startup;
-		wfunccost = argcosts.per_tuple;
-
-		/* also add the input expressions' cost to per-input-row costs */
-		cost_qual_eval_node(&argcosts, (Node *) wfunc->args, root);
-		startup_cost += argcosts.startup;
-		wfunccost += argcosts.per_tuple;
-
-		/*
-		 * Add the filter's cost to per-input-row costs.  XXX We should reduce
-		 * input expression costs according to filter selectivity.
-		 */
-		cost_qual_eval_node(&argcosts, (Node *) wfunc->aggfilter, root);
-		startup_cost += argcosts.startup;
-		wfunccost += argcosts.per_tuple;
-
-		total_cost += wfunccost * input_tuples;
-	}
-
-	/*
-	 * We also charge cpu_operator_cost per grouping column per tuple for
-	 * grouping comparisons, plus cpu_tuple_cost per tuple for general
-	 * overhead.
-	 *
-	 * XXX this neglects costs of spooling the data to disk when it overflows
-	 * work_mem.  Sooner or later that should get accounted for.
-	 */
-	total_cost += cpu_operator_cost * (numPartCols + numOrderCols) * input_tuples;
-	total_cost += cpu_tuple_cost * input_tuples;
-
-	path->rows = input_tuples;
-	path->startup_cost = startup_cost;
-	path->total_cost = total_cost;
-}
 
 /*
  * cost_group
@@ -4308,11 +4236,10 @@ cost_qual_eval_walker(Node *node, cost_qual_eval_context *context)
 				estimate_array_length(arraynode) * 0.5;
 		}
 	}
-	else if (IsA(node, Aggref) ||
-			 IsA(node, WindowFunc))
+	else if (IsA(node, Aggref))
 	{
 		/*
-		 * Aggref and WindowFunc nodes are (and should be) treated like Vars,
+		 * Aggref nodes are (and should be) treated like Vars,
 		 * ie, zero execution cost in the current model, because they behave
 		 * essentially like Vars at execution.  We disregard the costs of
 		 * their input expressions for the same reason.  The actual execution

@@ -74,7 +74,6 @@ typedef enum NodeTag
 	T_IncrementalSort,
 	T_Group,
 	T_Agg,
-	T_WindowAgg,
 	T_Unique,
 	T_Gather,
 	T_GatherMerge,
@@ -123,7 +122,6 @@ typedef enum NodeTag
 	T_IncrementalSortState,
 	T_GroupState,
 	T_AggState,
-	T_WindowAggState,
 	T_UniqueState,
 	T_GatherState,
 	T_GatherMergeState,
@@ -142,7 +140,6 @@ typedef enum NodeTag
 	T_Param,
 	T_Aggref,
 	T_GroupingFunc,
-	T_WindowFunc,
 	T_SubscriptingRef,
 	T_FuncExpr,
 	T_NamedArgExpr,
@@ -193,7 +190,6 @@ typedef enum NodeTag
 	 * with SubPlanState, which nodeSubplan.c has to modify.
 	 */
 	T_ExprState,
-	T_WindowFuncExprState,
 	T_SetExprState,
 	T_SubPlanState,
 	T_DomainConstraintState,
@@ -236,7 +232,6 @@ typedef enum NodeTag
 	T_AggPath,
 	T_GroupingSetsPath,
 	T_MinMaxAggPath,
-	T_WindowAggPath,
 	T_LockRowsPath,
 	T_ModifyTablePath,
 	T_LimitPath,
@@ -379,7 +374,6 @@ typedef enum NodeTag
 	T_TypeCast,
 	T_CollateClause,
 	T_SortBy,
-	T_WindowDef,
 	T_RangeSubselect,
 	T_RangeFunction,
 	T_RangeTableSample,
@@ -395,7 +389,6 @@ typedef enum NodeTag
 	T_WithCheckOption,
 	T_SortGroupClause,
 	T_GroupingSet,
-	T_WindowClause,
 	T_ObjectWithArgs,
 	T_AccessPriv,
 	T_CreateOpClassItem,
@@ -419,7 +412,6 @@ typedef enum NodeTag
 	T_TriggerData,				/* in commands/trigger.h */
 	T_EventTriggerData,			/* in commands/event_trigger.h */
 	T_ReturnSetInfo,			/* in nodes/execnodes.h */
-	T_WindowObjectData,			/* private in nodeWindowAgg.c */
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
 	T_InlineCodeBlock,			/* in nodes/parsenodes.h */
 	T_IndexAmRoutine,			/* in access/amapi.h */

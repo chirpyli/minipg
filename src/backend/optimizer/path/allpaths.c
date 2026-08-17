@@ -112,7 +112,6 @@ static bool subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 									  pushdown_safety_info *safetyInfo);
 static void check_output_expressions(Query *subquery,
 									pushdown_safety_info *safetyInfo);
-static bool targetIsInAllPartitionLists(TargetEntry *tle, Query *query);
 static bool qual_is_pushdown_safe(Query *subquery, Index rti,
 								  RestrictInfo *rinfo,
 								  pushdown_safety_info *safetyInfo);
@@ -2834,7 +2833,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 
 	/* Check points 3, 4, and 5 */
 	if (subquery->distinctClause ||
-		subquery->hasWindowFuncs ||
 		subquery->hasTargetSRFs)
 		safetyInfo->unsafeVolatile = true;
 
@@ -2921,41 +2919,7 @@ check_output_expressions(Query *subquery, pushdown_safety_info *safetyInfo)
 			continue;
 		}
 
-		/* If subquery uses window functions, check point 4 */
-		if (subquery->hasWindowFuncs &&
-			!targetIsInAllPartitionLists(tle, subquery))
-		{
-			/* not present in all PARTITION BY clauses, so mark it unsafe */
-			safetyInfo->unsafeColumns[tle->resno] = true;
-			continue;
-		}
 	}
-}
-
-
-/*
- * targetIsInAllPartitionLists
- *		True if the TargetEntry is listed in the PARTITION BY clause
- *		of every window defined in the query.
- *
- * It would be safe to ignore windows not actually used by any window
- * function, but it's not easy to get that info at this stage; and it's
- * unlikely to be useful to spend any extra cycles getting it, since
- * unreferenced window definitions are probably infrequent in practice.
- */
-static bool
-targetIsInAllPartitionLists(TargetEntry *tle, Query *query)
-{
-	ListCell   *lc;
-
-	foreach(lc, query->windowClause)
-	{
-		WindowClause *wc = (WindowClause *) lfirst(lc);
-
-		if (!targetIsInSortList(tle, InvalidOid, wc->partitionClause))
-			return false;
-	}
-	return true;
 }
 
 /*
@@ -3521,10 +3485,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			break;
 		case T_MinMaxAggPath:
 			ptype = "MinMaxAgg";
-			break;
-		case T_WindowAggPath:
-			ptype = "WindowAgg";
-			subpath = ((WindowAggPath *) path)->subpath;
 			break;
 		case T_LockRowsPath:
 			ptype = "LockRows";

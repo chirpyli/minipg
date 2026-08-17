@@ -93,7 +93,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	bool		is_column = (fn == NULL);
 	List	   *agg_order = (fn ? fn->agg_order : NIL);
 	Expr	   *agg_filter = NULL;
-	WindowDef  *over = (fn ? fn->over : NULL);
 	bool		agg_within_group = (fn ? fn->agg_within_group : false);
 	bool		agg_star = (fn ? fn->agg_star : false);
 	bool		agg_distinct = (fn ? fn->agg_distinct : false);
@@ -222,7 +221,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	 */
 	could_be_projection = (nargs == 1 && !proc_call &&
 						   agg_order == NIL && agg_filter == NULL &&
-						   !agg_star && !agg_distinct && over == NULL &&
+						   !agg_star && !agg_distinct &&
 						   !func_variadic && argnames == NIL &&
 						   list_length(funcname) == 1 &&
 						   (actual_arg_types[0] == RECORDOID ||
@@ -280,7 +279,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	if (proc_call &&
 		(fdresult == FUNCDETAIL_NORMAL ||
 		 fdresult == FUNCDETAIL_AGGREGATE ||
-		 fdresult == FUNCDETAIL_WINDOWFUNC ||
 		 fdresult == FUNCDETAIL_COERCION))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -340,12 +338,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 					 errmsg("FILTER specified, but %s is not an aggregate function",
 							NameListToString(funcname)),
 					 parser_errposition(pstate, location)));
-		if (over)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("OVER specified, but %s is not a window function nor an aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -382,12 +374,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("WITHIN GROUP is required for ordered-set aggregate %s",
-								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
-			if (over)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("OVER is not supported for ordered-set aggregate %s",
 								NameListToString(funcname)),
 						 parser_errposition(pstate, location)));
 			/* gram.y rejects DISTINCT + WITHIN GROUP */
@@ -515,25 +501,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 								NameListToString(funcname)),
 						 parser_errposition(pstate, location)));
 		}
-	}
-	else if (fdresult == FUNCDETAIL_WINDOWFUNC)
-	{
-		/*
-		 * True window functions must be called with a window definition.
-		 */
-		if (!over)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("window function %s requires an OVER clause",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-		/* And, per spec, WITHIN GROUP isn't allowed */
-		if (agg_within_group)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("window function %s cannot have WITHIN GROUP",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
 	}
 	else if (fdresult == FUNCDETAIL_COERCION)
 	{
@@ -758,7 +725,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 
 		retval = (Node *) funcexpr;
 	}
-	else if (fdresult == FUNCDETAIL_AGGREGATE && !over)
+	else if (fdresult == FUNCDETAIL_AGGREGATE)
 	{
 		/* aggregate function */
 		Aggref	   *aggref = makeNode(Aggref);
@@ -819,81 +786,13 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	}
 	else
 	{
-		/* window function */
-		WindowFunc *wfunc = makeNode(WindowFunc);
-
-		Assert(over);			/* lack of this was checked above */
-		Assert(!agg_within_group);	/* also checked above */
-
-		wfunc->winfnoid = funcid;
-		wfunc->wintype = rettype;
-		/* wincollid and inputcollid will be set by parse_collate.c */
-		wfunc->args = fargs;
-		/* winref will be set by transformWindowFuncCall */
-		wfunc->winstar = agg_star;
-		wfunc->winagg = (fdresult == FUNCDETAIL_AGGREGATE);
-		wfunc->aggfilter = agg_filter;
-		wfunc->location = location;
-
 		/*
-		 * agg_star is allowed for aggregate functions but distinct isn't
+		 * This branch is for aggregate functions (including plain aggregates
+		 * invoked as window functions); true window functions are no longer
+		 * supported (window function feature cropped).
 		 */
-		if (agg_distinct)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("DISTINCT is not implemented for window functions"),
-					 parser_errposition(pstate, location)));
-
-		/*
-		 * Reject attempt to call a parameterless aggregate without (*)
-		 * syntax.  This is mere pedantry but some folks insisted ...
-		 */
-		if (wfunc->winagg && fargs == NIL && !agg_star)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("%s(*) must be used to call a parameterless aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-
-		/*
-		 * ordered aggs not allowed in windows yet
-		 */
-		if (agg_order != NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("aggregate ORDER BY is not implemented for window functions"),
-					 parser_errposition(pstate, location)));
-
-		/*
-		 * FILTER is not yet supported with true window functions
-		 */
-		if (!wfunc->winagg && agg_filter)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("FILTER is not implemented for non-aggregate window functions"),
-					 parser_errposition(pstate, location)));
-
-		/*
-		 * Window functions can't either take or return sets
-		 */
-		if (pstate->p_last_srf != last_srf)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("window function calls cannot contain set-returning function calls"),
-					 errhint("You might be able to move the set-returning function into a LATERAL FROM item."),
-					 parser_errposition(pstate,
-										exprLocation(pstate->p_last_srf))));
-
-		if (retset)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-					 errmsg("window functions cannot return sets"),
-					 parser_errposition(pstate, location)));
-
-		/* parse_agg.c does additional window-func-specific processing */
-		transformWindowFuncCall(pstate, wfunc, over);
-
-		retval = (Node *) wfunc;
+		elog(ERROR, "unrecognized function detail result");
+		retval = NULL;
 	}
 
 	/* if it returns a set, remember it for error checks at higher levels */
@@ -1706,9 +1605,6 @@ func_get_detail(List *funcname,
 				break;
 			case PROKIND_PROCEDURE:
 				result = FUNCDETAIL_PROCEDURE;
-				break;
-			case PROKIND_WINDOW:
-				result = FUNCDETAIL_WINDOWFUNC;
 				break;
 			default:
 				elog(ERROR, "unrecognized prokind: %c", pform->prokind);

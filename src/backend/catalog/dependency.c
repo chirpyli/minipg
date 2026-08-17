@@ -1832,14 +1832,6 @@ find_expr_references_walker(Node *node,
 						   context->addrs);
 		/* fall through to examine arguments */
 	}
-	else if (IsA(node, WindowFunc))
-	{
-		WindowFunc *wfunc = (WindowFunc *) node;
-
-		add_object_address(OCLASS_PROC, wfunc->winfnoid, 0,
-						   context->addrs);
-		/* fall through to examine arguments */
-	}
 	else if (IsA(node, SubscriptingRef))
 	{
 		SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -2011,22 +2003,6 @@ find_expr_references_walker(Node *node,
 			add_object_address(OCLASS_OPERATOR, sgc->sortop, 0,
 							   context->addrs);
 		return false;
-	}
-	else if (IsA(node, WindowClause))
-	{
-		WindowClause *wc = (WindowClause *) node;
-
-		if (OidIsValid(wc->startInRangeFunc))
-			add_object_address(OCLASS_PROC, wc->startInRangeFunc, 0,
-							   context->addrs);
-		if (OidIsValid(wc->endInRangeFunc))
-			add_object_address(OCLASS_PROC, wc->endInRangeFunc, 0,
-							   context->addrs);
-		if (OidIsValid(wc->inRangeColl) &&
-			wc->inRangeColl != DEFAULT_COLLATION_OID)
-			add_object_address(OCLASS_COLLATION, wc->inRangeColl, 0,
-							   context->addrs);
-		/* fall through to examine substructure */
 	}
 	else if (IsA(node, Query))
 	{

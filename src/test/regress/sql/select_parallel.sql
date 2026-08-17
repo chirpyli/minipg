@@ -363,12 +363,6 @@ set force_parallel_mode = 1;
 select count(*) from tenk1;
 reset force_parallel_mode;
 
--- Window function calculation can't be pushed to workers.
-explain (costs off, verbose)
-  select count(*) from tenk1 a where (unique1, two) in
-    (select unique1, row_number() over() from tenk1 b);
-
-
 -- LIMIT/OFFSET within sub-selects can't be pushed to workers.
 explain (costs off)
   select * from tenk1 a where two in

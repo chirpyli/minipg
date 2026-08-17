@@ -161,9 +161,8 @@ CREATE AGGREGATE avg (float8)
    Aggregate functions can optionally support <firstterm>moving-aggregate
    mode</firstterm>, which allows substantially faster execution of aggregate
    functions within windows with moving frame starting points.
-   (See <xref linkend="tutorial-window"/>
-   and <xref linkend="syntax-window-functions"/> for information about use of
-   aggregate functions as window functions.)
+   (See the documentation about use of aggregate functions as window
+   functions.)
    The basic idea is that in addition to a normal <quote>forward</quote>
    transition function, the aggregate provides an <firstterm>inverse
    transition function</firstterm>, which allows rows to be removed from the

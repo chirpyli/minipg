@@ -479,7 +479,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_HASHED_SCALARARRAYOP,
 		&&CASE_EEOP_AGGREF,
 		&&CASE_EEOP_GROUPING_FUNC,
-		&&CASE_EEOP_WINDOW_FUNC,
 		&&CASE_EEOP_SUBPLAN,
 		&&CASE_EEOP_AGG_STRICT_DESERIALIZE,
 		&&CASE_EEOP_AGG_DESERIALIZE,
@@ -1536,21 +1535,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex/uncommon for an inline implementation */
 			ExecEvalGroupingFunc(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_WINDOW_FUNC)
-		{
-			/*
-			 * Like Aggref, just return a precomputed value from the econtext.
-			 */
-			WindowFuncExprState *wfunc = op->d.window_func.wfstate;
-
-			Assert(econtext->ecxt_aggvalues != NULL);
-
-			*op->resvalue = econtext->ecxt_aggvalues[wfunc->wfuncno];
-			*op->resnull = econtext->ecxt_aggnulls[wfunc->wfuncno];
 
 			EEO_NEXT();
 		}

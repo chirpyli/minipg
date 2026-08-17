@@ -41,21 +41,6 @@ ORDER BY month
 SELECT v, h, string_agg(c, E'\n') FROM ctv_data GROUP BY v, h ORDER BY 1,2,3
  \crosstabview 1 2 3
 
--- horizontal ASC order from window function
-SELECT v,h, string_agg(c, E'\n') AS c, row_number() OVER(ORDER BY h) AS r
-FROM ctv_data GROUP BY v, h ORDER BY 1,3,2
- \crosstabview v h c r
-
--- horizontal DESC order from window function
-SELECT v, h, string_agg(c, E'\n') AS c, row_number() OVER(ORDER BY h DESC) AS r
-FROM ctv_data GROUP BY v, h ORDER BY 1,3,2
- \crosstabview v h c r
-
--- horizontal ASC order from window function, NULLs pushed rightmost
-SELECT v,h, string_agg(c, E'\n') AS c, row_number() OVER(ORDER BY h NULLS LAST) AS r
-FROM ctv_data GROUP BY v, h ORDER BY 1,3,2
- \crosstabview v h c r
-
 -- only null, no column name, 2 columns: error
 SELECT null,null \crosstabview
 

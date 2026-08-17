@@ -3165,65 +3165,6 @@ create_minmaxagg_path(PlannerInfo *root,
 	return pathnode;
 }
 
-/*
- * create_windowagg_path
- *	  Creates a pathnode that represents computation of window functions
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'target' is the PathTarget to be computed
- * 'windowFuncs' is a list of WindowFunc structs
- * 'winclause' is a WindowClause that is common to all the WindowFuncs
- *
- * The input must be sorted according to the WindowClause's PARTITION keys
- * plus ORDER BY keys.
- */
-WindowAggPath *
-create_windowagg_path(PlannerInfo *root,
-					  RelOptInfo *rel,
-					  Path *subpath,
-					  PathTarget *target,
-					  List *windowFuncs,
-					  WindowClause *winclause)
-{
-	WindowAggPath *pathnode = makeNode(WindowAggPath);
-
-	pathnode->path.pathtype = T_WindowAgg;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = target;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	pathnode->path.parallel_safe = rel->consider_parallel &&
-		subpath->parallel_safe;
-	pathnode->path.parallel_workers = subpath->parallel_workers;
-	/* WindowAgg preserves the input sort order */
-	pathnode->path.pathkeys = subpath->pathkeys;
-
-	pathnode->subpath = subpath;
-	pathnode->winclause = winclause;
-
-	/*
-	 * For costing purposes, assume that there are no redundant partitioning
-	 * or ordering columns; it's not worth the trouble to deal with that
-	 * corner case here.  So we just pass the unmodified list lengths to
-	 * cost_windowagg.
-	 */
-	cost_windowagg(&pathnode->path, root,
-				   windowFuncs,
-				   list_length(winclause->partitionClause),
-				   list_length(winclause->orderClause),
-				   subpath->startup_cost,
-				   subpath->total_cost,
-				   subpath->rows);
-
-	/* add tlist eval cost for each output row */
-	pathnode->path.startup_cost += target->cost.startup;
-	pathnode->path.total_cost += target->cost.startup +
-		target->cost.per_tuple * pathnode->path.rows;
-
-	return pathnode;
-}
 
 
 

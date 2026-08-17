@@ -1183,7 +1183,6 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 	if (query->commandType != CMD_SELECT ||
 		query->hasAggs ||
 		query->groupingSets ||
-		query->hasWindowFuncs ||
 		query->hasTargetSRFs ||
 		query->havingQual ||
 		query->limitOffset ||
@@ -1233,7 +1232,6 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 	 */
 	query->targetList = NIL;
 	query->groupClause = NIL;
-	query->windowClause = NIL;
 	query->distinctClause = NIL;
 	query->sortClause = NIL;
 	query->hasDistinctOn = false;
@@ -2266,13 +2264,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 					agg->aggParams = aggcontext.paramids;
 				}
 			}
-			break;
-
-		case T_WindowAgg:
-			finalize_primnode(((WindowAgg *) plan)->startOffset,
-							  &context);
-			finalize_primnode(((WindowAgg *) plan)->endOffset,
-							  &context);
 			break;
 
 		case T_Gather:

@@ -3466,7 +3466,6 @@ estimate_num_groups(PlannerInfo *root, List *groupExprs, double input_rows,
 		 */
 		varshere = pull_var_clause(groupexpr,
 								   PVC_RECURSE_AGGREGATES |
-								   PVC_RECURSE_WINDOWFUNCS |
 								   PVC_RECURSE_PLACEHOLDERS);
 
 		/*

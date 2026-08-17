@@ -332,24 +332,6 @@ typedef struct GroupingFunc
 } GroupingFunc;
 
 /*
- * WindowFunc
- */
-typedef struct WindowFunc
-{
-	Expr		xpr;
-	Oid			winfnoid;		/* pg_proc Oid of the function */
-	Oid			wintype;		/* type Oid of result of the window function */
-	Oid			wincollid;		/* OID of collation of result */
-	Oid			inputcollid;	/* OID of collation that function should use */
-	List	   *args;			/* arguments to the window function */
-	Expr	   *aggfilter;		/* FILTER expression, if any */
-	Index		winref;			/* index of associated WindowClause */
-	bool		winstar;		/* true if argument list was really '*' */
-	bool		winagg;			/* is function a simple aggregate? */
-	int			location;		/* token location, or -1 if unknown */
-} WindowFunc;
-
-/*
  * SubscriptingRef: describes a subscripting operation over a container
  * (array, etc).
  *
