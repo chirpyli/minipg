@@ -313,7 +313,6 @@ typedef enum NodeTag
 	T_CreateFunctionStmt,
 	T_AlterFunctionStmt,
 	T_DoStmt,
-	T_RenameStmt,
 	T_RuleStmt,
 	T_TransactionStmt,
 	T_ViewStmt,

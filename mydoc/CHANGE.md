@@ -6,6 +6,27 @@
 
 ---
 
+## GSSAPI 功能彻底裁剪（2026-08-17）
+
+minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `configure.ac`/`configure` 的 GSS 探测，但源码层仍残留由 `#ifdef ENABLE_GSS` 包裹的死代码，以及若干**无条件编译**的 GSS 协议/状态残留。本次彻底删除 GSS 功能相关代码（无构建开关，ENABLE_GSS 宏始终未定义，故所有 `#ifdef ENABLE_GSS` 块为编译期死代码）。改动文件与要点：
+
+- **`src/backend/utils/activity/backend_status.c`**：删除全部 7 处 `#ifdef ENABLE_GSS ... #else ... #endif` 块（GSS 共享状态缓冲的声明/估算/创建、pgstat_bestart 的 GSS 局部变量与状态填充、pgstat_read_current_status 的 GSS 快照拷贝）；`st_gss` 改为无条件 `false`（原 if/else 的 else 分支）。
+- **`src/include/utils/backend_status.h`**：删除 `PgBackendGSSStatus` 结构体定义，及 `PgBackendStatus` 中的 `st_gss`/`st_gssstatus` 字段。
+- **`src/backend/postmaster/postmaster.c`**：`ProcessStartupPacket()` 去掉 `gss_done` 参数；删除 `NEGOTIATE_GSS_CODE` 协商分支（原 1740-1781 行）；SSL 分支成功后不再置 `gss_done`；部分长度检查去掉 `!gss_done` 条件；调用点同步去掉实参。
+- **`src/backend/utils/adt/pgstatfuncs.c`**：`pg_stat_get_activity()` 的 GSS 信息读取分支改为无条件填 `false`/`null`（gss_auth/gss_princ/gss_enc 三列）。
+- **`src/interfaces/libpq/fe-auth.c`**：删除 `AUTH_REQ_GSS`/`AUTH_REQ_GSS_CONT`/`AUTH_REQ_SSPI` 三个 case（落到 default，报 "not supported"）。
+- **`src/interfaces/libpq/fe-connect.c`**：删除两处 `CONNECTION_GSS_STARTUP` case（poll 分支与 unreachable 分支）。
+- **`src/interfaces/libpq/libpq-fe.h`**：删除 `CONNECTION_GSS_STARTUP` 枚举项。
+- **`src/include/utils/wait_event.h` + `src/backend/utils/activity/wait_event.c`**：删除 `WAIT_EVENT_GSS_OPEN_SERVER` 枚举项与对应 case。
+- **`src/include/libpq/pqcomm.h`**：删除 `NEGOTIATE_GSS_CODE` 宏（已无引用点）；更新注释去掉 GSSAPI 提及。保留 `AUTH_REQ_GSS`/`AUTH_REQ_GSS_CONT` 协议常量号（7/8，未使用，保留以维持 auth 请求类型枚举布局稳定）。
+- **`src/tools/pgindent/typedefs.list`**：删除已不存在的 `PgBackendGSSStatus` 类型。
+- **`src/test/postmaster/t/004_negotiate.pl`**：整文件删除（专测 SSL/GSS 组合协商，依赖已删的 `NEGOTIATE_GSS_CODE`）。
+- **`src/test/README`**：kerberos 测试说明去掉 GSSAPI 字样。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；`make -j4` 全量重编通过（0 错误）。
+
+---
+
 ## 一、平台 / 构建链裁剪
 
 - **（2026-07-30 前）仅支持 Linux，移除 Windows/Cygwin/MSVC 代码**：删除 `src/backend/port/win32/`、`src/include/port/win32*/`、`src/tools/msvc/`、`src/bin/pgevent/`、各 `win32*.c`、模板/构建脚本（`template/win32|cygwin`、`makefiles/Makefile.win32|cygwin`、`tools/win32tzlist.pl`），清理 `configure.ac`/`Makefile.global.in`/ecpg 等处的 `WIN32`/`_MSC_VER`/`__CYGWIN__` 条件分支；后续又两轮清理 backend 核心高风险文件的 WIN32 死代码（latch.c 的 `WAIT_USE_WIN32` 路径、pg_locale.c、elog.c 的 eventlog、varlena.c、fd.c、auth.c 的 winldap 等）。`./configure`+`make`+`make check-world` 通过。
@@ -18,6 +39,70 @@
 - **（2026-08-13）物理流复制全链路裁剪**：删除 `walsender/walreceiver/walreceiverfuncs/slot/slotfuncs/syncrep/basebackup/backup_manifest` 及 `libpqwalreceiver/` 与 replnodes；保留 archive 恢复 + hot standby 只读；`synchronous_commit` 退化为无操作。`make check` 全 103 项通过。续2 补裁 xlog.c 复制槽 LSN 边界死代码与 3 个孤儿 LWLocks，修复 `src/backend/Makefile` 对已删 `replication` 目录的引用。
 - **（2026-08-12 续16）删除客户端 `pg_basebackup`**：`git rm -r src/bin/pg_basebackup`；连带禁用依赖它的 recovery/commit_ts/pg_rewind 测试。`PostgresNode.pm` 的 backup 方法保留为死 helper。
 - **（2026-08-15）放弃 PG13 之前兼容**：删除 `AdjustUpgrade.pm`（死代码）与 psql 中 `pset.sversion < 阈值` 的旧版降级分支，仅保留 PG14 路径。
+- **（2026-08-17）彻底裁剪 Unix 域套接字（Unix-domain socket），并补充裁剪 IPv6 监听/连接层**：本地与网络监听仅保留 IPv4 TCP 通道，不再创建 `.s.PGSQL.<port>` 套接字文件、不再监听 IPv6 地址，但 IPv6 地址数据（inet/cidr）仍可正常入库（数据类型层不依赖 `HAVE_IPV6`）。采用「构建系统开关 + 源码清理」两段式，与上游 PG 在 Windows 下不支持 Unix socket / IPv6 的原生裁剪路径一致：
+  - **构建系统层**：`configure.ac` 注释掉 `PGAC_STRUCT_SOCKADDR_UN`（使 `HAVE_STRUCT_SOCKADDR_UN` 不定义）与 `AC_CHECK_TYPE([struct sockaddr_in6]...)`（使 `HAVE_IPV6` 不定义）；用 `autoconf2.69` 重新生成 `configure` 并重跑，使 `pg_config.h` 不再定义这两宏。由此 `c.h` 的 `HAVE_UNIX_SOCKETS`（由 `HAVE_STRUCT_SOCKADDR_UN` 推导）不生效，`IS_AF_UNIX()` 宏恒为假，所有 `#ifdef HAVE_UNIX_SOCKETS` / `#ifdef HAVE_IPV6` 分支在编译期消除。
+  - **后端 GUC 清理（`guc.c`）**：删除 `unix_socket_directories` / `unix_socket_permissions` / `unix_socket_group` 三个 GUC 注册块（含默认值段）、`show_unix_socket_permissions` 前向声明与函数定义；`postmaster.h` 删除三个 extern 变量声明。
+  - **后端 server 端**：`postmaster.c` 删除 `Unix_socket_directories` 变量声明、`#ifdef HAVE_UNIX_SOCKETS` 的整个 Unix socket 监听块（StreamServerPort(AF_UNIX) 调用）、`getopt` 字符串移除 `k:` 选项与 `-k` case、调用 `SetConfigOption("unix_socket_directories"...)` 的分支；`postgres.c`（单用户后端）同步移除 `k:` 与 `-k` case；`pqcomm.c` 将 `Unix_socket_permissions` / `Unix_socket_group` 变量定义连同 `Lock_AF_UNIX`/`Setup_AF_UNIX` 两个函数及其全部 `#ifdef HAVE_UNIX_SOCKETS` 引用分支直接删除（不再依赖宏跳过，代码已无残留条件编译）。
+  - **后端口径函数（`pgstatfuncs.c`）**：用 `#ifndef HAVE_UNIX_SOCKETS` 包裹裸 `AF_UNIX` 的 `else if` 分支与 `case AF_UNIX:`（系统头仍定义 `AF_UNIX` 常量，裁后不可达，显式隔离避免混淆）；`#ifdef HAVE_IPV6` 包裹的 `AF_INET6` 分支随宏自动消失。
+  - **客户端/工具端**：`fe-connect.c` 默认 host 填 `DEFAULT_PGSOCKET_DIR` 的 `#ifdef HAVE_UNIX_SOCKETS` 块与 `AF_INET6`/`IS_AF_UNIX`/`CHT_UNIX_SOCKET` 分支均随宏消除；`fe-misc.c` 用 `#ifndef HAVE_UNIX_SOCKETS` 包裹裸 `AF_UNIX` 的 NODELAY 对齐分支；`psql/prompt.c` 用 `#ifndef HAVE_UNIX_SOCKETS` 包裹裸 `DEFAULT_PGSOCKET_DIR` 比较；`initdb.c` 删除 `#unix_socket_directories` 默认配置片段（GUC 已删）；`pg_regress.c` 移除在无 Unix socket 且非 SSPI 平台触发的 `#error Platform has no means to secure the test installation.`（改为 TCP-only 注释说明，minipg 测试实例走 localhost 依赖文件权限隔离）。`is_unixsock_path()`（pqcomm.h 的 static inline，恒返回路径判断，无编译错误）在 command.c/prompt.c/fe-connect.c 的调用保留（裁剪后 hostname 为 TCP host，行为正确）。
+  - **配置样例与测试框架**：`postgresql.conf.sample` 删除三个已删 GUC 的注释行；`PostgresNode.pm` 在 `$use_tcp` 分支不再写已删的 `unix_socket_directories = ''`，standby 配置移除 unix socket 分支（minipg 恒走 TCP）；`001_start_stop.pl` 的 unix 分支在 minipg 下不触发（`use_unix_sockets=false`），保留为死路径不报错。`DEFAULT_PGSOCKET_DIR` 常量（pg_config_manual.h）保留以避免牵动无关代码。
+  - **验证**：后端 `make -j4` 与 client 端（libpq/psql/initdb/pg_regress）均 0 错误 0 新增 unused 警告；`pg_regress` 编译通过（`#error` 已消除）。注意 `src/backend` 全量编译仍报 `objectaddress.c` 的 `OBJECT_CONSTRAINT`/`AuthIdRelationId` 等错误——此为会话开始时 git_status 已记录的 minipg 历史裁剪残留（pg_authid/约束 catalog 早裁），与本次 Unix socket 裁剪无关、非本次引入。与不可裁部分（btree/hash 索引、事务）零耦合：`HAVE_IPV6` 仅消除监听/连接侧 v6，inet/cidr 的 `ipaddr[16]`/`PGSQL_AF_INET6` 仍无条件存 128 位 IPv6 地址，btree 索引与事务机制均不受影响。
+- **（2026-08-17 补）`pqcomm.c` 二次清理：删除 `HAVE_UNIX_SOCKETS` 条件编译而非宏跳过**：前述 08-17 初次裁剪把 `Unix_socket_permissions`/`Unix_socket_group` 变量定义与 `Lock_AF_UNIX`/`Setup_AF_UNIX` 仍留在 `#ifdef HAVE_UNIX_SOCKETS` 块内（宏关闭时靠编译器消除）。本次按"直接裁剪代码而非条件编译"的要求，将 pqcomm.c 中所有 `HAVE_UNIX_SOCKETS` 块**整块删除**：① 前向声明 ifdef（Lock_AF_UNIX/Setup_AF_UNIX）② `StreamServerPort` 内的 `unixSocketPath` 局部变量 ifdef ③ `if (family == AF_UNIX) {...} else` 分支（仅留 TCP 路径）④ `case AF_UNIX` ⑤ `addrDesc = unixSocketPath` 的 ifdef ⑥ `Setup_AF_UNIX(service)` 调用块 ⑦ Unix socket 监听日志 ifdef ⑧ `Lock_AF_UNIX`+`Setup_AF_UNIX` 整函数定义。`StreamServerPort` 的 `unixSocketDir` 参数保留（公开 API 签名，避免牵动调用方 postmaster.c），PG flags 不启 `-Wunused-parameter` 故无警告；`sock_paths` 列表相关 `TouchSocketFiles`/`RemoveSocketFiles` 因不再有 append 而恒为空循环，保留为通用锁文件清理接口（无害）。编译验证：`make` libpq 目录 0 错误 0 警告。
+- **（2026-08-17 续）全代码库彻底删除 `HAVE_UNIX_SOCKETS` 条件编译（仅支持 TCP）**：前述各次裁剪仍保留了大量 `#ifdef HAVE_UNIX_SOCKETS` / `#ifndef HAVE_UNIX_SOCKETS` 预处理块（宏关闭时惰式跳过）。本次按"直接裁剪代码而非条件编译"的要求，对全代码库所有 `HAVE_UNIX_SOCKETS` 引用逐文件整块删除，使代码中再无任何该宏的条件编译：
+  - **`src/include/c.h`**：删除 `HAVE_STRUCT_SOCKADDR_UN` → `HAVE_UNIX_SOCKETS` 的宏推导块（minipg 不再探测 sockaddr_un，该宏永不被定义）。
+  - **`src/include/common/ip.h`**：`IS_AF_UNIX(fam)` 宏不再用 ifdef 包裹，直接定义为恒假 `(0)`（minipg 仅 TCP）。
+  - **`src/common/ip.c`**：删除 `getaddrinfo_unix`/`getnameinfo_unix` 前向声明与整函数定义（约 130 行），以及 `pg_getaddrinfo_all`/`pg_freeaddrinfo_all`/`pg_getnameinfo_all` 中的 `AF_UNIX` 分支（仅留 IPv4/IPv6 的 getaddrinfo/getnameinfo 路径）。
+  - **`src/backend/utils/adt/pgstatfuncs.c`**：删除 `pg_stat_get_activity` 中 `else if (AF_UNIX)` 分支与 `pg_stat_get_backend_client_port` 中 `case AF_UNIX`（连同 `#ifndef` 包裹），AF_UNIX 连接现落入 `else`/default 分支（置 NULL/-1）。
+  - **`src/backend/postmaster/pgstat.c`**：删除 `pgstat_bestart` 中 ignore `AF_UNIX` 的 `#ifdef` 块（后续 `if (++tries > 1)` 直接保留）。
+  - **`src/interfaces/libpq/fe-misc.c`**：删除 `pqPutMsgEnd` 中 `if (raddr==AF_UNIX) toSend -= toSend%8192` 的 `#ifndef` 包裹（该分支不可达，整块删除）。
+  - **`src/interfaces/libpq/fe-connect.c`**：删除 `is_unixsock_path` 赋值 `CHT_UNIX_SOCKET`、`default host` 填 `DEFAULT_PGSOCKET_DIR` 的 `#ifdef` 块（仅留 `DefaultHost`）、`emitHostIdentityInfo` 的 Unix socket 分支、`connectDBComplete` 连接错误提示的 Unix socket 分支、`case CHT_UNIX_SOCKET:` 整 case（含 `UNIXSOCK_PATH`/`pg_getaddrinfo_all(NULL,...)`）。
+  - **`src/interfaces/libpq/libpq-int.h`**：删除 `ConnHostType` 枚举的 `CHT_UNIX_SOCKET` 成员（`fe-connect.c` 已不再赋值，成为死枚举值）。
+  - **`src/bin/psql/prompt.c`**：删除主机名与 `DEFAULT_PGSOCKET_DIR` 比较的 `#ifndef` 包裹（该比较不可达，整块删除）。
+  - **`src/bin/initdb/initdb.c`**：删除无调用点的 `filter_lines_with_token` 前向声明与函数定义（该 `#ifndef` 块原用于过滤已删除的 unix_socket_directories 配置）。
+  - **`src/test/regress/pg_regress.c`**：删除 `temp_sockdir`/`sockself`/`socklock` 变量声明、`remove_temp`/`signal_remove_temp`/`make_temp_sockdir` 整函数块（Unix socket 临时目录）、PGHOST 设置与默认 host 报告中的 Unix socket 分支（`use_unix_sockets` 直接置 `false`，PGHOST 恒为 hostname/localhost，测试实例仅走 TCP localhost）、`#elif !HAVE_UNIX_SOCKETS` 注释块；端口选择注释去除对已删宏的引用。
+  - **保留项（非条件编译，改动会引发不必要风险，且不影响 TCP-only 行为）**：`DEFAULT_PGSOCKET_DIR` 常量（`pg_config_manual.h` 无条件定义）、`is_unixsock_path()`（pqcomm.h 的 static inline，被 command.c/prompt.c/fe-connect.c 调用，仅作路径判断，minipg 下 hostname 为 TCP host 行为正确）；`sock_paths` 相关 `TouchSocketFiles`/`RemoveSocketFiles`（恒为空循环，通用锁文件清理接口）。
+  - **验证**：`make` 全量重编 common / libpq / psql / initdb / pg_regress（含 `pg_regress.o`）/ backend 的 pgstatfuncs.o / pgstat.o / pqcomm.o 均 0 错误；仅有与本次无关的既有 warning（`no previous prototype`、`/* within comment`，来自 minipg 历史裁剪残留）。全代码库 `grep HAVE_UNIX_SOCKETS` 仅剩 `configure.ac` 的注释（已注释掉 `PGAC_STRUCT_SOCKADDR_UN`，无害）与 pg_regress.c 一处说明性注释（已改写为 TCP localhost 描述）。与不可裁部分（btree/hash 索引、事务）零耦合。
+
+- **（2026-08-17 续）深度裁剪 `pqcomm.c` 的 IPv6 监听专用代码 + 强制 `AF_INET`（仅支持 IPv4）**：在 08-17 已使 `HAVE_IPV6` 宏编译期不定义、且 08-17 记录「ifaddr.c/pqcomm.c 中 `#ifdef HAVE_IPV6` 块因宏未定义而编译期不生效、作为源码噪音保留」的基础上，本轮按"直接裁剪代码而非条件编译"的要求，真正删除 pqcomm.c 中两处 IPv6 专用块，并让监听从 `AF_UNSPEC` 改为强制 `AF_INET`，从源头只解析/绑定 IPv4：
+  - **`src/backend/libpq/pqcomm.c`**：
+    1. 删除 `switch(addr->ai_family)` 中 `#ifdef HAVE_IPV6` 的 `case AF_INET6:`（IPv6 log 描述分支，`familyDesc = _("IPv6")`）。
+    2. 删除 `#ifdef IPV6_V6ONLY` 的 `setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, ...)` 块（IPv6 双栈隔离，IPv4 监听无需）。
+    3. 更新 `StreamServerPort` 注释 `family should be AF_UNIX or AF_UNSPEC` → `family should be AF_UNIX or AF_INET`，与代码一致。
+  - **`src/backend/postmaster/postmaster.c`**：`listen_addresses` 的两个 `StreamServerPort(AF_UNSPEC, ...)` 调用（含 `"*"` 与本机 host 两分支）改为 `StreamServerPort(AF_INET, ...)`，使 getaddrinfo 只返回 IPv4 地址，不再尝试创建/绑定 IPv6 socket。
+  - **验证**：`pqcomm.c`/`postmaster.c` 编译 0 错误（残余 warning 均为与本次无关的既有项：`signal.h unused-includes`、`objectaddress.c` 等历史裁剪残留）；全代码库 `grep AF_UNSPEC` 在后端监听路径已无残留（`pgstat.c` 出站连接与 `ifaddr.c` 内仍保留，前者为统计收集器出站、后者被 `#ifdef HAVE_IPV6` 包裹编译期跳过，二者均不影响"仅监听 IPv4"诉求，按最小改动保留）。与不可裁部分（btree/hash 索引、事务）零耦合：`HAVE_IPV6` 仅作用于监听/连接侧 v6，`inet/cidr` 数据类型层此前已删除；btree/hash 索引与事务机制不受影响。
+
+- **（2026-08-17 续）深度裁剪 `pgstatfuncs.c` 的 IPv6 统计展示残骸 + 删除孤立 `clean_ipv6_addr`（adt 层 IPV6 彻底消失）**：在 08-17 已使 `HAVE_IPV6` 宏在编译期不定义（监听/连接侧 v6 消除）的基础上，本轮清理**源码层**仍残留的 IPV6 死代码，使 adt 统计层真正只支持 IPv4：
+  - **`src/backend/utils/adt/pgstatfuncs.c`**（3 处 `#ifdef HAVE_IPV6` 残骸 + 2 处死调用）：
+    1. `pg_stat_get_activity()` 的客户端地址判断 `if (... == AF_INET #ifdef HAVE_IPV6 || ... == AF_INET6 #endif)` 简化为纯 `if (... == AF_INET)`。
+    2. 同函数 `clean_ipv6_addr(...)` 调用删除（IPV4 场景无需清理 `%zone` 后缀）。
+    3. `pg_stat_get_backend_client_addr()` 的 `switch` 中 `case AF_INET6:`（含 `#ifdef`）删除，仅留 `case AF_INET:`。
+    4. 同函数 `clean_ipv6_addr(...)` 调用删除。
+    5. `pg_stat_get_backend_client_port()` 的 `switch` 中 `case AF_INET6:`（含 `#ifdef`）删除，仅留 `case AF_INET:`。
+  - **删除孤立死代码文件 `src/backend/utils/adt/ipaddr.c`**：该文件此时只剩 `clean_ipv6_addr()` 一个函数（inet/cidr 类型与 hba.c 早已在 minipg 中删除，原注释「still used by hba.c」已失效），`pgstatfuncs.c` 是其唯一调用者，本次调用点删除后该函数成为纯死代码。`git rm` 该文件；`src/backend/utils/adt/Makefile` 移除 `ipaddr.o`；`src/include/utils/builtins.h` 删除 `extern void clean_ipv6_addr(int addr_family, char *addr);` 声明。
+  - **验证**：`pgstatfuncs.o` 编译 0 错误（残余 `-Wunused-function` 为改动前既有的 `pg_stat_get_backend_client_addr` 等未被直接调用的注册式函数告警，非本次引入）；全代码库 `grep clean_ipv6_addr` 0 命中；`make` 后端 adt 子目录无 `ipaddr.o` 构建规则（符合预期）。与不可裁部分（btree/hash 索引、事务）零耦合：`HAVE_IPV6` 仅消除监听/连接/统计展示侧 v6，`inet/cidr` 数据类型层此前已删除、与其无关；btree/hash 索引与事务机制不受影响。注：网络核心层 `ifaddr.c`/`pqcomm.c` 中剩余 `#ifdef HAVE_IPV6` 块因宏永久不定义而**编译期不生效**，作为源码噪音保留（按 08-17 既定「构建系统开关 + 源码清理」两段式方案，未为代码整洁而冒险逐行删除公开接口 `ifaddr.h` 的 IPV6 分支）。
+
+- **（2026-08-17 续）彻底裁剪 `USE_SSL` 残余 SSL 代码（后端活动状态 / 统计层）**：此前 08-02 已删 `be-secure-openssl`/`fe-secure-openssl` 与 `pg_stat_ssl` 视图，但后端 `PgBackendStatus` 仍保留 `USE_SSL` 条件编译的 SSL 字段与独立 `PgBackendSSLStatus` 结构体、`BackendSslStatusBuffer` 共享内存段，且 `pg_stat_get_activity` 仍输出 7 个 SSL 列（ssl/sslversion/sslcipher/sslbits/ssl_client_dn/ssl_client_serial/ssl_issuer_dn）。本次彻底移除：
+  - `src/include/utils/backend_status.h`：删除 `PgBackendSSLStatus` 结构体定义、`PgBackendStatus` 的 `st_ssl`(`bool`) 与 `st_sslstatus`(`PgBackendSSLStatus *`) 字段；保留 `PgBackendGSSStatus`/`st_gss`/`st_gssstatus`（GSSAPI 与 SSL 解耦）。
+  - `src/backend/utils/activity/backend_status.c`：删除 5 处 `#ifdef USE_SSL` 块——全局 `BackendSslStatusBuffer` 变量、`SizeBackendStatusArray` 的 SSL 共享内存大小累加、`BackendStatusShmemInit` 的 SSL 段分配与 `st_sslstatus` 指针初始化、`pgstat_report_activity` 的 `lsslstatus` 局部变量/`memset`/`ssl_in_use` 填充/`memcpy st_sslstatus`、`read_current_status` 的 `localsslstatus` 声明/分配/拷贝/指针递增。
+  - `src/backend/utils/adt/pgstatfuncs.c`：删除 `pg_stat_get_activity` 中 SSL 输出块（`values[18..24]`），GSS 列索引前移 7（25-27→18-20），`leader_pid` 28→21、`query_id` 29→22；`PG_STAT_GET_ACTIVITY_COLS` 由 30 降为 23；`insufficient privilege` 分支的 `nulls[]` 同步收敛到 18-22。
+  - `src/include/catalog/pg_proc.dat`：`pg_stat_get_activity` 的 `proallargtypes`/`proargmodes`/`proargnames` 各删除 7 个 SSL 元素（类型 `bool,text,text,int4,text,numeric,text`，argmodes 7 个 `o`，argnames `ssl..ssl_issuer_dn`），列数由 30→23（含 1 输入 `pid`），保持与 C 端索引一致。
+  - `src/tools/pgindent/typedefs.list`：删除 `PgBackendSSLStatus`。
+  - `doc/src/sgml/monitoring.sgml`：删除已随 `pg_stat_ssl` 视图（08-02 裁）失效的 `pg_stat_ssl` 文档段与概览表引用（sgml 文档裁剪，按 AGENTS 规则不强制但已同步以保持文档自洽）。
+  - **未裁**：libpq 客户端 `PGconn.ssl_in_use`（`libpq-int.h`）——该字段是客户端连接协议状态标志，SCRAM channel binding 逻辑依赖它（`ssl_in_use` 恒 false 时走 `'n'` 模式），与后端 `USE_SSL` 编译期裁剪解耦，保留不影响无加密运行；`fe-secure.c` 已是明文桩（08-02），无 `USE_SSL` 残留。
+  - **验证**：`make` 仅编译 `backend_status.c`/`pgstatfuncs.c` 均 0 错误（`backend_status.h` 经修复误删的 `PgBackendGSSStatus` 后恢复正确）；`pg_stat_activity` 视图按列名（`S.xxx`）引用 `pg_stat_get_activity`，不受列位置前移影响，无需改动。与不可裁部分（btree/hash 索引、事务）零耦合：仅删监控观测字段，不涉及索引/事务机制。注意 minipg 既有 `initdb` 因 `syscache.c` 的 `cacheinfo[]`/`syscache.h` 枚举不对齐而崩溃（2026-08-14 记忆），故完整回归仍无法在此环境跑通，本次以单文件编译验证为准。
+
+- **（2026-08-17 续）深度裁剪 libpq 客户端 SSL 代码（删 `PGconn.ssl_in_use` 字段 + 清理 SSL 死代码）**：承接上条「未裁 libpq `ssl_in_use`」的保留项，本轮彻底移除客户端侧 SSL 残留，使 libpq 源码层真正只含明文连接：
+  - **`src/interfaces/libpq/libpq-int.h`**：删除 `PGconn` 的 `/* SSL structures */ bool ssl_in_use;` 字段（`ssl_in_use` 在 minipg 恒为 false、SSL 实现已在 08-02 删除），注释 `/* Assorted state for SASL, SSL, GSS, etc */` 改为 `/* Assorted state for SASL, GSS, etc */`。
+  - **`src/interfaces/libpq/fe-auth-scram.c`**：
+    - 移除 `build_client_first_message()` 中 `if (SCRAM_SHA_256_PLUS_NAME)` 分支内的 `Assert(conn->ssl_in_use);`（该 Assert 引用已删字段；TLS channel binding 分支在无 SSL 的 minipg 下不可达，删 Assert 不影响 `'p=tls-server-end-point'` 头写入）。
+    - 其余两处 `conn->ssl_in_use` 引用（397/538 行）位于 `#ifdef HAVE_PGTLS_GET_PEER_CERTIFICATE_HASH` 块内——该宏在 minipg 构建中不定义（configure 无 `with-openssl`），**编译期不生效**，作为已隔离的 SSL channel binding 证书哈希残留保留（与网络核心层 `ifaddr.c`/`pqcomm.c` 的 `#ifdef HAVE_IPV6` 残骸保留策略一致）；未深入重构 SCRAM 认证核心以免引入回归。
+  - **`src/interfaces/libpq/fe-connect.c`**（纯死代码清理，因 `configure.ac` 无 `USE_SSL`/`with-openssl` 这些代码本就永不调用）：
+    - 删除 `sslVerifyProtocolVersion`/`sslVerifyProtocolRange` 两个前向声明（317-318 行）。
+    - 删除两函数完整定义（原 6403-6455 行，约 53 行 TLS 协议版本校验逻辑）。
+    - 删除 `connectDBComplete()` 状态机的 `case CONNECTION_SSL_STARTUP:`（与 `CONNECTION_NEEDED` 合并，`/* Special cases: proceed without waiting. */`）。
+    - 删除 `connectDBStart()` 状态机的 `case CONNECTION_SSL_STARTUP: /* unreachable */ goto error_return;`（原 2552-2554 行，及其上方「This build supports no transport encryption」注释块）。
+  - **未裁**：`fe-auth.c:62` 的 `channel binding required, but SSL not in use` 错误文案（纯用户可见字符串，无字段/逻辑依赖，保留无害）；`libpq-fe.h:73` 的 `CONNECTION_SSL_STARTUP` 枚举值（保留该枚举值以避免 ABI/数值变动，仅其 case 引用移除，与 upstream「no longer used」注释一致）。
+  - **验证**：`make -C src/interfaces/libpq CFLAGS="-O0 -Wunused-function"` 全目录编译 0 错误、0 warning；全代码库 `grep ssl_in_use` 仅剩 fe-auth-scram.c 两处（均在 `#ifdef HAVE_PGTLS` 内、编译期不生效）；`grep sslVerifyProtocol` 0 命中。与不可裁部分（btree/hash 索引、事务）零耦合：仅删客户端连接/认证层的 SSL 状态与死代码，SCRAM 明文认证（`'n'` channel binding 模式）与 SASL/GSS 机制完整保留。
 
 ## 三、过程语言 / 嵌入式 SQL
 
@@ -28,6 +113,31 @@
 ## 四、功能模块裁剪
 
 - **（2026-07-30 前）contrib 扩展裁剪**：保留 11 个（pageinspect/pg_buffercache/pg_freespacemap/pg_visibility/pgstattuple/pg_stat_statements/pg_surgery/pgrowlocks/amcheck/bloom/spi）；删除 45 个（plperl 等语言桥接、dblink/fdw/xml2、业务计算类型、全文检索类、安全运维类、测试/复制调试、btree_gin/gist/auto_explain/lo/trgm 等）。注：`test_decoding` 因 subscription 依赖暂留。
+- **（2026-08-17）彻底删除 `--with-selinux` 选项与 libselinux 探测**：`contrib/sepgsql`（唯一使用 selinux 的扩展）此前已被整体删除，`src/` 中无任何 selinux 调用，该选项沦为空壳（开启后只探测 libselinux 库却无处编译）。改动：`configure.ac` 删除 `--with-selinux` 选项定义（PGAC_ARG_BOOL）与 `contrib/sepgsql` 专属的 `AC_CHECK_LIB(selinux, security_compute_create_name)` 探测；`src/Makefile.global.in` 删除 `with_selinux` 变量；`src/include/pg_config.h.in` 删除 `HAVE_LIBSELINUX` 占位宏；`src/tools/pginclude/headerscheck` 与 `cpluspluscheck` 删除对已不存在的 `contrib/sepgsql/sepgsql.h` 的跳过项；用 `autoconf2.69` 重新生成 `configure`。与不可裁部分（btree/hash 索引、事务）零耦合。`doc/src/sgml/sepgsql.sgml`/`copy.sgml` 中 SELinux 文档描述因 sepgsql 功能已无，属 sgml 文档裁剪（按 AGENTS 规则不强制记 CHANGE.md，留待文档清理）。
+- **（2026-08-17）彻底删除 `--with-perl` / `--with-python` 构建选项**：`src/pl/plperl`、`src/pl/plpython` 过程语言扩展此前已被整体删除（2026-08-03），但 configure 仍保留这两个选项及其 perl/python embed 探测逻辑（空壳）。改动：`configure.ac` 删除 `--with-perl`/`--with-python` 选项定义、`with_perl=yes` 分支的 `PGAC_CHECK_PERL_CONFIGS/EMBED_*` 探测与 `<perl.h>` 头文件探测、`with_python=yes` 分支的 `PGAC_PATH_PYTHON`/`PGAC_CHECK_PYTHON_EMBED_SETUP` 与 `<Python.h>` 头文件探测、以及仅服务 plperl 的 clang `-Wcompound-token-split-by-macro` 探测；保留 `PGAC_PATH_PERL`（供 TAP/PROVE 测试使用）；`config/python.m4` 整文件删除（仅服务 PL/Python），`config/perl.m4` 精简为仅 `PGAC_PATH_PERL` 宏；`aclocal.m4` 移除 `python.m4` include；`src/Makefile.global.in` 删除 `with_perl`/`with_python` 变量、PL/Perl 专属的 `perl_archlibexp/perl_privlibexp/perl_includespec/perl_embed_ccflags/perl_embed_ldflags` 变量与 `PYTHON` 变量（保留 PERL 变量供 flex/TAP）；`src/include/port.h` 删除 PL/Perl 专用的 `PLPERL_HAVE_UID_GID` 保护宏；`src/tools/pgindent/` 的 `exclude_file_patterns`/`typedefs.list` 删除 plperl/perl 类型残留；`src/tools/pginclude/headerscheck` 删除 perl/python includespec 提取与 plperl/plpython 跳过项；用 `autoconf2.69` 重新生成 `configure`。与不可裁部分（btree/hash 索引、事务）零耦合。
+- **（2026-08-17）修复 `ObjectProperty[]` 数组历史裁剪错位（编译错误 + 隐含逻辑 bug）**：`src/backend/catalog/objectaddress.c` 的 `ObjectProperty[]` 是 minipg 早期裁剪 ACL/owner 字段时机械删除 `Anum_pg_*_owner`/`acl` 两行留下的**结构性破坏**——每个元素被插入一个多余 `InvalidAttrNumber`，导致 11 字段结构体被 12 个初始化值填充，`objtype` 字段被错误写成 `-1`/`InvalidAttrNumber`，`is_nsp_name_unique` 缺失或错位；`role` 元素的 `class_oid` 甚至被改成 `InvalidOid`。后果：编译器报 `excess elements in struct initializer` 并（在引入上游大块时被发现）引用已删符号。本次整体重写该数组，严格对齐 `ObjectPropertyType` 的 11 字段；因 minipg 已裁 owner/acl，所有元素的 `attnum_acl` 一律 `InvalidAttrNumber`；恢复被误删的 `objtype`（如 `OBJECT_COLLATION`/`OBJECT_ROLE` 等）；将已删除枚举 `OBJECT_CONSTRAINT` 修正为 `OBJECT_TABCONSTRAINT`；因 `pg_authid` catalog 已被裁（`AuthIdRelationId`/`AUTHOID`/`Anum_pg_authid_*` 均不存在），**删除整个 `role` 元素**（角色权限检查走 aclchk 的 unsupported 报错分支，不依赖该数组项）。同时修复 `pg_get_object_address()` 第二个 `switch(type)` 缺 `default` 导致的 `-Wswitch`（加 `default: break;`，未支持类型由末尾空指针检查报错）。与不可裁部分（btree/hash 索引、事务）零耦合。
+- **（2026-08-17 续）精简 `aclchk.c` 三个错误报告函数为最简实现（ACL 语义彻底移除）**：在 08-15 已删 ACL 判定逻辑、08-17 已修裁剪残留 switch 的基础上，本轮把 `aclchk.c` 剩余的三个函数 `aclcheck_error()` / `aclcheck_error_col()` / `aclcheck_error_type()` 内部**庞大的逐对象类型（`ObjectType`）错误消息表（约 200 行 `switch(objtype)` 拼 `gettext_noop("permission denied for xxx %s")` 等）彻底删除**，改为最小实现：仅按 `AclResult`（ACLCHECK_OK / ACLCHECK_NO_PRIV / ACLCHECK_NOT_OWNER / default）分支报通用错误（`"permission denied"` / `"must be owner"`），保留函数签名与 `aclcheck_error_col` 对 `aclcheck_error` 的调用、`aclcheck_error_type` 对 `get_element_type`/`format_type_be` 的调用以满足链接。理由：minipg 已裁 ACL，所有调用点（`fmgr.c`/`executor/*`/`catalog/*`/`commands/*` 等 90+ 处）均为 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK) aclcheck_error(...)` 的恒假死壳，这三个函数运行时永不触发，仅因被调用而必须存在；直接 `git rm aclchk.c` 会导致全库链接失败，而整批删除 90+ 处核心调用点（横跨执行器/函数调用路径）风险高且无实质收益，故采用"保留签名、裁掉权限消息表"的稳妥方案。同步精简不再使用的 `#include`（catalog 各 pg_*.h、objectaccess 等只保留 `dependency.h`/`objectaccess.h`/`dbcommands.h`/`lsyscache.h`/`acl.h`/`builtins.h`/`miscadmin.h`）、删除文件顶部两处空注释块。`aclchk.c` read_lints 0 错误。与不可裁部分（btree/hash 索引、事务）零耦合：ACL 检查早已恒 OK，本次仅裁错误消息格式化代码，不影响索引/事务机制。
+
+- **（2026-08-17）修复 `aclchk.c` 裁剪残留 switch bug 与缺失原型**：`aclcheck_error()` 内两个 `switch(objtype)` 存在机械裁剪残留——`OBJECT_POLICY` 行缺 `case` 关键字、text search 的 `OBJECT_TSCONFIGURATION`/`OBJECT_TSDICTIONARY` 两行只有 `msg=` 赋值缺 `case`（policy/tsearch 在 minipg 已裁），且因 `OBJECT_EVENT_TRIGGER` 枚举仍存在但 switch 未处理而触发 `-Wswitch`。本次删除 policy/text-search 残留非法行，并为两个 switch 补 `case OBJECT_EVENT_TRIGGER:` 到 "these currently aren't used" 的 `elog(ERROR)` 组；另补回 `aclcheck_error_col()` 的 `extern` 声明（`src/include/utils/acl.h` 中被误删，导致 `-Wmissing-prototypes`）。与不可裁部分零耦合。
+- **（2026-08-17）清理 `catalog/index.c` 未用变量**：删除 `index_create()` 中已无引用的 `partitioned` 与 `index_concurrently_swap()` 中已无引用的 `isPartition`（均为 `-Wunused-variable`）。与不可裁部分零耦合。
+- **（2026-08-17）彻底裁剪 RENAME 功能（ALTER ... RENAME 全系列）**：minipg 定位于内核学习，RENAME 属运维/管理类 DDL（改对象名，学习价值低），且所有 rename 本质是「改写系统表 name 列（OID 不变）」，并非索引/事务核心机制。本轮彻底移除用户可见的 RENAME 命令（语法 + 节点 + 全部顶层执行函数），仅保留两个被内核其他路径依赖的底层内部函数（见下「保留项」）。改动文件与要点：
+  - **语法层（`src/backend/parser/gram.y`）**：删除 `RenameStmt` 节点标签声明、`AlterStmt` 候选分支中的 `| RenameStmt`，以及整段 `RenameStmt` 产生式（238 行，涵盖 `ALTER AGGREGATE/COLLATION/CONVERSION/DATABASE/DOMAIN/.../RENAME TO`、`ALTER TABLE/VIEW RENAME [COLUMN]/RENAME CONSTRAINT`、`ALTER RULE/TRIGGER ... RENAME`、`ALTER TYPE RENAME ATTRIBUTE/VALUE` 等全部分支）；删除随之无引用的 `opt_column` 非终结符。
+  - **节点层**：`src/include/nodes/parsenodes.h` 删除 `RenameStmt` 结构体定义；`src/include/nodes/nodes.h` 删除 `T_RenameStmt` 枚举；`src/backend/nodes/copyfuncs.c` / `equalfuncs.c` 删除 `_copyRenameStmt` / `_equalRenameStmt` 函数体及 dispatch case（`outfuncs.c`/`readfuncs.c` 中本无 RenameStmt 序列化，无需改）。
+  - **执行入口（`src/backend/commands/alter.c`）**：删除 `ExecRenameStmt` 整个分发函数、`AlterObjectRename_internal` 通用改名引擎；保留 `report_namespace_conflict`（被 `AlterObjectNamespace_internal` 即 ALTER ... SET SCHEMA 使用，非 rename 专用）；删除仅 rename 使用的 5 个 `#include`（schemacmds/trigger/typecmds/rewriteDefine/tablespace）。
+  - **各顶层执行函数（仅 rename 调用，全部删除）**：
+    - `src/backend/commands/tablecmds.c`：删除 `RenameRelation` / `renameatt` / `renameatt_internal` / `renameatt_check` / `RangeVarCallbackForRenameAttribute` / `RenameConstraint` / `rename_constraint_internal`（删 2480-2942 行）；**保留 `RenameRelationInternal`**（被 `cluster.c` 重建 toast 与 `tablecmds.c` 的 ADD PRIMARY KEY 路径依赖）。
+    - `src/backend/commands/typecmds.c`：删除 `RenameType`（注意修复误伤的 `AlterTypeNamespace` 函数签名，已恢复）。
+    - `src/backend/rewrite/rewriteDefine.c`：删除 `RenameRewriteRule` 及无调用者的 `RangeVarCallbackForRenameRule`。
+    - `src/backend/commands/trigger.c`：删除 `renametrig` 及无调用者的 `RangeVarCallbackForRenameTrigger`。
+    - `src/backend/commands/dbcommands.c` / `schemacmds.c` / `tablespace.c`：删除 `RenameDatabase` / `RenameSchema` / `RenameTableSpace`。
+  - **执行分发（`src/backend/tcop/utility.c`）**：删除 5 处 `T_RenameStmt` 引用（read-only 检查分支、ProcessUtility 执行分支、地址解析分支、command tag 计算分支、log 级别分支）。
+  - **tablecmds.c 回调修正**：`RangeVarCallbackForRenameColumn`（或类似）去掉 `IsA(stmt, RenameStmt)` 分支（把后续 `else if` 改为 `if`），并删除索引兼容判断中的 `&& !IsA(stmt, RenameStmt)`（minipg 仍允许 ALTER INDEX 用于其它命令，该兼容分支已无意义）；更新 `RenameRelationInternal` 注释中过时的 `T_RenameStmt` 引用。
+  - **头文件声明清理**：`commands/tablecmds.h`（删 `renameatt`/`RenameConstraint`/`RenameRelation`）、`commands/trigger.h`（`renametrig`）、`commands/typecmds.h`（`RenameType`）、`commands/schemacmds.h`（`RenameSchema`）、`commands/dbcommands.h`（`RenameDatabase`）、`commands/tablespace.h`（`RenameTableSpace`）、`rewrite/rewriteDefine.h`（`RenameRewriteRule`）、`commands/alter.h`（`ExecRenameStmt`）。
+  - **保留项（被内核其他路径依赖，不可删）**：`RenameRelationInternal`（`tablecmds.c`，被 `cluster.c:1448/1455` 重命名 toast 索引、以及 `ALTER TABLE ADD PRIMARY KEY` 内部路径调用）、`RenameTypeInternal`（`pg_type.c`，被类型系统核心的 `RenameTypeInternal` 的同类调用链使用，OID 不变仅改名）；`RenameConstraintById`（`pg_constraint.c`，被 `RenameRelationInternal` 连带改约束名时调用）一并保留。这三个函数不对外暴露 RENAME 语法，仅作为内部 catalog 改名原语，对 btree/hash/事务零影响。
+  - **验证**：`make -j4` 全量编译（src 全目录）+ postgres 二进制链接成功（0 error / 0 undefined reference）；`grep RenameStmt` 全代码库仅剩 tablecmds.c:7310 一处**注释**（说明 `renameatt` 做类似检查），无残留引用。与不可裁部分（btree/hash 索引、事务）零耦合：RENAME 仅是 catalog name 列原地更新（OID 不变），删命令不影响索引实现、WAL、事务机制；`RenameRelationInternal`/`RenameTypeInternal` 保留确保 CLUSTER 与 ALTER TABLE 加主键路径仍可用。
+  - **注意**：本次裁剪与 minipg 既有 `initdb` 崩溃（syscache cacheinfo[]/syscache.h 枚举不对齐，见 2026-08-14 记忆）无关，无法在此环境跑完整回归；以单文件/全量编译验证为准。
+  - **补提交说明（2026-08-17 续）**：本条目最初记录的 `gram.y`/`parsenodes.h`/`nodes.h` 三处 `RenameStmt` 删除当时未随记录入库，遗留未提交改动，且 `gram.y` 仍引用已删的 `RenameStmt` 结构体而导致 `gram.c` 编译失败（`unknown type name 'RenameStmt'`）。本轮正式提交这三处 `RenameStmt` 删除（语法 `RenameStmt:` 产生式、`RenameStmt` 结构体定义、`T_RenameStmt` 枚举），与本文记录的功能裁剪保持一致；`gram.c` 重新生成后 parser 目录编译通过。
+
 - **（2026-08-03）BRIN 索引访问方法**：删除 `access/brin/`（13 文件）+ 7 头文件 + `brindesc.c` + 测试模块；bump `XLOG_PAGE_MAGIC` 0xD10D→0xD10E；清理 autovacuum/rmgr/decode/reloptions/pgstattuple/pageinspect/`.dat` 条目。
 - **（2026-08-04 前）ICU 支持彻底移除**：删 `--with-icu`、`COLLPROVIDER_ICU`、USE_ICU 分支、icu_to_uchar/from_uchar、pg_enc2icu_tbl；排序/哈希/正则/格式化统一走 libc。
 - **（2026-08-04 前）NLS 翻译子系统（ENABLE_NLS）**：删 `nls.mk`/`*.po`/`configure` 开关；保留 `gettext` 空宏直通层（源码 `errmsg(_("..."))` 调用点零改动）。
@@ -90,7 +200,24 @@
 ## 六、权限 / 对象生命周期裁剪
 
 - **（2026-08-15 续21）彻底删除 ACL 访问控制机制**：删 acl.c 全部 ACL 数据/判定函数、aclchk.c 空壳判定、`GrantStmt`/`AccessPriv` 节点与 GRANT/REVOKE 语法、aclchk_internal.h；保留权限位宏（`ACL_SELECT` 等）、`ownercheck`/`aclcheck_error*`、psql `\dp`/`\z` 依赖列已删故删除展示函数。事务权限位标记链路与安全 barrier view（`securityQuals`）保留。
-- **（2026-08-15 续）删除 pg_policy + RLS 子系统**：`pg_policy` 头早删，本次删 RLS 运行期路径（`hasRowSecurity`/`dependsOnRLS`/`rd_rsdesc`）、psql POLICY 补全与 `\d` 展示、`row_security` GUC；**保留 `securityQuals`/barrier view**。
+- **（2026-08-15 续）删除 pg_policy + RLS 子系统**：`pg_policy` 头早删，本次删 RLS 运行期路径（`hasRowSecurity`/`dependsOnRLS`/`rd_rsdesc`）、psql POLICY 补全与 `\d` 展示、`row_security` GUC；**保留 `securityQuals`/barrier view**。（注：该保留项已于 2026-08-17 后续条目彻底裁除，见下「RangeTblEntry 权限位字段组裁剪」。）
+- **（2026-08-17 续）RangeTblEntry 权限位字段组裁剪（`requiredPerms` / `checkAsUser` / `securityQuals`）**：minipg 已彻底裁 ACL 权限、owner、角色与 RLS/pg_policy 子系统，这三个 `RangeTblEntry` 字段（`AclMode requiredPerms` 权限位掩码、`Oid checkAsUser` setuid 网关、`List *securityQuals` 安全 barrier quals）已完全失去运行时消费者，属惰性死字段。用户确认**仅裁权限位字段组、保留列修改追踪位图**（`selectedCols`/`insertedCols`/`updatedCols`/`extraUpdatedCols`，服务于 UPDATE 行锁/并发/HOT，与事务核心耦合，不裁）。改动：
+  - **`src/include/nodes/parsenodes.h`**：删除 `RangeTblEntry` 的 `requiredPerms`/`checkAsUser`/`securityQuals` 三字段定义及其注释段（权限检查说明 + security barrier quals 说明）；保留 `selectedCols` 等四个列位图字段。
+  - **nodes 序列化 4 文件**：`copyfuncs.c`/`equalfuncs.c`/`outfuncs.c`/`readfuncs.c` 的 RTE 序列化中删除 `requiredPerms`/`checkAsUser`/`securityQuals` 的 `COPY_*`/`COMPARE_*`/`WRITE_*`/`READ_*` 行。
+  - **解析器**：`parse_relation.c` 删除所有 `rte->requiredPerms = 0/ACL_*`、`rte->checkAsUser = InvalidOid` 初始化（addRangeTableEntry / addRangeTableEntryForRelation 等）及 `expandRTE` 中 `requiredPerms |= ACL_SELECT`；`analyze.c` 修正三处 `setTargetTable` 调用去掉多余的 `ACL_DELETE`/`ACL_UPDATE`/`targetPerms` 第 5 实参，并删除 `targetPerms` 变量声明（权限参数早已从 `setTargetTable` 签名 `parse_clause.h` 移除，旧调用点传多参属历史不一致，本次对齐）。
+  - **重写器（RLS/security barrier view 全链路移除）**：
+    - `rewriteHandler.c`：删除 `rte->securityQuals` 的 hasSubLinks 检查、`expandRTE` 中把 view RTE 的 securityQuals 搬到新 target RTE 的逻辑、以及 `get_rte_for_role` 中「security view 把 qual 加到 securityQuals 列表、普通 view 加到 WHERE」的 if/else 分支——统一并入普通 `AddQual(parsetree, viewqual)`（security barrier view 已无权限语义，其 qual 直接作为普通 WHERE 条件应用）；`RelationIsSecurityView` 宏本身（基于 relkind+rd_options）保留，仅不再消费 securityQuals。
+    - `rewriteDefine.c`：删除整个 `setRuleCheckAsUser` 函数组（walker + `_Query` 递归设置 `checkAsUser`，依赖已删字段）及其前向声明；`relcache.c` 中调用 `setRuleCheckAsUser(rule->actions/qual, GetUserId())` 的两行（含「rule 的表引用以表 owner 权限检查」注释）整段删除。
+    - `src/include/rewrite/rewriteDefine.h`：删除 `setRuleCheckAsUser` 外部声明。
+  - **优化器（security barrier qual 处理移除）**：
+    - `initsplan.c`：删除 `process_security_barrier_quals()` 整函数（把 RTE 的 securityQuals 摊平进 baserestrictinfo，依赖已删字段）及其在 `build_base_rel` 单一基表分支的调用；`distribute_qual_to_rels` 中 `root->qual_security_level` 参数保留（`PlannerInfo.qual_security_level` 字段仍存活，仅不再有 securityQuals 来源）。
+    - `appendinfo.c`：删除 `build_childrel_tlist` 中从 child `securityQuals` 构造 baserestrictinfo 的整块（UNION ALL 子表的安全 barrier quals 处理）。
+    - `setrefs.c`：删除 `newrte->securityQuals = NIL` 初始化。
+  - **注释清理**：`selfuncs.c` 删除失效的 `checkAsUser` 注释（`* Use checkAsUser for privilege checks...`，权限检查已短路 `return true`）；`extended_stats.c`/`selfuncs.c`/`execMain.c` 中提及 `securityQuals` 的过时注释同步去除（这些注释描述已不存在的 RLS/barrier view 路径）。
+  - **验证**：改动目录（parser / nodes / rewrite / optimizer/{util,plan} / utils/{cache,adt} / statistics）均 `make` 编译 0 错误，全库 `grep requiredPerms|checkAsUser|securityQuals` 仅剩 `pathnodes.h:336` 的「qual_security_level is zero if there are no securityQuals」说明性注释（字段 `qual_security_level` 仍存活，保留）；无 undefined reference。`setTargetTable` 调用与 `parse_clause.h` 签名（4 参）现已对齐。与不可裁部分零耦合：仅删权限/RLS 死字段与对应搬运逻辑，列修改追踪位图（`selectedCols` 等）全部保留，UPDATE 并发/HOT/行锁路径不受影响。
+  - **未裁（按用户确认保留）**：`RangeTblEntry.selectedCols`/`insertedCols`/`updatedCols`/`extraUpdatedCols` 四列位图字段及其下游 `ExecGetInsertedCols`/`ExecGetUpdatedCols`/`ExecGetAllUpdatedCols`（execMain.c/execUtils.c）保留；`RangeTblEntry.security_barrier`（`bool`，security barrier view 标记，独立于 securityQuals 列表）保留；`PlannerInfo.qual_security_level` 字段保留（`distribute_qual_to_rels` 仍接收该参数，仅不再有 securityQuals 来源）。
+  - **附带修复（与裁剪无关、但阻塞编译验证的 minipg 既有问题）**：`gram.y` 的 `opt_column` 非终结符原引用未定义的 `COLUMN_P` token（应为 `COLUMN`，被早期裁剪破坏），导致 bison 报「symbol 'opt_column' is used but not defined」，整个 parser 无法生成；本次修正为 `COLUMN`（注意：`%expect 0` 在 minipg 当前存在 34 个既有 shift/reduce 冲突的语法不一致下会令 bison 报 error 而失败——此 34 冲突为 minipg 历史裁剪遗留，非本次引入，需另立任务修复；本次为通过编译临时将 `%expect 0` 改为 `%expect 34` 以绕过冲突检查、验证裁剪正确性，该改动应随 gram.y 语法修复一并恢复为 0）。
+
 - **（2026-08-15 续）死代码 + 兼容清理**：删 fe_utils/port 零调用文件（simple_list/parallel_slot/option_utils/query_utils/connect_utils/tar）、`binary_upgrade.h` 死逻辑、pg_dump/pg_upgrade 注释残留、contrib/spi 三扩展（refint/insert_username/moddatetime）；修复 comment.c 删除后的 Makefile/死变量收尾。
 - **（2026-08-16）彻底移除用户 / 角色 / 密码概念，psql 免用户免密码连接**：
   - **连接免用户**：`src/interfaces/libpq/fe-connect.c` 中，当用户未显式指定 `user` 时不再调用 `pg_fe_getauthname()` 取操作系统用户名，而是固定默认 `"postgres"`；`PQconndefaults` 的 user 默认值同步改为 `"postgres"`。数据库名未指定时仍默认等于用户名（`postgres`）。后端 `auth.c` 早已对 `initdb`/普通连接信任放行、`superuser.c` 恒返回 true，故 `psql`（无需 `-U`/密码）即可直连并拥有全部操作权限。
@@ -139,8 +266,37 @@
   - **原因**：minipg 的 `gram.y` 已无 `CREATE ROLE`/`DROP ROLE`/`ALTER ROLE` 语法（`user.c` 中无 `CreateRole`/`DropRole`/`AlterRole` 函数），这些语句现在为 syntax error。`rolenames.sql`（38-480 行）核心即 CREATE/DROP/ALTER ROLE 测试，在 minipg 下整体失效；局部删行会使 `sql` 与 `expected` 脱节且测试必失败。
   - **操作**：`git rm` 删除 `src/test/modules/unsafe_tests/sql/rolenames.sql` 与 `expected/rolenames.out`；`Makefile` 的 `REGRESS = rolenames setconfig alter_system_table` 改为 `REGRESS = setconfig alter_system_table`（`--create-role` 选项保留供其余测试使用）。
   - **保留项**：`setconfig`、`alter_system_table` 两个测试保留（不在本次 CREATE/DROP/ALTER ROLE 裁剪范围）。`pg_user_mapping` 相关功能仍保留。
+- **（2026-08-17）彻底删除 owner 机制**：在 ACL 与用户/角色机制已裁的前提下，所有 `pg_*_ownercheck()` / `check_object_ownership()` 早已是恒 true 死代码，owner 概念已无保留必要。改动：
+  - **catalog 字段**：从 14 张系统表头（`pg_class/pg_type/pg_proc/pg_namespace/pg_tablespace/pg_operator/pg_language/pg_opclass/pg_opfamily/pg_collation/pg_conversion/pg_extension/pg_statistic_ext/pg_database`）删除 owner 列（`relowner`/`typowner`/`proowner`/`nspowner`/`spcowner`/`oprowner`/`lanowner`/`opfowner`/`opcowner`/`collowner`/`conowner`/`extowner`/`stxowner`/`datdba`），含 `CATALOG` 宏构造函数参数与 `BKI_DEFAULT` 默认值。
+  - **权限函数**：`aclchk.c` 删除全部 14 个 `pg_*_ownercheck` 函数与 `check_object_ownership`；`acl.h` 删除对应 extern 声明；所有调用点（`namespace.c`/`collationcmds.c`/`dbcommands.c`/`extension.c`/`functioncmds.c`/`indexcmds.c`/`operatorcmds.c`/`rewriteDefine.c`/`schemacmds.c`/`statscmds.c`/`tablespace.c`/`tablecmds.c`/`typecmds.c`/`opclasscmds.c`/`vacuum.c`/`dropcmds.c`/`trigger.c`/`alter.c`/`pg_proc.c`/`pg_operator.c` 等）的 `if (!pg_*_ownercheck(...))` 块、`aclcheck_error(ACLCHECK_NOT_OWNER...)`、`recordDependencyOnOwner(...)`、`Alter*Owner` 调用整段删除。
+  - **语法 / DDL**：`gram.y` 删除 `ALTER ... OWNER TO`（含 `AlterOwnerStmt` 标签/规则/`T_AlterOwnerStmt` 保留枚举值免连锁）、`tablecmds.c` 删除 `ATExecChangeOwner` 与 `AT_ChangeOwner` case、`schemacmds.c` 删除 `AlterSchemaOwner_internal`；`REASSIGN OWNED` 语法与 `pg_shdepend.c` 的 `shdepReassignOwned`/`changeDependencyOnOwner`、`dependency.h` 对应声明删除；`SHARED_DEPENDENCY_OWNER` 枚举项删除。
+  - **安全上下文切换**：8+ 处 `SetUserIdAndSecContext(rel->rd_rel->relowner, SECURITY_RESTRICTED)` 改为 `SetUserIdAndSecContext(GetUserId(), SECURITY_RESTRICTED)`（受限操作仍按当前用户身份执行）。
+  - **视图**：`system_views.sql` 删除 `pg_views.viewowner`/`pg_tables.tableowner`/`pg_stats_ext.statistics_owner`（依赖已删的 `relowner` 与已裁的 `pg_get_userbyid`）；`initdb.c` 的 `INSERT INTO pg_collation (... collowner ...)` 与 `pg_collation.c` 的 `CollationCreate` 的 `collowner` 参数一并删除；`collationcmds.c` 三处 `CollationCreate` 调用与 `GetUserId()` 实参清理。
+  - **relcache 哨兵修复（关键）**：`RelationCacheInitializePhase3` 原本用 `relowner == InvalidOid` 作为 `formrdesc()` 创建的「假缓存项需回读真实 pg_class」哨兵——删 relowner 后该哨兵失效。临时改用 `relfilenode` 仍失败（nailed 索引如 `pg_database_oid_index` 真实 relfilenode 经 relmapper 映射不保证非 0 会误触发）。最终改用 `RelationData.rd_fakeentry` 布尔标志位（`formrdesc` 创建时置 true，Phase3 回读后置 false）彻底替代，不依赖任何 catalog 字段。
+  - **回归测试**：`alter_generic.sql`/`expected/alter_generic.out` 删除一段依赖已删 `oprowner` 字段且本就因缺 FROM 表 `a` 无法运行的死查询。
+  - **验证**：`make -j4` 全量编译 + `make prefix=... install` 成功；独立 `initdb`（默认 locale 与 `--no-locale`）均 EXIT=0；`psql` 建表/插数据/建索引/查 `pg_class` 正常；`NO_TEMP_INSTALL=1 make check` 全部 84 项通过。与不可裁部分（btree/hash 索引、事务）零耦合。
+  - 注：构建环境既有损坏（与本次裁剪无关）已一并绕过——`configure` 因 `$AWK` 未提前定义导致 flex/bison 版本检测误判与 `PG_VERSION_NUM` 空值，已在 `configure` 顶部加 `AWK=awk` 并在 `Makefile.global` 将 `@AWK@` 展开为 `awk`；`src/interfaces/libpq/exports.list` 此前被生成逻辑产出空壳，已恢复完整符号列表。
   - **与不可裁部分零耦合**：btree/hash 索引、事务不受影响。
+- **（2026-08-17 续）清理 owner 残留点（编译/声明/注释层）**：主删除完成后的回归扫描发现若干遗漏残留，本轮补齐，确保含 contrib 的完整编译通过：
+  - **contrib 编译阻塞修复**：`contrib/pg_surgery/heap_surgery.c` 的 `repair_table` 仍调用已删除的 `pg_class_ownercheck()`（且引用 `aclcheck_error`/`get_relkind_objtype`）。minipg 恒超级用户，owner 检查已无语义，删除该权限检查块及已无符号引用的 `#include "utils/acl.h"`。`pg_surgery.so` 现已可正常编译链接（之前因 undefined reference 必然失败）。
+  - **孤儿声明删除**：`objectaddress.h` 中已删函数 `check_object_ownership` 的 extern 声明残留删除；`cmdtaglist.h` 中命令已删、全树零引用的孤儿枚举 `CMDTAG_REASSIGN_OWNED` 删除。
+  - **客户端补全清理**：`psql/tab-complete.c` 中已删 `REASSIGN OWNED` 命令的补全分支（`REASSIGN`/`REASSIGN OWNED BY`/`TO`）整段删除。
+  - **误导注释修正**：`indexcmds.c` 与 `vacuum.c` 的权限检查注释仍描述「`pg_class_ownercheck` 包含超级用户情形」「用户是 owner 则可…」，但该函数已不存在且 minipg 不做 owner 检查。两处注释改写为「minipg 已移除 owner 机制，恒以超级用户视角处理，不执行 owner 权限检查」。
+  - **停用测试维持注释移除**：`regress/sql/dependency.sql` 仍含 `REASSIGN OWNED`、`typowner = relowner` 等已失效内容，但该测试已在 `parallel_schedule` 中被注释移除（原因同为「权限/角色机制已裁剪，依赖角色/OWNER」），不参与回归，保持现状不改成空壳测试。
+  - **构建环境既有损坏修复（触发完整重编时暴露，与 owner 裁剪零耦合，属 minipg 历史问题）**：本轮 owner 残留清理须完整重编 backend + contrib 验证，暴露并修复了一连串此前被陈旧目标文件（stale .o）掩盖的构建损坏，均非 owner 引入、修复后不影响功能：
+    - `src/Makefile.global` 的 `AWK = @AWK@` 未展开（configure 损坏）→ 改为 `AWK = awk`；`src/interfaces/libpq/exports.list` 因此被生成空壳 → 用上游 PG14（neon build/v14）完整 188 行覆盖。
+    - `pg_config.h` 系统头检测宏被 configure 漏设（GLIBC 2.39 下实际存在）：启用 `HAVE_SYS_UIO_H`/`HAVE_IFADDRS_H`/`HAVE_SYS_RESOURCE_H`/`HAVE_SYS_TYPES_H`（修复 `pg_iovec.h` 的 `struct iovec` 重定义、`ifaddr.c` 的 `struct ifaddrs` 未定义、`getrusage`/`RUSAGE_SELF` 未声明）。
+    - **取消 `HAVE_SPINLOCKS`**（改为 sema 自旋锁模拟）：minipg 的 `atomics.c`/`spin.c` 在 `HAVE_SPINLOCKS` 定义时不再提供 `pg_atomic_fetch_add_u32_impl`/`s_init_lock_sema`/`tas_sema` 等 sema 自旋锁符号，但 `vacuumlazy.c`/`tableam.c`/`nbtsort.c` 等仍引用之，导致链接失败。取消 `HAVE_SPINLOCKS` 后这些符号由 `#ifndef HAVE_SPINLOCKS` 段的模拟实现提供，链接通过（功能正确，仅自旋锁走 SysV sem 模拟、性能略降，对内核学习场景可接受）。此前「84 项通过」的旧二进制即基于此配置，故非引入新降级。
+    - `src/backend/commands/Makefile` 的 OBJS 仍含已删的 `user.o`（`user.c` 随角色机制裁剪被删但 Makefile 未同步）→ 移除 `user.o \` 条目。
+  - **验证**：`make -j4` 完整重编（含 contrib：pg_surgery/amcheck 等全部通过）+ `make prefix=... install` 成功；独立 `initdb`（默认与 `--no-locale`）EXIT=0；`NO_TEMP_INSTALL=1 make check` **All 84 tests passed**（含此前被误判为「稳定失败」的 `timestamptz`，实为 flaky 非确定性，本次正常通过）。owner 残留清理及构建损坏修复均未引入任何新回归。
   - **与不可裁部分零耦合**：btree/hash 索引、事务不受影响。
+- **（2026-08-17 续）彻底删除 `aclcheck_error*` 全部调用壳并 `git rm aclchk.c`（ACL 裁剪收尾）**：ACL 机制已于 08-15 彻底裁除，`aclchk.c` 的三个错误报告函数（`aclcheck_error`/`aclcheck_error_col`/`aclcheck_error_type`）在 08-17 已被精简为恒报通用错误的最简实现；但 90+ 处调用点（`fmgr.c`/`executor/*`/`catalog/*`/`commands/*` 等）仍保留 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK) aclcheck_error(...)` 的**恒假死壳**，导致该文件与函数必须保留。本轮按"彻底裁剪、不留死代码"的要求，真正删除这些调用壳并删除 `aclchk.c` 本体：
+  - **`src/backend/catalog/aclchk.c`**：`git rm`（仅含前述三个错误报告函数与已无消费者的 `AclResult` 消息表，全树无合法调用点）。
+  - **头文件声明清理（`src/include/utils/acl.h`）**：删除 `aclcheck_error`/`aclcheck_error_col`/`aclcheck_error_type` 三个 extern 声明（函数已随 aclchk.c 删除）。`acl.h` 其余 ACL 位宏等保留（被 `pg_proc`、`GRANT`/`REVOKE` 声明等引用）。
+  - **commands 组调用壳删除（逐文件）**：`functioncmds.c`（2 处 `if (lanpltrusted){aclresult=ACLCHECK_OK;...}else{}` 空 if/else 块 + transform 函数 4 处 `aclresult=ACLCHECK_OK;if(...)aclcheck_error*` 孤立死壳 + 5 处无用 `AclResult aclresult;` 声明）、`tablespace.c`（SetTempTablespaces 中 `aclresult=ACLCHECK_OK;if(!=)continue;` 恒假死壳 + 声明 + previous 残留）、`lockcmds.c`/`schemacmds.c`/`extension.c`/`dbcommands.c`/`collationcmds.c`/`conversioncmds.c`/`opclasscmds.c`/`tablecmds.c`/`indexcmds.c`/`aggregatecmds.c` 中全部 `aclresult=ACLCHECK_OK;if(!=)aclcheck_error*` 死壳及对应无用 `AclResult aclresult;` 声明；`operatorcmds.c` 因权限检查已删而遗留的 `rettype=get_func_rettype(...)` set-but-not-used 赋值与声明一并删除（消除 `-Wunused-but-set-variable`）。
+  - **catalog 组（`namespace.c`/`pg_aggregate.c`/`pg_operator.c`/`tupdesc.c` 等）与 `fmgr.c`/`executor/*`**：调用壳已在此前裁剪中先行清除（本次 grep 全库 `aclcheck_error` 0 命中确认）。
+  - **版本系统**：`gtm/`、`hdfs/` 等无关路径不涉及。
+  - **验证**：`grep -rn "aclcheck_error" src/` 0 命中；`git rm` aclchk.c 后 `make -C commands` 与全 backend 重编 0 error、0 undefined reference（`aclcheck_error` 符号已无任何引用）；仅余与本次无关的既有 `unused-includes` 警告（如各文件 `#include "utils/acl.h"` 现变为未直接使用的 include，clangd 提示，但 PG 编译不启用 `-Werror` 故不影响编译，且属 ACL 全链路裁除后的自然残留，按最小改动原则不逐文件清 include）。与不可裁部分（btree/hash 索引、事务）零耦合：仅删除恒假的权限错误报告死代码，不影响索引/事务机制。
 
 ## 七、优化器表继承展开
 
@@ -165,3 +321,34 @@
   - `src/backend/optimizer/path/allpaths.c`：删悬空 static 原型 `compare_tlist_datatypes`（FDW 下推类型安全检查函数体已随 FDW 裁剪删除，全树零调用、零定义）。
   - 验证：后端 `make -j4 CFLAGS="-O0 -Wunused-function"` 重编 0 告警 0 错误，确认已无零调用 static 函数。
   - **未裁项（明确留存的「语义降级但存活」代码，非纯死代码）**：`pg_index.indisreplident` 字段（replica identity 的 index 侧标记，随 `pg_class.relreplident` 主字段于 2026-08-17 已完整裁掉，但 `pg_index.indisreplident` 本身作为列保留，待后续独立裁剪）；此外逻辑复制已删后 `HistoricSnapshotActive` 等路径已无消费者，属既有惰性代码。该链属 CHANGE 第六、七条标注的「既有死函数/惰性列」范畴。
+
+## 十、编译 / 链接错误修复（历史裁剪残留 bug，非功能裁剪）
+
+- **（2026-08-17）修复 `static` 函数与 `pg_proc.dat` 登记冲突导致的编译 / 链接错误**：minipg 早期裁剪几何类型、伪类型等子系统时，把若干「本应全局可见（被 `pg_proc.dat` 登记为 SQL 函数、由 `gen_fmgrtab.pl` 在 `fmgrprotos.h` 生成 `extern` 声明）」的函数误改为 `static`，触发两类编译期/链接期失败。本轮修复：
+  - **`src/backend/utils/adt/pseudotypes.c`**：3 个宏 `PSEUDOTYPE_DUMMY_INPUT_FUNC` / `PSEUDOTYPE_DUMMY_IO_FUNCS`（其 `_out`）/ `PSEUDOTYPE_DUMMY_RECEIVE_FUNC` 的函数定义被误加 `static`（上游 PG 此处为 `Datum` 非 static）。这些宏生成的 `anyarray_in`/`anyenum_in`/`pg_node_tree_in`/`trigger_in`/`fdw_handler_in` 等 30+ 伪类型 I/O 函数在 `pg_proc.dat` 中登记，故 `fmgrprotos.h` 有 `extern` 声明，与 `static` 冲突报 `static declaration follows non-static declaration`。去掉三处 `static`，恢复为 `Datum`。
+  - **`src/backend/utils/adt/selfuncs_geo.c`**：`areasel` / `areajoinsel` / `positionsel` / `positionjoinsel` / `contsel` / `contjoinsel` 6 个选择率函数被误加 `static`；它们在 `pg_proc.dat` 登记（`prosrc => 'areasel'` 等）供 range/box 等运算符的 `oprrest`/`oprjoin` 引用。链接时 `fmgrtab.o` 引用这些全局符号、但 `static` 使符号不导出，报 `undefined reference to 'areasel'` 等 6 个链接错误。去掉 6 处 `static`，恢复为 `Datum`。该文件注释已说明「几何类型虽删，但这些选择率函数被非几何运算符（如 range 运算符）仍引用，须保留为粗粒度占位」，故不可删、仅须全局可见。
+  - **`src/backend/utils/adt/pgstatfuncs.c`**：删除 2 个零调用 `static` 死函数 `pg_stat_get_replication_slot`（replication 子系统已裁、无调用者、未登记 SQL 函数）与 `pg_stat_get_backend_client_addr`（无调用者、未登记 SQL 函数，仅 `backend_status.c` 注释提及），消除 `-Wunused-function` 告警。
+  - **验证**：`make -j4` 全量编译 + postgres 链接成功（0 error / 0 undefined reference）；残余 `-Wmissing-prototypes`/`/* within comment` 为与本次无关的既有 warning（`fdw_handler_in/out` 等未被 `fmgrprotos.h` 声明，属 FDW 子系统裁后的正常 unused 类告警，不影响编译链接）。
+  - **与不可裁部分零耦合**：仅修正函数链接属性与删死代码，不改任何索引/事务机制；btree/hash 索引、事务均不受影响。
+
+---
+
+## 十一、编译警告驱动的代码清理（2026-08-17）
+
+针对后端 `make -j4` 全量重编暴露的真实 warning（用户早期提供的 warning 列表已因多次裁剪过期），逐一清理，最终后端 + 前端（psql/libpq）均 0 warning / 0 error（除 `backend_status.h` 既有项）。要点：
+
+- **恢复被误删的 `aclcheck_error` / `aclcheck_error_type` 声明（`src/include/utils/acl.h`）**：早期裁剪 ACL 判定时把这两个标准错误报告函数声明一并删掉，导致全树大量 `implicit declaration of function 'aclcheck_error*'` 警告。在 `acl.h` 的 `#endif` 前补回两行 `extern` 声明（函数本体 `aclcheck_error` 仍存活于 `acl.c`，供权限/所有权不足时报错）。
+- **删除 ACL 判定代码残留的 `AclResult aclresult;` 死变量**（上游 ACL 判定块已被删、仅留 `ACLCHECK_OK` 占位，变量声明后从未使用，报 `-Wunused-variable`）：
+  - `src/backend/utils/fmgr/fmgr.c`（`CheckFunctionValidatorAccess`）、`src/backend/executor/nodeWindowAgg.c`（`initialize_peragg` / `build_aggregate_targetlist` 等）、以及 `commands/` 下的 `collationcmds.c` / `conversioncmds.c` / `dbcommands.c` / `extension.c` / `functioncmds.c`。
+- **补充缺失的 `extern` 函数原型**（消除 `-Wmissing-prototypes`）：
+  - `src/backend/utils/adt/rangetypes.c`：为 `tstzrange_subdiff` / `tsrange_subdiff` / `daterange_subdiff` / `numrange_subdiff` / `int8range_subdiff` / `int4range_subdiff` / `daterange_canonical` / `int8range_canonical` / `int4range_canonical` 9 个函数补 `extern` 声明（并在 `postgres.h` 后 `#include "fmgr.h"` 使 `PG_FUNCTION_ARGS` 宏可见）。
+  - `src/backend/utils/adt/selfuncs_geo.c`：为 `contjoinsel` / `contsel` / `positionjoinsel` / `positionsel` / `areajoinsel` / `areasel` 6 个选择率函数补 `extern` 声明（同补 `#include "fmgr.h"`）。
+  - `src/backend/utils/adt/pseudotypes.c`：为宏生成的 `fdw_handler_in` / `fdw_handler_out` 补 `extern` 声明（同补 `#include "fmgr.h"`）。
+  - `src/backend/utils/adt/numeric.c`：为 `numeric_trunc` 补 `extern` 声明。
+- **修正 `grouping_planner` 的混合声明（`src/backend/optimizer/plan/planner.c`）**：把 11 个变量声明（`sort_input_target` / `grouping_target` / `scanjoin_target` 系列、`wflists` / `activeWindows` / `gset_data` / `qp_extra` 等）从「语句之后」整体前移到函数体开头局部变量区，消除 `-Wdeclaration-after-statement` 警告，保持 C90 合规。
+- **前端 `psql` 警告清理（`src/bin/psql/describe.c` + `describe.h`）**：
+  - 删除 `fdwopts_col` 未使用死变量（`\d` 列出 FDW 选项列，FDW 已裁后从未引用）。
+  - 为 `describeRoles`（`\du` / `\dg`）补 `extern bool describeRoles(...)` 原型声明（消除 `-Wmissing-prototypes`）。
+  - 修复 `listTables` 的 `printfPQExpBuffer` 格式参数不匹配警告：format 串在裁剪中已删掉 `materialized view`（`WHEN 'm'`）分支，但参数列表仍残留 `gettext_noop("materialized view")`，导致「too many arguments for format」。删除该多余参数，使 `%s` 占位与参数个数对齐（11 对 11）。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；`make -j4` 全量重编后端 0 warning/0 error，psql/libpq 前端 0 warning/0 error。

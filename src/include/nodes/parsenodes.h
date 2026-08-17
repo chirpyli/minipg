@@ -754,14 +754,6 @@ typedef struct LockingClause
  *	  control visibility.  But it is needed by ruleutils.c to determine
  *	  whether RTEs should be shown in decompiled queries.
  *
- *	  requiredPerms and checkAsUser specify run-time access permissions
- *	  checks to be performed at query startup.  The user must have *all*
- *	  of the permissions that are OR'd together in requiredPerms (zero
- *	  indicates no permissions checking).  If checkAsUser is not zero,
- *	  then do the permissions checks using the access rights of that user,
- *	  not the current effective user ID.  (This allows rules to act as
- *	  setuid gateways.)  Permissions checks only apply to RELATION RTEs.
- *
  *	  For SELECT/INSERT/UPDATE permissions, if the user doesn't have
  *	  table-wide permissions then it is sufficient to have the permissions
  *	  on all columns identified in selectedCols (for SELECT) and/or
@@ -777,13 +769,6 @@ typedef struct LockingClause
  *	  need to ship off.
  *
  *	  extraUpdatedCols is no longer used or maintained; it's always empty.
- *
- *	  securityQuals is a list of security barrier quals (boolean expressions),
- *	  to be tested in the listed order before returning a row from the
- *	  relation.  It is always NIL in parser output.  Entries are added by the
- *	  rewriter to implement security-barrier views and/or row-level security.
- *	  Note that the planner turns each boolean expression into an implicitly
- *	  AND'ed sublist, as is its usual habit with qualification expressions.
  *--------------------
  */
 typedef enum RTEKind
@@ -943,13 +928,10 @@ typedef struct RangeTblEntry
 	bool		lateral;		/* subquery, function, or values is LATERAL? */
 	bool		inh;			/* inheritance requested? */
 	bool		inFromCl;		/* present in FROM clause? */
-	AclMode		requiredPerms;	/* bitmask of required access permissions */
-	Oid			checkAsUser;	/* if valid, check access as this role */
 	Bitmapset  *selectedCols;	/* columns needing SELECT permission */
 	Bitmapset  *insertedCols;	/* columns needing INSERT permission */
 	Bitmapset  *updatedCols;	/* columns needing UPDATE permission */
 	Bitmapset  *extraUpdatedCols;	/* generated columns being updated */
-	List	   *securityQuals;	/* security barrier quals to apply, if any */
 } RangeTblEntry;
 
 /*
@@ -1493,6 +1475,7 @@ typedef struct AlterTableStmt
 	ObjectType	objtype;		/* type of object */
 	bool		missing_ok;		/* skip error if table missing */
 } AlterTableStmt;
+
 
 typedef enum AlterTableType
 {
@@ -2226,24 +2209,6 @@ typedef struct InlineCodeBlock
 	bool		langIsTrusted;	/* trusted property of the language */
 	bool		atomic;			/* atomic execution context */
 } InlineCodeBlock;
-
-/* ----------------------
- *		Alter Object Rename Statement
- * ----------------------
- */
-typedef struct RenameStmt
-{
-	NodeTag		type;
-	ObjectType	renameType;		/* OBJECT_TABLE, OBJECT_COLUMN, etc */
-	ObjectType	relationType;	/* if column name, associated relation type */
-	RangeVar   *relation;		/* in case it's a table */
-	Node	   *object;			/* in case it's some other object */
-	char	   *subname;		/* name of contained object (column, rule,
-								 * trigger, etc) */
-	char	   *newname;		/* the new name */
-	DropBehavior behavior;		/* RESTRICT or CASCADE behavior */
-	bool		missing_ok;		/* skip error if missing? */
-} RenameStmt;
 
 /* ----------------------
  * ALTER object DEPENDS ON EXTENSION extname
