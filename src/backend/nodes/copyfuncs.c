@@ -1168,8 +1168,6 @@ _copyRangeVar(const RangeVar *from)
 }
 
 /*
-
-/*
  * We don't need a _copyExpr because Expr is an abstract supertype which
  * should never actually get instantiated.  Also, since it has no common
  * fields except NodeTag, there's no need for a helper routine to factor

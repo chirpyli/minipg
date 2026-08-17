@@ -1860,7 +1860,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 /*
  * Add an entry for a table function to the pstate's range table (p_rtable).
  * Then, construct and return a ParseNamespaceItem for the new RTE.
- *
+ */
 
 /*
  * Add an entry for a VALUES list to the pstate's range table (p_rtable).

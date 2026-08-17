@@ -3708,7 +3708,6 @@ ExecEvalConstraintCheck(ExprState *state, ExprEvalStep *op)
 }
 
 /*
-/*
  * ExecEvalGroupingFunc
  *
  * Computes a bitmask with a bit for each (unevaluated) argument expression

@@ -5416,12 +5416,6 @@ set_function_size_estimates(PlannerInfo *root, RelOptInfo *rel)
 }
 
 /*
- * set_function_size_estimates
- *		Set the size estimates for a base relation that is a function call.
- *
- * The rel's targetlist and restrictinfo list must have been constructed
- * already.
-/*
  * set_values_size_estimates
  *		Set the size estimates for a base relation that is a values list.
  *

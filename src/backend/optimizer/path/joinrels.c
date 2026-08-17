@@ -1319,21 +1319,7 @@ restriction_is_constant_false(List *restrictlist,
 	return false;
 }
 
-/*
- * Assess whether join between given two partitioned relations can be broken
- * down into joins between matching partitions; a technique called
- * "partitionwise join"
- *
- * Partitionwise join is possible when a. Joining relations have same
- * partitioning scheme b. There exists an equi-join between the partition keys
- * of the two relations.
- *
- * Partitionwise join is planned as follows (details: optimizer/README.)
- *
- * 1. Create the RelOptInfos for joins between matching partitions i.e
- * child-joins and add paths to them.
- *
- * 2. Construct Append or MergeAppend paths across the set of child joins.
+
 /*
  * Construct the SpecialJoinInfo for a child-join by translating
  * SpecialJoinInfo for the join between parents. left_relids and right_relids

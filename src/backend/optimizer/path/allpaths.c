@@ -2203,8 +2203,6 @@ set_values_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 
 
 /*
-
-/*
  * set_namedtuplestore_pathlist
  *		Build the (single) access path for a named tuplestore RTE
  *
@@ -2263,8 +2261,6 @@ set_result_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	/* Select cheapest path (pretty easy in this case...) */
 	set_cheapest(rel);
 }
-
-/*
 
 /*
  * generate_gather_paths
@@ -3348,9 +3344,6 @@ compute_parallel_worker(RelOptInfo *rel, double heap_pages, double index_pages,
 
 	return parallel_workers;
 }
-
-/*
-
 
 /*****************************************************************************
  *			DEBUG SUPPORT

@@ -1612,8 +1612,6 @@ typedef struct AlterDomainStmt
 } AlterDomainStmt;
 
 
-/* ----------------------
-
 /*
  * ObjectWithArgs represents a function/procedure/operator name plus parameter
  * identification.
@@ -1639,10 +1637,6 @@ typedef struct ObjectWithArgs
 	List	   *objfuncargs;	/* list of FunctionParameter nodes */
 	bool		args_unspecified;	/* argument list was omitted? */
 } ObjectWithArgs;
-
-/*
- * An access privilege, with optional list of column names
-
 
 /* ----------------------
  * SET Statement (includes RESET)

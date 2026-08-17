@@ -1733,10 +1733,6 @@ transformReturningList(ParseState *pstate, List *returningList)
 
 /*
  * transformDeclareCursorStmt -
-
-
-/*
- * transformDeclareCursorStmt -
  *	transform a DECLARE CURSOR Statement
  *
  * DECLARE CURSOR is like other utility statements in that we emit it as a

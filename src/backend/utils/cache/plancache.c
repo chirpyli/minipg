@@ -588,8 +588,6 @@ RevalidateCachedQuery(CachedPlanSource *plansource,
 	}
 
 	/*
-
-	/*
 	 * If the query is currently valid, acquire locks on the referenced
 	 * objects; then check again.  We need to do it this way to cover the race
 	 * condition that an invalidation message arrives before we get the locks.

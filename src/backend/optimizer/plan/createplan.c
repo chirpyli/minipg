@@ -3524,8 +3524,6 @@ create_valuesscan_plan(PlannerInfo *root, Path *best_path,
 }
 
 /*
-
-/*
  * create_namedtuplestorescan_plan
  *	 Returns a tuplestorescan plan for the base relation scanned by
  *	'best_path' with restriction clauses 'scan_clauses' and targetlist
@@ -3601,9 +3599,6 @@ create_resultscan_plan(PlannerInfo *root, Path *best_path,
 
 	return scan_plan;
 }
-
-/*
-
 
 /*
  * create_customscan_plan

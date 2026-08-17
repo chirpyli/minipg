@@ -1972,7 +1972,7 @@ tlist_coercion_finished:
 		newquery->jointree = makeFromExpr(list_make1(rtr), NULL);
 
 		/*
-		/* Replace original query in the correct element of the query list */
+		 * Replace original query in the correct element of the query list */
 		lfirst(parse_cell) = newquery;
 	}
 

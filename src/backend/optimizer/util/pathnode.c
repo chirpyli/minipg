@@ -2065,8 +2065,6 @@ create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
-
-/*
  * create_namedtuplestorescan_path
  *	  Creates a path corresponding to a scan of a named tuplestore, returning
  *	  the pathnode.

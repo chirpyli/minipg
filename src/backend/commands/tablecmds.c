@@ -9116,10 +9116,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
  * change_owner_recurse_to_sequences
  *
  * Helper function for ATExecChangeOwner.  Examines pg_depend searching
-/*
- * change_owner_recurse_to_sequences
- *
- * Helper function for ATExecChangeOwner.  Examines pg_depend searching
  * for sequences that are dependent on serial columns, and changes their
  * ownership.
  */
@@ -10819,7 +10815,7 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 
 /*
  * Transform any expressions present in the partition key
- *
+ */
 
 /*
  * ConstraintImpliedByRelConstraint
@@ -10878,7 +10874,6 @@ ConstraintImpliedByRelConstraint(Relation scanrel, List *testConstraint, List *p
 	return predicate_implied_by(testConstraint, existConstraint, true);
 }
 
-/*
 /*
  * resolve column compression specification to compression method.
  */
