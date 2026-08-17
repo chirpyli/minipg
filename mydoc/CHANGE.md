@@ -403,11 +403,28 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
   - `HistoricSnapshotActive`/`SetupHistoricSnapshot`/`HeapTupleSatisfiesHistoricMVCC`/`ResolveCminCmaxDuringDecoding` 逻辑解码残留：虽 `SetupHistoricSnapshot` 无调用者（即 `HistoricSnapshot` 恒 NULL、`HistoricSnapshotActive()` 恒 false），但 `HeapTupleSatisfiesHistoricMVCC` 经 `HeapTupleSatisfiesVisibility` 的 `SNAPSHOT_HISTORIC_MVCC` 分支可达，且 `snapshot_type` 枚举、`relcache.c`/`snapmgr.c` 的多处 `if` 守卫与之耦合。属核心 MVCC 可见性热路径，移除需同时清理快照分发、全局变量、`tuplecid_data` 及多个 if 守卫，风险高、学习价值（MVCC 子系统）高，**暂不裁剪**。
   - `qual_security_level`/`security_level` 传播链：securityQuals 字段虽已删，但 `security_level` 已深度编织进 `distribute_qual_to_rels`→`create_restrictinfo`→`RestrictInfo.security_level`→`outfuncs`/`readfuncs`→`createplan.c` 的成本排序逻辑，是规划器 clause 排序的**结构性组成部分**（恒 0 但生效），并非纯死代码；移除会触碰计划序列化格式与成本排序行为，**暂不裁剪**（学习价值高、风险高）。
   - `HAVE_IPV6` 未生效条件编译块（`ifaddr.c` 11 处、`fe-connect.c` 1 处）：属 `#ifdef` 编译期守卫，是否实际生效取决于 configure 是否定义 `HAVE_IPV6`；若当前构建已定义则该分支仍活跃。属条件编译噪音，需先确认 `pg_config.h` 中 `HAVE_IPV6` 真未定义再决定是否清理，**本轮未确认，暂缓**。
-  - `T_AlterOwnerStmt` 孤立死语法（owner 机制已删、执行体为空块 `{}`）：确为死语法，但删除涉及 `gram.y` 整个 `AlterOwnerStmt:` 产生式（15 个分支）及 `utility.c`×5、`equalfuncs.c`、`copyfuncs.c`、`nodes.h`、`parsenodes.h` 的连带删除，且需确认无其它文法引用该非终结符，改动面大，**本轮未执行**（留待后续独立裁剪）。
+  - `T_AlterOwnerStmt` 孤立死语法（owner 机制已删、执行体为空块 `{}`）：**已于 2026-08-18 执行裁剪**（见下「十二-补」）。
   - `partitionwise join/aggregate`：`consider_partitionwise_*` 确无赋值点、整条优化路径不可达，但 `enable_partitionwise_aggregate` 仍接线于 `planner.c` 且分区表已删；与分区功能整体耦合，宜随分区相关逻辑统一清理，**本轮未单独裁剪**。
   - `pg_user_mapping` catalog：确认全树 `.c` 零引用，仅残 `typedefs.list`（pgindent 用）与 `objectaccess.h` 注释中的一词；属 pgindent/注释噪音，非真实死代码，未改动。
 
 - **验证**：`src/backend/catalog`、`src/backend/utils/cache`、`src/backend/utils/adt`、`src/backend/commands`、`src/bin/psql` 增量 `make` 全部 0 error/0 warning（既有 `pg_operator.c:585 aclresult` 警告与本轮无关）。与不可裁部分（btree/hash 索引、事务）零耦合。
+
+### 十二-补：裁剪 `ALTER ... OWNER TO` 死代码链（2026-08-18）
+
+角色系统裁剪后，`ALTER ... OWNER TO` 的执行函数 `ExecAlterOwnerStmt` 已被删除，但整条语法链（生成 + 分发）残留，且 `utility.c` 中对应 case 为静默空壳（`case T_AlterOwnerStmt: break;` / `{}`），构成功能性 bug（语句被静默丢弃）。本轮彻底删除该链：
+
+- `src/include/commands/alter.h`：删除 `ExecAlterOwnerStmt` 与 `AlterObjectOwner_internal` 两个孤立 extern 声明。
+- `src/include/nodes/parsenodes.h`：删除 `AlterOwnerStmt` 结构体定义。
+- `src/include/nodes/nodes.h`：删除 `T_AlterOwnerStmt` 枚举项（连带使后续 `T_AlterOperatorStmt` 等枚举值 -1；节点支持文件在 make 时自动重生成）。
+- `src/backend/parser/gram.y`：删除 `%type` 中的 `AlterOwnerStmt`、顶层 `stmt` 规则引用、以及全部 15 条 `AlterOwnerStmt:` 产生式（含 `OWNER TO RoleSpec` 分支）。
+- `src/backend/nodes/copyfuncs.c`：`_copyAlterOwnerStmt` 函数及 `case T_AlterOwnerStmt` 分支。
+- `src/backend/nodes/equalfuncs.c`：`_equalAlterOwnerStmt` 函数及 `case T_AlterOwnerStmt` 分支。
+- `src/backend/tcop/utility.c`：删除全部 4 处 `T_AlterOwnerStmt` case（`ProcessUtility` 的 fall-through 组合、`standard_ProcessUtility` 的空块、以及 `CreateCommandTag` / `GetCommandLogLevel` 中的 tag/lev 分支）。现 `ALTER ... OWNER` 因无文法支持直接报语法错误。
+- `src/tools/pgindent/typedefs.list`：移除 `AlterOwnerStmt`（pgindent 噪音，保持列表一致）。
+
+**保留**：`RoleSpec` 节点仍被 `ALTER TABLE ... OWNER TO`（`AT_ChangeOwner`）与 `CREATE TABLESPACE ... OWNER` 使用，未删除。
+
+**验证**：`make -C src` 全量重编译并删除 `src/backend/postgres` 后重链接，0 error、0 undefined reference，二进制正常生成。
 
 ---
 

@@ -2137,19 +2137,6 @@ typedef struct AlterObjectSchemaStmt
 } AlterObjectSchemaStmt;
 
 /* ----------------------
- *		Alter Object Owner Statement
- * ----------------------
- */
-typedef struct AlterOwnerStmt
-{
-	NodeTag		type;
-	ObjectType	objectType;		/* OBJECT_TABLE, OBJECT_TYPE, etc */
-	RangeVar   *relation;		/* in case it's a table */
-	Node	   *object;			/* in case it's some other object */
-	RoleSpec   *newowner;		/* the new owner */
-} AlterOwnerStmt;
-
-/* ----------------------
  *		Alter Operator Set ( this-n-that )
  * ----------------------
  */

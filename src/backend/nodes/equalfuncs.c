@@ -1268,16 +1268,6 @@ _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSch
 	return true;
 }
 
-static bool
-_equalAlterOwnerStmt(const AlterOwnerStmt *a, const AlterOwnerStmt *b)
-{
-	COMPARE_SCALAR_FIELD(objectType);
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(object);
-	COMPARE_NODE_FIELD(newowner);
-
-	return true;
-}
 
 static bool
 _equalAlterOperatorStmt(const AlterOperatorStmt *a, const AlterOperatorStmt *b)
@@ -2567,9 +2557,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);
-			break;
-		case T_AlterOwnerStmt:
-			retval = _equalAlterOwnerStmt(a, b);
 			break;
 		case T_AlterOperatorStmt:
 			retval = _equalAlterOperatorStmt(a, b);

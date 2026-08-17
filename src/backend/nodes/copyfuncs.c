@@ -3095,18 +3095,6 @@ _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
 	return newnode;
 }
 
-static AlterOwnerStmt *
-_copyAlterOwnerStmt(const AlterOwnerStmt *from)
-{
-	AlterOwnerStmt *newnode = makeNode(AlterOwnerStmt);
-
-	COPY_SCALAR_FIELD(objectType);
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(object);
-	COPY_NODE_FIELD(newowner);
-
-	return newnode;
-}
 
 static AlterOperatorStmt *
 _copyAlterOperatorStmt(const AlterOperatorStmt *from)
@@ -4139,9 +4127,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);
-			break;
-		case T_AlterOwnerStmt:
-			retval = _copyAlterOwnerStmt(from);
 			break;
 		case T_AlterOperatorStmt:
 			retval = _copyAlterOperatorStmt(from);

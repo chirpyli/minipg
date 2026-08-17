@@ -238,7 +238,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
 		AlterCollationStmt
 		AlterDatabaseStmt AlterDomainStmt AlterEnumStmt
-		AlterObjectDependsStmt AlterObjectSchemaStmt AlterOwnerStmt
+		AlterObjectDependsStmt AlterObjectSchemaStmt
 		AlterOperatorStmt AlterTypeStmt AlterTableStmt
 		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
 		AlterCompositeTypeStmt
@@ -766,7 +766,6 @@ stmt:	AlterCollationStmt
 			| AlterFunctionStmt
 			| AlterObjectDependsStmt
 			| AlterObjectSchemaStmt
-			| AlterOwnerStmt
 			| AlterOperatorStmt
 			| AlterTypeStmt
 			| AlterTableStmt
@@ -5575,133 +5574,6 @@ AlterTypeStmt:
 				}
 		;
 
-/*****************************************************************************
- *
- * ALTER THING name OWNER TO newname
- *
- *****************************************************************************/
-
-AlterOwnerStmt: ALTER AGGREGATE aggregate_with_argtypes OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_AGGREGATE;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER COLLATION any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_COLLATION;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER CONVERSION_P any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_CONVERSION;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER DATABASE name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_DATABASE;
-					n->object = (Node *) makeString($3);
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER DOMAIN_P any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_DOMAIN;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER FUNCTION function_with_argtypes OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_FUNCTION;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR operator_with_argtypes OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_OPERATOR;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR CLASS any_name USING name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_OPCLASS;
-					n->object = (Node *) lcons(makeString($6), $4);
-					n->newowner = $9;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR FAMILY any_name USING name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_OPFAMILY;
-					n->object = (Node *) lcons(makeString($6), $4);
-					n->newowner = $9;
-					$$ = (Node *)n;
-				}
-			| ALTER PROCEDURE function_with_argtypes OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_PROCEDURE;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER ROUTINE function_with_argtypes OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_ROUTINE;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER SCHEMA name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_SCHEMA;
-					n->object = (Node *) makeString($3);
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER TYPE_P any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_TYPE;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER TABLESPACE name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_TABLESPACE;
-					n->object = (Node *) makeString($3);
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER STATISTICS any_name OWNER TO RoleSpec
-				{
-					AlterOwnerStmt *n = makeNode(AlterOwnerStmt);
-					n->objectType = OBJECT_STATISTIC_EXT;
-					n->object = (Node *) $3;
-					n->newowner = $6;
-					$$ = (Node *)n;
-				}
-			;
 
 
 /*****************************************************************************

@@ -133,7 +133,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterObjectSchemaStmt:
 		case T_AlterOpFamilyStmt:
 		case T_AlterOperatorStmt:
-		case T_AlterOwnerStmt:
 		case T_AlterStatsStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableSpaceOptionsStmt:
@@ -755,16 +754,10 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 				AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *) parsetree;
 
 				ExecAlterObjectSchemaStmt(stmt, NULL);
-			}
-			break;
+				}
+				break;
 
-		case T_AlterOwnerStmt:
-			{
-
-			}
-			break;
-
-		default:
+				default:
 			/* All other statement types have event trigger support */
 			ProcessUtilitySlow(pstate, pstmt, queryString,
 							   context, params, queryEnv,
@@ -1199,12 +1192,9 @@ ProcessUtilitySlow(ParseState *pstate,
 				address =
 					ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree,
 											  &secondaryObject);
-				break;
+											  break;
 
-			case T_AlterOwnerStmt:
-				break;
-
-			case T_AlterOperatorStmt:
+											  case T_AlterOperatorStmt:
 				address = AlterOperator((AlterOperatorStmt *) parsetree);
 				break;
 
@@ -1859,10 +1849,6 @@ CreateCommandTag(Node *parsetree)
 			tag = AlterObjectTypeCommandTag(((AlterObjectSchemaStmt *) parsetree)->objectType);
 			break;
 
-		case T_AlterOwnerStmt:
-			tag = AlterObjectTypeCommandTag(((AlterOwnerStmt *) parsetree)->objectType);
-			break;
-
 		case T_AlterTableMoveAllStmt:
 			tag = AlterObjectTypeCommandTag(((AlterTableMoveAllStmt *) parsetree)->objtype);
 			break;
@@ -2366,10 +2352,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterObjectSchemaStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterOwnerStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
