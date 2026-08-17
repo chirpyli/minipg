@@ -33,10 +33,6 @@ ALTER TABLE [ IF EXISTS ] <replaceable class="parameter">name</replaceable>
     SET SCHEMA <replaceable class="parameter">new_schema</replaceable>
 ALTER TABLE ALL IN TABLESPACE <replaceable class="parameter">name</replaceable> [ OWNED BY <replaceable class="parameter">role_name</replaceable> [, ... ] ]
     SET TABLESPACE <replaceable class="parameter">new_tablespace</replaceable> [ NOWAIT ]
-ALTER TABLE [ IF EXISTS ] <replaceable class="parameter">name</replaceable>
-    ATTACH PARTITION <replaceable class="parameter">partition_name</replaceable> { FOR VALUES <replaceable class="parameter">partition_bound_spec</replaceable> | DEFAULT }
-ALTER TABLE [ IF EXISTS ] <replaceable class="parameter">name</replaceable>
-    DETACH PARTITION <replaceable class="parameter">partition_name</replaceable> [ CONCURRENTLY | FINALIZE ]
 
 <phrase>where <replaceable class="parameter">action</replaceable> is one of:</phrase>
 
@@ -80,29 +76,11 @@ ALTER TABLE [ IF EXISTS ] <replaceable class="parameter">name</replaceable>
     SET ( <replaceable class="parameter">storage_parameter</replaceable> [= <replaceable class="parameter">value</replaceable>] [, ... ] )
     RESET ( <replaceable class="parameter">storage_parameter</replaceable> [, ... ] )
     INHERIT <replaceable class="parameter">parent_table</replaceable>
-    NO INHERIT <replaceable class="parameter">parent_table</replaceable>
-    OF <replaceable class="parameter">type_name</replaceable>
-    NOT OF
-    OWNER TO { <replaceable class="parameter">new_owner</replaceable> | CURRENT_ROLE | CURRENT_USER | SESSION_USER }
-    REPLICA IDENTITY { DEFAULT | USING INDEX <replaceable class="parameter">index_name</replaceable> | FULL | NOTHING }
-
-<phrase>and <replaceable class="parameter">partition_bound_spec</replaceable> is:</phrase>
-
-IN ( <replaceable class="parameter">partition_bound_expr</replaceable> [, ...] ) |
-FROM ( { <replaceable class="parameter">partition_bound_expr</replaceable> | MINVALUE | MAXVALUE } [, ...] )
-  TO ( { <replaceable class="parameter">partition_bound_expr</replaceable> | MINVALUE | MAXVALUE } [, ...] ) |
-WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REMAINDER <replaceable class="parameter">numeric_literal</replaceable> )
 
 <phrase>and <replaceable class="parameter">column_constraint</replaceable> is:</phrase>
 
 [ CONSTRAINT <replaceable class="parameter">constraint_name</replaceable> ]
 { NOT NULL |
-  NULL |
-  CHECK ( <replaceable class="parameter">expression</replaceable> ) [ NO INHERIT ] |
-  DEFAULT <replaceable>default_expr</replaceable> |
-  GENERATED ALWAYS AS ( <replaceable>generation_expr</replaceable> ) STORED |
-  GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY [ ( <replaceable>sequence_options</replaceable> ) ] |
-  UNIQUE <replaceable class="parameter">index_parameters</replaceable> |
   PRIMARY KEY <replaceable class="parameter">index_parameters</replaceable> |
   REFERENCES <replaceable class="parameter">reftable</replaceable> [ ( <replaceable class="parameter">refcolumn</replaceable> ) ] [ MATCH FULL | MATCH PARTIAL | MATCH SIMPLE ]
     [ ON DELETE <replaceable class="parameter">referential_action</replaceable> ] [ ON UPDATE <replaceable class="parameter">referential_action</replaceable> ] }
@@ -232,16 +210,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       <literal>NULL</literal> can exist, then the table scan is skipped.
      </para>
 
-     <para>
-      If this table is a partition, one cannot perform <literal>DROP NOT NULL</literal>
-      on a column if it is marked <literal>NOT NULL</literal> in the parent
-      table.  To drop the <literal>NOT NULL</literal> constraint from all the
-      partitions, perform <literal>DROP NOT NULL</literal> on the parent
-      table.  Even if there is no <literal>NOT NULL</literal> constraint on the
-      parent, such a constraint can still be added to individual partitions,
-      if desired; that is, the children can disallow nulls even if the parent
-      allows them, but not the other way around.
-     </para>
     </listitem>
    </varlistentry>
 
@@ -331,8 +299,7 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       <link linkend="sql-analyze"><command>ANALYZE</command></link>
       operations. <literal>n_distinct</literal> affects the statistics for the
       table itself, while <literal>n_distinct_inherited</literal> affects the
-      statistics gathered for the table plus its inheritance children, and for
-      the statistics gathered for partitioned tables.  When the value
+      statistics gathered for the table plus its inheritance children.  When the value
       specified is a positive value, the query planner will assume that the
       column contains exactly the specified number of distinct nonnull values.
       Fractional values may also be specified by using values below 0 and
@@ -450,13 +417,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       constraint is declared.
      </para>
 
-     <para>
-      Additional restrictions apply when unique or primary key constraints
-      are added to partitioned tables; see <link linkend="sql-createtable"><command>CREATE TABLE</command></link>.
-      Also, foreign key constraints on partitioned
-      tables may not be declared <literal>NOT VALID</literal> at present.
-     </para>
-
     </listitem>
    </varlistentry>
 
@@ -497,10 +457,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       a regular <literal>ADD PRIMARY KEY</literal> or <literal>ADD UNIQUE</literal>
       command.  In particular, dropping the constraint will make the index
       disappear too.
-     </para>
-
-     <para>
-      This form is not currently supported on partitioned tables.
      </para>
 
      <note>
@@ -699,10 +655,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       moves the data file(s) associated with the table to the new tablespace.
       Indexes on the table, if any, are not moved; but they can be moved
       separately with additional <literal>SET TABLESPACE</literal> commands.
-      When applied to a partitioned table, nothing is moved, but any
-      partitions created afterwards with
-      <command>CREATE TABLE PARTITION OF</command> will use that tablespace,
-      unless overridden by a <literal>TABLESPACE</literal> clause.
      </para>
 
      <para>
@@ -844,62 +796,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
     </listitem>
    </varlistentry>
 
-   <varlistentry id="sql-altertable-replica-identity">
-    <term><literal>REPLICA IDENTITY</literal></term>
-    <listitem>
-     <para>
-      This form changes the information which is written to the write-ahead log
-      to identify rows which are updated or deleted.
-      In most cases, the old value of each column is only logged if it differs
-      from the new value; however, if the old value is stored externally, it is
-      always logged regardless of whether it changed.
-      This option has no effect except when logical replication is in use.
-     <variablelist>
-      <varlistentry>
-       <term><literal>DEFAULT</literal></term>
-       <listitem>
-        <para>
-         Records the old values of the columns of the primary key, if any.
-         This is the default for non-system tables. 
-        </para>
-       </listitem>
-      </varlistentry>
-
-      <varlistentry>
-       <term><literal>USING INDEX <replaceable class="parameter">index_name</replaceable></literal></term>
-       <listitem>
-        <para>
-         Records the old values of the columns covered by the named index,
-         that must be unique, not partial, not deferrable, and include only
-         columns marked <literal>NOT NULL</literal>. If this index is
-         dropped, the behavior is the same as <literal>NOTHING</literal>.
-        </para>
-       </listitem>
-      </varlistentry>
-
-      <varlistentry>
-       <term><literal>FULL</literal></term>
-       <listitem>
-        <para>
-         Records the old values of all columns in the row.
-        </para>
-       </listitem>
-      </varlistentry>
-
-      <varlistentry>
-       <term><literal>NOTHING</literal></term>
-       <listitem>
-        <para>
-         Records no information about the old row. This is the default for
-         system tables.
-        </para>
-       </listitem>
-      </varlistentry>
-     </variablelist>
-     </para>
-    </listitem>
-   </varlistentry>
-
    <varlistentry>
     <term><literal>RENAME</literal></term>
     <listitem>
@@ -924,153 +820,17 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
     </listitem>
    </varlistentry>
 
-   <varlistentry id="sql-altertable-attach-partition">
-    <term><literal>ATTACH PARTITION <replaceable class="parameter">partition_name</replaceable> { FOR VALUES <replaceable class="parameter">partition_bound_spec</replaceable> | DEFAULT }</literal></term>
-    <listitem>
-     <para>
-      This form attaches an existing table (which might itself be partitioned)
-      as a partition of the target table. The table can be attached
-      as a partition for specific values using <literal>FOR VALUES</literal>
-      or as a default partition by using <literal>DEFAULT</literal>.
-      For each index in the target table, if a valid equivalent index
-      already exists in the partition, it will be attached to the target
-      table's index, as if ALTER INDEX ATTACH PARTITION had been executed;
-      otherwise, a new corresponding index will be created.  Invalid indexes
-      on the partition are skipped.
-      Note that if the existing table is a foreign table, it is currently not
-      allowed to attach the table as a partition of the target table if there
-      are <literal>UNIQUE</literal> indexes on the target table.  For each user-defined
-      row-level trigger that exists in the target table, a corresponding one
-      is created in the attached table.
-     </para>
-
-     <para>
-      A partition using <literal>FOR VALUES</literal> uses same syntax for
-      <replaceable class="parameter">partition_bound_spec</replaceable> as
-      <link linkend="sql-createtable"><command>CREATE TABLE</command></link>.
-      The partition bound specification
-      must correspond to the partitioning strategy and partition key of the
-      target table.  The table to be attached must have all the same columns
-      as the target table and no more; moreover, the column types must also
-      match.  Also, it must have all the <literal>NOT NULL</literal> and
-      <literal>CHECK</literal> constraints of the target table, not marked
-      <literal>NO INHERIT</literal>.  Currently
-      <literal>FOREIGN KEY</literal> constraints are not considered.
-      <literal>UNIQUE</literal> and <literal>PRIMARY KEY</literal> constraints
-      from the parent table will be created in the partition, if they don't
-      already exist.
-     </para>
-
-     <para>
-      If the new partition is a regular table, a full table scan is performed
-      to check that existing rows in the table do not violate the partition
-      constraint. It is possible to avoid this scan by adding a valid
-      <literal>CHECK</literal> constraint to the table that allows only
-      rows satisfying the desired partition constraint before running this
-      command. The <literal>CHECK</literal> constraint will be used to
-      determine that the table need not be scanned to validate the partition
-      constraint. This does not work, however, if any of the partition keys
-      is an expression and the partition does not accept
-      <literal>NULL</literal> values. If attaching a list partition that will
-      not accept <literal>NULL</literal> values, also add a
-      <literal>NOT NULL</literal> constraint to the partition key column,
-      unless it's an expression.
-     </para>
-
-     <para>
-      If the new partition is a foreign table, nothing is done to verify
-      that all the rows in the foreign table obey the partition constraint.
-     </para>
-
-     <para>
-      When a table has a default partition, defining a new partition changes
-      the partition constraint for the default partition. The default
-      partition can't contain any rows that would need to be moved to the new
-      partition, and will be scanned to verify that none are present. This
-      scan, like the scan of the new partition, can be avoided if an
-      appropriate <literal>CHECK</literal> constraint is present. Also like
-      the scan of the new partition, it is always skipped when the default
-      partition is a foreign table.
-     </para>
-
-     <para>
-      Attaching a partition acquires a
-      <literal>SHARE UPDATE EXCLUSIVE</literal> lock on the parent table,
-      in addition to the <literal>ACCESS EXCLUSIVE</literal> locks on the table
-      being attached and on the default partition (if any).
-     </para>
-
-     <para>
-      Further locks must also be held on all sub-partitions if the table being
-      attached is itself a partitioned table.  Likewise if the default
-      partition is itself a partitioned table.  The locking of the
-      sub-partitions can be avoided by adding a <literal>CHECK</literal>
-      constraint as described in
-      <xref linkend="ddl-partitioning-declarative-maintenance"/>.
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry id="sql-altertable-detach-partition">
-    <term><literal>DETACH PARTITION <replaceable class="parameter">partition_name</replaceable> [ CONCURRENTLY | FINALIZE ]</literal></term>
-
-    <listitem>
-     <para>
-      This form detaches the specified partition of the target table.  The detached
-      partition continues to exist as a standalone table, but no longer has any
-      ties to the table from which it was detached.  Any indexes that were
-      attached to the target table's indexes are detached.  Any triggers that
-      were created as clones of those in the target table are removed.
-      <literal>SHARE</literal> lock is obtained on any tables that reference
-      this partitioned table in foreign key constraints.
-     </para>
-     <para>
-      If <literal>CONCURRENTLY</literal> is specified, it runs using a reduced
-      lock level to avoid blocking other sessions that might be accessing the
-      partitioned table.  In this mode, two transactions are used internally.
-      During the first transaction, a <literal>SHARE UPDATE EXCLUSIVE</literal>
-      lock is taken on both parent table and partition, and the partition is
-      marked as undergoing detach; at that point, the transaction is committed
-      and all other transactions using the partitioned table are waited for.
-      Once all those transactions have completed, the second transaction
-      acquires <literal>SHARE UPDATE EXCLUSIVE</literal> on the partitioned
-      table and <literal>ACCESS EXCLUSIVE</literal> on the partition,
-      and the detach process completes.  A <literal>CHECK</literal> constraint
-      that duplicates the partition constraint is added to the partition.
-      <literal>CONCURRENTLY</literal> cannot be run in a transaction block and
-      is not allowed if the partitioned table contains a default partition.
-     </para>
-     <para>
-      If <literal>FINALIZE</literal> is specified, a previous
-      <literal>DETACH CONCURRENTLY</literal> invocation that was canceled or
-      interrupted is completed.
-      At most one partition in a partitioned table can be pending detach at
-      a time.
-     </para>
-    </listitem>
-   </varlistentry>
 
   </variablelist>
   </para>
 
-  <para>
-   All the forms of ALTER TABLE that act on a single table, except
-   <literal>RENAME</literal>, <literal>SET SCHEMA</literal>,
-   <literal>ATTACH PARTITION</literal>, and
-   <literal>DETACH PARTITION</literal> can be combined into
-   a list of multiple alterations to be applied together.  For example, it
-   is possible to add several columns and/or alter the type of several
-   columns in a single command.  This is particularly useful with large
-   tables, since only one pass over the table need be made.
-  </para>
 
   <para>
    You must own the table to use <command>ALTER TABLE</command>.
    To change the schema or tablespace of a table, you must also have
    <literal>CREATE</literal> privilege on the new schema or tablespace.
    To add the table as a new child of a parent table, you must own the parent
-   table as well.  Also, to attach a table as a new partition of the table,
-   you must own the table being attached.
+   table as well.
    To alter the owner, you must also be a direct or indirect member of the new
    owning role, and that role must have <literal>CREATE</literal> privilege on
    the table's schema.  (These restrictions enforce that altering the owner
@@ -1286,25 +1046,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
       </listitem>
      </varlistentry>
 
-     <varlistentry>
-      <term><replaceable class="parameter">partition_name</replaceable></term>
-      <listitem>
-       <para>
-        The name of the table to attach as a new partition or to detach from this table.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="parameter">partition_bound_spec</replaceable></term>
-      <listitem>
-       <para>
-        The partition bound specification for a new partition.  Refer to
-        <xref linkend="sql-createtable"/> for more details on the syntax of the same.
-       </para>
-      </listitem>
-     </varlistentry>
-
     </variablelist>
  </refsect1>
 
@@ -1341,11 +1082,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
     Adding a <literal>CHECK</literal> or <literal>NOT NULL</literal> constraint requires
     scanning the table to verify that existing rows meet the constraint,
     but does not require a table rewrite.
-   </para>
-
-   <para>
-    Similarly, when attaching a new partition it may be scanned to verify that
-    existing rows meet the partition constraint.
    </para>
 
    <para>
@@ -1444,9 +1180,6 @@ WITH ( MODULUS <replaceable class="parameter">numeric_literal</replaceable>, REM
     COLUMN</literal> (i.e., <command>ALTER TABLE ONLY ... DROP
     COLUMN</command>) never removes any descendant columns, but
     instead marks them as independently defined rather than inherited.
-    A nonrecursive <literal>DROP COLUMN</literal> command will fail for a
-    partitioned table, because all partitions of a table must have the same
-    columns as the partitioning root.
    </para>
 
    <para>
@@ -1660,41 +1393,6 @@ ALTER TABLE myschema.distributors SET SCHEMA yourschema;
 CREATE UNIQUE INDEX CONCURRENTLY dist_id_temp_idx ON distributors (dist_id);
 ALTER TABLE distributors DROP CONSTRAINT distributors_pkey,
     ADD CONSTRAINT distributors_pkey PRIMARY KEY USING INDEX dist_id_temp_idx;
-</programlisting></para>
-
-  <para>
-   To attach a partition to a range-partitioned table:
-<programlisting>
-ALTER TABLE measurement
-    ATTACH PARTITION measurement_y2016m07 FOR VALUES FROM ('2016-07-01') TO ('2016-08-01');
-</programlisting></para>
-
-  <para>
-   To attach a partition to a list-partitioned table:
-<programlisting>
-ALTER TABLE cities
-    ATTACH PARTITION cities_ab FOR VALUES IN ('a', 'b');
-</programlisting></para>
-
-  <para>
-   To attach a partition to a hash-partitioned table:
-<programlisting>
-ALTER TABLE orders
-    ATTACH PARTITION orders_p4 FOR VALUES WITH (MODULUS 4, REMAINDER 3);
-</programlisting></para>
-
-  <para>
-   To attach a default partition to a partitioned table:
-<programlisting>
-ALTER TABLE cities
-    ATTACH PARTITION cities_partdef DEFAULT;
-</programlisting></para>
-
-  <para>
-   To detach a partition from a partitioned table:
-<programlisting>
-ALTER TABLE measurement
-    DETACH PARTITION measurement_y2015m12;
 </programlisting></para>
 
  </refsect1>

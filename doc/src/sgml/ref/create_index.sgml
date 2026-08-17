@@ -740,12 +740,6 @@ Indexes:
    command.
    If the <literal>ONLY</literal> option is specified, no recursion
    is done, and the index is marked invalid.
-   (<command>ALTER INDEX ... ATTACH PARTITION</command> marks the index
-   valid, once all partitions acquire matching indexes.)  Note, however,
-   that any partition that is created in the future using
-   <command>CREATE TABLE ... PARTITION OF</command> will automatically
-   have a matching index, regardless of whether <literal>ONLY</literal> is
-   specified.
   </para>
 
   <para>

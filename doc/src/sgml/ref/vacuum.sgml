@@ -180,11 +180,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] [ ANALYZE ] [ <replaceable class="paramet
       <command>VACUUM</command> may still block when opening the relation's
       indexes.  Additionally, <command>VACUUM ANALYZE</command> may still
       block when acquiring sample rows from partitions, table inheritance
-      children, and some types of foreign tables.  Also, while
-      <command>VACUUM</command> ordinarily processes all partitions of
-      specified partitioned tables, this option will cause
-      <command>VACUUM</command> to skip all partitions if there is a
-      conflicting lock on the partitioned table.
+      children, and some types of foreign tables.
      </para>
     </listitem>
    </varlistentry>
@@ -323,8 +319,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] [ ANALYZE ] [ <replaceable class="paramet
     <listitem>
      <para>
       The name (optionally schema-qualified) of a specific table or
-      materialized view to vacuum.  If the specified table is a partitioned
-      table, all of its leaf partitions are vacuumed.
+      materialized view to vacuum.
      </para>
     </listitem>
    </varlistentry>

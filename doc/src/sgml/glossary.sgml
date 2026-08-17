@@ -978,17 +978,6 @@
    </glossdef>
    <glossdef>
     <para>
-     In reference to a
-     <glossterm linkend="glossary-partitioned-table">partitioned table</glossterm>:
-     One of the tables that each contain part of the data of the partitioned table,
-     which is said to be the <firstterm>parent</firstterm>.
-     The partition is itself a table, so it can also be queried directly;
-     at the same time, a partition can sometimes be a partitioned table,
-     allowing hierarchies to be created.
-    </para>
-   </glossdef>
-   <glossdef>
-    <para>
      In reference to a <glossterm linkend="glossary-window-function">window function</glossterm>
      in a <glossterm linkend="glossary-query">query</glossterm>,
      a partition is a user-defined criterion that identifies which neighboring
@@ -999,17 +988,6 @@
    </glossdef>
   </glossentry>
 
-  <glossentry id="glossary-partitioned-table">
-   <glossterm>Partitioned table (relation)</glossterm>
-   <glossdef>
-    <para>
-     A <glossterm linkend="glossary-relation">relation</glossterm> that is
-     in semantic terms the same as a <glossterm linkend="glossary-table">table</glossterm>,
-     but whose storage is distributed across several
-     <glossterm linkend="glossary-partition">partitions</glossterm>.
-    </para>
-   </glossdef>
-  </glossentry>
 
   <glossentry id="glossary-postmaster">
    <glossterm>Postmaster (process)</glossterm>

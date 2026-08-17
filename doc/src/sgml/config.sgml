@@ -5124,72 +5124,6 @@ ANY <replaceable class="parameter">num_sync</replaceable> ( <replaceable class="
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-enable-partition-pruning" xreflabel="enable_partition_pruning">
-      <term><varname>enable_partition_pruning</varname> (<type>boolean</type>)
-       <indexterm>
-        <primary><varname>enable_partition_pruning</varname> configuration parameter</primary>
-       </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Enables or disables the query planner's ability to eliminate a
-        partitioned table's partitions from query plans.  This also controls
-        the planner's ability to generate query plans which allow the query
-        executor to remove (ignore) partitions during query execution.  The
-        default is <literal>on</literal>.
-        See <xref linkend="ddl-partition-pruning"/> for details.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-enable-partitionwise-join" xreflabel="enable_partitionwise_join">
-      <term><varname>enable_partitionwise_join</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>enable_partitionwise_join</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Enables or disables the query planner's use of partitionwise join,
-        which allows a join between partitioned tables to be performed by
-        joining the matching partitions.  Partitionwise join currently applies
-        only when the join conditions include all the partition keys, which
-        must be of the same data type and have one-to-one matching sets of
-        child partitions.  With this setting enabled, the number of nodes
-        whose memory usage is restricted by <varname>work_mem</varname>
-        appearing in the final plan can increase linearly according to the
-        number of partitions being scanned.  This can result in a large
-        increase in overall memory consumption during the execution of the
-        query.  Query planning also becomes significantly more expensive in
-        terms of memory and CPU.  The default value is <literal>off</literal>.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-enable-partitionwise-aggregate" xreflabel="enable_partitionwise_aggregate">
-      <term><varname>enable_partitionwise_aggregate</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>enable_partitionwise_aggregate</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Enables or disables the query planner's use of partitionwise grouping
-        or aggregation, which allows grouping or aggregation on partitioned
-        tables to be performed separately for each partition.  If the
-        <literal>GROUP BY</literal> clause does not include the partition
-        keys, only partial aggregation can be performed on a per-partition
-        basis, and finalization must be performed later.  With this setting
-        enabled, the number of nodes whose memory usage is restricted by
-        <varname>work_mem</varname> appearing in the final plan can increase
-        linearly according to the number of partitions being scanned.  This
-        can result in a large increase in overall memory consumption during
-        the execution of the query.  Query planning also becomes significantly
-        more expensive in terms of memory and CPU.  The default value is
-        <literal>off</literal>.
-       </para>
-      </listitem>
-     </varlistentry>
 
      <varlistentry id="guc-enable-seqscan" xreflabel="enable_seqscan">
       <term><varname>enable_seqscan</varname> (<type>boolean</type>)
@@ -5630,15 +5564,7 @@ SELECT * FROM parent WHERE key = 2400;
         planning overhead that is quite noticeable on simple queries, and most
         often will yield no benefit for simple queries.  If you have no
         tables that are partitioned using traditional inheritance, you might
-        prefer to turn it off entirely.  (Note that the equivalent feature for
-        partitioned tables is controlled by a separate parameter,
-        <xref linkend="guc-enable-partition-pruning"/>.)
-       </para>
-
-       <para>
-        Refer to <xref linkend="ddl-partitioning-constraint-exclusion"/> for
-        more information on using constraint exclusion to implement
-        partitioning.
+        prefer to turn it off entirely.
        </para>
       </listitem>
      </varlistentry>
@@ -8125,14 +8051,6 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
         This variable is also not used when creating databases.
         By default, a new database inherits its tablespace setting from
         the template database it is copied from.
-       </para>
-
-       <para>
-        If this parameter is set to a value other than the empty string
-        when a partitioned table is created, the partitioned table's
-        tablespace will be set to that value, which will be used as
-        the default tablespace for partitions created in the future,
-        even if <varname>default_tablespace</varname> has changed since then.
        </para>
 
        <para>

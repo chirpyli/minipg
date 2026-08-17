@@ -24331,7 +24331,7 @@ Author: Michael Paquier <michael@paquier.xyz>
     </sect4>
 
     <sect4>
-     <title><link linkend="ddl-partitioning">Partitioning</link></title>
+     <title>Partitioning</title>
 
      <itemizedlist>
 

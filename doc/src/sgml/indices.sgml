@@ -1061,8 +1061,7 @@ CREATE INDEX mytable_cat_data ON mytable (category, data);
 
    <para>
     If your table is large enough that a single index really is a bad idea,
-    you should look into using partitioning instead (see
-    <xref linkend="ddl-partitioning"/>).  With that mechanism, the system
+    you should look into using partitioning instead.  With that mechanism, the system
     does understand that the tables and indexes are non-overlapping, so
     far better performance is possible.
    </para>
