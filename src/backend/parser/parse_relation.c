@@ -2769,7 +2769,6 @@ List *
 expandNSItemAttrs(ParseState *pstate, ParseNamespaceItem *nsitem,
 				  int sublevels_up, int location)
 {
-	RangeTblEntry *rte = nsitem->p_rte;
 	List	   *names,
 			   *vars;
 	ListCell   *name,

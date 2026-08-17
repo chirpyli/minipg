@@ -5460,10 +5460,9 @@ ATExecDropNotNull(Relation rel, const char *colName, LOCKMODE lockmode)
 		indexStruct = (Form_pg_index) GETSTRUCT(indexTuple);
 
 		/*
-		 * If the index is not a primary key or an index used as replica
-		 * identity, skip the check.
+		 * If the index is not a primary key, skip the check.
 		 */
-		if (indexStruct->indisprimary || indexStruct->indisreplident)
+		if (indexStruct->indisprimary)
 		{
 			/*
 			 * Loop over each attribute in the primary key or the index used

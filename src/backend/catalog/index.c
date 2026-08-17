@@ -614,7 +614,6 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indcheckxmin - 1] = BoolGetDatum(false);
 	values[Anum_pg_index_indisready - 1] = BoolGetDatum(isready);
 	values[Anum_pg_index_indislive - 1] = BoolGetDatum(true);
-	values[Anum_pg_index_indisreplident - 1] = BoolGetDatum(false);
 	values[Anum_pg_index_indkey - 1] = PointerGetDatum(indkey);
 	values[Anum_pg_index_indcollation - 1] = PointerGetDatum(indcollation);
 	values[Anum_pg_index_indclass - 1] = PointerGetDatum(indclass);
@@ -1543,9 +1542,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	newIndexForm->indimmediate = oldIndexForm->indimmediate;
 	oldIndexForm->indimmediate = true;
 
-	/* Preserve indisreplident in the new index */
-	newIndexForm->indisreplident = oldIndexForm->indisreplident;
-
 	/* Preserve indisclustered in the new index */
 	newIndexForm->indisclustered = oldIndexForm->indisclustered;
 
@@ -1556,7 +1552,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	newIndexForm->indisvalid = true;
 	oldIndexForm->indisvalid = false;
 	oldIndexForm->indisclustered = false;
-	oldIndexForm->indisreplident = false;
 
 	CatalogTupleUpdate(pg_index, &oldIndexTuple->t_self, oldIndexTuple);
 	CatalogTupleUpdate(pg_index, &newIndexTuple->t_self, newIndexTuple);
@@ -3384,12 +3379,10 @@ index_set_state_flags(Oid indexId, IndexStateFlagsAction action)
 			 * CONCURRENTLY that failed partway through.)
 			 *
 			 * Note: the CLUSTER logic assumes that indisclustered cannot be
-			 * set on any invalid index, so clear that flag too.  For
-			 * cleanliness, also clear indisreplident.
+			 * set on any invalid index, so clear that flag too.
 			 */
 			indexForm->indisvalid = false;
 			indexForm->indisclustered = false;
-			indexForm->indisreplident = false;
 			break;
 		case INDEX_DROP_SET_DEAD:
 
@@ -3402,7 +3395,6 @@ index_set_state_flags(Oid indexId, IndexStateFlagsAction action)
 			 */
 			Assert(!indexForm->indisvalid);
 			Assert(!indexForm->indisclustered);
-			Assert(!indexForm->indisreplident);
 			indexForm->indisready = false;
 			indexForm->indislive = false;
 			break;

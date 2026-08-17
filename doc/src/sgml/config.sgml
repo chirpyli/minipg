@@ -3667,7 +3667,7 @@ restore_command = 'copy "C:\\server\\archivedir\\%f" "%p"'  # Windows
 
         <para>
          On the subscriber side, specifies how many replication origins (see
-         <xref linkend="replication-origins"/>) can be tracked simultaneously,
+         ) can be tracked simultaneously,
          effectively limiting how many logical replication subscriptions can
          be created on the server. Setting it to a lower value than the current
          number of tracked replication origins (reflected in
@@ -10467,3 +10467,4 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
 
   </sect1>
 </chapter>
+

@@ -582,7 +582,6 @@ get_other_operator(List *otherOp, Oid otherLeftTypeId, Oid otherRightTypeId,
 	bool		otherDefined;
 	char	   *otherName;
 	Oid			otherNamespace;
-	AclResult	aclresult;
 
 	other_oid = OperatorLookup(otherOp,
 							   otherLeftTypeId,

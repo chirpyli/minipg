@@ -5969,8 +5969,7 @@ xact_redo(XLogReaderState *record)
 		LWLockAcquire(TwoPhaseStateLock, LW_EXCLUSIVE);
 		PrepareRedoAdd(XLogRecGetData(record),
 					   record->ReadRecPtr,
-					   record->EndRecPtr,
-					   XLogRecGetOrigin(record));
+					   record->EndRecPtr);
 		LWLockRelease(TwoPhaseStateLock);
 	}
 	else if (info == XLOG_XACT_ASSIGNMENT)

@@ -1774,7 +1774,7 @@ CREATE FUNCTION test(int, int) RETURNS int
     Procedural languages aren't built into the
     <productname>PostgreSQL</productname> server; they are offered
     by loadable modules.
-    See <xref linkend="xplang"/> and following chapters for more
+    See  and following chapters for more
     information.
    </para>
   </sect1>
@@ -3640,3 +3640,4 @@ supportfn(internal) returns internal
     the <literal>SupportRequestIndexCondition</literal> request type.
    </para>
   </sect1>
+

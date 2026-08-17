@@ -231,6 +231,7 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
   - **死分支（typecmds.c / outfuncs.c）**：删除两处 `case CONSTR_FOREIGN:` 域约束报错分支、outfuncs.c 中 `Constraint` 节点的 `CONSTR_FOREIGN` 序列化分支。
   - **与不可裁部分零耦合**：btree/hash 索引、事务不受影响。`pg_constraint` catalog 其余约束（CHECK/UNIQUE/PRIMARY）正常。
   - **回归基线同步（isolation）**：FK 语法从「运行时报错 `foreign key constraints are not supported in minipg`」变为「语法错误 `syntax error at or near "REFERENCES"/"FOREIGN"`」后，7 个 isolation 测试的 `expected/*.out` 仍停留在旧文案，导致 `make check-world` 失败。已于 2026-08-16 用 `output_iso/results/*.out` 覆盖以下 `expected/*.out` 同步：`fk-contention`、`fk-deadlock`、`fk-deadlock2`、`update-locked-tuple`、`propagate-lock-delete`、`alter-table-1`、`alter-table-2`。此同步与 `enum`/`create_index`（regress）属同类因（gram.y 裁语法后 expected 未同步），均非功能回退。
+- **（2026-08-17 续）删除 `gram.y` 死代码产生式 `generic_option_list`**：该产生式（原 3033-3042，`generic_option_list: generic_option_elem | generic_option_list ',' generic_option_elem`）在全文仅出现在自身 `%type` 声明与定义中，没有任何语法规则将其作为右端引用——它是服务于 `CREATE/ALTER SERVER`、`CREATE USER MAPPING`（带 OPTIONS 列表、无 SET/ADD/DROP 修饰）的产生式，而 minipg 已彻底裁掉 FDW/SERVER/USER MAPPING 整块语法（`CreateForeignServerStmt`/`AlterForeignServerStmt`/`ImportForeignSchemaStmt`/`CreateForeignDataWrapperStmt`/`CreateUserMappingStmt` 全树零引用）。实际被接线的 `ALTER ... OPTIONS (...)` 路径（表级 `AT_GenericOptions` / `AT_AlterColumnGenericOptions`，gram.y 1632 与 1840）走的是带动作修饰的 `alter_generic_options` → `alter_generic_option_list` → `alter_generic_option_elem`，完全不依赖 `generic_option_list`。本次：① 删除 `generic_option_list` 整段定义；② 第 452 行 `%type <list>` 声明中移除 `generic_option_list`，仅保留 `alter_generic_option_list`；底层 `generic_option_elem`/`alter_generic_option_list`/`alter_generic_options` 一律保留。验证：`make -C src/backend/parser` 重新生成 `gram.c` 并编译 `gram.o` 成功，无报错；全库再无 `generic_option_list`（独立）引用。与不可裁部分（btree/hash 索引、事务）零耦合。
 - **（2026-08-16）裁剪 `pg_get_serial_sequence` 函数（序列关联查询）**：
   - **后端实现（ruleutils.c）**：删除 `pg_get_serial_sequence` 整个函数定义（扫描 `pg_depend` 查找 serial/identity 列所依赖序列 OID 并返回限定名）。序列功能已于 2026-08-14 删除 `pg_sequence` catalog，该函数全库零调用方，运行时仅走到 `PG_RETURN_NULL()`，属无害死函数，本次一并裁除。
   - **catalog 注册（pg_proc.dat）**：删除 oid=1665 的函数注册行（CRLF 格式，用 sed 精准删除 3 行）。
@@ -352,3 +353,43 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
   - 修复 `listTables` 的 `printfPQExpBuffer` 格式参数不匹配警告：format 串在裁剪中已删掉 `materialized view`（`WHEN 'm'`）分支，但参数列表仍残留 `gettext_noop("materialized view")`，导致「too many arguments for format」。删除该多余参数，使 `%s` 占位与参数个数对齐（11 对 11）。
 
 与不可裁部分（btree/hash 索引、事务）零耦合；`make -j4` 全量重编后端 0 warning/0 error，psql/libpq 前端 0 warning/0 error。
+
+---
+
+## 十二、死代码残留裁剪（2026-08-17，对应 mydoc/minipg死代码残留分析报告.md）
+
+围绕已裁剪功能遗留的「惰性死代码 / 未清理引用」做彻底裁剪（不改任何索引/事务机制）。本轮实际执行以下 3 项（均为验证后零风险的纯死代码），其余项经评估后暂未执行并说明原因（见末尾）。
+
+- **（1）删除 `pg_index.indisreplident` 惰性死列（完成第九条 CHANGE 中「待后续独立裁剪」的承诺）**：REPLICA IDENTITY 主字段 `pg_class.relreplident` 已于 2026-08-17 完整裁掉，但 `pg_index.indisreplident` 作为列被刻意保留。本轮确认其写入恒 `false`、全树无消费者，属纯死列，彻底删除：
+  - `src/include/catalog/pg_index.h`：删除 CATALOG 结构体中的 `bool indisreplident` 字段（同步使 `Anum_pg_index_indisreplident` 枚举项随 genbki 消失）。
+  - `src/backend/catalog/index.c`：删除 `index_create` 中恒 false 写入行、`index_concurrently_swap`/重建时 `indisreplident` 的保留与清零、`IndexConcurrentlySetState` 的清零与 `Assert`。
+  - `src/backend/utils/cache/relcache.c`：删除 `RelationReloadIndexInfo` 中 `indisreplident` 字段复制。
+  - `src/backend/commands/tablecmds.c`：删除 `ATController` 中对 `indexStruct->indisreplident` 的判断（仅保留 `indisprimary`）。
+  - `src/bin/psql/describe.c`：删除 `\d`/`\d index` 中对 `i.indisreplident` 列的查询。
+  - **验证**：`src/backend/catalog`、`src/backend/utils/cache`、`src/backend/commands`、`src/bin/psql` 增量 `make` 均 0 error/0 warning。
+
+- **（1-补）修复 `describe.c` 删除 `indisreplident` 列后未同步列号导致的 psql SIGSEGV（2026-08-17 补充）**：
+  删除 `pg_index.indisreplident` 列后，索引描述查询（`describeOneTableDetails`）里 `a.amname`/`c2.relname`/`pg_get_expr(i.indpred,...)` 三列各前移一列，但对应的 `PQgetvalue` 列号未同步前移，导致越界访问 `NULL` 并崩溃：
+  - 单索引描述分支（`\d 索引名`）：`indamname`/`indtable`/`indpred` 原取列 `7/8/9`，实际应为 `6/7/8`（`PQgetvalue(result,0,9)` 为 NULL → `strlen(NULL)` → SIGSEGV，对应 core 中 `describe.c:1872`）。
+  - 索引列表分支（`\d 表名`）：`add_tablespace_footer` 取 `PQgetvalue(result,i,11)` 实际应为 `10`（`PQgetvalue` 越界返回 NULL → `atooid(NULL)` → `strtoul(NULL)` → SIGSEGV，对应 core 中 `describe.c:2001`）。
+  - 修正：将两处列号分别改为 `6/7/8` 与 `10`，与删除 `indisreplident` 后的真实列布局对齐。
+  - **验证**：`make check` 单测 `create_index`（含 `\d func_index_index` 表达式索引）由 signal 11 转为通过；`\d persons2`/`\d idx_t2`（部分索引）不再崩溃；完整 `parallel_schedule` 跑批中 `create_index`、`sanity_check` 均通过。
+  - 注：该崩溃在 `make check-world` 中表现为 `create_index ... FAILED (terminated by signal 11)`，根因即上述列号错位，非 UNION 集合操作限制（UNION 限制独立存在、不影响这两个测试）。
+
+- **（2）删除 `get_transform_fromsql` / `get_transform_tosql` 零调用死函数（FDW 转换死链）**：`pg_transform` catalog 本身保留（`get_transform_oid` 仍有调用者，供 `CREATE TRANSFORM`/`CREATE FUNCTION` 校验），但这 2 个「读取转换 SQL 函数指针」的函数原仅被已删的 FDW `GetFdwRoutine` 转换逻辑调用，全树零调用者，彻底删除：
+  - `src/backend/utils/cache/lsyscache.c`：删除 `get_transform_fromsql`、`get_transform_tosql` 函数体（含 `TRANSFORM CACHE` 注释块）。
+  - `src/include/utils/lsyscache.h`：删除对应 2 行 `extern` 声明。
+
+- **（3）删除 `fdw_handler` 伪类型 I/O 孤儿代码（FDW 残留收尾）**：`pg_type.dat` 已无 `fdw_handler` 类型项、`pg_proc.dat` 也无 `fdw_handler_in/out` 登记，但 `pseudotypes.c` 仍生成这对伪类型 I/O 函数（纯孤儿、编译后无任何引用），彻底删除：
+  - `src/backend/utils/adt/pseudotypes.c`：删除 `PSEUDOTYPE_DUMMY_IO_FUNCS(fdw_handler)` 及其 `extern fdw_handler_in/out` 前向声明。
+  - 说明：这呼应第九、十一条 CHANGE 中标注的「`fdw_handler_in/out` 等未被 `fmgrprotos.h` 声明的 FDW 子系统裁后 normal unused 类告警」，现彻底清除。
+
+- **本轮评估后暂未执行、原因说明（避免过度裁剪/破坏编译）**：
+  - `HistoricSnapshotActive`/`SetupHistoricSnapshot`/`HeapTupleSatisfiesHistoricMVCC`/`ResolveCminCmaxDuringDecoding` 逻辑解码残留：虽 `SetupHistoricSnapshot` 无调用者（即 `HistoricSnapshot` 恒 NULL、`HistoricSnapshotActive()` 恒 false），但 `HeapTupleSatisfiesHistoricMVCC` 经 `HeapTupleSatisfiesVisibility` 的 `SNAPSHOT_HISTORIC_MVCC` 分支可达，且 `snapshot_type` 枚举、`relcache.c`/`snapmgr.c` 的多处 `if` 守卫与之耦合。属核心 MVCC 可见性热路径，移除需同时清理快照分发、全局变量、`tuplecid_data` 及多个 if 守卫，风险高、学习价值（MVCC 子系统）高，**暂不裁剪**。
+  - `qual_security_level`/`security_level` 传播链：securityQuals 字段虽已删，但 `security_level` 已深度编织进 `distribute_qual_to_rels`→`create_restrictinfo`→`RestrictInfo.security_level`→`outfuncs`/`readfuncs`→`createplan.c` 的成本排序逻辑，是规划器 clause 排序的**结构性组成部分**（恒 0 但生效），并非纯死代码；移除会触碰计划序列化格式与成本排序行为，**暂不裁剪**（学习价值高、风险高）。
+  - `HAVE_IPV6` 未生效条件编译块（`ifaddr.c` 11 处、`fe-connect.c` 1 处）：属 `#ifdef` 编译期守卫，是否实际生效取决于 configure 是否定义 `HAVE_IPV6`；若当前构建已定义则该分支仍活跃。属条件编译噪音，需先确认 `pg_config.h` 中 `HAVE_IPV6` 真未定义再决定是否清理，**本轮未确认，暂缓**。
+  - `T_AlterOwnerStmt` 孤立死语法（owner 机制已删、执行体为空块 `{}`）：确为死语法，但删除涉及 `gram.y` 整个 `AlterOwnerStmt:` 产生式（15 个分支）及 `utility.c`×5、`equalfuncs.c`、`copyfuncs.c`、`nodes.h`、`parsenodes.h` 的连带删除，且需确认无其它文法引用该非终结符，改动面大，**本轮未执行**（留待后续独立裁剪）。
+  - `partitionwise join/aggregate`：`consider_partitionwise_*` 确无赋值点、整条优化路径不可达，但 `enable_partitionwise_aggregate` 仍接线于 `planner.c` 且分区表已删；与分区功能整体耦合，宜随分区相关逻辑统一清理，**本轮未单独裁剪**。
+  - `pg_user_mapping` catalog：确认全树 `.c` 零引用，仅残 `typedefs.list`（pgindent 用）与 `objectaccess.h` 注释中的一词；属 pgindent/注释噪音，非真实死代码，未改动。
+
+- **验证**：`src/backend/catalog`、`src/backend/utils/cache`、`src/backend/utils/adt`、`src/backend/commands`、`src/bin/psql` 增量 `make` 全部 0 error/0 warning（既有 `pg_operator.c:585 aclresult` 警告与本轮无关）。与不可裁部分（btree/hash 索引、事务）零耦合。

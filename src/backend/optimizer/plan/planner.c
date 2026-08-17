@@ -781,7 +781,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	{
 		RangeTblEntry *rte = lfirst_node(RangeTblEntry, l);
 		int			kind;
-		ListCell   *lcsq;
 
 		if (rte->rtekind == RTE_RELATION)
 		{

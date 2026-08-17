@@ -477,15 +477,11 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	ListCell   *icols;
 	ListCell   *attnos;
 	ListCell   *lc;
-	bool		isOnConflictUpdate;
 
 	qry->commandType = CMD_INSERT;
 	pstate->p_is_insert = true;
 
 	qry->override = stmt->override;
-
-	isOnConflictUpdate = (stmt->onConflictClause &&
-						  stmt->onConflictClause->action == ONCONFLICT_UPDATE);
 
 	/*
 	 * We have three cases to deal with: DEFAULT VALUES (selectStmt == NULL),

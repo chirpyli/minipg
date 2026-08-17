@@ -96,8 +96,6 @@ typname##_send(PG_FUNCTION_ARGS) \
 extern int no_such_variable
 
 #include "fmgr.h"
-extern Datum fdw_handler_in(PG_FUNCTION_ARGS);
-extern Datum fdw_handler_out(PG_FUNCTION_ARGS);
 
 
 /*
@@ -369,7 +367,6 @@ pg_node_tree_send(PG_FUNCTION_ARGS)
 PSEUDOTYPE_DUMMY_IO_FUNCS(any);
 PSEUDOTYPE_DUMMY_IO_FUNCS(trigger);
 PSEUDOTYPE_DUMMY_IO_FUNCS(language_handler);
-PSEUDOTYPE_DUMMY_IO_FUNCS(fdw_handler);
 PSEUDOTYPE_DUMMY_IO_FUNCS(table_am_handler);
 PSEUDOTYPE_DUMMY_IO_FUNCS(index_am_handler);
 PSEUDOTYPE_DUMMY_IO_FUNCS(tsm_handler);

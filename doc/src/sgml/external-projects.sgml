@@ -79,8 +79,7 @@
 
   <para>
    <productname>PostgreSQL</productname> includes several procedural
-   languages with the base distribution: <link
-   linkend="pltcl">PL/Tcl</link>.
+   languages with the base distribution: PL/Tcl.
   </para>
 
   <para>
@@ -125,3 +124,4 @@
   </para>
  </sect1>
 </appendix>
+

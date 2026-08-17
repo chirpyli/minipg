@@ -513,7 +513,7 @@
   <para>
    GiST indexes have eleven support functions, six of which are optional,
    as shown in <xref linkend="xindex-gist-support-table"/>.
-   (For more information see <xref linkend="gist"/>.)
+   (For more information see .)
   </para>
 
    <table tocentry="1" id="xindex-gist-support-table">
@@ -600,7 +600,7 @@
   <para>
    SP-GiST indexes have six support functions, one of which is optional, as
    shown in <xref linkend="xindex-spgist-support-table"/>.
-   (For more information see <xref linkend="spgist"/>.)
+   (For more information see .)
   </para>
 
    <table tocentry="1" id="xindex-spgist-support-table">
@@ -657,7 +657,7 @@
   <para>
    GIN indexes have seven support functions, four of which are optional,
    as shown in <xref linkend="xindex-gin-support-table"/>.
-   (For more information see <xref linkend="gin"/>.)
+   (For more information see .)
   </para>
 
    <table tocentry="1" id="xindex-gin-support-table">
@@ -1450,3 +1450,4 @@ CREATE OPERATOR CLASS polygon_ops
  </sect2>
 
 </sect1>
+

@@ -4562,7 +4562,6 @@ SET xmloption TO { DOCUMENT | CONTENT };
    </sect2>
   </sect1>
 
-  &json;
 
   &array;
 
@@ -5337,3 +5336,4 @@ WHERE ...
   </sect1>
 
  </chapter>
+

@@ -39,22 +39,15 @@
    &alterConversion;
    &alterDatabase;
    &alterDomain;
-   &alterEventTrigger;
    &alterExtension;
    &alterFunction;
    &alterIndex;
-   &alterLargeObject;
-   &alterMaterializedView;
    &alterOperator;
    &alterOperatorClass;
    &alterOperatorFamily;
-   &alterProcedure;
-   &alterPublication;
-   &alterRoutine;
    &alterRule;
    &alterSchema;
    &alterStatistics;
-   &alterSubscription;
    &alterTable;
    &alterTableSpace;
    &alterTrigger;
@@ -62,7 +55,6 @@
    &alterView;
    &analyze;
    &begin;
-   &call;
    &checkpoint;
    &close;
    &cluster;
@@ -75,20 +67,15 @@
    &createConversion;
    &createDatabase;
    &createDomain;
-   &createEventTrigger;
    &createExtension;
    &createFunction;
    &createIndex;
-   &createMaterializedView;
    &createOperator;
    &createOperatorClass;
    &createOperatorFamily;
-   &createProcedure;
-   &createPublication;
    &createRule;
    &createSchema;
    &createStatistics;
-   &createSubscription;
    &createTable;
    &createTableAs;
    &createTableSpace;
@@ -107,21 +94,15 @@
    &dropConversion;
    &dropDatabase;
    &dropDomain;
-   &dropEventTrigger;
    &dropExtension;
    &dropFunction;
    &dropIndex;
-   &dropMaterializedView;
    &dropOperator;
    &dropOperatorClass;
    &dropOperatorFamily;
-   &dropProcedure;
-   &dropPublication;
-   &dropRoutine;
    &dropRule;
    &dropSchema;
    &dropStatistics;
-   &dropSubscription;
    &dropTable;
    &dropTableSpace;
    &dropTransform;
@@ -137,8 +118,6 @@
    &lock;
    &move;
    &prepare;
-   &prepareTransaction;
-   &refreshMaterializedView;
    &reindex;
    &releaseSavepoint;
    &reset;
@@ -146,7 +125,6 @@
    &rollbackPrepared;
    &rollbackTo;
    &savepoint;
-   &securityLabel;
    &select;
    &selectInto;
    &set;
@@ -184,22 +162,8 @@
    </para>
   </partintro>
 
-   &clusterdb;
-   &createdb;
-   &dropdb;
-   &pgamcheck;
-   &pgbench;
    &pgConfig;
-   &pgDump;
-   &pgDumpall;
-   &pgIsready;
-   &pgReceivewal;
-   &pgRecvlogical;
-   &pgRestore;
-   &pgVerifyBackup;
    &psqlRef;
-   &reindexdb;
-   &vacuumdb;
 
  </reference>
 
@@ -217,15 +181,9 @@
   </partintro>
 
    &initdb;
-   &pgarchivecleanup;
-   &pgChecksums;
    &pgControldata;
    &pgCtl;
-   &pgResetwal;
    &pgRewind;
-   &pgtestfsync;
-   &pgtesttiming;
-   &pgupgrade;
    &pgwaldump;
    &postgres;
    &postmaster;
@@ -233,3 +191,4 @@
  </reference>
 
 </part>
+

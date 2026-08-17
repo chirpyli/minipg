@@ -275,7 +275,7 @@ CREATE INDEX <replaceable>name</replaceable> ON <replaceable>table</replaceable>
    documented in <xref linkend="gist-builtin-opclasses-table"/>.
    Many other GiST operator
    classes are available in the <literal>contrib</literal> collection or as separate
-   projects.  For more information see <xref linkend="gist"/>.
+   projects.  For more information see .
   </para>
 
   <para>
@@ -321,7 +321,7 @@ SELECT * FROM places ORDER BY location <-> point '(101,456)' LIMIT 10;
    these operators.)
    The SP-GiST operator classes included in the standard distribution are
    documented in <xref linkend="spgist-builtin-opclasses-table"/>.
-   For more information see <xref linkend="spgist"/>.
+   For more information see .
   </para>
 
   <para>
@@ -371,7 +371,7 @@ SELECT * FROM places ORDER BY location <-> point '(101,456)' LIMIT 10;
    documented in <xref linkend="gin-builtin-opclasses-table"/>.
    Many other GIN operator
    classes are available in the <literal>contrib</literal> collection or as separate
-   projects.  For more information see <xref linkend="gin"/>.
+   projects.  For more information see .
   </para>
   </sect2>
 
@@ -1632,3 +1632,4 @@ CREATE INDEX test1c_content_y_index ON test1c (content COLLATE "y");
   </itemizedlist>
  </sect1>
 </chapter>
+

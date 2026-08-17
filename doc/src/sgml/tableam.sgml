@@ -86,7 +86,7 @@
   For crash safety, an AM can use postgres' <link
   linkend="wal"><acronym>WAL</acronym></link>, or a custom implementation.
   If <acronym>WAL</acronym> is chosen, either <link
-  linkend="generic-wal">Generic WAL Records</link> can be used,
+  Generic WAL Records can be used,
   or a new type of <acronym>WAL</acronym> records can be implemented.
   Generic WAL Records are easy, but imply higher WAL volume.
   Implementation of a new type of WAL record
@@ -109,3 +109,4 @@
  </para>
 
 </chapter>
+

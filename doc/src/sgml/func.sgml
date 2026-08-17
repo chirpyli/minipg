@@ -24757,7 +24757,7 @@ postgres=# SELECT * FROM pg_walfile_name_offset(pg_stop_backup());
     controlling and interacting with replication features.
     See <xref linkend="streaming-replication"/>,
     <xref linkend="streaming-replication-slots"/>, and
-    <xref linkend="replication-origins"/>
+    
     for information about the underlying features.
     Use of functions for replication origin is only allowed to the
     superuser by default, but may be allowed to other users by using the
@@ -26844,3 +26844,4 @@ SELECT m.* FROM pg_statistic_ext join pg_statistic_ext_data on (oid = stxoid),
   </sect1>
 
 </chapter>
+

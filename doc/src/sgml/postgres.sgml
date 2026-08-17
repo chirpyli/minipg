@@ -220,12 +220,9 @@ break is not needed in a wider output rendering.
   &event-trigger;
   &rules;
 
-  &xplang;
-  &pltcl;
 
   &spi;
   &bgworker;
-  &logicaldecoding;
   &replication-origins;
 
  </part>
@@ -246,16 +243,12 @@ break is not needed in a wider output rendering.
   &catalogs;
   &protocol;
   &sources;
-  &plhandler;
   &tablesample-method;
   &custom-scan;
   &tableam;
   &indexam;
   &generic-wal;
   &btree;
-  &gist;
-  &spgist;
-  &gin;
   &hash;
   &storage;
   &bki;
@@ -288,3 +281,4 @@ break is not needed in a wider output rendering.
  <index id="bookindex"></index>
 
 </book>
+

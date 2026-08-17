@@ -275,17 +275,14 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <ival>	add_drop opt_asc_desc opt_nulls_order
 
 %type <node>	alter_table_cmd alter_type_cmd opt_collate_clause
-	   partition_cmd index_partition_cmd
 %type <list>	alter_table_cmds alter_type_cmds
-%type <list>    alter_identity_column_option_list
-%type <defelt>  alter_identity_column_option
 
 %type <dbehavior>	opt_drop_behavior
 
-%type <list>	createdb_opt_list createdb_opt_items copy_opt_list
+%type <list>	createdb_opt_list createdb_opt_items
 				transaction_mode_list
 				create_extension_opt_list alter_extension_opt_list
-%type <defelt>	createdb_opt_item copy_opt_item
+%type <defelt>	createdb_opt_item
 				transaction_mode_item
 				create_extension_opt_item alter_extension_opt_item
 
@@ -296,8 +293,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
 %type <boolean>	opt_or_replace opt_no
-				opt_grant_grant_option opt_grant_admin_option
-				opt_nowait opt_if_exists opt_with_data
+				opt_nowait opt_if_exists
 				opt_transaction_chain
 %type <ival>	opt_nowait_or_skip
 
@@ -316,8 +312,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean>	TransitionRowOrTable TransitionOldOrNew
 %type <node>	TriggerTransition
 
-%type <str>		copy_file_name
-				access_method_clause attr_name
+%type <str>		access_method_clause attr_name
 				table_access_method_clause name cursor_name file_name
 				opt_index_name cluster_index_specification
 
@@ -337,7 +332,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
 %type <list>	parse_toplevel stmtmulti routine_body_stmt_list
-				OptTableElementList TableElementList OptInherit definition
+				OptTableElementList TableElementList definition
 				OptTypedTableElementList TypedTableElementList
 				reloptions opt_reloptions
 				OptWith opt_definition func_args func_args_list
@@ -382,7 +377,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <typnam>	func_return func_type
 
 %type <boolean>  opt_restart_seqs
-%type <ival>	 OptNoLog
 %type <oncommit> OnCommitOption
 
 %type <ival>	for_locking_strength
@@ -402,9 +396,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean> opt_instead
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
 %type <boolean> opt_freeze opt_analyze opt_default opt_recheck
-%type <defelt>	opt_binary copy_delimiter
-
-%type <boolean> copy_from opt_program
 
 %type <ival>	event cursor_options opt_hold opt_set_data
 %type <objtype>	object_type_any_name object_type_name object_type_name_on_any_name
@@ -440,7 +431,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	row explicit_row implicit_row type_list array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
 %type <list>	when_clause_list
-%type <ival>	sub_type opt_materialized
+%type <ival>	sub_type
 %type <value>	NumericOnly
 %type <list>	NumericOnly_list
 %type <alias>	alias_clause opt_alias_clause opt_alias_clause_for_join_using
@@ -458,14 +449,12 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <str>		generic_option_name
 %type <node>	generic_option_arg
 %type <defelt>	generic_option_elem alter_generic_option_elem
-%type <list>	generic_option_list alter_generic_option_list
+%type <list>	alter_generic_option_list
 
 %type <ival>	reindex_target_type reindex_target_multitable
 
-%type <node>	copy_generic_opt_arg copy_generic_opt_arg_list_item
 %type <defelt>	copy_generic_opt_elem
 %type <list>	copy_generic_opt_list copy_generic_opt_arg_list
-%type <list>	copy_options
 
 %type <typnam>	Typename SimpleTypename ConstTypename
 				GenericType Numeric opt_float
@@ -478,13 +467,13 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean> opt_varying opt_timezone opt_no_inherit
 
 %type <ival>	Iconst SignedIconst
-%type <str>		Sconst comment_text notify_payload
-%type <str>		RoleId opt_boolean_or_string
+%type <str>		Sconst
+%type <str>		opt_boolean_or_string
 %type <list>	var_list
 %type <str>		ColId ColLabel BareColLabel
 %type <str>		NonReservedWord NonReservedWord_or_Sconst
 %type <str>		var_name type_function_name param_name
-%type <str>		createdb_opt_name plassign_target
+%type <str>		createdb_opt_name
 %type <node>	var_value zone_value
 %type <rolespec> RoleSpec
 
@@ -1919,40 +1908,7 @@ reloption_elem:
 				}
 		;
 
-alter_identity_column_option_list:
-			alter_identity_column_option
-				{ $$ = list_make1($1); }
-			| alter_identity_column_option_list alter_identity_column_option
-				{ $$ = lappend($1, $2); }
-		;
-
-alter_identity_column_option:
-			RESTART
-				{
-					$$ = makeDefElem("restart", NULL, @1);
-				}
-			| RESTART opt_with NumericOnly
-				{
-					$$ = makeDefElem("restart", (Node *)$3, @1);
-				}
-			| SET SeqOptElem
-				{
-					if (strcmp($2->defname, "as") == 0 ||
-						strcmp($2->defname, "restart") == 0 ||
-						strcmp($2->defname, "owned_by") == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("sequence option \"%s\" not supported here", $2->defname),
-								 parser_errposition(@2)));
-					$$ = $2;
-				}
-			| SET GENERATED generated_when
-				{
-					$$ = makeDefElem("generated", (Node *) makeInteger($3), @1);
-				}
-			;
-
-			/*****************************************************************************
+/*****************************************************************************
  *
  *	ALTER TYPE
  *
@@ -2705,9 +2661,6 @@ AlterStatsStmt:
 				}
 			;
 
-OptNoLog:	/*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
-		;
-
 
 /*****************************************************************************
  *
@@ -3074,23 +3027,7 @@ AlterExtensionContentsStmt:
 				}
 		;
 
-/*****************************************************************************
- *
- *		QUERY:
-
-
-generic_option_list:
-			generic_option_elem
-				{
-					$$ = list_make1($1);
-				}
-			| generic_option_list ',' generic_option_elem
-				{
-					$$ = lappend($1, $3);
-				}
-		;
-
-/* Options definition for ALTER FDW, SERVER and USER MAPPING */
+/* Options definiton for ALTER FDW, SERVER and USER MAPPING */
 alter_generic_options:
 			OPTIONS	'(' alter_generic_option_list ')'		{ $$ = $3; }
 		;
@@ -10423,47 +10360,6 @@ SignedIconst: Iconst								{ $$ = $1; }
 			| '+' Iconst							{ $$ = + $2; }
 			| '-' Iconst							{ $$ = - $2; }
 		;
-
-/* Role specifications */
-RoleId:		RoleSpec
-				{
-					RoleSpec *spc = (RoleSpec *) $1;
-					switch (spc->roletype)
-					{
-						case ROLESPEC_CSTRING:
-							$$ = spc->rolename;
-							break;
-						case ROLESPEC_PUBLIC:
-							ereport(ERROR,
-									(errcode(ERRCODE_RESERVED_NAME),
-									 errmsg("role name \"%s\" is reserved",
-											"public"),
-									 parser_errposition(@1)));
-							break;
-						case ROLESPEC_SESSION_USER:
-							ereport(ERROR,
-									(errcode(ERRCODE_RESERVED_NAME),
-									 errmsg("%s cannot be used as a role name here",
-											"SESSION_USER"),
-									 parser_errposition(@1)));
-							break;
-						case ROLESPEC_CURRENT_USER:
-							ereport(ERROR,
-									(errcode(ERRCODE_RESERVED_NAME),
-									 errmsg("%s cannot be used as a role name here",
-											"CURRENT_USER"),
-									 parser_errposition(@1)));
-							break;
-						case ROLESPEC_CURRENT_ROLE:
-							ereport(ERROR,
-									(errcode(ERRCODE_RESERVED_NAME),
-									 errmsg("%s cannot be used as a role name here",
-											"CURRENT_ROLE"),
-									 parser_errposition(@1)));
-							break;
-					}
-				}
-			;
 
 RoleSpec:	NonReservedWord
 					{

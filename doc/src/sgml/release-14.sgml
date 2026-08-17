@@ -24471,7 +24471,7 @@ Author: Heikki Linnakangas <heikki.linnakangas@iki.fi>
 -->
 
        <para>
-        Allow some <link linkend="gist">GiST</link> indexes to be built
+        Allow some GiST indexes to be built
         by presorting the data (Andrey Borodin)
         <ulink url="&commit_baseurl;16fa9b2b3">&sect;</ulink>
        </para>
@@ -24489,7 +24489,7 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
        <para>
-        Allow <link linkend="spgist">SP-GiST</link> indexes to contain
+        Allow SP-GiST indexes to contain
         <literal>INCLUDE</literal>'d columns (Pavel Borisov)
         <ulink url="&commit_baseurl;09c1c6ab4">&sect;</ulink>
        </para>
@@ -25483,7 +25483,7 @@ Author: Michael Paquier <michael@paquier.xyz>
     </itemizedlist>
 
     <sect4>
-     <title><link linkend="logical-replication">Logical Replication</link></title>
+     <title>Logical Replication</title>
 
      <itemizedlist>
 
@@ -27573,8 +27573,7 @@ Author: Alexander Korotkov <akorotkov@postgresql.org>
 -->
 
       <para>
-       Mark <link
-       linkend="btree-gist"><application>btree_gist</application></link>
+       Mark <application>btree_gist</application>
        functions as parallel safe (Steven Winfield)
        <ulink url="&commit_baseurl;d98c08cdc">&sect;</ulink>
       </para>
@@ -28208,3 +28207,4 @@ Author: Fujii Masao <fujii@postgresql.org>
   </sect2>
 
  </sect1>
+

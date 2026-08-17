@@ -95,45 +95,26 @@ CREATE EXTENSION <replaceable>module_name</replaceable>;
   module for details.
  </para>
 
- &adminpack;
  &amcheck;
  &auth-delay;
  &auto-explain;
  &bloom;
  &btree-gin;
  &btree-gist;
- &citext;
- &cube;
  &dict-int;
  &dict-xsyn;
- &earthdistance;
- &fuzzystrmatch;
- &hstore;
  &intagg;
- &intarray;
- &isn;
- &lo;
- &ltree;
- &oldsnapshot;
  &pageinspect;
- &passwordcheck;
  &pgbuffercache;
- &pgcrypto;
  &pgfreespacemap;
  &pgrowlocks;
- &pgstatstatements;
  &pgstattuple;
  &pgsurgery;
- &pgtrgm;
  &pgvisibility;
- &seg;
  &contrib-spi;
- &tablefunc;
- &tcn;
  &test-decoding;
  &tsm-system-rows;
  &tsm-system-time;
- &unaccent;
  &uuid-ossp;
 
  </appendix>
@@ -177,8 +158,6 @@ pages.
    distribution.
   </para>
 
- &oid2name;
- &vacuumlo;
  </sect1>
 
  <sect1 id="contrib-prog-server">
@@ -194,3 +173,4 @@ pages.
 
  </sect1>
 </appendix>
+

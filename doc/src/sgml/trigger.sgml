@@ -11,7 +11,7 @@
    This chapter provides general information about writing trigger functions.
    Trigger functions can be written in most of the available procedural
    languages, including
-   <application>PL/Tcl</application> (<xref linkend="pltcl"/>).
+   <application>PL/Tcl</application> ().
    After reading this chapter, you should consult the chapter for
    your favorite procedural language to find out the language-specific
    details of writing a trigger in it.
@@ -1005,3 +1005,4 @@ DELETE 2
    </para>
   </sect1>
  </chapter>
+

@@ -1830,11 +1830,6 @@ describeOneTableDetails(const char *schemaname,
 			appendPQExpBufferStr(&buf,
 								 "  false AS condeferrable, false AS condeferred,\n");
 
-		if (pset.sversion >= 90400)
-			appendPQExpBufferStr(&buf, "i.indisreplident,\n");
-		else
-			appendPQExpBufferStr(&buf, "false AS indisreplident,\n");
-
 		appendPQExpBuffer(&buf, "  a.amname, c2.relname, "
 						  "pg_catalog.pg_get_expr(i.indpred, i.indrelid, true)\n"
 						  "FROM pg_catalog.pg_index i, pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_am a\n"
@@ -1858,9 +1853,9 @@ describeOneTableDetails(const char *schemaname,
 			char	   *indisvalid = PQgetvalue(result, 0, 3);
 			char	   *deferrable = PQgetvalue(result, 0, 4);
 			char	   *deferred = PQgetvalue(result, 0, 5);
-			char	   *indamname = PQgetvalue(result, 0, 7);
-			char	   *indtable = PQgetvalue(result, 0, 8);
-			char	   *indpred = PQgetvalue(result, 0, 9);
+			char	   *indamname = PQgetvalue(result, 0, 6);
+			char	   *indtable = PQgetvalue(result, 0, 7);
+			char	   *indpred = PQgetvalue(result, 0, 8);
 
 			if (strcmp(indisprimary, "t") == 0)
 				printfPQExpBuffer(&tmpbuf, _("primary key, "));
@@ -1929,10 +1924,6 @@ describeOneTableDetails(const char *schemaname,
 				appendPQExpBufferStr(&buf,
 									 "null AS constraintdef, null AS contype, "
 									 "false AS condeferrable, false AS condeferred");
-			if (pset.sversion >= 90400)
-				appendPQExpBufferStr(&buf, ", i.indisreplident");
-			else
-				appendPQExpBufferStr(&buf, ", false AS indisreplident");
 			if (pset.sversion >= 80000)
 				appendPQExpBufferStr(&buf, ", c2.reltablespace");
 			appendPQExpBufferStr(&buf,
@@ -2008,7 +1999,7 @@ describeOneTableDetails(const char *schemaname,
 					/* Print tablespace of the index on the same line */
 					if (pset.sversion >= 80000)
 						add_tablespace_footer(&cont, RELKIND_INDEX,
-											  atooid(PQgetvalue(result, i, 11)),
+											  atooid(PQgetvalue(result, i, 10)),
 											  false);
 				}
 			}

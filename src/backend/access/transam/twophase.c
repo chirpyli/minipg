@@ -1849,7 +1849,7 @@ restoreTwoPhaseData(void)
 				continue;
 
 			PrepareRedoAdd(buf, InvalidXLogRecPtr,
-						   InvalidXLogRecPtr, InvalidRepOriginId);
+						   InvalidXLogRecPtr);
 		}
 	}
 	LWLockRelease(TwoPhaseStateLock);
@@ -2364,13 +2364,11 @@ RecordTransactionAbortPrepared(TransactionId xid,
  */
 void
 PrepareRedoAdd(char *buf, XLogRecPtr start_lsn,
-			   XLogRecPtr end_lsn, RepOriginId origin_id)
+			   XLogRecPtr end_lsn)
 {
 	TwoPhaseFileHeader *hdr = (TwoPhaseFileHeader *) buf;
 	char	   *bufptr;
 	const char *gid;
-
-	(void) origin_id;				/* unused after logical replication removal */
 	GlobalTransaction gxact;
 
 	Assert(LWLockHeldByMeInMode(TwoPhaseStateLock, LW_EXCLUSIVE));
