@@ -778,12 +778,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 		case RELKIND_RELATION:
 			/* INSERT/UPDATE/DELETE permission checks are handled elsewhere. */
 			break;
-		case RELKIND_SEQUENCE:
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot change sequence \"%s\"",
-							RelationGetRelationName(resultRel))));
-			break;
 		case RELKIND_TOASTVALUE:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -862,13 +856,6 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 	{
 		case RELKIND_RELATION:
 			/* OK */
-			break;
-		case RELKIND_SEQUENCE:
-			/* Must disallow this because we don't vacuum sequences */
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot lock rows in sequence \"%s\"",
-							RelationGetRelationName(rel))));
 			break;
 		case RELKIND_TOASTVALUE:
 			/* We could allow this, but there seems no good reason to */

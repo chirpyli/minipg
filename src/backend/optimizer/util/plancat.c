@@ -1038,12 +1038,6 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 				*allvisfrac = (double) relallvisible / curpages;
 			break;
 
-		case RELKIND_SEQUENCE:
-			/* Sequences always have a known size */
-			*pages = 1;
-			*tuples = 1;
-			*allvisfrac = 0;
-			break;
 		default:
 			/* else it has no disk storage; probably shouldn't get here? */
 			*pages = 0;

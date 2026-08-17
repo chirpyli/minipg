@@ -606,7 +606,6 @@ DefineQueryRewrite(const char *rulename,
 		classForm->relkind = RELKIND_VIEW;
 		classForm->relfrozenxid = InvalidTransactionId;
 		classForm->relminmxid = InvalidMultiXactId;
-		classForm->relreplident = REPLICA_IDENTITY_NOTHING;
 
 		CatalogTupleUpdate(relationRelation, &classTup->t_self, classTup);
 

@@ -3001,7 +3001,6 @@ RelationGetNumberOfBlocksInFork(Relation relation, ForkNumber forkNum)
 {
 	switch (relation->rd_rel->relkind)
 	{
-		case RELKIND_SEQUENCE:
 		case RELKIND_INDEX:
 			return smgrnblocks(RelationGetSmgr(relation), forkNum);
 

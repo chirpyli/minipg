@@ -441,13 +441,6 @@ static const SchemaQuery Query_for_list_of_routines = {
 	.result = "pg_catalog.quote_ident(p.proname)",
 };
 
-static const SchemaQuery Query_for_list_of_sequences = {
-	.catname = "pg_catalog.pg_class c",
-	.selcondition = "c.relkind IN (" CppAsString2(RELKIND_SEQUENCE) ")",
-	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
-	.namespace = "c.relnamespace",
-	.result = "pg_catalog.quote_ident(c.relname)",
-};
 
 static const SchemaQuery Query_for_list_of_tables = {
 	.catname = "pg_catalog.pg_class c",
@@ -532,7 +525,6 @@ static const SchemaQuery Query_for_list_of_selectables = {
 	.catname = "pg_catalog.pg_class c",
 	.selcondition =
 	"c.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
-	CppAsString2(RELKIND_SEQUENCE) ", "
 	CppAsString2(RELKIND_VIEW) ")",
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
@@ -1026,7 +1018,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"ROUTINE", NULL, NULL, &Query_for_list_of_routines, THING_NO_CREATE},
 	{"RULE", "SELECT pg_catalog.quote_ident(rulename) FROM pg_catalog.pg_rules WHERE substring(pg_catalog.quote_ident(rulename),1,%d)='%s'"},
 	{"SCHEMA", Query_for_list_of_schemas},
-	{"SEQUENCE", NULL, NULL, &Query_for_list_of_sequences},
 	{"STATISTICS", NULL, NULL, &Query_for_list_of_statistics},
 	{"SUBSCRIPTION", NULL, Query_for_list_of_subscriptions},
 	{"SYSTEM", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
@@ -1888,7 +1879,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("ADD", "ALTER", "CLUSTER ON", "DISABLE", "DROP",
 					  "ENABLE", "INHERIT", "NO", "RENAME", "RESET",
 					  "OWNER TO", "SET", "VALIDATE CONSTRAINT",
-					  "REPLICA IDENTITY", "ATTACH PARTITION",
+					  "ATTACH PARTITION",
 					  "DETACH PARTITION", "FORCE ROW LEVEL SECURITY");
 	/* ALTER TABLE xxx ENABLE */
 	else if (Matches("ALTER", "TABLE", MatchAny, "ENABLE"))
@@ -3484,8 +3475,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_indexes, NULL);
 	else if (TailMatchesCS("\\dP*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_partitioned_relations, NULL);
-	else if (TailMatchesCS("\\ds*"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_sequences, NULL);
 	else if (TailMatchesCS("\\dt*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
 	else if (TailMatchesCS("\\dT*"))

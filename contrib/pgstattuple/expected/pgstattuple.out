@@ -144,7 +144,7 @@ ERROR:  "test_view" (view) is not supported
 select pgstattuple_approx('test_view');
 ERROR:  "test_view" is not a table or TOAST table
 select pg_relpages('test_view');
-ERROR:  "test_view" is not a table, index, sequence, or TOAST table
+ERROR:  "test_view" is not a table, index, or TOAST table
 select pgstatindex('test_view');
 ERROR:  relation "test_view" is not a btree index
 select pgstathashindex('test_view');

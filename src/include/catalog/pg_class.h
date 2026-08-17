@@ -106,9 +106,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 
 	bool		relispopulated BKI_DEFAULT(t);
 
-	/* see REPLICA_IDENTITY_xxx constants */
-	char		relreplident BKI_DEFAULT(n);
-
 	/* link to original rel during table rewrite; otherwise 0 */
 	Oid			relrewrite BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_class);
 
@@ -147,25 +144,11 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 
 #define		  RELKIND_RELATION		  'r'	/* ordinary table */
 #define		  RELKIND_INDEX			  'i'	/* secondary index */
-#define		  RELKIND_SEQUENCE		  'S'	/* sequence object */
 #define		  RELKIND_TOASTVALUE	  't'	/* for out-of-line values */
 #define		  RELKIND_VIEW			  'v'	/* view */
 #define		  RELKIND_COMPOSITE_TYPE  'c'	/* composite type */
 
 #define		  RELPERSISTENCE_PERMANENT	'p' /* regular table */
-
-/* default selection for replica identity (primary key or nothing) */
-#define		  REPLICA_IDENTITY_DEFAULT	'd'
-/* no replica identity is logged for this relation */
-#define		  REPLICA_IDENTITY_NOTHING	'n'
-/* all columns are logged as replica identity */
-#define		  REPLICA_IDENTITY_FULL		'f'
-/*
- * an explicitly chosen candidate key's columns are used as replica identity.
- * Note this will still be set if the index has been dropped; in that case it
- * has the same meaning as 'n'.
- */
-#define		  REPLICA_IDENTITY_INDEX	'i'
 
 /*
  * Relation kinds that have physical storage. These relations normally have
@@ -175,7 +158,6 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 #define RELKIND_HAS_STORAGE(relkind) \
 	((relkind) == RELKIND_RELATION || \
 	 (relkind) == RELKIND_INDEX || \
-	 (relkind) == RELKIND_SEQUENCE || \
 	 (relkind) == RELKIND_TOASTVALUE)
 
 

@@ -899,8 +899,6 @@ contain_dml_walker(Node *node, void *context)
 }
 
 /*
-
-
  * convert_ANY_sublink_to_join: try to convert an ANY SubLink to a join
  *
  * The caller has found an ANY SubLink at the top level of one of the query's

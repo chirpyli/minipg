@@ -141,9 +141,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_SCHEMA:
 						msg = gettext_noop("permission denied for schema %s");
 						break;
-					case OBJECT_SEQUENCE:
-						msg = gettext_noop("permission denied for sequence %s");
-						break;
 					case OBJECT_STATISTIC_EXT:
 						msg = gettext_noop("permission denied for statistics object %s");
 						break;
@@ -238,9 +235,6 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 						break;
 					case OBJECT_ROUTINE:
 						msg = gettext_noop("must be owner of routine %s");
-						break;
-					case OBJECT_SEQUENCE:
-						msg = gettext_noop("must be owner of sequence %s");
 						break;
 					case OBJECT_SUBSCRIPTION:
 						msg = gettext_noop("must be owner of subscription %s");

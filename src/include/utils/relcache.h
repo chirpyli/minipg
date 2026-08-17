@@ -54,7 +54,6 @@ extern List *RelationGetFKeyList(Relation relation);
 extern List *RelationGetIndexList(Relation relation);
 extern List *RelationGetStatExtList(Relation relation);
 extern Oid	RelationGetPrimaryKeyIndex(Relation relation);
-extern Oid	RelationGetReplicaIndex(Relation relation);
 extern List *RelationGetIndexExpressions(Relation relation);
 extern List *RelationGetDummyIndexExpressions(Relation relation);
 extern List *RelationGetIndexPredicate(Relation relation);
@@ -65,14 +64,11 @@ typedef enum IndexAttrBitmapKind
 {
 	INDEX_ATTR_BITMAP_ALL,
 	INDEX_ATTR_BITMAP_KEY,
-	INDEX_ATTR_BITMAP_PRIMARY_KEY,
-	INDEX_ATTR_BITMAP_IDENTITY_KEY
+	INDEX_ATTR_BITMAP_PRIMARY_KEY
 } IndexAttrBitmapKind;
 
 extern Bitmapset *RelationGetIndexAttrBitmap(Relation relation,
 											 IndexAttrBitmapKind attrKind);
-
-extern Bitmapset *RelationGetIdentityKeyBitmap(Relation relation);
 
 extern void RelationGetExclusionInfo(Relation indexRelation,
 									 Oid **operators,

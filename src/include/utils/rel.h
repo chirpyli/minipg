@@ -58,8 +58,7 @@ typedef struct RelationData
 	bool		rd_islocaltemp; /* rel is a temp rel of this session */
 	bool		rd_isnailed;	/* rel is nailed in cache */
 	bool		rd_isvalid;		/* relcache entry is valid */
-	bool		rd_indexvalid;	/* is rd_indexlist valid? (also rd_pkindex and
-								 * rd_replidindex) */
+	bool		rd_indexvalid;	/* is rd_indexlist valid? (also rd_pkindex) */
 	bool		rd_statvalid;	/* is rd_statlist valid? */
 
 	/*----------
@@ -119,7 +118,6 @@ typedef struct RelationData
 	/* data managed by RelationGetIndexList: */
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */
 	Oid			rd_pkindex;		/* OID of primary key, if any */
-	Oid			rd_replidindex; /* OID of replica identity index, if any */
 
 	/* data managed by RelationGetStatExtList: */
 	List	   *rd_statlist;	/* list of OIDs of extended stats */
@@ -128,7 +126,6 @@ typedef struct RelationData
 	Bitmapset  *rd_indexattr;	/* identifies columns used in indexes */
 	Bitmapset  *rd_keyattr;		/* cols that can be ref'd by foreign keys */
 	Bitmapset  *rd_pkattr;		/* cols included in primary key */
-	Bitmapset  *rd_idattr;		/* included in replica identity index */
 
 	/*
 	 * rd_options is set whenever rd_rel is loaded into the relcache entry.

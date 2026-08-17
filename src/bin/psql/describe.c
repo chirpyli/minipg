@@ -1214,7 +1214,6 @@ describeOneTableDetails(const char *schemaname,
 		char	   *reloptions;
 		char	   *reloftype;
 		char		relpersistence;
-		char		relreplident;
 		char	   *relam;
 	}			tableinfo;
 	bool		show_column_details = false;
@@ -1236,7 +1235,7 @@ describeOneTableDetails(const char *schemaname,
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
-						  "c.relpersistence, c.relreplident, am.amname\n"
+						  "c.relpersistence, am.amname\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "LEFT JOIN pg_catalog.pg_am am ON (c.relam = am.oid)\n"
@@ -1255,7 +1254,7 @@ describeOneTableDetails(const char *schemaname,
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
-						  "c.relpersistence, c.relreplident\n"
+						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1273,7 +1272,7 @@ describeOneTableDetails(const char *schemaname,
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
-						  "c.relpersistence, c.relreplident\n"
+						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1290,7 +1289,7 @@ describeOneTableDetails(const char *schemaname,
 						  "c.relhastriggers, false, false, false AS relhasoids, "
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
-						  "c.relpersistence, c.relreplident\n"
+						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1406,11 +1405,9 @@ describeOneTableDetails(const char *schemaname,
 		pg_strdup(PQgetvalue(res, 0, 11)) : NULL;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
 		*(PQgetvalue(res, 0, 12)) : 0;
-	tableinfo.relreplident = (pset.sversion >= 90400) ?
-		*(PQgetvalue(res, 0, 13)) : 'd';
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 14) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 14));
+		tableinfo.relam = PQgetisnull(res, 0, 13) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 13));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -1862,7 +1859,6 @@ describeOneTableDetails(const char *schemaname,
 			char	   *indisvalid = PQgetvalue(result, 0, 3);
 			char	   *deferrable = PQgetvalue(result, 0, 4);
 			char	   *deferred = PQgetvalue(result, 0, 5);
-			char	   *indisreplident = PQgetvalue(result, 0, 6);
 			char	   *indamname = PQgetvalue(result, 0, 7);
 			char	   *indtable = PQgetvalue(result, 0, 8);
 			char	   *indpred = PQgetvalue(result, 0, 9);
@@ -1893,9 +1889,6 @@ describeOneTableDetails(const char *schemaname,
 
 			if (strcmp(deferred, "t") == 0)
 				appendPQExpBufferStr(&tmpbuf, _(", initially deferred"));
-
-			if (strcmp(indisreplident, "t") == 0)
-				appendPQExpBufferStr(&tmpbuf, _(", replica identity"));
 
 			printTableAddFooter(&cont, tmpbuf.data);
 
@@ -2010,9 +2003,6 @@ describeOneTableDetails(const char *schemaname,
 
 					if (strcmp(PQgetvalue(result, i, 4), "t") != 0)
 						appendPQExpBufferStr(&buf, " INVALID");
-
-					if (strcmp(PQgetvalue(result, i, 10), "t") == 0)
-						appendPQExpBufferStr(&buf, " REPLICA IDENTITY");
 
 					printTableAddFooter(&cont, buf.data);
 
@@ -2865,31 +2855,9 @@ describeOneTableDetails(const char *schemaname,
 		{
 			printfPQExpBuffer(&buf, _("Typed table of type: %s"), tableinfo.reloftype);
 			printTableAddFooter(&cont, buf.data);
-		}
+			}
 
-		if (verbose &&
-			tableinfo.relkind == RELKIND_RELATION &&
-
-		/*
-		 * No need to display default values; we already display a REPLICA
-		 * IDENTITY marker on indexes.
-		 */
-			tableinfo.relreplident != 'i' &&
-			((strcmp(schemaname, "pg_catalog") != 0 && tableinfo.relreplident != 'd') ||
-			 (strcmp(schemaname, "pg_catalog") == 0 && tableinfo.relreplident != 'n')))
-		{
-			const char *s = _("Replica Identity");
-
-			printfPQExpBuffer(&buf, "%s: %s",
-							  s,
-							  tableinfo.relreplident == 'f' ? "FULL" :
-							  tableinfo.relreplident == 'n' ? "NOTHING" :
-							  "???");
-
-			printTableAddFooter(&cont, buf.data);
-		}
-
-		/* OIDs, if verbose */
+			/* OIDs, if verbose */
 		if (verbose && tableinfo.hasoids)
 			printTableAddFooter(&cont, _("Has OIDs: yes"));
 
@@ -3227,7 +3195,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_INDEX) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_SEQUENCE) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
 					  " WHEN " "'p'" " THEN '%s'"
@@ -3240,7 +3207,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  gettext_noop("view"),
 					  gettext_noop("materialized view"),
 					  gettext_noop("index"),
-					  gettext_noop("sequence"),
 					  gettext_noop("special"),
 					  gettext_noop("TOAST table"),
 					  gettext_noop("partitioned table"),
@@ -3336,8 +3302,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	if (showIndexes)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ","
 							 "'I'" ",");
-	if (showSeq)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_SEQUENCE) ",");
 	if (showSystem || pattern)
 		appendPQExpBufferStr(&buf, "'s',"); /* was RELKIND_SPECIAL */
 

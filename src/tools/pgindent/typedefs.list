@@ -2128,7 +2128,6 @@ RepOriginId
 ReparameterizeForeignPathByChild_function
 ReplaceVarsFromTargetList_context
 ReplaceVarsNoMatchOption
-ReplicaIdentityStmt
 ReplicationState
 ReplicationStateCtl
 ReplicationStateOnDisk

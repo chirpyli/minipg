@@ -2867,10 +2867,6 @@
   prorettype => 'bool', proargtypes => 'regclass int2 bool',
   prosrc => 'pg_column_is_updatable' },
 
-{ oid => '6120', descr => 'oid of replica identity index if any',
-  proname => 'pg_get_replica_identity_index', procost => '10',
-  provolatile => 's', prorettype => 'regclass', proargtypes => 'regclass',
-  prosrc => 'pg_get_replica_identity_index' },
 
 # Deferrable unique constraint trigger
 { oid => '1250', descr => 'deferred UNIQUE constraint check',

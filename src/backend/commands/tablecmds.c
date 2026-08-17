@@ -236,12 +236,6 @@ static const struct dropmsgstrings dropmsgstringarray[] = {
 		gettext_noop("table \"%s\" does not exist, skipping"),
 		gettext_noop("\"%s\" is not a table"),
 	gettext_noop("Use DROP TABLE to remove a table.")},
-	{RELKIND_SEQUENCE,
-		ERRCODE_UNDEFINED_TABLE,
-		gettext_noop("sequence \"%s\" does not exist"),
-		gettext_noop("sequence \"%s\" does not exist, skipping"),
-		gettext_noop("\"%s\" is not a sequence"),
-	gettext_noop("Use DROP SEQUENCE to remove a sequence.")},
 	{RELKIND_VIEW,
 		ERRCODE_UNDEFINED_TABLE,
 		gettext_noop("view \"%s\" does not exist"),
@@ -300,9 +294,6 @@ static bool MergeCheckConstraint(List *constraints, char *name, Node *expr);
 static int	findAttrByName(const char *attributeName, List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
 								 Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved);
-static void AlterSeqNamespaces(Relation classRel, Relation rel,
-							   Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved,
-							   LOCKMODE lockmode);
 static ObjectAddress ATExecValidateConstraint(List **wqueue,
 											  Relation rel, char *constrName,
 											  bool recurse, bool recursing, LOCKMODE lockmode);
@@ -418,8 +409,6 @@ static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static void change_owner_recurse_to_sequences(Oid relationOid,
-											  Oid newOwnerId, LOCKMODE lockmode);
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
 									 LOCKMODE lockmode);
 static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
@@ -918,10 +907,6 @@ RemoveRelations(DropStmt *drop)
 
 		case OBJECT_INDEX:
 			relkind = RELKIND_INDEX;
-			break;
-
-		case OBJECT_SEQUENCE:
-			relkind = RELKIND_SEQUENCE;
 			break;
 
 		case OBJECT_VIEW:
@@ -8128,14 +8113,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 						Assert(foundObject.objectSubId == 0);
 						RememberIndexForRebuilding(foundObject.objectId, tab);
 					}
-					else if (relKind == RELKIND_SEQUENCE)
-					{
-						/*
-						 * This must be a SERIAL column's sequence.  We need
-						 * not do anything to it.
-						 */
-						Assert(foundObject.objectSubId == 0);
-					}
 					else if (relKind == RELKIND_RELATION &&
 							 foundObject.objectSubId != 0 &&
 							 get_attgenerated(foundObject.objectId, foundObject.objectSubId))
@@ -9100,9 +9077,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		if (tuple_class->reltoastrelid != InvalidOid)
 			ATExecChangeOwner(tuple_class->reltoastrelid, newOwnerId,
 							  true, lockmode);
-
-		/* If it has dependent sequences, recurse to change them too */
-		change_owner_recurse_to_sequences(relationOid, newOwnerId, lockmode);
 	}
 
 	InvokeObjectPostAlterHook(RelationRelationId, relationOid, 0);
@@ -9110,75 +9084,6 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 	ReleaseSysCache(tuple);
 	table_close(class_rel, RowExclusiveLock);
 	relation_close(target_rel, NoLock);
-}
-
-/*
- * change_owner_recurse_to_sequences
- *
- * Helper function for ATExecChangeOwner.  Examines pg_depend searching
- * for sequences that are dependent on serial columns, and changes their
- * ownership.
- */
-static void
-change_owner_recurse_to_sequences(Oid relationOid, Oid newOwnerId, LOCKMODE lockmode)
-{
-	Relation	depRel;
-	SysScanDesc scan;
-	ScanKeyData key[2];
-	HeapTuple	tup;
-
-	/*
-	 * SERIAL sequences are those having an auto dependency on one of the
-	 * table's columns (we don't care *which* column, exactly).
-	 */
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_refclassid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_refobjid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relationOid));
-	/* we leave refobjsubid unspecified */
-
-	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
-							  NULL, 2, key);
-
-	while (HeapTupleIsValid(tup = systable_getnext(scan)))
-	{
-		Form_pg_depend depForm = (Form_pg_depend) GETSTRUCT(tup);
-		Relation	seqRel;
-
-		/* skip dependencies other than auto dependencies on columns */
-		if (depForm->refobjsubid == 0 ||
-			depForm->classid != RelationRelationId ||
-			depForm->objsubid != 0 ||
-			!(depForm->deptype == DEPENDENCY_AUTO || depForm->deptype == DEPENDENCY_INTERNAL))
-			continue;
-
-		/* Use relation_open just in case it's an index */
-		seqRel = relation_open(depForm->objid, lockmode);
-
-		/* skip non-sequence relations */
-		if (RelationGetForm(seqRel)->relkind != RELKIND_SEQUENCE)
-		{
-			/* No need to keep the lock */
-			relation_close(seqRel, lockmode);
-			continue;
-		}
-
-		/* We don't need to close the sequence while we alter it. */
-		ATExecChangeOwner(depForm->objid, newOwnerId, true, lockmode);
-
-		/* Now we can close it.  Keep the lock till end of transaction. */
-		relation_close(seqRel, NoLock);
-	}
-
-	systable_endscan(scan);
-
-	relation_close(depRel, AccessShareLock);
 }
 
 /*
@@ -10165,8 +10070,6 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 
 	/* Fix other dependent stuff */
 	AlterIndexNamespaces(classRel, rel, oldNspOid, nspOid, objsMoved);
-	AlterSeqNamespaces(classRel, rel, oldNspOid, nspOid,
-					   objsMoved, AccessExclusiveLock);
 	AlterConstraintNamespaces(RelationGetRelid(rel), oldNspOid, nspOid,
 							  false, objsMoved);
 
@@ -10291,86 +10194,6 @@ AlterIndexNamespaces(Relation classRel, Relation rel,
 	}
 
 	list_free(indexList);
-}
-
-/*
- * Move all identity and SERIAL-column sequences of the specified relation to another
- * namespace.
- *
- * Note: we assume adequate permission checking was done by the caller,
- * and that the caller has a suitable lock on the owning relation.
- */
-static void
-AlterSeqNamespaces(Relation classRel, Relation rel,
-				   Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved,
-				   LOCKMODE lockmode)
-{
-	Relation	depRel;
-	SysScanDesc scan;
-	ScanKeyData key[2];
-	HeapTuple	tup;
-
-	/*
-	 * SERIAL sequences are those having an auto dependency on one of the
-	 * table's columns (we don't care *which* column, exactly).
-	 */
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_refclassid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_refobjid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(rel)));
-	/* we leave refobjsubid unspecified */
-
-	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
-							  NULL, 2, key);
-
-	while (HeapTupleIsValid(tup = systable_getnext(scan)))
-	{
-		Form_pg_depend depForm = (Form_pg_depend) GETSTRUCT(tup);
-		Relation	seqRel;
-
-		/* skip dependencies other than auto dependencies on columns */
-		if (depForm->refobjsubid == 0 ||
-			depForm->classid != RelationRelationId ||
-			depForm->objsubid != 0 ||
-			!(depForm->deptype == DEPENDENCY_AUTO || depForm->deptype == DEPENDENCY_INTERNAL))
-			continue;
-
-		/* Use relation_open just in case it's an index */
-		seqRel = relation_open(depForm->objid, lockmode);
-
-		/* skip non-sequence relations */
-		if (RelationGetForm(seqRel)->relkind != RELKIND_SEQUENCE)
-		{
-			/* No need to keep the lock */
-			relation_close(seqRel, lockmode);
-			continue;
-		}
-
-		/* Fix the pg_class and pg_depend entries */
-		AlterRelationNamespaceInternal(classRel, depForm->objid,
-									   oldNspOid, newNspOid,
-									   true, objsMoved);
-
-		/*
-		 * Sequences used to have entries in pg_type, but no longer do.  If we
-		 * ever re-instate that, we'll need to move the pg_type entry to the
-		 * new namespace, too (using AlterTypeNamespaceInternal).
-		 */
-		Assert(RelationGetForm(seqRel)->reltype == InvalidOid);
-
-		/* Now we can close it.  Keep the lock till end of transaction. */
-		relation_close(seqRel, NoLock);
-	}
-
-	systable_endscan(scan);
-
-	relation_close(depRel, AccessShareLock);
 }
 
 
@@ -10766,11 +10589,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	 * otherwise.  Otherwise, the user must select the correct form of the
 	 * command for the relation at issue.
 	 */
-	if (reltype == OBJECT_SEQUENCE && relkind != RELKIND_SEQUENCE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a sequence", rv->relname)));
-
 	if (reltype == OBJECT_VIEW && relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -10803,19 +10621,14 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	 */
 	if (IsA(stmt, AlterObjectSchemaStmt) &&
 		relkind != RELKIND_RELATION &&
-		relkind != RELKIND_VIEW &&
-		relkind != RELKIND_SEQUENCE)
+		relkind != RELKIND_VIEW)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a table, view, materialized view, sequence, or foreign table",
+				 errmsg("\"%s\" is not a table, view, materialized view, or foreign table",
 						rv->relname)));
 
 	ReleaseSysCache(tuple);
 }
-
-/*
- * Transform any expressions present in the partition key
- */
 
 /*
  * ConstraintImpliedByRelConstraint

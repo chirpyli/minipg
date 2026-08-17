@@ -234,7 +234,6 @@ pgstat_relation(Relation rel, FunctionCallInfo fcinfo)
 	{
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
-		case RELKIND_SEQUENCE:
 			return pgstat_heap(rel, fcinfo);
 		case RELKIND_INDEX:
 			/* see pgstatindex_impl */
@@ -291,11 +290,7 @@ pgstat_heap(Relation rel, FunctionCallInfo fcinfo)
 	pgstattuple_type stat = {0};
 	SnapshotData SnapshotDirty;
 
-	/*
-	 * Sequences always use heap AM, but they don't show that in the catalogs.
-	 */
-	if (rel->rd_rel->relkind != RELKIND_SEQUENCE &&
-		rel->rd_rel->relam != HEAP_TABLE_AM_OID)
+	if (rel->rd_rel->relam != HEAP_TABLE_AM_OID)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("only heap AM is supported")));

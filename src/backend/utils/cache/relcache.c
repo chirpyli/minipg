@@ -1074,10 +1074,6 @@ retry:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
-		case RELKIND_SEQUENCE:
-			Assert(relation->rd_rel->relam == InvalidOid);
-			RelationInitTableAccessMethod(relation);
-			break;
 		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
 			Assert(relation->rd_rel->relam == InvalidOid);
@@ -1652,16 +1648,7 @@ RelationInitTableAccessMethod(Relation relation)
 	HeapTuple	tuple;
 	Form_pg_am	aform;
 
-	if (relation->rd_rel->relkind == RELKIND_SEQUENCE)
-	{
-		/*
-		 * Sequences are currently accessed like heap tables, but it doesn't
-		 * seem prudent to show that in the catalog. So just overwrite it
-		 * here.
-		 */
-		relation->rd_amhandler = F_HEAP_TABLEAM_HANDLER;
-	}
-	else if (IsCatalogRelation(relation))
+	if (IsCatalogRelation(relation))
 	{
 		/*
 		 * Avoid doing a syscache lookup for catalog tables.
@@ -1773,7 +1760,6 @@ formrdesc(const char *relationName, Oid relationReltype,
 	/* ... and they're always populated, too */
 	relation->rd_rel->relispopulated = true;
 
-	relation->rd_rel->relreplident = REPLICA_IDENTITY_NOTHING;
 	relation->rd_rel->relpages = 0;
 	relation->rd_rel->reltuples = -1;
 	relation->rd_rel->relallvisible = 0;
@@ -2286,7 +2272,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
 	bms_free(relation->rd_pkattr);
-	bms_free(relation->rd_idattr);
 	if (relation->rd_options)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
@@ -3364,13 +3349,6 @@ RelationBuildLocalRelation(const char *relname,
 	/* relations are populated initially */
 	rel->rd_rel->relispopulated = true;
 
-	/* set replica identity -- system catalogs and non-tables don't have one */
-	if (!IsCatalogNamespace(relnamespace) &&
-		relkind == RELKIND_RELATION)
-		rel->rd_rel->relreplident = REPLICA_IDENTITY_DEFAULT;
-	else
-		rel->rd_rel->relreplident = REPLICA_IDENTITY_NOTHING;
-
 	/*
 	 * Insert relation physical and logical identifiers (OIDs) into the right
 	 * places.  For a mapped relation, we set relfilenode to zero and rely on
@@ -3408,7 +3386,6 @@ RelationBuildLocalRelation(const char *relname,
 	MemoryContextSwitchTo(oldcxt);
 
 	if (relkind == RELKIND_RELATION ||
-		relkind == RELKIND_SEQUENCE ||
 		relkind == RELKIND_TOASTVALUE)
 		RelationInitTableAccessMethod(rel);
 
@@ -3503,7 +3480,6 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 	switch (relation->rd_rel->relkind)
 	{
 		case RELKIND_INDEX:
-		case RELKIND_SEQUENCE:
 			{
 				/* handle these directly, at least for now */
 				SMgrRelation srel;
@@ -3568,13 +3544,9 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 		/* Normal case, update the pg_class entry */
 		classform->relfilenode = newrelfilenode;
 
-		/* relpages etc. never change for sequences */
-		if (relation->rd_rel->relkind != RELKIND_SEQUENCE)
-		{
-			classform->relpages = 0;	/* it's empty until further notice */
-			classform->reltuples = -1;
-			classform->relallvisible = 0;
-		}
+		classform->relpages = 0;	/* it's empty until further notice */
+		classform->reltuples = -1;
+		classform->relallvisible = 0;
 		classform->relfrozenxid = freezeXid;
 		classform->relminmxid = minmulti;
 		classform->relpersistence = persistence;
@@ -3945,7 +3917,6 @@ RelationCacheInitializePhase3(void)
 		/* Reload tableam data if needed */
 		if (relation->rd_tableam == NULL &&
 			(relation->rd_rel->relkind == RELKIND_RELATION ||
-			 relation->rd_rel->relkind == RELKIND_SEQUENCE ||
 			 relation->rd_rel->relkind == RELKIND_TOASTVALUE))
 		{
 			RelationInitTableAccessMethod(relation);
@@ -4390,9 +4361,7 @@ RelationGetFKeyList(Relation relation)
  * indexes, and syscache lookup could cause SI messages to be processed!
  *
  * In exactly the same way, we update rd_pkindex, which is the OID of the
- * relation's primary key index if any, else InvalidOid; and rd_replidindex,
- * which is the pg_class OID of an index to be used as the relation's
- * replication identity index, or InvalidOid if there is no such index.
+ * relation's primary key index if any, else InvalidOid.
  */
 List *
 RelationGetIndexList(Relation relation)
@@ -4403,9 +4372,7 @@ RelationGetIndexList(Relation relation)
 	HeapTuple	htup;
 	List	   *result;
 	List	   *oldlist;
-	char		replident = relation->rd_rel->relreplident;
 	Oid			pkeyIndex = InvalidOid;
-	Oid			candidateIndex = InvalidOid;
 	MemoryContext oldcxt;
 
 	/* Quick exit if we already computed the list. */
@@ -4448,8 +4415,7 @@ RelationGetIndexList(Relation relation)
 
 		/*
 		 * Invalid, non-unique, non-immediate or predicate indexes aren't
-		 * interesting for either oid indexes or replication identity indexes,
-		 * so don't check them.
+		 * interesting for primary key indexes, so don't check them.
 		 */
 		if (!index->indisvalid || !index->indisunique ||
 			!index->indimmediate ||
@@ -4459,10 +4425,6 @@ RelationGetIndexList(Relation relation)
 		/* remember primary key index if any */
 		if (index->indisprimary)
 			pkeyIndex = index->indexrelid;
-
-		/* remember explicitly chosen replica index */
-		if (index->indisreplident)
-			candidateIndex = index->indexrelid;
 	}
 
 	systable_endscan(indscan);
@@ -4477,12 +4439,6 @@ RelationGetIndexList(Relation relation)
 	oldlist = relation->rd_indexlist;
 	relation->rd_indexlist = list_copy(result);
 	relation->rd_pkindex = pkeyIndex;
-	if (replident == REPLICA_IDENTITY_DEFAULT && OidIsValid(pkeyIndex))
-		relation->rd_replidindex = pkeyIndex;
-	else if (replident == REPLICA_IDENTITY_INDEX && OidIsValid(candidateIndex))
-		relation->rd_replidindex = candidateIndex;
-	else
-		relation->rd_replidindex = InvalidOid;
 	relation->rd_indexvalid = true;
 	MemoryContextSwitchTo(oldcxt);
 
@@ -4596,27 +4552,6 @@ RelationGetPrimaryKeyIndex(Relation relation)
 	}
 
 	return relation->rd_pkindex;
-}
-
-/*
- * RelationGetReplicaIndex -- get OID of the relation's replica identity index
- *
- * Returns InvalidOid if there is no such index.
- */
-Oid
-RelationGetReplicaIndex(Relation relation)
-{
-	List	   *ilist;
-
-	if (!relation->rd_indexvalid)
-	{
-		/* RelationGetIndexList does the heavy lifting. */
-		ilist = RelationGetIndexList(relation);
-		list_free(ilist);
-		Assert(relation->rd_indexvalid);
-	}
-
-	return relation->rd_replidindex;
 }
 
 /*
@@ -4830,11 +4765,9 @@ RelationGetIndexAttrBitmap(Relation relation, IndexAttrBitmapKind attrKind)
 	Bitmapset  *indexattrs;		/* indexed columns */
 	Bitmapset  *uindexattrs;	/* columns in unique indexes */
 	Bitmapset  *pkindexattrs;	/* columns in the primary index */
-	Bitmapset  *idindexattrs;	/* columns in the replica identity */
 	List	   *indexoidlist;
 	List	   *newindexoidlist;
 	Oid			relpkindex;
-	Oid			relreplindex;
 	ListCell   *l;
 	MemoryContext oldcxt;
 
@@ -4849,8 +4782,6 @@ RelationGetIndexAttrBitmap(Relation relation, IndexAttrBitmapKind attrKind)
 				return bms_copy(relation->rd_keyattr);
 			case INDEX_ATTR_BITMAP_PRIMARY_KEY:
 				return bms_copy(relation->rd_pkattr);
-			case INDEX_ATTR_BITMAP_IDENTITY_KEY:
-				return bms_copy(relation->rd_idattr);
 			default:
 				elog(ERROR, "unknown attrKind %u", attrKind);
 		}
@@ -4871,14 +4802,13 @@ restart:
 		return NULL;
 
 	/*
-	 * Copy the rd_pkindex and rd_replidindex values computed by
-	 * RelationGetIndexList before proceeding.  This is needed because a
-	 * relcache flush could occur inside index_open below, resetting the
-	 * fields managed by RelationGetIndexList.  We need to do the work with
-	 * stable values of these fields.
+	 * Copy the rd_pkindex value computed by RelationGetIndexList before
+	 * proceeding.  This is needed because a relcache flush could occur inside
+	 * index_open below, resetting the fields managed by
+	 * RelationGetIndexList.  We need to do the work with a stable value of
+	 * this field.
 	 */
 	relpkindex = relation->rd_pkindex;
-	relreplindex = relation->rd_replidindex;
 
 	/*
 	 * For each index, add referenced attributes to indexattrs.
@@ -4893,7 +4823,6 @@ restart:
 	indexattrs = NULL;
 	uindexattrs = NULL;
 	pkindexattrs = NULL;
-	idindexattrs = NULL;
 	foreach(l, indexoidlist)
 	{
 		Oid			indexOid = lfirst_oid(l);
@@ -4905,7 +4834,6 @@ restart:
 		int			i;
 		bool		isKey;		/* candidate key */
 		bool		isPK;		/* primary key */
-		bool		isIDKey;	/* replica identity index */
 
 		indexDesc = index_open(indexOid, AccessShareLock);
 
@@ -4940,9 +4868,6 @@ restart:
 		/* Is this a primary key? */
 		isPK = (indexOid == relpkindex);
 
-		/* Is this index the configured (or default) replica identity? */
-		isIDKey = (indexOid == relreplindex);
-
 		/* Collect simple attribute references */
 		for (i = 0; i < indexDesc->rd_index->indnatts; i++)
 		{
@@ -4968,10 +4893,6 @@ restart:
 				if (isPK && i < indexDesc->rd_index->indnkeyatts)
 					pkindexattrs = bms_add_member(pkindexattrs,
 												  attrnum - FirstLowInvalidHeapAttributeNumber);
-
-				if (isIDKey && i < indexDesc->rd_index->indnkeyatts)
-					idindexattrs = bms_add_member(idindexattrs,
-												  attrnum - FirstLowInvalidHeapAttributeNumber);
 			}
 		}
 
@@ -4992,8 +4913,7 @@ restart:
 	 */
 	newindexoidlist = RelationGetIndexList(relation);
 	if (equal(indexoidlist, newindexoidlist) &&
-		relpkindex == relation->rd_pkindex &&
-		relreplindex == relation->rd_replidindex)
+		relpkindex == relation->rd_pkindex)
 	{
 		/* Still the same index set, so proceed */
 		list_free(newindexoidlist);
@@ -5006,7 +4926,6 @@ restart:
 		list_free(indexoidlist);
 		bms_free(uindexattrs);
 		bms_free(pkindexattrs);
-		bms_free(idindexattrs);
 		bms_free(indexattrs);
 
 		goto restart;
@@ -5019,8 +4938,6 @@ restart:
 	relation->rd_keyattr = NULL;
 	bms_free(relation->rd_pkattr);
 	relation->rd_pkattr = NULL;
-	bms_free(relation->rd_idattr);
-	relation->rd_idattr = NULL;
 
 	/*
 	 * Now save copies of the bitmaps in the relcache entry.  We intentionally
@@ -5032,7 +4949,6 @@ restart:
 	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
 	relation->rd_keyattr = bms_copy(uindexattrs);
 	relation->rd_pkattr = bms_copy(pkindexattrs);
-	relation->rd_idattr = bms_copy(idindexattrs);
 	relation->rd_indexattr = bms_copy(indexattrs);
 	MemoryContextSwitchTo(oldcxt);
 
@@ -5045,92 +4961,10 @@ restart:
 			return uindexattrs;
 		case INDEX_ATTR_BITMAP_PRIMARY_KEY:
 			return pkindexattrs;
-		case INDEX_ATTR_BITMAP_IDENTITY_KEY:
-			return idindexattrs;
 		default:
 			elog(ERROR, "unknown attrKind %u", attrKind);
 			return NULL;
 	}
-}
-
-/*
- * RelationGetIdentityKeyBitmap -- get a bitmap of replica identity attribute
- * numbers
- *
- * A bitmap of index attribute numbers for the configured replica identity
- * index is returned.
- *
- * See also comments of RelationGetIndexAttrBitmap().
- *
- * This is a special purpose function used during logical replication. Here,
- * unlike RelationGetIndexAttrBitmap(), we don't acquire a lock on the required
- * index as we build the cache entry using a historic snapshot and all the
- * later changes are absorbed while decoding WAL. Due to this reason, we don't
- * need to retry here in case of a change in the set of indexes.
- */
-Bitmapset *
-RelationGetIdentityKeyBitmap(Relation relation)
-{
-	Bitmapset  *idindexattrs = NULL;	/* columns in the replica identity */
-	Relation	indexDesc;
-	int			i;
-	Oid			replidindex;
-	MemoryContext oldcxt;
-
-	/* Quick exit if we already computed the result */
-	if (relation->rd_idattr != NULL)
-		return bms_copy(relation->rd_idattr);
-
-	/* Fast path if definitely no indexes */
-	if (!RelationGetForm(relation)->relhasindex)
-		return NULL;
-
-	/* Historic snapshot must be set. */
-	Assert(HistoricSnapshotActive());
-
-	replidindex = RelationGetReplicaIndex(relation);
-
-	/* Fall out if there is no replica identity index */
-	if (!OidIsValid(replidindex))
-		return NULL;
-
-	/* Look up the description for the replica identity index */
-	indexDesc = RelationIdGetRelation(replidindex);
-
-	if (!RelationIsValid(indexDesc))
-		elog(ERROR, "could not open relation with OID %u",
-			 relation->rd_replidindex);
-
-	/* Add referenced attributes to idindexattrs */
-	for (i = 0; i < indexDesc->rd_index->indnatts; i++)
-	{
-		int			attrnum = indexDesc->rd_index->indkey.values[i];
-
-		/*
-		 * We don't include non-key columns into idindexattrs bitmaps. See
-		 * RelationGetIndexAttrBitmap.
-		 */
-		if (attrnum != 0)
-		{
-			if (i < indexDesc->rd_index->indnkeyatts)
-				idindexattrs = bms_add_member(idindexattrs,
-											  attrnum - FirstLowInvalidHeapAttributeNumber);
-		}
-	}
-
-	RelationClose(indexDesc);
-
-	/* Don't leak the old values of these bitmaps, if any */
-	bms_free(relation->rd_idattr);
-	relation->rd_idattr = NULL;
-
-	/* Now save copy of the bitmap in the relcache entry */
-	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-	relation->rd_idattr = bms_copy(idindexattrs);
-	MemoryContextSwitchTo(oldcxt);
-
-	/* We return our original working copy for caller to play with */
-	return idindexattrs;
 }
 
 /*
@@ -5752,7 +5586,6 @@ load_relcache_init_file(bool shared)
 
 			/* Load table AM data */
 			if (rel->rd_rel->relkind == RELKIND_RELATION ||
-				rel->rd_rel->relkind == RELKIND_SEQUENCE ||
 				rel->rd_rel->relkind == RELKIND_TOASTVALUE)
 				RelationInitTableAccessMethod(rel);
 
@@ -5797,11 +5630,9 @@ load_relcache_init_file(bool shared)
 		rel->rd_indexvalid = false;
 		rel->rd_indexlist = NIL;
 		rel->rd_pkindex = InvalidOid;
-		rel->rd_replidindex = InvalidOid;
 		rel->rd_indexattr = NULL;
 		rel->rd_keyattr = NULL;
 		rel->rd_pkattr = NULL;
-		rel->rd_idattr = NULL;
 		rel->rd_statvalid = false;
 		rel->rd_statlist = NIL;
 		rel->rd_fkeyvalid = false;
