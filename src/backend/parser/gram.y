@@ -845,47 +845,18 @@ stmt:	AlterCollationStmt
  *****************************************************************************/
 
 CreateSchemaStmt:
-			CREATE SCHEMA OptSchemaName AUTHORIZATION RoleSpec OptSchemaEltList
+			CREATE SCHEMA OptSchemaName OptSchemaEltList
 				{
 					CreateSchemaStmt *n = makeNode(CreateSchemaStmt);
-					/* One can omit the schema name or the authorization id. */
 					n->schemaname = $3;
-					n->authrole = $5;
-					n->schemaElts = $6;
-					n->if_not_exists = false;
-					$$ = (Node *)n;
-				}
-			| CREATE SCHEMA ColId OptSchemaEltList
-				{
-					CreateSchemaStmt *n = makeNode(CreateSchemaStmt);
-					/* ...but not both */
-					n->schemaname = $3;
-					n->authrole = NULL;
 					n->schemaElts = $4;
 					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
-			| CREATE SCHEMA IF_P NOT EXISTS OptSchemaName AUTHORIZATION RoleSpec OptSchemaEltList
+			| CREATE SCHEMA IF_P NOT EXISTS OptSchemaName OptSchemaEltList
 				{
 					CreateSchemaStmt *n = makeNode(CreateSchemaStmt);
-					/* schema name can be omitted here, too */
 					n->schemaname = $6;
-					n->authrole = $8;
-					if ($9 != NIL)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("CREATE SCHEMA IF NOT EXISTS cannot include schema elements"),
-								 parser_errposition(@9)));
-					n->schemaElts = $9;
-					n->if_not_exists = true;
-					$$ = (Node *)n;
-				}
-			| CREATE SCHEMA IF_P NOT EXISTS ColId OptSchemaEltList
-				{
-					CreateSchemaStmt *n = makeNode(CreateSchemaStmt);
-					/* ...but not here */
-					n->schemaname = $6;
-					n->authrole = NULL;
 					if ($7 != NIL)
 						ereport(ERROR,
 								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

@@ -67,10 +67,4 @@ typedef enum
 	ACLCHECK_NOT_OWNER
 } AclResult;
 
-/*
- * routines used internally (role membership)
- */
-extern Oid	get_role_oid(const char *rolename, bool missing_ok);
-extern Oid	get_rolespec_oid(const RoleSpec *role, bool missing_ok);
-extern char *get_rolespec_name(const RoleSpec *role);
 #endif							/* ACL_H */

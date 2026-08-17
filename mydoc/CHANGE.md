@@ -291,6 +291,21 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
     - `src/backend/commands/Makefile` 的 OBJS 仍含已删的 `user.o`（`user.c` 随角色机制裁剪被删但 Makefile 未同步）→ 移除 `user.o \` 条目。
   - **验证**：`make -j4` 完整重编（含 contrib：pg_surgery/amcheck 等全部通过）+ `make prefix=... install` 成功；独立 `initdb`（默认与 `--no-locale`）EXIT=0；`NO_TEMP_INSTALL=1 make check` **All 84 tests passed**（含此前被误判为「稳定失败」的 `timestamptz`，实为 flaky 非确定性，本次正常通过）。owner 残留清理及构建损坏修复均未引入任何新回归。
   - **与不可裁部分零耦合**：btree/hash 索引、事务不受影响。
+- **（2026-08-18）彻底删除角色（role）骨架（regrole 类型 + OBJECT_ROLE/OCLASS_ROLE 枚举 + authrole 字段 + AUTHORIZATION 语法）**：minipg 于 2026-08-16 已移除用户/角色/密码概念，但角色「抽象层」与若干骨架仍残留为死代码；本次按"彻底裁剪、不留死代码"原则全链路删除。改动：
+  - **角色取 OID 适配层（`src/backend/utils/adt/acl.c` + `src/include/utils/acl.h`）**：删除 `get_role_oid`/`get_rolespec_oid`/`get_rolespec_name` 三个函数定义与 extern 声明（minipg 无角色，此前恒返回 `BOOTSTRAP_SUPERUSERID`/`"postgres"`，仅被角色相关调用点引用，现已无调用点）。`acl.h` 仅保留 `AclResult` 枚举与权限位宏。
+  - **regrole 类型全套（src/backend/utils/adt/regproc.c）**：删除 `regrolein`/`to_regrole`/`regroleout`/`regrolerecv`/`regrolesend` 五个函数（`regroleout` 调用保留的 `GetUserNameFromId`，但类型本身已删故一并移除）。
+  - **catalog 数据（pg_proc.dat / pg_type.dat / pg_cast.dat）**：删除 5 个 regrole 函数注册行（oid 4092/4093/4094/4095/4098）、regrole 类型项（oid 4096）、以及 7 条 regrole 类型转换 cast（pg_cast.dat 234-247 行）；genbki 重跑后 `fmgroids.h`/`fmgrtab.c` 不再含 regrole 符号。
+  - **对象寻址（src/backend/catalog/objectaddress.c）**：删除 `OCLASS_ROLE` 对象类表项、3 处 `OCLASS_ROLE` case（类型展示/简名/身份）、`OBJECT_ROLE` 在 `get_object_address` 双 switch 中的两处 case、以及 `get_object_address_unqualified` 中 `OBJECT_ROLE` 分支（原调用 `get_role_oid`）。
+  - **依赖图（src/backend/catalog/dependency.c）**：删除 `OCLASS_ROLE` 表项（InvalidOid 占位）、`doDeletion` 的全局对象 case、以及 REGROLEOID 依赖抑制分支（含遗留注释）。
+  - **类型注册（src/backend/utils/cache/catcache.c + src/backend/utils/adt/selfuncs.c）**：删除 `REGROLEOID` 类型判定分支（catcache 1 处、selfuncs 2 处）。
+  - **枚举与类型（src/include/catalog/dependency.h + src/include/nodes/parsenodes.h）**：从 `ObjectClass` 枚举删 `OCLASS_ROLE`、从 `ObjectType` 枚举删 `OBJECT_ROLE`；删除 `CreateSchemaStmt.authrole`（`RoleSpec *`）字段。
+  - **DDL 执行（src/backend/commands/schemacmds.c / src/backend/commands/extension.c / src/backend/parser/gram.y）**：`CreateSchemaStmt` 的 owner 计算退化为当前用户（`saved_uid`），不再经 `get_rolespec_oid`；`extension.c` 删除 `csstmt->authrole = NULL` 赋值与 `OBJECT_ROLE` case；`gram.y` 重写 `CreateSchemaStmt` 四条产生式为两条（去掉 `AUTHORIZATION RoleSpec` 与 4 处 `n->authrole` 赋值），minipg 的 `CREATE SCHEMA` 不再支持角色授权。
+  - **节点序列化（src/backend/nodes/equalfuncs.c / copyfuncs.c）**：删除 `COMPARE_NODE_FIELD(authrole)` / `COPY_NODE_FIELD(authrole)`。
+  - **命令标签（src/backend/tcop/utility.c）**：删除 `OBJECT_ROLE` → `CMDTAG_ALTER_ROLE` 分支。
+  - **其他 OCLASS_ROLE case（src/backend/commands/alter.c / tablecmds.c）**：从各自 switch 删除 `OCLASS_ROLE`。
+  - **回归测试（regproc.sql / regproc.out）**：删除全部 `regrole(...)` / `to_regrole(...)` 用例（含 CREATE ROLE/DROP ROLE 测试角色的建立与清理）。
+  - **验证**：`make -C src` 全量编译（含 backend/adt/parser/catalog/nodes/commands/bin）0 error，postgres/psql/pg_regress 链接成功（0 undefined reference）；全代码库 `grep get_role_oid|get_rolespec_oid|REGROLEOID|OBJECT_ROLE|OCLASS_ROLE|authrole|regrole` 0 命中（仅剩 `RoleSpec` 类型定义本身——被其它仍健在的语法如 OWNER 占位可能引用，属遗留类型壳，不影响编译）。与不可裁部分（btree/hash 索引、事务）零耦合：仅删除角色抽象层与 regrole 类型，不涉及索引/事务机制；`GetUserNameFromId` 仍被 name.c/namespace.c 等使用，故保留。
+
 - **（2026-08-17 续）彻底删除 `aclcheck_error*` 全部调用壳并 `git rm aclchk.c`（ACL 裁剪收尾）**：ACL 机制已于 08-15 彻底裁除，`aclchk.c` 的三个错误报告函数（`aclcheck_error`/`aclcheck_error_col`/`aclcheck_error_type`）在 08-17 已被精简为恒报通用错误的最简实现；但 90+ 处调用点（`fmgr.c`/`executor/*`/`catalog/*`/`commands/*` 等）仍保留 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK) aclcheck_error(...)` 的**恒假死壳**，导致该文件与函数必须保留。本轮按"彻底裁剪、不留死代码"的要求，真正删除这些调用壳并删除 `aclchk.c` 本体：
   - **`src/backend/catalog/aclchk.c`**：`git rm`（仅含前述三个错误报告函数与已无消费者的 `AclResult` 消息表，全树无合法调用点）。
   - **头文件声明清理（`src/include/utils/acl.h`）**：删除 `aclcheck_error`/`aclcheck_error_col`/`aclcheck_error_type` 三个 extern 声明（函数已随 aclchk.c 删除）。`acl.h` 其余 ACL 位宏等保留（被 `pg_proc`、`GRANT`/`REVOKE` 声明等引用）。

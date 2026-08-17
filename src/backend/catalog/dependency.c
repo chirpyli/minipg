@@ -141,7 +141,6 @@ static const Oid object_classes[] = {
 	TriggerRelationId,			/* OCLASS_TRIGGER */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	StatisticExtRelationId,		/* OCLASS_STATISTIC_EXT */
-	InvalidOid,					/* OCLASS_ROLE (minipg 无 pg_authid) */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
@@ -1408,7 +1407,6 @@ doDeletion(const ObjectAddress *object, int flags)
 			/*
 			 * These global object types are not supported here.
 			 */
-		case OCLASS_ROLE:
 		case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:
 			elog(ERROR, "global objects cannot be deleted by doDeletion");
@@ -1755,17 +1753,6 @@ find_expr_references_walker(Node *node,
 											  ObjectIdGetDatum(objoid)))
 						add_object_address(OCLASS_SCHEMA, objoid, 0,
 										   context->addrs);
-					break;
-
-					/*
-					 * Dependencies for regrole should be shared among all
-					 * databases, so explicitly inhibit to have dependencies.
-					 */
-				case REGROLEOID:
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("constant of the type %s cannot be used here",
-									"regrole")));
 					break;
 			}
 		}

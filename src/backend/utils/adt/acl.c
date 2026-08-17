@@ -40,36 +40,3 @@
 
 
 
-/* does what it says ... */
-Oid
-get_role_oid(const char *rolname, bool missing_ok)
-{
-	return BOOTSTRAP_SUPERUSERID;
-}
-
-
-/*
- * Given a RoleSpec node, return the OID it corresponds to.  If missing_ok is
- * true, return InvalidOid if the role does not exist.
- *
- * minipg 不存在角色，仅保留唯一的 BOOTSTRAP_SUPERUSERID 实体。
- */
-Oid
-get_rolespec_oid(const RoleSpec *role, bool missing_ok)
-{
-	return BOOTSTRAP_SUPERUSERID;
-}
-
-
-/*
- * Given a RoleSpec, returns a palloc'ed copy of the corresponding role's name.
- *
- * minipg 仅有一个固定角色名 "postgres"。
- */
-char *
-get_rolespec_name(const RoleSpec *role)
-{
-	return pstrdup("postgres");
-}
-
-

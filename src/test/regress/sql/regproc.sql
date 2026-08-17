@@ -42,13 +42,9 @@ SELECT to_regcollation('pg_catalog."POSIX"');
 
 -- schemaname not applicable
 
-SELECT regrole('regress_regrole_test');
-SELECT regrole('"regress_regrole_test"');
 SELECT regnamespace('pg_catalog');
 SELECT regnamespace('"pg_catalog"');
 
-SELECT to_regrole('regress_regrole_test');
-SELECT to_regrole('"regress_regrole_test"');
 SELECT to_regnamespace('pg_catalog');
 SELECT to_regnamespace('"pg_catalog"');
 
@@ -76,11 +72,6 @@ SELECT regcollation('ng_catalog."POSIX"');
 
 -- schemaname not applicable
 
-SELECT regrole('regress_regrole_test');
-SELECT regrole('"regress_regrole_test"');
-SELECT regrole('Nonexistent');
-SELECT regrole('"Nonexistent"');
-SELECT regrole('foo.bar');
 SELECT regnamespace('Nonexistent');
 SELECT regnamespace('"Nonexistent"');
 SELECT regnamespace('foo.bar');
@@ -109,12 +100,6 @@ SELECT to_regcollation('ng_catalog."POSIX"');
 
 -- schemaname not applicable
 
-SELECT to_regrole('regress_regrole_test');
-SELECT to_regrole('"regress_regrole_test"');
-SELECT to_regrole('foo.bar');
-SELECT to_regrole('Nonexistent');
-SELECT to_regrole('"Nonexistent"');
-SELECT to_regrole('foo.bar');
 SELECT to_regnamespace('Nonexistent');
 SELECT to_regnamespace('"Nonexistent"');
 SELECT to_regnamespace('foo.bar');

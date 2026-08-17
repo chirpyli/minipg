@@ -4302,7 +4302,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 		case REGCLASSOID:
 		case REGTYPEOID:
 		case REGCOLLATIONOID:
-		case REGROLEOID:
 		case REGNAMESPACEOID:
 			*scaledvalue = convert_numeric_to_scalar(value, valuetypid,
 													 &failure);
@@ -4416,7 +4415,6 @@ convert_numeric_to_scalar(Datum value, Oid typid, bool *failure)
 		case REGCLASSOID:
 		case REGTYPEOID:
 		case REGCOLLATIONOID:
-		case REGROLEOID:
 		case REGNAMESPACEOID:
 			/* we can treat OIDs as integers... */
 			return (double) DatumGetObjectId(value);

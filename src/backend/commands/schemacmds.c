@@ -63,11 +63,10 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 
 	/*
 	 * Who is supposed to own the new schema?
+	 *
+	 * minipg 不存在用户/角色，schema 归当前唯一用户所有。
 	 */
-	if (stmt->authrole)
-		owner_uid = get_rolespec_oid(stmt->authrole, false);
-	else
-		owner_uid = saved_uid;
+	owner_uid = saved_uid;
 
 	/* fill schema name with the user name if not specified */
 	if (!schemaName)

@@ -519,10 +519,6 @@ static const struct object_type_map
 	{
 		"schema", OBJECT_SCHEMA
 	},
-	/* OCLASS_ROLE */
-	{
-		"role", OBJECT_ROLE
-	},
 	/* OCLASS_DATABASE */
 	{
 		"database", OBJECT_DATABASE
@@ -692,10 +688,9 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_DATABASE:
 			case OBJECT_EXTENSION:
 			case OBJECT_TABLESPACE:
-			case OBJECT_ROLE:
 			case OBJECT_SCHEMA:
-		case OBJECT_LANGUAGE:
-		case OBJECT_ACCESS_METHOD:
+			case OBJECT_LANGUAGE:
+			case OBJECT_ACCESS_METHOD:
 			address = get_object_address_unqualified(objtype,
 													 (Value *) object, missing_ok);
 				break;
@@ -912,11 +907,6 @@ get_object_address_unqualified(ObjectType objtype,
 		case OBJECT_TABLESPACE:
 			address.classId = TableSpaceRelationId;
 			address.objectId = get_tablespace_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_ROLE:
-			address.classId = BOOTSTRAP_SUPERUSERID;
-			address.objectId = get_role_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
 		case OBJECT_SCHEMA:
@@ -1583,7 +1573,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_DATABASE:
 		case OBJECT_EXTENSION:
 		case OBJECT_LANGUAGE:
-		case OBJECT_ROLE:
 		case OBJECT_SCHEMA:
 		case OBJECT_TABLESPACE:
 			if (list_length(name) != 1)
@@ -2561,16 +2550,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 
 
 
-		case OCLASS_ROLE:
-			{
-				char	   *username = GetUserNameFromId(object->objectId,
-														 missing_ok);
-
-				if (username)
-					appendStringInfo(&buffer, _("role %s"), username);
-				break;
-			}
-
 		case OCLASS_DATABASE:
 			{
 				char	   *datname;
@@ -3104,10 +3083,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 
 
-
-		case OCLASS_ROLE:
-			appendStringInfoString(&buffer, "role");
-			break;
 
 		case OCLASS_DATABASE:
 			appendStringInfoString(&buffer, "database");
@@ -3897,20 +3872,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 
 
 
-
-		case OCLASS_ROLE:
-			{
-				char	   *username;
-
-				username = GetUserNameFromId(object->objectId, missing_ok);
-				if (!username)
-					break;
-				if (objname)
-					*objname = list_make1(username);
-				appendStringInfoString(&buffer,
-									   quote_identifier(username));
-				break;
-			}
 
 		case OCLASS_DATABASE:
 			{

@@ -1325,7 +1325,6 @@ typedef enum ObjectType
 	OBJECT_PROCEDURE,
 	OBJECT_PUBLICATION,
 	OBJECT_PUBLICATION_REL,
-	OBJECT_ROLE,
 	OBJECT_ROUTINE,
 	OBJECT_RULE,
 	OBJECT_SCHEMA,
@@ -1352,7 +1351,6 @@ typedef struct CreateSchemaStmt
 {
 	NodeTag		type;
 	char	   *schemaname;		/* the name of the schema to create */
-	RoleSpec   *authrole;		/* the owner of the created schema */
 	List	   *schemaElts;		/* schema components (list of parsenodes) */
 	bool		if_not_exists;	/* just do nothing if schema already exists? */
 } CreateSchemaStmt;

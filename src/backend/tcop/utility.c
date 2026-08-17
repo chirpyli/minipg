@@ -1561,9 +1561,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_PROCEDURE:
 			tag = CMDTAG_ALTER_PROCEDURE;
 			break;
-		case OBJECT_ROLE:
-			tag = CMDTAG_ALTER_ROLE;
-			break;
 		case OBJECT_ROUTINE:
 			tag = CMDTAG_ALTER_ROUTINE;
 			break;

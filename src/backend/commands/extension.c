@@ -1635,7 +1635,6 @@ CreateExtensionInternal(char *extensionName,
 			CreateSchemaStmt *csstmt = makeNode(CreateSchemaStmt);
 
 			csstmt->schemaname = schemaName;
-			csstmt->authrole = NULL;	/* will be created by current user */
 			csstmt->schemaElts = NIL;
 			csstmt->if_not_exists = false;
 			CreateSchemaCommand(csstmt, "(generated CREATE SCHEMA command)",
@@ -3396,7 +3395,6 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 		case OBJECT_EXTENSION:
 		case OBJECT_INDEX:
 		case OBJECT_PUBLICATION:
-		case OBJECT_ROLE:
 		case OBJECT_STATISTIC_EXT:
 		case OBJECT_SUBSCRIPTION:
 		case OBJECT_TABLESPACE:
