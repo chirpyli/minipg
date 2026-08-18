@@ -1011,8 +1011,7 @@ interpret_AS_clause(Oid languageOid, const char *languageName,
 
 
 /*
- * CreateFunction
- *	 Execute a CREATE FUNCTION (or CREATE PROCEDURE) utility statement.
+ * CREATE FUNCTION
  */
 ObjectAddress
 CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
@@ -1112,7 +1111,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	 * leakproof functions can see tuples which have not yet been filtered out
 	 * by security barrier views or row-level security policies.
 	 */
-
 	if (transformDefElem)
 	{
 		ListCell   *lc;
@@ -1148,7 +1146,13 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 									  &variadicArgType,
 									  &requiredResultType);
 
-	if (stmt->returnType)
+	if (stmt->is_procedure)
+	{
+		Assert(!stmt->returnType);
+		prorettype = requiredResultType ? requiredResultType : VOIDOID;
+		returnsSet = false;
+	}
+	else if (stmt->returnType)
 	{
 		/* explicit RETURNS clause */
 		compute_return_type(stmt->returnType, languageOid,
@@ -1240,7 +1244,7 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 						   prosrc_str,	/* converted to text later */
 						   probin_str,	/* converted to text later */
 						   prosqlbody,
-						   isWindowFunc ? PROKIND_WINDOW : PROKIND_FUNCTION,
+						   stmt->is_procedure ? PROKIND_PROCEDURE : (isWindowFunc ? PROKIND_WINDOW : PROKIND_FUNCTION),
 						   security,
 						   isLeakProof,
 						   isStrict,
@@ -1257,6 +1261,7 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 						   procost,
 						   prorows);
 }
+
 
 /*
  * Guts of function deletion.

@@ -4003,7 +4003,7 @@ float84ge(PG_FUNCTION_ARGS)
 
 /*
  * Implements the float8 version of the width_bucket() function
- * defined by SQL2003. See also width_bucket_numeric().
+ * defined by SQL2003. See also width_bucket_array().
  *
  * 'bound1' and 'bound2' are the lower and upper bounds of the
  * histogram's range, respectively. 'count' is the number of buckets

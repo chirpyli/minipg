@@ -2566,7 +2566,7 @@ AlterDomainDefault(List *names, Node *defaultRaw)
 	GenerateTypeDependencies(newtuple,
 							 rel,
 							 defaultExpr,
-							 NULL,	/* don't have typacl handy */
+							 NULL,	/* no ACL (ACL subsystem removed) */
 							 0, /* relation kind is n/a */
 							 false, /* a domain isn't an implicit array */
 							 false, /* nor is it any kind of dependent type */
@@ -4011,7 +4011,7 @@ AlterTypeRecurse(Oid typeOid, bool isImplicitArray,
 	GenerateTypeDependencies(newtup,
 							 catalog,
 							 NULL,	/* don't have defaultExpr handy */
-							 NULL,	/* don't have typacl handy */
+							 NULL,	/* no ACL (ACL subsystem removed) */
 							 0, /* we rejected composite types above */
 							 isImplicitArray,	/* it might be an array */
 							 isImplicitArray,	/* dependent iff it's array */

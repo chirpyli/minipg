@@ -760,3 +760,28 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
 
 ### 验证
 make check-world（NO_TEMP_INSTALL=1，依赖先 make install 到 tmp_install）全部通过：回归 82/82、isolation 66/66，以及 bin/ecpg 等其余子套件均通过。全库 `make -j` 重编通过，无 NUMERICOID/numeric 类型残留引用。
+
+---
+
+## FUNCTION/PROCEDURE 命令标签与派发层裁剪（2026-08-18）
+
+按用户决策"仅裁剪命令标签与派发层（保留语法/功能）"：保留 CREATE/ALTER/DROP FUNCTION/PROCEDURE 的语法与执行能力（回归测试大量依赖 CREATE FUNCTION 作支撑函数），但删除其命令标签（CMDTAG）定义并清理 utility.c 中对应的 case，使这些命令在执行时不再携带状态字符串（命令标签回退为未知）。
+
+### 删除的 CMDTAG 定义
+- **`src/include/tcop/cmdtaglist.h`**：删除 `CMDTAG_ALTER_FUNCTION`、`CMDTAG_CREATE_FUNCTION`、`CMDTAG_CREATE_PROCEDURE`、`CMDTAG_DROP_FUNCTION`、`CMDTAG_DROP_PROCEDURE` 五个命令标签宏（此前已删，本次确认保留该裁剪）。`CMDTAG_CREATE_RULE` 已恢复（CREATE RULE 仍需标签）。
+
+### utility.c 派发/标签层清理
+- **`src/backend/tcop/utility.c`**：
+  - `CreateCommandTag()`：为 `T_CreateFunctionStmt` 增加 case，返回 `CMDTAG_UNKNOWN`（无状态字符串）。
+  - `ClassifyUtilityCommandAsReadOnly()`：恢复 `case T_CreateFunctionStmt:`（fall through 到 `return COMMAND_IS_NOT_READ_ONLY`），否则 CREATE FUNCTION 在只读判断中触发 "unrecognized node type: 226" 错误（226 即 `T_CreateFunctionStmt` 枚举值）。
+  - `standard_ProcessUtility` 派发：恢复 `case T_CreateFunctionStmt: address = CreateFunction(...)` 实际执行（保留 DDL 能力）。
+
+### 保留的执行能力（语法 + 函数）
+- **`src/backend/parser/gram.y`**：恢复 `stmt` 规则中的 `| CreateFunctionStmt`；恢复 `CreateFunctionStmt` 语法块（含 CREATE FUNCTION / CREATE PROCEDURE）；恢复 `RemoveFuncStmt` 的 `DROP FUNCTION` / `DROP PROCEDURE` 分支（OBJECT_FUNCTION / OBJECT_PROCEDURE）。
+- **`src/backend/commands/functioncmds.c`**：恢复 `CreateFunction()` 函数（裁剪其中 ACL 检查：移除 `pg_namespace_aclcheck`/`pg_language_aclcheck`/`aclcheck_error`/`superuser()` 等已删除的权限校验），保留 `ProcedureCreate` 调用。
+
+### 修复的连带问题
+- 裁剪 FUNCTION/PROCEDURE CMDTAG 后，若编译期 cmdtaglist.h 与 cmdtag.c 数组版本不一致（tmp_install 残留旧头文件副本），会导致 `CMDTAG_SELECT` 枚举错位，普通 `SELECT` 命令状态被错误设为 "SELECT FOR KEY SHARE"，引发 libpq "could not interpret result from server" 错误。修复方式：删除污染的 `tmp_install` 旧头文件副本并强制重编 `tcop/utility.o`、`tcop/cmdtag.o`、`tcop/postgres.o`，确保 enum 与生成数组一致。
+
+### 验证
+make check-world 全部通过：回归 82/82、isolation 66/66，以及其余子套件均通过。

@@ -2037,16 +2037,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER TYPE ALTER ATTRIBUTE <foo> */
 	else if (Matches("ALTER", "TYPE", MatchAny, "ALTER", "ATTRIBUTE", MatchAny))
 		COMPLETE_WITH("TYPE");
-	/* complete ALTER GROUP <foo> */
-	else if (Matches("ALTER", "GROUP", MatchAny))
-		COMPLETE_WITH("ADD USER", "DROP USER", "RENAME TO");
-	/* complete ALTER GROUP <foo> ADD|DROP with USER */
-	else if (Matches("ALTER", "GROUP", MatchAny, "ADD|DROP"))
-		COMPLETE_WITH("USER");
-	/* complete ALTER GROUP <foo> ADD|DROP USER with a user name */
-	else if (Matches("ALTER", "GROUP", MatchAny, "ADD|DROP", "USER"))
-		completion_matches = NULL;
-
 	/*
 	 * If we have ALTER TYPE <sth> RENAME VALUE, provide list of enum values
 	 */

@@ -3991,49 +3991,6 @@ opt_nulls_order: NULLS_LA FIRST_P			{ $$ = SORTBY_NULLS_FIRST; }
  *
  *****************************************************************************/
 
-CreateFunctionStmt:
-			CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			RETURNS func_return opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = $7;
-					n->options = $8;
-					n->sql_body = $9;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			  RETURNS TABLE '(' table_func_column_list ')' opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = mergeTableFuncParameters($5, $9);
-					n->returnType = TableFuncTypeName($9);
-					n->returnType->location = @7;
-					n->options = $11;
-					n->sql_body = $12;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			  opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = NULL;
-					n->options = $6;
-					n->sql_body = $7;
-					$$ = (Node *)n;
-				}
-		;
-
 opt_or_replace:
 			OR REPLACE								{ $$ = true; }
 			| /*EMPTY*/								{ $$ = false; }
@@ -10184,6 +10141,62 @@ operator_def_elem: ColLabel '=' NONE
 		;
 
 
+
+CreateFunctionStmt:
+			CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
+			RETURNS func_return opt_createfunc_opt_list opt_routine_body
+				{
+					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
+					n->is_procedure = false;
+					n->replace = $2;
+					n->funcname = $4;
+					n->parameters = $5;
+					n->returnType = $7;
+					n->options = $8;
+					n->sql_body = $9;
+					$$ = (Node *)n;
+				}
+			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
+			  RETURNS TABLE '(' table_func_column_list ')' opt_createfunc_opt_list opt_routine_body
+				{
+					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
+					n->is_procedure = false;
+					n->replace = $2;
+					n->funcname = $4;
+					n->parameters = mergeTableFuncParameters($5, $9);
+					n->returnType = TableFuncTypeName($9);
+					n->returnType->location = @7;
+					n->options = $11;
+					n->sql_body = $12;
+					$$ = (Node *)n;
+				}
+			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
+			  opt_createfunc_opt_list opt_routine_body
+				{
+					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
+					n->is_procedure = false;
+					n->replace = $2;
+					n->funcname = $4;
+					n->parameters = $5;
+					n->returnType = NULL;
+					n->options = $6;
+					n->sql_body = $7;
+					$$ = (Node *)n;
+				}
+			| CREATE opt_or_replace PROCEDURE func_name func_args_with_defaults
+			  opt_createfunc_opt_list opt_routine_body
+				{
+					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
+					n->is_procedure = true;
+					n->replace = $2;
+					n->funcname = $4;
+					n->parameters = $5;
+					n->returnType = NULL;
+					n->options = $6;
+					n->sql_body = $7;
+					$$ = (Node *)n;
+				}
+		;
 
 /* Ignored, merely for SQL compliance */
 RemoveFuncStmt:

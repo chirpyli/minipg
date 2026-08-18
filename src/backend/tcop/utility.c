@@ -133,7 +133,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
 		case T_CreateExtensionStmt:
-		case T_CreateFunctionStmt:
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
 		case T_CreateRangeStmt:
@@ -148,6 +147,7 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropStmt:
 		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
+		case T_CreateFunctionStmt:
 		case T_IndexStmt:
 		case T_RuleStmt:
 		case T_TruncateStmt:
@@ -1089,15 +1089,15 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_ViewStmt:	/* CREATE VIEW */
 				address = DefineView((ViewStmt *) parsetree, queryString,
-									 pstmt->stmt_location, pstmt->stmt_len);
-				break;
-
-			case T_CreateFunctionStmt:	/* CREATE FUNCTION */
-				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
+									pstmt->stmt_location, pstmt->stmt_len);
 				break;
 
 			case T_RuleStmt:	/* CREATE RULE */
 				address = DefineRule((RuleStmt *) parsetree, queryString);
+				break;
+
+			case T_CreateFunctionStmt:
+				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
 				break;
 
 			case T_CreateTrigStmt:
@@ -1462,9 +1462,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_EXTENSION:
 			tag = CMDTAG_ALTER_EXTENSION;
 			break;
-		case OBJECT_FUNCTION:
-			tag = CMDTAG_ALTER_FUNCTION;
-			break;
 		case OBJECT_INDEX:
 			tag = CMDTAG_ALTER_INDEX;
 			break;
@@ -1665,12 +1662,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_EXTENSION;
 			break;
 
-			tag = CMDTAG_ALTER_EXTENSION;
-			break;
-
-			tag = CMDTAG_ALTER_EXTENSION;
-			break;
-
 		case T_DropStmt:
 			switch (((DropStmt *) parsetree)->removeType)
 			{
@@ -1697,12 +1688,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
-					break;
-				case OBJECT_FUNCTION:
-					tag = CMDTAG_DROP_FUNCTION;
-					break;
-				case OBJECT_PROCEDURE:
-					tag = CMDTAG_DROP_PROCEDURE;
 					break;
 				case OBJECT_ROUTINE:
 					tag = CMDTAG_DROP_ROUTINE;
@@ -1808,19 +1793,19 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_VIEW;
 			break;
 
+		case T_RuleStmt:
+			tag = CMDTAG_CREATE_RULE;
+			break;
+
 		case T_CreateFunctionStmt:
-			if (((CreateFunctionStmt *) parsetree)->is_procedure)
-				tag = CMDTAG_CREATE_PROCEDURE;
-			else
-				tag = CMDTAG_CREATE_FUNCTION;
+			/* FUNCTION/PROCEDURE command tags have been removed; report
+			 * an unknown tag so the command still executes but carries no
+			 * status string. */
+			tag = CMDTAG_UNKNOWN;
 			break;
 
 		case T_IndexStmt:
 			tag = CMDTAG_CREATE_INDEX;
-			break;
-
-		case T_RuleStmt:
-			tag = CMDTAG_CREATE_RULE;
 			break;
 
 		case T_DoStmt:
@@ -1829,9 +1814,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreatedbStmt:
 			tag = CMDTAG_CREATE_DATABASE;
-			break;
-
-			tag = CMDTAG_ALTER_DATABASE;
 			break;
 
 		case T_DropdbStmt:
@@ -2249,10 +2231,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_ViewStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateFunctionStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
