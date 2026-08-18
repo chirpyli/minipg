@@ -259,9 +259,9 @@ select 1::int2/0;
 
 select 1/0::int2;
 
-select 1::numeric/0;
+select 1::int8/0;
 
-select 1/0::numeric;
+select 1/0::int8;
 
 select 1::float8/0;
 

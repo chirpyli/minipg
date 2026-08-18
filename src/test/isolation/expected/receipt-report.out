@@ -14,9 +14,9 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -35,9 +35,9 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -55,9 +55,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c2: COMMIT;
@@ -76,9 +76,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -98,9 +98,9 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -118,9 +118,9 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c2: COMMIT;
@@ -139,9 +139,9 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -159,9 +159,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -180,9 +180,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -201,9 +201,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -224,9 +224,9 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -245,9 +245,9 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -265,9 +265,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c2: COMMIT;
@@ -286,9 +286,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -308,9 +308,9 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -343,8 +343,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -364,8 +364,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -386,8 +386,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -405,8 +405,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -425,8 +425,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -446,8 +446,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -465,8 +465,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -485,8 +485,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -504,8 +504,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -524,8 +524,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -544,8 +544,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -564,8 +564,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -584,8 +584,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -604,8 +604,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -626,8 +626,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -645,8 +645,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -665,8 +665,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -684,8 +684,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -704,8 +704,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -724,8 +724,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -746,8 +746,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -765,8 +765,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -785,8 +785,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -806,8 +806,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -825,8 +825,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -845,8 +845,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -864,8 +864,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -884,8 +884,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -904,8 +904,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -924,8 +924,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -944,8 +944,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -964,8 +964,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -983,8 +983,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1003,8 +1003,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1023,8 +1023,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1043,8 +1043,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1063,8 +1063,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1083,8 +1083,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1103,8 +1103,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1123,8 +1123,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1143,8 +1143,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -1163,8 +1163,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1183,8 +1183,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1203,8 +1203,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1226,9 +1226,9 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -1247,9 +1247,9 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -1267,9 +1267,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c2: COMMIT;
@@ -1288,9 +1288,9 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -1310,9 +1310,9 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
-         3|  12-22-2008|  4.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
+         3|  12-22-2008|     4
 (3 rows)
 
 step c3: COMMIT;
@@ -1345,8 +1345,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1366,8 +1366,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1388,8 +1388,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1407,8 +1407,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -1427,8 +1427,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1448,8 +1448,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1467,8 +1467,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1487,8 +1487,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1506,8 +1506,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1526,8 +1526,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1546,8 +1546,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -1566,8 +1566,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -1586,8 +1586,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1606,8 +1606,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1628,8 +1628,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1648,8 +1648,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1667,8 +1667,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1687,8 +1687,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1708,8 +1708,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1727,8 +1727,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1747,8 +1747,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1766,8 +1766,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -1786,8 +1786,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -1806,8 +1806,8 @@ receipt|  12-23-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1828,8 +1828,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1847,8 +1847,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -1867,8 +1867,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1888,8 +1888,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1907,8 +1907,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1927,8 +1927,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -1946,8 +1946,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1966,8 +1966,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -1986,8 +1986,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2006,8 +2006,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2026,8 +2026,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2046,8 +2046,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2068,8 +2068,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2087,8 +2087,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2107,8 +2107,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2126,8 +2126,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2146,8 +2146,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2166,8 +2166,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2185,8 +2185,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2205,8 +2205,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2225,8 +2225,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2245,8 +2245,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2265,8 +2265,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2285,8 +2285,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -2305,8 +2305,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2325,8 +2325,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2345,8 +2345,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2365,8 +2365,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2385,8 +2385,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2405,8 +2405,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2428,8 +2428,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2447,8 +2447,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2467,8 +2467,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2486,8 +2486,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2506,8 +2506,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2526,8 +2526,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2548,8 +2548,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2567,8 +2567,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2587,8 +2587,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2608,8 +2608,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2627,8 +2627,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2647,8 +2647,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2666,8 +2666,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2686,8 +2686,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2706,8 +2706,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2726,8 +2726,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -2746,8 +2746,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2766,8 +2766,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2785,8 +2785,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2805,8 +2805,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2825,8 +2825,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -2845,8 +2845,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2865,8 +2865,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2885,8 +2885,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2905,8 +2905,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2925,8 +2925,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2945,8 +2945,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -2965,8 +2965,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -2985,8 +2985,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3005,8 +3005,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3028,8 +3028,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3047,8 +3047,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3067,8 +3067,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3088,8 +3088,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3107,8 +3107,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -3127,8 +3127,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3146,8 +3146,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -3166,8 +3166,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -3186,8 +3186,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3206,8 +3206,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3226,8 +3226,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3246,8 +3246,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3268,8 +3268,8 @@ step c1: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3287,8 +3287,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c1: COMMIT;
@@ -3307,8 +3307,8 @@ step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3326,8 +3326,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3346,8 +3346,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3366,8 +3366,8 @@ step c2: COMMIT;
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3385,8 +3385,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3405,8 +3405,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3425,8 +3425,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3445,8 +3445,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3465,8 +3465,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3485,8 +3485,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3505,8 +3505,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3525,8 +3525,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3545,8 +3545,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c2: COMMIT;
@@ -3565,8 +3565,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3585,8 +3585,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3605,8 +3605,8 @@ step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -3624,8 +3624,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3644,8 +3644,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3664,8 +3664,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3684,8 +3684,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3704,8 +3704,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3724,8 +3724,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3744,8 +3744,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3764,8 +3764,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3784,8 +3784,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3804,8 +3804,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3824,8 +3824,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3844,8 +3844,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step rxwy1: INSERT INTO receipt VALUES (3, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 4.00);
@@ -3864,8 +3864,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3884,8 +3884,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3904,8 +3904,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3924,8 +3924,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3944,8 +3944,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3964,8 +3964,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -3984,8 +3984,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4004,8 +4004,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4024,8 +4024,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4044,8 +4044,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4064,8 +4064,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4084,8 +4084,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step wx2: UPDATE ctl SET deposit_date = DATE '2008-12-23' WHERE k = 'receipt';
@@ -4104,8 +4104,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -4124,8 +4124,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -4144,8 +4144,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -4164,8 +4164,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -4184,8 +4184,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;
@@ -4204,8 +4204,8 @@ receipt|  12-22-2008
 step ry3: SELECT * FROM receipt WHERE deposit_date = DATE '2008-12-22';
 receipt_no|deposit_date|amount
 ----------+------------+------
-         1|  12-22-2008|  1.00
-         2|  12-22-2008|  2.00
+         1|  12-22-2008|     1
+         2|  12-22-2008|     2
 (2 rows)
 
 step c3: COMMIT;

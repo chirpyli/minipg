@@ -219,13 +219,13 @@ FROM (VALUES (-2.5::float8),
 
 -- check rounding when casting from numeric
 SELECT x, x::int8 AS int8_value
-FROM (VALUES (-2.5::numeric),
-             (-1.5::numeric),
-             (-0.5::numeric),
-             (0.0::numeric),
-             (0.5::numeric),
-             (1.5::numeric),
-             (2.5::numeric)) t(x);
+FROM (VALUES (-2.5::int8),
+             (-1.5::int8),
+             (-0.5::int8),
+             (0.0::int8),
+             (0.5::int8),
+             (1.5::int8),
+             (2.5::int8)) t(x);
 
 -- test gcd()
 SELECT a, b, gcd(a, b), gcd(a, -b), gcd(b, a), gcd(-b, a)

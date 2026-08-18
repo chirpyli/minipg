@@ -498,11 +498,11 @@ set enable_sort = true;
 set enable_hashagg = false;
 
 explain (costs off)
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 
 create table gs_group_1 as
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 
 -- Produce results with hash aggregation.
@@ -511,11 +511,11 @@ set enable_hashagg = true;
 set enable_sort = false;
 
 explain (costs off)
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 
 create table gs_hash_1 as
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 
 set enable_sort = true;

@@ -5,6 +5,7 @@ CREATE OPERATOR @#@ (
    rightarg = int8,		-- prefix
    procedure = factorial
 );
+ERROR:  function factorial(bigint) does not exist
 CREATE OPERATOR #%# (
    leftarg = int8,		-- fail, postfix is no longer supported
    procedure = factorial
@@ -33,12 +34,12 @@ CREATE OPERATOR !=- (
    rightarg = int8,
    procedure = factorial
 );
+ERROR:  function factorial(bigint) does not exist
 SELECT !=- 10;
- ?column? 
-----------
-  3628800
-(1 row)
-
+ERROR:  operator does not exist: !=- integer
+LINE 1: SELECT !=- 10;
+               ^
+HINT:  No operator matches the given name and argument type. You might need to add an explicit type cast.
 -- postfix operators don't work anymore
 SELECT 10 !=-;
 ERROR:  syntax error at or near ";"
@@ -112,6 +113,7 @@ CREATE OPERATOR schema_op1.#*# (
    rightarg = int8,
    procedure = factorial
 );
+ERROR:  function factorial(bigint) does not exist
 ROLLBACK;
 -- Should fail. SETOF type functions not allowed as argument (testing leftarg)
 BEGIN TRANSACTION;
@@ -153,6 +155,7 @@ CREATE OPERATOR #@%# (
    invalid_att = int8
 );
 WARNING:  operator attribute "invalid_att" not recognized
+ERROR:  function factorial(bigint) does not exist
 -- Should fail. At least rightarg should be mandatorily specified
 CREATE OPERATOR #@%# (
    procedure = factorial

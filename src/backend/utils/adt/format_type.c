@@ -24,7 +24,6 @@
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
-#include "utils/numeric.h"
 #include "utils/syscache.h"
 
 static char *printTypmod(const char *typname, int32 typmod, Oid typmodout);
@@ -239,12 +238,7 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 			buf = pstrdup("bigint");
 			break;
 
-		case NUMERICOID:
-			if (with_typemod)
-				buf = printTypmod("numeric", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("numeric");
-			break;
+
 
 		case INTERVALOID:
 			if (with_typemod)
@@ -414,8 +408,7 @@ type_maximum_size(Oid type_oid, int32 typemod)
 				pg_encoding_max_length(GetDatabaseEncoding())
 				+ VARHDRSZ;
 
-		case NUMERICOID:
-			return numeric_maximum_size(typemod);
+
 
 		case VARBITOID:
 		case BITOID:

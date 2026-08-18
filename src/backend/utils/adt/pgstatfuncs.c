@@ -1712,7 +1712,7 @@ pg_stat_get_wal(PG_FUNCTION_ARGS)
 	TupleDescInitEntry(tupdesc, (AttrNumber) 2, "wal_fpi",
 					   INT8OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 3, "wal_bytes",
-					   NUMERICOID, -1, 0);
+					   INT8OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 4, "wal_buffers_full",
 					   INT8OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 5, "wal_write",
@@ -1735,12 +1735,8 @@ pg_stat_get_wal(PG_FUNCTION_ARGS)
 	values[0] = Int64GetDatum(wal_stats->wal_records);
 	values[1] = Int64GetDatum(wal_stats->wal_fpi);
 
-	/* Convert to numeric. */
-	snprintf(buf, sizeof buf, UINT64_FORMAT, wal_stats->wal_bytes);
-	values[2] = DirectFunctionCall3(numeric_in,
-									CStringGetDatum(buf),
-									ObjectIdGetDatum(0),
-									Int32GetDatum(-1));
+	/* wal_bytes is a 64-bit counter. */
+	values[2] = Int64GetDatum(wal_stats->wal_bytes);
 
 	values[3] = Int64GetDatum(wal_stats->wal_buffers_full);
 	values[4] = Int64GetDatum(wal_stats->wal_write);

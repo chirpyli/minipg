@@ -74,8 +74,8 @@ create table numeric_tbl (f1 numeric(18,3), f2 numeric);
 
 create view numeric_view as
   select
-    f1, f1::numeric(16,4) as f1164, f1::numeric as f1n,
-    f2, f2::numeric(16,4) as f2164, f2::numeric as f2n
+    f1, f1::int8(16,4) as f1164, f1::int8 as f1n,
+    f2, f2::int8(16,4) as f2164, f2::int8 as f2n
   from numeric_tbl;
 
 \d+ numeric_view

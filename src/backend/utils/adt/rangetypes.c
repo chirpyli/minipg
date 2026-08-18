@@ -33,7 +33,6 @@
 extern Datum tstzrange_subdiff(PG_FUNCTION_ARGS);
 extern Datum tsrange_subdiff(PG_FUNCTION_ARGS);
 extern Datum daterange_subdiff(PG_FUNCTION_ARGS);
-extern Datum numrange_subdiff(PG_FUNCTION_ARGS);
 extern Datum int8range_subdiff(PG_FUNCTION_ARGS);
 extern Datum int4range_subdiff(PG_FUNCTION_ARGS);
 extern Datum daterange_canonical(PG_FUNCTION_ARGS);
@@ -1575,22 +1574,6 @@ int8range_subdiff(PG_FUNCTION_ARGS)
 	int64		v2 = PG_GETARG_INT64(1);
 
 	PG_RETURN_FLOAT8((float8) v1 - (float8) v2);
-}
-
-Datum
-numrange_subdiff(PG_FUNCTION_ARGS)
-{
-	Datum		v1 = PG_GETARG_DATUM(0);
-	Datum		v2 = PG_GETARG_DATUM(1);
-	Datum		numresult;
-	float8		floatresult;
-
-	numresult = DirectFunctionCall2(numeric_sub, v1, v2);
-
-	floatresult = DatumGetFloat8(DirectFunctionCall1(numeric_float8,
-													 numresult));
-
-	PG_RETURN_FLOAT8(floatresult);
 }
 
 Datum

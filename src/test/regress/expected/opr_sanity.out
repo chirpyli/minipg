@@ -706,11 +706,6 @@ varbitcmp(bit varying,bit varying)
 boolle(boolean,boolean)
 boolge(boolean,boolean)
 btboolcmp(boolean,boolean)
-"numeric"(integer)
-"numeric"(real)
-"numeric"(double precision)
-"numeric"(bigint)
-"numeric"(smallint)
 int28eq(smallint,bigint)
 int28ne(smallint,bigint)
 int28lt(smallint,bigint)
@@ -1930,11 +1925,10 @@ ORDER BY 1, 2, 3;
                     | float_ops        | float8_ops       | double precision
                     | interval_ops     | interval_ops     | interval
                     | multirange_ops   | multirange_ops   | anymultirange
-                    | numeric_ops      | numeric_ops      | numeric
                     | range_ops        | range_ops        | anyrange
                     | record_image_ops | record_image_ops | record
                     | record_ops       | record_ops       | record
-(13 rows)
+(12 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.

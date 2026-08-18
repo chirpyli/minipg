@@ -4,12 +4,12 @@ SELECT size, pg_size_pretty(size), pg_size_pretty(-1 * size) FROM
             (1000000000000000::bigint)) x(size);
 
 SELECT size, pg_size_pretty(size), pg_size_pretty(-1 * size) FROM
-    (VALUES (10::numeric), (1000::numeric), (1000000::numeric),
-            (1000000000::numeric), (1000000000000::numeric),
-            (1000000000000000::numeric),
-            (10.5::numeric), (1000.5::numeric), (1000000.5::numeric),
-            (1000000000.5::numeric), (1000000000000.5::numeric),
-            (1000000000000000.5::numeric)) x(size);
+    (VALUES (10::int8), (1000::int8), (1000000::int8),
+            (1000000000::int8), (1000000000000::int8),
+            (1000000000000000::int8),
+            (10::int8), (1000::int8), (1000000::int8),
+            (1000000000::int8), (1000000000000::int8),
+            (1000000000000000::int8)) x(size);
 
 -- test where units change up
 SELECT size, pg_size_pretty(size), pg_size_pretty(-1 * size) FROM
@@ -20,11 +20,11 @@ SELECT size, pg_size_pretty(size), pg_size_pretty(-1 * size) FROM
             (11258449312612351::bigint), (11258449312612352::bigint)) x(size);
 
 SELECT size, pg_size_pretty(size), pg_size_pretty(-1 * size) FROM
-    (VALUES (10239::numeric), (10240::numeric),
-            (10485247::numeric), (10485248::numeric),
-            (10736893951::numeric), (10736893952::numeric),
-            (10994579406847::numeric), (10994579406848::numeric),
-            (11258449312612351::numeric), (11258449312612352::numeric)) x(size);
+    (VALUES (10239::int8), (10240::int8),
+            (10485247::int8), (10485248::int8),
+            (10736893951::int8), (10736893952::int8),
+            (10994579406847::int8), (10994579406848::int8),
+            (11258449312612351::int8), (11258449312612352::int8)) x(size);
 
 -- pg_size_bytes() tests
 SELECT size, pg_size_bytes(size) FROM

@@ -4292,7 +4292,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 		case INT8OID:
 		case FLOAT4OID:
 		case FLOAT8OID:
-		case NUMERICOID:
 		case OIDOID:
 		case REGPROCOID:
 		case REGPROCEDUREOID:
@@ -4401,11 +4400,6 @@ convert_numeric_to_scalar(Datum value, Oid typid, bool *failure)
 			return (double) DatumGetFloat4(value);
 		case FLOAT8OID:
 			return (double) DatumGetFloat8(value);
-		case NUMERICOID:
-			/* Note: out-of-range values will be clamped to +-HUGE_VAL */
-			return (double)
-				DatumGetFloat8(DirectFunctionCall1(numeric_float8_no_overflow,
-												   value));
 		case OIDOID:
 		case REGPROCOID:
 		case REGPROCEDUREOID:

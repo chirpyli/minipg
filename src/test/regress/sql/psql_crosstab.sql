@@ -31,7 +31,7 @@ SELECT v, to_char(d, 'Mon') AS "month name", EXTRACT(month FROM d) AS num,
 -- ordered months in vertical header, ordered years in horizontal header
 SELECT EXTRACT(year FROM d) AS year, to_char(d,'Mon') AS """month"" name",
   EXTRACT(month FROM d) AS month,
-  format('sum=%s avg=%s', sum(i), avg(i)::numeric(2,1))
+  format('sum=%s avg=%s', sum(i), avg(i)::int8(2,1))
   FROM ctv_data
   GROUP BY EXTRACT(year FROM d), to_char(d,'Mon'), EXTRACT(month FROM d)
 ORDER BY month

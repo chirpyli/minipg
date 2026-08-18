@@ -139,113 +139,72 @@ CREATE AGGREGATE sumdouble (float8)
     minvfunc = float8mi
 );
 
--- aggregate combine and serialization functions
-
--- can't specify just one of serialfunc and deserialfunc
-CREATE AGGREGATE myavg (numeric)
-(
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	serialfunc = numeric_avg_serialize
-);
-
--- serialfunc must have correct parameters
-CREATE AGGREGATE myavg (numeric)
-(
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	serialfunc = numeric_avg_deserialize,
-	deserialfunc = numeric_avg_deserialize
-);
-
--- deserialfunc must have correct parameters
-CREATE AGGREGATE myavg (numeric)
-(
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	serialfunc = numeric_avg_serialize,
-	deserialfunc = numeric_avg_serialize
-);
-
--- ensure combine function parameters are checked
-CREATE AGGREGATE myavg (numeric)
-(
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	serialfunc = numeric_avg_serialize,
-	deserialfunc = numeric_avg_deserialize,
-	combinefunc = int4larger
-);
+-- aggregate combine and final function checks
 
 -- ensure create aggregate works.
-CREATE AGGREGATE myavg (numeric)
+CREATE AGGREGATE myavg (int8)
 (
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	finalfunc = numeric_avg,
-	serialfunc = numeric_avg_serialize,
-	deserialfunc = numeric_avg_deserialize,
-	combinefunc = numeric_avg_combine,
+	stype = _int8,
+	sfunc = int8_avg_accum,
+	finalfunc = int8_avg,
 	finalfunc_modify = shareable  -- just to test a non-default setting
 );
 
 -- Ensure all these functions made it into the catalog
 SELECT aggfnoid, aggtransfn, aggcombinefn, aggtranstype::regtype,
-       aggserialfn, aggdeserialfn, aggfinalmodify
+       aggfinalfn, aggfinalmodify
 FROM pg_aggregate
 WHERE aggfnoid = 'myavg'::REGPROC;
 
-DROP AGGREGATE myavg (numeric);
+DROP AGGREGATE myavg (int8);
 
 -- create or replace aggregate
-CREATE AGGREGATE myavg (numeric)
+CREATE AGGREGATE myavg (int8)
 (
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	finalfunc = numeric_avg
+	stype = _int8,
+	sfunc = int8_avg_accum,
+	finalfunc = int8_avg
 );
 
-CREATE OR REPLACE AGGREGATE myavg (numeric)
+CREATE OR REPLACE AGGREGATE myavg (int8)
 (
-	stype = internal,
-	sfunc = numeric_avg_accum,
-	finalfunc = numeric_avg,
-	serialfunc = numeric_avg_serialize,
-	deserialfunc = numeric_avg_deserialize,
-	combinefunc = numeric_avg_combine,
+	stype = _int8,
+	sfunc = int8_avg_accum,
+	finalfunc = int8_avg,
+	combinefunc = int4_avg_combine,
 	finalfunc_modify = shareable  -- just to test a non-default setting
 );
 
 -- Ensure all these functions made it into the catalog again
 SELECT aggfnoid, aggtransfn, aggcombinefn, aggtranstype::regtype,
-       aggserialfn, aggdeserialfn, aggfinalmodify
+       aggfinalfn, aggfinalmodify
 FROM pg_aggregate
 WHERE aggfnoid = 'myavg'::REGPROC;
 
 -- can change stype:
-CREATE OR REPLACE AGGREGATE myavg (numeric)
+CREATE OR REPLACE AGGREGATE myavg (int8)
 (
-	stype = numeric,
-	sfunc = numeric_add
+	stype = _int8,
+	sfunc = int8_avg_accum
 );
 SELECT aggfnoid, aggtransfn, aggcombinefn, aggtranstype::regtype,
-       aggserialfn, aggdeserialfn, aggfinalmodify
+       aggfinalfn, aggfinalmodify
 FROM pg_aggregate
 WHERE aggfnoid = 'myavg'::REGPROC;
 
 -- can't change return type:
-CREATE OR REPLACE AGGREGATE myavg (numeric)
+CREATE OR REPLACE AGGREGATE myavg (int8)
 (
-	stype = numeric,
-	sfunc = numeric_add,
-	finalfunc = numeric_out
+	stype = _int8,
+	sfunc = int8_avg_accum,
+	finalfunc = int4_sum
 );
 
 -- can't change to a different kind:
-CREATE OR REPLACE AGGREGATE myavg (order by numeric)
+CREATE OR REPLACE AGGREGATE myavg (order by int8)
 (
-	stype = numeric,
-	sfunc = numeric_add
+	stype = _int8,
+	sfunc = int8_avg_accum
 );
 
 -- can't change plain function to aggregate:
@@ -260,7 +219,7 @@ CREATE OR REPLACE AGGREGATE sum3 (int8,int8,int8)
 
 drop function sum4(int8,int8,int8,int8);
 
-DROP AGGREGATE myavg (numeric);
+DROP AGGREGATE myavg (int8);
 
 -- invalid: bad parallel-safety marking
 CREATE AGGREGATE mysum (int)

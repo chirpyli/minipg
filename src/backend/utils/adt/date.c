@@ -28,7 +28,7 @@
 #include "utils/builtins.h"
 #include "utils/date.h"
 #include "utils/datetime.h"
-#include "utils/numeric.h"
+#include "utils/float.h"
 #include "utils/sortsupport.h"
 /*
  * gcc's -ffast-math switch breaks routines that expect exact results from
@@ -907,15 +907,9 @@ extract_date(PG_FUNCTION_ARGS)
 			case DTK_ISOYEAR:
 			case DTK_EPOCH:
 				if (DATE_IS_NOBEGIN(date))
-					PG_RETURN_NUMERIC(DatumGetNumeric(DirectFunctionCall3(numeric_in,
-																		  CStringGetDatum("-Infinity"),
-																		  ObjectIdGetDatum(InvalidOid),
-																		  Int32GetDatum(-1))));
+					PG_RETURN_FLOAT8(-get_float8_infinity());
 				else
-					PG_RETURN_NUMERIC(DatumGetNumeric(DirectFunctionCall3(numeric_in,
-																		  CStringGetDatum("Infinity"),
-																		  ObjectIdGetDatum(InvalidOid),
-																		  Int32GetDatum(-1))));
+					PG_RETURN_FLOAT8(get_float8_infinity());
 			default:
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -1016,7 +1010,7 @@ extract_date(PG_FUNCTION_ARGS)
 				 errmsg("date units \"%s\" not recognized", lowunits)));
 		intresult = 0;
 	}
-	PG_RETURN_NUMERIC(int64_to_numeric(intresult));
+	PG_RETURN_FLOAT8(intresult);
 }
 /* Add an interval to a date, giving a new date.
  * Must handle both positive and negative intervals.
@@ -1773,7 +1767,7 @@ in_range_time_interval(PG_FUNCTION_ARGS)
  * Extract specified field from time type.
  */
 static Datum
-time_part_common(PG_FUNCTION_ARGS, bool retnumeric)
+time_part_common(PG_FUNCTION_ARGS)
 {
 	text	   *units = PG_GETARG_TEXT_PP(0);
 	TimeADT		time = PG_GETARG_TIMEADT(1);
@@ -1799,24 +1793,10 @@ time_part_common(PG_FUNCTION_ARGS, bool retnumeric)
 				intresult = tm->tm_sec * INT64CONST(1000000) + fsec;
 				break;
 			case DTK_MILLISEC:
-				if (retnumeric)
-					/*---
-					 * tm->tm_sec * 1000 + fsec / 1000
-					 * = (tm->tm_sec * 1'000'000 + fsec) / 1000
-					 */
-					PG_RETURN_NUMERIC(int64_div_fast_to_numeric(tm->tm_sec * INT64CONST(1000000) + fsec, 3));
-				else
-					PG_RETURN_FLOAT8(tm->tm_sec * 1000.0 + fsec / 1000.0);
+				PG_RETURN_FLOAT8(tm->tm_sec * 1000.0 + fsec / 1000.0);
 				break;
 			case DTK_SECOND:
-				if (retnumeric)
-					/*---
-					 * tm->tm_sec + fsec / 1'000'000
-					 * = (tm->tm_sec * 1'000'000 + fsec) / 1'000'000
-					 */
-					PG_RETURN_NUMERIC(int64_div_fast_to_numeric(tm->tm_sec * INT64CONST(1000000) + fsec, 6));
-				else
-					PG_RETURN_FLOAT8(tm->tm_sec + fsec / 1000000.0);
+				PG_RETURN_FLOAT8(tm->tm_sec + fsec / 1000000.0);
 				break;
 			case DTK_MINUTE:
 				intresult = tm->tm_min;
@@ -1845,10 +1825,7 @@ time_part_common(PG_FUNCTION_ARGS, bool retnumeric)
 	}
 	else if (type == RESERV && val == DTK_EPOCH)
 	{
-		if (retnumeric)
-			PG_RETURN_NUMERIC(int64_div_fast_to_numeric(time, 6));
-		else
-			PG_RETURN_FLOAT8(time / 1000000.0);
+		PG_RETURN_FLOAT8(time / 1000000.0);
 	}
 	else
 	{
@@ -1858,18 +1835,15 @@ time_part_common(PG_FUNCTION_ARGS, bool retnumeric)
 						lowunits)));
 		intresult = 0;
 	}
-	if (retnumeric)
-		PG_RETURN_NUMERIC(int64_to_numeric(intresult));
-	else
-		PG_RETURN_FLOAT8(intresult);
+	PG_RETURN_FLOAT8(intresult);
 }
 Datum
 time_part(PG_FUNCTION_ARGS)
 {
-	return time_part_common(fcinfo, false);
+	return time_part_common(fcinfo);
 }
 Datum
 extract_time(PG_FUNCTION_ARGS)
 {
-	return time_part_common(fcinfo, true);
+	return time_part_common(fcinfo);
 }

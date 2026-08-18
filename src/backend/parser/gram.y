@@ -62,7 +62,6 @@
 #include "storage/lmgr.h"
 #include "utils/date.h"
 #include "utils/datetime.h"
-#include "utils/numeric.h"
 
 
 /*
@@ -7279,24 +7278,6 @@ Numeric:	INT_P
 			| DOUBLE_P PRECISION
 				{
 					$$ = SystemTypeName("float8");
-					$$->location = @1;
-				}
-			| DECIMAL_P opt_type_modifiers
-				{
-					$$ = SystemTypeName("numeric");
-					$$->typmods = $2;
-					$$->location = @1;
-				}
-			| DEC opt_type_modifiers
-				{
-					$$ = SystemTypeName("numeric");
-					$$->typmods = $2;
-					$$->location = @1;
-				}
-			| NUMERIC opt_type_modifiers
-				{
-					$$ = SystemTypeName("numeric");
-					$$->typmods = $2;
 					$$->location = @1;
 				}
 			| BOOLEAN_P

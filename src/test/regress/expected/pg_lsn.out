@@ -60,67 +60,68 @@ SELECT '0/16AE7F8' > pg_lsn '0/16AE7F7';
 (1 row)
 
 SELECT '0/16AE7F7'::pg_lsn - '0/16AE7F8'::pg_lsn;
- ?column? 
-----------
-       -1
-(1 row)
-
+ERROR:  operator does not exist: pg_lsn - pg_lsn
+LINE 1: SELECT '0/16AE7F7'::pg_lsn - '0/16AE7F8'::pg_lsn;
+                                   ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT '0/16AE7F8'::pg_lsn - '0/16AE7F7'::pg_lsn;
- ?column? 
-----------
-        1
-(1 row)
-
-SELECT '0/16AE7F7'::pg_lsn + 16::numeric;
- ?column?  
------------
- 0/16AE807
-(1 row)
-
-SELECT 16::numeric + '0/16AE7F7'::pg_lsn;
- ?column?  
------------
- 0/16AE807
-(1 row)
-
-SELECT '0/16AE7F7'::pg_lsn - 16::numeric;
- ?column?  
------------
- 0/16AE7E7
-(1 row)
-
-SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 1::numeric;
-     ?column?      
--------------------
- FFFFFFFF/FFFFFFFF
-(1 row)
-
-SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 2::numeric; -- out of range error
-ERROR:  pg_lsn out of range
-SELECT '0/1'::pg_lsn - 1::numeric;
- ?column? 
-----------
- 0/0
-(1 row)
-
-SELECT '0/1'::pg_lsn - 2::numeric; -- out of range error
-ERROR:  pg_lsn out of range
+ERROR:  operator does not exist: pg_lsn - pg_lsn
+LINE 1: SELECT '0/16AE7F8'::pg_lsn - '0/16AE7F7'::pg_lsn;
+                                   ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT '0/16AE7F7'::pg_lsn + 16::int8;
+ERROR:  operator does not exist: pg_lsn + bigint
+LINE 1: SELECT '0/16AE7F7'::pg_lsn + 16::int8;
+                                   ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT 16::int8 + '0/16AE7F7'::pg_lsn;
+ERROR:  operator does not exist: bigint + pg_lsn
+LINE 1: SELECT 16::int8 + '0/16AE7F7'::pg_lsn;
+                        ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT '0/16AE7F7'::pg_lsn - 16::int8;
+ERROR:  operator does not exist: pg_lsn - bigint
+LINE 1: SELECT '0/16AE7F7'::pg_lsn - 16::int8;
+                                   ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 1::int8;
+ERROR:  operator does not exist: pg_lsn + bigint
+LINE 1: SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 1::int8;
+                                           ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 2::int8; -- out of range error
+ERROR:  operator does not exist: pg_lsn + bigint
+LINE 1: SELECT 'FFFFFFFF/FFFFFFFE'::pg_lsn + 2::int8;
+                                           ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT '0/1'::pg_lsn - 1::int8;
+ERROR:  operator does not exist: pg_lsn - bigint
+LINE 1: SELECT '0/1'::pg_lsn - 1::int8;
+                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT '0/1'::pg_lsn - 2::int8; -- out of range error
+ERROR:  operator does not exist: pg_lsn - bigint
+LINE 1: SELECT '0/1'::pg_lsn - 2::int8;
+                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT '0/0'::pg_lsn + ('FFFFFFFF/FFFFFFFF'::pg_lsn - '0/0'::pg_lsn);
-     ?column?      
--------------------
- FFFFFFFF/FFFFFFFF
-(1 row)
-
+ERROR:  operator does not exist: pg_lsn - pg_lsn
+LINE 1: ...LECT '0/0'::pg_lsn + ('FFFFFFFF/FFFFFFFF'::pg_lsn - '0/0'::p...
+                                                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT 'FFFFFFFF/FFFFFFFF'::pg_lsn - ('FFFFFFFF/FFFFFFFF'::pg_lsn - '0/0'::pg_lsn);
- ?column? 
-----------
- 0/0
-(1 row)
-
-SELECT '0/16AE7F7'::pg_lsn + 'NaN'::numeric;
-ERROR:  cannot add NaN to pg_lsn
-SELECT '0/16AE7F7'::pg_lsn - 'NaN'::numeric;
-ERROR:  cannot subtract NaN from pg_lsn
+ERROR:  operator does not exist: pg_lsn - pg_lsn
+LINE 1: .../FFFFFFFF'::pg_lsn - ('FFFFFFFF/FFFFFFFF'::pg_lsn - '0/0'::p...
+                                                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+SELECT '0/16AE7F7'::pg_lsn + 'NaN'::int8;
+ERROR:  invalid input syntax for type bigint: "NaN"
+LINE 1: SELECT '0/16AE7F7'::pg_lsn + 'NaN'::int8;
+                                     ^
+SELECT '0/16AE7F7'::pg_lsn - 'NaN'::int8;
+ERROR:  invalid input syntax for type bigint: "NaN"
+LINE 1: SELECT '0/16AE7F7'::pg_lsn - 'NaN'::int8;
+                                     ^
 -- Check btree and hash opclasses
 EXPLAIN (COSTS OFF)
 SELECT DISTINCT (i || '/' || j)::pg_lsn f

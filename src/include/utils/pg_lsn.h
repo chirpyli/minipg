@@ -26,4 +26,8 @@
 
 extern XLogRecPtr pg_lsn_in_internal(const char *str, bool *have_error);
 
+extern Datum pg_lsn_mi(PG_FUNCTION_ARGS);
+extern Datum pg_lsn_pli(PG_FUNCTION_ARGS);
+extern Datum pg_lsn_mii(PG_FUNCTION_ARGS);
+
 #endif							/* PG_LSN_H */

@@ -428,13 +428,13 @@ select * from (
   group by grouping sets(1, 2)
 ) ss
 where x = 1 and q1 = 123;
-                 QUERY PLAN                 
---------------------------------------------
+                         QUERY PLAN                         
+------------------------------------------------------------
  Subquery Scan on ss
    Output: ss.x, ss.q1, ss.sum
    Filter: ((ss.x = 1) AND (ss.q1 = 123))
    ->  GroupAggregate
-         Output: (1), i1.q1, sum(i1.q2)
+         Output: (1), i1.q1, sum((i1.q2)::double precision)
          Group Key: 1
          Sort Key: i1.q1
            Group Key: i1.q1
@@ -1881,13 +1881,13 @@ set work_mem='64kB';
 set enable_sort = true;
 set enable_hashagg = false;
 explain (costs off)
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 ERROR:  relation "gs_data_1" does not exist
 LINE 3: from gs_data_1 group by cube (g1000, g100,g10);
              ^
 create table gs_group_1 as
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 ERROR:  syntax error at or near "as"
 LINE 1: create table gs_group_1 as
@@ -1896,13 +1896,13 @@ LINE 1: create table gs_group_1 as
 set enable_hashagg = true;
 set enable_sort = false;
 explain (costs off)
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 ERROR:  relation "gs_data_1" does not exist
 LINE 3: from gs_data_1 group by cube (g1000, g100,g10);
              ^
 create table gs_hash_1 as
-select g100, g10, sum(g::numeric), count(*), max(g::text)
+select g100, g10, sum(g::int8), count(*), max(g::text)
 from gs_data_1 group by cube (g1000, g100,g10);
 ERROR:  syntax error at or near "as"
 LINE 1: create table gs_hash_1 as

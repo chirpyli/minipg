@@ -8978,25 +8978,6 @@ get_const_expr(Const *constval, deparse_context *context, int showtype)
 			}
 			break;
 
-		case NUMERICOID:
-
-			/*
-			 * NUMERIC can be printed without quotes if it looks like a float
-			 * constant (not an integer, and not Infinity or NaN) and doesn't
-			 * have a leading sign (for the same reason as for INT4).
-			 */
-			if (isdigit((unsigned char) extval[0]) &&
-				strcspn(extval, "eE.") != strlen(extval))
-			{
-				appendStringInfoString(buf, extval);
-			}
-			else
-			{
-				appendStringInfo(buf, "'%s'", extval);
-				needlabel = true;	/* we must attach a cast */
-			}
-			break;
-
 		case BOOLOID:
 			if (strcmp(extval, "t") == 0)
 				appendStringInfoString(buf, "true");
@@ -9030,15 +9011,6 @@ get_const_expr(Const *constval, deparse_context *context, int showtype)
 			break;
 		case INT4OID:
 			/* We determined above whether a label is needed */
-			break;
-		case NUMERICOID:
-
-			/*
-			 * Float-looking constants will be typed as numeric, which we
-			 * checked above; but if there's a nondefault typmod we need to
-			 * show it.
-			 */
-			needlabel |= (constval->consttypmod >= 0);
 			break;
 		default:
 			needlabel = true;

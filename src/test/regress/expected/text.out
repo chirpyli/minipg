@@ -47,7 +47,7 @@ select 'four: ' || 2+2;
 
 -- but not this:
 select 3 || 4.0;
-ERROR:  operator does not exist: integer || numeric
+ERROR:  operator does not exist: integer || double precision
 LINE 1: select 3 || 4.0;
                  ^
 HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.

@@ -63,7 +63,7 @@ CREATE OR REPLACE VIEW viewtest AS
 
 -- should fail
 CREATE OR REPLACE VIEW viewtest AS
-	SELECT a, b::numeric FROM viewtest_tbl;
+	SELECT a, b::int8 FROM viewtest_tbl;
 
 -- should work
 CREATE OR REPLACE VIEW viewtest AS

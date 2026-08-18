@@ -6,7 +6,7 @@
 
 setup
 {
- CREATE TABLE accounts (accountid text NOT NULL PRIMARY KEY, balance numeric not null);
+ CREATE TABLE accounts (accountid text NOT NULL PRIMARY KEY, balance int8 not null);
  INSERT INTO accounts VALUES ('checking', 600),('savings',600);
 }
 

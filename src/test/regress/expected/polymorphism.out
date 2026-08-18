@@ -70,9 +70,9 @@ as $$
 $$ language sql;
 select x, pg_typeof(x), y, pg_typeof(y)
   from polyf(11, array[1, 2], 42, 34.5);
-    x     | pg_typeof |     y     | pg_typeof 
-----------+-----------+-----------+-----------
- {11,1,2} | integer[] | {42,34.5} | numeric[]
+    x     | pg_typeof |     y     |     pg_typeof      
+----------+-----------+-----------+--------------------
+ {11,1,2} | integer[] | {42,34.5} | double precision[]
 (1 row)
 
 select x, pg_typeof(x), y, pg_typeof(y)
@@ -89,7 +89,7 @@ LINE 2:   from polyf(11, '{1,2}', point(1,2), '(3,4)');
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x), y, pg_typeof(y)
   from polyf(11, array[1, 2.2], 42, 34.5);  -- fail
-ERROR:  function polyf(integer, numeric[], integer, numeric) does not exist
+ERROR:  function polyf(integer, double precision[], integer, double precision) does not exist
 LINE 2:   from polyf(11, array[1, 2.2], 42, 34.5);
                ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
@@ -865,7 +865,7 @@ select formarray(1.1, variadic array[1.2,55.5]);
 (1 row)
 
 select formarray(1.1, array[1.2,55.5]); -- fail without variadic
-ERROR:  function formarray(numeric, numeric[]) does not exist
+ERROR:  function formarray(double precision, double precision[]) does not exist
 LINE 1: select formarray(1.1, array[1.2,55.5]);
                ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
@@ -894,9 +894,9 @@ select pg_typeof(0);              -- integer
 (1 row)
 
 select pg_typeof(0.0);            -- numeric
- pg_typeof 
------------
- numeric
+    pg_typeof     
+------------------
+ double precision
 (1 row)
 
 select pg_typeof(1+1 = 2);        -- boolean
@@ -924,9 +924,9 @@ select pg_typeof(pg_typeof(0));   -- regtype
 (1 row)
 
 select pg_typeof(array[1.2,55.5]); -- numeric[]
- pg_typeof 
------------
- numeric[]
+     pg_typeof      
+--------------------
+ double precision[]
 (1 row)
 
 select pg_typeof(myleast(10, 1, 20, 33));  -- polymorphic input
@@ -1269,109 +1269,110 @@ create function dfunc(a varchar, b numeric, c date = current_date)
   returns table (a varchar, b numeric, c date) as $$
   select $1, $2, $3;
 $$ language sql;
+ERROR:  syntax error at or near "numeric"
+LINE 1: create function dfunc(a varchar, b numeric, c date = current...
+                                           ^
 select (dfunc('Hello World', 20, '2009-07-25'::date)).*;
-      a      | b  |     c      
--------------+----+------------
- Hello World | 20 | 07-25-2009
-(1 row)
-
+ERROR:  function dfunc(unknown, integer, date) does not exist
+LINE 1: select (dfunc('Hello World', 20, '2009-07-25'::date)).*;
+                ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello World', 20, '2009-07-25'::date);
-      a      | b  |     c      
--------------+----+------------
- Hello World | 20 | 07-25-2009
-(1 row)
-
+ERROR:  function dfunc(unknown, integer, date) does not exist
+LINE 1: select * from dfunc('Hello World', 20, '2009-07-25'::date);
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc(c := '2009-07-25'::date, a := 'Hello World', b := 20);
-      a      | b  |     c      
--------------+----+------------
- Hello World | 20 | 07-25-2009
-(1 row)
-
+ERROR:  function dfunc(c => date, a => unknown, b => integer) does not exist
+LINE 1: select * from dfunc(c := '2009-07-25'::date, a := 'Hello Wor...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello World', b := 20, c := '2009-07-25'::date);
-      a      | b  |     c      
--------------+----+------------
- Hello World | 20 | 07-25-2009
-(1 row)
-
+ERROR:  function dfunc(unknown, b => integer, c => date) does not exist
+LINE 1: select * from dfunc('Hello World', b := 20, c := '2009-07-25...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello World', c := '2009-07-25'::date, b := 20);
-      a      | b  |     c      
--------------+----+------------
- Hello World | 20 | 07-25-2009
-(1 row)
-
+ERROR:  function dfunc(unknown, c => date, b => integer) does not exist
+LINE 1: select * from dfunc('Hello World', c := '2009-07-25'::date, ...
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello World', c := 20, b := '2009-07-25'::date);  -- fail
 ERROR:  function dfunc(unknown, c => integer, b => date) does not exist
 LINE 1: select * from dfunc('Hello World', c := 20, b := '2009-07-25...
                       ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function dfunc(varchar, numeric, date);
+ERROR:  syntax error at or near "numeric"
+LINE 1: drop function dfunc(varchar, numeric, date);
+                                     ^
 -- test out parameters with named params
 create function dfunc(a varchar = 'def a', out _a varchar, c numeric = NULL, out _c numeric)
 returns record as $$
   select $1, $2;
 $$ language sql;
+ERROR:  syntax error at or near "numeric"
+LINE 1: ...tion dfunc(a varchar = 'def a', out _a varchar, c numeric = ...
+                                                             ^
 select (dfunc()).*;
-  _a   | _c 
--------+----
- def a |   
-(1 row)
-
+ERROR:  function dfunc() does not exist
+LINE 1: select (dfunc()).*;
+                ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc();
-  _a   | _c 
--------+----
- def a |   
-(1 row)
-
+ERROR:  function dfunc() does not exist
+LINE 1: select * from dfunc();
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello', 100);
-  _a   | _c  
--------+-----
- Hello | 100
-(1 row)
-
+ERROR:  function dfunc(unknown, integer) does not exist
+LINE 1: select * from dfunc('Hello', 100);
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc(a := 'Hello', c := 100);
-  _a   | _c  
--------+-----
- Hello | 100
-(1 row)
-
+ERROR:  function dfunc(a => unknown, c => integer) does not exist
+LINE 1: select * from dfunc(a := 'Hello', c := 100);
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc(c := 100, a := 'Hello');
-  _a   | _c  
--------+-----
- Hello | 100
-(1 row)
-
+ERROR:  function dfunc(c => integer, a => unknown) does not exist
+LINE 1: select * from dfunc(c := 100, a := 'Hello');
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello');
-  _a   | _c 
--------+----
- Hello |   
-(1 row)
-
+ERROR:  function dfunc(unknown) does not exist
+LINE 1: select * from dfunc('Hello');
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc('Hello', c := 100);
-  _a   | _c  
--------+-----
- Hello | 100
-(1 row)
-
+ERROR:  function dfunc(unknown, c => integer) does not exist
+LINE 1: select * from dfunc('Hello', c := 100);
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from dfunc(c := 100);
-  _a   | _c  
--------+-----
- def a | 100
-(1 row)
-
+ERROR:  function dfunc(c => integer) does not exist
+LINE 1: select * from dfunc(c := 100);
+                      ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- fail, can no longer change an input parameter's name
 create or replace function dfunc(a varchar = 'def a', out _a varchar, x numeric = NULL, out _c numeric)
 returns record as $$
   select $1, $2;
 $$ language sql;
-ERROR:  cannot change name of input parameter "c"
-HINT:  Use DROP FUNCTION dfunc(character varying,numeric) first.
+ERROR:  syntax error at or near "numeric"
+LINE 1: ...tion dfunc(a varchar = 'def a', out _a varchar, x numeric = ...
+                                                             ^
 create or replace function dfunc(a varchar = 'def a', out _a varchar, numeric = NULL, out _c numeric)
 returns record as $$
   select $1, $2;
 $$ language sql;
-ERROR:  cannot change name of input parameter "c"
-HINT:  Use DROP FUNCTION dfunc(character varying,numeric) first.
+ERROR:  syntax error at or near "numeric"
+LINE 1: ...nction dfunc(a varchar = 'def a', out _a varchar, numeric = ...
+                                                             ^
 drop function dfunc(varchar, numeric);
+ERROR:  syntax error at or near "numeric"
+LINE 1: drop function dfunc(varchar, numeric);
+                                     ^
 --fail, named parameters are not unique
 create function testpolym(a int, a int) returns int as $$ select 1;$$ language sql;
 ERROR:  parameter name "a" used more than once
@@ -1629,9 +1630,9 @@ select x, pg_typeof(x) from anyctest(11, 12) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, 12.3) x;
-  x   | pg_typeof 
-------+-----------
- 12.3 | numeric
+  x   |    pg_typeof     
+------+------------------
+ 12.3 | double precision
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, point(1,2)) x;  -- fail
@@ -1657,9 +1658,9 @@ select x, pg_typeof(x) from anyctest(11, 12) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, 12.3) x;
-     x     | pg_typeof 
------------+-----------
- {11,12.3} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {11,12.3} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[1,2]) x;  -- fail
@@ -1679,21 +1680,21 @@ select x, pg_typeof(x) from anyctest(11, array[12]) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[12.3]) x;
-     x     | pg_typeof 
------------+-----------
- {11,12.3} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {11,12.3} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(12.3, array[13]) x;
-     x     | pg_typeof 
------------+-----------
- {12.3,13} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {12.3,13} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(12.3, '{13,14.4}') x;
-       x        | pg_typeof 
-----------------+-----------
- {12.3,13,14.4} | numeric[]
+       x        |     pg_typeof      
+----------------+--------------------
+ {12.3,13,14.4} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[point(1,2)]) x;  -- fail
@@ -1725,9 +1726,9 @@ select x, pg_typeof(x) from anyctest(11, 12) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, 12.3) x;
-     x     | pg_typeof 
------------+-----------
- {11,12.3} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {11,12.3} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(array[11], array[1,2]) x;  -- fail
@@ -1742,9 +1743,9 @@ returns anycompatiblearray as $$
   select array[c, d]
 $$ language sql;
 select x, pg_typeof(x) from anyctest(11, array[1, 2], 42, 34.5) x;
-     x     | pg_typeof 
------------+-----------
- {42,34.5} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {42,34.5} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, array[1, 2], point(1,2), point(3,4)) x;
@@ -1758,7 +1759,7 @@ LINE 1: select x, pg_typeof(x) from anyctest(11, '{1,2}', point(1,2)...
                                                           ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select x, pg_typeof(x) from anyctest(11, array[1, 2.2], 42, 34.5) x;  -- fail
-ERROR:  function anyctest(integer, numeric[], integer, numeric) does not exist
+ERROR:  function anyctest(integer, double precision[], integer, double precision) does not exist
 LINE 1: select x, pg_typeof(x) from anyctest(11, array[1, 2.2], 42, ...
                                     ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
@@ -1775,9 +1776,9 @@ select x, pg_typeof(x) from anyctest(11, 12) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, 12.2) x;
-     x     | pg_typeof 
------------+-----------
- {11,12.2} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {11,12.2} | double precision[]
 (1 row)
 
 select x, pg_typeof(x) from anyctest(11, '12') x;
@@ -1797,9 +1798,9 @@ select x, pg_typeof(x) from anyctest(variadic array[11, 12]) x;
 (1 row)
 
 select x, pg_typeof(x) from anyctest(variadic array[11, 12.2]) x;
-     x     | pg_typeof 
------------+-----------
- {11,12.2} | numeric[]
+     x     |     pg_typeof      
+-----------+--------------------
+ {11,12.2} | double precision[]
 (1 row)
 
 drop function anyctest(variadic anycompatiblearray);

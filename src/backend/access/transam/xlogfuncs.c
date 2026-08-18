@@ -33,7 +33,6 @@
 #include "utils/builtins.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
-#include "utils/numeric.h"
 #include "utils/pg_lsn.h"
 #include "utils/timestamp.h"
 #include "utils/tuplestore.h"
@@ -647,7 +646,7 @@ pg_wal_lsn_diff(PG_FUNCTION_ARGS)
 								 PG_GETARG_DATUM(0),
 								 PG_GETARG_DATUM(1));
 
-	PG_RETURN_NUMERIC(result);
+	PG_RETURN_DATUM(result);
 }
 
 /*

@@ -116,10 +116,10 @@ FROM   (VALUES (0), (1.149484958), (17.149484958), (42.149484958),
         (149484958.550273), (2071124898672)) x(v)
 WHERE  hash_numeric(v)::bit(32) != hash_numeric_extended(v, 0)::bit(32)
        OR hash_numeric(v)::bit(32) = hash_numeric_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
-
+ERROR:  function hash_numeric(double precision) does not exist
+LINE 1: SELECT v as value, hash_numeric(v)::bit(32) as standard,
+                           ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT v as value, hash_array(v)::bit(32) as standard,
        hash_array_extended(v, 0)::bit(32) as extended0,
        hash_array_extended(v, 1)::bit(32) as extended1
@@ -134,17 +134,17 @@ WHERE  hash_array(v)::bit(32) != hash_array_extended(v, 0)::bit(32)
 
 -- array hashing with non-hashable element type
 SELECT v as value, hash_array(v)::bit(32) as standard
-FROM   (VALUES ('{0}'::numeric[])) x(v);
+FROM   (VALUES ('{0}'::int8[])) x(v);
  value |             standard             
 -------+----------------------------------
- {0}   | 00000000000000000000000000011110
+ {0}   | 11101111101111101100000011001110
 (1 row)
 
 SELECT v as value, hash_array_extended(v, 0)::bit(32) as extended0
-FROM   (VALUES ('{0}'::numeric[])) x(v);
+FROM   (VALUES ('{0}'::int8[])) x(v);
  value |            extended0             
 -------+----------------------------------
- {0}   | 00000000000000000000000000011110
+ {0}   | 11101111101111101100000011001110
 (1 row)
 
 SELECT v as value, hashbpchar(v)::bit(32) as standard,
@@ -232,21 +232,21 @@ WHERE  hash_record(v)::bit(32) != hash_record_extended(v, 0)::bit(32)
 DROP TYPE hash_test_t1;
 -- record hashing with non-hashable field type
 CREATE TYPE hash_test_t2 AS (a numeric, b text);
+ERROR:  syntax error at or near "numeric"
+LINE 1: CREATE TYPE hash_test_t2 AS (a numeric, b text);
+                                       ^
 SELECT v as value, hash_record(v)::bit(32) as standard
 FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
-  value  |             standard             
----------+----------------------------------
- (1,aaa) | 00100111000001010111101100111101
-(1 row)
-
+ERROR:  type "hash_test_t2" does not exist
+LINE 2: FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
+                                       ^
 SELECT v as value, hash_record_extended(v, 0)::bit(32) as extended0
 FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
-  value  |            extended0             
----------+----------------------------------
- (1,aaa) | 00100111000001010111101100111101
-(1 row)
-
+ERROR:  type "hash_test_t2" does not exist
+LINE 2: FROM   (VALUES (row(1, 'aaa')::hash_test_t2)) x(v);
+                                       ^
 DROP TYPE hash_test_t2;
+ERROR:  type "hash_test_t2" does not exist
 --
 -- Check special cases for specific data types
 --

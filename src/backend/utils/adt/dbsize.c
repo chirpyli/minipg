@@ -23,7 +23,6 @@
 #include "miscadmin.h"
 #include "storage/fd.h"
 #include "utils/builtins.h"
-#include "utils/numeric.h"
 #include "utils/rel.h"
 #include "utils/relfilenodemap.h"
 #include "utils/relmapper.h"
@@ -545,127 +544,6 @@ pg_size_pretty(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(buf));
 }
 
-static char *
-numeric_to_cstring(Numeric n)
-{
-	Datum		d = NumericGetDatum(n);
-
-	return DatumGetCString(DirectFunctionCall1(numeric_out, d));
-}
-
-static bool
-numeric_is_less(Numeric a, Numeric b)
-{
-	Datum		da = NumericGetDatum(a);
-	Datum		db = NumericGetDatum(b);
-
-	return DatumGetBool(DirectFunctionCall2(numeric_lt, da, db));
-}
-
-static Numeric
-numeric_absolute(Numeric n)
-{
-	Datum		d = NumericGetDatum(n);
-	Datum		result;
-
-	result = DirectFunctionCall1(numeric_abs, d);
-	return DatumGetNumeric(result);
-}
-
-static Numeric
-numeric_half_rounded(Numeric n)
-{
-	Datum		d = NumericGetDatum(n);
-	Datum		zero;
-	Datum		one;
-	Datum		two;
-	Datum		result;
-
-	zero = NumericGetDatum(int64_to_numeric(0));
-	one = NumericGetDatum(int64_to_numeric(1));
-	two = NumericGetDatum(int64_to_numeric(2));
-
-	if (DatumGetBool(DirectFunctionCall2(numeric_ge, d, zero)))
-		d = DirectFunctionCall2(numeric_add, d, one);
-	else
-		d = DirectFunctionCall2(numeric_sub, d, one);
-
-	result = DirectFunctionCall2(numeric_div_trunc, d, two);
-	return DatumGetNumeric(result);
-}
-
-static Numeric
-numeric_truncated_divide(Numeric n, int64 divisor)
-{
-	Datum		d = NumericGetDatum(n);
-	Datum		divisor_numeric;
-	Datum		result;
-
-	divisor_numeric = NumericGetDatum(int64_to_numeric(divisor));
-	result = DirectFunctionCall2(numeric_div_trunc, d, divisor_numeric);
-	return DatumGetNumeric(result);
-}
-
-Datum
-pg_size_pretty_numeric(PG_FUNCTION_ARGS)
-{
-	Numeric		size = PG_GETARG_NUMERIC(0);
-	Numeric		limit,
-				limit2;
-	char	   *result;
-
-	limit = int64_to_numeric(10 * 1024);
-	limit2 = int64_to_numeric(10 * 1024 * 2 - 1);
-
-	if (numeric_is_less(numeric_absolute(size), limit))
-	{
-		result = psprintf("%s bytes", numeric_to_cstring(size));
-	}
-	else
-	{
-		/* keep one extra bit for rounding */
-		/* size /= (1 << 9) */
-		size = numeric_truncated_divide(size, 1 << 9);
-
-		if (numeric_is_less(numeric_absolute(size), limit2))
-		{
-			size = numeric_half_rounded(size);
-			result = psprintf("%s kB", numeric_to_cstring(size));
-		}
-		else
-		{
-			/* size /= (1 << 10) */
-			size = numeric_truncated_divide(size, 1 << 10);
-
-			if (numeric_is_less(numeric_absolute(size), limit2))
-			{
-				size = numeric_half_rounded(size);
-				result = psprintf("%s MB", numeric_to_cstring(size));
-			}
-			else
-			{
-				/* size /= (1 << 10) */
-				size = numeric_truncated_divide(size, 1 << 10);
-
-				if (numeric_is_less(numeric_absolute(size), limit2))
-				{
-					size = numeric_half_rounded(size);
-					result = psprintf("%s GB", numeric_to_cstring(size));
-				}
-				else
-				{
-					/* size /= (1 << 10) */
-					size = numeric_truncated_divide(size, 1 << 10);
-					size = numeric_half_rounded(size);
-					result = psprintf("%s TB", numeric_to_cstring(size));
-				}
-			}
-		}
-	}
-
-	PG_RETURN_TEXT_P(cstring_to_text(result));
-}
-
 /*
  * Convert a human-readable size to a size in bytes
  */
@@ -677,7 +555,7 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 			   *strptr,
 			   *endptr;
 	char		saved_char;
-	Numeric		num;
+	double		num;
 	int64		result;
 	bool		have_digits = false;
 
@@ -746,10 +624,7 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 	saved_char = *endptr;
 	*endptr = '\0';
 
-	num = DatumGetNumeric(DirectFunctionCall3(numeric_in,
-											  CStringGetDatum(strptr),
-											  ObjectIdGetDatum(InvalidOid),
-											  Int32GetDatum(-1)));
+	num = strtod(strptr, NULL);
 
 	*endptr = saved_char;
 
@@ -794,19 +669,15 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 					 errhint("Valid units are \"bytes\", \"kB\", \"MB\", \"GB\", and \"TB\".")));
 
 		if (multiplier > 1)
-		{
-			Numeric		mul_num;
-
-			mul_num = int64_to_numeric(multiplier);
-
-			num = DatumGetNumeric(DirectFunctionCall2(numeric_mul,
-													  NumericGetDatum(mul_num),
-													  NumericGetDatum(num)));
-		}
+			num = num * (double) multiplier;
 	}
 
-	result = DatumGetInt64(DirectFunctionCall1(numeric_int8,
-											   NumericGetDatum(num)));
+	if (num > (double) PG_INT64_MAX || num < (double) PG_INT64_MIN)
+		ereport(ERROR,
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+				 errmsg("size \"%s\" is out of range", text_to_cstring(arg))));
+
+	result = (int64) num;
 
 	PG_RETURN_INT64(result);
 }

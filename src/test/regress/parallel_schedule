@@ -13,7 +13,7 @@
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char varchar text int2 int4 int8 oid float4 float8 bit numeric txid enum pg_lsn
+test: boolean char varchar text int2 int4 int8 oid float4 float8 bit txid enum pg_lsn
 
 # ----------
 # The second group of parallel tests

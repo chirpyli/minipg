@@ -727,3 +727,36 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
 - `pg_user_mappings` / `pg_foreign_*` 等 FDW 相关视图与本次无关，未改动。
 
 - **验证状态**：本次改动已通过 gcc `-fsyntax-only` 单独语法检查（`describe.c` / `tab_complete.c` 0 error），逻辑自洽。但因工作区存在**未提交的 gram.y 半成品裁剪**（删了 DoStmt / ReindexStmt / AlterTblSpcStmt 等语句规则但残留引用，bison 报 `used but not defined` 错误），整库当前无法编译，故 `make check-world` 暂未运行（用户决策：保留 gram.y 半成品、先不验证）。待 gram.y 修复后可补跑回归验证。
+
+
+---
+
+## numeric 数据类型彻底删除（2026-08-18）
+
+按"学习价值低、与不可裁核心（btree/hash 索引、事务）零耦合则可裁剪"的原则，本次**彻底删除 numeric 数据类型及其全部函数**，并把所有耦合代码改写为 int8 / float8 实现。numeric 属任意精度算术类型，内核学习价值低、依赖链极广（EXTRACT/justify/epoch、事务统计、WAL 的 pg_lsn、dbsize、to_char 格式化等）。
+
+### 删除 / 新建
+- 删除 `src/backend/utils/adt/numeric.c`（原 11327 行）、`src/include/utils/numeric.h`。
+- catalog 删除 numeric 条目：`pg_type.dat` 的 `numeric`(1700) 与 `numeric[]`(1231)；`pg_proc.dat` 中 numeric 相关函数（awk 批量删后恢复 5 个 `extract*` 函数，prorettype 由 numeric 改为 float8；注意 `extract_interval` 的 prorettype 一并改为 float8，否则常量折叠时 planner 以 interval(16 字节) 解读 float8(8 字节) 触发 datumCopy 段错误）；`pg_cast.dat` numeric 转换；`pg_opfamily.dat` 的 `numeric_ops`(btree/hash 两个 opfamily，其 amop/amproc 此前已删)。
+- 新建 `src/backend/utils/adt/intagg.c`：承接原 numeric.c 中整数 sum/avg 聚合，状态以 `_int8` 数组 `{int128 低64, 高64, count}` 表示；提供 `int2_sum`/`int4_sum`（int8 态累加）、`int2_avg_accum`/`int4_avg_accum`/`int8_avg_accum`（含 inv）、`int2int4_sum`(_int8->int8)、`int8_avg`(_int8->float8)、`int4_avg_combine`。`sum(int2)/sum(int4)` 走 int2_sum/int4_sum（aggtranstype int8）；`avg(int2)/avg(int4)/avg(int8)` 走 _int8 态 + int8_avg 终函数（返回 float8）。`pg_proc.dat` 新增 `int8_avg`(6205) 与 `avg(int8)/avg(int4)/avg(int2)`(2100/2101/2102, prorettype float8)；`pg_aggregate.dat` 修正 sum(int2)/sum(int4) 的 aggmtranstype 为 _int8，并补回 avg(int2)/avg(int4)/avg(int8)。`Makefile` 用 intagg.o 替换 numeric.o。
+
+### 耦合代码改写（统一改 int8 / float8）
+- `date.c`：extract_date/extract_time 返回 float8（删 numeric 分支）；justify_days/justify_hours 用 float8；加 `#include "utils/float.h"`。
+- `timestamp.c`：timestamp_part_common/timestamptz_part_common/interval_part_common 删 retnumeric 参数与 numeric 分支，EPOCH 直接返回 float8。
+- `pg_lsn.c`：pg_lsn_mi 返回 float8；pg_lsn_pli/pg_lsn_mii 参数改 int64。
+- `dbsize.c`：删 pg_size_pretty_numeric；pg_size_bytes 参数改 int64；pg_size_pretty 收 int8。
+- `formatting.c`：to_char numeric 路径改 float8（numeric_out->float8out、numeric_round->float8_round、numeric_mul->float8mul、numeric_power->float8_power、numeric_int4->float8_to_int4、numeric_out_sci->float8_out_sci）。
+- `format_type.c`/`pgstatfuncs.c`/`ruleutils.c`/`selfuncs.c`/`rangetypes.c`/`fe_utils/print.c`：删 NUMERICOID 分支（rangetypes.c 删 numrange_subdiff，numrange 未注册）。
+- `parse_node.c`：数字字面量解析改 int8。
+- `xlogfuncs.c`：pg_xact_commit_timestamp 返回 timestamptz（删 PG_RETURN_NUMERIC）。
+- `system_functions.sql`：删 log(numeric)/log10(numeric)/numeric_pl_pg_lsn 定义。
+- `src/test/modules/libpq_pipeline/libpq_pipeline.c`：查询 `$1::numeric` 改 `$1::int8`，NUMERICOID 改 INT8OID。
+
+### 回归测试同步
+- 删 numeric.sql/numeric_big.sql（及 expected），parallel_schedule 移除 numeric。
+- 测试 SQL 中 `::numeric` 全改 `::int8`（dbsize、create_aggregate、arrays、errors、sanity_check、width_bucket 等）；create_aggregate.sql 的 int 聚合用例改 `_int8` 表示（int8_avg_accum/int8_avg/int4_avg_combine）。
+- isolation 测试 total-cash/timeouts/receipt-report/read-only-anomaly(+2/-3)/serializable-parallel 的 setup 中 numeric/DECIMAL 改 int8。
+- 因 EXTRACT 改返回 float8（精度显示变化）与 int8 截断语义，重生成 23 个回归测试与 7 个 isolation 测试的 expected/*.out。
+
+### 验证
+make check-world（NO_TEMP_INSTALL=1，依赖先 make install 到 tmp_install）全部通过：回归 82/82、isolation 66/66，以及 bin/ecpg 等其余子套件均通过。全库 `make -j` 重编通过，无 NUMERICOID/numeric 类型残留引用。

@@ -9,12 +9,12 @@
 # src/include/catalog/pg_opclass.dat
 #
 #----------------------------------------------------------------------
-
-[
-
 # Note: we hard-wire an OID only for a few entries that have to be explicitly
 # referenced in the C code or in built-in catalog entries.  The rest get OIDs
 # assigned on-the-fly during initdb.
+
+[
+
 
 { opcmethod => 'btree', opcname => 'array_ops', opcfamily => 'btree/array_ops',
   opcintype => 'anyarray' },
@@ -72,11 +72,6 @@
   opcfamily => 'btree/interval_ops', opcintype => 'interval' },
 { opcmethod => 'hash', opcname => 'interval_ops',
   opcfamily => 'hash/interval_ops', opcintype => 'interval' },
-
-
-
-
-
 # Here's an ugly little hack to save space in the system catalog indexes.
 # btree doesn't ordinarily allow a storage type different from input type;
 # but cstring and name are the same thing except for trailing padding,
@@ -85,16 +80,16 @@
 # that we pad the cstring out with the full NAMEDATALEN bytes when performing
 # index-only scans.  See corresponding hacks in ExecInitIndexOnlyScan() and
 # StoreIndexTuple().
+
+
+
+
+
 { opcmethod => 'btree', opcname => 'name_ops', opcfamily => 'btree/text_ops',
   opcintype => 'name', opckeytype => 'cstring' },
 
 { opcmethod => 'hash', opcname => 'name_ops', opcfamily => 'hash/text_ops',
   opcintype => 'name' },
-{ oid => '3125', oid_symbol => 'NUMERIC_BTREE_OPS_OID',
-  opcmethod => 'btree', opcname => 'numeric_ops',
-  opcfamily => 'btree/numeric_ops', opcintype => 'numeric' },
-{ opcmethod => 'hash', opcname => 'numeric_ops',
-  opcfamily => 'hash/numeric_ops', opcintype => 'numeric' },
 { oid => '1981', oid_symbol => 'OID_BTREE_OPS_OID',
   opcmethod => 'btree', opcname => 'oid_ops', opcfamily => 'btree/oid_ops',
   opcintype => 'oid' },

@@ -398,17 +398,15 @@ make_const(ParseState *pstate, Value *value, int location)
 			}
 			else
 			{
-				/* arrange to report location if numeric_in() fails */
+				/* arrange to report location if float8in() fails */
 				setup_parser_errposition_callback(&pcbstate, pstate, location);
-				val = DirectFunctionCall3(numeric_in,
-										  CStringGetDatum(strVal(value)),
-										  ObjectIdGetDatum(InvalidOid),
-										  Int32GetDatum(-1));
+				val = DirectFunctionCall1(float8in,
+										  CStringGetDatum(strVal(value)));
 				cancel_parser_errposition_callback(&pcbstate);
 
-				typeid = NUMERICOID;
-				typelen = -1;	/* variable len */
-				typebyval = false;
+				typeid = FLOAT8OID;
+				typelen = sizeof(float8);
+				typebyval = FLOAT8PASSBYVAL;
 			}
 			break;
 

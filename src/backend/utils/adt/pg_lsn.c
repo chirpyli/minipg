@@ -16,7 +16,6 @@
 #include "funcapi.h"
 #include "libpq/pqformat.h"
 #include "utils/builtins.h"
-#include "utils/numeric.h"
 #include "utils/pg_lsn.h"
 
 #define MAXPG_LSNLEN			17
@@ -226,22 +225,15 @@ pg_lsn_mi(PG_FUNCTION_ARGS)
 {
 	XLogRecPtr	lsn1 = PG_GETARG_LSN(0);
 	XLogRecPtr	lsn2 = PG_GETARG_LSN(1);
-	char		buf[256];
-	Datum		result;
+	int64		diff;
 
 	/* Output could be as large as plus or minus 2^63 - 1. */
 	if (lsn1 < lsn2)
-		snprintf(buf, sizeof buf, "-" UINT64_FORMAT, lsn2 - lsn1);
+		diff = -((int64) (lsn2 - lsn1));
 	else
-		snprintf(buf, sizeof buf, UINT64_FORMAT, lsn1 - lsn2);
+		diff = (int64) (lsn1 - lsn2);
 
-	/* Convert to numeric. */
-	result = DirectFunctionCall3(numeric_in,
-								 CStringGetDatum(buf),
-								 ObjectIdGetDatum(0),
-								 Int32GetDatum(-1));
-
-	return result;
+	return Float8GetDatum((double) diff);
 }
 
 /*
@@ -252,30 +244,16 @@ Datum
 pg_lsn_pli(PG_FUNCTION_ARGS)
 {
 	XLogRecPtr	lsn = PG_GETARG_LSN(0);
-	Numeric		nbytes = PG_GETARG_NUMERIC(1);
-	Datum		num;
-	Datum		res;
-	char		buf[32];
+	int64		nbytes = PG_GETARG_INT64(1);
+	int64		res;
 
-	if (numeric_is_nan(nbytes))
+	res = (int64) lsn + nbytes;
+	if (res < 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot add NaN to pg_lsn")));
+				 errmsg("cannot add bytes to pg_lsn: result would be negative")));
 
-	/* Convert to numeric */
-	snprintf(buf, sizeof(buf), UINT64_FORMAT, lsn);
-	num = DirectFunctionCall3(numeric_in,
-							  CStringGetDatum(buf),
-							  ObjectIdGetDatum(0),
-							  Int32GetDatum(-1));
-
-	/* Add two numerics */
-	res = DirectFunctionCall2(numeric_add,
-							  NumericGetDatum(num),
-							  NumericGetDatum(nbytes));
-
-	/* Convert to pg_lsn */
-	return DirectFunctionCall1(numeric_pg_lsn, res);
+	PG_RETURN_LSN((XLogRecPtr) res);
 }
 
 /*
@@ -286,28 +264,14 @@ Datum
 pg_lsn_mii(PG_FUNCTION_ARGS)
 {
 	XLogRecPtr	lsn = PG_GETARG_LSN(0);
-	Numeric		nbytes = PG_GETARG_NUMERIC(1);
-	Datum		num;
-	Datum		res;
-	char		buf[32];
+	int64		nbytes = PG_GETARG_INT64(1);
+	int64		res;
 
-	if (numeric_is_nan(nbytes))
+	res = (int64) lsn - nbytes;
+	if (res < 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot subtract NaN from pg_lsn")));
+				 errmsg("cannot subtract bytes from pg_lsn: result would be negative")));
 
-	/* Convert to numeric */
-	snprintf(buf, sizeof(buf), UINT64_FORMAT, lsn);
-	num = DirectFunctionCall3(numeric_in,
-							  CStringGetDatum(buf),
-							  ObjectIdGetDatum(0),
-							  Int32GetDatum(-1));
-
-	/* Subtract two numerics */
-	res = DirectFunctionCall2(numeric_sub,
-							  NumericGetDatum(num),
-							  NumericGetDatum(nbytes));
-
-	/* Convert to pg_lsn */
-	return DirectFunctionCall1(numeric_pg_lsn, res);
+	PG_RETURN_LSN((XLogRecPtr) res);
 }

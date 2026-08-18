@@ -45,17 +45,6 @@ iportaltest|f
 mlparted2|f
 mlparted5_b|f
 mlparted5a|f
-num_data|f
-num_exp_add|t
-num_exp_div|t
-num_exp_ln|t
-num_exp_log10|t
-num_exp_mul|t
-num_exp_power_10_ln|t
-num_exp_sqrt|t
-num_exp_sub|t
-num_input_test|f
-num_result|f
 onek|t
 onek2|f
 person|f

@@ -138,12 +138,10 @@ SELECT 'nan'::float8 / '0'::float8;
       NaN
 (1 row)
 
-SELECT 'nan'::numeric::float8;
- float8 
---------
-    NaN
-(1 row)
-
+SELECT 'nan'::int8::float8;
+ERROR:  invalid input syntax for type bigint: "nan"
+LINE 1: SELECT 'nan'::int8::float8;
+               ^
 SELECT * FROM FLOAT8_TBL;
           f1          
 ----------------------

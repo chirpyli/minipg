@@ -210,7 +210,7 @@ select * from arrtest1;
 --
 
 -- table creation and INSERTs
-CREATE TABLE arrtest2 (i integer ARRAY[4], f float8[], n numeric[], t text[], d timestamp[]);
+CREATE TABLE arrtest2 (i integer ARRAY[4], f float8[], n int8[], t text[], d timestamp[]);
 INSERT INTO arrtest2 VALUES(
   ARRAY[[[113,142],[1,147]]],
   ARRAY[1.1,1.2,1.3]::float8[],
@@ -627,7 +627,7 @@ select array_agg(ar)
 select unnest(array[1,2,3]);
 select * from unnest(array[1,2,3]);
 select unnest(array[1,2,3,4.5]::float8[]);
-select unnest(array[1,2,3,4.5]::numeric[]);
+select unnest(array[1,2,3,4.5]::int8[]);
 select unnest(array[1,2,3,null,4,null,null,5,6]);
 select unnest(array[1,2,3,null,4,null,null,5,6]::text[]);
 select abs(unnest(array[1,2,null,-3]));
@@ -701,9 +701,9 @@ drop type textandtext;
 -- this exercises the varwidth and float8 code paths
 SELECT
     op,
-    width_bucket(op::numeric, ARRAY[1, 3, 5, 10.0]::numeric[]) AS wb_n1,
-    width_bucket(op::numeric, ARRAY[0, 5.5, 9.99]::numeric[]) AS wb_n2,
-    width_bucket(op::numeric, ARRAY[-6, -5, 2.0]::numeric[]) AS wb_n3,
+    width_bucket(op::int8, ARRAY[1, 3, 5, 10.0]::int8[]) AS wb_n1,
+    width_bucket(op::int8, ARRAY[0, 5.5, 9.99]::int8[]) AS wb_n2,
+    width_bucket(op::int8, ARRAY[-6, -5, 2.0]::int8[]) AS wb_n3,
     width_bucket(op::float8, ARRAY[1, 3, 5, 10.0]::float8[]) AS wb_f1,
     width_bucket(op::float8, ARRAY[0, 5.5, 9.99]::float8[]) AS wb_f2,
     width_bucket(op::float8, ARRAY[-6, -5, 2.0]::float8[]) AS wb_f3

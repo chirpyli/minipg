@@ -99,9 +99,9 @@ WHERE  hash_array(v)::bit(32) != hash_array_extended(v, 0)::bit(32)
 
 -- array hashing with non-hashable element type
 SELECT v as value, hash_array(v)::bit(32) as standard
-FROM   (VALUES ('{0}'::numeric[])) x(v);
+FROM   (VALUES ('{0}'::int8[])) x(v);
 SELECT v as value, hash_array_extended(v, 0)::bit(32) as extended0
-FROM   (VALUES ('{0}'::numeric[])) x(v);
+FROM   (VALUES ('{0}'::int8[])) x(v);
 
 SELECT v as value, hashbpchar(v)::bit(32) as standard,
        hashbpcharextended(v, 0)::bit(32) as extended0,

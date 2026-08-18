@@ -46,7 +46,7 @@ OBJS = \
 	mcxtfuncs.o \
 	misc.o \
 	name.o \
-	numeric.o \
+	intagg.o \
 	numutils.o \
 	oid.o \
 	oracle_compat.o \
@@ -80,9 +80,6 @@ clean distclean maintainer-clean:
 	rm -f lex.backup
 
 like.o: like.c like_match.c
-
-# Some code in numeric.c benefits from auto-vectorization
-numeric.o: CFLAGS += ${CFLAGS_VECTORIZE}
 
 varlena.o: varlena.c levenshtein.c
 
