@@ -353,7 +353,6 @@ typedef enum NodeTag
 	T_CreateTransformStmt,
 	T_CreateAmStmt,
 	T_CreateStatsStmt,
-	T_AlterCollationStmt,
 	T_AlterStatsStmt,
 
 	/*

@@ -28,7 +28,6 @@
 #include "catalog/toasting.h"
 #include "commands/alter.h"
 #include "commands/cluster.h"
-#include "commands/collationcmds.h"
 #include "commands/conversioncmds.h"
 #include "commands/copy.h"
 #include "commands/dbcommands.h"
@@ -121,7 +120,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_AlterCollationStmt:
 		case T_AlterDatabaseStmt:
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
@@ -1018,13 +1016,6 @@ ProcessUtilitySlow(ParseState *pstate,
 												 stmt->defnames,
 												 stmt->definition);
 							break;
-																														case OBJECT_COLLATION:
-							Assert(stmt->args == NIL);
-							address = DefineCollation(pstate,
-													  stmt->defnames,
-													  stmt->definition,
-													  stmt->if_not_exists);
-							break;
 						default:
 							elog(ERROR, "unrecognized define stmt type: %d",
 								 (int) stmt->kind);
@@ -1239,10 +1230,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_AlterStatsStmt:
 				address = AlterStatistics((AlterStatsStmt *) parsetree);
-				break;
-
-			case T_AlterCollationStmt:
-				address = AlterCollation((AlterCollationStmt *) parsetree);
 				break;
 
 		default:
@@ -1510,9 +1497,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_CAST:
 			tag = CMDTAG_ALTER_CAST;
 			break;
-		case OBJECT_COLLATION:
-			tag = CMDTAG_ALTER_COLLATION;
-			break;
 		case OBJECT_COLUMN:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
@@ -1766,9 +1750,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_DOMAIN:
 					tag = CMDTAG_DROP_DOMAIN;
 					break;
-				case OBJECT_COLLATION:
-					tag = CMDTAG_DROP_COLLATION;
-					break;
 				case OBJECT_CONVERSION:
 					tag = CMDTAG_DROP_CONVERSION;
 					break;
@@ -1896,9 +1877,6 @@ CreateCommandTag(Node *parsetree)
 					tag = CMDTAG_CREATE_TEXT_SEARCH_TEMPLATE;
 					break;
 					tag = CMDTAG_CREATE_TEXT_SEARCH_CONFIGURATION;
-					break;
-				case OBJECT_COLLATION:
-					tag = CMDTAG_CREATE_COLLATION;
 					break;
 				case OBJECT_ACCESS_METHOD:
 					tag = CMDTAG_CREATE_ACCESS_METHOD;
@@ -2077,11 +2055,7 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_ACCESS_METHOD;
 			break;
 
-		case T_AlterCollationStmt:
-			tag = CMDTAG_ALTER_COLLATION;
-			break;
-
-		case T_PrepareStmt:
+			case T_PrepareStmt:
 			tag = CMDTAG_PREPARE;
 			break;
 
@@ -2535,10 +2509,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterStatsStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterCollationStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

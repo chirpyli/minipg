@@ -59,9 +59,7 @@ AllocSetContext
 AllocSetFreeList
 AllocateDesc
 AllocateDescKind
-AlterCollationStmt
 AlterDatabaseStmt
-AlterDefaultPrivilegesStmt
 AlterDomainStmt
 AlterEnumStmt
 AlterEventTrigStmt

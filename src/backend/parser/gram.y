@@ -236,7 +236,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
-		AlterCollationStmt
 		AlterDatabaseStmt AlterDomainStmt AlterEnumStmt
 		AlterObjectDependsStmt AlterObjectSchemaStmt
 		AlterOperatorStmt AlterTypeStmt AlterTableStmt
@@ -753,8 +752,7 @@ toplevel_stmt:
 			| TransactionStmtLegacy
 		;
 
-stmt:	AlterCollationStmt
-			| AlterDatabaseStmt
+stmt:	AlterDatabaseStmt
 			| AlterDomainStmt
 			| AlterEnumStmt
 			| AlterExtensionStmt
@@ -3330,44 +3328,6 @@ DefineStmt:
 					n->params	= $6;
 					$$ = (Node *)n;
 				}
-			| CREATE COLLATION any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_COLLATION;
-					n->args = NIL;
-					n->defnames = $3;
-					n->definition = $4;
-					$$ = (Node *)n;
-				}
-			| CREATE COLLATION IF_P NOT EXISTS any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_COLLATION;
-					n->args = NIL;
-					n->defnames = $6;
-					n->definition = $7;
-					n->if_not_exists = true;
-					$$ = (Node *)n;
-				}
-			| CREATE COLLATION any_name FROM any_name
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_COLLATION;
-					n->args = NIL;
-					n->defnames = $3;
-					n->definition = list_make1(makeDefElem("from", (Node *) $5, @5));
-					$$ = (Node *)n;
-				}
-			| CREATE COLLATION IF_P NOT EXISTS any_name FROM any_name
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_COLLATION;
-					n->args = NIL;
-					n->defnames = $6;
-					n->definition = list_make1(makeDefElem("from", (Node *) $8, @8));
-					n->if_not_exists = true;
-					$$ = (Node *)n;
-				}
 		;
 
 definition: '(' def_list ')'						{ $$ = $2; }
@@ -3836,7 +3796,6 @@ object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
-			| COLLATION								{ $$ = OBJECT_COLLATION; }
 			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
 			| STATISTICS							{ $$ = OBJECT_STATISTIC_EXT; }
 		;
@@ -5263,15 +5222,6 @@ AlterObjectSchemaStmt:
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER COLLATION any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_COLLATION;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER CONVERSION_P any_name SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
@@ -5938,15 +5888,6 @@ drop_option:
  *		ALTER COLLATION
  *
  *****************************************************************************/
-
-AlterCollationStmt: ALTER COLLATION any_name REFRESH VERSION_P
-				{
-					AlterCollationStmt *n = makeNode(AlterCollationStmt);
-					n->collname = $3;
-					$$ = (Node *)n;
-				}
-		;
-
 
 
 
