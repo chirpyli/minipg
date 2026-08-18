@@ -580,3 +580,21 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
 - 删除 `opt_distinct_clause` 定义与 `%type` 中 `opt_distinct_clause` 标记（保留 `distinct_clause`）。
 
 - **验证**：`make -j4` 触发 bison 重生成 `gram.c`，原 3 个 useless nonterminal / 6 条 useless rule 警告**全部消除**（编译 EXIT=0）；剩余仅一条无关的 `selfuncs.c:5446` 未用变量警告（非本次引入、非编译错误）。`make install` + `make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。全代码库 `grep NumericOnly_list|any_with|opt_distinct_clause` 仅余 6848 行历史设计注释提及（非代码引用）。与不可裁部分（btree/hash 索引、事务）零耦合：仅删语法死规则，未改任何运行时/索引/事务逻辑。
+
+## 二十、gram.y 删除 CREATE ASSERTION 未实现语法（2026-08-18）
+
+`CREATE ASSERTION` 是 SQL 标准里"数据库级命名约束"语法，但 PostgreSQL/minipg 从未实现——`gram.y` 中只是一个直接 `ereport(ERROR, "CREATE ASSERTION is not yet implemented")` 的占位桩，不进入任何执行路径、不依赖任何 catalog 存储，与事务/索引等核心功能无耦合，学习价值低，属干净裁剪目标。
+
+裁剪动作（共 7 处，彻底删除、不留死代码）：
+- **`src/include/parser/kwlist.h`**：删除 `PG_KEYWORD("assertion", ASSERTION, UNRESERVED_KEYWORD, BARE_LABEL)` 关键字声明。
+- **`src/backend/parser/gram.y`**：
+  - `%token` 行（原 525）删除 `ASSERTION` 关键字 token 声明；
+  - `%type` 列表（原 252）删除 `CreateAssertionStmt` 节点类型声明；
+  - `schema_stmt` 备选（原 777）删除 `| CreateAssertionStmt`；
+  - 删除 `CreateAssertionStmt:` 产生式整段（含 `CREATE ASSERTION ... CHECK (...)` 规则与上方 `QUERY: CREATE ASSERTION ...` 注释块）；
+  - `unreserved_keyword` 分类列表（原 9975）删除 `| ASSERTION`；
+  - `bare_label_keyword` 分类列表（原 10484）删除 `| ASSERTION`。
+
+保留说明：`pg_constraint.h` 的 `CONSTRAINT_ASSERTION` 枚举项与注释是 constraint 系统"为将来扩展预留"的通用标记，与本次语法桩无直接依赖，属独立 catalog 设计预留，本次不裁剪（避免牵连 constraint 体系）。`Assert()` 运行时断言（c.h / elog.c 等）是完全不同的调试机制，与本次无关，未触动。
+
+- **验证**：`make -j4` 全量重编 EXIT=0（bison 重生成 `gram.c` 无报错、无新增警告）；`make install` + `make check-world` 全绿——regress 全部 83 tests passed，isolation / bin 同步通过，零 failure。全代码库 `grep CreateAssertionStmt` 与 gram.y 内 `ASSERTION` 关键字引用均清零。与不可裁部分（btree/hash 索引、事务）零耦合：仅删除未实现的语法桩与对应关键字，未改任何运行时/索引/事务逻辑。

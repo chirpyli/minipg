@@ -249,7 +249,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		CreateOpFamilyStmt AlterOpFamilyStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
-		CreateAssertionStmt CreateTransformStmt CreateTrigStmt
+		CreateTransformStmt CreateTrigStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
 		DropdbStmt DropTableSpaceStmt
@@ -522,7 +522,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ABSOLUTE_P ACCESS ACTION ADD_P ADMIN AFTER
 	AGGREGATE ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	ASENSITIVE ASSERTION ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
+	ASENSITIVE ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
 	BACKWARD BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
 	BOOLEAN_P BOTH BREADTH BY
@@ -774,7 +774,6 @@ stmt:	AlterCollationStmt
 			| ClusterStmt
 			| ConstraintsSetStmt
 			| CreateAmStmt
-			| CreateAssertionStmt
 			| CreateConversionStmt
 			| CreateDomainStmt
 			| CreateExtensionStmt
@@ -3243,25 +3242,6 @@ ConstraintAttributeElem:
 			| INITIALLY DEFERRED			{ $$ = CAS_INITIALLY_DEFERRED; }
 			| NOT VALID						{ $$ = CAS_NOT_VALID; }
 			| NO INHERIT					{ $$ = CAS_NO_INHERIT; }
-		;
-
-
-/*****************************************************************************
- *
- *		QUERY :
- *				CREATE ASSERTION ...
- *
- *****************************************************************************/
-
-CreateAssertionStmt:
-			CREATE ASSERTION any_name CHECK '(' a_expr ')' ConstraintAttributeSpec
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("CREATE ASSERTION is not yet implemented")));
-
-					$$ = NULL;
-				}
 		;
 
 
@@ -9992,7 +9972,6 @@ unreserved_keyword:
 			| ALTER
 			| ALWAYS
 			| ASENSITIVE
-			| ASSERTION
 			| ASSIGNMENT
 			| AT
 			| ATOMIC
@@ -10481,7 +10460,6 @@ bare_label_keyword:
 			| ANY
 			| ASC
 			| ASENSITIVE
-			| ASSERTION
 			| ASSIGNMENT
 			| ASYMMETRIC
 			| AT
