@@ -1710,23 +1710,6 @@ typedef struct CreateExtensionStmt
 	List	   *options;		/* List of DefElem nodes */
 } CreateExtensionStmt;
 
-/* Only used for ALTER EXTENSION UPDATE; later might need an action field */
-typedef struct AlterExtensionStmt
-{
-	NodeTag		type;
-	char	   *extname;
-	List	   *options;		/* List of DefElem nodes */
-} AlterExtensionStmt;
-
-typedef struct AlterExtensionContentsStmt
-{
-	NodeTag		type;
-	char	   *extname;		/* Extension's name */
-	int			action;			/* +1 = add object, -1 = drop object */
-	ObjectType	objtype;		/* Object's type */
-	Node	   *object;			/* Qualified name of the object */
-} AlterExtensionContentsStmt;
-
 
 /*----------------------
  *		Create POLICY Statement
@@ -1843,19 +1826,6 @@ typedef struct CreateOpFamilyStmt
 	List	   *opfamilyname;	/* qualified name (list of Value strings) */
 	char	   *amname;			/* name of index AM opfamily is for */
 } CreateOpFamilyStmt;
-
-/* ----------------------
- *		Alter Operator Family Statement
- * ----------------------
- */
-typedef struct AlterOpFamilyStmt
-{
-	NodeTag		type;
-	List	   *opfamilyname;	/* qualified name (list of Value strings) */
-	char	   *amname;			/* name of index AM opfamily is for */
-	bool		isDrop;			/* ADD or DROP the items? */
-	List	   *items;			/* List of CreateOpClassItem nodes */
-} AlterOpFamilyStmt;
 
 /* ----------------------
  *		Drop Table|Sequence|View|Index|Type|Domain|Conversion|Schema Statement
@@ -2023,13 +1993,6 @@ typedef struct StatsElem
  *		Alter Statistics Statement
  * ----------------------
  */
-typedef struct AlterStatsStmt
-{
-	NodeTag		type;
-	List	   *defnames;		/* qualified name (list of Value strings) */
-	int			stxstattarget;	/* statistics target */
-	bool		missing_ok;		/* skip error if statistics object is missing */
-} AlterStatsStmt;
 
 /* ----------------------
  *		Create Function Statement
@@ -2068,14 +2031,6 @@ typedef struct FunctionParameter
 	Node	   *defexpr;		/* raw default expr, or NULL if not given */
 } FunctionParameter;
 
-typedef struct AlterFunctionStmt
-{
-	NodeTag		type;
-	ObjectType	objtype;
-	ObjectWithArgs *func;		/* name and args of function */
-	List	   *actions;		/* list of DefElem */
-} AlterFunctionStmt;
-
 /* ----------------------
  *		DO Statement
  *
@@ -2101,16 +2056,6 @@ typedef struct InlineCodeBlock
  * ALTER object DEPENDS ON EXTENSION extname
  * ----------------------
  */
-typedef struct AlterObjectDependsStmt
-{
-	NodeTag		type;
-	ObjectType	objectType;		/* OBJECT_FUNCTION, OBJECT_TRIGGER, etc */
-	RangeVar   *relation;		/* in case a table is involved */
-	Node	   *object;			/* name of the object */
-	Value	   *extname;		/* extension name */
-	bool		remove;			/* set true to remove dep rather than add */
-} AlterObjectDependsStmt;
-
 /* ----------------------
  *		ALTER object SET SCHEMA Statement
  * ----------------------
@@ -2125,18 +2070,9 @@ typedef struct AlterObjectSchemaStmt
 	bool		missing_ok;		/* skip error if missing? */
 } AlterObjectSchemaStmt;
 
-/* ----------------------
- *		Alter Operator Set ( this-n-that )
- * ----------------------
- */
-typedef struct AlterOperatorStmt
-{
-	NodeTag		type;
-	ObjectWithArgs *opername;	/* operator name and argument types */
-	List	   *options;		/* List of DefElem nodes */
-} AlterOperatorStmt;
-
 /* ------------------------
+
+
  *		Alter Type Set ( this-n-that )
  * ------------------------
  */
@@ -2281,17 +2217,6 @@ typedef struct CreatedbStmt
 	char	   *dbname;			/* name of database to create */
 	List	   *options;		/* List of DefElem nodes */
 } CreatedbStmt;
-
-/* ----------------------
- *	Alter Database
- * ----------------------
- */
-typedef struct AlterDatabaseStmt
-{
-	NodeTag		type;
-	char	   *dbname;			/* name of database to alter */
-	List	   *options;		/* List of DefElem nodes */
-} AlterDatabaseStmt;
 
 /* ----------------------
  *		Dropdb Statement

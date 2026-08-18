@@ -40,18 +40,10 @@ extern ObjectAddress InsertExtensionTuple(const char *extName, Oid extOwner,
 										  Datum extConfig, Datum extCondition,
 										  List *requiredExtensions);
 
-extern ObjectAddress ExecAlterExtensionStmt(ParseState *pstate, AlterExtensionStmt *stmt);
-
-extern ObjectAddress ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
-													ObjectAddress *objAddr);
-
 extern Oid	get_extension_oid(const char *extname, bool missing_ok);
 extern char *get_extension_name(Oid ext_oid);
 extern bool extension_file_exists(const char *extensionName);
 
 extern Oid	get_function_sibling_type(Oid funcoid, const char *typname);
-
-extern ObjectAddress AlterExtensionNamespace(const char *extensionName, const char *newschema,
-											 Oid *oldschema);
 
 #endif							/* EXTENSION_H */

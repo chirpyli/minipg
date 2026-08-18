@@ -14,54 +14,6 @@
  * string literal (including a function body!) or a multiline comment.
  */
 
-CREATE VIEW pg_roles AS
-    SELECT
-        'postgres'::name AS rolname,
-        true::bool AS rolsuper,
-        true::bool AS rolinherit,
-        true::bool AS rolcreaterole,
-        true::bool AS rolcreatedb,
-        true::bool AS rolcanlogin,
-        true::bool AS rolreplication,
-        -1::int4 AS rolconnlimit,
-        '********'::text AS rolpassword,
-        NULL::timestamptz AS rolvaliduntil,
-        true::bool AS rolbypassrls,
-        NULL::text[] AS rolconfig,
-        10::oid AS oid;
-
-CREATE VIEW pg_shadow AS
-    SELECT
-        'postgres'::name AS usename,
-        10::oid AS usesysid,
-        true::bool AS usecreatedb,
-        true::bool AS usesuper,
-        true::bool AS userepl,
-        true::bool AS usebypassrls,
-        '********'::text AS passwd,
-        NULL::timestamptz AS valuntil,
-        NULL::text[] AS useconfig;
-
-CREATE VIEW pg_group AS
-    SELECT
-        'postgres'::name AS groname,
-        10::oid AS grosysid,
-        NULL::oid[] AS grolist
-    WHERE false;
-
-CREATE VIEW pg_user AS
-    SELECT
-        usename,
-        usesysid,
-        usecreatedb,
-        usesuper,
-        userepl,
-        usebypassrls,
-        '********'::text as passwd,
-        valuntil,
-        useconfig
-    FROM pg_shadow;
-
 CREATE VIEW pg_rules AS
     SELECT
         N.nspname AS schemaname,

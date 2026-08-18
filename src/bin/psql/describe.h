@@ -115,8 +115,5 @@ extern bool listOpFamilyOperators(const char *accessMethod_pattern,
 extern bool listOpFamilyFunctions(const char *access_method_pattern,
 								  const char *family_pattern, bool verbose);
 
-/* \du, \dg */
-extern bool describeRoles(const char *pattern, bool verbose, bool showSystem);
-
 
 #endif							/* DESCRIBE_H */

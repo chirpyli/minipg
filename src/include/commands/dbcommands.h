@@ -22,8 +22,6 @@
 extern Oid	createdb(ParseState *pstate, const CreatedbStmt *stmt);
 extern void dropdb(const char *dbname, bool missing_ok, bool force);
 extern void DropDatabase(ParseState *pstate, DropdbStmt *stmt);
-extern Oid	AlterDatabase(ParseState *pstate, AlterDatabaseStmt *stmt, bool isTopLevel);
-extern ObjectAddress AlterDatabaseOwner(const char *dbname, Oid newOwnerId);
 
 extern Oid	get_database_oid(const char *dbname, bool missing_ok);
 extern char *get_database_name(Oid dbid);

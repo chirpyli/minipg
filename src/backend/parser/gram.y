@@ -236,16 +236,15 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
-		AlterDatabaseStmt AlterDomainStmt AlterEnumStmt
-		AlterObjectDependsStmt AlterObjectSchemaStmt
-		AlterOperatorStmt AlterTypeStmt AlterTableStmt
-		AlterTblSpcStmt AlterExtensionStmt AlterExtensionContentsStmt
+		AlterDomainStmt AlterEnumStmt
+		AlterObjectSchemaStmt
+		AlterTypeStmt AlterTableStmt
+		AlterTblSpcStmt
 		AlterCompositeTypeStmt
-		AlterStatsStmt
 		AnalyzeStmt ClosePortalStmt ClusterStmt
 		ConstraintsSetStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
-		CreateOpFamilyStmt AlterOpFamilyStmt
+		CreateOpFamilyStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
 		CreateTransformStmt CreateTrigStmt
@@ -256,7 +255,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		ExplainStmt FetchStmt
 		IndexStmt InsertStmt
 		LoadStmt LockStmt ExplainableStmt PreparableStmt
-		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
+		CreateFunctionStmt ReindexStmt RemoveAggrStmt
 		RemoveFuncStmt RemoveOperStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
@@ -269,8 +268,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
 
-%type <node>	alter_column_default opclass_item opclass_drop alter_using
-%type <ival>	add_drop opt_asc_desc opt_nulls_order
+%type <node>	alter_column_default opclass_item alter_using
+%type <ival>	opt_asc_desc opt_nulls_order
 
 %type <node>	alter_table_cmd alter_type_cmd opt_collate_clause
 %type <list>	alter_table_cmds alter_type_cmds
@@ -279,10 +278,10 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <list>	createdb_opt_list createdb_opt_items
 				transaction_mode_list
-				create_extension_opt_list alter_extension_opt_list
-%type <defelt>	createdb_opt_item
+				create_extension_opt_list
+				%type <defelt>	createdb_opt_item
 				transaction_mode_item
-				create_extension_opt_item alter_extension_opt_item
+				create_extension_opt_item
 
 %type <ival>	opt_lock lock_type
 %type <str>		utility_option_name
@@ -290,8 +289,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	utility_option_list
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
-%type <boolean>	opt_or_replace opt_no
-				opt_nowait opt_if_exists
+%type <boolean>	opt_or_replace
+			opt_nowait opt_if_exists
 				opt_transaction_chain
 %type <ival>	opt_nowait_or_skip
 
@@ -336,7 +335,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				OptWith opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
 				aggr_args aggr_args_list
-				func_as createfunc_opt_list opt_createfunc_opt_list alterfunc_opt_list
+				func_as createfunc_opt_list opt_createfunc_opt_list
 				old_aggr_definition old_aggr_list
 				oper_argtypes RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
@@ -349,7 +348,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				target_list opt_target_list insert_column_list set_target_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
-				reloption_list TriggerFuncArgs opclass_item_list opclass_drop_list
+				reloption_list TriggerFuncArgs opclass_item_list
 				opclass_purpose opt_opfamily transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
@@ -396,7 +395,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean> opt_freeze opt_analyze opt_default opt_recheck
 
 %type <ival>	event cursor_options opt_hold opt_set_data
-%type <objtype>	object_type_any_name object_type_name object_type_name_on_any_name
+%type <objtype>	object_type_any_name object_type_name_on_any_name
 				drop_type_name
 
 %type <node>	fetch_args select_limit_value
@@ -752,20 +751,13 @@ toplevel_stmt:
 			| TransactionStmtLegacy
 		;
 
-stmt:	AlterDatabaseStmt
-			| AlterDomainStmt
+stmt:	AlterDomainStmt
 			| AlterEnumStmt
-			| AlterExtensionStmt
-			| AlterExtensionContentsStmt
-			| AlterFunctionStmt
-			| AlterObjectDependsStmt
 			| AlterObjectSchemaStmt
-			| AlterOperatorStmt
 			| AlterTypeStmt
 			| AlterTableStmt
 			| AlterTblSpcStmt
 			| AlterCompositeTypeStmt
-			| AlterStatsStmt
 			| AnalyzeStmt
 			| CheckPointStmt
 			| ClosePortalStmt
@@ -778,7 +770,6 @@ stmt:	AlterDatabaseStmt
 			| CreateFunctionStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
-			| AlterOpFamilyStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreateStatsStmt
@@ -2589,26 +2580,6 @@ stats_param:	ColId
  *
  *****************************************************************************/
 
-AlterStatsStmt:
-			ALTER STATISTICS any_name SET STATISTICS SignedIconst
-				{
-					AlterStatsStmt *n = makeNode(AlterStatsStmt);
-					n->defnames = $3;
-					n->missing_ok = false;
-					n->stxstattarget = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER STATISTICS IF_P EXISTS any_name SET STATISTICS SignedIconst
-				{
-					AlterStatsStmt *n = makeNode(AlterStatsStmt);
-					n->defnames = $5;
-					n->missing_ok = true;
-					n->stxstattarget = $8;
-					$$ = (Node *)n;
-				}
-			;
-
-
 NumericOnly:
 			FCONST								{ $$ = makeFloat($1); }
 			| '+' FCONST						{ $$ = makeFloat($2); }
@@ -2742,155 +2713,6 @@ create_extension_opt_item:
  * ALTER EXTENSION name UPDATE [ TO version ]
  *
  *****************************************************************************/
-
-AlterExtensionStmt: ALTER EXTENSION name UPDATE alter_extension_opt_list
-				{
-					AlterExtensionStmt *n = makeNode(AlterExtensionStmt);
-					n->extname = $3;
-					n->options = $5;
-					$$ = (Node *) n;
-				}
-		;
-
-alter_extension_opt_list:
-			alter_extension_opt_list alter_extension_opt_item
-				{ $$ = lappend($1, $2); }
-			| /* EMPTY */
-				{ $$ = NIL; }
-		;
-
-alter_extension_opt_item:
-			TO NonReservedWord_or_Sconst
-				{
-					$$ = makeDefElem("new_version", (Node *)makeString($2), @1);
-				}
-		;
-
-/*****************************************************************************
- *
- * ALTER EXTENSION name ADD/DROP object-identifier
- *
- *****************************************************************************/
-
-AlterExtensionContentsStmt:
-			ALTER EXTENSION name add_drop object_type_name name
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = $5;
-					n->object = (Node *) makeString($6);
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop object_type_any_name any_name
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = $5;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop AGGREGATE aggregate_with_argtypes
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_AGGREGATE;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop CAST '(' Typename AS Typename ')'
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_CAST;
-					n->object = (Node *) list_make2($7, $9);
-					$$ = (Node *) n;
-				}
-			| ALTER EXTENSION name add_drop DOMAIN_P Typename
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_DOMAIN;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop FUNCTION function_with_argtypes
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_FUNCTION;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop OPERATOR operator_with_argtypes
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_OPERATOR;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop OPERATOR CLASS any_name USING name
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_OPCLASS;
-					n->object = (Node *) lcons(makeString($9), $7);
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop OPERATOR FAMILY any_name USING name
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_OPFAMILY;
-					n->object = (Node *) lcons(makeString($9), $7);
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop PROCEDURE function_with_argtypes
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_PROCEDURE;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop ROUTINE function_with_argtypes
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_ROUTINE;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop TRANSFORM FOR Typename LANGUAGE name
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_TRANSFORM;
-					n->object = (Node *) list_make2($7, makeString($9));
-					$$ = (Node *)n;
-				}
-			| ALTER EXTENSION name add_drop TYPE_P Typename
-				{
-					AlterExtensionContentsStmt *n = makeNode(AlterExtensionContentsStmt);
-					n->extname = $3;
-					n->action = $4;
-					n->objtype = OBJECT_TYPE;
-					n->object = (Node *) $6;
-					$$ = (Node *)n;
-				}
-		;
 
 /* Options definiton for ALTER FDW, SERVER and USER MAPPING */
 alter_generic_options:
@@ -3564,50 +3386,7 @@ CreateOpFamilyStmt:
 				}
 		;
 
-AlterOpFamilyStmt:
-			ALTER OPERATOR FAMILY any_name USING name ADD_P opclass_item_list
-				{
-					AlterOpFamilyStmt *n = makeNode(AlterOpFamilyStmt);
-					n->opfamilyname = $4;
-					n->amname = $6;
-					n->isDrop = false;
-					n->items = $8;
-					$$ = (Node *) n;
-				}
-			| ALTER OPERATOR FAMILY any_name USING name DROP opclass_drop_list
-				{
-					AlterOpFamilyStmt *n = makeNode(AlterOpFamilyStmt);
-					n->opfamilyname = $4;
-					n->amname = $6;
-					n->isDrop = true;
-					n->items = $8;
-					$$ = (Node *) n;
-				}
-		;
 
-opclass_drop_list:
-			opclass_drop							{ $$ = list_make1($1); }
-			| opclass_drop_list ',' opclass_drop	{ $$ = lappend($1, $3); }
-		;
-
-opclass_drop:
-			OPERATOR Iconst '(' type_list ')'
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_OPERATOR;
-					n->number = $2;
-					n->class_args = $4;
-					$$ = (Node *) n;
-				}
-			| FUNCTION Iconst '(' type_list ')'
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_FUNCTION;
-					n->number = $2;
-					n->class_args = $4;
-					$$ = (Node *) n;
-				}
-		;
 
 
 DropOpClassStmt:
@@ -3806,11 +3585,6 @@ object_type_any_name:
  * DROP handles some of them separately
  */
 
-object_type_name:
-			drop_type_name							{ $$ = $1; }
-			| DATABASE								{ $$ = OBJECT_DATABASE; }
-			| TABLESPACE							{ $$ = OBJECT_TABLESPACE; }
-		;
 
 drop_type_name:
 			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
@@ -4744,224 +4518,6 @@ table_func_column_list:
  * only be applied to functions.
  *
  *****************************************************************************/
-AlterFunctionStmt:
-			ALTER FUNCTION function_with_argtypes alterfunc_opt_list opt_restrict
-				{
-					AlterFunctionStmt *n = makeNode(AlterFunctionStmt);
-					n->objtype = OBJECT_FUNCTION;
-					n->func = $3;
-					n->actions = $4;
-					$$ = (Node *) n;
-				}
-			| ALTER PROCEDURE function_with_argtypes alterfunc_opt_list opt_restrict
-				{
-					AlterFunctionStmt *n = makeNode(AlterFunctionStmt);
-					n->objtype = OBJECT_PROCEDURE;
-					n->func = $3;
-					n->actions = $4;
-					$$ = (Node *) n;
-				}
-			| ALTER ROUTINE function_with_argtypes alterfunc_opt_list opt_restrict
-				{
-					AlterFunctionStmt *n = makeNode(AlterFunctionStmt);
-					n->objtype = OBJECT_ROUTINE;
-					n->func = $3;
-					n->actions = $4;
-					$$ = (Node *) n;
-				}
-		;
-
-alterfunc_opt_list:
-			/* At least one option must be specified */
-			common_func_opt_item					{ $$ = list_make1($1); }
-			| alterfunc_opt_list common_func_opt_item { $$ = lappend($1, $2); }
-		;
-
-/* Ignored, merely for SQL compliance */
-opt_restrict:
-			RESTRICT
-			| /* EMPTY */
-		;
-
-
-/*****************************************************************************
- *
- *		QUERY:
- *
- *		DROP FUNCTION funcname (arg1, arg2, ...) [ RESTRICT | CASCADE ]
- *		DROP PROCEDURE procname (arg1, arg2, ...) [ RESTRICT | CASCADE ]
- *		DROP ROUTINE routname (arg1, arg2, ...) [ RESTRICT | CASCADE ]
- *		DROP AGGREGATE aggname (arg1, ...) [ RESTRICT | CASCADE ]
- *		DROP OPERATOR opname (leftoperand_typ, rightoperand_typ) [ RESTRICT | CASCADE ]
- *
- *****************************************************************************/
-
-RemoveFuncStmt:
-			DROP FUNCTION function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_FUNCTION;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP FUNCTION IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_FUNCTION;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP PROCEDURE function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_PROCEDURE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP PROCEDURE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_PROCEDURE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP ROUTINE function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_ROUTINE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP ROUTINE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_ROUTINE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
-
-RemoveAggrStmt:
-			DROP AGGREGATE aggregate_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_AGGREGATE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP AGGREGATE IF_P EXISTS aggregate_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_AGGREGATE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
-
-RemoveOperStmt:
-			DROP OPERATOR operator_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_OPERATOR;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP OPERATOR IF_P EXISTS operator_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_OPERATOR;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
-
-oper_argtypes:
-			'(' Typename ')'
-				{
-				   ereport(ERROR,
-						   (errcode(ERRCODE_SYNTAX_ERROR),
-							errmsg("missing argument"),
-							errhint("Use NONE to denote the missing argument of a unary operator."),
-							parser_errposition(@3)));
-				}
-			| '(' Typename ',' Typename ')'
-					{ $$ = list_make2($2, $4); }
-			| '(' NONE ',' Typename ')'					/* left unary */
-					{ $$ = list_make2(NULL, $4); }
-			| '(' Typename ',' NONE ')'					/* right unary */
-					{ $$ = list_make2($2, NULL); }
-		;
-
-any_operator:
-			all_Op
-					{ $$ = list_make1(makeString($1)); }
-			| ColId '.' any_operator
-					{ $$ = lcons(makeString($1), $3); }
-		;
-
-operator_with_argtypes_list:
-			operator_with_argtypes					{ $$ = list_make1($1); }
-			| operator_with_argtypes_list ',' operator_with_argtypes
-													{ $$ = lappend($1, $3); }
-		;
-
-operator_with_argtypes:
-			any_operator oper_argtypes
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = $1;
-					n->objargs = $2;
-					$$ = n;
-				}
-		;
-
-/*****************************************************************************
- *
- *		DO <anonymous code block> [ LANGUAGE language ]
- *
- * We use a DefElem list for future extensibility, and to allow flexibility
- * in the clause order.
- *
- *****************************************************************************/
-
-DoStmt: DO dostmt_opt_list
-				{
-					DoStmt *n = makeNode(DoStmt);
-					n->args = $2;
-					$$ = (Node *)n;
-				}
-		;
-
 dostmt_opt_list:
 			dostmt_opt_item						{ $$ = list_make1($1); }
 			| dostmt_opt_list dostmt_opt_item	{ $$ = lappend($1, $2); }
@@ -5147,64 +4703,6 @@ opt_set_data: SET DATA_P							{ $$ = 1; }
 			| /*EMPTY*/								{ $$ = 0; }
 		;
 
-/*****************************************************************************
- *
- * ALTER THING name DEPENDS ON EXTENSION name
- *
- *****************************************************************************/
-
-AlterObjectDependsStmt:
-			ALTER FUNCTION function_with_argtypes opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_FUNCTION;
-					n->object = (Node *) $3;
-					n->extname = makeString($8);
-					n->remove = $4;
-					$$ = (Node *)n;
-				}
-			| ALTER PROCEDURE function_with_argtypes opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_PROCEDURE;
-					n->object = (Node *) $3;
-					n->extname = makeString($8);
-					n->remove = $4;
-					$$ = (Node *)n;
-				}
-			| ALTER ROUTINE function_with_argtypes opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_ROUTINE;
-					n->object = (Node *) $3;
-					n->extname = makeString($8);
-					n->remove = $4;
-					$$ = (Node *)n;
-				}
-			| ALTER TRIGGER name ON qualified_name opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_TRIGGER;
-					n->relation = $5;
-					n->object = (Node *) list_make1(makeString($3));
-					n->extname = makeString($10);
-					n->remove = $6;
-					$$ = (Node *)n;
-				}
-			| ALTER INDEX qualified_name opt_no DEPENDS ON EXTENSION name
-				{
-					AlterObjectDependsStmt *n = makeNode(AlterObjectDependsStmt);
-					n->objectType = OBJECT_INDEX;
-					n->relation = $3;
-					n->extname = makeString($8);
-					n->remove = $4;
-					$$ = (Node *)n;
-				}
-		;
-
-opt_no:		NO				{ $$ = true; }
-			| /* EMPTY */	{ $$ = false;	}
-		;
 
 /*****************************************************************************
  *
@@ -5240,69 +4738,6 @@ AlterObjectSchemaStmt:
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			| ALTER EXTENSION name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_EXTENSION;
-					n->object = (Node *) makeString($3);
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER FUNCTION function_with_argtypes SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_FUNCTION;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR operator_with_argtypes SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_OPERATOR;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR CLASS any_name USING name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_OPCLASS;
-					n->object = (Node *) lcons(makeString($6), $4);
-					n->newschema = $9;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER OPERATOR FAMILY any_name USING name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_OPFAMILY;
-					n->object = (Node *) lcons(makeString($6), $4);
-					n->newschema = $9;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER PROCEDURE function_with_argtypes SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_PROCEDURE;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER ROUTINE function_with_argtypes SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_ROUTINE;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 			| ALTER TABLE relation_expr SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
@@ -5319,15 +4754,6 @@ AlterObjectSchemaStmt:
 					n->relation = $5;
 					n->newschema = $8;
 					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			| ALTER STATISTICS any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_STATISTIC_EXT;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
 				| ALTER VIEW qualified_name SET SCHEMA name
@@ -5365,25 +4791,6 @@ AlterObjectSchemaStmt:
  *
  *****************************************************************************/
 
-AlterOperatorStmt:
-			ALTER OPERATOR operator_with_argtypes SET '(' operator_def_list ')'
-				{
-					AlterOperatorStmt *n = makeNode(AlterOperatorStmt);
-					n->opername = $3;
-					n->options = $6;
-					$$ = (Node *)n;
-				}
-		;
-
-operator_def_list:	operator_def_elem								{ $$ = list_make1($1); }
-			| operator_def_list ',' operator_def_elem				{ $$ = lappend($1, $3); }
-		;
-
-operator_def_elem: ColLabel '=' NONE
-						{ $$ = makeDefElem($1, NULL, @1); }
-				   | ColLabel '=' operator_def_arg
-						{ $$ = makeDefElem($1, (Node *) $3, @1); }
-		;
 
 /* must be similar enough to def_arg to avoid reduce/reduce conflicts */
 operator_def_arg:
@@ -5792,33 +5199,6 @@ opt_equal:	'='
  *		ALTER DATABASE
  *
  *****************************************************************************/
-
-AlterDatabaseStmt:
-			ALTER DATABASE name WITH createdb_opt_list
-				 {
-					AlterDatabaseStmt *n = makeNode(AlterDatabaseStmt);
-					n->dbname = $3;
-					n->options = $5;
-					$$ = (Node *)n;
-				 }
-			| ALTER DATABASE name createdb_opt_list
-				 {
-					AlterDatabaseStmt *n = makeNode(AlterDatabaseStmt);
-					n->dbname = $3;
-					n->options = $4;
-					$$ = (Node *)n;
-				 }
-			| ALTER DATABASE name SET TABLESPACE name
-				 {
-					AlterDatabaseStmt *n = makeNode(AlterDatabaseStmt);
-					n->dbname = $3;
-					n->options = list_make1(makeDefElem("tablespace",
-														(Node *)makeString($6), @6));
-					$$ = (Node *)n;
-				 }
-		;
-
-
 
 				/*****************************************************************************
 				 *
@@ -10788,10 +10168,175 @@ opt_with:	WITH
 			| /*EMPTY*/
 		;
 
-add_drop:	ADD_P									{ $$ = +1; }
-			| DROP									{ $$ = -1; }
+
+any_operator:
+			all_Op
+						{ $$ = list_make1(makeString($1)); }
+			| ColId '.' any_operator
+						{ $$ = lcons(makeString($1), $3); }
 		;
 
+operator_with_argtypes_list:
+			operator_with_argtypes					{ $$ = list_make1($1); }
+			| operator_with_argtypes_list ',' operator_with_argtypes
+						{ $$ = lappend($1, $3); }
+		;
+
+operator_with_argtypes:
+			any_operator oper_argtypes
+			{
+				ObjectWithArgs *n = makeNode(ObjectWithArgs);
+				n->objname = $1;
+				n->objargs = $2;
+				$$ = n;
+			}
+		;
+
+operator_def_list:	operator_def_elem					{ $$ = list_make1($1); }
+			| operator_def_list ',' operator_def_elem			{ $$ = lappend($1, $3); }
+		;
+
+operator_def_elem: ColLabel '=' NONE
+						{ $$ = makeDefElem($1, NULL, @1); }
+		   | ColLabel '=' operator_def_arg
+						{ $$ = makeDefElem($1, (Node *) $3, @1); }
+		;
+
+
+
+/* Ignored, merely for SQL compliance */
+RemoveFuncStmt:
+			DROP FUNCTION function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_FUNCTION;
+					n->objects = $3;
+					n->behavior = $4;
+					n->missing_ok = false;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP FUNCTION IF_P EXISTS function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_FUNCTION;
+					n->objects = $5;
+					n->behavior = $6;
+					n->missing_ok = true;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP PROCEDURE function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_PROCEDURE;
+					n->objects = $3;
+					n->behavior = $4;
+					n->missing_ok = false;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP PROCEDURE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_PROCEDURE;
+					n->objects = $5;
+					n->behavior = $6;
+					n->missing_ok = true;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP ROUTINE function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_ROUTINE;
+					n->objects = $3;
+					n->behavior = $4;
+					n->missing_ok = false;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP ROUTINE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_ROUTINE;
+					n->objects = $5;
+					n->behavior = $6;
+					n->missing_ok = true;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+		;
+
+RemoveAggrStmt:
+			DROP AGGREGATE aggregate_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_AGGREGATE;
+					n->objects = $3;
+					n->behavior = $4;
+					n->missing_ok = false;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP AGGREGATE IF_P EXISTS aggregate_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_AGGREGATE;
+					n->objects = $5;
+					n->behavior = $6;
+					n->missing_ok = true;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+		;
+
+RemoveOperStmt:
+			DROP OPERATOR operator_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_OPERATOR;
+					n->objects = $3;
+					n->behavior = $4;
+					n->missing_ok = false;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+			| DROP OPERATOR IF_P EXISTS operator_with_argtypes_list opt_drop_behavior
+				{
+					DropStmt *n = makeNode(DropStmt);
+					n->removeType = OBJECT_OPERATOR;
+					n->objects = $5;
+					n->behavior = $6;
+					n->missing_ok = true;
+					n->concurrent = false;
+					$$ = (Node *)n;
+				}
+		;
+
+oper_argtypes:
+			'(' Typename ')'
+				{
+				   ereport(ERROR,
+						   (errcode(ERRCODE_SYNTAX_ERROR),
+							errmsg("missing argument"),
+							errhint("Use NONE to denote the missing argument of a unary operator."),
+							parser_errposition(@3)));
+				}
+			| '(' Typename ',' Typename ')'
+					{ $$ = list_make2($2, $4); }
+			| '(' NONE ',' Typename ')'					/* left unary */
+					{ $$ = list_make2(NULL, $4); }
+			| '(' Typename ',' NONE ')'					/* right unary */
+					{ $$ = list_make2($2, NULL); }
+		;
+DoStmt: DO dostmt_opt_list
+				{
+					DoStmt *n = makeNode(DoStmt);
+					n->args = $2;
+					$$ = (Node *)n;
+				}
+		;
 %%
 
 /*

@@ -655,20 +655,6 @@ select report_guc('work_mem'), current_setting('work_mem');
  1MB        | 3MB
 (1 row)
 
-alter function report_guc(text) set work_mem = '2MB';
-select report_guc('work_mem'), current_setting('work_mem');
- report_guc | current_setting 
-------------+-----------------
- 2MB        | 3MB
-(1 row)
-
-alter function report_guc(text) reset all;
-select report_guc('work_mem'), current_setting('work_mem');
- report_guc | current_setting 
-------------+-----------------
- 3MB        | 3MB
-(1 row)
-
 -- minipg: PL/pgSQL removed. The original test used plpgsql functions to verify
 -- SET LOCAL restriction by a function SET option, plain SET inside a function,
 -- and rollback-on-error of function-level SET. Those plpgsql-only checks are

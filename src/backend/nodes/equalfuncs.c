@@ -1184,16 +1184,6 @@ _equalCreateStatsStmt(const CreateStatsStmt *a, const CreateStatsStmt *b)
 }
 
 static bool
-_equalAlterStatsStmt(const AlterStatsStmt *a, const AlterStatsStmt *b)
-{
-	COMPARE_NODE_FIELD(defnames);
-	COMPARE_SCALAR_FIELD(stxstattarget);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
 _equalCreateFunctionStmt(const CreateFunctionStmt *a, const CreateFunctionStmt *b)
 {
 	COMPARE_SCALAR_FIELD(is_procedure);
@@ -1219,16 +1209,6 @@ _equalFunctionParameter(const FunctionParameter *a, const FunctionParameter *b)
 }
 
 static bool
-_equalAlterFunctionStmt(const AlterFunctionStmt *a, const AlterFunctionStmt *b)
-{
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_NODE_FIELD(func);
-	COMPARE_NODE_FIELD(actions);
-
-	return true;
-}
-
-static bool
 _equalDoStmt(const DoStmt *a, const DoStmt *b)
 {
 	COMPARE_NODE_FIELD(args);
@@ -1236,17 +1216,6 @@ _equalDoStmt(const DoStmt *a, const DoStmt *b)
 	return true;
 }
 
-static bool
-_equalAlterObjectDependsStmt(const AlterObjectDependsStmt *a, const AlterObjectDependsStmt *b)
-{
-	COMPARE_SCALAR_FIELD(objectType);
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(object);
-	COMPARE_NODE_FIELD(extname);
-	COMPARE_SCALAR_FIELD(remove);
-
-	return true;
-}
 
 static bool
 _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSchemaStmt *b)
@@ -1260,15 +1229,6 @@ _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSch
 	return true;
 }
 
-
-static bool
-_equalAlterOperatorStmt(const AlterOperatorStmt *a, const AlterOperatorStmt *b)
-{
-	COMPARE_NODE_FIELD(opername);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
 
 static bool
 _equalAlterTypeStmt(const AlterTypeStmt *a, const AlterTypeStmt *b)
@@ -1413,27 +1373,7 @@ _equalCreateOpFamilyStmt(const CreateOpFamilyStmt *a, const CreateOpFamilyStmt *
 }
 
 static bool
-_equalAlterOpFamilyStmt(const AlterOpFamilyStmt *a, const AlterOpFamilyStmt *b)
-{
-	COMPARE_NODE_FIELD(opfamilyname);
-	COMPARE_STRING_FIELD(amname);
-	COMPARE_SCALAR_FIELD(isDrop);
-	COMPARE_NODE_FIELD(items);
-
-	return true;
-}
-
-static bool
 _equalCreatedbStmt(const CreatedbStmt *a, const CreatedbStmt *b)
-{
-	COMPARE_STRING_FIELD(dbname);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterDatabaseStmt(const AlterDatabaseStmt *a, const AlterDatabaseStmt *b)
 {
 	COMPARE_STRING_FIELD(dbname);
 	COMPARE_NODE_FIELD(options);
@@ -1560,27 +1500,6 @@ _equalCreateExtensionStmt(const CreateExtensionStmt *a, const CreateExtensionStm
 
 	return true;
 }
-
-static bool
-_equalAlterExtensionStmt(const AlterExtensionStmt *a, const AlterExtensionStmt *b)
-{
-	COMPARE_STRING_FIELD(extname);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalAlterExtensionContentsStmt(const AlterExtensionContentsStmt *a, const AlterExtensionContentsStmt *b)
-{
-	COMPARE_STRING_FIELD(extname);
-	COMPARE_SCALAR_FIELD(action);
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_NODE_FIELD(object);
-
-	return true;
-}
-
 
 static bool
 _equalCreateTransformStmt(const CreateTransformStmt *a, const CreateTransformStmt *b)
@@ -2526,29 +2445,17 @@ equal(const void *a, const void *b)
 		case T_CreateStatsStmt:
 			retval = _equalCreateStatsStmt(a, b);
 			break;
-		case T_AlterStatsStmt:
-			retval = _equalAlterStatsStmt(a, b);
-			break;
 		case T_CreateFunctionStmt:
 			retval = _equalCreateFunctionStmt(a, b);
 			break;
 		case T_FunctionParameter:
 			retval = _equalFunctionParameter(a, b);
 			break;
-		case T_AlterFunctionStmt:
-			retval = _equalAlterFunctionStmt(a, b);
-			break;
 		case T_DoStmt:
 			retval = _equalDoStmt(a, b);
 			break;
-		case T_AlterObjectDependsStmt:
-			retval = _equalAlterObjectDependsStmt(a, b);
-			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);
-			break;
-		case T_AlterOperatorStmt:
-			retval = _equalAlterOperatorStmt(a, b);
 			break;
 		case T_AlterTypeStmt:
 			retval = _equalAlterTypeStmt(a, b);
@@ -2589,14 +2496,8 @@ equal(const void *a, const void *b)
 		case T_CreateOpFamilyStmt:
 			retval = _equalCreateOpFamilyStmt(a, b);
 			break;
-		case T_AlterOpFamilyStmt:
-			retval = _equalAlterOpFamilyStmt(a, b);
-			break;
 		case T_CreatedbStmt:
 			retval = _equalCreatedbStmt(a, b);
-			break;
-		case T_AlterDatabaseStmt:
-			retval = _equalAlterDatabaseStmt(a, b);
 			break;
 		case T_DropdbStmt:
 			retval = _equalDropdbStmt(a, b);
@@ -2633,12 +2534,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _equalCreateExtensionStmt(a, b);
-			break;
-		case T_AlterExtensionStmt:
-			retval = _equalAlterExtensionStmt(a, b);
-			break;
-		case T_AlterExtensionContentsStmt:
-			retval = _equalAlterExtensionContentsStmt(a, b);
 			break;
 		case T_CreateTransformStmt:
 			retval = _equalCreateTransformStmt(a, b);

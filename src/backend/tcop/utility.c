@@ -120,17 +120,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_AlterDatabaseStmt:
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
-		case T_AlterExtensionContentsStmt:
-		case T_AlterExtensionStmt:
-		case T_AlterFunctionStmt:
-		case T_AlterObjectDependsStmt:
 		case T_AlterObjectSchemaStmt:
-		case T_AlterOpFamilyStmt:
-		case T_AlterOperatorStmt:
-		case T_AlterStatsStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
@@ -650,11 +642,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			createdb(pstate, (CreatedbStmt *) parsetree);
 			break;
 
-		case T_AlterDatabaseStmt:
-			/* no event triggers for global objects */
-			AlterDatabase(pstate, (AlterDatabaseStmt *) parsetree, isTopLevel);
-			break;
-
 		case T_DropdbStmt:
 			/* no event triggers for global objects */
 			PreventInTransactionBlock(isTopLevel, "DROP DATABASE");
@@ -735,14 +722,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 				DropStmt   *stmt = (DropStmt *) parsetree;
 
 				ExecDropStmt(stmt, isTopLevel);
-			}
-			break;
-
-		case T_AlterObjectDependsStmt:
-			{
-				AlterObjectDependsStmt *stmt = (AlterObjectDependsStmt *) parsetree;
-
-				ExecAlterObjectDependsStmt(stmt, NULL);
 			}
 			break;
 
@@ -1085,14 +1064,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateExtension(pstate, (CreateExtensionStmt *) parsetree);
 				break;
 
-			case T_AlterExtensionStmt:
-				address = ExecAlterExtensionStmt(pstate, (AlterExtensionStmt *) parsetree);
-				break;
-
-			case T_AlterExtensionContentsStmt:
-				address = ExecAlterExtensionContentsStmt((AlterExtensionContentsStmt *) parsetree,
-														 &secondaryObject);
-				break;
 
 
 			case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
@@ -1123,10 +1094,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_CreateFunctionStmt:	/* CREATE FUNCTION */
 				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
-				break;
-
-			case T_AlterFunctionStmt:	/* ALTER FUNCTION */
-				address = AlterFunction(pstate, (AlterFunctionStmt *) parsetree);
 				break;
 
 			case T_RuleStmt:	/* CREATE RULE */
@@ -1160,10 +1127,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateTransform((CreateTransformStmt *) parsetree);
 				break;
 
-			case T_AlterOpFamilyStmt:
-				AlterOpFamily((AlterOpFamilyStmt *) parsetree);
-				break;
-
 			case T_AlterTableMoveAllStmt:
 				AlterTableMoveAll((AlterTableMoveAllStmt *) parsetree);
 				break;
@@ -1172,21 +1135,11 @@ ProcessUtilitySlow(ParseState *pstate,
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
 				break;
 
-			case T_AlterObjectDependsStmt:
-				address =
-					ExecAlterObjectDependsStmt((AlterObjectDependsStmt *) parsetree,
-											   &secondaryObject);
-				break;
-
 			case T_AlterObjectSchemaStmt:
 				address =
 					ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree,
 											  &secondaryObject);
 											  break;
-
-											  case T_AlterOperatorStmt:
-				address = AlterOperator((AlterOperatorStmt *) parsetree);
-				break;
 
 			case T_AlterTypeStmt:
 				address = AlterType((AlterTypeStmt *) parsetree);
@@ -1226,10 +1179,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 					address = CreateStatistics(stmt, true);
 				}
-				break;
-
-			case T_AlterStatsStmt:
-				address = AlterStatistics((AlterStatsStmt *) parsetree);
 				break;
 
 		default:
@@ -1553,14 +1502,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TRIGGER:
 			tag = CMDTAG_ALTER_TRIGGER;
 			break;
-			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
-			break;
-			tag = CMDTAG_ALTER_TEXT_SEARCH_DICTIONARY;
-			break;
-			tag = CMDTAG_ALTER_TEXT_SEARCH_PARSER;
-			break;
-			tag = CMDTAG_ALTER_TEXT_SEARCH_TEMPLATE;
-			break;
 		case OBJECT_TYPE:
 			tag = CMDTAG_ALTER_TYPE;
 			break;
@@ -1724,11 +1665,9 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_EXTENSION;
 			break;
 
-		case T_AlterExtensionStmt:
 			tag = CMDTAG_ALTER_EXTENSION;
 			break;
 
-		case T_AlterExtensionContentsStmt:
 			tag = CMDTAG_ALTER_EXTENSION;
 			break;
 
@@ -1756,14 +1695,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;
-					tag = CMDTAG_DROP_TEXT_SEARCH_PARSER;
-					break;
-					tag = CMDTAG_DROP_TEXT_SEARCH_DICTIONARY;
-					break;
-					tag = CMDTAG_DROP_TEXT_SEARCH_TEMPLATE;
-					break;
-				tag = CMDTAG_DROP_TEXT_SEARCH_CONFIGURATION;
-				break;
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
 					break;
@@ -1821,10 +1752,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_TRUNCATE_TABLE;
 			break;
 
-		case T_AlterObjectDependsStmt:
-			tag = AlterObjectTypeCommandTag(((AlterObjectDependsStmt *) parsetree)->objectType);
-			break;
-
 		case T_AlterObjectSchemaStmt:
 			tag = AlterObjectTypeCommandTag(((AlterObjectSchemaStmt *) parsetree)->objectType);
 			break;
@@ -1841,23 +1768,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_DOMAIN;
 			break;
 
-		case T_AlterFunctionStmt:
-			switch (((AlterFunctionStmt *) parsetree)->objtype)
-			{
-				case OBJECT_FUNCTION:
-					tag = CMDTAG_ALTER_FUNCTION;
-					break;
-				case OBJECT_PROCEDURE:
-					tag = CMDTAG_ALTER_PROCEDURE;
-					break;
-				case OBJECT_ROUTINE:
-					tag = CMDTAG_ALTER_ROUTINE;
-					break;
-				default:
-					tag = CMDTAG_UNKNOWN;
-			}
-			break;
-
 		case T_DefineStmt:
 			switch (((DefineStmt *) parsetree)->kind)
 			{
@@ -1869,14 +1779,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_TYPE:
 					tag = CMDTAG_CREATE_TYPE;
-					break;
-					tag = CMDTAG_CREATE_TEXT_SEARCH_PARSER;
-					break;
-					tag = CMDTAG_CREATE_TEXT_SEARCH_DICTIONARY;
-					break;
-					tag = CMDTAG_CREATE_TEXT_SEARCH_TEMPLATE;
-					break;
-					tag = CMDTAG_CREATE_TEXT_SEARCH_CONFIGURATION;
 					break;
 				case OBJECT_ACCESS_METHOD:
 					tag = CMDTAG_CREATE_ACCESS_METHOD;
@@ -1929,7 +1831,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_DATABASE;
 			break;
 
-		case T_AlterDatabaseStmt:
 			tag = CMDTAG_ALTER_DATABASE;
 			break;
 
@@ -2031,11 +1932,9 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_OPERATOR_FAMILY;
 			break;
 
-		case T_AlterOpFamilyStmt:
 			tag = CMDTAG_ALTER_OPERATOR_FAMILY;
 			break;
 
-		case T_AlterOperatorStmt:
 			tag = CMDTAG_ALTER_OPERATOR;
 			break;
 
@@ -2043,11 +1942,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_ALTER_TYPE;
 			break;
 
-			tag = CMDTAG_ALTER_TEXT_SEARCH_DICTIONARY;
-			break;
-
-			tag = CMDTAG_ALTER_TEXT_SEARCH_CONFIGURATION;
-			break;
 
 
 
@@ -2065,10 +1959,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateStatsStmt:
 			tag = CMDTAG_CREATE_STATISTICS;
-			break;
-
-		case T_AlterStatsStmt:
-			tag = CMDTAG_ALTER_STATISTICS;
 			break;
 
 		case T_DeallocateStmt:
@@ -2277,8 +2167,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateExtensionStmt:
-		case T_AlterExtensionStmt:
-		case T_AlterExtensionContentsStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -2320,15 +2208,10 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_ALL;
 			break;
 
-		case T_AlterObjectDependsStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_AlterObjectSchemaStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterOperatorStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -2373,10 +2256,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterFunctionStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_IndexStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -2393,7 +2272,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterDatabaseStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -2488,7 +2366,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterOpFamilyStmt:
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -2508,7 +2385,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterStatsStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

@@ -211,13 +211,6 @@ set work_mem = '1MB';
 
 select report_guc('work_mem'), current_setting('work_mem');
 
-alter function report_guc(text) set work_mem = '2MB';
-
-select report_guc('work_mem'), current_setting('work_mem');
-
-alter function report_guc(text) reset all;
-
-select report_guc('work_mem'), current_setting('work_mem');
 
 -- minipg: PL/pgSQL removed. The original test used plpgsql functions to verify
 -- SET LOCAL restriction by a function SET option, plain SET inside a function,

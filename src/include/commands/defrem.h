@@ -51,7 +51,6 @@ extern Oid	ResolveOpClass(List *opclass, Oid attrType,
 /* commands/functioncmds.c */
 extern ObjectAddress CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt);
 extern void RemoveFunctionById(Oid funcOid);
-extern ObjectAddress AlterFunction(ParseState *pstate, AlterFunctionStmt *stmt);
 extern ObjectAddress CreateTransform(CreateTransformStmt *stmt);
 extern void IsThereFunctionInNamespace(const char *proname, int pronargs,
 									   oidvector *proargtypes, Oid nspOid);
@@ -74,11 +73,9 @@ extern void interpret_function_parameter_list(ParseState *pstate,
 /* commands/operatorcmds.c */
 extern ObjectAddress DefineOperator(List *names, List *parameters);
 extern void RemoveOperatorById(Oid operOid);
-extern ObjectAddress AlterOperator(AlterOperatorStmt *stmt);
 
 /* commands/statscmds.c */
 extern ObjectAddress CreateStatistics(CreateStatsStmt *stmt, bool check_rights);
-extern ObjectAddress AlterStatistics(AlterStatsStmt *stmt);
 extern void RemoveStatisticsById(Oid statsOid);
 extern Oid	StatisticsGetRelation(Oid statId, bool missing_ok);
 
@@ -89,7 +86,6 @@ extern ObjectAddress DefineAggregate(ParseState *pstate, List *name, List *args,
 /* commands/opclasscmds.c */
 extern ObjectAddress DefineOpClass(CreateOpClassStmt *stmt);
 extern ObjectAddress DefineOpFamily(CreateOpFamilyStmt *stmt);
-extern Oid	AlterOpFamily(AlterOpFamilyStmt *stmt);
 extern void IsThereOpClassInNamespace(const char *opcname, Oid opcmethod,
 									  Oid opcnamespace);
 extern void IsThereOpFamilyInNamespace(const char *opfname, Oid opfmethod,

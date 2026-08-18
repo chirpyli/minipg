@@ -6,6 +6,113 @@
 
 ---
 
+## ALTER FUNCTION / OPERATOR / OPERATOR FAMILY / STATISTICS / EXTENSION / DATABASE 功能裁剪（2026-08-18）
+
+按"非核心对象管理 DDL 且与不可裁部分（btree/hash 索引、事务）零耦合则优先裁剪"的原则，本次彻底裁剪以下 7 类外围 `ALTER` 语法（与分析报告一致）：`ALTER FUNCTION/PROCEDURE/ROUTINE`、`ALTER OPERATOR`、`ALTER OPERATOR FAMILY`、`ALTER STATISTICS`、`ALTER EXTENSION`、`ALTER EXTENSION ... ADD/DROP CONTENTS`、`ALTER DATABASE`。
+
+`ALTER TABLE`（含 `ALTER INDEX`/`ALTER VIEW` 复用 `AlterTableStmt`，索引为不可裁核心）**保留**；`ALTER TYPE`/`ALTER DOMAIN`/`ALTER ENUM` 与表空间相关 `ALTER`（贴近存储引擎、学习价值高）**保留**；`ALTER OBJECT SET SCHEMA`/`ALTER OBJECT DEPENDS ON` 节点与语法入口仅移除直接 `ALTER FUNCTION/EXTENSION ... SET SCHEMA/DEPENDS` 入口，节点本体、产生式及 `ALTER TABLE SET SCHEMA` 复用路径**保留**。
+
+涉及文件与改动：
+
+- **`src/backend/parser/gram.y`**：从 `stmt:` 列表与 `%type` 删除 `AlterFunctionStmt`/`AlterOperatorStmt`/`AlterOpFamilyStmt`/`AlterStatsStmt`/`AlterExtensionStmt`/`AlterExtensionContentsStmt`/`AlterDatabaseStmt`；删除各自的文法产生式块（`AlterStatsStmt`、整个 `AlterExtension` 块、`AlterOpFamilyStmt`、`AlterFunctionStmt`、`AlterOperatorStmt`、`AlterDatabaseStmt`）；`stmt:` 列表中仅移除 `AlterObjectDependsStmt`/`AlterObjectSchemaStmt` 的直接入口行（节点/产生式保留，供 `ALTER TABLE SET SCHEMA` 等复用）。
+- **`src/include/nodes/nodes.h`** / **`src/include/nodes/parsenodes.h`**：删除上述 7 个节点的 `T_` 枚举值与结构体定义（`AlterObjectDependsStmt`/`AlterObjectSchemaStmt` 保留）。
+- **`src/backend/nodes/copyfuncs.c`** / **`src/backend/nodes/equalfuncs.c`** / **`src/backend/nodes/outfuncs.c`**：删除对应的 `_copyXxx`/`_equalXxx`/`_outXxx` 函数及 dispatch case。
+- **`src/backend/tcop/utility.c`**：在 4 个 switch（`ClassifyReadOnly`/`ProcessUtility` 执行、`GetCommandTag`、`SetQueryCompletion`）中删除上述 7 个节点的 case；同时删除孤儿执行体（`AlterDatabase`、`GetCommandTag` 中 `AlterFunctionStmt` 的 `objtype` 子 switch、`SetQueryCompletion` 中 `AlterStatsStmt` 分支）。
+- **`src/backend/commands/functioncmds.c`**：删除 `AlterFunction` 函数实现（保留 `CreateFunction`/`RemoveFunctionById`/`CreateTransform` 及 `check_transform_function`）。
+- **`src/backend/commands/operatorcmds.c`**：删除 `AlterOperator` 函数实现。
+- **`src/backend/commands/opclasscmds.c`**：删除 `AlterOpFamily` 及其 static 辅助 `AlterOpFamilyAdd`/`AlterOpFamilyDrop`（保留 `DefineOpClass`/`DefineOpFamily` 及通用 `processTypesSpec` 等）。
+- **`src/backend/commands/statscmds.c`**：删除 `AlterStatistics` 函数实现（保留 `CreateStatistics`/`RemoveStatisticsById`/`RemoveStatisticsDataById`/`ChooseExtendedStatisticName` 等 `CREATE STATISTICS` 依赖的辅助函数）。
+- **`src/backend/commands/extension.c`**：删除 `ExecAlterExtensionStmt`/`ExecAlterExtensionContentsStmt` 函数实现（保留 `CreateExtension` 及 `ApplyExtensionUpdates`/`AlterExtensionNamespace` 等，后者仍被 `ALTER EXTENSION SET SCHEMA` 与 `ALTER TABLE SET SCHEMA` 复用）。
+- **`src/backend/commands/dbcommands.c`**：删除 `AlterDatabase` 函数实现（保留 `createdb`/`dropdb`/`movedb` 等）；同步删除头文件残留的 `AlterDatabaseOwner` 死声明。
+- **头文件**：`src/include/commands/{defrem.h,dbcommands.h,extension.h}` 删除对应 `extern` 声明。
+- **`src/tools/pgindent/typedefs.list`**：删除上述 7 个类型名。
+- **`src/bin/psql/tab-complete.c`**：删除 `ALTER DATABASE`/`ALTER EXTENSION`/`ALTER STATISTICS`/`ALTER FUNCTION`/`ALTER AGGREGATE` 的代码补全分支（修复编辑器补全对未提供语法的提示）。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；改动为彻底删除，无死代码残留（除 `AlterObjectDependsStmt`/`AlterObjectSchemaStmt` 节点因 `ALTER TABLE` 复用而保留）。`make -j` 全量重编通过。
+
+### 回归测试同步（2026-08-18，裁剪收尾）
+
+上一轮语法裁剪后，4 个既有回归测试仍在调用已删除的语法，导致 `make check` 失败。本次从测试 SQL 中移除对已裁功能的依赖，并重新生成对应 `expected/*.out`：
+
+- **`sql/alter_generic.sql`**：删除 `ALTER OPERATOR FAMILY ... ADD/DROP` 整段（157–327 行）与 `ALTER STATISTICS` 整段（含其专属的 `CREATE TABLE alt_regress_1/2` 与 `pg_statistic_ext` 校验查询）；保留 `ALTER TABLE/INDEX/VIEW/OPCLASS RENAME`、`SET SCHEMA` 等复用 `AlterTableStmt` 路径的测试。
+- **`sql/alter_operator.sql`**：删除全部 `ALTER OPERATOR ... SET (...)` 调用及依赖它们的 `pg_proc`/`pg_operator` 校验查询，仅保留 `CREATE/DROP OPERATOR` 与 `pg_depend` 基础校验。
+- **`sql/misc_functions.sql`**：删除 `ALTER FUNCTION ... SUPPORT test_support_func` 测试段（含 `my_int_eq`/`my_gen_series` 定义及依赖 SUPPORT 的计划校验）；删除后相关查询计划回退为 Merge Join，已同步 `expected`。
+- **`sql/guc.sql`**：删除 `ALTER FUNCTION ... SET (work_mem)` / `RESET` 及其校验查询（属已裁 `ALTER FUNCTION` 子集）。
+
+`make check` 验证：**全部 83 个测试通过**。
+
+#### alter_generic 二次清理（2026-08-18，裁剪收尾）
+
+上一轮回归同步只移除了 `ALTER OPERATOR FAMILY ... ADD/DROP` 与 `ALTER STATISTICS`，但 `sql/alter_generic.sql` 仍残留已裁的 `ALTER FUNCTION` 与 `ALTER OPERATOR/OPERATOR FAMILY SET SCHEMA/RENAME` 调用（语法已彻底删除，现报 `syntax error at or near "FUNCTION"/"OPERATOR"`）。本次彻底清理测试 SQL 并重生成 `expected/alter_generic.out`：
+
+- **`sql/alter_generic.sql`**：删除 `Function and Aggregate` 段中的 `CREATE/ALTER FUNCTION` 全部语句（函数 `ALTER` 语法已裁），聚合 `ALTER AGGREGATE` 部分**保留**（仍可用）；删除 `Operator` 段（`CREATE/ALTER OPERATOR SET SCHEMA`，操作符 `ALTER` 已裁）；删除 `Operator Family` 段（`CREATE OPERATOR FAMILY` 及其 `RENAME/SET SCHEMA`，操作符族 `ALTER` 已裁）及结尾的 `pg_opfamily`/`pg_opclass` 校验查询。仅保留 `AGGREGATE`/`CONVERSION` 的 `ALTER ... RENAME/SET SCHEMA`（这两条路径未被裁）。
+- **`expected/alter_generic.out`**：依据新 SQL 重新生成（级联 `DROP SCHEMA` 对象数由 9/6 降为 4/2，因不再创建/迁移函数、操作符、操作符族）。
+
+`make check` 验证：**全部 83 个测试通过**。
+
+### gram.y 死语法清理（2026-08-18，裁剪收尾）
+
+上一轮语法块删除后，`gram.y` 遗留 7 个无用非终结符（bison 报 `7 nonterminals useless in grammar`），均为已裁功能的残骸，需彻底删除不留死代码：
+
+- `opclass_drop_list` / `opclass_drop`（3391–3413）：原 `CREATE OPERATOR CLASS ... AS (DROP OPERATOR n (...))` 就地删成员语法；minipg 的 `CreateOpClassStmt` 的 `AS` 子句只接 `opclass_item_list`，从未引用该分支 → 死代码（注意：这属于 `CREATE OPERATOR CLASS` 的边角写法，删除不影响 opclass 创建主路径，亦不触碰 btree/hash 索引核心）。
+- `object_type_name`（3612–3616）：仅将 `drop_type_name` 包一层 `DATABASE`/`TABLESPACE` 的包装非终结符，无任何规则引用它。保留其下层 `drop_type_name`（3495/3505 的 `DROP` 语句仍使用）。
+- `add_drop`（10330–10332）：`ALTER OPERATOR FAMILY ... ADD/DROP` 用，已裁 → 死。
+- `alter_extension_opt_list` / `alter_extension_opt_item`（10367–10385，含 ALTER EXTENSION 注释块）：`ALTER EXTENSION ... UPDATE ... WITH (new_version=...)` 用，已裁 → 死。
+- `alterfunc_opt_list`（10387–10391）：`ALTER FUNCTION ... SET/RESET` 用，已裁 → 死。
+
+同步从 7 处 `%type` 声明中移除对应符号。`make` 重编后 bison 警告全部消除；`make check`：**全部 83 个测试通过**。
+
+---
+
+## CREATE/DROP/ALTER COLLATION 功能裁剪（2026-08-18）
+
+排序规则（collation）的字符串比较内核（`pg_collation` 预置表、`pg_locale.c`、`parse_collate.c`、索引/排序的 collation 字段）属于数据库核心能力，**予以保留**。本次仅裁剪用户侧的 COLLATION 管理 DDL 入口，使其不可再由 SQL 创建/删除/修改自定义排序规则：
+
+- **`src/backend/parser/gram.y`**：删除 4 条 `CREATE COLLATION` 产生式、`ALTER COLLATION ... SET SCHEMA` 产生式、`AlterCollationStmt`（REFRESH VERSION）产生式；从 `object_type_any_name` 删除 `COLLATION` 分支（DROP 入口）、从 `stmt` 列表与 `%type` 删除 `AlterCollationStmt`。**保留** `OBJECT_COLLATION` 枚举（内核对象寻址仍需）。
+- **`src/backend/commands/collationcmds.c`**：删除 `DefineCollation`、`AlterCollation` 两个函数实现。**保留** `IsThereCollationInNamespace`（ALTER 通用路径依赖）、`pg_collation_actual_version`、`pg_import_system_collations`（initdb 依赖）。
+- **`src/include/commands/collationcmds.h`**：删除 `DefineCollation`/`AlterCollation` 声明，保留 `IsThereCollationInNamespace`。
+- **`src/backend/tcop/utility.c`**：删除 `DefineCollation` 的 `OBJECT_COLLATION` case、`T_AlterCollationStmt` 执行/命令标签/日志分支，以及 `OBJECT_COLLATION` 的 CREATE/DROP/ALTER 命令标签 case；移除冗余 `#include "commands/collationcmds.h"`。
+- **`src/include/nodes/nodes.h`**、**`src/include/nodes/parsenodes.h`**：删除 `T_AlterCollationStmt` 枚举值与 `AlterCollationStmt` 结构体。
+- **`src/backend/nodes/copyfuncs.c`**、**`src/backend/nodes/equalfuncs.c`**：删除 `_copyAlterCollationStmt`/`_equalAlterCollationStmt` 函数及对应 dispatch case。
+- **`src/tools/pgindent/typedefs.list`**：删除 `AlterCollationStmt` 类型名。
+
+`OBJECT_COLLATION` 枚举值、`pg_collation` 系统表、`C`/`POSIX` 预置 collation、`pg_import_system_collations`、`IsThereCollationInNamespace` 均保留，与不可裁部分（btree/hash 索引、事务）及内核字符串比较零耦合。
+
+---
+
+## ALTER DEFAULT PRIVILEGES 残留清理（2026-08-18）
+
+minipg 此前已彻底裁剪对象级 ACL 系统（权限位宏、aclchk、aclitem、`pg_default_acl` 等），`ALTER DEFAULT PRIVILEGES` 的执行函数、语法解析、底层系统表均已随 ACL 一同删除。本次仅清理两处遗留的孤立枚举/类型名（无对应语法、无执行入口、无 catalog 引用）：
+
+- **`src/include/tcop/cmdtaglist.h`**：删除孤立的 `CMDTAG_ALTER_DEFAULT_PRIVILEGES` 命令标签枚举项（第 35 行，现实中无任何语句触发，纯死代码）。
+- **`src/tools/pgindent/typedefs.list`**：删除已不存在的 `AlterDefaultPrivilegesStmt` 类型名（pgindent 静态名单，不影响编译）。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；改动为纯删除，无逻辑影响。
+
+---
+
+## cmdtaglist.h 已裁命令标签清理（2026-08-18）
+
+系统盘点 `src/include/tcop/cmdtaglist.h` 中全部命令标签，逐一核对对应 SQL 功能在 minipg 中是否已彻底裁剪（语法 `gram.y` 无规则 + 执行 `tcop/utility.c` 无对应 case + 无实现）。凡无语法、无执行入口、无对象系统引用（即孤立死代码）的标签一律删除，并同步清理 `utility.c` 中引用这些标签的悬挂死语句。
+
+删除的命令标签（共 23 条）：
+- **TEXT SEARCH 系列（12 条）**：CREATE/DROP/ALTER TEXT SEARCH CONFIGURATION/DICTIONARY/PARSER/TEMPLATE（`OBJECT_TEXT_SEARCH_*` 枚举已不存在，utility.c 仅余悬挂 `tag=` 死语句）。
+- **ROLE 系列（3 条）**：CREATE ROLE / ALTER ROLE / DROP ROLE（`OBJECT_ROLE` 枚举已删除，角色骨架已裁）。
+- **其它（8 条）**：CREATE TABLE AS、SELECT INTO、REFRESH MATERIALIZED VIEW、GRANT ROLE、REVOKE ROLE、DROP OWNED、CREATE CONSTRAINT、DROP CONSTRAINT、ALTER CONSTRAINT（语法与执行均已删除，utility.c 无引用）。
+
+同步修改：
+- **`src/include/tcop/cmdtaglist.h`**：删除上述 23 条 `PG_CMDTAG` 枚举项。
+- **`src/backend/tcop/utility.c`**：删除 `AlterObjectTypeCommandTag`/`RemoveObjects`/`DefineCommandTag`/`RenameStmt` 中引用已删 TEXT SEARCH 标签的 14 条悬挂 `tag = CMDTAG_xxx; break;` 死语句（其前置 `case` 标签已随语法裁剪而消失）。
+
+**未删除、有意保留的命令标签**（理由）：下列命令虽无对应 SQL 语法入口（被裁），但其 `ObjectType` 枚举（`OBJECT_ACCESS_METHOD`/`OBJECT_CAST`/`OBJECT_COLLATION`/`OBJECT_LANGUAGE`/`OBJECT_PUBLICATION`/`OBJECT_SUBSCRIPTION`/`OBJECT_TRANSFORM` 等）在内核对象寻址系统（`objectaddress.c`/`alter.c`/`dropcmds.c`/`extension.c`）中仍被引用，且 `utility.c` 中仍保留 `case OBJECT_xxx:` 分支引用其 `CMDTAG_xxx`。若删除这些 cmdtag 会导致编译期"未声明标识符"，因此必须随对象类型系统一并重构后方可删除，不属本次命令标签清理范围：
+- ACCESS METHOD（CREATE/ALTER/DROP）、CAST（CREATE/ALTER/DROP）、COLLATION（CREATE/ALTER/DROP）、LANGUAGE（CREATE/ALTER/DROP）、PUBLICATION（CREATE/ALTER/DROP）、SUBSCRIPTION（CREATE/ALTER/DROP）、TRANSFORM（CREATE/ALTER/DROP）、ALTER VIEW。
+
+> 注：保留项的根因是 parsenodes.h 的 `ObjectType` 枚举未随用户侧 DDL 语法一并裁剪，属历史遗留；如需彻底裁掉这些标签，应另行发起"对象类型系统裁剪"任务。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；改动为纯删除，无逻辑影响。
+
+---
+
 ## GSSAPI 功能彻底裁剪（2026-08-17）
 
 minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `configure.ac`/`configure` 的 GSS 探测，但源码层仍残留由 `#ifdef ENABLE_GSS` 包裹的死代码，以及若干**无条件编译**的 GSS 协议/状态残留。本次彻底删除 GSS 功能相关代码（无构建开关，ENABLE_GSS 宏始终未定义，故所有 `#ifdef ENABLE_GSS` 块为编译期死代码）。改动文件与要点：
@@ -598,3 +705,25 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
 保留说明：`pg_constraint.h` 的 `CONSTRAINT_ASSERTION` 枚举项与注释是 constraint 系统"为将来扩展预留"的通用标记，与本次语法桩无直接依赖，属独立 catalog 设计预留，本次不裁剪（避免牵连 constraint 体系）。`Assert()` 运行时断言（c.h / elog.c 等）是完全不同的调试机制，与本次无关，未触动。
 
 - **验证**：`make -j4` 全量重编 EXIT=0（bison 重生成 `gram.c` 无报错、无新增警告）；`make install` + `make check-world` 全绿——regress 全部 83 tests passed，isolation / bin 同步通过，零 failure。全代码库 `grep CreateAssertionStmt` 与 gram.y 内 `ASSERTION` 关键字引用均清零。与不可裁部分（btree/hash 索引、事务）零耦合：仅删除未实现的语法桩与对应关键字，未改任何运行时/索引/事务逻辑。
+
+---
+
+## 二十一、裁剪角色/用户兼容视图 pg_roles / pg_shadow / pg_group / pg_user（2026-08-18）
+
+这四个视图是 PostgreSQL「角色/用户」机制的兼容壳，底层 `pg_authid` / `pg_auth_members` 系统表已在先前 ACL/角色骨架裁剪中彻底删除，故这些视图映射的源头已不存在，属于彻底裁剪目标。与事务/btree/hash 索引等核心功能零耦合。
+
+裁剪动作（彻底删除、不留死代码）：
+
+- **`src/backend/catalog/system_views.sql`**：删除 `pg_roles`、`pg_shadow`、`pg_group`、`pg_user` 四个视图定义（`pg_user` 由 `pg_shadow` 派生，一并删除）。
+- **`src/bin/psql/describe.c`**：删除 `describeRoles()` 死函数（原 `\du` / `\dg` 命令实现，查询已删除的 `pg_roles` / `pg_auth_members` / `pg_authid`，且当前无任何调用入口，属之前角色裁剪遗留的死代码）；同时删除仅被其调用的 `add_role_attribute()` 辅助函数及其在文件头部的 `static` 前向声明。
+- **`src/bin/psql/describe.h`**：删除 `describeRoles()` 的 `extern` 声明。
+- **`src/bin/psql/help.c`**：删除 `\du[S+] list roles` 帮助行。
+- **`src/bin/psql/tab-complete.c`**：删除 `Query_for_list_of_roles` 宏（引用 `pg_roles`）；将 `GROUP` / `ROLE` / `USER` 补全项改为 `NULL`；将 `ALTER ... OWNED BY`、`ALTER GROUP ... ADD|DROP USER`、`DROP OWNED BY`、`OWNER TO`、`SET ROLE`、`SET SESSION AUTHORIZATION`、`CREATE USER MAPPING FOR`、`\connect`、`\du*` / `\dg*`、`\password` 中所有依赖该宏的角色名补全改为 `COMPLETE_WITH_NOTHING()`（或仅保留关键字），避免引用已删除视图。
+- **`src/tutorial/syscat.source`**：删除教程中依赖 `pg_roles` / `pg_type.typowner` 的两段示例查询（数据库所有者列表、类型所有者列表），避免教程执行失败。
+
+影响说明：
+- 内核 C 代码本就不依赖任何系统视图（直接查底层系统表或 C 函数），故删除这四个视图不影响事务、索引、优化器、GUC、扩展等核心功能。
+- 客户端侧：`\du` / `\dg` 命令、其帮助与补全、角色名相关补全失效——角色机制已裁，这些行为本应随之移除。
+- `pg_user_mappings` / `pg_foreign_*` 等 FDW 相关视图与本次无关，未改动。
+
+- **验证状态**：本次改动已通过 gcc `-fsyntax-only` 单独语法检查（`describe.c` / `tab_complete.c` 0 error），逻辑自洽。但因工作区存在**未提交的 gram.y 半成品裁剪**（删了 DoStmt / ReindexStmt / AlterTblSpcStmt 等语句规则但残留引用，bison 报 `used but not defined` 错误），整库当前无法编译，故 `make check-world` 暂未运行（用户决策：保留 gram.y 半成品、先不验证）。待 gram.y 修复后可补跑回归验证。

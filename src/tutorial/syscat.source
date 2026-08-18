@@ -22,14 +22,6 @@ SET search_path TO pg_catalog;
 SET standard_conforming_strings TO on;
 
 --
--- lists the names of all database owners and the name of their database(s)
---
-SELECT rolname, datname
-  FROM pg_roles, pg_database
-  WHERE pg_roles.oid = datdba
-  ORDER BY rolname, datname;
-
---
 -- lists all user-defined classes
 --
 SELECT n.nspname, c.relname
@@ -79,20 +71,6 @@ SELECT n.nspname, c.relname, a.attname, format_type(t.oid, null) as typname
     and a.attrelid = c.oid
     and a.atttypid = t.oid
   ORDER BY nspname, relname, attname;
-
-
---
--- lists all user-defined base types (not including array types)
---
-SELECT n.nspname, r.rolname, format_type(t.oid, null) as typname
-  FROM pg_type t, pg_roles r, pg_namespace n
-  WHERE r.oid = t.typowner
-    and t.typnamespace = n.oid
-    and t.typrelid = 0   -- no complex types
-    and t.typelem = 0    -- no arrays
-    and n.nspname not like 'pg\_%' -- no built-in types
-    and n.nspname != 'information_schema' -- no information_schema
-  ORDER BY nspname, rolname, typname;
 
 
 --

@@ -80,65 +80,6 @@ report_namespace_conflict(Oid classId, const char *name, Oid nspOid)
 			 errmsg(msgfmt, name, get_namespace_name(nspOid))));
 }
 
-/*
- * Executes an ALTER OBJECT / [NO] DEPENDS ON EXTENSION statement.
- *
- * Return value is the address of the altered object.  refAddress is an output
- * argument which, if not null, receives the address of the object that the
- * altered object now depends on.
- */
-ObjectAddress
-ExecAlterObjectDependsStmt(AlterObjectDependsStmt *stmt, ObjectAddress *refAddress)
-{
-	ObjectAddress address;
-	ObjectAddress refAddr;
-	Relation	rel;
-
-	address =
-		get_object_address_rv(stmt->objectType, stmt->relation, (List *) stmt->object,
-							  &rel, AccessExclusiveLock, false);
-
-	/*
-	 * Verify that the user is entitled to run the command.
-	 *
-	 * We don't check any privileges on the extension, because that's not
-	 * needed.  The object owner is stipulating, by running this command, that
-	 * the extension owner can drop the object whenever they feel like it,
-	 * which is not considered a problem.
-	 */
-
-	/*
-	 * If a relation was involved, it would have been opened and locked. We
-	 * don't need the relation here, but we'll retain the lock until commit.
-	 */
-	if (rel)
-		table_close(rel, NoLock);
-
-	refAddr = get_object_address(OBJECT_EXTENSION, (Node *) stmt->extname,
-								 &rel, AccessExclusiveLock, false);
-	Assert(rel == NULL);
-	if (refAddress)
-		*refAddress = refAddr;
-
-	if (stmt->remove)
-	{
-		deleteDependencyRecordsForSpecific(address.classId, address.objectId,
-										   DEPENDENCY_AUTO_EXTENSION,
-										   refAddr.classId, refAddr.objectId);
-	}
-	else
-	{
-		List	   *currexts;
-
-		/* Avoid duplicates */
-		currexts = getAutoExtensionsOfObject(address.classId,
-											 address.objectId);
-		if (!list_member_oid(currexts, refAddr.objectId))
-			recordDependencyOn(&address, &refAddr, DEPENDENCY_AUTO_EXTENSION);
-	}
-
-	return address;
-}
 
 /*
  * Executes an ALTER OBJECT / SET SCHEMA statement.  Based on the object
@@ -158,11 +99,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 
 	switch (stmt->objectType)
 	{
-		case OBJECT_EXTENSION:
-			address = AlterExtensionNamespace(strVal((Value *) stmt->object), stmt->newschema,
-											  oldSchemaAddr ? &oldNspOid : NULL);
-			break;
-
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
 			address = AlterTableNamespace(stmt,
@@ -180,13 +116,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 		case OBJECT_AGGREGATE:
 		case OBJECT_COLLATION:
 		case OBJECT_CONVERSION:
-		case OBJECT_FUNCTION:
-		case OBJECT_OPERATOR:
-		case OBJECT_OPCLASS:
-		case OBJECT_OPFAMILY:
-		case OBJECT_PROCEDURE:
-		case OBJECT_ROUTINE:
-		case OBJECT_STATISTIC_EXT:
 			{
 				Relation	catalog;
 				Relation	relation;

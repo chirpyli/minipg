@@ -64,6 +64,7 @@
 #define rl_completion_matches completion_matches
 #endif
 
+static char **completion_matches = NULL;
 /*
  * Currently we assume that rl_filename_dequoting_function exists if
  * rl_filename_quoting_function does.  If that proves not to be the case,
@@ -741,11 +742,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "  UNION ALL SELECT 'all') ss "\
 " WHERE substring(name,1,%d)='%s'"
 
-#define Query_for_list_of_roles \
-" SELECT pg_catalog.quote_ident(rolname) "\
-"   FROM pg_catalog.pg_roles "\
-"  WHERE substring(pg_catalog.quote_ident(rolname),1,%d)='%s'"
-
 
 /* the silly-looking length condition is just to eat up the current word */
 #define Query_for_index_of_table \
@@ -1002,7 +998,7 @@ static const pgsql_thing_t words_after_create[] = {
 	{"FOREIGN DATA WRAPPER", NULL, NULL, NULL},
 	{"FOREIGN TABLE", NULL, NULL, NULL},
 	{"FUNCTION", NULL, NULL, Query_for_list_of_functions},
-	{"GROUP", Query_for_list_of_roles},
+	{"GROUP", NULL},
 	{"INDEX", NULL, NULL, &Query_for_list_of_indexes},
 	{"LANGUAGE", Query_for_list_of_languages},
 	{"LARGE OBJECT", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
@@ -1014,7 +1010,7 @@ static const pgsql_thing_t words_after_create[] = {
 	{"PARSER", Query_for_list_of_ts_parsers, NULL, NULL, THING_NO_SHOW},
 	{"PROCEDURE", NULL, NULL, Query_for_list_of_procedures},
 	{"PUBLICATION", NULL, Query_for_list_of_publications},
-	{"ROLE", Query_for_list_of_roles},
+	{"ROLE", NULL},
 	{"ROUTINE", NULL, NULL, &Query_for_list_of_routines, THING_NO_CREATE},
 	{"RULE", "SELECT pg_catalog.quote_ident(rulename) FROM pg_catalog.pg_rules WHERE substring(pg_catalog.quote_ident(rulename),1,%d)='%s'"},
 	{"SCHEMA", Query_for_list_of_schemas},
@@ -1032,7 +1028,7 @@ static const pgsql_thing_t words_after_create[] = {
 																	 * INDEX ... */
 	{"UNLOGGED", NULL, NULL, NULL, THING_NO_DROP | THING_NO_ALTER}, /* for CREATE UNLOGGED
 																	 * TABLE ... */
-	{"USER", Query_for_list_of_roles " UNION SELECT 'MAPPING FOR'"},
+	{"USER", NULL},
 	{"USER MAPPING FOR", NULL, NULL, NULL},
 	{"VIEW", NULL, NULL, &Query_for_list_of_views},
 	{NULL}						/* end of list */
@@ -1554,30 +1550,10 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("SET TABLESPACE", "OWNED BY");
 	/* ALTER TABLE,INDEX,MATERIALIZED VIEW ALL IN TABLESPACE xxx OWNED BY */
 	else if (TailMatches("ALL", "IN", "TABLESPACE", MatchAny, "OWNED", "BY"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 	/* ALTER TABLE,INDEX,MATERIALIZED VIEW ALL IN TABLESPACE xxx OWNED BY xxx */
 	else if (TailMatches("ALL", "IN", "TABLESPACE", MatchAny, "OWNED", "BY", MatchAny))
 		COMPLETE_WITH("SET TABLESPACE");
-	/* ALTER AGGREGATE,FUNCTION,PROCEDURE,ROUTINE <name> */
-	else if (Matches("ALTER", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny))
-		COMPLETE_WITH("(");
-	/* ALTER AGGREGATE <name> (...) */
-	else if (Matches("ALTER", "AGGREGATE", MatchAny, MatchAny))
-	{
-		if (ends_with(prev_wd, ')'))
-			COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA");
-		else
-			COMPLETE_WITH_FUNCTION_ARG(prev2_wd);
-	}
-	/* ALTER FUNCTION,PROCEDURE,ROUTINE <name> (...) */
-	else if (Matches("ALTER", "FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny))
-	{
-		if (ends_with(prev_wd, ')'))
-			COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA",
-						  "DEPENDS ON EXTENSION", "NO DEPENDS ON EXTENSION");
-		else
-			COMPLETE_WITH_FUNCTION_ARG(prev2_wd);
-	}
 
 	/* ALTER PUBLICATION <name> */
 	else if (Matches("ALTER", "PUBLICATION", MatchAny))
@@ -1633,33 +1609,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER", "CONVERSION", MatchAny))
 		COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA");
 
-	/* ALTER DATABASE <name> */
-	else if (Matches("ALTER", "DATABASE", MatchAny))
-		COMPLETE_WITH("RESET", "SET", "OWNER TO", "RENAME TO",
-					  "IS_TEMPLATE", "ALLOW_CONNECTIONS",
-					  "CONNECTION LIMIT");
-
-	/* ALTER DATABASE <name> SET TABLESPACE */
-	else if (Matches("ALTER", "DATABASE", MatchAny, "SET", "TABLESPACE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
-
-	/* ALTER EXTENSION <name> */
-	else if (Matches("ALTER", "EXTENSION", MatchAny))
-		COMPLETE_WITH("ADD", "DROP", "UPDATE", "SET SCHEMA");
-
-	/* ALTER EXTENSION <name> UPDATE */
-	else if (Matches("ALTER", "EXTENSION", MatchAny, "UPDATE"))
-	{
-		completion_info_charp = prev2_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_available_extension_versions_with_TO);
-	}
-
-	/* ALTER EXTENSION <name> UPDATE TO */
-	else if (Matches("ALTER", "EXTENSION", MatchAny, "UPDATE", "TO"))
-	{
-		completion_info_charp = prev3_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_available_extension_versions);
-	}
 
 	/* ALTER FOREIGN */
 	else if (Matches("ALTER", "FOREIGN"))
@@ -1682,8 +1631,7 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER INDEX <name> */
 	else if (Matches("ALTER", "INDEX", MatchAny))
 		COMPLETE_WITH("ALTER COLUMN", "OWNER TO", "RENAME TO", "SET",
-					  "RESET", "ATTACH PARTITION",
-					  "DEPENDS ON EXTENSION", "NO DEPENDS ON EXTENSION");
+					  "RESET", "ATTACH PARTITION");
 	else if (Matches("ALTER", "INDEX", MatchAny, "ATTACH"))
 		COMPLETE_WITH("PARTITION");
 	else if (Matches("ALTER", "INDEX", MatchAny, "ATTACH", "PARTITION"))
@@ -1814,8 +1762,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* ALTER MATERIALIZED VIEW <name> */
 	else if (Matches("ALTER", "MATERIALIZED", "VIEW", MatchAny))
-		COMPLETE_WITH("ALTER COLUMN", "CLUSTER ON", "DEPENDS ON EXTENSION",
-					  "NO DEPENDS ON EXTENSION", "OWNER TO", "RENAME",
+		COMPLETE_WITH("ALTER COLUMN", "CLUSTER ON", "OWNER TO", "RENAME",
 					  "RESET (", "SET");
 	/* ALTER MATERIALIZED VIEW xxx RENAME */
 	else if (Matches("ALTER", "MATERIALIZED", "VIEW", MatchAny, "RENAME"))
@@ -1847,10 +1794,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER", "RULE", MatchAny, "ON", MatchAny))
 		COMPLETE_WITH("RENAME TO");
 
-	/* ALTER STATISTICS <name> */
-	else if (Matches("ALTER", "STATISTICS", MatchAny))
-		COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA", "SET STATISTICS");
-
 	/* ALTER TRIGGER <name>, add ON */
 	else if (Matches("ALTER", "TRIGGER", MatchAny))
 		COMPLETE_WITH("ON");
@@ -1869,8 +1812,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* ALTER TRIGGER <name> ON <name> */
 	else if (Matches("ALTER", "TRIGGER", MatchAny, "ON", MatchAny))
-		COMPLETE_WITH("RENAME TO", "DEPENDS ON EXTENSION",
-					  "NO DEPENDS ON EXTENSION");
+		COMPLETE_WITH("RENAME TO");
 
 	/*
 	 * If we detect ALTER TABLE <name>, suggest sub commands
@@ -2103,7 +2045,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("USER");
 	/* complete ALTER GROUP <foo> ADD|DROP USER with a user name */
 	else if (Matches("ALTER", "GROUP", MatchAny, "ADD|DROP", "USER"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 
 	/*
 	 * If we have ALTER TYPE <sth> RENAME VALUE, provide list of enum values
@@ -2850,7 +2792,7 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("DROP", "OWNED"))
 		COMPLETE_WITH("BY");
 	else if (Matches("DROP", "OWNED", "BY"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 
 	/* DROP TEXT SEARCH */
 	else if (Matches("DROP", "TEXT", "SEARCH"))
@@ -3069,7 +3011,7 @@ psql_completion(const char *text, int start, int end)
 
 /* OWNER TO  - complete with available roles */
 	else if (TailMatches("OWNER", "TO"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 
 /* ORDER BY */
 	else if (TailMatches("FROM", MatchAny, "ORDER"))
@@ -3199,13 +3141,13 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("DEFERRED", "IMMEDIATE");
 	/* Complete SET ROLE */
 	else if (Matches("SET", "ROLE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 	/* Complete SET SESSION with AUTHORIZATION or CHARACTERISTICS... */
 	else if (Matches("SET", "SESSION"))
 		COMPLETE_WITH("AUTHORIZATION", "CHARACTERISTICS AS TRANSACTION");
 	/* Complete SET SESSION AUTHORIZATION with username */
 	else if (Matches("SET", "SESSION", "AUTHORIZATION"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles " UNION SELECT 'DEFAULT'");
+		COMPLETE_WITH("DEFAULT");
 	/* Complete RESET SESSION with AUTHORIZATION */
 	else if (Matches("RESET", "SESSION"))
 		COMPLETE_WITH("AUTHORIZATION");
@@ -3320,11 +3262,10 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER|CREATE|DROP", "USER", "MAPPING"))
 		COMPLETE_WITH("FOR");
 	else if (Matches("CREATE", "USER", "MAPPING", "FOR"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles
-							" UNION SELECT 'CURRENT_ROLE'"
-							" UNION SELECT 'CURRENT_USER'"
-							" UNION SELECT 'PUBLIC'"
-							" UNION SELECT 'USER'");
+		COMPLETE_WITH("CURRENT_ROLE",
+					  "CURRENT_USER",
+					  "PUBLIC",
+					  "USER");
 
 /*
  * VACUUM [ ( option [, ...] ) ] [ table_and_columns [, ...] ]
@@ -3410,7 +3351,7 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatchesCS("\\connect|\\c", MatchAny))
 	{
 		if (!recognized_connection_string(prev_wd))
-			COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+			completion_matches = NULL;
 	}
 	else if (TailMatchesCS("\\da*"))
 		COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_aggregates, NULL);
@@ -3463,7 +3404,7 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatchesCS("\\dT*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_datatypes, NULL);
 	else if (TailMatchesCS("\\du*") || TailMatchesCS("\\dg*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 	else if (TailMatchesCS("\\dv*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_views, NULL);
 	else if (TailMatchesCS("\\dx*"))
@@ -3529,7 +3470,7 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatchesCS("\\l*") && !TailMatchesCS("\\lo*"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_databases);
 	else if (TailMatchesCS("\\password"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
+		completion_matches = NULL;
 	else if (TailMatchesCS("\\pset"))
 		COMPLETE_WITH_CS("border", "columns", "csv_fieldsep", "expanded",
 						 "fieldsep", "fieldsep_zero", "footer", "format",

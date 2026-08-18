@@ -2994,18 +2994,6 @@ _copyCreateStatsStmt(const CreateStatsStmt *from)
 	return newnode;
 }
 
-static AlterStatsStmt *
-_copyAlterStatsStmt(const AlterStatsStmt *from)
-{
-	AlterStatsStmt *newnode = makeNode(AlterStatsStmt);
-
-	COPY_NODE_FIELD(defnames);
-	COPY_SCALAR_FIELD(stxstattarget);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
 static CreateFunctionStmt *
 _copyCreateFunctionStmt(const CreateFunctionStmt *from)
 {
@@ -3035,18 +3023,6 @@ _copyFunctionParameter(const FunctionParameter *from)
 	return newnode;
 }
 
-static AlterFunctionStmt *
-_copyAlterFunctionStmt(const AlterFunctionStmt *from)
-{
-	AlterFunctionStmt *newnode = makeNode(AlterFunctionStmt);
-
-	COPY_SCALAR_FIELD(objtype);
-	COPY_NODE_FIELD(func);
-	COPY_NODE_FIELD(actions);
-
-	return newnode;
-}
-
 static DoStmt *
 _copyDoStmt(const DoStmt *from)
 {
@@ -3057,19 +3033,6 @@ _copyDoStmt(const DoStmt *from)
 	return newnode;
 }
 
-static AlterObjectDependsStmt *
-_copyAlterObjectDependsStmt(const AlterObjectDependsStmt *from)
-{
-	AlterObjectDependsStmt *newnode = makeNode(AlterObjectDependsStmt);
-
-	COPY_SCALAR_FIELD(objectType);
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(object);
-	COPY_NODE_FIELD(extname);
-	COPY_SCALAR_FIELD(remove);
-
-	return newnode;
-}
 
 static AlterObjectSchemaStmt *
 _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
@@ -3085,17 +3048,6 @@ _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
 	return newnode;
 }
 
-
-static AlterOperatorStmt *
-_copyAlterOperatorStmt(const AlterOperatorStmt *from)
-{
-	AlterOperatorStmt *newnode = makeNode(AlterOperatorStmt);
-
-	COPY_NODE_FIELD(opername);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
 
 static AlterTypeStmt *
 _copyAlterTypeStmt(const AlterTypeStmt *from)
@@ -3265,34 +3217,10 @@ _copyCreateOpFamilyStmt(const CreateOpFamilyStmt *from)
 	return newnode;
 }
 
-static AlterOpFamilyStmt *
-_copyAlterOpFamilyStmt(const AlterOpFamilyStmt *from)
-{
-	AlterOpFamilyStmt *newnode = makeNode(AlterOpFamilyStmt);
-
-	COPY_NODE_FIELD(opfamilyname);
-	COPY_STRING_FIELD(amname);
-	COPY_SCALAR_FIELD(isDrop);
-	COPY_NODE_FIELD(items);
-
-	return newnode;
-}
-
 static CreatedbStmt *
 _copyCreatedbStmt(const CreatedbStmt *from)
 {
 	CreatedbStmt *newnode = makeNode(CreatedbStmt);
-
-	COPY_STRING_FIELD(dbname);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterDatabaseStmt *
-_copyAlterDatabaseStmt(const AlterDatabaseStmt *from)
-{
-	AlterDatabaseStmt *newnode = makeNode(AlterDatabaseStmt);
 
 	COPY_STRING_FIELD(dbname);
 	COPY_NODE_FIELD(options);
@@ -3438,30 +3366,6 @@ _copyCreateExtensionStmt(const CreateExtensionStmt *from)
 	COPY_STRING_FIELD(extname);
 	COPY_SCALAR_FIELD(if_not_exists);
 	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterExtensionStmt *
-_copyAlterExtensionStmt(const AlterExtensionStmt *from)
-{
-	AlterExtensionStmt *newnode = makeNode(AlterExtensionStmt);
-
-	COPY_STRING_FIELD(extname);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static AlterExtensionContentsStmt *
-_copyAlterExtensionContentsStmt(const AlterExtensionContentsStmt *from)
-{
-	AlterExtensionContentsStmt *newnode = makeNode(AlterExtensionContentsStmt);
-
-	COPY_STRING_FIELD(extname);
-	COPY_SCALAR_FIELD(action);
-	COPY_SCALAR_FIELD(objtype);
-	COPY_NODE_FIELD(object);
 
 	return newnode;
 }
@@ -4094,29 +3998,17 @@ copyObjectImpl(const void *from)
 		case T_CreateStatsStmt:
 			retval = _copyCreateStatsStmt(from);
 			break;
-		case T_AlterStatsStmt:
-			retval = _copyAlterStatsStmt(from);
-			break;
 		case T_CreateFunctionStmt:
 			retval = _copyCreateFunctionStmt(from);
 			break;
 		case T_FunctionParameter:
 			retval = _copyFunctionParameter(from);
 			break;
-		case T_AlterFunctionStmt:
-			retval = _copyAlterFunctionStmt(from);
-			break;
 		case T_DoStmt:
 			retval = _copyDoStmt(from);
 			break;
-		case T_AlterObjectDependsStmt:
-			retval = _copyAlterObjectDependsStmt(from);
-			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);
-			break;
-		case T_AlterOperatorStmt:
-			retval = _copyAlterOperatorStmt(from);
 			break;
 		case T_AlterTypeStmt:
 			retval = _copyAlterTypeStmt(from);
@@ -4157,14 +4049,8 @@ copyObjectImpl(const void *from)
 		case T_CreateOpFamilyStmt:
 			retval = _copyCreateOpFamilyStmt(from);
 			break;
-		case T_AlterOpFamilyStmt:
-			retval = _copyAlterOpFamilyStmt(from);
-			break;
 		case T_CreatedbStmt:
 			retval = _copyCreatedbStmt(from);
-			break;
-		case T_AlterDatabaseStmt:
-			retval = _copyAlterDatabaseStmt(from);
 			break;
 		case T_DropdbStmt:
 			retval = _copyDropdbStmt(from);
@@ -4201,12 +4087,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _copyCreateExtensionStmt(from);
-			break;
-		case T_AlterExtensionStmt:
-			retval = _copyAlterExtensionStmt(from);
-			break;
-		case T_AlterExtensionContentsStmt:
-			retval = _copyAlterExtensionContentsStmt(from);
 			break;
 		case T_CreateTransformStmt:
 			retval = _copyCreateTransformStmt(from);
