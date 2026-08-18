@@ -54,7 +54,6 @@
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "tcop/utility.h"
-#include "utils/acl.h"
 #include "utils/backend_status.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -1679,41 +1678,18 @@ ExecBuildSlotValueDescription(Oid reloid,
 							  int maxfieldlen)
 {
 	StringInfoData buf;
-	StringInfoData collist;
 	bool		write_comma = false;
-	bool		write_comma_collist = false;
 	int			i;
-	AclResult	aclresult;
-	bool		table_perm = false;
-	bool		any_perm = false;
 
 	initStringInfo(&buf);
 
 	appendStringInfoChar(&buf, '(');
-
-	/*
-	 * Check if the user has permissions to see the row.  Table-level SELECT
-	 * allows access to all columns.  If the user does not have table-level
-	 * SELECT then we check each column and include those the user has SELECT
-	 * rights on.  Additionally, we always include columns the user provided
-	 * data for.
-	 */
-	aclresult = ACLCHECK_OK;
-	if (aclresult != ACLCHECK_OK)
-	{
-		/* Set up the buffer for the column list */
-		initStringInfo(&collist);
-		appendStringInfoChar(&collist, '(');
-	}
-	else
-		table_perm = any_perm = true;
 
 	/* Make sure the tuple is fully deconstructed */
 	slot_getallattrs(slot);
 
 	for (i = 0; i < tupdesc->natts; i++)
 	{
-		bool		column_perm = false;
 		char	   *val;
 		int			vallen;
 		Form_pg_attribute att = TupleDescAttr(tupdesc, i);
@@ -1722,74 +1698,36 @@ ExecBuildSlotValueDescription(Oid reloid,
 		if (att->attisdropped)
 			continue;
 
-		if (!table_perm)
+		if (slot->tts_isnull[i])
+			val = "null";
+		else
 		{
-			/*
-			 * No table-level SELECT, so need to make sure they either have
-			 * SELECT rights on the column or that they have provided the data
-			 * for the column.  If not, omit this column from the error
-			 * message.
-			 */
-			aclresult = ACLCHECK_OK;
-			if (bms_is_member(att->attnum - FirstLowInvalidHeapAttributeNumber,
-							  modifiedCols) || aclresult == ACLCHECK_OK)
-			{
-				column_perm = any_perm = true;
+			Oid			foutoid;
+			bool		typisvarlena;
 
-				if (write_comma_collist)
-					appendStringInfoString(&collist, ", ");
-				else
-					write_comma_collist = true;
-
-				appendStringInfoString(&collist, NameStr(att->attname));
-			}
+			getTypeOutputInfo(att->atttypid,
+							  &foutoid, &typisvarlena);
+			val = OidOutputFunctionCall(foutoid, slot->tts_values[i]);
 		}
 
-		if (table_perm || column_perm)
+		if (write_comma)
+			appendStringInfoString(&buf, ", ");
+		else
+			write_comma = true;
+
+		/* truncate if needed */
+		vallen = strlen(val);
+		if (vallen <= maxfieldlen)
+			appendBinaryStringInfo(&buf, val, vallen);
+		else
 		{
-			if (slot->tts_isnull[i])
-				val = "null";
-			else
-			{
-				Oid			foutoid;
-				bool		typisvarlena;
-
-				getTypeOutputInfo(att->atttypid,
-								  &foutoid, &typisvarlena);
-				val = OidOutputFunctionCall(foutoid, slot->tts_values[i]);
-			}
-
-			if (write_comma)
-				appendStringInfoString(&buf, ", ");
-			else
-				write_comma = true;
-
-			/* truncate if needed */
-			vallen = strlen(val);
-			if (vallen <= maxfieldlen)
-				appendBinaryStringInfo(&buf, val, vallen);
-			else
-			{
-				vallen = pg_mbcliplen(val, vallen, maxfieldlen);
-				appendBinaryStringInfo(&buf, val, vallen);
-				appendStringInfoString(&buf, "...");
-			}
+			vallen = pg_mbcliplen(val, vallen, maxfieldlen);
+			appendBinaryStringInfo(&buf, val, vallen);
+			appendStringInfoString(&buf, "...");
 		}
 	}
-
-	/* If we end up with zero columns being returned, then return NULL. */
-	if (!any_perm)
-		return NULL;
 
 	appendStringInfoChar(&buf, ')');
-
-	if (!table_perm)
-	{
-		appendStringInfoString(&collist, ") = ");
-		appendBinaryStringInfo(&collist, buf.data, buf.len);
-
-		return collist.data;
-	}
 
 	return buf.data;
 }

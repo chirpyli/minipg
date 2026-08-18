@@ -59,7 +59,6 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
-#include "utils/acl.h"
 #include "utils/attoptcache.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"

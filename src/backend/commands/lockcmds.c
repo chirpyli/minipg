@@ -24,7 +24,6 @@
 #include "parser/parse_clause.h"
 #include "rewrite/rewriteHandler.h"
 #include "storage/lmgr.h"
-#include "utils/acl.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 

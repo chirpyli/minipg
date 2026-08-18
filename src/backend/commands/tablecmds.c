@@ -76,7 +76,6 @@
 #include "storage/predicate.h"
 #include "storage/smgr.h"
 #include "tcop/utility.h"
-#include "utils/acl.h"
 
 /*
  * AT_REWRITE_* flags for tab->rewrite, previously defined in event_trigger.h.

@@ -32,7 +32,6 @@
 #include "miscadmin.h"
 #include "parser/parse_type.h"
 #include "parser/scansup.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/regproc.h"

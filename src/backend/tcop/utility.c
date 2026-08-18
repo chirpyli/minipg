@@ -54,7 +54,6 @@
 #include "storage/fd.h"
 #include "tcop/pquery.h"
 #include "tcop/utility.h"
-#include "utils/acl.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"

@@ -27,7 +27,6 @@
 #include "common/hashfn.h"
 #include "miscadmin.h"
 #include "parser/parse_type.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/resowner_private.h"

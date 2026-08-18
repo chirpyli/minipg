@@ -29,7 +29,6 @@
 #include "parser/parse_utilcmd.h"
 #include "parser/scansup.h"
 #include "tcop/utility.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"

@@ -26,7 +26,6 @@
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_coerce.h"
 #include "pgstat.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"

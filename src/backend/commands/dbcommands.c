@@ -53,7 +53,6 @@
 #include "storage/md.h"
 #include "storage/procarray.h"
 #include "storage/smgr.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/pg_locale.h"

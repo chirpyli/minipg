@@ -25,7 +25,6 @@
 #include "commands/variable.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"

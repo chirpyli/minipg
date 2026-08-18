@@ -73,7 +73,6 @@
 #include "storage/fd.h"
 #include "storage/lmgr.h"
 #include "storage/standby.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/guc.h"

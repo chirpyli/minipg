@@ -28,7 +28,6 @@
 #include "port/pg_bswap.h"
 #include "tcop/fastpath.h"
 #include "tcop/tcopprot.h"
-#include "utils/acl.h"
 #include "utils/lsyscache.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"

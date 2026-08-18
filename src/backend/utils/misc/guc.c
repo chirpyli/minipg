@@ -74,7 +74,6 @@
 #include "storage/proc.h"
 #include "storage/standby.h"
 #include "tcop/tcopprot.h"
-#include "utils/acl.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/bytea.h"

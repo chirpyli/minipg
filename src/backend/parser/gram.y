@@ -346,7 +346,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				name_list role_list from_clause from_list opt_array_bounds
 				qualified_name_list any_name any_name_list type_name_list
 				any_operator expr_list attrs
-				distinct_clause opt_distinct_clause
+				distinct_clause
 				target_list opt_target_list insert_column_list set_target_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
@@ -405,15 +405,12 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				select_fetch_first_value I_or_F_const
 %type <ival>	row_or_rows first_or_next
 
-%type <list>	OptSeqOptList SeqOptList OptParenthesizedSeqOptList
-%type <defelt>	SeqOptElem
-
 %type <istmt>	insert_rest
 %type <infer>	opt_conf_expr
 %type <onconflict> opt_on_conflict
 
 %type <vsetstmt> generic_set set_rest set_rest_more generic_reset reset_rest
-				 SetResetClause FunctionSetResetClause
+				 FunctionSetResetClause
 
 %type <node>	TableElement TypedTableElement ConstraintElem TableFuncElement
 %type <node>	columnDef columnOptions
@@ -432,7 +429,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	when_clause_list
 %type <ival>	sub_type
 %type <value>	NumericOnly
-%type <list>	NumericOnly_list
 %type <alias>	alias_clause opt_alias_clause opt_alias_clause_for_join_using
 %type <list>	func_alias_clause
 %type <sortby>	sortby
@@ -1193,13 +1189,7 @@ generic_reset:
 				}
 		;
 
-/* SetResetClause allows SET or RESET without LOCAL */
-SetResetClause:
-			SET set_rest					{ $$ = $2; }
-			| VariableResetStmt				{ $$ = (VariableSetStmt *) $1; }
-		;
-
-/* SetResetClause allows SET or RESET without LOCAL */
+/* FunctionSetResetClause allows SET or RESET without LOCAL */
 FunctionSetResetClause:
 			SET set_rest_more				{ $$ = $2; }
 			| VariableResetStmt				{ $$ = (VariableSetStmt *) $1; }
@@ -2622,84 +2612,6 @@ AlterStatsStmt:
 			;
 
 
-/*****************************************************************************
- *
- *		QUERY :
- *				CREATE SEQUENCE seqname
- *				ALTER SEQUENCE seqname
- *
- *****************************************************************************/
-
-OptSeqOptList: SeqOptList							{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-OptParenthesizedSeqOptList: '(' SeqOptList ')'		{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-SeqOptList: SeqOptElem								{ $$ = list_make1($1); }
-			| SeqOptList SeqOptElem					{ $$ = lappend($1, $2); }
-		;
-
-SeqOptElem: AS SimpleTypename
-				{
-					$$ = makeDefElem("as", (Node *)$2, @1);
-				}
-			| CACHE NumericOnly
-				{
-					$$ = makeDefElem("cache", (Node *)$2, @1);
-				}
-			| CYCLE
-				{
-					$$ = makeDefElem("cycle", (Node *)makeInteger(true), @1);
-				}
-			| NO CYCLE
-				{
-					$$ = makeDefElem("cycle", (Node *)makeInteger(false), @1);
-				}
-			| INCREMENT opt_by NumericOnly
-				{
-					$$ = makeDefElem("increment", (Node *)$3, @1);
-				}
-			| MAXVALUE NumericOnly
-				{
-					$$ = makeDefElem("maxvalue", (Node *)$2, @1);
-				}
-			| MINVALUE NumericOnly
-				{
-					$$ = makeDefElem("minvalue", (Node *)$2, @1);
-				}
-			| NO MAXVALUE
-				{
-					$$ = makeDefElem("maxvalue", NULL, @1);
-				}
-			| NO MINVALUE
-				{
-					$$ = makeDefElem("minvalue", NULL, @1);
-				}
-			| OWNED BY any_name
-				{
-					$$ = makeDefElem("owned_by", (Node *)$3, @1);
-				}
-			| START opt_with NumericOnly
-				{
-					$$ = makeDefElem("start", (Node *)$3, @1);
-				}
-			| RESTART
-				{
-					$$ = makeDefElem("restart", NULL, @1);
-				}
-			| RESTART opt_with NumericOnly
-				{
-					$$ = makeDefElem("restart", (Node *)$3, @1);
-				}
-		;
-
-opt_by:		BY
-			| /* EMPTY */
-	  ;
-
 NumericOnly:
 			FCONST								{ $$ = makeFloat($1); }
 			| '+' FCONST						{ $$ = makeFloat($2); }
@@ -2709,10 +2621,6 @@ NumericOnly:
 					doNegateFloat($$);
 				}
 			| SignedIconst						{ $$ = makeInteger($1); }
-		;
-
-NumericOnly_list:	NumericOnly						{ $$ = list_make1($1); }
-				| NumericOnly_list ',' NumericOnly	{ $$ = lappend($1, $3); }
 		;
 
 /* This ought to be just func_name, but that causes reduce/reduce conflicts
@@ -6153,13 +6061,6 @@ opt_as:		AS
 		;
 
 
-
-/* Use this if TIME or ORDINALITY after WITH should be taken as an identifier */
-any_with:	WITH
-			| WITH_LA
-		;
-
-
 /*****************************************************************************
  *
  * Manipulate a conversion
@@ -7057,11 +6958,6 @@ distinct_clause:
 opt_all_clause:
 			ALL
 			| /*EMPTY*/
-		;
-
-opt_distinct_clause:
-			distinct_clause							{ $$ = $1; }
-			| opt_all_clause						{ $$ = NIL; }
 		;
 
 opt_sort_clause:

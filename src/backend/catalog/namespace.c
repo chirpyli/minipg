@@ -43,7 +43,6 @@
 #include "storage/ipc.h"
 #include "storage/lmgr.h"
 #include "storage/sinvaladt.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/catcache.h"
 #include "utils/guc.h"

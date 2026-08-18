@@ -22,7 +22,6 @@
 #include "commands/tablespace.h"
 #include "miscadmin.h"
 #include "storage/fd.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/numeric.h"
 #include "utils/rel.h"

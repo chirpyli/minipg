@@ -66,7 +66,6 @@
 #include "pgstat.h"
 #include "tcop/pquery.h"
 #include "tcop/utility.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/guc.h"

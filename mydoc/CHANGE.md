@@ -428,6 +428,88 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
 
 ---
 
+## 十三、acl.h 头文件死宏清理（2026-08-18，ACL 裁剪收尾）
+
+此前 ACL 全链路裁剪（08-15 删判定、08-17 删 `aclcheck_error*` 调用壳与 `aclchk.c`、08-18 删角色骨架）后，`src/include/utils/acl.h` 仍残留大量**已无定义支撑的悬空宏**——这些宏依赖早已删除的权限位常量（`ACL_SELECT`/`ACL_INSERT`/`ACL_USAGE`/`ACL_CREATE` 等），任何代码展开它们都会报 `undeclared` 错误，属纯死代码。本轮按"彻底裁剪、不留死代码"清理：
+
+- **删除悬空宏（原 24~58 行）**：`ACL_ID_PUBLIC`、`ACLITEMOID`（aclitem 类型 OID 1033，类型已从 `pg_type.dat` 删除）、`ACLITEM_ALL_GRANTEES`、位运算宏 `ACL_GRANT_OPTION_FOR`/`ACL_OPTION_IS_GLOBAL`/`ACL_GRANT_WGO`、以及 14 个 `ACL_ALL_RIGHTS_*` 组合宏（RELATION/SEQUENCE/DATABASE/FDW/FOREIGN_SERVER/FUNCTION/LANGUAGE/LARGEOBJECT/NAMESPACE/OPSCHEMA/TYPE/OPCLASS/OPFAMILY/SCHEMA）。上述宏全部引用已裁的权限位常量，全代码库 `grep` 零引用，确认无调用点。
+- **删除不再需要的 include**：`nodes/parsenodes.h` 与 `parser/parse_node.h`（原仅为 `GrantStmt`/`ParseState` 等授权语法节点服务，授权语法已裁、acl.h 内已无任何 parsenodes 引用）；`access/htup.h`/`utils/snapshot.h` 因 acl.h 现已不含任何结构体定义亦不再直接需要，一并移除，使头文件自包含无 unused-include 告警。保留 `#ifndef ACL_H`/`#define ACL_H` 守卫。
+- **保留**：`AclResult` 枚举（`ACLCHECK_OK`/`ACLCHECK_NO_PRIV`/`ACLCHECK_NOT_OWNER`）——仍被 `execMain.c`/`genam.c` 的 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK)` 恒假死壳引用，需保留类型定义以通过编译。并补一段中文注释说明 minipg 已裁对象级 ACL、仅保留结果码。
+
+- **修订旧记录**：此前（2026-08-17 续「aclchk.c 调用壳删除」条目）称「acl.h 其余 ACL 位宏等保留（被 pg_proc、GRANT/REVOKE 声明等引用）」——经本轮核查，GRANT/REVOKE 语法与 pg_proc 中相关 ACL 逻辑均已删，这些宏实际无任何引用方，故由"保留"改为"彻底删除"，与 AGENTS「彻底裁剪、不留死代码」原则一致。
+
+- **验证**：`make -j4` 全量编译 + `make install` 成功；`make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），无任何 failure。全代码库 `grep ACL_ID_PUBLIC|ACLITEMOID|ACL_ALL_RIGHTS_|ACL_GRANT` 0 命中。与不可裁部分（btree/hash 索引、事务）零耦合：仅清头文件死宏，不改任何索引/事务机制。
+
+---
+
+## 十四、acl.h 整文件删除（2026-08-18，ACL 裁剪最终收尾）
+
+接第十三步后，`acl.h` 已退化到仅含 `AclResult` 枚举（且唯一引用方 `execMain.c`/`genam.c` 用它写的权限检查是恒真死壳）。为彻底消除该头文件及其残余依赖，本轮将其整文件删除：
+
+- **删除 acl.h 对 `AclResult` 的两处死壳引用，再删文件**：
+  1. `src/backend/executor/execMain.c` 的 `ExecBuildSlotValueDescription` 函数：原权限检查 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK)` 恒为真分支走 `table_perm = any_perm = true`，且死分支引用了 `collist`/`write_comma_collist`/`column_perm` 等废弃变量。删除 `AclResult aclresult`、`table_perm`/`any_perm`/`collist` 变量与全部 `!table_perm`/`!any_perm` 死分支，函数逻辑等价简化为「直接拼接所有非 dropped 列」；同步删 `#include "utils/acl.h"`。
+  2. `src/backend/access/index/genam.c` 的 `BuildIndexValueDescription` 函数：原 `aclresult = ACLCHECK_OK; if (aclresult != ACLCHECK_OK)` 恒为假分支（遍历 index key columns、遇 expression 列 `return NULL`）永不执行。删除 `AclResult aclresult`、`keyno` 变量与整个 if 块；同步删 `#include "utils/acl.h"`。
+  3. `git rm src/include/utils/acl.h`，回收 `#ifndef ACL_H` 守卫与仅存的 `AclResult` 枚举定义。
+- **清理 54 个冗余 include**：全代码库另有 54 个文件（catalog/namespace.c、heap.c、pg_proc.c、pg_type.c、dependency.c、objectaddress.c、commands/*、rewrite/*、tcop/*、utils/adt/acl.c、utils/misc/guc.c、src/include/catalog/pg_namespace.h 等）仍 `#include "utils/acl.h"`，但 acl.h 删除前已不依赖其中任何符号（全代码库 `grep AclResult|ACLCHECK_` 除 acl.h 自身外 0 命中），属历史残留冗余 include。用 `sed -i '/#include "utils\/acl.h"/d'` 精确删除这 54 行，避免删文件后编译报 "acl.h: No such file"。其中 `src/backend/utils/adt/acl.c` 现已被裁到不含任何 ACL 符号，仅剩空壳 include，一并清理。
+- **修订旧记录**：第十三步结论称「保留 `AclResult` 枚举」——本轮将死壳逻辑一并删除后，`AclResult` 再无引用方，故由"保留"改为"整文件删除"，与 AGENTS「彻底裁剪、不留死代码」原则最终对齐。
+- **验证**：`make -j4` 全量编译 + `make install` 成功；`make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。全代码库 `grep -rl '#include "utils/acl.h"'` 0 命中、`grep 'AclResult'` 0 命中（仅 acl.h 本体，已删除）。与不可裁部分（btree/hash 索引、事务）零耦合：仅删头文件与两处恒真权限检查死壳，未触及任何索引/事务机制；`BuildIndexValueDescription`/`ExecBuildSlotValueDescription` 行为在 minipg 恒为"全部可见"语义下完全不变。
+
+---
+
+## 十五、gram.y 删除 SetResetClause 死规则（2026-08-18）
+
+分析 `src/backend/parser/gram.y` 中 `SetResetClause` 与 `FunctionSetResetClause` 两规则（原 1196-1207 行）：
+- `SetResetClause`：在 PG 上游被 `CreateOpClassStmt`/`CreateOpFamilyStmt` 的 STORAGE 子句等引用，但 minipg 已裁剪这些语句，导致该规则**在全文件中无任何引用方**（仅出现在定义处与 `%type` 声明），属语法死代码；且其上方注释 `/* SetResetClause allows SET or RESET without LOCAL */` 是复制粘贴错误（贴在 `FunctionSetResetClause` 上）。
+- `FunctionSetResetClause`：被 `createfunc_opt_list`（`CREATE FUNCTION ... SET var=val | RESET var` 函数配置子句）引用，`CreateFunctionStmt` 在 minipg 仍为保留的核心 DDL，**不可裁**。
+
+本轮裁剪仅删除死规则：
+- 删除 `SetResetClause` 规则定义（原 1196-1200 行）。
+- 从 `%type <vsetstmt>` 声明（416 行）移除 `SetResetClause` 标记。
+- 修正误写注释：原 1202 行 `/* SetResetClause ... */` 改为 `/* FunctionSetResetClause allows SET or RESET without LOCAL */`。
+- 保留 `FunctionSetResetClause` 规则不动。
+
+- **验证**：`make -j4` 触发 bison 重新生成 `gram.c`（生成产物 `grep SetResetClause` 0 命中）+ `make install` 成功；`make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。与不可裁部分（btree/hash 索引、事务）零耦合：仅删语法死规则、不改任何运行时逻辑。
+
+---
+
+## 十六、gram.y 删除 CREATE/ALTER SEQUENCE 死语法链（2026-08-18）
+
+分析 `src/backend/parser/gram.y` 中序列 DDL 语法：minipg **顶层 `CreateSeqStmt`/`AlterSeqStmt` 规则此前已被彻底删除**（全文件无此节点、无 `CREATE SEQUENCE`/`ALTER SEQUENCE` 入口；且无 `SERIAL`/`serial` 关键字，无 serial 隐式建序列途径），但遗留了一整条无引用方的悬空语法子链与过时注释块：
+
+- 删除 2619-2692 行的过时注释块（`QUERY: CREATE SEQUENCE seqname / ALTER SEQUENCE seqname`，其指向的规则已不存在）与死语法链：`OptParenthesizedSeqOptList` → `SeqOptList` → `SeqOptElem` → `opt_by`。这些规则在全文中无任何上层调用方（仅存在于定义处），属纯死语法。
+- 从 `%type` 声明（408-409 行）删除 `SeqOptList OptParenthesizedSeqOptList` 与 `SeqOptElem` 标记。
+- **保留**活跃依赖：`NumericOnly`（2694-2703，被 16 处核心语法如 COST/ROWS、c_expr、generic_set 引用）、`opt_with`（被 CREATE EXTENSION/DATABASE、DROP DATABASE 等活跃规则引用）、`SEQUENCE`/`SEQUENCES` 关键字 token（保留无害，避免影响向后兼容）。（注：当时误判 `NumericOnly_list` 为活跃，后于第十九步验证其为无用死语法并删除。）
+
+- **说明**：本次仅裁语法死代码。运行期序列函数（`nextval`/`currval`/`lastval`、`NextValueExpr`）在 minipg 仍保留并在 regress 测试中使用——但因 CREATE SEQUENCE 顶层规则已无，minipg 当前无任何途径创建序列对象（DDL 入口缺失），序列整体功能对内核学习价值低（非 btree/hash 索引、非事务核心），符合 AGENTS「学习价值低优先裁剪」原则。本次未裁运行期函数，仅清理已无人引用的语法残骸。
+- **验证**：`make -j4` 触发 bison 重生成 `gram.c`（`grep SeqOptList|SeqOptElem|OptParenthesizedSeqOptList` 0 命中）+ `make install` 成功；`make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。全代码库 `grep SeqOptList|SeqOptElem|OptParenthesizedSeqOptList|opt_by` 0 命中。与不可裁部分（btree/hash 索引、事务）零耦合：仅删语法死链，未改任何运行时/索引/事务逻辑。
+
+---
+
+## 十七、删除空壳 acl.c（2026-08-18，ACL 裁剪最终收尾）
+
+接第十四步（删 acl.h 头文件）后，`src/backend/utils/adt/acl.c` 已成为纯空壳：仅 41 行版权头 + 22 个 include（access/htup_details.h、catalog/*、commands/*、utils/* 等），**无任何函数实现**（ACL 判定/aclchk 逻辑此前已被逐步裁空）。它是无符号、无调用方的死文件。
+
+- **删除文件**：`git rm src/backend/utils/adt/acl.c`。
+- **同步 Makefile**：从 `src/backend/utils/adt/Makefile` 的 `OBJS` 列表（原 15 行 `acl.o \`）移除 `acl.o`，否则编译报 "No rule to make target `acl.o`"。
+- **刷新构建产物**：删除残留旧对象文件 `src/backend/utils/adt/acl.o` 与自动生成的 `objfiles.txt`，强制重编 adt 目录，使 `objfiles.txt` 不再含 `acl.o`（避免链接阶段引用已不存在的 .o）。
+- **验证**：`make -j4` 全量编译（adt 目录 objfiles.txt 重生成后无 acl.o）+ `make install` 成功；`make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。全代码库 `grep 'acl\.o'` 仅余构建产物无关引用（objfiles.txt 已无）；`git status` 确认 acl.c 已删。与不可裁部分（btree/hash 索引、事务）零耦合：仅删空壳 .c 文件与 Makefile 条目，未触及任何索引/事务机制。
+
+---
+
+## 十八、小结：minipg ACL/权限系统裁剪全景（2026-08-18）
+
+截至本日，minipg 权限系统已全链路彻底裁剪（按 AGENTS「彻底裁剪、不留死代码」原则），收尾动作序列：
+1. **aclchk.c 调用壳删除 + pg_proc.dat 清理**（08-15 起）：删 `pg_class_aclmask`/`pg_attribute_aclmask` 等判定函数及其 pg_proc 注册。
+2. **角色骨架裁剪**（08-18）：`regrole` 类型、OBJECT_ROLE/OCLASS_ROLE 枚举、authrole 字段、AUTHORIZATION 语法彻底删除（pg_proc/pg_type/pg_cast.dat 同步清理）。
+3. **acl.h 头文件死宏清理**（08-18 十三步）：删所有依赖已删权限位常量的悬空宏。
+4. **acl.h 整文件删除**（08-18 十四步）：删 AclResult 死壳引用 + 54 个冗余 include + 文件本体。
+5. **空壳 acl.c 删除**（08-18 十七步）：删空壳文件 + Makefile OBJS 条目 + 刷新 objfiles.txt。
+6. **gram.y 死语法链**（08-18 十五/十六步）：删 SetResetClause 死规则、删 CREATE/ALTER SEQUENCE 悬空语法链。
+
+结论：minipg 已无对象级 ACL 位权限系统，仅保留所有者检查（ownercheck）语义；运行期 `nextval`/`currval` 等序列函数仍留用但序列对象无 DDL 创建途径。与不可裁核心（btree/hash 索引、事务）零耦合。
+
+---
+
 ## 十三、窗口函数（Window Function）彻底裁剪（2026-08-17）
 
 窗口函数（OVER 子句、WINDOW 子句、帧子句，以及内置窗口函数 row_number/rank/dense_rank/percent_rank/cume_dist/ntile/lag/lead/first_value/last_value/nth_value）属 SQL 高级特性，非数据库内核核心（btree/hash 索引、事务、聚合 agg 机制均不依赖），学习价值低于执行器基础框架，适合裁剪。采用「自底向上、由叶到根」彻底删除策略，删除后用户使用窗口函数将在语法/解析阶段被拒绝，而非静默忽略。改动文件与要点：
@@ -482,3 +564,19 @@ minipg 早期（2026-08-02）已在构建层删除 `--with-gssapi` 选项及 `co
   - 聚合（agg）、tuplestore（agg 游标依赖）、事务、btree/hash 索引机制完全不受影响。
 - **验证**：`make -j4` 全量编译（含 backend/adt/optimizer/parser/nodes/rewrite 全部子目录）+ postgres 链接成功（0 error / 0 undefined reference）；全代码库 `grep WindowFunc|WindowAgg|WindowDef|WindowClause|...` 0 命中残留引用。与不可裁部分（btree/hash 索引、事务）零耦合：仅删窗口执行/解析/优化链路，聚合与事务机制均不受影响。
 - **注意**：本次裁剪与 minipg 既有 `initdb` 崩溃（syscache cacheinfo[]/syscache.h 枚举不对齐，见 2026-08-14 记忆）无关——已用干净 HEAD 构建独立验证，纯净 HEAD 同样在 post-bootstrap 阶段 segfault，故无法在此环境跑完整回归；以单文件/全量编译验证为准。
+
+---
+
+## 十九、gram.y 消除 bison useless nonterminal/rule 警告（2026-08-18）
+
+`make` 编译期 bison 报 3 个非终结符无用、6 条规则无用（`-Wother`），定位三个悬空语法：
+- `NumericOnly_list`：定义（原 2627-2629，`NumericOnly_list: NumericOnly | NumericOnly_list ',' NumericOnly`），`%type <list>` 在 432 行。全文无任何上层规则引用（仅定义处出现），属死语法。第十六步曾误判为活跃并保留，本次证实为无用。
+- `any_with`：定义（原 6070-6073，`any_with: WITH | WITH_LA`），无 `%type` 单独声明、无任何引用方，死语法。
+- `opt_distinct_clause`：定义（原 6975-6978，`opt_distinct_clause: distinct_clause | opt_all_clause`），`%type` 在 349 行。注释（原 6853-6858）说明当初为避免 SELECT DISTINCT 与 INSERT...SELECT...ON CONFLICT 的 shift/reduce 冲突，已改为在 SELECT 规则里直接展开 `distinct_clause`，该包装规则因此失去所有引用方，成死语法；`distinct_clause` 本身仍被 SELECT 活跃引用，不受影响。
+
+裁剪动作：
+- 删除 `NumericOnly_list` 定义（含尾随 `;`）与 `%type <list> NumericOnly_list` 声明。
+- 删除 `any_with` 定义及上方注释块。
+- 删除 `opt_distinct_clause` 定义与 `%type` 中 `opt_distinct_clause` 标记（保留 `distinct_clause`）。
+
+- **验证**：`make -j4` 触发 bison 重生成 `gram.c`，原 3 个 useless nonterminal / 6 条 useless rule 警告**全部消除**（编译 EXIT=0）；剩余仅一条无关的 `selfuncs.c:5446` 未用变量警告（非本次引入、非编译错误）。`make install` + `make check-world` 全绿（regress 全部 tests passed，isolation/bin 同步通过），零 failure。全代码库 `grep NumericOnly_list|any_with|opt_distinct_clause` 仅余 6848 行历史设计注释提及（非代码引用）。与不可裁部分（btree/hash 索引、事务）零耦合：仅删语法死规则，未改任何运行时/索引/事务逻辑。

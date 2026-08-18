@@ -48,7 +48,6 @@
 #include "commands/typecmds.h"
 #include "miscadmin.h"
 #include "storage/lmgr.h"
-#include "utils/acl.h"
 #include "utils/fmgroids.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
