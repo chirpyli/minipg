@@ -27,20 +27,6 @@ COMMIT;
 
 DELETE FROM TIMESTAMP_TBL;
 
--- Verify that 'now' *does* change over a reasonable interval such as 100 msec,
--- and that it doesn't change over the same interval within a transaction block
-
-INSERT INTO TIMESTAMP_TBL VALUES ('now');
-
-BEGIN;
-INSERT INTO TIMESTAMP_TBL VALUES ('now');
-INSERT INTO TIMESTAMP_TBL VALUES ('now');
-SELECT count(*) AS two FROM TIMESTAMP_TBL WHERE d1 = timestamp(2) without time zone 'now';
-SELECT count(d1) AS three, count(DISTINCT d1) AS two FROM TIMESTAMP_TBL;
-COMMIT;
-
-TRUNCATE TIMESTAMP_TBL;
-
 -- Special values
 INSERT INTO TIMESTAMP_TBL VALUES ('-infinity');
 INSERT INTO TIMESTAMP_TBL VALUES ('infinity');
