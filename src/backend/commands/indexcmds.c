@@ -119,7 +119,7 @@ struct ReindexIndexCallbackState
  * 'attributeList': a list of IndexElem specifying columns and expressions
  *		to index on.
  * 'exclusionOpNames': list of names of exclusion-constraint operators,
- *		or NIL if not an exclusion constraint.
+ *		or NIL (always NIL; EXCLUDE constraints are not supported).
  *
  * This is tailored to the needs of ALTER TABLE ALTER TYPE, which recreates
  * any indexes that depended on a changing column from their pg_get_indexdef
@@ -136,11 +136,11 @@ struct ReindexIndexCallbackState
  * checked by this function, for them it's enough that table rewrite is
  * skipped.
  *
- * When a comparison or exclusion operator has a polymorphic input type, the
- * actual input types must also match.  This defends against the possibility
- * that operators could vary behavior in response to get_fn_expr_argtype().
- * At present, this hazard is theoretical: check_exclusion_constraint() and
- * all core index access methods decline to set fn_expr for such calls.
+ * When a comparison operator has a polymorphic input type, the actual input
+ * types must also match.  This defends against the possibility that
+ * operators could vary behavior in response to get_fn_expr_argtype().
+ * At present, this hazard is theoretical: all core index access methods
+ * decline to set fn_expr for such calls.
  *
  * We do not yet implement a test to verify compatibility of expression
  * columns or predicates, so assume any such index is incompatible.
@@ -285,36 +285,6 @@ CheckIndexCompatible(Oid oldId,
 
 		if (opclassOptions)
 			pfree(opclassOptions);
-	}
-
-	/* Any change in exclusion operator selections breaks compatibility. */
-	if (ret && indexInfo->ii_ExclusionOps != NULL)
-	{
-		Oid		   *old_operators,
-				   *old_procs;
-		uint16	   *old_strats;
-
-		RelationGetExclusionInfo(irel, &old_operators, &old_procs, &old_strats);
-		ret = memcmp(old_operators, indexInfo->ii_ExclusionOps,
-					 old_natts * sizeof(Oid)) == 0;
-
-		/* Require an exact input type match for polymorphic operators. */
-		if (ret)
-		{
-			for (i = 0; i < old_natts && ret; i++)
-			{
-				Oid			left,
-							right;
-
-				op_input_types(indexInfo->ii_ExclusionOps[i], &left, &right);
-				if ((IsPolymorphicType(left) || IsPolymorphicType(right)) &&
-					TupleDescAttr(irel->rd_att, i)->atttypid != typeObjectId[i])
-				{
-					ret = false;
-					break;
-				}
-			}
-		}
 	}
 
 	index_close(irel, NoLock);
@@ -682,11 +652,6 @@ DefineIndex(Oid relationId,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("cannot create index on partitioned table \"%s\" concurrently",
 							RelationGetRelationName(rel))));
-		if (stmt->excludeOpNames)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot create exclusion constraints on partitioned table \"%s\"",
-							RelationGetRelationName(rel))));
 	}
 
 	/*
@@ -748,7 +713,7 @@ DefineIndex(Oid relationId,
 		indexRelationName = ChooseIndexName(RelationGetRelationName(rel),
 											namespaceId,
 											indexColNames,
-											stmt->excludeOpNames,
+											NIL,
 											stmt->primary,
 											stmt->isconstraint);
 
@@ -799,12 +764,6 @@ DefineIndex(Oid relationId,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("access method \"%s\" does not support multicolumn indexes",
 						accessMethodName)));
-	if (stmt->excludeOpNames && amRoutine->amgettuple == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("access method \"%s\" does not support exclusion constraints",
-						accessMethodName)));
-
 	amcanorder = amRoutine->amcanorder;
 	amoptions = amRoutine->amoptions;
 
@@ -846,7 +805,7 @@ DefineIndex(Oid relationId,
 	ComputeIndexAttrs(indexInfo,
 					  typeObjectId, collationObjectId, classObjectId,
 					  coloptions, allIndexParams,
-					  stmt->excludeOpNames, relationId,
+					  NIL, relationId,
 					  accessMethodName, accessMethodId,
 					  amcanorder, stmt->isconstraint, root_save_userid,
 					  root_save_sec_context, &root_save_nestlevel);
@@ -918,8 +877,6 @@ DefineIndex(Oid relationId,
 			constraint_type = "PRIMARY KEY";
 		else if (stmt->unique)
 			constraint_type = "UNIQUE";
-		else if (stmt->excludeOpNames != NIL)
-			constraint_type = "EXCLUDE";
 		else
 		{
 			elog(ERROR, "unknown constraint type");
@@ -1287,24 +1244,13 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 				  int ddl_sec_context,
 				  int *ddl_save_nestlevel)
 {
-	ListCell   *nextExclOp;
 	ListCell   *lc;
 	int			attn;
 	int			nkeycols = indexInfo->ii_NumIndexKeyAttrs;
 	Oid			save_userid;
 	int			save_sec_context;
 
-	/* Allocate space for exclusion operator info, if needed */
-	if (exclusionOpNames)
-	{
-		Assert(list_length(exclusionOpNames) == nkeycols);
-		indexInfo->ii_ExclusionOps = (Oid *) palloc(sizeof(Oid) * nkeycols);
-		indexInfo->ii_ExclusionProcs = (Oid *) palloc(sizeof(Oid) * nkeycols);
-		indexInfo->ii_ExclusionStrats = (uint16 *) palloc(sizeof(uint16) * nkeycols);
-		nextExclOp = list_head(exclusionOpNames);
-	}
-	else
-		nextExclOp = NULL;
+	(void) exclusionOpNames;		/* EXCLUDE constraints are not supported */
 
 	if (OidIsValid(ddl_userid))
 		GetUserIdAndSecContext(&save_userid, &save_sec_context);
@@ -1502,84 +1448,6 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 		{
 			SetUserIdAndSecContext(save_userid, save_sec_context);
 			*ddl_save_nestlevel = NewGUCNestLevel();
-		}
-
-		/*
-		 * Identify the exclusion operator, if any.
-		 */
-		if (nextExclOp)
-		{
-			List	   *opname = (List *) lfirst(nextExclOp);
-			Oid			opid;
-			Oid			opfamily;
-			int			strat;
-
-			/*
-			 * Find the operator --- it must accept the column datatype
-			 * without runtime coercion (but binary compatibility is OK).
-			 * Operators contain opaque expressions (specifically, functions).
-			 * compatible_oper_opid() boils down to oper() and
-			 * IsBinaryCoercible().  PostgreSQL would have security problems
-			 * elsewhere if oper() started calling opaque expressions.
-			 */
-			if (OidIsValid(ddl_userid))
-			{
-				AtEOXact_GUC(false, *ddl_save_nestlevel);
-				SetUserIdAndSecContext(ddl_userid, ddl_sec_context);
-			}
-			opid = compatible_oper_opid(opname, atttype, atttype, false);
-			if (OidIsValid(ddl_userid))
-			{
-				SetUserIdAndSecContext(save_userid, save_sec_context);
-				*ddl_save_nestlevel = NewGUCNestLevel();
-			}
-
-			/*
-			 * Only allow commutative operators to be used in exclusion
-			 * constraints. If X conflicts with Y, but Y does not conflict
-			 * with X, bad things will happen.
-			 */
-			if (get_commutator(opid) != opid)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("operator %s is not commutative",
-								format_operator(opid)),
-						 errdetail("Only commutative operators can be used in exclusion constraints.")));
-
-			/*
-			 * Operator must be a member of the right opfamily, too
-			 */
-			opfamily = get_opclass_family(classOidP[attn]);
-			strat = get_op_opfamily_strategy(opid, opfamily);
-			if (strat == 0)
-			{
-				HeapTuple	opftuple;
-				Form_pg_opfamily opfform;
-
-				/*
-				 * attribute->opclass might not explicitly name the opfamily,
-				 * so fetch the name of the selected opfamily for use in the
-				 * error message.
-				 */
-				opftuple = SearchSysCache1(OPFAMILYOID,
-										   ObjectIdGetDatum(opfamily));
-				if (!HeapTupleIsValid(opftuple))
-					elog(ERROR, "cache lookup failed for opfamily %u",
-						 opfamily);
-				opfform = (Form_pg_opfamily) GETSTRUCT(opftuple);
-
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("operator %s is not a member of operator family \"%s\"",
-								format_operator(opid),
-								NameStr(opfform->opfname)),
-						 errdetail("The exclusion operator must be related to the index operator class for the constraint.")));
-			}
-
-			indexInfo->ii_ExclusionOps[attn] = opid;
-			indexInfo->ii_ExclusionProcs[attn] = get_opcode(opid);
-			indexInfo->ii_ExclusionStrats[attn] = strat;
-			nextExclOp = lnext(exclusionOpNames, nextExclOp);
 		}
 
 		/*
@@ -1998,20 +1866,14 @@ ChooseIndexName(const char *tabname, Oid namespaceId,
 {
 	char	   *indexname;
 
+	(void) exclusionOpNames;		/* EXCLUDE constraints are not supported */
+
 	if (primary)
 	{
 		/* the primary key's name does not depend on the specific column(s) */
 		indexname = ChooseRelationName(tabname,
 									   NULL,
 									   "pkey",
-									   namespaceId,
-									   true);
-	}
-	else if (exclusionOpNames != NIL)
-	{
-		indexname = ChooseRelationName(tabname,
-									   ChooseIndexNameAddition(colnames),
-									   "excl",
 									   namespaceId,
 									   true);
 	}
@@ -2801,12 +2663,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 						ereport(WARNING,
 								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								 errmsg("cannot reindex invalid index \"%s.%s\" concurrently, skipping",
-										get_namespace_name(get_rel_namespace(cellOid)),
-										get_rel_name(cellOid))));
-					else if (indexRelation->rd_index->indisexclusion)
-						ereport(WARNING,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("cannot reindex exclusion constraint index \"%s.%s\" concurrently, skipping",
 										get_namespace_name(get_rel_namespace(cellOid)),
 										get_rel_name(cellOid))));
 					else

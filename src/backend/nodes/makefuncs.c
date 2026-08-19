@@ -806,11 +806,6 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 	n->ii_Predicate = predicates;
 	n->ii_PredicateState = NULL;
 
-	/* exclusion constraints */
-	n->ii_ExclusionOps = NULL;
-	n->ii_ExclusionProcs = NULL;
-	n->ii_ExclusionStrats = NULL;
-
 	/* opclass options */
 	n->ii_OpclassOptions = NULL;
 

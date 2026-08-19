@@ -415,10 +415,9 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
 				columnref in_expr having_clause func_table array_expr
-				OptWhereClause operator_def_arg
+				operator_def_arg
 %type <list>	rowsfrom_item rowsfrom_list opt_col_def_list
 %type <boolean> opt_ordinality
-%type <list>	ExclusionConstraintList ExclusionConstraintElem
 %type <list>	func_arg_list func_arg_list_opt
 %type <node>	func_arg_expr
 %type <list>	row explicit_row implicit_row type_list array_expr_list
@@ -2405,25 +2404,6 @@ ConstraintElem:
 								   NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-			| EXCLUDE access_method_clause '(' ExclusionConstraintList ')'
-				opt_c_include opt_definition OptConsTableSpace OptWhereClause
-				ConstraintAttributeSpec
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_EXCLUSION;
-					n->location = @1;
-					n->access_method	= $2;
-					n->exclusions		= $4;
-					n->including		= $6;
-					n->options			= $7;
-					n->indexname		= NULL;
-					n->indexspace		= $8;
-					n->where_clause		= $9;
-					processCASbits($10, @10, "EXCLUDE",
-								   &n->deferrable, &n->initdeferred, NULL,
-								   NULL, yyscanner);
-					$$ = (Node *)n;
-				}
 		;
 
 opt_no_inherit:	NO INHERIT							{  $$ = true; }
@@ -2449,28 +2429,6 @@ columnElem: ColId
 opt_c_include:	INCLUDE '(' columnList ')'			{ $$ = $3; }
 			 |		/* EMPTY */						{ $$ = NIL; }
 			 ;
-
-			 ExclusionConstraintList:
-			ExclusionConstraintElem					{ $$ = list_make1($1); }
-			| ExclusionConstraintList ',' ExclusionConstraintElem
-													{ $$ = lappend($1, $3); }
-		;
-
-ExclusionConstraintElem: index_elem WITH any_operator
-			{
-				$$ = list_make2($1, $3);
-			}
-			/* allow OPERATOR() decoration for the benefit of ruleutils.c */
-			| index_elem WITH OPERATOR '(' any_operator ')'
-			{
-				$$ = list_make2($1, $5);
-			}
-		;
-
-OptWhereClause:
-		WHERE '(' a_expr ')'					{ $$ = $3; }
-		| /*EMPTY*/								{ $$ = NULL; }
-	;
 
 table_access_method_clause:
 			USING name							{ $$ = $2; }
@@ -3803,13 +3761,6 @@ opt_from_in:	from_in
 		;
 
 
-/*****************************************************************************
- *
- * GRANT and REVOKE statements
- *
- *****************************************************************************/
-
-
 
 /*****************************************************************************
  *
@@ -3834,7 +3785,6 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->options = $13;
 					n->tableSpace = $14;
 					n->whereClause = $15;
-					n->excludeOpNames = NIL;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -3863,7 +3813,6 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->options = $16;
 					n->tableSpace = $17;
 					n->whereClause = $18;
-					n->excludeOpNames = NIL;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;

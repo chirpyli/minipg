@@ -69,7 +69,6 @@ CreateConstraintEntry(const char *constraintName,
 					  char foreignUpdateType,
 					  char foreignDeleteType,
 					  char foreignMatchType,
-					  const Oid *exclOp,
 					  Node *conExpr,
 					  const char *conBin,
 					  bool conIsLocal,
@@ -87,7 +86,6 @@ CreateConstraintEntry(const char *constraintName,
 	ArrayType  *conpfeqopArray;
 	ArrayType  *conppeqopArray;
 	ArrayType  *conffeqopArray;
-	ArrayType  *conexclopArray;
 	NameData	cname;
 	int			i;
 	ObjectAddress conobject;
@@ -145,19 +143,6 @@ CreateConstraintEntry(const char *constraintName,
 		conffeqopArray = NULL;
 	}
 
-	if (exclOp != NULL)
-	{
-		Datum	   *opdatums;
-
-		opdatums = (Datum *) palloc(constraintNKeys * sizeof(Datum));
-		for (i = 0; i < constraintNKeys; i++)
-			opdatums[i] = ObjectIdGetDatum(exclOp[i]);
-		conexclopArray = construct_array(opdatums, constraintNKeys,
-										 OIDOID, sizeof(Oid), true, TYPALIGN_INT);
-	}
-	else
-		conexclopArray = NULL;
-
 	/* initialize nulls and values */
 	for (i = 0; i < Natts_pg_constraint; i++)
 	{
@@ -210,11 +195,6 @@ CreateConstraintEntry(const char *constraintName,
 		values[Anum_pg_constraint_conffeqop - 1] = PointerGetDatum(conffeqopArray);
 	else
 		nulls[Anum_pg_constraint_conffeqop - 1] = true;
-
-	if (conexclopArray)
-		values[Anum_pg_constraint_conexclop - 1] = PointerGetDatum(conexclopArray);
-	else
-		nulls[Anum_pg_constraint_conexclop - 1] = true;
 
 	if (conBin)
 		values[Anum_pg_constraint_conbin - 1] = CStringGetTextDatum(conBin);
@@ -347,11 +327,9 @@ CreateConstraintEntry(const char *constraintName,
 	free_object_addresses(addrs_normal);
 
 	/*
-	 * We don't bother to register dependencies on the exclusion operators of
-	 * an exclusion constraint.  We assume they are members of the opclass
-	 * supporting the index, so there's an indirect dependency via that. (This
-	 * would be pretty dicey for cross-type operators, but exclusion operators
-	 * can never be cross-type.)
+	 * We don't register dependencies on the operators of a constraint.  We
+	 * assume they are members of the opclass supporting the index, so there's
+	 * an indirect dependency via that.
 	 */
 
 	if (conExpr != NULL)
@@ -1006,8 +984,7 @@ get_relation_idx_constraint_oid(Oid relationId, Oid indexId)
 
 		/* See above */
 		if (constrForm->contype != CONSTRAINT_PRIMARY &&
-			constrForm->contype != CONSTRAINT_UNIQUE &&
-			constrForm->contype != CONSTRAINT_EXCLUSION)
+			constrForm->contype != CONSTRAINT_UNIQUE)
 			continue;
 
 		if (constrForm->conindid == indexId)

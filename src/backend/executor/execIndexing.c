@@ -44,11 +44,6 @@
  * "duplicate key error" anyway, although you get a different error
  * message.
  *
- * If an exclusion constraint is deferred, we still perform the conflict
- * checking scan immediately after inserting the index tuple.  But instead
- * of throwing an error if a conflict is found, we return that information
- * to the caller.  The caller must re-check them later by calling
- * check_exclusion_constraint().
  *
  * Speculative insertion
  * ---------------------
@@ -132,10 +127,6 @@ static bool check_exclusion_or_unique_constraint(Relation heap, Relation index,
 												 CEOUC_WAIT_MODE waitMode,
 												 bool errorOK,
 												 ItemPointer conflictTid);
-
-static bool index_recheck_constraint(Relation index, Oid *constr_procs,
-									 Datum *existing_values, bool *existing_isnull,
-									 Datum *new_values);
 
 /* ----------------------------------------------------------------
  *		ExecOpenIndices
@@ -419,57 +410,16 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 						 indexInfo);	/* index AM may need this */
 
 		/*
-		 * If the index has an associated exclusion constraint, check that.
-		 * This is simpler than the process for uniqueness checks since we
-		 * always insert first and then check.  If the constraint is deferred,
-		 * we check now anyway, but don't throw error on violation or wait for
-		 * a conclusive outcome from a concurrent insertion; instead we'll
-		 * queue a recheck event.  Similarly, noDupErr callers (speculative
-		 * inserters) will recheck later, and wait for a conclusive outcome
-		 * then.
-		 *
-		 * An index for an exclusion constraint can't also be UNIQUE (not an
-		 * essential property, we just don't allow it in the grammar), so no
-		 * need to preserve the prior state of satisfiesConstraint.
+		 * If the index is a partial index, we may not need to do the
+		 * uniqueness check at all (the tuple may not satisfy the predicate).
 		 */
-		if (indexInfo->ii_ExclusionOps != NULL)
-		{
-			bool		violationOK;
-			CEOUC_WAIT_MODE waitMode;
-
-			if (applyNoDupErr)
-			{
-				violationOK = true;
-				waitMode = CEOUC_LIVELOCK_PREVENTING_WAIT;
-			}
-			else if (!indexRelation->rd_index->indimmediate)
-			{
-				violationOK = true;
-				waitMode = CEOUC_NOWAIT;
-			}
-			else
-			{
-				violationOK = false;
-				waitMode = CEOUC_WAIT;
-			}
-
-			satisfiesConstraint =
-				check_exclusion_or_unique_constraint(heapRelation,
-													 indexRelation, indexInfo,
-													 tupleid, values, isnull,
-													 estate, false,
-													 waitMode, violationOK, NULL);
-		}
-
-		if ((checkUnique == UNIQUE_CHECK_PARTIAL ||
-			 indexInfo->ii_ExclusionOps != NULL) &&
-			!satisfiesConstraint)
+		if (checkUnique == UNIQUE_CHECK_PARTIAL && !satisfiesConstraint)
 		{
 			/*
-			 * The tuple potentially violates the uniqueness or exclusion
-			 * constraint, so make a note of the index so that we can re-check
-			 * it later.  Speculative inserters are told if there was a
-			 * speculative conflict, since that always requires a restart.
+			 * The tuple potentially violates the uniqueness constraint, so
+			 * make a note of the index so that we can re-check it later.
+			 * Speculative inserters are told if there was a speculative
+			 * conflict, since that always requires a restart.
 			 */
 			result = lappend_oid(result, RelationGetRelid(indexRelation));
 			if (indexRelation->rd_index->indimmediate && specConflict)
@@ -548,7 +498,7 @@ ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
 
 		indexInfo = indexInfoArray[i];
 
-		if (!indexInfo->ii_Unique && !indexInfo->ii_ExclusionOps)
+		if (!indexInfo->ii_Unique)
 			continue;
 
 		/* If the index is marked as read-only, ignore it */
@@ -683,16 +633,8 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	TupleTableSlot *existing_slot;
 	TupleTableSlot *save_scantuple;
 
-	if (indexInfo->ii_ExclusionOps)
-	{
-		constr_procs = indexInfo->ii_ExclusionProcs;
-		constr_strats = indexInfo->ii_ExclusionStrats;
-	}
-	else
-	{
-		constr_procs = indexInfo->ii_UniqueProcs;
-		constr_strats = indexInfo->ii_UniqueStrats;
-	}
+	constr_procs = indexInfo->ii_UniqueProcs;
+	constr_strats = indexInfo->ii_UniqueStrats;
 
 	/*
 	 * If any of the input values are NULL, the constraint check is assumed to
@@ -774,18 +716,6 @@ retry:
 		FormIndexDatum(indexInfo, existing_slot, estate,
 					   existing_values, existing_isnull);
 
-		/* If lossy indexscan, must recheck the condition */
-		if (index_scan->xs_recheck)
-		{
-			if (!index_recheck_constraint(index,
-										  constr_procs,
-										  existing_values,
-										  existing_isnull,
-										  values))
-				continue;		/* tuple doesn't actually match, so no
-								 * conflict */
-		}
-
 		/*
 		 * At this point we have either a conflict or a potential conflict.
 		 *
@@ -805,8 +735,7 @@ retry:
 			  DirtySnapshot.speculativeToken &&
 			  TransactionIdPrecedes(GetCurrentTransactionId(), xwait))))
 		{
-			reason_wait = indexInfo->ii_ExclusionOps ?
-				XLTW_RecheckExclusionConstr : XLTW_InsertIndex;
+			reason_wait = XLTW_InsertIndex;
 			index_endscan(index_scan);
 			if (DirtySnapshot.speculativeToken)
 				SpeculativeInsertionWait(DirtySnapshot.xmin,
@@ -871,51 +800,4 @@ retry:
 	ExecDropSingleTupleTableSlot(existing_slot);
 
 	return !conflict;
-}
-
-/*
- * Check for violation of an exclusion constraint
- *
- * This is a dumbed down version of check_exclusion_or_unique_constraint
- * for external callers. They don't need all the special modes.
- */
-void
-check_exclusion_constraint(Relation heap, Relation index,
-						   IndexInfo *indexInfo,
-						   ItemPointer tupleid,
-						   Datum *values, bool *isnull,
-						   EState *estate, bool newIndex)
-{
-	(void) check_exclusion_or_unique_constraint(heap, index, indexInfo, tupleid,
-												values, isnull,
-												estate, newIndex,
-												CEOUC_WAIT, false, NULL);
-}
-
-/*
- * Check existing tuple's index values to see if it really matches the
- * exclusion condition against the new_values.  Returns true if conflict.
- */
-static bool
-index_recheck_constraint(Relation index, Oid *constr_procs,
-						 Datum *existing_values, bool *existing_isnull,
-						 Datum *new_values)
-{
-	int			indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
-	int			i;
-
-	for (i = 0; i < indnkeyatts; i++)
-	{
-		/* Assume the exclusion operators are strict */
-		if (existing_isnull[i])
-			return false;
-
-		if (!DatumGetBool(OidFunctionCall2Coll(constr_procs[i],
-											   index->rd_indcollation[i],
-											   existing_values[i],
-											   new_values[i])))
-			return false;
-	}
-
-	return true;
 }

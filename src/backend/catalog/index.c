@@ -112,18 +112,13 @@ static void UpdateIndexRelation(Oid indexoid, Oid heapoid,
 								Oid *classOids,
 								int16 *coloptions,
 								bool primary,
-								bool isexclusion,
 								bool immediate,
 								bool isvalid,
 								bool isready);
 static void index_update_stats(Relation rel,
 							   bool hasindex,
 							   double reltuples);
-static void IndexCheckExclusion(Relation heapRelation,
-								Relation indexRelation,
-								IndexInfo *indexInfo);
 static bool validate_index_callback(ItemPointer itemptr, void *opaque);
-static bool ReindexIsCurrentlyProcessingIndex(Oid indexOid);
 static void SetReindexProcessing(Oid heapOid, Oid indexOid);
 static void ResetReindexProcessing(void);
 static void SetReindexPending(List *indexes);
@@ -533,12 +528,11 @@ UpdateIndexRelation(Oid indexoid,
 					Oid *classOids,
 					int16 *coloptions,
 					bool primary,
-					bool isexclusion,
 					bool immediate,
 					bool isvalid,
 					bool isready)
-{
-	int2vector *indkey;
+					{
+					int2vector *indkey;
 	oidvector  *indcollation;
 	oidvector  *indclass;
 	int2vector *indoption;
@@ -607,7 +601,6 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indnkeyatts - 1] = Int16GetDatum(indexInfo->ii_NumIndexKeyAttrs);
 	values[Anum_pg_index_indisunique - 1] = BoolGetDatum(indexInfo->ii_Unique);
 	values[Anum_pg_index_indisprimary - 1] = BoolGetDatum(primary);
-	values[Anum_pg_index_indisexclusion - 1] = BoolGetDatum(isexclusion);
 	values[Anum_pg_index_indimmediate - 1] = BoolGetDatum(immediate);
 	values[Anum_pg_index_indisclustered - 1] = BoolGetDatum(false);
 	values[Anum_pg_index_indisvalid - 1] = BoolGetDatum(isvalid);
@@ -718,7 +711,6 @@ index_create(Relation heapRelation,
 	TupleDesc	indexTupDesc;
 	bool		shared_relation;
 	bool		mapped_relation;
-	bool		is_exclusion;
 	Oid			namespaceId;
 	int			i;
 	char		relpersistence;
@@ -733,7 +725,6 @@ index_create(Relation heapRelation,
 	Assert((constr_flags == 0) ||
 		   ((flags & INDEX_CREATE_ADD_CONSTRAINT) != 0));
 	relkind = RELKIND_INDEX;
-	is_exclusion = (indexInfo->ii_ExclusionOps != NULL);
 
 	pg_class = table_open(RelationRelationId, RowExclusiveLock);
 
@@ -820,10 +811,6 @@ index_create(Relation heapRelation,
 	 * This case is currently not supported.  There's no way to ask for it in
 	 * the grammar with CREATE INDEX, but it can happen with REINDEX.
 	 */
-	if (concurrent && is_exclusion)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("concurrent index creation for exclusion constraints is not supported")));
 
 	/*
 	 * We cannot allow indexing a shared relation after initdb (because
@@ -973,7 +960,7 @@ index_create(Relation heapRelation,
 	UpdateIndexRelation(indexRelationId, heapRelationId, parentIndexRelid,
 						indexInfo,
 						collationObjectId, classObjectId, coloptions,
-						isprimary, is_exclusion,
+						isprimary,
 						(constr_flags & INDEX_CONSTR_CREATE_DEFERRABLE) == 0 &&
 						(flags & INDEX_CREATE_DEFERRABLE) == 0,
 						!concurrent && !invalid,
@@ -1016,11 +1003,9 @@ index_create(Relation heapRelation,
 				constraintType = CONSTRAINT_PRIMARY;
 			else if (indexInfo->ii_Unique)
 				constraintType = CONSTRAINT_UNIQUE;
-			else if (is_exclusion)
-				constraintType = CONSTRAINT_EXCLUSION;
 			else
 			{
-				elog(ERROR, "constraint must be PRIMARY, UNIQUE or EXCLUDE");
+				elog(ERROR, "constraint must be PRIMARY or UNIQUE");
 				constraintType = 0; /* keep compiler quiet */
 			}
 
@@ -1245,15 +1230,6 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 
 	/* The new index needs some information from the old index */
 	oldInfo = BuildIndexInfo(indexRelation);
-
-	/*
-	 * Concurrent build of an index with exclusion constraints is not
-	 * supported.
-	 */
-	if (oldInfo->ii_ExclusionOps != NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("concurrent index creation for exclusion constraints is not supported")));
 
 	/* Get the array of class and column options IDs from index info */
 	indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(oldIndexId));
@@ -1537,8 +1513,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	 */
 	newIndexForm->indisprimary = oldIndexForm->indisprimary;
 	oldIndexForm->indisprimary = false;
-	newIndexForm->indisexclusion = oldIndexForm->indisexclusion;
-	oldIndexForm->indisexclusion = false;
 	newIndexForm->indimmediate = oldIndexForm->indimmediate;
 	oldIndexForm->indimmediate = true;
 
@@ -1792,8 +1766,7 @@ index_concurrently_set_dead(Oid heapId, Oid indexId)
  *		constraint in the parent.
  * indexInfo: same info executor uses to insert into the index
  * constraintName: what it say (generally, should match name of index)
- * constraintType: one of CONSTRAINT_PRIMARY, CONSTRAINT_UNIQUE, or
- *		CONSTRAINT_EXCLUSION
+ * constraintType: one of CONSTRAINT_PRIMARY or CONSTRAINT_UNIQUE
  * flags: bitmask that can include any combination of these bits:
  *		INDEX_CONSTR_CREATE_MARK_AS_PRIMARY: index is a PRIMARY KEY
  *		INDEX_CONSTR_CREATE_DEFERRABLE: constraint is DEFERRABLE
@@ -1842,8 +1815,7 @@ index_constraint_create(Relation heapRelation,
 				 errmsg("user-defined indexes on system catalog tables are not supported")));
 
 	/* primary/unique constraints shouldn't have any expressions */
-	if (indexInfo->ii_Expressions &&
-		constraintType != CONSTRAINT_EXCLUSION)
+	if (indexInfo->ii_Expressions)
 		elog(ERROR, "constraints cannot have index expressions");
 
 	/*
@@ -1897,7 +1869,6 @@ index_constraint_create(Relation heapRelation,
 								   ' ',
 								   ' ',
 								   ' ',
-								   indexInfo->ii_ExclusionOps,
 								   NULL,	/* no check constraint */
 								   NULL,
 								   islocal,
@@ -2344,15 +2315,6 @@ BuildIndexInfo(Relation index)
 	for (i = 0; i < numAtts; i++)
 		ii->ii_IndexAttrNumbers[i] = indexStruct->indkey.values[i];
 
-	/* fetch exclusion constraint info if any */
-	if (indexStruct->indisexclusion)
-	{
-		RelationGetExclusionInfo(index,
-								 &ii->ii_ExclusionOps,
-								 &ii->ii_ExclusionProcs,
-								 &ii->ii_ExclusionStrats);
-	}
-
 	ii->ii_OpclassOptions = RelationGetIndexRawAttOptions(index);
 
 	return ii;
@@ -2526,10 +2488,6 @@ CompareIndexInfo(IndexInfo *info1, IndexInfo *info2,
 		if (!equal(info1->ii_Predicate, mapped))
 			return false;
 	}
-
-	/* No support currently for comparing exclusion indexes. */
-	if (info1->ii_ExclusionOps != NULL || info2->ii_ExclusionOps != NULL)
-		return false;
 
 	return true;
 }
@@ -3002,126 +2960,12 @@ index_build(Relation heapRelation,
 	/* Make the updated catalog row versions visible */
 	CommandCounterIncrement();
 
-	/*
-	 * If it's for an exclusion constraint, make a second pass over the heap
-	 * to verify that the constraint is satisfied.  We must not do this until
-	 * the index is fully valid.  (Broken HOT chains shouldn't matter, though;
-	 * see comments for IndexCheckExclusion.)
-	 */
-	if (indexInfo->ii_ExclusionOps != NULL)
-		IndexCheckExclusion(heapRelation, indexRelation, indexInfo);
-
 	/* Roll back any GUC changes executed by index functions */
 	AtEOXact_GUC(false, save_nestlevel);
 
 	/* Restore userid and security context */
 	SetUserIdAndSecContext(save_userid, save_sec_context);
 }
-
-/*
- * IndexCheckExclusion - verify that a new exclusion constraint is satisfied
- *
- * When creating an exclusion constraint, we first build the index normally
- * and then rescan the heap to check for conflicts.  We assume that we only
- * need to validate tuples that are live according to an up-to-date snapshot,
- * and that these were correctly indexed even in the presence of broken HOT
- * chains.  This should be OK since we are holding at least ShareLock on the
- * table, meaning there can be no uncommitted updates from other transactions.
- * (Note: that wouldn't necessarily work for system catalogs, since many
- * operations release write lock early on the system catalogs.)
- */
-static void
-IndexCheckExclusion(Relation heapRelation,
-					Relation indexRelation,
-					IndexInfo *indexInfo)
-{
-	TableScanDesc scan;
-	Datum		values[INDEX_MAX_KEYS];
-	bool		isnull[INDEX_MAX_KEYS];
-	ExprState  *predicate;
-	TupleTableSlot *slot;
-	EState	   *estate;
-	ExprContext *econtext;
-	Snapshot	snapshot;
-
-	/*
-	 * If we are reindexing the target index, mark it as no longer being
-	 * reindexed, to forestall an Assert in index_beginscan when we try to use
-	 * the index for probes.  This is OK because the index is now fully valid.
-	 */
-	if (ReindexIsCurrentlyProcessingIndex(RelationGetRelid(indexRelation)))
-		ResetReindexProcessing();
-
-	/*
-	 * Need an EState for evaluation of index expressions and partial-index
-	 * predicates.  Also a slot to hold the current tuple.
-	 */
-	estate = CreateExecutorState();
-	econtext = GetPerTupleExprContext(estate);
-	slot = table_slot_create(heapRelation, NULL);
-
-	/* Arrange for econtext's scan tuple to be the tuple under test */
-	econtext->ecxt_scantuple = slot;
-
-	/* Set up execution state for predicate, if any. */
-	predicate = ExecPrepareQual(indexInfo->ii_Predicate, estate);
-
-	/*
-	 * Scan all live tuples in the base relation.
-	 */
-	snapshot = RegisterSnapshot(GetLatestSnapshot());
-	scan = table_beginscan_strat(heapRelation,	/* relation */
-								 snapshot,	/* snapshot */
-								 0, /* number of keys */
-								 NULL,	/* scan key */
-								 true,	/* buffer access strategy OK */
-								 true); /* syncscan OK */
-
-	while (table_scan_getnextslot(scan, ForwardScanDirection, slot))
-	{
-		CHECK_FOR_INTERRUPTS();
-
-		/*
-		 * In a partial index, ignore tuples that don't satisfy the predicate.
-		 */
-		if (predicate != NULL)
-		{
-			if (!ExecQual(predicate, econtext))
-				continue;
-		}
-
-		/*
-		 * Extract index column values, including computing expressions.
-		 */
-		FormIndexDatum(indexInfo,
-					   slot,
-					   estate,
-					   values,
-					   isnull);
-
-		/*
-		 * Check that this tuple has no conflicts.
-		 */
-		check_exclusion_constraint(heapRelation,
-								   indexRelation, indexInfo,
-								   &(slot->tts_tid), values, isnull,
-								   estate, true);
-
-		MemoryContextReset(econtext->ecxt_per_tuple_memory);
-	}
-
-	table_endscan(scan);
-	UnregisterSnapshot(snapshot);
-
-	ExecDropSingleTupleTableSlot(slot);
-
-	FreeExecutorState(estate);
-
-	/* These may have been pointing to the now-gone estate */
-	indexInfo->ii_ExpressionsState = NIL;
-	indexInfo->ii_PredicateState = NULL;
-}
-
 
 /*
  * validate_index - support code for concurrent index builds
@@ -3590,15 +3434,12 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	/* Fetch info needed for index_build */
 	indexInfo = BuildIndexInfo(iRel);
 
-	/* If requested, skip checking uniqueness/exclusion constraints */
+	/* If requested, skip checking uniqueness constraints */
 	if (skip_constraint_checks)
 	{
-		if (indexInfo->ii_Unique || indexInfo->ii_ExclusionOps != NULL)
+		if (indexInfo->ii_Unique)
 			skipped_constraint = true;
 		indexInfo->ii_Unique = false;
-		indexInfo->ii_ExclusionOps = NULL;
-		indexInfo->ii_ExclusionProcs = NULL;
-		indexInfo->ii_ExclusionStrats = NULL;
 	}
 
 	/* Suppress use of the target index while rebuilding it */
@@ -3900,16 +3741,6 @@ bool
 ReindexIsProcessingHeap(Oid heapOid)
 {
 	return heapOid == currentlyReindexedHeap;
-}
-
-/*
- * ReindexIsCurrentlyProcessingIndex
- *		True if index specified by OID is currently being reindexed.
- */
-static bool
-ReindexIsCurrentlyProcessingIndex(Oid indexOid)
-{
-	return indexOid == currentlyReindexedIndex;
 }
 
 /*

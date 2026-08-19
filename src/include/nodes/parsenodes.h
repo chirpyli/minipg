@@ -1596,7 +1596,6 @@ typedef enum ConstrType			/* types of constraints */
 	CONSTR_CHECK,
 	CONSTR_PRIMARY,
 	CONSTR_UNIQUE,
-	CONSTR_EXCLUSION,
 	CONSTR_ATTR_DEFERRABLE,		/* attributes for previous constraint node */
 	CONSTR_ATTR_NOT_DEFERRABLE,
 	CONSTR_ATTR_DEFERRED,
@@ -1626,10 +1625,7 @@ typedef struct Constraint
 	List	   *including;		/* String nodes naming referenced nonkey
 								 * column(s) */
 
-	/* Fields used for EXCLUSION constraints: */
-	List	   *exclusions;		/* list of (IndexElem, operator name) pairs */
-
-	/* Fields used for index constraints (UNIQUE, PRIMARY KEY, EXCLUSION): */
+	/* Fields used for index constraints (UNIQUE, PRIMARY KEY): */
 	List	   *options;		/* options from WITH clause */
 	char	   *indexname;		/* existing index to use; otherwise NULL */
 	char	   *indexspace;		/* index tablespace; NULL for default */
@@ -1938,7 +1934,6 @@ typedef struct IndexStmt
 										 * of IndexElem */
 	List	   *options;		/* WITH clause options: a list of DefElem */
 	Node	   *whereClause;	/* qualification (partial-index predicate) */
-	List	   *excludeOpNames; /* exclusion operator names, or NIL if none */
 	Oid			indexOid;		/* OID of an existing index, if any */
 	Oid			oldNode;		/* relfilenode of existing storage, if any */
 	SubTransactionId oldCreateSubid;	/* rd_createSubid of oldNode */

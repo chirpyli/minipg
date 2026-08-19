@@ -848,9 +848,6 @@ XactLockTableWaitErrorCb(void *arg)
 			case XLTW_FetchUpdated:
 				cxt = gettext_noop("while rechecking updated tuple (%u,%u) in relation \"%s\"");
 				break;
-			case XLTW_RecheckExclusionConstr:
-				cxt = gettext_noop("while checking exclusion constraint on tuple (%u,%u) in relation \"%s\"");
-				break;
 
 			default:
 				return;

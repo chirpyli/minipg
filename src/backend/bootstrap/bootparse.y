@@ -281,7 +281,6 @@ Boot_DeclareIndexStmt:
 					stmt->indexIncludingParams = NIL;
 					stmt->options = NIL;
 					stmt->whereClause = NULL;
-					stmt->excludeOpNames = NIL;
 					stmt->indexOid = InvalidOid;
 					stmt->oldNode = InvalidOid;
 					stmt->oldCreateSubid = InvalidSubTransactionId;
@@ -332,7 +331,6 @@ Boot_DeclareUniqueIndexStmt:
 					stmt->indexIncludingParams = NIL;
 					stmt->options = NIL;
 					stmt->whereClause = NULL;
-					stmt->excludeOpNames = NIL;
 					stmt->indexOid = InvalidOid;
 					stmt->oldNode = InvalidOid;
 					stmt->oldCreateSubid = InvalidSubTransactionId;

@@ -625,13 +625,10 @@ bt_check_every_level(Relation rel, Relation heaprel, bool heapkeyspace,
 
 		/*
 		 * Don't wait for uncommitted tuple xact commit/abort when index is a
-		 * unique index on a catalog (or an index used by an exclusion
-		 * constraint).  This could otherwise happen in the readonly case.
+		 * unique index on a catalog.  This could otherwise happen in the
+		 * readonly case.
 		 */
 		indexinfo->ii_Unique = false;
-		indexinfo->ii_ExclusionOps = NULL;
-		indexinfo->ii_ExclusionProcs = NULL;
-		indexinfo->ii_ExclusionStrats = NULL;
 
 		elog(DEBUG1, "verifying that tuples from index \"%s\" are present in \"%s\"",
 			 RelationGetRelationName(state->rel),

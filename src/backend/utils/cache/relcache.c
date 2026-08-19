@@ -1394,9 +1394,6 @@ RelationInitIndexAccessInfo(Relation relation)
 	 */
 	relation->rd_indexprs = NIL;
 	relation->rd_indpred = NIL;
-	relation->rd_exclops = NULL;
-	relation->rd_exclprocs = NULL;
-	relation->rd_exclstrats = NULL;
 	relation->rd_amcache = NULL;
 }
 
@@ -2114,7 +2111,6 @@ RelationReloadIndexInfo(Relation relation)
 		 */
 		relation->rd_index->indisunique = index->indisunique;
 		relation->rd_index->indisprimary = index->indisprimary;
-		relation->rd_index->indisexclusion = index->indisexclusion;
 		relation->rd_index->indimmediate = index->indimmediate;
 		relation->rd_index->indisclustered = index->indisclustered;
 		relation->rd_index->indisvalid = index->indisvalid;
@@ -4948,136 +4944,6 @@ restart:
 }
 
 /*
- * RelationGetExclusionInfo -- get info about index's exclusion constraint
- *
- * This should be called only for an index that is known to have an
- * associated exclusion constraint.  It returns arrays (palloc'd in caller's
- * context) of the exclusion operator OIDs, their underlying functions'
- * OIDs, and their strategy numbers in the index's opclasses.  We cache
- * all this information since it requires a fair amount of work to get.
- */
-void
-RelationGetExclusionInfo(Relation indexRelation,
-						 Oid **operators,
-						 Oid **procs,
-						 uint16 **strategies)
-{
-	int			indnkeyatts;
-	Oid		   *ops;
-	Oid		   *funcs;
-	uint16	   *strats;
-	Relation	conrel;
-	SysScanDesc conscan;
-	ScanKeyData skey[1];
-	HeapTuple	htup;
-	bool		found;
-	MemoryContext oldcxt;
-	int			i;
-
-	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
-
-	/* Allocate result space in caller context */
-	*operators = ops = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	*procs = funcs = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	*strategies = strats = (uint16 *) palloc(sizeof(uint16) * indnkeyatts);
-
-	/* Quick exit if we have the data cached already */
-	if (indexRelation->rd_exclstrats != NULL)
-	{
-		memcpy(ops, indexRelation->rd_exclops, sizeof(Oid) * indnkeyatts);
-		memcpy(funcs, indexRelation->rd_exclprocs, sizeof(Oid) * indnkeyatts);
-		memcpy(strats, indexRelation->rd_exclstrats, sizeof(uint16) * indnkeyatts);
-		return;
-	}
-
-	/*
-	 * Search pg_constraint for the constraint associated with the index. To
-	 * make this not too painfully slow, we use the index on conrelid; that
-	 * will hold the parent relation's OID not the index's own OID.
-	 *
-	 * Note: if we wanted to rely on the constraint name matching the index's
-	 * name, we could just do a direct lookup using pg_constraint's unique
-	 * index.  For the moment it doesn't seem worth requiring that.
-	 */
-	ScanKeyInit(&skey[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(indexRelation->rd_index->indrelid));
-
-	conrel = table_open(ConstraintRelationId, AccessShareLock);
-	conscan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId, true,
-								 NULL, 1, skey);
-	found = false;
-
-	while (HeapTupleIsValid(htup = systable_getnext(conscan)))
-	{
-		Form_pg_constraint conform = (Form_pg_constraint) GETSTRUCT(htup);
-		Datum		val;
-		bool		isnull;
-		ArrayType  *arr;
-		int			nelem;
-
-		/* We want the exclusion constraint owning the index */
-		if (conform->contype != CONSTRAINT_EXCLUSION ||
-			conform->conindid != RelationGetRelid(indexRelation))
-			continue;
-
-		/* There should be only one */
-		if (found)
-			elog(ERROR, "unexpected exclusion constraint record found for rel %s",
-				 RelationGetRelationName(indexRelation));
-		found = true;
-
-		/* Extract the operator OIDS from conexclop */
-		val = fastgetattr(htup,
-						  Anum_pg_constraint_conexclop,
-						  conrel->rd_att, &isnull);
-		if (isnull)
-			elog(ERROR, "null conexclop for rel %s",
-				 RelationGetRelationName(indexRelation));
-
-		arr = DatumGetArrayTypeP(val);	/* ensure not toasted */
-		nelem = ARR_DIMS(arr)[0];
-		if (ARR_NDIM(arr) != 1 ||
-			nelem != indnkeyatts ||
-			ARR_HASNULL(arr) ||
-			ARR_ELEMTYPE(arr) != OIDOID)
-			elog(ERROR, "conexclop is not a 1-D Oid array");
-
-		memcpy(ops, ARR_DATA_PTR(arr), sizeof(Oid) * indnkeyatts);
-	}
-
-	systable_endscan(conscan);
-	table_close(conrel, AccessShareLock);
-
-	if (!found)
-		elog(ERROR, "exclusion constraint record missing for rel %s",
-			 RelationGetRelationName(indexRelation));
-
-	/* We need the func OIDs and strategy numbers too */
-	for (i = 0; i < indnkeyatts; i++)
-	{
-		funcs[i] = get_opcode(ops[i]);
-		strats[i] = get_op_opfamily_strategy(ops[i],
-											 indexRelation->rd_opfamily[i]);
-		/* shouldn't fail, since it was checked at index creation */
-		if (strats[i] == InvalidStrategy)
-			elog(ERROR, "could not find strategy for operator %u in family %u",
-				 ops[i], indexRelation->rd_opfamily[i]);
-	}
-
-	/* Save a copy of the results in the relcache entry. */
-	oldcxt = MemoryContextSwitchTo(indexRelation->rd_indexcxt);
-	indexRelation->rd_exclops = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	indexRelation->rd_exclprocs = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	indexRelation->rd_exclstrats = (uint16 *) palloc(sizeof(uint16) * indnkeyatts);
-	memcpy(indexRelation->rd_exclops, ops, sizeof(Oid) * indnkeyatts);
-	memcpy(indexRelation->rd_exclprocs, funcs, sizeof(Oid) * indnkeyatts);
-	memcpy(indexRelation->rd_exclstrats, strats, sizeof(uint16) * indnkeyatts);
-	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
  * RelationGetIndexRawAttOptions -- get AM/opclass-specific options for the index
  */
 Datum *
@@ -5595,9 +5461,6 @@ load_relcache_init_file(bool shared)
 		rel->trigdesc = NULL;
 		rel->rd_indexprs = NIL;
 		rel->rd_indpred = NIL;
-		rel->rd_exclops = NULL;
-		rel->rd_exclprocs = NULL;
-		rel->rd_exclstrats = NULL;
 
 		/*
 		 * Reset transient-state fields in the relcache entry

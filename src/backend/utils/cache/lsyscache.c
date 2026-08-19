@@ -1245,8 +1245,7 @@ get_constraint_index(Oid conoid)
 		Oid			result;
 
 		if (contup->contype == CONSTRAINT_UNIQUE ||
-			contup->contype == CONSTRAINT_PRIMARY ||
-			contup->contype == CONSTRAINT_EXCLUSION)
+			contup->contype == CONSTRAINT_PRIMARY)
 			result = contup->conindid;
 		else
 			result = InvalidOid;

@@ -937,13 +937,7 @@ DefineDomain(CreateDomainStmt *stmt)
 						 errmsg("primary key constraints not possible for domains")));
 				break;
 
-			case CONSTR_EXCLUSION:
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("exclusion constraints not possible for domains")));
-						 break;
-
-						 case CONSTR_ATTR_DEFERRABLE:
+			case CONSTR_ATTR_DEFERRABLE:
 						 case CONSTR_ATTR_NOT_DEFERRABLE:
 						 case CONSTR_ATTR_DEFERRED:
 						 case CONSTR_ATTR_IMMEDIATE:
@@ -2862,12 +2856,6 @@ AlterDomainAddConstraint(List *names, Node *newConstraint,
 					 errmsg("primary key constraints not possible for domains")));
 			break;
 
-		case CONSTR_EXCLUSION:
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("exclusion constraints not possible for domains")));
-			break;
-
 		case CONSTR_ATTR_DEFERRABLE:
 		case CONSTR_ATTR_NOT_DEFERRABLE:
 		case CONSTR_ATTR_DEFERRED:
@@ -3433,7 +3421,6 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 							  ' ',
 							  ' ',
 							  ' ',
-							  NULL, /* not an exclusion constraint */
 							  expr, /* Tree form of check constraint */
 							  ccbin,	/* Binary form of check constraint */
 							  true, /* is local */

@@ -139,12 +139,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	Oid			conffeqop[1] BKI_LOOKUP(pg_operator);
 
 	/*
-	 * If an exclusion constraint, the OIDs of the exclusion operators for
-	 * each column of the constraint
-	 */
-	Oid			conexclop[1] BKI_LOOKUP(pg_operator);
-
-	/*
 	 * If a check constraint, nodeToString representation of expression
 	 */
 	pg_node_tree conbin;
@@ -183,7 +177,6 @@ DECLARE_ARRAY_FOREIGN_KEY((confrelid, confkey), pg_attribute, (attrelid, attnum)
 #define CONSTRAINT_PRIMARY			'p'
 #define CONSTRAINT_UNIQUE			'u'
 #define CONSTRAINT_TRIGGER			't'
-#define CONSTRAINT_EXCLUSION		'x'
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
@@ -220,7 +213,6 @@ extern Oid	CreateConstraintEntry(const char *constraintName,
 								  char foreignUpdateType,
 								  char foreignDeleteType,
 								  char foreignMatchType,
-								  const Oid *exclOp,
 								  Node *conExpr,
 								  const char *conBin,
 								  bool conIsLocal,

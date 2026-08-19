@@ -136,11 +136,9 @@ unique_key_recheck(PG_FUNCTION_ARGS)
 
 	/*
 	 * Typically the index won't have expressions, but if it does we need an
-	 * EState to evaluate them.  We need it for exclusion constraints too,
-	 * even if they are just on simple columns.
+	 * EState to evaluate them.
 	 */
-	if (indexInfo->ii_Expressions != NIL ||
-		indexInfo->ii_ExclusionOps != NULL)
+	if (indexInfo->ii_Expressions != NIL)
 	{
 		estate = CreateExecutorState();
 		econtext = GetPerTupleExprContext(estate);
@@ -156,43 +154,25 @@ unique_key_recheck(PG_FUNCTION_ARGS)
 	 * Note: if the index uses functions that are not as immutable as they are
 	 * supposed to be, this could produce an index tuple different from the
 	 * original.  The index AM can catch such errors by verifying that it
-	 * finds a matching index entry with the tuple's TID.  For exclusion
-	 * constraints we check this in check_exclusion_constraint().
+	 * finds a matching index entry with the tuple's TID.
 	 */
 	FormIndexDatum(indexInfo, slot, estate, values, isnull);
 
 	/*
 	 * Now do the appropriate check.
+	 *
+	 * Note: this is not a real insert; it is a check that the index entry
+	 * that has already been inserted is unique.  Passing the tuple's tid
+	 * (i.e. unmodified by table_index_fetch_tuple()) is correct even if
+	 * the row is now dead, because that is the TID the index will know
+	 * about.
 	 */
-	if (indexInfo->ii_ExclusionOps == NULL)
-	{
-		/*
-		 * Note: this is not a real insert; it is a check that the index entry
-		 * that has already been inserted is unique.  Passing the tuple's tid
-		 * (i.e. unmodified by table_index_fetch_tuple()) is correct even if
-		 * the row is now dead, because that is the TID the index will know
-		 * about.
-		 */
-		index_insert(indexRel, values, isnull, &checktid,
-					 trigdata->tg_relation, UNIQUE_CHECK_EXISTING,
-					 false, indexInfo);
-	}
-	else
-	{
-		/*
-		 * For exclusion constraints we just do the normal check, but now it's
-		 * okay to throw error.  In the HOT-update case, we must use the live
-		 * HOT child's TID here, else check_exclusion_constraint will think
-		 * the child is a conflict.
-		 */
-		check_exclusion_constraint(trigdata->tg_relation, indexRel, indexInfo,
-								   &tmptid, values, isnull,
-								   estate, false);
-	}
+	index_insert(indexRel, values, isnull, &checktid,
+				 trigdata->tg_relation, UNIQUE_CHECK_EXISTING,
+				 false, indexInfo);
 
 	/*
-	 * If that worked, then this index entry is unique or non-excluded, and we
-	 * are done.
+	 * If that worked, then this index entry is unique, and we are done.
 	 */
 	if (estate != NULL)
 		FreeExecutorState(estate);

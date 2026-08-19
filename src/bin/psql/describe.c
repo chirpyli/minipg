@@ -225,18 +225,14 @@ describeTablespaces(const char *pattern, bool verbose)
 	if (pset.sversion >= 90200)
 		printfPQExpBuffer(&buf,
 						  "SELECT spcname AS \"%s\",\n"
-						  "  pg_catalog.pg_get_userbyid(spcowner) AS \"%s\",\n"
 						  "  pg_catalog.pg_tablespace_location(oid) AS \"%s\"",
 						  gettext_noop("Name"),
-						  gettext_noop("Owner"),
 						  gettext_noop("Location"));
 	else
 		printfPQExpBuffer(&buf,
 						  "SELECT spcname AS \"%s\",\n"
-						  "  pg_catalog.pg_get_userbyid(spcowner) AS \"%s\",\n"
 						  "  spclocation AS \"%s\"",
 						  gettext_noop("Name"),
-						  gettext_noop("Owner"),
 						  gettext_noop("Location"));
 
 	if (verbose && pset.sversion >= 90000)
@@ -460,9 +456,7 @@ describeFunctions(const char *functypes, const char *func_pattern,
 							  gettext_noop("unsafe"),
 							  gettext_noop("Parallel"));
 		appendPQExpBuffer(&buf,
-						  ",\n pg_catalog.pg_get_userbyid(p.proowner) as \"%s\""
 						  ",\n CASE WHEN prosecdef THEN '%s' ELSE '%s' END AS \"%s\"",
-						  gettext_noop("Owner"),
 						  gettext_noop("definer"),
 						  gettext_noop("invoker"),
 						  gettext_noop("Security"));
@@ -723,15 +717,9 @@ describeTypes(const char *pattern, bool verbose, bool showSystem)
 						  "  ) AS \"%s\",\n",
 						  gettext_noop("Elements"));
 	}
-	if (verbose)
-	{
-		appendPQExpBuffer(&buf,
-						  "  pg_catalog.pg_get_userbyid(t.typowner) AS \"%s\",\n",
-						  gettext_noop("Owner"));
-	}
 	if (verbose && pset.sversion >= 90200)
 	{
-		appendPQExpBufferStr(&buf, ",\n  ");
+		appendPQExpBufferStr(&buf, "\n  ");
 	}
 
 	appendPQExpBuffer(&buf,
@@ -1000,15 +988,13 @@ listAllDbs(const char *pattern, bool verbose)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT d.datname as \"%s\",\n"
-					  "       pg_catalog.pg_get_userbyid(d.datdba) as \"%s\",\n"
 					  "       pg_catalog.pg_encoding_to_char(d.encoding) as \"%s\",\n",
 					  gettext_noop("Name"),
-					  gettext_noop("Owner"),
 					  gettext_noop("Encoding"));
 	if (pset.sversion >= 80400)
 		appendPQExpBuffer(&buf,
 						  "       d.datcollate as \"%s\",\n"
-						  "       d.datctype as \"%s\",\n",
+						  "       d.datctype as \"%s\"\n",
 						  gettext_noop("Collate"),
 						  gettext_noop("Ctype"));
 	appendPQExpBufferStr(&buf, "       ");
@@ -3010,8 +2996,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
 					  " WHEN " "'p'" " THEN '%s'"
 					  " WHEN " "'I'" " THEN '%s'"
-					  " END as \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(c.relowner) as \"%s\"",
+					  " END as \"%s\"",
 					  gettext_noop("Schema"),
 					  gettext_noop("Name"),
 					  gettext_noop("table"),
@@ -3021,9 +3006,8 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  gettext_noop("TOAST table"),
 					  gettext_noop("partitioned table"),
 					  gettext_noop("partitioned index"),
-					  gettext_noop("Type"),
-					  gettext_noop("Owner"));
-	cols_so_far = 4;
+					  gettext_noop("Type"));
+	cols_so_far = 3;
 
 	if (showIndexes)
 	{
@@ -3215,11 +3199,9 @@ listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT n.nspname as \"%s\",\n"
-					  "  c.relname as \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(c.relowner) as \"%s\"",
+					  "  c.relname as \"%s\"",
 					  gettext_noop("Schema"),
-					  gettext_noop("Name"),
-					  gettext_noop("Owner"));
+					  gettext_noop("Name"));
 
 	if (mixed_output)
 	{
@@ -3355,15 +3337,10 @@ listLanguages(const char *pattern, bool verbose, bool showSystem)
 	initPQExpBuffer(&buf);
 
 	printfPQExpBuffer(&buf,
-					  "SELECT l.lanname AS \"%s\",\n",
+					  "SELECT l.lanname AS \"%s\"\n",
 					  gettext_noop("Name"));
-	if (pset.sversion >= 80300)
-		appendPQExpBuffer(&buf,
-						  "       pg_catalog.pg_get_userbyid(l.lanowner) as \"%s\",\n",
-						  gettext_noop("Owner"));
-
 	appendPQExpBuffer(&buf,
-					  "       l.lanpltrusted AS \"%s\"",
+					  ",\n       l.lanpltrusted AS \"%s\"",
 					  gettext_noop("Trusted"));
 
 	if (verbose)
@@ -3888,10 +3865,8 @@ listSchemas(const char *pattern, bool verbose, bool showSystem)
 
 	initPQExpBuffer(&buf);
 	printfPQExpBuffer(&buf,
-					  "SELECT n.nspname AS \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(n.nspowner) AS \"%s\"",
-					  gettext_noop("Name"),
-					  gettext_noop("Owner"));
+					  "SELECT n.nspname AS \"%s\"",
+					  gettext_noop("Name"));
 
 	if (verbose)
 	{
@@ -4726,13 +4701,11 @@ listPublications(const char *pattern)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT pubname AS \"%s\",\n"
-					  "  pg_catalog.pg_get_userbyid(pubowner) AS \"%s\",\n"
 					  "  puballtables AS \"%s\",\n"
 					  "  pubinsert AS \"%s\",\n"
 					  "  pubupdate AS \"%s\",\n"
 					  "  pubdelete AS \"%s\"",
 					  gettext_noop("Name"),
-					  gettext_noop("Owner"),
 					  gettext_noop("All tables"),
 					  gettext_noop("Inserts"),
 					  gettext_noop("Updates"),
@@ -4798,7 +4771,6 @@ describePublications(const char *pattern)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT oid, pubname,\n"
-					  "  pg_catalog.pg_get_userbyid(pubowner) AS owner,\n"
 					  "  puballtables, pubinsert, pubupdate, pubdelete");
 	if (has_pubtruncate)
 		appendPQExpBufferStr(&buf,
@@ -4843,7 +4815,7 @@ describePublications(const char *pattern)
 	for (i = 0; i < PQntuples(res); i++)
 	{
 		const char	align = 'l';
-		int			ncols = 5;
+		int			ncols = 4;
 		int			nrows = 1;
 		int			tables = 0;
 		PGresult   *tabres;
@@ -4864,7 +4836,6 @@ describePublications(const char *pattern)
 		printfPQExpBuffer(&title, _("Publication %s"), pubname);
 		printTableInit(&cont, &myopt, title.data, ncols, nrows);
 
-		printTableAddHeader(&cont, gettext_noop("Owner"), true, align);
 		printTableAddHeader(&cont, gettext_noop("All tables"), true, align);
 		printTableAddHeader(&cont, gettext_noop("Inserts"), true, align);
 		printTableAddHeader(&cont, gettext_noop("Updates"), true, align);
@@ -4878,11 +4849,10 @@ describePublications(const char *pattern)
 		printTableAddCell(&cont, PQgetvalue(res, i, 3), false, false);
 		printTableAddCell(&cont, PQgetvalue(res, i, 4), false, false);
 		printTableAddCell(&cont, PQgetvalue(res, i, 5), false, false);
-		printTableAddCell(&cont, PQgetvalue(res, i, 6), false, false);
 		if (has_pubtruncate)
-			printTableAddCell(&cont, PQgetvalue(res, i, 7), false, false);
+			printTableAddCell(&cont, PQgetvalue(res, i, 6), false, false);
 		if (has_pubviaroot)
-			printTableAddCell(&cont, PQgetvalue(res, i, 8), false, false);
+			printTableAddCell(&cont, PQgetvalue(res, i, 7), false, false);
 
 		if (!puballtables)
 		{
@@ -4953,11 +4923,9 @@ describeSubscriptions(const char *pattern, bool verbose)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT subname AS \"%s\"\n"
-					  ",  pg_catalog.pg_get_userbyid(subowner) AS \"%s\"\n"
 					  ",  subenabled AS \"%s\"\n"
 					  ",  subpublications AS \"%s\"\n",
 					  gettext_noop("Name"),
-					  gettext_noop("Owner"),
 					  gettext_noop("Enabled"),
 					  gettext_noop("Publication"));
 
@@ -5060,10 +5028,8 @@ listOperatorClasses(const char *access_method_pattern,
 						  "    WHEN pg_catalog.pg_opfamily_is_visible(of.oid)\n"
 						  "    THEN pg_catalog.format('%%I', of.opfname)\n"
 						  "    ELSE pg_catalog.format('%%I.%%I', ofn.nspname, of.opfname)\n"
-						  "  END AS \"%s\",\n"
-						  " pg_catalog.pg_get_userbyid(c.opcowner) AS \"%s\"\n",
-						  gettext_noop("Operator family"),
-						  gettext_noop("Owner"));
+						  "  END AS \"%s\"\n",
+						  gettext_noop("Operator family"));
 	appendPQExpBufferStr(&buf,
 						 "\nFROM pg_catalog.pg_opclass c\n"
 						 "  LEFT JOIN pg_catalog.pg_am am on am.oid = c.opcmethod\n"
@@ -5142,10 +5108,6 @@ listOperatorFamilies(const char *access_method_pattern,
 					  gettext_noop("AM"),
 					  gettext_noop("Operator family"),
 					  gettext_noop("Applicable types"));
-	if (verbose)
-		appendPQExpBuffer(&buf,
-						  ",\n  pg_catalog.pg_get_userbyid(f.opfowner) AS \"%s\"\n",
-						  gettext_noop("Owner"));
 	appendPQExpBufferStr(&buf,
 						 "\nFROM pg_catalog.pg_opfamily f\n"
 						 "  LEFT JOIN pg_catalog.pg_am am on am.oid = f.opfmethod\n"

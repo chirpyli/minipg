@@ -374,11 +374,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 				break;
 
-			case CONSTR_EXCLUSION:
-				/* grammar does not allow EXCLUDE as a column constraint */
-				elog(ERROR, "column exclusion constraints are not supported");
-				break;
-
 			case CONSTR_ATTR_DEFERRABLE:
 			case CONSTR_ATTR_NOT_DEFERRABLE:
 			case CONSTR_ATTR_DEFERRED:
@@ -416,10 +411,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 			break;
 
 		case CONSTR_UNIQUE:
-			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
-			break;
-
-		case CONSTR_EXCLUSION:
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 			break;
 
@@ -578,7 +569,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 		index->tableSpace = get_tablespace_name(idxrelrec->reltablespace);
 	else
 		index->tableSpace = NULL;
-	index->excludeOpNames = NIL;
 	index->indexOid = InvalidOid;
 	index->oldNode = InvalidOid;
 	index->oldCreateSubid = InvalidSubTransactionId;
@@ -599,12 +589,12 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	index->idxname = NULL;
 
 	/*
-	 * If the index is marked PRIMARY or has an exclusion condition, it's
-	 * certainly from a constraint; else, if it's not marked UNIQUE, it
-	 * certainly isn't.  If it is or might be from a constraint, we have to
-	 * fetch the pg_constraint record.
+	 * If the index is marked PRIMARY or UNIQUE, it's certainly from a
+	 * constraint; else, if it's not marked UNIQUE, it certainly isn't.  If it
+	 * is or might be from a constraint, we have to fetch the pg_constraint
+	 * record.
 	 */
-	if (index->primary || index->unique || idxrec->indisexclusion)
+	if (index->primary || index->unique)
 	{
 		Oid			constraintId = get_index_constraint(source_relid);
 
@@ -626,52 +616,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 			index->isconstraint = true;
 			index->deferrable = conrec->condeferrable;
 			index->initdeferred = conrec->condeferred;
-
-			/* If it's an exclusion constraint, we need the operator names */
-			if (idxrec->indisexclusion)
-			{
-				Datum	   *elems;
-				int			nElems;
-				int			i;
-
-				Assert(conrec->contype == CONSTRAINT_EXCLUSION);
-				/* Extract operator OIDs from the pg_constraint tuple */
-				datum = SysCacheGetAttr(CONSTROID, ht_constr,
-										Anum_pg_constraint_conexclop,
-										&isnull);
-				if (isnull)
-					elog(ERROR, "null conexclop for constraint %u",
-						 constraintId);
-
-				deconstruct_array(DatumGetArrayTypeP(datum),
-								  OIDOID, sizeof(Oid), true, TYPALIGN_INT,
-								  &elems, NULL, &nElems);
-
-				for (i = 0; i < nElems; i++)
-				{
-					Oid			operid = DatumGetObjectId(elems[i]);
-					HeapTuple	opertup;
-					Form_pg_operator operform;
-					char	   *oprname;
-					char	   *nspname;
-					List	   *namelist;
-
-					opertup = SearchSysCache1(OPEROID,
-											  ObjectIdGetDatum(operid));
-					if (!HeapTupleIsValid(opertup))
-						elog(ERROR, "cache lookup failed for operator %u",
-							 operid);
-					operform = (Form_pg_operator) GETSTRUCT(opertup);
-					oprname = pstrdup(NameStr(operform->oprname));
-					/* For simplicity we always schema-qualify the op name */
-					nspname = get_namespace_name(operform->oprnamespace);
-					namelist = list_make2(makeString(nspname),
-										  makeString(oprname));
-					index->excludeOpNames = lappend(index->excludeOpNames,
-													namelist);
-					ReleaseSysCache(opertup);
-				}
-			}
 
 			ReleaseSysCache(ht_constr);
 		}
@@ -955,8 +899,7 @@ transformIndexConstraints(CreateStmtContext *cxt)
 		Constraint *constraint = lfirst_node(Constraint, lc);
 
 		Assert(constraint->contype == CONSTR_PRIMARY ||
-			   constraint->contype == CONSTR_UNIQUE ||
-			   constraint->contype == CONSTR_EXCLUSION);
+			   constraint->contype == CONSTR_UNIQUE);
 
 		index = transformIndexConstraint(constraint, cxt);
 
@@ -996,7 +939,6 @@ transformIndexConstraints(CreateStmtContext *cxt)
 			if (equal(index->indexParams, priorindex->indexParams) &&
 				equal(index->indexIncludingParams, priorindex->indexIncludingParams) &&
 				equal(index->whereClause, priorindex->whereClause) &&
-				equal(index->excludeOpNames, priorindex->excludeOpNames) &&
 				strcmp(index->accessMethod, priorindex->accessMethod) == 0 &&
 				index->deferrable == priorindex->deferrable &&
 				index->initdeferred == priorindex->initdeferred)
@@ -1047,7 +989,8 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 
 	index = makeNode(IndexStmt);
 
-	index->unique = (constraint->contype != CONSTR_EXCLUSION);
+	index->unique = (constraint->contype == CONSTR_UNIQUE ||
+					 constraint->contype == CONSTR_PRIMARY);
 	index->primary = (constraint->contype == CONSTR_PRIMARY);
 	if (index->primary)
 	{
@@ -1080,7 +1023,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->whereClause = constraint->where_clause;
 	index->indexParams = NIL;
 	index->indexIncludingParams = NIL;
-	index->excludeOpNames = NIL;
 	index->indexOid = InvalidOid;
 	index->oldNode = InvalidOid;
 	index->oldCreateSubid = InvalidSubTransactionId;
@@ -1265,34 +1207,11 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	}
 
 	/*
-	 * If it's an EXCLUDE constraint, the grammar returns a list of pairs of
-	 * IndexElems and operator names.  We have to break that apart into
-	 * separate lists.
-	 */
-	if (constraint->contype == CONSTR_EXCLUSION)
-	{
-		foreach(lc, constraint->exclusions)
-		{
-			List	   *pair = (List *) lfirst(lc);
-			IndexElem  *elem;
-			List	   *opname;
-
-			Assert(list_length(pair) == 2);
-			elem = linitial_node(IndexElem, pair);
-			opname = lsecond_node(List, pair);
-
-			index->indexParams = lappend(index->indexParams, elem);
-			index->excludeOpNames = lappend(index->excludeOpNames, opname);
-		}
-	}
-
-	/*
 	 * For UNIQUE and PRIMARY KEY, we just have a list of column names.
 	 *
 	 * Make sure referenced keys exist.  If we are making a PRIMARY KEY index,
 	 * also make sure they are NOT NULL.
 	 */
-	else
 	{
 		foreach(lc, constraint->keys)
 		{
@@ -2171,8 +2090,7 @@ transformConstraintAttrs(CreateStmtContext *cxt, List *constraintList)
 #define SUPPORTS_ATTRS(node)				\
 	((node) != NULL &&						\
 	 ((node)->contype == CONSTR_PRIMARY ||	\
-	  (node)->contype == CONSTR_UNIQUE ||	\
-	  (node)->contype == CONSTR_EXCLUSION))
+	  (node)->contype == CONSTR_UNIQUE))
 
 	foreach(clist, constraintList)
 	{

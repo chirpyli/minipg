@@ -225,30 +225,6 @@ LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_seri...
                     ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
-CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box,
-				EXCLUDE USING btree (c1 WITH =) INCLUDE(c3,c4));
-ERROR:  type "box" does not exist
-LINE 1: CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box,
-                                                    ^
-SELECT indexrelid::regclass, indnatts, indnkeyatts, indisunique, indisprimary, indkey, indclass FROM pg_index WHERE indrelid = 'tbl'::regclass::oid;
-ERROR:  relation "tbl" does not exist
-LINE 1: ..., indkey, indclass FROM pg_index WHERE indrelid = 'tbl'::reg...
-                                                             ^
-SELECT pg_get_constraintdef(oid), conname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::regclass::oid;
-ERROR:  relation "tbl" does not exist
-LINE 1: ...nname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::reg...
-                                                             ^
--- ensure that constraint works
-INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
-ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM genera...
-                    ^
-INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_series(1,10) AS x;
-ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_seri...
-                    ^
-DROP TABLE tbl;
-ERROR:  table "tbl" does not exist
 /*
  * 3.0 Test ALTER TABLE DROP COLUMN.
  * Any column deletion leads to index deletion.

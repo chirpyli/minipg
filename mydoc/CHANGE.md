@@ -785,3 +785,43 @@ make check-world（NO_TEMP_INSTALL=1，依赖先 make install 到 tmp_install）
 
 ### 验证
 make check-world 全部通过：回归 82/82、isolation 66/66，以及其余子套件均通过。
+
+---
+
+## GRANT/REVOKE 命令标签裁剪（ACL 裁剪收尾，2026-08-19）
+
+ACL 权限系统此前已彻底移除（acl.h、aclchk.c、角色骨架、GRANT/REVOKE 语法与实现 grant.c 均已删），但 `cmdtaglist.h` 中残留 `CMDTAG_GRANT`/`CMDTAG_REVOKE` 两个已无引用方的死标签，且 `gram.y` 残留一处死注释。本次彻底清理。
+
+### 删除内容
+- **`src/include/tcop/cmdtaglist.h`**：删除 `CMDTAG_GRANT`（原 127 行）与 `CMDTAG_REVOKE`（原 137 行）两个命令标签宏。全代码库 `GrantStmt`/`ExecuteGrantStmt`/`CMDTAG_GRANT`/`CMDTAG_REVOKE` 经检索均 0 命中，删去不影响编译与运行（标签列表仍按字母序有序）。
+- **`src/backend/parser/gram.y`**：清理残留死注释 `/* GRANT and REVOKE statements */`（原 3808 行附近区块，对应语法已不存在）。
+
+### 验证
+make check-world 全部通过（回归/isolation 等子套件均保持通过）。
+
+---
+
+## EXCLUDE 约束（排除约束）功能裁剪（2026-08-19）
+
+minipg 的索引访问方法已裁至只剩 heap/btree/hash（GiST/SP-GiST/GIN/BRIN 全部移除），而 EXCLUDE 约束的标准用法（如区间不重叠 `&&`）依赖 GiST；btree 仅支持等值 `=`，使 EXCLUDE 退化为普通唯一约束。故 EXCLUDE 约束在 minipg 实际已不可用，仅存语法与存储骨架。本次按「裁剪约束 EXCLUDE 方案（B 方案，彻底删除）」将其从 minipg 全链路删除。
+
+### 删除内容（按代码链路）
+
+- **语法层（`src/backend/parser/gram.y`）**：删除 `EXCLUDE access_method_clause '(' ExclusionConstraintList ')'` 约束生产式及其子规则 `ExclusionConstraintList`/`ExclusionConstraintElem`；删除因此无用的 `OptWhereClause` 规则与 `%type` 声明；保留 `EXCLUDE` 关键字（与 `kwlist.h` 的 UNRESERVED_KEYWORD/BARE_LABEL 声明一致，避免 check_keywords.pl 报错）。
+- **节点定义**：`parsenodes.h` 删 `Constraint.exclusions` 与 `IndexStmt.excludeOpNames` 字段及 `CONSTR_EXCLUSION` 枚举；同步清理 `copyfuncs.c`/`equalfuncs.c`/`outfuncs.c` 对应字段读写与 `CONSTR_EXCLUSION` case。
+- **解析层（`parse_utilcmd.c`）**：删除 `transformTableConstraint` 的 `CONSTR_EXCLUSION` 分支、`transformIndexConstraint` 中 EXCLUSION 特殊处理、`SUPPORTS_ATTRS` 宏项、以及 `transformIndexStmt` 中从 `pg_constraint.conexclop` 重建 `excludeOpNames` 的整块。
+- **执行层（`indexcmds.c`/`index.c`）**：删除 `DefineIndex` 中分区表排除约束错误、AM 不支持排除约束错误、`constraint_type` 的 EXCLUDE 分支；`ComputeIndexAttrs`/`ChooseIndexName` 删除 exclusion 逻辑（保留 `exclusionOpNames` 参数但恒 NIL，加 `(void)` 消除警告）；`index.c` 删除 `IndexCheckExclusion` 函数、`index_create` 的 `is_exclusion` 变量与并发排除约束错误、`UpdateIndexRelation` 的 `isexclusion` 参数、`CheckIndexCompatible` 的排除兼容检查、`index_constraint_create` 的 EXCLUDE 类型分支、`ReindexIsCurrentlyProcessingIndex`（因唯一调用者被删）。
+- **catalog 存储（B 方案核心）**：`pg_constraint.h` 删 `conexclop` 列与 `CONSTRAINT_EXCLUSION` 宏、`CreateConstraintEntry` 删 `exclOp` 参数；`pg_constraint.c` 删 `conexclopArray` 构造与写入；`pg_index.h` 删 `indisexclusion` 列；同步清理 4 个 `CreateConstraintEntry` 调用点（`index.c`/`heap.c`/`typecmds.c`/`trigger.c`）。
+- **缓存/显示（`relcache.c`/`ruleutils.c`）**：删除 `RelationGetExclusionInfo` 函数及其在 relcache 的 `rd_exclops`/`rd_exclprocs`/`rd_exclstrats` 缓存字段；`ruleutils.c` 删除 `pg_get_constraintdef` 的 `CONSTRAINT_EXCLUSION` case、`pg_get_indexdef_worker` 的 `excludeOps` 参数与 EXCLUDE 显示分支。
+- **执行器/触发器**：`execIndexing.c` 删除 exclusion 冲突检测分支、`check_exclusion_constraint`/`index_recheck_constraint` 函数；`constraint.c` 的 `unique_key_recheck` 退化为纯唯一检查；`toasting.c`/`bootstrap.c`/`indexing.c`/`heapam_handler.c` 删除 `ii_ExclusionOps` 系列引用；`lmgr.h`/`lmgr.c` 删 `XLTW_RecheckExclusionConstr`。
+- **回归测试**：`sql/constraints.source`（input/output）删除 deferred exclusion 测试段；`sql/index_including.sql`（.sql/.out）删除 `EXCLUDE USING btree` 用例。
+
+### 保留边界（未破坏）
+btree/hash 索引、UNIQUE/PRIMARY KEY/CHECK 约束、pg_constraint/pg_index 基础设施、执行器唯一性检查路径均完整保留。`constraint_exclusion`（约束排除查询优化 GUC）为独立特性，与 EXCLUDE 约束无关，保留。
+
+### 关键经验
+- 删除非保留关键字（EXCLUDE）的语法规则时，**必须保留**关键字在 `kwlist.h` 及 `gram.y` 的 `unreserved_keyword`/`bare_label_keyword`/token 声明中的一致性（`check_keywords.pl` 强制），否则生成 gram.c 失败。
+- 删 catalog 列后必须强制全量重编：仅重编受影响的 .o 可能因旧头 ABI 不一致导致 initdb 在 btree 并行构建时崩溃（`cannot take query snapshot during a parallel operation`）。删除 `pg_*_d.h` 后需重新运行 genbki（`make -C src/backend/catalog bki-stamp`）并 symlink 到 `src/include/catalog/`，且 `touch src/backend/*.c` 触发重编。
+
+### 验证
+make check 全部通过（回归 82/82）；initdb 成功；`pg_index` 已无 `indisexclusion` 列、`pg_constraint` 已无 `conexclop` 列；`EXCLUDE (a WITH =)` 建表报语法错误；UNIQUE/CHECK/PRIMARY KEY 约束及 `pg_get_constraintdef`/`pg_get_indexdef` 显示均正常。

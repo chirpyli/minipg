@@ -2448,7 +2448,6 @@ _outIndexStmt(StringInfo str, const IndexStmt *node)
 	WRITE_NODE_FIELD(indexIncludingParams);
 	WRITE_NODE_FIELD(options);
 	WRITE_NODE_FIELD(whereClause);
-	WRITE_NODE_FIELD(excludeOpNames);
 	WRITE_OID_FIELD(indexOid);
 	WRITE_OID_FIELD(oldNode);
 	WRITE_UINT_FIELD(oldCreateSubid);
@@ -3177,18 +3176,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 			WRITE_STRING_FIELD(indexspace);
 			WRITE_BOOL_FIELD(reset_default_tblspc);
 			/* access_method and where_clause not currently used */
-			break;
-
-		case CONSTR_EXCLUSION:
-			appendStringInfoString(str, "EXCLUSION");
-			WRITE_NODE_FIELD(exclusions);
-			WRITE_NODE_FIELD(including);
-			WRITE_NODE_FIELD(options);
-			WRITE_STRING_FIELD(indexname);
-			WRITE_STRING_FIELD(indexspace);
-			WRITE_BOOL_FIELD(reset_default_tblspc);
-			WRITE_STRING_FIELD(access_method);
-			WRITE_NODE_FIELD(where_clause);
 			break;
 
 		case CONSTR_ATTR_DEFERRABLE:

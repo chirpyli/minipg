@@ -331,7 +331,6 @@ static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 										 StringInfo buf);
 static char *pg_get_ruledef_worker(Oid ruleoid, int prettyFlags);
 static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
-									const Oid *excludeOps,
 									bool attrsOnly, bool keysOnly,
 									bool showTblSpc, bool inherits,
 									int prettyFlags, bool missing_ok);
@@ -1108,7 +1107,7 @@ pg_get_indexdef(PG_FUNCTION_ARGS)
 
 	prettyFlags = PRETTYFLAG_INDENT;
 
-	res = pg_get_indexdef_worker(indexrelid, 0, NULL,
+	res = pg_get_indexdef_worker(indexrelid, 0,
 								 false, false,
 								 false, false,
 								 prettyFlags, true);
@@ -1130,7 +1129,7 @@ pg_get_indexdef_ext(PG_FUNCTION_ARGS)
 
 	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
 
-	res = pg_get_indexdef_worker(indexrelid, colno, NULL,
+	res = pg_get_indexdef_worker(indexrelid, colno,
 								 colno != 0, false,
 								 false, false,
 								 prettyFlags, true);
@@ -1149,7 +1148,7 @@ pg_get_indexdef_ext(PG_FUNCTION_ARGS)
 char *
 pg_get_indexdef_string(Oid indexrelid)
 {
-	return pg_get_indexdef_worker(indexrelid, 0, NULL,
+	return pg_get_indexdef_worker(indexrelid, 0,
 								  false, false,
 								  true, true,
 								  0, false);
@@ -1163,7 +1162,7 @@ pg_get_indexdef_columns(Oid indexrelid, bool pretty)
 
 	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
 
-	return pg_get_indexdef_worker(indexrelid, 0, NULL,
+	return pg_get_indexdef_worker(indexrelid, 0,
 								  true, true,
 								  false, false,
 								  prettyFlags, false);
@@ -1179,7 +1178,7 @@ pg_get_indexdef_columns_extended(Oid indexrelid, bits16 flags)
 
 	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
 
-	return pg_get_indexdef_worker(indexrelid, 0, NULL,
+	return pg_get_indexdef_worker(indexrelid, 0,
 								  true, keys_only,
 								  false, false,
 								  prettyFlags, false);
@@ -1188,18 +1187,13 @@ pg_get_indexdef_columns_extended(Oid indexrelid, bits16 flags)
 /*
  * Internal workhorse to decompile an index definition.
  *
- * This is now used for exclusion constraints as well: if excludeOps is not
- * NULL then it points to an array of exclusion operator OIDs.
  */
 static char *
 pg_get_indexdef_worker(Oid indexrelid, int colno,
-					   const Oid *excludeOps,
 					   bool attrsOnly, bool keysOnly,
 					   bool showTblSpc, bool inherits,
 					   int prettyFlags, bool missing_ok)
 {
-	/* might want a separate isConstraint parameter later */
-	bool		isConstraint = (excludeOps != NULL);
 	HeapTuple	ht_idx;
 	HeapTuple	ht_idxrel;
 	HeapTuple	ht_am;
@@ -1307,17 +1301,13 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 
 	if (!attrsOnly)
 	{
-		if (!isConstraint)
-			appendStringInfo(&buf, "CREATE %sINDEX %s ON %s USING %s (",
-							 idxrec->indisunique ? "UNIQUE " : "",
-							 quote_identifier(NameStr(idxrelrec->relname)),
-							 (prettyFlags & PRETTYFLAG_SCHEMA) ?
-							 generate_relation_name(indrelid, NIL) :
-							 generate_qualified_relation_name(indrelid),
-							 quote_identifier(NameStr(amrec->amname)));
-		else					/* currently, must be EXCLUDE constraint */
-			appendStringInfo(&buf, "EXCLUDE USING %s (",
-							 quote_identifier(NameStr(amrec->amname)));
+		appendStringInfo(&buf, "CREATE %sINDEX %s ON %s USING %s (",
+						 idxrec->indisunique ? "UNIQUE " : "",
+						 quote_identifier(NameStr(idxrelrec->relname)),
+						 (prettyFlags & PRETTYFLAG_SCHEMA) ?
+						 generate_relation_name(indrelid, NIL) :
+						 generate_qualified_relation_name(indrelid),
+						 quote_identifier(NameStr(amrec->amname)));
 	}
 
 	/*
@@ -1427,12 +1417,6 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 				}
 			}
 
-			/* Add the exclusion operator if relevant */
-			if (excludeOps != NULL)
-				appendStringInfo(&buf, " WITH %s",
-								 generate_operator_name(excludeOps[keyno],
-														keycoltype,
-														keycoltype));
 		}
 	}
 
@@ -1460,8 +1444,6 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			tblspc = get_rel_tablespace(indexrelid);
 			if (OidIsValid(tblspc))
 			{
-				if (isConstraint)
-					appendStringInfoString(&buf, " USING INDEX");
 				appendStringInfo(&buf, " TABLESPACE %s",
 								 quote_identifier(get_tablespace_name(tblspc)));
 			}
@@ -1488,10 +1470,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			/* Deparse */
 			str = deparse_expression_pretty(node, context, false, false,
 											prettyFlags, 0);
-			if (isConstraint)
-				appendStringInfo(&buf, " WHERE (%s)", str);
-			else
-				appendStringInfo(&buf, " WHERE %s", str);
+			appendStringInfo(&buf, " WHERE %s", str);
 		}
 	}
 
@@ -2093,46 +2072,6 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 			 */
 			appendStringInfoString(&buf, "TRIGGER");
 			break;
-		case CONSTRAINT_EXCLUSION:
-			{
-				Oid			indexOid = conForm->conindid;
-				Datum		val;
-				bool		isnull;
-				Datum	   *elems;
-				int			nElems;
-				int			i;
-				Oid		   *operators;
-
-				/* Extract operator OIDs from the pg_constraint tuple */
-				val = SysCacheGetAttr(CONSTROID, tup,
-									  Anum_pg_constraint_conexclop,
-									  &isnull);
-				if (isnull)
-					elog(ERROR, "null conexclop for constraint %u",
-						 constraintId);
-
-				deconstruct_array(DatumGetArrayTypeP(val),
-								  OIDOID, sizeof(Oid), true, TYPALIGN_INT,
-								  &elems, NULL, &nElems);
-
-				operators = (Oid *) palloc(nElems * sizeof(Oid));
-				for (i = 0; i < nElems; i++)
-					operators[i] = DatumGetObjectId(elems[i]);
-
-				/* pg_get_indexdef_worker does the rest */
-				/* suppress tablespace because pg_dump wants it that way */
-				appendStringInfoString(&buf,
-									   pg_get_indexdef_worker(indexOid,
-															  0,
-															  operators,
-															  false,
-															  false,
-															  false,
-															  false,
-															  prettyFlags,
-															  false));
-				break;
-			}
 		default:
 			elog(ERROR, "invalid constraint type \"%c\"", conForm->contype);
 			break;

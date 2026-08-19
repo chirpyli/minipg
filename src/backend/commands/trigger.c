@@ -707,7 +707,6 @@ CreateTriggerFiringOn(CreateTrigStmt *stmt, const char *queryString,
 											  ' ',
 											  ' ',
 											  ' ',
-											  NULL, /* no exclusion */
 											  NULL, /* no check constraint */
 											  NULL,
 											  true, /* islocal */

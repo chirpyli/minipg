@@ -1182,9 +1182,8 @@ heapam_index_build_range_scan(Relation heapRelation,
 	/* Remember if it's a system catalog */
 	is_system_catalog = IsSystemRelation(heapRelation);
 
-	/* See whether we're verifying uniqueness/exclusion properties */
-	checking_uniqueness = (indexInfo->ii_Unique ||
-						   indexInfo->ii_ExclusionOps != NULL);
+	/* See whether we're verifying uniqueness properties */
+	checking_uniqueness = indexInfo->ii_Unique;
 
 	/*
 	 * "Any visible" mode is not compatible with uniqueness checks; make sure

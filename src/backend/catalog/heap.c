@@ -2344,7 +2344,6 @@ StoreRelCheck(Relation rel, const char *ccname, Node *expr,
 							  ' ',
 							  ' ',
 							  ' ',
-							  NULL, /* not an exclusion constraint */
 							  expr, /* Tree form of check constraint */
 							  ccbin,	/* Binary form of check constraint */
 							  is_local, /* conislocal */

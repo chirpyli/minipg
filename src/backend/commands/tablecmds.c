@@ -2912,7 +2912,6 @@ AlterTableGetLockLevel(List *cmds)
 
 					switch (con->contype)
 					{
-						case CONSTR_EXCLUSION:
 						case CONSTR_PRIMARY:
 						case CONSTR_UNIQUE:
 
@@ -3754,7 +3753,6 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 				{
 					case CONSTR_PRIMARY:
 					case CONSTR_UNIQUE:
-					case CONSTR_EXCLUSION:
 						pass = AT_PASS_ADD_INDEXCONSTR;
 						break;
 					default:
@@ -8383,7 +8381,7 @@ TryReuseIndex(Oid oldId, IndexStmt *stmt)
 	if (CheckIndexCompatible(oldId,
 							 stmt->accessMethod,
 							 stmt->indexParams,
-							 stmt->excludeOpNames))
+							 NULL))
 	{
 		Relation	irel = index_open(oldId, NoLock);
 
