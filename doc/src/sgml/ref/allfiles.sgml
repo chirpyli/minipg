@@ -6,7 +6,6 @@ Complete list of usable sgml source files in this directory.
 
 <!-- SQL commands -->
 <!ENTITY abort SYSTEM "abort.sgml">
-<!ENTITY alterCollation SYSTEM "alter_collation.sgml">
 <!ENTITY alterConversion SYSTEM "alter_conversion.sgml">
 <!ENTITY alterDatabase SYSTEM "alter_database.sgml">
 <!ENTITY alterDomain SYSTEM "alter_domain.sgml">

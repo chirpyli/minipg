@@ -114,7 +114,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 
 			/* generic code path */
 		case OBJECT_AGGREGATE:
-		case OBJECT_COLLATION:
 		case OBJECT_CONVERSION:
 			{
 				Relation	catalog;

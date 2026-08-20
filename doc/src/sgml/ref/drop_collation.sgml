@@ -106,7 +106,6 @@ DROP COLLATION german;
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="sql-altercollation"/></member>
    <member><xref linkend="sql-createcollation"/></member>
   </simplelist>
  </refsect1>

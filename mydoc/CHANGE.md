@@ -6,6 +6,22 @@
 
 ---
 
+## ALTER COLLATION 功能裁剪（2026-08-20）
+
+minipg 的 `ALTER COLLATION` 在裁前已属死功能：语法生产式为空壳（`gram.y` 仅有 `ALTER COLLATION` 注释块而无实际产生式，无法解析）、无 `AlterCollation`/`RefreshCollationVersion` 实现函数、`RENAME` 已整体裁、`OWNER TO` 角色已裁，且无任何回归测试引用。本次彻底删除 `ALTER COLLATION` 的残留死代码与文档。
+
+涉及文件与改动：
+
+- **`src/backend/parser/gram.y`**：删除空的 `ALTER COLLATION` 注释块（仅注释，无生产式，属误导死壳）。
+- **`src/backend/commands/alter.c`**：从 `ExecAlterObjectSchemaStmt` 的 generic 代码路径中删除 `case OBJECT_COLLATION:`（该 case 实际不可达——无语法生成 `AlterObjectSchemaStmt(OBJECT_COLLATION)`），保留 `OBJECT_AGGREGATE`/`OBJECT_CONVERSION` 共享分支，不影响 CONVERSION 的 `SET SCHEMA`。
+- **`doc/src/sgml/ref/alter_collation.sgml`**：整文件删除（参考文档）；同步清理引用：`ref/allfiles.sgml` 删除 `<!ENTITY alterCollation ...>`、`reference.sgml` 删除 `&alterCollation;`、`create_collation.sgml` 与 `drop_collation.sgml` 的 See Also 中 `<xref linkend="sql-altercollation"/>`、`create_collation.sgml` 版本不匹配说明段、`func.sgml` 中 `pg_collation.collversion` 说明处的 `sql-altercollation` 断链 xref。
+
+保留项：`OBJECT_COLLATION` 枚举及 `objectaddress.c`/`dropcmds.c` 中的引用（`get_object_address` 的 `OBJECT_COLLATION` case、`pg_class` 描述、DROP COLLATION 路径）——这些服务于 **CREATE/DROP COLLATION**，collation 是排序规则核心对象，学习价值高，不予裁。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；改动为纯删除，无死代码残留（`OBJECT_COLLATION` 枚举仍被 CREATE/DROP COLLATION 及寻址逻辑共享，必须保留）。`make` 重编通过，`make check` 全绿后回填验证结果。
+
+---
+
 ## ALTER AGGREGATE 功能裁剪（2026-08-20）
 
 minipg 的 `ALTER AGGREGATE` 无独立 `AlterAggregateStmt` 节点，而是复用 `AlterObjectSchemaStmt`（`SET SCHEMA`）、`RenameStmt`（`RENAME`）、`AlterOwnerStmt`（`OWNER TO`）三类通用语句机制。经核查：minipg 已于历史裁剪中删除 `RenameStmt`/`ExecRenameStmt`（RENAME 语法整体不可用），且角色/owner 机制已裁（`OWNER TO` 无实际语义）；故 `ALTER AGGREGATE` 实际仅 `SET SCHEMA` 一条子命令（走 `OBJECT_AGGREGATE` 与 `OBJECT_COLLATION`/`OBJECT_CONVERSION` 共享的 `ExecAlterObjectSchemaStmt` generic 分支）生效。本次彻底裁剪 `ALTER AGGREGATE` 的全部用户侧入口（语法生产式 + 命令标签），底层 aggregate 对象系统（`OBJECT_AGGREGATE` 枚举、`pg_proc` 寻址、CREATE/DROP AGGREGATE）保留——因后者与函数机制深度共享，且 CREATE/DROP AGGREGATE 学习价值高，不予裁。

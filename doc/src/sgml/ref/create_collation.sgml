@@ -161,11 +161,6 @@ CREATE COLLATION [ IF NOT EXISTS ] <replaceable>name</replaceable> FROM <replace
        by <command>pg_upgrade</command> for copying the version from an
        existing installation.
       </para>
-
-      <para>
-       See also <xref linkend="sql-altercollation"/> for how to handle
-       collation version mismatches.
-      </para>
      </listitem>
     </varlistentry>
 
@@ -255,7 +250,6 @@ CREATE COLLATION german FROM "de_DE";
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="sql-altercollation"/></member>
    <member><xref linkend="sql-dropcollation"/></member>
   </simplelist>
  </refsect1>
