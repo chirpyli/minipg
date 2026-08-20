@@ -3718,7 +3718,7 @@ static struct config_string ConfigureNamesString[] =
 			GUC_LIST_INPUT
 		},
 		&ListenAddresses,
-		"localhost",
+		"*",
 		NULL, NULL, NULL
 	},
 

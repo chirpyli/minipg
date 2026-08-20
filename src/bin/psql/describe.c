@@ -3358,12 +3358,7 @@ listLanguages(const char *pattern, bool verbose, bool showSystem)
 	}
 
 	appendPQExpBuffer(&buf,
-					  ",\n       d.description AS \"%s\""
-					  "\nFROM pg_catalog.pg_language l\n"
-					  "LEFT JOIN pg_catalog.pg_description d\n"
-					  "  ON d.classoid = l.tableoid AND d.objoid = l.oid\n"
-					  "  AND d.objsubid = 0\n",
-					  gettext_noop("Description"));
+					  "\nFROM pg_catalog.pg_language l\n");
 
 	if (pattern)
 		if (!validateSQLNamePattern(&buf, pattern, false, false,
@@ -3430,22 +3425,9 @@ listDomains(const char *pattern, bool verbose, bool showSystem)
 					  gettext_noop("Default"),
 					  gettext_noop("Check"));
 
-	if (verbose)
-	{
-		appendPQExpBuffer(&buf,
-						  ",\n       d.description as \"%s\"",
-						  gettext_noop("Description"));
-	}
-
 	appendPQExpBufferStr(&buf,
 						 "\nFROM pg_catalog.pg_type t\n"
 						 "     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace\n");
-
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "     LEFT JOIN pg_catalog.pg_description d "
-							 "ON d.classoid = t.tableoid AND d.objoid = t.oid "
-							 "AND d.objsubid = 0\n");
 
 	appendPQExpBufferStr(&buf, "WHERE t.typtype = 'd'\n");
 
@@ -3506,22 +3488,10 @@ listConversions(const char *pattern, bool verbose, bool showSystem)
 					  gettext_noop("yes"), gettext_noop("no"),
 					  gettext_noop("Default?"));
 
-	if (verbose)
-		appendPQExpBuffer(&buf,
-						  ",\n       d.description AS \"%s\"",
-						  gettext_noop("Description"));
-
 	appendPQExpBufferStr(&buf,
 						 "\nFROM pg_catalog.pg_conversion c\n"
 						 "     JOIN pg_catalog.pg_namespace n "
 						 "ON n.oid = c.connamespace\n");
-
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "LEFT JOIN pg_catalog.pg_description d "
-							 "ON d.classoid = c.tableoid\n"
-							 "          AND d.objoid = c.oid "
-							 "AND d.objsubid = 0\n");
 
 	appendPQExpBufferStr(&buf, "WHERE true\n");
 
@@ -3692,11 +3662,6 @@ listCasts(const char *pattern, bool verbose)
 					  gettext_noop("yes"),
 					  gettext_noop("Implicit?"));
 
-	if (verbose)
-		appendPQExpBuffer(&buf,
-						  ",\n       d.description AS \"%s\"",
-						  gettext_noop("Description"));
-
 	/*
 	 * We need a left join to pg_proc for binary casts; the others are just
 	 * paranoia.
@@ -3712,12 +3677,6 @@ listCasts(const char *pattern, bool verbose)
 						 "     ON c.casttarget = tt.oid\n"
 						 "     LEFT JOIN pg_catalog.pg_namespace nt\n"
 						 "     ON nt.oid = tt.typnamespace\n");
-
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "     LEFT JOIN pg_catalog.pg_description d\n"
-							 "     ON d.classoid = c.tableoid AND d.objoid = "
-							 "c.oid AND d.objsubid = 0\n");
 
 	appendPQExpBufferStr(&buf, "WHERE ( (true");
 
@@ -4490,15 +4449,12 @@ listExtensions(const char *pattern)
 	initPQExpBuffer(&buf);
 	printfPQExpBuffer(&buf,
 					  "SELECT e.extname AS \"%s\", "
-					  "e.extversion AS \"%s\", n.nspname AS \"%s\", c.description AS \"%s\"\n"
+					  "e.extversion AS \"%s\", n.nspname AS \"%s\"\n"
 					  "FROM pg_catalog.pg_extension e "
-					  "LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace "
-					  "LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid "
-					  "AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass\n",
+					  "LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace\n",
 					  gettext_noop("Name"),
 					  gettext_noop("Version"),
-					  gettext_noop("Schema"),
-					  gettext_noop("Description"));
+					  gettext_noop("Schema"));
 
 	if (!validateSQLNamePattern(&buf, pattern,
 								false, false,

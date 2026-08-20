@@ -564,8 +564,8 @@ CREATE TABLE products (
      restore to fail.  The restore could fail even when the complete
      database state is consistent with the constraint, due to rows not
      being loaded in an order that will satisfy the constraint.  If
-     possible, use <literal>UNIQUE</literal>, <literal>EXCLUDE</literal>,
-     or <literal>FOREIGN KEY</literal> constraints to express
+     possible, use <literal>UNIQUE</literal> or
+     <literal>FOREIGN KEY</literal> constraints to express
      cross-row and cross-table restrictions.
     </para>
 
@@ -1104,42 +1104,6 @@ CREATE TABLE order_items (
     linkend="dml"/>.  Also see the description of foreign key constraint
     syntax in the reference documentation for
     <xref linkend="sql-createtable"/>.
-   </para>
-  </sect2>
-
-  <sect2 id="ddl-constraints-exclusion">
-   <title>Exclusion Constraints</title>
-
-   <indexterm>
-    <primary>exclusion constraint</primary>
-   </indexterm>
-
-   <indexterm>
-    <primary>constraint</primary>
-    <secondary>exclusion</secondary>
-   </indexterm>
-
-   <para>
-    Exclusion constraints ensure that if any two rows are compared on
-    the specified columns or expressions using the specified operators,
-    at least one of these operator comparisons will return false or null.
-    The syntax is:
-<programlisting>
-CREATE TABLE circles (
-    c circle,
-    EXCLUDE USING gist (c WITH &amp;&amp;)
-);
-</programlisting>
-   </para>
-
-   <para>
-    See also <link linkend="sql-createtable-exclude"><command>CREATE
-    TABLE ... CONSTRAINT ... EXCLUDE</command></link> for details.
-   </para>
-
-   <para>
-    Adding an exclusion constraint will automatically create an index
-    of the type specified in the constraint declaration.
    </para>
   </sect2>
  </sect1>
