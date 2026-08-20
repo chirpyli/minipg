@@ -2559,8 +2559,6 @@ _copyConstraint(const Constraint *from)
 
 	COPY_SCALAR_FIELD(contype);
 	COPY_STRING_FIELD(conname);
-	COPY_SCALAR_FIELD(deferrable);
-	COPY_SCALAR_FIELD(initdeferred);
 	COPY_LOCATION_FIELD(location);
 	COPY_SCALAR_FIELD(is_no_inherit);
 	COPY_NODE_FIELD(raw_expr);
@@ -2967,8 +2965,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_SCALAR_FIELD(unique);
 	COPY_SCALAR_FIELD(primary);
 	COPY_SCALAR_FIELD(isconstraint);
-	COPY_SCALAR_FIELD(deferrable);
-	COPY_SCALAR_FIELD(initdeferred);
 	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(concurrent);
 	COPY_SCALAR_FIELD(if_not_exists);
@@ -3411,8 +3407,6 @@ _copyCreateTrigStmt(const CreateTrigStmt *from)
 	COPY_NODE_FIELD(columns);
 	COPY_NODE_FIELD(whenClause);
 	COPY_NODE_FIELD(transitionRels);
-	COPY_SCALAR_FIELD(deferrable);
-	COPY_SCALAR_FIELD(initdeferred);
 	COPY_NODE_FIELD(constrrel);
 
 	return newnode;
@@ -3426,17 +3420,6 @@ _copyLockStmt(const LockStmt *from)
 	COPY_NODE_FIELD(relations);
 	COPY_SCALAR_FIELD(mode);
 	COPY_SCALAR_FIELD(nowait);
-
-	return newnode;
-}
-
-static ConstraintsSetStmt *
-_copyConstraintsSetStmt(const ConstraintsSetStmt *from)
-{
-	ConstraintsSetStmt *newnode = makeNode(ConstraintsSetStmt);
-
-	COPY_NODE_FIELD(constraints);
-	COPY_SCALAR_FIELD(deferred);
 
 	return newnode;
 }
@@ -4097,9 +4080,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_LockStmt:
 			retval = _copyLockStmt(from);
-			break;
-		case T_ConstraintsSetStmt:
-			retval = _copyConstraintsSetStmt(from);
 			break;
 		case T_ReindexStmt:
 			retval = _copyReindexStmt(from);

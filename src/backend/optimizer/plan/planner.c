@@ -2335,7 +2335,7 @@ remove_useless_groupby_columns(PlannerInfo *root)
 		 * Can't remove any columns for this rel if there is no suitable
 		 * (i.e., nondeferrable) primary key constraint.
 		 */
-		pkattnos = get_primary_key_attnos(rte->relid, false, &constraintOid);
+		pkattnos = get_primary_key_attnos(rte->relid, &constraintOid);
 		if (pkattnos == NULL)
 			continue;
 

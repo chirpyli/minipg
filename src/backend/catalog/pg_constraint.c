@@ -50,8 +50,6 @@ Oid
 CreateConstraintEntry(const char *constraintName,
 					  Oid constraintNamespace,
 					  char constraintType,
-					  bool isDeferrable,
-					  bool isDeferred,
 					  bool isValidated,
 					  Oid parentConstrId,
 					  Oid relId,
@@ -156,8 +154,6 @@ CreateConstraintEntry(const char *constraintName,
 	values[Anum_pg_constraint_conname - 1] = NameGetDatum(&cname);
 	values[Anum_pg_constraint_connamespace - 1] = ObjectIdGetDatum(constraintNamespace);
 	values[Anum_pg_constraint_contype - 1] = CharGetDatum(constraintType);
-	values[Anum_pg_constraint_condeferrable - 1] = BoolGetDatum(isDeferrable);
-	values[Anum_pg_constraint_condeferred - 1] = BoolGetDatum(isDeferred);
 	values[Anum_pg_constraint_convalidated - 1] = BoolGetDatum(isValidated);
 	values[Anum_pg_constraint_conrelid - 1] = ObjectIdGetDatum(relId);
 	values[Anum_pg_constraint_contypid - 1] = ObjectIdGetDatum(domainId);
@@ -1057,14 +1053,13 @@ get_domain_constraint_oid(Oid typid, const char *conname, bool missing_ok)
  * with attnos being offset by FirstLowInvalidHeapAttributeNumber so that
  * system columns can be represented.
  *
- * If there is no primary key, return NULL.  We also return NULL if the pkey
- * constraint is deferrable and deferrableOk is false.
+ * If there is no primary key, return NULL.
  *
  * *constraintOid is set to the OID of the pkey constraint, or InvalidOid
  * on failure.
  */
 Bitmapset *
-get_primary_key_attnos(Oid relid, bool deferrableOk, Oid *constraintOid)
+get_primary_key_attnos(Oid relid, Oid *constraintOid)
 {
 	Bitmapset  *pkattnos = NULL;
 	Relation	pg_constraint;
@@ -1099,14 +1094,6 @@ get_primary_key_attnos(Oid relid, bool deferrableOk, Oid *constraintOid)
 		/* Skip constraints that are not PRIMARY KEYs */
 		if (con->contype != CONSTRAINT_PRIMARY)
 			continue;
-
-		/*
-		 * If the primary key is deferrable, but we've been instructed to
-		 * ignore deferrable constraints, then we might as well give up
-		 * searching, since there can only be a single primary key on a table.
-		 */
-		if (con->condeferrable && !deferrableOk)
-			break;
 
 		/* Extract the conkey array, ie, attnums of PK's columns */
 		adatum = heap_getattr(tuple, Anum_pg_constraint_conkey,
@@ -1169,7 +1156,7 @@ check_functional_grouping(Oid relid,
 	ListCell   *gl;
 
 	/* If the rel has no PK, then we can't prove functional dependency */
-	pkattnos = get_primary_key_attnos(relid, false, &constraintOid);
+	pkattnos = get_primary_key_attnos(relid, &constraintOid);
 	if (pkattnos == NULL)
 		return false;
 

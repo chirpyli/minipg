@@ -180,7 +180,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 			}
 
 		case T_ClosePortalStmt:
-		case T_ConstraintsSetStmt:
 		case T_DeallocateStmt:
 		case T_DeclareCursorStmt:
 		case T_DiscardStmt:
@@ -696,11 +695,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			 */
 			RequireTransactionBlock(isTopLevel, "LOCK TABLE");
 			LockTableCommand((LockStmt *) parsetree);
-			break;
-
-		case T_ConstraintsSetStmt:
-			WarnNoTransactionBlock(isTopLevel, "SET CONSTRAINTS");
-			AfterTriggerSetState((ConstraintsSetStmt *) parsetree);
 			break;
 
 		case T_CheckPointStmt:
@@ -1887,10 +1881,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_LOCK_TABLE;
 			break;
 
-		case T_ConstraintsSetStmt:
-			tag = CMDTAG_SET_CONSTRAINTS;
-			break;
-
 		case T_CheckPointStmt:
 			tag = CMDTAG_CHECKPOINT;
 			break;
@@ -2310,10 +2300,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_LockStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_ConstraintsSetStmt:
 			lev = LOGSTMT_ALL;
 			break;
 

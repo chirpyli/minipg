@@ -406,7 +406,6 @@ ConstrType
 Constraint
 ConstraintCategory
 ConstraintInfo
-ConstraintsSetStmt
 ControlData
 ControlFileData
 ConvInfo

@@ -1734,8 +1734,7 @@ PlannedStmtRequiresSnapshot(PlannedStmt *pstmt)
 		IsA(utilityStmt, LockStmt) ||
 		IsA(utilityStmt, VariableSetStmt) ||
 		IsA(utilityStmt, VariableShowStmt) ||
-		IsA(utilityStmt, ConstraintsSetStmt) ||
-	/* efficiency hacks from here down */
+/* efficiency hacks from here down */
 		IsA(utilityStmt, FetchStmt) ||
 		IsA(utilityStmt, CheckPointStmt))
 		return false;

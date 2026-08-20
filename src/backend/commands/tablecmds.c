@@ -6663,8 +6663,6 @@ ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 	/* Create the catalog entries for the constraint */
 	flags = INDEX_CONSTR_CREATE_UPDATE_INDEX |
 		INDEX_CONSTR_CREATE_REMOVE_OLD_DEPS |
-		(stmt->initdeferred ? INDEX_CONSTR_CREATE_INIT_DEFERRED : 0) |
-		(stmt->deferrable ? INDEX_CONSTR_CREATE_DEFERRABLE : 0) |
 		(stmt->primary ? INDEX_CONSTR_CREATE_MARK_AS_PRIMARY : 0);
 
 	address = index_constraint_create(rel,

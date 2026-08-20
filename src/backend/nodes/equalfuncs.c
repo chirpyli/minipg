@@ -1159,8 +1159,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 	COMPARE_SCALAR_FIELD(unique);
 	COMPARE_SCALAR_FIELD(primary);
 	COMPARE_SCALAR_FIELD(isconstraint);
-	COMPARE_SCALAR_FIELD(deferrable);
-	COMPARE_SCALAR_FIELD(initdeferred);
 	COMPARE_SCALAR_FIELD(transformed);
 	COMPARE_SCALAR_FIELD(concurrent);
 	COMPARE_SCALAR_FIELD(if_not_exists);
@@ -1537,8 +1535,6 @@ _equalCreateTrigStmt(const CreateTrigStmt *a, const CreateTrigStmt *b)
 	COMPARE_NODE_FIELD(columns);
 	COMPARE_NODE_FIELD(whenClause);
 	COMPARE_NODE_FIELD(transitionRels);
-	COMPARE_SCALAR_FIELD(deferrable);
-	COMPARE_SCALAR_FIELD(initdeferred);
 	COMPARE_NODE_FIELD(constrrel);
 
 	return true;
@@ -1550,15 +1546,6 @@ _equalLockStmt(const LockStmt *a, const LockStmt *b)
 	COMPARE_NODE_FIELD(relations);
 	COMPARE_SCALAR_FIELD(mode);
 	COMPARE_SCALAR_FIELD(nowait);
-
-	return true;
-}
-
-static bool
-_equalConstraintsSetStmt(const ConstraintsSetStmt *a, const ConstraintsSetStmt *b)
-{
-	COMPARE_NODE_FIELD(constraints);
-	COMPARE_SCALAR_FIELD(deferred);
 
 	return true;
 }
@@ -1875,8 +1862,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 {
 	COMPARE_SCALAR_FIELD(contype);
 	COMPARE_STRING_FIELD(conname);
-	COMPARE_SCALAR_FIELD(deferrable);
-	COMPARE_SCALAR_FIELD(initdeferred);
 	COMPARE_LOCATION_FIELD(location);
 	COMPARE_SCALAR_FIELD(is_no_inherit);
 	COMPARE_NODE_FIELD(raw_expr);
@@ -2544,9 +2529,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_LockStmt:
 			retval = _equalLockStmt(a, b);
-			break;
-		case T_ConstraintsSetStmt:
-			retval = _equalConstraintsSetStmt(a, b);
 			break;
 		case T_ReindexStmt:
 			retval = _equalReindexStmt(a, b);

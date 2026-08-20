@@ -2455,8 +2455,6 @@ _outIndexStmt(StringInfo str, const IndexStmt *node)
 	WRITE_BOOL_FIELD(unique);
 	WRITE_BOOL_FIELD(primary);
 	WRITE_BOOL_FIELD(isconstraint);
-	WRITE_BOOL_FIELD(deferrable);
-	WRITE_BOOL_FIELD(initdeferred);
 	WRITE_BOOL_FIELD(transformed);
 	WRITE_BOOL_FIELD(concurrent);
 	WRITE_BOOL_FIELD(if_not_exists);
@@ -3113,8 +3111,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 	WRITE_NODE_TYPE("CONSTRAINT");
 
 	WRITE_STRING_FIELD(conname);
-	WRITE_BOOL_FIELD(deferrable);
-	WRITE_BOOL_FIELD(initdeferred);
 	WRITE_LOCATION_FIELD(location);
 
 	appendStringInfoString(str, " :contype ");
@@ -3176,22 +3172,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 			WRITE_STRING_FIELD(indexspace);
 			WRITE_BOOL_FIELD(reset_default_tblspc);
 			/* access_method and where_clause not currently used */
-			break;
-
-		case CONSTR_ATTR_DEFERRABLE:
-			appendStringInfoString(str, "ATTR_DEFERRABLE");
-			break;
-
-		case CONSTR_ATTR_NOT_DEFERRABLE:
-			appendStringInfoString(str, "ATTR_NOT_DEFERRABLE");
-			break;
-
-		case CONSTR_ATTR_DEFERRED:
-			appendStringInfoString(str, "ATTR_DEFERRED");
-			break;
-
-		case CONSTR_ATTR_IMMEDIATE:
-			appendStringInfoString(str, "ATTR_IMMEDIATE");
 			break;
 
 		default:

@@ -372,12 +372,9 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 		 * For an immediate-mode unique index, we just tell the index AM to
 		 * throw error if not unique.
 		 *
-		 * For a deferrable unique index, we tell the index AM to just detect
-		 * possible non-uniqueness, and we add the index OID to the result
-		 * list if further checking is needed.
-		 *
-		 * For a speculative insertion (used by INSERT ... ON CONFLICT), do
-		 * the same as for a deferrable unique index.
+		 * For a speculative insertion (used by INSERT ... ON CONFLICT), tell
+		 * the index AM to just detect possible non-uniqueness, and we add the
+		 * index OID to the result list if further checking is needed.
 		 */
 		if (!indexRelation->rd_index->indisunique)
 			checkUnique = UNIQUE_CHECK_NO;
@@ -386,7 +383,7 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 		else if (indexRelation->rd_index->indimmediate)
 			checkUnique = UNIQUE_CHECK_YES;
 		else
-			checkUnique = UNIQUE_CHECK_PARTIAL;
+			checkUnique = UNIQUE_CHECK_YES;
 
 		/*
 		 * There's definitely going to be an index_insert() call for this

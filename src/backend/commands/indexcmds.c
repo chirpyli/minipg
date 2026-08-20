@@ -921,11 +921,6 @@ DefineIndex(Oid relationId,
 	 * exist, mark the index as invalid.
 	 */
 
-	if (stmt->deferrable)
-		constr_flags |= INDEX_CONSTR_CREATE_DEFERRABLE;
-	if (stmt->initdeferred)
-		constr_flags |= INDEX_CONSTR_CREATE_INIT_DEFERRED;
-
 	indexRelationId =
 		index_create(rel, indexRelationName, indexRelationId, parentIndexId,
 					 parentConstraintId,

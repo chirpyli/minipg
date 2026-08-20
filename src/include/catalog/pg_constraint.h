@@ -49,8 +49,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	Oid			connamespace BKI_LOOKUP(pg_namespace);	/* OID of namespace
 														 * containing constraint */
 	char		contype;		/* constraint type; see codes below */
-	bool		condeferrable;	/* deferrable constraint? */
-	bool		condeferred;	/* deferred by default? */
 	bool		convalidated;	/* constraint has been validated? */
 
 	/*
@@ -194,8 +192,6 @@ typedef enum ConstraintCategory
 extern Oid	CreateConstraintEntry(const char *constraintName,
 								  Oid constraintNamespace,
 								  char constraintType,
-								  bool isDeferrable,
-								  bool isDeferred,
 								  bool isValidated,
 								  Oid parentConstrId,
 								  Oid relId,
@@ -240,8 +236,7 @@ extern Bitmapset *get_relation_constraint_attnos(Oid relid, const char *conname,
 extern Oid	get_domain_constraint_oid(Oid typid, const char *conname, bool missing_ok);
 extern Oid	get_relation_idx_constraint_oid(Oid relationId, Oid indexId);
 
-extern Bitmapset *get_primary_key_attnos(Oid relid, bool deferrableOk,
-										 Oid *constraintOid);
+extern Bitmapset *get_primary_key_attnos(Oid relid, Oid *constraintOid);
 
 extern bool check_functional_grouping(Oid relid,
 									  Index varno, Index varlevelsup,

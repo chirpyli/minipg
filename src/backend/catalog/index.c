@@ -672,9 +672,6 @@ UpdateIndexRelation(Oid indexoid,
  *			already exists.
  *		INDEX_CREATE_PARTITIONED:
  *			create a partitioned index (table must be partitioned)
- *		INDEX_CREATE_DEFERRABLE:
- *			index supports a deferrable constraint, mark it as
- *			non-immediate (indimmediate = false).
  *
  * constr_flags: flags passed to index_constraint_create
  *		(only if INDEX_CREATE_ADD_CONSTRAINT is set)
@@ -961,8 +958,7 @@ index_create(Relation heapRelation,
 						indexInfo,
 						collationObjectId, classObjectId, coloptions,
 						isprimary,
-						(constr_flags & INDEX_CONSTR_CREATE_DEFERRABLE) == 0 &&
-						(flags & INDEX_CREATE_DEFERRABLE) == 0,
+						true,
 						!concurrent && !invalid,
 						!concurrent);
 
@@ -1224,7 +1220,6 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 	List	   *indexExprs = NIL;
 	List	   *indexPreds = NIL;
 	bits16		flags = INDEX_CREATE_SKIP_BUILD | INDEX_CREATE_CONCURRENT;
-	Form_pg_index indexForm;
 
 	indexRelation = index_open(oldIndexId, RowExclusiveLock);
 
@@ -1235,12 +1230,6 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 	indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(oldIndexId));
 	if (!HeapTupleIsValid(indexTuple))
 		elog(ERROR, "cache lookup failed for index %u", oldIndexId);
-
-	indexForm = (Form_pg_index) GETSTRUCT(indexTuple);
-
-	/* Old index is deferrable, do the same for the new index */
-	if (!indexForm->indimmediate)
-		flags |= INDEX_CREATE_DEFERRABLE;
 
 	indclassDatum = SysCacheGetAttr(INDEXRELID, indexTuple,
 									Anum_pg_index_indclass, &isnull);
@@ -1769,8 +1758,6 @@ index_concurrently_set_dead(Oid heapId, Oid indexId)
  * constraintType: one of CONSTRAINT_PRIMARY or CONSTRAINT_UNIQUE
  * flags: bitmask that can include any combination of these bits:
  *		INDEX_CONSTR_CREATE_MARK_AS_PRIMARY: index is a PRIMARY KEY
- *		INDEX_CONSTR_CREATE_DEFERRABLE: constraint is DEFERRABLE
- *		INDEX_CONSTR_CREATE_INIT_DEFERRED: constraint is INITIALLY DEFERRED
  *		INDEX_CONSTR_CREATE_UPDATE_INDEX: update the pg_index row
  *		INDEX_CONSTR_CREATE_REMOVE_OLD_DEPS: remove existing dependencies
  *			of index on table's columns
@@ -1792,15 +1779,11 @@ index_constraint_create(Relation heapRelation,
 	ObjectAddress myself,
 				idxaddr;
 	Oid			conOid;
-	bool		deferrable;
-	bool		initdeferred;
 	bool		mark_as_primary;
 	bool		islocal;
 	bool		noinherit;
 	int			inhcount;
 
-	deferrable = (constr_flags & INDEX_CONSTR_CREATE_DEFERRABLE) != 0;
-	initdeferred = (constr_flags & INDEX_CONSTR_CREATE_INIT_DEFERRED) != 0;
 	mark_as_primary = (constr_flags & INDEX_CONSTR_CREATE_MARK_AS_PRIMARY) != 0;
 
 	/* constraint creation support doesn't work while bootstrapping */
@@ -1850,8 +1833,6 @@ index_constraint_create(Relation heapRelation,
 	conOid = CreateConstraintEntry(constraintName,
 								   namespaceId,
 								   constraintType,
-								   deferrable,
-								   initdeferred,
 								   true,
 								   parentConstraintId,
 								   RelationGetRelid(heapRelation),
@@ -1902,39 +1883,7 @@ index_constraint_create(Relation heapRelation,
 	}
 
 	/*
-	 * If the constraint is deferrable, create the deferred uniqueness
-	 * checking trigger.  (The trigger will be given an internal dependency on
-	 * the constraint by CreateTrigger.)
-	 */
-	if (deferrable)
-	{
-		CreateTrigStmt *trigger = makeNode(CreateTrigStmt);
-
-		trigger->replace = false;
-		trigger->isconstraint = true;
-		trigger->trigname = (constraintType == CONSTRAINT_PRIMARY) ?
-			"PK_ConstraintTrigger" :
-			"Unique_ConstraintTrigger";
-		trigger->relation = NULL;
-		trigger->funcname = SystemFuncName("unique_key_recheck");
-		trigger->args = NIL;
-		trigger->row = true;
-		trigger->timing = TRIGGER_TYPE_AFTER;
-		trigger->events = TRIGGER_TYPE_INSERT | TRIGGER_TYPE_UPDATE;
-		trigger->columns = NIL;
-		trigger->whenClause = NULL;
-		trigger->transitionRels = NIL;
-		trigger->deferrable = true;
-		trigger->initdeferred = initdeferred;
-		trigger->constrrel = NULL;
-
-		(void) CreateTrigger(trigger, NULL, RelationGetRelid(heapRelation),
-							 InvalidOid, conOid, indexRelationId, InvalidOid,
-							 InvalidOid, NULL, true, false);
-	}
-
-	/*
-	 * If needed, mark the index as primary and/or deferred in pg_index.
+	 * If needed, mark the index as primary in pg_index.
 	 *
 	 * Note: When making an existing index into a constraint, caller must have
 	 * a table lock that prevents concurrent table updates; otherwise, there
@@ -1942,7 +1891,7 @@ index_constraint_create(Relation heapRelation,
 	 * index at all.
 	 */
 	if ((constr_flags & INDEX_CONSTR_CREATE_UPDATE_INDEX) &&
-		(mark_as_primary || deferrable))
+		mark_as_primary)
 	{
 		Relation	pg_index;
 		HeapTuple	indexTuple;
@@ -1963,12 +1912,6 @@ index_constraint_create(Relation heapRelation,
 			indexForm->indisprimary = true;
 			dirty = true;
 			marked_as_primary = true;
-		}
-
-		if (deferrable && indexForm->indimmediate)
-		{
-			indexForm->indimmediate = false;
-			dirty = true;
 		}
 
 		if (dirty)

@@ -2838,10 +2838,6 @@
   prosrc => 'pg_column_is_updatable' },
 
 
-# Deferrable unique constraint trigger
-{ oid => '1250', descr => 'deferred UNIQUE constraint check',
-  proname => 'unique_key_recheck', provolatile => 'v', prorettype => 'trigger',
-  proargtypes => '', prosrc => 'unique_key_recheck' },
 
 
 { oid => '1666',

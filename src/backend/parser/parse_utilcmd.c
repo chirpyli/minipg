@@ -108,8 +108,6 @@ static IndexStmt *transformIndexConstraint(Constraint *constraint,
 										   CreateStmtContext *cxt);
 static void transformCheckConstraints(CreateStmtContext *cxt,
 									  bool skipValidation);
-static void transformConstraintAttrs(CreateStmtContext *cxt,
-									 List *constraintList);
 static void transformColumnType(CreateStmtContext *cxt, ColumnDef *column);
 static void setSchemaName(const char *context_schema, char **stmt_schema_name);
 
@@ -292,9 +290,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 	if (column->typeName)
 		transformColumnType(cxt, column);
 
-	/* Process column constraints, if any... */
-	transformConstraintAttrs(cxt, column->constraints);
-
 	saw_nullable = false;
 	saw_default = false;
 	saw_generated = false;
@@ -374,14 +369,7 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 				break;
 
-			case CONSTR_ATTR_DEFERRABLE:
-			case CONSTR_ATTR_NOT_DEFERRABLE:
-			case CONSTR_ATTR_DEFERRED:
-			case CONSTR_ATTR_IMMEDIATE:
-				/* transformConstraintAttrs took care of these */
-				break;
-
-			default:
+				default:
 				elog(ERROR, "unrecognized constraint type: %d",
 					 constraint->contype);
 				break;
@@ -421,10 +409,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 		case CONSTR_NULL:
 		case CONSTR_NOTNULL:
 		case CONSTR_DEFAULT:
-		case CONSTR_ATTR_DEFERRABLE:
-		case CONSTR_ATTR_NOT_DEFERRABLE:
-		case CONSTR_ATTR_DEFERRED:
-		case CONSTR_ATTR_IMMEDIATE:
 			elog(ERROR, "invalid context for constraint type %d",
 				 constraint->contype);
 			break;
@@ -601,7 +585,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 		if (OidIsValid(constraintId))
 		{
 			HeapTuple	ht_constr;
-			Form_pg_constraint conrec;
 
 			if (constraintOid)
 				*constraintOid = constraintId;
@@ -611,11 +594,8 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 			if (!HeapTupleIsValid(ht_constr))
 				elog(ERROR, "cache lookup failed for constraint %u",
 					 constraintId);
-			conrec = (Form_pg_constraint) GETSTRUCT(ht_constr);
 
 			index->isconstraint = true;
-			index->deferrable = conrec->condeferrable;
-			index->initdeferred = conrec->condeferred;
 
 			ReleaseSysCache(ht_constr);
 		}
@@ -939,9 +919,7 @@ transformIndexConstraints(CreateStmtContext *cxt)
 			if (equal(index->indexParams, priorindex->indexParams) &&
 				equal(index->indexIncludingParams, priorindex->indexIncludingParams) &&
 				equal(index->whereClause, priorindex->whereClause) &&
-				strcmp(index->accessMethod, priorindex->accessMethod) == 0 &&
-				index->deferrable == priorindex->deferrable &&
-				index->initdeferred == priorindex->initdeferred)
+				strcmp(index->accessMethod, priorindex->accessMethod) == 0)
 			{
 				priorindex->unique |= index->unique;
 
@@ -1008,8 +986,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		 */
 	}
 	index->isconstraint = true;
-	index->deferrable = constraint->deferrable;
-	index->initdeferred = constraint->initdeferred;
 
 	if (constraint->conname != NULL)
 		index->idxname = pstrdup(constraint->conname);
@@ -1118,18 +1094,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is a partial index", index_name),
 					 errdetail("Cannot create a primary key or unique constraint using such an index."),
-					 parser_errposition(cxt->pstate, constraint->location)));
-
-		/*
-		 * It's probably unsafe to change a deferred index to non-deferred. (A
-		 * non-constraint index couldn't be deferred anyway, so this case
-		 * should never occur; no need to sweat, but let's check it.)
-		 */
-		if (!index_form->indimmediate && !constraint->deferrable)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is a deferrable index", index_name),
-					 errdetail("Cannot create a non-deferrable constraint using a deferrable index."),
 					 parser_errposition(cxt->pstate, constraint->location)));
 
 		/*
@@ -2070,124 +2034,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 }
 
 
-/*
- * Preprocess a list of column constraint clauses
- * to attach constraint attributes to their primary constraint nodes
- * and detect inconsistent/misplaced constraint attributes.
- *
- * NOTE: currently, attributes are only supported for FOREIGN KEY, UNIQUE,
- * EXCLUSION, and PRIMARY KEY constraints, but someday they ought to be
- * supported for other constraint types.
- */
-static void
-transformConstraintAttrs(CreateStmtContext *cxt, List *constraintList)
-{
-	Constraint *lastprimarycon = NULL;
-	bool		saw_deferrability = false;
-	bool		saw_initially = false;
-	ListCell   *clist;
-
-#define SUPPORTS_ATTRS(node)				\
-	((node) != NULL &&						\
-	 ((node)->contype == CONSTR_PRIMARY ||	\
-	  (node)->contype == CONSTR_UNIQUE))
-
-	foreach(clist, constraintList)
-	{
-		Constraint *con = (Constraint *) lfirst(clist);
-
-		if (!IsA(con, Constraint))
-			elog(ERROR, "unrecognized node type: %d",
-				 (int) nodeTag(con));
-		switch (con->contype)
-		{
-			case CONSTR_ATTR_DEFERRABLE:
-				if (!SUPPORTS_ATTRS(lastprimarycon))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("misplaced DEFERRABLE clause"),
-							 parser_errposition(cxt->pstate, con->location)));
-				if (saw_deferrability)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple DEFERRABLE/NOT DEFERRABLE clauses not allowed"),
-							 parser_errposition(cxt->pstate, con->location)));
-				saw_deferrability = true;
-				lastprimarycon->deferrable = true;
-				break;
-
-			case CONSTR_ATTR_NOT_DEFERRABLE:
-				if (!SUPPORTS_ATTRS(lastprimarycon))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("misplaced NOT DEFERRABLE clause"),
-							 parser_errposition(cxt->pstate, con->location)));
-				if (saw_deferrability)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple DEFERRABLE/NOT DEFERRABLE clauses not allowed"),
-							 parser_errposition(cxt->pstate, con->location)));
-				saw_deferrability = true;
-				lastprimarycon->deferrable = false;
-				if (saw_initially &&
-					lastprimarycon->initdeferred)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("constraint declared INITIALLY DEFERRED must be DEFERRABLE"),
-							 parser_errposition(cxt->pstate, con->location)));
-				break;
-
-			case CONSTR_ATTR_DEFERRED:
-				if (!SUPPORTS_ATTRS(lastprimarycon))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("misplaced INITIALLY DEFERRED clause"),
-							 parser_errposition(cxt->pstate, con->location)));
-				if (saw_initially)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple INITIALLY IMMEDIATE/DEFERRED clauses not allowed"),
-							 parser_errposition(cxt->pstate, con->location)));
-				saw_initially = true;
-				lastprimarycon->initdeferred = true;
-
-				/*
-				 * If only INITIALLY DEFERRED appears, assume DEFERRABLE
-				 */
-				if (!saw_deferrability)
-					lastprimarycon->deferrable = true;
-				else if (!lastprimarycon->deferrable)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("constraint declared INITIALLY DEFERRED must be DEFERRABLE"),
-							 parser_errposition(cxt->pstate, con->location)));
-				break;
-
-			case CONSTR_ATTR_IMMEDIATE:
-				if (!SUPPORTS_ATTRS(lastprimarycon))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("misplaced INITIALLY IMMEDIATE clause"),
-							 parser_errposition(cxt->pstate, con->location)));
-				if (saw_initially)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple INITIALLY IMMEDIATE/DEFERRED clauses not allowed"),
-							 parser_errposition(cxt->pstate, con->location)));
-				saw_initially = true;
-				lastprimarycon->initdeferred = false;
-				break;
-
-			default:
-				/* Otherwise it's not an attribute */
-				lastprimarycon = con;
-				/* reset flags for new primary node */
-				saw_deferrability = false;
-				saw_initially = false;
-				break;
-		}
-	}
-}
 
 /*
  * Special handling of type definition for a column

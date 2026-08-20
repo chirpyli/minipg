@@ -937,15 +937,6 @@ DefineDomain(CreateDomainStmt *stmt)
 						 errmsg("primary key constraints not possible for domains")));
 				break;
 
-			case CONSTR_ATTR_DEFERRABLE:
-						 case CONSTR_ATTR_NOT_DEFERRABLE:
-						 case CONSTR_ATTR_DEFERRED:
-						 case CONSTR_ATTR_IMMEDIATE:
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("specifying constraint deferrability not supported for domains")));
-				break;
-
 			default:
 				elog(ERROR, "unrecognized constraint subtype: %d",
 					 (int) constr->contype);
@@ -2856,15 +2847,6 @@ AlterDomainAddConstraint(List *names, Node *newConstraint,
 					 errmsg("primary key constraints not possible for domains")));
 			break;
 
-		case CONSTR_ATTR_DEFERRABLE:
-		case CONSTR_ATTR_NOT_DEFERRABLE:
-		case CONSTR_ATTR_DEFERRED:
-		case CONSTR_ATTR_IMMEDIATE:
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("specifying constraint deferrability not supported for domains")));
-			break;
-
 		default:
 			elog(ERROR, "unrecognized constraint subtype: %d",
 				 (int) constr->contype);
@@ -3402,8 +3384,6 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 		CreateConstraintEntry(constr->conname,	/* Constraint Name */
 							  domainNamespace,	/* namespace */
 							  CONSTRAINT_CHECK, /* Constraint Type */
-							  false,	/* Is Deferrable */
-							  false,	/* Is Deferred */
 							  !constr->skip_validation, /* Is Validated */
 							  InvalidOid,	/* no parent constraint */
 							  InvalidOid,	/* not a relation constraint */

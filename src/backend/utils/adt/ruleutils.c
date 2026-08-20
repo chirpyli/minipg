@@ -947,13 +947,6 @@ pg_get_triggerdef_worker(Oid trigid, bool pretty)
 		if (OidIsValid(trigrec->tgconstrrelid))
 			appendStringInfo(&buf, "FROM %s ",
 							 generate_relation_name(trigrec->tgconstrrelid, NIL));
-		if (!trigrec->tgdeferrable)
-			appendStringInfoString(&buf, "NOT ");
-		appendStringInfoString(&buf, "DEFERRABLE INITIALLY ");
-		if (trigrec->tginitdeferred)
-			appendStringInfoString(&buf, "DEFERRED ");
-		else
-			appendStringInfoString(&buf, "IMMEDIATE ");
 	}
 
 	value = fastgetattr(ht_trig, Anum_pg_trigger_tgoldtable,
@@ -2077,10 +2070,6 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 			break;
 	}
 
-	if (conForm->condeferrable)
-		appendStringInfoString(&buf, " DEFERRABLE");
-	if (conForm->condeferred)
-		appendStringInfoString(&buf, " INITIALLY DEFERRED");
 	if (!conForm->convalidated)
 		appendStringInfoString(&buf, " NOT VALID");
 

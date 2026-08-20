@@ -321,7 +321,6 @@ typedef enum NodeTag
 	T_DiscardStmt,
 	T_CreateTrigStmt,
 	T_LockStmt,
-	T_ConstraintsSetStmt,
 	T_ReindexStmt,
 	T_CheckPointStmt,
 	T_CreateSchemaStmt,
