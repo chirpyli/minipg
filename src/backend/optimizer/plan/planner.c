@@ -3054,15 +3054,10 @@ create_grouping_paths(PlannerInfo *root,
 		extra.partial_costs_set = false;
 
 		/*
-		 * Determine whether partitionwise aggregation is in theory possible.
-		 * It can be disabled by the user, and for now, we don't try to
-		 * support grouping sets.  create_ordinary_grouping_paths() will check
-		 * additional conditions, such as whether input_rel is partitioned.
+		 * minipg has no partitioned tables (partitioning subsystem was
+		 * trimmed), so partitionwise aggregation is never possible.
 		 */
-		if (enable_partitionwise_aggregate && !parse->groupingSets)
-			extra.patype = PARTITIONWISE_AGGREGATE_FULL;
-		else
-			extra.patype = PARTITIONWISE_AGGREGATE_NONE;
+		extra.patype = PARTITIONWISE_AGGREGATE_NONE;
 
 		create_ordinary_grouping_paths(root, input_rel, grouped_rel,
 									   &agg_costs, gd, &extra,

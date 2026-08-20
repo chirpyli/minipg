@@ -907,3 +907,30 @@ EXCLUDE 约束与序列功能此前已彻底裁剪，但 `src/test/regress/{inpu
 - 因裁剪后整体输出结构变化，重新生成 `output/constraints.source` 期望输出（除 DEFAULTEXPR 常量默认值结果 `-3 | 7` 为推算修正外，其余保留段与原文逐字一致）。
 
 验证：input/output 已无 `nextval`/`currval`/`CREATE|ALTER SEQUENCE`/`*_seq`/`EXCLUDE` 残留引用；移除的所有表（`INSERT_TBL`/`INSERT_CHILD`/`*_SEQ`）在 regress 目录下零引用。（注：本次本地未能重跑 `make check`，因构建环境 `pg_sema.c` 符号链接与 `config.status` 复制步骤冲突导致 `./configure` 失败，属既有构建环境问题，与本次测试编辑无关；请在可用构建树上 `make check` 终验。）
+
+---
+
+## 删除因分区功能裁剪而失效的 3 个规划 GUC（2026-08-20）
+
+minipg 的分区子系统已彻底裁剪（`src/backend/partitioning/` 目录不存在，`PartitionDesc`/`RelationGetPartitionKey`/`partition_prune` 全代码库 0 命中），但 `guc.c` 仍注册 3 个分区规划 GUC，其控制的分区规划代码已完全不可达，属无效 GUC。本次一并清除：
+
+- **`enable_partitionwise_join`**（guc.c:1001）：除声明/注册外无任何读取点，完全死。
+- **`enable_partition_pruning`**（guc.c:1041）：除声明/注册外无任何读取点，完全死。
+- **`enable_partitionwise_aggregate`**（guc.c:1011）：唯一读取点是 `planner.c:3062` 把 `extra.patype` 置为 `PARTITIONWISE_AGGREGATE_FULL`；因无分区表该 flag 永远不生效。
+
+涉及文件与改动：
+
+- **`src/backend/utils/misc/guc.c`**：删除 3 个 `enable_partitionwise_*`/`enable_partition_pruning` 的 `DefineCustomBoolVariable` 注册块。
+- **`src/include/optimizer/cost.h`**：删除 3 个 `extern PGDLLIMPORT bool enable_partitionwise_*`/`enable_partition_pruning;` 声明。
+- **`src/backend/optimizer/path/costsize.c`**：删除 3 个 `bool enable_partitionwise_*`/`enable_partition_pruning = ...;` 全局变量定义。
+- **`src/backend/optimizer/plan/planner.c`**：将 `if (enable_partitionwise_aggregate && !parse->groupingSets) extra.patype = FULL; else NONE;` 简化为恒定 `extra.patype = PARTITIONWISE_AGGREGATE_NONE;`（保留下游 `create_ordinary_grouping_paths` 调用签名不变）。
+- **`src/backend/utils/misc/postgresql.conf.sample`**：删除 3 行已删 GUC 的示例配置。
+- **`src/backend/optimizer/util/relnode.c`**（连带修复编译错误）：删除 `build_child_join_rel()` 中遗留的 `Assert(parent_joinrel->consider_partitionwise_join);`——该 `RelOptInfo` 字段早已随分区裁剪从 `pathnodes.h` 删除，此 Assert 引用不存在的字段，属编译错误。
+
+保留项（非本次范畴）：optimizer 中 partitionwise join/aggregate 的**通用 joinrel 代码骨架**（`relnode.c`/`pathnode.c`/`allpaths.c`/`joinpath.c`/`equivclass.c`）及 `PlannerInfo.patype` 字段、`PARTITIONWISE_AGGREGATE_*` 枚举、planner.c 中 `PARTITIONWISE_AGGREGATE_PARTIAL` 的恒假比较分支（`PARTIAL` 全库从未赋值）——它们虽无法触发，但删除需动 `RelOptInfo`/path 结构等深层优化器逻辑，风险高、收益低，不属"清除无效 GUC"范畴，留待后续独立裁剪。
+
+回归测试同步：`sysviews.sql` 的 `select name, setting from pg_settings where name like 'enable%'` 输出中删除 3 个已裁 GUC 行，`expected/sysviews.out` 同步列宽与行数（19→16）。
+
+验证：`make -C src/backend` 全量重编 + `postgres` 链接成功（0 error / 0 undefined reference）；`grep enable_partitionwise_join|enable_partitionwise_aggregate|enable_partition_pruning|consider_partitionwise_join` 全代码库 0 命中；同步 `expected/sysviews.out` 后 `NO_TEMP_INSTALL=1 make check` **全部 82 个测试通过**。与不可裁部分（btree/hash 索引、事务）零耦合。
+
+> 注：中途曾见 `make check` 因 `pg_trigger` catalog 已裁、initdb post-bootstrap 脚本仍 `INSERT INTO pg_depend ... FROM pg_trigger` 而在 initdb 环节失败（见工作记忆）；再次干净重跑临时实例后 initdb 正常，`make check` 全绿，故该 initdb 报错属临时实例残留的既有干扰，非本次裁剪引入。

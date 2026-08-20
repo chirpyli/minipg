@@ -696,9 +696,6 @@ build_child_join_rel(PlannerInfo *root, RelOptInfo *outer_rel,
 	/* Only joins between "other" relations land here. */
 	Assert(IS_OTHER_REL(outer_rel) && IS_OTHER_REL(inner_rel));
 
-	/* The parent joinrel should have consider_partitionwise_join set. */
-	Assert(parent_joinrel->consider_partitionwise_join);
-
 	joinrel->reloptkind = RELOPT_OTHER_JOINREL;
 	joinrel->relids = bms_union(outer_rel->relids, inner_rel->relids);
 	joinrel->rows = 0;

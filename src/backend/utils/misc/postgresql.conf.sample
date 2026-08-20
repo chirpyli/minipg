@@ -323,9 +323,6 @@
 #enable_nestloop = on
 #enable_parallel_append = on
 #enable_parallel_hash = on
-#enable_partition_pruning = on
-#enable_partitionwise_join = off
-#enable_partitionwise_aggregate = off
 #enable_seqscan = on
 #enable_sort = on
 #enable_tidscan = on

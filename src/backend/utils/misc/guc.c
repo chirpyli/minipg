@@ -998,26 +998,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"enable_partitionwise_join", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables partitionwise join."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_partitionwise_join,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"enable_partitionwise_aggregate", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables partitionwise aggregation and grouping."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_partitionwise_aggregate,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"enable_parallel_append", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Enables the planner's use of parallel append plans."),
 			NULL,
@@ -1034,18 +1014,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_EXPLAIN
 		},
 		&enable_parallel_hash,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"enable_partition_pruning", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables plan-time and execution-time partition pruning."),
-			gettext_noop("Allows the query planner and executor to compare partition "
-						 "bounds to conditions in the query to determine which "
-						 "partitions must be scanned."),
-			GUC_EXPLAIN
-		},
-		&enable_partition_pruning,
 		true,
 		NULL, NULL, NULL
 	},
