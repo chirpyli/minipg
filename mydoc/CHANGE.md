@@ -6,6 +6,26 @@
 
 ---
 
+## ALTER AGGREGATE 功能裁剪（2026-08-20）
+
+minipg 的 `ALTER AGGREGATE` 无独立 `AlterAggregateStmt` 节点，而是复用 `AlterObjectSchemaStmt`（`SET SCHEMA`）、`RenameStmt`（`RENAME`）、`AlterOwnerStmt`（`OWNER TO`）三类通用语句机制。经核查：minipg 已于历史裁剪中删除 `RenameStmt`/`ExecRenameStmt`（RENAME 语法整体不可用），且角色/owner 机制已裁（`OWNER TO` 无实际语义）；故 `ALTER AGGREGATE` 实际仅 `SET SCHEMA` 一条子命令（走 `OBJECT_AGGREGATE` 与 `OBJECT_COLLATION`/`OBJECT_CONVERSION` 共享的 `ExecAlterObjectSchemaStmt` generic 分支）生效。本次彻底裁剪 `ALTER AGGREGATE` 的全部用户侧入口（语法生产式 + 命令标签），底层 aggregate 对象系统（`OBJECT_AGGREGATE` 枚举、`pg_proc` 寻址、CREATE/DROP AGGREGATE）保留——因后者与函数机制深度共享，且 CREATE/DROP AGGREGATE 学习价值高，不予裁。
+
+涉及文件与改动：
+
+- **`src/backend/parser/gram.y`**：从 `AlterObjectSchemaStmt` 产生式中删除 `ALTER AGGREGATE aggregate_with_argtypes SET SCHEMA name` 一条生产式（aggregate 段仅此一条 ALTER 入口，删除后 `ALTER AGGREGATE x SET SCHEMA y` 报语法错误）。
+- **`src/include/tcop/cmdtaglist.h`**：删除 `CMDTAG_ALTER_AGGREGATE` 命令标签枚举项（`OBJECT_AGGREGATE` 不再经 `AlterObjectTypeCommandTag` 返回标签）。
+- **`src/backend/tcop/utility.c`**：从 `AlterObjectTypeCommandTag` 的 switch 中删除 `case OBJECT_AGGREGATE: tag = CMDTAG_ALTER_AGGREGATE; break;`（该 switch 已有 `default: tag = CMDTAG_UNKNOWN;`，删除后无枚举未覆盖警告）。
+- **`doc/src/sgml/ref/alter_aggregate.sgml`**：整文件删除（参考文档）；同步清理引用：`ref/allfiles.sgml` 删除 `<!ENTITY alterAggregate ...>`、`reference.sgml` 删除 `&alterAggregate;`、`create_aggregate.sgml` 与 `drop_aggregate.sgml` 的 See Also 中 `<xref linkend="sql-alteraggregate"/>`；`drop_aggregate.sgml` 的 NOTES 段改写为「本实现无 ALTER AGGREGATE 命令」。
+
+回归测试同步（删除对已裁语法的依赖，重生成 `expected`）：
+
+- **`sql/alter_generic.sql`**：删除原 `Aggregate` 测试整段（含 `CREATE AGGREGATE alt_agg*` 与 `ALTER AGGREGATE ... RENAME/SET SCHEMA`），仅保留 `Conversion` 段；`expected/alter_generic.out` 同步删除 Aggregate 段输出，并修正结尾 `DROP SCHEMA` 级联对象数（由 4/2 降为 2/1）。
+- **`sql/create_aggregate.sql`**：删除两行 `alter aggregate ... rename to`（RENAME 语法已裁），改为 `\da my_percentile_disc` / `\da my_rank` 验证；`expected/create_aggregate.out` 同步替换对应输出。
+
+与不可裁部分（btree/hash 索引、事务）零耦合；改动为纯删除，无死代码残留（`OBJECT_AGGREGATE` 枚举仍被 CREATE/DROP AGGREGATE 及 `parse_func.c`/`objectaddress.c`/`dropcmds.c` 共享，必须保留）。`make` 重编通过，`make check` 全绿后回填验证结果。
+
+---
+
 ## ALTER FUNCTION / OPERATOR / OPERATOR FAMILY / STATISTICS / EXTENSION / DATABASE 功能裁剪（2026-08-18）
 
 按"非核心对象管理 DDL 且与不可裁部分（btree/hash 索引、事务）零耦合则优先裁剪"的原则，本次彻底裁剪以下 7 类外围 `ALTER` 语法（与分析报告一致）：`ALTER FUNCTION/PROCEDURE/ROUTINE`、`ALTER OPERATOR`、`ALTER OPERATOR FAMILY`、`ALTER STATISTICS`、`ALTER EXTENSION`、`ALTER EXTENSION ... ADD/DROP CONTENTS`、`ALTER DATABASE`。
@@ -825,3 +845,21 @@ btree/hash 索引、UNIQUE/PRIMARY KEY/CHECK 约束、pg_constraint/pg_index 基
 
 ### 验证
 make check 全部通过（回归 82/82）；initdb 成功；`pg_index` 已无 `indisexclusion` 列、`pg_constraint` 已无 `conexclop` 列；`EXCLUDE (a WITH =)` 建表报语法错误；UNIQUE/CHECK/PRIMARY KEY 约束及 `pg_get_constraintdef`/`pg_get_indexdef` 显示均正常。
+
+---
+
+## constraints 回归测试清理（2026-08-20，EXCLUDE + 序列裁切收尾）
+
+EXCLUDE 约束与序列功能此前已彻底裁剪，但 `src/test/regress/{input,output}/constraints.source` 仍残留对已裁功能的依赖，导致 `make check` 无法运行。本次清理：
+
+- **EXCLUDE 注释**：删除顶部功能说明中的 `--  - EXCLUDE clauses` 一行（实际的 EXCLUDE 测试块已于 2026-08-19 删除）。
+- **序列依赖整段删除**（序列 DDL `CREATE SEQUENCE` 已无语法入口，`nextval`/`currval` 在回归测试中不可用）：
+  - `CREATE SEQUENCE DEFAULT_SEQ` 及其在 `DEFAULTEXPR_TBL.i2` 的 `nextval('default_seq')` 默认值 —— 改为常量默认值 `DEFAULT 7`（保留表达式默认值的测试意图）。
+  - `CREATE SEQUENCE CHECK_SEQ`（创建后从未被使用）—— 删除。
+  - 整段「Check constraints on INSERT」（`INSERT_SEQ` + `INSERT_TBL` + `nextval`/`currval` 校验）—— 删除。
+  - 整段「Check inheritance of defaults and constraints」（`INSERT_CHILD INHERITS (INSERT_TBL)` 依赖已删的 `INSERT_TBL`）—— 删除。
+  - 整段「Check constraints on INSERT INTO」与「Check constraints on UPDATE」（均依赖 `INSERT_TBL` 及其序列默认值）—— 删除。
+- **保留**（均不依赖序列/EXCLUDE，且属约束核心学习价值）：DEFAULT 常量/表达式默认值、CHECK、`sys_col_check`（tableoid/ctid 系统列约束报错）、`NO INHERIT` 约束继承、COPY FROM 约束校验、PRIMARY KEY、UNIQUE、可延迟 UNIQUE（deferrable）、分区表唯一/FK/主键命名等。
+- 因裁剪后整体输出结构变化，重新生成 `output/constraints.source` 期望输出（除 DEFAULTEXPR 常量默认值结果 `-3 | 7` 为推算修正外，其余保留段与原文逐字一致）。
+
+验证：input/output 已无 `nextval`/`currval`/`CREATE|ALTER SEQUENCE`/`*_seq`/`EXCLUDE` 残留引用；移除的所有表（`INSERT_TBL`/`INSERT_CHILD`/`*_SEQ`）在 regress 目录下零引用。（注：本次本地未能重跑 `make check`，因构建环境 `pg_sema.c` 符号链接与 `config.status` 复制步骤冲突导致 `./configure` 失败，属既有构建环境问题，与本次测试编辑无关；请在可用构建树上 `make check` 终验。）

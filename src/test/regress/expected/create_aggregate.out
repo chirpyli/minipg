@@ -98,21 +98,19 @@ create aggregate my_rank(VARIADIC "any" ORDER BY VARIADIC "any") (
   finalfunc_extra = true,
   hypothetical
 );
-alter aggregate my_percentile_disc(float8 ORDER BY anyelement)
-  rename to test_percentile_disc;
-ERROR:  syntax error at or near "rename"
-LINE 2:   rename to test_percentile_disc;
-          ^
-alter aggregate my_rank(VARIADIC "any" ORDER BY VARIADIC "any")
-  rename to test_rank;
-ERROR:  syntax error at or near "rename"
-LINE 2:   rename to test_rank;
-          ^
-\da test_*
-                     List of aggregate functions
- Schema | Name | Result data type | Argument data types | Description 
---------+------+------------------+---------------------+-------------
-(0 rows)
+\da my_percentile_disc
+                                     List of aggregate functions
+ Schema |        Name        | Result data type |         Argument data types          | Description 
+--------+--------------------+------------------+--------------------------------------+-------------
+ public | my_percentile_disc | anyelement       | double precision ORDER BY anyelement | 
+(1 row)
+
+\da my_rank
+                                List of aggregate functions
+ Schema |  Name   | Result data type |          Argument data types           | Description 
+--------+---------+------------------+----------------------------------------+-------------
+ public | my_rank | bigint           | VARIADIC "any" ORDER BY VARIADIC "any" | 
+(1 row)
 
 -- moving-aggregate options
 CREATE AGGREGATE sumdouble (float8)

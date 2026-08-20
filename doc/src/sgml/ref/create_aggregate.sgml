@@ -798,7 +798,6 @@ SELECT col FROM tab ORDER BY col USING sortop LIMIT 1;
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="sql-alteraggregate"/></member>
    <member><xref linkend="sql-dropaggregate"/></member>
   </simplelist>
  </refsect1>

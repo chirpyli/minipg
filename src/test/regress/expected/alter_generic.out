@@ -8,55 +8,6 @@ CREATE SCHEMA alt_nsp1;
 CREATE SCHEMA alt_nsp2;
 SET search_path = alt_nsp1, public;
 --
--- Aggregate
---
-CREATE AGGREGATE alt_agg1 (
-  sfunc1 = int4pl, basetype = int4, stype1 = int4, initcond = 0
-);
-CREATE AGGREGATE alt_agg2 (
-  sfunc1 = int4mi, basetype = int4, stype1 = int4, initcond = 0
-);
-ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg2;   -- failed (name conflict)
-ERROR:  syntax error at or near "RENAME"
-LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg2;
-                                      ^
-ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg3;   -- OK
-ERROR:  syntax error at or near "RENAME"
-LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg3;
-                                      ^
-ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- OK
-CREATE AGGREGATE alt_agg1 (
-  sfunc1 = int4pl, basetype = int4, stype1 = int4, initcond = 100
-);
-ERROR:  function "alt_agg1" already exists with same argument types
-CREATE AGGREGATE alt_agg2 (
-  sfunc1 = int4mi, basetype = int4, stype1 = int4, initcond = -100
-);
-ALTER AGGREGATE alt_agg3(int) RENAME TO alt_agg4;   -- failed (not owner)
-ERROR:  syntax error at or near "RENAME"
-LINE 1: ALTER AGGREGATE alt_agg3(int) RENAME TO alt_agg4;
-                                      ^
-ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg4;   -- OK
-ERROR:  syntax error at or near "RENAME"
-LINE 1: ALTER AGGREGATE alt_agg1(int) RENAME TO alt_agg4;
-                                      ^
-ALTER AGGREGATE alt_agg3(int) SET SCHEMA alt_nsp2;  -- failed (not owner)
-ERROR:  aggregate alt_agg3(integer) does not exist
-ALTER AGGREGATE alt_agg2(int) SET SCHEMA alt_nsp2;  -- failed (name conflict)
-ERROR:  function alt_agg2(integer) already exists in schema "alt_nsp2"
-SELECT n.nspname, proname, prorettype::regtype, prokind, 'postgres'::name AS rolname
-  FROM pg_proc p, pg_namespace n
-  WHERE p.pronamespace = n.oid
-    AND n.nspname IN ('alt_nsp1', 'alt_nsp2')
-  ORDER BY nspname, proname;
- nspname  | proname  | prorettype | prokind | rolname  
-----------+----------+------------+---------+----------
- alt_nsp1 | alt_agg1 | integer    | a       | postgres
- alt_nsp1 | alt_agg2 | integer    | a       | postgres
- alt_nsp2 | alt_agg2 | integer    | a       | postgres
-(3 rows)
-
---
 -- We would test collations here, but it's not possible because the error
 -- messages tend to be nonportable.
 --
@@ -105,12 +56,8 @@ SELECT n.nspname, c.conname, 'postgres'::name AS rolname
 --- Cleanup resources
 ---
 DROP SCHEMA alt_nsp1 CASCADE;
-NOTICE:  drop cascades to 4 other objects
-DETAIL:  drop cascades to function alt_agg1(integer)
-drop cascades to function alt_agg2(integer)
-drop cascades to conversion alt_conv1
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to conversion alt_conv1
 drop cascades to conversion alt_conv2
 DROP SCHEMA alt_nsp2 CASCADE;
-NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to function alt_nsp2.alt_agg2(integer)
-drop cascades to conversion alt_nsp2.alt_conv2
+NOTICE:  drop cascades to conversion alt_nsp2.alt_conv2

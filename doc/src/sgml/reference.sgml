@@ -34,7 +34,6 @@
   </partintro>
 
    &abort;
-   &alterAggregate;
    &alterCollation;
    &alterConversion;
    &alterDatabase;

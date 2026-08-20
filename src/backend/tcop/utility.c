@@ -1437,9 +1437,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 
 	switch (objtype)
 	{
-		case OBJECT_AGGREGATE:
-			tag = CMDTAG_ALTER_AGGREGATE;
-			break;
 		case OBJECT_ATTRIBUTE:
 			tag = CMDTAG_ALTER_TYPE;
 			break;
