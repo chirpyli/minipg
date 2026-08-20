@@ -25,7 +25,6 @@
 
 #define DEFAULT_PROMPT1 "%/%R%x%# "
 #define DEFAULT_PROMPT2 "%/%R%x%# "
-#define DEFAULT_PROMPT3 ">> "
 
 /*
  * Note: these enums should generally be chosen so that zero corresponds
@@ -144,7 +143,6 @@ typedef struct _psqlSettings
 	HistControl histcontrol;
 	const char *prompt1;
 	const char *prompt2;
-	const char *prompt3;
 	PGVerbosity verbosity;		/* current error verbosity level */
 	PGContextVisibility show_context;	/* current context display level */
 } PsqlSettings;

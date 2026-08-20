@@ -274,8 +274,7 @@ San Francisco    43    57    0.0    1994-11-29
 Hayward    37    54    \N    1994-11-29
 </programlisting>
 
-    You can read more about the <command>COPY</command> command in
-    <xref linkend="sql-copy"/>.
+    You can read more about the <command>COPY</command> command.
    </para>
   </sect1>
 

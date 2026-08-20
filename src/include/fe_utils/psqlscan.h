@@ -44,8 +44,7 @@ typedef enum _promptStatus
 	PROMPT_SINGLEQUOTE,
 	PROMPT_DOUBLEQUOTE,
 	PROMPT_DOLLARQUOTE,
-	PROMPT_PAREN,
-	PROMPT_COPY
+	PROMPT_PAREN
 } promptStatus_t;
 
 /* Quoting request types for get_variable() callback */

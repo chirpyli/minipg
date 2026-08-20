@@ -41,41 +41,6 @@
 /*			 Procedures common to all sessions					*/
 /* ------------------------------------------------------------ */
 
-/*
- *	Initialize global context.
- *
- * This build supports no transport encryption, so there is nothing to set up.
- */
-int
-secure_initialize(bool isServerStart)
-{
-	return 0;
-}
-
-/*
- *	Destroy global context, if any.
- */
-void
-secure_destroy(void)
-{
-}
-
-/*
- *	Attempt to negotiate secure session.
- */
-int
-secure_open_server(Port *port)
-{
-	return 0;
-}
-
-/*
- *	Close secure session.
- */
-void
-secure_close(Port *port)
-{
-}
 
 /*
  *	Read data from a secure connection.

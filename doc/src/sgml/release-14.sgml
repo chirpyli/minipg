@@ -24269,8 +24269,8 @@ Author: Tomas Vondra <tomas.vondra@postgresql.org>
 -->
 
        <para>
-        Have <link linkend="sql-copy"><command>COPY FREEZE</command></link>
-        appropriately update page visibility bits (Anastasia Lubennikova,
+        Have <command>COPY FREEZE</command>
+               appropriately update page visibility bits (Anastasia Lubennikova,
         Pavan Deolasee, Jeff Janes)
         <ulink url="&commit_baseurl;7db0cd214">&sect;</ulink>
        </para>
@@ -25882,8 +25882,8 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
 -->
 
       <para>
-       Improve the performance of <link linkend="sql-copy"><command>COPY
-       FROM</command></link> in binary mode (Bharath Rupireddy, Amit
+       Improve the performance of <command>COPY
+       FROM</command> in binary mode (Bharath Rupireddy, Amit
        Langote)
        <ulink url="&commit_baseurl;0a0727ccf">&sect;</ulink>
       </para>
@@ -27223,10 +27223,9 @@ Author: Tom Lane <tgl@sss.pgh.pa.us>
        </para>
 
        <para>
-        For example this allows <link
-        linkend="sql-copy"><command>COPY,</command></link> <link
-        linkend="configure-options-misc"><acronym>WAL</acronym></link>
-        files, and relation segment files to be larger than four gigabytes.
+        For example this allows <command>COPY,</command> <link
+               linkend="configure-options-misc"><acronym>WAL</acronym></link>
+               files, and relation segment files to be larger than four gigabytes.
        </para>
       </listitem>
 

@@ -29,7 +29,6 @@
 #include "commands/alter.h"
 #include "commands/cluster.h"
 #include "commands/conversioncmds.h"
-#include "commands/copy.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/discard.h"

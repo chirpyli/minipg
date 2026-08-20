@@ -58,7 +58,6 @@
    &cluster;
    &commit;
    &commitPrepared;
-   &copyTable;
    &createAccessMethod;
    &createAggregate;
    &createCollation;

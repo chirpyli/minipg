@@ -30,7 +30,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY cluster SYSTEM "cluster.sgml">
 <!ENTITY commit SYSTEM "commit.sgml">
 <!ENTITY commitPrepared SYSTEM "commit_prepared.sgml">
-<!ENTITY copyTable SYSTEM "copy.sgml">
 <!ENTITY createAccessMethod SYSTEM "create_access_method.sgml">
 <!ENTITY createAggregate SYSTEM "create_aggregate.sgml">
 <!ENTITY createCollation SYSTEM "create_collation.sgml">

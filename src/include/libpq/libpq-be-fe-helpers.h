@@ -292,10 +292,7 @@ libpqsrv_get_result_last(PGconn *conn, uint32 wait_event_info)
 			PQclear(lastResult);
 			lastResult = result;
 
-			if (PQresultStatus(lastResult) == PGRES_COPY_IN ||
-				PQresultStatus(lastResult) == PGRES_COPY_OUT ||
-				PQresultStatus(lastResult) == PGRES_COPY_BOTH ||
-				PQstatus(conn) == CONNECTION_BAD)
+			if (PQstatus(conn) == CONNECTION_BAD)
 				break;
 		}
 	}

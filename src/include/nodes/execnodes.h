@@ -471,9 +471,6 @@ typedef struct ResultRelInfo
 	 * Used as the root for transition capture.
 	 */
 	struct ResultRelInfo *ri_RootResultRelInfo;
-
-	/* for use by copyfrom.c when performing multi-inserts */
-	struct CopyMultiInsertBuffer *ri_CopyMultiInsertBuffer;
 } ResultRelInfo;
 
 /*

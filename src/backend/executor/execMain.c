@@ -872,7 +872,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	 * this field is filled in ExecInitModifyTable().
 	 */
 	resultRelInfo->ri_RootResultRelInfo = partition_root_rri;
-	resultRelInfo->ri_CopyMultiInsertBuffer = NULL;
 }
 
 /* ----------------------------------------------------------------

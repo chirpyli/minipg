@@ -354,8 +354,6 @@ AcceptResult(const PGresult *result)
 			case PGRES_COMMAND_OK:
 			case PGRES_TUPLES_OK:
 			case PGRES_EMPTY_QUERY:
-			case PGRES_COPY_IN:
-			case PGRES_COPY_OUT:
 				/* Fine, do nothing */
 				OK = true;
 				break;
@@ -639,13 +637,6 @@ PSQLexecWatch(const char *query, const printQueryOpt *opt)
 
 		case PGRES_EMPTY_QUERY:
 			pg_log_error("\\watch cannot be used with an empty query");
-			PQclear(res);
-			return -1;
-
-		case PGRES_COPY_OUT:
-		case PGRES_COPY_IN:
-		case PGRES_COPY_BOTH:
-			pg_log_error("\\watch cannot be used with COPY");
 			PQclear(res);
 			return -1;
 

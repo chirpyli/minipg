@@ -413,16 +413,6 @@ ConvProcInfo
 ConversionLocation
 ConvertRowtypeExpr
 CookedConstraint
-CopyDest
-CopyFormatOptions
-CopyFromState
-CopyFromStateData
-CopyInsertMethod
-CopyMultiInsertBuffer
-CopyMultiInsertInfo
-CopySource
-CopyToState
-CopyToStateData
 Cost
 CostSelector
 Counters
@@ -478,7 +468,6 @@ DH
 DIR
 DNSServiceErrorType
 DNSServiceRef
-DR_copy
 DR_intorel
 DR_printtup
 DR_sqlfunction
@@ -2896,7 +2885,6 @@ compare_context
 config_var_value
 contain_aggs_of_level_context
 convert_testexpr_context
-copy_data_source_cb
 core_YYSTYPE
 core_yy_extra_type
 core_yyscan_t

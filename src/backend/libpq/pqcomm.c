@@ -230,12 +230,6 @@ socket_close(int code, Datum arg)
 	if (MyProcPort != NULL)
 	{
 		/*
-		 * Cleanly shut down SSL layer.  Nowhere else does a postmaster child
-		 * call this, so this is safe when interrupting BackendInitialize().
-		 */
-		secure_close(MyProcPort);
-
-		/*
 		 * Formerly we did an explicit close() here, but it seems better to
 		 * leave the socket open until the process dies.  This allows clients
 		 * to perform a "synchronous close" if they care --- wait till the

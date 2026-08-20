@@ -385,8 +385,6 @@ helpVariables(unsigned short int pager)
 					  "    specifies the standard psql prompt\n"));
 	fprintf(output, _("  PROMPT2\n"
 					  "    specifies the prompt used when a statement continues from a previous line\n"));
-	fprintf(output, _("  PROMPT3\n"
-					  "    specifies the prompt used during COPY ... FROM STDIN\n"));
 	fprintf(output, _("  QUIET\n"
 					  "    run quietly (same as -q option)\n"));
 	fprintf(output, _("  ROW_COUNT\n"

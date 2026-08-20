@@ -920,18 +920,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "   FROM pg_catalog.pg_cursors "\
 "  WHERE substring(pg_catalog.quote_ident(name),1,%d)='%s'"
 
-/* COPY options shared between FROM and TO */
-#define Copy_common_options \
-"DELIMITER", "ENCODING", "ESCAPE", "FORMAT", "HEADER", "NULL", "QUOTE"
-
-/* COPY FROM options */
-#define Copy_from_options \
-Copy_common_options, "FORCE_NOT_NULL", "FORCE_NULL", "FREEZE"
-
-/* COPY TO options */
-#define Copy_to_options \
-Copy_common_options, "FORCE_QUOTE"
-
 /*
  * These object types were introduced later than our support cutoff of
  * server version 7.4.  We use the VersionedQuery infrastructure so that
@@ -1426,7 +1414,7 @@ psql_completion(const char *text, int start, int end)
 	/* Known command-starting keywords. */
 	static const char *const sql_commands[] = {
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLOSE", "CLUSTER",
-		"COMMENT", "COMMIT", "COPY", "CREATE", "DEALLOCATE", "DECLARE",
+		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE", "DECLARE",
 		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
 		"FETCH", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LISTEN", "LOAD", "LOCK",
 		"MOVE", "NOTIFY", "PREPARE",
@@ -2157,54 +2145,7 @@ psql_completion(const char *text, int start, int end)
 			 Matches("COMMENT", "ON", MatchAny, MatchAny, MatchAny, MatchAnyExcept("IS")))
 		COMPLETE_WITH("IS");
 
-/* COPY */
-
-	/*
-	 * If we have COPY, offer list of tables or "(" (Also cover the analogous
-	 * backslash command).
-	 */
-	else if (Matches("COPY|\\copy"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables,
-								   " UNION ALL SELECT '('");
-	/* Complete COPY ( with legal query commands */
-	else if (Matches("COPY|\\copy", "("))
-		COMPLETE_WITH("SELECT", "TABLE", "VALUES", "INSERT INTO", "UPDATE", "DELETE FROM", "WITH");
-	/* Complete COPY <sth> */
-	else if (Matches("COPY|\\copy", MatchAny))
-		COMPLETE_WITH("FROM", "TO");
-	/* Complete COPY <sth> FROM|TO with filename */
-	else if (Matches("COPY", MatchAny, "FROM|TO"))
-	{
-		completion_charp = "";
-		completion_force_quote = true;	/* COPY requires quoted filename */
-		matches = rl_completion_matches(text, complete_from_files);
-	}
-
-	/* Complete COPY <sth> TO <sth> */
-	else if (Matches("COPY", MatchAny, "TO", MatchAny))
-		COMPLETE_WITH("WITH (");
-
-	/* Complete COPY <sth> FROM <sth> */
-	else if (Matches("COPY|\\copy", MatchAny, "FROM", MatchAny))
-		COMPLETE_WITH("WITH (", "WHERE");
-
-	/* Complete COPY <sth> FROM filename WITH ( */
-	else if (Matches("COPY|\\copy", MatchAny, "FROM", MatchAny, "WITH", "("))
-		COMPLETE_WITH(Copy_from_options);
-
-	/* Complete COPY <sth> TO filename WITH ( */
-	else if (Matches("COPY|\\copy", MatchAny, "TO", MatchAny, "WITH", "("))
-		COMPLETE_WITH(Copy_to_options);
-
-	/* Complete COPY <sth> FROM|TO filename WITH (FORMAT */
-	else if (Matches("COPY|\\copy", MatchAny, "FROM|TO", MatchAny, "WITH", "(", "FORMAT"))
-		COMPLETE_WITH("binary", "csv", "text");
-
-	/* Complete COPY <sth> FROM <sth> WITH (<options>) */
-	else if (Matches("COPY|\\copy", MatchAny, "FROM", MatchAny, "WITH", MatchAny))
-		COMPLETE_WITH("WHERE");
-
-	/* CREATE ACCESS METHOD */
+/* CREATE ACCESS METHOD */
 	/* Complete "CREATE ACCESS METHOD <name>" */
 	else if (Matches("CREATE", "ACCESS", "METHOD", MatchAny))
 		COMPLETE_WITH("TYPE");
@@ -3322,7 +3263,7 @@ psql_completion(const char *text, int start, int end)
 
 /* ... FROM ... */
 /* TODO: also include SRF ? */
-	else if (TailMatches("FROM") && !Matches("COPY|\\copy", MatchAny, "FROM"))
+	else if (TailMatches("FROM"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_selectables, NULL);
 
 /* ... JOIN ... */
@@ -4094,12 +4035,13 @@ complete_from_variables(const char *text, const char *prefix, const char *suffix
  * the consuming command will require it.
  *
  * Caller must set completion_charp to a zero- or one-character string
- * containing the escape character.  This is necessary since \copy has no
- * escape character, but every other backslash command recognizes "\" as an
- * escape character.
+ * containing the escape character.  This is necessary since some commands
+ * have no escape character, but the backslash command that uses this helper
+ * recognizes "\" as an escape character.
  *
  * Caller must also set completion_force_quote to indicate whether to force
- * quotes around the result.  (The SQL COPY command requires that.)
+ * quotes around the result.  (The consuming backslash command may require
+ * that.)
  */
 static char *
 complete_from_files(const char *text, int state)

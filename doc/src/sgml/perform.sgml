@@ -1611,7 +1611,7 @@ SELECT * FROM x, y, a, b, c WHERE something AND somethingelse;
    <title>Use <command>COPY</command></title>
 
    <para>
-    Use <link linkend="sql-copy"><command>COPY</command></link> to load
+    Use <command>COPY</command> to load
     all the rows in one command, instead of using a series of
     <command>INSERT</command> commands.  The <command>COPY</command>
     command is optimized for loading large numbers of rows; it is less

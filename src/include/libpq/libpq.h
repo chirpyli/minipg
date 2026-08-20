@@ -86,10 +86,6 @@ extern bool pq_check_connection(void);
 /*
  * prototypes for functions in be-secure.c
  */
-extern int	secure_initialize(bool isServerStart);
-extern void secure_destroy(void);
-extern int	secure_open_server(Port *port);
-extern void secure_close(Port *port);
 extern ssize_t secure_read(Port *port, void *ptr, size_t len);
 extern ssize_t secure_write(Port *port, void *ptr, size_t len);
 extern ssize_t secure_raw_read(Port *port, void *ptr, size_t len);

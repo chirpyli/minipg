@@ -34,8 +34,7 @@
  * %# - "#" if superuser, ">" otherwise
  * %R - in prompt1 normally =, or ^ if single line mode,
  *			or a ! if session is not connected to a database;
- *		in prompt2 -, *, ', or ";
- *		in prompt3 nothing
+ *		in prompt2 -, *, ', or "
  * %x - transaction status: empty, *, !, ? (unknown or no connection)
  * %l - The line number inside the current statement, starting from 1.
  * %? - the error code of the last query (not yet implemented)
@@ -81,10 +80,6 @@ get_prompt(promptStatus_t status, ConditionalStack cstack)
 		case PROMPT_COMMENT:
 		case PROMPT_PAREN:
 			prompt_string = pset.prompt2;
-			break;
-
-		case PROMPT_COPY:
-			prompt_string = pset.prompt3;
 			break;
 	}
 

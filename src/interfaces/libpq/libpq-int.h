@@ -179,9 +179,6 @@ typedef enum
 	PGASYNC_READY_MORE,			/* query done, waiting for client to fetch
 								 * result, more results expected from this
 								 * query */
-	PGASYNC_COPY_IN,			/* Copy In data transfer in progress */
-	PGASYNC_COPY_OUT,			/* Copy Out data transfer in progress */
-	PGASYNC_COPY_BOTH,			/* Copy In/Out data transfer in progress */
 	PGASYNC_PIPELINE_IDLE,		/* "Idle" between commands in pipeline mode */
 } PGAsyncStatusType;
 
@@ -341,8 +338,6 @@ struct pg_conn
 								 * sending semantics */
 	PGpipelineStatus pipelineStatus;	/* status of pipeline mode */
 	bool		singleRowMode;	/* return current query result row-by-row? */
-	char		copy_is_binary; /* 1 = copy binary, 0 = copy text */
-	int			copy_already_done;	/* # bytes already returned in COPY OUT */
 	PGnotify   *notifyHead;		/* oldest unreported Notify msg */
 	PGnotify   *notifyTail;		/* newest unreported Notify msg */
 
@@ -527,10 +522,6 @@ extern void pqParseInput3(PGconn *conn);
 extern int	pqGetErrorNotice3(PGconn *conn, bool isError);
 extern void pqBuildErrorMessage3(PQExpBuffer msg, const PGresult *res,
 								 PGVerbosity verbosity, PGContextVisibility show_context);
-extern int	pqGetCopyData3(PGconn *conn, char **buffer, int async);
-extern int	pqGetline3(PGconn *conn, char *s, int maxlen);
-extern int	pqGetlineAsync3(PGconn *conn, char *buffer, int bufsize);
-extern int	pqEndcopy3(PGconn *conn);
 extern PGresult *pqFunctionCall3(PGconn *conn, Oid fnid,
 								 int *result_buf, int buf_size,
 								 int *actual_result_len,

@@ -31,7 +31,6 @@
 #include "access/printsimple.h"
 #include "access/printtup.h"
 #include "access/xact.h"
-#include "commands/copy.h"
 #include "executor/functions.h"
 #include "executor/tqueue.h"
 #include "executor/tstoreReceiver.h"
@@ -136,9 +135,6 @@ CreateDestReceiver(CommandDest dest)
 		case DestTuplestore:
 			return CreateTuplestoreDestReceiver();
 
-		case DestCopyOut:
-			return CreateCopyDestReceiver();
-
 		case DestSQLFunction:
 			return CreateSQLFunctionDestReceiver();
 
@@ -194,7 +190,7 @@ EndCommand(const QueryCompletion *qc, CommandDest dest, bool force_undecorated_o
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestCopyOut:
+		
 		case DestSQLFunction:
 		case DestTupleQueue:
 			break;
@@ -237,7 +233,7 @@ NullCommand(CommandDest dest)
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestCopyOut:
+		
 		case DestSQLFunction:
 		case DestTupleQueue:
 			break;
@@ -278,7 +274,7 @@ ReadyForQuery(CommandDest dest)
 		case DestDebug:
 		case DestSPI:
 		case DestTuplestore:
-		case DestCopyOut:
+		
 		case DestSQLFunction:
 		case DestTupleQueue:
 			break;

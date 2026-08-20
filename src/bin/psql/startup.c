@@ -184,7 +184,6 @@ main(int argc, char *argv[])
 	SetVariableBool(pset.vars, "AUTOCOMMIT");
 	SetVariable(pset.vars, "PROMPT1", DEFAULT_PROMPT1);
 	SetVariable(pset.vars, "PROMPT2", DEFAULT_PROMPT2);
-	SetVariable(pset.vars, "PROMPT3", DEFAULT_PROMPT3);
 
 	parse_psql_options(argc, argv, &options);
 
@@ -1077,13 +1076,6 @@ prompt2_hook(const char *newval)
 	return true;
 }
 
-static bool
-prompt3_hook(const char *newval)
-{
-	pset.prompt3 = newval ? newval : "";
-	return true;
-}
-
 static char *
 verbosity_substitute_hook(char *newval)
 {
@@ -1210,9 +1202,6 @@ EstablishVariableSpace(void)
 	SetVariableHooks(pset.vars, "PROMPT2",
 					 NULL,
 					 prompt2_hook);
-	SetVariableHooks(pset.vars, "PROMPT3",
-					 NULL,
-					 prompt3_hook);
 	SetVariableHooks(pset.vars, "VERBOSITY",
 					 verbosity_substitute_hook,
 					 verbosity_hook);

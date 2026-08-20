@@ -20,10 +20,6 @@ OBJS = \
 	cluster.o \
 	collationcmds.o \
 	conversioncmds.o \
-	copy.o \
-	copyfrom.o \
-	copyfromparse.o \
-	copyto.o \
 	dbcommands.o \
 	define.o \
 	discard.o \
