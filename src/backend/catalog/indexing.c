@@ -47,7 +47,6 @@ CatalogOpenIndexes(Relation heapRel)
 	resultRelInfo = makeNode(ResultRelInfo);
 	resultRelInfo->ri_RangeTableIndex = 0;	/* dummy */
 	resultRelInfo->ri_RelationDesc = heapRel;
-	resultRelInfo->ri_TrigDesc = NULL;	/* we don't fire triggers */
 
 	ExecOpenIndices(resultRelInfo, false);
 

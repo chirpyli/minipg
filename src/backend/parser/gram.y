@@ -52,9 +52,7 @@
 #include "catalog/index.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_trigger.h"
 #include "commands/defrem.h"
-#include "commands/trigger.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/gramparse.h"
@@ -240,7 +238,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		CreateOpFamilyStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		
-		CreateTransformStmt CreateTrigStmt
+		CreateTransformStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropOpClassStmt DropOpFamilyStmt DropStmt
 		DropdbStmt DropTableSpaceStmt
@@ -293,15 +291,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <chr>		am_type
 
-%type <boolean> TriggerForSpec TriggerForType
-%type <ival>	TriggerActionTime
-%type <list>	TriggerEvents TriggerOneEvent
-%type <value>	TriggerFuncArg
-%type <node>	TriggerWhen
-%type <str>		TransitionRelName
-%type <boolean>	TransitionRowOrTable TransitionOldOrNew
-%type <node>	TriggerTransition
-
 %type <str>		access_method_clause attr_name
 				table_access_method_clause name cursor_name file_name
 				opt_index_name cluster_index_specification
@@ -310,7 +299,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				opt_class
 				opt_collate
 
-%type <range>	qualified_name insert_target OptConstrFromTable
+%type <range>	qualified_name insert_target
 
 %type <str>		all_Op MathOp
 
@@ -341,7 +330,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				target_list opt_target_list insert_column_list set_target_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
-				reloption_list TriggerFuncArgs opclass_item_list
+				reloption_list opclass_item_list
 				opclass_purpose opt_opfamily transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
@@ -350,7 +339,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 			alter_generic_options
 				relation_expr_list dostmt_opt_list
 				transform_element_list transform_type_list
-				TriggerTransitions TriggerReferencing
 				vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
 
@@ -583,7 +571,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	TABLE TABLES TABLESAMPLE TABLESPACE TEMP TEMPLATE TEMPORARY TEXT_P THEN
 	TIES TIME TIMESTAMP TO TRAILING TRANSACTION TRANSFORM
-	TREAT TRIGGER TRIM TRUE_P
+	TREAT TRIM TRUE_P
 	TRUNCATE TRUSTED TYPE_P TYPES_P
 
 	UESCAPE UNBOUNDED UNCOMMITTED UNENCRYPTED UNION UNIQUE UNKNOWN
@@ -764,7 +752,6 @@ stmt:	AlterDomainStmt
 			| CreateStatsStmt
 			| CreateTableSpaceStmt
 			| CreateTransformStmt
-			| CreateTrigStmt
 			| CreatedbStmt
 			| DeallocateStmt
 			| DeclareCursorStmt
@@ -863,7 +850,6 @@ OptSchemaEltList:
 schema_stmt:
 			CreateStmt
 			| IndexStmt
-			| CreateTrigStmt
 			| ViewStmt
 		;
 
@@ -1600,66 +1586,6 @@ alter_table_cmds:
 					AlterTableCmd *n = makeNode(AlterTableCmd);
 					n->subtype = AT_DropCluster;
 					n->name = NULL;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE TRIGGER <trig> */
-			| ENABLE_P TRIGGER name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableTrig;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE ALWAYS TRIGGER <trig> */
-			| ENABLE_P ALWAYS TRIGGER name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableAlwaysTrig;
-					n->name = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE REPLICA TRIGGER <trig> */
-			| ENABLE_P REPLICA TRIGGER name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableReplicaTrig;
-					n->name = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE TRIGGER ALL */
-			| ENABLE_P TRIGGER ALL
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableTrigAll;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE TRIGGER USER */
-			| ENABLE_P TRIGGER USER
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableTrigUser;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> DISABLE TRIGGER <trig> */
-			| DISABLE_P TRIGGER name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DisableTrig;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> DISABLE TRIGGER ALL */
-			| DISABLE_P TRIGGER ALL
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DisableTrigAll;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> DISABLE TRIGGER USER */
-			| DISABLE_P TRIGGER USER
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DisableTrigUser;
 					$$ = (Node *)n;
 				}
 			/* ALTER TABLE <name> ENABLE RULE <rule> */
@@ -2718,204 +2644,8 @@ am_type:
 		|	TABLE			{ $$ = AMTYPE_TABLE; }
 		;
 
-/*****************************************************************************
- *
- *		QUERIES :
- *				CREATE TRIGGER ...
- *
- *****************************************************************************/
 
-CreateTrigStmt:
-			CREATE opt_or_replace TRIGGER name TriggerActionTime TriggerEvents ON
-			qualified_name TriggerReferencing TriggerForSpec TriggerWhen
-			EXECUTE FUNCTION_or_PROCEDURE func_name '(' TriggerFuncArgs ')'
-				{
-					CreateTrigStmt *n = makeNode(CreateTrigStmt);
-					n->replace = $2;
-					n->isconstraint = false;
-					n->trigname = $4;
-					n->relation = $8;
-					n->funcname = $14;
-					n->args = $16;
-					n->row = $10;
-					n->timing = $5;
-					n->events = intVal(linitial($6));
-					n->columns = (List *) lsecond($6);
-					n->whenClause = $11;
-					n->transitionRels = $9;
-					n->constrrel = NULL;
-					$$ = (Node *)n;
-				}
-		  | CREATE opt_or_replace CONSTRAINT TRIGGER name AFTER TriggerEvents ON
-			qualified_name OptConstrFromTable ConstraintAttributeSpec
-			FOR EACH ROW TriggerWhen
-			EXECUTE FUNCTION_or_PROCEDURE func_name '(' TriggerFuncArgs ')'
-				{
-					CreateTrigStmt *n = makeNode(CreateTrigStmt);
-					n->replace = $2;
-					if (n->replace) /* not supported, see CreateTrigger */
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("CREATE OR REPLACE CONSTRAINT TRIGGER is not supported")));
-					n->isconstraint = true;
-					n->trigname = $5;
-					n->relation = $9;
-					n->funcname = $18;
-					n->args = $20;
-					n->row = true;
-					n->timing = TRIGGER_TYPE_AFTER;
-					n->events = intVal(linitial($7));
-					n->columns = (List *) lsecond($7);
-					n->whenClause = $15;
-					n->transitionRels = NIL;
-					processCASbits($11, @11, "TRIGGER",
-								   NULL, NULL, yyscanner);
-					n->constrrel = $10;
-					$$ = (Node *)n;
-				}
-		;
 
-TriggerActionTime:
-			BEFORE								{ $$ = TRIGGER_TYPE_BEFORE; }
-			| AFTER								{ $$ = TRIGGER_TYPE_AFTER; }
-			| INSTEAD OF						{ $$ = TRIGGER_TYPE_INSTEAD; }
-		;
-
-TriggerEvents:
-			TriggerOneEvent
-				{ $$ = $1; }
-			| TriggerEvents OR TriggerOneEvent
-				{
-					int		events1 = intVal(linitial($1));
-					int		events2 = intVal(linitial($3));
-					List   *columns1 = (List *) lsecond($1);
-					List   *columns2 = (List *) lsecond($3);
-
-					if (events1 & events2)
-						parser_yyerror("duplicate trigger events specified");
-					/*
-					 * concat'ing the columns lists loses information about
-					 * which columns went with which event, but so long as
-					 * only UPDATE carries columns and we disallow multiple
-					 * UPDATE items, it doesn't matter.  Command execution
-					 * should just ignore the columns for non-UPDATE events.
-					 */
-					$$ = list_make2(makeInteger(events1 | events2),
-									list_concat(columns1, columns2));
-				}
-		;
-
-TriggerOneEvent:
-			INSERT
-				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_INSERT), NIL); }
-			| DELETE_P
-				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_DELETE), NIL); }
-			| UPDATE
-				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_UPDATE), NIL); }
-			| UPDATE OF columnList
-				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_UPDATE), $3); }
-			| TRUNCATE
-				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_TRUNCATE), NIL); }
-		;
-
-TriggerReferencing:
-			REFERENCING TriggerTransitions			{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-TriggerTransitions:
-			TriggerTransition						{ $$ = list_make1($1); }
-			| TriggerTransitions TriggerTransition	{ $$ = lappend($1, $2); }
-		;
-
-TriggerTransition:
-			TransitionOldOrNew TransitionRowOrTable opt_as TransitionRelName
-				{
-					TriggerTransition *n = makeNode(TriggerTransition);
-					n->name = $4;
-					n->isNew = $1;
-					n->isTable = $2;
-					$$ = (Node *)n;
-				}
-		;
-
-TransitionOldOrNew:
-			NEW										{ $$ = true; }
-			| OLD									{ $$ = false; }
-		;
-
-TransitionRowOrTable:
-			TABLE									{ $$ = true; }
-			/*
-			 * According to the standard, lack of a keyword here implies ROW.
-			 * Support for that would require prohibiting ROW entirely here,
-			 * reserving the keyword ROW, and/or requiring AS (instead of
-			 * allowing it to be optional, as the standard specifies) as the
-			 * next token.  Requiring ROW seems cleanest and easiest to
-			 * explain.
-			 */
-			| ROW									{ $$ = false; }
-		;
-
-TransitionRelName:
-			ColId									{ $$ = $1; }
-		;
-
-TriggerForSpec:
-			FOR TriggerForOptEach TriggerForType
-				{
-					$$ = $3;
-				}
-			| /* EMPTY */
-				{
-					/*
-					 * If ROW/STATEMENT not specified, default to
-					 * STATEMENT, per SQL
-					 */
-					$$ = false;
-				}
-		;
-
-TriggerForOptEach:
-			EACH
-			| /*EMPTY*/
-		;
-
-TriggerForType:
-			ROW										{ $$ = true; }
-			| STATEMENT								{ $$ = false; }
-		;
-
-TriggerWhen:
-			WHEN '(' a_expr ')'						{ $$ = $3; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
-
-FUNCTION_or_PROCEDURE:
-			FUNCTION
-		|	PROCEDURE
-		;
-
-TriggerFuncArgs:
-			TriggerFuncArg							{ $$ = list_make1($1); }
-			| TriggerFuncArgs ',' TriggerFuncArg	{ $$ = lappend($1, $3); }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-TriggerFuncArg:
-			Iconst
-				{
-					$$ = makeString(psprintf("%d", $1));
-				}
-			| FCONST								{ $$ = makeString($1); }
-			| Sconst								{ $$ = makeString($1); }
-			| ColLabel								{ $$ = makeString($1); }
-		;
-
-OptConstrFromTable:
-			FROM qualified_name						{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
 
 ConstraintAttributeSpec:
 			/*EMPTY*/
@@ -3470,7 +3200,6 @@ drop_type_name:
 /* object types attached to a table */
 object_type_name_on_any_name:
 			RULE									{ $$ = OBJECT_RULE; }
-			| TRIGGER								{ $$ = OBJECT_TRIGGER; }
 		;
 
 any_name_list:
@@ -9329,7 +9058,6 @@ unreserved_keyword:
 			| TIES
 			| TRANSACTION
 			| TRANSFORM
-			| TRIGGER
 			| TRUNCATE
 			| TRUSTED
 			| TYPE_P
@@ -9905,7 +9633,6 @@ bare_label_keyword:
 			| TRANSACTION
 			| TRANSFORM
 			| TREAT
-			| TRIGGER
 			| TRIM
 			| TRUE_P
 			| TRUNCATE

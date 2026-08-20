@@ -42,7 +42,6 @@ OBJS = \
 	statscmds.o \
 	tablecmds.o \
 	tablespace.o \
-	trigger.o \
 	typecmds.o \
 	vacuum.o \
 	variable.o \

@@ -2553,16 +2553,6 @@ _outLockingClause(StringInfo str, const LockingClause *node)
 
 
 static void
-_outTriggerTransition(StringInfo str, const TriggerTransition *node)
-{
-	WRITE_NODE_TYPE("TRIGGERTRANSITION");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_BOOL_FIELD(isNew);
-	WRITE_BOOL_FIELD(isTable);
-}
-
-static void
 _outColumnDef(StringInfo str, const ColumnDef *node)
 {
 	WRITE_NODE_TYPE("COLUMNDEF");
@@ -3770,9 +3760,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ForeignKeyCacheInfo:
 				_outForeignKeyCacheInfo(str, obj);
-				break;
-			case T_TriggerTransition:
-				_outTriggerTransition(str, obj);
 				break;
 
 			default:

@@ -2008,11 +2008,6 @@
   proname => 'int8', proleakproof => 't', prorettype => 'int8',
   proargtypes => 'oid', prosrc => 'oidtoi8' },
 
-{ oid => '1291',
-  descr => 'trigger to suppress updates when new and old records match',
-  proname => 'suppress_redundant_updates_trigger', provolatile => 'v',
-  prorettype => 'trigger', proargtypes => '',
-  prosrc => 'suppress_redundant_updates_trigger' },
 
 { oid => '1292',
   proname => 'tideq', proleakproof => 't', prorettype => 'bool',
@@ -2766,9 +2761,6 @@
   proname => 'pg_get_statisticsobjdef_expressions', provolatile => 's',
   prorettype => '_text', proargtypes => 'oid',
   prosrc => 'pg_get_statisticsobjdef_expressions' },
-{ oid => '1662', descr => 'trigger description',
-  proname => 'pg_get_triggerdef', provolatile => 's', prorettype => 'text',
-  proargtypes => 'oid', prosrc => 'pg_get_triggerdef' },
 { oid => '1387', descr => 'constraint description',
   proname => 'pg_get_constraintdef', provolatile => 's', prorettype => 'text',
   proargtypes => 'oid', prosrc => 'pg_get_constraintdef' },
@@ -3996,9 +3988,6 @@
   proname => 'pg_stat_reset_slru', proisstrict => 'f', provolatile => 'v',
   prorettype => 'void', proargtypes => 'text', prosrc => 'pg_stat_reset_slru' },
 
-{ oid => '3163', descr => 'current trigger depth',
-  proname => 'pg_trigger_depth', provolatile => 's', proparallel => 'r',
-  prorettype => 'int4', proargtypes => '', prosrc => 'pg_trigger_depth' },
 
 { oid => '3778', descr => 'tablespace location',
   proname => 'pg_tablespace_location', provolatile => 's', prorettype => 'text',
@@ -5093,12 +5082,6 @@
 { oid => '2299', descr => 'I/O',
   proname => 'void_out', prorettype => 'cstring', proargtypes => 'void',
   prosrc => 'void_out' },
-{ oid => '2300', descr => 'I/O',
-  proname => 'trigger_in', proisstrict => 'f', prorettype => 'trigger',
-  proargtypes => 'cstring', prosrc => 'trigger_in' },
-{ oid => '2301', descr => 'I/O',
-  proname => 'trigger_out', prorettype => 'cstring', proargtypes => 'trigger',
-  prosrc => 'trigger_out' },
 { oid => '2302', descr => 'I/O',
   proname => 'language_handler_in', proisstrict => 'f',
   prorettype => 'language_handler', proargtypes => 'cstring',
@@ -5689,9 +5672,6 @@
   proallargtypes => '{text,text,interval,bool}', proargmodes => '{o,o,o,o}',
   proargnames => '{name,abbrev,utc_offset,is_dst}',
   prosrc => 'pg_timezone_names' },
-{ oid => '2730', descr => 'trigger description with pretty-print option',
-  proname => 'pg_get_triggerdef', provolatile => 's', prorettype => 'text',
-  proargtypes => 'oid bool', prosrc => 'pg_get_triggerdef_ext' },
 
 
 # shared memory usage

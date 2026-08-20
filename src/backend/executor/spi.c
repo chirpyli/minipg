@@ -20,7 +20,6 @@
 #include "access/xact.h"
 #include "catalog/heap.h"
 #include "catalog/pg_type.h"
-#include "commands/trigger.h"
 #include "executor/executor.h"
 #include "executor/spi_priv.h"
 #include "miscadmin.h"
@@ -2042,8 +2041,6 @@ SPI_result_code_string(int code)
 			return "SPI_OK_REL_REGISTER";
 		case SPI_OK_REL_UNREGISTER:
 			return "SPI_OK_REL_UNREGISTER";
-		case SPI_OK_TD_REGISTER:
-			return "SPI_OK_TD_REGISTER";
 	}
 	/* Unrecognized code ... return something useful ... */
 	sprintf(buf, "Unrecognized SPI code %d", code);
@@ -2879,10 +2876,7 @@ _SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount)
 #endif
 
 	/* Select execution options */
-	if (fire_triggers)
-		eflags = 0;				/* default run-to-completion flags */
-	else
-		eflags = EXEC_FLAG_SKIP_TRIGGERS;
+	eflags = 0;					/* default run-to-completion flags */
 
 	ExecutorStart(queryDesc, eflags);
 
@@ -3297,51 +3291,3 @@ SPI_unregister_relation(const char *name)
 	return res;
 }
 
-/*
- * Register the transient relations from 'tdata' using this SPI connection.
- * This should be called by PL implementations' trigger handlers after
- * connecting, in order to make transition tables visible to any queries run
- * in this connection.
- */
-int
-SPI_register_trigger_data(TriggerData *tdata)
-{
-	if (tdata == NULL)
-		return SPI_ERROR_ARGUMENT;
-
-	if (tdata->tg_newtable)
-	{
-		EphemeralNamedRelation enr =
-		palloc(sizeof(EphemeralNamedRelationData));
-		int			rc;
-
-		enr->md.name = tdata->tg_trigger->tgnewtable;
-		enr->md.reliddesc = tdata->tg_relation->rd_id;
-		enr->md.tupdesc = NULL;
-		enr->md.enrtype = ENR_NAMED_TUPLESTORE;
-		enr->md.enrtuples = tuplestore_tuple_count(tdata->tg_newtable);
-		enr->reldata = tdata->tg_newtable;
-		rc = SPI_register_relation(enr);
-		if (rc != SPI_OK_REL_REGISTER)
-			return rc;
-	}
-
-	if (tdata->tg_oldtable)
-	{
-		EphemeralNamedRelation enr =
-		palloc(sizeof(EphemeralNamedRelationData));
-		int			rc;
-
-		enr->md.name = tdata->tg_trigger->tgoldtable;
-		enr->md.reliddesc = tdata->tg_relation->rd_id;
-		enr->md.tupdesc = NULL;
-		enr->md.enrtype = ENR_NAMED_TUPLESTORE;
-		enr->md.enrtuples = tuplestore_tuple_count(tdata->tg_oldtable);
-		enr->reldata = tdata->tg_oldtable;
-		rc = SPI_register_relation(enr);
-		if (rc != SPI_OK_REL_REGISTER)
-			return rc;
-	}
-
-	return SPI_OK_TD_REGISTER;
-}

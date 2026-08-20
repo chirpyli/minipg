@@ -55,11 +55,9 @@
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "catalog/schemapg.h"
 #include "catalog/storage.h"
-#include "commands/trigger.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -1025,7 +1023,7 @@ retry:
 	RelationBuildTupleDesc(relation);
 
 	/*
-	 * Fetch rules and triggers that affect this relation
+	 * Fetch rules that affect this relation
 	 */
 	if (relation->rd_rel->relhasrules)
 		RelationBuildRuleLock(relation);
@@ -1034,11 +1032,6 @@ retry:
 		relation->rd_rules = NULL;
 		relation->rd_rulescxt = NULL;
 	}
-
-	if (relation->rd_rel->relhastriggers)
-		RelationBuildTriggers(relation);
-	else
-		relation->trigdesc = NULL;
 
 	/* foreign key data is not loaded till asked for */
 	relation->rd_fkeylist = NIL;
@@ -2245,7 +2238,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		else
 			FreeTupleDesc(relation->rd_att);
 	}
-	FreeTriggerDesc(relation->trigdesc);
 	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
 	list_free(relation->rd_statlist);
@@ -3745,12 +3737,11 @@ RelationCacheInitializePhase3(void)
 	 * temporarily setting criticalRelcachesBuilt to false again.  For now,
 	 * though, we just nail 'em in.)
 	 *
-	 * RewriteRelRulenameIndexId and TriggerRelidNameIndexId are not critical
-	 * in the same way as the others, because the critical catalogs don't
-	 * (currently) have any rules or triggers, and so these indexes can be
-	 * rebuilt without inducing recursion.  However they are used during
-	 * relcache load when a rel does have rules or triggers, so we choose to
-	 * nail them for performance reasons.
+	 * RewriteRelRulenameIndexId is not critical in the same way as the
+	 * others, because the critical catalogs don't (currently) have any rules,
+	 * and so this index can be rebuilt without inducing recursion.  However
+	 * it is used during relcache load when a rel does have rules, so we
+	 * choose to nail it for performance reasons.
 	 */
 	if (!criticalRelcachesBuilt)
 	{
@@ -3766,10 +3757,8 @@ RelationCacheInitializePhase3(void)
 							AccessMethodProcedureRelationId);
 		load_critical_index(RewriteRelRulenameIndexId,
 							RewriteRelationId);
-		load_critical_index(TriggerRelidNameIndexId,
-							TriggerRelationId);
 
-#define NUM_CRITICAL_LOCAL_INDEXES	7	/* fix if you change list above */
+#define NUM_CRITICAL_LOCAL_INDEXES	6	/* fix if you change list above */
 
 		criticalRelcachesBuilt = true;
 	}
@@ -3880,13 +3869,6 @@ RelationCacheInitializePhase3(void)
 			RelationBuildRuleLock(relation);
 			if (relation->rd_rules == NULL)
 				relation->rd_rel->relhasrules = false;
-			restart = true;
-		}
-		if (relation->rd_rel->relhastriggers && relation->trigdesc == NULL)
-		{
-			RelationBuildTriggers(relation);
-			if (relation->trigdesc == NULL)
-				relation->rd_rel->relhastriggers = false;
 			restart = true;
 		}
 
@@ -5449,16 +5431,15 @@ load_relcache_init_file(bool shared)
 		}
 
 		/*
-		 * Rules and triggers are not saved (mainly because the internal
-		 * format is complex and subject to change).  They must be rebuilt if
-		 * needed by RelationCacheInitializePhase3.  This is not expected to
-		 * be a big performance hit since few system catalogs have such. Ditto
-		 * for RLS policy data, partition info, index expressions, predicates,
+		 * Rules are not saved (mainly because the internal format is complex
+		 * and subject to change).  They must be rebuilt if needed by
+		 * RelationCacheInitializePhase3.  This is not expected to be a big
+		 * performance hit since few system catalogs have such. Ditto for RLS
+		 * policy data, partition info, index expressions, predicates,
 		 * exclusion info, and FDW info.
 		 */
 		rel->rd_rules = NULL;
 		rel->rd_rulescxt = NULL;
-		rel->trigdesc = NULL;
 		rel->rd_indexprs = NIL;
 		rel->rd_indpred = NIL;
 
@@ -5800,8 +5781,7 @@ write_item(const void *data, Size len, FILE *fp)
 bool
 RelationIdIsInInitFile(Oid relationId)
 {
-	if (relationId == TriggerRelidNameIndexId ||
-		relationId == DatabaseNameIndexId)
+	if (relationId == DatabaseNameIndexId)
 	{
 		/*
 		 * If this Assert fails, we don't need the applicable special case

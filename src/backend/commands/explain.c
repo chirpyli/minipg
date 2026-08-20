@@ -53,8 +53,6 @@ static void ExplainOneQuery(Query *query, int cursorOptions,
 							ExplainState *es,
 							const char *queryString, ParamListInfo params,
 							QueryEnvironment *queryEnv);
-static void report_triggers(ResultRelInfo *rInfo, bool show_relname,
-							ExplainState *es);
 static double elapsed_time(instr_time *starttime);
 static bool ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used);
 static void ExplainNode(PlanState *planstate, List *ancestors,
@@ -548,10 +546,6 @@ ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 		ExplainPropertyFloat("Planning Time", "ms", 1000.0 * plantime, 3, es);
 	}
 
-	/* Print info about runtime of triggers */
-	if (es->analyze)
-		ExplainPrintTriggers(es, queryDesc);
-
 	/*
 	 * Close down the query and free resources.  Include time for this in the
 	 * total execution time (although it should be pretty minimal).
@@ -695,143 +689,6 @@ ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc)
 	 * don't match the built-in defaults.
 	 */
 	ExplainPrintSettings(es);
-}
-
-/*
- * ExplainPrintTriggers -
- *	  convert a QueryDesc's trigger statistics to text and append it to
- *	  es->str
- *
- * The caller should have set up the options fields of *es, as well as
- * initializing the output buffer es->str.  Other fields in *es are
- * initialized here.
- */
-void
-ExplainPrintTriggers(ExplainState *es, QueryDesc *queryDesc)
-{
-	ResultRelInfo *rInfo;
-	bool		show_relname;
-	List	   *resultrels;
-	List	   *routerels;
-	List	   *targrels;
-	ListCell   *l;
-
-	resultrels = queryDesc->estate->es_opened_result_relations;
-	routerels = queryDesc->estate->es_tuple_routing_result_relations;
-	targrels = queryDesc->estate->es_trig_target_relations;
-
-	ExplainOpenGroup("Triggers", "Triggers", false, es);
-
-	show_relname = (list_length(resultrels) > 1 ||
-					routerels != NIL || targrels != NIL);
-	foreach(l, resultrels)
-	{
-		rInfo = (ResultRelInfo *) lfirst(l);
-		report_triggers(rInfo, show_relname, es);
-	}
-
-	foreach(l, routerels)
-	{
-		rInfo = (ResultRelInfo *) lfirst(l);
-		report_triggers(rInfo, show_relname, es);
-	}
-
-	foreach(l, targrels)
-	{
-		rInfo = (ResultRelInfo *) lfirst(l);
-		report_triggers(rInfo, show_relname, es);
-	}
-
-	ExplainCloseGroup("Triggers", "Triggers", false, es);
-}
-
-/*
- * ExplainQueryText -
- *	  add a "Query Text" node that contains the actual text of the query
- *
- * The caller should have set up the options fields of *es, as well as
- * initializing the output buffer es->str.
- *
- */
-void
-ExplainQueryText(ExplainState *es, QueryDesc *queryDesc)
-{
-	if (queryDesc->sourceText)
-		ExplainPropertyText("Query Text", queryDesc->sourceText, es);
-}
-
-/*
- * report_triggers -
- *		report execution stats for a single relation's triggers
- */
-static void
-report_triggers(ResultRelInfo *rInfo, bool show_relname, ExplainState *es)
-{
-	int			nt;
-
-	if (!rInfo->ri_TrigDesc || !rInfo->ri_TrigInstrument)
-		return;
-	for (nt = 0; nt < rInfo->ri_TrigDesc->numtriggers; nt++)
-	{
-		Trigger    *trig = rInfo->ri_TrigDesc->triggers + nt;
-		Instrumentation *instr = rInfo->ri_TrigInstrument + nt;
-		char	   *relname;
-		char	   *conname = NULL;
-
-		/* Must clean up instrumentation state */
-		InstrEndLoop(instr);
-
-		/*
-		 * We ignore triggers that were never invoked; they likely aren't
-		 * relevant to the current query type.
-		 */
-		if (instr->ntuples == 0)
-			continue;
-
-		ExplainOpenGroup("Trigger", NULL, true, es);
-
-		relname = RelationGetRelationName(rInfo->ri_RelationDesc);
-		if (OidIsValid(trig->tgconstraint))
-			conname = get_constraint_name(trig->tgconstraint);
-
-		/*
-		 * In text format, we avoid printing both the trigger name and the
-		 * constraint name unless VERBOSE is specified.  In non-text formats
-		 * we just print everything.
-		 */
-		if (es->format == EXPLAIN_FORMAT_TEXT)
-		{
-			if (es->verbose || conname == NULL)
-				appendStringInfo(es->str, "Trigger %s", trig->tgname);
-			else
-				appendStringInfoString(es->str, "Trigger");
-			if (conname)
-				appendStringInfo(es->str, " for constraint %s", conname);
-			if (show_relname)
-				appendStringInfo(es->str, " on %s", relname);
-			if (es->timing)
-				appendStringInfo(es->str, ": time=%.3f calls=%.0f\n",
-								 1000.0 * instr->total, instr->ntuples);
-			else
-				appendStringInfo(es->str, ": calls=%.0f\n", instr->ntuples);
-		}
-		else
-		{
-			ExplainPropertyText("Trigger Name", trig->tgname, es);
-			if (conname)
-				ExplainPropertyText("Constraint Name", conname, es);
-			ExplainPropertyText("Relation", relname, es);
-			if (es->timing)
-				ExplainPropertyFloat("Time", "ms", 1000.0 * instr->total, 3,
-									 es);
-			ExplainPropertyFloat("Calls", NULL, instr->ntuples, 0, es);
-		}
-
-		if (conname)
-			pfree(conname);
-
-		ExplainCloseGroup("Trigger", NULL, true, es);
-	}
 }
 
 /* Compute elapsed time in seconds since given timestamp */

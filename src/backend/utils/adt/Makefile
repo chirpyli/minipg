@@ -68,7 +68,6 @@ OBJS = \
 	selfuncs.o \
 	tid.o \
 	timestamp.o \
-	trigfuncs.o \
 	varbit.o \
 	varchar.o \
 	varlena.o \

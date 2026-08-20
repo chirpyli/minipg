@@ -25,7 +25,6 @@
 #include "storage/condition_variable.h"
 #include "utils/hsearch.h"
 #include "utils/queryenvironment.h"
-#include "utils/reltrigger.h"
 #include "utils/sharedtuplestore.h"
 #include "utils/snapshot.h"
 #include "utils/sortsupport.h"
@@ -430,22 +429,8 @@ typedef struct ResultRelInfo
 	/* updates do LockTuple() before oldtup read; see README.tuplock */
 	bool		ri_needLockTagTuple;
 
-	/* triggers to be fired, if any */
-	TriggerDesc *ri_TrigDesc;
-
-	/* cached lookup info for trigger functions */
-	FmgrInfo   *ri_TrigFunctions;
-
-	/* array of trigger WHEN expr states */
-	ExprState **ri_TrigWhenExprs;
-
-	/* optional runtime measurements for triggers */
-	Instrumentation *ri_TrigInstrument;
-
-	/* On-demand created slots for triggers / returning processing */
-	TupleTableSlot *ri_ReturningSlot;	/* for trigger output tuples */
-	TupleTableSlot *ri_TrigOldSlot; /* for a trigger's old tuple */
-	TupleTableSlot *ri_TrigNewSlot; /* for a trigger's new tuple */
+	/* On-demand created slot for returning processing */
+	TupleTableSlot *ri_ReturningSlot;	/* for returning tuples */
 
 	/* batch insert stuff */
 	int			ri_NumSlots;	/* number of slots in the array */
@@ -545,9 +530,6 @@ typedef struct EState
 	 * code for partitions that aren't found in the es_result_relations array.
 	 */
 	List	   *es_tuple_routing_result_relations;
-
-	/* Stuff used for firing triggers: */
-	List	   *es_trig_target_relations;	/* trigger-only ResultRelInfos */
 
 	/* Parameter info: */
 	ParamListInfo es_param_list_info;	/* values of external params */
@@ -1150,15 +1132,13 @@ typedef struct ModifyTableState
 	ResultRelInfo *resultRelInfo;	/* info about target relation(s) */
 
 	/*
-	 * Target relation mentioned in the original statement, used to fire
-	 * statement-level triggers and as the root for tuple routing.  (This
-	 * might point to one of the resultRelInfo[] entries, but it can also be a
-	 * distinct struct.)
+	 * Target relation mentioned in the original statement, used as the root
+	 * for tuple routing.  (This might point to one of the resultRelInfo[]
+	 * entries, but it can also be a distinct struct.)
 	 */
 	ResultRelInfo *rootResultRelInfo;
 
 	EPQState	mt_epqstate;	/* for evaluating EvalPlanQual rechecks */
-	bool		fireBSTriggers; /* do we need to fire stmt triggers? */
 
 	/*
 	 * These fields are used for inherited UPDATE and DELETE, to track which
@@ -1170,12 +1150,6 @@ typedef struct ModifyTableState
 	Oid			mt_lastResultOid;	/* last-seen value of tableoid */
 	int			mt_lastResultIndex; /* corresponding index in resultRelInfo[] */
 	HTAB	   *mt_resultOidHash;	/* optional hash table to speed lookups */
-
-	/* controls transition table population for specified operation */
-	struct TransitionCaptureState *mt_transition_capture;
-
-	/* controls transition table population for INSERT...ON CONFLICT UPDATE */
-	struct TransitionCaptureState *mt_oc_transition_capture;
 } ModifyTableState;
 
 /* ----------------

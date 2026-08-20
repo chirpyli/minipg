@@ -33,7 +33,6 @@
 #include "commands/copy.h"
 #include "commands/copyfrom_internal.h"
 #include "commands/progress.h"
-#include "commands/trigger.h"
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "executor/tuptable.h"
@@ -330,8 +329,7 @@ CopyMultiInsertBufferFlush(CopyMultiInsertInfo *miinfo,
 	for (i = 0; i < nused; i++)
 	{
 		/*
-		 * If there are any indexes, update them for all the inserted tuples,
-		 * and run AFTER ROW INSERT triggers.
+		 * If there are any indexes, update them for all the inserted tuples.
 		 */
 		if (resultRelInfo->ri_NumIndices > 0)
 		{
@@ -342,23 +340,7 @@ CopyMultiInsertBufferFlush(CopyMultiInsertInfo *miinfo,
 				ExecInsertIndexTuples(resultRelInfo,
 									  buffer->slots[i], estate, false, false,
 									  NULL, NIL);
-			ExecARInsertTriggers(estate, resultRelInfo,
-								 slots[i], recheckIndexes,
-								 cstate->transition_capture);
 			list_free(recheckIndexes);
-		}
-
-		/*
-		 * There's no indexes, but see if we need to run AFTER ROW INSERT
-		 * triggers anyway.
-		 */
-		else if (resultRelInfo->ri_TrigDesc != NULL &&
-				 (resultRelInfo->ri_TrigDesc->trig_insert_after_row ||
-				  resultRelInfo->ri_TrigDesc->trig_insert_new_table))
-		{
-			cstate->cur_lineno = buffer->linenos[i];
-			ExecARInsertTriggers(estate, resultRelInfo,
-								 slots[i], NIL, cstate->transition_capture);
 		}
 
 		ExecClearTuple(slots[i]);
@@ -537,27 +519,20 @@ CopyFrom(CopyFromState cstate)
 	CopyMultiInsertInfo multiInsertInfo = {0};	/* pacify compiler */
 	int64		processed = 0;
 	int64		excluded = 0;
-	bool		has_before_insert_row_trig;
-	bool		has_instead_insert_row_trig;
 
 	Assert(cstate->rel);
 	Assert(list_length(cstate->range_table) == 1);
 
 	/*
-	 * The target must be a plain, foreign, or partitioned relation, or have
-	 * an INSTEAD OF INSERT row trigger.  (Currently, such triggers are only
-	 * allowed on views, so we only hint about them in the view case.)
+	 * The target must be a plain, foreign, or partitioned relation.
 	 */
-	if (cstate->rel->rd_rel->relkind != RELKIND_RELATION &&
-		!(cstate->rel->trigdesc &&
-		  cstate->rel->trigdesc->trig_insert_instead_row))
+	if (cstate->rel->rd_rel->relkind != RELKIND_RELATION)
 	{
 		if (cstate->rel->rd_rel->relkind == RELKIND_VIEW)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot copy to view \"%s\"",
-							RelationGetRelationName(cstate->rel)),
-					 errhint("To enable copying to a view, provide an INSTEAD OF INSERT trigger.")));
+							RelationGetRelationName(cstate->rel))));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -646,22 +621,6 @@ CopyFrom(CopyFromState cstate)
 	mtstate->resultRelInfo = resultRelInfo;
 	mtstate->rootResultRelInfo = resultRelInfo;
 
-	/* Prepare to catch AFTER triggers. */
-	AfterTriggerBeginQuery();
-
-	/*
-	 * If there are any triggers with transition tables on the named relation,
-	 * we need to be prepared to capture transition tuples.
-	 *
-	 * Because partition tuple routing would like to know about whether
-	 * transition capture is active, we also set it in mtstate, which is
-	 * passed to ExecFindPartition() below.
-	 */
-	cstate->transition_capture = mtstate->mt_transition_capture =
-		MakeTransitionCaptureState(cstate->rel->trigdesc,
-								   RelationGetRelid(cstate->rel),
-								   CMD_INSERT);
-
 	if (cstate->whereClause)
 		cstate->qualexpr = ExecInitQual(castNode(List, cstate->whereClause),
 										&mtstate->ps);
@@ -673,25 +632,12 @@ CopyFrom(CopyFromState cstate)
 	 * number of reasons why we might not be able to do this.  These are
 	 * explained below.
 	 */
-	if (resultRelInfo->ri_TrigDesc != NULL &&
-		(resultRelInfo->ri_TrigDesc->trig_insert_before_row ||
-		 resultRelInfo->ri_TrigDesc->trig_insert_instead_row))
-	{
-		/*
-		 * Can't support multi-inserts when there are any BEFORE/INSTEAD OF
-		 * triggers on the table. Such triggers might query the table we're
-		 * inserting into and act differently if the tuples that have already
-		 * been processed and prepared for insertion are not there.
-		 */
-		insertMethod = CIM_SINGLE;
-	}
-	else if (cstate->volatile_defexprs)
+	if (cstate->volatile_defexprs)
 	{
 		/*
 		 * Can't support multi-inserts to foreign tables or if there are any
-		 * volatile default expressions in the table.  Similarly to the
-		 * trigger case above, such expressions may query the table we're
-		 * inserting into.
+		 * volatile default expressions in the table.  Such expressions may
+		 * query the table we're inserting into.
 		 *
 		 * Note: It does not matter if any partitions have any volatile
 		 * default expressions as we use the defaults from the target of the
@@ -744,20 +690,6 @@ CopyFrom(CopyFromState cstate)
 		bistate = GetBulkInsertState();
 	}
 
-	has_before_insert_row_trig = (resultRelInfo->ri_TrigDesc &&
-								  resultRelInfo->ri_TrigDesc->trig_insert_before_row);
-
-	has_instead_insert_row_trig = (resultRelInfo->ri_TrigDesc &&
-								   resultRelInfo->ri_TrigDesc->trig_insert_instead_row);
-
-	/*
-	 * Check BEFORE STATEMENT insertion triggers. It's debatable whether we
-	 * should do this for COPY, since it's not really an "INSERT" statement as
-	 * such. However, executing these triggers maintains consistency with the
-	 * EACH ROW triggers that we already fire on COPY.
-	 */
-	ExecBSInsertTriggers(estate, resultRelInfo);
-
 	econtext = GetPerTupleExprContext(estate);
 
 	/* Set up callback to identify error line number */
@@ -769,7 +701,6 @@ CopyFrom(CopyFromState cstate)
 	for (;;)
 	{
 		TupleTableSlot *myslot;
-		bool		skip_tuple;
 
 		CHECK_FOR_INTERRUPTS();
 
@@ -836,33 +767,12 @@ CopyFrom(CopyFromState cstate)
 		/* Insert into the target relation directly (no partition routing) */
 		resultRelInfo = target_resultRelInfo;
 
-		skip_tuple = false;
-
-		/* BEFORE ROW INSERT Triggers */
-		if (has_before_insert_row_trig)
 		{
-			if (!ExecBRInsertTriggers(estate, resultRelInfo, myslot))
-				skip_tuple = true;	/* "do nothing" */
-		}
-
-		if (!skip_tuple)
-		{
-			/*
-			 * If there is an INSTEAD OF INSERT ROW trigger, let it handle the
-			 * tuple.  Otherwise, proceed with inserting the tuple into the
-			 * table or foreign table.
-			 */
-			if (has_instead_insert_row_trig)
-			{
-				ExecIRInsertTriggers(estate, resultRelInfo, myslot);
-			}
-			else
-			{
-				/* Compute stored generated columns */
-				if (resultRelInfo->ri_RelationDesc->rd_att->constr &&
-					resultRelInfo->ri_RelationDesc->rd_att->constr->has_generated_stored)
-					ExecComputeStoredGenerated(resultRelInfo, estate, myslot,
-											   CMD_INSERT);
+			/* Compute stored generated columns */
+			if (resultRelInfo->ri_RelationDesc->rd_att->constr &&
+				resultRelInfo->ri_RelationDesc->rd_att->constr->has_generated_stored)
+				ExecComputeStoredGenerated(resultRelInfo, estate, myslot,
+										   CMD_INSERT);
 
 				/*
 				 * If the target is a plain table, check the constraints of
@@ -918,23 +828,12 @@ CopyFrom(CopyFromState cstate)
 																   NULL,
 																   NIL);
 
-					/* AFTER ROW INSERT Triggers */
-					ExecARInsertTriggers(estate, resultRelInfo, myslot,
-										 recheckIndexes, cstate->transition_capture);
-
 					list_free(recheckIndexes);
 				}
 			}
 
-			/*
-			 * We count only tuples not suppressed by a BEFORE INSERT trigger
-			 * or FDW; this is the same definition used by nodeModifyTable.c
-			 * for counting tuples inserted by an INSERT command.  Update
-			 * progress of the COPY command as well.
-			 */
 			pgstat_progress_update_param(PROGRESS_COPY_TUPLES_PROCESSED,
 										 ++processed);
-		}
 	}
 
 	/* Flush any remaining buffered tuples */
@@ -951,12 +850,6 @@ CopyFrom(CopyFromState cstate)
 		FreeBulkInsertState(bistate);
 
 	MemoryContextSwitchTo(oldcontext);
-
-	/* Execute AFTER STATEMENT insertion triggers */
-	ExecASInsertTriggers(estate, target_resultRelInfo, cstate->transition_capture);
-
-	/* Handle queued AFTER triggers */
-	AfterTriggerEndQuery(estate);
 
 	ExecResetTupleTable(estate->es_tupleTable, false);
 

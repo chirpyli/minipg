@@ -2625,17 +2625,6 @@ _copyRoleSpec(const RoleSpec *from)
 	return newnode;
 }
 
-static TriggerTransition *
-_copyTriggerTransition(const TriggerTransition *from)
-{
-	TriggerTransition *newnode = makeNode(TriggerTransition);
-
-	COPY_STRING_FIELD(name);
-	COPY_SCALAR_FIELD(isNew);
-	COPY_SCALAR_FIELD(isTable);
-
-	return newnode;
-}
 
 static Query *
 _copyQuery(const Query *from)
@@ -3390,28 +3379,6 @@ _copyCreateAmStmt(const CreateAmStmt *from)
 	return newnode;
 }
 
-static CreateTrigStmt *
-_copyCreateTrigStmt(const CreateTrigStmt *from)
-{
-	CreateTrigStmt *newnode = makeNode(CreateTrigStmt);
-
-	COPY_SCALAR_FIELD(replace);
-	COPY_SCALAR_FIELD(isconstraint);
-	COPY_STRING_FIELD(trigname);
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(funcname);
-	COPY_NODE_FIELD(args);
-	COPY_SCALAR_FIELD(row);
-	COPY_SCALAR_FIELD(timing);
-	COPY_SCALAR_FIELD(events);
-	COPY_NODE_FIELD(columns);
-	COPY_NODE_FIELD(whenClause);
-	COPY_NODE_FIELD(transitionRels);
-	COPY_NODE_FIELD(constrrel);
-
-	return newnode;
-}
-
 static LockStmt *
 _copyLockStmt(const LockStmt *from)
 {
@@ -4075,9 +4042,6 @@ copyObjectImpl(const void *from)
 		case T_CreateAmStmt:
 			retval = _copyCreateAmStmt(from);
 			break;
-		case T_CreateTrigStmt:
-			retval = _copyCreateTrigStmt(from);
-			break;
 		case T_LockStmt:
 			retval = _copyLockStmt(from);
 			break;
@@ -4206,9 +4170,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_RoleSpec:
 			retval = _copyRoleSpec(from);
-			break;
-		case T_TriggerTransition:
-			retval = _copyTriggerTransition(from);
 			break;
 
 			/*

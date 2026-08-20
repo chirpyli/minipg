@@ -40,7 +40,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
@@ -49,7 +48,6 @@
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "commands/typecmds.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -415,9 +413,6 @@ static void ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmo
 static void ATExecSetRelOptions(Relation rel, List *defList,
 								AlterTableType operation,
 								LOCKMODE lockmode);
-static void ATExecEnableDisableTrigger(Relation rel, const char *trigname,
-									   char fires_when, bool skip_system, bool recurse,
-									   LOCKMODE lockmode);
 static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 									char fires_when, LOCKMODE lockmode);
 static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
@@ -1214,9 +1209,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 					DropBehavior behavior, bool restart_seqs)
 {
 	List	   *rels;
-	EState	   *estate;
-	ResultRelInfo *resultRelInfos;
-	ResultRelInfo *resultRelInfo;
 	SubTransactionId mySubid;
 	ListCell   *cell;
 	Oid		   *logrelids;
@@ -1284,49 +1276,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 	if (restart_seqs)
 	{
 		/* Sequence restart is not supported in this build. */
-	}
-
-	/* Prepare to catch AFTER triggers. */
-	AfterTriggerBeginQuery();
-
-	/*
-	 * To fire triggers, we'll need an EState as well as a ResultRelInfo for
-	 * each relation.  We don't need to call ExecOpenIndices, though.
-	 *
-	 * We put the ResultRelInfos in the es_opened_result_relations list, even
-	 * though we don't have a range table and don't populate the
-	 * es_result_relations array.  That's a bit bogus, but it's enough to make
-	 * ExecGetTriggerResultRel() find them.
-	 */
-	estate = CreateExecutorState();
-	resultRelInfos = (ResultRelInfo *)
-		palloc(list_length(rels) * sizeof(ResultRelInfo));
-	resultRelInfo = resultRelInfos;
-	foreach(cell, rels)
-	{
-		Relation	rel = (Relation) lfirst(cell);
-
-		InitResultRelInfo(resultRelInfo,
-						  rel,
-						  0,	/* dummy rangetable index */
-						  NULL,
-						  0);
-		estate->es_opened_result_relations =
-			lappend(estate->es_opened_result_relations, resultRelInfo);
-		resultRelInfo++;
-	}
-
-	/*
-	 * Process all BEFORE STATEMENT TRUNCATE triggers before we begin
-	 * truncating (this is because one of them might throw an error). Also, if
-	 * we were to allow them to prevent statement execution, that would need
-	 * to be handled here.
-	 */
-	resultRelInfo = resultRelInfos;
-	foreach(cell, rels)
-	{
-		ExecBSTruncateTriggers(estate, resultRelInfo);
-		resultRelInfo++;
 	}
 
 	/*
@@ -1449,24 +1398,7 @@ ExecuteTruncateGuts(List *explicit_rels,
 	}
 
 	/*
-	 * Process all AFTER STATEMENT TRUNCATE triggers.
-	 */
-	resultRelInfo = resultRelInfos;
-	foreach(cell, rels)
-	{
-		ExecASTruncateTriggers(estate, resultRelInfo);
-		resultRelInfo++;
-	}
-
-	/* Handle queued AFTER triggers */
-	AfterTriggerEndQuery(estate);
-
-	/* We can clean up the EState now */
-	FreeExecutorState(estate);
-
-	/*
-	 * Close any rels opened by CASCADE (can't do this while EState still
-	 * holds refs)
+	 * Close any rels opened by CASCADE
 	 */
 	rels = list_difference_ptr(rels, explicit_rels);
 	foreach(cell, rels)
@@ -2636,14 +2568,6 @@ CheckTableNotInUse(Relation rel, const char *stmt)
 		/* translator: first %s is a SQL command, eg ALTER TABLE */
 				 errmsg("cannot %s \"%s\" because it is being used by active queries in this session",
 						stmt, RelationGetRelationName(rel))));
-
-	if (rel->rd_rel->relkind != RELKIND_INDEX &&
-		AfterTriggerPendingOnRel(RelationGetRelid(rel)))
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-		/* translator: first %s is a SQL command, eg ALTER TABLE */
-				 errmsg("cannot %s \"%s\" because it has pending trigger events",
-						stmt, RelationGetRelationName(rel))));
 }
 
 /*
@@ -2876,16 +2800,6 @@ AlterTableGetLockLevel(List *cmds)
 				/*
 				 * These subcommands affect write operations only.
 				 */
-			case AT_EnableTrig:
-			case AT_EnableAlwaysTrig:
-			case AT_EnableReplicaTrig:
-			case AT_EnableTrigAll:
-			case AT_EnableTrigUser:
-			case AT_DisableTrig:
-			case AT_DisableTrigAll:
-			case AT_DisableTrigUser:
-				cmd_lockmode = ShareRowExclusiveLock;
-				break;
 
 				/*
 				 * These subcommands affect write operations only. XXX
@@ -3270,20 +3184,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				cmd->subtype = AT_ValidateConstraintRecurse;
 			pass = AT_PASS_MISC;
 			break;
-		case AT_EnableTrig:		/* ENABLE TRIGGER variants */
-		case AT_EnableAlwaysTrig:
-		case AT_EnableReplicaTrig:
-		case AT_EnableTrigAll:
-		case AT_EnableTrigUser:
-		case AT_DisableTrig:	/* DISABLE TRIGGER variants */
-		case AT_DisableTrigAll:
-		case AT_DisableTrigUser:
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* Set up recursion for phase 2; no other prep needed */
-			if (recurse)
-				cmd->recurse = true;
-			pass = AT_PASS_MISC;
-			break;
+
 		case AT_EnableRule:		/* ENABLE/DISABLE RULE variants */
 		case AT_EnableAlwaysRule:
 		case AT_EnableReplicaRule:
@@ -3569,55 +3470,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_ReplaceRelOptions:	/* replace entire option list */
 			ATExecSetRelOptions(rel, (List *) cmd->def, cmd->subtype, lockmode);
 			break;
-		case AT_EnableTrig:		/* ENABLE TRIGGER name */
-			ATExecEnableDisableTrigger(rel, cmd->name,
-									   TRIGGER_FIRES_ON_ORIGIN, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_EnableAlwaysTrig:	/* ENABLE ALWAYS TRIGGER name */
-			ATExecEnableDisableTrigger(rel, cmd->name,
-									   TRIGGER_FIRES_ALWAYS, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_EnableReplicaTrig:	/* ENABLE REPLICA TRIGGER name */
-			ATExecEnableDisableTrigger(rel, cmd->name,
-									   TRIGGER_FIRES_ON_REPLICA, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_DisableTrig:	/* DISABLE TRIGGER name */
-			ATExecEnableDisableTrigger(rel, cmd->name,
-									   TRIGGER_DISABLED, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_EnableTrigAll:	/* ENABLE TRIGGER ALL */
-			ATExecEnableDisableTrigger(rel, NULL,
-									   TRIGGER_FIRES_ON_ORIGIN, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_DisableTrigAll: /* DISABLE TRIGGER ALL */
-			ATExecEnableDisableTrigger(rel, NULL,
-									   TRIGGER_DISABLED, false,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_EnableTrigUser: /* ENABLE TRIGGER USER */
-			ATExecEnableDisableTrigger(rel, NULL,
-									   TRIGGER_FIRES_ON_ORIGIN, true,
-									   cmd->recurse,
-									   lockmode);
-			break;
-		case AT_DisableTrigUser:	/* DISABLE TRIGGER USER */
-			ATExecEnableDisableTrigger(rel, NULL,
-									   TRIGGER_DISABLED, true,
-									   cmd->recurse,
-									   lockmode);
-			break;
-
 		case AT_EnableRule:		/* ENABLE RULE name */
 			ATExecEnableDisableRule(rel, cmd->name,
 									RULE_FIRES_ON_ORIGIN, lockmode);
@@ -7641,25 +7493,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 								   colName)));
 				break;
 
-			case OCLASS_TRIGGER:
-
-				/*
-				 * A trigger can depend on a column because the column is
-				 * specified as an update target, or because the column is
-				 * used in the trigger's WHEN condition.  The first case would
-				 * not require any extra work, but the second case would
-				 * require updating the WHEN expression, which has the same
-				 * issues as above.  Since we can't easily tell which case
-				 * applies, we punt for both.  FIXME someday.
-				 */
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter type of a column used in a trigger definition"),
-						 errdetail("%s depends on column \"%s\"",
-								   getObjectDescription(&foundObject, false),
-								   colName)));
-				break;
-
 			case OCLASS_DEFAULT:
 
 				/*
@@ -8938,19 +8771,6 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 	smgrclose(dstrel);
 }
 
-/*
- * ALTER TABLE ENABLE/DISABLE TRIGGER
- *
- * We just pass this off to trigger.c.
- */
-static void
-ATExecEnableDisableTrigger(Relation rel, const char *trigname,
-						   char fires_when, bool skip_system, bool recurse,
-						   LOCKMODE lockmode)
-{
-	EnableDisableTriggerNew(rel, trigname, fires_when, skip_system, recurse,
-							lockmode);
-}
 
 /*
  * ALTER TABLE ENABLE/DISABLE RULE

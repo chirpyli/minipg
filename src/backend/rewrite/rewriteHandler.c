@@ -25,7 +25,6 @@
 #include "access/table.h"
 #include "catalog/dependency.h"
 #include "catalog/pg_type.h"
-#include "commands/trigger.h"
 #include "executor/executor.h"
 
 #include "miscadmin.h"
@@ -93,7 +92,7 @@ static void markQueryForLocking(Query *qry, Node *jtnode,
 static List *matchLocks(CmdType event, RuleLock *rulelocks,
 						int varno, Query *parsetree, bool *hasUpdate);
 static Query *fireRIRrules(Query *parsetree, List *activeRIRs);
-static bool view_has_instead_trigger(Relation view, CmdType event);
+
 static Bitmapset *adjust_view_column_set(Bitmapset *cols, List *targetlist);
 static List *get_generated_columns(Relation rel, int rt_index);
 
@@ -1403,8 +1402,7 @@ rewriteValuesRTE(Query *parsetree, RangeTblEntry *rte, int rti,
 	 * NULL.
 	 */
 	isAutoUpdatableView = false;
-	if (target_relation->rd_rel->relkind == RELKIND_VIEW &&
-		!view_has_instead_trigger(target_relation, CMD_INSERT))
+	if (target_relation->rd_rel->relkind == RELKIND_VIEW)
 	{
 		List	   *locks;
 		bool		hasUpdate;
@@ -1603,21 +1601,6 @@ matchLocks(CmdType event,
 		 * role. ON SELECT rules will always be applied in order to keep views
 		 * working even in LOCAL or REPLICA role.
 		 */
-		if (oneLock->event != CMD_SELECT)
-		{
-			if (SessionReplicationRole == SESSION_REPLICATION_ROLE_REPLICA)
-			{
-				if (oneLock->enabled == RULE_FIRES_ON_ORIGIN ||
-					oneLock->enabled == RULE_DISABLED)
-					continue;
-			}
-			else				/* ORIGIN or LOCAL ROLE */
-			{
-				if (oneLock->enabled == RULE_FIRES_ON_REPLICA ||
-					oneLock->enabled == RULE_DISABLED)
-					continue;
-			}
-		}
 
 		if (oneLock->event == event)
 		{
@@ -2301,40 +2284,6 @@ get_view_query(Relation view)
 
 
 /*
- * view_has_instead_trigger - does view have an INSTEAD OF trigger for event?
- *
- * If it does, we don't want to treat it as auto-updatable.  This test can't
- * be folded into view_query_is_auto_updatable because it's not an error
- * condition.
- */
-static bool
-view_has_instead_trigger(Relation view, CmdType event)
-{
-	TriggerDesc *trigDesc = view->trigdesc;
-
-	switch (event)
-	{
-		case CMD_INSERT:
-			if (trigDesc && trigDesc->trig_insert_instead_row)
-				return true;
-			break;
-		case CMD_UPDATE:
-			if (trigDesc && trigDesc->trig_update_instead_row)
-				return true;
-			break;
-		case CMD_DELETE:
-			if (trigDesc && trigDesc->trig_delete_instead_row)
-				return true;
-			break;
-		default:
-			elog(ERROR, "unrecognized CmdType: %d", (int) event);
-			break;
-	}
-	return false;
-}
-
-
-/*
  * view_col_is_auto_updatable - test whether the specified column of a view
  * is auto-updatable. Returns NULL (if the column can be updated) or a message
  * string giving the reason that it cannot be.
@@ -2673,29 +2622,6 @@ relation_is_updatable(Oid reloid,
 		{
 			relation_close(rel, AccessShareLock);
 			return events;
-		}
-	}
-
-	/* Similarly look for INSTEAD OF triggers, if they are to be included */
-	if (include_triggers)
-	{
-		TriggerDesc *trigDesc = rel->trigdesc;
-
-		if (trigDesc)
-		{
-			if (trigDesc->trig_insert_instead_row)
-				events |= (1 << CMD_INSERT);
-			if (trigDesc->trig_update_instead_row)
-				events |= (1 << CMD_UPDATE);
-			if (trigDesc->trig_delete_instead_row)
-				events |= (1 << CMD_DELETE);
-
-			/* If we have triggers for all events, we're done */
-			if (events == ALL_EVENTS)
-			{
-				relation_close(rel, AccessShareLock);
-				return events;
-			}
 		}
 	}
 
@@ -3586,8 +3512,7 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 		 * updatable.
 		 */
 		if (!instead &&
-			rt_entry_relation->rd_rel->relkind == RELKIND_VIEW &&
-			!view_has_instead_trigger(rt_entry_relation, event))
+			rt_entry_relation->rd_rel->relkind == RELKIND_VIEW)
 		{
 			/*
 			 * If there were any qualified INSTEAD rules, don't allow the view

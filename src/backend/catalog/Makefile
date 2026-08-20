@@ -50,7 +50,7 @@ CATALOG_HEADERS := \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
 	pg_language.h pg_aggregate.h \
 	pg_statistic.h pg_statistic_ext.h pg_statistic_ext_data.h \
-	pg_rewrite.h pg_trigger.h \
+	pg_rewrite.h \
 	pg_cast.h pg_enum.h pg_namespace.h pg_conversion.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
 	pg_shdepend.h \

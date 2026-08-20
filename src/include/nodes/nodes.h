@@ -319,7 +319,6 @@ typedef enum NodeTag
 	T_VariableSetStmt,
 	T_VariableShowStmt,
 	T_DiscardStmt,
-	T_CreateTrigStmt,
 	T_LockStmt,
 	T_ReindexStmt,
 	T_CheckPointStmt,
@@ -387,7 +386,6 @@ typedef enum NodeTag
 	T_InferClause,
 	T_OnConflictClause,
 	T_RoleSpec,
-	T_TriggerTransition,
 	T_VacuumRelation,
 
 	/*
@@ -398,8 +396,6 @@ typedef enum NodeTag
 	 * purposes (usually because they are involved in APIs where we want to
 	 * pass multiple object types through the same pointer).
 	 */
-	T_TriggerData,				/* in commands/trigger.h */
-	T_EventTriggerData,			/* in commands/event_trigger.h */
 	T_ReturnSetInfo,			/* in nodes/execnodes.h */
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
 	T_InlineCodeBlock,			/* in nodes/parsenodes.h */

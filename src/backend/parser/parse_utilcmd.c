@@ -91,7 +91,6 @@ typedef struct
 	List	   *tables;			/* CREATE TABLE items */
 	List	   *views;			/* CREATE VIEW items */
 	List	   *indexes;		/* CREATE INDEX items */
-	List	   *triggers;		/* CREATE TRIGGER items */
 } CreateSchemaStmtContext;
 
 
@@ -2106,7 +2105,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	cxt.tables = NIL;
 	cxt.views = NIL;
 	cxt.indexes = NIL;
-	cxt.triggers = NIL;
 
 	/*
 	 * Run through each schema element in the schema element list. Separate
@@ -2153,16 +2151,7 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 				}
 				break;
 
-			case T_CreateTrigStmt:
-				{
-					CreateTrigStmt *elp = (CreateTrigStmt *) element;
-
-					setSchemaName(cxt.schemaname, &elp->relation->schemaname);
-					cxt.triggers = lappend(cxt.triggers, element);
-				}
-				break;
-
-			default:
+				default:
 				elog(ERROR, "unrecognized node type: %d",
 					 (int) nodeTag(element));
 		}
@@ -2172,7 +2161,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 	result = list_concat(result, cxt.tables);
 	result = list_concat(result, cxt.views);
 	result = list_concat(result, cxt.indexes);
-	result = list_concat(result, cxt.triggers);
 
 	return result;
 }

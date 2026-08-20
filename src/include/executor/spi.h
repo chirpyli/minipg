@@ -13,7 +13,6 @@
 #ifndef SPI_H
 #define SPI_H
 
-#include "commands/trigger.h"
 #include "lib/ilist.h"
 #include "parser/parser.h"
 #include "utils/portal.h"
@@ -95,7 +94,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_OK_REWRITTEN		14
 #define SPI_OK_REL_REGISTER		15
 #define SPI_OK_REL_UNREGISTER	16
-#define SPI_OK_TD_REGISTER		17
 
 #define SPI_OPT_NONATOMIC		(1 << 0)
 
@@ -197,7 +195,6 @@ extern void SPI_cursor_close(Portal portal);
 
 extern int	SPI_register_relation(EphemeralNamedRelation enr);
 extern int	SPI_unregister_relation(const char *name);
-extern int	SPI_register_trigger_data(TriggerData *tdata);
 
 extern void SPI_start_transaction(void);
 extern void SPI_commit(void);

@@ -43,14 +43,12 @@
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
-#include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
 #include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -344,19 +342,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"trigger",
-		TriggerRelationId,
-		TriggerOidIndexId,
-		InvalidOid,
-		InvalidOid,
-		Anum_pg_trigger_oid,
-		Anum_pg_trigger_tgname,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_TRIGGER,
-		false
-	},
-	{
 		"type",
 		TypeRelationId,
 		TypeOidIndexId,
@@ -510,10 +495,6 @@ static const struct object_type_map
 	{
 		"rule", OBJECT_RULE
 	},
-	/* OCLASS_TRIGGER */
-	{
-		"trigger", OBJECT_TRIGGER
-	},
 	/* OCLASS_SCHEMA */
 	{
 		"schema", OBJECT_SCHEMA
@@ -660,7 +641,6 @@ get_object_address(ObjectType objtype, Node *object,
 											   missing_ok);
 				break;
 			case OBJECT_RULE:
-			case OBJECT_TRIGGER:
 			case OBJECT_TABCONSTRAINT:
 				address = get_object_address_relobject(objtype, castNode(List, object),
 													   &relation, missing_ok);
@@ -1026,12 +1006,6 @@ get_object_address_relobject(ObjectType objtype, List *object,
 			address.classId = RewriteRelationId;
 			address.objectId = relation ?
 				get_rewrite_oid(reloid, depname, missing_ok) : InvalidOid;
-			address.objectSubId = 0;
-			break;
-		case OBJECT_TRIGGER:
-			address.classId = TriggerRelationId;
-			address.objectId = relation ?
-				get_trigger_oid(reloid, depname, missing_ok) : InvalidOid;
 			address.objectSubId = 0;
 			break;
 		case OBJECT_TABCONSTRAINT:
@@ -2451,52 +2425,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_TRIGGER:
-			{
-				Relation	trigDesc;
-				ScanKeyData skey[1];
-				SysScanDesc tgscan;
-				HeapTuple	tup;
-				Form_pg_trigger trig;
-				StringInfoData rel;
-
-				trigDesc = table_open(TriggerRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_trigger_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				tgscan = systable_beginscan(trigDesc, TriggerOidIndexId, true,
-											NULL, 1, skey);
-
-				tup = systable_getnext(tgscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for trigger %u",
-							 object->objectId);
-
-					systable_endscan(tgscan);
-					table_close(trigDesc, AccessShareLock);
-					break;
-				}
-
-				trig = (Form_pg_trigger) GETSTRUCT(tup);
-
-				initStringInfo(&rel);
-				getRelationDescription(&rel, trig->tgrelid, false);
-
-				/* translator: second %s is, e.g., "table %s" */
-				appendStringInfo(&buffer, _("trigger %s on %s"),
-								 NameStr(trig->tgname), rel.data);
-				pfree(rel.data);
-				systable_endscan(tgscan);
-				table_close(trigDesc, AccessShareLock);
-				break;
-			}
-
 		case OCLASS_SCHEMA:
 			{
 				char	   *nspname;
@@ -3065,10 +2993,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_REWRITE:
 			appendStringInfoString(&buffer, "rule");
-			break;
-
-		case OCLASS_TRIGGER:
-			appendStringInfoString(&buffer, "trigger");
 			break;
 
 		case OCLASS_SCHEMA:
@@ -3786,39 +3710,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 					*objname = lappend(*objname, pstrdup(NameStr(rule->rulename)));
 
 				table_close(ruleDesc, AccessShareLock);
-				break;
-			}
-
-		case OCLASS_TRIGGER:
-			{
-				Relation	trigDesc;
-				HeapTuple	tup;
-				Form_pg_trigger trig;
-
-				trigDesc = table_open(TriggerRelationId, AccessShareLock);
-
-				tup = get_catalog_object_by_oid(trigDesc, Anum_pg_trigger_oid,
-												object->objectId);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for trigger %u",
-							 object->objectId);
-
-					table_close(trigDesc, AccessShareLock);
-					break;
-				}
-
-				trig = (Form_pg_trigger) GETSTRUCT(tup);
-
-				appendStringInfo(&buffer, "%s on ",
-								 quote_identifier(NameStr(trig->tgname)));
-				getRelationIdentity(&buffer, trig->tgrelid, objname, false);
-				if (objname)
-					*objname = lappend(*objname, pstrdup(NameStr(trig->tgname)));
-
-				table_close(trigDesc, AccessShareLock);
 				break;
 			}
 

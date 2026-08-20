@@ -35,7 +35,6 @@
 #include "catalog/pg_enum.h"
 #include "catalog/storage.h"
 #include "commands/tablecmds.h"
-#include "commands/trigger.h"
 #include "executor/spi.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
@@ -2017,7 +2016,6 @@ StartTransaction(void)
 	 */
 	AtStart_GUC();
 	AtStart_Cache();
-	AfterTriggerBeginXact();
 
 	/*
 	 * done with start processing, set current transaction state to "in
@@ -2058,27 +2056,10 @@ CommitTransaction(void)
 	Assert(s->parent == NULL);
 
 	/*
-	 * Do pre-commit processing that involves calling user-defined code, such
-	 * as triggers.  SECURITY_RESTRICTED_OPERATION contexts must not queue an
-	 * action that would run here, because that would bypass the sandbox.
-	 * Since closing cursors could queue trigger actions, triggers could open
-	 * cursors, etc, we have to keep looping until there's nothing left to do.
+	 * Do pre-commit processing that involves closing open portals
+	 * (converting holdable ones into static portals).
 	 */
-	for (;;)
-	{
-		/*
-		 * Fire all currently pending deferred triggers.
-		 */
-		AfterTriggerFireDeferred();
-
-		/*
-		 * Close open portals (converting holdable ones into static portals).
-		 * If there weren't any, we are done ... otherwise loop back to check
-		 * if they queued deferred triggers.  Lather, rinse, repeat.
-		 */
-		if (!PreCommit_Portals(false))
-			break;
-	}
+	PreCommit_Portals(false);
 
 	/*
 	 * The remaining actions cannot call any user-defined code, so it's safe
@@ -2093,9 +2074,6 @@ CommitTransaction(void)
 	/* If we might have parallel workers, clean them up now. */
 	if (IsInParallelMode())
 		AtEOXact_Parallel(true);
-
-	/* Shut down the deferred-trigger manager */
-	AfterTriggerEndXact(true);
 
 	/*
 	 * Let ON COMMIT management do its thing (must happen after closing
@@ -2295,26 +2273,10 @@ PrepareTransaction(void)
 	Assert(s->parent == NULL);
 
 	/*
-	 * Do pre-commit processing that involves calling user-defined code, such
-	 * as triggers.  Since closing cursors could queue trigger actions,
-	 * triggers could open cursors, etc, we have to keep looping until there's
-	 * nothing left to do.
+	 * Do pre-commit processing that involves closing open portals
+	 * (converting holdable ones into static portals).
 	 */
-	for (;;)
-	{
-		/*
-		 * Fire all currently pending deferred triggers.
-		 */
-		AfterTriggerFireDeferred();
-
-		/*
-		 * Close open portals (converting holdable ones into static portals).
-		 * If there weren't any, we are done ... otherwise loop back to check
-		 * if they queued deferred triggers.  Lather, rinse, repeat.
-		 */
-		if (!PreCommit_Portals(true))
-			break;
-	}
+	PreCommit_Portals(true);
 
 	CallXactCallbacks(XACT_EVENT_PRE_PREPARE);
 
@@ -2324,9 +2286,6 @@ PrepareTransaction(void)
 	 * of this stuff could still throw an error, which would switch us into
 	 * the transaction-abort path.
 	 */
-
-	/* Shut down the deferred-trigger manager */
-	AfterTriggerEndXact(true);
 
 	/*
 	 * Let ON COMMIT management do its thing (must happen after closing
@@ -2651,7 +2610,6 @@ AbortTransaction(void)
 	/*
 	 * do abort processing
 	 */
-	AfterTriggerEndXact(false); /* 'false' means it's abort */
 	AtAbort_Portals();
 	smgrDoPendingSyncs(false, is_parallel_worker);
 	AtEOXact_RelationMap(false, is_parallel_worker);
@@ -4771,7 +4729,6 @@ StartSubTransaction(void)
 	 */
 	AtSubStart_Memory();
 	AtSubStart_ResourceOwner();
-	AfterTriggerBeginSubXact();
 
 	s->state = TRANS_INPROGRESS;
 
@@ -4828,7 +4785,6 @@ CommitSubTransaction(void)
 	/* Post-commit cleanup */
 	if (FullTransactionIdIsValid(s->fullTransactionId))
 		AtSubCommit_childXids();
-	AfterTriggerEndSubXact(true);
 	AtSubCommit_Portals(s->subTransactionId,
 						s->parent->subTransactionId,
 						s->parent->nestingLevel,
@@ -4990,7 +4946,6 @@ AbortSubTransaction(void)
 	 */
 	if (s->curTransactionOwner)
 	{
-		AfterTriggerEndSubXact(false);
 		AtSubAbort_Portals(s->subTransactionId,
 						   s->parent->subTransactionId,
 						   s->curTransactionOwner,

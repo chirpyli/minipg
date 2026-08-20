@@ -15,7 +15,6 @@
 #define COPYFROM_INTERNAL_H
 
 #include "commands/copy.h"
-#include "commands/trigger.h"
 
 /*
  * Represents the different source cases we need to worry about at
@@ -95,8 +94,6 @@ typedef struct CopyFromStateData
 	bool		volatile_defexprs;	/* is any of defexprs volatile? */
 	List	   *range_table;
 	ExprState  *qualexpr;
-
-	TransitionCaptureState *transition_capture;
 
 	/*
 	 * These variables are used to reduce overhead in COPY FROM.

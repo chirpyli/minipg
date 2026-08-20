@@ -106,7 +106,6 @@ typedef enum ObjectClass
 	OCLASS_AMOP,				/* pg_amop */
 	OCLASS_AMPROC,				/* pg_amproc */
 	OCLASS_REWRITE,				/* pg_rewrite */
-	OCLASS_TRIGGER,				/* pg_trigger */
 	OCLASS_SCHEMA,				/* pg_namespace */
 	OCLASS_STATISTIC_EXT,		/* pg_statistic_ext */
 	OCLASS_DATABASE,			/* pg_database */

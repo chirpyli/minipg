@@ -1287,15 +1287,10 @@ vac_update_relstats(Relation relation,
 			dirty = true;
 		}
 
-		/* We also clear relhasrules and relhastriggers if needed */
+		/* We also clear relhasrules if needed */
 		if (pgcform->relhasrules && relation->rd_rules == NULL)
 		{
 			pgcform->relhasrules = false;
-			dirty = true;
-		}
-		if (pgcform->relhastriggers && relation->trigdesc == NULL)
-		{
-			pgcform->relhastriggers = false;
 			dirty = true;
 		}
 	}

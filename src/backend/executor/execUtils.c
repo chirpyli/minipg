@@ -125,7 +125,6 @@ CreateExecutorState(void)
 	estate->es_result_relations = NULL;
 	estate->es_opened_result_relations = NIL;
 	estate->es_tuple_routing_result_relations = NIL;
-	estate->es_trig_target_relations = NIL;
 
 	estate->es_insert_pending_result_relations = NIL;
 	estate->es_insert_pending_modifytables = NIL;
@@ -1144,50 +1143,6 @@ ExecCleanTargetListLength(List *targetlist)
 			len++;
 	}
 	return len;
-}
-
-/*
- * Return a relInfo's tuple slot for a trigger's OLD tuples.
- */
-TupleTableSlot *
-ExecGetTriggerOldSlot(EState *estate, ResultRelInfo *relInfo)
-{
-	if (relInfo->ri_TrigOldSlot == NULL)
-	{
-		Relation	rel = relInfo->ri_RelationDesc;
-		MemoryContext oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-
-		relInfo->ri_TrigOldSlot =
-			ExecInitExtraTupleSlot(estate,
-								   RelationGetDescr(rel),
-								   table_slot_callbacks(rel));
-
-		MemoryContextSwitchTo(oldcontext);
-	}
-
-	return relInfo->ri_TrigOldSlot;
-}
-
-/*
- * Return a relInfo's tuple slot for a trigger's NEW tuples.
- */
-TupleTableSlot *
-ExecGetTriggerNewSlot(EState *estate, ResultRelInfo *relInfo)
-{
-	if (relInfo->ri_TrigNewSlot == NULL)
-	{
-		Relation	rel = relInfo->ri_RelationDesc;
-		MemoryContext oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-
-		relInfo->ri_TrigNewSlot =
-			ExecInitExtraTupleSlot(estate,
-								   RelationGetDescr(rel),
-								   table_slot_callbacks(rel));
-
-		MemoryContextSwitchTo(oldcontext);
-	}
-
-	return relInfo->ri_TrigNewSlot;
 }
 
 /*

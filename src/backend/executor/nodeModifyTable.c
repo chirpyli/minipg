@@ -46,7 +46,6 @@
 #include "access/tableam.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
-#include "commands/trigger.h"
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "miscadmin.h"
@@ -292,12 +291,9 @@ ExecInitStoredGenerated(ResultRelInfo *resultRelInfo,
 
 	/*
 	 * In an UPDATE, we can skip computing any generated columns that do not
-	 * depend on any UPDATE target column.  But if there is a BEFORE ROW
-	 * UPDATE trigger, we cannot skip because the trigger might change more
-	 * columns.
+	 * depend on any UPDATE target column.
 	 */
-	if (cmdtype == CMD_UPDATE &&
-		!(rel->trigdesc && rel->trigdesc->trig_update_before_row))
+	if (cmdtype == CMD_UPDATE)
 		updatedCols = ExecGetUpdatedCols(resultRelInfo, estate);
 	else
 		updatedCols = NULL;
@@ -655,10 +651,6 @@ ExecGetUpdateNewTuple(ResultRelInfo *relinfo,
  *		to access "junk" columns that are not going to be stored.
  *
  *		Returns RETURNING result if any, otherwise NULL.
- *
- *		This may change the currently active tuple conversion map in
- *		mtstate->mt_transition_capture, so the callers must take care to
- *		save the previous value to avoid losing track of it.
  * ----------------------------------------------------------------
  */
 static TupleTableSlot *
@@ -672,7 +664,6 @@ ExecInsert(ModifyTableState *mtstate,
 	Relation	resultRelationDesc;
 	List	   *recheckIndexes = NIL;
 	TupleTableSlot *result = NULL;
-	TransitionCaptureState *ar_insert_trig_tcs;
 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
 	OnConflictAction onconflict = node->onConflictAction;
 
@@ -688,31 +679,6 @@ ExecInsert(ModifyTableState *mtstate,
 		resultRelInfo->ri_IndexRelationDescs == NULL)
 		ExecOpenIndices(resultRelInfo, onconflict != ONCONFLICT_NONE);
 
-	/*
-	 * BEFORE ROW INSERT Triggers.
-	 *
-	 * Note: We fire BEFORE ROW TRIGGERS for every attempted insertion in an
-	 * INSERT ... ON CONFLICT statement.  We cannot check for constraint
-	 * violations before firing these triggers, because they can change the
-	 * values to insert.  Also, they can run arbitrary user-defined code with
-	 * side-effects that we can't cancel by just not inserting the tuple.
-	 */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_insert_before_row)
-	{
-
-		if (!ExecBRInsertTriggers(estate, resultRelInfo, slot))
-			return NULL;		/* "do nothing" */
-	}
-
-	/* INSTEAD OF ROW INSERT Triggers */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_insert_instead_row)
-	{
-		if (!ExecIRInsertTriggers(estate, resultRelInfo, slot))
-			return NULL;		/* "do nothing" */
-	}
-	else
 	{
 		WCOKind		wco_kind;
 
@@ -891,33 +857,6 @@ ExecInsert(ModifyTableState *mtstate,
 	if (canSetTag)
 		(estate->es_processed)++;
 
-	/*
-	 * If this insert is the result of a partition key update that moved the
-	 * tuple to a new partition, put this row into the transition NEW TABLE,
-	 * if there is one. We need to do this separately for DELETE and INSERT
-	 * because they happen on different tables.
-	 */
-	ar_insert_trig_tcs = mtstate->mt_transition_capture;
-	if (mtstate->operation == CMD_UPDATE && mtstate->mt_transition_capture
-		&& mtstate->mt_transition_capture->tcs_update_new_table)
-	{
-		ExecARUpdateTriggers(estate, resultRelInfo, NULL,
-							 NULL,
-							 slot,
-							 NULL,
-							 mtstate->mt_transition_capture);
-
-		/*
-		 * We've already captured the NEW TABLE row, so make sure any AR
-		 * INSERT trigger fired below doesn't capture it again.
-		 */
-		ar_insert_trig_tcs = NULL;
-	}
-
-	/* AFTER ROW INSERT Triggers */
-	ExecARInsertTriggers(estate, resultRelInfo, slot, recheckIndexes,
-						 ar_insert_trig_tcs);
-
 	list_free(recheckIndexes);
 
 	/*
@@ -982,39 +921,12 @@ ExecDelete(ModifyTableState *mtstate,
 	TM_Result	result;
 	TM_FailureData tmfd;
 	TupleTableSlot *slot = NULL;
-	TransitionCaptureState *ar_delete_trig_tcs;
 
 	if (tupleDeleted)
 		*tupleDeleted = false;
 
-	/* BEFORE ROW DELETE Triggers */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_delete_before_row)
 	{
-		bool		dodelete;
 
-
-		dodelete = ExecBRDeleteTriggers(estate, epqstate, resultRelInfo,
-										tupleid, oldtuple, epqreturnslot);
-
-		if (!dodelete)			/* "do nothing" */
-			return NULL;
-	}
-
-	/* INSTEAD OF ROW DELETE Triggers */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_delete_instead_row)
-	{
-		bool		dodelete;
-
-		Assert(oldtuple != NULL);
-		dodelete = ExecIRDeleteTriggers(estate, resultRelInfo, oldtuple);
-
-		if (!dodelete)			/* "do nothing" */
-			return NULL;
-	}
-	else
-	{
 		/*
 		 * delete the tuple
 		 *
@@ -1198,34 +1110,6 @@ ldelete:;
 	if (tupleDeleted)
 		*tupleDeleted = true;
 
-	/*
-	 * If this delete is the result of a partition key update that moved the
-	 * tuple to a new partition, put this row into the transition OLD TABLE,
-	 * if there is one. We need to do this separately for DELETE and INSERT
-	 * because they happen on different tables.
-	 */
-	ar_delete_trig_tcs = mtstate->mt_transition_capture;
-	if (mtstate->operation == CMD_UPDATE && mtstate->mt_transition_capture
-		&& mtstate->mt_transition_capture->tcs_update_old_table)
-	{
-		ExecARUpdateTriggers(estate, resultRelInfo,
-							 tupleid,
-							 oldtuple,
-							 NULL,
-							 NULL,
-							 mtstate->mt_transition_capture);
-
-		/*
-		 * We've already captured the OLD TABLE row, so make sure any AR
-		 * DELETE trigger fired below doesn't capture it again.
-		 */
-		ar_delete_trig_tcs = NULL;
-	}
-
-	/* AFTER ROW DELETE Triggers */
-	ExecARDeleteTriggers(estate, resultRelInfo, tupleid, oldtuple,
-						 ar_delete_trig_tcs);
-
 	/* Process RETURNING if present and if requested */
 	if (processReturning && resultRelInfo->ri_projectReturning)
 	{
@@ -1325,25 +1209,6 @@ ExecUpdate(ModifyTableState *mtstate,
 		resultRelInfo->ri_IndexRelationDescs == NULL)
 		ExecOpenIndices(resultRelInfo, false);
 
-	/* BEFORE ROW UPDATE Triggers */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_update_before_row)
-	{
-
-		if (!ExecBRUpdateTriggers(estate, epqstate, resultRelInfo,
-								  tupleid, oldtuple, slot))
-			return NULL;		/* "do nothing" */
-	}
-
-	/* INSTEAD OF ROW UPDATE Triggers */
-	if (resultRelInfo->ri_TrigDesc &&
-		resultRelInfo->ri_TrigDesc->trig_update_instead_row)
-	{
-		if (!ExecIRUpdateTriggers(estate, resultRelInfo,
-								  oldtuple, slot))
-			return NULL;		/* "do nothing" */
-	}
-	else
 	{
 		ItemPointerData lockedtid;
 		LockTupleMode lockmode;
@@ -1566,13 +1431,6 @@ lreplace:
 
 	if (canSetTag)
 		(estate->es_processed)++;
-
-	/* AFTER ROW UPDATE Triggers */
-	ExecARUpdateTriggers(estate, resultRelInfo, tupleid, oldtuple, slot,
-						 recheckIndexes,
-						 mtstate->operation == CMD_INSERT ?
-						 mtstate->mt_oc_transition_capture :
-						 mtstate->mt_transition_capture);
 
 	list_free(recheckIndexes);
 
@@ -1816,91 +1674,6 @@ ExecOnConflictUpdate(ModifyTableState *mtstate,
 
 
 /*
- * Process BEFORE EACH STATEMENT triggers
- */
-static void
-fireBSTriggers(ModifyTableState *node)
-{
-	ModifyTable *plan = (ModifyTable *) node->ps.plan;
-	ResultRelInfo *resultRelInfo = node->rootResultRelInfo;
-
-	switch (node->operation)
-	{
-		case CMD_INSERT:
-			ExecBSInsertTriggers(node->ps.state, resultRelInfo);
-			if (plan->onConflictAction == ONCONFLICT_UPDATE)
-				ExecBSUpdateTriggers(node->ps.state,
-									 resultRelInfo);
-			break;
-		case CMD_UPDATE:
-			ExecBSUpdateTriggers(node->ps.state, resultRelInfo);
-			break;
-		case CMD_DELETE:
-			ExecBSDeleteTriggers(node->ps.state, resultRelInfo);
-			break;
-		default:
-			elog(ERROR, "unknown operation");
-			break;
-	}
-}
-
-/*
- * Process AFTER EACH STATEMENT triggers
- */
-static void
-fireASTriggers(ModifyTableState *node)
-{
-	ModifyTable *plan = (ModifyTable *) node->ps.plan;
-	ResultRelInfo *resultRelInfo = node->rootResultRelInfo;
-
-	switch (node->operation)
-	{
-		case CMD_INSERT:
-			if (plan->onConflictAction == ONCONFLICT_UPDATE)
-				ExecASUpdateTriggers(node->ps.state,
-									 resultRelInfo,
-									 node->mt_oc_transition_capture);
-			ExecASInsertTriggers(node->ps.state, resultRelInfo,
-								 node->mt_transition_capture);
-			break;
-		case CMD_UPDATE:
-			ExecASUpdateTriggers(node->ps.state, resultRelInfo,
-								 node->mt_transition_capture);
-			break;
-		case CMD_DELETE:
-			ExecASDeleteTriggers(node->ps.state, resultRelInfo,
-								 node->mt_transition_capture);
-			break;
-		default:
-			elog(ERROR, "unknown operation");
-			break;
-	}
-}
-
-/*
- * Set up the state needed for collecting transition tuples for AFTER
- * triggers.
- */
-static void
-ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
-{
-	ModifyTable *plan = (ModifyTable *) mtstate->ps.plan;
-	ResultRelInfo *targetRelInfo = mtstate->rootResultRelInfo;
-
-	/* Check for transition tables on the directly targeted relation. */
-	mtstate->mt_transition_capture =
-		MakeTransitionCaptureState(targetRelInfo->ri_TrigDesc,
-								   RelationGetRelid(targetRelInfo->ri_RelationDesc),
-								   mtstate->operation);
-	if (plan->operation == CMD_INSERT &&
-		plan->onConflictAction == ONCONFLICT_UPDATE)
-		mtstate->mt_oc_transition_capture =
-			MakeTransitionCaptureState(targetRelInfo->ri_TrigDesc,
-									   RelationGetRelid(targetRelInfo->ri_RelationDesc),
-									   CMD_UPDATE);
-}
-
-/*
  * ExecPrepareTupleRouting --- prepare for routing one tuple
  *
  * Determine the partition in which the tuple in slot is to be inserted,
@@ -1956,15 +1729,6 @@ ExecModifyTable(PlanState *pstate)
 	 */
 	if (node->mt_done)
 		return NULL;
-
-	/*
-	 * On first call, fire BEFORE STATEMENT triggers before proceeding.
-	 */
-	if (node->fireBSTriggers)
-	{
-		fireBSTriggers(node);
-		node->fireBSTriggers = false;
-	}
 
 	/* Preload local variables */
 	resultRelInfo = node->resultRelInfo + node->mt_lastResultIndex;
@@ -2180,11 +1944,6 @@ ExecModifyTable(PlanState *pstate)
 	}
 
 
-	/*
-	 * We're done, but fire AFTER STATEMENT triggers before exiting.
-	 */
-	fireASTriggers(node);
-
 	node->mt_done = true;
 
 	return NULL;
@@ -2311,14 +2070,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	/* set up epqstate with dummy subplan data for the moment */
 	EvalPlanQualInitExt(&mtstate->mt_epqstate, estate, NULL, NIL,
 						node->epqParam, node->resultRelations);
-	mtstate->fireBSTriggers = true;
-
-	/*
-	 * Build state for collecting transition tuples.  This requires having a
-	 * valid trigger query context, so skip it in explain-only mode.
-	 */
-	if (!(eflags & EXEC_FLAG_EXPLAIN_ONLY))
-		ExecSetupTransitionCaptureState(mtstate, estate);
 
 	/*
 	 * Open all the result relations and initialize the ResultRelInfo structs.

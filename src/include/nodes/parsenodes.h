@@ -1123,22 +1123,6 @@ typedef struct OnConflictClause
 	int			location;		/* token location, or -1 if unknown */
 } OnConflictClause;
 
-/*
- * TriggerTransition -
- *	   representation of transition row or table naming clause
- *
- * Only transition tables are initially supported in the syntax, and only for
- * AFTER triggers, but other permutations are accepted by the parser so we can
- * give a meaningful message from C code.
- */
-typedef struct TriggerTransition
-{
-	NodeTag		type;
-	char	   *name;
-	bool		isNew;
-	bool		isTable;
-} TriggerTransition;
-
 /*****************************************************************************
  *		Raw Grammar Output Statements
  *****************************************************************************/
@@ -1311,7 +1295,6 @@ typedef enum ObjectType
 	OBJECT_DEFAULT,
 	OBJECT_DOMAIN,
 	OBJECT_DOMCONSTRAINT,
-	OBJECT_EVENT_TRIGGER,
 	OBJECT_EXTENSION,
 	OBJECT_FUNCTION,
 	OBJECT_INDEX,
@@ -1331,7 +1314,6 @@ typedef enum ObjectType
 	OBJECT_TABLE,
 	OBJECT_TABLESPACE,
 	OBJECT_TRANSFORM,
-	OBJECT_TRIGGER,
 	OBJECT_TYPE,
 	OBJECT_VIEW
 } ObjectType;
@@ -1412,20 +1394,10 @@ typedef enum AlterTableType
 	AT_SetRelOptions,			/* SET (...) -- AM specific parameters */
 	AT_ResetRelOptions,			/* RESET (...) -- AM specific parameters */
 	AT_ReplaceRelOptions,		/* replace reloption list in its entirety */
-	AT_EnableTrig,				/* ENABLE TRIGGER name */
-	AT_EnableAlwaysTrig,		/* ENABLE ALWAYS TRIGGER name */
-	AT_EnableReplicaTrig,		/* ENABLE REPLICA TRIGGER name */
-	AT_DisableTrig,				/* DISABLE TRIGGER name */
-	AT_EnableTrigAll,			/* ENABLE TRIGGER ALL */
-	AT_DisableTrigAll,			/* DISABLE TRIGGER ALL */
-	AT_EnableTrigUser,			/* ENABLE TRIGGER USER */
-	AT_DisableTrigUser,			/* DISABLE TRIGGER USER */
 	AT_EnableRule,				/* ENABLE RULE name */
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
 	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
 	AT_DisableRule,				/* DISABLE RULE name */
-	AT_AddInherit,				/* INHERIT parent */
-	AT_DropInherit,				/* NO INHERIT parent */
 	AT_AddOf,					/* OF <type_name> */
 	AT_DropOf,					/* NOT OF */
 	AT_GenericOptions,			/* OPTIONS (...) */
@@ -1708,32 +1680,6 @@ typedef struct CreateAmStmt
 	List	   *handler_name;	/* handler function name */
 	char		amtype;			/* type of access method */
 } CreateAmStmt;
-
-/* ----------------------
- *		Create TRIGGER Statement
- * ----------------------
- */
-typedef struct CreateTrigStmt
-{
-	NodeTag		type;
-	bool		replace;		/* replace trigger if already exists */
-	bool		isconstraint;	/* This is a constraint trigger */
-	char	   *trigname;		/* TRIGGER's name */
-	RangeVar   *relation;		/* relation trigger is on */
-	List	   *funcname;		/* qual. name of function to call */
-	List	   *args;			/* list of (T_String) Values or NIL */
-	bool		row;			/* ROW/STATEMENT */
-	/* timing uses the TRIGGER_TYPE bits defined in catalog/pg_trigger.h */
-	int16		timing;			/* BEFORE, AFTER, or INSTEAD */
-	/* events uses the TRIGGER_TYPE bits defined in catalog/pg_trigger.h */
-	int16		events;			/* "OR" of INSERT/UPDATE/DELETE/TRUNCATE */
-	List	   *columns;		/* column names, or NIL for all columns */
-	Node	   *whenClause;		/* qual expression, or NULL if none */
-	/* explicitly named transition data */
-	List	   *transitionRels; /* TriggerTransition nodes, or NIL if none */
-	/* The remaining fields are only used for constraint triggers */
-	RangeVar   *constrrel;		/* opposite relation, if RI trigger */
-} CreateTrigStmt;
 
 /* ----------------------
  *		Create {Aggregate|Operator|Type} Statement

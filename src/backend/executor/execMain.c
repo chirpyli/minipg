@@ -45,7 +45,6 @@
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
-#include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/nodeSubplan.h"
 #include "mb/pg_wchar.h"
@@ -205,15 +204,6 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 			if (queryDesc->plannedstmt->rowMarks != NIL ||
 				queryDesc->plannedstmt->hasModifyingCTE)
 				estate->es_output_cid = GetCurrentCommandId(true);
-
-			/*
-			 * A SELECT without modifying CTEs can't possibly queue triggers,
-			 * so force skip-triggers mode. This is just a marginal efficiency
-			 * hack, since AfterTriggerBeginQuery/AfterTriggerEndQuery aren't
-			 * all that expensive, but we might as well do it.
-			 */
-			if (!queryDesc->plannedstmt->hasModifyingCTE)
-				eflags |= EXEC_FLAG_SKIP_TRIGGERS;
 			break;
 
 		case CMD_INSERT:
@@ -235,13 +225,6 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	estate->es_crosscheck_snapshot = RegisterSnapshot(queryDesc->crosscheck_snapshot);
 	estate->es_top_eflags = eflags;
 	estate->es_instrument = queryDesc->instrument_options;
-
-	/*
-	 * Set up an AFTER-trigger statement context, unless told not to, or
-	 * unless it's EXPLAIN-only mode (when ExecutorFinish won't be called).
-	 */
-	if (!(eflags & (EXEC_FLAG_SKIP_TRIGGERS | EXEC_FLAG_EXPLAIN_ONLY)))
-		AfterTriggerBeginQuery();
 
 	/*
 	 * Initialize the plan state tree
@@ -410,10 +393,6 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 
 	/* Run ModifyTable nodes to completion */
 	ExecPostprocessPlan(estate);
-
-	/* Execute queued AFTER triggers, unless told not to */
-	if (!(estate->es_top_eflags & EXEC_FLAG_SKIP_TRIGGERS))
-		AfterTriggerEndQuery(estate);
 
 	if (queryDesc->totaltime)
 		InstrStopNode(queryDesc->totaltime, 0);
@@ -767,7 +746,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 					   OnConflictAction onConflictAction)
 {
 	Relation	resultRel = resultRelInfo->ri_RelationDesc;
-	TriggerDesc *trigDesc = resultRel->trigdesc;
 
 	/* Expect a fully-formed ResultRelInfo from InitResultRelInfo(). */
 	Assert(resultRelInfo->ri_needLockTagTuple ==
@@ -787,42 +765,13 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 		case RELKIND_VIEW:
 
 			/*
-			 * Okay only if there's a suitable INSTEAD OF trigger.  Messages
-			 * here should match rewriteHandler.c's rewriteTargetView and
-			 * RewriteQuery, except that we omit errdetail because we haven't
-			 * got the information handy (and given that we really shouldn't
-			 * get here anyway, it's not worth great exertion to get).
+			 * Views are not updatable in minipg: INSTEAD OF triggers and
+			 * rewrite rules have been removed.
 			 */
-			switch (operation)
-			{
-				case CMD_INSERT:
-					if (!trigDesc || !trigDesc->trig_insert_instead_row)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("cannot insert into view \"%s\"",
-										RelationGetRelationName(resultRel)),
-								 errhint("To enable inserting into the view, provide an INSTEAD OF INSERT trigger or an unconditional ON INSERT DO INSTEAD rule.")));
-					break;
-				case CMD_UPDATE:
-					if (!trigDesc || !trigDesc->trig_update_instead_row)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("cannot update view \"%s\"",
-										RelationGetRelationName(resultRel)),
-								 errhint("To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.")));
-					break;
-				case CMD_DELETE:
-					if (!trigDesc || !trigDesc->trig_delete_instead_row)
-						ereport(ERROR,
-								(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-								 errmsg("cannot delete from view \"%s\"",
-										RelationGetRelationName(resultRel)),
-								 errhint("To enable deleting from the view, provide an INSTEAD OF DELETE trigger or an unconditional ON DELETE DO INSTEAD rule.")));
-					break;
-				default:
-					elog(ERROR, "unrecognized CmdType: %d", (int) operation);
-					break;
-			}
+			ereport(ERROR,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("cannot change view \"%s\"",
+							RelationGetRelationName(resultRel))));
 			break;
 		default:
 			ereport(ERROR,
@@ -903,25 +852,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_IndexRelationInfo = NULL;
 	resultRelInfo->ri_needLockTagTuple =
 		IsInplaceUpdateRelation(resultRelationDesc);
-	/* make a copy so as not to depend on relcache info not changing... */
-	resultRelInfo->ri_TrigDesc = CopyTriggerDesc(resultRelationDesc->trigdesc);
-	if (resultRelInfo->ri_TrigDesc)
-	{
-		int			n = resultRelInfo->ri_TrigDesc->numtriggers;
-
-		resultRelInfo->ri_TrigFunctions = (FmgrInfo *)
-			palloc0(n * sizeof(FmgrInfo));
-		resultRelInfo->ri_TrigWhenExprs = (ExprState **)
-			palloc0(n * sizeof(ExprState *));
-		if (instrument_options)
-			resultRelInfo->ri_TrigInstrument = InstrAlloc(n, instrument_options, false);
-	}
-	else
-	{
-		resultRelInfo->ri_TrigFunctions = NULL;
-		resultRelInfo->ri_TrigWhenExprs = NULL;
-		resultRelInfo->ri_TrigInstrument = NULL;
-	}
 	/* The following fields are set later if needed */
 	resultRelInfo->ri_RowIdAttNo = 0;
 	resultRelInfo->ri_projectNew = NULL;
@@ -934,8 +864,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_onConflictArbiterIndexes = NIL;
 	resultRelInfo->ri_onConflict = NULL;
 	resultRelInfo->ri_ReturningSlot = NULL;
-	resultRelInfo->ri_TrigOldSlot = NULL;
-	resultRelInfo->ri_TrigNewSlot = NULL;
 
 	/*
 	 * Only ExecInitPartitionInfo() and ExecInitPartitionDispatchInfo() pass
@@ -945,91 +873,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	 */
 	resultRelInfo->ri_RootResultRelInfo = partition_root_rri;
 	resultRelInfo->ri_CopyMultiInsertBuffer = NULL;
-}
-
-/*
- * ExecGetTriggerResultRel
- *		Get a ResultRelInfo for a trigger target relation.
- *
- * Most of the time, triggers are fired on one of the result relations of the
- * query, and so we can just return a member of the es_result_relations array,
- * or the es_tuple_routing_result_relations list (if any). (Note: in self-join
- * situations there might be multiple members with the same OID; if so it
- * doesn't matter which one we pick.)
- *
- * However, it is sometimes necessary to fire triggers on other relations;
- * this happens mainly when an RI update trigger queues additional triggers
- * on other relations, which will be processed in the context of the outer
- * query.  For efficiency's sake, we want to have a ResultRelInfo for those
- * triggers too; that can avoid repeated re-opening of the relation.  (It
- * also provides a way for EXPLAIN ANALYZE to report the runtimes of such
- * triggers.)  So we make additional ResultRelInfo's as needed, and save them
- * in es_trig_target_relations.
- */
-ResultRelInfo *
-ExecGetTriggerResultRel(EState *estate, Oid relid)
-{
-	ResultRelInfo *rInfo;
-	ListCell   *l;
-	Relation	rel;
-	MemoryContext oldcontext;
-
-	/* Search through the query result relations */
-	foreach(l, estate->es_opened_result_relations)
-	{
-		rInfo = lfirst(l);
-		if (RelationGetRelid(rInfo->ri_RelationDesc) == relid)
-			return rInfo;
-	}
-
-	/*
-	 * Search through the result relations that were created during tuple
-	 * routing, if any.
-	 */
-	foreach(l, estate->es_tuple_routing_result_relations)
-	{
-		rInfo = (ResultRelInfo *) lfirst(l);
-		if (RelationGetRelid(rInfo->ri_RelationDesc) == relid)
-			return rInfo;
-	}
-
-	/* Nope, but maybe we already made an extra ResultRelInfo for it */
-	foreach(l, estate->es_trig_target_relations)
-	{
-		rInfo = (ResultRelInfo *) lfirst(l);
-		if (RelationGetRelid(rInfo->ri_RelationDesc) == relid)
-			return rInfo;
-	}
-	/* Nope, so we need a new one */
-
-	/*
-	 * Open the target relation's relcache entry.  We assume that an
-	 * appropriate lock is still held by the backend from whenever the trigger
-	 * event got queued, so we need take no new lock here.  Also, we need not
-	 * recheck the relkind, so no need for CheckValidResultRel.
-	 */
-	rel = table_open(relid, NoLock);
-
-	/*
-	 * Make the new entry in the right context.
-	 */
-	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-	rInfo = makeNode(ResultRelInfo);
-	InitResultRelInfo(rInfo,
-					  rel,
-					  0,		/* dummy rangetable index */
-					  NULL,
-					  estate->es_instrument);
-	estate->es_trig_target_relations =
-		lappend(estate->es_trig_target_relations, rInfo);
-	MemoryContextSwitchTo(oldcontext);
-
-	/*
-	 * Currently, we don't need any index information in ResultRelInfos used
-	 * only for triggers, so no need to call ExecOpenIndices.
-	 */
-
-	return rInfo;
 }
 
 /* ----------------------------------------------------------------
@@ -1137,27 +980,6 @@ ExecCloseResultRelations(EState *estate)
 		ResultRelInfo *resultRelInfo = lfirst(l);
 
 		ExecCloseIndices(resultRelInfo);
-	}
-
-	/* Close any relations that have been opened by ExecGetTriggerResultRel(). */
-	foreach(l, estate->es_trig_target_relations)
-	{
-		ResultRelInfo *resultRelInfo = (ResultRelInfo *) lfirst(l);
-
-		/*
-		 * Assert this is a "dummy" ResultRelInfo, see above.  Otherwise we
-		 * might be issuing a duplicate close against a Relation opened by
-		 * ExecGetRangeTableRelation.
-		 */
-		Assert(resultRelInfo->ri_RangeTableIndex == 0);
-
-		/*
-		 * Since ExecGetTriggerResultRel doesn't call ExecOpenIndices for
-		 * these rels, we needn't call ExecCloseIndices either.
-		 */
-		Assert(resultRelInfo->ri_NumIndices == 0);
-
-		table_close(resultRelInfo->ri_RelationDesc, NoLock);
 	}
 }
 
@@ -2227,7 +2049,6 @@ EvalPlanQualStart(EPQState *epqstate, Plan *planTree)
 	 * subplans themselves are initialized.
 	 */
 	rcestate->es_result_relations = NULL;
-	/* es_trig_target_relations must NOT be copied */
 	rcestate->es_top_eflags = parentestate->es_top_eflags;
 	rcestate->es_instrument = parentestate->es_instrument;
 	/* es_auxmodifytables must NOT be copied */

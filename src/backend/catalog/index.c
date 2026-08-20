@@ -48,14 +48,12 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
 #include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -1433,8 +1431,7 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 {
 	Relation	pg_class,
 				pg_index,
-				pg_constraint,
-				pg_trigger;
+				pg_constraint;
 	Relation	oldClassRel,
 				newClassRel;
 	HeapTuple	oldClassTuple,
@@ -1523,7 +1520,7 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	heap_freetuple(newIndexTuple);
 
 	/*
-	 * Move constraints and triggers over to the new index
+	 * Move constraints over to the new index
 	 */
 
 	constraintOids = get_index_ref_constraints(oldIndexId);
@@ -1534,15 +1531,11 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 		constraintOids = lappend_oid(constraintOids, indexConstraintOid);
 
 	pg_constraint = table_open(ConstraintRelationId, RowExclusiveLock);
-	pg_trigger = table_open(TriggerRelationId, RowExclusiveLock);
 
 	foreach(lc, constraintOids)
 	{
-		HeapTuple	constraintTuple,
-					triggerTuple;
+		HeapTuple	constraintTuple;
 		Form_pg_constraint conForm;
-		ScanKeyData key[1];
-		SysScanDesc scan;
 		Oid			constraintOid = lfirst_oid(lc);
 
 		/* Move the constraint from the old to the new index */
@@ -1561,35 +1554,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 		}
 
 		heap_freetuple(constraintTuple);
-
-		/* Search for trigger records */
-		ScanKeyInit(&key[0],
-					Anum_pg_trigger_tgconstraint,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(constraintOid));
-
-		scan = systable_beginscan(pg_trigger, TriggerConstraintIndexId, true,
-								  NULL, 1, key);
-
-		while (HeapTupleIsValid((triggerTuple = systable_getnext(scan))))
-		{
-			Form_pg_trigger tgForm = (Form_pg_trigger) GETSTRUCT(triggerTuple);
-
-			if (tgForm->tgconstrindid != oldIndexId)
-				continue;
-
-			/* Make a modifiable copy */
-			triggerTuple = heap_copytuple(triggerTuple);
-			tgForm = (Form_pg_trigger) GETSTRUCT(triggerTuple);
-
-			tgForm->tgconstrindid = newIndexId;
-
-			CatalogTupleUpdate(pg_trigger, &triggerTuple->t_self, triggerTuple);
-
-			heap_freetuple(triggerTuple);
-		}
-
-		systable_endscan(scan);
 	}
 
 	/*
@@ -1691,7 +1655,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	table_close(pg_class, RowExclusiveLock);
 	table_close(pg_index, RowExclusiveLock);
 	table_close(pg_constraint, RowExclusiveLock);
-	table_close(pg_trigger, RowExclusiveLock);
 
 	/* The lock taken previously is not released until the end of transaction */
 	relation_close(oldClassRel, NoLock);

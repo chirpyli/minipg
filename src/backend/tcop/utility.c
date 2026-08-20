@@ -41,7 +41,6 @@
 #include "commands/schemacmds.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "commands/typecmds.h"
 #include "commands/vacuum.h"
 #include "commands/view.h"
@@ -141,7 +140,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateStmt:
 		case T_CreateTableSpaceStmt:
 		case T_CreateTransformStmt:
-		case T_CreateTrigStmt:
 		case T_CreatedbStmt:
 		case T_DefineStmt:
 		case T_DropStmt:
@@ -1094,13 +1092,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
 				break;
 
-			case T_CreateTrigStmt:
-				address = CreateTrigger((CreateTrigStmt *) parsetree,
-										queryString, InvalidOid, InvalidOid,
-										InvalidOid, InvalidOid, InvalidOid,
-										InvalidOid, NULL, false, false);
-				break;
-
 				case T_CreateDomainStmt:
 				address = DefineDomain((CreateDomainStmt *) parsetree);
 				break;
@@ -1487,9 +1478,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TABLESPACE:
 			tag = CMDTAG_ALTER_TABLESPACE;
 			break;
-		case OBJECT_TRIGGER:
-			tag = CMDTAG_ALTER_TRIGGER;
-			break;
 		case OBJECT_TYPE:
 			tag = CMDTAG_ALTER_TYPE;
 			break;
@@ -1695,9 +1683,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_CAST:
 					tag = CMDTAG_DROP_CAST;
 					break;
-				case OBJECT_TRIGGER:
-					tag = CMDTAG_DROP_TRIGGER;
-					break;
 			case OBJECT_RULE:
 				tag = CMDTAG_DROP_RULE;
 				break;
@@ -1871,10 +1856,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateTransformStmt:
 			tag = CMDTAG_CREATE_TRANSFORM;
-			break;
-
-		case T_CreateTrigStmt:
-			tag = CMDTAG_CREATE_TRIGGER;
 			break;
 
 		case T_LockStmt:
@@ -2289,10 +2270,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_DiscardStmt:
 			lev = LOGSTMT_ALL;
-			break;
-
-		case T_CreateTrigStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_CreateDomainStmt:

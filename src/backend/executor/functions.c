@@ -851,20 +851,7 @@ postquel_start(execution_state *es, SQLFunctionCachePtr fcache)
 	/* Utility commands don't need Executor. */
 	if (es->qd->operation != CMD_UTILITY)
 	{
-		/*
-		 * In lazyEval mode, do not let the executor set up an AfterTrigger
-		 * context.  This is necessary not just an optimization, because we
-		 * mustn't exit from the function execution with a stacked
-		 * AfterTrigger level still active.  We are careful not to select
-		 * lazyEval mode for any statement that could possibly queue triggers.
-		 */
-		int			eflags;
-
-		if (es->lazyEval)
-			eflags = EXEC_FLAG_SKIP_TRIGGERS;
-		else
-			eflags = 0;			/* default run-to-completion flags */
-		ExecutorStart(es->qd, eflags);
+		ExecutorStart(es->qd, 0);
 	}
 
 	es->status = F_EXEC_RUN;

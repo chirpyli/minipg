@@ -23,16 +23,9 @@ test: deadlock-hard
 test: deadlock-soft
 test: deadlock-soft-2
 test: deadlock-parallel
-# detach-partition-concurrently-1 已随分区功能裁剪而移除
-# detach-partition-concurrently-2 已随分区功能裁剪而移除
-# detach-partition-concurrently-3 已随分区功能裁剪而移除
-# detach-partition-concurrently-4 已随分区功能裁剪而移除
 test: fk-contention
 test: fk-deadlock
 test: fk-deadlock2
-# fk-partitioned-1/fk-partitioned-2 已随分区功能裁剪而移除
-# eval-plan-qual 已随表继承(INHERITS)功能裁剪而移除
-# eval-plan-qual-trigger: 依赖 plpgsql 触发器(trig_report)，PL/pgSQL 已裁剪，移除
 test: inplace-inval
 # intra-grant-inplace / intra-grant-inplace-db: 依赖 GRANT 锁机制，权限已裁剪，移除
 test: lock-update-delete

@@ -42,7 +42,6 @@
 #include "catalog/storage.h"
 #include "commands/prepare.h"
 #include "commands/tablespace.h"
-#include "commands/trigger.h"
 #include "commands/vacuum.h"
 #include "commands/variable.h"
 #include "common/string.h"
@@ -162,7 +161,6 @@ static int	syslog_facility = 0;
 
 static void assign_syslog_facility(int newval, void *extra);
 static void assign_syslog_ident(const char *newval, void *extra);
-static void assign_session_replication_role(int newval, void *extra);
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
 static bool check_stage_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_log_stats(bool *newval, void **extra, GucSource source);
@@ -305,16 +303,6 @@ static const struct config_enum_entry isolation_level_options[] = {
 	{"read uncommitted", XACT_READ_UNCOMMITTED, false},
 	{NULL, 0}
 };
-
-static const struct config_enum_entry session_replication_role_options[] = {
-	{"origin", SESSION_REPLICATION_ROLE_ORIGIN, false},
-	{"replica", SESSION_REPLICATION_ROLE_REPLICA, false},
-	{"local", SESSION_REPLICATION_ROLE_LOCAL, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(session_replication_role_options) == (SESSION_REPLICATION_ROLE_LOCAL + 2),
-				 "array length mismatch");
 
 static const struct config_enum_entry syslog_facility_options[] = {
 #ifdef HAVE_SYSLOG
@@ -3985,16 +3973,6 @@ static struct config_enum ConfigureNamesEnum[] =
 #endif
 		syslog_facility_options,
 		NULL, assign_syslog_facility, NULL
-	},
-
-	{
-		{"session_replication_role", PGC_SUSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the session's behavior for triggers and rewrite rules."),
-			NULL
-		},
-		&SessionReplicationRole,
-		SESSION_REPLICATION_ROLE_ORIGIN, session_replication_role_options,
-		NULL, assign_session_replication_role, NULL
 	},
 
 	{
@@ -10329,16 +10307,6 @@ assign_syslog_ident(const char *newval, void *extra)
 }
 
 
-static void
-assign_session_replication_role(int newval, void *extra)
-{
-	/*
-	 * Must flush the plan cache when changing replication role; but don't
-	 * flush unnecessarily.
-	 */
-	if (SessionReplicationRole != newval)
-		ResetPlanCache();
-}
 
 static bool
 check_temp_buffers(int *newval, void **extra, GucSource source)

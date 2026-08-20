@@ -6,6 +6,34 @@
 
 ---
 
+## 触发器（TRIGGER）功能裁剪（2026-08-20）
+
+minipg 彻底裁剪触发器功能（含 SQL 触发器、内部/系统触发器、INSTEAD OF 触发器、事件触发器残余、延迟触发队列）。触发器的用户侧语法/DDL/执行器/缓存/目录全链路删除，仅保留目录列 `pg_class.relhastriggers` 的字段与写入（由 pg_depend/规则共享的 `pg_rewrite` 不受影响）。
+
+涉及文件与改动（分阶段收尾）：
+
+- **目录层**：删除 `src/include/catalog/pg_trigger.h`、`src/include/utils/reltrigger.h`；`pg_proc.dat` 删除触发器函数（`tgenabled` 相关 `trigfuncs.c` 的 `pg_trigger_depth` 等）与 `pg_type.dat` 相关类型；`objectaddress.c`/`dependency.c`/`dependency.h` 删除 `OBJECT_TRIGGER` 的 `get_object_address`/`findDependRecursively` 分支与 `DROPTRIGGER` 依赖处理；`catalog/Makefile`/`commands/Makefile`/`utils/adt/Makefile` 移除 `trigger.c`/`trigfuncs.c`。
+- **语法/命令层**：`gram.y` 删除 `CREATE TRIGGER`/`ALTER TRIGGER`/`DROP TRIGGER` 语法生产式与 `TriggerElem`/`TriggerActionTime`/`TriggerForClause`/`TriggerForEach`/`TriggerOptTransitionTable` 非终结符；`cmdtaglist.h` 删除 `CMDTAG_ALTER_TRIGGER`/`CMDTAG_CREATE_TRIGGER`/`CMDTAG_DROP_TRIGGER` 命令标签；`utility.c` 删除对应 `ProcessUtility` case；`dropcmds.c` 删除 `RemoveTriggerById`/`DROP TRIGGER` 分支；`commands/alter.c`/`tablecmds.c` 删除 `AT_AddConstraint` 中 `CONSTR_TRIGGER`（内部触发器约束）路径。
+- **节点层**：`parsenodes.h` 删除 `CreateTrigStmt`/`TriggerTransition`/`TriggerData` 结构体与 `parsenodes.h` 中相关字段（`Constraint` 的 `old_conname`/`conname` 等触发器约束字段、`IndexStmt` 的 `excludeOpNames` 无关，保留约束核心）；`nodes.h` 删除 `T_CreateTrigStmt`/`T_TriggerTransition` 枚举；`copyfuncs.c`/`equalfuncs.c`/`outfuncs.c` 删除对应节点复制/相等/输出函数与 case。
+- **执行层**：`execMain.c`/`execUtils.c`/`nodeModifyTable.c`/`spi.c`/`functions.c` 删除 `AfterTriggerBeginQuery`/`AfterTriggerEndQuery`/`AfterTriggerSetState` 调用、`ri_TrigDesc` 复制、`ExecASUpdateTriggers`/`ExecBSDeleteTriggers` 等 DML 触发器队列；`xact.c` 删除 `AfterTriggerBeginXact`/`AfterTriggerEndXact`/`AfterTriggerFireDeferred` 及 Commit/Prepare/Abort 的事务边界触发队列；`rewriteHandler.c` 删除 `fireRIRrules` 中对 `CommandType_INSERT` 的触发器规则处理；`plancat.c`/`plancat.h` 删除 `has_row_triggers`/`has_transition_tables`；`relcache.c` 删除 `RelationGetTriggerDesc`/`rd_trigdesc`/`relhastriggers` 缓存字段。
+- **用户可见函数**：`regress.c` 删除 `pg_trigger_depth` 等触发器测试函数与 `create_function_0.source` 中 3 个触发器 C 函数（`plpgsql_call_handler` 依赖外的 `int4pl` 无关）；`ruleutils.c` 删除 `pg_get_triggerdef` 等反解析函数；`guc.c` 删除 `session_replication_role`（触发器复制角色 GUC）及其相关 `row_security` 无耦合清理。
+- **头文件清理**：`commands/trigger.h`/`commands/alter.h` 删除 `renametrig`/`ExecRenameStmt` 等触发改名残留；`executor/executor.h`/`spi.h`/`optimizer/plancat.h` 删除触发器相关原型；`parser/kwlist.h` 保留 `TRIGGER` 关键字（不可删，见下）。
+
+**本次收尾（本会话补完）**：
+- `src/backend/catalog/indexing.c`：删除 `resultRelInfo->ri_TrigDesc = NULL`（`CatalogOpenIndexes` 中已删字段赋值）。
+- `src/backend/parser/parse_utilcmd.c`：删除 `CreateSchemaStmtContext` 的 `triggers` 字段、初始化、`T_CreateTrigStmt` case 与 `list_concat(cxt.triggers)`。
+- `src/bin/initdb/initdb.c`：删除 initdb 填充 pg_depend 时的 `INSERT INTO pg_depend SELECT ... FROM pg_trigger`（pg_trigger 表已删）。
+- `src/test/regress/expected/sanity_check.out`：删除 `pg_trigger|t` 系统目录清单期望行。
+- 清理 stale 生成文件 `pg_trigger_d.h`（genbki 在 pg_trigger.h 删除后不再生成）。
+
+**保留项**：`pg_class.relhastriggers` 列保留（仍由 `pg_rewrite`/`pg_depend` 依赖逻辑读取，语义退化为恒 false）；`TRIGGER` 关键字保留在 `kwlist.h`（`UNRESERVED_KEYWORD`，与 `BARE_LABEL` 冲突检查相关，check_keywords.pl 约束）；`sql_features`/信息模式中 `TRIGGER` 相关文档不改。**会话复制角色 GUC 不再存在**，但 `session_replication_role` 已随触发器一并裁剪，无残留引用。
+
+**修复裁剪引入的副作用 bug（`execMain.c` 的 `CMD_SELECT` case 被误删）**：触发器裁剪在 `standard_ExecutorStart` 删除 `CMD_SELECT` case 时，把标准 PG 中 SELECT 的 `if (rowMarks != NIL || hasModifyingCTE) GetCurrentCommandId(true)` 条件判断连同 `EXEC_FLAG_SKIP_TRIGGERS` 一起整段删除，导致 `CMD_SELECT` 掉入 `CMD_INSERT/DELETE/UPDATE` 分支、**无条件调用 `GetCurrentCommandId(true)`**。后果：(1) 普通 SELECT 也把 `currentCommandIdUsed` 置 true，使 `combocid` 回归测试的 cmin 值整体偏移 +1/+2（比标准 PG 多推进 command id）；(2) 在 `force_parallel_mode=on` 的并行查询中，parallel worker 执行多语句 parallel-safe SQL 函数（如 `lock_excl` 的 `select pg_advisory_xact_lock($1); select 1;`）时，第二条语句的 `CommandCounterIncrement` 因 `IsParallelWorker()` 命中 `cannot start commands during a parallel operation` 报错，导致 `src/test/isolation` 的 `deadlock-parallel` 测试失败。修复：恢复 `CMD_SELECT` case，仅保留 `GetCurrentCommandId` 的条件判断（`rowMarks`/`hasModifyingCTE`），不再保留已裁的 `EXEC_FLAG_SKIP_TRIGGERS`。修复后 `combocid.out` 恢复为原始标准 PG 预期值（cmin 不再偏移），`deadlock-parallel` 通过。
+
+验证：`make -j4` 全量重编通过；`cd src/test/regress && NO_TEMP_INSTALL=1 make check` **82 项全绿**；`cd src/test/isolation && NO_TEMP_INSTALL=1 make check` **66 项全绿**。注：此过程同时修复了 minipg 既有的 initdb bootstrap 崩溃（`heap_create` 创建 pg_proc 时 `rd_tableam` 为 NULL，系历史裁剪导致的混合编译/结构体布局不一致，经全量 clean 重编解决，非本裁剪引入）。
+
+---
+
 ## ALTER COLLATION 功能裁剪（2026-08-20）
 
 minipg 的 `ALTER COLLATION` 在裁前已属死功能：语法生产式为空壳（`gram.y` 仅有 `ALTER COLLATION` 注释块而无实际产生式，无法解析）、无 `AlterCollation`/`RefreshCollationVersion` 实现函数、`RENAME` 已整体裁、`OWNER TO` 角色已裁，且无任何回归测试引用。本次彻底删除 `ALTER COLLATION` 的残留死代码与文档。

@@ -221,7 +221,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 		case OCLASS_AMOP:
 		case OCLASS_AMPROC:
 		case OCLASS_REWRITE:
-		case OCLASS_TRIGGER:
 		case OCLASS_SCHEMA:
 		case OCLASS_DATABASE:
 		case OCLASS_TBLSPACE:

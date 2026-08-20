@@ -1521,26 +1521,6 @@ _equalCreateAmStmt(const CreateAmStmt *a, const CreateAmStmt *b)
 }
 
 static bool
-_equalCreateTrigStmt(const CreateTrigStmt *a, const CreateTrigStmt *b)
-{
-	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_SCALAR_FIELD(isconstraint);
-	COMPARE_STRING_FIELD(trigname);
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(funcname);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_SCALAR_FIELD(row);
-	COMPARE_SCALAR_FIELD(timing);
-	COMPARE_SCALAR_FIELD(events);
-	COMPARE_NODE_FIELD(columns);
-	COMPARE_NODE_FIELD(whenClause);
-	COMPARE_NODE_FIELD(transitionRels);
-	COMPARE_NODE_FIELD(constrrel);
-
-	return true;
-}
-
-static bool
 _equalLockStmt(const LockStmt *a, const LockStmt *b)
 {
 	COMPARE_NODE_FIELD(relations);
@@ -2051,16 +2031,6 @@ _equalRoleSpec(const RoleSpec *a, const RoleSpec *b)
 	return true;
 }
 
-static bool
-_equalTriggerTransition(const TriggerTransition *a, const TriggerTransition *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_SCALAR_FIELD(isNew);
-	COMPARE_SCALAR_FIELD(isTable);
-
-	return true;
-}
-
 /*
  * Stuff from pg_list.h
  */
@@ -2524,9 +2494,6 @@ equal(const void *a, const void *b)
 		case T_CreateAmStmt:
 			retval = _equalCreateAmStmt(a, b);
 			break;
-		case T_CreateTrigStmt:
-			retval = _equalCreateTrigStmt(a, b);
-			break;
 		case T_LockStmt:
 			retval = _equalLockStmt(a, b);
 			break;
@@ -2656,9 +2623,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_RoleSpec:
 			retval = _equalRoleSpec(a, b);
-			break;
-		case T_TriggerTransition:
-			retval = _equalTriggerTransition(a, b);
 			break;
 
 		default:

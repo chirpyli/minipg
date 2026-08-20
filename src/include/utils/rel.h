@@ -24,7 +24,6 @@
 #include "storage/relfilenode.h"
 #include "storage/smgr.h"
 #include "utils/relcache.h"
-#include "utils/reltrigger.h"
 
 
 /*
@@ -110,7 +109,6 @@ typedef struct RelationData
 	LockInfoData rd_lockInfo;	/* lock mgr's info for locking relation */
 	RuleLock   *rd_rules;		/* rewrite rules */
 	MemoryContext rd_rulescxt;	/* private memory cxt for rd_rules, if any */
-	TriggerDesc *trigdesc;		/* Trigger info, or NULL if rel has none */
 
 	/* data managed by RelationGetFKeyList: */
 	List	   *rd_fkeylist;	/* list of ForeignKeyCacheInfo (see below) */
