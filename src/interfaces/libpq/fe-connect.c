@@ -381,19 +381,7 @@ pqFreeCommandQueue(PGcmdQueueEntry *queue)
 static void
 pqDropServerData(PGconn *conn)
 {
-	PGnotify   *notify;
 	pgParameterStatus *pstatus;
-
-	/* Forget pending notifies */
-	notify = conn->notifyHead;
-	while (notify != NULL)
-	{
-		PGnotify   *prev = notify;
-
-		notify = notify->next;
-		free(prev);
-	}
-	conn->notifyHead = conn->notifyTail = NULL;
 
 	pqFreeCommandQueue(conn->cmd_queue_head);
 	conn->cmd_queue_head = conn->cmd_queue_tail = NULL;

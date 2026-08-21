@@ -2457,41 +2457,6 @@ sendFailed:
 	return 0;
 }
 
-/*
- * PQnotifies
- *	  returns a PGnotify* structure of the latest async notification
- * that has not yet been handled
- *
- * returns NULL, if there is currently
- * no unhandled async notification from the backend
- *
- * the CALLER is responsible for FREE'ing the structure returned
- *
- * Note that this function does not read any new data from the socket;
- * so usually, caller should call PQconsumeInput() first.
- */
-PGnotify *
-PQnotifies(PGconn *conn)
-{
-	PGnotify   *event;
-
-	if (!conn)
-		return NULL;
-
-	/* Parse any available data to see if we can extract NOTIFY messages. */
-	parseInput(conn);
-
-	event = conn->notifyHead;
-	if (event)
-	{
-		conn->notifyHead = event->next;
-		if (!conn->notifyHead)
-			conn->notifyTail = NULL;
-		event->next = NULL;		/* don't let app see the internal state */
-	}
-	return event;
-}
-
 /* ----------------
  *		PQfn -	Send a function call to the POSTGRES backend.
  *
@@ -3553,24 +3518,6 @@ PQfreemem(void *ptr)
 {
 	free(ptr);
 }
-
-/*
- * PQfreeNotify - free's the memory associated with a PGnotify
- *
- * This function is here only for binary backward compatibility.
- * New code should use PQfreemem().  A macro will automatically map
- * calls to PQfreemem.  It should be removed in the future.  bjm 2003-03-24
- */
-
-#undef PQfreeNotify
-void		PQfreeNotify(PGnotify *notify);
-
-void
-PQfreeNotify(PGnotify *notify)
-{
-	PQfreemem(notify);
-}
-
 
 /*
  * Escaping arbitrary strings to get valid SQL literal strings.

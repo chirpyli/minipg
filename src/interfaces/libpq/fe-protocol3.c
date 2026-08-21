@@ -43,7 +43,6 @@ static int	getRowDescriptions(PGconn *conn, int msgLength);
 static int	getParamDescriptions(PGconn *conn, int msgLength);
 static int	getAnotherTuple(PGconn *conn, int msgLength);
 static int	getParameterStatus(PGconn *conn);
-static int	getNotify(PGconn *conn);
 static int	getReadyForQuery(PGconn *conn);
 static void reportErrorPosition(PQExpBuffer msg, const char *query,
 								int loc, int encoding);
@@ -124,8 +123,8 @@ pqParseInput3(PGconn *conn)
 		}
 
 		/*
-		 * NOTIFY and NOTICE messages can happen in any state; always process
-		 * them right away.
+		 * NOTICE messages can happen in any state; always process them right
+		 * away.
 		 *
 		 * Most other messages should only be processed while in BUSY state.
 		 * (In particular, in READY state we hold off further parsing until
@@ -139,12 +138,7 @@ pqParseInput3(PGconn *conn)
 		 * from config file due to SIGHUP), but otherwise we hold off until
 		 * BUSY state.
 		 */
-		if (id == 'A')
-		{
-			if (getNotify(conn))
-				return;
-		}
-		else if (id == 'N')
+		if (id == 'N')
 		{
 			if (pqGetErrorNotice3(conn, false))
 				return;
@@ -1404,64 +1398,6 @@ getParameterStatus(PGconn *conn)
 	return 0;
 }
 
-
-/*
- * Attempt to read a Notify response message.
- * This is possible in several places, so we break it out as a subroutine.
- * Entry: 'A' message type and length have already been consumed.
- * Exit: returns 0 if successfully consumed Notify message.
- *		 returns EOF if not enough data.
- */
-static int
-getNotify(PGconn *conn)
-{
-	int			be_pid;
-	char	   *svname;
-	int			nmlen;
-	int			extralen;
-	PGnotify   *newNotify;
-
-	if (pqGetInt(&be_pid, 4, conn))
-		return EOF;
-	if (pqGets(&conn->workBuffer, conn))
-		return EOF;
-	/* must save name while getting extra string */
-	svname = strdup(conn->workBuffer.data);
-	if (!svname)
-		return EOF;
-	if (pqGets(&conn->workBuffer, conn))
-	{
-		free(svname);
-		return EOF;
-	}
-
-	/*
-	 * Store the strings right after the PQnotify structure so it can all be
-	 * freed at once.  We don't use NAMEDATALEN because we don't want to tie
-	 * this interface to a specific server name length.
-	 */
-	nmlen = strlen(svname);
-	extralen = strlen(conn->workBuffer.data);
-	newNotify = (PGnotify *) malloc(sizeof(PGnotify) + nmlen + extralen + 2);
-	if (newNotify)
-	{
-		newNotify->relname = (char *) newNotify + sizeof(PGnotify);
-		strcpy(newNotify->relname, svname);
-		newNotify->extra = newNotify->relname + nmlen + 1;
-		strcpy(newNotify->extra, conn->workBuffer.data);
-		newNotify->be_pid = be_pid;
-		newNotify->next = NULL;
-		if (conn->notifyTail)
-			conn->notifyTail->next = newNotify;
-		else
-			conn->notifyHead = newNotify;
-		conn->notifyTail = newNotify;
-	}
-
-	free(svname);
-	return 0;
-}
-
 /*
  * getReadyForQuery - process ReadyForQuery message
  */
@@ -1657,11 +1593,6 @@ pqFunctionCall3(PGconn *conn, Oid fnid,
 				if (pqGetErrorNotice3(conn, true))
 					continue;
 				status = PGRES_FATAL_ERROR;
-				break;
-			case 'A':			/* notify message */
-				/* handle notify and go back to processing return values */
-				if (getNotify(conn))
-					continue;
 				break;
 			case 'N':			/* notice */
 				/* handle notice and go back to processing return values */

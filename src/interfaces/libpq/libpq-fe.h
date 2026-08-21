@@ -172,21 +172,6 @@ typedef struct pg_result PGresult;
  */
 typedef struct pg_cancel PGcancel;
 
-/* PGnotify represents the occurrence of a NOTIFY message.
- * Ideally this would be an opaque typedef, but it's so simple that it's
- * unlikely to change.
- * NOTE: in Postgres 6.4 and later, the be_pid is the notifying backend's,
- * whereas in earlier versions it was always your own backend's PID.
- */
-typedef struct pgNotify
-{
-	char	   *relname;		/* notification condition name */
-	int			be_pid;			/* process ID of notifying server process */
-	char	   *extra;			/* notification parameter */
-	/* Fields below here are private to libpq; apps should not use 'em */
-	struct pgNotify *next;		/* list link */
-} PGnotify;
-
 /* Function types for notice-handling callbacks */
 typedef void (*PQnoticeReceiver) (void *arg, const PGresult *res);
 typedef void (*PQnoticeProcessor) (void *arg, const char *message);
@@ -446,9 +431,6 @@ extern int	PQexitPipelineMode(PGconn *conn);
 extern int	PQpipelineSync(PGconn *conn);
 extern int	PQsendFlushRequest(PGconn *conn);
 
-/* LISTEN/NOTIFY support */
-extern PGnotify *PQnotifies(PGconn *conn);
-
 /* Set blocking/nonblocking connection to the backend */
 extern int	PQsetnonblocking(PGconn *conn, int arg);
 extern int	PQisnonblocking(const PGconn *conn);
@@ -510,15 +492,8 @@ extern int	PQsendDescribePortal(PGconn *conn, const char *portal);
 /* Delete a PGresult */
 extern void PQclear(PGresult *res);
 
-/* For freeing other alloc'd results, such as PGnotify structs */
+/* For freeing other alloc'd results */
 extern void PQfreemem(void *ptr);
-
-/* Exists for backward compatibility.  bjm 2003-03-24 */
-#define PQfreeNotify(ptr) PQfreemem(ptr)
-
-/* Error when no password was given. */
-/* Note: depending on this is deprecated; use PQconnectionNeedsPassword(). */
-#define PQnoPasswordSupplied	"fe_sendauth: no password supplied\n"
 
 /* Create and manipulate PGresults */
 extern PGresult *PQmakeEmptyPGresult(PGconn *conn, ExecStatusType status);

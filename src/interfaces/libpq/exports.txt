@@ -21,7 +21,6 @@ PQtrace                       18
 PQuntrace                     19
 PQsetNoticeProcessor          20
 PQexec                        21
-PQnotifies                    22
 PQsendQuery                   23
 PQgetResult                   24
 PQisBusy                      25
@@ -71,7 +70,6 @@ PQresetPoll                   68
 PQresetStart                  69
 PQsetClientEncoding           70
 PQsetnonblocking              71
-PQfreeNotify                  72
 PQescapeString                73
 PQescapeBytea                 74
 printfPQExpBuffer             75

@@ -36,15 +36,6 @@
 #include "fe-auth.h"
 #include "libpq-fe.h"
 
-static int
-pg_password_sendauth(PGconn *conn, const char *password, AuthRequest areq)
-{
-	if (areq != AUTH_REQ_PASSWORD)
-		return STATUS_ERROR;
-
-	return pqPacketSend(conn, 'p', password, strlen(password) + 1);
-}
-
 /*
  * pg_fe_sendauth
  *		client demux routine for processing an authentication request
@@ -63,29 +54,6 @@ pg_fe_sendauth(AuthRequest areq, int payloadlen, PGconn *conn)
 	{
 		case AUTH_REQ_OK:
 			break;
-
-		case AUTH_REQ_PASSWORD:
-			{
-				char	   *password;
-
-				conn->password_needed = true;
-				password = conn->connhost[conn->whichhost].password;
-				if (password == NULL)
-					password = conn->pgpass;
-				if (password == NULL || password[0] == '\0')
-				{
-					appendPQExpBufferStr(&conn->errorMessage,
-										 PQnoPasswordSupplied);
-					return STATUS_ERROR;
-				}
-				if (pg_password_sendauth(conn, password, areq) != STATUS_OK)
-				{
-					appendPQExpBufferStr(&conn->errorMessage,
-										 "fe_sendauth: error sending password authentication\n");
-					return STATUS_ERROR;
-				}
-				break;
-			}
 
 		default:
 			appendPQExpBuffer(&conn->errorMessage,

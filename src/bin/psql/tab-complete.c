@@ -1410,8 +1410,8 @@ psql_completion(const char *text, int start, int end)
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLOSE", "CLUSTER",
 		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE", "DECLARE",
 		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
-		"FETCH", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LISTEN", "LOAD", "LOCK",
-		"MOVE", "NOTIFY", "PREPARE",
+		"FETCH", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LOAD", "LOCK",
+		"MOVE", "PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "ROLLBACK",
 		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
@@ -2889,10 +2889,6 @@ psql_completion(const char *text, int start, int end)
 			 Matches("LOCK", "TABLE", MatchAny, "IN", "SHARE"))
 		COMPLETE_WITH("MODE", "ROW EXCLUSIVE MODE",
 					  "UPDATE EXCLUSIVE MODE");
-
-/* NOTIFY --- can be inside EXPLAIN, RULE, etc */
-	else if (TailMatches("NOTIFY"))
-		COMPLETE_WITH_QUERY("SELECT pg_catalog.quote_ident(channel) FROM pg_catalog.pg_listening_channels() AS channel WHERE substring(pg_catalog.quote_ident(channel),1,%d)='%s'");
 
 /* OPTIONS */
 	else if (TailMatches("OPTIONS"))

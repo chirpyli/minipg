@@ -828,7 +828,6 @@ try_complete_step(TestSpec *testspec, PermutationStep *pstep, int flags)
 	int			sock = PQsocket(conn);
 	int			ret;
 	PGresult   *res;
-	PGnotify   *notify;
 	bool		canceled = false;
 
 	/*
@@ -1044,36 +1043,6 @@ try_complete_step(TestSpec *testspec, PermutationStep *pstep, int flags)
 					   PQresStatus(PQresultStatus(res)));
 		}
 		PQclear(res);
-	}
-
-	/* Report any available NOTIFY messages, too */
-	PQconsumeInput(conn);
-	while ((notify = PQnotifies(conn)) != NULL)
-	{
-		/* Try to identify which session it came from */
-		const char *sendername = NULL;
-		char		pidstring[32];
-		int			i;
-
-		for (i = 0; i < testspec->nsessions; i++)
-		{
-			if (notify->be_pid == conns[i + 1].backend_pid)
-			{
-				sendername = conns[i + 1].sessionname;
-				break;
-			}
-		}
-		if (sendername == NULL)
-		{
-			/* Doesn't seem to be any test session, so show the hard way */
-			snprintf(pidstring, sizeof(pidstring), "PID %d", notify->be_pid);
-			sendername = pidstring;
-		}
-		printf("%s: NOTIFY \"%s\" with payload \"%s\" from %s\n",
-			   testspec->sessions[step->session]->name,
-			   notify->relname, notify->extra, sendername);
-		PQfreemem(notify);
-		PQconsumeInput(conn);
 	}
 
 	/* Connection is now idle. */

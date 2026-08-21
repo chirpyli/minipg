@@ -659,31 +659,6 @@ PSQLexecWatch(const char *query, const printQueryOpt *opt)
 
 
 /*
- * PrintNotifications: check for asynchronous notifications, and print them out
- */
-static void
-PrintNotifications(void)
-{
-	PGnotify   *notify;
-
-	PQconsumeInput(pset.db);
-	while ((notify = PQnotifies(pset.db)) != NULL)
-	{
-		/* for backward compatibility, only show payload if nonempty */
-		if (notify->extra[0])
-			fprintf(pset.queryFout, _("Asynchronous notification \"%s\" with payload \"%s\" received from server process with PID %d.\n"),
-					notify->relname, notify->extra, notify->be_pid);
-		else
-			fprintf(pset.queryFout, _("Asynchronous notification \"%s\" received from server process with PID %d.\n"),
-					notify->relname, notify->be_pid);
-		fflush(pset.queryFout);
-		PQfreemem(notify);
-		PQconsumeInput(pset.db);
-	}
-}
-
-
-/*
  * PrintQueryTuples: assuming query result is OK, print its tuples
  *
  * Returns true if successful, false otherwise.
@@ -1254,8 +1229,6 @@ SendQuery(const char *query)
 		SetVariable(pset.vars, "ENCODING",
 					pg_encoding_to_char(pset.encoding));
 	}
-
-	PrintNotifications();
 
 	/* perform cleanup that should occur after any attempted query */
 

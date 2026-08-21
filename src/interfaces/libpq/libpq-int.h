@@ -336,8 +336,6 @@ struct pg_conn
 								 * sending semantics */
 	PGpipelineStatus pipelineStatus;	/* status of pipeline mode */
 	bool		singleRowMode;	/* return current query result row-by-row? */
-	PGnotify   *notifyHead;		/* oldest unreported Notify msg */
-	PGnotify   *notifyTail;		/* newest unreported Notify msg */
 
 	/* Support for multiple hosts in connection string */
 	int			nconnhost;		/* # of hosts named in conn string */
