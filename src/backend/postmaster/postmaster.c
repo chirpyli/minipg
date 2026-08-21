@@ -1554,6 +1554,23 @@ initMasks(fd_set *rmask)
 	return maxsock + 1;
 }
 
+/*
+ * postgres启动包：
+ * Startup包是客户端连接到PostgreSQL服务器时发送的第一个包，用于通知服务器客户端的协议版本和请求的数据库等信息，
+ * 它是libpq协议中唯一一个没有消息类型标识符的包，直接以4字节的开头表示包的长度（4字节）。（因为第一个包的特殊性，可以没有消息类型）。
+ * 如果是非SSL连接，它的格式如下：
++---------+---------+-----------------------+-------------------+---+
+| Length  | Protocol| Key/Value String Pairs| Terminator (\0)   |
+| (4字节) | (4字节) | (变长，以\0结尾的C字符串)| (1字节)           |
++---------+---------+-----------------------+-------------------+---+
+* 如果是SSL连接，则格式不同，第一个包是一个极小的SSL探测包（8 字节的魔数探测包（00000008 + 1234,5679）），需要进行SSL握手。
+* 其中Key/Value String Pairs是一个变长的字符串对列表，每个字符串对以\0结尾。先发参数名，再发参数值。都已\0结尾。
+* 必需包含的参数：
+	- user: 连接数据库的用户名
+	- database： 要连接的数据库名，如果不发，默认等于用户名。
+* 可选参数：
+	- application_name: 应用名称，例如walreceiver等。
+*/
 
 /*
  * Read a client's startup packet and do something according to it.
@@ -1589,10 +1606,7 @@ retry:
 	{
 		/*
 		 * If we get no data at all, don't clutter the log with a complaint;
-		 * such cases often occur for legitimate reasons.  An example is that
-		 * we might be here after responding to NEGOTIATE_SSL_CODE, and if the
-		 * client didn't like our response, it'll probably just drop the
-		 * connection.  Service-monitoring software also often just opens and
+		 * such cases often occur for legitimate reasons.   Service-monitoring software also often just opens and
 		 * closes a connection without sending anything.  (So do port
 		 * scanners, which may be less benign, but it's not really our job to
 		 * notice those.)
@@ -1657,43 +1671,6 @@ retry:
 		processCancelRequest(port, buf);
 		/* Not really an error, but we don't want to proceed further */
 		return STATUS_ERROR;
-	}
-
-	if (proto == NEGOTIATE_SSL_CODE && !ssl_done)
-	{
-		char		SSLok;
-
-		SSLok = 'N';			/* No support for SSL */
-
-retry1:
-		if (send(port->sock, &SSLok, 1, 0) != 1)
-		{
-			if (errno == EINTR)
-				goto retry1;	/* if interrupted, just retry */
-			ereport(COMMERROR,
-					(errcode_for_socket_access(),
-					 errmsg("failed to send SSL negotiation response: %m")));
-			return STATUS_ERROR;	/* close the connection */
-		}
-
-		/*
-		 * At this point we should have no data already buffered.  If we do,
-		 * it was received before we performed the SSL handshake, so it wasn't
-		 * encrypted and indeed may have been injected by a man-in-the-middle.
-		 * We report this case to the client.
-		 */
-		if (pq_buffer_has_data())
-			ereport(FATAL,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("received unencrypted data after SSL request"),
-					 errdetail("This could be either a client-software bug or evidence of an attempted man-in-the-middle attack.")));
-
-		/*
-		 * regular startup packet, cancel, etc packet should follow, but not
-		 * another SSL negotiation request
-		 */
-		ssl_done = true;
-		goto retry;
 	}
 
 	/* Could add additional special packet types here */

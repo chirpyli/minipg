@@ -619,41 +619,16 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	}
 
 	/*
-	 * Perform client authentication if necessary, then figure out our
-	 * postgres user ID, and see if we are a superuser.
-	 *
-	 * In standalone mode and in autovacuum worker processes, we use a fixed
-	 * ID, otherwise we figure it out from the authenticated user name.
-	 */
-	/*
-	 * minipg 没有用户/角色概念，任何连接都直接以超级用户身份操作，无需
-	 * 认证或权限检查。所有后端路径都走恒 superuser 的旁路（与 standalone
-	 * 语义一致），不再查询 pg_authid。
-	 *
+	 * minipg 没有用户，但是在原postgres中，会根据用户名获取用户ID，判断是否是超级用户，以及进行认证
+	 * 服务端需要告诉客户端是否认证通过。
 	 * 为了兼容客户端协议，仍调用 ClientAuthentication() 发送 AUTH_REQ_OK
-	 * 完成连接握手（因 pg_hba.conf 已被裁剪，该函数内部无条件信任放行），
-	 * 但不做任何身份查询。
+	 * 完成连接握手。
 	 */
 	if (MyProcPort != NULL)
 		ClientAuthentication(MyProcPort);
 
 	InitializeSessionUserIdStandalone();
 	am_superuser = true;
-
-	/*
-	 * minipg 不存在"shutdown 期间仅超管可连"的限制判断，因为所有连接都是
-	 * 超级用户。此处不再做 am_superuser 相关检查。
-	 */
-
-	/*
-	 * Binary upgrades only allowed super-user connections
-	 */
-	if (IsBinaryUpgrade && !am_superuser)
-	{
-		ereport(FATAL,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to connect in binary upgrade mode")));
-	}
 
 	/*
 	 * Set up the global variables holding database id and default tablespace.
