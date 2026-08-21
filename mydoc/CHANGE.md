@@ -6,6 +6,37 @@
 
 ---
 
+## SASL/SCRAM 认证裁剪（2026-08-21）
+
+服务端 `ClientAuthentication` 已被裁剪为无条件信任（仅发送 `AUTH_REQ_OK`），永远不会发起 SASL 握手；此前已裁剪 pg_hba/密码认证/SSL。因此客户端完整的 SASL/SCRAM 链路（`pg_SASL_init`/`pg_SASL_continue`/`fe-auth-scram.c` 等）均为死代码。SASL/SCRAM 属于网络认证协议层（RFC 4422/5802），非数据库内核核心，学习价值低，予以彻底裁剪。
+
+### 删除文件
+
+- **`src/common/scram-common.c`**、**`src/include/common/scram-common.h`**：SCRAM 通用原语（SaltedPassword/ClientKey/ServerKey 计算等）
+- **`src/common/saslprep.c`**、**`src/include/common/saslprep.h`**：SASLprep 密码规范化（RFC 4013，约千行 Unicode 表）
+- **`src/interfaces/libpq/fe-auth-scram.c`**：libpq 客户端 SCRAM-SHA-256 完整实现
+
+### 修改文件
+
+- **`src/include/libpq/pqcomm.h`**：删除 `AUTH_REQ_SASL` / `AUTH_REQ_SASL_CONT` / `AUTH_REQ_SASL_FIN` 三个认证请求码宏
+- **`src/backend/libpq/auth.c`**：删除 `PG_MAX_SASL_MESSAGE_LENGTH` 宏及注释；`sendAuthRequest` 的 flush 条件去掉 `AUTH_REQ_SASL_FIN` 引用
+- **`src/interfaces/libpq/fe-auth.c`**：重写——删除 `pg_SASL_init`、`pg_SASL_continue`、`check_expected_areq`、SASL 三 case 分支、`#include "common/scram-common.h"`；保留 `AUTH_REQ_PASSWORD` 等分支以维持 demux 完整性
+- **`src/interfaces/libpq/fe-auth.h`**：删除 `pg_fe_scram_*` 五个函数声明
+- **`src/interfaces/libpq/libpq-int.h`**：删除 `pg_conn.channel_binding` 与 `pg_conn.sasl_state` 字段
+- **`src/interfaces/libpq/fe-connect.c`**：删除 `DefaultChannelBinding` 宏、`channel_binding` conninfo 选项、`channel_binding` 校验与释放、`sasl_state` 释放、`#include "common/scram-common.h"`
+- **`src/common/Makefile`**、**`src/interfaces/libpq/Makefile`**：移除 `saslprep.o` / `scram-common.o` / `fe-auth-scram.o`
+- **`src/tools/pgindent/typedefs.list`**：清理 `fe_scram_state` / `fe_scram_state_enum` / `pg_saslprep_rc` / `scram_state` / `scram_state_enum` 死类型
+
+### 行为影响
+
+- 服务端：无变化（本就不发 SASL 请求）。
+- 客户端：`channel_binding` 连接参数与 `PGCHANNELBINDING` 环境变量不再被识别，传入会报 `invalid connection option "channel_binding"`；SASL/SCRAM 认证请求（服务端不会发送）走 default 报错分支。
+- 与不可裁部分（btree/hash 索引、事务）零耦合。
+
+验证：`make -j` 全量重编 0 错误 0 警告；手工 psql TCP 连接+查询成功；`channel_binding` 参数已被识别为非法选项。
+
+---
+
 ## 临时关系文件清理死链裁剪（2026-08-21）
 
 minipg 已彻底移除临时表功能（"Temporary relations are not supported in this build"），因此 `mdcreate` 不会再产生 `t<dboid>_<relfilenode>` 命名的临时关系物理文件。原 `RemovePgTempFiles()` 中对"遗留临时关系文件"的扫描清理逻辑已永远匹配不到任何文件，成为死代码，予以彻底删除。

@@ -47,14 +47,6 @@ static void sendAuthRequest(Port *port, AuthRequest areq, const char *extradata,
  */
 #define PG_MAX_AUTH_TOKEN_LENGTH	65535
 
-/*
- * Maximum accepted size of SASL messages.
- *
- * The messages that the server or libpq generate are much smaller than this,
- * but have some headroom.
- */
-#define PG_MAX_SASL_MESSAGE_LENGTH	1024
-
 /*----------------------------------------------------------------
  * Global authentication functions
  *----------------------------------------------------------------
@@ -67,8 +59,6 @@ static void sendAuthRequest(Port *port, AuthRequest areq, const char *extradata,
 void
 ClientAuthentication(Port *port)
 {
-	int			status = STATUS_OK;
-
 	/*
 	 * minipg: 已移除基于主机的访问控制（pg_hba.conf / pg_ident.conf）。所有入站
 	 * 连接均被无条件信任放行，不做 IP/数据库/角色规则匹配，也不进行密码验证。
@@ -76,8 +66,7 @@ ClientAuthentication(Port *port)
 	 */
 	CHECK_FOR_INTERRUPTS();
 
-	if (status == STATUS_OK)
-		sendAuthRequest(port, AUTH_REQ_OK, NULL, 0);
+	sendAuthRequest(port, AUTH_REQ_OK, NULL, 0);
 
 	/*
 	 * 认证已成功完成，复位全局标志，使后续 NOTICE/WARNING 等级的消息
@@ -105,11 +94,10 @@ sendAuthRequest(Port *port, AuthRequest areq, const char *extradata, int extrale
 	pq_endmessage(&buf);
 
 	/*
-	 * Flush message so client will see it, except for AUTH_REQ_OK and
-	 * AUTH_REQ_SASL_FIN, which need not be sent until we are ready for
-	 * queries.
+	 * Flush message so client will see it, except for AUTH_REQ_OK, which
+	 * need not be sent until we are ready for queries.
 	 */
-	if (areq != AUTH_REQ_OK && areq != AUTH_REQ_SASL_FIN)
+	if (areq != AUTH_REQ_OK)
 		pq_flush();
 
 	CHECK_FOR_INTERRUPTS();

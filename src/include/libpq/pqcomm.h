@@ -147,16 +147,9 @@ typedef uint32 PacketLen;
 /* These are the authentication request codes sent by the backend. */
 
 #define AUTH_REQ_OK			0	/* User is authenticated  */
-#define AUTH_REQ_KRB4		1	/* Kerberos V4. Not supported any more. */
-#define AUTH_REQ_KRB5		2	/* Kerberos V5. Not supported any more. */
 #define AUTH_REQ_PASSWORD	3	/* Password */
-#define AUTH_REQ_CRYPT		4	/* crypt password. Not supported any more. */
-#define AUTH_REQ_MD5		5	/* md5 password */
 #define AUTH_REQ_SCM_CREDS	6	/* transfer SCM credentials */
 #define AUTH_REQ_SSPI		9	/* SSPI negotiate without wrap() */
-#define AUTH_REQ_SASL	   10	/* Begin SASL authentication */
-#define AUTH_REQ_SASL_CONT 11	/* Continue SASL authentication */
-#define AUTH_REQ_SASL_FIN  12	/* Final SASL message */
 
 typedef uint32 AuthRequest;
 
@@ -180,10 +173,5 @@ typedef struct CancelRequestPacket
 } CancelRequestPacket;
 
 
-/*
- * A client can also start by sending a SSL negotiation request to get a
- * secure channel.
- */
-#define NEGOTIATE_SSL_CODE PG_PROTOCOL(1234,5679)
 
 #endif							/* PQCOMM_H */

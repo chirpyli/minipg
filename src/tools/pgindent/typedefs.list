@@ -3323,8 +3323,6 @@ row_security_policy_hook_type
 rsv_callback
 saophash_hash
 save_buffer
-scram_state
-scram_state_enum
 sem_t
 sequence_magic
 set_join_pathlist_hook_type

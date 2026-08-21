@@ -70,8 +70,6 @@ OBJS_COMMON = \
 	psprintf.o \
 	relpath.o \
 	rmtree.o \
-	saslprep.o \
-	scram-common.o \
 	string.o \
 	stringinfo.o \
 	unicode_norm.o \
