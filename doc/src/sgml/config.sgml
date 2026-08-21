@@ -1018,14 +1018,6 @@ include_dir 'conf.d'
      <title>Authentication</title>
 
      <variablelist>
-     <varlistentry id="guc-authentication-timeout" xreflabel="authentication_timeout">
-      <term><varname>authentication_timeout</varname> (<type>integer</type>)
-      <indexterm><primary>timeout</primary><secondary>client authentication</secondary></indexterm>
-      <indexterm><primary>client authentication</primary><secondary>timeout during</secondary></indexterm>
-      <indexterm>
-       <primary><varname>authentication_timeout</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
 
       <listitem>
        <para>

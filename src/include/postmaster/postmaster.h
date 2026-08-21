@@ -18,7 +18,6 @@ extern PGDLLIMPORT int PostPortNumber;
 extern char *ListenAddresses;
 extern bool ClientAuthInProgress;
 extern int	PreAuthDelay;
-extern int	AuthenticationTimeout;
 extern bool Log_connections;
 extern bool log_hostname;
 extern bool enable_bonjour;

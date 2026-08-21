@@ -962,27 +962,17 @@ ShutdownPostgres(int code, Datum arg)
 	LockReleaseAll(USER_LOCKMETHOD, true);
 }
 
-
 /*
  * STATEMENT_TIMEOUT handler: trigger a query-cancel interrupt.
  */
 static void
 StatementTimeoutHandler(void)
 {
-	int			sig = SIGINT;
-
-	/*
-	 * During authentication the timeout is used to deal with
-	 * authentication_timeout - we want to quit in response to such timeouts.
-	 */
-	if (ClientAuthInProgress)
-		sig = SIGTERM;
-
 #ifdef HAVE_SETSID
 	/* try to signal whole process group */
-	kill(-MyProcPid, sig);
+	kill(-MyProcPid, SIGINT);
 #endif
-	kill(MyProcPid, sig);
+	kill(MyProcPid, SIGINT);
 }
 
 /*

@@ -2293,17 +2293,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"authentication_timeout", PGC_SIGHUP, CONN_AUTH_AUTH,
-			gettext_noop("Sets the maximum allowed time to complete client authentication."),
-			NULL,
-			GUC_UNIT_S
-		},
-		&AuthenticationTimeout,
-		60, 1, 600,
-		NULL, NULL, NULL
-	},
-
-	{
 		/* Not for general use */
 		{"pre_auth_delay", PGC_SIGHUP, DEVELOPER_OPTIONS,
 			gettext_noop("Waits N seconds on connection startup before authentication."),

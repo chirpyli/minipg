@@ -77,10 +77,6 @@
 					# disconnection while running queries;
 					# 0 for never
 
-# - Authentication -
-
-#authentication_timeout = 1min		# 1s-600s
-
 #------------------------------------------------------------------------------
 # RESOURCE USAGE (except WAL)
 #------------------------------------------------------------------------------

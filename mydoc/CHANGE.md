@@ -6,6 +6,29 @@
 
 ---
 
+## authentication_timeout 参数裁剪（2026-08-21）
+
+彻底裁剪 `authentication_timeout` 参数及其配套的 `AuthenticationTimeout` 变量。
+
+### 涉及文件与改动
+
+- **`src/backend/utils/misc/guc.c`**：删除 `{"authentication_timeout", ...}` GUC 定义
+- **`src/backend/postmaster/postmaster.c`**：删除 `int AuthenticationTimeout = 60;` 变量定义及 `enable_timeout_after(STARTUP_PACKET_TIMEOUT)` 调用
+- **`src/backend/utils/init/postinit.c`**：删除 `enable_timeout_after(STATEMENT_TIMEOUT, AuthenticationTimeout * 1000)` 调用
+- **`src/include/postmaster/postmaster.h`**：删除 `extern int AuthenticationTimeout;` 声明
+- **`src/backend/utils/misc/postgresql.conf.sample`**：删除 `#authentication_timeout` 配置样例
+- **`src/backend/libpq/be-secure-openssl.c`**：删除相关注释
+
+### 修复事项
+
+`authentication_timeout` 的裁剪误删了 `StatementTimeoutHandler` 的注册（`STATEMENT_TIMEOUT` 与 `authentication_timeout` 共用同一 timeout 机制），导致 `statement_timeout` / `lock_timeout` 功能触发时服务端段错误。已修复：
+
+- **`src/backend/utils/init/postinit.c`**：恢复 `StatementTimeoutHandler` 的声明、`RegisterTimeout(STATEMENT_TIMEOUT, StatementTimeoutHandler)` 注册、及 `StatementTimeoutHandler` 函数定义（仅发送 SIGINT，不再处理 `ClientAuthInProgress` 分支）
+
+验证：`make -C src/test/isolation check` 全部 66 测试通过。
+
+---
+
 ## Relation Options（reloptions）功能裁剪（2026-08-21）
 
 minipg 彻底裁剪 Relation Options（关系选项）系统。reloptions 是 PostgreSQL 中用于存储表/索引/视图等关系级配置参数（如 fillfactor、autovacuum 设置、toast_tuple_target 等）的机制，存储在 `pg_class.reloptions` 列中，由 `reloptions.c` 解析并缓存在 `Relation->rd_options` 中。本次裁剪移除了整个 reloptions 框架，包括核心文件、所有选项结构体、解析注册表、以及所有消费者代码。**不保留 fillfactor**，所有表/索引使用硬编码的默认值。
