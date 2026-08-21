@@ -1052,3 +1052,24 @@ minipg 的分区子系统已彻底裁剪（`src/backend/partitioning/` 目录不
 全量 `make -j8` 编译 0 error / 0 warning；`make check-world` 退出码 0（回归 82/82、isolation 66/66、recovery/unsafe_tests 等套件全绿）；冒烟验证：`pg_tablespace` 仅含 `pg_default`/`pg_global` 两行，`CREATE TABLESPACE`/`ALTER TABLE ... SET TABLESPACE`/`CREATE TABLE ... TABLESPACE`/`CREATE DATABASE ... TABLESPACE` 均报语法错误，`SET default_tablespace` 报 unrecognized configuration parameter，建表/主键/插入正常且 `reltablespace=0`。
 
 > 注：本轮工作树中还混有并发会话对 `superuser_reserved_connections`/`ReservedBackends`（postmaster.c）的裁剪改动，非本次表空间裁剪范畴，未计入本条目。
+
+---
+
+## 裁剪 db_user_namespace（每数据库独立用户名，2026-08-21）
+
+`db_user_namespace` 是 PostgreSQL 7.3 引入的"每数据库独立用户名"功能，用户连接时自动将 `username` 拼接为 `username@dbname`，用于共享主机多租户隔离。官方文档自述为"临时措施"。该功能学习价值低（核心逻辑仅是字符串拼接），本次彻底裁剪。
+
+### 删除的代码点
+
+- **[guc.c](file:///home/postgres/works/my-github/minipg/src/backend/utils/misc/guc.c)**：删除 `db_user_namespace` GUC 定义（`PGC_SIGHUP, CONN_AUTH_AUTH`）
+- **[postmaster.c](file:///home/postgres/works/my-github/minipg/src/backend/postmaster/postmaster.c)**：删除 `bool Db_user_namespace = false;` 变量定义（L205）及 `ProcessStartupPacket` 中 user@dbname 拼接逻辑块（L1827-1843）
+- **[pqcomm.h](file:///home/postgres/works/my-github/minipg/src/include/libpq/pqcomm.h)**：删除 `extern bool Db_user_namespace;` 声明
+- **[postgresql.conf.sample](file:///home/postgres/works/my-github/minipg/src/backend/utils/misc/postgresql.conf.sample)**：删除 `#db_user_namespace = off` 注释行
+
+### 文档删除（不记入裁剪统计）
+
+- **[config.sgml](file:///home/postgres/works/my-github/minipg/doc/src/sgml/config.sgml)**：删除整节 `guc-db-user-namespace` 文档
+
+### 验证
+
+`make -j$(nproc)` 全量编译 0 error；`make check-world` 退出码 0，全部回归测试通过。与不可裁部分（btree/hash 索引、事务）零耦合。

@@ -80,8 +80,6 @@
 # - Authentication -
 
 #authentication_timeout = 1min		# 1s-600s
-#db_user_namespace = off
-
 
 #------------------------------------------------------------------------------
 # RESOURCE USAGE (except WAL)
