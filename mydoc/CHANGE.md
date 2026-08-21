@@ -6,6 +6,30 @@
 
 ---
 
+## 临时关系文件清理死链裁剪（2026-08-21）
+
+minipg 已彻底移除临时表功能（"Temporary relations are not supported in this build"），因此 `mdcreate` 不会再产生 `t<dboid>_<relfilenode>` 命名的临时关系物理文件。原 `RemovePgTempFiles()` 中对"遗留临时关系文件"的扫描清理逻辑已永远匹配不到任何文件，成为死代码，予以彻底删除。
+
+### 删除内容（`src/backend/storage/file/fd.c`）
+
+- `RemovePgTempRelationFiles(const char *tsdirname)`：扫描 tablespace 目录查找 per-DB 子目录
+- `RemovePgTempRelationFilesInDbspace(const char *dbspacedirname)`：在 per-DB 目录下按 `t*` 文件名 unlink
+- `looks_like_temp_rel_name(const char *name)`：判断文件名是否为临时关系文件（`t<digits>_<digits>` 规则）
+- `RemovePgTempFiles()` 中两处 `RemovePgTempRelationFiles(...)` 调用（base 与 pg_tblspc 各一处）及对应前向声明、函数头注释
+
+### 同步修改
+
+- **`src/include/storage/fd.h`**：删除 `extern bool looks_like_temp_rel_name(const char *name);` 导出声明
+
+### 保留说明
+
+- `RemovePgTempFilesInDir()`（普通临时文件清理，服务于排序/hash join/tuplesort 等内核临时文件）**保留**，与临时表无关。
+- `OpenTemporaryFile` 及其调用链保留。
+
+验证：`make -C src` 全库重编通过；`RemovePgTempFiles` 仍由 `postmaster.c` 在启动/崩溃重启时调用，仅清理 pgsql_tmp 普通临时文件。
+
+---
+
 ## authentication_timeout 参数裁剪（2026-08-21）
 
 彻底裁剪 `authentication_timeout` 参数及其配套的 `AuthenticationTimeout` 变量。

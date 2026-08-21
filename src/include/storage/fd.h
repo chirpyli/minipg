@@ -150,7 +150,6 @@ extern void AtEOSubXact_Files(bool isCommit, SubTransactionId mySubid,
 extern void RemovePgTempFiles(void);
 extern void RemovePgTempFilesInDir(const char *tmpdirname, bool missing_ok,
 								   bool unlink_all);
-extern bool looks_like_temp_rel_name(const char *name);
 
 extern int	pg_fsync(int fd);
 extern int	pg_fsync_no_writethrough(int fd);

@@ -327,8 +327,6 @@ static int	FreeDesc(AllocateDesc *desc);
 
 static void AtProcExit_Files(int code, Datum arg);
 static void CleanupTempFiles(bool isCommit, bool isProcExit);
-static void RemovePgTempRelationFiles(const char *tsdirname);
-static void RemovePgTempRelationFilesInDbspace(const char *dbspacedirname);
 
 static void walkdir(const char *path,
 					void (*action) (const char *fname, bool isdir, int elevel),
@@ -2981,12 +2979,10 @@ CleanupTempFiles(bool isCommit, bool isProcExit)
 
 
 /*
- * Remove temporary and temporary relation files left over from a prior
- * postmaster session
+ * Remove temporary files left over from a prior postmaster session
  *
  * This should be called during postmaster startup.  It will forcibly
- * remove any leftover files created by OpenTemporaryFile and any leftover
- * temporary relation files created by mdcreate.
+ * remove any leftover files created by OpenTemporaryFile.
  *
  * During post-backend-crash restart cycle, this routine is called when
  * remove_temp_files_after_crash GUC is enabled. Multiple crashes while
@@ -3012,7 +3008,6 @@ RemovePgTempFiles(void)
 	 */
 	snprintf(temp_path, sizeof(temp_path), "base/%s", PG_TEMP_FILES_DIR);
 	RemovePgTempFilesInDir(temp_path, true, false);
-	RemovePgTempRelationFiles("base");
 
 	/*
 	 * Cycle through temp directories for all non-default tablespaces.
@@ -3028,10 +3023,6 @@ RemovePgTempFiles(void)
 		snprintf(temp_path, sizeof(temp_path), "pg_tblspc/%s/%s/%s",
 				 spc_de->d_name, TABLESPACE_VERSION_DIRECTORY, PG_TEMP_FILES_DIR);
 		RemovePgTempFilesInDir(temp_path, true, false);
-
-		snprintf(temp_path, sizeof(temp_path), "pg_tblspc/%s/%s",
-				 spc_de->d_name, TABLESPACE_VERSION_DIRECTORY);
-		RemovePgTempRelationFiles(temp_path);
 	}
 
 	FreeDir(spc_dir);
@@ -3123,110 +3114,6 @@ RemovePgTempFilesInDir(const char *tmpdirname, bool missing_ok, bool unlink_all)
 	FreeDir(temp_dir);
 }
 
-/* Process one tablespace directory, look for per-DB subdirectories */
-static void
-RemovePgTempRelationFiles(const char *tsdirname)
-{
-	DIR		   *ts_dir;
-	struct dirent *de;
-	char		dbspace_path[MAXPGPATH * 2];
-
-	ts_dir = AllocateDir(tsdirname);
-
-	while ((de = ReadDirExtended(ts_dir, tsdirname, LOG)) != NULL)
-	{
-		/*
-		 * We're only interested in the per-database directories, which have
-		 * numeric names.  Note that this code will also (properly) ignore "."
-		 * and "..".
-		 */
-		if (strspn(de->d_name, "0123456789") != strlen(de->d_name))
-			continue;
-
-		snprintf(dbspace_path, sizeof(dbspace_path), "%s/%s",
-				 tsdirname, de->d_name);
-		RemovePgTempRelationFilesInDbspace(dbspace_path);
-	}
-
-	FreeDir(ts_dir);
-}
-
-/* Process one per-dbspace directory for RemovePgTempRelationFiles */
-static void
-RemovePgTempRelationFilesInDbspace(const char *dbspacedirname)
-{
-	DIR		   *dbspace_dir;
-	struct dirent *de;
-	char		rm_path[MAXPGPATH * 2];
-
-	dbspace_dir = AllocateDir(dbspacedirname);
-
-	while ((de = ReadDirExtended(dbspace_dir, dbspacedirname, LOG)) != NULL)
-	{
-		if (!looks_like_temp_rel_name(de->d_name))
-			continue;
-
-		snprintf(rm_path, sizeof(rm_path), "%s/%s",
-				 dbspacedirname, de->d_name);
-
-		if (unlink(rm_path) < 0)
-			ereport(LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not remove file \"%s\": %m",
-							rm_path)));
-	}
-
-	FreeDir(dbspace_dir);
-}
-
-/* t<digits>_<digits>, or t<digits>_<digits>_<forkname> */
-bool
-looks_like_temp_rel_name(const char *name)
-{
-	int			pos;
-	int			savepos;
-
-	/* Must start with "t". */
-	if (name[0] != 't')
-		return false;
-
-	/* Followed by a non-empty string of digits and then an underscore. */
-	for (pos = 1; isdigit((unsigned char) name[pos]); ++pos)
-		;
-	if (pos == 1 || name[pos] != '_')
-		return false;
-
-	/* Followed by another nonempty string of digits. */
-	for (savepos = ++pos; isdigit((unsigned char) name[pos]); ++pos)
-		;
-	if (savepos == pos)
-		return false;
-
-	/* We might have _forkname or .segment or both. */
-	if (name[pos] == '_')
-	{
-		int			forkchar = forkname_chars(&name[pos + 1], NULL);
-
-		if (forkchar <= 0)
-			return false;
-		pos += forkchar + 1;
-	}
-	if (name[pos] == '.')
-	{
-		int			segchar;
-
-		for (segchar = 1; isdigit((unsigned char) name[pos + segchar]); ++segchar)
-			;
-		if (segchar <= 1)
-			return false;
-		pos += segchar;
-	}
-
-	/* Now we should be at the end. */
-	if (name[pos] != '\0')
-		return false;
-	return true;
-}
 
 #ifdef HAVE_SYNCFS
 static void
