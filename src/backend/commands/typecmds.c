@@ -2404,7 +2404,6 @@ DefineCompositeType(RangeVar *typevar, List *coldeflist)
 	createStmt->constraints = NIL;
 	createStmt->options = NIL;
 	createStmt->oncommit = ONCOMMIT_NOOP;
-	createStmt->tablespacename = NULL;
 	createStmt->if_not_exists = false;
 
 	/*

@@ -182,17 +182,6 @@ int			PostPortNumber;
 /* The TCP listen address(es) */
 char	   *ListenAddresses;
 
-/*
- * ReservedBackends is the number of backends reserved for superuser use.
- * This number is taken out of the pool size given by MaxConnections so
- * number of backend slots available to non-superusers is
- * (MaxConnections - ReservedBackends).  Note what this really means is
- * "if there are <= ReservedBackends connections available, only superusers
- * can make new connections" --- pre-existing superuser connections don't
- * count against the limit.
- */
-int			ReservedBackends;
-
 /* The socket(s) we're listening to. */
 #define MAXLISTEN	64
 static pgsocket ListenSocket[MAXLISTEN];
@@ -744,17 +733,6 @@ PostmasterMain(int argc, char *argv[])
 
 	/* And switch working directory into it */
 	ChangeToDataDir();
-
-	/*
-	 * Check for invalid combinations of GUC settings.
-	 */
-	if (ReservedBackends >= MaxConnections)
-	{
-		write_stderr("%s: superuser_reserved_connections (%d) must be less than max_connections (%d)\n",
-					 progname,
-					 ReservedBackends, MaxConnections);
-		ExitPostmaster(1);
-	}
 
 	/*
 	 * Other one-time internal sanity checks can go here, if they are fast.

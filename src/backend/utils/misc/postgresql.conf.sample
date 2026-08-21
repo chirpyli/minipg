@@ -60,10 +60,6 @@
 					# (change requires restart)
 #port = 5432				# (change requires restart)
 #max_connections = 100			# (change requires restart)
-#superuser_reserved_connections = 3	# (change requires restart)
-					# (change requires restart)
-					# (change requires restart)
-					# (change requires restart)
 
 # - TCP settings -
 # see "man tcp" for details
@@ -84,7 +80,6 @@
 # - Authentication -
 
 #authentication_timeout = 1min		# 1s-600s
-#password_encryption = scram-sha-256	# scram-sha-256 or md5
 #db_user_namespace = off
 
 
@@ -588,10 +583,7 @@
 					#   error
 #search_path = '"$user", public'	# schema names
 #default_table_access_method = 'heap'
-#default_tablespace = ''		# a tablespace name, '' uses the default
 #default_toast_compression = 'pglz'	# 'pglz' or 'lz4'
-#temp_tablespaces = ''			# a list of tablespace names, '' uses
-					# only default tablespace
 #check_function_bodies = on
 #default_transaction_isolation = 'read committed'
 #default_transaction_read_only = off

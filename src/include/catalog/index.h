@@ -33,8 +33,6 @@ typedef enum
 typedef struct ReindexParams
 {
 	bits32		options;		/* bitmask of REINDEXOPT_* */
-	Oid			tablespaceOid;	/* New tablespace to move indexes to.
-								 * InvalidOid to do nothing. */
 } ReindexParams;
 
 /* flag bits for ReindexParams->flags */
@@ -92,7 +90,6 @@ extern Oid	index_create(Relation heapRelation,
 
 extern Oid	index_concurrently_create_copy(Relation heapRelation,
 										   Oid oldIndexId,
-										   Oid tablespaceOid,
 										   const char *newName);
 
 extern void index_concurrently_build(Oid heapRelationId,

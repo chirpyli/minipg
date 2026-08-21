@@ -124,7 +124,7 @@ bthandler(PG_FUNCTION_ARGS)
 	amroutine->amvacuumcleanup = btvacuumcleanup;
 	amroutine->amcanreturn = btcanreturn;
 	amroutine->amcostestimate = btcostestimate;
-	amroutine->amoptions = btoptions;
+	amroutine->amoptions = NULL;
 	amroutine->amproperty = btproperty;
 	amroutine->ambuildphasename = btbuildphasename;
 	amroutine->amvalidate = btvalidate;

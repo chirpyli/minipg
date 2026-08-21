@@ -733,7 +733,6 @@ typedef struct PgStat_StatDBEntry
 	PgStat_Counter n_tuples_updated;
 	PgStat_Counter n_tuples_deleted;
 	TimestampTz last_autovac_time;
-	PgStat_Counter n_conflict_tablespace;
 	PgStat_Counter n_conflict_lock;
 	PgStat_Counter n_conflict_snapshot;
 	PgStat_Counter n_conflict_bufferpin;

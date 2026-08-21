@@ -18,8 +18,9 @@
 #include <time.h>
 
 #include "access/nbtree.h"
-#include "access/reloptions.h"
+
 #include "access/relscan.h"
+#include "storage/lwlock.h"
 #include "catalog/catalog.h"
 #include "commands/progress.h"
 #include "lib/qunique.h"
@@ -2120,24 +2121,7 @@ BTreeShmemInit(void)
 		Assert(found);
 }
 
-bytea *
-btoptions(Datum reloptions, bool validate)
-{
-	static const relopt_parse_elt tab[] = {
-		{"fillfactor", RELOPT_TYPE_INT, offsetof(BTOptions, fillfactor)},
-		{"vacuum_cleanup_index_scale_factor", RELOPT_TYPE_REAL,
-		offsetof(BTOptions, vacuum_cleanup_index_scale_factor)},
-		{"deduplicate_items", RELOPT_TYPE_BOOL,
-		offsetof(BTOptions, deduplicate_items)}
 
-	};
-
-	return (bytea *) build_reloptions(reloptions, validate,
-									  RELOPT_KIND_BTREE,
-									  sizeof(BTOptions),
-									  tab, lengthof(tab));
-
-}
 
 /*
  *	btproperty() -- Check boolean properties of indexes.

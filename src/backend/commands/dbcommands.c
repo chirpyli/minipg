@@ -65,16 +65,8 @@ typedef struct
 	Oid			dest_dboid;		/* DB we are trying to create */
 } createdb_failure_params;
 
-typedef struct
-{
-	Oid			dest_dboid;		/* DB we are trying to move */
-	Oid			dest_tsoid;		/* tablespace we are trying to move to */
-} movedb_failure_params;
-
 /* non-export function prototypes */
 static void createdb_failure_callback(int code, Datum arg);
-static void movedb(const char *dbname, const char *tblspcname);
-static void movedb_failure_callback(int code, Datum arg);
 static bool get_db_info(const char *name, LOCKMODE lockmode,
 						Oid *dbIdP, Oid *ownerIdP,
 						int *encodingP, bool *dbIsTemplateP, bool *dbAllowConnP,
@@ -112,7 +104,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	bool		new_record_nulls[Natts_pg_database];
 	Oid			dboid;
 	ListCell   *option;
-	DefElem    *dtablespacename = NULL;
 	DefElem    *dtemplate = NULL;
 	DefElem    *dencoding = NULL;
 	DefElem    *dlocale = NULL;
@@ -139,16 +130,7 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	{
 		DefElem    *defel = (DefElem *) lfirst(option);
 
-		if (strcmp(defel->defname, "tablespace") == 0)
-		{
-			if (dtablespacename)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("conflicting or redundant options"),
-						 parser_errposition(pstate, defel->location)));
-			dtablespacename = defel;
-		}
-		else if (strcmp(defel->defname, "template") == 0)
+		if (strcmp(defel->defname, "template") == 0)
 		{
 			if (dtemplate)
 				ereport(ERROR,
@@ -225,7 +207,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 			ereport(WARNING,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("LOCATION is not supported anymore"),
-					 errhint("Consider using tablespaces instead."),
 					 parser_errposition(pstate, defel->location)));
 		}
 		else
@@ -400,56 +381,11 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 					 errhint("Use the same LC_CTYPE as in the template database, or use template0 as template.")));
 	}
 
-	/* Resolve default tablespace for new database */
-	if (dtablespacename && dtablespacename->arg)
-	{
-		char	   *tablespacename;
-
-		tablespacename = defGetString(dtablespacename);
-		dst_deftablespace = get_tablespace_oid(tablespacename, false);
-		/* pg_global must never be the default tablespace */
-		if (dst_deftablespace == GLOBALTABLESPACE_OID)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("pg_global cannot be used as default tablespace")));
-
-		/*
-		 * If we are trying to change the default tablespace of the template,
-		 * we require that the template not have any files in the new default
-		 * tablespace.  This is necessary because otherwise the copied
-		 * database would contain pg_class rows that refer to its default
-		 * tablespace both explicitly (by OID) and implicitly (as zero), which
-		 * would cause problems.  For example another CREATE DATABASE using
-		 * the copied database as template, and trying to change its default
-		 * tablespace again, would yield outright incorrect results (it would
-		 * improperly move tables to the new default tablespace that should
-		 * stay in the same tablespace).
-		 */
-		if (dst_deftablespace != src_deftablespace)
-		{
-			char	   *srcpath;
-			struct stat st;
-
-			srcpath = GetDatabasePath(src_dboid, dst_deftablespace);
-
-			if (stat(srcpath, &st) == 0 &&
-				S_ISDIR(st.st_mode) &&
-				!directory_is_empty(srcpath))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot assign new default tablespace \"%s\"",
-								tablespacename),
-						 errdetail("There is a conflict because database \"%s\" already has some tables in this tablespace.",
-								   dbtemplate)));
-			pfree(srcpath);
-		}
-	}
-	else
-	{
-		/* Use template database's default tablespace */
-		dst_deftablespace = src_deftablespace;
-		/* Note there is no additional permission check in this path */
-	}
+	/*
+	 * 表空间管理已裁剪：新数据库固定使用模板数据库的默认表空间
+	 * （即 pg_default）。
+	 */
+	dst_deftablespace = src_deftablespace;
 
 	/*
 	 * If built with appropriate switch, whine when regression-testing
@@ -595,10 +531,7 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 				continue;
 			}
 
-			if (srctablespace == src_deftablespace)
-				dsttablespace = dst_deftablespace;
-			else
-				dsttablespace = srctablespace;
+			dsttablespace = srctablespace;
 
 			dstpath = GetDatabasePath(dboid, dsttablespace);
 
@@ -923,325 +856,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 
 
 
-
-/*
- * ALTER DATABASE SET TABLESPACE
- */
-static void
-movedb(const char *dbname, const char *tblspcname)
-{
-	Oid			db_id;
-	Relation	pgdbrel;
-	int			notherbackends;
-	int			npreparedxacts;
-	HeapTuple	oldtuple,
-				newtuple;
-	Oid			src_tblspcoid,
-				dst_tblspcoid;
-	Datum		new_record[Natts_pg_database];
-	bool		new_record_nulls[Natts_pg_database];
-	bool		new_record_repl[Natts_pg_database];
-	ScanKeyData scankey;
-	SysScanDesc sysscan;
-	char	   *src_dbpath;
-	char	   *dst_dbpath;
-	DIR		   *dstdir;
-	struct dirent *xlde;
-	movedb_failure_params fparms;
-
-	/*
-	 * Look up the target database's OID, and get exclusive lock on it. We
-	 * need this to ensure that no new backend starts up in the database while
-	 * we are moving it, and that no one is using it as a CREATE DATABASE
-	 * template or trying to delete it.
-	 */
-	pgdbrel = table_open(DatabaseRelationId, RowExclusiveLock);
-
-	if (!get_db_info(dbname, AccessExclusiveLock, &db_id, NULL, NULL,
-					 NULL, NULL, NULL, NULL, NULL, &src_tblspcoid, NULL, NULL))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_DATABASE),
-				 errmsg("database \"%s\" does not exist", dbname)));
-
-	/*
-	 * We actually need a session lock, so that the lock will persist across
-	 * the commit/restart below.  (We could almost get away with letting the
-	 * lock be released at commit, except that someone could try to move
-	 * relations of the DB back into the old directory while we rmtree() it.)
-	 */
-	LockSharedObjectForSession(DatabaseRelationId, db_id, 0,
-							   AccessExclusiveLock);
-
-	/*
-	 * Permission checks
-	 */
-
-	/*
-	 * Obviously can't move the tables of my own database
-	 */
-	if (db_id == MyDatabaseId)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("cannot change the tablespace of the currently open database")));
-
-	/*
-	 * Get tablespace's oid
-	 */
-	dst_tblspcoid = get_tablespace_oid(tblspcname, false);
-
-	/*
-	 * pg_global must never be the default tablespace
-	 */
-	if (dst_tblspcoid == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("pg_global cannot be used as default tablespace")));
-
-	/*
-	 * No-op if same tablespace
-	 */
-	if (src_tblspcoid == dst_tblspcoid)
-	{
-		table_close(pgdbrel, NoLock);
-		UnlockSharedObjectForSession(DatabaseRelationId, db_id, 0,
-									 AccessExclusiveLock);
-		return;
-	}
-
-	/*
-	 * Check for other backends in the target database.  (Because we hold the
-	 * database lock, no new ones can start after this.)
-	 *
-	 * As in CREATE DATABASE, check this after other error conditions.
-	 */
-	if (CountOtherDBBackends(db_id, &notherbackends, &npreparedxacts))
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("database \"%s\" is being accessed by other users",
-						dbname),
-				 errdetail_busy_db(notherbackends, npreparedxacts)));
-
-	/*
-	 * Get old and new database paths
-	 */
-	src_dbpath = GetDatabasePath(db_id, src_tblspcoid);
-	dst_dbpath = GetDatabasePath(db_id, dst_tblspcoid);
-
-	/*
-	 * Force a checkpoint before proceeding. This will force all dirty
-	 * buffers, including those of unlogged tables, out to disk, to ensure
-	 * source database is up-to-date on disk for the copy.
-	 * FlushDatabaseBuffers() would suffice for that, but we also want to
-	 * process any pending unlink requests. Otherwise, the check for existing
-	 * files in the target directory might fail unnecessarily, not to mention
-	 * that the copy might fail due to source files getting deleted under it.
-	 * On Windows, this also ensures that background procs don't hold any open
-	 * files, which would cause rmdir() to fail.
-	 */
-	RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_FORCE | CHECKPOINT_WAIT
-					  | CHECKPOINT_FLUSH_ALL);
-
-	/*
-	 * Now drop all buffers holding data of the target database; they should
-	 * no longer be dirty so DropDatabaseBuffers is safe.
-	 *
-	 * It might seem that we could just let these buffers age out of shared
-	 * buffers naturally, since they should not get referenced anymore.  The
-	 * problem with that is that if the user later moves the database back to
-	 * its original tablespace, any still-surviving buffers would appear to
-	 * contain valid data again --- but they'd be missing any changes made in
-	 * the database while it was in the new tablespace.  In any case, freeing
-	 * buffers that should never be used again seems worth the cycles.
-	 *
-	 * Note: it'd be sufficient to get rid of buffers matching db_id and
-	 * src_tblspcoid, but bufmgr.c presently provides no API for that.
-	 */
-	DropDatabaseBuffers(db_id);
-
-	/*
-	 * Check for existence of files in the target directory, i.e., objects of
-	 * this database that are already in the target tablespace.  We can't
-	 * allow the move in such a case, because we would need to change those
-	 * relations' pg_class.reltablespace entries to zero, and we don't have
-	 * access to the DB's pg_class to do so.
-	 */
-	dstdir = AllocateDir(dst_dbpath);
-	if (dstdir != NULL)
-	{
-		while ((xlde = ReadDir(dstdir, dst_dbpath)) != NULL)
-		{
-			if (strcmp(xlde->d_name, ".") == 0 ||
-				strcmp(xlde->d_name, "..") == 0)
-				continue;
-
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("some relations of database \"%s\" are already in tablespace \"%s\"",
-							dbname, tblspcname),
-					 errhint("You must move them back to the database's default tablespace before using this command.")));
-		}
-
-		FreeDir(dstdir);
-
-		/*
-		 * The directory exists but is empty. We must remove it before using
-		 * the copydir function.
-		 */
-		if (rmdir(dst_dbpath) != 0)
-			elog(ERROR, "could not remove directory \"%s\": %m",
-				 dst_dbpath);
-	}
-
-	/*
-	 * Use an ENSURE block to make sure we remove the debris if the copy fails
-	 * (eg, due to out-of-disk-space).  This is not a 100% solution, because
-	 * of the possibility of failure during transaction commit, but it should
-	 * handle most scenarios.
-	 */
-	fparms.dest_dboid = db_id;
-	fparms.dest_tsoid = dst_tblspcoid;
-	PG_ENSURE_ERROR_CLEANUP(movedb_failure_callback,
-							PointerGetDatum(&fparms));
-	{
-		/*
-		 * Copy files from the old tablespace to the new one
-		 */
-		copydir(src_dbpath, dst_dbpath, false);
-
-		/*
-		 * Record the filesystem change in XLOG
-		 */
-		{
-			xl_dbase_create_rec xlrec;
-
-			xlrec.db_id = db_id;
-			xlrec.tablespace_id = dst_tblspcoid;
-			xlrec.src_db_id = db_id;
-			xlrec.src_tablespace_id = src_tblspcoid;
-
-			XLogBeginInsert();
-			XLogRegisterData((char *) &xlrec, sizeof(xl_dbase_create_rec));
-
-			(void) XLogInsert(RM_DBASE_ID,
-							  XLOG_DBASE_CREATE | XLR_SPECIAL_REL_UPDATE);
-		}
-
-		/*
-		 * Update the database's pg_database tuple
-		 */
-		ScanKeyInit(&scankey,
-					Anum_pg_database_datname,
-					BTEqualStrategyNumber, F_NAMEEQ,
-					CStringGetDatum(dbname));
-		sysscan = systable_beginscan(pgdbrel, DatabaseNameIndexId, true,
-									 NULL, 1, &scankey);
-		oldtuple = systable_getnext(sysscan);
-		if (!HeapTupleIsValid(oldtuple))	/* shouldn't happen... */
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_DATABASE),
-					 errmsg("database \"%s\" does not exist", dbname)));
-		LockTuple(pgdbrel, &oldtuple->t_self, InplaceUpdateTupleLock);
-
-		MemSet(new_record, 0, sizeof(new_record));
-		MemSet(new_record_nulls, false, sizeof(new_record_nulls));
-		MemSet(new_record_repl, false, sizeof(new_record_repl));
-
-		new_record[Anum_pg_database_dattablespace - 1] = ObjectIdGetDatum(dst_tblspcoid);
-		new_record_repl[Anum_pg_database_dattablespace - 1] = true;
-
-		newtuple = heap_modify_tuple(oldtuple, RelationGetDescr(pgdbrel),
-									 new_record,
-									 new_record_nulls, new_record_repl);
-		CatalogTupleUpdate(pgdbrel, &oldtuple->t_self, newtuple);
-		UnlockTuple(pgdbrel, &oldtuple->t_self, InplaceUpdateTupleLock);
-
-		InvokeObjectPostAlterHook(DatabaseRelationId, db_id, 0);
-
-		systable_endscan(sysscan);
-
-		/*
-		 * Force another checkpoint here.  As in CREATE DATABASE, this is to
-		 * ensure that we don't have to replay a committed XLOG_DBASE_CREATE
-		 * operation, which would cause us to lose any unlogged operations
-		 * done in the new DB tablespace before the next checkpoint.
-		 */
-		RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_FORCE | CHECKPOINT_WAIT);
-
-		/*
-		 * Force synchronous commit, thus minimizing the window between
-		 * copying the database files and committal of the transaction. If we
-		 * crash before committing, we'll leave an orphaned set of files on
-		 * disk, which is not fatal but not good either.
-		 */
-		ForceSyncCommit();
-
-		/*
-		 * Close pg_database, but keep lock till commit.
-		 */
-		table_close(pgdbrel, NoLock);
-	}
-	PG_END_ENSURE_ERROR_CLEANUP(movedb_failure_callback,
-								PointerGetDatum(&fparms));
-
-	/*
-	 * Commit the transaction so that the pg_database update is committed. If
-	 * we crash while removing files, the database won't be corrupt, we'll
-	 * just leave some orphaned files in the old directory.
-	 *
-	 * (This is OK because we know we aren't inside a transaction block.)
-	 *
-	 * XXX would it be safe/better to do this inside the ensure block?	Not
-	 * convinced it's a good idea; consider elog just after the transaction
-	 * really commits.
-	 */
-	PopActiveSnapshot();
-	CommitTransactionCommand();
-
-	/* Start new transaction for the remaining work; don't need a snapshot */
-	StartTransactionCommand();
-
-	/*
-	 * Remove files from the old tablespace
-	 */
-	if (!rmtree(src_dbpath, true))
-		ereport(WARNING,
-				(errmsg("some useless files may be left behind in old database directory \"%s\"",
-						src_dbpath)));
-
-	/*
-	 * Record the filesystem change in XLOG
-	 */
-	{
-		xl_dbase_drop_rec xlrec;
-
-		xlrec.db_id = db_id;
-		xlrec.ntablespaces = 1;
-
-		XLogBeginInsert();
-		XLogRegisterData((char *) &xlrec, sizeof(xl_dbase_drop_rec));
-		XLogRegisterData((char *) &src_tblspcoid, sizeof(Oid));
-
-		(void) XLogInsert(RM_DBASE_ID,
-						  XLOG_DBASE_DROP | XLR_SPECIAL_REL_UPDATE);
-	}
-
-	/* Now it's safe to release the database lock */
-	UnlockSharedObjectForSession(DatabaseRelationId, db_id, 0,
-								 AccessExclusiveLock);
-}
-
-/* Error cleanup callback for movedb */
-static void
-movedb_failure_callback(int code, Datum arg)
-{
-	movedb_failure_params *fparms = (movedb_failure_params *) DatumGetPointer(arg);
-	char	   *dstpath;
-
-	/* Get rid of anything we managed to copy to the target directory */
-	dstpath = GetDatabasePath(fparms->dest_dboid, fparms->dest_tsoid);
-
-	(void) rmtree(dstpath, true);
-}
 
 /*
  * Process options and call dropdb function.
@@ -1695,7 +1309,7 @@ recovery_create_dbdir(char *path, bool only_tblspc)
 	if (only_tblspc && strstr(path, "pg_tblspc/") == NULL)
 		elog(PANIC, "requested to created invalid directory: %s", path);
 
-	if (reachedConsistency && !allow_in_place_tablespaces)
+	if (reachedConsistency)
 		ereport(PANIC,
 				errmsg("missing directory \"%s\"", path));
 

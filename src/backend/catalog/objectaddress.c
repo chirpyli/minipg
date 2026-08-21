@@ -41,14 +41,12 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "commands/proclang.h"
-#include "commands/tablespace.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -316,19 +314,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"tablespace",
-		TableSpaceRelationId,
-		TablespaceOidIndexId,
-		TABLESPACEOID,
-		InvalidOid,
-		Anum_pg_tablespace_oid,
-		Anum_pg_tablespace_spcname,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_TABLESPACE,
-		false
-	},
-	{
 		"transform",
 		TransformRelationId,
 		TransformOidIndexId,
@@ -503,10 +488,6 @@ static const struct object_type_map
 	{
 		"database", OBJECT_DATABASE
 	},
-	/* OCLASS_TBLSPACE */
-	{
-		"tablespace", OBJECT_TABLESPACE
-	},
 	/* OCLASS_EXTENSION */
 	{
 		"extension", OBJECT_EXTENSION
@@ -666,7 +647,6 @@ get_object_address(ObjectType objtype, Node *object,
 				break;
 			case OBJECT_DATABASE:
 			case OBJECT_EXTENSION:
-			case OBJECT_TABLESPACE:
 			case OBJECT_SCHEMA:
 			case OBJECT_LANGUAGE:
 			case OBJECT_ACCESS_METHOD:
@@ -881,11 +861,6 @@ get_object_address_unqualified(ObjectType objtype,
 		case OBJECT_EXTENSION:
 			address.classId = ExtensionRelationId;
 			address.objectId = get_extension_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_TABLESPACE:
-			address.classId = TableSpaceRelationId;
-			address.objectId = get_tablespace_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
 		case OBJECT_SCHEMA:
@@ -1547,7 +1522,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_EXTENSION:
 		case OBJECT_LANGUAGE:
 		case OBJECT_SCHEMA:
-		case OBJECT_TABLESPACE:
 			if (list_length(name) != 1)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -2490,22 +2464,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 					break;
 				}
 				appendStringInfo(&buffer, _("database %s"), datname);
-				break;
-			}
-
-		case OCLASS_TBLSPACE:
-			{
-				char	   *tblspace;
-
-				tblspace = get_tablespace_name(object->objectId);
-				if (!tblspace)
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for tablespace %u",
-							 object->objectId);
-					break;
-				}
-			appendStringInfo(&buffer, _("tablespace %s"), tblspace);
 			break;
 		}
 
@@ -3003,21 +2961,13 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "statistics object");
 			break;
 
-
-
-
-
 		case OCLASS_DATABASE:
 			appendStringInfoString(&buffer, "database");
 			break;
 
-		case OCLASS_TBLSPACE:
-			appendStringInfoString(&buffer, "tablespace");
-		break;
-
 		case OCLASS_EXTENSION:
-		appendStringInfoString(&buffer, "extension");
-		break;
+			appendStringInfoString(&buffer, "extension");
+			break;
 
 		case OCLASS_TRANSFORM:
 			appendStringInfoString(&buffer, "transform");
@@ -3779,25 +3729,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 					*objname = list_make1(datname);
 				appendStringInfoString(&buffer,
 									   quote_identifier(datname));
-				break;
-			}
-
-		case OCLASS_TBLSPACE:
-			{
-				char	   *tblspace;
-
-				tblspace = get_tablespace_name(object->objectId);
-				if (!tblspace)
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for tablespace %u",
-							 object->objectId);
-					break;
-				}
-				if (objname)
-					*objname = list_make1(tblspace);
-				appendStringInfoString(&buffer,
-								   quote_identifier(tblspace));
 			break;
 		}
 

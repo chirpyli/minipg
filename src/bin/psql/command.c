@@ -99,7 +99,6 @@ static backslashResult exec_command_list(PsqlScanState scan_state, bool active_b
 static backslashResult exec_command_out(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_print(PsqlScanState scan_state, bool active_branch,
 										  PQExpBuffer query_buf, PQExpBuffer previous_buf);
-static backslashResult exec_command_password(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_prompt(PsqlScanState scan_state, bool active_branch,
 										   const char *cmd);
 static backslashResult exec_command_pset(PsqlScanState scan_state, bool active_branch);
@@ -362,8 +361,6 @@ exec_command(const char *cmd,
 	else if (strcmp(cmd, "p") == 0 || strcmp(cmd, "print") == 0)
 		status = exec_command_print(scan_state, active_branch,
 									query_buf, previous_buf);
-	else if (strcmp(cmd, "password") == 0)
-		status = exec_command_password(scan_state, active_branch);
 	else if (strcmp(cmd, "prompt") == 0)
 		status = exec_command_prompt(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "pset") == 0)
@@ -724,9 +721,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				break;
 			case 'a':
 				success = describeAggregates(pattern, show_verbose, show_system);
-				break;
-			case 'b':
-				success = describeTablespaces(pattern, show_verbose);
 				break;
 			case 'c':
 				success = listConversions(pattern, show_verbose, show_system);
@@ -1829,84 +1823,6 @@ exec_command_print(PsqlScanState scan_state, bool active_branch,
 	}
 
 	return PSQL_CMD_SKIP_LINE;
-}
-
-/*
- * \password -- set user password
- */
-static backslashResult
-exec_command_password(PsqlScanState scan_state, bool active_branch)
-{
-	bool		success = true;
-
-	if (active_branch)
-	{
-		char	   *user = psql_scan_slash_option(scan_state,
-												  OT_SQLID, NULL, true);
-		char	   *pw1;
-		char	   *pw2;
-		PQExpBufferData buf;
-
-		if (user == NULL)
-		{
-			/* By default, the command applies to CURRENT_USER */
-			PGresult   *res;
-
-			res = PSQLexec("SELECT CURRENT_USER");
-			if (!res)
-				return PSQL_CMD_ERROR;
-
-			user = pg_strdup(PQgetvalue(res, 0, 0));
-			PQclear(res);
-		}
-
-		initPQExpBuffer(&buf);
-		printfPQExpBuffer(&buf, _("Enter new password for user \"%s\": "), user);
-
-		pw1 = simple_prompt(buf.data, false);
-		pw2 = simple_prompt("Enter it again: ", false);
-
-		if (strcmp(pw1, pw2) != 0)
-		{
-			pg_log_error("Passwords didn't match.");
-			success = false;
-		}
-		else
-		{
-			char	   *encrypted_password;
-
-			encrypted_password = PQencryptPasswordConn(pset.db, pw1, user, NULL);
-
-			if (!encrypted_password)
-			{
-				pg_log_info("%s", PQerrorMessage(pset.db));
-				success = false;
-			}
-			else
-			{
-				PGresult   *res;
-
-				printfPQExpBuffer(&buf, "ALTER USER %s PASSWORD ",
-								  fmtId(user));
-				appendStringLiteralConn(&buf, encrypted_password, pset.db);
-				res = PSQLexec(buf.data);
-				if (!res)
-					success = false;
-				else
-					PQclear(res);
-				PQfreemem(encrypted_password);
-			}
-		}
-
-		free(user);
-		free(pw1);
-		free(pw2);
-		termPQExpBuffer(&buf);
-	}
-	else
-		ignore_slash_options(scan_state);
-
-	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
 }
 
 /*

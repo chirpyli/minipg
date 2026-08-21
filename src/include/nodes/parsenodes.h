@@ -1312,7 +1312,6 @@ typedef enum ObjectType
 	OBJECT_STATISTIC_EXT,
 	OBJECT_TABCONSTRAINT,
 	OBJECT_TABLE,
-	OBJECT_TABLESPACE,
 	OBJECT_TRANSFORM,
 	OBJECT_TYPE,
 	OBJECT_VIEW
@@ -1390,7 +1389,6 @@ typedef enum AlterTableType
 	AT_ClusterOn,				/* CLUSTER ON */
 	AT_DropCluster,				/* SET WITHOUT CLUSTER */
 	AT_DropOids,				/* SET WITHOUT OIDS */
-	AT_SetTableSpace,			/* SET TABLESPACE */
 	AT_SetRelOptions,			/* SET (...) -- AM specific parameters */
 	AT_ResetRelOptions,			/* RESET (...) -- AM specific parameters */
 	AT_ReplaceRelOptions,		/* replace reloption list in its entirety */
@@ -1532,7 +1530,6 @@ typedef struct CreateStmt
 	List	   *constraints;	/* constraints (list of Constraint nodes) */
 	List	   *options;		/* options from WITH clause */
 	OnCommitAction oncommit;	/* what do we do at COMMIT? */
-	char	   *tablespacename; /* table space to use, or NULL */
 	char	   *accessMethod;	/* table access method */
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 } CreateStmt;
@@ -1589,9 +1586,6 @@ typedef struct Constraint
 	/* Fields used for index constraints (UNIQUE, PRIMARY KEY): */
 	List	   *options;		/* options from WITH clause */
 	char	   *indexname;		/* existing index to use; otherwise NULL */
-	char	   *indexspace;		/* index tablespace; NULL for default */
-	bool		reset_default_tblspc;	/* reset default_tablespace prior to
-										 * creating the index */
 	/* These could be, but currently are not, used for UNIQUE/PKEY: */
 	char	   *access_method;	/* index access method; NULL for default */
 	Node	   *where_clause;	/* partial index predicate */
@@ -1611,45 +1605,6 @@ typedef struct Constraint
 	bool		skip_validation;	/* skip validation of existing rows? */
 	bool		initially_valid;	/* mark the new constraint as valid? */
 } Constraint;
-
-/* ----------------------
- *		Create/Drop Table Space Statements
- * ----------------------
- */
-
-typedef struct CreateTableSpaceStmt
-{
-	NodeTag		type;
-	char	   *tablespacename;
-	RoleSpec   *owner;
-	char	   *location;
-	List	   *options;
-} CreateTableSpaceStmt;
-
-typedef struct DropTableSpaceStmt
-{
-	NodeTag		type;
-	char	   *tablespacename;
-	bool		missing_ok;		/* skip error if missing? */
-} DropTableSpaceStmt;
-
-typedef struct AlterTableSpaceOptionsStmt
-{
-	NodeTag		type;
-	char	   *tablespacename;
-	List	   *options;
-	bool		isReset;
-} AlterTableSpaceOptionsStmt;
-
-typedef struct AlterTableMoveAllStmt
-{
-	NodeTag		type;
-	char	   *orig_tablespacename;
-	ObjectType	objtype;		/* Object type to move */
-	List	   *roles;			/* List of roles to move objects of */
-	char	   *new_tablespacename;
-	bool		nowait;
-} AlterTableMoveAllStmt;
 
 /* ----------------------
  *		Create/Alter Extension Statements
@@ -1861,7 +1816,6 @@ typedef struct IndexStmt
 	char	   *idxname;		/* name of new index, or NULL for default */
 	RangeVar   *relation;		/* relation to build index on */
 	char	   *accessMethod;	/* name of access method (eg. btree) */
-	char	   *tableSpace;		/* tablespace, or NULL for default */
 	List	   *indexParams;	/* columns to index: a list of IndexElem */
 	List	   *indexIncludingParams;	/* additional columns to index: a list
 										 * of IndexElem */
@@ -1878,8 +1832,6 @@ typedef struct IndexStmt
 	bool		transformed;	/* true when transformIndexStmt is finished */
 	bool		concurrent;		/* should this be a concurrent index build? */
 	bool		if_not_exists;	/* just do nothing if index already exists? */
-	bool		reset_default_tblspc;	/* reset default_tablespace prior to
-										 * executing */
 } IndexStmt;
 
 /* ----------------------

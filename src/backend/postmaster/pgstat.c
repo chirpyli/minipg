@@ -3385,7 +3385,6 @@ reset_dbentry_counters(PgStat_StatDBEntry *dbentry)
 	dbentry->n_tuples_updated = 0;
 	dbentry->n_tuples_deleted = 0;
 	dbentry->last_autovac_time = 0;
-	dbentry->n_conflict_tablespace = 0;
 	dbentry->n_conflict_lock = 0;
 	dbentry->n_conflict_snapshot = 0;
 	dbentry->n_conflict_bufferpin = 0;
@@ -5290,9 +5289,6 @@ pgstat_recv_recoveryconflict(PgStat_MsgRecoveryConflict *msg, int len)
 			 * Since we drop the information about the database as soon as it
 			 * replicates, there is no point in counting these conflicts.
 			 */
-			break;
-		case PROCSIG_RECOVERY_CONFLICT_TABLESPACE:
-			dbentry->n_conflict_tablespace++;
 			break;
 		case PROCSIG_RECOVERY_CONFLICT_LOCK:
 			dbentry->n_conflict_lock++;

@@ -111,8 +111,6 @@ int			wal_receiver_timeout = 60000;
 extern bool Log_disconnections;
 extern int	CommitDelay;
 extern int	CommitSiblings;
-extern char *default_tablespace;
-extern char *temp_tablespaces;
 extern bool ignore_checksum_failure;
 extern bool ignore_invalid_pages;
 extern bool synchronize_seqscans;
@@ -1726,17 +1724,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"allow_in_place_tablespaces", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Allows tablespaces directly inside pg_tblspc, for testing."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&allow_in_place_tablespaces,
-		false,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"quote_all_identifiers", PGC_USERSET, COMPAT_OPTIONS_PREVIOUS,
 			gettext_noop("When generating SQL fragments, quote all identifiers."),
 			NULL,
@@ -1928,17 +1915,6 @@ static struct config_int ConfigureNamesInt[] =
 		&MaxConnections,
 		100, 1, MAX_BACKENDS,
 		check_maxconnections, NULL, NULL
-	},
-
-	{
-		/* see max_connections */
-		{"superuser_reserved_connections", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the number of connection slots reserved for superusers."),
-			NULL
-		},
-		&ReservedBackends,
-		3, 0, MAX_BACKENDS,
-		NULL, NULL, NULL
 	},
 
 	{
@@ -3407,28 +3383,6 @@ static struct config_string ConfigureNamesString[] =
 		&default_table_access_method,
 		DEFAULT_TABLE_ACCESS_METHOD,
 		check_default_table_access_method, NULL, NULL
-	},
-
-	{
-		{"default_tablespace", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the default tablespace to create tables and indexes in."),
-			gettext_noop("An empty string selects the database's default tablespace."),
-			GUC_IS_NAME
-		},
-		&default_tablespace,
-		"",
-		check_default_tablespace, NULL, NULL
-	},
-
-	{
-		{"temp_tablespaces", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the tablespace(s) to use for temporary tables and sort files."),
-			NULL,
-			GUC_LIST_INPUT | GUC_LIST_QUOTE
-		},
-		&temp_tablespaces,
-		"",
-		check_temp_tablespaces, assign_temp_tablespaces, NULL
 	},
 
 	{

@@ -25,7 +25,6 @@
 #include "access/amapi.h"
 #include "access/htup_details.h"
 #include "access/relation.h"
-#include "access/reloptions.h"
 #include "access/table.h"
 #include "access/toast_compression.h"
 #include "catalog/dependency.h"
@@ -41,7 +40,6 @@
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
-#include "commands/tablespace.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -548,10 +546,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	index = makeNode(IndexStmt);
 	index->relation = heapRel;
 	index->accessMethod = pstrdup(NameStr(amrec->amname));
-	if (OidIsValid(idxrelrec->reltablespace))
-		index->tableSpace = get_tablespace_name(idxrelrec->reltablespace);
-	else
-		index->tableSpace = NULL;
 	index->indexOid = InvalidOid;
 	index->oldNode = InvalidOid;
 	index->oldCreateSubid = InvalidSubTransactionId;
@@ -561,7 +555,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	index->transformed = true;	/* don't need transformIndexStmt */
 	index->concurrent = false;
 	index->if_not_exists = false;
-	index->reset_default_tblspc = false;
 
 	/*
 	 * We don't try to preserve the name of the source index; instead, just
@@ -682,8 +675,7 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 
 		/* Add the operator class name, if non-default */
 		iparam->opclass = get_opclass(indclass->values[keyno], keycoltype);
-		iparam->opclassopts =
-			untransformRelOptions(get_attoptions(source_relid, keyno + 1));
+		iparam->opclassopts = NIL;
 
 		iparam->ordering = SORTBY_DEFAULT;
 		iparam->nulls_ordering = SORTBY_NULLS_DEFAULT;
@@ -744,10 +736,7 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 		index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
 	}
 	/* Copy reloptions if any */
-	datum = SysCacheGetAttr(RELOID, ht_idxrel,
-							Anum_pg_class_reloptions, &isnull);
-	if (!isnull)
-		index->options = untransformRelOptions(datum);
+	index->options = NIL;
 
 	/* If it's a partial index, decompile and append the predicate */
 	datum = SysCacheGetAttr(INDEXRELID, ht_idx,
@@ -994,7 +983,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->relation = cxt->relation;
 	index->accessMethod = constraint->access_method ? constraint->access_method : DEFAULT_INDEX_TYPE;
 	index->options = constraint->options;
-	index->tableSpace = constraint->indexspace;
 	index->whereClause = constraint->where_clause;
 	index->indexParams = NIL;
 	index->indexIncludingParams = NIL;
@@ -1005,7 +993,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->transformed = false;
 	index->concurrent = false;
 	index->if_not_exists = false;
-	index->reset_default_tblspc = constraint->reset_default_tblspc;
 
 	/*
 	 * If it's ALTER TABLE ADD CONSTRAINT USING INDEX, look up the index and

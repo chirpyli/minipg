@@ -59,7 +59,6 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
-#include "utils/attoptcache.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/fmgroids.h"
@@ -69,7 +68,6 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "utils/pg_rusage.h"
 #include "utils/sampling.h"
 #include "utils/sortsupport.h"
-#include "utils/spccache.h"
 #include "utils/syscache.h"
 #include "utils/timestamp.h"
 
@@ -485,7 +483,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 		for (i = 0; i < attr_cnt; i++)
 		{
 			VacAttrStats *stats = vacattrstats[i];
-			AttributeOpts *aopt;
 
 			stats->rows = rows;
 			stats->tupDesc = onerel->rd_att;
@@ -493,20 +490,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 								 std_fetch_func,
 								 numrows,
 								 totalrows);
-
-			/*
-			 * If the appropriate flavor of the n_distinct option is
-			 * specified, override with the corresponding value.
-			 */
-			aopt = get_attribute_options(onerel->rd_id, stats->attr->attnum);
-			if (aopt != NULL)
-			{
-				float8		n_distinct;
-
-				n_distinct = inh ? aopt->n_distinct_inherited : aopt->n_distinct;
-				if (n_distinct != 0.0)
-					stats->stadistinct = n_distinct;
-			}
 
 			MemoryContextResetAndDeleteChildren(col_context);
 		}
@@ -1095,7 +1078,7 @@ acquire_sample_rows(Relation onerel, int elevel,
 	nblocks = BlockSampler_Init(&bs, totalblocks, targrows, randseed);
 
 #ifdef USE_PREFETCH
-	prefetch_maximum = get_tablespace_maintenance_io_concurrency(onerel->rd_rel->reltablespace);
+	prefetch_maximum = maintenance_io_concurrency;
 	/* Create another BlockSampler, using the same seed, for prefetching */
 	if (prefetch_maximum)
 		(void) BlockSampler_Init(&prefetch_bs, totalblocks, targrows, randseed);

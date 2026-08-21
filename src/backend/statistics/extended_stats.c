@@ -36,7 +36,6 @@
 #include "statistics/extended_stats_internal.h"
 #include "statistics/statistics.h"
 #include "utils/array.h"
-#include "utils/attoptcache.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/fmgroids.h"
@@ -2236,10 +2235,6 @@ compute_expr_stats(Relation onerel, double totalrows,
 		 */
 		if (tcnt > 0)
 		{
-			AttributeOpts *aopt =
-			get_attribute_options(stats->attr->attrelid,
-								  stats->attr->attnum);
-
 			stats->exprvals = exprvals;
 			stats->exprnulls = exprnulls;
 			stats->rowstride = 1;
@@ -2247,13 +2242,6 @@ compute_expr_stats(Relation onerel, double totalrows,
 								 expr_fetch_func,
 								 tcnt,
 								 tcnt);
-
-			/*
-			 * If the n_distinct option is specified, it overrides the above
-			 * computation.
-			 */
-			if (aopt != NULL && aopt->n_distinct != 0.0)
-				stats->stadistinct = aopt->n_distinct;
 		}
 
 		/* And clean up */

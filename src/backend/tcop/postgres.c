@@ -2457,9 +2457,6 @@ errdetail_recovery_conflict(void)
 		case PROCSIG_RECOVERY_CONFLICT_LOCK:
 			errdetail("User was holding a relation lock for too long.");
 			break;
-		case PROCSIG_RECOVERY_CONFLICT_TABLESPACE:
-			errdetail("User was or might have been using tablespace that must be dropped.");
-			break;
 		case PROCSIG_RECOVERY_CONFLICT_SNAPSHOT:
 			errdetail("User query might have needed to see row versions that must be removed.");
 			break;
@@ -3031,7 +3028,6 @@ RecoveryConflictInterrupt(ProcSignalReason reason)
 				/* FALLTHROUGH */
 
 			case PROCSIG_RECOVERY_CONFLICT_LOCK:
-			case PROCSIG_RECOVERY_CONFLICT_TABLESPACE:
 			case PROCSIG_RECOVERY_CONFLICT_SNAPSHOT:
 
 				/*
@@ -3052,9 +3048,6 @@ RecoveryConflictInterrupt(ProcSignalReason reason)
 				 * PROCSIG_RECOVERY_CONFLICT_SNAPSHOT if no snapshots are held
 				 * by parent transactions and the transaction is not
 				 * transaction-snapshot mode
-				 *
-				 * PROCSIG_RECOVERY_CONFLICT_TABLESPACE if no temp files or
-				 * cursors open in parent transactions
 				 */
 				if (!IsSubTransaction())
 				{

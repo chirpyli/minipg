@@ -22,7 +22,6 @@
 #include "access/amapi.h"
 #include "access/htup_details.h"
 #include "access/relation.h"
-#include "access/reloptions.h"	/* for untransformRelOptions */
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "catalog/pg_aggregate.h"
@@ -10276,7 +10275,7 @@ pg_options_to_table(PG_FUNCTION_ARGS)
 	Datum		array = PG_GETARG_DATUM(0);
 
 	deflist_to_tuplestore((ReturnSetInfo *) fcinfo->resultinfo,
-						  untransformRelOptions(array));
+						  NIL);
 
 	return (Datum) 0;
 }

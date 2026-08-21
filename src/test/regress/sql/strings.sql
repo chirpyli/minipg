@@ -345,7 +345,7 @@ INSERT INTO toasttest values (repeat('1234567890',300));
 INSERT INTO toasttest values (repeat('1234567890',300));
 INSERT INTO toasttest values (repeat('1234567890',300));
 INSERT INTO toasttest values (repeat('1234567890',300));
--- expect 0 blocks
+-- expect >0 blocks (reloptions removed, toast_tuple_target default used)
 SELECT pg_relation_size(reltoastrelid) = 0 AS is_empty
   FROM pg_class where relname = 'toasttest';
 

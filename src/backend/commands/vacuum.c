@@ -1872,24 +1872,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	 */
 	if (params->index_cleanup == VACOPTVALUE_UNSPECIFIED)
 	{
-		StdRdOptIndexCleanup vacuum_index_cleanup;
-
-		if (rel->rd_options == NULL)
-			vacuum_index_cleanup = STDRD_OPTION_VACUUM_INDEX_CLEANUP_AUTO;
-		else
-			vacuum_index_cleanup =
-				((StdRdOptions *) rel->rd_options)->vacuum_index_cleanup;
-
-		if (vacuum_index_cleanup == STDRD_OPTION_VACUUM_INDEX_CLEANUP_AUTO)
-			params->index_cleanup = VACOPTVALUE_AUTO;
-		else if (vacuum_index_cleanup == STDRD_OPTION_VACUUM_INDEX_CLEANUP_ON)
-			params->index_cleanup = VACOPTVALUE_ENABLED;
-		else
-		{
-			Assert(vacuum_index_cleanup ==
-				   STDRD_OPTION_VACUUM_INDEX_CLEANUP_OFF);
-			params->index_cleanup = VACOPTVALUE_DISABLED;
-		}
+		params->index_cleanup = VACOPTVALUE_AUTO;
 	}
 
 	/*
@@ -1898,11 +1881,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 	 */
 	if (params->truncate == VACOPTVALUE_UNSPECIFIED)
 	{
-		if (rel->rd_options == NULL ||
-			((StdRdOptions *) rel->rd_options)->vacuum_truncate)
-			params->truncate = VACOPTVALUE_ENABLED;
-		else
-			params->truncate = VACOPTVALUE_DISABLED;
+		params->truncate = VACOPTVALUE_ENABLED;
 	}
 
 	/*

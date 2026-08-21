@@ -15,7 +15,6 @@
 
 #include "access/amapi.h"
 #include "access/generic_xlog.h"
-#include "access/reloptions.h"
 #include "bloom.h"
 #include "catalog/index.h"
 #include "commands/vacuum.h"
@@ -34,50 +33,15 @@
 
 PG_FUNCTION_INFO_V1(blhandler);
 
-/* Kind of relation options for bloom index */
-static relopt_kind bl_relopt_kind;
-
-/* parse table for fillRelOptions */
-static relopt_parse_elt bl_relopt_tab[INDEX_MAX_KEYS + 1];
-
 static int32 myRand(void);
 static void mySrand(uint32 seed);
 
 /*
- * Module initialize function: initialize info about Bloom relation options.
- *
- * Note: keep this in sync with makeDefaultBloomOptions().
+ * Module initialize function.
  */
 void
 _PG_init(void)
 {
-	int			i;
-	char		buf[16];
-
-	bl_relopt_kind = add_reloption_kind();
-
-	/* Option for length of signature */
-	add_int_reloption(bl_relopt_kind, "length",
-					  "Length of signature in bits",
-					  DEFAULT_BLOOM_LENGTH, 1, MAX_BLOOM_LENGTH,
-					  AccessExclusiveLock);
-	bl_relopt_tab[0].optname = "length";
-	bl_relopt_tab[0].opttype = RELOPT_TYPE_INT;
-	bl_relopt_tab[0].offset = offsetof(BloomOptions, bloomLength);
-
-	/* Number of bits for each possible index column: col1, col2, ... */
-	for (i = 0; i < INDEX_MAX_KEYS; i++)
-	{
-		snprintf(buf, sizeof(buf), "col%d", i + 1);
-		add_int_reloption(bl_relopt_kind, buf,
-						  "Number of bits generated for each index column",
-						  DEFAULT_BLOOM_BITS, 1, MAX_BLOOM_BITS,
-						  AccessExclusiveLock);
-		bl_relopt_tab[i + 1].optname = MemoryContextStrdup(TopMemoryContext,
-														   buf);
-		bl_relopt_tab[i + 1].opttype = RELOPT_TYPE_INT;
-		bl_relopt_tab[i + 1].offset = offsetof(BloomOptions, bitSize[0]) + sizeof(int) * i;
-	}
 }
 
 /*
@@ -425,12 +389,9 @@ BloomFillMetapage(Relation index, Page metaPage)
 	BloomMetaPageData *metadata;
 
 	/*
-	 * Choose the index's options.  If reloptions have been assigned, use
-	 * those, otherwise create default options.
+	 * Choose the index's options.  Use default options.
 	 */
-	opts = (BloomOptions *) index->rd_options;
-	if (!opts)
-		opts = makeDefaultBloomOptions();
+	opts = makeDefaultBloomOptions();
 
 	/*
 	 * Initialize contents of meta page, including a copy of the options,
@@ -475,23 +436,10 @@ BloomInitMetapage(Relation index)
 }
 
 /*
- * Parse reloptions for bloom index, producing a BloomOptions struct.
+ * Parse reloptions for bloom index.
  */
 bytea *
 bloptions(Datum reloptions, bool validate)
 {
-	BloomOptions *rdopts;
-
-	/* Parse the user-given reloptions */
-	rdopts = (BloomOptions *) build_reloptions(reloptions, validate,
-											   bl_relopt_kind,
-											   sizeof(BloomOptions),
-											   bl_relopt_tab,
-											   lengthof(bl_relopt_tab));
-
-	/* Convert signature length from # of bits to # to words, rounding up */
-	if (rdopts)
-		rdopts->bloomLength = (rdopts->bloomLength + SIGNWORDBITS - 1) / SIGNWORDBITS;
-
-	return (bytea *) rdopts;
+	return NULL;
 }

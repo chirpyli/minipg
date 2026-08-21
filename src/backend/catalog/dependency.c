@@ -138,8 +138,7 @@ static const Oid object_classes[] = {
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	StatisticExtRelationId,		/* OCLASS_STATISTIC_EXT */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
-	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
-	ExtensionRelationId,		/* OCLASS_EXTENSION */
+	ExtensionRelationId,			/* OCLASS_EXTENSION */
 	TransformRelationId			/* OCLASS_TRANSFORM */
 };
 
@@ -1397,12 +1396,11 @@ doDeletion(const ObjectAddress *object, int flags)
 			break;
 
 			/*
-			 * These global object types are not supported here.
-			 */
-		case OCLASS_DATABASE:
-		case OCLASS_TBLSPACE:
-			elog(ERROR, "global objects cannot be deleted by doDeletion");
-			break;
+		 * These global object types are not supported here.
+		 */
+	case OCLASS_DATABASE:
+		elog(ERROR, "global objects cannot be deleted by doDeletion");
+		break;
 
 			/*
 			 * There's intentionally no default: case here; we want the
@@ -2618,9 +2616,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case DatabaseRelationId:
 			return OCLASS_DATABASE;
-
-		case TableSpaceRelationId:
-			return OCLASS_TBLSPACE;
 
 		case ExtensionRelationId:
 			return OCLASS_EXTENSION;

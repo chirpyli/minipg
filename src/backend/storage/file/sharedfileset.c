@@ -28,6 +28,7 @@
 #include "commands/tablespace.h"
 #include "common/hashfn.h"
 #include "miscadmin.h"
+#include "nodes/pg_list.h"
 #include "storage/dsm.h"
 #include "storage/ipc.h"
 #include "storage/sharedfileset.h"

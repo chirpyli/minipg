@@ -33,7 +33,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
 #include "commands/collationcmds.h"
@@ -44,7 +43,6 @@
 #include "commands/proclang.h"
 #include "commands/schemacmds.h"
 #include "commands/tablecmds.h"
-#include "commands/tablespace.h"
 #include "commands/typecmds.h"
 #include "miscadmin.h"
 #include "storage/lmgr.h"
@@ -67,10 +65,6 @@ typedef struct
 } ShDependObjectInfo;
 
 static Oid	classIdGetDbId(Oid classId);
-static void shdepChangeDep(Relation sdepRel,
-						   Oid classid, Oid objid, int32 objsubid,
-						   Oid refclassid, Oid refobjid,
-						   SharedDependencyType deptype);
 static void shdepAddDependency(Relation sdepRel,
 							   Oid classId, Oid objectId, int32 objsubId,
 							   Oid refclassId, Oid refobjId,
@@ -136,181 +130,6 @@ recordSharedDependencyOn(ObjectAddress *depender,
 	table_close(sdepRel, RowExclusiveLock);
 }
 
-/*
- * shdepChangeDep
- *
- * Update shared dependency records to account for an updated referenced
- * object.  This is an internal workhorse for operations such as changing
- * an object's owner.
- *
- * There must be no more than one existing entry for the given dependent
- * object and dependency type!	So in practice this can only be used for
- * updating SHARED_DEPENDENCY_OWNER and SHARED_DEPENDENCY_TABLESPACE
- * entries, which should have that property.
- *
- * If there is no previous entry, we assume it was referencing a PINned
- * object, so we create a new entry.  If the new referenced object is
- * PINned, we don't create an entry (and drop the old one, if any).
- * (For tablespaces, we don't record dependencies in certain cases, so
- * there are other possible reasons for entries to be missing.)
- *
- * sdepRel must be the pg_shdepend relation, already opened and suitably
- * locked.
- */
-static void
-shdepChangeDep(Relation sdepRel,
-			   Oid classid, Oid objid, int32 objsubid,
-			   Oid refclassid, Oid refobjid,
-			   SharedDependencyType deptype)
-{
-	Oid			dbid = classIdGetDbId(classid);
-	HeapTuple	oldtup = NULL;
-	HeapTuple	scantup;
-	ScanKeyData key[4];
-	SysScanDesc scan;
-
-	/*
-	 * Make sure the new referenced object doesn't go away while we record the
-	 * dependency.
-	 */
-	shdepLockAndCheckObject(refclassid, refobjid);
-
-	/*
-	 * Look for a previous entry
-	 */
-	ScanKeyInit(&key[0],
-				Anum_pg_shdepend_dbid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(dbid));
-	ScanKeyInit(&key[1],
-				Anum_pg_shdepend_classid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(classid));
-	ScanKeyInit(&key[2],
-				Anum_pg_shdepend_objid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(objid));
-	ScanKeyInit(&key[3],
-				Anum_pg_shdepend_objsubid,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(objsubid));
-
-	scan = systable_beginscan(sdepRel, SharedDependDependerIndexId, true,
-							  NULL, 4, key);
-
-	while ((scantup = systable_getnext(scan)) != NULL)
-	{
-		/* Ignore if not of the target dependency type */
-		if (((Form_pg_shdepend) GETSTRUCT(scantup))->deptype != deptype)
-			continue;
-		/* Caller screwed up if multiple matches */
-		if (oldtup)
-			elog(ERROR,
-				 "multiple pg_shdepend entries for object %u/%u/%d deptype %c",
-				 classid, objid, objsubid, deptype);
-		oldtup = heap_copytuple(scantup);
-	}
-
-	systable_endscan(scan);
-
-	if (isSharedObjectPinned(refclassid, refobjid, sdepRel))
-	{
-		/* No new entry needed, so just delete existing entry if any */
-		if (oldtup)
-			CatalogTupleDelete(sdepRel, &oldtup->t_self);
-	}
-	else if (oldtup)
-	{
-		/* Need to update existing entry */
-		Form_pg_shdepend shForm = (Form_pg_shdepend) GETSTRUCT(oldtup);
-
-		/* Since oldtup is a copy, we can just modify it in-memory */
-		shForm->refclassid = refclassid;
-		shForm->refobjid = refobjid;
-
-		CatalogTupleUpdate(sdepRel, &oldtup->t_self, oldtup);
-	}
-	else
-	{
-		/* Need to insert new entry */
-		Datum		values[Natts_pg_shdepend];
-		bool		nulls[Natts_pg_shdepend];
-
-		memset(nulls, false, sizeof(nulls));
-
-		values[Anum_pg_shdepend_dbid - 1] = ObjectIdGetDatum(dbid);
-		values[Anum_pg_shdepend_classid - 1] = ObjectIdGetDatum(classid);
-		values[Anum_pg_shdepend_objid - 1] = ObjectIdGetDatum(objid);
-		values[Anum_pg_shdepend_objsubid - 1] = Int32GetDatum(objsubid);
-
-		values[Anum_pg_shdepend_refclassid - 1] = ObjectIdGetDatum(refclassid);
-		values[Anum_pg_shdepend_refobjid - 1] = ObjectIdGetDatum(refobjid);
-		values[Anum_pg_shdepend_deptype - 1] = CharGetDatum(deptype);
-
-		/*
-		 * we are reusing oldtup just to avoid declaring a new variable, but
-		 * it's certainly a new tuple
-		 */
-		oldtup = heap_form_tuple(RelationGetDescr(sdepRel), values, nulls);
-		CatalogTupleInsert(sdepRel, oldtup);
-	}
-
-	if (oldtup)
-		heap_freetuple(oldtup);
-}
-
-
-/*
- * recordDependencyOnTablespace
- *
- * A convenient wrapper of recordSharedDependencyOn -- register the specified
- * tablespace as default for the given object.
- *
- * Note: it's the caller's responsibility to ensure that there isn't a
- * tablespace entry for the object already.
- */
-void
-recordDependencyOnTablespace(Oid classId, Oid objectId, Oid tablespace)
-{
-	ObjectAddress myself,
-				referenced;
-
-	ObjectAddressSet(myself, classId, objectId);
-	ObjectAddressSet(referenced, TableSpaceRelationId, tablespace);
-
-	recordSharedDependencyOn(&myself, &referenced,
-							 SHARED_DEPENDENCY_TABLESPACE);
-}
-
-/*
- * changeDependencyOnTablespace
- *
- * Update the shared dependencies to account for the new tablespace.
- *
- * Note: we don't need an objsubid argument because only whole objects
- * have tablespaces.
- */
-void
-changeDependencyOnTablespace(Oid classId, Oid objectId, Oid newTablespaceId)
-{
-	Relation	sdepRel;
-
-	sdepRel = table_open(SharedDependRelationId, RowExclusiveLock);
-
-	if (newTablespaceId != DEFAULTTABLESPACE_OID &&
-		newTablespaceId != InvalidOid)
-		shdepChangeDep(sdepRel,
-					   classId, objectId, 0,
-					   TableSpaceRelationId, newTablespaceId,
-					   SHARED_DEPENDENCY_TABLESPACE);
-	else
-		shdepDropDependency(sdepRel,
-							classId, objectId, 0, true,
-							InvalidOid, InvalidOid,
-							SHARED_DEPENDENCY_INVALID);
-
-	table_close(sdepRel, RowExclusiveLock);
-}
 
 /*
  * A struct to keep track of dependencies found in other databases.
@@ -935,20 +754,6 @@ shdepLockAndCheckObject(Oid classId, Oid objectId)
 
 	switch (classId)
 	{
-		case TableSpaceRelationId:
-			{
-				/* For lack of a syscache on pg_tablespace, do this: */
-				char	   *tablespace = get_tablespace_name(objectId);
-
-				if (tablespace == NULL)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_OBJECT),
-							 errmsg("tablespace %u was concurrently dropped",
-									objectId)));
-				pfree(tablespace);
-				break;
-			}
-
 		case DatabaseRelationId:
 			{
 				/* For lack of a syscache on pg_database, do this: */
@@ -1011,8 +816,6 @@ storeObjectDescription(StringInfo descs,
 				appendStringInfo(descs, _("owner of %s"), objdesc);
 			else if (deptype == SHARED_DEPENDENCY_ACL)
 				appendStringInfo(descs, _("privileges for %s"), objdesc);
-			else if (deptype == SHARED_DEPENDENCY_TABLESPACE)
-				appendStringInfo(descs, _("tablespace for %s"), objdesc);
 			else
 				elog(ERROR, "unrecognized dependency type: %d",
 					 (int) deptype);

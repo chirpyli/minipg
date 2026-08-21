@@ -19,7 +19,6 @@
 #include "access/heapam.h"
 #include "access/heapam_xlog.h"
 #include "access/multixact.h"
-#include "access/reloptions.h"
 #include "access/relscan.h"
 #include "access/sysattr.h"
 #include "access/tableam.h"
@@ -169,7 +168,6 @@ typedef struct AlteredTableInfo
 	List	   *afterStmts;		/* List of utility command parsetrees */
 	bool		verify_new_notnull; /* T if we should recheck NOT NULL */
 	int			rewrite;		/* Reason for forced rewrite, if any */
-	Oid			newTableSpace;	/* new tablespace; 0 means no change */
 	Expr	   *partition_constraint;	/* for attach partition validation */
 	/* true, if validating default due to some other attach/detach */
 	bool		validate_default;
@@ -407,9 +405,6 @@ static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
 									 LOCKMODE lockmode);
 static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
-static void ATPrepSetTableSpace(AlteredTableInfo *tab, Relation rel,
-								const char *tablespacename, LOCKMODE lockmode);
-static void ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode);
 static void ATExecSetRelOptions(Relation rel, List *defList,
 								AlterTableType operation,
 								LOCKMODE lockmode);
@@ -422,7 +417,6 @@ static void ATExecDropOf(Relation rel, LOCKMODE lockmode);
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
 										  const char *column, Node *newValue, LOCKMODE lockmode);
 
-static void index_copy_data(Relation rel, RelFileNode newrnode);
 static const char *storage_name(char c);
 
 static void RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid,
@@ -469,7 +463,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	ListCell   *listptr;
 	AttrNumber	attnum;
 	bool		partitioned;
-	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
 	Oid			ofTypeId;
 	ObjectAddress address;
 	const char *accessMethod = NULL;
@@ -520,26 +513,9 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	/* Determine the list of OIDs of the parents. */
 	inheritOids = NIL;
 
-	/*
-	 * Select tablespace to use: an explicitly indicated one, or (in the case
-	 * of a partitioned table) the parent's, if it has one.
-	 */
-	if (stmt->tablespacename)
-	{
-		tablespaceId = get_tablespace_oid(stmt->tablespacename, false);
-
-		if (partitioned && tablespaceId == MyDatabaseTableSpace)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot specify default tablespace for partitioned relations")));
-	}
-	else
-		tablespaceId = InvalidOid;
-
-	/* still nothing? use the default */
-	if (!OidIsValid(tablespaceId))
-		tablespaceId = GetDefaultTablespace(stmt->relation->relpersistence,
-											partitioned);
+	/* 表空间管理已裁剪，始终使用默认表空间 */
+	tablespaceId = GetDefaultTablespace(stmt->relation->relpersistence,
+										partitioned);
 
 	/* In all cases disallow placing user relations in pg_global */
 	if (tablespaceId == GLOBALTABLESPACE_OID)
@@ -551,20 +527,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	if (!OidIsValid(ownerId))
 		ownerId = GetUserId();
 
-	/*
-	 * Parse and validate reloptions, if any.
-	 */
-	reloptions = transformRelOptions((Datum) 0, stmt->options, NULL, validnsps,
-									 true, false);
-
-	switch (relkind)
-	{
-		case RELKIND_VIEW:
-			(void) view_reloptions(reloptions, true);
-			break;
-		default:
-			(void) heap_reloptions(relkind, reloptions, true);
-	}
+	reloptions = (Datum) 0;
 
 	if (stmt->ofTypename)
 	{
@@ -2309,107 +2272,6 @@ SetRelationHasSubclass(Oid relationId, bool relhassubclass)
 }
 
 /*
- * CheckRelationTableSpaceMove
- *		Check if relation can be moved to new tablespace.
- *
- * NOTE: The caller must hold AccessExclusiveLock on the relation.
- *
- * Returns true if the relation can be moved to the new tablespace; raises
- * an error if it is not possible to do the move; returns false if the move
- * would have no effect.
- */
-bool
-CheckRelationTableSpaceMove(Relation rel, Oid newTableSpaceId)
-{
-	Oid			oldTableSpaceId;
-
-	/*
-	 * No work if no change in tablespace.  Note that MyDatabaseTableSpace is
-	 * stored as 0.
-	 */
-	oldTableSpaceId = rel->rd_rel->reltablespace;
-	if (newTableSpaceId == oldTableSpaceId ||
-		(newTableSpaceId == MyDatabaseTableSpace && oldTableSpaceId == 0))
-		return false;
-
-	/*
-	 * We cannot support moving mapped relations into different tablespaces.
-	 * (In particular this eliminates all shared catalogs.)
-	 */
-	if (RelationIsMapped(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move system relation \"%s\"",
-						RelationGetRelationName(rel))));
-
-	/* Cannot move a non-shared relation into pg_global */
-	if (newTableSpaceId == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("only shared relations can be placed in pg_global tablespace")));
-
-	return true;
-}
-
-/*
- * SetRelationTableSpace
- *		Set new reltablespace and relfilenode in pg_class entry.
- *
- * newTableSpaceId is the new tablespace for the relation, and
- * newRelFileNode its new filenode.  If newRelFileNode is InvalidOid,
- * this field is not updated.
- *
- * NOTE: The caller must hold AccessExclusiveLock on the relation.
- *
- * The caller of this routine had better check if a relation can be
- * moved to this new tablespace by calling CheckRelationTableSpaceMove()
- * first, and is responsible for making the change visible with
- * CommandCounterIncrement().
- */
-void
-SetRelationTableSpace(Relation rel,
-					  Oid newTableSpaceId,
-					  Oid newRelFileNode)
-{
-	Relation	pg_class;
-	HeapTuple	tuple;
-	ItemPointerData otid;
-	Form_pg_class rd_rel;
-	Oid			reloid = RelationGetRelid(rel);
-
-	Assert(CheckRelationTableSpaceMove(rel, newTableSpaceId));
-
-	/* Get a modifiable copy of the relation's pg_class row. */
-	pg_class = table_open(RelationRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheLockedCopy1(RELOID, ObjectIdGetDatum(reloid));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", reloid);
-	otid = tuple->t_self;
-	rd_rel = (Form_pg_class) GETSTRUCT(tuple);
-
-	/* Update the pg_class row. */
-	rd_rel->reltablespace = (newTableSpaceId == MyDatabaseTableSpace) ?
-		InvalidOid : newTableSpaceId;
-	if (OidIsValid(newRelFileNode))
-		rd_rel->relfilenode = newRelFileNode;
-	CatalogTupleUpdate(pg_class, &otid, tuple);
-	UnlockTuple(pg_class, &otid, InplaceUpdateTupleLock);
-
-	/*
-	 * Record dependency on tablespace.  This is only required for relations
-	 * that have no physical storage.
-	 */
-	if (!RELKIND_HAS_STORAGE(rel->rd_rel->relkind))
-		changeDependencyOnTablespace(RelationRelationId, reloid,
-									 rd_rel->reltablespace);
-
-	heap_freetuple(tuple);
-	table_close(pg_class, RowExclusiveLock);
-}
-
-
-/*
  *		RenameRelationInternal - change the name of a relation
  */
 void
@@ -2747,7 +2609,6 @@ AlterTableGetLockLevel(List *cmds)
 				 */
 			case AT_AddColumn:	/* may rewrite heap, in some cases and visible
 								 * to SELECT */
-			case AT_SetTableSpace:	/* must rewrite heap */
 			case AT_AlterColumnType:	/* must rewrite heap */
 				cmd_lockmode = AccessExclusiveLock;
 				break;
@@ -2903,10 +2764,10 @@ AlterTableGetLockLevel(List *cmds)
 				 */
 			case AT_SetRelOptions:	/* Uses MVCC in getIndexes() and
 									 * getTables() */
-			case AT_ResetRelOptions:	/* Uses MVCC in getIndexes() and
-										 * getTables() */
-				cmd_lockmode = AlterTableGetRelOptionsLockLevel((List *) cmd->def);
-				break;
+		case AT_ResetRelOptions:	/* Uses MVCC in getIndexes() and
+									 * getTables() */
+			cmd_lockmode = AccessExclusiveLock;
+			break;
 
 		case AT_AlterColumnGenericOptions:
 			cmd_lockmode = AccessExclusiveLock;
@@ -3156,12 +3017,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_DropOids:		/* SET WITHOUT OIDS */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			pass = AT_PASS_DROP;
-			break;
-		case AT_SetTableSpace:	/* SET TABLESPACE */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_INDEX);
-			/* This command never recurses */
-			ATPrepSetTableSpace(tab, rel, cmd->name, lockmode);
-			pass = AT_PASS_MISC;	/* doesn't actually matter */
 			break;
 		case AT_SetRelOptions:	/* SET (...) */
 		case AT_ResetRelOptions:	/* RESET (...) */
@@ -3457,14 +3312,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_DropOids:		/* SET WITHOUT OIDS */
 			/* nothing to do here, oid columns don't exist anymore */
 			break;
-		case AT_SetTableSpace:	/* SET TABLESPACE */
-
-			/*
-			 * Only do this for partitioned tables and indexes, for which this
-			 * is just a catalog change.  Other relation types which have
-			 * storage are handled by Phase 3.
-			 */
-			break;
 		case AT_SetRelOptions:	/* SET (...) */
 		case AT_ResetRelOptions:	/* RESET (...) */
 		case AT_ReplaceRelOptions:	/* replace entire option list */
@@ -3712,7 +3559,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			/* Build a temporary relation and copy data */
 			Relation	OldHeap;
 			Oid			OIDNewHeap;
-			Oid			NewTableSpace;
+			Oid			partitionTableSpace;
 			char		persistence;
 
 			OldHeap = table_open(tab->relid, NoLock);
@@ -3728,20 +3575,10 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 						 errmsg("cannot rewrite system relation \"%s\"",
 								RelationGetRelationName(OldHeap))));
 
-			if (RelationIsUsedAsCatalogTable(OldHeap))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot rewrite table \"%s\" used as a catalog table",
-								RelationGetRelationName(OldHeap))));
-
 			/*
-			 * Select destination tablespace (same as original unless user
-			 * requested a change)
+			 * Select destination tablespace (always use original)
 			 */
-			if (tab->newTableSpace)
-				NewTableSpace = tab->newTableSpace;
-			else
-				NewTableSpace = OldHeap->rd_rel->reltablespace;
+			partitionTableSpace = OldHeap->rd_rel->reltablespace;
 
 			/*
 			 * Select persistence of transient table (same as original)
@@ -3776,7 +3613,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 * persistence. That wouldn't work for pg_class, but that can't be
 			 * unlogged anyway.
 			 */
-			OIDNewHeap = make_new_heap(tab->relid, NewTableSpace, persistence,
+			OIDNewHeap = make_new_heap(tab->relid, partitionTableSpace, persistence,
 									   lockmode);
 
 			/*
@@ -3796,7 +3633,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 */
 			finish_heap_swap(tab->relid, OIDNewHeap,
 							 false, false, true,
-							 !OidIsValid(tab->newTableSpace),
+							 true,
 							 RecentXmin,
 							 ReadNextMultiXactId(),
 							 persistence);
@@ -3811,13 +3648,6 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			if (tab->constraints != NIL || tab->verify_new_notnull ||
 				tab->partition_constraint != NULL)
 				ATRewriteTable(tab, InvalidOid, lockmode);
-
-			/*
-			 * If we had SET TABLESPACE but no reason to reconstruct tuples,
-			 * just do a block-by-block copy.
-			 */
-			if (tab->newTableSpace)
-				ATExecSetTableSpace(tab->relid, tab->newTableSpace, lockmode);
 		}
 	}
 
@@ -5964,13 +5794,7 @@ ATExecSetOptions(Relation rel, const char *colName, Node *options,
 						colName)));
 
 	/* Generate new proposed attoptions (text array) */
-	datum = SysCacheGetAttr(ATTNAME, tuple, Anum_pg_attribute_attoptions,
-							&isnull);
-	newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-									 castNode(List, options), NULL, NULL,
-									 false, isReset);
-	/* Validate new options */
-	(void) attribute_reloptions(newOptions, true);
+	newOptions = (Datum) 0;
 
 	/* Build new tuple. */
 	memset(repl_null, false, sizeof(repl_null));
@@ -7524,7 +7348,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_AMPROC:
 			case OCLASS_SCHEMA:
 			case OCLASS_DATABASE:
-		case OCLASS_TBLSPACE:
 			case OCLASS_EXTENSION:
 			case OCLASS_TRANSFORM:
 
@@ -8108,7 +7931,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 
 			if (!rewrite)
 				TryReuseIndex(oldId, stmt);
-			stmt->reset_default_tblspc = true;
 
 			newcmd = makeNode(AlterTableCmd);
 			newcmd->subtype = AT_ReAddIndex;
@@ -8135,7 +7957,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 
 					if (!rewrite)
 						TryReuseIndex(indoid, indstmt);
-					indstmt->reset_default_tblspc = true;
 
 					cmd->subtype = AT_ReAddIndex;
 					tab->subcmds[AT_PASS_OLD_INDEX] =
@@ -8146,7 +7967,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 					Constraint *con = castNode(Constraint, cmd->def);
 
 					con->old_pktable_oid = refRelId;
-					con->reset_default_tblspc = true;
 					cmd->subtype = AT_ReAddConstraint;
 					tab->subcmds[AT_PASS_OLD_CONSTR] =
 						lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
@@ -8271,26 +8091,6 @@ ATExecDropCluster(Relation rel, LOCKMODE lockmode)
 }
 
 /*
- * ALTER TABLE SET TABLESPACE
- */
-static void
-ATPrepSetTableSpace(AlteredTableInfo *tab, Relation rel, const char *tablespacename, LOCKMODE lockmode)
-{
-	Oid			tablespaceId;
-
-	/* Check that the tablespace exists */
-	tablespaceId = get_tablespace_oid(tablespacename, false);
-
-	/* Save info for Phase 3 to do the real work */
-	if (OidIsValid(tab->newTableSpace))
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("cannot have multiple SET TABLESPACE subcommands")));
-
-	tab->newTableSpace = tablespaceId;
-}
-
-/*
  * Set, reset, or replace reloptions.
  */
 static void
@@ -8307,7 +8107,6 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	Datum		repl_val[Natts_pg_class];
 	bool		repl_null[Natts_pg_class];
 	bool		repl_repl[Natts_pg_class];
-	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
 
 	if (defList == NIL && operation != AT_ReplaceRelOptions)
 		return;					/* nothing to do */
@@ -8320,80 +8119,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relid);
 
-	if (operation == AT_ReplaceRelOptions)
-	{
-		/*
-		 * If we're supposed to replace the reloptions list, we just pretend
-		 * there were none before.
-		 */
-		datum = (Datum) 0;
-		isnull = true;
-	}
-	else
-	{
-		/* Get the old reloptions */
-		datum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_reloptions,
-								&isnull);
-	}
-
-	/* Generate new proposed reloptions (text array) */
-	newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-									 defList, NULL, validnsps, false,
-									 operation == AT_ResetRelOptions);
-
-	/* Validate */
-	switch (rel->rd_rel->relkind)
-	{
-		case RELKIND_RELATION:
-		case RELKIND_TOASTVALUE:
-			(void) heap_reloptions(rel->rd_rel->relkind, newOptions, true);
-			break;
-		case RELKIND_VIEW:
-			(void) view_reloptions(newOptions, true);
-			break;
-		case RELKIND_INDEX:
-			(void) index_reloptions(rel->rd_indam->amoptions, newOptions, true);
-			break;
-		default:
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is not a table, view, materialized view, index, or TOAST table",
-							RelationGetRelationName(rel))));
-			break;
-	}
-
-	/* Special-case validation of view options */
-	if (rel->rd_rel->relkind == RELKIND_VIEW)
-	{
-		Query	   *view_query = get_view_query(rel);
-		List	   *view_options = untransformRelOptions(newOptions);
-		ListCell   *cell;
-		bool		check_option = false;
-
-		foreach(cell, view_options)
-		{
-			DefElem    *defel = (DefElem *) lfirst(cell);
-
-			if (strcmp(defel->defname, "check_option") == 0)
-				check_option = true;
-		}
-
-		/*
-		 * If the check option is specified, look to see if the view is
-		 * actually auto-updatable or not.
-		 */
-		if (check_option)
-		{
-			const char *view_updatable_error =
-			view_query_is_auto_updatable(view_query, true);
-
-			if (view_updatable_error)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("WITH CHECK OPTION is supported only on automatically updatable views"),
-						 errhint("%s", _(view_updatable_error))));
-		}
-	}
+	newOptions = (Datum) 0;
 
 	/*
 	 * All we need do here is update the pg_class row; the new options will be
@@ -8435,27 +8161,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for relation %u", toastid);
 
-		if (operation == AT_ReplaceRelOptions)
-		{
-			/*
-			 * If we're supposed to replace the reloptions list, we just
-			 * pretend there were none before.
-			 */
-			datum = (Datum) 0;
-			isnull = true;
-		}
-		else
-		{
-			/* Get the old reloptions */
-			datum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_reloptions,
-									&isnull);
-		}
-
-		newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-										 defList, "toast", validnsps, false,
-										 operation == AT_ResetRelOptions);
-
-		(void) heap_reloptions(RELKIND_TOASTVALUE, newOptions, true);
+		newOptions = (Datum) 0;
 
 		memset(repl_val, 0, sizeof(repl_val));
 		memset(repl_null, false, sizeof(repl_null));
@@ -8485,290 +8191,6 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	}
 
 	table_close(pgclass, RowExclusiveLock);
-}
-
-/*
- * Execute ALTER TABLE SET TABLESPACE for cases where there is no tuple
- * rewriting to be done, so we just want to copy the data as fast as possible.
- */
-static void
-ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
-{
-	Relation	rel;
-	Oid			reltoastrelid;
-	Oid			newrelfilenode;
-	RelFileNode newrnode;
-	List	   *reltoastidxids = NIL;
-	ListCell   *lc;
-
-	/*
-	 * Need lock here in case we are recursing to toast table or index
-	 */
-	rel = relation_open(tableOid, lockmode);
-
-	/* Check first if relation can be moved to new tablespace */
-	if (!CheckRelationTableSpaceMove(rel, newTableSpace))
-	{
-		InvokeObjectPostAlterHook(RelationRelationId,
-								  RelationGetRelid(rel), 0);
-		relation_close(rel, NoLock);
-		return;
-	}
-
-	reltoastrelid = rel->rd_rel->reltoastrelid;
-	/* Fetch the list of indexes on toast relation if necessary */
-	if (OidIsValid(reltoastrelid))
-	{
-		Relation	toastRel = relation_open(reltoastrelid, lockmode);
-
-		reltoastidxids = RelationGetIndexList(toastRel);
-		relation_close(toastRel, lockmode);
-	}
-
-	/*
-	 * Relfilenodes are not unique in databases across tablespaces, so we need
-	 * to allocate a new one in the new tablespace.
-	 */
-	newrelfilenode = GetNewRelFileNode(newTableSpace, NULL,
-									   rel->rd_rel->relpersistence);
-
-	/* Open old and new relation */
-	newrnode = rel->rd_node;
-	newrnode.relNode = newrelfilenode;
-	newrnode.spcNode = newTableSpace;
-
-	/* hand off to AM to actually create the new filenode and copy the data */
-	if (rel->rd_rel->relkind == RELKIND_INDEX)
-	{
-		index_copy_data(rel, newrnode);
-	}
-	else
-	{
-		Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
-			   rel->rd_rel->relkind == RELKIND_TOASTVALUE);
-		table_relation_copy_data(rel, &newrnode);
-	}
-
-	/*
-	 * Update the pg_class row.
-	 *
-	 * NB: This wouldn't work if ATExecSetTableSpace() were allowed to be
-	 * executed on pg_class or its indexes (the above copy wouldn't contain
-	 * the updated pg_class entry), but that's forbidden with
-	 * CheckRelationTableSpaceMove().
-	 */
-	SetRelationTableSpace(rel, newTableSpace, newrelfilenode);
-
-	InvokeObjectPostAlterHook(RelationRelationId, RelationGetRelid(rel), 0);
-
-	RelationAssumeNewRelfilenode(rel);
-
-	relation_close(rel, NoLock);
-
-	/* Make sure the reltablespace change is visible */
-	CommandCounterIncrement();
-
-	/* Move associated toast relation and/or indexes, too */
-	if (OidIsValid(reltoastrelid))
-		ATExecSetTableSpace(reltoastrelid, newTableSpace, lockmode);
-	foreach(lc, reltoastidxids)
-		ATExecSetTableSpace(lfirst_oid(lc), newTableSpace, lockmode);
-
-	/* Clean up */
-	list_free(reltoastidxids);
-}
-
-/*
- * Alter Table ALL ... SET TABLESPACE
- *
- * Allows a user to move all objects of some type in a given tablespace in the
- * current database to another tablespace.  Objects can be chosen based on the
- * owner of the object also, to allow users to move only their objects.
- * The user must have CREATE rights on the new tablespace, as usual.   The main
- * permissions handling is done by the lower-level table move function.
- *
- * All to-be-moved objects are locked first. If NOWAIT is specified and the
- * lock can't be acquired then we ereport(ERROR).
- */
-Oid
-AlterTableMoveAll(AlterTableMoveAllStmt *stmt)
-{
-	List	   *relations = NIL;
-	ListCell   *l;
-	ScanKeyData key[1];
-	Relation	rel;
-	TableScanDesc scan;
-	HeapTuple	tuple;
-	Oid			orig_tablespaceoid;
-	Oid			new_tablespaceoid;
-
-	/* Ensure we were not asked to move something we can't */
-	if (stmt->objtype != OBJECT_TABLE && stmt->objtype != OBJECT_INDEX)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("only tables, indexes, and materialized views exist in tablespaces")));
-
-	/* Get the orig and new tablespace OIDs */
-	orig_tablespaceoid = get_tablespace_oid(stmt->orig_tablespacename, false);
-	new_tablespaceoid = get_tablespace_oid(stmt->new_tablespacename, false);
-
-	/* Can't move shared relations in to or out of pg_global */
-	/* This is also checked by ATExecSetTableSpace, but nice to stop earlier */
-	if (orig_tablespaceoid == GLOBALTABLESPACE_OID ||
-		new_tablespaceoid == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("cannot move relations in to or out of pg_global tablespace")));
-
-	/*
-	 * Now that the checks are done, check if we should set either to
-	 * InvalidOid because it is our database's default tablespace.
-	 */
-	if (orig_tablespaceoid == MyDatabaseTableSpace)
-		orig_tablespaceoid = InvalidOid;
-
-	if (new_tablespaceoid == MyDatabaseTableSpace)
-		new_tablespaceoid = InvalidOid;
-
-	/* no-op */
-	if (orig_tablespaceoid == new_tablespaceoid)
-		return new_tablespaceoid;
-
-	/*
-	 * Walk the list of objects in the tablespace and move them. This will
-	 * only find objects in our database, of course.
-	 */
-	ScanKeyInit(&key[0],
-				Anum_pg_class_reltablespace,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(orig_tablespaceoid));
-
-	rel = table_open(RelationRelationId, AccessShareLock);
-	scan = table_beginscan_catalog(rel, 1, key);
-	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
-	{
-		Form_pg_class relForm = (Form_pg_class) GETSTRUCT(tuple);
-		Oid			relOid = relForm->oid;
-
-		/*
-		 * Do not move objects in pg_catalog as part of this, if an admin
-		 * really wishes to do so, they can issue the individual ALTER
-		 * commands directly.
-		 *
-		 * Also, explicitly avoid any shared tables, temp tables, or TOAST
-		 * (TOAST will be moved with the main table).
-		 */
-		if (IsCatalogNamespace(relForm->relnamespace) ||
-			relForm->relisshared ||
-			IsToastNamespace(relForm->relnamespace))
-			continue;
-
-		/* Only move the object type requested */
-		if ((stmt->objtype == OBJECT_TABLE &&
-			 relForm->relkind != RELKIND_RELATION) ||
-			 (stmt->objtype == OBJECT_INDEX &&
-			 relForm->relkind != RELKIND_INDEX))
-			 continue;
-
-		/*
-		 * Handle permissions-checking here since we are locking the tables
-		 * and also to avoid doing a bunch of work only to fail part-way. Note
-		 * that permissions will also be checked by AlterTableInternal().
-		 *
-		 * Caller must be considered an owner on the table to move it.
-		 */
-
-		 if (stmt->nowait &&
-			!ConditionalLockRelationOid(relOid, AccessExclusiveLock))
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_IN_USE),
-					 errmsg("aborting because lock on relation \"%s.%s\" is not available",
-							get_namespace_name(relForm->relnamespace),
-							NameStr(relForm->relname))));
-		else
-			LockRelationOid(relOid, AccessExclusiveLock);
-
-		/* Add to our list of objects to move */
-		relations = lappend_oid(relations, relOid);
-	}
-
-	table_endscan(scan);
-	table_close(rel, AccessShareLock);
-
-	if (relations == NIL)
-		ereport(NOTICE,
-				(errcode(ERRCODE_NO_DATA_FOUND),
-				 errmsg("no matching relations in tablespace \"%s\" found",
-						orig_tablespaceoid == InvalidOid ? "(database default)" :
-						get_tablespace_name(orig_tablespaceoid))));
-
-	/* Everything is locked, loop through and move all of the relations. */
-	foreach(l, relations)
-	{
-		List	   *cmds = NIL;
-		AlterTableCmd *cmd = makeNode(AlterTableCmd);
-
-		cmd->subtype = AT_SetTableSpace;
-		cmd->name = stmt->new_tablespacename;
-
-		cmds = lappend(cmds, cmd);
-
-		/* OID is set by AlterTableInternal */
-		AlterTableInternal(lfirst_oid(l), cmds, false);
-	}
-
-	return new_tablespaceoid;
-}
-
-static void
-index_copy_data(Relation rel, RelFileNode newrnode)
-{
-	SMgrRelation dstrel;
-
-	dstrel = smgropen(newrnode, rel->rd_backend);
-
-	/*
-	 * Since we copy the file directly without looking at the shared buffers,
-	 * we'd better first flush out any pages of the source relation that are
-	 * in shared buffers.  We assume no new changes will be made while we are
-	 * holding exclusive lock on the rel.
-	 */
-	FlushRelationBuffers(rel);
-
-	/*
-	 * Create and copy all forks of the relation, and schedule unlinking of
-	 * old physical files.
-	 *
-	 * NOTE: any conflict in relfilenode value will be caught in
-	 * RelationCreateStorage().
-	 */
-	RelationCreateStorage(newrnode, rel->rd_rel->relpersistence);
-
-	/* copy main fork */
-	RelationCopyStorage(RelationGetSmgr(rel), dstrel, MAIN_FORKNUM,
-						rel->rd_rel->relpersistence);
-
-	/* copy those extra forks that exist */
-	for (ForkNumber forkNum = MAIN_FORKNUM + 1;
-		 forkNum <= MAX_FORKNUM; forkNum++)
-	{
-		if (smgrexists(RelationGetSmgr(rel), forkNum))
-		{
-			smgrcreate(dstrel, forkNum, false);
-
-			/*
-			 * WAL log creation if the relation is persistent.
-			 */
-			if (RelationIsPermanent(rel))
-				log_smgrcreate(&newrnode, forkNum);
-			RelationCopyStorage(RelationGetSmgr(rel), dstrel, forkNum,
-								rel->rd_rel->relpersistence);
-		}
-	}
-
-	/* drop old relation, and close new one */
-	RelationDropStorage(rel);
-	smgrclose(dstrel);
 }
 
 

@@ -710,35 +710,6 @@ include_dir 'conf.d'
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-superuser-reserved-connections"
-     xreflabel="superuser_reserved_connections">
-      <term><varname>superuser_reserved_connections</varname>
-      (<type>integer</type>)
-      <indexterm>
-       <primary><varname>superuser_reserved_connections</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Determines the number of connection <quote>slots</quote> that
-        are reserved for connections by <productname>PostgreSQL</productname>
-        superusers.  At most <xref linkend="guc-max-connections"/>
-        connections can ever be active simultaneously.  Whenever the
-        number of active concurrent connections is at least
-        <varname>max_connections</varname> minus
-        <varname>superuser_reserved_connections</varname>, new
-        connections will be accepted only for superusers, and no
-        new replication connections will be accepted.
-       </para>
-
-       <para>
-        The default value is three connections. The value must be less
-        than <varname>max_connections</varname>.
-        This parameter can only be set at server start.
-       </para>
-      </listitem>
-     </varlistentry>
-
      <varlistentry id="guc-unix-socket-directories" xreflabel="unix_socket_directories">
       <term><varname>unix_socket_directories</varname> (<type>string</type>)
       <indexterm>
@@ -9706,26 +9677,6 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
      <filename>postgresql.conf</filename> file.  Note that many of these
      parameters require special source compilation flags to work at all.
     </para>
-
-    <variablelist>
-     <varlistentry id="guc-allow-in-place-tablespaces" xreflabel="allow_in_place_tablespaces">
-      <term><varname>allow_in_place_tablespaces</varname> (<type>boolean</type>)
-      <indexterm>
-        <primary><varname>allow_in_place_tablespaces</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Allows tablespaces to be created as directories inside
-        <filename>pg_tblspc</filename>, when an empty location string
-        is provided to the <command>CREATE TABLESPACE</command> command.  This
-        is intended to allow testing replication scenarios where primary and
-        standby servers are running on the same machine.  Such directories
-        are likely to confuse backup tools that expect to find only symbolic
-        links in that location.  Only superusers can change this setting.
-       </para>
-      </listitem>
-     </varlistentry>
 
      <varlistentry id="guc-allow-system-table-mods" xreflabel="allow_system_table_mods">
       <term><varname>allow_system_table_mods</varname> (<type>boolean</type>)

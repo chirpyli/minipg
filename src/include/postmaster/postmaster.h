@@ -14,7 +14,6 @@
 #define _POSTMASTER_H
 
 /* GUC options */
-extern int	ReservedBackends;
 extern PGDLLIMPORT int PostPortNumber;
 extern char *ListenAddresses;
 extern bool ClientAuthInProgress;
@@ -33,8 +32,7 @@ extern int	postmaster_alive_fds[2];
  * Constants that represent which of postmaster_alive_fds is held by
  * postmaster, and which is used in children to check for postmaster death.
  */
-#define POSTMASTER_FD_WATCH		0	/* used in children to check for
-									 * postmaster death */
+#define POSTMASTER_FD_WATCH		0	/* used in children to check for postmaster death */
 #define POSTMASTER_FD_OWN		1	/* kept open by postmaster only */
 
 extern PGDLLIMPORT const char *progname;

@@ -1085,7 +1085,6 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 	COMPARE_NODE_FIELD(constraints);
 	COMPARE_NODE_FIELD(options);
 	COMPARE_SCALAR_FIELD(oncommit);
-	COMPARE_STRING_FIELD(tablespacename);
 	COMPARE_STRING_FIELD(accessMethod);
 	COMPARE_SCALAR_FIELD(if_not_exists);
 
@@ -1147,7 +1146,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 	COMPARE_STRING_FIELD(idxname);
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_STRING_FIELD(accessMethod);
-	COMPARE_STRING_FIELD(tableSpace);
 	COMPARE_NODE_FIELD(indexParams);
 	COMPARE_NODE_FIELD(indexIncludingParams);
 	COMPARE_NODE_FIELD(options);
@@ -1162,7 +1160,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 	COMPARE_SCALAR_FIELD(transformed);
 	COMPARE_SCALAR_FIELD(concurrent);
 	COMPARE_SCALAR_FIELD(if_not_exists);
-	COMPARE_SCALAR_FIELD(reset_default_tblspc);
 
 	return true;
 }
@@ -1440,50 +1437,6 @@ static bool
 _equalDiscardStmt(const DiscardStmt *a, const DiscardStmt *b)
 {
 	COMPARE_SCALAR_FIELD(target);
-
-	return true;
-}
-
-static bool
-_equalCreateTableSpaceStmt(const CreateTableSpaceStmt *a, const CreateTableSpaceStmt *b)
-{
-	COMPARE_STRING_FIELD(tablespacename);
-	COMPARE_NODE_FIELD(owner);
-	COMPARE_STRING_FIELD(location);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
-_equalDropTableSpaceStmt(const DropTableSpaceStmt *a, const DropTableSpaceStmt *b)
-{
-	COMPARE_STRING_FIELD(tablespacename);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
-_equalAlterTableSpaceOptionsStmt(const AlterTableSpaceOptionsStmt *a,
-								 const AlterTableSpaceOptionsStmt *b)
-{
-	COMPARE_STRING_FIELD(tablespacename);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(isReset);
-
-	return true;
-}
-
-static bool
-_equalAlterTableMoveAllStmt(const AlterTableMoveAllStmt *a,
-							const AlterTableMoveAllStmt *b)
-{
-	COMPARE_STRING_FIELD(orig_tablespacename);
-	COMPARE_SCALAR_FIELD(objtype);
-	COMPARE_NODE_FIELD(roles);
-	COMPARE_STRING_FIELD(new_tablespacename);
-	COMPARE_SCALAR_FIELD(nowait);
 
 	return true;
 }
@@ -1851,8 +1804,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_NODE_FIELD(including);
 	COMPARE_NODE_FIELD(options);
 	COMPARE_STRING_FIELD(indexname);
-	COMPARE_STRING_FIELD(indexspace);
-	COMPARE_SCALAR_FIELD(reset_default_tblspc);
 	COMPARE_STRING_FIELD(access_method);
 	COMPARE_NODE_FIELD(where_clause);
 	COMPARE_NODE_FIELD(pktable);
@@ -2472,18 +2423,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_DiscardStmt:
 			retval = _equalDiscardStmt(a, b);
-			break;
-		case T_CreateTableSpaceStmt:
-			retval = _equalCreateTableSpaceStmt(a, b);
-			break;
-		case T_DropTableSpaceStmt:
-			retval = _equalDropTableSpaceStmt(a, b);
-			break;
-		case T_AlterTableSpaceOptionsStmt:
-			retval = _equalAlterTableSpaceOptionsStmt(a, b);
-			break;
-		case T_AlterTableMoveAllStmt:
-			retval = _equalAlterTableMoveAllStmt(a, b);
 			break;
 		case T_CreateExtensionStmt:
 			retval = _equalCreateExtensionStmt(a, b);

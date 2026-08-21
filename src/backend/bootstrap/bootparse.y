@@ -276,7 +276,6 @@ Boot_DeclareIndexStmt:
 					stmt->idxname = $3;
 					stmt->relation = makeRangeVar(NULL, $6, -1);
 					stmt->accessMethod = $8;
-					stmt->tableSpace = NULL;
 					stmt->indexParams = $10;
 					stmt->indexIncludingParams = NIL;
 					stmt->options = NIL;
@@ -291,7 +290,6 @@ Boot_DeclareIndexStmt:
 					stmt->transformed = false;
 					stmt->concurrent = false;
 					stmt->if_not_exists = false;
-					stmt->reset_default_tblspc = false;
 
 					/* locks and races need not concern us in bootstrap mode */
 					relationId = RangeVarGetRelid(stmt->relation, NoLock,
@@ -324,7 +322,6 @@ Boot_DeclareUniqueIndexStmt:
 					stmt->idxname = $4;
 					stmt->relation = makeRangeVar(NULL, $7, -1);
 					stmt->accessMethod = $9;
-					stmt->tableSpace = NULL;
 					stmt->indexParams = $11;
 					stmt->indexIncludingParams = NIL;
 					stmt->options = NIL;
@@ -339,7 +336,6 @@ Boot_DeclareUniqueIndexStmt:
 					stmt->transformed = false;
 					stmt->concurrent = false;
 					stmt->if_not_exists = false;
-					stmt->reset_default_tblspc = false;
 
 					/* locks and races need not concern us in bootstrap mode */
 					relationId = RangeVarGetRelid(stmt->relation, NoLock,

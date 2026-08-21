@@ -16,14 +16,8 @@ plan skip_all => "disabled until after minor releases, due to instability";
 my $node_primary = PostgreSQL::Test::Cluster->new('primary');
 $node_primary->init(has_archiving => 1);
 
-my $tablespace1 = "test_recovery_conflict_tblspc";
-
 $node_primary->append_conf(
 	'postgresql.conf', qq[
-
-# Doesn't currently exist pre 15, but might be backpatched later
-#allow_in_place_tablespaces = on
-#temp_tablespaces = $tablespace1
 
 log_temp_files = 0
 
@@ -42,10 +36,6 @@ deadlock_timeout = 10ms
 $node_primary->start;
 
 my $backup_name = 'my_backup';
-
-# See allow_in_place_tablespaces comment above
-#$node_primary->safe_psql('postgres',
-#	qq[CREATE TABLESPACE $tablespace1 LOCATION '']);
 
 $node_primary->backup($backup_name);
 my $node_standby = PostgreSQL::Test::Cluster->new('standby');
@@ -187,38 +177,7 @@ $psql_standby->reconnect_and_clear();
 check_conflict_stat("lock");
 
 
-# See allow_in_place_tablespaces comment above
-### RECOVERY CONFLICT 4: Tablespace conflict
-#$sect = "tablespace conflict";
-#$expected_conflicts++;
-#
-## DECLARE a cursor for a query which, with sufficiently low work_mem, will
-## spill tuples into temp files in the temporary tablespace created during
-## setup.
-#$res = $psql_standby->query_safe(qq[
-#        BEGIN;
-#        SET work_mem = '64kB';
-#        DECLARE $cursor1 CURSOR FOR
-#          SELECT count(*) FROM generate_series(1,6000);
-#        FETCH FORWARD FROM $cursor1;
-#        ]);
-#like($res, qr/^6000$/m,
-#	"$sect: cursor with conflicting temp file established");
-#
-## Drop the tablespace currently containing spill files for the query on the
-## standby
-#$node_primary->safe_psql($test_db, qq[DROP TABLESPACE $tablespace1;]);
-#
-#$primary_lsn = $node_primary->lsn('flush');
-#$node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
-#
-#check_conflict_log(
-#	"User was or might have been using tablespace that must be dropped");
-#$psql_standby->reconnect_and_clear();
-#check_conflict_stat("tablespace");
-
-
-## RECOVERY CONFLICT 5: Deadlock
+## RECOVERY CONFLICT 4: Deadlock
 SKIP:
 {
 	skip "disabled until after minor releases, due to instability";

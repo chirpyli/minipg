@@ -1,5 +1,6 @@
-CREATE TABLE test_tablesample (id int, name text) WITH (fillfactor=10);
--- use fillfactor so we don't have to load too much data to get multiple pages
+CREATE TABLE test_tablesample (id int, name text);
+-- Note: fillfactor option removed (reloptions system removed);
+-- we insert enough data to ensure multiple pages for SYSTEM sampling tests
 
 INSERT INTO test_tablesample
   SELECT i, repeat(i::text, 200) FROM generate_series(0, 9) s(i);

@@ -709,7 +709,7 @@ _bt_pagestate(BTWriteState *wstate, uint32 level)
 	if (level > 0)
 		state->btps_full = (BLCKSZ * (100 - BTREE_NONLEAF_FILLFACTOR) / 100);
 	else
-		state->btps_full = BTGetTargetPageFreeSpace(wstate->index);
+		state->btps_full = BLCKSZ * (100 - BTREE_DEFAULT_FILLFACTOR) / 100;
 
 	/* no parent level, yet */
 	state->btps_next = NULL;
@@ -1189,8 +1189,7 @@ _bt_load(BTWriteState *wstate, BTSpool *btspool, BTSpool *btspool2)
 	int64		tuples_done = 0;
 	bool		deduplicate;
 
-	deduplicate = wstate->inskey->allequalimage && !btspool->isunique &&
-		BTGetDeduplicateItems(wstate->index);
+	deduplicate = wstate->inskey->allequalimage && !btspool->isunique;
 
 	if (merge)
 	{

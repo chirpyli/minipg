@@ -656,18 +656,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	}
 
 	/*
-	 * The last few regular connection slots are reserved for superusers. We
-	 * do not apply this limit to background processes, since they all have
-	 * their own pools of PGPROC slots.
-	 */
-	if (AmRegularBackendProcess() && !am_superuser &&
-		ReservedBackends > 0 &&
-		!HaveNFreeProcs(ReservedBackends))
-		ereport(FATAL,
-				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
-				 errmsg("remaining connection slots are reserved for non-replication superuser connections")));
-
-	/*
 	 * Set up the global variables holding database id and default tablespace.
 	 * But note we won't actually try to touch the database just yet.
 	 *

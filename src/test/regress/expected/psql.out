@@ -5220,10 +5220,6 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.sum
 cross-database references are not implemented: +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
 cross-database references are not implemented: nonesuch.pg_catalog.sum
-\db nonesuch.pg_default
-improper qualified name (too many dotted names): nonesuch.pg_default
-\db regression.pg_default
-improper qualified name (too many dotted names): regression.pg_default
 \dc host.regression.public.conversion
 improper qualified name (too many dotted names): host.regression.public.conversion
 \dc (.public.conversion
@@ -5445,12 +5441,6 @@ List of access methods
 ----+-----------------+----------------------+-----------------------+--------+----------
 (0 rows)
 
-\db "no.such.tablespace"
-   List of tablespaces
- Name | Owner | Location 
-------+-------+----------
-(0 rows)
-
 \dc "no.such.conversion"
                List of conversions
  Schema | Name | Source | Destination | Default? 
@@ -5639,8 +5629,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
 improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.of.operator.family"
 \dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.support.function.of.operator.family"
-\db "no.such.schema"."no.such.tablespace"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.tablespace"
 \dc "no.such.schema"."no.such.conversion"
                List of conversions
  Schema | Name | Source | Destination | Default? 

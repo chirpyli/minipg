@@ -45,7 +45,6 @@
 
 #include "access/amapi.h"
 #include "access/heapam.h"
-#include "access/reloptions.h"
 #include "access/relscan.h"
 #include "access/tableam.h"
 #include "access/transam.h"
@@ -970,56 +969,4 @@ index_store_float8_orderby_distances(IndexScanDesc scan, Oid *orderByTypes,
 	}
 }
 
-/* ----------------
- *      index_opclass_options
- *
- *      Parse opclass-specific options for index column.
- * ----------------
- */
-bytea *
-index_opclass_options(Relation indrel, AttrNumber attnum, Datum attoptions,
-					  bool validate)
-{
-	int			amoptsprocnum = indrel->rd_indam->amoptsprocnum;
-	Oid			procid = InvalidOid;
-	FmgrInfo   *procinfo;
-	local_relopts relopts;
 
-	/* fetch options support procedure if specified */
-	if (amoptsprocnum != 0)
-		procid = index_getprocid(indrel, attnum, amoptsprocnum);
-
-	if (!OidIsValid(procid))
-	{
-		Oid			opclass;
-		Datum		indclassDatum;
-		oidvector  *indclass;
-		bool		isnull;
-
-		if (!DatumGetPointer(attoptions))
-			return NULL;		/* ok, no options, no procedure */
-
-		/*
-		 * Report an error if the opclass's options-parsing procedure does not
-		 * exist but the opclass options are specified.
-		 */
-		indclassDatum = SysCacheGetAttr(INDEXRELID, indrel->rd_indextuple,
-										Anum_pg_index_indclass, &isnull);
-		Assert(!isnull);
-		indclass = (oidvector *) DatumGetPointer(indclassDatum);
-		opclass = indclass->values[attnum - 1];
-
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("operator class %s has no options",
-						generate_opclass_name(opclass))));
-	}
-
-	init_local_reloptions(&relopts, 0);
-
-	procinfo = index_getprocinfo(indrel, attnum, amoptsprocnum);
-
-	(void) FunctionCall1(procinfo, PointerGetDatum(&relopts));
-
-	return build_local_reloptions(&relopts, attoptions, validate);
-}

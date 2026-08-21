@@ -231,17 +231,16 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterDomainStmt AlterEnumStmt
 		AlterObjectSchemaStmt
 		AlterTypeStmt AlterTableStmt
-		AlterTblSpcStmt
 		AlterCompositeTypeStmt
 		AnalyzeStmt ClosePortalStmt ClusterStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt
-		CreateSchemaStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
+		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
 		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
-		DropOpClassStmt DropOpFamilyStmt DropStmt
-		DropdbStmt DropTableSpaceStmt
+		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
+	
 		DropTransformStmt
 		ExplainStmt FetchStmt
 		IndexStmt InsertStmt
@@ -323,7 +322,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				opt_column_list columnList opt_name_list
 				sort_clause opt_sort_clause sortby_list index_params stats_params
 				opt_include opt_c_include index_including_params
-				name_list role_list from_clause from_list opt_array_bounds
+				name_list from_clause from_list opt_array_bounds
 				qualified_name_list any_name any_name_list type_name_list
 				any_operator expr_list attrs
 				distinct_clause
@@ -458,8 +457,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <ival>	ConstraintAttributeSpec ConstraintAttributeElem
 %type <str>		ExistingIndex
 
-%type <str>		OptTableSpace OptConsTableSpace
-%type <rolespec> OptTableSpaceOwner
 %type <ival>	opt_check_option
 
 
@@ -734,7 +731,6 @@ stmt:	AlterDomainStmt
 			| AlterObjectSchemaStmt
 			| AlterTypeStmt
 			| AlterTableStmt
-			| AlterTblSpcStmt
 			| AlterCompositeTypeStmt
 			| AnalyzeStmt
 			| CheckPointStmt
@@ -750,7 +746,6 @@ stmt:	AlterDomainStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreateStatsStmt
-			| CreateTableSpaceStmt
 			| CreateTransformStmt
 			| CreatedbStmt
 			| DeallocateStmt
@@ -762,7 +757,6 @@ stmt:	AlterDomainStmt
 			| DropOpClassStmt
 			| DropOpFamilyStmt
 			| DropStmt
-			| DropTableSpaceStmt
 			| DropTransformStmt
 			| DropdbStmt
 			| ExecuteStmt
@@ -1255,28 +1249,6 @@ AlterTableStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 					}
-					|	ALTER TABLE ALL IN_P TABLESPACE name SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $6;
-					n->objtype = OBJECT_TABLE;
-					n->roles = NIL;
-					n->new_tablespacename = $9;
-					n->nowait = $10;
-					$$ = (Node *)n;
-				}
-		|	ALTER TABLE ALL IN_P TABLESPACE name OWNED BY role_list SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $6;
-					n->objtype = OBJECT_TABLE;
-					n->roles = $9;
-					n->new_tablespacename = $12;
-					n->nowait = $13;
-					$$ = (Node *)n;
-				}
 		|	ALTER INDEX qualified_name alter_table_cmds
 				{
 					AlterTableStmt *n = makeNode(AlterTableStmt);
@@ -1295,28 +1267,6 @@ AlterTableStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 					}
-					|	ALTER INDEX ALL IN_P TABLESPACE name SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $6;
-					n->objtype = OBJECT_INDEX;
-					n->roles = NIL;
-					n->new_tablespacename = $9;
-					n->nowait = $10;
-					$$ = (Node *)n;
-				}
-		|	ALTER INDEX ALL IN_P TABLESPACE name OWNED BY role_list SET TABLESPACE name opt_nowait
-				{
-					AlterTableMoveAllStmt *n =
-						makeNode(AlterTableMoveAllStmt);
-					n->orig_tablespacename = $6;
-					n->objtype = OBJECT_INDEX;
-					n->roles = $9;
-					n->new_tablespacename = $12;
-					n->nowait = $13;
-					$$ = (Node *)n;
-				}
 		|	ALTER VIEW qualified_name alter_table_cmds
 				{
 					AlterTableStmt *n = makeNode(AlterTableStmt);
@@ -1645,14 +1595,6 @@ alter_table_cmds:
 					n->newowner = $3;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> SET TABLESPACE <tablespacename> */
-			| SET TABLESPACE name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetTableSpace;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> SET (...) */
 			| SET reloptions
 				{
@@ -1849,7 +1791,7 @@ ClosePortalStmt:
 
 CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 			table_access_method_clause OptWith
-			OnCommitOption OptTableSpace
+			OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
 				$3->relpersistence = RELPERSISTENCE_PERMANENT;
@@ -1860,13 +1802,12 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				n->accessMethod = $7;
 				n->options = $8;
 				n->oncommit = $9;
-				n->tablespacename = $10;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
 			}
 		| CREATE TABLE IF_P NOT EXISTS qualified_name '('
 			OptTableElementList ')' table_access_method_clause
-			OptWith OnCommitOption OptTableSpace
+			OptWith OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
 				$6->relpersistence = RELPERSISTENCE_PERMANENT;
@@ -1877,13 +1818,12 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				n->accessMethod = $10;
 				n->options = $11;
 				n->oncommit = $12;
-				n->tablespacename = $13;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
 			}
 		| CREATE TABLE qualified_name OF any_name
 			OptTypedTableElementList table_access_method_clause
-			OptWith OnCommitOption OptTableSpace
+			OptWith OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
 				$3->relpersistence = RELPERSISTENCE_PERMANENT;
@@ -1895,13 +1835,12 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				n->accessMethod = $7;
 				n->options = $8;
 				n->oncommit = $9;
-				n->tablespacename = $10;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
 			}
 		| CREATE TABLE IF_P NOT EXISTS qualified_name OF any_name
 			OptTypedTableElementList table_access_method_clause
-			OptWith OnCommitOption OptTableSpace
+			OptWith OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
 				$6->relpersistence = RELPERSISTENCE_PERMANENT;
@@ -1913,7 +1852,6 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				n->accessMethod = $10;
 				n->options = $11;
 				n->oncommit = $12;
-				n->tablespacename = $13;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
 			}
@@ -2089,7 +2027,7 @@ ColConstraintElem:
 					n->location = @1;
 					$$ = (Node *)n;
 				}
-			| UNIQUE opt_definition OptConsTableSpace
+			| UNIQUE opt_definition
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_UNIQUE;
@@ -2097,10 +2035,9 @@ ColConstraintElem:
 					n->keys = NULL;
 					n->options = $2;
 					n->indexname = NULL;
-					n->indexspace = $3;
 					$$ = (Node *)n;
 				}
-			| PRIMARY KEY opt_definition OptConsTableSpace
+			| PRIMARY KEY opt_definition
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_PRIMARY;
@@ -2108,7 +2045,6 @@ ColConstraintElem:
 					n->keys = NULL;
 					n->options = $3;
 					n->indexname = NULL;
-					n->indexspace = $4;
 					$$ = (Node *)n;
 				}
 			| CHECK '(' a_expr ')' opt_no_inherit
@@ -2209,7 +2145,7 @@ ConstraintElem:
 					n->initially_valid = !n->skip_validation;
 					$$ = (Node *)n;
 				}
-			| UNIQUE '(' columnList ')' opt_c_include opt_definition OptConsTableSpace
+			| UNIQUE '(' columnList ')' opt_c_include opt_definition
 				ConstraintAttributeSpec
 				{
 					Constraint *n = makeNode(Constraint);
@@ -2219,8 +2155,7 @@ ConstraintElem:
 					n->including = $5;
 					n->options = $6;
 					n->indexname = NULL;
-					n->indexspace = $7;
-					processCASbits($8, @8, "UNIQUE",
+					processCASbits($7, @7, "UNIQUE",
 								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
@@ -2233,12 +2168,11 @@ ConstraintElem:
 					n->including = NIL;
 					n->options = NIL;
 					n->indexname = $2;
-					n->indexspace = NULL;
 					processCASbits($3, @3, "UNIQUE",
 								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-			| PRIMARY KEY '(' columnList ')' opt_c_include opt_definition OptConsTableSpace
+			| PRIMARY KEY '(' columnList ')' opt_c_include opt_definition
 				ConstraintAttributeSpec
 				{
 					Constraint *n = makeNode(Constraint);
@@ -2248,8 +2182,7 @@ ConstraintElem:
 					n->including = $6;
 					n->options = $7;
 					n->indexname = NULL;
-					n->indexspace = $8;
-					processCASbits($9, @9, "PRIMARY KEY",
+					processCASbits($8, @8, "PRIMARY KEY",
 								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
@@ -2262,7 +2195,6 @@ ConstraintElem:
 					n->including = NIL;
 					n->options = NIL;
 					n->indexname = $3;
-					n->indexspace = NULL;
 					processCASbits($4, @4, "PRIMARY KEY",
 								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
@@ -2309,14 +2241,6 @@ OnCommitOption:  ON COMMIT DROP				{ $$ = ONCOMMIT_DROP; }
 			| ON COMMIT DELETE_P ROWS		{ $$ = ONCOMMIT_DELETE_ROWS; }
 			| ON COMMIT PRESERVE ROWS		{ $$ = ONCOMMIT_PRESERVE_ROWS; }
 			| /*EMPTY*/						{ $$ = ONCOMMIT_NOOP; }
-		;
-
-OptTableSpace:   TABLESPACE name					{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
-
-OptConsTableSpace:   USING INDEX TABLESPACE name	{ $$ = $4; }
-			| /*EMPTY*/								{ $$ = NULL; }
 		;
 
 ExistingIndex:   USING INDEX name					{ $$ = $3; }
@@ -2423,54 +2347,6 @@ handler_name:
 opt_procedural:
 			PROCEDURAL
 			| /*EMPTY*/
-		;
-
-/*****************************************************************************
- *
- *		QUERY:
- *             CREATE TABLESPACE tablespace LOCATION '/path/to/tablespace/'
- *
- *****************************************************************************/
-
-CreateTableSpaceStmt: CREATE TABLESPACE name OptTableSpaceOwner LOCATION Sconst opt_reloptions
-				{
-					CreateTableSpaceStmt *n = makeNode(CreateTableSpaceStmt);
-					n->tablespacename = $3;
-					n->owner = $4;
-					n->location = $6;
-					n->options = $7;
-					$$ = (Node *) n;
-				}
-		;
-
-OptTableSpaceOwner: OWNER RoleSpec		{ $$ = $2; }
-			| /*EMPTY */				{ $$ = NULL; }
-		;
-
-/*****************************************************************************
- *
- *		QUERY :
- *				DROP TABLESPACE <tablespace>
- *
- *		No need for drop behaviour as we cannot implement dependencies for
- *		objects in other databases; we can only support RESTRICT.
- *
- ****************************************************************************/
-
-DropTableSpaceStmt: DROP TABLESPACE name
-				{
-					DropTableSpaceStmt *n = makeNode(DropTableSpaceStmt);
-					n->tablespacename = $3;
-					n->missing_ok = false;
-					$$ = (Node *) n;
-				}
-				|  DROP TABLESPACE IF_P EXISTS name
-				{
-					DropTableSpaceStmt *n = makeNode(DropTableSpaceStmt);
-					n->tablespacename = $5;
-					n->missing_ok = true;
-					$$ = (Node *) n;
-				}
 		;
 
 /*****************************************************************************
@@ -3412,13 +3288,11 @@ opt_from_in:	from_in
  *
  *		QUERY: CREATE INDEX
  *
- * Note: we cannot put TABLESPACE clause after WHERE clause unless we are
- * willing to make TABLESPACE a fully reserved word.
  *****************************************************************************/
 
 IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 			ON relation_expr access_method_clause '(' index_params ')'
-			opt_include opt_reloptions OptTableSpace where_clause
+			opt_include opt_reloptions where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -3429,8 +3303,7 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->indexParams = $10;
 					n->indexIncludingParams = $12;
 					n->options = $13;
-					n->tableSpace = $14;
-					n->whereClause = $15;
+					n->whereClause = $14;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -3439,12 +3312,11 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->isconstraint = false;
 					n->transformed = false;
 					n->if_not_exists = false;
-					n->reset_default_tblspc = false;
 					$$ = (Node *)n;
 				}
 			| CREATE opt_unique INDEX opt_concurrently IF_P NOT EXISTS name
 			ON relation_expr access_method_clause '(' index_params ')'
-			opt_include opt_reloptions OptTableSpace where_clause
+			opt_include opt_reloptions where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -3455,8 +3327,7 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->indexParams = $13;
 					n->indexIncludingParams = $15;
 					n->options = $16;
-					n->tableSpace = $17;
-					n->whereClause = $18;
+					n->whereClause = $17;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -3465,7 +3336,6 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->isconstraint = false;
 					n->transformed = false;
 					n->if_not_exists = true;
-					n->reset_default_tblspc = false;
 					$$ = (Node *)n;
 				}
 		;
@@ -4210,33 +4080,6 @@ reindex_target_multitable:
 
 /*****************************************************************************
  *
- * ALTER TABLESPACE
- *
- *****************************************************************************/
-
-AlterTblSpcStmt:
-			ALTER TABLESPACE name SET reloptions
-				{
-					AlterTableSpaceOptionsStmt *n =
-						makeNode(AlterTableSpaceOptionsStmt);
-					n->tablespacename = $3;
-					n->options = $5;
-					n->isReset = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TABLESPACE name RESET reloptions
-				{
-					AlterTableSpaceOptionsStmt *n =
-						makeNode(AlterTableSpaceOptionsStmt);
-					n->tablespacename = $3;
-					n->options = $5;
-					n->isReset = true;
-					$$ = (Node *)n;
-				}
-		;
-
-/*****************************************************************************
- *
  * ALTER THING name RENAME TO newname
  *
  *****************************************************************************/
@@ -4719,9 +4562,8 @@ createdb_opt_name:
 			| ENCODING						{ $$ = pstrdup($1); }
 			| LOCATION						{ $$ = pstrdup($1); }
 			| OWNER							{ $$ = pstrdup($1); }
-			| TABLESPACE					{ $$ = pstrdup($1); }
 			| TEMPLATE						{ $$ = pstrdup($1); }
-		;
+	;
 
 /*
  *	Though the equals sign doesn't match other WITH options, pg_dump uses
@@ -4734,13 +4576,7 @@ opt_equal:	'='
 
 /*****************************************************************************
  *
- *		ALTER DATABASE
- *
- *****************************************************************************/
-
-				/*****************************************************************************
-				 *
-				 *		DROP DATABASE [ IF EXISTS ] dbname [ [ WITH ] ( options ) ]
+ *		DROP DATABASE [ IF EXISTS ] dbname [ [ WITH ] ( options ) ]
  *
  * This is implicitly CASCADE, no need for drop behavior
  *****************************************************************************/
@@ -8717,12 +8553,6 @@ RoleSpec:	NonReservedWord
 					{
 						$$ = makeRoleSpec(ROLESPEC_SESSION_USER, @1);
 					}
-		;
-
-role_list:	RoleSpec
-					{ $$ = list_make1($1); }
-			| role_list ',' RoleSpec
-					{ $$ = lappend($1, $3); }
 		;
 
 

@@ -34,7 +34,6 @@
 #include "access/multixact.h"
 #include "access/nbtree.h"
 #include "access/parallel.h"
-#include "access/reloptions.h"
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "access/tableam.h"
@@ -278,7 +277,6 @@ static void formrdesc(const char *relationName, Oid relationReltype,
 
 static HeapTuple ScanPgRelation(Oid targetRelId, bool indexOK, bool force_non_historic);
 static Relation AllocateRelationDesc(Form_pg_class relp);
-static void RelationParseRelOptions(Relation relation, HeapTuple tuple);
 static void RelationBuildTupleDesc(Relation relation);
 static Relation RelationBuildDesc(Oid targetRelId, bool insertIt);
 static void RelationInitPhysicalAddr(Relation relation);
@@ -412,9 +410,7 @@ AllocateRelationDesc(Form_pg_class relp)
 	 * relcache --- there'd be little point in it, since we don't copy the
 	 * tuple's nulls bitmap and hence wouldn't know if the values are valid.
 	 * Bottom line is that relacl *cannot* be retrieved from the relcache. Get
-	 * it from the syscache if you need it.  The same goes for the original
-	 * form of reloptions (however, we do store the parsed form of reloptions
-	 * in rd_options).
+	 * it from the syscache if you need it.
 	 */
 	relationForm = (Form_pg_class) palloc(CLASS_TUPLE_SIZE);
 
@@ -431,62 +427,6 @@ AllocateRelationDesc(Form_pg_class relp)
 	MemoryContextSwitchTo(oldcxt);
 
 	return relation;
-}
-
-/*
- * RelationParseRelOptions
- *		Convert pg_class.reloptions into pre-parsed rd_options
- *
- * tuple is the real pg_class tuple (not rd_rel!) for relation
- *
- * Note: rd_rel and (if an index) rd_indam must be valid already
- */
-static void
-RelationParseRelOptions(Relation relation, HeapTuple tuple)
-{
-	bytea	   *options;
-	amoptions_function amoptsfn;
-
-	relation->rd_options = NULL;
-
-	/*
-	 * Look up any AM-specific parse function; fall out if relkind should not
-	 * have options.
-	 */
-	switch (relation->rd_rel->relkind)
-	{
-		case RELKIND_RELATION:
-		case RELKIND_TOASTVALUE:
-		case RELKIND_VIEW:
-			amoptsfn = NULL;
-			break;
-		case RELKIND_INDEX:
-			amoptsfn = relation->rd_indam->amoptions;
-			break;
-		default:
-			return;
-	}
-
-	/*
-	 * Fetch reloptions from tuple; have to use a hardwired descriptor because
-	 * we might not have any other for pg_class yet (consider executing this
-	 * code for pg_class itself)
-	 */
-	options = extractRelOptions(tuple, GetPgClassDescriptor(), amoptsfn);
-
-	/*
-	 * Copy parsed data into CacheMemoryContext.  To guard against the
-	 * possibility of leaks in the reloptions code, we want to do the actual
-	 * parsing in the caller's memory context and copy the results into
-	 * CacheMemoryContext after the fact.
-	 */
-	if (options)
-	{
-		relation->rd_options = MemoryContextAlloc(CacheMemoryContext,
-												  VARSIZE(options));
-		memcpy(relation->rd_options, options, VARSIZE(options));
-		pfree(options);
-	}
 }
 
 /*
@@ -1056,9 +996,6 @@ retry:
 			Assert(relation->rd_rel->relam == InvalidOid);
 			break;
 	}
-
-	/* extract reloptions if any */
-	RelationParseRelOptions(relation, pg_class_tuple);
 
 	/*
 	 * initialize the relation lock manager information
@@ -2067,10 +2004,6 @@ RelationReloadIndexInfo(Relation relation)
 			 RelationGetRelid(relation));
 	relp = (Form_pg_class) GETSTRUCT(pg_class_tuple);
 	memcpy(relation->rd_rel, relp, CLASS_TUPLE_SIZE);
-	/* Reload reloptions in case they changed */
-	if (relation->rd_options)
-		pfree(relation->rd_options);
-	RelationParseRelOptions(relation, pg_class_tuple);
 	/* done with pg_class tuple */
 	heap_freetuple(pg_class_tuple);
 	/* We must recalculate physical address in case it changed */
@@ -2244,8 +2177,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
 	bms_free(relation->rd_pkattr);
-	if (relation->rd_options)
-		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
 		pfree(relation->rd_indextuple);
 	if (relation->rd_amcache)
@@ -3834,11 +3765,6 @@ RelationCacheInitializePhase3(void)
 			 */
 			memcpy((char *) relation->rd_rel, (char *) relp, CLASS_TUPLE_SIZE);
 
-			/* Update rd_options while we have the tuple */
-			if (relation->rd_options)
-				pfree(relation->rd_options);
-			RelationParseRelOptions(relation, htup);
-
 			/*
 			 * Check the values in rd_att were set up correctly.  (We cannot
 			 * just copy them over now: formrdesc must have set up the rd_att
@@ -4979,7 +4905,6 @@ RelationGetIndexAttOptions(Relation relation, bool copy)
 {
 	MemoryContext oldcxt;
 	bytea	  **opts = relation->rd_opcoptions;
-	Oid			relid = RelationGetRelid(relation);
 	int			natts = RelationGetNumberOfAttributes(relation);	/* XXX
 																	 * IndexRelationGetNumberOfKeyAttributes */
 	int			i;
@@ -4990,19 +4915,6 @@ RelationGetIndexAttOptions(Relation relation, bool copy)
 
 	/* Get and parse opclass options. */
 	opts = palloc0(sizeof(*opts) * natts);
-
-	for (i = 0; i < natts; i++)
-	{
-		if (criticalRelcachesBuilt && relid != AttributeRelidNumIndexId)
-		{
-			Datum		attoptions = get_attoptions(relid, i + 1);
-
-			opts[i] = index_opclass_options(relation, i + 1, attoptions, false);
-
-			if (attoptions != (Datum) 0)
-				pfree(DatumGetPointer(attoptions));
-		}
-	}
 
 	/* Copy parsed options to the cache. */
 	oldcxt = MemoryContextSwitchTo(relation->rd_indexcxt);
@@ -5261,20 +5173,16 @@ load_relcache_init_file(bool shared)
 			has_not_null |= attr->attnotnull;
 		}
 
-		/* next read the access method specific field */
+		/* next read the access method specific field (reloptions - unused) */
 		if (fread(&len, 1, sizeof(len), fp) != sizeof(len))
 			goto read_failed;
 		if (len > 0)
 		{
-			rel->rd_options = palloc(len);
-			if (fread(rel->rd_options, 1, len, fp) != len)
+			void	   *opts = palloc(len);
+
+			if (fread(opts, 1, len, fp) != len)
 				goto read_failed;
-			if (len != VARSIZE(rel->rd_options))
-				goto read_failed;	/* sanity check */
-		}
-		else
-		{
-			rel->rd_options = NULL;
+			pfree(opts);
 		}
 
 		/* mark not-null status */
@@ -5658,10 +5566,8 @@ write_relcache_init_file(bool shared)
 					   ATTRIBUTE_FIXED_PART_SIZE, fp);
 		}
 
-		/* next, do the access method specific field */
-		write_item(rel->rd_options,
-				   (rel->rd_options ? VARSIZE(rel->rd_options) : 0),
-				   fp);
+		/* next, do the access method specific field (reloptions - unused) */
+		write_item(NULL, 0, fp);
 
 		/*
 		 * If it's an index, there's more to do. Note we explicitly ignore

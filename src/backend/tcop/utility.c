@@ -17,7 +17,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "access/reloptions.h"
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog.h"
@@ -121,8 +120,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
 		case T_AlterObjectSchemaStmt:
-		case T_AlterTableMoveAllStmt:
-		case T_AlterTableSpaceOptionsStmt:
 		case T_AlterTableStmt:
 		case T_AlterTypeStmt:
 		case T_CompositeTypeStmt:
@@ -137,12 +134,10 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateSchemaStmt:
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
-		case T_CreateTableSpaceStmt:
 		case T_CreateTransformStmt:
 		case T_CreatedbStmt:
 		case T_DefineStmt:
 		case T_DropStmt:
-		case T_DropTableSpaceStmt:
 		case T_DropdbStmt:
 		case T_CreateFunctionStmt:
 		case T_IndexStmt:
@@ -593,23 +588,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			ExecuteDoStmt((DoStmt *) parsetree, isAtomicContext);
 			break;
 
-		case T_CreateTableSpaceStmt:
-			/* no event triggers for global objects */
-			PreventInTransactionBlock(isTopLevel, "CREATE TABLESPACE");
-			CreateTableSpace((CreateTableSpaceStmt *) parsetree);
-			break;
-
-		case T_DropTableSpaceStmt:
-			/* no event triggers for global objects */
-			PreventInTransactionBlock(isTopLevel, "DROP TABLESPACE");
-			DropTableSpace((DropTableSpaceStmt *) parsetree);
-			break;
-
-		case T_AlterTableSpaceOptionsStmt:
-			/* no event triggers for global objects */
-			AlterTableSpaceOptions((AlterTableSpaceOptionsStmt *) parsetree);
-			break;
-
 		case T_TruncateStmt:
 			ExecuteTruncate((TruncateStmt *) parsetree);
 			break;
@@ -797,7 +775,6 @@ ProcessUtilitySlow(ParseState *pstate,
 						{
 							CreateStmt *cstmt = (CreateStmt *) stmt;
 							Datum		toast_options;
-							static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
 
 							/* Create the table itself */
 							address = DefineRelation(cstmt,
@@ -811,19 +788,7 @@ ProcessUtilitySlow(ParseState *pstate,
 							 */
 							CommandCounterIncrement();
 
-							/*
-							 * parse and validate reloptions for the toast
-							 * table
-							 */
-							toast_options = transformRelOptions((Datum) 0,
-																cstmt->options,
-																"toast",
-																validnsps,
-																true,
-																false);
-							(void) heap_reloptions(RELKIND_TOASTVALUE,
-												   toast_options,
-												   true);
+							toast_options = (Datum) 0;
 
 						NewRelationCreateToastTable(address.objectId,
 													toast_options);
@@ -1109,10 +1074,6 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_CreateTransformStmt:
 				address = CreateTransform((CreateTransformStmt *) parsetree);
-				break;
-
-			case T_AlterTableMoveAllStmt:
-				AlterTableMoveAll((AlterTableMoveAllStmt *) parsetree);
 				break;
 
 			case T_DropStmt:
@@ -1474,9 +1435,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
-		case OBJECT_TABLESPACE:
-			tag = CMDTAG_ALTER_TABLESPACE;
-			break;
 		case OBJECT_TYPE:
 			tag = CMDTAG_ALTER_TYPE;
 			break;
@@ -1624,18 +1582,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_TABLE;
 			break;
 
-		case T_CreateTableSpaceStmt:
-			tag = CMDTAG_CREATE_TABLESPACE;
-			break;
-
-		case T_DropTableSpaceStmt:
-			tag = CMDTAG_DROP_TABLESPACE;
-			break;
-
-		case T_AlterTableSpaceOptionsStmt:
-			tag = CMDTAG_ALTER_TABLESPACE;
-			break;
-
 		case T_CreateExtensionStmt:
 			tag = CMDTAG_CREATE_EXTENSION;
 			break;
@@ -1714,10 +1660,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_AlterObjectSchemaStmt:
 			tag = AlterObjectTypeCommandTag(((AlterObjectSchemaStmt *) parsetree)->objectType);
-			break;
-
-		case T_AlterTableMoveAllStmt:
-			tag = AlterObjectTypeCommandTag(((AlterTableMoveAllStmt *) parsetree)->objtype);
 			break;
 
 		case T_AlterTableStmt:
@@ -2109,16 +2051,7 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_CreateTableSpaceStmt:
-		case T_DropTableSpaceStmt:
-		case T_AlterTableSpaceOptionsStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_CreateExtensionStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 			lev = LOGSTMT_DDL;
 			break;
 
@@ -2168,7 +2101,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterTableMoveAllStmt:
 		case T_AlterTableStmt:
 			lev = LOGSTMT_DDL;
 			break;

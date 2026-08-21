@@ -527,7 +527,6 @@ CREATE VIEW pg_stat_database_conflicts AS
     SELECT
             D.oid AS datid,
             D.datname AS datname,
-            pg_stat_get_db_conflict_tablespace(D.oid) AS confl_tablespace,
             pg_stat_get_db_conflict_lock(D.oid) AS confl_lock,
             pg_stat_get_db_conflict_snapshot(D.oid) AS confl_snapshot,
             pg_stat_get_db_conflict_bufferpin(D.oid) AS confl_bufferpin,

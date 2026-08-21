@@ -588,11 +588,6 @@ extern int	PQdsplen(const char *s, int encoding);
 /* Get encoding id from environment variable PGCLIENTENCODING */
 extern int	PQenv2encoding(void);
 
-/* === in fe-auth.c === */
-
-extern char *PQencryptPassword(const char *passwd, const char *user);
-extern char *PQencryptPasswordConn(PGconn *conn, const char *passwd, const char *user, const char *algorithm);
-
 /* === in encnames.c === */
 
 extern int	pg_char_to_encoding(const char *name);

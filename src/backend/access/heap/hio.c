@@ -361,8 +361,7 @@ RelationGetBufferForTuple(Relation relation, Size len,
 						len, MaxHeapTupleSize)));
 
 	/* Compute desired extra freespace due to fillfactor option */
-	saveFreeSpace = RelationGetTargetPageFreeSpace(relation,
-												   HEAP_DEFAULT_FILLFACTOR);
+	saveFreeSpace = 0;
 
 	/*
 	 * Since pages without tuples can still have line pointers, we consider

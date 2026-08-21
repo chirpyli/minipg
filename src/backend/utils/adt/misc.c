@@ -16,7 +16,6 @@
 
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <dirent.h>
 #include <fcntl.h>
 #include <math.h>
 #include <unistd.h>
@@ -24,11 +23,9 @@
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "catalog/catalog.h"
-#include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/system_fk_info.h"
 #include "commands/dbcommands.h"
-#include "commands/tablespace.h"
 #include "common/keywords.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -196,187 +193,6 @@ current_query(PG_FUNCTION_ARGS)
 	else
 		PG_RETURN_NULL();
 }
-
-/* Function to find out which databases make use of a tablespace */
-
-Datum
-pg_tablespace_databases(PG_FUNCTION_ARGS)
-{
-	Oid			tablespaceOid = PG_GETARG_OID(0);
-	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-	bool		randomAccess;
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
-	char	   *location;
-	DIR		   *dirdesc;
-	struct dirent *de;
-	MemoryContext oldcontext;
-
-	/* check to see if caller supports us returning a tuplestore */
-	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("set-valued function called in context that cannot accept a set")));
-	if (!(rsinfo->allowedModes & SFRM_Materialize))
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("materialize mode required, but it is not allowed in this context")));
-
-	/* The tupdesc and tuplestore must be created in ecxt_per_query_memory */
-	oldcontext = MemoryContextSwitchTo(rsinfo->econtext->ecxt_per_query_memory);
-
-	tupdesc = CreateTemplateTupleDesc(1);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "pg_tablespace_databases",
-					   OIDOID, -1, 0);
-
-	randomAccess = (rsinfo->allowedModes & SFRM_Materialize_Random) != 0;
-	tupstore = tuplestore_begin_heap(randomAccess, false, work_mem);
-
-	rsinfo->returnMode = SFRM_Materialize;
-	rsinfo->setResult = tupstore;
-	rsinfo->setDesc = tupdesc;
-
-	MemoryContextSwitchTo(oldcontext);
-
-	if (tablespaceOid == GLOBALTABLESPACE_OID)
-	{
-		ereport(WARNING,
-				(errmsg("global tablespace never has databases")));
-		/* return empty tuplestore */
-		return (Datum) 0;
-	}
-
-	if (tablespaceOid == DEFAULTTABLESPACE_OID)
-		location = psprintf("base");
-	else
-		location = psprintf("pg_tblspc/%u/%s", tablespaceOid,
-							TABLESPACE_VERSION_DIRECTORY);
-
-	dirdesc = AllocateDir(location);
-
-	if (!dirdesc)
-	{
-		/* the only expected error is ENOENT */
-		if (errno != ENOENT)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not open directory \"%s\": %m",
-							location)));
-		ereport(WARNING,
-				(errmsg("%u is not a tablespace OID", tablespaceOid)));
-		/* return empty tuplestore */
-		return (Datum) 0;
-	}
-
-	while ((de = ReadDir(dirdesc, location)) != NULL)
-	{
-		Oid			datOid = atooid(de->d_name);
-		char	   *subdir;
-		bool		isempty;
-		Datum		values[1];
-		bool		nulls[1];
-
-		/* this test skips . and .., but is awfully weak */
-		if (!datOid)
-			continue;
-
-		/* if database subdir is empty, don't report tablespace as used */
-
-		subdir = psprintf("%s/%s", location, de->d_name);
-		isempty = directory_is_empty(subdir);
-		pfree(subdir);
-
-		if (isempty)
-			continue;			/* indeed, nothing in it */
-
-		values[0] = ObjectIdGetDatum(datOid);
-		nulls[0] = false;
-
-		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
-	}
-
-	FreeDir(dirdesc);
-	return (Datum) 0;
-}
-
-
-/*
- * pg_tablespace_location - get location for a tablespace
- */
-Datum
-pg_tablespace_location(PG_FUNCTION_ARGS)
-{
-	Oid			tablespaceOid = PG_GETARG_OID(0);
-	char		sourcepath[MAXPGPATH];
-	char		targetpath[MAXPGPATH];
-	int			rllen;
-	struct stat st;
-
-	/*
-	 * It's useful to apply this function to pg_class.reltablespace, wherein
-	 * zero means "the database's default tablespace".  So, rather than
-	 * throwing an error for zero, we choose to assume that's what is meant.
-	 */
-	if (tablespaceOid == InvalidOid)
-		tablespaceOid = MyDatabaseTableSpace;
-
-	/*
-	 * Return empty string for the cluster's default tablespaces
-	 */
-	if (tablespaceOid == DEFAULTTABLESPACE_OID ||
-		tablespaceOid == GLOBALTABLESPACE_OID)
-		PG_RETURN_TEXT_P(cstring_to_text(""));
-
-#ifdef HAVE_READLINK
-
-	/*
-	 * Find the location of the tablespace by reading the symbolic link that
-	 * is in pg_tblspc/<oid>.
-	 */
-	snprintf(sourcepath, sizeof(sourcepath), "pg_tblspc/%u", tablespaceOid);
-
-	/*
-	 * Before reading the link, check if the source path is a link or a
-	 * junction point.  Note that a directory is possible for a tablespace
-	 * created with allow_in_place_tablespaces enabled.  If a directory is
-	 * found, a relative path to the data directory is returned.
-	 */
-	if (lstat(sourcepath, &st) < 0)
-	{
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not stat file \"%s\": %m",
-						sourcepath)));
-	}
-
-	if (!S_ISLNK(st.st_mode))
-		PG_RETURN_TEXT_P(cstring_to_text(sourcepath));
-
-	/*
-	 * In presence of a link or a junction point, return the path pointing to.
-	 */
-	rllen = readlink(sourcepath, targetpath, sizeof(targetpath));
-	if (rllen < 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not read symbolic link \"%s\": %m",
-						sourcepath)));
-	if (rllen >= sizeof(targetpath))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("symbolic link \"%s\" target is too long",
-						sourcepath)));
-	targetpath[rllen] = '\0';
-
-	PG_RETURN_TEXT_P(cstring_to_text(targetpath));
-#else
-	ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			 errmsg("tablespaces are not supported on this platform")));
-	PG_RETURN_NULL();
-#endif
-}
-
 
 /* Function to return the list of grammar keywords */
 Datum

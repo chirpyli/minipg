@@ -71,7 +71,6 @@
 #include "utils/lsyscache.h"
 #include "utils/relcache.h"
 #include "utils/snapmgr.h"
-#include "utils/spccache.h"
 #include "utils/syscache.h"
 
 
@@ -2349,8 +2348,7 @@ heap_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 	AssertArg(!(options & HEAP_INSERT_NO_LOGICAL));
 
 	needwal = RelationNeedsWAL(relation);
-	saveFreeSpace = RelationGetTargetPageFreeSpace(relation,
-												   HEAP_DEFAULT_FILLFACTOR);
+	saveFreeSpace = 0;
 
 	/* Toast and set header data in all the slots */
 	heaptuples = palloc(ntuples * sizeof(HeapTuple));
@@ -7851,16 +7849,8 @@ heap_index_delete_tuples(Relation rel, TM_IndexDeleteOp *delstate)
 
 	/*
 	 * Determine the prefetch distance that we will attempt to maintain.
-	 *
-	 * Since the caller holds a buffer lock somewhere in rel, we'd better make
-	 * sure that isn't a catalog relation before we call code that does
-	 * syscache lookups, to avoid risk of deadlock.
 	 */
-	if (IsCatalogRelation(rel))
-		prefetch_distance = maintenance_io_concurrency;
-	else
-		prefetch_distance =
-			get_tablespace_maintenance_io_concurrency(rel->rd_rel->reltablespace);
+	prefetch_distance = maintenance_io_concurrency;
 
 	/* Cap initial prefetch distance for bottom-up deletion caller */
 	if (delstate->bottomup)

@@ -164,7 +164,6 @@ BTInsertStateData
 BTLeader
 BTMetaPageData
 BTOneVacInfo
-BTOptions
 BTPS_State
 BTPageOpaque
 BTPageOpaqueData
@@ -961,7 +960,6 @@ HashJoinTuple
 HashMemoryChunk
 HashMetaPage
 HashMetaPageData
-HashOptions
 HashPageOpaque
 HashPageOpaqueData
 HashPageStat
@@ -3091,8 +3089,6 @@ libpq_source
 line_t
 lineno_t
 list_sort_comparator
-local_relopt
-local_relopts
 local_source
 locale_t
 locate_agg_of_level_context
@@ -3311,18 +3307,6 @@ registered_buffer
 regmatch_t
 regoff_t
 regproc
-relopt_bool
-relopt_enum
-relopt_enum_elt_def
-relopt_gen
-relopt_int
-relopt_kind
-relopt_parse_elt
-relopt_real
-relopt_string
-relopt_type
-relopt_value
-relopts_validator
 remoteConn
 remoteConnHashEnt
 remoteDep

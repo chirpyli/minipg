@@ -170,7 +170,7 @@ _bt_findsplitloc(Relation rel,
 
 	/* Count up total space in data items before actually scanning 'em */
 	olddataitemstotal = rightspace - (int) PageGetExactFreeSpace(origpage);
-	leaffillfactor = BTGetFillFactor(rel);
+	leaffillfactor = BTREE_DEFAULT_FILLFACTOR;
 
 	/* Passed-in newitemsz is MAXALIGNED but does not include line pointer */
 	newitemsz += sizeof(ItemIdData);

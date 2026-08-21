@@ -3707,11 +3707,6 @@
   proname => 'pg_stat_get_db_tuples_deleted', provolatile => 's',
   proparallel => 'r', prorettype => 'int8', proargtypes => 'oid',
   prosrc => 'pg_stat_get_db_tuples_deleted' },
-{ oid => '3065',
-  descr => 'statistics: recovery conflicts in database caused by drop tablespace',
-  proname => 'pg_stat_get_db_conflict_tablespace', provolatile => 's',
-  proparallel => 'r', prorettype => 'int8', proargtypes => 'oid',
-  prosrc => 'pg_stat_get_db_conflict_tablespace' },
 { oid => '3066',
   descr => 'statistics: recovery conflicts in database caused by relation lock',
   proname => 'pg_stat_get_db_conflict_lock', provolatile => 's',
@@ -3989,9 +3984,7 @@
   prorettype => 'void', proargtypes => 'text', prosrc => 'pg_stat_reset_slru' },
 
 
-{ oid => '3778', descr => 'tablespace location',
-  proname => 'pg_tablespace_location', provolatile => 's', prorettype => 'text',
-  proargtypes => 'oid', prosrc => 'pg_tablespace_location' },
+
 
 { oid => '1946',
   descr => 'convert bytea value into some ascii-only text string',
@@ -4998,14 +4991,6 @@
 { oid => '2121', descr => 'compression method for the compressed datum',
   proname => 'pg_column_compression', provolatile => 's', prorettype => 'text',
   proargtypes => 'any', prosrc => 'pg_column_compression' },
-{ oid => '2322',
-  descr => 'total disk space usage for the specified tablespace',
-  proname => 'pg_tablespace_size', provolatile => 'v', prorettype => 'int8',
-  proargtypes => 'oid', prosrc => 'pg_tablespace_size_oid' },
-{ oid => '2323',
-  descr => 'total disk space usage for the specified tablespace',
-  proname => 'pg_tablespace_size', provolatile => 'v', prorettype => 'int8',
-  proargtypes => 'name', prosrc => 'pg_tablespace_size_name' },
 { oid => '2324', descr => 'total disk space usage for the specified database',
   proname => 'pg_database_size', provolatile => 'v', prorettype => 'int8',
   proargtypes => 'oid', prosrc => 'pg_database_size_oid' },
@@ -5821,10 +5806,7 @@
   proname => 'integer_pl_date', prolang => 'sql', prorettype => 'date',
   proargtypes => 'int4 date', prosrc => 'see system_functions.sql' },
 
-{ oid => '2556', descr => 'get OIDs of databases in a tablespace',
-  proname => 'pg_tablespace_databases', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'oid', proargtypes => 'oid',
-  prosrc => 'pg_tablespace_databases' },
+
 
 { oid => '2557', descr => 'convert int4 to boolean',
   proname => 'bool', proleakproof => 't', prorettype => 'bool',

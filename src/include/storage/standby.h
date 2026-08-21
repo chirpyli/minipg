@@ -33,7 +33,6 @@ extern void ResolveRecoveryConflictWithSnapshot(TransactionId latestRemovedXid,
 												RelFileNode node);
 extern void ResolveRecoveryConflictWithSnapshotFullXid(FullTransactionId latestRemovedFullXid,
 													   RelFileNode node);
-extern void ResolveRecoveryConflictWithTablespace(Oid tsid);
 extern void ResolveRecoveryConflictWithDatabase(Oid dbid);
 
 extern void ResolveRecoveryConflictWithLock(LOCKTAG locktag, bool logging_conflict);

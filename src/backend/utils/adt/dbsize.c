@@ -19,7 +19,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
-#include "commands/tablespace.h"
 #include "miscadmin.h"
 #include "storage/fd.h"
 #include "utils/builtins.h"
@@ -74,41 +73,21 @@ db_dir_size(const char *path)
 }
 
 /*
- * calculate size of database in all tablespaces
+ * calculate size of database
+ *
+ * 表空间管理已裁剪：数据库存储只存在于 pg_default（base/）中。
  */
 static int64
 calculate_database_size(Oid dbOid)
 {
 	int64		totalsize;
-	DIR		   *dirdesc;
-	struct dirent *direntry;
-	char		dirpath[MAXPGPATH];
-	char		pathname[MAXPGPATH + 21 + sizeof(TABLESPACE_VERSION_DIRECTORY)];
+	char		pathname[MAXPGPATH];
 
 	/* Shared storage in pg_global is not counted */
 
 	/* Include pg_default storage */
 	snprintf(pathname, sizeof(pathname), "base/%u", dbOid);
 	totalsize = db_dir_size(pathname);
-
-	/* Scan the non-default tablespaces */
-	snprintf(dirpath, MAXPGPATH, "pg_tblspc");
-	dirdesc = AllocateDir(dirpath);
-
-	while ((direntry = ReadDir(dirdesc, dirpath)) != NULL)
-	{
-		CHECK_FOR_INTERRUPTS();
-
-		if (strcmp(direntry->d_name, ".") == 0 ||
-			strcmp(direntry->d_name, "..") == 0)
-			continue;
-
-		snprintf(pathname, sizeof(pathname), "pg_tblspc/%s/%s/%u",
-				 direntry->d_name, TABLESPACE_VERSION_DIRECTORY, dbOid);
-		totalsize += db_dir_size(pathname);
-	}
-
-	FreeDir(dirdesc);
 
 	return totalsize;
 }
@@ -137,95 +116,6 @@ pg_database_size_name(PG_FUNCTION_ARGS)
 	size = calculate_database_size(dbOid);
 
 	if (size == 0)
-		PG_RETURN_NULL();
-
-	PG_RETURN_INT64(size);
-}
-
-
-/*
- * Calculate total size of tablespace. Returns -1 if the tablespace directory
- * cannot be found.
- */
-static int64
-calculate_tablespace_size(Oid tblspcOid)
-{
-	char		tblspcPath[MAXPGPATH];
-	char		pathname[MAXPGPATH * 2];
-	int64		totalsize = 0;
-	DIR		   *dirdesc;
-	struct dirent *direntry;
-
-	if (tblspcOid == DEFAULTTABLESPACE_OID)
-		snprintf(tblspcPath, MAXPGPATH, "base");
-	else if (tblspcOid == GLOBALTABLESPACE_OID)
-		snprintf(tblspcPath, MAXPGPATH, "global");
-	else
-		snprintf(tblspcPath, MAXPGPATH, "pg_tblspc/%u/%s", tblspcOid,
-				 TABLESPACE_VERSION_DIRECTORY);
-
-	dirdesc = AllocateDir(tblspcPath);
-
-	if (!dirdesc)
-		return -1;
-
-	while ((direntry = ReadDir(dirdesc, tblspcPath)) != NULL)
-	{
-		struct stat fst;
-
-		CHECK_FOR_INTERRUPTS();
-
-		if (strcmp(direntry->d_name, ".") == 0 ||
-			strcmp(direntry->d_name, "..") == 0)
-			continue;
-
-		snprintf(pathname, sizeof(pathname), "%s/%s", tblspcPath, direntry->d_name);
-
-		if (stat(pathname, &fst) < 0)
-		{
-			if (errno == ENOENT)
-				continue;
-			else
-				ereport(ERROR,
-						(errcode_for_file_access(),
-						 errmsg("could not stat file \"%s\": %m", pathname)));
-		}
-
-		if (S_ISDIR(fst.st_mode))
-			totalsize += db_dir_size(pathname);
-
-		totalsize += fst.st_size;
-	}
-
-	FreeDir(dirdesc);
-
-	return totalsize;
-}
-
-Datum
-pg_tablespace_size_oid(PG_FUNCTION_ARGS)
-{
-	Oid			tblspcOid = PG_GETARG_OID(0);
-	int64		size;
-
-	size = calculate_tablespace_size(tblspcOid);
-
-	if (size < 0)
-		PG_RETURN_NULL();
-
-	PG_RETURN_INT64(size);
-}
-
-Datum
-pg_tablespace_size_name(PG_FUNCTION_ARGS)
-{
-	Name		tblspcName = PG_GETARG_NAME(0);
-	Oid			tblspcOid = get_tablespace_oid(NameStr(*tblspcName), false);
-	int64		size;
-
-	size = calculate_tablespace_size(tblspcOid);
-
-	if (size < 0)
 		PG_RETURN_NULL();
 
 	PG_RETURN_INT64(size);

@@ -207,6 +207,7 @@ SELECT firstc, lastc FROM extra_wide_table;
 CREATE TABLE withoid() WITH OIDS;
 CREATE TABLE withoid() WITH (oids);
 CREATE TABLE withoid() WITH (oids = true);
+DROP TABLE withoid;
 
 -- but explicitly not adding oids is still supported
 CREATE TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;

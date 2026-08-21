@@ -40,8 +40,6 @@ extern void ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, L
 
 extern void AlterTableInternal(Oid relid, List *cmds, bool recurse);
 
-extern Oid	AlterTableMoveAll(AlterTableMoveAllStmt *stmt);
-
 extern ObjectAddress AlterTableNamespace(AlterObjectSchemaStmt *stmt,
 										 Oid *oldschema);
 
@@ -85,9 +83,6 @@ extern bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
 #include "nodes/pg_list.h"
 #include "storage/lock.h"
 
-extern bool CheckRelationTableSpaceMove(Relation rel, Oid newTableSpaceId);
-extern void SetRelationTableSpace(Relation rel, Oid newTableSpaceId,
-								  Oid newRelFileNode);
 extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
 extern void ResetRelRewrite(Oid myrelid);
 

@@ -1347,21 +1347,6 @@ pg_stat_get_db_temp_bytes(PG_FUNCTION_ARGS)
 }
 
 Datum
-pg_stat_get_db_conflict_tablespace(PG_FUNCTION_ARGS)
-{
-	Oid			dbid = PG_GETARG_OID(0);
-	int64		result;
-	PgStat_StatDBEntry *dbentry;
-
-	if ((dbentry = pgstat_fetch_stat_dbentry(dbid)) == NULL)
-		result = 0;
-	else
-		result = (int64) (dbentry->n_conflict_tablespace);
-
-	PG_RETURN_INT64(result);
-}
-
-Datum
 pg_stat_get_db_conflict_lock(PG_FUNCTION_ARGS)
 {
 	Oid			dbid = PG_GETARG_OID(0);
@@ -1431,8 +1416,7 @@ pg_stat_get_db_conflict_all(PG_FUNCTION_ARGS)
 	if ((dbentry = pgstat_fetch_stat_dbentry(dbid)) == NULL)
 		result = 0;
 	else
-		result = (int64) (dbentry->n_conflict_tablespace +
-						  dbentry->n_conflict_lock +
+		result = (int64) (dbentry->n_conflict_lock +
 						  dbentry->n_conflict_snapshot +
 						  dbentry->n_conflict_bufferpin +
 						  dbentry->n_conflict_startup_deadlock);

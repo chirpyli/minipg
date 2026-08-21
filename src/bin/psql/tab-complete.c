@@ -704,10 +704,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "SELECT pg_catalog.quote_ident(datname) FROM pg_catalog.pg_database "\
 " WHERE substring(pg_catalog.quote_ident(datname),1,%d)='%s'"
 
-#define Query_for_list_of_tablespaces \
-"SELECT pg_catalog.quote_ident(spcname) FROM pg_catalog.pg_tablespace "\
-" WHERE substring(pg_catalog.quote_ident(spcname),1,%d)='%s'"
-
 #define Query_for_list_of_encodings \
 " SELECT DISTINCT pg_catalog.pg_encoding_to_char(conforencoding) "\
 "   FROM pg_catalog.pg_conversion "\
@@ -731,7 +727,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "  UNION ALL SELECT 'transaction' "\
 "  UNION ALL SELECT 'session' "\
 "  UNION ALL SELECT 'role' "\
-"  UNION ALL SELECT 'tablespace' "\
 "  UNION ALL SELECT 'all') ss "\
 " WHERE substring(name,1,%d)='%s'"
 
@@ -1006,7 +1001,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"SUBSCRIPTION", NULL, Query_for_list_of_subscriptions},
 	{"SYSTEM", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"TABLE", NULL, NULL, &Query_for_list_of_tables},
-	{"TABLESPACE", Query_for_list_of_tablespaces},
 	{"TEMPLATE", Query_for_list_of_ts_templates, NULL, NULL, THING_NO_SHOW},
 	{"TEXT SEARCH", NULL, NULL, NULL},
 	{"TRANSFORM", NULL, NULL, NULL},
@@ -1527,22 +1521,11 @@ psql_completion(const char *text, int start, int end)
 
 	/* ALTER TABLE */
 	else if (Matches("ALTER", "TABLE"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables,
-								   "UNION SELECT 'ALL IN TABLESPACE'");
+		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
 
 	/* ALTER something */
 	else if (Matches("ALTER"))
 		matches = rl_completion_matches(text, alter_command_generator);
-	/* ALTER TABLE,INDEX,MATERIALIZED VIEW ALL IN TABLESPACE xxx */
-	else if (TailMatches("ALL", "IN", "TABLESPACE", MatchAny))
-		COMPLETE_WITH("SET TABLESPACE", "OWNED BY");
-	/* ALTER TABLE,INDEX,MATERIALIZED VIEW ALL IN TABLESPACE xxx OWNED BY */
-	else if (TailMatches("ALL", "IN", "TABLESPACE", MatchAny, "OWNED", "BY"))
-		completion_matches = NULL;
-	/* ALTER TABLE,INDEX,MATERIALIZED VIEW ALL IN TABLESPACE xxx OWNED BY xxx */
-	else if (TailMatches("ALL", "IN", "TABLESPACE", MatchAny, "OWNED", "BY", MatchAny))
-		COMPLETE_WITH("SET TABLESPACE");
-
 	/* ALTER PUBLICATION <name> */
 	else if (Matches("ALTER", "PUBLICATION", MatchAny))
 		COMPLETE_WITH("ADD TABLE", "DROP TABLE", "OWNER TO", "RENAME TO", "SET");
@@ -1614,8 +1597,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* ALTER INDEX */
 	else if (Matches("ALTER", "INDEX"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_indexes,
-								   "UNION SELECT 'ALL IN TABLESPACE'");
+		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_indexes, NULL);
 	/* ALTER INDEX <name> */
 	else if (Matches("ALTER", "INDEX", MatchAny))
 		COMPLETE_WITH("ALTER COLUMN", "OWNER TO", "RENAME TO", "SET",
@@ -1646,7 +1628,7 @@ psql_completion(const char *text, int start, int end)
 	}
 	/* ALTER INDEX <name> SET */
 	else if (Matches("ALTER", "INDEX", MatchAny, "SET"))
-		COMPLETE_WITH("(", "TABLESPACE");
+		COMPLETE_WITH("(");
 	/* ALTER INDEX <name> RESET */
 	else if (Matches("ALTER", "INDEX", MatchAny, "RESET"))
 		COMPLETE_WITH("(");
@@ -1672,8 +1654,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* ALTER MATERIALIZED VIEW */
 	else if (Matches("ALTER", "MATERIALIZED", "VIEW"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews,
-								   "UNION SELECT 'ALL IN TABLESPACE'");
+		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews, NULL);
 
 	/* ALTER USER,ROLE <name> */
 	else if (Matches("ALTER", "USER|ROLE", MatchAny) &&
@@ -1765,7 +1746,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("TO");
 	/* ALTER MATERIALIZED VIEW xxx SET */
 	else if (Matches("ALTER", "MATERIALIZED", "VIEW", MatchAny, "SET"))
-		COMPLETE_WITH("(", "SCHEMA", "TABLESPACE", "WITHOUT CLUSTER");
+		COMPLETE_WITH("(", "SCHEMA", "WITHOUT CLUSTER");
 
 	/* ALTER RULE <name>, add ON */
 	else if (Matches("ALTER", "RULE", MatchAny))
@@ -1929,15 +1910,9 @@ psql_completion(const char *text, int start, int end)
 	}
 	/* If we have ALTER TABLE <sth> SET, provide list of attributes and '(' */
 	else if (Matches("ALTER", "TABLE", MatchAny, "SET"))
-		COMPLETE_WITH("(", "LOGGED", "SCHEMA", "TABLESPACE", "UNLOGGED",
+		COMPLETE_WITH("(", "LOGGED", "SCHEMA", "UNLOGGED",
 					  "WITH", "WITHOUT");
 
-	/*
-	 * If we have ALTER TABLE <sth> SET TABLESPACE provide a list of
-	 * tablespaces
-	 */
-	else if (Matches("ALTER", "TABLE", MatchAny, "SET", "TABLESPACE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
 	/* If we have ALTER TABLE <sth> SET WITHOUT provide CLUSTER or OIDS */
 	else if (Matches("ALTER", "TABLE", MatchAny, "SET", "WITHOUT"))
 		COMPLETE_WITH("CLUSTER", "OIDS");
@@ -1978,16 +1953,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER", "TABLE", MatchAny, "DETACH", "PARTITION", MatchAny))
 		COMPLETE_WITH("CONCURRENTLY", "FINALIZE");
 
-	/* ALTER TABLESPACE <foo> with RENAME TO, OWNER TO, SET, RESET */
-	else if (Matches("ALTER", "TABLESPACE", MatchAny))
-		COMPLETE_WITH("RENAME TO", "OWNER TO", "SET", "RESET");
-	/* ALTER TABLESPACE <foo> SET|RESET */
-	else if (Matches("ALTER", "TABLESPACE", MatchAny, "SET|RESET"))
-		COMPLETE_WITH("(");
-	/* ALTER TABLESPACE <foo> SET|RESET ( */
-	else if (Matches("ALTER", "TABLESPACE", MatchAny, "SET|RESET", "("))
-		COMPLETE_WITH("seq_page_cost", "random_page_cost",
-					  "effective_io_concurrency", "maintenance_io_concurrency");
 
 	/* ALTER TEXT SEARCH */
 	else if (Matches("ALTER", "TEXT", "SEARCH"))
@@ -2122,7 +2087,7 @@ psql_completion(const char *text, int start, int end)
 					  "COLUMN", "AGGREGATE", "FUNCTION",
 					  "PROCEDURE", "ROUTINE",
 					  "OPERATOR", "TRIGGER", "CONSTRAINT", "DOMAIN",
-					  "LARGE OBJECT", "TABLESPACE", "TEXT SEARCH", "ROLE");
+					  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
 	else if (Matches("COMMENT", "ON", "ACCESS", "METHOD"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
 	else if (Matches("COMMENT", "ON", "FOREIGN"))
@@ -2174,7 +2139,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* CREATE DATABASE */
 	else if (Matches("CREATE", "DATABASE", MatchAny))
-		COMPLETE_WITH("OWNER", "TEMPLATE", "ENCODING", "TABLESPACE",
+		COMPLETE_WITH("OWNER", "TEMPLATE", "ENCODING",
 					  "IS_TEMPLATE",
 					  "ALLOW_CONNECTIONS", "CONNECTION LIMIT",
 					  "LC_COLLATE", "LC_CTYPE", "LOCALE");
@@ -2342,7 +2307,7 @@ psql_completion(const char *text, int start, int end)
 	/* Complete CREATE TABLE name (...) with supported options */
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)") ||
 			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)"))
-		COMPLETE_WITH("INHERITS (", "PARTITION BY", "USING", "TABLESPACE", "WITH (");
+		COMPLETE_WITH("INHERITS (", "PARTITION BY", "USING", "WITH (");
 	/* Complete CREATE TABLE (...) USING with table access methods */
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)", "USING") ||
 			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)", "USING"))
@@ -2351,13 +2316,6 @@ psql_completion(const char *text, int start, int end)
 	else if (TailMatches("CREATE", "TABLE", MatchAny, "(*)", "WITH", "(") ||
 			 TailMatches("CREATE", "UNLOGGED", "TABLE", MatchAny, "(*)", "WITH", "("))
 		COMPLETE_WITH_LIST(table_storage_parameters);
-
-/* CREATE TABLESPACE */
-	else if (Matches("CREATE", "TABLESPACE", MatchAny))
-		COMPLETE_WITH("OWNER", "LOCATION");
-	/* Complete CREATE TABLESPACE name OWNER name with "LOCATION" */
-	else if (Matches("CREATE", "TABLESPACE", MatchAny, "OWNER", MatchAny))
-		COMPLETE_WITH("LOCATION");
 
 /* CREATE TEXT SEARCH */
 	else if (Matches("CREATE", "TEXT", "SEARCH"))
@@ -3018,9 +2976,7 @@ psql_completion(const char *text, int start, int end)
 		 * one word, so the above test is correct.
 		 */
 		if (ends_with(prev_wd, '(') || ends_with(prev_wd, ','))
-			COMPLETE_WITH("CONCURRENTLY", "TABLESPACE", "VERBOSE");
-		else if (TailMatches("TABLESPACE"))
-			COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
+			COMPLETE_WITH("CONCURRENTLY", "VERBOSE");
 	}
 
 /* SELECT */
@@ -3294,8 +3250,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_operator_families, NULL);
 	else if (TailMatchesCS("\\dA*"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
-	else if (TailMatchesCS("\\db*"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_tablespaces);
 	else if (TailMatchesCS("\\dD*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_domains, NULL);
 	else if (TailMatchesCS("\\df*"))

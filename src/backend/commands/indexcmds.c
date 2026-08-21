@@ -18,7 +18,6 @@
 #include "access/amapi.h"
 #include "access/heapam.h"
 #include "access/htup_details.h"
-#include "access/reloptions.h"
 #include "access/sysattr.h"
 #include "access/tableam.h"
 #include "access/xact.h"
@@ -528,16 +527,6 @@ DefineIndex(Oid relationId,
 	root_save_nestlevel = NewGUCNestLevel();
 
 	/*
-	 * Some callers need us to run with an empty default_tablespace; this is a
-	 * necessary hack to be able to reproduce catalog state accurately when
-	 * recreating indexes after table-rewriting ALTER TABLE.
-	 */
-	if (stmt->reset_default_tblspc)
-		(void) set_config_option("default_tablespace", "",
-								 PGC_USERSET, PGC_S_SESSION,
-								 GUC_ACTION_SAVE, true, 0, false);
-
-	/*
 	 * Decide whether to build the index concurrently.  This build does not
 	 * support temporary relations, so CONCURRENTLY is honored whenever
 	 * requested.
@@ -670,23 +659,11 @@ DefineIndex(Oid relationId,
 	 * bootstrapping, since permissions machinery may not be working yet.
 	 */
 	/*
-	 * Select tablespace to use.  If not specified, use default tablespace
-	 * (which may in turn default to database's default).
+	 * Select tablespace to use.  Always use default tablespace.
 	 */
-	if (stmt->tableSpace)
-	{
-		tablespaceId = get_tablespace_oid(stmt->tableSpace, false);
-		if (partitioned && tablespaceId == MyDatabaseTableSpace)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot specify default tablespace for partitioned relations")));
-	}
-	else
-	{
-		tablespaceId = GetDefaultTablespace(rel->rd_rel->relpersistence,
-											partitioned);
-		/* note InvalidOid is OK in this case */
-	}
+	tablespaceId = GetDefaultTablespace(rel->rd_rel->relpersistence,
+										partitioned);
+	/* note InvalidOid is OK in this case */
 
 	/*
 	 * Force shared indexes into the pg_global tablespace.  This is a bit of a
@@ -776,13 +753,7 @@ DefineIndex(Oid relationId,
 	if (stmt->whereClause)
 		CheckPredicate((Expr *) stmt->whereClause);
 
-	/*
-	 * Parse AM-specific options, convert to text array form, validate.
-	 */
-	reloptions = transformRelOptions((Datum) 0, stmt->options,
-									 NULL, NULL, false, false);
-
-	(void) index_reloptions(amoptions, reloptions, true);
+	reloptions = (Datum) 0;
 
 	/*
 	 * Prepare arguments for index_create, primarily an IndexInfo structure.
@@ -937,8 +908,7 @@ DefineIndex(Oid relationId,
 	if (!OidIsValid(indexRelationId))
 	{
 		/*
-		 * Roll back any GUC changes executed by index functions.  Also revert
-		 * to original default_tablespace if we changed it above.
+		 * Roll back any GUC changes executed by index functions.
 		 */
 		AtEOXact_GUC(false, root_save_nestlevel);
 
@@ -1489,9 +1459,7 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 				indexInfo->ii_OpclassOptions =
 					palloc0(sizeof(Datum) * indexInfo->ii_NumIndexAttrs);
 
-			indexInfo->ii_OpclassOptions[attn] =
-				transformRelOptions((Datum) 0, attribute->opclassopts,
-									NULL, NULL, false, false);
+			indexInfo->ii_OpclassOptions[attn] = (Datum) 0;
 		}
 
 		attn++;
@@ -2005,7 +1973,6 @@ ExecReindex(ParseState *pstate, ReindexStmt *stmt, bool isTopLevel)
 	ListCell   *lc;
 	bool		concurrently = false;
 	bool		verbose = false;
-	char	   *tablespacename = NULL;
 
 	/* Parse option list */
 	foreach(lc, stmt->params)
@@ -2016,8 +1983,6 @@ ExecReindex(ParseState *pstate, ReindexStmt *stmt, bool isTopLevel)
 			verbose = defGetBoolean(opt);
 		else if (strcmp(opt->defname, "concurrently") == 0)
 			concurrently = defGetBoolean(opt);
-		else if (strcmp(opt->defname, "tablespace") == 0)
-			tablespacename = defGetString(opt);
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -2033,17 +1998,6 @@ ExecReindex(ParseState *pstate, ReindexStmt *stmt, bool isTopLevel)
 	params.options =
 		(verbose ? REINDEXOPT_VERBOSE : 0) |
 		(concurrently ? REINDEXOPT_CONCURRENTLY : 0);
-
-	/*
-	 * Assign the tablespace OID to move indexes to, with InvalidOid to do
-	 * nothing.
-	 */
-	if (tablespacename != NULL)
-	{
-		params.tablespaceOid = get_tablespace_oid(tablespacename, false);
-	}
-	else
-		params.tablespaceOid = InvalidOid;
 
 	switch (stmt->kind)
 	{
@@ -2264,7 +2218,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	List	   *relids = NIL;
 	int			num_keys;
 	bool		concurrent_warning = false;
-	bool		tablespace_warning = false;
 
 	AssertArg(objectName);
 	Assert(objectKind == REINDEX_OBJECT_SCHEMA ||
@@ -2372,40 +2325,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 						 errmsg("cannot reindex system catalogs concurrently, skipping all")));
 			concurrent_warning = true;
 			continue;
-		}
-
-		/*
-		 * If a new tablespace is set, check if this relation has to be
-		 * skipped.
-		 */
-		if (OidIsValid(params->tablespaceOid))
-		{
-			bool		skip_rel = false;
-
-			/*
-			 * Mapped relations cannot be moved to different tablespaces (in
-			 * particular this eliminates all shared catalogs.).
-			 */
-			if (RELKIND_HAS_STORAGE(classtuple->relkind) &&
-				!OidIsValid(classtuple->relfilenode))
-				skip_rel = true;
-
-			/*
-			 * A system relation is always skipped, even with
-			 * allow_system_table_mods enabled.
-			 */
-			if (IsSystemClass(relid, classtuple))
-				skip_rel = true;
-
-			if (skip_rel)
-			{
-				if (!tablespace_warning)
-					ereport(WARNING,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("cannot move system relations, skipping all")));
-				tablespace_warning = true;
-				continue;
-			}
 		}
 
 		/* Save the list of relation OIDs in private context */
@@ -2640,13 +2559,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 					heapRelation = table_open(relationOid,
 											  ShareUpdateExclusiveLock);
 
-				if (OidIsValid(params->tablespaceOid) &&
-					IsSystemRelation(heapRelation))
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot move system relation \"%s\"",
-									RelationGetRelationName(heapRelation))));
-
 				/* Add all the valid indexes of relation to list */
 				foreach(lc, RelationGetIndexList(heapRelation))
 				{
@@ -2778,13 +2690,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 					heapRelation = table_open(heapId,
 											  ShareUpdateExclusiveLock);
 
-				if (OidIsValid(params->tablespaceOid) &&
-					IsSystemRelation(heapRelation))
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot move system relation \"%s\"",
-									get_rel_name(relationOid))));
-
 				table_close(heapRelation, NoLock);
 
 				/* Save the list of relation OIDs in private context */
@@ -2827,13 +2732,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 		return false;
 	}
 
-	/* It's not a shared catalog, so refuse to move it to shared tablespace */
-	if (params->tablespaceOid == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move non-shared relation to tablespace \"%s\"",
-						get_tablespace_name(params->tablespaceOid))));
-
 	Assert(heapRelationIds != NIL);
 
 	/*-----
@@ -2874,7 +2772,6 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 		int			save_nestlevel;
 		Relation	newIndexRel;
 		LockRelId  *lockrelid;
-		Oid			tablespaceid;
 
 		indexRel = index_open(idx->indexId, ShareUpdateExclusiveLock);
 		heapRel = table_open(indexRel->rd_index->indrelid,
@@ -2912,17 +2809,9 @@ ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)
 											get_rel_namespace(indexRel->rd_index->indrelid),
 											false);
 
-		/* Choose the new tablespace, indexes of toast tables are not moved */
-		if (OidIsValid(params->tablespaceOid) &&
-			heapRel->rd_rel->relkind != RELKIND_TOASTVALUE)
-			tablespaceid = params->tablespaceOid;
-		else
-			tablespaceid = indexRel->rd_rel->reltablespace;
-
 		/* Create new index definition based on given index */
 		newIndexId = index_concurrently_create_copy(heapRel,
 													idx->indexId,
-													tablespaceid,
 													concurrentName);
 
 		/*

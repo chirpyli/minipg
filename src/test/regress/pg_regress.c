@@ -392,7 +392,6 @@ replace_string(StringInfo string, const char *replace, const char *replacement)
 static void
 convert_sourcefiles_in(const char *source_subdir, const char *dest_dir, const char *dest_subdir, const char *suffix)
 {
-	char		testtablespace[MAXPGPATH];
 	char		indir[MAXPGPATH];
 	char		outdir_sub[MAXPGPATH];
 	char	  **name;
@@ -420,9 +419,6 @@ convert_sourcefiles_in(const char *source_subdir, const char *dest_dir, const ch
 	snprintf(outdir_sub, MAXPGPATH, "%s/%s", dest_dir, dest_subdir);
 	if (!directory_exists(outdir_sub))
 		make_directory(outdir_sub);
-
-	/* We might need to replace @testtablespace@ */
-	snprintf(testtablespace, MAXPGPATH, "%s/testtablespace", outputdir);
 
 	/* finally loop on each file and do the replacement */
 	for (name = names; *name; name++)
@@ -469,7 +465,6 @@ convert_sourcefiles_in(const char *source_subdir, const char *dest_dir, const ch
 		{
 			replace_string(&line, "@abs_srcdir@", inputdir);
 			replace_string(&line, "@abs_builddir@", outputdir);
-			replace_string(&line, "@testtablespace@", testtablespace);
 			replace_string(&line, "@libdir@", dlpath);
 			replace_string(&line, "@DLSUFFIX@", DLSUFFIX);
 			fputs(line.data, outfile);
@@ -500,32 +495,6 @@ convert_sourcefiles(void)
 {
 	convert_sourcefiles_in("input", outputdir, "sql", "sql");
 	convert_sourcefiles_in("output", outputdir, "expected", "out");
-}
-
-/*
- * Clean out the test tablespace dir, or create it if it doesn't exist.
- *
- * On Windows, doing this cleanup here makes it possible to run the
- * regression tests under a Windows administrative user account with the
- * restricted token obtained when starting pg_regress.
- */
-static void
-prepare_testtablespace_dir(void)
-{
-	char		testtablespace[MAXPGPATH];
-
-	snprintf(testtablespace, MAXPGPATH, "%s/testtablespace", outputdir);
-
-	if (directory_exists(testtablespace))
-	{
-		if (!rmtree(testtablespace, true))
-		{
-			fprintf(stderr, _("\n%s: could not remove test tablespace \"%s\"\n"),
-					progname, testtablespace);
-			exit(2);
-		}
-	}
-	make_directory(testtablespace);
 }
 
 /*
@@ -1983,7 +1952,6 @@ help(void)
 	printf(_("      --launcher=CMD            use CMD as launcher of psql\n"));
 	printf(_("      --load-extension=EXT      load the named extension before running the\n"));
 	printf(_("                                tests; can appear multiple times\n"));
-	printf(_("      --make-testtablespace-dir create testtablespace directory\n"));
 	printf(_("      --max-connections=N       maximum number of concurrent connections\n"));
 	printf(_("                                (default is 0, meaning unlimited)\n"));
 	printf(_("      --max-concurrent-tests=N  maximum number of concurrent tests in schedule\n"));
@@ -2042,12 +2010,10 @@ regression_main(int argc, char *argv[],
 		{"load-extension", required_argument, NULL, 22},
 		{"config-auth", required_argument, NULL, 24},
 		{"max-concurrent-tests", required_argument, NULL, 25},
-		{"make-testtablespace-dir", no_argument, NULL, 26},
 		{NULL, 0, NULL, 0}
 	};
 
 	bool		use_unix_sockets;
-	bool		make_testtablespace_dir = false;
 	_stringlist *sl;
 	int			c;
 	int			i;
@@ -2162,9 +2128,6 @@ regression_main(int argc, char *argv[],
 			case 25:
 				max_concurrent_tests = atoi(optarg);
 				break;
-			case 26:
-				make_testtablespace_dir = true;
-				break;
 			default:
 				/* getopt_long already emitted a complaint */
 				fprintf(stderr, _("\nTry \"%s -h\" for more information.\n"),
@@ -2227,9 +2190,6 @@ regression_main(int argc, char *argv[],
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
 	unlimit_core_size();
 #endif
-
-	if (make_testtablespace_dir)
-		prepare_testtablespace_dir();
 
 	if (temp_instance)
 	{

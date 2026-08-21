@@ -151,7 +151,7 @@ test: prepare conversion polymorphism
 # ----------
 # indexing 已随表继承(INHERITS)/分区功能裁剪而移除
 # minipg: explain/memoize 依赖 plpgsql 测试桩（explain_filter 等），PL/pgSQL 已裁剪，移除
-test: reloptions
+# reloptions 已裁剪，移除测试用例
 
 # ----------
 # Another group of parallel tests (compression)

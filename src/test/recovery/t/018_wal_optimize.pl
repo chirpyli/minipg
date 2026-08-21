@@ -58,33 +58,7 @@ wal_skip_threshold = 0
 	$node->start;
 
 	# Setup
-	my $tablespace_dir = $node->basedir . '/tablespace_other';
-	mkdir($tablespace_dir);
 	my $result;
-
-	# Test redo of CREATE TABLESPACE.
-	$node->safe_psql(
-		'postgres', "
-		CREATE TABLE moved (id int);
-		INSERT INTO moved VALUES (1);
-		CREATE TABLESPACE other LOCATION '$tablespace_dir';
-		BEGIN;
-		ALTER TABLE moved SET TABLESPACE other;
-		CREATE TABLE originated (id int);
-		INSERT INTO originated VALUES (1);
-		CREATE UNIQUE INDEX ON originated(id) TABLESPACE other;
-		COMMIT;");
-	$node->stop('immediate');
-	$node->start;
-	$result = $node->safe_psql('postgres', "SELECT count(*) FROM moved;");
-	is($result, qq(1), "wal_level = $wal_level, CREATE+SET TABLESPACE");
-	$result = $node->safe_psql(
-		'postgres', "
-		INSERT INTO originated VALUES (1) ON CONFLICT (id)
-		  DO UPDATE set id = originated.id + 1
-		  RETURNING id;");
-	is($result, qq(2),
-		"wal_level = $wal_level, CREATE TABLESPACE, CREATE INDEX");
 
 	# Test direct truncation optimization.  No tuples.
 	$node->safe_psql(
@@ -184,78 +158,6 @@ wal_skip_threshold = 0
 	$result =
 	  $node->safe_psql('postgres', "SELECT count(*) FROM trunc_copy;");
 	is($result, qq(3), "wal_level = $wal_level, TRUNCATE COPY");
-
-	# Like previous test, but rollback SET TABLESPACE in a subtransaction.
-	$node->safe_psql(
-		'postgres', "
-		BEGIN;
-		CREATE TABLE spc_abort (id serial PRIMARY KEY, id2 int);
-		INSERT INTO spc_abort VALUES (DEFAULT, generate_series(1,3000));
-		TRUNCATE spc_abort;
-		SAVEPOINT s;
-		  ALTER TABLE spc_abort SET TABLESPACE other; ROLLBACK TO s;
-		COPY spc_abort FROM '$copy_file' DELIMITER ',';
-		COMMIT;");
-	$node->stop('immediate');
-	$node->start;
-	$result = $node->safe_psql('postgres', "SELECT count(*) FROM spc_abort;");
-	is($result, qq(3),
-		"wal_level = $wal_level, SET TABLESPACE abort subtransaction");
-
-	# in different subtransaction patterns
-	$node->safe_psql(
-		'postgres', "
-		BEGIN;
-		CREATE TABLE spc_commit (id serial PRIMARY KEY, id2 int);
-		INSERT INTO spc_commit VALUES (DEFAULT, generate_series(1,3000));
-		TRUNCATE spc_commit;
-		SAVEPOINT s; ALTER TABLE spc_commit SET TABLESPACE other; RELEASE s;
-		COPY spc_commit FROM '$copy_file' DELIMITER ',';
-		COMMIT;");
-	$node->stop('immediate');
-	$node->start;
-	$result =
-	  $node->safe_psql('postgres', "SELECT count(*) FROM spc_commit;");
-	is($result, qq(3),
-		"wal_level = $wal_level, SET TABLESPACE commit subtransaction");
-
-	$node->safe_psql(
-		'postgres', "
-		BEGIN;
-		CREATE TABLE spc_nest (id serial PRIMARY KEY, id2 int);
-		INSERT INTO spc_nest VALUES (DEFAULT, generate_series(1,3000));
-		TRUNCATE spc_nest;
-		SAVEPOINT s;
-			ALTER TABLE spc_nest SET TABLESPACE other;
-			SAVEPOINT s2;
-				ALTER TABLE spc_nest SET TABLESPACE pg_default;
-			ROLLBACK TO s2;
-			SAVEPOINT s2;
-				ALTER TABLE spc_nest SET TABLESPACE pg_default;
-			RELEASE s2;
-		ROLLBACK TO s;
-		COPY spc_nest FROM '$copy_file' DELIMITER ',';
-		COMMIT;");
-	$node->stop('immediate');
-	$node->start;
-	$result = $node->safe_psql('postgres', "SELECT count(*) FROM spc_nest;");
-	is($result, qq(3),
-		"wal_level = $wal_level, SET TABLESPACE nested subtransaction");
-
-	$node->safe_psql(
-		'postgres', "
-		CREATE TABLE spc_hint (id int);
-		INSERT INTO spc_hint VALUES (1);
-		BEGIN;
-		ALTER TABLE spc_hint SET TABLESPACE other;
-		CHECKPOINT;
-		SELECT * FROM spc_hint;  -- set hint bit
-		INSERT INTO spc_hint VALUES (2);
-		COMMIT;");
-	$node->stop('immediate');
-	$node->start;
-	$result = $node->safe_psql('postgres', "SELECT count(*) FROM spc_hint;");
-	is($result, qq(2), "wal_level = $wal_level, SET TABLESPACE, hint bit");
 
 	$node->safe_psql(
 		'postgres', "

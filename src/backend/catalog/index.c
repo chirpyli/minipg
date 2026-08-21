@@ -26,7 +26,6 @@
 #include "access/amapi.h"
 #include "access/heapam.h"
 #include "access/multixact.h"
-#include "access/reloptions.h"
 #include "access/relscan.h"
 #include "access/sysattr.h"
 #include "access/tableam.h"
@@ -1142,13 +1141,6 @@ index_create(Relation heapRelation,
 
 	indexRelation->rd_index->indnkeyatts = indexInfo->ii_NumIndexKeyAttrs;
 
-	/* Validate opclass-specific options */
-	if (indexInfo->ii_OpclassOptions)
-		for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
-			(void) index_opclass_options(indexRelation, i + 1,
-										 indexInfo->ii_OpclassOptions[i],
-										 true);
-
 	/*
 	 * If this is bootstrap (initdb) time, then we don't actually fill in the
 	 * index yet.  We'll be creating more indexes and classes later, so we
@@ -1195,12 +1187,10 @@ index_create(Relation heapRelation,
  * Create concurrently an index based on the definition of the one provided by
  * caller.  The index is inserted into catalogs and needs to be built later
  * on.  This is called during concurrent reindex processing.
- *
- * "tablespaceOid" is the tablespace to use for this index.
  */
 Oid
 index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
-							   Oid tablespaceOid, const char *newName)
+							   const char *newName)
 {
 	Relation	indexRelation;
 	IndexInfo  *oldInfo,
@@ -1332,7 +1322,7 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 							  newInfo,
 							  indexColNames,
 							  indexRelation->rd_rel->relam,
-							  tablespaceOid,
+							  indexRelation->rd_rel->reltablespace,
 							  indexRelation->rd_indcollation,
 							  indclass->values,
 							  indcoloptions->values,
@@ -3200,7 +3190,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	volatile bool skipped_constraint = false;
 	PGRUsage	ru0;
 	bool		progress = ((params->options & REINDEXOPT_REPORT_PROGRESS) != 0);
-	bool		set_tablespace = false;
 
 	pg_rusage_init(&ru0);
 
@@ -3288,48 +3277,10 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 				 errmsg("cannot reindex invalid index on TOAST table")));
 
 	/*
-	 * System relations cannot be moved even if allow_system_table_mods is
-	 * enabled to keep things consistent with the concurrent case where all
-	 * the indexes of a relation are processed in series, including indexes of
-	 * toast relations.
-	 *
-	 * Note that this check is not part of CheckRelationTableSpaceMove() as it
-	 * gets used for ALTER TABLE SET TABLESPACE that could cascade across
-	 * toast relations.
-	 */
-	if (OidIsValid(params->tablespaceOid) &&
-		IsSystemRelation(iRel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move system relation \"%s\"",
-						RelationGetRelationName(iRel))));
-
-	/* Check if the tablespace of this index needs to be changed */
-	if (OidIsValid(params->tablespaceOid) &&
-		CheckRelationTableSpaceMove(iRel, params->tablespaceOid))
-		set_tablespace = true;
-
-	/*
 	 * Also check for active uses of the index in the current transaction; we
 	 * don't want to reindex underneath an open indexscan.
 	 */
 	CheckTableNotInUse(iRel, "REINDEX INDEX");
-
-	/* Set new tablespace, if requested */
-	if (set_tablespace)
-	{
-		/* Update its pg_class row */
-		SetRelationTableSpace(iRel, params->tablespaceOid, InvalidOid);
-
-		/*
-		 * Schedule unlinking of the old index storage at transaction commit.
-		 */
-		RelationDropStorage(iRel);
-		RelationAssumeNewRelfilenode(iRel);
-
-		/* Make sure the reltablespace change is visible */
-		CommandCounterIncrement();
-	}
 
 	/*
 	 * All predicate locks on the index are about to be made invalid. Promote
@@ -3608,14 +3559,11 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 	{
 		/*
 		 * Note that this should fail if the toast relation is missing, so
-		 * reset REINDEXOPT_MISSING_OK.  Even if a new tablespace is set for
-		 * the parent relation, the indexes on its toast table are not moved.
-		 * This rule is enforced by setting tablespaceOid to InvalidOid.
+		 * reset REINDEXOPT_MISSING_OK.
 		 */
 		ReindexParams newparams = *params;
 
 		newparams.options &= ~(REINDEXOPT_MISSING_OK);
-		newparams.tablespaceOid = InvalidOid;
 		result |= reindex_relation(toast_relid, flags, &newparams);
 	}
 

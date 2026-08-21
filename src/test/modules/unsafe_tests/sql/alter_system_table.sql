@@ -23,9 +23,6 @@ ALTER TABLE pg_namespace ADD CONSTRAINT foo UNIQUE USING INDEX pg_namespace_nspn
 -- reserved schema name
 CREATE SCHEMA pg_foo;
 
--- reserved tablespace name
-CREATE TABLESPACE pg_foo LOCATION '/no/such/location';
-
 -- minipg: PL/pgSQL removed. The original also created a plpgsql trigger on a
 -- system catalog and renamed it; that trigger-based portion is dropped.
 
@@ -56,12 +53,6 @@ ROLLBACK;
 BEGIN;
 CREATE SCHEMA pg_foo;
 ROLLBACK;
-
--- reserved tablespace name
-SET client_min_messages = error;  -- disable ENFORCE_REGRESSION_TEST_NAME_RESTRICTIONS warning
-CREATE TABLESPACE pg_foo LOCATION '/no/such/location';
-RESET client_min_messages;
-
 
 -- cleanup
 DROP USER regress_user_ast;

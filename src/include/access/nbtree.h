@@ -1084,28 +1084,6 @@ typedef BTScanOpaqueData *BTScanOpaque;
 #define SK_BT_DESC			(INDOPTION_DESC << SK_BT_INDOPTION_SHIFT)
 #define SK_BT_NULLS_FIRST	(INDOPTION_NULLS_FIRST << SK_BT_INDOPTION_SHIFT)
 
-typedef struct BTOptions
-{
-	int32		varlena_header_;	/* varlena header (do not touch directly!) */
-	int			fillfactor;		/* page fill factor in percent (0..100) */
-	float8		vacuum_cleanup_index_scale_factor;	/* deprecated */
-	bool		deduplicate_items;	/* Try to deduplicate items? */
-} BTOptions;
-
-#define BTGetFillFactor(relation) \
-	(AssertMacro(relation->rd_rel->relkind == RELKIND_INDEX && \
-				 relation->rd_rel->relam == BTREE_AM_OID), \
-	 (relation)->rd_options ? \
-	 ((BTOptions *) (relation)->rd_options)->fillfactor : \
-	 BTREE_DEFAULT_FILLFACTOR)
-#define BTGetTargetPageFreeSpace(relation) \
-	(BLCKSZ * (100 - BTGetFillFactor(relation)) / 100)
-#define BTGetDeduplicateItems(relation) \
-	(AssertMacro(relation->rd_rel->relkind == RELKIND_INDEX && \
-				 relation->rd_rel->relam == BTREE_AM_OID), \
-	((relation)->rd_options ? \
-	 ((BTOptions *) (relation)->rd_options)->deduplicate_items : true))
-
 /*
  * Constant definition for progress reporting.  Phase numbers must match
  * btbuildphasename.
@@ -1254,7 +1232,6 @@ extern void _bt_end_vacuum(Relation rel);
 extern void _bt_end_vacuum_callback(int code, Datum arg);
 extern Size BTreeShmemSize(void);
 extern void BTreeShmemInit(void);
-extern bytea *btoptions(Datum reloptions, bool validate);
 extern bool btproperty(Oid index_oid, int attno,
 					   IndexAMProperty prop, const char *propname,
 					   bool *res, bool *isnull);

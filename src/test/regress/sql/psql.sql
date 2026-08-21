@@ -1265,8 +1265,6 @@ set search_path to default;
 \da host.regression.pg_catalog.sum
 \da +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
-\db nonesuch.pg_default
-\db regression.pg_default
 \dc host.regression.public.conversion
 \dc (.public.conversion
 \dc nonesuch.public.conversion
@@ -1363,7 +1361,6 @@ set search_path to default;
 \dAf "no.such.operator.family"
 \dAo "no.such.operator.of.operator.family"
 \dAp "no.such.operator.support.function.of.operator.family"
-\db "no.such.tablespace"
 \dc "no.such.conversion"
 \dC "no.such.cast"
 \dd "no.such.object.description"
@@ -1401,7 +1398,6 @@ set search_path to default;
 \dAf "no.such.schema"."no.such.operator.family"
 \dAo "no.such.schema"."no.such.operator.of.operator.family"
 \dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
-\db "no.such.schema"."no.such.tablespace"
 \dc "no.such.schema"."no.such.conversion"
 \dC "no.such.schema"."no.such.cast"
 \dd "no.such.schema"."no.such.object.description"

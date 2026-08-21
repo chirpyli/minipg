@@ -15,7 +15,7 @@
 #include "postgres.h"
 
 #include "access/hash.h"
-#include "access/reloptions.h"
+
 #include "access/relscan.h"
 #include "port/pg_bitutils.h"
 #include "storage/buf_internals.h"
@@ -272,18 +272,7 @@ _hash_checkpage(Relation rel, Buffer buf, int flags)
 	}
 }
 
-bytea *
-hashoptions(Datum reloptions, bool validate)
-{
-	static const relopt_parse_elt tab[] = {
-		{"fillfactor", RELOPT_TYPE_INT, offsetof(HashOptions, fillfactor)},
-	};
 
-	return (bytea *) build_reloptions(reloptions, validate,
-									  RELOPT_KIND_HASH,
-									  sizeof(HashOptions),
-									  tab, lengthof(tab));
-}
 
 /*
  * _hash_get_indextuple_hashkey - get the hash index tuple's hash key value

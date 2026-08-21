@@ -14,7 +14,6 @@
 #include "postgres.h"
 
 #include "access/amapi.h"
-#include "access/reloptions.h"
 #include "catalog/index.h"
 #include "commands/vacuum.h"
 #include "nodes/pathnodes.h"
@@ -25,114 +24,8 @@ PG_MODULE_MAGIC;
 
 void		_PG_init(void);
 
-/* parse table for fillRelOptions */
-relopt_parse_elt di_relopt_tab[6];
-
-/* Kind of relation options for dummy index */
-relopt_kind di_relopt_kind;
-
-typedef enum DummyAmEnum
-{
-	DUMMY_AM_ENUM_ONE,
-	DUMMY_AM_ENUM_TWO
-}			DummyAmEnum;
-
-/* Dummy index options */
-typedef struct DummyIndexOptions
-{
-	int32		vl_len_;		/* varlena header (do not touch directly!) */
-	int			option_int;
-	double		option_real;
-	bool		option_bool;
-	DummyAmEnum option_enum;
-	int			option_string_val_offset;
-	int			option_string_null_offset;
-}			DummyIndexOptions;
-
-relopt_enum_elt_def dummyAmEnumValues[] =
-{
-	{"one", DUMMY_AM_ENUM_ONE},
-	{"two", DUMMY_AM_ENUM_TWO},
-	{(const char *) NULL}		/* list terminator */
-};
-
 /* Handler for index AM */
 PG_FUNCTION_INFO_V1(dihandler);
-
-/*
- * Validation function for string relation options.
- */
-static void
-validate_string_option(const char *value)
-{
-	ereport(NOTICE,
-			(errmsg("new option value for string parameter %s",
-					value ? value : "NULL")));
-}
-
-/*
- * This function creates a full set of relation option types,
- * with various patterns.
- */
-static void
-create_reloptions_table(void)
-{
-	di_relopt_kind = add_reloption_kind();
-
-	add_int_reloption(di_relopt_kind, "option_int",
-					  "Integer option for dummy_index_am",
-					  10, -10, 100, AccessExclusiveLock);
-	di_relopt_tab[0].optname = "option_int";
-	di_relopt_tab[0].opttype = RELOPT_TYPE_INT;
-	di_relopt_tab[0].offset = offsetof(DummyIndexOptions, option_int);
-
-	add_real_reloption(di_relopt_kind, "option_real",
-					   "Real option for dummy_index_am",
-					   3.1415, -10, 100, AccessExclusiveLock);
-	di_relopt_tab[1].optname = "option_real";
-	di_relopt_tab[1].opttype = RELOPT_TYPE_REAL;
-	di_relopt_tab[1].offset = offsetof(DummyIndexOptions, option_real);
-
-	add_bool_reloption(di_relopt_kind, "option_bool",
-					   "Boolean option for dummy_index_am",
-					   true, AccessExclusiveLock);
-	di_relopt_tab[2].optname = "option_bool";
-	di_relopt_tab[2].opttype = RELOPT_TYPE_BOOL;
-	di_relopt_tab[2].offset = offsetof(DummyIndexOptions, option_bool);
-
-	add_enum_reloption(di_relopt_kind, "option_enum",
-					   "Enum option for dummy_index_am",
-					   dummyAmEnumValues,
-					   DUMMY_AM_ENUM_ONE,
-					   "Valid values are \"one\" and \"two\".",
-					   AccessExclusiveLock);
-	di_relopt_tab[3].optname = "option_enum";
-	di_relopt_tab[3].opttype = RELOPT_TYPE_ENUM;
-	di_relopt_tab[3].offset = offsetof(DummyIndexOptions, option_enum);
-
-	add_string_reloption(di_relopt_kind, "option_string_val",
-						 "String option for dummy_index_am with non-NULL default",
-						 "DefaultValue", &validate_string_option,
-						 AccessExclusiveLock);
-	di_relopt_tab[4].optname = "option_string_val";
-	di_relopt_tab[4].opttype = RELOPT_TYPE_STRING;
-	di_relopt_tab[4].offset = offsetof(DummyIndexOptions,
-									   option_string_val_offset);
-
-	/*
-	 * String option for dummy_index_am with NULL default, and without
-	 * description.
-	 */
-	add_string_reloption(di_relopt_kind, "option_string_null",
-						 NULL,	/* description */
-						 NULL, &validate_string_option,
-						 AccessExclusiveLock);
-	di_relopt_tab[5].optname = "option_string_null";
-	di_relopt_tab[5].opttype = RELOPT_TYPE_STRING;
-	di_relopt_tab[5].offset = offsetof(DummyIndexOptions,
-									   option_string_null_offset);
-}
-
 
 /*
  * Build a new index.
@@ -219,19 +112,6 @@ dicostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 }
 
 /*
- * Parse relation options for index AM, returning a DummyIndexOptions
- * structure filled with option values.
- */
-static bytea *
-dioptions(Datum reloptions, bool validate)
-{
-	return (bytea *) build_reloptions(reloptions, validate,
-									  di_relopt_kind,
-									  sizeof(DummyIndexOptions),
-									  di_relopt_tab, lengthof(di_relopt_tab));
-}
-
-/*
  * Validator for index AM.
  */
 static bool
@@ -308,7 +188,6 @@ dihandler(PG_FUNCTION_ARGS)
 	amroutine->amvacuumcleanup = divacuumcleanup;
 	amroutine->amcanreturn = NULL;
 	amroutine->amcostestimate = dicostestimate;
-	amroutine->amoptions = dioptions;
 	amroutine->amproperty = NULL;
 	amroutine->ambuildphasename = NULL;
 	amroutine->amvalidate = divalidate;
@@ -329,5 +208,4 @@ dihandler(PG_FUNCTION_ARGS)
 void
 _PG_init(void)
 {
-	create_reloptions_table();
 }

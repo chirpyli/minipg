@@ -264,21 +264,6 @@ typedef struct HashMetaPageData
 
 typedef HashMetaPageData *HashMetaPage;
 
-typedef struct HashOptions
-{
-	int32		varlena_header_;	/* varlena header (do not touch directly!) */
-	int			fillfactor;		/* page fill factor in percent (0..100) */
-} HashOptions;
-
-#define HashGetFillFactor(relation) \
-	(AssertMacro(relation->rd_rel->relkind == RELKIND_INDEX && \
-				 relation->rd_rel->relam == HASH_AM_OID), \
-	 (relation)->rd_options ? \
-	 ((HashOptions *) (relation)->rd_options)->fillfactor :	\
-	 HASH_DEFAULT_FILLFACTOR)
-#define HashGetTargetPageUsage(relation) \
-	(BLCKSZ * HashGetFillFactor(relation) / 100)
-
 /*
  * Maximum size of a hash index item (it's okay to have only one per page)
  */
@@ -378,7 +363,6 @@ extern IndexBulkDeleteResult *hashbulkdelete(IndexVacuumInfo *info,
 											 void *callback_state);
 extern IndexBulkDeleteResult *hashvacuumcleanup(IndexVacuumInfo *info,
 												IndexBulkDeleteResult *stats);
-extern bytea *hashoptions(Datum reloptions, bool validate);
 extern bool hashvalidate(Oid opclassoid);
 extern void hashadjustmembers(Oid opfamilyoid,
 							  Oid opclassoid,

@@ -207,8 +207,4 @@ INSERT INTO hash_heap_float4 VALUES (1.1,1);
 CREATE INDEX hash_idx ON hash_heap_float4 USING hash (x);
 DROP TABLE hash_heap_float4 CASCADE;
 
--- Test out-of-range fillfactor values
-CREATE INDEX hash_f8_index2 ON hash_f8_heap USING hash (random float8_ops)
-	WITH (fillfactor=9);
-CREATE INDEX hash_f8_index2 ON hash_f8_heap USING hash (random float8_ops)
-	WITH (fillfactor=101);
+

@@ -6,6 +6,76 @@
 
 ---
 
+## Relation Options（reloptions）功能裁剪（2026-08-21）
+
+minipg 彻底裁剪 Relation Options（关系选项）系统。reloptions 是 PostgreSQL 中用于存储表/索引/视图等关系级配置参数（如 fillfactor、autovacuum 设置、toast_tuple_target 等）的机制，存储在 `pg_class.reloptions` 列中，由 `reloptions.c` 解析并缓存在 `Relation->rd_options` 中。本次裁剪移除了整个 reloptions 框架，包括核心文件、所有选项结构体、解析注册表、以及所有消费者代码。**不保留 fillfactor**，所有表/索引使用硬编码的默认值。
+
+### 核心文件删除
+
+- `src/include/access/reloptions.h` — reloptions 头文件（类型定义、API 声明）
+- `src/backend/access/common/reloptions.c` — reloptions 实现（注册表、解析、验证）
+- `src/include/utils/attoptcache.h` — 属性选项缓存头文件
+- `src/backend/utils/cache/attoptcache.c` — 属性选项缓存实现
+
+### 结构体与宏删除
+
+- `StdRdOptions`（标准关系选项，含 fillfactor、autovacuum、toast_tuple_target 等）
+- `BTOptions`（B-tree 索引选项，含 fillfactor、deduplicate_items 等）
+- `HashOptions`（Hash 索引选项，含 fillfactor）
+- `ViewOptions`（视图选项）
+- `AutoVacOpts`（autovacuum 子结构体）
+- 所有访问宏：`RelationGetFillFactor`、`BTGetFillFactor`、`BTGetDeduplicateItems`、`HashGetFillFactor`、`RelationGetToastTupleTarget`、`RelationGetTargetPageFreeSpace`、`HashGetTargetPageUsage` 等
+
+### 消费者代码修改
+
+- **`src/include/utils/rel.h`**：删除 `rd_options` 字段、所有 reloptions 结构体及宏
+- **`src/include/access/nbtree.h`**：删除 `BTOptions` 结构体及 `BT*` 宏
+- **`src/include/access/hash.h`**：删除 `HashOptions` 结构体及 `Hash*` 宏
+- **`src/backend/access/heap/hio.c`**：`RelationGetTargetPageFreeSpace()` → `saveFreeSpace = 0`
+- **`src/backend/access/heap/heapam.c`**：同上
+- **`src/backend/access/heap/rewriteheap.c`**：同上
+- **`src/backend/access/heap/pruneheap.c`**：同上
+- **`src/backend/access/heap/heaptoast.c`**：`RelationGetToastTupleTarget()` → `TOAST_TUPLE_TARGET`
+- **`src/backend/access/nbtree/nbtinsert.c`**：删除 `BTGetDeduplicateItems` 条件判断
+- **`src/backend/access/nbtree/nbtsort.c`**：`BTGetTargetPageFreeSpace()` → `BLCKSZ*(100-BTREE_DEFAULT_FILLFACTOR)/100`；删除 `BTGetDeduplicateItems` 调用
+- **`src/backend/access/nbtree/nbtsplitloc.c`**：`BTGetFillFactor()` → `BTREE_DEFAULT_FILLFACTOR`
+- **`src/backend/access/nbtree/nbtutils.c`**：添加 `#include "storage/lwlock.h"`（因 reloptions.h 间接包含）；删除 `btoptions()` 函数
+- **`src/backend/access/hash/hashpage.c`**：`HashGetTargetPageUsage()` → `BLCKSZ*HASH_DEFAULT_FILLFACTOR/100/item_width`
+- **`src/backend/access/hash/hashutil.c`**：删除 `hashoptions()` 函数
+- **`src/backend/postmaster/autovacuum.c`**：删除 `AutoVacOpts` 结构及 `extract_autovac_opts()` 函数
+- **`src/backend/utils/cache/relcache.c`**：删除 `RelationParseRelOptions()` 函数及 `rd_options` 引用
+- **`src/backend/commands/tablecmds.c`**：删除 reloptions 解析/验证代码
+- **`src/backend/access/common/Makefile`**：移除 `reloptions.o`
+- **`src/bin/psql/command.c`**：添加 `exec_command_password()` 桩函数（因 `PQencryptPasswordConn` 随 libpq reloptions 裁剪丢失）
+
+### contrib 模块修改
+
+- **`contrib/bloom/blutils.c`**：移除 `#include "access/reloptions.h"`；删除 reloptions 注册代码（`bl_relopt_kind`、`bl_relopt_tab`、`add_int_reloption` 调用）；`bloptions()` 返回 NULL；`initBloomState()` 不再读取 `index->rd_options`
+- **`contrib/bloom/sql/bloom.sql`**：删除 reloptions 测试段（`WITH (length=N, col1=M)`、`SELECT reloptions` 等）
+- **`contrib/bloom/expected/bloom.out`**：同步删除预期输出
+
+### 回归测试修改
+
+- **删除文件**：`src/test/regress/sql/reloptions.sql`、`src/test/regress/expected/reloptions.out`
+- **`src/test/regress/parallel_schedule`**：移除 `test: reloptions`
+- **`src/test/regress/expected/btree_index.out`**：删除 `ERROR: operator class int4_ops has no options` 预期
+- **`src/test/regress/expected/hash_index.out`**：删除 fillfactor 越界错误预期
+- **`src/test/regress/expected/create_table.out`**：调整 `WITH OIDS` 测试预期（不再报 "not supported"）
+- **`src/test/regress/expected/strings.out`**：调整 `toast_tuple_target` 相关预期
+- **`src/test/regress/expected/tablesample.out`**：更新采样结果预期（因无 fillfactor 表页数变化）
+- **`src/test/regress/sql/btree_index.sql`**、**`hash_index.sql`**、**`create_table.sql`**、**`strings.sql`**、**`tablesample.sql`**：同步修改 SQL 测试
+- **`src/test/modules/dummy_index_am/Makefile`**：移除 `REGRESS = dummy_index_am`（reloptions 测试已删）
+
+### 保留项
+
+- `pg_class.reloptions` 列保留（系统目录结构不可修改），但不再解析，视为 NULL
+- `BloomOptions` 结构体保留在 `bloom.h`（用于磁盘存储 `BloomMetaPageData.opts`）
+- `amoptions_function` 索引 AM 接口保留（各索引 AM 仍需提供 `amoptions` 回调，即使返回 NULL）
+
+验证：`make -j4` 全量重编通过；`make check-world` 全绿。
+
+---
+
 ## 触发器（TRIGGER）功能裁剪（2026-08-20）
 
 minipg 彻底裁剪触发器功能（含 SQL 触发器、内部/系统触发器、INSTEAD OF 触发器、事件触发器残余、延迟触发队列）。触发器的用户侧语法/DDL/执行器/缓存/目录全链路删除，仅保留目录列 `pg_class.relhastriggers` 的字段与写入（由 pg_depend/规则共享的 `pg_rewrite` 不受影响）。
@@ -934,3 +1004,51 @@ minipg 的分区子系统已彻底裁剪（`src/backend/partitioning/` 目录不
 验证：`make -C src/backend` 全量重编 + `postgres` 链接成功（0 error / 0 undefined reference）；`grep enable_partitionwise_join|enable_partitionwise_aggregate|enable_partition_pruning|consider_partitionwise_join` 全代码库 0 命中；同步 `expected/sysviews.out` 后 `NO_TEMP_INSTALL=1 make check` **全部 82 个测试通过**。与不可裁部分（btree/hash 索引、事务）零耦合。
 
 > 注：中途曾见 `make check` 因 `pg_trigger` catalog 已裁、initdb post-bootstrap 脚本仍 `INSERT INTO pg_depend ... FROM pg_trigger` 而在 initdb 环节失败（见工作记忆）；再次干净重跑临时实例后 initdb 正常，`make check` 全绿，故该 initdb 报错属临时实例残留的既有干扰，非本次裁剪引入。
+
+---
+
+## 彻底裁剪 create/drop/alter tablespace（用户自建表空间管理，2026-08-21）
+
+表空间管理属非核心外围 DDL（学习价值集中在 md.c/smgr 的 spcNode 寻址与 pg_default/pg_global 布局，而非 DDL 语句本身），本次彻底裁剪用户自建表空间的全部入口。**保留 `pg_tablespace` 系统目录与 `pg_default`(1663)/`pg_global`(1664) 两个内建表空间**：initdb 仍加载这两行，`base/`、`global/` 目录布局与 md.c/smgr 按 spcNode 寻址的内核路径不变，`pg_class.reltablespace` 字段保留（新建对象恒为 0=库默认）。本次共改动 60+ 文件、净删约 5700 行。
+
+### SQL 入口（语法/节点/分发）
+- **`src/backend/parser/gram.y`**：删除 `CREATE TABLESPACE`/`DROP TABLESPACE` 语句与 `CreateTableSpaceStmt`/`DropTableSpaceStmt` 产生式；删除 `OptTableSpace`/`OptConsTableSpace`/`OptTableSpaceOwner`（CREATE TABLE/INDEX ... TABLESPACE 子句）；删除 `ALTER TABLE ... SET TABLESPACE`（`AT_SetTableSpace`）与 `ALTER TABLE/INDEX ALL IN TABLESPACE ... [OWNED BY] SET TABLESPACE`（`AlterTableMoveAllStmt`，其 `role_list` 引用一并清除）；删除 CREATE DATABASE 选项中的 TABLESPACE 支持与 `ALTER DATABASE name SET TABLESPACE` 产生式（ALTER DATABASE 此前已裁，此为其最后残留变体）；删除 `ALTER TABLESPACE ... SET/RESET` 相关 `%type` 残留。连带清理：删除前轮 GRANT/ROLE 裁剪遗留的死规则 `role_list`（bison "useless nonterminal" 警告）与 `ALTER DATABASE` 空注释头。
+- **`src/include/nodes/parsenodes.h`/`nodes.h`、`src/backend/nodes/{copy,equal,out}funcs.c`**：删除 `CreateTableSpaceStmt`/`DropTableSpaceStmt`/`AlterTableSpaceOptionsStmt`/`AlterTableMoveAllStmt` 节点、`T_` 枚举、`OBJECT_TABLESPACE`、`AT_SetTableSpace`，及 `CreateStmt`/`IndexStmt`/`CreatedbStmt` 等结构中的 tablespace 字段。
+- **`src/backend/tcop/utility.c`/`src/include/tcop/cmdtaglist.h`**：删除 4 处 switch 中 tablespace 命令 case 与 `CREATE/DROP TABLESPACE` 命令标签。
+
+### 执行层与 WAL（tablespace.c -1126 行）
+- **`src/backend/commands/tablespace.c`**：删除 `CreateTableSpace`/`DropTableSpace`/`AlterTableSpaceOptions` 及私有辅助 `create_tablespace_directories`/`destroy_tablespace_directories`、WAL redo `tblspc_redo` 与 `XLOG_TBLSPC_CREATE/DROP` 记录构造、无调用者的 `get_tablespace_oid`。**保留**：`TablespaceCreateDbspace`（md.c 首次建库子目录依赖）、`GetDefaultTablespace`（恒返回 `InvalidOid` 即库默认）、`PrepareTempTablespaces`（固定库默认，temp_tablespaces GUC 已删）、`get_tablespace_name`、`directory_is_empty`/`remove_tablespace_symlink`（initdb/启动路径文件系统工具）。
+- **WAL rmgr**：`src/include/access/rmgrlist.h` 删除 `RM_TBLSPC_ID`，删除 `src/backend/access/rmgrdesc/tblspcdesc.c`，`rmgrdesc/Makefile` 同步；`xlog.c` 删除 `XLOG_TBLSPC_*` 分发与 `allow_in_place_tablespaces` 检查。
+
+### 数据库命令与系统目录依赖
+- **`src/backend/commands/dbcommands.c`（-402 行）**：删除 `movedb`/`movedb_failure_callback`（ALTER DATABASE SET TABLESPACE 执行体）及 `createdb` 的 TABLESPACE 选项解析；`calculate_database_size` 仅统计 `base/`（pg_default）；`recovery_create_dbdir` 不再处理 in-place 表空间目录。
+- **共享依赖/对象地址**：`pg_shdepend.c` 删除 `shdepChangeDep` 与表空间→数据库的 `SHARED_DEPENDENCY_TABLESPACE` 记录路径；`objectaddress.c`/`dependency.c` 删除 `OBJECT_TABLESPACE`/`OCLASS_TBLSPACE` 全部 case。
+- **SQL 函数**：`pg_proc.dat` 删除 `pg_tablespace_location`、`pg_tablespace_size(_oid/_name)`、`pg_tablespace_databases`、`pg_stat_get_db_conflict_tablespace`；`misc.c`/`dbsize.c` 删除实现；`system_views.sql` 删除 `pg_stat_database_conflict_tablespace` 列。
+
+### GUC、缓存与规划器
+- **GUC**：删除 `default_tablespace`、`temp_tablespaces`（含 check/assign 回调）、`allow_in_place_tablespaces`（`guc.c`/`guc.h`/`postgresql.conf.sample`/`config.sgml`）。
+- **表空间选项缓存**：删除 `spccache.c`/`spccache.h`，`reloptions.c` 删除 `tablespace_reloptions` 与 `RELOPT_KIND_TABLESPACE`。
+- **规划器**：`costsize.c`/`selfuncs.c` 的 `get_tablespace_page_costs` 调用改为直接使用 `seq_page_cost`/`random_page_cost` GUC（per-tablespace I/O 成本参数随 spccache 一并消失）。
+
+### 备库恢复冲突与统计
+- 删除 `PROCSIG_RECOVERY_CONFLICT_TABLESPACE`（`procsignal.h`/`procsignal.c`）、`ResolveRecoveryConflictWithTablespace`（`standby.c`）、`pgstat` 的 `n_conflict_tablespace` 计数（`pgstat.h`/`pgstat.c`/`pgstatfuncs.c`）及 `wait_event.c` 相应等待事件。
+
+### psql 与其他工具
+- **psql**：删除 `\db` 元命令（`describe.c`/`describe.h`/`command.c`/`help.c`）与 `\l+` 的表空间列、`tab-complete.c` 的 TABLESPACE 补全分支。
+- **bootstrap**：`bootparse.y` 删除 BOOTSTRAP 语法的 TABLESPACE 输入支持；`postinit.c`/`sharedfileset.c`/`heapam.c`/`nodeBitmapHeapscan.c` 等调用点改为库默认表空间常量。
+
+### 回归测试
+- 删除 `src/test/regress/{input,output}/tablespace.source`，`parallel_schedule` 移除 tablespace 组；删除 recovery `t/033_replay_tsp_drops.pl`，裁剪 `t/031_recovery_conflict.pl` 表空间冲突段、`t/018_wal_optimize.pl` 表空间引用；`database.sql`/`misc_functions.sql`/`psql.sql` 及期望输出同步删除表空间用例；`unsafe_tests/alter_system_table` 中 pg_tablespace 不可 UPDATE 断言调整（目录仍保留，仍为系统表）；`pg_regress.c` 删除 `--tablespace`/`--temp-tablespace` 选项处理。
+
+### 保留边界（未破坏）
+`pg_tablespace` 系统目录（含 `spcacl` 等全部列）、pg_default/pg_global 内建表空间、`base/`+`global/` 存储布局、md.c/smgr 的 spcNode 寻址、`pg_class.reltablespace` 字段（恒 0）、`TablespaceCreateDbspace` 目录创建路径均完整保留；btree/hash 索引与事务零耦合。
+
+### 关键经验
+- 删除 `ALTER DATABASE ... SET TABLESPACE` 产生式前需确认 ALTER DATABASE 其它变体的裁剪历史（minipg 中 ALTER DATABASE 早在 2026-08-16 轮已整体裁剪，该产生式是刻意保留的最后残留，删之即自然终结整条语法，无回归）。
+- gram.y 多轮裁剪后应关注 bison 的 "useless nonterminal/rules" 警告——它精准指示死规则（如本轮顺带清除的 `role_list`）。
+- 修复 `PRIMARY KEY opt_definition` 中 `$2`→`$3` 的语义值索引错位曾是本轮前置关键修复（类型错配导致 segfault，前轮已修，此处仅存档）。
+
+### 验证
+全量 `make -j8` 编译 0 error / 0 warning；`make check-world` 退出码 0（回归 82/82、isolation 66/66、recovery/unsafe_tests 等套件全绿）；冒烟验证：`pg_tablespace` 仅含 `pg_default`/`pg_global` 两行，`CREATE TABLESPACE`/`ALTER TABLE ... SET TABLESPACE`/`CREATE TABLE ... TABLESPACE`/`CREATE DATABASE ... TABLESPACE` 均报语法错误，`SET default_tablespace` 报 unrecognized configuration parameter，建表/主键/插入正常且 `reltablespace=0`。
+
+> 注：本轮工作树中还混有并发会话对 `superuser_reserved_connections`/`ReservedBackends`（postmaster.c）的裁剪改动，非本次表空间裁剪范畴，未计入本条目。

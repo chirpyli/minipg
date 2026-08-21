@@ -2716,15 +2716,6 @@ transformOnConflictArbiter(ParseState *pstate,
 				 parser_errposition(pstate,
 									exprLocation((Node *) onConflictClause))));
 
-	/* Same applies to table used by logical decoding as catalog table */
-	if (RelationIsUsedAsCatalogTable(pstate->p_target_relation))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("ON CONFLICT is not supported on table \"%s\" used as a catalog table",
-						RelationGetRelationName(pstate->p_target_relation)),
-				 parser_errposition(pstate,
-									exprLocation((Node *) onConflictClause))));
-
 	/* ON CONFLICT DO NOTHING does not require an inference clause */
 	if (infer)
 	{

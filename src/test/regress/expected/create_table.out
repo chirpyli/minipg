@@ -192,9 +192,9 @@ ERROR:  syntax error at or near "OIDS"
 LINE 1: CREATE TABLE withoid() WITH OIDS;
                                     ^
 CREATE TABLE withoid() WITH (oids);
-ERROR:  tables declared WITH OIDS are not supported
 CREATE TABLE withoid() WITH (oids = true);
-ERROR:  tables declared WITH OIDS are not supported
+ERROR:  relation "withoid" already exists
+DROP TABLE withoid;
 -- but explicitly not adding oids is still supported
 CREATE TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
 CREATE TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;

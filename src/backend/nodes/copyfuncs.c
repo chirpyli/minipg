@@ -2568,8 +2568,6 @@ _copyConstraint(const Constraint *from)
 	COPY_NODE_FIELD(including);
 	COPY_NODE_FIELD(options);
 	COPY_STRING_FIELD(indexname);
-	COPY_STRING_FIELD(indexspace);
-	COPY_SCALAR_FIELD(reset_default_tblspc);
 	COPY_STRING_FIELD(access_method);
 	COPY_NODE_FIELD(where_clause);
 	COPY_NODE_FIELD(pktable);
@@ -2862,7 +2860,6 @@ CopyCreateStmtFields(const CreateStmt *from, CreateStmt *newnode)
 	COPY_NODE_FIELD(constraints);
 	COPY_NODE_FIELD(options);
 	COPY_SCALAR_FIELD(oncommit);
-	COPY_STRING_FIELD(tablespacename);
 	COPY_STRING_FIELD(accessMethod);
 	COPY_SCALAR_FIELD(if_not_exists);
 }
@@ -2942,7 +2939,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_STRING_FIELD(idxname);
 	COPY_NODE_FIELD(relation);
 	COPY_STRING_FIELD(accessMethod);
-	COPY_STRING_FIELD(tableSpace);
 	COPY_NODE_FIELD(indexParams);
 	COPY_NODE_FIELD(indexIncludingParams);
 	COPY_NODE_FIELD(options);
@@ -2957,7 +2953,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(concurrent);
 	COPY_SCALAR_FIELD(if_not_exists);
-	COPY_SCALAR_FIELD(reset_default_tblspc);
 
 	return newnode;
 }
@@ -3287,56 +3282,6 @@ _copyDiscardStmt(const DiscardStmt *from)
 	DiscardStmt *newnode = makeNode(DiscardStmt);
 
 	COPY_SCALAR_FIELD(target);
-
-	return newnode;
-}
-
-static CreateTableSpaceStmt *
-_copyCreateTableSpaceStmt(const CreateTableSpaceStmt *from)
-{
-	CreateTableSpaceStmt *newnode = makeNode(CreateTableSpaceStmt);
-
-	COPY_STRING_FIELD(tablespacename);
-	COPY_NODE_FIELD(owner);
-	COPY_STRING_FIELD(location);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
-static DropTableSpaceStmt *
-_copyDropTableSpaceStmt(const DropTableSpaceStmt *from)
-{
-	DropTableSpaceStmt *newnode = makeNode(DropTableSpaceStmt);
-
-	COPY_STRING_FIELD(tablespacename);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
-static AlterTableSpaceOptionsStmt *
-_copyAlterTableSpaceOptionsStmt(const AlterTableSpaceOptionsStmt *from)
-{
-	AlterTableSpaceOptionsStmt *newnode = makeNode(AlterTableSpaceOptionsStmt);
-
-	COPY_STRING_FIELD(tablespacename);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(isReset);
-
-	return newnode;
-}
-
-static AlterTableMoveAllStmt *
-_copyAlterTableMoveAllStmt(const AlterTableMoveAllStmt *from)
-{
-	AlterTableMoveAllStmt *newnode = makeNode(AlterTableMoveAllStmt);
-
-	COPY_STRING_FIELD(orig_tablespacename);
-	COPY_SCALAR_FIELD(objtype);
-	COPY_NODE_FIELD(roles);
-	COPY_STRING_FIELD(new_tablespacename);
-	COPY_SCALAR_FIELD(nowait);
 
 	return newnode;
 }
@@ -4020,18 +3965,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_DiscardStmt:
 			retval = _copyDiscardStmt(from);
-			break;
-		case T_CreateTableSpaceStmt:
-			retval = _copyCreateTableSpaceStmt(from);
-			break;
-		case T_DropTableSpaceStmt:
-			retval = _copyDropTableSpaceStmt(from);
-			break;
-		case T_AlterTableSpaceOptionsStmt:
-			retval = _copyAlterTableSpaceOptionsStmt(from);
-			break;
-		case T_AlterTableMoveAllStmt:
-			retval = _copyAlterTableMoveAllStmt(from);
 			break;
 		case T_CreateExtensionStmt:
 			retval = _copyCreateExtensionStmt(from);

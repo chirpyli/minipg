@@ -95,7 +95,6 @@
 #include "parser/parsetree.h"
 #include "utils/lsyscache.h"
 #include "utils/selfuncs.h"
-#include "utils/spccache.h"
 #include "utils/tuplesort.h"
 
 
@@ -243,9 +242,7 @@ cost_seqscan(Path *path, PlannerInfo *root,
 		startup_cost += disable_cost;
 
 	/* fetch estimated page cost for tablespace containing table */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  NULL,
-							  &spc_seq_page_cost);
+	spc_seq_page_cost = seq_page_cost;
 
 	/*
 	 * disk costs
@@ -325,9 +322,8 @@ cost_samplescan(Path *path, PlannerInfo *root,
 		path->rows = baserel->rows;
 
 	/* fetch estimated page cost for tablespace containing table */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  &spc_random_page_cost,
-							  &spc_seq_page_cost);
+	spc_random_page_cost = random_page_cost;
+	spc_seq_page_cost = seq_page_cost;
 
 	/* if NextSampleBlock is used, assume random access, else sequential */
 	spc_page_cost = (tsm->NextSampleBlock != NULL) ?
@@ -574,9 +570,8 @@ cost_index(IndexPath *path, PlannerInfo *root, double loop_count,
 	tuples_fetched = clamp_row_est(indexSelectivity * baserel->tuples);
 
 	/* fetch estimated page costs for tablespace containing table */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  &spc_random_page_cost,
-							  &spc_seq_page_cost);
+	spc_random_page_cost = random_page_cost;
+	spc_seq_page_cost = seq_page_cost;
 
 	/*----------
 	 * Estimate number of main-table pages fetched, and compute I/O cost.
@@ -987,9 +982,8 @@ cost_bitmap_heap_scan(Path *path, PlannerInfo *root, RelOptInfo *baserel,
 	T = (baserel->pages > 1) ? (double) baserel->pages : 1.0;
 
 	/* Fetch estimated page costs for tablespace containing table. */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  &spc_random_page_cost,
-							  &spc_seq_page_cost);
+	spc_random_page_cost = random_page_cost;
+	spc_seq_page_cost = seq_page_cost;
 
 	/*
 	 * For small numbers of pages we should charge spc_random_page_cost
@@ -1258,9 +1252,7 @@ cost_tidscan(Path *path, PlannerInfo *root,
 	cost_qual_eval(&tid_qual_cost, tidquals, root);
 
 	/* fetch estimated page cost for tablespace containing table */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  &spc_random_page_cost,
-							  NULL);
+	spc_random_page_cost = random_page_cost;
 
 	/* disk costs --- assume each tuple on a different page */
 	run_cost += spc_random_page_cost * ntuples;
@@ -1347,9 +1339,8 @@ cost_tidrangescan(Path *path, PlannerInfo *root,
 	cost_qual_eval(&tid_qual_cost, tidrangequals, root);
 
 	/* fetch estimated page cost for tablespace containing table */
-	get_tablespace_page_costs(baserel->reltablespace,
-							  &spc_random_page_cost,
-							  &spc_seq_page_cost);
+	spc_random_page_cost = random_page_cost;
+	spc_seq_page_cost = seq_page_cost;
 
 	/* disk costs; 1 random page and the remainder as seq pages */
 	run_cost += spc_random_page_cost + spc_seq_page_cost * nseqpages;

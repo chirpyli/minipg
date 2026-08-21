@@ -418,9 +418,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_RECOVERY_CONFLICT_SNAPSHOT:
 			event_name = "RecoveryConflictSnapshot";
 			break;
-		case WAIT_EVENT_RECOVERY_CONFLICT_TABLESPACE:
-			event_name = "RecoveryConflictTablespace";
-			break;
 		case WAIT_EVENT_RECOVERY_PAUSE:
 			event_name = "RecoveryPause";
 			break;

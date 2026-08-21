@@ -20,7 +20,6 @@ OBJS = \
 	relmapdesc.o \
 	smgrdesc.o \
 	standbydesc.o \
-	tblspcdesc.o \
 	xactdesc.o \
 	xlogdesc.o
 

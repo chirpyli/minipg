@@ -63,12 +63,6 @@ typedef enum DependencyType
  * created for the owner of an object; hence two objects may be linked by
  * one or the other, but not both, of these dependency types.)
  *
- * (e) a SHARED_DEPENDENCY_TABLESPACE entry means that the referenced
- * object is a tablespace mentioned in a relation without storage.  The
- * referenced object must be a pg_tablespace entry.  (Relations that have
- * storage don't need this: they are protected by the existence of a physical
- * file in the tablespace.)
- *
  * SHARED_DEPENDENCY_INVALID is a value used as a parameter in internal
  * routines, and is not valid in the catalog itself.
  */
@@ -77,7 +71,6 @@ typedef enum SharedDependencyType
 	SHARED_DEPENDENCY_PIN = 'p',
 	SHARED_DEPENDENCY_OWNER = 'o',
 	SHARED_DEPENDENCY_ACL = 'a',
-	SHARED_DEPENDENCY_TABLESPACE = 't',
 	SHARED_DEPENDENCY_INVALID = 0
 } SharedDependencyType;
 
@@ -109,7 +102,6 @@ typedef enum ObjectClass
 	OCLASS_SCHEMA,				/* pg_namespace */
 	OCLASS_STATISTIC_EXT,		/* pg_statistic_ext */
 	OCLASS_DATABASE,			/* pg_database */
-	OCLASS_TBLSPACE,			/* pg_tablespace */
 	OCLASS_EXTENSION,			/* pg_extension */
 	OCLASS_TRANSFORM			/* pg_transform */
 } ObjectClass;
@@ -219,12 +211,6 @@ extern void recordSharedDependencyOn(ObjectAddress *depender,
 
 extern void deleteSharedDependencyRecordsFor(Oid classId, Oid objectId,
 											 int32 objectSubId);
-
-extern void recordDependencyOnTablespace(Oid classId, Oid objectId,
-										 Oid tablespace);
-
-extern void changeDependencyOnTablespace(Oid classId, Oid objectId,
-										 Oid newTablespaceId);
 
 extern bool checkSharedDependencies(Oid classId, Oid objectId,
 									char **detail_msg, char **detail_log_msg);
