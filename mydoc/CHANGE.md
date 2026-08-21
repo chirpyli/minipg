@@ -6,6 +6,21 @@
 
 ---
 
+## initdb 裁剪：移除 `-A/--auth`、`--auth-host`、`--auth-local` 三个选项（2026-08-21）
+
+minipg 已不再需要 initdb 的认证方式配置选项，本次裁剪移除以下三个命令行选项：
+
+- `-A, --auth=METHOD`：本地连接的默认认证方式
+- `--auth-host=METHOD`：本地 TCP/IP 连接的默认认证方式
+- `--auth-local=METHOD`：本地 Unix 域套接字连接的默认认证方式
+
+涉及文件：
+
+- **`src/bin/initdb/initdb.c`**：删除 `usage()` 中三个选项的帮助文本；从 `getopt_long` 短选项字符串中移除 `A:`。
+- **`src/test/perl/PostgresNode.pm`**：测试基础设施调用 `initdb` 时移除 `-A trust` 参数。
+
+---
+
 ## CREATE/ALTER/DROP CONVERSION 功能裁剪 与 SEQUENCE 残留裁剪（2026-08-21）
 
 ### 一、CREATE/ALTER/DROP CONVERSION 功能裁剪
