@@ -572,22 +572,6 @@ include_dir 'conf.d'
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-external-pid-file" xreflabel="external_pid_file">
-      <term><varname>external_pid_file</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>external_pid_file</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Specifies the name of an additional process-ID (PID) file that the
-        server should create for use by server administration programs.
-        This parameter can only be set at server start.
-       </para>
-      </listitem>
-     </varlistentry>
-     </variablelist>
-
      <para>
       In a default installation, none of the above parameters are set
       explicitly.  Instead, the

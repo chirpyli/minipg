@@ -512,7 +512,6 @@ int			num_temp_buffers = 1024;
 
 char	   *cluster_name = "";
 char	   *ConfigFileName;
-char	   *external_pid_file;
 
 char	   *pgstat_temp_directory;
 
@@ -3636,17 +3635,6 @@ static struct config_string ConfigureNamesString[] =
 		&ConfigFileName,
 		NULL,
 		NULL, NULL, NULL
-	},
-
-	{
-		{"external_pid_file", PGC_POSTMASTER, FILE_LOCATIONS,
-			gettext_noop("Writes the postmaster PID to the specified file."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&external_pid_file,
-		NULL,
-		check_canonical_path, NULL, NULL
 	},
 
 	{

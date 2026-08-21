@@ -981,30 +981,6 @@ PostmasterMain(int argc, char *argv[])
 		ExitPostmaster(1);
 
 	/*
-	 * Write the external PID file if requested
-	 */
-	if (external_pid_file)
-	{
-		FILE	   *fpidfile = fopen(external_pid_file, "w");
-
-		if (fpidfile)
-		{
-			fprintf(fpidfile, "%d\n", MyProcPid);
-			fclose(fpidfile);
-
-			/* Make PID file world readable */
-			if (chmod(external_pid_file, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)
-				write_stderr("%s: could not change permissions of external PID file \"%s\": %s\n",
-							 progname, external_pid_file, strerror(errno));
-		}
-		else
-			write_stderr("%s: could not write external PID file \"%s\": %s\n",
-						 progname, external_pid_file, strerror(errno));
-
-		on_proc_exit(unlink_external_pid_file, 0);
-	}
-
-	/*
 	 * Remove old temporary files.  At this point there can be no other
 	 * Postgres processes running in this directory, so this should be safe.
 	 */
@@ -1020,26 +996,6 @@ PostmasterMain(int argc, char *argv[])
 	 * Initialize the autovacuum subsystem (again, no process start yet)
 	 */
 	autovac_init();
-
-#ifdef HAVE_PTHREAD_IS_THREADED_NP
-
-	/*
-	 * On macOS, libintl replaces setlocale() with a version that calls
-	 * CFLocaleCopyCurrent() when its second argument is "" and every relevant
-	 * environment variable is unset or empty.  CFLocaleCopyCurrent() makes
-	 * the process multithreaded.  The postmaster calls sigprocmask() and
-	 * calls fork() without an immediate exec(), both of which have undefined
-	 * behavior in a multithreaded program.  A multithreaded postmaster is the
-	 * normal case on Windows, which offers neither fork() nor sigprocmask().
-	 * Currently, macOS is the only platform having pthread_is_threaded_np(),
-	 * so we need not worry whether this HINT is appropriate elsewhere.
-	 */
-	if (pthread_is_threaded_np() != 0)
-		ereport(FATAL,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("postmaster became multithreaded during startup"),
-				 errhint("Set the LC_ALL environment variable to a valid locale.")));
-#endif
 
 	/*
 	 * Remember postmaster startup time
@@ -1109,17 +1065,6 @@ CloseServerPorts(int status, Datum arg)
 	 * removed in a later on_proc_exit callback.
 	 */
 }
-
-/*
- * on_proc_exit callback to delete external_pid_file
- */
-static void
-unlink_external_pid_file(int status, Datum arg)
-{
-	if (external_pid_file)
-		unlink(external_pid_file);
-}
-
 
 /*
  * Compute and check the directory paths to files that are part of the
@@ -1452,15 +1397,6 @@ ServerLoop(void)
 		/* Get other worker processes running, if needed */
 		if (StartWorkerNeeded || HaveCrashedWorker)
 			maybe_start_bgworkers();
-
-#ifdef HAVE_PTHREAD_IS_THREADED_NP
-
-		/*
-		 * With assertions enabled, check regularly for appearance of
-		 * additional threads.  All builds check at start and exit.
-		 */
-		Assert(pthread_is_threaded_np() == 0);
-#endif
 
 		/*
 		 * Lastly, check to see if it's time to do some things that we don't
