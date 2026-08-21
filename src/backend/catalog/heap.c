@@ -88,8 +88,7 @@ static void AddNewRelationTuple(Relation pg_class_desc,
 								Oid reloftype,
 								char relkind,
 								TransactionId relfrozenxid,
-								TransactionId relminmxid,
-								Datum reloptions);
+								TransactionId relminmxid);
 static ObjectAddress AddNewRelationType(const char *typeName,
 										Oid typeNamespace,
 										Oid new_rel_oid,
@@ -903,8 +902,7 @@ AddNewAttributeTuples(Oid new_rel_oid,
 void
 InsertPgClassTuple(Relation pg_class_desc,
 				   Relation new_rel_desc,
-				   Oid new_rel_oid,
-				   Datum reloptions)
+				   Oid new_rel_oid)
 {
 	Form_pg_class rd_rel = new_rel_desc->rd_rel;
 	Datum		values[Natts_pg_class];
@@ -940,10 +938,7 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relrewrite - 1] = ObjectIdGetDatum(rd_rel->relrewrite);
 	values[Anum_pg_class_relfrozenxid - 1] = TransactionIdGetDatum(rd_rel->relfrozenxid);
 	values[Anum_pg_class_relminmxid - 1] = MultiXactIdGetDatum(rd_rel->relminmxid);
-	if (reloptions != (Datum) 0)
-		values[Anum_pg_class_reloptions - 1] = reloptions;
-	else
-		nulls[Anum_pg_class_reloptions - 1] = true;
+	nulls[Anum_pg_class_reloptions - 1] = true;
 
 	tup = heap_form_tuple(RelationGetDescr(pg_class_desc), values, nulls);
 
@@ -968,8 +963,7 @@ AddNewRelationTuple(Relation pg_class_desc,
 					Oid reloftype,
 					char relkind,
 					TransactionId relfrozenxid,
-					TransactionId relminmxid,
-					Datum reloptions)
+					TransactionId relminmxid)
 {
 	Form_pg_class new_rel_reltup;
 
@@ -1007,8 +1001,7 @@ AddNewRelationTuple(Relation pg_class_desc,
 	new_rel_desc->rd_att->tdtypmod = -1;
 
 	/* Now build and insert the tuple */
-	InsertPgClassTuple(pg_class_desc, new_rel_desc, new_rel_oid,
-					   reloptions);
+	InsertPgClassTuple(pg_class_desc, new_rel_desc, new_rel_oid);
 }
 
 
@@ -1110,7 +1103,6 @@ heap_create_with_catalog(const char *relname,
 						 bool shared_relation,
 						 bool mapped_relation,
 						 OnCommitAction oncommit,
-						 Datum reloptions,
 						 bool allow_system_table_mods,
 						 bool is_internal,
 						 Oid relrewrite,
@@ -1317,8 +1309,7 @@ heap_create_with_catalog(const char *relname,
 						reloftypeid,
 						relkind,
 						relfrozenxid,
-						relminmxid,
-						reloptions);
+						relminmxid);
 
 	/*
 	 * now add tuples to pg_attribute for the attributes in our new relation.

@@ -1674,7 +1674,6 @@ select v||'a', case when grouping(v||'a') = 1 then 1 else 0 end, count(*)
 -- Bug #16784
 create table bug_16784(i int, j int);
 analyze bug_16784;
-alter table bug_16784 set (autovacuum_enabled = 'false');
 update pg_class set reltuples = 10 where relname='bug_16784';
 insert into bug_16784 select g/10, g from generate_series(1,40) g;
 set work_mem='64kB';
@@ -1872,8 +1871,6 @@ ERROR:  syntax error at or near "as"
 LINE 1: create table gs_data_1 as
                                ^
 analyze gs_data_1;
-ERROR:  relation "gs_data_1" does not exist
-alter table gs_data_1 set (autovacuum_enabled = 'false');
 ERROR:  relation "gs_data_1" does not exist
 update pg_class set reltuples = 10 where relname='gs_data_1';
 set work_mem='64kB';

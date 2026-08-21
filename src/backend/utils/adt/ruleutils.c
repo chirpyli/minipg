@@ -470,8 +470,6 @@ static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static void add_cast_to(StringInfo buf, Oid typid);
 static char *generate_qualified_type_name(Oid typid);
 static text *string_to_text(char *str);
-static char *flatten_reloptions(Oid relid);
-static void get_reloptions(StringInfo buf, Datum reloptions);
 
 #define only_marker(rte)  ((rte)->inh ? "" : "ONLY ")
 
@@ -1100,9 +1098,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 
 			if (has_options)
 			{
-				appendStringInfoString(&buf, " (");
-				get_reloptions(&buf, attoptions);
-				appendStringInfoChar(&buf, ')');
+				appendStringInfoString(&buf, " (...)");
 			}
 
 			/* Add options if relevant */
@@ -1129,16 +1125,6 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 	if (!attrsOnly)
 	{
 		appendStringInfoChar(&buf, ')');
-
-		/*
-		 * If it has options, append "WITH (options)"
-		 */
-		str = flatten_reloptions(indexrelid);
-		if (str)
-		{
-			appendStringInfo(&buf, " WITH (%s)", str);
-			pfree(str);
-		}
 
 		/*
 		 * Print tablespace, but only if requested
@@ -1693,14 +1679,7 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 				/* XXX why do we only print these bits if fullCommand? */
 				if (fullCommand && OidIsValid(indexId))
 				{
-					char	   *options = flatten_reloptions(indexId);
 					Oid			tblspc;
-
-					if (options)
-					{
-						appendStringInfo(&buf, " WITH (%s)", options);
-						pfree(options);
-					}
 
 					/*
 					 * Print the tablespace, unless it's the database default.
@@ -10112,95 +10091,6 @@ string_to_text(char *str)
 	pfree(str);
 	return result;
 }
-
-/*
- * Generate a C string representing a relation options from text[] datum.
- */
-static void
-get_reloptions(StringInfo buf, Datum reloptions)
-{
-	Datum	   *options;
-	int			noptions;
-	int			i;
-
-	deconstruct_array(DatumGetArrayTypeP(reloptions),
-					  TEXTOID, -1, false, TYPALIGN_INT,
-					  &options, NULL, &noptions);
-
-	for (i = 0; i < noptions; i++)
-	{
-		char	   *option = TextDatumGetCString(options[i]);
-		char	   *name;
-		char	   *separator;
-		char	   *value;
-
-		/*
-		 * Each array element should have the form name=value.  If the "=" is
-		 * missing for some reason, treat it like an empty value.
-		 */
-		name = option;
-		separator = strchr(option, '=');
-		if (separator)
-		{
-			*separator = '\0';
-			value = separator + 1;
-		}
-		else
-			value = "";
-
-		if (i > 0)
-			appendStringInfoString(buf, ", ");
-		appendStringInfo(buf, "%s=", quote_identifier(name));
-
-		/*
-		 * In general we need to quote the value; but to avoid unnecessary
-		 * clutter, do not quote if it is an identifier that would not need
-		 * quoting.  (We could also allow numbers, but that is a bit trickier
-		 * than it looks --- for example, are leading zeroes significant?  We
-		 * don't want to assume very much here about what custom reloptions
-		 * might mean.)
-		 */
-		if (quote_identifier(value) == value)
-			appendStringInfoString(buf, value);
-		else
-			simple_quote_literal(buf, value);
-
-		pfree(option);
-	}
-}
-
-/*
- * Generate a C string representing a relation's reloptions, or NULL if none.
- */
-static char *
-flatten_reloptions(Oid relid)
-{
-	char	   *result = NULL;
-	HeapTuple	tuple;
-	Datum		reloptions;
-	bool		isnull;
-
-	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", relid);
-
-	reloptions = SysCacheGetAttr(RELOID, tuple,
-								 Anum_pg_class_reloptions, &isnull);
-	if (!isnull)
-	{
-		StringInfoData buf;
-
-		initStringInfo(&buf);
-		get_reloptions(&buf, reloptions);
-
-		result = buf.data;
-	}
-
-	ReleaseSysCache(tuple);
-
-	return result;
-}
-
 
 /*
  * deflist_to_tuplestore - Helper function to convert DefElem list to

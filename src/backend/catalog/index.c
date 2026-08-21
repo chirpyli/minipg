@@ -924,8 +924,7 @@ index_create(Relation heapRelation,
 	 * store index's pg_class entry
 	 */
 	InsertPgClassTuple(pg_class, indexRelation,
-					   RelationGetRelid(indexRelation),
-					   reloptions);
+					   RelationGetRelid(indexRelation));
 
 	/* done with pg_class */
 	table_close(pg_class, RowExclusiveLock);

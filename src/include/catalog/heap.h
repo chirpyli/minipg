@@ -76,7 +76,6 @@ extern Oid	heap_create_with_catalog(const char *relname,
 									 bool shared_relation,
 									 bool mapped_relation,
 									 OnCommitAction oncommit,
-									 Datum reloptions,
 									 bool allow_system_table_mods,
 									 bool is_internal,
 									 Oid relrewrite,
@@ -100,8 +99,7 @@ extern void InsertPgAttributeTuples(Relation pg_attribute_rel,
 
 extern void InsertPgClassTuple(Relation pg_class_desc,
 							   Relation new_rel_desc,
-							   Oid new_rel_oid,
-							   Datum reloptions);
+							   Oid new_rel_oid);
 
 extern List *AddRelationNewConstraints(Relation rel,
 									   List *newColDefaults,

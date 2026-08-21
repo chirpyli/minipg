@@ -50,9 +50,6 @@ extern void appendPsqlMetaConnect(PQExpBuffer buf, const char *dbname);
 
 extern bool parsePGArray(const char *atext, char ***itemarray, int *nitems);
 
-extern bool appendReloptionsArray(PQExpBuffer buffer, const char *reloptions,
-								  const char *prefix, int encoding, bool std_strings);
-
 extern bool processSQLNamePattern(PGconn *conn, PQExpBuffer buf,
 								  const char *pattern,
 								  bool have_where, bool force_escape,

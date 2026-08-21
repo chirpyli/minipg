@@ -86,7 +86,7 @@ reset enable_bitmapscan;
 -- Also check LIKE optimization with binary-compatible cases
 
 CREATE TABLE btree_bpchar (f1 text collate "C");
-create index on btree_bpchar(f1 bpchar_ops) WITH (deduplicate_items=on);
+create index on btree_bpchar(f1 bpchar_ops);
 insert into btree_bpchar values ('foo'), ('fool'), ('bar'), ('quux');
 -- doesn't match index:
 explain (costs off)
@@ -109,9 +109,9 @@ insert into btree_bpchar select 'foo' from generate_series(1,1500);
 --
 -- Perform unique checking, with and without the use of deduplication
 --
-CREATE TABLE dedup_unique_test_table (a int) WITH (autovacuum_enabled=false);
-CREATE UNIQUE INDEX dedup_unique ON dedup_unique_test_table (a) WITH (deduplicate_items=on);
-CREATE UNIQUE INDEX plain_unique ON dedup_unique_test_table (a) WITH (deduplicate_items=off);
+CREATE TABLE dedup_unique_test_table (a int);
+CREATE UNIQUE INDEX dedup_unique ON dedup_unique_test_table (a);
+CREATE UNIQUE INDEX plain_unique ON dedup_unique_test_table (a);
 -- Generate enough garbage tuples in index to ensure that even the unique index
 -- with deduplication enabled has to check multiple leaf pages during unique
 -- checking (at least with a BLCKSZ of 8192 or less)
@@ -148,7 +148,7 @@ INSERT INTO dedup_unique_test_table SELECT i FROM generate_series(0,450) i;
 -- with a short tree.
 create table btree_tall_tbl(id int4, t text);
 alter table btree_tall_tbl alter COLUMN t set storage plain;
-create index btree_tall_idx on btree_tall_tbl (t, id) with (fillfactor = 10);
+create index btree_tall_idx on btree_tall_tbl (t, id);
 insert into btree_tall_tbl select g, repeat('x', 250)
 from generate_series(1, 130) g;
 
@@ -172,13 +172,10 @@ VACUUM delete_test_table;
 -- need to insert some rows to cause the fast root page to split.
 INSERT INTO delete_test_table SELECT i, 1, 2, 3 FROM generate_series(1,1000) i;
 
--- Test case of ALTER INDEX with abuse of column names for indexes.
--- This grammar is not officially supported, but the parser allows it.
+-- minipg: ALTER INDEX ... ALTER COLUMN ... SET (...) reloptions removed.
 CREATE INDEX btree_tall_idx2 ON btree_tall_tbl (id);
-ALTER INDEX btree_tall_idx2 ALTER COLUMN id SET (n_distinct=100);
 DROP INDEX btree_tall_idx2;
 -- Partitioned index
 CREATE TABLE btree_part (id int4) PARTITION BY RANGE (id);
 CREATE INDEX btree_part_idx ON btree_part(id);
-ALTER INDEX btree_part_idx ALTER COLUMN id SET (n_distinct=100);
 DROP TABLE btree_part;

@@ -774,8 +774,6 @@ ProcessUtilitySlow(ParseState *pstate,
 						if (IsA(stmt, CreateStmt))
 						{
 							CreateStmt *cstmt = (CreateStmt *) stmt;
-							Datum		toast_options;
-
 							/* Create the table itself */
 							address = DefineRelation(cstmt,
 													 RELKIND_RELATION,
@@ -788,10 +786,7 @@ ProcessUtilitySlow(ParseState *pstate,
 							 */
 							CommandCounterIncrement();
 
-							toast_options = (Datum) 0;
-
-						NewRelationCreateToastTable(address.objectId,
-													toast_options);
+						NewRelationCreateToastTable(address.objectId);
 					}
 					else
 						{

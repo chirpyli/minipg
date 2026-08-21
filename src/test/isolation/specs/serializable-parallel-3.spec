@@ -7,7 +7,6 @@ setup
 {
 	CREATE TABLE foo (a int);
 	INSERT INTO foo SELECT generate_series(1, 10)::int a;
-	ALTER TABLE foo SET (parallel_workers = 2);
 }
 
 teardown

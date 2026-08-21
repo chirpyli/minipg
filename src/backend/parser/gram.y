@@ -312,7 +312,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	parse_toplevel stmtmulti routine_body_stmt_list
 				OptTableElementList TableElementList definition
 				OptTypedTableElementList TypedTableElementList
-				reloptions opt_reloptions
 				OptWith opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
 				aggr_args aggr_args_list
@@ -329,7 +328,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				target_list opt_target_list insert_column_list set_target_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
-				reloption_list opclass_item_list
+				opclass_item_list
 				opclass_purpose opt_opfamily transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
@@ -392,7 +391,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <node>	TableElement TypedTableElement ConstraintElem TableFuncElement
 %type <node>	columnDef columnOptions
-%type <defelt>	def_elem reloption_elem old_aggr_elem operator_def_elem
+%type <defelt>	def_elem old_aggr_elem operator_def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
 				columnref in_expr having_clause func_table array_expr
@@ -1396,24 +1395,6 @@ alter_table_cmds:
 					n->def = (Node *) makeInteger($6);
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET ( column_parameter = value [, ... ] ) */
-			| ALTER opt_column ColId SET reloptions
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetOptions;
-					n->name = $3;
-					n->def = (Node *) $5;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> RESET ( column_parameter = value [, ... ] ) */
-			| ALTER opt_column ColId RESET reloptions
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ResetOptions;
-					n->name = $3;
-					n->def = (Node *) $5;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET STORAGE <storagemode> */
 			| ALTER opt_column ColId SET STORAGE ColId
 				{
@@ -1595,22 +1576,6 @@ alter_table_cmds:
 					n->newowner = $3;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> SET (...) */
-			| SET reloptions
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetRelOptions;
-					n->def = (Node *)$2;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> RESET (...) */
-			| RESET reloptions
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ResetRelOptions;
-					n->def = (Node *)$2;
-					$$ = (Node *)n;
-				}
 			| alter_generic_options
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
@@ -1648,40 +1613,6 @@ alter_using:
 			| /* EMPTY */				{ $$ = NULL; }
 		;
 
-
-reloptions:
-			'(' reloption_list ')'					{ $$ = $2; }
-		;
-
-opt_reloptions:		WITH reloptions					{ $$ = $2; }
-			 |		/* EMPTY */						{ $$ = NIL; }
-		;
-
-reloption_list:
-			reloption_elem							{ $$ = list_make1($1); }
-			| reloption_list ',' reloption_elem		{ $$ = lappend($1, $3); }
-		;
-
-/* This should match def_elem and also allow qualified names */
-reloption_elem:
-			ColLabel '=' def_arg
-				{
-					$$ = makeDefElem($1, (Node *) $3, @1);
-				}
-			| ColLabel
-				{
-					$$ = makeDefElem($1, NULL, @1);
-				}
-			| ColLabel '.' ColLabel '=' def_arg
-				{
-					$$ = makeDefElemExtended($1, $3, (Node *) $5,
-											 DEFELEM_UNSPEC, @1);
-				}
-			| ColLabel '.' ColLabel
-				{
-					$$ = makeDefElemExtended($1, $3, NULL, DEFELEM_UNSPEC, @1);
-				}
-		;
 
 /*****************************************************************************
  *
@@ -2232,8 +2163,7 @@ table_access_method_clause:
 
 /* WITHOUT OIDS is legacy only */
 OptWith:
-			WITH reloptions				{ $$ = $2; }
-			| WITHOUT OIDS				{ $$ = NIL; }
+			WITHOUT OIDS				{ $$ = NIL; }
 			| /*EMPTY*/					{ $$ = NIL; }
 		;
 
@@ -3292,7 +3222,7 @@ opt_from_in:	from_in
 
 IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 			ON relation_expr access_method_clause '(' index_params ')'
-			opt_include opt_reloptions where_clause
+			opt_include where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -3302,8 +3232,8 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->accessMethod = $8;
 					n->indexParams = $10;
 					n->indexIncludingParams = $12;
-					n->options = $13;
-					n->whereClause = $14;
+					n->options = NIL;
+					n->whereClause = $13;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -3316,7 +3246,7 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 				}
 			| CREATE opt_unique INDEX opt_concurrently IF_P NOT EXISTS name
 			ON relation_expr access_method_clause '(' index_params ')'
-			opt_include opt_reloptions where_clause
+			opt_include where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -3326,8 +3256,8 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					n->accessMethod = $11;
 					n->indexParams = $13;
 					n->indexIncludingParams = $15;
-					n->options = $16;
-					n->whereClause = $17;
+					n->options = NIL;
+					n->whereClause = $16;
 					n->indexOid = InvalidOid;
 					n->oldNode = InvalidOid;
 					n->oldCreateSubid = InvalidSubTransactionId;
@@ -3377,18 +3307,6 @@ index_elem_options:
 			$$->opclassopts = NIL;
 			$$->ordering = $3;
 			$$->nulls_ordering = $4;
-		}
-	| opt_collate any_name reloptions opt_asc_desc opt_nulls_order
-		{
-			$$ = makeNode(IndexElem);
-			$$->name = NULL;
-			$$->expr = NULL;
-			$$->indexcolname = NULL;
-			$$->collation = $1;
-			$$->opclass = $2;
-			$$->opclassopts = $3;
-			$$->ordering = $4;
-			$$->nulls_ordering = $5;
 		}
 	;
 
@@ -4453,30 +4371,30 @@ opt_transaction_chain:
  *
  *****************************************************************************/
 
-ViewStmt: CREATE VIEW qualified_name opt_column_list opt_reloptions
+ViewStmt: CREATE VIEW qualified_name opt_column_list
 				AS SelectStmt opt_check_option
 				{
 					ViewStmt *n = makeNode(ViewStmt);
 					n->view = $3;
 					n->view->relpersistence = RELPERSISTENCE_PERMANENT;
 					n->aliases = $4;
-					n->query = $7;
+					n->query = $6;
 					n->replace = false;
-					n->options = $5;
-					n->withCheckOption = $8;
+					n->options = NIL;
+					n->withCheckOption = $7;
 					$$ = (Node *) n;
 				}
-		| CREATE OR REPLACE VIEW qualified_name opt_column_list opt_reloptions
+		| CREATE OR REPLACE VIEW qualified_name opt_column_list
 			AS SelectStmt opt_check_option
 			{
 				ViewStmt *n = makeNode(ViewStmt);
 				n->view = $5;
 				n->view->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->aliases = $6;
-					n->query = $9;
+					n->query = $8;
 					n->replace = true;
-					n->options = $7;
-					n->withCheckOption = $10;
+					n->options = NIL;
+					n->withCheckOption = $9;
 					$$ = (Node *) n;
 			}
 		;

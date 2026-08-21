@@ -580,9 +580,6 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	Oid			OIDNewHeap;
 	Oid			toastid;
 	Relation	OldHeap;
-	HeapTuple	tuple;
-	Datum		reloptions;
-	bool		isNull;
 	Oid			namespaceid;
 
 	OldHeap = table_open(OIDOldHeap, lockmode);
@@ -594,17 +591,6 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	 * no reason to spend cycles inserting them into the catalogs only to
 	 * delete them.
 	 */
-
-	/*
-	 * But we do want to use reloptions of the old heap for new heap.
-	 */
-	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(OIDOldHeap));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", OIDOldHeap);
-	reloptions = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_reloptions,
-								 &isNull);
-	if (isNull)
-		reloptions = (Datum) 0;
 
 	(void) relpersistence;		/* 临时表已裁剪，relpersistence 恒为 PERMANENT */
 	namespaceid = RelationGetNamespace(OldHeap);
@@ -638,14 +624,11 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 										  false,
 										  RelationIsMapped(OldHeap),
 										  ONCOMMIT_NOOP,
-										  reloptions,
 										  true,
 										  true,
 										  OIDOldHeap,
 										  NULL);
 	Assert(OIDNewHeap != InvalidOid);
-
-	ReleaseSysCache(tuple);
 
 	/*
 	 * Advance command counter so that the newly-created relation's catalog
@@ -668,17 +651,7 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	if (OidIsValid(toastid))
 	{
 		/* keep the existing toast table's reloptions, if any */
-		tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(toastid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for relation %u", toastid);
-		reloptions = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_reloptions,
-									 &isNull);
-		if (isNull)
-			reloptions = (Datum) 0;
-
-		NewHeapCreateToastTable(OIDNewHeap, reloptions, lockmode, toastid);
-
-		ReleaseSysCache(tuple);
+		NewHeapCreateToastTable(OIDNewHeap, lockmode, toastid);
 	}
 
 	table_close(OldHeap, NoLock);

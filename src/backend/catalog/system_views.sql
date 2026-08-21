@@ -57,7 +57,7 @@ CREATE VIEW pg_indexes AS
          LEFT JOIN pg_tablespace T ON (T.oid = I.reltablespace)
     WHERE C.relkind IN ('r', 'm', 'p') AND I.relkind IN ('i', 'I');
 
-CREATE VIEW pg_stats WITH (security_barrier) AS
+CREATE VIEW pg_stats AS
     SELECT
         nspname AS schemaname,
         relname AS tablename,
@@ -121,7 +121,7 @@ CREATE VIEW pg_stats WITH (security_barrier) AS
     WHERE NOT attisdropped;
 
 
-CREATE VIEW pg_stats_ext WITH (security_barrier) AS
+CREATE VIEW pg_stats_ext AS
     SELECT cn.nspname AS schemaname,
            c.relname AS tablename,
            sn.nspname AS statistics_schemaname,
@@ -152,7 +152,7 @@ CREATE VIEW pg_stats_ext WITH (security_barrier) AS
                    ) m ON sd.stxdmcv IS NOT NULL
     WHERE true;
 
-CREATE VIEW pg_stats_ext_exprs WITH (security_barrier) AS
+CREATE VIEW pg_stats_ext_exprs AS
     SELECT cn.nspname AS schemaname,
            c.relname AS tablename,
            sn.nspname AS statistics_schemaname,

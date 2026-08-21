@@ -405,9 +405,6 @@ static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
 static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
 									 LOCKMODE lockmode);
 static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
-static void ATExecSetRelOptions(Relation rel, List *defList,
-								AlterTableType operation,
-								LOCKMODE lockmode);
 static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 									char fires_when, LOCKMODE lockmode);
 static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
@@ -459,7 +456,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	List	   *old_constraints;
 	List	   *rawDefaults;
 	List	   *cookedDefaults;
-	Datum		reloptions;
 	ListCell   *listptr;
 	AttrNumber	attnum;
 	bool		partitioned;
@@ -526,8 +522,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	/* Identify user ID that will own the table */
 	if (!OidIsValid(ownerId))
 		ownerId = GetUserId();
-
-	reloptions = (Datum) 0;
 
 	if (stmt->ofTypename)
 	{
@@ -663,7 +657,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 										  false,
 										  false,
 										  stmt->oncommit,
-										  reloptions,
 										  allowSystemTableMods,
 										  false,
 										  InvalidOid,
@@ -2727,14 +2720,6 @@ AlterTableGetLockLevel(List *cmds)
 				break;
 
 				/*
-				 * Only used by CREATE OR REPLACE VIEW which must conflict
-				 * with an SELECTs currently using the view.
-				 */
-			case AT_ReplaceRelOptions:
-				cmd_lockmode = AccessExclusiveLock;
-				break;
-
-				/*
 				 * These subcommands affect general strategies for performance
 				 * and maintenance, though don't change the semantic results
 				 * from normal data reads and writes. Delaying an ALTER TABLE
@@ -2755,19 +2740,6 @@ AlterTableGetLockLevel(List *cmds)
 		case AT_ValidateConstraint: /* Uses MVCC in getConstraints() */
 				cmd_lockmode = ShareUpdateExclusiveLock;
 				break;
-
-				/*
-				 * Rel options are more complex than first appears. Options
-				 * are set here for tables, views and indexes; for historical
-				 * reasons these can all be used with ALTER TABLE, so we can't
-				 * decide between them using the basic grammar.
-				 */
-			case AT_SetRelOptions:	/* Uses MVCC in getIndexes() and
-									 * getTables() */
-		case AT_ResetRelOptions:	/* Uses MVCC in getIndexes() and
-									 * getTables() */
-			cmd_lockmode = AccessExclusiveLock;
-			break;
 
 		case AT_AlterColumnGenericOptions:
 			cmd_lockmode = AccessExclusiveLock;
@@ -3018,14 +2990,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			pass = AT_PASS_DROP;
 			break;
-		case AT_SetRelOptions:	/* SET (...) */
-		case AT_ResetRelOptions:	/* RESET (...) */
-		case AT_ReplaceRelOptions:	/* reset them all, then set just these */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_INDEX);
-			/* This command never recurses */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
 		case AT_AlterConstraint:	/* ALTER CONSTRAINT */
 			ATSimplePermissions(rel, ATT_TABLE);
 			/* Recursion occurs during execution phase */
@@ -3136,7 +3100,7 @@ ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode,
 		 */
 		if ((tab->relkind == RELKIND_RELATION &&
 			 tab->partition_constraint == NULL))
-			AlterTableCreateToastTable(tab->relid, (Datum) 0, lockmode);
+			AlterTableCreateToastTable(tab->relid, lockmode);
 	}
 }
 
@@ -3311,11 +3275,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_DropOids:		/* SET WITHOUT OIDS */
 			/* nothing to do here, oid columns don't exist anymore */
-			break;
-		case AT_SetRelOptions:	/* SET (...) */
-		case AT_ResetRelOptions:	/* RESET (...) */
-		case AT_ReplaceRelOptions:	/* replace entire option list */
-			ATExecSetRelOptions(rel, (List *) cmd->def, cmd->subtype, lockmode);
 			break;
 		case AT_EnableRule:		/* ENABLE RULE name */
 			ATExecEnableDisableRule(rel, cmd->name,
@@ -8089,110 +8048,6 @@ ATExecDropCluster(Relation rel, LOCKMODE lockmode)
 {
 	mark_index_clustered(rel, InvalidOid, false);
 }
-
-/*
- * Set, reset, or replace reloptions.
- */
-static void
-ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
-					LOCKMODE lockmode)
-{
-	Oid			relid;
-	Relation	pgclass;
-	HeapTuple	tuple;
-	HeapTuple	newtuple;
-	Datum		datum;
-	bool		isnull;
-	Datum		newOptions;
-	Datum		repl_val[Natts_pg_class];
-	bool		repl_null[Natts_pg_class];
-	bool		repl_repl[Natts_pg_class];
-
-	if (defList == NIL && operation != AT_ReplaceRelOptions)
-		return;					/* nothing to do */
-
-	pgclass = table_open(RelationRelationId, RowExclusiveLock);
-
-	/* Fetch heap tuple */
-	relid = RelationGetRelid(rel);
-	tuple = SearchSysCacheLocked1(RELOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", relid);
-
-	newOptions = (Datum) 0;
-
-	/*
-	 * All we need do here is update the pg_class row; the new options will be
-	 * propagated into relcaches during post-commit cache inval.
-	 */
-	memset(repl_val, 0, sizeof(repl_val));
-	memset(repl_null, false, sizeof(repl_null));
-	memset(repl_repl, false, sizeof(repl_repl));
-
-	if (newOptions != (Datum) 0)
-		repl_val[Anum_pg_class_reloptions - 1] = newOptions;
-	else
-		repl_null[Anum_pg_class_reloptions - 1] = true;
-
-	repl_repl[Anum_pg_class_reloptions - 1] = true;
-
-	newtuple = heap_modify_tuple(tuple, RelationGetDescr(pgclass),
-								 repl_val, repl_null, repl_repl);
-
-	CatalogTupleUpdate(pgclass, &newtuple->t_self, newtuple);
-	UnlockTuple(pgclass, &tuple->t_self, InplaceUpdateTupleLock);
-
-	InvokeObjectPostAlterHook(RelationRelationId, RelationGetRelid(rel), 0);
-
-	heap_freetuple(newtuple);
-
-	ReleaseSysCache(tuple);
-
-	/* repeat the whole exercise for the toast table, if there's one */
-	if (OidIsValid(rel->rd_rel->reltoastrelid))
-	{
-		Relation	toastrel;
-		Oid			toastid = rel->rd_rel->reltoastrelid;
-
-		toastrel = table_open(toastid, lockmode);
-
-		/* Fetch heap tuple */
-		tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(toastid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for relation %u", toastid);
-
-		newOptions = (Datum) 0;
-
-		memset(repl_val, 0, sizeof(repl_val));
-		memset(repl_null, false, sizeof(repl_null));
-		memset(repl_repl, false, sizeof(repl_repl));
-
-		if (newOptions != (Datum) 0)
-			repl_val[Anum_pg_class_reloptions - 1] = newOptions;
-		else
-			repl_null[Anum_pg_class_reloptions - 1] = true;
-
-		repl_repl[Anum_pg_class_reloptions - 1] = true;
-
-		newtuple = heap_modify_tuple(tuple, RelationGetDescr(pgclass),
-									 repl_val, repl_null, repl_repl);
-
-		CatalogTupleUpdate(pgclass, &newtuple->t_self, newtuple);
-
-		InvokeObjectPostAlterHookArg(RelationRelationId,
-									 RelationGetRelid(toastrel), 0,
-									 InvalidOid, true);
-
-		heap_freetuple(newtuple);
-
-		ReleaseSysCache(tuple);
-
-		table_close(toastrel, NoLock);
-	}
-
-	table_close(pgclass, RowExclusiveLock);
-}
-
 
 /*
  * ALTER TABLE ENABLE/DISABLE RULE

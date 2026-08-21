@@ -9,7 +9,6 @@
 setup {
     create table smalltbl (id int);
     insert into smalltbl select i as id from generate_series(1,20) i;
-    alter table smalltbl set (autovacuum_enabled = off);
 }
 setup {
     vacuum analyze smalltbl;

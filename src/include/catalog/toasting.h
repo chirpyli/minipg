@@ -19,10 +19,10 @@
 /*
  * toasting.c prototypes
  */
-extern void NewRelationCreateToastTable(Oid relOid, Datum reloptions);
-extern void NewHeapCreateToastTable(Oid relOid, Datum reloptions,
+extern void NewRelationCreateToastTable(Oid relOid);
+extern void NewHeapCreateToastTable(Oid relOid,
 									LOCKMODE lockmode, Oid OIDOldToast);
-extern void AlterTableCreateToastTable(Oid relOid, Datum reloptions,
+extern void AlterTableCreateToastTable(Oid relOid,
 									   LOCKMODE lockmode);
 extern void BootstrapToastTable(char *relName,
 								Oid toastOid, Oid toastIndexOid);

@@ -67,7 +67,14 @@ minipg 彻底裁剪 Relation Options（关系选项）系统。reloptions 是 Po
 - **`src/backend/access/hash/hashutil.c`**：删除 `hashoptions()` 函数
 - **`src/backend/postmaster/autovacuum.c`**：删除 `AutoVacOpts` 结构及 `extract_autovac_opts()` 函数
 - **`src/backend/utils/cache/relcache.c`**：删除 `RelationParseRelOptions()` 函数及 `rd_options` 引用
-- **`src/backend/commands/tablecmds.c`**：删除 reloptions 解析/验证代码
+- **`src/backend/commands/tablecmds.c`**：删除 `ATExecSetRelOptions` 函数定义及声明；删除 `AT_SetRelOptions`/`AT_ResetRelOptions`/`AT_ReplaceRelOptions` 相关 case 代码（lock mode、permission/prep、execution 三处）；删除 `Datum reloptions` 局部变量及赋值；删除 `heap_create_with_catalog` 调用中的 `reloptions` 参数；删除 `AlterTableCreateToastTable` 调用中的 `(Datum) 0` 参数
+- **`src/backend/catalog/heap.c`**：删除 `InsertPgClassTuple` 和 `AddNewRelationTuple` 中的 `reloptions` 参数及 `Anum_pg_class_reloptions` 写入代码；删除 `heap_create_with_catalog` 函数签名中的 `Datum reloptions` 参数
+- **`src/include/catalog/heap.h`**：从 `heap_create_with_catalog` 和 `InsertPgClassTuple` 声明中删除 `Datum reloptions` 参数
+- **`src/include/catalog/toasting.h`**：从 `NewRelationCreateToastTable`、`NewHeapCreateToastTable`、`AlterTableCreateToastTable` 声明中删除 `Datum reloptions` 参数
+- **`src/backend/catalog/toasting.c`**：删除 `heap_create_with_catalog` 调用中的 `(Datum) 0` 参数
+- **`src/backend/commands/cluster.c`**：删除 `heap_create_with_catalog` 调用中的 `(Datum) 0` 参数
+- **`src/backend/catalog/index.c`**：删除 `InsertPgClassTuple` 调用中的 `reloptions` 参数
+- **`src/backend/bootstrap/bootparse.y`**：删除 `heap_create_with_catalog` 调用中的 `(Datum) 0` 参数
 - **`src/backend/access/common/Makefile`**：移除 `reloptions.o`
 - **`src/bin/psql/command.c`**：添加 `exec_command_password()` 桩函数（因 `PQencryptPasswordConn` 随 libpq reloptions 裁剪丢失）
 
@@ -84,8 +91,10 @@ minipg 彻底裁剪 Relation Options（关系选项）系统。reloptions 是 Po
 - **`src/test/regress/expected/btree_index.out`**：删除 `ERROR: operator class int4_ops has no options` 预期
 - **`src/test/regress/expected/hash_index.out`**：删除 fillfactor 越界错误预期
 - **`src/test/regress/expected/create_table.out`**：调整 `WITH OIDS` 测试预期（不再报 "not supported"）
-- **`src/test/regress/expected/strings.out`**：调整 `toast_tuple_target` 相关预期
+- **`src/test/regress/expected/strings.out`**：调整 `toast_tuple_target` 相关预期；`ALTER TABLE toasttest set (toast_tuple_target = 4080)` 改为报 `ERROR: unrecognized alter table type: 34`
+- **`src/test/regress/expected/hash_index.out`**：删除 fillfactor 越界错误预期；`ALTER INDEX hash_split_index SET (fillfactor = 10)` 改为报 `ERROR: unrecognized alter table type: 34`
 - **`src/test/regress/expected/tablesample.out`**：更新采样结果预期（因无 fillfactor 表页数变化）
+- **`src/test/regress/expected/groupingsets.out`**：`alter table ... set (autovacuum_enabled = 'false')` 改为报 `ERROR: unrecognized alter table type: 34`
 - **`src/test/regress/sql/btree_index.sql`**、**`hash_index.sql`**、**`create_table.sql`**、**`strings.sql`**、**`tablesample.sql`**：同步修改 SQL 测试
 - **`src/test/modules/dummy_index_am/Makefile`**：移除 `REGRESS = dummy_index_am`（reloptions 测试已删）
 
@@ -1092,6 +1101,32 @@ minipg 的分区子系统已彻底裁剪（`src/backend/partitioning/` 目录不
 ### 文档删除（不记入裁剪统计）
 
 - **[config.sgml](file:///home/postgres/works/my-github/minipg/doc/src/sgml/config.sgml)**：删除整节 `guc-db-user-namespace` 文档
+
+### 验证
+
+`make -j$(nproc)` 全量编译 0 error；`make check-world` 退出码 0，全部回归测试通过。与不可裁部分（btree/hash 索引、事务）零耦合。
+
+---
+
+## Relation Options 残余代码清理（2026-08-21）
+
+在之前 reloptions 核心裁剪的基础上，继续清理残余的 reloptions 相关代码。
+
+### 涉及文件与改动
+
+- **`src/backend/commands/indexcmds.c`**：删除 `Datum reloptions` 局部变量及 `reloptions = (Datum) 0` 赋值；`index_create` 调用中 `reloptions` 参数改为 `(Datum) 0`
+- **`src/backend/commands/view.c`**：删除 `check_option` 变量及所有 reloptions 相关代码（`stmt->options` 中 `check_option` 的添加和遍历）
+- **`src/backend/catalog/toasting.c`**：删除所有函数（`AlterTableCreateToastTable`, `NewHeapCreateToastTable`, `NewRelationCreateToastTable`, `CheckAndCreateToastTable`, `create_toast_table`）的 `Datum reloptions` 参数；`heap_create_with_catalog` 调用中 `reloptions` 改为 `(Datum) 0`
+- **`src/backend/commands/cluster.c`**：删除 `Datum reloptions` 局部变量、`Anum_pg_class_reloptions` 的 SysCacheGetAttr 调用、`reloptions = (Datum) 0`、以及 `ReleaseSysCache(tuple)`；`heap_create_with_catalog` 和 `NewHeapCreateToastTable` 调用中 `reloptions` 改为 `(Datum) 0`
+- **`src/backend/utils/cache/relcache.c`**：注释中删除 `reloptions` 提及
+- **`src/backend/utils/adt/ruleutils.c`**：删除 `get_reloptions` 和 `flatten_reloptions` 函数的定义、声明及所有调用
+- **`src/backend/parser/parse_utilcmd.c`**：删除 `index->options = NIL;`
+- **`src/fe_utils/string_utils.c`**：删除 `appendReloptionsArray` 函数定义
+- **`src/include/fe_utils/string_utils.h`**：删除 `appendReloptionsArray` 函数声明
+- **`src/include/catalog/toasting.h`**：删除所有函数声明中的 `Datum reloptions` 参数
+- **`src/bin/psql/command.c`**：删除 `c.reloptions` 引用及 `appendReloptionsArray` 调用
+- **`src/backend/tcop/utility.c`**：删除 `toast_options` 变量及调用 `NewRelationCreateToastTable` 时的 `reloptions` 参数
+- **`src/backend/commands/tablecmds.c`**：`AlterTableCreateToastTable` 调用中删除 `(Datum) 0` 参数
 
 ### 验证
 
