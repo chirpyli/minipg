@@ -323,7 +323,6 @@ typedef enum NodeTag
 	T_ReindexStmt,
 	T_CheckPointStmt,
 	T_CreateSchemaStmt,
-	T_CreateConversionStmt,
 	T_CreateOpClassStmt,
 	T_CreateOpFamilyStmt,
 	T_PrepareStmt,

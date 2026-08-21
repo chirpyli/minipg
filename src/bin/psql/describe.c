@@ -2854,7 +2854,6 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
  * i - indexes
  * v - views
  * m - materialized views
- * s - sequences
  * E - foreign table (Note: different from 'f', the relkind value)
  * (any order of the above is fine)
  */
@@ -3357,77 +3356,6 @@ listDomains(const char *pattern, bool verbose, bool showSystem)
 	return true;
 }
 
-/*
- * \dc
- *
- * Describes conversions.
- */
-bool
-listConversions(const char *pattern, bool verbose, bool showSystem)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-	static const bool translate_columns[] =
-	{false, false, false, false, true, false};
-
-	initPQExpBuffer(&buf);
-
-	printfPQExpBuffer(&buf,
-					  "SELECT n.nspname AS \"%s\",\n"
-					  "       c.conname AS \"%s\",\n"
-					  "       pg_catalog.pg_encoding_to_char(c.conforencoding) AS \"%s\",\n"
-					  "       pg_catalog.pg_encoding_to_char(c.contoencoding) AS \"%s\",\n"
-					  "       CASE WHEN c.condefault THEN '%s'\n"
-					  "       ELSE '%s' END AS \"%s\"",
-					  gettext_noop("Schema"),
-					  gettext_noop("Name"),
-					  gettext_noop("Source"),
-					  gettext_noop("Destination"),
-					  gettext_noop("yes"), gettext_noop("no"),
-					  gettext_noop("Default?"));
-
-	appendPQExpBufferStr(&buf,
-						 "\nFROM pg_catalog.pg_conversion c\n"
-						 "     JOIN pg_catalog.pg_namespace n "
-						 "ON n.oid = c.connamespace\n");
-
-	appendPQExpBufferStr(&buf, "WHERE true\n");
-
-	if (!showSystem && !pattern)
-		appendPQExpBufferStr(&buf, "  AND n.nspname <> 'pg_catalog'\n"
-							 "  AND n.nspname <> 'information_schema'\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, true, false,
-								"n.nspname", "c.conname", NULL,
-								"pg_catalog.pg_conversion_is_visible(c.oid)",
-								NULL, 3))
-		return false;
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1, 2;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of conversions");
-	myopt.translate_header = true;
-	myopt.translate_columns = translate_columns;
-	myopt.n_translate_columns = lengthof(translate_columns);
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
-
-/*
- * \dX
- *
- * Describes extended statistics.
- */
 bool
 listExtendedStats(const char *pattern)
 {

@@ -972,7 +972,6 @@ static const pgsql_thing_t words_after_create[] = {
 	 * to be used only by pg_dump.
 	 */
 	{"CONFIGURATION", Query_for_list_of_ts_configurations, NULL, NULL, THING_NO_SHOW},
-	{"CONVERSION", "SELECT pg_catalog.quote_ident(conname) FROM pg_catalog.pg_conversion WHERE substring(pg_catalog.quote_ident(conname),1,%d)='%s'"},
 	{"DATABASE", Query_for_list_of_databases},
 	{"DEFAULT PRIVILEGES", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, NULL, THING_NO_SHOW},
@@ -1576,9 +1575,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("ALTER", "COLLATION", MatchAny))
 		COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA");
 
-	/* ALTER CONVERSION <name> */
-	else if (Matches("ALTER", "CONVERSION", MatchAny))
-		COMPLETE_WITH("OWNER TO", "RENAME TO", "SET SCHEMA");
 
 
 	/* ALTER FOREIGN */
@@ -1699,14 +1695,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER DOMAIN <sth> SET */
 	else if (Matches("ALTER", "DOMAIN", MatchAny, "SET"))
 		COMPLETE_WITH("DEFAULT", "NOT NULL", "SCHEMA");
-	/* ALTER SEQUENCE <name> */
-	else if (Matches("ALTER", "SEQUENCE", MatchAny))
-		COMPLETE_WITH("INCREMENT", "MINVALUE", "MAXVALUE", "RESTART", "NO",
-					  "CACHE", "CYCLE", "SET SCHEMA", "OWNED BY", "OWNER TO",
-					  "RENAME TO");
-	/* ALTER SEQUENCE <name> NO */
-	else if (Matches("ALTER", "SEQUENCE", MatchAny, "NO"))
-		COMPLETE_WITH("MINVALUE", "MAXVALUE", "CYCLE");
 	/* ALTER SERVER <name> */
 	else if (Matches("ALTER", "SERVER", MatchAny))
 		COMPLETE_WITH("VERSION", "OPTIONS", "OWNER TO", "RENAME TO");
@@ -2078,11 +2066,11 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("COMMENT"))
 		COMPLETE_WITH("ON");
 	else if (Matches("COMMENT", "ON"))
-		COMPLETE_WITH(				  "ACCESS METHOD", "CAST", "COLLATION", "CONVERSION",
+		COMPLETE_WITH(				  "ACCESS METHOD", "CAST", "COLLATION",
 				  "DATABASE", "EXTENSION",
 				  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
 					  "INDEX", "LANGUAGE", "PUBLICATION", "RULE",
-					  "SCHEMA", "SEQUENCE", "STATISTICS", "SUBSCRIPTION",
+					  "SCHEMA", "STATISTICS", "SUBSCRIPTION",
 					  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
 					  "COLUMN", "AGGREGATE", "FUNCTION",
 					  "PROCEDURE", "ROUTINE",
@@ -2265,13 +2253,6 @@ psql_completion(const char *text, int start, int end)
 	/* Complete "AS ON <sth> TO" with a table name */
 	else if (TailMatches("AS", "ON", "SELECT|UPDATE|INSERT|DELETE", "TO"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
-
-/* CREATE SEQUENCE --- is allowed inside CREATE SCHEMA, so use TailMatches */
-	else if (TailMatches("CREATE", "SEQUENCE", MatchAny))
-		COMPLETE_WITH("INCREMENT BY", "MINVALUE", "MAXVALUE", "NO", "CACHE",
-					  "CYCLE", "OWNED BY", "START WITH");
-	else if (TailMatches("CREATE", "SEQUENCE", MatchAny, "NO"))
-		COMPLETE_WITH("MINVALUE", "MAXVALUE", "CYCLE");
 
 /* CREATE SERVER <name> */
 	else if (Matches("CREATE", "SERVER", MatchAny))
@@ -2637,7 +2618,7 @@ psql_completion(const char *text, int start, int end)
 /* DROP */
 	/* Complete DROP object with CASCADE / RESTRICT */
 	else if (Matches("DROP",
-					 "COLLATION|CONVERSION|DOMAIN|EXTENSION|LANGUAGE|PUBLICATION|SCHEMA|SEQUENCE|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
+					 "COLLATION|DOMAIN|EXTENSION|LANGUAGE|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
 					 MatchAny) ||
 			 Matches("DROP", "ACCESS", "METHOD", MatchAny) ||
 			 (Matches("DROP", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&

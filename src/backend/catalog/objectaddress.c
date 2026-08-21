@@ -180,7 +180,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_conversion_conname,
 		Anum_pg_conversion_connamespace,
 		InvalidAttrNumber,
-		OBJECT_CONVERSION,
 		true
 	},
 	{
@@ -440,10 +439,6 @@ static const struct object_type_map
 	{
 		"domain constraint", OBJECT_DOMCONSTRAINT
 	},
-	/* OCLASS_CONVERSION */
-	{
-		"conversion", OBJECT_CONVERSION
-	},
 	/* OCLASS_DEFAULT */
 	{
 		"default value", OBJECT_DEFAULT
@@ -673,11 +668,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_COLLATION:
 				address.classId = CollationRelationId;
 				address.objectId = get_collation_oid(castNode(List, object), missing_ok);
-				address.objectSubId = 0;
-				break;
-			case OBJECT_CONVERSION:
-				address.classId = ConversionRelationId;
-				address.objectId = get_conversion_oid(castNode(List, object), missing_ok);
 				address.objectSubId = 0;
 				break;
 			case OBJECT_OPCLASS:
@@ -1515,7 +1505,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_COLUMN:
 		case OBJECT_ATTRIBUTE:
 		case OBJECT_COLLATION:
-		case OBJECT_CONVERSION:
 		case OBJECT_STATISTIC_EXT:
 		case OBJECT_ACCESS_METHOD:
 		case OBJECT_DATABASE:
@@ -2054,38 +2043,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_CONVERSION:
-			{
-				HeapTuple	conTup;
-				Form_pg_conversion conv;
-				char	   *nspname;
-
-				conTup = SearchSysCache1(CONVOID,
-										 ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(conTup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for conversion %u",
-							 object->objectId);
-					break;
-				}
-
-				conv = (Form_pg_conversion) GETSTRUCT(conTup);
-
-				/* Qualify the name if not visible in search path */
-				if (ConversionIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(conv->connamespace);
-
-				appendStringInfo(&buffer, _("conversion %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(conv->conname)));
-				ReleaseSysCache(conTup);
-				break;
-			}
-
-		case OCLASS_DEFAULT:
 			{
 				Relation	attrdefDesc;
 				ScanKeyData skey[1];
@@ -2913,9 +2870,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 										 missing_ok);
 			break;
 
-		case OCLASS_CONVERSION:
-			appendStringInfoString(&buffer, "conversion");
-			break;
 
 		case OCLASS_DEFAULT:
 			appendStringInfoString(&buffer, "default value");
@@ -3325,33 +3279,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 						*objargs = lappend(*objargs, pstrdup(NameStr(con->conname)));
 				}
 
-				ReleaseSysCache(conTup);
-				break;
-			}
-
-		case OCLASS_CONVERSION:
-			{
-				HeapTuple	conTup;
-				Form_pg_conversion conForm;
-				char	   *schema;
-
-				conTup = SearchSysCache1(CONVOID,
-										 ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(conTup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for conversion %u",
-							 object->objectId);
-					break;
-				}
-				conForm = (Form_pg_conversion) GETSTRUCT(conTup);
-				schema = get_namespace_name_or_temp(conForm->connamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(conForm->conname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(conForm->conname)));
 				ReleaseSysCache(conTup);
 				break;
 			}

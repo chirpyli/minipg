@@ -251,7 +251,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
-		ViewStmt CheckPointStmt CreateConversionStmt
+		ViewStmt CheckPointStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
 		CreateAmStmt
 
@@ -736,7 +736,6 @@ stmt:	AlterDomainStmt
 			| ClosePortalStmt
 			| ClusterStmt
 			| CreateAmStmt
-			| CreateConversionStmt
 			| CreateDomainStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
@@ -2985,7 +2984,6 @@ object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
-			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
 			| STATISTICS							{ $$ = OBJECT_STATISTIC_EXT; }
 		;
 
@@ -4019,16 +4017,7 @@ opt_set_data: SET DATA_P							{ $$ = 1; }
  *****************************************************************************/
 
 AlterObjectSchemaStmt:
-			ALTER CONVERSION_P any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_CONVERSION;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER DOMAIN_P any_name SET SCHEMA name
+			ALTER DOMAIN_P any_name SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
 					n->objectType = OBJECT_DOMAIN;
@@ -4655,19 +4644,6 @@ opt_as:		AS
  *
  *****************************************************************************/
 
-CreateConversionStmt:
-			CREATE opt_default CONVERSION_P any_name FOR Sconst
-			TO Sconst FROM any_name
-			{
-				CreateConversionStmt *n = makeNode(CreateConversionStmt);
-				n->conversion_name = $4;
-				n->for_encoding_name = $6;
-				n->to_encoding_name = $8;
-				n->func_name = $10;
-				n->def = $2;
-				$$ = (Node *)n;
-			}
-		;
 
 /*****************************************************************************
  *

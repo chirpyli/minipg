@@ -1265,9 +1265,6 @@ set search_path to default;
 \da host.regression.pg_catalog.sum
 \da +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
-\dc host.regression.public.conversion
-\dc (.public.conversion
-\dc nonesuch.public.conversion
 \dC host.regression.pg_catalog.int8
 \dC ).pg_catalog.int8
 \dC nonesuch.pg_catalog.int8
@@ -1289,9 +1286,6 @@ set search_path to default;
 \dm host.regression.public.mvtest_bb
 \dm ^.public.mvtest_bb
 \dm nonesuch.public.mvtest_bb
-\ds host.regression.public.check_seq
-\ds regression|mydb.public.check_seq
-\ds nonesuch.public.check_seq
 \dt host.regression.public.b_star
 \dt regres+ion.public.b_star
 \dt nonesuch.public.b_star
@@ -1361,14 +1355,12 @@ set search_path to default;
 \dAf "no.such.operator.family"
 \dAo "no.such.operator.of.operator.family"
 \dAp "no.such.operator.support.function.of.operator.family"
-\dc "no.such.conversion"
 \dC "no.such.cast"
 \dd "no.such.object.description"
 \dD "no.such.domain"
 \ddp "no.such.default.access.privilege"
 \di "no.such.index.relation"
 \dm "no.such.materialized.view"
-\ds "no.such.relation"
 \dt "no.such.relation"
 \dv "no.such.relation"
 \df "no.such.function"
@@ -1398,14 +1390,12 @@ set search_path to default;
 \dAf "no.such.schema"."no.such.operator.family"
 \dAo "no.such.schema"."no.such.operator.of.operator.family"
 \dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
-\dc "no.such.schema"."no.such.conversion"
 \dC "no.such.schema"."no.such.cast"
 \dd "no.such.schema"."no.such.object.description"
 \dD "no.such.schema"."no.such.domain"
 \ddp "no.such.schema"."no.such.default.access.privilege"
 \di "no.such.schema"."no.such.index.relation"
 \dm "no.such.schema"."no.such.materialized.view"
-\ds "no.such.schema"."no.such.relation"
 \dt "no.such.schema"."no.such.relation"
 \dv "no.such.schema"."no.such.relation"
 \df "no.such.schema"."no.such.function"
@@ -1429,13 +1419,11 @@ set search_path to default;
 -- again, but with current database and dotted schema qualifications.
 \dt regression."no.such.schema"."no.such.table.relation"
 \da regression."no.such.schema"."no.such.aggregate.function"
-\dc regression."no.such.schema"."no.such.conversion"
 \dC regression."no.such.schema"."no.such.cast"
 \dd regression."no.such.schema"."no.such.object.description"
 \dD regression."no.such.schema"."no.such.domain"
 \di regression."no.such.schema"."no.such.index.relation"
 \dm regression."no.such.schema"."no.such.materialized.view"
-\ds regression."no.such.schema"."no.such.relation"
 \dt regression."no.such.schema"."no.such.relation"
 \dv regression."no.such.schema"."no.such.relation"
 \df regression."no.such.schema"."no.such.function"
@@ -1453,14 +1441,12 @@ set search_path to default;
 -- again, but with dotted database and dotted schema qualifications.
 \dt "no.such.database"."no.such.schema"."no.such.table.relation"
 \da "no.such.database"."no.such.schema"."no.such.aggregate.function"
-\dc "no.such.database"."no.such.schema"."no.such.conversion"
 \dC "no.such.database"."no.such.schema"."no.such.cast"
 \dd "no.such.database"."no.such.schema"."no.such.object.description"
 \dD "no.such.database"."no.such.schema"."no.such.domain"
 \ddp "no.such.database"."no.such.schema"."no.such.default.access.privilege"
 \di "no.such.database"."no.such.schema"."no.such.index.relation"
 \dm "no.such.database"."no.such.schema"."no.such.materialized.view"
-\ds "no.such.database"."no.such.schema"."no.such.relation"
 \dt "no.such.database"."no.such.schema"."no.such.relation"
 \dv "no.such.database"."no.such.schema"."no.such.relation"
 \df "no.such.database"."no.such.schema"."no.such.function"

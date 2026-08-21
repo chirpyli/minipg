@@ -27,7 +27,6 @@
 #include "catalog/toasting.h"
 #include "commands/alter.h"
 #include "commands/cluster.h"
-#include "commands/conversioncmds.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/discard.h"
@@ -124,7 +123,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTypeStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateAmStmt:
-		case T_CreateConversionStmt:
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
 		case T_CreateExtensionStmt:
@@ -1055,10 +1053,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = DefineDomain((CreateDomainStmt *) parsetree);
 				break;
 
-			case T_CreateConversionStmt:
-			address = CreateConversionCommand((CreateConversionStmt *) parsetree);
-			break;
-
 			case T_CreateOpClassStmt:
 				DefineOpClass((CreateOpClassStmt *) parsetree);
 				break;
@@ -1386,9 +1380,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_COLUMN:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
-		case OBJECT_CONVERSION:
-			tag = CMDTAG_ALTER_CONVERSION;
-			break;
 		case OBJECT_DATABASE:
 			tag = CMDTAG_ALTER_DATABASE;
 			break;
@@ -1599,9 +1590,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_DOMAIN:
 					tag = CMDTAG_DROP_DOMAIN;
 					break;
-				case OBJECT_CONVERSION:
-					tag = CMDTAG_DROP_CONVERSION;
-					break;
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;
@@ -1804,10 +1792,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_ReindexStmt:
 			tag = CMDTAG_REINDEX;
-			break;
-
-		case T_CreateConversionStmt:
-			tag = CMDTAG_CREATE_CONVERSION;
 			break;
 
 		case T_CreateOpClassStmt:
@@ -2212,10 +2196,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_ReindexStmt:
 			lev = LOGSTMT_ALL;	/* should this be DDL? */
-			break;
-
-		case T_CreateConversionStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_CreateOpClassStmt:

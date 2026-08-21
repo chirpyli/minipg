@@ -65,10 +65,6 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_conversion_oid_index, 2670, on pg_conversion using 
 #define ConversionOidIndexId  2670
 
 
-extern ObjectAddress ConversionCreate(const char *conname, Oid connamespace,
-									  Oid conowner,
-									  int32 conforencoding, int32 contoencoding,
-									  Oid conproc, bool def);
 extern Oid	FindDefaultConversion(Oid connamespace, int32 for_encoding,
 								  int32 to_encoding);
 

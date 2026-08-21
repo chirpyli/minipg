@@ -125,7 +125,6 @@ static const Oid object_classes[] = {
 	CastRelationId,				/* OCLASS_CAST */
 	CollationRelationId,		/* OCLASS_COLLATION */
 	ConstraintRelationId,		/* OCLASS_CONSTRAINT */
-	ConversionRelationId,		/* OCLASS_CONVERSION */
 	AttrDefaultRelationId,		/* OCLASS_DEFAULT */
 	LanguageRelationId,			/* OCLASS_LANGUAGE */
 	OperatorRelationId,			/* OCLASS_OPERATOR */
@@ -1383,7 +1382,6 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_CAST:
 		case OCLASS_COLLATION:
-		case OCLASS_CONVERSION:
 		case OCLASS_LANGUAGE:
 		case OCLASS_OPCLASS:
 		case OCLASS_OPFAMILY:
@@ -2579,8 +2577,6 @@ getObjectClass(const ObjectAddress *object)
 			return OCLASS_CONSTRAINT;
 
 		case ConversionRelationId:
-			return OCLASS_CONVERSION;
-
 		case AttrDefaultRelationId:
 			return OCLASS_DEFAULT;
 

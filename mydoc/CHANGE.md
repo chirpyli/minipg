@@ -6,6 +6,37 @@
 
 ---
 
+## CREATE/ALTER/DROP CONVERSION 功能裁剪 与 SEQUENCE 残留裁剪（2026-08-21）
+
+### 一、CREATE/ALTER/DROP CONVERSION 功能裁剪
+
+`pg_conversion` catalog 与其内置编码转换数据保留（内置编码转换仍依赖 `FindDefaultConversion` 与约束检查），但删除了「创建/修改/删除用户自定义 conversion」这一整套 DDL 用户侧入口，实现层 `conversioncmds.c` 与 `pg_conversion.c` 的 `ConversionCreate` 一并裁除：
+
+- **命令派发与语法（`gram.y` / `utility.c`）**：删除 `CreateConversionStmt` 整条语法产生式（`CREATE [DEFAULT] CONVERSION ... FOR ... TO ... FROM ...`）、`stmt` 与 `ClassifyUtilityCommandAsReadOnly` 中的 `T_CreateConversionStmt` 分支、`ProcessUtilitySlow` 的 `CreateConversionCommand` 调用、`CreateConversionStmt` 在 `CreateCommandTag` / `GetCommandLogLevel` 的分支；`AlterObjectSchemaStmt` 删除 `ALTER CONVERSION ... SET SCHEMA` 分支、`object_type_any_name` 删除 `CONVERSION_P` → `OBJECT_CONVERSION`（保留 `ALTER DOMAIN ... SET SCHEMA` 规则头，修复此前误删导致的 bison reduce/reduce 冲突）；`CreateCommandTag` / `AlterObjectTypeCommandTag` 删除 `DROP CONVERSION` / `ALTER CONVERSION` 标签分支。
+- **执行层删除文件与声明**：删除 `src/backend/commands/conversioncmds.c` 与 `src/include/commands/conversioncmds.h`；从 `src/backend/commands/Makefile`、`pg_shdepend.c`、`utility.c`、`alter.c` 引用中移除。
+- **catalog 层（`pg_conversion.c` / `pg_conversion.h`）**：删除 `ConversionCreate`（建 conversion 元组的入口）与其 `pg_conversion.h` 声明；保留 `FindDefaultConversion`。
+- **节点层（`nodes.h` / `parsenodes.h` / `copyfuncs.c` / `equalfuncs.c`）**：删除 `T_CreateConversionStmt`、`CreateConversionStmt` 结构体、`_copyCreateConversionStmt` / `_equalCreateConversionStmt` 及 `copyObjectImpl` / `equal` 中的分发分支；`ObjectType` 枚举删除 `OBJECT_CONVERSION`。
+- **依赖层**：删除 `OCLASS_CONVERSION`（`dependency.h` 枚举）、`object_classes[]` 数组项、`getObjectClass` 的 `ConversionRelationId` 分支、`getObjectAddress` 的 `OBJECT_CONVERSION` 分支、`getObjectDescription` / `getObjectTypeDescription` / `getObjectIdentityParts` 的 OCLASS_CONVERSION 分支（清理误删残留的孤儿代码行，修复 describe 编译错误）；`doDeletion` / `AlterObjectNamespace_oid` / `ATExecAlterColumnType` / `tablecmds.c` 中相应 case；`dropcmds.c` 的 `does_not_exist_skipping` 中 `OBJECT_CONVERSION` 分支。
+- **命令标签（`cmdtaglist.h`）**：删除 `CMDTAG_CREATE_CONVERSION` / `CMDTAG_ALTER_CONVERSION` / `CMDTAG_DROP_CONVERSION`。
+- **psql 客户端**：删除 `\dc`（`listConversions`）功能及其 `command.c` 的 `case 'c'`、`describe.h` 声明、`describe.c` 实现；删除 `tab-complete.c` 中 CREATE/ALTER/COMMENT ON/DROP 的相关 CONVERSION 补全分支与补全查询；更新 `help.c` 使用说明。
+- **回归测试**：`conversion.sql/.out` 删除用户自定义 conversion 的建/删用例（保留内置编码转换函数测试）；`drop_if_exists` 删除 `CREATE/DROP CONVERSION` 用例；`psql.sql/.out` 删除全部 `\dc` 用例；`parallel_schedule` 移除已删除的 `alter_generic` 及随之失效的 `sql/alter_generic.sql`、`expected/alter_generic.out`。
+- **pgindent 工具**：`src/tools/pgindent/typedefs.list` 删除 `CreateConversionStmt`。
+
+### 二、SEQUENCE 残留裁剪（承接此前序列 DDL / `pg_sequence` catalog / `RELKIND_SEQUENCE` 裁剪）
+
+此前已裁除序列 DDL 与 `sequence.c` / `pg_sequence`，本轮清理剩下零散残留：
+
+- **psql**：删除 `\ds`（`showSeq`）序列列举功能残留的 `describe.c` / `describe.h` 引用与 `tab-complete.c` 中 CREATE/ALTER/DROP SEQUENCE 补全分支（配合上一节回归测试同步删除 psql.out 中 `\ds` 用例）。
+- **命令标签（`cmdtaglist.h`）**：删除 `CMDTAG_CREATE_SEQUENCE` / `CMDTAG_ALTER_SEQUENCE` / `CMDTAG_DROP_SEQUENCE` / 无引用死标签 `CMDTAG_DISCARD_SEQUENCES`。
+- **节点（`parsenodes.h`）**：`DiscardMode` 枚举删除无语法来源的 `DISCARD_SEQUENCES`。
+- **pgindent 工具**：`typedefs.list` 删除 `AlterSeqStmt` / `CreateSeqStmt`。
+
+### 验证
+
+`make -j8` 全量重编通过；`make check-world` 全绿（regress 80 用例、isolation 与 contrib 均通过）。`conversion` 回归经复跑通过；`timestamptz`/`conversion` 首次偶发失败为既有 `now` 时钟相关脆弱断言与手工编辑未对齐，均已复跑验证通过。
+
+---
+
 ## libpq / 通信层 IPv6 与死代码裁剪（2026-08-21）
 
 minipg 仅支持 IPv4，监听/连接层不再需要 IPv6 代码。此前 `configure.ac` 已关闭 `HAVE_IPV6` 检测（`HAVE_IPV6` 宏始终未定义），所有 `#ifdef HAVE_IPV6` 块在编译期已被条件编译消除，属纯粹死代码。本次彻底删除这些死代码与宏定义本身（不在源码中保留条件编译），并清理与 IPv6 同源的 Notify / 密码认证残留死代码。

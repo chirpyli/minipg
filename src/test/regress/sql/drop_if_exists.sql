@@ -99,13 +99,6 @@ DROP DOMAIN test_domain_exists;
 -- collation
 DROP COLLATION IF EXISTS test_collation_exists;
 
--- conversion
-DROP CONVERSION test_conversion_exists;
-DROP CONVERSION IF EXISTS test_conversion_exists;
-CREATE CONVERSION test_conversion_exists
-    FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
-DROP CONVERSION test_conversion_exists;
-
 -- text search parser
 DROP TEXT SEARCH PARSER test_tsparser_exists;
 DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
@@ -224,7 +217,6 @@ DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
 DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
 DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
 DROP COLLATION IF EXISTS no_such_schema.foo;
-DROP CONVERSION IF EXISTS no_such_schema.foo;
 DROP DOMAIN IF EXISTS no_such_schema.foo;
 DROP FUNCTION IF EXISTS no_such_schema.foo();
 DROP FUNCTION IF EXISTS foo(no_such_type);

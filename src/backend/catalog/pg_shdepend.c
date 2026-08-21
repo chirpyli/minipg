@@ -36,7 +36,6 @@
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
 #include "commands/collationcmds.h"
-#include "commands/conversioncmds.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"

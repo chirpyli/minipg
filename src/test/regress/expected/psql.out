@@ -5220,12 +5220,6 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.sum
 cross-database references are not implemented: +.pg_catalog.sum
 \da nonesuch.pg_catalog.sum
 cross-database references are not implemented: nonesuch.pg_catalog.sum
-\dc host.regression.public.conversion
-improper qualified name (too many dotted names): host.regression.public.conversion
-\dc (.public.conversion
-cross-database references are not implemented: (.public.conversion
-\dc nonesuch.public.conversion
-cross-database references are not implemented: nonesuch.public.conversion
 \dC host.regression.pg_catalog.int8
 improper qualified name (too many dotted names): host.regression.pg_catalog.int8
 \dC ).pg_catalog.int8
@@ -5268,12 +5262,6 @@ improper qualified name (too many dotted names): host.regression.public.mvtest_b
 cross-database references are not implemented: ^.public.mvtest_bb
 \dm nonesuch.public.mvtest_bb
 cross-database references are not implemented: nonesuch.public.mvtest_bb
-\ds host.regression.public.check_seq
-improper qualified name (too many dotted names): host.regression.public.check_seq
-\ds regression|mydb.public.check_seq
-cross-database references are not implemented: regression|mydb.public.check_seq
-\ds nonesuch.public.check_seq
-cross-database references are not implemented: nonesuch.public.check_seq
 \dt host.regression.public.b_star
 improper qualified name (too many dotted names): host.regression.public.b_star
 \dt regres+ion.public.b_star
@@ -5441,12 +5429,6 @@ List of access methods
 ----+-----------------+----------------------+-----------------------+--------+----------
 (0 rows)
 
-\dc "no.such.conversion"
-               List of conversions
- Schema | Name | Source | Destination | Default? 
---------+------+--------+-------------+----------
-(0 rows)
-
 \dC "no.such.cast"
                   List of casts
  Source type | Target type | Function | Implicit? 
@@ -5478,12 +5460,6 @@ List of access methods
 (0 rows)
 
 \dm "no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
-(0 rows)
-
-\ds "no.such.relation"
       List of relations
  Schema | Name | Type | Owner 
 --------+------+------+-------
@@ -5629,12 +5605,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
 improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.of.operator.family"
 \dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.support.function.of.operator.family"
-\dc "no.such.schema"."no.such.conversion"
-               List of conversions
- Schema | Name | Source | Destination | Default? 
---------+------+--------+-------------+----------
-(0 rows)
-
 \dC "no.such.schema"."no.such.cast"
                   List of casts
  Source type | Target type | Function | Implicit? 
@@ -5666,12 +5636,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
 (0 rows)
 
 \dm "no.such.schema"."no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
-(0 rows)
-
-\ds "no.such.schema"."no.such.relation"
       List of relations
  Schema | Name | Type | Owner 
 --------+------+------+-------
@@ -5774,12 +5738,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
 --------+------+------------------+---------------------+-------------
 (0 rows)
 
-\dc regression."no.such.schema"."no.such.conversion"
-               List of conversions
- Schema | Name | Source | Destination | Default? 
---------+------+--------+-------------+----------
-(0 rows)
-
 \dC regression."no.such.schema"."no.such.cast"
                   List of casts
  Source type | Target type | Function | Implicit? 
@@ -5805,12 +5763,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
 (0 rows)
 
 \dm regression."no.such.schema"."no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
-(0 rows)
-
-\ds regression."no.such.schema"."no.such.relation"
       List of relations
  Schema | Name | Type | Owner 
 --------+------+------+-------
@@ -5891,8 +5843,6 @@ LINE 5: FROM pg_catalog.pg_ts_template t
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.table.relation"
 \da "no.such.database"."no.such.schema"."no.such.aggregate.function"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.aggregate.function"
-\dc "no.such.database"."no.such.schema"."no.such.conversion"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.conversion"
 \dC "no.such.database"."no.such.schema"."no.such.cast"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.cast"
 \dd "no.such.database"."no.such.schema"."no.such.object.description"
@@ -5905,8 +5855,6 @@ cross-database references are not implemented: "no.such.database"."no.such.schem
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.index.relation"
 \dm "no.such.database"."no.such.schema"."no.such.materialized.view"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.materialized.view"
-\ds "no.such.database"."no.such.schema"."no.such.relation"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.relation"
 \dt "no.such.database"."no.such.schema"."no.such.relation"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.relation"
 \dv "no.such.database"."no.such.schema"."no.such.relation"

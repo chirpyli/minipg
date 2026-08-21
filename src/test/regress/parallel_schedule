@@ -106,7 +106,7 @@ test: tablesample groupingsets drop_operator join_hash
 # ----------
 # misc 已随表继承(INHERITS)功能裁剪而移除（依赖 stud_emp/emp 继承表）
 # create_table_like 已随表继承(INHERITS)功能裁剪而移除
-test: alter_generic alter_operator dbsize misc_functions sysviews tsrf tidscan tidrangescan
+test: alter_operator dbsize misc_functions sysviews tsrf tidscan tidrangescan
 
 # rules cannot run concurrently with any test that creates
 # a view or rule in the public schema

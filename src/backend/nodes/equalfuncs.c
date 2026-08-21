@@ -1505,18 +1505,6 @@ _equalCreateSchemaStmt(const CreateSchemaStmt *a, const CreateSchemaStmt *b)
 }
 
 static bool
-_equalCreateConversionStmt(const CreateConversionStmt *a, const CreateConversionStmt *b)
-{
-	COMPARE_NODE_FIELD(conversion_name);
-	COMPARE_STRING_FIELD(for_encoding_name);
-	COMPARE_STRING_FIELD(to_encoding_name);
-	COMPARE_NODE_FIELD(func_name);
-	COMPARE_SCALAR_FIELD(def);
-
-	return true;
-}
-
-static bool
 _equalPrepareStmt(const PrepareStmt *a, const PrepareStmt *b)
 {
 	COMPARE_STRING_FIELD(name);
@@ -2444,9 +2432,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateSchemaStmt:
 			retval = _equalCreateSchemaStmt(a, b);
-			break;
-		case T_CreateConversionStmt:
-			retval = _equalCreateConversionStmt(a, b);
 			break;
 		case T_PrepareStmt:
 			retval = _equalPrepareStmt(a, b);

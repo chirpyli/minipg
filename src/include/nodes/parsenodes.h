@@ -1290,7 +1290,6 @@ typedef enum ObjectType
 	OBJECT_CAST,
 	OBJECT_COLUMN,
 	OBJECT_COLLATION,
-	OBJECT_CONVERSION,
 	OBJECT_DATABASE,
 	OBJECT_DEFAULT,
 	OBJECT_DOMAIN,
@@ -2180,7 +2179,6 @@ typedef enum DiscardMode
 {
 	DISCARD_ALL,
 	DISCARD_PLANS,
-	DISCARD_SEQUENCES,
 	DISCARD_TEMP
 } DiscardMode;
 
@@ -2224,20 +2222,6 @@ typedef struct ReindexStmt
 	const char *name;			/* name of database to reindex */
 	List	   *params;			/* list of DefElem nodes */
 } ReindexStmt;
-
-/* ----------------------
- *		CREATE CONVERSION Statement
- * ----------------------
- */
-typedef struct CreateConversionStmt
-{
-	NodeTag		type;
-	List	   *conversion_name;	/* Name of the conversion */
-	char	   *for_encoding_name;	/* source encoding name */
-	char	   *to_encoding_name;	/* destination encoding name */
-	List	   *func_name;		/* qualified conversion function name */
-	bool		def;			/* is this a default conversion? */
-} CreateConversionStmt;
 
 /* ----------------------
  *	CREATE TRANSFORM Statement

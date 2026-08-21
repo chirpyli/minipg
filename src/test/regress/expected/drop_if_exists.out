@@ -67,14 +67,6 @@ ERROR:  type "test_domain_exists" does not exist
 -- collation
 DROP COLLATION IF EXISTS test_collation_exists;
 NOTICE:  collation "test_collation_exists" does not exist, skipping
--- conversion
-DROP CONVERSION test_conversion_exists;
-ERROR:  conversion "test_conversion_exists" does not exist
-DROP CONVERSION IF EXISTS test_conversion_exists;
-NOTICE:  conversion "test_conversion_exists" does not exist, skipping
-CREATE CONVERSION test_conversion_exists
-    FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8;
-DROP CONVERSION test_conversion_exists;
 -- text search parser
 DROP TEXT SEARCH PARSER test_tsparser_exists;
 ERROR:  syntax error at or near "TEXT"
@@ -260,8 +252,6 @@ ERROR:  syntax error at or near "CAST"
 LINE 1: DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
              ^
 DROP COLLATION IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP CONVERSION IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP DOMAIN IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping

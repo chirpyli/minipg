@@ -32,7 +32,6 @@
 #include "catalog/pg_statistic_ext.h"
 #include "commands/alter.h"
 #include "commands/collationcmds.h"
-#include "commands/conversioncmds.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
@@ -114,7 +113,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 
 			/* generic code path */
 		case OBJECT_AGGREGATE:
-		case OBJECT_CONVERSION:
 			{
 				Relation	catalog;
 				Relation	relation;
@@ -196,7 +194,6 @@ AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
 
 		case OCLASS_PROC:
 		case OCLASS_COLLATION:
-		case OCLASS_CONVERSION:
 		case OCLASS_OPERATOR:
 		case OCLASS_OPCLASS:
 		case OCLASS_OPFAMILY:

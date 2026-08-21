@@ -722,9 +722,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			case 'a':
 				success = describeAggregates(pattern, show_verbose, show_system);
 				break;
-			case 'c':
-				success = listConversions(pattern, show_verbose, show_system);
-				break;
 			case 'C':
 				success = listCasts(pattern, show_verbose);
 				break;

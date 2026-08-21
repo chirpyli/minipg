@@ -68,7 +68,7 @@ AlterObjectSchemaStmt
 AlterPolicyStmt
 AlterRoleSetStmt
 AlterRoleStmt
-AlterSeqStmt
+
 AlterTSConfigType
 AlterTSConfigurationStmt
 AlterTSDictionaryStmt
@@ -418,7 +418,6 @@ Counters
 CoverExt
 CoverPos
 CreateAmStmt
-CreateConversionStmt
 CreateDomainStmt
 CreateEnumStmt
 CreateEventTrigStmt
@@ -435,7 +434,6 @@ CreateRangeStmt
 CreateRoleStmt
 CreateSchemaStmt
 CreateSchemaStmtContext
-CreateSeqStmt
 CreateStatsStmt
 CreateStmt
 CreateStmtContext
