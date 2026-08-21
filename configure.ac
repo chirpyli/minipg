@@ -1492,13 +1492,8 @@ AC_CHECK_DECLS(F_FULLFSYNC, [], [], [#include <fcntl.h>])
 
 AC_CHECK_DECLS([RTLD_GLOBAL, RTLD_NOW], [], [], [#include <dlfcn.h>])
 
-dnl minipg: 裁剪 IPv6 监听/连接层 —— 不检测 struct sockaddr_in6，使 HAVE_IPV6 不定义，
-dnl 从编译期消除监听/连接侧的 IPv6 代码（inet/cidr 数据类型仍保留 IPv6 地址存储能力）。
-dnl AC_CHECK_TYPE([struct sockaddr_in6],
-dnl         [AC_DEFINE(HAVE_IPV6, 1, [Define to 1 if you have support for IPv6.])],
-dnl         [],
-dnl [$ac_includes_default
-dnl #include <netinet/in.h>])
+dnl minipg: 监听/连接层仅支持 IPv4，不检测 struct sockaddr_in6，HAVE_IPV6 始终不定义，
+dnl 编译期消除监听/连接侧的 IPv6 代码（inet/cidr 数据类型仍保留 IPv6 地址存储能力）。
 
 AC_CACHE_CHECK([for PS_STRINGS], [pgac_cv_var_PS_STRINGS],
 [AC_LINK_IFELSE([AC_LANG_PROGRAM(

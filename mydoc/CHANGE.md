@@ -6,6 +6,53 @@
 
 ---
 
+## libpq / 通信层 IPv6 与死代码裁剪（2026-08-21）
+
+minipg 仅支持 IPv4，监听/连接层不再需要 IPv6 代码。此前 `configure.ac` 已关闭 `HAVE_IPV6` 检测（`HAVE_IPV6` 宏始终未定义），所有 `#ifdef HAVE_IPV6` 块在编译期已被条件编译消除，属纯粹死代码。本次彻底删除这些死代码与宏定义本身（不在源码中保留条件编译），并清理与 IPv6 同源的 Notify / 密码认证残留死代码。
+
+### 一、IPv6 通信层裁剪
+
+- **`src/backend/libpq/ifaddr.c`**：删除全部 IPv6 代码——`range_sockaddr_AF_INET6` 声明与定义、`pg_range_sockaddr` 的 `AF_INET6` 分支、`pg_sockaddr_cidr_mask` 的 `case AF_INET6` 与 `128` 位掩码、`run_ifaddr_callback` 的 `AF_INET6` 掩码检查、SIOCGLIFCONF 版 `pg_foreach_ifaddr` 的 `sock6` 声明/创建/`fd` 三元选择/`close(sock6)`、fallback 版 `::1/128` loopback 块。
+- **`src/interfaces/libpq/fe-connect.c`**：删除 `connectOptions2`/`pg_sockaddr2string` 中的 `#ifdef HAVE_IPV6` `AF_INET6` 地址格式化块（保留 URI 中的 `[ipv6]` 字符串解析，其为协议无关解析、不影响 IPv4-only）。
+- **`src/include/pg_config.h.in`**、**`src/include/pg_config.h`**：删除 `HAVE_IPV6` 宏定义（`#undef` / `#define` 形式）。
+- **`src/tools/ifaddrs/test_ifaddrs.c`**：删除 `print_addr` 中的 `#ifdef HAVE_IPV6` `case AF_INET6`。
+- **`src/configure.ac`**：清理注释，明确「仅支持 IPv4，不检测 struct sockaddr_in6」。
+- 保留项（与通信层 IPv6 无关）：`src/common/ip.c` 的 `pg_getaddrinfo_all` 等 getaddrinfo 封装（协议无关 DNS 解析，IPv4-only 也必需）；`src/port/inet_net_ntop.c` 的 `PGSQL_AF_INET6` 分支（服务于 inet/cidr 数据类型的 IPv6 地址**存储/显示**能力，configure.ac 注释约定保留）。
+
+### 二、Notify（LISTEN/NOTIFY）前端死代码裁剪
+
+后端 LISTEN/NOTIFY 早已删除，以下前端代码均为死代码：
+- **`src/interfaces/libpq/fe-protocol3.c`**：删除 `getNotify()` 函数、`pqParseInput3` 主循环与 `pqFunctionCall3` 中的 `case 'A'`（NotifyResponse）解析分支、前向声明；更新 "NOTIFY and NOTICE" 注释为仅 NOTICE。
+- **`src/interfaces/libpq/fe-exec.c`**：删除 `PQnotifies()` 与 `PQfreeNotify()`。
+- **`src/interfaces/libpq/libpq-fe.h`**：删除 `PGnotify` 结构体、`PQnotifies` 声明、`PQfreeNotify` 宏、`PQnoPasswordSupplied` 宏（已无引用）。
+- **`src/interfaces/libpq/libpq-int.h`**：删除 `PGconn.notifyHead` / `notifyTail` 字段。
+- **`src/interfaces/libpq/fe-connect.c`**：`pqDropServerData` 删除 notify 队列清理。
+- **`src/interfaces/libpq/exports.txt`**：删除 `PQnotifies` / `PQfreeNotify` 导出符号。
+- **`src/bin/psql/common.c`**：删除 `PrintNotifications()` 函数及其调用。
+- **`src/bin/psql/tab-complete.c`**：从关键词列表删除 `LISTEN` / `NOTIFY`，删除 `NOTIFY` 的 tab 补全分支。
+- **`src/test/isolation/isolationtester.c`**：删除 notify 变量与 NOTIFY 报告逻辑块。
+- **删除文件**：`src/test/examples/testlibpq2.c`、`src/test/examples/testlibpq2.sql`（专用于 LISTEN/NOTIFY 异步通知示例），并从 `src/test/examples/Makefile` 的 `PROGS` 移除。
+
+### 三、密码认证残留死代码裁剪
+
+后端 `ClientAuthentication` 无条件发送 `AUTH_REQ_OK`，永不发送 `AUTH_REQ_PASSWORD`：
+- **`src/interfaces/libpq/fe-auth.c`**：删除 `AUTH_REQ_PASSWORD` 分支与已无调用者的 `pg_password_sendauth()` 函数。
+
+### 四、COPY 协议 trace 死代码裁剪
+
+后端 COPY 命令已删除，`fe-trace.c` 中 Copy 相关追踪分支永不触发：
+- **`src/interfaces/libpq/fe-trace.c`**：删除 `pqTraceOutputf`(CopyFail)/`pqTraceOutputG`(CopyInResponse)/`pqTraceOutputH`(CopyOutResponse)/`pqTraceOutputW`(CopyBothResponse) 函数；删除 `pqTraceOutputMessage` 中的 `case 'c'`(CopyDone)/`case 'd'`(CopyData)/`case 'f'`(CopyFail)/`case 'G'`(StartCopyIn)/`case 'W'`(StartCopyBoth) 分支；`case 'H'` 简化为纯 Flush（去掉 Copy Out 调用）。
+
+### 行为影响
+
+- 编译期彻底消除 IPv6 死代码（无 `#ifdef HAVE_IPV6` 残留），libpq ABI 去除 `PQnotifies`/`PQfreeNotify`/`PGnotify`；`PQnoPasswordSupplied` 宏移除。
+- 与不可裁部分（btree/hash 索引、事务）零耦合。
+- 注：`src/test/regress/pg_regress.c` 的 `have_ipv6` 局部变量及 `src/tools/ifaddrs` 等属测试框架通用逻辑，未改动（其 IPv6 分支现在不执行但保留无害）。
+
+验证：`make -j` 全量重编 0 错误；`make check-world` 通过（无 regression.diffs；pg_rewind 因依赖 pg_basebackup 已移除而跳过，属预期）。
+
+---
+
 ## SASL/SCRAM 认证裁剪（2026-08-21）
 
 服务端 `ClientAuthentication` 已被裁剪为无条件信任（仅发送 `AUTH_REQ_OK`），永远不会发起 SASL 握手；此前已裁剪 pg_hba/密码认证/SSL。因此客户端完整的 SASL/SCRAM 链路（`pg_SASL_init`/`pg_SASL_continue`/`fe-auth-scram.c` 等）均为死代码。SASL/SCRAM 属于网络认证协议层（RFC 4422/5802），非数据库内核核心，学习价值低，予以彻底裁剪。

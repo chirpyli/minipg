@@ -36,12 +36,6 @@ static int	range_sockaddr_AF_INET(const struct sockaddr_in *addr,
 								   const struct sockaddr_in *netaddr,
 								   const struct sockaddr_in *netmask);
 
-#ifdef HAVE_IPV6
-static int	range_sockaddr_AF_INET6(const struct sockaddr_in6 *addr,
-									const struct sockaddr_in6 *netaddr,
-									const struct sockaddr_in6 *netmask);
-#endif
-
 
 /*
  * pg_range_sockaddr - is addr within the subnet specified by netaddr/netmask ?
@@ -58,12 +52,6 @@ pg_range_sockaddr(const struct sockaddr_storage *addr,
 		return range_sockaddr_AF_INET((const struct sockaddr_in *) addr,
 									  (const struct sockaddr_in *) netaddr,
 									  (const struct sockaddr_in *) netmask);
-#ifdef HAVE_IPV6
-	else if (addr->ss_family == AF_INET6)
-		return range_sockaddr_AF_INET6((const struct sockaddr_in6 *) addr,
-									   (const struct sockaddr_in6 *) netaddr,
-									   (const struct sockaddr_in6 *) netmask);
-#endif
 	else
 		return 0;
 }
@@ -80,26 +68,6 @@ range_sockaddr_AF_INET(const struct sockaddr_in *addr,
 		return 0;
 }
 
-
-#ifdef HAVE_IPV6
-
-static int
-range_sockaddr_AF_INET6(const struct sockaddr_in6 *addr,
-						const struct sockaddr_in6 *netaddr,
-						const struct sockaddr_in6 *netmask)
-{
-	int			i;
-
-	for (i = 0; i < 16; i++)
-	{
-		if (((addr->sin6_addr.s6_addr[i] ^ netaddr->sin6_addr.s6_addr[i]) &
-			 netmask->sin6_addr.s6_addr[i]) != 0)
-			return 0;
-	}
-
-	return 1;
-}
-#endif							/* HAVE_IPV6 */
 
 /*
  *	pg_sockaddr_cidr_mask - make a network mask of the appropriate family
@@ -149,32 +117,6 @@ pg_sockaddr_cidr_mask(struct sockaddr_storage *mask, char *numbits, int family)
 				break;
 			}
 
-#ifdef HAVE_IPV6
-		case AF_INET6:
-			{
-				struct sockaddr_in6 mask6;
-				int			i;
-
-				if (bits < 0 || bits > 128)
-					return -1;
-				memset(&mask6, 0, sizeof(mask6));
-				for (i = 0; i < 16; i++)
-				{
-					if (bits <= 0)
-						mask6.sin6_addr.s6_addr[i] = 0;
-					else if (bits >= 8)
-						mask6.sin6_addr.s6_addr[i] = 0xff;
-					else
-					{
-						mask6.sin6_addr.s6_addr[i] =
-							(0xff << (8 - (int) bits)) & 0xff;
-					}
-					bits -= 8;
-				}
-				memcpy(mask, &mask6, sizeof(mask6));
-				break;
-			}
-#endif
 		default:
 			return -1;
 	}
@@ -209,13 +151,6 @@ run_ifaddr_callback(PgIfAddrCallback callback, void *cb_data,
 			if (((struct sockaddr_in *) mask)->sin_addr.s_addr == INADDR_ANY)
 				mask = NULL;
 		}
-#ifdef HAVE_IPV6
-		else if (mask->sa_family == AF_INET6)
-		{
-			if (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *) mask)->sin6_addr))
-				mask = NULL;
-		}
-#endif
 	}
 
 	/* If mask is invalid, generate our own fully-set mask */
@@ -302,9 +237,6 @@ pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
 	pgsocket	sock,
 				fd;
 
-#ifdef HAVE_IPV6
-	pgsocket	sock6;
-#endif
 	int			i,
 				total;
 
@@ -347,28 +279,13 @@ pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
 			break;
 	}
 
-#ifdef HAVE_IPV6
-	/* We'll need an IPv6 socket too for the SIOCGLIFNETMASK ioctls */
-	sock6 = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (sock6 == PGINVALID_SOCKET)
-	{
-		free(buffer);
-		close(sock);
-		return -1;
-	}
-#endif
-
 	total = lifc.lifc_len / sizeof(struct lifreq);
 	lifr = lifc.lifc_req;
 	for (i = 0; i < total; ++i)
 	{
 		addr = (struct sockaddr *) &lifr[i].lifr_addr;
 		memcpy(&lmask, &lifr[i], sizeof(struct lifreq));
-#ifdef HAVE_IPV6
-		fd = (addr->sa_family == AF_INET6) ? sock6 : sock;
-#else
 		fd = sock;
-#endif
 		if (ioctl(fd, SIOCGLIFNETMASK, &lmask) < 0)
 			mask = NULL;
 		else
@@ -378,9 +295,6 @@ pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
 
 	free(buffer);
 	close(sock);
-#ifdef HAVE_IPV6
-	close(sock6);
-#endif
 	return 0;
 }
 #elif defined(SIOCGIFCONF)
@@ -498,10 +412,6 @@ pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
 	struct sockaddr_in addr;
 	struct sockaddr_storage mask;
 
-#ifdef HAVE_IPV6
-	struct sockaddr_in6 addr6;
-#endif
-
 	/* addr 127.0.0.1/8 */
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -511,18 +421,6 @@ pg_foreach_ifaddr(PgIfAddrCallback callback, void *cb_data)
 	run_ifaddr_callback(callback, cb_data,
 						(struct sockaddr *) &addr,
 						(struct sockaddr *) &mask);
-
-#ifdef HAVE_IPV6
-	/* addr ::1/128 */
-	memset(&addr6, 0, sizeof(addr6));
-	addr6.sin6_family = AF_INET6;
-	addr6.sin6_addr.s6_addr[15] = 1;
-	memset(&mask, 0, sizeof(mask));
-	pg_sockaddr_cidr_mask(&mask, "128", AF_INET6);
-	run_ifaddr_callback(callback, cb_data,
-						(struct sockaddr *) &addr6,
-						(struct sockaddr *) &mask);
-#endif
 
 	return 0;
 }
