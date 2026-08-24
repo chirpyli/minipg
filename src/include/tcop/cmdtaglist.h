@@ -26,10 +26,6 @@
 /* symbol name, textual name, event_trigger_ok, table_rewrite_ok, rowcount */
 PG_CMDTAG(CMDTAG_UNKNOWN, "???", false, false, false)
 PG_CMDTAG(CMDTAG_ALTER_INDEX, "ALTER INDEX", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_RULE, "ALTER RULE", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_SCHEMA, "ALTER SCHEMA", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_STATISTICS, "ALTER STATISTICS", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_SUBSCRIPTION, "ALTER SUBSCRIPTION", true, false, false)
 PG_CMDTAG(CMDTAG_ALTER_TABLE, "ALTER TABLE", true, true, false)
 PG_CMDTAG(CMDTAG_ALTER_TRANSFORM, "ALTER TRANSFORM", true, false, false)
 PG_CMDTAG(CMDTAG_ALTER_TYPE, "ALTER TYPE", true, true, false)

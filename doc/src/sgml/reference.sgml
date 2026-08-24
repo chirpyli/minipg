@@ -40,9 +40,6 @@
    &alterExtension;
    &alterFunction;
    &alterIndex;
-   &alterRule;
-   &alterSchema;
-   &alterStatistics;
    &alterTable;
    &alterTableSpace;
    &alterTrigger;

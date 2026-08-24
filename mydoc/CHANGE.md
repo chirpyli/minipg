@@ -4,6 +4,25 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## ALTER RULE / ALTER SCHEMA / ALTER STATISTICS / ALTER SUBSCRIPTION 命令标签裁剪（2026-08-24）
+
+### 一、背景
+`ALTER RULE`、`ALTER SCHEMA`、`ALTER STATISTICS`、`ALTER SUBSCRIPTION` 四个命令在 minipg 中均无语法产生式、无节点类型、无执行路径（无 `RenameStmt` / `AlterOwnerStmt` / `AlterStatsStmt` / `AlterSubscriptionStmt`），属纯遗留死标签，本次仅清理其命令标签与 `AlterObjectTypeCommandTag` 中的死分支。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_ALTER_RULE` / `CMDTAG_ALTER_SCHEMA` / `CMDTAG_ALTER_STATISTICS` / `CMDTAG_ALTER_SUBSCRIPTION`（`cmdtaglist.h`）。
+- `utility.c` 的 `AlterObjectTypeCommandTag` 中对应死分支（`OBJECT_RULE` / `OBJECT_SCHEMA` / `OBJECT_SUBSCRIPTION` / `OBJECT_STATISTIC_EXT`）。
+- `parsenodes.h` 中完全无用的 `OBJECT_SUBSCRIPTION` 枚举值（其余三个枚举值仍被 DROP/对象地址解析使用，保留）。
+- 同步删除 `alter_rule.sgml` / `alter_schema.sgml` / `alter_statistics.sgml` 三个文档，并移除其在 `allfiles.sgml` / `reference.sgml` 中的实体引用。
+
+### 三、保留
+- `OBJECT_RULE` / `OBJECT_SCHEMA` / `OBJECT_STATISTIC_EXT` 枚举值及 `DROP ... RULE/SCHEMA/STATISTICS`、`REINDEX SCHEMA` 等执行路径：删除对象 / 依赖处理仍需按对象类型映射。
+- `ALTER TABLE ... ENABLE/DISABLE RULE`（`AT_EnableRule`/`AT_DisableRule`）：该路径经 `AlterTableStmt(OBJECT_TABLE)` 映射为 `CMDTAG_ALTER_TABLE`，与本次裁剪无关。
+
+> 重要经验：本工程 Makefile **未启用头文件自动依赖跟踪**。编辑 `cmdtaglist.h` 后，`CommandTag` 枚举数值前移（本次前移 4 位），但除被 rm 或直接修改的 `*.o` 外其余对象（如 `dest.c` / `postgres.c` / `executor`）不会自动重编，运行时会出现命令标签错位（如 `SELECT 1` 的完成标签被判为 `SELECT 0 1`，回归大量报「could not interpret result from server」）。正确做法：编辑 `cmdtaglist.h` 后执行 `make clean && make -j8` 全量干净重编，再跑 `make check-world`。
+
+验证：全量干净重编 + `make check-world` 全绿（regress 73 项 + 各子套件全通过）。
+
 ## ALTER LANGUAGE / OPERATOR / OPERATOR CLASS / OPERATOR FAMILY / PROCEDURE / PUBLICATION / ROUTINE 命令标签裁剪（2026-08-24）
 
 ### 一、背景

@@ -1193,12 +1193,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_INDEX:
 			tag = CMDTAG_ALTER_INDEX;
 			break;
-		case OBJECT_RULE:
-			tag = CMDTAG_ALTER_RULE;
-			break;
-		case OBJECT_SCHEMA:
-			tag = CMDTAG_ALTER_SCHEMA;
-			break;
 		case OBJECT_TABLE:
 		case OBJECT_TABCONSTRAINT:
 			tag = CMDTAG_ALTER_TABLE;
@@ -1208,12 +1202,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 			break;
 		case OBJECT_VIEW:
 			tag = CMDTAG_ALTER_VIEW;
-			break;
-		case OBJECT_SUBSCRIPTION:
-			tag = CMDTAG_ALTER_SUBSCRIPTION;
-			break;
-		case OBJECT_STATISTIC_EXT:
-			tag = CMDTAG_ALTER_STATISTICS;
 			break;
 		default:
 			tag = CMDTAG_UNKNOWN;
