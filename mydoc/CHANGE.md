@@ -6,6 +6,34 @@
 
 ---
 
+## DO 语句裁剪（2026-08-24）
+
+DO 语句是 SQL 层执行「匿名代码块」（`DO ... LANGUAGE plpgsql`）的入口。minipg 仅保留 internal/c/sql 三种内置语言且均无 `laninline`（内联代码处理器），任何 `DO ... LANGUAGE` 在执行期必然在 `ExecuteDoStmt` 处报 "language ... does not support inline code execution"，亦无 pl 扩展语言可装载，属无实际效果的「装饰性」语法。为保留它需额外携带内联代码执行分发（`ExecuteDoStmt`）、执行期结构 `InlineCodeBlock` 与命令标签 `CMDTAG_DO`，学习价值低，故整体裁剪。
+
+### 删除的代码点
+
+- **语法/节点层**
+  - [gram.y](file:///home/postgres/works/my-github/minipg/src/backend/parser/gram.y)：删除 `DoStmt` 产生式、`dostmt_opt_list`/`dostmt_opt_item` 非终结符、`utility_stmt` 中的 `| DoStmt` 分支及对应 `%type` 声明（`CreateTransformStmt` 区段前残留的孤立 ALTER FUNCTION 注释一并清理）
+  - [parsenodes.h](file:///home/postgres/works/my-github/minipg/src/include/nodes/parsenodes.h)：删除 `DoStmt`、`InlineCodeBlock` 结构体；**[nodes.h](file:///home/postgres/works/my-github/minipg/src/include/nodes/nodes.h)** 删除 `T_DoStmt`、`T_InlineCodeBlock` 结点标签并重排枚举
+- **节点支持层**
+  - [copyfuncs.c](file:///home/postgres/works/my-github/minipg/src/backend/nodes/copyfuncs.c)：删除 `_copyDoStmt` 及其分发分支；**[equalfuncs.c](file:///home/postgres/works/my-github/minipg/src/backend/nodes/equalfuncs.c)** 删除 `_equalDoStmt` 及其分发分支
+  - [typedefs.list](file:///home/postgres/works/my-github/minipg/src/tools/pgindent/typedefs.list)：移除 `DoStmt`、`InlineCodeBlock`
+- **命令执行层**
+  - [functioncmds.c](file:///home/postgres/works/my-github/minipg/src/backend/commands/functioncmds.c)：删除 `ExecuteDoStmt`（内联代码执行入口，`InlineCodeBlock` 唯一使用者）
+  - [defrem.h](file:///home/postgres/works/my-github/minipg/src/include/commands/defrem.h)：删除 `ExecuteDoStmt` 声明
+  - [utility.c](file:///home/postgres/works/my-github/minipg/src/backend/tcop/utility.c)：删除 `ClassifyUtilityCommandAsReadOnly`（严格只读分类）、`standard_ProcessUtility` 分发、`CreateCommandTag`（`CMDTAG_DO`）、`GetCommandLogLevel`（`LOGSTMT_ALL`）四处 `T_DoStmt` 分支
+  - [cmdtaglist.h](file:///home/postgres/works/my-github/minipg/src/include/tcop/cmdtaglist.h)：删除 `CMDTAG_DO("DO")` 命令标签
+
+### 保留边界（未破坏）
+
+`DO` 关键字在 [kwlist.h](file:///home/postgres/works/my-github/minipg/src/include/parser/kwlist.h) 与 gram.y `ReservedWord` 列表中**保留**——`CREATE RULE ... DO INSTEAD` 与 `INSERT ... ON CONFLICT ... DO UPDATE/NOTHING` 复用同一 `DO` token，移除将破坏规则与 upsert 语法。btree/hash 索引与事务零耦合。
+
+### 验证
+
+`make -j8` 全量编译 0 error；`make check-world` 退出码 0（主回归 79/79 通过，isolation/modules/contrib 全绿）。冒烟验证：`DO $$...$$;` 报语法错误（`syntax error at or near "DO"`），普通 `SELECT` 正常返回，`INSERT ... ON CONFLICT DO UPDATE/NOTHING` 与 `CREATE RULE ... DO INSTEAD` 均按预期工作。
+
+---
+
 ## 游标（CURSOR）功能裁剪（2026-08-24）
 
 游标是 SQL 层通过 `DECLARE CURSOR` / `FETCH` / `MOVE` / `CLOSE` 访问、按名称显式推进的查询结果集，依赖可滚动/可持久的 Portal 状态。Handler/协议层的 Portal 机制（扩展查询协议的未命名/命名 Portal、`PortalDescribe`、`DestTuplestore` 目标等）属于执行器分发核心，**被完整保留**；本次仅裁剪 SQL 游标语法、游标专用执行路径、`WHERE CURRENT OF`、可持久游标物化机制及 `refcursor` 类型。学习价值低（游标驱动逻辑与执行器解耦，属可选配层）。
