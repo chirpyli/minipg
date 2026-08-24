@@ -152,9 +152,6 @@ static void check_qualified_name(List *names, core_yyscan_t yyscanner);
 static List *check_func_name(List *names, core_yyscan_t yyscanner);
 static List *check_indirection(List *indirection, core_yyscan_t yyscanner);
 static List *extractArgTypes(List *parameters);
-static List *extractAggrArgTypes(List *aggrargs);
-static List *makeOrderedSetArgs(List *directargs, List *orderedargs,
-								core_yyscan_t yyscanner);
 static void insertSelectOptions(SelectStmt *stmt,
 								List *sortClause, List *lockingClause,
 								SelectLimit *limitClause,
@@ -238,14 +235,14 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
-		CreatedbStmt DefineStmt DeleteStmt DiscardStmt
+		CreatedbStmt CreateTypeStmt DeleteStmt DiscardStmt
 		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
 	
 		DropTransformStmt
 		ExplainStmt
 		IndexStmt InsertStmt
 		LoadStmt LockStmt ExplainableStmt PreparableStmt
-		CreateFunctionStmt ReindexStmt RemoveAggrStmt
+		CreateFunctionStmt ReindexStmt
 		RemoveFuncStmt RemoveOperStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
@@ -301,8 +298,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 
 %type <str>		iso_level opt_encoding
-%type <objwithargs> function_with_argtypes aggregate_with_argtypes operator_with_argtypes
-%type <list>	function_with_argtypes_list aggregate_with_argtypes_list operator_with_argtypes_list
+%type <objwithargs> function_with_argtypes operator_with_argtypes
+%type <list>	function_with_argtypes_list operator_with_argtypes_list
 %type <node>	vacuum_relation
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
@@ -311,9 +308,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				OptTypedTableElementList TypedTableElementList
 				OptWith opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
-				aggr_args aggr_args_list
 				func_as createfunc_opt_list opt_createfunc_opt_list
-				old_aggr_definition old_aggr_list
 				oper_argtypes RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
 				sort_clause opt_sort_clause sortby_list index_params stats_params
@@ -345,7 +340,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 
 %type <defelt>	createfunc_opt_item common_func_opt_item
-%type <fun_param> func_arg func_arg_with_default table_func_column aggr_arg
+%type <fun_param> func_arg func_arg_with_default table_func_column
 %type <fun_param_mode> arg_class
 %type <typnam>	func_return func_type
 
@@ -388,7 +383,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <node>	TableElement TypedTableElement ConstraintElem TableFuncElement
 %type <node>	columnDef columnOptions
-%type <defelt>	def_elem old_aggr_elem operator_def_elem
+%type <defelt>	def_elem operator_def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
 				columnref in_expr having_clause func_table array_expr
@@ -741,8 +736,8 @@ stmt:	AlterDomainStmt
 			| CreateStatsStmt
 			| CreateTransformStmt
 			| CreatedbStmt
+			| CreateTypeStmt
 			| DeallocateStmt
-			| DefineStmt
 			| DeleteStmt
 			| DiscardStmt
 			| DropOpClassStmt
@@ -758,7 +753,6 @@ stmt:	AlterDomainStmt
 		| LockStmt
 		| PrepareStmt
 			| ReindexStmt
-			| RemoveAggrStmt
 			| RemoveFuncStmt
 			| RemoveOperStmt
 			| RuleStmt
@@ -2428,66 +2422,12 @@ ConstraintAttributeElem:
 /*****************************************************************************
  *
  *		QUERY :
- *				define (aggregate,operator,type)
+ *				create type (composite,enum,range)
  *
  *****************************************************************************/
 
-DefineStmt:
-			CREATE opt_or_replace AGGREGATE func_name aggr_args definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_AGGREGATE;
-					n->oldstyle = false;
-					n->replace = $2;
-					n->defnames = $4;
-					n->args = $5;
-					n->definition = $6;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace AGGREGATE func_name old_aggr_definition
-				{
-					/* old-style (pre-8.2) syntax for CREATE AGGREGATE */
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_AGGREGATE;
-					n->oldstyle = true;
-					n->replace = $2;
-					n->defnames = $4;
-					n->args = NIL;
-					n->definition = $5;
-					$$ = (Node *)n;
-				}
-			| CREATE OPERATOR any_operator definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_OPERATOR;
-					n->oldstyle = false;
-					n->defnames = $3;
-					n->args = NIL;
-					n->definition = $4;
-					$$ = (Node *)n;
-				}
-			| CREATE TYPE_P any_name definition
-				{
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TYPE;
-					n->oldstyle = false;
-					n->defnames = $3;
-					n->args = NIL;
-					n->definition = $4;
-					$$ = (Node *)n;
-				}
-			| CREATE TYPE_P any_name
-				{
-					/* Shell type (identified by lack of definition) */
-					DefineStmt *n = makeNode(DefineStmt);
-					n->kind = OBJECT_TYPE;
-					n->oldstyle = false;
-					n->defnames = $3;
-					n->args = NIL;
-					n->definition = NIL;
-					$$ = (Node *)n;
-				}
-			| CREATE TYPE_P any_name AS '(' OptTableFuncElementList ')'
+CreateTypeStmt:
+			CREATE TYPE_P any_name AS '(' OptTableFuncElementList ')'
 				{
 					CompositeTypeStmt *n = makeNode(CompositeTypeStmt);
 
@@ -2536,24 +2476,6 @@ def_arg:	func_type						{ $$ = (Node *)$1; }
 			| NumericOnly					{ $$ = (Node *)$1; }
 			| Sconst						{ $$ = (Node *)makeString($1); }
 			| NONE							{ $$ = (Node *)makeString(pstrdup($1)); }
-		;
-
-old_aggr_definition: '(' old_aggr_list ')'			{ $$ = $2; }
-		;
-
-old_aggr_list: old_aggr_elem						{ $$ = list_make1($1); }
-			| old_aggr_list ',' old_aggr_elem		{ $$ = lappend($1, $3); }
-		;
-
-/*
- * Must use IDENT here to avoid reduce/reduce conflicts; fortunately none of
- * the item names needed in old aggregate definitions are likely to become
- * SQL keywords.
- */
-old_aggr_elem:  IDENT '=' def_arg
-				{
-					$$ = makeDefElem($1, (Node *)$3, @1);
-				}
 		;
 
 opt_enum_val_list:
@@ -3357,90 +3279,6 @@ func_arg_with_default:
 					$$ = $1;
 					$$->defexpr = $3;
 				}
-		;
-
-/* Aggregate args can be most things that function args can be */
-aggr_arg:	func_arg
-				{
-					if (!($1->mode == FUNC_PARAM_DEFAULT ||
-						  $1->mode == FUNC_PARAM_IN ||
-						  $1->mode == FUNC_PARAM_VARIADIC))
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("aggregates cannot have output arguments"),
-								 parser_errposition(@1)));
-					$$ = $1;
-				}
-		;
-
-/*
- * The SQL standard offers no guidance on how to declare aggregate argument
- * lists, since it doesn't have CREATE AGGREGATE etc.  We accept these cases:
- *
- * (*)									- normal agg with no args
- * (aggr_arg,...)						- normal agg with args
- * (ORDER BY aggr_arg,...)				- ordered-set agg with no direct args
- * (aggr_arg,... ORDER BY aggr_arg,...)	- ordered-set agg with direct args
- *
- * The zero-argument case is spelled with '*' for consistency with COUNT(*).
- *
- * An additional restriction is that if the direct-args list ends in a
- * VARIADIC item, the ordered-args list must contain exactly one item that
- * is also VARIADIC with the same type.  This allows us to collapse the two
- * VARIADIC items into one, which is necessary to represent the aggregate in
- * pg_proc.  We check this at the grammar stage so that we can return a list
- * in which the second VARIADIC item is already discarded, avoiding extra work
- * in cases such as DROP AGGREGATE.
- *
- * The return value of this production is a two-element list, in which the
- * first item is a sublist of FunctionParameter nodes (with any duplicate
- * VARIADIC item already dropped, as per above) and the second is an integer
- * Value node, containing -1 if there was no ORDER BY and otherwise the number
- * of argument declarations before the ORDER BY.  (If this number is equal
- * to the first sublist's length, then we dropped a duplicate VARIADIC item.)
- * This representation is passed as-is to CREATE AGGREGATE; for operations
- * on existing aggregates, we can just apply extractArgTypes to the first
- * sublist.
- */
-aggr_args:	'(' '*' ')'
-				{
-					$$ = list_make2(NIL, makeInteger(-1));
-				}
-			| '(' aggr_args_list ')'
-				{
-					$$ = list_make2($2, makeInteger(-1));
-				}
-			| '(' ORDER BY aggr_args_list ')'
-				{
-					$$ = list_make2($4, makeInteger(0));
-				}
-			| '(' aggr_args_list ORDER BY aggr_args_list ')'
-				{
-					/* this is the only case requiring consistency checking */
-					$$ = makeOrderedSetArgs($2, $5, yyscanner);
-				}
-		;
-
-aggr_args_list:
-			aggr_arg								{ $$ = list_make1($1); }
-			| aggr_args_list ',' aggr_arg			{ $$ = lappend($1, $3); }
-		;
-
-aggregate_with_argtypes:
-			func_name aggr_args
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = $1;
-					n->objargs = extractAggrArgTypes($2);
-					n->objfuncargs = (List *) linitial($2);
-					$$ = n;
-				}
-		;
-
-aggregate_with_argtypes_list:
-			aggregate_with_argtypes					{ $$ = list_make1($1); }
-			| aggregate_with_argtypes_list ',' aggregate_with_argtypes
-													{ $$ = lappend($1, $3); }
 		;
 
 opt_createfunc_opt_list:
@@ -9258,29 +9096,6 @@ RemoveFuncStmt:
 				}
 		;
 
-RemoveAggrStmt:
-			DROP AGGREGATE aggregate_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_AGGREGATE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP AGGREGATE IF_P EXISTS aggregate_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_AGGREGATE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
-
 RemoveOperStmt:
 			DROP OPERATOR operator_with_argtypes_list opt_drop_behavior
 				{
@@ -9619,56 +9434,6 @@ extractArgTypes(List *parameters)
 			result = lappend(result, p->argType);
 	}
 	return result;
-}
-
-/* extractAggrArgTypes()
- * As above, but work from the output of the aggr_args production.
- */
-static List *
-extractAggrArgTypes(List *aggrargs)
-{
-	Assert(list_length(aggrargs) == 2);
-	return extractArgTypes((List *) linitial(aggrargs));
-}
-
-/* makeOrderedSetArgs()
- * Build the result of the aggr_args production (which see the comments for).
- * This handles only the case where both given lists are nonempty, so that
- * we have to deal with multiple VARIADIC arguments.
- */
-static List *
-makeOrderedSetArgs(List *directargs, List *orderedargs,
-				   core_yyscan_t yyscanner)
-{
-	FunctionParameter *lastd = (FunctionParameter *) llast(directargs);
-	Value	   *ndirectargs;
-
-	/* No restriction unless last direct arg is VARIADIC */
-	if (lastd->mode == FUNC_PARAM_VARIADIC)
-	{
-		FunctionParameter *firsto = (FunctionParameter *) linitial(orderedargs);
-
-		/*
-		 * We ignore the names, though the aggr_arg production allows them;
-		 * it doesn't allow default values, so those need not be checked.
-		 */
-		if (list_length(orderedargs) != 1 ||
-			firsto->mode != FUNC_PARAM_VARIADIC ||
-			!equal(lastd->argType, firsto->argType))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("an ordered-set aggregate with a VARIADIC direct argument must have one VARIADIC aggregated argument of the same data type"),
-					 parser_errposition(exprLocation((Node *) firsto))));
-
-		/* OK, drop the duplicate VARIADIC argument from the internal form */
-		orderedargs = NIL;
-	}
-
-	/* don't merge into the next line, as list_concat changes directargs */
-	ndirectargs = makeInteger(list_length(directargs));
-
-	return list_make2(list_concat(directargs, orderedargs),
-					  ndirectargs);
 }
 
 /* insertSelectOptions()

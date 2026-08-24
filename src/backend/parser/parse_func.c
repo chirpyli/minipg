@@ -1984,7 +1984,6 @@ LookupFuncNameInternal(ObjectType objtype, List *funcname,
 		switch (objtype)
 		{
 			case OBJECT_FUNCTION:
-			case OBJECT_AGGREGATE:
 				/* Ignore procedures */
 				if (get_func_prokind(clist->oid) == PROKIND_PROCEDURE)
 					continue;
@@ -2110,8 +2109,7 @@ LookupFuncWithArgs(ObjectType objtype, ObjectWithArgs *func, bool missing_ok)
 	Oid			oid;
 	FuncLookupError lookupError;
 
-	Assert(objtype == OBJECT_AGGREGATE ||
-		   objtype == OBJECT_FUNCTION ||
+	Assert(objtype == OBJECT_FUNCTION ||
 		   objtype == OBJECT_PROCEDURE ||
 		   objtype == OBJECT_ROUTINE);
 
@@ -2267,16 +2265,6 @@ LookupFuncWithArgs(ObjectType objtype, ObjectWithArgs *func, bool missing_ok)
 														  NIL, argoids))));
 				break;
 
-			case OBJECT_AGGREGATE:
-				/* Reject if found object is not an aggregate. */
-				if (get_func_prokind(oid) != PROKIND_AGGREGATE)
-					ereport(ERROR,
-							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-							 errmsg("function %s is not an aggregate",
-									func_signature_string(func->objname, argcount,
-														  NIL, argoids))));
-				break;
-
 			default:
 				/* OBJECT_ROUTINE accepts anything. */
 				break;
@@ -2306,25 +2294,6 @@ LookupFuncWithArgs(ObjectType objtype, ObjectWithArgs *func, bool missing_ok)
 							ereport(ERROR,
 									(errcode(ERRCODE_UNDEFINED_FUNCTION),
 									 errmsg("procedure %s does not exist",
-											func_signature_string(func->objname, argcount,
-																  NIL, argoids))));
-						break;
-
-					case OBJECT_AGGREGATE:
-						if (func->args_unspecified)
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_FUNCTION),
-									 errmsg("could not find an aggregate named \"%s\"",
-											NameListToString(func->objname))));
-						else if (argcount == 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_FUNCTION),
-									 errmsg("aggregate %s(*) does not exist",
-											NameListToString(func->objname))));
-						else
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_FUNCTION),
-									 errmsg("aggregate %s does not exist",
 											func_signature_string(func->objname, argcount,
 																  NIL, argoids))));
 						break;
@@ -2364,14 +2333,6 @@ LookupFuncWithArgs(ObjectType objtype, ObjectWithArgs *func, bool missing_ok)
 										NameListToString(func->objname)),
 								 func->args_unspecified ?
 								 errhint("Specify the argument list to select the procedure unambiguously.") : 0));
-						break;
-					case OBJECT_AGGREGATE:
-						ereport(ERROR,
-								(errcode(ERRCODE_AMBIGUOUS_FUNCTION),
-								 errmsg("aggregate name \"%s\" is not unique",
-										NameListToString(func->objname)),
-								 func->args_unspecified ?
-								 errhint("Specify the argument list to select the aggregate unambiguously.") : 0));
 						break;
 					case OBJECT_ROUTINE:
 						ereport(ERROR,

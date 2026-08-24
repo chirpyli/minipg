@@ -298,7 +298,6 @@ typedef enum NodeTag
 	T_AlterDomainStmt,
 	T_ClusterStmt,
 	T_CreateStmt,
-	T_DefineStmt,
 	T_DropStmt,
 	T_TruncateStmt,
 	T_IndexStmt,

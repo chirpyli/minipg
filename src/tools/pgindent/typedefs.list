@@ -483,7 +483,6 @@ DecodedBkpBlock
 DecodingOutputState
 DefElem
 DefElemAction
-DefineStmt
 DeleteStmt
 DependencyGenerator
 DependencyGeneratorData

@@ -153,10 +153,6 @@ SELECT (SELECT generate_series(1,3) LIMIT 1 OFFSET few.id) FROM few;
 -- tSRF in correlated subquery, referencing SRF outside
 SELECT (SELECT generate_series(1,3) LIMIT 1 OFFSET g.i) FROM generate_series(0,3) g(i);
 
--- Operators can return sets too
-CREATE OPERATOR |@| (PROCEDURE = unnest, RIGHTARG = ANYARRAY);
-SELECT |@|ARRAY[1,2,3];
-
 -- Some fun cases involving duplicate SRF calls
 explain (verbose, costs off)
 select generate_series(1,3) as x, generate_series(1,3) + 1 as xp1;

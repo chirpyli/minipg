@@ -13,7 +13,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	aggregatecmds.o \
 	alter.o \
 	amcmds.o \
 	analyze.o \

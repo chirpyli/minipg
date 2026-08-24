@@ -134,20 +134,6 @@ DROP FUNCTION IF EXISTS test_function_exists();
 DROP FUNCTION test_function_exists(int, text, int[]);
 DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
 
--- aggregate
-DROP AGGREGATE test_aggregate_exists(*);
-DROP AGGREGATE IF EXISTS test_aggregate_exists(*);
-
-DROP AGGREGATE test_aggregate_exists(int);
-DROP AGGREGATE IF EXISTS test_aggregate_exists(int);
-
--- operator
-DROP OPERATOR @#@ (int, int);
-DROP OPERATOR IF EXISTS @#@ (int, int);
-CREATE OPERATOR @#@
-        (leftarg = int8, rightarg = int8, procedure = int8xor);
-DROP OPERATOR @#@ (int8, int8);
-
 -- cast
 DROP CAST (text AS text);
 DROP CAST IF EXISTS (text AS text);
@@ -205,9 +191,6 @@ DROP TABLE test_exists;
 
 -- be tolerant with missing schemas, types, etc
 
-DROP AGGREGATE IF EXISTS no_such_schema.foo(int);
-DROP AGGREGATE IF EXISTS foo(no_such_type);
-DROP AGGREGATE IF EXISTS foo(no_such_schema.no_such_type);
 DROP CAST IF EXISTS (INTEGER AS no_such_type2);
 DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
 DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);

@@ -38,9 +38,9 @@ test: horology opr_sanity misc_sanity comments expressions unicode xid mvcc euc_
 # ----------
 # These four each depend on the previous one
 # ----------
+# create_function_1 已随 CREATE TYPE 基础类型裁剪而移除（其 int44in/int44out
+# C 函数仅为 create_type.sql 的 city_budget 基础类型服务，city_budget 已删除）
 # create_function_2 已随表继承(INHERITS)功能裁剪而移除
-test: create_function_1
-test: create_type
 # create_table 已改写：移除 INHERITS 继承链与 PARTITION BY 分区，保留标准基础表(tenk1/tenk2/onek/person 等)
 test: create_table
 # create_index 为 onek/tenk1/bt_*_heap/hash_*_heap 等基础表建立索引，
@@ -64,8 +64,6 @@ test: insert
 # create_misc 已改写：移除 INHERITS 继承链(person*/ihighway/shighway/a_star 等)，保留普通基础表
 # (hobbies_r/equipment_r/city/road/ramp/iportaltest)，依赖 create_table 创建的基础表
 test: create_misc
-test: create_operator 
-# These depend on create_operator
 test: index_including
 
 # ----------
@@ -75,7 +73,7 @@ test: index_including
 #   constraints vacuum create_function_3 database
 # information_schema 已裁剪，triggers/updatable_views 深度依赖 information_schema，移除
 # inherit 已随表继承(INHERITS)功能裁剪而移除
-test: create_aggregate typed_table hash_func errors infinite_recurse
+test: typed_table hash_func errors infinite_recurse
 
 # ----------
 # sanity_check does a vacuum, affecting the sort order of SELECT *
@@ -99,14 +97,14 @@ test: select_distinct select_distinct_on select_implicit select_having case tran
 # 权限/角色机制已裁剪，matview identity generated 依赖 ROLE/OWNER，移除
 # information_schema 已裁剪，collate 引用 information_schema.views，移除
 # lock 已随表继承(INHERITS)功能裁剪而移除
-test: tablesample groupingsets drop_operator join_hash
+test: tablesample groupingsets join_hash
 
 # ----------
 # Another group of parallel tests
 # ----------
 # misc 已随表继承(INHERITS)功能裁剪而移除（依赖 stud_emp/emp 继承表）
 # create_table_like 已随表继承(INHERITS)功能裁剪而移除
-test: alter_operator dbsize misc_functions sysviews tsrf tidscan tidrangescan
+test: dbsize misc_functions sysviews tsrf tidscan tidrangescan
 
 # rules cannot run concurrently with any test that creates
 # a view or rule in the public schema

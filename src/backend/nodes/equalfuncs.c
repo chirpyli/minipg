@@ -1066,20 +1066,6 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 
 
 static bool
-_equalDefineStmt(const DefineStmt *a, const DefineStmt *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_SCALAR_FIELD(oldstyle);
-	COMPARE_NODE_FIELD(defnames);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(definition);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-	COMPARE_SCALAR_FIELD(replace);
-
-	return true;
-}
-
-static bool
 _equalDropStmt(const DropStmt *a, const DropStmt *b)
 {
 	COMPARE_NODE_FIELD(objects);
@@ -2251,9 +2237,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateStmt:
 			retval = _equalCreateStmt(a, b);
-			break;
-		case T_DefineStmt:
-			retval = _equalDefineStmt(a, b);
 			break;
 		case T_DropStmt:
 			retval = _equalDropStmt(a, b);

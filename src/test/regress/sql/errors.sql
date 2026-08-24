@@ -109,22 +109,6 @@ end;
 
 
 --
--- CREATE AGGREGATE
-
--- sfunc/finalfunc type disagreement
-create aggregate newavg2 (sfunc = int4pl,
-			  basetype = int4,
-			  stype = int4,
-			  finalfunc = int2um,
-			  initcond = '0');
-
--- left out basetype
-create aggregate newcnt1 (sfunc = int4inc,
-			  stype = int4,
-			  initcond = '0');
-
-
---
 -- DROP INDEX
 
 -- missing index name
@@ -135,28 +119,6 @@ drop index 314159;
 
 -- no such index
 drop index nonesuch;
-
-
---
--- DROP AGGREGATE
-
--- missing aggregate name
-drop aggregate;
-
--- missing aggregate type
-drop aggregate newcnt1;
-
--- bad aggregate name
-drop aggregate 314159 (int);
-
--- bad aggregate type
-drop aggregate newcnt (nonesuch);
-
--- no such aggregate
-drop aggregate nonesuch (int4);
-
--- no such aggregate for type
-drop aggregate newcnt (float4);
 
 
 --

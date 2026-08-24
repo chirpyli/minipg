@@ -187,24 +187,14 @@ SELECT ss.f1 AS "Correlated Field", ss.f3 AS "Second Field"
   FROM SUBSELECT_TBL ss
   WHERE f1 NOT IN (SELECT f1+1 FROM INT4_TBL
                    WHERE f1 != ss.f1 AND f1 < 2147483647);
- Correlated Field | Second Field 
-------------------+--------------
-                2 |            4
-                3 |            5
-                2 |            2
-                3 |            3
-                6 |            8
-                8 |             
-(6 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 3:   WHERE f1 NOT IN (SELECT f1+1 FROM INT4_TBL
+                                            ^
 select q1, float8(count(*)) / (select count(*) from int8_tbl)
 from int8_tbl group by q1 order by q1;
-        q1        | ?column? 
-------------------+----------
-              123 |      0.4
- 4567890123456789 |      0.6
-(2 rows)
-
+ERROR:  relation "int8_tbl" does not exist
+LINE 2: from int8_tbl group by q1 order by q1;
+             ^
 -- Unspecified-type literals in output columns should resolve as text
 SELECT *, pg_typeof(f1) FROM
   (SELECT 'foo' AS f1 FROM generate_series(1,3)) ss ORDER BY 1;
@@ -249,40 +239,21 @@ select 1 = all (select (select 1));
 explain (costs off)
 select * from int4_tbl o where exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit null);
-             QUERY PLAN             
-------------------------------------
- Hash Semi Join
-   Hash Cond: (o.f1 = i.f1)
-   ->  Seq Scan on int4_tbl o
-   ->  Hash
-         ->  Seq Scan on int4_tbl i
-(5 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: select * from int4_tbl o where exists
+                      ^
 explain (costs off)
 select * from int4_tbl o where not exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit 1);
-             QUERY PLAN             
-------------------------------------
- Hash Anti Join
-   Hash Cond: (o.f1 = i.f1)
-   ->  Seq Scan on int4_tbl o
-   ->  Hash
-         ->  Seq Scan on int4_tbl i
-(5 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: select * from int4_tbl o where not exists
+                      ^
 explain (costs off)
 select * from int4_tbl o where exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit 0);
-              QUERY PLAN              
---------------------------------------
- Seq Scan on int4_tbl o
-   Filter: (SubPlan 1)
-   SubPlan 1
-     ->  Limit
-           ->  Seq Scan on int4_tbl i
-                 Filter: (f1 = o.f1)
-(6 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: select * from int4_tbl o where exists
+                      ^
 --
 -- Test cases to catch unpleasant interactions between IN-join processing
 -- and subquery pullup.
@@ -290,42 +261,33 @@ select * from int4_tbl o where exists
 select count(*) from
   (select 1 from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
- count 
--------
-   100
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   (select 1 from tenk1 a
+                         ^
 select count(distinct ss.ten) from
   (select ten from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
- count 
--------
-    10
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   (select ten from tenk1 a
+                           ^
 select count(*) from
   (select 1 from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
- count 
--------
-   100
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   (select 1 from tenk1 a
+                         ^
 select count(distinct ss.ten) from
   (select ten from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
- count 
--------
-    10
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   (select ten from tenk1 a
+                           ^
 --
 -- Test cases to check for overenthusiastic optimization of
 -- "IN (SELECT DISTINCT ...)" and related cases.  Per example from
 -- Luca Pireddu and Michael Fuhr.
 --
 CREATE TABLE foo (id integer);
-ERROR:  relation "foo" already exists
 CREATE TABLE bar (id1 integer, id2 integer);
 INSERT INTO foo VALUES (1);
 INSERT INTO bar VALUES (1, 1);
@@ -334,14 +296,18 @@ INSERT INTO bar VALUES (3, 1);
 -- These cases require an extra level of distinct-ing above subquery s
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
-ERROR:  column "id" does not exist
-LINE 1: SELECT * FROM foo WHERE id IN
-                                ^
+ id 
+----
+  1
+(1 row)
+
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id1,id2 FROM bar GROUP BY id1,id2) AS s);
-ERROR:  column "id" does not exist
-LINE 1: SELECT * FROM foo WHERE id IN
-                                ^
+ id 
+----
+  1
+(1 row)
+
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id1, id2 FROM bar UNION
                       SELECT id1, id2 FROM bar) AS s);
@@ -349,14 +315,18 @@ ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- These cases do not
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT ON (id2) id1, id2 FROM bar) AS s);
-ERROR:  column "id" does not exist
-LINE 1: SELECT * FROM foo WHERE id IN
-                                ^
+ id 
+----
+  1
+(1 row)
+
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id2 FROM bar GROUP BY id2) AS s);
-ERROR:  column "id" does not exist
-LINE 1: SELECT * FROM foo WHERE id IN
-                                ^
+ id 
+----
+  1
+(1 row)
+
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id2 FROM bar UNION
                       SELECT id2 FROM bar) AS s);
@@ -469,24 +439,21 @@ update shipped_view set value = 11
     from int4_tbl a join int4_tbl b
       on (a.f1 = (select f1 from int4_tbl c where c.f1=b.f1))
     where ordnum = a.f1;
+ERROR:  relation "int4_tbl" does not exist
+LINE 2:     from int4_tbl a join int4_tbl b
+                 ^
 select * from shipped_view;
- ttype | ordnum | partnum | value 
--------+--------+---------+-------
- wt    |      0 | 1       |    11
+ ttype | ordnum | partnum |  value  
+-------+--------+---------+---------
+ wt    |      0 | 1       | 1234.56
 (1 row)
 
 select f1, ss1 as relabel from
     (select *, (select sum(f1) from int4_tbl b where f1 >= a.f1) as ss1
      from int4_tbl a) ss;
-     f1      |  relabel   
--------------+------------
-           0 | 2147607103
-      123456 | 2147607103
-     -123456 | 2147483647
-  2147483647 | 2147483647
- -2147483647 |          0
-(5 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 3:      from int4_tbl a) ss;
+                  ^
 --
 -- Test cases involving PARAM_EXEC parameters and min/max index optimizations.
 -- Per bug report from David Sanchez i Gregori.
@@ -495,20 +462,16 @@ select * from (
   select max(unique1) from tenk1 as a
   where exists (select 1 from tenk1 as b where b.thousand = a.unique2)
 ) ss;
- max  
-------
- 9997
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   select max(unique1) from tenk1 as a
+                                   ^
 select * from (
   select min(unique1) from tenk1 as a
   where not exists (select 1 from tenk1 as b where b.unique2 = 10000)
 ) ss;
- min 
------
-   0
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   select min(unique1) from tenk1 as a
+                                   ^
 --
 -- Test that an IN implemented using a UniquePath does unique-ification
 -- with the right semantics, as per bug #4113.  (Unfortunately we have
@@ -518,28 +481,25 @@ select * from (
 -- pointless.)
 --
 CREATE TABLE numeric_table (num_col numeric);
+ERROR:  syntax error at or near "numeric"
+LINE 1: CREATE TABLE numeric_table (num_col numeric);
+                                            ^
 insert into numeric_table values (1), (1.000000000000000000001), (2), (3);
+ERROR:  relation "numeric_table" does not exist
+LINE 1: insert into numeric_table values (1), (1.0000000000000000000...
+                    ^
 CREATE TABLE float_table (float_col float8);
 insert into float_table values (1), (2), (3);
 select * from float_table
   where float_col in (select num_col from numeric_table);
- float_col 
------------
-         1
-         2
-         3
-(3 rows)
-
+ERROR:  relation "numeric_table" does not exist
+LINE 2:   where float_col in (select num_col from numeric_table);
+                                                  ^
 select * from numeric_table
   where num_col in (select float_col from float_table);
-         num_col         
--------------------------
-                       1
- 1.000000000000000000001
-                       2
-                       3
-(4 rows)
-
+ERROR:  relation "numeric_table" does not exist
+LINE 1: select * from numeric_table
+                      ^
 --
 -- Test case for bug #4290: bogus calculation of subplan param sets
 --
@@ -568,14 +528,16 @@ from tc;
 -- Test case for 8.3 "failed to locate grouping columns" bug
 --
 CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
+ERROR:  syntax error at or near "numeric"
+LINE 1: CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
+                            ^
 select * from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
    from t1 up) ss
 group by f1,f2,fs;
- f1 | f2 | fs 
-----+----+----
-(0 rows)
-
+ERROR:  relation "t1" does not exist
+LINE 3:    from t1 up) ss
+                ^
 --
 -- Test case for bug #5514 (mishandling of whole-row Vars in subselects)
 --
@@ -611,15 +573,9 @@ select (select (a.*)::text) from view_a a;
 -- any junk columns therein
 --
 select q from (select max(f1) from int4_tbl group by f1 order by f1) q;
-       q       
----------------
- (-2147483647)
- (-123456)
- (0)
- (123456)
- (2147483647)
-(5 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 1: select q from (select max(f1) from int4_tbl group by f1 orde...
+                                           ^
 --
 -- Test case for sublinks pulled up into joinaliasvars lists in an
 -- inherited update/delete query
@@ -633,6 +589,9 @@ where exists (
     ( select f1, array(select q1 from int8_tbl) as arr
       from text_tbl ) ss
   where road.name = ss.f1 );
+ERROR:  relation "road" does not exist
+LINE 1: delete from road
+                    ^
 rollback;
 --
 -- Test case for sublinks pushed down into subselects via join alias expansion
@@ -644,31 +603,30 @@ from
    from int8_tbl) sq0
   join
   int4_tbl i4 on dummy = i4.f1;
- qq1 
------
-(0 rows)
-
+ERROR:  relation "int8_tbl" does not exist
+LINE 5:    from int8_tbl) sq0
+                ^
 --
 -- Test case for subselect within UPDATE of INSERT...ON CONFLICT DO UPDATE
 --
 CREATE TABLE upsert(key int4 primary key, val text);
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'not seen';
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'seen with subselect ' || (select f1 from int4_tbl where f1 != 0 limit 1)::text;
+ERROR:  relation "int4_tbl" does not exist
+LINE 1: ...t val = 'seen with subselect ' || (select f1 from int4_tbl w...
+                                                             ^
 select * from upsert;
- key |            val             
------+----------------------------
-   1 | seen with subselect 123456
+ key | val 
+-----+-----
+   1 | val
 (1 row)
 
 insert into upsert values (1, 'x'), (999, 'y')
 on conflict (key) do update set val = (select u from (select 'int4_tbl' u from int4_tbl limit 1) aa)
 returning *;
- key |   val    
------+----------
-   1 | int4_tbl
- 999 | y
-(2 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: ...et val = (select u from (select 'int4_tbl' u from int4_tbl l...
+                                                             ^
 --
 -- Test case for cross-type partial matching in hashed subplan (bug #7597)
 --
@@ -744,128 +702,32 @@ select row(row(row(1))) = any (select row(row(1)));
 select '1'::text in (select '1'::name union all select '1'::name);
 ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 --
--- Test that we don't try to use a hashed subplan if the simplified
--- testexpr isn't of the right shape
---
--- this fails by default, of course
-select * from int8_tbl where q1 in (select c1 from inner_text);
-ERROR:  operator does not exist: bigint = text
-LINE 1: select * from int8_tbl where q1 in (select c1 from inner_tex...
-                                        ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
-begin;
--- make an operator to allow it to succeed
-create function bogus_int8_text_eq(int8, text) returns boolean
-language sql as 'select $1::text = $2';
-create operator = (procedure=bogus_int8_text_eq, leftarg=int8, rightarg=text);
-explain (costs off)
-select * from int8_tbl where q1 in (select c1 from inner_text);
-           QUERY PLAN           
---------------------------------
- Seq Scan on int8_tbl
-   Filter: (hashed SubPlan 1)
-   SubPlan 1
-     ->  Seq Scan on inner_text
-(4 rows)
-
-select * from int8_tbl where q1 in (select c1 from inner_text);
- q1  |        q2        
------+------------------
- 123 |              456
- 123 | 4567890123456789
-(2 rows)
-
--- inlining of this function results in unusual number of hash clauses,
--- which we can still cope with
-create or replace function bogus_int8_text_eq(int8, text) returns boolean
-language sql as 'select $1::text = $2 and $1::text = $2';
-explain (costs off)
-select * from int8_tbl where q1 in (select c1 from inner_text);
-           QUERY PLAN           
---------------------------------
- Seq Scan on int8_tbl
-   Filter: (hashed SubPlan 1)
-   SubPlan 1
-     ->  Seq Scan on inner_text
-(4 rows)
-
-select * from int8_tbl where q1 in (select c1 from inner_text);
- q1  |        q2        
------+------------------
- 123 |              456
- 123 | 4567890123456789
-(2 rows)
-
--- inlining of this function causes LHS and RHS to be switched,
--- which we can't cope with, so hashing should be abandoned
-create or replace function bogus_int8_text_eq(int8, text) returns boolean
-language sql as 'select $2 = $1::text';
-explain (costs off)
-select * from int8_tbl where q1 in (select c1 from inner_text);
-              QUERY PLAN              
---------------------------------------
- Seq Scan on int8_tbl
-   Filter: (SubPlan 1)
-   SubPlan 1
-     ->  Materialize
-           ->  Seq Scan on inner_text
-(5 rows)
-
-select * from int8_tbl where q1 in (select c1 from inner_text);
- q1  |        q2        
------+------------------
- 123 |              456
- 123 | 4567890123456789
-(2 rows)
-
-rollback;  -- to get rid of the bogus operator
---
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
 --
 explain (costs off)
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
-                          QUERY PLAN                          
---------------------------------------------------------------
- Aggregate
-   ->  Seq Scan on tenk1 t
-         Filter: ((hashed SubPlan 2) OR (ten < 0))
-         SubPlan 2
-           ->  Index Only Scan using tenk1_unique1 on tenk1 k
-(5 rows)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2: select count(*) from tenk1 t
+                             ^
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
- count 
--------
- 10000
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 1: select count(*) from tenk1 t
+                             ^
 explain (costs off)
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
-                          QUERY PLAN                          
---------------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tenk1 t
-         Recheck Cond: (thousand = 1)
-         Filter: ((SubPlan 1) OR (ten < 0))
-         ->  Bitmap Index Scan on tenk1_thous_tenthous
-               Index Cond: (thousand = 1)
-         SubPlan 1
-           ->  Index Only Scan using tenk1_unique1 on tenk1 k
-                 Index Cond: (unique1 = t.unique2)
-(9 rows)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2: select count(*) from tenk1 t
+                             ^
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
- count 
--------
-    10
-(1 row)
-
+ERROR:  relation "tenk1" does not exist
+LINE 1: select count(*) from tenk1 t
+                             ^
 -- It's possible for the same EXISTS to get resolved both ways
 CREATE TABLE exists_tbl (c1 int, c2 int, c3 int) partition by list (c1);
 ERROR:  syntax error at or near "partition"
@@ -904,10 +766,9 @@ where a.thousand = b.thousand
   and exists ( select 1 from tenk1 c where b.hundred = c.hundred
                    and not exists ( select 1 from tenk1 d
                                     where a.thousand = d.thousand ) );
- thousand 
-----------
-(0 rows)
-
+ERROR:  relation "tenk1" does not exist
+LINE 1: select a.thousand from tenk1 a, tenk1 b
+                               ^
 --
 -- Check that nested sub-selects are not pulled up if they contain volatiles
 --
@@ -983,37 +844,18 @@ select sum(ss.tst::int) from
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
-                                                                                         QUERY PLAN                                                                                          
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Aggregate
-   Output: sum((((hashed SubPlan 1)))::integer)
-   ->  Nested Loop
-         Output: ((hashed SubPlan 1))
-         ->  Seq Scan on public.onek o
-               Output: o.unique1, o.unique2, o.two, o.four, o.ten, o.twenty, o.hundred, o.thousand, o.twothousand, o.fivethous, o.tenthous, o.odd, o.even, o.stringu1, o.stringu2, o.string4
-               Filter: (o.ten = 0)
-         ->  Bitmap Heap Scan on public.onek i
-               Output: (hashed SubPlan 1), random()
-               Recheck Cond: (i.unique1 = o.unique1)
-               ->  Bitmap Index Scan on onek_unique1
-                     Index Cond: (i.unique1 = o.unique1)
-               SubPlan 1
-                 ->  Seq Scan on public.int4_tbl
-                       Output: int4_tbl.f1
-                       Filter: (int4_tbl.f1 <= $0)
-(16 rows)
-
+ERROR:  relation "onek" does not exist
+LINE 3:   onek o cross join lateral (
+          ^
 select sum(ss.tst::int) from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
- sum 
------
- 100
-(1 row)
-
+ERROR:  relation "onek" does not exist
+LINE 2:   onek o cross join lateral (
+          ^
 --
 -- Test rescan of a SetOp node
 --
@@ -1121,69 +963,29 @@ explain (verbose, costs off)
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
   (select ten from tenk1 b);
-                                                                                         QUERY PLAN                                                                                          
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Hash Join
-   Output: int4_tbl.f1
-   Hash Cond: (b.ten = CASE WHEN (hashed SubPlan 1) THEN int4_tbl.f1 ELSE NULL::integer END)
-   ->  HashAggregate
-         Output: b.ten
-         Group Key: b.ten
-         ->  Seq Scan on public.tenk1 b
-               Output: b.unique1, b.unique2, b.two, b.four, b.ten, b.twenty, b.hundred, b.thousand, b.twothousand, b.fivethous, b.tenthous, b.odd, b.even, b.stringu1, b.stringu2, b.string4
-   ->  Hash
-         Output: int4_tbl.f1
-         ->  Seq Scan on public.int4_tbl
-               Output: int4_tbl.f1
-         SubPlan 1
-           ->  Index Only Scan using tenk1_unique1 on public.tenk1 a
-                 Output: a.unique1
-(15 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: select * from int4_tbl where
+                      ^
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
   (select ten from tenk1 b);
- f1 
-----
-  0
-(1 row)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 1: select * from int4_tbl where
+                      ^
 --
 -- Check for incorrect optimization when IN subquery contains a SRF
 --
 explain (verbose, costs off)
 select * from int4_tbl o where (f1, f1) in
   (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
-                            QUERY PLAN                             
--------------------------------------------------------------------
- Nested Loop Semi Join
-   Output: o.f1
-   Join Filter: (o.f1 = "ANY_subquery".f1)
-   ->  Seq Scan on public.int4_tbl o
-         Output: o.f1
-   ->  Materialize
-         Output: "ANY_subquery".f1, "ANY_subquery".g
-         ->  Subquery Scan on "ANY_subquery"
-               Output: "ANY_subquery".f1, "ANY_subquery".g
-               Filter: ("ANY_subquery".f1 = "ANY_subquery".g)
-               ->  Result
-                     Output: i.f1, ((generate_series(1, 50)) / 10)
-                     ->  ProjectSet
-                           Output: generate_series(1, 50), i.f1
-                           ->  HashAggregate
-                                 Output: i.f1
-                                 Group Key: i.f1
-                                 ->  Seq Scan on public.int4_tbl i
-                                       Output: i.f1
-(19 rows)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 2: select * from int4_tbl o where (f1, f1) in
+                      ^
 select * from int4_tbl o where (f1, f1) in
   (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
- f1 
-----
-  0
-(1 row)
-
+ERROR:  relation "int4_tbl" does not exist
+LINE 1: select * from int4_tbl o where (f1, f1) in
+                      ^
 --
 -- check for over-optimization of whole-row Var referencing an Append plan
 --
@@ -1225,30 +1027,21 @@ ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- nextval() should not be called more than the nominal number of times
 --
 CREATE SEQUENCE ts1;
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: CREATE SEQUENCE ts1;
+               ^
 select * from
   (select distinct ten from tenk1) ss
   where ten < 10 + nextval('ts1')
   order by 1;
- ten 
------
-   0
-   1
-   2
-   3
-   4
-   5
-   6
-   7
-   8
-   9
-(10 rows)
-
+ERROR:  relation "tenk1" does not exist
+LINE 2:   (select distinct ten from tenk1) ss
+                                    ^
 select nextval('ts1');
- nextval 
----------
-      11
-(1 row)
-
+ERROR:  function nextval(unknown) does not exist
+LINE 1: select nextval('ts1');
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 --
 -- Check that volatile quals aren't pushed down past a set-returning function;
 -- while a nonvolatile qual can be, if it doesn't reference the SRF.
@@ -1286,6 +1079,9 @@ select * from
 
 -- if we pretend it's stable, we get different results:
 alter function tattle(x int, y int) stable;
+ERROR:  syntax error at or near "function"
+LINE 1: alter function tattle(x int, y int) stable;
+              ^
 explain (verbose, costs off)
 select * from
   (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss

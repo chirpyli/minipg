@@ -27,13 +27,25 @@ DROP INDEX test_index_exists;
 ERROR:  index "test_index_exists" does not exist
 -- sequence
 DROP SEQUENCE test_sequence_exists;
-ERROR:  sequence "test_sequence_exists" does not exist
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: DROP SEQUENCE test_sequence_exists;
+             ^
 DROP SEQUENCE IF EXISTS test_sequence_exists;
-NOTICE:  sequence "test_sequence_exists" does not exist, skipping
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: DROP SEQUENCE IF EXISTS test_sequence_exists;
+             ^
 CREATE SEQUENCE test_sequence_exists;
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: CREATE SEQUENCE test_sequence_exists;
+               ^
 DROP SEQUENCE IF EXISTS test_sequence_exists;
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: DROP SEQUENCE IF EXISTS test_sequence_exists;
+             ^
 DROP SEQUENCE test_sequence_exists;
-ERROR:  sequence "test_sequence_exists" does not exist
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: DROP SEQUENCE test_sequence_exists;
+             ^
 -- schema
 DROP SCHEMA test_schema_exists;
 ERROR:  schema "test_schema_exists" does not exist
@@ -66,7 +78,9 @@ ERROR:  type "test_domain_exists" does not exist
 ---
 -- collation
 DROP COLLATION IF EXISTS test_collation_exists;
-NOTICE:  collation "test_collation_exists" does not exist, skipping
+ERROR:  syntax error at or near "COLLATION"
+LINE 1: DROP COLLATION IF EXISTS test_collation_exists;
+             ^
 -- text search parser
 DROP TEXT SEARCH PARSER test_tsparser_exists;
 ERROR:  syntax error at or near "TEXT"
@@ -137,23 +151,6 @@ DROP FUNCTION test_function_exists(int, text, int[]);
 ERROR:  function test_function_exists(integer, text, integer[]) does not exist
 DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
 NOTICE:  function test_function_exists(pg_catalog.int4,text,pg_catalog.int4[]) does not exist, skipping
--- aggregate
-DROP AGGREGATE test_aggregate_exists(*);
-ERROR:  aggregate test_aggregate_exists(*) does not exist
-DROP AGGREGATE IF EXISTS test_aggregate_exists(*);
-NOTICE:  aggregate test_aggregate_exists() does not exist, skipping
-DROP AGGREGATE test_aggregate_exists(int);
-ERROR:  aggregate test_aggregate_exists(integer) does not exist
-DROP AGGREGATE IF EXISTS test_aggregate_exists(int);
-NOTICE:  aggregate test_aggregate_exists(pg_catalog.int4) does not exist, skipping
--- operator
-DROP OPERATOR @#@ (int, int);
-ERROR:  operator does not exist: integer @#@ integer
-DROP OPERATOR IF EXISTS @#@ (int, int);
-NOTICE:  operator @#@ does not exist, skipping
-CREATE OPERATOR @#@
-        (leftarg = int8, rightarg = int8, procedure = int8xor);
-DROP OPERATOR @#@ (int8, int8);
 -- cast
 DROP CAST (text AS text);
 ERROR:  syntax error at or near "CAST"
@@ -165,21 +162,39 @@ LINE 1: DROP CAST IF EXISTS (text AS text);
              ^
 -- trigger
 DROP TRIGGER test_trigger_exists ON test_exists;
-ERROR:  trigger "test_trigger_exists" for table "test_exists" does not exist
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER test_trigger_exists ON test_exists;
+             ^
 DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
-NOTICE:  trigger "test_trigger_exists" for relation "test_exists" does not exist, skipping
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
+             ^
 DROP TRIGGER test_trigger_exists ON no_such_table;
-ERROR:  relation "no_such_table" does not exist
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER test_trigger_exists ON no_such_table;
+             ^
 DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table;
-NOTICE:  relation "no_such_table" does not exist, skipping
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table;
+             ^
 DROP TRIGGER test_trigger_exists ON no_such_schema.no_such_table;
-ERROR:  schema "no_such_schema" does not exist
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER test_trigger_exists ON no_such_schema.no_such_t...
+             ^
 DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_schema.no_such_table;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_schema...
+             ^
 CREATE TRIGGER test_trigger_exists
     BEFORE UPDATE ON test_exists
     FOR EACH ROW EXECUTE PROCEDURE suppress_redundant_updates_trigger();
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: CREATE TRIGGER test_trigger_exists
+               ^
 DROP TRIGGER test_trigger_exists ON test_exists;
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER test_trigger_exists ON test_exists;
+             ^
 -- rule
 DROP RULE test_rule_exists ON test_exists;
 ERROR:  rule "test_rule_exists" for relation "test_exists" does not exist
@@ -197,10 +212,6 @@ CREATE RULE test_rule_exists AS ON INSERT TO test_exists
     DO INSTEAD
     INSERT INTO test_exists VALUES (NEW.a, NEW.b || NEW.a::text);
 DROP RULE test_rule_exists ON test_exists;
-DROP SERVER IF EXISTS test_server_exists;
-ERROR:  syntax error at or near "SERVER"
-LINE 1: DROP SERVER IF EXISTS test_server_exists;
-             ^
 -- operator class
 DROP OPERATOR CLASS test_operator_class USING btree;
 ERROR:  operator class "test_operator_class" does not exist for access method "btree"
@@ -224,12 +235,6 @@ DROP TABLE IF EXISTS test_exists;
 DROP TABLE test_exists;
 ERROR:  table "test_exists" does not exist
 -- be tolerant with missing schemas, types, etc
-DROP AGGREGATE IF EXISTS no_such_schema.foo(int);
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP AGGREGATE IF EXISTS foo(no_such_type);
-NOTICE:  type "no_such_type" does not exist, skipping
-DROP AGGREGATE IF EXISTS foo(no_such_schema.no_such_type);
-NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP CAST IF EXISTS (INTEGER AS no_such_type2);
 ERROR:  syntax error at or near "CAST"
 LINE 1: DROP CAST IF EXISTS (INTEGER AS no_such_type2);
@@ -247,10 +252,11 @@ ERROR:  syntax error at or near "CAST"
 LINE 1: DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
              ^
 DROP COLLATION IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "COLLATION"
+LINE 1: DROP COLLATION IF EXISTS no_such_schema.foo;
+             ^
 DROP DOMAIN IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
-             ^
 DROP FUNCTION IF EXISTS no_such_schema.foo();
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP FUNCTION IF EXISTS foo(no_such_type);
@@ -274,7 +280,9 @@ NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP RULE IF EXISTS foo ON no_such_schema.bar;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP SEQUENCE IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "SEQUENCE"
+LINE 1: DROP SEQUENCE IF EXISTS no_such_schema.foo;
+             ^
 DROP TABLE IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
@@ -294,7 +302,9 @@ ERROR:  syntax error at or near "TEXT"
 LINE 1: DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
              ^
 DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
-NOTICE:  schema "no_such_schema" does not exist, skipping
+ERROR:  syntax error at or near "TRIGGER"
+LINE 1: DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
+             ^
 DROP TYPE IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP VIEW IF EXISTS no_such_schema.foo;

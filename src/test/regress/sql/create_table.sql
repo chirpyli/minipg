@@ -80,10 +80,12 @@ CREATE TABLE person (
 );
 
 
+-- minipg: city_budget 原为 create_type.sql 定义的基础类型(element=int4)，
+-- CREATE TYPE 基础形式已裁剪，budget 列改用 text
 CREATE TABLE city (
 	name		name,
 	location 	text,
-	budget 		city_budget
+	budget 		text
 );
 
 CREATE TABLE dept (

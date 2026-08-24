@@ -4,6 +4,24 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE/DROP AGGREGATE、CREATE OPERATOR、CREATE TYPE（基础/shell）裁剪（2026-08-24）
+
+### 一、删除内容
+删除 `DefineStmt` 中 `CreateAggregateStmt`/`CreateOperatorStmt`/`CreateTypeStmt`（含基础类型与 shell 类型）的整套 DDL 链路：gram.y 产生式、`aggregatecmds.c`（整个文件）、`operatorcmds.c`/`typecmds.c` 中对应的 `DefineAggregate`/`DefineOperator`/`DefineType`（仅保留复合/枚举/range 分支）、`T_CreateAggregateStmt`/`T_CreateOperatorStmt`/`T_CreateTypeStmt` 节点（copy/equal）、命令标签（`CMDTAG_CREATE/DROP_AGGREGATE`、`CMDTAG_CREATE_OPERATOR`）、`OBJECT_AGGREGATE`/`OBJECT_OPERATOR` 对象寻址、`DROP AGGREGATE`、`remove_aggregate`、`ComputeFunctionHash` 等。
+
+### 二、保留
+`CREATE TYPE AS`（复合/枚举/range）、`ALTER/DROP TYPE`、`ALTER/DROP OPERATOR`、`CREATE/ALTER/DROP OPERATOR CLASS/FAMILY`、`CreateShellType`（内部 shell 机制，供复合类型自引用等使用）。
+
+### 三、同步清理
+- 删除测试文件：`create_aggregate`、`create_operator`、`create_type`、`drop_operator`、`alter_operator`、`equivclass`。
+- `create_function_1` 测试删除（其 `int44in`/`int44out` C 函数仅服务于 `city_budget` 基础类型，已随 CREATE TYPE 基础形式裁剪一并移除，`regress.c` 同步删函数）。
+- `create_table.sql` 的 `city` 表 `budget` 列由 `city_budget` 基础类型改为 `text`。
+- `src/test/modules/test_custom_types` 整个模块删除（依赖 CREATE TYPE 基础形式 + CREATE OPERATOR，CREATE EXTENSION 直接报语法错误）。
+- `errors`/`tsrf`/`float4`/`expressions`/`drop_if_exists`/`polymorphism`/`case`/`subselect` 等测试脚本裁剪依赖被删语法的用例，`parallel_schedule` 移除对应条目。
+
+### 四、验证
+`make -j8` 全量重编通过；`make check-world` 全绿（regress 73 用例 + modules/contrib）。
+
 ## DO 语句裁剪（2026-08-24）
 
 DO 语句是 SQL 匿名块入口，minipg 内置语言均无 `laninline`，执行必然报错，属装饰性语法。删除 gram.y 产生式、`DoStmt`/`InlineCodeBlock` 节点、`ExecuteDoStmt`、`CMDTAG_DO`；**保留 `DO` 关键字**（CREATE RULE ... DO INSTEAD、ON CONFLICT ... DO UPDATE 复用）。验证：make check 通过，DO 报语法错误，upsert/rule 正常。

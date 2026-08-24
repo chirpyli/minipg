@@ -139,29 +139,3 @@ SELECT float4send('750486563e-38'::float4);
 
 SELECT float4send('1.17549435e-38'::float4);
 SELECT float4send('1.1754944e-38'::float4);
-
--- test output (and round-trip safety) of various values.
--- To ensure we're testing what we think we're testing, start with
--- float values specified by bit patterns (as a useful side effect,
--- this means we'll fail on non-IEEE platforms).
-
-create type xfloat4;
-create function xfloat4in(cstring) returns xfloat4 immutable strict
-  language internal as 'int4in';
-create function xfloat4out(xfloat4) returns cstring immutable strict
-  language internal as 'int4out';
-create type xfloat4 (input = xfloat4in, output = xfloat4out, like = float4);
-create cast (xfloat4 as float4) without function;
-create cast (float4 as xfloat4) without function;
-create cast (xfloat4 as integer) without function;
-create cast (integer as xfloat4) without function;
-
--- float4: seeeeeee emmmmmmm mmmmmmmm mmmmmmmm
-
--- we don't care to assume the platform's strtod() handles subnormals
--- correctly; those are "use at your own risk". However we do test
--- subnormal outputs, since those are under our control.
-
-
--- clean up, lest opr_sanity complain
-drop type xfloat4 cascade;

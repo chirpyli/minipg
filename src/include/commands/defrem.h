@@ -70,17 +70,12 @@ extern void interpret_function_parameter_list(ParseState *pstate,
 											  Oid *requiredResultType);
 
 /* commands/operatorcmds.c */
-extern ObjectAddress DefineOperator(List *names, List *parameters);
 extern void RemoveOperatorById(Oid operOid);
 
 /* commands/statscmds.c */
 extern ObjectAddress CreateStatistics(CreateStatsStmt *stmt, bool check_rights);
 extern void RemoveStatisticsById(Oid statsOid);
 extern Oid	StatisticsGetRelation(Oid statId, bool missing_ok);
-
-/* commands/aggregatecmds.c */
-extern ObjectAddress DefineAggregate(ParseState *pstate, List *name, List *args, bool oldstyle,
-									 List *parameters, bool replace);
 
 /* commands/opclasscmds.c */
 extern ObjectAddress DefineOpClass(CreateOpClassStmt *stmt);

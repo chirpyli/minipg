@@ -236,12 +236,6 @@ interpret_function_parameter_list(ParseState *pstate,
 							(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 							 errmsg("SQL function cannot accept shell type %s",
 									TypeNameToString(t))));
-				/* We don't allow creating aggregates on shell types either */
-				else if (objtype == OBJECT_AGGREGATE)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-							 errmsg("aggregate cannot accept shell type %s",
-									TypeNameToString(t))));
 				else
 					ereport(NOTICE,
 							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -262,11 +256,7 @@ interpret_function_parameter_list(ParseState *pstate,
 
 		if (t->setof)
 		{
-			if (objtype == OBJECT_AGGREGATE)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-						 errmsg("aggregates cannot accept set arguments")));
-			else if (objtype == OBJECT_PROCEDURE)
+			if (objtype == OBJECT_PROCEDURE)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 						 errmsg("procedures cannot accept set arguments")));

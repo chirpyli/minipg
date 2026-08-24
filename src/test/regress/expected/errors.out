@@ -135,20 +135,6 @@ WARNING:  there is no transaction in progress
 end;
 WARNING:  there is no transaction in progress
 --
--- CREATE AGGREGATE
--- sfunc/finalfunc type disagreement
-create aggregate newavg2 (sfunc = int4pl,
-			  basetype = int4,
-			  stype = int4,
-			  finalfunc = int2um,
-			  initcond = '0');
-ERROR:  function int2um(integer) does not exist
--- left out basetype
-create aggregate newcnt1 (sfunc = int4inc,
-			  stype = int4,
-			  initcond = '0');
-ERROR:  aggregate input type must be specified
---
 -- DROP INDEX
 -- missing index name
 drop index;
@@ -163,32 +149,6 @@ LINE 1: drop index 314159;
 -- no such index
 drop index nonesuch;
 ERROR:  index "nonesuch" does not exist
---
--- DROP AGGREGATE
--- missing aggregate name
-drop aggregate;
-ERROR:  syntax error at or near ";"
-LINE 1: drop aggregate;
-                      ^
--- missing aggregate type
-drop aggregate newcnt1;
-ERROR:  syntax error at or near ";"
-LINE 1: drop aggregate newcnt1;
-                              ^
--- bad aggregate name
-drop aggregate 314159 (int);
-ERROR:  syntax error at or near "314159"
-LINE 1: drop aggregate 314159 (int);
-                       ^
--- bad aggregate type
-drop aggregate newcnt (nonesuch);
-ERROR:  type "nonesuch" does not exist
--- no such aggregate
-drop aggregate nonesuch (int4);
-ERROR:  aggregate nonesuch(integer) does not exist
--- no such aggregate for type
-drop aggregate newcnt (float4);
-ERROR:  aggregate newcnt(real) does not exist
 --
 -- DROP FUNCTION
 -- missing function name

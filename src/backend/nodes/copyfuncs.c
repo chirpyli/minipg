@@ -2838,22 +2838,6 @@ _copyCreateStmt(const CreateStmt *from)
 
 
 
-static DefineStmt *
-_copyDefineStmt(const DefineStmt *from)
-{
-	DefineStmt *newnode = makeNode(DefineStmt);
-
-	COPY_SCALAR_FIELD(kind);
-	COPY_SCALAR_FIELD(oldstyle);
-	COPY_NODE_FIELD(defnames);
-	COPY_NODE_FIELD(args);
-	COPY_NODE_FIELD(definition);
-	COPY_SCALAR_FIELD(if_not_exists);
-	COPY_SCALAR_FIELD(replace);
-
-	return newnode;
-}
-
 static DropStmt *
 _copyDropStmt(const DropStmt *from)
 {
@@ -3777,9 +3761,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateStmt:
 			retval = _copyCreateStmt(from);
-			break;
-		case T_DefineStmt:
-			retval = _copyDefineStmt(from);
 			break;
 		case T_DropStmt:
 			retval = _copyDropStmt(from);

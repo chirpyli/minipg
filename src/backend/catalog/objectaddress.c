@@ -412,9 +412,6 @@ static const struct object_type_map
 	},
 	/* OCLASS_PROC */
 	{
-		"aggregate", OBJECT_AGGREGATE
-	},
-	{
 		"function", OBJECT_FUNCTION
 	},
 	{
@@ -651,7 +648,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_DOMAIN:
 				address = get_object_address_type(objtype, castNode(TypeName, object), missing_ok);
 				break;
-			case OBJECT_AGGREGATE:
 			case OBJECT_FUNCTION:
 			case OBJECT_PROCEDURE:
 			case OBJECT_ROUTINE:
@@ -1413,8 +1409,7 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	/*
 	 * If args are given, decode them according to the object type.
 	 */
-	if (type == OBJECT_AGGREGATE ||
-		type == OBJECT_FUNCTION ||
+	if (type == OBJECT_FUNCTION ||
 		type == OBJECT_PROCEDURE ||
 		type == OBJECT_ROUTINE ||
 		type == OBJECT_OPERATOR ||
@@ -1526,7 +1521,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_FUNCTION:
 		case OBJECT_PROCEDURE:
 		case OBJECT_ROUTINE:
-		case OBJECT_AGGREGATE:
 		case OBJECT_OPERATOR:
 			{
 				ObjectWithArgs *owa = makeNode(ObjectWithArgs);

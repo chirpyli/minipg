@@ -118,58 +118,6 @@ reverse_name(PG_FUNCTION_ARGS)
 }
 
 
-
-/*
- * Type int44 has no real-world use, but the regression tests use it
- * (under the alias "city_budget").  It's a four-element vector of int4's.
- */
-
-/*
- *		int44in			- converts "num, num, ..." to internal form
- *
- *		Note: Fills any missing positions with zeroes.
- */
-PG_FUNCTION_INFO_V1(int44in);
-
-Datum
-int44in(PG_FUNCTION_ARGS)
-{
-	char	   *input_string = PG_GETARG_CSTRING(0);
-	int32	   *result = (int32 *) palloc(4 * sizeof(int32));
-	int			i;
-
-	i = sscanf(input_string,
-			   "%d, %d, %d, %d",
-			   &result[0],
-			   &result[1],
-			   &result[2],
-			   &result[3]);
-	while (i < 4)
-		result[i++] = 0;
-
-	PG_RETURN_POINTER(result);
-}
-
-/*
- *		int44out		- converts internal form to "num, num, ..."
- */
-PG_FUNCTION_INFO_V1(int44out);
-
-Datum
-int44out(PG_FUNCTION_ARGS)
-{
-	int32	   *an_array = (int32 *) PG_GETARG_POINTER(0);
-	char	   *result = (char *) palloc(16 * 4);
-
-	snprintf(result, 16 * 4, "%d,%d,%d,%d",
-			 an_array[0],
-			 an_array[1],
-			 an_array[2],
-			 an_array[3]);
-
-	PG_RETURN_CSTRING(result);
-}
-
 PG_FUNCTION_INFO_V1(make_tuple_indirect);
 Datum
 make_tuple_indirect(PG_FUNCTION_ARGS)

@@ -131,7 +131,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateStmt:
 		case T_CreateTransformStmt:
 		case T_CreatedbStmt:
-		case T_DefineStmt:
 		case T_DropStmt:
 		case T_DropdbStmt:
 		case T_CreateFunctionStmt:
@@ -860,38 +859,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				/*
 				 * ************* object creation / destruction **************
 				 */
-			case T_DefineStmt:
-				{
-					DefineStmt *stmt = (DefineStmt *) parsetree;
-
-					switch (stmt->kind)
-					{
-						case OBJECT_AGGREGATE:
-							address =
-								DefineAggregate(pstate, stmt->defnames, stmt->args,
-												stmt->oldstyle,
-												stmt->definition,
-												stmt->replace);
-							break;
-						case OBJECT_OPERATOR:
-							Assert(stmt->args == NIL);
-							address = DefineOperator(stmt->defnames,
-													 stmt->definition);
-							break;
-						case OBJECT_TYPE:
-							Assert(stmt->args == NIL);
-							address = DefineType(pstate,
-												 stmt->defnames,
-												 stmt->definition);
-							break;
-						default:
-							elog(ERROR, "unrecognized define stmt type: %d",
-								 (int) stmt->kind);
-							break;
-					}
-				}
-				break;
-
 			case T_IndexStmt:	/* CREATE INDEX */
 				{
 					IndexStmt  *stmt = (IndexStmt *) parsetree;
@@ -1479,9 +1446,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_ROUTINE:
 					tag = CMDTAG_DROP_ROUTINE;
 					break;
-				case OBJECT_AGGREGATE:
-					tag = CMDTAG_DROP_AGGREGATE;
-					break;
 				case OBJECT_OPERATOR:
 					tag = CMDTAG_DROP_OPERATOR;
 					break;
@@ -1528,23 +1492,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_AlterDomainStmt:
 			tag = CMDTAG_ALTER_DOMAIN;
-			break;
-
-		case T_DefineStmt:
-			switch (((DefineStmt *) parsetree)->kind)
-			{
-				case OBJECT_AGGREGATE:
-					tag = CMDTAG_CREATE_AGGREGATE;
-					break;
-				case OBJECT_OPERATOR:
-					tag = CMDTAG_CREATE_OPERATOR;
-					break;
-				case OBJECT_TYPE:
-					tag = CMDTAG_CREATE_TYPE;
-					break;
-				default:
-					tag = CMDTAG_UNKNOWN;
-			}
 			break;
 
 		case T_CompositeTypeStmt:
@@ -1936,10 +1883,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterDomainStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_DefineStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

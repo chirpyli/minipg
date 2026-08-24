@@ -111,30 +111,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 										 oldSchemaAddr ? &oldNspOid : NULL);
 			break;
 
-			/* generic code path */
-		case OBJECT_AGGREGATE:
-			{
-				Relation	catalog;
-				Relation	relation;
-				Oid			classId;
-				Oid			nspOid;
-
-				address = get_object_address(stmt->objectType,
-											 stmt->object,
-											 &relation,
-											 AccessExclusiveLock,
-											 false);
-				Assert(relation == NULL);
-				classId = address.classId;
-				catalog = table_open(classId, RowExclusiveLock);
-				nspOid = LookupCreationNamespace(stmt->newschema);
-
-				oldNspOid = AlterObjectNamespace_internal(catalog, address.objectId,
-														  nspOid);
-				table_close(catalog, RowExclusiveLock);
-			}
-			break;
-
 		default:
 			elog(ERROR, "unrecognized AlterObjectSchemaStmt type: %d",
 				 (int) stmt->objectType);

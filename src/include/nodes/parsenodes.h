@@ -1283,7 +1283,6 @@ typedef struct ReturnStmt
 typedef enum ObjectType
 {
 	OBJECT_ACCESS_METHOD,
-	OBJECT_AGGREGATE,
 	OBJECT_AMOP,
 	OBJECT_AMPROC,
 	OBJECT_ATTRIBUTE,			/* type's attribute, when distinct from column */
@@ -1617,22 +1616,6 @@ typedef struct CreateExtensionStmt
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 	List	   *options;		/* List of DefElem nodes */
 } CreateExtensionStmt;
-
-/* ----------------------
- *		Create {Aggregate|Operator|Type} Statement
- * ----------------------
- */
-typedef struct DefineStmt
-{
-	NodeTag		type;
-	ObjectType	kind;			/* aggregate, operator, type */
-	bool		oldstyle;		/* hack to signal old CREATE AGG syntax */
-	List	   *defnames;		/* qualified name (list of Value strings) */
-	List	   *args;			/* a list of TypeName (if needed) */
-	List	   *definition;		/* a list of DefElem */
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-	bool		replace;		/* replace if already exists? */
-} DefineStmt;
 
 /* ----------------------
  *		Create Domain Statement
