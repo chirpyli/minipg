@@ -6,6 +6,51 @@
 
 ---
 
+## 游标（CURSOR）功能裁剪（2026-08-24）
+
+游标是 SQL 层通过 `DECLARE CURSOR` / `FETCH` / `MOVE` / `CLOSE` 访问、按名称显式推进的查询结果集，依赖可滚动/可持久的 Portal 状态。Handler/协议层的 Portal 机制（扩展查询协议的未命名/命名 Portal、`PortalDescribe`、`DestTuplestore` 目标等）属于执行器分发核心，**被完整保留**；本次仅裁剪 SQL 游标语法、游标专用执行路径、`WHERE CURRENT OF`、可持久游标物化机制及 `refcursor` 类型。学习价值低（游标驱动逻辑与执行器解耦，属可选配层）。
+
+### 删除的代码点
+
+- **语法/节点层**
+  - **[gram.y](file:///home/postgres/works/my-github/minipg/src/backend/parser/gram.y)**：删除 `DECLARE CURSOR` / `FETCH` / `MOVE` / `CLOSE` 产生式及 `cursor_name`、`opt_hold` 等游标专用非终结符
+  - **[parsenodes.h](file:///home/postgres/works/my-github/minipg/src/include/nodes/parsenodes.h)** / **[nodes.h](file:///home/postgres/works/my-github/minipg/src/include/nodes/nodes.h)**：删除 `DeclareCursorStmt`、`FetchStmt` 结构体与 `T_DeclareCursorStmt`、`T_FetchStmt` 结点标签
+  - **[primnodes.h](file:///home/postgres/works/my-github/minipg/src/include/nodes/primnodes.h)**：删除 `CurrentOfExpr` 结点及 `T_CurrentOfExpr`
+  - **[kwlist.h](file:///home/postgres/works/my-github/minipg/src/include/parser/kwlist.h)**：从关键字表删除游标用关键字（保留 `FETCH` 用于 `FETCH FIRST n ROWS ONLY` 限制语法、`FIRST_P`/`LAST_P` 用于 `SELECT` 专项访问）
+- **执行/命令层**
+  - **[portalcmds.c](file:///home/postgres/works/my-github/minipg/src/backend/commands/portalcmds.c)**：删除 `PerformCursorOpen`（`DECLARE CURSOR` 入口）及 `PerformPortalFetch`/`PerformPortalClose` 中游标命令行分支
+  - **[pquery.c](file:///home/postgres/works/my-github/minipg/src/backend/tcop/pquery.c)**：删除 `PortalRunFetch` / `DoPortalRewind` 游标推进逻辑
+  - **[portalmem.c](file:///home/postgres/works/my-github/minipg/src/backend/utils/mmgr/portalmem.c)**：删除 `PersistHoldablePortal`（可持久游标物化）、`HoldPortal` 相关状态及 `CURSOR_OPT_SCROLL` 检查
+  - **[execCurrent.c](file:///home/postgres/works/my-github/minipg/src/backend/executor/execCurrent.c)**：删除（含 `execCurrentOf` 与 `WHERE CURRENT OF` 处理）及 executor/Makefile 移除编译项
+  - **[nodeTidscan.c](file:///home/postgres/works/my-github/minipg/src/backend/executor/nodeTidscan.c)**、**[nodeLockRows.c](file:///home/postgres/works/my-github/minipg/src/backend/executor/nodeLockRows.c)**：删除 `CurrentOfExpr` 求值分支
+  - **[spi.c](file:///home/postgres/works/my-github/minipg/src/backend/executor/spi.c)**：删除 `ExecQueryUsingCursor`、`HoldPinnedPortals` 等游标 SPI 入口
+  - **[tstoreReceiver.c](file:///home/postgres/works/my-github/minipg/src/backend/executor/tstoreReceiver.c)**：删除游标专用 detoast 与元组映射参数，仅保留向 Tuplestore 存元组
+- **类型层**
+  - **[pg_type.dat](file:///home/postgres/works/my-github/minipg/src/include/catalog/pg_type.dat)**：删除 `refcursor` 类型项；**[pg_proc.dat](file:///home/postgres/works/my-github/minipg/src/include/catalog/pg_proc.dat)** 移除 `pg_cursor` 相关目录项；**[system_views.sql](file:///home/postgres/works/my-github/minipg/src/backend/catalog/system_views.sql)** 移除游标相关系统目录视图
+- **客户端**
+  - **[psql](file:///home/postgres/works/my-github/minipg/src/bin/psql/common.c)**：删除依赖 SQL 游标的 `FETCH_COUNT`（`\set FETCH_COUNT`）逐批读取功能；**[tab-complete.c](file:///home/postgres/works/my-github/minipg/src/bin/psql/tab-complete.c)** 移除补全关键字；**[settings.h](file:///home/postgres/works/my-github/minipg/src/bin/psql/settings.h)** / **[startup.c](file:///home/postgres/works/my-github/minipg/src/bin/psql/startup.c)** 清理对应配置
+  - **[testlibpq.c](file:///home/postgres/works/my-github/minipg/src/test/examples/testlibpq.c)** / **[testlibpq4.c](file:///home/postgres/works/my-github/minipg/src/test/examples/testlibpq4.c)**：示例改用普通 `SELECT` 读取
+
+### 回归测试适配
+
+- 主回归：删除游标专用用例 [portals_p2](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/portals_p2.sql)（.sql/.out 同删）；[transactions](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/transactions.sql)、[combocid](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/combocid.sql)、[hash_index](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/hash_index.sql)、[tidscan](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/tidscan.sql)、[tablesample](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/tablesample.sql)、[psql](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/psql.sql) 等删除/改写游标子用例
+- [rangefuncs](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/rangefuncs.sql) / [subselect](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/subselect.sql)：原滚动游标反扫/HOLD 用例改用普通查询或删除
+- [isolation_schedule](file:///home/postgres/works/my-github/minipg/src/test/isolation/isolation_schedule)：移除依赖 `DECLARE CURSOR` 固定缓冲页的 `vacuum-reltuples` 用例
+- [snapshot_too_old](file:///home/postgres/works/my-github/minipg/src/test/modules/snapshot_too_old/specs/sto_using_cursor.spec)：删除游标版快照用例
+- [libpq_pipeline](file:///home/postgres/works/my-github/minipg/src/test/modules/libpq_pipeline/libpq_pipeline.c)：改用扩展查询协议（未命名 Portal）验证 `PortalDescribe`
+- [031_recovery_conflict.pl](file:///home/postgres/works/my-github/minipg/src/test/recovery/t/031_recovery_conflict.pl)：buffer pin 冲突依赖游标持有缓冲页，已删除；快照冲突改用 `REPEATABLE READ` 事务
+- [type_sanity](file:///home/postgres/works/my-github/minipg/src/test/regress/sql/type_sanity.sql)：去掉 `refcursor` 类型引用并同步 [tab_core_types](file:///home/postgres/works/my-github/minipg/src/test/regress/expected/type_sanity.out) 期望
+
+### 保留边界（未破坏）
+
+Portal 机制、扩展查询协议（未命名/命名 Portal、`PortalDescribe`、释放/关闭）、`DestTuplestore` 目标接收器、SPI 的 `spi_cursor_fetch` 之外的内存管理入口均保留；`cursorOptions` 作为 plancache/plan 的 `CURSOR_OPT_*` 计划标志（并行计划、通用/定制计划切换）保留不变。btree/hash 索引与事务零耦合。
+
+### 验证
+
+`make -j8` 全量编译 0 error；`make check-world` 退出码 0，回归 159/159 通过、isolation 等其他套件全绿。冒烟验证：`DECLARE/FETCH/CLOSE` 均报语法错误，`refcursor` 类型不存在，普通 `SELECT` 正常返回，`pg_cursor` 与游标相关 `pg_proc` 计数为 0。
+
+---
+
 ## 插件钩子与调试桩裁剪（2026-08-24）
 
 ### 一、插件钩子（ProcessUtility_hook + 4 个 Executor 钩子）裁剪
