@@ -332,7 +332,6 @@ typedef enum NodeTag
 	T_AlterEnumStmt,
 	T_CreateExtensionStmt,
 	T_CreateTransformStmt,
-	T_CreateAmStmt,
 	T_CreateStatsStmt,
 
 	/*

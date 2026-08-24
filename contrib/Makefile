@@ -6,7 +6,6 @@ include $(top_builddir)/src/Makefile.global
 
 SUBDIRS = \
 		amcheck		\
-		bloom		\
 		pageinspect	\
 		pg_buffercache	\
 		pg_freespacemap \

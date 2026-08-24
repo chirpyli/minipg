@@ -150,8 +150,7 @@ CREATE INDEX test1_id_index ON test1 (id);
 
   <para>
    <productname>PostgreSQL</productname> provides several index types:
-   B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and the extension <link
-   linkend="bloom">bloom</link>.
+   B-tree, Hash, GiST, SP-GiST, GIN, and BRIN.
    Each index type uses a different
    algorithm that is best suited to different types of indexable clauses.
    By default, the <link linkend="sql-createindex"><command>CREATE

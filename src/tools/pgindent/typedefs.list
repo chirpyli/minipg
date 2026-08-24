@@ -416,7 +416,6 @@ CostSelector
 Counters
 CoverExt
 CoverPos
-CreateAmStmt
 CreateDomainStmt
 CreateEnumStmt
 CreateEventTrigStmt

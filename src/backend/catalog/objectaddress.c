@@ -644,9 +644,8 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_EXTENSION:
 			case OBJECT_SCHEMA:
 			case OBJECT_LANGUAGE:
-			case OBJECT_ACCESS_METHOD:
-			address = get_object_address_unqualified(objtype,
-													 (Value *) object, missing_ok);
+				address = get_object_address_unqualified(objtype,
+														 (Value *) object, missing_ok);
 				break;
 			case OBJECT_TYPE:
 			case OBJECT_DOMAIN:
@@ -838,11 +837,6 @@ get_object_address_unqualified(ObjectType objtype,
 	/* Translate name to OID. */
 	switch (objtype)
 	{
-		case OBJECT_ACCESS_METHOD:
-			address.classId = AccessMethodRelationId;
-			address.objectId = get_am_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
 		case OBJECT_DATABASE:
 			address.classId = DatabaseRelationId;
 			address.objectId = get_database_oid(name, missing_ok);
@@ -1506,7 +1500,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_ATTRIBUTE:
 		case OBJECT_COLLATION:
 		case OBJECT_STATISTIC_EXT:
-		case OBJECT_ACCESS_METHOD:
 		case OBJECT_DATABASE:
 		case OBJECT_EXTENSION:
 		case OBJECT_LANGUAGE:

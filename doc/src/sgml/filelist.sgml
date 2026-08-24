@@ -82,7 +82,6 @@
 <!-- contrib information -->
 <!ENTITY contrib         SYSTEM "contrib.sgml">
 <!ENTITY amcheck         SYSTEM "amcheck.sgml">
-<!ENTITY bloom           SYSTEM "bloom.sgml">
 <!ENTITY intagg          SYSTEM "intagg.sgml">
 <!ENTITY oldsnapshot     SYSTEM "oldsnapshot.sgml">
 <!ENTITY pageinspect     SYSTEM "pageinspect.sgml">

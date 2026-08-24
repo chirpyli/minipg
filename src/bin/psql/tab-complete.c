@@ -956,7 +956,6 @@ typedef struct
 #define THING_NO_SHOW		(THING_NO_CREATE | THING_NO_DROP | THING_NO_ALTER)
 
 static const pgsql_thing_t words_after_create[] = {
-	{"ACCESS METHOD", NULL, NULL, NULL, THING_NO_ALTER},
 	{"AGGREGATE", NULL, NULL, Query_for_list_of_aggregates},
 	{"CAST", NULL, NULL, NULL}, /* Casts have complex structures for names, so
 								 * skip it */
@@ -2054,22 +2053,20 @@ psql_completion(const char *text, int start, int end)
 	}
 
 /* COMMENT */
-	else if (Matches("COMMENT"))
-		COMPLETE_WITH("ON");
-	else if (Matches("COMMENT", "ON"))
-		COMPLETE_WITH(				  "ACCESS METHOD", "CAST", "COLLATION",
-				  "DATABASE", "EXTENSION",
-				  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
-					  "INDEX", "LANGUAGE", "PUBLICATION", "RULE",
-					  "SCHEMA", "STATISTICS", "SUBSCRIPTION",
-					  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
-					  "COLUMN", "AGGREGATE", "FUNCTION",
-					  "PROCEDURE", "ROUTINE",
-					  "OPERATOR", "TRIGGER", "CONSTRAINT", "DOMAIN",
-					  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
-	else if (Matches("COMMENT", "ON", "ACCESS", "METHOD"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
-	else if (Matches("COMMENT", "ON", "FOREIGN"))
+else if (Matches("COMMENT"))
+	COMPLETE_WITH("ON");
+else if (Matches("COMMENT", "ON"))
+	COMPLETE_WITH(				  "CAST", "COLLATION",
+			  "DATABASE", "EXTENSION",
+			  "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "SERVER",
+				  "INDEX", "LANGUAGE", "PUBLICATION", "RULE",
+				  "SCHEMA", "STATISTICS", "SUBSCRIPTION",
+				  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
+				  "COLUMN", "AGGREGATE", "FUNCTION",
+				  "PROCEDURE", "ROUTINE",
+				  "OPERATOR", "TRIGGER", "CONSTRAINT", "DOMAIN",
+				  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
+else if (Matches("COMMENT", "ON", "FOREIGN"))
 		COMPLETE_WITH("DATA WRAPPER", "TABLE");
 	else if (Matches("COMMENT", "ON", "TEXT", "SEARCH"))
 		COMPLETE_WITH("CONFIGURATION", "DICTIONARY", "PARSER", "TEMPLATE");
@@ -2089,18 +2086,7 @@ psql_completion(const char *text, int start, int end)
 			 Matches("COMMENT", "ON", MatchAny, MatchAny, MatchAny, MatchAnyExcept("IS")))
 		COMPLETE_WITH("IS");
 
-/* CREATE ACCESS METHOD */
-	/* Complete "CREATE ACCESS METHOD <name>" */
-	else if (Matches("CREATE", "ACCESS", "METHOD", MatchAny))
-		COMPLETE_WITH("TYPE");
-	/* Complete "CREATE ACCESS METHOD <name> TYPE" */
-	else if (Matches("CREATE", "ACCESS", "METHOD", MatchAny, "TYPE"))
-		COMPLETE_WITH("INDEX", "TABLE");
-	/* Complete "CREATE ACCESS METHOD <name> TYPE <type>" */
-	else if (Matches("CREATE", "ACCESS", "METHOD", MatchAny, "TYPE", MatchAny))
-		COMPLETE_WITH("HANDLER");
-
-	/* CREATE COLLATION */
+/* CREATE COLLATION */
 	else if (Matches("CREATE", "COLLATION", MatchAny))
 		COMPLETE_WITH("(", "FROM");
 	else if (Matches("CREATE", "COLLATION", MatchAny, "FROM"))
@@ -2571,7 +2557,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches("DROP",
 					 "COLLATION|DOMAIN|EXTENSION|LANGUAGE|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
 					 MatchAny) ||
-			 Matches("DROP", "ACCESS", "METHOD", MatchAny) ||
 			 (Matches("DROP", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&
 			  ends_with(prev_wd, ')')) ||
 			 Matches("DROP", "EVENT", "TRIGGER", MatchAny) ||
@@ -2629,12 +2614,6 @@ psql_completion(const char *text, int start, int end)
 	}
 	else if (Matches("DROP", "TRIGGER", MatchAny, "ON", MatchAny))
 		COMPLETE_WITH("CASCADE", "RESTRICT");
-
-	/* DROP ACCESS METHOD */
-	else if (Matches("DROP", "ACCESS"))
-		COMPLETE_WITH("METHOD");
-	else if (Matches("DROP", "ACCESS", "METHOD"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
 
 	/* DROP RULE */
 	else if (Matches("DROP", "RULE", MatchAny))
@@ -3208,9 +3187,7 @@ psql_completion(const char *text, int start, int end)
 	}
 	else if (TailMatchesCS("\\h|\\help", MatchAny, MatchAny))
 	{
-		if (TailMatches("CREATE|DROP", "ACCESS"))
-			COMPLETE_WITH("METHOD");
-		else if (TailMatches("ALTER", "DEFAULT"))
+		if (TailMatches("ALTER", "DEFAULT"))
 			COMPLETE_WITH("PRIVILEGES");
 		else if (TailMatches("CREATE|ALTER|DROP", "EVENT"))
 			COMPLETE_WITH("TRIGGER");

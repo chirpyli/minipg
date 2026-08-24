@@ -3252,18 +3252,6 @@ _copyCreateTransformStmt(const CreateTransformStmt *from)
 	return newnode;
 }
 
-static CreateAmStmt *
-_copyCreateAmStmt(const CreateAmStmt *from)
-{
-	CreateAmStmt *newnode = makeNode(CreateAmStmt);
-
-	COPY_STRING_FIELD(amname);
-	COPY_NODE_FIELD(handler_name);
-	COPY_SCALAR_FIELD(amtype);
-
-	return newnode;
-}
-
 static LockStmt *
 _copyLockStmt(const LockStmt *from)
 {
@@ -3882,9 +3870,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateTransformStmt:
 			retval = _copyCreateTransformStmt(from);
-			break;
-		case T_CreateAmStmt:
-			retval = _copyCreateAmStmt(from);
 			break;
 		case T_LockStmt:
 			retval = _copyLockStmt(from);

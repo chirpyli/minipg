@@ -253,7 +253,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
-		CreateAmStmt
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
@@ -287,8 +286,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <str>		OptSchemaName
 %type <list>	OptSchemaEltList
-
-%type <chr>		am_type
 
 %type <str>		access_method_clause attr_name
 			table_access_method_clause name file_name
@@ -537,7 +534,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
 
-	MAPPING MATCH MATERIALIZED MAXVALUE METHOD MINUTE_P MINVALUE MODE MONTH_P
+	MAPPING MATCH MATERIALIZED MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
 
 	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NFC NFD NFKC NFKD NO NONE
 	NORMALIZE NORMALIZED
@@ -734,7 +731,6 @@ stmt:	AlterDomainStmt
 			| AnalyzeStmt
 			| CheckPointStmt
 			| ClusterStmt
-			| CreateAmStmt
 			| CreateDomainStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
@@ -2407,31 +2403,6 @@ generic_option_arg:
 		;
 
 
-/*****************************************************************************
- *
- *		QUERY:
- *             CREATE ACCESS METHOD name HANDLER handler_name
- *
- *****************************************************************************/
-
-CreateAmStmt: CREATE ACCESS METHOD name TYPE_P am_type HANDLER handler_name
-				{
-					CreateAmStmt *n = makeNode(CreateAmStmt);
-					n->amname = $4;
-					n->handler_name = $8;
-					n->amtype = $6;
-					$$ = (Node *) n;
-				}
-		;
-
-am_type:
-			INDEX			{ $$ = AMTYPE_INDEX; }
-		|	TABLE			{ $$ = AMTYPE_TABLE; }
-		;
-
-
-
-
 ConstraintAttributeSpec:
 			/*EMPTY*/
 				{ $$ = 0; }
@@ -2975,8 +2946,7 @@ object_type_any_name:
 
 
 drop_type_name:
-			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
-			| EXTENSION								{ $$ = OBJECT_EXTENSION; }
+			EXTENSION								{ $$ = OBJECT_EXTENSION; }
 			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
 			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
 		;
@@ -8412,7 +8382,6 @@ unreserved_keyword:
 			| MATCH
 			| MATERIALIZED
 			| MAXVALUE
-			| METHOD
 			| MINUTE_P
 			| MINVALUE
 			| MODE
@@ -8941,7 +8910,6 @@ bare_label_keyword:
 			| MATCH
 			| MATERIALIZED
 			| MAXVALUE
-			| METHOD
 			| MINVALUE
 			| MODE
 			| NAME_P

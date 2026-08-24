@@ -98,7 +98,6 @@ CREATE EXTENSION <replaceable>module_name</replaceable>;
  &amcheck;
  &auth-delay;
  &auto-explain;
- &bloom;
  &btree-gin;
  &btree-gist;
  &dict-int;

@@ -443,33 +443,6 @@ select 1 where false;
 \df exp
 \pset tuples_only false
 
--- check conditional am display
-\pset expanded off
-
-CREATE SCHEMA tableam_display;
-SET search_path TO tableam_display;
-CREATE ACCESS METHOD heap_psql TYPE TABLE HANDLER heap_tableam_handler;
--- Use only relations with a physical size of zero.
-CREATE TABLE tbl_heap_psql(f1 int, f2 char(100)) using heap_psql;
-CREATE TABLE tbl_heap(f1 int, f2 char(100)) using heap;
-CREATE VIEW view_heap_psql AS SELECT f1 from tbl_heap_psql;
-\d+ tbl_heap_psql
-\d+ tbl_heap
-\set HIDE_TABLEAM off
-\d+ tbl_heap_psql
-\d+ tbl_heap
--- AM is displayed for tables and indexes.
-\d+
-\dt+
-\dm+
--- But not for views and sequences.
-\dv+
-\set HIDE_TABLEAM on
-\d+
-RESET search_path;
-DROP SCHEMA tableam_display CASCADE;
-DROP ACCESS METHOD heap_psql;
-
 -- test numericlocale (as best we can without control of psql's locale)
 
 \pset format aligned

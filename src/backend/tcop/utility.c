@@ -120,7 +120,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableStmt:
 		case T_AlterTypeStmt:
 		case T_CompositeTypeStmt:
-		case T_CreateAmStmt:
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
 		case T_CreateExtensionStmt:
@@ -1020,11 +1019,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = AlterType((AlterTypeStmt *) parsetree);
 				break;
 
-
-				case T_CreateAmStmt:
-				address = CreateAccessMethod((CreateAmStmt *) parsetree);
-				break;
-
 			case T_CreateStatsStmt:
 				{
 					Oid			relid;
@@ -1509,9 +1503,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TRANSFORM:
 					tag = CMDTAG_DROP_TRANSFORM;
 					break;
-				case OBJECT_ACCESS_METHOD:
-					tag = CMDTAG_DROP_ACCESS_METHOD;
-					break;
 				case OBJECT_PUBLICATION:
 					tag = CMDTAG_DROP_PUBLICATION;
 					break;
@@ -1550,9 +1541,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_TYPE:
 					tag = CMDTAG_CREATE_TYPE;
-					break;
-				case OBJECT_ACCESS_METHOD:
-					tag = CMDTAG_CREATE_ACCESS_METHOD;
 					break;
 				default:
 					tag = CMDTAG_UNKNOWN;
@@ -1692,13 +1680,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_AlterTypeStmt:
 			tag = CMDTAG_ALTER_TYPE;
-			break;
-
-
-
-
-		case T_CreateAmStmt:
-			tag = CMDTAG_CREATE_ACCESS_METHOD;
 			break;
 
 			case T_PrepareStmt:
@@ -2076,15 +2057,9 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-
-
 			lev = LOGSTMT_DDL;
 			break;
 
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateAmStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

@@ -1416,16 +1416,6 @@ _equalCreateTransformStmt(const CreateTransformStmt *a, const CreateTransformStm
 }
 
 static bool
-_equalCreateAmStmt(const CreateAmStmt *a, const CreateAmStmt *b)
-{
-	COMPARE_STRING_FIELD(amname);
-	COMPARE_NODE_FIELD(handler_name);
-	COMPARE_SCALAR_FIELD(amtype);
-
-	return true;
-}
-
-static bool
 _equalLockStmt(const LockStmt *a, const LockStmt *b)
 {
 	COMPARE_NODE_FIELD(relations);
@@ -2354,9 +2344,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateTransformStmt:
 			retval = _equalCreateTransformStmt(a, b);
-			break;
-		case T_CreateAmStmt:
-			retval = _equalCreateAmStmt(a, b);
 			break;
 		case T_LockStmt:
 			retval = _equalLockStmt(a, b);

@@ -1618,23 +1618,6 @@ typedef struct CreateExtensionStmt
 	List	   *options;		/* List of DefElem nodes */
 } CreateExtensionStmt;
 
-
-/*----------------------
- *		Create POLICY Statement
- *----------------------
- */
-/*----------------------
- *		Create ACCESS METHOD Statement
- *----------------------
- */
-typedef struct CreateAmStmt
-{
-	NodeTag		type;
-	char	   *amname;			/* access method name */
-	List	   *handler_name;	/* handler function name */
-	char		amtype;			/* type of access method */
-} CreateAmStmt;
-
 /* ----------------------
  *		Create {Aggregate|Operator|Type} Statement
  * ----------------------
