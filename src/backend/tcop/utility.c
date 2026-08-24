@@ -1193,24 +1193,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_INDEX:
 			tag = CMDTAG_ALTER_INDEX;
 			break;
-		case OBJECT_LANGUAGE:
-			tag = CMDTAG_ALTER_LANGUAGE;
-			break;
-		case OBJECT_OPCLASS:
-			tag = CMDTAG_ALTER_OPERATOR_CLASS;
-			break;
-		case OBJECT_OPERATOR:
-			tag = CMDTAG_ALTER_OPERATOR;
-			break;
-		case OBJECT_OPFAMILY:
-			tag = CMDTAG_ALTER_OPERATOR_FAMILY;
-			break;
-		case OBJECT_PROCEDURE:
-			tag = CMDTAG_ALTER_PROCEDURE;
-			break;
-		case OBJECT_ROUTINE:
-			tag = CMDTAG_ALTER_ROUTINE;
-			break;
 		case OBJECT_RULE:
 			tag = CMDTAG_ALTER_RULE;
 			break;
@@ -1226,9 +1208,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 			break;
 		case OBJECT_VIEW:
 			tag = CMDTAG_ALTER_VIEW;
-			break;
-		case OBJECT_PUBLICATION:
-			tag = CMDTAG_ALTER_PUBLICATION;
 			break;
 		case OBJECT_SUBSCRIPTION:
 			tag = CMDTAG_ALTER_SUBSCRIPTION;
@@ -1540,12 +1519,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateOpFamilyStmt:
 			tag = CMDTAG_CREATE_OPERATOR_FAMILY;
-			break;
-
-			tag = CMDTAG_ALTER_OPERATOR_FAMILY;
-			break;
-
-			tag = CMDTAG_ALTER_OPERATOR;
 			break;
 
 		case T_AlterTypeStmt:

@@ -4,6 +4,25 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## ALTER LANGUAGE / OPERATOR / OPERATOR CLASS / OPERATOR FAMILY / PROCEDURE / PUBLICATION / ROUTINE 命令标签裁剪（2026-08-24）
+
+### 一、背景
+`ALTER LANGUAGE`、`ALTER OPERATOR`、`ALTER OPERATOR CLASS`、`ALTER OPERATOR FAMILY`、`ALTER PROCEDURE`、`ALTER PUBLICATION`、`ALTER ROUTINE` 七个命令在 minipg 中早已随语言/操作符/发布/存储过程等功能裁剪（无语法产生式、无节点类型、无执行路径），本次仅清理其遗留命令标签与死分支。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_ALTER_LANGUAGE` / `CMDTAG_ALTER_OPERATOR` / `CMDTAG_ALTER_OPERATOR_CLASS` / `CMDTAG_ALTER_OPERATOR_FAMILY` / `CMDTAG_ALTER_PROCEDURE` / `CMDTAG_ALTER_PUBLICATION` / `CMDTAG_ALTER_ROUTINE`（`cmdtaglist.h`）。
+- `utility.c` 的 `AlterObjectTypeCommandTag` 中对应死分支（`OBJECT_LANGUAGE` / `OBJECT_OPERATOR` / `OBJECT_OPCLASS` / `OBJECT_OPFAMILY` / `OBJECT_PROCEDURE` / `OBJECT_ROUTINE` / `OBJECT_PUBLICATION`）。
+- `utility.c` 的 `CreateCommandTag` 中一段无 case 标签的孤儿死代码（残留引用 `CMDTAG_ALTER_OPERATOR_FAMILY` 与 `CMDTAG_ALTER_OPERATOR`，早已不可达）。
+- 同步删除 `alter_operator.sgml` / `alter_opclass.sgml` / `alter_opfamily.sgml` 三个文档，并移除其在 `allfiles.sgml` / `reference.sgml` 中的实体引用。
+
+### 三、保留
+- `CREATE OPERATOR`（`CMDTAG_CREATE_OPERATOR`）、`CREATE/DROP OPERATOR CLASS/FAMILY`（`CMDTAG_CREATE/DROP_OPERATOR_CLASS/FAMILY`）标签及其执行路径：opclasscmds.c / operatorcmds.c 仍被索引、排序等核心功能使用，属黑盒保留项；`ALTER` 方向因无语法入口而彻底删除。
+- `DROP OPERATOR` / `DROP OPERATOR CLASS` / `DROP OPERATOR FAMILY` / `DROP PUBLICATION` / `DROP SUBSCRIPTION` / `DROP ROUTINE` / `DROP PROCEDURE` / `DROP LANGUAGE` 标签：删除对象 / 依赖级联仍需按对象类型映射命令标签。
+
+> 注意：本次变更删除 `cmdtaglist.h` 中的 7 个标签会使 `CommandTag` 枚举数值整体前移，必须对包含 `cmdtag.o`（及其依赖本次标签列表的源文件）做一次干净重编，否则运行时命令标签会发生 7 位错位（如 `DROP TABLE` 被判为 `DROP OPERATOR FAMILY`）。回归报错「could not interpret result from server」或 read-only 事务命令名错位时，应先 `rm src/backend/tcop/cmdtag.o` 全量重编。
+
+验证：全量重编 + `make check-world` 全绿。
+
 ## ALTER DOMAIN / ALTER DATABASE / ALTER EXTENSION 命令裁剪（2026-08-24）
 
 ### 一、背景

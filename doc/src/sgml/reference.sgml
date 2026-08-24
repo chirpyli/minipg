@@ -40,9 +40,6 @@
    &alterExtension;
    &alterFunction;
    &alterIndex;
-   &alterOperator;
-   &alterOperatorClass;
-   &alterOperatorFamily;
    &alterRule;
    &alterSchema;
    &alterStatistics;

@@ -12,9 +12,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY alterExtension SYSTEM "alter_extension.sgml">
 <!ENTITY alterFunction SYSTEM "alter_function.sgml">
 <!ENTITY alterIndex SYSTEM "alter_index.sgml">
-<!ENTITY alterOperator SYSTEM "alter_operator.sgml">
-<!ENTITY alterOperatorClass SYSTEM "alter_opclass.sgml">
-<!ENTITY alterOperatorFamily SYSTEM "alter_opfamily.sgml">
 <!ENTITY alterRule SYSTEM "alter_rule.sgml">
 <!ENTITY alterSchema SYSTEM "alter_schema.sgml">
 <!ENTITY alterStatistics SYSTEM "alter_statistics.sgml">
