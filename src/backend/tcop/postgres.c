@@ -598,19 +598,6 @@ pg_parse_query(const char *query_string)
 	if (log_parser_stats)
 		ShowUsage("PARSER STATISTICS");
 
-#ifdef COPY_PARSE_PLAN_TREES
-	/* Optional debugging check: pass raw parsetrees through copyObject() */
-	{
-		List	   *new_list = copyObject(raw_parsetree_list);
-
-		/* This checks both copyObject() and the equal() routines... */
-		if (!equal(new_list, raw_parsetree_list))
-			elog(WARNING, "copyObject() failed to produce an equal raw parse tree");
-		else
-			raw_parsetree_list = new_list;
-	}
-#endif
-
 	/*
 	 * Currently, outfuncs/readfuncs support is missing for many raw parse
 	 * tree nodes, so we don't try to implement WRITE_READ_PARSE_PLAN_TREES

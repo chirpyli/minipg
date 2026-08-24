@@ -76,12 +76,11 @@
 
 
 /* ----------------
- *		CommandDest is a simplistic means of identifying the desired
- *		destination.  Someday this will probably need to be improved.
+ *		CommandDest 是一种用于标识目标端的简化手段。将来这一天或许
+ *		需要对其进行改进。
  *
- * Note: only the values DestNone, DestDebug, DestRemote are legal for the
- * global variable whereToSendOutput.   The other values may be used
- * as the destination for individual commands.
+ * 注意：对于全局变量 whereToSendOutput，只有 DestNone、DestDebug、
+ * DestRemote 这几个取值是合法的。其余取值可作为单条命令的目标端使用。
  * ----------------
  */
 typedef enum

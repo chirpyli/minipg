@@ -54,8 +54,6 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 
-/* Hook for plugins to get control in ProcessUtility() */
-ProcessUtility_hook_type ProcessUtility_hook = NULL;
 
 /* local function declarations */
 static int	ClassifyUtilityCommandAsReadOnly(Node *parsetree);
@@ -364,15 +362,6 @@ CheckRestrictedOperation(const char *cmdname)
  * Caller MUST supply a queryString; it is not allowed (anymore) to pass NULL.
  * If you really don't have source text, you can pass a constant string,
  * perhaps "(query not available)".
- *
- * Note for users of ProcessUtility_hook: the same queryString may be passed
- * to multiple invocations of ProcessUtility when processing a query string
- * containing multiple semicolon-separated statements.  One should use
- * pstmt->stmt_location and pstmt->stmt_len to identify the substring
- * containing the current statement.  Keep in mind also that some utility
- * statements (e.g., CREATE SCHEMA) will recurse to ProcessUtility to process
- * sub-statements, often passing down the same queryString, stmt_location,
- * and stmt_len that were given for the whole statement.
  */
 void
 ProcessUtility(PlannedStmt *pstmt,
@@ -389,17 +378,7 @@ ProcessUtility(PlannedStmt *pstmt,
 	Assert(queryString != NULL);	/* required as of 8.4 */
 	Assert(qc == NULL || qc->commandTag == CMDTAG_UNKNOWN);
 
-	/*
-	 * We provide a function hook variable that lets loadable plugins get
-	 * control when ProcessUtility is called.  Such a plugin would normally
-	 * call standard_ProcessUtility().
-	 */
-	if (ProcessUtility_hook)
-		(*ProcessUtility_hook) (pstmt, queryString, readOnlyTree,
-								context, params, queryEnv,
-								dest, qc);
-	else
-		standard_ProcessUtility(pstmt, queryString, readOnlyTree,
+	standard_ProcessUtility(pstmt, queryString, readOnlyTree,
 								context, params, queryEnv,
 								dest, qc);
 }

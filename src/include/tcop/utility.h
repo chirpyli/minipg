@@ -67,16 +67,6 @@ typedef struct AlterTableUtilityContext
 	 COMMAND_OK_IN_PARALLEL_MODE)
 #define COMMAND_IS_NOT_READ_ONLY	0
 
-/* Hook for plugins to get control in ProcessUtility() */
-typedef void (*ProcessUtility_hook_type) (PlannedStmt *pstmt,
-										  const char *queryString,
-										  bool readOnlyTree,
-										  ProcessUtilityContext context,
-										  ParamListInfo params,
-										  QueryEnvironment *queryEnv,
-										  DestReceiver *dest, QueryCompletion *qc);
-extern PGDLLIMPORT ProcessUtility_hook_type ProcessUtility_hook;
-
 extern void ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 						   bool readOnlyTree,
 						   ProcessUtilityContext context, ParamListInfo params,

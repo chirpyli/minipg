@@ -77,9 +77,6 @@ static Query *transformExplainStmt(ParseState *pstate,
 								   ExplainStmt *stmt);
 static void transformLockingClause(ParseState *pstate, Query *qry,
 								   LockingClause *lc, bool pushedDown);
-#ifdef RAW_EXPRESSION_COVERAGE_TEST
-static bool test_raw_expression_coverage(Node *node, void *context);
-#endif
 
 
 /*
@@ -215,25 +212,6 @@ Query *
 transformStmt(ParseState *pstate, Node *parseTree)
 {
 	Query	   *result;
-
-	/*
-	 * We apply RAW_EXPRESSION_COVERAGE_TEST testing to basic DML statements;
-	 * we can't just run it on everything because raw_expression_tree_walker()
-	 * doesn't claim to handle utility statements.
-	 */
-#ifdef RAW_EXPRESSION_COVERAGE_TEST
-	switch (nodeTag(parseTree))
-	{
-		case T_SelectStmt:
-		case T_InsertStmt:
-		case T_UpdateStmt:
-		case T_DeleteStmt:
-			(void) test_raw_expression_coverage(parseTree, NULL);
-			break;
-		default:
-			break;
-	}
-#endif							/* RAW_EXPRESSION_COVERAGE_TEST */
 
 	/*
 	 * Caution: when changing the set of statement types that have non-default
@@ -2113,25 +2091,3 @@ applyLockingClause(Query *qry, Index rtindex,
 	rc->pushedDown = pushedDown;
 	qry->rowMarks = lappend(qry->rowMarks, rc);
 }
-
-/*
- * Coverage testing for raw_expression_tree_walker().
- *
- * When enabled, we run raw_expression_tree_walker() over every DML statement
- * submitted to parse analysis.  Without this provision, that function is only
- * applied in limited cases involving CTEs, and we don't really want to have
- * to test everything inside as well as outside a CTE.
- */
-#ifdef RAW_EXPRESSION_COVERAGE_TEST
-
-static bool
-test_raw_expression_coverage(Node *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	return raw_expression_tree_walker(node,
-									  test_raw_expression_coverage,
-									  context);
-}
-
-#endif							/* RAW_EXPRESSION_COVERAGE_TEST */

@@ -590,10 +590,6 @@ ExecScanRecheckMtd
 ExecStatus
 ExecStatusType
 ExecuteStmt
-ExecutorEnd_hook_type
-ExecutorFinish_hook_type
-ExecutorRun_hook_type
-ExecutorStart_hook_type
 ExpandedArrayHeader
 ExpandedObjectHeader
 ExpandedObjectMethods
@@ -1912,7 +1908,6 @@ ProcSignalSlot
 ProcState
 ProcWaitStatus
 ProcessUtilityContext
-ProcessUtility_hook_type
 ProcessingMode
 ProgressCommandType
 ProjectSet

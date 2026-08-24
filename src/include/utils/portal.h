@@ -53,38 +53,32 @@
 #include "utils/resowner.h"
 
 /*
- * We have several execution strategies for Portals, depending on what
- * query or queries are to be executed.  (Note: in all cases, a Portal
- * executes just a single source-SQL query, and thus produces just a
- * single result from the user's viewpoint.  However, the rule rewriter
- * may expand the single source query to zero or many actual queries.)
+ * Portal 有多种执行策略，具体取决于要执行的是哪条（或哪些）查询。
+ * （注意：在任何情况下，一个 Portal 都只执行单条源 SQL 查询，因此从用户的
+ * 视角来看只产生单一结果。不过，规则重写器可能把这条源查询展开为
+ * 零条或多条实际查询。）
  *
- * PORTAL_ONE_SELECT: the portal contains one single SELECT query.  We run
- * the Executor incrementally as results are demanded.  This strategy also
- * supports holdable cursors (the Executor results can be dumped into a
- * tuplestore for access after transaction completion).
+ * PORTAL_ONE_SELECT：Portal 中包含一条 SELECT 查询。我们按结果被请求
+ * 的节奏增量式地运行执行器。该策略还支持可保持游标（执行器的结果可以
+ * 转储进 tuplestore，以便在事务结束后仍可访问）。
  *
- * PORTAL_ONE_RETURNING: the portal contains a single INSERT/UPDATE/DELETE
- * query with a RETURNING clause (plus possibly auxiliary queries added by
- * rule rewriting).  On first execution, we run the portal to completion
- * and dump the primary query's results into the portal tuplestore; the
- * results are then returned to the client as demanded.  (We can't support
- * suspension of the query partway through, because the AFTER TRIGGER code
- * can't cope, and also because we don't want to risk failing to execute
- * all the auxiliary queries.)
+ * PORTAL_ONE_RETURNING：Portal 中包含一条带 RETURNING 子句的
+ * INSERT/UPDATE/DELETE 查询（可能还有规则重写附加的辅助查询）。首次执行时，
+ * 我们将该 Portal 完整运行，并把主查询的结果转储进 Portal 的 tuplestore；
+ * 随后按客户端请求返回这些结果。（我们无法支持在查询执行到一半时挂起，
+ * 因为 AFTER 触发器代码无法处理这种情况，同时也是因为我们不想冒险漏执行
+ * 任何辅助查询。）
  *
- * PORTAL_ONE_MOD_WITH: the portal contains one single SELECT query, but
- * it has data-modifying CTEs.  This is currently treated the same as the
- * PORTAL_ONE_RETURNING case because of the possibility of needing to fire
- * triggers.  It may act more like PORTAL_ONE_SELECT in future.
+ * PORTAL_ONE_MOD_WITH：Portal 中包含一条 SELECT 查询，但它带有
+ * 数据修改型 CTE。由于可能需要触发触发器，目前将其与 PORTAL_ONE_RETURNING
+ * 情形同等对待。未来其行为可能会更接近 PORTAL_ONE_SELECT。
  *
- * PORTAL_UTIL_SELECT: the portal contains a utility statement that returns
- * a SELECT-like result (for example, EXPLAIN or SHOW).  On first execution,
- * we run the statement and dump its results into the portal tuplestore;
- * the results are then returned to the client as demanded.
+ * PORTAL_UTIL_SELECT：Portal 中包含一条返回类 SELECT 结果的实用语句
+ * （例如 EXPLAIN 或 SHOW）。首次执行时，我们运行该语句并将其结果转储进
+ * Portal 的 tuplestore；随后按客户端请求返回这些结果。
  *
- * PORTAL_MULTI_QUERY: all other cases.  Here, we do not support partial
- * execution: the portal's queries will be run to completion on first call.
+ * PORTAL_MULTI_QUERY：所有其他情形。在此情形下，我们不支持部分执行：
+ * Portal 的查询会在首次调用时完整运行至结束。
  */
 typedef enum PortalStrategy
 {

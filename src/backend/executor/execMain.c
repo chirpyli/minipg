@@ -60,12 +60,6 @@
 #include "utils/snapmgr.h"
 
 
-/* Hooks for plugins to get control in ExecutorStart/Run/Finish/End */
-ExecutorStart_hook_type ExecutorStart_hook = NULL;
-ExecutorRun_hook_type ExecutorRun_hook = NULL;
-ExecutorFinish_hook_type ExecutorFinish_hook = NULL;
-ExecutorEnd_hook_type ExecutorEnd_hook = NULL;
-
 /* decls for local routines only used within this module */
 static void InitPlan(QueryDesc *queryDesc, int eflags);
 static void CheckValidRowMarkRel(Relation rel, RowMarkType markType);
@@ -123,10 +117,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 	 */
 	pgstat_report_query_id(queryDesc->plannedstmt->queryId, false);
 
-	if (ExecutorStart_hook)
-		(*ExecutorStart_hook) (queryDesc, eflags);
-	else
-		standard_ExecutorStart(queryDesc, eflags);
+	standard_ExecutorStart(queryDesc, eflags);
 }
 
 void
@@ -271,10 +262,7 @@ ExecutorRun(QueryDesc *queryDesc,
 			ScanDirection direction, uint64 count,
 			bool execute_once)
 {
-	if (ExecutorRun_hook)
-		(*ExecutorRun_hook) (queryDesc, direction, count, execute_once);
-	else
-		standard_ExecutorRun(queryDesc, direction, count, execute_once);
+	standard_ExecutorRun(queryDesc, direction, count, execute_once);
 }
 
 void
@@ -361,10 +349,7 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 void
 ExecutorFinish(QueryDesc *queryDesc)
 {
-	if (ExecutorFinish_hook)
-		(*ExecutorFinish_hook) (queryDesc);
-	else
-		standard_ExecutorFinish(queryDesc);
+	standard_ExecutorFinish(queryDesc);
 }
 
 void
@@ -417,10 +402,7 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 void
 ExecutorEnd(QueryDesc *queryDesc)
 {
-	if (ExecutorEnd_hook)
-		(*ExecutorEnd_hook) (queryDesc);
-	else
-		standard_ExecutorEnd(queryDesc);
+	standard_ExecutorEnd(queryDesc);
 }
 
 void

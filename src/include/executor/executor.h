@@ -60,26 +60,6 @@
 #define EXEC_FLAG_WITH_NO_DATA	0x0020	/* rel scannability doesn't matter */
 
 
-/* Hook for plugins to get control in ExecutorStart() */
-typedef void (*ExecutorStart_hook_type) (QueryDesc *queryDesc, int eflags);
-extern PGDLLIMPORT ExecutorStart_hook_type ExecutorStart_hook;
-
-/* Hook for plugins to get control in ExecutorRun() */
-typedef void (*ExecutorRun_hook_type) (QueryDesc *queryDesc,
-									   ScanDirection direction,
-									   uint64 count,
-									   bool execute_once);
-extern PGDLLIMPORT ExecutorRun_hook_type ExecutorRun_hook;
-
-/* Hook for plugins to get control in ExecutorFinish() */
-typedef void (*ExecutorFinish_hook_type) (QueryDesc *queryDesc);
-extern PGDLLIMPORT ExecutorFinish_hook_type ExecutorFinish_hook;
-
-/* Hook for plugins to get control in ExecutorEnd() */
-typedef void (*ExecutorEnd_hook_type) (QueryDesc *queryDesc);
-extern PGDLLIMPORT ExecutorEnd_hook_type ExecutorEnd_hook;
-
-
 /*
  * prototypes from functions in execAmi.c
  */
