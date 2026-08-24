@@ -506,7 +506,6 @@ DiscardStmt
 DistanceValue
 DistinctColInfo
 DistinctExpr
-DoStmt
 DocRepresentation
 DomainConstraintCache
 DomainConstraintRef
@@ -1048,7 +1047,6 @@ InheritableSocket
 InitSampleScan_function
 InitializeDSMForeignScan_function
 InitializeWorkerForeignScan_function
-InlineCodeBlock
 InsertStmt
 Instrumentation
 Int128AggState

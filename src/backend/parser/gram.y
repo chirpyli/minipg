@@ -238,7 +238,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
-		CreatedbStmt DefineStmt DeleteStmt DiscardStmt DoStmt
+		CreatedbStmt DefineStmt DeleteStmt DiscardStmt
 		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
 	
 		DropTransformStmt
@@ -335,7 +335,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 			execute_param_clause using_clause returning_clause
 			opt_enum_val_list enum_val_list table_func_column_list
 			alter_generic_options
-				relation_expr_list dostmt_opt_list
+				relation_expr_list
 				transform_element_list transform_type_list
 				vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
@@ -347,7 +347,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	grouping_sets_clause
 
 
-%type <defelt>	createfunc_opt_item common_func_opt_item dostmt_opt_item
+%type <defelt>	createfunc_opt_item common_func_opt_item
 %type <fun_param> func_arg func_arg_with_default table_func_column aggr_arg
 %type <fun_param_mode> arg_class
 %type <typnam>	func_return func_type
@@ -749,7 +749,6 @@ stmt:	AlterDomainStmt
 			| DefineStmt
 			| DeleteStmt
 			| DiscardStmt
-			| DoStmt
 			| DropOpClassStmt
 			| DropOpFamilyStmt
 			| DropStmt
@@ -3668,30 +3667,6 @@ table_func_column_list:
 			| table_func_column_list ',' table_func_column
 				{
 					$$ = lappend($1, $3);
-				}
-		;
-
-/*****************************************************************************
- * ALTER FUNCTION / ALTER PROCEDURE / ALTER ROUTINE
- *
- * RENAME and OWNER subcommands are already provided by the generic
- * ALTER infrastructure, here we just specify alterations that can
- * only be applied to functions.
- *
- *****************************************************************************/
-dostmt_opt_list:
-			dostmt_opt_item						{ $$ = list_make1($1); }
-			| dostmt_opt_list dostmt_opt_item	{ $$ = lappend($1, $2); }
-		;
-
-dostmt_opt_item:
-			Sconst
-				{
-					$$ = makeDefElem("as", (Node *)makeString($1), @1);
-				}
-			| LANGUAGE NonReservedWord_or_Sconst
-				{
-					$$ = makeDefElem("language", (Node *)makeString($2), @1);
 				}
 		;
 
@@ -9376,13 +9351,6 @@ oper_argtypes:
 					{ $$ = list_make2(NULL, $4); }
 			| '(' Typename ',' NONE ')'					/* right unary */
 					{ $$ = list_make2($2, NULL); }
-		;
-DoStmt: DO dostmt_opt_list
-				{
-					DoStmt *n = makeNode(DoStmt);
-					n->args = $2;
-					$$ = (Node *)n;
-				}
 		;
 %%
 

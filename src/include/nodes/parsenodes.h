@@ -1853,27 +1853,6 @@ typedef struct FunctionParameter
 } FunctionParameter;
 
 /* ----------------------
- *		DO Statement
- *
- * DoStmt is the raw parser output, InlineCodeBlock is the execution-time API
- * ----------------------
- */
-typedef struct DoStmt
-{
-	NodeTag		type;
-	List	   *args;			/* List of DefElem nodes */
-} DoStmt;
-
-typedef struct InlineCodeBlock
-{
-	NodeTag		type;
-	char	   *source_text;	/* source text of anonymous code block */
-	Oid			langOid;		/* OID of selected language */
-	bool		langIsTrusted;	/* trusted property of the language */
-	bool		atomic;			/* atomic execution context */
-} InlineCodeBlock;
-
-/* ----------------------
  * ALTER object DEPENDS ON EXTENSION extname
  * ----------------------
  */

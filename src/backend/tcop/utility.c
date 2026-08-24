@@ -145,16 +145,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_IS_NOT_READ_ONLY;
 			}
 
-		case T_DoStmt:
-			{
-				/*
-				 * Commands inside the DO block might not be read only, but
-				 * they'll be checked separately when we try to execute them.
-				 * Here we only need to worry about the DO command itself.
-				 */
-				return COMMAND_IS_STRICTLY_READ_ONLY;
-			}
-
 		case T_CheckPointStmt:
 			{
 				/*
@@ -535,10 +525,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 						break;
 				}
 			}
-			break;
-
-		case T_DoStmt:
-			ExecuteDoStmt((DoStmt *) parsetree, isAtomicContext);
 			break;
 
 		case T_TruncateStmt:
@@ -1608,10 +1594,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_INDEX;
 			break;
 
-		case T_DoStmt:
-			tag = CMDTAG_DO;
-			break;
-
 		case T_CreatedbStmt:
 			tag = CMDTAG_CREATE_DATABASE;
 			break;
@@ -2008,14 +1990,7 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_DoStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
 		case T_CreatedbStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 			lev = LOGSTMT_DDL;
 			break;
 

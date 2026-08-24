@@ -303,7 +303,6 @@ typedef enum NodeTag
 	T_TruncateStmt,
 	T_IndexStmt,
 	T_CreateFunctionStmt,
-	T_DoStmt,
 	T_RuleStmt,
 	T_TransactionStmt,
 	T_ViewStmt,
@@ -389,7 +388,6 @@ typedef enum NodeTag
 	 */
 	T_ReturnSetInfo,			/* in nodes/execnodes.h */
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
-	T_InlineCodeBlock,			/* in nodes/parsenodes.h */
 	T_IndexAmRoutine,			/* in access/amapi.h */
 	T_TableAmRoutine,			/* in access/tableam.h */
 	T_TsmRoutine,				/* in access/tsmapi.h */

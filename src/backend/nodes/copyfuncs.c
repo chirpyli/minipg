@@ -2952,17 +2952,6 @@ _copyFunctionParameter(const FunctionParameter *from)
 	return newnode;
 }
 
-static DoStmt *
-_copyDoStmt(const DoStmt *from)
-{
-	DoStmt	   *newnode = makeNode(DoStmt);
-
-	COPY_NODE_FIELD(args);
-
-	return newnode;
-}
-
-
 static AlterObjectSchemaStmt *
 _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
 {
@@ -3821,9 +3810,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_FunctionParameter:
 			retval = _copyFunctionParameter(from);
-			break;
-		case T_DoStmt:
-			retval = _copyDoStmt(from);
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);

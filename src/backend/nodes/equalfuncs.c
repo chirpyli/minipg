@@ -1164,15 +1164,6 @@ _equalFunctionParameter(const FunctionParameter *a, const FunctionParameter *b)
 }
 
 static bool
-_equalDoStmt(const DoStmt *a, const DoStmt *b)
-{
-	COMPARE_NODE_FIELD(args);
-
-	return true;
-}
-
-
-static bool
 _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSchemaStmt *b)
 {
 	COMPARE_SCALAR_FIELD(objectType);
@@ -2291,9 +2282,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_FunctionParameter:
 			retval = _equalFunctionParameter(a, b);
-			break;
-		case T_DoStmt:
-			retval = _equalDoStmt(a, b);
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);
