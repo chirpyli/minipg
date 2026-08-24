@@ -74,21 +74,6 @@ reset synchronous_commit;
 
 discard all;
 
--- CURSOR commands
-
-BEGIN;
-
-DECLARE hsc CURSOR FOR select * from hs3;
-
-FETCH next from hsc;
-fetch first from hsc;
-fetch last from hsc;
-fetch 1 from hsc;
-
-CLOSE hsc;
-
-COMMIT;
-
 -- Prepared plans
 
 PREPARE hsp AS select count(*) from hs1;

@@ -22,10 +22,6 @@
 extern DestReceiver *CreateTuplestoreDestReceiver(void);
 
 extern void SetTuplestoreDestReceiverParams(DestReceiver *self,
-											Tuplestorestate *tStore,
-											MemoryContext tContext,
-											bool detoast,
-											TupleDesc target_tupdesc,
-											const char *map_failure_msg);
+											Tuplestorestate *tStore);
 
 #endif							/* TSTORE_RECEIVER_H */

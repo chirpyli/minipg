@@ -395,7 +395,7 @@ struct Tuplesortstate
 	 */
 	int			result_tape;	/* actual tape number of finished output */
 	int			current;		/* array index (only used if SORTEDINMEM) */
-	bool		eof_reached;	/* reached EOF (needed for cursors) */
+	bool		eof_reached;	/* reached EOF (needed for mark/restore) */
 
 	/* markpos_xxx holds marked position for mark and restore */
 	long		markpos_block;	/* tape block# (only used if SORTEDONTAPE) */

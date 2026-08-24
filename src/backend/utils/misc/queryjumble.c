@@ -626,16 +626,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				APP_JUMB(sd->typeId);
 			}
 			break;
-		case T_CurrentOfExpr:
-			{
-				CurrentOfExpr *ce = (CurrentOfExpr *) node;
-
-				APP_JUMB(ce->cvarno);
-				if (ce->cursor_name)
-					APP_JUMB_STRING(ce->cursor_name);
-				APP_JUMB(ce->cursor_param);
-			}
-			break;
 		case T_InferenceElem:
 			{
 				InferenceElem *ie = (InferenceElem *) node;

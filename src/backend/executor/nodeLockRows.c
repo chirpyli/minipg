@@ -212,7 +212,7 @@ lnext:
 					 test);
 		}
 
-		/* Remember locked tuple's TID for EPQ testing and WHERE CURRENT OF */
+		/* Remember locked tuple's TID for EPQ testing */
 		erm->curCtid = tid;
 	}
 

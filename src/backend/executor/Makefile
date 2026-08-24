@@ -14,7 +14,6 @@ include $(top_builddir)/src/Makefile.global
 
 OBJS = \
 	execAmi.o \
-	execCurrent.o \
 	execExpr.o \
 	execExprInterp.o \
 	execGrouping.o \

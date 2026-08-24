@@ -118,13 +118,7 @@ BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
   CREATE TABLE pxtest4 (a int);
   INSERT INTO pxtest4 VALUES (1);
   INSERT INTO pxtest4 VALUES (2);
-  DECLARE foo CURSOR FOR SELECT * FROM pxtest4;
-  -- Fetch 1 tuple, keeping the cursor open
-  FETCH 1 FROM foo;
 PREPARE TRANSACTION 'regress-two';
-
--- No such cursor
-FETCH 1 FROM foo;
 
 -- Table doesn't exist, the creation hasn't been committed yet
 SELECT * FROM pxtest2;

@@ -285,21 +285,6 @@ _readQuery(void)
 }
 
 /*
- * _readDeclareCursorStmt
- */
-static DeclareCursorStmt *
-_readDeclareCursorStmt(void)
-{
-	READ_LOCALS(DeclareCursorStmt);
-
-	READ_STRING_FIELD(portalname);
-	READ_INT_FIELD(options);
-	READ_NODE_FIELD(query);
-
-	READ_DONE();
-}
-
-/*
  * _readWithCheckOption
  */
 static WithCheckOption *
@@ -1044,21 +1029,6 @@ _readSetToDefault(void)
 	READ_INT_FIELD(typeMod);
 	READ_OID_FIELD(collation);
 	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readCurrentOfExpr
- */
-static CurrentOfExpr *
-_readCurrentOfExpr(void)
-{
-	READ_LOCALS(CurrentOfExpr);
-
-	READ_UINT_FIELD(cvarno);
-	READ_STRING_FIELD(cursor_name);
-	READ_INT_FIELD(cursor_param);
 
 	READ_DONE();
 }
@@ -2329,8 +2299,6 @@ parseNodeString(void)
 		return_value = _readCoerceToDomainValue();
 	else if (MATCH("SETTODEFAULT", 12))
 		return_value = _readSetToDefault();
-	else if (MATCH("CURRENTOFEXPR", 13))
-		return_value = _readCurrentOfExpr();
 	else if (MATCH("INFERENCEELEM", 13))
 		return_value = _readInferenceElem();
 	else if (MATCH("TARGETENTRY", 11))
@@ -2353,8 +2321,6 @@ parseNodeString(void)
 		return_value = _readTableSampleClause();
 	else if (MATCH("DEFELEM", 7))
 		return_value = _readDefElem();
-	else if (MATCH("DECLARECURSOR", 13))
-		return_value = _readDeclareCursorStmt();
 	else if (MATCH("PLANNEDSTMT", 11))
 		return_value = _readPlannedStmt();
 	else if (MATCH("PLAN", 4))

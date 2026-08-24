@@ -2355,9 +2355,9 @@ PQdescribePrepared(PGconn *conn, const char *stmt)
  *	  Obtain information about a previously created portal
  *
  * This is much like PQdescribePrepared, except that no parameter info is
- * returned.  Note that at the moment, libpq doesn't really expose portals
- * to the client; but this can be used with a portal created by a SQL
- * DECLARE CURSOR command.
+ * returned.  Note that at the moment, libpq doesn't really expose named
+ * portals to the client; but this can be used with the unnamed portal
+ * created by the extended query protocol.
  */
 PGresult *
 PQdescribePortal(PGconn *conn, const char *portal)

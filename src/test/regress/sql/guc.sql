@@ -168,13 +168,11 @@ SHOW special."weird name";
 --
 
 -- do changes
-DECLARE foo CURSOR WITH HOLD FOR SELECT 1;
 PREPARE foo AS SELECT 1;
 SET vacuum_cost_delay = 13;
 CREATE TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
 -- look changes
 SELECT name FROM pg_prepared_statements;
-SELECT name FROM pg_cursors;
 SHOW vacuum_cost_delay;
 SELECT relname from pg_class where relname = 'tmp_foo';
 SELECT current_user = 'regress_guc_user';
@@ -182,7 +180,6 @@ SELECT current_user = 'regress_guc_user';
 DISCARD ALL;
 -- look again
 SELECT name FROM pg_prepared_statements;
-SELECT name FROM pg_cursors;
 SHOW vacuum_cost_delay;
 SELECT relname from pg_class where relname = 'tmp_foo';
 SELECT current_user = 'regress_guc_user';

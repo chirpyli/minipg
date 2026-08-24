@@ -62,7 +62,6 @@
 #include "utils/syscache.h"
 
 /* GUC parameters */
-double		cursor_tuple_fraction = DEFAULT_CURSOR_TUPLE_FRACTION;
 int			force_parallel_mode = FORCE_PARALLEL_OFF;
 bool		parallel_leader_participation = true;
 
@@ -267,9 +266,9 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	/*
 	 * Assess whether it's feasible to use parallel mode for this query. We
 	 * can't do this in a standalone backend, or if the command will try to
-	 * modify any data, or if this is a cursor operation, or if GUCs are set
-	 * to values that don't permit parallelism, or if parallel-unsafe
-	 * functions are present in the query tree.
+	 * modify any data, or if GUCs are set to values that don't permit
+	 * parallelism, or if parallel-unsafe functions are present in the query
+	 * tree.
 	 *
 	 * (Note that we do allow CREATE TABLE AS, SELECT INTO, and CREATE
 	 * MATERIALIZED VIEW to use parallel plans, but this is safe only because
@@ -322,33 +321,8 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	glob->parallelModeNeeded = glob->parallelModeOK &&
 		(force_parallel_mode != FORCE_PARALLEL_OFF);
 
-	/* Determine what fraction of the plan is likely to be scanned */
-	if (cursorOptions & CURSOR_OPT_FAST_PLAN)
-	{
-		/*
-		 * We have no real idea how many tuples the user will ultimately FETCH
-		 * from a cursor, but it is often the case that he doesn't want 'em
-		 * all, or would prefer a fast-start plan anyway so that he can
-		 * process some of the tuples sooner.  Use a GUC parameter to decide
-		 * what fraction to optimize for.
-		 */
-		tuple_fraction = cursor_tuple_fraction;
-
-		/*
-		 * We document cursor_tuple_fraction as simply being a fraction, which
-		 * means the edge cases 0 and 1 have to be treated specially here.  We
-		 * convert 1 to 0 ("all the tuples") and 0 to a very small fraction.
-		 */
-		if (tuple_fraction >= 1.0)
-			tuple_fraction = 0.0;
-		else if (tuple_fraction <= 0.0)
-			tuple_fraction = 1e-10;
-	}
-	else
-	{
-		/* Default assumption is we need all the tuples */
-		tuple_fraction = 0.0;
-	}
+	/* Default assumption is we need all the tuples */
+	tuple_fraction = 0.0;
 
 	/* primary planning entry point (may recurse for subqueries) */
 	root = subquery_planner(glob, parse, NULL,
@@ -359,16 +333,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	best_path = get_cheapest_fractional_path(final_rel, tuple_fraction);
 
 	top_plan = create_plan(root, best_path);
-
-	/*
-	 * If creating a plan for a scrollable cursor, make sure it can run
-	 * backwards on demand.  Add a Material node at the top at need.
-	 */
-	if (cursorOptions & CURSOR_OPT_SCROLL)
-	{
-		if (!ExecSupportsBackwardScan(top_plan))
-			top_plan = materialize_finished_plan(top_plan);
-	}
 
 	/*
 	 * Optionally add a Gather node for testing purposes, provided this is

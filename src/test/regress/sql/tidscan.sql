@@ -53,34 +53,9 @@ SELECT t1.ctid, t1.*, t2.ctid, t2.*
 FROM tidscan t1 LEFT JOIN tidscan t2 ON t1.ctid = t2.ctid WHERE t1.id = 1;
 RESET enable_hashjoin;
 
--- exercise backward scan and rewind
-BEGIN;
-DECLARE c CURSOR FOR
-SELECT ctid, * FROM tidscan WHERE ctid = ANY(ARRAY['(0,1)', '(0,2)']::tid[]);
-FETCH ALL FROM c;
-FETCH BACKWARD 1 FROM c;
-FETCH FIRST FROM c;
-ROLLBACK;
-
--- tidscan via CURRENT OF
-BEGIN;
-DECLARE c CURSOR FOR SELECT ctid, * FROM tidscan;
-FETCH NEXT FROM c; -- skip one row
-FETCH NEXT FROM c;
--- perform update
-EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
-UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-FETCH NEXT FROM c;
--- perform update
-EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
-UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-SELECT * FROM tidscan;
--- position cursor past any rows
-FETCH NEXT FROM c;
--- should error out
-EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
-UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-ROLLBACK;
+-- minipg: cursors removed.  The original tests exercised backward scan and
+-- rewind of a TID scan, and TID scans via CURRENT OF, through cursors;
+-- those cursor-dependent subtests are dropped.
 
 -- bulk joins on CTID
 -- (these plans don't use TID scans, but this still seems like an

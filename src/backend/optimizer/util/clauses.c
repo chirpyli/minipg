@@ -1218,16 +1218,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 			}
 			break;
 
-		case T_CurrentOfExpr:
-
-			/*
-			 * WHERE CURRENT OF doesn't contain leaky function calls.
-			 * Moreover, it is essential that this is considered non-leaky,
-			 * since the planner must always generate a TID scan when CURRENT
-			 * OF is present -- cf. cost_tidscan.
-			 */
-			return false;
-
 		default:
 
 			/*
@@ -3359,10 +3349,8 @@ eval_const_expressions_mutator(Node *node,
 
 	/*
 	 * For any node type not handled above, copy the node unchanged but
-	 * const-simplify its subexpressions.  This is the correct thing for node
-	 * types whose behavior might change between planning and execution, such
-	 * as CurrentOfExpr.  It's also a safe default for new node types not
-	 * known to this routine.
+	 * const-simplify its subexpressions.  It's also a safe default for new
+	 * node types not known to this routine.
 	 */
 	return ece_generic_processing(node);
 }

@@ -232,17 +232,17 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterObjectSchemaStmt
 		AlterTypeStmt AlterTableStmt
 		AlterCompositeTypeStmt
-		AnalyzeStmt ClosePortalStmt ClusterStmt
+		AnalyzeStmt ClusterStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
-		CreatedbStmt DeclareCursorStmt DefineStmt DeleteStmt DiscardStmt DoStmt
+		CreatedbStmt DefineStmt DeleteStmt DiscardStmt DoStmt
 		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
 	
 		DropTransformStmt
-		ExplainStmt FetchStmt
+		ExplainStmt
 		IndexStmt InsertStmt
 		LoadStmt LockStmt ExplainableStmt PreparableStmt
 		CreateFunctionStmt ReindexStmt RemoveAggrStmt
@@ -291,8 +291,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <chr>		am_type
 
 %type <str>		access_method_clause attr_name
-				table_access_method_clause name cursor_name file_name
-				opt_index_name cluster_index_specification
+			table_access_method_clause name file_name
+			opt_index_name cluster_index_specification
 
 %type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
 				opt_class
@@ -373,11 +373,11 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
 %type <boolean> opt_freeze opt_analyze opt_default opt_recheck
 
-%type <ival>	event cursor_options opt_hold opt_set_data
+%type <ival>	event opt_set_data
 %type <objtype>	object_type_any_name object_type_name_on_any_name
 				drop_type_name
 
-%type <node>	fetch_args select_limit_value
+%type <node>	select_limit_value
 				offset_clause select_offset_value
 				select_fetch_first_value I_or_F_const
 %type <ival>	row_or_rows first_or_next
@@ -492,23 +492,23 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
  */
 
 /* ordinary key words in alphabetical order */
-%token <keyword> ABORT_P ABSOLUTE_P ACCESS ACTION ADD_P ADMIN AFTER
+%token <keyword> ABORT_P ACCESS ACTION ADD_P ADMIN AFTER
 	AGGREGATE ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	ASENSITIVE ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
+	ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
-	BACKWARD BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
+	BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
 	BOOLEAN_P BOTH BREADTH BY
 
 	CACHE CALL CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
-	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLOSE
+	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS
 	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
 	COST CREATE CROSS CSV CUBE CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
-	CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE
+	CURRENT_TIMESTAMP CURRENT_USER CYCLE
 
-	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DEFAULT DEFAULTS
+	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPENDS DEPTH DESC
 	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P DOMAIN_P
 	DOUBLE_P DROP
@@ -518,15 +518,15 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	EXTENSION EXTERNAL EXTRACT
 
 	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
-	FORCE FOREIGN FORWARD FREEZE FROM FULL FUNCTION FUNCTIONS
+	FORCE FOREIGN FREEZE FROM FULL FUNCTION FUNCTIONS
 
 	GENERATED GLOBAL GRANTED GREATEST GROUP_P GROUPING GROUPS
 
-	HANDLER HAVING HEADER_P HOLD HOUR_P
+	HANDLER HAVING HEADER_P HOUR_P
 
 	IDENTITY_P IF_P ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IMPORT_P IN_P INCLUDE
 	INCLUDING INCREMENT INDEX INDEXES INHERIT INHERITS INITIALLY INLINE_P
-	INNER_P INOUT INPUT_P INSENSITIVE INSERT INSTEAD INT_P INTEGER
+	INNER_P INOUT INPUT_P INSERT INSTEAD INT_P INTEGER
 	INTERSECT INTERVAL INTO INVOKER IS ISNULL ISOLATION
 
 	JOIN
@@ -537,9 +537,9 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
 
-	MAPPING MATCH MATERIALIZED MAXVALUE METHOD MINUTE_P MINVALUE MODE MONTH_P MOVE
+	MAPPING MATCH MATERIALIZED MAXVALUE METHOD MINUTE_P MINVALUE MODE MONTH_P
 
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NEXT NFC NFD NFKC NFKD NO NONE
+	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NFC NFD NFKC NFKD NO NONE
 	NORMALIZE NORMALIZED
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
@@ -550,16 +550,16 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	PARALLEL PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
-	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM
+	PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM
 
 	QUOTE
 
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCES REFERENCING
-	REFRESH REINDEX RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
+	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
 	RESET RESTART RESTRICT RETURN RETURNING RETURNS RIGHT ROLE ROLLBACK ROLLUP
 	ROUTINE ROUTINES ROW ROWS RULE
 
-	SAVEPOINT SCHEMA SCHEMAS SCROLL SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
+	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
 	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P STABLE STANDALONE_P
 	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRICT_P STRIP_P
@@ -733,7 +733,6 @@ stmt:	AlterDomainStmt
 			| AlterCompositeTypeStmt
 			| AnalyzeStmt
 			| CheckPointStmt
-			| ClosePortalStmt
 			| ClusterStmt
 			| CreateAmStmt
 			| CreateDomainStmt
@@ -747,7 +746,6 @@ stmt:	AlterDomainStmt
 			| CreateTransformStmt
 			| CreatedbStmt
 			| DeallocateStmt
-			| DeclareCursorStmt
 			| DefineStmt
 			| DeleteStmt
 			| DiscardStmt
@@ -759,7 +757,6 @@ stmt:	AlterDomainStmt
 			| DropdbStmt
 			| ExecuteStmt
 			| ExplainStmt
-			| FetchStmt
 			| IndexStmt
 		| InsertStmt
 		| LoadStmt
@@ -1693,22 +1690,6 @@ alter_type_cmd:
  *				close <portalname>
  *
  *****************************************************************************/
-
-ClosePortalStmt:
-			CLOSE cursor_name
-				{
-					ClosePortalStmt *n = makeNode(ClosePortalStmt);
-					n->portalname = $2;
-					$$ = (Node *)n;
-				}
-			| CLOSE ALL
-				{
-					ClosePortalStmt *n = makeNode(ClosePortalStmt);
-					n->portalname = NULL;
-					$$ = (Node *)n;
-				}
-		;
-
 
 
 
@@ -3057,159 +3038,6 @@ opt_restart_seqs:
  *			fetch/move
  *
  *****************************************************************************/
-
-FetchStmt:	FETCH fetch_args
-				{
-					FetchStmt *n = (FetchStmt *) $2;
-					n->ismove = false;
-					$$ = (Node *)n;
-				}
-			| MOVE fetch_args
-				{
-					FetchStmt *n = (FetchStmt *) $2;
-					n->ismove = true;
-					$$ = (Node *)n;
-				}
-		;
-
-fetch_args:	cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $1;
-					n->direction = FETCH_FORWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $2;
-					n->direction = FETCH_FORWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| NEXT opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_FORWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| PRIOR opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_BACKWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| FIRST_P opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_ABSOLUTE;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| LAST_P opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_ABSOLUTE;
-					n->howMany = -1;
-					$$ = (Node *)n;
-				}
-			| ABSOLUTE_P SignedIconst opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_ABSOLUTE;
-					n->howMany = $2;
-					$$ = (Node *)n;
-				}
-			| RELATIVE_P SignedIconst opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_RELATIVE;
-					n->howMany = $2;
-					$$ = (Node *)n;
-				}
-			| SignedIconst opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_FORWARD;
-					n->howMany = $1;
-					$$ = (Node *)n;
-				}
-			| ALL opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_FORWARD;
-					n->howMany = FETCH_ALL;
-					$$ = (Node *)n;
-				}
-			| FORWARD opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_FORWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| FORWARD SignedIconst opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_FORWARD;
-					n->howMany = $2;
-					$$ = (Node *)n;
-				}
-			| FORWARD ALL opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_FORWARD;
-					n->howMany = FETCH_ALL;
-					$$ = (Node *)n;
-				}
-			| BACKWARD opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $3;
-					n->direction = FETCH_BACKWARD;
-					n->howMany = 1;
-					$$ = (Node *)n;
-				}
-			| BACKWARD SignedIconst opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_BACKWARD;
-					n->howMany = $2;
-					$$ = (Node *)n;
-				}
-			| BACKWARD ALL opt_from_in cursor_name
-				{
-					FetchStmt *n = makeNode(FetchStmt);
-					n->portalname = $4;
-					n->direction = FETCH_BACKWARD;
-					n->howMany = FETCH_ALL;
-					$$ = (Node *)n;
-				}
-		;
-
-from_in:	FROM
-			| IN_P
-		;
-
-opt_from_in:	from_in
-			| /* EMPTY */
-		;
-
 
 
 /*****************************************************************************
@@ -4887,7 +4715,6 @@ ExplainableStmt:
 			| InsertStmt
 			| UpdateStmt
 			| DeleteStmt
-			| DeclareCursorStmt
 			| ExecuteStmt					/* by default all are $$=$1 */
 		;
 
@@ -5263,39 +5090,6 @@ set_target_list:
 			| set_target_list ',' set_target		{ $$ = lappend($1,$3); }
 		;
 
-
-/*****************************************************************************
- *
- *		QUERY:
- *				CURSOR STATEMENTS
- *
- *****************************************************************************/
-DeclareCursorStmt: DECLARE cursor_name cursor_options CURSOR opt_hold FOR SelectStmt
-				{
-					DeclareCursorStmt *n = makeNode(DeclareCursorStmt);
-					n->portalname = $2;
-					/* currently we always set FAST_PLAN option */
-					n->options = $3 | $5 | CURSOR_OPT_FAST_PLAN;
-					n->query = $7;
-					$$ = (Node *)n;
-				}
-		;
-
-cursor_name:	name						{ $$ = $1; }
-		;
-
-cursor_options: /*EMPTY*/					{ $$ = 0; }
-			| cursor_options NO SCROLL		{ $$ = $1 | CURSOR_OPT_NO_SCROLL; }
-			| cursor_options SCROLL			{ $$ = $1 | CURSOR_OPT_SCROLL; }
-			| cursor_options BINARY			{ $$ = $1 | CURSOR_OPT_BINARY; }
-			| cursor_options ASENSITIVE		{ $$ = $1 | CURSOR_OPT_ASENSITIVE; }
-			| cursor_options INSENSITIVE	{ $$ = $1 | CURSOR_OPT_INSENSITIVE; }
-		;
-
-opt_hold: /* EMPTY */						{ $$ = 0; }
-			| WITH HOLD						{ $$ = CURSOR_OPT_HOLD; }
-			| WITHOUT HOLD					{ $$ = 0; }
-		;
 
 /*****************************************************************************
  *
@@ -5701,8 +5495,7 @@ row_or_rows: ROW									{ $$ = 0; }
 		;
 
 first_or_next: FIRST_P								{ $$ = 0; }
-			| NEXT									{ $$ = 0; }
-		;
+	;
 
 
 /*
@@ -6336,16 +6129,8 @@ where_clause:
 /* variant for UPDATE and DELETE */
 where_or_current_clause:
 			WHERE a_expr							{ $$ = $2; }
-			| WHERE CURRENT_P OF cursor_name
-				{
-					CurrentOfExpr *n = makeNode(CurrentOfExpr);
-					/* cvarno is filled in by parse analysis */
-					n->cursor_name = $4;
-					n->cursor_param = 0;
-					$$ = (Node *) n;
-				}
 			| /*EMPTY*/								{ $$ = NULL; }
-		;
+	;
 
 
 OptTableFuncElementList:
@@ -8518,7 +8303,6 @@ BareColLabel:	IDENT								{ $$ = $1; }
  */
 unreserved_keyword:
 			  ABORT_P
-			| ABSOLUTE_P
 			| ACCESS
 			| ACTION
 			| ADD_P
@@ -8528,13 +8312,11 @@ unreserved_keyword:
 			| ALSO
 			| ALTER
 			| ALWAYS
-			| ASENSITIVE
 			| ASSIGNMENT
 			| AT
 			| ATOMIC
 			| ATTACH
 			| ATTRIBUTE
-			| BACKWARD
 			| BEFORE
 			| BEGIN_P
 			| BREADTH
@@ -8549,7 +8331,6 @@ unreserved_keyword:
 			| CHARACTERISTICS
 			| CHECKPOINT
 			| CLASS
-			| CLOSE
 			| CLUSTER
 			| COLUMNS
 			| COMMENT
@@ -8568,13 +8349,11 @@ unreserved_keyword:
 			| CSV
 			| CUBE
 			| CURRENT_P
-			| CURSOR
 			| CYCLE
 			| DATA_P
 			| DATABASE
 			| DAY_P
 			| DEALLOCATE
-			| DECLARE
 			| DEFAULTS
 			| DEFERRED
 			| DEFINER
@@ -8612,7 +8391,6 @@ unreserved_keyword:
 			| FIRST_P
 			| FOLLOWING
 			| FORCE
-			| FORWARD
 			| FUNCTION
 			| FUNCTIONS
 			| GENERATED
@@ -8621,7 +8399,6 @@ unreserved_keyword:
 			| GROUPS
 			| HANDLER
 			| HEADER_P
-			| HOLD
 			| HOUR_P
 			| IDENTITY_P
 			| IF_P
@@ -8638,7 +8415,6 @@ unreserved_keyword:
 			| INHERITS
 			| INLINE_P
 			| INPUT_P
-			| INSENSITIVE
 			| INSERT
 			| INSTEAD
 			| INVOKER
@@ -8666,11 +8442,9 @@ unreserved_keyword:
 			| MINVALUE
 			| MODE
 			| MONTH_P
-			| MOVE
 			| NAME_P
 			| NAMES
 			| NEW
-			| NEXT
 			| NFC
 			| NFD
 			| NFKC
@@ -8706,7 +8480,6 @@ unreserved_keyword:
 			| PREPARE
 			| PREPARED
 			| PRESERVE
-			| PRIOR
 			| PRIVILEGES
 			| PROCEDURAL
 			| PROCEDURE
@@ -8722,7 +8495,6 @@ unreserved_keyword:
 			| REFERENCING
 			| REFRESH
 			| REINDEX
-			| RELATIVE_P
 			| RELEASE
 			| RENAME
 			| REPEATABLE
@@ -8743,7 +8515,6 @@ unreserved_keyword:
 			| SAVEPOINT
 			| SCHEMA
 			| SCHEMAS
-			| SCROLL
 			| SEARCH
 			| SECOND_P
 			| SECURITY
@@ -8999,7 +8770,6 @@ reserved_keyword:
  */
 bare_label_keyword:
 			  ABORT_P
-			| ABSOLUTE_P
 			| ACCESS
 			| ACTION
 			| ADD_P
@@ -9015,7 +8785,6 @@ bare_label_keyword:
 			| AND
 			| ANY
 			| ASC
-			| ASENSITIVE
 			| ASSIGNMENT
 			| ASYMMETRIC
 			| AT
@@ -9023,7 +8792,6 @@ bare_label_keyword:
 			| ATTACH
 			| ATTRIBUTE
 			| AUTHORIZATION
-			| BACKWARD
 			| BEFORE
 			| BEGIN_P
 			| BETWEEN
@@ -9047,7 +8815,6 @@ bare_label_keyword:
 			| CHECK
 			| CHECKPOINT
 			| CLASS
-			| CLOSE
 			| CLUSTER
 			| COALESCE
 			| COLLATE
@@ -9079,14 +8846,12 @@ bare_label_keyword:
 			| CURRENT_SCHEMA
 			| CURRENT_TIMESTAMP
 			| CURRENT_USER
-			| CURSOR
 			| CYCLE
 			| DATA_P
 			| DATABASE
 			| DEALLOCATE
 			| DEC
 			| DECIMAL_P
-			| DECLARE
 			| DEFAULT
 			| DEFAULTS
 			| DEFERRABLE
@@ -9135,7 +8900,6 @@ bare_label_keyword:
 			| FOLLOWING
 			| FORCE
 			| FOREIGN
-			| FORWARD
 			| FREEZE
 			| FULL
 			| FUNCTION
@@ -9148,7 +8912,6 @@ bare_label_keyword:
 			| GROUPS
 			| HANDLER
 			| HEADER_P
-			| HOLD
 			| IDENTITY_P
 			| IF_P
 			| ILIKE
@@ -9169,7 +8932,6 @@ bare_label_keyword:
 			| INNER_P
 			| INOUT
 			| INPUT_P
-			| INSENSITIVE
 			| INSERT
 			| INSTEAD
 			| INT_P
@@ -9207,14 +8969,12 @@ bare_label_keyword:
 			| METHOD
 			| MINVALUE
 			| MODE
-			| MOVE
 			| NAME_P
 			| NAMES
 			| NATIONAL
 			| NATURAL
 			| NCHAR
 			| NEW
-			| NEXT
 			| NFC
 			| NFD
 			| NFKC
@@ -9263,7 +9023,6 @@ bare_label_keyword:
 			| PREPARED
 			| PRESERVE
 			| PRIMARY
-			| PRIOR
 			| PRIVILEGES
 			| PROCEDURAL
 			| PROCEDURE
@@ -9282,7 +9041,6 @@ bare_label_keyword:
 			| REFERENCING
 			| REFRESH
 			| REINDEX
-			| RELATIVE_P
 			| RELEASE
 			| RENAME
 			| REPEATABLE
@@ -9305,7 +9063,6 @@ bare_label_keyword:
 			| SAVEPOINT
 			| SCHEMA
 			| SCHEMAS
-			| SCROLL
 			| SEARCH
 			| SECURITY
 			| SELECT

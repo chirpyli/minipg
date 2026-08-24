@@ -4,8 +4,7 @@
  *	  POSTGRES portal definitions.
  *
  * A portal is an abstraction which represents the execution state of
- * a running or runnable query.  Portals support both SQL-level CURSORs
- * and protocol-level portals.
+ * a running or runnable query.  Portals support protocol-level portals.
  *
  * Scrolling (nonsequential access) and suspension of execution are allowed
  * only for portals that contain a single SELECT-type query.  We do not want
@@ -15,25 +14,8 @@
  * plan trees; so the restriction to a single query is not a problem
  * in practice.
  *
- * For SQL cursors, we support three kinds of scroll behavior:
- *
- * (1) Neither NO SCROLL nor SCROLL was specified: to remain backward
- *	   compatible, we allow backward fetches here, unless it would
- *	   impose additional runtime overhead to do so.
- *
- * (2) NO SCROLL was specified: don't allow any backward fetches.
- *
- * (3) SCROLL was specified: allow all kinds of backward fetches, even
- *	   if we need to take a performance hit to do so.  (The planner sticks
- *	   a Materialize node atop the query plan if needed.)
- *
- * Case #1 is converted to #2 or #3 by looking at the query itself and
- * determining if scrollability can be supported without additional
- * overhead.
- *
  * Protocol-level portals have no nonsequential-fetch API and so the
- * distinction doesn't matter for them.  They are always initialized
- * to look like NO SCROLL cursors.
+ * distinction doesn't matter for them.
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -59,8 +41,7 @@
  * 零条或多条实际查询。）
  *
  * PORTAL_ONE_SELECT：Portal 中包含一条 SELECT 查询。我们按结果被请求
- * 的节奏增量式地运行执行器。该策略还支持可保持游标（执行器的结果可以
- * 转储进 tuplestore，以便在事务结束后仍可访问）。
+ * 的节奏增量式地运行执行器。
  *
  * PORTAL_ONE_RETURNING：Portal 中包含一条带 RETURNING 子句的
  * INSERT/UPDATE/DELETE 查询（可能还有规则重写附加的辅助查询）。首次执行时，
@@ -117,10 +98,8 @@ typedef struct PortalData
 
 	/*
 	 * State data for remembering which subtransaction(s) the portal was
-	 * created or used in.  If the portal is held over from a previous
-	 * transaction, both subxids are InvalidSubTransactionId.  Otherwise,
-	 * createSubid is the creating subxact and activeSubid is the last subxact
-	 * in which we ran the portal.
+	 * created or used in: createSubid is the creating subxact and
+	 * activeSubid is the last subxact in which we ran the portal.
 	 */
 	SubTransactionId createSubid;	/* the creating subxact */
 	SubTransactionId activeSubid;	/* the last subxact with activity */
@@ -137,14 +116,9 @@ typedef struct PortalData
 
 	/* Features/options */
 	PortalStrategy strategy;	/* see above */
-	int			cursorOptions;	/* DECLARE CURSOR option bits */
-	bool		run_once;		/* unused */
 
 	/* Status data */
 	PortalStatus status;		/* see above */
-	bool		portalPinned;	/* a pinned portal can't be dropped */
-	bool		autoHeld;		/* was automatically converted from pinned to
-								 * held (see HoldPinnedPortals()) */
 
 	/* If not NULL, Executor is active; call ExecutorEnd eventually: */
 	QueryDesc  *queryDesc;		/* info needed for executor invocation */
@@ -163,11 +137,10 @@ typedef struct PortalData
 	Snapshot	portalSnapshot; /* active snapshot, or NULL if none */
 
 	/*
-	 * Where we store tuples for a held cursor or a PORTAL_ONE_RETURNING,
-	 * PORTAL_ONE_MOD_WITH, or PORTAL_UTIL_SELECT query.  (A cursor held past
-	 * the end of its transaction no longer has any active executor state.)
+	 * Where we store tuples for a PORTAL_ONE_RETURNING,
+	 * PORTAL_ONE_MOD_WITH, or PORTAL_UTIL_SELECT query.
 	 */
-	Tuplestorestate *holdStore; /* store for holdable cursors */
+	Tuplestorestate *holdStore; /* store for stashed query results */
 	MemoryContext holdContext;	/* memory containing holdStore */
 
 	/*
@@ -175,27 +148,22 @@ typedef struct PortalData
 	 * reference to this snapshot if there is any possibility that the tuples
 	 * contain TOAST references, because releasing the snapshot could allow
 	 * recently-dead rows to be vacuumed away, along with any toast data
-	 * belonging to them.  In the case of a held cursor, we avoid needing to
-	 * keep such a snapshot by forcibly detoasting the data.
+	 * belonging to them.
 	 */
 	Snapshot	holdSnapshot;	/* registered snapshot, or NULL if none */
 
 	/*
-	 * atStart, atEnd and portalPos indicate the current cursor position.
-	 * portalPos is zero before the first row, N after fetching N'th row of
-	 * query.  After we run off the end, portalPos = # of rows in query, and
-	 * atEnd is true.  Note that atStart implies portalPos == 0, but not the
-	 * reverse: we might have backed up only as far as the first row, not to
-	 * the start.  Also note that various code inspects atStart and atEnd, but
-	 * only the portal movement routines should touch portalPos.
-	 */
+ * atStart, atEnd and portalPos indicate the current portal position.
+ * portalPos is zero before the first row, N after fetching N'th row of
+ * query.  After we run off the end, portalPos = # of rows in query, and
+ * atEnd is true.  Note that atStart implies portalPos == 0, but not the
+ * reverse: we might have backed up only as far as the first row, not to
+ * the start.  Also note that various code inspects atStart and atEnd, but
+ * only the portal run routines should touch portalPos.
+ */
 	bool		atStart;
 	bool		atEnd;
 	uint64		portalPos;
-
-	/* Presentation data, primarily used by the pg_cursors system view */
-	TimestampTz creation_time;	/* time at which this portal was defined */
-	bool		visible;		/* include this portal in pg_cursors? */
 
 	/* Stuff added at the end to avoid ABI break in stable branches: */
 	int			createLevel;	/* creating subxact's nesting level */
@@ -213,7 +181,6 @@ extern void EnablePortalManager(void);
 extern bool PreCommit_Portals(bool isPrepare);
 extern void AtAbort_Portals(void);
 extern void AtCleanup_Portals(void);
-extern void PortalErrorCleanup(void);
 extern void AtSubCommit_Portals(SubTransactionId mySubid,
 								SubTransactionId parentSubid,
 								int parentLevel,
@@ -225,8 +192,6 @@ extern void AtSubAbort_Portals(SubTransactionId mySubid,
 extern void AtSubCleanup_Portals(SubTransactionId mySubid);
 extern Portal CreatePortal(const char *name, bool allowDup, bool dupSilent);
 extern Portal CreateNewPortal(void);
-extern void PinPortal(Portal portal);
-extern void UnpinPortal(Portal portal);
 extern void MarkPortalActive(Portal portal);
 extern void MarkPortalDone(Portal portal);
 extern void MarkPortalFailed(Portal portal);
@@ -241,8 +206,6 @@ extern void PortalDefineQuery(Portal portal,
 extern PlannedStmt *PortalGetPrimaryStmt(Portal portal);
 extern void PortalCreateHoldStore(Portal portal);
 extern void PortalHashTableDeleteAll(void);
-extern bool ThereAreNoReadyPortals(void);
-extern void HoldPinnedPortals(void);
 extern void ForgetPortalSnapshots(void);
 
 #endif							/* PORTAL_H */

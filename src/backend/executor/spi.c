@@ -56,9 +56,6 @@ typedef struct SPICallbackArg
 	RawParseMode mode;
 } SPICallbackArg;
 
-static Portal SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
-									   ParamListInfo paramLI, bool read_only);
-
 static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan);
 
 static void _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan);
@@ -73,10 +70,6 @@ static ParamListInfo _SPI_convert_params(int nargs, Oid *argtypes,
 static int	_SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount);
 
 static void _SPI_error_callback(void *arg);
-
-static void _SPI_cursor_operation(Portal portal,
-								  FetchDirection direction, long count,
-								  DestReceiver *dest);
 
 static SPIPlanPtr _SPI_make_plan_non_temp(SPIPlanPtr plan);
 static SPIPlanPtr _SPI_save_plan(SPIPlanPtr plan);
@@ -264,13 +257,6 @@ _SPI_commit(bool chain)
 		/* Protect current SPI stack entry against deletion */
 		_SPI_current->internal_xact = true;
 
-		/*
-		 * Hold any pinned portals that any PLs might be using.  We have to do
-		 * this before changing transaction state, since this will run
-		 * user-defined code that might throw an error.
-		 */
-		HoldPinnedPortals();
-
 		/* Release snapshots associated with portals */
 		ForgetPortalSnapshots();
 
@@ -354,14 +340,6 @@ _SPI_rollback(bool chain)
 	{
 		/* Protect current SPI stack entry against deletion */
 		_SPI_current->internal_xact = true;
-
-		/*
-		 * Hold any pinned portals that any PLs might be using.  We have to do
-		 * this before changing transaction state, since this will run
-		 * user-defined code that might throw an error, and in any case
-		 * couldn't be run in an already-aborted transaction.
-		 */
-		HoldPinnedPortals();
 
 		/* Release snapshots associated with portals */
 		ForgetPortalSnapshots();
@@ -869,13 +847,6 @@ SPI_execute_with_args(const char *src,
 SPIPlanPtr
 SPI_prepare(const char *src, int nargs, Oid *argtypes)
 {
-	return SPI_prepare_cursor(src, nargs, argtypes, 0);
-}
-
-SPIPlanPtr
-SPI_prepare_cursor(const char *src, int nargs, Oid *argtypes,
-				   int cursorOptions)
-{
 	_SPI_plan	plan;
 	SPIPlanPtr	result;
 
@@ -892,7 +863,7 @@ SPI_prepare_cursor(const char *src, int nargs, Oid *argtypes,
 	memset(&plan, 0, sizeof(_SPI_plan));
 	plan.magic = _SPI_PLAN_MAGIC;
 	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = cursorOptions;
+	plan.cursor_options = 0;
 	plan.nargs = nargs;
 	plan.argtypes = argtypes;
 	plan.parserSetup = NULL;
@@ -1445,438 +1416,6 @@ SPI_freetuptable(SPITupleTable *tuptable)
 	MemoryContextDelete(tuptable->tuptabcxt);
 }
 
-
-/*
- * SPI_cursor_open()
- *
- *	Open a prepared SPI plan as a portal
- */
-Portal
-SPI_cursor_open(const char *name, SPIPlanPtr plan,
-				Datum *Values, const char *Nulls,
-				bool read_only)
-{
-	Portal		portal;
-	ParamListInfo paramLI;
-
-	/* build transient ParamListInfo in caller's context */
-	paramLI = _SPI_convert_params(plan->nargs, plan->argtypes,
-								  Values, Nulls);
-
-	portal = SPI_cursor_open_internal(name, plan, paramLI, read_only);
-
-	/* done with the transient ParamListInfo */
-	if (paramLI)
-		pfree(paramLI);
-
-	return portal;
-}
-
-
-/*
- * SPI_cursor_open_with_args()
- *
- * Parse and plan a query and open it as a portal.
- */
-Portal
-SPI_cursor_open_with_args(const char *name,
-						  const char *src,
-						  int nargs, Oid *argtypes,
-						  Datum *Values, const char *Nulls,
-						  bool read_only, int cursorOptions)
-{
-	Portal		result;
-	_SPI_plan	plan;
-	ParamListInfo paramLI;
-
-	if (src == NULL || nargs < 0)
-		elog(ERROR, "SPI_cursor_open_with_args called with invalid arguments");
-
-	if (nargs > 0 && (argtypes == NULL || Values == NULL))
-		elog(ERROR, "SPI_cursor_open_with_args called with missing parameters");
-
-	SPI_result = _SPI_begin_call(true);
-	if (SPI_result < 0)
-		elog(ERROR, "SPI_cursor_open_with_args called while not connected");
-
-	memset(&plan, 0, sizeof(_SPI_plan));
-	plan.magic = _SPI_PLAN_MAGIC;
-	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = cursorOptions;
-	plan.nargs = nargs;
-	plan.argtypes = argtypes;
-	plan.parserSetup = NULL;
-	plan.parserSetupArg = NULL;
-
-	/* build transient ParamListInfo in executor context */
-	paramLI = _SPI_convert_params(nargs, argtypes,
-								  Values, Nulls);
-
-	_SPI_prepare_plan(src, &plan);
-
-	/* We needn't copy the plan; SPI_cursor_open_internal will do so */
-
-	result = SPI_cursor_open_internal(name, &plan, paramLI, read_only);
-
-	/* And clean up */
-	_SPI_end_call(true);
-
-	return result;
-}
-
-
-/*
- * SPI_cursor_open_with_paramlist()
- *
- *	Same as SPI_cursor_open except that parameters (if any) are passed
- *	as a ParamListInfo, which supports dynamic parameter set determination
- */
-Portal
-SPI_cursor_open_with_paramlist(const char *name, SPIPlanPtr plan,
-							   ParamListInfo params, bool read_only)
-{
-	return SPI_cursor_open_internal(name, plan, params, read_only);
-}
-
-/* Parse a query and open it as a cursor */
-Portal
-SPI_cursor_parse_open(const char *name,
-					  const char *src,
-					  const SPIParseOpenOptions *options)
-{
-	Portal		result;
-	_SPI_plan	plan;
-
-	if (src == NULL || options == NULL)
-		elog(ERROR, "SPI_cursor_parse_open called with invalid arguments");
-
-	SPI_result = _SPI_begin_call(true);
-	if (SPI_result < 0)
-		elog(ERROR, "SPI_cursor_parse_open called while not connected");
-
-	memset(&plan, 0, sizeof(_SPI_plan));
-	plan.magic = _SPI_PLAN_MAGIC;
-	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = options->cursorOptions;
-	if (options->params)
-	{
-		plan.parserSetup = options->params->parserSetup;
-		plan.parserSetupArg = options->params->parserSetupArg;
-	}
-
-	_SPI_prepare_plan(src, &plan);
-
-	/* We needn't copy the plan; SPI_cursor_open_internal will do so */
-
-	result = SPI_cursor_open_internal(name, &plan,
-									  options->params, options->read_only);
-
-	/* And clean up */
-	_SPI_end_call(true);
-
-	return result;
-}
-
-
-/*
- * SPI_cursor_open_internal()
- *
- *	Common code for SPI_cursor_open variants
- */
-static Portal
-SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
-						 ParamListInfo paramLI, bool read_only)
-{
-	CachedPlanSource *plansource;
-	CachedPlan *cplan;
-	List	   *stmt_list;
-	char	   *query_string;
-	Snapshot	snapshot;
-	MemoryContext oldcontext;
-	Portal		portal;
-	SPICallbackArg spicallbackarg;
-	ErrorContextCallback spierrcontext;
-
-	/*
-	 * Check that the plan is something the Portal code will special-case as
-	 * returning one tupleset.
-	 */
-	if (!SPI_is_cursor_plan(plan))
-	{
-		/* try to give a good error message */
-		const char *cmdtag;
-
-		if (list_length(plan->plancache_list) != 1)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
-					 errmsg("cannot open multi-query plan as cursor")));
-		plansource = (CachedPlanSource *) linitial(plan->plancache_list);
-		/* A SELECT that fails SPI_is_cursor_plan() must be SELECT INTO */
-		if (plansource->commandTag == CMDTAG_SELECT)
-			cmdtag = "SELECT INTO";
-		else
-			cmdtag = GetCommandTagName(plansource->commandTag);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
-		/* translator: %s is name of a SQL command, eg INSERT */
-				 errmsg("cannot open %s query as cursor", cmdtag)));
-	}
-
-	Assert(list_length(plan->plancache_list) == 1);
-	plansource = (CachedPlanSource *) linitial(plan->plancache_list);
-
-	/* Push the SPI stack */
-	if (_SPI_begin_call(true) < 0)
-		elog(ERROR, "SPI_cursor_open called while not connected");
-
-	/* Reset SPI result (note we deliberately don't touch lastoid) */
-	SPI_processed = 0;
-	SPI_tuptable = NULL;
-	_SPI_current->processed = 0;
-	_SPI_current->tuptable = NULL;
-
-	/* Create the portal */
-	if (name == NULL || name[0] == '\0')
-	{
-		/* Use a random nonconflicting name */
-		portal = CreateNewPortal();
-	}
-	else
-	{
-		/* In this path, error if portal of same name already exists */
-		portal = CreatePortal(name, false, false);
-	}
-
-	/* Copy the plan's query string into the portal */
-	query_string = MemoryContextStrdup(portal->portalContext,
-									   plansource->query_string);
-
-	/*
-	 * Setup error traceback support for ereport(), in case GetCachedPlan
-	 * throws an error.
-	 */
-	spicallbackarg.query = plansource->query_string;
-	spicallbackarg.mode = plan->parse_mode;
-	spierrcontext.callback = _SPI_error_callback;
-	spierrcontext.arg = &spicallbackarg;
-	spierrcontext.previous = error_context_stack;
-	error_context_stack = &spierrcontext;
-
-	/*
-	 * Note: for a saved plan, we mustn't have any failure occur between
-	 * GetCachedPlan and PortalDefineQuery; that would result in leaking our
-	 * plancache refcount.
-	 */
-
-	/* Replan if needed, and increment plan refcount for portal */
-	cplan = GetCachedPlan(plansource, paramLI, NULL, _SPI_current->queryEnv);
-	stmt_list = cplan->stmt_list;
-
-	if (!plan->saved)
-	{
-		/*
-		 * We don't want the portal to depend on an unsaved CachedPlanSource,
-		 * so must copy the plan into the portal's context.  An error here
-		 * will result in leaking our refcount on the plan, but it doesn't
-		 * matter because the plan is unsaved and hence transient anyway.
-		 */
-		oldcontext = MemoryContextSwitchTo(portal->portalContext);
-		stmt_list = copyObject(stmt_list);
-		MemoryContextSwitchTo(oldcontext);
-		ReleaseCachedPlan(cplan, NULL);
-		cplan = NULL;			/* portal shouldn't depend on cplan */
-	}
-
-	/*
-	 * Set up the portal.
-	 */
-	PortalDefineQuery(portal,
-					  NULL,		/* no statement name */
-					  query_string,
-					  plansource->commandTag,
-					  stmt_list,
-					  cplan);
-
-	/*
-	 * Set up options for portal.  Default SCROLL type is chosen the same way
-	 * as PerformCursorOpen does it.
-	 */
-	portal->cursorOptions = plan->cursor_options;
-	if (!(portal->cursorOptions & (CURSOR_OPT_SCROLL | CURSOR_OPT_NO_SCROLL)))
-	{
-		if (list_length(stmt_list) == 1 &&
-			linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
-			linitial_node(PlannedStmt, stmt_list)->rowMarks == NIL &&
-			ExecSupportsBackwardScan(linitial_node(PlannedStmt, stmt_list)->planTree))
-			portal->cursorOptions |= CURSOR_OPT_SCROLL;
-		else
-			portal->cursorOptions |= CURSOR_OPT_NO_SCROLL;
-	}
-
-	/*
-	 * Disallow SCROLL with SELECT FOR UPDATE.  This is not redundant with the
-	 * check in transformDeclareCursorStmt because the cursor options might
-	 * not have come through there.
-	 */
-	if (portal->cursorOptions & CURSOR_OPT_SCROLL)
-	{
-		if (list_length(stmt_list) == 1 &&
-			linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
-			linitial_node(PlannedStmt, stmt_list)->rowMarks != NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("DECLARE SCROLL CURSOR ... FOR UPDATE/SHARE is not supported"),
-					 errdetail("Scrollable cursors must be READ ONLY.")));
-	}
-
-	/* Make current query environment available to portal at execution time. */
-	portal->queryEnv = _SPI_current->queryEnv;
-
-	/*
-	 * If told to be read-only, we'd better check for read-only queries. This
-	 * can't be done earlier because we need to look at the finished, planned
-	 * queries.  (In particular, we don't want to do it between GetCachedPlan
-	 * and PortalDefineQuery, because throwing an error between those steps
-	 * would result in leaking our plancache refcount.)
-	 */
-	if (read_only)
-	{
-		ListCell   *lc;
-
-		foreach(lc, stmt_list)
-		{
-			PlannedStmt *pstmt = lfirst_node(PlannedStmt, lc);
-
-			if (!CommandIsReadOnly(pstmt))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				/* translator: %s is a SQL statement name */
-						 errmsg("%s is not allowed in a non-volatile function",
-								CreateCommandName((Node *) pstmt))));
-		}
-	}
-
-	/* Set up the snapshot to use. */
-	if (read_only)
-		snapshot = GetActiveSnapshot();
-	else
-	{
-		CommandCounterIncrement();
-		snapshot = GetTransactionSnapshot();
-	}
-
-	/*
-	 * If the plan has parameters, copy them into the portal.  Note that this
-	 * must be done after revalidating the plan, because in dynamic parameter
-	 * cases the set of parameters could have changed during re-parsing.
-	 */
-	if (paramLI)
-	{
-		oldcontext = MemoryContextSwitchTo(portal->portalContext);
-		paramLI = copyParamList(paramLI);
-		MemoryContextSwitchTo(oldcontext);
-	}
-
-	/*
-	 * Start portal execution.
-	 */
-	PortalStart(portal, paramLI, 0, snapshot);
-
-	Assert(portal->strategy != PORTAL_MULTI_QUERY);
-
-	/* Pop the error context stack */
-	error_context_stack = spierrcontext.previous;
-
-	/* Pop the SPI stack */
-	_SPI_end_call(true);
-
-	/* Return the created portal */
-	return portal;
-}
-
-
-/*
- * SPI_cursor_find()
- *
- *	Find the portal of an existing open cursor
- */
-Portal
-SPI_cursor_find(const char *name)
-{
-	return GetPortalByName(name);
-}
-
-
-/*
- * SPI_cursor_fetch()
- *
- *	Fetch rows in a cursor
- */
-void
-SPI_cursor_fetch(Portal portal, bool forward, long count)
-{
-	_SPI_cursor_operation(portal,
-						  forward ? FETCH_FORWARD : FETCH_BACKWARD, count,
-						  CreateDestReceiver(DestSPI));
-	/* we know that the DestSPI receiver doesn't need a destroy call */
-}
-
-
-/*
- * SPI_cursor_move()
- *
- *	Move in a cursor
- */
-void
-SPI_cursor_move(Portal portal, bool forward, long count)
-{
-	_SPI_cursor_operation(portal,
-						  forward ? FETCH_FORWARD : FETCH_BACKWARD, count,
-						  None_Receiver);
-}
-
-
-/*
- * SPI_scroll_cursor_fetch()
- *
- *	Fetch rows in a scrollable cursor
- */
-void
-SPI_scroll_cursor_fetch(Portal portal, FetchDirection direction, long count)
-{
-	_SPI_cursor_operation(portal,
-						  direction, count,
-						  CreateDestReceiver(DestSPI));
-	/* we know that the DestSPI receiver doesn't need a destroy call */
-}
-
-
-/*
- * SPI_scroll_cursor_move()
- *
- *	Move in a scrollable cursor
- */
-void
-SPI_scroll_cursor_move(Portal portal, FetchDirection direction, long count)
-{
-	_SPI_cursor_operation(portal, direction, count, None_Receiver);
-}
-
-
-/*
- * SPI_cursor_close()
- *
- *	Close a cursor
- */
-void
-SPI_cursor_close(Portal portal)
-{
-	if (!PortalIsValid(portal))
-		elog(ERROR, "invalid portal in SPI cursor operation");
-
-	PortalDrop(portal, false);
-}
-
 /*
  * Returns the Oid representing the type id for argument at argIndex. First
  * parameter is at index zero.
@@ -1905,47 +1444,6 @@ SPI_getargcount(SPIPlanPtr plan)
 		return -1;
 	}
 	return plan->nargs;
-}
-
-/*
- * Returns true if the plan contains exactly one command
- * and that command returns tuples to the caller (eg, SELECT or
- * INSERT ... RETURNING, but not SELECT ... INTO). In essence,
- * the result indicates if the command can be used with SPI_cursor_open
- *
- * Parameters
- *	  plan: A plan previously prepared using SPI_prepare
- */
-bool
-SPI_is_cursor_plan(SPIPlanPtr plan)
-{
-	CachedPlanSource *plansource;
-
-	if (plan == NULL || plan->magic != _SPI_PLAN_MAGIC)
-	{
-		SPI_result = SPI_ERROR_ARGUMENT;
-		return false;
-	}
-
-	if (list_length(plan->plancache_list) != 1)
-	{
-		SPI_result = 0;
-		return false;			/* not exactly 1 pre-rewrite command */
-	}
-	plansource = (CachedPlanSource *) linitial(plan->plancache_list);
-
-	/*
-	 * We used to force revalidation of the cached plan here, but that seems
-	 * unnecessary: invalidation could mean a change in the rowtype of the
-	 * tuples returned by a plan, but not whether it returns tuples at all.
-	 */
-	SPI_result = 0;
-
-	/* Does it return tuples? */
-	if (plansource->resultDesc)
-		return true;
-
-	return false;
 }
 
 /*
@@ -2027,8 +1525,6 @@ SPI_result_code_string(int code)
 			return "SPI_OK_DELETE";
 		case SPI_OK_UPDATE:
 			return "SPI_OK_UPDATE";
-		case SPI_OK_CURSOR:
-			return "SPI_OK_CURSOR";
 		case SPI_OK_INSERT_RETURNING:
 			return "SPI_OK_INSERT_RETURNING";
 		case SPI_OK_DELETE_RETURNING:
@@ -2490,9 +1986,8 @@ _SPI_execute_plan(SPIPlanPtr plan, const SPIExecuteOptions *options,
 
 	/*
 	 * We interpret must_return_tuples as "there must be at least one query,
-	 * and all of them must return tuples".  This is a bit laxer than
-	 * SPI_is_cursor_plan's check, but there seems no reason to enforce that
-	 * there be only one query.
+	 * and all of them must return tuples".  There seems no reason to enforce
+	 * that there be only one query.
 	 */
 	if (options->must_return_tuples && plan->plancache_list == NIL)
 		ereport(ERROR,
@@ -2934,62 +2429,6 @@ _SPI_error_callback(void *arg)
 		errcontext("SQL statement \"%s\"", query);
 	}
 }
-
-/*
- * _SPI_cursor_operation()
- *
- *	Do a FETCH or MOVE in a cursor
- */
-static void
-_SPI_cursor_operation(Portal portal, FetchDirection direction, long count,
-					  DestReceiver *dest)
-{
-	uint64		nfetched;
-
-	/* Check that the portal is valid */
-	if (!PortalIsValid(portal))
-		elog(ERROR, "invalid portal in SPI cursor operation");
-
-	/* Push the SPI stack */
-	if (_SPI_begin_call(true) < 0)
-		elog(ERROR, "SPI cursor operation called while not connected");
-
-	/* Reset the SPI result (note we deliberately don't touch lastoid) */
-	SPI_processed = 0;
-	SPI_tuptable = NULL;
-	_SPI_current->processed = 0;
-	_SPI_current->tuptable = NULL;
-
-	/* Run the cursor */
-	nfetched = PortalRunFetch(portal,
-							  direction,
-							  count,
-							  dest);
-
-	/*
-	 * Think not to combine this store with the preceding function call. If
-	 * the portal contains calls to functions that use SPI, then _SPI_stack is
-	 * likely to move around while the portal runs.  When control returns,
-	 * _SPI_current will point to the correct stack entry... but the pointer
-	 * may be different than it was beforehand. So we must be sure to re-fetch
-	 * the pointer after the function call completes.
-	 */
-	_SPI_current->processed = nfetched;
-
-	if (dest->mydest == DestSPI && _SPI_checktuples())
-		elog(ERROR, "consistency check on SPI tuple count failed");
-
-	/* Put the result into place for access by caller */
-	SPI_processed = _SPI_current->processed;
-	SPI_tuptable = _SPI_current->tuptable;
-
-	/* tuptable now is caller's responsibility, not SPI's */
-	_SPI_current->tuptable = NULL;
-
-	/* Pop the SPI stack */
-	_SPI_end_call(true);
-}
-
 
 static MemoryContext
 _SPI_execmem(void)

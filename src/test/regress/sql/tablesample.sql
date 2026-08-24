@@ -23,31 +23,6 @@ CREATE VIEW test_tablesample_v2 AS
 \d+ test_tablesample_v1
 \d+ test_tablesample_v2
 
--- check a sampled query doesn't affect cursor in progress
-BEGIN;
-DECLARE tablesample_cur CURSOR FOR
-  SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (0);
-
-FETCH FIRST FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-
-SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (0);
-
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-
-FETCH FIRST FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-FETCH NEXT FROM tablesample_cur;
-
-CLOSE tablesample_cur;
-END;
-
 EXPLAIN (COSTS OFF)
   SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (2);
 EXPLAIN (COSTS OFF)

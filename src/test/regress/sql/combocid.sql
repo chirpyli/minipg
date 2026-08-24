@@ -39,21 +39,6 @@ COMMIT;
 -- combo data is not there anymore, but should still see tuples
 SELECT ctid,cmin,* FROM combocidtest;
 
--- Test combo CIDs with portals
-BEGIN;
-
-INSERT INTO combocidtest VALUES (333);
-
-DECLARE c CURSOR FOR SELECT ctid,cmin,* FROM combocidtest;
-
-DELETE FROM combocidtest;
-
-FETCH ALL FROM c;
-
-ROLLBACK;
-
-SELECT ctid,cmin,* FROM combocidtest;
-
 -- check behavior with locked tuples
 BEGIN;
 

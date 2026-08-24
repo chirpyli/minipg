@@ -170,17 +170,9 @@ INSERT INTO hash_split_heap SELECT 1 FROM generate_series(1, 500) a;
 CREATE INDEX hash_split_index on hash_split_heap USING HASH (keycol);
 INSERT INTO hash_split_heap SELECT 1 FROM generate_series(1, 5000) a;
 
--- Let's do a backward scan.
-BEGIN;
-SET enable_seqscan = OFF;
-SET enable_bitmapscan = OFF;
-
-DECLARE c CURSOR FOR SELECT * from hash_split_heap WHERE keycol = 1;
-MOVE FORWARD ALL FROM c;
-MOVE BACKWARD 10000 FROM c;
-MOVE BACKWARD ALL FROM c;
-CLOSE c;
-END;
+-- minipg: cursors removed.  The original test performed a backward scan
+-- over the hash index via a DECLARE/MOVE BACKWARD cursor; backward index
+-- scans can no longer be exercised through SQL, so that subtest is dropped.
 
 -- DELETE, INSERT, VACUUM.
 DELETE FROM hash_split_heap WHERE keycol = 1;

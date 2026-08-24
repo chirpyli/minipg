@@ -223,9 +223,6 @@ exprType(const Node *expr)
 		case T_SetToDefault:
 			type = ((const SetToDefault *) expr)->typeId;
 			break;
-		case T_CurrentOfExpr:
-			type = BOOLOID;
-			break;
 		case T_InferenceElem:
 			{
 				const InferenceElem *n = (const InferenceElem *) expr;
@@ -919,10 +916,6 @@ exprCollation(const Node *expr)
 		case T_SetToDefault:
 			coll = ((const SetToDefault *) expr)->collation;
 			break;
-		case T_CurrentOfExpr:
-			/* CurrentOfExpr's result is boolean ... */
-			coll = InvalidOid;	/* ... so it has no collation */
-			break;
 		case T_InferenceElem:
 			coll = exprCollation((Node *) ((const InferenceElem *) expr)->expr);
 			break;
@@ -1121,10 +1114,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_SetToDefault:
 			((SetToDefault *) expr)->collation = collation;
-			break;
-		case T_CurrentOfExpr:
-			/* CurrentOfExpr's result is boolean ... */
-			Assert(!OidIsValid(collation)); /* ... so never set a collation */
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));
@@ -1826,7 +1815,6 @@ expression_tree_walker(Node *node,
 		case T_SQLValueFunction:
 		case T_CoerceToDomainValue:
 		case T_SetToDefault:
-		case T_CurrentOfExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
@@ -2409,7 +2397,6 @@ expression_tree_mutator(Node *node,
 		case T_SQLValueFunction:
 		case T_CoerceToDomainValue:
 		case T_SetToDefault:
-		case T_CurrentOfExpr:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
@@ -3143,7 +3130,6 @@ raw_expression_tree_walker(Node *node,
 	switch (nodeTag(node))
 	{
 		case T_SetToDefault:
-		case T_CurrentOfExpr:
 		case T_SQLValueFunction:
 		case T_Integer:
 		case T_Float:

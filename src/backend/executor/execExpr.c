@@ -2273,17 +2273,9 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_CurrentOfExpr:
-			{
-				scratch.opcode = EEOP_CURRENTOFEXPR;
-				ExprEvalPushStep(state, &scratch);
-				break;
-				}
-
-				default:
-				elog(ERROR, "unrecognized node type: %d",
-					 (int) nodeTag(node));
-			break;
+		default:
+			elog(ERROR, "unrecognized node type: %d",
+				 (int) nodeTag(node));
 	}
 }
 

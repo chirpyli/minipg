@@ -9,7 +9,6 @@
 \set invalid/name foo
 -- fail: invalid value for special variable
 \set AUTOCOMMIT foo
-\set FETCH_COUNT foo
 -- check handling of built-in boolean variable
 \echo :ON_ERROR_ROLLBACK
 \set ON_ERROR_ROLLBACK
@@ -27,16 +26,6 @@ SELECT 1 as one, 2 as two \g
 \gx
 SELECT 3 as three, 4 as four \gx
 \g
-
--- \gx should work in FETCH_COUNT mode too
-\set FETCH_COUNT 1
-
-SELECT 1 as one, 2 as two \g
-\gx
-SELECT 3 as three, 4 as four \gx
-\g
-
-\unset FETCH_COUNT
 
 -- \g/\gx with pset options
 
@@ -72,16 +61,6 @@ select 1 as var1, NULL as var2, 3 as var3 \gset
 -- \gset requires just one tuple
 select 10 as test01, 20 as test02 from generate_series(1,3) \gset
 select 10 as test01, 20 as test02 from generate_series(1,0) \gset
-
--- \gset should work in FETCH_COUNT mode too
-\set FETCH_COUNT 1
-
-select 1 as x, 2 as y \gset pref01_ \\ \echo :pref01_x
-select 3 as x, 4 as y \gset pref01_ \echo :pref01_x \echo :pref01_y
-select 10 as test01, 20 as test02 from generate_series(1,3) \gset
-select 10 as test01, 20 as test02 from generate_series(1,0) \gset
-
-\unset FETCH_COUNT
 
 -- \gdesc
 
@@ -135,19 +114,6 @@ from pg_attribute
 where attrelid = 'gexec_test'::regclass and attnum > 0
 order by attnum
 \gexec
-
--- \gexec should work in FETCH_COUNT mode too
--- (though the fetch limit applies to the executed queries not the meta query)
-\set FETCH_COUNT 1
-
-select 'select 1 as ones', 'select x.y, x.y*2 as double from generate_series(1,4) as x(y)'
-union all
-select 'drop table gexec_test', NULL
-union all
-select 'drop table gexec_test', 'select ''2000-01-01''::date as party_over'
-\gexec
-
-\unset FETCH_COUNT
 
 -- show all pset options
 \pset
@@ -1135,23 +1101,6 @@ SELECT 4 AS \gdesc
 \echo 'number of rows:' :ROW_COUNT
 \echo 'last error message:' :LAST_ERROR_MESSAGE
 \echo 'last error code:' :LAST_ERROR_SQLSTATE
-
--- check row count for a cursor-fetched query
-\set FETCH_COUNT 10
-select unique2 from tenk1 order by unique2 limit 19;
-\echo 'error:' :ERROR
-\echo 'error code:' :SQLSTATE
-\echo 'number of rows:' :ROW_COUNT
-
--- cursor-fetched query with an error after the first group
-select 1/(15-unique2) from tenk1 order by unique2 limit 19;
-\echo 'error:' :ERROR
-\echo 'error code:' :SQLSTATE
-\echo 'number of rows:' :ROW_COUNT
-\echo 'last error message:' :LAST_ERROR_MESSAGE
-\echo 'last error code:' :LAST_ERROR_SQLSTATE
-
-\unset FETCH_COUNT
 
 create schema testpart;
 

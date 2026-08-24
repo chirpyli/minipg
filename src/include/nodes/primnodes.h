@@ -1224,26 +1224,6 @@ typedef struct SetToDefault
 } SetToDefault;
 
 /*
- * Node representing [WHERE] CURRENT OF cursor_name
- *
- * CURRENT OF is a bit like a Var, in that it carries the rangetable index
- * of the target relation being constrained; this aids placing the expression
- * correctly during planning.  We can assume however that its "levelsup" is
- * always zero, due to the syntactic constraints on where it can appear.
- *
- * The referenced cursor can be represented either as a hardwired string
- * or as a reference to a run-time parameter of type REFCURSOR.  The latter
- * case is for the convenience of plpgsql.
- */
-typedef struct CurrentOfExpr
-{
-	Expr		xpr;
-	Index		cvarno;			/* RT index of target relation */
-	char	   *cursor_name;	/* name of referenced cursor, or NULL */
-	int			cursor_param;	/* refcursor parameter number, or 0 */
-} CurrentOfExpr;
-
-/*
  * InferenceElem - an element of a unique index inference specification
  *
  * This mostly matches the structure of IndexElems, but having a dedicated

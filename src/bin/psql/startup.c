@@ -869,20 +869,6 @@ singlestep_hook(const char *newval)
 	return ParseVariableBool(newval, "SINGLESTEP", &pset.singlestep);
 }
 
-static char *
-fetch_count_substitute_hook(char *newval)
-{
-	if (newval == NULL)
-		newval = pg_strdup("0");
-	return newval;
-}
-
-static bool
-fetch_count_hook(const char *newval)
-{
-	return ParseVariableNum(newval, "FETCH_COUNT", &pset.fetch_count);
-}
-
 static bool
 histfile_hook(const char *newval)
 {
@@ -1169,9 +1155,6 @@ EstablishVariableSpace(void)
 	SetVariableHooks(pset.vars, "SINGLESTEP",
 					 bool_substitute_hook,
 					 singlestep_hook);
-	SetVariableHooks(pset.vars, "FETCH_COUNT",
-					 fetch_count_substitute_hook,
-					 fetch_count_hook);
 	SetVariableHooks(pset.vars, "HISTFILE",
 					 NULL,
 					 histfile_hook);

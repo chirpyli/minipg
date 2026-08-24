@@ -1269,7 +1269,7 @@ typedef struct ReturnStmt
  *		statements do need attention from parse analysis, and this is
  *		done by routines in parser/parse_utilcmd.c after ProcessUtility
  *		receives the command for execution.
- *		DECLARE CURSOR, EXPLAIN, and CREATE TABLE AS are special cases:
+ *		EXPLAIN and CREATE TABLE AS are special cases:
  *		they contain optimizable statements, which get processed normally
  *		by parser/analyze.c.
  *****************************************************************************/
@@ -1735,68 +1735,15 @@ typedef struct TruncateStmt
 } TruncateStmt;
 
 /* ----------------------
- *		Declare Cursor Statement
+ *		Planner-control flags
  *
- * The "query" field is initially a raw parse tree, and is converted to a
- * Query node during parse analysis.  Note that rewriting and planning
- * of the query are always postponed until execution.
+ * These option bits are passed down to the planner.  They do not
+ * correspond to any SQL grammar.
  * ----------------------
  */
-#define CURSOR_OPT_BINARY		0x0001	/* BINARY */
-#define CURSOR_OPT_SCROLL		0x0002	/* SCROLL explicitly given */
-#define CURSOR_OPT_NO_SCROLL	0x0004	/* NO SCROLL explicitly given */
-#define CURSOR_OPT_INSENSITIVE	0x0008	/* INSENSITIVE */
-#define CURSOR_OPT_ASENSITIVE	0x0010	/* ASENSITIVE */
-#define CURSOR_OPT_HOLD			0x0020	/* WITH HOLD */
-/* these planner-control flags do not correspond to any SQL grammar: */
-#define CURSOR_OPT_FAST_PLAN	0x0100	/* prefer fast-start plan */
 #define CURSOR_OPT_GENERIC_PLAN 0x0200	/* force use of generic plan */
 #define CURSOR_OPT_CUSTOM_PLAN	0x0400	/* force use of custom plan */
 #define CURSOR_OPT_PARALLEL_OK	0x0800	/* parallel mode OK */
-
-typedef struct DeclareCursorStmt
-{
-	NodeTag		type;
-	char	   *portalname;		/* name of the portal (cursor) */
-	int			options;		/* bitmask of options (see above) */
-	Node	   *query;			/* the query (see comments above) */
-} DeclareCursorStmt;
-
-/* ----------------------
- *		Close Portal Statement
- * ----------------------
- */
-typedef struct ClosePortalStmt
-{
-	NodeTag		type;
-	char	   *portalname;		/* name of the portal (cursor) */
-	/* NULL means CLOSE ALL */
-} ClosePortalStmt;
-
-/* ----------------------
- *		Fetch Statement (also Move)
- * ----------------------
- */
-typedef enum FetchDirection
-{
-	/* for these, howMany is how many rows to fetch; FETCH_ALL means ALL */
-	FETCH_FORWARD,
-	FETCH_BACKWARD,
-	/* for these, howMany indicates a position; only one row is fetched */
-	FETCH_ABSOLUTE,
-	FETCH_RELATIVE
-} FetchDirection;
-
-#define FETCH_ALL	LONG_MAX
-
-typedef struct FetchStmt
-{
-	NodeTag		type;
-	FetchDirection direction;	/* see above */
-	long		howMany;		/* number of rows, or position argument */
-	char	   *portalname;		/* name of portal (cursor) */
-	bool		ismove;			/* true if MOVE */
-} FetchStmt;
 
 /* ----------------------
  *		Create Index Statement

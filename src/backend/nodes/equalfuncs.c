@@ -672,16 +672,6 @@ _equalSetToDefault(const SetToDefault *a, const SetToDefault *b)
 }
 
 static bool
-_equalCurrentOfExpr(const CurrentOfExpr *a, const CurrentOfExpr *b)
-{
-	COMPARE_SCALAR_FIELD(cvarno);
-	COMPARE_STRING_FIELD(cursor_name);
-	COMPARE_SCALAR_FIELD(cursor_param);
-
-	return true;
-}
-
-static bool
 _equalInferenceElem(const InferenceElem *a, const InferenceElem *b)
 {
 	COMPARE_NODE_FIELD(expr);
@@ -1049,24 +1039,6 @@ _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 
 
 static bool
-_equalDeclareCursorStmt(const DeclareCursorStmt *a, const DeclareCursorStmt *b)
-{
-	COMPARE_STRING_FIELD(portalname);
-	COMPARE_SCALAR_FIELD(options);
-	COMPARE_NODE_FIELD(query);
-
-	return true;
-}
-
-static bool
-_equalClosePortalStmt(const ClosePortalStmt *a, const ClosePortalStmt *b)
-{
-	COMPARE_STRING_FIELD(portalname);
-
-	return true;
-}
-
-static bool
 _equalClusterStmt(const ClusterStmt *a, const ClusterStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
@@ -1125,17 +1097,6 @@ _equalTruncateStmt(const TruncateStmt *a, const TruncateStmt *b)
 	COMPARE_NODE_FIELD(relations);
 	COMPARE_SCALAR_FIELD(restart_seqs);
 	COMPARE_SCALAR_FIELD(behavior);
-
-	return true;
-}
-
-static bool
-_equalFetchStmt(const FetchStmt *a, const FetchStmt *b)
-{
-	COMPARE_SCALAR_FIELD(direction);
-	COMPARE_SCALAR_FIELD(howMany);
-	COMPARE_STRING_FIELD(portalname);
-	COMPARE_SCALAR_FIELD(ismove);
 
 	return true;
 }
@@ -2209,9 +2170,6 @@ equal(const void *a, const void *b)
 		case T_SetToDefault:
 			retval = _equalSetToDefault(a, b);
 			break;
-		case T_CurrentOfExpr:
-			retval = _equalCurrentOfExpr(a, b);
-			break;
 		case T_InferenceElem:
 			retval = _equalInferenceElem(a, b);
 			break;
@@ -2307,12 +2265,6 @@ equal(const void *a, const void *b)
 		case T_AlterDomainStmt:
 			retval = _equalAlterDomainStmt(a, b);
 			break;
-		case T_DeclareCursorStmt:
-			retval = _equalDeclareCursorStmt(a, b);
-			break;
-		case T_ClosePortalStmt:
-			retval = _equalClosePortalStmt(a, b);
-			break;
 		case T_ClusterStmt:
 			retval = _equalClusterStmt(a, b);
 			break;
@@ -2327,9 +2279,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TruncateStmt:
 			retval = _equalTruncateStmt(a, b);
-			break;
-		case T_FetchStmt:
-			retval = _equalFetchStmt(a, b);
 			break;
 		case T_IndexStmt:
 			retval = _equalIndexStmt(a, b);

@@ -253,48 +253,5 @@ WHERE t.ctid < '(1,0)';
  (0,10) | 10
 (10 rows)
 
--- cursors
--- Ensure we get a TID Range scan without a Materialize node.
-EXPLAIN (COSTS OFF)
-DECLARE c SCROLL CURSOR FOR SELECT ctid FROM tidrangescan WHERE ctid < '(1,0)';
-            QUERY PLAN             
------------------------------------
- Tid Range Scan on tidrangescan
-   TID Cond: (ctid < '(1,0)'::tid)
-(2 rows)
-
-BEGIN;
-DECLARE c SCROLL CURSOR FOR SELECT ctid FROM tidrangescan WHERE ctid < '(1,0)';
-FETCH NEXT c;
- ctid  
--------
- (0,1)
-(1 row)
-
-FETCH NEXT c;
- ctid  
--------
- (0,2)
-(1 row)
-
-FETCH PRIOR c;
- ctid  
--------
- (0,1)
-(1 row)
-
-FETCH FIRST c;
- ctid  
--------
- (0,1)
-(1 row)
-
-FETCH LAST c;
-  ctid  
---------
- (0,10)
-(1 row)
-
-COMMIT;
 DROP TABLE tidrangescan;
 RESET enable_seqscan;

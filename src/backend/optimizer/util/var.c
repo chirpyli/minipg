@@ -4,9 +4,7 @@
  *	  Var node manipulation routines
  *
  * Note: for most purposes, PlaceHolderVar is considered a Var too,
- * even if its contained expression is variable-free.  Also, CurrentOfExpr
- * is treated as a Var for purposes of determining whether an expression
- * contains variables.
+ * even if its contained expression is variable-free.
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -151,14 +149,6 @@ pull_varnos_walker(Node *node, pull_varnos_context *context)
 
 		if (var->varlevelsup == context->sublevels_up)
 			context->varnos = bms_add_member(context->varnos, var->varno);
-		return false;
-	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-		if (context->sublevels_up == 0)
-			context->varnos = bms_add_member(context->varnos, cexpr->cvarno);
 		return false;
 	}
 	if (IsA(node, PlaceHolderVar))
@@ -406,8 +396,6 @@ contain_var_clause_walker(Node *node, void *context)
 			return true;		/* abort the tree traversal and return true */
 		return false;
 	}
-	if (IsA(node, CurrentOfExpr))
-		return true;
 	if (IsA(node, PlaceHolderVar))
 	{
 		if (((PlaceHolderVar *) node)->phlevelsup == 0)
@@ -447,12 +435,6 @@ contain_vars_of_level_walker(Node *node, int *sublevels_up)
 	{
 		if (((Var *) node)->varlevelsup == *sublevels_up)
 			return true;		/* abort tree traversal and return true */
-		return false;
-	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		if (*sublevels_up == 0)
-			return true;
 		return false;
 	}
 	if (IsA(node, PlaceHolderVar))
@@ -529,11 +511,6 @@ locate_var_of_level_walker(Node *node,
 		}
 		return false;
 	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		/* since CurrentOfExpr doesn't carry location, nothing we can do */
-		return false;
-	}
 	/* No extra code needed for PlaceHolderVar; just look in contained expr */
 	if (IsA(node, Query))
 	{
@@ -574,8 +551,6 @@ locate_var_of_level_walker(Node *node,
  *
  *	  GroupingFuncs are treated exactly like Aggrefs, and so do not need
  *	  their own flag bits.
- *
- *	  CurrentOfExpr nodes are ignored in all cases.
  *
  *	  Upper-level vars (with varlevelsup > 0) should not be seen here,
  *	  likewise for upper-level Aggrefs and PlaceHolderVars.

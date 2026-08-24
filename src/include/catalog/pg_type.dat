@@ -256,12 +256,6 @@
 # OIDS 1700 - 1799
 
 
-{ oid => '1790', array_type_oid => '2201',
-  descr => 'reference to cursor (portal name)',
-  typname => 'refcursor', typlen => '-1', typbyval => 'f', typcategory => 'U',
-  typinput => 'textin', typoutput => 'textout', typreceive => 'textrecv',
-  typsend => 'textsend', typalign => 'i', typstorage => 'x' },
-
 # OIDS 2200 - 2299
 
 { oid => '2202', array_type_oid => '2207',

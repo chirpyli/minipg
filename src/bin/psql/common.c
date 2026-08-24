@@ -24,9 +24,7 @@
 #include "settings.h"
 
 static bool DescribeQuery(const char *query, double *elapsed_msec);
-static bool ExecQueryUsingCursor(const char *query, double *elapsed_msec);
 static bool command_no_begin(const char *query);
-static bool is_select_command(const char *query);
 
 
 /*
@@ -788,8 +786,7 @@ ExecQueryTuples(const PGresult *result)
 
 	/*
 	 * We must turn off gexec_flag to avoid infinite recursion.  Note that
-	 * this allows ExecQueryUsingCursor to be applied to the individual query
-	 * results.  SendQuery prevents it from being applied when fetching the
+	 * SendQuery prevents it from being applied when fetching the
 	 * queries-to-execute, because it can't handle recursion either.
 	 */
 	pset.gexec_flag = false;
@@ -1108,8 +1105,7 @@ SendQuery(const char *query)
 		ResetCancelConn();
 		results = NULL;			/* PQclear(NULL) does nothing */
 	}
-	else if (pset.fetch_count <= 0 || pset.gexec_flag ||
-			 pset.crosstab_flag || !is_select_command(query))
+	else
 	{
 		/* Default fetch-it-all-and-print mode */
 		instr_time	before,
@@ -1134,13 +1130,6 @@ SendQuery(const char *query)
 		/* but printing results isn't: */
 		if (OK && results)
 			OK = PrintQueryResults(results);
-	}
-	else
-	{
-		/* Fetch-in-segments mode */
-		OK = ExecQueryUsingCursor(query, &elapsed_msec);
-		ResetCancelConn();
-		results = NULL;			/* PQclear(NULL) does nothing */
 	}
 
 	if (!OK && pset.echo == PSQL_ECHO_ERRORS)
@@ -1382,271 +1371,6 @@ DescribeQuery(const char *query, double *elapsed_msec)
 
 	SetResultVariables(results, OK);
 	ClearOrSaveResult(results);
-
-	return OK;
-}
-
-
-/*
- * ExecQueryUsingCursor: run a SELECT-like query using a cursor
- *
- * This feature allows result sets larger than RAM to be dealt with.
- *
- * Returns true if the query executed successfully, false otherwise.
- *
- * If pset.timing is on, total query time (exclusive of result-printing) is
- * stored into *elapsed_msec.
- */
-static bool
-ExecQueryUsingCursor(const char *query, double *elapsed_msec)
-{
-	bool		OK = true;
-	PGresult   *results;
-	PQExpBufferData buf;
-	printQueryOpt my_popt = pset.popt;
-	FILE	   *fout;
-	bool		is_pipe;
-	bool		is_pager = false;
-	bool		started_txn = false;
-	int64		total_tuples = 0;
-	int			ntuples;
-	int			fetch_count;
-	char		fetch_cmd[64];
-	instr_time	before,
-				after;
-	int			flush_error;
-
-	*elapsed_msec = 0;
-
-	/* initialize print options for partial table output */
-	my_popt.topt.start_table = true;
-	my_popt.topt.stop_table = false;
-	my_popt.topt.prior_records = 0;
-
-	if (pset.timing)
-		INSTR_TIME_SET_CURRENT(before);
-
-	/* if we're not in a transaction, start one */
-	if (PQtransactionStatus(pset.db) == PQTRANS_IDLE)
-	{
-		results = PQexec(pset.db, "BEGIN");
-		OK = AcceptResult(results) &&
-			(PQresultStatus(results) == PGRES_COMMAND_OK);
-		ClearOrSaveResult(results);
-		if (!OK)
-			return false;
-		started_txn = true;
-	}
-
-	/* Send DECLARE CURSOR */
-	initPQExpBuffer(&buf);
-	appendPQExpBuffer(&buf, "DECLARE _psql_cursor NO SCROLL CURSOR FOR\n%s",
-					  query);
-
-	results = PQexec(pset.db, buf.data);
-	OK = AcceptResult(results) &&
-		(PQresultStatus(results) == PGRES_COMMAND_OK);
-	if (!OK)
-		SetResultVariables(results, OK);
-	ClearOrSaveResult(results);
-	termPQExpBuffer(&buf);
-	if (!OK)
-		goto cleanup;
-
-	if (pset.timing)
-	{
-		INSTR_TIME_SET_CURRENT(after);
-		INSTR_TIME_SUBTRACT(after, before);
-		*elapsed_msec += INSTR_TIME_GET_MILLISEC(after);
-	}
-
-	/*
-	 * In \gset mode, we force the fetch count to be 2, so that we will throw
-	 * the appropriate error if the query returns more than one row.
-	 */
-	if (pset.gset_prefix)
-		fetch_count = 2;
-	else
-		fetch_count = pset.fetch_count;
-
-	snprintf(fetch_cmd, sizeof(fetch_cmd),
-			 "FETCH FORWARD %d FROM _psql_cursor",
-			 fetch_count);
-
-	/* prepare to write output to \g argument, if any */
-	if (pset.gfname)
-	{
-		if (!openQueryOutputFile(pset.gfname, &fout, &is_pipe))
-		{
-			OK = false;
-			goto cleanup;
-		}
-		if (is_pipe)
-			disable_sigpipe_trap();
-	}
-	else
-	{
-		fout = pset.queryFout;
-		is_pipe = false;		/* doesn't matter */
-	}
-
-	/* clear any pre-existing error indication on the output stream */
-	clearerr(fout);
-
-	for (;;)
-	{
-		if (pset.timing)
-			INSTR_TIME_SET_CURRENT(before);
-
-		/* get fetch_count tuples at a time */
-		results = PQexec(pset.db, fetch_cmd);
-
-		if (pset.timing)
-		{
-			INSTR_TIME_SET_CURRENT(after);
-			INSTR_TIME_SUBTRACT(after, before);
-			*elapsed_msec += INSTR_TIME_GET_MILLISEC(after);
-		}
-
-		if (PQresultStatus(results) != PGRES_TUPLES_OK)
-		{
-			/* shut down pager before printing error message */
-			if (is_pager)
-			{
-				ClosePager(fout);
-				is_pager = false;
-			}
-
-			OK = AcceptResult(results);
-			Assert(!OK);
-			SetResultVariables(results, OK);
-			ClearOrSaveResult(results);
-			break;
-		}
-
-		if (pset.gset_prefix)
-		{
-			/* StoreQueryTuple will complain if not exactly one row */
-			OK = StoreQueryTuple(results);
-			ClearOrSaveResult(results);
-			break;
-		}
-
-		/*
-		 * Note we do not deal with \gdesc, \gexec or \crosstabview modes here
-		 */
-
-		ntuples = PQntuples(results);
-		total_tuples += ntuples;
-
-		if (ntuples < fetch_count)
-		{
-			/* this is the last result set, so allow footer decoration */
-			my_popt.topt.stop_table = true;
-		}
-		else if (fout == stdout && !is_pager)
-		{
-			/*
-			 * If query requires multiple result sets, hack to ensure that
-			 * only one pager instance is used for the whole mess
-			 */
-			fout = PageOutput(INT_MAX, &(my_popt.topt));
-			is_pager = true;
-		}
-
-		printQuery(results, &my_popt, fout, is_pager, pset.logfile);
-
-		ClearOrSaveResult(results);
-
-		/* after the first result set, disallow header decoration */
-		my_popt.topt.start_table = false;
-		my_popt.topt.prior_records += ntuples;
-
-		/*
-		 * Make sure to flush the output stream, so intermediate results are
-		 * visible to the client immediately.  We check the results because if
-		 * the pager dies/exits/etc, there's no sense throwing more data at
-		 * it.
-		 */
-		flush_error = fflush(fout);
-
-		/*
-		 * Check if we are at the end, if a cancel was pressed, or if there
-		 * were any errors either trying to flush out the results, or more
-		 * generally on the output stream at all.  If we hit any errors
-		 * writing things to the stream, we presume $PAGER has disappeared and
-		 * stop bothering to pull down more data.
-		 */
-		if (ntuples < fetch_count || cancel_pressed || flush_error ||
-			ferror(fout))
-			break;
-	}
-
-	if (pset.gfname)
-	{
-		/* close \g argument file/pipe */
-		if (is_pipe)
-		{
-			pclose(fout);
-			restore_sigpipe_trap();
-		}
-		else
-			fclose(fout);
-	}
-	else if (is_pager)
-	{
-		/* close transient pager */
-		ClosePager(fout);
-	}
-
-	if (OK)
-	{
-		/*
-		 * We don't have a PGresult here, and even if we did it wouldn't have
-		 * the right row count, so fake SetResultVariables().  In error cases,
-		 * we already set the result variables above.
-		 */
-		char		buf[32];
-
-		SetVariable(pset.vars, "ERROR", "false");
-		SetVariable(pset.vars, "SQLSTATE", "00000");
-		snprintf(buf, sizeof(buf), INT64_FORMAT, total_tuples);
-		SetVariable(pset.vars, "ROW_COUNT", buf);
-	}
-
-cleanup:
-	if (pset.timing)
-		INSTR_TIME_SET_CURRENT(before);
-
-	/*
-	 * We try to close the cursor on either success or failure, but on failure
-	 * ignore the result (it's probably just a bleat about being in an aborted
-	 * transaction)
-	 */
-	results = PQexec(pset.db, "CLOSE _psql_cursor");
-	if (OK)
-	{
-		OK = AcceptResult(results) &&
-			(PQresultStatus(results) == PGRES_COMMAND_OK);
-		ClearOrSaveResult(results);
-	}
-	else
-		PQclear(results);
-
-	if (started_txn)
-	{
-		results = PQexec(pset.db, OK ? "COMMIT" : "ROLLBACK");
-		OK &= AcceptResult(results) &&
-			(PQresultStatus(results) == PGRES_COMMAND_OK);
-		ClearOrSaveResult(results);
-	}
-
-	if (pset.timing)
-	{
-		INSTR_TIME_SET_CURRENT(after);
-		INSTR_TIME_SUBTRACT(after, before);
-		*elapsed_msec += INSTR_TIME_GET_MILLISEC(after);
-	}
 
 	return OK;
 }
@@ -1909,43 +1633,6 @@ command_no_begin(const char *query)
 			return true;
 		return false;
 	}
-
-	return false;
-}
-
-
-/*
- * Check whether the specified command is a SELECT (or VALUES).
- */
-static bool
-is_select_command(const char *query)
-{
-	int			wordlen;
-
-	/*
-	 * First advance over any whitespace, comments and left parentheses.
-	 */
-	for (;;)
-	{
-		query = skip_white_space(query);
-		if (query[0] == '(')
-			query++;
-		else
-			break;
-	}
-
-	/*
-	 * Check word length (since "selectx" is not "select").
-	 */
-	wordlen = 0;
-	while (isalpha((unsigned char) query[wordlen]))
-		wordlen += PQmblenBounded(&query[wordlen], pset.encoding);
-
-	if (wordlen == 6 && pg_strncasecmp(query, "select", 6) == 0)
-		return true;
-
-	if (wordlen == 6 && pg_strncasecmp(query, "values", 6) == 0)
-		return true;
 
 	return false;
 }

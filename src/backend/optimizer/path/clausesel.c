@@ -942,15 +942,6 @@ clause_selectivity_ext(PlannerInfo *root,
 						 jointype,
 						 sjinfo);
 	}
-	else if (IsA(clause, CurrentOfExpr))
-	{
-		/* CURRENT OF selects at most one row of its table */
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) clause;
-		RelOptInfo *crel = find_base_rel(root, cexpr->cvarno);
-
-		if (crel->tuples > 0)
-			s1 = 1.0 / crel->tuples;
-	}
 	else if (IsA(clause, RelabelType))
 	{
 		/* Not sure this case is needed, but it can't hurt */

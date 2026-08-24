@@ -64,38 +64,13 @@ main(int argc, char **argv)
 	PQclear(res);
 
 	/*
-	 * Our test case here involves using a cursor, for which we must be inside
-	 * a transaction block.  We could do the whole thing with a single
-	 * PQexec() of "select * from pg_database", but that's too trivial to make
-	 * a good example.
+	 * minipg: SQL cursors are not available, so fetch rows from pg_database,
+	 * the system catalog of databases, with a plain query.
 	 */
-
-	/* Start a transaction block */
-	res = PQexec(conn, "BEGIN");
-	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-	{
-		fprintf(stderr, "BEGIN command failed: %s", PQerrorMessage(conn));
-		PQclear(res);
-		exit_nicely(conn);
-	}
-	PQclear(res);
-
-	/*
-	 * Fetch rows from pg_database, the system catalog of databases
-	 */
-	res = PQexec(conn, "DECLARE myportal CURSOR FOR select * from pg_database");
-	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-	{
-		fprintf(stderr, "DECLARE CURSOR failed: %s", PQerrorMessage(conn));
-		PQclear(res);
-		exit_nicely(conn);
-	}
-	PQclear(res);
-
-	res = PQexec(conn, "FETCH ALL in myportal");
+	res = PQexec(conn, "SELECT * FROM pg_database");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
 	{
-		fprintf(stderr, "FETCH ALL failed: %s", PQerrorMessage(conn));
+		fprintf(stderr, "SELECT failed: %s", PQerrorMessage(conn));
 		PQclear(res);
 		exit_nicely(conn);
 	}
@@ -114,14 +89,6 @@ main(int argc, char **argv)
 		printf("\n");
 	}
 
-	PQclear(res);
-
-	/* close the portal ... we don't bother to check for errors ... */
-	res = PQexec(conn, "CLOSE myportal");
-	PQclear(res);
-
-	/* end the transaction */
-	res = PQexec(conn, "END");
 	PQclear(res);
 
 	/* close the connection to the database and cleanup */

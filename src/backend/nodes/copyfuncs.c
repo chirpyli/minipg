@@ -1830,21 +1830,6 @@ _copySetToDefault(const SetToDefault *from)
 }
 
 /*
- * _copyCurrentOfExpr
- */
-static CurrentOfExpr *
-_copyCurrentOfExpr(const CurrentOfExpr *from)
-{
-	CurrentOfExpr *newnode = makeNode(CurrentOfExpr);
-
-	COPY_SCALAR_FIELD(cvarno);
-	COPY_STRING_FIELD(cursor_name);
-	COPY_SCALAR_FIELD(cursor_param);
-
-	return newnode;
-}
-
-/*
  * _copyInferenceElem
  */
 static InferenceElem *
@@ -2811,29 +2796,6 @@ _copyObjectWithArgs(const ObjectWithArgs *from)
 }
 
 
-static DeclareCursorStmt *
-_copyDeclareCursorStmt(const DeclareCursorStmt *from)
-{
-	DeclareCursorStmt *newnode = makeNode(DeclareCursorStmt);
-
-	COPY_STRING_FIELD(portalname);
-	COPY_SCALAR_FIELD(options);
-	COPY_NODE_FIELD(query);
-
-	return newnode;
-}
-
-static ClosePortalStmt *
-_copyClosePortalStmt(const ClosePortalStmt *from)
-{
-	ClosePortalStmt *newnode = makeNode(ClosePortalStmt);
-
-	COPY_STRING_FIELD(portalname);
-
-	return newnode;
-}
-
-static ClusterStmt *
 _copyClusterStmt(const ClusterStmt *from)
 {
 	ClusterStmt *newnode = makeNode(ClusterStmt);
@@ -2918,18 +2880,7 @@ _copyTruncateStmt(const TruncateStmt *from)
 	return newnode;
 }
 
-static FetchStmt *
-_copyFetchStmt(const FetchStmt *from)
-{
-	FetchStmt  *newnode = makeNode(FetchStmt);
 
-	COPY_SCALAR_FIELD(direction);
-	COPY_SCALAR_FIELD(howMany);
-	COPY_STRING_FIELD(portalname);
-	COPY_SCALAR_FIELD(ismove);
-
-	return newnode;
-}
 
 static IndexStmt *
 _copyIndexStmt(const IndexStmt *from)
@@ -3736,9 +3687,6 @@ copyObjectImpl(const void *from)
 		case T_SetToDefault:
 			retval = _copySetToDefault(from);
 			break;
-		case T_CurrentOfExpr:
-			retval = _copyCurrentOfExpr(from);
-			break;
 		case T_InferenceElem:
 			retval = _copyInferenceElem(from);
 			break;
@@ -3847,12 +3795,6 @@ copyObjectImpl(const void *from)
 		case T_AlterDomainStmt:
 			retval = _copyAlterDomainStmt(from);
 			break;
-		case T_DeclareCursorStmt:
-			retval = _copyDeclareCursorStmt(from);
-			break;
-		case T_ClosePortalStmt:
-			retval = _copyClosePortalStmt(from);
-			break;
 		case T_ClusterStmt:
 			retval = _copyClusterStmt(from);
 			break;
@@ -3867,9 +3809,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_TruncateStmt:
 			retval = _copyTruncateStmt(from);
-			break;
-		case T_FetchStmt:
-			retval = _copyFetchStmt(from);
 			break;
 		case T_IndexStmt:
 			retval = _copyIndexStmt(from);

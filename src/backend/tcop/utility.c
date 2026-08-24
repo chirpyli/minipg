@@ -167,12 +167,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
 
-		case T_ClosePortalStmt:
 		case T_DeallocateStmt:
-		case T_DeclareCursorStmt:
 		case T_DiscardStmt:
 		case T_ExecuteStmt:
-		case T_FetchStmt:
 		case T_LoadStmt:
 		case T_PrepareStmt:
 		case T_VariableSetStmt:
@@ -538,27 +535,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 						break;
 				}
 			}
-			break;
-
-			/*
-			 * Portal (cursor) manipulation
-			 */
-		case T_DeclareCursorStmt:
-			PerformCursorOpen(pstate, (DeclareCursorStmt *) parsetree, params,
-							  isTopLevel);
-			break;
-
-		case T_ClosePortalStmt:
-			{
-				ClosePortalStmt *stmt = (ClosePortalStmt *) parsetree;
-
-				CheckRestrictedOperation("CLOSE");
-				PerformPortalClose(stmt->portalname);
-			}
-			break;
-
-		case T_FetchStmt:
-			PerformPortalFetch((FetchStmt *) parsetree, dest, qc);
 			break;
 
 		case T_DoStmt:
@@ -1176,19 +1152,6 @@ UtilityReturnsTuples(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_FetchStmt:
-			{
-				FetchStmt  *stmt = (FetchStmt *) parsetree;
-				Portal		portal;
-
-				if (stmt->ismove)
-					return false;
-				portal = GetPortalByName(stmt->portalname);
-				if (!PortalIsValid(portal))
-					return false;	/* not our business to raise error */
-				return portal->tupDesc ? true : false;
-			}
-
 		case T_ExecuteStmt:
 			{
 				ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
@@ -1226,19 +1189,6 @@ UtilityTupleDescriptor(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_FetchStmt:
-			{
-				FetchStmt  *stmt = (FetchStmt *) parsetree;
-				Portal		portal;
-
-				if (stmt->ismove)
-					return NULL;
-				portal = GetPortalByName(stmt->portalname);
-				if (!PortalIsValid(portal))
-					return NULL;	/* not our business to raise error */
-				return CreateTupleDescCopy(portal->tupDesc);
-			}
-
 		case T_ExecuteStmt:
 			{
 				ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
@@ -1319,12 +1269,6 @@ UtilityContainsQuery(Node *parsetree)
 
 	switch (nodeTag(parsetree))
 	{
-		case T_DeclareCursorStmt:
-			qry = castNode(Query, ((DeclareCursorStmt *) parsetree)->query);
-			if (qry->commandType == CMD_UTILITY)
-				return UtilityContainsQuery(qry->utilityStmt);
-			return qry;
-
 		case T_ExplainStmt:
 			qry = castNode(Query, ((ExplainStmt *) parsetree)->query);
 			if (qry->commandType == CMD_UTILITY)
@@ -1509,29 +1453,6 @@ CreateCommandTag(Node *parsetree)
 						tag = CMDTAG_UNKNOWN;
 						break;
 				}
-			}
-			break;
-
-		case T_DeclareCursorStmt:
-			tag = CMDTAG_DECLARE_CURSOR;
-			break;
-
-		case T_ClosePortalStmt:
-			{
-				ClosePortalStmt *stmt = (ClosePortalStmt *) parsetree;
-
-				if (stmt->portalname == NULL)
-					tag = CMDTAG_CLOSE_CURSOR_ALL;
-				else
-					tag = CMDTAG_CLOSE_CURSOR;
-			}
-			break;
-
-		case T_FetchStmt:
-			{
-				FetchStmt  *stmt = (FetchStmt *) parsetree;
-
-				tag = (stmt->ismove) ? CMDTAG_MOVE : CMDTAG_FETCH;
 			}
 			break;
 
@@ -1986,18 +1907,6 @@ GetCommandLogLevel(Node *parsetree)
 
 			/* utility statements --- same whether raw or cooked */
 		case T_TransactionStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_DeclareCursorStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_ClosePortalStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_FetchStmt:
 			lev = LOGSTMT_ALL;
 			break;
 

@@ -46,7 +46,6 @@ typedef struct TidExpr
 {
 	ExprState  *exprstate;		/* ExprState for a TID-yielding subexpr */
 	bool		isarray;		/* if true, it yields tid[] not just tid */
-	CurrentOfExpr *cexpr;		/* alternatively, we can have CURRENT OF */
 } TidExpr;
 
 static void TidExprListCreate(TidScanState *tidstate);
@@ -57,10 +56,7 @@ static TupleTableSlot *TidNext(TidScanState *node);
 
 /*
  * Extract the qual subexpressions that yield TIDs to search for,
- * and compile them into ExprStates if they're ordinary expressions.
- *
- * CURRENT OF is a special case that we can't compile usefully;
- * just drop it into the TidExpr list as-is.
+ * and compile them into ExprStates.
  */
 static void
 TidExprListCreate(TidScanState *tidstate)
@@ -69,7 +65,6 @@ TidExprListCreate(TidScanState *tidstate)
 	ListCell   *l;
 
 	tidstate->tss_tidexprs = NIL;
-	tidstate->tss_isCurrentOf = false;
 
 	foreach(l, node->tidquals)
 	{
@@ -102,22 +97,11 @@ TidExprListCreate(TidScanState *tidstate)
 											  &tidstate->ss.ps);
 			tidexpr->isarray = true;
 		}
-		else if (expr && IsA(expr, CurrentOfExpr))
-		{
-			CurrentOfExpr *cexpr = (CurrentOfExpr *) expr;
-
-			tidexpr->cexpr = cexpr;
-			tidstate->tss_isCurrentOf = true;
-		}
 		else
 			elog(ERROR, "could not identify CTID expression");
 
 		tidstate->tss_tidexprs = lappend(tidstate->tss_tidexprs, tidexpr);
 	}
-
-	/* CurrentOfExpr could never appear OR'd with something else */
-	Assert(list_length(tidstate->tss_tidexprs) == 1 ||
-		   !tidstate->tss_isCurrentOf);
 }
 
 /*
@@ -149,8 +133,8 @@ TidListEval(TidScanState *tidstate)
 
 	/*
 	 * We initialize the array with enough slots for the case that all quals
-	 * are simple OpExprs or CurrentOfExprs.  If there are any
-	 * ScalarArrayOpExprs, we may have to enlarge the array.
+	 * are simple OpExprs.  If there are any ScalarArrayOpExprs, we may have
+	 * to enlarge the array.
 	 */
 	numAllocTids = list_length(tidstate->tss_tidexprs);
 	tidList = (ItemPointerData *)
@@ -231,25 +215,6 @@ TidListEval(TidScanState *tidstate)
 			pfree(ipdatums);
 			pfree(ipnulls);
 		}
-		else
-		{
-			ItemPointerData cursor_tid;
-
-			Assert(tidexpr->cexpr);
-			if (execCurrentOf(tidexpr->cexpr, econtext,
-							  RelationGetRelid(tidstate->ss.ss_currentRelation),
-							  &cursor_tid))
-			{
-				if (numTids >= numAllocTids)
-				{
-					numAllocTids *= 2;
-					tidList = (ItemPointerData *)
-						repalloc(tidList,
-								 numAllocTids * sizeof(ItemPointerData));
-				}
-				tidList[numTids++] = cursor_tid;
-			}
-		}
 	}
 
 	/*
@@ -260,9 +225,6 @@ TidListEval(TidScanState *tidstate)
 	 */
 	if (numTids > 1)
 	{
-		/* CurrentOfExpr could never appear OR'd with something else */
-		Assert(!tidstate->tss_isCurrentOf);
-
 		qsort((void *) tidList, numTids, sizeof(ItemPointerData),
 			  itemptr_comparator);
 		numTids = qunique(tidList, numTids, sizeof(ItemPointerData),
@@ -312,7 +274,6 @@ TidNext(TidScanState *node)
 	EState	   *estate;
 	ScanDirection direction;
 	Snapshot	snapshot;
-	TableScanDesc scan;
 	Relation	heapRelation;
 	TupleTableSlot *slot;
 	ItemPointerData *tidList;
@@ -334,7 +295,6 @@ TidNext(TidScanState *node)
 	if (node->tss_TidList == NULL)
 		TidListEval(node);
 
-	scan = node->ss.ss_currentScanDesc;
 	tidList = node->tss_TidList;
 	numTids = node->tss_NumTids;
 
@@ -367,14 +327,6 @@ TidNext(TidScanState *node)
 	{
 		ItemPointerData tid = tidList[node->tss_TidPtr];
 
-		/*
-		 * For WHERE CURRENT OF, the tuple retrieved from the cursor might
-		 * since have been updated; if so, we should fetch the version that is
-		 * current according to our snapshot.
-		 */
-		if (node->tss_isCurrentOf)
-			table_tuple_get_latest_tid(scan, &tid);
-
 		if (table_tuple_fetch_row_version(heapRelation, &tid, snapshot, slot))
 			return slot;
 
@@ -401,10 +353,6 @@ static bool
 TidRecheck(TidScanState *node, TupleTableSlot *slot)
 {
 	ItemPointer match;
-
-	/* WHERE CURRENT OF always intends to resolve to the latest tuple */
-	if (node->tss_isCurrentOf)
-		return true;
 
 	if (node->tss_TidList == NULL)
 		TidListEval(node);

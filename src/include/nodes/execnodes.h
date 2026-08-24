@@ -593,8 +593,8 @@ typedef struct EState
  * subqueries-in-FROM will have an ExecRowMark with relation == NULL.  See
  * PlanRowMark for details about most of the fields.  In addition to fields
  * directly derived from PlanRowMark, we store an activity flag (to denote
- * inactive children of inheritance trees), curCtid, which is used by the
- * WHERE CURRENT OF code, and ermExtra, which is available for use by the plan
+ * inactive children of inheritance trees), curCtid, which is used by EPQ
+ * rechecking, and ermExtra, which is available for use by the plan
  * node that sources the relation (e.g., for a foreign table the FDW can use
  * ermExtra to hold information).
  *
@@ -1540,7 +1540,6 @@ typedef struct BitmapHeapScanState
  *	 TidScanState information
  *
  *		tidexprs	   list of TidExpr structs (see nodeTidscan.c)
- *		isCurrentOf    scan has a CurrentOfExpr qual
  *		NumTids		   number of tids in this scan
  *		TidPtr		   index of currently fetched tid
  *		TidList		   evaluated item pointers (array of size NumTids)
@@ -1551,7 +1550,6 @@ typedef struct TidScanState
 {
 	ScanState	ss;				/* its first field is NodeTag */
 	List	   *tss_tidexprs;
-	bool		tss_isCurrentOf;
 	int			tss_NumTids;
 	int			tss_TidPtr;
 	ItemPointerData *tss_TidList;

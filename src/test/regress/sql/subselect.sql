@@ -790,18 +790,6 @@ select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
 
 drop table sq_limit;
 
---
--- Ensure that backward scan direction isn't propagated into
--- expression subqueries (bug #15336)
---
-
-begin;
-
-declare c1 scroll cursor for
- select * from generate_series(1,4) i
-  where i <> all (values (2),(3));
-
-move forward all in c1;
-fetch backward all in c1;
-
-commit;
+-- minipg: SQL cursors are removed, so the backward-scan-direction test for
+-- expression subqueries (bug #15336) is dropped; it required a scroll cursor
+-- to fetch backward.

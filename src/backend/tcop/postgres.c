@@ -1099,8 +1099,6 @@ exec_simple_query(const char *query_string)
 		 * already is one, silently drop it.
 		 */
 		portal = CreatePortal("", true, true);
-		/* Don't display the portal in pg_cursors */
-		portal->visible = false;
 
 		/*
 		 * We don't have to copy anything into the portal, because everything
@@ -1120,25 +1118,12 @@ exec_simple_query(const char *query_string)
 		PortalStart(portal, NULL, 0, InvalidSnapshot);
 
 		/*
-		 * Select the appropriate output format: text unless we are doing a
-		 * FETCH from a binary cursor.  (Pretty grotty to have to do this here
-		 * --- but it avoids grottiness in other places.  Ah, the joys of
-		 * backward compatibility...)
-		 */
+	 * Select the appropriate output format: text unless we are doing a
+	 * FETCH from a binary portal.  (Pretty grotty to have to do this here
+	 * --- but it avoids grottiness in other places.  Ah, the joys of
+	 * backward compatibility...)
+	 */
 		format = 0;				/* TEXT is default */
-		if (IsA(parsetree->stmt, FetchStmt))
-		{
-			FetchStmt  *stmt = (FetchStmt *) parsetree->stmt;
-
-			if (!stmt->ismove)
-			{
-				Portal		fportal = GetPortalByName(stmt->portalname);
-
-				if (PortalIsValid(fportal) &&
-					(fportal->cursorOptions & CURSOR_OPT_BINARY))
-					format = 1; /* BINARY */
-			}
-		}
 		PortalSetResultFormat(portal, 1, &format);
 
 		/*
@@ -1157,9 +1142,8 @@ exec_simple_query(const char *query_string)
 		 * Run the portal to completion, and then drop it (and the receiver).
 		 */
 		(void) PortalRun(portal,
-						 FETCH_ALL,
+						 LONG_MAX,
 						 true,	/* always top level */
-						 true,	/* ignored */
 						 receiver,
 						 receiver,
 						 &qc);
@@ -2152,12 +2136,11 @@ exec_execute_message(const char *portal_name, long max_rows)
 	error_context_stack = &params_errcxt;
 
 	if (max_rows <= 0)
-		max_rows = FETCH_ALL;
+		max_rows = LONG_MAX;
 
 	completed = PortalRun(portal,
 						  max_rows,
 						  true, /* always top level */
-						  true, /* ignored */
 						  receiver,
 						  receiver,
 						  &qc);
@@ -4270,8 +4253,6 @@ PostgresMain(int argc, char *argv[],
 		 * Abort the current transaction in order to recover.
 		 */
 		AbortCurrentTransaction();
-
-		PortalErrorCleanup();
 
 		/*
 		 * Now return to normal top-level context and clear ErrorContext for

@@ -266,14 +266,6 @@ OffsetVarNodes_walker(Node *node, OffsetVarNodes_context *context)
 		}
 		return false;
 	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-		if (context->sublevels_up == 0)
-			cexpr->cvarno += context->offset;
-		return false;
-	}
 	if (IsA(node, RangeTblRef))
 	{
 		RangeTblRef *rtr = (RangeTblRef *) node;
@@ -431,15 +423,6 @@ ChangeVarNodes_walker(Node *node, ChangeVarNodes_context *context)
 			if (var->varnosyn == context->rt_index)
 				var->varnosyn = context->new_index;
 		}
-		return false;
-	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-		if (context->sublevels_up == 0 &&
-			cexpr->cvarno == context->rt_index)
-			cexpr->cvarno = context->new_index;
 		return false;
 	}
 	if (IsA(node, RangeTblRef))
@@ -626,13 +609,6 @@ IncrementVarSublevelsUp_walker(Node *node,
 			var->varlevelsup += context->delta_sublevels_up;
 		return false;			/* done here */
 	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		/* this should not happen */
-		if (context->min_sublevels_up == 0)
-			elog(ERROR, "cannot push down CurrentOfExpr");
-		return false;
-	}
 	if (IsA(node, Aggref))
 	{
 		Aggref	   *agg = (Aggref *) node;
@@ -741,15 +717,6 @@ rangeTableEntry_used_walker(Node *node,
 
 		if (var->varlevelsup == context->sublevels_up &&
 			var->varno == context->rt_index)
-			return true;
-		return false;
-	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-		if (context->sublevels_up == 0 &&
-			cexpr->cvarno == context->rt_index)
 			return true;
 		return false;
 	}
@@ -1040,25 +1007,6 @@ replace_rte_variables_mutator(Node *node,
 			return newnode;
 		}
 		/* otherwise fall through to copy the var normally */
-	}
-	else if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-		if (cexpr->cvarno == context->target_varno &&
-			context->sublevels_up == 0)
-		{
-			/*
-			 * We get here if a WHERE CURRENT OF expression turns out to apply
-			 * to a view.  Someday we might be able to translate the
-			 * expression to apply to an underlying table of the view, but
-			 * right now it's not implemented.
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("WHERE CURRENT OF on a view is not implemented")));
-		}
-		/* otherwise fall through to copy the expr normally */
 	}
 	else if (IsA(node, Query))
 	{

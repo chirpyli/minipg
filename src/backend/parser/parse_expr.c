@@ -63,7 +63,6 @@ static Node *transformMinMaxExpr(ParseState *pstate, MinMaxExpr *m);
 static Node *transformSQLValueFunction(ParseState *pstate,
 									   SQLValueFunction *svf);
 static Node *transformBooleanTest(ParseState *pstate, BooleanTest *b);
-static Node *transformCurrentOfExpr(ParseState *pstate, CurrentOfExpr *cexpr);
 static Node *transformColumnRef(ParseState *pstate, ColumnRef *cref);
 static Node *transformWholeRowRef(ParseState *pstate,
 								  ParseNamespaceItem *nsitem,
@@ -258,10 +257,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 
 		case T_BooleanTest:
 			result = transformBooleanTest(pstate, (BooleanTest *) expr);
-			break;
-
-		case T_CurrentOfExpr:
-			result = transformCurrentOfExpr(pstate, (CurrentOfExpr *) expr);
 			break;
 
 			/*
@@ -2284,55 +2279,6 @@ transformBooleanTest(ParseState *pstate, BooleanTest *b)
 										clausename);
 
 	return (Node *) b;
-}
-
-static Node *
-transformCurrentOfExpr(ParseState *pstate, CurrentOfExpr *cexpr)
-{
-	/* CURRENT OF can only appear at top level of UPDATE/DELETE */
-	Assert(pstate->p_target_nsitem != NULL);
-	cexpr->cvarno = pstate->p_target_nsitem->p_rtindex;
-
-	/*
-	 * Check to see if the cursor name matches a parameter of type REFCURSOR.
-	 * If so, replace the raw name reference with a parameter reference. (This
-	 * is a hack for the convenience of plpgsql.)
-	 */
-	if (cexpr->cursor_name != NULL) /* in case already transformed */
-	{
-		ColumnRef  *cref = makeNode(ColumnRef);
-		Node	   *node = NULL;
-
-		/* Build an unqualified ColumnRef with the given name */
-		cref->fields = list_make1(makeString(cexpr->cursor_name));
-		cref->location = -1;
-
-		/* See if there is a translation available from a parser hook */
-		if (pstate->p_pre_columnref_hook != NULL)
-			node = pstate->p_pre_columnref_hook(pstate, cref);
-		if (node == NULL && pstate->p_post_columnref_hook != NULL)
-			node = pstate->p_post_columnref_hook(pstate, cref, NULL);
-
-		/*
-		 * XXX Should we throw an error if we get a translation that isn't a
-		 * refcursor Param?  For now it seems best to silently ignore false
-		 * matches.
-		 */
-		if (node != NULL && IsA(node, Param))
-		{
-			Param	   *p = (Param *) node;
-
-			if (p->paramkind == PARAM_EXTERN &&
-				p->paramtype == REFCURSOROID)
-			{
-				/* Matches, so convert CURRENT OF to a param reference */
-				cexpr->cursor_name = NULL;
-				cexpr->cursor_param = p->paramid;
-			}
-		}
-	}
-
-	return (Node *) cexpr;
 }
 
 /*

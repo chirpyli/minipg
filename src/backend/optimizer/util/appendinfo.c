@@ -367,22 +367,6 @@ adjust_appendrel_attrs_mutator(Node *node,
 		}
 		return (Node *) var;
 	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) copyObject(node);
-
-		for (cnt = 0; cnt < nappinfos; cnt++)
-		{
-			AppendRelInfo *appinfo = appinfos[cnt];
-
-			if (cexpr->cvarno == appinfo->parent_relid)
-			{
-				cexpr->cvarno = appinfo->child_relid;
-				break;
-			}
-		}
-		return (Node *) cexpr;
-	}
 	if (IsA(node, PlaceHolderVar))
 	{
 		/* Copy the PlaceHolderVar node with correct mutation of subnodes */

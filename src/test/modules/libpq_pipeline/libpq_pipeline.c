@@ -940,13 +940,31 @@ test_prepared(PGconn *conn)
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("could not exit pipeline mode: %s", PQerrorMessage(conn));
 
+	/*
+	 * minipg: SQL cursors are not available, so create the unnamed portal
+	 * through the extended query protocol instead, and describe it.
+	 */
 	PQexec(conn, "BEGIN");
-	PQexec(conn, "DECLARE cursor_one CURSOR FOR SELECT 1");
 	PQenterPipelineMode(conn);
-	if (PQsendDescribePortal(conn, "cursor_one") != 1)
+	if (PQsendQueryParams(conn, "SELECT 1", 0, NULL, NULL, NULL, NULL, 0) != 1)
+		pg_fatal("failed to send query: %s", PQerrorMessage(conn));
+	if (PQsendDescribePortal(conn, "") != 1)
 		pg_fatal("PQsendDescribePortal failed: %s", PQerrorMessage(conn));
 	if (PQpipelineSync(conn) != 1)
 		pg_fatal("pipeline sync failed: %s", PQerrorMessage(conn));
+
+	/* first item: the query result */
+	res = PQgetResult(conn);
+	if (res == NULL)
+		pg_fatal("PQgetResult returned null");
+	if (PQresultStatus(res) != PGRES_TUPLES_OK)
+		pg_fatal("expected TUPLES_OK, got %s", PQresStatus(PQresultStatus(res)));
+	PQclear(res);
+	res = PQgetResult(conn);
+	if (res != NULL)
+		pg_fatal("expected NULL result");
+
+	/* second item: the described unnamed portal */
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("PQgetResult returned null");
@@ -967,6 +985,8 @@ test_prepared(PGconn *conn)
 
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("could not exit pipeline mode: %s", PQerrorMessage(conn));
+
+	PQexec(conn, "COMMIT");
 
 	fprintf(stderr, "ok\n");
 }

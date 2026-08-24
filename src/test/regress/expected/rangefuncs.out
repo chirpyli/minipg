@@ -139,10 +139,10 @@ LINE 1: select * from vw_ord;
                       ^
 drop view vw_ord;
 ERROR:  view "vw_ord" does not exist
--- ordinality and multiple functions vs. rewind and reverse scan
-begin;
-declare rf_cur scroll cursor for select * from rows from(generate_series(1,5),generate_series(1,2)) with ordinality as g(i,j,o);
-fetch all from rf_cur;
+-- ordinality and multiple functions of unequal cardinality
+-- minipg: SQL cursors are removed, so the original scroll-cursor rewind test
+-- is replaced by a plain query on the same SRF combination.
+select * from rows from(generate_series(1,5),generate_series(1,2)) with ordinality as g(i,j,o);
  i | j | o 
 ---+---+---
  1 | 1 | 1
@@ -152,85 +152,6 @@ fetch all from rf_cur;
  5 |   | 5
 (5 rows)
 
-fetch backward all from rf_cur;
- i | j | o 
----+---+---
- 5 |   | 5
- 4 |   | 4
- 3 |   | 3
- 2 | 2 | 2
- 1 | 1 | 1
-(5 rows)
-
-fetch all from rf_cur;
- i | j | o 
----+---+---
- 1 | 1 | 1
- 2 | 2 | 2
- 3 |   | 3
- 4 |   | 4
- 5 |   | 5
-(5 rows)
-
-fetch next from rf_cur;
- i | j | o 
----+---+---
-(0 rows)
-
-fetch next from rf_cur;
- i | j | o 
----+---+---
-(0 rows)
-
-fetch prior from rf_cur;
- i | j | o 
----+---+---
- 5 |   | 5
-(1 row)
-
-fetch absolute 1 from rf_cur;
- i | j | o 
----+---+---
- 1 | 1 | 1
-(1 row)
-
-fetch next from rf_cur;
- i | j | o 
----+---+---
- 2 | 2 | 2
-(1 row)
-
-fetch next from rf_cur;
- i | j | o 
----+---+---
- 3 |   | 3
-(1 row)
-
-fetch next from rf_cur;
- i | j | o 
----+---+---
- 4 |   | 4
-(1 row)
-
-fetch prior from rf_cur;
- i | j | o 
----+---+---
- 3 |   | 3
-(1 row)
-
-fetch prior from rf_cur;
- i | j | o 
----+---+---
- 2 | 2 | 2
-(1 row)
-
-fetch prior from rf_cur;
- i | j | o 
----+---+---
- 1 | 1 | 1
-(1 row)
-
-commit;
 -- function with implicit LATERAL
 select * from rngfunc2, rngfunct(rngfunc2.rngfuncid) z where rngfunc2.f2 = z.f2;
  rngfuncid | f2  | rngfuncid | f2  

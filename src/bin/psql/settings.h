@@ -133,7 +133,6 @@ typedef struct _psqlSettings
 	bool		singlestep;
 	bool		hide_compression;
 	bool		hide_tableam;
-	int			fetch_count;
 	int			histsize;
 	int			ignoreeof;
 	PSQL_ECHO	echo;

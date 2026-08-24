@@ -73,7 +73,7 @@ test: alter-table-2
 # alter-table-4 已随表继承(INHERITS)功能裁剪而移除
 # create-trigger: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 
-test: vacuum-reltuples
+# vacuum-reltuples 已随游标功能裁剪而移除（其核心场景依赖 DECLARE CURSOR 固定缓冲页）
 test: timeouts
 # vacuum-concurrent-drop 已随分区功能裁剪而移除
 # vacuum-conflict: 依赖 ROLE/OWNER TO 权限锁冲突，权限已裁剪，移除

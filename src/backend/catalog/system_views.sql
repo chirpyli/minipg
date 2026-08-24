@@ -225,9 +225,6 @@ CREATE VIEW pg_stats_ext_exprs AS
 CREATE VIEW pg_locks AS
     SELECT * FROM pg_lock_status() AS L;
 
-CREATE VIEW pg_cursors AS
-    SELECT * FROM pg_cursor() AS C;
-
 CREATE VIEW pg_available_extensions AS
     SELECT E.name, E.default_version, X.extversion AS installed_version,
            E.comment

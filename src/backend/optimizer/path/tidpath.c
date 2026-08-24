@@ -17,12 +17,6 @@
  * the relation under consideration.  Vars belonging to other relations of
  * the query are allowed, giving rise to parameterized TID scans.
  *
- * We also support "WHERE CURRENT OF cursor" conditions (CurrentOfExpr),
- * which amount to "CTID = run-time-determined-TID".  These could in
- * theory be translated to a simple comparison of CTID to the result of
- * a function, but in practice it works better to keep the special node
- * representation all the way through to execution.
- *
  * Additionally, TidRangePaths may be created for conditions of the form
  * "CTID relop pseudoconstant", where relop is one of >,>=,<,<=, and
  * AND-clauses composed of such conditions.
@@ -205,26 +199,6 @@ IsTidEqualAnyClause(PlannerInfo *root, RestrictInfo *rinfo, RelOptInfo *rel)
 }
 
 /*
- * Check to see if a RestrictInfo is a CurrentOfExpr referencing "rel".
- */
-static bool
-IsCurrentOfClause(RestrictInfo *rinfo, RelOptInfo *rel)
-{
-	CurrentOfExpr *node;
-
-	/* Must be a CurrentOfExpr */
-	if (!(rinfo->clause && IsA(rinfo->clause, CurrentOfExpr)))
-		return false;
-	node = (CurrentOfExpr *) rinfo->clause;
-
-	/* If it references this rel, we're good */
-	if (node->cvarno == rel->relid)
-		return true;
-
-	return false;
-}
-
-/*
  * Extract a set of CTID conditions from the given RestrictInfo
  *
  * Returns a List of CTID qual RestrictInfos for the specified rel (with
@@ -256,8 +230,7 @@ TidQualFromRestrictInfo(PlannerInfo *root, RestrictInfo *rinfo, RelOptInfo *rel)
 	 * Check all base cases.  If we get a match, return the clause.
 	 */
 	if (IsTidEqualClause(rinfo, rel) ||
-		IsTidEqualAnyClause(root, rinfo, rel) ||
-		IsCurrentOfClause(rinfo, rel))
+		IsTidEqualAnyClause(root, rinfo, rel))
 		return list_make1(rinfo);
 
 	return NIL;
@@ -404,9 +377,8 @@ BuildParameterizedTidPaths(PlannerInfo *root, RelOptInfo *rel, List *clauses)
 		 * We currently consider only TidEqual join clauses.  In principle we
 		 * might find a suitable ScalarArrayOpExpr in the rel's joininfo list,
 		 * but it seems unlikely to be worth expending the cycles to check.
-		 * And we definitely won't find a CurrentOfExpr here.  Hence, we don't
-		 * use TidQualFromRestrictInfo; but this must match that function
-		 * otherwise.
+		 * Hence, we don't use TidQualFromRestrictInfo; but this must match
+		 * that function otherwise.
 		 */
 		if (rinfo->pseudoconstant ||
 			!restriction_is_securely_promotable(rinfo, rel) ||

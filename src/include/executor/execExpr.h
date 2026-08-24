@@ -171,7 +171,6 @@ typedef enum ExprEvalOp
 	EEOP_NOT_DISTINCT,
 	EEOP_NULLIF,
 	EEOP_SQLVALUEFUNCTION,
-	EEOP_CURRENTOFEXPR,
 	EEOP_ARRAYEXPR,
 	EEOP_ARRAYCOERCE,
 	EEOP_ROW,
@@ -712,7 +711,6 @@ extern void ExecEvalParamExec(ExprState *state, ExprEvalStep *op,
 extern void ExecEvalParamExtern(ExprState *state, ExprEvalStep *op,
 								ExprContext *econtext);
 extern void ExecEvalSQLValueFunction(ExprState *state, ExprEvalStep *op);
-extern void ExecEvalCurrentOfExpr(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalRowNull(ExprState *state, ExprEvalStep *op,
 							ExprContext *econtext);
 extern void ExecEvalRowNotNull(ExprState *state, ExprEvalStep *op,

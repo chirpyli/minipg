@@ -536,7 +536,6 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 		case T_CoerceToDomainValue:
 		case T_CaseTestExpr:
 		case T_SetToDefault:
-		case T_CurrentOfExpr:
 
 			/*
 			 * General case for childless expression nodes.  These should

@@ -161,34 +161,6 @@ show synchronous_commit;
 reset synchronous_commit;
 discard temp;
 discard all;
--- CURSOR commands
-BEGIN;
-DECLARE hsc CURSOR FOR select * from hs3;
-FETCH next from hsc;
- col1 
-------
-  113
-(1 row)
-
-fetch first from hsc;
- col1 
-------
-  113
-(1 row)
-
-fetch last from hsc;
- col1 
-------
-  115
-(1 row)
-
-fetch 1 from hsc;
- col1 
-------
-(0 rows)
-
-CLOSE hsc;
-COMMIT;
 -- Prepared plans
 PREPARE hsp AS select count(*) from hs1;
 PREPARE hsp_noexec (integer) AS insert into hs1 values ($1);

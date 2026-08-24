@@ -1802,16 +1802,6 @@ fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context)
 		}
 		/* If no match, just fall through to process it normally */
 	}
-	if (IsA(node, CurrentOfExpr))
-	{
-		CurrentOfExpr *cexpr = (CurrentOfExpr *) copyObject(node);
-
-		Assert(cexpr->cvarno != INNER_VAR);
-		Assert(cexpr->cvarno != OUTER_VAR);
-		if (!IS_SPECIAL_VARNO(cexpr->cvarno))
-			cexpr->cvarno += context->rtoffset;
-		return (Node *) cexpr;
-	}
 	if (IsA(node, PlaceHolderVar))
 	{
 		/* At scan level, we should always just evaluate the contained expr */

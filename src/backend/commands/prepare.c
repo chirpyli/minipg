@@ -213,8 +213,6 @@ ExecuteQuery(ParseState *pstate,
 
 	/* Create a new portal to run the query in */
 	portal = CreateNewPortal();
-	/* Don't display the portal in pg_cursors, it is for internal use only */
-	portal->visible = false;
 
 	/* Copy the plan's saved query string into the portal's memory */
 	query_string = MemoryContextStrdup(portal->portalContext,
@@ -239,14 +237,14 @@ ExecuteQuery(ParseState *pstate,
 	 * Plain old EXECUTE.
 	 */
 	eflags = 0;
-	count = FETCH_ALL;
+	count = LONG_MAX;			/* run portal to completion */
 
 	/*
 	 * Run the portal as appropriate.
 	 */
 	PortalStart(portal, paramLI, eflags, GetActiveSnapshot());
 
-	(void) PortalRun(portal, count, false, true, dest, dest, qc);
+	(void) PortalRun(portal, count, false, dest, dest, qc);
 
 	PortalDrop(portal, false);
 

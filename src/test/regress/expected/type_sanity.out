@@ -161,18 +161,17 @@ WHERE (proargmodes IS NOT NULL AND 'v' = any(proargmodes))
 -----+-------------+-------------
 (0 rows)
 
--- As of 8.0, this check finds refcursor, which is borrowing
--- other types' I/O routines
+-- As of 8.0, this check found refcursor, which was borrowing
+-- other types' I/O routines (refcursor type removed in minipg)
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typinput = p2.oid AND p1.typtype in ('b', 'p') AND NOT
     (p1.typelem != 0 AND p1.typlen < 0) AND NOT
     (p2.prorettype = p1.oid AND NOT p2.proretset)
 ORDER BY 1;
- oid  |  typname  | oid | proname 
-------+-----------+-----+---------
- 1790 | refcursor |  46 | textin
-(1 row)
+ oid | typname | oid | proname 
+-----+---------+-----+---------
+(0 rows)
 
 -- Varlena array types will point to array_in
 -- Exception as of 8.1: int2vector and oidvector have their own I/O routines
@@ -211,8 +210,8 @@ ORDER BY 1;
 (5 rows)
 
 -- Check for bogus typoutput routines
--- As of 8.0, this check finds refcursor, which is borrowing
--- other types' I/O routines
+-- As of 8.0, this check found refcursor, which was borrowing
+-- other types' I/O routines (refcursor type removed in minipg)
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typoutput = p2.oid AND p1.typtype in ('b', 'p') AND NOT
@@ -221,10 +220,9 @@ WHERE p1.typoutput = p2.oid AND p1.typtype in ('b', 'p') AND NOT
       (p2.oid = 'array_out'::regproc AND
        p1.typelem != 0 AND p1.typlen = -1)))
 ORDER BY 1;
- oid  |  typname  | oid | proname 
-------+-----------+-----+---------
- 1790 | refcursor |  47 | textout
-(1 row)
+ oid | typname | oid | proname 
+-----+---------+-----+---------
+(0 rows)
 
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
@@ -277,18 +275,17 @@ WHERE p1.typreceive = p2.oid AND NOT
 -----+---------+-----+---------
 (0 rows)
 
--- As of 7.4, this check finds refcursor, which is borrowing
--- other types' I/O routines
+-- As of 7.4, this check found refcursor, which was borrowing
+-- other types' I/O routines (refcursor type removed in minipg)
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typreceive = p2.oid AND p1.typtype in ('b', 'p') AND NOT
     (p1.typelem != 0 AND p1.typlen < 0) AND NOT
     (p2.prorettype = p1.oid AND NOT p2.proretset)
 ORDER BY 1;
- oid  |  typname  | oid  | proname  
-------+-----------+------+----------
- 1790 | refcursor | 2414 | textrecv
-(1 row)
+ oid | typname | oid | proname 
+-----+---------+-----+---------
+(0 rows)
 
 -- Varlena array types will point to array_recv
 -- Exception as of 8.1: int2vector and oidvector have their own I/O routines
@@ -336,8 +333,8 @@ ORDER BY 1;
 (5 rows)
 
 -- Check for bogus typsend routines
--- As of 7.4, this check finds refcursor, which is borrowing
--- other types' I/O routines
+-- As of 7.4, this check found refcursor, which was borrowing
+-- other types' I/O routines (refcursor type removed in minipg)
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typsend = p2.oid AND p1.typtype in ('b', 'p') AND NOT
@@ -346,10 +343,9 @@ WHERE p1.typsend = p2.oid AND p1.typtype in ('b', 'p') AND NOT
       (p2.oid = 'array_send'::regproc AND
        p1.typelem != 0 AND p1.typlen = -1)))
 ORDER BY 1;
- oid  |  typname  | oid  | proname  
-------+-----------+------+----------
- 1790 | refcursor | 2415 | textsend
-(1 row)
+ oid | typname | oid | proname 
+-----+---------+-----+---------
+(0 rows)
 
 SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
@@ -674,18 +670,29 @@ WHERE p1.rngmultitypid IS NULL OR p1.rngmultitypid = 0;
 
 -- Create a table that holds all the known in-core data types and leave it
 -- around so as pg_upgrade is able to test their binary compatibility.
-CREATE TABLE tab_core_types AS SELECT
+CREATE TABLE tab_core_types (
+  c1 date, c2 time, c3 timestamp, c5 timestamptz, c6 interval,
+  c7 text, c8 text, c9 text, c10 int2, c11 int4, c12 int8, c13 float4,
+  c14 float8, c15 numeric, c16 "char", c17 bpchar, c18 varchar, c19 name,
+  c20 text, c21 bool, c22 bytea, c23 bit, c24 varbit, c25 numeric,
+  c27 int2vector, c28 oidvector, c29 xid8, c30 regclass,
+  c31 regtype, c32 regrole, c33 oid, c34 tid, c35 xid, c36 cid,
+  c37 txid_snapshot, c38 pg_snapshot, c39 pg_lsn, c40 information_schema.cardinal_number,
+  c41 information_schema.character_data, c42 information_schema.sql_identifier,
+  c43 information_schema.time_stamp, c44 information_schema.yes_or_no, c45 planets,
+  c46 insenum
+);
+INSERT INTO tab_core_types SELECT
   'today'::date,
   'now'::time,
   'now'::timestamp,
-  'now'::timetz,
   'now'::timestamptz,
   '12 seconds'::interval,
-  '{"reason":"because"}'::json,
-  '{"when":"now"}'::jsonb,
-  '$.a[*] ? (@ > 2)'::jsonpath,
+  '{"reason":"because"}'::text,
+  '{"when":"now"}'::text,
+  '$.a[*] ? (@ > 2)'::text,
   2::int2, 4::int4, 8::int8,
-  4::float4, '8'::float8, pi()::numeric,
+  4::float4, '8'::float8, pi()::int8,
   'foo'::"char",
   'c'::bpchar,
   'abc'::varchar,
@@ -695,15 +702,12 @@ CREATE TABLE tab_core_types AS SELECT
   E'\\xDEADBEEF'::bytea,
   B'10001'::bit,
   B'10001'::varbit AS varbit,
-  '12.34'::numeric,
-  'abc'::refcursor,
+  '12.34'::int8,
   '1 2'::int2vector,
   '1 2'::oidvector,
-  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
-  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
   '11'::xid8,
   'pg_class'::regclass,
-  'regtype'::regtype type,
+  'regtype'::regtype,
   'pg_monitor'::regrole,
   'pg_class'::regclass::oid,
   '(1,1)'::tid, '2'::xid, '3'::cid,
@@ -716,20 +720,7 @@ CREATE TABLE tab_core_types AS SELECT
   'now'::information_schema.time_stamp,
   'YES'::information_schema.yes_or_no,
   'venus'::planets,
-  'i16'::insenum,
-  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
-  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
-  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
-  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
-  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
-  '(2020-01-02, 2021-02-03)'::daterange,
-  '{(2020-01-02, 2021-02-03)}'::datemultirange,
-  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
-  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
-  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
-  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
-  arrayrange(ARRAY[1,2], ARRAY[2,1]),
-  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]));
+  'i16'::insenum;
 -- Sanity check on the previous table, checking that all core types are
 -- included in this table.
 SELECT oid, typname, typtype, typelem, typarray, typarray

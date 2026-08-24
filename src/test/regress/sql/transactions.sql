@@ -251,27 +251,6 @@ BEGIN;
 COMMIT;
 SELECT 1;			-- this should work
 
--- check non-transactional behavior of cursors
-BEGIN;
-	DECLARE c CURSOR FOR SELECT unique2 FROM tenk1 ORDER BY unique2;
-	SAVEPOINT one;
-		FETCH 10 FROM c;
-	ROLLBACK TO SAVEPOINT one;
-		FETCH 10 FROM c;
-	RELEASE SAVEPOINT one;
-	FETCH 10 FROM c;
-	CLOSE c;
-	DECLARE c CURSOR FOR SELECT unique2/0 FROM tenk1 ORDER BY unique2;
-	SAVEPOINT two;
-		FETCH 10 FROM c;
-	ROLLBACK TO SAVEPOINT two;
-	-- c is now dead to the world ...
-		FETCH 10 FROM c;
-	ROLLBACK TO SAVEPOINT two;
-	RELEASE SAVEPOINT two;
-	FETCH 10 FROM c;
-COMMIT;
-
 --
 -- Check that "stable" functions are really stable.  They should not be
 -- able to see the partial results of the calling query.  (Ideally we would
@@ -337,41 +316,10 @@ DROP TABLE trans_barbaz;
 -- exception handling (inverse) to verify open-relation revalidation during
 -- abort; that plpgsql-only check is dropped.
 
--- verify that cursors created during an aborted subtransaction are
--- closed, but that we do not rollback the effect of any FETCHs
--- performed in the aborted subtransaction
-begin;
-
-savepoint x;
-create table trans_abc (a int);
-insert into trans_abc values (5);
-insert into trans_abc values (10);
-declare foo cursor for select * from trans_abc;
-fetch from foo;
-rollback to x;
-
--- should fail
-fetch from foo;
-commit;
-
-begin;
-
-create table trans_abc (a int);
-insert into trans_abc values (5);
-insert into trans_abc values (10);
-insert into trans_abc values (15);
-declare foo cursor for select * from trans_abc;
-
-fetch from foo;
-
-savepoint x;
-fetch from foo;
-rollback to x;
-
-fetch from foo;
-
-abort;
-
+-- minipg: cursors removed. The original tests verified that cursors created
+-- during an aborted subtransaction are closed, without rolling back the
+-- effect of any FETCHs performed in the aborted subtransaction; those
+-- cursor-only subtests are dropped.
 
 -- minipg: PL/pgSQL removed. The original test used plpgsql functions (invert,
 -- create_temp_tab) to verify cursor-portal cleanup after a failure inside a

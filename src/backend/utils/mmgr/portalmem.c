@@ -184,11 +184,11 @@ CreatePortal(const char *name, bool allowDup, bool dupSilent)
 		if (!allowDup)
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_CURSOR),
-					 errmsg("cursor \"%s\" already exists", name)));
+					 errmsg("portal \"%s\" already exists", name)));
 		if (!dupSilent)
 			ereport(WARNING,
 					(errcode(ERRCODE_DUPLICATE_CURSOR),
-					 errmsg("closing existing cursor \"%s\"",
+					 errmsg("closing existing portal \"%s\"",
 							name)));
 		PortalDrop(portal, false);
 	}
@@ -212,11 +212,8 @@ CreatePortal(const char *name, bool allowDup, bool dupSilent)
 	portal->activeSubid = portal->createSubid;
 	portal->createLevel = GetCurrentTransactionNestLevel();
 	portal->strategy = PORTAL_MULTI_QUERY;
-	portal->cursorOptions = CURSOR_OPT_NO_SCROLL;
 	portal->atStart = true;
 	portal->atEnd = true;		/* disallow fetches until query is set */
-	portal->visible = true;
-	portal->creation_time = GetCurrentStatementStartTimestamp();
 
 	/* put portal in table (sets portal->name) */
 	PortalHashTableInsert(portal, name);
@@ -346,43 +343,17 @@ PortalCreateHoldStore(Portal portal)
 							  ALLOCSET_DEFAULT_SIZES);
 
 	/*
-	 * Create the tuple store, selecting cross-transaction temp files, and
-	 * enabling random access only if cursor requires scrolling.
+	 * Create the tuple store, selecting cross-transaction temp files.
 	 *
 	 * XXX: Should maintenance_work_mem be used for the portal size?
 	 */
 	oldcxt = MemoryContextSwitchTo(portal->holdContext);
 
 	portal->holdStore =
-		tuplestore_begin_heap(portal->cursorOptions & CURSOR_OPT_SCROLL,
+		tuplestore_begin_heap(false,
 							  true, work_mem);
 
 	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
- * PinPortal
- *		Protect a portal from dropping.
- *
- * A pinned portal is still unpinned and dropped at transaction or
- * subtransaction abort.
- */
-void
-PinPortal(Portal portal)
-{
-	if (portal->portalPinned)
-		elog(ERROR, "portal already pinned");
-
-	portal->portalPinned = true;
-}
-
-void
-UnpinPortal(Portal portal)
-{
-	if (!portal->portalPinned)
-		elog(ERROR, "portal not pinned");
-
-	portal->portalPinned = false;
 }
 
 /*
@@ -470,15 +441,6 @@ PortalDrop(Portal portal, bool isTopCommit)
 	AssertArg(PortalIsValid(portal));
 
 	/*
-	 * Don't allow dropping a pinned portal, it's still needed by whoever
-	 * pinned it.
-	 */
-	if (portal->portalPinned)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_CURSOR_STATE),
-				 errmsg("cannot drop pinned portal \"%s\"", portal->name)));
-
-	/*
 	 * Not sure if the PORTAL_ACTIVE case can validly happen or not...
 	 */
 	if (portal->status == PORTAL_ACTIVE)
@@ -538,7 +500,7 @@ PortalDrop(Portal portal, bool isTopCommit)
 	 * Top transaction commit (indicated by isTopCommit): normally we should
 	 * do nothing here and let the regular end-of-transaction resource
 	 * releasing mechanism handle these resources too.  However, if we have a
-	 * FAILED portal (eg, a cursor that got an error), we'd better clean up
+	 * FAILED portal (eg, one that got an error), we'd better clean up
 	 * its resources to avoid resource-leakage warning messages.
 	 *
 	 * Sub transaction commit: never comes here at all, since we don't kill
@@ -599,9 +561,9 @@ PortalDrop(Portal portal, bool isTopCommit)
 }
 
 /*
- * Delete all declared cursors.
+ * Delete all non-active portals.
  *
- * Used by commands: CLOSE ALL, DISCARD ALL
+ * Used by command: DISCARD ALL
  */
 void
 PortalHashTableDeleteAll(void)
@@ -630,45 +592,10 @@ PortalHashTableDeleteAll(void)
 }
 
 /*
- * "Hold" a portal.  Prepare it for access by later transactions.
- */
-static void
-HoldPortal(Portal portal)
-{
-	/*
-	 * Note that PersistHoldablePortal() must release all resources used by
-	 * the portal that are local to the creating transaction.
-	 */
-	PortalCreateHoldStore(portal);
-	PersistHoldablePortal(portal);
-
-	/* drop cached plan reference, if any */
-	PortalReleaseCachedPlan(portal);
-
-	/*
-	 * Any resources belonging to the portal will be released in the upcoming
-	 * transaction-wide cleanup; the portal will no longer have its own
-	 * resources.
-	 */
-	portal->resowner = NULL;
-
-	/*
-	 * Having successfully exported the holdable cursor, mark it as not
-	 * belonging to this transaction.
-	 */
-	portal->createSubid = InvalidSubTransactionId;
-	portal->activeSubid = InvalidSubTransactionId;
-	portal->createLevel = 0;
-}
-
-/*
  * Pre-commit processing for portals.
  *
- * Holdable cursors created in this transaction need to be converted to
- * materialized form, since we are going to close down the executor and
- * release locks.  Non-holdable portals created in this transaction are
- * simply removed.  Portals remaining from prior transactions should be
- * left untouched.
+ * Portals created in this transaction are simply removed, since we are
+ * going to close down the executor and release locks.
  *
  * Returns true if any portals changed state (possibly causing user-defined
  * code to be run), false if not.
@@ -685,14 +612,6 @@ PreCommit_Portals(bool isPrepare)
 	while ((hentry = (PortalHashEnt *) hash_seq_search(&status)) != NULL)
 	{
 		Portal		portal = hentry->portal;
-
-		/*
-		 * There should be no pinned portals anymore. Complain if someone
-		 * leaked one. Auto-held portals are allowed; we assume that whoever
-		 * pinned them is managing them.
-		 */
-		if (portal->portalPinned && !portal->autoHeld)
-			elog(ERROR, "cannot commit while a portal is pinned");
 
 		/*
 		 * Do not touch active portals --- this can only happen in the case of
@@ -719,50 +638,18 @@ PreCommit_Portals(bool isPrepare)
 			continue;
 		}
 
-		/* Is it a holdable portal created in the current xact? */
-		if ((portal->cursorOptions & CURSOR_OPT_HOLD) &&
-			portal->createSubid != InvalidSubTransactionId &&
-			portal->status == PORTAL_READY)
-		{
-			/*
-			 * We are exiting the transaction that created a holdable cursor.
-			 * Instead of dropping the portal, prepare it for access by later
-			 * transactions.
-			 *
-			 * However, if this is PREPARE TRANSACTION rather than COMMIT,
-			 * refuse PREPARE, because the semantics seem pretty unclear.
-			 */
-			if (isPrepare)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot PREPARE a transaction that has created a cursor WITH HOLD")));
+		/*
+		 * Zap all portals created in this transaction.
+		 */
+		PortalDrop(portal, true);
 
-			HoldPortal(portal);
-
-			/* Report we changed state */
-			result = true;
-		}
-		else if (portal->createSubid == InvalidSubTransactionId)
-		{
-			/*
-			 * Do nothing to cursors held over from a previous transaction
-			 * (including ones we just froze in a previous cycle of this loop)
-			 */
-			continue;
-		}
-		else
-		{
-			/* Zap all non-holdable portals */
-			PortalDrop(portal, true);
-
-			/* Report we changed state */
-			result = true;
-		}
+		/* Report we changed state */
+		result = true;
 
 		/*
-		 * After either freezing or dropping a portal, we have to restart the
-		 * iteration, because we could have invoked user-defined code that
-		 * caused a drop of the next portal in the hash chain.
+		 * After dropping a portal, we have to restart the iteration, because
+		 * we could have invoked user-defined code that caused a drop of the
+		 * next portal in the hash chain.
 		 */
 		hash_seq_term(&status);
 		hash_seq_init(&status, PortalHashTable);
@@ -795,20 +682,6 @@ AtAbort_Portals(void)
 		 */
 		if (portal->status == PORTAL_ACTIVE && shmem_exit_inprogress)
 			MarkPortalFailed(portal);
-
-		/*
-		 * Do nothing else to cursors held over from a previous transaction.
-		 */
-		if (portal->createSubid == InvalidSubTransactionId)
-			continue;
-
-		/*
-		 * Do nothing to auto-held cursors.  This is similar to the case of a
-		 * cursor from a previous transaction, but it could also be that the
-		 * cursor was auto-held in this transaction, so it wants to live on.
-		 */
-		if (portal->autoHeld)
-			continue;
 
 		/*
 		 * If it was created in the current transaction, we can't do normal
@@ -852,8 +725,7 @@ AtAbort_Portals(void)
 
 /*
  * Post-abort cleanup for portals.
- *
- * Delete all portals not held over from prior transactions.  */
+ */
 void
 AtCleanup_Portals(void)
 {
@@ -874,25 +746,6 @@ AtCleanup_Portals(void)
 			continue;
 
 		/*
-		 * Do nothing to cursors held over from a previous transaction or
-		 * auto-held ones.
-		 */
-		if (portal->createSubid == InvalidSubTransactionId || portal->autoHeld)
-		{
-			Assert(portal->status != PORTAL_ACTIVE);
-			Assert(portal->resowner == NULL);
-			continue;
-		}
-
-		/*
-		 * If a portal is still pinned, forcibly unpin it. PortalDrop will not
-		 * let us drop the portal otherwise. Whoever pinned the portal was
-		 * interrupted by the abort too and won't try to use it anymore.
-		 */
-		if (portal->portalPinned)
-			portal->portalPinned = false;
-
-		/*
 		 * We had better not call any user-defined code during cleanup, so if
 		 * the cleanup hook hasn't been run yet, too bad; we'll just skip it.
 		 */
@@ -904,32 +757,6 @@ AtCleanup_Portals(void)
 
 		/* Zap it. */
 		PortalDrop(portal, false);
-	}
-}
-
-/*
- * Portal-related cleanup when we return to the main loop on error.
- *
- * This is different from the cleanup at transaction abort.  Auto-held portals
- * are cleaned up on error but not on transaction abort.
- */
-void
-PortalErrorCleanup(void)
-{
-	HASH_SEQ_STATUS status;
-	PortalHashEnt *hentry;
-
-	hash_seq_init(&status, PortalHashTable);
-
-	while ((hentry = (PortalHashEnt *) hash_seq_search(&status)) != NULL)
-	{
-		Portal		portal = hentry->portal;
-
-		if (portal->autoHeld)
-		{
-			portal->portalPinned = false;
-			PortalDrop(portal, false);
-		}
 	}
 }
 
@@ -1104,14 +931,6 @@ AtSubCleanup_Portals(SubTransactionId mySubid)
 			continue;
 
 		/*
-		 * If a portal is still pinned, forcibly unpin it. PortalDrop will not
-		 * let us drop the portal otherwise. Whoever pinned the portal was
-		 * interrupted by the abort too and won't try to use it anymore.
-		 */
-		if (portal->portalPinned)
-			portal->portalPinned = false;
-
-		/*
 		 * We had better not call any user-defined code during cleanup, so if
 		 * the cleanup hook hasn't been run yet, too bad; we'll just skip it.
 		 */
@@ -1126,178 +945,13 @@ AtSubCleanup_Portals(SubTransactionId mySubid)
 	}
 }
 
-/* Find all available cursors */
-Datum
-pg_cursor(PG_FUNCTION_ARGS)
-{
-	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
-	MemoryContext per_query_ctx;
-	MemoryContext oldcontext;
-	HASH_SEQ_STATUS hash_seq;
-	PortalHashEnt *hentry;
-
-	/* check to see if caller supports us returning a tuplestore */
-	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("set-valued function called in context that cannot accept a set")));
-	if (!(rsinfo->allowedModes & SFRM_Materialize))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("materialize mode required, but it is not allowed in this context")));
-
-	/* need to build tuplestore in query context */
-	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
-	oldcontext = MemoryContextSwitchTo(per_query_ctx);
-
-	/*
-	 * build tupdesc for result tuples. This must match the definition of the
-	 * pg_cursors view in system_views.sql
-	 */
-	tupdesc = CreateTemplateTupleDesc(6);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "name",
-					   TEXTOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 2, "statement",
-					   TEXTOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 3, "is_holdable",
-					   BOOLOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 4, "is_binary",
-					   BOOLOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 5, "is_scrollable",
-					   BOOLOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 6, "creation_time",
-					   TIMESTAMPTZOID, -1, 0);
-
-	/*
-	 * We put all the tuples into a tuplestore in one scan of the hashtable.
-	 * This avoids any issue of the hashtable possibly changing between calls.
-	 */
-	tupstore =
-		tuplestore_begin_heap(rsinfo->allowedModes & SFRM_Materialize_Random,
-							  false, work_mem);
-
-	/* generate junk in short-term context */
-	MemoryContextSwitchTo(oldcontext);
-
-	hash_seq_init(&hash_seq, PortalHashTable);
-	while ((hentry = hash_seq_search(&hash_seq)) != NULL)
-	{
-		Portal		portal = hentry->portal;
-		Datum		values[6];
-		bool		nulls[6];
-
-		/* report only "visible" entries */
-		if (!portal->visible)
-			continue;
-		/* also ignore it if PortalDefineQuery hasn't been called yet */
-		if (!portal->sourceText)
-			continue;
-
-		MemSet(nulls, 0, sizeof(nulls));
-
-		values[0] = CStringGetTextDatum(portal->name);
-		values[1] = CStringGetTextDatum(portal->sourceText);
-		values[2] = BoolGetDatum(portal->cursorOptions & CURSOR_OPT_HOLD);
-		values[3] = BoolGetDatum(portal->cursorOptions & CURSOR_OPT_BINARY);
-		values[4] = BoolGetDatum(portal->cursorOptions & CURSOR_OPT_SCROLL);
-		values[5] = TimestampTzGetDatum(portal->creation_time);
-
-		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
-	}
-
-	/* clean up and return the tuplestore */
-	tuplestore_donestoring(tupstore);
-
-	rsinfo->returnMode = SFRM_Materialize;
-	rsinfo->setResult = tupstore;
-	rsinfo->setDesc = tupdesc;
-
-	return (Datum) 0;
-}
-
-bool
-ThereAreNoReadyPortals(void)
-{
-	HASH_SEQ_STATUS status;
-	PortalHashEnt *hentry;
-
-	hash_seq_init(&status, PortalHashTable);
-
-	while ((hentry = (PortalHashEnt *) hash_seq_search(&status)) != NULL)
-	{
-		Portal		portal = hentry->portal;
-
-		if (portal->status == PORTAL_READY)
-			return false;
-	}
-
-	return true;
-}
-
-/*
- * Hold all pinned portals.
- *
- * When initiating a COMMIT or ROLLBACK inside a procedure, this must be
- * called to protect internally-generated cursors from being dropped during
- * the transaction shutdown.  Currently, SPI calls this automatically; PLs
- * that initiate COMMIT or ROLLBACK some other way are on the hook to do it
- * themselves.  (Note that we couldn't do this in, say, AtAbort_Portals
- * because we need to run user-defined code while persisting a portal.
- * It's too late to do that once transaction abort has started.)
- *
- * We protect such portals by converting them to held cursors.  We mark them
- * as "auto-held" so that exception exit knows to clean them up.  (In normal,
- * non-exception code paths, the PL needs to clean such portals itself, since
- * transaction end won't do it anymore; but that should be normal practice
- * anyway.)
- */
-void
-HoldPinnedPortals(void)
-{
-	HASH_SEQ_STATUS status;
-	PortalHashEnt *hentry;
-
-	hash_seq_init(&status, PortalHashTable);
-
-	while ((hentry = (PortalHashEnt *) hash_seq_search(&status)) != NULL)
-	{
-		Portal		portal = hentry->portal;
-
-		if (portal->portalPinned && !portal->autoHeld)
-		{
-			/*
-			 * Doing transaction control, especially abort, inside a cursor
-			 * loop that is not read-only, for example using UPDATE ...
-			 * RETURNING, has weird semantics issues.  Also, this
-			 * implementation wouldn't work, because such portals cannot be
-			 * held.  (The core grammar enforces that only SELECT statements
-			 * can drive a cursor, but for example PL/pgSQL does not restrict
-			 * it.)
-			 */
-			if (portal->strategy != PORTAL_ONE_SELECT)
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("cannot perform transaction commands inside a cursor loop that is not read-only")));
-
-			/* Verify it's in a suitable state to be held */
-			if (portal->status != PORTAL_READY)
-				elog(ERROR, "pinned portal is not ready to be auto-held");
-
-			HoldPortal(portal);
-			portal->autoHeld = true;
-		}
-	}
-}
-
 /*
  * Drop the outer active snapshots for all portals, so that no snapshots
  * remain active.
  *
- * Like HoldPinnedPortals, this must be called when initiating a COMMIT or
- * ROLLBACK inside a procedure.  This has to be separate from that since it
- * should not be run until we're done with steps that are likely to fail.
+ * This must be called when initiating a COMMIT or ROLLBACK inside a
+ * procedure.  It should not be run until we're done with steps that are
+ * likely to fail.
  *
  * It's tempting to fold this into PreCommit_Portals, but to do so, we'd
  * need to clean up snapshot management in VACUUM and perhaps other places.

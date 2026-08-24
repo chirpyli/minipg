@@ -910,11 +910,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "   SELECT 'DEFAULT' ) ss "\
 "  WHERE pg_catalog.substring(name,1,%%d)='%%s'"
 
-#define Query_for_list_of_cursors \
-" SELECT pg_catalog.quote_ident(name) "\
-"   FROM pg_catalog.pg_cursors "\
-"  WHERE substring(pg_catalog.quote_ident(name),1,%d)='%s'"
-
 /*
  * These object types were introduced later than our support cutoff of
  * server version 7.4.  We use the VersionedQuery infrastructure so that
@@ -1406,11 +1401,11 @@ psql_completion(const char *text, int start, int end)
 
 	/* Known command-starting keywords. */
 	static const char *const sql_commands[] = {
-		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLOSE", "CLUSTER",
-		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE", "DECLARE",
+		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLUSTER",
+		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE",
 		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
-		"FETCH", "IMPORT FOREIGN SCHEMA", "INSERT INTO", "LOAD", "LOCK",
-		"MOVE", "PREPARE",
+		"IMPORT FOREIGN SCHEMA", "INSERT INTO", "LOAD", "LOCK",
+		"PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "ROLLBACK",
 		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
@@ -2027,10 +2022,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("AND", "WORK", "TRANSACTION", "TO SAVEPOINT", "PREPARED");
 	else if (Matches("ABORT|END|COMMIT|ROLLBACK", "AND"))
 		COMPLETE_WITH("CHAIN");
-/* CLOSE */
-	else if (Matches("CLOSE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_cursors
-							" UNION SELECT 'ALL'");
 /* CLUSTER */
 	else if (Matches("CLUSTER"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_clusterables, "UNION SELECT 'VERBOSE'");
@@ -2555,46 +2546,6 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_QUERY(Query_for_list_of_prepared_statements
 							" UNION SELECT 'ALL'");
 
-/* DECLARE */
-
-	/*
-	 * Complete DECLARE <name> with one of BINARY, INSENSITIVE, SCROLL, NO
-	 * SCROLL, and CURSOR.
-	 */
-	else if (Matches("DECLARE", MatchAny))
-		COMPLETE_WITH("BINARY", "ASENSITIVE", "INSENSITIVE", "SCROLL", "NO SCROLL",
-					  "CURSOR");
-
-	/*
-	 * Complete DECLARE ... <option> with other options. The PostgreSQL parser
-	 * allows DECLARE options to be specified in any order. But the
-	 * tab-completion follows the ordering of them that the SQL standard
-	 * provides, like the syntax of DECLARE command in the documentation
-	 * indicates.
-	 */
-	else if (HeadMatches("DECLARE") && TailMatches("BINARY"))
-		COMPLETE_WITH("INSENSITIVE", "SCROLL", "NO SCROLL", "CURSOR");
-	else if (HeadMatches("DECLARE") && TailMatches("INSENSITIVE"))
-		COMPLETE_WITH("SCROLL", "NO SCROLL", "CURSOR");
-	else if (HeadMatches("DECLARE") && TailMatches("SCROLL"))
-		COMPLETE_WITH("CURSOR");
-	/* Complete DECLARE ... [options] NO with SCROLL */
-	else if (HeadMatches("DECLARE") && TailMatches("NO"))
-		COMPLETE_WITH("SCROLL");
-
-	/*
-	 * Complete DECLARE ... CURSOR with one of WITH HOLD, WITHOUT HOLD, and
-	 * FOR
-	 */
-	else if (HeadMatches("DECLARE") && TailMatches("CURSOR"))
-		COMPLETE_WITH("WITH HOLD", "WITHOUT HOLD", "FOR");
-	/* Complete DECLARE ... CURSOR WITH|WITHOUT with HOLD */
-	else if (HeadMatches("DECLARE") && TailMatches("CURSOR", "WITH|WITHOUT"))
-		COMPLETE_WITH("HOLD");
-	/* Complete DECLARE ... CURSOR WITH|WITHOUT HOLD with FOR */
-	else if (HeadMatches("DECLARE") && TailMatches("CURSOR", "WITH|WITHOUT", "HOLD"))
-		COMPLETE_WITH("FOR");
-
 /* DELETE --- can be inside EXPLAIN, RULE, etc */
 	/* Complete DELETE with "FROM" */
 	else if (Matches("DELETE"))
@@ -2705,7 +2656,7 @@ psql_completion(const char *text, int start, int end)
  * EXPLAIN [ ANALYZE ] [ VERBOSE ] statement
  */
 	else if (Matches("EXPLAIN"))
-		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE", "DECLARE",
+		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE",
 					  "ANALYZE", "VERBOSE");
 	else if (HeadMatches("EXPLAIN", "(*") &&
 			 !HeadMatches("EXPLAIN", "(*)"))
@@ -2724,58 +2675,12 @@ psql_completion(const char *text, int start, int end)
 			COMPLETE_WITH("TEXT", "XML", "JSON", "YAML");
 	}
 	else if (Matches("EXPLAIN", "ANALYZE"))
-		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE", "DECLARE",
+		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE",
 					  "VERBOSE");
 	else if (Matches("EXPLAIN", "(*)") ||
 			 Matches("EXPLAIN", "VERBOSE") ||
 			 Matches("EXPLAIN", "ANALYZE", "VERBOSE"))
-		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE", "DECLARE");
-
-/* FETCH && MOVE */
-
-	/*
-	 * Complete FETCH with one of ABSOLUTE, BACKWARD, FORWARD, RELATIVE, ALL,
-	 * NEXT, PRIOR, FIRST, LAST, FROM, IN, and a list of cursors
-	 */
-	else if (Matches("FETCH|MOVE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_cursors
-							" UNION SELECT 'ABSOLUTE'"
-							" UNION SELECT 'BACKWARD'"
-							" UNION SELECT 'FORWARD'"
-							" UNION SELECT 'RELATIVE'"
-							" UNION SELECT 'ALL'"
-							" UNION SELECT 'NEXT'"
-							" UNION SELECT 'PRIOR'"
-							" UNION SELECT 'FIRST'"
-							" UNION SELECT 'LAST'"
-							" UNION SELECT 'FROM'"
-							" UNION SELECT 'IN'");
-
-	/*
-	 * Complete FETCH BACKWARD or FORWARD with one of ALL, FROM, IN, and a
-	 * list of cursors
-	 */
-	else if (Matches("FETCH|MOVE", "BACKWARD|FORWARD"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_cursors
-							" UNION SELECT 'ALL'"
-							" UNION SELECT 'FROM'"
-							" UNION SELECT 'IN'");
-
-	/*
-	 * Complete FETCH <direction> with "FROM" or "IN". These are equivalent,
-	 * but we may as well tab-complete both: perhaps some users prefer one
-	 * variant or the other.
-	 */
-	else if (Matches("FETCH|MOVE", "ABSOLUTE|BACKWARD|FORWARD|RELATIVE",
-					 MatchAnyExcept("FROM|IN")) ||
-			 Matches("FETCH|MOVE", "ALL|NEXT|PRIOR|FIRST|LAST"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_cursors
-							" UNION SELECT 'FROM'"
-							" UNION SELECT 'IN'");
-	/* Complete FETCH <direction> "FROM" or "IN" with a list of cursors */
-	else if (HeadMatches("FETCH|MOVE") &&
-			 TailMatches("FROM|IN"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_cursors);
+		COMPLETE_WITH("SELECT", "INSERT INTO", "DELETE FROM", "UPDATE");
 
 /* GROUP BY */
 	else if (TailMatches("FROM", MatchAny, "GROUP"))

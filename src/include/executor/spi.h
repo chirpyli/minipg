@@ -53,14 +53,6 @@ typedef struct SPIExecuteOptions
 	ResourceOwner owner;
 } SPIExecuteOptions;
 
-/* Optional arguments for SPI_cursor_parse_open */
-typedef struct SPIParseOpenOptions
-{
-	ParamListInfo params;
-	int			cursorOptions;
-	bool		read_only;
-} SPIParseOpenOptions;
-
 /* Plans are opaque structs for standard users of SPI */
 typedef struct _SPI_plan *SPIPlanPtr;
 
@@ -68,7 +60,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_ERROR_COPY			(-2)
 #define SPI_ERROR_OPUNKNOWN		(-3)
 #define SPI_ERROR_UNCONNECTED	(-4)
-#define SPI_ERROR_CURSOR		(-5)	/* not used anymore */
 #define SPI_ERROR_ARGUMENT		(-6)
 #define SPI_ERROR_PARAM			(-7)
 #define SPI_ERROR_TRANSACTION	(-8)
@@ -87,7 +78,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_OK_INSERT			7
 #define SPI_OK_DELETE			8
 #define SPI_OK_UPDATE			9
-#define SPI_OK_CURSOR			10
 #define SPI_OK_INSERT_RETURNING 11
 #define SPI_OK_DELETE_RETURNING 12
 #define SPI_OK_UPDATE_RETURNING 13
@@ -134,8 +124,6 @@ extern int	SPI_execute_with_args(const char *src,
 								  Datum *Values, const char *Nulls,
 								  bool read_only, long tcount);
 extern SPIPlanPtr SPI_prepare(const char *src, int nargs, Oid *argtypes);
-extern SPIPlanPtr SPI_prepare_cursor(const char *src, int nargs, Oid *argtypes,
-									 int cursorOptions);
 extern SPIPlanPtr SPI_prepare_extended(const char *src,
 									   const SPIPrepareOptions *options);
 extern SPIPlanPtr SPI_prepare_params(const char *src,
@@ -148,7 +136,6 @@ extern int	SPI_freeplan(SPIPlanPtr plan);
 
 extern Oid	SPI_getargtypeid(SPIPlanPtr plan, int argIndex);
 extern int	SPI_getargcount(SPIPlanPtr plan);
-extern bool SPI_is_cursor_plan(SPIPlanPtr plan);
 extern bool SPI_plan_is_valid(SPIPlanPtr plan);
 extern const char *SPI_result_code_string(int code);
 
@@ -173,25 +160,6 @@ extern void SPI_pfree(void *pointer);
 extern Datum SPI_datumTransfer(Datum value, bool typByVal, int typLen);
 extern void SPI_freetuple(HeapTuple pointer);
 extern void SPI_freetuptable(SPITupleTable *tuptable);
-
-extern Portal SPI_cursor_open(const char *name, SPIPlanPtr plan,
-							  Datum *Values, const char *Nulls, bool read_only);
-extern Portal SPI_cursor_open_with_args(const char *name,
-										const char *src,
-										int nargs, Oid *argtypes,
-										Datum *Values, const char *Nulls,
-										bool read_only, int cursorOptions);
-extern Portal SPI_cursor_open_with_paramlist(const char *name, SPIPlanPtr plan,
-											 ParamListInfo params, bool read_only);
-extern Portal SPI_cursor_parse_open(const char *name,
-									const char *src,
-									const SPIParseOpenOptions *options);
-extern Portal SPI_cursor_find(const char *name);
-extern void SPI_cursor_fetch(Portal portal, bool forward, long count);
-extern void SPI_cursor_move(Portal portal, bool forward, long count);
-extern void SPI_scroll_cursor_fetch(Portal, FetchDirection direction, long count);
-extern void SPI_scroll_cursor_move(Portal, FetchDirection direction, long count);
-extern void SPI_cursor_close(Portal portal);
 
 extern int	SPI_register_relation(EphemeralNamedRelation enr);
 extern int	SPI_unregister_relation(const char *name);

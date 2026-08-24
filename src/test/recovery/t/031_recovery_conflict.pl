@@ -68,60 +68,17 @@ my $psql_standby = $node_standby->background_psql($test_db,
 my $expected_conflicts = 0;
 
 
-## RECOVERY CONFLICT 1: Buffer pin conflict
-my $sect = "buffer pin conflict";
-$expected_conflicts++;
-
-# Aborted INSERT on primary that will be cleaned up by vacuum. Has to be old
-# enough so that there's not a snapshot conflict before the buffer pin
-# conflict.
-
-$node_primary->safe_psql(
-	$test_db,
-	qq[
-	BEGIN;
-	INSERT INTO $table1 VALUES (1,0);
-	ROLLBACK;
-	-- ensure flush, rollback doesn't do so
-	BEGIN; LOCK $table1; COMMIT;
-	]);
-
-$primary_lsn = $node_primary->lsn('flush');
-$node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
-
-my $cursor1 = "test_recovery_conflict_cursor";
-
-# DECLARE and use a cursor on standby, causing buffer with the only block of
-# the relation to be pinned on the standby
-my $res = $psql_standby->query_safe(qq[
-    BEGIN;
-    DECLARE $cursor1 CURSOR FOR SELECT b FROM $table1;
-    FETCH FORWARD FROM $cursor1;
-]);
-# FETCH FORWARD should have returned a 0 since all values of b in the table
-# are 0
-like($res, qr/^0$/m, "$sect: cursor with conflicting pin established");
+# minipg: cursors removed.  The original "buffer pin conflict" test relied on a
+# DECLARE CURSOR to pin a buffer on the standby; there is no SQL-level way to
+# hold a buffer pin across statements anymore, so that conflict is dropped.
+# The "snapshot conflict" test now holds a snapshot with a plain REPEATABLE
+# READ transaction instead of a cursor.
 
 # to check the log starting now for recovery conflict messages
 my $log_location = -s $node_standby->logfile;
 
-# VACUUM on the primary
-$node_primary->safe_psql($test_db, qq[VACUUM $table1;]);
-
-# Wait for catchup. Existing connection will be terminated before replay is
-# finished, so waiting for catchup ensures that there is no race between
-# encountering the recovery conflict which causes the disconnect and checking
-# the logfile for the terminated connection.
-$primary_lsn = $node_primary->lsn('flush');
-$node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
-
-check_conflict_log("User was holding shared buffer pin for too long");
-$psql_standby->reconnect_and_clear();
-check_conflict_stat("bufferpin");
-
-
 ## RECOVERY CONFLICT 2: Snapshot conflict
-$sect = "snapshot conflict";
+my $sect = "snapshot conflict";
 $expected_conflicts++;
 
 $node_primary->safe_psql($test_db,
@@ -129,13 +86,13 @@ $node_primary->safe_psql($test_db,
 $primary_lsn = $node_primary->lsn('flush');
 $node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
 
-# DECLARE and FETCH from cursor on the standby
-$res = $psql_standby->query_safe(qq[
-        BEGIN;
-        DECLARE $cursor1 CURSOR FOR SELECT b FROM $table1;
-        FETCH FORWARD FROM $cursor1;
+# Open a REPEATABLE READ transaction and read the table on the standby,
+# establishing a snapshot that will conflict with vacuum's pruning
+my $res = $psql_standby->query_safe(qq[
+        BEGIN ISOLATION LEVEL REPEATABLE READ;
+        SELECT b FROM $table1;
         ]);
-like($res, qr/^0$/m, "$sect: cursor with conflicting snapshot established");
+like($res, qr/^0$/m, "$sect: transaction with conflicting snapshot established");
 
 # Do some HOT updates
 $node_primary->safe_psql($test_db,
@@ -177,66 +134,9 @@ $psql_standby->reconnect_and_clear();
 check_conflict_stat("lock");
 
 
-## RECOVERY CONFLICT 4: Deadlock
-SKIP:
-{
-	skip "disabled until after minor releases, due to instability";
-
-$sect = "startup deadlock";
-$expected_conflicts++;
-
-# Generate a few dead rows, to later be cleaned up by vacuum. Then acquire a
-# lock on another relation in a prepared xact, so it's held continuously by
-# the startup process. The standby psql will block acquiring that lock while
-# holding a pin that vacuum needs, triggering the deadlock.
-$node_primary->safe_psql(
-	$test_db,
-	qq[
-CREATE TABLE $table1(a int, b int);
-INSERT INTO $table1 VALUES (1);
-BEGIN;
-INSERT INTO $table1(a) SELECT generate_series(1, 100) i;
-ROLLBACK;
-BEGIN;
-LOCK TABLE $table2;
-PREPARE TRANSACTION 'lock';
-INSERT INTO $table1(a) VALUES (170);
-SELECT txid_current();
-]);
-
-$primary_lsn = $node_primary->lsn('flush');
-$node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
-
-$res = $psql_standby->query_until(qr/^1$/m, qq[
-    BEGIN;
-    -- hold pin
-    DECLARE $cursor1 CURSOR FOR SELECT a FROM $table1;
-    FETCH FORWARD FROM $cursor1;
-    -- wait for lock held by prepared transaction
-	SELECT * FROM $table2;
-    ]);
-ok( 1, "$sect: cursor holding conflicting pin, also waiting for lock, established");
-
-# just to make sure we're waiting for lock already
-ok( $node_standby->poll_query_until(
-		'postgres', qq[
-SELECT 'waiting' FROM pg_locks WHERE locktype = 'relation' AND NOT granted;
-], 'waiting'),
-	"$sect: lock acquisition is waiting");
-
-# VACUUM will prune away rows, causing a buffer pin conflict, while standby
-# psql is waiting on lock
-$node_primary->safe_psql($test_db, qq[VACUUM $table1;]);
-$primary_lsn = $node_primary->lsn('flush');
-$node_primary->wait_for_catchup($node_standby, 'replay', $primary_lsn);
-
-check_conflict_log("User transaction caused buffer deadlock with recovery.");
-$psql_standby->reconnect_and_clear();
-check_conflict_stat("deadlock");
-
-# clean up for next tests
-$node_primary->safe_psql($test_db, qq[ROLLBACK PREPARED 'lock';]);
-}
+# minipg: cursors removed.  The original "startup deadlock" conflict test
+# (already disabled upstream due to instability) relied on a DECLARE CURSOR
+# to hold a buffer pin while waiting for a lock; it is dropped.
 
 
 # Check that expected number of conflicts show in pg_stat_database. Needs to

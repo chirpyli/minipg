@@ -2077,7 +2077,7 @@ CommitTransaction(void)
 
 	/*
 	 * Let ON COMMIT management do its thing (must happen after closing
-	 * cursors, to avoid dangling-reference problems)
+	 * portals, to avoid dangling-reference problems)
 	 */
 	PreCommit_on_commit_actions();
 
@@ -2289,7 +2289,7 @@ PrepareTransaction(void)
 
 	/*
 	 * Let ON COMMIT management do its thing (must happen after closing
-	 * cursors, to avoid dangling-reference problems)
+	 * portals, to avoid dangling-reference problems)
 	 */
 	PreCommit_on_commit_actions();
 
@@ -3348,7 +3348,7 @@ PreventInTransactionBlock(bool isTopLevel, const char *stmtType)
  *	These two functions allow for warnings or errors if a command is executed
  *	outside of a transaction block.  This is useful for commands that have no
  *	effects that persist past transaction end (and so calling them outside a
- *	transaction block is presumably an error).  DECLARE CURSOR is an example.
+ *	transaction block is presumably an error).  SET CONSTRAINTS is an example.
  *	While top-level transaction control commands (BEGIN/COMMIT/ABORT) and SET
  *	that have no effect issue warnings, all other no-effect commands generate
  *	errors.

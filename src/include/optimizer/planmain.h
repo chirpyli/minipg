@@ -17,11 +17,7 @@
 #include "nodes/pathnodes.h"
 #include "nodes/plannodes.h"
 
-/* GUC parameters */
-#define DEFAULT_CURSOR_TUPLE_FRACTION 0.1
-extern double cursor_tuple_fraction;
-
-/* query_planner callback to compute query_pathkeys */
+/* query_pathkeys callback to compute query_pathkeys */
 typedef void (*query_pathkeys_callback) (PlannerInfo *root, void *extra);
 
 /*

@@ -95,37 +95,15 @@ main(int argc, char **argv)
 	conn2 = PQsetdb(pghost, pgport, pgoptions, NULL, dbName2);
 	check_prepare_conn(conn2, dbName2);
 
-	/* start a transaction block */
-	res1 = PQexec(conn1, "BEGIN");
-	if (PQresultStatus(res1) != PGRES_COMMAND_OK)
-	{
-		fprintf(stderr, "BEGIN command failed\n");
-		PQclear(res1);
-		exit_nicely(conn1, conn2);
-	}
-
 	/*
-	 * make sure to PQclear() a PGresult whenever it is no longer needed to
-	 * avoid memory leaks
+	 * minipg: SQL cursors are not available, so fetch rows from pg_database
+	 * with a plain query.  Note that we still demonstrate two simultaneous
+	 * backend connections.
 	 */
-	PQclear(res1);
-
-	/*
-	 * fetch instances from the pg_database, the system catalog of databases
-	 */
-	res1 = PQexec(conn1, "DECLARE myportal CURSOR FOR select * from pg_database");
-	if (PQresultStatus(res1) != PGRES_COMMAND_OK)
-	{
-		fprintf(stderr, "DECLARE CURSOR command failed\n");
-		PQclear(res1);
-		exit_nicely(conn1, conn2);
-	}
-	PQclear(res1);
-
-	res1 = PQexec(conn1, "FETCH ALL in myportal");
+	res1 = PQexec(conn1, "SELECT * FROM pg_database");
 	if (PQresultStatus(res1) != PGRES_TUPLES_OK)
 	{
-		fprintf(stderr, "FETCH ALL command didn't return tuples properly\n");
+		fprintf(stderr, "SELECT command didn't return tuples properly\n");
 		PQclear(res1);
 		exit_nicely(conn1, conn2);
 	}
@@ -144,14 +122,10 @@ main(int argc, char **argv)
 		printf("\n");
 	}
 
-	PQclear(res1);
-
-	/* close the portal */
-	res1 = PQexec(conn1, "CLOSE myportal");
-	PQclear(res1);
-
-	/* end the transaction */
-	res1 = PQexec(conn1, "END");
+	/*
+	 * make sure to PQclear() a PGresult whenever it is no longer needed to
+	 * avoid memory leaks
+	 */
 	PQclear(res1);
 
 	/* close the connections to the database and cleanup */

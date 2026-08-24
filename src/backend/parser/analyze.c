@@ -10,7 +10,7 @@
  * utility commands, no locks are obtained here (and if they were, we could
  * not be sure we'd still have them at execution).  Hence the general rule
  * for utility commands is to just dump them into a Query node untransformed.
- * DECLARE CURSOR, EXPLAIN, and CREATE TABLE AS are exceptions because they
+ * EXPLAIN and CREATE TABLE AS are exceptions because they
  * contain optimizable statements, which we should transform.
  *
  *
@@ -71,8 +71,6 @@ static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt);
 static List *transformReturningList(ParseState *pstate, List *returningList);
 static List *transformUpdateTargetList(ParseState *pstate,
 									   List *targetList);
-static Query *transformDeclareCursorStmt(ParseState *pstate,
-										 DeclareCursorStmt *stmt);
 static Query *transformExplainStmt(ParseState *pstate,
 								   ExplainStmt *stmt);
 static void transformLockingClause(ParseState *pstate, Query *qry,
@@ -253,12 +251,7 @@ transformStmt(ParseState *pstate, Node *parseTree)
 			/*
 			 * Special cases
 			 */
-		case T_DeclareCursorStmt:
-			result = transformDeclareCursorStmt(pstate,
-												(DeclareCursorStmt *) parseTree);
-			break;
-
-		case T_ExplainStmt:
+			case T_ExplainStmt:
 			result = transformExplainStmt(pstate,
 										  (ExplainStmt *) parseTree);
 			break;
@@ -318,10 +311,9 @@ stmt_requires_parse_analysis(RawStmt *parseTree)
 			/*
 			 * Special cases
 			 */
-		case T_DeclareCursorStmt:
-		case T_ExplainStmt:
-			result = true;
-			break;
+			case T_ExplainStmt:
+				result = true;
+				break;
 
 		default:
 			/* all other statements just get wrapped in a CMD_UTILITY Query */
@@ -1668,87 +1660,6 @@ transformReturningList(ParseState *pstate, List *returningList)
 }
 
 
-/*
- * transformDeclareCursorStmt -
- *	transform a DECLARE CURSOR Statement
- *
- * DECLARE CURSOR is like other utility statements in that we emit it as a
- * CMD_UTILITY Query node; however, we must first transform the contained
- * query.  We used to postpone that until execution, but it's really necessary
- * to do it during the normal parse analysis phase to ensure that side effects
- * of parser hooks happen at the expected time.
- */
-static Query *
-transformDeclareCursorStmt(ParseState *pstate, DeclareCursorStmt *stmt)
-{
-	Query	   *result;
-	Query	   *query;
-
-	if ((stmt->options & CURSOR_OPT_SCROLL) &&
-		(stmt->options & CURSOR_OPT_NO_SCROLL))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
-		/* translator: %s is a SQL keyword */
-				 errmsg("cannot specify both %s and %s",
-						"SCROLL", "NO SCROLL")));
-
-	if ((stmt->options & CURSOR_OPT_ASENSITIVE) &&
-		(stmt->options & CURSOR_OPT_INSENSITIVE))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
-		/* translator: %s is a SQL keyword */
-				 errmsg("cannot specify both %s and %s",
-						"ASENSITIVE", "INSENSITIVE")));
-
-	/* Transform contained query, not allowing SELECT INTO */
-	query = transformStmt(pstate, stmt->query);
-	stmt->query = (Node *) query;
-
-	/* Grammar should not have allowed anything but SELECT */
-	if (!IsA(query, Query) ||
-		query->commandType != CMD_SELECT)
-		elog(ERROR, "unexpected non-SELECT command in DECLARE CURSOR");
-
-	/* FOR UPDATE and WITH HOLD are not compatible */
-	if (query->rowMarks != NIL && (stmt->options & CURSOR_OPT_HOLD))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("DECLARE CURSOR WITH HOLD ... %s is not supported",
-						LCS_asString(((RowMarkClause *)
-									  linitial(query->rowMarks))->strength)),
-				 errdetail("Holdable cursors must be READ ONLY.")));
-
-	/* FOR UPDATE and SCROLL are not compatible */
-	if (query->rowMarks != NIL && (stmt->options & CURSOR_OPT_SCROLL))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("DECLARE SCROLL CURSOR ... %s is not supported",
-						LCS_asString(((RowMarkClause *)
-									  linitial(query->rowMarks))->strength)),
-				 errdetail("Scrollable cursors must be READ ONLY.")));
-
-	/* FOR UPDATE and INSENSITIVE are not compatible */
-	if (query->rowMarks != NIL && (stmt->options & CURSOR_OPT_INSENSITIVE))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("DECLARE INSENSITIVE CURSOR ... %s is not valid",
-						LCS_asString(((RowMarkClause *)
-									  linitial(query->rowMarks))->strength)),
-				 errdetail("Insensitive cursors must be READ ONLY.")));
-
-	/* represent the command as a utility Query */
-	result = makeNode(Query);
-	result->commandType = CMD_UTILITY;
-	result->utilityStmt = (Node *) stmt;
-
-	return result;
-}
 
 
 /*

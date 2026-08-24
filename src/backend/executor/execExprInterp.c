@@ -457,7 +457,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_NOT_DISTINCT,
 		&&CASE_EEOP_NULLIF,
 		&&CASE_EEOP_SQLVALUEFUNCTION,
-		&&CASE_EEOP_CURRENTOFEXPR,
 		&&CASE_EEOP_ARRAYEXPR,
 		&&CASE_EEOP_ARRAYCOERCE,
 		&&CASE_EEOP_ROW,
@@ -1319,14 +1318,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			 * efficiency-wise.
 			 */
 			ExecEvalSQLValueFunction(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_CURRENTOFEXPR)
-		{
-			/* error invocation uses space, and shouldn't ever occur */
-			ExecEvalCurrentOfExpr(state, op);
 
 			EEO_NEXT();
 		}
@@ -2500,23 +2491,6 @@ ExecEvalSQLValueFunction(ExprState *state, ExprEvalStep *op)
 			*op->resnull = fcinfo->isnull;
 			break;
 	}
-}
-
-/*
- * Raise error if a CURRENT OF expression is evaluated.
- *
- * The planner should convert CURRENT OF into a TidScan qualification, or some
- * other special handling in a ForeignScan node.  So we have to be able to do
- * ExecInitExpr on a CurrentOfExpr, but we shouldn't ever actually execute it.
- * If we get here, we suppose we must be dealing with CURRENT OF on a foreign
- * table whose FDW doesn't handle it, and complain accordingly.
- */
-void
-ExecEvalCurrentOfExpr(ExprState *state, ExprEvalStep *op)
-{
-	ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			 errmsg("WHERE CURRENT OF is not supported for this table type")));
 }
 
 /*

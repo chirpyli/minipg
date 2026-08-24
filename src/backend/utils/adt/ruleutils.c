@@ -6656,7 +6656,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_Param:
 		case T_CoerceToDomainValue:
 		case T_SetToDefault:
-		case T_CurrentOfExpr:
 			/* single words: always simple */
 			return true;
 
@@ -7806,19 +7805,6 @@ get_rule_expr(Node *node, deparse_context *context,
 
 		case T_SetToDefault:
 			appendStringInfoString(buf, "DEFAULT");
-			break;
-
-		case T_CurrentOfExpr:
-			{
-				CurrentOfExpr *cexpr = (CurrentOfExpr *) node;
-
-				if (cexpr->cursor_name)
-					appendStringInfo(buf, "CURRENT OF %s",
-									 quote_identifier(cexpr->cursor_name));
-				else
-					appendStringInfo(buf, "CURRENT OF $%d",
-									 cexpr->cursor_param);
-			}
 			break;
 
 		case T_InferenceElem:

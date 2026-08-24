@@ -40,23 +40,10 @@ CREATEorary view vw_ord as select * from rows from(unnest(array[10,20],array['fo
 select * from vw_ord;
 drop view vw_ord;
 
--- ordinality and multiple functions vs. rewind and reverse scan
-begin;
-declare rf_cur scroll cursor for select * from rows from(generate_series(1,5),generate_series(1,2)) with ordinality as g(i,j,o);
-fetch all from rf_cur;
-fetch backward all from rf_cur;
-fetch all from rf_cur;
-fetch next from rf_cur;
-fetch next from rf_cur;
-fetch prior from rf_cur;
-fetch absolute 1 from rf_cur;
-fetch next from rf_cur;
-fetch next from rf_cur;
-fetch next from rf_cur;
-fetch prior from rf_cur;
-fetch prior from rf_cur;
-fetch prior from rf_cur;
-commit;
+-- ordinality and multiple functions of unequal cardinality
+-- minipg: SQL cursors are removed, so the original scroll-cursor rewind test
+-- is replaced by a plain query on the same SRF combination.
+select * from rows from(generate_series(1,5),generate_series(1,2)) with ordinality as g(i,j,o);
 
 -- function with implicit LATERAL
 select * from rngfunc2, rngfunct(rngfunc2.rngfuncid) z where rngfunc2.f2 = z.f2;

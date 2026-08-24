@@ -81,21 +81,6 @@ SELECT t.ctid,t2.c FROM tidrangescan t,
 LATERAL (SELECT count(*) c FROM tidrangescan t2 WHERE t2.ctid <= t.ctid) t2
 WHERE t.ctid < '(1,0)';
 
--- cursors
-
--- Ensure we get a TID Range scan without a Materialize node.
-EXPLAIN (COSTS OFF)
-DECLARE c SCROLL CURSOR FOR SELECT ctid FROM tidrangescan WHERE ctid < '(1,0)';
-
-BEGIN;
-DECLARE c SCROLL CURSOR FOR SELECT ctid FROM tidrangescan WHERE ctid < '(1,0)';
-FETCH NEXT c;
-FETCH NEXT c;
-FETCH PRIOR c;
-FETCH FIRST c;
-FETCH LAST c;
-COMMIT;
-
 DROP TABLE tidrangescan;
 
 RESET enable_seqscan;

@@ -1249,8 +1249,7 @@ typedef struct BitmapOrPath
  * TidPath represents a scan by TID
  *
  * tidquals is an implicitly OR'ed list of qual expressions of the form
- * "CTID = pseudoconstant", or "CTID = ANY(pseudoconstant_array)",
- * or a CurrentOfExpr for the relation.
+ * "CTID = pseudoconstant", or "CTID = ANY(pseudoconstant_array)".
  */
 typedef struct TidPath
 {

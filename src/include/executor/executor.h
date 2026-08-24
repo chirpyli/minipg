@@ -73,14 +73,6 @@ extern bool ExecSupportsBackwardScan(Plan *node);
 extern bool ExecMaterializesOutput(NodeTag plantype);
 
 /*
- * prototypes from functions in execCurrent.c
- */
-extern bool execCurrentOf(CurrentOfExpr *cexpr,
-						  ExprContext *econtext,
-						  Oid table_oid,
-						  ItemPointer current_tid);
-
-/*
  * prototypes from functions in execGrouping.c
  */
 extern ExprState *execTuplesMatchPrepare(TupleDesc desc,

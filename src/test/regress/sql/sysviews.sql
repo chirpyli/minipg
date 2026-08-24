@@ -20,9 +20,6 @@ select name, ident, parent, level, total_bytes >= free_bytes
 -- At introduction, pg_config had 23 entries; it may grow
 select count(*) > 20 as ok from pg_config;
 
--- We expect no cursors in this test; see also portals.sql
-select count(*) = 0 as ok from pg_cursors;
-
 select count(*) >= 0 as ok from pg_file_settings;
 
 -- There will surely be at least one active lock

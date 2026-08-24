@@ -1431,16 +1431,6 @@ _outSetToDefault(StringInfo str, const SetToDefault *node)
 }
 
 static void
-_outCurrentOfExpr(StringInfo str, const CurrentOfExpr *node)
-{
-	WRITE_NODE_TYPE("CURRENTOFEXPR");
-
-	WRITE_UINT_FIELD(cvarno);
-	WRITE_STRING_FIELD(cursor_name);
-	WRITE_INT_FIELD(cursor_param);
-}
-
-static void
 _outInferenceElem(StringInfo str, const InferenceElem *node)
 {
 	WRITE_NODE_TYPE("INFERENCEELEM");
@@ -2472,16 +2462,6 @@ _outCreateStatsStmt(StringInfo str, const CreateStatsStmt *node)
 }
 
 static void
-_outDeclareCursorStmt(StringInfo str, const DeclareCursorStmt *node)
-{
-	WRITE_NODE_TYPE("DECLARECURSOR");
-
-	WRITE_STRING_FIELD(portalname);
-	WRITE_INT_FIELD(options);
-	WRITE_NODE_FIELD(query);
-}
-
-static void
 _outSelectStmt(StringInfo str, const SelectStmt *node)
 {
 	WRITE_NODE_TYPE("SELECT");
@@ -2655,7 +2635,6 @@ _outQuery(StringInfo str, const Query *node)
 		{
 			case T_CreateStmt:
 			case T_IndexStmt:
-			case T_DeclareCursorStmt:
 				WRITE_NODE_FIELD(utilityStmt);
 				break;
 			default:
@@ -3448,9 +3427,6 @@ outNode(StringInfo str, const void *obj)
 			case T_SetToDefault:
 				_outSetToDefault(str, obj);
 				break;
-			case T_CurrentOfExpr:
-				_outCurrentOfExpr(str, obj);
-				break;
 			case T_InferenceElem:
 				_outInferenceElem(str, obj);
 				break;
@@ -3642,9 +3618,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_CreateStatsStmt:
 				_outCreateStatsStmt(str, obj);
-				break;
-			case T_DeclareCursorStmt:
-				_outDeclareCursorStmt(str, obj);
 				break;
 			case T_SelectStmt:
 				_outSelectStmt(str, obj);
