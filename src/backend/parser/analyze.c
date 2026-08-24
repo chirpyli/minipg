@@ -56,7 +56,6 @@
 /* Hook for plugins to get control at end of parse analysis */
 post_parse_analyze_hook_type post_parse_analyze_hook = NULL;
 
-static Query *transformOptionalSelectInto(ParseState *pstate, Node *parseTree);
 static Query *transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt);
 static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt);
 static List *transformInsertRow(ParseState *pstate, List *exprlist,
@@ -200,29 +199,12 @@ transformTopLevelStmt(ParseState *pstate, RawStmt *parseTree)
 {
 	Query	   *result;
 
-	/* We're at top level, so allow SELECT INTO */
-	result = transformOptionalSelectInto(pstate, parseTree->stmt);
+	result = transformStmt(pstate, parseTree->stmt);
 
 	result->stmt_location = parseTree->stmt_location;
 	result->stmt_len = parseTree->stmt_len;
 
 	return result;
-}
-
-/*
- * transformOptionalSelectInto -
- *	  If SELECT has INTO, convert it to CREATE TABLE AS.
- *
- * The only thing we do here that we don't do in transformStmt() is to
- * convert SELECT ... INTO into CREATE TABLE AS.  Since utility statements
- * aren't allowed within larger statements, this is only allowed at the top
- * of the parse tree, and so we only try it before entering the recursive
- * transformStmt() processing.
- */
-static Query *
-transformOptionalSelectInto(ParseState *pstate, Node *parseTree)
-{
-	return transformStmt(pstate, parseTree);
 }
 
 /*
@@ -1806,8 +1788,7 @@ transformExplainStmt(ParseState *pstate, ExplainStmt *stmt)
 {
 	Query	   *result;
 
-	/* transform contained query, allowing SELECT INTO */
-	stmt->query = (Node *) transformOptionalSelectInto(pstate, stmt->query);
+	stmt->query = (Node *) transformStmt(pstate, stmt->query);
 
 	/* represent the command as a utility Query */
 	result = makeNode(Query);
