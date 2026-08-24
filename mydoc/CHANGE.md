@@ -4,6 +4,14 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## ALTER AGGREGATE 全形式裁剪确认与 psql 死代码清理（2026-08-24）
+
+`ALTER AGGREGATE` 的三种形式（RENAME TO / OWNER TO / SET SCHEMA）此前（2026-08-18/08-20）已随外围 ALTER 裁剪与 `AlterAggregateStmt` 产生式删除而全部移除，本次在 `CREATE/DROP AGGREGATE` 裁剪（见上一条）基础上确认后端零残留：`gram.y` 无 `ALTER AGGREGATE` 产生式，`OBJECT_AGGREGATE` 枚举、命令标签、`alter.c`/对象寻址均无聚合分支。
+
+同步清理 `src/bin/psql/tab-complete.c` 中面向已裁命令的 AGGREGATE 补全死代码：`CREATE OR REPLACE`、`COMMENT ON`、`DROP`（含参数补全）候选列表移除 `AGGREGATE`；保留 `\dA`（`Query_for_list_of_aggregates`，内置聚合函数 avg/sum/count 等仍存于 `pg_aggregate`）。
+
+验证：`make check-world` 全绿。
+
 ## CREATE/DROP AGGREGATE、CREATE OPERATOR、CREATE TYPE（基础/shell）裁剪（2026-08-24）
 
 ### 一、删除内容

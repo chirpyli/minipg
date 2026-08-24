@@ -1503,7 +1503,7 @@ psql_completion(const char *text, int start, int end)
 	/* complete with something you can create or replace */
 	else if (TailMatches("CREATE", "OR", "REPLACE"))
 		COMPLETE_WITH("FUNCTION", "PROCEDURE", "LANGUAGE", "RULE", "VIEW",
-					  "AGGREGATE", "TRANSFORM", "TRIGGER");
+					  "TRANSFORM", "TRIGGER");
 
 /* DROP, but not DROP embedded in other commands */
 	/* complete with something you can drop */
@@ -2062,7 +2062,7 @@ else if (Matches("COMMENT", "ON"))
 				  "INDEX", "LANGUAGE", "PUBLICATION", "RULE",
 				  "SCHEMA", "STATISTICS", "SUBSCRIPTION",
 				  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
-				  "COLUMN", "AGGREGATE", "FUNCTION",
+				  "COLUMN", "FUNCTION",
 				  "PROCEDURE", "ROUTINE",
 				  "OPERATOR", "TRIGGER", "CONSTRAINT", "DOMAIN",
 				  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
@@ -2557,7 +2557,7 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 	else if (Matches("DROP",
 					 "COLLATION|DOMAIN|EXTENSION|LANGUAGE|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
 					 MatchAny) ||
-			 (Matches("DROP", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&
+			 (Matches("DROP", "FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&
 			  ends_with(prev_wd, ')')) ||
 			 Matches("DROP", "EVENT", "TRIGGER", MatchAny) ||
 			 Matches("DROP", "FOREIGN", "DATA", "WRAPPER", MatchAny) ||
@@ -2566,9 +2566,9 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 		COMPLETE_WITH("CASCADE", "RESTRICT");
 
 	/* help completing some of the variants */
-	else if (Matches("DROP", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny))
+	else if (Matches("DROP", "FUNCTION|PROCEDURE|ROUTINE", MatchAny))
 		COMPLETE_WITH("(");
-	else if (Matches("DROP", "AGGREGATE|FUNCTION|PROCEDURE|ROUTINE", MatchAny, "("))
+	else if (Matches("DROP", "FUNCTION|PROCEDURE|ROUTINE", MatchAny, "("))
 		COMPLETE_WITH_FUNCTION_ARG(prev2_wd);
 	else if (Matches("DROP", "FOREIGN"))
 		COMPLETE_WITH("DATA WRAPPER", "TABLE");
