@@ -350,18 +350,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 			msg = gettext_noop("language \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);
 			break;
-		case OBJECT_CAST:
-			{
-				if (!type_in_list_does_not_exist_skipping(list_make1(linitial(castNode(List, object))), &msg, &name) &&
-					!type_in_list_does_not_exist_skipping(list_make1(lsecond(castNode(List, object))), &msg, &name))
-				{
-					/* XXX quote or no quote? */
-					msg = gettext_noop("cast from type %s to type %s does not exist, skipping");
-					name = TypeNameToString(linitial_node(TypeName, castNode(List, object)));
-					args = TypeNameToString(lsecond_node(TypeName, castNode(List, object)));
-				}
-			}
-			break;
 		case OBJECT_TRANSFORM:
 			if (!type_in_list_does_not_exist_skipping(list_make1(linitial(castNode(List, object))), &msg, &name))
 			{

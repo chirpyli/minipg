@@ -151,15 +151,6 @@ DROP FUNCTION test_function_exists(int, text, int[]);
 ERROR:  function test_function_exists(integer, text, integer[]) does not exist
 DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
 NOTICE:  function test_function_exists(pg_catalog.int4,text,pg_catalog.int4[]) does not exist, skipping
--- cast
-DROP CAST (text AS text);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST (text AS text);
-             ^
-DROP CAST IF EXISTS (text AS text);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST IF EXISTS (text AS text);
-             ^
 -- trigger
 DROP TRIGGER test_trigger_exists ON test_exists;
 ERROR:  syntax error at or near "TRIGGER"
@@ -235,22 +226,6 @@ DROP TABLE IF EXISTS test_exists;
 DROP TABLE test_exists;
 ERROR:  table "test_exists" does not exist
 -- be tolerant with missing schemas, types, etc
-DROP CAST IF EXISTS (INTEGER AS no_such_type2);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST IF EXISTS (INTEGER AS no_such_type2);
-             ^
-DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
-             ^
-DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
-             ^
-DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
-ERROR:  syntax error at or near "CAST"
-LINE 1: DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
-             ^
 DROP COLLATION IF EXISTS no_such_schema.foo;
 ERROR:  syntax error at or near "COLLATION"
 LINE 1: DROP COLLATION IF EXISTS no_such_schema.foo;

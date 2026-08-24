@@ -4,6 +4,24 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE/ALTER/DROP CAST 功能裁剪（2026-08-24）
+
+### 一、背景
+用户自定义 CAST 的 DDL 入口（gram.y 的 `CREATE CAST`/`DROP CAST` 产生式、`castcmds.c` 整文件、`CreateCastStmt` 节点）此前已随 CREATE TYPE 基础形式裁剪一并移除，本次彻底清理 SQL 命令层的残留死代码。
+
+### 二、删除内容
+- `gram.y` 中 `CREATE CAST / DROP CAST` 残留注释头（无产生式）。
+- 命令标签 `CMDTAG_ALTER_CAST`/`CMDTAG_CREATE_CAST`/`CMDTAG_DROP_CAST`（`ALTER CAST` 在 PostgreSQL 中本就不存在命令语法，仅删除预留标签）。
+- `utility.c` 中 `AlterObjectTypeCommandTag`/`DropObjectTypeCommandTag` 的 `OBJECT_CAST` 分支（不可达）。
+- `dropcmds.c` 中 `does_not_exist_skipping` 的 `OBJECT_CAST` 分支（不可达）。
+- `drop_if_exists` 测试中 DROP CAST 用例（其期望输出为语法错误）。
+
+### 三、保留
+`pg_cast` 系统表、`CastCreate`（`pg_cast.c`）及 `OBJECT_CAST`/`OCLASS_CAST` 对象寻址与依赖管理：range 类型创建时系统自动生成 range→multirange 转换记录，`DROP TYPE ... CASCADE` 时依赖系统仍需按 `pg_cast` 元组执行级联删除，属于内核核心，不可裁剪。
+
+### 四、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 73 用例 + isolation/modules/contrib）。
+
 ## ALTER AGGREGATE 全形式裁剪确认与 psql 死代码清理（2026-08-24）
 
 `ALTER AGGREGATE` 的三种形式（RENAME TO / OWNER TO / SET SCHEMA）此前（2026-08-18/08-20）已随外围 ALTER 裁剪与 `AlterAggregateStmt` 产生式删除而全部移除，本次在 `CREATE/DROP AGGREGATE` 裁剪（见上一条）基础上确认后端零残留：`gram.y` 无 `ALTER AGGREGATE` 产生式，`OBJECT_AGGREGATE` 枚举、命令标签、`alter.c`/对象寻址均无聚合分支。

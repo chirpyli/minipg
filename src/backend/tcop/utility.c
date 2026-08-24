@@ -1244,9 +1244,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_ATTRIBUTE:
 			tag = CMDTAG_ALTER_TYPE;
 			break;
-		case OBJECT_CAST:
-			tag = CMDTAG_ALTER_CAST;
-			break;
 		case OBJECT_COLUMN:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
@@ -1451,9 +1448,6 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_LANGUAGE:
 					tag = CMDTAG_DROP_LANGUAGE;
-					break;
-				case OBJECT_CAST:
-					tag = CMDTAG_DROP_CAST;
 					break;
 			case OBJECT_RULE:
 				tag = CMDTAG_DROP_RULE;

@@ -134,10 +134,6 @@ DROP FUNCTION IF EXISTS test_function_exists();
 DROP FUNCTION test_function_exists(int, text, int[]);
 DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
 
--- cast
-DROP CAST (text AS text);
-DROP CAST IF EXISTS (text AS text);
-
 -- trigger
 DROP TRIGGER test_trigger_exists ON test_exists;
 DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
@@ -191,10 +187,6 @@ DROP TABLE test_exists;
 
 -- be tolerant with missing schemas, types, etc
 
-DROP CAST IF EXISTS (INTEGER AS no_such_type2);
-DROP CAST IF EXISTS (no_such_type1 AS INTEGER);
-DROP CAST IF EXISTS (INTEGER AS no_such_schema.bar);
-DROP CAST IF EXISTS (no_such_schema.foo AS INTEGER);
 DROP COLLATION IF EXISTS no_such_schema.foo;
 DROP DOMAIN IF EXISTS no_such_schema.foo;
 DROP FUNCTION IF EXISTS no_such_schema.foo();
