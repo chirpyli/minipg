@@ -6,6 +6,25 @@
 
 ---
 
+## 插件钩子与调试桩裁剪（2026-08-24）
+
+### 一、插件钩子（ProcessUtility_hook + 4 个 Executor 钩子）裁剪
+
+这些钩子均为「可加载插件介入内核」的扩展点，非数据库运行核心逻辑；minipg 现有 contrib 扩展（amcheck、bloom、pageinspect、pg_buffercache、pg_freespacemap、pg_surgery、pg_visibility、pgrowlocks、pgstattuple、spi 等）均无引用。全部删除，调用点直接改为调用对应的 `standard_*` 实现：
+
+- **`src/include/tcop/utility.h`**：删除 `ProcessUtility_hook_type` 类型定义与 `ProcessUtility_hook` 的 `extern` 声明；删除 `utility.c` 中针对该 hook 的残留注释块。
+- **`src/backend/tcop/utility.c`**：删除 `ProcessUtility_hook` 变量定义，`ProcessUtility()` 中 `if (ProcessUtility_hook) ... else standard_ProcessUtility(...)` 分支简化为直接调用 `standard_ProcessUtility()`。
+- **`src/include/executor/executor.h`**：删除 `ExecutorStart_hook_type` / `ExecutorRun_hook_type` / `ExecutorFinish_hook_type` / `ExecutorEnd_hook_type` 四个 typedef 与对应 `extern` 声明。
+- **`src/backend/executor/execMain.c`**：删除 4 个 hook 变量定义（`= NULL`）；`ExecutorStart/Run/Finish/End` 中 `if (hook) ... else standard_*` 分支简化为直接调用 `standard_*`。
+- **`src/tools/pgindent/typedefs.list`**：删除 5 个 hook 类型（`ProcessUtility_hook_type` 与 4 个 `Executor*_hook_type`）的登记项。
+
+### 二、调试桩裁剪
+
+- **`src/backend/parser/analyze.c`**：删除 `RAW_EXPRESSION_COVERAGE_TEST` 条件编译块——含 `test_raw_expression_coverage` 的前向声明、调用点（`transformStmt` 中对 SELECT/INSERT/UPDATE/DELETE 走 `raw_expression_tree_walker` 的自测）与函数定义；`pg_config_manual.h` 中对应的注释开关一并移除。该机制仅为上游维护 `raw_expression_tree_walker` 的开发者自测手段，默认关闭、非运行功能。
+- **`src/backend/tcop/postgres.c`**：删除 `COPY_PARSE_PLAN_TREES` 条件块中 `ereport` 打印 `raw_parse_tree` 的调试转储分支（保留节点解析本身）。
+
+---
+
 ## initdb 裁剪：移除 `-A/--auth`、`--auth-host`、`--auth-local` 三个选项（2026-08-21）
 
 minipg 已不再需要 initdb 的认证方式配置选项，本次裁剪移除以下三个命令行选项：
