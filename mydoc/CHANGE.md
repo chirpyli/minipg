@@ -4,6 +4,30 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## ALTER DOMAIN / ALTER DATABASE / ALTER EXTENSION 命令裁剪（2026-08-24）
+
+### 一、背景
+`ALTER DATABASE` 与 `ALTER EXTENSION` 命令在 minipg 中早已随数据库/扩展功能裁剪（无语法产生式、无节点、无执行路径），本次仅清理其遗留死标签与死分支。`ALTER DOMAIN` 命令此前仍保留完整的语法与执行路径，但领域类型（domain）的核心能力（CREATE DOMAIN、类型约束检查、依赖管理）已由既有代码支撑，`ALTER DOMAIN` 作为 DDL 变更入口学习价值低，予以彻底裁剪。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_ALTER_DATABASE` / `CMDTAG_ALTER_DOMAIN` / `CMDTAG_ALTER_EXTENSION`（`cmdtaglist.h`）。
+- `gram.y` 中 `AlterDomainStmt` 非终结符及其全部产生式（SET/DROP DEFAULT、SET/DROP NOT NULL、ADD CONSTRAINT、DROP CONSTRAINT、VALIDATE CONSTRAINT），以及 `AlterObjectSchemaStmt` 的 `ALTER DOMAIN ... SET SCHEMA` 分支。
+- `AlterDomainStmt` 节点：`nodes.h` 标签、`parsenodes.h` 结构体、`copyfuncs.c`/`equalfuncs.c` 复制与比较函数及 switch 分支、`typedefs.list` 条目。
+- `typecmds.c` 中 `AlterDomainDefault` / `AlterDomainNotNull` / `AlterDomainAddConstraint` / `AlterDomainDropConstraint` / `AlterDomainValidateConstraint` 五个执行函数及 `validateDomainConstraint` 辅助函数；`typecmds.h` 中对应 extern 声明。
+- `tablecmds.c` 中 `AT_ReAddDomainConstraint` 子命令处理（枚举、锁等级分支、执行分支、`AlterDomainStmt` 解析分支）。
+- `utility.c` 中 `T_AlterDomainStmt` 的只读分类、`ProcessUtilitySlow` 分发、`CreateCommandTag`、日志分级等分支，以及 `AlterObjectTypeCommandTag` 中 `OBJECT_DATABASE`/`OBJECT_DOMAIN`/`OBJECT_DOMCONSTRAINT`/`OBJECT_EXTENSION` 死分支。
+
+### 三、保留
+- `CREATE DOMAIN` / `DROP DOMAIN` 及其 `CMDTAG_CREATE_DOMAIN` / `CMDTAG_DROP_DOMAIN` 标签：domain 是类型系统核心，`DefineDomain`、`domainAddConstraint`、`get_rels_with_domain` 等仍被 CREATE DOMAIN 与约束依赖管理使用，不可裁剪。
+- `ALTER TABLE ... SET SCHEMA`、`ALTER TYPE ... SET SCHEMA`、`ALTER VIEW ... SET SCHEMA` 等其余 `AlterObjectSchemaStmt` 分支。
+- `OBJECT_DOMCONSTRAINT` 对象类型枚举：`objectaddress.c` 依赖系统仍须按域约束执行依赖/级联删除。
+
+验证：`make -j8` 全量重编通过；`make check-world` 全绿。
+
+## ALTER ACCESS METHOD 命令标签裁剪（2026-08-24）
+
+`CREATE ACCESS METHOD` 命令此前已随访问方法 DDL 裁剪一并移除（gram.y 产生式、`AlterAmStmt`/`DropAmStmt`/`DefineAm` 均已删除），本次清理遗留的命令标签 `CMDTAG_ALTER_ACCESS_METHOD`（`ALTER ACCESS METHOD` 在 PostgreSQL 中本就不存在命令语法，仅删除预留标签）。经全库检索，`src` 下已无任何 `ACCESS METHOD` 命令相关残留。验证：`make -j8` 全量重编通过；`make check-world` 全绿。
+
 ## CREATE/ALTER/DROP CAST 功能裁剪（2026-08-24）
 
 ### 一、背景

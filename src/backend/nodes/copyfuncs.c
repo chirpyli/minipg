@@ -2767,21 +2767,6 @@ _copyAlterTableCmd(const AlterTableCmd *from)
 	return newnode;
 }
 
-static AlterDomainStmt *
-_copyAlterDomainStmt(const AlterDomainStmt *from)
-{
-	AlterDomainStmt *newnode = makeNode(AlterDomainStmt);
-
-	COPY_SCALAR_FIELD(subtype);
-	COPY_NODE_FIELD(typeName);
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(def);
-	COPY_SCALAR_FIELD(behavior);
-	COPY_SCALAR_FIELD(missing_ok);
-
-	return newnode;
-}
-
 static ObjectWithArgs *
 _copyObjectWithArgs(const ObjectWithArgs *from)
 {
@@ -3752,9 +3737,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_AlterTableCmd:
 			retval = _copyAlterTableCmd(from);
-			break;
-		case T_AlterDomainStmt:
-			retval = _copyAlterDomainStmt(from);
 			break;
 		case T_ClusterStmt:
 			retval = _copyClusterStmt(from);

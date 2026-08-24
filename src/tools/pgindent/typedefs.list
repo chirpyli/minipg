@@ -59,7 +59,6 @@ AllocSetContext
 AllocSetFreeList
 AllocateDesc
 AllocateDescKind
-AlterDomainStmt
 AlterEnumStmt
 AlterEventTrigStmt
 AlterFdwStmt

@@ -1374,7 +1374,6 @@ typedef enum AlterTableType
 	AT_AddConstraint,			/* add constraint */
 	AT_AddConstraintRecurse,	/* internal to commands/tablecmds.c */
 	AT_ReAddConstraint,			/* internal to commands/tablecmds.c */
-	AT_ReAddDomainConstraint,	/* internal to commands/tablecmds.c */
 	AT_AlterConstraint,			/* alter constraint */
 	AT_ValidateConstraint,		/* validate constraint */
 	AT_ValidateConstraintRecurse,	/* internal to commands/tablecmds.c */
@@ -1421,29 +1420,11 @@ typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
 
 
 /* ----------------------
- *	Alter Domain
+ *	Alter Table
  *
  * The fields are used in different ways by the different variants of
  * this command.
- * ----------------------
  */
-typedef struct AlterDomainStmt
-{
-	NodeTag		type;
-	char		subtype;		/*------------
-								 *	T = alter column default
-								 *	N = alter column drop not null
-								 *	O = alter column set not null
-								 *	C = add constraint
-								 *	X = drop constraint
-								 *------------
-								 */
-	List	   *typeName;		/* domain to work on */
-	char	   *name;			/* column or constraint name to act on */
-	Node	   *def;			/* definition of default or constraint */
-	DropBehavior behavior;		/* RESTRICT or CASCADE for DROP cases */
-	bool		missing_ok;		/* skip error if missing? */
-} AlterDomainStmt;
 
 
 /*

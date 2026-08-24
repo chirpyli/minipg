@@ -1014,19 +1014,6 @@ _equalAlterTableCmd(const AlterTableCmd *a, const AlterTableCmd *b)
 }
 
 static bool
-_equalAlterDomainStmt(const AlterDomainStmt *a, const AlterDomainStmt *b)
-{
-	COMPARE_SCALAR_FIELD(subtype);
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(def);
-	COMPARE_SCALAR_FIELD(behavior);
-	COMPARE_SCALAR_FIELD(missing_ok);
-
-	return true;
-}
-
-static bool
 _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 {
 	COMPARE_NODE_FIELD(objname);
@@ -2228,9 +2215,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterTableCmd:
 			retval = _equalAlterTableCmd(a, b);
-			break;
-		case T_AlterDomainStmt:
-			retval = _equalAlterDomainStmt(a, b);
 			break;
 		case T_ClusterStmt:
 			retval = _equalClusterStmt(a, b);

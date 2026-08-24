@@ -114,7 +114,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_AlterDomainStmt:
 		case T_AlterEnumStmt:
 		case T_AlterObjectSchemaStmt:
 		case T_AlterTableStmt:
@@ -800,65 +799,9 @@ ProcessUtilitySlow(ParseState *pstate,
 
 				break;
 
-			case T_AlterDomainStmt:
-				{
-					AlterDomainStmt *stmt = (AlterDomainStmt *) parsetree;
-
-					/*
-					 * Some or all of these functions are recursive to cover
-					 * inherited things, so permission checks are done there.
-					 */
-					switch (stmt->subtype)
-					{
-						case 'T':	/* ALTER DOMAIN DEFAULT */
-
-							/*
-							 * Recursively alter column default for table and,
-							 * if requested, for descendants
-							 */
-							address =
-								AlterDomainDefault(stmt->typeName,
-												   stmt->def);
-							break;
-						case 'N':	/* ALTER DOMAIN DROP NOT NULL */
-							address =
-								AlterDomainNotNull(stmt->typeName,
-												   false);
-							break;
-						case 'O':	/* ALTER DOMAIN SET NOT NULL */
-							address =
-								AlterDomainNotNull(stmt->typeName,
-												   true);
-							break;
-						case 'C':	/* ADD CONSTRAINT */
-							address =
-								AlterDomainAddConstraint(stmt->typeName,
-														 stmt->def,
-														 &secondaryObject);
-							break;
-						case 'X':	/* DROP CONSTRAINT */
-							address =
-								AlterDomainDropConstraint(stmt->typeName,
-														  stmt->name,
-														  stmt->behavior,
-														  stmt->missing_ok);
-							break;
-						case 'V':	/* VALIDATE CONSTRAINT */
-							address =
-								AlterDomainValidateConstraint(stmt->typeName,
-															  stmt->name);
-							break;
-						default:	/* oops */
-							elog(ERROR, "unrecognized alter domain type: %d",
-								 (int) stmt->subtype);
-							break;
-					}
-				}
-				break;
-
-				/*
-				 * ************* object creation / destruction **************
-				 */
+			/*
+			 * ************* object creation / destruction **************
+			 */
 			case T_IndexStmt:	/* CREATE INDEX */
 				{
 					IndexStmt  *stmt = (IndexStmt *) parsetree;
@@ -1247,16 +1190,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_COLUMN:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
-		case OBJECT_DATABASE:
-			tag = CMDTAG_ALTER_DATABASE;
-			break;
-		case OBJECT_DOMAIN:
-		case OBJECT_DOMCONSTRAINT:
-			tag = CMDTAG_ALTER_DOMAIN;
-			break;
-		case OBJECT_EXTENSION:
-			tag = CMDTAG_ALTER_EXTENSION;
-			break;
 		case OBJECT_INDEX:
 			tag = CMDTAG_ALTER_INDEX;
 			break;
@@ -1482,10 +1415,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_AlterTableStmt:
 			tag = AlterObjectTypeCommandTag(((AlterTableStmt *) parsetree)->objtype);
-			break;
-
-		case T_AlterDomainStmt:
-			tag = CMDTAG_ALTER_DOMAIN;
 			break;
 
 		case T_CompositeTypeStmt:
@@ -1873,10 +1802,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterTableStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterDomainStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

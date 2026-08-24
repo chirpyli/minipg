@@ -295,7 +295,6 @@ typedef enum NodeTag
 	T_ReturnStmt,
 	T_AlterTableStmt,
 	T_AlterTableCmd,
-	T_AlterDomainStmt,
 	T_ClusterStmt,
 	T_CreateStmt,
 	T_DropStmt,

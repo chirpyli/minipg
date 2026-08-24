@@ -2673,7 +2673,6 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_AddConstraint:
 			case AT_AddConstraintRecurse:	/* becomes AT_AddConstraint */
 			case AT_ReAddConstraint:	/* becomes AT_AddConstraint */
-			case AT_ReAddDomainConstraint:	/* becomes AT_AddConstraint */
 				if (IsA(cmd->def, Constraint))
 				{
 					Constraint *con = (Constraint *) cmd->def;
@@ -3222,13 +3221,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			address =
 				ATExecAddConstraint(wqueue, tab, rel, (Constraint *) cmd->def,
 									true, true, lockmode);
-			break;
-		case AT_ReAddDomainConstraint:	/* Re-add pre-existing domain check
-										 * constraint */
-			address =
-				AlterDomainAddConstraint(((AlterDomainStmt *) cmd->def)->typeName,
-										 ((AlterDomainStmt *) cmd->def)->def,
-										 NULL);
 			break;
 		case AT_AddIndexConstraint: /* ADD CONSTRAINT USING INDEX */
 			ATExecAddIndexConstraint(tab, rel, (IndexStmt *) cmd->def,
@@ -7943,23 +7935,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 					elog(ERROR, "unexpected statement subtype: %d",
 						 (int) cmd->subtype);
 			}
-		}
-		else if (IsA(stm, AlterDomainStmt))
-		{
-			AlterDomainStmt *stmt = (AlterDomainStmt *) stm;
-
-			if (stmt->subtype == 'C')	/* ADD CONSTRAINT */
-			{
-				AlterTableCmd *cmd = makeNode(AlterTableCmd);
-
-				cmd->subtype = AT_ReAddDomainConstraint;
-				cmd->def = (Node *) stmt;
-				tab->subcmds[AT_PASS_OLD_CONSTR] =
-					lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
-			}
-			else
-				elog(ERROR, "unexpected statement subtype: %d",
-					 (int) stmt->subtype);
 		}
 		else if (IsA(stm, CreateStatsStmt))
 		{

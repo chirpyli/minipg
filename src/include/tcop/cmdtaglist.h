@@ -25,10 +25,6 @@
 
 /* symbol name, textual name, event_trigger_ok, table_rewrite_ok, rowcount */
 PG_CMDTAG(CMDTAG_UNKNOWN, "???", false, false, false)
-PG_CMDTAG(CMDTAG_ALTER_ACCESS_METHOD, "ALTER ACCESS METHOD", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_DATABASE, "ALTER DATABASE", false, false, false)
-PG_CMDTAG(CMDTAG_ALTER_DOMAIN, "ALTER DOMAIN", true, false, false)
-PG_CMDTAG(CMDTAG_ALTER_EXTENSION, "ALTER EXTENSION", true, false, false)
 PG_CMDTAG(CMDTAG_ALTER_INDEX, "ALTER INDEX", true, false, false)
 PG_CMDTAG(CMDTAG_ALTER_LANGUAGE, "ALTER LANGUAGE", true, false, false)
 PG_CMDTAG(CMDTAG_ALTER_OPERATOR, "ALTER OPERATOR", true, false, false)

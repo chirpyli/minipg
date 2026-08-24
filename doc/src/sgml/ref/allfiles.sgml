@@ -56,7 +56,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY delete SYSTEM "delete.sgml">
 <!ENTITY discard SYSTEM "discard.sgml">
 <!ENTITY do SYSTEM "do.sgml">
-<!ENTITY dropAccessMethod SYSTEM "drop_access_method.sgml">
 <!ENTITY dropAggregate SYSTEM "drop_aggregate.sgml">
 <!ENTITY dropCollation SYSTEM "drop_collation.sgml">
 <!ENTITY dropConversion SYSTEM "drop_conversion.sgml">

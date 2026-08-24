@@ -225,7 +225,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
-		AlterDomainStmt AlterEnumStmt
+		AlterEnumStmt
 		AlterObjectSchemaStmt
 		AlterTypeStmt AlterTableStmt
 		AlterCompositeTypeStmt
@@ -717,8 +717,7 @@ toplevel_stmt:
 			| TransactionStmtLegacy
 		;
 
-stmt:	AlterDomainStmt
-			| AlterEnumStmt
+stmt:	AlterEnumStmt
 			| AlterObjectSchemaStmt
 			| AlterTypeStmt
 			| AlterTableStmt
@@ -3622,16 +3621,8 @@ opt_set_data: SET DATA_P							{ $$ = 1; }
  *****************************************************************************/
 
 AlterObjectSchemaStmt:
-			ALTER DOMAIN_P any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_DOMAIN;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER TABLE relation_expr SET SCHEMA name
+			/* ALTER TABLE relation_expr SET SCHEMA name */
+			ALTER TABLE relation_expr SET SCHEMA name
 				{
 					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
 					n->objectType = OBJECT_TABLE;
@@ -4166,74 +4157,6 @@ CreateDomainStmt:
 					$$ = (Node *)n;
 				}
 		;
-
-AlterDomainStmt:
-			/* ALTER DOMAIN <domain> {SET DEFAULT <expr>|DROP DEFAULT} */
-			ALTER DOMAIN_P any_name alter_column_default
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'T';
-					n->typeName = $3;
-					n->def = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> DROP NOT NULL */
-			| ALTER DOMAIN_P any_name DROP NOT NULL_P
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'N';
-					n->typeName = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> SET NOT NULL */
-			| ALTER DOMAIN_P any_name SET NOT NULL_P
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'O';
-					n->typeName = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> ADD CONSTRAINT ... */
-			| ALTER DOMAIN_P any_name ADD_P TableConstraint
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'C';
-					n->typeName = $3;
-					n->def = $5;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> DROP CONSTRAINT <name> [RESTRICT|CASCADE] */
-			| ALTER DOMAIN_P any_name DROP CONSTRAINT name opt_drop_behavior
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'X';
-					n->typeName = $3;
-					n->name = $6;
-					n->behavior = $7;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> DROP CONSTRAINT IF EXISTS <name> [RESTRICT|CASCADE] */
-			| ALTER DOMAIN_P any_name DROP CONSTRAINT IF_P EXISTS name opt_drop_behavior
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'X';
-					n->typeName = $3;
-					n->name = $8;
-					n->behavior = $9;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			/* ALTER DOMAIN <domain> VALIDATE CONSTRAINT <name> */
-			| ALTER DOMAIN_P any_name VALIDATE CONSTRAINT name
-				{
-					AlterDomainStmt *n = makeNode(AlterDomainStmt);
-					n->subtype = 'V';
-					n->typeName = $3;
-					n->name = $6;
-					$$ = (Node *)n;
-				}
-			;
 
 opt_as:		AS
 			| /* EMPTY */

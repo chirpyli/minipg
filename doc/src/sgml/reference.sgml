@@ -85,7 +85,6 @@
    &delete;
    &discard;
    &do;
-   &dropAccessMethod;
    &dropAggregate;
    &dropCollation;
    &dropConversion;
