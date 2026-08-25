@@ -31,7 +31,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"

@@ -1186,15 +1186,6 @@ _equalCompositeTypeStmt(const CompositeTypeStmt *a, const CompositeTypeStmt *b)
 }
 
 static bool
-_equalCreateEnumStmt(const CreateEnumStmt *a, const CreateEnumStmt *b)
-{
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_NODE_FIELD(vals);
-
-	return true;
-}
-
-static bool
 _equalCreateRangeStmt(const CreateRangeStmt *a, const CreateRangeStmt *b)
 {
 	COMPARE_NODE_FIELD(typeName);
@@ -2231,9 +2222,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CompositeTypeStmt:
 			retval = _equalCompositeTypeStmt(a, b);
-			break;
-		case T_CreateEnumStmt:
-			retval = _equalCreateEnumStmt(a, b);
 			break;
 		case T_CreateRangeStmt:
 			retval = _equalCreateRangeStmt(a, b);

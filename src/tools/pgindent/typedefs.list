@@ -414,7 +414,6 @@ Counters
 CoverExt
 CoverPos
 CreateDomainStmt
-CreateEnumStmt
 CreateEventTrigStmt
 CreateExtensionStmt
 CreateFdwStmt
@@ -683,7 +682,6 @@ FormData_pg_constraint
 FormData_pg_conversion
 FormData_pg_database
 FormData_pg_depend
-FormData_pg_enum
 FormData_pg_event_trigger
 FormData_pg_extension
 FormData_pg_foreign_data_wrapper
@@ -728,7 +726,6 @@ Form_pg_constraint
 Form_pg_conversion
 Form_pg_database
 Form_pg_depend
-Form_pg_enum
 Form_pg_event_trigger
 Form_pg_extension
 Form_pg_foreign_data_wrapper

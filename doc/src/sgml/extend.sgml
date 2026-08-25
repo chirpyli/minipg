@@ -134,13 +134,6 @@
      them.
      The built-in base types are described in <xref linkend="datatype"/>.
     </para>
-
-    <para>
-     Enumerated (enum) types can be considered as a subcategory of base
-     types.  The main difference is that they can be created using
-     just <acronym>SQL</acronym> commands, without any low-level programming.
-     Refer to <xref linkend="datatype-enum"/> for more information.
-    </para>
    </sect2>
 
    <sect2>
@@ -273,14 +266,6 @@
        </row>
 
        <row>
-        <entry><type>anyenum</type></entry>
-        <entry>Simple</entry>
-        <entry>Indicates that a function accepts any enum data type
-        (see <xref linkend="datatype-enum"/>)
-        </entry>
-       </row>
-
-       <row>
         <entry><type>anyrange</type></entry>
         <entry>Simple</entry>
         <entry>Indicates that a function accepts any range data type
@@ -374,9 +359,6 @@
      <type>anynonarray</type> is treated exactly the same as <type>anyelement</type>,
      but adds the additional constraint that the actual type must not be
      an array type.
-     <type>anyenum</type> is treated exactly the same as <type>anyelement</type>,
-     but adds the additional constraint that the actual type must
-     be an enum type.
     </para>
 
     <para>
@@ -410,9 +392,7 @@
      implements subscripting as <literal>subscript(anyarray, integer)
      returns anyelement</literal>.  This declaration constrains the actual first
      argument to be an array type, and allows the parser to infer the correct
-     result type from the actual first argument's type.  Another example
-     is that a function declared as <literal>f(anyarray) returns anyenum</literal>
-     will only accept arrays of enum types.
+     result type from the actual first argument's type.
     </para>
 
     <para>
@@ -428,12 +408,9 @@
     </para>
 
     <para>
-     Note that <type>anynonarray</type> and <type>anyenum</type> do not represent
-     separate type variables; they are the same type as
-     <type>anyelement</type>, just with an additional constraint.  For
-     example, declaring a function as <literal>f(anyelement, anyenum)</literal>
-     is equivalent to declaring it as <literal>f(anyenum, anyenum)</literal>:
-     both actual arguments have to be the same enum type.
+     Note that <type>anynonarray</type> does not represent
+     a separate type variable; it is the same type as
+     <type>anyelement</type>, just with an additional constraint.
     </para>
 
     <para>
@@ -468,13 +445,6 @@
      <type>anymultirange</type> as a function result type requires that there be
      an <type>anycompatiblerange</type> or <type>anycompatiblemultirange</type>
      argument.
-    </para>
-
-    <para>
-     Notice that there is no <type>anycompatibleenum</type> type.  Such a
-     type would not be very useful, since there normally are not any
-     implicit casts to enum types, meaning that there would be no way to
-     resolve a common type for dissimilar enum inputs.
     </para>
 
     <para>

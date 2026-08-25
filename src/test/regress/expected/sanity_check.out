@@ -64,7 +64,6 @@ pg_constraint|t
 pg_conversion|t
 pg_database|t
 pg_depend|t
-pg_enum|t
 pg_extension|t
 pg_index|t
 pg_language|t

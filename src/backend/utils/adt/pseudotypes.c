@@ -191,19 +191,6 @@ anycompatiblearray_send(PG_FUNCTION_ARGS)
 }
 
 /*
- * anyenum
- *
- * We may as well allow output, since enum_out will in fact work.
- */
-PSEUDOTYPE_DUMMY_INPUT_FUNC(anyenum);
-
-Datum
-anyenum_out(PG_FUNCTION_ARGS)
-{
-	return enum_out(fcinfo);
-}
-
-/*
  * anyrange
  *
  * We may as well allow output, since range_out will in fact work.

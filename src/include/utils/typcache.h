@@ -25,9 +25,6 @@
 /* DomainConstraintCache is an opaque struct known only within typcache.c */
 typedef struct DomainConstraintCache DomainConstraintCache;
 
-/* TypeCacheEnumData is an opaque struct known only within typcache.c */
-struct TypeCacheEnumData;
-
 typedef struct TypeCacheEntry
 {
 	/* typeId is the hash lookup key and MUST BE FIRST */
@@ -126,7 +123,6 @@ typedef struct TypeCacheEntry
 	 * Private information about an enum type.  NULL if not enum or
 	 * information hasn't been requested.
 	 */
-	struct TypeCacheEnumData *enumData;
 
 	/* We also maintain a list of all known domain-type cache entries */
 	struct TypeCacheEntry *nextDomain;
@@ -196,8 +192,6 @@ extern TupleDesc lookup_rowtype_tupdesc_domain(Oid type_id, int32 typmod,
 extern void assign_record_type_typmod(TupleDesc tupDesc);
 
 extern uint64 assign_record_type_identifier(Oid type_id, int32 typmod);
-
-extern int	compare_values_of_enum(TypeCacheEntry *tcache, Oid arg1, Oid arg2);
 
 extern size_t SharedRecordTypmodRegistryEstimate(void);
 

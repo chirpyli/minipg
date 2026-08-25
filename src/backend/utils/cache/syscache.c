@@ -32,7 +32,6 @@
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_enum.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
@@ -298,28 +297,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		4
-	},
-	{EnumRelationId,			/* ENUMOID */
-		EnumOidIndexId,
-		1,
-		{
-			Anum_pg_enum_oid,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{EnumRelationId,			/* ENUMTYPOIDNAME */
-		EnumTypIdLabelIndexId,
-		2,
-		{
-			Anum_pg_enum_enumtypid,
-			Anum_pg_enum_enumlabel,
-			0,
-			0
-		},
-		8
 	},
 	{IndexRelationId,			/* INDEXRELID */
 		IndexRelidIndexId,

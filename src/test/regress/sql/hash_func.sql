@@ -147,15 +147,6 @@ FROM   (VALUES (NULL::pg_lsn), ('16/B374D84'), ('30/B374D84'),
 WHERE  pg_lsn_hash(v)::bit(32) != pg_lsn_hash_extended(v, 0)::bit(32)
        OR pg_lsn_hash(v)::bit(32) = pg_lsn_hash_extended(v, 1)::bit(32);
 
-CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
-SELECT v as value, hashenum(v)::bit(32) as standard,
-       hashenumextended(v, 0)::bit(32) as extended0,
-       hashenumextended(v, 1)::bit(32) as extended1
-FROM   (VALUES ('sad'::mood), ('ok'), ('happy')) x(v)
-WHERE  hashenum(v)::bit(32) != hashenumextended(v, 0)::bit(32)
-       OR hashenum(v)::bit(32) = hashenumextended(v, 1)::bit(32);
-DROP TYPE mood;
-
 
 CREATE TYPE hash_test_t1 AS (a int, b text);
 SELECT v as value, hash_record(v)::bit(32) as standard,

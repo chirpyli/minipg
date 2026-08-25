@@ -500,7 +500,7 @@ insert into comptable
   values (row(1,'foo'), array[row(2,'bar')::comptype, row(3,'baz')::comptype]);
 
 -- check that implicitly named array type _comptype isn't a problem
-create type _comptype as enum('fooey');
+create type _comptype as (f1 text);
 
 select * from comptable;
 select c2[2].f2 from comptable;

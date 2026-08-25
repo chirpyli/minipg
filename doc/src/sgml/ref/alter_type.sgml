@@ -28,8 +28,6 @@ ALTER TYPE <replaceable class="parameter">name</replaceable> RENAME TO <replacea
 ALTER TYPE <replaceable class="parameter">name</replaceable> SET SCHEMA <replaceable class="parameter">new_schema</replaceable>
 ALTER TYPE <replaceable class="parameter">name</replaceable> RENAME ATTRIBUTE <replaceable class="parameter">attribute_name</replaceable> TO <replaceable class="parameter">new_attribute_name</replaceable> [ CASCADE | RESTRICT ]
 ALTER TYPE <replaceable class="parameter">name</replaceable> <replaceable class="parameter">action</replaceable> [, ... ]
-ALTER TYPE <replaceable class="parameter">name</replaceable> ADD VALUE [ IF NOT EXISTS ] <replaceable class="parameter">new_enum_value</replaceable> [ { BEFORE | AFTER } <replaceable class="parameter">neighbor_enum_value</replaceable> ]
-ALTER TYPE <replaceable class="parameter">name</replaceable> RENAME VALUE <replaceable class="parameter">existing_enum_value</replaceable> TO <replaceable class="parameter">new_enum_value</replaceable>
 ALTER TYPE <replaceable class="parameter">name</replaceable> SET ( <replaceable class="parameter">property</replaceable> = <replaceable class="parameter">value</replaceable> [, ... ] )
 
 <phrase>where <replaceable class="parameter">action</replaceable> is one of:</phrase>
@@ -112,36 +110,6 @@ ALTER TYPE <replaceable class="parameter">name</replaceable> SET ( <replaceable 
     <listitem>
      <para>
       This form changes the type of an attribute of a composite type.
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
-    <term><literal>ADD VALUE [ IF NOT EXISTS ] [ BEFORE | AFTER ]</literal></term>
-    <listitem>
-     <para>
-      This form adds a new value to an enum type.  The new value's place in
-      the enum's ordering can be specified as being <literal>BEFORE</literal>
-      or <literal>AFTER</literal> one of the existing values.  Otherwise,
-      the new item is added at the end of the list of values.
-     </para>
-     <para>
-      If <literal>IF NOT EXISTS</literal> is specified, it is not an error if
-      the type already contains the new value: a notice is issued but no other
-      action is taken. Otherwise, an error will occur if the new value is
-      already present.
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
-    <term><literal>RENAME VALUE</literal></term>
-    <listitem>
-     <para>
-      This form renames a value of an enum type.
-      The value's place in the enum's ordering is not affected.
-      An error will occur if the specified value is not present or the new
-      name is already present.
      </para>
     </listitem>
    </varlistentry>
@@ -327,38 +295,6 @@ ALTER TYPE <replaceable class="parameter">name</replaceable> SET ( <replaceable 
      </varlistentry>
 
      <varlistentry>
-      <term><replaceable class="parameter">new_enum_value</replaceable></term>
-      <listitem>
-       <para>
-        The new value to be added to an enum type's list of values,
-        or the new name to be given to an existing value.
-        Like all enum literals, it needs to be quoted.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="parameter">neighbor_enum_value</replaceable></term>
-      <listitem>
-       <para>
-        The existing enum value that the new value should be added immediately
-        before or after in the enum type's sort ordering.
-        Like all enum literals, it needs to be quoted.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="parameter">existing_enum_value</replaceable></term>
-      <listitem>
-       <para>
-        The existing enum value that should be renamed.
-        Like all enum literals, it needs to be quoted.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
       <term><replaceable class="parameter">property</replaceable></term>
       <listitem>
        <para>
@@ -393,29 +329,6 @@ ALTER TYPE <replaceable class="parameter">name</replaceable> SET ( <replaceable 
   </refsect1>
 
  <refsect1>
-  <title>Notes</title>
-
-  <para>
-   If <command>ALTER TYPE ... ADD VALUE</command> (the form that adds a new
-   value to an enum type) is executed inside a transaction block, the new
-   value cannot be used until after the transaction has been committed.
-  </para>
-
-  <para>
-   Comparisons involving an added enum value will sometimes be slower than
-   comparisons involving only original members of the enum type.  This will
-   usually only occur if <literal>BEFORE</literal> or <literal>AFTER</literal>
-   is used to set the new value's sort position somewhere other than at the
-   end of the list.  However, sometimes it will happen even though the new
-   value is added at the end (this occurs if the OID counter <quote>wrapped
-   around</quote> since the original creation of the enum type).  The slowdown is
-   usually insignificant; but if it matters, optimal performance can be
-   regained by dropping and recreating the enum type, or by dumping and
-   restoring the database.
-  </para>
- </refsect1>
-
- <refsect1>
   <title>Examples</title>
 
   <para>
@@ -445,20 +358,6 @@ ALTER TYPE email SET SCHEMA customers;
    To add a new attribute to a composite type:
 <programlisting>
 ALTER TYPE compfoo ADD ATTRIBUTE f3 int;
-</programlisting>
-  </para>
-
-  <para>
-   To add a new value to an enum type in a particular sort position:
-<programlisting>
-ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
-</programlisting>
-  </para>
-
-  <para>
-   To rename an enum value:
-<programlisting>
-ALTER TYPE colors RENAME VALUE 'purple' TO 'mauve';
 </programlisting>
   </para>
 

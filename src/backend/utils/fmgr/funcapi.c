@@ -699,7 +699,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 		{
 			case ANYELEMENTOID:
 			case ANYNONARRAYOID:
-			case ANYENUMOID:
 				have_polymorphic_result = true;
 				have_anyelement_result = true;
 				break;
@@ -758,7 +757,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 		{
 			case ANYELEMENTOID:
 			case ANYNONARRAYOID:
-			case ANYENUMOID:
 				if (!OidIsValid(poly_actuals.anyelement_type))
 				{
 					poly_actuals.anyelement_type =
@@ -905,7 +903,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 		{
 			case ANYELEMENTOID:
 			case ANYNONARRAYOID:
-			case ANYENUMOID:
 				TupleDescInitEntry(tupdesc, i + 1,
 								   NameStr(att->attname),
 								   poly_actuals.anyelement_type,
@@ -1025,7 +1022,6 @@ resolve_polymorphic_argtypes(int numargs, Oid *argtypes, char *argmodes,
 		{
 			case ANYELEMENTOID:
 			case ANYNONARRAYOID:
-			case ANYENUMOID:
 				if (argmode == PROARGMODE_OUT || argmode == PROARGMODE_TABLE)
 				{
 					have_polymorphic_result = true;
@@ -1213,7 +1209,6 @@ resolve_polymorphic_argtypes(int numargs, Oid *argtypes, char *argmodes,
 		{
 			case ANYELEMENTOID:
 			case ANYNONARRAYOID:
-			case ANYENUMOID:
 				argtypes[i] = poly_actuals.anyelement_type;
 				break;
 			case ANYARRAYOID:
@@ -1265,7 +1260,6 @@ get_type_func_class(Oid typid, Oid *base_typeid)
 		case TYPTYPE_COMPOSITE:
 			return TYPEFUNC_COMPOSITE;
 		case TYPTYPE_BASE:
-		case TYPTYPE_ENUM:
 		case TYPTYPE_RANGE:
 		case TYPTYPE_MULTIRANGE:
 			return TYPEFUNC_SCALAR;

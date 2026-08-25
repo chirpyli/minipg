@@ -126,18 +126,6 @@ hashoidextended(PG_FUNCTION_ARGS)
 }
 
 Datum
-hashenum(PG_FUNCTION_ARGS)
-{
-	return hash_uint32((uint32) PG_GETARG_OID(0));
-}
-
-Datum
-hashenumextended(PG_FUNCTION_ARGS)
-{
-	return hash_uint32_extended((uint32) PG_GETARG_OID(0), PG_GETARG_INT64(1));
-}
-
-Datum
 hashfloat4(PG_FUNCTION_ARGS)
 {
 	float4		key = PG_GETARG_FLOAT4(0);

@@ -324,7 +324,6 @@ typedef enum NodeTag
 	T_DeallocateStmt,
 	T_AlterObjectSchemaStmt,
 	T_CompositeTypeStmt,
-	T_CreateEnumStmt,
 	T_CreateRangeStmt,
 	T_CreateExtensionStmt,
 	T_CreateTransformStmt,

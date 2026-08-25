@@ -323,7 +323,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
 			execute_param_clause using_clause returning_clause
-			opt_enum_val_list enum_val_list table_func_column_list
+			table_func_column_list
 			alter_generic_options
 				relation_expr_list
 				transform_element_list transform_type_list
@@ -2410,13 +2410,6 @@ CreateTypeStmt:
 					n->coldeflist = $6;
 					$$ = (Node *)n;
 				}
-			| CREATE TYPE_P any_name AS ENUM_P '(' opt_enum_val_list ')'
-				{
-					CreateEnumStmt *n = makeNode(CreateEnumStmt);
-					n->typeName = $3;
-					n->vals = $7;
-					$$ = (Node *)n;
-				}
 			| CREATE TYPE_P any_name AS RANGE definition
 				{
 					CreateRangeStmt *n = makeNode(CreateRangeStmt);
@@ -2451,23 +2444,6 @@ def_arg:	func_type						{ $$ = (Node *)$1; }
 			| Sconst						{ $$ = (Node *)makeString($1); }
 			| NONE							{ $$ = (Node *)makeString(pstrdup($1)); }
 		;
-
-opt_enum_val_list:
-		enum_val_list							{ $$ = $1; }
-		| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-enum_val_list:	Sconst
-				{ $$ = list_make1(makeString($1)); }
-			| enum_val_list ',' Sconst
-				{ $$ = lappend($1, makeString($3)); }
-		;
-
-/*****************************************************************************
- *
- *	ALTER TYPE enumtype ADD ...
- *
- *****************************************************************************/
 
 opt_if_not_exists: IF_P NOT EXISTS              { $$ = true; }
 		| /* EMPTY */                          { $$ = false; }

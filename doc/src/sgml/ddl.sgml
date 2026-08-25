@@ -2952,8 +2952,7 @@ DROP TABLE products CASCADE;
    consider this situation:
 
 <programlisting>
-CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow',
-                             'green', 'blue', 'purple');
+CREATE TYPE rainbow AS (red text, green text, blue text);
 
 CREATE TABLE my_colors (color rainbow, note text);
 

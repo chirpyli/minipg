@@ -172,10 +172,6 @@
   opcfamily => 'btree/pg_lsn_ops', opcintype => 'pg_lsn' },
 { opcmethod => 'hash', opcname => 'pg_lsn_ops', opcfamily => 'hash/pg_lsn_ops',
   opcintype => 'pg_lsn' },
-{ opcmethod => 'btree', opcname => 'enum_ops', opcfamily => 'btree/enum_ops',
-  opcintype => 'anyenum' },
-{ opcmethod => 'hash', opcname => 'enum_ops', opcfamily => 'hash/enum_ops',
-  opcintype => 'anyenum' },
 
 
 

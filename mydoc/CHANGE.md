@@ -4,6 +4,34 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## 枚举数据类型（enum）整体裁剪（2026-08-25）
+
+### 一、背景
+minipg 此前在「裁剪 ALTER TYPE」多轮中保留了 `CREATE TYPE AS ENUM` 与整个 `pg_enum` 枚举系统。本轮按用户要求将整个枚举数据类型彻底裁剪：枚举类型本身、`pg_enum` 演化目录、`anyenum` 多态伪类型、枚举相关操作符/操作符类族/聚合/哈希函数全部删除。枚举是纯用户自建类型，与 btree/hash 索引、事务等内核核心零耦合，学习价值低，可安全裁剪；`CREATE TYPE`（复合 / range）、`ALTER TABLE ... ALTER COLUMN ... TYPE` 列类型变更等保留。
+
+### 二、删除内容
+- **语法/节点**：`gram.y` 中 `CREATE TYPE ... AS ENUM` 的 `enum_type` 相关产生式与 `ENUM_P` 关键产生（`ENUM_P` 作为无保留关键字仍保留于关键字集合）；`parsenodes.h` 的 `CreateEnumStmt` 结构体、`nodes.h` 的 `T_CreateEnumStmt` 枚举值随之删除（`T_*` 整体前移）；`copyfuncs.c` / `equalfuncs.c` 对应 `_copy/_equalCreateEnumStmt` 与 case 一并删除；`typedefs.list` 移除 `CreateEnumStmt`。
+- **目录**：删除 `pg_enum.h`、`pg_enum.c`；删除 `syscache.c/h` 中 `ENUMOID`、`ENUMTYPOIDNAME` 两个缓存及其 `cacheinfo[]` 条目，`SysCacheSize` 同步；`objectaddress.c` 移除 `pg_enum.h` 引用；`typedefs.list` 移除 `FormData_pg_enum` / `Form_pg_enum`。
+- **多态伪类型**：`pg_type.dat` 删除 `anyenum` 条目，`pg_type.h` 删除 `ANYENUMOID`、`TYPTYPE_ENUM`、`TYPCATEGORY_ENUM`；`pseudotypes.c` 删除 `anyenum_in` / `anyenum_out`；`pg_proc.dat` 删除对应伪类型 I/O 函数。
+- **函数**：`enum.c` 删除，`utils/adt/Makefile` 移除 `enum.o`；`enum_in/out/recv/send` 等输入输出函数、`enum_eq/ne/lt/...` 比较操作符全部消失。
+- **operator/opclass**：`pg_operator.dat` 删除枚举比较操作符；`pg_opfamily.dat` / `pg_opclass.dat` 删除 `enum_ops`；`pg_amop.dat` / `pg_amproc.dat` 删除 btree/hash 中枚举操作符与支持过程。
+- **聚合**：`pg_aggregate.dat` 删除 `min(anyenum)` / `max(anyenum)`。
+- **哈希**：`hashfunc.c` 删除 `hashenum` / `hashenumextended`。
+- **调用方清理**：`parse_coerce.c` 移除 `ANYENUMOID` 分支与 `type_is_enum` 判断；`funcapi.c` / `functions.c` / `typecmds.c` 移除 `TYPTYPE_ENUM` / `ANYENUMOID` case；`lsyscache.[ch]` 删除 `type_is_enum`。
+- **事务/并行钩子**：`enum.c` 被删后，`xact.c` 移除 `AtEOXact_Enum()` 调用及 `pg_enum.h` 引用，`parallel.c` 移除 `EstimateUncommittedEnumsSpace` / `SerializeUncommittedEnums` / `RestoreUncommittedEnums` 及 `PARALLEL_KEY_UNCOMMITTEDENUMS`。
+- **psql**：`describe.c` 移除枚举元素（Elements）展示查询；`tab-complete.c` 移除 `COMPLETE_WITH_ENUM_VALUE` 宏与枚举值补全查询。
+- **测试**：删除 `sql/enum.sql` 与 `expected/enum.out`；`parallel_schedule` 移除 `enum` 测试项；`hash_func.sql/out` 删除枚举哈希测试；`opr_sanity.sql` 移除 `anyenum` 多态检查、`opr_sanity.out` 删除 `enum_in/out/recv` 等行；`rangefuncs.out` 更新不含 `anyenum` 的错误文案；`arrays.sql/out` 将 `create type _comptype as enum('fooey')` 改为复合类型 `as (f1 text)`（仅测试隐式数组类型名冲突）；`case.sql/out` 删除依赖 `enum_range` 的 CASE 段；`sanity_check.out` 删除 `pg_enum|t`。
+
+### 三、保留（内核核心，不裁）
+- `CREATE TYPE` 复合 / range 分支；`ALTER TABLE ... ALTER COLUMN ... TYPE` 列类型变更（`AT_AlterColumnType` / `ATExecAlterColumnType`）。
+- `enum` 关键字（`ENUM_P`）保留为无保留关键字。
+
+### 四、构建注意（重要）
+本工程 Makefile 未启用头文件自动依赖跟踪。`syscache.h` 中删除两个缓存会导致 `SysCacheIdentifier` 与 `TYPEOID` 等缓存编号前移，但旧的 `*.o`（如 `lsyscache.o`）不会自动重编，运行时 `get_typtype` 会用旧编号越界访问 `SysCache`，`initdb` bootstrap 建 `pg_attrdef` 时 `cache=0x0` 段错误。**务必 `make clean && make -j8` 全量干净重编再跑测试**。
+
+### 五、验证
+`make clean && make -j8` 通过；`make check-world` 全绿（regress 72 项 + 各子套件通过）；`initdb` bootstrap 不再段错误。
+
 ## ALTER RULE / ALTER SCHEMA / ALTER STATISTICS / ALTER SUBSCRIPTION 命令标签裁剪（2026-08-24）
 
 ### 一、背景

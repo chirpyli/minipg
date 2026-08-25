@@ -30,7 +30,6 @@ OBJS = \
 	dbsize.o \
 	domains.o \
 	encode.o \
-	enum.o \
 	expandeddatum.o \
 	expandedrecord.o \
 	float.o \

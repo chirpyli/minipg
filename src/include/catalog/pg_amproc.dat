@@ -235,12 +235,6 @@
   amprocrighttype => 'pg_lsn', amprocnum => '4', amproc => 'btequalimage' },
 
 
-{ amprocfamily => 'btree/enum_ops', amproclefttype => 'anyenum',
-  amprocrighttype => 'anyenum', amprocnum => '1', amproc => 'enum_cmp' },
-{ amprocfamily => 'btree/enum_ops', amproclefttype => 'anyenum',
-  amprocrighttype => 'anyenum', amprocnum => '4', amproc => 'btequalimage' },
-
-
 { amprocfamily => 'btree/range_ops', amproclefttype => 'anyrange',
   amprocrighttype => 'anyrange', amprocnum => '1', amproc => 'range_cmp' },
 { amprocfamily => 'btree/multirange_ops', amproclefttype => 'anymultirange',
@@ -380,12 +374,6 @@
   amprocrighttype => 'pg_lsn', amprocnum => '2',
   amproc => 'pg_lsn_hash_extended' },
 
-
-{ amprocfamily => 'hash/enum_ops', amproclefttype => 'anyenum',
-  amprocrighttype => 'anyenum', amprocnum => '1', amproc => 'hashenum' },
-{ amprocfamily => 'hash/enum_ops', amproclefttype => 'anyenum',
-  amprocrighttype => 'anyenum', amprocnum => '2',
-  amproc => 'hashenumextended' },
 { amprocfamily => 'hash/range_ops', amproclefttype => 'anyrange',
   amprocrighttype => 'anyrange', amprocnum => '1', amproc => 'hash_range' },
 { amprocfamily => 'hash/range_ops', amproclefttype => 'anyrange',

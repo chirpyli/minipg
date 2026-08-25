@@ -22,7 +22,6 @@
 #include "access/xlog.h"
 #include "catalog/index.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_enum.h"
 #include "catalog/storage.h"
 #include "executor/execParallel.h"
 #include "libpq/libpq.h"
@@ -74,7 +73,6 @@
 #define PARALLEL_KEY_PENDING_SYNCS			UINT64CONST(0xFFFFFFFFFFFF000B)
 #define PARALLEL_KEY_REINDEX_STATE			UINT64CONST(0xFFFFFFFFFFFF000C)
 #define PARALLEL_KEY_RELMAPPER_STATE		UINT64CONST(0xFFFFFFFFFFFF000D)
-#define PARALLEL_KEY_UNCOMMITTEDENUMS		UINT64CONST(0xFFFFFFFFFFFF000E)
 
 /* Fixed-size parallel state. */
 typedef struct FixedParallelState
@@ -211,7 +209,6 @@ InitializeParallelDSM(ParallelContext *pcxt)
 	Size		pendingsyncslen = 0;
 	Size		reindexlen = 0;
 	Size		relmapperlen = 0;
-	Size		uncommittedenumslen = 0;
 	Size		segsize = 0;
 	int			i;
 	FixedParallelState *fps;
@@ -279,10 +276,8 @@ InitializeParallelDSM(ParallelContext *pcxt)
 		shm_toc_estimate_chunk(&pcxt->estimator, reindexlen);
 		relmapperlen = EstimateRelationMapSpace();
 		shm_toc_estimate_chunk(&pcxt->estimator, relmapperlen);
-		uncommittedenumslen = EstimateUncommittedEnumsSpace();
-		shm_toc_estimate_chunk(&pcxt->estimator, uncommittedenumslen);
 		/* If you add more chunks here, you probably need to add keys. */
-		shm_toc_estimate_keys(&pcxt->estimator, 11);
+		shm_toc_estimate_keys(&pcxt->estimator, 10);
 
 		/* Estimate space need for error queues. */
 		StaticAssertStmt(BUFFERALIGN(PARALLEL_ERROR_QUEUE_SIZE) ==
@@ -361,7 +356,6 @@ InitializeParallelDSM(ParallelContext *pcxt)
 		char	   *error_queue_space;
 		char	   *session_dsm_handle_space;
 		char	   *entrypointstate;
-		char	   *uncommittedenumsspace;
 		Size		lnamelen;
 
 		/* Serialize shared libraries we have loaded. */
@@ -424,13 +418,6 @@ InitializeParallelDSM(ParallelContext *pcxt)
 		SerializeRelationMap(relmapperlen, relmapperspace);
 		shm_toc_insert(pcxt->toc, PARALLEL_KEY_RELMAPPER_STATE,
 					   relmapperspace);
-
-		/* Serialize uncommitted enum state. */
-		uncommittedenumsspace = shm_toc_allocate(pcxt->toc,
-												 uncommittedenumslen);
-		SerializeUncommittedEnums(uncommittedenumsspace, uncommittedenumslen);
-		shm_toc_insert(pcxt->toc, PARALLEL_KEY_UNCOMMITTEDENUMS,
-					   uncommittedenumsspace);
 
 		/* Allocate space for worker information. */
 		pcxt->worker = palloc0(sizeof(ParallelWorkerInfo) * pcxt->nworkers);
@@ -1272,7 +1259,6 @@ ParallelWorkerMain(Datum main_arg)
 	char	   *pendingsyncsspace;
 	char	   *reindexspace;
 	char	   *relmapperspace;
-	char	   *uncommittedenumsspace;
 	StringInfoData msgbuf;
 	char	   *session_dsm_handle_space;
 	Snapshot	tsnapshot;
@@ -1489,11 +1475,6 @@ ParallelWorkerMain(Datum main_arg)
 	/* Restore relmapper state. */
 	relmapperspace = shm_toc_lookup(toc, PARALLEL_KEY_RELMAPPER_STATE, false);
 	RestoreRelationMap(relmapperspace);
-
-	/* Restore uncommitted enums. */
-	uncommittedenumsspace = shm_toc_lookup(toc, PARALLEL_KEY_UNCOMMITTEDENUMS,
-										   false);
-	RestoreUncommittedEnums(uncommittedenumsspace);
 
 	/* Attach to the leader's serializable transaction, if SERIALIZABLE. */
 	AttachSerializableXact(fps->serializable_xact_handle);

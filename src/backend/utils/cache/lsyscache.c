@@ -2671,16 +2671,6 @@ type_is_rowtype(Oid typid)
 }
 
 /*
- * type_is_enum
- *	  Returns true if the given type is an enum type.
- */
-bool
-type_is_enum(Oid typid)
-{
-	return (get_typtype(typid) == TYPTYPE_ENUM);
-}
-
-/*
  * type_is_range
  *	  Returns true if the given type is a range type.
  */

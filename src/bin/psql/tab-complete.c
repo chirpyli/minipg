@@ -285,40 +285,6 @@ do { \
  * But include a quote if there's not one just before "text", to get the
  * user off to the right start.
  */
-#define COMPLETE_WITH_ENUM_VALUE(type) \
-do { \
-	char   *_completion_schema; \
-	char   *_completion_type; \
-	bool	use_quotes; \
-\
-	_completion_schema = strtokx(type, " \t\n\r", ".", "\"", 0, \
-								 false, false, pset.encoding); \
-	(void) strtokx(NULL, " \t\n\r", ".", "\"", 0, \
-				   false, false, pset.encoding); \
-	_completion_type = strtokx(NULL, " \t\n\r", ".", "\"", 0, \
-							   false, false, pset.encoding); \
-	use_quotes = (text[0] == '\'' || \
-				  start == 0 || rl_line_buffer[start - 1] != '\''); \
-	if (_completion_type == NULL) \
-	{ \
-		if (use_quotes) \
-			completion_charp = Query_for_list_of_enum_values_quoted; \
-		else \
-			completion_charp = Query_for_list_of_enum_values_unquoted; \
-		completion_info_charp = type; \
-	} \
-	else \
-	{ \
-		if (use_quotes) \
-			completion_charp = Query_for_list_of_enum_values_with_schema_quoted; \
-		else \
-			completion_charp = Query_for_list_of_enum_values_with_schema_unquoted; \
-		completion_info_charp = _completion_type; \
-		completion_info_charp2 = _completion_schema; \
-	} \
-	matches = rl_completion_matches(text, complete_from_query); \
-} while (0)
-
 #define COMPLETE_WITH_FUNCTION_ARG(function) \
 do { \
 	char   *_completion_schema; \
@@ -651,46 +617,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "   AND substring(pg_catalog.quote_ident(attname),1,%d)='%s' "\
 "   AND (pg_catalog.quote_ident(relname)='%s' "\
 "        OR '\"' || relname || '\"' ='%s') "\
-"   AND (pg_catalog.quote_ident(nspname)='%s' "\
-"        OR '\"' || nspname || '\"' ='%s') "
-
-#define Query_for_list_of_enum_values_quoted \
-"SELECT pg_catalog.quote_literal(enumlabel) "\
-"  FROM pg_catalog.pg_enum e, pg_catalog.pg_type t "\
-" WHERE t.oid = e.enumtypid "\
-"   AND substring(pg_catalog.quote_literal(enumlabel),1,%d)='%s' "\
-"   AND (pg_catalog.quote_ident(typname)='%s' "\
-"        OR '\"' || typname || '\"'='%s') "\
-"   AND pg_catalog.pg_type_is_visible(t.oid)"
-
-#define Query_for_list_of_enum_values_unquoted \
-"SELECT enumlabel "\
-"  FROM pg_catalog.pg_enum e, pg_catalog.pg_type t "\
-" WHERE t.oid = e.enumtypid "\
-"   AND substring(enumlabel,1,%d)='%s' "\
-"   AND (pg_catalog.quote_ident(typname)='%s' "\
-"        OR '\"' || typname || '\"'='%s') "\
-"   AND pg_catalog.pg_type_is_visible(t.oid)"
-
-#define Query_for_list_of_enum_values_with_schema_quoted \
-"SELECT pg_catalog.quote_literal(enumlabel) "\
-"  FROM pg_catalog.pg_enum e, pg_catalog.pg_type t, pg_catalog.pg_namespace n "\
-" WHERE t.oid = e.enumtypid "\
-"   AND n.oid = t.typnamespace "\
-"   AND substring(pg_catalog.quote_literal(enumlabel),1,%d)='%s' "\
-"   AND (pg_catalog.quote_ident(typname)='%s' "\
-"        OR '\"' || typname || '\"'='%s') "\
-"   AND (pg_catalog.quote_ident(nspname)='%s' "\
-"        OR '\"' || nspname || '\"' ='%s') "
-
-#define Query_for_list_of_enum_values_with_schema_unquoted \
-"SELECT enumlabel "\
-"  FROM pg_catalog.pg_enum e, pg_catalog.pg_type t, pg_catalog.pg_namespace n "\
-" WHERE t.oid = e.enumtypid "\
-"   AND n.oid = t.typnamespace "\
-"   AND substring(enumlabel,1,%d)='%s' "\
-"   AND (pg_catalog.quote_ident(typname)='%s' "\
-"        OR '\"' || typname || '\"'='%s') "\
 "   AND (pg_catalog.quote_ident(nspname)='%s' "\
 "        OR '\"' || nspname || '\"' ='%s') "
 
@@ -1950,17 +1876,17 @@ psql_completion(const char *text, int start, int end)
 
 	/* complete ALTER TYPE <foo> with actions */
 	else if (Matches("ALTER", "TYPE", MatchAny))
-		COMPLETE_WITH("ADD ATTRIBUTE", "ADD VALUE", "ALTER ATTRIBUTE",
+		COMPLETE_WITH("ADD ATTRIBUTE", "ALTER ATTRIBUTE",
 					  "DROP ATTRIBUTE",
 					  "OWNER TO", "RENAME", "SET SCHEMA", "SET (");
 	/* complete ALTER TYPE <foo> ADD with actions */
 	else if (Matches("ALTER", "TYPE", MatchAny, "ADD"))
-		COMPLETE_WITH("ATTRIBUTE", "VALUE");
+		COMPLETE_WITH("ATTRIBUTE");
 	/* ALTER TYPE <foo> RENAME	*/
 	else if (Matches("ALTER", "TYPE", MatchAny, "RENAME"))
-		COMPLETE_WITH("ATTRIBUTE", "TO", "VALUE");
-	/* ALTER TYPE xxx RENAME (ATTRIBUTE|VALUE) yyy */
-	else if (Matches("ALTER", "TYPE", MatchAny, "RENAME", "ATTRIBUTE|VALUE", MatchAny))
+		COMPLETE_WITH("ATTRIBUTE", "TO");
+	/* ALTER TYPE xxx RENAME ATTRIBUTE yyy */
+	else if (Matches("ALTER", "TYPE", MatchAny, "RENAME", "ATTRIBUTE", MatchAny))
 		COMPLETE_WITH("TO");
 
 	/*
@@ -1972,11 +1898,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER TYPE ALTER ATTRIBUTE <foo> */
 	else if (Matches("ALTER", "TYPE", MatchAny, "ALTER", "ATTRIBUTE", MatchAny))
 		COMPLETE_WITH("TYPE");
-	/*
-	 * If we have ALTER TYPE <sth> RENAME VALUE, provide list of enum values
-	 */
-	else if (Matches("ALTER", "TYPE", MatchAny, "RENAME", "VALUE"))
-		COMPLETE_WITH_ENUM_VALUE(prev3_wd);
 
 /*
  * ANALYZE [ ( option [, ...] ) ] [ table_and_columns [, ...] ]

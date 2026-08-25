@@ -32,7 +32,6 @@
 #include "access/xlogutils.h"
 #include "catalog/index.h"
 #include "catalog/namespace.h"
-#include "catalog/pg_enum.h"
 #include "catalog/storage.h"
 #include "commands/tablecmds.h"
 #include "executor/spi.h"
@@ -2207,7 +2206,6 @@ CommitTransaction(void)
 	 */
 	AtEOXact_GUC(true, 1);
 	AtEOXact_SPI(true);
-	AtEOXact_Enum();
 	AtEOXact_on_commit_actions(true);
 	AtEOXact_Namespace(true, is_parallel_worker);
 	AtEOXact_SMgr();
@@ -2469,7 +2467,6 @@ PrepareTransaction(void)
 	/* PREPARE acts the same as COMMIT as far as GUC is concerned */
 	AtEOXact_GUC(true, 1);
 	AtEOXact_SPI(true);
-	AtEOXact_Enum();
 	AtEOXact_on_commit_actions(true);
 	AtEOXact_Namespace(true, false);
 	AtEOXact_SMgr();
@@ -2673,7 +2670,6 @@ AbortTransaction(void)
 
 		AtEOXact_GUC(false, 1);
 		AtEOXact_SPI(false);
-		AtEOXact_Enum();
 		AtEOXact_on_commit_actions(false);
 		AtEOXact_Namespace(false, is_parallel_worker);
 		AtEOXact_SMgr();

@@ -2978,17 +2978,6 @@ _copyCompositeTypeStmt(const CompositeTypeStmt *from)
 	return newnode;
 }
 
-static CreateEnumStmt *
-_copyCreateEnumStmt(const CreateEnumStmt *from)
-{
-	CreateEnumStmt *newnode = makeNode(CreateEnumStmt);
-
-	COPY_NODE_FIELD(typeName);
-	COPY_NODE_FIELD(vals);
-
-	return newnode;
-}
-
 static CreateRangeStmt *
 _copyCreateRangeStmt(const CreateRangeStmt *from)
 {
@@ -3749,9 +3738,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CompositeTypeStmt:
 			retval = _copyCompositeTypeStmt(from);
-			break;
-		case T_CreateEnumStmt:
-			retval = _copyCreateEnumStmt(from);
 			break;
 		case T_CreateRangeStmt:
 			retval = _copyCreateRangeStmt(from);

@@ -114,10 +114,6 @@
   opfmethod => 'btree', opfname => 'pg_lsn_ops' },
 { oid => '3254',
   opfmethod => 'hash', opfname => 'pg_lsn_ops' },
-{ oid => '3522',
-  opfmethod => 'btree', opfname => 'enum_ops' },
-{ oid => '3523',
-  opfmethod => 'hash', opfname => 'enum_ops' },
 
 
 

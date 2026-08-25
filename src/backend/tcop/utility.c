@@ -118,7 +118,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateDomainStmt:
-		case T_CreateEnumStmt:
 		case T_CreateExtensionStmt:
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
@@ -388,7 +387,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 {
 	Node	   *parsetree;
 	bool		isTopLevel = (context == PROCESS_UTILITY_TOPLEVEL);
-	bool		isAtomicContext = (!(context == PROCESS_UTILITY_TOPLEVEL || context == PROCESS_UTILITY_QUERY_NONATOMIC) || IsTransactionBlock());
 	ParseState *pstate;
 	int			readonly_flags;
 
@@ -870,10 +868,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					address = DefineCompositeType(stmt->typevar,
 												  stmt->coldeflist);
 				}
-				break;
-
-			case T_CreateEnumStmt:	/* CREATE TYPE AS ENUM */
-				address = DefineEnum((CreateEnumStmt *) parsetree);
 				break;
 
 			case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
@@ -1378,11 +1372,7 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_TYPE;
 			break;
 
-		case T_CreateEnumStmt:
-			tag = CMDTAG_CREATE_TYPE;
-			break;
-
-		case T_CreateRangeStmt:
+			case T_CreateRangeStmt:
 			tag = CMDTAG_CREATE_TYPE;
 			break;
 
@@ -1745,10 +1735,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CompositeTypeStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateEnumStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

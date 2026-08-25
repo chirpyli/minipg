@@ -28,7 +28,6 @@ OBJS = \
 	pg_constraint.o \
 	pg_conversion.o \
 	pg_depend.o \
-	pg_enum.o \
 	pg_namespace.o \
 	pg_operator.o \
 	pg_proc.o \
@@ -51,7 +50,7 @@ CATALOG_HEADERS := \
 	pg_language.h pg_aggregate.h \
 	pg_statistic.h pg_statistic_ext.h pg_statistic_ext_data.h \
 	pg_rewrite.h \
-	pg_cast.h pg_enum.h pg_namespace.h pg_conversion.h pg_depend.h \
+	pg_cast.h pg_namespace.h pg_conversion.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
 	pg_shdepend.h \
 	pg_extension.h \
