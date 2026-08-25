@@ -4,6 +4,26 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE SUBSCRIPTION 命令标签裁剪（逻辑复制残留死标签，2026-08-25）
+
+### 一、背景
+`CMDTAG_CREATE_SUBSCRIPTION`（"CREATE SUBSCRIPTION"）是逻辑复制 `CREATE SUBSCRIPTION` 语句的命令标签。minipg 此前的裁剪已整体移除逻辑复制的语法与执行路径（`subscriptioncmds.c` 及 `CreateSubscriptionStmt` 节点均不存在，`gram.y` 无对应产生式），但 `cmdtaglist.h` 中该标签被漏删，属纯遗留死标签。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_CREATE_SUBSCRIPTION`（`cmdtaglist.h`），`CommandTag` 枚举整体前移 1 位。
+- 数据库内核（src/backend、src/include）中该标签无任何其他引用，无需清理调用方。
+
+### 三、保留（内核核心，不裁）
+- `CMDTAG_DROP_SUBSCRIPTION` 标签及 `DROP SUBSCRIPTION` 相关路径（逻辑复制目录 `pg_subscription*` 的通用对象删除仍按对象类型映射）。
+- 其余 `CREATE_*` / `DROP_*` 命令标签不受影响。
+- psql `tab-complete.c` 中 CREATE/ALTER SUBSCRIPTION 补全条目为客户端残留，与 ALTER SUBSCRIPTION（2026-08-24）、CREATE PUBLICATION 两轮一致，留待后续统一清理。
+
+### 四、构建注意（重要）
+`CommandTag` 枚举数值前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 72 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## CREATE PUBLICATION 命令标签裁剪（逻辑复制残留死标签，2026-08-25）
 
 ### 一、背景
