@@ -9216,7 +9216,7 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
  * The pg_inherits system catalog has been removed from minipg, so the
  * functions below no longer query any catalog.  They behave as if no
  * inheritance relationships exist, which keeps the many call sites in
- * TRUNCATE / ALTER TABLE recursion / type coercion / analyze / lockcmds
+ * TRUNCATE / ALTER TABLE recursion / type coercion / analyze
  * compiling and running correctly now that inheritance is unsupported.
  * =====================================================================
  */

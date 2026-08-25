@@ -127,9 +127,7 @@ SELECT * FROM pxtest2;
 SELECT gid FROM pg_prepared_xacts;
 
 -- pxtest3 should be locked because of the pending DROP
-begin;
-lock table pxtest3 in access share mode nowait;
-rollback;
+-- (LOCK TABLE 已裁剪，此处的锁验证场景随之移除)
 
 -- Disconnect, we will continue testing in a different backend
 \c -
@@ -138,9 +136,7 @@ rollback;
 SELECT gid FROM pg_prepared_xacts;
 
 -- pxtest3 should still be locked because of the pending DROP
-begin;
-lock table pxtest3 in access share mode nowait;
-rollback;
+-- (LOCK TABLE 已裁剪，此处的锁验证场景随之移除)
 
 -- Commit table creation
 COMMIT PREPARED 'regress-one';

@@ -1190,14 +1190,6 @@ _equalViewStmt(const ViewStmt *a, const ViewStmt *b)
 }
 
 static bool
-_equalLoadStmt(const LoadStmt *a, const LoadStmt *b)
-{
-	COMPARE_STRING_FIELD(filename);
-
-	return true;
-}
-
-static bool
 _equalCreatedbStmt(const CreatedbStmt *a, const CreatedbStmt *b)
 {
 	COMPARE_STRING_FIELD(dbname);
@@ -1290,16 +1282,6 @@ _equalCreateTransformStmt(const CreateTransformStmt *a, const CreateTransformStm
 	COMPARE_STRING_FIELD(lang);
 	COMPARE_NODE_FIELD(fromsql);
 	COMPARE_NODE_FIELD(tosql);
-
-	return true;
-}
-
-static bool
-_equalLockStmt(const LockStmt *a, const LockStmt *b)
-{
-	COMPARE_NODE_FIELD(relations);
-	COMPARE_SCALAR_FIELD(mode);
-	COMPARE_SCALAR_FIELD(nowait);
 
 	return true;
 }
@@ -2158,9 +2140,6 @@ equal(const void *a, const void *b)
 		case T_ViewStmt:
 			retval = _equalViewStmt(a, b);
 			break;
-		case T_LoadStmt:
-			retval = _equalLoadStmt(a, b);
-			break;
 		case T_CreatedbStmt:
 			retval = _equalCreatedbStmt(a, b);
 			break;
@@ -2190,9 +2169,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateTransformStmt:
 			retval = _equalCreateTransformStmt(a, b);
-			break;
-		case T_LockStmt:
-			retval = _equalLockStmt(a, b);
 			break;
 		case T_ReindexStmt:
 			retval = _equalReindexStmt(a, b);

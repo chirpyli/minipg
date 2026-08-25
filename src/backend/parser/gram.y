@@ -238,7 +238,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		DropTransformStmt
 		ExplainStmt
 		IndexStmt InsertStmt
-		LoadStmt LockStmt ExplainableStmt PreparableStmt
+		ExplainableStmt PreparableStmt
 		CreateFunctionStmt ReindexStmt
 		RemoveFuncStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
@@ -266,14 +266,13 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				transaction_mode_item
 				create_extension_opt_item
 
-%type <ival>	opt_lock lock_type
 %type <str>		utility_option_name
 %type <defelt>	utility_option_elem
 %type <list>	utility_option_list
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
 %type <boolean>	opt_or_replace
-			opt_nowait opt_if_exists
+			opt_if_exists
 				opt_transaction_chain
 %type <ival>	opt_nowait_or_skip
 
@@ -735,8 +734,6 @@ stmt:	AlterObjectSchemaStmt
 			| ExplainStmt
 			| IndexStmt
 		| InsertStmt
-		| LoadStmt
-		| LockStmt
 		| PrepareStmt
 			| ReindexStmt
 			| RemoveFuncStmt
@@ -3634,22 +3631,6 @@ opt_check_option:
 
 /*****************************************************************************
  *
- *		QUERY:
- *				LOAD "filename"
- *
- *****************************************************************************/
-
-LoadStmt:	LOAD file_name
-				{
-					LoadStmt *n = makeNode(LoadStmt);
-					n->filename = $2;
-					$$ = (Node *)n;
-				}
-		;
-
-
-/*****************************************************************************
- *
  *		CREATE DATABASE
  *
  *****************************************************************************/
@@ -4291,42 +4272,6 @@ using_clause:
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
-
-/*****************************************************************************
- *
- *		QUERY:
- *				LOCK TABLE
- *
- *****************************************************************************/
-
-LockStmt:	LOCK_P opt_table relation_expr_list opt_lock opt_nowait
-				{
-					LockStmt *n = makeNode(LockStmt);
-
-					n->relations = $3;
-					n->mode = $4;
-					n->nowait = $5;
-					$$ = (Node *)n;
-				}
-		;
-
-opt_lock:	IN_P lock_type MODE				{ $$ = $2; }
-			| /*EMPTY*/						{ $$ = AccessExclusiveLock; }
-		;
-
-lock_type:	ACCESS SHARE					{ $$ = AccessShareLock; }
-			| ROW SHARE						{ $$ = RowShareLock; }
-			| ROW EXCLUSIVE					{ $$ = RowExclusiveLock; }
-			| SHARE UPDATE EXCLUSIVE		{ $$ = ShareUpdateExclusiveLock; }
-			| SHARE							{ $$ = ShareLock; }
-			| SHARE ROW EXCLUSIVE			{ $$ = ShareRowExclusiveLock; }
-			| EXCLUSIVE						{ $$ = ExclusiveLock; }
-			| ACCESS EXCLUSIVE				{ $$ = AccessExclusiveLock; }
-		;
-
-opt_nowait:	NOWAIT							{ $$ = true; }
-			| /*EMPTY*/						{ $$ = false; }
-		;
 
 opt_nowait_or_skip:
 			NOWAIT							{ $$ = LockWaitError; }

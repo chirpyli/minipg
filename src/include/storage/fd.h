@@ -139,7 +139,6 @@ extern int	MakePGDirectory(const char *directoryName);
 /* Miscellaneous support routines */
 extern void InitFileAccess(void);
 extern void set_max_safe_fds(void);
-extern void closeAllVfds(void);
 extern void SetTempTablespaces(Oid *tableSpaces, int numSpaces);
 extern bool TempTablespacesAreSet(void);
 extern int	GetTempTablespaces(Oid *tableSpaces, int numSpaces);

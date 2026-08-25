@@ -55,7 +55,3 @@ CREATE FUNCTION reverse_name(name)
    RETURNS name
    AS '@libdir@/regress@DLSUFFIX@'
    LANGUAGE C STRICT;
---
--- Function dynamic loading
---
-LOAD '@libdir@/regress@DLSUFFIX@';

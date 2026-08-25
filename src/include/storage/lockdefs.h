@@ -42,8 +42,7 @@ typedef int LOCKMODE;
 #define ShareRowExclusiveLock	6	/* like EXCLUSIVE MODE, but allows ROW
 									 * SHARE */
 #define ExclusiveLock			7	/* blocks ROW SHARE/SELECT...FOR UPDATE */
-#define AccessExclusiveLock		8	/* ALTER TABLE, DROP TABLE, VACUUM FULL,
-									 * and unqualified LOCK TABLE */
+#define AccessExclusiveLock		8	/* ALTER TABLE, DROP TABLE, VACUUM FULL */
 
 #define MaxLockMode				8
 

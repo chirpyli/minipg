@@ -18,10 +18,8 @@ test: multiple-row-versions
 test: index-only-scan
 test: predicate-lock-hot-tuple
 test: update-conflict-out
-test: deadlock-simple
-test: deadlock-hard
-test: deadlock-soft
-test: deadlock-soft-2
+# deadlock-simple/hard/soft/soft-2: 依赖 LOCK TABLE 语句制造表锁死锁场景，LOCK TABLE 已裁剪，移除
+# timeouts: 其核心步骤 locktbl 依赖 LOCK TABLE 语句，LOCK TABLE 已裁剪，移除
 test: deadlock-parallel
 test: fk-contention
 test: fk-deadlock
@@ -49,7 +47,7 @@ test: lock-committed-keyupdate
 test: update-locked-tuple
 # reindex-concurrently: 依赖 serial 类型，minipg 已裁剪 serial，移除
 # reindex-concurrently-toast: 依赖 plpgsql DO 块动态重命名 toast 关系，PL/pgSQL 已裁剪，移除
-test: reindex-schema
+# reindex-schema: 其步骤 lock1 依赖 LOCK 语句，LOCK TABLE 已裁剪，移除
 test: propagate-lock-delete
 test: tuplelock-conflict
 # tuplelock-update: 依赖 serial 类型，minipg 已裁剪 serial，移除
@@ -74,7 +72,6 @@ test: alter-table-2
 # create-trigger: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 
 # vacuum-reltuples 已随游标功能裁剪而移除（其核心场景依赖 DECLARE CURSOR 固定缓冲页）
-test: timeouts
 # vacuum-concurrent-drop 已随分区功能裁剪而移除
 # vacuum-conflict: 依赖 ROLE/OWNER TO 权限锁冲突，权限已裁剪，移除
 # vacuum-skip-locked 已随分区功能裁剪而移除

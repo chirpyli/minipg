@@ -32,7 +32,6 @@
 #include "commands/discard.h"
 #include "commands/explain.h"
 #include "commands/extension.h"
-#include "commands/lockcmds.h"
 #include "commands/portalcmds.h"
 #include "commands/prepare.h"
 #include "commands/schemacmds.h"
@@ -149,7 +148,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DeallocateStmt:
 		case T_DiscardStmt:
 		case T_ExecuteStmt:
-		case T_LoadStmt:
 		case T_PrepareStmt:
 		case T_VariableSetStmt:
 			{
@@ -190,21 +188,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				 */
 			return COMMAND_IS_STRICTLY_READ_ONLY;
 		}
-
-		case T_LockStmt:
-			{
-				LockStmt   *stmt = (LockStmt *) parsetree;
-
-				/*
-				 * Only weaker locker modes are allowed during recovery. The
-				 * restrictions here must match those in
-				 * LockAcquireExtended().
-				 */
-				if (stmt->mode > RowExclusiveLock)
-					return COMMAND_OK_IN_READ_ONLY_TXN;
-				else
-					return COMMAND_IS_STRICTLY_READ_ONLY;
-			}
 
 		case T_TransactionStmt:
 			{
@@ -549,16 +532,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			DropDatabase(pstate, (DropdbStmt *) parsetree);
 			break;
 
-		case T_LoadStmt:
-			{
-				LoadStmt   *stmt = (LoadStmt *) parsetree;
-
-				closeAllVfds(); /* probably not necessary... */
-				/* Allowed names are restricted if you're not superuser */
-				load_file(stmt->filename, false);
-			}
-			break;
-
 		case T_ClusterStmt:
 			cluster(pstate, (ClusterStmt *) parsetree, isTopLevel);
 			break;
@@ -587,16 +560,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			/* should we allow DISCARD PLANS? */
 			CheckRestrictedOperation("DISCARD");
 			DiscardCommand((DiscardStmt *) parsetree, isTopLevel);
-			break;
-
-		case T_LockStmt:
-
-			/*
-			 * Since the lock would just get dropped immediately, LOCK TABLE
-			 * outside a transaction block is presumed to be user error.
-			 */
-			RequireTransactionBlock(isTopLevel, "LOCK TABLE");
-			LockTableCommand((LockStmt *) parsetree);
 			break;
 
 		case T_CheckPointStmt:
@@ -1338,10 +1301,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_DROP_DATABASE;
 			break;
 
-		case T_LoadStmt:
-			tag = CMDTAG_LOAD;
-			break;
-
 		case T_ClusterStmt:
 			tag = CMDTAG_CLUSTER;
 			break;
@@ -1398,10 +1357,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateTransformStmt:
 			tag = CMDTAG_CREATE_TRANSFORM;
-			break;
-
-		case T_LockStmt:
-			tag = CMDTAG_LOCK_TABLE;
 			break;
 
 		case T_CheckPointStmt:
@@ -1681,10 +1636,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_LoadStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
 		case T_ClusterStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -1725,10 +1676,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_DiscardStmt:
-			lev = LOGSTMT_ALL;
-			break;
-
-		case T_LockStmt:
 			lev = LOGSTMT_ALL;
 			break;
 

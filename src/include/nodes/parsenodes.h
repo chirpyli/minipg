@@ -1825,16 +1825,6 @@ typedef struct ViewStmt
 } ViewStmt;
 
 /* ----------------------
- *		Load Statement
- * ----------------------
- */
-typedef struct LoadStmt
-{
-	NodeTag		type;
-	char	   *filename;		/* file to load */
-} LoadStmt;
-
-/* ----------------------
  *		Createdb Statement
  * ----------------------
  */
@@ -1940,18 +1930,6 @@ typedef struct DiscardStmt
 	NodeTag		type;
 	DiscardMode target;
 } DiscardStmt;
-
-/* ----------------------
- *		LOCK Statement
- * ----------------------
- */
-typedef struct LockStmt
-{
-	NodeTag		type;
-	List	   *relations;		/* relations to lock */
-	int			mode;			/* lock mode */
-	bool		nowait;			/* no wait mode */
-} LockStmt;
 
 /* ----------------------
  *		REINDEX Statement

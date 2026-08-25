@@ -2983,16 +2983,6 @@ _copyViewStmt(const ViewStmt *from)
 	return newnode;
 }
 
-static LoadStmt *
-_copyLoadStmt(const LoadStmt *from)
-{
-	LoadStmt   *newnode = makeNode(LoadStmt);
-
-	COPY_STRING_FIELD(filename);
-
-	return newnode;
-}
-
 static CreatedbStmt *
 _copyCreatedbStmt(const CreatedbStmt *from)
 {
@@ -3106,18 +3096,6 @@ _copyCreateTransformStmt(const CreateTransformStmt *from)
 	COPY_STRING_FIELD(lang);
 	COPY_NODE_FIELD(fromsql);
 	COPY_NODE_FIELD(tosql);
-
-	return newnode;
-}
-
-static LockStmt *
-_copyLockStmt(const LockStmt *from)
-{
-	LockStmt   *newnode = makeNode(LockStmt);
-
-	COPY_NODE_FIELD(relations);
-	COPY_SCALAR_FIELD(mode);
-	COPY_SCALAR_FIELD(nowait);
 
 	return newnode;
 }
@@ -3663,9 +3641,6 @@ copyObjectImpl(const void *from)
 		case T_ViewStmt:
 			retval = _copyViewStmt(from);
 			break;
-		case T_LoadStmt:
-			retval = _copyLoadStmt(from);
-			break;
 		case T_CreatedbStmt:
 			retval = _copyCreatedbStmt(from);
 			break;
@@ -3695,9 +3670,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateTransformStmt:
 			retval = _copyCreateTransformStmt(from);
-			break;
-		case T_LockStmt:
-			retval = _copyLockStmt(from);
 			break;
 		case T_ReindexStmt:
 			retval = _copyReindexStmt(from);

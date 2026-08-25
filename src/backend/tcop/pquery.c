@@ -1280,8 +1280,8 @@ PlannedStmtRequiresSnapshot(PlannedStmt *pstmt)
 	 * about new ones should be that they do too.  Hence, enumerate those that
 	 * do not need one.
 	 *
-	 * Transaction control, LOCK, and SET must *not* set a snapshot, since
-	 * they need to be executable at the start of a transaction-snapshot-mode
+	 * Transaction control and SET must *not* set a snapshot, since they
+	 * need to be executable at the start of a transaction-snapshot-mode
 	 * transaction without freezing a snapshot.  By extension we allow SHOW
 	 * not to set a snapshot.  The other stmts listed are just efficiency
 	 * hacks.  Beware of listing anything that can modify the database --- if,
@@ -1289,7 +1289,6 @@ PlannedStmtRequiresSnapshot(PlannedStmt *pstmt)
 	 * user-defined functions, then it had better have a snapshot.
 	 */
 	if (IsA(utilityStmt, TransactionStmt) ||
-		IsA(utilityStmt, LockStmt) ||
 		IsA(utilityStmt, VariableSetStmt) ||
 		IsA(utilityStmt, VariableShowStmt) ||
 /* efficiency hacks from here down */

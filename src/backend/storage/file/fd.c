@@ -2743,29 +2743,6 @@ ClosePipeStream(FILE *file)
 	return pclose(file);
 }
 
-/*
- * closeAllVfds
- *
- * Force all VFDs into the physically-closed state, so that the fewest
- * possible number of kernel file descriptors are in use.  There is no
- * change in the logical state of the VFDs.
- */
-void
-closeAllVfds(void)
-{
-	Index		i;
-
-	if (SizeVfdCache > 0)
-	{
-		Assert(FileIsNotOpen(0));	/* Make sure ring not corrupted */
-		for (i = 1; i < SizeVfdCache; i++)
-		{
-			if (!FileIsNotOpen(i))
-				LruDelete(i);
-		}
-	}
-}
-
 
 /*
  * SetTempTablespaces

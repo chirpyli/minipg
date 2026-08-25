@@ -1329,7 +1329,7 @@ psql_completion(const char *text, int start, int end)
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLUSTER",
 		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE",
 		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
-		"IMPORT FOREIGN SCHEMA", "INSERT INTO", "LOAD", "LOCK",
+		"IMPORT FOREIGN SCHEMA", "INSERT INTO",
 		"PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "ROLLBACK",
@@ -2629,41 +2629,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 	/* Insert an open parenthesis after "VALUES" */
 	else if (TailMatches("VALUES") && !TailMatches("DEFAULT", "VALUES"))
 		COMPLETE_WITH("(");
-
-/* LOCK */
-	/* Complete LOCK [TABLE] with a list of tables */
-	else if (Matches("LOCK"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables,
-								   " UNION SELECT 'TABLE'");
-	else if (Matches("LOCK", "TABLE"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, "");
-
-	/* For the following, handle the case of a single table only for now */
-
-	/* Complete LOCK [TABLE] <table> with "IN" */
-	else if (Matches("LOCK", MatchAnyExcept("TABLE")) ||
-			 Matches("LOCK", "TABLE", MatchAny))
-		COMPLETE_WITH("IN");
-
-	/* Complete LOCK [TABLE] <table> IN with a lock mode */
-	else if (Matches("LOCK", MatchAny, "IN") ||
-			 Matches("LOCK", "TABLE", MatchAny, "IN"))
-		COMPLETE_WITH("ACCESS SHARE MODE",
-					  "ROW SHARE MODE", "ROW EXCLUSIVE MODE",
-					  "SHARE UPDATE EXCLUSIVE MODE", "SHARE MODE",
-					  "SHARE ROW EXCLUSIVE MODE",
-					  "EXCLUSIVE MODE", "ACCESS EXCLUSIVE MODE");
-
-	/* Complete LOCK [TABLE] <table> IN ACCESS|ROW with rest of lock mode */
-	else if (Matches("LOCK", MatchAny, "IN", "ACCESS|ROW") ||
-			 Matches("LOCK", "TABLE", MatchAny, "IN", "ACCESS|ROW"))
-		COMPLETE_WITH("EXCLUSIVE MODE", "SHARE MODE");
-
-	/* Complete LOCK [TABLE] <table> IN SHARE with rest of lock mode */
-	else if (Matches("LOCK", MatchAny, "IN", "SHARE") ||
-			 Matches("LOCK", "TABLE", MatchAny, "IN", "SHARE"))
-		COMPLETE_WITH("MODE", "ROW EXCLUSIVE MODE",
-					  "UPDATE EXCLUSIVE MODE");
 
 /* OPTIONS */
 	else if (TailMatches("OPTIONS"))

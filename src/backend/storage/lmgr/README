@@ -266,7 +266,7 @@ two categories of locks:
 lock on every relation they operate on, as well as various system catalogs
 that can be used internally.  Many DML operations can proceed in parallel
 against the same table at the same time; only DDL operations such as
-CLUSTER, ALTER TABLE, or DROP -- or explicit user action such as LOCK TABLE
+CLUSTER, ALTER TABLE, or DROP
 -- will create lock conflicts with the "weak" locks (AccessShareLock,
 RowShareLock, RowExclusiveLock) acquired by DML operations.
 

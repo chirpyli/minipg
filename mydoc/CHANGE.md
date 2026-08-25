@@ -4,6 +4,43 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## LOAD、LOCK TABLE 命令标签及语法整体裁剪（2026-08-25）
+
+### 一、背景
+本轮按用户要求裁剪 `cmdtaglist.h` 中 `CMDTAG_LOAD`（"LOAD"，动态加载共享库）、`CMDTAG_LOCK_TABLE`（"LOCK TABLE"，显式表锁）两个命令标签。`LOAD` 仅用于加载用户自定义共享库（C 函数），`LOCK TABLE` 显式表锁与事务锁管理器（`storage/lmgr`）的自动加锁、行锁、`SELECT FOR UPDATE` 等内核核心路径零耦合，两个命令均属非核心、学习价值低的语法糖，且与 btree/hash 索引、事务等不可裁部分无依赖，本轮整体裁剪。
+
+### 二、删除内容
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_LOAD`、`CMDTAG_LOCK_TABLE`，`CommandTag` 枚举整体前移 2 位。
+- **语法层（gram.y）**：
+  - 删 `LoadStmt` 产生式（`LOAD file_name`）及注释头。
+  - 删 `LockStmt` 产生式（`LOCK [TABLE] relation_expr_list [IN lock_type MODE] [NOWAIT]`）及助手非终结符 `opt_lock`、`lock_type`、`opt_nowait`；同步清理 `%type <ival>` 中 `opt_lock lock_type`、`%type <boolean>` 中 `opt_nowait` 声明与 `stmt` 顶层引用。
+- **节点层**：删 `parsenodes.h` 的 `LoadStmt`、`LockStmt` 结构体（含残留的 LOCK Statement 注释块）；删 `nodes.h` 的 `T_LoadStmt`、`T_LockStmt` 标签（后续枚举前移）。
+- **节点处理（copyfuncs.c / equalfuncs.c）**：删 `_copyLoadStmt`/`_equalLoadStmt`、`_copyLockStmt`/`_equalLockStmt` 及 `copyObjectImpl`/`equal` 中对应 case。
+- **派发层（utility.c）**：删 `ClassifyUtilityCommandAsReadOnly` 中 `T_LoadStmt` case 与 `T_LockStmt` case（含 lock 模式判定）、`standard_ProcessUtility` 中 `T_LoadStmt`（`load_file` 调用）与 `T_LockStmt`（`RequireTransactionBlock` + `LockTableCommand`）分支、`CreateCommandTag` 与 `GetCommandLogLevel` 中两 case；删 `#include "commands/lockcmds.h"`。
+- **锁命令实现**：删 `commands/lockcmds.c` 与 `include/commands/lockcmds.h`（`LockTableCommand` 等）；`commands/Makefile` 移除 `lockcmds.o`。
+- **pquery.c**：删 `PlannedStmtRequiresSnapshot` 中 `IsA(utilityStmt, LockStmt)` 判断。
+- **死代码清理**：删 `storage/file/fd.c` 的 `closeAllVfds` 及 `include/storage/fd.h` 声明（唯一调用方为已删的 LOAD 执行路径）。
+- **psql 补全（tab-complete.c）**：删 `sql_commands` 初始词表中的 "LOAD"/"LOCK" 及整个 LOCK 补全块。
+- **测试**：
+  - `hs_standby_allowed.sql/out`、`hs_standby_disallowed.sql/out`：删 LOCK/LOAD 测试段（该测试仅在 `standby_schedule`，非 check-world 计数）。
+  - `prepared_xacts.sql/out`：删两处 `lock table pxtest3 ... nowait` 锁验证段（2PC 锁持有验证依赖 LOCK TABLE）。
+  - `input/output/create_function_2.source`：删 LOAD 用例（`create_function_2` 已不在 `parallel_schedule`，清理仅为文件与内核一致）。
+  - `isolation_schedule`：注释移除 deadlock-simple/hard/soft/soft-2、timeouts（均以 LOCK TABLE 制造表锁死锁/超时）、reindex-schema（步骤用 `LOCK` 无 TABLE）6 个隔离测试。
+  - `recovery/t/031_recovery_conflict.pl`：Lock conflict 段改用 `SELECT count(*)` 在事务内持有 AccessShareLock（TAP 测试未启用，仅保持文件一致）；`recovery/t/037_invalid_database.pl` 删除（同时依赖已裁的 plpgsql DO 块与 LOCK TABLE，彻底不可用）。
+  - 注释清理：`storage/lmgr/README`、`include/storage/lockdefs.h` 中 "LOCK TABLE" 说明性文字。
+
+### 三、保留（内核核心，不裁）
+- 锁管理器（`storage/lmgr`）的锁模式枚举（`lockdefs.h` 的 `AccessShareLock`…`AccessExclusiveLock`）、加锁/解锁/死锁检测机制：事务、DML、DDL 自动加锁的内核核心，不可裁。
+- 行锁 / `SELECT FOR UPDATE` / `FOR SHARE` / `NOWAIT` / `SKIP LOCKED` 等行级锁路径（`README.tuplock`、`nowait`、`skip-locked` 隔离测试均保留）。
+- `load_file`（`fmgr/dfmgr.c`）：仍被 `miscinit.c` 的 `shared_preload_libraries` 等预加载库逻辑使用，不可裁。
+- `LOCKED` 关键字（`kwlist.h`）：仍用于 `SKIP LOCKED` 语法，保留；`LOAD`/`LOCK_P` 关键字按项目惯例保留为 unreserved 关键字。
+
+### 四、构建注意（重要）
+`CommandTag` 枚举数值整体前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 71 项 + isolation 59 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## DROP OPERATOR CLASS/FAMILY、DROP PUBLICATION、DROP ROUTINE、DROP RULE 命令标签及语法整体裁剪（2026-08-25）
 
 ### 一、背景

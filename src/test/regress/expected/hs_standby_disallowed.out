@@ -88,31 +88,6 @@ SELECT count(*) FROM hs1;
 ROLLBACK PREPARED 'foobar';
 ERROR:  cannot execute ROLLBACK PREPARED during recovery
 ROLLBACK;
--- Locks
-BEGIN;
-LOCK hs1;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
-BEGIN;
-LOCK hs1 IN SHARE UPDATE EXCLUSIVE MODE;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
-BEGIN;
-LOCK hs1 IN SHARE MODE;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
-BEGIN;
-LOCK hs1 IN SHARE ROW EXCLUSIVE MODE;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
-BEGIN;
-LOCK hs1 IN EXCLUSIVE MODE;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
-BEGIN;
-LOCK hs1 IN ACCESS EXCLUSIVE MODE;
-ERROR:  cannot execute LOCK TABLE during recovery
-COMMIT;
 -- disallowed commands
 ANALYZE hs1;
 ERROR:  cannot execute ANALYZE during recovery

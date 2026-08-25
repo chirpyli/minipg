@@ -26,7 +26,6 @@ OBJS = \
 	extension.o \
 	functioncmds.o \
 	indexcmds.o \
-	lockcmds.o \
 	opclasscmds.o \
 	operatorcmds.o \
 	portalcmds.o \

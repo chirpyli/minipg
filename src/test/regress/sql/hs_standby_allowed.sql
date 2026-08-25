@@ -83,17 +83,6 @@ EXECUTE hsp;
 
 DEALLOCATE hsp;
 
--- LOCK
-
-BEGIN;
-LOCK hs1 IN ACCESS SHARE MODE;
-LOCK hs1 IN ROW SHARE MODE;
-LOCK hs1 IN ROW EXCLUSIVE MODE;
-COMMIT;
-
--- LOAD
--- should work, easier if there is no test for that...
-
 
 -- ALLOWED COMMANDS
 

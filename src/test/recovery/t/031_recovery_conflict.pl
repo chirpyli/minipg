@@ -115,10 +115,10 @@ check_conflict_stat("snapshot");
 $sect = "lock conflict";
 $expected_conflicts++;
 
-# acquire lock to conflict with
+# acquire lock to conflict with (SELECT holds AccessShareLock till commit)
 $res = $psql_standby->query_safe(qq[
         BEGIN;
-        LOCK TABLE $table1 IN ACCESS SHARE MODE;
+        SELECT count(*) FROM $table1;
         SELECT 1;
         ]);
 like($res, qr/^1$/m, "$sect: conflicting lock acquired");
