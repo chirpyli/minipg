@@ -22,14 +22,11 @@
 #define DEFAULT_TYPDELIM		','
 
 extern void RemoveTypeById(Oid typeOid);
-extern ObjectAddress DefineDomain(CreateDomainStmt *stmt);
 extern ObjectAddress DefineRange(CreateRangeStmt *stmt);
 extern ObjectAddress DefineCompositeType(RangeVar *typevar, List *coldeflist);
 extern Oid	AssignTypeArrayOid(void);
 extern Oid	AssignTypeMultirangeOid(void);
 extern Oid	AssignTypeMultirangeArrayOid(void);
-
-extern void checkDomainOwner(HeapTuple tup);
 
 extern ObjectAddress AlterTypeOwner(List *names, Oid newOwnerId, ObjectType objecttype);
 extern void AlterTypeOwner_oid(Oid typeOid, Oid newOwnerId, bool hasDependEntry);

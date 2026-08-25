@@ -3015,19 +3015,6 @@ _copyLoadStmt(const LoadStmt *from)
 	return newnode;
 }
 
-static CreateDomainStmt *
-_copyCreateDomainStmt(const CreateDomainStmt *from)
-{
-	CreateDomainStmt *newnode = makeNode(CreateDomainStmt);
-
-	COPY_NODE_FIELD(domainname);
-	COPY_NODE_FIELD(typeName);
-	COPY_NODE_FIELD(collClause);
-	COPY_NODE_FIELD(constraints);
-
-	return newnode;
-}
-
 static CreateOpClassStmt *
 _copyCreateOpClassStmt(const CreateOpClassStmt *from)
 {
@@ -3747,9 +3734,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_LoadStmt:
 			retval = _copyLoadStmt(from);
-			break;
-		case T_CreateDomainStmt:
-			retval = _copyCreateDomainStmt(from);
 			break;
 		case T_CreateOpClassStmt:
 			retval = _copyCreateOpClassStmt(from);

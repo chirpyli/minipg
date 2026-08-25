@@ -117,7 +117,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterObjectSchemaStmt:
 		case T_AlterTableStmt:
 		case T_CompositeTypeStmt:
-		case T_CreateDomainStmt:
 		case T_CreateExtensionStmt:
 		case T_CreateOpClassStmt:
 		case T_CreateOpFamilyStmt:
@@ -887,10 +886,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
 				break;
 
-				case T_CreateDomainStmt:
-				address = DefineDomain((CreateDomainStmt *) parsetree);
-				break;
-
 			case T_CreateOpClassStmt:
 				DefineOpClass((CreateOpClassStmt *) parsetree);
 				break;
@@ -1282,10 +1277,6 @@ CreateCommandTag(Node *parsetree)
 						break;
 				}
 			}
-			break;
-
-		case T_CreateDomainStmt:
-			tag = CMDTAG_CREATE_DOMAIN;
 			break;
 
 		case T_CreateSchemaStmt:
@@ -1807,10 +1798,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_DiscardStmt:
 			lev = LOGSTMT_ALL;
-			break;
-
-		case T_CreateDomainStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_LockStmt:

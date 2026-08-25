@@ -1598,19 +1598,6 @@ typedef struct CreateExtensionStmt
 } CreateExtensionStmt;
 
 /* ----------------------
- *		Create Domain Statement
- * ----------------------
- */
-typedef struct CreateDomainStmt
-{
-	NodeTag		type;
-	List	   *domainname;		/* qualified name (list of Value strings) */
-	TypeName   *typeName;		/* the base type */
-	CollateClause *collClause;	/* untransformed COLLATE spec, if any */
-	List	   *constraints;	/* constraints (list of Constraint nodes) */
-} CreateDomainStmt;
-
-/* ----------------------
  *		Create Operator Class Statement
  * ----------------------
  */

@@ -228,7 +228,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterObjectSchemaStmt
 		AlterTableStmt
 		AnalyzeStmt ClusterStmt
-		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
+		CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
@@ -720,7 +720,6 @@ stmt:	AlterObjectSchemaStmt
 			| AnalyzeStmt
 			| CheckPointStmt
 			| ClusterStmt
-			| CreateDomainStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
 			| CreateOpClassStmt
@@ -4024,29 +4023,6 @@ drop_option:
 					$$ = makeDefElem("force", NULL, @1);
 				}
 		;
-
-/*****************************************************************************
- *
- * Manipulate a domain
- *
- *****************************************************************************/
-
-CreateDomainStmt:
-			CREATE DOMAIN_P any_name opt_as Typename ColQualList
-				{
-					CreateDomainStmt *n = makeNode(CreateDomainStmt);
-					n->domainname = $3;
-					n->typeName = $5;
-					SplitColQualList($6, &n->constraints, &n->collClause,
-									 yyscanner);
-					$$ = (Node *)n;
-				}
-		;
-
-opt_as:		AS
-			| /* EMPTY */
-		;
-
 
 /*****************************************************************************
  *

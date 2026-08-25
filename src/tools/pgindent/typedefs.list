@@ -413,7 +413,6 @@ CostSelector
 Counters
 CoverExt
 CoverPos
-CreateDomainStmt
 CreateEventTrigStmt
 CreateExtensionStmt
 CreateFdwStmt
@@ -2024,7 +2023,6 @@ RelMapFile
 RelMapping
 RelOptInfo
 RelOptKind
-RelToCheck
 RelToCluster
 RelabelType
 Relation

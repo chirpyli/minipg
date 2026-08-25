@@ -4,6 +4,36 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE DOMAIN 语法整体裁剪（2026-08-25）
+
+### 一、背景
+按用户要求，从命令标签 `cmdtaglist.h` 的 `CMDTAG_CREATE_DOMAIN` 入手，向下钻取删除整个 `CREATE DOMAIN` SQL 语法与执行路径。domain 类型本身（`pg_type` 的 `TYPTYPE_DOMAIN`、`domain.c` 的输入/输出/约束检查、typcache 域处理、依赖管理中的域约束）属类型系统基础设施，系统目录中仍可能存有域对象，运行期支持必须保留；本轮仅删除"创建域"这一条 DDL 入口。domain 学习价值低，可安全裁剪。
+
+### 二、删除内容
+- **命令标签**：`cmdtaglist.h` 删除 `CMDTAG_CREATE_DOMAIN`（"CREATE DOMAIN"），`CommandTag` 枚举整体前移。
+- **语法（gram.y）**：`stmt` 顶层删除 `CreateDomainStmt` 引用；删除 `CreateDomainStmt` 产生式（`CREATE DOMAIN_P any_name opt_as Typename ColQualList`）及其专属辅助规则 `opt_as`（`AS` / 空）。
+- **节点**：`parsenodes.h` 删除 `CreateDomainStmt` 结构体；`nodes.h` 删除 `T_CreateDomainStmt` 枚举值（后续 `T_*` 编号整体前移，须全量重编）；`copyfuncs.c`/`equalfuncs.c` 删除 `_copyCreateDomainStmt`/`_equalCreateDomainStmt` 及其 switch case。
+- **执行（typecmds.c）**：删除 `DefineDomain` 整函数及其辅助 `get_rels_with_domain`、`checkDomainOwner`、`domainAddConstraint`、`replace_domain_constraint_value` 与 `RelToCheck` 结构体；`typecmds.h` 同步删除 `DefineDomain`/`checkDomainOwner` 原型。
+- **派发（utility.c）**：删除 `T_CreateDomainStmt` 在 `ClassifyUtilityCommandAsReadOnly`、`ProcessUtility`、`GetCommandTag`、`GetCommandLogLevel` 中的 4 处 case（`GetCommandTag` 原映射回退 `CMDTAG_UNKNOWN`）。
+- **pgindent**：`typedefs.list` 删除 `CreateDomainStmt` / `RelToCheck`。
+
+### 三、保留（内核核心，不裁）
+- `DROP DOMAIN` / `CMDTAG_DROP_DOMAIN` 及 `OBJECT_DOMAIN` / `OBJECT_DOMCONSTRAINT` 对象类型：删除对象/依赖级联仍须按对象类型映射。
+- domain 类型运行期基础设施：`domain.c`（`domain_in/domain_recv/domain_check` 等 I/O 与约束检查）、typcache 域处理、`ALTER TABLE ... ALTER COLUMN ... TYPE` 列类型变更中的域处理等——系统目录中既有域对象必须可正常读写。
+- `DOMAIN_P` 关键字保留为无保留关键字（`DROP DOMAIN` 等仍需使用）。
+- `ALTER DOMAIN` 已于 2026-08-24 单独裁剪（上一轮删除 `AlterDomainStmt` 时保留 CREATE DOMAIN，本轮继续向下裁剪）。
+
+### 四、测试
+- 删除 `src/test/regress/sql/domain.sql` 与 `expected/domain.out`（域专属测试，parallel_schedule 中 `domain` 项此前已移除，本次确认无残留引用后彻底删除）。
+- `sql/insert.sql`：删除依赖域类型的 "Make the same tests with domains over the array and composite fields" 整段（`create domain insert_pos_ints` ... `drop type insert_test_type cascade`），`expected/insert.out` 同步删除对应预期。
+- 其余 `CREATE DOMAIN` 引用均不在回归调度内，无需处理：`collate.sql`（引用 information_schema，已随 information_schema 裁剪移除）、`drop_if_exists.sql`（依赖 role/owner，已移除）、`fast_default.sql`（既有 minipg domain/fast-default SIGSEGV，临时注释移出）、isolation `ddl-dependency-locking.spec`（依赖 DROP ROLE/OWNER 权限锁，已注释移出）、modules `test_extensions`（扩展脚本依赖 FDW/sequence，已从 check-world 移除）。
+
+### 五、构建注意（重要）
+删除 `nodes.h` 的 `T_CreateDomainStmt` 与 `cmdtaglist.h` 的 `CMDTAG_CREATE_DOMAIN` 会使节点枚举与 `CommandTag` 枚举数值整体前移，而本工程 Makefile 未启用头文件自动依赖跟踪，旧的 `*.o` 不会自动重编。**务必 `make clean && make -j8` 全量干净重编再跑测试**，否则运行时命令标签/节点类型错位（initdb 阶段 `unrecognized node type` 或完成标签错乱）。
+
+### 六、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 72 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## 枚举数据类型（enum）整体裁剪（2026-08-25）
 
 ### 一、背景

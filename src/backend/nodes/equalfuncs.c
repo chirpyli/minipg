@@ -1217,17 +1217,6 @@ _equalLoadStmt(const LoadStmt *a, const LoadStmt *b)
 }
 
 static bool
-_equalCreateDomainStmt(const CreateDomainStmt *a, const CreateDomainStmt *b)
-{
-	COMPARE_NODE_FIELD(domainname);
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_NODE_FIELD(collClause);
-	COMPARE_NODE_FIELD(constraints);
-
-	return true;
-}
-
-static bool
 _equalCreateOpClassStmt(const CreateOpClassStmt *a, const CreateOpClassStmt *b)
 {
 	COMPARE_NODE_FIELD(opclassname);
@@ -2231,9 +2220,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_LoadStmt:
 			retval = _equalLoadStmt(a, b);
-			break;
-		case T_CreateDomainStmt:
-			retval = _equalCreateDomainStmt(a, b);
 			break;
 		case T_CreateOpClassStmt:
 			retval = _equalCreateOpClassStmt(a, b);
