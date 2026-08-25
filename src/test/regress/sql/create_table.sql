@@ -185,10 +185,6 @@ CREATE TABLE unknowntab (
 	u unknown    -- fail
 );
 
-CREATE TYPE unknown_comptype AS (
-	u unknown    -- fail
-);
-
 CREATE TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 REINDEX INDEX unlogged2_pkey;

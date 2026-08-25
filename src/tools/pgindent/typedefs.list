@@ -377,7 +377,6 @@ CommonTableExpr
 CompareScalarsContext
 CompiledExprState
 CompositeIOData
-CompositeTypeStmt
 CompoundAffixFlag
 CompressionAlgorithm
 CompressorState
@@ -420,7 +419,6 @@ CreateForeignServerStmt
 CreateForeignTableStmt
 CreateFunctionStmt
 CreatePolicyStmt
-CreateRangeStmt
 CreateRoleStmt
 CreateSchemaStmt
 CreateSchemaStmtContext

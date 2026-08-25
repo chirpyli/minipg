@@ -1805,28 +1805,6 @@ typedef struct TransactionStmt
 } TransactionStmt;
 
 /* ----------------------
- *		Create Type Statement, composite types
- * ----------------------
- */
-typedef struct CompositeTypeStmt
-{
-	NodeTag		type;
-	RangeVar   *typevar;		/* the composite type to be created */
-	List	   *coldeflist;		/* list of ColumnDef nodes */
-} CompositeTypeStmt;
-
-/* ----------------------
- *		Create Type Statement, range types
- * ----------------------
- */
-typedef struct CreateRangeStmt
-{
-	NodeTag		type;
-	List	   *typeName;		/* qualified name (list of Value strings) */
-	List	   *params;			/* range parameters (list of DefElem) */
-} CreateRangeStmt;
-
-/* ----------------------
  *		Create View Statement
  * ----------------------
  */

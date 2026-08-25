@@ -232,7 +232,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
-		CreatedbStmt CreateTypeStmt DeleteStmt DiscardStmt
+		CreatedbStmt DeleteStmt DiscardStmt
 		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
 	
 		DropTransformStmt
@@ -725,7 +725,6 @@ stmt:	AlterObjectSchemaStmt
 			| CreateStatsStmt
 			| CreateTransformStmt
 			| CreatedbStmt
-			| CreateTypeStmt
 			| DeallocateStmt
 			| DeleteStmt
 			| DiscardStmt
@@ -2391,28 +2390,9 @@ ConstraintAttributeElem:
 /*****************************************************************************
  *
  *		QUERY :
- *				create type (composite,enum,range)
+ *				generic definition list (name '=' value, ...)
  *
  *****************************************************************************/
-
-CreateTypeStmt:
-			CREATE TYPE_P any_name AS '(' OptTableFuncElementList ')'
-				{
-					CompositeTypeStmt *n = makeNode(CompositeTypeStmt);
-
-					/* can't use qualified_name, sigh */
-					n->typevar = makeRangeVarFromAnyName($3, @3, yyscanner);
-					n->coldeflist = $6;
-					$$ = (Node *)n;
-				}
-			| CREATE TYPE_P any_name AS RANGE definition
-				{
-					CreateRangeStmt *n = makeNode(CreateRangeStmt);
-					n->typeName = $3;
-					n->params	= $6;
-					$$ = (Node *)n;
-				}
-		;
 
 definition: '(' def_list ')'						{ $$ = $2; }
 		;

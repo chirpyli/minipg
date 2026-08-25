@@ -4,6 +4,40 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE TYPE 语法整体裁剪（复合/range 类型，2026-08-25）
+
+### 一、背景
+`CREATE TYPE` 是用户态类型定义 DDL，minipg 中其语法仅支持两种形式：复合类型（`CREATE TYPE any_name AS (...)  →  CompositeTypeStmt`）与 range 类型（`CREATE TYPE any_name AS RANGE ...  →  CreateRangeStmt`），分别由 `DefineCompositeType`（内部转 `DefineRelation` 建 RELKIND_COMPOSITE_TYPE 表）与 `DefineRange` 执行。基础类型形式（shell type / `CREATE TYPE name (...)`）在本轮之前已被裁剪。复合类型创建与 `CREATE TABLE` 的列定义表重叠（`OptTableFuncElementList`），range 类型则依赖独立的 pg_range 目录与专属构造函数，且需预分配 multirange 及 multirange 数组 OID。二者均与 btree/hash 索引、事务等核心路径零耦合，属可裁剪的用户态 DDL，本轮按用户要求彻底裁剪。
+
+### 二、删除内容
+- **语法层（gram.y）**：删 `CreateTypeStmt` 产生式（复合 + range 两种形式）；同步清理 `%type CreateTypeStmt` 声明与 `stmt` 顶层分支；注释由「create type (composite,enum,range)」改为「generic definition list (name '=' value, ...)」。
+- **节点定义**：删 `parsenodes.h` 的 `CompositeTypeStmt`、`CreateRangeStmt` 两个结构体；删 `nodes.h` 枚举 `T_CompositeTypeStmt` / `T_CreateRangeStmt`（后续 `T_*` 整体前移，须全量重编）。
+- **节点拷贝/比较**：删 `copyfuncs.c` / `equalfuncs.c` 的 `_copy/_equalCompositeTypeStmt`、`_copy/_equalCreateRangeStmt` 与对应 `T_*` case。
+- **执行层（typecmds.c）**：删 `DefineCompositeType`、`DefineRange` 及其专属助手 `makeRangeConstructors`、`makeMultirangeConstructors`、`findRangeSubOpclass`、`findRangeCanonicalFunction`、`findRangeSubtypeDiffFunction`、`AssignTypeMultirangeOid`、`AssignTypeMultirangeArrayOid`。
+- **头文件**：删 `typecmds.h` 的 `DefineRange` / `DefineCompositeType` 原型；删 `typedefs.list` 的 `CompositeTypeStmt` / `CreateRangeStmt`。
+- **派发层（utility.c）**：删 4 处 `T_CompositeTypeStmt` / `T_CreateRangeStmt` 引用——`ClassifyUtilityCommandAsReadOnly`、`ProcessUtility`（`DefineCompositeType` / `DefineRange` 调用）、`CreateCommandTag`、`GetCommandLogLevel`。
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_CREATE_TYPE`，`CommandTag` 枚举整体前移 1 位。
+
+### 三、保留（内核核心，不裁）
+- `DROP TYPE`（`DropStmt` → objectaddress 通用删除 → `RemoveTypeById`）及 `OBJECT_TYPE` 依赖映射——类型删除属通用对象管理核心。
+- `ALTER TYPE` 相关路径：`AlterTypeNamespace` / `AlterTypeNamespace_oid` / `AlterTypeNamespaceInternal`（`ALTER TYPE SET SCHEMA`，与 ALTER TABLE/DOMAIN 共用）。
+- `AssignTypeArrayOid`：仍被 `heap.c` 的 `DefineRelation` 调用（`CREATE TABLE` 建表时为行类型预分配数组 OID），属核心路径。
+- `CREATE VIEW`（`CreateViewStmt`）及 `CMDTAG_CREATE_VIEW` 不受影响；CREATE TABLE / CREATE FUNCTION 等其它用户态 DDL 不受影响。
+
+### 四、测试
+- 删除 `sql/typed_table.sql` 与 `expected/typed_table.out`（整测试依赖 `CREATE TABLE ... OF type` 类型表，其类型由 CREATE TYPE 建立，属死测试）；`parallel_schedule` 删除 `typed_table` 项并加注释。
+- `insert.sql`：删除「indirection」段（依赖 CREATE TYPE 定义复合类型）；`expected/insert.out` 同步删除对应输出。
+- `hash_func.sql`：删除 record 类型哈希段（`CREATE TYPE` 定义匿名 record 复合类型）；`expected/hash_func.out` 同步删除。
+- `create_table.sql`：删除 `unknown_comptype` 段（`CREATE TYPE AS (...)` 用于未知类型列）；`expected/create_table.out` 同步删除。
+- `arrays.sql`：删除两段依赖 CREATE TYPE 复合类型的数组用例（含 `comptype`/`comptype_arr`）；`expected/arrays.out` 同步删除。
+- `sanity_check.out`：删除 `persons` / `persons2` / `persons3` 三行（该表由已删的 typed_table 测试创建）。
+
+### 五、构建注意（重要）
+删除 `nodes.h` 节点枚举与 `cmdtaglist.h` 命令标签都会使编号前移，必须 `make clean && make -j8` 全量干净重编；本工程 Makefile 未启用头文件自动依赖跟踪，仅增量编译会残留旧二进制。
+
+### 六、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 71 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## CREATE SUBSCRIPTION 命令标签裁剪（逻辑复制残留死标签，2026-08-25）
 
 ### 一、背景

@@ -116,9 +116,7 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 	{
 		case T_AlterObjectSchemaStmt:
 		case T_AlterTableStmt:
-		case T_CompositeTypeStmt:
 		case T_CreateExtensionStmt:
-		case T_CreateRangeStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
@@ -856,21 +854,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateExtension(pstate, (CreateExtensionStmt *) parsetree);
 				break;
 
-
-
-			case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
-				{
-					CompositeTypeStmt *stmt = (CompositeTypeStmt *) parsetree;
-
-					address = DefineCompositeType(stmt->typevar,
-												  stmt->coldeflist);
-				}
-				break;
-
-			case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
-				address = DefineRange((CreateRangeStmt *) parsetree);
-				break;
-
 			case T_ViewStmt:	/* CREATE VIEW */
 				address = DefineView((ViewStmt *) parsetree, queryString,
 									pstmt->stmt_location, pstmt->stmt_len);
@@ -1349,14 +1332,6 @@ CreateCommandTag(Node *parsetree)
 			tag = AlterObjectTypeCommandTag(((AlterTableStmt *) parsetree)->objtype);
 			break;
 
-		case T_CompositeTypeStmt:
-			tag = CMDTAG_CREATE_TYPE;
-			break;
-
-			case T_CreateRangeStmt:
-			tag = CMDTAG_CREATE_TYPE;
-			break;
-
 		case T_ViewStmt:
 			tag = CMDTAG_CREATE_VIEW;
 			break;
@@ -1704,14 +1679,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterTableStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CompositeTypeStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateRangeStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

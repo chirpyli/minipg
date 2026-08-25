@@ -157,10 +157,6 @@ CREATE TABLE unknowntab (
 	u unknown    -- fail
 );
 ERROR:  column "u" has pseudo-type unknown
-CREATE TYPE unknown_comptype AS (
-	u unknown    -- fail
-);
-ERROR:  column "u" has pseudo-type unknown
 CREATE TABLE unlogged2 (a int primary key);			-- OK
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
     relname     | relkind | relpersistence 

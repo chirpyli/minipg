@@ -1177,25 +1177,6 @@ _equalTransactionStmt(const TransactionStmt *a, const TransactionStmt *b)
 }
 
 static bool
-_equalCompositeTypeStmt(const CompositeTypeStmt *a, const CompositeTypeStmt *b)
-{
-	COMPARE_NODE_FIELD(typevar);
-	COMPARE_NODE_FIELD(coldeflist);
-
-	return true;
-}
-
-static bool
-_equalCreateRangeStmt(const CreateRangeStmt *a, const CreateRangeStmt *b)
-{
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_NODE_FIELD(params);
-
-	return true;
-}
-
-
-static bool
 _equalViewStmt(const ViewStmt *a, const ViewStmt *b)
 {
 	COMPARE_NODE_FIELD(view);
@@ -2173,12 +2154,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TransactionStmt:
 			retval = _equalTransactionStmt(a, b);
-			break;
-		case T_CompositeTypeStmt:
-			retval = _equalCompositeTypeStmt(a, b);
-			break;
-		case T_CreateRangeStmt:
-			retval = _equalCreateRangeStmt(a, b);
 			break;
 		case T_ViewStmt:
 			retval = _equalViewStmt(a, b);

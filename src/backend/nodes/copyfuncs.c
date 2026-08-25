@@ -2967,28 +2967,6 @@ _copyTransactionStmt(const TransactionStmt *from)
 	return newnode;
 }
 
-static CompositeTypeStmt *
-_copyCompositeTypeStmt(const CompositeTypeStmt *from)
-{
-	CompositeTypeStmt *newnode = makeNode(CompositeTypeStmt);
-
-	COPY_NODE_FIELD(typevar);
-	COPY_NODE_FIELD(coldeflist);
-
-	return newnode;
-}
-
-static CreateRangeStmt *
-_copyCreateRangeStmt(const CreateRangeStmt *from)
-{
-	CreateRangeStmt *newnode = makeNode(CreateRangeStmt);
-
-	COPY_NODE_FIELD(typeName);
-	COPY_NODE_FIELD(params);
-
-	return newnode;
-}
-
 
 static ViewStmt *
 _copyViewStmt(const ViewStmt *from)
@@ -3681,12 +3659,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_TransactionStmt:
 			retval = _copyTransactionStmt(from);
-			break;
-		case T_CompositeTypeStmt:
-			retval = _copyCompositeTypeStmt(from);
-			break;
-		case T_CreateRangeStmt:
-			retval = _copyCreateRangeStmt(from);
 			break;
 		case T_ViewStmt:
 			retval = _copyViewStmt(from);
