@@ -238,7 +238,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 	switch (objtype)
 	{
 		case OBJECT_TYPE:
-		case OBJECT_DOMAIN:
 			{
 				TypeName   *typ = castNode(TypeName, object);
 

@@ -104,7 +104,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 										  oldSchemaAddr ? &oldNspOid : NULL);
 			break;
 
-		case OBJECT_DOMAIN:
 		case OBJECT_TYPE:
 			address = AlterTypeNamespace(castNode(List, stmt->object), stmt->newschema,
 										 stmt->objectType,

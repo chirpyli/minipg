@@ -498,7 +498,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPENDS DEPTH DESC
-	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P DOMAIN_P
+	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P
 	DOUBLE_P DROP
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
@@ -2566,26 +2566,6 @@ DropStmt:	DROP object_type_any_name IF_P EXISTS any_name_list opt_drop_behavior
 				{
 					DropStmt *n = makeNode(DropStmt);
 					n->removeType = OBJECT_TYPE;
-					n->missing_ok = true;
-					n->objects = $5;
-					n->behavior = $6;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP DOMAIN_P type_name_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_DOMAIN;
-					n->missing_ok = false;
-					n->objects = $3;
-					n->behavior = $4;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP DOMAIN_P IF_P EXISTS type_name_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_DOMAIN;
 					n->missing_ok = true;
 					n->objects = $5;
 					n->behavior = $6;
@@ -7788,7 +7768,6 @@ unreserved_keyword:
 			| DISABLE_P
 			| DISCARD
 			| DOCUMENT_P
-			| DOMAIN_P
 			| DOUBLE_P
 			| DROP
 			| EACH
@@ -8290,7 +8269,6 @@ bare_label_keyword:
 			| DISTINCT
 			| DO
 			| DOCUMENT_P
-			| DOMAIN_P
 			| DOUBLE_P
 			| DROP
 			| EACH

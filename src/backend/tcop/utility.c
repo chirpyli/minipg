@@ -1279,9 +1279,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TYPE:
 					tag = CMDTAG_DROP_TYPE;
 					break;
-				case OBJECT_DOMAIN:
-					tag = CMDTAG_DROP_DOMAIN;
-					break;
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;

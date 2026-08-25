@@ -70,18 +70,6 @@ DROP TYPE IF EXISTS test_type_exists;
 
 DROP TYPE test_type_exists;
 
--- domain
-
-DROP DOMAIN test_domain_exists;
-
-DROP DOMAIN IF EXISTS test_domain_exists;
-
-CREATE domain test_domain_exists as int not null check (value > 0);
-
-DROP DOMAIN IF EXISTS test_domain_exists;
-
-DROP DOMAIN test_domain_exists;
-
 ---
 --- role/user/group
 ---
@@ -188,7 +176,6 @@ DROP TABLE test_exists;
 -- be tolerant with missing schemas, types, etc
 
 DROP COLLATION IF EXISTS no_such_schema.foo;
-DROP DOMAIN IF EXISTS no_such_schema.foo;
 DROP FUNCTION IF EXISTS no_such_schema.foo();
 DROP FUNCTION IF EXISTS foo(no_such_type);
 DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);

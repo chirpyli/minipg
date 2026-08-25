@@ -4,6 +4,36 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## DROP DOMAIN 整体裁剪（DOMAIN 对象残留清理，2026-08-25）
+
+### 一、背景
+此前已整体裁剪 `CREATE DOMAIN` 语法（其 `CreateDomainStmt` 节点、`DefineDomain`、`CMDTAG_CREATE_DOMAIN` 标签均已删）与 `ALTER DOMAIN` 语法（无 `AlterDomainStmt` 节点），但 `DROP DOMAIN` 语法与执行路径仍完整存在：`gram.y` 的 `DROP DOMAIN` / `DROP DOMAIN IF EXISTS` 两个产生式、`OBJECT_DOMAIN` / `OBJECT_DOMCONSTRAINT` 枚举及其在 `objectaddress.c` / `alter.c` / `typecmds.c` / `dropcmds.c` 中的分支、`CMDTAG_DROP_DOMAIN` 命令标签。由于 CREATE/ALTER DOMAIN 已不可达，这些 DROP DOMAIN 专属路径仅是删除历史遗留 domain 对象的残留功能，与 btree/hash 索引、事务等核心路径零耦合，本轮按用户要求整体裁剪，彻底去除 DOMAIN 对象残留。
+
+### 二、删除内容
+- **语法层（gram.y）**：删 `DROP DOMAIN` / `DROP DOMAIN IF EXISTS` 两个产生式；删 `DOMAIN_P` token 定义及 `unreserved_keyword` / `bare_label_keyword` 分类列表中的 `DOMAIN_P`；`kwlist.h` 删 `PG_KEYWORD("domain", ...)` 关键字（"domain" 恢复为普通标识符）。
+- **节点枚举（parsenodes.h）**：删 `OBJECT_DOMAIN`、`OBJECT_DOMCONSTRAINT`（后续 `ObjectType` 枚举整体前移）。
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_DROP_DOMAIN`，`CommandTag` 枚举整体前移 1 位。
+- **派发层（utility.c）**：删 `CreateCommandTag` 中 `OBJECT_DOMAIN` → `CMDTAG_DROP_DOMAIN` 分支。
+- **对象地址（objectaddress.c）**：删 `get_object_address` 中 `OBJECT_DOMCONSTRAINT` case（含 `get_domain_constraint_oid` 调用）与 `OBJECT_DOMAIN` case；删 `get_object_address_type` 中 `OBJECT_DOMAIN` 的域类型检查（"not a domain"）；删 `pg_get_object_address` 中 `OBJECT_DOMAIN` / `OBJECT_DOMCONSTRAINT` 相关分支；删 `object_type_map` 中 "domain constraint" 描述项。
+- **pg_constraint.c/h**：删 `get_domain_constraint_oid` 函数及原型（仅被已删的 `OBJECT_DOMCONSTRAINT` case 调用，属死代码）。
+- **alter.c**：删 `ExecAlterObjectSchemaStmt` 中 `OBJECT_DOMAIN` case（`ALTER DOMAIN SET SCHEMA` 语法已裁，不可达）。
+- **typecmds.c**：删 `AlterTypeNamespace` 中 `OBJECT_DOMAIN` 检查分支（`ALTER TYPE SET SCHEMA` 仅传 `OBJECT_TYPE`，不可达）。
+- **dropcmds.c**：删 `does_not_exist_skipping` 中 `OBJECT_DOMAIN` case（`DROP DOMAIN IF EXISTS` 专用，与 `OBJECT_TYPE` 拆开）。
+
+### 三、保留（内核核心，不裁）
+- `DROP TYPE`（`OBJECT_TYPE`）及其全部路径（`gram.y` DROP TYPE 产生式、`get_object_address_type` 类型查找、`CMDTAG_DROP_TYPE` 标签）不受影响。
+- `ALTER TYPE SET SCHEMA`（`AlterTypeNamespace`，`OBJECT_TYPE` 路径）不受影响。
+- `pg_constraint` 目录中表约束相关函数（`get_relation_constraint_oid` 等）不受影响。
+
+### 四、测试
+- `drop_if_exists.sql/out`：删除 domain 段（`DROP DOMAIN` / `DROP DOMAIN IF EXISTS` / `CREATE domain` 用例）。注：该测试当前不在 `parallel_schedule`（属死文件），本次清理仅为文件与内核功能保持一致，不影响 check-world 计数。
+
+### 五、构建注意（重要）
+删除 `parsenodes.h` 的 `ObjectType` 枚举、`cmdtaglist.h` 命令标签及 `kwlist.h` 关键字都会使编号前移，必须 `make clean && make -j8` 全量干净重编；本工程 Makefile 未启用头文件自动依赖跟踪，仅增量编译会残留旧二进制。
+
+### 六、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 71 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## CREATE TYPE 语法整体裁剪（复合/range 类型，2026-08-25）
 
 ### 一、背景

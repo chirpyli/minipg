@@ -432,9 +432,6 @@ static const struct object_type_map
 	{
 		"table constraint", OBJECT_TABCONSTRAINT
 	},
-	{
-		"domain constraint", OBJECT_DOMCONSTRAINT
-	},
 	/* OCLASS_DEFAULT */
 	{
 		"default value", OBJECT_DEFAULT
@@ -617,25 +614,6 @@ get_object_address(ObjectType objtype, Node *object,
 				address = get_object_address_relobject(objtype, castNode(List, object),
 													   &relation, missing_ok);
 				break;
-			case OBJECT_DOMCONSTRAINT:
-				{
-					List	   *objlist;
-					ObjectAddress domaddr;
-					char	   *constrname;
-
-					objlist = castNode(List, object);
-					domaddr = get_object_address_type(OBJECT_DOMAIN,
-													  linitial_node(TypeName, objlist),
-													  missing_ok);
-					constrname = strVal(lsecond(objlist));
-
-					address.classId = ConstraintRelationId;
-					address.objectId = get_domain_constraint_oid(domaddr.objectId,
-																 constrname, missing_ok);
-					address.objectSubId = 0;
-
-				}
-				break;
 			case OBJECT_DATABASE:
 			case OBJECT_EXTENSION:
 			case OBJECT_SCHEMA:
@@ -644,7 +622,6 @@ get_object_address(ObjectType objtype, Node *object,
 														 (Value *) object, missing_ok);
 				break;
 			case OBJECT_TYPE:
-			case OBJECT_DOMAIN:
 				address = get_object_address_type(objtype, castNode(TypeName, object), missing_ok);
 				break;
 			case OBJECT_FUNCTION:
@@ -1150,15 +1127,6 @@ get_object_address_type(ObjectType objtype, TypeName *typename, bool missing_ok)
 	}
 	address.objectId = typeTypeId(tup);
 
-	if (objtype == OBJECT_DOMAIN)
-	{
-		if (((Form_pg_type) GETSTRUCT(tup))->typtype != TYPTYPE_DOMAIN)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("\"%s\" is not a domain",
-							TypeNameToString(typename))));
-	}
-
 	ReleaseSysCache(tup);
 
 	return address;
@@ -1377,8 +1345,8 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	 * object type.  Most use a simple string Values list, but there are some
 	 * exceptions.
 	 */
-	if (type == OBJECT_TYPE || type == OBJECT_DOMAIN || type == OBJECT_CAST ||
-		type == OBJECT_TRANSFORM || type == OBJECT_DOMCONSTRAINT)
+	if (type == OBJECT_TYPE || type == OBJECT_CAST ||
+		type == OBJECT_TRANSFORM)
 	{
 		Datum	   *elems;
 		bool	   *nulls;
@@ -1448,7 +1416,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	 */
 	switch (type)
 	{
-			case OBJECT_DOMCONSTRAINT:
 			case OBJECT_CAST:
 			case OBJECT_TRANSFORM:
 				if (list_length(args) != 1)
@@ -1505,11 +1472,9 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 			objnode = linitial(name);
 			break;
 		case OBJECT_TYPE:
-		case OBJECT_DOMAIN:
 			objnode = (Node *) typename;
 			break;
 		case OBJECT_CAST:
-		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_TRANSFORM:
 			objnode = (Node *) list_make2(typename, linitial(args));
 			break;

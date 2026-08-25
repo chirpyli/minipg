@@ -996,56 +996,6 @@ get_relation_idx_constraint_oid(Oid relationId, Oid indexId)
 }
 
 /*
- * get_domain_constraint_oid
- *		Find a constraint on the specified domain with the specified name.
- *		Returns constraint's OID.
- */
-Oid
-get_domain_constraint_oid(Oid typid, const char *conname, bool missing_ok)
-{
-	Relation	pg_constraint;
-	HeapTuple	tuple;
-	SysScanDesc scan;
-	ScanKeyData skey[3];
-	Oid			conOid = InvalidOid;
-
-	pg_constraint = table_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(typid));
-	ScanKeyInit(&skey[2],
-				Anum_pg_constraint_conname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(conname));
-
-	scan = systable_beginscan(pg_constraint, ConstraintRelidTypidNameIndexId, true,
-							  NULL, 3, skey);
-
-	/* There can be at most one matching row */
-	if (HeapTupleIsValid(tuple = systable_getnext(scan)))
-		conOid = ((Form_pg_constraint) GETSTRUCT(tuple))->oid;
-
-	systable_endscan(scan);
-
-	/* If no such constraint exists, complain */
-	if (!OidIsValid(conOid) && !missing_ok)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("constraint \"%s\" for domain %s does not exist",
-						conname, format_type_be(typid))));
-
-	table_close(pg_constraint, AccessShareLock);
-
-	return conOid;
-}
-
-/*
  * get_primary_key_attnos
  *		Identify the columns in a relation's primary key, if any.
  *

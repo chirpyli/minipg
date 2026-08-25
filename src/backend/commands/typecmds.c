@@ -173,13 +173,6 @@ AlterTypeNamespace(List *names, const char *newschema, ObjectType objecttype,
 	typename = makeTypeNameFromNameList(names);
 	typeOid = typenameTypeId(NULL, typename);
 
-	/* Don't allow ALTER DOMAIN on a type */
-	if (objecttype == OBJECT_DOMAIN && get_typtype(typeOid) != TYPTYPE_DOMAIN)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("%s is not a domain",
-						format_type_be(typeOid))));
-
 	/* get schema OID and check its permissions */
 	nspOid = LookupCreationNamespace(newschema);
 
