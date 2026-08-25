@@ -2536,17 +2536,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 	else if (Matches("DROP", "TRIGGER", MatchAny, "ON", MatchAny))
 		COMPLETE_WITH("CASCADE", "RESTRICT");
 
-	/* DROP RULE */
-	else if (Matches("DROP", "RULE", MatchAny))
-		COMPLETE_WITH("ON");
-	else if (Matches("DROP", "RULE", MatchAny, "ON"))
-	{
-		completion_info_charp = prev2_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_tables_for_rule);
-	}
-	else if (Matches("DROP", "RULE", MatchAny, "ON", MatchAny))
-		COMPLETE_WITH("CASCADE", "RESTRICT");
-
 /* EXECUTE */
 	else if (Matches("EXECUTE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_prepared_statements);

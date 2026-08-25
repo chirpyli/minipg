@@ -177,41 +177,6 @@ DROP TRIGGER test_trigger_exists ON test_exists;
 ERROR:  syntax error at or near "TRIGGER"
 LINE 1: DROP TRIGGER test_trigger_exists ON test_exists;
              ^
--- rule
-DROP RULE test_rule_exists ON test_exists;
-ERROR:  rule "test_rule_exists" for relation "test_exists" does not exist
-DROP RULE IF EXISTS test_rule_exists ON test_exists;
-NOTICE:  rule "test_rule_exists" for relation "test_exists" does not exist, skipping
-DROP RULE test_rule_exists ON no_such_table;
-ERROR:  relation "no_such_table" does not exist
-DROP RULE IF EXISTS test_rule_exists ON no_such_table;
-NOTICE:  relation "no_such_table" does not exist, skipping
-DROP RULE test_rule_exists ON no_such_schema.no_such_table;
-ERROR:  schema "no_such_schema" does not exist
-DROP RULE IF EXISTS test_rule_exists ON no_such_schema.no_such_table;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-CREATE RULE test_rule_exists AS ON INSERT TO test_exists
-    DO INSTEAD
-    INSERT INTO test_exists VALUES (NEW.a, NEW.b || NEW.a::text);
-DROP RULE test_rule_exists ON test_exists;
--- operator class
-DROP OPERATOR CLASS test_operator_class USING btree;
-ERROR:  operator class "test_operator_class" does not exist for access method "btree"
-DROP OPERATOR CLASS IF EXISTS test_operator_class USING btree;
-NOTICE:  operator class "test_operator_class" does not exist for access method "btree", skipping
-DROP OPERATOR CLASS test_operator_class USING no_such_am;
-ERROR:  access method "no_such_am" does not exist
-DROP OPERATOR CLASS IF EXISTS test_operator_class USING no_such_am;
-ERROR:  access method "no_such_am" does not exist
--- operator family
-DROP OPERATOR FAMILY test_operator_family USING btree;
-ERROR:  operator family "test_operator_family" does not exist for access method "btree"
-DROP OPERATOR FAMILY IF EXISTS test_operator_family USING btree;
-NOTICE:  operator family "test_operator_family" does not exist for access method "btree", skipping
-DROP OPERATOR FAMILY test_operator_family USING no_such_am;
-ERROR:  access method "no_such_am" does not exist
-DROP OPERATOR FAMILY IF EXISTS test_operator_family USING no_such_am;
-ERROR:  access method "no_such_am" does not exist
 -- drop the table
 DROP TABLE IF EXISTS test_exists;
 DROP TABLE test_exists;
@@ -228,12 +193,6 @@ NOTICE:  type "no_such_type" does not exist, skipping
 DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP INDEX IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP OPERATOR CLASS IF EXISTS no_such_schema.widget_ops USING btree;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP OPERATOR FAMILY IF EXISTS no_such_schema.float_ops USING btree;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP RULE IF EXISTS foo ON no_such_schema.bar;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP SEQUENCE IF EXISTS no_such_schema.foo;
 ERROR:  syntax error at or near "SEQUENCE"

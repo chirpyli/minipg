@@ -137,36 +137,6 @@ CREATE TRIGGER test_trigger_exists
     FOR EACH ROW EXECUTE PROCEDURE suppress_redundant_updates_trigger();
 DROP TRIGGER test_trigger_exists ON test_exists;
 
--- rule
-DROP RULE test_rule_exists ON test_exists;
-DROP RULE IF EXISTS test_rule_exists ON test_exists;
-
-DROP RULE test_rule_exists ON no_such_table;
-DROP RULE IF EXISTS test_rule_exists ON no_such_table;
-
-DROP RULE test_rule_exists ON no_such_schema.no_such_table;
-DROP RULE IF EXISTS test_rule_exists ON no_such_schema.no_such_table;
-
-CREATE RULE test_rule_exists AS ON INSERT TO test_exists
-    DO INSTEAD
-    INSERT INTO test_exists VALUES (NEW.a, NEW.b || NEW.a::text);
-DROP RULE test_rule_exists ON test_exists;
-
-
--- operator class
-DROP OPERATOR CLASS test_operator_class USING btree;
-DROP OPERATOR CLASS IF EXISTS test_operator_class USING btree;
-
-DROP OPERATOR CLASS test_operator_class USING no_such_am;
-DROP OPERATOR CLASS IF EXISTS test_operator_class USING no_such_am;
-
--- operator family
-DROP OPERATOR FAMILY test_operator_family USING btree;
-DROP OPERATOR FAMILY IF EXISTS test_operator_family USING btree;
-
-DROP OPERATOR FAMILY test_operator_family USING no_such_am;
-DROP OPERATOR FAMILY IF EXISTS test_operator_family USING no_such_am;
-
 -- drop the table
 
 DROP TABLE IF EXISTS test_exists;
@@ -180,9 +150,6 @@ DROP FUNCTION IF EXISTS no_such_schema.foo();
 DROP FUNCTION IF EXISTS foo(no_such_type);
 DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 DROP INDEX IF EXISTS no_such_schema.foo;
-DROP OPERATOR CLASS IF EXISTS no_such_schema.widget_ops USING btree;
-DROP OPERATOR FAMILY IF EXISTS no_such_schema.float_ops USING btree;
-DROP RULE IF EXISTS foo ON no_such_schema.bar;
 DROP SEQUENCE IF EXISTS no_such_schema.foo;
 DROP TABLE IF EXISTS no_such_schema.foo;
 DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;

@@ -233,7 +233,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		
 		CreateTransformStmt
 		CreatedbStmt DeleteStmt DiscardStmt
-		DropdbStmt DropOpClassStmt DropOpFamilyStmt DropStmt
+		DropdbStmt DropStmt
 	
 		DropTransformStmt
 		ExplainStmt
@@ -362,7 +362,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <boolean> opt_freeze opt_analyze
 
 %type <ival>	event opt_set_data
-%type <objtype>	object_type_any_name object_type_name_on_any_name
+%type <objtype>	object_type_any_name
 				drop_type_name
 
 %type <node>	select_limit_value
@@ -728,8 +728,6 @@ stmt:	AlterObjectSchemaStmt
 			| DeallocateStmt
 			| DeleteStmt
 			| DiscardStmt
-			| DropOpClassStmt
-			| DropOpFamilyStmt
 			| DropStmt
 			| DropTransformStmt
 			| DropdbStmt
@@ -2426,61 +2424,6 @@ opt_if_not_exists: IF_P NOT EXISTS              { $$ = true; }
 
 /*****************************************************************************
  *
- *		QUERIES :
- *				DROP OPERATOR CLASS ...
- *				DROP OPERATOR FAMILY ...
- *
- *****************************************************************************/
-
-DropOpClassStmt:
-			DROP OPERATOR CLASS any_name USING name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->objects = list_make1(lcons(makeString($6), $4));
-					n->removeType = OBJECT_OPCLASS;
-					n->behavior = $7;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP OPERATOR CLASS IF_P EXISTS any_name USING name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->objects = list_make1(lcons(makeString($8), $6));
-					n->removeType = OBJECT_OPCLASS;
-					n->behavior = $9;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-		;
-
-DropOpFamilyStmt:
-			DROP OPERATOR FAMILY any_name USING name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->objects = list_make1(lcons(makeString($6), $4));
-					n->removeType = OBJECT_OPFAMILY;
-					n->behavior = $7;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP OPERATOR FAMILY IF_P EXISTS any_name USING name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->objects = list_make1(lcons(makeString($8), $6));
-					n->removeType = OBJECT_OPFAMILY;
-					n->behavior = $9;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-		;
-
-
-/*****************************************************************************
- *
  *		QUERY:
 /*****************************************************************************
  *
@@ -2530,26 +2473,6 @@ DropStmt:	DROP object_type_any_name IF_P EXISTS any_name_list opt_drop_behavior
 					n->behavior = $4;
 					n->concurrent = false;
 					$$ = (Node *)n;
-				}
-			| DROP object_type_name_on_any_name name ON any_name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = $2;
-					n->objects = list_make1(lappend($5, makeString($3)));
-					n->behavior = $6;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP object_type_name_on_any_name IF_P EXISTS name ON any_name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = $2;
-					n->objects = list_make1(lappend($7, makeString($5)));
-					n->behavior = $8;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *) n;
 				}
 			| DROP TYPE_P type_name_list opt_drop_behavior
 				{
@@ -2612,11 +2535,6 @@ drop_type_name:
 			EXTENSION								{ $$ = OBJECT_EXTENSION; }
 			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
 			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
-		;
-
-/* object types attached to a table */
-object_type_name_on_any_name:
-			RULE									{ $$ = OBJECT_RULE; }
 		;
 
 any_name_list:
@@ -8667,26 +8585,6 @@ RemoveFuncStmt:
 				{
 					DropStmt *n = makeNode(DropStmt);
 					n->removeType = OBJECT_PROCEDURE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP ROUTINE function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_ROUTINE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP ROUTINE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_ROUTINE;
 					n->objects = $5;
 					n->behavior = $6;
 					n->missing_ok = true;

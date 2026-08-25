@@ -1285,26 +1285,11 @@ CreateCommandTag(Node *parsetree)
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
 					break;
-				case OBJECT_ROUTINE:
-					tag = CMDTAG_DROP_ROUTINE;
-					break;
 				case OBJECT_LANGUAGE:
 					tag = CMDTAG_DROP_LANGUAGE;
 					break;
-			case OBJECT_RULE:
-				tag = CMDTAG_DROP_RULE;
-				break;
-			case OBJECT_OPCLASS:
-					tag = CMDTAG_DROP_OPERATOR_CLASS;
-					break;
-				case OBJECT_OPFAMILY:
-					tag = CMDTAG_DROP_OPERATOR_FAMILY;
-					break;
 				case OBJECT_TRANSFORM:
 					tag = CMDTAG_DROP_TRANSFORM;
-					break;
-				case OBJECT_PUBLICATION:
-					tag = CMDTAG_DROP_PUBLICATION;
 					break;
 				case OBJECT_STATISTIC_EXT:
 					tag = CMDTAG_DROP_STATISTICS;

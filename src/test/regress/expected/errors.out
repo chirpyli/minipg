@@ -180,34 +180,6 @@ LINE 1: drop type 314159;
 drop type nonesuch;
 ERROR:  type "nonesuch" does not exist
 --
--- DROP RULE
--- missing rule name
-drop rule;
-ERROR:  syntax error at or near ";"
-LINE 1: drop rule;
-                 ^
--- bad rule name
-drop rule 314159;
-ERROR:  syntax error at or near "314159"
-LINE 1: drop rule 314159;
-                  ^
--- no such rule
-drop rule nonesuch on noplace;
-ERROR:  relation "noplace" does not exist
--- these postquel variants are no longer supported
-drop tuple rule nonesuch;
-ERROR:  syntax error at or near "tuple"
-LINE 1: drop tuple rule nonesuch;
-             ^
-drop instance rule nonesuch on noplace;
-ERROR:  syntax error at or near "instance"
-LINE 1: drop instance rule nonesuch on noplace;
-             ^
-drop rewrite rule nonesuch;
-ERROR:  syntax error at or near "rewrite"
-LINE 1: drop rewrite rule nonesuch;
-             ^
---
 -- Check that division-by-zero is properly caught.
 --
 select 1/0;

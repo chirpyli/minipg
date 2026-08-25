@@ -320,19 +320,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				}
 				break;
 			}
-		case OBJECT_ROUTINE:
-			{
-				ObjectWithArgs *owa = castNode(ObjectWithArgs, object);
-
-				if (!schema_does_not_exist_skipping(owa->objname, &msg, &name) &&
-					!type_in_list_does_not_exist_skipping(owa->objargs, &msg, &name))
-				{
-					msg = gettext_noop("routine %s(%s) does not exist, skipping");
-					name = NameListToString(owa->objname);
-					args = TypeNameListToString(owa->objargs);
-				}
-				break;
-			}
 		case OBJECT_LANGUAGE:
 			msg = gettext_noop("language \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);
@@ -344,43 +331,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				name = TypeNameToString(linitial_node(TypeName, castNode(List, object)));
 				args = strVal(lsecond(castNode(List, object)));
 			}
-			break;
-		case OBJECT_RULE:
-			if (!owningrel_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("rule \"%s\" for relation \"%s\" does not exist, skipping");
-				name = strVal(llast(castNode(List, object)));
-			args = NameListToString(list_truncate(list_copy(castNode(List, object)),
-												  list_length(castNode(List, object)) - 1));
-			}
-			break;
-		case OBJECT_OPCLASS:
-			{
-				List	   *opcname = list_copy_tail(castNode(List, object), 1);
-
-				if (!schema_does_not_exist_skipping(opcname, &msg, &name))
-				{
-					msg = gettext_noop("operator class \"%s\" does not exist for access method \"%s\", skipping");
-					name = NameListToString(opcname);
-					args = strVal(linitial(castNode(List, object)));
-				}
-			}
-			break;
-		case OBJECT_OPFAMILY:
-			{
-				List	   *opfname = list_copy_tail(castNode(List, object), 1);
-
-				if (!schema_does_not_exist_skipping(opfname, &msg, &name))
-				{
-					msg = gettext_noop("operator family \"%s\" does not exist for access method \"%s\", skipping");
-					name = NameListToString(opfname);
-					args = strVal(linitial(castNode(List, object)));
-				}
-			}
-			break;
-		case OBJECT_PUBLICATION:
-			msg = gettext_noop("publication \"%s\" does not exist, skipping");
-			name = strVal((Value *) object);
 			break;
 		default:
 			elog(ERROR, "unrecognized object type: %d", (int) objtype);

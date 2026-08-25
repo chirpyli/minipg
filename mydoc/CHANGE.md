@@ -4,6 +4,34 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## DROP OPERATOR CLASS/FAMILY、DROP PUBLICATION、DROP ROUTINE、DROP RULE 命令标签及语法整体裁剪（2026-08-25）
+
+### 一、背景
+本轮按用户要求裁剪 `cmdtaglist.h` 中 5 个删除类命令标签：`CMDTAG_DROP_OPERATOR_CLASS`、`CMDTAG_DROP_OPERATOR_FAMILY`、`CMDTAG_DROP_PUBLICATION`、`CMDTAG_DROP_ROUTINE`、`CMDTAG_DROP_RULE`。其中 `DROP OPERATOR CLASS/FAMILY` 依赖已被裁剪的 `CREATE OPERATOR CLASS/FAMILY`（`DefineOpClass`/`DefineOpFamily` 均已删）、`DROP ROUTINE` 依赖已被裁剪的 `CREATE ROUTINE`、`DROP RULE` 仅剩 `CREATE RULE` 的规则体系，删除类语法失去实际意义；`DROP PUBLICATION` 在 gram.y 中本就无任何产生式（纯死标签）。5 个命令均与 btree/hash 索引、事务等内核核心零耦合，学习价值低，本轮整体裁剪。
+
+### 二、删除内容
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_DROP_OPERATOR_CLASS`、`CMDTAG_DROP_OPERATOR_FAMILY`、`CMDTAG_DROP_PUBLICATION`、`CMDTAG_DROP_ROUTINE`、`CMDTAG_DROP_RULE`，`CommandTag` 枚举整体前移 5 位。
+- **语法层（gram.y）**：
+  - 删 `DropOpClassStmt`（`DROP OPERATOR CLASS` / `DROP OPERATOR CLASS IF EXISTS`）与 `DropOpFamilyStmt`（`DROP OPERATOR FAMILY` / `DROP OPERATOR FAMILY IF EXISTS`）两个非终结符及其注释头；同步清理 `%type` 声明与 `stmt` 顶层引用。
+  - 删 `object_type_name_on_any_name` 非终结符（`RULE`）及其在 `%type <objtype>` 中的声明，以及 `DropStmt` 中两个使用它的产生式（`DROP RULE name ON any_name`、`DROP RULE IF EXISTS name ON any_name`）。
+  - 删 `RemoveFuncStmt` 中两个 `DROP ROUTINE` 产生式（`DROP ROUTINE` / `DROP ROUTINE IF EXISTS`），保留 `DROP FUNCTION` / `DROP PROCEDURE`。
+- **派发层（utility.c）**：删 `CreateCommandTag` 中 `OBJECT_ROUTINE`、`OBJECT_RULE`、`OBJECT_OPCLASS`、`OBJECT_OPFAMILY`、`OBJECT_PUBLICATION` 五个分支。
+- **dropcmds.c**：删 `does_not_exist_skipping` 中 `OBJECT_ROUTINE`、`OBJECT_RULE`、`OBJECT_OPCLASS`、`OBJECT_OPFAMILY`、`OBJECT_PUBLICATION` 五个 case（各 IF EXISTS 专属 "skipping" 提示）。
+- **psql 补全（tab-complete.c）**：删 `DROP RULE` 补全块。
+- **测试**：`errors.sql/out` 删 `-- DROP RULE` 整段（missing / bad / no such rule 及 postquel 变体用例）；`drop_if_exists.sql/out` 删 rule 段、operator class/family 段及 "be tolerant" 中的 `DROP OPERATOR CLASS/FAMILY IF EXISTS ... USING btree`、`DROP RULE IF EXISTS` 用例（该测试当前不在 `parallel_schedule`，清理仅为保持文件与内核功能一致）。
+
+### 三、保留（内核核心，不裁）
+- `OBJECT_OPCLASS` / `OBJECT_OPFAMILY` / `OBJECT_ROUTINE` / `OBJECT_RULE` / `OBJECT_PUBLICATION` 对象类型枚举与对象地址解析（`objectaddress.c` 的 `get_object_address` / `ObjectProperty` / `get_object_address_opcf` / `pg_get_object_address`、`dependency.c` 的 `OCLASS_OPCLASS`/`OCLASS_OPFAMILY` → `DropObjectById`、`OCLASS_REWRITE` → `RemoveRewriteRuleById`）：依赖系统删除对象 / 级联仍须按对象类型映射，属内核核心，不可裁。
+- `OBJECT_ROUTINE` 在 `parse_func.c`（`LookupFuncNameInternal` 等）中被广泛使用，用于 `DROP FUNCTION` / `DROP PROCEDURE` 的对象定位，不可裁。
+- `DROP FUNCTION` / `DROP PROCEDURE` 语法与执行路径（`OBJECT_FUNCTION` / `OBJECT_PROCEDURE`）不受影响。
+- `CREATE RULE` 及规则重写（rewrite 子系统）不受影响。
+
+### 四、构建注意（重要）
+`CommandTag` 枚举数值整体前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 71 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## DROP OPERATOR 命令标签及语法整体裁剪（2026-08-25）
 
 ### 一、背景

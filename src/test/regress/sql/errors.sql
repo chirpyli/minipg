@@ -148,23 +148,6 @@ drop type nonesuch;
 
 
 --
--- DROP RULE
-
--- missing rule name
-drop rule;
-
--- bad rule name
-drop rule 314159;
-
--- no such rule
-drop rule nonesuch on noplace;
-
--- these postquel variants are no longer supported
-drop tuple rule nonesuch;
-drop instance rule nonesuch on noplace;
-drop rewrite rule nonesuch;
-
---
 -- Check that division-by-zero is properly caught.
 --
 
