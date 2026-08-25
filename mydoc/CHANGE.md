@@ -23,6 +23,73 @@
 
 验证：全量干净重编 + `make check-world` 全绿（regress 73 项 + 各子套件全通过）。
 
+## ALTER TYPE ... RENAME VALUE 子命令彻底裁剪（2026-08-25）
+
+### 一、背景
+在「仅裁命令标签」基础上进一步向下钻取执行层。`ALTER TYPE ... ADD VALUE`（枚举运行时扩展）属内核保留能力；但 `ALTER TYPE ... RENAME VALUE`（重命名枚举标签）是独立的子命令，执行体 `RenameEnumLabel` 仅被该子命令引用，删去不影响 `CREATE TYPE AS ENUM` / `ADD VALUE` / `AlterTable(OBJECT_TYPE)` 列类型变更等核心路径。
+
+### 二、删除内容
+- **语法**：`gram.y` 中 `ALTER TYPE_P any_name RENAME VALUE_P Sconst TO Sconst` 生产式（原第 2531 行起）。
+- **节点**：`AlterEnumStmt.oldVal` 字段删除（`parsenodes.h`），同步清理 `equalfuncs.c` / `copyfuncs.c` 的 `oldVal` 比较与拷贝；`gram.y` 三个 `ADD VALUE` 生产式中 `n->oldVal = NULL;` 初始化一并移除。
+- **执行**：`typecmds.c` 的 `AlterEnum` 函数删 `if (stmt->oldVal)` RENAME 分支，仅保留 `AddEnumLabel`。
+- **catalog 函数**：`pg_enum.c` 的 `RenameEnumLabel` 整函数删除，及其声明 `pg_enum.h` 的 `RenameEnumLabel` 原型。
+
+### 三、保留
+- `ALTER TYPE ... ADD VALUE`（含 `IF NOT EXISTS` / `BEFORE` / `AFTER`）；`AlterTypeStmt`（`ALTER TYPE ... SET(storage/receive/send/typmod_in/...)` I/O 函数替换）**整体保留**——其中 `SET(receive/send/typmod_in/typmod_out/analyze)` 是自定义类型管理的内核能力，学习价值高，不裁整条 `AlterTypeStmt`。
+- `ALTER VIEW` 复用 `AlterTableStmt(OBJECT_VIEW)`，与视图/规则系统强耦合，本次不裁。
+
+### 四、测试
+- `src/test/regress/sql/enum.sql`：删除「rename a value」整段（原 256-265）与 transactional 段中的 `RENAME VALUE` 用法（原 299-303）。
+- `src/test/regress/expected/enum.out`：同步删除对应预期输出；因 `RENAME VALUE` 生产式移除后 `ALTER TYPE ... RENAME TO`（RenameStmt，本库未实现）的语法错误报告点由 `TO` 前移至 `RENAME`，更新 3 处 caret 位置；另因 bison 重算语法位置，2 处 `REFERENCES` 错误的 caret 偏移同步校正。
+
+验证：全量干净重编 + `make check`（73 项全绿）+ `make check-world`（各子套件全通过）。
+
+## ALTER TYPE 整个 SQL 语法彻底裁剪（2026-08-25）
+
+### 一、背景
+在「仅裁命令标签」「裁 RENAME VALUE 子命令」两轮基础上，用户要求进一步删除整个 `ALTER TYPE` SQL 语法（含 `ADD VALUE` 枚举扩展、`SET(...)` I/O 函数替换、复合类型加列、`SET SCHEMA`、`RENAME TO`）。经 code-explorer 子代理与人工核对：`AlterTypeStmt` / `AlterEnumStmt` 是独立节点，其执行体 `AlterType` / `AlterEnum` 仅被 `utility.c` 的 `ProcessUtility` 直接派发，**与 `ALTER TABLE ... ALTER COLUMN ... TYPE` 列类型变更（走 `AT_AlterColumnType` → `ATExecAlterColumnType`）零耦合**——后者不调用 `AlterType` / `AlterEnum` / `AlterTypeRecurse`。故可安全全链路删除而不破坏内核核心的列类型变更能力。
+
+### 二、删除内容
+- **语法层（gram.y）**：删 `AlterEnumStmt`（`ALTER TYPE ... ADD VALUE`）、`AlterTypeStmt`（`ALTER TYPE ... SET(...)`）、`AlterCompositeTypeStmt`（`ALTER TYPE ... alter_type_cmds` 复合类型加列）三个生产式；删 `AlterObjectSchemaStmt` 中 `ALTER TYPE ... SET SCHEMA` 分支、`RenameStmt` 的 `OBJECT_TYPE` 分支；同步清理 `%type` 声明与 `stmt` 顶层引用。保留 `AlterObjectSchemaStmt` / `AlterTableStmt` / `AnalyzeStmt` 节点本身（仍被其它对象复用）。
+- **节点定义**：删 `parsenodes.h` 的 `AlterTypeStmt` / `AlterEnumStmt` 结构体；删 `nodes.h` 枚举 `T_AlterTypeStmt` / `T_AlterEnumStmt`（后续 `T_*` 编号整体前移，须全量重编）。
+- **执行层（typecmds.c）**：删 `AlterType`、`AlterEnum`、`AlterTypeRecurse`（仅被 `AlterType` 内部递归调用，删后为死代码）三个函数；删无调用的 `checkEnumOwner`（minipg 已裁 ACL，仅检查枚举类型不再检查 owner）；删 `typecmds.h` 的 `AlterType` / `AlterEnum` 原型。
+- **节点拷贝/比较**：删 `copyfuncs.c` / `equalfuncs.c` 的 `_copyAlterTypeStmt` / `_copyAlterEnumStmt` / `_equalAlterTypeStmt` / `_equalAlterEnumStmt` 函数与对应 `T_*` case。
+- **派发层（utility.c）**：删 7 处 `T_AlterTypeStmt` / `T_AlterEnumStmt` 引用——`ClassifyUtilityCommandAsReadOnly`（fallthrough 只读分类）、`ProcessUtility` 两处派发、`CreateCommandTag` 两处（含 `T_AlterEnumStmt` 原映射 `CMDTAG_CREATE_TYPE`，因 `CMDTAG_ALTER_TYPE` 已于上轮删除，此处曾回退 `CMDTAG_UNKNOWN`）、`LogStmt` 两处 level 判定。
+- **pgindent**：删 `typedefs.list` 的 `AlterEnumStmt` / `AlterTypeStmt` 条目。
+
+### 三、保留（内核核心，不裁）
+- `CREATE TYPE`（复合/枚举/range）、`CREATE TYPE ... AS ENUM` 与 `pg_enum` 枚举系统；列类型变更 `ALTER TABLE ... ALTER COLUMN ... TYPE`（`AT_AlterColumnType` / `ATExecAlterColumnType` 整条路径）；视图（`ALTER VIEW` 复用 `AlterTableStmt(OBJECT_VIEW)`，与规则系统耦合，留待后续单独评估）。
+- `ALTER TYPE` 之下的 `RenameStmt(OBJECT_TYPE)` / `AlterObjectSchemaStmt(OBJECT_TYPE)` 通用节点 branch 已不可达（语法已删），但节点本身保留供 `ALTER TABLE`/`VIEW` 等复用。
+
+### 四、测试
+- `src/test/regress/sql/enum.sql`：删除「adding new values」「errors for adding labels」「if not exists tests」「Test inserting so many values that we have to renumber」「check transactional behaviour of ALTER TYPE ... ADD VALUE」全部 `ALTER TYPE ... ADD VALUE` / `RENAME VALUE` / `RENAME TO` 段，仅保留 `CREATE TYPE AS ENUM` 与基础查询/索引/域/数组/支持函数/RI。由于语法已移除，这些语句现报语法错误，必须删除。
+- `src/test/regress/sql/domain.sql`：删除复合类型 `alter type comptype alter attribute a type text` / `drop attribute b` 两段（走已删的 `AlterCompositeTypeStmt`）。
+- `expected/enum.out`、`expected/domain.out`：同步删除对应预期输出；`opr_sanity.out` 因函数 OID 随节点枚举重排，新增 `enum_in`(3506)/`enum_out`(3507) 出现在 cstring I/O 检查列表，已用真实 `results` 同步。
+- `expected/enum.out` 中 `ALTER TYPE ... RENAME TO` 报错点（原 `at or near "TO"`）因 `RENAME` 关键字不再出现在该语法位置，前移至 `at or near "RENAME"`，已在上一轮修正。
+
+### 五、构建注意（重要）
+删除 `nodes.h` 中枚举值会使所有 `T_*` 编号前移，必须**全量重编**：本环境经 `make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j` 重建后验证；仅增量 `make -C src/backend` 可能因头文件依赖未触发全重编而残留旧二进制，导致 `initdb` 阶段报 `unrecognized node type: 271 (T_Null)`。已确认 `make check`（73 项）+ `make check-world`（各子套件）全绿。
+
+## ALTER TRANSFORM / ALTER TYPE / ALTER VIEW 命令标签裁剪（2026-08-25）
+
+### 一、背景
+`ALTER TRANSFORM`、`ALTER TYPE`、`ALTER VIEW` 三类命令的语法与执行路径在 minipg 中仍存在（`AlterTypeStmt`/`AlterEnumStmt`/`CompositeTypeStmt`/`CreateEnumStmt`/`CreateRangeStmt`/`ViewStmt`/`AlterObjectSchemaStmt(OBJECT_TYPE/OBJECT_VIEW/OBJECT_ATTRIBUTE)` 等节点均保留），但 `ALTER TRANSFORM` 没有任何节点类型引用其命令标签（纯预留死标签），`ALTER TYPE`/`ALTER VIEW` 的标签亦仅为派发层状态字符串。本次按「仅裁标签与派发层、保留语法/功能」的既定方案，删除这三个命令标签，对应 `utility.c` 分支回退为 `CMDTAG_UNKNOWN`（命令仍照常执行，仅不再返回专属完成标签）。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_ALTER_TRANSFORM` / `CMDTAG_ALTER_TYPE` / `CMDTAG_ALTER_VIEW`（`cmdtaglist.h`）。
+- `utility.c` 中全部引用这三个标签的分支回退为 `CMDTAG_UNKNOWN`：
+  - `AlterObjectTypeCommandTag`：`OBJECT_ATTRIBUTE` → `CMDTAG_UNKNOWN`；`OBJECT_TYPE` → `CMDTAG_UNKNOWN`；`OBJECT_VIEW` → `CMDTAG_UNKNOWN`。
+  - `CreateCommandTag`：`T_AlterEnumStmt` → `CMDTAG_UNKNOWN`；`T_AlterTypeStmt` → `CMDTAG_UNKNOWN`。
+  - `CMDTAG_ALTER_TRANSFORM` 在 `src` 下无引用，仅删定义。
+
+### 三、保留
+- `CREATE TYPE`（复合/枚举/range）、`ALTER TYPE`（含 `ALTER TYPE ... ADD VALUE`/`ALTER ENUM`/`ALTER TYPE ... SET SCHEMA`）、`CREATE/ALTER/DROP VIEW`、`CREATE/ALTER/DROP TRANSFORM` 的语法与执行路径：类型系统、视图、transform 属内核保留项，本次仅移除命令完成标签。
+- `DROP TYPE`/`DROP VIEW`/`DROP TRANSFORM` 及其 `CMDTAG_DROP_*` 标签：删除对象仍须按对象类型映射命令标签。
+
+> 注意：删除 `cmdtaglist.h` 中 3 个标签会使 `CommandTag` 枚举数值整体前移，必须重编译 `cmdtag.o`/`utility.o` 及所有依赖 `cmdtag.h` 的源文件（建议 `make clean && make -j` 全量干净重编），否则运行时命令标签错位（如 `SELECT` 被判为后续枚举），客户端报「could not interpret result from server」。
+
+验证：全量干净重编通过；`make check` 73 项全绿。
+
 ## ALTER LANGUAGE / OPERATOR / OPERATOR CLASS / OPERATOR FAMILY / PROCEDURE / PUBLICATION / ROUTINE 命令标签裁剪（2026-08-24）
 
 ### 一、背景

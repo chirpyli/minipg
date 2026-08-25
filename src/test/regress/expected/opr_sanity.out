@@ -397,9 +397,10 @@ ORDER BY 1;
  2293 | cstring_out
  2501 | cstring_send
  2597 | domain_in
+ 3506 | enum_in
  3834 | range_in
  4231 | multirange_in
-(5 rows)
+(6 rows)
 
 -- Likewise, look for functions that return cstring and aren't datatype output
 -- functions nor typmod output functions.
@@ -416,9 +417,10 @@ ORDER BY 1;
 ------+----------------
  2292 | cstring_in
  2500 | cstring_recv
+ 3507 | enum_out
  3835 | range_out
  4232 | multirange_out
-(4 rows)
+(5 rows)
 
 -- Check for length inconsistencies between the various argument-info arrays.
 SELECT p1.oid, p1.proname

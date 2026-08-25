@@ -1816,19 +1816,6 @@ typedef struct AlterObjectSchemaStmt
 	bool		missing_ok;		/* skip error if missing? */
 } AlterObjectSchemaStmt;
 
-/* ------------------------
-
-
- *		Alter Type Set ( this-n-that )
- * ------------------------
- */
-typedef struct AlterTypeStmt
-{
-	NodeTag		type;
-	List	   *typeName;		/* type name (possibly qualified) */
-	List	   *options;		/* List of DefElem nodes */
-} AlterTypeStmt;
-
 /* ----------------------
  *		Create Rule Statement
  * ----------------------
@@ -1905,21 +1892,6 @@ typedef struct CreateRangeStmt
 	List	   *typeName;		/* qualified name (list of Value strings) */
 	List	   *params;			/* range parameters (list of DefElem) */
 } CreateRangeStmt;
-
-/* ----------------------
- *		Alter Type Statement, enum types
- * ----------------------
- */
-typedef struct AlterEnumStmt
-{
-	NodeTag		type;
-	List	   *typeName;		/* qualified name (list of Value strings) */
-	char	   *oldVal;			/* old enum value's name, if renaming */
-	char	   *newVal;			/* new enum value's name */
-	char	   *newValNeighbor; /* neighboring enum value, if specified */
-	bool		newValIsAfter;	/* place new enum value after neighbor? */
-	bool		skipIfNewValExists; /* no error if new already exists? */
-} AlterEnumStmt;
 
 /* ----------------------
  *		Create View Statement

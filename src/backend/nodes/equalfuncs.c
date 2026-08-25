@@ -1149,14 +1149,6 @@ _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSch
 }
 
 
-static bool
-_equalAlterTypeStmt(const AlterTypeStmt *a, const AlterTypeStmt *b)
-{
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
 
 static bool
 _equalRuleStmt(const RuleStmt *a, const RuleStmt *b)
@@ -1211,18 +1203,6 @@ _equalCreateRangeStmt(const CreateRangeStmt *a, const CreateRangeStmt *b)
 	return true;
 }
 
-static bool
-_equalAlterEnumStmt(const AlterEnumStmt *a, const AlterEnumStmt *b)
-{
-	COMPARE_NODE_FIELD(typeName);
-	COMPARE_STRING_FIELD(oldVal);
-	COMPARE_STRING_FIELD(newVal);
-	COMPARE_STRING_FIELD(newValNeighbor);
-	COMPARE_SCALAR_FIELD(newValIsAfter);
-	COMPARE_SCALAR_FIELD(skipIfNewValExists);
-
-	return true;
-}
 
 static bool
 _equalViewStmt(const ViewStmt *a, const ViewStmt *b)
@@ -2243,9 +2223,6 @@ equal(const void *a, const void *b)
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);
 			break;
-		case T_AlterTypeStmt:
-			retval = _equalAlterTypeStmt(a, b);
-			break;
 		case T_RuleStmt:
 			retval = _equalRuleStmt(a, b);
 			break;
@@ -2260,9 +2237,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateRangeStmt:
 			retval = _equalCreateRangeStmt(a, b);
-			break;
-		case T_AlterEnumStmt:
-			retval = _equalAlterEnumStmt(a, b);
 			break;
 		case T_ViewStmt:
 			retval = _equalViewStmt(a, b);

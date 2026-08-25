@@ -59,7 +59,6 @@ AllocSetContext
 AllocSetFreeList
 AllocateDesc
 AllocateDescKind
-AlterEnumStmt
 AlterEventTrigStmt
 AlterFdwStmt
 AlterForeignServerStmt
@@ -78,7 +77,6 @@ AlterTableStmt
 AlterTableType
 AlterTableUtilityContext
 AlterTypeRecurseParams
-AlterTypeStmt
 AlterUserMappingStmt
 AlteredTableInfo
 AlternativeSubPlan

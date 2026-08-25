@@ -156,11 +156,6 @@ alter domain dcomptype add constraint c1 check ((value).r > 0);
 
 select row(0,1)::dcomptype;  -- fail
 
-alter type comptype alter attribute r type varchar;  -- fail
-alter type comptype alter attribute r type bigint;
-
-alter type comptype drop attribute r;  -- fail
-alter type comptype drop attribute i;
 
 drop type comptype cascade;
 

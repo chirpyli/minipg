@@ -114,10 +114,8 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_AlterEnumStmt:
 		case T_AlterObjectSchemaStmt:
 		case T_AlterTableStmt:
-		case T_AlterTypeStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateDomainStmt:
 		case T_CreateEnumStmt:
@@ -882,10 +880,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = DefineRange((CreateRangeStmt *) parsetree);
 				break;
 
-			case T_AlterEnumStmt:	/* ALTER TYPE (enum) */
-				address = AlterEnum((AlterEnumStmt *) parsetree);
-				break;
-
 			case T_ViewStmt:	/* CREATE VIEW */
 				address = DefineView((ViewStmt *) parsetree, queryString,
 									pstmt->stmt_location, pstmt->stmt_len);
@@ -924,10 +918,6 @@ ProcessUtilitySlow(ParseState *pstate,
 					ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree,
 											  &secondaryObject);
 											  break;
-
-			case T_AlterTypeStmt:
-				address = AlterType((AlterTypeStmt *) parsetree);
-				break;
 
 			case T_CreateStatsStmt:
 				{
@@ -1185,7 +1175,7 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 	switch (objtype)
 	{
 		case OBJECT_ATTRIBUTE:
-			tag = CMDTAG_ALTER_TYPE;
+			tag = CMDTAG_UNKNOWN;
 			break;
 		case OBJECT_COLUMN:
 			tag = CMDTAG_ALTER_TABLE;
@@ -1198,10 +1188,10 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 			tag = CMDTAG_ALTER_TABLE;
 			break;
 		case OBJECT_TYPE:
-			tag = CMDTAG_ALTER_TYPE;
+			tag = CMDTAG_UNKNOWN;
 			break;
 		case OBJECT_VIEW:
-			tag = CMDTAG_ALTER_VIEW;
+			tag = CMDTAG_UNKNOWN;
 			break;
 		default:
 			tag = CMDTAG_UNKNOWN;
@@ -1396,10 +1386,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_TYPE;
 			break;
 
-		case T_AlterEnumStmt:
-			tag = CMDTAG_ALTER_TYPE;
-			break;
-
 		case T_ViewStmt:
 			tag = CMDTAG_CREATE_VIEW;
 			break;
@@ -1507,10 +1493,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateOpFamilyStmt:
 			tag = CMDTAG_CREATE_OPERATOR_FAMILY;
-			break;
-
-		case T_AlterTypeStmt:
-			tag = CMDTAG_ALTER_TYPE;
 			break;
 
 			case T_PrepareStmt:
@@ -1758,10 +1740,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-		case T_AlterTypeStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
 		case T_AlterTableStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -1775,10 +1753,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateRangeStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_AlterEnumStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

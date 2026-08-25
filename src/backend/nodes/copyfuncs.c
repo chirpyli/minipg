@@ -2936,16 +2936,6 @@ _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
 }
 
 
-static AlterTypeStmt *
-_copyAlterTypeStmt(const AlterTypeStmt *from)
-{
-	AlterTypeStmt *newnode = makeNode(AlterTypeStmt);
-
-	COPY_NODE_FIELD(typeName);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
 
 static RuleStmt *
 _copyRuleStmt(const RuleStmt *from)
@@ -3010,20 +3000,6 @@ _copyCreateRangeStmt(const CreateRangeStmt *from)
 	return newnode;
 }
 
-static AlterEnumStmt *
-_copyAlterEnumStmt(const AlterEnumStmt *from)
-{
-	AlterEnumStmt *newnode = makeNode(AlterEnumStmt);
-
-	COPY_NODE_FIELD(typeName);
-	COPY_STRING_FIELD(oldVal);
-	COPY_STRING_FIELD(newVal);
-	COPY_STRING_FIELD(newValNeighbor);
-	COPY_SCALAR_FIELD(newValIsAfter);
-	COPY_SCALAR_FIELD(skipIfNewValExists);
-
-	return newnode;
-}
 
 static ViewStmt *
 _copyViewStmt(const ViewStmt *from)
@@ -3765,9 +3741,6 @@ copyObjectImpl(const void *from)
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);
 			break;
-		case T_AlterTypeStmt:
-			retval = _copyAlterTypeStmt(from);
-			break;
 		case T_RuleStmt:
 			retval = _copyRuleStmt(from);
 			break;
@@ -3782,9 +3755,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateRangeStmt:
 			retval = _copyCreateRangeStmt(from);
-			break;
-		case T_AlterEnumStmt:
-			retval = _copyAlterEnumStmt(from);
 			break;
 		case T_ViewStmt:
 			retval = _copyViewStmt(from);

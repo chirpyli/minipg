@@ -225,10 +225,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
-		AlterEnumStmt
 		AlterObjectSchemaStmt
-		AlterTypeStmt AlterTableStmt
-		AlterCompositeTypeStmt
+		AlterTableStmt
 		AnalyzeStmt ClusterStmt
 		CreateDomainStmt CreateExtensionStmt CreateOpClassStmt
 		CreateOpFamilyStmt
@@ -717,11 +715,8 @@ toplevel_stmt:
 			| TransactionStmtLegacy
 		;
 
-stmt:	AlterEnumStmt
-			| AlterObjectSchemaStmt
-			| AlterTypeStmt
+stmt:	AlterObjectSchemaStmt
 			| AlterTableStmt
-			| AlterCompositeTypeStmt
 			| AnalyzeStmt
 			| CheckPointStmt
 			| ClusterStmt
@@ -1598,26 +1593,6 @@ alter_using:
 		;
 
 
-/*****************************************************************************
- *
- *	ALTER TYPE
- *
- * really variants of the ALTER TABLE subcommands with different spellings
- *****************************************************************************/
-
-AlterCompositeTypeStmt:
-			ALTER TYPE_P any_name alter_type_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-
-					/* can't use qualified_name, sigh */
-					n->relation = makeRangeVarFromAnyName($3, @3, yyscanner);
-					n->cmds = $4;
-					n->objtype = OBJECT_TYPE;
-					$$ = (Node *)n;
-				}
-			;
-
 alter_type_cmds:
 			alter_type_cmd							{ $$ = list_make1($1); }
 			| alter_type_cmds ',' alter_type_cmd	{ $$ = lappend($1, $3); }
@@ -2493,53 +2468,6 @@ enum_val_list:	Sconst
  *	ALTER TYPE enumtype ADD ...
  *
  *****************************************************************************/
-
-AlterEnumStmt:
-		ALTER TYPE_P any_name ADD_P VALUE_P opt_if_not_exists Sconst
-			{
-				AlterEnumStmt *n = makeNode(AlterEnumStmt);
-				n->typeName = $3;
-				n->oldVal = NULL;
-				n->newVal = $7;
-				n->newValNeighbor = NULL;
-				n->newValIsAfter = true;
-				n->skipIfNewValExists = $6;
-				$$ = (Node *) n;
-			}
-		 | ALTER TYPE_P any_name ADD_P VALUE_P opt_if_not_exists Sconst BEFORE Sconst
-			{
-				AlterEnumStmt *n = makeNode(AlterEnumStmt);
-				n->typeName = $3;
-				n->oldVal = NULL;
-				n->newVal = $7;
-				n->newValNeighbor = $9;
-				n->newValIsAfter = false;
-				n->skipIfNewValExists = $6;
-				$$ = (Node *) n;
-			}
-		 | ALTER TYPE_P any_name ADD_P VALUE_P opt_if_not_exists Sconst AFTER Sconst
-			{
-				AlterEnumStmt *n = makeNode(AlterEnumStmt);
-				n->typeName = $3;
-				n->oldVal = NULL;
-				n->newVal = $7;
-				n->newValNeighbor = $9;
-				n->newValIsAfter = true;
-				n->skipIfNewValExists = $6;
-				$$ = (Node *) n;
-			}
-		 | ALTER TYPE_P any_name RENAME VALUE_P Sconst TO Sconst
-			{
-				AlterEnumStmt *n = makeNode(AlterEnumStmt);
-				n->typeName = $3;
-				n->oldVal = $6;
-				n->newVal = $8;
-				n->newValNeighbor = NULL;
-				n->newValIsAfter = false;
-				n->skipIfNewValExists = false;
-				$$ = (Node *) n;
-			}
-		 ;
 
 opt_if_not_exists: IF_P NOT EXISTS              { $$ = true; }
 		| /* EMPTY */                          { $$ = false; }
@@ -3658,15 +3586,6 @@ AlterObjectSchemaStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-			| ALTER TYPE_P any_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_TYPE;
-					n->object = (Node *) $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
 		;
 
 /*****************************************************************************
@@ -3692,16 +3611,6 @@ operator_def_arg:
  * We repurpose ALTER OPERATOR's version of "definition" here
  *
  *****************************************************************************/
-
-AlterTypeStmt:
-			ALTER TYPE_P any_name SET '(' operator_def_list ')'
-				{
-					AlterTypeStmt *n = makeNode(AlterTypeStmt);
-					n->typeName = $3;
-					n->options = $6;
-					$$ = (Node *)n;
-				}
-		;
 
 
 
