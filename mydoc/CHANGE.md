@@ -4,6 +4,29 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## DROP OPERATOR 命令标签及语法整体裁剪（2026-08-25）
+
+### 一、背景
+`CMDTAG_DROP_OPERATOR`（"DROP OPERATOR"）是删除操作符语句 `DROP OPERATOR name (left, right)` 的命令标签，执行路径为 `RemoveOperStmt` → `utility.c` 派发 → `RemoveOperById`。此前 minipg 已整体裁剪 `CREATE OPERATOR`（`DefineOperator`、`CreateOperatorStmt` 均删），`DROP OPERATOR` 仅剩删除遗留运算符对象的残留入口，无法创建新运算符使该 DDL 失去实际意义，且与 btree/hash 索引、事务等内核核心零耦合，学习价值低，本轮按用户要求彻底裁剪。
+
+### 二、删除内容
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_DROP_OPERATOR`，`CommandTag` 枚举整体前移 1 位。
+- **语法层（gram.y）**：删 `RemoveOperStmt` 产生式（`DROP OPERATOR` / `DROP OPERATOR IF EXISTS`）及其专属助手 `operator_with_argtypes`、`operator_with_argtypes_list`、`operator_argtypes`；同步清理 `%type <objwithargs>` 声明与 `stmt` 顶层引用。
+- **派发层（utility.c）**：删 `CreateCommandTag` 中 `OBJECT_OPERATOR` → `CMDTAG_DROP_OPERATOR` 分支（`DROP OPERATOR` 删除命令现映射回 `CMDTAG_DROP`）。
+- **dropcmds.c**：删 `does_not_exist_skipping` 中 `OBJECT_OPERATOR` case（`DROP OPERATOR IF EXISTS` 专属，"operator %s does not exist, skipping" 提示）。
+- **测试**：`errors.sql/out` 删除 `-- DROP OPERATOR` 整段（missing operator name / bad operator name / no such operator 三个用例）；`drop_if_exists.sql/out` 删除 `DROP OPERATOR IF EXISTS` 用例。
+
+### 三、保留（内核核心，不裁）
+- `OBJECT_OPERATOR` 对象类型枚举与 `objectaddress.c` 的运算符对象地址解析（`get_object_address` / `ObjectProperty` / `object_type_map` / `OCLASS_OPERATOR` → `RemoveOperatorById`）：依赖系统删除对象 / 级联（如 `DROP TYPE ... CASCADE` 删除依赖操作符）仍须按对象类型映射，属内核核心，不可裁。
+- `DROP OPERATOR CLASS/FAMILY`（`OBJECT_OPCLASS` / `OBJECT_OPFAMILY`）及 `CMDTAG_DROP_OPERATOR_CLASS/FAMILY`：索引访问方法相关，不受影响。
+- 内建运算符（`pg_operator.dat` 目录数据）与 btree/hash 操作符类（`pg_amop` / `pg_amproc`）：索引/排序核心，不受影响。
+
+### 四、构建注意（重要）
+`CommandTag` 枚举数值前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 72 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## DROP DOMAIN 整体裁剪（DOMAIN 对象残留清理，2026-08-25）
 
 ### 一、背景

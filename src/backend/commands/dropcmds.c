@@ -333,18 +333,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				}
 				break;
 			}
-		case OBJECT_OPERATOR:
-			{
-				ObjectWithArgs *owa = castNode(ObjectWithArgs, object);
-
-				if (!schema_does_not_exist_skipping(owa->objname, &msg, &name) &&
-					!type_in_list_does_not_exist_skipping(owa->objargs, &msg, &name))
-				{
-					msg = gettext_noop("operator %s does not exist, skipping");
-					name = NameListToString(owa->objname);
-				}
-				break;
-			}
 		case OBJECT_LANGUAGE:
 			msg = gettext_noop("language \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);

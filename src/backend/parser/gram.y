@@ -240,7 +240,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		IndexStmt InsertStmt
 		LoadStmt LockStmt ExplainableStmt PreparableStmt
 		CreateFunctionStmt ReindexStmt
-		RemoveFuncStmt RemoveOperStmt ReturnStmt
+		RemoveFuncStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
@@ -295,8 +295,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 
 %type <str>		iso_level opt_encoding
-%type <objwithargs> function_with_argtypes operator_with_argtypes
-%type <list>	function_with_argtypes_list operator_with_argtypes_list
+%type <objwithargs> function_with_argtypes
+%type <list>	function_with_argtypes_list
 %type <node>	vacuum_relation
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
@@ -306,7 +306,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				OptWith opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
 				func_as createfunc_opt_list opt_createfunc_opt_list
-				oper_argtypes RuleActionList RuleActionMulti
+				RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
 				sort_clause opt_sort_clause sortby_list index_params stats_params
 				opt_include opt_c_include index_including_params
@@ -742,7 +742,6 @@ stmt:	AlterObjectSchemaStmt
 		| PrepareStmt
 			| ReindexStmt
 			| RemoveFuncStmt
-			| RemoveOperStmt
 			| RuleStmt
 			| SelectStmt
 			| TransactionStmt
@@ -8564,22 +8563,6 @@ any_operator:
 						{ $$ = lcons(makeString($1), $3); }
 		;
 
-operator_with_argtypes_list:
-			operator_with_argtypes					{ $$ = list_make1($1); }
-			| operator_with_argtypes_list ',' operator_with_argtypes
-						{ $$ = lappend($1, $3); }
-		;
-
-operator_with_argtypes:
-			any_operator oper_argtypes
-			{
-				ObjectWithArgs *n = makeNode(ObjectWithArgs);
-				n->objname = $1;
-				n->objargs = $2;
-				$$ = n;
-			}
-		;
-
 operator_def_list:	operator_def_elem					{ $$ = list_make1($1); }
 			| operator_def_list ',' operator_def_elem			{ $$ = lappend($1, $3); }
 		;
@@ -8712,45 +8695,6 @@ RemoveFuncStmt:
 				}
 		;
 
-RemoveOperStmt:
-			DROP OPERATOR operator_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_OPERATOR;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP OPERATOR IF_P EXISTS operator_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_OPERATOR;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
-
-oper_argtypes:
-			'(' Typename ')'
-				{
-				   ereport(ERROR,
-						   (errcode(ERRCODE_SYNTAX_ERROR),
-							errmsg("missing argument"),
-							errhint("Use NONE to denote the missing argument of a unary operator."),
-							parser_errposition(@3)));
-				}
-			| '(' Typename ',' Typename ')'
-					{ $$ = list_make2($2, $4); }
-			| '(' NONE ',' Typename ')'					/* left unary */
-					{ $$ = list_make2(NULL, $4); }
-			| '(' Typename ',' NONE ')'					/* right unary */
-					{ $$ = list_make2($2, NULL); }
-		;
 %%
 
 /*

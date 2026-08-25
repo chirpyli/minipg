@@ -1288,9 +1288,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_ROUTINE:
 					tag = CMDTAG_DROP_ROUTINE;
 					break;
-				case OBJECT_OPERATOR:
-					tag = CMDTAG_DROP_OPERATOR;
-					break;
 				case OBJECT_LANGUAGE:
 					tag = CMDTAG_DROP_LANGUAGE;
 					break;

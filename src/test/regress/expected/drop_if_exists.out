@@ -229,14 +229,6 @@ DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP INDEX IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP OPERATOR IF EXISTS no_such_schema.+ (int, int);
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP OPERATOR IF EXISTS + (no_such_type, no_such_type);
-NOTICE:  type "no_such_type" does not exist, skipping
-DROP OPERATOR IF EXISTS + (no_such_schema.no_such_type, no_such_schema.no_such_type);
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP OPERATOR IF EXISTS # (NONE, no_such_schema.no_such_type);
-NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP OPERATOR CLASS IF EXISTS no_such_schema.widget_ops USING btree;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP OPERATOR FAMILY IF EXISTS no_such_schema.float_ops USING btree;
