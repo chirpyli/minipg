@@ -118,8 +118,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableStmt:
 		case T_CompositeTypeStmt:
 		case T_CreateExtensionStmt:
-		case T_CreateOpClassStmt:
-		case T_CreateOpFamilyStmt:
 		case T_CreateRangeStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateStatsStmt:
@@ -886,14 +884,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
 				break;
 
-			case T_CreateOpClassStmt:
-				DefineOpClass((CreateOpClassStmt *) parsetree);
-				break;
-
-			case T_CreateOpFamilyStmt:
-				address = DefineOpFamily((CreateOpFamilyStmt *) parsetree);
-				break;
-
 			case T_CreateTransformStmt:
 				address = CreateTransform((CreateTransformStmt *) parsetree);
 				break;
@@ -1468,14 +1458,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_REINDEX;
 			break;
 
-		case T_CreateOpClassStmt:
-			tag = CMDTAG_CREATE_OPERATOR_CLASS;
-			break;
-
-		case T_CreateOpFamilyStmt:
-			tag = CMDTAG_CREATE_OPERATOR_FAMILY;
-			break;
-
 			case T_PrepareStmt:
 			tag = CMDTAG_PREPARE;
 			break;
@@ -1810,14 +1792,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_ReindexStmt:
 			lev = LOGSTMT_ALL;	/* should this be DDL? */
-			break;
-
-		case T_CreateOpClassStmt:
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateOpFamilyStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 		case T_CreateTransformStmt:

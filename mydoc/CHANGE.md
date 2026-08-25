@@ -4,6 +4,56 @@
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
 
+## CREATE OPERATOR CLASS / CREATE OPERATOR FAMILY 语法整体裁剪（2026-08-25）
+
+### 一、背景
+`CREATE OPERATOR CLASS` / `CREATE OPERATOR FAMILY` 是向索引访问方法注册自定义操作符类/操作符族的用户态 DDL。经核查，minipg 内建 btree/hash 的操作符类来自 `pg_opclass.dat` / `pg_opfamily.dat` 目录数据（initdb 装入），**不依赖运行时执行该 DDL**；执行体 `DefineOpClass` / `DefineOpFamily` 仅被 `utility.c` 的 `ProcessUtility` 派发，与索引、排序等核心路径零耦合。上一轮（2026-08-24）曾将其作为「黑盒保留项」，本轮按用户要求彻底裁剪。`DROP OPERATOR CLASS/FAMILY`、`ALTER ... RENAME/SET SCHEMA` 的查重函数（`IsThereOpClassInNamespace` / `IsThereOpFamilyInNamespace`）与 OID 解析（`get_opclass_oid` / `get_opfamily_oid`）仍被 objectaddress / typecmds / parse_clause / alter 等核心路径使用，予以保留。
+
+### 二、删除内容
+- **语法层（gram.y）**：删 `CreateOpClassStmt`、`CreateOpFamilyStmt` 两个产生式及其专属助手 `opclass_item_list`、`opclass_item`、`opt_default`、`opt_opfamily`、`opclass_purpose`、`opt_recheck`；同步清理 `%type` 声明与 `stmt` 顶层引用。
+- **节点定义**：删 `parsenodes.h` 的 `CreateOpClassStmt`、`CreateOpClassItem`（含 `OPCLASS_ITEM_*` 宏）、`CreateOpFamilyStmt`；删 `nodes.h` 枚举 `T_CreateOpClassStmt` / `T_CreateOpClassItem` / `T_CreateOpFamilyStmt`（后续 `T_*` 整体前移，须全量重编）。
+- **节点拷贝/比较**：删 `copyfuncs.c` / `equalfuncs.c` 的 `_copy/_equalCreateOpClassStmt`、`_copy/_equalCreateOpClassItem`、`_copy/_equalCreateOpFamilyStmt` 与对应 `T_*` case。
+- **执行层（opclasscmds.c）**：删 `DefineOpClass`、`DefineOpFamily` 及其专属助手 `CreateOpFamily`、`processTypesSpec`、`assignOperTypes`、`assignProcTypes`、`addFamilyMember`、`storeOperators`、`storeProcedures`、`typeDepNeeded`；顺带清理早已无调用的死代码 `dropOperators`、`dropProcedures`（上游仅被已裁的 `AlterOpFamily` 引用）。
+- **派发层（utility.c）**：删 4 处 `T_CreateOpClassStmt` / `T_CreateOpFamilyStmt` 引用——`ClassifyUtilityCommandAsReadOnly`、`ProcessUtility`（`DefineOpClass` / `DefineOpFamily` 调用）、`GetCommandTag`、`GetCommandLogLevel`。
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_CREATE_OPERATOR_CLASS` / `CMDTAG_CREATE_OPERATOR_FAMILY`，`CommandTag` 枚举整体前移 2 位。
+- **头文件/pgindent**：删 `defrem.h` 的 `DefineOpClass` / `DefineOpFamily` 原型；删 `typedefs.list` 的 `CreateOpClassStmt` / `CreateOpClassItem` / `CreateOpFamilyStmt`。
+
+### 三、保留（内核核心，不裁）
+- `DROP OPERATOR CLASS/FAMILY`（`DropStmt` → objectaddress 通用删除）及 `OBJECT_OPCLASS` / `OBJECT_OPFAMILY` 依赖映射。
+- `opclasscmds.c` 的 OID/名字解析与查重：`get_opclass_oid` / `get_opfamily_oid`（被 objectaddress.c、typecmds.c、parse_clause.c 调用）、`IsThereOpClassInNamespace` / `IsThereOpFamilyInNamespace`（被 alter.c 调用）。
+- 内建 btree/hash 操作符类（来自目录数据）与 `pg_amop` / `pg_amproc` 支持过程表——索引/排序核心零影响。
+- `CREATE OPERATOR`（`DefineOperator`）等其它操作符管理命令不受影响。
+
+### 四、测试
+- `src/test/regress/sql/insert.sql`：删除整段「direct partition inserts should check hash partition bound constraint」哈希分区测试块（含 `part_hashint4_noop` / `part_hashtext_length` 两个手写哈希函数、两个 `CREATE OPERATOR CLASS`、`hash_parted` 及其 hpart0-3 分区）。该块依赖已裁的 CREATE OPERATOR CLASS，且 minipg 本就不支持 `PARTITION BY`（全部语句原本就报语法错误），属死测试段；`expected/insert.out` 同步删除对应输出（原 544-621 行）。
+- `select_parallel.sql` 中的 `CREATE OPERATOR CLASS` 用法不受影响（该测试早已从 `parallel_schedule` 移除）。
+- `src/tutorial/complex.source` 中的 `CREATE OPERATOR CLASS` 教程示例不参与 check-world，未改动。
+
+### 五、构建注意（重要）
+删除 `nodes.h` 枚举与 `cmdtaglist.h` 命令标签都会使编号前移，必须 `make clean && make -j8` 全量干净重编；本工程 Makefile 未启用头文件自动依赖跟踪，仅增量编译会残留旧二进制。
+
+### 六、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 72 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
+## CLOSE 命令标签裁剪（游标残留死标签，2026-08-25）
+
+### 一、背景
+`CMDTAG_CLOSE`（"CLOSE"）是 SQL 游标关闭语句 `CLOSE name` / `CLOSE ALL` 的命令标签，上游由 `ClosePortalStmt` 节点 → `utility.c` 派发 → `PerformPortalClose()` 执行。minipg 此前的裁剪已整体移除游标功能（DECLARE/OPEN/FETCH/MOVE/CLOSE 语法与节点全部删除，`kwlist.h` 无 `close` 关键字，`portalcmds.c` 仅剩 portal 基础设施 `PortalCleanup`），但 `cmdtaglist.h` 中仅此一个游标族标签被漏删，属纯遗留死标签。
+
+### 二、删除内容
+- 命令标签 `CMDTAG_CLOSE`（`cmdtaglist.h`），`CommandTag` 枚举整体前移 1 位。
+- `src` 下该标签无任何其他引用（无语法、无节点、无执行路径、无 psql 引用），无需清理调用方。
+
+### 三、保留（内核核心，不裁）
+- portal 基础设施：`portalmem.c` 的 portal 存储管理、`portalcmds.c` 的 `PortalCleanup` 清理钩子——FE/BE 协议执行每个查询都经 portal，属内核核心。
+- `CMDTAG_CLUSTER` 等其余命令标签不受影响。
+
+### 四、构建注意（重要）
+`CommandTag` 枚举数值前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 72 项 + isolation 65 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
+
 ## CREATE DOMAIN 语法整体裁剪（2026-08-25）
 
 ### 一、背景

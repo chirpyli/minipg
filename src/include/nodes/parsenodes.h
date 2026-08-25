@@ -1598,49 +1598,6 @@ typedef struct CreateExtensionStmt
 } CreateExtensionStmt;
 
 /* ----------------------
- *		Create Operator Class Statement
- * ----------------------
- */
-typedef struct CreateOpClassStmt
-{
-	NodeTag		type;
-	List	   *opclassname;	/* qualified name (list of Value strings) */
-	List	   *opfamilyname;	/* qualified name (ditto); NIL if omitted */
-	char	   *amname;			/* name of index AM opclass is for */
-	TypeName   *datatype;		/* datatype of indexed column */
-	List	   *items;			/* List of CreateOpClassItem nodes */
-	bool		isDefault;		/* Should be marked as default for type? */
-} CreateOpClassStmt;
-
-#define OPCLASS_ITEM_OPERATOR		1
-#define OPCLASS_ITEM_FUNCTION		2
-#define OPCLASS_ITEM_STORAGETYPE	3
-
-typedef struct CreateOpClassItem
-{
-	NodeTag		type;
-	int			itemtype;		/* see codes above */
-	ObjectWithArgs *name;		/* operator or function name and args */
-	int			number;			/* strategy num or support proc num */
-	List	   *order_family;	/* only used for ordering operators */
-	List	   *class_args;		/* amproclefttype/amprocrighttype or
-								 * amoplefttype/amoprighttype */
-	/* fields used for a storagetype item: */
-	TypeName   *storedtype;		/* datatype stored in index */
-} CreateOpClassItem;
-
-/* ----------------------
- *		Create Operator Family Statement
- * ----------------------
- */
-typedef struct CreateOpFamilyStmt
-{
-	NodeTag		type;
-	List	   *opfamilyname;	/* qualified name (list of Value strings) */
-	char	   *amname;			/* name of index AM opfamily is for */
-} CreateOpFamilyStmt;
-
-/* ----------------------
  *		Drop Table|Sequence|View|Index|Type|Domain|Conversion|Schema Statement
  * ----------------------
  */

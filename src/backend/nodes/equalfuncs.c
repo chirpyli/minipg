@@ -1217,41 +1217,6 @@ _equalLoadStmt(const LoadStmt *a, const LoadStmt *b)
 }
 
 static bool
-_equalCreateOpClassStmt(const CreateOpClassStmt *a, const CreateOpClassStmt *b)
-{
-	COMPARE_NODE_FIELD(opclassname);
-	COMPARE_NODE_FIELD(opfamilyname);
-	COMPARE_STRING_FIELD(amname);
-	COMPARE_NODE_FIELD(datatype);
-	COMPARE_NODE_FIELD(items);
-	COMPARE_SCALAR_FIELD(isDefault);
-
-	return true;
-}
-
-static bool
-_equalCreateOpClassItem(const CreateOpClassItem *a, const CreateOpClassItem *b)
-{
-	COMPARE_SCALAR_FIELD(itemtype);
-	COMPARE_NODE_FIELD(name);
-	COMPARE_SCALAR_FIELD(number);
-	COMPARE_NODE_FIELD(order_family);
-	COMPARE_NODE_FIELD(class_args);
-	COMPARE_NODE_FIELD(storedtype);
-
-	return true;
-}
-
-static bool
-_equalCreateOpFamilyStmt(const CreateOpFamilyStmt *a, const CreateOpFamilyStmt *b)
-{
-	COMPARE_NODE_FIELD(opfamilyname);
-	COMPARE_STRING_FIELD(amname);
-
-	return true;
-}
-
-static bool
 _equalCreatedbStmt(const CreatedbStmt *a, const CreatedbStmt *b)
 {
 	COMPARE_STRING_FIELD(dbname);
@@ -2220,15 +2185,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_LoadStmt:
 			retval = _equalLoadStmt(a, b);
-			break;
-		case T_CreateOpClassStmt:
-			retval = _equalCreateOpClassStmt(a, b);
-			break;
-		case T_CreateOpClassItem:
-			retval = _equalCreateOpClassItem(a, b);
-			break;
-		case T_CreateOpFamilyStmt:
-			retval = _equalCreateOpFamilyStmt(a, b);
 			break;
 		case T_CreatedbStmt:
 			retval = _equalCreatedbStmt(a, b);

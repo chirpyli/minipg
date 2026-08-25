@@ -78,8 +78,6 @@ extern void RemoveStatisticsById(Oid statsOid);
 extern Oid	StatisticsGetRelation(Oid statId, bool missing_ok);
 
 /* commands/opclasscmds.c */
-extern ObjectAddress DefineOpClass(CreateOpClassStmt *stmt);
-extern ObjectAddress DefineOpFamily(CreateOpFamilyStmt *stmt);
 extern void IsThereOpClassInNamespace(const char *opcname, Oid opcmethod,
 									  Oid opcnamespace);
 extern void IsThereOpFamilyInNamespace(const char *opfname, Oid opfmethod,

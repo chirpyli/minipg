@@ -3015,47 +3015,6 @@ _copyLoadStmt(const LoadStmt *from)
 	return newnode;
 }
 
-static CreateOpClassStmt *
-_copyCreateOpClassStmt(const CreateOpClassStmt *from)
-{
-	CreateOpClassStmt *newnode = makeNode(CreateOpClassStmt);
-
-	COPY_NODE_FIELD(opclassname);
-	COPY_NODE_FIELD(opfamilyname);
-	COPY_STRING_FIELD(amname);
-	COPY_NODE_FIELD(datatype);
-	COPY_NODE_FIELD(items);
-	COPY_SCALAR_FIELD(isDefault);
-
-	return newnode;
-}
-
-static CreateOpClassItem *
-_copyCreateOpClassItem(const CreateOpClassItem *from)
-{
-	CreateOpClassItem *newnode = makeNode(CreateOpClassItem);
-
-	COPY_SCALAR_FIELD(itemtype);
-	COPY_NODE_FIELD(name);
-	COPY_SCALAR_FIELD(number);
-	COPY_NODE_FIELD(order_family);
-	COPY_NODE_FIELD(class_args);
-	COPY_NODE_FIELD(storedtype);
-
-	return newnode;
-}
-
-static CreateOpFamilyStmt *
-_copyCreateOpFamilyStmt(const CreateOpFamilyStmt *from)
-{
-	CreateOpFamilyStmt *newnode = makeNode(CreateOpFamilyStmt);
-
-	COPY_NODE_FIELD(opfamilyname);
-	COPY_STRING_FIELD(amname);
-
-	return newnode;
-}
-
 static CreatedbStmt *
 _copyCreatedbStmt(const CreatedbStmt *from)
 {
@@ -3734,15 +3693,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_LoadStmt:
 			retval = _copyLoadStmt(from);
-			break;
-		case T_CreateOpClassStmt:
-			retval = _copyCreateOpClassStmt(from);
-			break;
-		case T_CreateOpClassItem:
-			retval = _copyCreateOpClassItem(from);
-			break;
-		case T_CreateOpFamilyStmt:
-			retval = _copyCreateOpFamilyStmt(from);
 			break;
 		case T_CreatedbStmt:
 			retval = _copyCreatedbStmt(from);

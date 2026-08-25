@@ -228,8 +228,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterObjectSchemaStmt
 		AlterTableStmt
 		AnalyzeStmt ClusterStmt
-		CreateExtensionStmt CreateOpClassStmt
-		CreateOpFamilyStmt
+		CreateExtensionStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt
 		
 		CreateTransformStmt
@@ -252,7 +251,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
 
-%type <node>	alter_column_default opclass_item alter_using
+%type <node>	alter_column_default alter_using
 %type <ival>	opt_asc_desc opt_nulls_order
 
 %type <node>	alter_table_cmd alter_type_cmd opt_collate_clause
@@ -318,8 +317,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				target_list opt_target_list insert_column_list set_target_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
-				opclass_item_list
-				opclass_purpose opt_opfamily transaction_mode_list_or_empty
+				transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				prep_type_clause
 			execute_param_clause using_clause returning_clause
@@ -361,7 +359,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <boolean> opt_instead
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
-%type <boolean> opt_freeze opt_analyze opt_default opt_recheck
+%type <boolean> opt_freeze opt_analyze
 
 %type <ival>	event opt_set_data
 %type <objtype>	object_type_any_name object_type_name_on_any_name
@@ -722,8 +720,6 @@ stmt:	AlterObjectSchemaStmt
 			| ClusterStmt
 			| CreateExtensionStmt
 			| CreateFunctionStmt
-			| CreateOpClassStmt
-			| CreateOpFamilyStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreateStatsStmt
@@ -2452,126 +2448,10 @@ opt_if_not_exists: IF_P NOT EXISTS              { $$ = true; }
 /*****************************************************************************
  *
  *		QUERIES :
- *				CREATE OPERATOR CLASS ...
- *				CREATE OPERATOR FAMILY ...
- *				ALTER OPERATOR FAMILY ...
  *				DROP OPERATOR CLASS ...
  *				DROP OPERATOR FAMILY ...
  *
  *****************************************************************************/
-
-CreateOpClassStmt:
-			CREATE OPERATOR CLASS any_name opt_default FOR TYPE_P Typename
-			USING name opt_opfamily AS opclass_item_list
-				{
-					CreateOpClassStmt *n = makeNode(CreateOpClassStmt);
-					n->opclassname = $4;
-					n->isDefault = $5;
-					n->datatype = $8;
-					n->amname = $10;
-					n->opfamilyname = $11;
-					n->items = $13;
-					$$ = (Node *) n;
-				}
-		;
-
-opclass_item_list:
-			opclass_item							{ $$ = list_make1($1); }
-			| opclass_item_list ',' opclass_item	{ $$ = lappend($1, $3); }
-		;
-
-opclass_item:
-			OPERATOR Iconst any_operator opclass_purpose opt_recheck
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					ObjectWithArgs *owa = makeNode(ObjectWithArgs);
-					owa->objname = $3;
-					owa->objargs = NIL;
-					n->itemtype = OPCLASS_ITEM_OPERATOR;
-					n->name = owa;
-					n->number = $2;
-					n->order_family = $4;
-					$$ = (Node *) n;
-				}
-			| OPERATOR Iconst operator_with_argtypes opclass_purpose
-			  opt_recheck
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_OPERATOR;
-					n->name = $3;
-					n->number = $2;
-					n->order_family = $4;
-					$$ = (Node *) n;
-				}
-			| FUNCTION Iconst function_with_argtypes
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_FUNCTION;
-					n->name = $3;
-					n->number = $2;
-					$$ = (Node *) n;
-				}
-			| FUNCTION Iconst '(' type_list ')' function_with_argtypes
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_FUNCTION;
-					n->name = $6;
-					n->number = $2;
-					n->class_args = $4;
-					$$ = (Node *) n;
-				}
-			| STORAGE Typename
-				{
-					CreateOpClassItem *n = makeNode(CreateOpClassItem);
-					n->itemtype = OPCLASS_ITEM_STORAGETYPE;
-					n->storedtype = $2;
-					$$ = (Node *) n;
-				}
-		;
-
-opt_default:	DEFAULT						{ $$ = true; }
-			| /*EMPTY*/						{ $$ = false; }
-		;
-
-opt_opfamily:	FAMILY any_name				{ $$ = $2; }
-			| /*EMPTY*/						{ $$ = NIL; }
-		;
-
-opclass_purpose: FOR SEARCH					{ $$ = NIL; }
-			| FOR ORDER BY any_name			{ $$ = $4; }
-			| /*EMPTY*/						{ $$ = NIL; }
-		;
-
-opt_recheck:	RECHECK
-				{
-					/*
-					 * RECHECK no longer does anything in opclass definitions,
-					 * but we still accept it to ease porting of old database
-					 * dumps.
-					 */
-					ereport(NOTICE,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("RECHECK is no longer required"),
-							 errhint("Update your data type."),
-							 parser_errposition(@1)));
-					$$ = true;
-				}
-			| /*EMPTY*/						{ $$ = false; }
-		;
-
-
-CreateOpFamilyStmt:
-			CREATE OPERATOR FAMILY any_name USING name
-				{
-					CreateOpFamilyStmt *n = makeNode(CreateOpFamilyStmt);
-					n->opfamilyname = $4;
-					n->amname = $6;
-					$$ = (Node *) n;
-				}
-		;
-
-
-
 
 DropOpClassStmt:
 			DROP OPERATOR CLASS any_name USING name opt_drop_behavior
