@@ -98,8 +98,7 @@ DROP TYPE box;
    This command is similar to the corresponding command in the SQL
    standard, apart from the <literal>IF EXISTS</literal>
    option, which is a <productname>PostgreSQL</productname> extension.
-   But note that much of the <command>CREATE TYPE</command> command
-   and the data type extension mechanisms in
+   But note that the data type extension mechanisms in
    <productname>PostgreSQL</productname> differ from the SQL standard.
   </para>
  </refsect1>
@@ -109,7 +108,6 @@ DROP TYPE box;
 
   <simplelist type="inline">
    <member><xref linkend="sql-altertype"/></member>
-   <member><xref linkend="sql-createtype"/></member>
   </simplelist>
  </refsect1>
 

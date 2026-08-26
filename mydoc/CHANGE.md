@@ -1,8 +1,61 @@
 # minipg 变更日志（裁剪记录）
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
+
+## DROP TYPE 命令标签与语法整体裁剪（2026-08-26）
+
+### 一、背景
+此前 minipg 在「CREATE TYPE 语法整体裁剪（2026-08-25）」中保留了 `DROP TYPE`（`DropStmt` → objectaddress 通用删除 → `RemoveTypeById`）及其 `CMDTAG_DROP_TYPE` 标签，理由是"类型删除属通用对象管理核心"。本轮按用户要求，将用户显式的 **DROP TYPE 命令入口**彻底裁剪。注意：级联删除核心路径（`dependency.c` 的 `OCLASS_TYPE` → `RemoveTypeById`、objectaddress.c 的 `OBJECT_TYPE` 对象寻址）仍被 `DROP TABLE` 删列类型、`DROP TYPE ... CASCADE` 删依赖等场景依赖，**保留不裁**；仅裁用户手写的 `DROP TYPE` DDL 入口。
+
+### 二、删除内容
+- **命令标签**：`cmdtaglist.h` 删除 `CMDTAG_DROP_TYPE`，`CommandTag` 枚举整体前移 1 位。
+- **语法层（gram.y）**：删 `DROP TYPE` / `DROP TYPE IF EXISTS` 两个产生式（原 2469 / 2479 行）；删仅被其使用的 `type_name_list` 非终结符（`Typename | type_name_list ',' Typename`），并清理 `%type` 声明与 `stmt` 顶层引用；`TYPE_P` 关键字保留（`CREATE TYPE` 历史保留项，虽 CREATE TYPE 也已裁但关键字按惯例保留）。
+- **派发层（utility.c）**：删 `CreateCommandTag` 的 `DropStmt` 中 `OBJECT_TYPE → CMDTAG_DROP_TYPE` 分支（删除后该 case 不可达，落到 default → CMDTAG_UNKNOWN）；删 `AlterObjectTypeCommandTag` 中已不可达的 `OBJECT_TYPE → CMDTAG_UNKNOWN` 分支（ALTER TYPE 语法已于 2026-08-25 裁掉）。
+- **dropcmds.c**：删 `does_not_exist_skipping` 中 `OBJECT_TYPE` case（`DROP TYPE IF EXISTS` 专属 "type %s does not exist, skipping" 提示，语法已裁后不可达）。
+
+### 三、保留（内核核心，不裁）
+- `RemoveTypeById`（`typecmds.c`，由 `dependency.c` 级联删除回调 `OCLASS_TYPE` 调用）、`objectaddress.c` 的 `OBJECT_TYPE` 寻址（含 `get_object_address` / `get_object_address_type` / `pg_get_object_address` / `OCLASS_TYPE` → `DropObjectById`）：依赖系统删除对象 / 级联仍须按对象类型映射，属内核核心。
+- `DROP TYPE` 这类删除在级联场景（DROP TABLE 删列类型、DROP TYPE CASCADE 删依赖类型）仍通过 `RemoveTypeById` 内部执行，不依赖本命令标签。
+- `DROP TRANSFORM`（`CMDTAG_DROP_TRANSFORM`）与 `CreateTransform` 执行路径完整保留，未裁（用户仅选择裁 DROP TYPE）。
+
+### 四、测试
+- `expected/errors.out`：更新 `-- DROP TYPE` 段（missing / bad / no such type 三个用例）的预期——语法入口已裁，`drop type;` / `drop type 314159;` / `drop type nonesuch;` 现均报 `syntax error at or near "type"`（原预期为分号/314159/nonesuch 错误），已用实际运行结果同步。
+
+### 五、构建注意（重要）
+`CommandTag` 枚举数值前移，**本工程 Makefile 未启用头文件自动依赖跟踪**，旧的 `cmdtag.o` / `utility.o` / `postgres.o` 不会自动重编，运行时命令标签错位（如 `SELECT 1` 被判为后续枚举，回归大量报「could not interpret result from server: SELECT FOR UPDATE」）。正确做法：`make -C src/backend clean && make -j` 全量干净重编，并清除 `tmp_install` 旧二进制副本，再 `make check`。
+
+### 六、验证
+`make -C src/backend clean && make -j` 全量重编通过；`make check`（regress 71 项全绿）+ `make check-world`（各子套件全通过，无任何 FAILED）；`errors` 测试预期已同步。
+
+> 关联修正：原「DROP DOMAIN 整体裁剪（2026-08-25）」记录中"保留：`DROP TYPE`（`OBJECT_TYPE`）及其全部路径（`CMDTAG_DROP_TYPE` 标签）不受影响"——本轮已裁 `CMDTAG_DROP_TYPE` 与 DROP TYPE 语法，仅保留级联删除核心（`RemoveTypeById` / objectaddress 的 `OBJECT_TYPE` 寻址），该保留说明作废。
 > 验证命令固化：`cd src/test/regress && NO_TEMP_INSTALL=1 make check`（依赖先 `make prefix=$(pwd)/tmp_install install`）。
 > 已知既有问题：minipg 既有 HEAD 的 `initdb` 因 `syscache.c` 的 `cacheinfo[]` 与 `syscache.h` 枚举不对齐而崩溃，须先对齐二者方能跑完整回归；裁剪时遇到该问题以单文件/全量编译验证为准。
+
+## DROP LANGUAGE 命令标签及语法整体裁剪（2026-08-25）
+
+### 一、背景
+本轮按用户要求裁剪 `cmdtaglist.h` 中 `CMDTAG_DROP_LANGUAGE`（"DROP LANGUAGE"，删除过程语言）。`CREATE LANGUAGE`（过程语言创建）与 PL/pgSQL 此前已整体裁剪，`DROP LANGUAGE` 成为孤立残留；`LANGUAGE` 关键字本身仍被 `CREATE FUNCTION ... LANGUAGE`、`CREATE/DROP TRANSFORM` 使用，`pg_language` 系统目录与 `OBJECT_LANGUAGE` 对象类型仍由 C/SQL 内部语言（internal/c/sql）及对象地址依赖体系依赖，均属内核核心保留。
+
+### 二、删除内容
+- **命令标签**：删 `cmdtaglist.h` 的 `CMDTAG_DROP_LANGUAGE`，`CommandTag` 枚举前移 1 位。
+- **语法层（gram.y）**：
+  - 删 `drop_type_name` 中 `| opt_procedural LANGUAGE { $$ = OBJECT_LANGUAGE; }` 分支（`DROP [PROCEDURAL] LANGUAGE name` 语法入口）。
+  - 删仅被上者使用的 `opt_procedural` 非终结符（`PROCEDURAL | EMPTY`），`PROCEDURAL` 关键字按惯例保留在 `kwlist.h`/关键字表中。
+- **派发层**：删 `utility.c` `CreateCommandTag` 中 `case OBJECT_LANGUAGE: tag = CMDTAG_DROP_LANGUAGE;` 分支；删 `dropcmds.c` `does_not_exist_skipping` 中 `OBJECT_LANGUAGE` 的 "language %s does not exist, skipping" 分支。
+- **psql 补全（tab-complete.c）**：删 `words_after_create` 表中 `{"LANGUAGE", Query_for_list_of_languages}` 条目（CREATE/DROP LANGUAGE 补全）、`CREATE OR REPLACE` 补全词表中的 "LANGUAGE"、`DROP ... → CASCADE/RESTRICT` 正则中的 "LANGUAGE"。
+- **测试**：无回归/隔离用例使用 DROP LANGUAGE（先 grep 确认无残留），无需改测试。
+- **sgml 文档**：`doc/src/sgml/ref/drop_language.sgml` 已在先前裁剪 PL/pgSQL / CREATE LANGUAGE 时删除；`reference.sgml`、`allfiles.sgml` 均无 DROP LANGUAGE 引用，文档树已一致，本轮无 sgml 改动（仅 `release-14.sgml` 历史版本说明提及，非命令文档，保留）。
+
+### 三、保留（内核核心，不裁）
+- `ObjectType` 枚举中的 `OBJECT_LANGUAGE`、`objectaddress.c` 中 `ObjectProperty`/`get_object_address`/`getObjectDescription`/依赖处理等全部 LANGUAGE 分支：对象地址解析与依赖系统（`DROP ... CASCADE` 递归删除依赖语言）的内核核心，不可裁。
+- `pg_language` 目录、`LANGNAME`/`LANOID` syscache、`get_language_oid/get_language_name`：C/SQL 内部语言与函数 `prolang` 依赖所必需。
+- `CREATE FUNCTION ... LANGUAGE`、`CREATE/DROP TRANSFORM` 中的 `LANGUAGE` 关键字语义、`Query_for_list_of_languages`（`\dL` 补全）。
+
+### 四、构建注意
+`CommandTag` 枚举数值整体前移，本工程 Makefile 未启用头文件自动依赖跟踪，必须 `make clean && make -j8` 全量干净重编，否则运行时命令标签错位。
+
+### 五、验证
+`make clean && make -j8` 全量重编通过；`make check-world` 全绿（regress 71 项 + isolation 59 项 + modules/contrib 各子套件全通过，无任何 FAILED）。
 
 ## LOAD、LOCK TABLE 命令标签及语法整体裁剪（2026-08-25）
 

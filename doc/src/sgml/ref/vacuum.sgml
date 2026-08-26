@@ -179,8 +179,8 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] [ ANALYZE ] [ <replaceable class="paramet
       is skipped.  Note that even with this option,
       <command>VACUUM</command> may still block when opening the relation's
       indexes.  Additionally, <command>VACUUM ANALYZE</command> may still
-      block when acquiring sample rows from partitions, table inheritance
-      children, and some types of foreign tables.
+      block when acquiring sample rows from partitions
+      and some types of foreign tables.
      </para>
     </listitem>
    </varlistentry>

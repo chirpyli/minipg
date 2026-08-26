@@ -12,11 +12,6 @@ PostgreSQL documentation
   <primary>TABLE command</primary>
  </indexterm>
 
- <indexterm zone="sql-select">
-  <primary>WITH</primary>
-  <secondary>in SELECT</secondary>
- </indexterm>
-
  <refmeta>
   <refentrytitle>SELECT</refentrytitle>
   <manvolnum>7</manvolnum>
@@ -26,20 +21,17 @@ PostgreSQL documentation
  <refnamediv>
   <refname>SELECT</refname>
   <refname>TABLE</refname>
-  <refname>WITH</refname>
   <refpurpose>retrieve rows from a table or view</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
 <synopsis>
-[ WITH [ RECURSIVE ] <replaceable class="parameter">with_query</replaceable> [, ...] ]
 SELECT [ ALL | DISTINCT [ ON ( <replaceable class="parameter">expression</replaceable> [, ...] ) ] ]
     [ { * | <replaceable class="parameter">expression</replaceable> [ [ AS ] <replaceable class="parameter">output_name</replaceable> ] } [, ...] ]
     [ FROM <replaceable class="parameter">from_item</replaceable> [, ...] ]
     [ WHERE <replaceable class="parameter">condition</replaceable> ]
     [ GROUP BY [ ALL | DISTINCT ] <replaceable class="parameter">grouping_element</replaceable> [, ...] ]
     [ HAVING <replaceable class="parameter">condition</replaceable> ]
-    [ { UNION | INTERSECT | EXCEPT } [ ALL | DISTINCT ] <replaceable class="parameter">select</replaceable> ]
     [ ORDER BY <replaceable class="parameter">expression</replaceable> [ ASC | DESC | USING <replaceable class="parameter">operator</replaceable> ] [ NULLS { FIRST | LAST } ] [, ...] ]
     [ LIMIT { <replaceable class="parameter">count</replaceable> | ALL } ]
     [ OFFSET <replaceable class="parameter">start</replaceable> [ ROW | ROWS ] ]
@@ -51,7 +43,6 @@ SELECT [ ALL | DISTINCT [ ON ( <replaceable class="parameter">expression</replac
     [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ] [ [ AS ] <replaceable class="parameter">alias</replaceable> [ ( <replaceable class="parameter">column_alias</replaceable> [, ...] ) ] ]
                 [ TABLESAMPLE <replaceable class="parameter">sampling_method</replaceable> ( <replaceable class="parameter">argument</replaceable> [, ...] ) [ REPEATABLE ( <replaceable class="parameter">seed</replaceable> ) ] ]
     [ LATERAL ] ( <replaceable class="parameter">select</replaceable> ) [ AS ] <replaceable class="parameter">alias</replaceable> [ ( <replaceable class="parameter">column_alias</replaceable> [, ...] ) ]
-    <replaceable class="parameter">with_query_name</replaceable> [ [ AS ] <replaceable class="parameter">alias</replaceable> [ ( <replaceable class="parameter">column_alias</replaceable> [, ...] ) ] ]
     [ LATERAL ] <replaceable class="parameter">function_name</replaceable> ( [ <replaceable class="parameter">argument</replaceable> [, ...] ] )
                 [ WITH ORDINALITY ] [ [ AS ] <replaceable class="parameter">alias</replaceable> [ ( <replaceable class="parameter">column_alias</replaceable> [, ...] ) ] ]
     [ LATERAL ] <replaceable class="parameter">function_name</replaceable> ( [ <replaceable class="parameter">argument</replaceable> [, ...] ] ) [ AS ] <replaceable class="parameter">alias</replaceable> ( <replaceable class="parameter">column_definition</replaceable> [, ...] )
@@ -71,12 +62,6 @@ SELECT [ ALL | DISTINCT [ ON ( <replaceable class="parameter">expression</replac
     CUBE ( { <replaceable class="parameter">expression</replaceable> | ( <replaceable class="parameter">expression</replaceable> [, ...] ) } [, ...] )
     GROUPING SETS ( <replaceable class="parameter">grouping_element</replaceable> [, ...] )
 
-<phrase>and <replaceable class="parameter">with_query</replaceable> is:</phrase>
-
-    <replaceable class="parameter">with_query_name</replaceable> [ ( <replaceable class="parameter">column_name</replaceable> [, ...] ) ] AS [ [ NOT ] MATERIALIZED ] ( <replaceable class="parameter">select</replaceable> | <replaceable class="parameter">values</replaceable> | <replaceable class="parameter">insert</replaceable> | <replaceable class="parameter">update</replaceable> | <replaceable class="parameter">delete</replaceable> )
-        [ SEARCH { BREADTH | DEPTH } FIRST BY <replaceable>column_name</replaceable> [, ...] SET <replaceable>search_seq_col_name</replaceable> ]
-        [ CYCLE <replaceable>column_name</replaceable> [, ...] SET <replaceable>cycle_mark_col_name</replaceable> [ TO <replaceable>cycle_mark_value</replaceable> DEFAULT <replaceable>cycle_mark_default</replaceable> ] USING <replaceable>cycle_path_col_name</replaceable> ]
-
 TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
 </synopsis>
 
@@ -90,18 +75,6 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
    The general processing of <command>SELECT</command> is as follows:
 
    <orderedlist>
-    <listitem>
-     <para>
-      All queries in the <literal>WITH</literal> list are computed.
-      These effectively serve as temporary tables that can be referenced
-      in the <literal>FROM</literal> list.  A <literal>WITH</literal> query
-      that is referenced more than once in <literal>FROM</literal> is
-      computed only once,
-      unless specified otherwise with <literal>NOT MATERIALIZED</literal>.
-      (See <xref linkend="sql-with"/> below.)
-     </para>
-    </listitem>
-
     <listitem>
      <para>
       All elements in the <literal>FROM</literal> list are computed.
@@ -155,28 +128,6 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
 
     <listitem>
      <para>
-      Using the operators <literal>UNION</literal>,
-      <literal>INTERSECT</literal>, and <literal>EXCEPT</literal>, the
-      output of more than one <command>SELECT</command> statement can
-      be combined to form a single result set.  The
-      <literal>UNION</literal> operator returns all rows that are in
-      one or both of the result sets.  The
-      <literal>INTERSECT</literal> operator returns all rows that are
-      strictly in both result sets.  The <literal>EXCEPT</literal>
-      operator returns the rows that are in the first result set but
-      not in the second.  In all three cases, duplicate rows are
-      eliminated unless <literal>ALL</literal> is specified.  The noise
-      word <literal>DISTINCT</literal> can be added to explicitly specify
-      eliminating duplicate rows.  Notice that <literal>DISTINCT</literal> is
-      the default behavior here, even though <literal>ALL</literal> is
-      the default for <command>SELECT</command> itself.  (See
-      <xref linkend="sql-union"/>, <xref linkend="sql-intersect"/>, and
-      <xref linkend="sql-except"/> below.)
-     </para>
-    </listitem>
-
-    <listitem>
-     <para>
       If the <literal>ORDER BY</literal> clause is specified, the
       returned rows are sorted in the specified order.  If
       <literal>ORDER BY</literal> is not given, the rows are returned
@@ -220,167 +171,6 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
  <refsect1>
   <title>Parameters</title>
 
-  <refsect2 id="sql-with" xreflabel="WITH Clause">
-   <title><literal>WITH</literal> Clause</title>
-
-   <para>
-    The <literal>WITH</literal> clause allows you to specify one or more
-    subqueries that can be referenced by name in the primary query.
-    The subqueries effectively act as temporary tables or views
-    for the duration of the primary query.
-    Each subquery can be a <command>SELECT</command>, <command>TABLE</command>, <command>VALUES</command>,
-    <command>INSERT</command>, <command>UPDATE</command> or
-    <command>DELETE</command> statement.
-    When writing a data-modifying statement (<command>INSERT</command>,
-    <command>UPDATE</command> or <command>DELETE</command>) in
-    <literal>WITH</literal>, it is usual to include a <literal>RETURNING</literal> clause.
-    It is the output of <literal>RETURNING</literal>, <emphasis>not</emphasis> the underlying
-    table that the statement modifies, that forms the temporary table that is
-    read by the primary query.  If <literal>RETURNING</literal> is omitted, the
-    statement is still executed, but it produces no output so it cannot be
-    referenced as a table by the primary query.
-   </para>
-
-   <para>
-    A name (without schema qualification) must be specified for each
-    <literal>WITH</literal> query.  Optionally, a list of column names
-    can be specified; if this is omitted,
-    the column names are inferred from the subquery.
-   </para>
-
-   <para>
-    If <literal>RECURSIVE</literal> is specified, it allows a
-    <command>SELECT</command> subquery to reference itself by name.  Such a
-    subquery must have the form
-<synopsis>
-<replaceable class="parameter">non_recursive_term</replaceable> UNION [ ALL | DISTINCT ] <replaceable class="parameter">recursive_term</replaceable>
-</synopsis>
-    where the recursive self-reference must appear on the right-hand
-    side of the <literal>UNION</literal>.  Only one recursive self-reference
-    is permitted per query.  Recursive data-modifying statements are not
-    supported, but you can use the results of a recursive
-    <command>SELECT</command> query in
-    a data-modifying statement.  See <xref linkend="queries-with"/> for
-    an example.
-   </para>
-
-   <para>
-    Another effect of <literal>RECURSIVE</literal> is that
-    <literal>WITH</literal> queries need not be ordered: a query
-    can reference another one that is later in the list.  (However,
-    circular references, or mutual recursion, are not implemented.)
-    Without <literal>RECURSIVE</literal>, <literal>WITH</literal> queries
-    can only reference sibling <literal>WITH</literal> queries
-    that are earlier in the <literal>WITH</literal> list.
-   </para>
-
-   <para>
-    When there are multiple queries in the <literal>WITH</literal>
-    clause, <literal>RECURSIVE</literal> should be written only once,
-    immediately after <literal>WITH</literal>.  It applies to all queries
-    in the <literal>WITH</literal> clause, though it has no effect on
-    queries that do not use recursion or forward references.
-   </para>
-
-   <para>
-    The optional <literal>SEARCH</literal> clause computes a <firstterm>search
-    sequence column</firstterm> that can be used for ordering the results of a
-    recursive query in either breadth-first or depth-first order.  The
-    supplied column name list specifies the row key that is to be used for
-    keeping track of visited rows.  A column named
-    <replaceable>search_seq_col_name</replaceable> will be added to the result
-    column list of the <literal>WITH</literal> query.  This column can be
-    ordered by in the outer query to achieve the respective ordering.  See
-    <xref linkend="queries-with-search"/> for examples.
-   </para>
-
-   <para>
-    The optional <literal>CYCLE</literal> clause is used to detect cycles in
-    recursive queries.  The supplied column name list specifies the row key
-    that is to be used for keeping track of visited rows.  A column named
-    <replaceable>cycle_mark_col_name</replaceable> will be added to the result
-    column list of the <literal>WITH</literal> query.  This column will be set
-    to <replaceable>cycle_mark_value</replaceable> when a cycle has been
-    detected, else to <replaceable>cycle_mark_default</replaceable>.
-    Furthermore, processing of the recursive union will stop when a cycle has
-    been detected.  <replaceable>cycle_mark_value</replaceable> and
-    <replaceable>cycle_mark_default</replaceable> must be constants and they
-    must be coercible to a common data type, and the data type must have an
-    inequality operator.  (The SQL standard requires that they be Boolean
-    constants or character strings, but PostgreSQL does not require that.)  By
-    default, <literal>TRUE</literal> and <literal>FALSE</literal> (of type
-    <type>boolean</type>) are used.  Furthermore, a column
-    named <replaceable>cycle_path_col_name</replaceable> will be added to the
-    result column list of the <literal>WITH</literal> query.  This column is
-    used internally for tracking visited rows.  See <xref
-    linkend="queries-with-cycle"/> for examples.
-   </para>
-
-   <para>
-    Both the <literal>SEARCH</literal> and the <literal>CYCLE</literal> clause
-    are only valid for recursive <literal>WITH</literal> queries.  The
-    <replaceable>with_query</replaceable> must be a <literal>UNION</literal>
-    (or <literal>UNION ALL</literal>) of two <literal>SELECT</literal> (or
-    equivalent) commands (no nested <literal>UNION</literal>s).  If both
-    clauses are used, the column added by the <literal>SEARCH</literal> clause
-    appears before the columns added by the <literal>CYCLE</literal> clause.
-   </para>
-
-   <para>
-    The primary query and the <literal>WITH</literal> queries are all
-    (notionally) executed at the same time.  This implies that the effects of
-    a data-modifying statement in <literal>WITH</literal> cannot be seen from
-    other parts of the query, other than by reading its <literal>RETURNING</literal>
-    output.  If two such data-modifying statements attempt to modify the same
-    row, the results are unspecified.
-   </para>
-
-   <para>
-    A key property of <literal>WITH</literal> queries is that they
-    are normally evaluated only once per execution of the primary query,
-    even if the primary query refers to them more than once.
-    In particular, data-modifying statements are guaranteed to be
-    executed once and only once, regardless of whether the primary query
-    reads all or any of their output.
-   </para>
-
-   <para>
-    However, a <literal>WITH</literal> query can be marked
-    <literal>NOT MATERIALIZED</literal> to remove this guarantee.  In that
-    case, the <literal>WITH</literal> query can be folded into the primary
-    query much as though it were a simple sub-<literal>SELECT</literal> in
-    the primary query's <literal>FROM</literal> clause.  This results in
-    duplicate computations if the primary query refers to
-    that <literal>WITH</literal> query more than once; but if each such use
-    requires only a few rows of the <literal>WITH</literal> query's total
-    output, <literal>NOT MATERIALIZED</literal> can provide a net savings by
-    allowing the queries to be optimized jointly.
-    <literal>NOT MATERIALIZED</literal> is ignored if it is attached to
-    a <literal>WITH</literal> query that is recursive or is not
-    side-effect-free (i.e., is not a plain <literal>SELECT</literal>
-    containing no volatile functions).
-   </para>
-
-   <para>
-    By default, a side-effect-free <literal>WITH</literal> query is folded
-    into the primary query if it is used exactly once in the primary
-    query's <literal>FROM</literal> clause.  This allows joint optimization
-    of the two query levels in situations where that should be semantically
-    invisible.  However, such folding can be prevented by marking the
-    <literal>WITH</literal> query as <literal>MATERIALIZED</literal>.
-    That might be useful, for example, if the <literal>WITH</literal> query
-    is being used as an optimization fence to prevent the planner from
-    choosing a bad plan.
-    <productname>PostgreSQL</productname> versions before v12 never did
-    such folding, so queries written for older versions might rely on
-    <literal>WITH</literal> to act as an optimization fence.
-   </para>
-
-   <para>
-    See <xref linkend="queries-with"/> for additional information.
-   </para>
-  </refsect2>
-
   <refsect2 id="sql-from" xreflabel="FROM Clause">
    <title><literal>FROM</literal> Clause</title>
 
@@ -404,8 +194,7 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
        <para>
         The name (optionally schema-qualified) of an existing table or view.
         If <literal>ONLY</literal> is specified before the table name, only that
-        table is scanned.  If <literal>ONLY</literal> is not specified, the table
-        and all its descendant tables (if any) are scanned.  Optionally,
+        table is scanned.  Optionally,
         <literal>*</literal> can be specified after the table name to explicitly
         indicate that descendant tables are included.
        </para>
@@ -498,21 +287,6 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
         provided for it.  A
         <link linkend="sql-values"><command>VALUES</command></link> command
         can also be used here.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="parameter">with_query_name</replaceable></term>
-      <listitem>
-       <para>
-        A <literal>WITH</literal> query is referenced by writing its name,
-        just as though the query's name were a table name.  (In fact,
-        the <literal>WITH</literal> query hides any real table of the same name
-        for the purposes of the primary query.  If necessary, you can
-        refer to a real table of the same name by schema-qualifying
-        the table's name.)
-        An alias can be provided in the same way as for a table.
        </para>
       </listitem>
      </varlistentry>
@@ -817,11 +591,10 @@ GROUP BY [ ALL | DISTINCT ] <replaceable class="parameter">grouping_element</rep
     <literal>CUBE</literal> are present as grouping elements, then the
     <literal>GROUP BY</literal> clause as a whole defines some number of
     independent <replaceable>grouping sets</replaceable>.  The effect of this is
-    equivalent to constructing a <literal>UNION ALL</literal> between
+    equivalent to constructing a set union between
     subqueries with the individual grouping sets as their
     <literal>GROUP BY</literal> clauses.  The optional <literal>DISTINCT</literal>
-    clause removes duplicate sets before processing; it does <emphasis>not</emphasis>
-    transform the <literal>UNION ALL</literal> into a <literal>UNION DISTINCT</literal>.
+    clause removes duplicate sets before processing.
     For further details on the handling
     of grouping sets see <xref linkend="queries-grouping-sets"/>.
    </para>
@@ -1036,151 +809,6 @@ SELECT DISTINCT ON (location) location, time, report
    </para>
   </refsect2>
 
-  <refsect2 id="sql-union" xreflabel="UNION Clause">
-   <title><literal>UNION</literal> Clause</title>
-
-   <para>
-    The <literal>UNION</literal> clause has this general form:
-<synopsis>
-<replaceable class="parameter">select_statement</replaceable> UNION [ ALL | DISTINCT ] <replaceable class="parameter">select_statement</replaceable>
-</synopsis><replaceable class="parameter">select_statement</replaceable> is
-    any <command>SELECT</command> statement without an <literal>ORDER
-    BY</literal>, <literal>LIMIT</literal>, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>,
-    <literal>FOR SHARE</literal>, or <literal>FOR KEY SHARE</literal> clause.
-    (<literal>ORDER BY</literal> and <literal>LIMIT</literal> can be attached to a
-    subexpression if it is enclosed in parentheses.  Without
-    parentheses, these clauses will be taken to apply to the result of
-    the <literal>UNION</literal>, not to its right-hand input
-    expression.)
-   </para>
-
-   <para>
-    The <literal>UNION</literal> operator computes the set union of
-    the rows returned by the involved <command>SELECT</command>
-    statements.  A row is in the set union of two result sets if it
-    appears in at least one of the result sets.  The two
-    <command>SELECT</command> statements that represent the direct
-    operands of the <literal>UNION</literal> must produce the same
-    number of columns, and corresponding columns must be of compatible
-    data types.
-   </para>
-
-   <para>
-    The result of <literal>UNION</literal> does not contain any duplicate
-    rows unless the <literal>ALL</literal> option is specified.
-    <literal>ALL</literal> prevents elimination of duplicates.  (Therefore,
-    <literal>UNION ALL</literal> is usually significantly quicker than
-    <literal>UNION</literal>; use <literal>ALL</literal> when you can.)
-    <literal>DISTINCT</literal> can be written to explicitly specify the
-    default behavior of eliminating duplicate rows.
-   </para>
-
-   <para>
-    Multiple <literal>UNION</literal> operators in the same
-    <command>SELECT</command> statement are evaluated left to right,
-    unless otherwise indicated by parentheses.
-   </para>
-
-   <para>
-    Currently, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>, <literal>FOR SHARE</literal> and
-    <literal>FOR KEY SHARE</literal> cannot be
-    specified either for a <literal>UNION</literal> result or for any input of a
-    <literal>UNION</literal>.
-   </para>
-  </refsect2>
-
-  <refsect2 id="sql-intersect" xreflabel="INTERSECT Clause">
-   <title><literal>INTERSECT</literal> Clause</title>
-
-   <para>
-    The <literal>INTERSECT</literal> clause has this general form:
-<synopsis>
-<replaceable class="parameter">select_statement</replaceable> INTERSECT [ ALL | DISTINCT ] <replaceable class="parameter">select_statement</replaceable>
-</synopsis><replaceable class="parameter">select_statement</replaceable> is
-    any <command>SELECT</command> statement without an <literal>ORDER
-    BY</literal>, <literal>LIMIT</literal>, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>,
-    <literal>FOR SHARE</literal>, or <literal>FOR KEY SHARE</literal> clause.
-   </para>
-
-   <para>
-    The <literal>INTERSECT</literal> operator computes the set
-    intersection of the rows returned by the involved
-    <command>SELECT</command> statements.  A row is in the
-    intersection of two result sets if it appears in both result sets.
-   </para>
-
-   <para>
-    The result of <literal>INTERSECT</literal> does not contain any
-    duplicate rows unless the <literal>ALL</literal> option is specified.
-    With <literal>ALL</literal>, a row that has <replaceable>m</replaceable> duplicates in the
-    left table and <replaceable>n</replaceable> duplicates in the right table will appear
-    min(<replaceable>m</replaceable>,<replaceable>n</replaceable>) times in the result set.
-    <literal>DISTINCT</literal> can be written to explicitly specify the
-    default behavior of eliminating duplicate rows.
-   </para>
-
-   <para>
-    Multiple <literal>INTERSECT</literal> operators in the same
-    <command>SELECT</command> statement are evaluated left to right,
-    unless parentheses dictate otherwise.
-    <literal>INTERSECT</literal> binds more tightly than
-    <literal>UNION</literal>.  That is, <literal>A UNION B INTERSECT
-    C</literal> will be read as <literal>A UNION (B INTERSECT
-    C)</literal>.
-   </para>
-
-   <para>
-    Currently, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>, <literal>FOR SHARE</literal> and
-    <literal>FOR KEY SHARE</literal> cannot be
-    specified either for an <literal>INTERSECT</literal> result or for any input of
-    an <literal>INTERSECT</literal>.
-   </para>
-  </refsect2>
-
-  <refsect2 id="sql-except" xreflabel="EXCEPT Clause">
-   <title><literal>EXCEPT</literal> Clause</title>
-
-   <para>
-    The <literal>EXCEPT</literal> clause has this general form:
-<synopsis>
-<replaceable class="parameter">select_statement</replaceable> EXCEPT [ ALL | DISTINCT ] <replaceable class="parameter">select_statement</replaceable>
-</synopsis><replaceable class="parameter">select_statement</replaceable> is
-    any <command>SELECT</command> statement without an <literal>ORDER
-    BY</literal>, <literal>LIMIT</literal>, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>,
-    <literal>FOR SHARE</literal>, or <literal>FOR KEY SHARE</literal> clause.
-   </para>
-
-   <para>
-    The <literal>EXCEPT</literal> operator computes the set of rows
-    that are in the result of the left <command>SELECT</command>
-    statement but not in the result of the right one.
-   </para>
-
-   <para>
-    The result of <literal>EXCEPT</literal> does not contain any
-    duplicate rows unless the <literal>ALL</literal> option is specified.
-    With <literal>ALL</literal>, a row that has <replaceable>m</replaceable> duplicates in the
-    left table and <replaceable>n</replaceable> duplicates in the right table will appear
-    max(<replaceable>m</replaceable>-<replaceable>n</replaceable>,0) times in the result set.
-    <literal>DISTINCT</literal> can be written to explicitly specify the
-    default behavior of eliminating duplicate rows.
-   </para>
-
-   <para>
-    Multiple <literal>EXCEPT</literal> operators in the same
-    <command>SELECT</command> statement are evaluated left to right,
-    unless parentheses dictate otherwise.  <literal>EXCEPT</literal> binds at
-    the same level as <literal>UNION</literal>.
-   </para>
-
-   <para>
-    Currently, <literal>FOR NO KEY UPDATE</literal>, <literal>FOR UPDATE</literal>, <literal>FOR SHARE</literal> and
-    <literal>FOR KEY SHARE</literal> cannot be
-    specified either for an <literal>EXCEPT</literal> result or for any input of
-    an <literal>EXCEPT</literal>.
-   </para>
-  </refsect2>
-
   <refsect2 id="sql-orderby" xreflabel="ORDER BY Clause">
    <title><literal>ORDER BY</literal> Clause</title>
 
@@ -1222,9 +850,7 @@ ORDER BY <replaceable class="parameter">expression</replaceable> [ ASC | DESC | 
 SELECT name FROM distributors ORDER BY code;
 </programlisting>
     A limitation of this feature is that an <literal>ORDER BY</literal>
-    clause applying to the result of a <literal>UNION</literal>,
-    <literal>INTERSECT</literal>, or <literal>EXCEPT</literal> clause can only
-    specify an output column name or number, not an expression.
+    clause can only specify an output column name or number, not an expression.
    </para>
 
    <para>
@@ -1542,8 +1168,7 @@ TABLE <replaceable class="parameter">name</replaceable>
 SELECT * FROM <replaceable class="parameter">name</replaceable>
 </programlisting>
     It can be used as a top-level command or as a space-saving syntax
-    variant in parts of complex queries. Only the <literal>WITH</literal>,
-    <literal>UNION</literal>, <literal>INTERSECT</literal>, <literal>EXCEPT</literal>,
+    variant in parts of complex queries. Only the
     <literal>ORDER BY</literal>, <literal>LIMIT</literal>, <literal>OFFSET</literal>,
     <literal>FETCH</literal> and <literal>FOR</literal> locking clauses can be used
     with <command>TABLE</command>; the <literal>WHERE</literal> clause and any form of
@@ -1635,41 +1260,6 @@ SELECT * FROM distributors ORDER BY 2;
   </para>
 
   <para>
-   The next example shows how to obtain the union of the tables
-   <literal>distributors</literal> and
-   <literal>actors</literal>, restricting the results to those that begin
-   with the letter W in each table.  Only distinct rows are wanted, so the
-   key word <literal>ALL</literal> is omitted.
-
-<programlisting>
-distributors:               actors:
- did |     name              id |     name
------+--------------        ----+----------------
- 108 | Westward               1 | Woody Allen
- 111 | Walt Disney            2 | Warren Beatty
- 112 | Warner Bros.           3 | Walter Matthau
- ...                         ...
-
-SELECT distributors.name
-    FROM distributors
-    WHERE distributors.name LIKE 'W%'
-UNION
-SELECT actors.name
-    FROM actors
-    WHERE actors.name LIKE 'W%';
-
-      name
-----------------
- Walt Disney
- Walter Matthau
- Warner Bros.
- Warren Beatty
- Westward
- Woody Allen
-</programlisting>
-  </para>
-
-  <para>
    This example shows how to use a function in the <literal>FROM</literal>
    clause, both with and without a column definition list:
 
@@ -1709,57 +1299,6 @@ SELECT * FROM unnest(ARRAY['a','b','c','d','e','f']) WITH ORDINALITY;
  f      |        6
 (6 rows)
 </programlisting>
-  </para>
-
-  <para>
-   This example shows how to use a simple <literal>WITH</literal> clause:
-
-<programlisting>
-WITH t AS (
-    SELECT random() as x FROM generate_series(1, 3)
-  )
-SELECT * FROM t
-UNION ALL
-SELECT * FROM t;
-         x          
---------------------
-  0.534150459803641
-  0.520092216785997
- 0.0735620250925422
-  0.534150459803641
-  0.520092216785997
- 0.0735620250925422
-</programlisting>
-
-   Notice that the <literal>WITH</literal> query was evaluated only once,
-   so that we got two sets of the same three random values.
-  </para>
-
-  <para>
-   This example uses <literal>WITH RECURSIVE</literal> to find all
-   subordinates (direct or indirect) of the employee Mary, and their
-   level of indirectness, from a table that shows only direct
-   subordinates:
-
-<programlisting>
-WITH RECURSIVE employee_recursive(distance, employee_name, manager_name) AS (
-    SELECT 1, employee_name, manager_name
-    FROM employee
-    WHERE manager_name = 'Mary'
-  UNION ALL
-    SELECT er.distance + 1, e.employee_name, e.manager_name
-    FROM employee_recursive er, employee e
-    WHERE er.employee_name = e.manager_name
-  )
-SELECT distance, employee_name FROM employee_recursive;
-</programlisting>
-
-   Notice the typical form of recursive queries:
-   an initial condition, followed by <literal>UNION</literal>,
-   followed by the recursive part of the query. Be sure that the
-   recursive part of the query will eventually return no tuples, or
-   else the query will loop indefinitely.  (See <xref linkend="queries-with"/>
-   for more examples.)
   </para>
 
   <para>

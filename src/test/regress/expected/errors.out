@@ -168,17 +168,19 @@ ERROR:  function nonesuch() does not exist
 -- DROP TYPE
 -- missing type name
 drop type;
-ERROR:  syntax error at or near ";"
+ERROR:  syntax error at or near "type"
 LINE 1: drop type;
-                 ^
+             ^
 -- bad type name
 drop type 314159;
-ERROR:  syntax error at or near "314159"
+ERROR:  syntax error at or near "type"
 LINE 1: drop type 314159;
-                  ^
+             ^
 -- no such type
 drop type nonesuch;
-ERROR:  type "nonesuch" does not exist
+ERROR:  syntax error at or near "type"
+LINE 1: drop type nonesuch;
+             ^
 --
 -- Check that division-by-zero is properly caught.
 --

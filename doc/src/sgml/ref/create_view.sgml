@@ -221,15 +221,8 @@ CREATE VIEW [ <replaceable>schema</replaceable> . ] <replaceable>view_name</repl
 
      <para>
       Note that the <literal>CHECK OPTION</literal> is only supported on views that
-      are automatically updatable, and do not have <literal>INSTEAD OF</literal>
-      triggers or <literal>INSTEAD</literal> rules.  If an automatically updatable
-      view is defined on top of a base view that has <literal>INSTEAD OF</literal>
-      triggers, then the <literal>LOCAL CHECK OPTION</literal> may be used to check
-      the conditions on the automatically updatable view, but the conditions
-      on the base view with <literal>INSTEAD OF</literal> triggers will not be
-      checked (a cascaded check option will not cascade down to a
-      trigger-updatable view, and any check options defined directly on a
-      trigger-updatable view will be ignored).  If the view or any of its base
+      are automatically updatable, and do not have <literal>INSTEAD</literal>
+      rules.  If the view or any of its base
       relations has an <literal>INSTEAD</literal> rule that causes the
       <command>INSERT</command> or <command>UPDATE</command> command to be rewritten, then
       all check options will be ignored in the rewritten query, including any
@@ -376,12 +369,9 @@ CREATE VIEW vista AS SELECT text 'Hello World' AS hello;
     A more complex view that does not satisfy all these conditions is
     read-only by default: the system will not allow an insert, update, or
     delete on the view.  You can get the effect of an updatable view by
-    creating <literal>INSTEAD OF</literal> triggers on the view, which must
-    convert attempted inserts, etc. on the view into appropriate actions
-    on other tables.  For more information see <xref
-    linkend="sql-createtrigger"/>.  Another possibility is to create rules
-    (see <xref linkend="sql-createrule"/>), but in practice triggers are
-    easier to understand and use correctly.
+    creating rules
+    (see <xref linkend="sql-createrule"/>) that convert attempted inserts, etc.
+    on the view into appropriate actions on other tables.
    </para>
 
    <para>

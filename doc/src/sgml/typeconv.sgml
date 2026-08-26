@@ -140,10 +140,8 @@ common type for several subexpressions.
 <para>
 The system catalogs store information about which conversions, or
 <firstterm>casts</firstterm>, exist between which data types, and how to
-perform those conversions.  Additional casts can be added by the user
-with the <xref linkend="sql-createcast"/>
-command.  (This is usually
-done in conjunction with defining new data types.  The set of casts
+perform those conversions.
+(The set of casts
 between built-in types has been carefully crafted and is best not
 altered.)
 </para>
@@ -672,16 +670,7 @@ data type, or a type that could be converted to the named data type by
 applying that type's I/O functions (that is, the conversion is either to or
 from one of the standard string types).  When these conditions are met,
 the function call is treated as a form of <literal>CAST</literal> specification.
-  <footnote>
-   <para>
-    The reason for this step is to support function-style cast specifications
-    in cases where there is not an actual cast function.  If there is a cast
-    function, it is conventionally named after its output type, and so there
-    is no need to have a special case.  See
-    <xref linkend="sql-createcast"/>
-    for additional commentary.
-   </para>
-  </footnote>
+
 </para>
 </step>
 <step performance="required">
@@ -942,7 +931,7 @@ Check for an exact match with the target.
 <para>
 Otherwise, try to convert the expression to the target type.  This is possible
 if an <firstterm>assignment cast</firstterm> between the two types is registered in the
-<structname>pg_cast</structname> catalog (see <xref linkend="sql-createcast"/>).
+<structname>pg_cast</structname> catalog.
 Alternatively, if the expression is an unknown-type literal, the contents of
 the literal string will be fed to the input conversion routine for the target
 type.

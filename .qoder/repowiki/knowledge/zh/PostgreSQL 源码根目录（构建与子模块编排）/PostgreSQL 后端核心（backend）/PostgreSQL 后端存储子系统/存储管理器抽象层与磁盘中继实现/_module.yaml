@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: backend_server/storage/storage_manager
+title: 存储管理器抽象层与磁盘中继实现
+scope:
+    - src/backend/storage/smgr/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/storage/buffer
+    - path: backend_server/storage/file_io

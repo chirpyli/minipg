@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: backend_server/access_methods/nbtree_access_method
+title: B-Tree 索引访问方法（nbtree）
+scope:
+    - src/backend/access/nbtree/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/hash_access_method
+    - path: backend_server/access_methods/heap_access_method
+    - path: backend_server/access_methods/index_am_core

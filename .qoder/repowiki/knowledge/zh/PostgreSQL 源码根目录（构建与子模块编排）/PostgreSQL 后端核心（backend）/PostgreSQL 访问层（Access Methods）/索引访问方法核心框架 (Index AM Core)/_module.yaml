@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: backend_server/access_methods/index_am_core
+title: 索引访问方法核心框架 (Index AM Core)
+scope:
+    - src/backend/access/index/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/hash_access_method
+    - path: backend_server/access_methods/heap_access_method
+    - path: backend_server/access_methods/nbtree_access_method
+    - path: backend_server/storage/freespace

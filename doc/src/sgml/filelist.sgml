@@ -54,12 +54,8 @@
 <!ENTITY lobj       SYSTEM "lobj.sgml">
 <!ENTITY rules      SYSTEM "rules.sgml">
 <!ENTITY spi        SYSTEM "spi.sgml">
-<!ENTITY trigger    SYSTEM "trigger.sgml">
-<!ENTITY xaggr      SYSTEM "xaggr.sgml">
 <!ENTITY xfunc      SYSTEM "xfunc.sgml">
 <!ENTITY xindex     SYSTEM "xindex.sgml">
-<!ENTITY xoper      SYSTEM "xoper.sgml">
-<!ENTITY xtypes     SYSTEM "xtypes.sgml">
 
 <!-- reference pages -->
 <!ENTITY % allfiles   SYSTEM "ref/allfiles.sgml">

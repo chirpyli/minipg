@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: backend_server/postmaster_runtime
+title: PostgreSQL 服务器进程生命周期与 Postmaster 运行时
+scope:
+    - src/backend/postmaster/
+    - src/backend/main/
+    - src/backend/bootstrap/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/storage/ipc
+    - path: backend_server/utils/init_resowner
+    - path: backend_server/utils/misc

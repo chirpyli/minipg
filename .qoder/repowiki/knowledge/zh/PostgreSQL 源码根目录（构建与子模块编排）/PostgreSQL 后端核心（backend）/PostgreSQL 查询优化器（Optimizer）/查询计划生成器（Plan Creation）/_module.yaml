@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: backend_server/optimizer/plan_creation
+title: 查询计划生成器（Plan Creation）
+scope:
+    - src/backend/optimizer/plan/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/optimizer/utilities

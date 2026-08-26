@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: backend_server/utils/time
+title: 时间旅行与快照管理（Snapshot & Combo CID）
+scope:
+    - src/backend/utils/time/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/transam

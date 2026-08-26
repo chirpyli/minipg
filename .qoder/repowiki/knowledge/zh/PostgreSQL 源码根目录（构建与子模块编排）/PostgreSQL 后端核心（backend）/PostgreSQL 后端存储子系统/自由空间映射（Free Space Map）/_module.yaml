@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: backend_server/storage/freespace
+title: 自由空间映射（Free Space Map）
+scope:
+    - src/backend/storage/freespace/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/heap_access_method
+    - path: backend_server/access_methods/index_am_core

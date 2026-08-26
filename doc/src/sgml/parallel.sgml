@@ -382,7 +382,7 @@ EXPLAIN SELECT * FROM pgbench_accounts WHERE filler LIKE '%x%';
     must be <link linkend="parallel-safety">safe</link> for parallelism and must
     have a combine function.  If the aggregate has a transition state of type
     <literal>internal</literal>, it must have serialization and deserialization
-    functions.  See <xref linkend="sql-createaggregate"/> for more details.
+    functions.
     Parallel aggregation is not supported if any aggregate function call
     contains <literal>DISTINCT</literal> or <literal>ORDER BY</literal> clause and is also
     not supported for ordered set aggregates or when  the query involves
@@ -538,10 +538,7 @@ EXPLAIN SELECT * FROM pgbench_accounts WHERE filler LIKE '%x%';
     <xref linkend="sql-createfunction"/> or
     <xref linkend="sql-alterfunction"/>, markings can be set by specifying
     <literal>PARALLEL SAFE</literal>, <literal>PARALLEL RESTRICTED</literal>, or
-    <literal>PARALLEL UNSAFE</literal> as appropriate.  When using
-    <xref linkend="sql-createaggregate"/>, the
-    <literal>PARALLEL</literal> option can be specified with <literal>SAFE</literal>,
-    <literal>RESTRICTED</literal>, or <literal>UNSAFE</literal> as the corresponding value.
+    <literal>PARALLEL UNSAFE</literal> as appropriate.
   </para>
 
   <para>

@@ -202,10 +202,6 @@
      A conversion of a <glossterm linkend="glossary-datum">datum</glossterm>
      from its current data type to another data type.
     </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createcast"/>.
-    </para>
    </glossdef>
   </glossentry>
 
@@ -1629,10 +1625,6 @@
      <glossterm linkend="glossary-transaction">transaction</glossterm> as the
      statement which invoked it, and if the function fails, then the invoking
      statement also fails.
-    </para>
-    <para>
-     For more information, see
-     <xref linkend="sql-createtrigger"/>.
     </para>
    </glossdef>
   </glossentry>

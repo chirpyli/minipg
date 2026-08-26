@@ -815,9 +815,6 @@ SELECT t1.a, t2.b, t1.ctid FROM t1, t2 WHERE t1.a = t2.a;
 </para>
 
 <para>
-    Alternatively, the operation may be handled by a user-provided
-    <literal>INSTEAD OF</literal> trigger on the view
-    (see <xref linkend="sql-createtrigger"/>).
     Rewriting works slightly differently
     in this case.  For <command>INSERT</command>, the rewriter does
     nothing at all with the view, leaving it as the result relation

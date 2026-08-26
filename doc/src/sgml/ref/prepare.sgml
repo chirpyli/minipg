@@ -215,9 +215,9 @@ EXPLAIN EXECUTE <replaceable>name</replaceable>(<replaceable>parameter_values</r
    Create a prepared statement for an <command>INSERT</command>
    statement, and then execute it:
 <programlisting>
-PREPARE fooplan (int, text, bool, numeric) AS
+PREPARE fooplan (int, text, bool, int) AS
     INSERT INTO foo VALUES($1, $2, $3, $4);
-EXECUTE fooplan(1, 'Hunter Valley', 't', 200.00);
+EXECUTE fooplan(1, 'Hunter Valley', 't', 200);
 </programlisting>
   </para>
 

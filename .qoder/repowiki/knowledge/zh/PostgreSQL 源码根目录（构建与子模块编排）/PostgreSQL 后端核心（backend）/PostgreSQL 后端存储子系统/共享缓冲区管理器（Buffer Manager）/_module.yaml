@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: backend_server/storage/buffer
+title: 共享缓冲区管理器（Buffer Manager）
+scope:
+    - src/backend/storage/buffer/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/transam
+    - path: backend_server/executor
+    - path: backend_server/storage/file_io
+    - path: backend_server/storage/page
+    - path: backend_server/storage/storage_manager

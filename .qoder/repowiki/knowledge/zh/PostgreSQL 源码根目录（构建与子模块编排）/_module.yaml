@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: ""
+title: PostgreSQL 源码根目录（构建与子模块编排）
+scope:
+    - README
+    - Makefile
+    - GNUmakefile.in
+    - configure.ac
+    - aclocal.m4
+    - build.sh
+    - .gitignore
+    - .editorconfig
+    - .dir-locals.el
+    - .gitattributes
+    - .git-blame-ignore-revs
+    - .abi-compliance-history
+    - AGENTS.md
+    - COPYRIGHT
+    - HISTORY
+    - configure
+source_files: []
+depends_on: []
+related_to: []

@@ -81,7 +81,7 @@ INSERT INTO <replaceable class="parameter">table_name</replaceable> [ AS <replac
    rows matching the unique index values being inserted;  the details
    are covered in <xref linkend="index-unique-checks"/>.
    <literal>ON CONFLICT</literal> can be used to specify an alternative
-   action to raising a unique constraint or exclusion constraint
+   action to raising a unique constraint
    violation error. (See <xref linkend="sql-on-conflict"/> below.)
   </para>
 
@@ -332,7 +332,7 @@ INSERT INTO <replaceable class="parameter">table_name</replaceable> [ AS <replac
    </indexterm>
    <para>
     The optional <literal>ON CONFLICT</literal> clause specifies an
-    alternative action to raising a unique violation or exclusion
+    alternative action to raising a unique violation
     constraint violation error.  For each individual row proposed for
     insertion, either the insertion proceeds, or, if an
     <emphasis>arbiter</emphasis> constraint or index specified by
@@ -523,9 +523,7 @@ INSERT INTO <replaceable class="parameter">table_name</replaceable> [ AS <replac
      </varlistentry>
     </variablelist>
    <para>
-    Note that exclusion constraints are not supported as arbiters with
-    <literal>ON CONFLICT DO UPDATE</literal>. In all cases, only
-    <literal>NOT DEFERRABLE</literal> constraints and unique indexes
+    Note that <literal>NOT DEFERRABLE</literal> constraints and unique indexes
     are supported as arbiters.
    </para>
 

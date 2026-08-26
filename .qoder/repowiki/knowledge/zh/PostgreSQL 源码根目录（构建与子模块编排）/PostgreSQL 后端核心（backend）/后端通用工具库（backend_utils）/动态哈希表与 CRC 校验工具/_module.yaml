@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: backend_server/utils/hash
+title: 动态哈希表与 CRC 校验工具
+scope:
+    - src/backend/utils/hash/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/access_methods/hash_access_method

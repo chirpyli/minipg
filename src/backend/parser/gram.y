@@ -310,7 +310,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				sort_clause opt_sort_clause sortby_list index_params stats_params
 				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
-				qualified_name_list any_name any_name_list type_name_list
+				qualified_name_list any_name any_name_list
 				any_operator expr_list attrs
 				distinct_clause
 				target_list opt_target_list insert_column_list set_target_list
@@ -2205,11 +2205,6 @@ handler_name:
 			| name attrs				{ $$ = lcons(makeString($1), $2); }
 		;
 
-opt_procedural:
-			PROCEDURAL
-			| /*EMPTY*/
-		;
-
 /*****************************************************************************
  *
  *		QUERY:
@@ -2471,26 +2466,6 @@ DropStmt:	DROP object_type_any_name IF_P EXISTS any_name_list opt_drop_behavior
 					n->concurrent = false;
 					$$ = (Node *)n;
 				}
-			| DROP TYPE_P type_name_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_TYPE;
-					n->missing_ok = false;
-					n->objects = $3;
-					n->behavior = $4;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
-			| DROP TYPE_P IF_P EXISTS type_name_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_TYPE;
-					n->missing_ok = true;
-					n->objects = $5;
-					n->behavior = $6;
-					n->concurrent = false;
-					$$ = (Node *) n;
-				}
 			| DROP INDEX CONCURRENTLY any_name_list opt_drop_behavior
 				{
 					DropStmt *n = makeNode(DropStmt);
@@ -2530,7 +2505,6 @@ object_type_any_name:
 
 drop_type_name:
 			EXTENSION								{ $$ = OBJECT_EXTENSION; }
-			| opt_procedural LANGUAGE				{ $$ = OBJECT_LANGUAGE; }
 			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
 		;
 
@@ -2547,11 +2521,6 @@ attrs:		'.' attr_name
 					{ $$ = list_make1(makeString($2)); }
 			| attrs '.' attr_name
 					{ $$ = lappend($1, makeString($3)); }
-		;
-
-type_name_list:
-			Typename								{ $$ = list_make1($1); }
-			| type_name_list ',' Typename			{ $$ = lappend($1, $3); }
 		;
 
 /*****************************************************************************

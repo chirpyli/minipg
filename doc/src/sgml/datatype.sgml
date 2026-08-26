@@ -14,9 +14,7 @@
 
   <para>
    <productname>PostgreSQL</productname> has a rich set of native data
-   types available to users.  Users can add new types to
-   <productname>PostgreSQL</productname> using the <xref
-   linkend="sql-createtype"/> command.
+   types available to users.
   </para>
 
   <para>
@@ -4453,10 +4451,6 @@ INSERT INTO mytable VALUES(-1);  -- fails
     1.  Assigning a value of the underlying type to a field or variable of
     the domain type is allowed without writing an explicit cast, but the
     domain's constraints will be checked.
-   </para>
-
-   <para>
-    For additional information see <xref linkend="sql-createdomain"/>.
    </para>
   </sect1>
 

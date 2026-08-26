@@ -25891,11 +25891,6 @@ SELECT convert_from(pg_read_binary_file('file_in_utf8.txt'), 'UTF8');
    here since users need not use them directly.)
   </para>
 
-  <para>
-   For more information about creating triggers, see
-   <xref linkend="sql-createtrigger"/>.
-  </para>
-
    <table id="builtin-triggers-table">
     <title>Built-In Trigger Functions</title>
     <tgroup cols="1">

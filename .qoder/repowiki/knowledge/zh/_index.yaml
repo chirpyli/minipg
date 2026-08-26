@@ -1,0 +1,727 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: master
+nodes_managed: true
+exported_at: "2026-08-25T11:30:52Z"
+modules:
+    "":
+        dir_name: PostgreSQL 源码根目录（构建与子模块编排）
+        title: PostgreSQL 源码根目录（构建与子模块编排）
+        scope:
+            - README
+            - Makefile
+            - GNUmakefile.in
+            - configure.ac
+            - aclocal.m4
+            - build.sh
+            - .gitignore
+            - .editorconfig
+            - .dir-locals.el
+            - .gitattributes
+            - .git-blame-ignore-revs
+            - .abi-compliance-history
+            - AGENTS.md
+            - COPYRIGHT
+            - HISTORY
+            - configure
+        source_files: []
+        children:
+            - backend_server
+            - build_config
+            - client_tools
+            - common_libs
+            - documentation
+            - headers
+            - interfaces
+            - tests
+            - timezone
+            - tutorial
+        depends_on: []
+        related_to: []
+    backend_server:
+        dir_name: PostgreSQL 后端核心（backend）
+        title: PostgreSQL 后端核心（backend）
+        scope:
+            - src/backend/
+        source_files: []
+        children:
+            - backend_server/access_methods
+            - backend_server/catalog
+            - backend_server/commands
+            - backend_server/executor
+            - backend_server/libpq_client
+            - backend_server/nodes_and_lib
+            - backend_server/optimizer
+            - backend_server/parser
+            - backend_server/postmaster_runtime
+            - backend_server/rewrite_rules
+            - backend_server/statistics
+            - backend_server/storage
+            - backend_server/utils
+        depends_on: []
+        related_to:
+            - path: headers
+    backend_server/access_methods:
+        dir_name: PostgreSQL 访问层（Access Methods）
+        title: PostgreSQL 访问层（Access Methods）
+        scope:
+            - src/backend/access/
+        source_files: []
+        children:
+            - backend_server/access_methods/common_utils
+            - backend_server/access_methods/hash_access_method
+            - backend_server/access_methods/heap_access_method
+            - backend_server/access_methods/index_am_core
+            - backend_server/access_methods/nbtree_access_method
+            - backend_server/access_methods/rmgrdesc
+            - backend_server/access_methods/table_api
+            - backend_server/access_methods/tablesample
+            - backend_server/access_methods/transam
+        depends_on: []
+        related_to:
+            - path: backend_server/commands
+    backend_server/access_methods/common_utils:
+        dir_name: 访问层通用工具集（access_common）
+        title: 访问层通用工具集（access/common）
+        scope:
+            - src/backend/access/common/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/access_methods/hash_access_method:
+        dir_name: Hash 索引访问方法实现
+        title: Hash 索引访问方法实现
+        scope:
+            - src/backend/access/hash/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/index_am_core
+            - path: backend_server/access_methods/nbtree_access_method
+            - path: backend_server/utils/hash
+    backend_server/access_methods/heap_access_method:
+        dir_name: 堆表访问方法（Heap Access Method）
+        title: 堆表访问方法（Heap Access Method）
+        scope:
+            - src/backend/access/heap/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/index_am_core
+            - path: backend_server/access_methods/nbtree_access_method
+            - path: backend_server/storage/freespace
+    backend_server/access_methods/index_am_core:
+        dir_name: 索引访问方法核心框架 (Index AM Core)
+        title: 索引访问方法核心框架 (Index AM Core)
+        scope:
+            - src/backend/access/index/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/hash_access_method
+            - path: backend_server/access_methods/heap_access_method
+            - path: backend_server/access_methods/nbtree_access_method
+            - path: backend_server/storage/freespace
+    backend_server/access_methods/nbtree_access_method:
+        dir_name: B-Tree 索引访问方法（nbtree）
+        title: B-Tree 索引访问方法（nbtree）
+        scope:
+            - src/backend/access/nbtree/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/hash_access_method
+            - path: backend_server/access_methods/heap_access_method
+            - path: backend_server/access_methods/index_am_core
+    backend_server/access_methods/rmgrdesc:
+        dir_name: WAL 记录描述器（rmgrdesc）
+        title: WAL 记录描述器（rmgrdesc）
+        scope:
+            - src/backend/access/rmgrdesc/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/transam
+            - path: client_tools
+    backend_server/access_methods/table_api:
+        dir_name: 表访问接口与 TOAST 辅助
+        title: 表访问接口与 TOAST 辅助
+        scope:
+            - src/backend/access/table/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/access_methods/tablesample:
+        dir_name: TABLESAMPLE 采样方法实现
+        title: TABLESAMPLE 采样方法实现
+        scope:
+            - src/backend/access/tablesample/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/executor
+    backend_server/access_methods/transam:
+        dir_name: 事务管理与预写日志（Transam）子系统
+        title: 事务管理与预写日志（Transam）子系统
+        scope:
+            - src/backend/access/transam/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/rmgrdesc
+            - path: backend_server/storage/buffer
+            - path: backend_server/utils/time
+    backend_server/catalog:
+        dir_name: 系统目录与元数据管理（Catalog）
+        title: 系统目录与元数据管理（Catalog）
+        scope:
+            - src/backend/catalog/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/commands
+    backend_server/commands:
+        dir_name: 后端命令处理器（DDL_DML_管理命令）
+        title: 后端命令处理器（DDL/DML/管理命令）
+        scope:
+            - src/backend/commands/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods
+            - path: backend_server/catalog
+            - path: backend_server/executor
+            - path: backend_server/statistics
+    backend_server/executor:
+        dir_name: 查询执行引擎（Executor）
+        title: 查询执行引擎（Executor）
+        scope:
+            - src/backend/executor/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/tablesample
+            - path: backend_server/commands
+            - path: backend_server/optimizer
+            - path: backend_server/storage/buffer
+            - path: backend_server/utils/cache
+            - path: backend_server/utils/sort
+    backend_server/libpq_client:
+        dir_name: 后端 libpq 通信子系统
+        title: 后端 libpq 通信子系统
+        scope:
+            - src/backend/libpq/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: client_tools
+            - path: interfaces
+    backend_server/nodes_and_lib:
+        dir_name: 后端节点、通用库与平台适配层
+        title: 后端节点、通用库与平台适配层
+        scope:
+            - src/backend/nodes/
+            - src/backend/lib/
+            - src/backend/port/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/optimizer:
+        dir_name: PostgreSQL 查询优化器（Optimizer）
+        title: PostgreSQL 查询优化器（Optimizer）
+        scope:
+            - src/backend/optimizer/
+        source_files: []
+        children:
+            - backend_server/optimizer/path_generation
+            - backend_server/optimizer/plan_creation
+            - backend_server/optimizer/preparation
+            - backend_server/optimizer/utilities
+        depends_on: []
+        related_to:
+            - path: backend_server/executor
+            - path: backend_server/rewrite_rules
+    backend_server/optimizer/path_generation:
+        dir_name: 查询路径生成与代价估算（Path Generation）
+        title: 查询路径生成与代价估算（Path Generation）
+        scope:
+            - src/backend/optimizer/path/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/optimizer/utilities
+    backend_server/optimizer/plan_creation:
+        dir_name: 查询计划生成器（Plan Creation）
+        title: 查询计划生成器（Plan Creation）
+        scope:
+            - src/backend/optimizer/plan/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/optimizer/utilities
+    backend_server/optimizer/preparation:
+        dir_name: 查询预处理阶段（Preparation）
+        title: 查询预处理阶段（Preparation）
+        scope:
+            - src/backend/optimizer/prep/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/parser
+    backend_server/optimizer/utilities:
+        dir_name: 优化器工具函数库（optimizer_util）
+        title: 优化器工具函数库（optimizer/util）
+        scope:
+            - src/backend/optimizer/util/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/optimizer/path_generation
+            - path: backend_server/optimizer/plan_creation
+    backend_server/parser:
+        dir_name: SQL 词法_语法_语义分析器
+        title: SQL 词法/语法/语义分析器
+        scope:
+            - src/backend/parser/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/optimizer/preparation
+            - path: backend_server/rewrite_rules
+    backend_server/postmaster_runtime:
+        dir_name: PostgreSQL 服务器进程生命周期与 Postmaster 运行时
+        title: PostgreSQL 服务器进程生命周期与 Postmaster 运行时
+        scope:
+            - src/backend/postmaster/
+            - src/backend/main/
+            - src/backend/bootstrap/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/ipc
+            - path: backend_server/utils/init_resowner
+            - path: backend_server/utils/misc
+    backend_server/rewrite_rules:
+        dir_name: 查询重写规则子系统
+        title: 查询重写规则子系统
+        scope:
+            - src/backend/rewrite/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/optimizer
+            - path: backend_server/parser
+    backend_server/statistics:
+        dir_name: 扩展统计信息（Extended Statistics）分析器
+        title: 扩展统计信息（Extended Statistics）分析器
+        scope:
+            - src/backend/statistics/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/commands
+    backend_server/storage:
+        dir_name: PostgreSQL 后端存储子系统
+        title: PostgreSQL 后端存储子系统
+        scope:
+            - src/backend/storage/
+        source_files: []
+        children:
+            - backend_server/storage/buffer
+            - backend_server/storage/file_io
+            - backend_server/storage/freespace
+            - backend_server/storage/ipc
+            - backend_server/storage/lock_manager
+            - backend_server/storage/page
+            - backend_server/storage/storage_manager
+        depends_on: []
+        related_to: []
+    backend_server/storage/buffer:
+        dir_name: 共享缓冲区管理器（Buffer Manager）
+        title: 共享缓冲区管理器（Buffer Manager）
+        scope:
+            - src/backend/storage/buffer/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/transam
+            - path: backend_server/executor
+            - path: backend_server/storage/file_io
+            - path: backend_server/storage/page
+            - path: backend_server/storage/storage_manager
+    backend_server/storage/file_io:
+        dir_name: 后端文件 I_O 与临时文件管理
+        title: 后端文件 I/O 与临时文件管理
+        scope:
+            - src/backend/storage/file/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/buffer
+            - path: backend_server/storage/storage_manager
+    backend_server/storage/freespace:
+        dir_name: 自由空间映射（Free Space Map）
+        title: 自由空间映射（Free Space Map）
+        scope:
+            - src/backend/storage/freespace/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/heap_access_method
+            - path: backend_server/access_methods/index_am_core
+    backend_server/storage/ipc:
+        dir_name: 后端进程间通信（IPC）子系统
+        title: 后端进程间通信（IPC）子系统
+        scope:
+            - src/backend/storage/ipc/
+        source_files: []
+        children:
+            - backend_server/storage/ipc/ipc_core
+            - backend_server/storage/ipc/process_coordination
+            - backend_server/storage/ipc/shared_memory_dsm
+            - backend_server/storage/ipc/synchronization_signals
+        depends_on: []
+        related_to:
+            - path: backend_server/postmaster_runtime
+            - path: backend_server/utils/cache
+    backend_server/storage/ipc/ipc_core:
+        dir_name: 进程退出清理与共享缓存失效IPC
+        title: 进程退出清理与共享缓存失效IPC
+        scope:
+            - src/backend/storage/ipc/ipc.c
+            - src/backend/storage/ipc/ipci.c
+            - src/backend/storage/ipc/sinval.c
+            - src/backend/storage/ipc/sinvaladt.c
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/storage/ipc/process_coordination:
+        dir_name: 进程数组、进程信号与热备协调
+        title: 进程数组、进程信号与热备协调
+        scope:
+            - src/backend/storage/ipc/procarray.c
+            - src/backend/storage/ipc/procsignal.c
+            - src/backend/storage/ipc/standby.c
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/storage/ipc/shared_memory_dsm:
+        dir_name: 共享内存与动态共享段管理
+        title: 共享内存与动态共享段管理
+        scope:
+            - src/backend/storage/ipc/dsm.c
+            - src/backend/storage/ipc/dsm_impl.c
+            - src/backend/storage/ipc/shm_toc.c
+            - src/backend/storage/ipc/shmem.c
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/utils/mmgr
+    backend_server/storage/ipc/synchronization_signals:
+        dir_name: 进程间同步与信号机制（Barrier_Latch_Postmaster Signal）
+        title: 进程间同步与信号机制（Barrier/Latch/Postmaster Signal）
+        scope:
+            - src/backend/storage/ipc/barrier.c
+            - src/backend/storage/ipc/latch.c
+            - src/backend/storage/ipc/pmsignal.c
+            - src/backend/storage/ipc/signalfuncs.c
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/utils/activity_error
+    backend_server/storage/lock_manager:
+        dir_name: 锁管理器（Spinlock_LWLock_Heavyweight Lock & Deadlock Detection）
+        title: 锁管理器（Spinlock/LWLock/Heavyweight Lock & Deadlock Detection）
+        scope:
+            - src/backend/storage/lmgr/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend_server/storage/page:
+        dir_name: 数据页与行指针底层操作
+        title: 数据页与行指针底层操作
+        scope:
+            - src/backend/storage/page/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/buffer
+    backend_server/storage/storage_manager:
+        dir_name: 存储管理器抽象层与磁盘中继实现
+        title: 存储管理器抽象层与磁盘中继实现
+        scope:
+            - src/backend/storage/smgr/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/buffer
+            - path: backend_server/storage/file_io
+    backend_server/utils:
+        dir_name: 后端通用工具库（backend_utils）
+        title: 后端通用工具库（backend/utils）
+        scope:
+            - src/backend/utils/
+        source_files: []
+        children:
+            - backend_server/utils/activity_error
+            - backend_server/utils/adt
+            - backend_server/utils/cache
+            - backend_server/utils/fmgr
+            - backend_server/utils/hash
+            - backend_server/utils/init_resowner
+            - backend_server/utils/mb
+            - backend_server/utils/misc
+            - backend_server/utils/mmgr
+            - backend_server/utils/sort
+            - backend_server/utils/time
+        depends_on: []
+        related_to: []
+    backend_server/utils/activity_error:
+        dir_name: 后端活动状态与错误报告基础设施
+        title: 后端活动状态与错误报告基础设施
+        scope:
+            - src/backend/utils/activity/
+            - src/backend/utils/error/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/ipc/synchronization_signals
+    backend_server/utils/adt:
+        dir_name: 内置数据类型与函数库 (Built-in ADT)
+        title: 内置数据类型与函数库 (Built-in ADT)
+        scope:
+            - src/backend/utils/adt/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/utils/fmgr
+    backend_server/utils/cache:
+        dir_name: 系统目录与计划缓存子系统
+        title: 系统目录与计划缓存子系统
+        scope:
+            - src/backend/utils/cache/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/executor
+            - path: backend_server/storage/ipc
+    backend_server/utils/fmgr:
+        dir_name: 函数管理器（Function Manager, fmgr）
+        title: 函数管理器（Function Manager, fmgr）
+        scope:
+            - src/backend/utils/fmgr/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/utils/adt
+    backend_server/utils/hash:
+        dir_name: 动态哈希表与 CRC 校验工具
+        title: 动态哈希表与 CRC 校验工具
+        scope:
+            - src/backend/utils/hash/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/hash_access_method
+    backend_server/utils/init_resowner:
+        dir_name: 后端进程初始化与资源所有者管理
+        title: 后端进程初始化与资源所有者管理
+        scope:
+            - src/backend/utils/init/
+            - src/backend/utils/resowner/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/postmaster_runtime
+    backend_server/utils/mb:
+        dir_name: 多字节字符编码与转换过程
+        title: 多字节字符编码与转换过程
+        scope:
+            - src/backend/utils/mb/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: timezone
+    backend_server/utils/misc:
+        dir_name: GUC配置与通用工具集
+        title: GUC配置与通用工具集
+        scope:
+            - src/backend/utils/misc/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/postmaster_runtime
+    backend_server/utils/mmgr:
+        dir_name: 内存上下文与分配器子系统 (Memory Context & Allocators)
+        title: 内存上下文与分配器子系统 (Memory Context & Allocators)
+        scope:
+            - src/backend/utils/mmgr/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/storage/ipc/shared_memory_dsm
+    backend_server/utils/sort:
+        dir_name: 元组排序与临时存储子系统
+        title: 元组排序与临时存储子系统
+        scope:
+            - src/backend/utils/sort/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/executor
+    backend_server/utils/time:
+        dir_name: 时间旅行与快照管理（Snapshot & Combo CID）
+        title: 时间旅行与快照管理（Snapshot & Combo CID）
+        scope:
+            - src/backend/utils/time/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/transam
+    build_config:
+        dir_name: 构建配置与 PGXS 扩展系统
+        title: 构建配置与 PGXS 扩展系统
+        scope:
+            - config/
+            - src/makefiles/
+            - src/tools/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: documentation
+    client_tools:
+        dir_name: 客户端工具集（initdb_psql_pg_ctl_pg_rewind_pg_waldump_pg_controldata_pg_config）
+        title: 客户端工具集（initdb/psql/pg_ctl/pg_rewind/pg_waldump/pg_controldata/pg_config）
+        scope:
+            - src/bin/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/access_methods/rmgrdesc
+            - path: backend_server/libpq_client
+            - path: common_libs
+            - path: headers
+            - path: interfaces
+    common_libs:
+        dir_name: 通用基础库（common_port_fe_utils）
+        title: 通用基础库（common/port/fe_utils）
+        scope:
+            - src/common/
+            - src/port/
+            - src/fe_utils/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: client_tools
+    documentation:
+        dir_name: PostgreSQL 文档与项目说明
+        title: PostgreSQL 文档与项目说明
+        scope:
+            - doc/
+            - mydoc/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: build_config
+    headers:
+        dir_name: PostgreSQL 公共与内部头文件集合
+        title: PostgreSQL 公共与内部头文件集合
+        scope:
+            - src/include/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server
+            - path: client_tools
+            - path: interfaces
+    interfaces:
+        dir_name: libpq 前端客户端库
+        title: libpq 前端客户端库
+        scope:
+            - src/interfaces/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/libpq_client
+            - path: client_tools
+            - path: headers
+    tests:
+        dir_name: PostgreSQL 测试套件与测试基础设施
+        title: PostgreSQL 测试套件与测试基础设施
+        scope:
+            - src/test/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: tutorial
+    timezone:
+        dir_name: IANA 时区数据库与时间转换库（PostgreSQL 适配版）
+        title: IANA 时区数据库与时间转换库（PostgreSQL 适配版）
+        scope:
+            - src/timezone/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_server/utils/mb
+    tutorial:
+        dir_name: PostgreSQL 教程示例（SQL 脚本与 C 扩展函数）
+        title: PostgreSQL 教程示例（SQL 脚本与 C 扩展函数）
+        scope:
+            - src/tutorial/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: tests

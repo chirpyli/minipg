@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: backend_server/storage/ipc/process_coordination
+title: 进程数组、进程信号与热备协调
+scope:
+    - src/backend/storage/ipc/procarray.c
+    - src/backend/storage/ipc/procsignal.c
+    - src/backend/storage/ipc/standby.c
+source_files: []
+depends_on: []
+related_to: []

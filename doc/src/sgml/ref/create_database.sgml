@@ -28,7 +28,6 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
            [ LOCALE [=] <replaceable class="parameter">locale</replaceable> ]
            [ LC_COLLATE [=] <replaceable class="parameter">lc_collate</replaceable> ]
            [ LC_CTYPE [=] <replaceable class="parameter">lc_ctype</replaceable> ]
-           [ TABLESPACE [=] <replaceable class="parameter">tablespace_name</replaceable> ]
            [ ALLOW_CONNECTIONS [=] <replaceable class="parameter">allowconn</replaceable> ]
            [ CONNECTION LIMIT [=] <replaceable class="parameter">connlimit</replaceable> ]
            [ IS_TEMPLATE [=] <replaceable class="parameter">istemplate</replaceable> ]
@@ -156,20 +155,6 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
        </para>
       </listitem>
      </varlistentry>
-     <varlistentry>
-      <term><replaceable class="parameter">tablespace_name</replaceable></term>
-      <listitem>
-       <para>
-        The name of the tablespace that will be associated with the
-        new database, or <literal>DEFAULT</literal> to use the
-        template database's tablespace. This
-        tablespace will be the default tablespace used for objects
-        created in this database. See
-        <xref linkend="sql-createtablespace"/>
-        for more information.
-       </para>
-      </listitem>
-     </varlistentry>
 
       <varlistentry>
        <term><replaceable class="parameter">allowconn</replaceable></term>
@@ -293,15 +278,6 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
 
 <programlisting>
 CREATE DATABASE lusiadas;
-</programlisting>
-  </para>
-
-  <para>
-   To create a database <literal>sales</literal> owned by user <literal>salesapp</literal>
-   with a default tablespace of <literal>salesspace</literal>:
-
-<programlisting>
-CREATE DATABASE sales OWNER salesapp TABLESPACE salesspace;
 </programlisting>
   </para>
 

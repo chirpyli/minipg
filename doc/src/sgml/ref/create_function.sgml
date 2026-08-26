@@ -669,8 +669,8 @@ CREATE FUNCTION foo(int, int default 42) ...
    <para>
     The full <acronym>SQL</acronym> type syntax is allowed for
     declaring a function's arguments and return value.  However,
-    parenthesized type modifiers (e.g., the precision field for
-    type <type>numeric</type>) are discarded by <command>CREATE FUNCTION</command>.
+    parenthesized type modifiers (e.g., the length field for
+    type <type>varchar</type>) are discarded by <command>CREATE FUNCTION</command>.
     Thus for example
     <literal>CREATE FUNCTION foo (varchar(10)) ...</literal>
     is exactly the same as
@@ -737,17 +737,6 @@ $$ LANGUAGE plpgsql;
    Return a record containing multiple output parameters:
 <programlisting>
 CREATE FUNCTION dup(in int, out f1 int, out f2 text)
-    AS $$ SELECT $1, CAST($1 AS text) || ' is text' $$
-    LANGUAGE SQL;
-
-SELECT * FROM dup(42);
-</programlisting>
-   You can do the same thing more verbosely with an explicitly named
-   composite type:
-<programlisting>
-CREATE TYPE dup_result AS (f1 int, f2 text);
-
-CREATE FUNCTION dup(int) RETURNS dup_result
     AS $$ SELECT $1, CAST($1 AS text) || ' is text' $$
     LANGUAGE SQL;
 

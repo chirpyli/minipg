@@ -1826,8 +1826,7 @@ CAST ( <replaceable>expression</replaceable> AS <replaceable>type</replaceable> 
      have the same name as their output type, and thus the <quote>function-like
      syntax</quote> is nothing more than a direct invocation of the underlying
      conversion function.  Obviously, this is not something that a portable
-     application should rely on.  For further details see
-     <xref linkend="sql-createcast"/>.
+     application should rely on.
     </para>
    </note>
   </sect2>

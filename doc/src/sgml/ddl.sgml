@@ -12,8 +12,7 @@
   Subsequently, we discuss how tables can be organized into
   schemas, and how privileges can be assigned to tables.  Finally,
   we will briefly look at other features that affect the data storage,
-  such as inheritance, views, functions, and
-  triggers.
+  such as views and functions.
  </para>
 
  <sect1 id="ddl-basics">
@@ -323,32 +322,6 @@ CREATE TABLE people (
       Foreign tables can have generated columns.
      </para>
     </listitem>
-    <listitem>
-     <para>For inheritance:</para>
-     <itemizedlist>
-      <listitem>
-       <para>
-        If a parent column is a generated column, a child column must also be
-        a generated column using the same expression.  In the definition of
-        the child column, leave off the <literal>GENERATED</literal> clause,
-        as it will be copied from the parent.
-       </para>
-      </listitem>
-      <listitem>
-       <para>
-        In case of multiple inheritance, if one parent column is a generated
-        column, then all parent columns must be generated columns and with the
-        same expression.
-       </para>
-      </listitem>
-      <listitem>
-       <para>
-        If a parent column is not a generated column, a child column may be
-        defined to be a generated column or not.
-       </para>
-      </listitem>
-     </itemizedlist>
-    </listitem>
    </itemizedlist>
   </para>
 
@@ -361,15 +334,6 @@ CREATE TABLE people (
       underlying base columns.  So, it is possible to arrange it so that a
       particular role can read from a generated column but not from the
       underlying base columns.
-     </para>
-    </listitem>
-    <listitem>
-     <para>
-      Generated columns are, conceptually, updated after
-      <literal>BEFORE</literal> triggers have run.  Therefore, changes made to
-      base columns in a <literal>BEFORE</literal> trigger will be reflected in
-      generated columns.  But conversely, it is not allowed to access
-      generated columns in <literal>BEFORE</literal> triggers.
      </para>
     </listitem>
     <listitem>
@@ -564,19 +528,9 @@ CREATE TABLE products (
      restore to fail.  The restore could fail even when the complete
      database state is consistent with the constraint, due to rows not
      being loaded in an order that will satisfy the constraint.  If
-     possible, use <literal>UNIQUE</literal> or
-     <literal>FOREIGN KEY</literal> constraints to express
+     possible, use <literal>UNIQUE</literal>
+     constraints to express
      cross-row and cross-table restrictions.
-    </para>
-
-    <para>
-     If what you desire is a one-time check against other rows at row
-     insertion, rather than a continuously-maintained consistency
-     guarantee, a custom <link linkend="triggers">trigger</link> can be used
-     to implement that.  (This approach avoids the dump/restore problem because
-     <application>pg_dump</application> does not reinstall triggers until after
-     restoring data, so that the check will not be enforced during a
-     dump/restore.)
     </para>
    </note>
 
@@ -842,268 +796,7 @@ CREATE TABLE example (
     documentation purposes and for client applications.  For example,
     a GUI application that allows modifying row values probably needs
     to know the primary key of a table to be able to identify rows
-    uniquely.  There are also various ways in which the database system
-    makes use of a primary key if one has been declared; for example,
-    the primary key defines the default target column(s) for foreign keys
-    referencing its table.
-   </para>
-  </sect2>
-
-  <sect2 id="ddl-constraints-fk">
-   <title>Foreign Keys</title>
-
-   <indexterm>
-    <primary>foreign key</primary>
-   </indexterm>
-
-   <indexterm>
-    <primary>constraint</primary>
-    <secondary>foreign key</secondary>
-   </indexterm>
-
-   <indexterm>
-    <primary>referential integrity</primary>
-   </indexterm>
-
-   <para>
-    A foreign key constraint specifies that the values in a column (or
-    a group of columns) must match the values appearing in some row
-    of another table.
-    We say this maintains the <firstterm>referential
-    integrity</firstterm> between two related tables.
-   </para>
-
-   <para>
-    Say you have the product table that we have used several times already:
-<programlisting>
-CREATE TABLE products (
-    product_no integer PRIMARY KEY,
-    name text,
-    price numeric
-);
-</programlisting>
-    Let's also assume you have a table storing orders of those
-    products.  We want to ensure that the orders table only contains
-    orders of products that actually exist.  So we define a foreign
-    key constraint in the orders table that references the products
-    table:
-<programlisting>
-CREATE TABLE orders (
-    order_id integer PRIMARY KEY,
-    product_no integer <emphasis>REFERENCES products (product_no)</emphasis>,
-    quantity integer
-);
-</programlisting>
-    Now it is impossible to create orders with non-NULL
-    <structfield>product_no</structfield> entries that do not appear in the
-    products table.
-   </para>
-
-   <para>
-    We say that in this situation the orders table is the
-    <firstterm>referencing</firstterm> table and the products table is
-    the <firstterm>referenced</firstterm> table.  Similarly, there are
-    referencing and referenced columns.
-   </para>
-
-   <para>
-    You can also shorten the above command to:
-<programlisting>
-CREATE TABLE orders (
-    order_id integer PRIMARY KEY,
-    product_no integer <emphasis>REFERENCES products</emphasis>,
-    quantity integer
-);
-</programlisting>
-    because in absence of a column list the primary key of the
-    referenced table is used as the referenced column(s).
-   </para>
-
-   <para>
-    You can assign your own name for a foreign key constraint,
-    in the usual way.
-   </para>
-
-   <para>
-    A foreign key can also constrain and reference a group of columns.
-    As usual, it then needs to be written in table constraint form.
-    Here is a contrived syntax example:
-<programlisting>
-CREATE TABLE t1 (
-  a integer PRIMARY KEY,
-  b integer,
-  c integer,
-  <emphasis>FOREIGN KEY (b, c) REFERENCES other_table (c1, c2)</emphasis>
-);
-</programlisting>
-    Of course, the number and type of the constrained columns need to
-    match the number and type of the referenced columns.
-   </para>
-
-   <indexterm>
-    <primary>foreign key</primary>
-    <secondary>self-referential</secondary>
-   </indexterm>
-
-   <para>
-    Sometimes it is useful for the <quote>other table</quote> of a
-    foreign key constraint to be the same table; this is called
-    a <firstterm>self-referential</firstterm> foreign key.  For
-    example, if you want rows of a table to represent nodes of a tree
-    structure, you could write
-<programlisting>
-CREATE TABLE tree (
-    node_id integer PRIMARY KEY,
-    parent_id integer REFERENCES tree,
-    name text,
-    ...
-);
-</programlisting>
-    A top-level node would have NULL <structfield>parent_id</structfield>,
-    while non-NULL <structfield>parent_id</structfield> entries would be
-    constrained to reference valid rows of the table.
-   </para>
-
-   <para>
-    A table can have more than one foreign key constraint.  This is
-    used to implement many-to-many relationships between tables.  Say
-    you have tables about products and orders, but now you want to
-    allow one order to contain possibly many products (which the
-    structure above did not allow).  You could use this table structure:
-<programlisting>
-CREATE TABLE products (
-    product_no integer PRIMARY KEY,
-    name text,
-    price numeric
-);
-
-CREATE TABLE orders (
-    order_id integer PRIMARY KEY,
-    shipping_address text,
-    ...
-);
-
-CREATE TABLE order_items (
-    product_no integer REFERENCES products,
-    order_id integer REFERENCES orders,
-    quantity integer,
-    PRIMARY KEY (product_no, order_id)
-);
-</programlisting>
-    Notice that the primary key overlaps with the foreign keys in
-    the last table.
-   </para>
-
-   <indexterm>
-    <primary>CASCADE</primary>
-    <secondary>foreign key action</secondary>
-   </indexterm>
-
-   <indexterm>
-    <primary>RESTRICT</primary>
-    <secondary>foreign key action</secondary>
-   </indexterm>
-
-   <para>
-    We know that the foreign keys disallow creation of orders that
-    do not relate to any products.  But what if a product is removed
-    after an order is created that references it?  SQL allows you to
-    handle that as well.  Intuitively, we have a few options:
-    <itemizedlist spacing="compact">
-     <listitem><para>Disallow deleting a referenced product</para></listitem>
-     <listitem><para>Delete the orders as well</para></listitem>
-     <listitem><para>Something else?</para></listitem>
-    </itemizedlist>
-   </para>
-
-   <para>
-    To illustrate this, let's implement the following policy on the
-    many-to-many relationship example above: when someone wants to
-    remove a product that is still referenced by an order (via
-    <literal>order_items</literal>), we disallow it.  If someone
-    removes an order, the order items are removed as well:
-<programlisting>
-CREATE TABLE products (
-    product_no integer PRIMARY KEY,
-    name text,
-    price numeric
-);
-
-CREATE TABLE orders (
-    order_id integer PRIMARY KEY,
-    shipping_address text,
-    ...
-);
-
-CREATE TABLE order_items (
-    product_no integer REFERENCES products <emphasis>ON DELETE RESTRICT</emphasis>,
-    order_id integer REFERENCES orders <emphasis>ON DELETE CASCADE</emphasis>,
-    quantity integer,
-    PRIMARY KEY (product_no, order_id)
-);
-</programlisting>
-   </para>
-
-   <para>
-    Restricting and cascading deletes are the two most common options.
-    <literal>RESTRICT</literal> prevents deletion of a
-    referenced row. <literal>NO ACTION</literal> means that if any
-    referencing rows still exist when the constraint is checked, an error
-    is raised; this is the default behavior if you do not specify anything.
-    (The essential difference between these two choices is that
-    <literal>NO ACTION</literal> allows the check to be deferred until
-    later in the transaction, whereas <literal>RESTRICT</literal> does not.)
-    <literal>CASCADE</literal> specifies that when a referenced row is deleted,
-    row(s) referencing it should be automatically deleted as well.
-    There are two other options:
-    <literal>SET NULL</literal> and <literal>SET DEFAULT</literal>.
-    These cause the referencing column(s) in the referencing row(s)
-    to be set to nulls or their default
-    values, respectively, when the referenced row is deleted.
-    Note that these do not excuse you from observing any constraints.
-    For example, if an action specifies <literal>SET DEFAULT</literal>
-    but the default value would not satisfy the foreign key constraint, the
-    operation will fail.
-   </para>
-
-   <para>
-    Analogous to <literal>ON DELETE</literal> there is also
-    <literal>ON UPDATE</literal> which is invoked when a referenced
-    column is changed (updated).  The possible actions are the same.
-    In this case, <literal>CASCADE</literal> means that the updated values of the
-    referenced column(s) should be copied into the referencing row(s).
-   </para>
-
-   <para>
-    Normally, a referencing row need not satisfy the foreign key constraint
-    if any of its referencing columns are null.  If <literal>MATCH FULL</literal>
-    is added to the foreign key declaration, a referencing row escapes
-    satisfying the constraint only if all its referencing columns are null
-    (so a mix of null and non-null values is guaranteed to fail a
-    <literal>MATCH FULL</literal> constraint).  If you don't want referencing rows
-    to be able to avoid satisfying the foreign key constraint, declare the
-    referencing column(s) as <literal>NOT NULL</literal>.
-   </para>
-
-   <para>
-    A foreign key must reference columns that either are a primary key or
-    form a unique constraint, or are columns from a non-partial unique index.
-    This means that the referenced columns always have an index to allow
-    efficient lookups on whether a referencing row has a match.  Since a
-    <command>DELETE</command> of a row from the referenced table or an
-    <command>UPDATE</command> of a referenced column will require a scan of
-    the referencing table for rows matching the old value, it is often a good
-    idea to index the referencing columns too.  Because this is not always
-    needed, and there are many choices available on how to index, the
-    declaration of a foreign key constraint does not automatically create an
-    index on the referencing columns.
-   </para>
-
-   <para>
-    More information about updating and deleting data is in <xref
-    linkend="dml"/>.  Also see the description of foreign key constraint
-    syntax in the reference documentation for
-    <xref linkend="sql-createtable"/>.
+    uniquely.
    </para>
   </sect2>
  </sect1>
@@ -1136,9 +829,8 @@ CREATE TABLE order_items (
 
      <para>
       The OID of the table containing this row.  This column is
-      particularly handy for queries that select from inheritance
-      hierarchies (see <xref linkend="ddl-inherit"/>), since without it,
-      it's difficult to tell which individual table a row came from.  The
+      particularly handy for queries that need to identify which
+      table a row came from.  The
       <structfield>tableoid</structfield> can be joined against the
       <structfield>oid</structfield> column of
       <structname>pg_class</structname> to obtain the table name.
@@ -1259,8 +951,7 @@ CREATE TABLE order_items (
    the requirements of the application change, you can drop the
    table and create it again.  But this is not a convenient option if
    the table is already filled with data, or if the table is
-   referenced by other database objects (for instance a foreign key
-   constraint).  Therefore <productname>PostgreSQL</productname>
+   referenced by other database objects.  Therefore <productname>PostgreSQL</productname>
    provides a family of commands to make modifications to existing
    tables.  Note that this is conceptually distinct from altering
    the data contained in the table: here we are interested in altering
@@ -1373,9 +1064,9 @@ ALTER TABLE products DROP COLUMN description;
 </programlisting>
     Whatever data was in the column disappears.  Table constraints involving
     the column are dropped, too.  However, if the column is referenced by a
-    foreign key constraint of another table,
+    view or other database object,
     <productname>PostgreSQL</productname> will not silently drop that
-    constraint.  You can authorize dropping everything that depends on
+    object.  You can authorize dropping everything that depends on
     the column by adding <literal>CASCADE</literal>:
 <programlisting>
 ALTER TABLE products DROP COLUMN description CASCADE;
@@ -1398,7 +1089,6 @@ ALTER TABLE products DROP COLUMN description CASCADE;
 <programlisting>
 ALTER TABLE products ADD CHECK (name &lt;&gt; '');
 ALTER TABLE products ADD CONSTRAINT some_name UNIQUE (product_no);
-ALTER TABLE products ADD FOREIGN KEY (product_group_id) REFERENCES product_groups;
 </programlisting>
     To add a not-null constraint, which cannot be written as a table
     constraint, use this syntax:
@@ -1436,9 +1126,7 @@ ALTER TABLE products DROP CONSTRAINT some_name;
 
    <para>
     As with dropping a column, you need to add <literal>CASCADE</literal> if you
-    want to drop a constraint that something else depends on.  An example
-    is that a foreign key constraint depends on a unique or primary key
-    constraint on the referenced column(s).
+    want to drop a constraint that something else depends on.
    </para>
 
    <para>
@@ -1510,6 +1198,7 @@ ALTER TABLE products ALTER COLUMN price TYPE numeric(10,2);
   </sect2>
 </sect1>
 
+ <sect1 id="ddl-rowsecurity">
   <title>Row Security Policies</title>
 
   <indexterm zone="ddl-rowsecurity">
@@ -1833,11 +1522,9 @@ UPDATE 0
 </programlisting>
 
   <para>
-   Referential integrity checks, such as unique or primary key constraints
-   and foreign key references, always bypass row security to ensure that
-   data integrity is maintained.  Care must be taken when developing
-   schemas and row level policies to avoid <quote>covert channel</quote> leaks of
-   information through such referential integrity checks.
+   Referential integrity checks, such as unique and primary key constraints,
+   always bypass row security to ensure that
+   data integrity is maintained.
   </para>
 
   <para>
@@ -2479,346 +2166,6 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
   </sect2>
  </sect1>
 
- <sect1 id="ddl-inherit">
-  <title>Inheritance</title>
-
-  <indexterm>
-   <primary>inheritance</primary>
-  </indexterm>
-
-  <indexterm>
-   <primary>table</primary>
-   <secondary>inheritance</secondary>
-  </indexterm>
-
-  <para>
-   <productname>PostgreSQL</productname> implements table inheritance,
-   which can be a useful tool for database designers.  (SQL:1999 and
-   later define a type inheritance feature, which differs in many
-   respects from the features described here.)
-  </para>
-
-  <para>
-   Let's start with an example: suppose we are trying to build a data
-   model for cities.  Each state has many cities, but only one
-   capital. We want to be able to quickly retrieve the capital city
-   for any particular state. This can be done by creating two tables,
-   one for state capitals and one for cities that are not
-   capitals. However, what happens when we want to ask for data about
-   a city, regardless of whether it is a capital or not? The
-   inheritance feature can help to resolve this problem. We define the
-   <structname>capitals</structname> table so that it inherits from
-   <structname>cities</structname>:
-
-<programlisting>
-CREATE TABLE cities (
-    name            text,
-    population      float,
-    elevation       int     -- in feet
-);
-
-CREATE TABLE capitals (
-    state           char(2)
-) INHERITS (cities);
-</programlisting>
-
-   In this case, the <structname>capitals</structname> table <firstterm>inherits</firstterm>
-   all the columns of its parent table, <structname>cities</structname>. State
-   capitals also have an extra column, <structfield>state</structfield>, that shows
-   their state.
-  </para>
-
-  <para>
-   In <productname>PostgreSQL</productname>, a table can inherit from
-   zero or more other tables, and a query can reference either all
-   rows of a table or all rows of a table plus all of its descendant tables.
-   The latter behavior is the default.
-   For example, the following query finds the names of all cities,
-   including state capitals, that are located at an elevation over
-   500 feet:
-
-<programlisting>
-SELECT name, elevation
-    FROM cities
-    WHERE elevation &gt; 500;
-</programlisting>
-
-   Given the sample data from the <productname>PostgreSQL</productname>
-   tutorial (see <xref linkend="tutorial-sql-intro"/>), this returns:
-
-<programlisting>
-   name    | elevation
------------+-----------
- Las Vegas |      2174
- Mariposa  |      1953
- Madison   |       845
-</programlisting>
-  </para>
-
-  <para>
-   On the other hand, the following query finds all the cities that
-   are not state capitals and are situated at an elevation over 500 feet:
-
-<programlisting>
-SELECT name, elevation
-    FROM ONLY cities
-    WHERE elevation &gt; 500;
-
-   name    | elevation
------------+-----------
- Las Vegas |      2174
- Mariposa  |      1953
-</programlisting>
-  </para>
-
-  <para>
-   Here the <literal>ONLY</literal> keyword indicates that the query
-   should apply only to <structname>cities</structname>, and not any tables
-   below <structname>cities</structname> in the inheritance hierarchy.  Many
-   of the commands that we have already discussed &mdash;
-   <command>SELECT</command>, <command>UPDATE</command> and
-   <command>DELETE</command> &mdash; support the
-   <literal>ONLY</literal> keyword.
-  </para>
-
-  <para>
-   You can also write the table name with a trailing <literal>*</literal>
-   to explicitly specify that descendant tables are included:
-
-<programlisting>
-SELECT name, elevation
-    FROM cities*
-    WHERE elevation &gt; 500;
-</programlisting>
-
-   Writing <literal>*</literal> is not necessary, since this behavior is always
-   the default.  However, this syntax is still supported for
-   compatibility with older releases where the default could be changed.
-  </para>
-
-  <para>
-   In some cases you might wish to know which table a particular row
-   originated from. There is a system column called
-   <structfield>tableoid</structfield> in each table which can tell you the
-   originating table:
-
-<programlisting>
-SELECT c.tableoid, c.name, c.elevation
-FROM cities c
-WHERE c.elevation &gt; 500;
-</programlisting>
-
-   which returns:
-
-<programlisting>
- tableoid |   name    | elevation
-----------+-----------+-----------
-   139793 | Las Vegas |      2174
-   139793 | Mariposa  |      1953
-   139798 | Madison   |       845
-</programlisting>
-
-   (If you try to reproduce this example, you will probably get
-   different numeric OIDs.)  By doing a join with
-   <structname>pg_class</structname> you can see the actual table names:
-
-<programlisting>
-SELECT p.relname, c.name, c.elevation
-FROM cities c, pg_class p
-WHERE c.elevation &gt; 500 AND c.tableoid = p.oid;
-</programlisting>
-
-   which returns:
-
-<programlisting>
- relname  |   name    | elevation
-----------+-----------+-----------
- cities   | Las Vegas |      2174
- cities   | Mariposa  |      1953
- capitals | Madison   |       845
-</programlisting>
-  </para>
-
-  <para>
-   Another way to get the same effect is to use the <type>regclass</type>
-   alias type, which will print the table OID symbolically:
-
-<programlisting>
-SELECT c.tableoid::regclass, c.name, c.elevation
-FROM cities c
-WHERE c.elevation &gt; 500;
-</programlisting>
-  </para>
-
-  <para>
-   Inheritance does not automatically propagate data from
-   <command>INSERT</command> or <command>COPY</command> commands to
-   other tables in the inheritance hierarchy. In our example, the
-   following <command>INSERT</command> statement will fail:
-<programlisting>
-INSERT INTO cities (name, population, elevation, state)
-VALUES ('Albany', NULL, NULL, 'NY');
-</programlisting>
-   We might hope that the data would somehow be routed to the
-   <structname>capitals</structname> table, but this does not happen:
-   <command>INSERT</command> always inserts into exactly the table
-   specified.  In some cases it is possible to redirect the insertion
-   using a rule (see <xref linkend="rules"/>).  However that does not
-   help for the above case because the <structname>cities</structname> table
-   does not contain the column <structfield>state</structfield>, and so the
-   command will be rejected before the rule can be applied.
-  </para>
-
-  <para>
-   All check constraints and not-null constraints on a parent table are
-   automatically inherited by its children, unless explicitly specified
-   otherwise with <literal>NO INHERIT</literal> clauses.  Other types of constraints
-   (unique, primary key, and foreign key constraints) are not inherited.
-  </para>
-
-  <para>
-   A table can inherit from more than one parent table, in which case it has
-   the union of the columns defined by the parent tables.  Any columns
-   declared in the child table's definition are added to these.  If the
-   same column name appears in multiple parent tables, or in both a parent
-   table and the child's definition, then these columns are <quote>merged</quote>
-   so that there is only one such column in the child table.  To be merged,
-   columns must have the same data types, else an error is raised.
-   Inheritable check constraints and not-null constraints are merged in a
-   similar fashion.  Thus, for example, a merged column will be marked
-   not-null if any one of the column definitions it came from is marked
-   not-null.  Check constraints are merged if they have the same name,
-   and the merge will fail if their conditions are different.
-  </para>
-
-  <para>
-   Table inheritance is typically established when the child table is
-   created, using the <literal>INHERITS</literal> clause of the
-   <link linkend="sql-createtable"><command>CREATE TABLE</command></link>
-   statement.
-   Alternatively, a table which is already defined in a compatible way can
-   have a new parent relationship added, using the <literal>INHERIT</literal>
-   variant of <link linkend="sql-altertable"><command>ALTER TABLE</command></link>.
-   To do this the new child table must already include columns with
-   the same names and types as the columns of the parent. It must also include
-   check constraints with the same names and check expressions as those of the
-   parent. Similarly an inheritance link can be removed from a child using the
-   <literal>NO INHERIT</literal> variant of <command>ALTER TABLE</command>.
-   Dynamically adding and removing inheritance links like this can be useful
-   when the inheritance relationship is being used for table
-   organization.
-  </para>
-
-  <para>
-   A parent table cannot be dropped while any of its children remain. Neither
-   can columns or check constraints of child tables be dropped or altered
-   if they are inherited
-   from any parent tables. If you wish to remove a table and all of its
-   descendants, one easy way is to drop the parent table with the
-   <literal>CASCADE</literal> option (see <xref linkend="ddl-depend"/>).
-  </para>
-
-  <para>
-   <command>ALTER TABLE</command> will
-   propagate any changes in column data definitions and check
-   constraints down the inheritance hierarchy.  Again, dropping
-   columns that are depended on by other tables is only possible when using
-   the <literal>CASCADE</literal> option. <command>ALTER
-   TABLE</command> follows the same rules for duplicate column merging
-   and rejection that apply during <command>CREATE TABLE</command>.
-  </para>
-
-  <para>
-   Inherited queries perform access permission checks on the parent table
-   only.  Thus, for example, granting <literal>UPDATE</literal> permission on
-   the <structname>cities</structname> table implies permission to update rows in
-   the <structname>capitals</structname> table as well, when they are
-   accessed through <structname>cities</structname>.  This preserves the appearance
-   that the data is (also) in the parent table.  But
-   the <structname>capitals</structname> table could not be updated directly
-   without an additional grant.  In a similar way, the parent table's row
-   security policies (see <xref linkend="ddl-rowsecurity"/>) are applied to
-   rows coming from child tables during an inherited query.  A child table's
-   policies, if any, are applied only when it is the table explicitly named
-   in the query; and in that case, any policies attached to its parent(s) are
-   ignored.
-  </para>
-
-  <para>
-   Foreign tables (see <xref linkend="ddl-foreign-data"/>) can also
-   be part of inheritance hierarchies, either as parent or child
-   tables, just as regular tables can be.  If a foreign table is part
-   of an inheritance hierarchy then any operations not supported by
-   the foreign table are not supported on the whole hierarchy either.
-  </para>
-
- <sect2 id="ddl-inherit-caveats">
-  <title>Caveats</title>
-
-  <para>
-   Note that not all SQL commands are able to work on
-   inheritance hierarchies.  Commands that are used for data querying,
-   data modification, or schema modification
-   (e.g., <literal>SELECT</literal>, <literal>UPDATE</literal>, <literal>DELETE</literal>,
-   most variants of <literal>ALTER TABLE</literal>, but
-   not <literal>INSERT</literal> or <literal>ALTER TABLE ...
-   RENAME</literal>) typically default to including child tables and
-   support the <literal>ONLY</literal> notation to exclude them.
-   Commands that do database maintenance and tuning
-   (e.g., <literal>REINDEX</literal>, <literal>VACUUM</literal>)
-   typically only work on individual, physical tables and do not
-   support recursing over inheritance hierarchies.  The respective
-   behavior of each individual command is documented in its reference
-   page (<xref linkend="sql-commands"/>).
-  </para>
-
-  <para>
-   A serious limitation of the inheritance feature is that indexes (including
-   unique constraints) and foreign key constraints only apply to single
-   tables, not to their inheritance children. This is true on both the
-   referencing and referenced sides of a foreign key constraint. Thus,
-   in the terms of the above example:
-
-   <itemizedlist>
-    <listitem>
-     <para>
-      If we declared <structname>cities</structname>.<structfield>name</structfield> to be
-      <literal>UNIQUE</literal> or a <literal>PRIMARY KEY</literal>, this would not stop the
-      <structname>capitals</structname> table from having rows with names duplicating
-      rows in <structname>cities</structname>.  And those duplicate rows would by
-      default show up in queries from <structname>cities</structname>.  In fact, by
-      default <structname>capitals</structname> would have no unique constraint at all,
-      and so could contain multiple rows with the same name.
-      You could add a unique constraint to <structname>capitals</structname>, but this
-      would not prevent duplication compared to <structname>cities</structname>.
-     </para>
-    </listitem>
-
-    <listitem>
-     <para>
-      Similarly, if we were to specify that
-      <structname>cities</structname>.<structfield>name</structfield> <literal>REFERENCES</literal> some
-      other table, this constraint would not automatically propagate to
-      <structname>capitals</structname>.  In this case you could work around it by
-      manually adding the same <literal>REFERENCES</literal> constraint to
-      <structname>capitals</structname>.
-     </para>
-    </listitem>
-
-    <listitem>
-     <para>
-      Specifying that another table's column <literal>REFERENCES
-      cities(name)</literal> would allow the other table to contain city names, but
-      not capital names.  There is no good workaround for this case.
-     </para>
-    </listitem>
-   </itemizedlist>
-
-  </para>
-
-   </sect2>
-  </sect1>
-
 
 
  <sect1 id="ddl-others">
@@ -2880,38 +2227,17 @@ VALUES ('Albany', NULL, NULL, 'NY');
 
   <para>
    When you create complex database structures involving many tables
-   with foreign key constraints, views, triggers, functions, etc. you
+   with views, functions, etc. you
    implicitly create a net of dependencies between the objects.
-   For instance, a table with a foreign key constraint depends on the
-   table it references.
+   For instance, a view depends on the tables it references.
   </para>
 
   <para>
    To ensure the integrity of the entire database structure,
    <productname>PostgreSQL</productname> makes sure that you cannot
    drop objects that other objects still depend on.  For example,
-   attempting to drop the products table we considered in <xref
-   linkend="ddl-constraints-fk"/>, with the orders table depending on
-   it, would result in an error message like this:
-<screen>
-DROP TABLE products;
-
-ERROR:  cannot drop table products because other objects depend on it
-DETAIL:  constraint orders_product_no_fkey on table orders depends on table products
-HINT:  Use DROP ... CASCADE to drop the dependent objects too.
-</screen>
-   The error message contains a useful hint: if you do not want to
-   bother deleting all the dependent objects individually, you can run:
-<screen>
-DROP TABLE products CASCADE;
-</screen>
-   and all the dependent objects will be removed, as will any objects
-   that depend on them, recursively.  In this case, it doesn't remove
-   the orders table, it only removes the foreign key constraint.
-   It stops there because nothing depends on the foreign key constraint.
-   (If you want to check what <command>DROP ... CASCADE</command> will do,
-   run <command>DROP</command> without <literal>CASCADE</literal> and read the
-   <literal>DETAIL</literal> output.)
+   attempting to drop a table that is referenced by an existing view
+   would result in an error message.
   </para>
 
   <para>

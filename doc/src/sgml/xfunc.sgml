@@ -462,7 +462,7 @@ $$ LANGUAGE SQL;
 
      since the <type>integer</type> sum can be implicitly cast
      to <type>float8</type>.
-     (See <xref linkend="typeconv"/> or <xref linkend="sql-createcast"/>
+     (See <xref linkend="typeconv"/>
      for more about casts.)
     </para>
    </sect2>

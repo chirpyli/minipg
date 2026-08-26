@@ -108,11 +108,6 @@ CREATE [ OR REPLACE ] RULE <replaceable class="parameter">name</replaceable> AS 
     the automatic update transformation will generally outperform an
     explicit rule.
    </para>
-
-   <para>
-    Another alternative worth considering is to use <literal>INSTEAD OF</literal>
-    triggers (see <xref linkend="sql-createtrigger"/>) in place of rules.
-   </para>
   </note>
  </refsect1>
 
@@ -201,7 +196,7 @@ CREATE [ OR REPLACE ] RULE <replaceable class="parameter">name</replaceable> AS 
       The command or commands that make up the rule action.  Valid
       commands are <command>SELECT</command>,
       <command>INSERT</command>, <command>UPDATE</command>,
-      <command>DELETE</command>, or <command>NOTIFY</command>.
+      or <command>DELETE</command>.
      </para>
     </listitem>
    </varlistentry>
@@ -267,22 +262,6 @@ SELECT * FROM t1;
 </programlisting>
   </para>
 
-  <para>
-   Presently, if a rule action contains a <command>NOTIFY</command>
-   command, the <command>NOTIFY</command> command will be executed
-   unconditionally, that is, the <command>NOTIFY</command> will be
-   issued even if there are not any rows that the rule should apply
-   to.  For example, in:
-<programlisting>
-CREATE RULE notify_me AS ON UPDATE TO mytable DO ALSO NOTIFY mytable;
-
-UPDATE mytable SET name = 'foo' WHERE id = 42;
-</programlisting>
-   one <command>NOTIFY</command> event will be sent during the
-   <command>UPDATE</command>, whether or not there are any rows that
-   match the condition <literal>id = 42</literal>.  This is an
-   implementation restriction that might be fixed in future releases.
-  </para>
  </refsect1>
 
  <refsect1>

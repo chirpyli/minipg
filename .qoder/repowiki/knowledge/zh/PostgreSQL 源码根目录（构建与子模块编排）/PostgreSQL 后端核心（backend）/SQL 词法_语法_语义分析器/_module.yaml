@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: backend_server/parser
+title: SQL 词法/语法/语义分析器
+scope:
+    - src/backend/parser/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/optimizer/preparation
+    - path: backend_server/rewrite_rules

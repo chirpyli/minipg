@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: timezone
+title: IANA 时区数据库与时间转换库（PostgreSQL 适配版）
+scope:
+    - src/timezone/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/utils/mb

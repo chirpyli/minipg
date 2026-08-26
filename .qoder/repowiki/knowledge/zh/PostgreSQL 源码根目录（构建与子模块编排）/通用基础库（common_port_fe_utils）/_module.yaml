@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: common_libs
+title: 通用基础库（common/port/fe_utils）
+scope:
+    - src/common/
+    - src/port/
+    - src/fe_utils/
+source_files: []
+depends_on: []
+related_to:
+    - path: client_tools

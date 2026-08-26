@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: backend_server/storage/ipc/shared_memory_dsm
+title: 共享内存与动态共享段管理
+scope:
+    - src/backend/storage/ipc/dsm.c
+    - src/backend/storage/ipc/dsm_impl.c
+    - src/backend/storage/ipc/shm_toc.c
+    - src/backend/storage/ipc/shmem.c
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/utils/mmgr

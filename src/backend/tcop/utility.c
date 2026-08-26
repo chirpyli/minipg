@@ -1112,9 +1112,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
-		case OBJECT_TYPE:
-			tag = CMDTAG_UNKNOWN;
-			break;
 		case OBJECT_VIEW:
 			tag = CMDTAG_UNKNOWN;
 			break;
@@ -1239,18 +1236,12 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_INDEX:
 					tag = CMDTAG_DROP_INDEX;
 					break;
-				case OBJECT_TYPE:
-					tag = CMDTAG_DROP_TYPE;
-					break;
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
-					break;
-				case OBJECT_LANGUAGE:
-					tag = CMDTAG_DROP_LANGUAGE;
-					break;
+				break;
 				case OBJECT_TRANSFORM:
 					tag = CMDTAG_DROP_TRANSFORM;
 					break;

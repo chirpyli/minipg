@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: interfaces
+title: libpq 前端客户端库
+scope:
+    - src/interfaces/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/libpq_client
+    - path: client_tools
+    - path: headers

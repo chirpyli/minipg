@@ -81,8 +81,6 @@
       </para>
     </listitem>
   </itemizedlist>
-  In addition, you can define your own range types;
-  see <xref linkend="sql-createtype"/> for more information.
  </para>
  </sect2>
 
@@ -457,10 +455,6 @@ CREATE TYPE timerange AS RANGE (
 SELECT '[11:10, 23:00]'::timerange;
 </programlisting>
 
-  <para>
-   See <xref linkend="sql-createtype"/> for more information about creating
-   range types.
-  </para>
  </sect2>
 
  <sect2 id="rangetypes-indexing">

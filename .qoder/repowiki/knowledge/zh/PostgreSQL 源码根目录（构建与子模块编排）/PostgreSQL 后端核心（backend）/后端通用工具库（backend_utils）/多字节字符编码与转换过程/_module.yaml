@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: backend_server/utils/mb
+title: 多字节字符编码与转换过程
+scope:
+    - src/backend/utils/mb/
+source_files: []
+depends_on: []
+related_to:
+    - path: timezone

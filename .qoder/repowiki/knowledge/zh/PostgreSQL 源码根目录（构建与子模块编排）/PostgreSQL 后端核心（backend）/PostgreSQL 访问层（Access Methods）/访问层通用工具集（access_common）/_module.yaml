@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend_server/access_methods/common_utils
+title: 访问层通用工具集（access/common）
+scope:
+    - src/backend/access/common/
+source_files: []
+depends_on: []
+related_to: []

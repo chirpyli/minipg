@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend_server/access_methods/table_api
+title: 表访问接口与 TOAST 辅助
+scope:
+    - src/backend/access/table/
+source_files: []
+depends_on: []
+related_to: []

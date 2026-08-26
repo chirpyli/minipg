@@ -1630,11 +1630,7 @@ RESET client_encoding;
      system catalog.  <productname>PostgreSQL</productname> comes with
      some predefined conversions, as summarized in
      <xref linkend="multibyte-translation-table"/> and shown in more
-     detail in <xref linkend="builtin-conversions-table"/>.  You can
-     create a new conversion using the SQL command
-     <xref linkend="sql-createconversion"/>.  (To be used for automatic
-     client/server conversions, a conversion must be marked
-     as <quote>default</quote> for its character set pair.)
+     detail in <xref linkend="builtin-conversions-table"/>.
     </para>
 
     <table id="multibyte-translation-table">

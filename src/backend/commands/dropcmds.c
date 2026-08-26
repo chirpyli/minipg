@@ -237,17 +237,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 
 	switch (objtype)
 	{
-		case OBJECT_TYPE:
-			{
-				TypeName   *typ = castNode(TypeName, object);
-
-				if (!schema_does_not_exist_skipping(typ->names, &msg, &name))
-				{
-					msg = gettext_noop("type \"%s\" does not exist, skipping");
-					name = TypeNameToString(typ);
-				}
-			}
-			break;
 		case OBJECT_COLLATION:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
@@ -320,10 +309,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				}
 				break;
 			}
-		case OBJECT_LANGUAGE:
-			msg = gettext_noop("language \"%s\" does not exist, skipping");
-			name = strVal((Value *) object);
-			break;
 		case OBJECT_TRANSFORM:
 			if (!type_in_list_does_not_exist_skipping(list_make1(linitial(castNode(List, object))), &msg, &name))
 			{

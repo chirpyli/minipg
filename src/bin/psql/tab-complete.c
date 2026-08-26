@@ -902,7 +902,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"FUNCTION", NULL, NULL, Query_for_list_of_functions},
 	{"GROUP", NULL},
 	{"INDEX", NULL, NULL, &Query_for_list_of_indexes},
-	{"LANGUAGE", Query_for_list_of_languages},
 	{"LARGE OBJECT", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"MATERIALIZED VIEW", NULL, NULL, &Query_for_list_of_matviews},
 	{"OPERATOR", NULL, NULL, NULL}, /* Querying for this is probably not such
@@ -1428,7 +1427,7 @@ psql_completion(const char *text, int start, int end)
 
 	/* complete with something you can create or replace */
 	else if (TailMatches("CREATE", "OR", "REPLACE"))
-		COMPLETE_WITH("FUNCTION", "PROCEDURE", "LANGUAGE", "RULE", "VIEW",
+		COMPLETE_WITH("FUNCTION", "PROCEDURE", "RULE", "VIEW",
 					  "TRANSFORM", "TRIGGER");
 
 /* DROP, but not DROP embedded in other commands */
@@ -2476,7 +2475,7 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 /* DROP */
 	/* Complete DROP object with CASCADE / RESTRICT */
 	else if (Matches("DROP",
-					 "COLLATION|DOMAIN|EXTENSION|LANGUAGE|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
+					 "COLLATION|DOMAIN|EXTENSION|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
 					 MatchAny) ||
 			 (Matches("DROP", "FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&
 			  ends_with(prev_wd, ')')) ||

@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: backend_server/storage/ipc/synchronization_signals
+title: 进程间同步与信号机制（Barrier/Latch/Postmaster Signal）
+scope:
+    - src/backend/storage/ipc/barrier.c
+    - src/backend/storage/ipc/latch.c
+    - src/backend/storage/ipc/pmsignal.c
+    - src/backend/storage/ipc/signalfuncs.c
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_server/utils/activity_error
