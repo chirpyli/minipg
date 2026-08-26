@@ -7299,7 +7299,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_SCHEMA:
 			case OCLASS_DATABASE:
 			case OCLASS_EXTENSION:
-			case OCLASS_TRANSFORM:
 
 				/*
 				 * We don't expect any of these sorts of objects to depend on

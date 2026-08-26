@@ -319,7 +319,6 @@ typedef enum NodeTag
 	T_DeallocateStmt,
 	T_AlterObjectSchemaStmt,
 	T_CreateExtensionStmt,
-	T_CreateTransformStmt,
 	T_CreateStatsStmt,
 
 	/*

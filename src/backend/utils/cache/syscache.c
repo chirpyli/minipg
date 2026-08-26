@@ -46,7 +46,6 @@
 #include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_statistic_ext_data.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "lib/qunique.h"
 #include "miscadmin.h"
@@ -529,28 +528,6 @@ static const struct cachedesc cacheinfo[] = {
 			0,
 		},
 		4
-	},
-	{TransformRelationId,		/* TRFOID */
-		TransformOidIndexId,
-		1,
-		{
-			Anum_pg_transform_oid,
-			0,
-			0,
-			0,
-		},
-		16
-	},
-	{TransformRelationId,		/* TRFTYPELANG */
-		TransformTypeLangIndexId,
-		2,
-		{
-			Anum_pg_transform_trftype,
-			Anum_pg_transform_trflang,
-			0,
-			0,
-		},
-		16
 	},
 	{TypeRelationId,			/* TYPENAMENSP */
 		TypeNameNspIndexId,

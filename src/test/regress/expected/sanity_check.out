@@ -76,7 +76,6 @@ pg_statistic|t
 pg_statistic_ext|t
 pg_statistic_ext_data|t
 pg_tablespace|t
-pg_transform|t
 pg_type|t
 ramp|f
 real_city|f

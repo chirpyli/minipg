@@ -40,7 +40,6 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
@@ -312,19 +311,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"transform",
-		TransformRelationId,
-		TransformOidIndexId,
-		InvalidOid,
-		InvalidOid,
-		Anum_pg_transform_oid,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_TRANSFORM,
-		false
-	},
-	{
 		"type",
 		TypeRelationId,
 		TypeOidIndexId,
@@ -479,10 +465,6 @@ static const struct object_type_map
 	/* OCLASS_EXTENSION */
 	{
 		"extension", OBJECT_EXTENSION
-	},
-	/* OCLASS_TRANSFORM */
-	{
-		"transform", OBJECT_TRANSFORM
 	},
 	/* OCLASS_STATISTIC_EXT */
 	{
@@ -664,19 +646,6 @@ get_object_address(ObjectType objtype, Node *object,
 					address.objectSubId = 0;
 				}
 				break;
-			case OBJECT_TRANSFORM:
-				{
-					TypeName   *typename = linitial_node(TypeName, castNode(List, object));
-					char	   *langname = strVal(lsecond(castNode(List, object)));
-					Oid			type_id = LookupTypeNameOid(NULL, typename, missing_ok);
-					Oid			lang_id = get_language_oid(langname, missing_ok);
-
-					address.classId = TransformRelationId;
-					address.objectId =
-						get_transform_oid(type_id, lang_id, missing_ok);
-					address.objectSubId = 0;
-				}
-			break;
 			case OBJECT_STATISTIC_EXT:
 				address.classId = StatisticExtRelationId;
 				address.objectId = get_statistics_object_oid(castNode(List, object),
@@ -1345,8 +1314,7 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	 * object type.  Most use a simple string Values list, but there are some
 	 * exceptions.
 	 */
-	if (type == OBJECT_TYPE || type == OBJECT_CAST ||
-		type == OBJECT_TRANSFORM)
+	if (type == OBJECT_TYPE || type == OBJECT_CAST)
 	{
 		Datum	   *elems;
 		bool	   *nulls;
@@ -1416,10 +1384,9 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	 */
 	switch (type)
 	{
-			case OBJECT_CAST:
-			case OBJECT_TRANSFORM:
-				if (list_length(args) != 1)
-				ereport(ERROR,
+		case OBJECT_CAST:
+			if (list_length(args) != 1)
+			ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("argument list length must be exactly %d", 1)));
 			break;
@@ -1475,7 +1442,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 			objnode = (Node *) typename;
 			break;
 		case OBJECT_CAST:
-		case OBJECT_TRANSFORM:
 			objnode = (Node *) list_make2(typename, linitial(args));
 			break;
 		case OBJECT_AMOP:
@@ -2391,31 +2357,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 			break;
 		}
 
-		case OCLASS_TRANSFORM:
-		{
-				HeapTuple	trfTup;
-				Form_pg_transform trfForm;
-
-				trfTup = SearchSysCache1(TRFOID,
-										 ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(trfTup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for transform %u",
-							 object->objectId);
-					break;
-				}
-
-				trfForm = (Form_pg_transform) GETSTRUCT(trfTup);
-
-				appendStringInfo(&buffer, _("transform for %s language %s"),
-								 format_type_be(trfForm->trftype),
-								 get_language_name(trfForm->trflang, false));
-
-				ReleaseSysCache(trfTup);
-				break;
-			}
-
 			/*
 			 * There's intentionally no default: case here; we want the
 			 * compiler to warn if a new OCLASS hasn't been handled above.
@@ -2874,9 +2815,7 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "extension");
 			break;
 
-		case OCLASS_TRANSFORM:
-			appendStringInfoString(&buffer, "transform");
-			break;
+
 
 			/*
 			 * There's intentionally no default: case here; we want the
@@ -3623,58 +3562,16 @@ getObjectIdentityParts(const ObjectAddress *object,
 					break;
 				}
 				appendStringInfoString(&buffer, quote_identifier(extname));
-				if (objname)
-					*objname = list_make1(extname);
-			break;
-		}
-
-	case OCLASS_TRANSFORM:
-	{
-				Relation	transformDesc;
-				HeapTuple	tup;
-				Form_pg_transform transform;
-				char	   *transformLang;
-				char	   *transformType;
-
-				transformDesc = table_open(TransformRelationId, AccessShareLock);
-
-				tup = get_catalog_object_by_oid(transformDesc,
-												Anum_pg_transform_oid,
-												object->objectId);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for transform %u",
-							 object->objectId);
-
-					table_close(transformDesc, AccessShareLock);
-					break;
+					if (objname)
+						*objname = list_make1(extname);
+				break;
 				}
 
-				transform = (Form_pg_transform) GETSTRUCT(tup);
-
-				transformType = format_type_be_qualified(transform->trftype);
-				transformLang = get_language_name(transform->trflang, false);
-
-				appendStringInfo(&buffer, "for %s on language %s",
-								 transformType,
-								 transformLang);
-				if (objname)
-				{
-					*objname = list_make1(transformType);
-					*objargs = list_make1(pstrdup(transformLang));
+				/*
+				 * There's intentionally no default: case here; we want the
+				 * compiler to warn if a new OCLASS hasn't been handled above.
+				 */
 				}
-
-				table_close(transformDesc, AccessShareLock);
-			}
-			break;
-
-			/*
-			 * There's intentionally no default: case here; we want the
-			 * compiler to warn if a new OCLASS hasn't been handled above.
-			 */
-	}
 
 	if (!missing_ok)
 	{

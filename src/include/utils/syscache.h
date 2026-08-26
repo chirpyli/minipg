@@ -70,8 +70,6 @@ enum SysCacheIdentifier
 	STATEXTOID,
 	STATRELATTINH,
 	TABLESPACEOID,
-	TRFOID,
-	TRFTYPELANG,
 	TYPENAMENSP,
 	TYPEOID,
 	/* intentionally out of alphabetical order, to avoid an ABI break: */

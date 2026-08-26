@@ -24,7 +24,6 @@
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "executor/functions.h"
@@ -114,7 +113,6 @@ ProcedureCreate(const char *procedureName,
 				referenced;
 	char	   *detailmsg;
 	int			i;
-	Oid			trfid;
 	ObjectAddresses *addrs;
 
 	/*
@@ -595,25 +593,11 @@ ProcedureCreate(const char *procedureName,
 	ObjectAddressSet(referenced, TypeRelationId, returnType);
 	add_exact_object_address(&referenced, addrs);
 
-	/* dependency on transform used by return type, if any */
-	if ((trfid = get_transform_oid(returnType, languageObjectId, true)))
-	{
-		ObjectAddressSet(referenced, TransformRelationId, trfid);
-		add_exact_object_address(&referenced, addrs);
-	}
-
 	/* dependency on parameter types */
 	for (i = 0; i < allParamCount; i++)
 	{
 		ObjectAddressSet(referenced, TypeRelationId, allParams[i]);
 		add_exact_object_address(&referenced, addrs);
-
-		/* dependency on transform used by parameter type, if any */
-		if ((trfid = get_transform_oid(allParams[i], languageObjectId, true)))
-		{
-			ObjectAddressSet(referenced, TransformRelationId, trfid);
-			add_exact_object_address(&referenced, addrs);
-		}
 	}
 
 	/* dependency on support function, if any */

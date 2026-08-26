@@ -3086,20 +3086,6 @@ _copyCreateExtensionStmt(const CreateExtensionStmt *from)
 	return newnode;
 }
 
-static CreateTransformStmt *
-_copyCreateTransformStmt(const CreateTransformStmt *from)
-{
-	CreateTransformStmt *newnode = makeNode(CreateTransformStmt);
-
-	COPY_SCALAR_FIELD(replace);
-	COPY_NODE_FIELD(type_name);
-	COPY_STRING_FIELD(lang);
-	COPY_NODE_FIELD(fromsql);
-	COPY_NODE_FIELD(tosql);
-
-	return newnode;
-}
-
 static ReindexStmt *
 _copyReindexStmt(const ReindexStmt *from)
 {
@@ -3667,9 +3653,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _copyCreateExtensionStmt(from);
-			break;
-		case T_CreateTransformStmt:
-			retval = _copyCreateTransformStmt(from);
 			break;
 		case T_ReindexStmt:
 			retval = _copyReindexStmt(from);

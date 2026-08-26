@@ -230,12 +230,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AnalyzeStmt ClusterStmt
 		CreateExtensionStmt
 		CreateSchemaStmt CreateStmt CreateStatsStmt
-		
-		CreateTransformStmt
 		CreatedbStmt DeleteStmt DiscardStmt
 		DropdbStmt DropStmt
-	
-		DropTransformStmt
 		ExplainStmt
 		IndexStmt InsertStmt
 		ExplainableStmt PreparableStmt
@@ -322,9 +318,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 			execute_param_clause using_clause returning_clause
 			table_func_column_list
 			alter_generic_options
-				relation_expr_list
-				transform_element_list transform_type_list
-				vacuum_relation_list opt_vacuum_relation_list
+			relation_expr_list
+			vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
 
 %type <node>	opt_routine_body
@@ -722,13 +717,11 @@ stmt:	AlterObjectSchemaStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreateStatsStmt
-			| CreateTransformStmt
 			| CreatedbStmt
 			| DeallocateStmt
 			| DeleteStmt
 			| DiscardStmt
 			| DropStmt
-			| DropTransformStmt
 			| DropdbStmt
 			| ExecuteStmt
 			| ExplainStmt
@@ -3001,10 +2994,6 @@ createfunc_opt_item:
 				{
 					$$ = makeDefElem("language", (Node *)makeString($2), @1);
 				}
-			| TRANSFORM transform_type_list
-				{
-					$$ = makeDefElem("transform", (Node *)$2, @1);
-				}
 			| WINDOW
 				{
 					$$ = makeDefElem("window", (Node *)makeInteger(true), @1);
@@ -3071,12 +3060,7 @@ routine_body_stmt:
 			| ReturnStmt
 		;
 
-transform_type_list:
-			FOR TYPE_P Typename { $$ = list_make1($3); }
-			| transform_type_list ',' FOR TYPE_P Typename { $$ = lappend($1, $5); }
-		;
-
-opt_definition:
+			opt_definition:
 			WITH definition							{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
@@ -3105,55 +3089,6 @@ table_func_column_list:
 
 opt_if_exists: IF_P EXISTS						{ $$ = true; }
 		| /*EMPTY*/								{ $$ = false; }
-		;
-
-
-/*****************************************************************************
- *
- *		CREATE TRANSFORM / DROP TRANSFORM
- *
- *****************************************************************************/
-
-CreateTransformStmt: CREATE opt_or_replace TRANSFORM FOR Typename LANGUAGE name '(' transform_element_list ')'
-				{
-					CreateTransformStmt *n = makeNode(CreateTransformStmt);
-					n->replace = $2;
-					n->type_name = $5;
-					n->lang = $7;
-					n->fromsql = linitial($9);
-					n->tosql = lsecond($9);
-					$$ = (Node *)n;
-				}
-		;
-
-transform_element_list: FROM SQL_P WITH FUNCTION function_with_argtypes ',' TO SQL_P WITH FUNCTION function_with_argtypes
-				{
-					$$ = list_make2($5, $11);
-				}
-				| TO SQL_P WITH FUNCTION function_with_argtypes ',' FROM SQL_P WITH FUNCTION function_with_argtypes
-				{
-					$$ = list_make2($11, $5);
-				}
-				| FROM SQL_P WITH FUNCTION function_with_argtypes
-				{
-					$$ = list_make2($5, NULL);
-				}
-				| TO SQL_P WITH FUNCTION function_with_argtypes
-				{
-					$$ = list_make2(NULL, $5);
-				}
-		;
-
-
-DropTransformStmt: DROP TRANSFORM opt_if_exists FOR Typename LANGUAGE name opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_TRANSFORM;
-					n->objects = list_make1(list_make2($5, makeString($7)));
-					n->behavior = $8;
-					n->missing_ok = $3;
-					$$ = (Node *)n;
-				}
 		;
 
 

@@ -54,7 +54,7 @@ CATALOG_HEADERS := \
 	pg_database.h pg_tablespace.h \
 	pg_shdepend.h \
 	pg_extension.h \
-	pg_collation.h pg_range.h pg_transform.h
+	pg_collation.h pg_range.h
 
 GENERATED_HEADERS := $(CATALOG_HEADERS:%.h=%_d.h) schemapg.h system_fk_info.h
 

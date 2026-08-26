@@ -1275,18 +1275,6 @@ _equalCreateExtensionStmt(const CreateExtensionStmt *a, const CreateExtensionStm
 }
 
 static bool
-_equalCreateTransformStmt(const CreateTransformStmt *a, const CreateTransformStmt *b)
-{
-	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_NODE_FIELD(type_name);
-	COMPARE_STRING_FIELD(lang);
-	COMPARE_NODE_FIELD(fromsql);
-	COMPARE_NODE_FIELD(tosql);
-
-	return true;
-}
-
-static bool
 _equalReindexStmt(const ReindexStmt *a, const ReindexStmt *b)
 {
 	COMPARE_SCALAR_FIELD(kind);
@@ -2166,9 +2154,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _equalCreateExtensionStmt(a, b);
-			break;
-		case T_CreateTransformStmt:
-			retval = _equalCreateTransformStmt(a, b);
 			break;
 		case T_ReindexStmt:
 			retval = _equalReindexStmt(a, b);

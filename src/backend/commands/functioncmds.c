@@ -44,7 +44,6 @@
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
 #include "commands/defrem.h"
@@ -701,7 +700,6 @@ compute_function_attributes(ParseState *pstate,
 							List *options,
 							List **as,
 							char **language,
-							Node **transform,
 							bool *windowfunc_p,
 							char *volatility_p,
 							bool *strict_p,
@@ -716,7 +714,6 @@ compute_function_attributes(ParseState *pstate,
 	ListCell   *option;
 	DefElem    *as_item = NULL;
 	DefElem    *language_item = NULL;
-	DefElem    *transform_item = NULL;
 	DefElem    *windowfunc_item = NULL;
 	DefElem    *volatility_item = NULL;
 	DefElem    *strict_item = NULL;
@@ -749,15 +746,6 @@ compute_function_attributes(ParseState *pstate,
 						 errmsg("conflicting or redundant options"),
 						 parser_errposition(pstate, defel->location)));
 			language_item = defel;
-		}
-		else if (strcmp(defel->defname, "transform") == 0)
-		{
-			if (transform_item)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("conflicting or redundant options"),
-						 parser_errposition(pstate, defel->location)));
-			transform_item = defel;
 		}
 		else if (strcmp(defel->defname, "window") == 0)
 		{
@@ -798,8 +786,6 @@ compute_function_attributes(ParseState *pstate,
 		*as = (List *) as_item->arg;
 	if (language_item)
 		*language = strVal(language_item->arg);
-	if (transform_item)
-		*transform = transform_item->arg;
 	if (windowfunc_item)
 		*windowfunc_p = intVal(windowfunc_item->arg);
 	if (volatility_item)
@@ -1014,7 +1000,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	char	   *language;
 	Oid			languageOid;
 	Oid			languageValidator;
-	Node	   *transformDefElem = NULL;
 	char	   *funcname;
 	Oid			namespaceId;
 	oidvector  *parameterTypes;
@@ -1064,7 +1049,7 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	compute_function_attributes(pstate,
 								stmt->is_procedure,
 								stmt->options,
-								&as_clause, &language, &transformDefElem,
+								&as_clause, &language,
 								&isWindowFunc, &volatility,
 								&isStrict, &security, &isLeakProof,
 								&proconfig, &procost, &prorows,
@@ -1095,28 +1080,6 @@ CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt)
 	languageValidator = languageStruct->lanvalidator;
 
 	ReleaseSysCache(languageTuple);
-
-	/*
-	 * Only superuser is allowed to create leakproof functions because
-	 * leakproof functions can see tuples which have not yet been filtered out
-	 * by security barrier views or row-level security policies.
-	 */
-	if (transformDefElem)
-	{
-		ListCell   *lc;
-
-		foreach(lc, castNode(List, transformDefElem))
-		{
-			Oid			typeid = typenameTypeId(NULL,
-												lfirst_node(TypeName, lc));
-			Oid			elt = get_base_element_type(typeid);
-
-			typeid = elt ? elt : typeid;
-
-			get_transform_oid(typeid, languageOid, false);
-			trftypes_list = lappend_oid(trftypes_list, typeid);
-		}
-	}
 
 	/*
 	 * Convert remaining parameters of CREATE to form wanted by
@@ -1304,234 +1267,10 @@ RemoveFunctionById(Oid funcOid)
 
 
 
-static void
-check_transform_function(Form_pg_proc procstruct)
-{
-	if (procstruct->provolatile == PROVOLATILE_VOLATILE)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("transform function must not be volatile")));
-	if (procstruct->prokind != PROKIND_FUNCTION)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("transform function must be a normal function")));
-	if (procstruct->proretset)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("transform function must not return a set")));
-	if (procstruct->pronargs != 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("transform function must take one argument")));
-	if (procstruct->proargtypes.values[0] != INTERNALOID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("first argument of transform function must be type %s",
-						"internal")));
-}
 
 
-/*
- * CREATE TRANSFORM
- */
-ObjectAddress
-CreateTransform(CreateTransformStmt *stmt)
-{
-	Oid			typeid;
-	char		typtype;
-	Oid			langid;
-	Oid			fromsqlfuncid;
-	Oid			tosqlfuncid;
-	Form_pg_proc procstruct;
-	Datum		values[Natts_pg_transform];
-	bool		nulls[Natts_pg_transform];
-	bool		replaces[Natts_pg_transform];
-	Oid			transformid;
-	HeapTuple	tuple;
-	HeapTuple	newtuple;
-	Relation	relation;
-	ObjectAddress myself,
-				referenced;
-	ObjectAddresses *addrs;
-	bool		is_replace;
-
-	/*
-	 * Get the type
-	 */
-	typeid = typenameTypeId(NULL, stmt->type_name);
-	typtype = get_typtype(typeid);
-
-	if (typtype == TYPTYPE_PSEUDO)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("data type %s is a pseudo-type",
-						TypeNameToString(stmt->type_name))));
-
-	if (typtype == TYPTYPE_DOMAIN)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("data type %s is a domain",
-						TypeNameToString(stmt->type_name))));
-
-	/*
-	 * Get the language
-	 */
-	langid = get_language_oid(stmt->lang, false);
-
-	/*
-	 * Get the functions
-	 */
-	if (stmt->fromsql)
-	{
-		fromsqlfuncid = LookupFuncWithArgs(OBJECT_FUNCTION, stmt->fromsql, false);
-
-		tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fromsqlfuncid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for function %u", fromsqlfuncid);
-		procstruct = (Form_pg_proc) GETSTRUCT(tuple);
-		if (procstruct->prorettype != INTERNALOID)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("return data type of FROM SQL function must be %s",
-							"internal")));
-		check_transform_function(procstruct);
-		ReleaseSysCache(tuple);
-	}
-	else
-		fromsqlfuncid = InvalidOid;
-
-	if (stmt->tosql)
-	{
-		tosqlfuncid = LookupFuncWithArgs(OBJECT_FUNCTION, stmt->tosql, false);
-
-		tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(tosqlfuncid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for function %u", tosqlfuncid);
-		procstruct = (Form_pg_proc) GETSTRUCT(tuple);
-		if (procstruct->prorettype != typeid)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("return data type of TO SQL function must be the transform data type")));
-		check_transform_function(procstruct);
-		ReleaseSysCache(tuple);
-	}
-	else
-		tosqlfuncid = InvalidOid;
-
-	/*
-	 * Ready to go
-	 */
-	values[Anum_pg_transform_trftype - 1] = ObjectIdGetDatum(typeid);
-	values[Anum_pg_transform_trflang - 1] = ObjectIdGetDatum(langid);
-	values[Anum_pg_transform_trffromsql - 1] = ObjectIdGetDatum(fromsqlfuncid);
-	values[Anum_pg_transform_trftosql - 1] = ObjectIdGetDatum(tosqlfuncid);
-
-	MemSet(nulls, false, sizeof(nulls));
-
-	relation = table_open(TransformRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCache2(TRFTYPELANG,
-							ObjectIdGetDatum(typeid),
-							ObjectIdGetDatum(langid));
-	if (HeapTupleIsValid(tuple))
-	{
-		Form_pg_transform form = (Form_pg_transform) GETSTRUCT(tuple);
-
-		if (!stmt->replace)
-			ereport(ERROR,
-					(errcode(ERRCODE_DUPLICATE_OBJECT),
-					 errmsg("transform for type %s language \"%s\" already exists",
-							format_type_be(typeid),
-							stmt->lang)));
-
-		MemSet(replaces, false, sizeof(replaces));
-		replaces[Anum_pg_transform_trffromsql - 1] = true;
-		replaces[Anum_pg_transform_trftosql - 1] = true;
-
-		newtuple = heap_modify_tuple(tuple, RelationGetDescr(relation), values, nulls, replaces);
-		CatalogTupleUpdate(relation, &newtuple->t_self, newtuple);
-
-		transformid = form->oid;
-		ReleaseSysCache(tuple);
-		is_replace = true;
-	}
-	else
-	{
-		transformid = GetNewOidWithIndex(relation, TransformOidIndexId,
-										 Anum_pg_transform_oid);
-		values[Anum_pg_transform_oid - 1] = ObjectIdGetDatum(transformid);
-		newtuple = heap_form_tuple(RelationGetDescr(relation), values, nulls);
-		CatalogTupleInsert(relation, newtuple);
-		is_replace = false;
-	}
-
-	if (is_replace)
-		deleteDependencyRecordsFor(TransformRelationId, transformid, true);
-
-	addrs = new_object_addresses();
-
-	/* make dependency entries */
-	ObjectAddressSet(myself, TransformRelationId, transformid);
-
-	/* dependency on language */
-	ObjectAddressSet(referenced, LanguageRelationId, langid);
-	add_exact_object_address(&referenced, addrs);
-
-	/* dependency on type */
-	ObjectAddressSet(referenced, TypeRelationId, typeid);
-	add_exact_object_address(&referenced, addrs);
-
-	/* dependencies on functions */
-	if (OidIsValid(fromsqlfuncid))
-	{
-		ObjectAddressSet(referenced, ProcedureRelationId, fromsqlfuncid);
-		add_exact_object_address(&referenced, addrs);
-	}
-	if (OidIsValid(tosqlfuncid))
-	{
-		ObjectAddressSet(referenced, ProcedureRelationId, tosqlfuncid);
-		add_exact_object_address(&referenced, addrs);
-	}
-
-	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
-	free_object_addresses(addrs);
-
-	/* dependency on extension */
-	recordDependencyOnCurrentExtension(&myself, is_replace);
-
-	/* Post creation hook for new transform */
-	InvokeObjectPostCreateHook(TransformRelationId, transformid, 0);
-
-	heap_freetuple(newtuple);
-
-	table_close(relation, RowExclusiveLock);
-
-	return myself;
-}
 
 
-/*
- * get_transform_oid - given type OID and language OID, look up a transform OID
- *
- * If missing_ok is false, throw an error if the transform is not found.  If
- * true, just return InvalidOid.
- */
-Oid
-get_transform_oid(Oid type_id, Oid lang_id, bool missing_ok)
-{
-	Oid			oid;
-
-	oid = GetSysCacheOid2(TRFTYPELANG, Anum_pg_transform_oid,
-						  ObjectIdGetDatum(type_id),
-						  ObjectIdGetDatum(lang_id));
-	if (!OidIsValid(oid) && !missing_ok)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("transform for type %s language \"%s\" does not exist",
-						format_type_be(type_id),
-						get_language_name(lang_id, false))));
-	return oid;
-}
 
 
 /*

@@ -1307,7 +1307,6 @@ typedef enum ObjectType
 	OBJECT_STATISTIC_EXT,
 	OBJECT_TABCONSTRAINT,
 	OBJECT_TABLE,
-	OBJECT_TRANSFORM,
 	OBJECT_TYPE,
 	OBJECT_VIEW
 } ObjectType;
@@ -1953,20 +1952,6 @@ typedef struct ReindexStmt
 	const char *name;			/* name of database to reindex */
 	List	   *params;			/* list of DefElem nodes */
 } ReindexStmt;
-
-/* ----------------------
- *	CREATE TRANSFORM Statement
- * ----------------------
- */
-typedef struct CreateTransformStmt
-{
-	NodeTag		type;
-	bool		replace;
-	TypeName   *type_name;
-	char	   *lang;
-	ObjectWithArgs *fromsql;
-	ObjectWithArgs *tosql;
-} CreateTransformStmt;
 
 /* ----------------------
  *		PREPARE Statement

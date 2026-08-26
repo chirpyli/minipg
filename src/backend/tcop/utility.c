@@ -119,7 +119,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreateSchemaStmt:
 		case T_CreateStatsStmt:
 		case T_CreateStmt:
-		case T_CreateTransformStmt:
 		case T_CreatedbStmt:
 		case T_DropStmt:
 		case T_DropdbStmt:
@@ -830,10 +829,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
 				break;
 
-			case T_CreateTransformStmt:
-				address = CreateTransform((CreateTransformStmt *) parsetree);
-				break;
-
 			case T_DropStmt:
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
 				break;
@@ -1242,10 +1237,7 @@ CreateCommandTag(Node *parsetree)
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
 				break;
-				case OBJECT_TRANSFORM:
-					tag = CMDTAG_DROP_TRANSFORM;
-					break;
-				case OBJECT_STATISTIC_EXT:
+			case OBJECT_STATISTIC_EXT:
 					tag = CMDTAG_DROP_STATISTICS;
 					break;
 				default:
@@ -1344,10 +1336,6 @@ CreateCommandTag(Node *parsetree)
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}
-			break;
-
-		case T_CreateTransformStmt:
-			tag = CMDTAG_CREATE_TRANSFORM;
 			break;
 
 		case T_CheckPointStmt:
@@ -1676,10 +1664,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_ReindexStmt:
 			lev = LOGSTMT_ALL;	/* should this be DDL? */
-			break;
-
-		case T_CreateTransformStmt:
-			lev = LOGSTMT_DDL;
 			break;
 
 			lev = LOGSTMT_DDL;

@@ -279,7 +279,7 @@ CREATE [ OR REPLACE ] FUNCTION
       <para>
        Lists which transforms a call to the function should apply.  Transforms
        convert between SQL types and language-specific data types;
-       see <xref linkend="sql-createtransform"/>.  Procedural language
+       Procedural language
        implementations usually have hardcoded knowledge of the built-in types,
        so those don't need to be listed here.  If a procedural language
        implementation does not know how to handle a type and no transform is

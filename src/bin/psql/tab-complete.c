@@ -921,7 +921,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"TABLE", NULL, NULL, &Query_for_list_of_tables},
 	{"TEMPLATE", Query_for_list_of_ts_templates, NULL, NULL, THING_NO_SHOW},
 	{"TEXT SEARCH", NULL, NULL, NULL},
-	{"TRANSFORM", NULL, NULL, NULL},
 	{"TRIGGER", "SELECT pg_catalog.quote_ident(tgname) FROM pg_catalog.pg_trigger WHERE substring(pg_catalog.quote_ident(tgname),1,%d)='%s' AND NOT tgisinternal"},
 	{"TYPE", NULL, NULL, &Query_for_list_of_datatypes},
 	{"UNIQUE", NULL, NULL, NULL, THING_NO_DROP | THING_NO_ALTER},	/* for CREATE UNIQUE
@@ -1428,7 +1427,7 @@ psql_completion(const char *text, int start, int end)
 	/* complete with something you can create or replace */
 	else if (TailMatches("CREATE", "OR", "REPLACE"))
 		COMPLETE_WITH("FUNCTION", "PROCEDURE", "RULE", "VIEW",
-					  "TRANSFORM", "TRIGGER");
+					  "TRIGGER");
 
 /* DROP, but not DROP embedded in other commands */
 	/* complete with something you can drop */

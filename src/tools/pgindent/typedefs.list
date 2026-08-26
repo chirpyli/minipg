@@ -426,7 +426,6 @@ CreateStatsStmt
 CreateStmt
 CreateStmtContext
 CreateTableSpaceStmt
-CreateTransformStmt
 CreateTrigStmt
 CreateUserMappingStmt
 CreatedbStmt
@@ -696,7 +695,6 @@ FormData_pg_shdepend
 FormData_pg_statistic
 FormData_pg_statistic_ext
 FormData_pg_tablespace
-FormData_pg_transform
 FormData_pg_trigger
 FormData_pg_ts_config
 FormData_pg_ts_config_map
@@ -740,7 +738,6 @@ Form_pg_shdepend
 Form_pg_statistic
 Form_pg_statistic_ext
 Form_pg_tablespace
-Form_pg_transform
 Form_pg_trigger
 Form_pg_ts_config
 Form_pg_ts_config_map

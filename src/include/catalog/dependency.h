@@ -102,10 +102,9 @@ typedef enum ObjectClass
 	OCLASS_STATISTIC_EXT,		/* pg_statistic_ext */
 	OCLASS_DATABASE,			/* pg_database */
 	OCLASS_EXTENSION,			/* pg_extension */
-	OCLASS_TRANSFORM			/* pg_transform */
 } ObjectClass;
 
-#define LAST_OCLASS		OCLASS_TRANSFORM
+#define LAST_OCLASS		OCLASS_EXTENSION
 
 /* flag bits for performDeletion/performMultipleDeletions: */
 #define PERFORM_DELETION_INTERNAL			0x0001	/* internal action */

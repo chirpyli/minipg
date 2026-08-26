@@ -23,7 +23,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY createSchema SYSTEM "create_schema.sgml">
 <!ENTITY createStatistics SYSTEM "create_statistics.sgml">
 <!ENTITY createTable SYSTEM "create_table.sgml">
-<!ENTITY createTransform SYSTEM "create_transform.sgml">
 <!ENTITY createView SYSTEM "create_view.sgml">
 <!ENTITY deallocate SYSTEM "deallocate.sgml">
 <!ENTITY delete SYSTEM "delete.sgml">

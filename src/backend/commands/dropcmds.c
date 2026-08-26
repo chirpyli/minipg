@@ -309,14 +309,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				}
 				break;
 			}
-		case OBJECT_TRANSFORM:
-			if (!type_in_list_does_not_exist_skipping(list_make1(linitial(castNode(List, object))), &msg, &name))
-			{
-				msg = gettext_noop("transform for type %s language \"%s\" does not exist, skipping");
-				name = TypeNameToString(linitial_node(TypeName, castNode(List, object)));
-				args = strVal(lsecond(castNode(List, object)));
-			}
-			break;
 		default:
 			elog(ERROR, "unrecognized object type: %d", (int) objtype);
 			break;
