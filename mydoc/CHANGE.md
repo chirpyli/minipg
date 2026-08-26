@@ -2,6 +2,21 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 删除残留死标签 CMDTAG_DROP_SUBSCRIPTION（2026-08-26）
+
+### 一、背景
+逻辑复制相关功能（CREATE/DROP SUBSCRIPTION、CREATE/DROP PUBLICATION 及其执行路径 `CreateSubscription`/`DropSubscription`/`RemoveSubscription` 等）此前已整体裁剪。但 `cmdtaglist.h` 中残留 `CMDTAG_DROP_SUBSCRIPTION` 一行命令标签死壳：全代码库搜索 `SUBSCRIPTION` 仅出现在文档（doc/src/sgml）、psql 客户端帮助（help.c/command.c/describe.c/tab-complete.c）、配置样例与测试字符串中，后端 `gram.y` 无 CREATE/DROP SUBSCRIPTION 语法，`utility.c` 无 `OBJECT_SUBSCRIPTION` / 该 cmdtag 的 `CreateCommandTag` 分支，`DropSubscription`/`RemoveSubscription` 函数均不存在。属逻辑复制裁掉后未清的孤立死标签，类比此前 `CMDTAG_CREATE_SUBSCRIPTION` / `CMDTAG_CREATE_PUBLICATION` 的清理。
+
+### 二、删除内容
+- `cmdtaglist.h`：删除 `CMDTAG_DROP_SUBSCRIPTION`，`CommandTag` 枚举整体前移 1 位。
+- **无需联动裁剪功能**：DROP SUBSCRIPTION 命令与执行路径此前已不存在，本次仅删死标签，无语法 / 函数 / objectaddress 可裁。
+
+### 三、构建注意（重要）
+`CommandTag` 枚举数值前移，minipg 的 Makefile 未启用头文件自动依赖跟踪，旧的 `cmdtag.o` / `utility.o` / `postgres.o` 不会自动重编，会触发命令标签错位（回归报「could not interpret result from server」）。必须 `make -C src/backend clean && make -j` 全量干净重编 + 清 `tmp_install` 旧二进制副本。
+
+### 四、验证
+全量重编通过；`make check`（regress 71 项全绿）。
+
 ## DROP TYPE 命令标签与语法整体裁剪（2026-08-26）
 
 ### 一、背景
