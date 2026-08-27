@@ -2,6 +2,47 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 删除 src/common/jsonapi.c + src/include/common/jsonapi.h（JSON 解析死代码，2026-08-27）
+
+### 一、背景
+minipg 已彻底裁掉 JSON / JSONB 类型及其全部 SQL 函数（catalog 头文件零 JSON 残留）。`jsonapi.c` 是 JSON 类型值的词法/语法解析内核（`pg_parse_json` / `json_lex` / `makeJsonLexContext*` / `json_count_array_elements` / `json_errdetail` / `IsValidJsonNumber` / `nullSemAction`），类型没了，整条调用链断裂。
+
+### 二、核查
+全代码库（含 frontend，src/ 全树 grep）对 jsonapi 所有公共符号的引用**仅出现在 jsonapi.c 自身**——无任何外部调用方。独立存活的 `src/backend/utils/adt/json_escape.c`（`escape_json()`，供 `EXPLAIN (FORMAT JSON)` 与 backup manifest 使用）不依赖 jsonapi，保持独立、不裁。
+
+### 三、删除内容
+- 删文件：`src/common/jsonapi.c`、`src/include/common/jsonapi.h`。
+- 改 `src/common/Makefile`：从 OBJS 列表移除 `jsonapi.o \`（原第 62 行）。
+- 清理：`src/common/` 下残留目标文件 `jsonapi.o` / `jsonapi_shlib.o` / `jsonapi_srv.o` 及三个归档库（`libpgcommon.a` / `_shlib` / `_srv.a`）中的 `jsonapi*` 条目（强制重建 common 库确认条目已消失）。
+
+### 四、验证
+- `make -C src` 全量重编通过（退出码 0），所有链接 common 库的可执行文件（postgres / pg_dump / psql / pg_basebackup 等）重新链接成功、无未定义符号——反向证明 jsonapi 零引用。
+- `make check` 核心回归 **All 71 tests passed**、无 diff。
+
+## alter.c / typecmds.c 死代码裁剪（ALTER TYPE ... SET SCHEMA 残留，2026-08-27）
+
+### 一、背景
+在「ALTER TYPE 整个 SQL 语法彻底裁剪（2026-08-25）」中，`gram.y` 的 `AlterObjectSchemaStmt` 生产式已删去 `ALTER TYPE ... SET SCHEMA` 分支（现仅剩 `ALTER TABLE` / `ALTER VIEW`），但 `alter.c` 的 `ExecAlterObjectSchemaStmt` 仍残留 `OBJECT_TYPE` case 调用 `AlterTypeNamespace`，该 case 已不可达；同时 `alter.c` 的 `AlterObjectNamespace_oid` 函数（注释自述「currently used only by ALTER EXTENSION SET SCHEMA」）在语法层（gram.y 无 `ALTER EXTENSION SET SCHEMA` 产生式）被裁后已无任何调用方，成为纯死函数，其依赖的静态函数 `AlterObjectNamespace_internal`、`report_namespace_conflict` 仅被它调用，连锁成孤儿。连带 `typecmds.c` 的 `AlterTypeNamespace` / `AlterTypeNamespace_oid`（唯一调用方即上方已删的 alter.c 分支）亦成孤儿。按「彻底裁剪、不留死代码」原则清理。
+
+### 二、删除内容
+- **alter.c**：
+  - 删 `ExecAlterObjectSchemaStmt` 中不可达的 `OBJECT_TYPE` case（调用 `AlterTypeNamespace`）。
+  - 删无调用方的死函数 `AlterObjectNamespace_oid`（原「AlterExtensionNamespace」用途，语法已裁）。
+  - 删仅被上述函数使用的静态函数 `AlterObjectNamespace_internal`、`report_namespace_conflict`。
+  - 清理因删除而冗余的 include：`catalog/indexing.h`、`catalog/objectaccess.h`、`catalog/pg_collation.h`、`catalog/pg_conversion.h`、`catalog/pg_opclass.h`、`catalog/pg_opfamily.h`、`catalog/pg_proc.h`、`catalog/pg_statistic_ext.h`。
+- **alter.h**：删 `AlterObjectNamespace_oid` 声明。
+- **typecmds.c**：删 `AlterTypeNamespace`（仅被 alter.c 已删 case 调用）、`AlterTypeNamespace_oid`（仅被 `AlterTypeNamespace` 调用）。保留 `AlterTypeNamespaceInternal`（仍被 `AlterTypeNamespace_oid` 与 `tablecmds.c:8411` 的 `ALTER TABLE SET SCHEMA` 路径使用，属内核核心）。
+- **typecmds.h**：删 `AlterTypeNamespace` / `AlterTypeNamespace_oid` 声明，保留 `AlterTypeNamespaceInternal`。
+
+### 三、保留（内核核心，不裁）
+- `AlterTableNamespace`（`ALTER TABLE/VIEW SET SCHEMA`）、`AlterTypeNamespaceInternal`（`ALTER TABLE SET SCHEMA` 移动表类型、`ALTER TYPE` 经 tablecmds 的级联场景复用）——与 btree/hash 索引、事务零耦合但属对象命名空间管理的活路径。
+- `OBJECT_TYPE` 对象类型枚举与 `objectaddress.c` 的 `OBJECT_TYPE` 寻址（级联删除仍须按对象类型映射）。
+
+### 四、验证
+`make -C src/backend` 全量重编通过（生成 postgres 可执行文件，无错误）；`make check-world` 全绿（regress 无 diff，所有子套件通过，无任何 FAILED）。
+
+> 注：CHANGE.md 中「CREATE TYPE 语法整体裁剪（2026-08-25）」条目的「保留」段（原列 `AlterTypeNamespace` / `AlterTypeNamespace_oid` / `AlterTypeNamespaceInternal`）已不准确——前两者本轮已删，仅 `AlterTypeNamespaceInternal` 仍保留。
+
 ## 删除残留死标签 CMDTAG_DROP_SUBSCRIPTION（2026-08-26）
 
 ### 一、背景
@@ -206,7 +247,7 @@
 
 ### 三、保留（内核核心，不裁）
 - `DROP TYPE`（`DropStmt` → objectaddress 通用删除 → `RemoveTypeById`）及 `OBJECT_TYPE` 依赖映射——类型删除属通用对象管理核心。
-- `ALTER TYPE` 相关路径：`AlterTypeNamespace` / `AlterTypeNamespace_oid` / `AlterTypeNamespaceInternal`（`ALTER TYPE SET SCHEMA`，与 ALTER TABLE/DOMAIN 共用）。
+- `AlterTypeNamespaceInternal`（`ALTER TABLE SET SCHEMA` 移动表类型、objectaddress 级联场景复用，与 ALTER TABLE/DOMAIN 共用）。`AlterTypeNamespace` / `AlterTypeNamespace_oid` 已于 2026-08-27 裁掉（其唯一调用方 alter.c 的 `ALTER TYPE SET SCHEMA` 分支在 2026-08-25 已随语法删除而不可达）。
 - `AssignTypeArrayOid`：仍被 `heap.c` 的 `DefineRelation` 调用（`CREATE TABLE` 建表时为行类型预分配数组 OID），属核心路径。
 - `CREATE VIEW`（`CreateViewStmt`）及 `CMDTAG_CREATE_VIEW` 不受影响；CREATE TABLE / CREATE FUNCTION 等其它用户态 DDL 不受影响。
 

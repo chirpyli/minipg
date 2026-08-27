@@ -22,7 +22,5 @@
 
 extern ObjectAddress ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 											   ObjectAddress *oldSchemaAddr);
-extern Oid	AlterObjectNamespace_oid(Oid classId, Oid objid, Oid nspOid,
-									 ObjectAddresses *objsMoved);
 
 #endif							/* ALTER_H */

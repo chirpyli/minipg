@@ -59,7 +59,6 @@ OBJS_COMMON = \
 	file_utils.o \
 	hashfn.o \
 	ip.o \
-	jsonapi.o \
 	keywords.o \
 	kwlookup.o \
 	link-canary.o \

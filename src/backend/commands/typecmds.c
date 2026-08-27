@@ -156,60 +156,6 @@ AssignTypeArrayOid(void)
 }
 
 /*
- * Execute ALTER TYPE SET SCHEMA
- */
-ObjectAddress
-AlterTypeNamespace(List *names, const char *newschema, ObjectType objecttype,
-				   Oid *oldschema)
-{
-	TypeName   *typename;
-	Oid			typeOid;
-	Oid			nspOid;
-	Oid			oldNspOid;
-	ObjectAddresses *objsMoved;
-	ObjectAddress myself;
-
-	/* Make a TypeName so we can use standard type lookup machinery */
-	typename = makeTypeNameFromNameList(names);
-	typeOid = typenameTypeId(NULL, typename);
-
-	/* get schema OID and check its permissions */
-	nspOid = LookupCreationNamespace(newschema);
-
-	objsMoved = new_object_addresses();
-	oldNspOid = AlterTypeNamespace_oid(typeOid, nspOid, objsMoved);
-	free_object_addresses(objsMoved);
-
-	if (oldschema)
-		*oldschema = oldNspOid;
-
-	ObjectAddressSet(myself, TypeRelationId, typeOid);
-
-	return myself;
-}
-
-Oid
-AlterTypeNamespace_oid(Oid typeOid, Oid nspOid, ObjectAddresses *objsMoved)
-{
-	Oid			elemOid;
-
-	/* check permissions on type */
-
-	/* don't allow direct alteration of array types */
-	elemOid = get_element_type(typeOid);
-	if (OidIsValid(elemOid) && get_array_type(elemOid) == typeOid)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot alter array type %s",
-						format_type_be(typeOid)),
-				 errhint("You can alter type %s, which will alter the array type as well.",
-						 format_type_be(elemOid))));
-
-	/* and do the work */
-	return AlterTypeNamespaceInternal(typeOid, nspOid, false, true, objsMoved);
-}
-
-/*
  * Move specified type to new namespace.
  *
  * Caller must have already checked privileges.
