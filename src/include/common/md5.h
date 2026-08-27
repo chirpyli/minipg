@@ -21,14 +21,7 @@
 /* Block size for MD5 */
 #define MD5_BLOCK_SIZE	64
 
-/* password-related data */
-#define MD5_PASSWD_CHARSET	"0123456789abcdef"
-#define MD5_PASSWD_LEN	35
-
 /* Utilities common to all the MD5 implementations, as of md5_common.c */
 extern bool pg_md5_hash(const void *buff, size_t len, char *hexsum);
-extern bool pg_md5_binary(const void *buff, size_t len, void *outbuf);
-extern bool pg_md5_encrypt(const char *passwd, const char *salt,
-						   size_t salt_len, char *buf);
 
 #endif							/* PG_MD5_H */

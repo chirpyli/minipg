@@ -25,7 +25,6 @@
 
 #include "common/cryptohash.h"
 #include "md5_int.h"
-#include "sha1_int.h"
 #include "sha2_int.h"
 
 /*
@@ -48,7 +47,6 @@ struct pg_cryptohash_ctx
 	union
 	{
 		pg_md5_ctx	md5;
-		pg_sha1_ctx sha1;
 		pg_sha224_ctx sha224;
 		pg_sha256_ctx sha256;
 		pg_sha384_ctx sha384;
@@ -99,9 +97,6 @@ pg_cryptohash_init(pg_cryptohash_ctx *ctx)
 		case PG_MD5:
 			pg_md5_init(&ctx->data.md5);
 			break;
-		case PG_SHA1:
-			pg_sha1_init(&ctx->data.sha1);
-			break;
 		case PG_SHA224:
 			pg_sha224_init(&ctx->data.sha224);
 			break;
@@ -136,9 +131,6 @@ pg_cryptohash_update(pg_cryptohash_ctx *ctx, const uint8 *data, size_t len)
 	{
 		case PG_MD5:
 			pg_md5_update(&ctx->data.md5, data, len);
-			break;
-		case PG_SHA1:
-			pg_sha1_update(&ctx->data.sha1, data, len);
 			break;
 		case PG_SHA224:
 			pg_sha224_update(&ctx->data.sha224, data, len);
@@ -176,11 +168,6 @@ pg_cryptohash_final(pg_cryptohash_ctx *ctx, uint8 *dest, size_t len)
 			if (len < MD5_DIGEST_LENGTH)
 				return -1;
 			pg_md5_final(&ctx->data.md5, dest);
-			break;
-		case PG_SHA1:
-			if (len < SHA1_DIGEST_LENGTH)
-				return -1;
-			pg_sha1_final(&ctx->data.sha1, dest);
 			break;
 		case PG_SHA224:
 			if (len < PG_SHA224_DIGEST_LENGTH)

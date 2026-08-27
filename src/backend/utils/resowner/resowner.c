@@ -22,7 +22,6 @@
 
 #include "common/cryptohash.h"
 #include "common/hashfn.h"
-#include "common/hmac.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
 #include "storage/predicate.h"
@@ -129,7 +128,6 @@ typedef struct ResourceOwnerData
 	ResourceArray filearr;		/* open temporary files */
 	ResourceArray dsmarr;		/* dynamic shmem segments */
 	ResourceArray cryptohasharr;	/* cryptohash contexts */
-	ResourceArray hmacarr;		/* HMAC contexts */
 
 	/* We can remember up to MAX_RESOWNER_LOCKS references to local locks. */
 	int			nlocks;			/* number of owned locks */
@@ -178,7 +176,6 @@ static void PrintSnapshotLeakWarning(Snapshot snapshot);
 static void PrintFileLeakWarning(File file);
 static void PrintDSMLeakWarning(dsm_segment *seg);
 static void PrintCryptoHashLeakWarning(Datum handle);
-static void PrintHMACLeakWarning(Datum handle);
 
 
 /*****************************************************************************
@@ -448,7 +445,6 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 	ResourceArrayInit(&(owner->filearr), FileGetDatum(-1));
 	ResourceArrayInit(&(owner->dsmarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->cryptohasharr), PointerGetDatum(NULL));
-	ResourceArrayInit(&(owner->hmacarr), PointerGetDatum(NULL));
 
 	return owner;
 }
@@ -560,16 +556,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			if (isCommit)
 				PrintCryptoHashLeakWarning(foundres);
 			pg_cryptohash_free(context);
-		}
-
-		/* Ditto for HMAC contexts */
-		while (ResourceArrayGetAny(&(owner->hmacarr), &foundres))
-		{
-			pg_hmac_ctx *context = (pg_hmac_ctx *) PointerGetDatum(foundres);
-
-			if (isCommit)
-				PrintHMACLeakWarning(foundres);
-			pg_hmac_free(context);
 		}
 	}
 	else if (phase == RESOURCE_RELEASE_LOCKS)
@@ -739,7 +725,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner->filearr.nitems == 0);
 	Assert(owner->dsmarr.nitems == 0);
 	Assert(owner->cryptohasharr.nitems == 0);
-	Assert(owner->hmacarr.nitems == 0);
 	Assert(owner->nlocks == 0 || owner->nlocks == MAX_RESOWNER_LOCKS + 1);
 
 	/*
@@ -767,7 +752,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceArrayFree(&(owner->filearr));
 	ResourceArrayFree(&(owner->dsmarr));
 	ResourceArrayFree(&(owner->cryptohasharr));
-	ResourceArrayFree(&(owner->hmacarr));
 
 	pfree(owner);
 }
@@ -1394,50 +1378,5 @@ static void
 PrintCryptoHashLeakWarning(Datum handle)
 {
 	elog(WARNING, "cryptohash context reference leak: context %p still referenced",
-		 DatumGetPointer(handle));
-}
-
-/*
- * Make sure there is room for at least one more entry in a ResourceOwner's
- * hmac context reference array.
- *
- * This is separate from actually inserting an entry because if we run out of
- * memory, it's critical to do so *before* acquiring the resource.
- */
-void
-ResourceOwnerEnlargeHMAC(ResourceOwner owner)
-{
-	ResourceArrayEnlarge(&(owner->hmacarr));
-}
-
-/*
- * Remember that a HMAC context is owned by a ResourceOwner
- *
- * Caller must have previously done ResourceOwnerEnlargeHMAC()
- */
-void
-ResourceOwnerRememberHMAC(ResourceOwner owner, Datum handle)
-{
-	ResourceArrayAdd(&(owner->hmacarr), handle);
-}
-
-/*
- * Forget that a HMAC context is owned by a ResourceOwner
- */
-void
-ResourceOwnerForgetHMAC(ResourceOwner owner, Datum handle)
-{
-	if (!ResourceArrayRemove(&(owner->hmacarr), handle))
-		elog(ERROR, "HMAC context %p is not owned by resource owner %s",
-			 DatumGetPointer(handle), owner->name);
-}
-
-/*
- * Debugging subroutine
- */
-static void
-PrintHMACLeakWarning(Datum handle)
-{
-	elog(WARNING, "HMAC context reference leak: context %p still referenced",
 		 DatumGetPointer(handle));
 }

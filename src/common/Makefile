@@ -78,9 +78,7 @@ OBJS_COMMON = \
 
 OBJS_COMMON += \
 	cryptohash.o \
-	hmac.o \
 	md5.o \
-	sha1.o \
 	sha2.o
 
 # A few files are currently only built for frontend, not server

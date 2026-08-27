@@ -100,7 +100,6 @@ cryptohash_internal(pg_cryptohash_type type, bytea *input)
 			digest_len = PG_SHA512_DIGEST_LENGTH;
 			break;
 		case PG_MD5:
-		case PG_SHA1:
 			elog(ERROR, "unsupported cryptohash type %d", type);
 			break;
 	}
