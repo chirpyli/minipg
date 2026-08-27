@@ -391,10 +391,9 @@ ORDER BY 1;
 ------+---------------
  2293 | cstring_out
  2501 | cstring_send
- 2597 | domain_in
  3834 | range_in
  4231 | multirange_in
-(5 rows)
+(4 rows)
 
 -- Likewise, look for functions that return cstring and aren't datatype output
 -- functions nor typmod output functions.

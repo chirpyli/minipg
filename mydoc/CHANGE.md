@@ -2,6 +2,25 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 删除 domains.c 的 domain_in / domain_recv 孤立函数（2026-08-27）
+
+### 一、背景
+minipg 已裁掉所有 domain 具体类型（`pg_type.dat` 中无 `typtype='d'` 类型），`domain_in` / `domain_recv` 作为 typinput/typreceive 已无任何类型引用，但在 `pg_proc.dat` 中仍以独立 SQL 函数注册（oid 2597 / 2598），属于孤儿函数。
+
+### 二、删除内容
+- `src/backend/utils/adt/domains.c`：删 `domain_in`（I/O 输入）、`domain_recv`（二进制输入）两个函数及其注释头。保留 `domain_check`（运行时 I/O 检查，7+ 文件引用）、`domain_state_setup`、`domain_check_input`、`errdatatype`、`errdomainconstraint`。
+- `src/include/catalog/pg_proc.dat`：删 `domain_in` / `domain_recv` 两条注册（oid 2597 / 2598），否则 genbki 会留下孤立 SQL 函数。
+- `src/test/regress/expected/opr_sanity.out`：同步更新——该测试核查「返回 cstring 且非类型输出函数的函数」列表，原含 `2597 | domain_in`，删除后行数 5→4。
+
+### 三、验证
+- `make -C src` 全量重编通过（退出码 0，无 undefined reference，证明 domain_in/domain_recv 确无 .dat 引用）。
+- `make check` 核心回归 **All 71 tests passed**、无 diff。
+
+## 附：selfuncs_geo.c 的 areasel/positionsel/contsel 经核查为活代码（未裁）
+- 初判误以为三者无 .dat 引用（grep `pg_operator.dat` 时被 `arraycontsel` 子串匹配干扰，未注意到 `pg_proc.dat` 中三者各有独立注册条目 333/2076/2085 行，且被 `pg_operator.dat` 操作符经 `oprrest` 字段引用）。
+- 删除后 `make` 报 `undefined reference to areasel/positionsel/contsel`（fmgrtab.c 引用），证明它们是活的选择性估计函数。**已 `git checkout` 恢复 selfuncs_geo.c，未裁**。
+- 教训：判定 .dat 注册的函数是否死代码，必须 grep `pg_proc.dat` 的 `prosrc => '函数名'` 与 `pg_operator.dat` 的 `oprrest/oprjoin/oprcode => '函数名'`，不能仅凭后端 .c 调用方判断（fmgrtab 由 .dat 生成）。
+
 ## 删除 src/common/jsonapi.c + src/include/common/jsonapi.h（JSON 解析死代码，2026-08-27）
 
 ### 一、背景
