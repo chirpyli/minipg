@@ -2,6 +2,10 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪死命令标签 CMDTAG_CREATE_ROUTINE（2026-08-27）
+
+`CREATE ROUTINE` 在 PostgreSQL 中从未实现（使用 `CREATE FUNCTION`/`CREATE PROCEDURE` 代替），`CMDTAG_CREATE_ROUTINE` 全库零引用，属死标签，从 `cmdtaglist.h` 删除。
+
 ## 裁减加密哈希函数：MD5 全部 / HMAC 全部 / SHA1 全部 / SHA-2 SQL 函数（2026-08-27）
 
 ### 一、背景
