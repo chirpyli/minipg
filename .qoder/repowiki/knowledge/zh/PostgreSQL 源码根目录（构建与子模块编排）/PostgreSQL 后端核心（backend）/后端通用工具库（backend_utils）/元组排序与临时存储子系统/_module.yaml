@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: backend_server/utils/sort
-title: 元组排序与临时存储子系统
-scope:
-    - src/backend/utils/sort/
-source_files: []
-depends_on: []
-related_to:
-    - path: backend_server/executor

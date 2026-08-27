@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: backend_server/storage/lock_manager
-title: 锁管理器（Spinlock/LWLock/Heavyweight Lock & Deadlock Detection）
-scope:
-    - src/backend/storage/lmgr/
-source_files: []
-depends_on: []
-related_to: []

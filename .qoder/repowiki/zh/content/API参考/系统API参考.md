@@ -5,6 +5,7 @@
 - [fmgroids.h](file://src/backend/utils/fmgroids.h)
 - [system_views.sql](file://src/backend/catalog/system_views.sql)
 - [system_functions.sql](file://src/backend/catalog/system_functions.sql)
+- [cmdtaglist.h](file://src/include/tcop/cmdtaglist.h)
 - [arrayfuncs.c](file://src/backend/utils/adt/arrayfuncs.c)
 - [date.c](file://src/backend/utils/adt/date.c)
 - [datetime.c](file://src/backend/utils/adt/datetime.c)
@@ -16,6 +17,12 @@
 - [encode.c](file://src/backend/utils/adt/encode.c)
 - [pgstatfuncs.c](file://src/backend/utils/adt/pgstatfuncs.c)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 移除了CMDTAG_DROP_SUBSCRIPTION命令标签，该标签属于已裁剪的逻辑复制功能的残留
+- 更新了CommandTag枚举结构，所有相关枚举值向前移动1位
+- 清理了与逻辑复制相关的内部API引用
 
 ## 目录
 1. [简介](#简介)
@@ -30,12 +37,15 @@
 10. [附录：内置函数与操作符速查](#附录内置函数与操作符速查)
 
 ## 简介
-本参考文档面向Mini PostgreSQL系统的内置API，覆盖数学函数、字符串函数、日期时间函数、类型转换函数以及系统信息函数；同时汇总系统视图与常用操作符。文档以“函数签名—参数类型—返回值—SQL示例—性能与兼容性”的结构组织，帮助开发者快速定位并正确使用系统API。
+本参考文档面向Mini PostgreSQL系统的内置API，覆盖数学函数、字符串函数、日期时间函数、类型转换函数以及系统信息函数；同时汇总系统视图与常用操作符。文档以"函数签名—参数类型—返回值—SQL示例—性能与兼容性"的结构组织，帮助开发者快速定位并正确使用系统API。
+
+**重要更新**：Mini PostgreSQL已完全移除逻辑复制功能，包括CREATE/DROP SUBSCRIPTION、CREATE/DROP PUBLICATION等语法和实现。CMDTAG_DROP_SUBSCRIPTION命令标签作为残留已被清理，CommandTag枚举整体前移1位。
 
 ## 项目结构
 - 函数OID与注册表：通过 fmgroids.h 集中定义所有内置函数的OID常量，供后端快速查找与调用。
 - SQL层系统函数与视图：system_functions.sql 提供部分用SQL实现的系统函数（如 bit_length、age、overlaps 等），system_views.sql 定义大量系统视图（如 pg_stat_*、pg_locks、pg_settings 等）。
 - C语言实现：utils/adt 下按数据类型划分实现文件，涵盖数值、字符串、位串、编码、时间日期、统计等。
+- 命令标签管理：cmdtaglist.h 定义了所有支持的SQL命令标签，已移除逻辑复制相关标签。
 
 ```mermaid
 graph TB
@@ -46,28 +56,33 @@ C --> E["SQL函数(system_functions.sql)"]
 B --> F["系统视图(system_views.sql)"]
 F --> D
 F --> E
+G["命令标签(cmdtaglist.h)"] --> B
 ```
 
-图表来源
+**图表来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:33-179](file://src/backend/catalog/system_functions.sql#L33-L179)
 - [system_views.sql:17-287](file://src/backend/catalog/system_views.sql#L17-L287)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
-章节来源
+**章节来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:1-325](file://src/backend/catalog/system_functions.sql#L1-L325)
 - [system_views.sql:1-714](file://src/backend/catalog/system_views.sql#L1-L714)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
 ## 核心组件
 - 函数OID映射：fmgroids.h 提供 F_XXX 宏，将函数名与内部OID绑定，避免每次查询目录开销。
 - SQL系统函数：system_functions.sql 定义了若干轻量级或组合型函数（如 bit_length、age、overlaps、pg_relation_size 等）。
 - 系统视图：system_views.sql 暴露丰富的运行时与统计信息（如 pg_stat_activity、pg_stat_database、pg_locks、pg_settings 等）。
 - 类型与函数实现：utils/adt 下各文件实现具体类型的运算与函数（数值、字符串、位串、时间日期、编码、统计等）。
+- 命令标签系统：cmdtaglist.h 定义了当前支持的所有SQL命令标签，已移除逻辑复制相关标签。
 
-章节来源
+**章节来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:33-179](file://src/backend/catalog/system_functions.sql#L33-L179)
 - [system_views.sql:17-287](file://src/backend/catalog/system_views.sql#L17-L287)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
 ## 架构总览
 下图展示了从SQL到内置函数的调用路径，以及系统视图如何组合底层函数与元数据视图。
@@ -95,7 +110,7 @@ end
 R-->>U : 结果集
 ```
 
-图表来源
+**图表来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:33-179](file://src/backend/catalog/system_functions.sql#L33-L179)
 - [system_views.sql:17-287](file://src/backend/catalog/system_views.sql#L17-L287)
@@ -124,7 +139,7 @@ R-->>U : 结果集
 - 代码位置参考
   - float.c、int.c、int8.c、fmgroids.h
 
-章节来源
+**章节来源**
 - [fmgroids.h:132-162](file://src/backend/utils/fmgroids.h#L132-L162)
 - [fmgroids.h:568-575](file://src/backend/utils/fmgroids.h#L568-L575)
 - [fmgroids.h:627-639](file://src/backend/utils/fmgroids.h#L627-L639)
@@ -153,7 +168,7 @@ R-->>U : 结果集
 - 代码位置参考
   - system_functions.sql（bit_length）、fmgroids.h（TEXT/BYTEA/LIKE等）、arrayfuncs.c（数组转字符串等）
 
-章节来源
+**章节来源**
 - [system_functions.sql:33-49](file://src/backend/catalog/system_functions.sql#L33-L49)
 - [fmgroids.h:336-396](file://src/backend/utils/fmgroids.h#L336-L396)
 - [fmgroids.h:610-681](file://src/backend/utils/fmgroids.h#L610-L681)
@@ -179,7 +194,7 @@ R-->>U : 结果集
 - 代码位置参考
   - system_functions.sql（age/overlaps等）、timestamp.c、datetime.c、date.c
 
-章节来源
+**章节来源**
 - [system_functions.sql:51-172](file://src/backend/catalog/system_functions.sql#L51-L172)
 - [timestamp.c](file://src/backend/utils/adt/timestamp.c)
 - [datetime.c](file://src/backend/utils/adt/datetime.c)
@@ -202,7 +217,7 @@ R-->>U : 结果集
 - 代码位置参考
   - encode.c、system_functions.sql、fmgroids.h
 
-章节来源
+**章节来源**
 - [encode.c](file://src/backend/utils/adt/encode.c)
 - [system_functions.sql:175-228](file://src/backend/catalog/system_functions.sql#L175-L228)
 - [fmgroids.h:691-710](file://src/backend/utils/fmgroids.h#L691-L710)
@@ -225,7 +240,7 @@ R-->>U : 结果集
 - 代码位置参考
   - system_views.sql、system_functions.sql、pgstatfuncs.c
 
-章节来源
+**章节来源**
 - [system_views.sql:225-287](file://src/backend/catalog/system_views.sql#L225-L287)
 - [system_views.sql:291-714](file://src/backend/catalog/system_views.sql#L291-L714)
 - [system_functions.sql:175-228](file://src/backend/catalog/system_functions.sql#L175-L228)
@@ -243,7 +258,7 @@ R-->>U : 结果集
 - 代码位置参考
   - varbit.c、fmgroids.h
 
-章节来源
+**章节来源**
 - [fmgroids.h:610-681](file://src/backend/utils/fmgroids.h#L610-L681)
 - [varbit.c](file://src/backend/utils/adt/varbit.c)
 
@@ -256,7 +271,7 @@ R-->>U : 结果集
 - 代码位置参考
   - arrayfuncs.c、fmgroids.h
 
-章节来源
+**章节来源**
 - [arrayfuncs.c](file://src/backend/utils/adt/arrayfuncs.c)
 - [fmgroids.h:243-257](file://src/backend/utils/fmgroids.h#L243-L257)
 
@@ -264,6 +279,7 @@ R-->>U : 结果集
 - OID到实现：fmgroids.h 中的 F_XXX 宏将函数名映射到内部OID，执行期通过函数管理器直接调用C实现或SQL函数体。
 - SQL函数依赖：system_functions.sql 中的SQL函数常复用C实现（如 bit_length 调用 length/octet_length）。
 - 视图依赖：system_views.sql 的视图广泛调用统计函数（pg_stat_*）与元数据视图，形成稳定的只读接口。
+- 命令标签依赖：cmdtaglist.h 定义了所有支持的命令标签，已移除逻辑复制相关标签。
 
 ```mermaid
 graph LR
@@ -271,17 +287,21 @@ O["fmgroids.h(F_XXX)"] --> I["函数实现(adt/*)"]
 S["system_functions.sql"] --> I
 V["system_views.sql"] --> S
 V --> I
+CT["cmdtaglist.h"] --> P["命令派发"]
+P --> I
 ```
 
-图表来源
+**图表来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:33-179](file://src/backend/catalog/system_functions.sql#L33-L179)
 - [system_views.sql:17-287](file://src/backend/catalog/system_views.sql#L17-L287)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
-章节来源
+**章节来源**
 - [fmgroids.h:1-120](file://src/backend/utils/fmgroids.h#L1-L120)
 - [system_functions.sql:33-179](file://src/backend/catalog/system_functions.sql#L33-L179)
 - [system_views.sql:17-287](file://src/backend/catalog/system_views.sql#L17-L287)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
 ## 性能考虑
 - 稳定性标注
@@ -296,8 +316,6 @@ V --> I
   - 优先使用 IMMUTABLE 函数进行过滤与计算。
   - 对大数据集避免在WHERE中对列使用昂贵函数；必要时建立函数索引。
 
-[本节为通用指导，不直接分析具体文件]
-
 ## 故障排查指南
 - 权限问题
   - 部分系统函数（备份、终止后端等）默认限制执行权限，需按角色授权。
@@ -308,15 +326,20 @@ V --> I
 - 常见错误
   - 类型不匹配：确保函数参数类型与期望一致，必要时显式转换。
   - 非法输入：如日期越界、除零、负数开方等会抛出异常。
+- **构建注意事项**
+  - 由于CMDTAG_DROP_SUBSCRIPTION标签已被移除，CommandTag枚举整体前移1位。
+  - 必须执行 `make clean && make -j8` 全量干净重编，否则可能出现命令标签错位错误。
+  - 旧的cmdtag.o/utility.o/postgres.o不会自动重编，可能导致运行时错误。
 
-章节来源
+**章节来源**
 - [system_functions.sql:182-228](file://src/backend/catalog/system_functions.sql#L182-L228)
 - [system_views.sql:291-714](file://src/backend/catalog/system_views.sql#L291-L714)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)
 
 ## 结论
-Mini PostgreSQL提供了完整的内置函数与系统视图集合，覆盖数值、字符串、时间日期、编码、位串、数组及系统监控等场景。通过 fmgroids.h 的OID映射、system_functions.sql 的SQL函数与 system_views.sql 的系统视图，配合 utils/adt 下的C实现，形成了稳定高效的API体系。建议在开发中优先选择 IMMUTABLE/STABLE 且 PARALLEL SAFE 的函数，并结合统计视图进行性能调优。
+Mini PostgreSQL提供了完整的内置函数与系统视图集合，覆盖数值、字符串、时间日期、编码、位串、数组及系统监控等场景。通过 fmgroids.h 的OID映射、system_functions.sql 的SQL函数与 system_views.sql 的系统视图，配合 utils/adt 下的C实现，形成了稳定高效的API体系。
 
-[本节为总结，不直接分析具体文件]
+**重要更新**：随着逻辑复制功能的完全移除，CMDTAG_DROP_SUBSCRIPTION命令标签及相关实现已被清理。CommandTag枚举整体前移1位，构建时必须重新编译以确保正确的命令标签映射。建议在开发中优先选择 IMMUTABLE/STABLE 且 PARALLEL SAFE 的函数，并结合统计视图进行性能调优。
 
 ## 附录：内置函数与操作符速查
 说明：以下为常用API类别与代表性函数/操作符的速查清单，便于快速检索。完整签名与行为请参考对应源码与测试用例。
@@ -337,10 +360,11 @@ Mini PostgreSQL提供了完整的内置函数与系统视图集合，覆盖数�
   - pg_stat_activity、pg_stat_database、pg_locks、pg_settings、pg_file_settings、pg_available_extensions、pg_prepared_xacts、pg_prepared_statements
   - pg_relation_size、pg_start_backup、pg_stop_backup、pg_promote、pg_terminate_backend、normalize、is_normalized
 
-章节来源
+**章节来源**
 - [fmgroids.h:132-162](file://src/backend/utils/fmgroids.h#L132-L162)
 - [fmgroids.h:336-396](file://src/backend/utils/fmgroids.h#L336-L396)
 - [fmgroids.h:568-575](file://src/backend/utils/fmgroids.h#L568-L575)
 - [fmgroids.h:610-681](file://src/backend/utils/fmgroids.h#L610-L681)
 - [system_functions.sql:33-228](file://src/backend/catalog/system_functions.sql#L33-L228)
 - [system_views.sql:225-714](file://src/backend/catalog/system_views.sql#L225-L714)
+- [cmdtaglist.h:27-81](file://src/include/tcop/cmdtaglist.h#L27-L81)

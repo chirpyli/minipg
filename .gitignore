@@ -46,6 +46,8 @@ lib*.pc
 
 .vscode/
 .codebuddy/
+.qoder/
+.trae/
 autom4te.cache/
 
 # clangd cache and compile DB

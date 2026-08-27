@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: backend_server/utils/mmgr
-title: 内存上下文与分配器子系统 (Memory Context & Allocators)
-scope:
-    - src/backend/utils/mmgr/
-source_files: []
-depends_on: []
-related_to:
-    - path: backend_server/storage/ipc/shared_memory_dsm

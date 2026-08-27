@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-08-25T11:30:52Z"
+exported_at: "2026-08-27T07:56:10Z"
 modules:
     "":
-        dir_name: PostgreSQL 源码根目录（构建与子模块编排）
-        title: PostgreSQL 源码根目录（构建与子模块编排）
+        dir_name: PostgreSQL 源码树根（minipg 裁剪版）
+        title: PostgreSQL 源码树根（minipg 裁剪版）
         scope:
             - README
             - Makefile
@@ -649,8 +649,8 @@ modules:
             - path: headers
             - path: interfaces
     common_libs:
-        dir_name: 通用基础库（common_port_fe_utils）
-        title: 通用基础库（common/port/fe_utils）
+        dir_name: 公共基础库（common_port_fe_utils）
+        title: 公共基础库（common/port/fe_utils）
         scope:
             - src/common/
             - src/port/
@@ -661,8 +661,8 @@ modules:
         related_to:
             - path: client_tools
     documentation:
-        dir_name: PostgreSQL 文档与项目说明
-        title: PostgreSQL 文档与项目说明
+        dir_name: PostgreSQL SGML 文档构建与 minipg 中文项目文档
+        title: PostgreSQL SGML 文档构建与 minipg 中文项目文档
         scope:
             - doc/
             - mydoc/
@@ -672,8 +672,8 @@ modules:
         related_to:
             - path: build_config
     headers:
-        dir_name: PostgreSQL 公共与内部头文件集合
-        title: PostgreSQL 公共与内部头文件集合
+        dir_name: PostgreSQL 公共头文件集合（后端_前端共享接口）
+        title: PostgreSQL 公共头文件集合（后端/前端共享接口）
         scope:
             - src/include/
         source_files: []

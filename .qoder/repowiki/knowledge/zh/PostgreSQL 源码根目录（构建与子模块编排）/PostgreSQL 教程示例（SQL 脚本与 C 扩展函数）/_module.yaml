@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: tutorial
-title: PostgreSQL 教程示例（SQL 脚本与 C 扩展函数）
-scope:
-    - src/tutorial/
-source_files: []
-depends_on: []
-related_to:
-    - path: tests

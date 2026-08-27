@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: backend_server/access_methods
-title: PostgreSQL 访问层（Access Methods）
-scope:
-    - src/backend/access/
-source_files: []
-depends_on: []
-related_to:
-    - path: backend_server/commands

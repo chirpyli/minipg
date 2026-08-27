@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: backend_server/utils/misc
-title: GUC配置与通用工具集
-scope:
-    - src/backend/utils/misc/
-source_files: []
-depends_on: []
-related_to:
-    - path: backend_server/postmaster_runtime

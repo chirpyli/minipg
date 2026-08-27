@@ -20,9 +20,10 @@
 
 ## 更新摘要
 **所做更改**
-- 更新了语义分析章节，反映移除`transformOptionalSelectInto`包装函数的重构
-- 简化了语句转换流程的说明，强调内部调用结构更加直接
-- 保持了外部行为不变的前提下，提升了代码可维护性的描述
+- 移除了DROP TYPE SQL命令语法的文档说明，该语法已从解析器中完全移除
+- 移除了CREATE TRANSFORM和DROP TRANSFORM命令的相关文档
+- 更新了语法分析章节，反映transform相关产生式和非终结符的移除
+- 保持了整体文档结构的一致性
 
 ## 目录
 1. [简介](#简介)
@@ -165,6 +166,7 @@ Err --> End
   - 集合操作（UNION/INTERSECT/EXCEPT）在本仓库中显式拒绝（minipg特性）
 - INSERT/UPDATE/DELETE
   - 由stmt规则直接指向InsertStmt/UpdateStmt/DeleteStmt等非终结符，具体规则位于gram.y后续部分
+- **更新** DROP TYPE、CREATE TRANSFORM和DROP TRANSFORM命令语法已完全移除，不再支持这些SQL命令
 - 错误与位置
   - 通过parser_errposition与scanner_yyerror配合，精确定位语法错误
 
@@ -311,6 +313,7 @@ AG --> Q
 - UPDATE语句
   - 语法层：UpdateStmt 指定目标表、SET目标列表达式、WHERE条件、可选FROM/RETURNING
   - 语义层：表达式类型检查、关系解析、权限与可见性（由上层决定）
+- **更新** DROP TYPE、CREATE TRANSFORM和DROP TRANSFORM命令不再支持，尝试解析这些命令将导致语法错误
 
 ```mermaid
 sequenceDiagram
@@ -388,6 +391,7 @@ Analyze --> Agg["parse_agg.c"]
 - 语法错误
   - 关键字冲突/歧义：检查优先级与lookahead替换（NOT_LA/NULLS_LA/WITH_LA）
   - 集合操作不支持：minipg中显式拒绝UNION/INTERSECT/EXCEPT
+  - **更新** DROP TYPE、CREATE TRANSFORM和DROP TRANSFORM命令不再支持，使用这些命令将导致语法错误
 - 语义错误
   - 目标列/表达式类型不匹配：查看parse_target.c/parse_expr.c的错误路径
   - 聚合函数误用：检查parse_agg.c中的GROUP BY约束
@@ -402,7 +406,7 @@ Analyze --> Agg["parse_agg.c"]
 - [gram.y:5476-5493](file://src/backend/parser/gram.y#L5476-L5493)
 
 ## 结论
-该SQL解析器以清晰的三层架构（词法、语法、语义）实现了健壮且可扩展的解析能力。词法层通过状态机与无回溯策略保障性能；语法层通过严谨的文法与优先级控制构建原始解析树；语义层通过模块化子分析完成类型、函数、操作符与聚合等校验，最终生成Query供后续优化与执行。**更新** 最近的重构移除了不必要的包装函数transformOptionalSelectInto，简化了语句转换流程，在保持外部行为不变的同时提升了代码可维护性和执行效率。针对minipg的特性（如禁用集合操作），在语法层即给出友好提示，提升用户体验。
+该SQL解析器以清晰的三层架构（词法、语法、语义）实现了健壮且可扩展的解析能力。词法层通过状态机与无回溯策略保障性能；语法层通过严谨的文法与优先级控制构建原始解析树；语义层通过模块化子分析完成类型、函数、操作符与聚合等校验，最终生成Query供后续优化与执行。**更新** 最近的重构移除了不必要的包装函数transformOptionalSelectInto，简化了语句转换流程，在保持外部行为不变的同时提升了代码可维护性和执行效率。同时，DROP TYPE、CREATE TRANSFORM和DROP TRANSFORM命令语法已完全移除，进一步精简了解析器功能。**更新** 针对minipg的特性（如禁用集合操作），在语法层即给出友好提示，提升用户体验。
 
 ## 附录
 - 常用命令入口

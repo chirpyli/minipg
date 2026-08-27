@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: backend_server/optimizer/path_generation
-title: 查询路径生成与代价估算（Path Generation）
-scope:
-    - src/backend/optimizer/path/
-source_files: []
-depends_on: []
-related_to:
-    - path: backend_server/optimizer/utilities

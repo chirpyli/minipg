@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: tests
-title: PostgreSQL 测试套件与测试基础设施
-scope:
-    - src/test/
-source_files: []
-depends_on: []
-related_to:
-    - path: tutorial
