@@ -56,7 +56,7 @@ $bravo->safe_psql('postgres', 'checkpoint');
 # beyond the previous vacuum.
 $alpha->safe_psql('postgres', 'create table test2 (a int, b text)');
 $alpha->safe_psql('postgres',
-	'insert into test2 select generate_series(1,10000), md5(random()::text)');
+	'insert into test2 select generate_series(1,10000), repeat('x', 32)');
 $alpha->safe_psql('postgres', 'truncate test2');
 
 # Wait again for all records to be replayed.

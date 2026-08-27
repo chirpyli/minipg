@@ -62,7 +62,6 @@ OBJS_COMMON = \
 	keywords.o \
 	kwlookup.o \
 	link-canary.o \
-	md5_common.o \
 	pg_get_line.o \
 	pg_lzcompress.o \
 	pgfnames.o \
@@ -78,7 +77,6 @@ OBJS_COMMON = \
 
 OBJS_COMMON += \
 	cryptohash.o \
-	md5.o \
 	sha2.o
 
 # A few files are currently only built for frontend, not server

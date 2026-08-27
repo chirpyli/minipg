@@ -41,7 +41,7 @@ DECLARE
 BEGIN
     LOOP
         INSERT into filler
-        select g, repeat(md5(g::text), (random() * 60 + 1)::int)
+        select g, repeat('x', (random() * 60 + 1)::int)
         from generate_series(1, 10) g;
 
         remain := wal_segsize - (pg_current_wal_insert_lsn() - '0/0') % wal_segsize;
@@ -58,7 +58,7 @@ $$;
 my $initfile = $node->safe_psql('postgres',
 	'SELECT pg_walfile_name(pg_current_wal_insert_lsn())');
 $node->safe_psql('postgres',
-	qq{INSERT INTO filler SELECT g, repeat(md5(g::text), 20000) FROM generate_series(1, 200) g}
+	qq{INSERT INTO filler SELECT g, repeat('x', 640000) FROM generate_series(1, 200) g}
 );
 #$node->safe_psql('postgres', qq{create table foo ()});
 my $endfile = $node->safe_psql('postgres',

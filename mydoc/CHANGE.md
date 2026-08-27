@@ -2,6 +2,34 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁减加密哈希函数：MD5 全部 / HMAC 全部 / SHA1 全部 / SHA-2 SQL 函数（2026-08-27）
+
+### 一、背景
+minipg 已彻底裁掉角色/用户与口令认证（`auth.c` 无任何 md5/scram 调用），加密哈希函数对内核学习价值低，整体裁剪。经全库核查：
+- `pg_md5_encrypt` / `pg_md5_binary`：零调用者（口令加密入口已随认证裁剪消失）。
+- `md5()` SQL 函数（`md5_text`/`md5_bytea`）：仅回归测试使用，非内核核心。
+- `pg_hmac_create` 及其全部 HMAC API：零调用者（`resowner.c` 的 HMAC 资源管理函数也从未被调用）。
+- `PG_SHA1` / `sha1.c`：零调用者，`pg_proc.dat` 未注册 `sha1()` SQL 函数。
+- `sha224/256/384/512()` SQL 函数（`cryptohashfuncs.c`）：仅回归测试使用，非内核核心。SHA-2 底层实现（`sha2.c`/`sha2_int.h`）保留供 `cryptohash.c` 内部使用。
+
+### 二、删除内容
+- **MD5 全部**：删 `src/common/md5.c`、`src/common/md5_common.c`、`src/common/md5_int.h`、`src/include/common/md5.h`；`src/common/Makefile` 移除 `md5.o`/`md5_common.o`；`pg_proc.dat` 删 `md5(text)`/`md5(bytea)` 注册；`cryptohash.h` 删 `PG_MD5` enum 值；`cryptohash.c` 删 md5 include、union 字段及 init/update/final 三处 `case PG_MD5`。
+- **HMAC 整个模块**：删 `src/common/hmac.c`、`src/include/common/hmac.h`；`src/common/Makefile` 移除 `hmac.o`；`src/backend/utils/resowner/resowner.c` 删全部 HMAC 引用；`src/include/utils/resowner_private.h` 删对应声明。
+- **SHA1 模块**：删 `src/common/sha1.c`、`src/common/sha1_int.h`、`src/include/common/sha1.h`；`src/common/Makefile` 移除 `sha1.o`；`cryptohash.h` 删 `PG_SHA1` enum 值；`cryptohash.c` 删 sha1 include、union 字段及 init/update/final 三处 `case PG_SHA1`。
+- **SHA-2 SQL 函数**：删 `src/backend/utils/adt/cryptohashfuncs.c`（含 sha224/256/384/512 的 SQL 包装函数）；`src/backend/utils/adt/Makefile` 移除 `cryptohashfuncs.o`；`pg_proc.dat` 删 `sha224/sha256/sha384/sha512(bytea)` 注册。保留 `sha2.c`/`sha2_int.h` 底层实现。
+- **pgindent**：`src/tools/pgindent/typedefs.list` 删 `pg_hmac_ctx` / `pg_sha1_ctx` / `pg_md5_ctx`。
+- **回归测试**：`strings.sql` 删 MD5 测试套件与 SHA-2 测试段；`compression_1.out` 整体删除（依赖 `md5()`）；`opr_sanity.out` 删 md5/sha2 函数行；recovery 测试 `015_promotion_pages.pl`/`026_overwrite_contrecord.pl` 将 `md5(random()::text)` 替换为 `repeat('x', 32)`。
+
+### 三、保留
+- `cryptohash.c`/`cryptohash.h` 框架（SHA-224/256/384/512 分支仍供内部使用）。
+- `sha2.c`/`sha2_int.h` SHA-2 底层实现。
+
+### 四、构建注意
+`pg_cryptohash_type` enum 起始值由 `PG_MD5=0` 变为 `PG_SHA224=0`，但所有调用均按符号传参，无硬编码编号，**不会触发枚举错位**。须全量重编（`make -C src` 或 `make maintainer-clean && configure && make`）。
+
+### 五、验证
+`make check-world` 全部通过；源码全库 grep 已删符号零命中。
+
 ## 删除 domains.c 的 domain_in / domain_recv 孤立函数（2026-08-27）
 
 ### 一、背景

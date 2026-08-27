@@ -24,7 +24,6 @@
 #include <sys/param.h>
 
 #include "common/cryptohash.h"
-#include "md5_int.h"
 #include "sha2_int.h"
 
 /*
@@ -46,7 +45,6 @@ struct pg_cryptohash_ctx
 
 	union
 	{
-		pg_md5_ctx	md5;
 		pg_sha224_ctx sha224;
 		pg_sha256_ctx sha256;
 		pg_sha384_ctx sha384;
@@ -94,9 +92,6 @@ pg_cryptohash_init(pg_cryptohash_ctx *ctx)
 
 	switch (ctx->type)
 	{
-		case PG_MD5:
-			pg_md5_init(&ctx->data.md5);
-			break;
 		case PG_SHA224:
 			pg_sha224_init(&ctx->data.sha224);
 			break;
@@ -129,9 +124,6 @@ pg_cryptohash_update(pg_cryptohash_ctx *ctx, const uint8 *data, size_t len)
 
 	switch (ctx->type)
 	{
-		case PG_MD5:
-			pg_md5_update(&ctx->data.md5, data, len);
-			break;
 		case PG_SHA224:
 			pg_sha224_update(&ctx->data.sha224, data, len);
 			break;
@@ -164,11 +156,6 @@ pg_cryptohash_final(pg_cryptohash_ctx *ctx, uint8 *dest, size_t len)
 
 	switch (ctx->type)
 	{
-		case PG_MD5:
-			if (len < MD5_DIGEST_LENGTH)
-				return -1;
-			pg_md5_final(&ctx->data.md5, dest);
-			break;
 		case PG_SHA224:
 			if (len < PG_SHA224_DIGEST_LENGTH)
 				return -1;

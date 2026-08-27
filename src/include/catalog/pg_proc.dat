@@ -5171,25 +5171,6 @@
   proname => 'system', provolatile => 'v', prorettype => 'tsm_handler',
   proargtypes => 'internal', prosrc => 'tsm_system_handler' },
 
-# cryptographic
-{ oid => '2311', descr => 'MD5 hash',
-  proname => 'md5', proleakproof => 't', prorettype => 'text',
-  proargtypes => 'text', prosrc => 'md5_text' },
-{ oid => '2321', descr => 'MD5 hash',
-  proname => 'md5', proleakproof => 't', prorettype => 'text',
-  proargtypes => 'bytea', prosrc => 'md5_bytea' },
-{ oid => '3419', descr => 'SHA-224 hash',
-  proname => 'sha224', proleakproof => 't', prorettype => 'bytea',
-  proargtypes => 'bytea', prosrc => 'sha224_bytea' },
-{ oid => '3420', descr => 'SHA-256 hash',
-  proname => 'sha256', proleakproof => 't', prorettype => 'bytea',
-  proargtypes => 'bytea', prosrc => 'sha256_bytea' },
-{ oid => '3421', descr => 'SHA-384 hash',
-  proname => 'sha384', proleakproof => 't', prorettype => 'bytea',
-  proargtypes => 'bytea', prosrc => 'sha384_bytea' },
-{ oid => '3422', descr => 'SHA-512 hash',
-  proname => 'sha512', proleakproof => 't', prorettype => 'bytea',
-  proargtypes => 'bytea', prosrc => 'sha512_bytea' },
 
 # crosstype operations for date vs. timestamp and timestamptz
 { oid => '2338',

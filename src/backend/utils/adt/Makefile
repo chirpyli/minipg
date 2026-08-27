@@ -23,7 +23,6 @@ OBJS = \
 	ascii.o \
 	bool.o \
 	char.o \
-	cryptohashfuncs.o \
 	date.o \
 	datetime.o \
 	datum.o \
