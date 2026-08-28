@@ -102,7 +102,6 @@ SnapshotData SnapshotAnyData = {SNAPSHOT_ANY};
 static Snapshot CurrentSnapshot = NULL;
 static Snapshot SecondarySnapshot = NULL;
 static Snapshot CatalogSnapshot = NULL;
-static Snapshot HistoricSnapshot = NULL;
 
 /*
  * These are updated by GetSnapshotData.  We initialize them this way
@@ -111,9 +110,6 @@ static Snapshot HistoricSnapshot = NULL;
  */
 TransactionId TransactionXmin = FirstNormalTransactionId;
 TransactionId RecentXmin = FirstNormalTransactionId;
-
-/* (table, ctid) => (cmin, cmax) mapping during timetravel */
-static HTAB *tuplecid_data = NULL;
 
 /*
  * Elements of the active snapshot stack.
@@ -249,18 +245,6 @@ SnapMgrInit(void)
 Snapshot
 GetTransactionSnapshot(void)
 {
-	/*
-	 * Return historic snapshot if doing logical decoding. We'll never need a
-	 * non-historic transaction snapshot in this (sub-)transaction, so there's
-	 * no need to be careful to set one up for later calls to
-	 * GetTransactionSnapshot().
-	 */
-	if (HistoricSnapshotActive())
-	{
-		Assert(!FirstSnapshotSet);
-		return HistoricSnapshot;
-	}
-
 	/* First call in transaction? */
 	if (!FirstSnapshotSet)
 	{
@@ -336,7 +320,6 @@ GetLatestSnapshot(void)
 	 * So far there are no cases requiring support for GetLatestSnapshot()
 	 * during logical decoding, but it wouldn't be hard to add if required.
 	 */
-	Assert(!HistoricSnapshotActive());
 
 	/* If first call in transaction, go ahead and set the xact snapshot */
 	if (!FirstSnapshotSet)
@@ -385,16 +368,6 @@ GetOldestSnapshot(void)
 Snapshot
 GetCatalogSnapshot(Oid relid)
 {
-	/*
-	 * Return historic snapshot while we're doing logical decoding, so we can
-	 * see the appropriate state of the catalog.
-	 *
-	 * This is the primary reason for needing to reset the system caches after
-	 * finishing decoding.
-	 */
-	if (HistoricSnapshotActive())
-		return HistoricSnapshot;
-
 	return GetNonHistoricCatalogSnapshot(relid);
 }
 
@@ -519,7 +492,6 @@ SetTransactionSnapshot(Snapshot sourcesnap, VirtualTransactionId *sourcevxid,
 
 	Assert(pairingheap_is_empty(&RegisteredSnapshots));
 	Assert(FirstXactSnapshot == NULL);
-	Assert(!HistoricSnapshotActive());
 
 	/*
 	 * Even though we are not going to use the snapshot it computes, we must
@@ -2041,48 +2013,6 @@ MaintainOldSnapshotTimeMapping(TimestampTz whenTaken, TransactionId xmin)
 	LWLockRelease(OldSnapshotTimeMapLock);
 }
 
-
-/*
- * Setup a snapshot that replaces normal catalog snapshots that allows catalog
- * access to behave just like it did at a certain point in the past.
- *
- * Needed for logical decoding.
- */
-void
-SetupHistoricSnapshot(Snapshot historic_snapshot, HTAB *tuplecids)
-{
-	Assert(historic_snapshot != NULL);
-
-	/* setup the timetravel snapshot */
-	HistoricSnapshot = historic_snapshot;
-
-	/* setup (cmin, cmax) lookup hash */
-	tuplecid_data = tuplecids;
-}
-
-
-/*
- * Make catalog snapshots behave normally again.
- */
-void
-TeardownHistoricSnapshot(bool is_error)
-{
-	HistoricSnapshot = NULL;
-	tuplecid_data = NULL;
-}
-
-bool
-HistoricSnapshotActive(void)
-{
-	return HistoricSnapshot != NULL;
-}
-
-HTAB *
-HistoricSnapshotGetTupleCids(void)
-{
-	Assert(HistoricSnapshotActive());
-	return tuplecid_data;
-}
 
 /*
  * EstimateSnapshotSpace

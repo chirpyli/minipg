@@ -698,7 +698,6 @@ FormData_pg_ts_dict
 FormData_pg_ts_parser
 FormData_pg_ts_template
 FormData_pg_type
-FormData_pg_user_mapping
 Form_pg_aggregate
 Form_pg_am
 Form_pg_amop
@@ -741,7 +740,6 @@ Form_pg_ts_dict
 Form_pg_ts_parser
 Form_pg_ts_template
 Form_pg_type
-Form_pg_user_mapping
 FormatNode
 FreeBlockNumberArray
 FreeListData
@@ -1720,9 +1718,6 @@ PartitionRangeDatumKind
 PartitionScheme
 PartitionSpec
 PartitionTupleRouting
-PartitionedRelPruneInfo
-PartitionedRelPruningData
-PartitionwiseAggregateType
 PasswordType
 Path
 PathClauseUsage

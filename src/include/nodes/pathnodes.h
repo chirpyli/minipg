@@ -2402,24 +2402,6 @@ typedef struct JoinPathExtraData
 #define GROUPING_CAN_PARTIAL_AGG	0x0004
 
 /*
- * What kind of partitionwise aggregation is in use?
- *
- * PARTITIONWISE_AGGREGATE_NONE: Not used.
- *
- * PARTITIONWISE_AGGREGATE_FULL: Aggregate each partition separately, and
- * append the results.
- *
- * PARTITIONWISE_AGGREGATE_PARTIAL: Partially aggregate each partition
- * separately, append the results, and then finalize aggregation.
- */
-typedef enum
-{
-	PARTITIONWISE_AGGREGATE_NONE,
-	PARTITIONWISE_AGGREGATE_FULL,
-	PARTITIONWISE_AGGREGATE_PARTIAL
-} PartitionwiseAggregateType;
-
-/*
  * Struct for extra information passed to subroutines of create_grouping_paths
  *
  * flags indicating what kinds of grouping are possible.
@@ -2430,7 +2412,6 @@ typedef enum
  * target_parallel_safe is true if target is parallel safe.
  * havingQual gives list of quals to be applied after aggregation.
  * targetList gives list of columns to be projected.
- * patype is the type of partitionwise aggregation that is being performed.
  */
 typedef struct
 {
@@ -2444,7 +2425,6 @@ typedef struct
 	bool		target_parallel_safe;
 	Node	   *havingQual;
 	List	   *targetList;
-	PartitionwiseAggregateType patype;
 } GroupPathExtraData;
 
 /*

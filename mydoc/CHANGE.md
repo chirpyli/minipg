@@ -906,3 +906,7 @@ AM 已裁至 heap/btree/hash，EXCLUDE 依赖 GiST 故不可用，彻底删除�
 **测试套件改造（保留并发隔离验证能力）**：`src/test/isolation/isolationtester.c` 原本依赖扩展查询协议（`PQexecParams` 设置 application_name、`PQprepare`/`PQexecPrepared` 检测锁等待），后端裁剪后无法运行。改为全部走简单查询协议（`PQexec`）：application_name 用 `PQExpBuffer` 拼接 SQL 字符串；锁等待检测查询改为在 `try_complete_step` 中每次用 `PQexec` 拼接候选 pid 与 pid 列表（`pg_isolation_test_session_is_blocked('%s','{%s}')`）执行。全部 .sql 测试例保留，未改用扩展协议。
 
 影响：后端仅支持简单查询协议（`'Q'`）与 fastpath（`'F'`），`psql -c` 及所有走简单协议的客户端正常；isolation 58 个用例（除 nowait-5 依赖已裁的 SQL `PREPARE` 命令已从 isolation_schedule 移除外）全部通过；主回归 `make check` 70 用例、isolation 58 用例，整体 `make check-world` 通过。事务/索引/函数/查询核心功能正常。基于扩展协议的客户端（pgbench -f、JDBC/驱动等）无法连接执行。
+
+## 清理逻辑解码 Historic MVCC 快照与 partitionwise aggregation 残余死代码（2026-08-28）
+
+逻辑解码与分区功能裁剪后的死代码彻底清理：删除 `SNAPSHOT_HISTORIC_MVCC` 快照类型及 `IsMVCCSnapshot` 分支、snapmgr 的 `HistoricSnapshot*` API（Setup/Teardown/HistoricSnapshotActive/HistoricSnapshotGetTupleCids）、heapam_visibility 的 `HeapTupleSatisfiesHistoricMVCC` 及 heapam.c/snapmgr.c 相关逻辑；relcache 移除 HistoricSnapshotActive 下的 filenode 重取与提前 return 分支及死函数 `GetPgClassDescriptor`；planner 移除 partitionwise aggregation 残余（`patype` 字段、`PartitionwiseAggregateType`、`common_prefix_cmp`）；`objectaccess.h` 注释、typedefs.list 死类型（`pg_user_mapping`、`PartitionedRel*` 等）同步清理。净删约 440 行。验证：make check-world 通过。

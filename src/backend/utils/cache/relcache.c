@@ -281,7 +281,6 @@ static void RelationBuildTupleDesc(Relation relation);
 static Relation RelationBuildDesc(Oid targetRelId, bool insertIt);
 static void RelationInitPhysicalAddr(Relation relation);
 static void load_critical_index(Oid indexoid, Oid heapoid);
-static TupleDesc GetPgClassDescriptor(void);
 static TupleDesc GetPgIndexDescriptor(void);
 static void AttrDefaultFetch(Relation relation, int ndef);
 static int	AttrDefaultCmp(const void *a, const void *b);
@@ -1087,36 +1086,6 @@ RelationInitPhysicalAddr(Relation relation)
 
 	if (relation->rd_rel->relfilenode)
 	{
-		/*
-		 * Even if we are using a decoding snapshot that doesn't represent the
-		 * current state of the catalog we need to make sure the filenode
-		 * points to the current file since the older file will be gone (or
-		 * truncated). The new file will still contain older rows so lookups
-		 * in them will work correctly. This wouldn't work correctly if
-		 * rewrites were allowed to change the schema in an incompatible way,
-		 * but those are prevented both on catalog tables and on user tables
-		 * declared as additional catalog tables.
-		 */
-		if (HistoricSnapshotActive()
-			&& RelationIsAccessibleInLogicalDecoding(relation)
-			&& IsTransactionState())
-		{
-			HeapTuple	phys_tuple;
-			Form_pg_class physrel;
-
-			phys_tuple = ScanPgRelation(RelationGetRelid(relation),
-										RelationGetRelid(relation) != ClassOidIndexId,
-										true);
-			if (!HeapTupleIsValid(phys_tuple))
-				elog(ERROR, "could not find pg_class entry for %u",
-					 RelationGetRelid(relation));
-			physrel = (Form_pg_class) GETSTRUCT(phys_tuple);
-
-			relation->rd_rel->reltablespace = physrel->reltablespace;
-			relation->rd_rel->relfilenode = physrel->relfilenode;
-			heap_freetuple(phys_tuple);
-		}
-
 		relation->rd_node.relNode = relation->rd_rel->relfilenode;
 	}
 	else
@@ -2353,18 +2322,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 
 		if (newrel == NULL)
 		{
-			/*
-			 * We can validly get here, if we're using a historic snapshot in
-			 * which a relation, accessed from outside logical decoding, is
-			 * still invisible. In that case it's fine to just mark the
-			 * relation as invalid and return - it'll fully get reloaded by
-			 * the cache reset at the end of logical decoding (or at the next
-			 * access).  During normal processing we don't want to ignore this
-			 * case as it shouldn't happen there, as explained below.
-			 */
-			if (HistoricSnapshotActive())
-				return;
-
 			/*
 			 * This shouldn't happen as dropping a relation is intended to be
 			 * impossible if still referenced (cf. CheckTableNotInUse()). But
@@ -3871,11 +3828,10 @@ load_critical_index(Oid indexoid, Oid heapoid)
 }
 
 /*
- * GetPgClassDescriptor -- get a predefined tuple descriptor for pg_class
  * GetPgIndexDescriptor -- get a predefined tuple descriptor for pg_index
  *
  * We need this kluge because we have to be able to access non-fixed-width
- * fields of pg_class and pg_index before we have the standard catalog caches
+ * fields of pg_index before we have the standard catalog caches
  * available.  We use predefined data that's set up in just the same way as
  * the bootstrapped reldescs used by formrdesc().  The resulting tupdesc is
  * not 100% kosher: it does not have the correct rowtype OID in tdtypeid, nor
@@ -3910,19 +3866,6 @@ BuildHardcodedDescriptor(int natts, const FormData_pg_attribute *attrs)
 	MemoryContextSwitchTo(oldcxt);
 
 	return result;
-}
-
-static TupleDesc
-GetPgClassDescriptor(void)
-{
-	static TupleDesc pgclassdesc = NULL;
-
-	/* Already done? */
-	if (pgclassdesc == NULL)
-		pgclassdesc = BuildHardcodedDescriptor(Natts_pg_class,
-											   Desc_pg_class);
-
-	return pgclassdesc;
 }
 
 static TupleDesc

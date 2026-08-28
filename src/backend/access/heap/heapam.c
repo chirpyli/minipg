@@ -10267,19 +10267,3 @@ HeapCheckForSerializableConflictOut(bool visible, Relation relation,
 
 	CheckForSerializableConflictOut(relation, xid, snapshot);
 }
-
-/*
- * ResolveCminCmaxDuringDecoding
- *
- * minipg has removed logical replication, so combo CIDs / historic snapshot
- * tuple cid resolution are no longer needed.  Always report "not resolved".
- */
-bool
-ResolveCminCmaxDuringDecoding(struct HTAB *tuplecid_data,
-							  Snapshot snapshot,
-							  HeapTuple htup,
-							  Buffer buffer,
-							  CommandId *cmin, CommandId *cmax)
-{
-	return false;
-}

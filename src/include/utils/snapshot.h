@@ -102,13 +102,6 @@ typedef enum SnapshotType
 	SNAPSHOT_DIRTY,
 
 	/*
-	 * A tuple is visible iff it follows the rules of SNAPSHOT_MVCC, but
-	 * supports being called in timetravel context (for decoding catalog
-	 * contents in the context of logical decoding).
-	 */
-	SNAPSHOT_HISTORIC_MVCC,
-
-	/*
 	 * A tuple is visible iff the tuple might be visible to some transaction;
 	 * false if it's surely dead to everyone, i.e., vacuumable.
 	 *
@@ -126,9 +119,8 @@ typedef struct SnapshotData *Snapshot;
  * Struct representing all kind of possible snapshots.
  *
  * There are several different kinds of snapshots:
- * * Normal MVCC snapshots
+ * * MVCC snapshots
  * * MVCC snapshots taken during recovery (in Hot-Standby mode)
- * * Historic MVCC snapshots used during logical decoding
  * * snapshots passed to HeapTupleSatisfiesDirty()
  * * snapshots passed to HeapTupleSatisfiesNonVacuumable()
  * * snapshots used for SatisfiesAny, Toast, Self where no members are
@@ -160,8 +152,7 @@ typedef struct SnapshotData
 	/*
 	 * For normal MVCC snapshot this contains the all xact IDs that are in
 	 * progress, unless the snapshot was taken during recovery in which case
-	 * it's empty. For historic MVCC snapshots, the meaning is inverted, i.e.
-	 * it contains *committed* transactions between xmin and xmax.
+	 * it's empty.
 	 *
 	 * note: all ids in xip[] satisfy xmin <= xip[i] < xmax
 	 */

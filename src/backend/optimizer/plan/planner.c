@@ -195,7 +195,6 @@ static void apply_scanjoin_target_to_paths(PlannerInfo *root,
 										   List *scanjoin_targets_contain_srfs,
 										   bool scanjoin_target_parallel_safe,
 										   bool tlist_same_exprs);
-static int	common_prefix_cmp(const void *a, const void *b);
 
 
 /*****************************************************************************
@@ -3017,12 +3016,6 @@ create_grouping_paths(PlannerInfo *root,
 		extra.targetList = parse->targetList;
 		extra.partial_costs_set = false;
 
-		/*
-		 * minipg has no partitioned tables (partitioning subsystem was
-		 * trimmed), so partitionwise aggregation is never possible.
-		 */
-		extra.patype = PARTITIONWISE_AGGREGATE_NONE;
-
 		create_ordinary_grouping_paths(root, input_rel, grouped_rel,
 									   &agg_costs, gd, &extra,
 									   &partially_grouped_rel);
@@ -3185,7 +3178,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	Path	   *cheapest_path = input_rel->cheapest_total_path;
 	RelOptInfo *partially_grouped_rel = NULL;
 	double		dNumGroups;
-	PartitionwiseAggregateType patype = PARTITIONWISE_AGGREGATE_NONE;
 
 	/*
 	 * Before generating paths for grouped_rel, we first generate any possible
@@ -3194,14 +3186,7 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	 */
 	if ((extra->flags & GROUPING_CAN_PARTIAL_AGG) != 0)
 	{
-		bool		force_rel_creation;
-
-		/*
-		 * If we're doing partitionwise aggregation at this level, force
-		 * creation of a partially_grouped_rel so we can add partitionwise
-		 * paths to it.
-		 */
-		force_rel_creation = (patype == PARTITIONWISE_AGGREGATE_PARTIAL);
+		bool		force_rel_creation = false;
 
 		partially_grouped_rel =
 			create_partial_grouping_paths(root,
@@ -3214,17 +3199,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 
 	/* Set out parameter. */
 	*partially_grouped_rel_p = partially_grouped_rel;
-
-	/* If we are doing partial aggregation only, return. */
-	if (extra->patype == PARTITIONWISE_AGGREGATE_PARTIAL)
-	{
-		Assert(partially_grouped_rel);
-
-		if (partially_grouped_rel->pathlist)
-			set_cheapest(partially_grouped_rel);
-
-		return;
-	}
 
 	/* Gather any partially grouped partial paths. */
 	if (partially_grouped_rel && partially_grouped_rel->partial_pathlist)
@@ -4659,12 +4633,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 		}
 	}
 
-	/*
-	 * When partitionwise aggregate is used, we might have fully aggregated
-	 * paths in the partial pathlist, because add_paths_to_append_rel() will
-	 * consider a path for grouped_rel consisting of a Parallel Append of
-	 * non-partial paths from each child.
-	 */
+	/* Gather any partial paths for parallel finalization. */
 	if (grouped_rel->partial_pathlist != NIL)
 		gather_grouping_paths(root, grouped_rel);
 }
@@ -4704,17 +4673,6 @@ create_partial_grouping_paths(PlannerInfo *root,
 	ListCell   *lc;
 	bool		can_hash = (extra->flags & GROUPING_CAN_USE_HASH) != 0;
 	bool		can_sort = (extra->flags & GROUPING_CAN_USE_SORT) != 0;
-
-	/*
-	 * Consider whether we should generate partially aggregated non-partial
-	 * paths.  We can only do this if we have a non-partial path, and only if
-	 * the parent of the input rel is performing partial partitionwise
-	 * aggregation.  (Note that extra->patype is the type of partitionwise
-	 * aggregation being used at the parent level, not this level.)
-	 */
-	if (input_rel->pathlist != NIL &&
-		extra->patype == PARTITIONWISE_AGGREGATE_PARTIAL)
-		cheapest_total_path = input_rel->cheapest_total_path;
 
 	/*
 	 * If parallelism is possible for grouped_rel, then we should consider
@@ -5299,7 +5257,7 @@ apply_scanjoin_target_to_paths(PlannerInfo *root,
 	 * to all partitions, and generate brand-new Append paths in which the
 	 * scan/join target is computed below the Append rather than above it.
 	 * Since Append is not projection-capable, that might save a separate
-	 * Result node, and it also is important for partitionwise aggregate.
+	 * Result node.
 	 */
 
 	/*

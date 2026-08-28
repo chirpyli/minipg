@@ -94,8 +94,7 @@ extern PGDLLIMPORT SnapshotData CatalogSnapshotData;
 
 /* This macro encodes the knowledge of which snapshots are MVCC-safe */
 #define IsMVCCSnapshot(snapshot)  \
-	((snapshot)->snapshot_type == SNAPSHOT_MVCC || \
-	 (snapshot)->snapshot_type == SNAPSHOT_HISTORIC_MVCC)
+	((snapshot)->snapshot_type == SNAPSHOT_MVCC)
 
 #ifndef FRONTEND
 static inline bool
@@ -164,13 +163,6 @@ extern bool GlobalVisCheckRemovableFullXid(Relation rel, FullTransactionId fxid)
  * Utility functions for implementing visibility routines in table AMs.
  */
 extern bool XidInMVCCSnapshot(TransactionId xid, Snapshot snapshot);
-
-/* Support for catalog timetravel for logical decoding */
-struct HTAB;
-extern struct HTAB *HistoricSnapshotGetTupleCids(void);
-extern void SetupHistoricSnapshot(Snapshot snapshot_now, struct HTAB *tuplecids);
-extern void TeardownHistoricSnapshot(bool is_error);
-extern bool HistoricSnapshotActive(void);
 
 extern Size EstimateSnapshotSpace(Snapshot snapshot);
 extern void SerializeSnapshot(Snapshot snapshot, char *start_address);

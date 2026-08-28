@@ -228,16 +228,6 @@ extern bool XidInMVCCSnapshot(TransactionId xid, Snapshot snapshot);
 extern bool HeapTupleIsSurelyDead(HeapTuple htup,
 								  struct GlobalVisState *vistest);
 
-/*
- * To avoid leaking too much knowledge about reorderbuffer implementation
- * details this is implemented in reorderbuffer.c not heapam_visibility.c
- */
-struct HTAB;
-extern bool ResolveCminCmaxDuringDecoding(struct HTAB *tuplecid_data,
-										  Snapshot snapshot,
-										  HeapTuple htup,
-										  Buffer buffer,
-										  CommandId *cmin, CommandId *cmax);
 extern void HeapCheckForSerializableConflictOut(bool valid, Relation relation, HeapTuple tuple,
 												Buffer buffer, Snapshot snapshot);
 
