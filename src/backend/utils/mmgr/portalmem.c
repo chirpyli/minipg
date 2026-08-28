@@ -259,29 +259,18 @@ CreateNewPortal(void)
  * (before rewriting) was an empty string.  Also, the passed commandTag must
  * be a pointer to a constant string, since it is not copied.
  *
- * If cplan is provided, then it is a cached plan containing the stmts, and
- * the caller must have done GetCachedPlan(), causing a refcount increment.
- * The refcount will be released when the portal is destroyed.
- *
- * If cplan is NULL, then it is the caller's responsibility to ensure that
- * the passed plan trees have adequate lifetime.  Typically this is done by
- * copying them into the portal's context.
- *
  * The caller is also responsible for ensuring that the passed prepStmtName
  * (if not NULL) and sourceText have adequate lifetime.
  *
  * NB: this function mustn't do much beyond storing the passed values; in
- * particular don't do anything that risks elog(ERROR).  If that were to
- * happen here before storing the cplan reference, we'd leak the plancache
- * refcount that the caller is trying to hand off to us.
+ * particular don't do anything that risks elog(ERROR).
  */
 void
 PortalDefineQuery(Portal portal,
 				  const char *prepStmtName,
 				  const char *sourceText,
 				  CommandTag commandTag,
-				  List *stmts,
-				  CachedPlan *cplan)
+				  List *stmts)
 {
 	AssertArg(PortalIsValid(portal));
 	AssertState(portal->status == PORTAL_NEW);
@@ -295,29 +284,7 @@ PortalDefineQuery(Portal portal,
 	portal->qc.nprocessed = 0;
 	portal->commandTag = commandTag;
 	portal->stmts = stmts;
-	portal->cplan = cplan;
 	portal->status = PORTAL_DEFINED;
-}
-
-/*
- * PortalReleaseCachedPlan
- *		Release a portal's reference to its cached plan, if any.
- */
-static void
-PortalReleaseCachedPlan(Portal portal)
-{
-	if (portal->cplan)
-	{
-		ReleaseCachedPlan(portal->cplan, NULL);
-		portal->cplan = NULL;
-
-		/*
-		 * We must also clear portal->stmts which is now a dangling reference
-		 * to the cached plan's plan list.  This protects any code that might
-		 * try to examine the Portal later.
-		 */
-		portal->stmts = NIL;
-	}
 }
 
 /*
@@ -477,7 +444,6 @@ PortalDrop(Portal portal, bool isTopCommit)
 	PortalHashTableDelete(portal);
 
 	/* drop cached plan reference, if any */
-	PortalReleaseCachedPlan(portal);
 
 	/*
 	 * If portal has a snapshot protecting its data, release that.  This needs
@@ -703,7 +669,6 @@ AtAbort_Portals(void)
 		}
 
 		/* drop cached plan reference, if any */
-		PortalReleaseCachedPlan(portal);
 
 		/*
 		 * Any resources belonging to the portal will be released in the
@@ -890,7 +855,6 @@ AtSubAbort_Portals(SubTransactionId mySubid,
 		}
 
 		/* drop cached plan reference, if any */
-		PortalReleaseCachedPlan(portal);
 
 		/*
 		 * Any resources belonging to the portal will be released in the

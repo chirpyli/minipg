@@ -74,16 +74,6 @@ reset synchronous_commit;
 
 discard all;
 
--- Prepared plans
-
-PREPARE hsp AS select count(*) from hs1;
-PREPARE hsp_noexec (integer) AS insert into hs1 values ($1);
-
-EXECUTE hsp;
-
-DEALLOCATE hsp;
-
-
 -- ALLOWED COMMANDS
 
 CHECKPOINT;

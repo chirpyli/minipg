@@ -196,15 +196,3 @@ ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
 DROP VIEW fdv4;
 
 
--- prepared query plans: this results in failure on reuse
-
-PREPARE foo AS
-  SELECT id, keywords, title, body, created
-  FROM articles
-  GROUP BY id;
-
-EXECUTE foo;
-
-ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT;
-
-EXECUTE foo;  -- fail

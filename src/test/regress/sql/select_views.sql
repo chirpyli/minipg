@@ -131,13 +131,11 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_secure
 -- Test for the case when security_barrier gets changed between rewriter
 -- and planner stage.
 --
-PREPARE p1 AS SELECT * FROM my_property_normal WHERE f_leak(passwd);
-PREPARE p2 AS SELECT * FROM my_property_secure WHERE f_leak(passwd);
-EXECUTE p1;
-EXECUTE p2;
+SELECT * FROM my_property_normal WHERE f_leak(passwd);
+SELECT * FROM my_property_secure WHERE f_leak(passwd);
 ALTER VIEW my_property_normal SET (security_barrier=true);
 ALTER VIEW my_property_secure SET (security_barrier=false);
-EXECUTE p1;		-- To be perform as a view with security-barrier
-EXECUTE p2;		-- To be perform as a view without security-barrier
+SELECT * FROM my_property_normal WHERE f_leak(passwd);		-- To be perform as a view with security-barrier
+SELECT * FROM my_property_secure WHERE f_leak(passwd);		-- To be perform as a view without security-barrier
 
 -- Cleanup.

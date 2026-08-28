@@ -20,7 +20,6 @@
 #include "storage/fd.h"
 #include "storage/lock.h"
 #include "utils/catcache.h"
-#include "utils/plancache.h"
 #include "utils/resowner.h"
 #include "utils/snapshot.h"
 
@@ -52,13 +51,6 @@ extern void ResourceOwnerRememberRelationRef(ResourceOwner owner,
 											 Relation rel);
 extern void ResourceOwnerForgetRelationRef(ResourceOwner owner,
 										   Relation rel);
-
-/* support for plancache refcount management */
-extern void ResourceOwnerEnlargePlanCacheRefs(ResourceOwner owner);
-extern void ResourceOwnerRememberPlanCacheRef(ResourceOwner owner,
-											  CachedPlan *plan);
-extern void ResourceOwnerForgetPlanCacheRef(ResourceOwner owner,
-											CachedPlan *plan);
 
 /* support for tupledesc refcount management */
 extern void ResourceOwnerEnlargeTupleDescs(ResourceOwner owner);

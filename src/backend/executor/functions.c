@@ -78,8 +78,6 @@ typedef struct execution_state
  * and linked to from the fn_extra field of the FmgrInfo struct.
  *
  * Note that currently this has only the lifespan of the calling query.
- * Someday we should rewrite this code to use plancache.c to save parse/plan
- * results for longer than that.
  *
  * Physically, though, the data has the lifespan of the FmgrInfo that's used
  * to call the function, and there are cases (particularly with indexes)
@@ -676,8 +674,7 @@ init_sql_fcache(FunctionCallInfo fcinfo, Oid collation, bool lazyEvalOK)
 	 *
 	 * Note: since parsing and planning is done in fcontext, we will generate
 	 * a lot of cruft that lives as long as the fcache does.  This is annoying
-	 * but we'll not worry about it until the module is rewritten to use
-	 * plancache.c.
+	 * but we'll not worry about it until the module is rewritten.
 	 */
 	queryTree_list = NIL;
 	if (!isNull)

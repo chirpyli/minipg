@@ -25,9 +25,6 @@ select count(*) >= 0 as ok from pg_file_settings;
 -- There will surely be at least one active lock
 select count(*) > 0 as ok from pg_locks;
 
--- We expect no prepared statements in this test; see also prepare.sql
-select count(*) = 0 as ok from pg_prepared_statements;
-
 -- See also prepared_xacts.sql
 select count(*) >= 0 as ok from pg_prepared_xacts;
 

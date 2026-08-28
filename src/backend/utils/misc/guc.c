@@ -40,7 +40,6 @@
 #include "access/xlog_internal.h"
 #include "catalog/namespace.h"
 #include "catalog/storage.h"
-#include "commands/prepare.h"
 #include "commands/tablespace.h"
 #include "commands/vacuum.h"
 #include "commands/variable.h"
@@ -81,7 +80,6 @@
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/pg_lsn.h"
-#include "utils/plancache.h"
 #include "utils/portal.h"
 #include "utils/ps_status.h"
 #include "utils/queryjumble.h"
@@ -430,12 +428,6 @@ static const struct config_enum_entry force_parallel_mode_options[] = {
 	{NULL, 0, false}
 };
 
-static const struct config_enum_entry plan_cache_mode_options[] = {
-	{"auto", PLAN_CACHE_MODE_AUTO, false},
-	{"force_generic_plan", PLAN_CACHE_MODE_FORCE_GENERIC_PLAN, false},
-	{"force_custom_plan", PLAN_CACHE_MODE_FORCE_CUSTOM_PLAN, false},
-	{NULL, 0, false}
-};
 
 static struct config_enum_entry recovery_init_sync_method_options[] = {
 	{"fsync", RECOVERY_INIT_SYNC_METHOD_FSYNC, false},
@@ -3958,19 +3950,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&force_parallel_mode,
 		FORCE_PARALLEL_OFF, force_parallel_mode_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"plan_cache_mode", PGC_USERSET, QUERY_TUNING_OTHER,
-			gettext_noop("Controls the planner's selection of custom or generic plan."),
-			gettext_noop("Prepared statements can have custom and generic plans, and the planner "
-						 "will attempt to choose which is better.  This can be set to override "
-						 "the default behavior."),
-			GUC_EXPLAIN
-		},
-		&plan_cache_mode,
-		PLAN_CACHE_MODE_AUTO, plan_cache_mode_options,
 		NULL, NULL, NULL
 	},
 

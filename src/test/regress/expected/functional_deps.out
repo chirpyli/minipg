@@ -218,17 +218,3 @@ ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
 ERROR:  constraint "articles_pkey" of relation "articles" does not exist
 DROP VIEW fdv4;
 ERROR:  view "fdv4" does not exist
--- prepared query plans: this results in failure on reuse
-PREPARE foo AS
-  SELECT id, keywords, title, body, created
-  FROM articles
-  GROUP BY id;
-ERROR:  column "articles.keywords" must appear in the GROUP BY clause or be used in an aggregate function
-LINE 2:   SELECT id, keywords, title, body, created
-                     ^
-EXECUTE foo;
-ERROR:  prepared statement "foo" does not exist
-ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT;
-ERROR:  constraint "articles_pkey" of relation "articles" does not exist
-EXECUTE foo;  -- fail
-ERROR:  prepared statement "foo" does not exist

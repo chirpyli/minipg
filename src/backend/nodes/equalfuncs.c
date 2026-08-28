@@ -1295,32 +1295,6 @@ _equalCreateSchemaStmt(const CreateSchemaStmt *a, const CreateSchemaStmt *b)
 	return true;
 }
 
-static bool
-_equalPrepareStmt(const PrepareStmt *a, const PrepareStmt *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(argtypes);
-	COMPARE_NODE_FIELD(query);
-
-	return true;
-}
-
-static bool
-_equalExecuteStmt(const ExecuteStmt *a, const ExecuteStmt *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(params);
-
-	return true;
-}
-
-static bool
-_equalDeallocateStmt(const DeallocateStmt *a, const DeallocateStmt *b)
-{
-	COMPARE_STRING_FIELD(name);
-
-	return true;
-}
 
 
 static bool
@@ -2163,15 +2137,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateSchemaStmt:
 			retval = _equalCreateSchemaStmt(a, b);
-			break;
-		case T_PrepareStmt:
-			retval = _equalPrepareStmt(a, b);
-			break;
-		case T_ExecuteStmt:
-			retval = _equalExecuteStmt(a, b);
-			break;
-		case T_DeallocateStmt:
-			retval = _equalDeallocateStmt(a, b);
 			break;
 		case T_A_Expr:
 			retval = _equalAExpr(a, b);

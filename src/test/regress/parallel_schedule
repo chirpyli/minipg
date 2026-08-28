@@ -144,7 +144,7 @@ test: guc bitmapops combocid advisory_lock indirect_toast
 # information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
 # temp/truncate/returning 已随表继承(INHERITS)功能裁剪而移除
 # plpgsql: PL/pgSQL 已裁剪，移除对应测试条目（纯测试见已删 plpgsql.sql）
-test: prepare conversion polymorphism
+test: conversion polymorphism
 
 # ----------
 # Another group of parallel tests

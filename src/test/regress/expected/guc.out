@@ -552,17 +552,10 @@ ERROR:  unrecognized configuration parameter "special.weird name"
 -- Test DISCARD ALL
 --
 -- do changes
-PREPARE foo AS SELECT 1;
 SET vacuum_cost_delay = 13;
 CREATE TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
 ERROR:  ON COMMIT can only be used on temporary tables
 -- look changes
-SELECT name FROM pg_prepared_statements;
- name 
-------
- foo
-(1 row)
-
 SHOW vacuum_cost_delay;
  vacuum_cost_delay 
 -------------------
@@ -583,11 +576,6 @@ SELECT current_user = 'regress_guc_user';
 -- discard everything
 DISCARD ALL;
 -- look again
-SELECT name FROM pg_prepared_statements;
- name 
-------
-(0 rows)
-
 SHOW vacuum_cost_delay;
  vacuum_cost_delay 
 -------------------

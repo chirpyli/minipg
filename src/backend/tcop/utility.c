@@ -33,7 +33,6 @@
 #include "commands/explain.h"
 #include "commands/extension.h"
 #include "commands/portalcmds.h"
-#include "commands/prepare.h"
 #include "commands/schemacmds.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -144,10 +143,7 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
 
-		case T_DeallocateStmt:
 		case T_DiscardStmt:
-		case T_ExecuteStmt:
-		case T_PrepareStmt:
 		case T_VariableSetStmt:
 			{
 				/*
@@ -499,24 +495,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 		case T_TruncateStmt:
 			ExecuteTruncate((TruncateStmt *) parsetree);
-			break;
-
-		case T_PrepareStmt:
-			CheckRestrictedOperation("PREPARE");
-			PrepareQuery(pstate, (PrepareStmt *) parsetree,
-						 pstmt->stmt_location, pstmt->stmt_len);
-			break;
-
-		case T_ExecuteStmt:
-			ExecuteQuery(pstate,
-						 (ExecuteStmt *) parsetree,
-						 params,
-						 dest, qc);
-			break;
-
-		case T_DeallocateStmt:
-			CheckRestrictedOperation("DEALLOCATE");
-			DeallocateQuery((DeallocateStmt *) parsetree);
 			break;
 
 		case T_CreatedbStmt:
@@ -952,19 +930,6 @@ UtilityReturnsTuples(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_ExecuteStmt:
-			{
-				ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
-				PreparedStatement *entry;
-
-				entry = FetchPreparedStatement(stmt->name, false);
-				if (!entry)
-					return false;	/* not our business to raise error */
-				if (entry->plansource->resultDesc)
-					return true;
-				return false;
-			}
-
 		case T_ExplainStmt:
 			return true;
 
@@ -989,17 +954,6 @@ UtilityTupleDescriptor(Node *parsetree)
 {
 	switch (nodeTag(parsetree))
 	{
-		case T_ExecuteStmt:
-			{
-				ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
-				PreparedStatement *entry;
-
-				entry = FetchPreparedStatement(stmt->name, false);
-				if (!entry)
-					return NULL;	/* not our business to raise error */
-				return FetchPreparedStatementResultDesc(entry);
-			}
-
 		case T_ExplainStmt:
 			return ExplainResultDesc((ExplainStmt *) parsetree);
 
@@ -1346,27 +1300,8 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_REINDEX;
 			break;
 
-			case T_PrepareStmt:
-			tag = CMDTAG_PREPARE;
-			break;
-
-		case T_ExecuteStmt:
-			tag = CMDTAG_EXECUTE;
-			break;
-
 		case T_CreateStatsStmt:
 			tag = CMDTAG_CREATE_STATISTICS;
-			break;
-
-		case T_DeallocateStmt:
-			{
-				DeallocateStmt *stmt = (DeallocateStmt *) parsetree;
-
-				if (stmt->name == NULL)
-					tag = CMDTAG_DEALLOCATE_ALL;
-				else
-					tag = CMDTAG_DEALLOCATE;
-			}
 			break;
 
 			/* already-planned queries */
@@ -1555,33 +1490,6 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_TruncateStmt:
 			lev = LOGSTMT_MOD;
-			break;
-
-		case T_PrepareStmt:
-			{
-				PrepareStmt *stmt = (PrepareStmt *) parsetree;
-
-				/* Look through a PREPARE to the contained stmt */
-				lev = GetCommandLogLevel(stmt->query);
-			}
-			break;
-
-		case T_ExecuteStmt:
-			{
-				ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
-				PreparedStatement *ps;
-
-				/* Look through an EXECUTE to the referenced stmt */
-				ps = FetchPreparedStatement(stmt->name, false);
-				if (ps && ps->plansource->raw_parse_tree)
-					lev = GetCommandLogLevel(ps->plansource->raw_parse_tree->stmt);
-				else
-					lev = LOGSTMT_ALL;
-			}
-			break;
-
-		case T_DeallocateStmt:
-			lev = LOGSTMT_ALL;
 			break;
 
 		case T_AlterObjectSchemaStmt:

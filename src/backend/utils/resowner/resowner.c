@@ -122,7 +122,6 @@ typedef struct ResourceOwnerData
 	ResourceArray catrefarr;	/* catcache references */
 	ResourceArray catlistrefarr;	/* catcache-list pins */
 	ResourceArray relrefarr;	/* relcache references */
-	ResourceArray planrefarr;	/* plancache references */
 	ResourceArray tupdescarr;	/* tupdesc references */
 	ResourceArray snapshotarr;	/* snapshot references */
 	ResourceArray filearr;		/* open temporary files */
@@ -170,7 +169,6 @@ static void ResourceOwnerReleaseInternal(ResourceOwner owner,
 										 bool isTopLevel);
 static void ReleaseAuxProcessResourcesCallback(int code, Datum arg);
 static void PrintRelCacheLeakWarning(Relation rel);
-static void PrintPlanCacheLeakWarning(CachedPlan *plan);
 static void PrintTupleDescLeakWarning(TupleDesc tupdesc);
 static void PrintSnapshotLeakWarning(Snapshot snapshot);
 static void PrintFileLeakWarning(File file);
@@ -439,7 +437,6 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 	ResourceArrayInit(&(owner->catrefarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->catlistrefarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->relrefarr), PointerGetDatum(NULL));
-	ResourceArrayInit(&(owner->planrefarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->tupdescarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->snapshotarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->filearr), FileGetDatum(-1));
@@ -634,16 +631,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			ReleaseCatCacheList(res);
 		}
 
-		/* Ditto for plancache references */
-		while (ResourceArrayGetAny(&(owner->planrefarr), &foundres))
-		{
-			CachedPlan *res = (CachedPlan *) DatumGetPointer(foundres);
-
-			if (isCommit)
-				PrintPlanCacheLeakWarning(res);
-			ReleaseCachedPlan(res, owner);
-		}
-
 		/* Ditto for tupdesc references */
 		while (ResourceArrayGetAny(&(owner->tupdescarr), &foundres))
 		{
@@ -683,26 +670,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 }
 
 /*
- * ResourceOwnerReleaseAllPlanCacheRefs
- *		Release the plancache references (only) held by this owner.
- *
- * We might eventually add similar functions for other resource types,
- * but for now, only this is needed.
- */
-void
-ResourceOwnerReleaseAllPlanCacheRefs(ResourceOwner owner)
-{
-	Datum		foundres;
-
-	while (ResourceArrayGetAny(&(owner->planrefarr), &foundres))
-	{
-		CachedPlan *res = (CachedPlan *) DatumGetPointer(foundres);
-
-		ReleaseCachedPlan(res, owner);
-	}
-}
-
-/*
  * ResourceOwnerDelete
  *		Delete an owner object and its descendants.
  *
@@ -719,7 +686,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner->catrefarr.nitems == 0);
 	Assert(owner->catlistrefarr.nitems == 0);
 	Assert(owner->relrefarr.nitems == 0);
-	Assert(owner->planrefarr.nitems == 0);
 	Assert(owner->tupdescarr.nitems == 0);
 	Assert(owner->snapshotarr.nitems == 0);
 	Assert(owner->filearr.nitems == 0);
@@ -746,7 +712,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceArrayFree(&(owner->catrefarr));
 	ResourceArrayFree(&(owner->catlistrefarr));
 	ResourceArrayFree(&(owner->relrefarr));
-	ResourceArrayFree(&(owner->planrefarr));
 	ResourceArrayFree(&(owner->tupdescarr));
 	ResourceArrayFree(&(owner->snapshotarr));
 	ResourceArrayFree(&(owner->filearr));
@@ -1108,50 +1073,6 @@ PrintRelCacheLeakWarning(Relation rel)
 {
 	elog(WARNING, "relcache reference leak: relation \"%s\" not closed",
 		 RelationGetRelationName(rel));
-}
-
-/*
- * Make sure there is room for at least one more entry in a ResourceOwner's
- * plancache reference array.
- *
- * This is separate from actually inserting an entry because if we run out
- * of memory, it's critical to do so *before* acquiring the resource.
- */
-void
-ResourceOwnerEnlargePlanCacheRefs(ResourceOwner owner)
-{
-	ResourceArrayEnlarge(&(owner->planrefarr));
-}
-
-/*
- * Remember that a plancache reference is owned by a ResourceOwner
- *
- * Caller must have previously done ResourceOwnerEnlargePlanCacheRefs()
- */
-void
-ResourceOwnerRememberPlanCacheRef(ResourceOwner owner, CachedPlan *plan)
-{
-	ResourceArrayAdd(&(owner->planrefarr), PointerGetDatum(plan));
-}
-
-/*
- * Forget that a plancache reference is owned by a ResourceOwner
- */
-void
-ResourceOwnerForgetPlanCacheRef(ResourceOwner owner, CachedPlan *plan)
-{
-	if (!ResourceArrayRemove(&(owner->planrefarr), PointerGetDatum(plan)))
-		elog(ERROR, "plancache reference %p is not owned by resource owner %s",
-			 plan, owner->name);
-}
-
-/*
- * Debugging subroutine
- */
-static void
-PrintPlanCacheLeakWarning(CachedPlan *plan)
-{
-	elog(WARNING, "plancache reference leak: plan %p not closed", plan);
 }
 
 /*

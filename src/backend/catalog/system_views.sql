@@ -245,9 +245,6 @@ CREATE VIEW pg_prepared_xacts AS
     FROM pg_prepared_xact() AS P
          LEFT JOIN pg_database D ON P.dbid = D.oid;
 
-CREATE VIEW pg_prepared_statements AS
-    SELECT * FROM pg_prepared_statement() AS P;
-
 CREATE VIEW pg_settings AS
     SELECT * FROM pg_show_all_settings() AS A;
 

@@ -16,7 +16,6 @@
 #include "access/xact.h"
 #include "catalog/namespace.h"
 #include "commands/discard.h"
-#include "commands/prepare.h"
 #include "utils/guc.h"
 #include "utils/portal.h"
 
@@ -35,7 +34,7 @@ DiscardCommand(DiscardStmt *stmt, bool isTopLevel)
 			break;
 
 		case DISCARD_PLANS:
-			ResetPlanCache();
+			/* Plan cache has been removed; DISCARD PLANS is now a no-op */
 			break;
 
 		case DISCARD_TEMP:
@@ -63,7 +62,5 @@ DiscardAll(bool isTopLevel)
 	PortalHashTableDeleteAll();
 	SetPGVariable("session_authorization", NIL, false);
 	ResetAllOptions();
-	DropAllPreparedStatements();
 	LockReleaseAll(USER_LOCKMETHOD, true);
-	ResetPlanCache();
 }

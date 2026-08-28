@@ -551,7 +551,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 */
 	RelationCacheInitialize();
 	InitCatalogCache();
-	InitPlanCache();
 
 	/* Initialize portal manager */
 	EnablePortalManager();

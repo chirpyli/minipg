@@ -205,7 +205,6 @@ static List *set_returning_clause_references(PlannerInfo *root,
  * that implements each op).
  *
  * 8. We create lists of specific objects that the plan depends on.
- * This will be used by plancache.c to drive invalidation of cached plans.
  * Relation dependencies are represented by OIDs, and everything else by
  * PlanInvalItems (this distinction is motivated by the shared-inval APIs).
  * Currently, relations, user-defined functions, and domains are the only
@@ -2861,8 +2860,7 @@ record_plan_function_dependency(PlannerInfo *root, Oid funcid)
 
 		/*
 		 * It would work to use any syscache on pg_proc, but the easiest is
-		 * PROCOID since we already have the function's OID at hand.  Note
-		 * that plancache.c knows we use PROCOID.
+		 * PROCOID since we already have the function's OID at hand.
 		 */
 		inval_item->cacheId = PROCOID;
 		inval_item->hashValue = GetSysCacheHashValue1(PROCOID,
@@ -2897,8 +2895,7 @@ record_plan_type_dependency(PlannerInfo *root, Oid typid)
 
 		/*
 		 * It would work to use any syscache on pg_type, but the easiest is
-		 * TYPEOID since we already have the type's OID at hand.  Note that
-		 * plancache.c knows we use TYPEOID.
+		 * TYPEOID since we already have the type's OID at hand.
 		 */
 		inval_item->cacheId = TYPEOID;
 		inval_item->hashValue = GetSysCacheHashValue1(TYPEOID,
@@ -2915,8 +2912,7 @@ record_plan_type_dependency(PlannerInfo *root, Oid typid)
  *		just as set_plan_references would do.  Also detect whether any
  *		rewrite steps were affected by RLS.
  *
- * This is needed by plancache.c to handle invalidation of cached unplanned
- * queries.
+ * This is needed to handle invalidation of cached unplanned queries.
  *
  * Note: this does not go through eval_const_expressions, and hence doesn't
  * reflect its additions of inlined functions and elided CoerceToDomain nodes

@@ -135,8 +135,13 @@ ERROR:  cannot execute DELETE in a read-only transaction
 UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = temptest.a; -- ok
 ERROR:  cannot execute UPDATE in a read-only transaction
 PREPARE test AS UPDATE writetest SET a = 0; -- ok
+ERROR:  syntax error at or near "test"
+LINE 1: PREPARE test AS UPDATE writetest SET a = 0;
+                ^
 EXECUTE test; -- fail
-ERROR:  cannot execute UPDATE in a read-only transaction
+ERROR:  syntax error at or near "EXECUTE"
+LINE 1: EXECUTE test;
+        ^
 SELECT * FROM writetest, temptest; -- ok
  a | a 
 ---+---

@@ -41,7 +41,6 @@
 #include "access/xact.h"
 #include "access/xlog.h"			/* for LocalProcessControlFile */
 #include "catalog/pg_type.h"
-#include "commands/prepare.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqsignal.h"
@@ -104,19 +103,6 @@ int			client_connection_check_interval = 0;
 int			restrict_nonsystem_relation_kind;
 
 /* ----------------
- *		private typedefs etc
- * ----------------
- */
-
-/* type of argument for bind_param_error_callback */
-typedef struct BindParamCbData
-{
-	const char *portalName;
-	int			paramno;		/* zero-based param number, or -1 initially */
-	const char *paramval;		/* textual input string, if available */
-} BindParamCbData;
-
-/* ----------------
  *		private variables
  * ----------------
  */
@@ -152,20 +138,6 @@ static bool xact_started = false;
  */
 static bool DoingCommandRead = false;
 
-/*
- * Flags to implement skip-till-Sync-after-error behavior for messages of
- * the extended query protocol.
- */
-static bool doing_extended_query_message = false;
-static bool ignore_till_sync = false;
-
-/*
- * If an unnamed prepared statement exists, it's stored here.
- * We keep it separate from the hashtable kept by commands/prepare.c
- * in order to reduce overhead for short-lived queries.
- */
-static CachedPlanSource *unnamed_stmt_psrc = NULL;
-
 /* assorted command-line switches */
 static const char *userDoption = NULL;	/* -D switch */
 static bool EchoQuery = false;	/* -E switch */
@@ -189,17 +161,11 @@ static int	interactive_getc(void);
 static int	SocketBackend(StringInfo inBuf);
 static int	ReadCommand(StringInfo inBuf);
 static bool check_log_statement(List *stmt_list);
-static int	errdetail_execute(List *raw_parsetree_list);
-static int	errdetail_params(ParamListInfo params);
 static int	errdetail_abort(void);
 static int	errdetail_recovery_conflict(void);
-static void bind_param_error_callback(void *arg);
 static void start_xact_command(void);
 static void finish_xact_command(void);
 static bool IsTransactionExitStmt(Node *parsetree);
-static bool IsTransactionExitStmtList(List *pstmts);
-static bool IsTransactionStmtList(List *pstmts);
-static void drop_unnamed_stmt(void);
 static void log_disconnections(int code, Datum arg);
 static void enable_statement_timeout(void);
 static void disable_statement_timeout(void);
@@ -376,59 +342,28 @@ SocketBackend(StringInfo inBuf)
 	 * we used garbage as a length word.  We can also select a type-dependent
 	 * limit on what a sane length word could be.  (The limit could be chosen
 	 * more granularly, but it's not clear it's worth fussing over.)
-	 *
-	 * This also gives us a place to set the doing_extended_query_message flag
-	 * as soon as possible.
 	 */
 	switch (qtype)
 	{
 		case 'Q':				/* simple query */
 			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			doing_extended_query_message = false;
 			break;
 
 		case 'F':				/* fastpath function call */
 			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			doing_extended_query_message = false;
 			break;
 
 		case 'X':				/* terminate */
 			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
-			doing_extended_query_message = false;
-			ignore_till_sync = false;
-			break;
-
-		case 'B':				/* bind */
-		case 'P':				/* parse */
-			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			doing_extended_query_message = true;
-			break;
-
-		case 'C':				/* close */
-		case 'D':				/* describe */
-		case 'E':				/* execute */
-		case 'H':				/* flush */
-			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
-			doing_extended_query_message = true;
-			break;
-
-		case 'S':				/* sync */
-			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
-			/* stop any active skip-till-Sync */
-			ignore_till_sync = false;
-			/* mark not-extended, so that a new error doesn't begin skip */
-			doing_extended_query_message = false;
 			break;
 
 		case 'd':				/* copy data */
 			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			doing_extended_query_message = false;
 			break;
 
 		case 'c':				/* copy done */
 		case 'f':				/* copy fail */
 			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
-			doing_extended_query_message = false;
 			break;
 
 		default:
@@ -935,14 +870,6 @@ exec_simple_query(const char *query_string)
 	start_xact_command();
 
 	/*
-	 * Zap any pre-existing unnamed statement.  (While not strictly necessary,
-	 * it seems best to define simple-Query mode as if it used the unnamed
-	 * statement and portal; this ensures we recover any storage used by prior
-	 * unnamed operations.)
-	 */
-	drop_unnamed_stmt();
-
-	/*
 	 * Switch to appropriate context for constructing parsetrees.
 	 */
 	oldcontext = MemoryContextSwitchTo(MessageContext);
@@ -958,8 +885,7 @@ exec_simple_query(const char *query_string)
 	{
 		ereport(LOG,
 				(errmsg("statement: %s", query_string),
-				 errhidestmt(true),
-				 errdetail_execute(parsetree_list)));
+				 errhidestmt(true)));
 		was_logged = true;
 	}
 
@@ -1109,8 +1035,7 @@ exec_simple_query(const char *query_string)
 						  NULL,
 						  query_string,
 						  commandTag,
-						  plantree_list,
-						  NULL);
+						  plantree_list);
 
 		/*
 		 * Start the portal.  No parameters here.
@@ -1238,8 +1163,7 @@ exec_simple_query(const char *query_string)
 			ereport(LOG,
 					(errmsg("duration: %s ms  statement: %s",
 							msec_str, query_string),
-					 errhidestmt(true),
-					 errdetail_execute(parsetree_list)));
+					 errhidestmt(true)));
 			break;
 	}
 
@@ -1250,1397 +1174,6 @@ exec_simple_query(const char *query_string)
 
 	debug_query_string = NULL;
 }
-
-/*
- * exec_parse_message
- *
- * Execute a "Parse" protocol message.
- */
-static void
-exec_parse_message(const char *query_string,	/* string to execute */
-				   const char *stmt_name,	/* name for prepared stmt */
-				   Oid *paramTypes, /* parameter types */
-				   int numParams)	/* number of parameters */
-{
-	MemoryContext unnamed_stmt_context = NULL;
-	MemoryContext oldcontext;
-	List	   *parsetree_list;
-	RawStmt    *raw_parse_tree;
-	List	   *querytree_list;
-	CachedPlanSource *psrc;
-	bool		is_named;
-	bool		save_log_statement_stats = log_statement_stats;
-	char		msec_str[32];
-
-	/*
-	 * Report query to various monitoring facilities.
-	 */
-	debug_query_string = query_string;
-
-	pgstat_report_activity(STATE_RUNNING, query_string);
-
-	set_ps_display("PARSE");
-
-	if (save_log_statement_stats)
-		ResetUsage();
-
-	ereport(DEBUG2,
-			(errmsg_internal("parse %s: %s",
-							 *stmt_name ? stmt_name : "<unnamed>",
-							 query_string)));
-
-	/*
-	 * Start up a transaction command so we can run parse analysis etc. (Note
-	 * that this will normally change current memory context.) Nothing happens
-	 * if we are already in one.  This also arms the statement timeout if
-	 * necessary.
-	 */
-	start_xact_command();
-
-	/*
-	 * Switch to appropriate context for constructing parsetrees.
-	 *
-	 * We have two strategies depending on whether the prepared statement is
-	 * named or not.  For a named prepared statement, we do parsing in
-	 * MessageContext and copy the finished trees into the prepared
-	 * statement's plancache entry; then the reset of MessageContext releases
-	 * temporary space used by parsing and rewriting. For an unnamed prepared
-	 * statement, we assume the statement isn't going to hang around long, so
-	 * getting rid of temp space quickly is probably not worth the costs of
-	 * copying parse trees.  So in this case, we create the plancache entry's
-	 * query_context here, and do all the parsing work therein.
-	 */
-	is_named = (stmt_name[0] != '\0');
-	if (is_named)
-	{
-		/* Named prepared statement --- parse in MessageContext */
-		oldcontext = MemoryContextSwitchTo(MessageContext);
-	}
-	else
-	{
-		/* Unnamed prepared statement --- release any prior unnamed stmt */
-		drop_unnamed_stmt();
-		/* Create context for parsing */
-		unnamed_stmt_context =
-			AllocSetContextCreate(MessageContext,
-								  "unnamed prepared statement",
-								  ALLOCSET_DEFAULT_SIZES);
-		oldcontext = MemoryContextSwitchTo(unnamed_stmt_context);
-	}
-
-	/*
-	 * Do basic parsing of the query or queries (this should be safe even if
-	 * we are in aborted transaction state!)
-	 */
-	parsetree_list = pg_parse_query(query_string);
-
-	/*
-	 * We only allow a single user statement in a prepared statement. This is
-	 * mainly to keep the protocol simple --- otherwise we'd need to worry
-	 * about multiple result tupdescs and things like that.
-	 */
-	if (list_length(parsetree_list) > 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("cannot insert multiple commands into a prepared statement")));
-
-	if (parsetree_list != NIL)
-	{
-		Query	   *query;
-		bool		snapshot_set = false;
-
-		raw_parse_tree = linitial_node(RawStmt, parsetree_list);
-
-		/*
-		 * If we are in an aborted transaction, reject all commands except
-		 * COMMIT/ROLLBACK.  It is important that this test occur before we
-		 * try to do parse analysis, rewrite, or planning, since all those
-		 * phases try to do database accesses, which may fail in abort state.
-		 * (It might be safe to allow some additional utility commands in this
-		 * state, but not many...)
-		 */
-		if (IsAbortedTransactionBlockState() &&
-			!IsTransactionExitStmt(raw_parse_tree->stmt))
-			ereport(ERROR,
-					(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
-					 errmsg("current transaction is aborted, "
-							"commands ignored until end of transaction block"),
-					 errdetail_abort()));
-
-		/*
-		 * Create the CachedPlanSource before we do parse analysis, since it
-		 * needs to see the unmodified raw parse tree.
-		 */
-		psrc = CreateCachedPlan(raw_parse_tree, query_string,
-								CreateCommandTag(raw_parse_tree->stmt));
-
-		/*
-		 * Set up a snapshot if parse analysis will need one.
-		 */
-		if (analyze_requires_snapshot(raw_parse_tree))
-		{
-			PushActiveSnapshot(GetTransactionSnapshot());
-			snapshot_set = true;
-		}
-
-		/*
-		 * Analyze and rewrite the query.  Note that the originally specified
-		 * parameter set is not required to be complete, so we have to use
-		 * parse_analyze_varparams().
-		 */
-		if (log_parser_stats)
-			ResetUsage();
-
-		query = parse_analyze_varparams(raw_parse_tree,
-										query_string,
-										&paramTypes,
-										&numParams);
-
-		/*
-		 * Check all parameter types got determined.
-		 */
-		for (int i = 0; i < numParams; i++)
-		{
-			Oid			ptype = paramTypes[i];
-
-			if (ptype == InvalidOid || ptype == UNKNOWNOID)
-				ereport(ERROR,
-						(errcode(ERRCODE_INDETERMINATE_DATATYPE),
-						 errmsg("could not determine data type of parameter $%d",
-								i + 1)));
-		}
-
-		if (log_parser_stats)
-			ShowUsage("PARSE ANALYSIS STATISTICS");
-
-		querytree_list = pg_rewrite_query(query);
-
-		/* Done with the snapshot used for parsing */
-		if (snapshot_set)
-			PopActiveSnapshot();
-	}
-	else
-	{
-		/* Empty input string.  This is legal. */
-		raw_parse_tree = NULL;
-		psrc = CreateCachedPlan(raw_parse_tree, query_string,
-								CMDTAG_UNKNOWN);
-		querytree_list = NIL;
-	}
-
-	/*
-	 * CachedPlanSource must be a direct child of MessageContext before we
-	 * reparent unnamed_stmt_context under it, else we have a disconnected
-	 * circular subgraph.  Klugy, but less so than flipping contexts even more
-	 * above.
-	 */
-	if (unnamed_stmt_context)
-		MemoryContextSetParent(psrc->context, MessageContext);
-
-	/* Finish filling in the CachedPlanSource */
-	CompleteCachedPlan(psrc,
-					   querytree_list,
-					   unnamed_stmt_context,
-					   paramTypes,
-					   numParams,
-					   NULL,
-					   NULL,
-					   CURSOR_OPT_PARALLEL_OK,	/* allow parallel mode */
-					   true);	/* fixed result */
-
-	/* If we got a cancel signal during analysis, quit */
-	CHECK_FOR_INTERRUPTS();
-
-	if (is_named)
-	{
-		/*
-		 * Store the query as a prepared statement.
-		 */
-		StorePreparedStatement(stmt_name, psrc, false);
-	}
-	else
-	{
-		/*
-		 * We just save the CachedPlanSource into unnamed_stmt_psrc.
-		 */
-		SaveCachedPlan(psrc);
-		unnamed_stmt_psrc = psrc;
-	}
-
-	MemoryContextSwitchTo(oldcontext);
-
-	/*
-	 * We do NOT close the open transaction command here; that only happens
-	 * when the client sends Sync.  Instead, do CommandCounterIncrement just
-	 * in case something happened during parse/plan.
-	 */
-	CommandCounterIncrement();
-
-	/*
-	 * Send ParseComplete.
-	 */
-	if (whereToSendOutput == DestRemote)
-		pq_putemptymessage('1');
-
-	/*
-	 * Emit duration logging if appropriate.
-	 */
-	switch (check_log_duration(msec_str, false))
-	{
-		case 1:
-			ereport(LOG,
-					(errmsg("duration: %s ms", msec_str),
-					 errhidestmt(true)));
-			break;
-		case 2:
-			ereport(LOG,
-					(errmsg("duration: %s ms  parse %s: %s",
-							msec_str,
-							*stmt_name ? stmt_name : "<unnamed>",
-							query_string),
-					 errhidestmt(true)));
-			break;
-	}
-
-	if (save_log_statement_stats)
-		ShowUsage("PARSE MESSAGE STATISTICS");
-
-	debug_query_string = NULL;
-}
-
-/*
- * exec_bind_message
- *
- * Process a "Bind" message to create a portal from a prepared statement
- */
-static void
-exec_bind_message(StringInfo input_message)
-{
-	const char *portal_name;
-	const char *stmt_name;
-	int			numPFormats;
-	int16	   *pformats = NULL;
-	int			numParams;
-	int			numRFormats;
-	int16	   *rformats = NULL;
-	CachedPlanSource *psrc;
-	CachedPlan *cplan;
-	Portal		portal;
-	char	   *query_string;
-	char	   *saved_stmt_name;
-	ParamListInfo params;
-	MemoryContext oldContext;
-	bool		save_log_statement_stats = log_statement_stats;
-	bool		snapshot_set = false;
-	char		msec_str[32];
-	ParamsErrorCbData params_data;
-	ErrorContextCallback params_errcxt;
-	ListCell   *lc;
-
-	/* Get the fixed part of the message */
-	portal_name = pq_getmsgstring(input_message);
-	stmt_name = pq_getmsgstring(input_message);
-
-	ereport(DEBUG2,
-			(errmsg_internal("bind %s to %s",
-							 *portal_name ? portal_name : "<unnamed>",
-							 *stmt_name ? stmt_name : "<unnamed>")));
-
-	/* Find prepared statement */
-	if (stmt_name[0] != '\0')
-	{
-		PreparedStatement *pstmt;
-
-		pstmt = FetchPreparedStatement(stmt_name, true);
-		psrc = pstmt->plansource;
-	}
-	else
-	{
-		/* special-case the unnamed statement */
-		psrc = unnamed_stmt_psrc;
-		if (!psrc)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_PSTATEMENT),
-					 errmsg("unnamed prepared statement does not exist")));
-	}
-
-	/*
-	 * Report query to various monitoring facilities.
-	 */
-	debug_query_string = psrc->query_string;
-
-	pgstat_report_activity(STATE_RUNNING, psrc->query_string);
-
-	foreach(lc, psrc->query_list)
-	{
-		Query	   *query = lfirst_node(Query, lc);
-
-		if (query->queryId != UINT64CONST(0))
-		{
-			pgstat_report_query_id(query->queryId, false);
-			break;
-		}
-	}
-
-	set_ps_display("BIND");
-
-	if (save_log_statement_stats)
-		ResetUsage();
-
-	/*
-	 * Start up a transaction command so we can call functions etc. (Note that
-	 * this will normally change current memory context.) Nothing happens if
-	 * we are already in one.  This also arms the statement timeout if
-	 * necessary.
-	 */
-	start_xact_command();
-
-	/* Switch back to message context */
-	MemoryContextSwitchTo(MessageContext);
-
-	/* Get the parameter format codes */
-	numPFormats = pq_getmsgint(input_message, 2);
-	if (numPFormats > 0)
-	{
-		pformats = (int16 *) palloc(numPFormats * sizeof(int16));
-		for (int i = 0; i < numPFormats; i++)
-			pformats[i] = pq_getmsgint(input_message, 2);
-	}
-
-	/* Get the parameter value count */
-	numParams = pq_getmsgint(input_message, 2);
-
-	if (numPFormats > 1 && numPFormats != numParams)
-		ereport(ERROR,
-				(errcode(ERRCODE_PROTOCOL_VIOLATION),
-				 errmsg("bind message has %d parameter formats but %d parameters",
-						numPFormats, numParams)));
-
-	if (numParams != psrc->num_params)
-		ereport(ERROR,
-				(errcode(ERRCODE_PROTOCOL_VIOLATION),
-				 errmsg("bind message supplies %d parameters, but prepared statement \"%s\" requires %d",
-						numParams, stmt_name, psrc->num_params)));
-
-	/*
-	 * If we are in aborted transaction state, the only portals we can
-	 * actually run are those containing COMMIT or ROLLBACK commands. We
-	 * disallow binding anything else to avoid problems with infrastructure
-	 * that expects to run inside a valid transaction.  We also disallow
-	 * binding any parameters, since we can't risk calling user-defined I/O
-	 * functions.
-	 */
-	if (IsAbortedTransactionBlockState() &&
-		(!(psrc->raw_parse_tree &&
-		   IsTransactionExitStmt(psrc->raw_parse_tree->stmt)) ||
-		 numParams != 0))
-		ereport(ERROR,
-				(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
-				 errmsg("current transaction is aborted, "
-						"commands ignored until end of transaction block"),
-				 errdetail_abort()));
-
-	/*
-	 * Create the portal.  Allow silent replacement of an existing portal only
-	 * if the unnamed portal is specified.
-	 */
-	if (portal_name[0] == '\0')
-		portal = CreatePortal(portal_name, true, true);
-	else
-		portal = CreatePortal(portal_name, false, false);
-
-	/*
-	 * Prepare to copy stuff into the portal's memory context.  We do all this
-	 * copying first, because it could possibly fail (out-of-memory) and we
-	 * don't want a failure to occur between GetCachedPlan and
-	 * PortalDefineQuery; that would result in leaking our plancache refcount.
-	 */
-	oldContext = MemoryContextSwitchTo(portal->portalContext);
-
-	/* Copy the plan's query string into the portal */
-	query_string = pstrdup(psrc->query_string);
-
-	/* Likewise make a copy of the statement name, unless it's unnamed */
-	if (stmt_name[0])
-		saved_stmt_name = pstrdup(stmt_name);
-	else
-		saved_stmt_name = NULL;
-
-	/*
-	 * Set a snapshot if we have parameters to fetch (since the input
-	 * functions might need it) or the query isn't a utility command (and
-	 * hence could require redoing parse analysis and planning).  We keep the
-	 * snapshot active till we're done, so that plancache.c doesn't have to
-	 * take new ones.
-	 */
-	if (numParams > 0 ||
-		(psrc->raw_parse_tree &&
-		 analyze_requires_snapshot(psrc->raw_parse_tree)))
-	{
-		PushActiveSnapshot(GetTransactionSnapshot());
-		snapshot_set = true;
-	}
-
-	/*
-	 * Fetch parameters, if any, and store in the portal's memory context.
-	 */
-	if (numParams > 0)
-	{
-		char	  **knownTextValues = NULL; /* allocate on first use */
-		BindParamCbData one_param_data;
-
-		/*
-		 * Set up an error callback so that if there's an error in this phase,
-		 * we can report the specific parameter causing the problem.
-		 */
-		one_param_data.portalName = portal->name;
-		one_param_data.paramno = -1;
-		one_param_data.paramval = NULL;
-		params_errcxt.previous = error_context_stack;
-		params_errcxt.callback = bind_param_error_callback;
-		params_errcxt.arg = (void *) &one_param_data;
-		error_context_stack = &params_errcxt;
-
-		params = makeParamList(numParams);
-
-		for (int paramno = 0; paramno < numParams; paramno++)
-		{
-			Oid			ptype = psrc->param_types[paramno];
-			int32		plength;
-			Datum		pval;
-			bool		isNull;
-			StringInfoData pbuf;
-			char		csave;
-			int16		pformat;
-
-			one_param_data.paramno = paramno;
-			one_param_data.paramval = NULL;
-
-			plength = pq_getmsgint(input_message, 4);
-			isNull = (plength == -1);
-
-			if (!isNull)
-			{
-				const char *pvalue = pq_getmsgbytes(input_message, plength);
-
-				/*
-				 * Rather than copying data around, we just set up a phony
-				 * StringInfo pointing to the correct portion of the message
-				 * buffer.  We assume we can scribble on the message buffer so
-				 * as to maintain the convention that StringInfos have a
-				 * trailing null.  This is grotty but is a big win when
-				 * dealing with very large parameter strings.
-				 */
-				pbuf.data = unconstify(char *, pvalue);
-				pbuf.maxlen = plength + 1;
-				pbuf.len = plength;
-				pbuf.cursor = 0;
-
-				csave = pbuf.data[plength];
-				pbuf.data[plength] = '\0';
-			}
-			else
-			{
-				pbuf.data = NULL;	/* keep compiler quiet */
-				csave = 0;
-			}
-
-			if (numPFormats > 1)
-				pformat = pformats[paramno];
-			else if (numPFormats > 0)
-				pformat = pformats[0];
-			else
-				pformat = 0;	/* default = text */
-
-			if (pformat == 0)	/* text mode */
-			{
-				Oid			typinput;
-				Oid			typioparam;
-				char	   *pstring;
-
-				getTypeInputInfo(ptype, &typinput, &typioparam);
-
-				/*
-				 * We have to do encoding conversion before calling the
-				 * typinput routine.
-				 */
-				if (isNull)
-					pstring = NULL;
-				else
-					pstring = pg_client_to_server(pbuf.data, plength);
-
-				/* Now we can log the input string in case of error */
-				one_param_data.paramval = pstring;
-
-				pval = OidInputFunctionCall(typinput, pstring, typioparam, -1);
-
-				one_param_data.paramval = NULL;
-
-				/*
-				 * If we might need to log parameters later, save a copy of
-				 * the converted string in MessageContext; then free the
-				 * result of encoding conversion, if any was done.
-				 */
-				if (pstring)
-				{
-					if (log_parameter_max_length_on_error != 0)
-					{
-						MemoryContext oldcxt;
-
-						oldcxt = MemoryContextSwitchTo(MessageContext);
-
-						if (knownTextValues == NULL)
-							knownTextValues =
-								palloc0(numParams * sizeof(char *));
-
-						if (log_parameter_max_length_on_error < 0)
-							knownTextValues[paramno] = pstrdup(pstring);
-						else
-						{
-							/*
-							 * We can trim the saved string, knowing that we
-							 * won't print all of it.  But we must copy at
-							 * least two more full characters than
-							 * BuildParamLogString wants to use; otherwise it
-							 * might fail to include the trailing ellipsis.
-							 */
-							knownTextValues[paramno] =
-								pnstrdup(pstring,
-										 log_parameter_max_length_on_error
-										 + 2 * MAX_MULTIBYTE_CHAR_LEN);
-						}
-
-						MemoryContextSwitchTo(oldcxt);
-					}
-					if (pstring != pbuf.data)
-						pfree(pstring);
-				}
-			}
-			else if (pformat == 1)	/* binary mode */
-			{
-				Oid			typreceive;
-				Oid			typioparam;
-				StringInfo	bufptr;
-
-				/*
-				 * Call the parameter type's binary input converter
-				 */
-				getTypeBinaryInputInfo(ptype, &typreceive, &typioparam);
-
-				if (isNull)
-					bufptr = NULL;
-				else
-					bufptr = &pbuf;
-
-				pval = OidReceiveFunctionCall(typreceive, bufptr, typioparam, -1);
-
-				/* Trouble if it didn't eat the whole buffer */
-				if (!isNull && pbuf.cursor != pbuf.len)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
-							 errmsg("incorrect binary data format in bind parameter %d",
-									paramno + 1)));
-			}
-			else
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("unsupported format code: %d",
-								pformat)));
-				pval = 0;		/* keep compiler quiet */
-			}
-
-			/* Restore message buffer contents */
-			if (!isNull)
-				pbuf.data[plength] = csave;
-
-			params->params[paramno].value = pval;
-			params->params[paramno].isnull = isNull;
-
-			/*
-			 * We mark the params as CONST.  This ensures that any custom plan
-			 * makes full use of the parameter values.
-			 */
-			params->params[paramno].pflags = PARAM_FLAG_CONST;
-			params->params[paramno].ptype = ptype;
-		}
-
-		/* Pop the per-parameter error callback */
-		error_context_stack = error_context_stack->previous;
-
-		/*
-		 * Once all parameters have been received, prepare for printing them
-		 * in future errors, if configured to do so.  (This is saved in the
-		 * portal, so that they'll appear when the query is executed later.)
-		 */
-		if (log_parameter_max_length_on_error != 0)
-			params->paramValuesStr =
-				BuildParamLogString(params,
-									knownTextValues,
-									log_parameter_max_length_on_error);
-	}
-	else
-		params = NULL;
-
-	/* Done storing stuff in portal's context */
-	MemoryContextSwitchTo(oldContext);
-
-	/*
-	 * Set up another error callback so that all the parameters are logged if
-	 * we get an error during the rest of the BIND processing.
-	 */
-	params_data.portalName = portal->name;
-	params_data.params = params;
-	params_errcxt.previous = error_context_stack;
-	params_errcxt.callback = ParamsErrorCallback;
-	params_errcxt.arg = (void *) &params_data;
-	error_context_stack = &params_errcxt;
-
-	/* Get the result format codes */
-	numRFormats = pq_getmsgint(input_message, 2);
-	if (numRFormats > 0)
-	{
-		rformats = (int16 *) palloc(numRFormats * sizeof(int16));
-		for (int i = 0; i < numRFormats; i++)
-			rformats[i] = pq_getmsgint(input_message, 2);
-	}
-
-	pq_getmsgend(input_message);
-
-	/*
-	 * Obtain a plan from the CachedPlanSource.  Any cruft from (re)planning
-	 * will be generated in MessageContext.  The plan refcount will be
-	 * assigned to the Portal, so it will be released at portal destruction.
-	 */
-	cplan = GetCachedPlan(psrc, params, NULL, NULL);
-
-	/*
-	 * Now we can define the portal.
-	 *
-	 * DO NOT put any code that could possibly throw an error between the
-	 * above GetCachedPlan call and here.
-	 */
-	PortalDefineQuery(portal,
-					  saved_stmt_name,
-					  query_string,
-					  psrc->commandTag,
-					  cplan->stmt_list,
-					  cplan);
-
-	/* Done with the snapshot used for parameter I/O and parsing/planning */
-	if (snapshot_set)
-		PopActiveSnapshot();
-
-	/*
-	 * And we're ready to start portal execution.
-	 */
-	PortalStart(portal, params, 0, InvalidSnapshot);
-
-	/*
-	 * Apply the result format requests to the portal.
-	 */
-	PortalSetResultFormat(portal, numRFormats, rformats);
-
-	/*
-	 * Done binding; remove the parameters error callback.  Entries emitted
-	 * later determine independently whether to log the parameters or not.
-	 */
-	error_context_stack = error_context_stack->previous;
-
-	/*
-	 * Send BindComplete.
-	 */
-	if (whereToSendOutput == DestRemote)
-		pq_putemptymessage('2');
-
-	/*
-	 * Emit duration logging if appropriate.
-	 */
-	switch (check_log_duration(msec_str, false))
-	{
-		case 1:
-			ereport(LOG,
-					(errmsg("duration: %s ms", msec_str),
-					 errhidestmt(true)));
-			break;
-		case 2:
-			ereport(LOG,
-					(errmsg("duration: %s ms  bind %s%s%s: %s",
-							msec_str,
-							*stmt_name ? stmt_name : "<unnamed>",
-							*portal_name ? "/" : "",
-							*portal_name ? portal_name : "",
-							psrc->query_string),
-					 errhidestmt(true),
-					 errdetail_params(params)));
-			break;
-	}
-
-	if (save_log_statement_stats)
-		ShowUsage("BIND MESSAGE STATISTICS");
-
-	debug_query_string = NULL;
-}
-
-/*
- * exec_execute_message
- *
- * Process an "Execute" message for a portal
- */
-static void
-exec_execute_message(const char *portal_name, long max_rows)
-{
-	CommandDest dest;
-	DestReceiver *receiver;
-	Portal		portal;
-	bool		completed;
-	QueryCompletion qc;
-	const char *sourceText;
-	const char *prepStmtName;
-	ParamListInfo portalParams;
-	bool		save_log_statement_stats = log_statement_stats;
-	bool		is_xact_command;
-	bool		execute_is_fetch;
-	bool		was_logged = false;
-	char		msec_str[32];
-	ParamsErrorCbData params_data;
-	ErrorContextCallback params_errcxt;
-	ListCell   *lc;
-
-	/* Adjust destination to tell printtup.c what to do */
-	dest = whereToSendOutput;
-	if (dest == DestRemote)
-		dest = DestRemoteExecute;
-
-	portal = GetPortalByName(portal_name);
-	if (!PortalIsValid(portal))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_CURSOR),
-				 errmsg("portal \"%s\" does not exist", portal_name)));
-
-	/*
-	 * If the original query was a null string, just return
-	 * EmptyQueryResponse.
-	 */
-	if (portal->commandTag == CMDTAG_UNKNOWN)
-	{
-		Assert(portal->stmts == NIL);
-		NullCommand(dest);
-		return;
-	}
-
-	/* Does the portal contain a transaction command? */
-	is_xact_command = IsTransactionStmtList(portal->stmts);
-
-	/*
-	 * We must copy the sourceText and prepStmtName into MessageContext in
-	 * case the portal is destroyed during finish_xact_command.  We do not
-	 * make a copy of the portalParams though, preferring to just not print
-	 * them in that case.
-	 */
-	sourceText = pstrdup(portal->sourceText);
-	if (portal->prepStmtName)
-		prepStmtName = pstrdup(portal->prepStmtName);
-	else
-		prepStmtName = "<unnamed>";
-	portalParams = portal->portalParams;
-
-	/*
-	 * Report query to various monitoring facilities.
-	 */
-	debug_query_string = sourceText;
-
-	pgstat_report_activity(STATE_RUNNING, sourceText);
-
-	foreach(lc, portal->stmts)
-	{
-		PlannedStmt *stmt = lfirst_node(PlannedStmt, lc);
-
-		if (stmt->queryId != UINT64CONST(0))
-		{
-			pgstat_report_query_id(stmt->queryId, false);
-			break;
-		}
-	}
-
-	set_ps_display(GetCommandTagName(portal->commandTag));
-
-	if (save_log_statement_stats)
-		ResetUsage();
-
-	BeginCommand(portal->commandTag, dest);
-
-	/*
-	 * Create dest receiver in MessageContext (we don't want it in transaction
-	 * context, because that may get deleted if portal contains VACUUM).
-	 */
-	receiver = CreateDestReceiver(dest);
-	if (dest == DestRemoteExecute)
-		SetRemoteDestReceiverParams(receiver, portal);
-
-	/*
-	 * Ensure we are in a transaction command (this should normally be the
-	 * case already due to prior BIND).
-	 */
-	start_xact_command();
-
-	/*
-	 * If we re-issue an Execute protocol request against an existing portal,
-	 * then we are only fetching more rows rather than completely re-executing
-	 * the query from the start. atStart is never reset for a v3 portal, so we
-	 * are safe to use this check.
-	 */
-	execute_is_fetch = !portal->atStart;
-
-	/* Log immediately if dictated by log_statement */
-	if (check_log_statement(portal->stmts))
-	{
-		ereport(LOG,
-				(errmsg("%s %s%s%s: %s",
-						execute_is_fetch ?
-						_("execute fetch from") :
-						_("execute"),
-						prepStmtName,
-						*portal_name ? "/" : "",
-						*portal_name ? portal_name : "",
-						sourceText),
-				 errhidestmt(true),
-				 errdetail_params(portalParams)));
-		was_logged = true;
-	}
-
-	/*
-	 * If we are in aborted transaction state, the only portals we can
-	 * actually run are those containing COMMIT or ROLLBACK commands.
-	 */
-	if (IsAbortedTransactionBlockState() &&
-		!IsTransactionExitStmtList(portal->stmts))
-		ereport(ERROR,
-				(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
-				 errmsg("current transaction is aborted, "
-						"commands ignored until end of transaction block"),
-				 errdetail_abort()));
-
-	/* Check for cancel signal before we start execution */
-	CHECK_FOR_INTERRUPTS();
-
-	/*
-	 * Okay to run the portal.  Set the error callback so that parameters are
-	 * logged.  The parameters must have been saved during the bind phase.
-	 */
-	params_data.portalName = portal->name;
-	params_data.params = portalParams;
-	params_errcxt.previous = error_context_stack;
-	params_errcxt.callback = ParamsErrorCallback;
-	params_errcxt.arg = (void *) &params_data;
-	error_context_stack = &params_errcxt;
-
-	if (max_rows <= 0)
-		max_rows = LONG_MAX;
-
-	completed = PortalRun(portal,
-						  max_rows,
-						  true, /* always top level */
-						  receiver,
-						  receiver,
-						  &qc);
-
-	receiver->rDestroy(receiver);
-
-	/* Done executing; remove the params error callback */
-	error_context_stack = error_context_stack->previous;
-
-	if (completed)
-	{
-		if (is_xact_command || (MyXactFlags & XACT_FLAGS_NEEDIMMEDIATECOMMIT))
-		{
-			/*
-			 * If this was a transaction control statement, commit it.  We
-			 * will start a new xact command for the next command (if any).
-			 * Likewise if the statement required immediate commit.  Without
-			 * this provision, we wouldn't force commit until Sync is
-			 * received, which creates a hazard if the client tries to
-			 * pipeline immediate-commit statements.
-			 */
-			finish_xact_command();
-
-			/*
-			 * These commands typically don't have any parameters, and even if
-			 * one did we couldn't print them now because the storage went
-			 * away during finish_xact_command.  So pretend there were none.
-			 */
-			portalParams = NULL;
-		}
-		else
-		{
-			/*
-			 * We need a CommandCounterIncrement after every query, except
-			 * those that start or end a transaction block.
-			 */
-			CommandCounterIncrement();
-
-			/*
-			 * Set XACT_FLAGS_PIPELINING whenever we complete an Execute
-			 * message without immediately committing the transaction.
-			 */
-			MyXactFlags |= XACT_FLAGS_PIPELINING;
-
-			/*
-			 * Disable statement timeout whenever we complete an Execute
-			 * message.  The next protocol message will start a fresh timeout.
-			 */
-			disable_statement_timeout();
-		}
-
-		/* Send appropriate CommandComplete to client */
-		EndCommand(&qc, dest, false);
-	}
-	else
-	{
-		/* Portal run not complete, so send PortalSuspended */
-		if (whereToSendOutput == DestRemote)
-			pq_putemptymessage('s');
-
-		/*
-		 * Set XACT_FLAGS_PIPELINING whenever we suspend an Execute message,
-		 * too.
-		 */
-		MyXactFlags |= XACT_FLAGS_PIPELINING;
-	}
-
-	/*
-	 * Emit duration logging if appropriate.
-	 */
-	switch (check_log_duration(msec_str, was_logged))
-	{
-		case 1:
-			ereport(LOG,
-					(errmsg("duration: %s ms", msec_str),
-					 errhidestmt(true)));
-			break;
-		case 2:
-			ereport(LOG,
-					(errmsg("duration: %s ms  %s %s%s%s: %s",
-							msec_str,
-							execute_is_fetch ?
-							_("execute fetch from") :
-							_("execute"),
-							prepStmtName,
-							*portal_name ? "/" : "",
-							*portal_name ? portal_name : "",
-							sourceText),
-					 errhidestmt(true),
-					 errdetail_params(portalParams)));
-			break;
-	}
-
-	if (save_log_statement_stats)
-		ShowUsage("EXECUTE MESSAGE STATISTICS");
-
-	debug_query_string = NULL;
-}
-
-/*
- * check_log_statement
- *		Determine whether command should be logged because of log_statement
- *
- * stmt_list can be either raw grammar output or a list of planned
- * statements
- */
-static bool
-check_log_statement(List *stmt_list)
-{
-	ListCell   *stmt_item;
-
-	if (log_statement == LOGSTMT_NONE)
-		return false;
-	if (log_statement == LOGSTMT_ALL)
-		return true;
-
-	/* Else we have to inspect the statement(s) to see whether to log */
-	foreach(stmt_item, stmt_list)
-	{
-		Node	   *stmt = (Node *) lfirst(stmt_item);
-
-		if (GetCommandLogLevel(stmt) <= log_statement)
-			return true;
-	}
-
-	return false;
-}
-
-/*
- * check_log_duration
- *		Determine whether current command's duration should be logged
- *		We also check if this statement in this transaction must be logged
- *		(regardless of its duration).
- *
- * Returns:
- *		0 if no logging is needed
- *		1 if just the duration should be logged
- *		2 if duration and query details should be logged
- *
- * If logging is needed, the duration in msec is formatted into msec_str[],
- * which must be a 32-byte buffer.
- *
- * was_logged should be true if caller already logged query details (this
- * essentially prevents 2 from being returned).
- */
-int
-check_log_duration(char *msec_str, bool was_logged)
-{
-	if (log_duration || log_min_duration_sample >= 0 ||
-		log_min_duration_statement >= 0 || xact_is_sampled)
-	{
-		long		secs;
-		int			usecs;
-		int			msecs;
-		bool		exceeded_duration;
-		bool		exceeded_sample_duration;
-		bool		in_sample = false;
-
-		TimestampDifference(GetCurrentStatementStartTimestamp(),
-							GetCurrentTimestamp(),
-							&secs, &usecs);
-		msecs = usecs / 1000;
-
-		/*
-		 * This odd-looking test for log_min_duration_* being exceeded is
-		 * designed to avoid integer overflow with very long durations: don't
-		 * compute secs * 1000 until we've verified it will fit in int.
-		 */
-		exceeded_duration = (log_min_duration_statement == 0 ||
-							 (log_min_duration_statement > 0 &&
-							  (secs > log_min_duration_statement / 1000 ||
-							   secs * 1000 + msecs >= log_min_duration_statement)));
-
-		exceeded_sample_duration = (log_min_duration_sample == 0 ||
-									(log_min_duration_sample > 0 &&
-									 (secs > log_min_duration_sample / 1000 ||
-									  secs * 1000 + msecs >= log_min_duration_sample)));
-
-		/*
-		 * Do not log if log_statement_sample_rate = 0. Log a sample if
-		 * log_statement_sample_rate <= 1 and avoid unnecessary random() call
-		 * if log_statement_sample_rate = 1.
-		 */
-		if (exceeded_sample_duration)
-			in_sample = log_statement_sample_rate != 0 &&
-				(log_statement_sample_rate == 1 ||
-				 random() <= log_statement_sample_rate * MAX_RANDOM_VALUE);
-
-		if (exceeded_duration || in_sample || log_duration || xact_is_sampled)
-		{
-			snprintf(msec_str, 32, "%ld.%03d",
-					 secs * 1000 + msecs, usecs % 1000);
-			if ((exceeded_duration || in_sample || xact_is_sampled) && !was_logged)
-				return 2;
-			else
-				return 1;
-		}
-	}
-
-	return 0;
-}
-
-/*
- * errdetail_execute
- *
- * Add an errdetail() line showing the query referenced by an EXECUTE, if any.
- * The argument is the raw parsetree list.
- */
-static int
-errdetail_execute(List *raw_parsetree_list)
-{
-	ListCell   *parsetree_item;
-
-	foreach(parsetree_item, raw_parsetree_list)
-	{
-		RawStmt    *parsetree = lfirst_node(RawStmt, parsetree_item);
-
-		if (IsA(parsetree->stmt, ExecuteStmt))
-		{
-			ExecuteStmt *stmt = (ExecuteStmt *) parsetree->stmt;
-			PreparedStatement *pstmt;
-
-			pstmt = FetchPreparedStatement(stmt->name, false);
-			if (pstmt)
-			{
-				errdetail("prepare: %s", pstmt->plansource->query_string);
-				return 0;
-			}
-		}
-	}
-
-	return 0;
-}
-
-/*
- * errdetail_params
- *
- * Add an errdetail() line showing bind-parameter data, if available.
- * Note that this is only used for statement logging, so it is controlled
- * by log_parameter_max_length not log_parameter_max_length_on_error.
- */
-static int
-errdetail_params(ParamListInfo params)
-{
-	if (params && params->numParams > 0 && log_parameter_max_length != 0)
-	{
-		char	   *str;
-
-		str = BuildParamLogString(params, NULL, log_parameter_max_length);
-		if (str && str[0] != '\0')
-			errdetail("parameters: %s", str);
-	}
-
-	return 0;
-}
-
-/*
- * errdetail_abort
- *
- * Add an errdetail() line showing abort reason, if any.
- */
-static int
-errdetail_abort(void)
-{
-	if (MyProc->recoveryConflictPending)
-		errdetail("abort reason: recovery conflict");
-
-	return 0;
-}
-
-/*
- * errdetail_recovery_conflict
- *
- * Add an errdetail() line showing conflict source.
- */
-static int
-errdetail_recovery_conflict(void)
-{
-	switch (RecoveryConflictReason)
-	{
-		case PROCSIG_RECOVERY_CONFLICT_BUFFERPIN:
-			errdetail("User was holding shared buffer pin for too long.");
-			break;
-		case PROCSIG_RECOVERY_CONFLICT_LOCK:
-			errdetail("User was holding a relation lock for too long.");
-			break;
-		case PROCSIG_RECOVERY_CONFLICT_SNAPSHOT:
-			errdetail("User query might have needed to see row versions that must be removed.");
-			break;
-		case PROCSIG_RECOVERY_CONFLICT_STARTUP_DEADLOCK:
-			errdetail("User transaction caused buffer deadlock with recovery.");
-			break;
-		case PROCSIG_RECOVERY_CONFLICT_DATABASE:
-			errdetail("User was connected to a database that must be dropped.");
-			break;
-		default:
-			break;
-			/* no errdetail */
-	}
-
-	return 0;
-}
-
-/*
- * bind_param_error_callback
- *
- * Error context callback used while parsing parameters in a Bind message
- */
-static void
-bind_param_error_callback(void *arg)
-{
-	BindParamCbData *data = (BindParamCbData *) arg;
-	StringInfoData buf;
-	char	   *quotedval;
-
-	if (data->paramno < 0)
-		return;
-
-	/* If we have a textual value, quote it, and trim if necessary */
-	if (data->paramval)
-	{
-		initStringInfo(&buf);
-		appendStringInfoStringQuoted(&buf, data->paramval,
-									 log_parameter_max_length_on_error);
-		quotedval = buf.data;
-	}
-	else
-		quotedval = NULL;
-
-	if (data->portalName && data->portalName[0] != '\0')
-	{
-		if (quotedval)
-			errcontext("portal \"%s\" parameter $%d = %s",
-					   data->portalName, data->paramno + 1, quotedval);
-		else
-			errcontext("portal \"%s\" parameter $%d",
-					   data->portalName, data->paramno + 1);
-	}
-	else
-	{
-		if (quotedval)
-			errcontext("unnamed portal parameter $%d = %s",
-					   data->paramno + 1, quotedval);
-		else
-			errcontext("unnamed portal parameter $%d",
-					   data->paramno + 1);
-	}
-
-	if (quotedval)
-		pfree(quotedval);
-}
-
-/*
- * exec_describe_statement_message
- *
- * Process a "Describe" message for a prepared statement
- */
-static void
-exec_describe_statement_message(const char *stmt_name)
-{
-	CachedPlanSource *psrc;
-
-	/*
-	 * Start up a transaction command. (Note that this will normally change
-	 * current memory context.) Nothing happens if we are already in one.
-	 */
-	start_xact_command();
-
-	/* Switch back to message context */
-	MemoryContextSwitchTo(MessageContext);
-
-	/* Find prepared statement */
-	if (stmt_name[0] != '\0')
-	{
-		PreparedStatement *pstmt;
-
-		pstmt = FetchPreparedStatement(stmt_name, true);
-		psrc = pstmt->plansource;
-	}
-	else
-	{
-		/* special-case the unnamed statement */
-		psrc = unnamed_stmt_psrc;
-		if (!psrc)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_PSTATEMENT),
-					 errmsg("unnamed prepared statement does not exist")));
-	}
-
-	/* Prepared statements shouldn't have changeable result descs */
-	Assert(psrc->fixed_result);
-
-	/*
-	 * If we are in aborted transaction state, we can't run
-	 * SendRowDescriptionMessage(), because that needs catalog accesses.
-	 * Hence, refuse to Describe statements that return data.  (We shouldn't
-	 * just refuse all Describes, since that might break the ability of some
-	 * clients to issue COMMIT or ROLLBACK commands, if they use code that
-	 * blindly Describes whatever it does.)  We can Describe parameters
-	 * without doing anything dangerous, so we don't restrict that.
-	 */
-	if (IsAbortedTransactionBlockState() &&
-		psrc->resultDesc)
-		ereport(ERROR,
-				(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
-				 errmsg("current transaction is aborted, "
-						"commands ignored until end of transaction block"),
-				 errdetail_abort()));
-
-	if (whereToSendOutput != DestRemote)
-		return;					/* can't actually do anything... */
-
-	/*
-	 * First describe the parameters...
-	 */
-	pq_beginmessage_reuse(&row_description_buf, 't');	/* parameter description
-														 * message type */
-	pq_sendint16(&row_description_buf, psrc->num_params);
-
-	for (int i = 0; i < psrc->num_params; i++)
-	{
-		Oid			ptype = psrc->param_types[i];
-
-		pq_sendint32(&row_description_buf, (int) ptype);
-	}
-	pq_endmessage_reuse(&row_description_buf);
-
-	/*
-	 * Next send RowDescription or NoData to describe the result...
-	 */
-	if (psrc->resultDesc)
-	{
-		List	   *tlist;
-
-		/* Get the plan's primary targetlist */
-		tlist = CachedPlanGetTargetList(psrc, NULL);
-
-		SendRowDescriptionMessage(&row_description_buf,
-								  psrc->resultDesc,
-								  tlist,
-								  NULL);
-	}
-	else
-		pq_putemptymessage('n');	/* NoData */
-
-}
-
-/*
- * exec_describe_portal_message
- *
- * Process a "Describe" message for a portal
- */
-static void
-exec_describe_portal_message(const char *portal_name)
-{
-	Portal		portal;
-
-	/*
-	 * Start up a transaction command. (Note that this will normally change
-	 * current memory context.) Nothing happens if we are already in one.
-	 */
-	start_xact_command();
-
-	/* Switch back to message context */
-	MemoryContextSwitchTo(MessageContext);
-
-	portal = GetPortalByName(portal_name);
-	if (!PortalIsValid(portal))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_CURSOR),
-				 errmsg("portal \"%s\" does not exist", portal_name)));
-
-	/*
-	 * If we are in aborted transaction state, we can't run
-	 * SendRowDescriptionMessage(), because that needs catalog accesses.
-	 * Hence, refuse to Describe portals that return data.  (We shouldn't just
-	 * refuse all Describes, since that might break the ability of some
-	 * clients to issue COMMIT or ROLLBACK commands, if they use code that
-	 * blindly Describes whatever it does.)
-	 */
-	if (IsAbortedTransactionBlockState() &&
-		portal->tupDesc)
-		ereport(ERROR,
-				(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
-				 errmsg("current transaction is aborted, "
-						"commands ignored until end of transaction block"),
-				 errdetail_abort()));
-
-	if (whereToSendOutput != DestRemote)
-		return;					/* can't actually do anything... */
-
-	if (portal->tupDesc)
-		SendRowDescriptionMessage(&row_description_buf,
-								  portal->tupDesc,
-								  FetchPortalTargetList(portal),
-								  portal->formats);
-	else
-		pq_putemptymessage('n');	/* NoData */
-}
-
 
 /*
  * Convenience routines for starting/committing a single command.
@@ -2720,51 +1253,6 @@ IsTransactionExitStmt(Node *parsetree)
 	}
 	return false;
 }
-
-/* Test a list that contains PlannedStmt nodes */
-static bool
-IsTransactionExitStmtList(List *pstmts)
-{
-	if (list_length(pstmts) == 1)
-	{
-		PlannedStmt *pstmt = linitial_node(PlannedStmt, pstmts);
-
-		if (pstmt->commandType == CMD_UTILITY &&
-			IsTransactionExitStmt(pstmt->utilityStmt))
-			return true;
-	}
-	return false;
-}
-
-/* Test a list that contains PlannedStmt nodes */
-static bool
-IsTransactionStmtList(List *pstmts)
-{
-	if (list_length(pstmts) == 1)
-	{
-		PlannedStmt *pstmt = linitial_node(PlannedStmt, pstmts);
-
-		if (pstmt->commandType == CMD_UTILITY &&
-			IsA(pstmt->utilityStmt, TransactionStmt))
-			return true;
-	}
-	return false;
-}
-
-/* Release any existing unnamed prepared statement */
-static void
-drop_unnamed_stmt(void)
-{
-	/* paranoia to avoid a dangling pointer in case of error */
-	if (unnamed_stmt_psrc)
-	{
-		CachedPlanSource *psrc = unnamed_stmt_psrc;
-
-		unnamed_stmt_psrc = NULL;
-		DropCachedPlan(psrc);
-	}
-}
-
 
 /* --------------------------------
  *		signal handler routines used in PostgresMain()
@@ -4163,9 +2651,8 @@ PostgresMain(int argc, char *argv[],
 
 	/*
 	 * Create memory context and buffer used for RowDescription messages. As
-	 * SendRowDescriptionMessage(), via exec_describe_statement_message(), is
-	 * frequently executed for ever single statement, we don't want to
-	 * allocate a separate buffer every time.
+	 * SendRowDescriptionMessage() is frequently executed for ever single
+	 * statement, we don't want to allocate a separate buffer every time.
 	 */
 	row_description_context = AllocSetContextCreate(TopMemoryContext,
 													"RowDescriptionContext",
@@ -4261,14 +2748,6 @@ PostgresMain(int argc, char *argv[],
 		MemoryContextSwitchTo(TopMemoryContext);
 		FlushErrorState();
 
-		/*
-		 * If we were handling an extended-query-protocol message, initiate
-		 * skip till next Sync.  This also causes us not to issue
-		 * ReadyForQuery (until we get Sync).
-		 */
-		if (doing_extended_query_message)
-			ignore_till_sync = true;
-
 		/* We don't have a transaction command open anymore */
 		xact_started = false;
 
@@ -4292,8 +2771,7 @@ PostgresMain(int argc, char *argv[],
 	/* We can now handle ereport(ERROR) */
 	PG_exception_stack = &local_sigjmp_buf;
 
-	if (!ignore_till_sync)
-		send_ready_for_query = true;	/* initially, or after error */
+	send_ready_for_query = true;	/* initially, or after error */
 
 	/*
 	 * Non-error queries loop here.
@@ -4303,12 +2781,6 @@ PostgresMain(int argc, char *argv[],
 	{
 		int			firstchar;
 		StringInfoData input_message;
-
-		/*
-		 * At top of loop, reset extended-query-message flag, so that any
-		 * errors encountered in "idle" state don't provoke skip.
-		 */
-		doing_extended_query_message = false;
 
 		/*
 		 * Release storage left over from prior query cycle, and create a new
@@ -4451,12 +2923,8 @@ PostgresMain(int argc, char *argv[],
 		}
 
 		/*
-		 * (7) process the command.  But ignore it if we're skipping till
-		 * Sync.
+		 * (7) process the command.
 		 */
-		if (ignore_till_sync && firstchar != EOF)
-			continue;
-
 		switch (firstchar)
 		{
 			case 'Q':			/* simple query */
@@ -4475,61 +2943,6 @@ PostgresMain(int argc, char *argv[],
 				}
 				break;
 
-			case 'P':			/* parse */
-				{
-					const char *stmt_name;
-					const char *query_string;
-					int			numParams;
-					Oid		   *paramTypes = NULL;
-
-
-					/* Set statement_timestamp() */
-					SetCurrentStatementStartTimestamp();
-
-					stmt_name = pq_getmsgstring(&input_message);
-					query_string = pq_getmsgstring(&input_message);
-					numParams = pq_getmsgint(&input_message, 2);
-					if (numParams > 0)
-					{
-						paramTypes = (Oid *) palloc(numParams * sizeof(Oid));
-						for (int i = 0; i < numParams; i++)
-							paramTypes[i] = pq_getmsgint(&input_message, 4);
-					}
-					pq_getmsgend(&input_message);
-
-					exec_parse_message(query_string, stmt_name,
-									   paramTypes, numParams);
-				}
-				break;
-
-			case 'B':			/* bind */
-
-				/* Set statement_timestamp() */
-				SetCurrentStatementStartTimestamp();
-
-				/*
-				 * this message is complex enough that it seems best to put
-				 * the field extraction out-of-line
-				 */
-				exec_bind_message(&input_message);
-				break;
-
-			case 'E':			/* execute */
-				{
-					const char *portal_name;
-					int			max_rows;
-
-
-					/* Set statement_timestamp() */
-					SetCurrentStatementStartTimestamp();
-
-					portal_name = pq_getmsgstring(&input_message);
-					max_rows = pq_getmsgint(&input_message, 4);
-					pq_getmsgend(&input_message);
-
-					exec_execute_message(portal_name, max_rows);
-				}
-				break;
 
 			case 'F':			/* fastpath function call */
 
@@ -4563,91 +2976,6 @@ PostgresMain(int argc, char *argv[],
 				send_ready_for_query = true;
 				break;
 
-			case 'C':			/* close */
-				{
-					int			close_type;
-					const char *close_target;
-
-
-					close_type = pq_getmsgbyte(&input_message);
-					close_target = pq_getmsgstring(&input_message);
-					pq_getmsgend(&input_message);
-
-					switch (close_type)
-					{
-						case 'S':
-							if (close_target[0] != '\0')
-								DropPreparedStatement(close_target, false);
-							else
-							{
-								/* special-case the unnamed statement */
-								drop_unnamed_stmt();
-							}
-							break;
-						case 'P':
-							{
-								Portal		portal;
-
-								portal = GetPortalByName(close_target);
-								if (PortalIsValid(portal))
-									PortalDrop(portal, false);
-							}
-							break;
-						default:
-							ereport(ERROR,
-									(errcode(ERRCODE_PROTOCOL_VIOLATION),
-									 errmsg("invalid CLOSE message subtype %d",
-											close_type)));
-							break;
-					}
-
-					if (whereToSendOutput == DestRemote)
-						pq_putemptymessage('3');	/* CloseComplete */
-				}
-				break;
-
-			case 'D':			/* describe */
-				{
-					int			describe_type;
-					const char *describe_target;
-
-
-					/* Set statement_timestamp() (needed for xact) */
-					SetCurrentStatementStartTimestamp();
-
-					describe_type = pq_getmsgbyte(&input_message);
-					describe_target = pq_getmsgstring(&input_message);
-					pq_getmsgend(&input_message);
-
-					switch (describe_type)
-					{
-						case 'S':
-							exec_describe_statement_message(describe_target);
-							break;
-						case 'P':
-							exec_describe_portal_message(describe_target);
-							break;
-						default:
-							ereport(ERROR,
-									(errcode(ERRCODE_PROTOCOL_VIOLATION),
-									 errmsg("invalid DESCRIBE message subtype %d",
-											describe_type)));
-							break;
-					}
-				}
-				break;
-
-			case 'H':			/* flush */
-				pq_getmsgend(&input_message);
-				if (whereToSendOutput == DestRemote)
-					pq_flush();
-				break;
-
-			case 'S':			/* sync */
-				pq_getmsgend(&input_message);
-				finish_xact_command();
-				send_ready_for_query = true;
-				break;
 
 				/*
 				 * 'X' means that the frontend is closing down the socket. EOF
@@ -4907,4 +3235,120 @@ disable_statement_timeout(void)
 {
 	if (get_timeout_active(STATEMENT_TIMEOUT))
 		disable_timeout(STATEMENT_TIMEOUT, false);
+}
+
+int
+check_log_duration(char *msec_str, bool was_logged)
+{
+	if (log_duration || log_min_duration_sample >= 0 ||
+		log_min_duration_statement >= 0 || xact_is_sampled)
+	{
+		long		secs;
+		int			usecs;
+		int			msecs;
+		bool		exceeded_duration;
+		bool		exceeded_sample_duration;
+		bool		in_sample = false;
+
+		TimestampDifference(GetCurrentStatementStartTimestamp(),
+							GetCurrentTimestamp(),
+							&secs, &usecs);
+		msecs = usecs / 1000;
+
+		/*
+		 * This odd-looking test for log_min_duration_* being exceeded is
+		 * designed to avoid integer overflow with very long durations: don't
+		 * compute secs * 1000 until we've verified it will fit in int.
+		 */
+		exceeded_duration = (log_min_duration_statement == 0 ||
+							 (log_min_duration_statement > 0 &&
+							  (secs > log_min_duration_statement / 1000 ||
+							   secs * 1000 + msecs >= log_min_duration_statement)));
+
+		exceeded_sample_duration = (log_min_duration_sample == 0 ||
+									(log_min_duration_sample > 0 &&
+									 (secs > log_min_duration_sample / 1000 ||
+									  secs * 1000 + msecs >= log_min_duration_sample)));
+
+		/*
+		 * Do not log if log_statement_sample_rate = 0. Log a sample if
+		 * log_statement_sample_rate <= 1 and avoid unnecessary random() call
+		 * if log_statement_sample_rate = 1.
+		 */
+		if (exceeded_sample_duration)
+			in_sample = log_statement_sample_rate != 0 &&
+				(log_statement_sample_rate == 1 ||
+				 random() <= log_statement_sample_rate * MAX_RANDOM_VALUE);
+
+		if (exceeded_duration || in_sample || log_duration || xact_is_sampled)
+		{
+			snprintf(msec_str, 32, "%ld.%03d",
+					 secs * 1000 + msecs, usecs % 1000);
+			if ((exceeded_duration || in_sample || xact_is_sampled) && !was_logged)
+				return 2;
+			else
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+static bool
+check_log_statement(List *stmt_list)
+{
+	ListCell   *stmt_item;
+
+	if (log_statement == LOGSTMT_NONE)
+		return false;
+	if (log_statement == LOGSTMT_ALL)
+		return true;
+
+	/* Else we have to inspect the statement(s) to see whether to log */
+	foreach(stmt_item, stmt_list)
+	{
+		Node	   *stmt = (Node *) lfirst(stmt_item);
+
+		if (GetCommandLogLevel(stmt) <= log_statement)
+			return true;
+	}
+
+	return false;
+}
+
+static int
+errdetail_abort(void)
+{
+	if (MyProc->recoveryConflictPending)
+		errdetail("abort reason: recovery conflict");
+
+	return 0;
+}
+
+static int
+errdetail_recovery_conflict(void)
+{
+	switch (RecoveryConflictReason)
+	{
+		case PROCSIG_RECOVERY_CONFLICT_BUFFERPIN:
+			errdetail("User was holding shared buffer pin for too long.");
+			break;
+		case PROCSIG_RECOVERY_CONFLICT_LOCK:
+			errdetail("User was holding a relation lock for too long.");
+			break;
+		case PROCSIG_RECOVERY_CONFLICT_SNAPSHOT:
+			errdetail("User query might have needed to see row versions that must be removed.");
+			break;
+		case PROCSIG_RECOVERY_CONFLICT_STARTUP_DEADLOCK:
+			errdetail("User transaction caused buffer deadlock with recovery.");
+			break;
+		case PROCSIG_RECOVERY_CONFLICT_DATABASE:
+			errdetail("User was connected to a database that must be dropped.");
+			break;
+		default:
+			break;
+			/* no errdetail */
+	}
+
+	return 0;
 }

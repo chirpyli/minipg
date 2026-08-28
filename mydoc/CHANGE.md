@@ -2,6 +2,24 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪 SQL PREPARE/EXECUTE/DEALLOCATE 语法及相关测试（2026-08-27）
+
+### 一、背景
+minipg 已彻底移除 PREPARE/EXECUTE/DEALLOCATE 预处理语句语法（属于扩展 FE/BE 协议的一部分），但部分回归测试仍使用这些语法，导致测试失败。
+
+### 二、删除/更新内容
+- **`src/test/regress/expected/transactions.out`**：更新 `PREPARE test AS UPDATE writetest SET a = 0;` 和 `EXECUTE test;` 的预期输出，现在显示语法错误而非原来的"cannot execute UPDATE in a read-only transaction"。
+- **`src/test/regress/expected/write_parallel.out`**：更新 `prepare prep_stmt as ...` 的预期输出，现在显示语法错误。
+- **`src/test/regress/sql/functional_deps.sql`** 及 **`src/test/regress/expected/functional_deps.out`**：移除"prepared query plans"测试段（PREPARE foo AS ... / EXECUTE foo / DEALLOCATE foo）。
+- **`src/test/regress/sql/hs_standby_allowed.sql`** 及 **`src/test/regress/expected/hs_standby_allowed.out`**：移除"Prepared plans"测试段（PREPARE hsp / EXECUTE hsp / DEALLOCATE hsp）。
+- **`src/test/regress/sql/psql.sql`** 及 **`src/test/regress/expected/psql.out`**：移除"should work with tuple-returning utilities, such as EXECUTE"测试段（PREPARE test / EXECUTE test \gdesc / EXPLAIN EXECUTE test \gdesc）。
+- **`src/test/regress/sql/select_parallel.sql`** 及 **`src/test/regress/expected/select_parallel.out`**：移除 PREPARE pstmt / EXPLAIN EXECUTE pstmt / EXECUTE pstmt / DEALLOCATE pstmt 测试段。
+- **`src/test/regress/sql/select_views.sql`** 及 **`src/test/regress/expected/select_views.out`**：将 PREPARE p1/p2 和 EXECUTE p1/p2 替换为直接 SELECT 语句，保留 security_barrier 视图测试逻辑。
+
+### 三、验证
+- `make -C src/test/regress check` 全部通过：**All 70 tests passed**。
+- 所有使用 PREPARE/EXECUTE/DEALLOCATE 语法的测试文件已更新或移除相关测试段。
+
 ## 裁剪死命令标签 CMDTAG_CREATE_ROUTINE（2026-08-27）
 
 `CREATE ROUTINE` 在 PostgreSQL 中从未实现（使用 `CREATE FUNCTION`/`CREATE PROCEDURE` 代替），`CMDTAG_CREATE_ROUTINE` 全库零引用，属死标签，从 `cmdtaglist.h` 删除。
@@ -872,3 +890,19 @@ AM 已裁至 heap/btree/hash，EXCLUDE 依赖 GiST 故不可用，彻底删除�
 ## Relation Options 残余代码清理（2026-08-21）
 
 清理 reloptions 核心裁剪后残留：indexcmds/view/toasting/cluster/relcache/ruleutils `get_reloptions`/fe_utils `appendReloptionsArray`/parse_utilcmd/psql 的 reloptions 参数与引用。验证：make check-world 退出码 0。
+
+## 彻底裁剪扩展查询协议（Extended Query Protocol）+ 计划缓存（plancache）（2026-08-28）
+
+为简化内核，彻底移除 libpq 扩展查询协议（Parse/Bind/Describe/Execute/Sync/Flush 消息）及其底层计划缓存。仅保留简单查询协议（`'Q'`）与 fastpath（`'F'`），psql `-c` 及所有走简单协议的客户端仍正常工作。
+
+**server 端（tcop/postgres.c）**：删除主消息循环中 `'P'/'B'/'D'/'E'/'H'/'S'/'C'(close) 全部扩展协议 case` 与 `ignore_till_sync`/`doing_extended_query_message` 跳过逻辑；删除 `exec_parse_message`/`exec_bind_message`/`exec_execute_message`/`exec_describe_statement_message`/`exec_describe_portal_message`/`errdetail_execute`/`errdetail_params`/`bind_param_error_callback`/`IsTransactionExitStmtList`/`IsTransactionStmtList`/`drop_unnamed_stmt` 全部实现与辅助类型 `BindParamCbData`；清理 `SocketBackend` 对扩展协议消息的校验分支、`exec_simple_query` 中的 `drop_unnamed_stmt`/`errdetail_execute` 调用、错误处理区的 skip-till-sync 逻辑；保留被误删的通用函数 `check_log_statement`/`check_log_duration`/`errdetail_abort`/`errdetail_recovery_conflict`。
+
+**计划缓存模块**：删除 `src/backend/utils/cache/plancache.c` 与 `src/include/utils/plancache.h`；`functions.c`/`spi.c`/`extension.c`/`clauses.c` 改为直接经 `pg_parse_query`/`pg_analyze_and_rewrite_params`/`pg_plan_queries` 即时执行 SQL，不再缓存计划。
+
+**PREPARE 语句命令**：删除 `src/backend/commands/prepare.c` 与 `src/include/commands/prepare.h`（SQL `PREPARE`/`EXECUTE`/`DEALLOCATE` 语法层已在前序裁剪中移除）。
+
+**连带清理**：`nodes/parsenodes.h` 删除 PreparedStmt/PrepareStmt 相关节点；`nodetags` 同步清理；`utility.c`/`guc.c`/`portalmem.c`/`postinit.c`/`pquery.c` 移除对计划缓存与扩展协议的引用；`cmdtaglist.h` 同步；`tools/pgindent/typedefs.list` 删除 `BindParamCbData` 等死类型；删除 `src/test/modules/test_predtest` 与回归用例 `prepare.sql`/`plancache.sql`。
+
+**测试套件改造（保留并发隔离验证能力）**：`src/test/isolation/isolationtester.c` 原本依赖扩展查询协议（`PQexecParams` 设置 application_name、`PQprepare`/`PQexecPrepared` 检测锁等待），后端裁剪后无法运行。改为全部走简单查询协议（`PQexec`）：application_name 用 `PQExpBuffer` 拼接 SQL 字符串；锁等待检测查询改为在 `try_complete_step` 中每次用 `PQexec` 拼接候选 pid 与 pid 列表（`pg_isolation_test_session_is_blocked('%s','{%s}')`）执行。全部 .sql 测试例保留，未改用扩展协议。
+
+影响：后端仅支持简单查询协议（`'Q'`）与 fastpath（`'F'`），`psql -c` 及所有走简单协议的客户端正常；isolation 58 个用例（除 nowait-5 依赖已裁的 SQL `PREPARE` 命令已从 isolation_schedule 移除外）全部通过；主回归 `make check` 70 用例、isolation 58 用例，整体 `make check-world` 通过。事务/索引/函数/查询核心功能正常。基于扩展协议的客户端（pgbench -f、JDBC/驱动等）无法连接执行。

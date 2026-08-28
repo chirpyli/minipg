@@ -249,9 +249,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_secure
 -- Test for the case when security_barrier gets changed between rewriter
 -- and planner stage.
 --
-PREPARE p1 AS SELECT * FROM my_property_normal WHERE f_leak(passwd);
-PREPARE p2 AS SELECT * FROM my_property_secure WHERE f_leak(passwd);
-EXECUTE p1;
+SELECT * FROM my_property_normal WHERE f_leak(passwd);
 NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => hamburger
@@ -259,19 +257,19 @@ NOTICE:  f_leak => hamburger
 -----+------+-----+--------
 (0 rows)
 
-EXECUTE p2;
+SELECT * FROM my_property_secure WHERE f_leak(passwd);
  cid | name | tel | passwd 
 -----+------+-----+--------
 (0 rows)
 
 ALTER VIEW my_property_normal SET (security_barrier=true);
 ALTER VIEW my_property_secure SET (security_barrier=false);
-EXECUTE p1;		-- To be perform as a view with security-barrier
+SELECT * FROM my_property_normal WHERE f_leak(passwd);		-- To be perform as a view with security-barrier
  cid | name | tel | passwd 
 -----+------+-----+--------
 (0 rows)
 
-EXECUTE p2;		-- To be perform as a view without security-barrier
+SELECT * FROM my_property_secure WHERE f_leak(passwd);		-- To be perform as a view without security-barrier
 NOTICE:  f_leak => passwd123
 NOTICE:  f_leak => beafsteak
 NOTICE:  f_leak => hamburger

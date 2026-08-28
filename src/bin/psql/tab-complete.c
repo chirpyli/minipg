@@ -815,11 +815,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 "  WHERE (%d = pg_catalog.length('%s'))"\
 "    AND pg_catalog.quote_ident(name)='%s'"
 
-#define Query_for_list_of_prepared_statements \
-" SELECT pg_catalog.quote_ident(name) "\
-"   FROM pg_catalog.pg_prepared_statements "\
-"  WHERE substring(pg_catalog.quote_ident(name),1,%d)='%s'"
-
 #define Query_for_list_of_tablesample_methods \
 " SELECT pg_catalog.quote_ident(proname) "\
 "   FROM pg_catalog.pg_proc "\
@@ -1325,10 +1320,9 @@ psql_completion(const char *text, int start, int end)
 	/* Known command-starting keywords. */
 	static const char *const sql_commands[] = {
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CALL", "CHECKPOINT", "CLUSTER",
-		"COMMENT", "COMMIT", "CREATE", "DEALLOCATE",
-		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
+		"COMMENT", "COMMIT", "CREATE",
+		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXPLAIN",
 		"IMPORT FOREIGN SCHEMA", "INSERT INTO",
-		"PREPARE",
 		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
 		"RESET", "ROLLBACK",
 		"SAVEPOINT", "SELECT", "SET", "SHOW", "START",
@@ -2446,11 +2440,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 			 TailMatches("EXECUTE", "FUNCTION|PROCEDURE"))
 		COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_functions, NULL);
 
-/* DEALLOCATE */
-	else if (Matches("DEALLOCATE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_prepared_statements
-							" UNION SELECT 'ALL'");
-
 /* DELETE --- can be inside EXPLAIN, RULE, etc */
 	/* Complete DELETE with "FROM" */
 	else if (Matches("DELETE"))
@@ -2533,10 +2522,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 	}
 	else if (Matches("DROP", "TRIGGER", MatchAny, "ON", MatchAny))
 		COMPLETE_WITH("CASCADE", "RESTRICT");
-
-/* EXECUTE */
-	else if (Matches("EXECUTE"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_prepared_statements);
 
 /*
  * EXPLAIN [ ( option [, ...] ) ] statement
@@ -2641,10 +2626,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 		COMPLETE_WITH("BY");
 	else if (TailMatches("FROM", MatchAny, "ORDER", "BY"))
 		COMPLETE_WITH_ATTR(prev3_wd, "");
-
-/* PREPARE xx AS */
-	else if (Matches("PREPARE", MatchAny, "AS"))
-		COMPLETE_WITH("SELECT", "UPDATE", "INSERT INTO", "DELETE FROM");
 
 /* REFRESH MATERIALIZED VIEW */
 	else if (Matches("REFRESH"))

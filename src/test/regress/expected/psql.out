@@ -175,21 +175,6 @@ SELECT
  now    | date
 (8 rows)
 
--- should work with tuple-returning utilities, such as EXECUTE
-PREPARE test AS SELECT 1 AS first, 2 AS second;
-EXECUTE test \gdesc
- Column |  Type   
---------+---------
- first  | integer
- second | integer
-(2 rows)
-
-EXPLAIN EXECUTE test \gdesc
-   Column   | Type 
-------------+------
- QUERY PLAN | text
-(1 row)
-
 -- should fail cleanly - syntax error
 SELECT 1 + \gdesc
 ERROR:  syntax error at end of input

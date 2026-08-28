@@ -234,7 +234,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		DropdbStmt DropStmt
 		ExplainStmt
 		IndexStmt InsertStmt
-		ExplainableStmt PreparableStmt
+		ExplainableStmt
 		CreateFunctionStmt ReindexStmt
 		RemoveFuncStmt ReturnStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
@@ -242,7 +242,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
 		ViewStmt CheckPointStmt
-		DeallocateStmt PrepareStmt ExecuteStmt
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
@@ -314,8 +313,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				def_list operator_def_list indirection opt_indirection
 				transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
-				prep_type_clause
-			execute_param_clause using_clause returning_clause
+				using_clause returning_clause
 			table_func_column_list
 			alter_generic_options
 			relation_expr_list
@@ -718,16 +716,13 @@ stmt:	AlterObjectSchemaStmt
 			| CreateStmt
 			| CreateStatsStmt
 			| CreatedbStmt
-			| DeallocateStmt
 			| DeleteStmt
 			| DiscardStmt
 			| DropStmt
 			| DropdbStmt
-			| ExecuteStmt
 			| ExplainStmt
 			| IndexStmt
 		| InsertStmt
-		| PrepareStmt
 			| ReindexStmt
 			| RemoveFuncStmt
 			| RuleStmt
@@ -3918,88 +3913,6 @@ ExplainableStmt:
 			| InsertStmt
 			| UpdateStmt
 			| DeleteStmt
-			| ExecuteStmt					/* by default all are $$=$1 */
-		;
-
-/*****************************************************************************
- *
- *		QUERY:
- *				PREPARE <plan_name> [(args, ...)] AS <query>
- *
- *****************************************************************************/
-
-PrepareStmt: PREPARE name prep_type_clause AS PreparableStmt
-				{
-					PrepareStmt *n = makeNode(PrepareStmt);
-					n->name = $2;
-					n->argtypes = $3;
-					n->query = $5;
-					$$ = (Node *) n;
-				}
-		;
-
-prep_type_clause: '(' type_list ')'			{ $$ = $2; }
-				| /* EMPTY */				{ $$ = NIL; }
-		;
-
-PreparableStmt:
-			SelectStmt
-			| InsertStmt
-			| UpdateStmt
-			| DeleteStmt					/* by default all are $$=$1 */
-		;
-
-/*****************************************************************************
- *
- * EXECUTE <plan_name> [(params, ...)]
- * CREATE TABLE <name> AS EXECUTE <plan_name> [(params, ...)]
- *
- *****************************************************************************/
-
-ExecuteStmt: EXECUTE name execute_param_clause
-				{
-					ExecuteStmt *n = makeNode(ExecuteStmt);
-					n->name = $2;
-					n->params = $3;
-					$$ = (Node *) n;
-				}
-		;
-
-execute_param_clause: '(' expr_list ')'				{ $$ = $2; }
-					| /* EMPTY */					{ $$ = NIL; }
-					;
-
-/*****************************************************************************
- *
- *		QUERY:
- *				DEALLOCATE [PREPARE] <plan_name>
- *
- *****************************************************************************/
-
-DeallocateStmt: DEALLOCATE name
-					{
-						DeallocateStmt *n = makeNode(DeallocateStmt);
-						n->name = $2;
-						$$ = (Node *) n;
-					}
-				| DEALLOCATE PREPARE name
-					{
-						DeallocateStmt *n = makeNode(DeallocateStmt);
-						n->name = $3;
-						$$ = (Node *) n;
-					}
-				| DEALLOCATE ALL
-					{
-						DeallocateStmt *n = makeNode(DeallocateStmt);
-						n->name = NULL;
-						$$ = (Node *) n;
-					}
-				| DEALLOCATE PREPARE ALL
-					{
-						DeallocateStmt *n = makeNode(DeallocateStmt);
-						n->name = NULL;
-						$$ = (Node *) n;
-					}
 		;
 
 /*****************************************************************************

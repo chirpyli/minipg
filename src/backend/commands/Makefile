@@ -29,7 +29,6 @@ OBJS = \
 	opclasscmds.o \
 	operatorcmds.o \
 	portalcmds.o \
-	prepare.o \
 	proclang.o \
 	schemacmds.o \
 	statscmds.o \

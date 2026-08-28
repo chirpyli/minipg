@@ -3111,38 +3111,6 @@ _copyCreateSchemaStmt(const CreateSchemaStmt *from)
 	return newnode;
 }
 
-static PrepareStmt *
-_copyPrepareStmt(const PrepareStmt *from)
-{
-	PrepareStmt *newnode = makeNode(PrepareStmt);
-
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(argtypes);
-	COPY_NODE_FIELD(query);
-
-	return newnode;
-}
-
-static ExecuteStmt *
-_copyExecuteStmt(const ExecuteStmt *from)
-{
-	ExecuteStmt *newnode = makeNode(ExecuteStmt);
-
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(params);
-
-	return newnode;
-}
-
-static DeallocateStmt *
-_copyDeallocateStmt(const DeallocateStmt *from)
-{
-	DeallocateStmt *newnode = makeNode(DeallocateStmt);
-
-	COPY_STRING_FIELD(name);
-
-	return newnode;
-}
 
 /* ****************************************************************
  *					extensible.h copy functions
@@ -3662,15 +3630,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateSchemaStmt:
 			retval = _copyCreateSchemaStmt(from);
-			break;
-		case T_PrepareStmt:
-			retval = _copyPrepareStmt(from);
-			break;
-		case T_ExecuteStmt:
-			retval = _copyExecuteStmt(from);
-			break;
-		case T_DeallocateStmt:
-			retval = _copyDeallocateStmt(from);
 			break;
 		case T_A_Expr:
 			retval = _copyAExpr(from);

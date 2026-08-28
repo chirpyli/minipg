@@ -16,7 +16,6 @@
 #include "access/xact.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
-#include "commands/prepare.h"
 #include "executor/nodeHash.h"
 #include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
@@ -242,7 +241,7 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 	 * Parse analysis was done already, but we still have to run the rule
 	 * rewriter.  We do not do AcquireRewriteLocks: we assume the query either
 	 * came straight from the parser, or suitable locks were acquired by
-	 * plancache.c.
+	 * the caller.
 	 */
 	rewritten = QueryRewrite(castNode(Query, stmt->query));
 
@@ -379,12 +378,7 @@ ExplainOneQuery(Query *query, int cursorOptions,
 /*
  * ExplainOneUtility -
  *	  print out the execution plan for one utility statement
- *	  (In general, utility statements don't have plans, but there are some
- *	  we treat as special cases)
- *
- * This is exported because it's called back from prepare.c in the
- * EXPLAIN EXECUTE case.  In that case, we'll be dealing with a statement
- * that's in the plan cache, so we have to ensure we don't modify it.
+ *	  (Utility statements have no plan structure after removing EXPLAIN EXECUTE)
  */
 void
 ExplainOneUtility(Node *utilityStmt, ExplainState *es,
@@ -394,17 +388,11 @@ ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 	if (utilityStmt == NULL)
 		return;
 
-	if (IsA(utilityStmt, ExecuteStmt))
-		ExplainExecuteQuery((ExecuteStmt *) utilityStmt, es,
-							queryString, params, queryEnv);
+	if (es->format == EXPLAIN_FORMAT_TEXT)
+		appendStringInfoString(es->str,
+							   "Utility statements have no plan structure\n");
 	else
-	{
-		if (es->format == EXPLAIN_FORMAT_TEXT)
-			appendStringInfoString(es->str,
-								   "Utility statements have no plan structure\n");
-		else
-			ExplainDummyGroup("Utility Statement", NULL, es);
-	}
+		ExplainDummyGroup("Utility Statement", NULL, es);
 }
 
 /*
@@ -412,8 +400,7 @@ ExplainOneUtility(Node *utilityStmt, ExplainState *es,
  *		given a planned query, execute it if needed, and then print
  *		EXPLAIN output
  *
- * This is exported because it's called back from prepare.c in the
- * EXPLAIN EXECUTE case, and because an index advisor plugin would need
+ * This is exported because an index advisor plugin would need
  * to call it.
  */
 void

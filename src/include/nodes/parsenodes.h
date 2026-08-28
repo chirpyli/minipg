@@ -1953,41 +1953,5 @@ typedef struct ReindexStmt
 	List	   *params;			/* list of DefElem nodes */
 } ReindexStmt;
 
-/* ----------------------
- *		PREPARE Statement
- * ----------------------
- */
-typedef struct PrepareStmt
-{
-	NodeTag		type;
-	char	   *name;			/* Name of plan, arbitrary */
-	List	   *argtypes;		/* Types of parameters (List of TypeName) */
-	Node	   *query;			/* The query itself (as a raw parsetree) */
-} PrepareStmt;
 
-
-/* ----------------------
- *		EXECUTE Statement
- * ----------------------
- */
-
-typedef struct ExecuteStmt
-{
-	NodeTag		type;
-	char	   *name;			/* The name of the plan to execute */
-	List	   *params;			/* Values to assign to parameters */
-} ExecuteStmt;
-
-
-/* ----------------------
- *		DEALLOCATE Statement
- * ----------------------
- */
-typedef struct DeallocateStmt
-{
-	NodeTag		type;
-	char	   *name;			/* The name of the plan to remove */
-	/* NULL means DEALLOCATE ALL */
-} DeallocateStmt;
-
-#endif							/* PARSENODES_H */
+#endif						/* PARSENODES_H */

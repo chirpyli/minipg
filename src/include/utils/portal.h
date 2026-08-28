@@ -31,7 +31,6 @@
 #include "datatype/timestamp.h"
 #include "executor/execdesc.h"
 #include "tcop/cmdtag.h"
-#include "utils/plancache.h"
 #include "utils/resowner.h"
 
 /*
@@ -109,7 +108,6 @@ typedef struct PortalData
 	CommandTag	commandTag;		/* command tag for original query */
 	QueryCompletion qc;			/* command completion data for executed query */
 	List	   *stmts;			/* list of PlannedStmts */
-	CachedPlan *cplan;			/* CachedPlan, if stmts are from one */
 
 	ParamListInfo portalParams; /* params to pass to query */
 	QueryEnvironment *queryEnv; /* environment for query */
@@ -201,8 +199,7 @@ extern void PortalDefineQuery(Portal portal,
 							  const char *prepStmtName,
 							  const char *sourceText,
 							  CommandTag commandTag,
-							  List *stmts,
-							  CachedPlan *cplan);
+							  List *stmts);
 extern PlannedStmt *PortalGetPrimaryStmt(Portal portal);
 extern void PortalCreateHoldStore(Portal portal);
 extern void PortalHashTableDeleteAll(void);

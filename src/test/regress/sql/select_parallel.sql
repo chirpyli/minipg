@@ -419,11 +419,6 @@ $$SELECT array[$1,$2]$$ language sql parallel safe;
 CREATE TABLE fooarr(f1 text, f2 int[], f3 text);
 INSERT INTO fooarr VALUES('1', ARRAY[1,2], 'one');
 
-PREPARE pstmt(text, int[]) AS SELECT * FROM fooarr WHERE f1 = $1 AND f2 = $2;
-EXPLAIN (COSTS OFF) EXECUTE pstmt('1', make_some_array(1,2));
-EXECUTE pstmt('1', make_some_array(1,2));
-DEALLOCATE pstmt;
-
 -- test interaction between subquery and partial_paths
 CREATE VIEW tenk1_vw_sec WITH (security_barrier) AS SELECT * FROM tenk1;
 EXPLAIN (COSTS OFF)

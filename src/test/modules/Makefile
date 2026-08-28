@@ -10,11 +10,9 @@ include $(top_builddir)/src/Makefile.global
 # minipg 已裁剪 CREATE TYPE 基础形式与 CREATE OPERATOR，CREATE EXTENSION 直接报语法错误，整体无法运行，故移除。
 SUBDIRS = \
 		  delay_execution \
-		  libpq_pipeline \
 		  test_bloomfilter \
 		  test_integerset \
 		  test_misc \
-		  test_predtest \
 		  test_rbtree \
 		  test_shm_mq
 

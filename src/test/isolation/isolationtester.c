@@ -18,8 +18,6 @@
 #include "pg_getopt.h"
 #include "pqexpbuffer.h"
 
-#define PREP_WAITING "isolationtester_waiting"
-
 /*
  * conns[0] is the global setup, teardown, and watchdog connection.  Additional
  * connections represent spec-defined sessions.
@@ -47,6 +45,13 @@ static bool any_new_notice = false;
 
 /* Maximum time to wait before giving up on a step (in usec) */
 static int64 max_step_wait = 300 * USECS_PER_SEC;
+
+/*
+ * minipg: 锁等待检测查询改用简单查询协议（PQexec）执行，因为扩展查询协议
+ * （PQprepare/PQexecPrepared）已被裁剪。wait_pids_list 保存除控制连接外所有
+ * 会话的后端 pid 列表（不含引号与花括号），运行时拼入完整 SQL。
+ */
+static char *wait_pids_list = NULL;
 
 
 static void check_testspec(TestSpec *testspec);
@@ -92,7 +97,6 @@ main(int argc, char **argv)
 	const char *env_wait;
 	TestSpec   *testspec;
 	PGresult   *res;
-	PQExpBufferData wait_query;
 	int			opt;
 	int			i;
 
@@ -191,14 +195,23 @@ main(int argc, char **argv)
 		 * easier to map spec file sessions to log output and
 		 * pg_stat_activity. The reason to append instead of just setting the
 		 * name is that we don't know the name of the test currently running.
+		 *
+		 * minipg: 后端已裁剪扩展查询协议（Parse/Bind/Execute），这里改用
+		 * 简单查询协议（PQexec）拼接 SQL 字符串。
 		 */
-		res = PQexecParams(conns[i].conn,
-						   "SELECT set_config('application_name',\n"
-						   "  current_setting('application_name') || '/' || $1,\n"
-						   "  false)",
-						   1, NULL,
-						   &sessionname,
-						   NULL, NULL, 0);
+		{
+			PQExpBufferData appname_sql;
+
+			initPQExpBuffer(&appname_sql);
+			appendPQExpBufferStr(&appname_sql,
+								 "SELECT set_config('application_name', "
+								 "current_setting('application_name') || '/' || '");
+			appendPQExpBufferStr(&appname_sql, sessionname);
+			appendPQExpBufferStr(&appname_sql, "', false)");
+
+			res = PQexec(conns[i].conn, appname_sql.data);
+			termPQExpBuffer(&appname_sql);
+		}
 		if (PQresultStatus(res) != PGRES_TUPLES_OK)
 		{
 			fprintf(stderr, "setting of application name failed: %s",
@@ -218,25 +231,22 @@ main(int argc, char **argv)
 	 * exactly expect concurrent use of test tables.  However, autovacuum will
 	 * occasionally take AccessExclusiveLock to truncate a table, and we must
 	 * ignore that transient wait.
+	 *
+	 * minipg: 后端已裁剪扩展查询协议（Parse/Bind/Execute），无法使用
+	 * PQprepare/PQexecPrepared。改为把查询拆成 prefix/suffix 两段，
+	 * 在每次检测时用 PQexec（简单协议）拼接候选 pid 后执行。
 	 */
-	initPQExpBuffer(&wait_query);
-	appendPQExpBufferStr(&wait_query,
-						 "SELECT pg_catalog.pg_isolation_test_session_is_blocked($1, '{");
-	/* The spec syntax requires at least one session; assume that here. */
-	appendPQExpBufferStr(&wait_query, conns[1].backend_pid_str);
-	for (i = 2; i < nconns; i++)
-		appendPQExpBuffer(&wait_query, ",%s", conns[i].backend_pid_str);
-	appendPQExpBufferStr(&wait_query, "}')");
-
-	res = PQprepare(conns[0].conn, PREP_WAITING, wait_query.data, 0, NULL);
-	if (PQresultStatus(res) != PGRES_COMMAND_OK)
 	{
-		fprintf(stderr, "prepare of lock wait query failed: %s",
-				PQerrorMessage(conns[0].conn));
-		exit(1);
+		PQExpBufferData pids;
+
+		initPQExpBuffer(&pids);
+		/* The spec syntax requires at least one session; assume that here. */
+		appendPQExpBufferStr(&pids, conns[1].backend_pid_str);
+		for (i = 2; i < nconns; i++)
+			appendPQExpBuffer(&pids, ",%s", conns[i].backend_pid_str);
+		wait_pids_list = pg_strdup(pids.data);
+		termPQExpBuffer(&pids);
 	}
-	PQclear(res);
-	termPQExpBuffer(&wait_query);
 
 	/*
 	 * Run the permutations specified in the spec, or all if none were
@@ -884,10 +894,20 @@ try_complete_step(TestSpec *testspec, PermutationStep *pstep, int flags)
 			if (flags & STEP_NONBLOCK)
 			{
 				bool		waiting;
+				PQExpBufferData wq;
 
-				res = PQexecPrepared(conns[0].conn, PREP_WAITING, 1,
-									 &conns[step->session + 1].backend_pid_str,
-									 NULL, NULL, 0);
+				/*
+				 * minipg: 用简单协议（PQexec）拼接候选 pid 与 pid 列表后执行，
+				 * 替代被裁剪的 PQexecPrepared。
+				 */
+				initPQExpBuffer(&wq);
+				appendPQExpBuffer(&wq,
+								 "SELECT pg_catalog.pg_isolation_test_session_is_blocked('%s', '{%s}')",
+								 conns[step->session + 1].backend_pid_str,
+								 wait_pids_list);
+
+				res = PQexec(conns[0].conn, wq.data);
+				termPQExpBuffer(&wq);
 				if (PQresultStatus(res) != PGRES_TUPLES_OK ||
 					PQntuples(res) != 1)
 				{

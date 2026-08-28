@@ -18,7 +18,7 @@
 #include <limits.h>
 
 #include "access/xact.h"
-#include "commands/prepare.h"
+#include "executor/executor.h"
 #include "executor/tstoreReceiver.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
@@ -193,7 +193,6 @@ ProcessQuery(PlannedStmt *plan,
  *		Select portal execution strategy given the intended statement list.
  *
  * The list elements can be Querys or PlannedStmts.
- * That's more general than portals need, but plancache.c uses this too.
  *
  * See the comments in portal.h.
  */
@@ -327,7 +326,6 @@ FetchPortalTargetList(Portal portal)
  *		Returns NIL if the statement doesn't have a determinable targetlist.
  *
  * This can be applied to a Query or a PlannedStmt.
- * That's more general than portals need, but plancache.c uses this too.
  *
  * Note: do not modify the result.
  *
@@ -373,14 +371,6 @@ FetchStatementTargetList(Node *stmt)
 				return pstmt->planTree->targetlist;
 			return NIL;
 		}
-	}
-	if (IsA(stmt, ExecuteStmt))
-	{
-		ExecuteStmt *estmt = (ExecuteStmt *) stmt;
-		PreparedStatement *entry;
-
-		entry = FetchPreparedStatement(estmt->name, true);
-		return FetchPreparedStatementTargetList(entry);
 	}
 	return NIL;
 }
@@ -1059,7 +1049,7 @@ PortalRunUtility(Portal portal, PlannedStmt *pstmt,
 
 	ProcessUtility(pstmt,
 				   portal->sourceText,
-				   (portal->cplan != NULL), /* protect tree if in plancache */
+				   false, /* protect tree */
 				   isTopLevel ? PROCESS_UTILITY_TOPLEVEL : PROCESS_UTILITY_QUERY,
 				   portal->portalParams,
 				   portal->queryEnv,
@@ -1231,7 +1221,7 @@ PortalRunMulti(Portal portal,
 		/*
 		 * Avoid crashing if portal->stmts has been reset.  This can only
 		 * occur if a CALL or DO utility statement executed an internal
-		 * COMMIT/ROLLBACK (cf PortalReleaseCachedPlan).  The CALL or DO must
+		 * COMMIT/ROLLBACK.  The CALL or DO must
 		 * have been the only statement in the portal, so there's nothing left
 		 * for us to do; but we don't want to dereference a now-dangling list
 		 * pointer.

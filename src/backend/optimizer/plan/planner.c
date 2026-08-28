@@ -4005,7 +4005,7 @@ adjust_paths_for_srfs(PlannerInfo *root, RelOptInfo *rel,
  * This does not return any information about dependencies of the expression.
  * Hence callers should use the results only for the duration of the current
  * query.  Callers that would like to cache the results for longer should use
- * expression_planner_with_deps, probably via the plancache.
+ * expression_planner_with_deps.
  *
  * Note: this must not make any damaging changes to the passed-in expression
  * tree.  (It would actually be okay to apply fix_opfuncids to it, but since

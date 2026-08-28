@@ -303,8 +303,6 @@ CTEMaterialize
 CTESearchClause
 CV
 CachedExpression
-CachedPlan
-CachedPlanSource
 CallContext
 CallStmt
 CancelRequestPacket
@@ -467,7 +465,6 @@ DbInfo
 DbInfoArr
 DeClonePtrType
 DeadLockState
-DeallocateStmt
 DecodedBkpBlock
 DecodingOutputState
 DefElem
@@ -572,7 +569,6 @@ ExecScanAccessMtd
 ExecScanRecheckMtd
 ExecStatus
 ExecStatusType
-ExecuteStmt
 ExpandedArrayHeader
 ExpandedObjectHeader
 ExpandedObjectMethods
@@ -1861,7 +1857,6 @@ PredicateLockData
 PredicateLockTargetType
 PrefetchBufferResult
 PrepParallelRestorePtrType
-PrepareStmt
 PreparedStatement
 PresortedKeyData
 PrintExtraTocPtrType
