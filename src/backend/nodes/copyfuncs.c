@@ -2500,17 +2500,6 @@ _copyIndexElem(const IndexElem *from)
 	return newnode;
 }
 
-static StatsElem *
-_copyStatsElem(const StatsElem *from)
-{
-	StatsElem  *newnode = makeNode(StatsElem);
-
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(expr);
-
-	return newnode;
-}
-
 static ColumnDef *
 _copyColumnDef(const ColumnDef *from)
 {
@@ -2872,21 +2861,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_SCALAR_FIELD(isconstraint);
 	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(concurrent);
-	COPY_SCALAR_FIELD(if_not_exists);
-
-	return newnode;
-}
-
-static CreateStatsStmt *
-_copyCreateStatsStmt(const CreateStatsStmt *from)
-{
-	CreateStatsStmt *newnode = makeNode(CreateStatsStmt);
-
-	COPY_NODE_FIELD(defnames);
-	COPY_NODE_FIELD(stat_types);
-	COPY_NODE_FIELD(exprs);
-	COPY_NODE_FIELD(relations);
-	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(if_not_exists);
 
 	return newnode;
@@ -3574,9 +3548,7 @@ copyObjectImpl(const void *from)
 		case T_IndexStmt:
 			retval = _copyIndexStmt(from);
 			break;
-		case T_CreateStatsStmt:
-			retval = _copyCreateStatsStmt(from);
-			break;
+
 		case T_CreateFunctionStmt:
 			retval = _copyCreateFunctionStmt(from);
 			break;
@@ -3688,9 +3660,7 @@ copyObjectImpl(const void *from)
 		case T_IndexElem:
 			retval = _copyIndexElem(from);
 			break;
-		case T_StatsElem:
-			retval = _copyStatsElem(from);
-			break;
+
 		case T_ColumnDef:
 			retval = _copyColumnDef(from);
 			break;

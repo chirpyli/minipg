@@ -21,7 +21,7 @@ SUBDIRS = access bootstrap catalog commands common datatype \
 	executor fe_utils \
 	lib libpq mb nodes optimizer parser postmaster \
 	replication rewrite \
-	statistics storage tcop \
+	storage tcop \
 	utils port port/atomics portability
 
 # Install all headers

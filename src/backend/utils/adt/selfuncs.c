@@ -104,7 +104,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_statistic.h"
-#include "catalog/pg_statistic_ext.h"
 #include "executor/nodeAgg.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -117,7 +116,6 @@
 #include "optimizer/plancat.h"
 #include "parser/parse_clause.h"
 #include "parser/parsetree.h"
-#include "statistics/statistics.h"
 #include "storage/bufmgr.h"
 #include "utils/builtins.h"
 #include "utils/date.h"
@@ -155,8 +153,6 @@ static double eqjoinsel_semi(Oid opfuncoid, Oid collation,
 							 Form_pg_statistic stats1, Form_pg_statistic stats2,
 							 bool have_mcvs1, bool have_mcvs2,
 							 RelOptInfo *inner_rel);
-static bool estimate_multivariate_ndistinct(PlannerInfo *root,
-											RelOptInfo *rel, List **varinfos, double *ndistinct);
 static bool convert_to_scalar(Datum value, Oid valuetypid, Oid collid,
 							  double *scaledvalue,
 							  Datum lobound, Datum hibound, Oid boundstypid,
@@ -3437,14 +3433,6 @@ estimate_num_groups(PlannerInfo *root, List *groupExprs, double input_rows,
 		 * If examine_variable is able to deduce anything about the GROUP BY
 		 * expression, treat it as a single variable even if it's really more
 		 * complicated.
-		 *
-		 * XXX This has the consequence that if there's a statistics object on
-		 * the expression, we don't split it into individual Vars. This
-		 * affects our selection of statistics in
-		 * estimate_multivariate_ndistinct, because it's probably better to
-		 * use more accurate estimate for each expression and treat them as
-		 * independent, than to combine estimates for the extracted variables
-		 * when we don't know how that relates to the expressions.
 		 */
 		examine_variable(root, groupexpr, 0, &vardata);
 		if (HeapTupleIsValid(vardata.statsTuple) || vardata.isunique)
@@ -3550,52 +3538,29 @@ estimate_num_groups(PlannerInfo *root, List *groupExprs, double input_rows,
 		}
 
 		/*
-		 * Get the numdistinct estimate for the Vars of this rel.  We
-		 * iteratively search for multivariate n-distinct with maximum number
-		 * of vars; assuming that each var group is independent of the others,
-		 * we multiply them together.  Any remaining relvarinfos after no more
-		 * multivariate matches are found are assumed independent too, so
-		 * their individual ndistinct estimates are multiplied also.
+		 * Get the numdistinct estimate for the Vars of this rel.  We assume
+		 * each var group is independent of the others, and multiply their
+		 * individual ndistinct estimates together.
 		 *
-		 * While iterating, count how many separate numdistinct values we
-		 * apply.  We apply a fudge factor below, but only if we multiplied
-		 * more than one such values.
+		 * Count how many separate numdistinct values we apply.  We apply a
+		 * fudge factor below, but only if we multiplied more than one such
+		 * values.
 		 */
-		while (relvarinfos)
+		foreach(l, relvarinfos)
 		{
-			double		mvndistinct;
+			GroupVarInfo *varinfo2 = (GroupVarInfo *) lfirst(l);
 
-			if (estimate_multivariate_ndistinct(root, rel, &relvarinfos,
-												&mvndistinct))
-			{
-				reldistinct *= mvndistinct;
-				if (relmaxndistinct < mvndistinct)
-					relmaxndistinct = mvndistinct;
-				relvarcount++;
-			}
-			else
-			{
-				foreach(l, relvarinfos)
-				{
-					GroupVarInfo *varinfo2 = (GroupVarInfo *) lfirst(l);
+			reldistinct *= varinfo2->ndistinct;
+			if (relmaxndistinct < varinfo2->ndistinct)
+				relmaxndistinct = varinfo2->ndistinct;
+			relvarcount++;
 
-					reldistinct *= varinfo2->ndistinct;
-					if (relmaxndistinct < varinfo2->ndistinct)
-						relmaxndistinct = varinfo2->ndistinct;
-					relvarcount++;
-
-					/*
-					 * When varinfo2's isdefault is set then we'd better set
-					 * the SELFLAG_USED_DEFAULT bit in the EstimationInfo.
-					 */
-					if (estinfo != NULL && varinfo2->isdefault)
-						estinfo->flags |= SELFLAG_USED_DEFAULT;
-
-				}
-
-				/* we're done with this relation */
-				relvarinfos = NIL;
-			}
+			/*
+			 * When varinfo2's isdefault is set then we'd better set the
+			 * SELFLAG_USED_DEFAULT bit in the EstimationInfo.
+			 */
+			if (estinfo != NULL && varinfo2->isdefault)
+				estinfo->flags |= SELFLAG_USED_DEFAULT;
 		}
 
 		/*
@@ -3886,345 +3851,6 @@ estimate_hashagg_tablesize(PlannerInfo *root, Path *path,
  *
  *-------------------------------------------------------------------------
  */
-
-/*
- * Find applicable ndistinct statistics for the given list of VarInfos (which
- * must all belong to the given rel), and update *ndistinct to the estimate of
- * the MVNDistinctItem that best matches.  If a match it found, *varinfos is
- * updated to remove the list of matched varinfos.
- *
- * Varinfos that aren't for simple Vars are ignored.
- *
- * Return true if we're able to find a match, false otherwise.
- */
-static bool
-estimate_multivariate_ndistinct(PlannerInfo *root, RelOptInfo *rel,
-								List **varinfos, double *ndistinct)
-{
-	ListCell   *lc;
-	int			nmatches_vars;
-	int			nmatches_exprs;
-	Oid			statOid = InvalidOid;
-	MVNDistinct *stats;
-	StatisticExtInfo *matched_info = NULL;
-	RangeTblEntry		*rte;
-
-	/* bail out immediately if the table has no extended statistics */
-	if (!rel->statlist)
-		return false;
-
-	/*
-	 * When dealing with regular inheritance trees, ignore extended stats
-	 * (which were built without data from child rels, and thus do not
-	 * represent them). For partitioned tables data there's no data in the
-	 * non-leaf relations, so we build stats only for the inheritance tree.
-	 * So for partitioned tables we do consider extended stats.
-	 */
-	rte = planner_rt_fetch(rel->relid, root);
-	if (rte->inh)
-		return false;
-
-	/* look for the ndistinct statistics object matching the most vars */
-	nmatches_vars = 0;			/* we require at least two matches */
-	nmatches_exprs = 0;
-	foreach(lc, rel->statlist)
-	{
-		ListCell   *lc2;
-		StatisticExtInfo *info = (StatisticExtInfo *) lfirst(lc);
-		int			nshared_vars = 0;
-		int			nshared_exprs = 0;
-
-		/* skip statistics of other kinds */
-		if (info->kind != STATS_EXT_NDISTINCT)
-			continue;
-
-		/*
-		 * Determine how many expressions (and variables in non-matched
-		 * expressions) match. We'll then use these numbers to pick the
-		 * statistics object that best matches the clauses.
-		 */
-		foreach(lc2, *varinfos)
-		{
-			ListCell   *lc3;
-			GroupVarInfo *varinfo = (GroupVarInfo *) lfirst(lc2);
-			AttrNumber	attnum;
-
-			Assert(varinfo->rel == rel);
-
-			/* simple Var, search in statistics keys directly */
-			if (IsA(varinfo->var, Var))
-			{
-				attnum = ((Var *) varinfo->var)->varattno;
-
-				/*
-				 * Ignore system attributes - we don't support statistics on
-				 * them, so can't match them (and it'd fail as the values are
-				 * negative).
-				 */
-				if (!AttrNumberIsForUserDefinedAttr(attnum))
-					continue;
-
-				if (bms_is_member(attnum, info->keys))
-					nshared_vars++;
-
-				continue;
-			}
-
-			/* expression - see if it's in the statistics object */
-			foreach(lc3, info->exprs)
-			{
-				Node	   *expr = (Node *) lfirst(lc3);
-
-				if (equal(varinfo->var, expr))
-				{
-					nshared_exprs++;
-					break;
-				}
-			}
-		}
-
-		if (nshared_vars + nshared_exprs < 2)
-			continue;
-
-		/*
-		 * Does this statistics object match more columns than the currently
-		 * best object?  If so, use this one instead.
-		 *
-		 * XXX This should break ties using name of the object, or something
-		 * like that, to make the outcome stable.
-		 */
-		if ((nshared_exprs > nmatches_exprs) ||
-			(((nshared_exprs == nmatches_exprs)) && (nshared_vars > nmatches_vars)))
-		{
-			statOid = info->statOid;
-			nmatches_vars = nshared_vars;
-			nmatches_exprs = nshared_exprs;
-			matched_info = info;
-		}
-	}
-
-	/* No match? */
-	if (statOid == InvalidOid)
-		return false;
-
-	Assert(nmatches_vars + nmatches_exprs > 1);
-
-	stats = statext_ndistinct_load(statOid);
-
-	/*
-	 * If we have a match, search it for the specific item that matches (there
-	 * must be one), and construct the output values.
-	 */
-	if (stats)
-	{
-		int			i;
-		List	   *newlist = NIL;
-		MVNDistinctItem *item = NULL;
-		ListCell   *lc2;
-		Bitmapset  *matched = NULL;
-		AttrNumber	attnum_offset;
-
-		/*
-		 * How much we need to offset the attnums? If there are no
-		 * expressions, no offset is needed. Otherwise offset enough to move
-		 * the lowest one (which is equal to number of expressions) to 1.
-		 */
-		if (matched_info->exprs)
-			attnum_offset = (list_length(matched_info->exprs) + 1);
-		else
-			attnum_offset = 0;
-
-		/* see what actually matched */
-		foreach(lc2, *varinfos)
-		{
-			ListCell   *lc3;
-			int			idx;
-			bool		found = false;
-
-			GroupVarInfo *varinfo = (GroupVarInfo *) lfirst(lc2);
-
-			/*
-			 * Process a simple Var expression, by matching it to keys
-			 * directly. If there's a matching expression, we'll try matching
-			 * it later.
-			 */
-			if (IsA(varinfo->var, Var))
-			{
-				AttrNumber	attnum = ((Var *) varinfo->var)->varattno;
-
-				/*
-				 * Ignore expressions on system attributes. Can't rely on the
-				 * bms check for negative values.
-				 */
-				if (!AttrNumberIsForUserDefinedAttr(attnum))
-					continue;
-
-				/* Is the variable covered by the statistics object? */
-				if (!bms_is_member(attnum, matched_info->keys))
-					continue;
-
-				attnum = attnum + attnum_offset;
-
-				/* ensure sufficient offset */
-				Assert(AttrNumberIsForUserDefinedAttr(attnum));
-
-				matched = bms_add_member(matched, attnum);
-
-				found = true;
-			}
-
-			/*
-			 * XXX Maybe we should allow searching the expressions even if we
-			 * found an attribute matching the expression? That would handle
-			 * trivial expressions like "(a)" but it seems fairly useless.
-			 */
-			if (found)
-				continue;
-
-			/* expression - see if it's in the statistics object */
-			idx = 0;
-			foreach(lc3, matched_info->exprs)
-			{
-				Node	   *expr = (Node *) lfirst(lc3);
-
-				if (equal(varinfo->var, expr))
-				{
-					AttrNumber	attnum = -(idx + 1);
-
-					attnum = attnum + attnum_offset;
-
-					/* ensure sufficient offset */
-					Assert(AttrNumberIsForUserDefinedAttr(attnum));
-
-					matched = bms_add_member(matched, attnum);
-
-					/* there should be just one matching expression */
-					break;
-				}
-
-				idx++;
-			}
-		}
-
-		/* Find the specific item that exactly matches the combination */
-		for (i = 0; i < stats->nitems; i++)
-		{
-			int			j;
-			MVNDistinctItem *tmpitem = &stats->items[i];
-
-			if (tmpitem->nattributes != bms_num_members(matched))
-				continue;
-
-			/* assume it's the right item */
-			item = tmpitem;
-
-			/* check that all item attributes/expressions fit the match */
-			for (j = 0; j < tmpitem->nattributes; j++)
-			{
-				AttrNumber	attnum = tmpitem->attributes[j];
-
-				/*
-				 * Thanks to how we constructed the matched bitmap above, we
-				 * can just offset all attnums the same way.
-				 */
-				attnum = attnum + attnum_offset;
-
-				if (!bms_is_member(attnum, matched))
-				{
-					/* nah, it's not this item */
-					item = NULL;
-					break;
-				}
-			}
-
-			/*
-			 * If the item has all the matched attributes, we know it's the
-			 * right one - there can't be a better one. matching more.
-			 */
-			if (item)
-				break;
-		}
-
-		/*
-		 * Make sure we found an item. There has to be one, because ndistinct
-		 * statistics includes all combinations of attributes.
-		 */
-		if (!item)
-			elog(ERROR, "corrupt MVNDistinct entry");
-
-		/* Form the output varinfo list, keeping only unmatched ones */
-		foreach(lc, *varinfos)
-		{
-			GroupVarInfo *varinfo = (GroupVarInfo *) lfirst(lc);
-			ListCell   *lc3;
-			bool		found = false;
-
-			/*
-			 * Let's look at plain variables first, because it's the most
-			 * common case and the check is quite cheap. We can simply get the
-			 * attnum and check (with an offset) matched bitmap.
-			 */
-			if (IsA(varinfo->var, Var))
-			{
-				AttrNumber	attnum = ((Var *) varinfo->var)->varattno;
-
-				/*
-				 * If it's a system attribute, we're done. We don't support
-				 * extended statistics on system attributes, so it's clearly
-				 * not matched. Just keep the expression and continue.
-				 */
-				if (!AttrNumberIsForUserDefinedAttr(attnum))
-				{
-					newlist = lappend(newlist, varinfo);
-					continue;
-				}
-
-				/* apply the same offset as above */
-				attnum += attnum_offset;
-
-				/* if it's not matched, keep the varinfo */
-				if (!bms_is_member(attnum, matched))
-					newlist = lappend(newlist, varinfo);
-
-				/* The rest of the loop deals with complex expressions. */
-				continue;
-			}
-
-			/*
-			 * Process complex expressions, not just simple Vars.
-			 *
-			 * First, we search for an exact match of an expression. If we
-			 * find one, we can just discard the whole GroupExprInfo, with all
-			 * the variables we extracted from it.
-			 *
-			 * Otherwise we inspect the individual vars, and try matching it
-			 * to variables in the item.
-			 */
-			foreach(lc3, matched_info->exprs)
-			{
-				Node	   *expr = (Node *) lfirst(lc3);
-
-				if (equal(varinfo->var, expr))
-				{
-					found = true;
-					break;
-				}
-			}
-
-			/* found exact match, skip */
-			if (found)
-				continue;
-
-			newlist = lappend(newlist, varinfo);
-		}
-
-		*varinfos = newlist;
-		*ndistinct = item->ndistinct;
-		return true;
-	}
-
-	return false;
-}
 
 /*
  * convert_to_scalar
@@ -4871,7 +4497,6 @@ get_join_variables(PlannerInfo *root, List *args, SpecialJoinInfo *sjinfo,
 		*join_is_reversed = false;
 }
 
-/* statext_expressions_load copies the tuple, so just pfree it. */
 static void
 ReleaseDummy(HeapTuple tuple)
 {
@@ -5128,98 +4753,6 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
 			}
 			if (vardata->statsTuple)
 				break;
-		}
-
-		/*
-		 * Search extended statistics for one with a matching expression.
-		 * There might be multiple ones, so just grab the first one. In the
-		 * future, we might consider the statistics target (and pick the most
-		 * accurate statistics) and maybe some other parameters.
-		 */
-		foreach(slist, onerel->statlist)
-		{
-			StatisticExtInfo *info = (StatisticExtInfo *) lfirst(slist);
-			RangeTblEntry	 *rte = planner_rt_fetch(onerel->relid, root);
-			ListCell   *expr_item;
-			int			pos;
-
-			/*
-			 * Stop once we've found statistics for the expression (either
-			 * from extended stats, or for an index in the preceding loop).
-			 */
-			if (vardata->statsTuple)
-				break;
-
-			/*
-			 * When dealing with regular inheritance trees, ignore extended
-			 * stats (which were built without data from child rels, and thus
-			 * do not represent them). For partitioned tables data there's no
-			 * data in the non-leaf relations, so we build stats only for the
-			 * inheritance tree. So for partitioned tables we do consider
-			 * extended stats.
-			 */
-			if (rte->inh)
-				break;
-
-			/* skip stats without per-expression stats */
-			if (info->kind != STATS_EXT_EXPRESSIONS)
-				continue;
-
-			pos = 0;
-			foreach(expr_item, info->exprs)
-			{
-				Node	   *expr = (Node *) lfirst(expr_item);
-
-				Assert(expr);
-
-				/* strip RelabelType before comparing it */
-				if (expr && IsA(expr, RelabelType))
-					expr = (Node *) ((RelabelType *) expr)->arg;
-
-				/* found a match, see if we can extract pg_statistic row */
-				if (equal(node, expr))
-				{
-					HeapTuple	t = statext_expressions_load(info->statOid, pos);
-
-					vardata->statsTuple = t;
-
-					/* Nothing to release if no data found */
-					if (vardata->statsTuple != NULL)
-					{
-						/*
-						 * XXX Not sure if we should cache the tuple somewhere.
-						 * Now we just create a new copy every time.
-						 */
-						vardata->freefunc = ReleaseDummy;
-					}
-
-					/*
-					 * Test if user has permission to access all rows from the
-					 * table.
-					 *
-					 * For simplicity, we insist on the whole table being
-					 * selectable, rather than trying to identify which
-					 * column(s) the statistics object depends on.
-					 *
-					 * Note that for an inheritance child, permissions are
-					 * checked on the inheritance root parent, and whole-table
-					 * select privilege on the parent doesn't quite guarantee
-					 * that the user could read all columns of the child.  But
-					 * in practice it's unlikely that any interesting security
-					 * violation could result from allowing access to the
-					 * expression stats, so we allow it anyway.  See similar
-					 * code in examine_simple_variable() for additional
-					 * comments.
-					 */
-					vardata->acl_ok = all_rows_selectable(root,
-														  onerel->relid,
-														  NULL);
-
-					break;
-				}
-
-				pos++;
-			}
 		}
 	}
 }

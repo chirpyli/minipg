@@ -38,7 +38,6 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_type.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
@@ -177,8 +176,6 @@ typedef struct AlteredTableInfo
 	List	   *changedIndexOids;	/* OIDs of indexes to rebuild */
 	List	   *changedIndexDefs;	/* string definitions of same */
 	char	   *clusterOnIndex; /* index to use for CLUSTER */
-	List	   *changedStatisticsOids;	/* OIDs of statistics to rebuild */
-	List	   *changedStatisticsDefs;	/* string definitions of same */
 } AlteredTableInfo;
 
 /* Struct describing one new constraint to check in Phase 3 scan */
@@ -368,8 +365,6 @@ static ObjectAddress ATExecDropColumn(List **wqueue, Relation rel, const char *c
 									  ObjectAddresses *addrs);
 static ObjectAddress ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 									IndexStmt *stmt, bool is_rebuild, LOCKMODE lockmode);
-static ObjectAddress ATExecAddStatistics(AlteredTableInfo *tab, Relation rel,
-										 CreateStatsStmt *stmt, bool is_rebuild, LOCKMODE lockmode);
 static ObjectAddress ATExecAddConstraint(List **wqueue,
 										 AlteredTableInfo *tab, Relation rel,
 										 Constraint *newConstraint, bool recurse, bool is_readd,
@@ -3186,10 +3181,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_ReAddIndex:		/* ADD INDEX */
 			ATExecAddIndex(tab, rel, (IndexStmt *) cmd->def, true,
 									 lockmode);
-			break;
-		case AT_ReAddStatistics:	/* ADD STATISTICS */
-			ATExecAddStatistics(tab, rel, (CreateStatsStmt *) cmd->def,
-										  true, lockmode);
 			break;
 		case AT_AddConstraint:	/* ADD CONSTRAINT */
 			/* Transform the command only during initial examination */
@@ -6205,29 +6196,6 @@ ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 }
 
 /*
- * ALTER TABLE ADD STATISTICS
- *
- * This is no such command in the grammar, but we use this internally to add
- * AT_ReAddStatistics subcommands to rebuild extended statistics after a table
- * column type change.
- */
-static ObjectAddress
-ATExecAddStatistics(AlteredTableInfo *tab, Relation rel,
-					CreateStatsStmt *stmt, bool is_rebuild, LOCKMODE lockmode)
-{
-	ObjectAddress address;
-
-	Assert(IsA(stmt, CreateStatsStmt));
-
-	/* The CreateStatsStmt has already been through transformStatsStmt */
-	Assert(stmt->transformed);
-
-	address = CreateStatistics(stmt, !is_rebuild);
-
-	return address;
-}
-
-/*
  * ALTER TABLE ADD CONSTRAINT USING INDEX
  *
  * Returns the address of the new constraint.
@@ -7277,15 +7245,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 				Assert(defaultexpr);
 				break;
 
-			case OCLASS_STATISTIC_EXT:
-
-				/*
-				 * Give the extended-stats machinery a chance to fix anything
-				 * that this column type change would break.
-				 */
-				RememberStatisticsForRebuilding(foundObject.objectId, tab);
-				break;
-
 			case OCLASS_TYPE:
 			case OCLASS_CAST:
 			case OCLASS_COLLATION:
@@ -7599,32 +7558,6 @@ RememberIndexForRebuilding(Oid indoid, AlteredTableInfo *tab)
 }
 
 /*
- * Subroutine for ATExecAlterColumnType: remember that a statistics object
- * needs to be rebuilt (which we might already know).
- */
-static void
-RememberStatisticsForRebuilding(Oid stxoid, AlteredTableInfo *tab)
-{
-	/*
-	 * This de-duplication check is critical for two independent reasons: we
-	 * mustn't try to recreate the same statistics object twice, and if the
-	 * statistics object depends on more than one column whose type is to be
-	 * altered, we must capture its definition string before applying any of
-	 * the type changes. ruleutils.c will get confused if we ask again later.
-	 */
-	if (!list_member_oid(tab->changedStatisticsOids, stxoid))
-	{
-		/* OK, capture the statistics object's existing definition string */
-		char	   *defstring = pg_get_statisticsobjdef_string(stxoid);
-
-		tab->changedStatisticsOids = lappend_oid(tab->changedStatisticsOids,
-												 stxoid);
-		tab->changedStatisticsDefs = lappend(tab->changedStatisticsDefs,
-											 defstring);
-	}
-}
-
-/*
  * Cleanup after we've finished all the ALTER TYPE operations for a
  * particular relation.  We have to drop and recreate all the indexes
  * and constraints that depend on the altered columns.  We do the
@@ -7737,36 +7670,6 @@ ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab, LOCKMODE lockmode)
 		add_exact_object_address(&obj, objects);
 	}
 
-	/* add dependencies for new statistics */
-	forboth(oid_item, tab->changedStatisticsOids,
-			def_item, tab->changedStatisticsDefs)
-	{
-		Oid			oldId = lfirst_oid(oid_item);
-		Oid			relid;
-
-		relid = StatisticsGetRelation(oldId, false);
-
-		/*
-		 * As above, make sure we have lock on the statistics object's table
-		 * if it's not the same table.  However, we take
-		 * ShareUpdateExclusiveLock here, aligning with the lock level used in
-		 * CreateStatistics and RemoveStatisticsById.
-		 *
-		 * CAUTION: this should be done after all cases that grab
-		 * AccessExclusiveLock, else we risk causing deadlock due to needing
-		 * to promote our table lock.
-		 */
-		if (relid != tab->relid)
-			LockRelationOid(relid, ShareUpdateExclusiveLock);
-
-		ATPostAlterTypeParse(oldId, relid, InvalidOid,
-							 (char *) lfirst(def_item),
-							 wqueue, lockmode, tab->rewrite);
-
-		ObjectAddressSet(obj, StatisticExtRelationId, oldId);
-		add_exact_object_address(&obj, objects);
-	}
-
 
 	/*
 	 * Queue up command to restore marking of index used for cluster.
@@ -7846,11 +7749,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 			querytree_list = lappend(querytree_list, stmt);
 			querytree_list = list_concat(querytree_list, afterStmts);
 		}
-		else if (IsA(stmt, CreateStatsStmt))
-			querytree_list = lappend(querytree_list,
-									 transformStatsStmt(oldRelId,
-														(CreateStatsStmt *) stmt,
-														cmd));
 		else
 			querytree_list = lappend(querytree_list, stmt);
 	}
@@ -7934,17 +7832,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 					elog(ERROR, "unexpected statement subtype: %d",
 						 (int) cmd->subtype);
 			}
-		}
-		else if (IsA(stm, CreateStatsStmt))
-		{
-			CreateStatsStmt *stmt = (CreateStatsStmt *) stm;
-			AlterTableCmd *newcmd;
-
-			newcmd = makeNode(AlterTableCmd);
-			newcmd->subtype = AT_ReAddStatistics;
-			newcmd->def = (Node *) stmt;
-			tab->subcmds[AT_PASS_MISC] =
-				lappend(tab->subcmds[AT_PASS_MISC], newcmd);
 		}
 		else
 			elog(ERROR, "unexpected statement type: %d",

@@ -1099,19 +1099,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 }
 
 static bool
-_equalCreateStatsStmt(const CreateStatsStmt *a, const CreateStatsStmt *b)
-{
-	COMPARE_NODE_FIELD(defnames);
-	COMPARE_NODE_FIELD(stat_types);
-	COMPARE_NODE_FIELD(exprs);
-	COMPARE_NODE_FIELD(relations);
-	COMPARE_SCALAR_FIELD(transformed);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-
-	return true;
-}
-
-static bool
 _equalCreateFunctionStmt(const CreateFunctionStmt *a, const CreateFunctionStmt *b)
 {
 	COMPARE_SCALAR_FIELD(is_procedure);
@@ -1509,15 +1496,6 @@ _equalIndexElem(const IndexElem *a, const IndexElem *b)
 	return true;
 }
 
-
-static bool
-_equalStatsElem(const StatsElem *a, const StatsElem *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(expr);
-
-	return true;
-}
 
 static bool
 _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
@@ -2081,9 +2059,6 @@ equal(const void *a, const void *b)
 		case T_IndexStmt:
 			retval = _equalIndexStmt(a, b);
 			break;
-		case T_CreateStatsStmt:
-			retval = _equalCreateStatsStmt(a, b);
-			break;
 		case T_CreateFunctionStmt:
 			retval = _equalCreateFunctionStmt(a, b);
 			break;
@@ -2194,9 +2169,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_IndexElem:
 			retval = _equalIndexElem(a, b);
-			break;
-		case T_StatsElem:
-			retval = _equalStatsElem(a, b);
 			break;
 		case T_ColumnDef:
 			retval = _equalColumnDef(a, b);

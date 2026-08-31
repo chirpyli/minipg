@@ -31,7 +31,6 @@ OBJS = \
 	portalcmds.o \
 	proclang.o \
 	schemacmds.o \
-	statscmds.o \
 	tablecmds.o \
 	tablespace.o \
 	typecmds.o \

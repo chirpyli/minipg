@@ -116,7 +116,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_AlterTableStmt:
 		case T_CreateExtensionStmt:
 		case T_CreateSchemaStmt:
-		case T_CreateStatsStmt:
 		case T_CreateStmt:
 		case T_CreatedbStmt:
 		case T_DropStmt:
@@ -817,40 +816,9 @@ ProcessUtilitySlow(ParseState *pstate,
 											  &secondaryObject);
 											  break;
 
-			case T_CreateStatsStmt:
-				{
-					Oid			relid;
-					CreateStatsStmt *stmt = (CreateStatsStmt *) parsetree;
-					RangeVar   *rel = (RangeVar *) linitial(stmt->relations);
-
-					if (!IsA(rel, RangeVar))
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("CREATE STATISTICS only supports relation names in the FROM clause")));
-
-					/*
-					 * CREATE STATISTICS will influence future execution plans
-					 * but does not interfere with currently executing plans.
-					 * So it should be enough to take ShareUpdateExclusiveLock
-					 * on relation, conflicting with ANALYZE and other DDL
-					 * that sets statistical information, but not with normal
-					 * queries.
-					 *
-					 * XXX RangeVarCallbackOwnsRelation not needed here, to
-					 * keep the same behavior as before.
-					 */
-					relid = RangeVarGetRelid(rel, ShareUpdateExclusiveLock, false);
-
-					/* Run parse analysis ... */
-					stmt = transformStatsStmt(relid, stmt, queryString);
-
-					address = CreateStatistics(stmt, true);
-				}
-				break;
-
-		default:
-			elog(ERROR, "unrecognized node type: %d",
-				 (int) nodeTag(parsetree));
+			default:
+				elog(ERROR, "unrecognized node type: %d",
+					 (int) nodeTag(parsetree));
 			break;
 		}
 }
@@ -1191,9 +1159,6 @@ CreateCommandTag(Node *parsetree)
 			case OBJECT_EXTENSION:
 				tag = CMDTAG_DROP_EXTENSION;
 				break;
-			case OBJECT_STATISTIC_EXT:
-					tag = CMDTAG_DROP_STATISTICS;
-					break;
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}
@@ -1298,10 +1263,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_ReindexStmt:
 			tag = CMDTAG_REINDEX;
-			break;
-
-		case T_CreateStatsStmt:
-			tag = CMDTAG_CREATE_STATISTICS;
 			break;
 
 			/* already-planned queries */
@@ -1580,10 +1541,6 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
-			lev = LOGSTMT_DDL;
-			break;
-
-		case T_CreateStatsStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

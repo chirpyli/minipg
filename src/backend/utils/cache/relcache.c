@@ -52,7 +52,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/schemapg.h"
@@ -2142,7 +2141,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	}
 	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
-	list_free(relation->rd_statlist);
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
 	bms_free(relation->rd_pkattr);
@@ -4276,91 +4274,6 @@ RelationGetIndexList(Relation relation)
 }
 
 /*
- * RelationGetStatExtList
- *		get a list of OIDs of statistics objects on this relation
- *
- * The statistics list is created only if someone requests it, in a way
- * similar to RelationGetIndexList().  We scan pg_statistic_ext to find
- * relevant statistics, and add the list to the relcache entry so that we
- * won't have to compute it again.  Note that shared cache inval of a
- * relcache entry will delete the old list and set rd_statvalid to 0,
- * so that we must recompute the statistics list on next request.  This
- * handles creation or deletion of a statistics object.
- *
- * The returned list is guaranteed to be sorted in order by OID, although
- * this is not currently needed.
- *
- * Since shared cache inval causes the relcache's copy of the list to go away,
- * we return a copy of the list palloc'd in the caller's context.  The caller
- * may list_free() the returned list after scanning it. This is necessary
- * since the caller will typically be doing syscache lookups on the relevant
- * statistics, and syscache lookup could cause SI messages to be processed!
- */
-List *
-RelationGetStatExtList(Relation relation)
-{
-	Relation	indrel;
-	SysScanDesc indscan;
-	ScanKeyData skey;
-	HeapTuple	htup;
-	List	   *result;
-	List	   *oldlist;
-	MemoryContext oldcxt;
-
-	/* Quick exit if we already computed the list. */
-	if (relation->rd_statvalid != 0)
-		return list_copy(relation->rd_statlist);
-
-	/*
-	 * We build the list we intend to return (in the caller's context) while
-	 * doing the scan.  After successfully completing the scan, we copy that
-	 * list into the relcache entry.  This avoids cache-context memory leakage
-	 * if we get some sort of error partway through.
-	 */
-	result = NIL;
-
-	/*
-	 * Prepare to scan pg_statistic_ext for entries having stxrelid = this
-	 * rel.
-	 */
-	ScanKeyInit(&skey,
-				Anum_pg_statistic_ext_stxrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
-
-	indrel = table_open(StatisticExtRelationId, AccessShareLock);
-	indscan = systable_beginscan(indrel, StatisticExtRelidIndexId, true,
-								 NULL, 1, &skey);
-
-	while (HeapTupleIsValid(htup = systable_getnext(indscan)))
-	{
-		Oid			oid = ((Form_pg_statistic_ext) GETSTRUCT(htup))->oid;
-
-		result = lappend_oid(result, oid);
-	}
-
-	systable_endscan(indscan);
-
-	table_close(indrel, AccessShareLock);
-
-	/* Sort the result list into OID order, per API spec. */
-	list_sort(result, list_oid_cmp);
-
-	/* Now save a copy of the completed list in the relcache entry. */
-	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-	oldlist = relation->rd_statlist;
-	relation->rd_statlist = list_copy(result);
-
-	relation->rd_statvalid = true;
-	MemoryContextSwitchTo(oldcxt);
-
-	/* Don't leak the old list, if there is one */
-	list_free(oldlist);
-
-	return result;
-}
-
-/*
  * RelationGetPrimaryKeyIndex -- get OID of the relation's primary key index
  *
  * Returns InvalidOid if there is no such index.
@@ -5308,8 +5221,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_indexattr = NULL;
 		rel->rd_keyattr = NULL;
 		rel->rd_pkattr = NULL;
-		rel->rd_statvalid = false;
-		rel->rd_statlist = NIL;
 		rel->rd_fkeyvalid = false;
 		rel->rd_fkeylist = NIL;
 		rel->rd_createSubid = InvalidSubTransactionId;

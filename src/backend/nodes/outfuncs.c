@@ -2074,7 +2074,6 @@ _outRelOptInfo(StringInfo str, const RelOptInfo *node)
 	WRITE_NODE_FIELD(lateral_vars);
 	WRITE_BITMAPSET_FIELD(lateral_referencers);
 	WRITE_NODE_FIELD(indexlist);
-	WRITE_NODE_FIELD(statlist);
 	WRITE_UINT_FIELD(pages);
 	WRITE_FLOAT_FIELD(tuples, "%.0f");
 	WRITE_FLOAT_FIELD(allvisfrac, "%.6f");
@@ -2140,18 +2139,6 @@ _outForeignKeyOptInfo(StringInfo str, const ForeignKeyOptInfo *node)
 	appendStringInfoString(str, " :rinfos");
 	for (i = 0; i < node->nkeys; i++)
 		appendStringInfo(str, " %d", list_length(node->rinfos[i]));
-}
-
-static void
-_outStatisticExtInfo(StringInfo str, const StatisticExtInfo *node)
-{
-	WRITE_NODE_TYPE("STATISTICEXTINFO");
-
-	/* NB: this isn't a complete set of fields */
-	WRITE_OID_FIELD(statOid);
-	/* don't write rel, leads to infinite recursion in plan tree dump */
-	WRITE_CHAR_FIELD(kind);
-	WRITE_BITMAPSET_FIELD(keys);
 }
 
 static void
@@ -2449,19 +2436,6 @@ _outIndexStmt(StringInfo str, const IndexStmt *node)
 }
 
 static void
-_outCreateStatsStmt(StringInfo str, const CreateStatsStmt *node)
-{
-	WRITE_NODE_TYPE("CREATESTATSSTMT");
-
-	WRITE_NODE_FIELD(defnames);
-	WRITE_NODE_FIELD(stat_types);
-	WRITE_NODE_FIELD(exprs);
-	WRITE_NODE_FIELD(relations);
-	WRITE_BOOL_FIELD(transformed);
-	WRITE_BOOL_FIELD(if_not_exists);
-}
-
-static void
 _outSelectStmt(StringInfo str, const SelectStmt *node)
 {
 	WRITE_NODE_TYPE("SELECT");
@@ -2601,15 +2575,6 @@ _outIndexElem(StringInfo str, const IndexElem *node)
 	WRITE_NODE_FIELD(opclassopts);
 	WRITE_ENUM_FIELD(ordering, SortByDir);
 	WRITE_ENUM_FIELD(nulls_ordering, SortByNulls);
-}
-
-static void
-_outStatsElem(StringInfo str, const StatsElem *node)
-{
-	WRITE_NODE_TYPE("STATSELEM");
-
-	WRITE_STRING_FIELD(name);
-	WRITE_NODE_FIELD(expr);
 }
 
 static void
@@ -3604,9 +3569,6 @@ outNode(StringInfo str, const void *obj)
 			case T_GroupingSetData:
 				_outGroupingSetData(str, obj);
 				break;
-			case T_StatisticExtInfo:
-				_outStatisticExtInfo(str, obj);
-				break;
 			case T_ExtensibleNode:
 				_outExtensibleNode(str, obj);
 				break;
@@ -3615,9 +3577,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_IndexStmt:
 				_outIndexStmt(str, obj);
-				break;
-			case T_CreateStatsStmt:
-				_outCreateStatsStmt(str, obj);
 				break;
 			case T_SelectStmt:
 				_outSelectStmt(str, obj);
@@ -3639,9 +3598,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_IndexElem:
 				_outIndexElem(str, obj);
-				break;
-			case T_StatsElem:
-				_outStatsElem(str, obj);
 				break;
 			case T_Query:
 				_outQuery(str, obj);

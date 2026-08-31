@@ -212,7 +212,6 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent)
 	/* min_attr, max_attr, attr_needed, attr_widths are set below */
 	rel->lateral_vars = NIL;
 	rel->indexlist = NIL;
-	rel->statlist = NIL;
 	rel->pages = 0;
 	rel->tuples = 0;
 	rel->allvisfrac = 0;
@@ -562,7 +561,6 @@ build_join_rel(PlannerInfo *root,
 	joinrel->lateral_vars = NIL;
 	joinrel->lateral_referencers = NULL;
 	joinrel->indexlist = NIL;
-	joinrel->statlist = NIL;
 	joinrel->pages = 0;
 	joinrel->tuples = 0;
 	joinrel->allvisfrac = 0;

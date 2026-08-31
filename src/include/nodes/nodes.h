@@ -250,7 +250,6 @@ typedef enum NodeTag
 	T_PlannerParamItem,
 	T_RollupData,
 	T_GroupingSetData,
-	T_StatisticExtInfo,
 
 	/*
 	 * TAGS FOR MEMORY NODES (memnodes.h)
@@ -316,7 +315,6 @@ typedef enum NodeTag
 	T_CreateSchemaStmt,
 	T_AlterObjectSchemaStmt,
 	T_CreateExtensionStmt,
-	T_CreateStatsStmt,
 
 	/*
 	 * TAGS FOR PARSE TREE NODES (parsenodes.h)

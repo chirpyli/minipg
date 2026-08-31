@@ -36,7 +36,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
@@ -1479,88 +1478,9 @@ transformIndexStmt(Oid relid, IndexStmt *stmt, const char *queryString)
 }
 
 /*
- * transformStatsStmt - parse analysis for CREATE STATISTICS
- *
- * To avoid race conditions, it's important that this function relies only on
- * the passed-in relid (and not on stmt->relation) to determine the target
- * relation.
+ * transformRuleStmt - parse analysis for CREATE RULE
  */
-CreateStatsStmt *
-transformStatsStmt(Oid relid, CreateStatsStmt *stmt, const char *queryString)
-{
-	ParseState *pstate;
-	ParseNamespaceItem *nsitem;
-	ListCell   *l;
-	Relation	rel;
-
-	/* Nothing to do if statement already transformed. */
-	if (stmt->transformed)
-		return stmt;
-
-	/* Set up pstate */
-	pstate = make_parsestate(NULL);
-	pstate->p_sourcetext = queryString;
-
-	/*
-	 * Put the parent table into the rtable so that the expressions can refer
-	 * to its fields without qualification.  Caller is responsible for locking
-	 * relation, but we still need to open it.
-	 */
-	rel = relation_open(relid, NoLock);
-	nsitem = addRangeTableEntryForRelation(pstate, rel,
-										   AccessShareLock,
-										   NULL, false, true);
-
-	/* no to join list, yes to namespaces */
-	addNSItemToQuery(pstate, nsitem, false, true, true);
-
-	/* take care of any expressions */
-	foreach(l, stmt->exprs)
-	{
-		StatsElem  *selem = (StatsElem *) lfirst(l);
-
-		if (selem->expr)
-		{
-			/* Now do parse transformation of the expression */
-			selem->expr = transformExpr(pstate, selem->expr,
-										EXPR_KIND_STATS_EXPRESSION);
-
-			/* We have to fix its collations too */
-			assign_expr_collations(pstate, selem->expr);
-		}
-	}
-
-	/*
-	 * Check that only the base rel is mentioned.  (This should be dead code
-	 * now that add_missing_from is history.)
-	 */
-	if (list_length(pstate->p_rtable) != 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("statistics expressions can refer only to the table being referenced")));
-
-	free_parsestate(pstate);
-
-	/* Close relation */
-	table_close(rel, NoLock);
-
-	/* Mark statement as successfully transformed */
-	stmt->transformed = true;
-
-	return stmt;
-}
-
-
-/*
- * transformRuleStmt -
- *	  transform a CREATE RULE Statement. The action is a list of parse
- *	  trees which is transformed into a list of query trees, and we also
- *	  transform the WHERE clause if any.
- *
- * actions and whereClause are output parameters that receive the
- * transformed results.
- */
-void
+RuleStmt *
 transformRuleStmt(RuleStmt *stmt, const char *queryString,
 				  List **actions, Node **whereClause)
 {

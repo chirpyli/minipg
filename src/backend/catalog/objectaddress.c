@@ -39,7 +39,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
@@ -322,19 +321,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		OBJECT_TYPE,
 		false
-	},
-	{
-		"extended statistics",
-		StatisticExtRelationId,
-		StatisticExtOidIndexId,
-		STATEXTOID,
-		STATEXTNAMENSP,
-		Anum_pg_statistic_ext_oid,
-		Anum_pg_statistic_ext_stxname,
-		Anum_pg_statistic_ext_stxnamespace,
-		InvalidAttrNumber,
-		OBJECT_STATISTIC_EXT,
-		false
 	}
 };
 
@@ -465,10 +451,6 @@ static const struct object_type_map
 	/* OCLASS_EXTENSION */
 	{
 		"extension", OBJECT_EXTENSION
-	},
-	/* OCLASS_STATISTIC_EXT */
-	{
-		"statistics object", OBJECT_STATISTIC_EXT
 	}
 };
 
@@ -645,12 +627,6 @@ get_object_address(ObjectType objtype, Node *object,
 						get_cast_oid(sourcetypeid, targettypeid, missing_ok);
 					address.objectSubId = 0;
 				}
-				break;
-			case OBJECT_STATISTIC_EXT:
-				address.classId = StatisticExtRelationId;
-				address.objectId = get_statistics_object_oid(castNode(List, object),
-															 missing_ok);
-				address.objectSubId = 0;
 				break;
 			default:
 				elog(ERROR, "unrecognized objtype: %d", (int) objtype);
@@ -1427,7 +1403,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_COLUMN:
 		case OBJECT_ATTRIBUTE:
 		case OBJECT_COLLATION:
-		case OBJECT_STATISTIC_EXT:
 		case OBJECT_DATABASE:
 		case OBJECT_EXTENSION:
 		case OBJECT_LANGUAGE:
@@ -2289,38 +2264,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_STATISTIC_EXT:
-			{
-				HeapTuple	stxTup;
-				Form_pg_statistic_ext stxForm;
-				char	   *nspname;
-
-				stxTup = SearchSysCache1(STATEXTOID,
-										 ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(stxTup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for statistics object %u",
-							 object->objectId);
-					break;
-				}
-
-				stxForm = (Form_pg_statistic_ext) GETSTRUCT(stxTup);
-
-				/* Qualify the name if not visible in search path */
-				if (StatisticsObjIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(stxForm->stxnamespace);
-
-				appendStringInfo(&buffer, _("statistics object %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(stxForm->stxname)));
-
-				ReleaseSysCache(stxTup);
-				break;
-			}
-
 
 
 
@@ -2801,10 +2744,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_SCHEMA:
 			appendStringInfoString(&buffer, "schema");
-			break;
-
-		case OCLASS_STATISTIC_EXT:
-			appendStringInfoString(&buffer, "statistics object");
 			break;
 
 		case OCLASS_DATABASE:
@@ -3498,33 +3437,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 					*objname = list_make1(nspname);
 				break;
 			}
-
-		case OCLASS_STATISTIC_EXT:
-			{
-				HeapTuple	tup;
-				Form_pg_statistic_ext formStatistic;
-				char	   *schema;
-
-				tup = SearchSysCache1(STATEXTOID,
-									  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for statistics object %u",
-							 object->objectId);
-					break;
-				}
-				formStatistic = (Form_pg_statistic_ext) GETSTRUCT(tup);
-				schema = get_namespace_name_or_temp(formStatistic->stxnamespace);
-				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(formStatistic->stxname)));
-				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(formStatistic->stxname)));
-				ReleaseSysCache(tup);
-			}
-			break;
 
 
 

@@ -59,7 +59,6 @@ typedef struct RelationData
 	bool		rd_isvalid;		/* relcache entry is valid */
 	bool		rd_fakeentry;	/* formrdesc-created entry, real data not loaded yet */
 	bool		rd_indexvalid;	/* is rd_indexlist valid? (also rd_pkindex) */
-	bool		rd_statvalid;	/* is rd_statlist valid? */
 
 	/*----------
 	 * rd_createSubid is the ID of the highest subtransaction the rel has
@@ -117,9 +116,6 @@ typedef struct RelationData
 	/* data managed by RelationGetIndexList: */
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */
 	Oid			rd_pkindex;		/* OID of primary key, if any */
-
-	/* data managed by RelationGetStatExtList: */
-	List	   *rd_statlist;	/* list of OIDs of extended stats */
 
 	/* data managed by RelationGetIndexAttrBitmap: */
 	Bitmapset  *rd_indexattr;	/* identifies columns used in indexes */

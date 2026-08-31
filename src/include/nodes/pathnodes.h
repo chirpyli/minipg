@@ -665,7 +665,6 @@ typedef struct RelOptInfo
 	List	   *lateral_vars;	/* LATERAL Vars and PHVs referenced by rel */
 	Relids		lateral_referencers;	/* rels that reference me laterally */
 	List	   *indexlist;		/* list of IndexOptInfo */
-	List	   *statlist;		/* list of StatisticExtInfo */
 	BlockNumber pages;			/* size estimates derived from pg_class */
 	double		tuples;
 	double		allvisfrac;
@@ -822,24 +821,6 @@ typedef struct ForeignKeyOptInfo
 	/* List of non-EC RestrictInfos matching each column's condition */
 	List	   *rinfos[INDEX_MAX_KEYS];
 } ForeignKeyOptInfo;
-
-/*
- * StatisticExtInfo
- *		Information about extended statistics for planning/optimization
- *
- * Each pg_statistic_ext row is represented by one or more nodes of this
- * type, or even zero if ANALYZE has not computed them.
- */
-typedef struct StatisticExtInfo
-{
-	NodeTag		type;
-
-	Oid			statOid;		/* OID of the statistics row */
-	RelOptInfo *rel;			/* back-link to statistic's table */
-	char		kind;			/* statistics kind of this entry */
-	Bitmapset  *keys;			/* attnums of the columns covered */
-	List	   *exprs;			/* expressions */
-} StatisticExtInfo;
 
 /*
  * EquivalenceClasses

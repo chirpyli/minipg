@@ -21,7 +21,6 @@
 #include "optimizer/optimizer.h"
 #include "optimizer/pathnode.h"
 #include "optimizer/plancat.h"
-#include "statistics/statistics.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/selfuncs.h"
@@ -124,7 +123,6 @@ clauselist_selectivity_ext(PlannerInfo *root,
 						   bool use_extended_stats)
 {
 	Selectivity s1 = 1.0;
-	RelOptInfo *rel;
 	Bitmapset  *estimatedclauses = NULL;
 	RangeQueryClause *rqlist = NULL;
 	ListCell   *l;
@@ -138,24 +136,6 @@ clauselist_selectivity_ext(PlannerInfo *root,
 		return clause_selectivity_ext(root, (Node *) linitial(clauses),
 									  varRelid, jointype, sjinfo,
 									  use_extended_stats);
-
-	/*
-	 * Determine if these clauses reference a single relation.  If so, and if
-	 * it has extended statistics, try to apply those.
-	 */
-	rel = find_single_rel_for_clauses(root, clauses);
-	if (use_extended_stats && rel && rel->rtekind == RTE_RELATION && rel->statlist != NIL)
-	{
-		/*
-		 * Estimate as many clauses as possible using extended statistics.
-		 *
-		 * 'estimatedclauses' is populated with the 0-based list position
-		 * index of clauses estimated here, and that should be ignored below.
-		 */
-		s1 = statext_clauselist_selectivity(root, clauses, varRelid,
-											jointype, sjinfo, rel,
-											&estimatedclauses, false);
-	}
 
 	/*
 	 * Apply normal selectivity estimates for remaining clauses. We'll be
@@ -366,28 +346,9 @@ clauselist_selectivity_or(PlannerInfo *root,
 						  bool use_extended_stats)
 {
 	Selectivity s1 = 0.0;
-	RelOptInfo *rel;
 	Bitmapset  *estimatedclauses = NULL;
 	ListCell   *lc;
 	int			listidx;
-
-	/*
-	 * Determine if these clauses reference a single relation.  If so, and if
-	 * it has extended statistics, try to apply those.
-	 */
-	rel = find_single_rel_for_clauses(root, clauses);
-	if (use_extended_stats && rel && rel->rtekind == RTE_RELATION && rel->statlist != NIL)
-	{
-		/*
-		 * Estimate as many clauses as possible using extended statistics.
-		 *
-		 * 'estimatedclauses' is populated with the 0-based list position
-		 * index of clauses estimated here, and that should be ignored below.
-		 */
-		s1 = statext_clauselist_selectivity(root, clauses, varRelid,
-											jointype, sjinfo, rel,
-											&estimatedclauses, true);
-	}
 
 	/*
 	 * Estimate the remaining clauses as if they were independent.

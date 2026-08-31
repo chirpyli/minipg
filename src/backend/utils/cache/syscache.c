@@ -43,8 +43,6 @@
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_statistic.h"
-#include "catalog/pg_statistic_ext.h"
-#include "catalog/pg_statistic_ext_data.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "lib/qunique.h"
@@ -473,39 +471,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		8
-	},
-	{StatisticExtDataRelationId,	/* STATEXTDATASTXOID */
-		StatisticExtDataStxoidIndexId,
-		1,
-		{
-			Anum_pg_statistic_ext_data_stxoid,
-			0,
-			0,
-			0
-		},
-		4
-	},
-	{StatisticExtRelationId,	/* STATEXTNAMENSP */
-		StatisticExtNameIndexId,
-		2,
-		{
-			Anum_pg_statistic_ext_stxname,
-			Anum_pg_statistic_ext_stxnamespace,
-			0,
-			0
-		},
-		4
-	},
-	{StatisticExtRelationId,	/* STATEXTOID */
-		StatisticExtOidIndexId,
-		1,
-		{
-			Anum_pg_statistic_ext_oid,
-			0,
-			0,
-			0
-		},
-		4
 	},
 	{StatisticRelationId,		/* STATRELATTINH */
 		StatisticRelidAttnumInhIndexId,

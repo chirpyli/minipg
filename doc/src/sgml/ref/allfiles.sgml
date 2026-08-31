@@ -21,7 +21,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY createIndex SYSTEM "create_index.sgml">
 <!ENTITY createRule SYSTEM "create_rule.sgml">
 <!ENTITY createSchema SYSTEM "create_schema.sgml">
-<!ENTITY createStatistics SYSTEM "create_statistics.sgml">
 <!ENTITY createTable SYSTEM "create_table.sgml">
 <!ENTITY createView SYSTEM "create_view.sgml">
 <!ENTITY delete SYSTEM "delete.sgml">
@@ -31,7 +30,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY dropFunction SYSTEM "drop_function.sgml">
 <!ENTITY dropIndex SYSTEM "drop_index.sgml">
 <!ENTITY dropSchema SYSTEM "drop_schema.sgml">
-<!ENTITY dropStatistics SYSTEM "drop_statistics.sgml">
 <!ENTITY dropTable SYSTEM "drop_table.sgml">
 <!ENTITY dropType SYSTEM "drop_type.sgml">
 <!ENTITY dropView SYSTEM "drop_view.sgml">

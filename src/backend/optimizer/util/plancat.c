@@ -29,7 +29,6 @@
 #include "catalog/heap.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_statistic_ext.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -42,7 +41,6 @@
 #include "parser/parse_relation.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
-#include "statistics/statistics.h"
 #include "storage/bufmgr.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
@@ -69,7 +67,6 @@ static List *get_relation_constraints(PlannerInfo *root,
 									  bool include_partition);
 static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
 							   Relation heapRelation);
-static List *get_relation_statistics(RelOptInfo *rel, Relation relation);
 
 
 /*
@@ -82,7 +79,6 @@ static List *get_relation_statistics(RelOptInfo *rel, Relation relation);
  *	min_attr	lowest valid AttrNumber
  *	max_attr	highest valid AttrNumber
  *	indexlist	list of IndexOptInfos for relation's indexes
- *	statlist	list of StatisticExtInfo for relation's statistic objects
  *	pages		number of pages
  *	tuples		number of tuples
  *	rel_parallel_workers user-defined number of parallel workers
@@ -429,8 +425,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	}
 
 	rel->indexlist = indexinfos;
-
-	rel->statlist = get_relation_statistics(rel, relation);
 
 	/* Collect info about relation's foreign keys, if relevant */
 	get_relation_foreign_keys(root, rel, relation, inhparent);
@@ -1244,157 +1238,6 @@ get_relation_constraints(PlannerInfo *root,
 	table_close(relation, NoLock);
 
 	return result;
-}
-
-/*
- * get_relation_statistics
- *		Retrieve extended statistics defined on the table.
- *
- * Returns a List (possibly empty) of StatisticExtInfo objects describing
- * the statistics.  Note that this doesn't load the actual statistics data,
- * just the identifying metadata.  Only stats actually built are considered.
- */
-static List *
-get_relation_statistics(RelOptInfo *rel, Relation relation)
-{
-	Index		varno = rel->relid;
-	List	   *statoidlist;
-	List	   *stainfos = NIL;
-	ListCell   *l;
-
-	statoidlist = RelationGetStatExtList(relation);
-
-	foreach(l, statoidlist)
-	{
-		Oid			statOid = lfirst_oid(l);
-		Form_pg_statistic_ext staForm;
-		HeapTuple	htup;
-		HeapTuple	dtup;
-		Bitmapset  *keys = NULL;
-		List	   *exprs = NIL;
-		int			i;
-
-		htup = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(statOid));
-		if (!HeapTupleIsValid(htup))
-			elog(ERROR, "cache lookup failed for statistics object %u", statOid);
-		staForm = (Form_pg_statistic_ext) GETSTRUCT(htup);
-
-		dtup = SearchSysCache1(STATEXTDATASTXOID, ObjectIdGetDatum(statOid));
-		if (!HeapTupleIsValid(dtup))
-			elog(ERROR, "cache lookup failed for statistics object %u", statOid);
-
-		/*
-		 * First, build the array of columns covered.  This is ultimately
-		 * wasted if no stats within the object have actually been built, but
-		 * it doesn't seem worth troubling over that case.
-		 */
-		for (i = 0; i < staForm->stxkeys.dim1; i++)
-			keys = bms_add_member(keys, staForm->stxkeys.values[i]);
-
-		/*
-		 * Preprocess expressions (if any). We read the expressions, run them
-		 * through eval_const_expressions, and fix the varnos.
-		 */
-		{
-			bool		isnull;
-			Datum		datum;
-
-			/* decode expression (if any) */
-			datum = SysCacheGetAttr(STATEXTOID, htup,
-									Anum_pg_statistic_ext_stxexprs, &isnull);
-
-			if (!isnull)
-			{
-				char	   *exprsString;
-
-				exprsString = TextDatumGetCString(datum);
-				exprs = (List *) stringToNode(exprsString);
-				pfree(exprsString);
-
-				/*
-				 * Run the expressions through eval_const_expressions. This is
-				 * not just an optimization, but is necessary, because the
-				 * planner will be comparing them to similarly-processed qual
-				 * clauses, and may fail to detect valid matches without this.
-				 * We must not use canonicalize_qual, however, since these
-				 * aren't qual expressions.
-				 */
-				exprs = (List *) eval_const_expressions(NULL, (Node *) exprs);
-
-				/* May as well fix opfuncids too */
-				fix_opfuncids((Node *) exprs);
-
-				/*
-				 * Modify the copies we obtain from the relcache to have the
-				 * correct varno for the parent relation, so that they match
-				 * up correctly against qual clauses.
-				 */
-				if (varno != 1)
-					ChangeVarNodes((Node *) exprs, 1, varno, 0);
-			}
-		}
-
-		/* add one StatisticExtInfo for each kind built */
-		if (statext_is_kind_built(dtup, STATS_EXT_NDISTINCT))
-		{
-			StatisticExtInfo *info = makeNode(StatisticExtInfo);
-
-			info->statOid = statOid;
-			info->rel = rel;
-			info->kind = STATS_EXT_NDISTINCT;
-			info->keys = bms_copy(keys);
-			info->exprs = exprs;
-
-			stainfos = lappend(stainfos, info);
-		}
-
-		if (statext_is_kind_built(dtup, STATS_EXT_DEPENDENCIES))
-		{
-			StatisticExtInfo *info = makeNode(StatisticExtInfo);
-
-			info->statOid = statOid;
-			info->rel = rel;
-			info->kind = STATS_EXT_DEPENDENCIES;
-			info->keys = bms_copy(keys);
-			info->exprs = exprs;
-
-			stainfos = lappend(stainfos, info);
-		}
-
-		if (statext_is_kind_built(dtup, STATS_EXT_MCV))
-		{
-			StatisticExtInfo *info = makeNode(StatisticExtInfo);
-
-			info->statOid = statOid;
-			info->rel = rel;
-			info->kind = STATS_EXT_MCV;
-			info->keys = bms_copy(keys);
-			info->exprs = exprs;
-
-			stainfos = lappend(stainfos, info);
-		}
-
-		if (statext_is_kind_built(dtup, STATS_EXT_EXPRESSIONS))
-		{
-			StatisticExtInfo *info = makeNode(StatisticExtInfo);
-
-			info->statOid = statOid;
-			info->rel = rel;
-			info->kind = STATS_EXT_EXPRESSIONS;
-			info->keys = bms_copy(keys);
-			info->exprs = exprs;
-
-			stainfos = lappend(stainfos, info);
-		}
-
-		ReleaseSysCache(htup);
-		ReleaseSysCache(dtup);
-		bms_free(keys);
-	}
-
-	list_free(statoidlist);
-
-	return stainfos;
 }
 
 /*

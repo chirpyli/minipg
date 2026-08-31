@@ -555,13 +555,6 @@ static const SchemaQuery Query_for_list_of_constraints_with_schema = {
 	.result = "pg_catalog.quote_ident(c.conname)",
 };
 
-static const SchemaQuery Query_for_list_of_statistics = {
-	.catname = "pg_catalog.pg_statistic_ext s",
-	.viscondition = "pg_catalog.pg_statistics_obj_is_visible(s.oid)",
-	.namespace = "s.stxnamespace",
-	.result = "pg_catalog.quote_ident(s.stxname)",
-};
-
 static const SchemaQuery Query_for_list_of_collations = {
 	.catname = "pg_catalog.pg_collation c",
 	.selcondition = "c.collencoding IN (-1, pg_catalog.pg_char_to_encoding(pg_catalog.getdatabaseencoding()))",
@@ -910,7 +903,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"ROUTINE", NULL, NULL, &Query_for_list_of_routines, THING_NO_CREATE},
 	{"RULE", "SELECT pg_catalog.quote_ident(rulename) FROM pg_catalog.pg_rules WHERE substring(pg_catalog.quote_ident(rulename),1,%d)='%s'"},
 	{"SCHEMA", Query_for_list_of_schemas},
-	{"STATISTICS", NULL, NULL, &Query_for_list_of_statistics},
 	{"SUBSCRIPTION", NULL, Query_for_list_of_subscriptions},
 	{"SYSTEM", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"TABLE", NULL, NULL, &Query_for_list_of_tables},
@@ -1341,7 +1333,7 @@ psql_completion(const char *text, int start, int end)
 		"\\dF", "\\dFd", "\\dFp", "\\dFt", "\\dg", "\\di", "\\dl", "\\dL",
 		"\\dm", "\\dn", "\\do", "\\dO", "\\dp", "\\dP", "\\dPi", "\\dPt",
 		"\\drds", "\\dRs", "\\dRp", "\\ds", "\\dS",
-		"\\dt", "\\dT", "\\dv", "\\du", "\\dx", "\\dX", "\\dy",
+		"\\dt", "\\dT", "\\dv", "\\du", "\\dx", "\\dy",
 		"\\e", "\\echo", "\\ef", "\\elif", "\\else", "\\encoding",
 		"\\endif", "\\errverbose", "\\ev",
 		"\\f",
@@ -3009,8 +3001,6 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_views, NULL);
 	else if (TailMatchesCS("\\dx*"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_extensions);
-	else if (TailMatchesCS("\\dX*"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_statistics, NULL);
 	else if (TailMatchesCS("\\dm*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_matviews, NULL);
 

@@ -32,7 +32,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "funcapi.h"
@@ -2042,126 +2041,6 @@ ConversionIsVisible(Oid conid)
 	return visible;
 }
 
-/*
- * get_statistics_object_oid - find a statistics object by possibly qualified name
- *
- * If not found, returns InvalidOid if missing_ok, else throws error
- */
-Oid
-get_statistics_object_oid(List *names, bool missing_ok)
-{
-	char	   *schemaname;
-	char	   *stats_name;
-	Oid			namespaceId;
-	Oid			stats_oid = InvalidOid;
-	ListCell   *l;
-
-	/* deconstruct the name list */
-	DeconstructQualifiedName(names, &schemaname, &stats_name);
-
-	if (schemaname)
-	{
-		/* use exact schema given */
-		namespaceId = LookupExplicitNamespace(schemaname, missing_ok);
-		if (missing_ok && !OidIsValid(namespaceId))
-			stats_oid = InvalidOid;
-		else
-			stats_oid = GetSysCacheOid2(STATEXTNAMENSP, Anum_pg_statistic_ext_oid,
-										PointerGetDatum(stats_name),
-										ObjectIdGetDatum(namespaceId));
-	}
-	else
-	{
-		/* search for it in search path */
-		recomputeNamespacePath();
-
-		foreach(l, activeSearchPath)
-		{
-			namespaceId = lfirst_oid(l);
-
-			stats_oid = GetSysCacheOid2(STATEXTNAMENSP, Anum_pg_statistic_ext_oid,
-										PointerGetDatum(stats_name),
-										ObjectIdGetDatum(namespaceId));
-			if (OidIsValid(stats_oid))
-				break;
-		}
-	}
-
-	if (!OidIsValid(stats_oid) && !missing_ok)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("statistics object \"%s\" does not exist",
-						NameListToString(names))));
-
-	return stats_oid;
-}
-
-/*
- * StatisticsObjIsVisible
- *		Determine whether a statistics object (identified by OID) is visible in
- *		the current search path.  Visible means "would be found by searching
- *		for the unqualified statistics object name".
- */
-bool
-StatisticsObjIsVisible(Oid relid)
-{
-	HeapTuple	stxtup;
-	Form_pg_statistic_ext stxform;
-	Oid			stxnamespace;
-	bool		visible;
-
-	stxtup = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(stxtup))
-		elog(ERROR, "cache lookup failed for statistics object %u", relid);
-	stxform = (Form_pg_statistic_ext) GETSTRUCT(stxtup);
-
-	recomputeNamespacePath();
-
-	/*
-	 * Quick check: if it ain't in the path at all, it ain't visible. Items in
-	 * the system namespace are surely in the path and so we needn't even do
-	 * list_member_oid() for them.
-	 */
-	stxnamespace = stxform->stxnamespace;
-	if (stxnamespace != PG_CATALOG_NAMESPACE &&
-		!list_member_oid(activeSearchPath, stxnamespace))
-		visible = false;
-	else
-	{
-		/*
-		 * If it is in the path, it might still not be visible; it could be
-		 * hidden by another statistics object of the same name earlier in the
-		 * path. So we must do a slow check for conflicting objects.
-		 */
-		char	   *stxname = NameStr(stxform->stxname);
-		ListCell   *l;
-
-		visible = false;
-		foreach(l, activeSearchPath)
-		{
-			Oid			namespaceId = lfirst_oid(l);
-
-			if (namespaceId == stxnamespace)
-			{
-				/* Found it first in path */
-				visible = true;
-				break;
-			}
-			if (SearchSysCacheExists2(STATEXTNAMENSP,
-									  PointerGetDatum(stxname),
-									  ObjectIdGetDatum(namespaceId)))
-			{
-				/* Found something else first in path */
-				break;
-			}
-		}
-	}
-
-	ReleaseSysCache(stxtup);
-
-	return visible;
-}
-
 
 
 /*
@@ -3277,17 +3156,6 @@ pg_conversion_is_visible(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	PG_RETURN_BOOL(ConversionIsVisible(oid));
-}
-
-Datum
-pg_statistics_obj_is_visible(PG_FUNCTION_ARGS)
-{
-	Oid			oid = PG_GETARG_OID(0);
-
-	if (!SearchSysCacheExists1(STATEXTOID, ObjectIdGetDatum(oid)))
-		PG_RETURN_NULL();
-
-	PG_RETURN_BOOL(StatisticsObjIsVisible(oid));
 }
 
 /*

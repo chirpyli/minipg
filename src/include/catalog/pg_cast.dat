@@ -284,24 +284,6 @@
 { castsource => 'pg_node_tree', casttarget => 'text', castfunc => '0',
   castcontext => 'i', castmethod => 'b' },
 
-# pg_ndistinct can be coerced to, but not from, bytea and text
-{ castsource => 'pg_ndistinct', casttarget => 'bytea', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'pg_ndistinct', casttarget => 'text', castfunc => '0',
-  castcontext => 'i', castmethod => 'i' },
-
-# pg_dependencies can be coerced to, but not from, bytea and text
-{ castsource => 'pg_dependencies', casttarget => 'bytea', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'pg_dependencies', casttarget => 'text', castfunc => '0',
-  castcontext => 'i', castmethod => 'i' },
-
-# pg_mcv_list can be coerced to, but not from, bytea and text
-{ castsource => 'pg_mcv_list', casttarget => 'bytea', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'pg_mcv_list', casttarget => 'text', castfunc => '0',
-  castcontext => 'i', castmethod => 'i' },
-
 # Datetime category
 { castsource => 'date', casttarget => 'timestamp',
   castfunc => 'timestamp(date)', castcontext => 'i', castmethod => 'f' },

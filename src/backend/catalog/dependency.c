@@ -40,7 +40,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
@@ -134,7 +133,6 @@ static const Oid object_classes[] = {
 	AccessMethodProcedureRelationId,	/* OCLASS_AMPROC */
 	RewriteRelationId,			/* OCLASS_REWRITE */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
-	StatisticExtRelationId,		/* OCLASS_STATISTIC_EXT */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	ExtensionRelationId,			/* OCLASS_EXTENSION */
 };
@@ -1369,11 +1367,6 @@ doDeletion(const ObjectAddress *object, int flags)
 			RemoveRewriteRuleById(object->objectId);
 			break;
 
-		case OCLASS_STATISTIC_EXT:
-			RemoveStatisticsById(object->objectId);
-			break;
-
-
 		case OCLASS_EXTENSION:
 			RemoveExtensionById(object->objectId);
 			break;
@@ -2603,9 +2596,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case NamespaceRelationId:
 			return OCLASS_SCHEMA;
-
-		case StatisticExtRelationId:
-			return OCLASS_STATISTIC_EXT;
 
 		case DatabaseRelationId:
 			return OCLASS_DATABASE;

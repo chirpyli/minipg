@@ -208,7 +208,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	SortBy				*sortby;
 	JoinExpr			*jexpr;
 	IndexElem			*ielem;
-	StatsElem			*selem;
 	Alias				*alias;
 	RangeVar			*range;
 	Node				*with;
@@ -229,7 +228,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		AlterTableStmt
 		AnalyzeStmt ClusterStmt
 		CreateExtensionStmt
-		CreateSchemaStmt CreateStmt CreateStatsStmt
+		CreateSchemaStmt CreateStmt
 		CreatedbStmt DeleteStmt DiscardStmt
 		DropdbStmt DropStmt
 		ExplainStmt
@@ -302,7 +301,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				func_as createfunc_opt_list opt_createfunc_opt_list
 				RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
-				sort_clause opt_sort_clause sortby_list index_params stats_params
+				sort_clause opt_sort_clause sortby_list index_params
 				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
 				qualified_name_list any_name any_name_list
@@ -389,7 +388,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	func_alias_clause
 %type <sortby>	sortby
 %type <ielem>	index_elem index_elem_options
-%type <selem>	stats_param
 %type <node>	table_ref
 %type <jexpr>	joined_table
 %type <range>	relation_expr
@@ -714,7 +712,6 @@ stmt:	AlterObjectSchemaStmt
 			| CreateFunctionStmt
 			| CreateSchemaStmt
 			| CreateStmt
-			| CreateStatsStmt
 			| CreatedbStmt
 			| DeleteStmt
 			| DiscardStmt
@@ -2109,61 +2106,12 @@ ExistingIndex:   USING INDEX name					{ $$ = $3; }
  *
  *****************************************************************************/
 
-CreateStatsStmt:
-			CREATE STATISTICS any_name
-			opt_name_list ON stats_params FROM from_list
-				{
-					CreateStatsStmt *n = makeNode(CreateStatsStmt);
-					n->defnames = $3;
-					n->stat_types = $4;
-					n->exprs = $6;
-					n->relations = $8;
-					n->if_not_exists = false;
-					$$ = (Node *)n;
-				}
-			| CREATE STATISTICS IF_P NOT EXISTS any_name
-			opt_name_list ON stats_params FROM from_list
-				{
-					CreateStatsStmt *n = makeNode(CreateStatsStmt);
-					n->defnames = $6;
-					n->stat_types = $7;
-					n->exprs = $9;
-					n->relations = $11;
-					n->if_not_exists = true;
-					$$ = (Node *)n;
-				}
-			;
-
 /*
  * Statistics attributes can be either simple column references, or arbitrary
  * expressions in parens.  For compatibility with index attributes permitted
  * in CREATE INDEX, we allow an expression that's just a function call to be
  * written without parens.
  */
-
-stats_params:	stats_param							{ $$ = list_make1($1); }
-			| stats_params ',' stats_param			{ $$ = lappend($1, $3); }
-		;
-
-stats_param:	ColId
-				{
-					$$ = makeNode(StatsElem);
-					$$->name = $1;
-					$$->expr = NULL;
-				}
-			| func_expr_windowless
-				{
-					$$ = makeNode(StatsElem);
-					$$->name = NULL;
-					$$->expr = $1;
-				}
-			| '(' a_expr ')'
-				{
-					$$ = makeNode(StatsElem);
-					$$->name = NULL;
-					$$->expr = $2;
-				}
-		;
 
 /*****************************************************************************
  *
@@ -2481,7 +2429,6 @@ object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
-			| STATISTICS							{ $$ = OBJECT_STATISTIC_EXT; }
 		;
 
 /*

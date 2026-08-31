@@ -834,9 +834,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				else
 					success = listExtensions(pattern);
 				break;
-		case 'X':			/* Extended Statistics */
-			success = listExtendedStats(pattern);
-			break;
 		default:
 				status = PSQL_CMD_UNKNOWN;
 		}

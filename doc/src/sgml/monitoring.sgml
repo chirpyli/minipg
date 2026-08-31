@@ -5341,26 +5341,6 @@ SELECT pg_stat_get_backend_pid(s.backendid) AS pid,
       </para></entry>
      </row>
 
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ext_stats_total</structfield> <type>bigint</type>
-      </para>
-      <para>
-       Number of extended statistics.
-      </para></entry>
-     </row>
-
-     <row>
-      <entry role="catalog_table_entry"><para role="column_definition">
-       <structfield>ext_stats_computed</structfield> <type>bigint</type>
-      </para>
-      <para>
-       Number of extended statistics computed. This counter only advances
-       when the phase is <literal>computing extended statistics</literal>.
-      </para></entry>
-     </row>
-
-     <row>
       <entry role="catalog_table_entry"><para role="column_definition">
        <structfield>child_tables_total</structfield> <type>bigint</type>
       </para>
@@ -5434,13 +5414,6 @@ SELECT pg_stat_get_backend_pid(s.backendid) AS pid,
       <entry>
        The command is computing statistics from the sample rows obtained
        during the table scan.
-      </entry>
-     </row>
-     <row>
-      <entry><literal>computing extended statistics</literal></entry>
-      <entry>
-       The command is computing extended statistics from the sample rows
-       obtained during the table scan.
       </entry>
      </row>
      <row>

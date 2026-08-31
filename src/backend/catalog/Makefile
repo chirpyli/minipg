@@ -41,14 +41,14 @@ include $(top_srcdir)/src/backend/common.mk
 
 # Note: the order of this list determines the order in which the catalog
 # header files are assembled into postgres.bki.  BKI_BOOTSTRAP catalogs
-# must appear first, and pg_statistic before pg_statistic_ext_data, and
-# there are reputedly other, undocumented ordering dependencies.
+# must appear first, and there are reputedly other, undocumented
+# ordering dependencies.
 CATALOG_HEADERS := \
 	pg_proc.h pg_type.h pg_attribute.h pg_class.h \
 	pg_attrdef.h pg_constraint.h pg_index.h pg_operator.h \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
 	pg_language.h pg_aggregate.h \
-	pg_statistic.h pg_statistic_ext.h pg_statistic_ext_data.h \
+	pg_statistic.h \
 	pg_rewrite.h \
 	pg_cast.h pg_namespace.h pg_conversion.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
@@ -109,14 +109,13 @@ install-data: bki-stamp installdirs
 	$(INSTALL_DATA) $(call vpathsearch,system_constraints.sql) '$(DESTDIR)$(datadir)/system_constraints.sql'
 	$(INSTALL_DATA) $(srcdir)/system_functions.sql '$(DESTDIR)$(datadir)/system_functions.sql'
 	$(INSTALL_DATA) $(srcdir)/system_views.sql '$(DESTDIR)$(datadir)/system_views.sql'
-	$(INSTALL_DATA) $(srcdir)/fix-CVE-2024-4317.sql '$(DESTDIR)$(datadir)/fix-CVE-2024-4317.sql'
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(datadir)'
 
 .PHONY: uninstall-data
 uninstall-data:
-	rm -f $(addprefix '$(DESTDIR)$(datadir)'/, postgres.bki system_constraints.sql system_functions.sql system_views.sql fix-CVE-2024-4317.sql)
+	rm -f $(addprefix '$(DESTDIR)$(datadir)'/, postgres.bki system_constraints.sql system_functions.sql system_views.sql)
 
 # postgres.bki, system_constraints.sql, and the generated headers are
 # in the distribution tarball, so they are not cleaned here.

@@ -71,8 +71,7 @@ extern void interpret_function_parameter_list(ParseState *pstate,
 extern void RemoveOperatorById(Oid operOid);
 
 /* commands/statscmds.c */
-extern ObjectAddress CreateStatistics(CreateStatsStmt *stmt, bool check_rights);
-extern void RemoveStatisticsById(Oid statsOid);
+
 extern Oid	StatisticsGetRelation(Oid statId, bool missing_ok);
 
 /* commands/opclasscmds.c */

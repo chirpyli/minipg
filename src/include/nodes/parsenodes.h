@@ -1304,7 +1304,6 @@ typedef enum ObjectType
 	OBJECT_ROUTINE,
 	OBJECT_RULE,
 	OBJECT_SCHEMA,
-	OBJECT_STATISTIC_EXT,
 	OBJECT_TABCONSTRAINT,
 	OBJECT_TABLE,
 	OBJECT_TYPE,
@@ -1666,35 +1665,6 @@ typedef struct IndexStmt
 	bool		concurrent;		/* should this be a concurrent index build? */
 	bool		if_not_exists;	/* just do nothing if index already exists? */
 } IndexStmt;
-
-/* ----------------------
- *		Create Statistics Statement
- * ----------------------
- */
-typedef struct CreateStatsStmt
-{
-	NodeTag		type;
-	List	   *defnames;		/* qualified name (list of Value strings) */
-	List	   *stat_types;		/* stat types (list of Value strings) */
-	List	   *exprs;			/* expressions to build statistics on */
-	List	   *relations;		/* rels to build stats on (list of RangeVar) */
-	bool		transformed;	/* true when transformStatsStmt is finished */
-	bool		if_not_exists;	/* do nothing if stats name already exists */
-} CreateStatsStmt;
-
-/*
- * StatsElem - statistics parameters (used in CREATE STATISTICS)
- *
- * For a plain attribute, 'name' is the name of the referenced table column
- * and 'expr' is NULL.  For an expression, 'name' is NULL and 'expr' is the
- * expression tree.
- */
-typedef struct StatsElem
-{
-	NodeTag		type;
-	char	   *name;			/* name of attribute to index, or NULL */
-	Node	   *expr;			/* expression to index, or NULL */
-} StatsElem;
 
 
 /* ----------------------

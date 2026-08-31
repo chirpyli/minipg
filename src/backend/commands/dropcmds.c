@@ -248,13 +248,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 			msg = gettext_noop("schema \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);
 			break;
-		case OBJECT_STATISTIC_EXT:
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("statistics object \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{
 				msg = gettext_noop("text search parser \"%s\" does not exist, skipping");
