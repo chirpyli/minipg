@@ -52,7 +52,6 @@
    &createStatistics;
    &createTable;
    &createView;
-   &deallocate;
    &delete;
    &discard;
    &dropDatabase;
@@ -62,14 +61,11 @@
    &dropSchema;
    &dropStatistics;
    &dropTable;
-   &dropTransform;
    &dropType;
    &dropView;
    &end;
-   &execute;
    &explain;
    &insert;
-   &prepare;
    &reindex;
    &releaseSavepoint;
    &reset;
@@ -79,7 +75,6 @@
    &savepoint;
    &select;
    &set;
-   &setSessionAuth;
    &setTransaction;
    &show;
    &startTransaction;

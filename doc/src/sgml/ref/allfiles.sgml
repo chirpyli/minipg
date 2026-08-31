@@ -24,7 +24,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY createStatistics SYSTEM "create_statistics.sgml">
 <!ENTITY createTable SYSTEM "create_table.sgml">
 <!ENTITY createView SYSTEM "create_view.sgml">
-<!ENTITY deallocate SYSTEM "deallocate.sgml">
 <!ENTITY delete SYSTEM "delete.sgml">
 <!ENTITY discard SYSTEM "discard.sgml">
 <!ENTITY dropDatabase SYSTEM "drop_database.sgml">
@@ -34,14 +33,11 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY dropSchema SYSTEM "drop_schema.sgml">
 <!ENTITY dropStatistics SYSTEM "drop_statistics.sgml">
 <!ENTITY dropTable SYSTEM "drop_table.sgml">
-<!ENTITY dropTransform SYSTEM "drop_transform.sgml">
 <!ENTITY dropType SYSTEM "drop_type.sgml">
 <!ENTITY dropView SYSTEM "drop_view.sgml">
 <!ENTITY end SYSTEM "end.sgml">
-<!ENTITY execute SYSTEM "execute.sgml">
 <!ENTITY explain SYSTEM "explain.sgml">
 <!ENTITY insert SYSTEM "insert.sgml">
-<!ENTITY prepare SYSTEM "prepare.sgml">
 <!ENTITY reindex SYSTEM "reindex.sgml">
 <!ENTITY releaseSavepoint SYSTEM "release_savepoint.sgml">
 <!ENTITY reset SYSTEM "reset.sgml">
@@ -51,7 +47,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY savepoint SYSTEM "savepoint.sgml">
 <!ENTITY select SYSTEM "select.sgml">
 <!ENTITY set SYSTEM "set.sgml">
-<!ENTITY setSessionAuth SYSTEM "set_session_auth.sgml">
 <!ENTITY setTransaction SYSTEM "set_transaction.sgml">
 <!ENTITY show SYSTEM "show.sgml">
 <!ENTITY startTransaction SYSTEM "start_transaction.sgml">

@@ -2248,7 +2248,7 @@ PGresult *PQprepare(PGconn *conn,
         <xref linkend="libpq-PQprepare"/> creates a prepared statement for later
         execution with <xref linkend="libpq-PQexecPrepared"/>.  This feature allows
         commands to be executed repeatedly without being parsed and
-        planned each time;  see <xref linkend="sql-prepare"/> for details.
+        planned each time.
        </para>
 
        <para>
@@ -2288,10 +2288,10 @@ PGresult *PQprepare(PGconn *conn,
     </variablelist>
 
     Prepared statements for use with <xref linkend="libpq-PQexecPrepared"/> can also
-    be created by executing SQL <xref linkend="sql-prepare"/>
+    be created by executing SQL <command>PREPARE</command>
     statements.  Also, although there is no <application>libpq</application>
-    function for deleting a prepared statement, the SQL <xref
-    linkend="sql-deallocate"/> statement
+    function for deleting a prepared statement, the SQL <command>DEALLOCATE</command>
+    statement
     can be used for that purpose.
    </para>
 

@@ -1100,9 +1100,8 @@ SPIPlanPtr SPI_prepare(const char * <parameter>command</parameter>, int <paramet
    statement.  Also, if the value of <xref linkend="guc-search-path"/> changes
    from one use to the next, the statement will be re-parsed using the new
    <varname>search_path</varname>.  (This latter behavior is new as of
-   <productname>PostgreSQL</productname> 9.3.)  See <xref
-   linkend="sql-prepare"/> for more information about the behavior of prepared
-   statements.
+   <productname>PostgreSQL</productname> 9.3.)  See the documentation for
+   more information about the behavior of prepared statements.
   </para>
 
   <para>

@@ -1622,8 +1622,8 @@ SELECT * FROM x, y, a, b, c WHERE something AND somethingelse;
    </para>
 
    <para>
-    If you cannot use <command>COPY</command>, it might help to use <link
-    linkend="sql-prepare"><command>PREPARE</command></link> to create a
+    If you cannot use <command>COPY</command>, it might help to use
+    <command>PREPARE</command> to create a
     prepared <command>INSERT</command> statement, and then use
     <command>EXECUTE</command> as many times as required.  This avoids
     some of the overhead of repeatedly parsing and planning
