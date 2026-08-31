@@ -76,8 +76,6 @@
 #include "utils/snapmgr.h"
 #include "utils/timestamp.h"
 
-extern uint32 bootstrap_data_checksum_version;
-
 /* Unsupported old recovery command file names (relative to $PGDATA) */
 #define RECOVERY_COMMAND_FILE	"recovery.conf"
 #define RECOVERY_COMMAND_DONE	"recovery.done"
@@ -4539,7 +4537,6 @@ InitControlFile(uint64 sysidentifier)
 	ControlFile->wal_level = wal_level;
 	ControlFile->wal_log_hints = wal_log_hints;
 	ControlFile->track_commit_timestamp = track_commit_timestamp;
-	ControlFile->data_checksum_version = bootstrap_data_checksum_version;
 }
 
 static void
@@ -4817,8 +4814,6 @@ ReadControlFile(void)
 	CalculateCheckpointSegments();
 
 	/* Make the initdb settings visible as GUC variables, too */
-	SetConfigOption("data_checksums", DataChecksumsEnabled() ? "yes" : "no",
-					PGC_INTERNAL, PGC_S_OVERRIDE);
 }
 
 /*
@@ -4849,16 +4844,6 @@ GetMockAuthenticationNonce(void)
 {
 	Assert(ControlFile != NULL);
 	return ControlFile->mock_authentication_nonce;
-}
-
-/*
- * Are checksums enabled for data pages?
- */
-bool
-DataChecksumsEnabled(void)
-{
-	Assert(ControlFile != NULL);
-	return (ControlFile->data_checksum_version > 0);
 }
 
 /*

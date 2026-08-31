@@ -487,26 +487,6 @@ RelationCopyStorage(SMgrRelation src, SMgrRelation dst,
 
 		smgrread(src, forkNum, blkno, buf.data);
 
-		if (!PageIsVerifiedExtended(page, blkno,
-									PIV_LOG_WARNING | PIV_REPORT_STAT))
-		{
-			/*
-			 * For paranoia's sake, capture the file path before invoking the
-			 * ereport machinery.  This guards against the possibility of a
-			 * relcache flush caused by, e.g., an errcontext callback.
-			 * (errcontext callbacks shouldn't be risking any such thing, but
-			 * people have been known to forget that rule.)
-			 */
-			char	   *relpath = relpathbackend(src->smgr_rnode.node,
-												 src->smgr_rnode.backend,
-												 forkNum);
-
-			ereport(ERROR,
-					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("invalid page in block %u of relation %s",
-							blkno, relpath)));
-		}
-
 		/*
 		 * WAL-log the copied page. Unfortunately we don't know what kind of a
 		 * page this is, so we have to log the full page including any unused
@@ -514,8 +494,6 @@ RelationCopyStorage(SMgrRelation src, SMgrRelation dst,
 		 */
 		if (use_wal)
 			log_newpage(&dst->smgr_rnode.node, forkNum, blkno, page, false);
-
-		PageSetChecksumInplace(page, blkno);
 
 		/*
 		 * Now write the page.  We say skipFsync = true because there's no

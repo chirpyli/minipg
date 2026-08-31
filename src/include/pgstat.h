@@ -81,7 +81,6 @@ typedef enum StatMsgType
 	PGSTAT_MTYPE_RECOVERYCONFLICT,
 	PGSTAT_MTYPE_TEMPFILE,
 	PGSTAT_MTYPE_DEADLOCK,
-	PGSTAT_MTYPE_CHECKSUMFAILURE,
 	PGSTAT_MTYPE_REPLSLOT,
 	PGSTAT_MTYPE_CONNECT,
 	PGSTAT_MTYPE_DISCONNECT,
@@ -636,19 +635,6 @@ typedef struct PgStat_MsgDeadlock
 } PgStat_MsgDeadlock;
 
 /* ----------
- * PgStat_MsgChecksumFailure	Sent by the backend to tell the collector
- *								about checksum failures noticed.
- * ----------
- */
-typedef struct PgStat_MsgChecksumFailure
-{
-	PgStat_MsgHdr m_hdr;
-	Oid			m_databaseid;
-	int			m_failurecount;
-	TimestampTz m_failure_time;
-} PgStat_MsgChecksumFailure;
-
-/* ----------
  * PgStat_MsgConnect			Sent by the backend upon connection
  *								establishment
  * ----------
@@ -699,7 +685,6 @@ typedef union PgStat_Msg
 	PgStat_MsgRecoveryConflict msg_recoveryconflict;
 	PgStat_MsgDeadlock msg_deadlock;
 	PgStat_MsgTempFile msg_tempfile;
-	PgStat_MsgChecksumFailure msg_checksumfailure;
 	PgStat_MsgReplSlot msg_replslot;
 	PgStat_MsgConnect msg_connect;
 	PgStat_MsgDisconnect msg_disconnect;
@@ -740,8 +725,6 @@ typedef struct PgStat_StatDBEntry
 	PgStat_Counter n_temp_files;
 	PgStat_Counter n_temp_bytes;
 	PgStat_Counter n_deadlocks;
-	PgStat_Counter n_checksum_failures;
-	TimestampTz last_checksum_failure;
 	PgStat_Counter n_block_read_time;	/* times in microseconds */
 	PgStat_Counter n_block_write_time;
 	PgStat_Counter n_sessions;
@@ -994,8 +977,6 @@ extern void pgstat_report_analyze(Relation rel,
 
 extern void pgstat_report_recovery_conflict(int reason);
 extern void pgstat_report_deadlock(void);
-extern void pgstat_report_checksum_failures_in_db(Oid dboid, int failurecount);
-extern void pgstat_report_checksum_failure(void);
 extern void pgstat_report_replslot(const PgStat_StatReplSlotEntry *repSlotStat);
 extern void pgstat_report_replslot_create(const char *slotname);
 extern void pgstat_report_replslot_drop(const char *slotname);

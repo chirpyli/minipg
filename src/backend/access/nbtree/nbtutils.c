@@ -1877,7 +1877,7 @@ _bt_killitems(IndexScanDesc scan)
 			 * happens while holding a buffer lock possibly in shared mode,
 			 * it's possible that multiple processes attempt to do this
 			 * simultaneously, leading to multiple full-page images being sent
-			 * to WAL (if wal_log_hints or data checksums are enabled), which
+			 * to WAL (if wal_log_hints is enabled), which
 			 * is undesirable.
 			 */
 			if (killtuple && !ItemIdIsDead(iid))

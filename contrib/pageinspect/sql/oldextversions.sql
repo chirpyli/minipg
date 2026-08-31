@@ -10,7 +10,6 @@ CREATE INDEX test1_a_idx ON test1 USING btree (a);
 -- from page.sql
 SELECT octet_length(get_raw_page('test1', 0)) AS main_0;
 SELECT octet_length(get_raw_page('test1', 'main', 0)) AS main_0;
-SELECT page_checksum(get_raw_page('test1', 0), 0) IS NOT NULL AS silly_checksum_test;
 
 -- from btree.sql
 SELECT * FROM bt_page_stats('test1_a_idx', 1);

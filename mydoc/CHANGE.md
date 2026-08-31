@@ -2,6 +2,28 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪数据页校验（Page Checksum）功能（2026-08-31）
+
+### 一、背景
+数据页校验是基于 FNV-1a 变体算法、将校验和写入页头 `pd_checksum` 字段用于检测磁盘静默损坏的可选完整性保护机制。属于"非内核核心、学习价值低"的可裁剪项（与 btree/hash 索引、事务无耦合）。本次彻底裁剪其逻辑层（计算/验证/开关/统计/工具选项），但**保留 `pd_checksum` 字段本身**（2 字节空字段），不破坏页头布局与磁盘格式兼容。
+
+### 二、删除/更新内容
+- **算法文件**：删 `src/backend/storage/page/checksum.c`、`src/include/storage/checksum.h`、`src/include/storage/checksum_impl.h`；`src/backend/storage/page/Makefile` 移除 `checksum.o` 及其特殊编译规则。
+- **bufpage 接口**：`src/backend/storage/page/bufpage.c` 删 `PageIsVerifiedExtended`/`PageSetChecksumCopy`/`PageSetChecksumInplace` 与全局变量 `ignore_checksum_failure`；`src/include/storage/bufpage.h` 删 `PG_DATA_CHECKSUM_VERSION`、`PIV_LOG_WARNING`/`PIV_REPORT_STAT` 标志、`PageIsVerified` 宏及三函数声明。
+- **开关链路**：`src/include/catalog/pg_control.h` 删 `data_checksum_version` 字段；`src/backend/bootstrap/bootstrap.c` 删 `bootstrap_data_checksum_version` 变量与 `-k` case；`src/backend/access/transam/xlog.c` 删 `DataChecksumsEnabled()` 函数、extern 声明、`ControlFile->data_checksum_version` 赋值、`SetConfigOption("data_checksums")` 调用；`src/include/access/xlog.h` 删 `DataChecksumsEnabled` 声明，并将 `XLogHintBitIsNeeded()` 宏由 `(DataChecksumsEnabled() || wal_log_hints)` 退化为仅 `wal_log_hints`（6 处调用点同步）。
+- **读写路径**：`bufmgr.c` 写路径 `bufToWrite = PageSetChecksumCopy(...)` 改为 `bufToWrite = bufBlock;`；读路径 `ReadBuffer_common` 删 `PageIsVerifiedExtended` 校验失败分支（保留 `RBM_ZERO_ON_ERROR` 语义）；`catalog/storage.c` 删 `RelationCopyStorage` 中 `PageIsVerifiedExtended` 校验分支。删除 9 处 `PageSetChecksumInplace` 调用（storage.c/nbtsort.c/nbtree.c/hashpage.c/rewriteheap.c×2/visibilitymap.c/localbuf.c/freespace.c）。
+- **统计与 GUC**：`guc.c` 删 `ignore_checksum_failure` GUC 注册与 `data_checksums` GUC 注册/变量；`pgstat.c` 删 `PGSTAT_MTYPE_CHECKSUMFAILURE` 消息处理、`pgstat_report_checksum_failure(s_in_db)`、`n_checksum_failures`/`last_checksum_failure` 计数；`pgstatfuncs.c` 删 `pg_stat_get_db_checksum_failures`/`pg_stat_get_db_checksum_last_failure`；`pgstat.h` 删对应枚举/结构体/字段/声明；`system_views.sql` 删 `pg_stat_database` 的 `checksum_failures`/`checksum_last_failure` 列。
+- **工具端**：`initdb.c` 删 `-k`/`--data-checksums` 选项、变量、boot 命令中的 `-k` 及 `data_checksums` 状态输出（并修正 boot 命令 snprintf 占位符）；`pg_controldata.c`（前后端）删 `data_checksum_version`/`data_page_checksum_version` 列输出；`pg_rewind.c` 的 target 校验改为仅依赖 `wal_log_hints`。
+- **catalog 注册**：`pg_proc.dat` 删两个 checksum 统计 SQL 函数条目；修正 `pg_control_system`/`pg_control_init` 的 `proargnames`（移除 `data_page_checksum_version`，与 C 实现返回列一致，满足 opr_sanity）。
+- **pageinspect 扩展**：`rawpage.c` 删依赖已删 `pg_checksum_page` 的 `page_checksum` 函数族及其 `storage/checksum.h` include；升级脚本 `pageinspect--1.5--1.6.sql`/`1.8--1.9.sql` 删 `page_checksum` 注册；删测试 `sql/checksum.sql`、`expected/checksum.out`/`checksum_1.out`、`Makefile` 的 `checksum` 测试注册；同步删 `sql/page.sql`/`oldextversions.sql` 及对应 `.out` 中的 `page_checksum` 调用与输出。
+- **测试脚手架**：`src/test/perl/PostgresNode.pm` 删未使用的 `corrupt_page_checksum` 方法。
+- **文档（不记入功能裁剪，仅随代码清理）**：裁剪 `storage.sgml`/`monitoring.sgml`/`wal.sgml`/`config.sgml`/`protocol.sgml`/`func.sgml`/`ref/initdb.sgml`/`ref/pg_rewind.sgml`/`amcheck.sgml`/`pageinspect.sgml` 中数据页校验相关段落与 GUC 说明。
+
+### 三、验证
+- `make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j` 全量重编通过（改动 bufpage.h/xlog.h/pgstat.h 等核心头文件，必须全量重编）。
+- `make check`：**All 70 tests passed**。
+- `make check-world`：全部通过（含 isolation、contrib/pageinspect、pg_rewind 等）。
+
 ## 裁剪 SQL PREPARE/EXECUTE/DEALLOCATE 语法及相关测试（2026-08-27）
 
 ### 一、背景

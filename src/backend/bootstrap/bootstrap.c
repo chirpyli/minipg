@@ -50,8 +50,6 @@
 #include "utils/rel.h"
 #include "utils/relmapper.h"
 
-uint32		bootstrap_data_checksum_version = 0;	/* No checksum */
-
 
 static void CheckerModeMain(void);
 static void BootstrapModeMain(void);
@@ -245,9 +243,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 				break;
 			case 'F':
 				SetConfigOption("fsync", "false", PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-			case 'k':
-				bootstrap_data_checksum_version = PG_DATA_CHECKSUM_VERSION;
 				break;
 			case 'r':
 				strlcpy(OutputFileName, optarg, MAXPGPATH);

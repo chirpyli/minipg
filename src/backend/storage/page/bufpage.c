@@ -18,13 +18,8 @@
 #include "access/itup.h"
 #include "access/xlog.h"
 #include "pgstat.h"
-#include "storage/checksum.h"
 #include "utils/memdebug.h"
 #include "utils/memutils.h"
-
-
-/* GUC variable */
-bool		ignore_checksum_failure = false;
 
 
 /* ----------------------------------------------------------------
@@ -57,109 +52,6 @@ PageInit(Page page, Size pageSize, Size specialSize)
 	p->pd_special = pageSize - specialSize;
 	PageSetPageSizeAndVersion(page, pageSize, PG_PAGE_LAYOUT_VERSION);
 	/* p->pd_prune_xid = InvalidTransactionId;		done by above MemSet */
-}
-
-
-/*
- * PageIsVerifiedExtended
- *		Check that the page header and checksum (if any) appear valid.
- *
- * This is called when a page has just been read in from disk.  The idea is
- * to cheaply detect trashed pages before we go nuts following bogus line
- * pointers, testing invalid transaction identifiers, etc.
- *
- * It turns out to be necessary to allow zeroed pages here too.  Even though
- * this routine is *not* called when deliberately adding a page to a relation,
- * there are scenarios in which a zeroed page might be found in a table.
- * (Example: a backend extends a relation, then crashes before it can write
- * any WAL entry about the new page.  The kernel will already have the
- * zeroed page in the file, and it will stay that way after restart.)  So we
- * allow zeroed pages here, and are careful that the page access macros
- * treat such a page as empty and without free space.  Eventually, VACUUM
- * will clean up such a page and make it usable.
- *
- * If flag PIV_LOG_WARNING is set, a WARNING is logged in the event of
- * a checksum failure.
- *
- * If flag PIV_REPORT_STAT is set, a checksum failure is reported directly
- * to pgstat.
- */
-bool
-PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
-{
-	PageHeader	p = (PageHeader) page;
-	size_t	   *pagebytes;
-	int			i;
-	bool		checksum_failure = false;
-	bool		header_sane = false;
-	bool		all_zeroes = false;
-	uint16		checksum = 0;
-
-	/*
-	 * Don't verify page data unless the page passes basic non-zero test
-	 */
-	if (!PageIsNew(page))
-	{
-		if (DataChecksumsEnabled())
-		{
-			checksum = pg_checksum_page((char *) page, blkno);
-
-			if (checksum != p->pd_checksum)
-				checksum_failure = true;
-		}
-
-		/*
-		 * The following checks don't prove the header is correct, only that
-		 * it looks sane enough to allow into the buffer pool. Later usage of
-		 * the block can still reveal problems, which is why we offer the
-		 * checksum option.
-		 */
-		if ((p->pd_flags & ~PD_VALID_FLAG_BITS) == 0 &&
-			p->pd_lower <= p->pd_upper &&
-			p->pd_upper <= p->pd_special &&
-			p->pd_special <= BLCKSZ &&
-			p->pd_special == MAXALIGN(p->pd_special))
-			header_sane = true;
-
-		if (header_sane && !checksum_failure)
-			return true;
-	}
-
-	/* Check all-zeroes case */
-	all_zeroes = true;
-	pagebytes = (size_t *) page;
-	for (i = 0; i < (BLCKSZ / sizeof(size_t)); i++)
-	{
-		if (pagebytes[i] != 0)
-		{
-			all_zeroes = false;
-			break;
-		}
-	}
-
-	if (all_zeroes)
-		return true;
-
-	/*
-	 * Throw a WARNING if the checksum fails, but only after we've checked for
-	 * the all-zeroes case.
-	 */
-	if (checksum_failure)
-	{
-		if ((flags & PIV_LOG_WARNING) != 0)
-			ereport(WARNING,
-					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("page verification failed, calculated checksum %u but expected %u",
-							checksum, p->pd_checksum)));
-
-		if ((flags & PIV_REPORT_STAT) != 0)
-			pgstat_report_checksum_failure();
-
-		if (header_sane && ignore_checksum_failure)
-			return true;
-	}
-
-	return false;
 }
 
 
@@ -1482,58 +1374,4 @@ PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 	memcpy(PageGetItem(page, tupid), newtup, newsize);
 
 	return true;
-}
-
-
-/*
- * Set checksum for a page in shared buffers.
- *
- * If checksums are disabled, or if the page is not initialized, just return
- * the input.  Otherwise, we must make a copy of the page before calculating
- * the checksum, to prevent concurrent modifications (e.g. setting hint bits)
- * from making the final checksum invalid.  It doesn't matter if we include or
- * exclude hints during the copy, as long as we write a valid page and
- * associated checksum.
- *
- * Returns a pointer to the block-sized data that needs to be written. Uses
- * statically-allocated memory, so the caller must immediately write the
- * returned page and not refer to it again.
- */
-char *
-PageSetChecksumCopy(Page page, BlockNumber blkno)
-{
-	static char *pageCopy = NULL;
-
-	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
-		return (char *) page;
-
-	/*
-	 * We allocate the copy space once and use it over on each subsequent
-	 * call.  The point of palloc'ing here, rather than having a static char
-	 * array, is first to ensure adequate alignment for the checksumming code
-	 * and second to avoid wasting space in processes that never call this.
-	 */
-	if (pageCopy == NULL)
-		pageCopy = MemoryContextAlloc(TopMemoryContext, BLCKSZ);
-
-	memcpy(pageCopy, (char *) page, BLCKSZ);
-	((PageHeader) pageCopy)->pd_checksum = pg_checksum_page(pageCopy, blkno);
-	return pageCopy;
-}
-
-/*
- * Set checksum for a page in private memory.
- *
- * This must only be used when we know that no other process can be modifying
- * the page buffer.
- */
-void
-PageSetChecksumInplace(Page page, BlockNumber blkno)
-{
-	/* If we don't need a checksum, just return */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
-		return;
-
-	((PageHeader) page)->pd_checksum = pg_checksum_page((char *) page, blkno);
 }

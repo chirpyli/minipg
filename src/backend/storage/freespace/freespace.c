@@ -680,8 +680,6 @@ fsm_extend(Relation rel, BlockNumber fsm_nblocks)
 	/* Extend as needed. */
 	while (fsm_nblocks_now < fsm_nblocks)
 	{
-		PageSetChecksumInplace((Page) pg.data, fsm_nblocks_now);
-
 		smgrextend(reln, FSM_FORKNUM, fsm_nblocks_now,
 				   pg.data, false);
 		fsm_nblocks_now++;

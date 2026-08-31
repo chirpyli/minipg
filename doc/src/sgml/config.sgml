@@ -2587,10 +2587,8 @@ include_dir 'conf.d'
        </para>
 
        <para>
-        If data checksums are enabled, hint bit updates are always WAL-logged
-        and this setting is ignored. You can use this setting to test how much
-        extra WAL-logging would occur if your database had data checksums
-        enabled.
+        When enabled, hint bit updates are WAL-logged, providing protection
+        against torn page writes.
        </para>
 
        <para>
@@ -5118,7 +5116,6 @@ SELECT * FROM parent WHERE key = 2400;
         <literal>force_generic_plan</literal>.
         This setting is considered when a cached plan is to be executed,
         not when it is prepared.
-        For more information see <xref linkend="sql-prepare"/>.
        </para>
       </listitem>
      </varlistentry>
@@ -9303,20 +9300,6 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
       </listitem>
      </varlistentry>
 
-     <varlistentry id="guc-data-checksums" xreflabel="data_checksums">
-      <term><varname>data_checksums</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>data_checksums</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Reports whether data checksums are enabled for this cluster.
-        See <xref linkend="app-initdb-data-checksums"/> for more information.
-       </para>
-      </listitem>
-     </varlistentry>
-
      <varlistentry id="guc-data-directory-mode" xreflabel="data_directory_mode">
       <term><varname>data_directory_mode</varname> (<type>integer</type>)
       <indexterm>
@@ -10044,31 +10027,6 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
         only available if the <symbol>WAL_DEBUG</symbol> macro was
         defined when <productname>PostgreSQL</productname> was
         compiled.
-       </para>
-      </listitem>
-     </varlistentry>
-
-    <varlistentry id="guc-ignore-checksum-failure" xreflabel="ignore_checksum_failure">
-      <term><varname>ignore_checksum_failure</varname> (<type>boolean</type>)
-      <indexterm>
-       <primary><varname>ignore_checksum_failure</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Only has effect if <xref linkend="app-initdb-data-checksums"/> are enabled.
-       </para>
-       <para>
-        Detection of a checksum failure during a read normally causes
-        <productname>PostgreSQL</productname> to report an error, aborting the current
-        transaction.  Setting <varname>ignore_checksum_failure</varname> to on causes
-        the system to ignore the failure (but still report a warning), and
-        continue processing.  This behavior may <emphasis>cause crashes, propagate
-        or hide corruption, or other serious problems</emphasis>.  However, it may allow
-        you to get past the error and retrieve undamaged tuples that might still be
-        present in the table if the block header is still sane. If the header is
-        corrupt an error will be reported even if this option is enabled. The
-        default setting is <literal>off</literal>, and it can only be changed by a superuser.
        </para>
       </listitem>
      </varlistentry>

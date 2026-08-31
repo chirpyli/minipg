@@ -17,12 +17,6 @@ SELECT octet_length(get_raw_page('test1', 'main', 0)) AS main_0;
    8192
 (1 row)
 
-SELECT page_checksum(get_raw_page('test1', 0), 0) IS NOT NULL AS silly_checksum_test;
- silly_checksum_test 
----------------------
- t
-(1 row)
-
 -- from btree.sql
 SELECT * FROM bt_page_stats('test1_a_idx', 1);
  blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 

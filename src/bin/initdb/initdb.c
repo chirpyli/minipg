@@ -103,7 +103,6 @@ static bool noinstructions = false;
 static bool do_sync = true;
 static bool sync_only = false;
 static bool show_setting = false;
-static bool data_checksums = false;
 static char *xlog_dir = NULL;
 static char *str_wal_segment_size_mb = NULL;
 static int	wal_segment_size_mb;
@@ -1047,10 +1046,9 @@ bootstrap_template1(void)
 	unsetenv("PGCLIENTENCODING");
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" --boot -x1 -X %u %s %s %s %s",
+			 "\"%s\" --boot -x1 -X %u %s %s %s",
 			 backend_exec,
 			 wal_segment_size_mb * (1024 * 1024),
-			 data_checksums ? "-k" : "",
 			 boot_options, extra_options,
 			 debug ? "-d 5" : "");
 
@@ -1595,7 +1593,6 @@ usage(const char *progname)
 	printf(_(" [-D, --pgdata=]DATADIR     location for this database cluster\n"));
 	printf(_("  -E, --encoding=ENCODING   set default encoding for new databases\n"));
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
-	printf(_("  -k, --data-checksums      use data page checksums\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
 	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
 			 "      --lc-monetary=, --lc-numeric=, --lc-time=LOCALE\n"
@@ -2168,7 +2165,6 @@ main(int argc, char *argv[])
 		{"sync-only", no_argument, NULL, 'S'},
 		{"waldir", required_argument, NULL, 'X'},
 		{"wal-segsize", required_argument, NULL, 12},
-		{"data-checksums", no_argument, NULL, 'k'},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
 		{NULL, 0, NULL, 0}
@@ -2212,7 +2208,7 @@ main(int argc, char *argv[])
 
 	/* process command-line options */
 
-	while ((c = getopt_long(argc, argv, "dD:E:gkL:nNsST:U:WX:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(argc, argv, "dD:E:gL:nNsST:U:WX:", long_options, &option_index)) != -1)
 	{
 		switch (c)
 		{
@@ -2241,9 +2237,6 @@ main(int argc, char *argv[])
 				break;
 			case 'S':
 				sync_only = true;
-				break;
-			case 'k':
-				data_checksums = true;
 				break;
 			case 'L':
 				share_path = pg_strdup(optarg);
@@ -2399,11 +2392,6 @@ main(int argc, char *argv[])
 	setup_locale_encoding();
 
 	printf("\n");
-
-	if (data_checksums)
-		printf(_("Data page checksums are enabled.\n"));
-	else
-		printf(_("Data page checksums are disabled.\n"));
 
 	if (pwprompt || pwfilename)
 		get_su_pwd();

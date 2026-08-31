@@ -77,14 +77,6 @@ AS 'MODULE_PATHNAME', 'hash_metapage_info'
 LANGUAGE C STRICT PARALLEL SAFE;
 
 --
--- page_checksum()
---
-CREATE FUNCTION page_checksum(IN page bytea, IN blkno int4)
-RETURNS smallint
-AS 'MODULE_PATHNAME', 'page_checksum'
-LANGUAGE C STRICT PARALLEL SAFE;
-
---
 -- bt_page_items_bytea()
 --
 CREATE FUNCTION bt_page_items(IN page bytea,

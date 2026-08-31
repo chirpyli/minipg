@@ -25,9 +25,6 @@ SELECT get_raw_page('test1', 0) = get_raw_page('test1', 'main', 0);
 
 SELECT pagesize, version FROM page_header(get_raw_page('test1', 0));
 
-SELECT page_checksum(get_raw_page('test1', 0), 0) IS NOT NULL AS silly_checksum_test;
-SELECT page_checksum(get_raw_page('test1', 0), -1);
-
 SELECT tuple_data_split('test1'::regclass, t_data, t_infomask, t_infomask2, t_bits)
     FROM heap_page_items(get_raw_page('test1', 0));
 
@@ -79,7 +76,6 @@ drop table test8;
 -- page sizes.
 \set VERBOSITY terse
 SELECT fsm_page_contents('aaa'::bytea);
-SELECT page_checksum('bbb'::bytea, 0);
 SELECT page_header('ccc'::bytea);
 \set VERBOSITY default
 
@@ -87,4 +83,3 @@ SELECT page_header('ccc'::bytea);
 SHOW block_size \gset
 SELECT fsm_page_contents(decode(repeat('00', :block_size), 'hex'));
 SELECT page_header(decode(repeat('00', :block_size), 'hex'));
-SELECT page_checksum(decode(repeat('00', :block_size), 'hex'), 1);

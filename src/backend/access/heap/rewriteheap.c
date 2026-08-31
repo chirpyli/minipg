@@ -322,8 +322,6 @@ end_heap_rewrite(RewriteState state)
 						state->rs_buffer,
 						true);
 
-		PageSetChecksumInplace(state->rs_buffer, state->rs_blockno);
-
 		smgrextend(RelationGetSmgr(state->rs_new_rel), MAIN_FORKNUM,
 				   state->rs_blockno, (char *) state->rs_buffer, true);
 	}
@@ -687,8 +685,6 @@ raw_heap_insert(RewriteState state, HeapTuple tup)
 			 * need for smgr to schedule an fsync for this write; we'll do it
 			 * ourselves in end_heap_rewrite.
 			 */
-			PageSetChecksumInplace(page, state->rs_blockno);
-
 			smgrextend(RelationGetSmgr(state->rs_new_rel), MAIN_FORKNUM,
 					   state->rs_blockno, (char *) page, true);
 

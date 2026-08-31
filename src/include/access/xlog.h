@@ -182,13 +182,10 @@ extern PGDLLIMPORT int wal_level;
 /*
  * Is a full-page image needed for hint bit updates?
  *
- * Normally, we don't WAL-log hint bit updates, but if checksums are enabled,
- * we have to protect them against torn page writes.  When you only set
- * individual bits on a page, it's still consistent no matter what combination
- * of the bits make it to disk, but the checksum wouldn't match.  Also WAL-log
- * them if forced by wal_log_hints=on.
+ * We WAL-log hint bit updates when forced by wal_log_hints=on, to protect
+ * against torn page writes.
  */
-#define XLogHintBitIsNeeded() (DataChecksumsEnabled() || wal_log_hints)
+#define XLogHintBitIsNeeded() (wal_log_hints)
 
 /* Do we need to WAL-log information required only for Hot Standby and logical replication? */
 #define XLogStandbyInfoActive() (wal_level >= WAL_LEVEL_REPLICA)
@@ -310,7 +307,6 @@ extern TimestampTz GetCurrentChunkReplayStartTime(void);
 extern void UpdateControlFile(void);
 extern uint64 GetSystemIdentifier(void);
 extern char *GetMockAuthenticationNonce(void);
-extern bool DataChecksumsEnabled(void);
 extern XLogRecPtr GetFakeLSNForUnloggedRel(void);
 extern Size XLOGShmemSize(void);
 extern void XLOGShmemInit(void);

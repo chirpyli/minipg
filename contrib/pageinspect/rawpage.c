@@ -23,7 +23,6 @@
 #include "miscadmin.h"
 #include "pageinspect.h"
 #include "storage/bufmgr.h"
-#include "storage/checksum.h"
 #include "utils/builtins.h"
 #include "utils/pg_lsn.h"
 #include "utils/rel.h"
@@ -286,49 +285,4 @@ page_header(PG_FUNCTION_ARGS)
 	result = HeapTupleGetDatum(tuple);
 
 	PG_RETURN_DATUM(result);
-}
-
-/*
- * page_checksum
- *
- * Compute checksum of a raw page
- */
-
-PG_FUNCTION_INFO_V1(page_checksum_1_9);
-PG_FUNCTION_INFO_V1(page_checksum);
-
-static Datum
-page_checksum_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
-{
-	bytea	   *raw_page = PG_GETARG_BYTEA_P(0);
-	int64		blkno = (ext_version == PAGEINSPECT_V1_8 ? PG_GETARG_UINT32(1) : PG_GETARG_INT64(1));
-	Page		page;
-
-
-	if (blkno < 0 || blkno > MaxBlockNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid block number")));
-
-	page = get_page_from_raw(raw_page);
-
-	if (PageIsNew(page))
-		PG_RETURN_NULL();
-
-	PG_RETURN_INT16(pg_checksum_page((char *) page, blkno));
-}
-
-Datum
-page_checksum_1_9(PG_FUNCTION_ARGS)
-{
-	return page_checksum_internal(fcinfo, PAGEINSPECT_V1_9);
-}
-
-/*
- * Entry point for old extension version
- */
-Datum
-page_checksum(PG_FUNCTION_ARGS)
-{
-	return page_checksum_internal(fcinfo, PAGEINSPECT_V1_8);
 }

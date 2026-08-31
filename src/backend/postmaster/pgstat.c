@@ -349,7 +349,6 @@ static void pgstat_recv_funcstat(PgStat_MsgFuncstat *msg, int len);
 static void pgstat_recv_funcpurge(PgStat_MsgFuncpurge *msg, int len);
 static void pgstat_recv_recoveryconflict(PgStat_MsgRecoveryConflict *msg, int len);
 static void pgstat_recv_deadlock(PgStat_MsgDeadlock *msg, int len);
-static void pgstat_recv_checksum_failure(PgStat_MsgChecksumFailure *msg, int len);
 static void pgstat_recv_connect(PgStat_MsgConnect *msg, int len);
 static void pgstat_recv_disconnect(PgStat_MsgDisconnect *msg, int len);
 static void pgstat_recv_replslot(PgStat_MsgReplSlot *msg, int len);
@@ -1614,40 +1613,6 @@ pgstat_report_deadlock(void)
 }
 
 
-
-/* --------
- * pgstat_report_checksum_failures_in_db() -
- *
- *	Tell the collector about one or more checksum failures.
- * --------
- */
-void
-pgstat_report_checksum_failures_in_db(Oid dboid, int failurecount)
-{
-	PgStat_MsgChecksumFailure msg;
-
-	if (pgStatSock == PGINVALID_SOCKET || !pgstat_track_counts)
-		return;
-
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_CHECKSUMFAILURE);
-	msg.m_databaseid = dboid;
-	msg.m_failurecount = failurecount;
-	msg.m_failure_time = GetCurrentTimestamp();
-
-	pgstat_send(&msg, sizeof(msg));
-}
-
-/* --------
- * pgstat_report_checksum_failure() -
- *
- *	Tell the collector about a checksum failure.
- * --------
- */
-void
-pgstat_report_checksum_failure(void)
-{
-	pgstat_report_checksum_failures_in_db(MyDatabaseId, 1);
-}
 
 /* --------
  * pgstat_report_tempfile() -
@@ -3322,11 +3287,6 @@ PgstatCollectorMain(int argc, char *argv[])
 					pgstat_recv_tempfile(&msg.msg_tempfile, len);
 					break;
 
-				case PGSTAT_MTYPE_CHECKSUMFAILURE:
-					pgstat_recv_checksum_failure(&msg.msg_checksumfailure,
-												 len);
-					break;
-
 				case PGSTAT_MTYPE_REPLSLOT:
 					pgstat_recv_replslot(&msg.msg_replslot, len);
 					break;
@@ -3392,8 +3352,6 @@ reset_dbentry_counters(PgStat_StatDBEntry *dbentry)
 	dbentry->n_temp_files = 0;
 	dbentry->n_temp_bytes = 0;
 	dbentry->n_deadlocks = 0;
-	dbentry->n_checksum_failures = 0;
-	dbentry->last_checksum_failure = 0;
 	dbentry->n_block_read_time = 0;
 	dbentry->n_block_write_time = 0;
 	dbentry->n_sessions = 0;
@@ -5319,23 +5277,6 @@ pgstat_recv_deadlock(PgStat_MsgDeadlock *msg, int len)
 	dbentry = pgstat_get_db_entry(msg->m_databaseid, true);
 
 	dbentry->n_deadlocks++;
-}
-
-/* ----------
- * pgstat_recv_checksum_failure() -
- *
- *	Process a CHECKSUMFAILURE message.
- * ----------
- */
-static void
-pgstat_recv_checksum_failure(PgStat_MsgChecksumFailure *msg, int len)
-{
-	PgStat_StatDBEntry *dbentry;
-
-	dbentry = pgstat_get_db_entry(msg->m_databaseid, true);
-
-	dbentry->n_checksum_failures += msg->m_failurecount;
-	dbentry->last_checksum_failure = msg->m_failure_time;
 }
 
 /* ----------

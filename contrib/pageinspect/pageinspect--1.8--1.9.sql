@@ -19,15 +19,6 @@ AS 'MODULE_PATHNAME', 'get_raw_page_fork_1_9'
 LANGUAGE C STRICT PARALLEL SAFE;
 
 --
--- page_checksum()
---
-DROP FUNCTION page_checksum(IN page bytea, IN blkno int4);
-CREATE FUNCTION page_checksum(IN page bytea, IN blkno int8)
-RETURNS smallint
-AS 'MODULE_PATHNAME', 'page_checksum_1_9'
-LANGUAGE C STRICT PARALLEL SAFE;
-
---
 -- bt_metap()
 --
 DROP FUNCTION bt_metap(text);

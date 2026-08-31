@@ -9724,7 +9724,7 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
   <para>
    The <structname>pg_prepared_statements</structname> view displays
    all the prepared statements that are available in the current
-   session. See <xref linkend="sql-prepare"/> for more information about prepared
+   session. See the documentation for more information about prepared
    statements.
   </para>
 
@@ -9732,7 +9732,7 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
    <structname>pg_prepared_statements</structname> contains one row
    for each prepared statement. Rows are added to the view when a new
    prepared statement is created and removed when a prepared statement
-   is released (for example, via the <link linkend="sql-deallocate"><command>DEALLOCATE</command></link> command).
+   is released (for example, via the <command>DEALLOCATE</command> command).
   </para>
 
   <table>

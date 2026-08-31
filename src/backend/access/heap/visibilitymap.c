@@ -654,8 +654,6 @@ vm_extend(Relation rel, BlockNumber vm_nblocks)
 	/* Now extend the file */
 	while (vm_nblocks_now < vm_nblocks)
 	{
-		PageSetChecksumInplace((Page) pg.data, vm_nblocks_now);
-
 		smgrextend(reln, VISIBILITYMAP_FORKNUM, vm_nblocks_now, pg.data, false);
 		vm_nblocks_now++;
 	}

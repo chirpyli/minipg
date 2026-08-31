@@ -109,7 +109,6 @@ int			wal_receiver_timeout = 60000;
 extern bool Log_disconnections;
 extern int	CommitDelay;
 extern int	CommitSiblings;
-extern bool ignore_checksum_failure;
 extern bool ignore_invalid_pages;
 extern bool synchronize_seqscans;
 
@@ -546,7 +545,6 @@ static int	max_identifier_length;
 static int	block_size;
 static int	segment_size;
 static int	wal_block_size;
-static bool data_checksums;
 static bool integer_datetimes;
 static bool assert_enabled;
 static bool in_hot_standby;
@@ -1036,21 +1034,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&enableFsync,
 		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"ignore_checksum_failure", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Continues processing after a checksum failure."),
-			gettext_noop("Detection of a checksum failure normally causes PostgreSQL to "
-						 "report an error, aborting the current transaction. Setting "
-						 "ignore_checksum_failure to true causes the system to ignore the failure "
-						 "(but still report a warning), and continue processing. This "
-						 "behavior could cause crashes or other serious problems. Only "
-						 "has an effect if checksums are enabled."),
-			GUC_NOT_IN_SAMPLE
-		},
-		&ignore_checksum_failure,
-		false,
 		NULL, NULL, NULL
 	},
 	{
@@ -1711,17 +1694,6 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL,
 		},
 		&quote_all_identifiers,
-		false,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"data_checksums", PGC_INTERNAL, PRESET_OPTIONS,
-			gettext_noop("Shows whether data checksums are turned on for this cluster."),
-			NULL,
-			GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE
-		},
-		&data_checksums,
 		false,
 		NULL, NULL, NULL
 	},

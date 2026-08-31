@@ -165,22 +165,7 @@ PostgreSQL documentation
       </listitem>
      </varlistentry>
 
-     <varlistentry id="app-initdb-data-checksums" xreflabel="data checksums">
-      <term><option>-k</option></term>
-      <term><option>--data-checksums</option></term>
-      <listitem>
-       <para>
-        Use checksums on data pages to help detect corruption by the
-        I/O system that would otherwise be silent. Enabling checksums
-        may incur a noticeable performance penalty. If set, checksums
-        are calculated for all objects, in all databases. All checksum
-        failures will be reported in the
-        <link linkend="monitoring-pg-stat-database-view">
-        <structname>pg_stat_database</structname></link> view.
-        See <xref linkend="checksums" /> for details.
-       </para>
-      </listitem>
-     </varlistentry>
+
 
      <varlistentry>
       <term><option>--locale=<replaceable>locale</replaceable></option></term>

@@ -691,13 +691,12 @@ sanityChecks(void)
 	}
 
 	/*
-	 * Target cluster need to use checksums or hint bit wal-logging, this to
-	 * prevent from data corruption that could occur because of hint bits.
+	 * Target cluster needs to use hint bit wal-logging, to prevent from data
+	 * corruption that could occur because of hint bits.
 	 */
-	if (ControlFile_target.data_checksum_version != PG_DATA_CHECKSUM_VERSION &&
-		!ControlFile_target.wal_log_hints)
+	if (!ControlFile_target.wal_log_hints)
 	{
-		pg_fatal("target server needs to use either data checksums or \"wal_log_hints = on\"");
+		pg_fatal("target server needs to use \"wal_log_hints = on\"");
 	}
 
 	/*

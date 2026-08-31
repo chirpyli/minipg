@@ -300,8 +300,6 @@ pg_control_init(PG_FUNCTION_ARGS)
 					   INT4OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 9, "float8_pass_by_value",
 					   BOOLOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 10, "data_page_checksum_version",
-					   INT4OID, -1, 0);
 	tupdesc = BlessTupleDesc(tupdesc);
 
 	/* read the control file */
@@ -338,9 +336,6 @@ pg_control_init(PG_FUNCTION_ARGS)
 
 	values[8] = BoolGetDatum(ControlFile->float8ByVal);
 	nulls[8] = false;
-
-	values[9] = Int32GetDatum(ControlFile->data_checksum_version);
-	nulls[9] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);
 

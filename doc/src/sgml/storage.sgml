@@ -786,9 +786,8 @@ data. Empty in ordinary tables.</entry>
   The first 24 bytes of each page consists of a page header
   (<structname>PageHeaderData</structname>). Its format is detailed in <xref
   linkend="pageheaderdata-table"/>. The first field tracks the most
-  recent WAL entry related to this page. The second field contains
-  the page checksum if <xref linkend="app-initdb-data-checksums"/> are
-  enabled.  Next is a 2-byte field containing flag bits. This is followed
+  recent WAL entry related to this page. The second field is currently
+  unused.  Next is a 2-byte field containing flag bits. This is followed
   by three 2-byte integer fields (<structfield>pd_lower</structfield>,
   <structfield>pd_upper</structfield>, and
   <structfield>pd_special</structfield>).  These contain byte offsets
@@ -834,7 +833,7 @@ data. Empty in ordinary tables.</entry>
    <entry>pd_checksum</entry>
    <entry>uint16</entry>
    <entry>2 bytes</entry>
-   <entry>Page checksum</entry>
+   <entry>Unused</entry>
   </row>
   <row>
    <entry>pd_flags</entry>

@@ -193,14 +193,6 @@
     </listitem>
     <listitem>
      <para>
-      Data pages are not currently checksummed by default, though full page images
-      recorded in WAL records will be protected; see <link
-      linkend="app-initdb-data-checksums"><application>initdb</application></link>
-      for details about enabling data checksums.
-     </para>
-    </listitem>
-    <listitem>
-     <para>
       Internal data structures such as <filename>pg_xact</filename>, <filename>pg_subtrans</filename>, <filename>pg_multixact</filename>,
       <filename>pg_serial</filename>, <filename>pg_stat</filename>, <filename>pg_snapshots</filename> are not directly
       checksummed, nor are pages protected by full page writes. However, where
@@ -230,54 +222,7 @@
   </para>
  </sect1>
 
- <sect1 id="checksums">
-  <title>Data Checksums</title>
-  <indexterm>
-   <primary>checksums</primary>
-  </indexterm>
-
-  <para>
-   By default, data pages are not protected by checksums, but this can
-   optionally be enabled for a cluster. When enabled, each data page includes
-   a checksum that is updated when the page is written and verified each time
-   the page is read. Only data pages are protected by checksums; internal data
-   structures and temporary files are not.
-  </para>
-
-  <para>
-   Checksums can be enabled when the cluster is initialized using <link
-   linkend="app-initdb-data-checksums"><application>initdb</application></link>.
-   They can also be enabled or disabled at a later time as an offline
-   operation. Data checksums are enabled or disabled at the full cluster
-   level, and cannot be specified individually for databases or tables.
-  </para>
-
-  <para>
-   The current state of checksums in the cluster can be verified by viewing the
-   value of the read-only configuration variable <xref
-   linkend="guc-data-checksums" /> by issuing the command <command>SHOW
-   data_checksums</command>.
-  </para>
-
-  <para>
-   When attempting to recover from page corruptions, it may be necessary to
-   bypass the checksum protection. To do this, temporarily set the
-   configuration parameter <xref linkend="guc-ignore-checksum-failure" />.
-  </para>
-
-  <sect2 id="checksums-offline-enable-disable">
-   <title>Off-line Enabling of Checksums</title>
-
-   <para>
-    The <link linkend="app-pgchecksums"><application>pg_checksums</application></link>
-    application can be used to enable or disable data checksums, as well as
-    verify checksums, on an offline cluster.
-   </para>
-
-  </sect2>
- </sect1>
-
-  <sect1 id="wal-intro">
+ <sect1 id="wal-intro">
    <title>Write-Ahead Logging (<acronym>WAL</acronym>)</title>
 
    <indexterm zone="wal">

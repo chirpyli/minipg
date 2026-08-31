@@ -216,9 +216,6 @@ typedef struct ControlFileData
 
 	bool		float8ByVal;	/* float8, int8, etc pass-by-value? */
 
-	/* Are data pages protected by checksums? Zero if no checksum version */
-	uint32		data_checksum_version;
-
 	/*
 	 * Random nonce, used in authentication requests that need to proceed
 	 * based on values that are cluster-unique, like a SASL exchange that

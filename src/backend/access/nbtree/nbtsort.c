@@ -662,8 +662,6 @@ _bt_blwritepage(BTWriteState *wstate, Page page, BlockNumber blkno)
 				   true);
 	}
 
-	PageSetChecksumInplace(page, blkno);
-
 	/*
 	 * Now write the page.  There's no need for smgr to schedule an fsync for
 	 * this write; we'll do it ourselves before ending the build.

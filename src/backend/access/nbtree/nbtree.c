@@ -162,7 +162,6 @@ btbuildempty(Relation index)
 	 * XLOG_DBASE_CREATE or XLOG_TBLSPC_CREATE record.  Therefore, we need
 	 * this even when wal_level=minimal.
 	 */
-	PageSetChecksumInplace(metapage, BTREE_METAPAGE);
 	smgrwrite(RelationGetSmgr(index), INIT_FORKNUM, BTREE_METAPAGE,
 			  (char *) metapage, true);
 	log_newpage(&RelationGetSmgr(index)->smgr_rnode.node, INIT_FORKNUM,

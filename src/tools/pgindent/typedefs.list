@@ -1770,7 +1770,6 @@ PgStat_MsgAnlAncestors
 PgStat_MsgArchiver
 PgStat_MsgAutovacStart
 PgStat_MsgBgWriter
-PgStat_MsgChecksumFailure
 PgStat_MsgConnect
 PgStat_MsgDeadlock
 PgStat_MsgDisconnect

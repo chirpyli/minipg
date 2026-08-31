@@ -217,8 +217,6 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 		/* Find smgr relation for buffer */
 		oreln = smgropen(bufHdr->tag.rnode, MyBackendId);
 
-		PageSetChecksumInplace(localpage, bufHdr->tag.blockNum);
-
 		/* And write... */
 		smgrwrite(oreln,
 				  bufHdr->tag.forkNum,
