@@ -20,13 +20,12 @@
 typedef struct CommandTagBehavior
 {
 	const char *name;
-	const bool	event_trigger_ok;
 	const bool	table_rewrite_ok;
 	const bool	display_rowcount;
 } CommandTagBehavior;
 
-#define PG_CMDTAG(tag, name, evtrgok, rwrok, rowcnt) \
-	{ name, evtrgok, rwrok, rowcnt },
+#define PG_CMDTAG(tag, name, rwrok, rowcnt) \
+	{ name, rwrok, rowcnt },
 
 const CommandTagBehavior tag_behavior[COMMAND_TAG_NEXTTAG] = {
 #include "tcop/cmdtaglist.h"
@@ -51,12 +50,6 @@ bool
 command_tag_display_rowcount(CommandTag commandTag)
 {
 	return tag_behavior[commandTag].display_rowcount;
-}
-
-bool
-command_tag_event_trigger_ok(CommandTag commandTag)
-{
-	return tag_behavior[commandTag].event_trigger_ok;
 }
 
 bool

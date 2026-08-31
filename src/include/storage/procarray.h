@@ -96,7 +96,4 @@ extern void XidCacheRemoveRunningXids(TransactionId xid,
 extern void ProcArraySetReplicationSlotXmin(TransactionId xmin,
 											TransactionId catalog_xmin, bool already_locked);
 
-extern void ProcArrayGetReplicationSlotXmin(TransactionId *xmin,
-											TransactionId *catalog_xmin);
-
 #endif							/* PROCARRAY_H */

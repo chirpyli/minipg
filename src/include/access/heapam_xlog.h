@@ -50,7 +50,6 @@
  * the ones above associated with RM_HEAP_ID.  XLOG_HEAP_OPMASK applies to
  * these, too.
  */
-#define XLOG_HEAP2_REWRITE		0x00
 #define XLOG_HEAP2_PRUNE		0x10
 #define XLOG_HEAP2_VACUUM		0x20
 #define XLOG_HEAP2_FREEZE_PAGE	0x30
@@ -377,17 +376,6 @@ typedef struct xl_heap_new_cid
 
 #define SizeOfHeapNewCid (offsetof(xl_heap_new_cid, target_tid) + sizeof(ItemPointerData))
 
-/* logical rewrite xlog record header */
-typedef struct xl_heap_rewrite_mapping
-{
-	TransactionId mapped_xid;	/* xid that might need to see the row */
-	Oid			mapped_db;		/* DbOid or InvalidOid for shared rels */
-	Oid			mapped_rel;		/* Oid of the mapped relation */
-	off_t		offset;			/* How far have we written so far */
-	uint32		num_mappings;	/* Number of in-memory mappings */
-	XLogRecPtr	start_lsn;		/* Insert LSN at begin of rewrite */
-} xl_heap_rewrite_mapping;
-
 extern void HeapTupleHeaderAdvanceLatestRemovedXid(HeapTupleHeader tuple,
 												   TransactionId *latestRemovedXid);
 
@@ -398,7 +386,6 @@ extern void heap_mask(char *pagedata, BlockNumber blkno);
 extern void heap2_redo(XLogReaderState *record);
 extern void heap2_desc(StringInfo buf, XLogReaderState *record);
 extern const char *heap2_identify(uint8 info);
-extern void heap_xlog_logical_rewrite(XLogReaderState *r);
 
 extern XLogRecPtr log_heap_freeze(Relation reln, Buffer buffer,
 								  TransactionId cutoff_xid, xl_heap_freeze_tuple *tuples,

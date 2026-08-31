@@ -3989,27 +3989,6 @@ ProcArraySetReplicationSlotXmin(TransactionId xmin, TransactionId catalog_xmin,
 }
 
 /*
- * ProcArrayGetReplicationSlotXmin
- *
- * Return the current slot xmin limits. That's useful to be able to remove
- * data that's older than those limits.
- */
-void
-ProcArrayGetReplicationSlotXmin(TransactionId *xmin,
-								TransactionId *catalog_xmin)
-{
-	LWLockAcquire(ProcArrayLock, LW_SHARED);
-
-	if (xmin != NULL)
-		*xmin = procArray->replication_slot_xmin;
-
-	if (catalog_xmin != NULL)
-		*catalog_xmin = procArray->replication_slot_catalog_xmin;
-
-	LWLockRelease(ProcArrayLock);
-}
-
-/*
  * XidCacheRemoveRunningXids
  *
  * Remove a bunch of TransactionIds from the list of known-running

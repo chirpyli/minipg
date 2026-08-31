@@ -14,7 +14,7 @@
 #define CMDTAG_H
 
 
-#define PG_CMDTAG(tag, name, evtrgok, rwrok, rowcnt) \
+#define PG_CMDTAG(tag, name, rwrok, rowcnt) \
 	tag,
 
 typedef enum CommandTag
@@ -51,7 +51,6 @@ CopyQueryCompletion(QueryCompletion *dst, const QueryCompletion *src)
 extern void InitializeQueryCompletion(QueryCompletion *qc);
 extern const char *GetCommandTagName(CommandTag commandTag);
 extern bool command_tag_display_rowcount(CommandTag commandTag);
-extern bool command_tag_event_trigger_ok(CommandTag commandTag);
 extern bool command_tag_table_rewrite_ok(CommandTag commandTag);
 extern CommandTag GetCommandTagEnum(const char *tagname);
 

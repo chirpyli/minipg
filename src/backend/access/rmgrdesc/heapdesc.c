@@ -256,9 +256,6 @@ heap2_identify(uint8 info)
 		case XLOG_HEAP2_NEW_CID:
 			id = "NEW_CID";
 			break;
-		case XLOG_HEAP2_REWRITE:
-			id = "REWRITE";
-			break;
 	}
 
 	return id;

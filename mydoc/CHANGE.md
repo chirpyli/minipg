@@ -2,6 +2,27 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 清理"已删功能"残留的死代码（2026-08-31）
+
+### 一、背景
+在前序裁剪（GiST/SP-GiST/GIN/BRIN 索引、event trigger、逻辑复制/replication）之后，代码库中存在若干仅被这些已删功能引用、现已无任何调用者的孤立函数/结构体/字段/命令标签字段。它们属于死代码，本次彻底清理，不留死代码、不引入条件编译。
+
+### 二、删除/更新内容
+- **GiST/SP-GiST 代价估算函数（索引 AM 已裁）**：`src/backend/utils/adt/selfuncs.c` 删 `gistcostestimate()`、`spgcostestimate()` 两个死函数（其指针原由 GiST/SP-GiST AM handler 注册到 `amcostestimate`，两 AM 已从 `pg_am.dat` 删除，全库零调用者）；`src/include/utils/index_selfuncs.h` 删对应的两处 `extern` 声明。
+- **event trigger 残留命令标签字段与函数（event trigger 功能已裁）**：`cmdtaglist.h` 删除每行 CMDTAG 的 `event_trigger_ok` 第 3 字段及说明注释；`src/include/tcop/cmdtag.h` 的 `PG_CMDTAG` 宏签名去掉 `evtrgok` 参数、并删 `command_tag_event_trigger_ok()` 声明；`src/backend/tcop/cmdtag.c` 的 `CommandTagBehavior` 结构体删 `event_trigger_ok` 字段、宏签名同步去掉 `evtrgok`、并删 `command_tag_event_trigger_ok()` 函数（全库零引用）。
+- **rewriteheap.c 逻辑解码（logical replication）残留（replication 目录已删）**：`src/backend/access/heap/rewriteheap.c` 删除 `logical_begin_heap_rewrite`/`logical_heap_rewrite_flush_mappings`/`logical_end_heap_rewrite`/`logical_rewrite_log_mapping`/`logical_rewrite_heap_tuple`/`heap_xlog_logical_rewrite`/`CheckPointLogicalRewriteHeap` 共 7 个死函数；删除 `RewriteMappingFile`/`RewriteMappingDataEntry` 两个死结构；删除 `RewriteStateData` 中 `rs_logical_rewrite`/`rs_logical_xmin`/`rs_begin_lsn`/`rs_logical_mappings`/`rs_num_rewrite_mappings` 5 个死字段；删除 3 处调用点（`end_heap_rewrite`/`begin_heap_rewrite`/`rewrite_heap_tuple` 中的 if 分支）；更新一处提及已删符号的设计注释。保留 `HEAP_INSERT_NO_LOGICAL` 标记（仍被 heapam 的 TOAST 写入路径使用，属活语义）。
+- **关联死代码（跨文件）**：
+  - `src/include/access/rewriteheap.h` 删 `LogicalRewriteMappingData` 结构、`LOGICAL_REWRITE_FORMAT` 宏、`CheckPointLogicalRewriteHeap` 声明。
+  - `src/include/access/heapam_xlog.h` 删 `XLOG_HEAP2_REWRITE` 宏（=0x00，heap2 的 opcode）、`xl_heap_rewrite_mapping` 结构、`heap_xlog_logical_rewrite` 声明。
+  - `src/backend/access/heap/heapam.c` 删 redo 分发中 `case XLOG_HEAP2_REWRITE` 及其 `heap_xlog_logical_rewrite(record)` 调用（该 WAL 记录类型不再产生）。
+  - `src/backend/access/rmgrdesc/heapdesc.c` 删 `case XLOG_HEAP2_REWRITE` 的 rmgr 描述分支。
+  - `src/backend/storage/ipc/procarray.c` 删 `ProcArrayGetReplicationSlotXmin()` 死函数（仅被已删的 `logical_begin_heap_rewrite` 调用）；`src/include/storage/procarray.h` 删其 `extern` 声明。`procArray->replication_slot_xmin`/`replication_slot_catalog_xmin` 字段**保留**（仍被 `ProcArraySetReplicationSlotXmin` 及 xmin 可见性视线计算等活代码使用）。
+- **未动部分**：`src/tools/pgindent/typedefs.list` 中的 `LogicalRewriteMappingData`/`xl_heap_rewrite_mapping` 条目为 pgindent 维护清单，不影响编译，按惯例保留。
+
+### 三、验证
+- `make` 全量重编通过（改动 cmdtag.h/procarray.h/rewriteheap.h/heapam_xlog.h 等核心头文件及多个 .c，已触发相关目标重编）。
+- `make check-world`：全部通过（含主回归、isolation、contrib 等），无功能回退。
+
 ## 裁剪数据页校验（Page Checksum）功能（2026-08-31）
 
 ### 一、背景
