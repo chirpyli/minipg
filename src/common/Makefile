@@ -48,7 +48,6 @@ LIBS += $(PTHREAD_LIBS)
 OBJS_COMMON = \
 	archive.o \
 	base64.o \
-	checksum_helper.o \
 	config_info.o \
 	controldata_utils.o \
 	d2s.o \
@@ -74,10 +73,6 @@ OBJS_COMMON = \
 	username.o \
 	wait_error.o \
 	wchar.o
-
-OBJS_COMMON += \
-	cryptohash.o \
-	sha2.o
 
 # A few files are currently only built for frontend, not server
 # (Mkvcbuild.pm has a copy of this list, too).  logging.c is excluded

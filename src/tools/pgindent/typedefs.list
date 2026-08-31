@@ -3127,16 +3127,11 @@ pgParameterStatus
 pg_atomic_flag
 pg_atomic_uint32
 pg_atomic_uint64
-pg_checksum_context
-pg_checksum_raw_context
-pg_checksum_type
 pg_conn_host
 pg_conn_host_type
 pg_conv_map
 pg_crc32
 pg_crc32c
-pg_cryptohash_ctx
-pg_cryptohash_type
 pg_ctype_cache
 pg_enc
 pg_enc2gettext
@@ -3154,10 +3149,6 @@ pg_regex_t
 pg_regmatch_t
 pg_regoff_t
 pg_saslprep_rc
-pg_sha224_ctx
-pg_sha256_ctx
-pg_sha384_ctx
-pg_sha512_ctx
 pg_snapshot
 pg_stack_base_t
 pg_time_t

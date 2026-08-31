@@ -20,7 +20,6 @@
  */
 #include "postgres.h"
 
-#include "common/cryptohash.h"
 #include "common/hashfn.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
@@ -126,7 +125,6 @@ typedef struct ResourceOwnerData
 	ResourceArray snapshotarr;	/* snapshot references */
 	ResourceArray filearr;		/* open temporary files */
 	ResourceArray dsmarr;		/* dynamic shmem segments */
-	ResourceArray cryptohasharr;	/* cryptohash contexts */
 
 	/* We can remember up to MAX_RESOWNER_LOCKS references to local locks. */
 	int			nlocks;			/* number of owned locks */
@@ -173,7 +171,6 @@ static void PrintTupleDescLeakWarning(TupleDesc tupdesc);
 static void PrintSnapshotLeakWarning(Snapshot snapshot);
 static void PrintFileLeakWarning(File file);
 static void PrintDSMLeakWarning(dsm_segment *seg);
-static void PrintCryptoHashLeakWarning(Datum handle);
 
 
 /*****************************************************************************
@@ -441,7 +438,6 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 	ResourceArrayInit(&(owner->snapshotarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->filearr), FileGetDatum(-1));
 	ResourceArrayInit(&(owner->dsmarr), PointerGetDatum(NULL));
-	ResourceArrayInit(&(owner->cryptohasharr), PointerGetDatum(NULL));
 
 	return owner;
 }
@@ -542,17 +538,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			if (isCommit)
 				PrintDSMLeakWarning(res);
 			dsm_detach(res);
-		}
-
-		/* Ditto for cryptohash contexts */
-		while (ResourceArrayGetAny(&(owner->cryptohasharr), &foundres))
-		{
-			pg_cryptohash_ctx *context =
-			(pg_cryptohash_ctx *) PointerGetDatum(foundres);
-
-			if (isCommit)
-				PrintCryptoHashLeakWarning(foundres);
-			pg_cryptohash_free(context);
 		}
 	}
 	else if (phase == RESOURCE_RELEASE_LOCKS)
@@ -690,7 +675,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner->snapshotarr.nitems == 0);
 	Assert(owner->filearr.nitems == 0);
 	Assert(owner->dsmarr.nitems == 0);
-	Assert(owner->cryptohasharr.nitems == 0);
 	Assert(owner->nlocks == 0 || owner->nlocks == MAX_RESOWNER_LOCKS + 1);
 
 	/*
@@ -716,7 +700,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceArrayFree(&(owner->snapshotarr));
 	ResourceArrayFree(&(owner->filearr));
 	ResourceArrayFree(&(owner->dsmarr));
-	ResourceArrayFree(&(owner->cryptohasharr));
 
 	pfree(owner);
 }
@@ -1255,49 +1238,4 @@ PrintDSMLeakWarning(dsm_segment *seg)
 {
 	elog(WARNING, "dynamic shared memory leak: segment %u still referenced",
 		 dsm_segment_handle(seg));
-}
-
-/*
- * Make sure there is room for at least one more entry in a ResourceOwner's
- * cryptohash context reference array.
- *
- * This is separate from actually inserting an entry because if we run out of
- * memory, it's critical to do so *before* acquiring the resource.
- */
-void
-ResourceOwnerEnlargeCryptoHash(ResourceOwner owner)
-{
-	ResourceArrayEnlarge(&(owner->cryptohasharr));
-}
-
-/*
- * Remember that a cryptohash context is owned by a ResourceOwner
- *
- * Caller must have previously done ResourceOwnerEnlargeCryptoHash()
- */
-void
-ResourceOwnerRememberCryptoHash(ResourceOwner owner, Datum handle)
-{
-	ResourceArrayAdd(&(owner->cryptohasharr), handle);
-}
-
-/*
- * Forget that a cryptohash context is owned by a ResourceOwner
- */
-void
-ResourceOwnerForgetCryptoHash(ResourceOwner owner, Datum handle)
-{
-	if (!ResourceArrayRemove(&(owner->cryptohasharr), handle))
-		elog(ERROR, "cryptohash context %p is not owned by resource owner %s",
-			 DatumGetPointer(handle), owner->name);
-}
-
-/*
- * Debugging subroutine
- */
-static void
-PrintCryptoHashLeakWarning(Datum handle)
-{
-	elog(WARNING, "cryptohash context reference leak: context %p still referenced",
-		 DatumGetPointer(handle));
 }
