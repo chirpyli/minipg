@@ -672,9 +672,11 @@ initialize_environment(void)
 		unsetenv("PGCLIENTENCODING");
 
 	/*
-	 * Set timezone and datestyle for datetime-related tests
+	 * Set timezone and datestyle for datetime-related tests.
+	 * minipg ships only UTC and the fixed-offset Etc/GMT* zones, so the
+	 * regression default is UTC (deterministic and always present).
 	 */
-	setenv("PGTZ", "America/Los_Angeles", 1);
+	setenv("PGTZ", "UTC", 1);
 	setenv("PGDATESTYLE", "Postgres, MDY", 1);
 
 	/*

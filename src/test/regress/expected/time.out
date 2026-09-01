@@ -11,13 +11,10 @@ INSERT INTO TIME_TBL VALUES ('12:00');
 INSERT INTO TIME_TBL VALUES ('12:01');
 INSERT INTO TIME_TBL VALUES ('23:59');
 INSERT INTO TIME_TBL VALUES ('11:59:59.99 PM');
-INSERT INTO TIME_TBL VALUES ('2003-03-07 15:36:39 America/New_York');
-INSERT INTO TIME_TBL VALUES ('2003-07-07 15:36:39 America/New_York');
+INSERT INTO TIME_TBL VALUES ('2003-03-07 15:36:39 Etc/GMT+5');
+INSERT INTO TIME_TBL VALUES ('2003-07-07 15:36:39 Etc/GMT+5');
 -- this should fail (the timezone offset is not known)
-INSERT INTO TIME_TBL VALUES ('15:36:39 America/New_York');
-ERROR:  invalid input syntax for type time: "15:36:39 America/New_York"
-LINE 1: INSERT INTO TIME_TBL VALUES ('15:36:39 America/New_York');
-                                     ^
+INSERT INTO TIME_TBL VALUES ('15:36:39 Etc/GMT+5');
 SELECT f1 AS "Time" FROM TIME_TBL;
     Time     
 -------------
@@ -31,7 +28,8 @@ SELECT f1 AS "Time" FROM TIME_TBL;
  23:59:59.99
  15:36:39
  15:36:39
-(10 rows)
+ 15:36:39
+(11 rows)
 
 SELECT f1 AS "Three" FROM TIME_TBL WHERE f1 < '05:06:07';
   Three   
@@ -51,7 +49,8 @@ SELECT f1 AS "Five" FROM TIME_TBL WHERE f1 > '05:06:07';
  23:59:59.99
  15:36:39
  15:36:39
-(7 rows)
+ 15:36:39
+(8 rows)
 
 SELECT f1 AS "None" FROM TIME_TBL WHERE f1 < '00:00';
  None 
@@ -71,7 +70,8 @@ SELECT f1 AS "Eight" FROM TIME_TBL WHERE f1 >= '00:00';
  23:59:59.99
  15:36:39
  15:36:39
-(10 rows)
+ 15:36:39
+(11 rows)
 
 -- Check edge cases
 SELECT '23:59:59.999999'::time;

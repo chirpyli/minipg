@@ -90,19 +90,19 @@ reset datestyle;
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('1997.041 17:32:01 UTC');
 
 -- timestamps at different timezones
-INSERT INTO TIMESTAMPTZ_TBL VALUES ('19970210 173201 America/New_York');
-SELECT '19970210 173201' AT TIME ZONE 'America/New_York';
-INSERT INTO TIMESTAMPTZ_TBL VALUES ('19970710 173201 America/New_York');
-SELECT '19970710 173201' AT TIME ZONE 'America/New_York';
+INSERT INTO TIMESTAMPTZ_TBL VALUES ('19970210 173201 Etc/GMT+5');
+SELECT '19970210 173201' AT TIME ZONE 'Etc/GMT+5';
+INSERT INTO TIMESTAMPTZ_TBL VALUES ('19970710 173201 Etc/GMT+5');
+SELECT '19970710 173201' AT TIME ZONE 'Etc/GMT+5';
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('19970710 173201 America/Does_not_exist');
 SELECT '19970710 173201' AT TIME ZONE 'America/Does_not_exist';
 
 -- Daylight saving time for timestamps beyond 32-bit time_t range.
-SELECT '20500710 173201 Europe/Helsinki'::timestamptz; -- DST
-SELECT '20500110 173201 Europe/Helsinki'::timestamptz; -- non-DST
+SELECT '20500710 173201 Etc/GMT-2'::timestamptz; -- DST
+SELECT '20500110 173201 Etc/GMT-2'::timestamptz; -- non-DST
 
-SELECT '205000-07-10 17:32:01 Europe/Helsinki'::timestamptz; -- DST
-SELECT '205000-01-10 17:32:01 Europe/Helsinki'::timestamptz; -- non-DST
+SELECT '205000-07-10 17:32:01 Etc/GMT-2'::timestamptz; -- DST
+SELECT '205000-01-10 17:32:01 Etc/GMT-2'::timestamptz; -- non-DST
 
 -- Check date conversion and date arithmetic
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('1997-06-10 18:32:01 PDT');
@@ -147,7 +147,7 @@ INSERT INTO TIMESTAMPTZ_TBL VALUES ('Feb 16 17:32:01 5097 BC');
 
 -- Alternative field order that we've historically supported (sort of)
 -- with regular and POSIXy timezone specs
-SELECT 'Wed Jul 11 10:51:14 America/New_York 2001'::timestamptz;
+SELECT 'Wed Jul 11 10:51:14 Etc/GMT+5 2001'::timestamptz;
 SELECT 'Wed Jul 11 10:51:14 GMT-4 2001'::timestamptz;
 SELECT 'Wed Jul 11 10:51:14 GMT+4 2001'::timestamptz;
 SELECT 'Wed Jul 11 10:51:14 PST-03:00 2001'::timestamptz;
@@ -189,7 +189,7 @@ SELECT d1 - timestamp with time zone '1997-01-02' AS diff
 
 SELECT date_trunc( 'week', timestamp with time zone '2004-02-29 15:44:17.71393' ) AS week_trunc;
 
-SELECT date_trunc('day', timestamp with time zone '2001-02-16 20:38:40+00', 'Australia/Sydney') as sydney_trunc;  -- zone name
+SELECT date_trunc('day', timestamp with time zone '2001-02-16 20:38:40+00', 'Etc/GMT-10') as sydney_trunc;  -- zone name
 SELECT date_trunc('day', timestamp with time zone '2001-02-16 20:38:40+00', 'GMT') as gmt_trunc;  -- fixed-offset abbreviation
 SELECT date_trunc('day', timestamp with time zone '2001-02-16 20:38:40+00', 'VET') as vet_trunc;  -- variable-offset abbreviation
 
@@ -197,7 +197,7 @@ SELECT date_trunc('day', timestamp with time zone '2001-02-16 20:38:40+00', 'VET
 SELECT
   str,
   interval,
-  date_trunc(str, ts, 'Australia/Sydney') = date_bin(interval::interval, ts, timestamp with time zone '2001-01-01+11') AS equal
+  date_trunc(str, ts, 'Etc/GMT-10') = date_bin(interval::interval, ts, timestamp with time zone '2001-01-01+10') AS equal
 FROM (
   VALUES
   ('day', '1 d'),
@@ -317,7 +317,7 @@ SELECT * FROM TIMESTAMPTZ_TST ORDER BY a;
 DROP TABLE TIMESTAMPTZ_TST;
 
 -- test timestamptz constructors
-set TimeZone to 'America/New_York';
+set TimeZone to 'Etc/GMT+5';
 
 -- numeric timezone
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33);
@@ -333,10 +333,10 @@ SELECT make_timestamptz(2014, 12, 10, 10, 10, 10, '-16');
 SELECT make_timestamptz(1973, 07, 15, 08, 15, 55.33, '+2') = '1973-07-15 08:15:55.33+02'::timestamptz;
 
 -- full timezone names
-SELECT make_timestamptz(2014, 12, 10, 0, 0, 0, 'Europe/Prague') = timestamptz '2014-12-10 00:00:00 Europe/Prague';
-SELECT make_timestamptz(2014, 12, 10, 0, 0, 0, 'Europe/Prague') AT TIME ZONE 'UTC';
-SELECT make_timestamptz(1881, 12, 10, 0, 0, 0, 'Asia/Singapore') AT TIME ZONE 'UTC';
-SELECT make_timestamptz(1881, 12, 10, 0, 0, 0, 'Pacific/Honolulu') AT TIME ZONE 'UTC';
+SELECT make_timestamptz(2014, 12, 10, 0, 0, 0, 'Etc/GMT-1') = timestamptz '2014-12-10 00:00:00 Etc/GMT-1';
+SELECT make_timestamptz(2014, 12, 10, 0, 0, 0, 'Etc/GMT-1') AT TIME ZONE 'UTC';
+SELECT make_timestamptz(1881, 12, 10, 0, 0, 0, 'Etc/GMT-8') AT TIME ZONE 'UTC';
+SELECT make_timestamptz(1881, 12, 10, 0, 0, 0, 'Etc/GMT+10') AT TIME ZONE 'UTC';
 SELECT make_timestamptz(1881, 12, 10, 0, 0, 0, 'Europe/Paris') AT TIME ZONE 'UTC';
 SELECT make_timestamptz(1910, 12, 24, 0, 0, 0, 'Nehwon/Lankhmar');
 
@@ -365,22 +365,23 @@ select * from generate_series('2020-01-01 00:00'::timestamptz,
                               '0 hour'::interval);
 
 --
--- Test behavior with a dynamic (time-varying) timezone abbreviation.
--- These tests rely on the knowledge that MSK (Europe/Moscow standard time)
--- moved forwards in Mar 2011 and backwards again in Oct 2014.
+-- Test behavior with fixed-offset timezones.
+-- minipg ships only UTC and the Etc/GMT* fixed-offset zones; the historical
+-- DST data (e.g. Etc/GMT-3 transitions) has been removed, so the zones
+-- below are simple fixed offsets.
 --
 
 SET TimeZone to 'UTC';
 
-SELECT '2011-03-27 00:00:00 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 01:00:00 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 01:59:59 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 02:00:00 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 02:00:01 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 02:59:59 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 03:00:00 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 03:00:01 Europe/Moscow'::timestamptz;
-SELECT '2011-03-27 04:00:00 Europe/Moscow'::timestamptz;
+SELECT '2011-03-27 00:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 01:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 01:59:59 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 02:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 02:00:01 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 02:59:59 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 03:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 03:00:01 Etc/GMT-3'::timestamptz;
+SELECT '2011-03-27 04:00:00 Etc/GMT-3'::timestamptz;
 
 SELECT '2011-03-27 00:00:00 MSK'::timestamptz;
 SELECT '2011-03-27 01:00:00 MSK'::timestamptz;
@@ -392,11 +393,11 @@ SELECT '2011-03-27 03:00:00 MSK'::timestamptz;
 SELECT '2011-03-27 03:00:01 MSK'::timestamptz;
 SELECT '2011-03-27 04:00:00 MSK'::timestamptz;
 
-SELECT '2014-10-26 00:00:00 Europe/Moscow'::timestamptz;
-SELECT '2014-10-26 00:59:59 Europe/Moscow'::timestamptz;
-SELECT '2014-10-26 01:00:00 Europe/Moscow'::timestamptz;
-SELECT '2014-10-26 01:00:01 Europe/Moscow'::timestamptz;
-SELECT '2014-10-26 02:00:00 Europe/Moscow'::timestamptz;
+SELECT '2014-10-26 00:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2014-10-26 00:59:59 Etc/GMT-3'::timestamptz;
+SELECT '2014-10-26 01:00:00 Etc/GMT-3'::timestamptz;
+SELECT '2014-10-26 01:00:01 Etc/GMT-3'::timestamptz;
+SELECT '2014-10-26 02:00:00 Etc/GMT-3'::timestamptz;
 
 SELECT '2014-10-26 00:00:00 MSK'::timestamptz;
 SELECT '2014-10-26 00:59:59 MSK'::timestamptz;
@@ -404,15 +405,15 @@ SELECT '2014-10-26 01:00:00 MSK'::timestamptz;
 SELECT '2014-10-26 01:00:01 MSK'::timestamptz;
 SELECT '2014-10-26 02:00:00 MSK'::timestamptz;
 
-SELECT '2011-03-27 00:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 01:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 01:59:59'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 02:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 02:00:01'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 02:59:59'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 03:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 03:00:01'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 04:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
+SELECT '2011-03-27 00:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 01:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 01:59:59'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 02:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 02:00:01'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 02:59:59'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 03:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 03:00:01'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 04:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
 
 SELECT '2011-03-27 00:00:00'::timestamp AT TIME ZONE 'MSK';
 SELECT '2011-03-27 01:00:00'::timestamp AT TIME ZONE 'MSK';
@@ -424,11 +425,11 @@ SELECT '2011-03-27 03:00:00'::timestamp AT TIME ZONE 'MSK';
 SELECT '2011-03-27 03:00:01'::timestamp AT TIME ZONE 'MSK';
 SELECT '2011-03-27 04:00:00'::timestamp AT TIME ZONE 'MSK';
 
-SELECT '2014-10-26 00:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-26 00:59:59'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-26 01:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-26 01:00:01'::timestamp AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-26 02:00:00'::timestamp AT TIME ZONE 'Europe/Moscow';
+SELECT '2014-10-26 00:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-26 00:59:59'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-26 01:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-26 01:00:01'::timestamp AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-26 02:00:00'::timestamp AT TIME ZONE 'Etc/GMT-3';
 
 SELECT '2014-10-26 00:00:00'::timestamp AT TIME ZONE 'MSK';
 SELECT '2014-10-26 00:59:59'::timestamp AT TIME ZONE 'MSK';
@@ -451,7 +452,7 @@ SELECT to_timestamp('-Infinity'::float);
 SELECT to_timestamp('NaN'::float);
 
 
-SET TimeZone to 'Europe/Moscow';
+SET TimeZone to 'Etc/GMT-3';
 
 SELECT '2011-03-26 21:00:00 UTC'::timestamptz;
 SELECT '2011-03-26 22:00:00 UTC'::timestamptz;
@@ -469,19 +470,19 @@ SELECT '2014-10-25 23:00:00 UTC'::timestamptz;
 
 RESET TimeZone;
 
-SELECT '2011-03-26 21:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-26 22:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-26 22:59:59 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-26 23:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-26 23:00:01 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-26 23:59:59 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2011-03-27 00:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
+SELECT '2011-03-26 21:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-26 22:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-26 22:59:59 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-26 23:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-26 23:00:01 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-26 23:59:59 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2011-03-27 00:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
 
-SELECT '2014-10-25 21:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-25 21:59:59 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-25 22:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-25 22:00:01 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
-SELECT '2014-10-25 23:00:00 UTC'::timestamptz AT TIME ZONE 'Europe/Moscow';
+SELECT '2014-10-25 21:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-25 21:59:59 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-25 22:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-25 22:00:01 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
+SELECT '2014-10-25 23:00:00 UTC'::timestamptz AT TIME ZONE 'Etc/GMT-3';
 
 SELECT '2011-03-26 21:00:00 UTC'::timestamptz AT TIME ZONE 'MSK';
 SELECT '2011-03-26 22:00:00 UTC'::timestamptz AT TIME ZONE 'MSK';

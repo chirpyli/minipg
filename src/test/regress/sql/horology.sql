@@ -351,13 +351,13 @@ RESET DateStyle;
 -- Check behavior with SQL-style fixed-GMT-offset time zone (cf bug #8572)
 --
 
-SET TIME ZONE 'America/New_York';
+SET TIME ZONE 'Etc/GMT+5';
 SET TIME ZONE '-1.5';
 
 SHOW TIME ZONE;
 
 SELECT '2012-12-12 12:00'::timestamptz;
-SELECT '2012-12-12 12:00 America/New_York'::timestamptz;
+SELECT '2012-12-12 12:00 Etc/GMT+5'::timestamptz;
 
 
 RESET TIME ZONE;
