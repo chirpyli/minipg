@@ -102,9 +102,6 @@ static int	acquire_sample_rows(Relation onerel, int elevel,
 								HeapTuple *rows, int targrows,
 								double *totalrows, double *totaldeadrows);
 static int	compare_rows(const void *a, const void *b, void *arg);
-static int	acquire_inherited_sample_rows(Relation onerel, int elevel,
-										  HeapTuple *rows, int targrows,
-										  double *totalrows, double *totaldeadrows);
 static void update_attstats(Oid relid, bool inh,
 							int natts, VacAttrStats **vacattrstats);
 static Datum std_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull);
@@ -192,13 +189,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 				   relpages, false, in_outer_xact, elevel);
 
 	/*
-	 * If there are child tables, do recursive ANALYZE.
-	 */
-	if (onerel->rd_rel->relhassubclass)
-		do_analyze_rel(onerel, params, va_cols, acquirefunc, relpages,
-					   true, in_outer_xact, elevel);
-
-	/*
 	 * Close source relation now, but keep lock so that no one deletes it
 	 * before we commit.  (If someone did, they'd fail to clean up the entries
 	 * we made in pg_statistic.  Also, releasing the lock before commit would
@@ -210,11 +200,7 @@ analyze_rel(Oid relid, RangeVar *relation,
 }
 
 /*
- *	do_analyze_rel() -- analyze one relation, recursively or not
- *
- * Note that "acquirefunc" is only relevant for the non-inherited case.
- * For the inherited case, acquire_inherited_sample_rows() determines the
- * appropriate acquirefunc for each child table.
+ *	do_analyze_rel() -- analyze one relation
  */
 static void
 do_analyze_rel(Relation onerel, VacuumParams *params,
@@ -249,16 +235,10 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	PgStat_Counter startreadtime = 0;
 	PgStat_Counter startwritetime = 0;
 
-	if (inh)
-		ereport(elevel,
-				(errmsg("analyzing \"%s.%s\" inheritance tree",
-						get_namespace_name(RelationGetNamespace(onerel)),
-						RelationGetRelationName(onerel))));
-	else
-		ereport(elevel,
-				(errmsg("analyzing \"%s.%s\"",
-						get_namespace_name(RelationGetNamespace(onerel)),
-						RelationGetRelationName(onerel))));
+	ereport(elevel,
+			(errmsg("analyzing \"%s.%s\"",
+					get_namespace_name(RelationGetNamespace(onerel)),
+					RelationGetRelationName(onerel))));
 
 	/*
 	 * Set up a working context so that we can easily free whatever junk gets
@@ -439,14 +419,9 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	pgstat_progress_update_param(PROGRESS_ANALYZE_PHASE,
 								 inh ? PROGRESS_ANALYZE_PHASE_ACQUIRE_SAMPLE_ROWS_INH :
 								 PROGRESS_ANALYZE_PHASE_ACQUIRE_SAMPLE_ROWS);
-	if (inh)
-		numrows = acquire_inherited_sample_rows(onerel, elevel,
-												rows, targrows,
-												&totalrows, &totaldeadrows);
-	else
-		numrows = (*acquirefunc) (onerel, elevel,
-								  rows, targrows,
-								  &totalrows, &totaldeadrows);
+	numrows = (*acquirefunc) (onerel, elevel,
+							  rows, targrows,
+							  &totalrows, &totaldeadrows);
 
 	/*
 	 * Compute the statistics.  Temporary results during the calculations for
@@ -1241,221 +1216,6 @@ compare_rows(const void *a, const void *b, void *arg)
 	if (oa > ob)
 		return 1;
 	return 0;
-}
-
-
-/*
- * acquire_inherited_sample_rows -- acquire sample rows from inheritance tree
- *
- * This has the same API as acquire_sample_rows, except that rows are
- * collected from all inheritance children as well as the specified table.
- * We fail and return zero if there are no inheritance children, or if all
- * children are foreign tables that don't support ANALYZE.
- */
-static int
-acquire_inherited_sample_rows(Relation onerel, int elevel,
-							  HeapTuple *rows, int targrows,
-							  double *totalrows, double *totaldeadrows)
-{
-	List	   *tableOIDs;
-	Relation   *rels;
-	AcquireSampleRowsFunc *acquirefuncs;
-	double	   *relblocks;
-	double		totalblocks;
-	int			numrows,
-				nrels,
-				i;
-	ListCell   *lc;
-	bool		has_child;
-
-	/* Initialize output parameters to zero now, in case we exit early */
-	*totalrows = 0;
-	*totaldeadrows = 0;
-
-	/*
-	 * Find all members of inheritance set.  We only need AccessShareLock on
-	 * the children.
-	 */
-	tableOIDs =
-		find_all_inheritors(RelationGetRelid(onerel), AccessShareLock, NULL);
-
-	/*
-	 * Check that there's at least one descendant, else fail.  This could
-	 * happen despite analyze_rel's relhassubclass check, if table once had a
-	 * child but no longer does.  In that case, we can clear the
-	 * relhassubclass field so as not to make the same mistake again later.
-	 * (This is safe because we hold ShareUpdateExclusiveLock.)
-	 */
-	if (list_length(tableOIDs) < 2)
-	{
-		/* CCI because we already updated the pg_class row in this command */
-		CommandCounterIncrement();
-		SetRelationHasSubclass(RelationGetRelid(onerel), false);
-		ereport(elevel,
-				(errmsg("skipping analyze of \"%s.%s\" inheritance tree --- this inheritance tree contains no child tables",
-						get_namespace_name(RelationGetNamespace(onerel)),
-						RelationGetRelationName(onerel))));
-		return 0;
-	}
-
-	/*
-	 * Identify acquirefuncs to use, and count blocks in all the relations.
-	 * The result could overflow BlockNumber, so we use double arithmetic.
-	 */
-	rels = (Relation *) palloc(list_length(tableOIDs) * sizeof(Relation));
-	acquirefuncs = (AcquireSampleRowsFunc *)
-		palloc(list_length(tableOIDs) * sizeof(AcquireSampleRowsFunc));
-	relblocks = (double *) palloc(list_length(tableOIDs) * sizeof(double));
-	totalblocks = 0;
-	nrels = 0;
-	has_child = false;
-	foreach(lc, tableOIDs)
-	{
-		Oid			childOID = lfirst_oid(lc);
-		Relation	childrel;
-		AcquireSampleRowsFunc acquirefunc = NULL;
-		BlockNumber relpages = 0;
-
-		/* We already got the needed lock */
-		childrel = table_open(childOID, NoLock);
-
-		/* Check table type (MATVIEW can't happen, but might as well allow) */
-		if (childrel->rd_rel->relkind == RELKIND_RELATION)
-		{
-			/* Regular table, so use the regular row acquisition function */
-			acquirefunc = acquire_sample_rows;
-			relpages = RelationGetNumberOfBlocks(childrel);
-		}
-		else
-		{
-			/*
-			 * ignore, but release the lock on it.  don't try to unlock the
-			 * passed-in relation
-			 */
-			if (childrel != onerel)
-				table_close(childrel, AccessShareLock);
-			else
-				table_close(childrel, NoLock);
-			continue;
-		}
-
-		/* OK, we'll process this child */
-		has_child = true;
-		rels[nrels] = childrel;
-		acquirefuncs[nrels] = acquirefunc;
-		relblocks[nrels] = (double) relpages;
-		totalblocks += (double) relpages;
-		nrels++;
-	}
-
-	/*
-	 * If we don't have at least one child table to consider, fail.  If the
-	 * relation is a partitioned table, it's not counted as a child table.
-	 */
-	if (!has_child)
-	{
-		ereport(elevel,
-				(errmsg("skipping analyze of \"%s.%s\" inheritance tree --- this inheritance tree contains no analyzable child tables",
-						get_namespace_name(RelationGetNamespace(onerel)),
-						RelationGetRelationName(onerel))));
-		return 0;
-	}
-
-	/*
-	 * Now sample rows from each relation, proportionally to its fraction of
-	 * the total block count.  (This might be less than desirable if the child
-	 * rels have radically different free-space percentages, but it's not
-	 * clear that it's worth working harder.)
-	 */
-	pgstat_progress_update_param(PROGRESS_ANALYZE_CHILD_TABLES_TOTAL,
-								 nrels);
-	numrows = 0;
-	for (i = 0; i < nrels; i++)
-	{
-		Relation	childrel = rels[i];
-		AcquireSampleRowsFunc acquirefunc = acquirefuncs[i];
-		double		childblocks = relblocks[i];
-
-		/*
-		 * Report progress.  The sampling function will normally report blocks
-		 * done/total, but we need to reset them to 0 here, so that they don't
-		 * show an old value until that.
-		 */
-		{
-			const int	progress_index[] = {
-				PROGRESS_ANALYZE_CURRENT_CHILD_TABLE_RELID,
-				PROGRESS_ANALYZE_BLOCKS_DONE,
-				PROGRESS_ANALYZE_BLOCKS_TOTAL
-			};
-			const int64 progress_vals[] = {
-				RelationGetRelid(childrel),
-				0,
-				0,
-			};
-
-			pgstat_progress_update_multi_param(3, progress_index, progress_vals);
-		}
-
-		if (childblocks > 0)
-		{
-			int			childtargrows;
-
-			childtargrows = (int) rint(targrows * childblocks / totalblocks);
-			/* Make sure we don't overrun due to roundoff error */
-			childtargrows = Min(childtargrows, targrows - numrows);
-			if (childtargrows > 0)
-			{
-				int			childrows;
-				double		trows,
-							tdrows;
-
-				/* Fetch a random sample of the child's rows */
-				childrows = (*acquirefunc) (childrel, elevel,
-											rows + numrows, childtargrows,
-											&trows, &tdrows);
-
-				/* We may need to convert from child's rowtype to parent's */
-				if (childrows > 0 &&
-					!equalTupleDescs(RelationGetDescr(childrel),
-									 RelationGetDescr(onerel)))
-				{
-					TupleConversionMap *map;
-
-					map = convert_tuples_by_name(RelationGetDescr(childrel),
-												 RelationGetDescr(onerel));
-					if (map != NULL)
-					{
-						int			j;
-
-						for (j = 0; j < childrows; j++)
-						{
-							HeapTuple	newtup;
-
-							newtup = execute_attr_map_tuple(rows[numrows + j], map);
-							heap_freetuple(rows[numrows + j]);
-							rows[numrows + j] = newtup;
-						}
-						free_conversion_map(map);
-					}
-				}
-
-				/* And add to counts */
-				numrows += childrows;
-				*totalrows += trows;
-				*totaldeadrows += tdrows;
-			}
-		}
-
-		/*
-		 * Note: we cannot release the child-table locks, since we may have
-		 * pointers to their TOAST tables in the sampled rows.
-		 */
-		table_close(childrel, NoLock);
-		pgstat_progress_update_param(PROGRESS_ANALYZE_CHILD_TABLES_DONE,
-									 i + 1);
-	}
-
-	return numrows;
 }
 
 

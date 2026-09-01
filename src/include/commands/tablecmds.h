@@ -60,15 +60,13 @@ extern void ExecuteTruncateGuts(List *explicit_rels,
 								DropBehavior behavior,
 								bool restart_seqs);
 
-extern void SetRelationHasSubclass(Oid relationId, bool relhassubclass);
-
 /*
  * The pg_inherits system catalog has been removed from minipg, so the
  * inheritance-related catalog query functions below are kept only as stubs
  * that behave as if no inheritance relationships exist.  They are referenced
- * by several command/optimizer paths (e.g. TRUNCATE, ALTER TABLE recursion,
- * type coercion) that must keep compiling and running correctly even though
- * inheritance is no longer supported.
+ * by several command paths (e.g. TRUNCATE, ALTER TABLE recursion) that must
+ * keep compiling and running correctly even though inheritance is no longer
+ * supported.
  */
 extern List *find_inheritance_children(Oid parentrelId, LOCKMODE lockmode);
 extern List *find_inheritance_children_extended(Oid parentrelId, bool omit_detached,
@@ -76,12 +74,6 @@ extern List *find_inheritance_children_extended(Oid parentrelId, bool omit_detac
 
 extern List *find_all_inheritors(Oid parentrelId, LOCKMODE lockmode,
 								 List **parents);
-extern bool has_subclass(Oid relationId);
-extern bool has_superclass(Oid relationId);
-extern bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
-
-#include "nodes/pg_list.h"
-#include "storage/lock.h"
 
 extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
 extern void ResetRelRewrite(Oid myrelid);

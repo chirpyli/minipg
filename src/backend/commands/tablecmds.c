@@ -488,14 +488,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * Determine the lockmode to use when scanning parents.  A self-exclusive
 	 * lock is needed here.
 	 *
-	 * For regular inheritance, if two backends attempt to add children to the
-	 * same parent simultaneously, and that parent has no pre-existing
-	 * children, then both will attempt to update the parent's relhassubclass
-	 * field, leading to a "tuple concurrently updated" error.  Also, this
-	 * interlocks against a concurrent ANALYZE on the parent table, which
-	 * might otherwise be attempting to clear the parent's relhassubclass
-	 * field, if its previous children were recently dropped.
-	 *
 	 * If the child table is a partition, then we instead grab an exclusive
 	 * lock on the parent because its partition descriptor will be changed by
 	 * addition of the new partition.
@@ -2202,62 +2194,6 @@ findAttrByName(const char *attributeName, List *schema)
 	return 0;
 }
 
-
-/*
- * SetRelationHasSubclass
- *		Set the value of the relation's relhassubclass field in pg_class.
- *
- * It's always safe to set this field to true, because all SQL commands are
- * ready to see true and then find no children.  On the other hand, commands
- * generally assume zero children if this is false.
- *
- * Caller must hold any self-exclusive lock until end of transaction.  If the
- * new value is false, caller must have acquired that lock before reading the
- * evidence that justified the false value.  That way, it properly waits if
- * another backend is simultaneously concluding no need to change the tuple
- * (new and old values are true).
- *
- * NOTE: an important side-effect of this operation is that an SI invalidation
- * message is sent out to all backends --- including me --- causing plans
- * referencing the relation to be rebuilt with the new list of children.
- * This must happen even if we find that no change is needed in the pg_class
- * row.
- */
-void
-SetRelationHasSubclass(Oid relationId, bool relhassubclass)
-{
-	Relation	relationRelation;
-	HeapTuple	tuple;
-	Form_pg_class classtuple;
-
-	Assert(CheckRelationOidLockedByMe(relationId,
-									  ShareUpdateExclusiveLock, false) ||
-		   CheckRelationOidLockedByMe(relationId,
-									  ShareRowExclusiveLock, true));
-
-	/*
-	 * Fetch a modifiable copy of the tuple, modify it, update pg_class.
-	 */
-	relationRelation = table_open(RelationRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(relationId));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", relationId);
-	classtuple = (Form_pg_class) GETSTRUCT(tuple);
-
-	if (classtuple->relhassubclass != relhassubclass)
-	{
-		classtuple->relhassubclass = relhassubclass;
-		CatalogTupleUpdate(relationRelation, &tuple->t_self, tuple);
-	}
-	else
-	{
-		/* no need to change tuple, but force relcache rebuild anyway */
-		CacheInvalidateRelcacheByTuple(tuple);
-	}
-
-	heap_freetuple(tuple);
-	table_close(relationRelation, RowExclusiveLock);
-}
 
 /*
  *		RenameRelationInternal - change the name of a relation
@@ -4142,10 +4078,11 @@ ATSimpleRecursion(List **wqueue, Relation rel,
 				  AlterTableUtilityContext *context)
 {
 	/*
-	 * Propagate to children, if desired and if there are (or might be) any
-	 * children.
+	 * Propagate to children, if desired.  (Inheritance is no longer
+	 * supported, so there are never any children; this is effectively a
+	 * no-op, but kept for call-site compatibility.)
 	 */
-	if (recurse && rel->rd_rel->relhassubclass)
+	if (recurse)
 	{
 		Oid			relid = RelationGetRelid(rel);
 		ListCell   *child;
@@ -9027,9 +8964,9 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
  *
  * The pg_inherits system catalog has been removed from minipg, so the
  * functions below no longer query any catalog.  They behave as if no
- * inheritance relationships exist, which keeps the many call sites in
- * TRUNCATE / ALTER TABLE recursion / type coercion / analyze
- * compiling and running correctly now that inheritance is unsupported.
+ * inheritance relationships exist, which keeps the remaining call sites in
+ * TRUNCATE / ALTER TABLE recursion / analyze compiling and running
+ * correctly now that inheritance is unsupported.
  * =====================================================================
  */
 
@@ -9076,38 +9013,3 @@ find_all_inheritors(Oid parentrelId, LOCKMODE lockmode, List **parents)
 		*parents = NIL;
 	return list_make1_oid(parentrelId);
 }
-
-/*
- * has_subclass
- *
- * No relation can have subclasses anymore.
- */
-bool
-has_subclass(Oid relationId)
-{
-	return false;
-}
-
-/*
- * has_superclass
- *
- * No relation can inherit from another anymore.
- */
-bool
-has_superclass(Oid relationId)
-{
-	return false;
-}
-
-/*
- * typeInheritsFrom
- *
- * Composite types cannot inherit from one another anymore (CREATE TYPE ...
- * UNDER was removed), so this is always false.
- */
-bool
-typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
-{
-	return false;
-}
-

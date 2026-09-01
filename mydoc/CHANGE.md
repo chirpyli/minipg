@@ -2,6 +2,42 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪继承关系判定死壳 has_subclass / has_superclass / typeInheritsFrom（2026-09-01）
+
+### 一、背景
+表继承（`pg_inherits` 系统表）此前已被裁剪，`tablecmds.c` 中保留了三个恒返回 `false` 的存根函数：`has_subclass()`（关系是否有子表）、`has_superclass()`（关系是否有父表）、`typeInheritsFrom()`（复合类型间继承，随 `CREATE TYPE ... UNDER` 一并作废）。三者已无任何有效语义，仅剩 2 处调用点且结果恒定，属于典型死壳代码，按"彻底裁剪、不留死代码"原则移除，同时把调用点化简为常量分支。
+
+### 二、删除/更新内容
+- `src/backend/commands/tablecmds.c`：删除 `has_subclass()` / `has_superclass()` / `typeInheritsFrom()` 三个函数定义（共 33 行）；更新继承存根函数区块的头注释（调用方列表去掉已不存在的 "type coercion"）。
+- `src/include/commands/tablecmds.h`：删除三个函数声明；同步更新存根说明注释；并清理该处遗留的重复 `#include "nodes/pg_list.h"` / `#include "storage/lock.h"`（文件顶部已包含，且 `catalog/dependency.h`、`nodes/parsenodes.h` 已间接引入）。
+- `src/backend/optimizer/plan/planner.c`：`subquery_planner()` 中 `if (rte->inh) rte->inh = has_subclass(rte->relid);` 化简为 `rte->inh = false;`（RTE_RELATION 分支），并删除已失效的上游注释（关于"曾有子表后又删除"的 false-positive 说明）；随之删除本文件唯一为该函数而引入的 `#include "commands/tablecmds.h"`。
+- `src/backend/rewrite/rewriteDefine.c`：删除 `DefineQueryRewrite()` 中 `has_superclass()` 恒为假的 `ereport(ERROR, ... "has parent tables")` 检查块（表转视图路径）；保留其上基于 `pg_class.relhassubclass` 的子表检查。
+- `src/backend/parser/parse_coerce.c`：`typeIsOfTypedTable()` 注释中去掉对已删 `typeInheritsFrom()` 的交叉引用。
+
+### 三、验证
+- `make -j8` 增量重编通过（改动涉及 `commands/tablecmds.h`，相关编译单元均重编）。
+- `make check-world` 全绿（串行执行；并行 `-j` 会因多个测试实例抢占同一端口互相踢掉 postmaster 而产生假失败）。
+- 全代码库 grep `has_subclass|has_superclass|typeInheritsFrom` 零命中（`doc/` 历史发布说明除外）。
+
+## 裁剪 pg_class.relhassubclass 列与 SetRelationHasSubclass / acquire_inherited_sample_rows（2026-09-01）
+
+### 一、背景
+表继承（`pg_inherits`）已被裁剪，`pg_class.relhassubclass` 列与 `SetRelationHasSubclass()` 实际已无置 true 的路径（仅 `analyze.c` 在无子表时将继承树标记清为 false）。`rewriteDefine.c`/`tableam.c`/`analyze.c`/`tablecmds.c` 中对该列的判断均恒假，`acquire_inherited_sample_rows()` 因 `inh` 恒 false 而不可达。按“彻底裁剪、不留死代码”原则移除该列及相关函数与恒假分支。
+
+### 二、删除/更新内容
+- `src/include/catalog/pg_class.h`：删除 `relhassubclass` 列，`Natts_pg_class` 由 26 降为 25（属 catalog 结构变更，已做全量重编）。
+- `src/backend/catalog/heap.c`：删除 `InsertPgClassTuple()` 中对 `Anum_pg_class_relhassubclass` 的赋值。
+- `src/backend/commands/tablecmds.c`：删除 `SetRelationHasSubclass()` 函数定义；`ATSimpleRecursion()` 中基于 `relhassubclass` 为真的 `ereport(ERROR)` 分支（建表继承路径已不可达）一并删除并精简注释。
+- `src/backend/commands/analyze.c`：删除整个 `acquire_inherited_sample_rows()` 函数（约 215 行）及其前向声明；`do_analyze_rel()` 中 `inh` 分支化简——递归 ANALYZE 提示块删除、原 `acquire_inherited_sample_rows()` 调用改为直接调用 `acquire_sample_rows()`，并同步更新函数头注释。
+- `src/backend/access/table/tableam.c`：`table_block_relation_estimate_size()` 删除对 `rel->rd_rel->relhassubclass` 恒假的判定，恒应用空表启发式。
+- `src/backend/rewrite/rewriteDefine.c`：`DefineQueryRewrite()` 删除基于 `relhassubclass` 与 `has_superclass()` 的两段恒假“转视图”`ereport(ERROR)` 检查。
+- `src/backend/optimizer/plan/planner.c`：随 `has_subclass` 化简，`RTE_RELATION` 分支保留 `rte->inh = false;` 作为明确语义并精简注释。
+
+### 三、验证
+- 属 catalog 列布局变更，执行全量重编：`make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j`。
+- `make check` / `make check-world` 退出码 0，全部用例通过。
+- 全代码库 grep `relhassubclass|SetRelationHasSubclass|acquire_inherited_sample_rows` 零命中。
+
 ## 精简字符集编码体系为 UTF8 / LATIN1(ISO-8859-1) / SQL_ASCII（2026-09-01）
 
 ### 一、背景

@@ -429,20 +429,6 @@ DefineQueryRewrite(const char *rulename,
 						 errmsg("could not convert table \"%s\" to a view because it has indexes",
 								RelationGetRelationName(event_relation))));
 
-			if (event_relation->rd_rel->relhassubclass)
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("could not convert table \"%s\" to a view because it has child tables",
-								RelationGetRelationName(event_relation))));
-
-			if (has_superclass(RelationGetRelid(event_relation)))
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("could not convert table \"%s\" to a view because it has parent tables",
-								RelationGetRelationName(event_relation))));
-
-
-
 			RelisBecomingView = true;
 		}
 	}

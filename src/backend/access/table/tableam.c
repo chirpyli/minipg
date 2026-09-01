@@ -688,13 +688,11 @@ table_block_relation_estimate_size(Relation rel, int32 *attr_widths,
 	 *
 	 * We test "never vacuumed" by seeing whether reltuples < 0.
 	 *
-	 * If the table has inheritance children, we don't apply this heuristic.
-	 * Totally empty parent tables are quite common, so we should be willing
-	 * to believe that they are empty.
+	 * Inheritance is no longer supported, so we always apply this heuristic
+	 * (there are never any child tables to consider).
 	 */
 	if (curpages < 10 &&
-		reltuples < 0 &&
-		!rel->rd_rel->relhassubclass)
+		reltuples < 0)
 		curpages = 10;
 
 	/* report estimated # pages */

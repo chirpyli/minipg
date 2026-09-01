@@ -3139,8 +3139,7 @@ is_complex_array(Oid typid)
 
 /*
  * Check whether reltypeId is the row type of a typed table of type
- * reloftypeId, or is a domain over such a row type.  (This is conceptually
- * similar to the subtype relationship checked by typeInheritsFrom().)
+ * reloftypeId, or is a domain over such a row type.
  */
 static bool
 typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)

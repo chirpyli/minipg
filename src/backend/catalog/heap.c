@@ -924,7 +924,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relchecks - 1] = Int16GetDatum(rd_rel->relchecks);
 	values[Anum_pg_class_relhasrules - 1] = BoolGetDatum(rd_rel->relhasrules);
 	values[Anum_pg_class_relhastriggers - 1] = BoolGetDatum(rd_rel->relhastriggers);
-	values[Anum_pg_class_relhassubclass - 1] = BoolGetDatum(rd_rel->relhassubclass);
 	values[Anum_pg_class_relispopulated - 1] = BoolGetDatum(rd_rel->relispopulated);
 	values[Anum_pg_class_relrewrite - 1] = ObjectIdGetDatum(rd_rel->relrewrite);
 	values[Anum_pg_class_relfrozenxid - 1] = TransactionIdGetDatum(rd_rel->relfrozenxid);

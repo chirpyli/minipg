@@ -25,7 +25,6 @@
 #include "access/table.h"
 #include "access/xact.h"
 #include "catalog/pg_constraint.h"
-#include "commands/tablecmds.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "executor/executor.h"
@@ -572,21 +571,13 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 		switch (rte->rtekind)
 		{
 			case RTE_RELATION:
-				if (rte->inh)
-				{
-					/*
-					 * Check to see if the relation actually has any children;
-					 * if not, clear the inh flag so we can treat it as a
-					 * plain base relation.
-					 *
-					 * Note: this could give a false-positive result, if the
-					 * rel once had children but no longer does.  We used to
-					 * be able to clear rte->inh later on when we discovered
-					 * that, but no more; we have to handle such cases as
-					 * full-fledged inheritance.
-					 */
-					rte->inh = has_subclass(rte->relid);
-				}
+
+				/*
+				 * Inheritance is no longer supported, so no relation can have
+				 * children; clear the inh flag so the rel is always treated
+				 * as a plain base relation.
+				 */
+				rte->inh = false;
 				break;
 			case RTE_JOIN:
 				root->hasJoinRTEs = true;
