@@ -620,36 +620,6 @@ pg_utf_mblen(const unsigned char *s)
  * original available at : http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
  */
 
-struct mbinterval
-{
-	unsigned short first;
-	unsigned short last;
-};
-
-/* auxiliary function for binary search in interval table */
-static int
-mbbisearch(pg_wchar ucs, const struct mbinterval *table, int max)
-{
-	int			min = 0;
-	int			mid;
-
-	if (ucs < table[0].first || ucs > table[max].last)
-		return 0;
-	while (max >= min)
-	{
-		mid = (min + max) / 2;
-		if (ucs > table[mid].last)
-			min = mid + 1;
-		else if (ucs < table[mid].first)
-			max = mid - 1;
-		else
-			return 1;
-	}
-
-	return 0;
-}
-
-
 /* The following functions define the column width of an ISO 10646
  * character as follows:
  *
@@ -658,21 +628,12 @@ mbbisearch(pg_wchar ucs, const struct mbinterval *table, int max)
  *	  - Other C0/C1 control characters and DEL will lead to a return
  *		value of -1.
  *
- *	  - Non-spacing and enclosing combining characters (general
- *		category code Mn or Me in the Unicode database) have a
- *		column width of 0.
- *
- *	  - Other format characters (general category code Cf in the Unicode
- *		database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
- *
- *	  - Hangul Jamo medial vowels and final consonants (U+1160-U+11FF)
- *		have a column width of 0.
- *
  *	  - Spacing characters in the East Asian Wide (W) or East Asian
  *		FullWidth (F) category as defined in Unicode Technical
  *		Report #11 have a column width of 2.
  *
- *	  - All remaining characters (including all printable
+ *	  - All remaining characters (including non-spacing combining
+ *		characters, Unicode format characters, all printable
  *		ISO 8859-1 and WGL4 characters, Unicode control characters,
  *		etc.) have a column width of 1.
  *
@@ -683,8 +644,6 @@ mbbisearch(pg_wchar ucs, const struct mbinterval *table, int max)
 static int
 ucs_wcwidth(pg_wchar ucs)
 {
-#include "common/unicode_combining_table.h"
-
 	/* test for 8-bit control characters */
 	if (ucs == 0)
 		return 0;
@@ -692,13 +651,8 @@ ucs_wcwidth(pg_wchar ucs)
 	if (ucs < 0x20 || (ucs >= 0x7f && ucs < 0xa0) || ucs > 0x0010ffff)
 		return -1;
 
-	/* binary search in table of non-spacing characters */
-	if (mbbisearch(ucs, combining,
-				   sizeof(combining) / sizeof(struct mbinterval) - 1))
-		return 0;
-
 	/*
-	 * if we arrive here, ucs is not a combining or C0/C1 control character
+	 * if we arrive here, ucs is not a C0/C1 control character
 	 */
 
 	return 1 +

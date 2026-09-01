@@ -78,10 +78,6 @@ $(call recurse,install-tests,src/test/regress,install-tests)
 GNUmakefile: GNUmakefile.in $(top_builddir)/config.status
 	./config.status $@
 
-update-unicode: | submake-generated-headers submake-libpgport
-	$(MAKE) -C src/common/unicode $@
-	$(MAKE) -C contrib/unaccent $@
-
 
 ##########################################################################
 

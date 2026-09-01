@@ -69,7 +69,6 @@ OBJS_COMMON = \
 	rmtree.o \
 	string.o \
 	stringinfo.o \
-	unicode_norm.o \
 	username.o \
 	wait_error.o \
 	wchar.o

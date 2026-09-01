@@ -7953,46 +7953,10 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoChar(buf, ')');
 			return true;
 
-		case F_IS_NORMALIZED:
-			/* IS xxx NORMALIZED */
-			appendStringInfoString(buf, "(");
-			get_rule_expr_paren((Node *) linitial(expr->args), context, false,
-								(Node *) expr);
-			appendStringInfoString(buf, " IS");
-			if (list_length(expr->args) == 2)
-			{
-				Const	   *con = (Const *) lsecond(expr->args);
-
-				Assert(IsA(con, Const) &&
-					   con->consttype == TEXTOID &&
-					   !con->constisnull);
-				appendStringInfo(buf, " %s",
-								 TextDatumGetCString(con->constvalue));
-			}
-			appendStringInfoString(buf, " NORMALIZED)");
-			return true;
-
 		case F_PG_COLLATION_FOR:
 			/* COLLATION FOR */
 			appendStringInfoString(buf, "COLLATION FOR (");
 			get_rule_expr((Node *) linitial(expr->args), context, false);
-			appendStringInfoChar(buf, ')');
-			return true;
-
-		case F_NORMALIZE:
-			/* NORMALIZE() */
-			appendStringInfoString(buf, "NORMALIZE(");
-			get_rule_expr((Node *) linitial(expr->args), context, false);
-			if (list_length(expr->args) == 2)
-			{
-				Const	   *con = (Const *) lsecond(expr->args);
-
-				Assert(IsA(con, Const) &&
-					   con->consttype == TEXTOID &&
-					   !con->constisnull);
-				appendStringInfo(buf, ", %s",
-								 TextDatumGetCString(con->constvalue));
-			}
 			appendStringInfoChar(buf, ')');
 			return true;
 

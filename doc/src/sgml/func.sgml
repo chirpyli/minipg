@@ -2405,32 +2405,6 @@ repeat('Pg', 4) <returnvalue>PgPgPgPg</returnvalue>
       <row>
        <entry role="func_table_entry"><para role="func_signature">
         <indexterm>
-         <primary>normalized</primary>
-        </indexterm>
-        <indexterm>
-         <primary>Unicode normalization</primary>
-        </indexterm>
-         <type>text</type> <literal>IS</literal> <optional><literal>NOT</literal></optional> <optional><parameter>form</parameter></optional> <literal>NORMALIZED</literal>
-        <returnvalue>boolean</returnvalue>
-       </para>
-       <para>
-        Checks whether the string is in the specified Unicode normalization
-        form.  The optional <parameter>form</parameter> key word specifies the
-        form: <literal>NFC</literal> (the default), <literal>NFD</literal>,
-        <literal>NFKC</literal>, or <literal>NFKD</literal>.  This expression can
-        only be used when the server encoding is <literal>UTF8</literal>.  Note
-        that checking for normalization using this expression is often faster
-        than normalizing possibly already normalized strings.
-       </para>
-       <para>
-        <literal>U&amp;'\0061\0308bc' IS NFD NORMALIZED</literal>
-        <returnvalue>t</returnvalue>
-       </para></entry>
-      </row>
-
-      <row>
-       <entry role="func_table_entry"><para role="func_signature">
-        <indexterm>
          <primary>bit_length</primary>
         </indexterm>
         <function>bit_length</function> ( <type>text</type> )
@@ -2494,32 +2468,6 @@ repeat('Pg', 4) <returnvalue>PgPgPgPg</returnvalue>
        <para>
         <literal>lower('TOM')</literal>
         <returnvalue>tom</returnvalue>
-       </para></entry>
-      </row>
-
-      <row>
-       <entry role="func_table_entry"><para role="func_signature">
-        <indexterm>
-         <primary>normalize</primary>
-        </indexterm>
-        <indexterm>
-         <primary>Unicode normalization</primary>
-        </indexterm>
-        <function>normalize</function> ( <type>text</type>
-        <optional>, <parameter>form</parameter> </optional> )
-        <returnvalue>text</returnvalue>
-       </para>
-       <para>
-        Converts the string to the specified Unicode
-        normalization form.  The optional <parameter>form</parameter> key word
-        specifies the form: <literal>NFC</literal> (the default),
-        <literal>NFD</literal>, <literal>NFKC</literal>, or
-        <literal>NFKD</literal>.  This function can only be used when the
-        server encoding is <literal>UTF8</literal>.
-       </para>
-       <para>
-        <literal>normalize(U&amp;'\0061\0308bc', NFC)</literal>
-        <returnvalue>U&amp;'\00E4bc'</returnvalue>
        </para></entry>
       </row>
 

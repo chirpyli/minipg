@@ -2566,8 +2566,6 @@ ULONG
 ULONG_PTR
 UV
 UVersionInfo
-UnicodeNormalizationForm
-UnicodeNormalizationQC
 Unique
 UniquePath
 UniquePathMethod
@@ -3147,11 +3145,6 @@ pg_time_usec_t
 pg_tz
 pg_tz_cache
 pg_tzenum
-pg_unicode_decompinfo
-pg_unicode_decomposition
-pg_unicode_norminfo
-pg_unicode_normprops
-pg_unicode_recompinfo
 pg_utf_to_local_combined
 pg_uuid_t
 pg_wc_probefunc

@@ -33,7 +33,7 @@ test: strings numerology date time timestamp timestamptz interval
 # test_enc_conversion)，opr_sanity/misc_functions/alter_generic/indirect_toast/
 # conversion 等测试均依赖，须先于各并行组串行执行
 test: create_function_0
-test: horology opr_sanity misc_sanity comments expressions unicode xid mvcc euc_kr
+test: horology opr_sanity misc_sanity comments expressions xid mvcc euc_kr
 
 # ----------
 # These four each depend on the previous one

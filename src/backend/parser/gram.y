@@ -346,7 +346,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	extract_list overlay_list position_list
 %type <list>	substr_list trim_list
 %type <list>	opt_interval interval_second
-%type <str>		unicode_normal_form
 
 %type <boolean> opt_instead
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
@@ -517,8 +516,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	MAPPING MATCH MATERIALIZED MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
 
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NFC NFD NFKC NFKD NO NONE
-	NORMALIZE NORMALIZED
+	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NO NONE
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
 
@@ -6017,36 +6015,6 @@ a_expr:		c_expr									{ $$ = $1; }
 							 errmsg("UNIQUE predicate is not yet implemented"),
 							 parser_errposition(@1)));
 				}
-			| a_expr IS NORMALIZED								%prec IS
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("is_normalized"),
-											   list_make1($1),
-											   COERCE_SQL_SYNTAX,
-											   @2);
-				}
-			| a_expr IS unicode_normal_form NORMALIZED			%prec IS
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("is_normalized"),
-											   list_make2($1, makeStringConst($3, @3)),
-											   COERCE_SQL_SYNTAX,
-											   @2);
-				}
-			| a_expr IS NOT NORMALIZED							%prec IS
-				{
-					$$ = makeNotExpr((Node *) makeFuncCall(SystemFuncName("is_normalized"),
-														   list_make1($1),
-														   COERCE_SQL_SYNTAX,
-														   @2),
-									 @2);
-				}
-			| a_expr IS NOT unicode_normal_form NORMALIZED		%prec IS
-				{
-					$$ = makeNotExpr((Node *) makeFuncCall(SystemFuncName("is_normalized"),
-														   list_make2($1, makeStringConst($4, @4)),
-														   COERCE_SQL_SYNTAX,
-														   @2),
-									 @2);
-				}
 			| DEFAULT
 				{
 					/*
@@ -6456,20 +6424,6 @@ func_expr_common_subexpr:
 											   COERCE_SQL_SYNTAX,
 											   @1);
 				}
-			| NORMALIZE '(' a_expr ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("normalize"),
-											   list_make1($3),
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| NORMALIZE '(' a_expr ',' unicode_normal_form ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("normalize"),
-											   list_make2($3, makeStringConst($5, @5)),
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
 			| OVERLAY '(' overlay_list ')'
 				{
 					$$ = (Node *) makeFuncCall(SystemFuncName("overlay"),
@@ -6782,13 +6736,6 @@ extract_arg:
 			| MINUTE_P								{ $$ = "minute"; }
 			| SECOND_P								{ $$ = "second"; }
 			| Sconst								{ $$ = $1; }
-		;
-
-unicode_normal_form:
-			NFC										{ $$ = "NFC"; }
-			| NFD									{ $$ = "NFD"; }
-			| NFKC									{ $$ = "NFKC"; }
-			| NFKD									{ $$ = "NFKD"; }
 		;
 
 /* OVERLAY() arguments */
@@ -7470,12 +7417,7 @@ unreserved_keyword:
 			| NAME_P
 			| NAMES
 			| NEW
-			| NFC
-			| NFD
-			| NFKC
-			| NFKD
 			| NO
-			| NORMALIZED
 			| NOTHING
 			| NOTIFY
 			| NOWAIT
@@ -7645,7 +7587,6 @@ col_name_keyword:
 			| NATIONAL
 			| NCHAR
 			| NONE
-			| NORMALIZE
 			| NULLIF
 			| NUMERIC
 			| OUT_P
@@ -7998,14 +7939,8 @@ bare_label_keyword:
 			| NATURAL
 			| NCHAR
 			| NEW
-			| NFC
-			| NFD
-			| NFKC
-			| NFKD
 			| NO
 			| NONE
-			| NORMALIZE
-			| NORMALIZED
 			| NOT
 			| NOTHING
 			| NOTIFY

@@ -1008,3 +1008,19 @@ AM 已裁至 heap/btree/hash，EXCLUDE 依赖 GiST 故不可用，彻底删除�
 **测试**：type_sanity.sql/.out 删除 typbasetype 相关查询与 'd' 行；collate.sql/.out 删除 CREATE DOMAIN/cast 用例并调整 DROP SCHEMA CASCADE 计数（20→16）；psql.sql/.out 删除 \dD 用例；typedefs.list 删除 `ConstraintCategory`。
 
 验证：make clean && make -j8 全量重编通过；make check-world 退出码 0，全部用例通过。
+
+## 彻底裁剪 Unicode 规范化（UAX #15，2026-09-01）
+
+移除 NFC/NFD/NFKC/NFKD 规范化算法、其生成数据表、SQL 函数与语法，及组合字符宽度表等相关资产，使内核不再含任何 Unicode normalization 实现（约净删 815KB 生成数据 + 算法代码）。
+
+**算法与数据（src/common）**：删除 `unicode_norm.c` 与 `src/common/unicode/` 生成器目录（generate-unicode_norm_table.pl、generate-unicode_normprops_table.pl、generate-unicode_combining_table.pl、generate-norm_test_table.pl、norm_test.c 等）；`src/include/common/` 删除 `unicode_norm.h`、`unicode_norm_table.h`、`unicode_normprops_table.h`、`unicode_norm_hashfunc.h`；`common/Makefile` 的 `OBJS_COMMON` 去掉 `unicode_norm.o`。
+
+**组合字符宽度表（wchar.c）**：先精简 `ucs_wcwidth()`——删除 `#include "common/unicode_combining_table.h"`、`mbbisearch(ucs, combining, ...)` 分支，并连带删除因此未用的 `struct mbinterval` 与静态函数 `mbbisearch()`，改写“组合字符宽度为 0”注释；保留 CJK/全角宽度 2 判定。随后删除 `unicode_combining_table.h`。
+
+**SQL 层**：`varlena.c` 删除 `unicode_norm_form_from_string`/`unicode_normalize_func`/`unicode_is_normalized` 三函数与对应 include；`pg_proc.dat`（oid 4350/4351，sed 删行）与 `system_functions.sql`（带 DEFAULT 'NFC' 的两条 CREATE OR REPLACE FUNCTION）双注册一并删除（只删其一会致 initdb 或 ruleutils 编译失败）；`ruleutils.c` 删除 `F_NORMALIZE`/`F_IS_NORMALIZED` 两个反解析 case。
+
+**语法与关键字**：`gram.y` 删除 `NORMALIZE(...)`、`expr IS [NOT] [form] NORMALIZED` 共 6 条生产式、`unicode_normal_form` 非终结符与 `%type`/token 声明，及 `unreserved_keyword`/`col_name_keyword`/`bare_label_keyword` 三处关键字项；`kwlist.h` 删除 nfc/nfd/nfkc/nfkd/normalize/normalized 六行（与 gram.y 经 check_keywords.pl 双向校验，须成对删）。
+
+**测试与文档**：`parallel_schedule` 移除 `unicode` 用例；删除 `sql/unicode.sql`/`expected/unicode.out`；`create_view.sql`/`.out` 删除 is_normalized/normalize 四列用例；`func.sgml` 删除 normalize/is normalized 两个 row 块；`RELEASE_CHANGES` 删除 update-unicode 指引；`pgindent/typedefs.list`、`exclude_file_patterns`、`pginclude/{headerscheck,cpluspluscheck}` 清理相关例外条目；`GNUmakefile.in` 删除 update-unicode 目标，`src/Makefile.global.in` 去 .PHONY 项并删除 `UNICODE_VERSION`/`CLDR_VERSION` 段。
+
+验证：全量 `make maintainer-clean && configure && make -j` 通过；`make check` / `make check-world` 退出码 0，全部用例通过。运行时唯一行为变化：U+0300 等组合附加字符显示宽度由 0 变 1（psql 对齐用），回归用例零命中不受影响。全树残留扫描（除 release-14.sgml 历史发布说明与 SQL 标准关键字列表）`unicode_norm`/`unicode_combining_table`/`UnicodeNormalization`/`mbbisearch`/`update-unicode` 均为 0 命中。

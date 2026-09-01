@@ -7374,15 +7374,6 @@
   proargnames => '{tablespace,name,size,modification}',
   prosrc => 'pg_ls_tmpdir_1arg' },
 
-
-{ oid => '4350', descr => 'Unicode normalization',
-  proname => 'normalize', prorettype => 'text', proargtypes => 'text text',
-  prosrc => 'unicode_normalize_func' },
-
-{ oid => '4351', descr => 'check Unicode normalization',
-  proname => 'is_normalized', prorettype => 'bool', proargtypes => 'text text',
-  prosrc => 'unicode_is_normalized' },
-
 { oid => '6198', descr => 'unescape Unicode characters',
   proname => 'unistr', prorettype => 'text', proargtypes => 'text',
   prosrc => 'unistr' },

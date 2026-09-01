@@ -598,10 +598,6 @@ select
   extract(day from now()) as extr,
   (now(), '1 day'::interval) overlaps
     (current_timestamp(2), '1 day'::interval) as o,
-  'foo' is normalized isn,
-  'foo' is nfkc normalized isnn,
-  normalize('foo') as n,
-  normalize('foo', nfkd) as nfkd,
   overlay('foo' placing 'bar' from 2) as ovl,
   overlay('foo' placing 'bar' from 2 for 3) as ovl2,
   position('foo' in 'foobar') as p,
