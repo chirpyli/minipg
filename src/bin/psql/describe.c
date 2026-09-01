@@ -1101,7 +1101,6 @@ describeOneTableDetails(const char *schemaname,
 		char		relkind;
 		bool		hasindex;
 		bool		hasrules;
-		bool		hastriggers;
 		bool		hasoids;
 		bool		ispartition;
 		Oid			tablespace;
@@ -1125,7 +1124,6 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
@@ -1144,7 +1142,6 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
@@ -1162,7 +1159,6 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
@@ -1180,7 +1176,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, false AS relhasoids, "
+						  ""
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
@@ -1197,7 +1193,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, false AS relhasoids, "
+						  ""
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
@@ -1214,7 +1210,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, false AS relhasoids, "
+						  ""
 						  "false as relispartition, %s, c.reltablespace, "
 						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1230,7 +1226,7 @@ describeOneTableDetails(const char *schemaname,
 	{
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
-						  "c.relhastriggers, false, false, false AS relhasoids, "
+						  ""
 						  "false as relispartition, %s, c.reltablespace\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1287,21 +1283,20 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.relkind = *(PQgetvalue(res, 0, 1));
 	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
 	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 3), "t") == 0;
-	tableinfo.hastriggers = strcmp(PQgetvalue(res, 0, 4), "t") == 0;
-	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 7), "t") == 0;
-	tableinfo.ispartition = strcmp(PQgetvalue(res, 0, 8), "t") == 0;
+	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 6), "t") == 0;
+	tableinfo.ispartition = strcmp(PQgetvalue(res, 0, 7), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?
-		pg_strdup(PQgetvalue(res, 0, 9)) : NULL;
+		pg_strdup(PQgetvalue(res, 0, 8)) : NULL;
 	tableinfo.tablespace = (pset.sversion >= 80000) ?
-		atooid(PQgetvalue(res, 0, 10)) : 0;
+		atooid(PQgetvalue(res, 0, 9)) : 0;
 	tableinfo.reloftype = (pset.sversion >= 90000 &&
-						   strcmp(PQgetvalue(res, 0, 11), "") != 0) ?
-		pg_strdup(PQgetvalue(res, 0, 11)) : NULL;
+						   strcmp(PQgetvalue(res, 0, 10), "") != 0) ?
+		pg_strdup(PQgetvalue(res, 0, 10)) : NULL;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 12)) : 0;
+		*(PQgetvalue(res, 0, 11)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 13) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 13));
+		tableinfo.relam = PQgetisnull(res, 0, 12) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 12));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -1905,8 +1900,7 @@ describeOneTableDetails(const char *schemaname,
 		 * except if the table is partitioned, in which case the triggers
 		 * appear in the partitions)
 		 */
-		if (tableinfo.hastriggers ||
-			tableinfo.relkind == 'p')
+		if (tableinfo.relkind == 'p')
 		{
 			if (pset.sversion >= 120000 &&
 				(tableinfo.ispartition || tableinfo.relkind == 'p'))
@@ -1979,8 +1973,7 @@ describeOneTableDetails(const char *schemaname,
 		}
 
 		/* print incoming foreign-key references */
-		if (tableinfo.hastriggers ||
-			tableinfo.relkind == 'p')
+		if (tableinfo.relkind == 'p')
 		{
 			if (pset.sversion >= 120000)
 			{
@@ -2219,184 +2212,6 @@ describeOneTableDetails(const char *schemaname,
 		}
 	}
 
-	/*
-	 * Print triggers next, if any (but only user-defined triggers).  This
-	 * could apply to either a table or a view.
-	 */
-	if (tableinfo.hastriggers)
-	{
-		PGresult   *result;
-		int			tuples;
-
-		printfPQExpBuffer(&buf,
-						  "SELECT t.tgname, "
-						  "pg_catalog.pg_get_triggerdef(t.oid%s), "
-						  "t.tgenabled, %s,\n",
-						  (pset.sversion >= 90000 ? ", true" : ""),
-						  (pset.sversion >= 90000 ? "t.tgisinternal" :
-						   pset.sversion >= 80300 ?
-						   "t.tgconstraint <> 0 AS tgisinternal" :
-						   "false AS tgisinternal"));
-
-		/*
-		 * Detect whether each trigger is inherited, and if so, get the name
-		 * of the topmost table it's inherited from.  We have no easy way to
-		 * do that pre-v13, for lack of the tgparentid column.  Even with
-		 * tgparentid, a straightforward search for the topmost parent would
-		 * require a recursive CTE, which seems unduly expensive.  We cheat a
-		 * bit by assuming parent triggers will match by tgname; then, joining
-		 * with pg_partition_ancestors() allows the planner to make use of
-		 * pg_trigger_tgrelid_tgname_index if it wishes.  We ensure we find
-		 * the correct topmost parent by stopping at the first-in-partition-
-		 * ancestry-order trigger that has tgparentid = 0.  (There might be
-		 * unrelated, non-inherited triggers with the same name further up the
-		 * stack, so this is important.)
-		 */
-		if (pset.sversion >= 130000)
-			appendPQExpBufferStr(&buf,
-								 "  CASE WHEN t.tgparentid != 0 THEN\n"
-								 "    (SELECT u.tgrelid::pg_catalog.regclass\n"
-								 "     FROM pg_catalog.pg_trigger AS u,\n"
-								 "          pg_catalog.pg_partition_ancestors(t.tgrelid) WITH ORDINALITY AS a(relid, depth)\n"
-								 "     WHERE u.tgname = t.tgname AND u.tgrelid = a.relid\n"
-								 "           AND u.tgparentid = 0\n"
-								 "     ORDER BY a.depth LIMIT 1)\n"
-								 "  END AS parent\n");
-		else
-			appendPQExpBufferStr(&buf, "  NULL AS parent\n");
-
-		appendPQExpBuffer(&buf,
-						  "FROM pg_catalog.pg_trigger t\n"
-						  "WHERE t.tgrelid = '%s' AND ",
-						  oid);
-
-		if (pset.sversion >= 110000)
-			appendPQExpBufferStr(&buf, "(NOT t.tgisinternal OR (t.tgisinternal AND t.tgenabled = 'D') \n"
-								 "    OR EXISTS (SELECT 1 FROM pg_catalog.pg_depend WHERE objid = t.oid \n"
-								 "        AND refclassid = 'pg_catalog.pg_trigger'::pg_catalog.regclass))");
-		else if (pset.sversion >= 90000)
-			/* display/warn about disabled internal triggers */
-			appendPQExpBufferStr(&buf, "(NOT t.tgisinternal OR (t.tgisinternal AND t.tgenabled = 'D'))");
-		else if (pset.sversion >= 80300)
-			appendPQExpBufferStr(&buf, "(t.tgconstraint = 0 OR (t.tgconstraint <> 0 AND t.tgenabled = 'D'))");
-		else
-			appendPQExpBufferStr(&buf,
-								 "(NOT tgisconstraint "
-								 " OR NOT EXISTS"
-								 "  (SELECT 1 FROM pg_catalog.pg_depend d "
-								 "   JOIN pg_catalog.pg_constraint c ON (d.refclassid = c.tableoid AND d.refobjid = c.oid) "
-								 "   WHERE d.classid = t.tableoid AND d.objid = t.oid AND d.deptype = 'i' AND c.contype = 'f'))");
-		appendPQExpBufferStr(&buf, "\nORDER BY 1;");
-
-		result = PSQLexec(buf.data);
-		if (!result)
-			goto error_return;
-		else
-			tuples = PQntuples(result);
-
-		if (tuples > 0)
-		{
-			bool		have_heading;
-			int			category;
-
-			/*
-			 * split the output into 4 different categories. Enabled triggers,
-			 * disabled triggers and the two special ALWAYS and REPLICA
-			 * configurations.
-			 */
-			for (category = 0; category <= 4; category++)
-			{
-				have_heading = false;
-				for (i = 0; i < tuples; i++)
-				{
-					bool		list_trigger;
-					const char *tgdef;
-					const char *usingpos;
-					const char *tgenabled;
-					const char *tgisinternal;
-
-					/*
-					 * Check if this trigger falls into the current category
-					 */
-					tgenabled = PQgetvalue(result, i, 2);
-					tgisinternal = PQgetvalue(result, i, 3);
-					list_trigger = false;
-					switch (category)
-					{
-						case 0:
-							if (*tgenabled == 'O' || *tgenabled == 't')
-								list_trigger = true;
-							break;
-						case 1:
-							if ((*tgenabled == 'D' || *tgenabled == 'f') &&
-								*tgisinternal == 'f')
-								list_trigger = true;
-							break;
-						case 2:
-							if ((*tgenabled == 'D' || *tgenabled == 'f') &&
-								*tgisinternal == 't')
-								list_trigger = true;
-							break;
-						case 3:
-							if (*tgenabled == 'A')
-								list_trigger = true;
-							break;
-						case 4:
-							if (*tgenabled == 'R')
-								list_trigger = true;
-							break;
-					}
-					if (list_trigger == false)
-						continue;
-
-					/* Print the category heading once */
-					if (have_heading == false)
-					{
-						switch (category)
-						{
-							case 0:
-								printfPQExpBuffer(&buf, _("Triggers:"));
-								break;
-							case 1:
-								if (pset.sversion >= 80300)
-									printfPQExpBuffer(&buf, _("Disabled user triggers:"));
-								else
-									printfPQExpBuffer(&buf, _("Disabled triggers:"));
-								break;
-							case 2:
-								printfPQExpBuffer(&buf, _("Disabled internal triggers:"));
-								break;
-							case 3:
-								printfPQExpBuffer(&buf, _("Triggers firing always:"));
-								break;
-							case 4:
-								printfPQExpBuffer(&buf, _("Triggers firing on replica only:"));
-								break;
-
-						}
-						printTableAddFooter(&cont, buf.data);
-						have_heading = true;
-					}
-
-					/* Everything after "TRIGGER" is echoed verbatim */
-					tgdef = PQgetvalue(result, i, 1);
-					usingpos = strstr(tgdef, " TRIGGER ");
-					if (usingpos)
-						tgdef = usingpos + 9;
-
-					printfPQExpBuffer(&buf, "    %s", tgdef);
-
-					/* Visually distinguish inherited triggers */
-					if (!PQgetisnull(result, i, 4))
-						appendPQExpBuffer(&buf, ", ON TABLE %s",
-										  PQgetvalue(result, i, 4));
-
-					printTableAddFooter(&cont, buf.data);
-				}
-			}
-		}
-		PQclear(result);
-	}
 
 	/*
 	 * Finish printing the footer information about a table.

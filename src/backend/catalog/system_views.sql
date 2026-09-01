@@ -38,8 +38,7 @@ CREATE VIEW pg_tables AS
         C.relname AS tablename,
         T.spcname AS tablespace,
         C.relhasindex AS hasindexes,
-        C.relhasrules AS hasrules,
-        C.relhastriggers AS hastriggers
+        C.relhasrules AS hasrules
     FROM pg_class C LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
          LEFT JOIN pg_tablespace T ON (T.oid = C.reltablespace)
     WHERE C.relkind IN ('r', 'p');

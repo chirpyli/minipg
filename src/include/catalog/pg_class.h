@@ -95,9 +95,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	/* has (or has had) any rules */
 	bool		relhasrules BKI_DEFAULT(f);
 
-	/* has (or has had) any TRIGGERs */
-	bool		relhastriggers BKI_DEFAULT(f);
-
 	bool		relispopulated BKI_DEFAULT(t);
 
 	/* link to original rel during table rewrite; otherwise 0 */

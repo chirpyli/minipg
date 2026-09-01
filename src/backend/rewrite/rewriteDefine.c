@@ -416,12 +416,7 @@ DefineQueryRewrite(const char *rulename,
 			table_endscan(scanDesc);
 			UnregisterSnapshot(snapshot);
 
-			if (event_relation->rd_rel->relhastriggers)
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("could not convert table \"%s\" to a view because it has triggers",
-								RelationGetRelationName(event_relation)),
-						 errhint("In particular, the table cannot be involved in any foreign key relationships.")));
+
 
 			if (event_relation->rd_rel->relhasindex)
 				ereport(ERROR,

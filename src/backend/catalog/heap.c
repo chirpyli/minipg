@@ -923,7 +923,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relnatts - 1] = Int16GetDatum(rd_rel->relnatts);
 	values[Anum_pg_class_relchecks - 1] = Int16GetDatum(rd_rel->relchecks);
 	values[Anum_pg_class_relhasrules - 1] = BoolGetDatum(rd_rel->relhasrules);
-	values[Anum_pg_class_relhastriggers - 1] = BoolGetDatum(rd_rel->relhastriggers);
 	values[Anum_pg_class_relispopulated - 1] = BoolGetDatum(rd_rel->relispopulated);
 	values[Anum_pg_class_relrewrite - 1] = ObjectIdGetDatum(rd_rel->relrewrite);
 	values[Anum_pg_class_relfrozenxid - 1] = TransactionIdGetDatum(rd_rel->relfrozenxid);
@@ -3203,23 +3202,18 @@ heap_truncate_check_FKs(List *relations, bool tempTables)
 	ListCell   *cell;
 
 	/*
-	 * Build a list of OIDs of the interesting relations.
-	 *
-	 * If a relation has no triggers, then it can neither have FKs nor be
-	 * referenced by a FK from another table, so we can ignore it.  For
-	 * partitioned tables, FKs have no triggers, so we must include them
-	 * anyway.
+	 * Build a list of OIDs of the interesting relations.  We must consider
+	 * every relation, because a FK may be defined on any of them.
 	 */
 	foreach(cell, relations)
 	{
 		Relation	rel = lfirst(cell);
 
-		if (rel->rd_rel->relhastriggers)
-			oids = lappend_oid(oids, RelationGetRelid(rel));
+		oids = lappend_oid(oids, RelationGetRelid(rel));
 	}
 
 	/*
-	 * Fast path: if no relation has triggers, none has FKs either.
+	 * Fast path: if there are no relations, none has FKs either.
 	 */
 	if (oids == NIL)
 		return;

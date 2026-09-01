@@ -2,6 +2,31 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪 pg_class.relhastriggers 列与触发器相关死代码（2026-09-01）
+
+### 一、背景
+触发器（trigger）全链路此前已彻底裁剪（见 `CHANGE.md` 历史记录），但 `pg_class.relhastriggers` 当时被刻意保留为一个"恒 false"的死壳列：既不写入真值、也从不参与有效判断。当前它属于既不写真值、又无读取方依赖的空字段，符合"彻底裁剪、不留死代码"原则，予以删除；同时清理所有围绕该列的赋值、快速判断分支与 psql 展示逻辑。
+
+### 二、删除/更新内容
+- `src/include/catalog/pg_class.h`：删除 `relhastriggers` 列定义及注释，`Natts_pg_class` 同步递减（catalog 结构变更，已做全量重编）。
+- `src/backend/catalog/heap.c`：
+  - `InsertPgClassTuple()` 中删除对 `Anum_pg_class_relhastriggers` 的 `values[...]=BoolGetDatum(...)` 赋值。
+  - `heap_truncate_check_FKs()`：删除 `if (rel->rd_rel->relhastriggers)` 快速跳过守卫，恢复"遍历 relations 并据 `pg_constraint` 扫描外键"的本体逻辑（此前因该列恒假而始终跳过 FK 校验）。
+- `src/backend/utils/cache/relcache.c`：`RelationGetFKeyList()` 删除 `if (!relation->rd_rel->relhastriggers) return NIL;` 恒真快速返回分支，并同步更新上方注释。
+- `src/backend/rewrite/rewriteDefine.c`：`DefineQueryRewrite()` 中"表含触发器则禁止转视图"的 `ereport(ERROR)` 死分支整体删除。
+- `src/backend/catalog/system_views.sql`：从 `pg_tables` 视图删除 `hastriggers` 列。
+- `src/bin/psql/describe.c`：
+  - 7 个版本分支的 `\d` 主查询去掉 `c.relhastriggers` 列；删除 `tableinfo.hastriggers` 成员及赋值。
+  - 结果集列序号整体下移一位：`hasoids 7→6`、`ispartition 8→7`、`reloptions 9→8`、`tablespace 10→9`、`reloftype 11→10`、`relpersistence 12→11`、`relam/amname 13→12`（初版漏移后两项，致 `\d` 报 "column number 13 is out of range 0..12"，已修正）。
+  - 删除整段 "Print triggers next" 触发器展示块（触发器已裁，永不触发）。
+  - 两处外键展示门控 `if (tableinfo.hastriggers || tableinfo.relkind == 'p')` 化简为一处 `if (tableinfo.relkind == 'p')`。
+- `doc/src/sgml/catalogs.sgml`：删除 `relhastriggers` 列定义文档、`pg_class.relhastriggers` 的 note 说明，以及 `pg_tables.hastriggers` 列文档。
+
+### 三、验证
+- 属 catalog 列布局变更，执行全量重编：`make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j`。
+- `make check` 69/69 用例通过（首次运行 `bit / create_index / prepared_xacts / tablesample / polymorphism` 5 例失败，根因为 describe.c 列序号漏移，修正后复跑全绿）。
+- 全代码库 grep `relhastriggers|hastriggers` 在 `src/` 与 `doc/` 下均零命中。
+
 ## 裁剪继承关系判定死壳 has_subclass / has_superclass / typeInheritsFrom（2026-09-01）
 
 ### 一、背景

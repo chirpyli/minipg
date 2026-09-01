@@ -3740,8 +3740,8 @@ RelationCacheInitializePhase3(void)
 		/*
 		 * Fix data that isn't saved in relcache cache file.
 		 *
-		 * relhasrules or relhastriggers could possibly be wrong or out of
-		 * date.  If we don't actually find any rules or triggers, clear the
+		 * relhasrules could possibly be wrong or out of
+		 * date.  If we don't actually find any rules, clear the
 		 * local copy of the flag so that we don't get into an infinite loop
 		 * here.  We don't make any attempt to fix the pg_class entry, though.
 		 */
@@ -4109,10 +4109,6 @@ RelationGetFKeyList(Relation relation)
 	/* Quick exit if we already computed the list. */
 	if (relation->rd_fkeyvalid)
 		return relation->rd_fkeylist;
-
-	/* Fast path: tables without triggers can't have FKs */
-	if (!relation->rd_rel->relhastriggers)
-		return NIL;
 
 	/*
 	 * We build the list we intend to return (in the caller's context) while
