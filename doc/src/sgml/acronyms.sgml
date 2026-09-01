@@ -750,7 +750,7 @@
     <term><acronym>UUID</acronym></term>
     <listitem>
      <para>
-      <link linkend="datatype-uuid">Universally Unique Identifier</link>
+      Universally Unique Identifier
      </para>
     </listitem>
    </varlistentry>

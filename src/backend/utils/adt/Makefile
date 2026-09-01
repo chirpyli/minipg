@@ -55,7 +55,6 @@ OBJS = \
 	regproc.o \
 	rowtypes.o \
 	ruleutils.o \
-	selfuncs_geo.o \
 	selfuncs.o \
 	tid.o \
 	timestamp.o \

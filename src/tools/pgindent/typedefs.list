@@ -2985,7 +2985,6 @@ import_error_callback_arg
 indexed_tlist
 inet
 inetKEY
-inet_struct
 init_function
 inline_cte_walker_context
 inline_error_callback_arg
@@ -3048,9 +3047,6 @@ ltxtquery
 mXactCacheEnt
 mac8KEY
 macKEY
-macaddr
-macaddr8
-macaddr_sortsupport_state
 manifest_file
 manifest_files_hash
 manifest_files_iterator
@@ -3146,7 +3142,6 @@ pg_tz
 pg_tz_cache
 pg_tzenum
 pg_utf_to_local_combined
-pg_uuid_t
 pg_wc_probefunc
 pg_wchar
 pg_wchar_tbl
