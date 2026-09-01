@@ -2,6 +2,25 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪 psql 的 tab-complete 自动补全（readline 补全逻辑）（2026-09-01）
+
+### 一、背景
+`src/bin/psql/tab-complete.c` 实现 readline 的 SQL 关键字与对象名 Tab 自动补全，仅在 psql 交互模式下由 `initialize_readline()` 初始化，回归测试（psql 非交互执行 SQL）不会触发。自动补全是客户端交互增强功能，与 btree/hash 索引、事务等内核零耦合，属于学习价值低的客户端展示/交互代码，故彻底裁剪，仅保留 readline/history 基础交互能力（行编辑、历史记录）。
+
+### 二、删除/更新内容
+- 删除 `src/bin/psql/tab-complete.c`：readline 自动补全实现（约 3800 行），整体移除。
+- 删除 `src/bin/psql/tab-complete.h`：自动补全头文件（`tab_completion_query_buf` / `initialize_readline` 声明），整体移除。
+- `src/bin/psql/Makefile`：OBJS 列表移除 `tab-complete.o`；该 Makefile 无 HEADERS / EXTRA 变量登记，无需额外清理。
+- `src/bin/psql/input.c`：
+  - 删除 `#include "tab-complete.h"`（`input.h` 已 `#include "pqexpbuffer.h"`，`PQExpBuffer` 类型仍可用，无需新增头文件）。
+  - 删除 `tab_completion_query_buf` 的两处赋值（原第 79-80 行注释与赋值、原第 92 行；该全局变量由已删头文件声明）。
+  - 删除 `initialize_readline();` 调用（位于 `initializeInput()` 内 `#ifdef USE_READLINE` 块）；保留其后的 `rl_initialize();`（readline 库函数），确保交互模式 readline 库仍被初始化。
+
+### 三、验证
+- `make -C src/bin/psql` 编译、链接通过（psql 二进制成功生成，不再包含自动补全逻辑）。
+- 全代码库 grep `tab-complete|tab_completion_query_buf|initialize_readline` 仅剩 `mydoc/CHANGE.md`、`doc/src/sgml/release-*.sgml`（历史发布说明）等文档，无活动代码引用。
+- 删除后 psql 交互模式仍具备 readline 行编辑与历史记录能力；非交互回归测试行为不变。
+
 ## 裁剪 psql 的 \dAf / \dAo / \dAp 元命令（operator family 展示层）（2026-08-31）
 
 ### 一、背景

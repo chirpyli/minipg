@@ -38,7 +38,6 @@ OBJS = \
 	sql_help.o \
 	startup.o \
 	stringutils.o \
-	tab-complete.o \
 	variables.o
 
 

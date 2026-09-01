@@ -15,7 +15,6 @@
 #include "common/logging.h"
 #include "input.h"
 #include "settings.h"
-#include "tab-complete.h"
 
 #define PSQLHISTORY ".psql_history"
 
@@ -76,9 +75,6 @@ gets_interactive(const char *prompt, PQExpBuffer query_buf)
 		rl_reset_screen_size();
 #endif
 
-		/* Make current query_buf available to tab completion callback */
-		tab_completion_query_buf = query_buf;
-
 		/* Enable SIGINT to longjmp to sigint_interrupt_jmp */
 		sigint_interrupt_enabled = true;
 
@@ -87,9 +83,6 @@ gets_interactive(const char *prompt, PQExpBuffer query_buf)
 
 		/* Disable SIGINT again */
 		sigint_interrupt_enabled = false;
-
-		/* Pure neatnik-ism */
-		tab_completion_query_buf = NULL;
 
 		return result;
 	}
@@ -347,8 +340,7 @@ initializeInput(int flags)
 
 		useReadline = true;
 
-		/* these two things must be done in this order: */
-		initialize_readline();
+		/* initialize readline library */
 		rl_initialize();
 
 		useHistory = true;
