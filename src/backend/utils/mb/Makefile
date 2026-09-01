@@ -13,7 +13,6 @@ top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	conv.o \
 	mbutils.o \
 	stringinfo_mb.o \
 	wstrcmp.o \

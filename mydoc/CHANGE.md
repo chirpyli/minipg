@@ -2,6 +2,28 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 精简字符集编码体系为 UTF8 / LATIN1(ISO-8859-1) / SQL_ASCII（2026-09-01）
+
+### 一、背景
+PostgreSQL 原生支持 40+ 种字符集编码及其相互转换。minipg 作为精简内核，保留 UTF8 / LATIN1(ISO-8859-1) / SQL_ASCII 三套已能覆盖绝大多数教学与运行场景；其余编码（EUC_*/SJIS/BIG5/GB*/KOI8/MULE 等）及其转换过程、约 20 万行的 Unicode 映射数据/生成脚本、以及若干孤立的编码表生成器，均为非核心的编码转换/展示代码，学习价值低、体量大，故彻底裁剪，不留死代码、不引入条件编译。
+
+### 二、删除/更新内容
+- **目录与孤立生成器**：删除 `src/backend/utils/mb/conversion_procs/` 下除 `utf8_and_iso8859_1` 外的 25 个子目录；删除整个 `src/backend/utils/mb/Unicode/` 目录（76 个 .map + 12 个 .pl 生成脚本 + convutils.pm + Makefile + 源数据，约 20 万行）；删除三个孤立代码生成器 `iso.c`/`win1251.c`/`win866.c`（独立 `main()`，生成 KOI8 系列转换表，不编入后端、与保留的 LATIN1 无关）。
+- **conversion_procs/Makefile**：`SUBDIRS` 仅保留 `utf8_and_iso8859_1`。
+- **核心编码表（以 `pg_enc` 枚举为单一事实源，41→3，所有按枚举索引的数组/分支锁步收缩）**：
+  - `src/include/mb/pg_wchar.h`：`pg_enc` 收缩为 `PG_SQL_ASCII=0 / PG_UTF8 / PG_LATIN1 / _PG_LAST_ENCODING_`；`PG_ENCODING_BE_LAST` 改为 `PG_LATIN1`；删除失效的 MULE/MIC 宏（`LC_*`、`IS_LC*`、`SS2`/`SS3`、`ISSJISHEAD`/`ISSJISTAIL` 等）与已删 `conv.c` 函数声明（`UtfToLocal`/`LocalToUtf`/`local2local`/`latin2mic`/`mic2latin`/`..._with_table`、`BIG5toCNS`/`CNStoBIG5`、`pg_mule_mblen`）；并恢复裁剪过程中被误删的 `MAX_CONVERSION_INPUT_LENGTH`/`MAX_UNICODE_EQUIVALENT_STRING` 两个宏（被 `parser.c`/`varlena.c`/`mbutils.c` 引用）。
+  - `src/common/wchar.c`：`pg_wchar_table[]` 缩为 3 项，删除各被删编码的 per-encoding 转换函数。
+  - `src/common/encnames.c`：`pg_enc2name_tbl[]` 缩为 3 项，修正 `pg_char2enc`/`pg_enc2char` 名↔号映射。
+  - `src/port/chklocale.c`：`encoding_match_list[]` 仅留 `{PG_UTF8,"UTF-8"}`/`{PG_LATIN1,"ISO-8859-1"}`/`{PG_SQL_ASCII,"US-ASCII"}` + NULL。
+- **死代码**：`src/backend/utils/mb/conv.c` 整体删除（仅服务于已删 conversion_procs 的 MIC/Unicode helper，全库零调用）；`mbutils.c` 删除被删编码分支；`src/backend/utils/adt/ascii.c` 删除被删编码的 else-if 分支。
+- **catalog 数据（用 `sed` 整行删除，genbki 自动重生成 fmgroids.h/fmgrtab.c）**：`pg_conversion.dat` 仅留 `utf8_to_iso8859_1`/`iso_8859_1_to_utf8` 两条；`pg_proc.dat` 删除全部被删转换函数条目（保留上述两条对应的函数条目）。删除条目与删除的 `.c` 一一对应。
+- **回归测试**：`src/test/regress/sql/conversion.sql` 与 `expected/conversion.out` 改为仅测试 UTF8↔LATIN1（原测试覆盖全部已删编码，预期输出无法再匹配，属功能裁剪的必然伴随更新；sgml 文档裁剪不计入）。
+
+### 三、验证
+- `make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j` 全量重编通过（枚举重编号影响所有 `#include "mb/pg_wchar.h"` 的编译单元，必须全量重编，不能增量）。
+- `make check-world` 全绿（regress 69 + isolation 58 等全部通过）；`conversion` 测试已更新为仅覆盖保留编码。
+- 实库验证：`initdb --locale=C` → `server_encoding`/`client_encoding` = SQL_ASCII；`initdb --locale=C.utf8` → UTF8。`convert('café', UTF8, LATIN1)` = `\x636166e9`（é→0xE9），`SET client_encoding='LATIN1'` 下 `café` 正常往返；非 LATIN1 字符（如中文）转 LATIN1 正确报错 "no equivalent in encoding LATIN1"。`pg_conversion` 仅 2 行；psql `\encoding`/`\l` 正常。
+
 ## 裁剪 psql 的 tab-complete 自动补全（readline 补全逻辑）（2026-09-01）
 
 ### 一、背景

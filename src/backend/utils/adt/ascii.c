@@ -45,30 +45,6 @@ pg_to_ascii(unsigned char *src, unsigned char *src_end, unsigned char *dest, int
 		ascii = (const unsigned char *) "  cL Y  \"Ca  -R     'u .,      ?AAAAAAACEEEEIIII NOOOOOxOUUUUYTBaaaaaaaceeeeiiii nooooo/ouuuuyty";
 		range = RANGE_160;
 	}
-	else if (enc == PG_LATIN2)
-	{
-		/*
-		 * ISO-8859-2 <range: 160 -- 255>
-		 */
-		ascii = (const unsigned char *) " A L LS \"SSTZ-ZZ a,l'ls ,sstz\"zzRAAAALCCCEEEEIIDDNNOOOOxRUUUUYTBraaaalccceeeeiiddnnoooo/ruuuuyt.";
-		range = RANGE_160;
-	}
-	else if (enc == PG_LATIN9)
-	{
-		/*
-		 * ISO-8859-15 <range: 160 -- 255>
-		 */
-		ascii = (const unsigned char *) "  cL YS sCa  -R     Zu .z   EeY?AAAAAAACEEEEIIII NOOOOOxOUUUUYTBaaaaaaaceeeeiiii nooooo/ouuuuyty";
-		range = RANGE_160;
-	}
-	else if (enc == PG_WIN1250)
-	{
-		/*
-		 * Window CP1250 <range: 128 -- 255>
-		 */
-		ascii = (const unsigned char *) "  ' \"    %S<STZZ `'\"\".--  s>stzz   L A  \"CS  -RZ  ,l'u .,as L\"lzRAAAALCCCEEEEIIDDNNOOOOxRUUUUYTBraaaalccceeeeiiddnnoooo/ruuuuyt ";
-		range = RANGE_128;
-	}
 	else
 	{
 		ereport(ERROR,

@@ -1408,109 +1408,6 @@ pg_utf8_increment(unsigned char *charptr, int length)
 }
 
 /*
- * EUC-JP character incrementer function.
- *
- * If the sequence starts with SS2 (0x8e), it must be a two-byte sequence
- * representing JIS X 0201 characters with the second byte ranging between
- * 0xa1 and 0xdf.  We just increment the last byte if it's less than 0xdf,
- * and otherwise rewrite the whole sequence to 0xa1 0xa1.
- *
- * If the sequence starts with SS3 (0x8f), it must be a three-byte sequence
- * in which the last two bytes range between 0xa1 and 0xfe.  The last byte
- * is incremented if possible, otherwise the second-to-last byte.
- *
- * If the sequence starts with a value other than the above and its MSB
- * is set, it must be a two-byte sequence representing JIS X 0208 characters
- * with both bytes ranging between 0xa1 and 0xfe.  The last byte is
- * incremented if possible, otherwise the second-to-last byte.
- *
- * Otherwise, the sequence is a single-byte ASCII character. It is
- * incremented up to 0x7f.
- */
-static bool
-pg_eucjp_increment(unsigned char *charptr, int length)
-{
-	unsigned char c1,
-				c2;
-	int			i;
-
-	c1 = *charptr;
-
-	switch (c1)
-	{
-		case SS2:				/* JIS X 0201 */
-			if (length != 2)
-				return false;
-
-			c2 = charptr[1];
-
-			if (c2 >= 0xdf)
-				charptr[0] = charptr[1] = 0xa1;
-			else if (c2 < 0xa1)
-				charptr[1] = 0xa1;
-			else
-				charptr[1]++;
-			break;
-
-		case SS3:				/* JIS X 0212 */
-			if (length != 3)
-				return false;
-
-			for (i = 2; i > 0; i--)
-			{
-				c2 = charptr[i];
-				if (c2 < 0xa1)
-				{
-					charptr[i] = 0xa1;
-					return true;
-				}
-				else if (c2 < 0xfe)
-				{
-					charptr[i]++;
-					return true;
-				}
-			}
-
-			/* Out of 3-byte code region */
-			return false;
-
-		default:
-			if (IS_HIGHBIT_SET(c1)) /* JIS X 0208? */
-			{
-				if (length != 2)
-					return false;
-
-				for (i = 1; i >= 0; i--)
-				{
-					c2 = charptr[i];
-					if (c2 < 0xa1)
-					{
-						charptr[i] = 0xa1;
-						return true;
-					}
-					else if (c2 < 0xfe)
-					{
-						charptr[i]++;
-						return true;
-					}
-				}
-
-				/* Out of 2 byte code region */
-				return false;
-			}
-			else
-			{					/* ASCII, single byte */
-				if (c1 > 0x7e)
-					return false;
-				(*charptr)++;
-			}
-			break;
-	}
-
-	return true;
-}
-
-/*
  * get the character incrementer for the encoding for the current database
  */
 mbcharacter_incrementer
@@ -1524,9 +1421,6 @@ pg_database_encoding_character_incrementer(void)
 	{
 		case PG_UTF8:
 			return pg_utf8_increment;
-
-		case PG_EUC_JP:
-			return pg_eucjp_increment;
 
 		default:
 			return pg_generic_charinc;

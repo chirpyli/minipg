@@ -1,5 +1,7 @@
 --
 -- Test built-in conversion functions.
+-- minipg: only UTF8, LATIN1 (ISO-8859-1) and SQL_ASCII are retained, so this
+-- test exercises just those conversions.
 --
 -- Helper function to test a conversion. Uses the test_enc_conversion function
 -- that was created in the create_function_0 test.
@@ -26,490 +28,65 @@ $$;
 --
 CREATE TABLE utf8_inputs (inbytes bytea, description text);
 insert into utf8_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\xc3a4c3b6',	'valid, extra latin chars'),
-  ('\xd184d0bed0be',	'valid, cyrillic'),
-  ('\x666f6fe8b1a1',	'valid, kanji/Chinese'),
-  ('\xe382abe3829a',	'valid, two chars that combine to one in EUC_JIS_2004'),
-  ('\xe382ab',		'only first half of combined char in EUC_JIS_2004'),
-  ('\xe382abe382',	'incomplete combination when converted EUC_JIS_2004'),
-  ('\xecbd94eb81bceba6ac', 'valid, Hangul, Korean'),
-  ('\x666f6fefa8aa',	'valid, needs mapping function to convert to GB18030'),
-  ('\x66e8b1ff6f6f',	'invalid byte sequence'),
-  ('\x66006f',		'invalid, NUL byte'),
-  ('\x666f6fe8b100',	'invalid, NUL byte'),
-  ('\x666f6fe8b1',	'incomplete character at end');
+  ('\x666f6f',          'valid, pure ASCII'),
+  ('\xc3a4c3b6',       'valid, latin chars (äö)'),
+  ('\x666f6fe8b1a1',   'valid, Chinese char (not representable in LATIN1)'),
+  ('\x66e8b1ff6f6f',   'invalid byte sequence'),
+  ('\x66006f',         'invalid, NUL byte'),
+  ('\x666f6fe8b1',     'incomplete character at end');
 -- Test UTF-8 verification
 select description, (test_conv(inbytes, 'utf8', 'utf8')).* from utf8_inputs;
-                     description                      |        result        |   errorat    | error 
-------------------------------------------------------+----------------------+--------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x           | 
- valid, extra latin chars                             | \xc3a4c3b6           | \x           | 
- valid, cyrillic                                      | \xd184d0bed0be       | \x           | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x           | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \x           | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \x           | 
- incomplete combination when converted EUC_JIS_2004   | \xe382ab             | \xe382       | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x           | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x           | 
- invalid byte sequence                                | \x66                 | \xe8b1ff6f6f | 
- invalid, NUL byte                                    | \x66                 | \x006f       | 
- invalid, NUL byte                                    | \x666f6f             | \xe8b100     | 
- incomplete character at end                          | \x666f6f             | \xe8b1       | 
-(13 rows)
+                    description                    |     result     |   errorat    | error 
+---------------------------------------------------+----------------+--------------+-------
+ valid, pure ASCII                                 | \x666f6f       | \x           | 
+ valid, latin chars (äö)                         | \xc3a4c3b6     | \x           | 
+ valid, Chinese char (not representable in LATIN1) | \x666f6fe8b1a1 | \x           | 
+ invalid byte sequence                             | \x66           | \xe8b1ff6f6f | 
+ invalid, NUL byte                                 | \x66           | \x006f       | 
+ incomplete character at end                       | \x666f6f       | \xe8b1       | 
+(6 rows)
 
--- Test conversions from UTF-8
-select description, inbytes, (test_conv(inbytes, 'utf8', 'euc_jis_2004')).* from utf8_inputs;
-                     description                      |       inbytes        |     result     |       errorat        | error 
-------------------------------------------------------+----------------------+----------------+----------------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f       | \x                   | 
- valid, extra latin chars                             | \xc3a4c3b6           | \xa9daa9ec     | \x                   | 
- valid, cyrillic                                      | \xd184d0bed0be       | \xa7e6a7e0a7e0 | \x                   | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6fbedd   | \x                   | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \xa5f7         | \x                   | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \xa5ab         | \x                   | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \x             | \xe382abe382         | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x             | \xecbd94eb81bceba6ac | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f       | \xefa8aa             | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66           | \xe8b1ff6f6f         | 
- invalid, NUL byte                                    | \x66006f             | \x66           | \x006f               | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f       | \xe8b100             | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f       | \xe8b1               | 
-(13 rows)
-
+-- Test conversions from UTF-8 to LATIN1
 select description, inbytes, (test_conv(inbytes, 'utf8', 'latin1')).* from utf8_inputs;
-                     description                      |       inbytes        |  result  |       errorat        | error 
-------------------------------------------------------+----------------------+----------+----------------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f | \x                   | 
- valid, extra latin chars                             | \xc3a4c3b6           | \xe4f6   | \x                   | 
- valid, cyrillic                                      | \xd184d0bed0be       | \x       | \xd184d0bed0be       | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6f | \xe8b1a1             | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \x       | \xe382abe3829a       | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \x       | \xe382ab             | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \x       | \xe382abe382         | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x       | \xecbd94eb81bceba6ac | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f | \xefa8aa             | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66     | \xe8b1ff6f6f         | 
- invalid, NUL byte                                    | \x66006f             | \x66     | \x006f               | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f | \xe8b100             | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f | \xe8b1               | 
-(13 rows)
-
-select description, inbytes, (test_conv(inbytes, 'utf8', 'latin2')).* from utf8_inputs;
-                     description                      |       inbytes        |  result  |       errorat        | error 
-------------------------------------------------------+----------------------+----------+----------------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f | \x                   | 
- valid, extra latin chars                             | \xc3a4c3b6           | \xe4f6   | \x                   | 
- valid, cyrillic                                      | \xd184d0bed0be       | \x       | \xd184d0bed0be       | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6f | \xe8b1a1             | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \x       | \xe382abe3829a       | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \x       | \xe382ab             | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \x       | \xe382abe382         | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x       | \xecbd94eb81bceba6ac | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f | \xefa8aa             | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66     | \xe8b1ff6f6f         | 
- invalid, NUL byte                                    | \x66006f             | \x66     | \x006f               | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f | \xe8b100             | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f | \xe8b1               | 
-(13 rows)
-
-select description, inbytes, (test_conv(inbytes, 'utf8', 'latin5')).* from utf8_inputs;
-                     description                      |       inbytes        |  result  |       errorat        | error 
-------------------------------------------------------+----------------------+----------+----------------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f | \x                   | 
- valid, extra latin chars                             | \xc3a4c3b6           | \xe4f6   | \x                   | 
- valid, cyrillic                                      | \xd184d0bed0be       | \x       | \xd184d0bed0be       | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6f | \xe8b1a1             | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \x       | \xe382abe3829a       | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \x       | \xe382ab             | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \x       | \xe382abe382         | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x       | \xecbd94eb81bceba6ac | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f | \xefa8aa             | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66     | \xe8b1ff6f6f         | 
- invalid, NUL byte                                    | \x66006f             | \x66     | \x006f               | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f | \xe8b100             | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f | \xe8b1               | 
-(13 rows)
-
-select description, inbytes, (test_conv(inbytes, 'utf8', 'koi8r')).* from utf8_inputs;
-                     description                      |       inbytes        |  result  |       errorat        | error 
-------------------------------------------------------+----------------------+----------+----------------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f | \x                   | 
- valid, extra latin chars                             | \xc3a4c3b6           | \x       | \xc3a4c3b6           | 
- valid, cyrillic                                      | \xd184d0bed0be       | \xc6cfcf | \x                   | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6f | \xe8b1a1             | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \x       | \xe382abe3829a       | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \x       | \xe382ab             | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \x       | \xe382abe382         | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x       | \xecbd94eb81bceba6ac | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f | \xefa8aa             | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66     | \xe8b1ff6f6f         | 
- invalid, NUL byte                                    | \x66006f             | \x66     | \x006f               | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f | \xe8b100             | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f | \xe8b1               | 
-(13 rows)
-
-select description, inbytes, (test_conv(inbytes, 'utf8', 'gb18030')).* from utf8_inputs;
-                     description                      |       inbytes        |           result           |   errorat    | error 
-------------------------------------------------------+----------------------+----------------------------+--------------+-------
- valid, pure ASCII                                    | \x666f6f             | \x666f6f                   | \x           | 
- valid, extra latin chars                             | \xc3a4c3b6           | \x81308a3181308b32         | \x           | 
- valid, cyrillic                                      | \xd184d0bed0be       | \xa7e6a7e0a7e0             | \x           | 
- valid, kanji/Chinese                                 | \x666f6fe8b1a1       | \x666f6fcff3               | \x           | 
- valid, two chars that combine to one in EUC_JIS_2004 | \xe382abe3829a       | \xa5ab8139a732             | \x           | 
- only first half of combined char in EUC_JIS_2004     | \xe382ab             | \xa5ab                     | \x           | 
- incomplete combination when converted EUC_JIS_2004   | \xe382abe382         | \xa5ab                     | \xe382       | 
- valid, Hangul, Korean                                | \xecbd94eb81bceba6ac | \x8334e5398238c4338330b335 | \x           | 
- valid, needs mapping function to convert to GB18030  | \x666f6fefa8aa       | \x666f6f84309c38           | \x           | 
- invalid byte sequence                                | \x66e8b1ff6f6f       | \x66                       | \xe8b1ff6f6f | 
- invalid, NUL byte                                    | \x66006f             | \x66                       | \x006f       | 
- invalid, NUL byte                                    | \x666f6fe8b100       | \x666f6f                   | \xe8b100     | 
- incomplete character at end                          | \x666f6fe8b1         | \x666f6f                   | \xe8b1       | 
-(13 rows)
+                    description                    |    inbytes     |  result  |   errorat    | error 
+---------------------------------------------------+----------------+----------+--------------+-------
+ valid, pure ASCII                                 | \x666f6f       | \x666f6f | \x           | 
+ valid, latin chars (äö)                         | \xc3a4c3b6     | \xe4f6   | \x           | 
+ valid, Chinese char (not representable in LATIN1) | \x666f6fe8b1a1 | \x666f6f | \xe8b1a1     | 
+ invalid byte sequence                             | \x66e8b1ff6f6f | \x66     | \xe8b1ff6f6f | 
+ invalid, NUL byte                                 | \x66006f       | \x66     | \x006f       | 
+ incomplete character at end                       | \x666f6fe8b1   | \x666f6f | \xe8b1       | 
+(6 rows)
 
 --
--- EUC_JIS_2004
+-- LATIN1 (ISO-8859-1)
 --
-CREATE TABLE euc_jis_2004_inputs (inbytes bytea, description text);
-insert into euc_jis_2004_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\x666f6fbedd',	'valid'),
-  ('\xa5f7',		'valid, translates to two UTF-8 chars '),
-  ('\xbeddbe',		'incomplete char '),
-  ('\x666f6f00bedd',	'invalid, NUL byte'),
-  ('\x666f6fbe00dd',	'invalid, NUL byte'),
-  ('\x666f6fbedd00',	'invalid, NUL byte'),
-  ('\xbe04',		'invalid byte sequence');
--- Test EUC_JIS_2004 verification
-select description, inbytes, (test_conv(inbytes, 'euc_jis_2004', 'euc_jis_2004')).* from euc_jis_2004_inputs;
-              description              |    inbytes     |    result    | errorat  | error 
----------------------------------------+----------------+--------------+----------+-------
- valid, pure ASCII                     | \x666f6f       | \x666f6f     | \x       | 
- valid                                 | \x666f6fbedd   | \x666f6fbedd | \x       | 
- valid, translates to two UTF-8 chars  | \xa5f7         | \xa5f7       | \x       | 
- incomplete char                       | \xbeddbe       | \xbedd       | \xbe     | 
- invalid, NUL byte                     | \x666f6f00bedd | \x666f6f     | \x00bedd | 
- invalid, NUL byte                     | \x666f6fbe00dd | \x666f6f     | \xbe00dd | 
- invalid, NUL byte                     | \x666f6fbedd00 | \x666f6fbedd | \x00     | 
- invalid byte sequence                 | \xbe04         | \x           | \xbe04   | 
-(8 rows)
-
--- Test conversions from EUC_JIS_2004
-select description, inbytes, (test_conv(inbytes, 'euc_jis_2004', 'utf8')).* from euc_jis_2004_inputs;
-              description              |    inbytes     |     result     | errorat  | error 
----------------------------------------+----------------+----------------+----------+-------
- valid, pure ASCII                     | \x666f6f       | \x666f6f       | \x       | 
- valid                                 | \x666f6fbedd   | \x666f6fe8b1a1 | \x       | 
- valid, translates to two UTF-8 chars  | \xa5f7         | \xe382abe3829a | \x       | 
- incomplete char                       | \xbeddbe       | \xe8b1a1       | \xbe     | 
- invalid, NUL byte                     | \x666f6f00bedd | \x666f6f       | \x00bedd | 
- invalid, NUL byte                     | \x666f6fbe00dd | \x666f6f       | \xbe00dd | 
- invalid, NUL byte                     | \x666f6fbedd00 | \x666f6fe8b1a1 | \x00     | 
- invalid byte sequence                 | \xbe04         | \x             | \xbe04   | 
-(8 rows)
-
---
--- SHIFT-JIS-2004
---
-CREATE TABLE shiftjis2004_inputs (inbytes bytea, description text);
-insert into shiftjis2004_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\x666f6f8fdb',	'valid'),
-  ('\x666f6f81c0',	'valid, no translation to UTF-8'),
-  ('\x666f6f82f5',	'valid, translates to two UTF-8 chars '),
-  ('\x666f6f8fdb8f',	'incomplete char '),
-  ('\x666f6f820a',	'incomplete char, followed by newline '),
-  ('\x666f6f008fdb',	'invalid, NUL byte'),
-  ('\x666f6f8f00db',	'invalid, NUL byte'),
-  ('\x666f6f8fdb00',	'invalid, NUL byte');
--- Test SHIFT-JIS-2004 verification
-select description, inbytes, (test_conv(inbytes, 'shiftjis2004', 'shiftjis2004')).* from shiftjis2004_inputs;
-              description              |    inbytes     |    result    | errorat  | error 
----------------------------------------+----------------+--------------+----------+-------
- valid, pure ASCII                     | \x666f6f       | \x666f6f     | \x       | 
- valid                                 | \x666f6f8fdb   | \x666f6f8fdb | \x       | 
- valid, no translation to UTF-8        | \x666f6f81c0   | \x666f6f81c0 | \x       | 
- valid, translates to two UTF-8 chars  | \x666f6f82f5   | \x666f6f82f5 | \x       | 
- incomplete char                       | \x666f6f8fdb8f | \x666f6f8fdb | \x8f     | 
- incomplete char, followed by newline  | \x666f6f820a   | \x666f6f     | \x820a   | 
- invalid, NUL byte                     | \x666f6f008fdb | \x666f6f     | \x008fdb | 
- invalid, NUL byte                     | \x666f6f8f00db | \x666f6f     | \x8f00db | 
- invalid, NUL byte                     | \x666f6f8fdb00 | \x666f6f8fdb | \x00     | 
-(9 rows)
-
--- Test conversions from SHIFT-JIS-2004
-select description, inbytes, (test_conv(inbytes, 'shiftjis2004', 'utf8')).* from shiftjis2004_inputs;
-              description              |    inbytes     |        result        | errorat  | error 
----------------------------------------+----------------+----------------------+----------+-------
- valid, pure ASCII                     | \x666f6f       | \x666f6f             | \x       | 
- valid                                 | \x666f6f8fdb   | \x666f6fe8b1a1       | \x       | 
- valid, no translation to UTF-8        | \x666f6f81c0   | \x666f6fe28a84       | \x       | 
- valid, translates to two UTF-8 chars  | \x666f6f82f5   | \x666f6fe3818be3829a | \x       | 
- incomplete char                       | \x666f6f8fdb8f | \x666f6fe8b1a1       | \x8f     | 
- incomplete char, followed by newline  | \x666f6f820a   | \x666f6f             | \x820a   | 
- invalid, NUL byte                     | \x666f6f008fdb | \x666f6f             | \x008fdb | 
- invalid, NUL byte                     | \x666f6f8f00db | \x666f6f             | \x8f00db | 
- invalid, NUL byte                     | \x666f6f8fdb00 | \x666f6fe8b1a1       | \x00     | 
-(9 rows)
-
-select description, inbytes, (test_conv(inbytes, 'shiftjis2004', 'euc_jis_2004')).* from shiftjis2004_inputs;
-              description              |    inbytes     |    result    | errorat  | error 
----------------------------------------+----------------+--------------+----------+-------
- valid, pure ASCII                     | \x666f6f       | \x666f6f     | \x       | 
- valid                                 | \x666f6f8fdb   | \x666f6fbedd | \x       | 
- valid, no translation to UTF-8        | \x666f6f81c0   | \x666f6fa2c2 | \x       | 
- valid, translates to two UTF-8 chars  | \x666f6f82f5   | \x666f6fa4f7 | \x       | 
- incomplete char                       | \x666f6f8fdb8f | \x666f6fbedd | \x8f     | 
- incomplete char, followed by newline  | \x666f6f820a   | \x666f6f     | \x820a   | 
- invalid, NUL byte                     | \x666f6f008fdb | \x666f6f     | \x008fdb | 
- invalid, NUL byte                     | \x666f6f8f00db | \x666f6f     | \x8f00db | 
- invalid, NUL byte                     | \x666f6f8fdb00 | \x666f6fbedd | \x00     | 
-(9 rows)
-
---
--- GB18030
---
-CREATE TABLE gb18030_inputs (inbytes bytea, description text);
-insert into gb18030_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\x666f6fcff3',	'valid'),
-  ('\x666f6f8431a530',	'valid, no translation to UTF-8'),
-  ('\x666f6f84309c38',	'valid, translates to UTF-8 by mapping function'),
-  ('\x666f6f84309c',	'incomplete char '),
-  ('\x666f6f84309c0a',	'incomplete char, followed by newline '),
-  ('\x666f6f84',		'incomplete char at end'),
-  ('\x666f6f84309c3800', 'invalid, NUL byte'),
-  ('\x666f6f84309c0038', 'invalid, NUL byte');
--- Test GB18030 verification.  Round-trip through text so the backing of the
--- bytea values is palloc, not shared_buffers.  This lets Valgrind detect
--- reads past the end.
-select description, inbytes, (test_conv(inbytes::text::bytea, 'gb18030', 'gb18030')).* from gb18030_inputs;
-                  description                   |      inbytes       |      result      |   errorat    | error 
-------------------------------------------------+--------------------+------------------+--------------+-------
- valid, pure ASCII                              | \x666f6f           | \x666f6f         | \x           | 
- valid                                          | \x666f6fcff3       | \x666f6fcff3     | \x           | 
- valid, no translation to UTF-8                 | \x666f6f8431a530   | \x666f6f8431a530 | \x           | 
- valid, translates to UTF-8 by mapping function | \x666f6f84309c38   | \x666f6f84309c38 | \x           | 
- incomplete char                                | \x666f6f84309c     | \x666f6f         | \x84309c     | 
- incomplete char, followed by newline           | \x666f6f84309c0a   | \x666f6f         | \x84309c0a   | 
- incomplete char at end                         | \x666f6f84         | \x666f6f         | \x84         | 
- invalid, NUL byte                              | \x666f6f84309c3800 | \x666f6f84309c38 | \x00         | 
- invalid, NUL byte                              | \x666f6f84309c0038 | \x666f6f         | \x84309c0038 | 
-(9 rows)
-
--- Test conversions from GB18030
-select description, inbytes, (test_conv(inbytes, 'gb18030', 'utf8')).* from gb18030_inputs;
-                  description                   |      inbytes       |     result     |   errorat    | error 
-------------------------------------------------+--------------------+----------------+--------------+-------
- valid, pure ASCII                              | \x666f6f           | \x666f6f       | \x           | 
- valid                                          | \x666f6fcff3       | \x666f6fe8b1a1 | \x           | 
- valid, no translation to UTF-8                 | \x666f6f8431a530   | \x666f6f       | \x8431a530   | 
- valid, translates to UTF-8 by mapping function | \x666f6f84309c38   | \x666f6fefa8aa | \x           | 
- incomplete char                                | \x666f6f84309c     | \x666f6f       | \x84309c     | 
- incomplete char, followed by newline           | \x666f6f84309c0a   | \x666f6f       | \x84309c0a   | 
- incomplete char at end                         | \x666f6f84         | \x666f6f       | \x84         | 
- invalid, NUL byte                              | \x666f6f84309c3800 | \x666f6fefa8aa | \x00         | 
- invalid, NUL byte                              | \x666f6f84309c0038 | \x666f6f       | \x84309c0038 | 
-(9 rows)
-
---
--- ISO-8859-5
---
-CREATE TABLE iso8859_5_inputs (inbytes bytea, description text);
-insert into iso8859_5_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\xe4dede',		'valid'),
-  ('\x00',		'invalid, NUL byte'),
-  ('\xe400dede',	'invalid, NUL byte'),
-  ('\xe4dede00',	'invalid, NUL byte');
--- Test ISO-8859-5 verification
-select description, inbytes, (test_conv(inbytes, 'iso8859-5', 'iso8859-5')).* from iso8859_5_inputs;
-    description    |  inbytes   |  result  | errorat  | error 
--------------------+------------+----------+----------+-------
- valid, pure ASCII | \x666f6f   | \x666f6f | \x       | 
- valid             | \xe4dede   | \xe4dede | \x       | 
- invalid, NUL byte | \x00       | \x       | \x00     | 
- invalid, NUL byte | \xe400dede | \xe4     | \x00dede | 
- invalid, NUL byte | \xe4dede00 | \xe4dede | \x00     | 
+CREATE TABLE latin1_inputs (inbytes bytea, description text);
+insert into latin1_inputs  values
+  ('\x666f6f',          'valid, pure ASCII'),
+  ('\xe9',             'valid, accented char (é)'),
+  ('\xe9a9',           'valid, two accented chars (é©)'),
+  ('\x00',             'invalid, NUL byte'),
+  ('\xe900',           'invalid, NUL byte');
+-- Test LATIN1 verification
+select description, inbytes, (test_conv(inbytes, 'latin1', 'latin1')).* from latin1_inputs;
+           description            | inbytes  |  result  | errorat | error 
+----------------------------------+----------+----------+---------+-------
+ valid, pure ASCII                | \x666f6f | \x666f6f | \x      | 
+ valid, accented char (é)        | \xe9     | \xe9     | \x      | 
+ valid, two accented chars (é©) | \xe9a9   | \xe9a9   | \x      | 
+ invalid, NUL byte                | \x00     | \x       | \x00    | 
+ invalid, NUL byte                | \xe900   | \xe9     | \x00    | 
 (5 rows)
 
--- Test conversions from ISO-8859-5
-select description, inbytes, (test_conv(inbytes, 'iso8859-5', 'utf8')).* from iso8859_5_inputs;
-    description    |  inbytes   |     result     | errorat  | error 
--------------------+------------+----------------+----------+-------
- valid, pure ASCII | \x666f6f   | \x666f6f       | \x       | 
- valid             | \xe4dede   | \xd184d0bed0be | \x       | 
- invalid, NUL byte | \x00       | \x             | \x00     | 
- invalid, NUL byte | \xe400dede | \xd184         | \x00dede | 
- invalid, NUL byte | \xe4dede00 | \xd184d0bed0be | \x00     | 
+-- Test conversions from LATIN1 to UTF-8
+select description, inbytes, (test_conv(inbytes, 'latin1', 'utf8')).* from latin1_inputs;
+           description            | inbytes  |   result   | errorat | error 
+----------------------------------+----------+------------+---------+-------
+ valid, pure ASCII                | \x666f6f | \x666f6f   | \x      | 
+ valid, accented char (é)        | \xe9     | \xc3a9     | \x      | 
+ valid, two accented chars (é©) | \xe9a9   | \xc3a9c2a9 | \x      | 
+ invalid, NUL byte                | \x00     | \x         | \x00    | 
+ invalid, NUL byte                | \xe900   | \xc3a9     | \x00    | 
 (5 rows)
-
-select description, inbytes, (test_conv(inbytes, 'iso8859-5', 'koi8r')).* from iso8859_5_inputs;
-    description    |  inbytes   |  result  | errorat  | error 
--------------------+------------+----------+----------+-------
- valid, pure ASCII | \x666f6f   | \x666f6f | \x       | 
- valid             | \xe4dede   | \xc6cfcf | \x       | 
- invalid, NUL byte | \x00       | \x       | \x00     | 
- invalid, NUL byte | \xe400dede | \xc6     | \x00dede | 
- invalid, NUL byte | \xe4dede00 | \xc6cfcf | \x00     | 
-(5 rows)
-
-select description, inbytes, (test_conv(inbytes, 'iso8859_5', 'mule_internal')).* from iso8859_5_inputs;
-    description    |  inbytes   |     result     | errorat  | error 
--------------------+------------+----------------+----------+-------
- valid, pure ASCII | \x666f6f   | \x666f6f       | \x       | 
- valid             | \xe4dede   | \x8bc68bcf8bcf | \x       | 
- invalid, NUL byte | \x00       | \x             | \x00     | 
- invalid, NUL byte | \xe400dede | \x8bc6         | \x00dede | 
- invalid, NUL byte | \xe4dede00 | \x8bc68bcf8bcf | \x00     | 
-(5 rows)
-
---
--- Big5
---
-CREATE TABLE big5_inputs (inbytes bytea, description text);
-insert into big5_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\x666f6fb648',	'valid'),
-  ('\x666f6fa27f',	'valid, no translation to UTF-8'),
-  ('\x666f6fb60048',	'invalid, NUL byte'),
-  ('\x666f6fb64800',	'invalid, NUL byte');
--- Test Big5 verification
-select description, inbytes, (test_conv(inbytes, 'big5', 'big5')).* from big5_inputs;
-          description           |    inbytes     |    result    | errorat  | error 
---------------------------------+----------------+--------------+----------+-------
- valid, pure ASCII              | \x666f6f       | \x666f6f     | \x       | 
- valid                          | \x666f6fb648   | \x666f6fb648 | \x       | 
- valid, no translation to UTF-8 | \x666f6fa27f   | \x666f6fa27f | \x       | 
- invalid, NUL byte              | \x666f6fb60048 | \x666f6f     | \xb60048 | 
- invalid, NUL byte              | \x666f6fb64800 | \x666f6fb648 | \x00     | 
-(5 rows)
-
--- Test conversions from Big5
-select description, inbytes, (test_conv(inbytes, 'big5', 'utf8')).* from big5_inputs;
-          description           |    inbytes     |     result     | errorat  | error 
---------------------------------+----------------+----------------+----------+-------
- valid, pure ASCII              | \x666f6f       | \x666f6f       | \x       | 
- valid                          | \x666f6fb648   | \x666f6fe8b1a1 | \x       | 
- valid, no translation to UTF-8 | \x666f6fa27f   | \x666f6f       | \xa27f   | 
- invalid, NUL byte              | \x666f6fb60048 | \x666f6f       | \xb60048 | 
- invalid, NUL byte              | \x666f6fb64800 | \x666f6fe8b1a1 | \x00     | 
-(5 rows)
-
-select description, inbytes, (test_conv(inbytes, 'big5', 'mule_internal')).* from big5_inputs;
-          description           |    inbytes     |     result     | errorat  | error 
---------------------------------+----------------+----------------+----------+-------
- valid, pure ASCII              | \x666f6f       | \x666f6f       | \x       | 
- valid                          | \x666f6fb648   | \x666f6f95e2af | \x       | 
- valid, no translation to UTF-8 | \x666f6fa27f   | \x666f6f95a3c1 | \x       | 
- invalid, NUL byte              | \x666f6fb60048 | \x666f6f       | \xb60048 | 
- invalid, NUL byte              | \x666f6fb64800 | \x666f6f95e2af | \x00     | 
-(5 rows)
-
---
--- MULE_INTERNAL
---
-CREATE TABLE mic_inputs (inbytes bytea, description text);
-insert into mic_inputs  values
-  ('\x666f6f',		'valid, pure ASCII'),
-  ('\x8bc68bcf8bcf',	'valid (in KOI8R)'),
-  ('\x8bc68bcf8b',	'invalid,incomplete char'),
-  ('\x92bedd',		'valid (in SHIFT_JIS)'),
-  ('\x92be',		'invalid, incomplete char)'),
-  ('\x666f6f95a3c1',	'valid (in Big5)'),
-  ('\x666f6f95a3',	'invalid, incomplete char'),
-  ('\x9200bedd',	'invalid, NUL byte'),
-  ('\x92bedd00',	'invalid, NUL byte'),
-  ('\x8b00c68bcf8bcf',	'invalid, NUL byte');
--- Test MULE_INTERNAL verification
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'mule_internal')).* from mic_inputs;
-        description        |     inbytes      |     result     |     errorat      | error 
----------------------------+------------------+----------------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f       | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \x8bc68bcf8bcf | \x               | 
- invalid,incomplete char   | \x8bc68bcf8b     | \x8bc68bcf     | \x8b             | 
- valid (in SHIFT_JIS)      | \x92bedd         | \x92bedd       | \x               | 
- invalid, incomplete char) | \x92be           | \x             | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6f95a3c1 | \x               | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f       | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x             | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \x92bedd       | \x00             | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x             | \x8b00c68bcf8bcf | 
-(10 rows)
-
--- Test conversions from MULE_INTERNAL
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'koi8r')).* from mic_inputs;
-        description        |     inbytes      |  result  |     errorat      | error 
----------------------------+------------------+----------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \xc6cfcf | \x               | 
- invalid,incomplete char   | \x8bc68bcf8b     | \xc6cf   | \x8b             | 
- valid (in SHIFT_JIS)      | \x92bedd         | \x       | \x92bedd         | 
- invalid, incomplete char) | \x92be           | \x       | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6f | \x95a3c1         | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x       | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \x       | \x92bedd00       | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x       | \x8b00c68bcf8bcf | 
-(10 rows)
-
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'iso8859-5')).* from mic_inputs;
-        description        |     inbytes      |  result  |     errorat      | error 
----------------------------+------------------+----------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \xe4dede | \x               | 
- invalid,incomplete char   | \x8bc68bcf8b     | \xe4de   | \x8b             | 
- valid (in SHIFT_JIS)      | \x92bedd         | \x       | \x92bedd         | 
- invalid, incomplete char) | \x92be           | \x       | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6f | \x95a3c1         | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x       | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \x       | \x92bedd00       | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x       | \x8b00c68bcf8bcf | 
-(10 rows)
-
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'sjis')).* from mic_inputs;
-        description        |     inbytes      |  result  |     errorat      | error 
----------------------------+------------------+----------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \x       | \x8bc68bcf8bcf   | 
- invalid,incomplete char   | \x8bc68bcf8b     | \x       | \x8bc68bcf8b     | 
- valid (in SHIFT_JIS)      | \x92bedd         | \x8fdb   | \x               | 
- invalid, incomplete char) | \x92be           | \x       | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6f | \x95a3c1         | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x       | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \x8fdb   | \x00             | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x       | \x8b00c68bcf8bcf | 
-(10 rows)
-
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'big5')).* from mic_inputs;
-        description        |     inbytes      |    result    |     errorat      | error 
----------------------------+------------------+--------------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f     | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \x           | \x8bc68bcf8bcf   | 
- invalid,incomplete char   | \x8bc68bcf8b     | \x           | \x8bc68bcf8b     | 
- valid (in SHIFT_JIS)      | \x92bedd         | \x           | \x92bedd         | 
- invalid, incomplete char) | \x92be           | \x           | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6fa2a1 | \x               | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f     | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x           | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \x           | \x92bedd00       | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x           | \x8b00c68bcf8bcf | 
-(10 rows)
-
-select description, inbytes, (test_conv(inbytes, 'mule_internal', 'euc_jp')).* from mic_inputs;
-        description        |     inbytes      |  result  |     errorat      | error 
----------------------------+------------------+----------+------------------+-------
- valid, pure ASCII         | \x666f6f         | \x666f6f | \x               | 
- valid (in KOI8R)          | \x8bc68bcf8bcf   | \x       | \x8bc68bcf8bcf   | 
- invalid,incomplete char   | \x8bc68bcf8b     | \x       | \x8bc68bcf8b     | 
- valid (in SHIFT_JIS)      | \x92bedd         | \xbedd   | \x               | 
- invalid, incomplete char) | \x92be           | \x       | \x92be           | 
- valid (in Big5)           | \x666f6f95a3c1   | \x666f6f | \x95a3c1         | 
- invalid, incomplete char  | \x666f6f95a3     | \x666f6f | \x95a3           | 
- invalid, NUL byte         | \x9200bedd       | \x       | \x9200bedd       | 
- invalid, NUL byte         | \x92bedd00       | \xbedd   | \x00             | 
- invalid, NUL byte         | \x8b00c68bcf8bcf | \x       | \x8b00c68bcf8bcf | 
-(10 rows)
 
