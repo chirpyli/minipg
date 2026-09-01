@@ -47,7 +47,6 @@
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_range.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
@@ -121,13 +120,6 @@ RemoveTypeById(Oid typeOid)
 
 	CatalogTupleDelete(relation, &tup->t_self);
 
-	/*
-	 * If it is a range type, delete the pg_range entry too; we don't bother
-	 * with making a dependency entry for that, so it has to be done "by hand"
-	 * here.
-	 */
-	if (((Form_pg_type) GETSTRUCT(tup))->typtype == TYPTYPE_RANGE)
-		RangeDelete(typeOid);
 
 	ReleaseSysCache(tup);
 

@@ -39,7 +39,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_range.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_statistic.h"
@@ -415,29 +414,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
-	},
-	{RangeRelationId,			/* RANGEMULTIRANGE */
-		RangeMultirangeTypidIndexId,
-		1,
-		{
-			Anum_pg_range_rngmultitypid,
-			0,
-			0,
-			0
-		},
-		4
-	},
-
-	{RangeRelationId,			/* RANGETYPE */
-		RangeTypidIndexId,
-		1,
-		{
-			Anum_pg_range_rngtypid,
-			0,
-			0,
-			0
-		},
-		4
 	},
 	{RelationRelationId,		/* RELNAMENSP */
 		ClassNameNspIndexId,

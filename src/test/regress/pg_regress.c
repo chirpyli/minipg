@@ -32,7 +32,6 @@
 #include "common/logging.h"
 #include "common/restricted_token.h"
 #include "common/string.h"
-#include "common/username.h"
 #include "getopt_long.h"
 #include "lib/stringinfo.h"
 #include "libpq/pqcomm.h"		/* needed for UNIXSOCK_PATH() */

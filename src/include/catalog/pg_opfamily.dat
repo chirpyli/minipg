@@ -16,8 +16,6 @@
   opfmethod => 'btree', opfname => 'array_ops' },
 { oid => '627',
   opfmethod => 'hash', opfname => 'array_ops' },
-{ oid => '423',
-  opfmethod => 'btree', opfname => 'bit_ops' },
 { oid => '424', oid_symbol => 'BOOL_BTREE_FAM_OID',
   opfmethod => 'btree', opfname => 'bool_ops' },
 { oid => '426', oid_symbol => 'BPCHAR_BTREE_FAM_OID',
@@ -82,8 +80,6 @@
   opfmethod => 'hash', opfname => 'time_ops' },
 { oid => '1999',
   opfmethod => 'hash', opfname => 'timestamptz_ops' },
-{ oid => '2002',
-  opfmethod => 'btree', opfname => 'varbit_ops' },
 { oid => '2040',
   opfmethod => 'hash', opfname => 'timestamp_ops' },
 { oid => '2095', oid_symbol => 'TEXT_PATTERN_BTREE_FAM_OID',
@@ -119,10 +115,6 @@
 
 
 
-{ oid => '3901',
-  opfmethod => 'btree', opfname => 'range_ops' },
-{ oid => '3903',
-  opfmethod => 'hash', opfname => 'range_ops' },
 
 
 
@@ -184,8 +176,4 @@
 
 
 
-{ oid => '4199',
-  opfmethod => 'btree', opfname => 'multirange_ops' },
-{ oid => '4225',
-  opfmethod => 'hash', opfname => 'multirange_ops' },
 ]

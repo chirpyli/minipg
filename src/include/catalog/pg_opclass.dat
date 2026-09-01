@@ -20,8 +20,6 @@
   opcintype => 'anyarray' },
 { opcmethod => 'hash', opcname => 'array_ops', opcfamily => 'hash/array_ops',
   opcintype => 'anyarray' },
-{ opcmethod => 'btree', opcname => 'bit_ops', opcfamily => 'btree/bit_ops',
-  opcintype => 'bit' },
 { opcmethod => 'btree', opcname => 'bool_ops', opcfamily => 'btree/bool_ops',
   opcintype => 'bool' },
 { opcmethod => 'btree', opcname => 'bpchar_ops',
@@ -120,8 +118,6 @@
   opcfamily => 'btree/datetime_ops', opcintype => 'timestamptz' },
 { opcmethod => 'hash', opcname => 'timestamptz_ops',
   opcfamily => 'hash/timestamptz_ops', opcintype => 'timestamptz' },
-{ opcmethod => 'btree', opcname => 'varbit_ops',
-  opcfamily => 'btree/varbit_ops', opcintype => 'varbit' },
 { opcmethod => 'btree', opcname => 'varchar_ops', opcfamily => 'btree/text_ops',
   opcintype => 'text', opcdefault => 'f' },
 { opcmethod => 'hash', opcname => 'varchar_ops', opcfamily => 'hash/text_ops',
@@ -177,15 +173,7 @@
 
 
 
-{ opcmethod => 'btree', opcname => 'range_ops', opcfamily => 'btree/range_ops',
-  opcintype => 'anyrange' },
-{ opcmethod => 'hash', opcname => 'range_ops', opcfamily => 'hash/range_ops',
-  opcintype => 'anyrange' },
 
-{ opcmethod => 'btree', opcname => 'multirange_ops',
-  opcfamily => 'btree/multirange_ops', opcintype => 'anymultirange' },
-{ opcmethod => 'hash', opcname => 'multirange_ops',
-  opcfamily => 'hash/multirange_ops', opcintype => 'anymultirange' },
 
 
 

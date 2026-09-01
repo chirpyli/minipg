@@ -22,13 +22,7 @@ CREATE TABLE gstest3 (a integer, b integer, c integer, d integer);
 \set ECHO all
 alter table gstest3 add primary key (a);
 
-CREATE TABLE gstest4(id integer, v integer,
-                          unhashable_col bit(4), unsortable_col xid);
-insert into gstest4
-values (1,1,b'0000','1'), (2,2,b'0001','1'),
-       (3,4,b'0010','2'), (4,8,b'0011','2'),
-       (5,16,b'0000','2'), (6,32,b'0001','2'),
-       (7,64,b'0010','1'), (8,128,b'0011','1');
+
 
 CREATE TABLE gstest_empty (a integer, b integer, v integer);
 
@@ -296,10 +290,7 @@ select sum(ten) from onek group by rollup(four::text), two order by 1;
 
 set enable_hashagg = true;
 
--- failure cases
 
-select count(*) from gstest4 group by rollup(unhashable_col,unsortable_col);
-select array_agg(v order by v) from gstest4 group by grouping sets ((id,unsortable_col),(id));
 
 -- simple cases
 
@@ -318,35 +309,9 @@ explain (costs off)
   select a, b, grouping(a,b), array_agg(v order by v)
     from gstest1 group by cube(a,b);
 
--- unsortable cases
-select unsortable_col, count(*)
-  from gstest4 group by grouping sets ((unsortable_col),(unsortable_col))
-  order by unsortable_col::text;
 
--- mixed hashable/sortable cases
-select unhashable_col, unsortable_col,
-       grouping(unhashable_col, unsortable_col),
-       count(*), sum(v)
-  from gstest4 group by grouping sets ((unhashable_col),(unsortable_col))
- order by 3, 5;
-explain (costs off)
-  select unhashable_col, unsortable_col,
-         grouping(unhashable_col, unsortable_col),
-         count(*), sum(v)
-    from gstest4 group by grouping sets ((unhashable_col),(unsortable_col))
-   order by 3,5;
 
-select unhashable_col, unsortable_col,
-       grouping(unhashable_col, unsortable_col),
-       count(*), sum(v)
-  from gstest4 group by grouping sets ((v,unhashable_col),(v,unsortable_col))
- order by 3,5;
-explain (costs off)
-  select unhashable_col, unsortable_col,
-         grouping(unhashable_col, unsortable_col),
-         count(*), sum(v)
-    from gstest4 group by grouping sets ((v,unhashable_col),(v,unsortable_col))
-   order by 3,5;
+
 
 -- empty input: first is 0 rows, second 1, third 3 etc.
 select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),a);

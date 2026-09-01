@@ -31,7 +31,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_range.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -626,18 +625,6 @@ get_op_hash_functions_ext(Oid opno, Oid inputtype,
 	{
 		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
 		if (typentry->hash_proc != F_HASH_RECORD)
-			return false;
-	}
-	else if (opno == RANGE_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc != F_HASH_RANGE)
-			return false;
-	}
-	else if (opno == MULTIRANGE_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc != F_HASH_MULTIRANGE)
 			return false;
 	}
 
@@ -1471,8 +1458,7 @@ op_mergejoinable(Oid opno, Oid inputtype)
 	 * For array_eq or record_eq, we can sort if the element or field types
 	 * are all sortable.  We could implement all the checks for that here, but
 	 * the typcache already does that and caches the results too, so let's
-	 * rely on the typcache.  We do not need similar special cases for ranges
-	 * or multiranges, because their subtypes are required to be sortable.
+	 * rely on the typcache.
 	 */
 	if (opno == ARRAY_EQ_OP)
 	{
@@ -1507,7 +1493,7 @@ op_mergejoinable(Oid opno, Oid inputtype)
  * Returns true if the operator is hashjoinable.  (There must be a suitable
  * hash opfamily entry for this operator if it is so marked.)
  *
- * In some cases (currently array_eq, record_eq, range_eq, multirange_eq),
+ * In some cases (currently array_eq, record_eq),
  * hashjoinability depends on the specific input data type the operator is
  * invoked for, so that must be passed as well.  We currently assume that only
  * one input's type is needed to check this --- by convention, pass the left
@@ -1531,18 +1517,6 @@ op_hashjoinable(Oid opno, Oid inputtype)
 	{
 		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
 		if (typentry->hash_proc == F_HASH_RECORD)
-			result = true;
-	}
-	else if (opno == RANGE_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc == F_HASH_RANGE)
-			result = true;
-	}
-	else if (opno == MULTIRANGE_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc == F_HASH_MULTIRANGE)
 			result = true;
 	}
 	else
@@ -2553,26 +2527,6 @@ type_is_rowtype(Oid typid)
 }
 
 /*
- * type_is_range
- *	  Returns true if the given type is a range type.
- */
-bool
-type_is_range(Oid typid)
-{
-	return (get_typtype(typid) == TYPTYPE_RANGE);
-}
-
-/*
- * type_is_multirange
- *	  Returns true if the given type is a multirange type.
- */
-bool
-type_is_multirange(Oid typid)
-{
-	return (get_typtype(typid) == TYPTYPE_MULTIRANGE);
-}
-
-/*
  * get_type_category_preferred
  *
  *		Given the type OID, fetch its category and preferred-type status.
@@ -3249,109 +3203,6 @@ char *
 get_namespace_name_or_temp(Oid nspid)
 {
 	return get_namespace_name(nspid);
-}
-
-/*				---------- PG_RANGE CACHES ----------				 */
-
-/*
- * get_range_subtype
- *		Returns the subtype of a given range type
- *
- * Returns InvalidOid if the type is not a range type.
- */
-Oid
-get_range_subtype(Oid rangeOid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(RANGETYPE, ObjectIdGetDatum(rangeOid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_range rngtup = (Form_pg_range) GETSTRUCT(tp);
-		Oid			result;
-
-		result = rngtup->rngsubtype;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
-
-/*
- * get_range_collation
- *		Returns the collation of a given range type
- *
- * Returns InvalidOid if the type is not a range type,
- * or if its subtype is not collatable.
- */
-Oid
-get_range_collation(Oid rangeOid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(RANGETYPE, ObjectIdGetDatum(rangeOid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_range rngtup = (Form_pg_range) GETSTRUCT(tp);
-		Oid			result;
-
-		result = rngtup->rngcollation;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
-
-/*
- * get_range_multirange
- *		Returns the multirange type of a given range type
- *
- * Returns InvalidOid if the type is not a range type.
- */
-Oid
-get_range_multirange(Oid rangeOid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(RANGETYPE, ObjectIdGetDatum(rangeOid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_range rngtup = (Form_pg_range) GETSTRUCT(tp);
-		Oid			result;
-
-		result = rngtup->rngmultitypid;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
-
-/*
- * get_multirange_range
- *		Returns the range type of a given multirange
- *
- * Returns InvalidOid if the type is not a multirange.
- */
-Oid
-get_multirange_range(Oid multirangeOid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(RANGEMULTIRANGE, ObjectIdGetDatum(multirangeOid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_range rngtup = (Form_pg_range) GETSTRUCT(tp);
-		Oid			result;
-
-		result = rngtup->rngtypid;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
 }
 
 /*				---------- PG_INDEX CACHE ----------				 */

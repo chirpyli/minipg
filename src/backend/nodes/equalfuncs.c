@@ -1764,7 +1764,6 @@ _equalValue(const Value *a, const Value *b)
 			break;
 		case T_Float:
 		case T_String:
-		case T_BitString:
 			COMPARE_STRING_FIELD(val.str);
 			break;
 		case T_Null:
@@ -1972,7 +1971,6 @@ equal(const void *a, const void *b)
 		case T_Integer:
 		case T_Float:
 		case T_String:
-		case T_BitString:
 		case T_Null:
 			retval = _equalValue(a, b);
 			break;

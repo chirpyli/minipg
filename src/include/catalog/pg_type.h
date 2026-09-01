@@ -214,9 +214,7 @@ DECLARE_UNIQUE_INDEX(pg_type_typname_nsp_index, 2704, on pg_type using btree(typ
  */
 #define  TYPTYPE_BASE		'b' /* base type (ordinary scalar type) */
 #define  TYPTYPE_COMPOSITE	'c' /* composite (e.g., table's rowtype) */
-#define  TYPTYPE_MULTIRANGE	'm' /* multirange type */
 #define  TYPTYPE_PSEUDO		'p' /* pseudo-type */
-#define  TYPTYPE_RANGE		'r' /* range type */
 
 #define  TYPCATEGORY_INVALID	'\0'	/* not an allowed category */
 #define  TYPCATEGORY_ARRAY		'A'
@@ -253,16 +251,12 @@ DECLARE_UNIQUE_INDEX(pg_type_typname_nsp_index, 2704, on pg_type using btree(typ
 #define IsPolymorphicTypeFamily1(typid)  \
 	((typid) == ANYELEMENTOID || \
 	 (typid) == ANYARRAYOID || \
-	 (typid) == ANYNONARRAYOID || \
-	 (typid) == ANYRANGEOID || \
-	 (typid) == ANYMULTIRANGEOID)
+	 (typid) == ANYNONARRAYOID)
 
 #define IsPolymorphicTypeFamily2(typid)  \
 	((typid) == ANYCOMPATIBLEOID || \
 	 (typid) == ANYCOMPATIBLEARRAYOID || \
-	 (typid) == ANYCOMPATIBLENONARRAYOID || \
-	 (typid) == ANYCOMPATIBLERANGEOID || \
-	 (typid) == ANYCOMPATIBLEMULTIRANGEOID)
+	 (typid) == ANYCOMPATIBLENONARRAYOID)
 
 /* Is this a "true" array type?  (Requires fmgroids.h) */
 #define IsTrueArrayType(typeForm)  \
@@ -325,8 +319,5 @@ extern char *makeArrayTypeName(const char *typeName, Oid typeNamespace);
 
 extern bool moveArrayTypeName(Oid typeOid, const char *typeName,
 							  Oid typeNamespace);
-
-extern char *makeMultirangeTypeName(const char *rangeTypeName,
-									Oid typeNamespace);
 
 #endif							/* PG_TYPE_H */

@@ -29,7 +29,7 @@
 #include "utils/int8.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
-#include "utils/varbit.h"
+
 
 static void pcb_error_callback(void *arg);
 
@@ -423,18 +423,7 @@ make_const(ParseState *pstate, Value *value, int location)
 			typebyval = false;
 			break;
 
-		case T_BitString:
-			/* arrange to report location if bit_in() fails */
-			setup_parser_errposition_callback(&pcbstate, pstate, location);
-			val = DirectFunctionCall3(bit_in,
-									  CStringGetDatum(strVal(value)),
-									  ObjectIdGetDatum(InvalidOid),
-									  Int32GetDatum(-1));
-			cancel_parser_errposition_callback(&pcbstate);
-			typeid = BITOID;
-			typelen = -1;
-			typebyval = false;
-			break;
+
 
 		case T_Null:
 			/* return a null const */

@@ -40,23 +40,23 @@ FROM heap_page_items(get_raw_page('test1', 0)),
 
 -- tests for decoding of combined flags
 -- HEAP_XMAX_SHR_LOCK = (HEAP_XMAX_EXCL_LOCK | HEAP_XMAX_KEYSHR_LOCK)
-SELECT * FROM heap_tuple_infomask_flags(x'0050'::int, 0);
+SELECT * FROM heap_tuple_infomask_flags(80::int, 0);
 -- HEAP_XMIN_FROZEN = (HEAP_XMIN_COMMITTED | HEAP_XMIN_INVALID)
-SELECT * FROM heap_tuple_infomask_flags(x'0300'::int, 0);
+SELECT * FROM heap_tuple_infomask_flags(768::int, 0);
 -- HEAP_MOVED = (HEAP_MOVED_IN | HEAP_MOVED_OFF)
-SELECT * FROM heap_tuple_infomask_flags(x'C000'::int, 0);
-SELECT * FROM heap_tuple_infomask_flags(x'C000'::int, 0);
+SELECT * FROM heap_tuple_infomask_flags(49152::int, 0);
+SELECT * FROM heap_tuple_infomask_flags(49152::int, 0);
 
 -- test all flags of t_infomask and t_infomask2
 SELECT unnest(raw_flags)
-  FROM heap_tuple_infomask_flags(x'FFFF'::int, x'FFFF'::int) ORDER BY 1;
+  FROM heap_tuple_infomask_flags(65535::int, 65535::int) ORDER BY 1;
 SELECT unnest(combined_flags)
-  FROM heap_tuple_infomask_flags(x'FFFF'::int, x'FFFF'::int) ORDER BY 1;
+  FROM heap_tuple_infomask_flags(65535::int, 65535::int) ORDER BY 1;
 
 -- no flags at all
 SELECT * FROM heap_tuple_infomask_flags(0, 0);
 -- no combined flags
-SELECT * FROM heap_tuple_infomask_flags(x'0010'::int, 0);
+SELECT * FROM heap_tuple_infomask_flags(16::int, 0);
 
 DROP TABLE test1;
 
@@ -65,7 +65,7 @@ DROP TABLE test1;
 
 -- check null bitmap alignment for table whose number of attributes is multiple of 8
 create table test8 (f1 int, f2 int, f3 int, f4 int, f5 int, f6 int, f7 int, f8 int);
-insert into test8(f1, f8) values (x'7f00007f'::int, 0);
+insert into test8(f1, f8) values (2130706559::int, 0);
 select t_bits, t_data from heap_page_items(get_raw_page('test8', 0));
 select tuple_data_split('test8'::regclass, t_data, t_infomask, t_infomask2, t_bits)
     from heap_page_items(get_raw_page('test8', 0));

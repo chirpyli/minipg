@@ -2852,10 +2852,7 @@ _outValue(StringInfo str, const Value *value)
 				outToken(str, value->val.str);
 			appendStringInfoChar(str, '"');
 			break;
-		case T_BitString:
-			/* internal representation already has leading 'b' */
-			appendStringInfoString(str, value->val.str);
-			break;
+
 		case T_Null:
 			/* this is seen only within A_Const, not in transformed trees */
 			appendStringInfoString(str, "NULL");
@@ -3114,8 +3111,7 @@ outNode(StringInfo str, const void *obj)
 		_outList(str, obj);
 	else if (IsA(obj, Integer) ||
 			 IsA(obj, Float) ||
-			 IsA(obj, String) ||
-			 IsA(obj, BitString))
+			 IsA(obj, String))
 	{
 		/* nodeRead does not want to see { } around these! */
 		_outValue(str, obj);

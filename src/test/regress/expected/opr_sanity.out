@@ -126,10 +126,9 @@ WHERE p1.oid < p2.oid AND
      p1.proretset != p2.proretset OR
      p1.provolatile != p2.provolatile OR
      p1.pronargs != p2.pronargs);
- oid  |         proname         | oid  |         proname         
-------+-------------------------+------+-------------------------
- 4002 | multirange_constructor2 | 4003 | multirange_constructor3
-(1 row)
+ oid | proname | oid | proname 
+-----+---------+-----+---------
+(0 rows)
 
 -- Look for uses of different type OIDs in the argument/result type fields
 -- for different aliases of the same built-in function.
@@ -180,9 +179,8 @@ ORDER BY 1, 2;
  text                        | character
  text                        | character varying
  timestamp without time zone | timestamp with time zone
- bit                         | bit varying
  txid_snapshot               | pg_snapshot
-(6 rows)
+(5 rows)
 
 SELECT DISTINCT p1.proargtypes[1]::regtype, p2.proargtypes[1]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -200,9 +198,8 @@ ORDER BY 1, 2;
 -----------------------------+--------------------------
  integer                     | xid
  timestamp without time zone | timestamp with time zone
- bit                         | bit varying
  txid_snapshot               | pg_snapshot
-(4 rows)
+(3 rows)
 
 SELECT DISTINCT p1.proargtypes[2]::regtype, p2.proargtypes[2]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -303,9 +300,7 @@ WHERE p1.prorettype IN
   AND NOT
     ('anyelement'::regtype = ANY (p1.proargtypes) OR
      'anyarray'::regtype = ANY (p1.proargtypes) OR
-     'anynonarray'::regtype = ANY (p1.proargtypes) OR
-     'anyrange'::regtype = ANY (p1.proargtypes) OR
-     'anymultirange'::regtype = ANY (p1.proargtypes))
+     'anynonarray'::regtype = ANY (p1.proargtypes))
 ORDER BY 2;
  oid  |    proname     
 ------+----------------
@@ -317,30 +312,6 @@ ORDER BY 2;
  2400 | array_recv
 (6 rows)
 
--- anyrange and anymultirange are tighter than the rest, can only resolve
--- from each other
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE p1.prorettype IN ('anyrange'::regtype, 'anymultirange'::regtype)
-  AND NOT
-    ('anyrange'::regtype = ANY (p1.proargtypes) OR
-      'anymultirange'::regtype = ANY (p1.proargtypes))
-ORDER BY 2;
- oid  |         proname         
-------+-------------------------
- 4229 | anymultirange_in
- 3832 | anyrange_in
- 4004 | multirange_constructor0
- 4002 | multirange_constructor2
- 4003 | multirange_constructor3
- 4231 | multirange_in
- 4233 | multirange_recv
- 4000 | range_constructor2
- 4001 | range_constructor3
- 3834 | range_in
- 3836 | range_recv
-(11 rows)
-
 -- similarly for the anycompatible family
 SELECT p1.oid, p1.proname
 FROM pg_proc as p1
@@ -350,8 +321,7 @@ WHERE p1.prorettype IN
   AND NOT
     ('anycompatible'::regtype = ANY (p1.proargtypes) OR
      'anycompatiblearray'::regtype = ANY (p1.proargtypes) OR
-     'anycompatiblenonarray'::regtype = ANY (p1.proargtypes) OR
-     'anycompatiblerange'::regtype = ANY (p1.proargtypes))
+     'anycompatiblenonarray'::regtype = ANY (p1.proargtypes))
 ORDER BY 2;
  oid  |         proname          
 ------+--------------------------
@@ -360,17 +330,6 @@ ORDER BY 2;
  5090 | anycompatiblearray_recv
  5092 | anycompatiblenonarray_in
 (4 rows)
-
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE p1.prorettype = 'anycompatiblerange'::regtype
-  AND NOT
-     'anycompatiblerange'::regtype = ANY (p1.proargtypes)
-ORDER BY 2;
- oid  |        proname        
-------+-----------------------
- 5094 | anycompatiblerange_in
-(1 row)
 
 -- Look for functions that accept cstring and are neither datatype input
 -- functions nor encoding conversion functions.  It's almost never a good
@@ -387,13 +346,11 @@ WHERE 'cstring'::regtype = ANY (p1.proargtypes)
     AND NOT EXISTS(SELECT 1 FROM pg_conversion WHERE conproc = p1.oid)
     AND p1.oid != 'shell_in(cstring)'::regprocedure
 ORDER BY 1;
- oid  |    proname    
-------+---------------
+ oid  |   proname    
+------+--------------
  2293 | cstring_out
  2501 | cstring_send
- 3834 | range_in
- 4231 | multirange_in
-(4 rows)
+(2 rows)
 
 -- Likewise, look for functions that return cstring and aren't datatype output
 -- functions nor typmod output functions.
@@ -406,13 +363,11 @@ WHERE  p1.prorettype = 'cstring'::regtype
     AND NOT EXISTS(SELECT 1 FROM pg_type WHERE typmodout = p1.oid)
     AND p1.oid != 'shell_out(void)'::regprocedure
 ORDER BY 1;
- oid  |    proname     
-------+----------------
+ oid  |   proname    
+------+--------------
  2292 | cstring_in
  2500 | cstring_recv
- 3835 | range_out
- 4232 | multirange_out
-(4 rows)
+(2 rows)
 
 -- Check for length inconsistencies between the various argument-info arrays.
 SELECT p1.oid, p1.proname
@@ -681,22 +636,8 @@ xideqint4(xid,integer)
 "interval"(time without time zone)
 name(character varying)
 "varchar"(name)
-biteq(bit,bit)
-bitne(bit,bit)
-bitge(bit,bit)
-bitgt(bit,bit)
-bitle(bit,bit)
-bitlt(bit,bit)
-bitcmp(bit,bit)
 oidgt(oid,oid)
 oidge(oid,oid)
-varbiteq(bit varying,bit varying)
-varbitne(bit varying,bit varying)
-varbitge(bit varying,bit varying)
-varbitgt(bit varying,bit varying)
-varbitle(bit varying,bit varying)
-varbitlt(bit varying,bit varying)
-varbitcmp(bit varying,bit varying)
 boolle(boolean,boolean)
 boolge(boolean,boolean)
 btboolcmp(boolean,boolean)
@@ -1029,9 +970,7 @@ ORDER BY 1, 2;
  *<>  | *<>
  *=   | *=
  +    | +
- -|-  | -|-
  <    | >
- <<   | >>
  <=   | >=
  <>   | <>
  <@   | @>
@@ -1039,7 +978,7 @@ ORDER BY 1, 2;
  |    | |
  ~<=~ | ~>=~
  ~<~  | ~>~
-(19 rows)
+(17 rows)
 
 -- Likewise for negator pairs.
 SELECT DISTINCT o1.oprname AS op1, o2.oprname AS op2
@@ -1909,11 +1848,9 @@ ORDER BY 1, 2, 3;
                     | float_ops        | float4_ops       | real
                     | float_ops        | float8_ops       | double precision
                     | interval_ops     | interval_ops     | interval
-                    | multirange_ops   | multirange_ops   | anymultirange
-                    | range_ops        | range_ops        | anyrange
                     | record_image_ops | record_image_ops | record
                     | record_ops       | record_ops       | record
-(12 rows)
+(10 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.

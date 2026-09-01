@@ -233,20 +233,7 @@ WHERE p1.prorettype IN
   AND NOT
     ('anyelement'::regtype = ANY (p1.proargtypes) OR
      'anyarray'::regtype = ANY (p1.proargtypes) OR
-     'anynonarray'::regtype = ANY (p1.proargtypes) OR
-     'anyrange'::regtype = ANY (p1.proargtypes) OR
-     'anymultirange'::regtype = ANY (p1.proargtypes))
-ORDER BY 2;
-
--- anyrange and anymultirange are tighter than the rest, can only resolve
--- from each other
-
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE p1.prorettype IN ('anyrange'::regtype, 'anymultirange'::regtype)
-  AND NOT
-    ('anyrange'::regtype = ANY (p1.proargtypes) OR
-      'anymultirange'::regtype = ANY (p1.proargtypes))
+     'anynonarray'::regtype = ANY (p1.proargtypes))
 ORDER BY 2;
 
 -- similarly for the anycompatible family
@@ -259,15 +246,7 @@ WHERE p1.prorettype IN
   AND NOT
     ('anycompatible'::regtype = ANY (p1.proargtypes) OR
      'anycompatiblearray'::regtype = ANY (p1.proargtypes) OR
-     'anycompatiblenonarray'::regtype = ANY (p1.proargtypes) OR
-     'anycompatiblerange'::regtype = ANY (p1.proargtypes))
-ORDER BY 2;
-
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE p1.prorettype = 'anycompatiblerange'::regtype
-  AND NOT
-     'anycompatiblerange'::regtype = ANY (p1.proargtypes)
+     'anycompatiblenonarray'::regtype = ANY (p1.proargtypes))
 ORDER BY 2;
 
 

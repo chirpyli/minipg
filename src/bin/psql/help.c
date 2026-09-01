@@ -17,7 +17,6 @@
 
 #include "common.h"
 #include "common/logging.h"
-#include "common/username.h"
 #include "help.h"
 #include "input.h"
 #include "settings.h"
@@ -43,20 +42,12 @@ usage(unsigned short int pager)
 {
 	const char *env;
 	const char *user;
-	char	   *errstr;
 	FILE	   *output;
 
 	/* Find default user, in case we need it. */
 	user = getenv("PGUSER");
 	if (!user)
-	{
-		user = get_user_name(&errstr);
-		if (!user)
-		{
-			pg_log_fatal("%s", errstr);
-			exit(EXIT_FAILURE);
-		}
-	}
+		user = "postgres";
 
 	/*
 	 * Keep this line count in sync with the number of lines printed below!

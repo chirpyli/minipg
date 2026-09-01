@@ -31,7 +31,6 @@ OBJS = \
 	pg_namespace.o \
 	pg_operator.o \
 	pg_proc.o \
-	pg_range.o \
 	pg_shdepend.o \
 	pg_type.o \
 	storage.o \
@@ -54,7 +53,7 @@ CATALOG_HEADERS := \
 	pg_database.h pg_tablespace.h \
 	pg_shdepend.h \
 	pg_extension.h \
-	pg_collation.h pg_range.h
+	pg_collation.h
 
 GENERATED_HEADERS := $(CATALOG_HEADERS:%.h=%_d.h) schemapg.h system_fk_info.h
 
@@ -66,7 +65,7 @@ POSTGRES_BKI_DATA = $(addprefix $(top_srcdir)/src/include/catalog/,\
 	pg_cast.dat pg_class.dat pg_collation.dat pg_conversion.dat \
 	pg_database.dat pg_language.dat \
 	pg_namespace.dat pg_opclass.dat pg_operator.dat pg_opfamily.dat \
-	pg_proc.dat pg_range.dat pg_tablespace.dat \
+	pg_proc.dat pg_tablespace.dat \
 	pg_type.dat \
 	)
 

@@ -235,7 +235,7 @@ debackslash(const char *token, int length)
  * nodeTokenType -
  *	  returns the type of the node token contained in token.
  *	  It returns one of the following valid NodeTags:
- *		T_Integer, T_Float, T_String, T_BitString
+ *		T_Integer, T_Float, T_String
  *	  and some of its own:
  *		RIGHT_PAREN, LEFT_PAREN, LEFT_BRACE, OTHER_TOKEN
  *
@@ -285,8 +285,6 @@ nodeTokenType(const char *token, int length)
 		retval = LEFT_BRACE;
 	else if (*token == '"' && length > 1 && token[length - 1] == '"')
 		retval = T_String;
-	else if (*token == 'b')
-		retval = T_BitString;
 	else
 		retval = OTHER_TOKEN;
 	return retval;
@@ -442,16 +440,7 @@ nodeRead(const char *token, int tok_len)
 			/* need to remove leading and trailing quotes, and backslashes */
 			result = (Node *) makeString(debackslash(token + 1, tok_len - 2));
 			break;
-		case T_BitString:
-			{
-				char	   *val = palloc(tok_len);
 
-				/* skip leading 'b' */
-				memcpy(val, token + 1, tok_len - 1);
-				val[tok_len - 1] = '\0';
-				result = (Node *) makeBitString(val);
-				break;
-			}
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) type);
 			result = NULL;		/* keep compiler happy */

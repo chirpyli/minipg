@@ -67,7 +67,6 @@
 #include "common/logging.h"
 #include "common/restricted_token.h"
 #include "common/string.h"
-#include "common/username.h"
 #include "fe_utils/string_utils.h"
 #include "getaddrinfo.h"
 #include "getopt_long.h"
@@ -503,7 +502,7 @@ cleanup_directories_atexit(void)
 static char *
 get_id(void)
 {
-	const char *username;
+	const char *username = "postgres";
 
 	if (geteuid() == 0)			/* 0 is root's uid */
 	{
@@ -513,8 +512,6 @@ get_id(void)
 				  "own the server process.\n"));
 		exit(1);
 	}
-
-	username = get_user_name_or_exit(progname);
 
 	return pg_strdup(username);
 }

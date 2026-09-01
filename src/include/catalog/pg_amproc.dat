@@ -15,10 +15,6 @@
 
 { amprocfamily => 'btree/array_ops', amproclefttype => 'anyarray',
   amprocrighttype => 'anyarray', amprocnum => '1', amproc => 'btarraycmp' },
-{ amprocfamily => 'btree/bit_ops', amproclefttype => 'bit',
-  amprocrighttype => 'bit', amprocnum => '1', amproc => 'bitcmp' },
-{ amprocfamily => 'btree/bit_ops', amproclefttype => 'bit',
-  amprocrighttype => 'bit', amprocnum => '4', amproc => 'btequalimage' },
 { amprocfamily => 'btree/bool_ops', amproclefttype => 'bool',
   amprocrighttype => 'bool', amprocnum => '1', amproc => 'btboolcmp' },
 { amprocfamily => 'btree/bool_ops', amproclefttype => 'bool',
@@ -202,10 +198,6 @@
 { amprocfamily => 'btree/time_ops', amproclefttype => 'time',
   amprocrighttype => 'interval', amprocnum => '3',
   amproc => 'in_range(time,time,interval,bool,bool)' },
-{ amprocfamily => 'btree/varbit_ops', amproclefttype => 'varbit',
-  amprocrighttype => 'varbit', amprocnum => '1', amproc => 'varbitcmp' },
-{ amprocfamily => 'btree/varbit_ops', amproclefttype => 'varbit',
-  amprocrighttype => 'varbit', amprocnum => '4', amproc => 'btequalimage' },
 { amprocfamily => 'btree/text_pattern_ops', amproclefttype => 'text',
   amprocrighttype => 'text', amprocnum => '1', amproc => 'bttext_pattern_cmp' },
 { amprocfamily => 'btree/text_pattern_ops', amproclefttype => 'text',
@@ -235,11 +227,6 @@
   amprocrighttype => 'pg_lsn', amprocnum => '4', amproc => 'btequalimage' },
 
 
-{ amprocfamily => 'btree/range_ops', amproclefttype => 'anyrange',
-  amprocrighttype => 'anyrange', amprocnum => '1', amproc => 'range_cmp' },
-{ amprocfamily => 'btree/multirange_ops', amproclefttype => 'anymultirange',
-  amprocrighttype => 'anymultirange', amprocnum => '1',
-  amproc => 'multirange_cmp' },
 
 { amprocfamily => 'btree/xid8_ops', amproclefttype => 'xid8',
   amprocrighttype => 'xid8', amprocnum => '1', amproc => 'xid8cmp' },
@@ -374,17 +361,6 @@
   amprocrighttype => 'pg_lsn', amprocnum => '2',
   amproc => 'pg_lsn_hash_extended' },
 
-{ amprocfamily => 'hash/range_ops', amproclefttype => 'anyrange',
-  amprocrighttype => 'anyrange', amprocnum => '1', amproc => 'hash_range' },
-{ amprocfamily => 'hash/range_ops', amproclefttype => 'anyrange',
-  amprocrighttype => 'anyrange', amprocnum => '2',
-  amproc => 'hash_range_extended' },
-{ amprocfamily => 'hash/multirange_ops', amproclefttype => 'anymultirange',
-  amprocrighttype => 'anymultirange', amprocnum => '1',
-  amproc => 'hash_multirange' },
-{ amprocfamily => 'hash/multirange_ops', amproclefttype => 'anymultirange',
-  amprocrighttype => 'anymultirange', amprocnum => '2',
-  amproc => 'hash_multirange_extended' },
 # minmax bytea
 # bloom bytea
 # minmax "char"
@@ -429,8 +405,6 @@
 # minmax time with time zone
 # minmax multi time with time zone
 # bloom time with time zone
-# minmax bit
-# minmax bit varying
 # minmax numeric
 # minmax multi numeric
 # bloom numeric

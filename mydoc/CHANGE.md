@@ -2,6 +2,49 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 彻底裁剪 range / multirange 范围类型簇（2026-09-01）
+
+### 一、背景
+范围类型（range）与多范围类型（multirange）是 PostgreSQL 的扩展用户态类型，依赖专属 `pg_range` 系统目录、独立的类型缓存（`typcache` 的 range/multirange 子结构）、专用构造函数（`range_constructor*` / `multirange_constructor*`）、专属 I/O 与统计函数，以及一整套 `anyrange`/`anymultirange`/`anycompatiblerange`/`anycompatiblemultirange` 多态伪类型与配套的 `range_ops`/`multirange_ops` 操作符类族、转换器与选择性估计函数。其创建路径（`DefineRange` 及 `makeRangeConstructors`/`makeMultirangeConstructors`）已在「CREATE TYPE 语法整体裁剪（2026-08-25）」中删除，本轮把类型簇的运行时实现与目录一并彻底移除。该簇与 btree/hash 索引、事务等核心路径零耦合，纯属扩展类型，学习价值低，可安全裁剪。
+
+### 二、删除/更新内容
+
+**1. 删除的源文件与头文件**
+- `src/backend/catalog/pg_range.c`、头文件 `src/include/catalog/pg_range.h`（`pg_range` 系统目录读写实现整体删除）。
+- `src/backend/utils/adt/rangetypes.c`、`rangetypes_selfuncs.c`、`rangetypes_typanalyze.c`：范围类型 I/O、选择性估计、ANALYZE 类型分析。
+- `src/backend/utils/adt/multirangetypes.c`、`multirangetypes_selfuncs.c`：多范围类型实现与统计。
+- 头文件 `src/include/utils/rangetypes.h`、`src/include/utils/multirangetypes.h`。
+- `src/backend/utils/adt/Makefile`、`src/common/Makefile`、`src/backend/catalog/Makefile`：从编目移除上述文件。
+
+**2. catalog .dat 数据收敛**
+- `pg_type.dat`：删除所有 `int4range`/`int8range`/`numrange`/`tsrange`/`tstzrange`/`daterange` 及其对应 `*multirange` 类型（含 `anyrange`/`anymultirange`/`anycompatiblerange`/`anycompatiblemultirange` 伪类型，改由 `pseudotypes.c` 仅保留声明，不再经 `pg_range` 登记）。
+- `pg_proc.dat`：删除上述类型配套的 `*_in`/`*_out`/`*_recv`/`*_send`、范围/多范围构造函数、范围合并/包含等操作符底层函数；`pseudotypes.c` 仅保留伪类型的 I/O 占位函数（不再与 `pg_range` 挂钩）。
+- `pg_operator.dat` / `pg_opclass.dat` / `pg_opfamily.dat` / `pg_amop.dat` / `pg_amproc.dat` / `pg_cast.dat` / `pg_aggregate.dat`：删除 range/multirange 专属操作符、`range_ops`/`multirange_ops` 操作符类族、range→multirange 自动转换、range 聚合等条目。
+
+**3. 节点与语法树**
+- `nodes.h`：删除 `T_RangeTblFunction` 中 range 专用分支无关项；`NodeTag` 中 `T_RangeVar` 之外的范围类型节点（如 `T_RangeSubselect` 等仍保留，仅删范围类型相关死节点）；`nodes/*`（copyfuncs/equalfuncs/nodeFuncs/outfuncs/read/value）同步删去 range/multirange 专属节点的拷贝/比较/输出/读取分支。
+- `parser/gram.y`、`parse_coerce.c`、`parse_node.c`：删除范围类型解析、多态伪类型解析与 `parse_coerce` 中 range/multirange 多态解析分支（含 `anyrange`/`anymultirange`/`anycompatiblerange`/`anycompatiblemultirange` 解析）。
+
+**4. 类型缓存与系统缓存**
+- `utils/cache/typcache.h`：删除 `TYPECACHE_RANGE_INFO`/`TYPECACHE_MULTIRANGE_INFO` 标志与 `RangeTypeCacheEntry`/`MultirangeTypeCacheEntry` 子结构、`typcache_entry` 的 range/multirange 关联字段；`typcache.c`：删除 `load_rangetype_info`/`load_multirangetype_info` 及 `array_element_has_*` 中 range/multirange 特判分支、hash 注释里 `hash_range`/`hash_multirange` 引用。
+- `utils/cache/syscache.c`、`syscache.h`：删除 `RANGETYPE`/`RANGEMULTI` 等 `pg_range` 缓存条目。
+- `utils/cache/lsyscache.c`/`lsyscache.h`：删除 `get_range_subtype`/`get_multirange_range` 等查询 `pg_range` 的助手，及 `op_mergejoinable`/`op_hashjoinable` 注释中 range/multirange 说明。
+
+**5. 其它死代码清理**
+- `catalog/pg_type.c`：删除 `makeMultirangeTypeName()` 及其 `pg_type.h` 声明（无调用方）。
+- `include/utils/selfuncs.h`：删除未使用的 `DEFAULT_MULTIRANGE_INEQ_SEL` 宏。
+- `executor/functions.c`、`utils/fmgr/funcapi.c`：删除范围类型 `OUT`/`IN` 函数与 `get_range_subtype`/`get_multirange_range` 引用分支。
+- `bin/initdb/initinitdb.c`、`bin/psql/help.c`、`optimizer/plan/subselect.c`、`utils/adt/ruleutils.c`、`utils/adt/format_type.c`、`main/main.c`：删除范围类型相关文案、帮助项与格式化分支。
+
+### 三、验证
+- 属 catalog 结构与 `NodeTag` 枚举变更，执行全量重编：`make maintainer-clean && ./configure --prefix=/home/postgres/minipg --enable-debug && make -j`。
+- `make check` 全部用例通过（其中 `opr_sanity`/`sanity_check`/`polymorphism` 三个期望输出因 range/multirange 条目消失需同步更新：删除 `multirange_constructor` 二元组、`pg_range` 系统表断言、`anyrange`/`anymultirange`/`anycompatiblerange` 多态检查与 `anycompatiblemultirange` 失败用例、`range_ops`/`multirange_ops` opclass 行；已用实际结果回写 `expected/*.out`）。
+- 全代码库 grep `pg_range|rangetypes|multirangetypes|makeMultirangeTypeName|DEFAULT_MULTIRANGE_INEQ_SEL|get_range_subtype|get_multirange_range` 在 `src/` 下均零命中（版权/历史发布说明除外）。
+
+### 附：同时合入的其它已验证裁剪
+- `src/backend/utils/adt/varbit.c`、头文件 `src/include/utils/varbit.h`：`bit`/`varbit` 位串类型实现（与范围类型同属可裁扩展类型）一并删除，相关 `pg_type.dat`/`pg_proc.dat` 条目与 `format_type.c` 分支同步清理。
+- `src/common/username.c`、头文件 `src/include/common/username.h`：`get_username()` 用户态辅助（仅被已裁的客户端/角色相关路径引用）删除，`common/Makefile` 同步移除。
+
 ## 裁剪 pg_class.relhastriggers 列与触发器相关死代码（2026-09-01）
 
 ### 一、背景
@@ -1126,3 +1169,24 @@ AM 已裁至 heap/btree/hash，EXCLUDE 依赖 GiST 故不可用，彻底删除�
 **测试与文档**：`parallel_schedule` 移除 `unicode` 用例；删除 `sql/unicode.sql`/`expected/unicode.out`；`create_view.sql`/`.out` 删除 is_normalized/normalize 四列用例；`func.sgml` 删除 normalize/is normalized 两个 row 块；`RELEASE_CHANGES` 删除 update-unicode 指引；`pgindent/typedefs.list`、`exclude_file_patterns`、`pginclude/{headerscheck,cpluspluscheck}` 清理相关例外条目；`GNUmakefile.in` 删除 update-unicode 目标，`src/Makefile.global.in` 去 .PHONY 项并删除 `UNICODE_VERSION`/`CLDR_VERSION` 段。
 
 验证：全量 `make maintainer-clean && configure && make -j` 通过；`make check` / `make check-world` 退出码 0，全部用例通过。运行时唯一行为变化：U+0300 等组合附加字符显示宽度由 0 变 1（psql 对齐用），回归用例零命中不受影响。全树残留扫描（除 release-14.sgml 历史发布说明与 SQL 标准关键字列表）`unicode_norm`/`unicode_combining_table`/`UnicodeNormalization`/`mbbisearch`/`update-unicode` 均为 0 命中。
+
+## 彻底裁剪 bit / varbit 位串数据类型（2026-09-01）
+
+几何/网络/UUID 等小数据类型此前已裁，本轮完成最后的位串（bit/varbit）类型裁剪，使内核不再支持 `bit`/`bit varying` 类型。
+
+**实现文件**：删除 `src/backend/utils/adt/varbit.c` 与 `src/include/utils/varbit.h`，并从 `utils/adt/Makefile` 移除 `varbit.o`。
+
+**系统目录（catalog .dat，全部经 genbki 自动重生成，类型数组由 `array_type_oid` 自动派生故仅删基类型）**：
+- `pg_type.dat`：删除 `bit`/`varbit` 基类型条目（数组类型 1561 等随之消失）。
+- `pg_proc.dat`：删除全部位串函数（约 40 条）——`bit_in/out/recv/send`、`bittypmodin/out`、`varbit_*`（I/O 与 typmod）、比较/位运算 `biteq/bitne/bitge/bitgt/bitle/bitlt/bitcmp/bitcat/bitand/bitor/bitxor/bitnot/bitshiftleft/bitshiftright`、位操作 `bitgetbit/bitsetbit/bit_bit_count`、类型转换 `bit(int8,int4)`/`int8(bit)`/`bitfromint8/bittoint8`、聚合 `bit_and(bit)/bit_or(bit)/bit_xor(bit)`、`varbit_support` 规划器支持函数，以及 `bit_length(bit)`、`get_bit(bit,int4)`/`set_bit(bit,int4,int4)`/`bit_count(bit)`（bytea/text 变体保留）。
+- `pg_operator.dat`：删除 bit/varbit 全部运算符（= <> < > <= >= & | # ~ << >> || 等，整型位运算运算符保留）。
+- `pg_opclass.dat` / `pg_opfamily.dat` / `pg_amop.dat` / `pg_amproc.dat`：删除 bit/varbit 的 btree/minmax 操作符类与相关 amop/amproc 行，并清理孤儿注释（`# btree bit`/`# minmax bit` 等）。
+- `pg_cast.dat`：删除 bit/varbit 与 int4/int8 之间的双向转换行，清理 `# BitString category`/`# Cross-category casts between bit and int4, int8` 注释。
+- `pg_aggregate.dat`：删除 `bit_and(bit)/bit_or(bit)/bit_xor(bit)` 聚合（整型位运算聚合保留）。
+- `system_functions.sql`：删除 `bit_length(bit)` 定义（bytea/text 变体保留）。
+
+**位串字面量（B'101'/X'1F'）**：`bit` 类型消失后位串字面量无法生成，彻底移除该路径——`gram.y` 删除 `BCONST`/`XCONST` 产生式与 `makeBitStringConst()`；`parse_node.c` 删除 `case T_BitString:` 与 `#include "utils/varbit.h"`；`nodes/value.c` 删除 `makeBitString()`（`value.h` 同步删除声明）；`nodes.h` 删除 `T_BitString` 枚举（NodeTag 编号前移，全量重编）；`read.c`/`copyfuncs.c`/`outfuncs.c`/`equalfuncs.c`/`nodeFuncs.c` 删除各自 `T_BitString` 处理分支；`format_type.c` 删除 `BITOID`/`VARBITOID` 的反解析 case；`ruleutils.c` 删除 `overlay`/`position`/`substring` 的 bit 变体反解析分支；`read.c` token 分类去掉 `'b'`→T_BitString 分支。
+
+**回归测试适配（保持 check-world 全绿）**：删除 `bit.sql` 与 `expected/bit.out`，并从 `parallel_schedule` 移除 `bit`；同步更新 `opr_sanity.out`（移除 bit 运算符/隐式转换行）、`sanity_check.out`（移除已随 bit.sql 消失的 `bit_defaults` 表）、`hash_func.sql/.out`（`::bit(32)` 显示改为 `::int8`）、`groupingsets.sql/.out`（移除依赖 `bit(4)` 作为“不可哈希列”的 gstest4 段落——minipg 中已无“可排序但不可哈希”的类型，该混合哈希/排序 GROUP BY 错误用例无法复现）、`contrib/pageinspect/page.sql/.out`（`x'...'` 十六进制字面量改为等值十进制整型字面量）。
+
+影响：内核不再支持 `bit`/`bit varying` 类型与 `B'...'`/`X'...'` 位串字面量（二者现均为语法错误）；`bit_length`/`get_bit`/`set_bit`/`bit_count` 仅保留 bytea/text 变体；`bit_and`/`bit_or`/`bit_xor` 仅保留整型变体。验证：全量 `make clean && make -j` 重编通过；`make check-world` 退出码 0，全部用例（主回归 68 + contrib + isolation）通过。

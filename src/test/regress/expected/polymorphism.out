@@ -1084,13 +1084,6 @@ LINE 1: select x, pg_typeof(x) from anyctest(11, 12) x;
                                     ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function anyctest(anycompatible, anycompatiblearray);
--- fail, can't infer result type:
-create function anyctest(anycompatible)
-returns anycompatiblemultirange as $$
-  select $1
-$$ language sql;
-ERROR:  cannot determine result data type
-DETAIL:  A result of type anycompatiblemultirange requires at least one input of type anycompatiblerange or anycompatiblemultirange.
 create function anyctest(anycompatiblenonarray, anycompatiblenonarray)
 returns anycompatiblearray as $$
   select array[$1, $2]

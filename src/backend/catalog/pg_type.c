@@ -766,48 +766,6 @@ moveArrayTypeName(Oid typeOid, const char *typeName, Oid typeNamespace)
 	return true;
 }
 
-
-/*
- * makeMultirangeTypeName
- *	  - given a range type name, make a multirange type name for it
- *
- * caller is responsible for pfreeing the result
- */
-char *
-makeMultirangeTypeName(const char *rangeTypeName, Oid typeNamespace)
-{
-	char	   *buf;
-	const char *rangestr;
-
-	/*
-	 * If the range type name contains "range" then change that to
-	 * "multirange". Otherwise add "_multirange" to the end.
-	 */
-	rangestr = strstr(rangeTypeName, "range");
-	if (rangestr)
-	{
-		char	   *prefix = pnstrdup(rangeTypeName, rangestr - rangeTypeName);
-
-		buf = psprintf("%s%s%s", prefix, "multi", rangestr);
-	}
-	else
-		buf = psprintf("%s_multirange", pnstrdup(rangeTypeName, NAMEDATALEN - 12));
-
-	/* clip it at NAMEDATALEN-1 bytes */
-	buf[pg_mbcliplen(buf, strlen(buf), NAMEDATALEN - 1)] = '\0';
-
-	if (SearchSysCacheExists2(TYPENAMENSP,
-							  CStringGetDatum(buf),
-							  ObjectIdGetDatum(typeNamespace)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("type \"%s\" already exists", buf),
-				 errdetail("Failed while creating a multirange type for type \"%s\".", rangeTypeName),
-				 errhint("You can manually specify a multirange type name using the \"multirange_type_name\" attribute.")));
-
-	return pstrdup(buf);
-}
-
 /*
  * makeUniqueTypeName
  *		Generate a unique name for a prospective new type

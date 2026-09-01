@@ -7960,8 +7960,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoChar(buf, ')');
 			return true;
 
-		case F_OVERLAY_BIT_BIT_INT4:
-		case F_OVERLAY_BIT_BIT_INT4_INT4:
 		case F_OVERLAY_BYTEA_BYTEA_INT4:
 		case F_OVERLAY_BYTEA_BYTEA_INT4_INT4:
 		case F_OVERLAY_TEXT_TEXT_INT4:
@@ -7981,7 +7979,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoChar(buf, ')');
 			return true;
 
-		case F_POSITION_BIT_BIT:
 		case F_POSITION_BYTEA_BYTEA:
 		case F_POSITION_TEXT_TEXT:
 			/* POSITION() ... extra parens since args are b_expr not a_expr */
@@ -7992,8 +7989,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoString(buf, "))");
 			return true;
 
-		case F_SUBSTRING_BIT_INT4:
-		case F_SUBSTRING_BIT_INT4_INT4:
 		case F_SUBSTRING_BYTEA_INT4:
 		case F_SUBSTRING_BYTEA_INT4_INT4:
 		case F_SUBSTRING_TEXT_INT4:
@@ -8561,10 +8556,8 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 
 					/*
 					 * If all the function calls in the list are to unnest,
-					 * and none need a coldeflist, then collapse the list back
-					 * down to UNNEST(args).  (If we had more than one
-					 * built-in unnest function, this would get more
-					 * difficult.)
+					 * and none need a coldeflist, then collapse the list
+					 * back down to UNNEST(args).
 					 *
 					 * XXX This is pretty ugly, since it makes not-terribly-
 					 * future-proof assumptions about what the parser would do
@@ -8579,7 +8572,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 						RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
 
 						if (!IsA(rtfunc->funcexpr, FuncExpr) ||
-							((FuncExpr *) rtfunc->funcexpr)->funcid != F_UNNEST_ANYARRAY ||
+							((FuncExpr *) rtfunc->funcexpr)->funcid != F_UNNEST ||
 							rtfunc->funccolnames != NIL)
 						{
 							all_unnest = false;

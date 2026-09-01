@@ -247,12 +247,6 @@
   aggtranstype => 'int8' },
 { aggfnoid => 'bit_xor(int8)', aggtransfn => 'int8xor',
   aggcombinefn => 'int8xor', aggtranstype => 'int8' },
-{ aggfnoid => 'bit_and(bit)', aggtransfn => 'bitand', aggcombinefn => 'bitand',
-  aggtranstype => 'bit' },
-{ aggfnoid => 'bit_or(bit)', aggtransfn => 'bitor', aggcombinefn => 'bitor',
-  aggtranstype => 'bit' },
-{ aggfnoid => 'bit_xor(bit)', aggtransfn => 'bitxor', aggcombinefn => 'bitxor',
-  aggtranstype => 'bit' },
 
 
 # array
@@ -273,16 +267,6 @@
   aggfinalfn => 'bytea_string_agg_finalfn', aggtranstype => 'internal' },
 
 # range
-{ aggfnoid => 'range_intersect_agg(anyrange)',
-  aggtransfn => 'range_intersect_agg_transfn',
-  aggcombinefn => 'range_intersect_agg_transfn', aggtranstype => 'anyrange' },
-{ aggfnoid => 'range_intersect_agg(anymultirange)',
-  aggtransfn => 'multirange_intersect_agg_transfn',
-  aggcombinefn => 'multirange_intersect_agg_transfn',
-  aggtranstype => 'anymultirange' },
-{ aggfnoid => 'range_agg(anyrange)', aggtransfn => 'range_agg_transfn',
-  aggfinalfn => 'range_agg_finalfn', aggfinalextra => 't',
-  aggtranstype => 'internal' },
 
 
 

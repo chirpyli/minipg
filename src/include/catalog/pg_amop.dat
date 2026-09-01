@@ -628,37 +628,10 @@
 { amopfamily => 'btree/bool_ops', amoplefttype => 'bool',
   amoprighttype => 'bool', amopstrategy => '5', amopopr => '>(bool,bool)',
   amopmethod => 'btree' },
-# btree bit
 
 
-{ amopfamily => 'btree/bit_ops', amoplefttype => 'bit', amoprighttype => 'bit',
-  amopstrategy => '1', amopopr => '<(bit,bit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/bit_ops', amoplefttype => 'bit', amoprighttype => 'bit',
-  amopstrategy => '2', amopopr => '<=(bit,bit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/bit_ops', amoplefttype => 'bit', amoprighttype => 'bit',
-  amopstrategy => '3', amopopr => '=(bit,bit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/bit_ops', amoplefttype => 'bit', amoprighttype => 'bit',
-  amopstrategy => '4', amopopr => '>=(bit,bit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/bit_ops', amoplefttype => 'bit', amoprighttype => 'bit',
-  amopstrategy => '5', amopopr => '>(bit,bit)', amopmethod => 'btree' },
-# btree varbit
 
 
-{ amopfamily => 'btree/varbit_ops', amoplefttype => 'varbit',
-  amoprighttype => 'varbit', amopstrategy => '1', amopopr => '<(varbit,varbit)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/varbit_ops', amoplefttype => 'varbit',
-  amoprighttype => 'varbit', amopstrategy => '2',
-  amopopr => '<=(varbit,varbit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/varbit_ops', amoplefttype => 'varbit',
-  amoprighttype => 'varbit', amopstrategy => '3', amopopr => '=(varbit,varbit)',
-  amopmethod => 'btree' },
-{ amopfamily => 'btree/varbit_ops', amoplefttype => 'varbit',
-  amoprighttype => 'varbit', amopstrategy => '4',
-  amopopr => '>=(varbit,varbit)', amopmethod => 'btree' },
-{ amopfamily => 'btree/varbit_ops', amoplefttype => 'varbit',
-  amoprighttype => 'varbit', amopstrategy => '5', amopopr => '>(varbit,varbit)',
-  amopmethod => 'btree' },
 # btree text pattern
 
 
@@ -938,50 +911,6 @@
 # GIN tsvector_ops
 # btree tsquery_ops
 # GiST tsquery_ops
-# btree range_ops
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-{ amopfamily => 'btree/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '1',
-  amopopr => '<(anyrange,anyrange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '2',
-  amopopr => '<=(anyrange,anyrange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '3',
-  amopopr => '=(anyrange,anyrange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '4',
-  amopopr => '>=(anyrange,anyrange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '5',
-  amopopr => '>(anyrange,anyrange)', amopmethod => 'btree' },
-# hash range_ops
-
-{ amopfamily => 'hash/range_ops', amoplefttype => 'anyrange',
-  amoprighttype => 'anyrange', amopstrategy => '1',
-  amopopr => '=(anyrange,anyrange)', amopmethod => 'hash' },
-# GiST range_ops
-# GiST multirange_ops
-# btree multirange_ops
 
 
 
@@ -1021,26 +950,28 @@
 
 
 
-{ amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '1',
-  amopopr => '<(anymultirange,anymultirange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '2',
-  amopopr => '<=(anymultirange,anymultirange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '3',
-  amopopr => '=(anymultirange,anymultirange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '4',
-  amopopr => '>=(anymultirange,anymultirange)', amopmethod => 'btree' },
-{ amopfamily => 'btree/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '5',
-  amopopr => '>(anymultirange,anymultirange)', amopmethod => 'btree' },
-# hash multirange_ops
 
-{ amopfamily => 'hash/multirange_ops', amoplefttype => 'anymultirange',
-  amoprighttype => 'anymultirange', amopstrategy => '1',
-  amopopr => '=(anymultirange,anymultirange)', amopmethod => 'hash' },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # GiST inet_ops
 # minmax bytea
 # bloom bytea
@@ -1086,8 +1017,6 @@
 # minmax time with time zone
 # minmax multi time with time zone
 # bloom time with time zone
-# minmax bit
-# minmax bit varying
 # minmax numeric
 # minmax multi numeric
 # bloom numeric

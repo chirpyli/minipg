@@ -184,20 +184,7 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 
 	switch (type_oid)
 	{
-		case BITOID:
-			if (with_typemod)
-				buf = printTypmod("bit", typemod, typeform->typmodout);
-			else if ((flags & FORMAT_TYPE_TYPEMOD_GIVEN) != 0)
-			{
-				/*
-				 * bit with typmod -1 is not the same as BIT, which means
-				 * BIT(1) per SQL spec.  Report it as the quoted typename so
-				 * that parser will not assign a bogus typmod.
-				 */
-			}
-			else
-				buf = pstrdup("bit");
-			break;
+
 
 		case BOOLOID:
 			buf = pstrdup("boolean");
@@ -268,12 +255,7 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 				buf = pstrdup("timestamp with time zone");
 			break;
 
-		case VARBITOID:
-			if (with_typemod)
-				buf = printTypmod("bit varying", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("bit varying");
-			break;
+
 
 		case VARCHAROID:
 			if (with_typemod)
@@ -410,11 +392,7 @@ type_maximum_size(Oid type_oid, int32 typemod)
 
 
 
-		case VARBITOID:
-		case BITOID:
-			/* typemod is the (max) number of bits */
-			return (typemod + (BITS_PER_BYTE - 1)) / BITS_PER_BYTE
-				+ 2 * sizeof(int32);
+
 	}
 
 	/* Unknown type, or unlimited-width type such as 'text' */

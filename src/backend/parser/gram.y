@@ -143,7 +143,7 @@ static Node *makeStringConst(char *str, int location);
 static Node *makeStringConstCast(char *str, int location, TypeName *typename);
 static Node *makeIntConst(int val, int location);
 static Node *makeFloatConst(char *str, int location);
-static Node *makeBitStringConst(char *str, int location);
+
 static Node *makeNullAConst(int location);
 static Node *makeAConst(Value *v, int location);
 static Node *makeBoolAConst(bool state, int location);
@@ -7076,19 +7076,7 @@ AexprConst: Iconst
 				{
 					$$ = makeStringConst($1, @1);
 				}
-			| BCONST
-				{
-					$$ = makeBitStringConst($1, @1);
-				}
-			| XCONST
-				{
-					/* This is a bit constant per SQL99:
-					 * Without Feature F511, "BIT data type",
-					 * a <general literal> shall not be a
-					 * <bit string literal> or a <hex string literal>.
-					 */
-					$$ = makeBitStringConst($1, @1);
-				}
+
 			| func_name Sconst
 				{
 					/* generic type 'literal' syntax */
@@ -8384,17 +8372,7 @@ makeFloatConst(char *str, int location)
 	return (Node *)n;
 }
 
-static Node *
-makeBitStringConst(char *str, int location)
-{
-	A_Const *n = makeNode(A_Const);
 
-	n->val.type = T_BitString;
-	n->val.val.str = str;
-	n->location = location;
-
-	return (Node *)n;
-}
 
 static Node *
 makeNullAConst(int location)

@@ -48,8 +48,6 @@ OBJS = \
 	oid.o \
 	oracle_compat.o \
 	orderedsetaggs.o \
-	multirangetypes.o \
-	multirangetypes_selfuncs.o \
 	pg_locale.o \
 	pg_lsn.o \
 	pgstatfuncs.o \
@@ -58,14 +56,10 @@ OBJS = \
 	regproc.o \
 	rowtypes.o \
 	ruleutils.o \
-	rangetypes.o \
-	rangetypes_selfuncs.o \
-	rangetypes_typanalyze.o \
 	selfuncs_geo.o \
 	selfuncs.o \
 	tid.o \
 	timestamp.o \
-	varbit.o \
 	varchar.o \
 	varlena.o \
 	version.o \

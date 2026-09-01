@@ -473,12 +473,6 @@ select x, pg_typeof(x) from anyctest(11, 12) x;  -- fail
 
 drop function anyctest(anycompatible, anycompatiblearray);
 
--- fail, can't infer result type:
-create function anyctest(anycompatible)
-returns anycompatiblemultirange as $$
-  select $1
-$$ language sql;
-
 create function anyctest(anycompatiblenonarray, anycompatiblenonarray)
 returns anycompatiblearray as $$
   select array[$1, $2]

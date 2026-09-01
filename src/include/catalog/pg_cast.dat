@@ -331,21 +331,7 @@
 
 
 
-# BitString category
-{ castsource => 'bit', casttarget => 'varbit', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
-{ castsource => 'varbit', casttarget => 'bit', castfunc => '0',
-  castcontext => 'i', castmethod => 'b' },
 
-# Cross-category casts between bit and int4, int8
-{ castsource => 'int8', casttarget => 'bit', castfunc => 'bit(int8,int4)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'int4', casttarget => 'bit', castfunc => 'bit(int4,int4)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'bit', casttarget => 'int8', castfunc => 'int8(bit)',
-  castcontext => 'e', castmethod => 'f' },
-{ castsource => 'bit', casttarget => 'int4', castfunc => 'int4(bit)',
-  castcontext => 'e', castmethod => 'f' },
 
 # Cross-category casts to and from TEXT
 # We need entries here only for a few specialized cases where the behavior
@@ -392,10 +378,6 @@
 { castsource => 'interval', casttarget => 'interval',
   castfunc => 'interval(interval,int4)', castcontext => 'i',
   castmethod => 'f' },
-{ castsource => 'bit', casttarget => 'bit', castfunc => 'bit(bit,int4,bool)',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'varbit', casttarget => 'varbit', castfunc => 'varbit',
-  castcontext => 'i', castmethod => 'f' },
   castfunc => 'numeric(numeric,int4)', castcontext => 'i', castmethod => 'f' },
 
   castcontext => 'e', castmethod => 'f' },

@@ -82,23 +82,6 @@ typedef struct TypeCacheEntry
 	TupleDesc	tupDesc;
 	uint64		tupDesc_identifier;
 
-	/*
-	 * Fields computed when TYPECACHE_RANGE_INFO is requested.  Zeroes if not
-	 * a range type or information hasn't yet been requested.  Note that
-	 * rng_cmp_proc_finfo could be different from the element type's default
-	 * btree comparison function.
-	 */
-	struct TypeCacheEntry *rngelemtype; /* range's element type */
-	Oid			rng_collation;	/* collation for comparisons, if any */
-	FmgrInfo	rng_cmp_proc_finfo; /* comparison function */
-	FmgrInfo	rng_canonical_finfo;	/* canonicalization function, if any */
-	FmgrInfo	rng_subdiff_finfo;	/* difference function, if any */
-
-	/*
-	 * Fields computed when TYPECACHE_MULTIRANGE_INFO is required.
-	 */
-	struct TypeCacheEntry *rngtype; /* multirange's range underlying type */
-
 	/* Private data, for internal use of typcache.c only */
 	int			flags;			/* flags about what we've computed */
 
@@ -120,10 +103,8 @@ typedef struct TypeCacheEntry
 #define TYPECACHE_TUPDESC			0x00100
 #define TYPECACHE_BTREE_OPFAMILY	0x00200
 #define TYPECACHE_HASH_OPFAMILY		0x00400
-#define TYPECACHE_RANGE_INFO		0x00800
 #define TYPECACHE_HASH_EXTENDED_PROC		0x04000
 #define TYPECACHE_HASH_EXTENDED_PROC_FINFO	0x08000
-#define TYPECACHE_MULTIRANGE_INFO			0x10000
 
 /* This value will not equal any valid tupledesc identifier, nor 0 */
 #define INVALID_TUPLEDESC_IDENTIFIER ((uint64) 1)

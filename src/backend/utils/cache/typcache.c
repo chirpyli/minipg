@@ -53,7 +53,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_operator.h"
-#include "catalog/pg_range.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "executor/executor.h"
@@ -250,8 +249,6 @@ static int32 NextRecordTypmod = 0;	/* number of entries used */
 static uint64 tupledesc_id_counter = INVALID_TUPLEDESC_IDENTIFIER;
 
 static void load_typcache_tupdesc(TypeCacheEntry *typentry);
-static void load_rangetype_info(TypeCacheEntry *typentry);
-static void load_multirangetype_info(TypeCacheEntry *typentry);
 static bool array_element_has_equality(TypeCacheEntry *typentry);
 static bool array_element_has_compare(TypeCacheEntry *typentry);
 static bool array_element_has_hashing(TypeCacheEntry *typentry);
@@ -262,12 +259,6 @@ static bool record_fields_have_compare(TypeCacheEntry *typentry);
 static bool record_fields_have_hashing(TypeCacheEntry *typentry);
 static bool record_fields_have_extended_hashing(TypeCacheEntry *typentry);
 static void cache_record_field_properties(TypeCacheEntry *typentry);
-static bool range_element_has_hashing(TypeCacheEntry *typentry);
-static bool range_element_has_extended_hashing(TypeCacheEntry *typentry);
-static void cache_range_element_properties(TypeCacheEntry *typentry);
-static bool multirange_element_has_hashing(TypeCacheEntry *typentry);
-static bool multirange_element_has_extended_hashing(TypeCacheEntry *typentry);
-static void cache_multirange_element_properties(TypeCacheEntry *typentry);
 static void TypeCacheRelCallback(Datum arg, Oid relid);
 static void TypeCacheTypCallback(Datum arg, int cacheid, uint32 hashvalue);
 static void TypeCacheOpcCallback(Datum arg, int cacheid, uint32 hashvalue);
@@ -507,9 +498,7 @@ lookup_type_cache(Oid type_id, int flags)
 		 * If the proposed equality operator is array_eq or record_eq, check
 		 * to see if the element type or column types support equality.  If
 		 * not, array_eq or record_eq would fail at runtime, so we don't want
-		 * to report that the type has equality.  (We can omit similar
-		 * checking for ranges and multiranges because ranges can't be created
-		 * in the first place unless their subtypes support equality.)
+		 * to report that the type has equality.
 		 */
 		if (eq_opr == ARRAY_EQ_OP &&
 			!array_element_has_equality(typentry))
@@ -545,8 +534,7 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTLessStrategyNumber);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed; but again
-		 * we need no special check for ranges or multiranges.
+		 * As above, make sure array_cmp or record_cmp will succeed.
 		 */
 		if (lt_opr == ARRAY_LT_OP &&
 			!array_element_has_compare(typentry))
@@ -570,8 +558,7 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTGreaterStrategyNumber);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed; but again
-		 * we need no special check for ranges or multiranges.
+		 * As above, make sure array_cmp or record_cmp will succeed.
 		 */
 		if (gt_opr == ARRAY_GT_OP &&
 			!array_element_has_compare(typentry))
@@ -595,8 +582,7 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTORDER_PROC);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed; but again
-		 * we need no special check for ranges or multiranges.
+		 * As above, make sure array_cmp or record_cmp will succeed.
 		 */
 		if (cmp_proc == F_BTARRAYCMP &&
 			!array_element_has_compare(typentry))
@@ -633,21 +619,13 @@ lookup_type_cache(Oid type_id, int flags)
 										  HASHSTANDARD_PROC);
 
 		/*
-		 * As above, make sure hash_array, hash_record, hash_range, or
-		 * hash_multirange will succeed.  Here we do need to check the range
-		 * cases.
+		 * As above, make sure hash_array or hash_record will succeed.
 		 */
 		if (hash_proc == F_HASH_ARRAY &&
 			!array_element_has_hashing(typentry))
 			hash_proc = InvalidOid;
 		else if (hash_proc == F_HASH_RECORD &&
 				 !record_fields_have_hashing(typentry))
-			hash_proc = InvalidOid;
-		else if (hash_proc == F_HASH_RANGE &&
-				 !range_element_has_hashing(typentry))
-			hash_proc = InvalidOid;
-		else if (hash_proc == F_HASH_MULTIRANGE &&
-				 !multirange_element_has_hashing(typentry))
 			hash_proc = InvalidOid;
 
 		/* Force update of hash_proc_finfo only if we're changing state */
@@ -679,20 +657,14 @@ lookup_type_cache(Oid type_id, int flags)
 												   HASHEXTENDED_PROC);
 
 		/*
-		 * As above, make sure hash_array_extended, hash_record_extended,
-		 * hash_range_extended, or hash_multirange_extended will succeed.
+		 * As above, make sure hash_array_extended or hash_record_extended
+		 * will succeed.
 		 */
 		if (hash_extended_proc == F_HASH_ARRAY_EXTENDED &&
 			!array_element_has_extended_hashing(typentry))
 			hash_extended_proc = InvalidOid;
 		else if (hash_extended_proc == F_HASH_RECORD_EXTENDED &&
 				 !record_fields_have_extended_hashing(typentry))
-			hash_extended_proc = InvalidOid;
-		else if (hash_extended_proc == F_HASH_RANGE_EXTENDED &&
-				 !range_element_has_extended_hashing(typentry))
-			hash_extended_proc = InvalidOid;
-		else if (hash_extended_proc == F_HASH_MULTIRANGE_EXTENDED &&
-				 !multirange_element_has_extended_hashing(typentry))
 			hash_extended_proc = InvalidOid;
 
 		/* Force update of proc finfo only if we're changing state */
@@ -759,30 +731,6 @@ lookup_type_cache(Oid type_id, int flags)
 		load_typcache_tupdesc(typentry);
 	}
 
-	/*
-	 * If requested, get information about a range type
-	 *
-	 * This includes making sure that the basic info about the range element
-	 * type is up-to-date.
-	 */
-	if ((flags & TYPECACHE_RANGE_INFO) &&
-		typentry->typtype == TYPTYPE_RANGE)
-	{
-		if (typentry->rngelemtype == NULL)
-			load_rangetype_info(typentry);
-		else if (!(typentry->rngelemtype->flags & TCFLAGS_HAVE_PG_TYPE_DATA))
-			(void) lookup_type_cache(typentry->rngelemtype->type_id, 0);
-	}
-
-	/*
-	 * If requested, get information about a multirange type
-	 */
-	if ((flags & TYPECACHE_MULTIRANGE_INFO) &&
-		typentry->rngtype == NULL &&
-		typentry->typtype == TYPTYPE_MULTIRANGE)
-	{
-		load_multirangetype_info(typentry);
-	}
 
 	return typentry;
 }
@@ -819,79 +767,6 @@ load_typcache_tupdesc(TypeCacheEntry *typentry)
 	typentry->tupDesc_identifier = ++tupledesc_id_counter;
 
 	relation_close(rel, AccessShareLock);
-}
-
-/*
- * load_rangetype_info --- helper routine to set up range type information
- */
-static void
-load_rangetype_info(TypeCacheEntry *typentry)
-{
-	Form_pg_range pg_range;
-	HeapTuple	tup;
-	Oid			subtypeOid;
-	Oid			opclassOid;
-	Oid			canonicalOid;
-	Oid			subdiffOid;
-	Oid			opfamilyOid;
-	Oid			opcintype;
-	Oid			cmpFnOid;
-
-	/* get information from pg_range */
-	tup = SearchSysCache1(RANGETYPE, ObjectIdGetDatum(typentry->type_id));
-	/* should not fail, since we already checked typtype ... */
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for range type %u",
-			 typentry->type_id);
-	pg_range = (Form_pg_range) GETSTRUCT(tup);
-
-	subtypeOid = pg_range->rngsubtype;
-	typentry->rng_collation = pg_range->rngcollation;
-	opclassOid = pg_range->rngsubopc;
-	canonicalOid = pg_range->rngcanonical;
-	subdiffOid = pg_range->rngsubdiff;
-
-	ReleaseSysCache(tup);
-
-	/* get opclass properties and look up the comparison function */
-	opfamilyOid = get_opclass_family(opclassOid);
-	opcintype = get_opclass_input_type(opclassOid);
-
-	cmpFnOid = get_opfamily_proc(opfamilyOid, opcintype, opcintype,
-								 BTORDER_PROC);
-	if (!RegProcedureIsValid(cmpFnOid))
-		elog(ERROR, "missing support function %d(%u,%u) in opfamily %u",
-			 BTORDER_PROC, opcintype, opcintype, opfamilyOid);
-
-	/* set up cached fmgrinfo structs */
-	fmgr_info_cxt(cmpFnOid, &typentry->rng_cmp_proc_finfo,
-				  CacheMemoryContext);
-	if (OidIsValid(canonicalOid))
-		fmgr_info_cxt(canonicalOid, &typentry->rng_canonical_finfo,
-					  CacheMemoryContext);
-	if (OidIsValid(subdiffOid))
-		fmgr_info_cxt(subdiffOid, &typentry->rng_subdiff_finfo,
-					  CacheMemoryContext);
-
-	/* Lastly, set up link to the element type --- this marks data valid */
-	typentry->rngelemtype = lookup_type_cache(subtypeOid, 0);
-}
-
-/*
- * load_multirangetype_info --- helper routine to set up multirange type
- * information
- */
-static void
-load_multirangetype_info(TypeCacheEntry *typentry)
-{
-	Oid			rangetypeOid;
-
-	rangetypeOid = get_multirange_range(typentry->type_id);
-	if (!OidIsValid(rangetypeOid))
-		elog(ERROR, "cache lookup failed for multirange type %u",
-			 typentry->type_id);
-
-	typentry->rngtype = lookup_type_cache(rangetypeOid, TYPECACHE_RANGE_INFO);
 }
 
 /*
@@ -1070,93 +945,6 @@ cache_record_field_properties(TypeCacheEntry *typentry)
 	typentry->flags |= TCFLAGS_CHECKED_FIELD_PROPERTIES;
 }
 
-/*
- * Likewise, some helper functions for range and multirange types.
- *
- * We can borrow the flag bits for array element properties to use for range
- * element properties, since those flag bits otherwise have no use in a
- * range or multirange type's typcache entry.
- */
-
-static bool
-range_element_has_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_ELEM_PROPERTIES))
-		cache_range_element_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_ELEM_HASHING) != 0;
-}
-
-static bool
-range_element_has_extended_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_ELEM_PROPERTIES))
-		cache_range_element_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_ELEM_EXTENDED_HASHING) != 0;
-}
-
-static void
-cache_range_element_properties(TypeCacheEntry *typentry)
-{
-	/* load up subtype link if we didn't already */
-	if (typentry->rngelemtype == NULL &&
-		typentry->typtype == TYPTYPE_RANGE)
-		load_rangetype_info(typentry);
-
-	if (typentry->rngelemtype != NULL)
-	{
-		TypeCacheEntry *elementry;
-
-		/* might need to calculate subtype's hash function properties */
-		elementry = lookup_type_cache(typentry->rngelemtype->type_id,
-									  TYPECACHE_HASH_PROC |
-									  TYPECACHE_HASH_EXTENDED_PROC);
-		if (OidIsValid(elementry->hash_proc))
-			typentry->flags |= TCFLAGS_HAVE_ELEM_HASHING;
-		if (OidIsValid(elementry->hash_extended_proc))
-			typentry->flags |= TCFLAGS_HAVE_ELEM_EXTENDED_HASHING;
-	}
-	typentry->flags |= TCFLAGS_CHECKED_ELEM_PROPERTIES;
-}
-
-static bool
-multirange_element_has_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_ELEM_PROPERTIES))
-		cache_multirange_element_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_ELEM_HASHING) != 0;
-}
-
-static bool
-multirange_element_has_extended_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_ELEM_PROPERTIES))
-		cache_multirange_element_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_ELEM_EXTENDED_HASHING) != 0;
-}
-
-static void
-cache_multirange_element_properties(TypeCacheEntry *typentry)
-{
-	/* load up range link if we didn't already */
-	if (typentry->rngtype == NULL &&
-		typentry->typtype == TYPTYPE_MULTIRANGE)
-		load_multirangetype_info(typentry);
-
-	if (typentry->rngtype != NULL && typentry->rngtype->rngelemtype != NULL)
-	{
-		TypeCacheEntry *elementry;
-
-		/* might need to calculate subtype's hash function properties */
-		elementry = lookup_type_cache(typentry->rngtype->rngelemtype->type_id,
-									  TYPECACHE_HASH_PROC |
-									  TYPECACHE_HASH_EXTENDED_PROC);
-		if (OidIsValid(elementry->hash_proc))
-			typentry->flags |= TCFLAGS_HAVE_ELEM_HASHING;
-		if (OidIsValid(elementry->hash_extended_proc))
-			typentry->flags |= TCFLAGS_HAVE_ELEM_EXTENDED_HASHING;
-	}
-	typentry->flags |= TCFLAGS_CHECKED_ELEM_PROPERTIES;
-}
 
 /*
  * Make sure that RecordCacheArray and RecordIdentifierArray are large enough

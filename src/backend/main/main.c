@@ -23,7 +23,6 @@
 #include <unistd.h>
 
 #include "bootstrap/bootstrap.h"
-#include "common/username.h"
 #include "miscadmin.h"
 #include "port/atomics.h"
 #include "postmaster/postmaster.h"
@@ -171,7 +170,7 @@ main(int argc, char *argv[])
 	else if (argc > 1 && strcmp(argv[1], "--single") == 0)
 		PostgresMain(argc, argv,
 					 NULL,		/* no dbname */
-					 strdup(get_user_name_or_exit(progname)));	/* does not return */
+					 strdup("postgres"));	/* does not return */
 	else
 		PostmasterMain(argc, argv); /* does not return */
 	abort();					/* should not get here */

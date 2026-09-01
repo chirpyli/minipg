@@ -5,206 +5,289 @@
 -- whose low 32 bits match the standard hash function.  When the salt is
 -- not 0, we should get a different result.
 --
-SELECT v as value, hashint2(v)::bit(32) as standard,
-       hashint2extended(v, 0)::bit(32) as extended0,
-       hashint2extended(v, 1)::bit(32) as extended1
+SELECT v as value, hashint2(v)::int8 as standard,
+       hashint2extended(v, 0)::int8 as extended0,
+       hashint2extended(v, 1)::int8 as extended1
 FROM   (VALUES (0::int2), (1::int2), (17::int2), (42::int2)) x(v)
-WHERE  hashint2(v)::bit(32) != hashint2extended(v, 0)::bit(32)
-       OR hashint2(v)::bit(32) = hashint2extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashint2(v)::int8 != hashint2extended(v, 0)::int8
+       OR hashint2(v)::int8 = hashint2extended(v, 1)::int8;
+ value |  standard   |      extended0       |      extended1       
+-------+-------------+----------------------+----------------------
+     0 |  -272711505 |  4154612158245552303 |   434346878670890809
+     1 | -1905060026 | -3670598878359251130 | -7620678293940249823
+    17 |  -917053276 |   253480267289125028 |  7020340311154861306
+    42 |  1509752520 |  8010225493015854792 |  3812564155960986560
+(4 rows)
 
-SELECT v as value, hashint4(v)::bit(32) as standard,
-       hashint4extended(v, 0)::bit(32) as extended0,
-       hashint4extended(v, 1)::bit(32) as extended1
+SELECT v as value, hashint4(v)::int8 as standard,
+       hashint4extended(v, 0)::int8 as extended0,
+       hashint4extended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1), (17), (42), (550273), (207112489)) x(v)
-WHERE  hashint4(v)::bit(32) != hashint4extended(v, 0)::bit(32)
-       OR hashint4(v)::bit(32) = hashint4extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashint4(v)::int8 != hashint4extended(v, 0)::int8
+       OR hashint4(v)::int8 = hashint4extended(v, 1)::int8;
+   value   |  standard   |      extended0       |      extended1       
+-----------+-------------+----------------------+----------------------
+         0 |  -272711505 |  4154612158245552303 |   434346878670890809
+         1 | -1905060026 | -3670598878359251130 | -7620678293940249823
+        17 |  -917053276 |   253480267289125028 |  7020340311154861306
+        42 |  1509752520 |  8010225493015854792 |  3812564155960986560
+    550273 |   340943895 |   -57633972530551785 |  2595894780383029830
+ 207112489 |  1104236721 |  6907798161860939953 | -4651947588450974876
+(6 rows)
 
-SELECT v as value, hashint8(v)::bit(32) as standard,
-       hashint8extended(v, 0)::bit(32) as extended0,
-       hashint8extended(v, 1)::bit(32) as extended1
+SELECT v as value, hashint8(v)::int8 as standard,
+       hashint8extended(v, 0)::int8 as extended0,
+       hashint8extended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1), (17), (42), (550273), (207112489)) x(v)
-WHERE  hashint8(v)::bit(32) != hashint8extended(v, 0)::bit(32)
-       OR hashint8(v)::bit(32) = hashint8extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashint8(v)::int8 != hashint8extended(v, 0)::int8
+       OR hashint8(v)::int8 = hashint8extended(v, 1)::int8;
+   value   |  standard   |      extended0       |      extended1       
+-----------+-------------+----------------------+----------------------
+         0 |  -272711505 |  4154612158245552303 |   434346878670890809
+         1 | -1905060026 | -3670598878359251130 | -7620678293940249823
+        17 |  -917053276 |   253480267289125028 |  7020340311154861306
+        42 |  1509752520 |  8010225493015854792 |  3812564155960986560
+    550273 |   340943895 |   -57633972530551785 |  2595894780383029830
+ 207112489 |  1104236721 |  6907798161860939953 | -4651947588450974876
+(6 rows)
 
-SELECT v as value, hashfloat4(v)::bit(32) as standard,
-       hashfloat4extended(v, 0)::bit(32) as extended0,
-       hashfloat4extended(v, 1)::bit(32) as extended1
+SELECT v as value, hashfloat4(v)::int8 as standard,
+       hashfloat4extended(v, 0)::int8 as extended0,
+       hashfloat4extended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1), (17), (42), (550273), (207112489)) x(v)
-WHERE  hashfloat4(v)::bit(32) != hashfloat4extended(v, 0)::bit(32)
-       OR hashfloat4(v)::bit(32) = hashfloat4extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashfloat4(v)::int8 != hashfloat4extended(v, 0)::int8
+       OR hashfloat4(v)::int8 = hashfloat4extended(v, 1)::int8;
+   value   |  standard   |      extended0       |      extended1       
+-----------+-------------+----------------------+----------------------
+         1 |   376496956 |  4033440226552636220 | -5171306710781166124
+        17 | -1068551742 | -7387389895317179966 | -7096802344384560079
+        42 |   520736324 | -1499743785435148732 |  6214288114320012570
+    550273 |  1266269258 | -3544860022515581878 |  -582174430648348316
+ 207112489 |  -224795530 | -3838079331090176906 | -8012586397467962292
+(5 rows)
 
-SELECT v as value, hashfloat8(v)::bit(32) as standard,
-       hashfloat8extended(v, 0)::bit(32) as extended0,
-       hashfloat8extended(v, 1)::bit(32) as extended1
+SELECT v as value, hashfloat8(v)::int8 as standard,
+       hashfloat8extended(v, 0)::int8 as extended0,
+       hashfloat8extended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1), (17), (42), (550273), (207112489)) x(v)
-WHERE  hashfloat8(v)::bit(32) != hashfloat8extended(v, 0)::bit(32)
-       OR hashfloat8(v)::bit(32) = hashfloat8extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashfloat8(v)::int8 != hashfloat8extended(v, 0)::int8
+       OR hashfloat8(v)::int8 = hashfloat8extended(v, 1)::int8;
+   value   |  standard   |      extended0       |      extended1       
+-----------+-------------+----------------------+----------------------
+         1 |   376496956 |  4033440226552636220 | -5171306710781166124
+        17 | -1068551742 | -7387389895317179966 | -7096802344384560079
+        42 |   520736324 | -1499743785435148732 |  6214288114320012570
+    550273 |  1266269258 | -3544860022515581878 |  -582174430648348316
+ 207112489 |  1636871388 |  1824521741273181404 |  7623564824726718238
+(5 rows)
 
-SELECT v as value, hashoid(v)::bit(32) as standard,
-       hashoidextended(v, 0)::bit(32) as extended0,
-       hashoidextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashoid(v)::int8 as standard,
+       hashoidextended(v, 0)::int8 as extended0,
+       hashoidextended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1), (17), (42), (550273), (207112489)) x(v)
-WHERE  hashoid(v)::bit(32) != hashoidextended(v, 0)::bit(32)
-       OR hashoid(v)::bit(32) = hashoidextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashoid(v)::int8 != hashoidextended(v, 0)::int8
+       OR hashoid(v)::int8 = hashoidextended(v, 1)::int8;
+   value   |  standard   |      extended0       |      extended1       
+-----------+-------------+----------------------+----------------------
+         0 |  -272711505 |  4154612158245552303 |   434346878670890809
+         1 | -1905060026 | -3670598878359251130 | -7620678293940249823
+        17 |  -917053276 |   253480267289125028 |  7020340311154861306
+        42 |  1509752520 |  8010225493015854792 |  3812564155960986560
+    550273 |   340943895 |   -57633972530551785 |  2595894780383029830
+ 207112489 |  1104236721 |  6907798161860939953 | -4651947588450974876
+(6 rows)
 
-SELECT v as value, hashchar(v)::bit(32) as standard,
-       hashcharextended(v, 0)::bit(32) as extended0,
-       hashcharextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashchar(v)::int8 as standard,
+       hashcharextended(v, 0)::int8 as extended0,
+       hashcharextended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::"char"), ('1'), ('x'), ('X'), ('p'), ('N')) x(v)
-WHERE  hashchar(v)::bit(32) != hashcharextended(v, 0)::bit(32)
-       OR hashchar(v)::bit(32) = hashcharextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashchar(v)::int8 != hashcharextended(v, 0)::int8
+       OR hashchar(v)::int8 = hashcharextended(v, 1)::int8;
+ value |  standard   |      extended0       |      extended1       
+-------+-------------+----------------------+----------------------
+ 1     |   888805212 |  9185408430972213084 | -5566646930907685627
+ x     | -1072653310 |  -300249585504183294 | -6527344295840258089
+ X     | -1783003161 |  5602260888493590503 |  3741314046649993601
+ p     | -1216226922 | -4430008241597851242 |   -64384551210861746
+ N     |  1976409549 |  5017369166392171981 |  6320853104131786520
+(5 rows)
 
-SELECT v as value, hashname(v)::bit(32) as standard,
-       hashnameextended(v, 0)::bit(32) as extended0,
-       hashnameextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashname(v)::int8 as standard,
+       hashnameextended(v, 0)::int8 as extended0,
+       hashnameextended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL), ('PostgreSQL'), ('eIpUEtqmY89'), ('AXKEJBTK'),
         ('muop28x03'), ('yi3nm0d73')) x(v)
-WHERE  hashname(v)::bit(32) != hashnameextended(v, 0)::bit(32)
-       OR hashname(v)::bit(32) = hashnameextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashname(v)::int8 != hashnameextended(v, 0)::int8
+       OR hashname(v)::int8 = hashnameextended(v, 1)::int8;
+    value    |  standard   |      extended0       |      extended1       
+-------------+-------------+----------------------+----------------------
+ PostgreSQL  | -1696465276 | -5770657681951818108 | -1358846221981485480
+ eIpUEtqmY89 |  1820180513 | -1275776723006406623 |  1314446201569324470
+ AXKEJBTK    |  1316352705 |  4102847856773558977 |   120317941467862907
+ muop28x03   | -1138522341 |  6152145075303581467 | -6705065684987507733
+ yi3nm0d73   |  1880619975 |  4632767081301408711 | -3227811903240167559
+(5 rows)
 
-SELECT v as value, hashtext(v)::bit(32) as standard,
-       hashtextextended(v, 0)::bit(32) as extended0,
-       hashtextextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashtext(v)::int8 as standard,
+       hashtextextended(v, 0)::int8 as extended0,
+       hashtextextended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL), ('PostgreSQL'), ('eIpUEtqmY89'), ('AXKEJBTK'),
         ('muop28x03'), ('yi3nm0d73')) x(v)
-WHERE  hashtext(v)::bit(32) != hashtextextended(v, 0)::bit(32)
-       OR hashtext(v)::bit(32) = hashtextextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashtext(v)::int8 != hashtextextended(v, 0)::int8
+       OR hashtext(v)::int8 = hashtextextended(v, 1)::int8;
+    value    |  standard   |      extended0       |      extended1       
+-------------+-------------+----------------------+----------------------
+ PostgreSQL  | -1696465276 | -5770657681951818108 | -1358846221981485480
+ eIpUEtqmY89 |  1820180513 | -1275776723006406623 |  1314446201569324470
+ AXKEJBTK    |  1316352705 |  4102847856773558977 |   120317941467862907
+ muop28x03   | -1138522341 |  6152145075303581467 | -6705065684987507733
+ yi3nm0d73   |  1880619975 |  4632767081301408711 | -3227811903240167559
+(5 rows)
 
-SELECT v as value, hashoidvector(v)::bit(32) as standard,
-       hashoidvectorextended(v, 0)::bit(32) as extended0,
-       hashoidvectorextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashoidvector(v)::int8 as standard,
+       hashoidvectorextended(v, 0)::int8 as extended0,
+       hashoidvectorextended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::oidvector), ('0 1 2 3 4'), ('17 18 19 20'),
         ('42 43 42 45'), ('550273 550273 570274'),
         ('207112489 207112499 21512 2155 372325 1363252')) x(v)
-WHERE  hashoidvector(v)::bit(32) != hashoidvectorextended(v, 0)::bit(32)
-       OR hashoidvector(v)::bit(32) = hashoidvectorextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashoidvector(v)::int8 != hashoidvectorextended(v, 0)::int8
+       OR hashoidvector(v)::int8 = hashoidvectorextended(v, 1)::int8;
+                     value                     |  standard   |      extended0       |      extended1       
+-----------------------------------------------+-------------+----------------------+----------------------
+ 0 1 2 3 4                                     |  -370450493 | -3733358120069799997 |  6166610607036226876
+ 17 18 19 20                                   | -1188815123 |  -295979322976231699 | -4805509123655557717
+ 42 43 42 45                                   | -1822147525 |  6228663112453864507 |  1254724838537622455
+ 550273 550273 570274                          | -1410816253 |  4358936473071298307 | -1020718771959417586
+ 207112489 207112499 21512 2155 372325 1363252 |    61410269 |  7985321076457016285 |  4312024484615260412
+(5 rows)
 
-SELECT v as value, hash_numeric(v)::bit(32) as standard,
-       hash_numeric_extended(v, 0)::bit(32) as extended0,
-       hash_numeric_extended(v, 1)::bit(32) as extended1
+SELECT v as value, hash_numeric(v)::int8 as standard,
+       hash_numeric_extended(v, 0)::int8 as extended0,
+       hash_numeric_extended(v, 1)::int8 as extended1
 FROM   (VALUES (0), (1.149484958), (17.149484958), (42.149484958),
         (149484958.550273), (2071124898672)) x(v)
-WHERE  hash_numeric(v)::bit(32) != hash_numeric_extended(v, 0)::bit(32)
-       OR hash_numeric(v)::bit(32) = hash_numeric_extended(v, 1)::bit(32);
+WHERE  hash_numeric(v)::int8 != hash_numeric_extended(v, 0)::int8
+       OR hash_numeric(v)::int8 = hash_numeric_extended(v, 1)::int8;
 ERROR:  function hash_numeric(double precision) does not exist
-LINE 1: SELECT v as value, hash_numeric(v)::bit(32) as standard,
+LINE 1: SELECT v as value, hash_numeric(v)::int8 as standard,
                            ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-SELECT v as value, hash_array(v)::bit(32) as standard,
-       hash_array_extended(v, 0)::bit(32) as extended0,
-       hash_array_extended(v, 1)::bit(32) as extended1
+SELECT v as value, hash_array(v)::int8 as standard,
+       hash_array_extended(v, 0)::int8 as extended0,
+       hash_array_extended(v, 1)::int8 as extended1
 FROM   (VALUES ('{0}'::int4[]), ('{0,1,2,3,4}'), ('{17,18,19,20}'),
         ('{42,34,65,98}'), ('{550273,590027, 870273}'),
         ('{207112489, 807112489}')) x(v)
-WHERE  hash_array(v)::bit(32) != hash_array_extended(v, 0)::bit(32)
-       OR hash_array(v)::bit(32) = hash_array_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hash_array(v)::int8 != hash_array_extended(v, 0)::int8
+       OR hash_array(v)::int8 = hash_array_extended(v, 1)::int8;
+         value          |  standard   |      extended0       |      extended1       
+------------------------+-------------+----------------------+----------------------
+ {0}                    |  -272711474 |  4154612158245552334 |   434346878670890840
+ {0,1,2,3,4}            |  -400208206 |  6802225111146778290 | -9219869157324414256
+ {17,18,19,20}          |   998528879 | -1010935012993509521 |   -12212636651439687
+ {42,34,65,98}          | -1666252174 | -2022936693368225166 |  6723328879164486412
+ {550273,590027,870273} |   108672198 |  6096312382898451654 | -6448146122621069238
+ {207112489,807112489}  |   182926814 |  8953157292051086814 |  8513911704082540217
+(6 rows)
 
 -- array hashing with non-hashable element type
-SELECT v as value, hash_array(v)::bit(32) as standard
+SELECT v as value, hash_array(v)::int8 as standard
 FROM   (VALUES ('{0}'::int8[])) x(v);
- value |             standard             
--------+----------------------------------
- {0}   | 11101111101111101100000011001110
+ value |  standard  
+-------+------------
+ {0}   | -272711474
 (1 row)
 
-SELECT v as value, hash_array_extended(v, 0)::bit(32) as extended0
+SELECT v as value, hash_array_extended(v, 0)::int8 as extended0
 FROM   (VALUES ('{0}'::int8[])) x(v);
- value |            extended0             
--------+----------------------------------
- {0}   | 11101111101111101100000011001110
+ value |      extended0      
+-------+---------------------
+ {0}   | 4154612158245552334
 (1 row)
 
-SELECT v as value, hashbpchar(v)::bit(32) as standard,
-       hashbpcharextended(v, 0)::bit(32) as extended0,
-       hashbpcharextended(v, 1)::bit(32) as extended1
+SELECT v as value, hashbpchar(v)::int8 as standard,
+       hashbpcharextended(v, 0)::int8 as extended0,
+       hashbpcharextended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL), ('PostgreSQL'), ('eIpUEtqmY89'), ('AXKEJBTK'),
         ('muop28x03'), ('yi3nm0d73')) x(v)
-WHERE  hashbpchar(v)::bit(32) != hashbpcharextended(v, 0)::bit(32)
-       OR hashbpchar(v)::bit(32) = hashbpcharextended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  hashbpchar(v)::int8 != hashbpcharextended(v, 0)::int8
+       OR hashbpchar(v)::int8 = hashbpcharextended(v, 1)::int8;
+    value    |  standard   |      extended0       |      extended1       
+-------------+-------------+----------------------+----------------------
+ PostgreSQL  | -1696465276 | -5770657681951818108 | -1358846221981485480
+ eIpUEtqmY89 |  1820180513 | -1275776723006406623 |  1314446201569324470
+ AXKEJBTK    |  1316352705 |  4102847856773558977 |   120317941467862907
+ muop28x03   | -1138522341 |  6152145075303581467 | -6705065684987507733
+ yi3nm0d73   |  1880619975 |  4632767081301408711 | -3227811903240167559
+(5 rows)
 
-SELECT v as value, time_hash(v)::bit(32) as standard,
-       time_hash_extended(v, 0)::bit(32) as extended0,
-       time_hash_extended(v, 1)::bit(32) as extended1
+SELECT v as value, time_hash(v)::int8 as standard,
+       time_hash_extended(v, 0)::int8 as extended0,
+       time_hash_extended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::time), ('11:09:59'), ('1:09:59'), ('11:59:59'),
         ('7:9:59'), ('5:15:59')) x(v)
-WHERE  time_hash(v)::bit(32) != time_hash_extended(v, 0)::bit(32)
-       OR time_hash(v)::bit(32) = time_hash_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  time_hash(v)::int8 != time_hash_extended(v, 0)::int8
+       OR time_hash(v)::int8 = time_hash_extended(v, 1)::int8;
+  value   |  standard  |      extended0       |      extended1       
+----------+------------+----------------------+----------------------
+ 11:09:59 | 1740227977 |  6564483993255396745 | -4195280914249155905
+ 01:09:59 |  356014008 | -5368148179735259208 | -2046741307632344162
+ 11:59:59 | 1153183566 | -1946402611012030642 | -4025026224423916732
+ 07:09:59 | 1025469285 | -6508852593364604059 |  1092668065412787603
+ 05:15:59 |  119788729 |   850546358160184505 |  1760393635597191227
+(5 rows)
 
-SELECT v as value, interval_hash(v)::bit(32) as standard,
-       interval_hash_extended(v, 0)::bit(32) as extended0,
-       interval_hash_extended(v, 1)::bit(32) as extended1
+SELECT v as value, interval_hash(v)::int8 as standard,
+       interval_hash_extended(v, 0)::int8 as extended0,
+       interval_hash_extended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::interval),
         ('5 month 7 day 46 minutes'), ('1 year 7 day 46 minutes'),
         ('1 year 7 month 20 day 46 minutes'), ('5 month'),
         ('17 year 11 month 7 day 9 hours 46 minutes 5 seconds')) x(v)
-WHERE  interval_hash(v)::bit(32) != interval_hash_extended(v, 0)::bit(32)
-       OR interval_hash(v)::bit(32) = interval_hash_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  interval_hash(v)::int8 != interval_hash_extended(v, 0)::int8
+       OR interval_hash(v)::int8 = interval_hash_extended(v, 1)::int8;
+                      value                       |  standard   |      extended0       |      extended1       
+--------------------------------------------------+-------------+----------------------+----------------------
+ @ 5 mons 7 days 46 mins                          | -1650268900 | -2083448633614473956 |   942857083618110188
+ @ 1 year 7 days 46 mins                          |  -188752276 |   682362847358869100 |  8020267027678391873
+ @ 1 year 7 mons 20 days 46 mins                  | -1444594270 |  6089252150895263138 | -4322963122194547468
+ @ 5 mons                                         |  -402409602 |  1927909079586682750 |  6550779087738020598
+ @ 17 years 11 mons 7 days 9 hours 46 mins 5 secs | -1299620699 |  3035087197319027877 | -8075234394233322834
+(5 rows)
 
-SELECT v as value, timestamp_hash(v)::bit(32) as standard,
-       timestamp_hash_extended(v, 0)::bit(32) as extended0,
-       timestamp_hash_extended(v, 1)::bit(32) as extended1
+SELECT v as value, timestamp_hash(v)::int8 as standard,
+       timestamp_hash_extended(v, 0)::int8 as extended0,
+       timestamp_hash_extended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::timestamp), ('2017-08-22 00:09:59.518762'),
         ('2015-08-20 00:11:52.51762-08'),
         ('2017-05-22 00:11:52.62-01'),
         ('2013-08-22 00:11:52.62+01'), ('2013-08-22 11:59:59+04')) x(v)
-WHERE  timestamp_hash(v)::bit(32) != timestamp_hash_extended(v, 0)::bit(32)
-       OR timestamp_hash(v)::bit(32) = timestamp_hash_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  timestamp_hash(v)::int8 != timestamp_hash_extended(v, 0)::int8
+       OR timestamp_hash(v)::int8 = timestamp_hash_extended(v, 1)::int8;
+              value              |  standard   |      extended0       |      extended1       
+---------------------------------+-------------+----------------------+----------------------
+ Tue Aug 22 00:09:59.518762 2017 | -1951806412 |  7278392942403374132 |   752475669196389666
+ Thu Aug 20 00:11:52.51762 2015  |  -753461281 |  1439783954396157919 | -8499892273580723126
+ Mon May 22 00:11:52.62 2017     |  -858287878 | -7815280934003437318 |  9086995893915210118
+ Thu Aug 22 00:11:52.62 2013     |  -245073051 |  4303234162906921829 |  3090899049055242995
+ Thu Aug 22 11:59:59 2013        |  2142759115 |  6663281100598012107 |  5596100192673380224
+(5 rows)
 
-SELECT v as value, pg_lsn_hash(v)::bit(32) as standard,
-       pg_lsn_hash_extended(v, 0)::bit(32) as extended0,
-       pg_lsn_hash_extended(v, 1)::bit(32) as extended1
+SELECT v as value, pg_lsn_hash(v)::int8 as standard,
+       pg_lsn_hash_extended(v, 0)::int8 as extended0,
+       pg_lsn_hash_extended(v, 1)::int8 as extended1
 FROM   (VALUES (NULL::pg_lsn), ('16/B374D84'), ('30/B374D84'),
         ('255/B374D84'), ('25/B379D90'), ('900/F37FD90')) x(v)
-WHERE  pg_lsn_hash(v)::bit(32) != pg_lsn_hash_extended(v, 0)::bit(32)
-       OR pg_lsn_hash(v)::bit(32) = pg_lsn_hash_extended(v, 1)::bit(32);
- value | standard | extended0 | extended1 
--------+----------+-----------+-----------
-(0 rows)
+WHERE  pg_lsn_hash(v)::int8 != pg_lsn_hash_extended(v, 0)::int8
+       OR pg_lsn_hash(v)::int8 = pg_lsn_hash_extended(v, 1)::int8;
+    value    |  standard  |      extended0       |      extended1       
+-------------+------------+----------------------+----------------------
+ 16/B374D84  |  783723155 |  7832933829336017555 |  1597760003272856237
+ 30/B374D84  | 1759241999 |  7315578115833194255 |   250978243334195842
+ 255/B374D84 | 1495333152 | -8505578907370456800 |  2864899247787372688
+ 25/B379D90  | 1855968905 | -2568725525910530423 |  2651386222680031386
+ 900/F37FD90 |  440850662 | -4924651226760029978 | -4622323655181136135
+(5 rows)
 
 --
 -- Check special cases for specific data types

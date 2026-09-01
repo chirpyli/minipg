@@ -30,12 +30,6 @@
  */
 
 
-CREATE OR REPLACE FUNCTION bit_length(bit)
- RETURNS integer
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN length($1);
-
 CREATE OR REPLACE FUNCTION bit_length(bytea)
  RETURNS integer
  LANGUAGE sql
@@ -210,18 +204,6 @@ RETURNS interval
 LANGUAGE INTERNAL
 STRICT IMMUTABLE PARALLEL SAFE
 AS 'make_interval';
-
-
---
--- The default permissions for functions mean that anyone can execute them.
--- A number of functions shouldn't be executable by just anyone, but rather
--- than use explicit 'superuser()' checks in those functions, we use the GRANT
--- system to REVOKE access to those functions at initdb time.  Administrators
--- can later change who can access these functions, or leave them as only
--- available to superuser / cluster owner, if they choose.
---
-
-
 
 
 

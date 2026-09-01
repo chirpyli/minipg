@@ -2248,7 +2248,6 @@ _copyAConst(const A_Const *from)
 			break;
 		case T_Float:
 		case T_String:
-		case T_BitString:
 			COPY_STRING_FIELD(val.val.str);
 			break;
 		case T_Null:
@@ -3092,7 +3091,6 @@ _copyValue(const Value *from)
 			break;
 		case T_Float:
 		case T_String:
-		case T_BitString:
 			COPY_STRING_FIELD(val.str);
 			break;
 		case T_Null:
@@ -3435,7 +3433,6 @@ copyObjectImpl(const void *from)
 		case T_Integer:
 		case T_Float:
 		case T_String:
-		case T_BitString:
 		case T_Null:
 			retval = _copyValue(from);
 			break;

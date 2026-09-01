@@ -14,7 +14,6 @@ SELECT relname, relhasindex
 aggtest|f
 array_index_op_test|f
 array_op_test|f
-bit_defaults|f
 boolindex|t
 bprime|f
 bt_f8_heap|t
@@ -69,7 +68,6 @@ pg_opclass|t
 pg_operator|t
 pg_opfamily|t
 pg_proc|t
-pg_range|t
 pg_rewrite|t
 pg_shdepend|t
 pg_statistic|t
