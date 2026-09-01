@@ -21,10 +21,6 @@
 #include "storage/dsm.h"
 #include "utils/dsa.h"
 
-
-/* DomainConstraintCache is an opaque struct known only within typcache.c */
-typedef struct DomainConstraintCache DomainConstraintCache;
-
 typedef struct TypeCacheEntry
 {
 	/* typeId is the hash lookup key and MUST BE FIRST */
@@ -103,19 +99,6 @@ typedef struct TypeCacheEntry
 	 */
 	struct TypeCacheEntry *rngtype; /* multirange's range underlying type */
 
-	/*
-	 * Domain's base type and typmod if it's a domain type.  Zeroes if not
-	 * domain, or if information hasn't been requested.
-	 */
-	Oid			domainBaseType;
-	int32		domainBaseTypmod;
-
-	/*
-	 * Domain constraint data if it's a domain type.  NULL if not domain, or
-	 * if domain has no constraints, or if information hasn't been requested.
-	 */
-	DomainConstraintCache *domainData;
-
 	/* Private data, for internal use of typcache.c only */
 	int			flags;			/* flags about what we've computed */
 
@@ -123,9 +106,6 @@ typedef struct TypeCacheEntry
 	 * Private information about an enum type.  NULL if not enum or
 	 * information hasn't been requested.
 	 */
-
-	/* We also maintain a list of all known domain-type cache entries */
-	struct TypeCacheEntry *nextDomain;
 } TypeCacheEntry;
 
 /* Bit flags to indicate which fields a given caller needs to have set */
@@ -141,8 +121,6 @@ typedef struct TypeCacheEntry
 #define TYPECACHE_BTREE_OPFAMILY	0x00200
 #define TYPECACHE_HASH_OPFAMILY		0x00400
 #define TYPECACHE_RANGE_INFO		0x00800
-#define TYPECACHE_DOMAIN_BASE_INFO			0x01000
-#define TYPECACHE_DOMAIN_CONSTR_INFO		0x02000
 #define TYPECACHE_HASH_EXTENDED_PROC		0x04000
 #define TYPECACHE_HASH_EXTENDED_PROC_FINFO	0x08000
 #define TYPECACHE_MULTIRANGE_INFO			0x10000
@@ -150,34 +128,9 @@ typedef struct TypeCacheEntry
 /* This value will not equal any valid tupledesc identifier, nor 0 */
 #define INVALID_TUPLEDESC_IDENTIFIER ((uint64) 1)
 
-/*
- * Callers wishing to maintain a long-lived reference to a domain's constraint
- * set must store it in one of these.  Use InitDomainConstraintRef() and
- * UpdateDomainConstraintRef() to manage it.  Note: DomainConstraintState is
- * considered an executable expression type, so it's defined in execnodes.h.
- */
-typedef struct DomainConstraintRef
-{
-	List	   *constraints;	/* list of DomainConstraintState nodes */
-	MemoryContext refctx;		/* context holding DomainConstraintRef */
-	TypeCacheEntry *tcache;		/* typcache entry for domain type */
-	bool		need_exprstate; /* does caller need check_exprstate? */
-
-	/* Management data --- treat these fields as private to typcache.c */
-	DomainConstraintCache *dcc; /* current constraints, or NULL if none */
-	MemoryContextCallback callback; /* used to release refcount when done */
-} DomainConstraintRef;
-
 typedef struct SharedRecordTypmodRegistry SharedRecordTypmodRegistry;
 
 extern TypeCacheEntry *lookup_type_cache(Oid type_id, int flags);
-
-extern void InitDomainConstraintRef(Oid type_id, DomainConstraintRef *ref,
-									MemoryContext refctx, bool need_exprstate);
-
-extern void UpdateDomainConstraintRef(DomainConstraintRef *ref);
-
-extern bool DomainHasConstraints(Oid type_id);
 
 extern TupleDesc lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
 
@@ -185,9 +138,6 @@ extern TupleDesc lookup_rowtype_tupdesc_noerror(Oid type_id, int32 typmod,
 												bool noError);
 
 extern TupleDesc lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
-
-extern TupleDesc lookup_rowtype_tupdesc_domain(Oid type_id, int32 typmod,
-											   bool noError);
 
 extern void assign_record_type_typmod(TupleDesc tupDesc);
 

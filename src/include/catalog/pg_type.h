@@ -64,7 +64,7 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 
 	/*
 	 * typtype is 'b' for a base type, 'c' for a composite type (e.g., a
-	 * table's rowtype), 'd' for a domain, 'e' for an enum type, 'p' for a
+	 * table's rowtype), 'e' for an enum type, 'p' for a
 	 * pseudo-type, or 'r' for a range type. (Use the TYPTYPE macros below.)
 	 *
 	 * If typtype is 'c', typrelid is the OID of the class' entry in pg_class.
@@ -189,61 +189,10 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 	char		typstorage BKI_DEFAULT(p) BKI_ARRAY_DEFAULT(x);
 
 	/*
-	 * This flag represents a "NOT NULL" constraint against this datatype.
-	 *
-	 * If true, the attnotnull column for a corresponding table column using
-	 * this datatype will always enforce the NOT NULL constraint.
-	 *
-	 * Used primarily for domain types.
-	 */
-	bool		typnotnull BKI_DEFAULT(f);
-
-	/*
-	 * Domains use typbasetype to show the base (or domain) type that the
-	 * domain is based on.  Zero if the type is not a domain.
-	 */
-	Oid			typbasetype BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_type);
-
-	/*
-	 * Domains use typtypmod to record the typmod to be applied to their base
-	 * type (-1 if base type does not use a typmod).  -1 if this type is not a
-	 * domain.
-	 */
-	int32		typtypmod BKI_DEFAULT(-1);
-
-	/*
-	 * typndims is the declared number of dimensions for an array domain type
-	 * (i.e., typbasetype is an array type).  Otherwise zero.
-	 */
-	int32		typndims BKI_DEFAULT(0);
-
-	/*
 	 * Collation: 0 if type cannot use collations, nonzero (typically
-	 * DEFAULT_COLLATION_OID) for collatable base types, possibly some other
-	 * OID for domains over collatable types
+	 * DEFAULT_COLLATION_OID) for collatable base types
 	 */
 	Oid			typcollation BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_collation);
-
-#ifdef CATALOG_VARLEN			/* variable-length fields start here */
-
-	/*
-	 * If typdefaultbin is not NULL, it is the nodeToString representation of
-	 * a default expression for the type.  Currently this is only used for
-	 * domains.
-	 */
-	pg_node_tree typdefaultbin BKI_DEFAULT(_null_) BKI_ARRAY_DEFAULT(_null_);
-
-	/*
-	 * typdefault is NULL if the type has no associated default value. If
-	 * typdefaultbin is not NULL, typdefault must contain a human-readable
-	 * version of the default expression represented by typdefaultbin. If
-	 * typdefaultbin is NULL and typdefault is not, then typdefault is the
-	 * external representation of the type's default value, which may be fed
-	 * to the type's input converter to produce a constant.
-	 */
-	text		typdefault BKI_DEFAULT(_null_) BKI_ARRAY_DEFAULT(_null_);
-
-#endif
 } FormData_pg_type;
 
 /* ----------------
@@ -252,8 +201,6 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
  * ----------------
  */
 typedef FormData_pg_type *Form_pg_type;
-
-DECLARE_TOAST(pg_type, 4171, 4172);
 
 DECLARE_UNIQUE_INDEX_PKEY(pg_type_oid_index, 2703, on pg_type using btree(oid oid_ops));
 #define TypeOidIndexId	2703
@@ -267,7 +214,6 @@ DECLARE_UNIQUE_INDEX(pg_type_typname_nsp_index, 2704, on pg_type using btree(typ
  */
 #define  TYPTYPE_BASE		'b' /* base type (ordinary scalar type) */
 #define  TYPTYPE_COMPOSITE	'c' /* composite (e.g., table's rowtype) */
-#define  TYPTYPE_DOMAIN		'd' /* domain over another type */
 #define  TYPTYPE_MULTIRANGE	'm' /* multirange type */
 #define  TYPTYPE_PSEUDO		'p' /* pseudo-type */
 #define  TYPTYPE_RANGE		'r' /* range type */
@@ -358,20 +304,13 @@ extern ObjectAddress TypeCreate(Oid newTypeOid,
 								Oid elementType,
 								bool isImplicitArray,
 								Oid arrayType,
-								Oid baseType,
-								const char *defaultTypeValue,
-								char *defaultTypeBin,
 								bool passedByValue,
 								char alignment,
 								char storage,
-								int32 typeMod,
-								int32 typNDims,
-								bool typeNotNull,
 								Oid typeCollation);
 
 extern void GenerateTypeDependencies(HeapTuple typeTuple,
 									 Relation typeCatalog,
-									 Node *defaultExpr,
 									 void *typacl,
 									 char relationKind, /* only for relation
 														 * rowtypes */

@@ -169,8 +169,6 @@ typedef enum NodeTag
 	T_SQLValueFunction,
 	T_NullTest,
 	T_BooleanTest,
-	T_CoerceToDomain,
-	T_CoerceToDomainValue,
 	T_SetToDefault,
 	T_InferenceElem,
 	T_TargetEntry,
@@ -191,7 +189,6 @@ typedef enum NodeTag
 	T_ExprState,
 	T_SetExprState,
 	T_SubPlanState,
-	T_DomainConstraintState,
 
 	/*
 	 * TAGS FOR PLANNER NODES (pathnodes.h)

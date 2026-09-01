@@ -751,8 +751,7 @@ init_sexpr(Oid foid, Oid input_collation, Expr *node,
 		/* Must save tupdesc in sexpr's context */
 		oldcontext = MemoryContextSwitchTo(sexprCxt);
 
-		if (functypclass == TYPEFUNC_COMPOSITE ||
-			functypclass == TYPEFUNC_COMPOSITE_DOMAIN)
+		if (functypclass == TYPEFUNC_COMPOSITE)
 		{
 			/* Composite data type, e.g. a table's row type */
 			Assert(tupdesc);

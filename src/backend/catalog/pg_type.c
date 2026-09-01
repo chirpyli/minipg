@@ -112,13 +112,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	values[Anum_pg_type_typanalyze - 1] = ObjectIdGetDatum(InvalidOid);
 	values[Anum_pg_type_typalign - 1] = CharGetDatum(TYPALIGN_INT);
 	values[Anum_pg_type_typstorage - 1] = CharGetDatum(TYPSTORAGE_PLAIN);
-	values[Anum_pg_type_typnotnull - 1] = BoolGetDatum(false);
-	values[Anum_pg_type_typbasetype - 1] = ObjectIdGetDatum(InvalidOid);
-	values[Anum_pg_type_typtypmod - 1] = Int32GetDatum(-1);
-	values[Anum_pg_type_typndims - 1] = Int32GetDatum(0);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(InvalidOid);
-	nulls[Anum_pg_type_typdefaultbin - 1] = true;
-	nulls[Anum_pg_type_typdefault - 1] = true;
 
 	typoid = GetNewOidWithIndex(pg_type_desc, TypeOidIndexId,
 								Anum_pg_type_oid);
@@ -141,7 +135,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	if (!IsBootstrapProcessingMode())
 		GenerateTypeDependencies(tup,
 								 pg_type_desc,
-								 NULL,
 								 NULL,
 								 0,
 								 false,
@@ -196,15 +189,9 @@ TypeCreate(Oid newTypeOid,
 		   Oid elementType,
 		   bool isImplicitArray,
 		   Oid arrayType,
-		   Oid baseType,
-		   const char *defaultTypeValue,	/* human-readable rep */
-		   char *defaultTypeBin,	/* cooked rep */
 		   bool passedByValue,
 		   char alignment,
 		   char storage,
-		   int32 typeMod,
-		   int32 typNDims,		/* Array dimensions for baseType */
-		   bool typeNotNull,
 		   Oid typeCollation)
 {
 	Relation	pg_type_desc;
@@ -352,28 +339,7 @@ TypeCreate(Oid newTypeOid,
 	values[Anum_pg_type_typanalyze - 1] = ObjectIdGetDatum(analyzeProcedure);
 	values[Anum_pg_type_typalign - 1] = CharGetDatum(alignment);
 	values[Anum_pg_type_typstorage - 1] = CharGetDatum(storage);
-	values[Anum_pg_type_typnotnull - 1] = BoolGetDatum(typeNotNull);
-	values[Anum_pg_type_typbasetype - 1] = ObjectIdGetDatum(baseType);
-	values[Anum_pg_type_typtypmod - 1] = Int32GetDatum(typeMod);
-	values[Anum_pg_type_typndims - 1] = Int32GetDatum(typNDims);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(typeCollation);
-
-	/*
-	 * initialize the default binary value for this type.  Check for nulls of
-	 * course.
-	 */
-	if (defaultTypeBin)
-		values[Anum_pg_type_typdefaultbin - 1] = CStringGetTextDatum(defaultTypeBin);
-	else
-		nulls[Anum_pg_type_typdefaultbin - 1] = true;
-
-	/*
-	 * initialize the default value for this type.
-	 */
-	if (defaultTypeValue)
-		values[Anum_pg_type_typdefault - 1] = CStringGetTextDatum(defaultTypeValue);
-	else
-		nulls[Anum_pg_type_typdefault - 1] = true;
 
 	/*
 	 * open pg_type and prepare to insert or update a row.
@@ -445,9 +411,6 @@ TypeCreate(Oid newTypeOid,
 	if (!IsBootstrapProcessingMode())
 		GenerateTypeDependencies(tup,
 								 pg_type_desc,
-								 (defaultTypeBin ?
-								  stringToNode(defaultTypeBin) :
-								  NULL),
 								 NULL,
 								 relationKind,
 								 isImplicitArray,
@@ -504,7 +467,6 @@ TypeCreate(Oid newTypeOid,
 void
 GenerateTypeDependencies(HeapTuple typeTuple,
 						 Relation typeCatalog,
-						 Node *defaultExpr,
 						 void *typacl,
 						 char relationKind, /* only for relation rowtypes */
 						 bool isImplicitArray,
@@ -514,20 +476,9 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 {
 	Form_pg_type typeForm = (Form_pg_type) GETSTRUCT(typeTuple);
 	Oid			typeObjectId = typeForm->oid;
-	Datum		datum;
-	bool		isNull;
 	ObjectAddress myself,
 				referenced;
 	ObjectAddresses *addrs_normal;
-
-	/* Extract defaultExpr if caller didn't pass it */
-	if (defaultExpr == NULL)
-	{
-		datum = heap_getattr(typeTuple, Anum_pg_type_typdefaultbin,
-							 RelationGetDescr(typeCatalog), &isNull);
-		if (!isNull)
-			defaultExpr = stringToNode(TextDatumGetCString(datum));
-	}
 
 	/* If rebuild, first flush old dependencies, except extension deps */
 	if (rebuild)
@@ -607,15 +558,8 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 		add_exact_object_address(&referenced, addrs_normal);
 	}
 
-	/* Normal dependency from a domain to its base type. */
-	if (OidIsValid(typeForm->typbasetype))
-	{
-		ObjectAddressSet(referenced, TypeRelationId, typeForm->typbasetype);
-		add_exact_object_address(&referenced, addrs_normal);
-	}
-
 	/*
-	 * Normal dependency from a domain to its collation.  We know the default
+	 * Normal dependency from a type to its collation.  We know the default
 	 * collation is pinned, so don't bother recording it.
 	 */
 	if (OidIsValid(typeForm->typcollation) &&
@@ -627,10 +571,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 
 	record_object_address_dependencies(&myself, addrs_normal, DEPENDENCY_NORMAL);
 	free_object_addresses(addrs_normal);
-
-	/* Normal dependency on the default expression. */
-	if (defaultExpr)
-		recordDependencyOnExpr(&myself, defaultExpr, NIL, DEPENDENCY_NORMAL);
 
 	/*
 	 * If the type is a rowtype for a relation, mark it as internally

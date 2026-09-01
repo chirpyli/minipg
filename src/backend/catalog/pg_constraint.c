@@ -56,7 +56,6 @@ CreateConstraintEntry(const char *constraintName,
 					  const int16 *constraintKey,
 					  int constraintNKeys,
 					  int constraintNTotalKeys,
-					  Oid domainId,
 					  Oid indexRelId,
 					  Oid foreignRelId,
 					  const int16 *foreignKey,
@@ -156,7 +155,6 @@ CreateConstraintEntry(const char *constraintName,
 	values[Anum_pg_constraint_contype - 1] = CharGetDatum(constraintType);
 	values[Anum_pg_constraint_convalidated - 1] = BoolGetDatum(isValidated);
 	values[Anum_pg_constraint_conrelid - 1] = ObjectIdGetDatum(relId);
-	values[Anum_pg_constraint_contypid - 1] = ObjectIdGetDatum(domainId);
 	values[Anum_pg_constraint_conindid - 1] = ObjectIdGetDatum(indexRelId);
 	values[Anum_pg_constraint_conparentid - 1] = ObjectIdGetDatum(parentConstrId);
 	values[Anum_pg_constraint_confrelid - 1] = ObjectIdGetDatum(foreignRelId);
@@ -230,17 +228,6 @@ CreateConstraintEntry(const char *constraintName,
 			ObjectAddressSet(relobject, RelationRelationId, relId);
 			add_exact_object_address(&relobject, addrs_auto);
 		}
-	}
-
-	if (OidIsValid(domainId))
-	{
-		/*
-		 * Register auto dependency from constraint to owning domain
-		 */
-		ObjectAddress domobject;
-
-		ObjectAddressSet(domobject, TypeRelationId, domainId);
-		add_exact_object_address(&domobject, addrs_auto);
 	}
 
 	record_object_address_dependencies(&conobject, addrs_auto,
@@ -348,44 +335,38 @@ CreateConstraintEntry(const char *constraintName,
 
 /*
  * Test whether given name is currently used as a constraint name
- * for the given object (relation or domain).
+ * for the given relation.
  *
  * This is used to decide whether to accept a user-specified constraint name.
  * It is deliberately not the same test as ChooseConstraintName uses to decide
  * whether an auto-generated name is OK: here, we will allow it unless there
- * is an identical constraint name in use *on the same object*.
+ * is an identical constraint name in use *on the same relation*.
  *
- * NB: Caller should hold exclusive lock on the given object, else
+ * NB: Caller should hold exclusive lock on the given relation, else
  * this test can be fooled by concurrent additions.
  */
 bool
-ConstraintNameIsUsed(ConstraintCategory conCat, Oid objId,
+ConstraintNameIsUsed(Oid relid,
 					 const char *conname)
 {
 	bool		found;
 	Relation	conDesc;
 	SysScanDesc conscan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 
 	conDesc = table_open(ConstraintRelationId, AccessShareLock);
 
 	ScanKeyInit(&skey[0],
 				Anum_pg_constraint_conrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum((conCat == CONSTRAINT_RELATION)
-								 ? objId : InvalidOid));
+				ObjectIdGetDatum(relid));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum((conCat == CONSTRAINT_DOMAIN)
-								 ? objId : InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(conname));
 
-	conscan = systable_beginscan(conDesc, ConstraintRelidTypidNameIndexId,
-								 true, NULL, 3, skey);
+	conscan = systable_beginscan(conDesc, ConstraintRelidNameIndexId,
+								 true, NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	found = (HeapTupleIsValid(systable_getnext(conscan)));
@@ -588,15 +569,6 @@ RemoveConstraintById(Oid conId)
 		/* Keep lock on constraint's rel until end of xact */
 		table_close(rel, NoLock);
 	}
-	else if (OidIsValid(con->contypid))
-	{
-		/*
-		 * XXX for now, do nothing special when dropping a domain constraint
-		 *
-		 * Probably there should be some form of locking on the domain type,
-		 * but we have no such concept at the moment.
-		 */
-	}
 	else
 		elog(ERROR, "constraint %u is not of a known type", conId);
 
@@ -636,21 +608,11 @@ RenameConstraintById(Oid conId, const char *newname)
 	 * For user-friendliness, check whether the name is already in use.
 	 */
 	if (OidIsValid(con->conrelid) &&
-		ConstraintNameIsUsed(CONSTRAINT_RELATION,
-							 con->conrelid,
-							 newname))
+		ConstraintNameIsUsed(con->conrelid, newname))
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("constraint \"%s\" for relation \"%s\" already exists",
 						newname, get_rel_name(con->conrelid))));
-	if (OidIsValid(con->contypid) &&
-		ConstraintNameIsUsed(CONSTRAINT_DOMAIN,
-							 con->contypid,
-							 newname))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("constraint \"%s\" for domain %s already exists",
-						newname, format_type_be(con->contypid))));
 
 	/* OK, do the rename --- tuple is a copy, so OK to scribble on it */
 	namestrcpy(&(con->conname), newname);
@@ -665,17 +627,15 @@ RenameConstraintById(Oid conId, const char *newname)
 
 /*
  * AlterConstraintNamespaces
- *		Find any constraints belonging to the specified object,
+ *		Find any constraints belonging to the specified relation,
  *		and move them to the specified new namespace.
- *
- * isType indicates whether the owning object is a type or a relation.
  */
 void
 AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
-						  Oid newNspId, bool isType, ObjectAddresses *objsMoved)
+						  Oid newNspId, ObjectAddresses *objsMoved)
 {
 	Relation	conRel;
-	ScanKeyData key[2];
+	ScanKeyData key[1];
 	SysScanDesc scan;
 	HeapTuple	tup;
 
@@ -684,14 +644,10 @@ AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
 	ScanKeyInit(&key[0],
 				Anum_pg_constraint_conrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(isType ? InvalidOid : ownerId));
-	ScanKeyInit(&key[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(isType ? ownerId : InvalidOid));
+				ObjectIdGetDatum(ownerId));
 
-	scan = systable_beginscan(conRel, ConstraintRelidTypidNameIndexId, true,
-							  NULL, 2, key);
+	scan = systable_beginscan(conRel, ConstraintRelidNameIndexId, true,
+							  NULL, 1, key);
 
 	while (HeapTupleIsValid((tup = systable_getnext(scan))))
 	{
@@ -814,7 +770,7 @@ get_relation_constraint_oid(Oid relid, const char *conname, bool missing_ok)
 	Relation	pg_constraint;
 	HeapTuple	tuple;
 	SysScanDesc scan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 	Oid			conOid = InvalidOid;
 
 	pg_constraint = table_open(ConstraintRelationId, AccessShareLock);
@@ -824,16 +780,12 @@ get_relation_constraint_oid(Oid relid, const char *conname, bool missing_ok)
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(relid));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(conname));
 
-	scan = systable_beginscan(pg_constraint, ConstraintRelidTypidNameIndexId, true,
-							  NULL, 3, skey);
+	scan = systable_beginscan(pg_constraint, ConstraintRelidNameIndexId, true,
+							  NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	if (HeapTupleIsValid(tuple = systable_getnext(scan)))
@@ -873,7 +825,7 @@ get_relation_constraint_attnos(Oid relid, const char *conname,
 	Relation	pg_constraint;
 	HeapTuple	tuple;
 	SysScanDesc scan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 
 	/* Set *constraintOid, to avoid complaints about uninitialized vars */
 	*constraintOid = InvalidOid;
@@ -885,16 +837,12 @@ get_relation_constraint_attnos(Oid relid, const char *conname,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(relid));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(conname));
 
-	scan = systable_beginscan(pg_constraint, ConstraintRelidTypidNameIndexId, true,
-							  NULL, 3, skey);
+	scan = systable_beginscan(pg_constraint, ConstraintRelidNameIndexId, true,
+							  NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	if (HeapTupleIsValid(tuple = systable_getnext(scan)))
@@ -970,7 +918,7 @@ get_relation_idx_constraint_oid(Oid relationId, Oid indexId)
 				BTEqualStrategyNumber,
 				F_OIDEQ,
 				ObjectIdGetDatum(relationId));
-	scan = systable_beginscan(pg_constraint, ConstraintRelidTypidNameIndexId,
+	scan = systable_beginscan(pg_constraint, ConstraintRelidNameIndexId,
 							  true, NULL, 1, &key);
 	while ((tuple = systable_getnext(scan)) != NULL)
 	{
@@ -1028,7 +976,7 @@ get_primary_key_attnos(Oid relid, Oid *constraintOid)
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(relid));
 
-	scan = systable_beginscan(pg_constraint, ConstraintRelidTypidNameIndexId, true,
+	scan = systable_beginscan(pg_constraint, ConstraintRelidNameIndexId, true,
 							  NULL, 1, skey);
 
 	while (HeapTupleIsValid(tuple = systable_getnext(scan)))

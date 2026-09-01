@@ -1703,7 +1703,6 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 	fn_typtype = get_typtype(rettype);
 
 	if (fn_typtype == TYPTYPE_BASE ||
-		fn_typtype == TYPTYPE_DOMAIN ||
 		fn_typtype == TYPTYPE_RANGE ||
 		fn_typtype == TYPTYPE_MULTIRANGE)
 	{

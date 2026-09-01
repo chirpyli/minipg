@@ -4006,7 +4006,7 @@ CheckConstraintFetch(Relation relation)
 				ObjectIdGetDatum(RelationGetRelid(relation)));
 
 	conrel = table_open(ConstraintRelationId, AccessShareLock);
-	conscan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId, true,
+	conscan = systable_beginscan(conrel, ConstraintRelidNameIndexId, true,
 								 NULL, 1, skey);
 
 	while (HeapTupleIsValid(htup = systable_getnext(conscan)))
@@ -4129,7 +4129,7 @@ RelationGetFKeyList(Relation relation)
 				ObjectIdGetDatum(RelationGetRelid(relation)));
 
 	conrel = table_open(ConstraintRelationId, AccessShareLock);
-	conscan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId, true,
+	conscan = systable_beginscan(conrel, ConstraintRelidNameIndexId, true,
 								 NULL, 1, &skey);
 
 	while (HeapTupleIsValid(htup = systable_getnext(conscan)))

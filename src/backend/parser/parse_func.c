@@ -2469,7 +2469,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			pstate->p_hasTargetSRFs = true;
 			break;
 		case EXPR_KIND_CHECK_CONSTRAINT:
-		case EXPR_KIND_DOMAIN_CHECK:
 			err = _("set-returning functions are not allowed in check constraints");
 			break;
 		case EXPR_KIND_COLUMN_DEFAULT:

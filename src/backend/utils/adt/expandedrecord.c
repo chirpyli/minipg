@@ -44,12 +44,6 @@ static const ExpandedObjectMethods ER_methods =
 /* Other local functions */
 static void ER_mc_callback(void *arg);
 static MemoryContext get_short_term_cxt(ExpandedRecordHeader *erh);
-static void build_dummy_expanded_header(ExpandedRecordHeader *main_erh);
-static pg_noinline void check_domain_for_new_field(ExpandedRecordHeader *erh,
-												   int fnumber,
-												   Datum newValue, bool isnull);
-static pg_noinline void check_domain_for_new_tuple(ExpandedRecordHeader *erh,
-												   HeapTuple tuple);
 
 
 /*
@@ -84,15 +78,7 @@ make_expanded_record_from_typeid(Oid type_id, int32 typmod,
 		 */
 		TypeCacheEntry *typentry;
 
-		typentry = lookup_type_cache(type_id,
-									 TYPECACHE_TUPDESC |
-									 TYPECACHE_DOMAIN_BASE_INFO);
-		if (typentry->typtype == TYPTYPE_DOMAIN)
-		{
-			flags |= ER_FLAG_IS_DOMAIN;
-			typentry = lookup_type_cache(typentry->domainBaseType,
-										 TYPECACHE_TUPDESC);
-		}
+		typentry = lookup_type_cache(type_id, TYPECACHE_TUPDESC);
 		if (typentry->tupDesc == NULL)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -372,8 +358,7 @@ make_expanded_record_from_exprecord(ExpandedRecordHeader *olderh,
 	erh->er_typmod = olderh->er_typmod;
 	erh->er_tupdesc_id = olderh->er_tupdesc_id;
 
-	/* The only flag bit that transfers over is IS_DOMAIN */
-	erh->flags = olderh->flags & ER_FLAG_IS_DOMAIN;
+	erh->flags = 0;
 
 	/*
 	 * Copy tupdesc if needed, but we prefer to bump its refcount if possible.
@@ -452,12 +437,6 @@ expanded_record_set_tuple(ExpandedRecordHeader *erh,
 
 	/* Shouldn't ever be trying to assign new data to a dummy header */
 	Assert(!(erh->flags & ER_FLAG_IS_DUMMY));
-
-	/*
-	 * Before performing the assignment, see if result will satisfy domain.
-	 */
-	if (erh->flags & ER_FLAG_IS_DOMAIN)
-		check_domain_for_new_tuple(erh, tuple);
 
 	/*
 	 * If we need to get rid of out-of-line field values, do so, using the
@@ -1126,10 +1105,6 @@ expanded_record_set_field_internal(ExpandedRecordHeader *erh, int fnumber,
 	 */
 	Assert(!(erh->flags & ER_FLAG_IS_DUMMY) || !check_constraints);
 
-	/* Before performing the assignment, see if result will satisfy domain */
-	if ((erh->flags & ER_FLAG_IS_DOMAIN) && check_constraints)
-		check_domain_for_new_field(erh, fnumber, newValue, isnull);
-
 	/* If we haven't yet deconstructed the tuple, do that */
 	if (!(erh->flags & ER_FLAG_DVALUES_VALID))
 		deconstruct_expanded_record(erh);
@@ -1346,22 +1321,6 @@ expanded_record_set_fields(ExpandedRecordHeader *erh,
 		dnulls[fnumber] = isnull;
 	}
 
-	/*
-	 * Because we don't guarantee atomicity of set_fields(), we can just leave
-	 * checking of domain constraints to occur as the final step; if it throws
-	 * an error, too bad.
-	 */
-	if (erh->flags & ER_FLAG_IS_DOMAIN)
-	{
-		/* We run domain_check in a short-lived context to limit cruft */
-		MemoryContextSwitchTo(get_short_term_cxt(erh));
-
-		domain_check(ExpandedRecordGetRODatum(erh), false,
-					 erh->er_decltypeid,
-					 &erh->er_domaininfo,
-					 erh->hdr.eoh_context);
-	}
-
 	MemoryContextSwitchTo(oldcxt);
 }
 
@@ -1388,246 +1347,4 @@ get_short_term_cxt(ExpandedRecordHeader *erh)
 	return erh->er_short_term_cxt;
 }
 
-/*
- * Construct "dummy header" for checking domain constraints.
- *
- * Since we don't want to modify the state of the expanded record until
- * we've validated the constraints, our approach is to set up a dummy
- * record header containing the new field value(s) and then pass that to
- * domain_check.  We retain the dummy header as part of the expanded
- * record's state to save palloc cycles, but reinitialize (most of)
- * its contents on each use.
- */
-static void
-build_dummy_expanded_header(ExpandedRecordHeader *main_erh)
-{
-	ExpandedRecordHeader *erh;
-	TupleDesc	tupdesc = expanded_record_get_tupdesc(main_erh);
 
-	/* Ensure we have a short-lived context */
-	(void) get_short_term_cxt(main_erh);
-
-	/*
-	 * Allocate dummy header on first time through, or in the unlikely event
-	 * that the number of fields changes (in which case we just leak the old
-	 * one).  Include space for its field values in the request.
-	 */
-	erh = main_erh->er_dummy_header;
-	if (erh == NULL || erh->nfields != tupdesc->natts)
-	{
-		char	   *chunk;
-
-		erh = (ExpandedRecordHeader *)
-			MemoryContextAlloc(main_erh->hdr.eoh_context,
-							   MAXALIGN(sizeof(ExpandedRecordHeader))
-							   + tupdesc->natts * (sizeof(Datum) + sizeof(bool)));
-
-		/* Ensure all header fields are initialized to 0/null */
-		memset(erh, 0, sizeof(ExpandedRecordHeader));
-
-		/*
-		 * We set up the dummy header with an indication that its memory
-		 * context is the short-lived context.  This is so that, if any
-		 * detoasting of out-of-line values happens due to an attempt to
-		 * extract a composite datum from the dummy header, the detoasted
-		 * stuff will end up in the short-lived context and not cause a leak.
-		 * This is cheating a bit on the expanded-object protocol; but since
-		 * we never pass a R/W pointer to the dummy object to any other code,
-		 * nothing else is authorized to delete or transfer ownership of the
-		 * object's context, so it should be safe enough.
-		 */
-		EOH_init_header(&erh->hdr, &ER_methods, main_erh->er_short_term_cxt);
-		erh->er_magic = ER_MAGIC;
-
-		/* Set up dvalues/dnulls, with no valid contents as yet */
-		chunk = (char *) erh + MAXALIGN(sizeof(ExpandedRecordHeader));
-		erh->dvalues = (Datum *) chunk;
-		erh->dnulls = (bool *) (chunk + tupdesc->natts * sizeof(Datum));
-		erh->nfields = tupdesc->natts;
-
-		/*
-		 * The fields we just set are assumed to remain constant through
-		 * multiple uses of the dummy header to check domain constraints.  All
-		 * other dummy header fields should be explicitly reset below, to
-		 * ensure there's not accidental effects of one check on the next one.
-		 */
-
-		main_erh->er_dummy_header = erh;
-	}
-
-	/*
-	 * If anything inquires about the dummy header's declared type, it should
-	 * report the composite base type, not the domain type (since the VALUE in
-	 * a domain check constraint is of the base type not the domain).  Hence
-	 * we do not transfer over the IS_DOMAIN flag, nor indeed any of the main
-	 * header's flags, since the dummy header is empty of data at this point.
-	 * But don't forget to mark header as dummy.
-	 */
-	erh->flags = ER_FLAG_IS_DUMMY;
-
-	/* Copy composite-type identification info */
-	erh->er_decltypeid = erh->er_typeid = main_erh->er_typeid;
-	erh->er_typmod = main_erh->er_typmod;
-
-	/* Dummy header does not need its own tupdesc refcount */
-	erh->er_tupdesc = tupdesc;
-	erh->er_tupdesc_id = main_erh->er_tupdesc_id;
-
-	/*
-	 * It's tempting to copy over whatever we know about the flat size, but
-	 * there's no point since we're surely about to modify the dummy record's
-	 * field(s).  Instead just clear anything left over from a previous usage
-	 * cycle.
-	 */
-	erh->flat_size = 0;
-
-	/* Copy over fvalue if we have it, so that system columns are available */
-	erh->fvalue = main_erh->fvalue;
-	erh->fstartptr = main_erh->fstartptr;
-	erh->fendptr = main_erh->fendptr;
-}
-
-/*
- * Precheck domain constraints for a set_field operation
- */
-static pg_noinline void
-check_domain_for_new_field(ExpandedRecordHeader *erh, int fnumber,
-						   Datum newValue, bool isnull)
-{
-	ExpandedRecordHeader *dummy_erh;
-	MemoryContext oldcxt;
-
-	/* Construct dummy header to contain proposed new field set */
-	build_dummy_expanded_header(erh);
-	dummy_erh = erh->er_dummy_header;
-
-	/*
-	 * If record isn't empty, just deconstruct it (if needed) and copy over
-	 * the existing field values.  If it is empty, just fill fields with nulls
-	 * manually --- don't call deconstruct_expanded_record prematurely.
-	 */
-	if (!ExpandedRecordIsEmpty(erh))
-	{
-		deconstruct_expanded_record(erh);
-		memcpy(dummy_erh->dvalues, erh->dvalues,
-			   dummy_erh->nfields * sizeof(Datum));
-		memcpy(dummy_erh->dnulls, erh->dnulls,
-			   dummy_erh->nfields * sizeof(bool));
-		/* There might be some external values in there... */
-		dummy_erh->flags |= erh->flags & ER_FLAG_HAVE_EXTERNAL;
-	}
-	else
-	{
-		memset(dummy_erh->dvalues, 0, dummy_erh->nfields * sizeof(Datum));
-		memset(dummy_erh->dnulls, true, dummy_erh->nfields * sizeof(bool));
-	}
-
-	/* Either way, we now have valid dvalues */
-	dummy_erh->flags |= ER_FLAG_DVALUES_VALID;
-
-	/* Caller error if fnumber is system column or nonexistent column */
-	if (unlikely(fnumber <= 0 || fnumber > dummy_erh->nfields))
-		elog(ERROR, "cannot assign to field %d of expanded record", fnumber);
-
-	/* Insert proposed new value into dummy field array */
-	dummy_erh->dvalues[fnumber - 1] = newValue;
-	dummy_erh->dnulls[fnumber - 1] = isnull;
-
-	/*
-	 * The proposed new value might be external, in which case we'd better set
-	 * the flag for that in dummy_erh.  (This matters in case something in the
-	 * domain check expressions tries to extract a flat value from the dummy
-	 * header.)
-	 */
-	if (!isnull)
-	{
-		Form_pg_attribute attr = TupleDescAttr(erh->er_tupdesc, fnumber - 1);
-
-		if (!attr->attbyval && attr->attlen == -1 &&
-			VARATT_IS_EXTERNAL(DatumGetPointer(newValue)))
-			dummy_erh->flags |= ER_FLAG_HAVE_EXTERNAL;
-	}
-
-	/*
-	 * We call domain_check in the short-lived context, so that any cruft
-	 * leaked by expression evaluation can be reclaimed.
-	 */
-	oldcxt = MemoryContextSwitchTo(erh->er_short_term_cxt);
-
-	/*
-	 * And now we can apply the check.  Note we use main header's domain cache
-	 * space, so that caching carries across repeated uses.
-	 */
-	domain_check(ExpandedRecordGetRODatum(dummy_erh), false,
-				 erh->er_decltypeid,
-				 &erh->er_domaininfo,
-				 erh->hdr.eoh_context);
-
-	MemoryContextSwitchTo(oldcxt);
-
-	/* We might as well clean up cruft immediately. */
-	MemoryContextReset(erh->er_short_term_cxt);
-}
-
-/*
- * Precheck domain constraints for a set_tuple operation
- */
-static pg_noinline void
-check_domain_for_new_tuple(ExpandedRecordHeader *erh, HeapTuple tuple)
-{
-	ExpandedRecordHeader *dummy_erh;
-	MemoryContext oldcxt;
-
-	/* If we're being told to set record to empty, just see if NULL is OK */
-	if (tuple == NULL)
-	{
-		/* We run domain_check in a short-lived context to limit cruft */
-		oldcxt = MemoryContextSwitchTo(get_short_term_cxt(erh));
-
-		domain_check((Datum) 0, true,
-					 erh->er_decltypeid,
-					 &erh->er_domaininfo,
-					 erh->hdr.eoh_context);
-
-		MemoryContextSwitchTo(oldcxt);
-
-		/* We might as well clean up cruft immediately. */
-		MemoryContextReset(erh->er_short_term_cxt);
-
-		return;
-	}
-
-	/* Construct dummy header to contain replacement tuple */
-	build_dummy_expanded_header(erh);
-	dummy_erh = erh->er_dummy_header;
-
-	/* Insert tuple, but don't bother to deconstruct its fields for now */
-	dummy_erh->fvalue = tuple;
-	dummy_erh->fstartptr = (char *) tuple->t_data;
-	dummy_erh->fendptr = ((char *) tuple->t_data) + tuple->t_len;
-	dummy_erh->flags |= ER_FLAG_FVALUE_VALID;
-
-	/* Remember if we have any out-of-line field values */
-	if (HeapTupleHasExternal(tuple))
-		dummy_erh->flags |= ER_FLAG_HAVE_EXTERNAL;
-
-	/*
-	 * We call domain_check in the short-lived context, so that any cruft
-	 * leaked by expression evaluation can be reclaimed.
-	 */
-	oldcxt = MemoryContextSwitchTo(erh->er_short_term_cxt);
-
-	/*
-	 * And now we can apply the check.  Note we use main header's domain cache
-	 * space, so that caching carries across repeated uses.
-	 */
-	domain_check(ExpandedRecordGetRODatum(dummy_erh), false,
-				 erh->er_decltypeid,
-				 &erh->er_domaininfo,
-				 erh->hdr.eoh_context);
-
-	MemoryContextSwitchTo(oldcxt);
-
-	/* We might as well clean up cruft immediately. */
-	MemoryContextReset(erh->er_short_term_cxt);
-}

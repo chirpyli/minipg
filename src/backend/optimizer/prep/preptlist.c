@@ -384,11 +384,12 @@ expand_insert_targetlist(PlannerInfo *root, List *tlist, Relation rel)
 			else
 			{
 				/* Normal column, insert a NULL of the column datatype */
-				new_expr = coerce_null_to_domain(att_tup->atttypid,
-												 att_tup->atttypmod,
-												 att_tup->attcollation,
-												 att_tup->attlen,
-												 att_tup->attbyval);
+				new_expr = (Node *) makeConst(att_tup->atttypid,
+												att_tup->atttypmod,
+												att_tup->attcollation,
+												att_tup->attlen,
+												(Datum) 0, true,
+												att_tup->attbyval);
 				/* Must run expression preprocessing on any non-const nodes */
 				if (!IsA(new_expr, Const))
 					new_expr = eval_const_expressions(root, new_expr);

@@ -2849,8 +2849,6 @@ getConstraintTypeDescription(StringInfo buffer, Oid constroid, bool missing_ok)
 
 	if (OidIsValid(constrForm->conrelid))
 		appendStringInfoString(buffer, "table constraint");
-	else if (OidIsValid(constrForm->contypid))
-		appendStringInfoString(buffer, "domain constraint");
 	else
 		elog(ERROR, "invalid constraint %u", constrForm->oid);
 
@@ -3091,22 +3089,7 @@ getObjectIdentityParts(const ObjectAddress *object,
 						*objname = lappend(*objname, pstrdup(NameStr(con->conname)));
 				}
 				else
-				{
-					ObjectAddress domain;
-
-					Assert(OidIsValid(con->contypid));
-					domain.classId = TypeRelationId;
-					domain.objectId = con->contypid;
-					domain.objectSubId = 0;
-
-					appendStringInfo(&buffer, "%s on %s",
-									 quote_identifier(NameStr(con->conname)),
-									 getObjectIdentityParts(&domain, objname,
-															objargs, false));
-
-					if (objname)
-						*objargs = lappend(*objargs, pstrdup(NameStr(con->conname)));
-				}
+					elog(ERROR, "invalid constraint %u", con->oid);
 
 				ReleaseSysCache(conTup);
 				break;

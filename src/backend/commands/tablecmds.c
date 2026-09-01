@@ -4219,9 +4219,8 @@ ATTypedTableRecursion(List **wqueue, Relation rel, AlterTableCmd *cmd,
  * or a type name (not both) for use in the error message, if any.
  *
  * Note that "typeOid" is not necessarily a composite type; it could also be
- * another container type such as an array or range, or a domain over one of
- * these things.  The name of this function is therefore somewhat historical,
- * but it's not worth changing.
+ * another container type such as an array or range.  The name of this
+ * function is therefore somewhat historical, but it's not worth changing.
  *
  * We assume that functions and views depending on the type are not reasons
  * to reject the ALTER.  (How safe is this really?)
@@ -4267,11 +4266,11 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 		if (pg_depend->classid == TypeRelationId)
 		{
 			/*
-			 * This must be an array, domain, or range containing the given
-			 * type, so recursively check for uses of this type.  Note that
-			 * any error message will mention the original type not the
-			 * container; this is intentional.
-			 */
+		 * This must be an array or range containing the given
+		 * type, so recursively check for uses of this type.  Note that
+		 * any error message will mention the original type not the
+		 * container; this is intentional.
+		 */
 			find_composite_type_dependencies(pg_depend->objid,
 											 origRelation, origTypeName);
 			continue;
@@ -4422,8 +4421,6 @@ find_typed_table_dependencies(Oid typeOid, const char *typeName, DropBehavior be
  * isn't suitable, throw an error.  Currently, we require that the type
  * originated with CREATE TYPE AS.  We could support any row type, but doing so
  * would require handling a number of extra corner cases in the DDL commands.
- * (Also, allowing domain-over-composite would open up a can of worms about
- * whether and how the domain's constraints should apply to derived tables.)
  */
 void
 check_of_type(HeapTuple typetuple)
@@ -4734,15 +4731,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * NULL if so, so without any modification of the tuple data we will get
 	 * the effect of NULL values in the new column.
 	 *
-	 * An exception occurs when the new column is of a domain type: the domain
-	 * might have a NOT NULL constraint, or a check constraint that indirectly
-	 * rejects nulls.  If there are any domain constraints then we construct
-	 * an explicit NULL default value that will be passed through
-	 * CoerceToDomain processing.  (This is a tad inefficient, since it causes
-	 * rewriting the table which we really wouldn't have to do; but we do it
-	 * to preserve the historical behavior that such a failure will be raised
-	 * only if the table currently contains some rows.)
-	 *
 	 * Note: we use build_column_default, and not just the cooked default
 	 * returned by AddRelationNewConstraints, so that the right thing happens
 	 * when a datatype's default applies.
@@ -4760,34 +4748,9 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 */
 	if (RELKIND_HAS_STORAGE(relkind) && attribute.attnum > 0)
 	{
-		bool		has_domain_constraints;
 		bool		has_missing = false;
 
 		defval = (Expr *) build_column_default(rel, attribute.attnum);
-
-		/* Build CoerceToDomain(NULL) expression if needed */
-		has_domain_constraints = DomainHasConstraints(typeOid);
-		if (!defval && has_domain_constraints)
-		{
-			Oid			baseTypeId;
-			int32		baseTypeMod;
-			Oid			baseTypeColl;
-
-			baseTypeMod = typmod;
-			baseTypeId = getBaseTypeAndTypmod(typeOid, &baseTypeMod);
-			baseTypeColl = get_typcollation(baseTypeId);
-			defval = (Expr *) makeNullConst(baseTypeId, baseTypeMod, baseTypeColl);
-			defval = (Expr *) coerce_to_target_type(NULL,
-													(Node *) defval,
-													baseTypeId,
-													typeOid,
-													typmod,
-													COERCION_ASSIGNMENT,
-													COERCE_IMPLICIT_CAST,
-													-1);
-			if (defval == NULL) /* should not happen */
-				elog(ERROR, "failed to coerce base type to domain");
-		}
 
 		if (defval)
 		{
@@ -4808,14 +4771,10 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			 * Attempt to skip a complete table rewrite by storing the
 			 * specified DEFAULT value outside of the heap.  This is only
 			 * allowed for plain relations and non-generated columns, and the
-			 * default expression can't be volatile (stable is OK).  Note that
-			 * contain_volatile_functions deems CoerceToDomain immutable, but
-			 * here we consider that coercion to a domain with constraints is
-			 * volatile; else it might fail even when the table is empty.
+			 * default expression can't be volatile (stable is OK).
 			 */
 			if (rel->rd_rel->relkind == RELKIND_RELATION &&
 				!colDef->generated &&
-				!has_domain_constraints &&
 				!contain_volatile_functions((Node *) defval))
 			{
 				EState	   *estate;
@@ -6471,7 +6430,7 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 	Relation	conrel;
 	Form_pg_constraint con;
 	SysScanDesc scan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 	HeapTuple	tuple;
 	bool		found = false;
 	bool		is_no_inherit_constraint = false;
@@ -6494,15 +6453,11 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(rel)));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(constrName));
-	scan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId,
-							  true, NULL, 3, skey);
+	scan = systable_beginscan(conrel, ConstraintRelidNameIndexId,
+							  true, NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	if (HeapTupleIsValid(tuple = systable_getnext(scan)))
@@ -6600,15 +6555,11 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 					BTEqualStrategyNumber, F_OIDEQ,
 					ObjectIdGetDatum(childrelid));
 		ScanKeyInit(&skey[1],
-					Anum_pg_constraint_contypid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(InvalidOid));
-		ScanKeyInit(&skey[2],
 					Anum_pg_constraint_conname,
 					BTEqualStrategyNumber, F_NAMEEQ,
 					CStringGetDatum(constrName));
-		scan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId,
-								  true, NULL, 3, skey);
+		scan = systable_beginscan(conrel, ConstraintRelidNameIndexId,
+								  true, NULL, 2, skey);
 
 		/* There can be at most one matching row */
 		if (!HeapTupleIsValid(tuple = systable_getnext(scan)))
@@ -6964,12 +6915,7 @@ ATPrepAlterColumnType(List **wqueue,
  * rewrite in these cases:
  *
  * - the old type is binary coercible to the new type
- * - the new type is an unconstrained domain over the old type
  * - {NEW,OLD} or {OLD,NEW} is {timestamptz,timestamp} and the timezone is UTC
- *
- * In the case of a constrained domain, we could get by with scanning the
- * table and checking the constraint rather than actually rewriting it, but we
- * don't currently try to do that.
  */
 static bool
 ATColumnChangeRequiresRewrite(Node *expr, AttrNumber varattno)
@@ -6983,14 +6929,6 @@ ATColumnChangeRequiresRewrite(Node *expr, AttrNumber varattno)
 			return false;
 		else if (IsA(expr, RelabelType))
 			expr = (Node *) ((RelabelType *) expr)->arg;
-		else if (IsA(expr, CoerceToDomain))
-		{
-			CoerceToDomain *d = (CoerceToDomain *) expr;
-
-			if (DomainHasConstraints(d->resulttype))
-				return true;
-			expr = (Node *) d->arg;
-		}
 		else if (IsA(expr, FuncExpr))
 		{
 			FuncExpr   *f = (FuncExpr *) expr;
@@ -7609,15 +7547,7 @@ ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab, LOCKMODE lockmode)
 		if (!HeapTupleIsValid(tup)) /* should not happen */
 			elog(ERROR, "cache lookup failed for constraint %u", oldId);
 		con = (Form_pg_constraint) GETSTRUCT(tup);
-		if (OidIsValid(con->conrelid))
-			relid = con->conrelid;
-		else
-		{
-			/* must be a domain constraint */
-			relid = get_typ_typrelid(getBaseType(con->contypid));
-			if (!OidIsValid(relid))
-				elog(ERROR, "could not identify relation associated with constraint %u", oldId);
-		}
+		relid = con->conrelid;
 		confrelid = con->confrelid;
 		conislocal = con->conislocal;
 		ReleaseSysCache(tup);
@@ -8301,7 +8231,7 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 	/* Fix other dependent stuff */
 	AlterIndexNamespaces(classRel, rel, oldNspOid, nspOid, objsMoved);
 	AlterConstraintNamespaces(RelationGetRelid(rel), oldNspOid, nspOid,
-							  false, objsMoved);
+							  objsMoved);
 
 	table_close(classRel, RowExclusiveLock);
 }
@@ -8946,7 +8876,7 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
 {
 	Relation	conrel;
 	SysScanDesc scan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 	HeapTuple	tuple;
 	Form_pg_constraint con;
 	ObjectAddress address;
@@ -8961,15 +8891,11 @@ ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(rel)));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(constrName));
-	scan = systable_beginscan(conrel, ConstraintRelidTypidNameIndexId,
-							  true, NULL, 3, skey);
+	scan = systable_beginscan(conrel, ConstraintRelidNameIndexId,
+							  true, NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	if (!HeapTupleIsValid(tuple = systable_getnext(scan)))

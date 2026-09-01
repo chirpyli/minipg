@@ -339,8 +339,6 @@ ClusterStmt
 CmdType
 CoalesceExpr
 CoerceParamHook
-CoerceToDomain
-CoerceToDomainValue
 CoerceViaIO
 CoercionContext
 CoercionForm
@@ -396,7 +394,6 @@ Const
 ConstrCheck
 ConstrType
 Constraint
-ConstraintCategory
 ConstraintInfo
 ControlData
 ControlFileData
@@ -491,11 +488,6 @@ DistanceValue
 DistinctColInfo
 DistinctExpr
 DocRepresentation
-DomainConstraintCache
-DomainConstraintRef
-DomainConstraintState
-DomainConstraintType
-DomainIOData
 DropBehavior
 DropOwnedStmt
 DropRoleStmt
@@ -1572,7 +1564,6 @@ PLyExecutionContext
 PLyObToArray
 PLyObToDatum
 PLyObToDatumFunc
-PLyObToDomain
 PLyObToScalar
 PLyObToTransform
 PLyObToTuple

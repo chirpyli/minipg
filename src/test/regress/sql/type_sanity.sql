@@ -154,7 +154,7 @@ SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typinput = p2.oid AND p2.provolatile NOT IN ('i', 's');
 
--- Composites, domains, enums, multiranges, ranges should all use the same input routines
+-- Composites, enums, multiranges, ranges should all use the same input routines
 SELECT DISTINCT typtype, typinput
 FROM pg_type AS p1
 WHERE p1.typtype not in ('b', 'p')
@@ -186,13 +186,8 @@ WHERE p1.typoutput = p2.oid AND p2.provolatile NOT IN ('i', 's');
 -- Composites, enums, multiranges, ranges should all use the same output routines
 SELECT DISTINCT typtype, typoutput
 FROM pg_type AS p1
-WHERE p1.typtype not in ('b', 'd', 'p')
+WHERE p1.typtype not in ('b', 'p')
 ORDER BY 1;
-
--- Domains should have same typoutput as their base types
-SELECT p1.oid, p1.typname, p2.oid, p2.typname
-FROM pg_type AS p1 LEFT JOIN pg_type AS p2 ON p1.typbasetype = p2.oid
-WHERE p1.typtype = 'd' AND p1.typoutput IS DISTINCT FROM p2.typoutput;
 
 -- Check for bogus typreceive routines
 
@@ -235,7 +230,7 @@ SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typreceive = p2.oid AND p2.provolatile NOT IN ('i', 's');
 
--- Composites, domains, enums, multiranges, ranges should all use the same receive routines
+-- Composites, enums, multiranges, ranges should all use the same receive routines
 SELECT DISTINCT typtype, typreceive
 FROM pg_type AS p1
 WHERE p1.typtype not in ('b', 'p')
@@ -267,13 +262,8 @@ WHERE p1.typsend = p2.oid AND p2.provolatile NOT IN ('i', 's');
 -- Composites, enums, multiranges, ranges should all use the same send routines
 SELECT DISTINCT typtype, typsend
 FROM pg_type AS p1
-WHERE p1.typtype not in ('b', 'd', 'p')
+WHERE p1.typtype not in ('b', 'p')
 ORDER BY 1;
-
--- Domains should have same typsend as their base types
-SELECT p1.oid, p1.typname, p2.oid, p2.typname
-FROM pg_type AS p1 LEFT JOIN pg_type AS p2 ON p1.typbasetype = p2.oid
-WHERE p1.typtype = 'd' AND p1.typsend IS DISTINCT FROM p2.typsend;
 
 -- Check for bogus typmodin routines
 
@@ -355,28 +345,18 @@ WHERE p1.typanalyze = p2.oid AND NOT
 
 -- there does not seem to be a reason to care about volatility of typanalyze
 
--- domains inherit their base type's typanalyze
-
-SELECT d.oid, d.typname, d.typanalyze, t.oid, t.typname, t.typanalyze
-FROM pg_type d JOIN pg_type t ON d.typbasetype = t.oid
-WHERE d.typanalyze != t.typanalyze;
-
 -- range_typanalyze should be used for all and only range types
--- (but exclude domains, which we checked above)
 
 SELECT t.oid, t.typname, t.typanalyze
 FROM pg_type t LEFT JOIN pg_range r on t.oid = r.rngtypid
-WHERE t.typbasetype = 0 AND
-    (t.typanalyze = 'range_typanalyze'::regproc) != (r.rngtypid IS NOT NULL);
+WHERE (t.typanalyze = 'range_typanalyze'::regproc) != (r.rngtypid IS NOT NULL);
 
 -- array_typanalyze should be used for all and only array types
--- (but exclude domains, which we checked above)
 -- As of 9.2 this finds int2vector and oidvector, which are weird anyway
 
 SELECT t.oid, t.typname, t.typanalyze
 FROM pg_type t
-WHERE t.typbasetype = 0 AND
-    (t.typanalyze = 'array_typanalyze'::regproc) !=
+WHERE (t.typanalyze = 'array_typanalyze'::regproc) !=
     (t.typsubscript = 'array_subscript_handler'::regproc)
 ORDER BY 1;
 

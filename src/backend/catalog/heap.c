@@ -592,15 +592,6 @@ CheckAttributeType(const char *attname,
 								attname, format_type_be(atttypid))));
 		}
 	}
-	else if (att_typtype == TYPTYPE_DOMAIN)
-	{
-		/*
-		 * If it's a domain, recurse to check its base type.
-		 */
-		CheckAttributeType(attname, getBaseType(atttypid), attcollation,
-						   containing_rowtypes,
-						   flags);
-	}
 	else if (att_typtype == TYPTYPE_COMPOSITE)
 	{
 		/*
@@ -1043,15 +1034,9 @@ AddNewRelationType(const char *typeName,
 				   InvalidOid,	/* array element type - irrelevant */
 				   false,		/* this is not an array type */
 				   new_array_type,	/* array type if any */
-				   InvalidOid,	/* domain base type - irrelevant */
-				   NULL,		/* default value - none */
-				   NULL,		/* default binary representation */
 				   false,		/* passed by reference */
 				   TYPALIGN_DOUBLE, /* alignment - must be the largest! */
 				   TYPSTORAGE_EXTENDED, /* fully TOASTable */
-				   -1,			/* typmod */
-				   0,			/* array dimensions for typBaseType */
-				   false,		/* Type NOT NULL */
 				   InvalidOid); /* rowtypes never have a collation */
 }
 
@@ -1273,15 +1258,9 @@ heap_create_with_catalog(const char *relname,
 				   new_type_oid,	/* array element type - the rowtype */
 				   true,		/* yes, this is an array type */
 				   InvalidOid,	/* this has no array type */
-				   InvalidOid,	/* domain base type - irrelevant */
-				   NULL,		/* default value - none */
-				   NULL,		/* default binary representation */
 				   false,		/* passed by reference */
 				   TYPALIGN_DOUBLE, /* alignment - must be the largest! */
 				   TYPSTORAGE_EXTENDED, /* fully TOASTable */
-				   -1,			/* typmod */
-				   0,			/* array dimensions for typBaseType */
-				   false,		/* Type NOT NULL */
 				   InvalidOid); /* rowtypes never have a collation */
 
 		pfree(relarrayname);
@@ -2313,7 +2292,6 @@ StoreRelCheck(Relation rel, const char *ccname, Node *expr,
 							  attNos,	/* attrs in the constraint */
 							  keycount, /* # key attrs in the constraint */
 							  keycount, /* # total attrs in the constraint */
-							  InvalidOid,	/* not a domain constraint */
 							  InvalidOid,	/* no associated index */
 							  InvalidOid,	/* Foreign key fields */
 							  NULL,
@@ -2482,12 +2460,6 @@ AddRelationNewConstraints(Relation rel,
 		 * an explicit pg_attrdef entry, since the default behavior is
 		 * equivalent.  This applies to column defaults, but not for
 		 * generation expressions.
-		 *
-		 * Note a nonobvious property of this test: if the column is of a
-		 * domain type, what we'll get is not a bare null Const but a
-		 * CoerceToDomain expr, so we will not discard the default.  This is
-		 * critical because the column default needs to be retained to
-		 * override any default that the domain might have.
 		 */
 		if (expr == NULL ||
 			(!colDef->generated &&
@@ -2673,7 +2645,7 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 	bool		found;
 	Relation	conDesc;
 	SysScanDesc conscan;
-	ScanKeyData skey[3];
+	ScanKeyData skey[2];
 	HeapTuple	tup;
 
 	/* Search for a pg_constraint entry with same name and relation */
@@ -2686,16 +2658,12 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(rel)));
 	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(InvalidOid));
-	ScanKeyInit(&skey[2],
 				Anum_pg_constraint_conname,
 				BTEqualStrategyNumber, F_NAMEEQ,
 				CStringGetDatum(ccname));
 
-	conscan = systable_beginscan(conDesc, ConstraintRelidTypidNameIndexId, true,
-								 NULL, 3, skey);
+	conscan = systable_beginscan(conDesc, ConstraintRelidNameIndexId, true,
+								 NULL, 2, skey);
 
 	/* There can be at most one matching row */
 	if (HeapTupleIsValid(tup = systable_getnext(conscan)))

@@ -877,18 +877,12 @@ transformInsertRow(ParseState *pstate, List *exprlist,
 		if (strip_indirection)
 		{
 			/*
-			 * We need to remove top-level FieldStores and SubscriptingRefs,
-			 * as well as any CoerceToDomain appearing above one of those ---
-			 * but not a CoerceToDomain that isn't above one of those.
+			 * We need to remove top-level FieldStores and SubscriptingRefs.
 			 */
 			while (expr)
 			{
 				Expr	   *subexpr = expr;
 
-				while (IsA(subexpr, CoerceToDomain))
-				{
-					subexpr = ((CoerceToDomain *) subexpr)->arg;
-				}
 				if (IsA(subexpr, FieldStore))
 				{
 					FieldStore *fstore = (FieldStore *) subexpr;

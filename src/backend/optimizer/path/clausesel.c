@@ -913,16 +913,6 @@ clause_selectivity_ext(PlannerInfo *root,
 									sjinfo,
 									use_extended_stats);
 	}
-	else if (IsA(clause, CoerceToDomain))
-	{
-		/* Not sure this case is needed, but it can't hurt */
-		s1 = clause_selectivity_ext(root,
-									(Node *) ((CoerceToDomain *) clause)->arg,
-									varRelid,
-									jointype,
-									sjinfo,
-									use_extended_stats);
-	}
 	else
 	{
 		/*

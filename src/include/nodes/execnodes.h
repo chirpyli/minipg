@@ -108,9 +108,6 @@ typedef struct ExprState
 
 	Datum	   *innermost_caseval;
 	bool	   *innermost_casenull;
-
-	Datum	   *innermost_domainval;
-	bool	   *innermost_domainnull;
 } ExprState;
 
 
@@ -243,12 +240,6 @@ typedef struct ExprContext
 	Datum		caseValue_datum;
 #define FIELDNO_EXPRCONTEXT_CASENULL 11
 	bool		caseValue_isNull;
-
-	/* Value to substitute for CoerceToDomainValue nodes in expression */
-#define FIELDNO_EXPRCONTEXT_DOMAINDATUM 12
-	Datum		domainValue_datum;
-#define FIELDNO_EXPRCONTEXT_DOMAINNULL 13
-	bool		domainValue_isNull;
 
 	/* Link to containing EState (NULL if a standalone ExprContext) */
 	struct EState *ecxt_estate;
@@ -832,28 +823,6 @@ typedef struct SubPlanState
 	FmgrInfo   *cur_eq_funcs;	/* equality functions for LHS vs. table */
 	ExprState  *cur_eq_comp;	/* equality comparator for LHS vs. table */
 } SubPlanState;
-
-/*
- * DomainConstraintState - one item to check during CoerceToDomain
- *
- * Note: we consider this to be part of an ExprState tree, so we give it
- * a name following the xxxState convention.  But there's no directly
- * associated plan-tree node.
- */
-typedef enum DomainConstraintType
-{
-	DOM_CONSTRAINT_NOTNULL,
-	DOM_CONSTRAINT_CHECK
-} DomainConstraintType;
-
-typedef struct DomainConstraintState
-{
-	NodeTag		type;
-	DomainConstraintType constrainttype;	/* constraint type */
-	char	   *name;			/* name of constraint (for error msgs) */
-	Expr	   *check_expr;		/* for CHECK, a boolean expression */
-	ExprState  *check_exprstate;	/* check_expr's eval state, or NULL */
-} DomainConstraintState;
 
 
 /* ----------------------------------------------------------------

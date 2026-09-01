@@ -745,8 +745,7 @@ typedef struct FieldSelect
  * the assign case of SubscriptingRef, this is used to implement UPDATE of a
  * portion of a column.
  *
- * resulttype is always a named composite type (not a domain).  To update
- * a composite domain value, apply CoerceToDomain to the FieldStore.
+ * resulttype is always a named composite type.
  *
  * A single FieldStore can actually represent updates of several different
  * fields.  The parser only generates FieldStores with single-element lists,
@@ -993,8 +992,7 @@ typedef struct RowExpr
 	Oid			row_typeid;		/* RECORDOID or a composite type's ID */
 
 	/*
-	 * row_typeid cannot be a domain over composite, only plain composite.  To
-	 * create a composite domain value, apply CoerceToDomain to the RowExpr.
+	 * row_typeid cannot be a domain over composite, only plain composite.
 	 *
 	 * Note: we deliberately do NOT store a typmod.  Although a typmod will be
 	 * associated with specific RECORD types at runtime, it will differ for
@@ -1168,44 +1166,6 @@ typedef struct BooleanTest
 	BoolTestType booltesttype;	/* test type */
 	int			location;		/* token location, or -1 if unknown */
 } BooleanTest;
-
-/*
- * CoerceToDomain
- *
- * CoerceToDomain represents the operation of coercing a value to a domain
- * type.  At runtime (and not before) the precise set of constraints to be
- * checked will be determined.  If the value passes, it is returned as the
- * result; if not, an error is raised.  Note that this is equivalent to
- * RelabelType in the scenario where no constraints are applied.
- */
-typedef struct CoerceToDomain
-{
-	Expr		xpr;
-	Expr	   *arg;			/* input expression */
-	Oid			resulttype;		/* domain type ID (result type) */
-	int32		resulttypmod;	/* output typmod (currently always -1) */
-	Oid			resultcollid;	/* OID of collation, or InvalidOid if none */
-	CoercionForm coercionformat;	/* how to display this node */
-	int			location;		/* token location, or -1 if unknown */
-} CoerceToDomain;
-
-/*
- * Placeholder node for the value to be processed by a domain's check
- * constraint.  This is effectively like a Param, but can be implemented more
- * simply since we need only one replacement value at a time.
- *
- * Note: the typeId/typeMod/collation will be set from the domain's base type,
- * not the domain itself.  This is because we shouldn't consider the value
- * to be a member of the domain if we haven't yet checked its constraints.
- */
-typedef struct CoerceToDomainValue
-{
-	Expr		xpr;
-	Oid			typeId;			/* type for substituted value */
-	int32		typeMod;		/* typemod for substituted value */
-	Oid			collation;		/* collation for the substituted value */
-	int			location;		/* token location, or -1 if unknown */
-} CoerceToDomainValue;
 
 /*
  * Placeholder node for a DEFAULT marker in an INSERT or UPDATE command.

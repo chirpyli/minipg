@@ -157,7 +157,6 @@ extern void get_type_io_data(Oid typid,
 							 Oid *typioparam,
 							 Oid *func);
 extern char get_typstorage(Oid typid);
-extern Node *get_typdefault(Oid typid);
 extern char get_typtype(Oid typid);
 extern bool type_is_rowtype(Oid typid);
 extern bool type_is_range(Oid typid);

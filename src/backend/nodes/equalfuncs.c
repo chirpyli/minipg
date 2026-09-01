@@ -637,30 +637,6 @@ _equalBooleanTest(const BooleanTest *a, const BooleanTest *b)
 }
 
 static bool
-_equalCoerceToDomain(const CoerceToDomain *a, const CoerceToDomain *b)
-{
-	COMPARE_NODE_FIELD(arg);
-	COMPARE_SCALAR_FIELD(resulttype);
-	COMPARE_SCALAR_FIELD(resulttypmod);
-	COMPARE_SCALAR_FIELD(resultcollid);
-	COMPARE_COERCIONFORM_FIELD(coercionformat);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalCoerceToDomainValue(const CoerceToDomainValue *a, const CoerceToDomainValue *b)
-{
-	COMPARE_SCALAR_FIELD(typeId);
-	COMPARE_SCALAR_FIELD(typeMod);
-	COMPARE_SCALAR_FIELD(collation);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalSetToDefault(const SetToDefault *a, const SetToDefault *b)
 {
 	COMPARE_SCALAR_FIELD(typeId);
@@ -1942,12 +1918,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_BooleanTest:
 			retval = _equalBooleanTest(a, b);
-			break;
-		case T_CoerceToDomain:
-			retval = _equalCoerceToDomain(a, b);
-			break;
-		case T_CoerceToDomainValue:
-			retval = _equalCoerceToDomainValue(a, b);
 			break;
 		case T_SetToDefault:
 			retval = _equalSetToDefault(a, b);

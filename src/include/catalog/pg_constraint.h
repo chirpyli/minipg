@@ -42,8 +42,8 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	 * SQL-spec compatibility.
 	 *
 	 * However, we do require conname to be unique among the constraints of a
-	 * single relation or domain.  This is enforced by a unique index on
-	 * conrelid + contypid + conname.
+	 * single relation.  This is enforced by a unique index on
+	 * conrelid + conname.
 	 */
 	NameData	conname;		/* name of this constraint */
 	Oid			connamespace BKI_LOOKUP(pg_namespace);	/* OID of namespace
@@ -53,21 +53,10 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 
 	/*
 	 * conrelid and conkey are only meaningful if the constraint applies to a
-	 * specific relation (this excludes domain constraints and assertions).
-	 * Otherwise conrelid is 0 and conkey is NULL.
+	 * specific relation.  Otherwise conrelid is 0 and conkey is NULL.
 	 */
 	Oid			conrelid BKI_LOOKUP_OPT(pg_class);	/* relation this
 													 * constraint constrains */
-
-	/*
-	 * contypid links to the pg_type row for a domain if this is a domain
-	 * constraint.  Otherwise it's 0.
-	 *
-	 * For SQL-style global ASSERTIONs, both conrelid and contypid would be
-	 * zero. This is not presently supported, however.
-	 */
-	Oid			contypid BKI_LOOKUP_OPT(pg_type);	/* domain this constraint
-													 * constrains */
 
 	/*
 	 * conindid links to the index supporting the constraint, if any;
@@ -154,10 +143,8 @@ DECLARE_TOAST(pg_constraint, 2832, 2833);
 
 DECLARE_INDEX(pg_constraint_conname_nsp_index, 2664, on pg_constraint using btree(conname name_ops, connamespace oid_ops));
 #define ConstraintNameNspIndexId  2664
-DECLARE_UNIQUE_INDEX(pg_constraint_conrelid_contypid_conname_index, 2665, on pg_constraint using btree(conrelid oid_ops, contypid oid_ops, conname name_ops));
-#define ConstraintRelidTypidNameIndexId	2665
-DECLARE_INDEX(pg_constraint_contypid_index, 2666, on pg_constraint using btree(contypid oid_ops));
-#define ConstraintTypidIndexId	2666
+DECLARE_UNIQUE_INDEX(pg_constraint_conrelid_conname_index, 2665, on pg_constraint using btree(conrelid oid_ops, conname name_ops));
+#define ConstraintRelidNameIndexId	2665
 DECLARE_UNIQUE_INDEX_PKEY(pg_constraint_oid_index, 2667, on pg_constraint using btree(oid oid_ops));
 #define ConstraintOidIndexId  2667
 DECLARE_INDEX(pg_constraint_conparentid_index, 2579, on pg_constraint using btree(conparentid oid_ops));
@@ -178,17 +165,6 @@ DECLARE_ARRAY_FOREIGN_KEY((confrelid, confkey), pg_attribute, (attrelid, attnum)
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
-/*
- * Identify constraint type for lookup purposes
- */
-typedef enum ConstraintCategory
-{
-	CONSTRAINT_RELATION,
-	CONSTRAINT_DOMAIN,
-	CONSTRAINT_ASSERTION		/* for future expansion */
-} ConstraintCategory;
-
-
 extern Oid	CreateConstraintEntry(const char *constraintName,
 								  Oid constraintNamespace,
 								  char constraintType,
@@ -198,7 +174,6 @@ extern Oid	CreateConstraintEntry(const char *constraintName,
 								  const int16 *constraintKey,
 								  int constraintNKeys,
 								  int constraintNTotalKeys,
-								  Oid domainId,
 								  Oid indexRelId,
 								  Oid foreignRelId,
 								  const int16 *foreignKey,
@@ -218,7 +193,7 @@ extern Oid	CreateConstraintEntry(const char *constraintName,
 
 extern void RemoveConstraintById(Oid conId);
 extern void RenameConstraintById(Oid conId, const char *newname);
-extern bool ConstraintNameIsUsed(ConstraintCategory conCat, Oid objId,
+extern bool ConstraintNameIsUsed(Oid relid,
 								 const char *conname);
 extern bool ConstraintNameExists(const char *conname, Oid namespaceid);
 extern char *ChooseConstraintName(const char *name1, const char *name2,
@@ -226,7 +201,7 @@ extern char *ChooseConstraintName(const char *name1, const char *name2,
 								  List *others);
 
 extern void AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
-									  Oid newNspId, bool isType, ObjectAddresses *objsMoved);
+									  Oid newNspId, ObjectAddresses *objsMoved);
 extern void ConstraintSetParentConstraint(Oid childConstrId,
 										  Oid parentConstrId,
 										  Oid childTableId);

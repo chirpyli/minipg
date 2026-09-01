@@ -846,8 +846,7 @@ index_create(Relation heapRelation,
 	}
 
 	if ((flags & INDEX_CREATE_ADD_CONSTRAINT) != 0 &&
-		ConstraintNameIsUsed(CONSTRAINT_RELATION, heapRelationId,
-							 indexRelationName))
+		ConstraintNameIsUsed(heapRelationId, indexRelationName))
 	{
 		/*
 		 * INDEX_CREATE_IF_NOT_EXISTS does not apply here, since the
@@ -1791,7 +1790,6 @@ index_constraint_create(Relation heapRelation,
 								   indexInfo->ii_IndexAttrNumbers,
 								   indexInfo->ii_NumIndexKeyAttrs,
 								   indexInfo->ii_NumIndexAttrs,
-								   InvalidOid,	/* no domain */
 								   indexRelationId, /* index OID */
 								   InvalidOid,	/* no foreign key */
 								   NULL,

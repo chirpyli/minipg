@@ -680,34 +680,12 @@ typeidTypeRelid(Oid type_id)
 
 /*
  * Given a typeid, return the type's typrelid (associated relation), if any.
- * Returns InvalidOid if type is not a composite type or a domain over one.
- * This is the same as typeidTypeRelid(getBaseType(type_id)), but faster.
+ * Returns InvalidOid if type is not a composite type.
  */
 Oid
 typeOrDomainTypeRelid(Oid type_id)
 {
-	HeapTuple	typeTuple;
-	Form_pg_type type;
-	Oid			result;
-
-	for (;;)
-	{
-		typeTuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_id));
-		if (!HeapTupleIsValid(typeTuple))
-			elog(ERROR, "cache lookup failed for type %u", type_id);
-		type = (Form_pg_type) GETSTRUCT(typeTuple);
-		if (type->typtype != TYPTYPE_DOMAIN)
-		{
-			/* Not a domain, so done looking through domains */
-			break;
-		}
-		/* It is a domain, so examine the base type instead */
-		type_id = type->typbasetype;
-		ReleaseSysCache(typeTuple);
-	}
-	result = type->typrelid;
-	ReleaseSysCache(typeTuple);
-	return result;
+	return typeidTypeRelid(type_id);
 }
 
 /*

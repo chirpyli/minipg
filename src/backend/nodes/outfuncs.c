@@ -1396,30 +1396,6 @@ _outBooleanTest(StringInfo str, const BooleanTest *node)
 }
 
 static void
-_outCoerceToDomain(StringInfo str, const CoerceToDomain *node)
-{
-	WRITE_NODE_TYPE("COERCETODOMAIN");
-
-	WRITE_NODE_FIELD(arg);
-	WRITE_OID_FIELD(resulttype);
-	WRITE_INT_FIELD(resulttypmod);
-	WRITE_OID_FIELD(resultcollid);
-	WRITE_ENUM_FIELD(coercionformat, CoercionForm);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outCoerceToDomainValue(StringInfo str, const CoerceToDomainValue *node)
-{
-	WRITE_NODE_TYPE("COERCETODOMAINVALUE");
-
-	WRITE_OID_FIELD(typeId);
-	WRITE_INT_FIELD(typeMod);
-	WRITE_OID_FIELD(collation);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outSetToDefault(StringInfo str, const SetToDefault *node)
 {
 	WRITE_NODE_TYPE("SETTODEFAULT");
@@ -3382,12 +3358,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_BooleanTest:
 				_outBooleanTest(str, obj);
-				break;
-			case T_CoerceToDomain:
-				_outCoerceToDomain(str, obj);
-				break;
-			case T_CoerceToDomainValue:
-				_outCoerceToDomainValue(str, obj);
 				break;
 			case T_SetToDefault:
 				_outSetToDefault(str, obj);

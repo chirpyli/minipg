@@ -352,14 +352,6 @@ coerce_type(ParseState *pstate, Node *node,
 
 		result = (Node *) newcon;
 
-		/* If target is a domain, apply constraints. */
-		if (baseTypeId != targetTypeId)
-			result = coerce_to_domain(result,
-									  baseTypeId, baseTypeMod,
-									  targetTypeId,
-									  ccontext, cformat, location,
-									  false);
-
 		ReleaseSysCache(baseType);
 
 		return result;
@@ -413,10 +405,7 @@ coerce_type(ParseState *pstate, Node *node,
 		{
 			/*
 			 * Generate an expression tree representing run-time application
-			 * of the conversion function.  If we are dealing with a domain
-			 * target type, the conversion function will yield the base type,
-			 * and we need to extract the correct typmod to use from the
-			 * domain's typtypmod.
+			 * of the conversion function.
 			 */
 			Oid			baseTypeId;
 			int32		baseTypeMod;
@@ -427,16 +416,6 @@ coerce_type(ParseState *pstate, Node *node,
 			result = build_coercion_expression(node, pathtype, funcId,
 											   baseTypeId, baseTypeMod,
 											   ccontext, cformat, location);
-
-			/*
-			 * If domain, coerce to the domain type and relabel with domain
-			 * type ID, hiding the previous coercion node.
-			 */
-			if (targetTypeId != baseTypeId)
-				result = coerce_to_domain(result, baseTypeId, baseTypeMod,
-										  targetTypeId,
-										  ccontext, cformat, location,
-										  true);
 		}
 		else
 		{
@@ -449,25 +428,9 @@ coerce_type(ParseState *pstate, Node *node,
 			 * that must be accounted for.  If the destination is a domain
 			 * then we won't need a RelabelType node.
 			 */
-			result = coerce_to_domain(node, InvalidOid, -1, targetTypeId,
-									  ccontext, cformat, location,
-									  false);
-			if (result == node)
-			{
-				/*
-				 * XXX could we label result with exprTypmod(node) instead of
-				 * default -1 typmod, to save a possible length-coercion
-				 * later? Would work if both types have same interpretation of
-				 * typmod, which is likely but not certain.
-				 */
-				RelabelType *r = makeRelabelType((Expr *) result,
-												 targetTypeId, -1,
-												 InvalidOid,
-												 cformat);
-
-				r->location = location;
-				result = (Node *) r;
-			}
+			result = (Node *) makeRelabelType((Expr *) node, targetTypeId, -1,
+											  InvalidOid, cformat);
+			((RelabelType *) result)->location = location;
 		}
 		return result;
 	}
@@ -649,74 +612,6 @@ can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
 }
 
 
-/*
- * Create an expression tree to represent coercion to a domain type.
- *
- * 'arg': input expression
- * 'baseTypeId': base type of domain, if known (pass InvalidOid if caller
- *		has not bothered to look this up)
- * 'baseTypeMod': base type typmod of domain, if known (pass -1 if caller
- *		has not bothered to look this up)
- * 'typeId': target type to coerce to
- * 'ccontext': context indicator to control coercions
- * 'cformat': coercion display format
- * 'location': coercion request location
- * 'hideInputCoercion': if true, hide the input coercion under this one.
- *
- * If the target type isn't a domain, the given 'arg' is returned as-is.
- */
-Node *
-coerce_to_domain(Node *arg, Oid baseTypeId, int32 baseTypeMod, Oid typeId,
-				 CoercionContext ccontext, CoercionForm cformat, int location,
-				 bool hideInputCoercion)
-{
-	CoerceToDomain *result;
-
-	/* Get the base type if it hasn't been supplied */
-	if (baseTypeId == InvalidOid)
-		baseTypeId = getBaseTypeAndTypmod(typeId, &baseTypeMod);
-
-	/* If it isn't a domain, return the node as it was passed in */
-	if (baseTypeId == typeId)
-		return arg;
-
-	/* Suppress display of nested coercion steps */
-	if (hideInputCoercion)
-		hide_coercion_node(arg);
-
-	/*
-	 * If the domain applies a typmod to its base type, build the appropriate
-	 * coercion step.  Mark it implicit for display purposes, because we don't
-	 * want it shown separately by ruleutils.c; but the isExplicit flag passed
-	 * to the conversion function depends on the manner in which the domain
-	 * coercion is invoked, so that the semantics of implicit and explicit
-	 * coercion differ.  (Is that really the behavior we want?)
-	 *
-	 * NOTE: because we apply this as part of the fixed expression structure,
-	 * ALTER DOMAIN cannot alter the typtypmod.  But it's unclear that that
-	 * would be safe to do anyway, without lots of knowledge about what the
-	 * base type thinks the typmod means.
-	 */
-	arg = coerce_type_typmod(arg, baseTypeId, baseTypeMod,
-							 ccontext, COERCE_IMPLICIT_CAST, location,
-							 false);
-
-	/*
-	 * Now build the domain coercion node.  This represents run-time checking
-	 * of any constraints currently attached to the domain.  This also ensures
-	 * that the expression is properly labeled as to result type.
-	 */
-	result = makeNode(CoerceToDomain);
-	result->arg = (Expr *) arg;
-	result->resulttype = typeId;
-	result->resulttypmod = -1;	/* currently, always -1 for domains */
-	/* resultcollid will be set by parse_collate.c */
-	result->coercionformat = cformat;
-	result->location = location;
-
-	return (Node *) result;
-}
-
 
 /*
  * coerce_type_typmod()
@@ -815,8 +710,6 @@ hide_coercion_node(Node *node)
 		((ConvertRowtypeExpr *) node)->convertformat = COERCE_IMPLICIT_CAST;
 	else if (IsA(node, RowExpr))
 		((RowExpr *) node)->row_format = COERCE_IMPLICIT_CAST;
-	else if (IsA(node, CoerceToDomain))
-		((CoerceToDomain *) node)->coercionformat = COERCE_IMPLICIT_CAST;
 	else
 		elog(ERROR, "unsupported node type: %d", (int) nodeTag(node));
 }
@@ -1126,17 +1019,6 @@ coerce_record_to_complex(ParseState *pstate, Node *node,
 	rowexpr->colnames = NIL;	/* not needed for named target type */
 	rowexpr->location = location;
 
-	/* If target is a domain, apply constraints */
-	if (baseTypeId != targetTypeId)
-	{
-		rowexpr->row_format = COERCE_IMPLICIT_CAST;
-		return coerce_to_domain((Node *) rowexpr,
-								baseTypeId, baseTypeMod,
-								targetTypeId,
-								ccontext, cformat, location,
-								false);
-	}
-
 	return (Node *) rowexpr;
 }
 
@@ -1254,43 +1136,6 @@ coerce_to_specific_type(ParseState *pstate, Node *node,
 	return coerce_to_specific_type_typmod(pstate, node,
 										  targetTypeId, -1,
 										  constructName);
-}
-
-/*
- * coerce_null_to_domain()
- *		Build a NULL constant, then wrap it in CoerceToDomain
- *		if the desired type is a domain type.  This allows any
- *		NOT NULL domain constraint to be enforced at runtime.
- */
-Node *
-coerce_null_to_domain(Oid typid, int32 typmod, Oid collation,
-					  int typlen, bool typbyval)
-{
-	Node	   *result;
-	Oid			baseTypeId;
-	int32		baseTypeMod = typmod;
-
-	/*
-	 * The constant must appear to have the domain's base type/typmod, else
-	 * coerce_to_domain() will apply a length coercion which is useless.
-	 */
-	baseTypeId = getBaseTypeAndTypmod(typid, &baseTypeMod);
-	result = (Node *) makeConst(baseTypeId,
-								baseTypeMod,
-								collation,
-								typlen,
-								(Datum) 0,
-								true,	/* isnull */
-								typbyval);
-	if (typid != baseTypeId)
-		result = coerce_to_domain(result,
-								  baseTypeId, baseTypeMod,
-								  typid,
-								  COERCION_IMPLICIT,
-								  COERCE_IMPLICIT_CAST,
-								  -1,
-								  false);
-	return result;
 }
 
 /*

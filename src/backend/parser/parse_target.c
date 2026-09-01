@@ -799,15 +799,6 @@ transformAssignmentIndirection(ParseState *pstate,
 			 * constraints being checked only once after we've assigned to all
 			 * the fields that the INSERT or UPDATE means to.
 			 */
-			if (baseTypeId != targetTypeId)
-				return coerce_to_domain((Node *) fstore,
-										baseTypeId, baseTypeMod,
-										targetTypeId,
-										COERCION_IMPLICIT,
-										COERCE_IMPLICIT_CAST,
-										location,
-										false);
-
 			return (Node *) fstore;
 		}
 	}

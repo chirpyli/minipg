@@ -943,11 +943,12 @@ rewriteTargetListIU(List *targetList,
 				if (commandType == CMD_INSERT)
 					new_tle = NULL;
 				else
-					new_expr = coerce_null_to_domain(att_tup->atttypid,
-													 att_tup->atttypmod,
-													 att_tup->attcollation,
-													 att_tup->attlen,
-													 att_tup->attbyval);
+					new_expr = (Node *) makeConst(att_tup->atttypid,
+												 att_tup->atttypmod,
+												 att_tup->attcollation,
+												 att_tup->attlen,
+												 (Datum) 0, true,
+												 att_tup->attbyval);
 			}
 
 			if (new_expr)
@@ -979,7 +980,6 @@ process_matched_tle(TargetEntry *src_tle,
 					const char *attrName)
 {
 	TargetEntry *result;
-	CoerceToDomain *coerce_expr = NULL;
 	Node	   *src_expr;
 	Node	   *prior_expr;
 	Node	   *src_input;
@@ -1016,29 +1016,10 @@ process_matched_tle(TargetEntry *src_tle,
 	 * For FieldStore, instead of nesting we can generate a single
 	 * FieldStore with multiple target fields.  We must nest when
 	 * SubscriptingRefs are involved though.
-	 *
-	 * As a further complication, the destination column might be a domain,
-	 * resulting in each assignment containing a CoerceToDomain node over a
-	 * FieldStore or SubscriptingRef.  These should have matching target
-	 * domains, so we strip them and reconstitute a single CoerceToDomain over
-	 * the combined FieldStore/SubscriptingRef nodes.  (Notice that this has
-	 * the result that the domain's checks are applied only after we do all
-	 * the field or element updates, not after each one.  This is desirable.)
 	 *----------
 	 */
 	src_expr = (Node *) src_tle->expr;
 	prior_expr = (Node *) prior_tle->expr;
-
-	if (src_expr && IsA(src_expr, CoerceToDomain) &&
-		prior_expr && IsA(prior_expr, CoerceToDomain) &&
-		((CoerceToDomain *) src_expr)->resulttype ==
-		((CoerceToDomain *) prior_expr)->resulttype)
-	{
-		/* we assume without checking that resulttypmod/resultcollid match */
-		coerce_expr = (CoerceToDomain *) src_expr;
-		src_expr = (Node *) ((CoerceToDomain *) src_expr)->arg;
-		prior_expr = (Node *) ((CoerceToDomain *) prior_expr)->arg;
-	}
 
 	src_input = get_assignment_input(src_expr);
 	prior_input = get_assignment_input(prior_expr);
@@ -1106,16 +1087,6 @@ process_matched_tle(TargetEntry *src_tle,
 	{
 		elog(ERROR, "cannot happen");
 		newexpr = NULL;
-	}
-
-	if (coerce_expr)
-	{
-		/* put back the CoerceToDomain */
-		CoerceToDomain *newcoerce = makeNode(CoerceToDomain);
-
-		memcpy(newcoerce, coerce_expr, sizeof(CoerceToDomain));
-		newcoerce->arg = (Expr *) newexpr;
-		newexpr = (Node *) newcoerce;
 	}
 
 	result = flatCopyTargetEntry(src_tle);
@@ -1190,20 +1161,12 @@ build_column_default(Relation rel, int attrno)
 				 attrno, RelationGetRelationName(rel));
 	}
 
-	/*
-	 * No per-column default, so look for a default for the type itself.  But
-	 * not for generated columns.
-	 */
-	if (expr == NULL && !att_tup->attgenerated)
-		expr = get_typdefault(atttype);
-
 	if (expr == NULL)
 		return NULL;			/* No default anywhere */
 
 	/*
 	 * Make sure the value is coerced to the target column type; this will
-	 * generally be true already, but there seem to be some corner cases
-	 * involving domain defaults where it might not be true. This should match
+	 * generally be true already. This should match
 	 * the parser's processing of non-defaulted expressions --- see
 	 * transformAssignedExpr().
 	 */
@@ -1498,11 +1461,12 @@ rewriteValuesRTE(Query *parsetree, RangeTblEntry *rte, int rti,
 						continue;
 					}
 
-					new_expr = coerce_null_to_domain(att_tup->atttypid,
-													 att_tup->atttypmod,
-													 att_tup->attcollation,
-													 att_tup->attlen,
-													 att_tup->attbyval);
+					new_expr = (Node *) makeConst(att_tup->atttypid,
+												 att_tup->atttypmod,
+												 att_tup->attcollation,
+												 att_tup->attlen,
+												 (Datum) 0, true,
+												 att_tup->attbyval);
 				}
 				newList = lappend(newList, new_expr);
 			}

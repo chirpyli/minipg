@@ -44,22 +44,6 @@ SELECT * FROM collate_test1 WHERE b >= 'abc' COLLATE "C";
 SELECT * FROM collate_test1 WHERE b COLLATE "C" >= 'abc' COLLATE "C";
 SELECT * FROM collate_test1 WHERE b COLLATE "C" >= 'bbc' COLLATE "POSIX"; -- fail
 
-CREATE DOMAIN testdomain_p AS text COLLATE "POSIX";
-CREATE DOMAIN testdomain_i AS int COLLATE "POSIX"; -- fail
-CREATE TABLE collate_test4 (
-    a int,
-    b testdomain_p
-);
-INSERT INTO collate_test4 SELECT * FROM collate_test1;
-SELECT a, b FROM collate_test4 ORDER BY b;
-
-CREATE TABLE collate_test5 (
-    a int,
-    b testdomain_p COLLATE "C"
-);
-INSERT INTO collate_test5 SELECT * FROM collate_test1;
-SELECT a, b FROM collate_test5 ORDER BY b;
-
 
 SELECT a, b FROM collate_test1 ORDER BY b;
 SELECT a, b FROM collate_test2 ORDER BY b;
@@ -115,12 +99,6 @@ SELECT a, lower(nullif(x, 'foo')), lower(nullif(y, 'foo')) FROM collate_test10;
 
 SELECT a, CASE b WHEN 'abc' THEN 'abcd' ELSE b END FROM collate_test1 ORDER BY 2;
 SELECT a, CASE b WHEN 'abc' THEN 'abcd' ELSE b END FROM collate_test2 ORDER BY 2;
-
-CREATE DOMAIN testdomain AS text;
-SELECT a, b::testdomain FROM collate_test1 ORDER BY 2;
-SELECT a, b::testdomain FROM collate_test2 ORDER BY 2;
-SELECT a, b::testdomain_p FROM collate_test2 ORDER BY 2;
-SELECT a, lower(x::testdomain), lower(y::testdomain) FROM collate_test10;
 
 SELECT min(b), max(b) FROM collate_test1;
 SELECT min(b), max(b) FROM collate_test2;

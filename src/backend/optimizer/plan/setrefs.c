@@ -2871,41 +2871,6 @@ record_plan_function_dependency(PlannerInfo *root, Oid funcid)
 }
 
 /*
- * record_plan_type_dependency
- *		Mark the current plan as depending on a particular type.
- *
- * This is exported so that eval_const_expressions can record a
- * dependency on a domain that it's removed a CoerceToDomain node for.
- *
- * We don't currently need to record dependencies on domains that the
- * plan contains CoerceToDomain nodes for, though that might change in
- * future.  Hence, this isn't actually called in this module, though
- * someday fix_expr_common might call it.
- */
-void
-record_plan_type_dependency(PlannerInfo *root, Oid typid)
-{
-	/*
-	 * As in record_plan_function_dependency, ignore the possibility that
-	 * someone would change a built-in domain.
-	 */
-	if (typid >= (Oid) FirstBootstrapObjectId)
-	{
-		PlanInvalItem *inval_item = makeNode(PlanInvalItem);
-
-		/*
-		 * It would work to use any syscache on pg_type, but the easiest is
-		 * TYPEOID since we already have the type's OID at hand.
-		 */
-		inval_item->cacheId = TYPEOID;
-		inval_item->hashValue = GetSysCacheHashValue1(TYPEOID,
-													  ObjectIdGetDatum(typid));
-
-		root->glob->invalItems = lappend(root->glob->invalItems, inval_item);
-	}
-}
-
-/*
  * extract_query_dependencies
  *		Given a rewritten, but not yet planned, query or queries
  *		(i.e. a Query node or list of Query nodes), extract dependencies
@@ -2915,11 +2880,9 @@ record_plan_type_dependency(PlannerInfo *root, Oid typid)
  * This is needed to handle invalidation of cached unplanned queries.
  *
  * Note: this does not go through eval_const_expressions, and hence doesn't
- * reflect its additions of inlined functions and elided CoerceToDomain nodes
- * to the invalItems list.  This is obviously OK for functions, since we'll
- * see them in the original query tree anyway.  For domains, it's OK because
- * we don't care about domains unless they get elided.  That is, a plan might
- * have domain dependencies that the query tree doesn't.
+ * reflect its additions of inlined functions to the invalItems list.  This is
+ * obviously OK for functions, since we'll see them in the original query
+ * tree anyway.
  */
 void
 extract_query_dependencies(Node *query,

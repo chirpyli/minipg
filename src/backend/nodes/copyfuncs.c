@@ -1780,40 +1780,6 @@ _copyBooleanTest(const BooleanTest *from)
 }
 
 /*
- * _copyCoerceToDomain
- */
-static CoerceToDomain *
-_copyCoerceToDomain(const CoerceToDomain *from)
-{
-	CoerceToDomain *newnode = makeNode(CoerceToDomain);
-
-	COPY_NODE_FIELD(arg);
-	COPY_SCALAR_FIELD(resulttype);
-	COPY_SCALAR_FIELD(resulttypmod);
-	COPY_SCALAR_FIELD(resultcollid);
-	COPY_SCALAR_FIELD(coercionformat);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
- * _copyCoerceToDomainValue
- */
-static CoerceToDomainValue *
-_copyCoerceToDomainValue(const CoerceToDomainValue *from)
-{
-	CoerceToDomainValue *newnode = makeNode(CoerceToDomainValue);
-
-	COPY_SCALAR_FIELD(typeId);
-	COPY_SCALAR_FIELD(typeMod);
-	COPY_SCALAR_FIELD(collation);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
  * _copySetToDefault
  */
 static SetToDefault *
@@ -3418,12 +3384,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_BooleanTest:
 			retval = _copyBooleanTest(from);
-			break;
-		case T_CoerceToDomain:
-			retval = _copyCoerceToDomain(from);
-			break;
-		case T_CoerceToDomainValue:
-			retval = _copyCoerceToDomainValue(from);
 			break;
 		case T_SetToDefault:
 			retval = _copySetToDefault(from);

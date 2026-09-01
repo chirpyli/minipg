@@ -4902,59 +4902,6 @@ List of access methods
 ------+------+---------+-------------
 (0 rows)
 
-\dAf spgist
-        List of operator families
- AM | Operator family | Applicable types 
-----+-----------------+------------------
-(0 rows)
-
-\dAf btree int4
-              List of operator families
-  AM   | Operator family |     Applicable types      
--------+-----------------+---------------------------
- btree | integer_ops     | smallint, integer, bigint
-(1 row)
-
-\dAo+ btree float_ops
-                                List of operators of operator families
-  AM   | Operator family |               Operator                | Strategy | Purpose | Sort opfamily 
--------+-----------------+---------------------------------------+----------+---------+---------------
- btree | float_ops       | <(double precision,double precision)  |        1 | search  | 
- btree | float_ops       | <=(double precision,double precision) |        2 | search  | 
- btree | float_ops       | =(double precision,double precision)  |        3 | search  | 
- btree | float_ops       | >=(double precision,double precision) |        4 | search  | 
- btree | float_ops       | >(double precision,double precision)  |        5 | search  | 
- btree | float_ops       | <(real,real)                          |        1 | search  | 
- btree | float_ops       | <=(real,real)                         |        2 | search  | 
- btree | float_ops       | =(real,real)                          |        3 | search  | 
- btree | float_ops       | >=(real,real)                         |        4 | search  | 
- btree | float_ops       | >(real,real)                          |        5 | search  | 
- btree | float_ops       | <(double precision,real)              |        1 | search  | 
- btree | float_ops       | <=(double precision,real)             |        2 | search  | 
- btree | float_ops       | =(double precision,real)              |        3 | search  | 
- btree | float_ops       | >=(double precision,real)             |        4 | search  | 
- btree | float_ops       | >(double precision,real)              |        5 | search  | 
- btree | float_ops       | <(real,double precision)              |        1 | search  | 
- btree | float_ops       | <=(real,double precision)             |        2 | search  | 
- btree | float_ops       | =(real,double precision)              |        3 | search  | 
- btree | float_ops       | >=(real,double precision)             |        4 | search  | 
- btree | float_ops       | >(real,double precision)              |        5 | search  | 
-(20 rows)
-
-\dAp+ btree float_ops
-                                                         List of support functions of operator families
-  AM   | Operator family | Registered left type | Registered right type | Number |                                   Function                                   
--------+-----------------+----------------------+-----------------------+--------+------------------------------------------------------------------------------
- btree | float_ops       | double precision     | double precision      |      1 | btfloat8cmp(double precision,double precision)
- btree | float_ops       | double precision     | double precision      |      2 | btfloat8sortsupport(internal)
- btree | float_ops       | double precision     | double precision      |      3 | in_range(double precision,double precision,double precision,boolean,boolean)
- btree | float_ops       | real                 | real                  |      1 | btfloat4cmp(real,real)
- btree | float_ops       | real                 | real                  |      2 | btfloat4sortsupport(internal)
- btree | float_ops       | double precision     | real                  |      1 | btfloat84cmp(double precision,real)
- btree | float_ops       | real                 | double precision      |      1 | btfloat48cmp(real,double precision)
- btree | float_ops       | real                 | double precision      |      3 | in_range(real,real,double precision,boolean,boolean)
-(8 rows)
-
 -- check \df, \do with argument specifications
 \df *sqrt
                              List of functions
@@ -5123,12 +5070,6 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.pg_c
 cross-database references are not implemented: [.pg_catalog.pg_class
 \dd nonesuch.pg_catalog.pg_class
 cross-database references are not implemented: nonesuch.pg_catalog.pg_class
-\dD host.regression.public.gtestdomain1
-improper qualified name (too many dotted names): host.regression.public.gtestdomain1
-\dD ].public.gtestdomain1
-cross-database references are not implemented: ].public.gtestdomain1
-\dD nonesuch.public.gtestdomain1
-cross-database references are not implemented: nonesuch.public.gtestdomain1
 \ddp host.regression.pg_catalog.pg_class
 improper qualified name (too many dotted names): host.regression.pg_catalog.pg_class
 \ddp {.pg_catalog.pg_class
@@ -5255,14 +5196,6 @@ cross-database references are not implemented: nonesuch.public.mlparted
 improper qualified name (too many dotted names): nonesuch.lc_messages
 \drds regression.lc_messages
 improper qualified name (too many dotted names): regression.lc_messages
-\dRp public.mypub
-improper qualified name (too many dotted names): public.mypub
-\dRp regression.mypub
-improper qualified name (too many dotted names): regression.mypub
-\dRs public.mysub
-improper qualified name (too many dotted names): public.mysub
-\dRs regression.mysub
-improper qualified name (too many dotted names): regression.mysub
 \dx regression.plpgsql
 improper qualified name (too many dotted names): regression.plpgsql
 \dx nonesuch.plpgsql
@@ -5302,24 +5235,6 @@ List of access methods
 ----+------------+--------------+----------------+----------
 (0 rows)
 
-\dAf "no.such.operator.family"
-        List of operator families
- AM | Operator family | Applicable types 
-----+-----------------+------------------
-(0 rows)
-
-\dAo "no.such.operator.of.operator.family"
-        List of operators of operator families
- AM | Operator family | Operator | Strategy | Purpose 
-----+-----------------+----------+----------+---------
-(0 rows)
-
-\dAp "no.such.operator.support.function.of.operator.family"
-                     List of support functions of operator families
- AM | Operator family | Registered left type | Registered right type | Number | Function 
-----+-----------------+----------------------+-----------------------+--------+----------
-(0 rows)
-
 \dC "no.such.cast"
                   List of casts
  Source type | Target type | Function | Implicit? 
@@ -5330,12 +5245,6 @@ List of access methods
          Object descriptions
  Schema | Name | Object | Description 
 --------+------+--------+-------------
-(0 rows)
-
-\dD "no.such.domain"
-                        List of domains
- Schema | Name | Type | Collation | Nullable | Default | Check 
---------+------+------+-----------+----------+---------+-------
 (0 rows)
 
 \ddp "no.such.default.access.privilege"
@@ -5437,18 +5346,6 @@ List of schemas
 ------+----------+----------
 (0 rows)
 
-\dRp "no.such.publication"
-                              List of publications
- Name | Owner | All tables | Inserts | Updates | Deletes | Truncates | Via root 
-------+-------+------------+---------+---------+---------+-----------+----------
-(0 rows)
-
-\dRs "no.such.subscription"
-        List of subscriptions
- Name | Owner | Enabled | Publication 
-------+-------+---------+-------------
-(0 rows)
-
 \dT "no.such.data.type"
      List of data types
  Schema | Name | Description 
@@ -5490,12 +5387,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.acces
 
 \dAc "no.such.schema"."no.such.operator.class"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.class"
-\dAf "no.such.schema"."no.such.operator.family"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.family"
-\dAo "no.such.schema"."no.such.operator.of.operator.family"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.of.operator.family"
-\dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.operator.support.function.of.operator.family"
 \dC "no.such.schema"."no.such.cast"
                   List of casts
  Source type | Target type | Function | Implicit? 
@@ -5506,12 +5397,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
          Object descriptions
  Schema | Name | Object | Description 
 --------+------+--------+-------------
-(0 rows)
-
-\dD "no.such.schema"."no.such.domain"
-                        List of domains
- Schema | Name | Type | Collation | Nullable | Default | Check 
---------+------+------+-----------+----------+---------+-------
 (0 rows)
 
 \ddp "no.such.schema"."no.such.default.access.privilege"
@@ -5596,10 +5481,6 @@ cross-database references are not implemented: "no.such.schema"."no.such.languag
 
 \drds "no.such.schema"."no.such.setting"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.setting"
-\dRp "no.such.schema"."no.such.publication"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.publication"
-\dRs "no.such.schema"."no.such.subscription"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.subscription"
 \dT "no.such.schema"."no.such.data.type"
      List of data types
  Schema | Name | Description 
@@ -5639,12 +5520,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
          Object descriptions
  Schema | Name | Object | Description 
 --------+------+--------+-------------
-(0 rows)
-
-\dD regression."no.such.schema"."no.such.domain"
-                        List of domains
- Schema | Name | Type | Collation | Nullable | Default | Check 
---------+------+------+-----------+----------+---------+-------
 (0 rows)
 
 \di regression."no.such.schema"."no.such.index.relation"
@@ -5738,8 +5613,6 @@ cross-database references are not implemented: "no.such.database"."no.such.schem
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.cast"
 \dd "no.such.database"."no.such.schema"."no.such.object.description"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.object.description"
-\dD "no.such.database"."no.such.schema"."no.such.domain"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.domain"
 \ddp "no.such.database"."no.such.schema"."no.such.default.access.privilege"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.default.access.privilege"
 \di "no.such.database"."no.such.schema"."no.such.index.relation"

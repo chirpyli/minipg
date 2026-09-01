@@ -984,40 +984,6 @@ _readBooleanTest(void)
 }
 
 /*
- * _readCoerceToDomain
- */
-static CoerceToDomain *
-_readCoerceToDomain(void)
-{
-	READ_LOCALS(CoerceToDomain);
-
-	READ_NODE_FIELD(arg);
-	READ_OID_FIELD(resulttype);
-	READ_INT_FIELD(resulttypmod);
-	READ_OID_FIELD(resultcollid);
-	READ_ENUM_FIELD(coercionformat, CoercionForm);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readCoerceToDomainValue
- */
-static CoerceToDomainValue *
-_readCoerceToDomainValue(void)
-{
-	READ_LOCALS(CoerceToDomainValue);
-
-	READ_OID_FIELD(typeId);
-	READ_INT_FIELD(typeMod);
-	READ_OID_FIELD(collation);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
  * _readSetToDefault
  */
 static SetToDefault *
@@ -2293,10 +2259,6 @@ parseNodeString(void)
 		return_value = _readNullTest();
 	else if (MATCH("BOOLEANTEST", 11))
 		return_value = _readBooleanTest();
-	else if (MATCH("COERCETODOMAIN", 14))
-		return_value = _readCoerceToDomain();
-	else if (MATCH("COERCETODOMAINVALUE", 19))
-		return_value = _readCoerceToDomainValue();
 	else if (MATCH("SETTODEFAULT", 12))
 		return_value = _readSetToDefault();
 	else if (MATCH("INFERENCEELEM", 13))

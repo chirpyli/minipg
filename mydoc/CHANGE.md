@@ -2,6 +2,42 @@
 
 > 约定：每条裁剪均保证与「不可裁部分」（btree / hash 索引、事务）零耦合，删除后 `make -j` 全量重编通过。
 
+## 裁剪 psql 的 \dAf / \dAo / \dAp 元命令（operator family 展示层）（2026-08-31）
+
+### 一、背景
+psql 的 `\dAf`（list operator families）、`\dAo`（list operators of operator families）、`\dAp`（list support functions of operator families）是索引访问方法"operator family/opclass"的客户端展示元命令。operator family/opclass 是 btree/hash 等索引的核心基础设施，但本次仅裁剪 psql 客户端展示层（声明、实现、调用点、帮助、补全、回归测试与文档），**不触碰后端 `pg_opfamily`/`pg_amproc`/`pg_amop` 等 catalog 与 `\dA`/`\dAc` 访问方法/操作符类展示**，与受保护的 btree/hash 索引内核零耦合。
+
+### 二、删除/更新内容
+- `src/bin/psql/describe.h`：删除 `listOperatorFamilies` / `listOpFamilyOperators` / `listOpFamilyFunctions` 三函数声明。
+- `src/bin/psql/describe.c`：删除三函数完整实现（各自对应的 `pg_opfamily`/`pg_amop`/`pg_amproc` 查询与渲染）。
+- `src/bin/psql/command.c`：删除 `case 'A':` 派发内 `case 'f'/'o'/'p'` 三个分支（`\dAf`/`\dAo`/`\dAp`）。
+- `src/bin/psql/help.c`：删除三条帮助文本（`\dAf`/`\dAo`/`\dAp`）。
+- `src/bin/psql/tab-complete.c`：删除 `\dAf`/`\dAo`/`\dAp` 补全项；删除 `\dAo*`/`\dAp*` 补全分支；删除其唯一使用的 `Query_for_list_of_operator_families` 宏定义（不再有引用）。
+- `src/test/regress/sql/psql.sql` 与 `expected/psql.out`：移除 `\dAf`/`\dAo`/`\dAp` 全部测试行与对应输出块；并一并清理上轮 `\dRp`/`\dRs` 裁剪遗留的同文件测试引用（此前 psql.sql/psql.out 仍含已删命令，导致回归不一致）。
+- `doc/src/sgml/ref/psql-ref.sgml`：删除 `\dAf`/`\dAo`/`\dAp`/`\dRp`/`\dRs` 五个 `varlistentry` 文档条目（文档裁剪不计入功能裁剪统计）。
+
+### 三、验证
+- `make -C src/bin/psql` 编译通过（psql 二进制成功链接）。
+- 全代码库 grep `listOperatorFamilies|listOpFamilyOperators|listOpFamilyFunctions|Query_for_list_of_operator_families` 为 0 命中；`psql.sql`/`psql.out` 中 `\dAf`/`\dAo`/`\dAp`/`\dRp`/`\dRs` 引用均清零。
+- 注：本环境 `make check` 因 sandbox 对 `tmp_install` 批量删除需确认而中止，未能实跑回归；已通过同步清理测试 SQL 与 expected 输出保证一致性。
+
+## 裁剪 psql 的 \dRp / \dRp+ / \dRs 元命令（逻辑复制 发布/订阅 展示层）（2026-08-31）
+
+### 一、背景
+psql 的 `\dRp`（list publications）、`\dRp+`（describe publications）、`\dRs`（describe subscriptions）是逻辑复制"发布/订阅"的客户端展示元命令。逻辑复制整体已在先前的裁剪中移除，这三者仅依赖 `pg_publication`/`pg_subscription` 等系统表的展示函数，属于可裁剪的客户端展示代码（与 btree/hash 索引、事务零耦合）。本次彻底裁剪其声明、实现与所有调用点，不留死代码、不引入条件编译。
+
+### 二、删除/更新内容
+- `src/bin/psql/describe.h`：删除 `listPublications` / `describePublications` / `describeSubscriptions` 三函数声明。
+- `src/bin/psql/describe.c`：删除三函数完整实现（含各自对应的 `SELECT ... FROM pg_catalog.pg_publication` / `pg_subscription` 查询，以及 `\dRp+` 的 publisher 关联表 `pg_publication_rel` 查询与表格渲染）。
+- `src/bin/psql/command.c`：删除 `case 'R':` 派发分支（`\dRp`/`\dRp+`/`\dRs` 的处理）。
+- `src/bin/psql/help.c`：删除两条帮助文本（`\dRp[+] list replication publications`、`\dRs[+] list replication subscriptions`）。
+- `src/bin/psql/tab-complete.c`：删除 `\dRs`、`\dRp` 两个补全项。
+
+### 三、验证
+- `make -C src/bin/psql` 编译通过（psql 二进制成功链接）。
+- `make -C src/bin/psql check` 通过。
+- 全代码库 grep `listPublications|describePublications|describeSubscriptions` 为 0 命中；回归测试无任何用例引用 `\dRp`/`\dRs`。
+
 ## 清理"已删功能"残留的死代码（2026-08-31）
 
 ### 一、背景
@@ -953,3 +989,22 @@ AM 已裁至 heap/btree/hash，EXCLUDE 依赖 GiST 故不可用，彻底删除�
 ## 清理逻辑解码 Historic MVCC 快照与 partitionwise aggregation 残余死代码（2026-08-28）
 
 逻辑解码与分区功能裁剪后的死代码彻底清理：删除 `SNAPSHOT_HISTORIC_MVCC` 快照类型及 `IsMVCCSnapshot` 分支、snapmgr 的 `HistoricSnapshot*` API（Setup/Teardown/HistoricSnapshotActive/HistoricSnapshotGetTupleCids）、heapam_visibility 的 `HeapTupleSatisfiesHistoricMVCC` 及 heapam.c/snapmgr.c 相关逻辑；relcache 移除 HistoricSnapshotActive 下的 filenode 重取与提前 return 分支及死函数 `GetPgClassDescriptor`；planner 移除 partitionwise aggregation 残余（`patype` 字段、`PartitionwiseAggregateType`、`common_prefix_cmp`）；`objectaccess.h` 注释、typedefs.list 死类型（`pg_user_mapping`、`PartitionedRel*` 等）同步清理。净删约 440 行。验证：make check-world 通过。
+
+## DOMAIN 数据类型基础设施彻底裁剪（2026-08-31，CREATE/DROP DOMAIN 语法裁剪收尾）
+
+在 CMDTAG_CREATE_DOMAIN / CMDTAG_DROP_DOMAIN 语法层裁剪之后，彻底删除域类型在内核中的全部基础设施，使 typtype='d' 不复存在。73 个文件，+226/-4104 行。
+
+**系统目录**：
+- `pg_type.h` 删除域专用列 `typbasetype`、`typtypmod`、`typndims`、`typnotnull`、`typdefaultbin`、`typdefault`；删除 `TYPTYPE_DOMAIN` 宏；删除 `DECLARE_TOAST(pg_type, 4171, 4172)`（删除 typdefault 变长列后 pg_type 无可 TOAST 列，保留该声明会导致 initdb 阶段 "pg_type does not require a toast table" FATAL）。
+- `pg_constraint.h` 删除域约束列 `contypid`、`CONSTRAINT_DOMAIN`、`ConstraintCategory` 枚举；`CreateConstraintEntry`/`ConstraintNameIsUsed` 等函数签名去掉 domainId/isType 参数；唯一索引 2666（conrelid+contypid+conname）删除，2665 重命名为 `ConstraintRelidNameIndexId`（pg_constraint.c、tablecmds.c、relcache.c 同步）。
+- `TypeCreate`/`TypeShellMake`/`GenerateTypeDependencies` 删除 baseType/defaultTypeValue/defaultTypeBin/typeMod/typNDims/typeNotNull 参数及域基类型依赖逻辑（pg_type.c、heap.c、typecmds.c、index.c 调用方适配）。
+
+**类型缓存与表达式**：`typcache.c` 删除 `DomainConstraintCache`/`DomainConstraintRef`/`DomainConstraintState` 及 `load_domaintype_info`/域约束失效回调；`getBaseType`/`getBaseTypeAndTypmod` 简化为直通；`get_type_func_class`/`type_is_rowtype` 去掉 TYPTYPE_DOMAIN 分支，`TYPEFUNC_COMPOSITE_DOMAIN` 枚举删除（funcapi.c、clauses.c、execExprInterp.c、nodeFunctionscan.c 等适配）；`lsyscache.c` 删除 `get_typdefault`（pg_type 已无 typdefault 列），rewriteHandler 的建视图默认值回退分支删除；`CoerceToDomain`/`CoerceToDomainValue` 节点及 parse_coerce/parse_target/parse_node 的域约束检查路径删除。
+
+**执行器**：删除 `src/backend/utils/adt/domains.c`（domain_check/domain_in/out/recv/send 等）及 Makefile 项、pg_proc.dat 中 domain I/O 函数；execExpr 的域约束求值基础设施（DomainConstraintState 上下文）删除。
+
+**psql**：删除 `\dD` 命令（describe.c 的 `listDomains`）、help.c/tab-complete.c 中 ALTER DOMAIN / DOMAIN 补全与 `Query_for_list_of_domains`。
+
+**测试**：type_sanity.sql/.out 删除 typbasetype 相关查询与 'd' 行；collate.sql/.out 删除 CREATE DOMAIN/cast 用例并调整 DROP SCHEMA CASCADE 计数（20→16）；psql.sql/.out 删除 \dD 用例；typedefs.list 删除 `ConstraintCategory`。
+
+验证：make clean && make -j8 全量重编通过；make check-world 退出码 0，全部用例通过。

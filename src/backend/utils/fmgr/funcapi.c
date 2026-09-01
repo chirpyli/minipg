@@ -322,9 +322,7 @@ get_expr_result_type(Node *expr,
 		if (resultTupleDesc)
 			*resultTupleDesc = NULL;
 		result = get_type_func_class(typid, &base_typid);
-		if ((result == TYPEFUNC_COMPOSITE ||
-			 result == TYPEFUNC_COMPOSITE_DOMAIN) &&
-			resultTupleDesc)
+		if (result == TYPEFUNC_COMPOSITE && resultTupleDesc)
 			*resultTupleDesc = lookup_rowtype_tupdesc_copy(base_typid, -1);
 	}
 
@@ -440,7 +438,6 @@ internal_get_result_type(Oid funcid,
 	switch (result)
 	{
 		case TYPEFUNC_COMPOSITE:
-		case TYPEFUNC_COMPOSITE_DOMAIN:
 			if (resultTupleDesc)
 				*resultTupleDesc = lookup_rowtype_tupdesc_copy(base_rettype, -1);
 			/* Named composite types can't have any polymorphic columns */
@@ -486,8 +483,7 @@ get_expr_result_tupdesc(Node *expr, bool noError)
 
 	functypclass = get_expr_result_type(expr, NULL, &tupleDesc);
 
-	if (functypclass == TYPEFUNC_COMPOSITE ||
-		functypclass == TYPEFUNC_COMPOSITE_DOMAIN)
+	if (functypclass == TYPEFUNC_COMPOSITE)
 		return tupleDesc;
 
 	if (!noError)
@@ -1244,7 +1240,6 @@ resolve_polymorphic_argtypes(int numargs, Oid *argtypes, char *argmodes,
 /*
  * get_type_func_class
  *		Given the type OID, obtain its TYPEFUNC classification.
- *		Also, if it's a domain, return the base type OID.
  *
  * This is intended to centralize a bunch of formerly ad-hoc code for
  * classifying types.  The categories used here are useful for deciding
@@ -1263,12 +1258,6 @@ get_type_func_class(Oid typid, Oid *base_typeid)
 		case TYPTYPE_RANGE:
 		case TYPTYPE_MULTIRANGE:
 			return TYPEFUNC_SCALAR;
-		case TYPTYPE_DOMAIN:
-			*base_typeid = typid = getBaseType(typid);
-			if (get_typtype(typid) == TYPTYPE_COMPOSITE)
-				return TYPEFUNC_COMPOSITE_DOMAIN;
-			else				/* domain base type can't be a pseudotype */
-				return TYPEFUNC_SCALAR;
 		case TYPTYPE_PSEUDO:
 			if (typid == RECORDOID)
 				return TYPEFUNC_RECORD;
@@ -1845,10 +1834,7 @@ TypeGetTupleDesc(Oid typeoid, List *colaliases)
 	TupleDesc	tupdesc = NULL;
 
 	/*
-	 * Build a suitable tupledesc representing the output rows.  We
-	 * intentionally do not support TYPEFUNC_COMPOSITE_DOMAIN here, as it's
-	 * unlikely that legacy callers of this obsolete function would be
-	 * prepared to apply domain constraints.
+	 * Build a suitable tupledesc representing the output rows.
 	 */
 	if (functypclass == TYPEFUNC_COMPOSITE)
 	{

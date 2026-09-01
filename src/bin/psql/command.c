@@ -701,15 +701,7 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 						case 'c':
 							success = listOperatorClasses(pattern, pattern2, show_verbose);
 							break;
-						case 'f':
-							success = listOperatorFamilies(pattern, pattern2, show_verbose);
-							break;
-						case 'o':
-							success = listOpFamilyOperators(pattern, pattern2, show_verbose);
-							break;
-						case 'p':
-							success = listOpFamilyFunctions(pattern, pattern2, show_verbose);
-							break;
+
 						default:
 							status = PSQL_CMD_UNKNOWN;
 							break;
@@ -727,9 +719,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				break;
 			case 'd':
 				success = objectDescription(pattern, show_system);
-				break;
-			case 'D':
-				success = listDomains(pattern, show_verbose, show_system);
 				break;
 			case 'f':			/* function subsystem */
 				switch (cmd[2])
@@ -790,22 +779,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			case 's':
 			case 'E':
 				success = listTables(&cmd[1], pattern, show_verbose, show_system);
-				break;
-			case 'R':
-				switch (cmd[2])
-				{
-					case 'p':
-						if (show_verbose)
-							success = describePublications(pattern);
-						else
-							success = listPublications(pattern);
-						break;
-					case 's':
-						success = describeSubscriptions(pattern, show_verbose);
-						break;
-					default:
-						status = PSQL_CMD_UNKNOWN;
-				}
 				break;
 			case 'F':			/* text search subsystem */
 				switch (cmd[2])

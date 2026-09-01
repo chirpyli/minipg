@@ -1267,27 +1267,17 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 
 	if (fullCommand)
 	{
-		if (OidIsValid(conForm->conrelid))
-		{
-			/*
-			 * Currently, callers want ALTER TABLE (without ONLY) for CHECK
-			 * constraints, and other types of constraints don't inherit
-			 * anyway so it doesn't matter whether we say ONLY or not. Someday
-			 * we might need to let callers specify whether to put ONLY in the
-			 * command.
-			 */
-			appendStringInfo(&buf, "ALTER TABLE %s ADD CONSTRAINT %s ",
-							 generate_qualified_relation_name(conForm->conrelid),
-							 quote_identifier(NameStr(conForm->conname)));
-		}
-		else
-		{
-			/* Must be a domain constraint */
-			Assert(OidIsValid(conForm->contypid));
-			appendStringInfo(&buf, "ALTER DOMAIN %s ADD CONSTRAINT %s ",
-							 generate_qualified_type_name(conForm->contypid),
-							 quote_identifier(NameStr(conForm->conname)));
-		}
+		/*
+		 * Currently, callers want ALTER TABLE (without ONLY) for CHECK
+		 * constraints, and other types of constraints don't inherit
+		 * anyway so it doesn't matter whether we say ONLY or not. Someday
+		 * we might need to let callers specify whether to put ONLY in the
+		 * command.
+		 */
+		Assert(OidIsValid(conForm->conrelid));
+		appendStringInfo(&buf, "ALTER TABLE %s ADD CONSTRAINT %s ",
+						 generate_qualified_relation_name(conForm->conrelid),
+						 quote_identifier(NameStr(conForm->conname)));
 	}
 
 	switch (conForm->contype)
@@ -5203,14 +5193,14 @@ get_update_query_targetlist_def(Query *query, List *targetList,
 		if (next_ma_cell != NULL && cur_ma_sublink == NULL)
 		{
 			/*
-			 * We must dig down into the expr to see if it's a PARAM_MULTIEXPR
-			 * Param.  That could be buried under FieldStores and
-			 * SubscriptingRefs and CoerceToDomains (cf processIndirection()),
-			 * and underneath those there could be an implicit type coercion.
-			 * Because we would ignore implicit type coercions anyway, we
-			 * don't need to be as careful as processIndirection() is about
-			 * descending past implicit CoerceToDomains.
-			 */
+		 * We must dig down into the expr to see if it's a PARAM_MULTIEXPR
+		 * Param.  That could be buried under FieldStores and
+		 * SubscriptingRefs (cf processIndirection()),
+		 * and underneath those there could be an implicit type coercion.
+		 * Because we would ignore implicit type coercions anyway, we
+		 * don't need to be as careful as processIndirection() is about
+		 * descending past implicit type coercions.
+		 */
 			expr = (Node *) tle->expr;
 			while (expr)
 			{
@@ -5228,14 +5218,6 @@ get_update_query_targetlist_def(Query *query, List *targetList,
 						break;
 
 					expr = (Node *) sbsref->refassgnexpr;
-				}
-				else if (IsA(expr, CoerceToDomain))
-				{
-					CoerceToDomain *cdomain = (CoerceToDomain *) expr;
-
-					if (cdomain->coercionformat != COERCE_IMPLICIT_CAST)
-						break;
-					expr = (Node *) cdomain->arg;
 				}
 				else
 					break;
@@ -6339,7 +6321,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_Var:
 		case T_Const:
 		case T_Param:
-		case T_CoerceToDomainValue:
 		case T_SetToDefault:
 			/* single words: always simple */
 			return true;
@@ -6376,10 +6357,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 			 */
 			return (IsA(parentNode, FieldStore) ? false : true);
 
-		case T_CoerceToDomain:
-			/* maybe simple, check args */
-			return isSimpleNode((Node *) ((CoerceToDomain *) node)->arg,
-								node, prettyFlags);
 		case T_RelabelType:
 			return isSimpleNode((Node *) ((RelabelType *) node)->arg,
 								node, prettyFlags);
@@ -7461,31 +7438,6 @@ get_rule_expr(Node *node, deparse_context *context,
 				if (!PRETTY_PAREN(context))
 					appendStringInfoChar(buf, ')');
 			}
-			break;
-
-		case T_CoerceToDomain:
-			{
-				CoerceToDomain *ctest = (CoerceToDomain *) node;
-				Node	   *arg = (Node *) ctest->arg;
-
-				if (ctest->coercionformat == COERCE_IMPLICIT_CAST &&
-					!showimplicit)
-				{
-					/* don't show the implicit cast */
-					get_rule_expr(arg, context, false);
-				}
-				else
-				{
-					get_coercion_expr(arg, context,
-									  ctest->resulttype,
-									  ctest->resulttypmod,
-									  node);
-				}
-			}
-			break;
-
-		case T_CoerceToDomainValue:
-			appendStringInfoString(buf, "VALUE");
 			break;
 
 		case T_SetToDefault:
@@ -9118,9 +9070,7 @@ generate_opclass_name(Oid opclass)
  *
  * We strip any top-level FieldStore or assignment SubscriptingRef nodes that
  * appear in the input, printing them as decoration for the base column
- * name (which we assume the caller just printed).  We might also need to
- * strip CoerceToDomain nodes, but only ones that appear above assignment
- * nodes.
+ * name (which we assume the caller just printed).
  *
  * Returns the subexpression that's to be assigned.
  */
@@ -9128,7 +9078,6 @@ static Node *
 processIndirection(Node *node, deparse_context *context)
 {
 	StringInfo	buf = context->buf;
-	CoerceToDomain *cdomain = NULL;
 
 	for (;;)
 	{
@@ -9177,27 +9126,9 @@ processIndirection(Node *node, deparse_context *context)
 			 */
 			node = (Node *) sbsref->refassgnexpr;
 		}
-		else if (IsA(node, CoerceToDomain))
-		{
-			cdomain = (CoerceToDomain *) node;
-			/* If it's an explicit domain coercion, we're done */
-			if (cdomain->coercionformat != COERCE_IMPLICIT_CAST)
-				break;
-			/* Tentatively descend past the CoerceToDomain */
-			node = (Node *) cdomain->arg;
-		}
 		else
 			break;
 	}
-
-	/*
-	 * If we descended past a CoerceToDomain whose argument turned out not to
-	 * be a FieldStore or array assignment, back up to the CoerceToDomain.
-	 * (This is not enough to be fully correct if there are nested implicit
-	 * CoerceToDomains, but such cases shouldn't ever occur.)
-	 */
-	if (cdomain && node == (Node *) cdomain->arg)
-		node = (Node *) cdomain;
 
 	return node;
 }

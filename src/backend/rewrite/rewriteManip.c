@@ -1299,19 +1299,16 @@ ReplaceVarsFromTargetList_callback(Var *var,
 
 			case REPLACEVARS_SUBSTITUTE_NULL:
 				{
-					/*
-					 * If Var is of domain type, we must add a CoerceToDomain
-					 * node, in case there is a NOT NULL domain constraint.
-					 */
 					int16		vartyplen;
 					bool		vartypbyval;
 
 					get_typlenbyval(var->vartype, &vartyplen, &vartypbyval);
-					return coerce_null_to_domain(var->vartype,
-												 var->vartypmod,
-												 var->varcollid,
-												 vartyplen,
-												 vartypbyval);
+					return (Node *) makeConst(var->vartype,
+											var->vartypmod,
+											var->varcollid,
+											vartyplen,
+											(Datum) 0, true,
+											vartypbyval);
 				}
 		}
 		elog(ERROR, "could not find replacement targetlist entry for attno %d",

@@ -1602,7 +1602,7 @@ recordDependencyOnSingleRelExpr(const ObjectAddress *depender,
  * some other object.  For instance Var nodes depend on a column which depends
  * on the datatype, and OpExpr nodes depend on the operator which depends on
  * the datatype.  However we do need a type dependency if there is no such
- * indirect dependency, as for example in Const and CoerceToDomain nodes.
+ * indirect dependency, as for example in Const nodes.
  *
  * Similarly, we don't need to create dependencies on collations except where
  * the collation is being freshly introduced to the expression.
@@ -1941,13 +1941,6 @@ find_expr_references_walker(Node *node,
 							   context->addrs);
 		}
 		/* fall through to examine arguments */
-	}
-	else if (IsA(node, CoerceToDomain))
-	{
-		CoerceToDomain *cd = (CoerceToDomain *) node;
-
-		add_object_address(OCLASS_TYPE, cd->resulttype, 0,
-						   context->addrs);
 	}
 	else if (IsA(node, OnConflictExpr))
 	{

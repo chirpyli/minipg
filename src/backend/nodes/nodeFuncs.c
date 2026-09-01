@@ -214,12 +214,6 @@ exprType(const Node *expr)
 		case T_BooleanTest:
 			type = BOOLOID;
 			break;
-		case T_CoerceToDomain:
-			type = ((const CoerceToDomain *) expr)->resulttype;
-			break;
-		case T_CoerceToDomainValue:
-			type = ((const CoerceToDomainValue *) expr)->typeId;
-			break;
 		case T_SetToDefault:
 			type = ((const SetToDefault *) expr)->typeId;
 			break;
@@ -457,10 +451,6 @@ exprTypmod(const Node *expr)
 			break;
 		case T_SQLValueFunction:
 			return ((const SQLValueFunction *) expr)->typmod;
-		case T_CoerceToDomain:
-			return ((const CoerceToDomain *) expr)->resulttypmod;
-		case T_CoerceToDomainValue:
-			return ((const CoerceToDomainValue *) expr)->typeMod;
 		case T_SetToDefault:
 			return ((const SetToDefault *) expr)->typeMod;
 		case T_PlaceHolderVar:
@@ -668,13 +658,6 @@ strip_implicit_coercions(Node *node)
 		ConvertRowtypeExpr *c = (ConvertRowtypeExpr *) node;
 
 		if (c->convertformat == COERCE_IMPLICIT_CAST)
-			return strip_implicit_coercions((Node *) c->arg);
-	}
-	else if (IsA(node, CoerceToDomain))
-	{
-		CoerceToDomain *c = (CoerceToDomain *) node;
-
-		if (c->coercionformat == COERCE_IMPLICIT_CAST)
 			return strip_implicit_coercions((Node *) c->arg);
 	}
 	return node;
@@ -907,12 +890,6 @@ exprCollation(const Node *expr)
 			/* BooleanTest's result is boolean ... */
 			coll = InvalidOid;	/* ... so it has no collation */
 			break;
-		case T_CoerceToDomain:
-			coll = ((const CoerceToDomain *) expr)->resultcollid;
-			break;
-		case T_CoerceToDomainValue:
-			coll = ((const CoerceToDomainValue *) expr)->collation;
-			break;
 		case T_SetToDefault:
 			coll = ((const SetToDefault *) expr)->collation;
 			break;
@@ -1105,12 +1082,6 @@ exprSetCollation(Node *expr, Oid collation)
 		case T_BooleanTest:
 			/* BooleanTest's result is boolean ... */
 			Assert(!OidIsValid(collation)); /* ... so never set a collation */
-			break;
-		case T_CoerceToDomain:
-			((CoerceToDomain *) expr)->resultcollid = collation;
-			break;
-		case T_CoerceToDomainValue:
-			((CoerceToDomainValue *) expr)->collation = collation;
 			break;
 		case T_SetToDefault:
 			((SetToDefault *) expr)->collation = collation;
@@ -1380,18 +1351,6 @@ exprLocation(const Node *expr)
 								  exprLocation((Node *) bexpr->arg));
 			}
 			break;
-		case T_CoerceToDomain:
-			{
-				const CoerceToDomain *cexpr = (const CoerceToDomain *) expr;
-
-				/* Much as above */
-				loc = leftmostLoc(cexpr->location,
-								  exprLocation((Node *) cexpr->arg));
-			}
-			break;
-		case T_CoerceToDomainValue:
-			loc = ((const CoerceToDomainValue *) expr)->location;
-			break;
 		case T_SetToDefault:
 			loc = ((const SetToDefault *) expr)->location;
 			break;
@@ -1605,7 +1564,7 @@ set_sa_opfuncid(ScalarArrayOpExpr *opexpr)
  * for themselves, in case additional checks should be made, or because they
  * have special rules about which parts of the tree need to be visited.
  *
- * Note: we ignore MinMaxExpr, SQLValueFunction, CoerceToDomain,
+ * Note: we ignore MinMaxExpr, SQLValueFunction,
  * and NextValueExpr nodes, because they do not contain SQL function OIDs.
  * However, they can invoke SQL-visible functions, so callers should take
  * thought about how to treat them.
@@ -1813,7 +1772,6 @@ expression_tree_walker(Node *node,
 		case T_Param:
 		case T_CaseTestExpr:
 		case T_SQLValueFunction:
-		case T_CoerceToDomainValue:
 		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
@@ -2012,8 +1970,6 @@ expression_tree_walker(Node *node,
 			return walker(((NullTest *) node)->arg, context);
 		case T_BooleanTest:
 			return walker(((BooleanTest *) node)->arg, context);
-		case T_CoerceToDomain:
-			return walker(((CoerceToDomain *) node)->arg, context);
 		case T_TargetEntry:
 			return walker(((TargetEntry *) node)->expr, context);
 		case T_Query:
@@ -2395,7 +2351,6 @@ expression_tree_mutator(Node *node,
 		case T_Param:
 		case T_CaseTestExpr:
 		case T_SQLValueFunction:
-		case T_CoerceToDomainValue:
 		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
@@ -2742,19 +2697,9 @@ expression_tree_mutator(Node *node,
 				FLATCOPY(newnode, btest, BooleanTest);
 				MUTATE(newnode->arg, btest->arg, Expr *);
 				return (Node *) newnode;
-			}
-			break;
-		case T_CoerceToDomain:
-			{
-				CoerceToDomain *ctest = (CoerceToDomain *) node;
-				CoerceToDomain *newnode;
-
-				FLATCOPY(newnode, ctest, CoerceToDomain);
-				MUTATE(newnode->arg, ctest->arg, Expr *);
-				return (Node *) newnode;
-			}
-			break;
-		case T_TargetEntry:
+				}
+				break;
+				case T_TargetEntry:
 			{
 				TargetEntry *targetentry = (TargetEntry *) node;
 				TargetEntry *newnode;

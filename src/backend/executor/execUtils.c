@@ -251,9 +251,6 @@ CreateExprContextInternal(EState *estate, Size minContextSize,
 	econtext->caseValue_datum = (Datum) 0;
 	econtext->caseValue_isNull = true;
 
-	econtext->domainValue_datum = (Datum) 0;
-	econtext->domainValue_isNull = true;
-
 	econtext->ecxt_estate = estate;
 
 	econtext->ecxt_callbacks = NULL;
@@ -365,9 +362,6 @@ CreateStandaloneExprContext(void)
 
 	econtext->caseValue_datum = (Datum) 0;
 	econtext->caseValue_isNull = true;
-
-	econtext->domainValue_datum = (Datum) 0;
-	econtext->domainValue_isNull = true;
 
 	econtext->ecxt_estate = NULL;
 

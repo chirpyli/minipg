@@ -379,60 +379,6 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 				 */
 				return false;	/* done */
 			}
-		case T_CoerceToDomain:
-			{
-				/*
-				 * If the domain declaration included a non-default COLLATE
-				 * spec, then use that collation as the output collation of
-				 * the coercion.  Otherwise allow the input collation to
-				 * bubble up.  (The input should be of the domain's base type,
-				 * therefore we don't need to worry about it not being
-				 * collatable when the domain is.)
-				 */
-				CoerceToDomain *expr = (CoerceToDomain *) node;
-				Oid			typcollation = get_typcollation(expr->resulttype);
-
-				/* ... but first, recurse */
-				(void) expression_tree_walker(node,
-											  assign_collations_walker,
-											  (void *) &loccontext);
-
-				if (OidIsValid(typcollation))
-				{
-					/* Node's result type is collatable. */
-					if (typcollation == DEFAULT_COLLATION_OID)
-					{
-						/* Collation state bubbles up from child. */
-						collation = loccontext.collation;
-						strength = loccontext.strength;
-						location = loccontext.location;
-					}
-					else
-					{
-						/* Use domain's collation as an implicit choice. */
-						collation = typcollation;
-						strength = COLLATE_IMPLICIT;
-						location = exprLocation(node);
-					}
-				}
-				else
-				{
-					/* Node's result type isn't collatable. */
-					collation = InvalidOid;
-					strength = COLLATE_NONE;
-					location = -1;	/* won't be used */
-				}
-
-				/*
-				 * Save the state into the expression node.  We know it
-				 * doesn't care about input collation.
-				 */
-				if (strength == COLLATE_CONFLICT)
-					exprSetCollation(node, InvalidOid);
-				else
-					exprSetCollation(node, collation);
-			}
-			break;
 		case T_TargetEntry:
 			(void) expression_tree_walker(node,
 										  assign_collations_walker,
@@ -533,7 +479,6 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 		case T_Var:
 		case T_Const:
 		case T_Param:
-		case T_CoerceToDomainValue:
 		case T_CaseTestExpr:
 		case T_SetToDefault:
 

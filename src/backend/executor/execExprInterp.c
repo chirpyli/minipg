@@ -470,9 +470,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_SBSREF_OLD,
 		&&CASE_EEOP_SBSREF_ASSIGN,
 		&&CASE_EEOP_SBSREF_FETCH,
-		&&CASE_EEOP_DOMAIN_TESTVAL,
-		&&CASE_EEOP_DOMAIN_NOTNULL,
-		&&CASE_EEOP_DOMAIN_CHECK,
 		&&CASE_EEOP_CONVERT_ROWTYPE,
 		&&CASE_EEOP_SCALARARRAYOP,
 		&&CASE_EEOP_HASHED_SCALARARRAYOP,
@@ -1105,25 +1102,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			EEO_NEXT();
 		}
 
-		EEO_CASE(EEOP_DOMAIN_TESTVAL)
-		{
-			/*
-			 * See EEOP_CASE_TESTVAL comment.
-			 */
-			if (op->d.casetest.value)
-			{
-				*op->resvalue = *op->d.casetest.value;
-				*op->resnull = *op->d.casetest.isnull;
-			}
-			else
-			{
-				*op->resvalue = econtext->domainValue_datum;
-				*op->resnull = econtext->domainValue_isNull;
-			}
-
-			EEO_NEXT();
-		}
-
 		EEO_CASE(EEOP_MAKE_READONLY)
 		{
 			/*
@@ -1486,22 +1464,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex for an inline implementation */
 			ExecEvalHashedScalarArrayOp(state, op, econtext);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_DOMAIN_NOTNULL)
-		{
-			/* too complex for an inline implementation */
-			ExecEvalConstraintNotNull(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_DOMAIN_CHECK)
-		{
-			/* too complex for an inline implementation */
-			ExecEvalConstraintCheck(state, op);
 
 			EEO_NEXT();
 		}
@@ -3635,37 +3597,6 @@ ExecEvalHashedScalarArrayOp(ExprState *state, ExprEvalStep *op, ExprContext *eco
 }
 
 /*
- * Evaluate a NOT NULL domain constraint.
- */
-void
-ExecEvalConstraintNotNull(ExprState *state, ExprEvalStep *op)
-{
-	if (*op->resnull)
-		ereport(ERROR,
-				(errcode(ERRCODE_NOT_NULL_VIOLATION),
-				 errmsg("domain %s does not allow null values",
-						format_type_be(op->d.domaincheck.resulttype)),
-				 errdatatype(op->d.domaincheck.resulttype)));
-}
-
-/*
- * Evaluate a CHECK domain constraint.
- */
-void
-ExecEvalConstraintCheck(ExprState *state, ExprEvalStep *op)
-{
-	if (!*op->d.domaincheck.checknull &&
-		!DatumGetBool(*op->d.domaincheck.checkvalue))
-		ereport(ERROR,
-				(errcode(ERRCODE_CHECK_VIOLATION),
-				 errmsg("value for domain %s violates check constraint \"%s\"",
-						format_type_be(op->d.domaincheck.resulttype),
-						op->d.domaincheck.constraintname),
-				 errdomainconstraint(op->d.domaincheck.resulttype,
-									 op->d.domaincheck.constraintname)));
-}
-
-/*
  * ExecEvalGroupingFunc
  *
  * Computes a bitmask with a bit for each (unevaluated) argument expression
@@ -3786,12 +3717,9 @@ ExecEvalWholeRowVar(ExprState *state, ExprEvalStep *op, ExprContext *econtext)
 			 * generates an INT4 NULL regardless of the dropped column type).
 			 * If we find a dropped column and cannot verify that case (1)
 			 * holds, we have to use the slow path to check (2) for each row.
-			 *
-			 * If vartype is a domain over composite, just look through that
-			 * to the base composite type.
 			 */
-			var_tupdesc = lookup_rowtype_tupdesc_domain(variable->vartype,
-														-1, false);
+			var_tupdesc = lookup_rowtype_tupdesc_noerror(variable->vartype,
+														 -1, false);
 
 			slot_tupdesc = slot->tts_tupleDescriptor;
 

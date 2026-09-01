@@ -268,14 +268,7 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 		 * currently support this, but probably will someday).
 		 */
 		AlterConstraintNamespaces(typform->typrelid, oldNspOid,
-								  nspOid, false, objsMoved);
-	}
-	else
-	{
-		/* If it's a domain, it might have constraints */
-		if (typform->typtype == TYPTYPE_DOMAIN)
-			AlterConstraintNamespaces(typeOid, oldNspOid, nspOid, true,
-									  objsMoved);
+								  nspOid, objsMoved);
 	}
 
 	/*

@@ -360,14 +360,6 @@ static const SchemaQuery Query_for_list_of_composite_datatypes = {
 	.qualresult = "pg_catalog.quote_ident(t.typname)",
 };
 
-static const SchemaQuery Query_for_list_of_domains = {
-	.catname = "pg_catalog.pg_type t",
-	.selcondition = "t.typtype = 'd'",
-	.viscondition = "pg_catalog.pg_type_is_visible(t.oid)",
-	.namespace = "t.typnamespace",
-	.result = "pg_catalog.quote_ident(t.typname)",
-};
-
 /* Note: this intentionally accepts aggregates as well as plain functions */
 static const SchemaQuery Query_for_list_of_functions[] = {
 	{
@@ -467,13 +459,6 @@ static const SchemaQuery Query_for_list_of_partitioned_relations = {
 	.viscondition = "pg_catalog.pg_table_is_visible(c.oid)",
 	.namespace = "c.relnamespace",
 	.result = "pg_catalog.quote_ident(c.relname)",
-};
-
-static const SchemaQuery Query_for_list_of_operator_families = {
-	.catname = "pg_catalog.pg_opfamily c",
-	.viscondition = "pg_catalog.pg_opfamily_is_visible(c.oid)",
-	.namespace = "c.opfnamespace",
-	.result = "pg_catalog.quote_ident(c.opfname)",
 };
 
 /* Relations supporting INSERT, UPDATE or DELETE */
@@ -680,14 +665,6 @@ static const SchemaQuery Query_for_list_of_collations = {
 " WHERE c.conrelid <> 0 "
 
 /* the silly-looking length condition is just to eat up the current word */
-#define Query_for_constraint_of_type \
-"SELECT pg_catalog.quote_ident(conname) "\
-"  FROM pg_catalog.pg_type t, pg_catalog.pg_constraint con "\
-" WHERE t.oid=contypid and (%d = pg_catalog.length('%s'))"\
-"       and pg_catalog.quote_ident(t.typname)='%s'"\
-"       and pg_catalog.pg_type_is_visible(t.oid)"
-
-/* the silly-looking length condition is just to eat up the current word */
 #define Query_for_list_of_tables_for_constraint \
 "SELECT pg_catalog.quote_ident(relname) "\
 "  FROM pg_catalog.pg_class"\
@@ -883,7 +860,6 @@ static const pgsql_thing_t words_after_create[] = {
 	{"DATABASE", Query_for_list_of_databases},
 	{"DEFAULT PRIVILEGES", NULL, NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, NULL, THING_NO_SHOW},
-	{"DOMAIN", NULL, NULL, &Query_for_list_of_domains},
 	{"EXTENSION", Query_for_list_of_extensions},
 	{"FOREIGN DATA WRAPPER", NULL, NULL, NULL},
 	{"FOREIGN TABLE", NULL, NULL, NULL},
@@ -1327,12 +1303,12 @@ psql_completion(const char *text, int start, int end)
 		"\\a",
 		"\\connect", "\\conninfo", "\\C", "\\cd",
 		"\\copyright", "\\crosstabview",
-		"\\d", "\\da", "\\dA", "\\dAc", "\\dAf", "\\dAo", "\\dAp",
-		"\\db", "\\dc", "\\dC", "\\dd", "\\dD",
+		"\\d", "\\da", "\\dA", "\\dAc",
+		"\\db", "\\dc", "\\dC", "\\dd",
 		"\\dE", "\\df",
 		"\\dF", "\\dFd", "\\dFp", "\\dFt", "\\dg", "\\di", "\\dl", "\\dL",
 		"\\dm", "\\dn", "\\do", "\\dO", "\\dp", "\\dP", "\\dPi", "\\dPt",
-		"\\drds", "\\dRs", "\\dRp", "\\ds", "\\dS",
+		"\\drds", "\\ds", "\\dS",
 		"\\dt", "\\dT", "\\dv", "\\du", "\\dx", "\\dy",
 		"\\e", "\\echo", "\\ef", "\\elif", "\\else", "\\encoding",
 		"\\endif", "\\errverbose", "\\ev",
@@ -1576,29 +1552,6 @@ psql_completion(const char *text, int start, int end)
 					  "RENAME TO", "REPLICATION", "RESET", "SET", "SUPERUSER",
 					  "VALID UNTIL");
 
-	/* ALTER DOMAIN <name> */
-	else if (Matches("ALTER", "DOMAIN", MatchAny))
-		COMPLETE_WITH("ADD", "DROP", "OWNER TO", "RENAME", "SET",
-					  "VALIDATE CONSTRAINT");
-	/* ALTER DOMAIN <sth> DROP */
-	else if (Matches("ALTER", "DOMAIN", MatchAny, "DROP"))
-		COMPLETE_WITH("CONSTRAINT", "DEFAULT", "NOT NULL");
-	/* ALTER DOMAIN <sth> DROP|RENAME|VALIDATE CONSTRAINT */
-	else if (Matches("ALTER", "DOMAIN", MatchAny, "DROP|RENAME|VALIDATE", "CONSTRAINT"))
-	{
-		completion_info_charp = prev3_wd;
-		COMPLETE_WITH_QUERY(Query_for_constraint_of_type);
-	}
-	/* ALTER DOMAIN <sth> RENAME */
-	else if (Matches("ALTER", "DOMAIN", MatchAny, "RENAME"))
-		COMPLETE_WITH("CONSTRAINT", "TO");
-	/* ALTER DOMAIN <sth> RENAME CONSTRAINT <sth> */
-	else if (Matches("ALTER", "DOMAIN", MatchAny, "RENAME", "CONSTRAINT", MatchAny))
-		COMPLETE_WITH("TO");
-
-	/* ALTER DOMAIN <sth> SET */
-	else if (Matches("ALTER", "DOMAIN", MatchAny, "SET"))
-		COMPLETE_WITH("DEFAULT", "NOT NULL", "SCHEMA");
 	/* ALTER SERVER <name> */
 	else if (Matches("ALTER", "SERVER", MatchAny))
 		COMPLETE_WITH("VERSION", "OPTIONS", "OWNER TO", "RENAME TO");
@@ -1969,8 +1922,8 @@ else if (Matches("COMMENT", "ON"))
 				  "TABLE", "TYPE", "VIEW", "MATERIALIZED VIEW",
 				  "COLUMN", "FUNCTION",
 				  "PROCEDURE", "ROUTINE",
-				  "OPERATOR", "TRIGGER", "CONSTRAINT", "DOMAIN",
-				  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
+				  "OPERATOR", "TRIGGER", "CONSTRAINT",
+			  "LARGE OBJECT", "TEXT SEARCH", "ROLE");
 else if (Matches("COMMENT", "ON", "FOREIGN"))
 		COMPLETE_WITH("DATA WRAPPER", "TABLE");
 	else if (Matches("COMMENT", "ON", "TEXT", "SEARCH"))
@@ -2455,7 +2408,7 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 /* DROP */
 	/* Complete DROP object with CASCADE / RESTRICT */
 	else if (Matches("DROP",
-					 "COLLATION|DOMAIN|EXTENSION|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
+					 "COLLATION|EXTENSION|PUBLICATION|SCHEMA|SERVER|SUBSCRIPTION|STATISTICS|TABLE|TYPE|VIEW",
 					 MatchAny) ||
 			 (Matches("DROP", "FUNCTION|PROCEDURE|ROUTINE", MatchAny, MatchAny) &&
 			  ends_with(prev_wd, ')')) ||
@@ -2949,16 +2902,10 @@ else if (Matches("COMMENT", "ON", "FOREIGN"))
 	}
 	else if (TailMatchesCS("\\da*"))
 		COMPLETE_WITH_VERSIONED_SCHEMA_QUERY(Query_for_list_of_aggregates, NULL);
-	else if (TailMatchesCS("\\dAc*", MatchAny) ||
-			 TailMatchesCS("\\dAf*", MatchAny))
+	else if (TailMatchesCS("\\dAc*", MatchAny))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_datatypes, NULL);
-	else if (TailMatchesCS("\\dAo*", MatchAny) ||
-			 TailMatchesCS("\\dAp*", MatchAny))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_operator_families, NULL);
 	else if (TailMatchesCS("\\dA*"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_access_methods);
-	else if (TailMatchesCS("\\dD*"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_domains, NULL);
 	else if (TailMatchesCS("\\df*"))
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_routines, NULL);
 	else if (HeadMatchesCS("\\df*"))

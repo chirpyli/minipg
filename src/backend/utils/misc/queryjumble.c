@@ -604,21 +604,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) bt->arg);
 			}
 			break;
-		case T_CoerceToDomain:
-			{
-				CoerceToDomain *cd = (CoerceToDomain *) node;
-
-				APP_JUMB(cd->resulttype);
-				JumbleExpr(jstate, (Node *) cd->arg);
-			}
-			break;
-		case T_CoerceToDomainValue:
-			{
-				CoerceToDomainValue *cdv = (CoerceToDomainValue *) node;
-
-				APP_JUMB(cdv->typeId);
-			}
-			break;
 		case T_SetToDefault:
 			{
 				SetToDefault *sd = (SetToDefault *) node;

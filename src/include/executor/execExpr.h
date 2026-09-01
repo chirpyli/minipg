@@ -219,15 +219,6 @@ typedef enum ExprEvalOp
 	/* compute element/slice for SubscriptingRef fetch expression */
 	EEOP_SBSREF_FETCH,
 
-	/* evaluate value for CoerceToDomainValue */
-	EEOP_DOMAIN_TESTVAL,
-
-	/* evaluate a domain's NOT NULL constraint */
-	EEOP_DOMAIN_NOTNULL,
-
-	/* evaluate a single domain CHECK constraint */
-	EEOP_DOMAIN_CHECK,
-
 	/* evaluate assorted special-purpose expression types */
 	EEOP_CONVERT_ROWTYPE,
 	EEOP_SCALARARRAYOP,
@@ -522,18 +513,6 @@ typedef struct ExprEvalStep
 			struct SubscriptingRefState *state;
 		}			sbsref;
 
-		/* for EEOP_DOMAIN_NOTNULL / DOMAIN_CHECK */
-		struct
-		{
-			/* name of constraint */
-			char	   *constraintname;
-			/* where the result of a CHECK constraint will be stored */
-			Datum	   *checkvalue;
-			bool	   *checknull;
-			/* OID of domain type */
-			Oid			resulttype;
-		}			domaincheck;
-
 		/* for EEOP_CONVERT_ROWTYPE */
 		struct
 		{
@@ -731,8 +710,6 @@ extern void ExecEvalConvertRowtype(ExprState *state, ExprEvalStep *op,
 extern void ExecEvalScalarArrayOp(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalHashedScalarArrayOp(ExprState *state, ExprEvalStep *op,
 										ExprContext *econtext);
-extern void ExecEvalConstraintNotNull(ExprState *state, ExprEvalStep *op);
-extern void ExecEvalConstraintCheck(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalGroupingFunc(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalSubPlan(ExprState *state, ExprEvalStep *op,
 							ExprContext *econtext);

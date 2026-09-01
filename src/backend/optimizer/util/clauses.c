@@ -341,11 +341,7 @@ contain_mutable_functions_walker(Node *node, void *context)
 	/*
 	 * It should be safe to treat MinMaxExpr as immutable, because it will
 	 * depend on a non-cross-type btree comparison function, and those should
-	 * always be immutable.  Treating CoerceToDomain as immutable is outright
-	 * dangerous.  But we
-	 * have done so historically, and changing this would probably cause more
-	 * problems than it would fix.  In practice, if you have a non-immutable
-	 * domain constraint you are in for pain anyhow.
+	 * always be immutable.
 	 */
 
 	/* Recurse to check arguments */
@@ -507,8 +503,8 @@ contain_volatile_functions_walker(Node *node, void *context)
 
 	/*
 	 * See notes in contain_mutable_functions_walker about why we treat
-	 * MinMaxExpr and CoerceToDomain as immutable, while
-	 * SQLValueFunction is stable.  Hence, none of them are of interest here.
+	 * MinMaxExpr as immutable, while SQLValueFunction is stable.  Hence,
+	 * neither of them is of interest here.
 	 */
 
 	/* Recurse to check arguments */
@@ -679,20 +675,10 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 
 	/*
 	 * It should be OK to treat MinMaxExpr as parallel-safe, since btree
-	 * opclass support functions are generally parallel-safe.  We err on the
-	 * side of caution by treating CoerceToDomain as parallel-restricted.
-	 * (Note: in principle that's wrong because a domain constraint could
-	 * contain a parallel-unsafe function; but useful constraints probably
-	 * never would have such, and assuming they do would cripple use of
-	 * parallel query in the presence of domain types.)  SQLValueFunction
-	 * should be safe in all cases.  NextValueExpr is parallel-unsafe.
+	 * opclass support functions are generally parallel-safe.
+	 * SQLValueFunction should be safe in all cases.  NextValueExpr is
+	 * parallel-unsafe.
 	 */
-	if (IsA(node, CoerceToDomain))
-	{
-		if (max_parallel_hazard_test(PROPARALLEL_RESTRICTED, context))
-			return true;
-	}
-
 	/*
 	 * As a notational convenience for callers, look through RestrictInfo.
 	 */
@@ -990,11 +976,9 @@ contain_exec_param_walker(Node *node, List *param_ids)
  * SQL function for fear of creating such a situation.  The same applies for
  * CaseTestExpr used within the elemexpr of an ArrayCoerceExpr.
  *
- * CoerceToDomainValue would have the same issue if domain CHECK expressions
- * could get inlined into larger expressions, but presently that's impossible.
- * Still, it might be allowed in future, or other node types with similar
- * issues might get invented.  So give this function a generic name, and set
- * up the recursion state to allow multiple flag bits.
+ * Other node types with similar issues might get invented.  So give this
+ * function a generic name, and set up the recursion state to allow multiple
+ * flag bits.
  */
 static bool
 contain_context_dependent_node(Node *clause)
@@ -1941,10 +1925,6 @@ CommuteOpExpr(OpExpr *clause)
  * is still what it was when the expression was parsed.  This is needed to
  * guard against improper simplification after ALTER COLUMN TYPE.  (XXX we
  * may well need to make similar checks elsewhere?)
- *
- * rowtypeid may come from a whole-row Var, and therefore it can be a domain
- * over composite, but for this purpose we only care about checking the type
- * of a contained field.
  */
 static bool
 rowtype_field_matches(Oid rowtypeid, int fieldnum,
@@ -1957,7 +1937,7 @@ rowtype_field_matches(Oid rowtypeid, int fieldnum,
 	/* No issue for RECORD, since there is no way to ALTER such a type */
 	if (rowtypeid == RECORDOID)
 		return true;
-	tupdesc = lookup_rowtype_tupdesc_domain(rowtypeid, -1, false);
+	tupdesc = lookup_rowtype_tupdesc_noerror(rowtypeid, -1, false);
 	if (fieldnum <= 0 || fieldnum > tupdesc->natts)
 	{
 		ReleaseTupleDesc(tupdesc);
@@ -2721,13 +2701,9 @@ eval_const_expressions_mutator(Node *node,
 				/*
 				 * If constant argument and the per-element expression is
 				 * immutable, we can simplify the whole thing to a constant.
-				 * Exception: although contain_mutable_functions considers
-				 * CoerceToDomain immutable for historical reasons, let's not
-				 * do so here; this ensures coercion to an array-over-domain
-				 * does not apply the domain's constraints until runtime.
 				 */
 				if (ac->arg && IsA(ac->arg, Const) &&
-					ac->elemexpr && !IsA(ac->elemexpr, CoerceToDomain) &&
+					ac->elemexpr &&
 					!contain_mutable_functions((Node *) ac->elemexpr))
 					return ece_evaluate_expr(ac);
 
@@ -3234,51 +3210,6 @@ eval_const_expressions_mutator(Node *node,
 				newbtest->booltesttype = btest->booltesttype;
 				newbtest->location = btest->location;
 				return (Node *) newbtest;
-			}
-		case T_CoerceToDomain:
-			{
-				/*
-				 * If the domain currently has no constraints, we replace the
-				 * CoerceToDomain node with a simple RelabelType, which is
-				 * both far faster to execute and more amenable to later
-				 * optimization.  We must then mark the plan as needing to be
-				 * rebuilt if the domain's constraints change.
-				 *
-				 * Also, in estimation mode, always replace CoerceToDomain
-				 * nodes, effectively assuming that the coercion will succeed.
-				 */
-				CoerceToDomain *cdomain = (CoerceToDomain *) node;
-				CoerceToDomain *newcdomain;
-				Node	   *arg;
-
-				arg = eval_const_expressions_mutator((Node *) cdomain->arg,
-													 context);
-				if (context->estimate ||
-					!DomainHasConstraints(cdomain->resulttype))
-				{
-					/* Record dependency, if this isn't estimation mode */
-					if (context->root && !context->estimate)
-						record_plan_type_dependency(context->root,
-													cdomain->resulttype);
-
-					/* Generate RelabelType to substitute for CoerceToDomain */
-					return applyRelabelType(arg,
-											cdomain->resulttype,
-											cdomain->resulttypmod,
-											cdomain->resultcollid,
-											cdomain->coercionformat,
-											cdomain->location,
-											true);
-				}
-
-				newcdomain = makeNode(CoerceToDomain);
-				newcdomain->arg = (Expr *) arg;
-				newcdomain->resulttype = cdomain->resulttype;
-				newcdomain->resulttypmod = cdomain->resulttypmod;
-				newcdomain->resultcollid = cdomain->resultcollid;
-				newcdomain->coercionformat = cdomain->coercionformat;
-				newcdomain->location = cdomain->location;
-				return (Node *) newcdomain;
 			}
 		case T_PlaceHolderVar:
 
@@ -4932,7 +4863,6 @@ inline_set_returning_function(PlannerInfo *root, RangeTblEntry *rte)
 								 funcform->prokind,
 								 true, NULL) &&
 		(functypclass == TYPEFUNC_COMPOSITE ||
-		 functypclass == TYPEFUNC_COMPOSITE_DOMAIN ||
 		 functypclass == TYPEFUNC_RECORD))
 		goto fail;				/* reject not-whole-tuple-result cases */
 

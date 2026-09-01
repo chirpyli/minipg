@@ -2434,134 +2434,22 @@ get_typstorage(Oid typid)
 }
 
 /*
- * get_typdefault
- *	  Given a type OID, return the type's default value, if any.
- *
- *	  The result is a palloc'd expression node tree, or NULL if there
- *	  is no defined default for the datatype.
- *
- * NB: caller should be prepared to coerce result to correct datatype;
- * the returned expression tree might produce something of the wrong type.
- */
-Node *
-get_typdefault(Oid typid)
-{
-	HeapTuple	typeTuple;
-	Form_pg_type type;
-	Datum		datum;
-	bool		isNull;
-	Node	   *expr;
-
-	typeTuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (!HeapTupleIsValid(typeTuple))
-		elog(ERROR, "cache lookup failed for type %u", typid);
-	type = (Form_pg_type) GETSTRUCT(typeTuple);
-
-	/*
-	 * typdefault and typdefaultbin are potentially null, so don't try to
-	 * access 'em as struct fields. Must do it the hard way with
-	 * SysCacheGetAttr.
-	 */
-	datum = SysCacheGetAttr(TYPEOID,
-							typeTuple,
-							Anum_pg_type_typdefaultbin,
-							&isNull);
-
-	if (!isNull)
-	{
-		/* We have an expression default */
-		expr = stringToNode(TextDatumGetCString(datum));
-	}
-	else
-	{
-		/* Perhaps we have a plain literal default */
-		datum = SysCacheGetAttr(TYPEOID,
-								typeTuple,
-								Anum_pg_type_typdefault,
-								&isNull);
-
-		if (!isNull)
-		{
-			char	   *strDefaultVal;
-
-			/* Convert text datum to C string */
-			strDefaultVal = TextDatumGetCString(datum);
-			/* Convert C string to a value of the given type */
-			datum = OidInputFunctionCall(type->typinput, strDefaultVal,
-										 getTypeIOParam(typeTuple), -1);
-			/* Build a Const node containing the value */
-			expr = (Node *) makeConst(typid,
-									  -1,
-									  type->typcollation,
-									  type->typlen,
-									  datum,
-									  false,
-									  type->typbyval);
-			pfree(strDefaultVal);
-		}
-		else
-		{
-			/* No default */
-			expr = NULL;
-		}
-	}
-
-	ReleaseSysCache(typeTuple);
-
-	return expr;
-}
-
-/*
  * getBaseType
- *		If the given type is a domain, return its base type;
- *		otherwise return the type's own OID.
+ *		Return the type's own OID.
  */
 Oid
 getBaseType(Oid typid)
 {
-	int32		typmod = -1;
-
-	return getBaseTypeAndTypmod(typid, &typmod);
+	return typid;
 }
 
 /*
  * getBaseTypeAndTypmod
- *		If the given type is a domain, return its base type and typmod;
- *		otherwise return the type's own OID, and leave *typmod unchanged.
- *
- * Note that the "applied typmod" should be -1 for every domain level
- * above the bottommost; therefore, if the passed-in typid is indeed
- * a domain, *typmod should be -1.
+ *		Return the type's own OID, and leave *typmod unchanged.
  */
 Oid
 getBaseTypeAndTypmod(Oid typid, int32 *typmod)
 {
-	/*
-	 * We loop to find the bottom base type in a stack of domains.
-	 */
-	for (;;)
-	{
-		HeapTuple	tup;
-		Form_pg_type typTup;
-
-		tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-		if (!HeapTupleIsValid(tup))
-			elog(ERROR, "cache lookup failed for type %u", typid);
-		typTup = (Form_pg_type) GETSTRUCT(tup);
-		if (typTup->typtype != TYPTYPE_DOMAIN)
-		{
-			/* Not a domain, so done */
-			ReleaseSysCache(tup);
-			break;
-		}
-
-		Assert(*typmod == -1);
-		typid = typTup->typbasetype;
-		*typmod = typTup->typtypmod;
-
-		ReleaseSysCache(tup);
-	}
-
 	return typid;
 }
 
@@ -2647,8 +2535,7 @@ get_typtype(Oid typid)
  * type_is_rowtype
  *
  *		Convenience function to determine whether a type OID represents
- *		a "rowtype" type --- either RECORD or a named composite type
- *		(including a domain over a named composite type).
+ *		a "rowtype" type --- either RECORD or a named composite type.
  */
 bool
 type_is_rowtype(Oid typid)
@@ -2659,10 +2546,6 @@ type_is_rowtype(Oid typid)
 	{
 		case TYPTYPE_COMPOSITE:
 			return true;
-		case TYPTYPE_DOMAIN:
-			if (get_typtype(getBaseType(typid)) == TYPTYPE_COMPOSITE)
-				return true;
-			break;
 		default:
 			break;
 	}
@@ -2810,8 +2693,7 @@ get_promoted_array_type(Oid typid)
 
 /*
  * get_base_element_type
- *		Given the type OID, get the typelem, looking "through" any domain
- *		to its underlying array type.
+ *		Given the type OID, get the typelem.
  *
  * This is equivalent to get_element_type(getBaseType(typid)), but avoids
  * an extra cache lookup.  Note that it fails to provide any information
@@ -2820,37 +2702,21 @@ get_promoted_array_type(Oid typid)
 Oid
 get_base_element_type(Oid typid)
 {
-	/*
-	 * We loop to find the bottom base type in a stack of domains.
-	 */
-	for (;;)
+	HeapTuple	tup;
+	Form_pg_type typTup;
+
+	tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
+	if (!HeapTupleIsValid(tup))
+		return InvalidOid;
+	typTup = (Form_pg_type) GETSTRUCT(tup);
+	if (IsTrueArrayType(typTup))
 	{
-		HeapTuple	tup;
-		Form_pg_type typTup;
+		Oid			result = typTup->typelem;
 
-		tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-		if (!HeapTupleIsValid(tup))
-			break;
-		typTup = (Form_pg_type) GETSTRUCT(tup);
-		if (typTup->typtype != TYPTYPE_DOMAIN)
-		{
-			/* Not a domain, so stop descending */
-			Oid			result;
-
-			/* This test must match get_element_type */
-			if (IsTrueArrayType(typTup))
-				result = typTup->typelem;
-			else
-				result = InvalidOid;
-			ReleaseSysCache(tup);
-			return result;
-		}
-
-		typid = typTup->typbasetype;
 		ReleaseSysCache(tup);
+		return result;
 	}
-
-	/* Like get_element_type, silently return InvalidOid for bogus input */
+	ReleaseSysCache(tup);
 	return InvalidOid;
 }
 

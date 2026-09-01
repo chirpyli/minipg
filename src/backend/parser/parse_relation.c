@@ -1622,7 +1622,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 					/* ok */
 					break;
 				case TYPEFUNC_COMPOSITE:
-				case TYPEFUNC_COMPOSITE_DOMAIN:
 
 					/*
 					 * If the function's raw result type is RECORD, we must
@@ -1660,8 +1659,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 						 parser_errposition(pstate, exprLocation(funcexpr))));
 		}
 
-		if (functypclass == TYPEFUNC_COMPOSITE ||
-			functypclass == TYPEFUNC_COMPOSITE_DOMAIN)
+		if (functypclass == TYPEFUNC_COMPOSITE)
 		{
 			/* Composite data type, e.g. a table's row type */
 			Assert(tupdesc);
@@ -2338,8 +2336,7 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 															&funcrettype,
 															&tupdesc);
 
-					if (functypclass == TYPEFUNC_COMPOSITE ||
-						functypclass == TYPEFUNC_COMPOSITE_DOMAIN)
+					if (functypclass == TYPEFUNC_COMPOSITE)
 					{
 						/* Composite data type, e.g. a table's row type */
 						Assert(tupdesc);

@@ -76,9 +76,6 @@ static void ExecInitSubscriptingRef(ExprEvalStep *scratch,
 									ExprState *state,
 									Datum *resv, bool *resnull);
 static bool isAssignmentIndirectionExpr(Expr *expr);
-static void ExecInitCoerceToDomain(ExprEvalStep *scratch, CoerceToDomain *ctest,
-								   ExprState *state,
-								   Datum *resv, bool *resnull);
 static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 								  ExprEvalStep *scratch,
 								  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
@@ -2245,34 +2242,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_CoerceToDomain:
-			{
-				CoerceToDomain *ctest = (CoerceToDomain *) node;
-
-				ExecInitCoerceToDomain(&scratch, ctest, state,
-									   resv, resnull);
-				break;
-			}
-
-		case T_CoerceToDomainValue:
-			{
-				/*
-				 * Read from location identified by innermost_domainval.  Note
-				 * that innermost_domainval could be NULL, if we're compiling
-				 * a standalone domain check rather than one embedded in a
-				 * larger expression.  In that case we must read from
-				 * econtext->domainValue_datum.  We'll take care of that
-				 * scenario at runtime.
-				 */
-				scratch.opcode = EEOP_DOMAIN_TESTVAL;
-				/* we share instruction union variant with case testval */
-				scratch.d.casetest.value = state->innermost_domainval;
-				scratch.d.casetest.isnull = state->innermost_domainnull;
-
-				ExprEvalPushStep(state, &scratch);
-				break;
-			}
-
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -2978,8 +2947,8 @@ ExecInitSubscriptingRef(ExprEvalStep *scratch, SubscriptingRef *sbsref,
  * top-level node.  Nested-assignment situations give rise to expression
  * trees in which each level of assignment has its own CaseTestExpr, and the
  * recursive structure appears within the newvals or refassgnexpr field.
- * There is an exception, though: if the array is an array-of-domain, we will
- * have a CoerceToDomain or RelabelType as the refassgnexpr, and we need to
+ * There is an exception, though: if the array element type requires it,
+ * we will have a RelabelType as the refassgnexpr, and we need to
  * be able to look through that.
  */
 static bool
@@ -3001,12 +2970,6 @@ isAssignmentIndirectionExpr(Expr *expr)
 		if (sbsRef->refexpr && IsA(sbsRef->refexpr, CaseTestExpr))
 			return true;
 	}
-	else if (IsA(expr, CoerceToDomain))
-	{
-		CoerceToDomain *cd = (CoerceToDomain *) expr;
-
-		return isAssignmentIndirectionExpr(cd->arg);
-	}
 	else if (IsA(expr, RelabelType))
 	{
 		RelabelType *r = (RelabelType *) expr;
@@ -3014,149 +2977,6 @@ isAssignmentIndirectionExpr(Expr *expr)
 		return isAssignmentIndirectionExpr(r->arg);
 	}
 	return false;
-}
-
-/*
- * Prepare evaluation of a CoerceToDomain expression.
- */
-static void
-ExecInitCoerceToDomain(ExprEvalStep *scratch, CoerceToDomain *ctest,
-					   ExprState *state, Datum *resv, bool *resnull)
-{
-	DomainConstraintRef *constraint_ref;
-	Datum	   *domainval = NULL;
-	bool	   *domainnull = NULL;
-	ListCell   *l;
-
-	scratch->d.domaincheck.resulttype = ctest->resulttype;
-	/* we'll allocate workspace only if needed */
-	scratch->d.domaincheck.checkvalue = NULL;
-	scratch->d.domaincheck.checknull = NULL;
-
-	/*
-	 * Evaluate argument - it's fine to directly store it into resv/resnull,
-	 * if there's constraint failures there'll be errors, otherwise it's what
-	 * needs to be returned.
-	 */
-	ExecInitExprRec(ctest->arg, state, resv, resnull);
-
-	/*
-	 * Note: if the argument is of varlena type, it could be a R/W expanded
-	 * object.  We want to return the R/W pointer as the final result, but we
-	 * have to pass a R/O pointer as the value to be tested by any functions
-	 * in check expressions.  We don't bother to emit a MAKE_READONLY step
-	 * unless there's actually at least one check expression, though.  Until
-	 * we've tested that, domainval/domainnull are NULL.
-	 */
-
-	/*
-	 * Collect the constraints associated with the domain.
-	 *
-	 * Note: before PG v10 we'd recheck the set of constraints during each
-	 * evaluation of the expression.  Now we bake them into the ExprState
-	 * during executor initialization.  That means we don't need typcache.c to
-	 * provide compiled exprs.
-	 */
-	constraint_ref = (DomainConstraintRef *)
-		palloc(sizeof(DomainConstraintRef));
-	InitDomainConstraintRef(ctest->resulttype,
-							constraint_ref,
-							CurrentMemoryContext,
-							false);
-
-	/*
-	 * Compile code to check each domain constraint.  NOTNULL constraints can
-	 * just be applied on the resv/resnull value, but for CHECK constraints we
-	 * need more pushups.
-	 */
-	foreach(l, constraint_ref->constraints)
-	{
-		DomainConstraintState *con = (DomainConstraintState *) lfirst(l);
-		Datum	   *save_innermost_domainval;
-		bool	   *save_innermost_domainnull;
-
-		scratch->d.domaincheck.constraintname = con->name;
-
-		switch (con->constrainttype)
-		{
-			case DOM_CONSTRAINT_NOTNULL:
-				scratch->opcode = EEOP_DOMAIN_NOTNULL;
-				ExprEvalPushStep(state, scratch);
-				break;
-			case DOM_CONSTRAINT_CHECK:
-				/* Allocate workspace for CHECK output if we didn't yet */
-				if (scratch->d.domaincheck.checkvalue == NULL)
-				{
-					scratch->d.domaincheck.checkvalue =
-						(Datum *) palloc(sizeof(Datum));
-					scratch->d.domaincheck.checknull =
-						(bool *) palloc(sizeof(bool));
-				}
-
-				/*
-				 * If first time through, determine where CoerceToDomainValue
-				 * nodes should read from.
-				 */
-				if (domainval == NULL)
-				{
-					/*
-					 * Since value might be read multiple times, force to R/O
-					 * - but only if it could be an expanded datum.
-					 */
-					if (get_typlen(ctest->resulttype) == -1)
-					{
-						ExprEvalStep scratch2 = {0};
-
-						/* Yes, so make output workspace for MAKE_READONLY */
-						domainval = (Datum *) palloc(sizeof(Datum));
-						domainnull = (bool *) palloc(sizeof(bool));
-
-						/* Emit MAKE_READONLY */
-						scratch2.opcode = EEOP_MAKE_READONLY;
-						scratch2.resvalue = domainval;
-						scratch2.resnull = domainnull;
-						scratch2.d.make_readonly.value = resv;
-						scratch2.d.make_readonly.isnull = resnull;
-						ExprEvalPushStep(state, &scratch2);
-					}
-					else
-					{
-						/* No, so it's fine to read from resv/resnull */
-						domainval = resv;
-						domainnull = resnull;
-					}
-				}
-
-				/*
-				 * Set up value to be returned by CoerceToDomainValue nodes.
-				 * We must save and restore innermost_domainval/null fields,
-				 * in case this node is itself within a check expression for
-				 * another domain.
-				 */
-				save_innermost_domainval = state->innermost_domainval;
-				save_innermost_domainnull = state->innermost_domainnull;
-				state->innermost_domainval = domainval;
-				state->innermost_domainnull = domainnull;
-
-				/* evaluate check expression value */
-				ExecInitExprRec(con->check_expr, state,
-								scratch->d.domaincheck.checkvalue,
-								scratch->d.domaincheck.checknull);
-
-				state->innermost_domainval = save_innermost_domainval;
-				state->innermost_domainnull = save_innermost_domainnull;
-
-				/* now test result */
-				scratch->opcode = EEOP_DOMAIN_CHECK;
-				ExprEvalPushStep(state, scratch);
-
-				break;
-			default:
-				elog(ERROR, "unrecognized constraint type: %d",
-					 (int) con->constrainttype);
-				break;
-		}
-	}
 }
 
 /*

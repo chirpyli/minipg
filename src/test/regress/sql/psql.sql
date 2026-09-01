@@ -1147,11 +1147,7 @@ set search_path to default;
 \dA+ *
 \dA+ h*
 \dA+ foo
-\dAf spgist
-\dAf btree int4
-\dAo+ btree float_ops
 
-\dAp+ btree float_ops
 
 -- check \df, \do with argument specifications
 \df *sqrt
@@ -1188,9 +1184,6 @@ set search_path to default;
 \dd host.regression.pg_catalog.pg_class
 \dd [.pg_catalog.pg_class
 \dd nonesuch.pg_catalog.pg_class
-\dD host.regression.public.gtestdomain1
-\dD ].public.gtestdomain1
-\dD nonesuch.public.gtestdomain1
 \ddp host.regression.pg_catalog.pg_class
 \ddp {.pg_catalog.pg_class
 \ddp nonesuch.pg_catalog.pg_class
@@ -1252,10 +1245,6 @@ set search_path to default;
 \dP nonesuch.public.mlparted
 \drds nonesuch.lc_messages
 \drds regression.lc_messages
-\dRp public.mypub
-\dRp regression.mypub
-\dRs public.mysub
-\dRs regression.mysub
 \dx regression.plpgsql
 \dx nonesuch.plpgsql
 \dX host.regression.public.func_deps_stat
@@ -1269,12 +1258,8 @@ set search_path to default;
 \dt "no.such.table.relation"
 \da "no.such.aggregate.function"
 \dAc "no.such.operator.class"
-\dAf "no.such.operator.family"
-\dAo "no.such.operator.of.operator.family"
-\dAp "no.such.operator.support.function.of.operator.family"
 \dC "no.such.cast"
 \dd "no.such.object.description"
-\dD "no.such.domain"
 \ddp "no.such.default.access.privilege"
 \di "no.such.index.relation"
 \dm "no.such.materialized.view"
@@ -1292,8 +1277,6 @@ set search_path to default;
 \dp "no.such.access.privilege"
 \dP "no.such.partitioned.relation"
 \drds "no.such.setting"
-\dRp "no.such.publication"
-\dRs "no.such.subscription"
 \dT "no.such.data.type"
 \dx "no.such.installed.extension"
 \dX "no.such.extended.statistics"
@@ -1304,12 +1287,8 @@ set search_path to default;
 \dt "no.such.schema"."no.such.table.relation"
 \da "no.such.schema"."no.such.aggregate.function"
 \dAc "no.such.schema"."no.such.operator.class"
-\dAf "no.such.schema"."no.such.operator.family"
-\dAo "no.such.schema"."no.such.operator.of.operator.family"
-\dAp "no.such.schema"."no.such.operator.support.function.of.operator.family"
 \dC "no.such.schema"."no.such.cast"
 \dd "no.such.schema"."no.such.object.description"
-\dD "no.such.schema"."no.such.domain"
 \ddp "no.such.schema"."no.such.default.access.privilege"
 \di "no.such.schema"."no.such.index.relation"
 \dm "no.such.schema"."no.such.materialized.view"
@@ -1326,8 +1305,6 @@ set search_path to default;
 \dp "no.such.schema"."no.such.access.privilege"
 \dP "no.such.schema"."no.such.partitioned.relation"
 \drds "no.such.schema"."no.such.setting"
-\dRp "no.such.schema"."no.such.publication"
-\dRs "no.such.schema"."no.such.subscription"
 \dT "no.such.schema"."no.such.data.type"
 \dx "no.such.schema"."no.such.installed.extension"
 \dX "no.such.schema"."no.such.extended.statistics"
@@ -1338,7 +1315,6 @@ set search_path to default;
 \da regression."no.such.schema"."no.such.aggregate.function"
 \dC regression."no.such.schema"."no.such.cast"
 \dd regression."no.such.schema"."no.such.object.description"
-\dD regression."no.such.schema"."no.such.domain"
 \di regression."no.such.schema"."no.such.index.relation"
 \dm regression."no.such.schema"."no.such.materialized.view"
 \dt regression."no.such.schema"."no.such.relation"
@@ -1360,7 +1336,6 @@ set search_path to default;
 \da "no.such.database"."no.such.schema"."no.such.aggregate.function"
 \dC "no.such.database"."no.such.schema"."no.such.cast"
 \dd "no.such.database"."no.such.schema"."no.such.object.description"
-\dD "no.such.database"."no.such.schema"."no.such.domain"
 \ddp "no.such.database"."no.such.schema"."no.such.default.access.privilege"
 \di "no.such.database"."no.such.schema"."no.such.index.relation"
 \dm "no.such.database"."no.such.schema"."no.such.materialized.view"

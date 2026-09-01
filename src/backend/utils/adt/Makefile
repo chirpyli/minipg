@@ -27,7 +27,6 @@ OBJS = \
 	datetime.o \
 	datum.o \
 	dbsize.o \
-	domains.o \
 	encode.o \
 	expandeddatum.o \
 	expandedrecord.o \
