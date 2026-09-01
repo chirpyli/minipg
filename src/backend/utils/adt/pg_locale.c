@@ -18,16 +18,15 @@
  * LC_MESSAGES is settable at run time and will take effect
  * immediately.
  *
- * The other categories, LC_MONETARY, LC_NUMERIC, and LC_TIME are also
+ * The other categories, LC_MONETARY and LC_NUMERIC, are also
  * settable at run-time.  However, we don't actually set those locale
  * categories permanently.  This would have bizarre effects like no
  * longer accepting standard floating-point literals in some locales.
  * Instead, we only set these locale categories briefly when needed,
- * cache the required information obtained from localeconv() or
- * strftime(), and then set the locale categories back to "C".
- * The cached information is only used by the formatting functions
- * (to_char, etc.) and the money type.  For the user, this should all be
- * transparent.
+ * cache the required information obtained from localeconv(), and then
+ * set the locale categories back to "C".
+ * The cached information is only used by the money type.  For the
+ * user, this should all be transparent.
  *
  * !!! NOW HEAR THIS !!!
  *
@@ -52,14 +51,11 @@
 
 #include "postgres.h"
 
-#include <time.h>
-
 #include "access/htup_details.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_control.h"
 #include "mb/pg_wchar.h"
 #include "utils/builtins.h"
-#include "utils/formatting.h"
 #include "utils/hsearch.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -72,30 +68,13 @@
 #endif
 
 
-#define		MAX_L10N_DATA		80
-
-
 /* GUC settings */
 char	   *locale_messages;
 char	   *locale_monetary;
 char	   *locale_numeric;
-char	   *locale_time;
-
-/*
- * lc_time localization cache.
- *
- * We use only the first 7 or 12 entries of these arrays.  The last array
- * element is left as NULL for the convenience of outside code that wants
- * to sequentially scan these arrays.
- */
-char	   *localized_abbrev_days[7 + 1];
-char	   *localized_full_days[7 + 1];
-char	   *localized_abbrev_months[12 + 1];
-char	   *localized_full_months[12 + 1];
 
 /* indicates whether locale information cache is valid */
 static bool CurrentLocaleConvValid = false;
-static bool CurrentLCTimeValid = false;
 
 /* Cache for collation-related knowledge */
 
@@ -171,9 +150,6 @@ pg_perm_setlocale(int category, const char *locale)
 			break;
 		case LC_NUMERIC:
 			envvar = "LC_NUMERIC";
-			break;
-		case LC_TIME:
-			envvar = "LC_TIME";
 			break;
 		default:
 			elog(FATAL, "unrecognized LC category: %d", category);
@@ -262,18 +238,6 @@ void
 assign_locale_numeric(const char *newval, void *extra)
 {
 	CurrentLocaleConvValid = false;
-}
-
-bool
-check_locale_time(char **newval, void **extra, GucSource source)
-{
-	return check_locale(LC_TIME, *newval, NULL);
-}
-
-void
-assign_locale_time(const char *newval, void *extra)
-{
-	CurrentLCTimeValid = false;
 }
 
 /*
@@ -576,163 +540,6 @@ PGLC_localeconv(void)
 	return &CurrentLocaleConv;
 }
 
-/*
- * Subroutine for cache_locale_time().
- * Convert the given string from encoding "encoding" to the database
- * encoding, and store the result at *dst, replacing any previous value.
- */
-static void
-cache_single_string(char **dst, const char *src, int encoding)
-{
-	char	   *ptr;
-	char	   *olddst;
-
-	/* Convert the string to the database encoding, or validate it's OK */
-	ptr = pg_any_to_server(src, strlen(src), encoding);
-
-	/* Store the string in long-lived storage, replacing any previous value */
-	olddst = *dst;
-	*dst = MemoryContextStrdup(TopMemoryContext, ptr);
-	if (olddst)
-		pfree(olddst);
-
-	/* Might as well clean up any palloc'd conversion result, too */
-	if (ptr != src)
-		pfree(ptr);
-}
-
-/*
- * Update the lc_time localization cache variables if needed.
- */
-void
-cache_locale_time(void)
-{
-	char		buf[(2 * 7 + 2 * 12) * MAX_L10N_DATA];
-	char	   *bufptr;
-	time_t		timenow;
-	struct tm  *timeinfo;
-	bool		strftimefail = false;
-	int			encoding;
-	int			i;
-	char	   *save_lc_time;
-
-	/* did we do this already? */
-	if (CurrentLCTimeValid)
-		return;
-
-	elog(DEBUG3, "cache_locale_time() executed; locale: \"%s\"", locale_time);
-
-	/*
-	 * As in PGLC_localeconv(), it's critical that we not throw error while
-	 * libc's locale settings have nondefault values.  Hence, we just call
-	 * strftime() within the critical section, and then convert and save its
-	 * results afterwards.
-	 */
-
-	/* Save prevailing value of time locale */
-	save_lc_time = setlocale(LC_TIME, NULL);
-	if (!save_lc_time)
-		elog(ERROR, "setlocale(NULL) failed");
-	save_lc_time = pstrdup(save_lc_time);
-
-	setlocale(LC_TIME, locale_time);
-
-	/* We use times close to current time as data for strftime(). */
-	timenow = time(NULL);
-	timeinfo = localtime(&timenow);
-
-	/* Store the strftime results in MAX_L10N_DATA-sized portions of buf[] */
-	bufptr = buf;
-
-	/*
-	 * MAX_L10N_DATA is sufficient buffer space for every known locale, and
-	 * POSIX defines no strftime() errors.  (Buffer space exhaustion is not an
-	 * error.)  An implementation might report errors (e.g. ENOMEM) by
-	 * returning 0 (or, less plausibly, a negative value) and setting errno.
-	 * Report errno just in case the implementation did that, but clear it in
-	 * advance of the calls so we don't emit a stale, unrelated errno.
-	 */
-	errno = 0;
-
-	/* localized days */
-	for (i = 0; i < 7; i++)
-	{
-		timeinfo->tm_wday = i;
-		if (strftime(bufptr, MAX_L10N_DATA, "%a", timeinfo) <= 0)
-			strftimefail = true;
-		bufptr += MAX_L10N_DATA;
-		if (strftime(bufptr, MAX_L10N_DATA, "%A", timeinfo) <= 0)
-			strftimefail = true;
-		bufptr += MAX_L10N_DATA;
-	}
-
-	/* localized months */
-	for (i = 0; i < 12; i++)
-	{
-		timeinfo->tm_mon = i;
-		timeinfo->tm_mday = 1;	/* make sure we don't have invalid date */
-		if (strftime(bufptr, MAX_L10N_DATA, "%b", timeinfo) <= 0)
-			strftimefail = true;
-		bufptr += MAX_L10N_DATA;
-		if (strftime(bufptr, MAX_L10N_DATA, "%B", timeinfo) <= 0)
-			strftimefail = true;
-		bufptr += MAX_L10N_DATA;
-	}
-
-	/*
-	 * Restore the prevailing locale settings; as in PGLC_localeconv(),
-	 * failure to do so is fatal.
-	 */
-	if (!setlocale(LC_TIME, save_lc_time))
-		elog(FATAL, "failed to restore LC_TIME to \"%s\"", save_lc_time);
-
-	/*
-	 * At this point we've done our best to clean up, and can throw errors, or
-	 * call functions that might throw errors, with a clean conscience.
-	 */
-	if (strftimefail)
-		elog(ERROR, "strftime() failed: %m");
-
-	/* Release the pstrdup'd locale names */
-	pfree(save_lc_time);
-
-	/*
-	 * As in PGLC_localeconv(), we must convert strftime()'s output from the
-	 * encoding implied by LC_TIME to the database encoding.  If we can't
-	 * identify the LC_TIME encoding, just perform encoding validation.
-	 */
-	encoding = pg_get_encoding_from_locale(locale_time, true);
-	if (encoding < 0)
-		encoding = PG_SQL_ASCII;
-
-	bufptr = buf;
-
-	/* localized days */
-	for (i = 0; i < 7; i++)
-	{
-		cache_single_string(&localized_abbrev_days[i], bufptr, encoding);
-		bufptr += MAX_L10N_DATA;
-		cache_single_string(&localized_full_days[i], bufptr, encoding);
-		bufptr += MAX_L10N_DATA;
-	}
-	localized_abbrev_days[7] = NULL;
-	localized_full_days[7] = NULL;
-
-	/* localized months */
-	for (i = 0; i < 12; i++)
-	{
-		cache_single_string(&localized_abbrev_months[i], bufptr, encoding);
-		bufptr += MAX_L10N_DATA;
-		cache_single_string(&localized_full_months[i], bufptr, encoding);
-		bufptr += MAX_L10N_DATA;
-	}
-	localized_abbrev_months[12] = NULL;
-	localized_full_months[12] = NULL;
-
-	CurrentLCTimeValid = true;
-}
-
-
 
 /*
  * Detect aging strxfrm() implementations that, in a subset of locales, write
@@ -807,8 +614,8 @@ check_strxfrm_bug(void)
  *
  * Note that some code relies on the flags not reporting false negatives
  * (that is, saying it's not C when it is).  For example, char2wchar()
- * could fail if the locale is C, so str_tolower() shouldn't call it
- * in that case.
+ * could fail if the locale is C, so the upper/lower/initcap functions
+ * shouldn't call it in that case.
  *
  * Note that we currently lack any way to flush the cache.  Since we don't
  * support ALTER COLLATION, this is OK.  The worst case is that someone

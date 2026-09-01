@@ -8217,7 +8217,7 @@ SET XML OPTION { DOCUMENT | CONTENT };
         built-in default is <literal>ISO, MDY</literal>, but
         <application>initdb</application> will initialize the
         configuration file with a setting that corresponds to the
-        behavior of the chosen <varname>lc_time</varname> locale.
+        behavior of the chosen locale.
        </para>
       </listitem>
      </varlistentry>
@@ -8398,8 +8398,8 @@ SET XML OPTION { DOCUMENT | CONTENT };
       <listitem>
        <para>
         Sets the locale to use for formatting monetary amounts, for
-        example with the <function>to_char</function> family of
-        functions.  Acceptable values are system-dependent; see <xref
+        example when outputting values of the <type>money</type>
+        type.  Acceptable values are system-dependent; see <xref
         linkend="locale"/> for more information.  If this variable is
         set to the empty string (which is the default) then the value
         is inherited from the execution environment of the server in a
@@ -8417,27 +8417,8 @@ SET XML OPTION { DOCUMENT | CONTENT };
       <listitem>
        <para>
         Sets the locale to use for formatting numbers, for example
-        with the <function>to_char</function> family of
-        functions. Acceptable values are system-dependent; see <xref
-        linkend="locale"/> for more information.  If this variable is
-        set to the empty string (which is the default) then the value
-        is inherited from the execution environment of the server in a
-        system-dependent way.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-lc-time" xreflabel="lc_time">
-      <term><varname>lc_time</varname> (<type>string</type>)
-      <indexterm>
-       <primary><varname>lc_time</varname> configuration parameter</primary>
-      </indexterm>
-      </term>
-      <listitem>
-       <para>
-        Sets the locale to use for formatting dates and times, for example
-        with the <function>to_char</function> family of
-        functions. Acceptable values are system-dependent; see <xref
+        when outputting values of the <type>money</type>
+        type. Acceptable values are system-dependent; see <xref
         linkend="locale"/> for more information.  If this variable is
         set to the empty string (which is the default) then the value
         is inherited from the execution environment of the server in a

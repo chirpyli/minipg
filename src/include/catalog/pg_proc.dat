@@ -2922,39 +2922,6 @@
   proargtypes => 'time interval', prosrc => 'time_mi_interval' },
 
 
-
-
-
-
-
-
-
-# formatting
-{ oid => '1770', descr => 'format timestamp with time zone to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'timestamptz text', prosrc => 'timestamptz_to_char' },
-{ oid => '1773', descr => 'format int4 to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'int4 text', prosrc => 'int4_to_char' },
-{ oid => '1774', descr => 'format int8 to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'int8 text', prosrc => 'int8_to_char' },
-{ oid => '1775', descr => 'format float4 to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'float4 text', prosrc => 'float4_to_char' },
-{ oid => '1776', descr => 'format float8 to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'float8 text', prosrc => 'float8_to_char' },
-{ oid => '1778', descr => 'convert text to timestamp with time zone',
-  proname => 'to_timestamp', provolatile => 's', prorettype => 'timestamptz',
-  proargtypes => 'text text', prosrc => 'to_timestamp' },
-{ oid => '1780', descr => 'convert text to date',
-  proname => 'to_date', provolatile => 's', prorettype => 'date',
-  proargtypes => 'text text', prosrc => 'to_date' },
-{ oid => '1768', descr => 'format interval to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'interval text', prosrc => 'interval_to_char' },
-
 { oid => '1282', descr => 'quote an identifier for usage in a querystring',
   proname => 'quote_ident', prorettype => 'text', proargtypes => 'text',
   prosrc => 'quote_ident' },
@@ -3990,9 +3957,6 @@
 { oid => '2048', descr => 'finite timestamp?',
   proname => 'isfinite', prorettype => 'bool', proargtypes => 'timestamp',
   prosrc => 'timestamp_finite' },
-{ oid => '2049', descr => 'format timestamp to text',
-  proname => 'to_char', provolatile => 's', prorettype => 'text',
-  proargtypes => 'timestamp text', prosrc => 'timestamp_to_char' },
 { oid => '2052',
   proname => 'timestamp_eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'timestamp timestamp', prosrc => 'timestamp_eq' },

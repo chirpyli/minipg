@@ -15,17 +15,34 @@
  */
 #include "postgres.h"
 
+/*
+ * towlower() and friends should be in <wctype.h>, but some pre-C99 systems
+ * declare them in <wchar.h>, so include that too.
+ */
+#include <limits.h>
+#include <wchar.h>
+#ifdef HAVE_WCTYPE_H
+#include <wctype.h>
+#endif
+
+#include "catalog/pg_collation.h"
 #include "common/int.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "utils/builtins.h"
-#include "utils/formatting.h"
+#include "utils/pg_locale.h"
 
 static text *dotrim(const char *string, int stringlen,
 					const char *set, int setlen,
 					bool doltrim, bool dortrim);
 static bytea *dobyteatrim(bytea *string, bytea *set,
 						  bool doltrim, bool dortrim);
+static char *str_tolower(const char *buff, size_t nbytes, Oid collid);
+static char *str_toupper(const char *buff, size_t nbytes, Oid collid);
+static char *str_initcap(const char *buff, size_t nbytes, Oid collid);
+static char *asc_tolower(const char *buff, size_t nbytes);
+static char *asc_toupper(const char *buff, size_t nbytes);
+static char *asc_initcap(const char *buff, size_t nbytes);
 
 
 /********************************************************************
@@ -124,6 +141,452 @@ initcap(PG_FUNCTION_ARGS)
 }
 
 
+
+
+/*****************************************************************************
+ *			Case conversion helpers for upper/lower/initcap
+ *
+ * If the system provides the needed functions for wide-character manipulation
+ * (which are all standardized by C99), then we implement upper/lower/initcap
+ * using wide-character functions, if necessary.  Otherwise we use the
+ * traditional <ctype.h> functions, which of course will not work as desired
+ * in multibyte character sets.  Note that in either case we are effectively
+ * assuming that the database character encoding matches the encoding implied
+ * by LC_CTYPE.
+ *
+ * If the system provides locale_t and associated functions (which are
+ * standardized by Open Group's XBD), we can support collations that are
+ * neither default nor C.  The code is written to handle both combinations
+ * of have-wide-characters and have-locale_t, though it's rather unlikely
+ * a platform would have the latter without the former.
+ *****************************************************************************/
+
+/*
+ * collation-aware, wide-character-aware lower function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+str_tolower(const char *buff, size_t nbytes, Oid collid)
+{
+	char	   *result;
+
+	if (!buff)
+		return NULL;
+
+	/* C/POSIX collations use this path regardless of database encoding */
+	if (lc_ctype_is_c(collid))
+	{
+		result = asc_tolower(buff, nbytes);
+	}
+	else
+	{
+		pg_locale_t mylocale = 0;
+
+		if (collid != DEFAULT_COLLATION_OID)
+		{
+			if (!OidIsValid(collid))
+			{
+				/*
+				 * This typically means that the parser could not resolve a
+				 * conflict of implicit collations, so report it that way.
+				 */
+				ereport(ERROR,
+						(errcode(ERRCODE_INDETERMINATE_COLLATION),
+						 errmsg("could not determine which collation to use for %s function",
+								"lower()"),
+						 errhint("Use the COLLATE clause to set the collation explicitly.")));
+			}
+			mylocale = pg_newlocale_from_collation(collid);
+		}
+
+		{
+			if (pg_database_encoding_max_length() > 1)
+			{
+				wchar_t    *workspace;
+				size_t		curr_char;
+				size_t		result_size;
+
+				/* Overflow paranoia */
+				if ((nbytes + 1) > (INT_MAX / sizeof(wchar_t)))
+					ereport(ERROR,
+							(errcode(ERRCODE_OUT_OF_MEMORY),
+							 errmsg("out of memory")));
+
+				/* Output workspace cannot have more codes than input bytes */
+				workspace = (wchar_t *) palloc((nbytes + 1) * sizeof(wchar_t));
+
+				char2wchar(workspace, nbytes + 1, buff, nbytes, mylocale);
+
+				for (curr_char = 0; workspace[curr_char] != 0; curr_char++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+						workspace[curr_char] = towlower_l(workspace[curr_char], mylocale->info.lt);
+					else
+#endif
+						workspace[curr_char] = towlower(workspace[curr_char]);
+				}
+
+				/*
+				 * Make result large enough; case change might change number
+				 * of bytes
+				 */
+				result_size = curr_char * pg_database_encoding_max_length() + 1;
+				result = palloc(result_size);
+
+				wchar2char(result, workspace, result_size, mylocale);
+				pfree(workspace);
+			}
+			else
+			{
+				char	   *p;
+
+				result = pnstrdup(buff, nbytes);
+
+				/*
+				 * Note: we assume that tolower_l() will not be so broken as
+				 * to need an isupper_l() guard test.  When using the default
+				 * collation, we apply the traditional Postgres behavior that
+				 * forces ASCII-style treatment of I/i, but in non-default
+				 * collations you get exactly what the collation says.
+				 */
+				for (p = result; *p; p++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+						*p = tolower_l((unsigned char) *p, mylocale->info.lt);
+					else
+#endif
+						*p = pg_tolower((unsigned char) *p);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+/*
+ * collation-aware, wide-character-aware upper function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+str_toupper(const char *buff, size_t nbytes, Oid collid)
+{
+	char	   *result;
+
+	if (!buff)
+		return NULL;
+
+	/* C/POSIX collations use this path regardless of database encoding */
+	if (lc_ctype_is_c(collid))
+	{
+		result = asc_toupper(buff, nbytes);
+	}
+	else
+	{
+		pg_locale_t mylocale = 0;
+
+		if (collid != DEFAULT_COLLATION_OID)
+		{
+			if (!OidIsValid(collid))
+			{
+				/*
+				 * This typically means that the parser could not resolve a
+				 * conflict of implicit collations, so report it that way.
+				 */
+				ereport(ERROR,
+						(errcode(ERRCODE_INDETERMINATE_COLLATION),
+						 errmsg("could not determine which collation to use for %s function",
+								"upper()"),
+						 errhint("Use the COLLATE clause to set the collation explicitly.")));
+			}
+			mylocale = pg_newlocale_from_collation(collid);
+		}
+
+		{
+			if (pg_database_encoding_max_length() > 1)
+			{
+				wchar_t    *workspace;
+				size_t		curr_char;
+				size_t		result_size;
+
+				/* Overflow paranoia */
+				if ((nbytes + 1) > (INT_MAX / sizeof(wchar_t)))
+					ereport(ERROR,
+							(errcode(ERRCODE_OUT_OF_MEMORY),
+							 errmsg("out of memory")));
+
+				/* Output workspace cannot have more codes than input bytes */
+				workspace = (wchar_t *) palloc((nbytes + 1) * sizeof(wchar_t));
+
+				char2wchar(workspace, nbytes + 1, buff, nbytes, mylocale);
+
+				for (curr_char = 0; workspace[curr_char] != 0; curr_char++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+						workspace[curr_char] = towupper_l(workspace[curr_char], mylocale->info.lt);
+					else
+#endif
+						workspace[curr_char] = towupper(workspace[curr_char]);
+				}
+
+				/*
+				 * Make result large enough; case change might change number
+				 * of bytes
+				 */
+				result_size = curr_char * pg_database_encoding_max_length() + 1;
+				result = palloc(result_size);
+
+				wchar2char(result, workspace, result_size, mylocale);
+				pfree(workspace);
+			}
+			else
+			{
+				char	   *p;
+
+				result = pnstrdup(buff, nbytes);
+
+				/*
+				 * Note: we assume that toupper_l() will not be so broken as
+				 * to need an islower_l() guard test.  When using the default
+				 * collation, we apply the traditional Postgres behavior that
+				 * forces ASCII-style treatment of I/i, but in non-default
+				 * collations you get exactly what the collation says.
+				 */
+				for (p = result; *p; p++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+						*p = toupper_l((unsigned char) *p, mylocale->info.lt);
+					else
+#endif
+						*p = pg_toupper((unsigned char) *p);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+/*
+ * collation-aware, wide-character-aware initcap function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+str_initcap(const char *buff, size_t nbytes, Oid collid)
+{
+	char	   *result;
+	int			wasalnum = false;
+
+	if (!buff)
+		return NULL;
+
+	/* C/POSIX collations use this path regardless of database encoding */
+	if (lc_ctype_is_c(collid))
+	{
+		result = asc_initcap(buff, nbytes);
+	}
+	else
+	{
+		pg_locale_t mylocale = 0;
+
+		if (collid != DEFAULT_COLLATION_OID)
+		{
+			if (!OidIsValid(collid))
+			{
+				/*
+				 * This typically means that the parser could not resolve a
+				 * conflict of implicit collations, so report it that way.
+				 */
+				ereport(ERROR,
+						(errcode(ERRCODE_INDETERMINATE_COLLATION),
+						 errmsg("could not determine which collation to use for %s function",
+								"initcap()"),
+						 errhint("Use the COLLATE clause to set the collation explicitly.")));
+			}
+			mylocale = pg_newlocale_from_collation(collid);
+		}
+
+		{
+			if (pg_database_encoding_max_length() > 1)
+			{
+				wchar_t    *workspace;
+				size_t		curr_char;
+				size_t		result_size;
+
+				/* Overflow paranoia */
+				if ((nbytes + 1) > (INT_MAX / sizeof(wchar_t)))
+					ereport(ERROR,
+							(errcode(ERRCODE_OUT_OF_MEMORY),
+							 errmsg("out of memory")));
+
+				/* Output workspace cannot have more codes than input bytes */
+				workspace = (wchar_t *) palloc((nbytes + 1) * sizeof(wchar_t));
+
+				char2wchar(workspace, nbytes + 1, buff, nbytes, mylocale);
+
+				for (curr_char = 0; workspace[curr_char] != 0; curr_char++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+					{
+						if (wasalnum)
+							workspace[curr_char] = towlower_l(workspace[curr_char], mylocale->info.lt);
+						else
+							workspace[curr_char] = towupper_l(workspace[curr_char], mylocale->info.lt);
+						wasalnum = iswalnum_l(workspace[curr_char], mylocale->info.lt);
+					}
+					else
+#endif
+					{
+						if (wasalnum)
+							workspace[curr_char] = towlower(workspace[curr_char]);
+						else
+							workspace[curr_char] = towupper(workspace[curr_char]);
+						wasalnum = iswalnum(workspace[curr_char]);
+					}
+				}
+
+				/*
+				 * Make result large enough; case change might change number
+				 * of bytes
+				 */
+				result_size = curr_char * pg_database_encoding_max_length() + 1;
+				result = palloc(result_size);
+
+				wchar2char(result, workspace, result_size, mylocale);
+				pfree(workspace);
+			}
+			else
+			{
+				char	   *p;
+
+				result = pnstrdup(buff, nbytes);
+
+				/*
+				 * Note: we assume that toupper_l()/tolower_l() will not be so
+				 * broken as to need guard tests.  When using the default
+				 * collation, we apply the traditional Postgres behavior that
+				 * forces ASCII-style treatment of I/i, but in non-default
+				 * collations you get exactly what the collation says.
+				 */
+				for (p = result; *p; p++)
+				{
+#ifdef HAVE_LOCALE_T
+					if (mylocale)
+					{
+						if (wasalnum)
+							*p = tolower_l((unsigned char) *p, mylocale->info.lt);
+						else
+							*p = toupper_l((unsigned char) *p, mylocale->info.lt);
+						wasalnum = isalnum_l((unsigned char) *p, mylocale->info.lt);
+					}
+					else
+#endif
+					{
+						if (wasalnum)
+							*p = pg_tolower((unsigned char) *p);
+						else
+							*p = pg_toupper((unsigned char) *p);
+						wasalnum = isalnum((unsigned char) *p);
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+/*
+ * ASCII-only lower function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+asc_tolower(const char *buff, size_t nbytes)
+{
+	char	   *result;
+	char	   *p;
+
+	if (!buff)
+		return NULL;
+
+	result = pnstrdup(buff, nbytes);
+
+	for (p = result; *p; p++)
+		*p = pg_ascii_tolower((unsigned char) *p);
+
+	return result;
+}
+
+/*
+ * ASCII-only upper function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+asc_toupper(const char *buff, size_t nbytes)
+{
+	char	   *result;
+	char	   *p;
+
+	if (!buff)
+		return NULL;
+
+	result = pnstrdup(buff, nbytes);
+
+	for (p = result; *p; p++)
+		*p = pg_ascii_toupper((unsigned char) *p);
+
+	return result;
+}
+
+/*
+ * ASCII-only initcap function
+ *
+ * We pass the number of bytes so we can pass varlena and char*
+ * to this function.  The result is a palloc'd, null-terminated string.
+ */
+static char *
+asc_initcap(const char *buff, size_t nbytes)
+{
+	char	   *result;
+	char	   *p;
+	int			wasalnum = false;
+
+	if (!buff)
+		return NULL;
+
+	result = pnstrdup(buff, nbytes);
+
+	for (p = result; *p; p++)
+	{
+		char		c;
+
+		if (wasalnum)
+			*p = c = pg_ascii_tolower((unsigned char) *p);
+		else
+			*p = c = pg_ascii_toupper((unsigned char) *p);
+		/* we don't trust isalnum() here */
+		wasalnum = ((c >= 'A' && c <= 'Z') ||
+					(c >= 'a' && c <= 'z') ||
+					(c >= '0' && c <= '9'));
+	}
+
+	return result;
+}
 
 
 /********************************************************************

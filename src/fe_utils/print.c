@@ -3514,7 +3514,6 @@ setDecimalLocale(void)
 		groupdigits = 3;		/* most common */
 
 	/* Don't accept an empty thousands_sep string, either */
-	/* similar code exists in formatting.c */
 	if (*extlconv->thousands_sep)
 		thousands_sep = pg_strdup(extlconv->thousands_sep);
 	/* Make sure thousands separator doesn't match decimal point symbol. */

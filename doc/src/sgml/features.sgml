@@ -411,9 +411,8 @@
 
      <para>
       Where interoperability with other systems is a concern, for some data
-      types, it may be necessary to use data type formatting functions (such
-      as those in <xref linkend="functions-formatting"/>) explicitly to
-      produce the standard mappings.
+      types, it may be necessary to use data type formatting functions
+      explicitly to produce the standard mappings.
      </para>
     </sect3>
    </sect2>

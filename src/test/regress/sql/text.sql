@@ -33,9 +33,9 @@ select 3 || 4.0;
  * various string functions
  */
 select concat('one');
-select concat(1,2,3,'hello',true, false, to_date('20100309','YYYYMMDD'));
+select concat(1,2,3,'hello',true, false, '20100309'::date);
 select concat_ws('#','one');
-select concat_ws('#',1,2,3,'hello',true, false, to_date('20100309','YYYYMMDD'));
+select concat_ws('#',1,2,3,'hello',true, false, '20100309'::date);
 select concat_ws(',',10,20,null,30);
 select concat_ws('',10,20,null,30);
 select concat_ws(NULL,10,20,null,30) is null;

@@ -638,7 +638,6 @@ initialize_environment(void)
 		unsetenv("LC_CTYPE");
 		unsetenv("LC_MONETARY");
 		unsetenv("LC_NUMERIC");
-		unsetenv("LC_TIME");
 		unsetenv("LANG");
 
 		/*
@@ -1691,7 +1690,6 @@ create_database(const char *dbname)
 				 "SET lc_messages TO 'C';"
 				 "SET lc_monetary TO 'C';"
 				 "SET lc_numeric TO 'C';"
-				 "SET lc_time TO 'C';"
 				 "SET bytea_output TO 'hex';"
 				 "SET timezone_abbreviations TO 'Default';");
 

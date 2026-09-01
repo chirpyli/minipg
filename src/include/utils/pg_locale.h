@@ -22,13 +22,6 @@
 extern char *locale_messages;
 extern char *locale_monetary;
 extern char *locale_numeric;
-extern char *locale_time;
-
-/* lc_time localization cache */
-extern char *localized_abbrev_days[];
-extern char *localized_full_days[];
-extern char *localized_abbrev_months[];
-extern char *localized_full_months[];
 
 
 extern bool check_locale_messages(char **newval, void **extra, GucSource source);
@@ -37,8 +30,6 @@ extern bool check_locale_monetary(char **newval, void **extra, GucSource source)
 extern void assign_locale_monetary(const char *newval, void *extra);
 extern bool check_locale_numeric(char **newval, void **extra, GucSource source);
 extern void assign_locale_numeric(const char *newval, void *extra);
-extern bool check_locale_time(char **newval, void **extra, GucSource source);
-extern void assign_locale_time(const char *newval, void *extra);
 
 extern bool check_locale(int category, const char *locale, char **canonname);
 extern char *pg_perm_setlocale(int category, const char *locale);
@@ -52,8 +43,6 @@ extern bool lc_ctype_is_c(Oid collation);
  * information) with locale information for all categories.
  */
 extern struct lconv *PGLC_localeconv(void);
-
-extern void cache_locale_time(void);
 
 
 /*

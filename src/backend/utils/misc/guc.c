@@ -3386,16 +3386,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"lc_time", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets the locale for formatting date and time values."),
-			NULL
-		},
-		&locale_time,
-		"C",
-		check_locale_time, assign_locale_time, NULL
-	},
-
-	{
 		{"session_preload_libraries", PGC_SUSET, CLIENT_CONN_PRELOAD,
 			gettext_noop("Lists shared libraries to preload into each backend."),
 			NULL,

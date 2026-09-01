@@ -873,10 +873,6 @@ setup_config(void)
 			 escape_quotes(lc_numeric));
 	conflines = replace_token(conflines, "#lc_numeric = 'C'", repltok);
 
-	snprintf(repltok, sizeof(repltok), "lc_time = '%s'",
-			 escape_quotes(lc_time));
-	conflines = replace_token(conflines, "#lc_time = 'C'", repltok);
-
 	switch (locale_date_order(lc_time))
 	{
 		case DATEORDER_YMD:

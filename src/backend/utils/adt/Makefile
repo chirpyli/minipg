@@ -32,7 +32,6 @@ OBJS = \
 	expandedrecord.o \
 	float.o \
 	format_type.o \
-	formatting.o \
 	genfile.o \
 	int.o \
 	int8.o \

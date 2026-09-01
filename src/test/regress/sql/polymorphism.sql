@@ -234,7 +234,7 @@ $$ language sql;
 
 select dfunc();
 select dfunc(0);
-select dfunc(to_date('20081215','YYYYMMDD'));
+select dfunc('20081215'::date);
 select dfunc('City'::text);
 
 drop function dfunc(anyelement);

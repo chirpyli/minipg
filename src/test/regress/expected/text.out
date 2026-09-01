@@ -60,7 +60,7 @@ select concat('one');
  one
 (1 row)
 
-select concat(1,2,3,'hello',true, false, to_date('20100309','YYYYMMDD'));
+select concat(1,2,3,'hello',true, false, '20100309'::date);
         concat        
 ----------------------
  123hellotf03-09-2010
@@ -72,7 +72,7 @@ select concat_ws('#','one');
  one
 (1 row)
 
-select concat_ws('#',1,2,3,'hello',true, false, to_date('20100309','YYYYMMDD'));
+select concat_ws('#',1,2,3,'hello',true, false, '20100309'::date);
          concat_ws          
 ----------------------------
  1#2#3#hello#t#f#03-09-2010

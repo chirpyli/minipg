@@ -118,10 +118,6 @@ initdb --locale=sv_SE
         <entry><envar>LC_NUMERIC</envar></entry>
         <entry>Formatting of numbers</entry>
        </row>
-       <row>
-        <entry><envar>LC_TIME</envar></entry>
-        <entry>Formatting of dates and times</entry>
-       </row>
       </tbody>
      </tgroup>
     </informaltable>
