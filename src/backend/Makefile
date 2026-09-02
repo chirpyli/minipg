@@ -42,16 +42,11 @@ OBJS = \
 	$(top_builddir)/src/common/libpgcommon_srv.a \
 	$(top_builddir)/src/port/libpgport_srv.a
 
-# We put libpgport and libpgcommon into OBJS, so remove it from LIBS; also add
-# ICU
-LIBS := $(filter-out -lpgport -lpgcommon, $(LIBS)) $(ICU_LIBS)
+# We put libpgport and libpgcommon into OBJS, so remove it from LIBS
+LIBS := $(filter-out -lpgport -lpgcommon, $(LIBS))
 
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lz -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
-
-ifeq ($(with_systemd),yes)
-LIBS += -lsystemd
-endif
 
 ##########################################################################
 

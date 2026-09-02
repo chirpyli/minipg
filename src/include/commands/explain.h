@@ -17,19 +17,11 @@
 #include "lib/stringinfo.h"
 #include "parser/parse_node.h"
 
-typedef enum ExplainFormat
-{
-	EXPLAIN_FORMAT_TEXT,
-	EXPLAIN_FORMAT_JSON,
-	EXPLAIN_FORMAT_YAML
-} ExplainFormat;
-
 typedef struct ExplainWorkersState
 {
 	int			num_workers;	/* # of worker processes the plan used */
 	bool	   *worker_inited;	/* per-worker state-initialized flags */
 	StringInfoData *worker_str; /* per-worker transient output buffers */
-	int		   *worker_state_save;	/* per-worker grouping state save areas */
 	StringInfo	prev_str;		/* saved output buffer while redirecting */
 } ExplainWorkersState;
 
@@ -45,10 +37,8 @@ typedef struct ExplainState
 	bool		timing;			/* print detailed node timing */
 	bool		summary;		/* print total planning and execution timing */
 	bool		settings;		/* print modified settings */
-	ExplainFormat format;		/* output format */
 	/* state for output formatting --- not reset for each new plan tree */
 	int			indent;			/* current indentation level */
-	List	   *grouping_stack; /* format-specific grouping state */
 	/* state related to the current plan tree (filled by ExplainPrintPlan) */
 	PlannedStmt *pstmt;			/* top of plan */
 	List	   *rtable;			/* range table */
@@ -95,14 +85,8 @@ extern void ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc);
 
 extern void ExplainQueryText(ExplainState *es, QueryDesc *queryDesc);
 
-extern void ExplainBeginOutput(ExplainState *es);
-extern void ExplainEndOutput(ExplainState *es);
-extern void ExplainSeparatePlans(ExplainState *es);
-
 extern void ExplainPropertyList(const char *qlabel, List *data,
 								ExplainState *es);
-extern void ExplainPropertyListNested(const char *qlabel, List *data,
-									  ExplainState *es);
 extern void ExplainPropertyText(const char *qlabel, const char *value,
 								ExplainState *es);
 extern void ExplainPropertyInteger(const char *qlabel, const char *unit,
@@ -113,10 +97,5 @@ extern void ExplainPropertyFloat(const char *qlabel, const char *unit,
 								 double value, int ndigits, ExplainState *es);
 extern void ExplainPropertyBool(const char *qlabel, bool value,
 								ExplainState *es);
-
-extern void ExplainOpenGroup(const char *objtype, const char *labelname,
-							 bool labeled, ExplainState *es);
-extern void ExplainCloseGroup(const char *objtype, const char *labelname,
-							  bool labeled, ExplainState *es);
 
 #endif							/* EXPLAIN_H */

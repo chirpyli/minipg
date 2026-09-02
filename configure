@@ -683,18 +683,9 @@ LZ4_CFLAGS
 with_lz4
 with_zlib
 with_system_tzdata
-with_libxslt
-XML2_LIBS
-XML2_CFLAGS
-XML2_CONFIG
-with_libxml
 with_uuid
 with_readline
-with_systemd
 with_tcl
-ICU_LIBS
-ICU_CFLAGS
-with_icu
 enable_thread_safety
 INCLUDES
 autodepend
@@ -788,7 +779,6 @@ with_template
 with_includes
 with_libraries
 with_libs
-enable_integer_datetimes
 with_pgport
 enable_rpath
 enable_spinlocks
@@ -805,17 +795,12 @@ with_CC
 enable_depend
 enable_cassert
 enable_thread_safety
-with_icu
 with_tcl
 with_tclconfig
-with_bonjour
-with_systemd
 with_readline
 with_libedit_preferred
 with_uuid
 with_ossp_uuid
-with_libxml
-with_libxslt
 with_system_tzdata
 with_zlib
 with_lz4
@@ -837,11 +822,6 @@ CPP
 PKG_CONFIG
 PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
-ICU_CFLAGS
-ICU_LIBS
-XML2_CONFIG
-XML2_CFLAGS
-XML2_LIBS
 LZ4_CFLAGS
 LZ4_LIBS
 LDFLAGS_EX
@@ -1461,8 +1441,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-integer-datetimes
-                          obsolete option, no longer supported
   --disable-rpath         do not embed shared library search path in
                           executables
   --disable-spinlocks     do not use spinlocks
@@ -1493,18 +1471,13 @@ Optional Packages:
   --with-wal-blocksize=BLOCKSIZE
                           set WAL block size in kB [8]
   --with-CC=CMD           set compiler (deprecated)
-  --with-icu              build with ICU support
   --with-tcl              build Tcl modules (PL/Tcl)
   --with-tclconfig=DIR    tclConfig.sh is in DIR
-  --with-bonjour          build with Bonjour support
-  --with-systemd          build with systemd support
   --without-readline      do not use GNU Readline nor BSD Libedit for editing
   --with-libedit-preferred
                           prefer BSD Libedit over GNU Readline
   --with-uuid=LIB         build contrib/uuid-ossp using LIB (bsd,e2fs,ossp)
   --with-ossp-uuid        obsolete spelling of --with-uuid=ossp
-  --with-libxml           build with XML support
-  --with-libxslt          use XSLT support when building contrib/xml2
   --with-system-tzdata=DIR
                           use system time zone data in DIR
   --without-zlib          do not use Zlib
@@ -1527,11 +1500,6 @@ Some influential environment variables:
               directories to add to pkg-config's search path
   PKG_CONFIG_LIBDIR
               path overriding pkg-config's built-in search path
-  ICU_CFLAGS  C compiler flags for ICU, overriding pkg-config
-  ICU_LIBS    linker flags for ICU, overriding pkg-config
-  XML2_CONFIG path to xml2-config utility
-  XML2_CFLAGS C compiler flags for XML2, overriding pkg-config
-  XML2_LIBS   linker flags for XML2, overriding pkg-config
   LZ4_CFLAGS  C compiler flags for LZ4, overriding pkg-config
   LZ4_LIBS    linker flags for LZ4, overriding pkg-config
   LDFLAGS_EX  extra linker flags for linking executables only
@@ -2998,36 +2966,6 @@ if test "${with_libs+set}" = set; then :
       LIBRARY_DIRS=$withval
       ;;
   esac
-
-fi
-
-
-
-
-#
-# 64-bit integer date/time storage is now the only option, but to avoid
-# unnecessary breakage of build scripts, continue to accept an explicit
-# "--enable-integer-datetimes" switch.
-#
-
-
-# Check whether --enable-integer-datetimes was given.
-if test "${enable_integer_datetimes+set}" = set; then :
-  enableval=$enable_integer_datetimes;
-  case $enableval in
-    yes)
-      :
-      ;;
-    no)
-      as_fn_error $? "--disable-integer-datetimes is no longer supported" "$LINENO" 5
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --enable-integer-datetimes option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  enable_integer_datetimes=yes
 
 fi
 
@@ -7221,135 +7159,6 @@ $as_echo "$enable_thread_safety" >&6; }
 
 
 #
-# ICU
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with ICU support" >&5
-$as_echo_n "checking whether to build with ICU support... " >&6; }
-
-
-
-# Check whether --with-icu was given.
-if test "${with_icu+set}" = set; then :
-  withval=$with_icu;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_ICU 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-icu option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_icu=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_icu" >&5
-$as_echo "$with_icu" >&6; }
-
-
-if test "$with_icu" = yes; then
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for icu-uc icu-i18n" >&5
-$as_echo_n "checking for icu-uc icu-i18n... " >&6; }
-
-if test -n "$ICU_CFLAGS"; then
-    pkg_cv_ICU_CFLAGS="$ICU_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"icu-uc icu-i18n\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "icu-uc icu-i18n") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_ICU_CFLAGS=`$PKG_CONFIG --cflags "icu-uc icu-i18n" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$ICU_LIBS"; then
-    pkg_cv_ICU_LIBS="$ICU_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"icu-uc icu-i18n\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "icu-uc icu-i18n") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_ICU_LIBS=`$PKG_CONFIG --libs "icu-uc icu-i18n" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        ICU_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "icu-uc icu-i18n" 2>&1`
-        else
-	        ICU_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "icu-uc icu-i18n" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$ICU_PKG_ERRORS" >&5
-
-	as_fn_error $? "Package requirements (icu-uc icu-i18n) were not met:
-
-$ICU_PKG_ERRORS
-
-Consider adjusting the PKG_CONFIG_PATH environment variable if you
-installed software in a non-standard prefix.
-
-Alternatively, you may set the environment variables ICU_CFLAGS
-and ICU_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details." "$LINENO" 5
-elif test $pkg_failed = untried; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
-is in your PATH or set the PKG_CONFIG environment variable to the full
-path to pkg-config.
-
-Alternatively, you may set the environment variables ICU_CFLAGS
-and ICU_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
-
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.
-See \`config.log' for more details" "$LINENO" 5; }
-else
-	ICU_CFLAGS=$pkg_cv_ICU_CFLAGS
-	ICU_LIBS=$pkg_cv_ICU_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-fi
-fi
-
-#
 # Optionally build Tcl modules (PL/Tcl)
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with Tcl" >&5
@@ -7406,76 +7215,6 @@ if test "${with_tclconfig+set}" = set; then :
 fi
 
 
-
-#
-# Bonjour
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with Bonjour support" >&5
-$as_echo_n "checking whether to build with Bonjour support... " >&6; }
-
-
-
-# Check whether --with-bonjour was given.
-if test "${with_bonjour+set}" = set; then :
-  withval=$with_bonjour;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_BONJOUR 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-bonjour option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_bonjour=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_bonjour" >&5
-$as_echo "$with_bonjour" >&6; }
-
-
-#
-# Systemd
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with systemd support" >&5
-$as_echo_n "checking whether to build with systemd support... " >&6; }
-
-
-
-# Check whether --with-systemd was given.
-if test "${with_systemd+set}" = set; then :
-  withval=$with_systemd;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_SYSTEMD 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-systemd option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_systemd=no
-
-fi
-
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_systemd" >&5
-$as_echo "$with_systemd" >&6; }
 
 #
 # Readline
@@ -7623,225 +7362,6 @@ $as_echo "#define HAVE_UUID_OSSP 1" >>confdefs.h
     as_fn_error $? "--with-uuid must specify one of bsd, e2fs, or ossp" "$LINENO" 5
   fi
 fi
-
-
-
-#
-# XML
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with XML support" >&5
-$as_echo_n "checking whether to build with XML support... " >&6; }
-
-
-
-# Check whether --with-libxml was given.
-if test "${with_libxml+set}" = set; then :
-  withval=$with_libxml;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_LIBXML 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-libxml option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_libxml=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_libxml" >&5
-$as_echo "$with_libxml" >&6; }
-
-
-if test "$with_libxml" = yes ; then
-  # Check pkg-config, then xml2-config.  But for backwards compatibility,
-  # setting XML2_CONFIG overrides pkg-config.
-    have_libxml2_pkg_config=no
-  if test -z "$XML2_CONFIG" -a -n "$PKG_CONFIG"; then
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libxml-2.0 >= 2.6.23" >&5
-$as_echo_n "checking for libxml-2.0 >= 2.6.23... " >&6; }
-
-if test -n "$XML2_CFLAGS"; then
-    pkg_cv_XML2_CFLAGS="$XML2_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libxml-2.0 >= 2.6.23\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libxml-2.0 >= 2.6.23") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_XML2_CFLAGS=`$PKG_CONFIG --cflags "libxml-2.0 >= 2.6.23" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$XML2_LIBS"; then
-    pkg_cv_XML2_LIBS="$XML2_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libxml-2.0 >= 2.6.23\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libxml-2.0 >= 2.6.23") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_XML2_LIBS=`$PKG_CONFIG --libs "libxml-2.0 >= 2.6.23" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        XML2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libxml-2.0 >= 2.6.23" 2>&1`
-        else
-	        XML2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libxml-2.0 >= 2.6.23" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$XML2_PKG_ERRORS" >&5
-
-	# do nothing
-elif test $pkg_failed = untried; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	# do nothing
-else
-	XML2_CFLAGS=$pkg_cv_XML2_CFLAGS
-	XML2_LIBS=$pkg_cv_XML2_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-	have_libxml2_pkg_config=yes
-fi
-  fi
-  if test "$have_libxml2_pkg_config" = no ; then
-    if test -z "$XML2_CONFIG"; then
-  for ac_prog in xml2-config
-do
-  # Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_XML2_CONFIG+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $XML2_CONFIG in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_XML2_CONFIG="$XML2_CONFIG" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_XML2_CONFIG="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-XML2_CONFIG=$ac_cv_path_XML2_CONFIG
-if test -n "$XML2_CONFIG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $XML2_CONFIG" >&5
-$as_echo "$XML2_CONFIG" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-  test -n "$XML2_CONFIG" && break
-done
-
-else
-  # Report the value of XML2_CONFIG in configure's output in all cases.
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for XML2_CONFIG" >&5
-$as_echo_n "checking for XML2_CONFIG... " >&6; }
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $XML2_CONFIG" >&5
-$as_echo "$XML2_CONFIG" >&6; }
-fi
-
-    if test -n "$XML2_CONFIG"; then
-      XML2_CFLAGS=`$XML2_CONFIG --cflags`
-      XML2_LIBS=`$XML2_CONFIG --libs`
-    fi
-  fi
-  # Note the user could also set XML2_CFLAGS/XML2_LIBS directly
-  for pgac_option in $XML2_CFLAGS; do
-    case $pgac_option in
-      -I*|-D*) INCLUDES="$INCLUDES $pgac_option";;
-    esac
-  done
-  for pgac_option in $XML2_LIBS; do
-    case $pgac_option in
-      -L*) LIBDIRS="$LIBDIRS $pgac_option";;
-    esac
-  done
-fi
-
-
-#
-# XSLT
-#
-
-
-
-# Check whether --with-libxslt was given.
-if test "${with_libxslt+set}" = set; then :
-  withval=$with_libxslt;
-  case $withval in
-    yes)
-
-$as_echo "#define USE_LIBXSLT 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-libxslt option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_libxslt=no
-
-fi
-
-
-
 
 
 
@@ -11280,106 +10800,6 @@ $as_echo "$as_me: WARNING:
 *** Not using atomic operations will cause poor performance." >&2;}
 fi
 
-if test "$with_libxml" = yes ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for xmlSaveToBuffer in -lxml2" >&5
-$as_echo_n "checking for xmlSaveToBuffer in -lxml2... " >&6; }
-if ${ac_cv_lib_xml2_xmlSaveToBuffer+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lxml2  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char xmlSaveToBuffer ();
-int
-main ()
-{
-return xmlSaveToBuffer ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_xml2_xmlSaveToBuffer=yes
-else
-  ac_cv_lib_xml2_xmlSaveToBuffer=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_xml2_xmlSaveToBuffer" >&5
-$as_echo "$ac_cv_lib_xml2_xmlSaveToBuffer" >&6; }
-if test "x$ac_cv_lib_xml2_xmlSaveToBuffer" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBXML2 1
-_ACEOF
-
-  LIBS="-lxml2 $LIBS"
-
-else
-  as_fn_error $? "library 'xml2' (version >= 2.6.23) is required for XML support" "$LINENO" 5
-fi
-
-fi
-
-if test "$with_libxslt" = yes ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for xsltCleanupGlobals in -lxslt" >&5
-$as_echo_n "checking for xsltCleanupGlobals in -lxslt... " >&6; }
-if ${ac_cv_lib_xslt_xsltCleanupGlobals+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lxslt  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char xsltCleanupGlobals ();
-int
-main ()
-{
-return xsltCleanupGlobals ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_xslt_xsltCleanupGlobals=yes
-else
-  ac_cv_lib_xslt_xsltCleanupGlobals=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_xslt_xsltCleanupGlobals" >&5
-$as_echo "$ac_cv_lib_xslt_xsltCleanupGlobals" >&6; }
-if test "x$ac_cv_lib_xslt_xsltCleanupGlobals" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBXSLT 1
-_ACEOF
-
-  LIBS="-lxslt $LIBS"
-
-else
-  as_fn_error $? "library 'xslt' is required for XSLT support" "$LINENO" 5
-fi
-
-fi
-
 if test "$with_lz4" = yes ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for LZ4_compress_default in -llz4" >&5
 $as_echo_n "checking for LZ4_compress_default in -llz4... " >&6; }
@@ -11832,50 +11252,6 @@ else
 fi
 
 done
-
-fi
-
-if test "$with_systemd" = yes ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "systemd/sd-daemon.h" "ac_cv_header_systemd_sd_daemon_h" "$ac_includes_default"
-if test "x$ac_cv_header_systemd_sd_daemon_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <systemd/sd-daemon.h> is required for systemd support" "$LINENO" 5
-fi
-
-
-fi
-
-if test "$with_libxml" = yes ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "libxml/parser.h" "ac_cv_header_libxml_parser_h" "$ac_includes_default"
-if test "x$ac_cv_header_libxml_parser_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <libxml/parser.h> is required for XML support" "$LINENO" 5
-fi
-
-
-fi
-
-if test "$with_libxslt" = yes ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "libxslt/xslt.h" "ac_cv_header_libxslt_xslt_h" "$ac_includes_default"
-if test "x$ac_cv_header_libxslt_xslt_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <libxslt/xslt.h> is required for XSLT support" "$LINENO" 5
-fi
-
-
-fi
-
-if test "$with_bonjour" = yes ; then
-  ac_fn_c_check_header_mongrel "$LINENO" "dns_sd.h" "ac_cv_header_dns_sd_h" "$ac_includes_default"
-if test "x$ac_cv_header_dns_sd_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <dns_sd.h> is required for Bonjour" "$LINENO" 5
-fi
-
 
 fi
 
@@ -14744,23 +14120,6 @@ cat >>confdefs.h <<_ACEOF
 #define HAVE_DECL_STRTOULL $ac_have_decl
 _ACEOF
 
-
-if test "$with_icu" = yes; then
-  ac_save_CPPFLAGS=$CPPFLAGS
-  CPPFLAGS="$CPPFLAGS $ICU_CFLAGS"
-
-  # Verify we have ICU's header files
-  ac_fn_c_check_header_mongrel "$LINENO" "unicode/ucol.h" "ac_cv_header_unicode_ucol_h" "$ac_includes_default"
-if test "x$ac_cv_header_unicode_ucol_h" = xyes; then :
-
-else
-  as_fn_error $? "header file <unicode/ucol.h> is required for ICU" "$LINENO" 5
-fi
-
-
-
-  CPPFLAGS=$ac_save_CPPFLAGS
-fi
 
 # Lastly, restore full LIBS list and check for readline/libedit symbols
 LIBS="$LIBS_including_readline"

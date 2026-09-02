@@ -35,7 +35,6 @@ OBJS = \
 	genfile.o \
 	int.o \
 	int8.o \
-	json_escape.o \
 	like.o \
 	like_support.o \
 	lockfuncs.o \

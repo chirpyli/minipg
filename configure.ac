@@ -101,16 +101,6 @@ PGAC_ARG_REQ(with, libs,      [DIRS], [alternative spelling of --with-libraries]
 
 
 #
-# 64-bit integer date/time storage is now the only option, but to avoid
-# unnecessary breakage of build scripts, continue to accept an explicit
-# "--enable-integer-datetimes" switch.
-#
-PGAC_ARG_BOOL(enable, integer-datetimes, yes, [obsolete option, no longer supported],
-              [],
-              [AC_MSG_ERROR([--disable-integer-datetimes is no longer supported])])
-
-
-#
 # Default port number (--with-pgport), default 5432
 #
 AC_MSG_CHECKING([for default port number])
@@ -712,19 +702,6 @@ AC_MSG_RESULT([$enable_thread_safety])
 AC_SUBST(enable_thread_safety)
 
 #
-# ICU
-#
-AC_MSG_CHECKING([whether to build with ICU support])
-PGAC_ARG_BOOL(with, icu, no, [build with ICU support],
-              [AC_DEFINE([USE_ICU], 1, [Define to build with ICU support. (--with-icu)])])
-AC_MSG_RESULT([$with_icu])
-AC_SUBST(with_icu)
-
-if test "$with_icu" = yes; then
-  PKG_CHECK_MODULES(ICU, icu-uc icu-i18n)
-fi
-
-#
 # Optionally build Tcl modules (PL/Tcl)
 #
 AC_MSG_CHECKING([whether to build with Tcl])
@@ -736,25 +713,6 @@ AC_SUBST([with_tcl])
 # This will override the use of tclsh to find the paths to search.
 
 PGAC_ARG_REQ(with, tclconfig, [DIR], [tclConfig.sh is in DIR])
-
-#
-# Bonjour
-#
-AC_MSG_CHECKING([whether to build with Bonjour support])
-PGAC_ARG_BOOL(with, bonjour, no,
-              [build with Bonjour support],
-              [AC_DEFINE([USE_BONJOUR], 1, [Define to 1 to build with Bonjour support. (--with-bonjour)])])
-AC_MSG_RESULT([$with_bonjour])
-
-
-#
-# Systemd
-#
-AC_MSG_CHECKING([whether to build with systemd support])
-PGAC_ARG_BOOL(with, systemd, no, [build with systemd support],
-              [AC_DEFINE([USE_SYSTEMD], 1, [Define to build with systemd support. (--with-systemd)])])
-AC_SUBST(with_systemd)
-AC_MSG_RESULT([$with_systemd])
 
 #
 # Readline
@@ -810,54 +768,6 @@ if test "$with_uuid" != no ; then
 fi
 AC_SUBST(with_uuid)
 
-
-#
-# XML
-#
-AC_MSG_CHECKING([whether to build with XML support])
-PGAC_ARG_BOOL(with, libxml, no, [build with XML support],
-              [AC_DEFINE([USE_LIBXML], 1, [Define to 1 to build with XML support. (--with-libxml)])])
-AC_MSG_RESULT([$with_libxml])
-AC_SUBST(with_libxml)
-
-if test "$with_libxml" = yes ; then
-  # Check pkg-config, then xml2-config.  But for backwards compatibility,
-  # setting XML2_CONFIG overrides pkg-config.
-  AC_ARG_VAR(XML2_CONFIG, [path to xml2-config utility])dnl
-  have_libxml2_pkg_config=no
-  if test -z "$XML2_CONFIG" -a -n "$PKG_CONFIG"; then
-    PKG_CHECK_MODULES(XML2, [libxml-2.0 >= 2.6.23],
-                      [have_libxml2_pkg_config=yes], [# do nothing])
-  fi
-  if test "$have_libxml2_pkg_config" = no ; then
-    PGAC_PATH_PROGS(XML2_CONFIG, xml2-config)
-    if test -n "$XML2_CONFIG"; then
-      XML2_CFLAGS=`$XML2_CONFIG --cflags`
-      XML2_LIBS=`$XML2_CONFIG --libs`
-    fi
-  fi
-  # Note the user could also set XML2_CFLAGS/XML2_LIBS directly
-  for pgac_option in $XML2_CFLAGS; do
-    case $pgac_option in
-      -I*|-D*) INCLUDES="$INCLUDES $pgac_option";;
-    esac
-  done
-  for pgac_option in $XML2_LIBS; do
-    case $pgac_option in
-      -L*) LIBDIRS="$LIBDIRS $pgac_option";;
-    esac
-  done
-fi
-
-
-#
-# XSLT
-#
-PGAC_ARG_BOOL(with, libxslt, no, [use XSLT support when building contrib/xml2],
-              [AC_DEFINE([USE_LIBXSLT], 1, [Define to 1 to use XSLT support when building contrib/xml2. (--with-libxslt)])])
-
-
-AC_SUBST(with_libxslt)
 
 #
 # tzdata
@@ -1073,14 +983,6 @@ else
 *** Not using atomic operations will cause poor performance.])
 fi
 
-if test "$with_libxml" = yes ; then
-  AC_CHECK_LIB(xml2, xmlSaveToBuffer, [], [AC_MSG_ERROR([library 'xml2' (version >= 2.6.23) is required for XML support])])
-fi
-
-if test "$with_libxslt" = yes ; then
-  AC_CHECK_LIB(xslt, xsltCleanupGlobals, [], [AC_MSG_ERROR([library 'xslt' is required for XSLT support])])
-fi
-
 if test "$with_lz4" = yes ; then
   AC_CHECK_LIB(lz4, LZ4_compress_default, [], [AC_MSG_ERROR([library 'lz4' is required for LZ4 support])])
 fi
@@ -1207,28 +1109,6 @@ fi
 
 if test "$with_lz4" = yes; then
   AC_CHECK_HEADERS(lz4.h, [], [AC_MSG_ERROR([lz4.h header file is required for LZ4])])
-fi
-
-if test "$with_systemd" = yes ; then
-  AC_CHECK_HEADER(systemd/sd-daemon.h, [], [AC_MSG_ERROR([header file <systemd/sd-daemon.h> is required for systemd support])])
-fi
-
-if test "$with_libxml" = yes ; then
-  AC_CHECK_HEADER(libxml/parser.h, [], [AC_MSG_ERROR([header file <libxml/parser.h> is required for XML support])])
-fi
-
-if test "$with_libxslt" = yes ; then
-  AC_CHECK_HEADER(libxslt/xslt.h, [], [AC_MSG_ERROR([header file <libxslt/xslt.h> is required for XSLT support])])
-fi
-
-if test "$with_bonjour" = yes ; then
-  AC_CHECK_HEADER(dns_sd.h, [], [AC_MSG_ERROR([header file <dns_sd.h> is required for Bonjour])])
-dnl At some point we might add something like
-dnl AC_SEARCH_LIBS(DNSServiceRegister, dns_sd)
-dnl but right now, what that would mainly accomplish is to encourage
-dnl people to try to use the avahi implementation, which does not work.
-dnl If you want to use Apple's own Bonjour code on another platform,
-dnl just add -ldns_sd to LIBS manually.
 fi
 
 # for contrib/uuid-ossp
@@ -1588,17 +1468,6 @@ AC_CHECK_FUNCS([strtoll __strtoll strtoq], [break])
 AC_CHECK_FUNCS([strtoull __strtoull strtouq], [break])
 # strto[u]ll may exist but not be declared
 AC_CHECK_DECLS([strtoll, strtoull])
-
-if test "$with_icu" = yes; then
-  ac_save_CPPFLAGS=$CPPFLAGS
-  CPPFLAGS="$CPPFLAGS $ICU_CFLAGS"
-
-  # Verify we have ICU's header files
-  AC_CHECK_HEADER(unicode/ucol.h, [],
-        [AC_MSG_ERROR([header file <unicode/ucol.h> is required for ICU])])
-
-  CPPFLAGS=$ac_save_CPPFLAGS
-fi
 
 # Lastly, restore full LIBS list and check for readline/libedit symbols
 LIBS="$LIBS_including_readline"

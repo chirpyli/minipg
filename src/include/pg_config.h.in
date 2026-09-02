@@ -100,26 +100,6 @@
    don't. */
 #undef HAVE_DECL_F_FULLFSYNC
 
-/* Define to 1 if you have the declaration of
-   `LLVMCreateGDBRegistrationListener', and to 0 if you don't. */
-#undef HAVE_DECL_LLVMCREATEGDBREGISTRATIONLISTENER
-
-/* Define to 1 if you have the declaration of
-   `LLVMCreatePerfJITEventListener', and to 0 if you don't. */
-#undef HAVE_DECL_LLVMCREATEPERFJITEVENTLISTENER
-
-/* Define to 1 if you have the declaration of `LLVMGetHostCPUFeatures', and to
-   0 if you don't. */
-#undef HAVE_DECL_LLVMGETHOSTCPUFEATURES
-
-/* Define to 1 if you have the declaration of `LLVMGetHostCPUName', and to 0
-   if you don't. */
-#undef HAVE_DECL_LLVMGETHOSTCPUNAME
-
-/* Define to 1 if you have the declaration of `LLVMOrcGetSymbolAddressIn', and
-   to 0 if you don't. */
-#undef HAVE_DECL_LLVMORCGETSYMBOLADDRESSIN
-
 /* Define to 1 if you have the declaration of `memset_s', and to 0 if you
    don't. */
 #undef HAVE_DECL_MEMSET_S
@@ -302,12 +282,6 @@
 
 /* Define if you have a function readline library */
 #undef HAVE_LIBREADLINE
-
-/* Define to 1 if you have the `xml2' library (-lxml2). */
-#undef HAVE_LIBXML2
-
-/* Define to 1 if you have the `xslt' library (-lxslt). */
-#undef HAVE_LIBXSLT
 
 /* Define to 1 if you have the `z' library (-lz). */
 #undef HAVE_LIBZ
@@ -522,9 +496,6 @@
 
 /* Define to 1 if `__ss_len' is a member of `struct sockaddr_storage'. */
 #undef HAVE_STRUCT_SOCKADDR_STORAGE___SS_LEN
-
-/* Define to 1 if the system has the type `struct sockaddr_un'. */
-#undef HAVE_STRUCT_SOCKADDR_UN
 
 /* Define to 1 if `tm_zone' is a member of `struct tm'. */
 #undef HAVE_STRUCT_TM_TM_ZONE
@@ -819,19 +790,6 @@
 /* Define to 1 to build with assertion checks. (--enable-cassert) */
 #undef USE_ASSERT_CHECKING
 
-/* Define to 1 to build with Bonjour support. (--with-bonjour) */
-#undef USE_BONJOUR
-
-/* Define to build with ICU support. (--with-icu) */
-#undef USE_ICU
-
-/* Define to 1 to build with XML support. (--with-libxml) */
-#undef USE_LIBXML
-
-/* Define to 1 to use XSLT support when building contrib/xml2.
-   (--with-libxslt) */
-#undef USE_LIBXSLT
-
 /* Define to 1 to build with LZ4 support. (--with-lz4) */
 #undef USE_LZ4
 
@@ -846,9 +804,6 @@
 
 /* Define to 1 to use Intel SSE 4.2 CRC instructions with a runtime check. */
 #undef USE_SSE42_CRC32C_WITH_RUNTIME_CHECK
-
-/* Define to build with systemd support. (--with-systemd) */
-#undef USE_SYSTEMD
 
 /* Define to select SysV-style semaphores. */
 #undef USE_SYSV_SEMAPHORES

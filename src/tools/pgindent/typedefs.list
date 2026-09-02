@@ -549,7 +549,6 @@ ExpandedRange
 ExpandedRecordFieldInfo
 ExpandedRecordHeader
 ExplainDirectModify_function
-ExplainFormat
 ExplainOneQuery_hook_type
 ExplainState
 ExplainStmt
