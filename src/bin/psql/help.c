@@ -20,7 +20,6 @@
 #include "help.h"
 #include "input.h"
 #include "settings.h"
-#include "sql_help.h"
 
 /*
  * PLEASE:
@@ -123,8 +122,7 @@ usage(unsigned short int pager)
 	fprintf(output, _("  -w, --no-password        never prompt for password\n"));
 	fprintf(output, _("  -W, --password           force password prompt (should happen automatically)\n"));
 
-	fprintf(output, _("\nFor more information, type \"\\?\" (for internal commands) or \"\\help\" (for SQL\n"
-					  "commands) from within psql, or consult the psql section in the PostgreSQL\n"
+	fprintf(output, _("\nFor more information, type \"\\?\" (for internal commands) from within psql, or consult the psql section in the PostgreSQL\n"
 					  "documentation.\n\n"));
 	fprintf(output, _("Report bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 	fprintf(output, _("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
@@ -151,7 +149,7 @@ slashUsage(unsigned short int pager)
 	 * Use "psql --help=commands | wc" to count correctly.  It's okay to count
 	 * the USE_READLINE line even in builds without that.
 	 */
-	output = PageOutput(136, pager ? &(pset.popt.topt) : NULL);
+	output = PageOutput(135, pager ? &(pset.popt.topt) : NULL);
 
 	fprintf(output, _("General\n"));
 	fprintf(output, _("  \\copyright             show PostgreSQL usage and distribution terms\n"));
@@ -176,7 +174,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\? [commands]          show help on backslash commands\n"));
 	fprintf(output, _("  \\? options             show help on psql command-line options\n"));
 	fprintf(output, _("  \\? variables           show help on special variables\n"));
-	fprintf(output, _("  \\h [NAME]              help on syntax of SQL commands, * for all commands\n"));
 	fprintf(output, "\n");
 
 	fprintf(output, _("Query Buffer\n"));
@@ -477,170 +474,6 @@ helpVariables(unsigned short int pager)
 }
 
 
-/*
- * helpSQL -- help with SQL commands
- *
- * Note: we assume caller removed any trailing spaces in "topic".
- */
-void
-helpSQL(const char *topic, unsigned short int pager)
-{
-#define VALUE_OR_NULL(a) ((a) ? (a) : "")
-
-	if (!topic || strlen(topic) == 0)
-	{
-		/* Print all the available command names */
-		int			screen_width;
-		int			ncolumns;
-		int			nrows;
-		FILE	   *output;
-		int			i;
-		int			j;
-
-		/* Find screen width to determine how many columns will fit */
-#ifdef TIOCGWINSZ
-		struct winsize screen_size;
-
-		if (ioctl(fileno(stdout), TIOCGWINSZ, &screen_size) == -1)
-			screen_width = 80;	/* ioctl failed, assume 80 */
-		else
-			screen_width = screen_size.ws_col;
-#else
-		screen_width = 80;		/* default assumption */
-#endif
-
-		ncolumns = (screen_width - 3) / (QL_MAX_CMD_LEN + 1);
-		ncolumns = Max(ncolumns, 1);
-		nrows = (QL_HELP_COUNT + (ncolumns - 1)) / ncolumns;
-
-		output = PageOutput(nrows + 1, pager ? &(pset.popt.topt) : NULL);
-
-		fputs(_("Available help:\n"), output);
-
-		for (i = 0; i < nrows; i++)
-		{
-			fprintf(output, "  ");
-			for (j = 0; j < ncolumns - 1; j++)
-				fprintf(output, "%-*s",
-						QL_MAX_CMD_LEN + 1,
-						VALUE_OR_NULL(QL_HELP[i + j * nrows].cmd));
-			if (i + j * nrows < QL_HELP_COUNT)
-				fprintf(output, "%s",
-						VALUE_OR_NULL(QL_HELP[i + j * nrows].cmd));
-			fputc('\n', output);
-		}
-
-		ClosePager(output);
-	}
-	else
-	{
-		int			i,
-					pass;
-		FILE	   *output = NULL;
-		size_t		len,
-					wordlen,
-					j;
-		int			nl_count;
-
-		/*
-		 * len is the amount of the input to compare to the help topic names.
-		 * We first try exact match, then first + second words, then first
-		 * word only.
-		 */
-		len = strlen(topic);
-
-		for (pass = 1; pass <= 3; pass++)
-		{
-			if (pass > 1)		/* Nothing on first pass - try the opening
-								 * word(s) */
-			{
-				wordlen = j = 1;
-				while (j < len && topic[j++] != ' ')
-					wordlen++;
-				if (pass == 2 && j < len)
-				{
-					wordlen++;
-					while (j < len && topic[j++] != ' ')
-						wordlen++;
-				}
-				if (wordlen >= len)
-				{
-					/* Failed to shorten input, so try next pass if any */
-					continue;
-				}
-				len = wordlen;
-			}
-
-			/*
-			 * Count newlines for pager.  This logic must agree with what the
-			 * following loop will do!
-			 */
-			nl_count = 0;
-			for (i = 0; QL_HELP[i].cmd; i++)
-			{
-				if (pg_strncasecmp(topic, QL_HELP[i].cmd, len) == 0 ||
-					strcmp(topic, "*") == 0)
-				{
-					/* magic constant here must match format below! */
-					nl_count += 7 + QL_HELP[i].nl_count;
-
-					/* If we have an exact match, exit.  Fixes \h SELECT */
-					if (pg_strcasecmp(topic, QL_HELP[i].cmd) == 0)
-						break;
-				}
-			}
-			/* If no matches, don't open the output yet */
-			if (nl_count == 0)
-				continue;
-
-			if (!output)
-				output = PageOutput(nl_count, pager ? &(pset.popt.topt) : NULL);
-
-			for (i = 0; QL_HELP[i].cmd; i++)
-			{
-				if (pg_strncasecmp(topic, QL_HELP[i].cmd, len) == 0 ||
-					strcmp(topic, "*") == 0)
-				{
-					PQExpBufferData buffer;
-					char	   *url;
-
-					initPQExpBuffer(&buffer);
-					QL_HELP[i].syntaxfunc(&buffer);
-					url = psprintf("https://www.postgresql.org/docs/%s/%s.html",
-								   strstr(PG_VERSION, "devel") ? "devel" : PG_MAJORVERSION,
-								   QL_HELP[i].docbook_id);
-					/* # of newlines in format must match constant above! */
-					fprintf(output, _("Command:     %s\n"
-									  "Description: %s\n"
-									  "Syntax:\n%s\n\n"
-									  "URL: %s\n\n"),
-							QL_HELP[i].cmd,
-							_(QL_HELP[i].help),
-							buffer.data,
-							url);
-					free(url);
-					termPQExpBuffer(&buffer);
-
-					/* If we have an exact match, exit.  Fixes \h SELECT */
-					if (pg_strcasecmp(topic, QL_HELP[i].cmd) == 0)
-						break;
-				}
-			}
-			break;
-		}
-
-		/* If we never found anything, report that */
-		if (!output)
-		{
-			output = PageOutput(2, pager ? &(pset.popt.topt) : NULL);
-			fprintf(output, _("No help available for \"%s\".\n"
-							  "Try \\h with no arguments to see available help.\n"),
-					topic);
-		}
-
-		ClosePager(output);
-	}
-}
 
 
 
