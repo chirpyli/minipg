@@ -100,14 +100,6 @@ SELECT * FROM verify_heapam('test_sequence',
 							startblock := NULL,
 							endblock := NULL);
 
--- Check that foreign tables are rejected
-CREATE FOREIGN DATA WRAPPER dummy;
-CREATE SERVER dummy_server FOREIGN DATA WRAPPER dummy;
-CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_server;
-SELECT * FROM verify_heapam('test_foreign_table',
-							startblock := NULL,
-							endblock := NULL);
-
 -- cleanup
 DROP TABLE heaptest;
 DROP TABLE test_partition;

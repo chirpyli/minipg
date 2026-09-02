@@ -8,8 +8,8 @@
  *
  * Note that there are files outside src/backend/optimizer/ that are
  * considered planner modules, because they're too much in bed with
- * planner operations to be treated otherwise.  FDW planning code is an
- * example.  For the most part, however, code outside the core planner
+ * planner operations to be treated otherwise.  For the most part,
+ * however, code outside the core planner
  * should not need to include any optimizer/ header except this one.
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group

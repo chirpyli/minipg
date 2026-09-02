@@ -67,16 +67,6 @@ select pg_relpages('test_view');
 select pgstatindex('test_view');
 select pgstathashindex('test_view');
 
-create foreign data wrapper dummy;
-create server dummy_server foreign data wrapper dummy;
-create foreign table test_foreign_table () server dummy_server;
--- these should all fail
-select pgstattuple('test_foreign_table');
-select pgstattuple_approx('test_foreign_table');
-select pg_relpages('test_foreign_table');
-select pgstatindex('test_foreign_table');
-select pgstathashindex('test_foreign_table');
-
 -- 分区功能已在 minipg 中裁剪，不再测试分区子表及其索引的 pgstattuple 调用。
 
 -- toast tables should work
@@ -85,6 +75,3 @@ select pgstattuple_approx((select reltoastrelid from pg_class where relname = 't
 select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
 
 drop view test_view;
-drop foreign table test_foreign_table;
-drop server dummy_server;
-drop foreign data wrapper dummy;

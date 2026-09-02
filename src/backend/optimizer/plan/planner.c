@@ -3059,10 +3059,6 @@ make_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 		is_parallel_safe(root, (Node *) havingQual))
 		grouped_rel->consider_parallel = true;
 
-	/*
-	 * If the input rel belongs to a single FDW, so does the grouped rel.
-	 */
-
 	return grouped_rel;
 }
 
@@ -5236,10 +5232,6 @@ apply_scanjoin_target_to_paths(PlannerInfo *root,
 	 * confused in createplan.c if they don't agree.  We must do this now so
 	 * that any append paths made in the next part will use the correct
 	 * pathtarget (cf. create_append_path).
-	 *
-	 * Note that this is also necessary if GetForeignUpperPaths() gets called
-	 * on the final scan/join relation or on any of its children, since the
-	 * FDW might look at the rel's target to create ForeignPaths.
 	 */
 	rel->reltarget = llast_node(PathTarget, scanjoin_targets);
 
@@ -5292,10 +5284,6 @@ create_distinct_paths(PlannerInfo *root,
 	 * expressions are parallel-safe.
 	 */
 	distinct_rel->consider_parallel = input_rel->consider_parallel;
-
-	/*
-	 * If the input rel belongs to a single FDW, so does the distinct_rel.
-	 */
 
 	/* Estimate number of distinct rows there will be */
 	if (parse->groupClause || parse->groupingSets || parse->hasAggs ||
@@ -5430,10 +5418,6 @@ create_distinct_paths(PlannerInfo *root,
 				 errmsg("could not implement DISTINCT"),
 				 errdetail("Some of the datatypes only support hashing, while others only support sorting.")));
 
-	/*
-	 * If there is an FDW that's responsible for all baserels of the query,
-	 * let it consider adding ForeignPaths.
-	 */
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_DISTINCT,
@@ -5483,10 +5467,6 @@ create_ordered_paths(PlannerInfo *root,
 	 */
 	if (input_rel->consider_parallel && target_parallel_safe)
 		ordered_rel->consider_parallel = true;
-
-	/*
-	 * If the input rel belongs to a single FDW, so does the ordered_rel.
-	 */
 
 	foreach(lc, input_rel->pathlist)
 	{
@@ -5677,10 +5657,6 @@ create_ordered_paths(PlannerInfo *root,
 		}
 	}
 
-	/*
-	 * If there is an FDW that's responsible for all baserels of the query,
-	 * let it consider adding ForeignPaths.
-	 */
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_ORDERED,

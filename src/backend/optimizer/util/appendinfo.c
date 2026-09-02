@@ -835,8 +835,6 @@ add_row_identity_var(PlannerInfo *root, Var *orig_var,
  * add_row_identity_columns
  *
  * This function adds the row identity columns needed by the core code.
- * FDWs might call add_row_identity_var() for themselves to add nonstandard
- * columns.  (Duplicate requests are fine.)
  */
 void
 add_row_identity_columns(PlannerInfo *root, Index rtindex,

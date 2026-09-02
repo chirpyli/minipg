@@ -673,23 +673,6 @@ ExecCreateScanSlotFromOuterPlan(EState *estate,
 }
 
 /* ----------------------------------------------------------------
- *		ExecRelationIsTargetRelation
- *
- *		Detect whether a relation (identified by rangetable index)
- *		is one of the target relations of the query.
- *
- * Note: This is currently no longer used in core.  We keep it around
- * because FDWs may wish to use it to determine if their foreign table
- * is a target relation.
- * ----------------------------------------------------------------
- */
-bool
-ExecRelationIsTargetRelation(EState *estate, Index scanrelid)
-{
-	return list_member_int(estate->es_plannedstmt->resultRelations, scanrelid);
-}
-
-/* ----------------------------------------------------------------
  *		ExecOpenScanRelation
  *
  *		Open the heap relation to be scanned by a base-level scan plan node.

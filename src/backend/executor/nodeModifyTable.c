@@ -24,8 +24,8 @@
  *		values plus row-locating info for UPDATE cases, or just the
  *		row-locating info for DELETE cases.
  *
- *		The relation to modify can be an ordinary table, a view having an
- *		INSTEAD OF trigger, or a foreign table.  Earlier processing already
+ *		The relation to modify can be an ordinary table or a view having an
+ *		INSTEAD OF trigger.  Earlier processing already
  *		pointed ModifyTable to the underlying relations of any automatically
  *		updatable view not using an INSTEAD OF trigger, so code here can
  *		assume it won't have one as a modification target.  This node does
@@ -172,9 +172,6 @@ ExecCheckPlanOutput(Relation resultRel, List *targetList)
  * resultRelInfo: current result rel
  * tupleSlot: slot holding tuple actually inserted/updated/deleted
  * planSlot: slot holding tuple returned by top subplan node
- *
- * Note: If tupleSlot is NULL, the FDW should have already provided econtext's
- * scan tuple.
  *
  * Returns a slot holding the result tuple
  */
@@ -890,11 +887,7 @@ ExecInsert(ModifyTableState *mtstate,
  *		When deleting from a table, tupleid identifies the tuple to
  *		delete and oldtuple is NULL.  When deleting through a view
  *		INSTEAD OF trigger, oldtuple is passed to the triggers and identifies
- *		what to delete, and tupleid is invalid.  When deleting from a
- *		foreign table, tupleid is invalid; the FDW has to figure out
- *		which row to delete using data from the planSlot.  oldtuple is
- *		passed to foreign table triggers; it is NULL when the foreign
- *		table has no relevant triggers.  We use tupleDeleted to indicate
+ *		what to delete, and tupleid is invalid.  We use tupleDeleted to indicate
  *		whether the tuple is actually deleted, callers can use it to
  *		decide whether to continue the operation.  When this DELETE is a
  *		part of an UPDATE of partition-key, then the slot returned by
@@ -1161,11 +1154,7 @@ ldelete:;
  *		When updating a table, tupleid identifies the tuple to
  *		update and oldtuple is NULL.  When updating through a view INSTEAD OF
  *		trigger, oldtuple is passed to the triggers and identifies what to
- *		update, and tupleid is invalid.  When updating a foreign table,
- *		tupleid is invalid; the FDW has to figure out which row to
- *		update using data from the planSlot.  oldtuple is passed to
- *		foreign table triggers; it is NULL when the foreign table has
- *		no relevant triggers.
+ *		update, and tupleid is invalid.
  *
  *		slot contains the new tuple value to be stored.
  *		planSlot is the output of the ModifyTable's subplan; we use it
@@ -1833,9 +1822,7 @@ ExecModifyTable(PlanState *pstate)
 			 * of the target table.
 			 *
 			 * Note that the wholerow attribute does not carry system columns,
-			 * so foreign table triggers miss seeing those, except that we
-			 * know enough here to set t_tableOid.  Quite separately from
-			 * this, the FDW may fetch its own junk attrs to identify the row.
+			 * so we know enough here to set t_tableOid.
 			 *
 			 * Other relevant relkinds, currently limited to views having
 			 * INSTEAD OF triggers, always have a wholerow attribute.
@@ -2074,8 +2061,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	/*
 	 * Open all the result relations and initialize the ResultRelInfo structs.
 	 * (But root relation was initialized above, if it's part of the array.)
-	 * We must do this before initializing the subplan, because direct-modify
-	 * FDWs expect their ResultRelInfos to be available.
 	 */
 	resultRelInfo = mtstate->resultRelInfo;
 	i = 0;
@@ -2120,9 +2105,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 
 		/*
 		 * For UPDATE/DELETE, find the appropriate junk attr now, either a
-		 * 'ctid' or 'wholerow' attribute depending on relkind.  For foreign
-		 * tables, the FDW might have created additional junk attr(s), but
-		 * those are no concern of ours.
+		 * 'ctid' or 'wholerow' attribute depending on relkind.
 		 */
 		if (operation == CMD_UPDATE || operation == CMD_DELETE)
 		{

@@ -149,33 +149,6 @@ select pgstatindex('test_view');
 ERROR:  relation "test_view" is not a btree index
 select pgstathashindex('test_view');
 ERROR:  relation "test_view" is not a hash index
-create foreign data wrapper dummy;
-ERROR:  syntax error at or near "foreign"
-LINE 1: create foreign data wrapper dummy;
-               ^
-create server dummy_server foreign data wrapper dummy;
-ERROR:  syntax error at or near "server"
-LINE 1: create server dummy_server foreign data wrapper dummy;
-               ^
-create foreign table test_foreign_table () server dummy_server;
-ERROR:  syntax error at or near "foreign"
-LINE 1: create foreign table test_foreign_table () server dummy_serv...
-               ^
--- these should all fail
-select pgstattuple('test_foreign_table');
-ERROR:  relation "test_foreign_table" does not exist
-select pgstattuple_approx('test_foreign_table');
-ERROR:  relation "test_foreign_table" does not exist
-LINE 1: select pgstattuple_approx('test_foreign_table');
-                                  ^
-select pg_relpages('test_foreign_table');
-ERROR:  relation "test_foreign_table" does not exist
-select pgstatindex('test_foreign_table');
-ERROR:  relation "test_foreign_table" does not exist
-select pgstathashindex('test_foreign_table');
-ERROR:  relation "test_foreign_table" does not exist
-LINE 1: select pgstathashindex('test_foreign_table');
-                               ^
 -- 分区功能已在 minipg 中裁剪，不再测试分区子表及其索引的 pgstattuple 调用。
 -- toast tables should work
 select pgstattuple((select reltoastrelid from pg_class where relname = 'test'));
@@ -197,15 +170,3 @@ select pg_relpages((select reltoastrelid from pg_class where relname = 'test'));
 (1 row)
 
 drop view test_view;
-drop foreign table test_foreign_table;
-ERROR:  syntax error at or near "foreign"
-LINE 1: drop foreign table test_foreign_table;
-             ^
-drop server dummy_server;
-ERROR:  syntax error at or near "server"
-LINE 1: drop server dummy_server;
-             ^
-drop foreign data wrapper dummy;
-ERROR:  syntax error at or near "foreign"
-LINE 1: drop foreign data wrapper dummy;
-             ^

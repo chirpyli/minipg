@@ -5076,12 +5076,6 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.pg_c
 cross-database references are not implemented: {.pg_catalog.pg_class
 \ddp nonesuch.pg_catalog.pg_class
 cross-database references are not implemented: nonesuch.pg_catalog.pg_class
-\dE host.regression.public.ft
-improper qualified name (too many dotted names): host.regression.public.ft
-\dE }.public.ft
-cross-database references are not implemented: }.public.ft
-\dE nonesuch.public.ft
-cross-database references are not implemented: nonesuch.public.ft
 \di host.regression.public.tenk1_hundred
 improper qualified name (too many dotted names): host.regression.public.tenk1_hundred
 \di ..public.tenk1_hundred
@@ -5106,22 +5100,6 @@ improper qualified name (too many dotted names): host.regression.public.shoe
 cross-database references are not implemented: regress(ion).public.shoe
 \dv nonesuch.public.shoe
 cross-database references are not implemented: nonesuch.public.shoe
-\des nonesuch.server
-invalid command \des
-\des regression.server
-invalid command \des
-\des nonesuch.server
-invalid command \des
-\des regression.server
-invalid command \des
-\des nonesuch.username
-invalid command \des
-\des regression.username
-invalid command \des
-\dew nonesuch.fdw
-invalid command \dew
-\dew regression.fdw
-invalid command \dew
 \df host.regression.public.namelen
 improper qualified name (too many dotted names): host.regression.public.namelen
 \df regres[qrstuv]ion.public.namelen

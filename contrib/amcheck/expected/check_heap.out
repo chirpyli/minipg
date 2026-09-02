@@ -212,26 +212,6 @@ ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unkno
 LINE 1: SELECT * FROM verify_heapam('test_sequence',
                       ^
 HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
--- Check that foreign tables are rejected
-CREATE FOREIGN DATA WRAPPER dummy;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: CREATE FOREIGN DATA WRAPPER dummy;
-               ^
-CREATE SERVER dummy_server FOREIGN DATA WRAPPER dummy;
-ERROR:  syntax error at or near "SERVER"
-LINE 1: CREATE SERVER dummy_server FOREIGN DATA WRAPPER dummy;
-               ^
-CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_server;
-ERROR:  syntax error at or near "FOREIGN"
-LINE 1: CREATE FOREIGN TABLE test_foreign_table () SERVER dummy_serv...
-               ^
-SELECT * FROM verify_heapam('test_foreign_table',
-							startblock := NULL,
-							endblock := NULL);
-ERROR:  function verify_heapam(unknown, startblock => unknown, endblock => unknown) does not exist
-LINE 1: SELECT * FROM verify_heapam('test_foreign_table',
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- cleanup
 DROP TABLE heaptest;
 DROP TABLE test_partition;

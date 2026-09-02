@@ -1187,9 +1187,6 @@ set search_path to default;
 \ddp host.regression.pg_catalog.pg_class
 \ddp {.pg_catalog.pg_class
 \ddp nonesuch.pg_catalog.pg_class
-\dE host.regression.public.ft
-\dE }.public.ft
-\dE nonesuch.public.ft
 \di host.regression.public.tenk1_hundred
 \di ..public.tenk1_hundred
 \di nonesuch.public.tenk1_hundred
@@ -1202,14 +1199,6 @@ set search_path to default;
 \dv host.regression.public.shoe
 \dv regress(ion).public.shoe
 \dv nonesuch.public.shoe
-\des nonesuch.server
-\des regression.server
-\des nonesuch.server
-\des regression.server
-\des nonesuch.username
-\des regression.username
-\dew nonesuch.fdw
-\dew regression.fdw
 \df host.regression.public.namelen
 \df regres[qrstuv]ion.public.namelen
 \df nonesuch.public.namelen

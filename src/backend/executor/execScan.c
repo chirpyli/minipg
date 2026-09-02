@@ -54,10 +54,10 @@ ExecScanFetch(ScanState *node,
 		if (scanrelid == 0)
 		{
 			/*
-			 * This is a ForeignScan or CustomScan which has pushed down a
-			 * join to the remote side.  If it is a descendant node in the EPQ
-			 * recheck plan tree, run the recheck method function.  Otherwise,
-			 * run the access method function below.
+			 * This is a CustomScan which has pushed down a join to the remote
+			 * side.  If it is a descendant node in the EPQ recheck plan tree,
+			 * run the recheck method function.  Otherwise, run the access
+			 * method function below.
 			 */
 			if (bms_is_member(epqstate->epqParam, node->ps.plan->extParam))
 			{

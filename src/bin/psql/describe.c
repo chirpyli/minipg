@@ -2471,7 +2471,6 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
  * i - indexes
  * v - views
  * m - materialized views
- * E - foreign table (Note: different from 'f', the relkind value)
  * (any order of the above is fine)
  */
 bool
@@ -2482,7 +2481,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	bool		showViews = strchr(tabtypes, 'v') != NULL;
 	bool		showMatViews = strchr(tabtypes, 'm') != NULL;
 	bool		showSeq = strchr(tabtypes, 's') != NULL;
-	bool		showForeign = strchr(tabtypes, 'E') != NULL;
 
 	PQExpBufferData buf;
 	PGresult   *res;
@@ -2490,9 +2488,9 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	int			cols_so_far;
 	bool		translate_columns[] = {false, false, true, false, false, false, false, false, false};
 
-	/* If tabtypes is empty, we default to \dtvmsE (but see also command.c) */
-	if (!(showTables || showIndexes || showViews || showMatViews || showSeq || showForeign))
-		showTables = showViews = showMatViews = showSeq = showForeign = true;
+	/* If tabtypes is empty, we default to \dtvms (but see also command.c) */
+	if (!(showTables || showIndexes || showViews || showMatViews || showSeq))
+		showTables = showViews = showMatViews = showSeq = true;
 
 	initPQExpBuffer(&buf);
 

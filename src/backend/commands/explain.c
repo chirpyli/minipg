@@ -1686,16 +1686,6 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 	if (IsA(plan, MergeAppend))
 		return;
 
-	/*
-	 * Likewise for ForeignScan that executes a direct INSERT/UPDATE/DELETE
-	 *
-	 * Note: the tlist for a ForeignScan that executes a direct INSERT/UPDATE
-	 * might contain subplan output expressions that are confusing in this
-	 * context.  The tlist for a ForeignScan that executes a direct UPDATE/
-	 * DELETE always contains "junk" target columns to identify the exact row
-	 * to update or delete, which would be confusing in this context.  So, we
-	 * suppress it in all the cases.
-	 */
 	/* Set up deparsing context */
 	context = set_deparse_context_plan(es->deparse_cxt,
 									   plan,
@@ -3271,10 +3261,9 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 /*
  * Show extra information for a ModifyTable node
  *
- * We have three objectives here.  First, if there's more than one target
+ * We have two objectives here.  First, if there's more than one target
  * table or it's different from the nominal target, identify the actual
- * target(s).  Second, give FDWs a chance to display extra info about foreign
- * targets.  Third, show information about ON CONFLICT.
+ * target(s).  Second, show information about ON CONFLICT.
  */
 static void
 show_modifytable_info(ModifyTableState *mtstate, List *ancestors,

@@ -34,16 +34,6 @@ select pg_visibility_map_summary('test_view');
 select pg_check_frozen('test_view');
 select pg_truncate_visibility_map('test_view');
 
-create foreign data wrapper dummy;
-create server dummy_server foreign data wrapper dummy;
-create foreign table test_foreign_table () server dummy_server;
--- foreign tables do not have VMs, so these all fail
-select pg_visibility('test_foreign_table', 0);
-select pg_visibility_map('test_foreign_table');
-select pg_visibility_map_summary('test_foreign_table');
-select pg_check_frozen('test_foreign_table');
-select pg_truncate_visibility_map('test_foreign_table');
-
 -- check some of the allowed relkinds
 create table regular_table (a int, b text);
 alter table regular_table alter column b set storage external;
@@ -67,12 +57,9 @@ select count(*) > 0 from pg_visibility('matview_visibility_test');
 -- SQL COPY 命令已在 minipg 中裁剪（见 mydoc/CHANGE.md），
 -- 原"test copy freeze"段专门验证 COPY FREEZE 对可见性映射/冻结页的影响，
 -- 其测试对象 COPY FREEZE 已不存在，故整段删除；仅保留下方 cleanup 中
--- 对其它对象的可见性验证（表/视图/序列/外表/物化视图）。
+-- 对其它对象的可见性验证（表/视图/物化视图）。
 
 -- cleanup
 drop view test_view;
-drop foreign table test_foreign_table;
-drop server dummy_server;
-drop foreign data wrapper dummy;
 drop materialized view matview_visibility_test;
 drop table regular_table;

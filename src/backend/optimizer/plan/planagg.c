@@ -201,8 +201,7 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 	 * Note: grouping_planner won't have created this upperrel yet, but it's
 	 * fine for us to create it first.  We will not have inserted the correct
 	 * consider_parallel value in it, but MinMaxAggPath paths are currently
-	 * never parallel-safe anyway, so that doesn't matter.  Likewise, it
-	 * doesn't matter that we haven't filled FDW-related fields in the rel.
+	 * never parallel-safe anyway, so that doesn't matter.
 	 * Also, because there are no rowmarks, we know that the processed_tlist
 	 * doesn't need to change anymore, so making the pathtarget now is safe.
 	 */

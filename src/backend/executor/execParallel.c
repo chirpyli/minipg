@@ -187,8 +187,7 @@ ExecSerializePlan(Plan *plan, EState *estate)
 	 * Transfer only parallel-safe subplans, leaving a NULL "hole" in the list
 	 * for unsafe ones (so that the list indexes of the safe ones are
 	 * preserved).  This positively ensures that the worker won't try to run,
-	 * or even do ExecInitNode on, an unsafe subplan.  That's important to
-	 * protect, eg, non-parallel-aware FDWs from getting into trouble.
+	 * or even do ExecInitNode on, an unsafe subplan.
 	 */
 	pstmt->subplans = NIL;
 	foreach(lc, estate->es_plannedstmt->subplans)

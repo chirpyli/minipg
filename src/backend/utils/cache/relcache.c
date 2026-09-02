@@ -5196,7 +5196,7 @@ load_relcache_init_file(bool shared)
 		 * RelationCacheInitializePhase3.  This is not expected to be a big
 		 * performance hit since few system catalogs have such. Ditto for RLS
 		 * policy data, partition info, index expressions, predicates,
-		 * exclusion info, and FDW info.
+		 * exclusion info.
 		 */
 		rel->rd_rules = NULL;
 		rel->rd_rulescxt = NULL;

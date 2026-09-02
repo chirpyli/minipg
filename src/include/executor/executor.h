@@ -526,8 +526,6 @@ extern void ExecCreateScanSlotFromOuterPlan(EState *estate,
 											ScanState *scanstate,
 											const TupleTableSlotOps *tts_ops);
 
-extern bool ExecRelationIsTargetRelation(EState *estate, Index scanrelid);
-
 extern Relation ExecOpenScanRelation(EState *estate, Index scanrelid, int eflags);
 
 extern void ExecInitRangeTable(EState *estate, List *rangeTable);

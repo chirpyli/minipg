@@ -21,7 +21,6 @@ AclMode
 AcquireSampleRowsFunc
 ActionList
 ActiveSnapshotElt
-AddForeignUpdateTargets_function
 AffixNode
 AffixNodeData
 AfterTriggerEvent
@@ -60,8 +59,6 @@ AllocSetFreeList
 AllocateDesc
 AllocateDescKind
 AlterEventTrigStmt
-AlterFdwStmt
-AlterForeignServerStmt
 AlterObjectSchemaStmt
 AlterPolicyStmt
 AlterRoleSetStmt
@@ -83,7 +80,6 @@ AlternativeSubPlan
 AmcheckOptions
 AnalyzeAttrComputeStatsFunc
 AnalyzeAttrFetchFunc
-AnalyzeForeignTable_function
 AnlExprData
 AnlIndexData
 AnyArrayType
@@ -199,9 +195,6 @@ BackgroundWorkerHandle
 BackgroundWorkerSlot
 Barrier
 BeginDirectModify_function
-BeginForeignInsert_function
-BeginForeignModify_function
-BeginForeignScan_function
 BeginSampleScan_function
 BernoulliSamplerData
 BgWorkerStartTime
@@ -409,9 +402,6 @@ CoverExt
 CoverPos
 CreateEventTrigStmt
 CreateExtensionStmt
-CreateFdwStmt
-CreateForeignServerStmt
-CreateForeignTableStmt
 CreateFunctionStmt
 CreatePolicyStmt
 CreateRoleStmt
@@ -524,9 +514,6 @@ EndBlobPtrType
 EndBlobsPtrType
 EndDataPtrType
 EndDirectModify_function
-EndForeignInsert_function
-EndForeignModify_function
-EndForeignScan_function
 EndSampleScan_function
 EnumItem
 EolType
@@ -539,7 +526,6 @@ EquivalenceClass
 EquivalenceMember
 ErrorContextCallback
 ErrorData
-EstimateDSMForeignScan_function
 EstimationInfo
 ExceptionLabelMap
 ExceptionMap
@@ -547,11 +533,6 @@ ExclusiveBackupState
 ExecAuxRowMark
 ExecEvalBoolSubroutine
 ExecEvalSubroutine
-ExecForeignBatchInsert_function
-ExecForeignDelete_function
-ExecForeignInsert_function
-ExecForeignTruncate_function
-ExecForeignUpdate_function
 ExecParallelEstimateContext
 ExecParallelInitializeDSMContext
 ExecPhraseData
@@ -568,8 +549,6 @@ ExpandedRange
 ExpandedRecordFieldInfo
 ExpandedRecordHeader
 ExplainDirectModify_function
-ExplainForeignModify_function
-ExplainForeignScan_function
 ExplainFormat
 ExplainOneQuery_hook_type
 ExplainState
@@ -595,7 +574,6 @@ ExtensionInfo
 ExtensionMemberId
 ExtensionSiblingCache
 ExtensionVersionInfo
-FDWCollateState
 FD_SET
 FILE
 FILETIME
@@ -607,13 +585,9 @@ FSMPageData
 FakeRelCacheEntry
 FakeRelCacheEntryData
 FastPathStrongRelationLockData
-FdwInfo
-FdwRoutine
 FieldSelect
 FieldStore
 File
-FileFdwExecutionState
-FileFdwPlanState
 FileNameMap
 FileTag
 FinalPathExtraData
@@ -634,19 +608,8 @@ ForEachState
 ForFiveState
 ForFourState
 ForThreeState
-ForeignAsyncConfigureWait_function
-ForeignAsyncNotify_function
-ForeignAsyncRequest_function
-ForeignDataWrapper
 ForeignKeyCacheInfo
 ForeignKeyOptInfo
-ForeignPath
-ForeignScan
-ForeignScanState
-ForeignServer
-ForeignServerInfo
-ForeignTable
-ForeignTruncateInfo
 ForkNumber
 FormData_pg_aggregate
 FormData_pg_am
@@ -665,9 +628,6 @@ FormData_pg_database
 FormData_pg_depend
 FormData_pg_event_trigger
 FormData_pg_extension
-FormData_pg_foreign_data_wrapper
-FormData_pg_foreign_server
-FormData_pg_foreign_table
 FormData_pg_index
 FormData_pg_language
 FormData_pg_namespace
@@ -707,9 +667,6 @@ Form_pg_database
 Form_pg_depend
 Form_pg_event_trigger
 Form_pg_extension
-Form_pg_foreign_data_wrapper
-Form_pg_foreign_server
-Form_pg_foreign_table
 Form_pg_index
 Form_pg_language
 Form_pg_namespace
@@ -800,13 +757,6 @@ GenerationContext
 GenerationPointer
 GenericCosts
 GenericXLogState
-GetForeignJoinPaths_function
-GetForeignModifyBatchSize_function
-GetForeignPaths_function
-GetForeignPlan_function
-GetForeignRelSize_function
-GetForeignRowMarkType_function
-GetForeignUpperPaths_function
 GetState
 GiSTOptions
 GinBtree
@@ -959,9 +909,6 @@ IV
 IdentLine
 IdentifierLookup
 IfStackElem
-ImportForeignSchemaStmt
-ImportForeignSchemaType
-ImportForeignSchema_function
 ImportQual
 InProgressEnt
 IncludeWal
@@ -1014,8 +961,6 @@ InfoItem
 InhInfo
 InheritableSocket
 InitSampleScan_function
-InitializeDSMForeignScan_function
-InitializeWorkerForeignScan_function
 InsertStmt
 Instrumentation
 Int128AggState
@@ -1030,9 +975,6 @@ IpcMemoryKey
 IpcMemoryState
 IpcSemaphoreId
 IpcSemaphoreKey
-IsForeignPathAsyncCapable_function
-IsForeignRelUpdatable_function
-IsForeignScanParallelSafe_function
 IsoConnInfo
 IspellDict
 Item
@@ -1041,7 +983,6 @@ ItemIdData
 ItemPointer
 ItemPointerData
 IterateDirectModify_function
-IterateForeignScan_function
 IterateJsonStringValuesState
 JEntry
 JHashState
@@ -1739,14 +1680,6 @@ PgBenchFunction
 PgBenchValue
 PgBenchValueType
 PgChecksumMode
-PgFdwAnalyzeState
-PgFdwConnState
-PgFdwDirectModifyState
-PgFdwModifyState
-PgFdwOption
-PgFdwPathExtraData
-PgFdwRelationInfo
-PgFdwScanState
 PgIfAddrCallback
 PgStat_ArchiverStats
 PgStat_BackendFunctionEntry
@@ -1806,7 +1739,6 @@ PlaceHolderInfo
 PlaceHolderVar
 Plan
 PlanDirectModify_function
-PlanForeignModify_function
 PlanInvalItem
 PlanRowMark
 PlanState
@@ -1950,15 +1882,12 @@ Ranges
 RawColumnDefault
 RawParseMode
 RawStmt
-ReInitializeDSMForeignScan_function
-ReScanForeignScan_function
 ReadBufPtrType
 ReadBufferMode
 ReadBytePtrType
 ReadExtraTocPtrType
 ReadFunc
 ReassignOwnedStmt
-RecheckForeignScan_function
 RecordCacheArrayEntry
 RecordCacheEntry
 RecordCompareData
@@ -1973,7 +1902,6 @@ RecursionContext
 RecursiveUnion
 RecursiveUnionPath
 RecursiveUnionState
-RefetchForeignRow_function
 RegProcedure
 Regis
 RegisNode
@@ -2037,7 +1965,6 @@ ReorderBufferTupleCidEnt
 ReorderBufferTupleCidKey
 ReorderTuple
 RepOriginId
-ReparameterizeForeignPathByChild_function
 ReplaceVarsFromTargetList_context
 ReplaceVarsNoMatchOption
 ReplicationState
@@ -2211,7 +2138,6 @@ ShellTypeInfo
 ShippableCacheEntry
 ShippableCacheKey
 ShmemIndexEnt
-ShutdownForeignScan_function
 ShutdownInformation
 ShutdownMode
 SignTSVector
@@ -2884,7 +2810,6 @@ eLogType
 ean13
 eary
 ec_matches_callback_type
-ec_member_foreign_arg
 ec_member_matches_arg
 emit_log_hook_type
 eval_const_expressions_context
@@ -2922,8 +2847,6 @@ fmExprContextCallbackFunction
 fmNodePtr
 fmStringInfo
 fmgr_hook_type
-foreign_glob_cxt
-foreign_loc_cxt
 freeaddrinfo_ptr_t
 freefunc
 fsec_t

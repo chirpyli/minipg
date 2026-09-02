@@ -629,7 +629,7 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attisdropped = false;
 	att->attislocal = true;
 	att->attinhcount = 0;
-	/* attacl, attoptions and attfdwoptions are not present in tupledescs */
+	/* attoptions is not present in tupledescs */
 
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(oidtypeid));
 	if (!HeapTupleIsValid(tuple))
@@ -690,7 +690,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 	att->attisdropped = false;
 	att->attislocal = true;
 	att->attinhcount = 0;
-	/* attacl, attoptions and attfdwoptions are not present in tupledescs */
+	/* attoptions is not present in tupledescs */
 
 	att->atttypid = oidtypeid;
 

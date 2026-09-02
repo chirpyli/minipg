@@ -1895,13 +1895,12 @@ inject_projection_plan(Plan *subplan, List *tlist, bool parallel_safe)
  * change_plan_targetlist
  *	  Externally available wrapper for inject_projection_plan.
  *
- * This is meant for use by FDW plan-generation functions, which might
- * want to adjust the tlist computed by some subplan tree.  In general,
- * a Result node is needed to compute the new tlist, but we can optimize
- * some cases.
+ * This is used when we need to adjust the tlist computed by some subplan
+ * tree.  In general, a Result node is needed to compute the new tlist, but
+ * we can optimize some cases.
  *
  * In most cases, tlist_parallel_safe can just be passed as the parallel_safe
- * flag of the FDW's own Path node.
+ * flag of the Path node the subplan was created from.
  */
 Plan *
 change_plan_targetlist(Plan *subplan, List *tlist, bool tlist_parallel_safe)

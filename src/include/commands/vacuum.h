@@ -287,9 +287,4 @@ extern void analyze_rel(Oid relid, RangeVar *relation,
 						BufferAccessStrategy bstrategy);
 extern bool std_typanalyze(VacAttrStats *stats);
 
-/* in utils/misc/sampling.c --- duplicate of declarations in utils/sampling.h */
-extern double anl_random_fract(void);
-extern double anl_init_selection_state(int n);
-extern double anl_get_next_S(double t, int n, double *stateptr);
-
 #endif							/* VACUUM_H */

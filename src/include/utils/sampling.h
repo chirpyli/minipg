@@ -55,11 +55,4 @@ typedef ReservoirStateData *ReservoirState;
 extern void reservoir_init_selection_state(ReservoirState rs, int n);
 extern double reservoir_get_next_S(ReservoirState rs, double t, int n);
 
-/* Old API, still in use by assorted FDWs */
-/* For backwards compatibility, these declarations are duplicated in vacuum.h */
-
-extern double anl_random_fract(void);
-extern double anl_init_selection_state(int n);
-extern double anl_get_next_S(double t, int n, double *stateptr);
-
 #endif							/* SAMPLING_H */
