@@ -255,63 +255,6 @@ check_timezone(char **newval, void **extra, GucSource source)
 	char	   *endptr;
 	double		hours;
 
-	if (pg_strncasecmp(*newval, "interval", 8) == 0)
-	{
-		/*
-		 * Support INTERVAL 'foo'.  This is for SQL spec compliance, not
-		 * because it has any actual real-world usefulness.
-		 */
-		const char *valueptr = *newval;
-		char	   *val;
-		Interval   *interval;
-
-		valueptr += 8;
-		while (isspace((unsigned char) *valueptr))
-			valueptr++;
-		if (*valueptr++ != '\'')
-			return false;
-		val = pstrdup(valueptr);
-		/* Check and remove trailing quote */
-		endptr = strchr(val, '\'');
-		if (!endptr || endptr[1] != '\0')
-		{
-			pfree(val);
-			return false;
-		}
-		*endptr = '\0';
-
-		/*
-		 * Try to parse it.  XXX an invalid interval format will result in
-		 * ereport(ERROR), which is not desirable for GUC.  We did what we
-		 * could to guard against this in flatten_set_variable_args, but a
-		 * string coming in from postgresql.conf might contain anything.
-		 */
-		interval = DatumGetIntervalP(DirectFunctionCall3(interval_in,
-														 CStringGetDatum(val),
-														 ObjectIdGetDatum(InvalidOid),
-														 Int32GetDatum(-1)));
-
-		pfree(val);
-		if (interval->month != 0)
-		{
-			GUC_check_errdetail("Cannot specify months in time zone interval.");
-			pfree(interval);
-			return false;
-		}
-		if (interval->day != 0)
-		{
-			GUC_check_errdetail("Cannot specify days in time zone interval.");
-			pfree(interval);
-			return false;
-		}
-
-		/* Here we change from SQL to Unix sign convention */
-		gmtoffset = -(interval->time / USECS_PER_SEC);
-		new_tz = pg_tzset_offset(gmtoffset);
-
-		pfree(interval);
-	}
-	else
 	{
 		/*
 		 * Try it as a numeric number of hours (possibly fractional).

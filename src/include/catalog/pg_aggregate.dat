@@ -1,15 +1,10 @@
+[
 { aggfnoid => 'avg(float4)', aggtransfn => 'float4_accum',
   aggfinalfn => 'float8_avg', aggcombinefn => 'float8_combine',
   aggtranstype => '_float8', agginitval => '{0,0,0}' },
 { aggfnoid => 'avg(float8)', aggtransfn => 'float8_accum',
   aggfinalfn => 'float8_avg', aggcombinefn => 'float8_combine',
   aggtranstype => '_float8', agginitval => '{0,0,0}' },
-{ aggfnoid => 'avg(interval)', aggtransfn => 'interval_accum',
-  aggfinalfn => 'interval_avg', aggcombinefn => 'interval_combine',
-  aggmtransfn => 'interval_accum', aggminvtransfn => 'interval_accum_inv',
-  aggmfinalfn => 'interval_avg', aggtranstype => '_interval',
-  aggmtranstype => '_interval', agginitval => '{0 second,0 second}',
-  aggminitval => '{0 second,0 second}' },
 { aggfnoid => 'sum(int4)', aggtransfn => 'int4_sum', aggcombinefn => 'int8pl',
   aggmtransfn => 'int4_avg_accum', aggminvtransfn => 'int4_avg_accum_inv',
   aggmfinalfn => 'int2int4_sum', aggtranstype => 'int8',
@@ -22,12 +17,6 @@
   aggcombinefn => 'float4pl', aggtranstype => 'float4' },
 { aggfnoid => 'sum(float8)', aggtransfn => 'float8pl',
   aggcombinefn => 'float8pl', aggtranstype => 'float8' },
-{ aggfnoid => 'sum(interval)', aggtransfn => 'interval_pl',
-  aggcombinefn => 'interval_pl', aggmtransfn => 'interval_pl',
-  aggminvtransfn => 'interval_mi', aggtranstype => 'interval',
-  aggmtranstype => 'interval' },
-
-# max
 { aggfnoid => 'max(int8)', aggtransfn => 'int8larger',
   aggcombinefn => 'int8larger', aggsortop => '>(int8,int8)',
   aggtranstype => 'int8' },
@@ -58,9 +47,6 @@
 { aggfnoid => 'max(timestamptz)', aggtransfn => 'timestamptz_larger',
   aggcombinefn => 'timestamptz_larger',
   aggsortop => '>(timestamptz,timestamptz)', aggtranstype => 'timestamptz' },
-{ aggfnoid => 'max(interval)', aggtransfn => 'interval_larger',
-  aggcombinefn => 'interval_larger', aggsortop => '>(interval,interval)',
-  aggtranstype => 'interval' },
 { aggfnoid => 'max(text)', aggtransfn => 'text_larger',
   aggcombinefn => 'text_larger', aggsortop => '>(text,text)',
   aggtranstype => 'text' },
@@ -76,8 +62,6 @@
 { aggfnoid => 'max(pg_lsn)', aggtransfn => 'pg_lsn_larger',
   aggcombinefn => 'pg_lsn_larger', aggsortop => '>(pg_lsn,pg_lsn)',
   aggtranstype => 'pg_lsn' },
-
-# min
 { aggfnoid => 'min(int8)', aggtransfn => 'int8smaller',
   aggcombinefn => 'int8smaller', aggsortop => '<(int8,int8)',
   aggtranstype => 'int8' },
@@ -108,9 +92,6 @@
 { aggfnoid => 'min(timestamptz)', aggtransfn => 'timestamptz_smaller',
   aggcombinefn => 'timestamptz_smaller',
   aggsortop => '<(timestamptz,timestamptz)', aggtranstype => 'timestamptz' },
-{ aggfnoid => 'min(interval)', aggtransfn => 'interval_smaller',
-  aggcombinefn => 'interval_smaller', aggsortop => '<(interval,interval)',
-  aggtranstype => 'interval' },
 { aggfnoid => 'min(text)', aggtransfn => 'text_smaller',
   aggcombinefn => 'text_smaller', aggsortop => '<(text,text)',
   aggtranstype => 'text' },
@@ -123,13 +104,9 @@
 { aggfnoid => 'min(tid)', aggtransfn => 'tidsmaller',
   aggcombinefn => 'tidsmaller', aggsortop => '<(tid,tid)',
   aggtranstype => 'tid' },
-
-# min
 { aggfnoid => 'min(pg_lsn)', aggtransfn => 'pg_lsn_smaller',
   aggcombinefn => 'pg_lsn_smaller', aggsortop => '<(pg_lsn,pg_lsn)',
   aggtranstype => 'pg_lsn' },
-
-# count
 { aggfnoid => 'count(any)', aggtransfn => 'int8inc_any',
   aggcombinefn => 'int8pl', aggmtransfn => 'int8inc_any',
   aggminvtransfn => 'int8dec_any', aggtranstype => 'int8',
@@ -173,25 +150,17 @@
 { aggfnoid => 'stddev(float8)', aggtransfn => 'float8_accum',
   aggfinalfn => 'float8_stddev_samp', aggcombinefn => 'float8_combine',
   aggtranstype => '_float8', agginitval => '{0,0,0}' },
-
-# array
 { aggfnoid => 'array_agg(anynonarray)', aggtransfn => 'array_agg_transfn',
   aggfinalfn => 'array_agg_finalfn', aggfinalextra => 't',
   aggtranstype => 'internal' },
 { aggfnoid => 'array_agg(anyarray)', aggtransfn => 'array_agg_array_transfn',
   aggfinalfn => 'array_agg_array_finalfn', aggfinalextra => 't',
   aggtranstype => 'internal' },
-
-# text
 { aggfnoid => 'string_agg(text,text)', aggtransfn => 'string_agg_transfn',
   aggfinalfn => 'string_agg_finalfn', aggtranstype => 'internal' },
-
-# bytea
 { aggfnoid => 'string_agg(bytea,bytea)',
   aggtransfn => 'bytea_string_agg_transfn',
   aggfinalfn => 'bytea_string_agg_finalfn', aggtranstype => 'internal' },
-
-# hypothetical-set aggregates
 { aggfnoid => 'rank(any)', aggkind => 'h', aggnumdirectargs => '1',
   aggtransfn => 'ordered_set_transition_multi', aggfinalfn => 'rank_final',
   aggfinalextra => 't', aggfinalmodify => 'w', aggmfinalmodify => 'w',
@@ -208,7 +177,6 @@
   aggtransfn => 'ordered_set_transition_multi',
   aggfinalfn => 'dense_rank_final', aggfinalextra => 't', aggfinalmodify => 'w',
   aggmfinalmodify => 'w', aggtranstype => 'internal' },
-
 { aggfnoid => 'avg(int8)', aggtransfn => 'int8_avg_accum',
   aggfinalfn => 'int8_avg', aggcombinefn => 'int4_avg_combine',
   aggmtransfn => 'int8_avg_accum', aggminvtransfn => 'int8_avg_accum_inv',
@@ -223,5 +191,5 @@
   aggfinalfn => 'int8_avg', aggcombinefn => 'int4_avg_combine',
   aggmtransfn => 'int2_avg_accum', aggminvtransfn => 'int2_avg_accum_inv',
   aggmfinalfn => 'int8_avg', aggtranstype => '_int8',
-  aggmtranstype => '_int8', agginitval => '{0,0,0}', aggminitval => '{0,0,0}' },
+  aggmtranstype => '_int8', agginitval => '{0,0,0}', aggminitval => '{0,0,0}' }
 ]

@@ -42,18 +42,6 @@ LANGUAGE sql
 IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN octet_length($1) * 8;
 
-CREATE OR REPLACE FUNCTION age(timestamptz)
- RETURNS interval
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT COST 1
-RETURN age(cast(current_date as timestamptz), $1);
-
-CREATE OR REPLACE FUNCTION age(timestamp)
- RETURNS interval
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT COST 1
-RETURN age(cast(current_date as timestamp), $1);
-
 CREATE OR REPLACE FUNCTION date_part(text, date)
  RETURNS double precision
  LANGUAGE sql
@@ -72,98 +60,11 @@ CREATE OR REPLACE FUNCTION timedate_pl(time, date)
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN $2 + $1;
 
-CREATE OR REPLACE FUNCTION interval_pl_time(interval, time)
- RETURNS time
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
-CREATE OR REPLACE FUNCTION interval_pl_date(interval, date)
- RETURNS timestamp
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
-CREATE OR REPLACE FUNCTION interval_pl_timestamp(interval, timestamp)
- RETURNS timestamp
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
-CREATE OR REPLACE FUNCTION interval_pl_timestamptz(interval, timestamptz)
- RETURNS timestamptz
- LANGUAGE sql
- STABLE PARALLEL SAFE STRICT COST 1
-RETURN $2 + $1;
-
 CREATE OR REPLACE FUNCTION integer_pl_date(integer, date)
  RETURNS date
  LANGUAGE sql
  IMMUTABLE PARALLEL SAFE STRICT COST 1
 RETURN $2 + $1;
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, timestamptz,
-  timestamptz, interval)
- RETURNS boolean
- LANGUAGE sql
- STABLE PARALLEL SAFE COST 1
-RETURN ($1, $2) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
-  timestamptz, interval)
- RETURNS boolean
- LANGUAGE sql
- STABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
-  timestamptz, timestamptz)
- RETURNS boolean
- LANGUAGE sql
- STABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, $4);
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamp, timestamp,
-  timestamp, interval)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, $2) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
-  timestamp, timestamp)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, $4);
-
-CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
-  timestamp, interval)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
-  time, interval)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(time, time,
-  time, interval)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, $2) overlaps ($3, ($3 + $4));
-
-CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
-  time, time)
- RETURNS boolean
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE COST 1
-RETURN ($1, ($1 + $2)) overlaps ($3, $4);
 
 
 CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
@@ -193,17 +94,6 @@ CREATE OR REPLACE FUNCTION
   pg_terminate_backend(pid integer, timeout int8 DEFAULT 0)
   RETURNS boolean STRICT VOLATILE LANGUAGE INTERNAL AS 'pg_terminate_backend'
   PARALLEL SAFE;
-
-
-
-CREATE OR REPLACE FUNCTION
-  make_interval(years int4 DEFAULT 0, months int4 DEFAULT 0, weeks int4 DEFAULT 0,
-                days int4 DEFAULT 0, hours int4 DEFAULT 0, mins int4 DEFAULT 0,
-                secs double precision DEFAULT 0.0)
-RETURNS interval
-LANGUAGE INTERNAL
-STRICT IMMUTABLE PARALLEL SAFE
-AS 'make_interval';
 
 
 

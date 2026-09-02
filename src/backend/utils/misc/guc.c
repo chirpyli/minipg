@@ -7204,27 +7204,16 @@ flatten_set_variable_args(const char *name, List *args)
 	initStringInfo(&buf);
 
 	/*
-	 * Each list member may be a plain A_Const node, or an A_Const within a
-	 * TypeCast; the latter case is supported only for ConstInterval arguments
-	 * (for SET TIME ZONE).
+	 * Each list member is a plain A_Const node.
 	 */
 	foreach(l, args)
 	{
 		Node	   *arg = (Node *) lfirst(l);
 		char	   *val;
-		TypeName   *typeName = NULL;
 		A_Const    *con;
 
 		if (l != list_head(args))
 			appendStringInfoString(&buf, ", ");
-
-		if (IsA(arg, TypeCast))
-		{
-			TypeCast   *tc = (TypeCast *) arg;
-
-			arg = tc->arg;
-			typeName = tc->typeName;
-		}
 
 		if (!IsA(arg, A_Const))
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(arg));
@@ -7241,48 +7230,19 @@ flatten_set_variable_args(const char *name, List *args)
 				break;
 			case T_String:
 				val = strVal(&con->val);
-				if (typeName != NULL)
-				{
-					/*
-					 * Must be a ConstInterval argument for TIME ZONE. Coerce
-					 * to interval and back to normalize the value and account
-					 * for any typmod.
-					 */
-					Oid			typoid;
-					int32		typmod;
-					Datum		interval;
-					char	   *intervalout;
-
-					typenameTypeIdAndMod(NULL, typeName, &typoid, &typmod);
-					Assert(typoid == INTERVALOID);
-
-					interval =
-						DirectFunctionCall3(interval_in,
-											CStringGetDatum(val),
-											ObjectIdGetDatum(InvalidOid),
-											Int32GetDatum(typmod));
-
-					intervalout =
-						DatumGetCString(DirectFunctionCall1(interval_out,
-															interval));
-					appendStringInfo(&buf, "INTERVAL '%s'", intervalout);
-				}
+				/*
+				 * Plain string literal or identifier.  For quote mode,
+				 * quote it if it's not a vanilla identifier.
+				 */
+				if (flags & GUC_LIST_QUOTE)
+					appendStringInfoString(&buf, quote_identifier(val));
 				else
-				{
-					/*
-					 * Plain string literal or identifier.  For quote mode,
-					 * quote it if it's not a vanilla identifier.
-					 */
-					if (flags & GUC_LIST_QUOTE)
-						appendStringInfoString(&buf, quote_identifier(val));
-					else
-						appendStringInfoString(&buf, val);
-				}
-				break;
-			default:
-				elog(ERROR, "unrecognized node type: %d",
-					 (int) nodeTag(&con->val));
-				break;
+					appendStringInfoString(&buf, val);
+			break;
+		default:
+			elog(ERROR, "unrecognized node type: %d",
+				 (int) nodeTag(&con->val));
+			break;
 		}
 	}
 

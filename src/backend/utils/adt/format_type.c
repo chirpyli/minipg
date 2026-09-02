@@ -227,13 +227,6 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 
 
 
-		case INTERVALOID:
-			if (with_typemod)
-				buf = printTypmod("interval", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("interval");
-			break;
-
 		case TIMEOID:
 			if (with_typemod)
 				buf = printTypmod("time", typemod, typeform->typmodout);

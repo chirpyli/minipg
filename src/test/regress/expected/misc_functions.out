@@ -196,8 +196,7 @@ select * from (select pg_ls_dir('.') a) a where a = 'base' limit 1;
 (1 row)
 
 select * from (select (pg_timezone_names()).name) ptn where name='UTC' limit 1;
- name 
-------
- UTC
-(1 row)
-
+ERROR:  function pg_timezone_names() does not exist
+LINE 1: select * from (select (pg_timezone_names()).name) ptn where ...
+                               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.

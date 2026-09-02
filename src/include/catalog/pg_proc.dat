@@ -1,44 +1,4 @@
-#----------------------------------------------------------------------
-#
-# pg_proc.dat
-#    Initial contents of the pg_proc system catalog.
-#
-# Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
-# Portions Copyright (c) 1994, Regents of the University of California
-#
-# src/include/catalog/pg_proc.dat
-#
-#----------------------------------------------------------------------
-
 [
-
-# Note: every entry in pg_proc.dat is expected to have a 'descr' comment,
-# except for functions that implement pg_operator.dat operators and don't
-# have a good reason to be called directly rather than via the operator.
-# (If you do expect such a function to be used directly, you should
-# duplicate the operator's comment.)  initdb will supply suitable default
-# comments for functions referenced by pg_operator.
-
-# Try to follow the style of existing functions' comments.
-# Some recommended conventions:
-#
-# "I/O" for typinput, typoutput, typreceive, typsend functions
-# "I/O typmod" for typmodin, typmodout functions
-# "aggregate transition function" for aggtransfn functions, unless
-# they are reasonably useful in their own right
-# "aggregate final function" for aggfinalfn functions (likewise)
-# "convert srctypename to desttypename" for cast functions
-# "less-equal-greater" for B-tree comparison functions
-
-# Note: pronargs is computed when this file is read, so it does not need
-# to be specified in entries here.  See AddDefaultValues() in Catalog.pm.
-
-# Once upon a time these entries were ordered by OID.  Lately it's often
-# been the custom to insert new entries adjacent to related older entries.
-# Try to do one or the other though, don't just insert entries at random.
-
-# OIDS 1 - 99
-
 { oid => '1242', descr => 'I/O',
   proname => 'boolin', prorettype => 'bool', proargtypes => 'cstring',
   prosrc => 'boolin' },
@@ -223,25 +183,18 @@
 { oid => '78', descr => 'convert int4 to char',
   proname => 'char', prorettype => 'char', proargtypes => 'int4',
   prosrc => 'i4tochar' },
-
-
 { oid => '1257', descr => 'length',
   proname => 'textlen', prorettype => 'int4', proargtypes => 'text',
   prosrc => 'textlen' },
 { oid => '1258',
   proname => 'textcat', prorettype => 'text', proargtypes => 'text text',
   prosrc => 'textcat' },
-
 { oid => '84',
   proname => 'boolne', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'bool bool', prosrc => 'boolne' },
 { oid => '89', descr => 'PostgreSQL version string',
   proname => 'version', provolatile => 's', prorettype => 'text',
   proargtypes => '', prosrc => 'pgsql_version' },
-
-
-# OIDS 100 - 199
-
 { oid => '101', descr => 'restriction selectivity of = and related operators',
   proname => 'eqsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int4', prosrc => 'eqsel' },
@@ -274,7 +227,6 @@
   proname => 'scalargtjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'scalargtjoinsel' },
-
 { oid => '336',
   descr => 'restriction selectivity of <= and related operators on scalar datatypes',
   proname => 'scalarlesel', provolatile => 's', prorettype => 'float8',
@@ -293,41 +245,12 @@
   proname => 'scalargejoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'scalargejoinsel' },
-
 { oid => '109', descr => 'I/O',
   proname => 'unknownin', prorettype => 'unknown', proargtypes => 'cstring',
   prosrc => 'unknownin' },
 { oid => '110', descr => 'I/O',
   proname => 'unknownout', prorettype => 'cstring', proargtypes => 'unknown',
   prosrc => 'unknownout' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '141',
   proname => 'int4mul', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4mul' },
@@ -451,15 +374,6 @@
 { oid => '185',
   proname => 'oidne', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oid oid', prosrc => 'oidne' },
-
-
-
-
-
-
-
-
-
 { oid => '195', descr => 'I/O',
   proname => 'pg_node_tree_in', prorettype => 'pg_node_tree',
   proargtypes => 'cstring', prosrc => 'pg_node_tree_in' },
@@ -473,9 +387,6 @@
 { oid => '198', descr => 'I/O',
   proname => 'pg_node_tree_send', provolatile => 's', prorettype => 'bytea',
   proargtypes => 'pg_node_tree', prosrc => 'pg_node_tree_send' },
-
-# OIDS 200 - 299
-
 { oid => '200', descr => 'I/O',
   proname => 'float4in', prorettype => 'float4', proargtypes => 'cstring',
   prosrc => 'float4in' },
@@ -509,14 +420,12 @@
 { oid => '211', descr => 'smaller of two',
   proname => 'float4smaller', prorettype => 'float4',
   proargtypes => 'float4 float4', prosrc => 'float4smaller' },
-
 { oid => '212',
   proname => 'int4um', prorettype => 'int4', proargtypes => 'int4',
   prosrc => 'int4um' },
 { oid => '213',
   proname => 'int2um', prorettype => 'int2', proargtypes => 'int2',
   prosrc => 'int2um' },
-
 { oid => '214', descr => 'I/O',
   proname => 'float8in', prorettype => 'float8', proargtypes => 'cstring',
   prosrc => 'float8in' },
@@ -553,11 +462,6 @@
 { oid => '224', descr => 'smaller of two',
   proname => 'float8smaller', prorettype => 'float8',
   proargtypes => 'float8 float8', prosrc => 'float8smaller' },
-
-
-
-
-
 { oid => '228', descr => 'round to nearest integer',
   proname => 'dround', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dround' },
@@ -603,8 +507,6 @@
 { oid => '238', descr => 'convert float4 to int2',
   proname => 'int2', prorettype => 'int2', proargtypes => 'float4',
   prosrc => 'ftoi2' },
-
-
 { oid => '240',
   proname => 'nameeqtext', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'name text', prosrc => 'nameeqtext' },
@@ -647,19 +549,13 @@
 { oid => '253', descr => 'less-equal-greater',
   proname => 'bttextnamecmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'text name', prosrc => 'bttextnamecmp' },
-
 { oid => '266', descr => 'concatenate name and oid',
   proname => 'nameconcatoid', prorettype => 'name', proargtypes => 'name oid',
   prosrc => 'nameconcatoid' },
-
 { oid => '274',
   descr => 'current date and time - increments during transactions',
   proname => 'timeofday', provolatile => 'v', prorettype => 'text',
   proargtypes => '', prosrc => 'timeofday' },
-
-
-
-
 { oid => '279',
   proname => 'float48mul', prorettype => 'float8',
   proargtypes => 'float4 float8', prosrc => 'float48mul' },
@@ -684,7 +580,6 @@
 { oid => '286',
   proname => 'float84mi', prorettype => 'float8',
   proargtypes => 'float8 float4', prosrc => 'float84mi' },
-
 { oid => '287',
   proname => 'float4eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float4 float4', prosrc => 'float4eq' },
@@ -703,7 +598,6 @@
 { oid => '292',
   proname => 'float4ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float4 float4', prosrc => 'float4ge' },
-
 { oid => '293',
   proname => 'float8eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float8 float8', prosrc => 'float8eq' },
@@ -722,13 +616,9 @@
 { oid => '298',
   proname => 'float8ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float8 float8', prosrc => 'float8ge' },
-
 { oid => '299',
   proname => 'float48eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float4 float8', prosrc => 'float48eq' },
-
-# OIDS 300 - 399
-
 { oid => '300',
   proname => 'float48ne', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'float4 float8', prosrc => 'float48ne' },
@@ -765,7 +655,6 @@
 { oid => '320', descr => 'bucket number of operand in equal-width histogram',
   proname => 'width_bucket', prorettype => 'int4',
   proargtypes => 'float8 float8 float8 int4', prosrc => 'width_bucket_float8' },
-
 { oid => '311', descr => 'convert float4 to float8',
   proname => 'float8', proleakproof => 't', prorettype => 'float8',
   proargtypes => 'float4', prosrc => 'ftod' },
@@ -790,14 +679,10 @@
 { oid => '319', descr => 'convert float4 to int4',
   proname => 'int4', prorettype => 'int4', proargtypes => 'float4',
   prosrc => 'ftoi4' },
-
-# Table access method handlers
 { oid => '3', descr => 'row-oriented heap table access method handler',
   proname => 'heap_tableam_handler', provolatile => 'v',
   prorettype => 'table_am_handler', proargtypes => 'internal',
   prosrc => 'heap_tableam_handler' },
-
-# Index access method handlers
 { oid => '330', descr => 'btree index access method handler',
   proname => 'bthandler', provolatile => 'v', prorettype => 'index_am_handler',
   proargtypes => 'internal', prosrc => 'bthandler' },
@@ -805,12 +690,9 @@
   proname => 'hashhandler', provolatile => 'v',
   prorettype => 'index_am_handler', proargtypes => 'internal',
   prosrc => 'hashhandler' },
-
-
 { oid => '338', descr => 'validate an operator class',
   proname => 'amvalidate', provolatile => 'v', prorettype => 'bool',
   proargtypes => 'oid', prosrc => 'amvalidate' },
-
 { oid => '636', descr => 'test property of an index access method',
   proname => 'pg_indexam_has_property', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid text',
@@ -825,18 +707,6 @@
 { oid => '676', descr => 'return name of given index build phase',
   proname => 'pg_indexam_progress_phasename', prorettype => 'text',
   proargtypes => 'oid int8', prosrc => 'pg_indexam_progress_phasename' },
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '350', descr => 'less-equal-greater',
   proname => 'btint2cmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'int2 int2', prosrc => 'btint2cmp' },
@@ -926,27 +796,6 @@
   proname => 'in_range', prorettype => 'bool',
   proargtypes => 'float4 float4 float8 bool bool',
   prosrc => 'in_range_float4_float8' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OIDS 400 - 499
-
 { oid => '401', descr => 'convert char(n) to text',
   proname => 'text', prorettype => 'text', proargtypes => 'bpchar',
   prosrc => 'rtrim1' },
@@ -962,7 +811,6 @@
 { oid => '409', descr => 'convert char(n) to name',
   proname => 'name', proleakproof => 't', prorettype => 'name',
   proargtypes => 'bpchar', prosrc => 'bpchar_name' },
-
 { oid => '449', descr => 'hash',
   proname => 'hashint2', prorettype => 'int4', proargtypes => 'int2',
   prosrc => 'hashint2' },
@@ -1029,9 +877,6 @@
 { oid => '776', descr => 'hash',
   proname => 'hashoidvectorextended', prorettype => 'int8',
   proargtypes => 'oidvector int8', prosrc => 'hashoidvectorextended' },
-
-
-
 { oid => '438', descr => 'count the number of NULL arguments',
   proname => 'num_nulls', provariadic => 'any', proisstrict => 'f',
   prorettype => 'int4', proargtypes => 'any', proallargtypes => '{any}',
@@ -1040,14 +885,12 @@
   proname => 'num_nonnulls', provariadic => 'any', proisstrict => 'f',
   prorettype => 'int4', proargtypes => 'any', proallargtypes => '{any}',
   proargmodes => '{v}', prosrc => 'pg_num_nonnulls' },
-
 { oid => '458', descr => 'larger of two',
   proname => 'text_larger', proleakproof => 't', prorettype => 'text',
   proargtypes => 'text text', prosrc => 'text_larger' },
 { oid => '459', descr => 'smaller of two',
   proname => 'text_smaller', proleakproof => 't', prorettype => 'text',
   proargtypes => 'text text', prosrc => 'text_smaller' },
-
 { oid => '460', descr => 'I/O',
   proname => 'int8in', prorettype => 'int8', proargtypes => 'cstring',
   prosrc => 'int8in' },
@@ -1087,7 +930,6 @@
 { oid => '472',
   proname => 'int8ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int8 int8', prosrc => 'int8ge' },
-
 { oid => '474',
   proname => 'int84eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int8 int4', prosrc => 'int84eq' },
@@ -1106,7 +948,6 @@
 { oid => '479',
   proname => 'int84ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int8 int4', prosrc => 'int84ge' },
-
 { oid => '480', descr => 'convert int8 to int4',
   proname => 'int4', prorettype => 'int4', proargtypes => 'int8',
   prosrc => 'int84' },
@@ -1119,32 +960,24 @@
 { oid => '483', descr => 'convert float8 to int8',
   proname => 'int8', prorettype => 'int8', proargtypes => 'float8',
   prosrc => 'dtoi8' },
-
-# OIDS 500 - 599
-
-# OIDS 600 - 699
-
 { oid => '626', descr => 'hash',
   proname => 'hash_array', prorettype => 'int4', proargtypes => 'anyarray',
   prosrc => 'hash_array' },
 { oid => '782', descr => 'hash',
   proname => 'hash_array_extended', prorettype => 'int8',
   proargtypes => 'anyarray int8', prosrc => 'hash_array_extended' },
-
 { oid => '652', descr => 'convert int8 to float4',
   proname => 'float4', proleakproof => 't', prorettype => 'float4',
   proargtypes => 'int8', prosrc => 'i8tof' },
 { oid => '653', descr => 'convert float4 to int8',
   proname => 'int8', prorettype => 'int8', proargtypes => 'float4',
   prosrc => 'ftoi8' },
-
 { oid => '714', descr => 'convert int8 to int2',
   proname => 'int2', prorettype => 'int2', proargtypes => 'int8',
   prosrc => 'int82' },
 { oid => '754', descr => 'convert int2 to int8',
   proname => 'int8', proleakproof => 't', prorettype => 'int8',
   proargtypes => 'int2', prosrc => 'int28' },
-
 { oid => '655',
   proname => 'namelt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'name name', prosrc => 'namelt' },
@@ -1160,7 +993,6 @@
 { oid => '659',
   proname => 'namene', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'name name', prosrc => 'namene' },
-
 { oid => '668', descr => 'adjust char() to typmod length',
   proname => 'bpchar', prorettype => 'bpchar',
   proargtypes => 'bpchar int4 bool', prosrc => 'bpchar' },
@@ -1171,7 +1003,6 @@
   proname => 'varchar', prosupport => 'varchar_support',
   prorettype => 'varchar', proargtypes => 'varchar int4 bool',
   prosrc => 'varchar' },
-
 { oid => '619',
   proname => 'oidvectorne', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oidvector oidvector', prosrc => 'oidvectorne' },
@@ -1190,8 +1021,6 @@
 { oid => '681',
   proname => 'oidvectorgt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oidvector oidvector', prosrc => 'oidvectorgt' },
-
-# OIDS 700 - 799
 { oid => '710', descr => 'deprecated, use current_user instead',
   proname => 'getpgusername', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'current_user' },
@@ -1201,7 +1030,6 @@
 { oid => '717',
   proname => 'oidle', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oid oid', prosrc => 'oidle' },
-
 { oid => '720', descr => 'octet length',
   proname => 'octet_length', prorettype => 'int4', proargtypes => 'bytea',
   prosrc => 'byteaoctetlen' },
@@ -1226,21 +1054,6 @@
 { oid => '6163', descr => 'number of set bits',
   proname => 'bit_count', prorettype => 'int8', proargtypes => 'bytea',
   prosrc => 'bytea_bit_count' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '740',
   proname => 'text_lt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'text text', prosrc => 'text_lt' },
@@ -1253,14 +1066,12 @@
 { oid => '743',
   proname => 'text_ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'text text', prosrc => 'text_ge' },
-
 { oid => '745', descr => 'current user name',
   proname => 'current_user', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'current_user' },
 { oid => '746', descr => 'session user name',
   proname => 'session_user', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'session_user' },
-
 { oid => '744',
   proname => 'array_eq', prorettype => 'bool',
   proargtypes => 'anyarray anyarray', prosrc => 'array_eq' },
@@ -1433,8 +1244,6 @@
   proname => 'arraycontjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'arraycontjoinsel' },
-
-
 { oid => '766', descr => 'increment',
   proname => 'int4inc', prorettype => 'int4', proargtypes => 'int4',
   prosrc => 'int4inc' },
@@ -1450,9 +1259,6 @@
 { oid => '771', descr => 'smaller of two',
   proname => 'int2smaller', prorettype => 'int2', proargtypes => 'int2 int2',
   prosrc => 'int2smaller' },
-
-# OIDS 800 - 899
-
 { oid => '849', descr => 'position of substring',
   proname => 'position', prorettype => 'int4', proargtypes => 'text text',
   prosrc => 'textpos' },
@@ -1465,7 +1271,6 @@
 { oid => '851',
   proname => 'textnlike', prorettype => 'bool', proargtypes => 'text text',
   prosrc => 'textnlike' },
-
 { oid => '852',
   proname => 'int48eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int4 int8', prosrc => 'int48eq' },
@@ -1484,18 +1289,15 @@
 { oid => '857',
   proname => 'int48ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int4 int8', prosrc => 'int48ge' },
-
 { oid => '858',
   proname => 'namelike', prosupport => 'textlike_support', prorettype => 'bool',
   proargtypes => 'name text', prosrc => 'namelike' },
 { oid => '859',
   proname => 'namenlike', prorettype => 'bool', proargtypes => 'name text',
   prosrc => 'namenlike' },
-
 { oid => '860', descr => 'convert char to char(n)',
   proname => 'bpchar', prorettype => 'bpchar', proargtypes => 'char',
   prosrc => 'char_bpchar' },
-
 { oid => '861', descr => 'name of the current database',
   proname => 'current_database', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'current_database' },
@@ -1503,85 +1305,36 @@
   proname => 'current_query', proisstrict => 'f', provolatile => 'v',
   proparallel => 'r', prorettype => 'text', proargtypes => '',
   prosrc => 'current_query' },
-
 { oid => '940', descr => 'modulus',
   proname => 'mod', prorettype => 'int2', proargtypes => 'int2 int2',
   prosrc => 'int2mod' },
 { oid => '941', descr => 'modulus',
   proname => 'mod', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4mod' },
-
 { oid => '945',
   proname => 'int8mod', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8mod' },
 { oid => '947', descr => 'modulus',
   proname => 'mod', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8mod' },
-
 { oid => '5044', descr => 'greatest common divisor',
   proname => 'gcd', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4gcd' },
 { oid => '5045', descr => 'greatest common divisor',
   proname => 'gcd', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8gcd' },
-
 { oid => '5046', descr => 'least common multiple',
   proname => 'lcm', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4lcm' },
 { oid => '5047', descr => 'least common multiple',
   proname => 'lcm', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8lcm' },
-
 { oid => '944', descr => 'convert text to char',
   proname => 'char', prorettype => 'char', proargtypes => 'text',
   prosrc => 'text_char' },
 { oid => '946', descr => 'convert char to text',
   proname => 'text', prorettype => 'text', proargtypes => 'char',
   prosrc => 'char_text' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OIDS 1000 - 1999
-
-{ oid => '1026', descr => 'adjust timestamp to new time zone',
-  proname => 'timezone', prorettype => 'timestamp',
-  proargtypes => 'interval timestamptz', prosrc => 'timestamptz_izone' },
-
 { oid => '1044', descr => 'I/O',
   proname => 'bpcharin', prorettype => 'bpchar',
   proargtypes => 'cstring oid int4', prosrc => 'bpcharin' },
@@ -1675,13 +1428,6 @@
 { oid => '3136', descr => 'sort support',
   proname => 'date_sortsupport', prorettype => 'void',
   proargtypes => 'internal', prosrc => 'date_sortsupport' },
-{ oid => '4133', descr => 'window RANGE support',
-  proname => 'in_range', prorettype => 'bool',
-  proargtypes => 'date date interval bool bool',
-  prosrc => 'in_range_date_interval' },
-
-# OIDS 1100 - 1199
-
 { oid => '1102',
   proname => 'time_lt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'time time', prosrc => 'time_lt' },
@@ -1730,12 +1476,6 @@
 { oid => '1145',
   proname => 'time_eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'time time', prosrc => 'time_eq' },
-
-
-
-
-
-
 { oid => '1150', descr => 'I/O',
   proname => 'timestamptz_in', provolatile => 's', prorettype => 'timestamptz',
   proargtypes => 'cstring oid int4', prosrc => 'timestamptz_in' },
@@ -1772,65 +1512,12 @@
 { oid => '1159', descr => 'adjust timestamp to new time zone',
   proname => 'timezone', prorettype => 'timestamp',
   proargtypes => 'text timestamptz', prosrc => 'timestamptz_zone' },
-
-{ oid => '1160', descr => 'I/O',
-  proname => 'interval_in', provolatile => 's', prorettype => 'interval',
-  proargtypes => 'cstring oid int4', prosrc => 'interval_in' },
-{ oid => '1161', descr => 'I/O',
-  proname => 'interval_out', prorettype => 'cstring', proargtypes => 'interval',
-  prosrc => 'interval_out' },
-{ oid => '2903', descr => 'I/O typmod',
-  proname => 'intervaltypmodin', prorettype => 'int4',
-  proargtypes => '_cstring', prosrc => 'intervaltypmodin' },
-{ oid => '2904', descr => 'I/O typmod',
-  proname => 'intervaltypmodout', prorettype => 'cstring',
-  proargtypes => 'int4', prosrc => 'intervaltypmodout' },
-{ oid => '1162',
-  proname => 'interval_eq', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_eq' },
-{ oid => '1163',
-  proname => 'interval_ne', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_ne' },
-{ oid => '1164',
-  proname => 'interval_lt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_lt' },
-{ oid => '1165',
-  proname => 'interval_le', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_le' },
-{ oid => '1166',
-  proname => 'interval_ge', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_ge' },
-{ oid => '1167',
-  proname => 'interval_gt', proleakproof => 't', prorettype => 'bool',
-  proargtypes => 'interval interval', prosrc => 'interval_gt' },
-{ oid => '1168',
-  proname => 'interval_um', prorettype => 'interval', proargtypes => 'interval',
-  prosrc => 'interval_um' },
-{ oid => '1169',
-  proname => 'interval_pl', prorettype => 'interval',
-  proargtypes => 'interval interval', prosrc => 'interval_pl' },
-{ oid => '1170',
-  proname => 'interval_mi', prorettype => 'interval',
-  proargtypes => 'interval interval', prosrc => 'interval_mi' },
 { oid => '1171', descr => 'extract field from timestamp with time zone',
   proname => 'date_part', provolatile => 's', prorettype => 'float8',
   proargtypes => 'text timestamptz', prosrc => 'timestamptz_part' },
-{ oid => '1172', descr => 'extract field from interval',
-  proname => 'date_part', prorettype => 'float8',
-  proargtypes => 'text interval', prosrc => 'interval_part' },
 { oid => '1174', descr => 'convert date to timestamp with time zone',
   proname => 'timestamptz', provolatile => 's', prorettype => 'timestamptz',
   proargtypes => 'date', prosrc => 'date_timestamptz' },
-{ oid => '2711',
-  descr => 'promote groups of 24 hours to numbers of days and promote groups of 30 days to numbers of months',
-  proname => 'justify_interval', prorettype => 'interval',
-  proargtypes => 'interval', prosrc => 'interval_justify_interval' },
-{ oid => '1175', descr => 'promote groups of 24 hours to numbers of days',
-  proname => 'justify_hours', prorettype => 'interval',
-  proargtypes => 'interval', prosrc => 'interval_justify_hours' },
-{ oid => '1295', descr => 'promote groups of 30 days to numbers of months',
-  proname => 'justify_days', prorettype => 'interval',
-  proargtypes => 'interval', prosrc => 'interval_justify_days' },
 { oid => '1176', descr => 'convert date and time to timestamp with time zone',
   proname => 'timestamptz', prolang => 'sql', provolatile => 's',
   prorettype => 'timestamptz', proargtypes => 'date time',
@@ -1846,44 +1533,12 @@
   descr => 'age of a multi-transaction ID, in multi-transactions before current multi-transaction',
   proname => 'mxid_age', provolatile => 's', prorettype => 'int4',
   proargtypes => 'xid', prosrc => 'mxid_age' },
-
-{ oid => '1188',
-  proname => 'timestamptz_mi', prorettype => 'interval',
-  proargtypes => 'timestamptz timestamptz', prosrc => 'timestamp_mi' },
-{ oid => '1189',
-  proname => 'timestamptz_pl_interval', provolatile => 's',
-  prorettype => 'timestamptz', proargtypes => 'timestamptz interval',
-  prosrc => 'timestamptz_pl_interval' },
-{ oid => '1190',
-  proname => 'timestamptz_mi_interval', provolatile => 's',
-  prorettype => 'timestamptz', proargtypes => 'timestamptz interval',
-  prosrc => 'timestamptz_mi_interval' },
 { oid => '1195', descr => 'smaller of two',
   proname => 'timestamptz_smaller', prorettype => 'timestamptz',
   proargtypes => 'timestamptz timestamptz', prosrc => 'timestamp_smaller' },
 { oid => '1196', descr => 'larger of two',
   proname => 'timestamptz_larger', prorettype => 'timestamptz',
   proargtypes => 'timestamptz timestamptz', prosrc => 'timestamp_larger' },
-{ oid => '1197', descr => 'smaller of two',
-  proname => 'interval_smaller', prorettype => 'interval',
-  proargtypes => 'interval interval', prosrc => 'interval_smaller' },
-{ oid => '1198', descr => 'larger of two',
-  proname => 'interval_larger', prorettype => 'interval',
-  proargtypes => 'interval interval', prosrc => 'interval_larger' },
-{ oid => '1199', descr => 'date difference preserving months and years',
-  proname => 'age', prorettype => 'interval',
-  proargtypes => 'timestamptz timestamptz', prosrc => 'timestamptz_age' },
-
-# OIDS 1200 - 1299
-
-{ oid => '3918', descr => 'planner support for interval length coercion',
-  proname => 'interval_support', prorettype => 'internal',
-  proargtypes => 'internal', prosrc => 'interval_support' },
-{ oid => '1200', descr => 'adjust interval precision',
-  proname => 'interval', prosupport => 'interval_support',
-  prorettype => 'interval', proargtypes => 'interval int4',
-  prosrc => 'interval_scale' },
-
 { oid => '1215', descr => 'get description for object id and catalog name',
   proname => 'obj_description', prolang => 'sql', procost => '100',
   provolatile => 's', prorettype => 'text', proargtypes => 'oid name',
@@ -1897,7 +1552,6 @@
   proname => 'shobj_description', prolang => 'sql', procost => '100',
   provolatile => 's', prorettype => 'text', proargtypes => 'oid name',
   prosrc => 'see system_functions.sql' },
-
 { oid => '1217',
   descr => 'truncate timestamp with time zone to specified units',
   proname => 'date_trunc', provolatile => 's', prorettype => 'timestamptz',
@@ -1906,10 +1560,6 @@
   descr => 'truncate timestamp with time zone to specified units in specified time zone',
   proname => 'date_trunc', provolatile => 's', prorettype => 'timestamptz',
   proargtypes => 'text timestamptz text', prosrc => 'timestamptz_trunc_zone' },
-{ oid => '1218', descr => 'truncate interval to specified units',
-  proname => 'date_trunc', prorettype => 'interval',
-  proargtypes => 'text interval', prosrc => 'interval_trunc' },
-
 { oid => '1219', descr => 'increment',
   proname => 'int8inc', prorettype => 'int8', proargtypes => 'int8',
   prosrc => 'int8inc' },
@@ -1925,15 +1575,12 @@
 { oid => '1230',
   proname => 'int8abs', prorettype => 'int8', proargtypes => 'int8',
   prosrc => 'int8abs' },
-
 { oid => '1236', descr => 'larger of two',
   proname => 'int8larger', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8larger' },
 { oid => '1237', descr => 'smaller of two',
   proname => 'int8smaller', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8smaller' },
-
-
 { oid => '1251',
   proname => 'int4abs', prorettype => 'int4', proargtypes => 'int4',
   prosrc => 'int4abs' },
@@ -1967,7 +1614,6 @@
 { oid => '1281',
   proname => 'int48div', prorettype => 'int8', proargtypes => 'int4 int8',
   prosrc => 'int48div' },
-
 { oid => '837',
   proname => 'int82pl', prorettype => 'int8', proargtypes => 'int8 int2',
   prosrc => 'int82pl' },
@@ -1992,15 +1638,12 @@
 { oid => '948',
   proname => 'int28div', prorettype => 'int8', proargtypes => 'int2 int8',
   prosrc => 'int28div' },
-
 { oid => '1287', descr => 'convert int8 to oid',
   proname => 'oid', prorettype => 'oid', proargtypes => 'int8',
   prosrc => 'i8tooid' },
 { oid => '1288', descr => 'convert oid to int8',
   proname => 'int8', proleakproof => 't', prorettype => 'int8',
   proargtypes => 'oid', prosrc => 'oidtoi8' },
-
-
 { oid => '1292',
   proname => 'tideq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'tid tid', prosrc => 'tideq' },
@@ -2038,7 +1681,6 @@
 { oid => '2234', descr => 'hash',
   proname => 'hashtidextended', prorettype => 'int8', proargtypes => 'tid int8',
   prosrc => 'hashtidextended' },
-
 { oid => '1296',
   proname => 'timedate_pl', prolang => 'sql', prorettype => 'timestamp',
   proargtypes => 'time date', prosrc => 'see system_functions.sql' },
@@ -2055,50 +1697,13 @@
 { oid => '2649', descr => 'current clock time',
   proname => 'clock_timestamp', provolatile => 'v', prorettype => 'timestamptz',
   proargtypes => '', prosrc => 'clock_timestamp' },
-
-# OIDS 1300 - 1399
-
-
-
-
-
-
 { oid => '1304', descr => 'intervals overlap?',
   proname => 'overlaps', proisstrict => 'f', prorettype => 'bool',
   proargtypes => 'timestamptz timestamptz timestamptz timestamptz',
   prosrc => 'overlaps_timestamp' },
-{ oid => '1305', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  provolatile => 's', prorettype => 'bool',
-  proargtypes => 'timestamptz interval timestamptz interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '1306', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  provolatile => 's', prorettype => 'bool',
-  proargtypes => 'timestamptz timestamptz timestamptz interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '1307', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  provolatile => 's', prorettype => 'bool',
-  proargtypes => 'timestamptz interval timestamptz timestamptz',
-  prosrc => 'see system_functions.sql' },
-
 { oid => '1308', descr => 'intervals overlap?',
   proname => 'overlaps', proisstrict => 'f', prorettype => 'bool',
   proargtypes => 'time time time time', prosrc => 'overlaps_time' },
-{ oid => '1309', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'time interval time interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '1310', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'time time time interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '1311', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'time interval time time',
-  prosrc => 'see system_functions.sql' },
-
 { oid => '1312', descr => 'I/O',
   proname => 'timestamp_in', provolatile => 's', prorettype => 'timestamp',
   proargtypes => 'cstring oid int4', prosrc => 'timestamp_in' },
@@ -2114,31 +1719,21 @@
 { oid => '1314', descr => 'less-equal-greater',
   proname => 'timestamptz_cmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'timestamptz timestamptz', prosrc => 'timestamp_cmp' },
-{ oid => '1315', descr => 'less-equal-greater',
-  proname => 'interval_cmp', proleakproof => 't', prorettype => 'int4',
-  proargtypes => 'interval interval', prosrc => 'interval_cmp' },
 { oid => '1316', descr => 'convert timestamp to time',
   proname => 'time', prorettype => 'time', proargtypes => 'timestamp',
   prosrc => 'timestamp_time' },
-
 { oid => '1317', descr => 'length',
   proname => 'length', prorettype => 'int4', proargtypes => 'text',
   prosrc => 'textlen' },
 { oid => '1318', descr => 'character length',
   proname => 'length', prorettype => 'int4', proargtypes => 'bpchar',
   prosrc => 'bpcharlen' },
-
 { oid => '1319',
   proname => 'xideqint4', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'xid int4', prosrc => 'xideq' },
 { oid => '3309',
   proname => 'xidneqint4', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'xid int4', prosrc => 'xidneq' },
-
-{ oid => '1326',
-  proname => 'interval_div', prorettype => 'interval',
-  proargtypes => 'interval float8', prosrc => 'interval_div' },
-
 { oid => '1339', descr => 'base 10 logarithm',
   proname => 'dlog10', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dlog10' },
@@ -2166,28 +1761,19 @@
 { oid => '1347', descr => 'natural exponential (e^x)',
   proname => 'exp', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dexp' },
-
-# This form of obj_description is now deprecated, since it will fail if
-# OIDs are not unique across system catalogs.  Use the other form instead.
 { oid => '1348', descr => 'deprecated, use two-argument form instead',
   proname => 'obj_description', prolang => 'sql', procost => '100',
   provolatile => 's', prorettype => 'text', proargtypes => 'oid',
   prosrc => 'see system_functions.sql' },
-
 { oid => '1349', descr => 'print type names of oidvector field',
   proname => 'oidvectortypes', provolatile => 's', prorettype => 'text',
   proargtypes => 'oidvector', prosrc => 'oidvectortypes' },
-
 { oid => '1367', descr => 'character length',
   proname => 'character_length', prorettype => 'int4', proargtypes => 'bpchar',
   prosrc => 'bpcharlen' },
 { oid => '1369', descr => 'character length',
   proname => 'character_length', prorettype => 'int4', proargtypes => 'text',
   prosrc => 'textlen' },
-
-{ oid => '1370', descr => 'convert time to interval',
-  proname => 'interval', proleakproof => 't', prorettype => 'interval',
-  proargtypes => 'time', prosrc => 'time_interval' },
 { oid => '1372', descr => 'character length',
   proname => 'char_length', prorettype => 'int4', proargtypes => 'bpchar',
   prosrc => 'bpcharlen' },
@@ -2197,39 +1783,27 @@
 { oid => '1375', descr => 'octet length',
   proname => 'octet_length', prorettype => 'int4', proargtypes => 'bpchar',
   prosrc => 'bpcharoctetlen' },
-
 { oid => '1377', descr => 'larger of two',
   proname => 'time_larger', prorettype => 'time', proargtypes => 'time time',
   prosrc => 'time_larger' },
 { oid => '1378', descr => 'smaller of two',
   proname => 'time_smaller', prorettype => 'time', proargtypes => 'time time',
   prosrc => 'time_smaller' },
-
 { oid => '1381', descr => 'character length',
   proname => 'char_length', prorettype => 'int4', proargtypes => 'text',
   prosrc => 'textlen' },
-
 { oid => '1384', descr => 'extract field from date',
   proname => 'date_part', prolang => 'sql', prorettype => 'float8',
   proargtypes => 'text date', prosrc => 'see system_functions.sql' },
 { oid => '1385', descr => 'extract field from time',
   proname => 'date_part', prorettype => 'float8', proargtypes => 'text time',
   prosrc => 'time_part' },
-{ oid => '1386',
-  descr => 'date difference from today preserving months and years',
-  proname => 'age', prolang => 'sql', provolatile => 's',
-  prorettype => 'interval', proargtypes => 'timestamptz',
-  prosrc => 'see system_functions.sql' },
-
 { oid => '1373', descr => 'finite date?',
   proname => 'isfinite', prorettype => 'bool', proargtypes => 'date',
   prosrc => 'date_finite' },
 { oid => '1389', descr => 'finite timestamp?',
   proname => 'isfinite', prorettype => 'bool', proargtypes => 'timestamptz',
   prosrc => 'timestamp_finite' },
-{ oid => '1390', descr => 'finite interval?',
-  proname => 'isfinite', prorettype => 'bool', proargtypes => 'interval',
-  prosrc => 'interval_finite' },
 { oid => '1394', descr => 'absolute value',
   proname => 'abs', prorettype => 'float4', proargtypes => 'float4',
   prosrc => 'float4abs' },
@@ -2245,152 +1819,24 @@
 { oid => '1398', descr => 'absolute value',
   proname => 'abs', prorettype => 'int2', proargtypes => 'int2',
   prosrc => 'int2abs' },
-
-# OIDS 1400 - 1499
-
 { oid => '1400', descr => 'convert varchar to name',
   proname => 'name', proleakproof => 't', prorettype => 'name',
   proargtypes => 'varchar', prosrc => 'text_name' },
 { oid => '1401', descr => 'convert name to varchar',
   proname => 'varchar', proleakproof => 't', prorettype => 'varchar',
   proargtypes => 'name', prosrc => 'name_text' },
-
 { oid => '1402', descr => 'current schema name',
   proname => 'current_schema', provolatile => 's', proparallel => 'u',
   prorettype => 'name', proargtypes => '', prosrc => 'current_schema' },
 { oid => '1403', descr => 'current schema search list',
   proname => 'current_schemas', provolatile => 's', proparallel => 'u',
   prorettype => '_name', proargtypes => 'bool', prosrc => 'current_schemas' },
-
 { oid => '1404', descr => 'substitute portion of string',
   proname => 'overlay', prorettype => 'text',
   proargtypes => 'text text int4 int4', prosrc => 'textoverlay' },
 { oid => '1405', descr => 'substitute portion of string',
   proname => 'overlay', prorettype => 'text', proargtypes => 'text text int4',
   prosrc => 'textoverlay_no_len' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-{ oid => '1419', descr => 'convert interval to time',
-  proname => 'time', prorettype => 'time', proargtypes => 'interval',
-  prosrc => 'interval_time' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# pclose and popen might better be named close and open, but that crashes initdb.
-# - thomas 97/04/20
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OIDS 1500 - 1599
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '1569', descr => 'matches LIKE expression',
   proname => 'like', prosupport => 'textlike_support', prorettype => 'bool',
   proargtypes => 'text text', prosrc => 'textlike' },
@@ -2403,23 +1849,16 @@
 { oid => '1572', descr => 'does not match LIKE expression',
   proname => 'notlike', prorettype => 'bool', proargtypes => 'name text',
   prosrc => 'namenlike' },
-
 { oid => '275', descr => 'return the next oid for a system table',
   proname => 'pg_nextoid', provolatile => 'v', proparallel => 'u',
   prorettype => 'oid', proargtypes => 'regclass name regclass',
   prosrc => 'pg_nextoid' },
-
-
-
 { oid => '1598', descr => 'random value',
   proname => 'random', provolatile => 'v', proparallel => 'r',
   prorettype => 'float8', proargtypes => '', prosrc => 'drandom' },
 { oid => '1599', descr => 'set random seed',
   proname => 'setseed', provolatile => 'v', proparallel => 'r',
   prorettype => 'void', proargtypes => 'float8', prosrc => 'setseed' },
-
-# OIDS 1600 - 1699
-
 { oid => '1600', descr => 'arcsine',
   proname => 'asin', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dasin' },
@@ -2444,7 +1883,6 @@
 { oid => '1607', descr => 'cotangent',
   proname => 'cot', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dcot' },
-
 { oid => '2731', descr => 'arcsine, degrees',
   proname => 'asind', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dasind' },
@@ -2469,7 +1907,6 @@
 { oid => '2738', descr => 'cotangent, degrees',
   proname => 'cotd', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dcotd' },
-
 { oid => '1608', descr => 'radians to degrees',
   proname => 'degrees', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'degrees' },
@@ -2478,7 +1915,6 @@
   prosrc => 'radians' },
 { oid => '1610', descr => 'PI',
   proname => 'pi', prorettype => 'float8', proargtypes => '', prosrc => 'dpi' },
-
 { oid => '2462', descr => 'hyperbolic sine',
   proname => 'sinh', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'dsinh' },
@@ -2497,11 +1933,6 @@
 { oid => '2467', descr => 'inverse hyperbolic tangent',
   proname => 'atanh', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'datanh' },
-
-{ oid => '1618',
-  proname => 'interval_mul', prorettype => 'interval',
-  proargtypes => 'interval float8', prosrc => 'interval_mul' },
-
 { oid => '1620', descr => 'convert first char to int4',
   proname => 'ascii', prorettype => 'int4', proargtypes => 'text',
   prosrc => 'ascii' },
@@ -2511,19 +1942,12 @@
 { oid => '1622', descr => 'replicate string n times',
   proname => 'repeat', prorettype => 'text', proargtypes => 'text int4',
   prosrc => 'repeat' },
-
-
-{ oid => '1624',
-  proname => 'mul_d_interval', prorettype => 'interval',
-  proargtypes => 'float8 interval', prosrc => 'mul_d_interval' },
-
 { oid => '1631',
   proname => 'bpcharlike', prosupport => 'textlike_support',
   prorettype => 'bool', proargtypes => 'bpchar text', prosrc => 'textlike' },
 { oid => '1632',
   proname => 'bpcharnlike', prorettype => 'bool', proargtypes => 'bpchar text',
   prosrc => 'textnlike' },
-
 { oid => '1633',
   proname => 'texticlike', prosupport => 'texticlike_support',
   prorettype => 'bool', proargtypes => 'text text', prosrc => 'texticlike' },
@@ -2542,15 +1966,12 @@
 { oid => '1637', descr => 'convert LIKE pattern to use backslash escapes',
   proname => 'like_escape', prorettype => 'text', proargtypes => 'text text',
   prosrc => 'like_escape' },
-
 { oid => '1660',
   proname => 'bpchariclike', prosupport => 'texticlike_support',
   prorettype => 'bool', proargtypes => 'bpchar text', prosrc => 'texticlike' },
 { oid => '1661',
   proname => 'bpcharicnlike', prorettype => 'bool',
   proargtypes => 'bpchar text', prosrc => 'texticnlike' },
-
-# Oracle Compatibility Related Functions - By Edmund Mergl <E.Mergl@bawue.de>
 { oid => '868', descr => 'position of substring',
   proname => 'strpos', prorettype => 'int4', proargtypes => 'text text',
   prosrc => 'textpos' },
@@ -2590,7 +2011,6 @@
 { oid => '885', descr => 'trim spaces from both ends of string',
   proname => 'btrim', prorettype => 'text', proargtypes => 'text',
   prosrc => 'btrim1' },
-
 { oid => '936', descr => 'extract portion of string',
   proname => 'substring', prorettype => 'text', proargtypes => 'text int4 int4',
   prosrc => 'text_substr' },
@@ -2610,58 +2030,42 @@
 { oid => '2090', descr => 'convert int8 number to hex',
   proname => 'to_hex', prorettype => 'text', proargtypes => 'int8',
   prosrc => 'to_hex64' },
-
-# for character set encoding support
-
-# return database encoding name
 { oid => '1039', descr => 'encoding name of current database',
   proname => 'getdatabaseencoding', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'getdatabaseencoding' },
-
-# return client encoding name i.e. session encoding
 { oid => '810', descr => 'encoding name of current database',
   proname => 'pg_client_encoding', provolatile => 's', prorettype => 'name',
   proargtypes => '', prosrc => 'pg_client_encoding' },
-
 { oid => '1713', descr => 'length of string in specified encoding',
   proname => 'length', provolatile => 's', prorettype => 'int4',
   proargtypes => 'bytea name', prosrc => 'length_in_encoding' },
-
 { oid => '1714',
   descr => 'convert string with specified source encoding name',
   proname => 'convert_from', provolatile => 's', prorettype => 'text',
   proargtypes => 'bytea name', prosrc => 'pg_convert_from' },
-
 { oid => '1717',
   descr => 'convert string with specified destination encoding name',
   proname => 'convert_to', provolatile => 's', prorettype => 'bytea',
   proargtypes => 'text name', prosrc => 'pg_convert_to' },
-
 { oid => '1813', descr => 'convert string with specified encoding names',
   proname => 'convert', provolatile => 's', prorettype => 'bytea',
   proargtypes => 'bytea name name', prosrc => 'pg_convert' },
-
 { oid => '1264', descr => 'convert encoding name to encoding id',
   proname => 'pg_char_to_encoding', provolatile => 's', prorettype => 'int4',
   proargtypes => 'name', prosrc => 'PG_char_to_encoding' },
-
 { oid => '1597', descr => 'convert encoding id to encoding name',
   proname => 'pg_encoding_to_char', provolatile => 's', prorettype => 'name',
   proargtypes => 'int4', prosrc => 'PG_encoding_to_char' },
-
 { oid => '2319',
   descr => 'maximum octet length of a character in given encoding',
   proname => 'pg_encoding_max_length', prorettype => 'int4',
   proargtypes => 'int4', prosrc => 'pg_encoding_max_length_sql' },
-
 { oid => '1638',
   proname => 'oidgt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oid oid', prosrc => 'oidgt' },
 { oid => '1639',
   proname => 'oidge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'oid oid', prosrc => 'oidge' },
-
-# System-view support functions
 { oid => '1573', descr => 'source text of a rule',
   proname => 'pg_get_ruledef', provolatile => 's', prorettype => 'text',
   proargtypes => 'oid', prosrc => 'pg_get_ruledef' },
@@ -2706,7 +2110,6 @@
   proname => 'pg_get_function_sqlbody', provolatile => 's',
   prorettype => 'text', proargtypes => 'oid',
   prosrc => 'pg_get_function_sqlbody' },
-
 { oid => '1686', descr => 'list of SQL keywords',
   proname => 'pg_get_keywords', procost => '10', prorows => '500',
   proretset => 't', provolatile => 's', prorettype => 'record',
@@ -2714,7 +2117,6 @@
   proargmodes => '{o,o,o,o,o}',
   proargnames => '{word,catcode,barelabel,catdesc,baredesc}',
   prosrc => 'pg_get_keywords' },
-
 { oid => '6159', descr => 'list of catalog foreign key relationships',
   proname => 'pg_get_catalog_foreign_keys', procost => '10', prorows => '250',
   proretset => 't', provolatile => 's', prorettype => 'record',
@@ -2736,7 +2138,6 @@
   descr => 'collation of the argument; implementation of the COLLATION FOR expression',
   proname => 'pg_collation_for', proisstrict => 'f', provolatile => 's',
   prorettype => 'text', proargtypes => 'any', prosrc => 'pg_collation_for' },
-
 { oid => '3842', descr => 'is a relation insertable/updatable/deletable',
   proname => 'pg_relation_is_updatable', procost => '10', provolatile => 's',
   prorettype => 'int4', proargtypes => 'regclass bool',
@@ -2745,126 +2146,6 @@
   proname => 'pg_column_is_updatable', procost => '10', provolatile => 's',
   prorettype => 'bool', proargtypes => 'regclass int2 bool',
   prosrc => 'pg_column_is_updatable' },
-
-
-
-
-
-
-
-
-
-# for macaddr type support
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# for macaddr8 type support
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# for inet type support
-
-
-
-# for cidr type support
-
-
-
-# these are used for both inet and cidr
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# inet/cidr functions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# GiST support for inet and cidr
-
-
-
-
-
-
-
-
-
-# Selectivity estimation for inet and cidr
-
-{ oid => '1690',
-  proname => 'time_mi_time', prorettype => 'interval',
-  proargtypes => 'time time', prosrc => 'time_mi_time' },
-
 { oid => '1691',
   proname => 'boolle', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'bool bool', prosrc => 'boolle' },
@@ -2874,28 +2155,12 @@
 { oid => '1693', descr => 'less-equal-greater',
   proname => 'btboolcmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'bool bool', prosrc => 'btboolcmp' },
-
 { oid => '1688', descr => 'hash',
   proname => 'time_hash', prorettype => 'int4', proargtypes => 'time',
   prosrc => 'time_hash' },
 { oid => '3409', descr => 'hash',
   proname => 'time_hash_extended', prorettype => 'int8',
   proargtypes => 'time int8', prosrc => 'time_hash_extended' },
-{ oid => '1697', descr => 'hash',
-  proname => 'interval_hash', prorettype => 'int4', proargtypes => 'interval',
-  prosrc => 'interval_hash' },
-{ oid => '3418', descr => 'hash',
-  proname => 'interval_hash_extended', prorettype => 'int8',
-  proargtypes => 'interval int8', prosrc => 'interval_hash_extended' },
-
-{ oid => '1747',
-  proname => 'time_pl_interval', prorettype => 'time',
-  proargtypes => 'time interval', prosrc => 'time_pl_interval' },
-{ oid => '1748',
-  proname => 'time_mi_interval', prorettype => 'time',
-  proargtypes => 'time interval', prosrc => 'time_mi_interval' },
-
-
 { oid => '1282', descr => 'quote an identifier for usage in a querystring',
   proname => 'quote_ident', prorettype => 'text', proargtypes => 'text',
   prosrc => 'quote_ident' },
@@ -2915,14 +2180,12 @@
   proname => 'quote_nullable', prolang => 'sql', proisstrict => 'f',
   provolatile => 's', prorettype => 'text', proargtypes => 'anyelement',
   prosrc => 'select pg_catalog.quote_nullable($1::pg_catalog.text)' },
-
 { oid => '1798', descr => 'I/O',
   proname => 'oidin', prorettype => 'oid', proargtypes => 'cstring',
   prosrc => 'oidin' },
 { oid => '1799', descr => 'I/O',
   proname => 'oidout', prorettype => 'cstring', proargtypes => 'oid',
   prosrc => 'oidout' },
-
 { oid => '3058', descr => 'concatenate values',
   proname => 'concat', provariadic => 'any', proisstrict => 'f',
   provolatile => 's', prorettype => 'text', proargtypes => 'any',
@@ -2949,15 +2212,12 @@
 { oid => '3540', descr => 'format text message',
   proname => 'format', proisstrict => 'f', provolatile => 's',
   prorettype => 'text', proargtypes => 'text', prosrc => 'text_format_nv' },
-
 { oid => '1810', descr => 'length in bits',
   proname => 'bit_length', prolang => 'sql', prorettype => 'int4',
   proargtypes => 'bytea', prosrc => 'see system_functions.sql' },
 { oid => '1811', descr => 'length in bits',
   proname => 'bit_length', prolang => 'sql', prorettype => 'int4',
   proargtypes => 'text', prosrc => 'see system_functions.sql' },
-
-# Selectivity estimators for LIKE and related operators
 { oid => '1814', descr => 'restriction selectivity of ILIKE',
   proname => 'iclikesel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int4', prosrc => 'iclikesel' },
@@ -2993,8 +2253,6 @@
   proname => 'prefixjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'prefixjoinsel' },
-
-# Aggregate-related functions
 { oid => '1830', descr => 'aggregate final function',
   proname => 'float8_avg', prorettype => 'float8', proargtypes => '_float8',
   prosrc => 'float8_avg' },
@@ -3025,19 +2283,6 @@
 { oid => '1841', descr => 'aggregate transition function',
   proname => 'int4_sum', proisstrict => 'f', prorettype => 'int8',
   proargtypes => 'int8 int4', prosrc => 'int4_sum' },
-
-{ oid => '1843', descr => 'aggregate transition function',
-  proname => 'interval_accum', prorettype => '_interval',
-  proargtypes => '_interval interval', prosrc => 'interval_accum' },
-{ oid => '3325', descr => 'aggregate combine function',
-  proname => 'interval_combine', prorettype => '_interval',
-  proargtypes => '_interval _interval', prosrc => 'interval_combine' },
-{ oid => '3549', descr => 'aggregate transition function',
-  proname => 'interval_accum_inv', prorettype => '_interval',
-  proargtypes => '_interval interval', prosrc => 'interval_accum_inv' },
-{ oid => '1844', descr => 'aggregate final function',
-  proname => 'interval_avg', prorettype => 'interval',
-  proargtypes => '_interval', prosrc => 'interval_avg' },
 { oid => '1962', descr => 'aggregate transition function',
   proname => 'int2_avg_accum', prorettype => '_int8',
   proargtypes => '_int8 int2', prosrc => 'int2_avg_accum' },
@@ -3056,7 +2301,6 @@
 { oid => '6205', descr => 'aggregate final function',
   proname => 'int8_avg', prorettype => 'float8', proargtypes => '_int8',
   prosrc => 'int8_avg' },
-
 { oid => '3535', descr => 'aggregate transition function',
   proname => 'string_agg_transfn', proisstrict => 'f', prorettype => 'internal',
   proargtypes => 'internal text text', prosrc => 'string_agg_transfn' },
@@ -3079,8 +2323,6 @@
   proname => 'string_agg', prokind => 'a', proisstrict => 'f',
   prorettype => 'bytea', proargtypes => 'bytea bytea',
   prosrc => 'aggregate_dummy' },
-
-# To ASCII conversion
 { oid => '1845', descr => 'encode text from DB encoding to ASCII text',
   proname => 'to_ascii', prorettype => 'text', proargtypes => 'text',
   prosrc => 'to_ascii_default' },
@@ -3090,11 +2332,6 @@
 { oid => '1847', descr => 'encode text from encoding to ASCII text',
   proname => 'to_ascii', prorettype => 'text', proargtypes => 'text name',
   prosrc => 'to_ascii_encname' },
-
-{ oid => '1848',
-  proname => 'interval_pl_time', prolang => 'sql', prorettype => 'time',
-  proargtypes => 'interval time', prosrc => 'see system_functions.sql' },
-
 { oid => '1850',
   proname => 'int28eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int2 int8', prosrc => 'int28eq' },
@@ -3113,7 +2350,6 @@
 { oid => '1855',
   proname => 'int28ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int2 int8', prosrc => 'int28ge' },
-
 { oid => '1856',
   proname => 'int82eq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int8 int2', prosrc => 'int82eq' },
@@ -3132,7 +2368,6 @@
 { oid => '1861',
   proname => 'int82ge', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int8 int2', prosrc => 'int82ge' },
-
 { oid => '1892',
   proname => 'int2and', prorettype => 'int2', proargtypes => 'int2 int2',
   prosrc => 'int2and' },
@@ -3151,7 +2386,6 @@
 { oid => '1897',
   proname => 'int2shr', prorettype => 'int2', proargtypes => 'int2 int4',
   prosrc => 'int2shr' },
-
 { oid => '1898',
   proname => 'int4and', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4and' },
@@ -3170,7 +2404,6 @@
 { oid => '1903',
   proname => 'int4shr', prorettype => 'int4', proargtypes => 'int4 int4',
   prosrc => 'int4shr' },
-
 { oid => '1904',
   proname => 'int8and', prorettype => 'int8', proargtypes => 'int8 int8',
   prosrc => 'int8and' },
@@ -3189,7 +2422,6 @@
 { oid => '1909',
   proname => 'int8shr', prorettype => 'int8', proargtypes => 'int8 int4',
   prosrc => 'int8shr' },
-
 { oid => '1910',
   proname => 'int8up', prorettype => 'int8', proargtypes => 'int8',
   prosrc => 'int8up' },
@@ -3205,10 +2437,6 @@
 { oid => '1914',
   proname => 'float8up', prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'float8up' },
-
-
-
-
 { oid => '1928', descr => 'statistics: number of scans done for table/index',
   proname => 'pg_stat_get_numscans', provolatile => 's', proparallel => 'r',
   prorettype => 'int8', proargtypes => 'oid',
@@ -3361,7 +2589,6 @@
   proname => 'pg_stat_get_backend_start', provolatile => 's',
   proparallel => 'r', prorettype => 'timestamptz', proargtypes => 'int4',
   prosrc => 'pg_stat_get_backend_start' },
-
 { oid => '1393',
   descr => 'statistics: port number of client connected to backend',
   proname => 'pg_stat_get_backend_client_port', provolatile => 's',
@@ -3546,7 +2773,6 @@
 { oid => '2859', descr => 'statistics: number of buffer allocations',
   proname => 'pg_stat_get_buf_alloc', provolatile => 's', proparallel => 'r',
   prorettype => 'int8', proargtypes => '', prosrc => 'pg_stat_get_buf_alloc' },
-
 { oid => '1136', descr => 'statistics: information about WAL activity',
   proname => 'pg_stat_get_wal', proisstrict => 'f', provolatile => 's',
   proparallel => 'r', prorettype => 'record', proargtypes => '',
@@ -3554,7 +2780,6 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o}',
   proargnames => '{wal_records,wal_fpi,wal_bytes,wal_buffers_full,wal_write,wal_sync,wal_write_time,wal_sync_time,stats_reset}',
   prosrc => 'pg_stat_get_wal' },
-
 { oid => '2306', descr => 'statistics: information about SLRU caches',
   proname => 'pg_stat_get_slru', prorows => '100', proisstrict => 'f',
   proretset => 't', provolatile => 's', proparallel => 'r',
@@ -3563,7 +2788,6 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o}',
   proargnames => '{name,blks_zeroed,blks_hit,blks_read,blks_written,blks_exists,flushes,truncates,stats_reset}',
   prosrc => 'pg_stat_get_slru' },
-
 { oid => '2978', descr => 'statistics: number of function calls',
   proname => 'pg_stat_get_function_calls', provolatile => 's',
   proparallel => 'r', prorettype => 'int8', proargtypes => 'oid',
@@ -3578,7 +2802,6 @@
   proname => 'pg_stat_get_function_self_time', provolatile => 's',
   proparallel => 'r', prorettype => 'float8', proargtypes => 'oid',
   prosrc => 'pg_stat_get_function_self_time' },
-
 { oid => '3037',
   descr => 'statistics: number of scans done for table/index in current transaction',
   proname => 'pg_stat_get_xact_numscans', provolatile => 'v',
@@ -3639,7 +2862,6 @@
   proname => 'pg_stat_get_xact_function_self_time', provolatile => 'v',
   proparallel => 'r', prorettype => 'float8', proargtypes => 'oid',
   prosrc => 'pg_stat_get_xact_function_self_time' },
-
 { oid => '3788',
   descr => 'statistics: timestamp of the current statistics snapshot',
   proname => 'pg_stat_get_snapshot_timestamp', provolatile => 's',
@@ -3672,10 +2894,6 @@
   descr => 'statistics: reset collected statistics for a single SLRU',
   proname => 'pg_stat_reset_slru', proisstrict => 'f', provolatile => 'v',
   prorettype => 'void', proargtypes => 'text', prosrc => 'pg_stat_reset_slru' },
-
-
-
-
 { oid => '1946',
   descr => 'convert bytea value into some ascii-only text string',
   proname => 'encode', prorettype => 'text', proargtypes => 'bytea text',
@@ -3684,7 +2902,6 @@
   descr => 'convert ascii-encoded text string into bytea value',
   proname => 'decode', prorettype => 'bytea', proargtypes => 'text text',
   prosrc => 'binary_decode' },
-
 { oid => '1948',
   proname => 'byteaeq', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'bytea bytea', prosrc => 'byteaeq' },
@@ -3709,26 +2926,22 @@
 { oid => '3331', descr => 'sort support',
   proname => 'bytea_sortsupport', prorettype => 'void',
   proargtypes => 'internal', prosrc => 'bytea_sortsupport' },
-
 { oid => '3917', descr => 'planner support for timestamp length coercion',
   proname => 'timestamp_support', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'timestamp_support' },
 { oid => '3944', descr => 'planner support for time length coercion',
   proname => 'time_support', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'time_support' },
-
 { oid => '1961', descr => 'adjust timestamp precision',
   proname => 'timestamp', prosupport => 'timestamp_support',
   prorettype => 'timestamp', proargtypes => 'timestamp int4',
   prosrc => 'timestamp_scale' },
-
 { oid => '1965', descr => 'larger of two',
   proname => 'oidlarger', prorettype => 'oid', proargtypes => 'oid oid',
   prosrc => 'oidlarger' },
 { oid => '1966', descr => 'smaller of two',
   proname => 'oidsmaller', prorettype => 'oid', proargtypes => 'oid oid',
   prosrc => 'oidsmaller' },
-
 { oid => '1967', descr => 'adjust timestamptz precision',
   proname => 'timestamptz', prosupport => 'timestamp_support',
   prorettype => 'timestamptz', proargtypes => 'timestamptz int4',
@@ -3736,7 +2949,6 @@
 { oid => '1968', descr => 'adjust time precision',
   proname => 'time', prosupport => 'time_support', prorettype => 'time',
   proargtypes => 'time int4', prosrc => 'time_scale' },
-
 { oid => '2003',
   proname => 'textanycat', prolang => 'sql', provolatile => 's',
   prorettype => 'text', proargtypes => 'text anynonarray',
@@ -3745,7 +2957,6 @@
   proname => 'anytextcat', prolang => 'sql', provolatile => 's',
   prorettype => 'text', proargtypes => 'anynonarray text',
   prosrc => 'select $1::pg_catalog.text operator(pg_catalog.||) $2' },
-
 { oid => '2005',
   proname => 'bytealike', prosupport => 'textlike_support',
   prorettype => 'bool', proargtypes => 'bytea bytea', prosrc => 'bytealike' },
@@ -3791,23 +3002,12 @@
 { oid => '6196', descr => 'trim selected bytes from right end of string',
   proname => 'rtrim', prorettype => 'bytea', proargtypes => 'bytea bytea',
   prosrc => 'byteartrim' },
-
 { oid => '2019', descr => 'convert timestamp with time zone to time',
   proname => 'time', provolatile => 's', prorettype => 'time',
   proargtypes => 'timestamptz', prosrc => 'timestamptz_time' },
 { oid => '2020', descr => 'truncate timestamp to specified units',
   proname => 'date_trunc', prorettype => 'timestamp',
   proargtypes => 'text timestamp', prosrc => 'timestamp_trunc' },
-
-{ oid => '6177', descr => 'bin timestamp into specified interval',
-  proname => 'date_bin', prorettype => 'timestamp',
-  proargtypes => 'interval timestamp timestamp', prosrc => 'timestamp_bin' },
-{ oid => '6178',
-  descr => 'bin timestamp with time zone into specified interval',
-  proname => 'date_bin', prorettype => 'timestamptz',
-  proargtypes => 'interval timestamptz timestamptz',
-  prosrc => 'timestamptz_bin' },
-
 { oid => '2021', descr => 'extract field from timestamp',
   proname => 'date_part', prorettype => 'float8',
   proargtypes => 'text timestamp', prosrc => 'timestamp_part' },
@@ -3826,15 +3026,6 @@
 { oid => '2029', descr => 'convert timestamp to date',
   proname => 'date', prorettype => 'date', proargtypes => 'timestamp',
   prosrc => 'timestamp_date' },
-{ oid => '2031',
-  proname => 'timestamp_mi', prorettype => 'interval',
-  proargtypes => 'timestamp timestamp', prosrc => 'timestamp_mi' },
-{ oid => '2032',
-  proname => 'timestamp_pl_interval', prorettype => 'timestamp',
-  proargtypes => 'timestamp interval', prosrc => 'timestamp_pl_interval' },
-{ oid => '2033',
-  proname => 'timestamp_mi_interval', prorettype => 'timestamp',
-  proargtypes => 'timestamp interval', prosrc => 'timestamp_mi_interval' },
 { oid => '2035', descr => 'smaller of two',
   proname => 'timestamp_smaller', prorettype => 'timestamp',
   proargtypes => 'timestamp timestamp', prosrc => 'timestamp_smaller' },
@@ -3851,41 +3042,12 @@
   proname => 'overlaps', proisstrict => 'f', prorettype => 'bool',
   proargtypes => 'timestamp timestamp timestamp timestamp',
   prosrc => 'overlaps_timestamp' },
-{ oid => '2042', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'timestamp interval timestamp interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '2043', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'timestamp timestamp timestamp interval',
-  prosrc => 'see system_functions.sql' },
-{ oid => '2044', descr => 'intervals overlap?',
-  proname => 'overlaps', prolang => 'sql', proisstrict => 'f',
-  prorettype => 'bool', proargtypes => 'timestamp interval timestamp timestamp',
-  prosrc => 'see system_functions.sql' },
 { oid => '2045', descr => 'less-equal-greater',
   proname => 'timestamp_cmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'timestamp timestamp', prosrc => 'timestamp_cmp' },
 { oid => '3137', descr => 'sort support',
   proname => 'timestamp_sortsupport', prorettype => 'void',
   proargtypes => 'internal', prosrc => 'timestamp_sortsupport' },
-
-{ oid => '4134', descr => 'window RANGE support',
-  proname => 'in_range', prorettype => 'bool',
-  proargtypes => 'timestamp timestamp interval bool bool',
-  prosrc => 'in_range_timestamp_interval' },
-{ oid => '4135', descr => 'window RANGE support',
-  proname => 'in_range', provolatile => 's', prorettype => 'bool',
-  proargtypes => 'timestamptz timestamptz interval bool bool',
-  prosrc => 'in_range_timestamptz_interval' },
-{ oid => '4136', descr => 'window RANGE support',
-  proname => 'in_range', prorettype => 'bool',
-  proargtypes => 'interval interval interval bool bool',
-  prosrc => 'in_range_interval_interval' },
-{ oid => '4137', descr => 'window RANGE support',
-  proname => 'in_range', prorettype => 'bool',
-  proargtypes => 'time time interval bool bool',
-  prosrc => 'in_range_time_interval' },
 { oid => '2048', descr => 'finite timestamp?',
   proname => 'isfinite', prorettype => 'bool', proargtypes => 'timestamp',
   prosrc => 'timestamp_finite' },
@@ -3907,30 +3069,9 @@
 { oid => '2057',
   proname => 'timestamp_gt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'timestamp timestamp', prosrc => 'timestamp_gt' },
-{ oid => '2058', descr => 'date difference preserving months and years',
-  proname => 'age', prorettype => 'interval',
-  proargtypes => 'timestamp timestamp', prosrc => 'timestamp_age' },
-{ oid => '2059',
-  descr => 'date difference from today preserving months and years',
-  proname => 'age', prolang => 'sql', provolatile => 's',
-  prorettype => 'interval', proargtypes => 'timestamp',
-  prosrc => 'see system_functions.sql' },
-
 { oid => '2069', descr => 'adjust timestamp to new time zone',
   proname => 'timezone', prorettype => 'timestamptz',
   proargtypes => 'text timestamp', prosrc => 'timestamp_zone' },
-{ oid => '2070', descr => 'adjust timestamp to new time zone',
-  proname => 'timezone', prorettype => 'timestamptz',
-  proargtypes => 'interval timestamp', prosrc => 'timestamp_izone' },
-{ oid => '2071',
-  proname => 'date_pl_interval', prorettype => 'timestamp',
-  proargtypes => 'date interval', prosrc => 'date_pl_interval' },
-{ oid => '2072',
-  proname => 'date_mi_interval', prorettype => 'timestamp',
-  proargtypes => 'date interval', prosrc => 'date_mi_interval' },
-
-
-
 { oid => '2077', descr => 'SHOW X as a function',
   proname => 'current_setting', provolatile => 's', prorettype => 'text',
   proargtypes => 'text', prosrc => 'show_config_by_name' },
@@ -3988,12 +3129,10 @@
   provolatile => 'v', prorettype => 'record', proargtypes => 'xid',
   proallargtypes => '{xid,xid,text}', proargmodes => '{i,o,o}',
   proargnames => '{multixid,xid,mode}', prosrc => 'pg_get_multixact_members' },
-
 { oid => '3581', descr => 'get commit timestamp of a transaction',
   proname => 'pg_xact_commit_timestamp', provolatile => 'v',
   prorettype => 'timestamptz', proargtypes => 'xid',
   prosrc => 'pg_xact_commit_timestamp' },
-
 { oid => '6168',
   descr => 'get commit timestamp and replication origin of a transaction',
   proname => 'pg_xact_commit_timestamp_origin', provolatile => 'v',
@@ -4001,7 +3140,6 @@
   proallargtypes => '{xid,timestamptz,oid}', proargmodes => '{i,o,o}',
   proargnames => '{xid,timestamp,roident}',
   prosrc => 'pg_xact_commit_timestamp_origin' },
-
 { oid => '3583',
   descr => 'get transaction Id, commit timestamp and replication origin of latest transaction commit',
   proname => 'pg_last_committed_xact', provolatile => 'v',
@@ -4009,11 +3147,9 @@
   proallargtypes => '{xid,timestamptz,oid}', proargmodes => '{o,o,o}',
   proargnames => '{xid,timestamp,roident}',
   prosrc => 'pg_last_committed_xact' },
-
 { oid => '3537', descr => 'get identification of SQL object',
   proname => 'pg_describe_object', provolatile => 's', prorettype => 'text',
   proargtypes => 'oid oid int4', prosrc => 'pg_describe_object' },
-
 { oid => '3839',
   descr => 'get machine-parseable identification of SQL object',
   proname => 'pg_identify_object', provolatile => 's', prorettype => 'record',
@@ -4022,7 +3158,6 @@
   proargmodes => '{i,i,i,o,o,o,o}',
   proargnames => '{classid,objid,objsubid,type,schema,name,identity}',
   prosrc => 'pg_identify_object' },
-
 { oid => '3382',
   descr => 'get identification of SQL object for pg_get_object_address()',
   proname => 'pg_identify_object_as_address', provolatile => 's',
@@ -4031,7 +3166,6 @@
   proargmodes => '{i,i,i,o,o,o}',
   proargnames => '{classid,objid,objsubid,type,object_names,object_args}',
   prosrc => 'pg_identify_object_as_address' },
-
 { oid => '3954',
   descr => 'get OID-based object address from name/args arrays',
   proname => 'pg_get_object_address', provolatile => 's',
@@ -4040,7 +3174,6 @@
   proargmodes => '{i,i,i,o,o,o}',
   proargnames => '{type,object_names,object_args,classid,objid,objsubid}',
   prosrc => 'pg_get_object_address' },
-
 { oid => '2079', descr => 'is table visible in search path?',
   proname => 'pg_table_is_visible', procost => '10', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid', prosrc => 'pg_table_is_visible' },
@@ -4067,15 +3200,10 @@
   proname => 'pg_conversion_is_visible', procost => '10', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid',
   prosrc => 'pg_conversion_is_visible' },
-
-
-
-
 { oid => '3815', descr => 'is collation visible in search path?',
   proname => 'pg_collation_is_visible', procost => '10', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid',
   prosrc => 'pg_collation_is_visible' },
-
 { oid => '2854', descr => 'get OID of current session\'s temp schema, if any',
   proname => 'pg_my_temp_schema', provolatile => 's', proparallel => 'r',
   prorettype => 'oid', proargtypes => '', prosrc => 'pg_my_temp_schema' },
@@ -4083,7 +3211,6 @@
   proname => 'pg_is_other_temp_schema', provolatile => 's',
   prorettype => 'bool', proargtypes => 'oid',
   prosrc => 'pg_is_other_temp_schema' },
-
 { oid => '2171', descr => 'cancel a server process\' current query',
   proname => 'pg_cancel_backend', provolatile => 'v', prorettype => 'bool',
   proargtypes => 'int4', prosrc => 'pg_cancel_backend' },
@@ -4143,15 +3270,12 @@
 { oid => '2851', descr => 'wal filename, given a wal location',
   proname => 'pg_walfile_name', prorettype => 'text', proargtypes => 'pg_lsn',
   prosrc => 'pg_walfile_name' },
-
 { oid => '3809', descr => 'export a snapshot',
   proname => 'pg_export_snapshot', provolatile => 'v', proparallel => 'u',
   prorettype => 'text', proargtypes => '', prosrc => 'pg_export_snapshot' },
-
 { oid => '3810', descr => 'true if server is in recovery',
   proname => 'pg_is_in_recovery', provolatile => 'v', prorettype => 'bool',
   proargtypes => '', prosrc => 'pg_is_in_recovery' },
-
 { oid => '3821', descr => 'last wal replay location',
   proname => 'pg_last_wal_replay_lsn', provolatile => 'v',
   prorettype => 'pg_lsn', proargtypes => '',
@@ -4160,7 +3284,6 @@
   proname => 'pg_last_xact_replay_timestamp', provolatile => 'v',
   prorettype => 'timestamptz', proargtypes => '',
   prosrc => 'pg_last_xact_replay_timestamp' },
-
 { oid => '3071', descr => 'pause wal replay',
   proname => 'pg_wal_replay_pause', provolatile => 'v', prorettype => 'void',
   proargtypes => '', prosrc => 'pg_wal_replay_pause' },
@@ -4175,7 +3298,6 @@
   proname => 'pg_get_wal_replay_pause_state', provolatile => 'v',
   prorettype => 'text', proargtypes => '',
   prosrc => 'pg_get_wal_replay_pause_state' },
-
 { oid => '2621', descr => 'reload configuration files',
   proname => 'pg_reload_conf', provolatile => 'v', prorettype => 'bool',
   proargtypes => '', prosrc => 'pg_reload_conf' },
@@ -4192,7 +3314,6 @@
   proname => 'pg_current_logfile', proisstrict => 'f', provolatile => 'v',
   prorettype => 'text', proargtypes => 'text',
   prosrc => 'pg_current_logfile_1arg' },
-
 { oid => '2623', descr => 'get information about file',
   proname => 'pg_stat_file', provolatile => 'v', prorettype => 'record',
   proargtypes => 'text',
@@ -4237,7 +3358,6 @@
   proname => 'pg_ls_dir', prorows => '1000', proretset => 't',
   provolatile => 'v', prorettype => 'text', proargtypes => 'text bool bool',
   prosrc => 'pg_ls_dir' },
-
 { oid => '2971', descr => 'convert boolean to text',
   proname => 'text', prorettype => 'text', proargtypes => 'bool',
   prosrc => 'booltext' },
@@ -4249,10 +3369,6 @@
   descr => 'the average (arithmetic mean) as float8 of all float8 values',
   proname => 'avg', prokind => 'a', proisstrict => 'f', prorettype => 'float8',
   proargtypes => 'float8', prosrc => 'aggregate_dummy' },
-{ oid => '2106', descr => 'the average (arithmetic mean) as interval of all interval values',
-  proname => 'avg', prokind => 'a', proisstrict => 'f',
-  prorettype => 'interval', proargtypes => 'interval',
-  prosrc => 'aggregate_dummy' },
 { oid => '2100', descr => 'the average (arithmetic mean) as float8 of all bigint values',
   proname => 'avg', prokind => 'a', proisstrict => 'f', prorettype => 'float8',
   proargtypes => 'int8', prosrc => 'aggregate_dummy' },
@@ -4274,11 +3390,6 @@
 { oid => '2111', descr => 'sum as float8 across all float8 input values',
   proname => 'sum', prokind => 'a', proisstrict => 'f', prorettype => 'float8',
   proargtypes => 'float8', prosrc => 'aggregate_dummy' },
-{ oid => '2113', descr => 'sum as interval across all interval input values',
-  proname => 'sum', prokind => 'a', proisstrict => 'f',
-  prorettype => 'interval', proargtypes => 'interval',
-  prosrc => 'aggregate_dummy' },
-
 { oid => '2115', descr => 'maximum value of all bigint input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'int8',
   proargtypes => 'int8', prosrc => 'aggregate_dummy' },
@@ -4312,10 +3423,6 @@
   proname => 'max', prokind => 'a', proisstrict => 'f',
   prorettype => 'timestamptz', proargtypes => 'timestamptz',
   prosrc => 'aggregate_dummy' },
-{ oid => '2128', descr => 'maximum value of all interval input values',
-  proname => 'max', prokind => 'a', proisstrict => 'f',
-  prorettype => 'interval', proargtypes => 'interval',
-  prosrc => 'aggregate_dummy' },
 { oid => '2129', descr => 'maximum value of all text input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'text',
   proargtypes => 'text', prosrc => 'aggregate_dummy' },
@@ -4329,11 +3436,9 @@
 { oid => '2797', descr => 'maximum value of all tid input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'tid',
   proargtypes => 'tid', prosrc => 'aggregate_dummy' },
-
 { oid => '4189', descr => 'maximum value of all pg_lsn input values',
   proname => 'max', prokind => 'a', proisstrict => 'f', prorettype => 'pg_lsn',
   proargtypes => 'pg_lsn', prosrc => 'aggregate_dummy' },
-
 { oid => '2131', descr => 'minimum value of all bigint input values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'int8',
   proargtypes => 'int8', prosrc => 'aggregate_dummy' },
@@ -4367,10 +3472,6 @@
   proname => 'min', prokind => 'a', proisstrict => 'f',
   prorettype => 'timestamptz', proargtypes => 'timestamptz',
   prosrc => 'aggregate_dummy' },
-{ oid => '2144', descr => 'minimum value of all interval input values',
-  proname => 'min', prokind => 'a', proisstrict => 'f',
-  prorettype => 'interval', proargtypes => 'interval',
-  prosrc => 'aggregate_dummy' },
 { oid => '2145', descr => 'minimum value of all text values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'text',
   proargtypes => 'text', prosrc => 'aggregate_dummy' },
@@ -4384,12 +3485,9 @@
 { oid => '2798', descr => 'minimum value of all tid input values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'tid',
   proargtypes => 'tid', prosrc => 'aggregate_dummy' },
-
 { oid => '4190', descr => 'minimum value of all pg_lsn input values',
   proname => 'min', prokind => 'a', proisstrict => 'f', prorettype => 'pg_lsn',
   proargtypes => 'pg_lsn', prosrc => 'aggregate_dummy' },
-
-# count has two forms: count(any) and count(*)
 { oid => '2147',
   descr => 'number of input rows for which the input expression is not null',
   proname => 'count', prokind => 'a', proisstrict => 'f', prorettype => 'int8',
@@ -4412,7 +3510,6 @@
   proname => 'var_samp', prokind => 'a', proisstrict => 'f',
   prorettype => 'float8', proargtypes => 'float4',
   prosrc => 'aggregate_dummy' },
-
 { oid => '2645',
   descr => 'sample variance of float8 input values (square of the sample standard deviation)',
   proname => 'var_samp', prokind => 'a', proisstrict => 'f',
@@ -4452,7 +3549,6 @@
   proname => 'stddev', prokind => 'a', proisstrict => 'f',
   prorettype => 'float8', proargtypes => 'float8',
   prosrc => 'aggregate_dummy' },
-
 { oid => '2160',
   proname => 'text_pattern_lt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'text text', prosrc => 'text_pattern_lt' },
@@ -4471,7 +3567,6 @@
 { oid => '3332', descr => 'sort support',
   proname => 'bttext_pattern_sortsupport', prorettype => 'void',
   proargtypes => 'internal', prosrc => 'bttext_pattern_sortsupport' },
-
 { oid => '2174',
   proname => 'bpchar_pattern_lt', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'bpchar bpchar', prosrc => 'bpchar_pattern_lt' },
@@ -4490,7 +3585,6 @@
 { oid => '3333', descr => 'sort support',
   proname => 'btbpchar_pattern_sortsupport', prorettype => 'void',
   proargtypes => 'internal', prosrc => 'btbpchar_pattern_sortsupport' },
-
 { oid => '2188', descr => 'less-equal-greater',
   proname => 'btint48cmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'int4 int8', prosrc => 'btint48cmp' },
@@ -4515,7 +3609,6 @@
 { oid => '2195', descr => 'less-equal-greater',
   proname => 'btfloat84cmp', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'float8 float4', prosrc => 'btfloat84cmp' },
-
 { oid => '2212', descr => 'I/O',
   proname => 'regprocedurein', provolatile => 's', prorettype => 'regprocedure',
   proargtypes => 'cstring', prosrc => 'regprocedurein' },
@@ -4571,7 +3664,6 @@
 { oid => '1079', descr => 'convert text to regclass',
   proname => 'regclass', provolatile => 's', prorettype => 'regclass',
   proargtypes => 'text', prosrc => 'text_regclass' },
-
 { oid => '4084', descr => 'I/O',
   proname => 'regnamespacein', provolatile => 's', prorettype => 'regnamespace',
   proargtypes => 'cstring', prosrc => 'regnamespacein' },
@@ -4582,12 +3674,10 @@
   proname => 'to_regnamespace', provolatile => 's',
   prorettype => 'regnamespace', proargtypes => 'text',
   prosrc => 'to_regnamespace' },
-
 { oid => '1268',
   descr => 'parse qualified identifier to array of identifiers',
   proname => 'parse_ident', prorettype => '_text', proargtypes => 'text bool',
   proargnames => '{str,strict}', prosrc => 'parse_ident' },
-
 { oid => '2246', descr => '(internal)',
   proname => 'fmgr_internal_validator', provolatile => 's',
   prorettype => 'void', proargtypes => 'oid',
@@ -4598,14 +3688,6 @@
 { oid => '2248', descr => '(internal)',
   proname => 'fmgr_sql_validator', provolatile => 's', prorettype => 'void',
   proargtypes => 'oid', prosrc => 'fmgr_sql_validator' },
-
-
-
-
-
-
-
-
 { oid => '1269',
   descr => 'bytes required to store the value, perhaps with compression',
   proname => 'pg_column_size', provolatile => 's', prorettype => 'int4',
@@ -4658,7 +3740,6 @@
 { oid => '3034', descr => 'file path of relation',
   proname => 'pg_relation_filepath', provolatile => 's', prorettype => 'text',
   proargtypes => 'regclass', prosrc => 'pg_relation_filepath' },
-
 { oid => '2290', descr => 'I/O',
   proname => 'record_in', provolatile => 's', prorettype => 'record',
   proargtypes => 'cstring oid int4', prosrc => 'record_in' },
@@ -4768,17 +3849,12 @@
   proname => 'anycompatiblenonarray_out', prorettype => 'cstring',
   proargtypes => 'anycompatiblenonarray',
   prosrc => 'anycompatiblenonarray_out' },
-
-# tablesample method handlers
 { oid => '3313', descr => 'BERNOULLI tablesample method handler',
   proname => 'bernoulli', provolatile => 'v', prorettype => 'tsm_handler',
   proargtypes => 'internal', prosrc => 'tsm_bernoulli_handler' },
 { oid => '3314', descr => 'SYSTEM tablesample method handler',
   proname => 'system', provolatile => 'v', prorettype => 'tsm_handler',
   proargtypes => 'internal', prosrc => 'tsm_system_handler' },
-
-
-# crosstype operations for date vs. timestamp and timestamptz
 { oid => '2338',
   proname => 'date_lt_timestamp', prorettype => 'bool',
   proargtypes => 'date timestamp', prosrc => 'date_lt_timestamp' },
@@ -4800,7 +3876,6 @@
 { oid => '2344', descr => 'less-equal-greater',
   proname => 'date_cmp_timestamp', prorettype => 'int4',
   proargtypes => 'date timestamp', prosrc => 'date_cmp_timestamp' },
-
 { oid => '2351',
   proname => 'date_lt_timestamptz', provolatile => 's', prorettype => 'bool',
   proargtypes => 'date timestamptz', prosrc => 'date_lt_timestamptz' },
@@ -4822,7 +3897,6 @@
 { oid => '2357', descr => 'less-equal-greater',
   proname => 'date_cmp_timestamptz', provolatile => 's', prorettype => 'int4',
   proargtypes => 'date timestamptz', prosrc => 'date_cmp_timestamptz' },
-
 { oid => '2364',
   proname => 'timestamp_lt_date', prorettype => 'bool',
   proargtypes => 'timestamp date', prosrc => 'timestamp_lt_date' },
@@ -4844,7 +3918,6 @@
 { oid => '2370', descr => 'less-equal-greater',
   proname => 'timestamp_cmp_date', prorettype => 'int4',
   proargtypes => 'timestamp date', prosrc => 'timestamp_cmp_date' },
-
 { oid => '2377',
   proname => 'timestamptz_lt_date', provolatile => 's', prorettype => 'bool',
   proargtypes => 'timestamptz date', prosrc => 'timestamptz_lt_date' },
@@ -4866,8 +3939,6 @@
 { oid => '2383', descr => 'less-equal-greater',
   proname => 'timestamptz_cmp_date', provolatile => 's', prorettype => 'int4',
   proargtypes => 'timestamptz date', prosrc => 'timestamptz_cmp_date' },
-
-# crosstype operations for timestamp vs. timestamptz
 { oid => '2520',
   proname => 'timestamp_lt_timestamptz', provolatile => 's',
   prorettype => 'bool', proargtypes => 'timestamp timestamptz',
@@ -4896,7 +3967,6 @@
   proname => 'timestamp_cmp_timestamptz', provolatile => 's',
   prorettype => 'int4', proargtypes => 'timestamp timestamptz',
   prosrc => 'timestamp_cmp_timestamptz' },
-
 { oid => '2527',
   proname => 'timestamptz_lt_timestamp', provolatile => 's',
   prorettype => 'bool', proargtypes => 'timestamptz timestamp',
@@ -4925,8 +3995,6 @@
   proname => 'timestamptz_cmp_timestamp', provolatile => 's',
   prorettype => 'int4', proargtypes => 'timestamptz timestamp',
   prosrc => 'timestamptz_cmp_timestamp' },
-
-# send/receive functions
 { oid => '2400', descr => 'I/O',
   proname => 'array_recv', provolatile => 's', prorettype => 'anyarray',
   proargtypes => 'internal oid int4', prosrc => 'array_recv' },
@@ -5011,8 +4079,6 @@
 { oid => '2427', descr => 'I/O',
   proname => 'float8send', prorettype => 'bytea', proargtypes => 'float8',
   prosrc => 'float8send' },
-
-
 { oid => '2430', descr => 'I/O',
   proname => 'bpcharrecv', provolatile => 's', prorettype => 'bpchar',
   proargtypes => 'internal oid int4', prosrc => 'bpcharrecv' },
@@ -5097,7 +4163,6 @@
 { oid => '2455', descr => 'I/O',
   proname => 'regtypesend', prorettype => 'bytea', proargtypes => 'regtype',
   prosrc => 'regtypesend' },
-
 { oid => '4087', descr => 'I/O',
   proname => 'regnamespacerecv', prorettype => 'regnamespace',
   proargtypes => 'internal', prosrc => 'regnamespacerecv' },
@@ -5128,24 +4193,6 @@
 { oid => '2477', descr => 'I/O',
   proname => 'timestamptz_send', prorettype => 'bytea',
   proargtypes => 'timestamptz', prosrc => 'timestamptz_send' },
-{ oid => '2478', descr => 'I/O',
-  proname => 'interval_recv', prorettype => 'interval',
-  proargtypes => 'internal oid int4', prosrc => 'interval_recv' },
-{ oid => '2479', descr => 'I/O',
-  proname => 'interval_send', prorettype => 'bytea', proargtypes => 'interval',
-  prosrc => 'interval_send' },
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '2500', descr => 'I/O',
   proname => 'cstring_recv', provolatile => 's', prorettype => 'cstring',
   proargtypes => 'internal', prosrc => 'cstring_recv' },
@@ -5164,10 +4211,6 @@
 { oid => '3121', descr => 'I/O',
   proname => 'void_send', prorettype => 'bytea', proargtypes => 'void',
   prosrc => 'void_send' },
-
-
-
-# System-view support functions with pretty-print option
 { oid => '2504', descr => 'source text of a rule with pretty-print option',
   proname => 'pg_get_ruledef', provolatile => 's', prorettype => 'text',
   proargtypes => 'oid bool', prosrc => 'pg_get_ruledef_ext' },
@@ -5197,29 +4240,12 @@
   descr => 'deparse an encoded expression with pretty-print option',
   proname => 'pg_get_expr', provolatile => 's', prorettype => 'text',
   proargtypes => 'pg_node_tree oid bool', prosrc => 'pg_get_expr_ext' },
-{ oid => '2599', descr => 'get the available time zone abbreviations',
-  proname => 'pg_timezone_abbrevs', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => '',
-  proallargtypes => '{text,interval,bool}', proargmodes => '{o,o,o}',
-  proargnames => '{abbrev,utc_offset,is_dst}',
-  prosrc => 'pg_timezone_abbrevs' },
-{ oid => '2856', descr => 'get the available time zone names',
-  proname => 'pg_timezone_names', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'record', proargtypes => '',
-  proallargtypes => '{text,text,interval,bool}', proargmodes => '{o,o,o,o}',
-  proargnames => '{name,abbrev,utc_offset,is_dst}',
-  prosrc => 'pg_timezone_names' },
-
-
-# shared memory usage
 { oid => '5052', descr => 'allocations from the main shared memory segment',
   proname => 'pg_get_shmem_allocations', prorows => '50', proretset => 't',
   provolatile => 'v', prorettype => 'record', proargtypes => '',
   proallargtypes => '{text,int8,int8,int8}', proargmodes => '{o,o,o,o}',
   proargnames => '{name,off,size,allocated_size}',
   prosrc => 'pg_get_shmem_allocations' },
-
-# memory context of local backend
 { oid => '2282',
   descr => 'information about all memory contexts of local backend',
   proname => 'pg_get_backend_memory_contexts', prorows => '100',
@@ -5229,14 +4255,10 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o}',
   proargnames => '{name, ident, parent, level, total_bytes, total_nblocks, free_bytes, free_chunks, used_bytes}',
   prosrc => 'pg_get_backend_memory_contexts' },
-
-# logging memory contexts of the specified backend
 { oid => '4543', descr => 'log memory contexts of the specified backend',
   proname => 'pg_log_backend_memory_contexts', provolatile => 'v',
   prorettype => 'bool', proargtypes => 'int4',
   prosrc => 'pg_log_backend_memory_contexts' },
-
-# non-persistent series generator
 { oid => '1066', descr => 'non-persistent series generator',
   proname => 'generate_series', prorows => '1000',
   prosupport => 'generate_series_int4_support', proretset => 't',
@@ -5263,92 +4285,23 @@
 { oid => '3995', descr => 'planner support for generate_series',
   proname => 'generate_series_int8_support', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'generate_series_int8_support' },
-{ oid => '938', descr => 'non-persistent series generator',
-  proname => 'generate_series', prorows => '1000', proretset => 't',
-  prorettype => 'timestamp', proargtypes => 'timestamp timestamp interval',
-  prosrc => 'generate_series_timestamp' },
-{ oid => '939', descr => 'non-persistent series generator',
-  proname => 'generate_series', prorows => '1000', proretset => 't',
-  provolatile => 's', prorettype => 'timestamptz',
-  proargtypes => 'timestamptz timestamptz interval',
-  prosrc => 'generate_series_timestamptz' },
-
-# formerly-missing interval + datetime operators
-{ oid => '2546',
-  proname => 'interval_pl_date', prolang => 'sql', prorettype => 'timestamp',
-  proargtypes => 'interval date', prosrc => 'see system_functions.sql' },
-{ oid => '2548',
-  proname => 'interval_pl_timestamp', prolang => 'sql',
-  prorettype => 'timestamp', proargtypes => 'interval timestamp',
-  prosrc => 'see system_functions.sql' },
-{ oid => '2549',
-  proname => 'interval_pl_timestamptz', prolang => 'sql', provolatile => 's',
-  prorettype => 'timestamptz', proargtypes => 'interval timestamptz',
-  prosrc => 'see system_functions.sql' },
 { oid => '2550',
   proname => 'integer_pl_date', prolang => 'sql', prorettype => 'date',
   proargtypes => 'int4 date', prosrc => 'see system_functions.sql' },
-
-
-
 { oid => '2557', descr => 'convert int4 to boolean',
   proname => 'bool', proleakproof => 't', prorettype => 'bool',
   proargtypes => 'int4', prosrc => 'int4_bool' },
 { oid => '2558', descr => 'convert boolean to int4',
   proname => 'int4', proleakproof => 't', prorettype => 'int4',
   proargtypes => 'bool', prosrc => 'bool_int4' },
-
-# start time function
 { oid => '2560', descr => 'postmaster start time',
   proname => 'pg_postmaster_start_time', provolatile => 's',
   prorettype => 'timestamptz', proargtypes => '',
   prosrc => 'pg_postmaster_start_time' },
-
-# config reload time function
 { oid => '2034', descr => 'configuration load time',
   proname => 'pg_conf_load_time', provolatile => 's', proparallel => 'r',
   prorettype => 'timestamptz', proargtypes => '',
   prosrc => 'pg_conf_load_time' },
-
-# new functions for Y-direction rtree opclasses
-
-
-
-
-
-
-
-
-
-
-
-# support functions for GiST r-tree emulation
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# GIN array support
-
-
-
-
-
-
-# overlap/contains/contained
 { oid => '2747',
   proname => 'arrayoverlap', prorettype => 'bool',
   proargtypes => 'anyarray anyarray', prosrc => 'arrayoverlap' },
@@ -5358,48 +4311,6 @@
 { oid => '2749',
   proname => 'arraycontained', prorettype => 'bool',
   proargtypes => 'anyarray anyarray', prosrc => 'arraycontained' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# userlock replacements
 { oid => '2880', descr => 'obtain exclusive advisory lock',
   proname => 'pg_advisory_lock', provolatile => 'v', proparallel => 'r',
   prorettype => 'void', proargtypes => 'int8',
@@ -5483,7 +4394,6 @@
 { oid => '2892', descr => 'release all advisory locks',
   proname => 'pg_advisory_unlock_all', provolatile => 'v', proparallel => 'r',
   prorettype => 'void', proargtypes => '', prosrc => 'pg_advisory_unlock_all' },
-# pg_lsn
 { oid => '3229', descr => 'I/O',
   proname => 'pg_lsn_in', prorettype => 'pg_lsn', proargtypes => 'cstring',
   prosrc => 'pg_lsn_in' },
@@ -5535,285 +4445,6 @@
 { oid => '5024',
   proname => 'pg_lsn_mii', prorettype => 'pg_lsn',
   proargtypes => 'pg_lsn int8', prosrc => 'pg_lsn_mii' },
-
-
-# text search stuff
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# historical int8/txid_snapshot variants of xid8 functions
 { oid => '2939', descr => 'I/O',
   proname => 'txid_snapshot_in', prorettype => 'txid_snapshot',
   proargtypes => 'cstring', prosrc => 'pg_snapshot_in' },
@@ -5853,8 +4484,6 @@
 { oid => '3360', descr => 'commit status of transaction',
   proname => 'txid_status', provolatile => 'v', prorettype => 'text',
   proargtypes => 'int8', prosrc => 'pg_xact_status' },
-
-# pg_snapshot functions
 { oid => '5055', descr => 'I/O',
   proname => 'pg_snapshot_in', prorettype => 'pg_snapshot',
   proargtypes => 'cstring', prosrc => 'pg_snapshot_in' },
@@ -5884,8 +4513,6 @@
 { oid => '5065', descr => 'is xid8 visible in snapshot?',
   proname => 'pg_visible_in_snapshot', prorettype => 'bool',
   proargtypes => 'xid8 pg_snapshot', prosrc => 'pg_visible_in_snapshot' },
-
-# transaction ID and status functions
 { oid => '5059', descr => 'get current transaction ID',
   proname => 'pg_current_xact_id', provolatile => 's', proparallel => 'u',
   prorettype => 'xid8', proargtypes => '', prosrc => 'pg_current_xact_id' },
@@ -5896,8 +4523,6 @@
 { oid => '5066', descr => 'commit status of transaction',
   proname => 'pg_xact_status', provolatile => 'v', prorettype => 'text',
   proargtypes => 'xid8', prosrc => 'pg_xact_status' },
-
-# record comparison using normal comparison rules
 { oid => '2981',
   proname => 'record_eq', prorettype => 'bool', proargtypes => 'record record',
   prosrc => 'record_eq' },
@@ -5919,15 +4544,12 @@
 { oid => '2987', descr => 'less-equal-greater',
   proname => 'btrecordcmp', prorettype => 'int4',
   proargtypes => 'record record', prosrc => 'btrecordcmp' },
-
 { oid => '6192', descr => 'hash',
   proname => 'hash_record', prorettype => 'int4', proargtypes => 'record',
   prosrc => 'hash_record' },
 { oid => '6193', descr => 'hash',
   proname => 'hash_record_extended', prorettype => 'int8',
   proargtypes => 'record int8', prosrc => 'hash_record_extended' },
-
-# record comparison using raw byte images
 { oid => '3181',
   proname => 'record_image_eq', prorettype => 'bool',
   proargtypes => 'record record', prosrc => 'record_image_eq' },
@@ -5952,8 +4574,6 @@
 { oid => '5051', descr => 'equal image',
   proname => 'btequalimage', prorettype => 'bool', proargtypes => 'oid',
   prosrc => 'btequalimage' },
-
-# Extensions
 { oid => '3082', descr => 'list available extensions',
   proname => 'pg_available_extensions', procost => '10', prorows => '100',
   proretset => 't', provolatile => 's', prorettype => 'record',
@@ -5979,8 +4599,6 @@
   proname => 'pg_extension_config_dump', provolatile => 'v', proparallel => 'u',
   prorettype => 'void', proargtypes => 'regclass text',
   prosrc => 'pg_extension_config_dump' },
-
-# date, time, timestamp constructors
 { oid => '3846', descr => 'construct date',
   proname => 'make_date', prorettype => 'date', proargtypes => 'int4 int4 int4',
   proargnames => '{year,month,day}', prosrc => 'make_date' },
@@ -6003,25 +4621,11 @@
   proargtypes => 'int4 int4 int4 int4 int4 float8 text',
   proargnames => '{year,month,mday,hour,min,sec,timezone}',
   prosrc => 'make_timestamptz_at_timezone' },
-{ oid => '3464', descr => 'construct interval',
-  proname => 'make_interval', prorettype => 'interval',
-  proargtypes => 'int4 int4 int4 int4 int4 int4 float8',
-  proargnames => '{years,months,weeks,days,hours,mins,secs}',
-  prosrc => 'make_interval' },
-
-
-
-
-
-
-# transition function for hypothetical-set aggregates
 { oid => '3971', descr => 'aggregate transition function',
   proname => 'ordered_set_transition_multi', provariadic => 'any',
   proisstrict => 'f', prorettype => 'internal', proargtypes => 'internal any',
   proallargtypes => '{internal,any}', proargmodes => '{i,v}',
   prosrc => 'ordered_set_transition_multi' },
-
-# hypothetical-set aggregates (and their support functions)
 { oid => '3986', descr => 'rank of hypothetical row',
   proname => 'rank', provariadic => 'any', prokind => 'a', proisstrict => 'f',
   prorettype => 'int8', proargtypes => 'any', proallargtypes => '{any}',
@@ -6061,78 +4665,6 @@
   prorettype => 'int8', proargtypes => 'internal any',
   proallargtypes => '{internal,any}', proargmodes => '{i,v}',
   prosrc => 'hypothetical_dense_rank_final' },
-
-# conversion functions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '4374', descr => 'internal conversion function for LATIN1 to UTF8',
   proname => 'iso8859_1_to_utf8', prolang => 'c', prorettype => 'int4',
   proargtypes => 'int4 int4 cstring internal int4 bool',
@@ -6141,19 +4673,6 @@
   proname => 'utf8_to_iso8859_1', prolang => 'c', prorettype => 'int4',
   proargtypes => 'int4 int4 cstring internal int4 bool',
   prosrc => 'utf8_to_iso8859_1', probin => '$libdir/utf8_and_iso8859_1' },
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '5040',
   descr => 'restriction selectivity for generic matching operators',
   proname => 'matchingsel', provolatile => 's', prorettype => 'float8',
@@ -6162,18 +4681,11 @@
   proname => 'matchingjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'matchingjoinsel' },
-
-
-# publications
-
-# pg_config
 { oid => '3400', descr => 'pg_config binary as a function',
   proname => 'pg_config', prorows => '23', proretset => 't', provolatile => 's',
   proparallel => 'r', prorettype => 'record', proargtypes => '',
   proallargtypes => '{text,text}', proargmodes => '{o,o}',
   proargnames => '{name,setting}', prosrc => 'pg_config' },
-
-# pg_controldata related functions
 { oid => '3441',
   descr => 'pg_controldata general state information as a function',
   proname => 'pg_control_system', provolatile => 'v', prorettype => 'record',
@@ -6181,7 +4693,6 @@
   proargmodes => '{o,o,o,o}',
   proargnames => '{pg_control_version,catalog_version_no,system_identifier,pg_control_last_modified}',
   prosrc => 'pg_control_system' },
-
 { oid => '3442',
   descr => 'pg_controldata checkpoint state information as a function',
   proname => 'pg_control_checkpoint', provolatile => 'v',
@@ -6190,7 +4701,6 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o}',
   proargnames => '{checkpoint_lsn,redo_lsn,redo_wal_file,timeline_id,prev_timeline_id,full_page_writes,next_xid,next_oid,next_multixact_id,next_multi_offset,oldest_xid,oldest_xid_dbid,oldest_active_xid,oldest_multi_xid,oldest_multi_dbid,oldest_commit_ts_xid,newest_commit_ts_xid,checkpoint_time}',
   prosrc => 'pg_control_checkpoint' },
-
 { oid => '3443',
   descr => 'pg_controldata recovery state information as a function',
   proname => 'pg_control_recovery', provolatile => 'v', prorettype => 'record',
@@ -6198,7 +4708,6 @@
   proargmodes => '{o,o,o,o,o}',
   proargnames => '{min_recovery_end_lsn,min_recovery_end_timeline,backup_start_lsn,backup_end_lsn,end_of_backup_record_required}',
   prosrc => 'pg_control_recovery' },
-
 { oid => '3444',
   descr => 'pg_controldata init state information as a function',
   proname => 'pg_control_init', provolatile => 'v', prorettype => 'record',
@@ -6207,30 +4716,21 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o,o,o}',
   proargnames => '{max_data_alignment,database_block_size,blocks_per_segment,wal_block_size,bytes_per_wal_segment,max_identifier_length,max_index_columns,max_toast_chunk_size,large_object_chunk_size,float8_pass_by_value,data_page_checksum_version}',
   prosrc => 'pg_control_init' },
-
-# subscripting support for built-in types
 { oid => '6179', descr => 'standard array subscripting support',
   proname => 'array_subscript_handler', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'array_subscript_handler' },
 { oid => '6180', descr => 'raw array subscripting support',
   proname => 'raw_array_subscript_handler', prorettype => 'internal',
   proargtypes => 'internal', prosrc => 'raw_array_subscript_handler' },
-# type subscripting support
-
-
-# collation management functions
 { oid => '3445', descr => 'import collations from operating system',
   proname => 'pg_import_system_collations', procost => '100',
   provolatile => 'v', proparallel => 'u', prorettype => 'int4',
   proargtypes => 'regnamespace', prosrc => 'pg_import_system_collations' },
-
 { oid => '3448',
   descr => 'get actual version of collation from operating system',
   proname => 'pg_collation_actual_version', procost => '100',
   provolatile => 'v', prorettype => 'text', proargtypes => 'oid',
   prosrc => 'pg_collation_actual_version' },
-
-# system management/monitoring related functions
 { oid => '3353', descr => 'list files in the log directory',
   proname => 'pg_ls_logdir', procost => '10', prorows => '20', proretset => 't',
   provolatile => 'v', prorettype => 'record', proargtypes => '',
@@ -6258,22 +4758,18 @@
   proallargtypes => '{oid,text,int8,timestamptz}', proargmodes => '{i,o,o,o}',
   proargnames => '{tablespace,name,size,modification}',
   prosrc => 'pg_ls_tmpdir_1arg' },
-
 { oid => '6198', descr => 'unescape Unicode characters',
   proname => 'unistr', prorettype => 'text', proargtypes => 'text',
   prosrc => 'unistr' },
 { oid => '6203', descr => 'extract field from timestamp with time zone',
   proname => 'extract', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'text timestamptz', prosrc => 'extract_timestamptz' }
-{ oid => '6204', descr => 'extract field from interval',
-  proname => 'extract', prorettype => 'float8', proargtypes => 'text interval',
-  prosrc => 'extract_interval' }
+  proargtypes => 'text timestamptz', prosrc => 'extract_timestamptz' },
 { oid => '6199', descr => 'extract field from date',
   proname => 'extract', prorettype => 'float8', proargtypes => 'text date',
-  prosrc => 'extract_date' }
+  prosrc => 'extract_date' },
 { oid => '6200', descr => 'extract field from time',
   proname => 'extract', prorettype => 'float8', proargtypes => 'text time',
-  prosrc => 'extract_time' }
+  prosrc => 'extract_time' },
 { oid => '6202', descr => 'extract field from timestamp',
   proname => 'extract', prorettype => 'float8',
   proargtypes => 'text timestamp', prosrc => 'extract_timestamp' }

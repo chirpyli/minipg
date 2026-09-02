@@ -580,66 +580,10 @@ SELECT d1 FROM TIMESTAMPTZ_TBL
 
 SELECT d1 - timestamp with time zone '1997-01-02' AS diff
    FROM TIMESTAMPTZ_TBL WHERE d1 BETWEEN '1902-01-01' AND '2038-01-01';
-                  diff                  
-----------------------------------------
- @ 9863 days ago
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 2 secs
- @ 40 days 1 hour 32 mins 1.4 secs
- @ 40 days 1 hour 32 mins 1.5 secs
- @ 40 days 1 hour 32 mins 1.6 secs
- @ 0
- @ 3 hours 4 mins 5 secs
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 160 days 32 mins 1 sec
- @ 1724 days 18 hours 19 mins 20 secs
- @ 1168 days 16 hours 14 mins 1 sec
- @ 1168 days 12 hours 14 mins 2 secs
- @ 1168 days 10 hours 14 mins 3 secs
- @ 1168 days 11 hours 14 mins 4 secs
- @ 1168 days 9 hours 14 mins 5 secs
- @ 40 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 22 hours 32 mins 1 sec
- @ 189 days 22 hours 32 mins 1 sec
- @ 160 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 40 days 17 hours 32 mins 1 sec
- @ 41 days 17 hours 32 mins 1 sec
- @ 42 days 17 hours 32 mins 1 sec
- @ 43 days 17 hours 32 mins 1 sec
- @ 44 days 17 hours 32 mins 1 sec
- @ 45 days 17 hours 32 mins 1 sec
- @ 45 days 17 hours 32 mins 1 sec
- @ 308 days 6 hours 27 mins 59 secs ago
- @ 307 days 6 hours 27 mins 59 secs ago
- @ 306 days 6 hours 27 mins 59 secs ago
- @ 2 days 6 hours 27 mins 59 secs ago
- @ 1 day 6 hours 27 mins 59 secs ago
- @ 6 hours 27 mins 59 secs ago
- @ 57 days 17 hours 32 mins 1 sec
- @ 58 days 17 hours 32 mins 1 sec
- @ 362 days 17 hours 32 mins 1 sec
- @ 363 days 17 hours 32 mins 1 sec
- @ 1093 days 17 hours 32 mins 1 sec
- @ 1094 days 17 hours 32 mins 1 sec
- @ 1459 days 17 hours 32 mins 1 sec
- @ 1460 days 17 hours 32 mins 1 sec
-(56 rows)
-
+ERROR:  operator does not exist: timestamp with time zone - timestamp with time zone
+LINE 1: SELECT d1 - timestamp with time zone '1997-01-02' AS diff
+                  ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT date_trunc( 'week', timestamp with time zone '2004-02-29 15:44:17.71393' ) AS week_trunc;
           week_trunc          
 ------------------------------
@@ -679,16 +623,9 @@ FROM (
   ('microsecond', '1 us')
 ) intervals (str, interval),
 (VALUES (timestamptz '2020-02-29 15:44:17.71393+00')) ts (ts);
-     str     | interval | equal 
--------------+----------+-------
- day         | 1 d      | t
- hour        | 1 h      | t
- minute      | 1 m      | t
- second      | 1 s      | t
- millisecond | 1 ms     | t
- microsecond | 1 us     | t
-(6 rows)
-
+ERROR:  syntax error at or near "interval"
+LINE 4: ...trunc(str, ts, 'Etc/GMT-10') = date_bin(interval::interval, ...
+                                                             ^
 -- bin timestamps into arbitrary intervals
 SELECT
   interval,
@@ -707,113 +644,59 @@ FROM (
 ) intervals (interval),
 (VALUES (timestamptz '2020-02-11 15:44:17.71393')) ts (ts),
 (VALUES (timestamptz '2001-01-01')) origin (origin);
-     interval      |                 ts                 |            origin            |              date_bin              
--------------------+------------------------------------+------------------------------+------------------------------------
- 15 days           | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Thu Feb 06 00:00:00 2020 UTC
- 2 hours           | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 14:00:00 2020 UTC
- 1 hour 30 minutes | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 15:00:00 2020 UTC
- 15 minutes        | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 15:30:00 2020 UTC
- 10 seconds        | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 15:44:10 2020 UTC
- 100 milliseconds  | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 15:44:17.7 2020 UTC
- 250 microseconds  | Tue Feb 11 15:44:17.71393 2020 UTC | Mon Jan 01 00:00:00 2001 UTC | Tue Feb 11 15:44:17.71375 2020 UTC
-(7 rows)
-
+ERROR:  syntax error at or near "interval"
+LINE 5:   date_bin(interval::interval, ts, origin)
+                             ^
 -- shift bins using the origin parameter:
 SELECT date_bin('5 min'::interval, timestamptz '2020-02-01 01:01:01+00', timestamptz '2020-02-01 00:02:30+00');
-           date_bin           
-------------------------------
- Sat Feb 01 00:57:30 2020 UTC
-(1 row)
-
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('5 min'::interval, timestamptz '2020-02-01 0...
+                                 ^
 -- test roundoff edge case when source < origin
 SELECT date_bin('30 minutes'::interval, timestamptz '2024-02-01 15:00:00', timestamptz '2024-02-01 17:00:00');
-           date_bin           
-------------------------------
- Thu Feb 01 15:00:00 2024 UTC
-(1 row)
-
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('30 minutes'::interval, timestamptz '2024-02...
+                                      ^
 -- disallow intervals with months or years
 SELECT date_bin('5 months'::interval, timestamp with time zone '2020-02-01 01:01:01+00', timestamp with time zone '2001-01-01+00');
-ERROR:  timestamps cannot be binned into intervals containing months or years
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('5 months'::interval, timestamp with time zo...
+                                    ^
 SELECT date_bin('5 years'::interval,  timestamp with time zone '2020-02-01 01:01:01+00', timestamp with time zone '2001-01-01+00');
-ERROR:  timestamps cannot be binned into intervals containing months or years
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('5 years'::interval,  timestamp with time zo...
+                                   ^
 -- disallow zero intervals
 SELECT date_bin('0 days'::interval, timestamp with time zone '1970-01-01 01:00:00+00' , timestamp with time zone '1970-01-01 00:00:00+00');
-ERROR:  stride must be greater than zero
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('0 days'::interval, timestamp with time zone...
+                                  ^
 -- disallow negative intervals
 SELECT date_bin('-2 days'::interval, timestamp with time zone '1970-01-01 01:00:00+00' , timestamp with time zone '1970-01-01 00:00:00+00');
-ERROR:  stride must be greater than zero
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT date_bin('-2 days'::interval, timestamp with time zon...
+                                   ^
 -- test overflow cases
 select date_bin('15 minutes'::interval, timestamptz '294276-12-30', timestamptz '4000-12-20 BC');
-ERROR:  interval out of range
+ERROR:  syntax error at or near "interval"
+LINE 1: select date_bin('15 minutes'::interval, timestamptz '294276-...
+                                      ^
 select date_bin('200000000 days'::interval, '2024-02-01'::timestamptz, '2024-01-01'::timestamptz);
-ERROR:  interval out of range
+ERROR:  syntax error at or near "interval"
+LINE 1: select date_bin('200000000 days'::interval, '2024-02-01'::ti...
+                                          ^
 select date_bin('365000 days'::interval, '4400-01-01 BC'::timestamptz, '4000-01-01 BC'::timestamptz);
-ERROR:  timestamp out of range
+ERROR:  syntax error at or near "interval"
+LINE 1: select date_bin('365000 days'::interval, '4400-01-01 BC'::ti...
+                                       ^
 -- Test casting within a BETWEEN qualifier
 SELECT d1 - timestamp with time zone '1997-01-02' AS diff
   FROM TIMESTAMPTZ_TBL
   WHERE d1 BETWEEN timestamp with time zone '1902-01-01' AND timestamp with time zone '2038-01-01';
-                  diff                  
-----------------------------------------
- @ 9863 days ago
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 2 secs
- @ 40 days 1 hour 32 mins 1.4 secs
- @ 40 days 1 hour 32 mins 1.5 secs
- @ 40 days 1 hour 32 mins 1.6 secs
- @ 0
- @ 3 hours 4 mins 5 secs
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 160 days 32 mins 1 sec
- @ 1724 days 18 hours 19 mins 20 secs
- @ 1168 days 16 hours 14 mins 1 sec
- @ 1168 days 12 hours 14 mins 2 secs
- @ 1168 days 10 hours 14 mins 3 secs
- @ 1168 days 11 hours 14 mins 4 secs
- @ 1168 days 9 hours 14 mins 5 secs
- @ 40 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 40 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 39 days 22 hours 32 mins 1 sec
- @ 189 days 22 hours 32 mins 1 sec
- @ 160 days 1 hour 32 mins 1 sec
- @ 39 days 17 hours 32 mins 1 sec
- @ 40 days 17 hours 32 mins 1 sec
- @ 41 days 17 hours 32 mins 1 sec
- @ 42 days 17 hours 32 mins 1 sec
- @ 43 days 17 hours 32 mins 1 sec
- @ 44 days 17 hours 32 mins 1 sec
- @ 45 days 17 hours 32 mins 1 sec
- @ 45 days 17 hours 32 mins 1 sec
- @ 308 days 6 hours 27 mins 59 secs ago
- @ 307 days 6 hours 27 mins 59 secs ago
- @ 306 days 6 hours 27 mins 59 secs ago
- @ 2 days 6 hours 27 mins 59 secs ago
- @ 1 day 6 hours 27 mins 59 secs ago
- @ 6 hours 27 mins 59 secs ago
- @ 57 days 17 hours 32 mins 1 sec
- @ 58 days 17 hours 32 mins 1 sec
- @ 362 days 17 hours 32 mins 1 sec
- @ 363 days 17 hours 32 mins 1 sec
- @ 1093 days 17 hours 32 mins 1 sec
- @ 1094 days 17 hours 32 mins 1 sec
- @ 1459 days 17 hours 32 mins 1 sec
- @ 1460 days 17 hours 32 mins 1 sec
-(56 rows)
-
+ERROR:  operator does not exist: timestamp with time zone - timestamp with time zone
+LINE 1: SELECT d1 - timestamp with time zone '1997-01-02' AS diff
+                  ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 -- DATE_PART (timestamptz_part)
 SELECT d1 as timestamptz,
    date_part( 'year', d1) AS year, date_part( 'month', d1) AS month,
@@ -1408,62 +1291,24 @@ RESET TimeZone;
 select * from generate_series('2020-01-01 00:00'::timestamptz,
                               '2020-01-02 03:00'::timestamptz,
                               '1 hour'::interval);
-       generate_series        
-------------------------------
- Wed Jan 01 00:00:00 2020 UTC
- Wed Jan 01 01:00:00 2020 UTC
- Wed Jan 01 02:00:00 2020 UTC
- Wed Jan 01 03:00:00 2020 UTC
- Wed Jan 01 04:00:00 2020 UTC
- Wed Jan 01 05:00:00 2020 UTC
- Wed Jan 01 06:00:00 2020 UTC
- Wed Jan 01 07:00:00 2020 UTC
- Wed Jan 01 08:00:00 2020 UTC
- Wed Jan 01 09:00:00 2020 UTC
- Wed Jan 01 10:00:00 2020 UTC
- Wed Jan 01 11:00:00 2020 UTC
- Wed Jan 01 12:00:00 2020 UTC
- Wed Jan 01 13:00:00 2020 UTC
- Wed Jan 01 14:00:00 2020 UTC
- Wed Jan 01 15:00:00 2020 UTC
- Wed Jan 01 16:00:00 2020 UTC
- Wed Jan 01 17:00:00 2020 UTC
- Wed Jan 01 18:00:00 2020 UTC
- Wed Jan 01 19:00:00 2020 UTC
- Wed Jan 01 20:00:00 2020 UTC
- Wed Jan 01 21:00:00 2020 UTC
- Wed Jan 01 22:00:00 2020 UTC
- Wed Jan 01 23:00:00 2020 UTC
- Thu Jan 02 00:00:00 2020 UTC
- Thu Jan 02 01:00:00 2020 UTC
- Thu Jan 02 02:00:00 2020 UTC
- Thu Jan 02 03:00:00 2020 UTC
-(28 rows)
-
+ERROR:  syntax error at or near "interval"
+LINE 3:                               '1 hour'::interval);
+                                                ^
 -- the LIMIT should allow this to terminate in a reasonable amount of time
 -- (but that unfortunately doesn't work yet for SELECT * FROM ...)
 select generate_series('2022-01-01 00:00'::timestamptz,
                        'infinity'::timestamptz,
                        '1 month'::interval) limit 10;
-       generate_series        
-------------------------------
- Sat Jan 01 00:00:00 2022 UTC
- Tue Feb 01 00:00:00 2022 UTC
- Tue Mar 01 00:00:00 2022 UTC
- Fri Apr 01 00:00:00 2022 UTC
- Sun May 01 00:00:00 2022 UTC
- Wed Jun 01 00:00:00 2022 UTC
- Fri Jul 01 00:00:00 2022 UTC
- Mon Aug 01 00:00:00 2022 UTC
- Thu Sep 01 00:00:00 2022 UTC
- Sat Oct 01 00:00:00 2022 UTC
-(10 rows)
-
+ERROR:  syntax error at or near "interval"
+LINE 3:                        '1 month'::interval) limit 10;
+                                          ^
 -- errors
 select * from generate_series('2020-01-01 00:00'::timestamptz,
                               '2020-01-02 03:00'::timestamptz,
                               '0 hour'::interval);
-ERROR:  step size cannot equal zero
+ERROR:  syntax error at or near "interval"
+LINE 3:                               '0 hour'::interval);
+                                                ^
 --
 -- Test behavior with fixed-offset timezones.
 -- minipg ships only UTC and the Etc/GMT* fixed-offset zones; the historical

@@ -430,9 +430,9 @@ datum_image_hash(Datum value, bool typByVal, int typLen)
 Datum
 btequalimage(PG_FUNCTION_ARGS)
 {
-	Oid			opcintype = PG_GETARG_OID(0);
+	PG_GETARG_OID(0);
 
-	PG_RETURN_BOOL(opcintype != INTERVALOID);
+	PG_RETURN_BOOL(true);
 }
 
 /*-------------------------------------------------------------------------

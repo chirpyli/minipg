@@ -159,12 +159,6 @@ CREATE VIEW pg_file_settings AS
    SELECT * FROM pg_show_all_file_settings() AS A;
 
 
-CREATE VIEW pg_timezone_abbrevs AS
-    SELECT * FROM pg_timezone_abbrevs();
-
-CREATE VIEW pg_timezone_names AS
-    SELECT * FROM pg_timezone_names();
-
 CREATE VIEW pg_config AS
     SELECT * FROM pg_config();
 

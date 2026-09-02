@@ -1,22 +1,4 @@
-#----------------------------------------------------------------------
-#
-# pg_operator.dat
-#    Initial contents of the pg_operator system catalog.
-#
-# Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
-# Portions Copyright (c) 1994, Regents of the University of California
-#
-# src/include/catalog/pg_operator.dat
-#
-#----------------------------------------------------------------------
-# Note: every entry in pg_operator.dat is expected to have a 'descr' comment.
-# If the operator is a deprecated equivalent of some other entry, be sure
-# to comment it as such so that initdb doesn't think it's a preferred name
-# for the underlying function.
-
 [
-
-
 { oid => '15', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'int4',
   oprright => 'int8', oprresult => 'bool', oprcom => '=(int8,int4)',
@@ -42,7 +24,6 @@
   oprname => '>=', oprleft => 'int4', oprright => 'int8', oprresult => 'bool',
   oprcom => '<=(int8,int4)', oprnegate => '<(int4,int8)', oprcode => 'int48ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '58', descr => 'less than',
   oprname => '<', oprleft => 'bool', oprright => 'bool', oprresult => 'bool',
   oprcom => '>(bool,bool)', oprnegate => '>=(bool,bool)', oprcode => 'boollt',
@@ -68,7 +49,6 @@
   oprname => '>=', oprleft => 'bool', oprright => 'bool', oprresult => 'bool',
   oprcom => '<=(bool,bool)', oprnegate => '<(bool,bool)', oprcode => 'boolge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '92', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'char',
   oprright => 'char', oprresult => 'bool', oprcom => '=(char,char)',
@@ -106,7 +86,6 @@
   oprname => '^@', oprleft => 'text', oprright => 'text', oprresult => 'bool',
   oprcode => 'starts_with', oprrest => 'prefixsel',
   oprjoin => 'prefixjoinsel' },
-
 { oid => '254', oid_symbol => 'NameEqualTextOperator', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'name',
   oprright => 'text', oprresult => 'bool', oprcom => '=(text,name)',
@@ -166,7 +145,6 @@
   oprname => '<>', oprleft => 'text', oprright => 'name', oprresult => 'bool',
   oprcom => '<>(name,text)', oprnegate => '=(text,name)',
   oprcode => 'textnename', oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-
 { oid => '349', descr => 'append element onto end of array',
   oprname => '||', oprleft => 'anycompatiblearray', oprright => 'anycompatible',
   oprresult => 'anycompatiblearray', oprcode => 'array_append' },
@@ -177,7 +155,6 @@
   oprname => '||', oprleft => 'anycompatiblearray',
   oprright => 'anycompatiblearray', oprresult => 'anycompatiblearray',
   oprcode => 'array_cat' },
-
 { oid => '352', descr => 'equal',
   oprname => '=', oprcanhash => 't', oprleft => 'xid', oprright => 'xid',
   oprresult => 'bool', oprcom => '=(xid,xid)', oprnegate => '<>(xid,xid)',
@@ -223,7 +200,6 @@
   oprname => '=', oprcanhash => 't', oprleft => 'cid', oprright => 'cid',
   oprresult => 'bool', oprcom => '=(cid,cid)', oprcode => 'cideq',
   oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-
 { oid => '387', oid_symbol => 'TIDEqualOperator', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'tid',
   oprright => 'tid', oprresult => 'bool', oprcom => '=(tid,tid)',
@@ -251,7 +227,6 @@
   oprname => '>=', oprleft => 'tid', oprright => 'tid', oprresult => 'bool',
   oprcom => '<=(tid,tid)', oprnegate => '<(tid,tid)', oprcode => 'tidge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '410', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'int8',
   oprright => 'int8', oprresult => 'bool', oprcom => '=(int8,int8)',
@@ -277,7 +252,6 @@
   oprname => '>=', oprleft => 'int8', oprright => 'int8', oprresult => 'bool',
   oprcom => '<=(int8,int8)', oprnegate => '<(int8,int8)', oprcode => 'int8ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '416', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'int8',
   oprright => 'int4', oprresult => 'bool', oprcom => '=(int4,int8)',
@@ -309,44 +283,12 @@
 { oid => '473', descr => 'absolute value',
   oprname => '@', oprkind => 'l', oprleft => '0', oprright => 'int8',
   oprresult => 'int8', oprcode => 'int8abs' },
-
 { oid => '484', descr => 'negate',
   oprname => '-', oprkind => 'l', oprleft => '0', oprright => 'int8',
   oprresult => 'int8', oprcode => 'int8um' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '514', descr => 'multiply',
   oprname => '*', oprleft => 'int4', oprright => 'int4', oprresult => 'int4',
   oprcom => '*(int4,int4)', oprcode => 'int4mul' },
-
 { oid => '518', descr => 'not equal',
   oprname => '<>', oprleft => 'int4', oprright => 'int4', oprresult => 'bool',
   oprcom => '<>(int4,int4)', oprnegate => '=(int4,int4)', oprcode => 'int4ne',
@@ -532,7 +474,6 @@
 { oid => '597', descr => 'cube root',
   oprname => '||/', oprkind => 'l', oprleft => '0', oprright => 'float8',
   oprresult => 'float8', oprcode => 'dcbrt' },
-
 { oid => '607', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'oid',
   oprright => 'oid', oprresult => 'bool', oprcom => '=(oid,oid)',
@@ -558,7 +499,6 @@
   oprname => '>=', oprleft => 'oid', oprright => 'oid', oprresult => 'bool',
   oprcom => '<=(oid,oid)', oprnegate => '<(oid,oid)', oprcode => 'oidge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '644', descr => 'not equal',
   oprname => '<>', oprleft => 'oidvector', oprright => 'oidvector',
   oprresult => 'bool', oprcom => '<>(oidvector,oidvector)',
@@ -589,20 +529,6 @@
   oprright => 'oidvector', oprresult => 'bool',
   oprcom => '=(oidvector,oidvector)', oprnegate => '<>(oidvector,oidvector)',
   oprcode => 'oidvectoreq', oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '620', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'float4',
   oprright => 'float4', oprresult => 'bool', oprcom => '=(float4,float4)',
@@ -637,7 +563,6 @@
   oprname => '<>', oprleft => 'char', oprright => 'char', oprresult => 'bool',
   oprcom => '<>(char,char)', oprnegate => '=(char,char)', oprcode => 'charne',
   oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-
 { oid => '631', descr => 'less than',
   oprname => '<', oprleft => 'char', oprright => 'char', oprresult => 'bool',
   oprcom => '>(char,char)', oprnegate => '>=(char,char)', oprcode => 'charlt',
@@ -654,7 +579,6 @@
   oprname => '>=', oprleft => 'char', oprright => 'char', oprresult => 'bool',
   oprcom => '<=(char,char)', oprnegate => '<(char,char)', oprcode => 'charge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '643', descr => 'not equal',
   oprname => '<>', oprleft => 'name', oprright => 'name', oprresult => 'bool',
   oprcom => '<>(name,name)', oprnegate => '=(name,name)', oprcode => 'namene',
@@ -662,7 +586,6 @@
 { oid => '654', descr => 'concatenate',
   oprname => '||', oprleft => 'text', oprright => 'text', oprresult => 'text',
   oprcode => 'textcat' },
-
 { oid => '660', descr => 'less than',
   oprname => '<', oprleft => 'name', oprright => 'name', oprresult => 'bool',
   oprcom => '>(name,name)', oprnegate => '>=(name,name)', oprcode => 'namelt',
@@ -696,7 +619,6 @@
   oprname => '>=', oprleft => 'text', oprright => 'text', oprresult => 'bool',
   oprcom => '<=(text,text)', oprnegate => '<(text,text)', oprcode => 'text_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '670', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'float8',
   oprright => 'float8', oprresult => 'bool', oprcom => '=(float8,float8)',
@@ -727,7 +649,6 @@
   oprresult => 'bool', oprcom => '<=(float8,float8)',
   oprnegate => '<(float8,float8)', oprcode => 'float8ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '682', descr => 'absolute value',
   oprname => '@', oprkind => 'l', oprleft => '0', oprright => 'int2',
   oprresult => 'int2', oprcode => 'int2abs' },
@@ -743,7 +664,6 @@
 { oid => '687', descr => 'divide',
   oprname => '/', oprleft => 'int8', oprright => 'int8', oprresult => 'int8',
   oprcode => 'int8div' },
-
 { oid => '688', descr => 'add',
   oprname => '+', oprleft => 'int8', oprright => 'int4', oprresult => 'int8',
   oprcom => '+(int4,int8)', oprcode => 'int84pl' },
@@ -768,7 +688,6 @@
 { oid => '695', descr => 'divide',
   oprname => '/', oprleft => 'int4', oprright => 'int8', oprresult => 'int8',
   oprcode => 'int48div' },
-
 { oid => '818', descr => 'add',
   oprname => '+', oprleft => 'int8', oprright => 'int2', oprresult => 'int8',
   oprcom => '+(int2,int8)', oprcode => 'int82pl' },
@@ -793,70 +712,17 @@
 { oid => '825', descr => 'divide',
   oprname => '/', oprleft => 'int2', oprright => 'int8', oprresult => 'int8',
   oprcode => 'int28div' },
-# add translation/rotation/scaling operators for geometric types. - thomas 97/05/10
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '773', descr => 'absolute value',
   oprname => '@', oprkind => 'l', oprleft => '0', oprright => 'int4',
   oprresult => 'int4', oprcode => 'int4abs' },
-# additional operators for geometric types - thomas 1997-07-09
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '965', descr => 'exponentiation',
   oprname => '^', oprleft => 'float8', oprright => 'float8',
   oprresult => 'float8', oprcode => 'dpow' },
-# additional geometric operators - thomas 1997-07-09
-
-
-
-
-
 { oid => '1054', oid_symbol => 'BpcharEqualOperator', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'bpchar',
   oprright => 'bpchar', oprresult => 'bool', oprcom => '=(bpchar,bpchar)',
   oprnegate => '<>(bpchar,bpchar)', oprcode => 'bpchareq', oprrest => 'eqsel',
   oprjoin => 'eqjoinsel' },
-
 { oid => '1057', descr => 'not equal',
   oprname => '<>', oprleft => 'bpchar', oprright => 'bpchar',
   oprresult => 'bool', oprcom => '<>(bpchar,bpchar)',
@@ -883,8 +749,6 @@
   oprresult => 'bool', oprcom => '<=(bpchar,bpchar)',
   oprnegate => '<(bpchar,bpchar)', oprcode => 'bpcharge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# generic array comparison operators
-
 { oid => '1070', oid_symbol => 'ARRAY_EQ_OP', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'anyarray',
   oprright => 'anyarray', oprresult => 'bool', oprcom => '=(anyarray,anyarray)',
@@ -915,15 +779,6 @@
   oprresult => 'bool', oprcom => '<=(anyarray,anyarray)',
   oprnegate => '<(anyarray,anyarray)', oprcode => 'array_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# date operators
-
-{ oid => '1076', descr => 'add',
-  oprname => '+', oprleft => 'date', oprright => 'interval',
-  oprresult => 'timestamp', oprcom => '+(interval,date)',
-  oprcode => 'date_pl_interval' },
-{ oid => '1077', descr => 'subtract',
-  oprname => '-', oprleft => 'date', oprright => 'interval',
-  oprresult => 'timestamp', oprcode => 'date_mi_interval' },
 { oid => '1093', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'date',
   oprright => 'date', oprresult => 'bool', oprcom => '=(date,date)',
@@ -958,8 +813,6 @@
 { oid => '1101', descr => 'subtract',
   oprname => '-', oprleft => 'date', oprright => 'int4', oprresult => 'date',
   oprcode => 'date_mii' },
-# time operators
-
 { oid => '1108', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'time',
   oprright => 'time', oprresult => 'bool', oprcom => '=(time,time)',
@@ -985,8 +838,6 @@
   oprname => '>=', oprleft => 'time', oprright => 'time', oprresult => 'bool',
   oprcom => '<=(time,time)', oprnegate => '<(time,time)', oprcode => 'time_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# float48 operators
-
 { oid => '1116', descr => 'add',
   oprname => '+', oprleft => 'float4', oprright => 'float8',
   oprresult => 'float8', oprcom => '+(float8,float4)', oprcode => 'float48pl' },
@@ -1030,8 +881,6 @@
   oprresult => 'bool', oprcom => '<=(float8,float4)',
   oprnegate => '<(float4,float8)', oprcode => 'float48ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# float84 operators
-
 { oid => '1126', descr => 'add',
   oprname => '+', oprleft => 'float8', oprright => 'float4',
   oprresult => 'float8', oprcom => '+(float4,float8)', oprcode => 'float84pl' },
@@ -1075,8 +924,6 @@
   oprresult => 'bool', oprcom => '<=(float4,float8)',
   oprnegate => '<(float8,float4)', oprcode => 'float84ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# LIKE hacks by Keith Parks.
-
 { oid => '1207', oid_symbol => 'OID_NAME_LIKE_OP',
   descr => 'matches LIKE expression',
   oprname => '~~', oprleft => 'name', oprright => 'text', oprresult => 'bool',
@@ -1104,9 +951,6 @@
   oprname => '!~~', oprleft => 'bpchar', oprright => 'text',
   oprresult => 'bool', oprnegate => '~~(bpchar,text)', oprcode => 'bpcharnlike',
   oprrest => 'nlikesel', oprjoin => 'nlikejoinsel' },
-# timestamptz operators
-
-
 { oid => '1320', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't',
   oprleft => 'timestamptz', oprright => 'timestamptz', oprresult => 'bool',
@@ -1138,60 +982,6 @@
   oprresult => 'bool', oprcom => '<=(timestamptz,timestamptz)',
   oprnegate => '<(timestamptz,timestamptz)', oprcode => 'timestamptz_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-{ oid => '1327', descr => 'add',
-  oprname => '+', oprleft => 'timestamptz', oprright => 'interval',
-  oprresult => 'timestamptz', oprcom => '+(interval,timestamptz)',
-  oprcode => 'timestamptz_pl_interval' },
-{ oid => '1328', descr => 'subtract',
-  oprname => '-', oprleft => 'timestamptz', oprright => 'timestamptz',
-  oprresult => 'interval', oprcode => 'timestamptz_mi' },
-{ oid => '1329', descr => 'subtract',
-  oprname => '-', oprleft => 'timestamptz', oprright => 'interval',
-  oprresult => 'timestamptz', oprcode => 'timestamptz_mi_interval' },
-# interval operators
-
-{ oid => '1330', descr => 'equal',
-  oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'interval',
-  oprright => 'interval', oprresult => 'bool', oprcom => '=(interval,interval)',
-  oprnegate => '<>(interval,interval)', oprcode => 'interval_eq',
-  oprrest => 'eqsel', oprjoin => 'eqjoinsel' },
-{ oid => '1331', descr => 'not equal',
-  oprname => '<>', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'bool', oprcom => '<>(interval,interval)',
-  oprnegate => '=(interval,interval)', oprcode => 'interval_ne',
-  oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-{ oid => '1332', descr => 'less than',
-  oprname => '<', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'bool', oprcom => '>(interval,interval)',
-  oprnegate => '>=(interval,interval)', oprcode => 'interval_lt',
-  oprrest => 'scalarltsel', oprjoin => 'scalarltjoinsel' },
-{ oid => '1333', descr => 'less than or equal',
-  oprname => '<=', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'bool', oprcom => '>=(interval,interval)',
-  oprnegate => '>(interval,interval)', oprcode => 'interval_le',
-  oprrest => 'scalarlesel', oprjoin => 'scalarlejoinsel' },
-{ oid => '1334', descr => 'greater than',
-  oprname => '>', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'bool', oprcom => '<(interval,interval)',
-  oprnegate => '<=(interval,interval)', oprcode => 'interval_gt',
-  oprrest => 'scalargtsel', oprjoin => 'scalargtjoinsel' },
-{ oid => '1335', descr => 'greater than or equal',
-  oprname => '>=', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'bool', oprcom => '<=(interval,interval)',
-  oprnegate => '<(interval,interval)', oprcode => 'interval_ge',
-  oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
-{ oid => '1336', descr => 'negate',
-  oprname => '-', oprkind => 'l', oprleft => '0', oprright => 'interval',
-  oprresult => 'interval', oprcode => 'interval_um' },
-{ oid => '1337', descr => 'add',
-  oprname => '+', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'interval', oprcom => '+(interval,interval)',
-  oprcode => 'interval_pl' },
-{ oid => '1338', descr => 'subtract',
-  oprname => '-', oprleft => 'interval', oprright => 'interval',
-  oprresult => 'interval', oprcode => 'interval_mi' },
-
 { oid => '1360', descr => 'convert date and time to timestamp',
   oprname => '+', oprleft => 'date', oprright => 'time',
   oprresult => 'timestamp', oprcom => '+(time,date)',
@@ -1200,151 +990,6 @@
   oprname => '+', oprleft => 'time', oprright => 'date',
   oprresult => 'timestamp', oprcom => '+(date,time)',
   oprcode => 'timedate_pl' },
-
-{ oid => '1399', descr => 'subtract',
-  oprname => '-', oprleft => 'time', oprright => 'time',
-  oprresult => 'interval', oprcode => 'time_mi_time' },
-# additional geometric operators - thomas 97/04/18
-# additional geometric operators - thomas 1997-07-09
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-{ oid => '1583', descr => 'multiply',
-  oprname => '*', oprleft => 'interval', oprright => 'float8',
-  oprresult => 'interval', oprcom => '*(float8,interval)',
-  oprcode => 'interval_mul' },
-{ oid => '1584', descr => 'multiply',
-  oprname => '*', oprleft => 'float8', oprright => 'interval',
-  oprresult => 'interval', oprcom => '*(interval,float8)',
-  oprcode => 'mul_d_interval' },
-{ oid => '1585', descr => 'divide',
-  oprname => '/', oprleft => 'interval', oprright => 'float8',
-  oprresult => 'interval', oprcode => 'interval_div' },
-# MACADDR type
-# MACADDR8 type
-# INET type (these also support CIDR via implicit cast)
-# case-insensitive LIKE hacks
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '1625', oid_symbol => 'OID_NAME_ICLIKE_OP',
   descr => 'matches LIKE expression, case-insensitive',
   oprname => '~~*', oprleft => 'name', oprright => 'text', oprresult => 'bool',
@@ -1374,23 +1019,6 @@
   oprresult => 'bool', oprnegate => '~~*(bpchar,text)',
   oprcode => 'bpcharicnlike', oprrest => 'icnlikesel',
   oprjoin => 'icnlikejoinsel' },
-# NUMERIC type - OID's 1700-1799
-
-
-{ oid => '1800', descr => 'add',
-  oprname => '+', oprleft => 'time', oprright => 'interval',
-  oprresult => 'time', oprcom => '+(interval,time)',
-  oprcode => 'time_pl_interval' },
-{ oid => '1801', descr => 'subtract',
-  oprname => '-', oprleft => 'time', oprright => 'interval',
-  oprresult => 'time', oprcode => 'time_mi_interval' },
-
-
-{ oid => '1849', descr => 'add',
-  oprname => '+', oprleft => 'interval', oprright => 'time',
-  oprresult => 'time', oprcom => '+(time,interval)',
-  oprcode => 'interval_pl_time' },
-
 { oid => '1862', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'int2',
   oprright => 'int8', oprresult => 'bool', oprcom => '=(int8,int2)',
@@ -1416,7 +1044,6 @@
   oprname => '>=', oprleft => 'int2', oprright => 'int8', oprresult => 'bool',
   oprcom => '<=(int8,int2)', oprnegate => '<(int2,int8)', oprcode => 'int28ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '1868', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'int8',
   oprright => 'int2', oprresult => 'bool', oprcom => '=(int2,int8)',
@@ -1442,7 +1069,6 @@
   oprname => '>=', oprleft => 'int8', oprright => 'int2', oprresult => 'bool',
   oprcom => '<=(int2,int8)', oprnegate => '<(int8,int2)', oprcode => 'int82ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-
 { oid => '1874', descr => 'bitwise and',
   oprname => '&', oprleft => 'int2', oprright => 'int2', oprresult => 'int2',
   oprcom => '&(int2,int2)', oprcode => 'int2and' },
@@ -1461,7 +1087,6 @@
 { oid => '1879', descr => 'bitwise shift right',
   oprname => '>>', oprleft => 'int2', oprright => 'int4', oprresult => 'int2',
   oprcode => 'int2shr' },
-
 { oid => '1880', descr => 'bitwise and',
   oprname => '&', oprleft => 'int4', oprright => 'int4', oprresult => 'int4',
   oprcom => '&(int4,int4)', oprcode => 'int4and' },
@@ -1480,7 +1105,6 @@
 { oid => '1885', descr => 'bitwise shift right',
   oprname => '>>', oprleft => 'int4', oprright => 'int4', oprresult => 'int4',
   oprcode => 'int4shr' },
-
 { oid => '1886', descr => 'bitwise and',
   oprname => '&', oprleft => 'int8', oprright => 'int8', oprresult => 'int8',
   oprcom => '&(int8,int8)', oprcode => 'int8and' },
@@ -1499,7 +1123,6 @@
 { oid => '1891', descr => 'bitwise shift right',
   oprname => '>>', oprleft => 'int8', oprright => 'int4', oprresult => 'int8',
   oprcode => 'int8shr' },
-
 { oid => '1916', descr => 'unary plus',
   oprname => '+', oprkind => 'l', oprleft => '0', oprright => 'int8',
   oprresult => 'int8', oprcode => 'int8up' },
@@ -1515,8 +1138,6 @@
 { oid => '1920', descr => 'unary plus',
   oprname => '+', oprkind => 'l', oprleft => '0', oprright => 'float8',
   oprresult => 'float8', oprcode => 'float8up' },
-# bytea operators
-
 { oid => '1955', oid_symbol => 'ByteaEqualOperator', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'bytea',
   oprright => 'bytea', oprresult => 'bool', oprcom => '=(bytea,bytea)',
@@ -1547,7 +1168,6 @@
   oprcom => '<=(bytea,bytea)', oprnegate => '<(bytea,bytea)',
   oprcode => 'byteage', oprrest => 'scalargesel',
   oprjoin => 'scalargejoinsel' },
-
 { oid => '2016', oid_symbol => 'OID_BYTEA_LIKE_OP',
   descr => 'matches LIKE expression',
   oprname => '~~', oprleft => 'bytea', oprright => 'bytea', oprresult => 'bool',
@@ -1560,8 +1180,6 @@
 { oid => '2018', descr => 'concatenate',
   oprname => '||', oprleft => 'bytea', oprright => 'bytea',
   oprresult => 'bytea', oprcode => 'byteacat' },
-# timestamp operators
-
 { oid => '2060', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'timestamp',
   oprright => 'timestamp', oprresult => 'bool',
@@ -1592,18 +1210,6 @@
   oprresult => 'bool', oprcom => '<=(timestamp,timestamp)',
   oprnegate => '<(timestamp,timestamp)', oprcode => 'timestamp_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-{ oid => '2066', descr => 'add',
-  oprname => '+', oprleft => 'timestamp', oprright => 'interval',
-  oprresult => 'timestamp', oprcom => '+(interval,timestamp)',
-  oprcode => 'timestamp_pl_interval' },
-{ oid => '2067', descr => 'subtract',
-  oprname => '-', oprleft => 'timestamp', oprright => 'timestamp',
-  oprresult => 'interval', oprcode => 'timestamp_mi' },
-{ oid => '2068', descr => 'subtract',
-  oprname => '-', oprleft => 'timestamp', oprright => 'interval',
-  oprresult => 'timestamp', oprcode => 'timestamp_mi_interval' },
-# character-by-character (not collation order) comparison operators for character types
-
 { oid => '2314', oid_symbol => 'TextPatternLessOperator',
   descr => 'less than',
   oprname => '~<~', oprleft => 'text', oprright => 'text', oprresult => 'bool',
@@ -1626,7 +1232,6 @@
   oprcom => '~<~(text,text)', oprnegate => '~<=~(text,text)',
   oprcode => 'text_pattern_gt', oprrest => 'scalargtsel',
   oprjoin => 'scalargtjoinsel' },
-
 { oid => '2326', oid_symbol => 'BpcharPatternLessOperator',
   descr => 'less than',
   oprname => '~<~', oprleft => 'bpchar', oprright => 'bpchar',
@@ -1649,8 +1254,6 @@
   oprresult => 'bool', oprcom => '~<~(bpchar,bpchar)',
   oprnegate => '~<=~(bpchar,bpchar)', oprcode => 'bpchar_pattern_gt',
   oprrest => 'scalargtsel', oprjoin => 'scalargtjoinsel' },
-# crosstype operations for date vs. timestamp and timestamptz
-
 { oid => '2345', descr => 'less than',
   oprname => '<', oprleft => 'date', oprright => 'timestamp',
   oprresult => 'bool', oprcom => '>(timestamp,date)',
@@ -1681,7 +1284,6 @@
   oprresult => 'bool', oprcom => '<>(timestamp,date)',
   oprnegate => '=(date,timestamp)', oprcode => 'date_ne_timestamp',
   oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-
 { oid => '2358', descr => 'less than',
   oprname => '<', oprleft => 'date', oprright => 'timestamptz',
   oprresult => 'bool', oprcom => '>(timestamptz,date)',
@@ -1713,7 +1315,6 @@
   oprresult => 'bool', oprcom => '<>(timestamptz,date)',
   oprnegate => '=(date,timestamptz)', oprcode => 'date_ne_timestamptz',
   oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-
 { oid => '2371', descr => 'less than',
   oprname => '<', oprleft => 'timestamp', oprright => 'date',
   oprresult => 'bool', oprcom => '>(date,timestamp)',
@@ -1744,7 +1345,6 @@
   oprresult => 'bool', oprcom => '<>(date,timestamp)',
   oprnegate => '=(timestamp,date)', oprcode => 'timestamp_ne_date',
   oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-
 { oid => '2384', descr => 'less than',
   oprname => '<', oprleft => 'timestamptz', oprright => 'date',
   oprresult => 'bool', oprcom => '>(date,timestamptz)',
@@ -1775,8 +1375,6 @@
   oprresult => 'bool', oprcom => '<>(date,timestamptz)',
   oprnegate => '=(timestamptz,date)', oprcode => 'timestamptz_ne_date',
   oprrest => 'neqsel', oprjoin => 'neqjoinsel' },
-# crosstype operations for timestamp vs. timestamptz
-
 { oid => '2534', descr => 'less than',
   oprname => '<', oprleft => 'timestamp', oprright => 'timestamptz',
   oprresult => 'bool', oprcom => '>(timestamptz,timestamp)',
@@ -1814,7 +1412,6 @@
   oprnegate => '=(timestamp,timestamptz)',
   oprcode => 'timestamp_ne_timestamptz', oprrest => 'neqsel',
   oprjoin => 'neqjoinsel' },
-
 { oid => '2540', descr => 'less than',
   oprname => '<', oprleft => 'timestamptz', oprright => 'timestamp',
   oprresult => 'bool', oprcom => '>(timestamp,timestamptz)',
@@ -1852,37 +1449,9 @@
   oprnegate => '=(timestamptz,timestamp)',
   oprcode => 'timestamptz_ne_timestamp', oprrest => 'neqsel',
   oprjoin => 'neqjoinsel' },
-# formerly-missing interval + datetime operators
-
-{ oid => '2551', descr => 'add',
-  oprname => '+', oprleft => 'interval', oprright => 'date',
-  oprresult => 'timestamp', oprcom => '+(date,interval)',
-  oprcode => 'interval_pl_date' },
-{ oid => '2553', descr => 'add',
-  oprname => '+', oprleft => 'interval', oprright => 'timestamp',
-  oprresult => 'timestamp', oprcom => '+(timestamp,interval)',
-  oprcode => 'interval_pl_timestamp' },
-{ oid => '2554', descr => 'add',
-  oprname => '+', oprleft => 'interval', oprright => 'timestamptz',
-  oprresult => 'timestamptz', oprcom => '+(timestamptz,interval)',
-  oprcode => 'interval_pl_timestamptz' },
 { oid => '2555', descr => 'add',
   oprname => '+', oprleft => 'int4', oprright => 'date', oprresult => 'date',
   oprcom => '+(date,int4)', oprcode => 'integer_pl_date' },
-# new operators for Y-direction rtree opfamilies
-# overlap/contains/contained for arrays
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '2750', oid_symbol => 'OID_ARRAY_OVERLAP_OP', descr => 'overlaps',
   oprname => '&&', oprleft => 'anyarray', oprright => 'anyarray',
   oprresult => 'bool', oprcom => '&&(anyarray,anyarray)',
@@ -1899,15 +1468,12 @@
   oprresult => 'bool', oprcom => '@>(anyarray,anyarray)',
   oprcode => 'arraycontained', oprrest => 'arraycontsel',
   oprjoin => 'arraycontjoinsel' },
-# capturing operators to preserve pre-8.3 behavior of text concatenation
-
 { oid => '2779', descr => 'concatenate',
   oprname => '||', oprleft => 'text', oprright => 'anynonarray',
   oprresult => 'text', oprcode => 'textanycat' },
 { oid => '2780', descr => 'concatenate',
   oprname => '||', oprleft => 'anynonarray', oprright => 'text',
   oprresult => 'text', oprcode => 'anytextcat' },
-# pg_lsn operators
 { oid => '3222', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'pg_lsn',
   oprright => 'pg_lsn', oprresult => 'bool', oprcom => '=(pg_lsn,pg_lsn)',
@@ -1938,35 +1504,6 @@
   oprresult => 'bool', oprcom => '<=(pg_lsn,pg_lsn)',
   oprnegate => '<(pg_lsn,pg_lsn)', oprcode => 'pg_lsn_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# tsearch operations
-# generic record comparison operators
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 { oid => '2988', oid_symbol => 'RECORD_EQ_OP', descr => 'equal',
   oprname => '=', oprcanmerge => 't', oprcanhash => 't', oprleft => 'record',
   oprright => 'record', oprresult => 'bool', oprcom => '=(record,record)',
@@ -1997,8 +1534,6 @@
   oprresult => 'bool', oprcom => '<=(record,record)',
   oprnegate => '<(record,record)', oprcode => 'record_ge',
   oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# byte-oriented tests for identical rows and fast sorting
-
 { oid => '3188', descr => 'identical',
   oprname => '*=', oprcanmerge => 't', oprleft => 'record',
   oprright => 'record', oprresult => 'bool', oprcom => '*=(record,record)',
@@ -2028,38 +1563,5 @@
   oprname => '*>=', oprleft => 'record', oprright => 'record',
   oprresult => 'bool', oprcom => '*<=(record,record)',
   oprnegate => '*<(record,record)', oprcode => 'record_image_ge',
-  oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' },
-# generic range type operators
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  oprrest => 'scalargesel', oprjoin => 'scalargejoinsel' }
 ]

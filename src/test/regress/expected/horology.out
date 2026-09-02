@@ -278,136 +278,100 @@ ERROR:  time with time zone is not supported
 SELECT date '2001-02-03' + time with time zone '04:05:06 UTC' AS "Date + Time UTC";
 ERROR:  time with time zone is not supported
 SELECT date '1991-02-03' + interval '2 years' AS "Add Two Years";
-      Add Two Years       
---------------------------
- Wed Feb 03 00:00:00 1993
-(1 row)
-
+ERROR:  syntax error at or near "'2 years'"
+LINE 1: SELECT date '1991-02-03' + interval '2 years' AS "Add Two Ye...
+                                            ^
 SELECT date '2001-12-13' - interval '2 years' AS "Subtract Two Years";
-    Subtract Two Years    
---------------------------
- Mon Dec 13 00:00:00 1999
-(1 row)
-
+ERROR:  syntax error at or near "'2 years'"
+LINE 1: SELECT date '2001-12-13' - interval '2 years' AS "Subtract T...
+                                            ^
 -- subtract time from date should not make sense; use interval instead
 SELECT date '1991-02-03' - time '04:05:06' AS "Subtract Time";
-      Subtract Time       
---------------------------
- Sat Feb 02 19:54:54 1991
-(1 row)
-
+ERROR:  operator does not exist: date - time without time zone
+LINE 1: SELECT date '1991-02-03' - time '04:05:06' AS "Subtract Time...
+                                 ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT date '1991-02-03' - time with time zone '04:05:06 UTC' AS "Subtract Time UTC";
 ERROR:  time with time zone is not supported
 --
 -- timestamp, interval arithmetic
 --
 SELECT timestamp without time zone '1996-03-01' - interval '1 second' AS "Feb 29";
-          Feb 29          
---------------------------
- Thu Feb 29 23:59:59 1996
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ...mestamp without time zone '1996-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp without time zone '1999-03-01' - interval '1 second' AS "Feb 28";
-          Feb 28          
---------------------------
- Sun Feb 28 23:59:59 1999
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ...mestamp without time zone '1999-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp without time zone '2000-03-01' - interval '1 second' AS "Feb 29";
-          Feb 29          
---------------------------
- Tue Feb 29 23:59:59 2000
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ...mestamp without time zone '2000-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp without time zone '1999-12-01' + interval '1 month - 1 second' AS "Dec 31";
-          Dec 31          
---------------------------
- Fri Dec 31 23:59:59 1999
-(1 row)
-
+ERROR:  syntax error at or near "'1 month - 1 second'"
+LINE 1: ...mestamp without time zone '1999-12-01' + interval '1 month -...
+                                                             ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '106000000 days' AS "Feb 23, 285506";
-       Feb 23, 285506       
-----------------------------
- Fri Feb 23 00:00:00 285506
-(1 row)
-
+ERROR:  syntax error at or near "'106000000 days'"
+LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '106000000...
+                                                             ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '107000000 days' AS "Jan 20, 288244";
-       Jan 20, 288244       
-----------------------------
- Sat Jan 20 00:00:00 288244
-(1 row)
-
+ERROR:  syntax error at or near "'107000000 days'"
+LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '107000000...
+                                                             ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '109203489 days' AS "Dec 31, 294276";
-       Dec 31, 294276       
-----------------------------
- Sun Dec 31 00:00:00 294276
-(1 row)
-
+ERROR:  syntax error at or near "'109203489 days'"
+LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '109203489...
+                                                             ^
 SELECT timestamp without time zone '2000-01-01' - interval '2483590 days' AS "out of range";
-ERROR:  timestamp out of range
+ERROR:  syntax error at or near "'2483590 days'"
+LINE 1: ...mestamp without time zone '2000-01-01' - interval '2483590 d...
+                                                             ^
 SELECT timestamp without time zone '12/31/294276' - timestamp without time zone '12/23/1999' AS "106751991 Days";
-  106751991 Days  
-------------------
- @ 106751991 days
-(1 row)
-
+ERROR:  operator does not exist: timestamp without time zone - timestamp without time zone
+LINE 1: SELECT timestamp without time zone '12/31/294276' - timestam...
+                                                          ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 -- Shorthand values
 -- Not directly usable for regression testing since these are not constants.
 -- So, just try to test parser and hope for the best - thomas 97/04/26
 SELECT (timestamp without time zone 'today' = (timestamp without time zone 'yesterday' + interval '1 day')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day')) ...
+                                                             ^
 SELECT (timestamp without time zone 'today' = (timestamp without time zone 'tomorrow' - interval '1 day')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ...timestamp without time zone 'tomorrow' - interval '1 day')) ...
+                                                             ^
 SELECT (timestamp without time zone 'today 10:30' = (timestamp without time zone 'yesterday' + interval '1 day 10 hr 30 min')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day 10 hr 30 min'"
+LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day 10 ...
+                                                             ^
 SELECT (timestamp without time zone '10:30 today' = (timestamp without time zone 'yesterday' + interval '1 day 10 hr 30 min')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day 10 hr 30 min'"
+LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day 10 ...
+                                                             ^
 SELECT (timestamp without time zone 'tomorrow' = (timestamp without time zone 'yesterday' + interval '2 days')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'2 days'"
+LINE 1: ...imestamp without time zone 'yesterday' + interval '2 days'))...
+                                                             ^
 SELECT (timestamp without time zone 'tomorrow 16:00:00' = (timestamp without time zone 'today' + interval '1 day 16 hours')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day 16 hours'"
+LINE 1: ...= (timestamp without time zone 'today' + interval '1 day 16 ...
+                                                             ^
 SELECT (timestamp without time zone '16:00:00 tomorrow' = (timestamp without time zone 'today' + interval '1 day 16 hours')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day 16 hours'"
+LINE 1: ...= (timestamp without time zone 'today' + interval '1 day 16 ...
+                                                             ^
 SELECT (timestamp without time zone 'yesterday 12:34:56' = (timestamp without time zone 'tomorrow' - interval '2 days - 12:34:56')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'2 days - 12:34:56'"
+LINE 1: ...timestamp without time zone 'tomorrow' - interval '2 days - ...
+                                                             ^
 SELECT (timestamp without time zone '12:34:56 yesterday' = (timestamp without time zone 'tomorrow' - interval '2 days - 12:34:56')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'2 days - 12:34:56'"
+LINE 1: ...timestamp without time zone 'tomorrow' - interval '2 days - ...
+                                                             ^
 SELECT (timestamp without time zone 'tomorrow' > 'now') as "True";
  True 
 ------
@@ -430,189 +394,45 @@ SELECT date '1994-01-01' + time '10:00' AS "Jan_01_1994_10am";
 (1 row)
 
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMP_TBL;
-          one_year           
------------------------------
- -infinity
- infinity
- Fri Jan 01 00:00:00 1971
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:02 1998
- Tue Feb 10 17:32:01.4 1998
- Tue Feb 10 17:32:01.5 1998
- Tue Feb 10 17:32:01.6 1998
- Fri Jan 02 00:00:00 1998
- Fri Jan 02 03:04:05 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Wed Jun 10 17:32:01 1998
- Sun Sep 22 18:19:20 2002
- Thu Mar 15 08:14:01 2001
- Thu Mar 15 13:14:02 2001
- Thu Mar 15 12:14:03 2001
- Thu Mar 15 03:14:04 2001
- Thu Mar 15 02:14:05 2001
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:00 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Tue Feb 10 17:32:01 1998
- Wed Jun 10 18:32:01 1998
- Tue Feb 10 17:32:01 1998
- Wed Feb 11 17:32:01 1998
- Thu Feb 12 17:32:01 1998
- Fri Feb 13 17:32:01 1998
- Sat Feb 14 17:32:01 1998
- Sun Feb 15 17:32:01 1998
- Mon Feb 16 17:32:01 1998
- Thu Feb 16 17:32:01 0096 BC
- Sun Feb 16 17:32:01 0098
- Fri Feb 16 17:32:01 0598
- Wed Feb 16 17:32:01 1098
- Sun Feb 16 17:32:01 1698
- Fri Feb 16 17:32:01 1798
- Wed Feb 16 17:32:01 1898
- Mon Feb 16 17:32:01 1998
- Sun Feb 16 17:32:01 2098
- Fri Feb 28 17:32:01 1997
- Fri Feb 28 17:32:01 1997
- Sat Mar 01 17:32:01 1997
- Tue Dec 30 17:32:01 1997
- Wed Dec 31 17:32:01 1997
- Thu Jan 01 17:32:01 1998
- Sat Feb 28 17:32:01 1998
- Sun Mar 01 17:32:01 1998
- Wed Dec 30 17:32:01 1998
- Thu Dec 31 17:32:01 1998
- Sun Dec 31 17:32:01 2000
- Mon Jan 01 17:32:01 2001
- Mon Dec 31 17:32:01 2001
- Tue Jan 01 17:32:01 2002
-(65 rows)
-
+ERROR:  syntax error at or near "'1 year'"
+LINE 1: SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMP_TBL...
+                             ^
 SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMP_TBL;
-          one_year           
------------------------------
- -infinity
- infinity
- Wed Jan 01 00:00:00 1969
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:02 1996
- Sat Feb 10 17:32:01.4 1996
- Sat Feb 10 17:32:01.5 1996
- Sat Feb 10 17:32:01.6 1996
- Tue Jan 02 00:00:00 1996
- Tue Jan 02 03:04:05 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Mon Jun 10 17:32:01 1996
- Fri Sep 22 18:19:20 2000
- Mon Mar 15 08:14:01 1999
- Mon Mar 15 13:14:02 1999
- Mon Mar 15 12:14:03 1999
- Mon Mar 15 03:14:04 1999
- Mon Mar 15 02:14:05 1999
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:00 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sat Feb 10 17:32:01 1996
- Mon Jun 10 18:32:01 1996
- Sat Feb 10 17:32:01 1996
- Sun Feb 11 17:32:01 1996
- Mon Feb 12 17:32:01 1996
- Tue Feb 13 17:32:01 1996
- Wed Feb 14 17:32:01 1996
- Thu Feb 15 17:32:01 1996
- Fri Feb 16 17:32:01 1996
- Mon Feb 16 17:32:01 0098 BC
- Thu Feb 16 17:32:01 0096
- Tue Feb 16 17:32:01 0596
- Sun Feb 16 17:32:01 1096
- Thu Feb 16 17:32:01 1696
- Tue Feb 16 17:32:01 1796
- Sun Feb 16 17:32:01 1896
- Fri Feb 16 17:32:01 1996
- Thu Feb 16 17:32:01 2096
- Tue Feb 28 17:32:01 1995
- Tue Feb 28 17:32:01 1995
- Wed Mar 01 17:32:01 1995
- Sat Dec 30 17:32:01 1995
- Sun Dec 31 17:32:01 1995
- Mon Jan 01 17:32:01 1996
- Wed Feb 28 17:32:01 1996
- Fri Mar 01 17:32:01 1996
- Mon Dec 30 17:32:01 1996
- Tue Dec 31 17:32:01 1996
- Thu Dec 31 17:32:01 1998
- Fri Jan 01 17:32:01 1999
- Fri Dec 31 17:32:01 1999
- Sat Jan 01 17:32:01 2000
-(65 rows)
-
+ERROR:  syntax error at or near "'1 year'"
+LINE 1: SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMP_TBL...
+                             ^
 SELECT timestamp with time zone '1996-03-01' - interval '1 second' AS "Feb 29";
-            Feb 29            
-------------------------------
- Thu Feb 29 23:59:59 1996 UTC
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ... timestamp with time zone '1996-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp with time zone '1999-03-01' - interval '1 second' AS "Feb 28";
-            Feb 28            
-------------------------------
- Sun Feb 28 23:59:59 1999 UTC
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ... timestamp with time zone '1999-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp with time zone '2000-03-01' - interval '1 second' AS "Feb 29";
-            Feb 29            
-------------------------------
- Tue Feb 29 23:59:59 2000 UTC
-(1 row)
-
+ERROR:  syntax error at or near "'1 second'"
+LINE 1: ... timestamp with time zone '2000-03-01' - interval '1 second'...
+                                                             ^
 SELECT timestamp with time zone '1999-12-01' + interval '1 month - 1 second' AS "Dec 31";
-            Dec 31            
-------------------------------
- Fri Dec 31 23:59:59 1999 UTC
-(1 row)
-
+ERROR:  syntax error at or near "'1 month - 1 second'"
+LINE 1: ... timestamp with time zone '1999-12-01' + interval '1 month -...
+                                                             ^
 SELECT timestamp with time zone '2000-01-01' - interval '2483590 days' AS "out of range";
-ERROR:  timestamp out of range
+ERROR:  syntax error at or near "'2483590 days'"
+LINE 1: ... timestamp with time zone '2000-01-01' - interval '2483590 d...
+                                                             ^
 SELECT (timestamp with time zone 'today' = (timestamp with time zone 'yesterday' + interval '1 day')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ... (timestamp with time zone 'yesterday' + interval '1 day')) ...
+                                                             ^
 SELECT (timestamp with time zone 'today' = (timestamp with time zone 'tomorrow' - interval '1 day')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ...= (timestamp with time zone 'tomorrow' - interval '1 day')) ...
+                                                             ^
 SELECT (timestamp with time zone 'tomorrow' = (timestamp with time zone 'yesterday' + interval '2 days')) as "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'2 days'"
+LINE 1: ... (timestamp with time zone 'yesterday' + interval '2 days'))...
+                                                             ^
 SELECT (timestamp with time zone 'tomorrow' > 'now') as "True";
  True 
 ------
@@ -623,29 +443,21 @@ SELECT (timestamp with time zone 'tomorrow' > 'now') as "True";
 -- (just for fun, let's use an intentionally nonstandard POSIX zone spec)
 SET TIME ZONE 'CST7CDT,M4.1.0,M10.5.0';
 SELECT timestamp with time zone '2005-04-02 12:00-07' + interval '1 day' as "Apr 3, 12:00";
-         Apr 3, 12:00         
-------------------------------
- Sun Apr 03 12:00:00 2005 CDT
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ...p with time zone '2005-04-02 12:00-07' + interval '1 day' as...
+                                                             ^
 SELECT timestamp with time zone '2005-04-02 12:00-07' + interval '24 hours' as "Apr 3, 13:00";
-         Apr 3, 13:00         
-------------------------------
- Sun Apr 03 13:00:00 2005 CDT
-(1 row)
-
+ERROR:  syntax error at or near "'24 hours'"
+LINE 1: ...p with time zone '2005-04-02 12:00-07' + interval '24 hours'...
+                                                             ^
 SELECT timestamp with time zone '2005-04-03 12:00-06' - interval '1 day' as "Apr 2, 12:00";
-         Apr 2, 12:00         
-------------------------------
- Sat Apr 02 12:00:00 2005 CST
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 1: ...p with time zone '2005-04-03 12:00-06' - interval '1 day' as...
+                                                             ^
 SELECT timestamp with time zone '2005-04-03 12:00-06' - interval '24 hours' as "Apr 2, 11:00";
-         Apr 2, 11:00         
-------------------------------
- Sat Apr 02 11:00:00 2005 CST
-(1 row)
-
+ERROR:  syntax error at or near "'24 hours'"
+LINE 1: ...p with time zone '2005-04-03 12:00-06' - interval '24 hours'...
+                                                             ^
 RESET TIME ZONE;
 SELECT timestamptz(date '1994-01-01', time '11:00') AS "Jan_01_1994_10am";
        Jan_01_1994_10am       
@@ -666,190 +478,46 @@ ERROR:  time with time zone is not supported
 SELECT timestamptz(date '1994-01-01', time with time zone '11:00-5') AS "Jan_01_1994_8am";
 ERROR:  time with time zone is not supported
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_TBL;
-            one_year             
----------------------------------
- -infinity
- infinity
- Fri Jan 01 00:00:00 1971 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:02 1998 UTC
- Wed Feb 11 01:32:01.4 1998 UTC
- Wed Feb 11 01:32:01.5 1998 UTC
- Wed Feb 11 01:32:01.6 1998 UTC
- Fri Jan 02 00:00:00 1998 UTC
- Fri Jan 02 03:04:05 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Thu Jun 11 00:32:01 1998 UTC
- Sun Sep 22 18:19:20 2002 UTC
- Thu Mar 15 16:14:01 2001 UTC
- Thu Mar 15 12:14:02 2001 UTC
- Thu Mar 15 10:14:03 2001 UTC
- Thu Mar 15 11:14:04 2001 UTC
- Thu Mar 15 09:14:05 2001 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Tue Feb 10 17:32:01 1998 UTC
- Tue Feb 10 17:32:00 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Wed Feb 11 01:32:01 1998 UTC
- Tue Feb 10 17:32:01 1998 UTC
- Tue Feb 10 17:32:01 1998 UTC
- Tue Feb 10 17:32:01 1998 UTC
- Tue Feb 10 22:32:01 1998 UTC
- Fri Jul 10 22:32:01 1998 UTC
- Thu Jun 11 01:32:01 1998 UTC
- Tue Feb 10 17:32:01 1998 UTC
- Wed Feb 11 17:32:01 1998 UTC
- Thu Feb 12 17:32:01 1998 UTC
- Fri Feb 13 17:32:01 1998 UTC
- Sat Feb 14 17:32:01 1998 UTC
- Sun Feb 15 17:32:01 1998 UTC
- Mon Feb 16 17:32:01 1998 UTC
- Thu Feb 16 17:32:01 0096 UTC BC
- Sun Feb 16 17:32:01 0098 UTC
- Fri Feb 16 17:32:01 0598 UTC
- Wed Feb 16 17:32:01 1098 UTC
- Sun Feb 16 17:32:01 1698 UTC
- Fri Feb 16 17:32:01 1798 UTC
- Wed Feb 16 17:32:01 1898 UTC
- Mon Feb 16 17:32:01 1998 UTC
- Sun Feb 16 17:32:01 2098 UTC
- Fri Feb 28 17:32:01 1997 UTC
- Fri Feb 28 17:32:01 1997 UTC
- Sat Mar 01 17:32:01 1997 UTC
- Tue Dec 30 17:32:01 1997 UTC
- Wed Dec 31 17:32:01 1997 UTC
- Thu Jan 01 17:32:01 1998 UTC
- Sat Feb 28 17:32:01 1998 UTC
- Sun Mar 01 17:32:01 1998 UTC
- Wed Dec 30 17:32:01 1998 UTC
- Thu Dec 31 17:32:01 1998 UTC
- Sun Dec 31 17:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC
- Mon Dec 31 17:32:01 2001 UTC
- Tue Jan 01 17:32:01 2002 UTC
-(66 rows)
-
+ERROR:  syntax error at or near "'1 year'"
+LINE 1: SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_T...
+                             ^
 SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMPTZ_TBL;
-            one_year             
----------------------------------
- -infinity
- infinity
- Wed Jan 01 00:00:00 1969 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:02 1996 UTC
- Sun Feb 11 01:32:01.4 1996 UTC
- Sun Feb 11 01:32:01.5 1996 UTC
- Sun Feb 11 01:32:01.6 1996 UTC
- Tue Jan 02 00:00:00 1996 UTC
- Tue Jan 02 03:04:05 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Tue Jun 11 00:32:01 1996 UTC
- Fri Sep 22 18:19:20 2000 UTC
- Mon Mar 15 16:14:01 1999 UTC
- Mon Mar 15 12:14:02 1999 UTC
- Mon Mar 15 10:14:03 1999 UTC
- Mon Mar 15 11:14:04 1999 UTC
- Mon Mar 15 09:14:05 1999 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sat Feb 10 17:32:01 1996 UTC
- Sat Feb 10 17:32:00 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sun Feb 11 01:32:01 1996 UTC
- Sat Feb 10 17:32:01 1996 UTC
- Sat Feb 10 17:32:01 1996 UTC
- Sat Feb 10 17:32:01 1996 UTC
- Sat Feb 10 22:32:01 1996 UTC
- Wed Jul 10 22:32:01 1996 UTC
- Tue Jun 11 01:32:01 1996 UTC
- Sat Feb 10 17:32:01 1996 UTC
- Sun Feb 11 17:32:01 1996 UTC
- Mon Feb 12 17:32:01 1996 UTC
- Tue Feb 13 17:32:01 1996 UTC
- Wed Feb 14 17:32:01 1996 UTC
- Thu Feb 15 17:32:01 1996 UTC
- Fri Feb 16 17:32:01 1996 UTC
- Mon Feb 16 17:32:01 0098 UTC BC
- Thu Feb 16 17:32:01 0096 UTC
- Tue Feb 16 17:32:01 0596 UTC
- Sun Feb 16 17:32:01 1096 UTC
- Thu Feb 16 17:32:01 1696 UTC
- Tue Feb 16 17:32:01 1796 UTC
- Sun Feb 16 17:32:01 1896 UTC
- Fri Feb 16 17:32:01 1996 UTC
- Thu Feb 16 17:32:01 2096 UTC
- Tue Feb 28 17:32:01 1995 UTC
- Tue Feb 28 17:32:01 1995 UTC
- Wed Mar 01 17:32:01 1995 UTC
- Sat Dec 30 17:32:01 1995 UTC
- Sun Dec 31 17:32:01 1995 UTC
- Mon Jan 01 17:32:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC
- Thu Dec 31 17:32:01 1998 UTC
- Fri Jan 01 17:32:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC
-(66 rows)
-
+ERROR:  syntax error at or near "'1 year'"
+LINE 1: SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMPTZ_T...
+                             ^
 --
 -- time, interval arithmetic
 --
 SELECT CAST(time '01:02' AS interval) AS "+01:02";
-     +01:02      
------------------
- @ 1 hour 2 mins
-(1 row)
-
+ERROR:  syntax error at or near "interval"
+LINE 1: SELECT CAST(time '01:02' AS interval) AS "+01:02";
+                                    ^
 SELECT CAST(interval '02:03' AS time) AS "02:03:00";
- 02:03:00 
-----------
- 02:03:00
-(1 row)
-
+ERROR:  syntax error at or near "'02:03'"
+LINE 1: SELECT CAST(interval '02:03' AS time) AS "02:03:00";
+                             ^
 SELECT time '01:30' + interval '02:01' AS "03:31:00";
- 03:31:00 
-----------
- 03:31:00
-(1 row)
-
+ERROR:  syntax error at or near "'02:01'"
+LINE 1: SELECT time '01:30' + interval '02:01' AS "03:31:00";
+                                       ^
 SELECT time '01:30' - interval '02:01' AS "23:29:00";
- 23:29:00 
-----------
- 23:29:00
-(1 row)
-
+ERROR:  syntax error at or near "'02:01'"
+LINE 1: SELECT time '01:30' - interval '02:01' AS "23:29:00";
+                                       ^
 SELECT time '02:30' + interval '36:01' AS "14:31:00";
- 14:31:00 
-----------
- 14:31:00
-(1 row)
-
+ERROR:  syntax error at or near "'36:01'"
+LINE 1: SELECT time '02:30' + interval '36:01' AS "14:31:00";
+                                       ^
 SELECT time '03:30' + interval '1 month 04:01' AS "07:31:00";
- 07:31:00 
-----------
- 07:31:00
-(1 row)
-
+ERROR:  syntax error at or near "'1 month 04:01'"
+LINE 1: SELECT time '03:30' + interval '1 month 04:01' AS "07:31:00"...
+                                       ^
 SELECT CAST(time with time zone '01:02-08' AS interval) AS "+00:01";
 ERROR:  time with time zone is not supported
 SELECT CAST(interval '02:03' AS time with time zone) AS "02:03:00-08";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "'02:03'"
+LINE 1: SELECT CAST(interval '02:03' AS time with time zone) AS "02:...
+                             ^
 SELECT time with time zone '01:30-08' - interval '02:01' AS "23:29:00-08";
 ERROR:  time with time zone is not supported
 SELECT time with time zone '02:30-08' + interval '36:01' AS "14:31:00-08";
@@ -870,231 +538,15 @@ SELECT t.d1 AS t, i.f1 AS i, t.d1 + i.f1 AS "add", t.d1 - i.f1 AS "subtract"
   WHERE t.d1 BETWEEN '1990-01-01' AND '2001-01-01'
     AND i.f1 BETWEEN '00:00' AND '23:00'
   ORDER BY 1,2;
-             t              |     i     |            add             |          subtract          
-----------------------------+-----------+----------------------------+----------------------------
- Wed Feb 28 17:32:01 1996   | @ 1 min   | Wed Feb 28 17:33:01 1996   | Wed Feb 28 17:31:01 1996
- Wed Feb 28 17:32:01 1996   | @ 5 hours | Wed Feb 28 22:32:01 1996   | Wed Feb 28 12:32:01 1996
- Thu Feb 29 17:32:01 1996   | @ 1 min   | Thu Feb 29 17:33:01 1996   | Thu Feb 29 17:31:01 1996
- Thu Feb 29 17:32:01 1996   | @ 5 hours | Thu Feb 29 22:32:01 1996   | Thu Feb 29 12:32:01 1996
- Fri Mar 01 17:32:01 1996   | @ 1 min   | Fri Mar 01 17:33:01 1996   | Fri Mar 01 17:31:01 1996
- Fri Mar 01 17:32:01 1996   | @ 5 hours | Fri Mar 01 22:32:01 1996   | Fri Mar 01 12:32:01 1996
- Mon Dec 30 17:32:01 1996   | @ 1 min   | Mon Dec 30 17:33:01 1996   | Mon Dec 30 17:31:01 1996
- Mon Dec 30 17:32:01 1996   | @ 5 hours | Mon Dec 30 22:32:01 1996   | Mon Dec 30 12:32:01 1996
- Tue Dec 31 17:32:01 1996   | @ 1 min   | Tue Dec 31 17:33:01 1996   | Tue Dec 31 17:31:01 1996
- Tue Dec 31 17:32:01 1996   | @ 5 hours | Tue Dec 31 22:32:01 1996   | Tue Dec 31 12:32:01 1996
- Wed Jan 01 17:32:01 1997   | @ 1 min   | Wed Jan 01 17:33:01 1997   | Wed Jan 01 17:31:01 1997
- Wed Jan 01 17:32:01 1997   | @ 5 hours | Wed Jan 01 22:32:01 1997   | Wed Jan 01 12:32:01 1997
- Thu Jan 02 00:00:00 1997   | @ 1 min   | Thu Jan 02 00:01:00 1997   | Wed Jan 01 23:59:00 1997
- Thu Jan 02 00:00:00 1997   | @ 5 hours | Thu Jan 02 05:00:00 1997   | Wed Jan 01 19:00:00 1997
- Thu Jan 02 03:04:05 1997   | @ 1 min   | Thu Jan 02 03:05:05 1997   | Thu Jan 02 03:03:05 1997
- Thu Jan 02 03:04:05 1997   | @ 5 hours | Thu Jan 02 08:04:05 1997   | Wed Jan 01 22:04:05 1997
- Mon Feb 10 17:32:00 1997   | @ 1 min   | Mon Feb 10 17:33:00 1997   | Mon Feb 10 17:31:00 1997
- Mon Feb 10 17:32:00 1997   | @ 5 hours | Mon Feb 10 22:32:00 1997   | Mon Feb 10 12:32:00 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 1 min   | Mon Feb 10 17:33:01 1997   | Mon Feb 10 17:31:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01 1997   | @ 5 hours | Mon Feb 10 22:32:01 1997   | Mon Feb 10 12:32:01 1997
- Mon Feb 10 17:32:01.4 1997 | @ 1 min   | Mon Feb 10 17:33:01.4 1997 | Mon Feb 10 17:31:01.4 1997
- Mon Feb 10 17:32:01.4 1997 | @ 5 hours | Mon Feb 10 22:32:01.4 1997 | Mon Feb 10 12:32:01.4 1997
- Mon Feb 10 17:32:01.5 1997 | @ 1 min   | Mon Feb 10 17:33:01.5 1997 | Mon Feb 10 17:31:01.5 1997
- Mon Feb 10 17:32:01.5 1997 | @ 5 hours | Mon Feb 10 22:32:01.5 1997 | Mon Feb 10 12:32:01.5 1997
- Mon Feb 10 17:32:01.6 1997 | @ 1 min   | Mon Feb 10 17:33:01.6 1997 | Mon Feb 10 17:31:01.6 1997
- Mon Feb 10 17:32:01.6 1997 | @ 5 hours | Mon Feb 10 22:32:01.6 1997 | Mon Feb 10 12:32:01.6 1997
- Mon Feb 10 17:32:02 1997   | @ 1 min   | Mon Feb 10 17:33:02 1997   | Mon Feb 10 17:31:02 1997
- Mon Feb 10 17:32:02 1997   | @ 5 hours | Mon Feb 10 22:32:02 1997   | Mon Feb 10 12:32:02 1997
- Tue Feb 11 17:32:01 1997   | @ 1 min   | Tue Feb 11 17:33:01 1997   | Tue Feb 11 17:31:01 1997
- Tue Feb 11 17:32:01 1997   | @ 5 hours | Tue Feb 11 22:32:01 1997   | Tue Feb 11 12:32:01 1997
- Wed Feb 12 17:32:01 1997   | @ 1 min   | Wed Feb 12 17:33:01 1997   | Wed Feb 12 17:31:01 1997
- Wed Feb 12 17:32:01 1997   | @ 5 hours | Wed Feb 12 22:32:01 1997   | Wed Feb 12 12:32:01 1997
- Thu Feb 13 17:32:01 1997   | @ 1 min   | Thu Feb 13 17:33:01 1997   | Thu Feb 13 17:31:01 1997
- Thu Feb 13 17:32:01 1997   | @ 5 hours | Thu Feb 13 22:32:01 1997   | Thu Feb 13 12:32:01 1997
- Fri Feb 14 17:32:01 1997   | @ 1 min   | Fri Feb 14 17:33:01 1997   | Fri Feb 14 17:31:01 1997
- Fri Feb 14 17:32:01 1997   | @ 5 hours | Fri Feb 14 22:32:01 1997   | Fri Feb 14 12:32:01 1997
- Sat Feb 15 17:32:01 1997   | @ 1 min   | Sat Feb 15 17:33:01 1997   | Sat Feb 15 17:31:01 1997
- Sat Feb 15 17:32:01 1997   | @ 5 hours | Sat Feb 15 22:32:01 1997   | Sat Feb 15 12:32:01 1997
- Sun Feb 16 17:32:01 1997   | @ 1 min   | Sun Feb 16 17:33:01 1997   | Sun Feb 16 17:31:01 1997
- Sun Feb 16 17:32:01 1997   | @ 1 min   | Sun Feb 16 17:33:01 1997   | Sun Feb 16 17:31:01 1997
- Sun Feb 16 17:32:01 1997   | @ 5 hours | Sun Feb 16 22:32:01 1997   | Sun Feb 16 12:32:01 1997
- Sun Feb 16 17:32:01 1997   | @ 5 hours | Sun Feb 16 22:32:01 1997   | Sun Feb 16 12:32:01 1997
- Fri Feb 28 17:32:01 1997   | @ 1 min   | Fri Feb 28 17:33:01 1997   | Fri Feb 28 17:31:01 1997
- Fri Feb 28 17:32:01 1997   | @ 5 hours | Fri Feb 28 22:32:01 1997   | Fri Feb 28 12:32:01 1997
- Sat Mar 01 17:32:01 1997   | @ 1 min   | Sat Mar 01 17:33:01 1997   | Sat Mar 01 17:31:01 1997
- Sat Mar 01 17:32:01 1997   | @ 5 hours | Sat Mar 01 22:32:01 1997   | Sat Mar 01 12:32:01 1997
- Tue Jun 10 17:32:01 1997   | @ 1 min   | Tue Jun 10 17:33:01 1997   | Tue Jun 10 17:31:01 1997
- Tue Jun 10 17:32:01 1997   | @ 5 hours | Tue Jun 10 22:32:01 1997   | Tue Jun 10 12:32:01 1997
- Tue Jun 10 18:32:01 1997   | @ 1 min   | Tue Jun 10 18:33:01 1997   | Tue Jun 10 18:31:01 1997
- Tue Jun 10 18:32:01 1997   | @ 5 hours | Tue Jun 10 23:32:01 1997   | Tue Jun 10 13:32:01 1997
- Tue Dec 30 17:32:01 1997   | @ 1 min   | Tue Dec 30 17:33:01 1997   | Tue Dec 30 17:31:01 1997
- Tue Dec 30 17:32:01 1997   | @ 5 hours | Tue Dec 30 22:32:01 1997   | Tue Dec 30 12:32:01 1997
- Wed Dec 31 17:32:01 1997   | @ 1 min   | Wed Dec 31 17:33:01 1997   | Wed Dec 31 17:31:01 1997
- Wed Dec 31 17:32:01 1997   | @ 5 hours | Wed Dec 31 22:32:01 1997   | Wed Dec 31 12:32:01 1997
- Fri Dec 31 17:32:01 1999   | @ 1 min   | Fri Dec 31 17:33:01 1999   | Fri Dec 31 17:31:01 1999
- Fri Dec 31 17:32:01 1999   | @ 5 hours | Fri Dec 31 22:32:01 1999   | Fri Dec 31 12:32:01 1999
- Sat Jan 01 17:32:01 2000   | @ 1 min   | Sat Jan 01 17:33:01 2000   | Sat Jan 01 17:31:01 2000
- Sat Jan 01 17:32:01 2000   | @ 5 hours | Sat Jan 01 22:32:01 2000   | Sat Jan 01 12:32:01 2000
- Wed Mar 15 02:14:05 2000   | @ 1 min   | Wed Mar 15 02:15:05 2000   | Wed Mar 15 02:13:05 2000
- Wed Mar 15 02:14:05 2000   | @ 5 hours | Wed Mar 15 07:14:05 2000   | Tue Mar 14 21:14:05 2000
- Wed Mar 15 03:14:04 2000   | @ 1 min   | Wed Mar 15 03:15:04 2000   | Wed Mar 15 03:13:04 2000
- Wed Mar 15 03:14:04 2000   | @ 5 hours | Wed Mar 15 08:14:04 2000   | Tue Mar 14 22:14:04 2000
- Wed Mar 15 08:14:01 2000   | @ 1 min   | Wed Mar 15 08:15:01 2000   | Wed Mar 15 08:13:01 2000
- Wed Mar 15 08:14:01 2000   | @ 5 hours | Wed Mar 15 13:14:01 2000   | Wed Mar 15 03:14:01 2000
- Wed Mar 15 12:14:03 2000   | @ 1 min   | Wed Mar 15 12:15:03 2000   | Wed Mar 15 12:13:03 2000
- Wed Mar 15 12:14:03 2000   | @ 5 hours | Wed Mar 15 17:14:03 2000   | Wed Mar 15 07:14:03 2000
- Wed Mar 15 13:14:02 2000   | @ 1 min   | Wed Mar 15 13:15:02 2000   | Wed Mar 15 13:13:02 2000
- Wed Mar 15 13:14:02 2000   | @ 5 hours | Wed Mar 15 18:14:02 2000   | Wed Mar 15 08:14:02 2000
- Sun Dec 31 17:32:01 2000   | @ 1 min   | Sun Dec 31 17:33:01 2000   | Sun Dec 31 17:31:01 2000
- Sun Dec 31 17:32:01 2000   | @ 5 hours | Sun Dec 31 22:32:01 2000   | Sun Dec 31 12:32:01 2000
-(104 rows)
-
+ERROR:  relation "interval_tbl" does not exist
+LINE 2:   FROM TIMESTAMP_TBL t, INTERVAL_TBL i
+                                ^
 SELECT t.f1 AS t, i.f1 AS i, t.f1 + i.f1 AS "add", t.f1 - i.f1 AS "subtract"
   FROM TIME_TBL t, INTERVAL_TBL i
   ORDER BY 1,2;
-      t      |               i               |     add     |  subtract   
--------------+-------------------------------+-------------+-------------
- 00:00:00    | @ 14 secs ago                 | 23:59:46    | 00:00:14
- 00:00:00    | @ 1 min                       | 00:01:00    | 23:59:00
- 00:00:00    | @ 5 hours                     | 05:00:00    | 19:00:00
- 00:00:00    | @ 1 day 2 hours 3 mins 4 secs | 02:03:04    | 21:56:56
- 00:00:00    | @ 10 days                     | 00:00:00    | 00:00:00
- 00:00:00    | @ 3 mons                      | 00:00:00    | 00:00:00
- 00:00:00    | @ 5 mons                      | 00:00:00    | 00:00:00
- 00:00:00    | @ 5 mons 12 hours             | 12:00:00    | 12:00:00
- 00:00:00    | @ 6 years                     | 00:00:00    | 00:00:00
- 00:00:00    | @ 34 years                    | 00:00:00    | 00:00:00
- 01:00:00    | @ 14 secs ago                 | 00:59:46    | 01:00:14
- 01:00:00    | @ 1 min                       | 01:01:00    | 00:59:00
- 01:00:00    | @ 5 hours                     | 06:00:00    | 20:00:00
- 01:00:00    | @ 1 day 2 hours 3 mins 4 secs | 03:03:04    | 22:56:56
- 01:00:00    | @ 10 days                     | 01:00:00    | 01:00:00
- 01:00:00    | @ 3 mons                      | 01:00:00    | 01:00:00
- 01:00:00    | @ 5 mons                      | 01:00:00    | 01:00:00
- 01:00:00    | @ 5 mons 12 hours             | 13:00:00    | 13:00:00
- 01:00:00    | @ 6 years                     | 01:00:00    | 01:00:00
- 01:00:00    | @ 34 years                    | 01:00:00    | 01:00:00
- 02:03:00    | @ 14 secs ago                 | 02:02:46    | 02:03:14
- 02:03:00    | @ 1 min                       | 02:04:00    | 02:02:00
- 02:03:00    | @ 5 hours                     | 07:03:00    | 21:03:00
- 02:03:00    | @ 1 day 2 hours 3 mins 4 secs | 04:06:04    | 23:59:56
- 02:03:00    | @ 10 days                     | 02:03:00    | 02:03:00
- 02:03:00    | @ 3 mons                      | 02:03:00    | 02:03:00
- 02:03:00    | @ 5 mons                      | 02:03:00    | 02:03:00
- 02:03:00    | @ 5 mons 12 hours             | 14:03:00    | 14:03:00
- 02:03:00    | @ 6 years                     | 02:03:00    | 02:03:00
- 02:03:00    | @ 34 years                    | 02:03:00    | 02:03:00
- 11:59:00    | @ 14 secs ago                 | 11:58:46    | 11:59:14
- 11:59:00    | @ 1 min                       | 12:00:00    | 11:58:00
- 11:59:00    | @ 5 hours                     | 16:59:00    | 06:59:00
- 11:59:00    | @ 1 day 2 hours 3 mins 4 secs | 14:02:04    | 09:55:56
- 11:59:00    | @ 10 days                     | 11:59:00    | 11:59:00
- 11:59:00    | @ 3 mons                      | 11:59:00    | 11:59:00
- 11:59:00    | @ 5 mons                      | 11:59:00    | 11:59:00
- 11:59:00    | @ 5 mons 12 hours             | 23:59:00    | 23:59:00
- 11:59:00    | @ 6 years                     | 11:59:00    | 11:59:00
- 11:59:00    | @ 34 years                    | 11:59:00    | 11:59:00
- 12:00:00    | @ 14 secs ago                 | 11:59:46    | 12:00:14
- 12:00:00    | @ 1 min                       | 12:01:00    | 11:59:00
- 12:00:00    | @ 5 hours                     | 17:00:00    | 07:00:00
- 12:00:00    | @ 1 day 2 hours 3 mins 4 secs | 14:03:04    | 09:56:56
- 12:00:00    | @ 10 days                     | 12:00:00    | 12:00:00
- 12:00:00    | @ 3 mons                      | 12:00:00    | 12:00:00
- 12:00:00    | @ 5 mons                      | 12:00:00    | 12:00:00
- 12:00:00    | @ 5 mons 12 hours             | 00:00:00    | 00:00:00
- 12:00:00    | @ 6 years                     | 12:00:00    | 12:00:00
- 12:00:00    | @ 34 years                    | 12:00:00    | 12:00:00
- 12:01:00    | @ 14 secs ago                 | 12:00:46    | 12:01:14
- 12:01:00    | @ 1 min                       | 12:02:00    | 12:00:00
- 12:01:00    | @ 5 hours                     | 17:01:00    | 07:01:00
- 12:01:00    | @ 1 day 2 hours 3 mins 4 secs | 14:04:04    | 09:57:56
- 12:01:00    | @ 10 days                     | 12:01:00    | 12:01:00
- 12:01:00    | @ 3 mons                      | 12:01:00    | 12:01:00
- 12:01:00    | @ 5 mons                      | 12:01:00    | 12:01:00
- 12:01:00    | @ 5 mons 12 hours             | 00:01:00    | 00:01:00
- 12:01:00    | @ 6 years                     | 12:01:00    | 12:01:00
- 12:01:00    | @ 34 years                    | 12:01:00    | 12:01:00
- 15:36:39    | @ 14 secs ago                 | 15:36:25    | 15:36:53
- 15:36:39    | @ 14 secs ago                 | 15:36:25    | 15:36:53
- 15:36:39    | @ 14 secs ago                 | 15:36:25    | 15:36:53
- 15:36:39    | @ 1 min                       | 15:37:39    | 15:35:39
- 15:36:39    | @ 1 min                       | 15:37:39    | 15:35:39
- 15:36:39    | @ 1 min                       | 15:37:39    | 15:35:39
- 15:36:39    | @ 5 hours                     | 20:36:39    | 10:36:39
- 15:36:39    | @ 5 hours                     | 20:36:39    | 10:36:39
- 15:36:39    | @ 5 hours                     | 20:36:39    | 10:36:39
- 15:36:39    | @ 1 day 2 hours 3 mins 4 secs | 17:39:43    | 13:33:35
- 15:36:39    | @ 1 day 2 hours 3 mins 4 secs | 17:39:43    | 13:33:35
- 15:36:39    | @ 1 day 2 hours 3 mins 4 secs | 17:39:43    | 13:33:35
- 15:36:39    | @ 10 days                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 10 days                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 10 days                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 3 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 3 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 3 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 5 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 5 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 5 mons                      | 15:36:39    | 15:36:39
- 15:36:39    | @ 5 mons 12 hours             | 03:36:39    | 03:36:39
- 15:36:39    | @ 5 mons 12 hours             | 03:36:39    | 03:36:39
- 15:36:39    | @ 5 mons 12 hours             | 03:36:39    | 03:36:39
- 15:36:39    | @ 6 years                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 6 years                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 6 years                     | 15:36:39    | 15:36:39
- 15:36:39    | @ 34 years                    | 15:36:39    | 15:36:39
- 15:36:39    | @ 34 years                    | 15:36:39    | 15:36:39
- 15:36:39    | @ 34 years                    | 15:36:39    | 15:36:39
- 23:59:00    | @ 14 secs ago                 | 23:58:46    | 23:59:14
- 23:59:00    | @ 1 min                       | 00:00:00    | 23:58:00
- 23:59:00    | @ 5 hours                     | 04:59:00    | 18:59:00
- 23:59:00    | @ 1 day 2 hours 3 mins 4 secs | 02:02:04    | 21:55:56
- 23:59:00    | @ 10 days                     | 23:59:00    | 23:59:00
- 23:59:00    | @ 3 mons                      | 23:59:00    | 23:59:00
- 23:59:00    | @ 5 mons                      | 23:59:00    | 23:59:00
- 23:59:00    | @ 5 mons 12 hours             | 11:59:00    | 11:59:00
- 23:59:00    | @ 6 years                     | 23:59:00    | 23:59:00
- 23:59:00    | @ 34 years                    | 23:59:00    | 23:59:00
- 23:59:59.99 | @ 14 secs ago                 | 23:59:45.99 | 00:00:13.99
- 23:59:59.99 | @ 1 min                       | 00:00:59.99 | 23:58:59.99
- 23:59:59.99 | @ 5 hours                     | 04:59:59.99 | 18:59:59.99
- 23:59:59.99 | @ 1 day 2 hours 3 mins 4 secs | 02:03:03.99 | 21:56:55.99
- 23:59:59.99 | @ 10 days                     | 23:59:59.99 | 23:59:59.99
- 23:59:59.99 | @ 3 mons                      | 23:59:59.99 | 23:59:59.99
- 23:59:59.99 | @ 5 mons                      | 23:59:59.99 | 23:59:59.99
- 23:59:59.99 | @ 5 mons 12 hours             | 11:59:59.99 | 11:59:59.99
- 23:59:59.99 | @ 6 years                     | 23:59:59.99 | 23:59:59.99
- 23:59:59.99 | @ 34 years                    | 23:59:59.99 | 23:59:59.99
-(110 rows)
-
+ERROR:  relation "interval_tbl" does not exist
+LINE 2:   FROM TIME_TBL t, INTERVAL_TBL i
+                           ^
 -- SQL9x OVERLAPS operator
 -- test with time zone
 SELECT (timestamp with time zone '2000-11-27', timestamp with time zone '2000-11-28')
@@ -1113,32 +565,24 @@ SELECT (timestamp with time zone '2000-11-26', timestamp with time zone '2000-11
 
 SELECT (timestamp with time zone '2000-11-27', timestamp with time zone '2000-11-28')
   OVERLAPS (timestamp with time zone '2000-11-27 12:00', interval '1 day') AS "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 2: ...stamp with time zone '2000-11-27 12:00', interval '1 day') A...
+                                                             ^
 SELECT (timestamp with time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp with time zone '2000-11-27 12:00', timestamp with time zone '2000-11-30') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ... (timestamp with time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 SELECT (timestamp with time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp with time zone '2000-11-27', interval '12 hours') AS "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ... (timestamp with time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 SELECT (timestamp with time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp with time zone '2000-11-27 12:00', interval '12 hours') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ... (timestamp with time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 -- test without time zone
 SELECT (timestamp without time zone '2000-11-27', timestamp without time zone '2000-11-28')
   OVERLAPS (timestamp without time zone '2000-11-27 12:00', timestamp without time zone '2000-11-30') AS "True";
@@ -1156,32 +600,24 @@ SELECT (timestamp without time zone '2000-11-26', timestamp without time zone '2
 
 SELECT (timestamp without time zone '2000-11-27', timestamp without time zone '2000-11-28')
   OVERLAPS (timestamp without time zone '2000-11-27 12:00', interval '1 day') AS "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 day'"
+LINE 2: ...mp without time zone '2000-11-27 12:00', interval '1 day') A...
+                                                             ^
 SELECT (timestamp without time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp without time zone '2000-11-27 12:00', timestamp without time zone '2000-11-30') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ...imestamp without time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 SELECT (timestamp without time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp without time zone '2000-11-27', interval '12 hours') AS "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ...imestamp without time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 SELECT (timestamp without time zone '2000-11-27', interval '12 hours')
   OVERLAPS (timestamp without time zone '2000-11-27 12:00', interval '12 hours') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'12 hours'"
+LINE 1: ...imestamp without time zone '2000-11-27', interval '12 hours'...
+                                                             ^
 -- test time and interval
 SELECT (time '00:00', time '01:00')
   OVERLAPS (time '00:30', time '01:30') AS "True";
@@ -1192,28 +628,22 @@ SELECT (time '00:00', time '01:00')
 
 SELECT (time '00:00', interval '1 hour')
   OVERLAPS (time '00:30', interval '1 hour') AS "True";
- True 
-------
- t
-(1 row)
-
+ERROR:  syntax error at or near "'1 hour'"
+LINE 1: SELECT (time '00:00', interval '1 hour')
+                                       ^
 SELECT (time '00:00', interval '1 hour')
   OVERLAPS (time '01:30', interval '1 hour') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'1 hour'"
+LINE 1: SELECT (time '00:00', interval '1 hour')
+                                       ^
 -- SQL99 seems to want this to be false (and we conform to the spec).
 -- istm that this *should* return true, on the theory that time
 -- intervals can wrap around the day boundary - thomas 2001-09-25
 SELECT (time '00:00', interval '1 hour')
   OVERLAPS (time '01:30', interval '1 day') AS "False";
- False 
--------
- f
-(1 row)
-
+ERROR:  syntax error at or near "'1 hour'"
+LINE 1: SELECT (time '00:00', interval '1 hour')
+                                       ^
 CREATE TABLE TEMP_TIMESTAMP (f1 timestamp with time zone);
 -- get some candidate input values
 INSERT INTO TEMP_TIMESTAMP (f1)
@@ -1246,626 +676,32 @@ SELECT f1 AS "timestamp"
 SELECT d.f1 AS "timestamp", t.f1 AS "interval", d.f1 + t.f1 AS plus
   FROM TEMP_TIMESTAMP d, INTERVAL_TBL t
   ORDER BY plus, "timestamp", "interval";
-          timestamp           |           interval            |             plus             
-------------------------------+-------------------------------+------------------------------
- Thu Jan 01 00:00:00 1970 UTC | @ 14 secs ago                 | Wed Dec 31 23:59:46 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 1 min                       | Thu Jan 01 00:01:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 hours                     | Thu Jan 01 05:00:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 1 day 2 hours 3 mins 4 secs | Fri Jan 02 02:03:04 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 10 days                     | Sun Jan 11 00:00:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 3 mons                      | Wed Apr 01 00:00:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 mons                      | Mon Jun 01 00:00:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 mons 12 hours             | Mon Jun 01 12:00:00 1970 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 6 years                     | Thu Jan 01 00:00:00 1976 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 14 secs ago                 | Wed Feb 28 17:31:47 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 1 min                       | Wed Feb 28 17:33:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 hours                     | Wed Feb 28 22:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 14 secs ago                 | Thu Feb 29 17:31:47 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 1 min                       | Thu Feb 29 17:33:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Feb 29 19:35:05 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 hours                     | Thu Feb 29 22:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 14 secs ago                 | Fri Mar 01 17:31:47 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 1 min                       | Fri Mar 01 17:33:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Fri Mar 01 19:35:05 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 hours                     | Fri Mar 01 22:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Sat Mar 02 19:35:05 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 10 days                     | Sat Mar 09 17:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 10 days                     | Sun Mar 10 17:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 10 days                     | Mon Mar 11 17:32:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 3 mons                      | Tue May 28 17:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 3 mons                      | Wed May 29 17:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 3 mons                      | Sat Jun 01 17:32:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 mons                      | Sun Jul 28 17:32:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 mons 12 hours             | Mon Jul 29 05:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 mons                      | Mon Jul 29 17:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 mons 12 hours             | Tue Jul 30 05:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 mons                      | Thu Aug 01 17:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 mons 12 hours             | Fri Aug 02 05:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 14 secs ago                 | Mon Dec 30 17:31:47 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 1 min                       | Mon Dec 30 17:33:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 hours                     | Mon Dec 30 22:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 14 secs ago                 | Tue Dec 31 17:31:47 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 1 min                       | Tue Dec 31 17:33:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Dec 31 19:35:05 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 hours                     | Tue Dec 31 22:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Wed Jan 01 19:35:05 1997 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 10 days                     | Thu Jan 09 17:32:01 1997 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 10 days                     | Fri Jan 10 17:32:01 1997 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 3 mons                      | Sun Mar 30 17:32:01 1997 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 3 mons                      | Mon Mar 31 17:32:01 1997 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 mons                      | Fri May 30 17:32:01 1997 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 mons 12 hours             | Sat May 31 05:32:01 1997 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 mons                      | Sat May 31 17:32:01 1997 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 mons 12 hours             | Sun Jun 01 05:32:01 1997 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 14 secs ago                 | Fri Dec 31 17:31:47 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 1 min                       | Fri Dec 31 17:33:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 hours                     | Fri Dec 31 22:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 14 secs ago                 | Sat Jan 01 17:31:47 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 1 min                       | Sat Jan 01 17:33:01 2000 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 1 day 2 hours 3 mins 4 secs | Sat Jan 01 19:35:05 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 hours                     | Sat Jan 01 22:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Sun Jan 02 19:35:05 2000 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 10 days                     | Mon Jan 10 17:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 10 days                     | Tue Jan 11 17:32:01 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 14 secs ago                 | Wed Mar 15 02:13:51 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 1 min                       | Wed Mar 15 02:15:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 14 secs ago                 | Wed Mar 15 03:13:50 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 1 min                       | Wed Mar 15 03:15:04 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 hours                     | Wed Mar 15 07:14:05 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 14 secs ago                 | Wed Mar 15 08:13:47 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 hours                     | Wed Mar 15 08:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 1 min                       | Wed Mar 15 08:15:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 14 secs ago                 | Wed Mar 15 12:13:49 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 1 min                       | Wed Mar 15 12:15:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 14 secs ago                 | Wed Mar 15 13:13:48 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 hours                     | Wed Mar 15 13:14:01 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 1 min                       | Wed Mar 15 13:15:02 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 hours                     | Wed Mar 15 17:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 hours                     | Wed Mar 15 18:14:02 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Mar 16 04:17:09 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Mar 16 05:17:08 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Mar 16 10:17:05 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Mar 16 14:17:07 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Mar 16 15:17:06 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 10 days                     | Sat Mar 25 02:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 10 days                     | Sat Mar 25 03:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 10 days                     | Sat Mar 25 08:14:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 10 days                     | Sat Mar 25 12:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 10 days                     | Sat Mar 25 13:14:02 2000 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 3 mons                      | Fri Mar 31 17:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 3 mons                      | Sat Apr 01 17:32:01 2000 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 mons                      | Wed May 31 17:32:01 2000 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 mons 12 hours             | Thu Jun 01 05:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 mons                      | Thu Jun 01 17:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 mons 12 hours             | Fri Jun 02 05:32:01 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 3 mons                      | Thu Jun 15 02:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 3 mons                      | Thu Jun 15 03:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 3 mons                      | Thu Jun 15 08:14:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 3 mons                      | Thu Jun 15 12:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 3 mons                      | Thu Jun 15 13:14:02 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 mons                      | Tue Aug 15 02:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 mons                      | Tue Aug 15 03:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 mons                      | Tue Aug 15 08:14:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 mons                      | Tue Aug 15 12:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 mons                      | Tue Aug 15 13:14:02 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 mons 12 hours             | Tue Aug 15 14:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 mons 12 hours             | Tue Aug 15 15:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 mons 12 hours             | Tue Aug 15 20:14:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 mons 12 hours             | Wed Aug 16 00:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 mons 12 hours             | Wed Aug 16 01:14:02 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 14 secs ago                 | Sun Dec 31 17:31:47 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 1 min                       | Sun Dec 31 17:33:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 hours                     | Sun Dec 31 22:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 14 secs ago                 | Mon Jan 01 17:31:47 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 1 min                       | Mon Jan 01 17:33:01 2001 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Mon Jan 01 19:35:05 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 hours                     | Mon Jan 01 22:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Jan 02 19:35:05 2001 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 10 days                     | Wed Jan 10 17:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 10 days                     | Thu Jan 11 17:32:01 2001 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 3 mons                      | Sat Mar 31 17:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 3 mons                      | Sun Apr 01 17:32:01 2001 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 mons                      | Thu May 31 17:32:01 2001 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 mons 12 hours             | Fri Jun 01 05:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 mons                      | Fri Jun 01 17:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 mons 12 hours             | Sat Jun 02 05:32:01 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 14 secs ago                 | Sat Sep 22 18:19:06 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 1 min                       | Sat Sep 22 18:20:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 hours                     | Sat Sep 22 23:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 1 day 2 hours 3 mins 4 secs | Sun Sep 23 20:22:24 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 10 days                     | Tue Oct 02 18:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 3 mons                      | Sat Dec 22 18:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 mons                      | Fri Feb 22 18:19:20 2002 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 mons 12 hours             | Sat Feb 23 06:19:20 2002 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 6 years                     | Thu Feb 28 17:32:01 2002 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 6 years                     | Thu Feb 28 17:32:01 2002 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 6 years                     | Fri Mar 01 17:32:01 2002 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 6 years                     | Mon Dec 30 17:32:01 2002 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 6 years                     | Tue Dec 31 17:32:01 2002 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 34 years                    | Thu Jan 01 00:00:00 2004 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 6 years                     | Sat Dec 31 17:32:01 2005 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 6 years                     | Sun Jan 01 17:32:01 2006 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 6 years                     | Wed Mar 15 02:14:05 2006 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 6 years                     | Wed Mar 15 03:14:04 2006 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 6 years                     | Wed Mar 15 08:14:01 2006 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 6 years                     | Wed Mar 15 12:14:03 2006 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 6 years                     | Wed Mar 15 13:14:02 2006 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 6 years                     | Sun Dec 31 17:32:01 2006 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 6 years                     | Mon Jan 01 17:32:01 2007 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 6 years                     | Sat Sep 22 18:19:20 2007 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 34 years                    | Thu Feb 28 17:32:01 2030 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 34 years                    | Thu Feb 28 17:32:01 2030 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 34 years                    | Fri Mar 01 17:32:01 2030 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 34 years                    | Mon Dec 30 17:32:01 2030 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 34 years                    | Tue Dec 31 17:32:01 2030 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 34 years                    | Sat Dec 31 17:32:01 2033 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 34 years                    | Sun Jan 01 17:32:01 2034 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 34 years                    | Wed Mar 15 02:14:05 2034 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 34 years                    | Wed Mar 15 03:14:04 2034 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 34 years                    | Wed Mar 15 08:14:01 2034 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 34 years                    | Wed Mar 15 12:14:03 2034 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 34 years                    | Wed Mar 15 13:14:02 2034 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 34 years                    | Sun Dec 31 17:32:01 2034 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 34 years                    | Mon Jan 01 17:32:01 2035 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 34 years                    | Sat Sep 22 18:19:20 2035 UTC
-(160 rows)
-
+ERROR:  relation "interval_tbl" does not exist
+LINE 2:   FROM TEMP_TIMESTAMP d, INTERVAL_TBL t
+                                 ^
 SELECT d.f1 AS "timestamp", t.f1 AS "interval", d.f1 - t.f1 AS minus
   FROM TEMP_TIMESTAMP d, INTERVAL_TBL t
   WHERE isfinite(d.f1)
   ORDER BY minus, "timestamp", "interval";
-          timestamp           |           interval            |            minus             
-------------------------------+-------------------------------+------------------------------
- Thu Jan 01 00:00:00 1970 UTC | @ 34 years                    | Wed Jan 01 00:00:00 1936 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 34 years                    | Wed Feb 28 17:32:01 1962 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 34 years                    | Wed Feb 28 17:32:01 1962 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 34 years                    | Thu Mar 01 17:32:01 1962 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 34 years                    | Sun Dec 30 17:32:01 1962 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 34 years                    | Mon Dec 31 17:32:01 1962 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 6 years                     | Wed Jan 01 00:00:00 1964 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 34 years                    | Fri Dec 31 17:32:01 1965 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 34 years                    | Sat Jan 01 17:32:01 1966 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 34 years                    | Tue Mar 15 02:14:05 1966 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 34 years                    | Tue Mar 15 03:14:04 1966 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 34 years                    | Tue Mar 15 08:14:01 1966 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 34 years                    | Tue Mar 15 12:14:03 1966 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 34 years                    | Tue Mar 15 13:14:02 1966 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 34 years                    | Sat Dec 31 17:32:01 1966 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 34 years                    | Sun Jan 01 17:32:01 1967 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 34 years                    | Fri Sep 22 18:19:20 1967 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 mons 12 hours             | Thu Jul 31 12:00:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 mons                      | Fri Aug 01 00:00:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 3 mons                      | Wed Oct 01 00:00:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 10 days                     | Mon Dec 22 00:00:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Dec 30 21:56:56 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 5 hours                     | Wed Dec 31 19:00:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 1 min                       | Wed Dec 31 23:59:00 1969 UTC
- Thu Jan 01 00:00:00 1970 UTC | @ 14 secs ago                 | Thu Jan 01 00:00:14 1970 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 6 years                     | Wed Feb 28 17:32:01 1990 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 6 years                     | Wed Feb 28 17:32:01 1990 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 6 years                     | Thu Mar 01 17:32:01 1990 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 6 years                     | Sun Dec 30 17:32:01 1990 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 6 years                     | Mon Dec 31 17:32:01 1990 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 6 years                     | Fri Dec 31 17:32:01 1993 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 6 years                     | Sat Jan 01 17:32:01 1994 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 6 years                     | Tue Mar 15 02:14:05 1994 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 6 years                     | Tue Mar 15 03:14:04 1994 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 6 years                     | Tue Mar 15 08:14:01 1994 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 6 years                     | Tue Mar 15 12:14:03 1994 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 6 years                     | Tue Mar 15 13:14:02 1994 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 6 years                     | Sat Dec 31 17:32:01 1994 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 6 years                     | Sun Jan 01 17:32:01 1995 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 6 years                     | Fri Sep 22 18:19:20 1995 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 mons 12 hours             | Thu Sep 28 05:32:01 1995 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 mons                      | Thu Sep 28 17:32:01 1995 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 mons 12 hours             | Fri Sep 29 05:32:01 1995 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 mons                      | Fri Sep 29 17:32:01 1995 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 mons 12 hours             | Sun Oct 01 05:32:01 1995 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 mons                      | Sun Oct 01 17:32:01 1995 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 3 mons                      | Tue Nov 28 17:32:01 1995 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 3 mons                      | Wed Nov 29 17:32:01 1995 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 3 mons                      | Fri Dec 01 17:32:01 1995 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 10 days                     | Sun Feb 18 17:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 10 days                     | Mon Feb 19 17:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 10 days                     | Tue Feb 20 17:32:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Feb 27 15:28:57 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 5 hours                     | Wed Feb 28 12:32:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Wed Feb 28 15:28:57 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 1 min                       | Wed Feb 28 17:31:01 1996 UTC
- Wed Feb 28 17:32:01 1996 UTC | @ 14 secs ago                 | Wed Feb 28 17:32:15 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 5 hours                     | Thu Feb 29 12:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Feb 29 15:28:57 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 1 min                       | Thu Feb 29 17:31:01 1996 UTC
- Thu Feb 29 17:32:01 1996 UTC | @ 14 secs ago                 | Thu Feb 29 17:32:15 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 5 hours                     | Fri Mar 01 12:32:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 1 min                       | Fri Mar 01 17:31:01 1996 UTC
- Fri Mar 01 17:32:01 1996 UTC | @ 14 secs ago                 | Fri Mar 01 17:32:15 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 mons 12 hours             | Tue Jul 30 05:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 mons                      | Tue Jul 30 17:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 mons 12 hours             | Wed Jul 31 05:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 mons                      | Wed Jul 31 17:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 3 mons                      | Mon Sep 30 17:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 3 mons                      | Mon Sep 30 17:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 10 days                     | Fri Dec 20 17:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 10 days                     | Sat Dec 21 17:32:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Sun Dec 29 15:28:57 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 5 hours                     | Mon Dec 30 12:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 1 day 2 hours 3 mins 4 secs | Mon Dec 30 15:28:57 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 1 min                       | Mon Dec 30 17:31:01 1996 UTC
- Mon Dec 30 17:32:01 1996 UTC | @ 14 secs ago                 | Mon Dec 30 17:32:15 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 5 hours                     | Tue Dec 31 12:32:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 1 min                       | Tue Dec 31 17:31:01 1996 UTC
- Tue Dec 31 17:32:01 1996 UTC | @ 14 secs ago                 | Tue Dec 31 17:32:15 1996 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 mons 12 hours             | Sat Jul 31 05:32:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 mons                      | Sat Jul 31 17:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 mons 12 hours             | Sun Aug 01 05:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 mons                      | Sun Aug 01 17:32:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 3 mons                      | Thu Sep 30 17:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 3 mons                      | Fri Oct 01 17:32:01 1999 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 mons 12 hours             | Thu Oct 14 14:14:05 1999 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 mons 12 hours             | Thu Oct 14 15:14:04 1999 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 mons 12 hours             | Thu Oct 14 20:14:01 1999 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 mons 12 hours             | Fri Oct 15 00:14:03 1999 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 mons 12 hours             | Fri Oct 15 01:14:02 1999 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 mons                      | Fri Oct 15 02:14:05 1999 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 mons                      | Fri Oct 15 03:14:04 1999 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 mons                      | Fri Oct 15 08:14:01 1999 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 mons                      | Fri Oct 15 12:14:03 1999 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 mons                      | Fri Oct 15 13:14:02 1999 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 3 mons                      | Wed Dec 15 02:14:05 1999 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 3 mons                      | Wed Dec 15 03:14:04 1999 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 3 mons                      | Wed Dec 15 08:14:01 1999 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 3 mons                      | Wed Dec 15 12:14:03 1999 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 3 mons                      | Wed Dec 15 13:14:02 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 10 days                     | Tue Dec 21 17:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 10 days                     | Wed Dec 22 17:32:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 1 day 2 hours 3 mins 4 secs | Thu Dec 30 15:28:57 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 5 hours                     | Fri Dec 31 12:32:01 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Fri Dec 31 15:28:57 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 1 min                       | Fri Dec 31 17:31:01 1999 UTC
- Fri Dec 31 17:32:01 1999 UTC | @ 14 secs ago                 | Fri Dec 31 17:32:15 1999 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 5 hours                     | Sat Jan 01 12:32:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 1 min                       | Sat Jan 01 17:31:01 2000 UTC
- Sat Jan 01 17:32:01 2000 UTC | @ 14 secs ago                 | Sat Jan 01 17:32:15 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 10 days                     | Sun Mar 05 02:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 10 days                     | Sun Mar 05 03:14:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 10 days                     | Sun Mar 05 08:14:01 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 10 days                     | Sun Mar 05 12:14:03 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 10 days                     | Sun Mar 05 13:14:02 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Mar 14 00:11:01 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Mar 14 01:11:00 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Mar 14 06:10:57 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Mar 14 10:10:59 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Tue Mar 14 11:10:58 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 5 hours                     | Tue Mar 14 21:14:05 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 5 hours                     | Tue Mar 14 22:14:04 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 1 min                       | Wed Mar 15 02:13:05 2000 UTC
- Wed Mar 15 02:14:05 2000 UTC | @ 14 secs ago                 | Wed Mar 15 02:14:19 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 1 min                       | Wed Mar 15 03:13:04 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 5 hours                     | Wed Mar 15 03:14:01 2000 UTC
- Wed Mar 15 03:14:04 2000 UTC | @ 14 secs ago                 | Wed Mar 15 03:14:18 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 5 hours                     | Wed Mar 15 07:14:03 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 1 min                       | Wed Mar 15 08:13:01 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 5 hours                     | Wed Mar 15 08:14:02 2000 UTC
- Wed Mar 15 08:14:01 2000 UTC | @ 14 secs ago                 | Wed Mar 15 08:14:15 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 1 min                       | Wed Mar 15 12:13:03 2000 UTC
- Wed Mar 15 12:14:03 2000 UTC | @ 14 secs ago                 | Wed Mar 15 12:14:17 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 1 min                       | Wed Mar 15 13:13:02 2000 UTC
- Wed Mar 15 13:14:02 2000 UTC | @ 14 secs ago                 | Wed Mar 15 13:14:16 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 mons 12 hours             | Mon Jul 31 05:32:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 mons                      | Mon Jul 31 17:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 mons 12 hours             | Tue Aug 01 05:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 mons                      | Tue Aug 01 17:32:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 3 mons                      | Sat Sep 30 17:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 3 mons                      | Sun Oct 01 17:32:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 10 days                     | Thu Dec 21 17:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 10 days                     | Fri Dec 22 17:32:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 1 day 2 hours 3 mins 4 secs | Sat Dec 30 15:28:57 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 5 hours                     | Sun Dec 31 12:32:01 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 1 day 2 hours 3 mins 4 secs | Sun Dec 31 15:28:57 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 1 min                       | Sun Dec 31 17:31:01 2000 UTC
- Sun Dec 31 17:32:01 2000 UTC | @ 14 secs ago                 | Sun Dec 31 17:32:15 2000 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 5 hours                     | Mon Jan 01 12:32:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 1 min                       | Mon Jan 01 17:31:01 2001 UTC
- Mon Jan 01 17:32:01 2001 UTC | @ 14 secs ago                 | Mon Jan 01 17:32:15 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 mons 12 hours             | Sun Apr 22 06:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 mons                      | Sun Apr 22 18:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 3 mons                      | Fri Jun 22 18:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 10 days                     | Wed Sep 12 18:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 1 day 2 hours 3 mins 4 secs | Fri Sep 21 16:16:16 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 5 hours                     | Sat Sep 22 13:19:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 1 min                       | Sat Sep 22 18:18:20 2001 UTC
- Sat Sep 22 18:19:20 2001 UTC | @ 14 secs ago                 | Sat Sep 22 18:19:34 2001 UTC
-(160 rows)
-
+ERROR:  relation "interval_tbl" does not exist
+LINE 2:   FROM TEMP_TIMESTAMP d, INTERVAL_TBL t
+                                 ^
 SELECT d.f1 AS "timestamp",
    timestamp with time zone '1980-01-06 00:00 GMT' AS gpstime_zero,
    d.f1 - timestamp with time zone '1980-01-06 00:00 GMT' AS difference
   FROM TEMP_TIMESTAMP d
   ORDER BY difference;
-          timestamp           |         gpstime_zero         |              difference              
-------------------------------+------------------------------+--------------------------------------
- Thu Jan 01 00:00:00 1970 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 3657 days ago
- Wed Feb 28 17:32:01 1996 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 5897 days 17 hours 32 mins 1 sec
- Thu Feb 29 17:32:01 1996 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 5898 days 17 hours 32 mins 1 sec
- Fri Mar 01 17:32:01 1996 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 5899 days 17 hours 32 mins 1 sec
- Mon Dec 30 17:32:01 1996 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 6203 days 17 hours 32 mins 1 sec
- Tue Dec 31 17:32:01 1996 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 6204 days 17 hours 32 mins 1 sec
- Fri Dec 31 17:32:01 1999 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7299 days 17 hours 32 mins 1 sec
- Sat Jan 01 17:32:01 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7300 days 17 hours 32 mins 1 sec
- Wed Mar 15 02:14:05 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7374 days 2 hours 14 mins 5 secs
- Wed Mar 15 03:14:04 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7374 days 3 hours 14 mins 4 secs
- Wed Mar 15 08:14:01 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7374 days 8 hours 14 mins 1 sec
- Wed Mar 15 12:14:03 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7374 days 12 hours 14 mins 3 secs
- Wed Mar 15 13:14:02 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7374 days 13 hours 14 mins 2 secs
- Sun Dec 31 17:32:01 2000 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7665 days 17 hours 32 mins 1 sec
- Mon Jan 01 17:32:01 2001 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7666 days 17 hours 32 mins 1 sec
- Sat Sep 22 18:19:20 2001 UTC | Sun Jan 06 00:00:00 1980 UTC | @ 7930 days 18 hours 19 mins 20 secs
-(16 rows)
-
+ERROR:  operator does not exist: timestamp with time zone - timestamp with time zone
+LINE 3:    d.f1 - timestamp with time zone '1980-01-06 00:00 GMT' AS...
+                ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT d1.f1 AS timestamp1, d2.f1 AS timestamp2, d1.f1 - d2.f1 AS difference
   FROM TEMP_TIMESTAMP d1, TEMP_TIMESTAMP d2
   ORDER BY timestamp1, timestamp2, difference;
-          timestamp1          |          timestamp2          |                difference                 
-------------------------------+------------------------------+-------------------------------------------
- Thu Jan 01 00:00:00 1970 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 0
- Thu Jan 01 00:00:00 1970 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 9554 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 9555 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 9556 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 9860 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 9861 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 10956 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 10957 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 11031 days 2 hours 14 mins 5 secs ago
- Thu Jan 01 00:00:00 1970 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 11031 days 3 hours 14 mins 4 secs ago
- Thu Jan 01 00:00:00 1970 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 11031 days 8 hours 14 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 11031 days 12 hours 14 mins 3 secs ago
- Thu Jan 01 00:00:00 1970 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 11031 days 13 hours 14 mins 2 secs ago
- Thu Jan 01 00:00:00 1970 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 11322 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 11323 days 17 hours 32 mins 1 sec ago
- Thu Jan 01 00:00:00 1970 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 11587 days 18 hours 19 mins 20 secs ago
- Wed Feb 28 17:32:01 1996 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 9554 days 17 hours 32 mins 1 sec
- Wed Feb 28 17:32:01 1996 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 0
- Wed Feb 28 17:32:01 1996 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1 day ago
- Wed Feb 28 17:32:01 1996 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 2 days ago
- Wed Feb 28 17:32:01 1996 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 306 days ago
- Wed Feb 28 17:32:01 1996 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 307 days ago
- Wed Feb 28 17:32:01 1996 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1402 days ago
- Wed Feb 28 17:32:01 1996 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1403 days ago
- Wed Feb 28 17:32:01 1996 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 1476 days 8 hours 42 mins 4 secs ago
- Wed Feb 28 17:32:01 1996 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 1476 days 9 hours 42 mins 3 secs ago
- Wed Feb 28 17:32:01 1996 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 1476 days 14 hours 42 mins ago
- Wed Feb 28 17:32:01 1996 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 1476 days 18 hours 42 mins 2 secs ago
- Wed Feb 28 17:32:01 1996 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 1476 days 19 hours 42 mins 1 sec ago
- Wed Feb 28 17:32:01 1996 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1768 days ago
- Wed Feb 28 17:32:01 1996 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1769 days ago
- Wed Feb 28 17:32:01 1996 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 2033 days 47 mins 19 secs ago
- Thu Feb 29 17:32:01 1996 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 9555 days 17 hours 32 mins 1 sec
- Thu Feb 29 17:32:01 1996 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1 day
- Thu Feb 29 17:32:01 1996 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 0
- Thu Feb 29 17:32:01 1996 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1 day ago
- Thu Feb 29 17:32:01 1996 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 305 days ago
- Thu Feb 29 17:32:01 1996 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 306 days ago
- Thu Feb 29 17:32:01 1996 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1401 days ago
- Thu Feb 29 17:32:01 1996 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1402 days ago
- Thu Feb 29 17:32:01 1996 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 1475 days 8 hours 42 mins 4 secs ago
- Thu Feb 29 17:32:01 1996 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 1475 days 9 hours 42 mins 3 secs ago
- Thu Feb 29 17:32:01 1996 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 1475 days 14 hours 42 mins ago
- Thu Feb 29 17:32:01 1996 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 1475 days 18 hours 42 mins 2 secs ago
- Thu Feb 29 17:32:01 1996 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 1475 days 19 hours 42 mins 1 sec ago
- Thu Feb 29 17:32:01 1996 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1767 days ago
- Thu Feb 29 17:32:01 1996 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1768 days ago
- Thu Feb 29 17:32:01 1996 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 2032 days 47 mins 19 secs ago
- Fri Mar 01 17:32:01 1996 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 9556 days 17 hours 32 mins 1 sec
- Fri Mar 01 17:32:01 1996 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 2 days
- Fri Mar 01 17:32:01 1996 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1 day
- Fri Mar 01 17:32:01 1996 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 0
- Fri Mar 01 17:32:01 1996 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 304 days ago
- Fri Mar 01 17:32:01 1996 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 305 days ago
- Fri Mar 01 17:32:01 1996 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1400 days ago
- Fri Mar 01 17:32:01 1996 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1401 days ago
- Fri Mar 01 17:32:01 1996 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 1474 days 8 hours 42 mins 4 secs ago
- Fri Mar 01 17:32:01 1996 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 1474 days 9 hours 42 mins 3 secs ago
- Fri Mar 01 17:32:01 1996 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 1474 days 14 hours 42 mins ago
- Fri Mar 01 17:32:01 1996 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 1474 days 18 hours 42 mins 2 secs ago
- Fri Mar 01 17:32:01 1996 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 1474 days 19 hours 42 mins 1 sec ago
- Fri Mar 01 17:32:01 1996 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1766 days ago
- Fri Mar 01 17:32:01 1996 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1767 days ago
- Fri Mar 01 17:32:01 1996 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 2031 days 47 mins 19 secs ago
- Mon Dec 30 17:32:01 1996 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 9860 days 17 hours 32 mins 1 sec
- Mon Dec 30 17:32:01 1996 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 306 days
- Mon Dec 30 17:32:01 1996 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 305 days
- Mon Dec 30 17:32:01 1996 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 304 days
- Mon Dec 30 17:32:01 1996 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 0
- Mon Dec 30 17:32:01 1996 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1 day ago
- Mon Dec 30 17:32:01 1996 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1096 days ago
- Mon Dec 30 17:32:01 1996 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1097 days ago
- Mon Dec 30 17:32:01 1996 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 1170 days 8 hours 42 mins 4 secs ago
- Mon Dec 30 17:32:01 1996 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 1170 days 9 hours 42 mins 3 secs ago
- Mon Dec 30 17:32:01 1996 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 1170 days 14 hours 42 mins ago
- Mon Dec 30 17:32:01 1996 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 1170 days 18 hours 42 mins 2 secs ago
- Mon Dec 30 17:32:01 1996 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 1170 days 19 hours 42 mins 1 sec ago
- Mon Dec 30 17:32:01 1996 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1462 days ago
- Mon Dec 30 17:32:01 1996 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1463 days ago
- Mon Dec 30 17:32:01 1996 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 1727 days 47 mins 19 secs ago
- Tue Dec 31 17:32:01 1996 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 9861 days 17 hours 32 mins 1 sec
- Tue Dec 31 17:32:01 1996 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 307 days
- Tue Dec 31 17:32:01 1996 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 306 days
- Tue Dec 31 17:32:01 1996 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 305 days
- Tue Dec 31 17:32:01 1996 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1 day
- Tue Dec 31 17:32:01 1996 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 0
- Tue Dec 31 17:32:01 1996 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1095 days ago
- Tue Dec 31 17:32:01 1996 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1096 days ago
- Tue Dec 31 17:32:01 1996 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 1169 days 8 hours 42 mins 4 secs ago
- Tue Dec 31 17:32:01 1996 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 1169 days 9 hours 42 mins 3 secs ago
- Tue Dec 31 17:32:01 1996 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 1169 days 14 hours 42 mins ago
- Tue Dec 31 17:32:01 1996 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 1169 days 18 hours 42 mins 2 secs ago
- Tue Dec 31 17:32:01 1996 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 1169 days 19 hours 42 mins 1 sec ago
- Tue Dec 31 17:32:01 1996 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1461 days ago
- Tue Dec 31 17:32:01 1996 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1462 days ago
- Tue Dec 31 17:32:01 1996 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 1726 days 47 mins 19 secs ago
- Fri Dec 31 17:32:01 1999 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 10956 days 17 hours 32 mins 1 sec
- Fri Dec 31 17:32:01 1999 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1402 days
- Fri Dec 31 17:32:01 1999 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1401 days
- Fri Dec 31 17:32:01 1999 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1400 days
- Fri Dec 31 17:32:01 1999 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1096 days
- Fri Dec 31 17:32:01 1999 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1095 days
- Fri Dec 31 17:32:01 1999 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 0
- Fri Dec 31 17:32:01 1999 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 1 day ago
- Fri Dec 31 17:32:01 1999 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 74 days 8 hours 42 mins 4 secs ago
- Fri Dec 31 17:32:01 1999 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 74 days 9 hours 42 mins 3 secs ago
- Fri Dec 31 17:32:01 1999 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 74 days 14 hours 42 mins ago
- Fri Dec 31 17:32:01 1999 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 74 days 18 hours 42 mins 2 secs ago
- Fri Dec 31 17:32:01 1999 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 74 days 19 hours 42 mins 1 sec ago
- Fri Dec 31 17:32:01 1999 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 366 days ago
- Fri Dec 31 17:32:01 1999 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 367 days ago
- Fri Dec 31 17:32:01 1999 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 631 days 47 mins 19 secs ago
- Sat Jan 01 17:32:01 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 10957 days 17 hours 32 mins 1 sec
- Sat Jan 01 17:32:01 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1403 days
- Sat Jan 01 17:32:01 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1402 days
- Sat Jan 01 17:32:01 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1401 days
- Sat Jan 01 17:32:01 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1097 days
- Sat Jan 01 17:32:01 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1096 days
- Sat Jan 01 17:32:01 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 1 day
- Sat Jan 01 17:32:01 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 0
- Sat Jan 01 17:32:01 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 73 days 8 hours 42 mins 4 secs ago
- Sat Jan 01 17:32:01 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 73 days 9 hours 42 mins 3 secs ago
- Sat Jan 01 17:32:01 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 73 days 14 hours 42 mins ago
- Sat Jan 01 17:32:01 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 73 days 18 hours 42 mins 2 secs ago
- Sat Jan 01 17:32:01 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 73 days 19 hours 42 mins 1 sec ago
- Sat Jan 01 17:32:01 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 365 days ago
- Sat Jan 01 17:32:01 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 366 days ago
- Sat Jan 01 17:32:01 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 630 days 47 mins 19 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11031 days 2 hours 14 mins 5 secs
- Wed Mar 15 02:14:05 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1476 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1475 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1474 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1170 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1169 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 74 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 73 days 8 hours 42 mins 4 secs
- Wed Mar 15 02:14:05 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 0
- Wed Mar 15 02:14:05 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 59 mins 59 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 5 hours 59 mins 56 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 9 hours 59 mins 58 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 10 hours 59 mins 57 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 291 days 15 hours 17 mins 56 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 292 days 15 hours 17 mins 56 secs ago
- Wed Mar 15 02:14:05 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 556 days 16 hours 5 mins 15 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11031 days 3 hours 14 mins 4 secs
- Wed Mar 15 03:14:04 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1476 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1475 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1474 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1170 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1169 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 74 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 73 days 9 hours 42 mins 3 secs
- Wed Mar 15 03:14:04 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 59 mins 59 secs
- Wed Mar 15 03:14:04 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 0
- Wed Mar 15 03:14:04 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 4 hours 59 mins 57 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 8 hours 59 mins 59 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 9 hours 59 mins 58 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 291 days 14 hours 17 mins 57 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 292 days 14 hours 17 mins 57 secs ago
- Wed Mar 15 03:14:04 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 556 days 15 hours 5 mins 16 secs ago
- Wed Mar 15 08:14:01 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11031 days 8 hours 14 mins 1 sec
- Wed Mar 15 08:14:01 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1476 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1475 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1474 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1170 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1169 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 74 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 73 days 14 hours 42 mins
- Wed Mar 15 08:14:01 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 5 hours 59 mins 56 secs
- Wed Mar 15 08:14:01 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 4 hours 59 mins 57 secs
- Wed Mar 15 08:14:01 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 0
- Wed Mar 15 08:14:01 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 4 hours 2 secs ago
- Wed Mar 15 08:14:01 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 5 hours 1 sec ago
- Wed Mar 15 08:14:01 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 291 days 9 hours 18 mins ago
- Wed Mar 15 08:14:01 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 292 days 9 hours 18 mins ago
- Wed Mar 15 08:14:01 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 556 days 10 hours 5 mins 19 secs ago
- Wed Mar 15 12:14:03 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11031 days 12 hours 14 mins 3 secs
- Wed Mar 15 12:14:03 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1476 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1475 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1474 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1170 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1169 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 74 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 73 days 18 hours 42 mins 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 9 hours 59 mins 58 secs
- Wed Mar 15 12:14:03 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 8 hours 59 mins 59 secs
- Wed Mar 15 12:14:03 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 4 hours 2 secs
- Wed Mar 15 12:14:03 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 0
- Wed Mar 15 12:14:03 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 59 mins 59 secs ago
- Wed Mar 15 12:14:03 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 291 days 5 hours 17 mins 58 secs ago
- Wed Mar 15 12:14:03 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 292 days 5 hours 17 mins 58 secs ago
- Wed Mar 15 12:14:03 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 556 days 6 hours 5 mins 17 secs ago
- Wed Mar 15 13:14:02 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11031 days 13 hours 14 mins 2 secs
- Wed Mar 15 13:14:02 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1476 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1475 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1474 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1170 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1169 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 74 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 73 days 19 hours 42 mins 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 10 hours 59 mins 57 secs
- Wed Mar 15 13:14:02 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 9 hours 59 mins 58 secs
- Wed Mar 15 13:14:02 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 5 hours 1 sec
- Wed Mar 15 13:14:02 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 59 mins 59 secs
- Wed Mar 15 13:14:02 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 0
- Wed Mar 15 13:14:02 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 291 days 4 hours 17 mins 59 secs ago
- Wed Mar 15 13:14:02 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 292 days 4 hours 17 mins 59 secs ago
- Wed Mar 15 13:14:02 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 556 days 5 hours 5 mins 18 secs ago
- Sun Dec 31 17:32:01 2000 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11322 days 17 hours 32 mins 1 sec
- Sun Dec 31 17:32:01 2000 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1768 days
- Sun Dec 31 17:32:01 2000 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1767 days
- Sun Dec 31 17:32:01 2000 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1766 days
- Sun Dec 31 17:32:01 2000 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1462 days
- Sun Dec 31 17:32:01 2000 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1461 days
- Sun Dec 31 17:32:01 2000 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 366 days
- Sun Dec 31 17:32:01 2000 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 365 days
- Sun Dec 31 17:32:01 2000 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 291 days 15 hours 17 mins 56 secs
- Sun Dec 31 17:32:01 2000 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 291 days 14 hours 17 mins 57 secs
- Sun Dec 31 17:32:01 2000 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 291 days 9 hours 18 mins
- Sun Dec 31 17:32:01 2000 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 291 days 5 hours 17 mins 58 secs
- Sun Dec 31 17:32:01 2000 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 291 days 4 hours 17 mins 59 secs
- Sun Dec 31 17:32:01 2000 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 0
- Sun Dec 31 17:32:01 2000 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 1 day ago
- Sun Dec 31 17:32:01 2000 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 265 days 47 mins 19 secs ago
- Mon Jan 01 17:32:01 2001 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11323 days 17 hours 32 mins 1 sec
- Mon Jan 01 17:32:01 2001 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 1769 days
- Mon Jan 01 17:32:01 2001 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 1768 days
- Mon Jan 01 17:32:01 2001 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 1767 days
- Mon Jan 01 17:32:01 2001 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1463 days
- Mon Jan 01 17:32:01 2001 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1462 days
- Mon Jan 01 17:32:01 2001 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 367 days
- Mon Jan 01 17:32:01 2001 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 366 days
- Mon Jan 01 17:32:01 2001 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 292 days 15 hours 17 mins 56 secs
- Mon Jan 01 17:32:01 2001 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 292 days 14 hours 17 mins 57 secs
- Mon Jan 01 17:32:01 2001 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 292 days 9 hours 18 mins
- Mon Jan 01 17:32:01 2001 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 292 days 5 hours 17 mins 58 secs
- Mon Jan 01 17:32:01 2001 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 292 days 4 hours 17 mins 59 secs
- Mon Jan 01 17:32:01 2001 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 1 day
- Mon Jan 01 17:32:01 2001 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 0
- Mon Jan 01 17:32:01 2001 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 264 days 47 mins 19 secs ago
- Sat Sep 22 18:19:20 2001 UTC | Thu Jan 01 00:00:00 1970 UTC | @ 11587 days 18 hours 19 mins 20 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Feb 28 17:32:01 1996 UTC | @ 2033 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Thu Feb 29 17:32:01 1996 UTC | @ 2032 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Fri Mar 01 17:32:01 1996 UTC | @ 2031 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Mon Dec 30 17:32:01 1996 UTC | @ 1727 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Tue Dec 31 17:32:01 1996 UTC | @ 1726 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Fri Dec 31 17:32:01 1999 UTC | @ 631 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Sat Jan 01 17:32:01 2000 UTC | @ 630 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Mar 15 02:14:05 2000 UTC | @ 556 days 16 hours 5 mins 15 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Mar 15 03:14:04 2000 UTC | @ 556 days 15 hours 5 mins 16 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Mar 15 08:14:01 2000 UTC | @ 556 days 10 hours 5 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Mar 15 12:14:03 2000 UTC | @ 556 days 6 hours 5 mins 17 secs
- Sat Sep 22 18:19:20 2001 UTC | Wed Mar 15 13:14:02 2000 UTC | @ 556 days 5 hours 5 mins 18 secs
- Sat Sep 22 18:19:20 2001 UTC | Sun Dec 31 17:32:01 2000 UTC | @ 265 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Mon Jan 01 17:32:01 2001 UTC | @ 264 days 47 mins 19 secs
- Sat Sep 22 18:19:20 2001 UTC | Sat Sep 22 18:19:20 2001 UTC | @ 0
-(256 rows)
-
+ERROR:  operator does not exist: timestamp with time zone - timestamp with time zone
+LINE 1: ...T d1.f1 AS timestamp1, d2.f1 AS timestamp2, d1.f1 - d2.f1 AS...
+                                                             ^
+HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 --
 -- Conversions
 --

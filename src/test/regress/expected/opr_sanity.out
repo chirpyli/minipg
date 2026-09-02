@@ -620,20 +620,12 @@ timestamptz_lt(timestamp with time zone,timestamp with time zone)
 timestamptz_le(timestamp with time zone,timestamp with time zone)
 timestamptz_ge(timestamp with time zone,timestamp with time zone)
 timestamptz_gt(timestamp with time zone,timestamp with time zone)
-interval_eq(interval,interval)
-interval_ne(interval,interval)
-interval_lt(interval,interval)
-interval_le(interval,interval)
-interval_ge(interval,interval)
-interval_gt(interval,interval)
 charlt("char","char")
 tidne(tid,tid)
 int8(oid)
 tideq(tid,tid)
 timestamptz_cmp(timestamp with time zone,timestamp with time zone)
-interval_cmp(interval,interval)
 xideqint4(xid,integer)
-"interval"(time without time zone)
 name(character varying)
 "varchar"(name)
 oidgt(oid,oid)
@@ -1841,10 +1833,9 @@ ORDER BY 1, 2, 3;
                     | array_ops        | array_ops        | anyarray
                     | float_ops        | float4_ops       | real
                     | float_ops        | float8_ops       | double precision
-                    | interval_ops     | interval_ops     | interval
                     | record_image_ops | record_image_ops | record
                     | record_ops       | record_ops       | record
-(10 rows)
+(9 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.

@@ -289,7 +289,6 @@
   castfunc => 'timestamp(date)', castcontext => 'i', castmethod => 'f' },
 { castsource => 'date', casttarget => 'timestamptz',
   castfunc => 'timestamptz(date)', castcontext => 'i', castmethod => 'f' },
-{ castsource => 'time', casttarget => 'interval', castfunc => 'interval(time)',
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'timestamp', casttarget => 'date',
   castfunc => 'date(timestamp)', castcontext => 'a', castmethod => 'f' },
@@ -303,7 +302,6 @@
   castfunc => 'time(timestamptz)', castcontext => 'a', castmethod => 'f' },
 { castsource => 'timestamptz', casttarget => 'timestamp',
   castfunc => 'timestamp(timestamptz)', castcontext => 'a', castmethod => 'f' },
-{ castsource => 'interval', casttarget => 'time', castfunc => 'time(interval)',
   castcontext => 'a', castmethod => 'f' },
 
 # Geometric category
@@ -375,8 +373,6 @@
 { castsource => 'timestamptz', casttarget => 'timestamptz',
   castfunc => 'timestamptz(timestamptz,int4)', castcontext => 'i',
   castmethod => 'f' },
-{ castsource => 'interval', casttarget => 'interval',
-  castfunc => 'interval(interval,int4)', castcontext => 'i',
   castmethod => 'f' },
   castfunc => 'numeric(numeric,int4)', castcontext => 'i', castmethod => 'f' },
 

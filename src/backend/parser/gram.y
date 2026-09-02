@@ -345,7 +345,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <list>	extract_list overlay_list position_list
 %type <list>	substr_list trim_list
-%type <list>	opt_interval interval_second
 
 %type <boolean> opt_instead
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
@@ -405,7 +404,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				GenericType Numeric opt_float
 				Character ConstCharacter
 				CharacterWithLength CharacterWithoutLength
-				ConstDatetime ConstInterval
+				ConstDatetime
 				Bit ConstBit BitWithLength BitWithoutLength
 %type <str>		character
 %type <str>		extract_arg
@@ -1011,28 +1010,6 @@ zone_value:
 			| IDENT
 				{
 					$$ = makeStringConst($1, @1);
-				}
-			| ConstInterval Sconst opt_interval
-				{
-					TypeName *t = $1;
-					if ($3 != NIL)
-					{
-						A_Const *n = (A_Const *) linitial($3);
-						if ((n->val.val.ival & ~(INTERVAL_MASK(HOUR) | INTERVAL_MASK(MINUTE))) != 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("time zone interval must be HOUR or HOUR TO MINUTE"),
-									 parser_errposition(@3)));
-					}
-					t->typmods = $3;
-					$$ = makeStringConstCast($2, @2, t);
-				}
-			| ConstInterval '(' Iconst ')' Sconst
-				{
-					TypeName *t = $1;
-					t->typmods = list_make2(makeIntConst(INTERVAL_FULL_RANGE, -1),
-											makeIntConst($3, @3));
-					$$ = makeStringConstCast($5, @5, t);
 				}
 			| NumericOnly							{ $$ = makeAConst($1, @1); }
 			| DEFAULT								{ $$ = NULL; }
@@ -5256,17 +5233,6 @@ SimpleTypename:
 			| Bit									{ $$ = $1; }
 			| Character								{ $$ = $1; }
 			| ConstDatetime							{ $$ = $1; }
-			| ConstInterval opt_interval
-				{
-					$$ = $1;
-					$$->typmods = $2;
-				}
-			| ConstInterval '(' Iconst ')'
-				{
-					$$ = $1;
-					$$->typmods = list_make2(makeIntConst(INTERVAL_FULL_RANGE, -1),
-											 makeIntConst($3, @3));
-				}
 		;
 
 /* We have a separate ConstTypename to allow defaulting fixed-length
@@ -5552,13 +5518,6 @@ ConstDatetime:
 				}
 		;
 
-ConstInterval:
-			INTERVAL
-				{
-					$$ = SystemTypeName("interval");
-					$$->location = @1;
-				}
-		;
 
 opt_timezone:
 			WITH_LA TIME ZONE						{ $$ = true; }
@@ -5566,76 +5525,7 @@ opt_timezone:
 			| /*EMPTY*/								{ $$ = false; }
 		;
 
-opt_interval:
-			YEAR_P
-				{ $$ = list_make1(makeIntConst(INTERVAL_MASK(YEAR), @1)); }
-			| MONTH_P
-				{ $$ = list_make1(makeIntConst(INTERVAL_MASK(MONTH), @1)); }
-			| DAY_P
-				{ $$ = list_make1(makeIntConst(INTERVAL_MASK(DAY), @1)); }
-			| HOUR_P
-				{ $$ = list_make1(makeIntConst(INTERVAL_MASK(HOUR), @1)); }
-			| MINUTE_P
-				{ $$ = list_make1(makeIntConst(INTERVAL_MASK(MINUTE), @1)); }
-			| interval_second
-				{ $$ = $1; }
-			| YEAR_P TO MONTH_P
-				{
-					$$ = list_make1(makeIntConst(INTERVAL_MASK(YEAR) |
-												 INTERVAL_MASK(MONTH), @1));
-				}
-			| DAY_P TO HOUR_P
-				{
-					$$ = list_make1(makeIntConst(INTERVAL_MASK(DAY) |
-												 INTERVAL_MASK(HOUR), @1));
-				}
-			| DAY_P TO MINUTE_P
-				{
-					$$ = list_make1(makeIntConst(INTERVAL_MASK(DAY) |
-												 INTERVAL_MASK(HOUR) |
-												 INTERVAL_MASK(MINUTE), @1));
-				}
-			| DAY_P TO interval_second
-				{
-					$$ = $3;
-					linitial($$) = makeIntConst(INTERVAL_MASK(DAY) |
-												INTERVAL_MASK(HOUR) |
-												INTERVAL_MASK(MINUTE) |
-												INTERVAL_MASK(SECOND), @1);
-				}
-			| HOUR_P TO MINUTE_P
-				{
-					$$ = list_make1(makeIntConst(INTERVAL_MASK(HOUR) |
-												 INTERVAL_MASK(MINUTE), @1));
-				}
-			| HOUR_P TO interval_second
-				{
-					$$ = $3;
-					linitial($$) = makeIntConst(INTERVAL_MASK(HOUR) |
-												INTERVAL_MASK(MINUTE) |
-												INTERVAL_MASK(SECOND), @1);
-				}
-			| MINUTE_P TO interval_second
-				{
-					$$ = $3;
-					linitial($$) = makeIntConst(INTERVAL_MASK(MINUTE) |
-												INTERVAL_MASK(SECOND), @1);
-				}
-			| /*EMPTY*/
-				{ $$ = NIL; }
-		;
 
-interval_second:
-			SECOND_P
-				{
-					$$ = list_make1(makeIntConst(INTERVAL_MASK(SECOND), @1));
-				}
-			| SECOND_P '(' Iconst ')'
-				{
-					$$ = list_make2(makeIntConst(INTERVAL_MASK(SECOND), @1),
-									makeIntConst($3, @3));
-				}
-		;
 
 
 /*****************************************************************************
@@ -7119,19 +7009,6 @@ AexprConst: Iconst
 			| ConstTypename Sconst
 				{
 					$$ = makeStringConstCast($2, @2, $1);
-				}
-			| ConstInterval Sconst opt_interval
-				{
-					TypeName *t = $1;
-					t->typmods = $3;
-					$$ = makeStringConstCast($2, @2, t);
-				}
-			| ConstInterval '(' Iconst ')' Sconst
-				{
-					TypeName *t = $1;
-					t->typmods = list_make2(makeIntConst(INTERVAL_FULL_RANGE, -1),
-											makeIntConst($3, @3));
-					$$ = makeStringConstCast($5, @5, t);
 				}
 			| TRUE_P
 				{

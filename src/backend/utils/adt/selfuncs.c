@@ -3987,7 +3987,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 		case TIMESTAMPOID:
 		case TIMESTAMPTZOID:
 		case DATEOID:
-		case INTERVALOID:
 		case TIMEOID:
 			*scaledvalue = convert_timevalue_to_scalar(value, valuetypid,
 													   &failure);
@@ -4366,18 +4365,6 @@ convert_timevalue_to_scalar(Datum value, Oid typid, bool *failure)
 			return DatumGetTimestampTz(value);
 		case DATEOID:
 			return date2timestamp_no_overflow(DatumGetDateADT(value));
-		case INTERVALOID:
-			{
-				Interval   *interval = DatumGetIntervalP(value);
-
-				/*
-				 * Convert the month part of Interval to days using assumed
-				 * average month length of 365.25/12.0 days.  Not too
-				 * accurate, but plenty good enough for our purposes.
-				 */
-				return interval->time + interval->day * (double) USECS_PER_DAY +
-					interval->month * ((DAYS_PER_YEAR / (double) MONTHS_PER_YEAR) * USECS_PER_DAY);
-			}
 		case TIMEOID:
 			return DatumGetTimeADT(value);
 	}

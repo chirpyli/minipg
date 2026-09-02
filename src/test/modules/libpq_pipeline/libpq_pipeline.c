@@ -891,13 +891,13 @@ test_prepared(PGconn *conn)
 	if (PQenterPipelineMode(conn) != 1)
 		pg_fatal("failed to enter pipeline mode: %s", PQerrorMessage(conn));
 	if (PQsendPrepare(conn, "select_one", "SELECT $1, '42', $1::int8, "
-					"interval '1 sec'",
+					"'1 sec'::text",
 					1, param_oids) != 1)
 		pg_fatal("preparing query failed: %s", PQerrorMessage(conn));
 	expected_oids[0] = INT4OID;
 	expected_oids[1] = TEXTOID;
 	expected_oids[2] = INT8OID;
-	expected_oids[3] = INTERVALOID;
+	expected_oids[3] = TEXTOID;
 	if (PQsendDescribePrepared(conn, "select_one") != 1)
 		pg_fatal("failed to send describePrepared: %s", PQerrorMessage(conn));
 	if (PQpipelineSync(conn) != 1)

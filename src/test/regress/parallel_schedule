@@ -21,7 +21,7 @@ test: boolean char varchar text int2 int4 int8 oid float4 float8 txid pg_lsn
 # numerology depends on int2, int4, int8, float4, float8
 # multirangetypes 已随 range/multirange 具体类型裁剪而移除
 # ----------
-test: strings numerology date time timestamp timestamptz interval 
+test: strings numerology date time timestamp timestamptz 
 
 # ----------
 # Another group of parallel tests

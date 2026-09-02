@@ -99,29 +99,21 @@ select name, setting from pg_settings where name like 'enable%';
 -- (At the time of writing, the actual counts are around 38 because of
 -- zones using fractional GMT offsets, so this is a pretty loose test.)
 select count(distinct utc_offset) >= 24 as ok from pg_timezone_names;
- ok 
-----
- t
-(1 row)
-
+ERROR:  relation "pg_timezone_names" does not exist
+LINE 1: ...elect count(distinct utc_offset) >= 24 as ok from pg_timezon...
+                                                             ^
 select count(distinct utc_offset) >= 24 as ok from pg_timezone_abbrevs;
- ok 
-----
- t
-(1 row)
-
+ERROR:  relation "pg_timezone_abbrevs" does not exist
+LINE 1: ...elect count(distinct utc_offset) >= 24 as ok from pg_timezon...
+                                                             ^
 -- Let's check the non-default timezone abbreviation sets, too
 set timezone_abbreviations = 'Australia';
 select count(distinct utc_offset) >= 24 as ok from pg_timezone_abbrevs;
- ok 
-----
- t
-(1 row)
-
+ERROR:  relation "pg_timezone_abbrevs" does not exist
+LINE 1: ...elect count(distinct utc_offset) >= 24 as ok from pg_timezon...
+                                                             ^
 set timezone_abbreviations = 'India';
 select count(distinct utc_offset) >= 24 as ok from pg_timezone_abbrevs;
- ok 
-----
- t
-(1 row)
-
+ERROR:  relation "pg_timezone_abbrevs" does not exist
+LINE 1: ...elect count(distinct utc_offset) >= 24 as ok from pg_timezon...
+                                                             ^

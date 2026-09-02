@@ -843,26 +843,6 @@ timestamptz_cmp_date(PG_FUNCTION_ARGS)
  * We implement this by promoting the dates to timestamp (without time zone)
  * and then using the timestamp-and-interval in_range function.
  */
-Datum
-in_range_date_interval(PG_FUNCTION_ARGS)
-{
-	DateADT		val = PG_GETARG_DATEADT(0);
-	DateADT		base = PG_GETARG_DATEADT(1);
-	Interval   *offset = PG_GETARG_INTERVAL_P(2);
-	bool		sub = PG_GETARG_BOOL(3);
-	bool		less = PG_GETARG_BOOL(4);
-	Timestamp	valStamp;
-	Timestamp	baseStamp;
-	/* XXX we could support out-of-range cases here, perhaps */
-	valStamp = date2timestamp(val);
-	baseStamp = date2timestamp(base);
-	return DirectFunctionCall5(in_range_timestamp_interval,
-							   TimestampGetDatum(valStamp),
-							   TimestampGetDatum(baseStamp),
-							   IntervalPGetDatum(offset),
-							   BoolGetDatum(sub),
-							   BoolGetDatum(less));
-}
 /* extract_date()
  * Extract specified field from date type.
  */
@@ -1018,34 +998,12 @@ extract_date(PG_FUNCTION_ARGS)
  * We implement this by promoting the date to timestamp (without time zone)
  * and then using the timestamp plus interval function.
  */
-Datum
-date_pl_interval(PG_FUNCTION_ARGS)
-{
-	DateADT		dateVal = PG_GETARG_DATEADT(0);
-	Interval   *span = PG_GETARG_INTERVAL_P(1);
-	Timestamp	dateStamp;
-	dateStamp = date2timestamp(dateVal);
-	return DirectFunctionCall2(timestamp_pl_interval,
-							   TimestampGetDatum(dateStamp),
-							   PointerGetDatum(span));
-}
 /* Subtract an interval from a date, giving a new date.
  * Must handle both positive and negative intervals.
  *
  * We implement this by promoting the date to timestamp (without time zone)
  * and then using the timestamp minus interval function.
  */
-Datum
-date_mi_interval(PG_FUNCTION_ARGS)
-{
-	DateADT		dateVal = PG_GETARG_DATEADT(0);
-	Interval   *span = PG_GETARG_INTERVAL_P(1);
-	Timestamp	dateStamp;
-	dateStamp = date2timestamp(dateVal);
-	return DirectFunctionCall2(timestamp_mi_interval,
-							   TimestampGetDatum(dateStamp),
-							   PointerGetDatum(span));
-}
 /* date_timestamp()
  * Convert date to timestamp data type.
  */
@@ -1645,17 +1603,6 @@ datetime_timestamp(PG_FUNCTION_ARGS)
 /* time_interval()
  * Convert time to interval data type.
  */
-Datum
-time_interval(PG_FUNCTION_ARGS)
-{
-	TimeADT		time = PG_GETARG_TIMEADT(0);
-	Interval   *result;
-	result = (Interval *) palloc(sizeof(Interval));
-	result->time = time;
-	result->day = 0;
-	result->month = 0;
-	PG_RETURN_INTERVAL_P(result);
-}
 /* interval_time()
  * Convert interval to time data type.
  *
@@ -1664,105 +1611,18 @@ time_interval(PG_FUNCTION_ARGS)
  * what to do with negative intervals, but we choose to subtract the floor,
  * so that, say, '-2 hours' becomes '22:00:00'.
  */
-Datum
-interval_time(PG_FUNCTION_ARGS)
-{
-	Interval   *span = PG_GETARG_INTERVAL_P(0);
-	TimeADT		result;
-	int64		days;
-	result = span->time;
-	if (result >= USECS_PER_DAY)
-	{
-		days = result / USECS_PER_DAY;
-		result -= days * USECS_PER_DAY;
-	}
-	else if (result < 0)
-	{
-		days = (-result + USECS_PER_DAY - 1) / USECS_PER_DAY;
-		result += days * USECS_PER_DAY;
-	}
-	PG_RETURN_TIMEADT(result);
-}
 /* time_mi_time()
  * Subtract two times to produce an interval.
  */
-Datum
-time_mi_time(PG_FUNCTION_ARGS)
-{
-	TimeADT		time1 = PG_GETARG_TIMEADT(0);
-	TimeADT		time2 = PG_GETARG_TIMEADT(1);
-	Interval   *result;
-	result = (Interval *) palloc(sizeof(Interval));
-	result->month = 0;
-	result->day = 0;
-	result->time = time1 - time2;
-	PG_RETURN_INTERVAL_P(result);
-}
 /* time_pl_interval()
  * Add interval to time.
  */
-Datum
-time_pl_interval(PG_FUNCTION_ARGS)
-{
-	TimeADT		time = PG_GETARG_TIMEADT(0);
-	Interval   *span = PG_GETARG_INTERVAL_P(1);
-	TimeADT		result;
-	result = time + span->time;
-	result -= result / USECS_PER_DAY * USECS_PER_DAY;
-	if (result < INT64CONST(0))
-		result += USECS_PER_DAY;
-	PG_RETURN_TIMEADT(result);
-}
 /* time_mi_interval()
  * Subtract interval from time.
  */
-Datum
-time_mi_interval(PG_FUNCTION_ARGS)
-{
-	TimeADT		time = PG_GETARG_TIMEADT(0);
-	Interval   *span = PG_GETARG_INTERVAL_P(1);
-	TimeADT		result;
-	result = time - span->time;
-	result -= result / USECS_PER_DAY * USECS_PER_DAY;
-	if (result < INT64CONST(0))
-		result += USECS_PER_DAY;
-	PG_RETURN_TIMEADT(result);
-}
 /*
  * in_range support function for time.
  */
-Datum
-in_range_time_interval(PG_FUNCTION_ARGS)
-{
-	TimeADT		val = PG_GETARG_TIMEADT(0);
-	TimeADT		base = PG_GETARG_TIMEADT(1);
-	Interval   *offset = PG_GETARG_INTERVAL_P(2);
-	bool		sub = PG_GETARG_BOOL(3);
-	bool		less = PG_GETARG_BOOL(4);
-	TimeADT		sum;
-	/*
-	 * Like time_pl_interval/time_mi_interval, we disregard the month and day
-	 * fields of the offset.  So our test for negative should too.
-	 */
-	if (offset->time < 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PRECEDING_OR_FOLLOWING_SIZE),
-				 errmsg("invalid preceding or following size in window function")));
-	/*
-	 * We can't use time_pl_interval/time_mi_interval here, because their
-	 * wraparound behavior would give wrong (or at least undesirable) answers.
-	 * Fortunately the equivalent non-wrapping behavior is trivial, especially
-	 * since we don't worry about integer overflow.
-	 */
-	if (sub)
-		sum = base - offset->time;
-	else
-		sum = base + offset->time;
-	if (less)
-		PG_RETURN_BOOL(val <= sum);
-	else
-		PG_RETURN_BOOL(val >= sum);
-}
 /* time_part() and extract_time()
  * Extract specified field from time type.
  */

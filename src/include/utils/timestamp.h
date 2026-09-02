@@ -26,19 +26,15 @@
  */
 #define DatumGetTimestamp(X)  ((Timestamp) DatumGetInt64(X))
 #define DatumGetTimestampTz(X)	((TimestampTz) DatumGetInt64(X))
-#define DatumGetIntervalP(X)  ((Interval *) DatumGetPointer(X))
 
 #define TimestampGetDatum(X) Int64GetDatum(X)
 #define TimestampTzGetDatum(X) Int64GetDatum(X)
-#define IntervalPGetDatum(X) PointerGetDatum(X)
 
 #define PG_GETARG_TIMESTAMP(n) DatumGetTimestamp(PG_GETARG_DATUM(n))
 #define PG_GETARG_TIMESTAMPTZ(n) DatumGetTimestampTz(PG_GETARG_DATUM(n))
-#define PG_GETARG_INTERVAL_P(n) DatumGetIntervalP(PG_GETARG_DATUM(n))
 
 #define PG_RETURN_TIMESTAMP(x) return TimestampGetDatum(x)
 #define PG_RETURN_TIMESTAMPTZ(x) return TimestampTzGetDatum(x)
-#define PG_RETURN_INTERVAL_P(x) return IntervalPGetDatum(x)
 
 
 #define TIMESTAMP_MASK(b) (1 << (b))
@@ -88,8 +84,6 @@ extern int	timestamp2tm(Timestamp dt, int *tzp, struct pg_tm *tm,
 						 fsec_t *fsec, const char **tzn, pg_tz *attimezone);
 extern void dt2time(Timestamp dt, int *hour, int *min, int *sec, fsec_t *fsec);
 
-extern int	interval2tm(Interval span, struct pg_tm *tm, fsec_t *fsec);
-extern int	tm2interval(struct pg_tm *tm, fsec_t fsec, Interval *span);
 
 extern Timestamp SetEpochTimestamp(void);
 extern void GetEpochTime(struct pg_tm *tm);

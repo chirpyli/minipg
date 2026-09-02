@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * timestamp.h
- *	  Timestamp and Interval typedefs and related macros.
+ *	  Timestamp typedefs and related macros.
  *
  * Note: this file must be includable in both frontend and backend contexts.
  *
@@ -18,16 +18,8 @@
 /*
  * Timestamp represents absolute time.
  *
- * Interval represents delta time. Keep track of months (and years), days,
- * and hours/minutes/seconds separately since the elapsed time spanned is
- * unknown until instantiated relative to an absolute time.
- *
- * Note that Postgres uses "time interval" to mean a bounded interval,
- * consisting of a beginning and ending time, not a time span - thomas 97/03/20
- *
- * Timestamps, as well as the h/m/s fields of intervals, are stored as
- * int64 values with units of microseconds.  (Once upon a time they were
- * double values with units of seconds.)
+ * Timestamps are stored as int64 values with units of microseconds.
+ * (Once upon a time they were double values with units of seconds.)
  *
  * TimeOffset and fsec_t are convenience typedefs for temporary variables.
  * Do not use fsec_t in values stored on-disk.
@@ -40,18 +32,9 @@ typedef int64 TimestampTz;
 typedef int64 TimeOffset;
 typedef int32 fsec_t;			/* fractional seconds (in microseconds) */
 
-typedef struct
-{
-	TimeOffset	time;			/* all time units other than days, months and
-								 * years */
-	int32		day;			/* days, after time for alignment */
-	int32		month;			/* months and years, after time for alignment */
-} Interval;
-
 
 /* Limits on the "precision" option (typmod) for these data types */
 #define MAX_TIMESTAMP_PRECISION 6
-#define MAX_INTERVAL_PRECISION 6
 
 /*
  *	Round off to MAX_TIMESTAMP_PRECISION decimal places.

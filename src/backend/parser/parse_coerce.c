@@ -261,15 +261,9 @@ coerce_type(ParseState *pstate, Node *node,
 		 * For most types we pass typmod -1 to the input routine, because
 		 * existing input routines follow implicit-coercion semantics for
 		 * length checks, which is not always what we want here.  Any length
-		 * constraint will be applied later by our caller.  An exception
-		 * however is the INTERVAL type, for which we *must* pass the typmod
-		 * or it won't be able to obey the bizarre SQL-spec input rules. (Ugly
-		 * as sin, but so is this part of the spec...)
+		 * constraint will be applied later by our caller.
 		 */
-		if (baseTypeId == INTERVALOID)
-			inputTypeMod = baseTypeMod;
-		else
-			inputTypeMod = -1;
+		inputTypeMod = -1;
 
 		baseType = typeidType(baseTypeId);
 

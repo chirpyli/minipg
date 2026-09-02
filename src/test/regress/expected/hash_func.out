@@ -246,15 +246,9 @@ FROM   (VALUES (NULL::interval),
         ('17 year 11 month 7 day 9 hours 46 minutes 5 seconds')) x(v)
 WHERE  interval_hash(v)::int8 != interval_hash_extended(v, 0)::int8
        OR interval_hash(v)::int8 = interval_hash_extended(v, 1)::int8;
-                      value                       |  standard   |      extended0       |      extended1       
---------------------------------------------------+-------------+----------------------+----------------------
- @ 5 mons 7 days 46 mins                          | -1650268900 | -2083448633614473956 |   942857083618110188
- @ 1 year 7 days 46 mins                          |  -188752276 |   682362847358869100 |  8020267027678391873
- @ 1 year 7 mons 20 days 46 mins                  | -1444594270 |  6089252150895263138 | -4322963122194547468
- @ 5 mons                                         |  -402409602 |  1927909079586682750 |  6550779087738020598
- @ 17 years 11 mons 7 days 9 hours 46 mins 5 secs | -1299620699 |  3035087197319027877 | -8075234394233322834
-(5 rows)
-
+ERROR:  syntax error at or near "interval"
+LINE 4: FROM   (VALUES (NULL::interval),
+                              ^
 SELECT v as value, timestamp_hash(v)::int8 as standard,
        timestamp_hash_extended(v, 0)::int8 as extended0,
        timestamp_hash_extended(v, 1)::int8 as extended1
