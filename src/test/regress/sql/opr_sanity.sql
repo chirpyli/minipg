@@ -992,7 +992,7 @@ WHERE
      OR a.aggdeserialfn != b.aggdeserialfn);
 
 -- Cross-check aggsortop (if present) against pg_operator.
--- We expect to find entries for bool_and, bool_or, every, max, and min.
+-- We expect to find entries for max and min.
 
 SELECT DISTINCT proname, oprname
 FROM pg_operator AS o, pg_aggregate AS a, pg_proc AS p

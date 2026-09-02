@@ -470,7 +470,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ACCESS ACTION ADD_P ADMIN AFTER
-	AGGREGATE ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
+	ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
 	ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
 	BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
@@ -7270,7 +7270,6 @@ unreserved_keyword:
 			| ADD_P
 			| ADMIN
 			| AFTER
-			| AGGREGATE
 			| ALSO
 			| ALTER
 			| ALWAYS
@@ -7729,7 +7728,6 @@ bare_label_keyword:
 			| ADD_P
 			| ADMIN
 			| AFTER
-			| AGGREGATE
 			| ALL
 			| ALSO
 			| ALTER

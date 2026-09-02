@@ -893,12 +893,6 @@ int8inc_any(PG_FUNCTION_ARGS)
 }
 
 Datum
-int8inc_float8_float8(PG_FUNCTION_ARGS)
-{
-	return int8inc(fcinfo);
-}
-
-Datum
 int8dec_any(PG_FUNCTION_ARGS)
 {
 	return int8dec(fcinfo);

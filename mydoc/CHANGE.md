@@ -131,6 +131,24 @@
 - **编译器驱动清理**：`-Wunused-function` 清零调用 static(08-16)；误加 `static` 致与 pg_proc.dat/fmgrprotos.h 冲突的函数改全局(08-17)；`-Wdeclaration-after-statement` 与 psql 警告清理(08-17，后端+前端 0 warning)；`aclcheck_error*` 声明恢复、`AclResult` 死变量删(08-17)。
 - **Historic MVCC 快照 + partitionwise agg 残余(08-28)**：删 `SNAPSHOT_HISTORIC_MVCC`/`IsMVCCSnapshot`、snapmgr 的 `HistoricSnapshot*`、heapam 的 `HeapTupleSatisfiesHistoricMVCC`、relcache `GetPgClassDescriptor`、planner partitionwise aggregation 残余(`patype`/`common_prefix_cmp`)，净删 ~440 行。
 
+## 十二、聚合函数裁剪（09-02）
+
+- **AGGREGATE 关键字死清理**：`kwlist.h` 删 `PG_KEYWORD("aggregate", AGGREGATE, UNRESERVED_KEYWORD, BARE_LABEL)` 一处；`gram.y` 删 `%token AGGREGATE`、`unreserved_keyword`、`bare_label_keyword` 列表三处。`aggregate` 退化为普通标识符（`WITHIN GROUP` 产生式与假设集聚合 `rank() WITHIN GROUP (ORDER BY ...)` 保留，不受影响）。
+- **裁剪 31 条低价值内置聚合**（`pg_aggregate.dat` 96→65 条，同步 `sed -i` 删 `pg_proc.dat` 对应条目）：
+  - 统计回归族：`regr_count/slope/intercept/r2/avgx/avgy/sxx/syy/sxy`（9）、`covar_pop/covar_samp`（2）、`corr`（1）；
+  - 有序集族：`percentile_disc/percentile_cont`（float8/interval 变体 6）、`mode`（1）；
+  - 布尔族：`bool_and/bool_or/every`（3）；
+  - 整型位运算族：`bit_and/bit_or/bit_xor`（int2/int4/int8 各 3，共 9）。
+- **同步删除失效 C 实现**（仅删上述聚合专属代码，净删约 1400 行）：
+  - `float.c`：删 `float8_regr_accum/float8_regr_combine/float8_regr_sxx/syy/sxy/avgx/avgy/r2/slope/intercept`、`float8_covar_pop/covar_samp`、`float8_corr`（13 函数）；保留 `float8_accum/float8_avg`（variance/stddev 系列仍依赖）。
+  - `orderedsetaggs.c`：删 `ordered_set_transition`（非 multi 变体）及 `percentile_disc_final/percentile_cont_float8_final/percentile_cont_interval_final/percentile_disc_multi_final/percentile_cont_float8_multi_final/percentile_cont_interval_multi_final/mode_final` 共 14 个函数 + 6 个仅被其调用的静态辅助（`float8_lerp/interval_lerp/percentile_cont_final_common/pct_info_cmp/setup_pct_info/percentile_cont_multi_final_common`）；保留 `ordered_set_transition_multi`、`hypothetical_rank/percent_rank/cume_dist/dense_rank_final` 及共享静态 `ordered_set_startup/ordered_set_shutdown/hypothetical_check_argtypes/hypothetical_rank_common`。
+  - `bool.c`：删 `booland_statefunc/boolor_statefunc/bool_accum/bool_accum_inv/bool_alltrue/bool_anytrue` + `BoolAggState`/`makeBoolAggState`；`int8.c` 删 `int8inc_float8_float8`。
+- **保留边界（不可删，否则破坏核心/假设集链路）**：
+  - 整型位运算符 `int2and/int2or/int2xor`、`int4*`、`int8*`（`&`/`|`/`#` 表达式运算符实现，`pg_operator.dat` 指向，仅删 catalog 聚合条目、C 函数保留）；
+  - `count/sum/avg/min/max`、`array_agg/string_agg`、`variance/stddev` 系列；
+  - 假设集 `rank/dense_rank/percent_rank/cume_dist` + `ordered_set_transition_multi` + `WITHIN GROUP` 语法。
+- **回归同步**：`groupingsets.sql` 删 `percentile_disc(0.5) within group (order by v)` 调用、同步 `expected/groupingsets.out`；`opr_sanity.sql` 注释改「max and min」、同步 `expected/opr_sanity.out`（删 bool_and/bool_or/every 行）。`make check` 主回归套件 68 用例全绿。
+
 ---
 
 > 各裁剪的「保留项」「构建注意」「验证」细节已并入上述分组与「〇、通用构建注意」；逐文件清单见 `mydoc/CHANGE.full.md`（由完整历史版本留存）。
