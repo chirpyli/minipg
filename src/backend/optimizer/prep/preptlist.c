@@ -37,6 +37,7 @@
 #include "postgres.h"
 
 #include "access/table.h"
+#include "catalog/pg_collation.h"
 #include "nodes/makefuncs.h"
 #include "optimizer/appendinfo.h"
 #include "optimizer/optimizer.h"
@@ -116,8 +117,7 @@ preprocess_targetlist(PlannerInfo *root)
 	 * there might not be any leaf target relations, in which case we must do
 	 * this in distribute_row_identity_vars().)
 	 */
-	if ((command_type == CMD_UPDATE || command_type == CMD_DELETE) &&
-		!target_rte->inh)
+	if (command_type == CMD_UPDATE || command_type == CMD_DELETE)
 	{
 		/* row-identity logic expects to add stuff to processed_tlist */
 		root->processed_tlist = tlist;
@@ -366,27 +366,12 @@ expand_insert_targetlist(PlannerInfo *root, List *tlist, Relation rel)
 											  true, /* isnull */
 											  true /* byval */ );
 			}
-			else if (att_tup->attgenerated)
-			{
-				/* Generated column, insert a NULL of the base type */
-				Oid			baseTypeId = att_tup->atttypid;
-				int32		baseTypeMod = att_tup->atttypmod;
-
-				baseTypeId = getBaseTypeAndTypmod(baseTypeId, &baseTypeMod);
-				new_expr = (Node *) makeConst(baseTypeId,
-											  baseTypeMod,
-											  att_tup->attcollation,
-											  att_tup->attlen,
-											  (Datum) 0,
-											  true, /* isnull */
-											  att_tup->attbyval);
-			}
 			else
 			{
 				/* Normal column, insert a NULL of the column datatype */
 				new_expr = (Node *) makeConst(att_tup->atttypid,
 												att_tup->atttypmod,
-												att_tup->attcollation,
+												get_typcollation(att_tup->atttypid),
 												att_tup->attlen,
 												(Datum) 0, true,
 												att_tup->attbyval);

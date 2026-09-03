@@ -66,7 +66,6 @@ extern Oid	heap_create_with_catalog(const char *relname,
 									 Oid reltablespace,
 									 Oid relid,
 									 Oid reltypeid,
-									 Oid reloftypeid,
 									 Oid ownerid,
 									 Oid accessmtd,
 									 TupleDesc tupdesc,
@@ -86,10 +85,6 @@ extern void heap_drop_with_catalog(Oid relid);
 extern void heap_truncate(List *relids);
 
 extern void heap_truncate_one_rel(Relation rel);
-
-extern void heap_truncate_check_FKs(List *relations, bool tempTables);
-
-extern List *heap_truncate_find_FKs(List *relationIds);
 
 extern void InsertPgAttributeTuples(Relation pg_attribute_rel,
 									TupleDesc tupdesc,

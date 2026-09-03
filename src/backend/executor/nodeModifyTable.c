@@ -129,23 +129,6 @@ ExecCheckPlanOutput(Relation resultRel, List *targetList)
 						 errdetail("Query provides a value for a dropped column at ordinal position %d.",
 								   attno)));
 		}
-		else if (attr->attgenerated)
-		{
-			/*
-			 * For a generated column, the planner will have inserted a null
-			 * of the column's base type (to avoid possibly failing on domain
-			 * not-null constraints).  It doesn't seem worth insisting on that
-			 * exact type though, since a null value is type-independent.  As
-			 * above, just insist on *some* NULL constant.
-			 */
-			if (!IsA(tle->expr, Const) ||
-				!((Const *) tle->expr)->constisnull)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("table row type and query-specified row type do not match"),
-						 errdetail("Query provides a value for a generated column at ordinal position %d.",
-								   attno)));
-		}
 		else
 		{
 			/* Normal case: demand type match */
@@ -257,182 +240,6 @@ ExecCheckTIDVisible(EState *estate,
 		elog(ERROR, "failed to fetch conflicting tuple for ON CONFLICT");
 	ExecCheckTupleVisible(estate, rel, tempSlot);
 	ExecClearTuple(tempSlot);
-}
-
-/*
- * Initialize to compute stored generated columns for a tuple
- *
- * This fills the resultRelInfo's ri_GeneratedExprs field and makes an
- * associated ResultRelInfoExtra struct to hold ri_extraUpdatedCols.
- * (Currently, ri_extraUpdatedCols is consulted only in UPDATE, but we might
- * as well fill it for INSERT too.)
- */
-void
-ExecInitStoredGenerated(ResultRelInfo *resultRelInfo,
-						EState *estate,
-						CmdType cmdtype)
-{
-	Relation	rel = resultRelInfo->ri_RelationDesc;
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-	int			natts = tupdesc->natts;
-	Bitmapset  *updatedCols;
-	ResultRelInfoExtra *rextra;
-	MemoryContext oldContext;
-
-	/* Don't call twice */
-	Assert(resultRelInfo->ri_GeneratedExprs == NULL);
-
-	/* Nothing to do if no generated columns */
-	if (!(tupdesc->constr && tupdesc->constr->has_generated_stored))
-		return;
-
-	/*
-	 * In an UPDATE, we can skip computing any generated columns that do not
-	 * depend on any UPDATE target column.
-	 */
-	if (cmdtype == CMD_UPDATE)
-		updatedCols = ExecGetUpdatedCols(resultRelInfo, estate);
-	else
-		updatedCols = NULL;
-
-	/*
-	 * Make sure these data structures are built in the per-query memory
-	 * context so they'll survive throughout the query.
-	 */
-	oldContext = MemoryContextSwitchTo(estate->es_query_cxt);
-
-	resultRelInfo->ri_GeneratedExprs =
-		(ExprState **) palloc0(natts * sizeof(ExprState *));
-	resultRelInfo->ri_NumGeneratedNeeded = 0;
-
-	rextra = palloc_object(ResultRelInfoExtra);
-	rextra->rinfo = resultRelInfo;
-	rextra->ri_extraUpdatedCols = NULL;
-	estate->es_resultrelinfo_extra = lappend(estate->es_resultrelinfo_extra,
-											 rextra);
-
-	for (int i = 0; i < natts; i++)
-	{
-		if (TupleDescAttr(tupdesc, i)->attgenerated == ATTRIBUTE_GENERATED_STORED)
-		{
-			Expr	   *expr;
-
-			/* Fetch the GENERATED AS expression tree */
-			expr = (Expr *) build_column_default(rel, i + 1);
-			if (expr == NULL)
-				elog(ERROR, "no generation expression found for column number %d of table \"%s\"",
-					 i + 1, RelationGetRelationName(rel));
-
-			/*
-			 * If it's an update with a known set of update target columns,
-			 * see if we can skip the computation.
-			 */
-			if (updatedCols)
-			{
-				Bitmapset  *attrs_used = NULL;
-
-				pull_varattnos((Node *) expr, 1, &attrs_used);
-
-				if (!bms_overlap(updatedCols, attrs_used))
-					continue;	/* need not update this column */
-			}
-
-			/* No luck, so prepare the expression for execution */
-			resultRelInfo->ri_GeneratedExprs[i] = ExecPrepareExpr(expr, estate);
-			resultRelInfo->ri_NumGeneratedNeeded++;
-
-			/* And mark this column in rextra->ri_extraUpdatedCols */
-			rextra->ri_extraUpdatedCols =
-				bms_add_member(rextra->ri_extraUpdatedCols,
-							   i + 1 - FirstLowInvalidHeapAttributeNumber);
-		}
-	}
-
-	MemoryContextSwitchTo(oldContext);
-}
-
-/*
- * Compute stored generated columns for a tuple
- */
-void
-ExecComputeStoredGenerated(ResultRelInfo *resultRelInfo,
-						   EState *estate, TupleTableSlot *slot,
-						   CmdType cmdtype)
-{
-	Relation	rel = resultRelInfo->ri_RelationDesc;
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-	int			natts = tupdesc->natts;
-	ExprContext *econtext = GetPerTupleExprContext(estate);
-	MemoryContext oldContext;
-	Datum	   *values;
-	bool	   *nulls;
-
-	/* We should not be called unless this is true */
-	Assert(tupdesc->constr && tupdesc->constr->has_generated_stored);
-
-	/*
-	 * For relations named directly in the query, ExecInitStoredGenerated
-	 * should have been called already; but this might not have happened yet
-	 * for a partition child rel.  Also, it's convenient for outside callers
-	 * to not have to call ExecInitStoredGenerated explicitly.
-	 */
-	if (resultRelInfo->ri_GeneratedExprs == NULL)
-		ExecInitStoredGenerated(resultRelInfo, estate, cmdtype);
-
-	/*
-	 * If no generated columns have been affected by this change, then skip
-	 * the rest.
-	 */
-	if (resultRelInfo->ri_NumGeneratedNeeded == 0)
-		return;
-
-	oldContext = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
-
-	values = palloc(sizeof(*values) * natts);
-	nulls = palloc(sizeof(*nulls) * natts);
-
-	slot_getallattrs(slot);
-	memcpy(nulls, slot->tts_isnull, sizeof(*nulls) * natts);
-
-	for (int i = 0; i < natts; i++)
-	{
-		Form_pg_attribute attr = TupleDescAttr(tupdesc, i);
-
-		if (resultRelInfo->ri_GeneratedExprs[i])
-		{
-			Datum		val;
-			bool		isnull;
-
-			Assert(attr->attgenerated == ATTRIBUTE_GENERATED_STORED);
-
-			econtext->ecxt_scantuple = slot;
-
-			val = ExecEvalExpr(resultRelInfo->ri_GeneratedExprs[i], econtext, &isnull);
-
-			/*
-			 * We must make a copy of val as we have no guarantees about where
-			 * memory for a pass-by-reference Datum is located.
-			 */
-			if (!isnull)
-				val = datumCopy(val, attr->attbyval, attr->attlen);
-
-			values[i] = val;
-			nulls[i] = isnull;
-		}
-		else
-		{
-			if (!nulls[i])
-				values[i] = datumCopy(slot->tts_values[i], attr->attbyval, attr->attlen);
-		}
-	}
-
-	ExecClearTuple(slot);
-	memcpy(slot->tts_values, values, sizeof(*values) * natts);
-	memcpy(slot->tts_isnull, nulls, sizeof(*nulls) * natts);
-	ExecStoreVirtualTuple(slot);
-	ExecMaterializeSlot(slot);
-
-	MemoryContextSwitchTo(oldContext);
 }
 
 /*
@@ -680,18 +487,10 @@ ExecInsert(ModifyTableState *mtstate,
 		WCOKind		wco_kind;
 
 		/*
-		 * Constraints and GENERATED expressions might reference the tableoid
-		 * column, so (re-)initialize tts_tableOid before evaluating them.
+		 * Constraints might reference the tableoid column, so
+		 * (re-)initialize tts_tableOid before evaluating them.
 		 */
 		slot->tts_tableOid = RelationGetRelid(resultRelationDesc);
-
-		/*
-		 * Compute stored generated columns
-		 */
-		if (resultRelationDesc->rd_att->constr &&
-			resultRelationDesc->rd_att->constr->has_generated_stored)
-			ExecComputeStoredGenerated(resultRelInfo, estate, slot,
-									   CMD_INSERT);
 
 		/*
 		 * Check any RLS WITH CHECK policies.
@@ -1214,18 +1013,10 @@ lreplace:
 		lockedtid = *tupleid;
 
 		/*
-		 * Constraints and GENERATED expressions might reference the tableoid
-		 * column, so (re-)initialize tts_tableOid before evaluating them.
+		 * Constraints might reference the tableoid column, so
+		 * (re-)initialize tts_tableOid before evaluating them.
 		 */
 		slot->tts_tableOid = RelationGetRelid(resultRelationDesc);
-
-		/*
-		 * Compute stored generated columns
-		 */
-		if (resultRelationDesc->rd_att->constr &&
-			resultRelationDesc->rd_att->constr->has_generated_stored)
-			ExecComputeStoredGenerated(resultRelInfo, estate, slot,
-									   CMD_UPDATE);
 
 		/* ensure slot is independent, consider e.g. EPQ */
 		ExecMaterializeSlot(slot);
@@ -2134,13 +1925,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			}
 		}
 
-		/*
-		 * For INSERT and UPDATE, prepare to evaluate any generated columns.
-		 * (This is probably not necessary any longer, but we'll refrain from
-		 * changing it in back branches, in case extension code expects it.)
-		 */
-		if (operation == CMD_INSERT || operation == CMD_UPDATE)
-			ExecInitStoredGenerated(resultRelInfo, estate, operation);
 	}
 
 	/*

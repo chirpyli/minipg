@@ -997,20 +997,11 @@ get_attstattarget(Oid relid, AttrNumber attnum)
 char
 get_attgenerated(Oid relid, AttrNumber attnum)
 {
-	HeapTuple	tp;
-	Form_pg_attribute att_tup;
-	char		result;
-
-	tp = SearchSysCache2(ATTNUM,
-						 ObjectIdGetDatum(relid),
-						 Int16GetDatum(attnum));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for attribute %d of relation %u",
-			 attnum, relid);
-	att_tup = (Form_pg_attribute) GETSTRUCT(tp);
-	result = att_tup->attgenerated;
-	ReleaseSysCache(tp);
-	return result;
+	/*
+	 * Generated columns have been removed in minipg, so no attribute is ever
+	 * generated.  Kept as a stub returning '\0' for any remaining callers.
+	 */
+	return '\0';
 }
 
 /*
@@ -1066,7 +1057,7 @@ get_atttypetypmodcoll(Oid relid, AttrNumber attnum,
 
 	*typid = att_tup->atttypid;
 	*typmod = att_tup->atttypmod;
-	*collid = att_tup->attcollation;
+	*collid = DEFAULT_COLLATION_OID;
 	ReleaseSysCache(tp);
 }
 
@@ -2864,20 +2855,30 @@ get_typmodout(Oid typid)
 Oid
 get_typcollation(Oid typid)
 {
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (HeapTupleIsValid(tp))
+	/*
+	 * Per-object collations have been removed in minipg: pg_type.typcollation
+	 * is gone, and the collatable types all use the single default (C)
+	 * collation.  Only the types that used to be marked collatable report a
+	 * collation; every other type reports InvalidOid, exactly as it did
+	 * before, so that non-collatable types (bool, int, ...) still get no
+	 * collation assigned to expressions over them.
+	 */
+	switch (typid)
 	{
-		Form_pg_type typtup = (Form_pg_type) GETSTRUCT(tp);
-		Oid			result;
-
-		result = typtup->typcollation;
-		ReleaseSysCache(tp);
-		return result;
+		case NAMEOID:
+		case TEXTOID:
+		case BPCHAROID:
+		case VARCHAROID:
+		case PG_NODE_TREEOID:
+		/* 数组类型沿袭其元素类型的排序规则 */
+		case NAMEARRAYOID:
+		case TEXTARRAYOID:
+		case BPCHARARRAYOID:
+		case VARCHARARRAYOID:
+			return DEFAULT_COLLATION_OID;
+		default:
+			return InvalidOid;
 	}
-	else
-		return InvalidOid;
 }
 
 

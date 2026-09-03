@@ -1425,10 +1425,6 @@ exprLocation(const Node *expr)
 				loc = leftmostLoc(loc, tc->location);
 			}
 			break;
-		case T_CollateClause:
-			/* just use argument's location */
-			loc = exprLocation(((const CollateClause *) expr)->arg);
-			break;
 		case T_SortBy:
 			/* just use argument's location (ignore operator, if any) */
 			loc = exprLocation(((const SortBy *) expr)->node);
@@ -3311,8 +3307,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_CollateClause:
-			return walker(((CollateClause *) node)->arg, context);
 		case T_SortBy:
 			return walker(((SortBy *) node)->node, context);
 		case T_RangeSubselect:
@@ -3369,8 +3363,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(coldef->raw_default, context))
 					return true;
-				if (walker(coldef->collClause, context))
-					return true;
 				/* for now, constraints are ignored */
 			}
 			break;
@@ -3380,7 +3372,7 @@ raw_expression_tree_walker(Node *node,
 
 				if (walker(indelem->expr, context))
 					return true;
-				/* collation and opclass names are deemed uninteresting */
+				/* opclass names are deemed uninteresting */
 			}
 			break;
 		case T_GroupingSet:

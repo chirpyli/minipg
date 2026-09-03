@@ -4046,7 +4046,7 @@ create_hashjoin_plan(PlannerInfo *root,
 			{
 				skewTable = rte->relid;
 				skewColumn = var->varattno;
-				skewInherit = rte->inh;
+				skewInherit = false;
 			}
 		}
 	}

@@ -279,7 +279,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 			case RTE_RELATION:
 				APP_JUMB(rte->relid);
 				JumbleExpr(jstate, (Node *) rte->tablesample);
-				APP_JUMB(rte->inh);
 				break;
 			case RTE_SUBQUERY:
 				JumbleQueryInternal(jstate, rte->subquery);

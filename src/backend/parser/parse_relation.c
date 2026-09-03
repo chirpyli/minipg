@@ -21,6 +21,7 @@
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "catalog/heap.h"
+#include "catalog/pg_collation.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "funcapi.h"
@@ -626,7 +627,7 @@ scanNSItemForColumn(ParseState *pstate, ParseNamespaceItem *nsitem,
 					  attnum,
 					  sysatt->atttypid,
 					  sysatt->atttypmod,
-					  sysatt->attcollation,
+					  DEFAULT_COLLATION_OID,
 					  sublevels_up);
 	}
 	var->location = location;
@@ -1142,7 +1143,7 @@ buildNSItemFromTupleDesc(RangeTblEntry *rte, Index rtindex, TupleDesc tupdesc)
 		nscolumns[varattno].p_varattno = varattno + 1;
 		nscolumns[varattno].p_vartype = attr->atttypid;
 		nscolumns[varattno].p_vartypmod = attr->atttypmod;
-		nscolumns[varattno].p_varcollid = attr->attcollation;
+		nscolumns[varattno].p_varcollid = get_typcollation(attr->atttypid);
 		nscolumns[varattno].p_varnosyn = rtindex;
 		nscolumns[varattno].p_varattnosyn = varattno + 1;
 	}
@@ -1322,7 +1323,6 @@ addRangeTableEntry(ParseState *pstate,
 	 * which is the right thing for all except target tables.
 	 */
 	rte->lateral = false;
-	rte->inh = inh;
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -1408,7 +1408,6 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	 * which is the right thing for all except target tables.
 	 */
 	rte->lateral = false;
-	rte->inh = inh;
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -1503,7 +1502,6 @@ addRangeTableEntryForSubquery(ParseState *pstate,
 	 * Subqueries are never checked for access rights.
 	 */
 	rte->lateral = lateral;
-	rte->inh = false;			/* never true for subqueries */
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -1714,7 +1712,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 							 parser_errposition(pstate, n->location)));
 				typenameTypeIdAndMod(pstate, n->typeName,
 									 &attrtype, &attrtypmod);
-				attrcollation = GetColumnDefCollation(pstate, n, attrtype);
+				attrcollation = GetColumnDefCollation(attrtype);
 				TupleDescInitEntry(tupdesc,
 								   (AttrNumber) i,
 								   attrname,
@@ -1822,7 +1820,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 	 * permissions mechanism).
 	 */
 	rte->lateral = lateral;
-	rte->inh = false;			/* never true for functions */
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -1906,7 +1903,6 @@ addRangeTableEntryForValues(ParseState *pstate,
 	 * Subqueries are never checked for access rights.
 	 */
 	rte->lateral = lateral;
-	rte->inh = false;			/* never true for values RTEs */
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -2001,7 +1997,6 @@ addRangeTableEntryForJoin(ParseState *pstate,
 	 * Joins are never checked for access rights.
 	 */
 	rte->lateral = false;
-	rte->inh = false;			/* never true for joins */
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -2114,7 +2109,7 @@ addRangeTableEntryForENR(ParseState *pstate,
 			rte->coltypes = lappend_oid(rte->coltypes, att->atttypid);
 			rte->coltypmods = lappend_int(rte->coltypmods, att->atttypmod);
 			rte->colcollations = lappend_oid(rte->colcollations,
-											 att->attcollation);
+											 DEFAULT_COLLATION_OID);
 		}
 	}
 
@@ -2124,7 +2119,6 @@ addRangeTableEntryForENR(ParseState *pstate,
 	 * ENRs are never checked for access rights.
 	 */
 	rte->lateral = false;
-	rte->inh = false;			/* never true for ENRs */
 	rte->inFromCl = inFromCl;
 
 	rte->selectedCols = NULL;
@@ -2683,7 +2677,7 @@ expandTupleDesc(TupleDesc tupdesc, Alias *eref, int count, int offset,
 
 			varnode = makeVar(rtindex, varattno + offset + 1,
 							  attr->atttypid, attr->atttypmod,
-							  attr->attcollation,
+							  DEFAULT_COLLATION_OID,
 							  sublevels_up);
 			varnode->location = location;
 
@@ -3148,7 +3142,7 @@ attnumCollationId(Relation rd, int attid)
 	}
 	if (attid > rd->rd_att->natts)
 		elog(ERROR, "invalid attribute number %d", attid);
-	return TupleDescAttr(rd->rd_att, attid - 1)->attcollation;
+	return DEFAULT_COLLATION_OID;
 }
 
 /*

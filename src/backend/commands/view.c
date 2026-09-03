@@ -66,24 +66,7 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		{
 			ColumnDef  *def = makeColumnDef(tle->resname,
 											exprType((Node *) tle->expr),
-											exprTypmod((Node *) tle->expr),
-											exprCollation((Node *) tle->expr));
-
-			/*
-			 * It's possible that the column is of a collatable type but the
-			 * collation could not be resolved, so double-check.
-			 */
-			if (type_is_collatable(exprType((Node *) tle->expr)))
-			{
-				if (!OidIsValid(def->collOid))
-					ereport(ERROR,
-							(errcode(ERRCODE_INDETERMINATE_COLLATION),
-							 errmsg("could not determine which collation to use for view column \"%s\"",
-									def->colname),
-							 errhint("Use the COLLATE clause to set the collation explicitly.")));
-			}
-			else
-				Assert(!OidIsValid(def->collOid));
+											exprTypmod((Node *) tle->expr));
 
 			attrList = lappend(attrList, def);
 		}

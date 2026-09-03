@@ -591,12 +591,12 @@ INSERT INTO concur_exprs_tab (c1, c2) VALUES (1369652450, FALSE),
   (414515746, TRUE),
   (897778963, FALSE);
 CREATE UNIQUE INDEX concur_exprs_index_expr
-  ON concur_exprs_tab ((c1::text COLLATE "C"));
+  ON concur_exprs_tab ((c1::text));
 CREATE UNIQUE INDEX concur_exprs_index_pred ON concur_exprs_tab (c1)
-  WHERE (c1::text > 500000000::text COLLATE "C");
+  WHERE (c1::text > 500000000::text);
 CREATE UNIQUE INDEX concur_exprs_index_pred_2
   ON concur_exprs_tab ((1 / c1))
-  WHERE ('-H') >= (c2::TEXT) COLLATE "C";
+  WHERE ('-H') >= (c2::TEXT);
 ALTER INDEX concur_exprs_index_expr ALTER COLUMN 1 SET STATISTICS 100;
 ANALYZE concur_exprs_tab;
 SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (

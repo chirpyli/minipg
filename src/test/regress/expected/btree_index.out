@@ -177,7 +177,7 @@ reset enable_seqscan;
 reset enable_indexscan;
 reset enable_bitmapscan;
 -- Also check LIKE optimization with binary-compatible cases
-CREATE TABLE btree_bpchar (f1 text collate "C");
+CREATE TABLE btree_bpchar (f1 text);
 create index on btree_bpchar(f1 bpchar_ops);
 insert into btree_bpchar values ('foo'), ('fool'), ('bar'), ('quux');
 -- doesn't match index:

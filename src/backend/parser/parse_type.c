@@ -16,6 +16,7 @@
 
 #include "access/htup_details.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "lib/stringinfo.h"
 #include "nodes/makefuncs.h"
@@ -530,44 +531,13 @@ LookupCollation(ParseState *pstate, List *collnames, int location)
  * GetColumnDefCollation
  *
  * Get the collation to be used for a column being defined, given the
- * ColumnDef node and the previously-determined column type OID.
- *
- * pstate is only used for error location purposes, and can be NULL.
+ * previously-determined column type OID.  (minipg has removed explicit
+ * COLLATE clauses, so the only possible collation is the type's default.)
  */
 Oid
-GetColumnDefCollation(ParseState *pstate, ColumnDef *coldef, Oid typeOid)
+GetColumnDefCollation(Oid typeOid)
 {
-	Oid			result;
-	Oid			typcollation = get_typcollation(typeOid);
-	int			location = coldef->location;
-
-	if (coldef->collClause)
-	{
-		/* We have a raw COLLATE clause, so look up the collation */
-		location = coldef->collClause->location;
-		result = LookupCollation(pstate, coldef->collClause->collname,
-								 location);
-	}
-	else if (OidIsValid(coldef->collOid))
-	{
-		/* Precooked collation spec, use that */
-		result = coldef->collOid;
-	}
-	else
-	{
-		/* Use the type's default collation if any */
-		result = typcollation;
-	}
-
-	/* Complain if COLLATE is applied to an uncollatable type */
-	if (OidIsValid(result) && !OidIsValid(typcollation))
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("collations are not supported by type %s",
-						format_type_be(typeOid)),
-				 parser_errposition(pstate, location)));
-
-	return result;
+	return get_typcollation(typeOid);
 }
 
 /* return a Type structure, given a type id */
@@ -633,14 +603,15 @@ typeTypeRelid(Type typ)
 	return typtup->typrelid;
 }
 
-/* given type (as type struct), return its 'typcollation' attribute */
+/* given type (as type struct), return its collation (or InvalidOid if the
+ * type is not collatable).  In minipg there is a single default (C) collation,
+ * so collatable types report that and everything else reports InvalidOid. */
 Oid
 typeTypeCollation(Type typ)
 {
-	Form_pg_type typtup;
+	Form_pg_type typtup = (Form_pg_type) GETSTRUCT(typ);
 
-	typtup = (Form_pg_type) GETSTRUCT(typ);
-	return typtup->typcollation;
+	return get_typcollation(typtup->oid);
 }
 
 /*

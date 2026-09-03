@@ -130,8 +130,6 @@ CreateTupleDescCopy(TupleDesc tupdesc)
 		att->attnotnull = false;
 		att->atthasdef = false;
 		att->atthasmissing = false;
-		att->attidentity = '\0';
-		att->attgenerated = '\0';
 	}
 
 	/* We can copy the tuple type identification, too */
@@ -166,7 +164,6 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 		TupleConstr *cpy = (TupleConstr *) palloc0(sizeof(TupleConstr));
 
 		cpy->has_not_null = constr->has_not_null;
-		cpy->has_generated_stored = constr->has_generated_stored;
 
 		if ((cpy->num_defval = constr->num_defval) > 0)
 		{
@@ -202,7 +199,6 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 				cpy->check[i].ccname = pstrdup(constr->check[i].ccname);
 				cpy->check[i].ccbin = pstrdup(constr->check[i].ccbin);
 				cpy->check[i].ccvalid = constr->check[i].ccvalid;
-				cpy->check[i].ccnoinherit = constr->check[i].ccnoinherit;
 			}
 		}
 
@@ -243,8 +239,6 @@ TupleDescCopy(TupleDesc dst, TupleDesc src)
 		att->attnotnull = false;
 		att->atthasdef = false;
 		att->atthasmissing = false;
-		att->attidentity = '\0';
-		att->attgenerated = '\0';
 	}
 	dst->constr = NULL;
 
@@ -297,8 +291,6 @@ TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
 	dstAtt->attnotnull = false;
 	dstAtt->atthasdef = false;
 	dstAtt->atthasmissing = false;
-	dstAtt->attidentity = '\0';
-	dstAtt->attgenerated = '\0';
 }
 
 /*
@@ -450,17 +442,7 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 			return false;
 		if (attr1->atthasdef != attr2->atthasdef)
 			return false;
-		if (attr1->attidentity != attr2->attidentity)
-			return false;
-		if (attr1->attgenerated != attr2->attgenerated)
-			return false;
 		if (attr1->attisdropped != attr2->attisdropped)
-			return false;
-		if (attr1->attislocal != attr2->attislocal)
-			return false;
-		if (attr1->attinhcount != attr2->attinhcount)
-			return false;
-		if (attr1->attcollation != attr2->attcollation)
 			return false;
 		/* variable-length fields are not even present... */
 	}
@@ -473,8 +455,6 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 		if (constr2 == NULL)
 			return false;
 		if (constr1->has_not_null != constr2->has_not_null)
-			return false;
-		if (constr1->has_generated_stored != constr2->has_generated_stored)
 			return false;
 		n = constr1->num_defval;
 		if (n != (int) constr2->num_defval)
@@ -529,8 +509,7 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 
 			if (!(strcmp(check1->ccname, check2->ccname) == 0 &&
 				  strcmp(check1->ccbin, check2->ccbin) == 0 &&
-				  check1->ccvalid == check2->ccvalid &&
-				  check1->ccnoinherit == check2->ccnoinherit))
+				  check1->ccvalid == check2->ccvalid))
 				return false;
 		}
 	}
@@ -624,11 +603,7 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attnotnull = false;
 	att->atthasdef = false;
 	att->atthasmissing = false;
-	att->attidentity = '\0';
-	att->attgenerated = '\0';
 	att->attisdropped = false;
-	att->attislocal = true;
-	att->attinhcount = 0;
 	/* attoptions is not present in tupledescs */
 
 	tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(oidtypeid));
@@ -642,7 +617,6 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attalign = typeForm->typalign;
 	att->attstorage = typeForm->typstorage;
 	att->attcompression = InvalidCompressionMethod;
-	att->attcollation = typeForm->typcollation;
 
 	ReleaseSysCache(tuple);
 }
@@ -685,11 +659,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 	att->attnotnull = false;
 	att->atthasdef = false;
 	att->atthasmissing = false;
-	att->attidentity = '\0';
-	att->attgenerated = '\0';
 	att->attisdropped = false;
-	att->attislocal = true;
-	att->attinhcount = 0;
 	/* attoptions is not present in tupledescs */
 
 	att->atttypid = oidtypeid;
@@ -708,7 +678,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attalign = TYPALIGN_INT;
 			att->attstorage = TYPSTORAGE_EXTENDED;
 			att->attcompression = InvalidCompressionMethod;
-			att->attcollation = DEFAULT_COLLATION_OID;
 			break;
 
 		case BOOLOID:
@@ -717,7 +686,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attalign = TYPALIGN_CHAR;
 			att->attstorage = TYPSTORAGE_PLAIN;
 			att->attcompression = InvalidCompressionMethod;
-			att->attcollation = InvalidOid;
 			break;
 
 		case INT4OID:
@@ -726,7 +694,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attalign = TYPALIGN_INT;
 			att->attstorage = TYPSTORAGE_PLAIN;
 			att->attcompression = InvalidCompressionMethod;
-			att->attcollation = InvalidOid;
 			break;
 
 		case INT8OID:
@@ -735,7 +702,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attalign = TYPALIGN_DOUBLE;
 			att->attstorage = TYPSTORAGE_PLAIN;
 			att->attcompression = InvalidCompressionMethod;
-			att->attcollation = InvalidOid;
 			break;
 
 		default:
@@ -761,7 +727,6 @@ TupleDescInitEntryCollation(TupleDesc desc,
 	AssertArg(attributeNumber >= 1);
 	AssertArg(attributeNumber <= desc->natts);
 
-	TupleDescAttr(desc, attributeNumber - 1)->attcollation = collationid;
 }
 
 
@@ -810,7 +775,7 @@ BuildDescForRelation(List *schema)
 		attname = entry->colname;
 		typenameTypeIdAndMod(NULL, entry->typeName, &atttypid, &atttypmod);
 
-		attcollation = GetColumnDefCollation(NULL, entry, atttypid);
+		attcollation = GetColumnDefCollation(atttypid);
 		attdim = list_length(entry->typeName->arrayBounds);
 
 		if (entry->typeName->setof)
@@ -831,8 +796,6 @@ BuildDescForRelation(List *schema)
 		/* Fill in additional stuff not handled by TupleDescInitEntry */
 		att->attnotnull = entry->is_not_null;
 		has_not_null |= entry->is_not_null;
-		att->attislocal = entry->is_local;
-		att->attinhcount = entry->inhcount;
 	}
 
 	if (has_not_null)
@@ -840,7 +803,6 @@ BuildDescForRelation(List *schema)
 		TupleConstr *constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
 
 		constr->has_not_null = true;
-		constr->has_generated_stored = false;
 		constr->defval = NULL;
 		constr->missing = NULL;
 		constr->num_defval = 0;

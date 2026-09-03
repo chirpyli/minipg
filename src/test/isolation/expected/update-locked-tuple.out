@@ -1,6 +1,0 @@
-Parsed test spec with 2 sessions
-
-starting permutation: s1b s2b s2u s2c s1u1 s1u2 s1c
-setup failed: ERROR:  syntax error at or near "REFERENCES"
-LINE 8:                         user_id INTEGER REFERENCES users (id...
-                                                ^

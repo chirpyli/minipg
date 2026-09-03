@@ -1928,8 +1928,7 @@ CommuteOpExpr(OpExpr *clause)
  */
 static bool
 rowtype_field_matches(Oid rowtypeid, int fieldnum,
-					  Oid expectedtype, int32 expectedtypmod,
-					  Oid expectedcollation)
+					  Oid expectedtype, int32 expectedtypmod)
 {
 	TupleDesc	tupdesc;
 	Form_pg_attribute attr;
@@ -1946,8 +1945,7 @@ rowtype_field_matches(Oid rowtypeid, int fieldnum,
 	attr = TupleDescAttr(tupdesc, fieldnum - 1);
 	if (attr->attisdropped ||
 		attr->atttypid != expectedtype ||
-		attr->atttypmod != expectedtypmod ||
-		attr->attcollation != expectedcollation)
+		attr->atttypmod != expectedtypmod)
 	{
 		ReleaseTupleDesc(tupdesc);
 		return false;
@@ -3011,8 +3009,7 @@ eval_const_expressions_mutator(Node *node,
 					if (rowtype_field_matches(((Var *) arg)->vartype,
 											  fselect->fieldnum,
 											  fselect->resulttype,
-											  fselect->resulttypmod,
-											  fselect->resultcollid))
+											  fselect->resulttypmod))
 						return (Node *) makeVar(((Var *) arg)->varno,
 												fselect->fieldnum,
 												fselect->resulttype,
@@ -3033,8 +3030,7 @@ eval_const_expressions_mutator(Node *node,
 						if (rowtype_field_matches(rowexpr->row_typeid,
 												  fselect->fieldnum,
 												  fselect->resulttype,
-												  fselect->resulttypmod,
-												  fselect->resultcollid) &&
+												  fselect->resulttypmod) &&
 							fselect->resulttype == exprType(fld) &&
 							fselect->resulttypmod == exprTypmod(fld) &&
 							fselect->resultcollid == exprCollation(fld))
@@ -3054,8 +3050,7 @@ eval_const_expressions_mutator(Node *node,
 					if (rowtype_field_matches(con->consttype,
 											  newfselect->fieldnum,
 											  newfselect->resulttype,
-											  newfselect->resulttypmod,
-											  newfselect->resultcollid))
+											  newfselect->resulttypmod))
 						return ece_evaluate_expr(newfselect);
 				}
 				return (Node *) newfselect;

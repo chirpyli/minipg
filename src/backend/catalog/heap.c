@@ -85,7 +85,6 @@ static void AddNewRelationTuple(Relation pg_class_desc,
 								Relation new_rel_desc,
 								Oid new_rel_oid,
 								Oid new_type_oid,
-								Oid reloftype,
 								char relkind,
 								TransactionId relfrozenxid,
 								TransactionId relminmxid);
@@ -97,14 +96,11 @@ static ObjectAddress AddNewRelationType(const char *typeName,
 										Oid new_row_type,
 										Oid new_array_type);
 static Oid	StoreRelCheck(Relation rel, const char *ccname, Node *expr,
-						  bool is_validated, bool is_local, int inhcount,
-						  bool is_no_inherit, bool is_internal);
+						  bool is_validated, bool is_internal);
 static void StoreConstraints(Relation rel, List *cooked_constraints,
 							 bool is_internal);
 static bool MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
-										bool allow_merge, bool is_local,
-										bool is_initially_valid,
-										bool is_no_inherit);
+										bool allow_merge, bool is_initially_valid);
 static void SetRelationNumChecks(Relation rel, int numchecks);
 static Node *cookConstraint(ParseState *pstate,
 							Node *raw_constraint,
@@ -145,7 +141,6 @@ static const FormData_pg_attribute a1 = {
 	.attalign = TYPALIGN_SHORT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 static const FormData_pg_attribute a2 = {
@@ -159,7 +154,6 @@ static const FormData_pg_attribute a2 = {
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 static const FormData_pg_attribute a3 = {
@@ -173,7 +167,6 @@ static const FormData_pg_attribute a3 = {
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 static const FormData_pg_attribute a4 = {
@@ -187,7 +180,6 @@ static const FormData_pg_attribute a4 = {
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 static const FormData_pg_attribute a5 = {
@@ -201,7 +193,6 @@ static const FormData_pg_attribute a5 = {
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 /*
@@ -221,7 +212,6 @@ static const FormData_pg_attribute a6 = {
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
 	.attnotnull = true,
-	.attislocal = true,
 };
 
 static const FormData_pg_attribute *SysAtt[] = {&a1, &a2, &a3, &a4, &a5, &a6};
@@ -517,7 +507,7 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
 			continue;
 		CheckAttributeType(NameStr(attr->attname),
 						   attr->atttypid,
-						   attr->attcollation,
+						   DEFAULT_COLLATION_OID,
 						   NIL, /* assume we're creating a new rowtype */
 						   flags);
 	}
@@ -626,7 +616,7 @@ CheckAttributeType(const char *attname,
 			if (attr->attisdropped)
 				continue;
 			CheckAttributeType(NameStr(attr->attname),
-							   attr->atttypid, attr->attcollation,
+							   attr->atttypid, DEFAULT_COLLATION_OID,
 							   containing_rowtypes,
 							   flags & ~CHKATYPE_IS_PARTKEY);
 		}
@@ -736,12 +726,7 @@ InsertPgAttributeTuples(Relation pg_attribute_rel,
 		slot[slotCount]->tts_values[Anum_pg_attribute_attnotnull - 1] = BoolGetDatum(attrs->attnotnull);
 		slot[slotCount]->tts_values[Anum_pg_attribute_atthasdef - 1] = BoolGetDatum(attrs->atthasdef);
 		slot[slotCount]->tts_values[Anum_pg_attribute_atthasmissing - 1] = BoolGetDatum(attrs->atthasmissing);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attidentity - 1] = CharGetDatum(attrs->attidentity);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attgenerated - 1] = CharGetDatum(attrs->attgenerated);
 		slot[slotCount]->tts_values[Anum_pg_attribute_attisdropped - 1] = BoolGetDatum(attrs->attisdropped);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attislocal - 1] = BoolGetDatum(attrs->attislocal);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attinhcount - 1] = Int32GetDatum(attrs->attinhcount);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attcollation - 1] = ObjectIdGetDatum(attrs->attcollation);
 		if (attoptions && attoptions[natts] != (Datum) 0)
 			slot[slotCount]->tts_values[Anum_pg_attribute_attoptions - 1] = attoptions[natts];
 		else
@@ -825,11 +810,11 @@ AddNewAttributeTuples(Oid new_rel_oid,
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 
 		/* The default collation is pinned, so don't bother recording it */
-		if (OidIsValid(tupdesc->attrs[i].attcollation) &&
-			tupdesc->attrs[i].attcollation != DEFAULT_COLLATION_OID)
+		if (OidIsValid(DEFAULT_COLLATION_OID) &&
+			DEFAULT_COLLATION_OID != DEFAULT_COLLATION_OID)
 		{
 			ObjectAddressSet(referenced, CollationRelationId,
-							 tupdesc->attrs[i].attcollation);
+							 DEFAULT_COLLATION_OID);
 			recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 		}
 	}
@@ -887,7 +872,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relname - 1] = NameGetDatum(&rd_rel->relname);
 	values[Anum_pg_class_relnamespace - 1] = ObjectIdGetDatum(rd_rel->relnamespace);
 	values[Anum_pg_class_reltype - 1] = ObjectIdGetDatum(rd_rel->reltype);
-	values[Anum_pg_class_reloftype - 1] = ObjectIdGetDatum(rd_rel->reloftype);
 	values[Anum_pg_class_relam - 1] = ObjectIdGetDatum(rd_rel->relam);
 	values[Anum_pg_class_relfilenode - 1] = ObjectIdGetDatum(rd_rel->relfilenode);
 	values[Anum_pg_class_reltablespace - 1] = ObjectIdGetDatum(rd_rel->reltablespace);
@@ -928,7 +912,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 					Relation new_rel_desc,
 					Oid new_rel_oid,
 					Oid new_type_oid,
-					Oid reloftype,
 					char relkind,
 					TransactionId relfrozenxid,
 					TransactionId relminmxid)
@@ -962,7 +945,6 @@ AddNewRelationTuple(Relation pg_class_desc,
 	new_rel_reltup->relfrozenxid = relfrozenxid;
 	new_rel_reltup->relminmxid = relminmxid;
 	new_rel_reltup->reltype = new_type_oid;
-	new_rel_reltup->reloftype = reloftype;
 
 	/* fill rd_att's type ID with something sane even if reltype is zero */
 	new_rel_desc->rd_att->tdtypeid = new_type_oid ? new_type_oid : RECORDOID;
@@ -1028,7 +1010,6 @@ AddNewRelationType(const char *typeName,
  *	reltablespace: OID of tablespace it goes in
  *	relid: OID to assign to new rel, or InvalidOid to select a new OID
  *	reltypeid: OID to assign to rel's rowtype, or InvalidOid to select one
- *	reloftypeid: if a typed table, OID of underlying type; else InvalidOid
  *	ownerid: OID of new rel's owner
  *	accessmtd: OID of new rel's access method
  *	tupdesc: tuple descriptor (source of column definitions)
@@ -1055,7 +1036,6 @@ heap_create_with_catalog(const char *relname,
 						 Oid reltablespace,
 						 Oid relid,
 						 Oid reltypeid,
-						 Oid reloftypeid,
 						 Oid ownerid,
 						 Oid accessmtd,
 						 TupleDesc tupdesc,
@@ -1262,7 +1242,6 @@ heap_create_with_catalog(const char *relname,
 						new_rel_desc,
 						relid,
 						new_type_oid,
-						reloftypeid,
 						relkind,
 						relfrozenxid,
 						relminmxid);
@@ -1304,11 +1283,6 @@ heap_create_with_catalog(const char *relname,
 		ObjectAddressSet(referenced, NamespaceRelationId, relnamespace);
 		add_exact_object_address(&referenced, addrs);
 
-		if (reloftypeid)
-		{
-			ObjectAddressSet(referenced, TypeRelationId, reloftypeid);
-			add_exact_object_address(&referenced, addrs);
-		}
 
 		/*
 		 * Make a dependency link to force the relation to be deleted if its
@@ -1526,9 +1500,6 @@ RemoveAttributeById(Oid relid, AttrNumber attnum)
 
 		/* We don't want to keep stats for it anymore */
 		attStruct->attstattarget = 0;
-
-		/* Unset this so no one tries to look up the generation expression */
-		attStruct->attgenerated = '\0';
 
 		/*
 		 * Change the column name to something that isn't likely to conflict
@@ -2076,7 +2047,7 @@ StoreAttrDefault(Relation rel, AttrNumber attnum,
 		elog(ERROR, "cache lookup failed for attribute %d of relation %u",
 			 attnum, RelationGetRelid(rel));
 	attStruct = (Form_pg_attribute) GETSTRUCT(atttup);
-	attgenerated = attStruct->attgenerated;
+	attgenerated = '\0';
 	if (!attStruct->atthasdef)
 	{
 		Form_pg_attribute defAttStruct;
@@ -2210,8 +2181,7 @@ StoreAttrDefault(Relation rel, AttrNumber attnum,
  */
 static Oid
 StoreRelCheck(Relation rel, const char *ccname, Node *expr,
-			  bool is_validated, bool is_local, int inhcount,
-			  bool is_no_inherit, bool is_internal)
+			  bool is_validated, bool is_internal)
 {
 	char	   *ccbin;
 	List	   *varList;
@@ -2264,26 +2234,13 @@ StoreRelCheck(Relation rel, const char *ccname, Node *expr,
 							  RelationGetNamespace(rel),	/* namespace */
 							  CONSTRAINT_CHECK, /* Constraint Type */
 							  is_validated,
-							  InvalidOid,	/* no parent constraint */
 							  RelationGetRelid(rel),	/* relation */
 							  attNos,	/* attrs in the constraint */
 							  keycount, /* # key attrs in the constraint */
 							  keycount, /* # total attrs in the constraint */
 							  InvalidOid,	/* no associated index */
-							  InvalidOid,	/* Foreign key fields */
-							  NULL,
-							  NULL,
-							  NULL,
-							  NULL,
-							  0,
-							  ' ',
-							  ' ',
-							  ' ',
-							  expr, /* Tree form of check constraint */
+							 expr, /* Tree form of check constraint */
 							  ccbin,	/* Binary form of check constraint */
-							  is_local, /* conislocal */
-							  inhcount, /* coninhcount */
-							  is_no_inherit,	/* connoinherit */
 							  is_internal); /* internally constructed? */
 
 	pfree(ccbin);
@@ -2330,9 +2287,7 @@ StoreConstraints(Relation rel, List *cooked_constraints, bool is_internal)
 			case CONSTR_CHECK:
 				con->conoid =
 					StoreRelCheck(rel, con->name, con->expr,
-								  !con->skip_validation, con->is_local,
-								  con->inhcount, con->is_no_inherit,
-								  is_internal);
+								  !con->skip_validation, is_internal);
 				numchecks++;
 				break;
 			default:
@@ -2430,7 +2385,7 @@ AddRelationNewConstraints(Relation rel,
 		expr = cookDefault(pstate, colDef->raw_default,
 						   atp->atttypid, atp->atttypmod,
 						   NameStr(atp->attname),
-						   atp->attgenerated);
+						   '\0');
 
 		/*
 		 * If the expression is just a NULL constant, we do not bother to make
@@ -2525,9 +2480,7 @@ AddRelationNewConstraints(Relation rel,
 			 * what ATAddCheckConstraint wants.)
 			 */
 			if (MergeWithExistingConstraint(rel, ccname, expr,
-											allow_merge, is_local,
-											cdef->initially_valid,
-											cdef->is_no_inherit))
+											allow_merge, cdef->initially_valid))
 				continue;
 		}
 		else
@@ -2573,8 +2526,7 @@ AddRelationNewConstraints(Relation rel,
 		 * OK, store it.
 		 */
 		constrOid =
-			StoreRelCheck(rel, ccname, expr, cdef->initially_valid, is_local,
-						  is_local ? 0 : 1, cdef->is_no_inherit, is_internal);
+			StoreRelCheck(rel, ccname, expr, cdef->initially_valid, is_internal);
 
 		numchecks++;
 
@@ -2615,9 +2567,7 @@ AddRelationNewConstraints(Relation rel,
  */
 static bool
 MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
-							bool allow_merge, bool is_local,
-							bool is_initially_valid,
-							bool is_no_inherit)
+							bool allow_merge, bool is_initially_valid)
 {
 	bool		found;
 	Relation	conDesc;
@@ -2663,16 +2613,6 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 				found = true;
 		}
 
-		/*
-		 * If the existing constraint is purely inherited (no local
-		 * definition) then interpret addition of a local constraint as a
-		 * legal merge.  This allows ALTER ADD CONSTRAINT on parent and child
-		 * tables to be given in either order with same end state.  However if
-		 * the relation is a partition, all inherited constraints are always
-		 * non-local, including those that were merged.
-		 */
-		if (is_local && !con->conislocal)
-			allow_merge = true;
 
 		if (!found || !allow_merge)
 			ereport(ERROR,
@@ -2680,23 +2620,6 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 					 errmsg("constraint \"%s\" for relation \"%s\" already exists",
 							ccname, RelationGetRelationName(rel))));
 
-		/* If the child constraint is "no inherit" then cannot merge */
-		if (con->connoinherit)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("constraint \"%s\" conflicts with non-inherited constraint on relation \"%s\"",
-							ccname, RelationGetRelationName(rel))));
-
-		/*
-		 * Must not change an existing inherited constraint to "no inherit"
-		 * status.  That's because inherited constraints should be able to
-		 * propagate to lower-level children.
-		 */
-		if (con->coninhcount > 0 && is_no_inherit)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("constraint \"%s\" conflicts with inherited constraint on relation \"%s\"",
-							ccname, RelationGetRelationName(rel))));
 
 		/*
 		 * If the child constraint is "not valid" then cannot merge with a
@@ -2708,26 +2631,6 @@ MergeWithExistingConstraint(Relation rel, const char *ccname, Node *expr,
 					 errmsg("constraint \"%s\" conflicts with NOT VALID constraint on relation \"%s\"",
 							ccname, RelationGetRelationName(rel))));
 
-		/* OK to update the tuple */
-		ereport(NOTICE,
-				(errmsg("merging constraint \"%s\" with inherited definition",
-						ccname)));
-
-		tup = heap_copytuple(tup);
-		con = (Form_pg_constraint) GETSTRUCT(tup);
-
-		if (is_local)
-			con->conislocal = true;
-		else
-			con->coninhcount++;
-
-		if (is_no_inherit)
-		{
-			Assert(is_local);
-			con->connoinherit = true;
-		}
-
-		CatalogTupleUpdate(conDesc, &tup->t_self, tup);
 	}
 
 	systable_endscan(conscan);
@@ -2799,7 +2702,7 @@ check_nested_generated_walker(Node *node, void *context)
 
 		attnum = var->varattno;
 
-		if (attnum > 0 && get_attgenerated(relid, attnum))
+		if (attnum > 0 && false)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 					 errmsg("cannot use generated column \"%s\" in column generation expression",
@@ -3111,9 +3014,6 @@ heap_truncate(List *relids)
 		relations = lappend(relations, rel);
 	}
 
-	/* Don't allow truncate on tables that are referenced by foreign keys */
-	heap_truncate_check_FKs(relations, true);
-
 	/* OK to do it */
 	foreach(cell, relations)
 	{
@@ -3159,230 +3059,3 @@ heap_truncate_one_rel(Relation rel)
 		table_close(toastrel, NoLock);
 	}
 }
-
-/*
- * heap_truncate_check_FKs
- *		Check for foreign keys referencing a list of relations that
- *		are to be truncated, and raise error if there are any
- *
- * We disallow such FKs (except self-referential ones) since the whole point
- * of TRUNCATE is to not scan the individual rows to be thrown away.
- *
- * This is split out so it can be shared by both implementations of truncate.
- * Caller should already hold a suitable lock on the relations.
- *
- * tempTables is only used to select an appropriate error message.
- */
-void
-heap_truncate_check_FKs(List *relations, bool tempTables)
-{
-	List	   *oids = NIL;
-	List	   *dependents;
-	ListCell   *cell;
-
-	/*
-	 * Build a list of OIDs of the interesting relations.  We must consider
-	 * every relation, because a FK may be defined on any of them.
-	 */
-	foreach(cell, relations)
-	{
-		Relation	rel = lfirst(cell);
-
-		oids = lappend_oid(oids, RelationGetRelid(rel));
-	}
-
-	/*
-	 * Fast path: if there are no relations, none has FKs either.
-	 */
-	if (oids == NIL)
-		return;
-
-	/*
-	 * Otherwise, must scan pg_constraint.  We make one pass with all the
-	 * relations considered; if this finds nothing, then all is well.
-	 */
-	dependents = heap_truncate_find_FKs(oids);
-	if (dependents == NIL)
-		return;
-
-	/*
-	 * Otherwise we repeat the scan once per relation to identify a particular
-	 * pair of relations to complain about.  This is pretty slow, but
-	 * performance shouldn't matter much in a failure path.  The reason for
-	 * doing things this way is to ensure that the message produced is not
-	 * dependent on chance row locations within pg_constraint.
-	 */
-	foreach(cell, oids)
-	{
-		Oid			relid = lfirst_oid(cell);
-		ListCell   *cell2;
-
-		dependents = heap_truncate_find_FKs(list_make1_oid(relid));
-
-		foreach(cell2, dependents)
-		{
-			Oid			relid2 = lfirst_oid(cell2);
-
-			if (!list_member_oid(oids, relid2))
-			{
-				char	   *relname = get_rel_name(relid);
-				char	   *relname2 = get_rel_name(relid2);
-
-				if (tempTables)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("unsupported ON COMMIT and foreign key combination"),
-							 errdetail("Table \"%s\" references \"%s\", but they do not have the same ON COMMIT setting.",
-									   relname2, relname)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot truncate a table referenced in a foreign key constraint"),
-							 errdetail("Table \"%s\" references \"%s\".",
-									   relname2, relname),
-							 errhint("Truncate table \"%s\" at the same time, "
-									 "or use TRUNCATE ... CASCADE.",
-									 relname2)));
-			}
-		}
-	}
-}
-
-/*
- * heap_truncate_find_FKs
- *		Find relations having foreign keys referencing any of the given rels
- *
- * Input and result are both lists of relation OIDs.  The result contains
- * no duplicates, does *not* include any rels that were already in the input
- * list, and is sorted in OID order.  (The last property is enforced mainly
- * to guarantee consistent behavior in the regression tests; we don't want
- * behavior to change depending on chance locations of rows in pg_constraint.)
- *
- * Note: caller should already have appropriate lock on all rels mentioned
- * in relationIds.  Since adding or dropping an FK requires exclusive lock
- * on both rels, this ensures that the answer will be stable.
- */
-List *
-heap_truncate_find_FKs(List *relationIds)
-{
-	List	   *result = NIL;
-	List	   *oids;
-	List	   *parent_cons;
-	ListCell   *cell;
-	ScanKeyData key;
-	Relation	fkeyRel;
-	SysScanDesc fkeyScan;
-	HeapTuple	tuple;
-	bool		restart;
-
-	oids = list_copy(relationIds);
-
-	/*
-	 * Must scan pg_constraint.  Right now, it is a seqscan because there is
-	 * no available index on confrelid.
-	 */
-	fkeyRel = table_open(ConstraintRelationId, AccessShareLock);
-
-restart:
-	restart = false;
-	parent_cons = NIL;
-
-	fkeyScan = systable_beginscan(fkeyRel, InvalidOid, false,
-								  NULL, 0, NULL);
-
-	while (HeapTupleIsValid(tuple = systable_getnext(fkeyScan)))
-	{
-		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(tuple);
-
-		/* Not a foreign key */
-		if (con->contype != CONSTRAINT_FOREIGN)
-			continue;
-
-		/* Not referencing one of our list of tables */
-		if (!list_member_oid(oids, con->confrelid))
-			continue;
-
-		/*
-		 * If this constraint has a parent constraint which we have not seen
-		 * yet, keep track of it for the second loop, below.  Tracking parent
-		 * constraints allows us to climb up to the top-level level constraint
-		 * and look for all possible relations referencing the partitioned
-		 * table.
-		 */
-		if (OidIsValid(con->conparentid) &&
-			!list_member_oid(parent_cons, con->conparentid))
-			parent_cons = lappend_oid(parent_cons, con->conparentid);
-
-		/*
-		 * Add referencer to result, unless present in input list.  (Don't
-		 * worry about dupes: we'll fix that below).
-		 */
-		if (!list_member_oid(relationIds, con->conrelid))
-			result = lappend_oid(result, con->conrelid);
-	}
-
-	systable_endscan(fkeyScan);
-
-	/*
-	 * Process each parent constraint we found to add the list of referenced
-	 * relations by them to the oids list.  If we do add any new such
-	 * relations, redo the first loop above.  Also, if we see that the parent
-	 * constraint in turn has a parent, add that so that we process all
-	 * relations in a single additional pass.
-	 */
-	foreach(cell, parent_cons)
-	{
-		Oid			parent = lfirst_oid(cell);
-
-		ScanKeyInit(&key,
-					Anum_pg_constraint_oid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(parent));
-
-		fkeyScan = systable_beginscan(fkeyRel, ConstraintOidIndexId,
-									  true, NULL, 1, &key);
-
-		tuple = systable_getnext(fkeyScan);
-		if (HeapTupleIsValid(tuple))
-		{
-			Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(tuple);
-
-			/*
-			 * pg_constraint rows always appear for partitioned hierarchies
-			 * this way: on the each side of the constraint, one row appears
-			 * for each partition that points to the top-most table on the
-			 * other side.
-			 *
-			 * Because of this arrangement, we can correctly catch all
-			 * relevant relations by adding to 'parent_cons' all rows with
-			 * valid conparentid, and to the 'oids' list all rows with a zero
-			 * conparentid.  If any oids are added to 'oids', redo the first
-			 * loop above by setting 'restart'.
-			 */
-			if (OidIsValid(con->conparentid))
-				parent_cons = list_append_unique_oid(parent_cons,
-													 con->conparentid);
-			else if (!list_member_oid(oids, con->confrelid))
-			{
-				oids = lappend_oid(oids, con->confrelid);
-				restart = true;
-			}
-		}
-
-		systable_endscan(fkeyScan);
-	}
-
-	list_free(parent_cons);
-	if (restart)
-		goto restart;
-
-	table_close(fkeyRel, AccessShareLock);
-	list_free(oids);
-
-	/* Now sort and de-duplicate the result list */
-	list_sort(result, list_oid_cmp);
-	list_deduplicate_oid(result);
-
-	return result;
-}
-

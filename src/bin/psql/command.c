@@ -57,7 +57,6 @@ static backslashResult exec_command_connect(PsqlScanState scan_state, bool activ
 static backslashResult exec_command_cd(PsqlScanState scan_state, bool active_branch,
 									   const char *cmd);
 static backslashResult exec_command_conninfo(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_copyright(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_crosstabview(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_d(PsqlScanState scan_state, bool active_branch,
 									  const char *cmd);
@@ -307,8 +306,6 @@ exec_command(const char *cmd,
 		status = exec_command_cd(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "conninfo") == 0)
 		status = exec_command_conninfo(scan_state, active_branch);
-	else if (strcmp(cmd, "copyright") == 0)
-		status = exec_command_copyright(scan_state, active_branch);
 	else if (strcmp(cmd, "crosstabview") == 0)
 		status = exec_command_crosstabview(scan_state, active_branch);
 	else if (cmd[0] == 'd')
@@ -614,18 +611,6 @@ exec_command_conninfo(PsqlScanState scan_state, bool active_branch)
 }
 
 /*
- * \copyright -- print copyright notice
- */
-static backslashResult
-exec_command_copyright(PsqlScanState scan_state, bool active_branch)
-{
-	if (active_branch)
-		print_copyright();
-
-	return PSQL_CMD_SKIP_LINE;
-}
-
-/*
  * \crosstabview -- execute a query and display results in crosstab
  */
 static backslashResult
@@ -748,23 +733,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				break;
 			case 'O':
 				success = listCollations(pattern, show_verbose, show_system);
-				break;
-			case 'P':
-				{
-					switch (cmd[2])
-					{
-						case '\0':
-						case '+':
-						case 't':
-						case 'i':
-						case 'n':
-							success = listPartitionedTables(&cmd[2], pattern, show_verbose);
-							break;
-						default:
-							status = PSQL_CMD_UNKNOWN;
-							break;
-					}
-				}
 				break;
 			case 'T':
 				success = describeTypes(pattern, show_verbose, show_system);

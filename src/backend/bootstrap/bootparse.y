@@ -223,7 +223,6 @@ Boot_CreateStmt:
 													  shared_relation ? GLOBALTABLESPACE_OID : 0,
 													  $3,
 													  $6,
-													  InvalidOid,
 													  BOOTSTRAP_SUPERUSERID,
 													  HEAP_TABLE_AM_OID,
 													  tupdesc,
@@ -388,7 +387,6 @@ boot_index_param:
 					n->name = $1;
 					n->expr = NULL;
 					n->indexcolname = NULL;
-					n->collation = NIL;
 					n->opclass = list_make1(makeString($2));
 					n->ordering = SORTBY_DEFAULT;
 					n->nulls_ordering = SORTBY_NULLS_DEFAULT;

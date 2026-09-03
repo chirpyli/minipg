@@ -14,6 +14,4 @@ void		slashUsage(unsigned short int pager);
 
 void		helpVariables(unsigned short int pager);
 
-void		print_copyright(void);
-
 #endif

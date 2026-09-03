@@ -49,6 +49,7 @@
 #include "access/parallel.h"
 #include "access/relation.h"
 #include "access/session.h"
+#include "catalog/pg_collation.h"
 #include "access/table.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_constraint.h"
@@ -356,7 +357,7 @@ lookup_type_cache(Oid type_id, int flags)
 		typentry->typrelid = typtup->typrelid;
 		typentry->typsubscript = typtup->typsubscript;
 		typentry->typelem = typtup->typelem;
-		typentry->typcollation = typtup->typcollation;
+		typentry->typcollation = get_typcollation(type_id);
 		typentry->flags |= TCFLAGS_HAVE_PG_TYPE_DATA;
 
 		ReleaseSysCache(tp);
@@ -394,7 +395,7 @@ lookup_type_cache(Oid type_id, int flags)
 		typentry->typrelid = typtup->typrelid;
 		typentry->typsubscript = typtup->typsubscript;
 		typentry->typelem = typtup->typelem;
-		typentry->typcollation = typtup->typcollation;
+		typentry->typcollation = get_typcollation(type_id);
 		typentry->flags |= TCFLAGS_HAVE_PG_TYPE_DATA;
 
 		ReleaseSysCache(tp);

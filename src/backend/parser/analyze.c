@@ -25,6 +25,7 @@
 #include "postgres.h"
 
 #include "access/sysattr.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -363,7 +364,7 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 
 	/* set up range table with just the result rel */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 stmt->relation->inh,
+										 false,
 										 true);
 	nsitem = pstate->p_target_nsitem;
 
@@ -1052,7 +1053,7 @@ BuildOnConflictExcludedTargetlist(Relation targetrel,
 		{
 			var = makeVar(exclRelIndex, attno + 1,
 						  attr->atttypid, attr->atttypmod,
-						  attr->attcollation,
+						  DEFAULT_COLLATION_OID,
 						  0);
 			name = pstrdup(NameStr(attr->attname));
 		}
@@ -1491,7 +1492,7 @@ transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt)
 	pstate->p_is_insert = false;
 
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 stmt->relation->inh,
+										 false,
 										 true);
 	nsitem = pstate->p_target_nsitem;
 

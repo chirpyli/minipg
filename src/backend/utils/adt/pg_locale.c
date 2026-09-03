@@ -700,28 +700,14 @@ lc_collate_is_c(Oid collation)
 		return false;
 
 	/*
-	 * If we're asked about the default collation, we have to inquire of the C
-	 * library.  Cache the result so we only have to compute it once.
+	 * If we're asked about the default collation, the answer is always C:
+	 * minipg removed per-object collations, and the default collation is
+	 * pinned to C everywhere (bootstrap, single-user and normal backends
+	 * alike).  This keeps index builds deterministic regardless of the
+	 * LC_COLLATE environment the process happens to inherit.
 	 */
 	if (collation == DEFAULT_COLLATION_OID)
-	{
-		static int	result = -1;
-		char	   *localeptr;
-
-		if (result >= 0)
-			return (bool) result;
-		localeptr = setlocale(LC_COLLATE, NULL);
-		if (!localeptr)
-			elog(ERROR, "invalid LC_COLLATE setting");
-
-		if (strcmp(localeptr, "C") == 0)
-			result = true;
-		else if (strcmp(localeptr, "POSIX") == 0)
-			result = true;
-		else
-			result = false;
-		return (bool) result;
-	}
+		return true;
 
 	/*
 	 * If we're asked about the built-in C/POSIX collations, we know that.

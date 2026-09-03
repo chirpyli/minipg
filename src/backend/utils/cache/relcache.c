@@ -453,7 +453,6 @@ RelationBuildTupleDesc(Relation relation)
 	constr = (TupleConstr *) MemoryContextAllocZero(CacheMemoryContext,
 													sizeof(TupleConstr));
 	constr->has_not_null = false;
-	constr->has_generated_stored = false;
 
 	/*
 	 * Form a scan key that selects only user attributes (attnum > 0).
@@ -505,8 +504,6 @@ RelationBuildTupleDesc(Relation relation)
 		/* Update constraint/default info */
 		if (attp->attnotnull)
 			constr->has_not_null = true;
-		if (attp->attgenerated == ATTRIBUTE_GENERATED_STORED)
-			constr->has_generated_stored = true;
 		if (attp->atthasdef)
 			ndef++;
 
@@ -602,7 +599,6 @@ RelationBuildTupleDesc(Relation relation)
 	 * Set up constraint/default info
 	 */
 	if (constr->has_not_null ||
-		constr->has_generated_stored ||
 		ndef > 0 ||
 		attrmiss ||
 		relation->rd_rel->relchecks > 0)
@@ -971,10 +967,6 @@ retry:
 		relation->rd_rulescxt = NULL;
 	}
 
-	/* foreign key data is not loaded till asked for */
-	relation->rd_fkeylist = NIL;
-	relation->rd_fkeyvalid = false;
-
 	/*
 	 * initialize access method information
 	 */
@@ -1234,24 +1226,8 @@ RelationInitIndexAccessInfo(Relation relation)
 		relation->rd_supportinfo = NULL;
 	}
 
-	relation->rd_indcollation = (Oid *)
-		MemoryContextAllocZero(indexcxt, indnkeyatts * sizeof(Oid));
-
 	relation->rd_indoption = (int16 *)
 		MemoryContextAllocZero(indexcxt, indnkeyatts * sizeof(int16));
-
-	/*
-	 * indcollation cannot be referenced directly through the C struct,
-	 * because it comes after the variable-width indkey field.  Must extract
-	 * the datum the hard way...
-	 */
-	indcollDatum = fastgetattr(relation->rd_indextuple,
-							   Anum_pg_index_indcollation,
-							   GetPgIndexDescriptor(),
-							   &isnull);
-	Assert(!isnull);
-	indcoll = (oidvector *) DatumGetPointer(indcollDatum);
-	memcpy(relation->rd_indcollation, indcoll->values, indnkeyatts * sizeof(Oid));
 
 	/*
 	 * indclass cannot be referenced directly through the C struct, because it
@@ -2139,7 +2115,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		else
 			FreeTupleDesc(relation->rd_att);
 	}
-	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
@@ -3163,8 +3138,6 @@ RelationBuildLocalRelation(const char *relname,
 		Form_pg_attribute satt = TupleDescAttr(tupDesc, i);
 		Form_pg_attribute datt = TupleDescAttr(rel->rd_att, i);
 
-		datt->attidentity = satt->attidentity;
-		datt->attgenerated = satt->attgenerated;
 		datt->attnotnull = satt->attnotnull;
 		has_not_null |= satt->attnotnull;
 	}
@@ -4028,7 +4001,6 @@ CheckConstraintFetch(Relation relation)
 		}
 
 		check[found].ccvalid = conform->convalidated;
-		check[found].ccnoinherit = conform->connoinherit;
 		check[found].ccname = MemoryContextStrdup(CacheMemoryContext,
 												  NameStr(conform->conname));
 
@@ -4079,80 +4051,6 @@ CheckConstraintCmp(const void *a, const void *b)
 	const ConstrCheck *cb = (const ConstrCheck *) b;
 
 	return strcmp(ca->ccname, cb->ccname);
-}
-
-/*
- * RelationGetFKeyList -- get a list of foreign key info for the relation
- *
- * Returns a list of ForeignKeyCacheInfo structs, one per FK constraining
- * the given relation.  This data is a direct copy of relevant fields from
- * pg_constraint.  The list items are in no particular order.
- *
- * CAUTION: the returned list is part of the relcache's data, and could
- * vanish in a relcache entry reset.  Callers must inspect or copy it
- * before doing anything that might trigger a cache flush, such as
- * system catalog accesses.  copyObject() can be used if desired.
- * (We define it this way because current callers want to filter and
- * modify the list entries anyway, so copying would be a waste of time.)
- */
-List *
-RelationGetFKeyList(Relation relation)
-{
-	List	   *result;
-	Relation	conrel;
-	SysScanDesc conscan;
-	ScanKeyData skey;
-	HeapTuple	htup;
-	List	   *oldlist;
-	MemoryContext oldcxt;
-
-	/* Quick exit if we already computed the list. */
-	if (relation->rd_fkeyvalid)
-		return relation->rd_fkeylist;
-
-	/*
-	 * We build the list we intend to return (in the caller's context) while
-	 * doing the scan.  After successfully completing the scan, we copy that
-	 * list into the relcache entry.  This avoids cache-context memory leakage
-	 * if we get some sort of error partway through.
-	 */
-	result = NIL;
-
-	/* Prepare to scan pg_constraint for entries having conrelid = this rel. */
-	ScanKeyInit(&skey,
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
-
-	conrel = table_open(ConstraintRelationId, AccessShareLock);
-	conscan = systable_beginscan(conrel, ConstraintRelidNameIndexId, true,
-								 NULL, 1, &skey);
-
-	while (HeapTupleIsValid(htup = systable_getnext(conscan)))
-	{
-		Form_pg_constraint constraint = (Form_pg_constraint) GETSTRUCT(htup);
-
-		/* Foreign-key constraints are not supported in minipg. */
-		if (constraint->contype != CONSTRAINT_FOREIGN)
-			continue;
-
-		/* FK rows should never exist; the branch above always continues. */
-	}
-
-	systable_endscan(conscan);
-	table_close(conrel, AccessShareLock);
-
-	/* Now save a copy of the completed list in the relcache entry. */
-	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-	oldlist = relation->rd_fkeylist;
-	relation->rd_fkeylist = copyObject(result);
-	relation->rd_fkeyvalid = true;
-	MemoryContextSwitchTo(oldcxt);
-
-	/* Don't leak the old list, if there is one */
-	list_free_deep(oldlist);
-
-	return result;
 }
 
 /*
@@ -5058,7 +4956,6 @@ load_relcache_init_file(bool shared)
 			RegProcedure *support;
 			int			nsupport;
 			int16	   *indoption;
-			Oid		   *indcollation;
 
 			/* Count nailed indexes to ensure we have 'em all */
 			if (rel->rd_isnailed)
@@ -5124,16 +5021,6 @@ load_relcache_init_file(bool shared)
 
 			rel->rd_support = support;
 
-			/* next, read the vector of collation OIDs */
-			if (fread(&len, 1, sizeof(len), fp) != sizeof(len))
-				goto read_failed;
-
-			indcollation = (Oid *) MemoryContextAlloc(indexcxt, len);
-			if (fread(indcollation, 1, len, fp) != len)
-				goto read_failed;
-
-			rel->rd_indcollation = indcollation;
-
 			/* finally, read the vector of indoption values */
 			if (fread(&len, 1, sizeof(len), fp) != sizeof(len))
 				goto read_failed;
@@ -5186,7 +5073,6 @@ load_relcache_init_file(bool shared)
 			Assert(rel->rd_support == NULL);
 			Assert(rel->rd_supportinfo == NULL);
 			Assert(rel->rd_indoption == NULL);
-			Assert(rel->rd_indcollation == NULL);
 			Assert(rel->rd_opcoptions == NULL);
 		}
 
@@ -5217,8 +5103,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_indexattr = NULL;
 		rel->rd_keyattr = NULL;
 		rel->rd_pkattr = NULL;
-		rel->rd_fkeyvalid = false;
-		rel->rd_fkeylist = NIL;
 		rel->rd_createSubid = InvalidSubTransactionId;
 		rel->rd_newRelfilenodeSubid = InvalidSubTransactionId;
 		rel->rd_firstRelfilenodeSubid = InvalidSubTransactionId;
@@ -5444,11 +5328,6 @@ write_relcache_init_file(bool shared)
 			/* next, write the vector of support procedure OIDs */
 			write_item(rel->rd_support,
 					   relform->relnatts * (rel->rd_indam->amsupport * sizeof(RegProcedure)),
-					   fp);
-
-			/* next, write the vector of collation OIDs */
-			write_item(rel->rd_indcollation,
-					   relform->relnatts * sizeof(Oid),
 					   fp);
 
 			/* finally, write the vector of indoption values */

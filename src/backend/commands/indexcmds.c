@@ -66,10 +66,9 @@
 static bool CompareOpclassOptions(Datum *opts1, Datum *opts2, int natts);
 static void CheckPredicate(Expr *predicate);
 static void ComputeIndexAttrs(IndexInfo *indexInfo,
-							  Oid *typeOidP,
-							  Oid *collationOidP,
-							  Oid *classOidP,
-							  int16 *colOptionP,
+						  Oid *typeOidP,
+						  Oid *classOidP,
+						  int16 *colOptionP,
 							  List *attList,
 							  List *exclusionOpNames,
 							  Oid relId,
@@ -152,7 +151,6 @@ CheckIndexCompatible(Oid oldId,
 {
 	bool		isconstraint;
 	Oid		   *typeObjectId;
-	Oid		   *collationObjectId;
 	Oid		   *classObjectId;
 	Oid			accessMethodId;
 	Oid			relationId;
@@ -168,7 +166,6 @@ CheckIndexCompatible(Oid oldId,
 	bool		isnull;
 	bool		ret = true;
 	oidvector  *old_indclass;
-	oidvector  *old_indcollation;
 	Relation	irel;
 	int			i;
 	Datum		d;
@@ -211,11 +208,10 @@ CheckIndexCompatible(Oid oldId,
 	indexInfo = makeIndexInfo(numberOfAttributes, numberOfAttributes,
 							  accessMethodId, NIL, NIL, false, false, false);
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
-	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	coloptions = (int16 *) palloc(numberOfAttributes * sizeof(int16));
 	ComputeIndexAttrs(indexInfo,
-					  typeObjectId, collationObjectId, classObjectId,
+					  typeObjectId, classObjectId,
 					  coloptions, attributeList,
 					  exclusionOpNames, relationId,
 					  accessMethodName, accessMethodId,
@@ -240,21 +236,15 @@ CheckIndexCompatible(Oid oldId,
 		return false;
 	}
 
-	/* Any change in operator class or collation breaks compatibility. */
+	/* Any change in operator class breaks compatibility. */
 	old_natts = indexForm->indnkeyatts;
 	Assert(old_natts == numberOfAttributes);
-
-	d = SysCacheGetAttr(INDEXRELID, tuple, Anum_pg_index_indcollation, &isnull);
-	Assert(!isnull);
-	old_indcollation = (oidvector *) DatumGetPointer(d);
 
 	d = SysCacheGetAttr(INDEXRELID, tuple, Anum_pg_index_indclass, &isnull);
 	Assert(!isnull);
 	old_indclass = (oidvector *) DatumGetPointer(d);
 
 	ret = (memcmp(old_indclass->values, classObjectId,
-				  old_natts * sizeof(Oid)) == 0 &&
-		   memcmp(old_indcollation->values, collationObjectId,
 				  old_natts * sizeof(Oid)) == 0);
 
 	ReleaseSysCache(tuple);
@@ -490,7 +480,6 @@ DefineIndex(Oid relationId,
 	char	   *indexRelationName;
 	char	   *accessMethodName;
 	Oid		   *typeObjectId;
-	Oid		   *collationObjectId;
 	Oid		   *classObjectId;
 	Oid			accessMethodId;
 	Oid			namespaceId;
@@ -770,11 +759,10 @@ DefineIndex(Oid relationId,
 							  concurrent);
 
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
-	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	coloptions = (int16 *) palloc(numberOfAttributes * sizeof(int16));
 	ComputeIndexAttrs(indexInfo,
-					  typeObjectId, collationObjectId, classObjectId,
+					  typeObjectId, classObjectId,
 					  coloptions, allIndexParams,
 					  NIL, relationId,
 					  accessMethodName, accessMethodId,
@@ -897,7 +885,7 @@ DefineIndex(Oid relationId,
 					 parentConstraintId,
 					 stmt->oldNode, indexInfo, indexColNames,
 					 accessMethodId, tablespaceId,
-					 collationObjectId, classObjectId,
+					 classObjectId,
 					 coloptions, reloptions,
 					 flags, constr_flags,
 					 allowSystemTableMods, !check_rights,
@@ -1195,7 +1183,6 @@ CheckPredicate(Expr *predicate)
 static void
 ComputeIndexAttrs(IndexInfo *indexInfo,
 				  Oid *typeOidP,
-				  Oid *collationOidP,
 				  Oid *classOidP,
 				  int16 *colOptionP,
 				  List *attList,	/* list of IndexElem's */
@@ -1258,7 +1245,7 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 			attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 			indexInfo->ii_IndexAttrNumbers[attn] = attform->attnum;
 			atttype = attform->atttypid;
-			attcollation = attform->attcollation;
+			attcollation = get_typcollation(atttype);
 			ReleaseSysCache(atttuple);
 		}
 		else
@@ -1319,15 +1306,10 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 		typeOidP[attn] = atttype;
 
 		/*
-		 * Included columns have no collation, no opclass and no ordering
-		 * options.
+		 * Included columns have no opclass and no ordering options.
 		 */
 		if (attn >= nkeycols)
 		{
-			if (attribute->collation)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-						 errmsg("including column does not support a collation")));
 			if (attribute->opclass)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
@@ -1343,30 +1325,9 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 
 			classOidP[attn] = InvalidOid;
 			colOptionP[attn] = 0;
-			collationOidP[attn] = InvalidOid;
 			attn++;
 
 			continue;
-		}
-
-		/*
-		 * Apply collation override if any.  Use of ddl_userid is necessary
-		 * due to ACL checks therein, and it's safe because collations don't
-		 * contain opaque expressions (or non-opaque expressions).
-		 */
-		if (attribute->collation)
-		{
-			if (OidIsValid(ddl_userid))
-			{
-				AtEOXact_GUC(false, *ddl_save_nestlevel);
-				SetUserIdAndSecContext(ddl_userid, ddl_sec_context);
-			}
-			attcollation = get_collation_oid(attribute->collation, false);
-			if (OidIsValid(ddl_userid))
-			{
-				SetUserIdAndSecContext(save_userid, save_sec_context);
-				*ddl_save_nestlevel = NewGUCNestLevel();
-			}
 		}
 
 		/*
@@ -1391,8 +1352,6 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 						 errmsg("collations are not supported by type %s",
 								format_type_be(atttype))));
 		}
-
-		collationOidP[attn] = attcollation;
 
 		/*
 		 * Identify the opclass to use.  Use of ddl_userid is necessary due to

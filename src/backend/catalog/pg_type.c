@@ -112,7 +112,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	values[Anum_pg_type_typanalyze - 1] = ObjectIdGetDatum(InvalidOid);
 	values[Anum_pg_type_typalign - 1] = CharGetDatum(TYPALIGN_INT);
 	values[Anum_pg_type_typstorage - 1] = CharGetDatum(TYPSTORAGE_PLAIN);
-	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(InvalidOid);
 
 	typoid = GetNewOidWithIndex(pg_type_desc, TypeOidIndexId,
 								Anum_pg_type_oid);
@@ -339,7 +338,6 @@ TypeCreate(Oid newTypeOid,
 	values[Anum_pg_type_typanalyze - 1] = ObjectIdGetDatum(analyzeProcedure);
 	values[Anum_pg_type_typalign - 1] = CharGetDatum(alignment);
 	values[Anum_pg_type_typstorage - 1] = CharGetDatum(storage);
-	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(typeCollation);
 
 	/*
 	 * open pg_type and prepare to insert or update a row.
@@ -562,10 +560,10 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 	 * Normal dependency from a type to its collation.  We know the default
 	 * collation is pinned, so don't bother recording it.
 	 */
-	if (OidIsValid(typeForm->typcollation) &&
-		typeForm->typcollation != DEFAULT_COLLATION_OID)
+	if (OidIsValid(InvalidOid) &&
+		InvalidOid != DEFAULT_COLLATION_OID)
 	{
-		ObjectAddressSet(referenced, CollationRelationId, typeForm->typcollation);
+		ObjectAddressSet(referenced, CollationRelationId, InvalidOid);
 		add_exact_object_address(&referenced, addrs_normal);
 	}
 

@@ -229,7 +229,6 @@ slashUsage(unsigned short int pager)
 					  "                         list operators\n"));
 	fprintf(output, _("  \\dO[S+] [PATTERN]      list collations\n"));
 	fprintf(output, _("  \\dp     [PATTERN]      list table, view access privileges\n"));
-	fprintf(output, _("  \\dP[itn+] [PATTERN]    list [only index/table] partitioned relations [n=nested]\n"));
 	fprintf(output, _("  \\drds [ROLEPTRN [DBPTRN]] list per-database role settings\n"));
 
 	fprintf(output, _("  \\dt[S+] [PATTERN]      list tables\n"));
@@ -471,31 +470,4 @@ helpVariables(unsigned short int pager)
 					  "    directory for temporary files\n"));
 
 	ClosePager(output);
-}
-
-
-
-
-
-void
-print_copyright(void)
-{
-	puts("PostgreSQL Database Management System\n"
-		 "(also known as Postgres, formerly known as Postgres95)\n\n"
-		 "Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group\n\n"
-		 "Portions Copyright (c) 1994, The Regents of the University of California\n\n"
-		 "Permission to use, copy, modify, and distribute this software and its\n"
-		 "documentation for any purpose, without fee, and without a written agreement\n"
-		 "is hereby granted, provided that the above copyright notice and this\n"
-		 "paragraph and the following two paragraphs appear in all copies.\n\n"
-		 "IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR\n"
-		 "DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING\n"
-		 "LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS\n"
-		 "DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE\n"
-		 "POSSIBILITY OF SUCH DAMAGE.\n\n"
-		 "THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,\n"
-		 "INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY\n"
-		 "AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS\n"
-		 "ON AN \"AS IS\" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO\n"
-		 "PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.\n");
 }

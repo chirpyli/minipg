@@ -473,7 +473,6 @@ makeRangeVar(char *schemaname, char *relname, int location)
 	r->catalogname = NULL;
 	r->schemaname = schemaname;
 	r->relname = relname;
-	r->inh = true;
 	r->relpersistence = RELPERSISTENCE_PERMANENT;
 	r->alias = NULL;
 	r->location = location;
@@ -530,11 +529,11 @@ makeTypeNameFromOid(Oid typeOid, int32 typmod)
  * makeColumnDef -
  *	build a ColumnDef node to represent a simple column definition.
  *
- * Type and collation are specified by OID.
+ * Type is specified by OID.
  * Other properties are all basic to start with.
  */
 ColumnDef *
-makeColumnDef(const char *colname, Oid typeOid, int32 typmod, Oid collOid)
+makeColumnDef(const char *colname, Oid typeOid, int32 typmod)
 {
 	ColumnDef  *n = makeNode(ColumnDef);
 
@@ -547,8 +546,6 @@ makeColumnDef(const char *colname, Oid typeOid, int32 typmod, Oid collOid)
 	n->storage = 0;
 	n->raw_default = NULL;
 	n->cooked_default = NULL;
-	n->collClause = NULL;
-	n->collOid = collOid;
 	n->constraints = NIL;
 	n->location = -1;
 

@@ -1085,9 +1085,6 @@ describeOneTableDetails(const char *schemaname,
 				atttype_col = -1,
 				attrdef_col = -1,
 				attnotnull_col = -1,
-				attcoll_col = -1,
-				attidentity_col = -1,
-				attgenerated_col = -1,
 				isindexkey_col = -1,
 				indexdef_col = -1,
 				attstorage_col = -1,
@@ -1105,7 +1102,6 @@ describeOneTableDetails(const char *schemaname,
 		bool		ispartition;
 		Oid			tablespace;
 		char	   *reloptions;
-		char	   *reloftype;
 		char		relpersistence;
 		char	   *relam;
 	}			tableinfo;
@@ -1126,7 +1122,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence, am.amname\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1144,7 +1139,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1161,7 +1155,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, false as relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1178,7 +1171,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "false as relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1195,7 +1187,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "false as relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1212,7 +1203,6 @@ describeOneTableDetails(const char *schemaname,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "false as relispartition, %s, c.reltablespace, "
-						  "CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1289,14 +1279,11 @@ describeOneTableDetails(const char *schemaname,
 		pg_strdup(PQgetvalue(res, 0, 8)) : NULL;
 	tableinfo.tablespace = (pset.sversion >= 80000) ?
 		atooid(PQgetvalue(res, 0, 9)) : 0;
-	tableinfo.reloftype = (pset.sversion >= 90000 &&
-						   strcmp(PQgetvalue(res, 0, 10), "") != 0) ?
-		pg_strdup(PQgetvalue(res, 0, 10)) : NULL;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 11)) : 0;
+		*(PQgetvalue(res, 0, 10)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 12) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 12));
+		tableinfo.relam = PQgetisnull(res, 0, 11) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 11));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -1333,22 +1320,6 @@ describeOneTableDetails(const char *schemaname,
 							 ",\n  a.attnotnull");
 		attrdef_col = cols++;
 		attnotnull_col = cols++;
-		if (pset.sversion >= 90100)
-			appendPQExpBufferStr(&buf, ",\n  (SELECT c.collname FROM pg_catalog.pg_collation c, pg_catalog.pg_type t\n"
-								 "   WHERE c.oid = a.attcollation AND t.oid = a.atttypid AND a.attcollation <> t.typcollation) AS attcollation");
-		else
-			appendPQExpBufferStr(&buf, ",\n  NULL AS attcollation");
-		attcoll_col = cols++;
-		if (pset.sversion >= 100000)
-			appendPQExpBufferStr(&buf, ",\n  a.attidentity");
-		else
-			appendPQExpBufferStr(&buf, ",\n  ''::pg_catalog.char AS attidentity");
-		attidentity_col = cols++;
-		if (pset.sversion >= 120000)
-			appendPQExpBufferStr(&buf, ",\n  a.attgenerated");
-		else
-			appendPQExpBufferStr(&buf, ",\n  ''::pg_catalog.char AS attgenerated");
-		attgenerated_col = cols++;
 	}
 	if (tableinfo.relkind == RELKIND_INDEX ||
 		tableinfo.relkind == 'I')
@@ -1476,7 +1447,6 @@ describeOneTableDetails(const char *schemaname,
 	headers[cols++] = gettext_noop("Type");
 	if (show_column_details)
 	{
-		headers[cols++] = gettext_noop("Collation");
 		headers[cols++] = gettext_noop("Nullable");
 		headers[cols++] = gettext_noop("Default");
 	}
@@ -1510,37 +1480,14 @@ describeOneTableDetails(const char *schemaname,
 		/* Type */
 		printTableAddCell(&cont, PQgetvalue(res, i, atttype_col), false, false);
 
-		/* Collation, Nullable, Default */
+		/* Nullable, Default */
 		if (show_column_details)
 		{
-			char	   *identity;
-			char	   *generated;
-			char	   *default_str;
-			bool		mustfree = false;
-
-			printTableAddCell(&cont, PQgetvalue(res, i, attcoll_col), false, false);
-
 			printTableAddCell(&cont,
 							  strcmp(PQgetvalue(res, i, attnotnull_col), "t") == 0 ? "not null" : "",
 							  false, false);
 
-			identity = PQgetvalue(res, i, attidentity_col);
-			generated = PQgetvalue(res, i, attgenerated_col);
-
-			if (identity[0] == ATTRIBUTE_IDENTITY_ALWAYS)
-				default_str = "generated always as identity";
-			else if (identity[0] == ATTRIBUTE_IDENTITY_BY_DEFAULT)
-				default_str = "generated by default as identity";
-			else if (generated[0] == ATTRIBUTE_GENERATED_STORED)
-			{
-				default_str = psprintf("generated always as (%s) stored",
-									   PQgetvalue(res, i, attrdef_col));
-				mustfree = true;
-			}
-			else
-				default_str = PQgetvalue(res, i, attrdef_col);
-
-			printTableAddCell(&cont, default_str, false, mustfree);
+			printTableAddCell(&cont, PQgetvalue(res, i, attrdef_col), false, false);
 		}
 
 		/* Info for index columns */
@@ -1895,134 +1842,7 @@ describeOneTableDetails(const char *schemaname,
 			PQclear(result);
 		}
 
-		/*
-		 * Print foreign-key constraints (there are none if no triggers,
-		 * except if the table is partitioned, in which case the triggers
-		 * appear in the partitions)
-		 */
-		if (tableinfo.relkind == 'p')
-		{
-			if (pset.sversion >= 120000 &&
-				(tableinfo.ispartition || tableinfo.relkind == 'p'))
-			{
-				/*
-				 * Put the constraints defined in this table first, followed
-				 * by the constraints defined in ancestor partitioned tables.
-				 */
-				printfPQExpBuffer(&buf,
-								  "SELECT conrelid = '%s'::pg_catalog.regclass AS sametable,\n"
-								  "       conname,\n"
-								  "       pg_catalog.pg_get_constraintdef(oid, true) AS condef,\n"
-								  "       conrelid::pg_catalog.regclass AS ontable\n"
-								  "  FROM pg_catalog.pg_constraint,\n"
-								  "       pg_catalog.pg_partition_ancestors('%s')\n"
-								  " WHERE conrelid = relid AND contype = 'f' AND conparentid = 0\n"
-								  "ORDER BY sametable DESC, conname;",
-								  oid, oid);
-			}
-			else
-			{
-				printfPQExpBuffer(&buf,
-								  "SELECT true as sametable, conname,\n"
-								  "  pg_catalog.pg_get_constraintdef(r.oid, true) as condef,\n"
-								  "  conrelid::pg_catalog.regclass AS ontable\n"
-								  "FROM pg_catalog.pg_constraint r\n"
-								  "WHERE r.conrelid = '%s' AND r.contype = 'f'\n",
-								  oid);
 
-				if (pset.sversion >= 120000)
-					appendPQExpBufferStr(&buf, "     AND conparentid = 0\n");
-				appendPQExpBufferStr(&buf, "ORDER BY conname");
-			}
-
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			if (tuples > 0)
-			{
-				int			i_sametable = PQfnumber(result, "sametable"),
-							i_conname = PQfnumber(result, "conname"),
-							i_condef = PQfnumber(result, "condef"),
-							i_ontable = PQfnumber(result, "ontable");
-
-				printTableAddFooter(&cont, _("Foreign-key constraints:"));
-				for (i = 0; i < tuples; i++)
-				{
-					/*
-					 * Print untranslated constraint name and definition. Use
-					 * a "TABLE tab" prefix when the constraint is defined in
-					 * a parent partitioned table.
-					 */
-					if (strcmp(PQgetvalue(result, i, i_sametable), "f") == 0)
-						printfPQExpBuffer(&buf, "    TABLE \"%s\" CONSTRAINT \"%s\" %s",
-										  PQgetvalue(result, i, i_ontable),
-										  PQgetvalue(result, i, i_conname),
-										  PQgetvalue(result, i, i_condef));
-					else
-						printfPQExpBuffer(&buf, "    \"%s\" %s",
-										  PQgetvalue(result, i, i_conname),
-										  PQgetvalue(result, i, i_condef));
-
-					printTableAddFooter(&cont, buf.data);
-				}
-			}
-			PQclear(result);
-		}
-
-		/* print incoming foreign-key references */
-		if (tableinfo.relkind == 'p')
-		{
-			if (pset.sversion >= 120000)
-			{
-				printfPQExpBuffer(&buf,
-								  "SELECT conname, conrelid::pg_catalog.regclass AS ontable,\n"
-								  "       pg_catalog.pg_get_constraintdef(oid, true) AS condef\n"
-								  "  FROM pg_catalog.pg_constraint c\n"
-								  " WHERE confrelid IN (SELECT pg_catalog.pg_partition_ancestors('%s')\n"
-								  "                     UNION ALL VALUES ('%s'::pg_catalog.regclass))\n"
-								  "       AND contype = 'f' AND conparentid = 0\n"
-								  "ORDER BY conname;",
-								  oid, oid);
-			}
-			else
-			{
-				printfPQExpBuffer(&buf,
-								  "SELECT conname, conrelid::pg_catalog.regclass AS ontable,\n"
-								  "       pg_catalog.pg_get_constraintdef(oid, true) AS condef\n"
-								  "  FROM pg_catalog.pg_constraint\n"
-								  " WHERE confrelid = %s AND contype = 'f'\n"
-								  "ORDER BY conname;",
-								  oid);
-			}
-
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			if (tuples > 0)
-			{
-				int			i_conname = PQfnumber(result, "conname"),
-							i_ontable = PQfnumber(result, "ontable"),
-							i_condef = PQfnumber(result, "condef");
-
-				printTableAddFooter(&cont, _("Referenced by:"));
-				for (i = 0; i < tuples; i++)
-				{
-					printfPQExpBuffer(&buf, "    TABLE \"%s\" CONSTRAINT \"%s\" %s",
-									  PQgetvalue(result, i, i_ontable),
-									  PQgetvalue(result, i, i_conname),
-									  PQgetvalue(result, i, i_condef));
-
-					printTableAddFooter(&cont, buf.data);
-				}
-			}
-			PQclear(result);
-		}
 
 		/* print rules */
 		if (tableinfo.hasrules)
@@ -2342,11 +2162,6 @@ describeOneTableDetails(const char *schemaname,
 		PQclear(result);
 
 		/* Table type */
-		if (tableinfo.reloftype)
-		{
-			printfPQExpBuffer(&buf, _("Typed table of type: %s"), tableinfo.reloftype);
-			printTableAddFooter(&cont, buf.data);
-			}
 
 			/* OIDs, if verbose */
 		if (verbose && tableinfo.hasoids)
@@ -2656,180 +2471,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 
 		printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
 	}
-
-	PQclear(res);
-	return true;
-}
-
-/*
- * \dP
- * Takes an optional regexp to select particular relations
- *
- * As with \d, you can specify the kinds of relations you want:
- *
- * t for tables
- * i for indexes
- *
- * And there's additional flags:
- *
- * n to list non-leaf partitioned tables
- *
- * and you can mix and match these in any order.
- */
-bool
-listPartitionedTables(const char *reltypes, const char *pattern, bool verbose)
-{
-	bool		showTables = strchr(reltypes, 't') != NULL;
-	bool		showIndexes = strchr(reltypes, 'i') != NULL;
-	bool		showNested = strchr(reltypes, 'n') != NULL;
-	PQExpBufferData buf;
-	PQExpBufferData title;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-	bool		translate_columns[] = {false, false, false, false, false, false, false, false, false};
-	const char *tabletitle;
-	bool		mixed_output = false;
-
-	/*
-	 * Note: Declarative table partitioning is only supported as of Pg 10.0.
-	 */
-	/* If no relation kind was selected, show them all */
-	if (!showTables && !showIndexes)
-		showTables = showIndexes = true;
-
-	if (showIndexes && !showTables)
-		tabletitle = _("List of partitioned indexes");	/* \dPi */
-	else if (showTables && !showIndexes)
-		tabletitle = _("List of partitioned tables");	/* \dPt */
-	else
-	{
-		/* show all kinds */
-		tabletitle = _("List of partitioned relations");
-		mixed_output = true;
-	}
-
-	initPQExpBuffer(&buf);
-
-	printfPQExpBuffer(&buf,
-					  "SELECT n.nspname as \"%s\",\n"
-					  "  c.relname as \"%s\"",
-					  gettext_noop("Schema"),
-					  gettext_noop("Name"));
-
-	if (mixed_output)
-	{
-		appendPQExpBuffer(&buf,
-						  ",\n  CASE c.relkind"
-						  " WHEN " "'p'" " THEN '%s'"
-						  " WHEN " "'I'" " THEN '%s'"
-						  " END as \"%s\"",
-						  gettext_noop("partitioned table"),
-						  gettext_noop("partitioned index"),
-						  gettext_noop("Type"));
-
-		translate_columns[3] = true;
-	}
-
-	if (showNested || pattern)
-		appendPQExpBuffer(&buf,
-						  ",\n  inh.inhparent::pg_catalog.regclass as \"%s\"",
-						  gettext_noop("Parent name"));
-
-	if (showIndexes)
-		appendPQExpBuffer(&buf,
-						  ",\n c2.oid::pg_catalog.regclass as \"%s\"",
-						  gettext_noop("Table"));
-
-	if (verbose)
-	{
-		if (showNested)
-		{
-			appendPQExpBuffer(&buf,
-							  ",\n  s.dps as \"%s\"",
-							  gettext_noop("Leaf partition size"));
-			appendPQExpBuffer(&buf,
-							  ",\n  s.tps as \"%s\"",
-							  gettext_noop("Total size"));
-		}
-		else
-			/* Sizes of all partitions are considered in this case. */
-			appendPQExpBuffer(&buf,
-							  ",\n  s.tps as \"%s\"",
-							  gettext_noop("Total size"));
-
-		appendPQExpBuffer(&buf,
-						  ",\n  pg_catalog.obj_description(c.oid, 'pg_class') as \"%s\"",
-						  gettext_noop("Description"));
-	}
-
-	appendPQExpBufferStr(&buf,
-						 "\nFROM pg_catalog.pg_class c"
-						 "\n     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace");
-
-	if (showIndexes)
-		appendPQExpBufferStr(&buf,
-							 "\n     LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid"
-							 "\n     LEFT JOIN pg_catalog.pg_class c2 ON i.indrelid = c2.oid");
-
-	if (showNested || pattern)
-		appendPQExpBufferStr(&buf,
-							 "\n     LEFT JOIN (SELECT NULL::oid AS inhrelid) inh ON c.oid = inh.inhrelid");
-
-	if (verbose)
-	{
-		/*
-		 * Use pg_partition_tree to compute table and partition sizes.
-		 */
-		appendPQExpBufferStr(&buf,
-							 ",\n     LATERAL (SELECT pg_catalog.pg_size_pretty(sum("
-							 "\n                 CASE WHEN ppt.isleaf AND ppt.level = 1"
-							 "\n                      THEN pg_catalog.pg_table_size(ppt.relid)"
-							 " ELSE 0 END)) AS dps"
-							 ",\n                     pg_catalog.pg_size_pretty(sum("
-							 "pg_catalog.pg_table_size(ppt.relid))) AS tps"
-							 "\n              FROM pg_catalog.pg_partition_tree(c.oid) ppt) s");
-	}
-
-	appendPQExpBufferStr(&buf, "\nWHERE c.relkind IN (");
-	if (showTables)
-		appendPQExpBufferStr(&buf, "'p'" ",");
-	if (showIndexes)
-		appendPQExpBufferStr(&buf, "'I'" ",");
-	appendPQExpBufferStr(&buf, "''");	/* dummy */
-	appendPQExpBufferStr(&buf, ")\n");
-
-	if (!pattern)
-		appendPQExpBufferStr(&buf, "      AND n.nspname <> 'pg_catalog'\n"
-							 "      AND n.nspname NOT LIKE 'pg_toast%'\n"
-							 "      AND n.nspname <> 'information_schema'\n");
-
-	if (!validateSQLNamePattern(&buf, pattern, true, false,
-								"n.nspname", "c.relname", NULL,
-								"pg_catalog.pg_table_is_visible(c.oid)",
-								NULL, 3))
-		return false;
-
-	appendPQExpBuffer(&buf, "ORDER BY \"Schema\", %s%s\"Name\";",
-					  mixed_output ? "\"Type\" DESC, " : "",
-					  showNested || pattern ? "\"Parent name\" NULLS FIRST, " : "");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	initPQExpBuffer(&title);
-	appendPQExpBufferStr(&title, tabletitle);
-
-	myopt.nullPrint = NULL;
-	myopt.title = title.data;
-	myopt.translate_header = true;
-	myopt.translate_columns = translate_columns;
-	myopt.n_translate_columns = lengthof(translate_columns);
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	termPQExpBuffer(&title);
 
 	PQclear(res);
 	return true;

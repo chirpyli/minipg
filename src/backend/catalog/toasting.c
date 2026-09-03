@@ -145,7 +145,6 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	char		toast_relname[NAMEDATALEN];
 	char		toast_idxname[NAMEDATALEN];
 	IndexInfo  *indexInfo;
-	Oid			collationObjectId[2];
 	Oid			classObjectId[2];
 	int16		coloptions[2];
 	ObjectAddress baseobject,
@@ -226,7 +225,6 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 										   toastOid,
 										   InvalidOid,
 										   InvalidOid,
-										   InvalidOid,
 										   table_relation_toast_am(rel),
 										   tupdesc,
 										   NIL,
@@ -278,9 +276,6 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	indexInfo->ii_AmCache = NULL;
 	indexInfo->ii_Context = CurrentMemoryContext;
 
-	collationObjectId[0] = InvalidOid;
-	collationObjectId[1] = InvalidOid;
-
 	classObjectId[0] = OID_BTREE_OPS_OID;
 	classObjectId[1] = INT4_BTREE_OPS_OID;
 
@@ -293,7 +288,7 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 				 list_make2("chunk_id", "chunk_seq"),
 				 BTREE_AM_OID,
 				 rel->rd_rel->reltablespace,
-				 collationObjectId, classObjectId, coloptions, (Datum) 0,
+				 classObjectId, coloptions, (Datum) 0,
 				 INDEX_CREATE_IS_PRIMARY, 0, true, true, NULL);
 
 	table_close(toast_rel, NoLock);

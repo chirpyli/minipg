@@ -50,7 +50,6 @@ static Node *coerce_record_to_complex(ParseState *pstate, Node *node,
 									  CoercionForm cformat,
 									  int location);
 static bool is_complex_array(Oid typid);
-static bool typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId);
 
 
 /*
@@ -452,38 +451,6 @@ coerce_type(ParseState *pstate, Node *node,
 		/* NB: we do NOT want a RelabelType here */
 		return node;
 	}
-	if (typeIsOfTypedTable(inputTypeId, targetTypeId))
-	{
-		/*
-		 * Input class type is a subclass of target, so generate an
-		 * appropriate runtime conversion (removing unneeded columns and
-		 * possibly rearranging the ones that are wanted).
-		 *
-		 * We will also get here when the input is a domain over a subclass of
-		 * the target type.  To keep life simple for the executor, we define
-		 * ConvertRowtypeExpr as only working between regular composite types;
-		 * therefore, in such cases insert a RelabelType to smash the input
-		 * expression down to its base type.
-		 */
-		Oid			baseTypeId = getBaseType(inputTypeId);
-		ConvertRowtypeExpr *r = makeNode(ConvertRowtypeExpr);
-
-		if (baseTypeId != inputTypeId)
-		{
-			RelabelType *rt = makeRelabelType((Expr *) node,
-											  baseTypeId, -1,
-											  InvalidOid,
-											  COERCE_IMPLICIT_CAST);
-
-			rt->location = location;
-			node = (Node *) rt;
-		}
-		r->arg = (Expr *) node;
-		r->resulttype = targetTypeId;
-		r->convertformat = cformat;
-		r->location = location;
-		return (Node *) r;
-	}
 	/* If we get here, caller blew it */
 	elog(ERROR, "failed to find conversion function from %s to %s",
 		 format_type_be(inputTypeId), format_type_be(targetTypeId));
@@ -577,11 +544,6 @@ can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
 			is_complex_array(inputTypeId))
 			continue;
 
-		/*
-		 * If input is a class type that inherits from target, accept
-		 */
-		if (typeIsOfTypedTable(inputTypeId, targetTypeId))
-			continue;
 
 		/*
 		 * Else, cannot coerce at this argument position
@@ -2547,31 +2509,3 @@ is_complex_array(Oid typid)
 }
 
 
-/*
- * Check whether reltypeId is the row type of a typed table of type
- * reloftypeId, or is a domain over such a row type.
- */
-static bool
-typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)
-{
-	Oid			relid = typeOrDomainTypeRelid(reltypeId);
-	bool		result = false;
-
-	if (relid)
-	{
-		HeapTuple	tp;
-		Form_pg_class reltup;
-
-		tp = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-		if (!HeapTupleIsValid(tp))
-			elog(ERROR, "cache lookup failed for relation %u", relid);
-
-		reltup = (Form_pg_class) GETSTRUCT(tp);
-		if (reltup->reloftype == reloftypeId)
-			result = true;
-
-		ReleaseSysCache(tp);
-	}
-
-	return result;
-}

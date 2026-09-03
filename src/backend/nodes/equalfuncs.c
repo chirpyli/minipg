@@ -109,7 +109,6 @@ _equalRangeVar(const RangeVar *a, const RangeVar *b)
 	COMPARE_STRING_FIELD(catalogname);
 	COMPARE_STRING_FIELD(schemaname);
 	COMPARE_STRING_FIELD(relname);
-	COMPARE_SCALAR_FIELD(inh);
 	COMPARE_SCALAR_FIELD(relpersistence);
 	COMPARE_NODE_FIELD(alias);
 	COMPARE_LOCATION_FIELD(location);
@@ -1016,7 +1015,6 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(tableElts);
-	COMPARE_NODE_FIELD(ofTypename);
 	COMPARE_NODE_FIELD(constraints);
 	COMPARE_NODE_FIELD(options);
 	COMPARE_SCALAR_FIELD(oncommit);
@@ -1398,16 +1396,6 @@ _equalTypeCast(const TypeCast *a, const TypeCast *b)
 }
 
 static bool
-_equalCollateClause(const CollateClause *a, const CollateClause *b)
-{
-	COMPARE_NODE_FIELD(arg);
-	COMPARE_NODE_FIELD(collname);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalSortBy(const SortBy *a, const SortBy *b)
 {
 	COMPARE_NODE_FIELD(node);
@@ -1463,7 +1451,6 @@ _equalIndexElem(const IndexElem *a, const IndexElem *b)
 	COMPARE_STRING_FIELD(name);
 	COMPARE_NODE_FIELD(expr);
 	COMPARE_STRING_FIELD(indexcolname);
-	COMPARE_NODE_FIELD(collation);
 	COMPARE_NODE_FIELD(opclass);
 	COMPARE_NODE_FIELD(opclassopts);
 	COMPARE_SCALAR_FIELD(ordering);
@@ -1489,8 +1476,6 @@ _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 	COMPARE_SCALAR_FIELD(identity);
 	COMPARE_NODE_FIELD(identitySequence);
 	COMPARE_SCALAR_FIELD(generated);
-	COMPARE_NODE_FIELD(collClause);
-	COMPARE_SCALAR_FIELD(collOid);
 	COMPARE_NODE_FIELD(constraints);
 	COMPARE_LOCATION_FIELD(location);
 
@@ -1513,14 +1498,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_STRING_FIELD(indexname);
 	COMPARE_STRING_FIELD(access_method);
 	COMPARE_NODE_FIELD(where_clause);
-	COMPARE_NODE_FIELD(pktable);
-	COMPARE_NODE_FIELD(fk_attrs);
-	COMPARE_NODE_FIELD(pk_attrs);
-	COMPARE_SCALAR_FIELD(fk_matchtype);
-	COMPARE_SCALAR_FIELD(fk_upd_action);
-	COMPARE_SCALAR_FIELD(fk_del_action);
-	COMPARE_NODE_FIELD(old_conpfeqop);
-	COMPARE_SCALAR_FIELD(old_pktable_oid);
 	COMPARE_SCALAR_FIELD(skip_validation);
 	COMPARE_SCALAR_FIELD(initially_valid);
 
@@ -1576,7 +1553,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_NODE_FIELD(alias);
 	COMPARE_NODE_FIELD(eref);
 	COMPARE_SCALAR_FIELD(lateral);
-	COMPARE_SCALAR_FIELD(inh);
 	COMPARE_SCALAR_FIELD(inFromCl);
 	COMPARE_BITMAPSET_FIELD(selectedCols);
 	COMPARE_BITMAPSET_FIELD(insertedCols);
@@ -2116,9 +2092,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TypeCast:
 			retval = _equalTypeCast(a, b);
-			break;
-		case T_CollateClause:
-			retval = _equalCollateClause(a, b);
 			break;
 		case T_SortBy:
 			retval = _equalSortBy(a, b);

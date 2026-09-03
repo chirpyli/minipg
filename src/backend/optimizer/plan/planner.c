@@ -577,7 +577,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 				 * children; clear the inh flag so the rel is always treated
 				 * as a plain base relation.
 				 */
-				rte->inh = false;
 				break;
 			case RTE_JOIN:
 				root->hasJoinRTEs = true;
@@ -604,9 +603,8 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	{
 		RangeTblEntry *rte = rt_fetch(parse->resultRelation, parse->rtable);
 
-		if (!rte->inh)
-			root->leaf_result_relids =
-				bms_make_singleton(parse->resultRelation);
+		root->leaf_result_relids =
+			bms_make_singleton(parse->resultRelation);
 	}
 
 	/*
@@ -2273,12 +2271,6 @@ remove_useless_groupby_columns(PlannerInfo *root)
 		if (rte->rtekind != RTE_RELATION)
 			continue;
 
-		/*
-		 * We must skip inheritance parent tables as some of the child rels
-		 * may cause duplicate rows.
-		 */
-		if (rte->inh)
-			continue;
 
 		/* Nothing to do unless this rel has multiple Vars in GROUP BY */
 		relattnos = groupbyattnos[relid];
@@ -4094,15 +4086,14 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 	rte->relkind = RELKIND_RELATION;	/* Don't be too picky. */
 	rte->rellockmode = AccessShareLock;
 	rte->lateral = false;
-	rte->inh = false;
 	rte->inFromCl = true;
 	query->rtable = list_make1(rte);
 
 	/* Set up RTE/RelOptInfo arrays */
 	setup_simple_rel_arrays(root);
 
-	/* Build RelOptInfo */
-	rel = build_simple_rel(root, 1, NULL);
+	/* Build RelOptInfo；此处需要真实索引信息，不按继承父表处理 */
+	rel = build_simple_rel(root, 1, NULL, false);
 
 	/* Locate IndexOptInfo for the target index */
 	indexInfo = NULL;
@@ -4210,10 +4201,10 @@ plan_create_index_workers(Oid tableOid, Oid indexOid)
 	/*
 	 * Build a minimal RTE.
 	 *
-	 * Mark the RTE with inh = true.  This is a kludge to prevent
-	 * get_relation_info() from fetching index info, which is necessary
-	 * because it does not expect that any IndexOptInfo is currently
-	 * undergoing REINDEX.
+	 * 按"继承父表"方式构建 RelOptInfo（inhparent = true）。这是为了防止
+	 * get_relation_info() 去收集索引信息：此处传入的索引可能正处于
+	 * CREATE INDEX / REINDEX 的构建过程中，pg_index 已标记为有效但数据文件
+	 * 尚未写入，此时读取 btree 元页会失败。堆表尺寸因此在下方另行估算。
 	 */
 	rte = makeNode(RangeTblEntry);
 	rte->rtekind = RTE_RELATION;
@@ -4221,15 +4212,14 @@ plan_create_index_workers(Oid tableOid, Oid indexOid)
 	rte->relkind = RELKIND_RELATION;	/* Don't be too picky. */
 	rte->rellockmode = AccessShareLock;
 	rte->lateral = false;
-	rte->inh = true;
 	rte->inFromCl = true;
 	query->rtable = list_make1(rte);
 
 	/* Set up RTE/RelOptInfo arrays */
 	setup_simple_rel_arrays(root);
 
-	/* Build RelOptInfo */
-	rel = build_simple_rel(root, 1, NULL);
+	/* Build RelOptInfo，按继承父表处理以跳过索引信息收集 */
+	rel = build_simple_rel(root, 1, NULL, true);
 
 	/* Rels are assumed already locked by the caller */
 	heap = table_open(tableOid, NoLock);

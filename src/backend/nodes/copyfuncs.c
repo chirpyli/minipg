@@ -1128,7 +1128,6 @@ _copyRangeVar(const RangeVar *from)
 	COPY_STRING_FIELD(catalogname);
 	COPY_STRING_FIELD(schemaname);
 	COPY_STRING_FIELD(relname);
-	COPY_SCALAR_FIELD(inh);
 	COPY_SCALAR_FIELD(relpersistence);
 	COPY_NODE_FIELD(alias);
 	COPY_LOCATION_FIELD(location);
@@ -2080,7 +2079,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_NODE_FIELD(alias);
 	COPY_NODE_FIELD(eref);
 	COPY_SCALAR_FIELD(lateral);
-	COPY_SCALAR_FIELD(inh);
 	COPY_SCALAR_FIELD(inFromCl);
 	COPY_BITMAPSET_FIELD(selectedCols);
 	COPY_BITMAPSET_FIELD(insertedCols);
@@ -2436,18 +2434,6 @@ _copyTypeCast(const TypeCast *from)
 	return newnode;
 }
 
-static CollateClause *
-_copyCollateClause(const CollateClause *from)
-{
-	CollateClause *newnode = makeNode(CollateClause);
-
-	COPY_NODE_FIELD(arg);
-	COPY_NODE_FIELD(collname);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
 static IndexElem *
 _copyIndexElem(const IndexElem *from)
 {
@@ -2456,7 +2442,6 @@ _copyIndexElem(const IndexElem *from)
 	COPY_STRING_FIELD(name);
 	COPY_NODE_FIELD(expr);
 	COPY_STRING_FIELD(indexcolname);
-	COPY_NODE_FIELD(collation);
 	COPY_NODE_FIELD(opclass);
 	COPY_NODE_FIELD(opclassopts);
 	COPY_SCALAR_FIELD(ordering);
@@ -2483,8 +2468,6 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_SCALAR_FIELD(identity);
 	COPY_NODE_FIELD(identitySequence);
 	COPY_SCALAR_FIELD(generated);
-	COPY_NODE_FIELD(collClause);
-	COPY_SCALAR_FIELD(collOid);
 	COPY_NODE_FIELD(constraints);
 	COPY_LOCATION_FIELD(location);
 
@@ -2509,14 +2492,6 @@ _copyConstraint(const Constraint *from)
 	COPY_STRING_FIELD(indexname);
 	COPY_STRING_FIELD(access_method);
 	COPY_NODE_FIELD(where_clause);
-	COPY_NODE_FIELD(pktable);
-	COPY_NODE_FIELD(fk_attrs);
-	COPY_NODE_FIELD(pk_attrs);
-	COPY_SCALAR_FIELD(fk_matchtype);
-	COPY_SCALAR_FIELD(fk_upd_action);
-	COPY_SCALAR_FIELD(fk_del_action);
-	COPY_NODE_FIELD(old_conpfeqop);
-	COPY_SCALAR_FIELD(old_pktable_oid);
 	COPY_SCALAR_FIELD(skip_validation);
 	COPY_SCALAR_FIELD(initially_valid);
 
@@ -2757,7 +2732,6 @@ CopyCreateStmtFields(const CreateStmt *from, CreateStmt *newnode)
 {
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(tableElts);
-	COPY_NODE_FIELD(ofTypename);
 	COPY_NODE_FIELD(constraints);
 	COPY_NODE_FIELD(options);
 	COPY_SCALAR_FIELD(oncommit);
@@ -3105,22 +3079,6 @@ _copyValue(const Value *from)
 }
 
 
-static ForeignKeyCacheInfo *
-_copyForeignKeyCacheInfo(const ForeignKeyCacheInfo *from)
-{
-	ForeignKeyCacheInfo *newnode = makeNode(ForeignKeyCacheInfo);
-
-	COPY_SCALAR_FIELD(conoid);
-	COPY_SCALAR_FIELD(conrelid);
-	COPY_SCALAR_FIELD(confrelid);
-	COPY_SCALAR_FIELD(nkeys);
-	/* COPY_SCALAR_FIELD might work for these, but let's not assume that */
-	memcpy(newnode->conkey, from->conkey, sizeof(newnode->conkey));
-	memcpy(newnode->confkey, from->confkey, sizeof(newnode->confkey));
-	memcpy(newnode->conpfeqop, from->conpfeqop, sizeof(newnode->conpfeqop));
-
-	return newnode;
-}
 
 
 /*
@@ -3596,9 +3554,6 @@ copyObjectImpl(const void *from)
 		case T_TypeCast:
 			retval = _copyTypeCast(from);
 			break;
-		case T_CollateClause:
-			retval = _copyCollateClause(from);
-			break;
 		case T_SortBy:
 			retval = _copySortBy(from);
 			break;
@@ -3667,10 +3622,6 @@ copyObjectImpl(const void *from)
 			/*
 			 * MISCELLANEOUS NODES
 			 */
-		case T_ForeignKeyCacheInfo:
-			retval = _copyForeignKeyCacheInfo(from);
-			break;
-
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(from));
 			retval = 0;			/* keep compiler quiet */

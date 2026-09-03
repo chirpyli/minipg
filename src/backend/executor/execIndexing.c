@@ -100,6 +100,7 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "catalog/pg_collation.h"
 
 #include "access/genam.h"
 #include "access/relscan.h"
@@ -618,7 +619,6 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 {
 	Oid		   *constr_procs;
 	uint16	   *constr_strats;
-	Oid		   *index_collations = index->rd_indcollation;
 	int			indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
 	IndexScanDesc index_scan;
 	ScanKeyData scankeys[INDEX_MAX_KEYS];
@@ -656,7 +656,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 							   i + 1,
 							   constr_strats[i],
 							   InvalidOid,
-							   index_collations[i],
+							   DEFAULT_COLLATION_OID,
 							   constr_procs[i],
 							   values[i]);
 	}

@@ -16,6 +16,7 @@
 
 #include "access/htup_details.h"
 #include "catalog/pg_aggregate.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "funcapi.h"
@@ -1866,7 +1867,7 @@ ParseComplexProjection(ParseState *pstate, const char *funcname, Node *first_arg
 			fselect->resulttype = att->atttypid;
 			fselect->resulttypmod = att->atttypmod;
 			/* save attribute's collation for parse_collate.c */
-			fselect->resultcollid = att->attcollation;
+			fselect->resultcollid = DEFAULT_COLLATION_OID;
 			return (Node *) fselect;
 		}
 	}

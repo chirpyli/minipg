@@ -14,6 +14,7 @@
  */
 #include "postgres.h"
 
+#include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "funcapi.h"
@@ -445,7 +446,7 @@ transformAssignedExpr(ParseState *pstate,
 				 parser_errposition(pstate, location)));
 	attrtype = attnumTypeId(rd, attrno);
 	attrtypmod = TupleDescAttr(rd->rd_att, attrno - 1)->atttypmod;
-	attrcollation = TupleDescAttr(rd->rd_att, attrno - 1)->attcollation;
+	attrcollation = DEFAULT_COLLATION_OID;
 
 	/*
 	 * If the expression is a DEFAULT placeholder, insert the attribute's
@@ -1439,7 +1440,7 @@ ExpandRowReference(ParseState *pstate, Node *expr,
 		fselect->resulttype = att->atttypid;
 		fselect->resulttypmod = att->atttypmod;
 		/* save attribute's collation for parse_collate.c */
-		fselect->resultcollid = att->attcollation;
+		fselect->resultcollid = DEFAULT_COLLATION_OID;
 
 		if (make_target_entry)
 		{
@@ -1727,8 +1728,6 @@ FigureColnameInternal(Node *node, char **name)
 				}
 			}
 			break;
-		case T_CollateClause:
-			return FigureColnameInternal(((CollateClause *) node)->arg, name);
 		case T_GroupingFunc:
 			/* make GROUPING() act like a regular function */
 			*name = "grouping";

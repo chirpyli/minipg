@@ -298,7 +298,6 @@ print_rt(const List *rtable)
 		}
 
 		printf("\t%s\t%s\n",
-			   (rte->inh ? "inh" : ""),
 			   (rte->inFromCl ? "inFromCl" : ""));
 		i++;
 	}

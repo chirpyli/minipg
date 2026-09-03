@@ -190,12 +190,6 @@ extern PGDLLIMPORT int wal_level;
 /* Do we need to WAL-log information required only for Hot Standby and logical replication? */
 #define XLogStandbyInfoActive() (wal_level >= WAL_LEVEL_REPLICA)
 
-/* Do we need to WAL-log information required only for logical replication?
- *
- * minipg has removed logical replication, so this is always false.
- */
-#define XLogLogicalInfoActive() (false)
-
 #ifdef WAL_DEBUG
 extern bool XLOG_DEBUG;
 #endif

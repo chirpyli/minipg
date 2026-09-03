@@ -129,8 +129,6 @@ CreateExecutorState(void)
 	estate->es_insert_pending_result_relations = NIL;
 	estate->es_insert_pending_modifytables = NIL;
 
-	estate->es_resultrelinfo_extra = NIL;
-
 	estate->es_param_list_info = NULL;
 	estate->es_param_exec_vals = NULL;
 
@@ -1178,34 +1176,8 @@ ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate)
 	return rte->updatedCols;
 }
 
-/* Return a bitmap representing generated columns being updated */
-Bitmapset *
-ExecGetExtraUpdatedCols(ResultRelInfo *relinfo, EState *estate)
-{
-	Relation	rel = relinfo->ri_RelationDesc;
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-
-	if (tupdesc->constr && tupdesc->constr->has_generated_stored)
-	{
-		ListCell   *lc;
-
-		/* Compute the info if we didn't already */
-		if (relinfo->ri_GeneratedExprs == NULL)
-			ExecInitStoredGenerated(relinfo, estate, CMD_UPDATE);
-		foreach(lc, estate->es_resultrelinfo_extra)
-		{
-			ResultRelInfoExtra *rextra = (ResultRelInfoExtra *) lfirst(lc);
-
-			if (rextra->rinfo == relinfo)
-				return rextra->ri_extraUpdatedCols;
-		}
-		Assert(false);			/* shouldn't get here */
-	}
-	return NULL;
-}
-
 /*
- * Return columns being updated, including generated columns
+ * Return columns being updated
  *
  * The bitmap is allocated in per-tuple memory context. It's up to the caller to
  * copy it into a different context with the appropriate lifespan, if needed.
@@ -1219,8 +1191,7 @@ ExecGetAllUpdatedCols(ResultRelInfo *relinfo, EState *estate)
 
 	oldcxt = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
 
-	ret = bms_union(ExecGetUpdatedCols(relinfo, estate),
-					ExecGetExtraUpdatedCols(relinfo, estate));
+	ret = bms_copy(ExecGetUpdatedCols(relinfo, estate));
 
 	MemoryContextSwitchTo(oldcxt);
 

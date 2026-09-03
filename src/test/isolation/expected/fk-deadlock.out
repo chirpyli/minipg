@@ -1,6 +1,0 @@
-Parsed test spec with 2 sessions
-
-starting permutation: s1i s1u s1c s2i s2u s2c
-setup failed: ERROR:  syntax error at or near "REFERENCES"
-LINE 9:  parent_key int  NOT NULL REFERENCES parent
-                                  ^

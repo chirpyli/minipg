@@ -135,7 +135,7 @@ static int
 namecmp(Name arg1, Name arg2, Oid collid)
 {
 	/* Fast path for common case used in system catalogs */
-	if (collid == C_COLLATION_OID)
+	if (collid == C_COLLATION_OID || collid == DEFAULT_COLLATION_OID)
 		return strncmp(NameStr(*arg1), NameStr(*arg2), NAMEDATALEN);
 
 	/* Else rely on the varstr infrastructure */

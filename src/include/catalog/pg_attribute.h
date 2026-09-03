@@ -144,31 +144,8 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 	/* Has a missing value or not */
 	bool		atthasmissing BKI_DEFAULT(f);
 
-	/* One of the ATTRIBUTE_IDENTITY_* constants below, or '\0' */
-	char		attidentity BKI_DEFAULT('\0');
-
-	/* One of the ATTRIBUTE_GENERATED_* constants below, or '\0' */
-	char		attgenerated BKI_DEFAULT('\0');
-
 	/* Is dropped (ie, logically invisible) or not */
 	bool		attisdropped BKI_DEFAULT(f);
-
-	/*
-	 * This flag specifies whether this column has ever had a local
-	 * definition.  It is set for normal non-inherited columns, but also for
-	 * columns that are inherited from parents if also explicitly listed in
-	 * CREATE TABLE INHERITS.  It is also set when inheritance is removed from
-	 * a table with ALTER TABLE NO INHERIT.  If the flag is set, the column is
-	 * not dropped by a parent's DROP COLUMN even if this causes the column's
-	 * attinhcount to become zero.
-	 */
-	bool		attislocal BKI_DEFAULT(t);
-
-	/* Number of times inherited from direct parent relation(s) */
-	int32		attinhcount BKI_DEFAULT(0);
-
-	/* attribute's collation, if any */
-	Oid			attcollation BKI_LOOKUP_OPT(pg_collation);
 
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
 	/* NOTE: The following fields are not present in tuple descriptors. */
@@ -191,7 +168,7 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
  * can access the variable-length fields except in a real tuple!
  */
 #define ATTRIBUTE_FIXED_PART_SIZE \
-	(offsetof(FormData_pg_attribute,attcollation) + sizeof(Oid))
+	(offsetof(FormData_pg_attribute,attisdropped) + sizeof(bool))
 
 /* ----------------
  *		Form_pg_attribute corresponds to a pointer to a tuple with
@@ -204,14 +181,5 @@ DECLARE_UNIQUE_INDEX(pg_attribute_relid_attnam_index, 2658, on pg_attribute usin
 #define AttributeRelidNameIndexId  2658
 DECLARE_UNIQUE_INDEX_PKEY(pg_attribute_relid_attnum_index, 2659, on pg_attribute using btree(attrelid oid_ops, attnum int2_ops));
 #define AttributeRelidNumIndexId  2659
-
-#ifdef EXPOSE_TO_CLIENT_CODE
-
-#define		  ATTRIBUTE_IDENTITY_ALWAYS		'a'
-#define		  ATTRIBUTE_IDENTITY_BY_DEFAULT 'd'
-
-#define		  ATTRIBUTE_GENERATED_STORED	's'
-
-#endif							/* EXPOSE_TO_CLIENT_CODE */
 
 #endif							/* PG_ATTRIBUTE_H */

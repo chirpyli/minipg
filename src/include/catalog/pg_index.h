@@ -47,7 +47,6 @@ CATALOG(pg_index,2610,IndexRelationId) BKI_SCHEMA_MACRO
 											 * or 0 */
 
 #ifdef CATALOG_VARLEN
-	oidvector	indcollation BKI_LOOKUP_OPT(pg_collation) BKI_FORCE_NOT_NULL;	/* collation identifiers */
 	oidvector	indclass BKI_LOOKUP(pg_opclass) BKI_FORCE_NOT_NULL; /* opclass identifiers */
 	int2vector	indoption BKI_FORCE_NOT_NULL;	/* per-column flags
 												 * (AM-specific meanings) */

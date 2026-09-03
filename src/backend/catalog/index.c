@@ -97,7 +97,6 @@ static TupleDesc ConstructTupleDescriptor(Relation heapRelation,
 										  IndexInfo *indexInfo,
 										  List *indexColNames,
 										  Oid accessMethodObjectId,
-										  Oid *collationObjectId,
 										  Oid *classObjectId);
 static void InitializeAttributeOids(Relation indexRelation,
 									int numatts, Oid indexoid);
@@ -105,7 +104,6 @@ static void AppendAttributeTuples(Relation indexRelation, Datum *attopts);
 static void UpdateIndexRelation(Oid indexoid, Oid heapoid,
 								Oid parentIndexId,
 								IndexInfo *indexInfo,
-								Oid *collationOids,
 								Oid *classOids,
 								int16 *coloptions,
 								bool primary,
@@ -256,7 +254,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 						 IndexInfo *indexInfo,
 						 List *indexColNames,
 						 Oid accessMethodObjectId,
-						 Oid *collationObjectId,
 						 Oid *classObjectId)
 {
 	int			numatts = indexInfo->ii_NumIndexAttrs;
@@ -297,9 +294,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 		to->attnum = i + 1;
 		to->attstattarget = -1;
 		to->attcacheoff = -1;
-		to->attislocal = true;
-		to->attcollation = (i < numkeyatts) ?
-			collationObjectId[i] : InvalidOid;
 
 		/*
 		 * Set the attribute name as specified by caller.
@@ -385,7 +379,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 			 * needn't check for the non-expression case).
 			 */
 			CheckAttributeType(NameStr(to->attname),
-							   to->atttypid, to->attcollation,
+							   to->atttypid, get_typcollation(to->atttypid),
 							   NIL, 0);
 		}
 
@@ -521,7 +515,6 @@ UpdateIndexRelation(Oid indexoid,
 					Oid heapoid,
 					Oid parentIndexId,
 					IndexInfo *indexInfo,
-					Oid *collationOids,
 					Oid *classOids,
 					int16 *coloptions,
 					bool primary,
@@ -530,7 +523,6 @@ UpdateIndexRelation(Oid indexoid,
 					bool isready)
 					{
 					int2vector *indkey;
-	oidvector  *indcollation;
 	oidvector  *indclass;
 	int2vector *indoption;
 	Datum		exprsDatum;
@@ -548,7 +540,6 @@ UpdateIndexRelation(Oid indexoid,
 	indkey = buildint2vector(NULL, indexInfo->ii_NumIndexAttrs);
 	for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
 		indkey->values[i] = indexInfo->ii_IndexAttrNumbers[i];
-	indcollation = buildoidvector(collationOids, indexInfo->ii_NumIndexKeyAttrs);
 	indclass = buildoidvector(classOids, indexInfo->ii_NumIndexKeyAttrs);
 	indoption = buildint2vector(coloptions, indexInfo->ii_NumIndexKeyAttrs);
 
@@ -605,7 +596,6 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indisready - 1] = BoolGetDatum(isready);
 	values[Anum_pg_index_indislive - 1] = BoolGetDatum(true);
 	values[Anum_pg_index_indkey - 1] = PointerGetDatum(indkey);
-	values[Anum_pg_index_indcollation - 1] = PointerGetDatum(indcollation);
 	values[Anum_pg_index_indclass - 1] = PointerGetDatum(indclass);
 	values[Anum_pg_index_indoption - 1] = PointerGetDatum(indoption);
 	values[Anum_pg_index_indexprs - 1] = exprsDatum;
@@ -648,7 +638,6 @@ UpdateIndexRelation(Oid indexoid,
  * indexColNames: column names to use for index (List of char *)
  * accessMethodObjectId: OID of index AM to use
  * tableSpaceId: OID of tablespace to use
- * collationObjectId: array of collation OIDs, one per index column
  * classObjectId: array of index opclass OIDs, one per index column
  * coloptions: array of per-index-column indoption settings
  * reloptions: AM-specific options
@@ -689,7 +678,6 @@ index_create(Relation heapRelation,
 			 List *indexColNames,
 			 Oid accessMethodObjectId,
 			 Oid tableSpaceId,
-			 Oid *collationObjectId,
 			 Oid *classObjectId,
 			 int16 *coloptions,
 			 Datum reloptions,
@@ -745,51 +733,6 @@ index_create(Relation heapRelation,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("user-defined indexes on system catalog tables are not supported")));
-
-	/*
-	 * Btree text_pattern_ops uses text_eq as the equality operator, which is
-	 * fine as long as the collation is deterministic; text_eq then reduces to
-	 * bitwise equality and so it is semantically compatible with the other
-	 * operators and functions in that opclass.  But with a nondeterministic
-	 * collation, text_eq could yield results that are incompatible with the
-	 * actual behavior of the index (which is determined by the opclass's
-	 * comparison function).  We prevent such problems by refusing creation of
-	 * an index with that opclass and a nondeterministic collation.
-	 *
-	 * The same applies to varchar_pattern_ops and bpchar_pattern_ops.  If we
-	 * find more cases, we might decide to create a real mechanism for marking
-	 * opclasses as incompatible with nondeterminism; but for now, this small
-	 * hack suffices.
-	 *
-	 * Another solution is to use a special operator, not text_eq, as the
-	 * equality opclass member; but that is undesirable because it would
-	 * prevent index usage in many queries that work fine today.
-	 */
-	for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
-	{
-		Oid			collation = collationObjectId[i];
-		Oid			opclass = classObjectId[i];
-
-		if (collation)
-		{
-			if ((opclass == TEXT_BTREE_PATTERN_OPS_OID ||
-				 opclass == VARCHAR_BTREE_PATTERN_OPS_OID ||
-				 opclass == BPCHAR_BTREE_PATTERN_OPS_OID) &&
-				!get_collation_isdeterministic(collation))
-			{
-				HeapTuple	classtup;
-
-				classtup = SearchSysCache1(CLAOID, ObjectIdGetDatum(opclass));
-				if (!HeapTupleIsValid(classtup))
-					elog(ERROR, "cache lookup failed for operator class %u", opclass);
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("nondeterministic collations are not supported for operator class \"%s\"",
-								NameStr(((Form_pg_opclass) GETSTRUCT(classtup))->opcname))));
-				ReleaseSysCache(classtup);
-			}
-		}
-	}
 
 	/*
 	 * Concurrent index build on a system catalog is unsafe because we tend to
@@ -865,7 +808,6 @@ index_create(Relation heapRelation,
 											indexInfo,
 											indexColNames,
 											accessMethodObjectId,
-											collationObjectId,
 											classObjectId);
 
 	/*
@@ -951,7 +893,7 @@ index_create(Relation heapRelation,
 	 */
 	UpdateIndexRelation(indexRelationId, heapRelationId, parentIndexRelid,
 						indexInfo,
-						collationObjectId, classObjectId, coloptions,
+						classObjectId, coloptions,
 						isprimary,
 						true,
 						!concurrent && !invalid,
@@ -1065,20 +1007,6 @@ index_create(Relation heapRelation,
 
 		/* placeholder for normal dependencies */
 		addrs = new_object_addresses();
-
-		/* Store dependency on collations */
-
-		/* The default collation is pinned, so don't bother recording it */
-		for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
-		{
-			if (OidIsValid(collationObjectId[i]) &&
-				collationObjectId[i] != DEFAULT_COLLATION_OID)
-			{
-				ObjectAddressSet(referenced, CollationRelationId,
-								 collationObjectId[i]);
-				add_exact_object_address(&referenced, addrs);
-			}
-		}
 
 		/* Store dependency on operator classes */
 		for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
@@ -1321,7 +1249,6 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 							  indexColNames,
 							  indexRelation->rd_rel->relam,
 							  indexRelation->rd_rel->reltablespace,
-							  indexRelation->rd_indcollation,
 							  indclass->values,
 							  indcoloptions->values,
 							  optionDatum,
@@ -1785,26 +1712,13 @@ index_constraint_create(Relation heapRelation,
 								   namespaceId,
 								   constraintType,
 								   true,
-								   parentConstraintId,
 								   RelationGetRelid(heapRelation),
 								   indexInfo->ii_IndexAttrNumbers,
 								   indexInfo->ii_NumIndexKeyAttrs,
 								   indexInfo->ii_NumIndexAttrs,
 								   indexRelationId, /* index OID */
-								   InvalidOid,	/* no foreign key */
-								   NULL,
-								   NULL,
-								   NULL,
-								   NULL,
-								   0,
-								   ' ',
-								   ' ',
-								   ' ',
 								   NULL,	/* no check constraint */
 								   NULL,
-								   islocal,
-								   inhcount,
-								   noinherit,
 								   is_internal);
 
 	/*

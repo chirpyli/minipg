@@ -69,30 +69,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	Oid			conindid BKI_LOOKUP_OPT(pg_class);	/* index supporting this
 													 * constraint */
 
-	/*
-	 * If this constraint is on a partition inherited from a partitioned
-	 * table, this is the OID of the corresponding constraint in the parent.
-	 */
-	Oid			conparentid BKI_LOOKUP_OPT(pg_constraint);
-
-	/*
-	 * These fields, plus confkey, are only meaningful for a foreign-key
-	 * constraint.  Otherwise confrelid is 0 and the char fields are spaces.
-	 */
-	Oid			confrelid BKI_LOOKUP_OPT(pg_class); /* relation referenced by
-													 * foreign key */
-	char		confupdtype;	/* foreign key's ON UPDATE action */
-	char		confdeltype;	/* foreign key's ON DELETE action */
-	char		confmatchtype;	/* foreign key's match type */
-
-	/* Has a local definition (hence, do not drop when coninhcount is 0) */
-	bool		conislocal;
-
-	/* Number of times inherited from direct parent relation(s) */
-	int32		coninhcount;
-
-	/* Has a local definition and cannot be inherited */
-	bool		connoinherit;
 
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
 
@@ -101,29 +77,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	 * NULL for trigger constraints)
 	 */
 	int16		conkey[1];
-
-	/*
-	 * If a foreign key, the referenced columns of confrelid
-	 */
-	int16		confkey[1];
-
-	/*
-	 * If a foreign key, the OIDs of the PK = FK equality operators for each
-	 * column of the constraint
-	 */
-	Oid			conpfeqop[1] BKI_LOOKUP(pg_operator);
-
-	/*
-	 * If a foreign key, the OIDs of the PK = PK equality operators for each
-	 * column of the constraint (i.e., equality for the referenced columns)
-	 */
-	Oid			conppeqop[1] BKI_LOOKUP(pg_operator);
-
-	/*
-	 * If a foreign key, the OIDs of the FK = FK equality operators for each
-	 * column of the constraint (i.e., equality for the referencing columns)
-	 */
-	Oid			conffeqop[1] BKI_LOOKUP(pg_operator);
 
 	/*
 	 * If a check constraint, nodeToString representation of expression
@@ -147,21 +100,16 @@ DECLARE_UNIQUE_INDEX(pg_constraint_conrelid_conname_index, 2665, on pg_constrain
 #define ConstraintRelidNameIndexId	2665
 DECLARE_UNIQUE_INDEX_PKEY(pg_constraint_oid_index, 2667, on pg_constraint using btree(oid oid_ops));
 #define ConstraintOidIndexId  2667
-DECLARE_INDEX(pg_constraint_conparentid_index, 2579, on pg_constraint using btree(conparentid oid_ops));
-#define ConstraintParentIndexId	2579
 
 /* conkey can contain zero (InvalidAttrNumber) if a whole-row Var is used */
 DECLARE_ARRAY_FOREIGN_KEY_OPT((conrelid, conkey), pg_attribute, (attrelid, attnum));
-DECLARE_ARRAY_FOREIGN_KEY((confrelid, confkey), pg_attribute, (attrelid, attnum));
 
 #ifdef EXPOSE_TO_CLIENT_CODE
 
 /* Valid values for contype */
 #define CONSTRAINT_CHECK			'c'
-#define CONSTRAINT_FOREIGN			'f'
 #define CONSTRAINT_PRIMARY			'p'
 #define CONSTRAINT_UNIQUE			'u'
-#define CONSTRAINT_TRIGGER			't'
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
@@ -169,26 +117,13 @@ extern Oid	CreateConstraintEntry(const char *constraintName,
 								  Oid constraintNamespace,
 								  char constraintType,
 								  bool isValidated,
-								  Oid parentConstrId,
 								  Oid relId,
 								  const int16 *constraintKey,
 								  int constraintNKeys,
 								  int constraintNTotalKeys,
 								  Oid indexRelId,
-								  Oid foreignRelId,
-								  const int16 *foreignKey,
-								  const Oid *pfEqOp,
-								  const Oid *ppEqOp,
-								  const Oid *ffEqOp,
-								  int foreignNKeys,
-								  char foreignUpdateType,
-								  char foreignDeleteType,
-								  char foreignMatchType,
 								  Node *conExpr,
 								  const char *conBin,
-								  bool conIsLocal,
-								  int conInhCount,
-								  bool conNoInherit,
 								  bool is_internal);
 
 extern void RemoveConstraintById(Oid conId);

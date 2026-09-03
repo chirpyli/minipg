@@ -1231,10 +1231,6 @@ CommandEndInvalidationMessages(void)
 	ProcessInvalidationMessages(&transInvalInfo->ii.CurrentCmdInvalidMsgs,
 								LocalExecuteInvalidationMessage);
 
-	/* WAL Log per-command invalidation messages for wal_level=logical */
-	if (XLogLogicalInfoActive())
-		LogLogicalInvalidations();
-
 	AppendInvalidationMessages(&transInvalInfo->PriorCmdInvalidMsgs,
 							   &transInvalInfo->ii.CurrentCmdInvalidMsgs);
 }
@@ -1344,20 +1340,7 @@ CacheInvalidateHeapTupleCommon(Relation relation,
 	}
 	else if (tupleRelId == ConstraintRelationId)
 	{
-		Form_pg_constraint constrtup = (Form_pg_constraint) GETSTRUCT(tuple);
-
-		/*
-		 * Foreign keys are part of relcache entries, too, so send out an
-		 * inval for the table that the FK applies to.
-		 */
-		if (constrtup->contype == CONSTRAINT_FOREIGN &&
-			OidIsValid(constrtup->conrelid))
-		{
-			relationId = constrtup->conrelid;
-			databaseId = MyDatabaseId;
-		}
-		else
-			return;
+		return;
 	}
 	else
 		return;

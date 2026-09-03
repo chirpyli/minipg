@@ -917,7 +917,6 @@ _outRangeVar(StringInfo str, const RangeVar *node)
 	 */
 	WRITE_STRING_FIELD(schemaname);
 	WRITE_STRING_FIELD(relname);
-	WRITE_BOOL_FIELD(inh);
 	WRITE_CHAR_FIELD(relpersistence);
 	WRITE_NODE_FIELD(alias);
 	WRITE_LOCATION_FIELD(location);
@@ -1996,7 +1995,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(row_identity_vars);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(placeholder_list);
-	WRITE_NODE_FIELD(fkey_list);
 	WRITE_NODE_FIELD(query_pathkeys);
 	WRITE_NODE_FIELD(group_pathkeys);
 	WRITE_NODE_FIELD(distinct_pathkeys);
@@ -2091,31 +2089,6 @@ _outIndexOptInfo(StringInfo str, const IndexOptInfo *node)
 	/* we don't bother with fields copied from the index AM's API struct */
 }
 
-static void
-_outForeignKeyOptInfo(StringInfo str, const ForeignKeyOptInfo *node)
-{
-	int			i;
-
-	WRITE_NODE_TYPE("FOREIGNKEYOPTINFO");
-
-	WRITE_UINT_FIELD(con_relid);
-	WRITE_UINT_FIELD(ref_relid);
-	WRITE_INT_FIELD(nkeys);
-	WRITE_ATTRNUMBER_ARRAY(conkey, node->nkeys);
-	WRITE_ATTRNUMBER_ARRAY(confkey, node->nkeys);
-	WRITE_OID_ARRAY(conpfeqop, node->nkeys);
-	WRITE_INT_FIELD(nmatched_ec);
-	WRITE_INT_FIELD(nconst_ec);
-	WRITE_INT_FIELD(nmatched_rcols);
-	WRITE_INT_FIELD(nmatched_ri);
-	/* for compactness, just print the number of matches per column: */
-	appendStringInfoString(str, " :eclass");
-	for (i = 0; i < node->nkeys; i++)
-		appendStringInfo(str, " %d", (node->eclass[i] != NULL));
-	appendStringInfoString(str, " :rinfos");
-	for (i = 0; i < node->nkeys; i++)
-		appendStringInfo(str, " %d", list_length(node->rinfos[i]));
-}
 
 static void
 _outEquivalenceClass(StringInfo str, const EquivalenceClass *node)
@@ -2370,7 +2343,6 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(tableElts);
-	WRITE_NODE_FIELD(ofTypename);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_NODE_FIELD(options);
 	WRITE_ENUM_FIELD(oncommit, OnCommitAction);
@@ -2497,8 +2469,6 @@ _outColumnDef(StringInfo str, const ColumnDef *node)
 	WRITE_CHAR_FIELD(identity);
 	WRITE_NODE_FIELD(identitySequence);
 	WRITE_CHAR_FIELD(generated);
-	WRITE_NODE_FIELD(collClause);
-	WRITE_OID_FIELD(collOid);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_LOCATION_FIELD(location);
 }
@@ -2529,16 +2499,6 @@ _outTypeCast(StringInfo str, const TypeCast *node)
 }
 
 static void
-_outCollateClause(StringInfo str, const CollateClause *node)
-{
-	WRITE_NODE_TYPE("COLLATECLAUSE");
-
-	WRITE_NODE_FIELD(arg);
-	WRITE_NODE_FIELD(collname);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outIndexElem(StringInfo str, const IndexElem *node)
 {
 	WRITE_NODE_TYPE("INDEXELEM");
@@ -2546,7 +2506,6 @@ _outIndexElem(StringInfo str, const IndexElem *node)
 	WRITE_STRING_FIELD(name);
 	WRITE_NODE_FIELD(expr);
 	WRITE_STRING_FIELD(indexcolname);
-	WRITE_NODE_FIELD(collation);
 	WRITE_NODE_FIELD(opclass);
 	WRITE_NODE_FIELD(opclassopts);
 	WRITE_ENUM_FIELD(ordering, SortByDir);
@@ -2722,7 +2681,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 	}
 
 	WRITE_BOOL_FIELD(lateral);
-	WRITE_BOOL_FIELD(inh);
 	WRITE_BOOL_FIELD(inFromCl);
 	WRITE_BITMAPSET_FIELD(selectedCols);
 	WRITE_BITMAPSET_FIELD(insertedCols);
@@ -3081,19 +3039,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 	}
 }
 
-static void
-_outForeignKeyCacheInfo(StringInfo str, const ForeignKeyCacheInfo *node)
-{
-	WRITE_NODE_TYPE("FOREIGNKEYCACHEINFO");
-
-	WRITE_OID_FIELD(conoid);
-	WRITE_OID_FIELD(conrelid);
-	WRITE_OID_FIELD(confrelid);
-	WRITE_INT_FIELD(nkeys);
-	WRITE_ATTRNUMBER_ARRAY(conkey, node->nkeys);
-	WRITE_ATTRNUMBER_ARRAY(confkey, node->nkeys);
-	WRITE_OID_ARRAY(conpfeqop, node->nkeys);
-}
 
 /*
  * outNode -
@@ -3484,9 +3429,6 @@ outNode(StringInfo str, const void *obj)
 			case T_IndexOptInfo:
 				_outIndexOptInfo(str, obj);
 				break;
-			case T_ForeignKeyOptInfo:
-				_outForeignKeyOptInfo(str, obj);
-				break;
 			case T_EquivalenceClass:
 				_outEquivalenceClass(str, obj);
 				break;
@@ -3558,9 +3500,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_TypeCast:
 				_outTypeCast(str, obj);
-				break;
-			case T_CollateClause:
-				_outCollateClause(str, obj);
 				break;
 			case T_IndexElem:
 				_outIndexElem(str, obj);
@@ -3645,9 +3584,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_LockingClause:
 				_outLockingClause(str, obj);
-				break;
-			case T_ForeignKeyCacheInfo:
-				_outForeignKeyCacheInfo(str, obj);
 				break;
 
 			default:

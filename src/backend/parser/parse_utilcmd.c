@@ -78,7 +78,6 @@ typedef struct
 	List	   *alist;			/* "after list" of things to do after creating
 								 * the table */
 	IndexStmt  *pkey;			/* PRIMARY KEY index, if any */
-	bool		ofType;			/* true if statement contains OF typename */
 } CreateStmtContext;
 
 /* State shared by transformCreateSchemaStmtElements and its subroutines */
@@ -95,8 +94,6 @@ static void transformColumnDefinition(CreateStmtContext *cxt,
 									  ColumnDef *column);
 static void transformTableConstraint(CreateStmtContext *cxt,
 									 Constraint *constraint);
-static void transformOfType(CreateStmtContext *cxt,
-							TypeName *ofTypename);
 static List *get_collation(Oid collation, Oid actual_datatype);
 static List *get_opclass(Oid opclass, Oid actual_datatype);
 static void transformIndexConstraints(CreateStmtContext *cxt);
@@ -199,10 +196,7 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.blist = NIL;
 	cxt.alist = NIL;
 	cxt.pkey = NULL;
-	cxt.ofType = (stmt->ofTypename != NULL);
 
-	if (stmt->ofTypename)
-		transformOfType(&cxt, stmt->ofTypename);
 
 	/*
 	 * Run through each primary element in the table creation clause. Separate
@@ -277,7 +271,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 {
 	bool		saw_nullable;
 	bool		saw_default;
-	bool		saw_generated;
 	ListCell   *clist;
 
 	cxt->columns = lappend(cxt->columns, column);
@@ -288,7 +281,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 
 	saw_nullable = false;
 	saw_default = false;
-	saw_generated = false;
 
 	foreach(clist, column->constraints)
 	{
@@ -333,25 +325,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				saw_default = true;
 				break;
 
-			case CONSTR_GENERATED:
-				if (cxt->ofType)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("generated columns are not supported on typed tables")));
-
-				if (saw_generated)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple generation clauses specified for column \"%s\" of table \"%s\"",
-									column->colname, cxt->relation->relname),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
-				column->generated = ATTRIBUTE_GENERATED_STORED;
-				column->raw_default = constraint->raw_expr;
-				Assert(constraint->cooked_expr == NULL);
-				saw_generated = true;
-				break;
-
 			case CONSTR_CHECK:
 				cxt->ckconstraints = lappend(cxt->ckconstraints, constraint);
 				break;
@@ -371,13 +344,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				break;
 		}
 
-		if (saw_default && saw_generated)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("both default and generation expression specified for column \"%s\" of table \"%s\"",
-							column->colname, cxt->relation->relname),
-					 parser_errposition(cxt->pstate,
-										constraint->location)));
 	}
 }
 
@@ -416,54 +382,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 	}
 }
 
-
-
-
-static void
-transformOfType(CreateStmtContext *cxt, TypeName *ofTypename)
-{
-	HeapTuple	tuple;
-	TupleDesc	tupdesc;
-	int			i;
-	Oid			ofTypeId;
-
-	AssertArg(ofTypename);
-
-	tuple = typenameType(NULL, ofTypename, NULL);
-	check_of_type(tuple);
-	ofTypeId = ((Form_pg_type) GETSTRUCT(tuple))->oid;
-	ofTypename->typeOid = ofTypeId; /* cached for later */
-
-	tupdesc = lookup_rowtype_tupdesc(ofTypeId, -1);
-	for (i = 0; i < tupdesc->natts; i++)
-	{
-		Form_pg_attribute attr = TupleDescAttr(tupdesc, i);
-		ColumnDef  *n;
-
-		if (attr->attisdropped)
-			continue;
-
-		n = makeNode(ColumnDef);
-		n->colname = pstrdup(NameStr(attr->attname));
-		n->typeName = makeTypeNameFromOid(attr->atttypid, attr->atttypmod);
-		n->inhcount = 0;
-		n->is_local = true;
-		n->is_not_null = false;
-		n->is_from_type = true;
-		n->storage = 0;
-		n->raw_default = NULL;
-		n->cooked_default = NULL;
-		n->collClause = NULL;
-		n->collOid = attr->attcollation;
-		n->constraints = NIL;
-		n->location = -1;
-		cxt->columns = lappend(cxt->columns, n);
-	}
-	DecrTupleDescRefCount(tupdesc);
-
-	ReleaseSysCache(tuple);
-}
-
 /*
  * Generate an IndexStmt node using information from an already existing index
  * "source_idx".
@@ -494,7 +412,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	Form_pg_class idxrelrec;
 	Form_pg_index idxrec;
 	Form_pg_am	amrec;
-	oidvector  *indcollation;
 	oidvector  *indclass;
 	IndexStmt  *index;
 	List	   *indexprs;
@@ -528,12 +445,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 		elog(ERROR, "cache lookup failed for access method %u",
 			 idxrelrec->relam);
 	amrec = (Form_pg_am) GETSTRUCT(ht_am);
-
-	/* Extract indcollation from the pg_index tuple */
-	datum = SysCacheGetAttr(INDEXRELID, ht_idx,
-							Anum_pg_index_indcollation, &isnull);
-	Assert(!isnull);
-	indcollation = (oidvector *) DatumGetPointer(datum);
 
 	/* Extract indclass from the pg_index tuple */
 	datum = SysCacheGetAttr(INDEXRELID, ht_idx,
@@ -668,9 +579,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 
 		/* Copy the original index column name */
 		iparam->indexcolname = pstrdup(NameStr(attr->attname));
-
-		/* Add the collation name, if non-default */
-		iparam->collation = get_collation(indcollation->values[keyno], keycoltype);
 
 		/* Add the operator class name, if non-default */
 		iparam->opclass = get_opclass(indclass->values[keyno], keycoltype);
@@ -1134,7 +1042,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 				defopclass = GetDefaultOpClass(attform->atttypid,
 											   index_rel->rd_rel->relam);
 				if (indclass->values[i] != defopclass ||
-					attform->attcollation != index_rel->rd_indcollation[i] ||
+					DEFAULT_COLLATION_OID != DEFAULT_COLLATION_OID ||
 					attoptions != (Datum) 0 ||
 					index_rel->rd_indoption[i] != 0)
 					ereport(ERROR,
@@ -1243,7 +1151,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 			iparam->name = pstrdup(key);
 			iparam->expr = NULL;
 			iparam->indexcolname = NULL;
-			iparam->collation = NIL;
 			iparam->opclass = NIL;
 			iparam->opclassopts = NIL;
 			iparam->ordering = SORTBY_DEFAULT;
@@ -1318,7 +1225,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		iparam->name = pstrdup(key);
 		iparam->expr = NULL;
 		iparam->indexcolname = NULL;
-		iparam->collation = NIL;
 		iparam->opclass = NIL;
 		iparam->opclassopts = NIL;
 		index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
@@ -1788,7 +1694,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 	cxt.blist = NIL;
 	cxt.alist = NIL;
 	cxt.pkey = NULL;
-	cxt.ofType = false;
 
 	/*
 	 * Transform ALTER subcommands that need it (most don't).  These largely
@@ -1952,23 +1857,6 @@ transformColumnType(CreateStmtContext *cxt, ColumnDef *column)
 	 * including any collation spec that might be present.
 	 */
 	Type		ctype = typenameType(cxt->pstate, column->typeName, NULL);
-
-	if (column->collClause)
-	{
-		Form_pg_type typtup = (Form_pg_type) GETSTRUCT(ctype);
-
-		LookupCollation(cxt->pstate,
-						column->collClause->collname,
-						column->collClause->location);
-		/* Complain if COLLATE is applied to an uncollatable type */
-		if (!OidIsValid(typtup->typcollation))
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("collations are not supported by type %s",
-							format_type_be(typtup->oid)),
-					 parser_errposition(cxt->pstate,
-										column->collClause->location)));
-	}
 
 	ReleaseSysCache(ctype);
 }

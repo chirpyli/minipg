@@ -197,7 +197,6 @@ typedef enum NodeTag
 	T_PlannerGlobal,
 	T_RelOptInfo,
 	T_IndexOptInfo,
-	T_ForeignKeyOptInfo,
 	T_ParamPathInfo,
 	T_Path,
 	T_IndexPath,
@@ -327,7 +326,6 @@ typedef enum NodeTag
 	T_ResTarget,
 	T_MultiAssignRef,
 	T_TypeCast,
-	T_CollateClause,
 	T_SortBy,
 	T_RangeSubselect,
 	T_RangeFunction,
@@ -367,7 +365,6 @@ typedef enum NodeTag
 	T_IndexAmRoutine,			/* in access/amapi.h */
 	T_TableAmRoutine,			/* in access/tableam.h */
 	T_TsmRoutine,				/* in access/tsmapi.h */
-	T_ForeignKeyCacheInfo,		/* in utils/rel.h */
 	T_CallContext,				/* in nodes/parsenodes.h */
 	T_SupportRequestSimplify,	/* in nodes/supportnodes.h */
 	T_SupportRequestSelectivity,	/* in nodes/supportnodes.h */

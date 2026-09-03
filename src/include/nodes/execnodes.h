@@ -439,12 +439,6 @@ typedef struct ResultRelInfo
 	/* array of constraint-checking expr states */
 	ExprState **ri_ConstraintExprs;
 
-	/* array of stored generated columns expr states */
-	ExprState **ri_GeneratedExprs;
-
-	/* number of stored generated columns we need to compute */
-	int			ri_NumGeneratedNeeded;
-
 	/* list of RETURNING expressions */
 	List	   *ri_returningList;
 
@@ -463,19 +457,6 @@ typedef struct ResultRelInfo
 	 */
 	struct ResultRelInfo *ri_RootResultRelInfo;
 } ResultRelInfo;
-
-/*
- * To avoid an ABI-breaking change in the size of ResultRelInfo in back
- * branches, we create one of these for each result relation for which we've
- * computed extraUpdatedCols, and store it in EState.es_resultrelinfo_extra.
- */
-typedef struct ResultRelInfoExtra
-{
-	ResultRelInfo *rinfo;		/* owning ResultRelInfo */
-
-	/* For INSERT/UPDATE, attnums of generated columns to be computed */
-	Bitmapset  *ri_extraUpdatedCols;
-} ResultRelInfoExtra;
 
 /* ----------------
  *	  EState information
@@ -568,9 +549,6 @@ typedef struct EState
 	 */
 	List	   *es_insert_pending_result_relations;
 	List	   *es_insert_pending_modifytables;
-
-	/* List of ResultRelInfoExtra structs (see above) */
-	List	   *es_resultrelinfo_extra;
 } EState;
 
 

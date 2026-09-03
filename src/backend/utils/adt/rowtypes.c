@@ -18,6 +18,7 @@
 
 #include "access/detoast.h"
 #include "access/htup_details.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "common/hashfn.h"
 #include "funcapi.h"
@@ -938,9 +939,7 @@ record_cmp(FunctionCallInfo fcinfo)
 		 * If they're not same collation, we don't complain here, but the
 		 * comparison function might.
 		 */
-		collation = att1->attcollation;
-		if (collation != att2->attcollation)
-			collation = InvalidOid;
+		collation = DEFAULT_COLLATION_OID;
 
 		/*
 		 * Lookup the comparison function if not done already
@@ -1184,9 +1183,7 @@ record_eq(PG_FUNCTION_ARGS)
 		 * If they're not same collation, we don't complain here, but the
 		 * equality function might.
 		 */
-		collation = att1->attcollation;
-		if (collation != att2->attcollation)
-			collation = InvalidOid;
+		collation = DEFAULT_COLLATION_OID;
 
 		/*
 		 * Lookup the equality function if not done already
@@ -1870,7 +1867,7 @@ hash_record(PG_FUNCTION_ARGS)
 			LOCAL_FCINFO(locfcinfo, 1);
 
 			InitFunctionCallInfoData(*locfcinfo, &typentry->hash_proc_finfo, 1,
-									 att->attcollation, NULL, NULL);
+									 DEFAULT_COLLATION_OID, NULL, NULL);
 			locfcinfo->args[0].value = values[i];
 			locfcinfo->args[0].isnull = false;
 			element_hash = DatumGetUInt32(FunctionCallInvoke(locfcinfo));
@@ -1991,7 +1988,7 @@ hash_record_extended(PG_FUNCTION_ARGS)
 			LOCAL_FCINFO(locfcinfo, 2);
 
 			InitFunctionCallInfoData(*locfcinfo, &typentry->hash_extended_proc_finfo, 2,
-									 att->attcollation, NULL, NULL);
+									 DEFAULT_COLLATION_OID, NULL, NULL);
 			locfcinfo->args[0].value = values[i];
 			locfcinfo->args[0].isnull = false;
 			locfcinfo->args[1].value = Int64GetDatum(seed);

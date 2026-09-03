@@ -21,9 +21,6 @@ test: update-conflict-out
 # deadlock-simple/hard/soft/soft-2: 依赖 LOCK TABLE 语句制造表锁死锁场景，LOCK TABLE 已裁剪，移除
 # timeouts: 其核心步骤 locktbl 依赖 LOCK TABLE 语句，LOCK TABLE 已裁剪，移除
 test: deadlock-parallel
-test: fk-contention
-test: fk-deadlock
-test: fk-deadlock2
 test: inplace-inval
 # intra-grant-inplace / intra-grant-inplace-db: 依赖 GRANT 锁机制，权限已裁剪，移除
 test: lock-update-delete
@@ -44,7 +41,6 @@ test: multixact-no-deadlock
 test: multixact-no-forget
 test: lock-committed-update
 test: lock-committed-keyupdate
-test: update-locked-tuple
 # reindex-concurrently: 依赖 serial 类型，minipg 已裁剪 serial，移除
 # reindex-concurrently-toast: 依赖 plpgsql DO 块动态重命名 toast 关系，PL/pgSQL 已裁剪，移除
 # reindex-schema: 其步骤 lock1 依赖 LOCK 语句，LOCK TABLE 已裁剪，移除
@@ -64,8 +60,6 @@ test: skip-locked-3
 test: skip-locked-4
 # drop-index-concurrently-1: 依赖 serial 类型，minipg 已裁剪 serial，移除
 test: multiple-cic
-test: alter-table-1
-test: alter-table-2
 # alter-table-3: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除
 # alter-table-4 已随表继承(INHERITS)功能裁剪而移除
 # create-trigger: 依赖 plpgsql 触发器(f() RETURNS TRIGGER)，PL/pgSQL 已裁剪，移除

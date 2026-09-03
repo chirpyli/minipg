@@ -69,7 +69,6 @@ static Node *transformWholeRowRef(ParseState *pstate,
 								  int sublevels_up, int location);
 static Node *transformIndirection(ParseState *pstate, A_Indirection *ind);
 static Node *transformTypeCast(ParseState *pstate, TypeCast *tc);
-static Node *transformCollateClause(ParseState *pstate, CollateClause *c);
 static Node *make_row_comparison_op(ParseState *pstate, List *opname,
 									List *largs, List *rargs, int location);
 static Node *make_row_distinct_op(ParseState *pstate, List *opname,
@@ -145,10 +144,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 
 		case T_TypeCast:
 			result = transformTypeCast(pstate, (TypeCast *) expr);
-			break;
-
-		case T_CollateClause:
-			result = transformCollateClause(pstate, (CollateClause *) expr);
 			break;
 
 		case T_A_Expr:
@@ -2426,39 +2421,6 @@ transformTypeCast(ParseState *pstate, TypeCast *tc)
 				 parser_coercion_errposition(pstate, location, expr)));
 
 	return result;
-}
-
-/*
- * Handle an explicit COLLATE clause.
- *
- * Transform the argument, and look up the collation name.
- */
-static Node *
-transformCollateClause(ParseState *pstate, CollateClause *c)
-{
-	CollateExpr *newc;
-	Oid			argtype;
-
-	newc = makeNode(CollateExpr);
-	newc->arg = (Expr *) transformExprRecurse(pstate, c->arg);
-
-	argtype = exprType((Node *) newc->arg);
-
-	/*
-	 * The unknown type is not collatable, but coerce_type() takes care of it
-	 * separately, so we'll let it go here.
-	 */
-	if (!type_is_collatable(argtype) && argtype != UNKNOWNOID)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("collations are not supported by type %s",
-						format_type_be(argtype)),
-				 parser_errposition(pstate, c->location)));
-
-	newc->collOid = LookupCollation(pstate, c->collname, c->location);
-	newc->location = c->location;
-
-	return (Node *) newc;
 }
 
 /*

@@ -1272,20 +1272,19 @@ SELECT p1.indexrelid, p1.indrelid
 FROM pg_index as p1
 WHERE array_lower(indkey, 1) != 0 OR array_upper(indkey, 1) != indnatts-1 OR
     array_lower(indclass, 1) != 0 OR array_upper(indclass, 1) != indnatts-1 OR
-    array_lower(indcollation, 1) != 0 OR array_upper(indcollation, 1) != indnatts-1 OR
     array_lower(indoption, 1) != 0 OR array_upper(indoption, 1) != indnatts-1;
 
--- Check that opclasses and collations match the underlying columns.
+-- Check that opclasses match the underlying columns.
 -- (As written, this test ignores expression indexes.)
 
 SELECT indexrelid::regclass, indrelid::regclass, attname, atttypid::regtype, opcname
 FROM (SELECT indexrelid, indrelid, unnest(indkey) as ikey,
-             unnest(indclass) as iclass, unnest(indcollation) as icoll
+             unnest(indclass) as iclass
       FROM pg_index) ss,
       pg_attribute a,
       pg_opclass opc
 WHERE a.attrelid = indrelid AND a.attnum = ikey AND opc.oid = iclass AND
-      (NOT binary_coercible(atttypid, opcintype) OR icoll != attcollation);
+      NOT binary_coercible(atttypid, opcintype);
 
 -- For system catalogs, be even tighter: nearly all indexes should be
 -- exact type matches not binary-coercible matches.  At this writing
@@ -1293,34 +1292,11 @@ WHERE a.attrelid = indrelid AND a.attnum = ikey AND opc.oid = iclass AND
 
 SELECT indexrelid::regclass, indrelid::regclass, attname, atttypid::regtype, opcname
 FROM (SELECT indexrelid, indrelid, unnest(indkey) as ikey,
-             unnest(indclass) as iclass, unnest(indcollation) as icoll
+             unnest(indclass) as iclass
       FROM pg_index
       WHERE indrelid < 16384) ss,
       pg_attribute a,
       pg_opclass opc
 WHERE a.attrelid = indrelid AND a.attnum = ikey AND opc.oid = iclass AND
-      (opcintype != atttypid OR icoll != attcollation)
+      (opcintype != atttypid)
 ORDER BY 1;
-
--- Check for system catalogs with collation-sensitive ordering.  This is not
--- a representational error in pg_index, but simply wrong catalog design.
--- It's bad because we expect to be able to clone template0 and assign the
--- copy a different database collation.  It would especially not work for
--- shared catalogs.
-
-SELECT relname, attname, attcollation
-FROM pg_class c, pg_attribute a
-WHERE c.oid = attrelid AND c.oid < 16384 AND
-    c.relkind != 'v' AND  -- we don't care about columns in views
-    attcollation != 0 AND
-    attcollation != (SELECT oid FROM pg_collation WHERE collname = 'C');
-
--- Double-check that collation-sensitive indexes have "C" collation, too.
-
-SELECT indexrelid::regclass, indrelid::regclass, iclass, icoll
-FROM (SELECT indexrelid, indrelid,
-             unnest(indclass) as iclass, unnest(indcollation) as icoll
-      FROM pg_index
-      WHERE indrelid < 16384) ss
-WHERE icoll != 0 AND
-    icoll != (SELECT oid FROM pg_collation WHERE collname = 'C');

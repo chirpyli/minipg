@@ -468,7 +468,11 @@ static void add_cast_to(StringInfo buf, Oid typid);
 static char *generate_qualified_type_name(Oid typid);
 static text *string_to_text(char *str);
 
-#define only_marker(rte)  ((rte)->inh ? "" : "ONLY ")
+/*
+ * minipg 已删除表继承（INHERITS）：RangeTblEntry 不再有 inh 标志，任何查询
+ * 都不存在"是否包含子表"的区别，因此不再输出 ONLY 关键字。
+ */
+#define only_marker(rte)  ""
 
 
 /* ----------
@@ -907,11 +911,9 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 	List	   *context;
 	Oid			indrelid;
 	int			keyno;
-	Datum		indcollDatum;
 	Datum		indclassDatum;
 	Datum		indoptionDatum;
 	bool		isnull;
-	oidvector  *indcollation;
 	oidvector  *indclass;
 	int2vector *indoption;
 	StringInfoData buf;
@@ -933,12 +935,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 	indrelid = idxrec->indrelid;
 	Assert(indexrelid == idxrec->indexrelid);
 
-	/* Must get indcollation, indclass, and indoption the hard way */
-	indcollDatum = SysCacheGetAttr(INDEXRELID, ht_idx,
-								   Anum_pg_index_indcollation, &isnull);
-	Assert(!isnull);
-	indcollation = (oidvector *) DatumGetPointer(indcollDatum);
-
+	/* Must get indclass and indoption the hard way */
 	indclassDatum = SysCacheGetAttr(INDEXRELID, ht_idx,
 									Anum_pg_index_indclass, &isnull);
 	Assert(!isnull);
@@ -1080,7 +1077,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			(!colno || colno == keyno + 1))
 		{
 			int16		opt = indoption->values[keyno];
-			Oid			indcoll = indcollation->values[keyno];
+			Oid			indcoll = get_typcollation(keycoltype);
 			Datum		attoptions = get_attoptions(indexrelid, keyno + 1);
 			bool		has_options = attoptions != (Datum) 0;
 
@@ -1417,21 +1414,9 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 				 * Note that simply checking for leading '(' and trailing ')'
 				 * would NOT be good enough, consider "(x > 0) AND (y > 0)".
 				 */
-				appendStringInfo(&buf, "CHECK (%s)%s",
-								 consrc,
-								 conForm->connoinherit ? " NO INHERIT" : "");
+				appendStringInfo(&buf, "CHECK (%s)", consrc);
 				break;
 			}
-		case CONSTRAINT_TRIGGER:
-
-			/*
-			 * There isn't an ALTER TABLE syntax for creating a user-defined
-			 * constraint trigger, but it seems better to print something than
-			 * throw an error; if we throw error then this function couldn't
-			 * safely be applied to all rows of pg_constraint.
-			 */
-			appendStringInfoString(&buf, "TRIGGER");
-			break;
 		default:
 			elog(ERROR, "invalid constraint type \"%c\"", conForm->contype);
 			break;
@@ -2411,7 +2396,6 @@ deparse_context_for(const char *aliasname, Oid relid)
 	rte->alias = makeAlias(aliasname, NIL);
 	rte->eref = rte->alias;
 	rte->lateral = false;
-	rte->inh = false;
 	rte->inFromCl = true;
 
 	/* Build one-element rtable */

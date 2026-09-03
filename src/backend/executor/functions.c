@@ -1944,7 +1944,6 @@ tlist_coercion_finished:
 		rte->subquery = parse;
 		rte->eref = rte->alias = makeAlias("*SELECT*", colnames);
 		rte->lateral = false;
-		rte->inh = false;
 		rte->inFromCl = true;
 		newquery->rtable = list_make1(rte);
 

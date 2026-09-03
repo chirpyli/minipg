@@ -188,11 +188,6 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 	 */
 	char		typstorage BKI_DEFAULT(p) BKI_ARRAY_DEFAULT(x);
 
-	/*
-	 * Collation: 0 if type cannot use collations, nonzero (typically
-	 * DEFAULT_COLLATION_OID) for collatable base types
-	 */
-	Oid			typcollation BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_collation);
 } FormData_pg_type;
 
 /* ----------------
@@ -225,11 +220,9 @@ DECLARE_UNIQUE_INDEX(pg_type_typname_nsp_index, 2704, on pg_type using btree(typ
 #define  TYPCATEGORY_NETWORK	'I' /* think INET */
 #define  TYPCATEGORY_NUMERIC	'N'
 #define  TYPCATEGORY_PSEUDOTYPE 'P'
-#define  TYPCATEGORY_RANGE		'R'
 #define  TYPCATEGORY_STRING		'S'
 #define  TYPCATEGORY_TIMESPAN	'T'
 #define  TYPCATEGORY_USER		'U'
-#define  TYPCATEGORY_BITSTRING	'V' /* er ... "varbit"? */
 #define  TYPCATEGORY_UNKNOWN	'X'
 
 #define  TYPALIGN_CHAR			'c' /* char alignment (i.e. unaligned) */

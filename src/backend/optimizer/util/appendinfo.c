@@ -16,6 +16,7 @@
 
 #include "access/htup_details.h"
 #include "access/table.h"
+#include "catalog/pg_collation.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/appendinfo.h"
@@ -114,7 +115,7 @@ make_inh_translation_list(Relation oldrelation, Relation newrelation,
 		attname = NameStr(att->attname);
 		atttypid = att->atttypid;
 		atttypmod = att->atttypmod;
-		attcollation = att->attcollation;
+		attcollation = get_typcollation(atttypid);
 
 		/*
 		 * When we are generating the "translation list" for the parent table
@@ -158,12 +159,9 @@ make_inh_translation_list(Relation oldrelation, Relation newrelation,
 			att = TupleDescAttr(new_tupdesc, new_attno);
 		}
 
-		/* Found it, check type and collation match */
+		/* Found it, check type match */
 		if (atttypid != att->atttypid || atttypmod != att->atttypmod)
 			elog(ERROR, "attribute \"%s\" of relation \"%s\" does not match parent's type",
-				 attname, RelationGetRelationName(newrelation));
-		if (attcollation != att->attcollation)
-			elog(ERROR, "attribute \"%s\" of relation \"%s\" does not match parent's collation",
 				 attname, RelationGetRelationName(newrelation));
 
 		vars = lappend(vars, makeVar(newvarno,
@@ -890,11 +888,8 @@ distribute_row_identity_vars(PlannerInfo *root)
 		return;
 	}
 	target_rte = rt_fetch(result_relation, parse->rtable);
-	if (!target_rte->inh)
-	{
-		Assert(root->row_identity_vars == NIL);
-		return;
-	}
+	Assert(root->row_identity_vars == NIL);
+	return;
 
 	/*
 	 * Ordinarily, we expect that leaf result relation(s) will have added some
@@ -979,11 +974,8 @@ expand_appendrel_subquery(PlannerInfo *root, RelOptInfo *rel,
 		Assert(childrte != NULL);
 
 		/* Build the child RelOptInfo. */
-		childrel = build_simple_rel(root, childRTindex, rel);
+		childrel = build_simple_rel(root, childRTindex, rel, false);
 
-		/* Child may itself be an appendrel subquery, in which case recurse. */
-		if (childrte->inh)
-			expand_appendrel_subquery(root, childrel, childrte, childRTindex);
 	}
 }
 

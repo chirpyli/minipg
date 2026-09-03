@@ -893,8 +893,8 @@ examine_attribute(Relation onerel, int attnum, Node *index_expr)
 		 * preference to anything else; but if not, fall back to whatever we
 		 * can get from the expression.
 		 */
-		if (OidIsValid(onerel->rd_indcollation[attnum - 1]))
-			stats->attrcollid = onerel->rd_indcollation[attnum - 1];
+		if (OidIsValid(DEFAULT_COLLATION_OID))
+			stats->attrcollid = DEFAULT_COLLATION_OID;
 		else
 			stats->attrcollid = exprCollation(index_expr);
 	}
@@ -902,7 +902,7 @@ examine_attribute(Relation onerel, int attnum, Node *index_expr)
 	{
 		stats->attrtypid = attr->atttypid;
 		stats->attrtypmod = attr->atttypmod;
-		stats->attrcollid = attr->attcollation;
+		stats->attrcollid = DEFAULT_COLLATION_OID;
 	}
 
 	typtuple = SearchSysCacheCopy1(TYPEOID,

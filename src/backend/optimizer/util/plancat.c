@@ -24,6 +24,7 @@
 #include "access/table.h"
 #include "access/tableam.h"
 #include "access/transam.h"
+#include "catalog/pg_collation.h"
 #include "access/xlog.h"
 #include "catalog/catalog.h"
 #include "catalog/heap.h"
@@ -56,8 +57,6 @@ int			constraint_exclusion = CONSTRAINT_EXCLUSION_PARTITION;
 get_relation_info_hook_type get_relation_info_hook = NULL;
 
 
-static void get_relation_foreign_keys(PlannerInfo *root, RelOptInfo *rel,
-									  Relation relation, bool inhparent);
 static bool infer_collation_opclass_match(InferenceElem *elem, Relation idxRel,
 										  List *idxExprs);
 static List *get_relation_constraints(PlannerInfo *root,
@@ -82,8 +81,6 @@ static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
  *	pages		number of pages
  *	tuples		number of tuples
  *	rel_parallel_workers user-defined number of parallel workers
- *
- * Also, add information about the relation's foreign keys to root->fkey_list.
  *
  * Also, initialize the attr_needed[] and attr_widths[] arrays.  In most
  * cases these are left as zeroes, but sometimes we need to compute attr
@@ -245,7 +242,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			{
 				info->opfamily[i] = indexRelation->rd_opfamily[i];
 				info->opcintype[i] = indexRelation->rd_opcintype[i];
-				info->indexcollations[i] = indexRelation->rd_indcollation[i];
+				info->indexcollations[i] = get_typcollation(info->opcintype[i]);
 			}
 
 			info->relam = indexRelation->rd_rel->relam;
@@ -426,9 +423,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 
 	rel->indexlist = indexinfos;
 
-	/* Collect info about relation's foreign keys, if relevant */
-	get_relation_foreign_keys(root, rel, relation, inhparent);
-
 	/* Collect info about functions implemented by the rel's table AM. */
 	if (relation->rd_tableam &&
 		relation->rd_tableam->scan_set_tidrange != NULL &&
@@ -444,111 +438,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	 */
 	if (get_relation_info_hook)
 		(*get_relation_info_hook) (root, relationObjectId, inhparent, rel);
-}
-
-/*
- * get_relation_foreign_keys -
- *	  Retrieves foreign key information for a given relation.
- *
- * ForeignKeyOptInfos for relevant foreign keys are created and added to
- * root->fkey_list.  We do this now while we have the relcache entry open.
- * We could sometimes avoid making useless ForeignKeyOptInfos if we waited
- * until all RelOptInfos have been built, but the cost of re-opening the
- * relcache entries would probably exceed any savings.
- */
-static void
-get_relation_foreign_keys(PlannerInfo *root, RelOptInfo *rel,
-						  Relation relation, bool inhparent)
-{
-	List	   *rtable = root->parse->rtable;
-	List	   *cachedfkeys;
-	ListCell   *lc;
-
-	/*
-	 * If it's not a baserel, we don't care about its FKs.  Also, if the query
-	 * references only a single relation, we can skip the lookup since no FKs
-	 * could satisfy the requirements below.
-	 */
-	if (rel->reloptkind != RELOPT_BASEREL ||
-		list_length(rtable) < 2)
-		return;
-
-	/*
-	 * If it's the parent of an inheritance tree, ignore its FKs.  We could
-	 * make useful FK-based deductions if we found that all members of the
-	 * inheritance tree have equivalent FK constraints, but detecting that
-	 * would require code that hasn't been written.
-	 */
-	if (inhparent)
-		return;
-
-	/*
-	 * Extract data about relation's FKs from the relcache.  Note that this
-	 * list belongs to the relcache and might disappear in a cache flush, so
-	 * we must not do any further catalog access within this function.
-	 */
-	cachedfkeys = RelationGetFKeyList(relation);
-
-	/*
-	 * Figure out which FKs are of interest for this query, and create
-	 * ForeignKeyOptInfos for them.  We want only FKs that reference some
-	 * other RTE of the current query.  In queries containing self-joins,
-	 * there might be more than one other RTE for a referenced table, and we
-	 * should make a ForeignKeyOptInfo for each occurrence.
-	 *
-	 * Ideally, we would ignore RTEs that correspond to non-baserels, but it's
-	 * too hard to identify those here, so we might end up making some useless
-	 * ForeignKeyOptInfos.  If so, match_foreign_keys_to_quals() will remove
-	 * them again.
-	 */
-	foreach(lc, cachedfkeys)
-	{
-		ForeignKeyCacheInfo *cachedfk = (ForeignKeyCacheInfo *) lfirst(lc);
-		Index		rti;
-		ListCell   *lc2;
-
-		/* conrelid should always be that of the table we're considering */
-		Assert(cachedfk->conrelid == RelationGetRelid(relation));
-
-		/* Scan to find other RTEs matching confrelid */
-		rti = 0;
-		foreach(lc2, rtable)
-		{
-			RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc2);
-			ForeignKeyOptInfo *info;
-
-			rti++;
-			/* Ignore if not the correct table */
-			if (rte->rtekind != RTE_RELATION ||
-				rte->relid != cachedfk->confrelid)
-				continue;
-			/* Ignore if it's an inheritance parent; doesn't really match */
-			if (rte->inh)
-				continue;
-			/* Ignore self-referential FKs; we only care about joins */
-			if (rti == rel->relid)
-				continue;
-
-			/* OK, let's make an entry */
-			info = makeNode(ForeignKeyOptInfo);
-			info->con_relid = rel->relid;
-			info->ref_relid = rti;
-			info->nkeys = cachedfk->nkeys;
-			memcpy(info->conkey, cachedfk->conkey, sizeof(info->conkey));
-			memcpy(info->confkey, cachedfk->confkey, sizeof(info->confkey));
-			memcpy(info->conpfeqop, cachedfk->conpfeqop, sizeof(info->conpfeqop));
-			/* zero out fields to be filled by match_foreign_keys_to_quals */
-			info->nmatched_ec = 0;
-			info->nconst_ec = 0;
-			info->nmatched_rcols = 0;
-			info->nmatched_ri = 0;
-			memset(info->eclass, 0, sizeof(info->eclass));
-			memset(info->fk_eclass_member, 0, sizeof(info->fk_eclass_member));
-			memset(info->rinfos, 0, sizeof(info->rinfos));
-
-			root->fkey_list = lappend(root->fkey_list, info);
-		}
-	}
 }
 
 /*
@@ -877,7 +766,7 @@ infer_collation_opclass_match(InferenceElem *elem, Relation idxRel,
 	{
 		Oid			opfamily = idxRel->rd_opfamily[natt - 1];
 		Oid			opcinputtype = idxRel->rd_opcintype[natt - 1];
-		Oid			collation = idxRel->rd_indcollation[natt - 1];
+		Oid			collation = get_typcollation(opcinputtype);
 		int			attno = idxRel->rd_index->indkey.values[natt - 1];
 
 		if (attno != 0)
@@ -1170,8 +1059,6 @@ get_relation_constraints(PlannerInfo *root,
 			 */
 			if (!constr->check[i].ccvalid)
 				continue;
-			if (constr->check[i].ccnoinherit && !include_noinherit)
-				continue;
 
 			cexpr = stringToNode(constr->check[i].ccbin);
 
@@ -1218,7 +1105,7 @@ get_relation_constraints(PlannerInfo *root,
 												  i,
 												  att->atttypid,
 												  att->atttypmod,
-												  att->attcollation,
+												  get_typcollation(att->atttypid),
 												  0);
 					ntest->nulltesttype = IS_NOT_NULL;
 
@@ -1364,14 +1251,14 @@ relation_excluded_by_constraints(PlannerInfo *root,
 	 * tables should never have NO INHERIT constraints; but it's not necessary
 	 * for us to assume that here.)
 	 */
-	include_noinherit = !rte->inh;
+	include_noinherit = true;
 
 	/*
 	 * Currently, attnotnull constraints must be treated as NO INHERIT unless
 	 * this is a partitioned table.  In future we might track their
 	 * inheritance status more accurately, allowing this to be refined.
 	 */
-	include_notnull = !rte->inh;
+	include_notnull = true;
 
 	/*
 	 * Fetch the appropriate set of constraint expressions.
@@ -1475,7 +1362,7 @@ build_physical_tlist(PlannerInfo *root, RelOptInfo *rel)
 							  attrno,
 							  att_tup->atttypid,
 							  att_tup->atttypmod,
-							  att_tup->attcollation,
+							  get_typcollation(att_tup->atttypid),
 							  0);
 
 				tlist = lappend(tlist,
@@ -1586,7 +1473,7 @@ build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
 										indexkey,
 										att_tup->atttypid,
 										att_tup->atttypmod,
-										att_tup->attcollation,
+										get_typcollation(att_tup->atttypid),
 										0);
 		}
 		else
@@ -1906,79 +1793,4 @@ has_unique_index(RelOptInfo *rel, AttrNumber attno)
 	return false;
 }
 
-
-/*
- * has_stored_generated_columns
- *
- * Does table identified by RTI have any STORED GENERATED columns?
- */
-bool
-has_stored_generated_columns(PlannerInfo *root, Index rti)
-{
-	RangeTblEntry *rte = planner_rt_fetch(rti, root);
-	Relation	relation;
-	TupleDesc	tupdesc;
-	bool		result = false;
-
-	/* Assume we already have adequate lock */
-	relation = table_open(rte->relid, NoLock);
-
-	tupdesc = RelationGetDescr(relation);
-	result = tupdesc->constr && tupdesc->constr->has_generated_stored;
-
-	table_close(relation, NoLock);
-
-	return result;
-}
-
-/*
- * get_dependent_generated_columns
- *
- * Get the column numbers of any STORED GENERATED columns of the relation
- * that depend on any column listed in target_cols.  Both the input and
- * result bitmapsets contain column numbers offset by
- * FirstLowInvalidHeapAttributeNumber.
- */
-Bitmapset *
-get_dependent_generated_columns(PlannerInfo *root, Index rti,
-								Bitmapset *target_cols)
-{
-	Bitmapset  *dependentCols = NULL;
-	RangeTblEntry *rte = planner_rt_fetch(rti, root);
-	Relation	relation;
-	TupleDesc	tupdesc;
-	TupleConstr *constr;
-
-	/* Assume we already have adequate lock */
-	relation = table_open(rte->relid, NoLock);
-
-	tupdesc = RelationGetDescr(relation);
-	constr = tupdesc->constr;
-
-	if (constr && constr->has_generated_stored)
-	{
-		for (int i = 0; i < constr->num_defval; i++)
-		{
-			AttrDefault *defval = &constr->defval[i];
-			Node	   *expr;
-			Bitmapset  *attrs_used = NULL;
-
-			/* skip if not generated column */
-			if (!TupleDescAttr(tupdesc, defval->adnum - 1)->attgenerated)
-				continue;
-
-			/* identify columns this generated column depends on */
-			expr = stringToNode(defval->adbin);
-			pull_varattnos(expr, 1, &attrs_used);
-
-			if (bms_overlap(target_cols, attrs_used))
-				dependentCols = bms_add_member(dependentCols,
-											   defval->adnum - FirstLowInvalidHeapAttributeNumber);
-		}
-	}
-
-	table_close(relation, NoLock);
-
-	return dependentCols;
-}
 

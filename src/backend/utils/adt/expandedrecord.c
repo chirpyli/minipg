@@ -22,6 +22,7 @@
 #include "access/heaptoast.h"
 #include "access/htup_details.h"
 #include "catalog/heap.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
@@ -1013,7 +1014,7 @@ expanded_record_lookup_field(ExpandedRecordHeader *erh, const char *fieldname,
 			finfo->fnumber = attr->attnum;
 			finfo->ftypeid = attr->atttypid;
 			finfo->ftypmod = attr->atttypmod;
-			finfo->fcollation = attr->attcollation;
+			finfo->fcollation = DEFAULT_COLLATION_OID;
 			return true;
 		}
 	}
@@ -1025,7 +1026,7 @@ expanded_record_lookup_field(ExpandedRecordHeader *erh, const char *fieldname,
 		finfo->fnumber = sysattr->attnum;
 		finfo->ftypeid = sysattr->atttypid;
 		finfo->ftypmod = sysattr->atttypmod;
-		finfo->fcollation = sysattr->attcollation;
+		finfo->fcollation = DEFAULT_COLLATION_OID;
 		return true;
 	}
 

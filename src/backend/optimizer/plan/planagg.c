@@ -121,8 +121,6 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 	rte = planner_rt_fetch(rtr->rtindex, root);
 	if (rte->rtekind == RTE_RELATION)
 		 /* ordinary relation, ok */ ;
-	else if (rte->rtekind == RTE_SUBQUERY && rte->inh)
-		 /* flattened UNION ALL subquery, ok */ ;
 	else
 		return;
 

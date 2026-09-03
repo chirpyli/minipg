@@ -4781,7 +4781,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 		vardata->statsTuple = SearchSysCache3(STATRELATTINH,
 											  ObjectIdGetDatum(rte->relid),
 											  Int16GetDatum(var->varattno),
-											  BoolGetDatum(rte->inh));
+											  BoolGetDatum(false));
 		vardata->freefunc = ReleaseSysCache;
 
 		if (HeapTupleIsValid(vardata->statsTuple))
@@ -4807,7 +4807,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 			vardata->acl_ok = true;
 		}
 	}
-	else if (rte->rtekind == RTE_SUBQUERY && !rte->inh)
+	else if (rte->rtekind == RTE_SUBQUERY)
 	{
 		/*
 		 * Plain subquery (not one that was converted to an appendrel).
@@ -6378,7 +6378,7 @@ btcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 			vardata.statsTuple = SearchSysCache3(STATRELATTINH,
 												 ObjectIdGetDatum(relid),
 												 Int16GetDatum(colnum),
-												 BoolGetDatum(rte->inh));
+												 BoolGetDatum(false));
 			vardata.freefunc = ReleaseSysCache;
 		}
 	}

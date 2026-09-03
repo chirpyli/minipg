@@ -372,7 +372,7 @@ static ParseNamespaceItem *
 transformTableEntry(ParseState *pstate, RangeVar *r)
 {
 	/* addRangeTableEntry does all the work */
-	return addRangeTableEntry(pstate, r, r->alias, r->inh, true);
+	return addRangeTableEntry(pstate, r, r->alias, false, true);
 }
 
 /*
@@ -2658,12 +2658,8 @@ resolve_unique_index_expr(ParseState *pstate, InferClause *infer,
 		 */
 		pInfer->expr = transformExpr(pstate, parse, EXPR_KIND_INDEX_EXPRESSION);
 
-		/* Perform lookup of collation and operator class as required */
-		if (!ielem->collation)
-			pInfer->infercollid = InvalidOid;
-		else
-			pInfer->infercollid = LookupCollation(pstate, ielem->collation,
-												  exprLocation(pInfer->expr));
+		/* Perform lookup of operator class as required */
+		pInfer->infercollid = InvalidOid;
 
 		if (!ielem->opclass)
 			pInfer->inferopclass = InvalidOid;

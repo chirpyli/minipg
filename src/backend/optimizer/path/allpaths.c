@@ -354,11 +354,6 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		 */
 		set_dummy_rel_pathlist(rel);
 	}
-	else if (rte->inh)
-	{
-		/* It's an "append relation", process accordingly */
-		set_append_rel_size(root, rel, rti, rte);
-	}
 	else
 	{
 		switch (rel->rtekind)
@@ -421,11 +416,6 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	if (IS_DUMMY_REL(rel))
 	{
 		/* We already proved the relation empty, so nothing more to do */
-	}
-	else if (rte->inh)
-	{
-		/* It's an "append relation", process accordingly */
-		set_append_rel_pathlist(root, rel, rti, rte);
 	}
 	else
 	{

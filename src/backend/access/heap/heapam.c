@@ -2199,21 +2199,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 			xlrec.flags |= XLH_INSERT_IS_SPECULATIVE;
 		Assert(ItemPointerGetBlockNumber(&heaptup->t_self) == BufferGetBlockNumber(buffer));
 
-		/*
-		 * For logical decoding, we need the tuple even if we're doing a full
-		 * page write, so make sure it's included even if we take a full-page
-		 * image. (XXX We could alternatively store a pointer into the FPW).
-		 */
-		if (RelationIsLogicallyLogged(relation) &&
-			!(options & HEAP_INSERT_NO_LOGICAL))
-		{
-			xlrec.flags |= XLH_INSERT_CONTAINS_NEW_TUPLE;
-			bufflags |= REGBUF_KEEP_DATA;
-
-			if (IsToastRelation(relation))
-				xlrec.flags |= XLH_INSERT_ON_TOAST_RELATION;
-		}
-
 		XLogBeginInsert();
 		XLogRegisterData((char *) &xlrec, SizeOfHeapInsert);
 
@@ -2341,7 +2326,7 @@ heap_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 	Buffer		vmbuffer = InvalidBuffer;
 	bool		needwal;
 	Size		saveFreeSpace;
-	bool		need_tuple_data = RelationIsLogicallyLogged(relation);
+	bool		need_tuple_data = false;
 	bool		need_cids = RelationIsAccessibleInLogicalDecoding(relation);
 
 	/* currently not needed (thus unsupported) for heap_multi_insert() */
@@ -8539,7 +8524,7 @@ log_heap_update(Relation reln, Buffer oldbuf,
 				suffixlen = 0;
 	XLogRecPtr	recptr;
 	Page		page = BufferGetPage(newbuf);
-	bool		need_tuple_data = RelationIsLogicallyLogged(reln);
+	bool		need_tuple_data = false;
 	bool		init;
 	int			bufflags;
 

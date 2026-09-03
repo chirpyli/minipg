@@ -386,7 +386,7 @@ add_rtes_to_flat_rtable(PlannerInfo *root, bool recursing)
 		 * RTEs without matching RelOptInfos, as they likewise have been
 		 * pulled up.
 		 */
-		if (rte->rtekind == RTE_SUBQUERY && !rte->inh &&
+		if (rte->rtekind == RTE_SUBQUERY &&
 			rti < root->simple_rel_array_size)
 		{
 			RelOptInfo *rel = root->simple_rel_array[rti];

@@ -294,17 +294,6 @@ typedef struct TypeCast
 } TypeCast;
 
 /*
- * CollateClause - a COLLATE expression
- */
-typedef struct CollateClause
-{
-	NodeTag		type;
-	Node	   *arg;			/* input expression */
-	List	   *collname;		/* possibly-qualified collation name */
-	int			location;		/* token location, or -1 if unknown */
-} CollateClause;
-
-/*
  * RoleSpec - a role name or one of a few special values.
  */
 typedef enum RoleSpecType
@@ -533,10 +522,6 @@ typedef struct RangeTableSample
  * how this ColumnDef node was created (by parsing, or by inheritance
  * from an existing relation).  We should never have both in the same node!
  *
- * Similarly, we may have a COLLATE specification in either raw form
- * (represented as a CollateClause with arg==NULL) or cooked form
- * (the collation's OID).
- *
  * The constraints list may contain a CONSTR_DEFAULT item in a raw
  * parsetree produced by gram.y, but transformCreateStmt will remove
  * the item and set raw_default instead.  CONSTR_DEFAULT items
@@ -559,8 +544,6 @@ typedef struct ColumnDef
 	RangeVar   *identitySequence;	/* to store identity sequence name for
 									 * ALTER TABLE ... ADD COLUMN */
 	char		generated;		/* attgenerated setting */
-	CollateClause *collClause;	/* untransformed COLLATE spec, if any */
-	Oid			collOid;		/* collation OID (InvalidOid if not set) */
 	List	   *constraints;	/* other constraints on column */
 	int			location;		/* parse location, or -1 if none/unknown */
 } ColumnDef;
@@ -578,7 +561,6 @@ typedef struct IndexElem
 	char	   *name;			/* name of attribute to index, or NULL */
 	Node	   *expr;			/* expression to index, or NULL */
 	char	   *indexcolname;	/* name for index column; NULL = default */
-	List	   *collation;		/* name of collation; NIL = default */
 	List	   *opclass;		/* name of desired opclass; NIL = default */
 	List	   *opclassopts;	/* opclass-specific options, or NIL */
 	SortByDir	ordering;		/* ASC/DESC/default */
@@ -860,7 +842,6 @@ typedef struct RangeTblEntry
 	Alias	   *alias;			/* user-written alias clause, if any */
 	Alias	   *eref;			/* expanded reference names */
 	bool		lateral;		/* subquery, function, or values is LATERAL? */
-	bool		inh;			/* inheritance requested? */
 	bool		inFromCl;		/* present in FROM clause? */
 	Bitmapset  *selectedCols;	/* columns needing SELECT permission */
 	Bitmapset  *insertedCols;	/* columns needing INSERT permission */
@@ -1388,8 +1369,6 @@ typedef enum AlterTableType
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
 	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
 	AT_DisableRule,				/* DISABLE RULE name */
-	AT_AddOf,					/* OF <type_name> */
-	AT_DropOf,					/* NOT OF */
 	AT_GenericOptions,			/* OPTIONS (...) */
 	AT_AddIdentity,				/* ADD IDENTITY */
 	AT_SetIdentity,				/* SET identity column options */
@@ -1500,7 +1479,6 @@ typedef struct CreateStmt
 	NodeTag		type;
 	RangeVar   *relation;		/* relation to create */
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	TypeName   *ofTypename;		/* OF typename */
 	List	   *constraints;	/* constraints (list of Constraint nodes) */
 	List	   *options;		/* options from WITH clause */
 	OnCommitAction oncommit;	/* what do we do at COMMIT? */
@@ -1563,17 +1541,6 @@ typedef struct Constraint
 	/* These could be, but currently are not, used for UNIQUE/PKEY: */
 	char	   *access_method;	/* index access method; NULL for default */
 	Node	   *where_clause;	/* partial index predicate */
-
-	/* Fields used for FOREIGN KEY constraints: */
-	RangeVar   *pktable;		/* Primary key table */
-	List	   *fk_attrs;		/* Attributes of foreign key */
-	List	   *pk_attrs;		/* Corresponding attrs in PK table */
-	char		fk_matchtype;	/* FULL, PARTIAL, SIMPLE */
-	char		fk_upd_action;	/* ON UPDATE action */
-	char		fk_del_action;	/* ON DELETE action */
-	List	   *old_conpfeqop;	/* pg_constraint.conpfeqop of my former self */
-	Oid			old_pktable_oid;	/* pg_constraint.confrelid of my former
-									 * self */
 
 	/* Fields used for constraints that allow a NOT VALID specification */
 	bool		skip_validation;	/* skip validation of existing rows? */

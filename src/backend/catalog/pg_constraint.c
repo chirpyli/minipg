@@ -51,26 +51,13 @@ CreateConstraintEntry(const char *constraintName,
 					  Oid constraintNamespace,
 					  char constraintType,
 					  bool isValidated,
-					  Oid parentConstrId,
 					  Oid relId,
 					  const int16 *constraintKey,
 					  int constraintNKeys,
 					  int constraintNTotalKeys,
 					  Oid indexRelId,
-					  Oid foreignRelId,
-					  const int16 *foreignKey,
-					  const Oid *pfEqOp,
-					  const Oid *ppEqOp,
-					  const Oid *ffEqOp,
-					  int foreignNKeys,
-					  char foreignUpdateType,
-					  char foreignDeleteType,
-					  char foreignMatchType,
 					  Node *conExpr,
 					  const char *conBin,
-					  bool conIsLocal,
-					  int conInhCount,
-					  bool conNoInherit,
 					  bool is_internal)
 {
 	Relation	conDesc;
@@ -79,10 +66,6 @@ CreateConstraintEntry(const char *constraintName,
 	bool		nulls[Natts_pg_constraint];
 	Datum		values[Natts_pg_constraint];
 	ArrayType  *conkeyArray;
-	ArrayType  *confkeyArray;
-	ArrayType  *conpfeqopArray;
-	ArrayType  *conppeqopArray;
-	ArrayType  *conffeqopArray;
 	NameData	cname;
 	int			i;
 	ObjectAddress conobject;
@@ -110,36 +93,6 @@ CreateConstraintEntry(const char *constraintName,
 	else
 		conkeyArray = NULL;
 
-	if (foreignNKeys > 0)
-	{
-		Datum	   *fkdatums;
-
-		fkdatums = (Datum *) palloc(foreignNKeys * sizeof(Datum));
-		for (i = 0; i < foreignNKeys; i++)
-			fkdatums[i] = Int16GetDatum(foreignKey[i]);
-		confkeyArray = construct_array(fkdatums, foreignNKeys,
-									   INT2OID, 2, true, TYPALIGN_SHORT);
-		for (i = 0; i < foreignNKeys; i++)
-			fkdatums[i] = ObjectIdGetDatum(pfEqOp[i]);
-		conpfeqopArray = construct_array(fkdatums, foreignNKeys,
-										 OIDOID, sizeof(Oid), true, TYPALIGN_INT);
-		for (i = 0; i < foreignNKeys; i++)
-			fkdatums[i] = ObjectIdGetDatum(ppEqOp[i]);
-		conppeqopArray = construct_array(fkdatums, foreignNKeys,
-										 OIDOID, sizeof(Oid), true, TYPALIGN_INT);
-		for (i = 0; i < foreignNKeys; i++)
-			fkdatums[i] = ObjectIdGetDatum(ffEqOp[i]);
-		conffeqopArray = construct_array(fkdatums, foreignNKeys,
-										 OIDOID, sizeof(Oid), true, TYPALIGN_INT);
-	}
-	else
-	{
-		confkeyArray = NULL;
-		conpfeqopArray = NULL;
-		conppeqopArray = NULL;
-		conffeqopArray = NULL;
-	}
-
 	/* initialize nulls and values */
 	for (i = 0; i < Natts_pg_constraint; i++)
 	{
@@ -156,39 +109,11 @@ CreateConstraintEntry(const char *constraintName,
 	values[Anum_pg_constraint_convalidated - 1] = BoolGetDatum(isValidated);
 	values[Anum_pg_constraint_conrelid - 1] = ObjectIdGetDatum(relId);
 	values[Anum_pg_constraint_conindid - 1] = ObjectIdGetDatum(indexRelId);
-	values[Anum_pg_constraint_conparentid - 1] = ObjectIdGetDatum(parentConstrId);
-	values[Anum_pg_constraint_confrelid - 1] = ObjectIdGetDatum(foreignRelId);
-	values[Anum_pg_constraint_confupdtype - 1] = CharGetDatum(foreignUpdateType);
-	values[Anum_pg_constraint_confdeltype - 1] = CharGetDatum(foreignDeleteType);
-	values[Anum_pg_constraint_confmatchtype - 1] = CharGetDatum(foreignMatchType);
-	values[Anum_pg_constraint_conislocal - 1] = BoolGetDatum(conIsLocal);
-	values[Anum_pg_constraint_coninhcount - 1] = Int32GetDatum(conInhCount);
-	values[Anum_pg_constraint_connoinherit - 1] = BoolGetDatum(conNoInherit);
 
 	if (conkeyArray)
 		values[Anum_pg_constraint_conkey - 1] = PointerGetDatum(conkeyArray);
 	else
 		nulls[Anum_pg_constraint_conkey - 1] = true;
-
-	if (confkeyArray)
-		values[Anum_pg_constraint_confkey - 1] = PointerGetDatum(confkeyArray);
-	else
-		nulls[Anum_pg_constraint_confkey - 1] = true;
-
-	if (conpfeqopArray)
-		values[Anum_pg_constraint_conpfeqop - 1] = PointerGetDatum(conpfeqopArray);
-	else
-		nulls[Anum_pg_constraint_conpfeqop - 1] = true;
-
-	if (conppeqopArray)
-		values[Anum_pg_constraint_conppeqop - 1] = PointerGetDatum(conppeqopArray);
-	else
-		nulls[Anum_pg_constraint_conppeqop - 1] = true;
-
-	if (conffeqopArray)
-		values[Anum_pg_constraint_conffeqop - 1] = PointerGetDatum(conffeqopArray);
-	else
-		nulls[Anum_pg_constraint_conffeqop - 1] = true;
 
 	if (conBin)
 		values[Anum_pg_constraint_conbin - 1] = CStringGetTextDatum(conBin);
@@ -236,74 +161,6 @@ CreateConstraintEntry(const char *constraintName,
 
 	/* Handle set of normal dependencies */
 	addrs_normal = new_object_addresses();
-
-	if (OidIsValid(foreignRelId))
-	{
-		/*
-		 * Register normal dependency from constraint to foreign relation, or
-		 * to specific column(s) if any are mentioned.
-		 */
-		ObjectAddress relobject;
-
-		if (foreignNKeys > 0)
-		{
-			for (i = 0; i < foreignNKeys; i++)
-			{
-				ObjectAddressSubSet(relobject, RelationRelationId,
-									foreignRelId, foreignKey[i]);
-				add_exact_object_address(&relobject, addrs_normal);
-			}
-		}
-		else
-		{
-			ObjectAddressSet(relobject, RelationRelationId, foreignRelId);
-			add_exact_object_address(&relobject, addrs_normal);
-		}
-	}
-
-	if (OidIsValid(indexRelId) && constraintType == CONSTRAINT_FOREIGN)
-	{
-		/*
-		 * Register normal dependency on the unique index that supports a
-		 * foreign-key constraint.  (Note: for indexes associated with unique
-		 * or primary-key constraints, the dependency runs the other way, and
-		 * is not made here.)
-		 */
-		ObjectAddress relobject;
-
-		ObjectAddressSet(relobject, RelationRelationId, indexRelId);
-		add_exact_object_address(&relobject, addrs_normal);
-	}
-
-	if (foreignNKeys > 0)
-	{
-		/*
-		 * Register normal dependencies on the equality operators that support
-		 * a foreign-key constraint.  If the PK and FK types are the same then
-		 * all three operators for a column are the same; otherwise they are
-		 * different.
-		 */
-		ObjectAddress oprobject;
-
-		oprobject.classId = OperatorRelationId;
-		oprobject.objectSubId = 0;
-
-		for (i = 0; i < foreignNKeys; i++)
-		{
-			oprobject.objectId = pfEqOp[i];
-			add_exact_object_address(&oprobject, addrs_normal);
-			if (ppEqOp[i] != pfEqOp[i])
-			{
-				oprobject.objectId = ppEqOp[i];
-				add_exact_object_address(&oprobject, addrs_normal);
-			}
-			if (ffEqOp[i] != pfEqOp[i])
-			{
-				oprobject.objectId = ffEqOp[i];
-				add_exact_object_address(&oprobject, addrs_normal);
-			}
-		}
-	}
 
 	record_object_address_dependencies(&conobject, addrs_normal,
 									   DEPENDENCY_NORMAL);
@@ -685,79 +542,6 @@ AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
 
 	table_close(conRel, RowExclusiveLock);
 }
-
-/*
- * ConstraintSetParentConstraint
- *		Set a partition's constraint as child of its parent constraint,
- *		or remove the linkage if parentConstrId is InvalidOid.
- *
- * This updates the constraint's pg_constraint row to show it as inherited, and
- * adds PARTITION dependencies to prevent the constraint from being deleted
- * on its own.  Alternatively, reverse that.
- */
-void
-ConstraintSetParentConstraint(Oid childConstrId,
-							  Oid parentConstrId,
-							  Oid childTableId)
-{
-	Relation	constrRel;
-	Form_pg_constraint constrForm;
-	HeapTuple	tuple,
-				newtup;
-	ObjectAddress depender;
-	ObjectAddress referenced;
-
-	constrRel = table_open(ConstraintRelationId, RowExclusiveLock);
-	tuple = SearchSysCache1(CONSTROID, ObjectIdGetDatum(childConstrId));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for constraint %u", childConstrId);
-	newtup = heap_copytuple(tuple);
-	constrForm = (Form_pg_constraint) GETSTRUCT(newtup);
-	if (OidIsValid(parentConstrId))
-	{
-		/* don't allow setting parent for a constraint that already has one */
-		Assert(constrForm->coninhcount == 0);
-		if (constrForm->conparentid != InvalidOid)
-			elog(ERROR, "constraint %u already has a parent constraint",
-				 childConstrId);
-
-		constrForm->conislocal = false;
-		constrForm->coninhcount++;
-		constrForm->conparentid = parentConstrId;
-
-		CatalogTupleUpdate(constrRel, &tuple->t_self, newtup);
-
-		ObjectAddressSet(depender, ConstraintRelationId, childConstrId);
-
-		ObjectAddressSet(referenced, ConstraintRelationId, parentConstrId);
-		recordDependencyOn(&depender, &referenced, DEPENDENCY_PARTITION_PRI);
-
-		ObjectAddressSet(referenced, RelationRelationId, childTableId);
-		recordDependencyOn(&depender, &referenced, DEPENDENCY_PARTITION_SEC);
-	}
-	else
-	{
-		constrForm->coninhcount--;
-		constrForm->conislocal = true;
-		constrForm->conparentid = InvalidOid;
-
-		/* Make sure there's no further inheritance. */
-		Assert(constrForm->coninhcount == 0);
-
-		CatalogTupleUpdate(constrRel, &tuple->t_self, newtup);
-
-		deleteDependencyRecordsForClass(ConstraintRelationId, childConstrId,
-										ConstraintRelationId,
-										DEPENDENCY_PARTITION_PRI);
-		deleteDependencyRecordsForClass(ConstraintRelationId, childConstrId,
-										RelationRelationId,
-										DEPENDENCY_PARTITION_SEC);
-	}
-
-	ReleaseSysCache(tuple);
-	table_close(constrRel, RowExclusiveLock);
-}
-
 
 /*
  * get_relation_constraint_oid

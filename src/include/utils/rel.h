@@ -109,10 +109,6 @@ typedef struct RelationData
 	RuleLock   *rd_rules;		/* rewrite rules */
 	MemoryContext rd_rulescxt;	/* private memory cxt for rd_rules, if any */
 
-	/* data managed by RelationGetFKeyList: */
-	List	   *rd_fkeylist;	/* list of ForeignKeyCacheInfo (see below) */
-	bool		rd_fkeyvalid;	/* true if list has been computed */
-
 	/* data managed by RelationGetIndexList: */
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */
 	Oid			rd_pkindex;		/* OID of primary key, if any */
@@ -159,7 +155,6 @@ typedef struct RelationData
 	int16	   *rd_indoption;	/* per-column AM-specific flags */
 	List	   *rd_indexprs;	/* index expression trees, if any */
 	List	   *rd_indpred;		/* index predicate tree, if any */
-	Oid		   *rd_indcollation;	/* OIDs of index collations */
 	bytea	  **rd_opcoptions;	/* parsed opclass-specific options */
 
 	/*
@@ -188,33 +183,6 @@ typedef struct RelationData
 	struct PgStat_TableStatus *pgstat_info; /* statistics collection area */
 } RelationData;
 
-
-/*
- * ForeignKeyCacheInfo
- *		Information the relcache can cache about foreign key constraints
- *
- * This is basically just an image of relevant columns from pg_constraint.
- * We make it a subclass of Node so that copyObject() can be used on a list
- * of these, but we also ensure it is a "flat" object without substructure,
- * so that list_free_deep() is sufficient to free such a list.
- * The per-FK-column arrays can be fixed-size because we allow at most
- * INDEX_MAX_KEYS columns in a foreign key constraint.
- *
- * Currently, we mostly cache fields of interest to the planner, but the set
- * of fields has already grown the constraint OID for other uses.
- */
-typedef struct ForeignKeyCacheInfo
-{
-	NodeTag		type;
-	Oid			conoid;			/* oid of the constraint itself */
-	Oid			conrelid;		/* relation constrained by the foreign key */
-	Oid			confrelid;		/* relation referenced by the foreign key */
-	int			nkeys;			/* number of columns in the foreign key */
-	/* these arrays each have nkeys valid entries: */
-	AttrNumber	conkey[INDEX_MAX_KEYS]; /* cols in referencing table */
-	AttrNumber	confkey[INDEX_MAX_KEYS];	/* cols in referenced table */
-	Oid			conpfeqop[INDEX_MAX_KEYS];	/* PK = FK operator OIDs */
-} ForeignKeyCacheInfo;
 
 
 /*
@@ -429,23 +397,6 @@ RelationGetSmgr(Relation rel)
  * continue to compile with the branch simply never taken.
  */
 #define RelationIsAccessibleInLogicalDecoding(relation) (false)
-
-/*
- * RelationIsLogicallyLogged
- *		True if we need to log enough information to extract the data from the
- *		WAL stream.
- *
- * We don't log information for unlogged tables (since they don't WAL log
- * anyway), for foreign tables (since they don't WAL log, either),
- * and for system tables (their content is hard to make sense of, and
- * it would complicate decoding slightly for little gain). Note that we *do*
- * log information for user defined catalog tables since they presumably are
- * interesting to the user...
- */
-#define RelationIsLogicallyLogged(relation) \
-	(XLogLogicalInfoActive() && \
-	 RelationNeedsWAL(relation) && \
-	 !IsCatalogRelation(relation))
 
 /* routines in utils/cache/relcache.c */
 extern void RelationIncrementReferenceCount(Relation rel);

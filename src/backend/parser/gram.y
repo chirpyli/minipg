@@ -167,9 +167,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 static List *mergeTableFuncParameters(List *func_args, List *columns);
 static TypeName *TableFuncTypeName(List *columns);
 static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner);
-static void SplitColQualList(List *qualList,
-							 List **constraintList, CollateClause **collClause,
-							 core_yyscan_t yyscanner);
 static void processCASbits(int cas_bits, int location, const char *constrType,
 			   bool *not_valid, bool *no_inherit, core_yyscan_t yyscanner);
 
@@ -248,7 +245,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <node>	alter_column_default alter_using
 %type <ival>	opt_asc_desc opt_nulls_order
 
-%type <node>	alter_table_cmd alter_type_cmd opt_collate_clause
+%type <node>	alter_table_cmd alter_type_cmd
 %type <list>	alter_table_cmds alter_type_cmds
 
 %type <dbehavior>	opt_drop_behavior
@@ -280,7 +277,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
 				opt_class
-				opt_collate
 
 %type <range>	qualified_name insert_target
 
@@ -295,7 +291,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <list>	parse_toplevel stmtmulti routine_body_stmt_list
 				OptTableElementList TableElementList definition
-				OptTypedTableElementList TypedTableElementList
 				OptWith opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
 				func_as createfunc_opt_list opt_createfunc_opt_list
@@ -366,8 +361,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <vsetstmt> generic_set set_rest set_rest_more generic_reset reset_rest
 				 FunctionSetResetClause
 
-%type <node>	TableElement TypedTableElement ConstraintElem TableFuncElement
-%type <node>	columnDef columnOptions
+%type <node>	TableElement ConstraintElem TableFuncElement
+%type <node>	columnDef
 %type <defelt>	def_elem operator_def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
@@ -477,7 +472,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	CACHE CALL CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS
-	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMIT
+	CLUSTER COALESCE COLUMN COLUMNS COMMENT COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
 	COST CREATE CROSS CSV CUBE CURRENT_P
@@ -494,7 +489,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	EXTENSION EXTERNAL EXTRACT
 
 	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
-	FORCE FOREIGN FREEZE FROM FULL FUNCTION FUNCTIONS
+	FORCE FREEZE FROM FULL FUNCTION FUNCTIONS
 
 	GENERATED GLOBAL GRANTED GREATEST GROUP_P GROUPING GROUPS
 
@@ -529,7 +524,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 	QUOTE
 
-	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCES REFERENCING
+	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
 	RESET RESTART RESTRICT RETURN RETURNING RETURNS RIGHT ROLE ROLLBACK ROLLUP
 	ROUTINE ROUTINES ROW ROWS RULE
@@ -624,7 +619,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %left		'^'
 /* Unary Operators */
 %left		AT				/* sets precedence for AT TIME ZONE */
-%left		COLLATE
 %right		UMINUS
 %left		'[' ']'
 %left		'(' ')'
@@ -1365,7 +1359,7 @@ alter_table_cmds:
 			 * ALTER TABLE <name> ALTER [COLUMN] <colname> [SET DATA] TYPE <typename>
 			 *		[ USING <expression> ]
 			 */
-			| ALTER opt_column ColId opt_set_data TYPE_P Typename opt_collate_clause alter_using
+			| ALTER opt_column ColId opt_set_data TYPE_P Typename alter_using
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
 					ColumnDef *def = makeNode(ColumnDef);
@@ -1374,8 +1368,7 @@ alter_table_cmds:
 					n->def = (Node *) def;
 					/* We only use these fields of the ColumnDef node */
 					def->typeName = $6;
-					def->collClause = (CollateClause *) $7;
-					def->raw_default = $8;
+					def->raw_default = $7;
 					def->location = @3;
 					$$ = (Node *)n;
 				}
@@ -1478,23 +1471,6 @@ alter_table_cmds:
 					n->name = $3;
 					$$ = (Node *)n;
 					}
-					/* ALTER TABLE <name> OF <type_name> */
-					| OF any_name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					TypeName *def = makeTypeNameFromNameList($2);
-					def->location = @2;
-					n->subtype = AT_AddOf;
-					n->def = (Node *) def;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> NOT OF */
-			| NOT OF
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropOf;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> OWNER TO RoleSpec */
 			| OWNER TO RoleSpec
 				{
@@ -1521,18 +1497,6 @@ opt_drop_behavior:
 			CASCADE						{ $$ = DROP_CASCADE; }
 			| RESTRICT					{ $$ = DROP_RESTRICT; }
 			| /* EMPTY */				{ $$ = DROP_RESTRICT; /* default */ }
-		;
-
-opt_collate_clause:
-			COLLATE any_name
-				{
-					CollateClause *n = makeNode(CollateClause);
-					n->arg = NULL;
-					n->collname = $2;
-					n->location = @1;
-					$$ = (Node *) n;
-				}
-			| /* EMPTY */				{ $$ = NULL; }
 		;
 
 alter_using:
@@ -1577,17 +1541,16 @@ alter_type_cmd:
 					$$ = (Node *)n;
 				}
 			/* ALTER TYPE <name> ALTER ATTRIBUTE <attname> [SET DATA] TYPE <typename> [RESTRICT|CASCADE] */
-			| ALTER ATTRIBUTE ColId opt_set_data TYPE_P Typename opt_collate_clause opt_drop_behavior
+			| ALTER ATTRIBUTE ColId opt_set_data TYPE_P Typename opt_drop_behavior
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
 					ColumnDef *def = makeNode(ColumnDef);
 					n->subtype = AT_AlterColumnType;
 					n->name = $3;
 					n->def = (Node *) def;
-					n->behavior = $8;
+					n->behavior = $7;
 					/* We only use these fields of the ColumnDef node */
 					def->typeName = $6;
-					def->collClause = (CollateClause *) $7;
 					def->raw_default = NULL;
 					def->location = @3;
 					$$ = (Node *)n;
@@ -1619,7 +1582,6 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				$3->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->relation = $3;
 				n->tableElts = $5;
-				n->ofTypename = NULL;
 				n->constraints = NIL;
 				n->accessMethod = $7;
 				n->options = $8;
@@ -1635,41 +1597,6 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				$6->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->relation = $6;
 				n->tableElts = $8;
-				n->ofTypename = NULL;
-				n->constraints = NIL;
-				n->accessMethod = $10;
-				n->options = $11;
-				n->oncommit = $12;
-				n->if_not_exists = true;
-				$$ = (Node *)n;
-			}
-		| CREATE TABLE qualified_name OF any_name
-			OptTypedTableElementList table_access_method_clause
-			OptWith OnCommitOption
-			{
-				CreateStmt *n = makeNode(CreateStmt);
-				$3->relpersistence = RELPERSISTENCE_PERMANENT;
-				n->relation = $3;
-				n->tableElts = $6;
-				n->ofTypename = makeTypeNameFromNameList($5);
-				n->ofTypename->location = @5;
-				n->constraints = NIL;
-				n->accessMethod = $7;
-				n->options = $8;
-				n->oncommit = $9;
-				n->if_not_exists = false;
-				$$ = (Node *)n;
-			}
-		| CREATE TABLE IF_P NOT EXISTS qualified_name OF any_name
-			OptTypedTableElementList table_access_method_clause
-			OptWith OnCommitOption
-			{
-				CreateStmt *n = makeNode(CreateStmt);
-				$6->relpersistence = RELPERSISTENCE_PERMANENT;
-				n->relation = $6;
-				n->tableElts = $9;
-				n->ofTypename = makeTypeNameFromNameList($8);
-				n->ofTypename->location = @8;
 				n->constraints = NIL;
 				n->accessMethod = $10;
 				n->options = $11;
@@ -1684,10 +1611,6 @@ OptTableElementList:
 			| /*EMPTY*/							{ $$ = NIL; }
 		;
 
-OptTypedTableElementList:
-			'(' TypedTableElementList ')'		{ $$ = $2; }
-			| /*EMPTY*/							{ $$ = NIL; }
-		;
 
 TableElementList:
 			TableElement
@@ -1700,24 +1623,9 @@ TableElementList:
 				}
 		;
 
-TypedTableElementList:
-			TypedTableElement
-				{
-					$$ = list_make1($1);
-				}
-			| TypedTableElementList ',' TypedTableElement
-				{
-					$$ = lappend($1, $3);
-				}
-		;
 
 TableElement:
 			columnDef							{ $$ = $1; }
-			| TableConstraint					{ $$ = $1; }
-		;
-
-TypedTableElement:
-			columnOptions						{ $$ = $1; }
 			| TableConstraint					{ $$ = $1; }
 		;
 
@@ -1734,51 +1642,12 @@ columnDef:	ColId Typename opt_column_compression ColQualList
 					n->storage = 0;
 					n->raw_default = NULL;
 					n->cooked_default = NULL;
-					n->collOid = InvalidOid;
-					SplitColQualList($4, &n->constraints, &n->collClause,
-									 yyscanner);
+					n->constraints = $4;
 					n->location = @1;
 					$$ = (Node *)n;
 				}
 		;
 
-columnOptions:	ColId ColQualList
-				{
-					ColumnDef *n = makeNode(ColumnDef);
-					n->colname = $1;
-					n->typeName = NULL;
-					n->inhcount = 0;
-					n->is_local = true;
-					n->is_not_null = false;
-					n->is_from_type = false;
-					n->storage = 0;
-					n->raw_default = NULL;
-					n->cooked_default = NULL;
-					n->collOid = InvalidOid;
-					SplitColQualList($2, &n->constraints, &n->collClause,
-									 yyscanner);
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-				| ColId WITH OPTIONS ColQualList
-				{
-					ColumnDef *n = makeNode(ColumnDef);
-					n->colname = $1;
-					n->typeName = NULL;
-					n->inhcount = 0;
-					n->is_local = true;
-					n->is_not_null = false;
-					n->is_from_type = false;
-					n->storage = 0;
-					n->raw_default = NULL;
-					n->cooked_default = NULL;
-					n->collOid = InvalidOid;
-					SplitColQualList($4, &n->constraints, &n->collClause,
-									 yyscanner);
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-		;
 
 column_compression:
 			COMPRESSION ColId						{ $$ = $2; }
@@ -1804,19 +1673,6 @@ ColConstraint:
 					$$ = (Node *) n;
 				}
 			| ColConstraintElem						{ $$ = $1; }
-			| COLLATE any_name
-				{
-					/*
-					 * Note: the CollateClause is momentarily included in
-					 * the list built by ColQualList, but we split it out
-					 * again in SplitColQualList.
-					 */
-					CollateClause *n = makeNode(CollateClause);
-					n->arg = NULL;
-					n->collname = $2;
-					n->location = @1;
-					$$ = (Node *) n;
-				}
 		;
 
 /* DEFAULT NULL is already the default for Postgres.
@@ -1889,53 +1745,8 @@ ColConstraintElem:
 					n->raw_expr = $2;
 					n->cooked_expr = NULL;
 					$$ = (Node *)n;
-					}
-					| GENERATED generated_when AS '(' a_expr ')' STORED
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_GENERATED;
-					n->generated_when = $2;
-					n->raw_expr = $5;
-					n->cooked_expr = NULL;
-					n->location = @1;
-
-					/*
-					 * Can't do this in the grammar because of shift/reduce
-					 * conflicts.  (IDENTITY allows both ALWAYS and BY
-					 * DEFAULT, but generated columns only allow ALWAYS.)  We
-					 * can also give a more useful error message and location.
-					 */
-					if ($2 != ATTRIBUTE_IDENTITY_ALWAYS)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("for a generated column, GENERATED ALWAYS must be specified"),
-								 parser_errposition(@2)));
-
-					$$ = (Node *)n;
-					}
+				}
 					;
-
-generated_when:
-			ALWAYS			{ $$ = ATTRIBUTE_IDENTITY_ALWAYS; }
-			| BY DEFAULT	{ $$ = ATTRIBUTE_IDENTITY_BY_DEFAULT; }
-		;
-
-/*
- * ConstraintAttr represents constraint attributes, which we parse as if
- * they were independent constraint clauses, in order to avoid shift/reduce
- * conflicts (since NOT might start either an independent NOT NULL clause
- * or an attribute).  parse_utilcmd.c is responsible for attaching the
- * attribute information to the preceding "real" constraint node, and for
- * complaining if attribute clauses appear in the wrong place or wrong
- * combinations.
- *
- * See also ConstraintAttributeSpec, which can be used in places where
- * there is no parsing conflict.  (Note: currently, NOT VALID and NO INHERIT
- * are allowed clauses in ConstraintAttributeSpec, but not here.  Someday we
- * might need to allow them here too, but for the moment it doesn't seem
- * useful in the statements that use ConstraintAttr.)
- */
-
 
 
 /* ConstraintElem specifies constraint syntax which is not embedded into
@@ -2515,17 +2326,16 @@ index_params:	index_elem							{ $$ = list_make1($1); }
 
 
 index_elem_options:
-	opt_collate opt_class opt_asc_desc opt_nulls_order
+	opt_class opt_asc_desc opt_nulls_order
 		{
 			$$ = makeNode(IndexElem);
 			$$->name = NULL;
 			$$->expr = NULL;
 			$$->indexcolname = NULL;
-			$$->collation = $1;
-			$$->opclass = $2;
+			$$->opclass = $1;
 			$$->opclassopts = NIL;
-			$$->ordering = $3;
-			$$->nulls_ordering = $4;
+			$$->ordering = $2;
+			$$->nulls_ordering = $3;
 		}
 	;
 
@@ -2557,10 +2367,6 @@ opt_include:		INCLUDE '(' index_including_params ')'			{ $$ = $3; }
 
 index_including_params:	index_elem						{ $$ = list_make1($1); }
 			| index_including_params ',' index_elem		{ $$ = lappend($1, $3); }
-		;
-
-opt_collate: COLLATE any_name						{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
 opt_class:	any_name								{ $$ = $1; }
@@ -4955,28 +4761,24 @@ relation_expr:
 				{
 					/* inheritance query, implicitly */
 					$$ = $1;
-					$$->inh = true;
 					$$->alias = NULL;
 				}
 			| qualified_name '*'
 				{
 					/* inheritance query, explicitly */
 					$$ = $1;
-					$$->inh = true;
 					$$->alias = NULL;
 				}
 			| ONLY qualified_name
 				{
 					/* no inheritance */
 					$$ = $2;
-					$$->inh = false;
 					$$->alias = NULL;
 				}
 			| ONLY '(' qualified_name ')'
 				{
 					/* no inheritance, SQL99-style syntax */
 					$$ = $3;
-					$$->inh = false;
 					$$->alias = NULL;
 				}
 		;
@@ -5118,7 +4920,7 @@ TableFuncElementList:
 				}
 		;
 
-TableFuncElement:	ColId Typename opt_collate_clause
+TableFuncElement:	ColId Typename
 				{
 					ColumnDef *n = makeNode(ColumnDef);
 					n->colname = $1;
@@ -5130,8 +4932,6 @@ TableFuncElement:	ColId Typename opt_collate_clause
 					n->storage = 0;
 					n->raw_default = NULL;
 					n->cooked_default = NULL;
-					n->collClause = (CollateClause *) $3;
-					n->collOid = InvalidOid;
 					n->constraints = NIL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -5526,14 +5326,6 @@ opt_timezone:
 a_expr:		c_expr									{ $$ = $1; }
 			| a_expr TYPECAST Typename
 					{ $$ = makeTypeCast($1, $3, @2); }
-			| a_expr COLLATE any_name
-				{
-					CollateClause *n = makeNode(CollateClause);
-					n->arg = $1;
-					n->collname = $3;
-					n->location = @2;
-					$$ = (Node *) n;
-				}
 			| a_expr AT TIME ZONE a_expr			%prec AT
 				{
 					$$ = (Node *) makeFuncCall(SystemFuncName("timezone"),
@@ -6213,14 +6005,7 @@ func_expr_windowless:
  * Special expressions that are considered to be functions.
  */
 func_expr_common_subexpr:
-			COLLATION FOR '(' a_expr ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("pg_collation_for"),
-											   list_make1($4),
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| CURRENT_DATE
+			CURRENT_DATE
 				{
 					$$ = makeSQLValueFunction(SVFOP_CURRENT_DATE, -1, @1);
 				}
@@ -7450,7 +7235,6 @@ col_name_keyword:
 type_func_name_keyword:
 			  AUTHORIZATION
 			| BINARY
-			| COLLATION
 			| CONCURRENTLY
 			| CROSS
 			| CURRENT_SCHEMA
@@ -7492,7 +7276,6 @@ reserved_keyword:
 			| CASE
 			| CAST
 			| CHECK
-			| COLLATE
 			| COLUMN
 			| CONSTRAINT
 			| CREATE
@@ -7512,7 +7295,6 @@ reserved_keyword:
 			| FALSE_P
 			| FETCH
 			| FOR
-			| FOREIGN
 			| FROM
 			| GROUP_P
 			| HAVING
@@ -7534,7 +7316,6 @@ reserved_keyword:
 			| ORDER
 			| PLACING
 			| PRIMARY
-			| REFERENCES
 			| RETURNING
 			| SELECT
 			| SESSION_USER
@@ -7613,8 +7394,6 @@ bare_label_keyword:
 			| CLASS
 			| CLUSTER
 			| COALESCE
-			| COLLATE
-			| COLLATION
 			| COLUMN
 			| COLUMNS
 			| COMMENT
@@ -7694,7 +7473,6 @@ bare_label_keyword:
 			| FLOAT_P
 			| FOLLOWING
 			| FORCE
-			| FOREIGN
 			| FREEZE
 			| FULL
 			| FUNCTION
@@ -7825,7 +7603,6 @@ bare_label_keyword:
 
 			| RECURSIVE
 			| REF_P
-			| REFERENCES
 			| REFERENCING
 			| REFRESH
 			| REINDEX
@@ -8657,43 +8434,6 @@ makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner)
 	r->location = position;
 
 	return r;
-}
-
-/* Separate Constraint nodes from COLLATE clauses in a ColQualList */
-static void
-SplitColQualList(List *qualList,
-				 List **constraintList, CollateClause **collClause,
-				 core_yyscan_t yyscanner)
-{
-	ListCell   *cell;
-
-	*collClause = NULL;
-	foreach(cell, qualList)
-	{
-		Node   *n = (Node *) lfirst(cell);
-
-		if (IsA(n, Constraint))
-		{
-			/* keep it in list */
-			continue;
-		}
-		if (IsA(n, CollateClause))
-		{
-			CollateClause *c = (CollateClause *) n;
-
-			if (*collClause)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("multiple COLLATE clauses not allowed"),
-						 parser_errposition(c->location)));
-			*collClause = c;
-		}
-		else
-			elog(ERROR, "unexpected node type %d", (int) n->type);
-		/* remove non-Constraint nodes from qualList */
-		qualList = foreach_delete_current(qualList, cell);
-	}
-	*constraintList = qualList;
 }
 
 /*

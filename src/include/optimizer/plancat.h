@@ -70,9 +70,4 @@ extern void add_function_cost(PlannerInfo *root, Oid funcid, Node *node,
 
 extern double get_function_rows(PlannerInfo *root, Oid funcid, Node *node);
 
-extern bool has_stored_generated_columns(PlannerInfo *root, Index rti);
-
-extern Bitmapset *get_dependent_generated_columns(PlannerInfo *root, Index rti,
-												  Bitmapset *target_cols);
-
 #endif							/* PLANCAT_H */

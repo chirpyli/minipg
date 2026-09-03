@@ -13,6 +13,7 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "catalog/pg_collation.h"
 
 #include "access/hash.h"
 
@@ -87,7 +88,7 @@ _hash_datum2hashkey(Relation rel, Datum key)
 
 	/* XXX assumes index has only one attribute */
 	procinfo = index_getprocinfo(rel, 1, HASHSTANDARD_PROC);
-	collation = rel->rd_indcollation[0];
+	collation = DEFAULT_COLLATION_OID;
 
 	return DatumGetUInt32(FunctionCall1Coll(procinfo, collation, key));
 }
@@ -114,7 +115,7 @@ _hash_datum2hashkey_type(Relation rel, Datum key, Oid keytype)
 		elog(ERROR, "missing support function %d(%u,%u) for index \"%s\"",
 			 HASHSTANDARD_PROC, keytype, keytype,
 			 RelationGetRelationName(rel));
-	collation = rel->rd_indcollation[0];
+	collation = DEFAULT_COLLATION_OID;
 
 	return DatumGetUInt32(OidFunctionCall1Coll(hash_proc, collation, key));
 }

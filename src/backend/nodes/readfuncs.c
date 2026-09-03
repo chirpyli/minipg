@@ -375,7 +375,6 @@ _readRangeVar(void)
 
 	READ_STRING_FIELD(schemaname);
 	READ_STRING_FIELD(relname);
-	READ_BOOL_FIELD(inh);
 	READ_CHAR_FIELD(relpersistence);
 	READ_NODE_FIELD(alias);
 	READ_LOCATION_FIELD(location);
@@ -1193,7 +1192,6 @@ _readRangeTblEntry(void)
 	}
 
 	READ_BOOL_FIELD(lateral);
-	READ_BOOL_FIELD(inh);
 	READ_BOOL_FIELD(inFromCl);
 	READ_BITMAPSET_FIELD(selectedCols);
 	READ_BITMAPSET_FIELD(insertedCols);

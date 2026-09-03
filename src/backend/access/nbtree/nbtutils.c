@@ -14,6 +14,7 @@
  */
 
 #include "postgres.h"
+#include "catalog/pg_collation.h"
 
 #include <time.h>
 
@@ -158,7 +159,7 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 									   (AttrNumber) (i + 1),
 									   InvalidStrategy,
 									   InvalidOid,
-									   rel->rd_indcollation[i],
+									   DEFAULT_COLLATION_OID,
 									   procinfo,
 									   arg);
 		/* Record if any key attribute is NULL (or truncated) */
@@ -2718,7 +2719,7 @@ _bt_allequalimage(Relation rel, bool debugmessage)
 	{
 		Oid			opfamily = rel->rd_opfamily[i];
 		Oid			opcintype = rel->rd_opcintype[i];
-		Oid			collation = rel->rd_indcollation[i];
+		Oid			collation = DEFAULT_COLLATION_OID;
 		Oid			equalimageproc;
 
 		equalimageproc = get_opfamily_proc(opfamily, opcintype, opcintype,
