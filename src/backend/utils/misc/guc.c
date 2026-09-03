@@ -467,7 +467,6 @@ bool		Debug_print_parse = false;
 bool		Debug_print_rewritten = false;
 bool		Debug_pretty_print = true;
 
-bool		log_parser_stats = false;
 bool		log_planner_stats = false;
 bool		log_executor_stats = false;
 bool		log_statement_stats = false;	/* this is sort of all three above
@@ -1220,15 +1219,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&Debug_pretty_print,
 		true,
 		NULL, NULL, NULL
-	},
-	{
-		{"log_parser_stats", PGC_SUSET, STATS_MONITORING,
-			gettext_noop("Writes parser performance statistics to the server log."),
-			NULL
-		},
-		&log_parser_stats,
-		false,
-		check_stage_log_stats, NULL, NULL
 	},
 	{
 		{"log_planner_stats", PGC_SUSET, STATS_MONITORING,
@@ -3348,23 +3338,13 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"lc_monetary", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets the locale for formatting monetary amounts."),
-			NULL
-		},
-		&locale_monetary,
-		"C",
-		check_locale_monetary, assign_locale_monetary, NULL
-	},
-
-	{
 		{"lc_numeric", PGC_USERSET, CLIENT_CONN_LOCALE,
 			gettext_noop("Sets the locale for formatting numbers."),
 			NULL
 		},
 		&locale_numeric,
 		"C",
-		check_locale_numeric, assign_locale_numeric, NULL
+		check_locale_numeric, NULL, NULL
 	},
 
 	{
@@ -10100,10 +10080,10 @@ static bool
 check_log_stats(bool *newval, void **extra, GucSource source)
 {
 	if (*newval &&
-		(log_parser_stats || log_planner_stats || log_executor_stats))
+		(log_planner_stats || log_executor_stats))
 	{
 		GUC_check_errdetail("Cannot enable \"log_statement_stats\" when "
-							"\"log_parser_stats\", \"log_planner_stats\", "
+							"\"log_planner_stats\", "
 							"or \"log_executor_stats\" is true.");
 		return false;
 	}

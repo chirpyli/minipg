@@ -18,15 +18,9 @@
  * LC_MESSAGES is settable at run time and will take effect
  * immediately.
  *
- * The other categories, LC_MONETARY and LC_NUMERIC, are also
- * settable at run-time.  However, we don't actually set those locale
- * categories permanently.  This would have bizarre effects like no
- * longer accepting standard floating-point literals in some locales.
- * Instead, we only set these locale categories briefly when needed,
- * cache the required information obtained from localeconv(), and then
- * set the locale categories back to "C".
- * The cached information is only used by the money type.  For the
- * user, this should all be transparent.
+ * LC_NUMERIC is kept at "C" (set in main.c) so that numeric/decimal
+ * input parsing always uses "." as the decimal point regardless of the
+ * environment locale.
  *
  * !!! NOW HEAR THIS !!!
  *
@@ -70,11 +64,7 @@
 
 /* GUC settings */
 char	   *locale_messages;
-char	   *locale_monetary;
 char	   *locale_numeric;
-
-/* indicates whether locale information cache is valid */
-static bool CurrentLocaleConvValid = false;
 
 /* Cache for collation-related knowledge */
 
@@ -145,9 +135,6 @@ pg_perm_setlocale(int category, const char *locale)
 			envvar = "LC_MESSAGES";
 			break;
 #endif							/* LC_MESSAGES */
-		case LC_MONETARY:
-			envvar = "LC_MONETARY";
-			break;
 		case LC_NUMERIC:
 			envvar = "LC_NUMERIC";
 			break;
@@ -217,27 +204,9 @@ check_locale(int category, const char *locale, char **canonname)
  * This will have been locked down by an earlier call to pg_perm_setlocale.
  */
 bool
-check_locale_monetary(char **newval, void **extra, GucSource source)
-{
-	return check_locale(LC_MONETARY, *newval, NULL);
-}
-
-void
-assign_locale_monetary(const char *newval, void *extra)
-{
-	CurrentLocaleConvValid = false;
-}
-
-bool
 check_locale_numeric(char **newval, void **extra, GucSource source)
 {
 	return check_locale(LC_NUMERIC, *newval, NULL);
-}
-
-void
-assign_locale_numeric(const char *newval, void *extra)
-{
-	CurrentLocaleConvValid = false;
 }
 
 /*
@@ -284,261 +253,6 @@ assign_locale_messages(const char *newval, void *extra)
 }
 
 
-/*
- * Frees the malloced content of a struct lconv.  (But not the struct
- * itself.)  It's important that this not throw elog(ERROR).
- */
-static void
-free_struct_lconv(struct lconv *s)
-{
-	if (s->decimal_point)
-		free(s->decimal_point);
-	if (s->thousands_sep)
-		free(s->thousands_sep);
-	if (s->grouping)
-		free(s->grouping);
-	if (s->int_curr_symbol)
-		free(s->int_curr_symbol);
-	if (s->currency_symbol)
-		free(s->currency_symbol);
-	if (s->mon_decimal_point)
-		free(s->mon_decimal_point);
-	if (s->mon_thousands_sep)
-		free(s->mon_thousands_sep);
-	if (s->mon_grouping)
-		free(s->mon_grouping);
-	if (s->positive_sign)
-		free(s->positive_sign);
-	if (s->negative_sign)
-		free(s->negative_sign);
-}
-
-/*
- * Check that all fields of a struct lconv (or at least, the ones we care
- * about) are non-NULL.  The field list must match free_struct_lconv().
- */
-static bool
-struct_lconv_is_valid(struct lconv *s)
-{
-	if (s->decimal_point == NULL)
-		return false;
-	if (s->thousands_sep == NULL)
-		return false;
-	if (s->grouping == NULL)
-		return false;
-	if (s->int_curr_symbol == NULL)
-		return false;
-	if (s->currency_symbol == NULL)
-		return false;
-	if (s->mon_decimal_point == NULL)
-		return false;
-	if (s->mon_thousands_sep == NULL)
-		return false;
-	if (s->mon_grouping == NULL)
-		return false;
-	if (s->positive_sign == NULL)
-		return false;
-	if (s->negative_sign == NULL)
-		return false;
-	return true;
-}
-
-
-/*
- * Convert the strdup'd string at *str from the specified encoding to the
- * database encoding.
- */
-static void
-db_encoding_convert(int encoding, char **str)
-{
-	char	   *pstr;
-	char	   *mstr;
-
-	/* convert the string to the database encoding */
-	pstr = pg_any_to_server(*str, strlen(*str), encoding);
-	if (pstr == *str)
-		return;					/* no conversion happened */
-
-	/* need it malloc'd not palloc'd */
-	mstr = strdup(pstr);
-	if (mstr == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_OUT_OF_MEMORY),
-				 errmsg("out of memory")));
-
-	/* replace old string */
-	free(*str);
-	*str = mstr;
-
-	pfree(pstr);
-}
-
-
-/*
- * Return the POSIX lconv struct (contains number/money formatting
- * information) with locale information for all categories.
- */
-struct lconv *
-PGLC_localeconv(void)
-{
-	static struct lconv CurrentLocaleConv;
-	static bool CurrentLocaleConvAllocated = false;
-	struct lconv *extlconv;
-	struct lconv worklconv;
-	char	   *save_lc_monetary;
-	char	   *save_lc_numeric;
-
-	/* Did we do it already? */
-	if (CurrentLocaleConvValid)
-		return &CurrentLocaleConv;
-
-	/* Free any already-allocated storage */
-	if (CurrentLocaleConvAllocated)
-	{
-		free_struct_lconv(&CurrentLocaleConv);
-		CurrentLocaleConvAllocated = false;
-	}
-
-	/*
-	 * This is tricky because we really don't want to risk throwing error
-	 * while the locale is set to other than our usual settings.  Therefore,
-	 * the process is: collect the usual settings, set locale to special
-	 * setting, copy relevant data into worklconv using strdup(), restore
-	 * normal settings, convert data to desired encoding, and finally stash
-	 * the collected data in CurrentLocaleConv.  This makes it safe if we
-	 * throw an error during encoding conversion or run out of memory anywhere
-	 * in the process.  All data pointed to by struct lconv members is
-	 * allocated with strdup, to avoid premature elog(ERROR) and to allow
-	 * using a single cleanup routine.
-	 */
-	memset(&worklconv, 0, sizeof(worklconv));
-
-	/* Save prevailing values of monetary and numeric locales */
-	save_lc_monetary = setlocale(LC_MONETARY, NULL);
-	if (!save_lc_monetary)
-		elog(ERROR, "setlocale(NULL) failed");
-	save_lc_monetary = pstrdup(save_lc_monetary);
-
-	save_lc_numeric = setlocale(LC_NUMERIC, NULL);
-	if (!save_lc_numeric)
-		elog(ERROR, "setlocale(NULL) failed");
-	save_lc_numeric = pstrdup(save_lc_numeric);
-
-	/*
-	 * The POSIX standard explicitly says that it is undefined what happens if
-	 * LC_MONETARY or LC_NUMERIC imply an encoding (codeset) different from
-	 * that implied by LC_CTYPE.  In practice, all Unix-ish platforms seem to
-	 * believe that localeconv() should return strings that are encoded in the
-	 * codeset implied by the LC_MONETARY or LC_NUMERIC locale name.  Hence,
-	 * once we have successfully collected the localeconv() results, we will
-	 * convert them from that codeset to the desired server encoding.
-	 */
-
-	/* Here begins the critical section where we must not throw error */
-
-	/* Get formatting information for numeric */
-	setlocale(LC_NUMERIC, locale_numeric);
-	extlconv = localeconv();
-
-	/* Must copy data now in case setlocale() overwrites it */
-	worklconv.decimal_point = strdup(extlconv->decimal_point);
-	worklconv.thousands_sep = strdup(extlconv->thousands_sep);
-	worklconv.grouping = strdup(extlconv->grouping);
-
-	/* Get formatting information for monetary */
-	setlocale(LC_MONETARY, locale_monetary);
-	extlconv = localeconv();
-
-	/* Must copy data now in case setlocale() overwrites it */
-	worklconv.int_curr_symbol = strdup(extlconv->int_curr_symbol);
-	worklconv.currency_symbol = strdup(extlconv->currency_symbol);
-	worklconv.mon_decimal_point = strdup(extlconv->mon_decimal_point);
-	worklconv.mon_thousands_sep = strdup(extlconv->mon_thousands_sep);
-	worklconv.mon_grouping = strdup(extlconv->mon_grouping);
-	worklconv.positive_sign = strdup(extlconv->positive_sign);
-	worklconv.negative_sign = strdup(extlconv->negative_sign);
-	/* Copy scalar fields as well */
-	worklconv.int_frac_digits = extlconv->int_frac_digits;
-	worklconv.frac_digits = extlconv->frac_digits;
-	worklconv.p_cs_precedes = extlconv->p_cs_precedes;
-	worklconv.p_sep_by_space = extlconv->p_sep_by_space;
-	worklconv.n_cs_precedes = extlconv->n_cs_precedes;
-	worklconv.n_sep_by_space = extlconv->n_sep_by_space;
-	worklconv.p_sign_posn = extlconv->p_sign_posn;
-	worklconv.n_sign_posn = extlconv->n_sign_posn;
-
-	/*
-	 * Restore the prevailing locale settings; failure to do so is fatal.
-	 * Considering that the prevailing LC_MONETARY and LC_NUMERIC are almost
-	 * certainly "C", there's really no reason that restoring those should
-	 * fail.
-	 */
-	if (!setlocale(LC_MONETARY, save_lc_monetary))
-		elog(FATAL, "failed to restore LC_MONETARY to \"%s\"", save_lc_monetary);
-	if (!setlocale(LC_NUMERIC, save_lc_numeric))
-		elog(FATAL, "failed to restore LC_NUMERIC to \"%s\"", save_lc_numeric);
-
-	/*
-	 * At this point we've done our best to clean up, and can call functions
-	 * that might possibly throw errors with a clean conscience.  But let's
-	 * make sure we don't leak any already-strdup'd fields in worklconv.
-	 */
-	PG_TRY();
-	{
-		int			encoding;
-
-		/* Release the pstrdup'd locale names */
-		pfree(save_lc_monetary);
-		pfree(save_lc_numeric);
-
-		/* If any of the preceding strdup calls failed, complain now. */
-		if (!struct_lconv_is_valid(&worklconv))
-			ereport(ERROR,
-					(errcode(ERRCODE_OUT_OF_MEMORY),
-					 errmsg("out of memory")));
-
-		/*
-		 * Now we must perform encoding conversion from whatever's associated
-		 * with the locales into the database encoding.  If we can't identify
-		 * the encoding implied by LC_NUMERIC or LC_MONETARY (ie we get -1),
-		 * use PG_SQL_ASCII, which will result in just validating that the
-		 * strings are OK in the database encoding.
-		 */
-		encoding = pg_get_encoding_from_locale(locale_numeric, true);
-		if (encoding < 0)
-			encoding = PG_SQL_ASCII;
-
-		db_encoding_convert(encoding, &worklconv.decimal_point);
-		db_encoding_convert(encoding, &worklconv.thousands_sep);
-		/* grouping is not text and does not require conversion */
-
-		encoding = pg_get_encoding_from_locale(locale_monetary, true);
-		if (encoding < 0)
-			encoding = PG_SQL_ASCII;
-
-		db_encoding_convert(encoding, &worklconv.int_curr_symbol);
-		db_encoding_convert(encoding, &worklconv.currency_symbol);
-		db_encoding_convert(encoding, &worklconv.mon_decimal_point);
-		db_encoding_convert(encoding, &worklconv.mon_thousands_sep);
-		/* mon_grouping is not text and does not require conversion */
-		db_encoding_convert(encoding, &worklconv.positive_sign);
-		db_encoding_convert(encoding, &worklconv.negative_sign);
-	}
-	PG_CATCH();
-	{
-		free_struct_lconv(&worklconv);
-		PG_RE_THROW();
-	}
-	PG_END_TRY();
-
-	/*
-	 * Everything is good, so save the results.
-	 */
-	CurrentLocaleConv = worklconv;
-	CurrentLocaleConvAllocated = true;
-	CurrentLocaleConvValid = true;
-	return &CurrentLocaleConv;
-}
 
 
 /*

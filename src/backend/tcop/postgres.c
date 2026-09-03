@@ -507,13 +507,7 @@ pg_parse_query(const char *query_string)
 
 	TRACE_POSTGRESQL_QUERY_PARSE_START(query_string);
 
-	if (log_parser_stats)
-		ResetUsage();
-
 	raw_parsetree_list = raw_parser(query_string, RAW_PARSE_DEFAULT);
-
-	if (log_parser_stats)
-		ShowUsage("PARSER STATISTICS");
 
 	/*
 	 * Currently, outfuncs/readfuncs support is missing for many raw parse
@@ -548,14 +542,8 @@ pg_analyze_and_rewrite(RawStmt *parsetree, const char *query_string,
 	/*
 	 * (1) Perform parse analysis.
 	 */
-	if (log_parser_stats)
-		ResetUsage();
-
 	query = parse_analyze(parsetree, query_string, paramTypes, numParams,
 						  queryEnv);
-
-	if (log_parser_stats)
-		ShowUsage("PARSE ANALYSIS STATISTICS");
 
 	/*
 	 * (2) Rewrite the queries, as necessary
@@ -591,9 +579,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	/*
 	 * (1) Perform parse analysis.
 	 */
-	if (log_parser_stats)
-		ResetUsage();
-
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = query_string;
 	pstate->p_queryEnv = queryEnv;
@@ -610,9 +595,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	free_parsestate(pstate);
 
 	pgstat_report_query_id(query->queryId, false);
-
-	if (log_parser_stats)
-		ShowUsage("PARSE ANALYSIS STATISTICS");
 
 	/*
 	 * (2) Rewrite the queries, as necessary
@@ -639,9 +621,6 @@ pg_rewrite_query(Query *query)
 		elog_node_display(LOG, "parse tree", query,
 						  Debug_pretty_print);
 
-	if (log_parser_stats)
-		ResetUsage();
-
 	if (query->commandType == CMD_UTILITY)
 	{
 		/* don't rewrite utilities, just dump 'em into result list */
@@ -652,9 +631,6 @@ pg_rewrite_query(Query *query)
 		/* rewrite regular queries */
 		querytree_list = QueryRewrite(query);
 	}
-
-	if (log_parser_stats)
-		ShowUsage("REWRITER STATISTICS");
 
 #ifdef COPY_PARSE_PLAN_TREES
 	/* Optional debugging check: pass querytree through copyObject() */
@@ -2135,9 +2111,7 @@ get_stats_option_name(const char *arg)
 	switch (arg[0])
 	{
 		case 'p':
-			if (optarg[1] == 'a')	/* "parser" */
-				return "log_parser_stats";
-			else if (optarg[1] == 'l')	/* "planner" */
+			if (optarg[1] == 'l')	/* "planner" */
 				return "log_planner_stats";
 			break;
 

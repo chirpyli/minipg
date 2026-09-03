@@ -1480,9 +1480,7 @@ typedef struct CreateStmt
 	RangeVar   *relation;		/* relation to create */
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
 	List	   *constraints;	/* constraints (list of Constraint nodes) */
-	List	   *options;		/* options from WITH clause */
 	OnCommitAction oncommit;	/* what do we do at COMMIT? */
-	char	   *accessMethod;	/* table access method */
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 } CreateStmt;
 
@@ -1507,8 +1505,6 @@ typedef enum ConstrType			/* types of constraints */
 								 * expect it */
 	CONSTR_NOTNULL,
 	CONSTR_DEFAULT,
-	CONSTR_IDENTITY,
-	CONSTR_GENERATED,
 	CONSTR_CHECK,
 	CONSTR_PRIMARY,
 	CONSTR_UNIQUE

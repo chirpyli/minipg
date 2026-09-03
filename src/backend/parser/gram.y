@@ -272,7 +272,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <list>	OptSchemaEltList
 
 %type <str>		access_method_clause attr_name
-			table_access_method_clause name file_name
+			name file_name
 			opt_index_name cluster_index_specification
 
 %type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
@@ -291,7 +291,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 %type <list>	parse_toplevel stmtmulti routine_body_stmt_list
 				OptTableElementList TableElementList definition
-				OptWith opt_definition func_args func_args_list
+				opt_definition func_args func_args_list
 				func_args_with_defaults func_args_with_defaults_list
 				func_as createfunc_opt_list opt_createfunc_opt_list
 				RuleActionList RuleActionMulti
@@ -1575,7 +1575,6 @@ alter_type_cmd:
  *****************************************************************************/
 
 CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
-			table_access_method_clause OptWith
 			OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
@@ -1583,24 +1582,19 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				n->relation = $3;
 				n->tableElts = $5;
 				n->constraints = NIL;
-				n->accessMethod = $7;
-				n->options = $8;
-				n->oncommit = $9;
+				n->oncommit = $7;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
 			}
 		| CREATE TABLE IF_P NOT EXISTS qualified_name '('
-			OptTableElementList ')' table_access_method_clause
-			OptWith OnCommitOption
+			OptTableElementList ')' OnCommitOption
 			{
 				CreateStmt *n = makeNode(CreateStmt);
 				$6->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->relation = $6;
 				n->tableElts = $8;
 				n->constraints = NIL;
-				n->accessMethod = $10;
-				n->options = $11;
-				n->oncommit = $12;
+				n->oncommit = $10;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
 			}
@@ -1857,17 +1851,6 @@ columnElem: ColId
 opt_c_include:	INCLUDE '(' columnList ')'			{ $$ = $3; }
 			 |		/* EMPTY */						{ $$ = NIL; }
 			 ;
-
-table_access_method_clause:
-			USING name							{ $$ = $2; }
-			| /*EMPTY*/							{ $$ = NULL; }
-		;
-
-/* WITHOUT OIDS is legacy only */
-OptWith:
-			WITHOUT OIDS				{ $$ = NIL; }
-			| /*EMPTY*/					{ $$ = NIL; }
-		;
 
 OnCommitOption:  ON COMMIT DROP				{ $$ = ONCOMMIT_DROP; }
 			| ON COMMIT DELETE_P ROWS		{ $$ = ONCOMMIT_DELETE_ROWS; }

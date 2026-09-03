@@ -167,8 +167,6 @@ main(int argc, char *argv[])
 
 	pset.notty = (!isatty(fileno(stdin)) || !isatty(fileno(stdout)));
 
-	pset.getPassword = TRI_DEFAULT;
-
 	EstablishVariableSpace();
 
 	/* Create variables showing psql version number */
@@ -215,16 +213,6 @@ main(int argc, char *argv[])
 		pset.popt.topt.recordSep.separator_zero = false;
 	}
 
-	if (pset.getPassword == TRI_YES)
-	{
-		/*
-		 * We can't be sure yet of the username that will be used, so don't
-		 * offer a potentially wrong one.  Typical uses of this option are
-		 * noninteractive anyway.
-		 */
-		password = simple_prompt("Password: ", false);
-	}
-
 	/* loop until we have a password if requested by backend */
 	do
 	{
@@ -257,8 +245,7 @@ main(int argc, char *argv[])
 
 		if (PQstatus(pset.db) == CONNECTION_BAD &&
 			PQconnectionNeedsPassword(pset.db) &&
-			!password &&
-			pset.getPassword != TRI_NO)
+			!password)
 		{
 			/*
 			 * Before closing the old PGconn, extract the user name that was
@@ -480,8 +467,6 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 		{"set", required_argument, NULL, 'v'},
 		{"variable", required_argument, NULL, 'v'},
 		{"version", no_argument, NULL, 'V'},
-		{"no-password", no_argument, NULL, 'w'},
-		{"password", no_argument, NULL, 'W'},
 		{"expanded", no_argument, NULL, 'x'},
 		{"no-psqlrc", no_argument, NULL, 'X'},
 		{"help", optional_argument, NULL, 1},
@@ -494,7 +479,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 
 	memset(options, 0, sizeof *options);
 
-	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:h:HlL:no:p:P:qR:sStT:U:v:VwWxXz?01",
+	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:h:HlL:no:p:P:qR:sStT:U:v:VxXz?01",
 							long_options, &optindex)) != -1)
 	{
 		switch (c)
@@ -630,12 +615,6 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 			case 'V':
 				showVersion();
 				exit(EXIT_SUCCESS);
-			case 'w':
-				pset.getPassword = TRI_NO;
-				break;
-			case 'W':
-				pset.getPassword = TRI_YES;
-				break;
 			case 'x':
 				pset.popt.topt.expanded = true;
 				break;

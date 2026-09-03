@@ -1016,9 +1016,7 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(tableElts);
 	COMPARE_NODE_FIELD(constraints);
-	COMPARE_NODE_FIELD(options);
 	COMPARE_SCALAR_FIELD(oncommit);
-	COMPARE_STRING_FIELD(accessMethod);
 	COMPARE_SCALAR_FIELD(if_not_exists);
 
 	return true;

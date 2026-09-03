@@ -437,14 +437,12 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Oid			tablespaceId;
 	Relation	rel;
 	TupleDesc	descriptor;
-	List	   *inheritOids;
 	List	   *old_constraints;
 	List	   *rawDefaults;
 	List	   *cookedDefaults;
 	ListCell   *listptr;
 	AttrNumber	attnum;
-	bool		partitioned;
-	Oid			ofTypeId;
+
 	ObjectAddress address;
 	const char *accessMethod = NULL;
 	Oid			accessMethodId = InvalidOid;
@@ -463,8 +461,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("ON COMMIT can only be used on temporary tables")));
 
-	partitioned = false;
-
 	/*
 	 * Look up the namespace in which we are supposed to create the relation,
 	 * check we have permission to create there, lock it against concurrent
@@ -474,33 +470,12 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	namespaceId =
 		RangeVarGetAndCheckCreationNamespace(stmt->relation, NoLock, NULL);
 
-	/*
-	 * Determine the lockmode to use when scanning parents.  A self-exclusive
-	 * lock is needed here.
-	 *
-	 * If the child table is a partition, then we instead grab an exclusive
-	 * lock on the parent because its partition descriptor will be changed by
-	 * addition of the new partition.
-	 */
-
-	/* Determine the list of OIDs of the parents. */
-	inheritOids = NIL;
-
 	/* 表空间管理已裁剪，始终使用默认表空间 */
-	tablespaceId = GetDefaultTablespace(stmt->relation->relpersistence,
-										partitioned);
-
-	/* In all cases disallow placing user relations in pg_global */
-	if (tablespaceId == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("only shared relations can be placed in pg_global tablespace")));
+	tablespaceId = InvalidOid;
 
 	/* Identify user ID that will own the table */
 	if (!OidIsValid(ownerId))
 		ownerId = GetUserId();
-
-	ofTypeId = InvalidOid;
 
 	/*
 	 * Look up inheritance ancestors and generate relation schema, including
@@ -508,7 +483,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * modified by MergeAttributes.)
 	 */
 	stmt->tableElts =
-		MergeAttributes(stmt->tableElts, inheritOids,
+		MergeAttributes(stmt->tableElts, NIL,
 						stmt->relation->relpersistence,
 						&old_constraints);
 
@@ -575,31 +550,16 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 			attr->atthasdef = true;
 		}
 
-		if (colDef->identity)
-
-		if (colDef->generated)
-
 		if (colDef->compression)
 			attr->attcompression = GetAttributeCompression(attr->atttypid,
 														   colDef->compression);
 	}
 
 	/*
-	 * If the statement hasn't specified an access method, but we're defining
-	 * a type of relation that needs one, use the default.
+	 * Use the default table access method for relation kinds that need one.
 	 */
-	if (stmt->accessMethod != NULL)
-	{
-		accessMethod = stmt->accessMethod;
-
-		if (partitioned)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("specifying a table access method is not supported on a partitioned table")));
-
-	}
-	else if (relkind == RELKIND_RELATION ||
-			 relkind == RELKIND_TOASTVALUE)
+	if (relkind == RELKIND_RELATION ||
+		relkind == RELKIND_TOASTVALUE)
 		accessMethod = default_table_access_method;
 
 	/* look up the access method, verify it is for a table */

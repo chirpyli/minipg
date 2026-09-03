@@ -39,8 +39,6 @@ const char *progname;
 static void startup_hacks(const char *progname);
 static void init_locale(const char *categoryname, int category, const char *locale);
 static void help(const char *progname);
-static void check_root(const char *progname);
-
 
 /*
  * Any Postgres server process begins execution here.
@@ -106,10 +104,10 @@ main(int argc, char *argv[])
 #endif
 
 	/*
-	 * We keep these set to "C" always, except transiently in pg_locale.c; see
-	 * that file for explanations.
+	 * We keep LC_NUMERIC set to "C" always, so that numeric input parsing
+	 * uses "." as the decimal point regardless of the environment locale.
+	 * (Monetary formatting was removed; see pg_locale.c for background.)
 	 */
-	init_locale("LC_MONETARY", LC_MONETARY, "C");
 	init_locale("LC_NUMERIC", LC_NUMERIC, "C");
 
 	/*

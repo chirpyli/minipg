@@ -84,11 +84,9 @@ static char *share_path = NULL;
 
 /* values to be obtained from arguments */
 static char *pg_data = NULL;
-static char *encoding = NULL;
 static char *locale = NULL;
 static char *lc_collate = NULL;
 static char *lc_ctype = NULL;
-static char *lc_monetary = NULL;
 static char *lc_numeric = NULL;
 static char *lc_time = NULL;
 static char *lc_messages = NULL;
@@ -183,7 +181,6 @@ static char **readfile(const char *path);
 static void writefile(char *path, char **lines);
 static FILE *popen_check(const char *command, const char *mode);
 static char *get_id(void);
-static int	get_encoding_id(const char *encoding_name);
 static void set_input(char **dest, const char *filename);
 static void check_input(char *path);
 static void write_version_file(const char *extrapath);
@@ -526,24 +523,6 @@ encodingid_to_string(int enc)
 }
 
 /*
- * get the encoding id for a given encoding name
- */
-static int
-get_encoding_id(const char *encoding_name)
-{
-	int			enc;
-
-	if (encoding_name && *encoding_name)
-	{
-		if ((enc = pg_valid_server_encoding(encoding_name)) >= 0)
-			return enc;
-	}
-	pg_log_error("\"%s\" is not a valid server encoding name",
-				 encoding_name ? encoding_name : "(null)");
-	exit(1);
-}
-
-/*
  * set name of given input file variable under data directory
  */
 static void
@@ -864,10 +843,6 @@ setup_config(void)
 	snprintf(repltok, sizeof(repltok), "lc_messages = '%s'",
 			 escape_quotes(lc_messages));
 	conflines = replace_token(conflines, "#lc_messages = 'C'", repltok);
-
-	snprintf(repltok, sizeof(repltok), "lc_monetary = '%s'",
-			 escape_quotes(lc_monetary));
-	conflines = replace_token(conflines, "#lc_monetary = 'C'", repltok);
 
 	snprintf(repltok, sizeof(repltok), "lc_numeric = '%s'",
 			 escape_quotes(lc_numeric));
@@ -1542,8 +1517,6 @@ setlocales(void)
 			lc_numeric = locale;
 		if (!lc_time)
 			lc_time = locale;
-		if (!lc_monetary)
-			lc_monetary = locale;
 		if (!lc_messages)
 			lc_messages = locale;
 	}
@@ -1561,8 +1534,6 @@ setlocales(void)
 	lc_numeric = canonname;
 	check_locale_name(LC_TIME, lc_time, &canonname);
 	lc_time = canonname;
-	check_locale_name(LC_MONETARY, lc_monetary, &canonname);
-	lc_monetary = canonname;
 #if defined(LC_MESSAGES)
 	check_locale_name(LC_MESSAGES, lc_messages, &canonname);
 	lc_messages = canonname;
@@ -1584,11 +1555,10 @@ usage(const char *progname)
 	printf(_("  %s [OPTION]... [DATADIR]\n"), progname);
 	printf(_("\nOptions:\n"));
 	printf(_(" [-D, --pgdata=]DATADIR     location for this database cluster\n"));
-	printf(_("  -E, --encoding=ENCODING   set default encoding for new databases\n"));
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
 	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
-			 "      --lc-monetary=, --lc-numeric=, --lc-time=LOCALE\n"
+			 "      --lc-numeric=, --lc-time=LOCALE\n"
 			 "                            set default locale in the respective category for\n"
 			 "                            new databases (default taken from environment)\n"));
 	printf(_("      --no-locale           equivalent to --locale=C\n"));
@@ -1709,7 +1679,6 @@ setup_locale_encoding(void)
 	if (strcmp(lc_ctype, lc_collate) == 0 &&
 		strcmp(lc_ctype, lc_time) == 0 &&
 		strcmp(lc_ctype, lc_numeric) == 0 &&
-		strcmp(lc_ctype, lc_monetary) == 0 &&
 		strcmp(lc_ctype, lc_messages) == 0)
 		printf(_("The database cluster will be initialized with locale \"%s\".\n"), lc_ctype);
 	else
@@ -1718,18 +1687,15 @@ setup_locale_encoding(void)
 				 "  COLLATE:  %s\n"
 				 "  CTYPE:    %s\n"
 				 "  MESSAGES: %s\n"
-				 "  MONETARY: %s\n"
 				 "  NUMERIC:  %s\n"
 				 "  TIME:     %s\n"),
 			   lc_collate,
 			   lc_ctype,
 			   lc_messages,
-			   lc_monetary,
 			   lc_numeric,
 			   lc_time);
 	}
 
-	if (!encoding)
 	{
 		int			ctype_enc;
 
@@ -1740,7 +1706,6 @@ setup_locale_encoding(void)
 			/* Couldn't recognize the locale's codeset */
 			pg_log_error("could not find suitable encoding for locale \"%s\"",
 						 lc_ctype);
-			fprintf(stderr, _("Rerun %s with the -E option.\n"), progname);
 			fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 					progname);
 			exit(1);
@@ -1765,8 +1730,6 @@ setup_locale_encoding(void)
 				   pg_encoding_to_char(encodingid));
 		}
 	}
-	else
-		encodingid = get_encoding_id(encoding);
 
 	if (!check_locale_encoding(lc_ctype, encodingid) ||
 		!check_locale_encoding(lc_collate, encodingid))
@@ -2134,11 +2097,9 @@ main(int argc, char *argv[])
 {
 	static struct option long_options[] = {
 		{"pgdata", required_argument, NULL, 'D'},
-		{"encoding", required_argument, NULL, 'E'},
 		{"locale", required_argument, NULL, 1},
 		{"lc-collate", required_argument, NULL, 2},
 		{"lc-ctype", required_argument, NULL, 3},
-		{"lc-monetary", required_argument, NULL, 4},
 		{"lc-numeric", required_argument, NULL, 5},
 		{"lc-time", required_argument, NULL, 6},
 		{"lc-messages", required_argument, NULL, 7},
@@ -2201,15 +2162,12 @@ main(int argc, char *argv[])
 
 	/* process command-line options */
 
-	while ((c = getopt_long(argc, argv, "dD:E:gL:nNsST:U:WX:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(argc, argv, "dD:gL:nNsST:U:WX:", long_options, &option_index)) != -1)
 	{
 		switch (c)
 		{
 			case 'D':
 				pg_data = pg_strdup(optarg);
-				break;
-			case 'E':
-				encoding = pg_strdup(optarg);
 				break;
 			case 'W':
 				pwprompt = true;
@@ -2242,9 +2200,6 @@ main(int argc, char *argv[])
 				break;
 			case 3:
 				lc_ctype = pg_strdup(optarg);
-				break;
-			case 4:
-				lc_monetary = pg_strdup(optarg);
 				break;
 			case 5:
 				lc_numeric = pg_strdup(optarg);

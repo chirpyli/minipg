@@ -184,28 +184,6 @@ SELECT firstc, lastc FROM extra_wide_table;
  first col | last col
 (1 row)
 
--- check that tables with oids cannot be created anymore
-CREATE TABLE withoid() WITH OIDS;
-ERROR:  syntax error at or near "WITH"
-LINE 1: CREATE TABLE withoid() WITH OIDS;
-                               ^
-CREATE TABLE withoid() WITH (oids);
-ERROR:  syntax error at or near "WITH"
-LINE 1: CREATE TABLE withoid() WITH (oids);
-                               ^
-CREATE TABLE withoid() WITH (oids = true);
-ERROR:  syntax error at or near "WITH"
-LINE 1: CREATE TABLE withoid() WITH (oids = true);
-                               ^
-DROP TABLE withoid;
-ERROR:  table "withoid" does not exist
--- but explicitly not adding oids is still supported
-CREATE TABLE withoutoid() WITHOUT OIDS; DROP TABLE withoutoid;
-CREATE TABLE withoutoid() WITH (oids = false); DROP TABLE withoutoid;
-ERROR:  syntax error at or near "WITH"
-LINE 1: CREATE TABLE withoutoid() WITH (oids = false);
-                                  ^
-ERROR:  table "withoutoid" does not exist
 -- temporary tables are ignored by pg_filenode_relation().
 CREATE TABLE relation_filenode_check(c1 int);
 SELECT relpersistence,

@@ -46,6 +46,7 @@
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
 #include "pgstat.h"
+#include "postgres_ext.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
@@ -650,8 +651,7 @@ DefineIndex(Oid relationId,
 	/*
 	 * Select tablespace to use.  Always use default tablespace.
 	 */
-	tablespaceId = GetDefaultTablespace(rel->rd_rel->relpersistence,
-										partitioned);
+	tablespaceId = InvalidOid;
 	/* note InvalidOid is OK in this case */
 
 	/*

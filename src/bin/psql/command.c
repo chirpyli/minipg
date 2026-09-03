@@ -2989,18 +2989,6 @@ do_connect(enum trivalue reuse_previous_specification,
 	 * the postmaster's log.  But libpq offers no API that would let us obtain
 	 * a password and then continue with the first connection attempt.
 	 */
-	if (pset.getPassword == TRI_YES && success)
-	{
-		/*
-		 * If a connstring or URI is provided, we don't know which username
-		 * will be used, since we haven't dug that out of the connstring.
-		 * Don't risk issuing a misleading prompt.  As in startup.c, it does
-		 * not seem worth working harder, since this getPassword setting is
-		 * normally only used in noninteractive cases.
-		 */
-		password = prompt_for_password(has_connection_string ? NULL : user);
-	}
-
 	/*
 	 * Consider whether to force client_encoding to "auto" (overriding
 	 * anything in the connection string).  We do so if we have a terminal
@@ -3075,7 +3063,7 @@ do_connect(enum trivalue reuse_previous_specification,
 		 * Connection attempt failed; either retry the connection attempt with
 		 * a new password, or give up.
 		 */
-		if (!password && PQconnectionNeedsPassword(n_conn) && pset.getPassword != TRI_NO)
+		if (!password && PQconnectionNeedsPassword(n_conn))
 		{
 			/*
 			 * Prompt for password using the username we actually connected

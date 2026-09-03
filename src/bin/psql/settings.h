@@ -98,7 +98,6 @@ typedef struct _psqlSettings
 
 	bool		notty;			/* stdin or stdout is not a tty (as determined
 								 * on startup) */
-	enum trivalue getPassword;	/* prompt the user for a username and password */
 	FILE	   *cur_cmd_source; /* describe the status of the current main
 								 * loop */
 	bool		cur_cmd_interactive;

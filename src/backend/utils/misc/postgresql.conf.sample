@@ -506,7 +506,6 @@
 
 #compute_query_id = auto
 #log_statement_stats = off
-#log_parser_stats = off
 #log_planner_stats = off
 #log_executor_stats = off
 
@@ -599,8 +598,7 @@
 
 # These settings are initialized by initdb, but they can be changed.
 #lc_messages = 'C'			# locale for system error message
-					# strings
-#lc_monetary = 'C'			# locale for monetary formatting
+				# strings
 #lc_numeric = 'C'			# locale for number formatting
 
 # default configuration for text search

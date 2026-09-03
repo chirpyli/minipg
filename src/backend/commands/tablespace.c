@@ -235,27 +235,6 @@ remove_tablespace_symlink(const char *linkloc)
 	}
 }
 
-
-/*
- * GetDefaultTablespace -- get the OID of the current default tablespace
- *
- * 表空间管理已裁剪：所有对象一律使用数据库默认表空间（pg_default），
- * 因此本函数固定返回数据库默认表空间 OID。
- */
-Oid
-GetDefaultTablespace(char relpersistence, bool partitioned)
-{
-	(void) relpersistence;		/* 临时表已裁剪，relpersistence 恒为 PERMANENT */
-	(void) partitioned;			/* 分区表表空间指定已裁剪 */
-
-	/*
-	 * 表空间管理已裁剪：返回 InvalidOid 表示使用数据库默认表空间
-	 * （与 postgres 默认表空间 GUC 为空时的行为一致）。
-	 */
-	return InvalidOid;
-}
-
-
 /*
  * Routines for handling the GUC variable 'temp_tablespaces'.
  */
