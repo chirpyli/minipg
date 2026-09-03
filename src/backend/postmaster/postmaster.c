@@ -199,10 +199,7 @@ static int	SendStop = false;
 /* still more option variables */
 
 int			PreAuthDelay = 0;
-
 bool		log_hostname;		/* for ps display and logging */
-bool		Log_connections = false;
-
 bool		restart_after_crash = true;
 bool		remove_temp_files_after_crash = true;
 
@@ -747,22 +744,6 @@ PostmasterMain(int argc, char *argv[])
 	 * getopt(3) library so that it will work correctly in subprocesses.
 	 */
 	optind = 1;
-
-	/* For debugging: display postmaster environment */
-	{
-		char	  **p;
-
-		ereport(DEBUG3,
-				(errmsg_internal("%s: PostmasterMain: initial environment dump:",
-								 progname)));
-		ereport(DEBUG3,
-				(errmsg_internal("-----------------------------------------")));
-		for (p = environ; *p; ++p)
-			ereport(DEBUG3,
-					(errmsg_internal("\t%s", *p)));
-		ereport(DEBUG3,
-				(errmsg_internal("-----------------------------------------")));
-	}
 
 	/*
 	 * Create lockfile for data directory.
@@ -3603,20 +3584,6 @@ BackendInitialize(Port *port)
 	 */
 	port->remote_host = strdup(remote_host);
 	port->remote_port = strdup(remote_port);
-
-	/* And now we can issue the Log_connections message, if wanted */
-	if (Log_connections)
-	{
-		if (remote_port[0])
-			ereport(LOG,
-					(errmsg("connection received: host=%s port=%s",
-							remote_host,
-							remote_port)));
-		else
-			ereport(LOG,
-					(errmsg("connection received: host=%s",
-							remote_host)));
-	}
 
 	/*
 	 * If we did a reverse lookup to name, we might as well save the results

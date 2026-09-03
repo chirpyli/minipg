@@ -503,9 +503,6 @@ extern int	pqRowProcessor(PGconn *conn, const char **errmsgp);
 extern void pqCommandQueueAdvance(PGconn *conn, bool isReadyForQuery,
 								  bool gotSync);
 extern int	PQsendQueryContinue(PGconn *conn, const char *query);
-extern PGresult *PQnfn(PGconn *conn, int fnid, int *result_buf, int buf_size,
-					   int *result_len, int result_is_int,
-					   const PQArgBlock *args, int nargs);
 
 /* === in fe-protocol3.c === */
 
@@ -515,11 +512,6 @@ extern void pqParseInput3(PGconn *conn);
 extern int	pqGetErrorNotice3(PGconn *conn, bool isError);
 extern void pqBuildErrorMessage3(PQExpBuffer msg, const PGresult *res,
 								 PGVerbosity verbosity, PGContextVisibility show_context);
-extern PGresult *pqFunctionCall3(PGconn *conn, Oid fnid,
-								 int *result_buf, int buf_size,
-								 int *actual_result_len,
-								 int result_is_int,
-								 const PQArgBlock *args, int nargs);
 
 /* === in fe-misc.c === */
 

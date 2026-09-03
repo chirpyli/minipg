@@ -25,7 +25,6 @@ PQsendQuery                   23
 PQgetResult                   24
 PQisBusy                      25
 PQconsumeInput                26
-PQfn                          27
 PQresultStatus                28
 PQntuples                     29
 PQnfields                     30

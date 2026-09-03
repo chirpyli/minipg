@@ -219,21 +219,6 @@ typedef struct _PQconninfoOption
 } PQconninfoOption;
 
 /* ----------------
- * PQArgBlock -- structure for PQfn() arguments
- * ----------------
- */
-typedef struct
-{
-	int			len;
-	int			isint;
-	union
-	{
-		int		   *ptr;		/* can't use void (dec compiler barfs)	 */
-		int			integer;
-	}			u;
-} PQArgBlock;
-
-/* ----------------
  * PGresAttDesc -- Data about a single attribute (column) of a query result
  * ----------------
  */
@@ -441,18 +426,6 @@ extern PGPing PQpingParams(const char *const *keywords,
 
 /* Force the write buffer to be written (or at least try) */
 extern int	PQflush(PGconn *conn);
-
-/*
- * "Fast path" interface --- not really recommended for application
- * use
- */
-extern PGresult *PQfn(PGconn *conn,
-					  int fnid,
-					  int *result_buf,
-					  int *result_len,
-					  int result_is_int,
-					  const PQArgBlock *args,
-					  int nargs);
 
 /* Accessor functions for PGresult objects */
 extern ExecStatusType PQresultStatus(const PGresult *res);

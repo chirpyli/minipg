@@ -686,9 +686,6 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 				case STATE_IDLEINTRANSACTION:
 					values[4] = CStringGetTextDatum("idle in transaction");
 					break;
-				case STATE_FASTPATH:
-					values[4] = CStringGetTextDatum("fastpath function call");
-					break;
 				case STATE_IDLEINTRANSACTION_ABORTED:
 					values[4] = CStringGetTextDatum("idle in transaction (aborted)");
 					break;

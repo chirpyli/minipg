@@ -1133,24 +1133,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"log_connections", PGC_SU_BACKEND, LOGGING_WHAT,
-			gettext_noop("Logs each successful connection."),
-			NULL
-		},
-		&Log_connections,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"log_disconnections", PGC_SU_BACKEND, LOGGING_WHAT,
-			gettext_noop("Logs end of a session, including duration."),
-			NULL
-		},
-		&Log_disconnections,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"debug_assertions", PGC_INTERNAL, PRESET_OPTIONS,
 			gettext_noop("Shows whether the running server has assertion checks enabled."),
 			NULL,

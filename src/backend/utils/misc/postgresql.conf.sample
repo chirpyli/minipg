@@ -20,10 +20,6 @@
 # "SELECT pg_reload_conf()".  Some parameters, which are marked below,
 # require a server shutdown and restart to take effect.
 #
-# Any parameter can also be given as a command-line option to the server, e.g.,
-# "postgres -c log_connections=on".  Some parameters can be changed at run time
-# with the "SET" SQL command.
-#
 # Memory units:  B  = bytes            Time units:  us  = microseconds
 #                kB = kilobytes                     ms  = milliseconds
 #                MB = megabytes                     s   = seconds
@@ -438,8 +434,6 @@
 					# actions running at least this number
 					# of milliseconds.
 #log_checkpoints = off
-#log_connections = off
-#log_disconnections = off
 #log_duration = off
 #log_error_verbosity = default		# terse, default, or verbose messages
 #log_hostname = off

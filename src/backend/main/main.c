@@ -48,8 +48,6 @@ static void check_root(const char *progname);
 int
 main(int argc, char *argv[])
 {
-	bool		do_check_root = true;
-
 	/*
 	 * If supported on the current platform, set up a handler to be called if
 	 * the backend/postmaster crashes with a fatal signal or exception.
@@ -139,26 +137,7 @@ main(int argc, char *argv[])
 			fputs(PG_BACKEND_VERSIONSTR, stdout);
 			exit(0);
 		}
-
-		/*
-		 * We allow "-C var" to be called by root.  This is reasonably safe
-		 * since it is a read-only activity.  This case is important because
-		 * pg_ctl may try to invoke it while still holding administrator
-		 * privileges on Windows.  Note that while -C can normally be in any
-		 * argv position, if you want to bypass the root check you must put it
-		 * first.  This reduces the risk that we might misinterpret some other
-		 * mode's -C switch as being the postmaster/postgres one.
-		 */
-		if (argc > 2 && strcmp(argv[1], "-C") == 0)
-			do_check_root = false;
 	}
-
-	/*
-	 * Make sure we are not running as root, unless it's safe for the selected
-	 * option.
-	 */
-	if (do_check_root)
-		check_root(progname);
 
 	/*
 	 * Dispatch to one of various subprograms depending on first argument.
@@ -231,8 +210,6 @@ help(const char *progname)
 	printf(_("Usage:\n  %s [OPTION]...\n\n"), progname);
 	printf(_("Options:\n"));
 	printf(_("  -B NBUFFERS        number of shared buffers\n"));
-	printf(_("  -c NAME=VALUE      set run-time parameter\n"));
-	printf(_("  -C NAME            print value of run-time parameter, then exit\n"));
 	printf(_("  -d 1-5             debugging level\n"));
 	printf(_("  -D DATADIR         database directory\n"));
 	printf(_("  -e                 use European date input format (DMY)\n"));
@@ -276,34 +253,4 @@ help(const char *progname)
 			 "the configuration file.\n\n"
 			 "Report bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 	printf(_("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
-}
-
-
-
-static void
-check_root(const char *progname)
-{
-	if (geteuid() == 0)
-	{
-		write_stderr("\"root\" execution of the PostgreSQL server is not permitted.\n"
-					 "The server must be started under an unprivileged user ID to prevent\n"
-					 "possible system security compromise.  See the documentation for\n"
-					 "more information on how to properly start the server.\n");
-		exit(1);
-	}
-
-	/*
-	 * Also make sure that real and effective uids are the same. Executing as
-	 * a setuid program from a root shell is a security hole, since on many
-	 * platforms a nefarious subroutine could setuid back to root if real uid
-	 * is root.  (Since nobody actually uses postgres as a setuid program,
-	 * trying to actively fix this situation seems more trouble than it's
-	 * worth; we'll just expend the effort to check for it.)
-	 */
-	if (getuid() != geteuid())
-	{
-		write_stderr("%s: real and effective user IDs must match\n",
-					 progname);
-		exit(1);
-	}
 }

@@ -1529,7 +1529,6 @@ PMSignalData
 PMSignalReason
 PMState
 POLYGON
-PQArgBlock
 PQEnvironmentOption
 PQExpBuffer
 PQExpBufferData

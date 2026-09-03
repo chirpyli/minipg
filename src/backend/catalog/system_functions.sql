@@ -29,19 +29,6 @@
  * string literal (including a function body!) or a multiline comment.
  */
 
-
-CREATE OR REPLACE FUNCTION bit_length(bytea)
- RETURNS integer
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN octet_length($1) * 8;
-
-CREATE OR REPLACE FUNCTION bit_length(text)
-RETURNS integer
-LANGUAGE sql
-IMMUTABLE PARALLEL SAFE STRICT COST 1
-RETURN octet_length($1) * 8;
-
 CREATE OR REPLACE FUNCTION date_part(text, date)
  RETURNS double precision
  LANGUAGE sql

@@ -35,7 +35,6 @@ $node->start();
 $node->safe_psql(
 	'postgres',
 	q[ALTER SYSTEM SET restart_after_crash = 1;
-				   ALTER SYSTEM SET log_connections = 1;
 				   SELECT pg_reload_conf();]);
 
 # Run psql, keeping session alive, so we have an alive backend to kill.

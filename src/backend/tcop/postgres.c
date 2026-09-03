@@ -64,7 +64,6 @@
 #include "storage/proc.h"
 #include "storage/procsignal.h"
 #include "storage/sinval.h"
-#include "tcop/fastpath.h"
 #include "tcop/pquery.h"
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
@@ -84,9 +83,6 @@ const char *debug_query_string; /* client-supplied query string */
 
 /* Note: whereToSendOutput is initialized for the bootstrap/standalone case */
 CommandDest whereToSendOutput = DestDebug;
-
-/* flag for logging end of session */
-bool		Log_disconnections = false;
 
 int			log_statement = LOGSTMT_NONE;
 
@@ -134,7 +130,7 @@ static bool xact_started = false;
 /*
  * Flag to indicate that we are doing the outer loop's read-from-client,
  * as opposed to any random read from client that might happen within
- * commands like COPY FROM STDIN.
+ * a command.
  */
 static bool DoingCommandRead = false;
 
@@ -166,7 +162,6 @@ static int	errdetail_recovery_conflict(void);
 static void start_xact_command(void);
 static void finish_xact_command(void);
 static bool IsTransactionExitStmt(Node *parsetree);
-static void log_disconnections(int code, Datum arg);
 static void enable_statement_timeout(void);
 static void disable_statement_timeout(void);
 
@@ -349,20 +344,7 @@ SocketBackend(StringInfo inBuf)
 			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
 			break;
 
-		case 'F':				/* fastpath function call */
-			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			break;
-
 		case 'X':				/* terminate */
-			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
-			break;
-
-		case 'd':				/* copy data */
-			maxmsglen = PQ_LARGE_MESSAGE_LIMIT;
-			break;
-
-		case 'c':				/* copy done */
-		case 'f':				/* copy fail */
 			maxmsglen = PQ_SMALL_MESSAGE_LIMIT;
 			break;
 
@@ -2094,11 +2076,6 @@ set_debug_options(int debug_flag, GucContext context, GucSource source)
 	else
 		SetConfigOption("log_min_messages", "notice", context, source);
 
-	if (debug_flag >= 1 && context == PGC_POSTMASTER)
-	{
-		SetConfigOption("log_connections", "true", context, source);
-		SetConfigOption("log_disconnections", "true", context, source);
-	}
 	if (debug_flag >= 2)
 		SetConfigOption("log_statement", "all", context, source);
 	if (debug_flag >= 3)
@@ -2606,13 +2583,6 @@ PostgresMain(int argc, char *argv[],
 	 */
 	BeginReportingGUCOptions();
 
-	/*
-	 * Also set up handler to log session end; we have to wait till now to be
-	 * sure Log_disconnections has its final value.
-	 */
-	if (IsUnderPostmaster && Log_disconnections)
-		on_proc_exit(log_disconnections, 0);
-
 	pgstat_report_connect(MyDatabaseId);
 
 	/*
@@ -2870,9 +2840,7 @@ PostgresMain(int argc, char *argv[],
 
 		/*
 		 * (2) Allow asynchronous signals to be executed immediately if they
-		 * come in while we are waiting for client input. (This must be
-		 * conditional since we don't want, say, reads on behalf of COPY FROM
-		 * STDIN doing the same thing.)
+		 * come in while we are waiting for client input.
 		 */
 		DoingCommandRead = true;
 
@@ -2943,40 +2911,6 @@ PostgresMain(int argc, char *argv[],
 				}
 				break;
 
-
-			case 'F':			/* fastpath function call */
-
-				/* Set statement_timestamp() */
-				SetCurrentStatementStartTimestamp();
-
-				/* Report query to various monitoring facilities. */
-				pgstat_report_activity(STATE_FASTPATH, NULL);
-				set_ps_display("<FASTPATH>");
-
-				/* start an xact for this function invocation */
-				start_xact_command();
-
-				/*
-				 * Note: we may at this point be inside an aborted
-				 * transaction.  We can't throw error for that until we've
-				 * finished reading the function-call message, so
-				 * HandleFunctionRequest() must check for it after doing so.
-				 * Be careful not to do anything that assumes we're inside a
-				 * valid transaction here.
-				 */
-
-				/* switch back to message context */
-				MemoryContextSwitchTo(MessageContext);
-
-				HandleFunctionRequest(&input_message);
-
-				/* commit the function-invocation transaction */
-				finish_xact_command();
-
-				send_ready_for_query = true;
-				break;
-
-
 				/*
 				 * 'X' means that the frontend is closing down the socket. EOF
 				 * means unexpected loss of frontend connection. Either way,
@@ -3006,17 +2940,6 @@ PostgresMain(int argc, char *argv[],
 				 * scenarios.
 				 */
 				proc_exit(0);
-
-			case 'd':			/* copy data */
-			case 'c':			/* copy done */
-			case 'f':			/* copy fail */
-
-				/*
-				 * Accept but ignore these messages, per protocol spec; we
-				 * probably got here because a COPY failed, and the frontend
-				 * is still sending data.
-				 */
-				break;
 
 			default:
 				ereport(FATAL,
@@ -3168,38 +3091,6 @@ ShowUsage(const char *title)
 			 errdetail_internal("%s", str.data)));
 
 	pfree(str.data);
-}
-
-/*
- * on_proc_exit handler to log end of session
- */
-static void
-log_disconnections(int code, Datum arg)
-{
-	Port	   *port = MyProcPort;
-	long		secs;
-	int			usecs;
-	int			msecs;
-	int			hours,
-				minutes,
-				seconds;
-
-	TimestampDifference(MyStartTimestamp,
-						GetCurrentTimestamp(),
-						&secs, &usecs);
-	msecs = usecs / 1000;
-
-	hours = secs / SECS_PER_HOUR;
-	secs %= SECS_PER_HOUR;
-	minutes = secs / SECS_PER_MINUTE;
-	seconds = secs % SECS_PER_MINUTE;
-
-	ereport(LOG,
-			(errmsg("disconnection: session time: %d:%02d:%02d.%03d "
-					"user=%s database=%s host=%s%s%s",
-					hours, minutes, seconds, msecs,
-					port->user_name, port->database_name, port->remote_host,
-					port->remote_port[0] ? " port=" : "", port->remote_port)));
 }
 
 /*

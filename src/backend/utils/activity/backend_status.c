@@ -460,7 +460,6 @@ pgstat_report_activity(BackendState state, const char *cmd_str)
 	 * calculate the duration.
 	 */
 	if ((beentry->st_state == STATE_RUNNING ||
-		 beentry->st_state == STATE_FASTPATH ||
 		 beentry->st_state == STATE_IDLEINTRANSACTION ||
 		 beentry->st_state == STATE_IDLEINTRANSACTION_ABORTED) &&
 		state != beentry->st_state)
@@ -472,8 +471,7 @@ pgstat_report_activity(BackendState state, const char *cmd_str)
 							current_timestamp,
 							&secs, &usecs);
 
-		if (beentry->st_state == STATE_RUNNING ||
-			beentry->st_state == STATE_FASTPATH)
+		if (beentry->st_state == STATE_RUNNING)
 			pgstat_count_conn_active_time((PgStat_Counter) secs * 1000000 + usecs);
 		else
 			pgstat_count_conn_txn_idle_time((PgStat_Counter) secs * 1000000 + usecs);
