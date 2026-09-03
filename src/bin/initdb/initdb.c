@@ -111,7 +111,6 @@ static int	encodingid;
 static char *bki_file;
 static char *conf_file;
 static char *system_constraints_file;
-static char *system_functions_file;
 static char *system_views_file;
 static bool success = false;
 static bool made_new_pgdata = false;
@@ -1744,7 +1743,6 @@ setup_data_file_paths(void)
 	set_input(&bki_file, "postgres.bki");
 	set_input(&conf_file, "postgresql.conf.sample");
 	set_input(&system_constraints_file, "system_constraints.sql");
-	set_input(&system_functions_file, "system_functions.sql");
 	set_input(&system_views_file, "system_views.sql");
 
 	if (show_setting || debug)
@@ -1765,7 +1763,6 @@ setup_data_file_paths(void)
 	check_input(bki_file);
 	check_input(conf_file);
 	check_input(system_constraints_file);
-	check_input(system_functions_file);
 	check_input(system_views_file);
 }
 
@@ -2067,7 +2064,6 @@ initialize_data_directory(void)
 
 	setup_run_file(cmdfd, system_constraints_file);
 
-	setup_run_file(cmdfd, system_functions_file);
 
 	setup_depend(cmdfd);
 

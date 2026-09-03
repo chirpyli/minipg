@@ -117,8 +117,6 @@ main(int argc, char *argv[])
 	 */
 	unsetenv("LC_ALL");
 
-	check_strxfrm_bug();
-
 	/*
 	 * Catch standard options before doing much else, in particular before we
 	 * insist on not being root.

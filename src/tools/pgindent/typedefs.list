@@ -402,7 +402,6 @@ CoverExt
 CoverPos
 CreateEventTrigStmt
 CreateExtensionStmt
-CreateFunctionStmt
 CreatePolicyStmt
 CreateRoleStmt
 CreateSchemaStmt
@@ -710,7 +709,6 @@ FuncInfo
 FuncLookupError
 FunctionCallInfo
 FunctionCallInfoBaseData
-FunctionParameter
 FunctionParameterMode
 FunctionScan
 FunctionScanPerFuncState
@@ -1983,7 +1981,6 @@ Result
 ResultRelInfo
 ResultState
 ReturnSetInfo
-ReturnStmt
 RevmapContents
 RewriteMappingDataEntry
 RewriteMappingFile

@@ -180,37 +180,4 @@ DECLARE_UNIQUE_INDEX(pg_proc_proname_args_nsp_index, 2691, on pg_proc using btre
 
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
-
-extern ObjectAddress ProcedureCreate(const char *procedureName,
-									 Oid procNamespace,
-									 bool replace,
-									 bool returnsSet,
-									 Oid returnType,
-									 Oid proowner,
-									 Oid languageObjectId,
-									 Oid languageValidator,
-									 const char *prosrc,
-									 const char *probin,
-									 Node *prosqlbody,
-									 char prokind,
-									 bool security_definer,
-									 bool isLeakProof,
-									 bool isStrict,
-									 char volatility,
-									 char parallel,
-									 oidvector *parameterTypes,
-									 Datum allParameterTypes,
-									 Datum parameterModes,
-									 Datum parameterNames,
-									 List *parameterDefaults,
-									 Datum trftypes,
-									 Datum proconfig,
-									 Oid prosupport,
-									 float4 procost,
-									 float4 prorows);
-
-extern bool function_parse_error_transpose(const char *prosrc);
-
-extern List *oid_array_to_list(Datum datum);
-
 #endif							/* PG_PROC_H */

@@ -68,7 +68,6 @@ static void StatementTimeoutHandler(void);
 static void LockTimeoutHandler(void);
 static void IdleInTransactionSessionTimeoutHandler(void);
 static void IdleSessionTimeoutHandler(void);
-static void ClientCheckTimeoutHandler(void);
 static void process_startup_options(Port *port, bool am_superuser);
 
 
@@ -291,8 +290,6 @@ CheckMyDatabase(const char *name, bool am_superuser, bool override_allow_connect
 	SetConfigOption("lc_collate", collate, PGC_INTERNAL, PGC_S_OVERRIDE);
 	SetConfigOption("lc_ctype", ctype, PGC_INTERNAL, PGC_S_OVERRIDE);
 
-	check_strxfrm_bug();
-
 	ReleaseSysCache(tup);
 }
 
@@ -500,7 +497,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		RegisterTimeout(IDLE_IN_TRANSACTION_SESSION_TIMEOUT,
 						IdleInTransactionSessionTimeoutHandler);
 		RegisterTimeout(IDLE_SESSION_TIMEOUT, IdleSessionTimeoutHandler);
-		RegisterTimeout(CLIENT_CONNECTION_CHECK_TIMEOUT, ClientCheckTimeoutHandler);
 	}
 
 	/*
@@ -974,14 +970,6 @@ static void
 IdleSessionTimeoutHandler(void)
 {
 	IdleSessionTimeoutPending = true;
-	InterruptPending = true;
-	SetLatch(MyLatch);
-}
-
-static void
-ClientCheckTimeoutHandler(void)
-{
-	CheckClientConnectionPending = true;
 	InterruptPending = true;
 	SetLatch(MyLatch);
 }

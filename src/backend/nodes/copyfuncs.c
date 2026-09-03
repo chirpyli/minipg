@@ -2554,7 +2554,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(hasSubLinks);
 	COPY_SCALAR_FIELD(hasDistinctOn);
 	COPY_SCALAR_FIELD(hasForUpdate);
-	COPY_SCALAR_FIELD(isReturn);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);
 	COPY_NODE_FIELD(targetList);
@@ -2656,16 +2655,6 @@ _copySelectStmt(const SelectStmt *from)
 }
 
 
-static ReturnStmt *
-_copyReturnStmt(const ReturnStmt *from)
-{
-	ReturnStmt *newnode = makeNode(ReturnStmt);
-
-	COPY_NODE_FIELD(returnval);
-
-	return newnode;
-}
-
 static AlterTableStmt *
 _copyAlterTableStmt(const AlterTableStmt *from)
 {
@@ -2703,13 +2692,13 @@ _copyObjectWithArgs(const ObjectWithArgs *from)
 
 	COPY_NODE_FIELD(objname);
 	COPY_NODE_FIELD(objargs);
-	COPY_NODE_FIELD(objfuncargs);
 	COPY_SCALAR_FIELD(args_unspecified);
 
 	return newnode;
 }
 
 
+static ClusterStmt *
 _copyClusterStmt(const ClusterStmt *from)
 {
 	ClusterStmt *newnode = makeNode(ClusterStmt);
@@ -2799,35 +2788,6 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_SCALAR_FIELD(transformed);
 	COPY_SCALAR_FIELD(concurrent);
 	COPY_SCALAR_FIELD(if_not_exists);
-
-	return newnode;
-}
-
-static CreateFunctionStmt *
-_copyCreateFunctionStmt(const CreateFunctionStmt *from)
-{
-	CreateFunctionStmt *newnode = makeNode(CreateFunctionStmt);
-
-	COPY_SCALAR_FIELD(is_procedure);
-	COPY_SCALAR_FIELD(replace);
-	COPY_NODE_FIELD(funcname);
-	COPY_NODE_FIELD(parameters);
-	COPY_NODE_FIELD(returnType);
-	COPY_NODE_FIELD(options);
-	COPY_NODE_FIELD(sql_body);
-
-	return newnode;
-}
-
-static FunctionParameter *
-_copyFunctionParameter(const FunctionParameter *from)
-{
-	FunctionParameter *newnode = makeNode(FunctionParameter);
-
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(argType);
-	COPY_SCALAR_FIELD(mode);
-	COPY_NODE_FIELD(defexpr);
 
 	return newnode;
 }
@@ -3437,9 +3397,6 @@ copyObjectImpl(const void *from)
 		case T_SelectStmt:
 			retval = _copySelectStmt(from);
 			break;
-		case T_ReturnStmt:
-			retval = _copyReturnStmt(from);
-			break;
 		case T_AlterTableStmt:
 			retval = _copyAlterTableStmt(from);
 			break;
@@ -3462,12 +3419,6 @@ copyObjectImpl(const void *from)
 			retval = _copyIndexStmt(from);
 			break;
 
-		case T_CreateFunctionStmt:
-			retval = _copyCreateFunctionStmt(from);
-			break;
-		case T_FunctionParameter:
-			retval = _copyFunctionParameter(from);
-			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);
 			break;

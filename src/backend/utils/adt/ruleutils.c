@@ -4434,10 +4434,7 @@ get_basic_select_query(Query *query, deparse_context *context,
 	/*
 	 * Build up the query string - first we say SELECT
 	 */
-	if (query->isReturn)
-		appendStringInfoString(buf, "RETURN");
-	else
-		appendStringInfoString(buf, "SELECT");
+	appendStringInfoString(buf, "SELECT");
 
 	/* Add the DISTINCT clause if given */
 	if (query->distinctClause != NIL)
@@ -9365,7 +9362,7 @@ generate_function_name(Oid funcid, int nargs, List *argnames, Oid *argtypes,
 	if (!force_qualify)
 		p_result = func_get_detail(list_make1(makeString(proname)),
 								   NIL, argnames, nargs, argtypes,
-								   !use_variadic, true, false,
+								   !use_variadic, true,
 								   &p_funcid, &p_rettype,
 								   &p_retset, &p_nvargs, &p_vatype,
 								   &p_true_typeids, NULL);

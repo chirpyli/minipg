@@ -2359,21 +2359,10 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 		argno++;
 	}
 
-	/* Insert appropriate opcode depending on strictness and stats level */
-	if (pgstat_track_functions <= flinfo->fn_stats)
-	{
-		if (flinfo->fn_strict && nargs > 0)
-			scratch->opcode = EEOP_FUNCEXPR_STRICT;
-		else
-			scratch->opcode = EEOP_FUNCEXPR;
-	}
+	if (flinfo->fn_strict && nargs > 0)
+		scratch->opcode = EEOP_FUNCEXPR_STRICT;
 	else
-	{
-		if (flinfo->fn_strict && nargs > 0)
-			scratch->opcode = EEOP_FUNCEXPR_STRICT_FUSAGE;
-		else
-			scratch->opcode = EEOP_FUNCEXPR_FUSAGE;
-	}
+		scratch->opcode = EEOP_FUNCEXPR;
 }
 
 /*

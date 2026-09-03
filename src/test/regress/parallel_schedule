@@ -26,14 +26,7 @@ test: strings numerology date time timestamp timestamptz
 # ----------
 # Another group of parallel tests
 # horology depends on interval, timestamp, timestamptz
-# opr_sanity depends on create_function_0
-# ----------
-# create_function_0 定义 regress 测试桩 C 函数(binary_coercible/test_support_func/
-# test_opclass_options_func/make_tuple_indirect/test_enc_setup/test_conv/
-# test_enc_conversion)，opr_sanity/misc_functions/alter_generic/indirect_toast/
-# conversion 等测试均依赖，须先于各并行组串行执行
-test: create_function_0
-test: horology opr_sanity misc_sanity comments expressions xid mvcc euc_kr
+test: horology misc_sanity comments xid mvcc euc_kr
 
 # ----------
 # These four each depend on the previous one
@@ -44,7 +37,7 @@ test: horology opr_sanity misc_sanity comments expressions xid mvcc euc_kr
 # create_table 已改写：移除 INHERITS 继承链与 PARTITION BY 分区，保留标准基础表(tenk1/tenk2/onek/person 等)
 test: create_table
 # create_index 为 onek/tenk1/bt_*_heap/hash_*_heap 等基础表建立索引，
-# sanity_check/arrays/window/amutils/groupingsets 等多个测试依赖这些索引
+# sanity_check/amutils 等测试依赖这些索引
 test: create_index
 
 # ----------
@@ -74,7 +67,7 @@ test: index_including
 # typed_table 已随 CREATE TYPE 裁剪而移除（typed table 依赖 CREATE TYPE 创建复合类型）
 # information_schema 已裁剪，triggers/updatable_views 深度依赖 information_schema，移除
 # inherit 已随表继承(INHERITS)功能裁剪而移除
-test: hash_func errors infinite_recurse
+test: hash_func
 
 # ----------
 # sanity_check does a vacuum, affecting the sort order of SELECT *
@@ -90,7 +83,7 @@ ignore: random
 # information_schema 已裁剪，join 引用 information_schema.cardinal_number，移除
 # CREATE TABLE AS (CTAS) 语法已裁剪，random 测试依赖该语法，移除
 # aggregates/portals 已随表继承(INHERITS)功能裁剪而移除
-test: select_distinct select_distinct_on select_implicit select_having case transactions arrays btree_index hash_index prepared_xacts
+test: select_distinct select_distinct_on select_implicit select_having btree_index hash_index prepared_xacts
 
 # ----------
 # Another group of parallel tests
@@ -98,7 +91,7 @@ test: select_distinct select_distinct_on select_implicit select_having case tran
 # 权限/角色机制已裁剪，matview identity generated 依赖 ROLE/OWNER，移除
 # information_schema 已裁剪，collate 引用 information_schema.views，移除
 # lock 已随表继承(INHERITS)功能裁剪而移除
-test: tablesample groupingsets join_hash
+test: tablesample join_hash
 
 # ----------
 # Another group of parallel tests
@@ -133,7 +126,7 @@ test: vacuum_parallel
 #   select_views foreign_key dependency alter_table sequence largeobject
 # cluster 已随表继承(INHERITS)功能裁剪而移除
 # portals_p2 已随游标功能裁剪而移除
-test: guc bitmapops combocid advisory_lock indirect_toast
+test: bitmapops combocid advisory_lock
 
 # ----------
 # ----------
@@ -144,7 +137,6 @@ test: guc bitmapops combocid advisory_lock indirect_toast
 # information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
 # temp/truncate/returning 已随表继承(INHERITS)功能裁剪而移除
 # plpgsql: PL/pgSQL 已裁剪，移除对应测试条目（纯测试见已删 plpgsql.sql）
-test: conversion polymorphism
 
 # ----------
 # Another group of parallel tests

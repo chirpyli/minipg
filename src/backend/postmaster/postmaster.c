@@ -337,7 +337,7 @@ static volatile bool HaveCrashedWorker = false;
  * postmaster.c - function prototypes
  */
 static void CloseServerPorts(int status, Datum arg);
-static void unlink_external_pid_file(int status, Datum arg);
+
 static void getInstallationPaths(const char *argv0);
 static void checkControlFile(void);
 static Port *ConnCreate(int serverFd);
@@ -3697,22 +3697,6 @@ BackendRun(Port *port)
 static void
 ExitPostmaster(int status)
 {
-#ifdef HAVE_PTHREAD_IS_THREADED_NP
-
-	/*
-	 * There is no known cause for a postmaster to become multithreaded after
-	 * startup.  However, we might reach here via an error exit before
-	 * reaching the test in PostmasterMain, so provide the same hint as there.
-	 * This message uses LOG level, because an unclean shutdown at this point
-	 * would usually not look much different from a clean shutdown.
-	 */
-	if (pthread_is_threaded_np() != 0)
-		ereport(LOG,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("postmaster became multithreaded"),
-				 errhint("Set the LC_ALL environment variable to a valid locale.")));
-#endif
-
 	/* should cleanup shared memory and kill all backends */
 
 	/*

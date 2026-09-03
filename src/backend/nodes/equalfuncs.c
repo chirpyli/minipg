@@ -862,7 +862,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(hasSubLinks);
 	COMPARE_SCALAR_FIELD(hasDistinctOn);
 	COMPARE_SCALAR_FIELD(hasForUpdate);
-	COMPARE_SCALAR_FIELD(isReturn);
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
@@ -955,14 +954,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 
 
 static bool
-_equalReturnStmt(const ReturnStmt *a, const ReturnStmt *b)
-{
-	COMPARE_NODE_FIELD(returnval);
-
-	return true;
-}
-
-static bool
 _equalAlterTableStmt(const AlterTableStmt *a, const AlterTableStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
@@ -993,7 +984,6 @@ _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 {
 	COMPARE_NODE_FIELD(objname);
 	COMPARE_NODE_FIELD(objargs);
-	COMPARE_NODE_FIELD(objfuncargs);
 	COMPARE_SCALAR_FIELD(args_unspecified);
 
 	return true;
@@ -1066,31 +1056,6 @@ _equalIndexStmt(const IndexStmt *a, const IndexStmt *b)
 	COMPARE_SCALAR_FIELD(transformed);
 	COMPARE_SCALAR_FIELD(concurrent);
 	COMPARE_SCALAR_FIELD(if_not_exists);
-
-	return true;
-}
-
-static bool
-_equalCreateFunctionStmt(const CreateFunctionStmt *a, const CreateFunctionStmt *b)
-{
-	COMPARE_SCALAR_FIELD(is_procedure);
-	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_NODE_FIELD(funcname);
-	COMPARE_NODE_FIELD(parameters);
-	COMPARE_NODE_FIELD(returnType);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_NODE_FIELD(sql_body);
-
-	return true;
-}
-
-static bool
-_equalFunctionParameter(const FunctionParameter *a, const FunctionParameter *b)
-{
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(argType);
-	COMPARE_SCALAR_FIELD(mode);
-	COMPARE_NODE_FIELD(defexpr);
 
 	return true;
 }
@@ -1977,9 +1942,6 @@ equal(const void *a, const void *b)
 		case T_SelectStmt:
 			retval = _equalSelectStmt(a, b);
 			break;
-		case T_ReturnStmt:
-			retval = _equalReturnStmt(a, b);
-			break;
 		case T_AlterTableStmt:
 			retval = _equalAlterTableStmt(a, b);
 			break;
@@ -2000,12 +1962,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_IndexStmt:
 			retval = _equalIndexStmt(a, b);
-			break;
-		case T_CreateFunctionStmt:
-			retval = _equalCreateFunctionStmt(a, b);
-			break;
-		case T_FunctionParameter:
-			retval = _equalFunctionParameter(a, b);
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);

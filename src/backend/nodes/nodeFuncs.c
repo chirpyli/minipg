@@ -1441,10 +1441,6 @@ exprLocation(const Node *expr)
 		case T_Constraint:
 			loc = ((const Constraint *) expr)->location;
 			break;
-		case T_FunctionParameter:
-			/* just use typename's location */
-			loc = exprLocation((Node *) ((const FunctionParameter *) expr)->argType);
-			break;
 		case T_GroupingSet:
 			loc = ((const GroupingSet *) expr)->location;
 			break;

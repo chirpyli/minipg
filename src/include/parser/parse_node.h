@@ -46,11 +46,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_WHERE,			/* WHERE */
 	EXPR_KIND_HAVING,			/* HAVING */
 	EXPR_KIND_FILTER,			/* FILTER */
-	EXPR_KIND_WINDOW_PARTITION, /* window definition PARTITION BY */
-	EXPR_KIND_WINDOW_ORDER,		/* window definition ORDER BY */
-	EXPR_KIND_WINDOW_FRAME_RANGE,	/* window frame clause with RANGE */
-	EXPR_KIND_WINDOW_FRAME_ROWS,	/* window frame clause with ROWS */
-	EXPR_KIND_WINDOW_FRAME_GROUPS,	/* window frame clause with GROUPS */
 	EXPR_KIND_SELECT_TARGET,	/* SELECT target list item */
 	EXPR_KIND_INSERT_TARGET,	/* INSERT target list item */
 	EXPR_KIND_UPDATE_SOURCE,	/* UPDATE assignment source item */
@@ -71,10 +66,7 @@ typedef enum ParseExprKind
 	EXPR_KIND_STATS_EXPRESSION, /* extended statistics expression */
 	EXPR_KIND_ALTER_COL_TRANSFORM,	/* transform expr in ALTER COLUMN TYPE */
 	EXPR_KIND_EXECUTE_PARAMETER,	/* parameter value in EXECUTE */
-	EXPR_KIND_TRIGGER_WHEN,		/* WHEN condition in CREATE TRIGGER */
 	EXPR_KIND_POLICY,			/* USING or WITH CHECK expr in policy */
-	EXPR_KIND_PARTITION_BOUND,	/* partition bound expression */
-	EXPR_KIND_PARTITION_EXPRESSION, /* PARTITION BY expression */
 	EXPR_KIND_CALL_ARGUMENT,	/* procedure argument in CALL */
 	EXPR_KIND_COPY_WHERE,		/* WHERE condition in COPY FROM */
 	EXPR_KIND_GENERATED_COLUMN, /* generation expression for a column */

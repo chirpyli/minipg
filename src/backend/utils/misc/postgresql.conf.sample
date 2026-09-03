@@ -63,10 +63,6 @@
 #tcp_user_timeout = 0			# TCP_USER_TIMEOUT, in milliseconds;
 					# 0 selects the system default
 
-#client_connection_check_interval = 0	# time between checks for client
-					# disconnection while running queries;
-					# 0 for never
-
 #------------------------------------------------------------------------------
 # RESOURCE USAGE (except WAL)
 #------------------------------------------------------------------------------
@@ -402,26 +398,6 @@
 					#   fatal
 					#   panic (effectively off)
 
-#log_min_duration_statement = -1	# -1 is disabled, 0 logs all statements
-					# and their durations, > 0 logs only
-					# statements running at least this number
-					# of milliseconds
-
-#log_min_duration_sample = -1		# -1 is disabled, 0 logs a sample of statements
-					# and their durations, > 0 logs only a sample of
-					# statements running at least this number
-					# of milliseconds;
-					# sample fraction is determined by log_statement_sample_rate
-
-#log_statement_sample_rate = 1.0	# fraction of logged statements exceeding
-					# log_min_duration_sample to be logged;
-					# 1.0 logs all such statements, 0.0 never logs
-
-
-#log_transaction_sample_rate = 0.0	# fraction of transactions whose statements
-					# are logged regardless of their duration; 1.0 logs all
-					# statements from all transactions, 0.0 never logs
-
 # - What to Log -
 
 #debug_print_parse = off
@@ -434,7 +410,6 @@
 					# actions running at least this number
 					# of milliseconds.
 #log_checkpoints = off
-#log_duration = off
 #log_error_verbosity = default		# terse, default, or verbose messages
 #log_hostname = off
 #log_line_prefix = '%m [%p] '		# special values:
@@ -471,7 +446,6 @@
 					# bind-parameter values to N bytes;
 					# -1 means print in full, 0 disables
 #log_statement = 'none'			# none, ddl, mod, all
-#log_replication_commands = off
 #log_temp_files = -1			# log temporary files equal or larger
 					# than the specified size in kilobytes;
 					# -1 disables, 0 logs all temp files
@@ -498,7 +472,6 @@
 #track_counts = on
 #track_io_timing = off
 #track_wal_io_timing = off
-#track_functions = none			# none, pl, all
 #stats_temp_directory = 'pg_stat_tmp'
 
 
@@ -562,7 +535,6 @@
 #search_path = '"$user", public'	# schema names
 #default_table_access_method = 'heap'
 #default_toast_compression = 'pglz'	# 'pglz' or 'lz4'
-#check_function_bodies = on
 #default_transaction_isolation = 'read committed'
 #default_transaction_read_only = off
 #default_transaction_deferrable = off

@@ -201,9 +201,6 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 	if (IsQueryIdEnabled())
 		jstate = JumbleQuery(query, pstate->p_sourcetext);
 
-	if (post_parse_analyze_hook)
-		(*post_parse_analyze_hook) (pstate, query, jstate);
-
 	/*
 	 * Parse analysis was done already, but we still have to run the rule
 	 * rewriter.  We do not do AcquireRewriteLocks: we assume the query either

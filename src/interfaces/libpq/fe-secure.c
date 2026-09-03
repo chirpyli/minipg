@@ -101,25 +101,6 @@ struct sigpipe_info
 /* ------------------------------------------------------------ */
 
 /*
- *	Initialize global context.
- *
- * This build supports no transport encryption, so there is nothing to set up.
- */
-int
-pqsecure_initialize(PGconn *conn, bool do_ssl, bool do_crypto)
-{
-	return 0;
-}
-
-/*
- *	Close secure session.
- */
-void
-pqsecure_close(PGconn *conn)
-{
-}
-
-/*
  *	Read data from a secure connection.
  *
  * On failure, this function is responsible for appending a suitable message

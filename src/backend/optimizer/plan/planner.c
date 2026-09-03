@@ -64,9 +64,6 @@
 int			force_parallel_mode = FORCE_PARALLEL_OFF;
 bool		parallel_leader_participation = true;
 
-/* Hook for plugins to get control in planner() */
-planner_hook_type planner_hook = NULL;
-
 /* Hook for plugins to get control when grouping_planner() plans upper rels */
 create_upper_paths_hook_type create_upper_paths_hook = NULL;
 
@@ -213,12 +210,7 @@ PlannedStmt *
 planner(Query *parse, const char *query_string, int cursorOptions,
 		ParamListInfo boundParams)
 {
-	PlannedStmt *result;
-
-	if (planner_hook)
-		result = (*planner_hook) (parse, query_string, cursorOptions, boundParams);
-	else
-		result = standard_planner(parse, query_string, cursorOptions, boundParams);
+	PlannedStmt *result = standard_planner(parse, query_string, cursorOptions, boundParams);
 	return result;
 }
 
@@ -276,7 +268,7 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	 * GIN page locks would make this unsafe.  We'll have to fix that somehow
 	 * if we want to allow parallel inserts in general; updates and deletes
 	 * have additional problems especially around combo CIDs.)
-	 *
+	 
 	 * For now, we don't try to use parallel mode if we're running inside a
 	 * parallel worker.  We might eventually be able to relax this
 	 * restriction, but for now it seems best not to have parallel workers
@@ -601,10 +593,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	 */
 	if (parse->resultRelation)
 	{
-		RangeTblEntry *rte = rt_fetch(parse->resultRelation, parse->rtable);
-
-		root->leaf_result_relids =
-			bms_make_singleton(parse->resultRelation);
+		root->leaf_result_relids = bms_make_singleton(parse->resultRelation);
 	}
 
 	/*
@@ -1563,11 +1552,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	extra.limit_tuples = limit_tuples;
 	extra.count_est = count_est;
 	extra.offset_est = offset_est;
-
-	/* Let extensions possibly add some more paths */
-	if (create_upper_paths_hook)
-		(*create_upper_paths_hook) (root, UPPERREL_FINAL,
-									current_rel, final_rel, &extra);
 
 	/* Note: currently, we leave it to callers to do set_cheapest() */
 }

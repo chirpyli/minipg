@@ -110,7 +110,6 @@
  * ----------
  */
 bool		pgstat_track_counts = false;
-int			pgstat_track_functions = TRACK_FUNC_OFF;
 
 /* ----------
  * Built from GUC parameter
@@ -1801,45 +1800,9 @@ void
 pgstat_init_function_usage(FunctionCallInfo fcinfo,
 						   PgStat_FunctionCallUsage *fcu)
 {
-	PgStat_BackendFunctionEntry *htabent;
-	bool		found;
-
-	if (pgstat_track_functions <= fcinfo->flinfo->fn_stats)
-	{
-		/* stats not wanted */
-		fcu->fs = NULL;
-		return;
-	}
-
-	if (!pgStatFunctions)
-	{
-		/* First time through - initialize function stat table */
-		HASHCTL		hash_ctl;
-
-		hash_ctl.keysize = sizeof(Oid);
-		hash_ctl.entrysize = sizeof(PgStat_BackendFunctionEntry);
-		pgStatFunctions = hash_create("Function stat entries",
-									  PGSTAT_FUNCTION_HASH_SIZE,
-									  &hash_ctl,
-									  HASH_ELEM | HASH_BLOBS);
-	}
-
-	/* Get the stats entry for this function, create if necessary */
-	htabent = hash_search(pgStatFunctions, &fcinfo->flinfo->fn_oid,
-						  HASH_ENTER, &found);
-	if (!found)
-		MemSet(&htabent->f_counts, 0, sizeof(PgStat_FunctionCounts));
-
-	fcu->fs = &htabent->f_counts;
-
-	/* save stats for this function, later used to compensate for recursion */
-	fcu->save_f_total_time = htabent->f_counts.f_total_time;
-
-	/* save current backend-wide total time */
-	fcu->save_total = total_func_time;
-
-	/* get clock time as of function start */
-	INSTR_TIME_SET_CURRENT(fcu->f_start);
+	/* stats not wanted */
+	fcu->fs = NULL;
+	return;
 }
 
 /*

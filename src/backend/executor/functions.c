@@ -380,7 +380,6 @@ sql_fn_post_column_ref(ParseState *pstate, ColumnRef *cref, Node *var)
 								  list_make1(param),
 								  pstate->p_last_srf,
 								  NULL,
-								  false,
 								  cref->location);
 	}
 

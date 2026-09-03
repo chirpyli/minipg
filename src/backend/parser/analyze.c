@@ -53,10 +53,6 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 
-
-/* Hook for plugins to get control at end of parse analysis */
-post_parse_analyze_hook_type post_parse_analyze_hook = NULL;
-
 static Query *transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt);
 static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt);
 static List *transformInsertRow(ParseState *pstate, List *exprlist,
@@ -67,7 +63,6 @@ static OnConflictExpr *transformOnConflictClause(ParseState *pstate,
 static int	count_rowexpr_columns(ParseState *pstate, Node *expr);
 static Query *transformSelectStmt(ParseState *pstate, SelectStmt *stmt);
 static Query *transformValuesClause(ParseState *pstate, SelectStmt *stmt);
-static Query *transformReturnStmt(ParseState *pstate, ReturnStmt *stmt);
 static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt);
 static List *transformReturningList(ParseState *pstate, List *returningList);
 static List *transformUpdateTargetList(ParseState *pstate,
@@ -112,9 +107,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 	if (IsQueryIdEnabled())
 		jstate = JumbleQuery(query, sourceText);
 
-	if (post_parse_analyze_hook)
-		(*post_parse_analyze_hook) (pstate, query, jstate);
-
 	free_parsestate(pstate);
 
 	pgstat_report_query_id(query->queryId, false);
@@ -150,9 +142,6 @@ parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
 
 	if (IsQueryIdEnabled())
 		jstate = JumbleQuery(query, sourceText);
-
-	if (post_parse_analyze_hook)
-		(*post_parse_analyze_hook) (pstate, query, jstate);
 
 	free_parsestate(pstate);
 
@@ -245,10 +234,6 @@ transformStmt(ParseState *pstate, Node *parseTree)
 			}
 			break;
 
-		case T_ReturnStmt:
-			result = transformReturnStmt(pstate, (ReturnStmt *) parseTree);
-			break;
-
 			/*
 			 * Special cases
 			 */
@@ -305,7 +290,6 @@ stmt_requires_parse_analysis(RawStmt *parseTree)
 		case T_DeleteStmt:
 		case T_UpdateStmt:
 		case T_SelectStmt:
-		case T_ReturnStmt:
 			result = true;
 			break;
 
@@ -1442,34 +1426,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
 
 	qry->hasSubLinks = pstate->p_hasSubLinks;
-
-	assign_query_collations(pstate, qry);
-
-	return qry;
-}
-
-/*
- * transformReturnStmt -
- *	  transforms a return statement
- */
-static Query *
-transformReturnStmt(ParseState *pstate, ReturnStmt *stmt)
-{
-	Query	   *qry = makeNode(Query);
-
-	qry->commandType = CMD_SELECT;
-	qry->isReturn = true;
-
-	qry->targetList = list_make1(makeTargetEntry((Expr *) transformExpr(pstate, stmt->returnval, EXPR_KIND_SELECT_TARGET),
-												 1, NULL, false));
-
-	if (pstate->p_resolve_unknowns)
-		resolveTargetListUnknowns(pstate, qry->targetList);
-	qry->rtable = pstate->p_rtable;
-	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
-	qry->hasSubLinks = pstate->p_hasSubLinks;
-	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
-	qry->hasAggs = pstate->p_hasAggs;
 
 	assign_query_collations(pstate, qry);
 

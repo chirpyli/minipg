@@ -35,14 +35,6 @@
 /* Default directory to store temporary statistics data in */
 #define PG_STAT_TMP_DIR		"pg_stat_tmp"
 
-/* Values for track_functions GUC variable --- order is significant! */
-typedef enum TrackFunctionsLevel
-{
-	TRACK_FUNC_OFF,
-	TRACK_FUNC_PL,
-	TRACK_FUNC_ALL
-}			TrackFunctionsLevel;
-
 /* Values to track the cause of session termination */
 typedef enum SessionEndType
 {
@@ -906,7 +898,6 @@ typedef struct PgStat_FunctionCallUsage
  * ----------
  */
 extern PGDLLIMPORT bool pgstat_track_counts;
-extern PGDLLIMPORT int pgstat_track_functions;
 extern char *pgstat_stat_directory;
 extern char *pgstat_stat_tmpname;
 extern char *pgstat_stat_filename;

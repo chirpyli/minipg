@@ -49,23 +49,7 @@ extern Oid	ResolveOpClass(List *opclass, Oid attrType,
 						   const char *accessMethodName, Oid accessMethodId);
 
 /* commands/functioncmds.c */
-extern ObjectAddress CreateFunction(ParseState *pstate, CreateFunctionStmt *stmt);
 extern void RemoveFunctionById(Oid funcOid);
-extern void IsThereFunctionInNamespace(const char *proname, int pronargs,
-									   oidvector *proargtypes, Oid nspOid);
-extern void interpret_function_parameter_list(ParseState *pstate,
-											  List *parameters,
-											  Oid languageOid,
-											  ObjectType objtype,
-											  oidvector **parameterTypes,
-											  List **parameterTypes_list,
-											  ArrayType **allParameterTypes,
-											  ArrayType **parameterModes,
-											  ArrayType **parameterNames,
-											  List **inParameterNames_list,
-											  List **parameterDefaults,
-											  Oid *variadicArgType,
-											  Oid *requiredResultType);
 
 /* commands/operatorcmds.c */
 extern void RemoveOperatorById(Oid operOid);

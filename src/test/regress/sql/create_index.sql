@@ -197,16 +197,6 @@ BEGIN;
 CREATE INDEX CONCURRENTLY concur_index7 ON concur_heap(f1);
 COMMIT;
 -- test where predicate is able to do a transactional update during
--- a concurrent build before switching pg_index state flags.
--- minipg: PL/pgSQL removed; SQL function with same effect (always true).
-CREATE FUNCTION predicate_stable() RETURNS bool IMMUTABLE
-LANGUAGE sql AS $$
-  SELECT txid_current() IS NOT NULL;
-$$;
-CREATE INDEX CONCURRENTLY concur_index8 ON concur_heap (f1)
-  WHERE predicate_stable();
-DROP INDEX concur_index8;
-DROP FUNCTION predicate_stable();
 
 -- But you can do a regular index build in a transaction
 BEGIN;

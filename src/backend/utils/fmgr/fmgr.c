@@ -169,7 +169,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		finfo->fn_nargs = fbp->nargs;
 		finfo->fn_strict = fbp->strict;
 		finfo->fn_retset = fbp->retset;
-		finfo->fn_stats = TRACK_FUNC_ALL;	/* ie, never track */
+		finfo->fn_stats = 0;	/* ie, never track */
 		finfo->fn_addr = fbp->func;
 		finfo->fn_oid = functionId;
 		return;
@@ -205,7 +205,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		 FmgrHookIsNeeded(functionId)))
 	{
 		finfo->fn_addr = fmgr_security_definer;
-		finfo->fn_stats = TRACK_FUNC_ALL;	/* ie, never track */
+		finfo->fn_stats = 0;	/* ie, never track */
 		finfo->fn_oid = functionId;
 		ReleaseSysCache(procedureTuple);
 		return;
@@ -239,22 +239,22 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 			/* Should we check that nargs, strict, retset match the table? */
 			finfo->fn_addr = fbp->func;
 			/* note this policy is also assumed in fast path above */
-			finfo->fn_stats = TRACK_FUNC_ALL;	/* ie, never track */
+			finfo->fn_stats = 0;	/* ie, never track */
 			break;
 
 		case ClanguageId:
 			fmgr_info_C_lang(functionId, finfo, procedureTuple);
-			finfo->fn_stats = TRACK_FUNC_PL;	/* ie, track if ALL */
+			finfo->fn_stats = 0;	/* ie, track if ALL */
 			break;
 
 		case SQLlanguageId:
 			finfo->fn_addr = fmgr_sql;
-			finfo->fn_stats = TRACK_FUNC_PL;	/* ie, track if ALL */
+			finfo->fn_stats = 0;	/* ie, track if ALL */
 			break;
 
 		default:
 			fmgr_info_other_lang(functionId, finfo, procedureTuple);
-			finfo->fn_stats = TRACK_FUNC_OFF;	/* ie, track if not OFF */
+			finfo->fn_stats = 0;	/* ie, track if not OFF */
 			break;
 	}
 

@@ -393,7 +393,6 @@ transformIndirection(ParseState *pstate, A_Indirection *ind)
 										  list_make1(result),
 										  last_srf,
 										  NULL,
-										  false,
 										  location);
 			if (newresult == NULL)
 				unknown_attribute(pstate, result, strVal(n), location);
@@ -455,11 +454,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_POLICY:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_FILTER:
-		case EXPR_KIND_WINDOW_PARTITION:
-		case EXPR_KIND_WINDOW_ORDER:
-		case EXPR_KIND_WINDOW_FRAME_RANGE:
-		case EXPR_KIND_WINDOW_FRAME_ROWS:
-		case EXPR_KIND_WINDOW_FRAME_GROUPS:
 		case EXPR_KIND_SELECT_TARGET:
 		case EXPR_KIND_INSERT_TARGET:
 		case EXPR_KIND_UPDATE_SOURCE:
@@ -479,8 +473,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_STATS_EXPRESSION:
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 		case EXPR_KIND_EXECUTE_PARAMETER:
-		case EXPR_KIND_TRIGGER_WHEN:
-		case EXPR_KIND_PARTITION_EXPRESSION:
 		case EXPR_KIND_CALL_ARGUMENT:
 		case EXPR_KIND_COPY_WHERE:
 		case EXPR_KIND_GENERATED_COLUMN:
@@ -490,9 +482,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 
 		case EXPR_KIND_COLUMN_DEFAULT:
 			err = _("cannot use column reference in DEFAULT expression");
-			break;
-		case EXPR_KIND_PARTITION_BOUND:
-			err = _("cannot use column reference in partition bound expression");
 			break;
 
 			/*
@@ -619,7 +608,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 											 list_make1(node),
 											 pstate->p_last_srf,
 											 NULL,
-											 false,
 											 cref->location);
 				}
 				break;
@@ -669,7 +657,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 											 list_make1(node),
 											 pstate->p_last_srf,
 											 NULL,
-											 false,
 											 cref->location);
 				}
 				break;
@@ -732,7 +719,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 											 list_make1(node),
 											 pstate->p_last_srf,
 											 NULL,
-											 false,
 											 cref->location);
 				}
 				break;
@@ -1368,7 +1354,6 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 							 targs,
 							 last_srf,
 							 fn,
-							 false,
 							 fn->location);
 }
 
@@ -1689,11 +1674,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_POLICY:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_FILTER:
-		case EXPR_KIND_WINDOW_PARTITION:
-		case EXPR_KIND_WINDOW_ORDER:
-		case EXPR_KIND_WINDOW_FRAME_RANGE:
-		case EXPR_KIND_WINDOW_FRAME_ROWS:
-		case EXPR_KIND_WINDOW_FRAME_GROUPS:
 		case EXPR_KIND_SELECT_TARGET:
 		case EXPR_KIND_INSERT_TARGET:
 		case EXPR_KIND_UPDATE_SOURCE:
@@ -1730,15 +1710,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 			break;
 		case EXPR_KIND_EXECUTE_PARAMETER:
 			err = _("cannot use subquery in EXECUTE parameter");
-			break;
-		case EXPR_KIND_TRIGGER_WHEN:
-			err = _("cannot use subquery in trigger WHEN condition");
-			break;
-		case EXPR_KIND_PARTITION_BOUND:
-			err = _("cannot use subquery in partition bound");
-			break;
-		case EXPR_KIND_PARTITION_EXPRESSION:
-			err = _("cannot use subquery in partition key expression");
 			break;
 		case EXPR_KIND_CALL_ARGUMENT:
 			err = _("cannot use subquery in CALL argument");
@@ -2763,16 +2734,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "HAVING";
 		case EXPR_KIND_FILTER:
 			return "FILTER";
-		case EXPR_KIND_WINDOW_PARTITION:
-			return "window PARTITION BY";
-		case EXPR_KIND_WINDOW_ORDER:
-			return "window ORDER BY";
-		case EXPR_KIND_WINDOW_FRAME_RANGE:
-			return "window RANGE";
-		case EXPR_KIND_WINDOW_FRAME_ROWS:
-			return "window ROWS";
-		case EXPR_KIND_WINDOW_FRAME_GROUPS:
-			return "window GROUPS";
 		case EXPR_KIND_SELECT_TARGET:
 			return "SELECT";
 		case EXPR_KIND_INSERT_TARGET:
@@ -2810,12 +2771,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "USING";
 		case EXPR_KIND_EXECUTE_PARAMETER:
 			return "EXECUTE";
-		case EXPR_KIND_TRIGGER_WHEN:
-			return "WHEN";
-		case EXPR_KIND_PARTITION_BOUND:
-			return "partition bound";
-		case EXPR_KIND_PARTITION_EXPRESSION:
-			return "PARTITION BY";
 		case EXPR_KIND_CALL_ARGUMENT:
 			return "CALL";
 		case EXPR_KIND_COPY_WHERE:

@@ -178,7 +178,6 @@ static bool check_autovacuum_work_mem(int *newval, void **extra, GucSource sourc
 static bool check_effective_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_huge_page_size(int *newval, void **extra, GucSource source);
-static bool check_client_connection_check_interval(int *newval, void **extra, GucSource source);
 static void assign_pgstat_temp_directory(const char *newval, void *extra);
 static bool check_application_name(char **newval, void **extra, GucSource source);
 static void assign_application_name(const char *newval, void *extra);
@@ -200,7 +199,6 @@ static bool check_recovery_target_name(char **newval, void **extra, GucSource so
 static void assign_recovery_target_name(const char *newval, void *extra);
 static bool check_recovery_target_lsn(char **newval, void **extra, GucSource source);
 static void assign_recovery_target_lsn(const char *newval, void *extra);
-static bool check_default_with_oids(bool *newval, void **extra, GucSource source);
 
 /* Private functions in guc-file.l that need to be called from guc.c */
 static ConfigVariable *ProcessConfigFileInternal(GucContext context,
@@ -314,16 +312,6 @@ static const struct config_enum_entry syslog_facility_options[] = {
 #endif
 	{NULL, 0}
 };
-
-static const struct config_enum_entry track_function_options[] = {
-	{"none", TRACK_FUNC_OFF, false},
-	{"pl", TRACK_FUNC_PL, false},
-	{"all", TRACK_FUNC_ALL, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(track_function_options) == (TRACK_FUNC_ALL + 2),
-				 "array length mismatch");
 
 
 /*
@@ -461,7 +449,6 @@ extern const struct config_enum_entry dynamic_shared_memory_options[];
 /*
  * GUC option variables that are exported from this module
  */
-bool		log_duration = false;
 bool		Debug_print_plan = false;
 bool		Debug_print_parse = false;
 bool		Debug_print_rewritten = false;
@@ -473,25 +460,18 @@ bool		log_statement_stats = false;	/* this is sort of all three above
 											 * together */
 bool		log_btree_build_stats = false;
 
-bool		check_function_bodies = true;
-
 /*
  * This GUC exists solely for backward compatibility, check its definition for
  * details.
  */
-bool		default_with_oids = false;
 bool		session_auth_is_superuser;
 
 int			log_min_error_statement = ERROR;
 int			log_min_messages = WARNING;
 int			client_min_messages = NOTICE;
-int			log_min_duration_sample = -1;
-int			log_min_duration_statement = -1;
 int			log_parameter_max_length = -1;
 int			log_parameter_max_length_on_error = 0;
 int			log_temp_files = -1;
-double		log_statement_sample_rate = 1.0;
-double		log_xact_sample_rate = 0;
 int			trace_recovery_messages = LOG;
 char	   *backtrace_functions;
 char	   *backtrace_symbol_list;
@@ -1176,15 +1156,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"log_duration", PGC_SUSET, LOGGING_WHAT,
-			gettext_noop("Logs the duration of each completed SQL statement."),
-			NULL
-		},
-		&log_duration,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"debug_print_parse", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Logs each query's parse tree."),
 			NULL
@@ -1445,15 +1416,6 @@ static struct config_bool ConfigureNamesBool[] =
 		check_transaction_deferrable, NULL, NULL
 	},
 	{
-		{"check_function_bodies", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Check routine bodies during CREATE FUNCTION and CREATE PROCEDURE."),
-			NULL
-		},
-		&check_function_bodies,
-		true,
-		NULL, NULL, NULL
-	},
-	{
 		{"array_nulls", PGC_USERSET, COMPAT_OPTIONS_PREVIOUS,
 			gettext_noop("Enable input of NULL elements in arrays."),
 			gettext_noop("When turned on, unquoted NULL in an array input "
@@ -1463,22 +1425,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&Array_nulls,
 		true,
 		NULL, NULL, NULL
-	},
-
-	/*
-	 * WITH OIDS support, and consequently default_with_oids, was removed in
-	 * PostgreSQL 12, but we tolerate the parameter being set to false to
-	 * avoid unnecessarily breaking older dump files.
-	 */
-	{
-		{"default_with_oids", PGC_USERSET, COMPAT_OPTIONS_PREVIOUS,
-			gettext_noop("WITH OIDS is no longer supported; this can only be false."),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&default_with_oids,
-		false,
-		check_default_with_oids, NULL, NULL
 	},
 	{
 		{"logging_collector", PGC_POSTMASTER, LOGGING_WHERE,
@@ -2067,17 +2013,6 @@ static struct config_int ConfigureNamesInt[] =
 #endif
 
 	{
-		{"statement_timeout", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the maximum allowed duration of any statement."),
-			gettext_noop("A value of 0 turns off the timeout."),
-			GUC_UNIT_MS
-		},
-		&StatementTimeout,
-		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"lock_timeout", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Sets the maximum allowed duration of any wait for a lock."),
 			gettext_noop("A value of 0 turns off the timeout."),
@@ -2376,31 +2311,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&extra_float_digits,
 		1, -15, 3,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_min_duration_sample", PGC_SUSET, LOGGING_WHEN,
-			gettext_noop("Sets the minimum execution time above which "
-						 "a sample of statements will be logged."
-						 " Sampling is determined by log_statement_sample_rate."),
-			gettext_noop("Zero logs a sample of all queries. -1 turns this feature off."),
-			GUC_UNIT_MS
-		},
-		&log_min_duration_sample,
-		-1, -1, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_min_duration_statement", PGC_SUSET, LOGGING_WHEN,
-			gettext_noop("Sets the minimum execution time above which "
-						 "all statements will be logged."),
-			gettext_noop("Zero prints all queries. -1 turns this feature off."),
-			GUC_UNIT_MS
-		},
-		&log_min_duration_statement,
-		-1, -1, INT_MAX,
 		NULL, NULL, NULL
 	},
 
@@ -2916,17 +2826,6 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"client_connection_check_interval", PGC_USERSET, CONN_AUTH_SETTINGS,
-			gettext_noop("Sets the time interval between checks for disconnection while running queries."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&client_connection_check_interval,
-		0, 0, INT_MAX,
-		check_client_connection_check_interval, NULL, NULL
-	},
-
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0, 0, 0, NULL, NULL, NULL
@@ -3106,27 +3005,6 @@ static struct config_real ConfigureNamesReal[] =
 		&CheckPointCompletionTarget,
 		0.9, 0.0, 1.0,
 		NULL, assign_checkpoint_completion_target, NULL
-	},
-
-	{
-		{"log_statement_sample_rate", PGC_SUSET, LOGGING_WHEN,
-			gettext_noop("Fraction of statements exceeding log_min_duration_sample to be logged."),
-			gettext_noop("Use a value between 0.0 (never log) and 1.0 (always log).")
-		},
-		&log_statement_sample_rate,
-		1.0, 0.0, 1.0,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_transaction_sample_rate", PGC_SUSET, LOGGING_WHEN,
-			gettext_noop("Sets the fraction of transactions from which to log all statements."),
-			gettext_noop("Use a value between 0.0 (never log) and 1.0 (log all "
-						 "statements for all transactions).")
-		},
-		&log_xact_sample_rate,
-		0.0, 0.0, 1.0,
-		NULL, NULL, NULL
 	},
 
 	/* End-of-list marker */
@@ -3802,16 +3680,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		 * it's not worth having a separate options array for this.
 		 */
 		LOG, client_message_level_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"track_functions", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects function-level statistics on database activity."),
-			NULL
-		},
-		&pgstat_track_functions,
-		TRACK_FUNC_OFF, track_function_options,
 		NULL, NULL, NULL
 	},
 
@@ -10328,20 +10196,6 @@ check_huge_page_size(int *newval, void **extra, GucSource source)
 	return true;
 }
 
-static bool
-check_client_connection_check_interval(int *newval, void **extra, GucSource source)
-{
-#ifndef POLLRDHUP
-	/* Linux only, for now.  See pq_check_connection(). */
-	if (*newval != 0)
-	{
-		GUC_check_errdetail("client_connection_check_interval must be set to 0 on platforms that lack POLLRDHUP.");
-		return false;
-	}
-#endif
-	return true;
-}
-
 static void
 assign_pgstat_temp_directory(const char *newval, void *extra)
 {
@@ -10751,21 +10605,6 @@ assign_recovery_target_lsn(const char *newval, void *extra)
 	}
 	else
 		recoveryTarget = RECOVERY_TARGET_UNSET;
-}
-
-static bool
-check_default_with_oids(bool *newval, void **extra, GucSource source)
-{
-	if (*newval)
-	{
-		/* check the GUC's definition for an explanation */
-		GUC_check_errcode(ERRCODE_FEATURE_NOT_SUPPORTED);
-		GUC_check_errmsg("tables declared WITH OIDS are not supported");
-
-		return false;
-	}
-
-	return true;
 }
 
 #include "guc-file.c"

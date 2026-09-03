@@ -434,7 +434,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	char		relname[NAMEDATALEN];
 	Oid			namespaceId;
 	Oid			relationId;
-	Oid			tablespaceId;
 	Relation	rel;
 	TupleDesc	descriptor;
 	List	   *old_constraints;
@@ -469,9 +468,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 */
 	namespaceId =
 		RangeVarGetAndCheckCreationNamespace(stmt->relation, NoLock, NULL);
-
-	/* 表空间管理已裁剪，始终使用默认表空间 */
-	tablespaceId = InvalidOid;
 
 	/* Identify user ID that will own the table */
 	if (!OidIsValid(ownerId))
@@ -573,7 +569,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 */
 	relationId = heap_create_with_catalog(relname,
 										  namespaceId,
-										  tablespaceId,
+										  InvalidOid,   	/* 表空间管理已裁剪，始终使用默认表空间 */
 										  InvalidOid,
 										  InvalidOid,
 										  ownerId,

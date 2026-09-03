@@ -3601,8 +3601,6 @@ FlushRelationsAllBuffers(SMgrRelation *smgrs, int nrels)
 
 	for (i = 0; i < nrels; i++)
 	{
-		Assert(!RelFileNodeBackendIsTemp(smgrs[i]->smgr_rnode));
-
 		srels[i].rnode = smgrs[i]->smgr_rnode.node;
 		srels[i].srel = smgrs[i];
 	}

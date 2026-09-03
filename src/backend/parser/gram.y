@@ -151,7 +151,6 @@ static RoleSpec *makeRoleSpec(RoleSpecType type, int location);
 static void check_qualified_name(List *names, core_yyscan_t yyscanner);
 static List *check_func_name(List *names, core_yyscan_t yyscanner);
 static List *check_indirection(List *indirection, core_yyscan_t yyscanner);
-static List *extractArgTypes(List *parameters);
 static void insertSelectOptions(SelectStmt *stmt,
 								List *sortClause, List *lockingClause,
 								SelectLimit *limitClause,
@@ -164,8 +163,6 @@ static Node *makeNotExpr(Node *expr, int location);
 static Node *makeAArrayExpr(List *elements, int location);
 static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 								  int location);
-static List *mergeTableFuncParameters(List *func_args, List *columns);
-static TypeName *TableFuncTypeName(List *columns);
 static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner);
 static void processCASbits(int cas_bits, int location, const char *constrType,
 			   bool *not_valid, bool *no_inherit, core_yyscan_t yyscanner);
@@ -198,9 +195,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	Value				*value;
 	ObjectType			objtype;
 	TypeName			*typnam;
-	FunctionParameter   *fun_param;
-	FunctionParameterMode fun_param_mode;
-	ObjectWithArgs		*objwithargs;
 	DefElem				*defelt;
 	SortBy				*sortby;
 	JoinExpr			*jexpr;
@@ -220,7 +214,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	struct GroupClause  *groupclause;
 }
 
-%type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
+%type <node>	stmt toplevel_stmt schema_stmt
 		AlterObjectSchemaStmt
 		AlterTableStmt
 		AnalyzeStmt ClusterStmt
@@ -231,8 +225,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 		ExplainStmt
 		IndexStmt InsertStmt
 		ExplainableStmt
-		CreateFunctionStmt ReindexStmt
-		RemoveFuncStmt ReturnStmt
+		ReindexStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
@@ -275,7 +268,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 			name file_name
 			opt_index_name cluster_index_specification
 
-%type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
+%type <list>	func_name qual_Op qual_all_Op subquery_Op
 				opt_class
 
 %type <range>	qualified_name insert_target
@@ -284,16 +277,12 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 
 
 %type <str>		iso_level opt_encoding
-%type <objwithargs> function_with_argtypes
-%type <list>	function_with_argtypes_list
 %type <node>	vacuum_relation
 %type <selectlimit> opt_select_limit select_limit limit_clause
 
-%type <list>	parse_toplevel stmtmulti routine_body_stmt_list
+%type <list>	parse_toplevel stmtmulti
 				OptTableElementList TableElementList definition
-				opt_definition func_args func_args_list
-				func_args_with_defaults func_args_with_defaults_list
-				func_as createfunc_opt_list opt_createfunc_opt_list
+				opt_definition
 				RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
 				sort_clause opt_sort_clause sortby_list index_params
@@ -308,23 +297,16 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
 				using_clause returning_clause
-			table_func_column_list
 			alter_generic_options
 			relation_expr_list
 			vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
 
-%type <node>	opt_routine_body
 %type <groupclause> group_clause
 %type <list>	group_by_list
 %type <node>	group_by_item empty_grouping_set rollup_clause cube_clause
 %type <node>	grouping_sets_clause
 
-
-%type <defelt>	createfunc_opt_item common_func_opt_item
-%type <fun_param> func_arg func_arg_with_default table_func_column
-%type <fun_param_mode> arg_class
-%type <typnam>	func_return func_type
 
 %type <boolean>  opt_restart_seqs
 %type <oncommit> OnCommitOption
@@ -359,7 +341,8 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <onconflict> opt_on_conflict
 
 %type <vsetstmt> generic_set set_rest set_rest_more generic_reset reset_rest
-				 FunctionSetResetClause
+
+%type <typnam>	func_type
 
 %type <node>	TableElement ConstraintElem TableFuncElement
 %type <node>	columnDef
@@ -465,46 +448,46 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ACCESS ACTION ADD_P ADMIN AFTER
 	ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	ASSIGNMENT ASYMMETRIC ATOMIC AT ATTACH ATTRIBUTE AUTHORIZATION
+	ASSIGNMENT ASYMMETRIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
 	BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
 	BOOLEAN_P BOTH BREADTH BY
 
-	CACHE CALL CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
+	CACHE CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS
 	CLUSTER COALESCE COLUMN COLUMNS COMMENT COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
-	COST CREATE CROSS CSV CUBE CURRENT_P
+	CREATE CROSS CSV CUBE CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
 	CURRENT_TIMESTAMP CURRENT_USER CYCLE
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DEFAULT DEFAULTS
-	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPENDS DEPTH DESC
+	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPTH DESC
 	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P
 	DOUBLE_P DROP
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
 	EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXPRESSION
-	EXTENSION EXTERNAL EXTRACT
+	EXTENSION EXTRACT
 
 	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
-	FORCE FREEZE FROM FULL FUNCTION FUNCTIONS
+	FORCE FREEZE FROM FULL
 
-	GENERATED GLOBAL GRANTED GREATEST GROUP_P GROUPING GROUPS
+	GENERATED GLOBAL GREATEST GROUP_P GROUPING GROUPS
 
-	HANDLER HAVING HEADER_P HOUR_P
+	HAVING HEADER_P HOUR_P
 
-	IDENTITY_P IF_P ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IMPORT_P IN_P INCLUDE
-	INCLUDING INCREMENT INDEX INDEXES INHERIT INHERITS INITIALLY INLINE_P
-	INNER_P INOUT INPUT_P INSERT INSTEAD INT_P INTEGER
-	INTERSECT INTERVAL INTO INVOKER IS ISNULL ISOLATION
+	IDENTITY_P IF_P ILIKE IMMEDIATE IMPLICIT_P IMPORT_P IN_P INCLUDE
+	INCLUDING INCREMENT INDEX INDEXES INHERIT INHERITS INITIALLY
+	INNER_P INPUT_P INSERT INSTEAD INT_P INTEGER
+	INTERSECT INTERVAL INTO IS ISNULL ISOLATION
 
 	JOIN
 
 	KEY
 
-	LABEL LANGUAGE LARGE_P LAST_P LATERAL_P
+	LABEL LARGE_P LAST_P LATERAL_P
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
 
@@ -515,28 +498,28 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	NULLS_P NUMERIC
 
 	OBJECT_P OF OFF OFFSET OIDS OLD ON ONLY OPERATOR OPTION OPTIONS OR
-	ORDER ORDINALITY OTHERS OUT_P OUTER_P
+	ORDER ORDINALITY OTHERS OUTER_P
 	OVER OVERLAPS OVERLAY OVERRIDING OWNED OWNER
 
-	PARALLEL PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
+	PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
-	PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM
+	PRIVILEGES PROGRAM
 
 	QUOTE
 
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
-	RESET RESTART RESTRICT RETURN RETURNING RETURNS RIGHT ROLE ROLLBACK ROLLUP
-	ROUTINE ROUTINES ROW ROWS RULE
+	RESET RESTART RESTRICT RETURNING RIGHT ROLE ROLLBACK ROLLUP
+	ROW ROWS RULE
 
-	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
+	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
-	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P STABLE STANDALONE_P
-	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRICT_P STRIP_P
-	SUBSTRING SUPPORT SYMMETRIC SYSID SYSTEM_P
+	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P
+	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRIP_P
+	SUBSTRING SYMMETRIC SYSID SYSTEM_P
 
 	TABLE TABLES TABLESAMPLE TABLESPACE TEMP TEMPLATE TEMPORARY TEXT_P THEN
-	TIES TIME TIMESTAMP TO TRAILING TRANSACTION TRANSFORM
+	TIES TIME TIMESTAMP TO TRAILING TRANSACTION
 	TREAT TRIM TRUE_P
 	TRUNCATE TRUSTED TYPE_P TYPES_P
 
@@ -544,9 +527,9 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 	UNLISTEN UNLOGGED UNTIL UPDATE USER USING
 
 	VACUUM VALID VALIDATE VALIDATOR VALUE_P VALUES VARCHAR VARIADIC VARYING
-	VERBOSE VERSION_P VIEW VIEWS VOLATILE
+	VERBOSE VERSION_P VIEW VIEWS
 
-	WHEN WHERE WHITESPACE_P WINDOW WITH WITHIN WITHOUT WORK WRAPPER WRITE
+	WHEN WHERE WHITESPACE_P WITH WITHIN WITHOUT WORK WRITE
 
 
 	YEAR_P YES_P
@@ -700,7 +683,6 @@ stmt:	AlterObjectSchemaStmt
 			| CheckPointStmt
 			| ClusterStmt
 			| CreateExtensionStmt
-			| CreateFunctionStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreatedbStmt
@@ -712,7 +694,6 @@ stmt:	AlterObjectSchemaStmt
 			| IndexStmt
 		| InsertStmt
 			| ReindexStmt
-			| RemoveFuncStmt
 			| RuleStmt
 			| SelectStmt
 			| TransactionStmt
@@ -1064,12 +1045,6 @@ generic_reset:
 					n->kind = VAR_RESET_ALL;
 					$$ = n;
 				}
-		;
-
-/* FunctionSetResetClause allows SET or RESET without LOCAL */
-FunctionSetResetClause:
-			SET set_rest_more				{ $$ = $2; }
-			| VariableResetStmt				{ $$ = (VariableSetStmt *) $1; }
 		;
 
 
@@ -1901,15 +1876,6 @@ NumericOnly:
 			| SignedIconst						{ $$ = makeInteger($1); }
 		;
 
-/* This ought to be just func_name, but that causes reduce/reduce conflicts
- * (CREATE LANGUAGE is the only place where func_name isn't followed by '(').
- * Work around by using simple names, instead.
- */
-handler_name:
-			name						{ $$ = list_make1(makeString($1)); }
-			| name attrs				{ $$ = lcons(makeString($1), $2); }
-		;
-
 /*****************************************************************************
  *
  *		QUERY:
@@ -2367,171 +2333,15 @@ opt_nulls_order: NULLS_LA FIRST_P			{ $$ = SORTBY_NULLS_FIRST; }
 		;
 
 
-/*****************************************************************************
- *
- *		QUERY:
- *				create [or replace] function <fname>
- *						[(<type-1> { , <type-n>})]
- *						returns <type-r>
- *						as <filename or code in language as appropriate>
- *						language <lang> [with parameters]
- *
- *****************************************************************************/
-
 opt_or_replace:
 			OR REPLACE								{ $$ = true; }
 			| /*EMPTY*/								{ $$ = false; }
-		;
-
-func_args:	'(' func_args_list ')'					{ $$ = $2; }
-			| '(' ')'								{ $$ = NIL; }
-		;
-
-func_args_list:
-			func_arg								{ $$ = list_make1($1); }
-			| func_args_list ',' func_arg			{ $$ = lappend($1, $3); }
-		;
-
-function_with_argtypes_list:
-			function_with_argtypes					{ $$ = list_make1($1); }
-			| function_with_argtypes_list ',' function_with_argtypes
-													{ $$ = lappend($1, $3); }
-		;
-
-function_with_argtypes:
-			func_name func_args
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = $1;
-					n->objargs = extractArgTypes($2);
-					n->objfuncargs = $2;
-					$$ = n;
-				}
-			/*
-			 * Because of reduce/reduce conflicts, we can't use func_name
-			 * below, but we can write it out the long way, which actually
-			 * allows more cases.
-			 */
-			| type_func_name_keyword
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = list_make1(makeString(pstrdup($1)));
-					n->args_unspecified = true;
-					$$ = n;
-				}
-			| ColId
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = list_make1(makeString($1));
-					n->args_unspecified = true;
-					$$ = n;
-				}
-			| ColId indirection
-				{
-					ObjectWithArgs *n = makeNode(ObjectWithArgs);
-					n->objname = check_func_name(lcons(makeString($1), $2),
-												  yyscanner);
-					n->args_unspecified = true;
-					$$ = n;
-				}
-		;
-
-/*
- * func_args_with_defaults is separate because we only want to accept
- * defaults in CREATE FUNCTION, not in ALTER etc.
- */
-func_args_with_defaults:
-		'(' func_args_with_defaults_list ')'		{ $$ = $2; }
-		| '(' ')'									{ $$ = NIL; }
-		;
-
-func_args_with_defaults_list:
-		func_arg_with_default						{ $$ = list_make1($1); }
-		| func_args_with_defaults_list ',' func_arg_with_default
-													{ $$ = lappend($1, $3); }
-		;
-
-/*
- * The style with arg_class first is SQL99 standard, but Oracle puts
- * param_name first; accept both since it's likely people will try both
- * anyway.  Don't bother trying to save productions by letting arg_class
- * have an empty alternative ... you'll get shift/reduce conflicts.
- *
- * We can catch over-specified arguments here if we want to,
- * but for now better to silently swallow typmod, etc.
- * - thomas 2000-03-22
- */
-func_arg:
-			arg_class param_name func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = $2;
-					n->argType = $3;
-					n->mode = $1;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-			| param_name arg_class func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = $1;
-					n->argType = $3;
-					n->mode = $2;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-			| param_name func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = $1;
-					n->argType = $2;
-					n->mode = FUNC_PARAM_DEFAULT;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-			| arg_class func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = NULL;
-					n->argType = $2;
-					n->mode = $1;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-			| func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = NULL;
-					n->argType = $1;
-					n->mode = FUNC_PARAM_DEFAULT;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-		;
-
-/* INOUT is SQL99 standard, IN OUT is for Oracle compatibility */
-arg_class:	IN_P								{ $$ = FUNC_PARAM_IN; }
-			| OUT_P								{ $$ = FUNC_PARAM_OUT; }
-			| INOUT								{ $$ = FUNC_PARAM_INOUT; }
-			| IN_P OUT_P						{ $$ = FUNC_PARAM_INOUT; }
-			| VARIADIC							{ $$ = FUNC_PARAM_VARIADIC; }
 		;
 
 /*
  * Ideally param_name should be ColId, but that causes too many conflicts.
  */
 param_name:	type_function_name
-		;
-
-func_return:
-			func_type
-				{
-					/* We can catch over-specified results here if we want to,
-					 * but for now better to silently swallow typmod, etc.
-					 * - thomas 2000-03-22
-					 */
-					$$ = $1;
-				}
 		;
 
 /*
@@ -2555,209 +2365,9 @@ func_type:	Typename								{ $$ = $1; }
 				}
 		;
 
-func_arg_with_default:
-		func_arg
-				{
-					$$ = $1;
-				}
-		| func_arg DEFAULT a_expr
-				{
-					$$ = $1;
-					$$->defexpr = $3;
-				}
-		| func_arg '=' a_expr
-				{
-					$$ = $1;
-					$$->defexpr = $3;
-				}
-		;
-
-opt_createfunc_opt_list:
-			createfunc_opt_list
-			| /*EMPTY*/ { $$ = NIL; }
-	;
-
-createfunc_opt_list:
-			/* Must be at least one to prevent conflict */
-			createfunc_opt_item						{ $$ = list_make1($1); }
-			| createfunc_opt_list createfunc_opt_item { $$ = lappend($1, $2); }
-	;
-
-/*
- * Options common to both CREATE FUNCTION and ALTER FUNCTION
- */
-common_func_opt_item:
-			CALLED ON NULL_P INPUT_P
-				{
-					$$ = makeDefElem("strict", (Node *)makeInteger(false), @1);
-				}
-			| RETURNS NULL_P ON NULL_P INPUT_P
-				{
-					$$ = makeDefElem("strict", (Node *)makeInteger(true), @1);
-				}
-			| STRICT_P
-				{
-					$$ = makeDefElem("strict", (Node *)makeInteger(true), @1);
-				}
-			| IMMUTABLE
-				{
-					$$ = makeDefElem("volatility", (Node *)makeString("immutable"), @1);
-				}
-			| STABLE
-				{
-					$$ = makeDefElem("volatility", (Node *)makeString("stable"), @1);
-				}
-			| VOLATILE
-				{
-					$$ = makeDefElem("volatility", (Node *)makeString("volatile"), @1);
-				}
-			| EXTERNAL SECURITY DEFINER
-				{
-					$$ = makeDefElem("security", (Node *)makeInteger(true), @1);
-				}
-			| EXTERNAL SECURITY INVOKER
-				{
-					$$ = makeDefElem("security", (Node *)makeInteger(false), @1);
-				}
-			| SECURITY DEFINER
-				{
-					$$ = makeDefElem("security", (Node *)makeInteger(true), @1);
-				}
-			| SECURITY INVOKER
-				{
-					$$ = makeDefElem("security", (Node *)makeInteger(false), @1);
-				}
-			| LEAKPROOF
-				{
-					$$ = makeDefElem("leakproof", (Node *)makeInteger(true), @1);
-				}
-			| NOT LEAKPROOF
-				{
-					$$ = makeDefElem("leakproof", (Node *)makeInteger(false), @1);
-				}
-			| COST NumericOnly
-				{
-					$$ = makeDefElem("cost", (Node *)$2, @1);
-				}
-			| ROWS NumericOnly
-				{
-					$$ = makeDefElem("rows", (Node *)$2, @1);
-				}
-			| SUPPORT any_name
-				{
-					$$ = makeDefElem("support", (Node *)$2, @1);
-				}
-			| FunctionSetResetClause
-				{
-					/* we abuse the normal content of a DefElem here */
-					$$ = makeDefElem("set", (Node *)$1, @1);
-				}
-			| PARALLEL ColId
-				{
-					$$ = makeDefElem("parallel", (Node *)makeString($2), @1);
-				}
-		;
-
-createfunc_opt_item:
-			AS func_as
-				{
-					$$ = makeDefElem("as", (Node *)$2, @1);
-				}
-			| LANGUAGE NonReservedWord_or_Sconst
-				{
-					$$ = makeDefElem("language", (Node *)makeString($2), @1);
-				}
-			| WINDOW
-				{
-					$$ = makeDefElem("window", (Node *)makeInteger(true), @1);
-				}
-			| common_func_opt_item
-				{
-					$$ = $1;
-				}
-		;
-
-func_as:	Sconst						{ $$ = list_make1(makeString($1)); }
-			| Sconst ',' Sconst
-				{
-					$$ = list_make2(makeString($1), makeString($3));
-				}
-		;
-
-ReturnStmt:	RETURN a_expr
-				{
-					ReturnStmt *r = makeNode(ReturnStmt);
-					r->returnval = (Node *) $2;
-					$$ = (Node *) r;
-				}
-		;
-
-opt_routine_body:
-			ReturnStmt
-				{
-					$$ = $1;
-				}
-			| BEGIN_P ATOMIC routine_body_stmt_list END_P
-				{
-					/*
-					 * A compound statement is stored as a single-item list
-					 * containing the list of statements as its member.  That
-					 * way, the parse analysis code can tell apart an empty
-					 * body from no body at all.
-					 */
-					$$ = (Node *) list_make1($3);
-				}
-			| /*EMPTY*/
-				{
-					$$ = NULL;
-				}
-		;
-
-routine_body_stmt_list:
-			routine_body_stmt_list routine_body_stmt ';'
-				{
-					/* As in stmtmulti, discard empty statements */
-					if ($2 != NULL)
-						$$ = lappend($1, $2);
-					else
-						$$ = $1;
-				}
-			| /*EMPTY*/
-				{
-					$$ = NIL;
-				}
-		;
-
-routine_body_stmt:
-			stmt
-			| ReturnStmt
-		;
-
-			opt_definition:
+opt_definition:
 			WITH definition							{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-table_func_column:	param_name func_type
-				{
-					FunctionParameter *n = makeNode(FunctionParameter);
-					n->name = $1;
-					n->argType = $2;
-					n->mode = FUNC_PARAM_TABLE;
-					n->defexpr = NULL;
-					$$ = n;
-				}
-		;
-
-table_func_column_list:
-			table_func_column
-				{
-					$$ = list_make1($1);
-				}
-			| table_func_column_list ',' table_func_column
-				{
-					$$ = lappend($1, $3);
-				}
 		;
 
 opt_if_exists: IF_P EXISTS						{ $$ = true; }
@@ -6887,7 +6497,6 @@ unreserved_keyword:
 			| ALWAYS
 			| ASSIGNMENT
 			| AT
-			| ATOMIC
 			| ATTACH
 			| ATTRIBUTE
 			| BEFORE
@@ -6895,8 +6504,6 @@ unreserved_keyword:
 			| BREADTH
 			| BY
 			| CACHE
-			| CALL
-			| CALLED
 			| CASCADE
 			| CASCADED
 			| CATALOG_P
@@ -6918,7 +6525,6 @@ unreserved_keyword:
 			| CONTINUE_P
 			| CONVERSION_P
 			| COPY
-			| COST
 			| CSV
 			| CUBE
 			| CURRENT_P
@@ -6929,11 +6535,9 @@ unreserved_keyword:
 			| DEALLOCATE
 			| DEFAULTS
 			| DEFERRED
-			| DEFINER
 			| DELETE_P
 			| DELIMITER
 			| DELIMITERS
-			| DEPENDS
 			| DEPTH
 			| DETACH
 			| DICTIONARY
@@ -6956,26 +6560,20 @@ unreserved_keyword:
 			| EXPLAIN
 			| EXPRESSION
 			| EXTENSION
-			| EXTERNAL
 			| FAMILY
 			| FILTER
 			| FINALIZE
 			| FIRST_P
 			| FOLLOWING
 			| FORCE
-			| FUNCTION
-			| FUNCTIONS
 			| GENERATED
 			| GLOBAL
-			| GRANTED
 			| GROUPS
-			| HANDLER
 			| HEADER_P
 			| HOUR_P
 			| IDENTITY_P
 			| IF_P
 			| IMMEDIATE
-			| IMMUTABLE
 			| IMPLICIT_P
 			| IMPORT_P
 			| INCLUDE
@@ -6985,18 +6583,14 @@ unreserved_keyword:
 			| INDEXES
 			| INHERIT
 			| INHERITS
-			| INLINE_P
 			| INPUT_P
 			| INSERT
 			| INSTEAD
-			| INVOKER
 			| ISOLATION
 			| KEY
 			| LABEL
-			| LANGUAGE
 			| LARGE_P
 			| LAST_P
-			| LEAKPROOF
 			| LEVEL
 			| LISTEN
 			| LOAD
@@ -7035,7 +6629,6 @@ unreserved_keyword:
 			| OVERRIDING
 			| OWNED
 			| OWNER
-			| PARALLEL
 			| PARSER
 			| PARTIAL
 			| PARTITION
@@ -7047,9 +6640,6 @@ unreserved_keyword:
 			| PREPARED
 			| PRESERVE
 			| PRIVILEGES
-			| PROCEDURAL
-			| PROCEDURE
-			| PROCEDURES
 			| PROGRAM
 			| QUOTE
 			| RANGE
@@ -7069,13 +6659,9 @@ unreserved_keyword:
 			| RESET
 			| RESTART
 			| RESTRICT
-			| RETURN
-			| RETURNS
 			| ROLE
 			| ROLLBACK
 			| ROLLUP
-			| ROUTINE
-			| ROUTINES
 			| ROWS
 			| RULE
 			| SAVEPOINT
@@ -7083,7 +6669,6 @@ unreserved_keyword:
 			| SCHEMAS
 			| SEARCH
 			| SECOND_P
-			| SECURITY
 			| SERIALIZABLE
 			| SERVER
 			| SESSION
@@ -7095,8 +6680,6 @@ unreserved_keyword:
 			| SKIP
 			| SNAPSHOT
 			| SQL_P
-			| STABLE
-			| STANDALONE_P
 			| START
 			| STATEMENT
 			| STATISTICS
@@ -7104,9 +6687,7 @@ unreserved_keyword:
 			| STDOUT
 			| STORAGE
 			| STORED
-			| STRICT_P
 			| STRIP_P
-			| SUPPORT
 			| SYSID
 			| SYSTEM_P
 			| TABLES
@@ -7118,7 +6699,6 @@ unreserved_keyword:
 			| TEXT_P
 			| TIES
 			| TRANSACTION
-			| TRANSFORM
 			| TRUNCATE
 			| TRUSTED
 			| TYPE_P
@@ -7141,12 +6721,10 @@ unreserved_keyword:
 			| VERSION_P
 			| VIEW
 			| VIEWS
-			| VOLATILE
 			| WHITESPACE_P
 			| WITHIN
 			| WITHOUT
 			| WORK
-			| WRAPPER
 			| WRITE
 			| YEAR_P
 			| YES_P
@@ -7178,7 +6756,6 @@ col_name_keyword:
 			| FLOAT_P
 			| GREATEST
 			| GROUPING
-			| INOUT
 			| INT_P
 			| INTEGER
 			| INTERVAL
@@ -7188,7 +6765,6 @@ col_name_keyword:
 			| NONE
 			| NULLIF
 			| NUMERIC
-			| OUT_P
 			| OVERLAY
 			| POSITION
 			| PRECISION
@@ -7316,7 +6892,6 @@ reserved_keyword:
 			| VARIADIC
 			| WHEN
 			| WHERE
-			| WINDOW
 			| WITH
 		;
 
@@ -7348,7 +6923,6 @@ bare_label_keyword:
 			| ASSIGNMENT
 			| ASYMMETRIC
 			| AT
-			| ATOMIC
 			| ATTACH
 			| ATTRIBUTE
 			| AUTHORIZATION
@@ -7363,8 +6937,6 @@ bare_label_keyword:
 			| BREADTH
 			| BY
 			| CACHE
-			| CALL
-			| CALLED
 			| CASCADE
 			| CASCADED
 			| CASE
@@ -7393,7 +6965,6 @@ bare_label_keyword:
 			| CONTINUE_P
 			| CONVERSION_P
 			| COPY
-			| COST
 			| CROSS
 			| CSV
 			| CUBE
@@ -7414,11 +6985,9 @@ bare_label_keyword:
 			| DEFAULTS
 			| DEFERRABLE
 			| DEFERRED
-			| DEFINER
 			| DELETE_P
 			| DELIMITER
 			| DELIMITERS
-			| DEPENDS
 			| DEPTH
 			| DESC
 			| DETACH
@@ -7447,7 +7016,6 @@ bare_label_keyword:
 			| EXPLAIN
 			| EXPRESSION
 			| EXTENSION
-			| EXTERNAL
 			| EXTRACT
 			| FALSE_P
 			| FAMILY
@@ -7458,21 +7026,16 @@ bare_label_keyword:
 			| FORCE
 			| FREEZE
 			| FULL
-			| FUNCTION
-			| FUNCTIONS
 			| GENERATED
 			| GLOBAL
-			| GRANTED
 			| GREATEST
 			| GROUPING
 			| GROUPS
-			| HANDLER
 			| HEADER_P
 			| IDENTITY_P
 			| IF_P
 			| ILIKE
 			| IMMEDIATE
-			| IMMUTABLE
 			| IMPLICIT_P
 			| IMPORT_P
 			| IN_P
@@ -7484,27 +7047,22 @@ bare_label_keyword:
 			| INHERIT
 			| INHERITS
 			| INITIALLY
-			| INLINE_P
 			| INNER_P
-			| INOUT
 			| INPUT_P
 			| INSERT
 			| INSTEAD
 			| INT_P
 			| INTEGER
 			| INTERVAL
-			| INVOKER
 			| IS
 			| ISOLATION
 			| JOIN
 			| KEY
 			| LABEL
-			| LANGUAGE
 			| LARGE_P
 			| LAST_P
 			| LATERAL_P
 			| LEADING
-			| LEAKPROOF
 			| LEAST
 			| LEFT
 			| LEVEL
@@ -7552,13 +7110,11 @@ bare_label_keyword:
 			| OR
 			| ORDINALITY
 			| OTHERS
-			| OUT_P
 			| OUTER_P
 			| OVERLAY
 			| OVERRIDING
 			| OWNED
 			| OWNER
-			| PARALLEL
 			| PARSER
 			| PARTIAL
 			| PARTITION
@@ -7573,9 +7129,6 @@ bare_label_keyword:
 			| PRESERVE
 			| PRIMARY
 			| PRIVILEGES
-			| PROCEDURAL
-			| PROCEDURE
-			| PROCEDURES
 			| PROGRAM
 			| QUOTE
 			| RANGE
@@ -7597,14 +7150,10 @@ bare_label_keyword:
 			| RESET
 			| RESTART
 			| RESTRICT
-			| RETURN
-			| RETURNS
 			| RIGHT
 			| ROLE
 			| ROLLBACK
 			| ROLLUP
-			| ROUTINE
-			| ROUTINES
 			| ROW
 			| ROWS
 			| RULE
@@ -7612,7 +7161,6 @@ bare_label_keyword:
 			| SCHEMA
 			| SCHEMAS
 			| SEARCH
-			| SECURITY
 			| SELECT
 			| SERIALIZABLE
 			| SERVER
@@ -7629,8 +7177,6 @@ bare_label_keyword:
 			| SNAPSHOT
 			| SOME
 			| SQL_P
-			| STABLE
-			| STANDALONE_P
 			| START
 			| STATEMENT
 			| STATISTICS
@@ -7638,10 +7184,8 @@ bare_label_keyword:
 			| STDOUT
 			| STORAGE
 			| STORED
-			| STRICT_P
 			| STRIP_P
 			| SUBSTRING
-			| SUPPORT
 			| SYMMETRIC
 			| SYSID
 			| SYSTEM_P
@@ -7660,7 +7204,6 @@ bare_label_keyword:
 			| TIMESTAMP
 			| TRAILING
 			| TRANSACTION
-			| TRANSFORM
 			| TREAT
 			| TRIM
 			| TRUE_P
@@ -7692,11 +7235,9 @@ bare_label_keyword:
 			| VERSION_P
 			| VIEW
 			| VIEWS
-			| VOLATILE
 			| WHEN
 			| WHITESPACE_P
 			| WORK
-			| WRAPPER
 			| WRITE
 			| YES_P
 			| ZONE
@@ -7725,107 +7266,6 @@ operator_def_elem: ColLabel '=' NONE
 						{ $$ = makeDefElem($1, (Node *) $3, @1); }
 		;
 
-
-
-CreateFunctionStmt:
-			CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			RETURNS func_return opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = $7;
-					n->options = $8;
-					n->sql_body = $9;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			  RETURNS TABLE '(' table_func_column_list ')' opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = mergeTableFuncParameters($5, $9);
-					n->returnType = TableFuncTypeName($9);
-					n->returnType->location = @7;
-					n->options = $11;
-					n->sql_body = $12;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace FUNCTION func_name func_args_with_defaults
-			  opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = false;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = NULL;
-					n->options = $6;
-					n->sql_body = $7;
-					$$ = (Node *)n;
-				}
-			| CREATE opt_or_replace PROCEDURE func_name func_args_with_defaults
-			  opt_createfunc_opt_list opt_routine_body
-				{
-					CreateFunctionStmt *n = makeNode(CreateFunctionStmt);
-					n->is_procedure = true;
-					n->replace = $2;
-					n->funcname = $4;
-					n->parameters = $5;
-					n->returnType = NULL;
-					n->options = $6;
-					n->sql_body = $7;
-					$$ = (Node *)n;
-				}
-		;
-
-/* Ignored, merely for SQL compliance */
-RemoveFuncStmt:
-			DROP FUNCTION function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_FUNCTION;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP FUNCTION IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_FUNCTION;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP PROCEDURE function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_PROCEDURE;
-					n->objects = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-			| DROP PROCEDURE IF_P EXISTS function_with_argtypes_list opt_drop_behavior
-				{
-					DropStmt *n = makeNode(DropStmt);
-					n->removeType = OBJECT_PROCEDURE;
-					n->objects = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					n->concurrent = false;
-					$$ = (Node *)n;
-				}
-		;
 
 %%
 
@@ -8096,28 +7536,6 @@ check_indirection(List *indirection, core_yyscan_t yyscanner)
 	return indirection;
 }
 
-/* extractArgTypes()
- * Given a list of FunctionParameter nodes, extract a list of just the
- * argument types (TypeNames) for input parameters only.  This is what
- * is needed to look up an existing function, which is what is wanted by
- * the productions that use this call.
- */
-static List *
-extractArgTypes(List *parameters)
-{
-	List	   *result = NIL;
-	ListCell   *i;
-
-	foreach(i, parameters)
-	{
-		FunctionParameter *p = (FunctionParameter *) lfirst(i);
-
-		if (p->mode != FUNC_PARAM_OUT && p->mode != FUNC_PARAM_TABLE)
-			result = lappend(result, p->argType);
-	}
-	return result;
-}
-
 /* insertSelectOptions()
  * Insert ORDER BY, etc into an already-constructed SelectStmt.
  *
@@ -8327,54 +7745,6 @@ makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod, int location)
 	svf->typmod = typmod;
 	svf->location = location;
 	return (Node *) svf;
-}
-
-
-/*
- * Merge the input and output parameters of a table function.
- */
-static List *
-mergeTableFuncParameters(List *func_args, List *columns)
-{
-	ListCell   *lc;
-
-	/* Explicit OUT and INOUT parameters shouldn't be used in this syntax */
-	foreach(lc, func_args)
-	{
-		FunctionParameter *p = (FunctionParameter *) lfirst(lc);
-
-		if (p->mode != FUNC_PARAM_DEFAULT &&
-			p->mode != FUNC_PARAM_IN &&
-			p->mode != FUNC_PARAM_VARIADIC)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("OUT and INOUT arguments aren't allowed in TABLE functions")));
-	}
-
-	return list_concat(func_args, columns);
-}
-
-/*
- * Determine return type of a TABLE function.  A single result column
- * returns setof that column's type; otherwise return setof record.
- */
-static TypeName *
-TableFuncTypeName(List *columns)
-{
-	TypeName *result;
-
-	if (list_length(columns) == 1)
-	{
-		FunctionParameter *p = (FunctionParameter *) linitial(columns);
-
-		result = copyObject(p->argType);
-	}
-	else
-		result = SystemTypeName("record");
-
-	result->setof = true;
-
-	return result;
 }
 
 /*

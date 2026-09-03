@@ -223,25 +223,3 @@ set nosuch.setting = 'nada';
 select current_setting('nosuch.setting');
 select current_setting('nosuch.setting', false);
 select current_setting('nosuch.setting', true);
-
--- Normally, CREATE FUNCTION should complain about invalid values in
--- function SET options; but not if check_function_bodies is off,
--- because that creates ordering hazards for pg_dump
-
-create function func_with_bad_set() returns int as $$ select 1 $$
-language sql
-set work_mem = no_such_config;
-
-set check_function_bodies = off;
-
-create function func_with_bad_set() returns int as $$ select 1 $$
-language sql
-set work_mem = no_such_config;
-
-select func_with_bad_set();
-
-reset check_function_bodies;
-
-set default_with_oids to f;
--- Should not allow to set it to true.
-set default_with_oids to t;

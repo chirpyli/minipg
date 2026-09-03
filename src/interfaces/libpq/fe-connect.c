@@ -331,9 +331,6 @@ pgthreadlock_t pg_g_threadlock = default_threadlock;
 void
 pqDropConnection(PGconn *conn, bool flushInput)
 {
-	/* Drop any SSL state */
-	pqsecure_close(conn);
-
 	/* Close the socket itself */
 	if (conn->sock != PGINVALID_SOCKET)
 		closesocket(conn->sock);

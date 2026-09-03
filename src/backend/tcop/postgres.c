@@ -92,9 +92,6 @@ int			max_stack_depth = 100;
 /* wait N seconds to allow attach from a debugger */
 int			PostAuthDelay = 0;
 
-/* Time between checks that the client is still connected. */
-int			client_connection_check_interval = 0;
-
 /* flags for non-system relation kinds to restrict use */
 int			restrict_nonsystem_relation_kind;
 
@@ -589,9 +586,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	if (IsQueryIdEnabled())
 		jstate = JumbleQuery(query, query_string);
 
-	if (post_parse_analyze_hook)
-		(*post_parse_analyze_hook) (pstate, query, jstate);
-
 	free_parsestate(pstate);
 
 	pgstat_report_query_id(query->queryId, false);
@@ -631,20 +625,6 @@ pg_rewrite_query(Query *query)
 		/* rewrite regular queries */
 		querytree_list = QueryRewrite(query);
 	}
-
-#ifdef COPY_PARSE_PLAN_TREES
-	/* Optional debugging check: pass querytree through copyObject() */
-	{
-		List	   *new_list;
-
-		new_list = copyObject(querytree_list);
-		/* This checks both copyObject() and the equal() routines... */
-		if (!equal(new_list, querytree_list))
-			elog(WARNING, "copyObject() failed to produce equal parse tree");
-		else
-			querytree_list = new_list;
-	}
-#endif
 
 	/*
 	 * We don't apply WRITE_READ_PARSE_PLAN_TREES to rewritten query trees,
@@ -686,49 +666,6 @@ pg_plan_query(Query *querytree, const char *query_string, int cursorOptions,
 
 	if (log_planner_stats)
 		ShowUsage("PLANNER STATISTICS");
-
-#ifdef COPY_PARSE_PLAN_TREES
-	/* Optional debugging check: pass plan tree through copyObject() */
-	{
-		PlannedStmt *new_plan = copyObject(plan);
-
-		/*
-		 * equal() currently does not have routines to compare Plan nodes, so
-		 * don't try to test equality here.  Perhaps fix someday?
-		 */
-#ifdef NOT_USED
-		/* This checks both copyObject() and the equal() routines... */
-		if (!equal(new_plan, plan))
-			elog(WARNING, "copyObject() failed to produce an equal plan tree");
-		else
-#endif
-			plan = new_plan;
-	}
-#endif
-
-#ifdef WRITE_READ_PARSE_PLAN_TREES
-	/* Optional debugging check: pass plan tree through outfuncs/readfuncs */
-	{
-		char	   *str;
-		PlannedStmt *new_plan;
-
-		str = nodeToString(plan);
-		new_plan = stringToNodeWithLocations(str);
-		pfree(str);
-
-		/*
-		 * equal() currently does not have routines to compare Plan nodes, so
-		 * don't try to test equality here.  Perhaps fix someday?
-		 */
-#ifdef NOT_USED
-		/* This checks both outfuncs/readfuncs and the equal() routines... */
-		if (!equal(new_plan, plan))
-			elog(WARNING, "outfuncs/readfuncs failed to produce an equal plan tree");
-		else
-#endif
-			plan = new_plan;
-	}
-#endif
 
 	/*
 	 * Print plan if debugging.
@@ -1107,24 +1044,6 @@ exec_simple_query(const char *query_string)
 	if (!parsetree_list)
 		NullCommand(dest);
 
-	/*
-	 * Emit duration logging if appropriate.
-	 */
-	switch (check_log_duration(msec_str, was_logged))
-	{
-		case 1:
-			ereport(LOG,
-					(errmsg("duration: %s ms", msec_str),
-					 errhidestmt(true)));
-			break;
-		case 2:
-			ereport(LOG,
-					(errmsg("duration: %s ms  statement: %s",
-							msec_str, query_string),
-					 errhidestmt(true)));
-			break;
-	}
-
 	if (save_log_statement_stats)
 		ShowUsage("QUERY STATISTICS");
 
@@ -1145,50 +1064,18 @@ start_xact_command(void)
 
 		xact_started = true;
 	}
-
-	/*
-	 * Start statement timeout if necessary.  Note that this'll intentionally
-	 * not reset the clock on an already started timeout, to avoid the timing
-	 * overhead when start_xact_command() is invoked repeatedly, without an
-	 * interceding finish_xact_command() (e.g. parse/bind/execute).  If that's
-	 * not desired, the timeout has to be disabled explicitly.
-	 */
-	enable_statement_timeout();
-
-	/* Start timeout for checking if the client has gone away if necessary. */
-	if (client_connection_check_interval > 0 &&
-		IsUnderPostmaster &&
-		MyProcPort &&
-		!get_timeout_active(CLIENT_CONNECTION_CHECK_TIMEOUT))
-		enable_timeout_after(CLIENT_CONNECTION_CHECK_TIMEOUT,
-							 client_connection_check_interval);
 }
 
 static void
 finish_xact_command(void)
 {
-	/* cancel active statement timeout after each command */
-	disable_statement_timeout();
-
 	if (xact_started)
 	{
 		CommitTransactionCommand();
 
-#ifdef MEMORY_CONTEXT_CHECKING
-		/* Check all memory contexts that weren't freed during commit */
-		/* (those that were, were checked before being deleted) */
-		MemoryContextCheck(TopMemoryContext);
-#endif
-
-#ifdef SHOW_MEMORY_STATS
-		/* Print mem stats after each commit for leak tracking */
-		MemoryContextStats(TopMemoryContext);
-#endif
-
 		xact_started = false;
 	}
 }
-
 
 /*
  * Convenience routines for checking whether a statement is one of the
@@ -1581,26 +1468,6 @@ ProcessInterrupts(void)
 			ereport(FATAL,
 					(errcode(ERRCODE_ADMIN_SHUTDOWN),
 					 errmsg("terminating connection due to administrator command")));
-	}
-
-	if (CheckClientConnectionPending)
-	{
-		CheckClientConnectionPending = false;
-
-		/*
-		 * Check for lost connection and re-arm, if still configured, but not
-		 * if we've arrived back at DoingCommandRead state.  We don't want to
-		 * wake up idle sessions, and they already know how to detect lost
-		 * connections.
-		 */
-		if (!DoingCommandRead && client_connection_check_interval > 0)
-		{
-			if (!pq_check_connection())
-				ClientConnectionLost = true;
-			else
-				enable_timeout_after(CLIENT_CONNECTION_CHECK_TIMEOUT,
-									 client_connection_check_interval);
-		}
 	}
 
 	if (ClientConnectionLost)
@@ -3067,97 +2934,6 @@ ShowUsage(const char *title)
 	pfree(str.data);
 }
 
-/*
- * Start statement timeout timer, if enabled.
- *
- * If there's already a timeout running, don't restart the timer.  That
- * enables compromises between accuracy of timeouts and cost of starting a
- * timeout.
- */
-static void
-enable_statement_timeout(void)
-{
-	/* must be within an xact */
-	Assert(xact_started);
-
-	if (StatementTimeout > 0)
-	{
-		if (!get_timeout_active(STATEMENT_TIMEOUT))
-			enable_timeout_after(STATEMENT_TIMEOUT, StatementTimeout);
-	}
-	else
-	{
-		if (get_timeout_active(STATEMENT_TIMEOUT))
-			disable_timeout(STATEMENT_TIMEOUT, false);
-	}
-}
-
-/*
- * Disable statement timeout, if active.
- */
-static void
-disable_statement_timeout(void)
-{
-	if (get_timeout_active(STATEMENT_TIMEOUT))
-		disable_timeout(STATEMENT_TIMEOUT, false);
-}
-
-int
-check_log_duration(char *msec_str, bool was_logged)
-{
-	if (log_duration || log_min_duration_sample >= 0 ||
-		log_min_duration_statement >= 0 || xact_is_sampled)
-	{
-		long		secs;
-		int			usecs;
-		int			msecs;
-		bool		exceeded_duration;
-		bool		exceeded_sample_duration;
-		bool		in_sample = false;
-
-		TimestampDifference(GetCurrentStatementStartTimestamp(),
-							GetCurrentTimestamp(),
-							&secs, &usecs);
-		msecs = usecs / 1000;
-
-		/*
-		 * This odd-looking test for log_min_duration_* being exceeded is
-		 * designed to avoid integer overflow with very long durations: don't
-		 * compute secs * 1000 until we've verified it will fit in int.
-		 */
-		exceeded_duration = (log_min_duration_statement == 0 ||
-							 (log_min_duration_statement > 0 &&
-							  (secs > log_min_duration_statement / 1000 ||
-							   secs * 1000 + msecs >= log_min_duration_statement)));
-
-		exceeded_sample_duration = (log_min_duration_sample == 0 ||
-									(log_min_duration_sample > 0 &&
-									 (secs > log_min_duration_sample / 1000 ||
-									  secs * 1000 + msecs >= log_min_duration_sample)));
-
-		/*
-		 * Do not log if log_statement_sample_rate = 0. Log a sample if
-		 * log_statement_sample_rate <= 1 and avoid unnecessary random() call
-		 * if log_statement_sample_rate = 1.
-		 */
-		if (exceeded_sample_duration)
-			in_sample = log_statement_sample_rate != 0 &&
-				(log_statement_sample_rate == 1 ||
-				 random() <= log_statement_sample_rate * MAX_RANDOM_VALUE);
-
-		if (exceeded_duration || in_sample || log_duration || xact_is_sampled)
-		{
-			snprintf(msec_str, 32, "%ld.%03d",
-					 secs * 1000 + msecs, usecs % 1000);
-			if ((exceeded_duration || in_sample || xact_is_sampled) && !was_logged)
-				return 2;
-			else
-				return 1;
-		}
-	}
-
-	return 0;
-}
 
 static bool
 check_log_statement(List *stmt_list)
@@ -3216,4 +2992,14 @@ errdetail_recovery_conflict(void)
 	}
 
 	return 0;
+}
+
+/*
+ * Disable statement timeout, if active.
+ */
+static void
+disable_statement_timeout(void)
+{
+	if (get_timeout_active(STATEMENT_TIMEOUT))
+		disable_timeout(STATEMENT_TIMEOUT, false);
 }

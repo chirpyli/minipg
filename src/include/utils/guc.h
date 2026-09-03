@@ -242,21 +242,14 @@ extern bool log_planner_stats;
 extern bool log_executor_stats;
 extern bool log_statement_stats;
 extern bool log_btree_build_stats;
-
-extern PGDLLIMPORT bool check_function_bodies;
 extern bool session_auth_is_superuser;
 
-extern bool log_duration;
 extern int	log_parameter_max_length;
 extern int	log_parameter_max_length_on_error;
 extern int	log_min_error_statement;
 extern PGDLLIMPORT int log_min_messages;
 extern PGDLLIMPORT int client_min_messages;
-extern int	log_min_duration_sample;
-extern int	log_min_duration_statement;
 extern int	log_temp_files;
-extern double log_statement_sample_rate;
-extern double log_xact_sample_rate;
 extern char *backtrace_functions;
 extern char *backtrace_symbol_list;
 

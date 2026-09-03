@@ -412,33 +412,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_FILTER:
 			errkind = true;
 			break;
-		case EXPR_KIND_WINDOW_PARTITION:
-			/* okay */
-			break;
-		case EXPR_KIND_WINDOW_ORDER:
-			/* okay */
-			break;
-		case EXPR_KIND_WINDOW_FRAME_RANGE:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in window RANGE");
-			else
-				err = _("grouping operations are not allowed in window RANGE");
-
-			break;
-		case EXPR_KIND_WINDOW_FRAME_ROWS:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in window ROWS");
-			else
-				err = _("grouping operations are not allowed in window ROWS");
-
-			break;
-		case EXPR_KIND_WINDOW_FRAME_GROUPS:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in window GROUPS");
-			else
-				err = _("grouping operations are not allowed in window GROUPS");
-
-			break;
 		case EXPR_KIND_SELECT_TARGET:
 			/* okay */
 			break;
@@ -516,27 +489,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 				err = _("aggregate functions are not allowed in EXECUTE parameters");
 			else
 				err = _("grouping operations are not allowed in EXECUTE parameters");
-
-			break;
-		case EXPR_KIND_TRIGGER_WHEN:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in trigger WHEN conditions");
-			else
-				err = _("grouping operations are not allowed in trigger WHEN conditions");
-
-			break;
-		case EXPR_KIND_PARTITION_BOUND:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in partition bound");
-			else
-				err = _("grouping operations are not allowed in partition bound");
-
-			break;
-		case EXPR_KIND_PARTITION_EXPRESSION:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in partition key expressions");
-			else
-				err = _("grouping operations are not allowed in partition key expressions");
 
 			break;
 		case EXPR_KIND_GENERATED_COLUMN:

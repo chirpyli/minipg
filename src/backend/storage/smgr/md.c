@@ -200,7 +200,7 @@ mdcreate(SMgrRelation reln, ForkNumber forkNum, bool isRedo)
 							isRedo);
 
 	path = relpath(reln->smgr_rnode, forkNum);
-
+	// 建表最核心的内容，创建表文件，文件名：/tablespace/dboid/relfileoid
 	fd = PathNameOpenFile(path, O_RDWR | O_CREAT | O_EXCL | PG_BINARY);
 
 	if (fd < 0)
@@ -324,7 +324,7 @@ mdunlinkfork(RelFileNodeBackend rnode, ForkNumber forkNum, bool isRedo)
 	/*
 	 * Delete or truncate the first segment.
 	 */
-	if (isRedo || forkNum != MAIN_FORKNUM || RelFileNodeBackendIsTemp(rnode))
+	if (isRedo || forkNum != MAIN_FORKNUM)
 	{
 		if (!RelFileNodeBackendIsTemp(rnode))
 		{
@@ -1012,9 +1012,6 @@ register_unlink_segment(RelFileNodeBackend rnode, ForkNumber forknum,
 	FileTag		tag;
 
 	INIT_MD_FILETAG(tag, rnode.node, forknum, segno);
-
-	/* Should never be used with temp relations */
-	Assert(!RelFileNodeBackendIsTemp(rnode));
 
 	RegisterSyncRequest(&tag, SYNC_UNLINK_REQUEST, true /* retryOnError */ );
 }

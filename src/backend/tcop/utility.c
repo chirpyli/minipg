@@ -120,7 +120,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_CreatedbStmt:
 		case T_DropStmt:
 		case T_DropdbStmt:
-		case T_CreateFunctionStmt:
 		case T_IndexStmt:
 		case T_RuleStmt:
 		case T_TruncateStmt:
@@ -802,10 +801,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = DefineRule((RuleStmt *) parsetree, queryString);
 				break;
 
-			case T_CreateFunctionStmt:
-				address = CreateFunction(pstate, (CreateFunctionStmt *) parsetree);
-				break;
-
 			case T_DropStmt:
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
 				break;
@@ -1182,13 +1177,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_RuleStmt:
 			tag = CMDTAG_CREATE_RULE;
-			break;
-
-		case T_CreateFunctionStmt:
-			/* FUNCTION/PROCEDURE command tags have been removed; report
-			 * an unknown tag so the command still executes but carries no
-			 * status string. */
-			tag = CMDTAG_UNKNOWN;
 			break;
 
 		case T_IndexStmt:

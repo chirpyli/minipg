@@ -24,21 +24,19 @@ typedef enum
 	FUNCDETAIL_NOTFOUND,		/* no matching function */
 	FUNCDETAIL_MULTIPLE,		/* too many matching functions */
 	FUNCDETAIL_NORMAL,			/* found a matching regular function */
-	FUNCDETAIL_PROCEDURE,		/* found a matching procedure */
 	FUNCDETAIL_AGGREGATE,		/* found a matching aggregate function */
 	FUNCDETAIL_COERCION			/* it's a type coercion request */
 } FuncDetailCode;
 
 
 extern Node *ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
-							   Node *last_srf, FuncCall *fn, bool proc_call,
+							   Node *last_srf, FuncCall *fn,
 							   int location);
 
 extern FuncDetailCode func_get_detail(List *funcname,
 									  List *fargs, List *fargnames,
 									  int nargs, Oid *argtypes,
 									  bool expand_variadic, bool expand_defaults,
-									  bool include_out_arguments,
 									  Oid *funcid, Oid *rettype,
 									  bool *retset, int *nvargs, Oid *vatype,
 									  Oid **true_typeids, List **argdefaults);

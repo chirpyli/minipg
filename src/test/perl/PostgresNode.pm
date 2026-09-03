@@ -551,7 +551,6 @@ sub init
 	print $conf "restart_after_crash = off\n";
 	print $conf "log_line_prefix = '%m [%p] %q%a '\n";
 	print $conf "log_statement = all\n";
-	print $conf "log_replication_commands = on\n";
 	print $conf "wal_retrieve_retry_interval = '500ms'\n";
 
 	# If a setting tends to affect whether tests pass or fail, print it after

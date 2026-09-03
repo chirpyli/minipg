@@ -22,7 +22,6 @@ OBJS = \
 	namespace.o \
 	objectaccess.o \
 	objectaddress.o \
-	pg_aggregate.o \
 	pg_cast.o \
 	pg_collation.o \
 	pg_constraint.o \
@@ -30,7 +29,6 @@ OBJS = \
 	pg_depend.o \
 	pg_namespace.o \
 	pg_operator.o \
-	pg_proc.o \
 	pg_shdepend.o \
 	pg_type.o \
 	storage.o \
@@ -106,7 +104,6 @@ $(top_builddir)/src/include/catalog/header-stamp: bki-stamp
 install-data: bki-stamp installdirs
 	$(INSTALL_DATA) $(call vpathsearch,postgres.bki) '$(DESTDIR)$(datadir)/postgres.bki'
 	$(INSTALL_DATA) $(call vpathsearch,system_constraints.sql) '$(DESTDIR)$(datadir)/system_constraints.sql'
-	$(INSTALL_DATA) $(srcdir)/system_functions.sql '$(DESTDIR)$(datadir)/system_functions.sql'
 	$(INSTALL_DATA) $(srcdir)/system_views.sql '$(DESTDIR)$(datadir)/system_views.sql'
 
 installdirs:
@@ -114,7 +111,7 @@ installdirs:
 
 .PHONY: uninstall-data
 uninstall-data:
-	rm -f $(addprefix '$(DESTDIR)$(datadir)'/, postgres.bki system_constraints.sql system_functions.sql system_views.sql)
+	rm -f $(addprefix '$(DESTDIR)$(datadir)'/, postgres.bki system_constraints.sql system_views.sql)
 
 # postgres.bki, system_constraints.sql, and the generated headers are
 # in the distribution tarball, so they are not cleaned here.

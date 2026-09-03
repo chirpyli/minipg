@@ -131,7 +131,6 @@ typedef struct Query
 	bool		hasSubLinks;	/* has subquery SubLink */
 	bool		hasDistinctOn;	/* distinctClause is from DISTINCT ON */
 	bool		hasForUpdate;	/* FOR [KEY] UPDATE/SHARE was specified */
-	bool		isReturn;		/* is a RETURN statement */
 
 	List	   *rtable;			/* list of range table entries */
 	FromExpr   *jointree;		/* table join tree (FROM and WHERE clauses) */
@@ -1231,16 +1230,6 @@ typedef struct SelectStmt
 } SelectStmt;
 
 
-/* ----------------------
- * RETURN statement (inside SQL function body)
- */
-typedef struct ReturnStmt
-{
-	NodeTag		type;
-	Node	   *returnval;
-} ReturnStmt;
-
-
 /*****************************************************************************
  *		Other Statements (no optimizations required)
  *
@@ -1402,16 +1391,12 @@ typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
 
 
 /*
- * ObjectWithArgs represents a function/procedure/operator name plus parameter
- * identification.
+ * ObjectWithArgs represents an operator name plus parameter identification.
  *
  * objargs includes only the types of the input parameters of the object.
  * In some contexts, that will be all we have, and it's enough to look up
  * objects according to the traditional Postgres rules (i.e., when only input
  * arguments matter).
- *
- * objfuncargs, if not NIL, carries the full specification of the parameter
- * list, including parameter mode annotations.
  *
  * Some grammar productions can set args_unspecified = true instead of
  * providing parameter info.  In this case, lookup will succeed only if
@@ -1423,7 +1408,6 @@ typedef struct ObjectWithArgs
 	NodeTag		type;
 	List	   *objname;		/* qualified name of function/operator */
 	List	   *objargs;		/* list of Typename nodes (input args only) */
-	List	   *objfuncargs;	/* list of FunctionParameter nodes */
 	bool		args_unspecified;	/* argument list was omitted? */
 } ObjectWithArgs;
 
@@ -1630,27 +1614,6 @@ typedef struct IndexStmt
 } IndexStmt;
 
 
-/* ----------------------
- *		Alter Statistics Statement
- * ----------------------
- */
-
-/* ----------------------
- *		Create Function Statement
- * ----------------------
- */
-typedef struct CreateFunctionStmt
-{
-	NodeTag		type;
-	bool		is_procedure;	/* it's really CREATE PROCEDURE */
-	bool		replace;		/* T => replace if already exists */
-	List	   *funcname;		/* qualified name of function to create */
-	List	   *parameters;		/* a list of FunctionParameter */
-	TypeName   *returnType;		/* the return type */
-	List	   *options;		/* a list of DefElem */
-	Node	   *sql_body;
-} CreateFunctionStmt;
-
 typedef enum FunctionParameterMode
 {
 	/* the assigned enum values appear in pg_proc, don't change 'em! */
@@ -1662,15 +1625,6 @@ typedef enum FunctionParameterMode
 	/* this is not used in pg_proc: */
 	FUNC_PARAM_DEFAULT = 'd'	/* default; effectively same as IN */
 } FunctionParameterMode;
-
-typedef struct FunctionParameter
-{
-	NodeTag		type;
-	char	   *name;			/* parameter name, or NULL if not given */
-	TypeName   *argType;		/* TypeName for parameter type */
-	FunctionParameterMode mode; /* IN/OUT/etc */
-	Node	   *defexpr;		/* raw default expr, or NULL if not given */
-} FunctionParameter;
 
 /* ----------------------
  * ALTER object DEPENDS ON EXTENSION extname
