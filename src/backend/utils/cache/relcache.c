@@ -283,8 +283,6 @@ static void load_critical_index(Oid indexoid, Oid heapoid);
 static TupleDesc GetPgIndexDescriptor(void);
 static void AttrDefaultFetch(Relation relation, int ndef);
 static int	AttrDefaultCmp(const void *a, const void *b);
-static void CheckConstraintFetch(Relation relation);
-static int	CheckConstraintCmp(const void *a, const void *b);
 static void InitIndexAmRoutine(Relation relation);
 static void IndexSupportInitialize(oidvector *indclass,
 								   RegProcedure *indexSupport,
@@ -611,11 +609,6 @@ RelationBuildTupleDesc(Relation relation)
 			constr->num_defval = 0;
 
 		constr->missing = attrmiss;
-
-		if (relation->rd_rel->relchecks > 0)	/* CHECKs */
-			CheckConstraintFetch(relation);
-		else
-			constr->num_check = 0;
 	}
 	else
 	{
@@ -3948,109 +3941,6 @@ AttrDefaultCmp(const void *a, const void *b)
 	const AttrDefault *adb = (const AttrDefault *) b;
 
 	return ada->adnum - adb->adnum;
-}
-
-/*
- * Load any check constraints for the relation.
- *
- * As with defaults, if we don't find the expected number of them, just warn
- * here.  The executor should throw an error if an INSERT/UPDATE is attempted.
- */
-static void
-CheckConstraintFetch(Relation relation)
-{
-	ConstrCheck *check;
-	int			ncheck = relation->rd_rel->relchecks;
-	Relation	conrel;
-	SysScanDesc conscan;
-	ScanKeyData skey[1];
-	HeapTuple	htup;
-	int			found = 0;
-
-	/* Allocate array with room for as many entries as expected */
-	check = (ConstrCheck *)
-		MemoryContextAllocZero(CacheMemoryContext,
-							   ncheck * sizeof(ConstrCheck));
-
-	/* Search pg_constraint for relevant entries */
-	ScanKeyInit(&skey[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
-
-	conrel = table_open(ConstraintRelationId, AccessShareLock);
-	conscan = systable_beginscan(conrel, ConstraintRelidNameIndexId, true,
-								 NULL, 1, skey);
-
-	while (HeapTupleIsValid(htup = systable_getnext(conscan)))
-	{
-		Form_pg_constraint conform = (Form_pg_constraint) GETSTRUCT(htup);
-		Datum		val;
-		bool		isnull;
-
-		/* We want check constraints only */
-		if (conform->contype != CONSTRAINT_CHECK)
-			continue;
-
-		/* protect limited size of array */
-		if (found >= ncheck)
-		{
-			elog(WARNING, "unexpected pg_constraint record found for relation \"%s\"",
-				 RelationGetRelationName(relation));
-			break;
-		}
-
-		check[found].ccvalid = conform->convalidated;
-		check[found].ccname = MemoryContextStrdup(CacheMemoryContext,
-												  NameStr(conform->conname));
-
-		/* Grab and test conbin is actually set */
-		val = fastgetattr(htup,
-						  Anum_pg_constraint_conbin,
-						  conrel->rd_att, &isnull);
-		if (isnull)
-			elog(WARNING, "null conbin for relation \"%s\"",
-				 RelationGetRelationName(relation));
-		else
-		{
-			/* detoast and convert to cstring in caller's context */
-			char	   *s = TextDatumGetCString(val);
-
-			check[found].ccbin = MemoryContextStrdup(CacheMemoryContext, s);
-			pfree(s);
-			found++;
-		}
-	}
-
-	systable_endscan(conscan);
-	table_close(conrel, AccessShareLock);
-
-	if (found != ncheck)
-		elog(WARNING, "%d pg_constraint record(s) missing for relation \"%s\"",
-			 ncheck - found, RelationGetRelationName(relation));
-
-	/*
-	 * Sort the records by name.  This ensures that CHECKs are applied in a
-	 * deterministic order, and it also makes equalTupleDescs() faster.
-	 */
-	if (found > 1)
-		qsort(check, found, sizeof(ConstrCheck), CheckConstraintCmp);
-
-	/* Install array only after it's fully valid */
-	relation->rd_att->constr->check = check;
-	relation->rd_att->constr->num_check = found;
-}
-
-/*
- * qsort comparator to sort ConstrCheck entries by name
- */
-static int
-CheckConstraintCmp(const void *a, const void *b)
-{
-	const ConstrCheck *ca = (const ConstrCheck *) a;
-	const ConstrCheck *cb = (const ConstrCheck *) b;
-
-	return strcmp(ca->ccname, cb->ccname);
 }
 
 /*

@@ -159,8 +159,6 @@ static int	errdetail_recovery_conflict(void);
 static void start_xact_command(void);
 static void finish_xact_command(void);
 static bool IsTransactionExitStmt(Node *parsetree);
-static void enable_statement_timeout(void);
-static void disable_statement_timeout(void);
 
 
 /* ----------------------------------------------------------------
@@ -1009,13 +1007,6 @@ exec_simple_query(const char *query_string)
 			 * those that start or end a transaction block.
 			 */
 			CommandCounterIncrement();
-
-			/*
-			 * Disable statement timeout between queries of a multi-query
-			 * string, so that the timeout applies separately to each query.
-			 * (Our next loop iteration will start a fresh timeout.)
-			 */
-			disable_statement_timeout();
 		}
 
 		/*
@@ -2992,14 +2983,4 @@ errdetail_recovery_conflict(void)
 	}
 
 	return 0;
-}
-
-/*
- * Disable statement timeout, if active.
- */
-static void
-disable_statement_timeout(void)
-{
-	if (get_timeout_active(STATEMENT_TIMEOUT))
-		disable_timeout(STATEMENT_TIMEOUT, false);
 }

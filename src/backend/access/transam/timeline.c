@@ -49,19 +49,6 @@
 void
 restoreTimeLineHistoryFiles(TimeLineID begin, TimeLineID end)
 {
-	char		path[MAXPGPATH];
-	char		histfname[MAXFNAMELEN];
-	TimeLineID	tli;
-
-	for (tli = begin; tli < end; tli++)
-	{
-		if (tli == 1)
-			continue;
-
-		TLHistoryFileName(histfname, tli);
-		if (RestoreArchivedFile(path, histfname, "RECOVERYHISTORY", 0, false))
-			KeepFileRestoredFromArchive(path, histfname);
-	}
 }
 
 /*
@@ -93,14 +80,7 @@ readTimeLineHistory(TimeLineID targetTLI)
 		return list_make1(entry);
 	}
 
-	if (ArchiveRecoveryRequested)
-	{
-		TLHistoryFileName(histfname, targetTLI);
-		fromArchive =
-			RestoreArchivedFile(path, histfname, "RECOVERYHISTORY", 0, false);
-	}
-	else
-		TLHistoryFilePath(path, targetTLI);
+	TLHistoryFilePath(path, targetTLI);
 
 	fd = AllocateFile(path, "r");
 	if (fd == NULL)
@@ -229,13 +209,7 @@ existsTimeLineHistory(TimeLineID probeTLI)
 	if (probeTLI == 1)
 		return false;
 
-	if (ArchiveRecoveryRequested)
-	{
-		TLHistoryFileName(histfname, probeTLI);
-		RestoreArchivedFile(path, histfname, "RECOVERYHISTORY", 0, false);
-	}
-	else
-		TLHistoryFilePath(path, probeTLI);
+	TLHistoryFilePath(path, probeTLI);
 
 	fd = AllocateFile(path, "r");
 	if (fd != NULL)
@@ -331,13 +305,7 @@ writeTimeLineHistory(TimeLineID newTLI, TimeLineID parentTLI,
 	/*
 	 * If a history file exists for the parent, copy it verbatim
 	 */
-	if (ArchiveRecoveryRequested)
-	{
-		TLHistoryFileName(histfname, parentTLI);
-		RestoreArchivedFile(path, histfname, "RECOVERYHISTORY", 0, false);
-	}
-	else
-		TLHistoryFilePath(path, parentTLI);
+	TLHistoryFilePath(path, parentTLI);
 
 	srcfd = OpenTransientFile(path, O_RDONLY);
 	if (srcfd < 0)

@@ -3681,20 +3681,6 @@ XLogFileRead(XLogSegNo segno, int emode, TimeLineID tli,
 
 	switch (source)
 	{
-		case XLOG_FROM_ARCHIVE:
-			/* Report recovery progress in PS display */
-			snprintf(activitymsg, sizeof(activitymsg), "waiting for %s",
-					 xlogfname);
-			set_ps_display(activitymsg);
-
-			restoredFromArchive = RestoreArchivedFile(path, xlogfname,
-													  "RECOVERYXLOG",
-													  wal_segment_size,
-													  InRedo);
-			if (!restoredFromArchive)
-				return -1;
-			break;
-
 		case XLOG_FROM_PG_WAL:
 		case XLOG_FROM_STREAM:
 			XLogFilePath(path, tli, segno, wal_segment_size);
@@ -4359,8 +4345,7 @@ ReadRecord(XLogReaderState *xlogreader, int emode,
 			 * complete record, so if we did this, we would later create an
 			 * overwrite contrecord in the wrong place, breaking everything.
 			 */
-			if (!ArchiveRecoveryRequested &&
-				!XLogRecPtrIsInvalid(xlogreader->abortedRecPtr))
+			if (!XLogRecPtrIsInvalid(xlogreader->abortedRecPtr))
 			{
 				abortedRecPtr = xlogreader->abortedRecPtr;
 				missingContrecPtr = xlogreader->missingContrecPtr;
@@ -10053,17 +10038,6 @@ xlog_redo(XLogReaderState *record)
 		 * redo an xl_clog_truncate if it changed since initialization.
 		 */
 		SetTransactionIdLimit(checkPoint.oldestXid, checkPoint.oldestXidDB);
-
-		/*
-		 * If we see a shutdown checkpoint while waiting for an end-of-backup
-		 * record, the backup was canceled and the end-of-backup record will
-		 * never arrive.
-		 */
-		if (ArchiveRecoveryRequested &&
-			!XLogRecPtrIsInvalid(ControlFile->backupStartPoint) &&
-			XLogRecPtrIsInvalid(ControlFile->backupEndPoint))
-			ereport(PANIC,
-					(errmsg("online backup was canceled, recovery cannot continue")));
 
 		/*
 		 * If we see a shutdown checkpoint, we know that nothing was running

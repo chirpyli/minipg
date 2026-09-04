@@ -124,11 +124,6 @@ typedef struct GroupClause
 	List   *list;
 } GroupClause;
 
-/* ConstraintAttributeSpec yields an integer bitmask of these flags: */
-#define CAS_NOT_VALID				0x10
-#define CAS_NO_INHERIT				0x20
-
-
 #define parser_yyerror(msg)  scanner_yyerror(msg, yyscanner)
 #define parser_errposition(pos)  scanner_errposition(pos, yyscanner)
 
@@ -164,9 +159,6 @@ static Node *makeAArrayExpr(List *elements, int location);
 static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 								  int location);
 static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner);
-static void processCASbits(int cas_bits, int location, const char *constrType,
-			   bool *not_valid, bool *no_inherit, core_yyscan_t yyscanner);
-
 %}
 
 %pure-parser
@@ -386,7 +378,7 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 				Bit ConstBit BitWithLength BitWithoutLength
 %type <str>		character
 %type <str>		extract_arg
-%type <boolean> opt_varying opt_timezone opt_no_inherit
+%type <boolean> opt_varying opt_timezone
 
 %type <ival>	Iconst SignedIconst
 %type <str>		Sconst
@@ -407,7 +399,6 @@ static void processCASbits(int cas_bits, int location, const char *constrType,
 %type <str>		column_compression opt_column_compression
 %type <list>	ColQualList
 %type <node>	ColConstraint ColConstraintElem
-%type <ival>	ConstraintAttributeSpec ConstraintAttributeElem
 %type <str>		ExistingIndex
 
 %type <ival>	opt_check_option
@@ -1224,6 +1215,14 @@ alter_table_cmds:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
+		/* ALTER TABLE <name> ADD CONSTRAINT ... */
+		| ADD_P TableConstraint
+			{
+				AlterTableCmd *n = makeNode(AlterTableCmd);
+				n->subtype = AT_AddConstraint;
+				n->def = $2;
+				$$ = (Node *)n;
+			}
 			/* ALTER TABLE <name> ALTER [COLUMN] <colname> {SET DEFAULT <expr>|DROP DEFAULT} */
 			| ALTER opt_column ColId alter_column_default
 				{
@@ -1353,22 +1352,6 @@ alter_table_cmds:
 					n->subtype = AT_AlterColumnGenericOptions;
 					n->name = $3;
 					n->def = (Node *) $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ADD CONSTRAINT ... */
-			| ADD_P TableConstraint
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_AddConstraint;
-					n->def = $2;
-					$$ = (Node *)n;
-					}
-					/* ALTER TABLE <name> VALIDATE CONSTRAINT ... */
-			| VALIDATE CONSTRAINT name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ValidateConstraint;
-					n->name = $3;
 					$$ = (Node *)n;
 				}
 			/* ALTER TABLE <name> DROP CONSTRAINT IF EXISTS <name> [RESTRICT|CASCADE] */
@@ -1556,7 +1539,6 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				$3->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->relation = $3;
 				n->tableElts = $5;
-				n->constraints = NIL;
 				n->oncommit = $7;
 				n->if_not_exists = false;
 				$$ = (Node *)n;
@@ -1568,7 +1550,6 @@ CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
 				$6->relpersistence = RELPERSISTENCE_PERMANENT;
 				n->relation = $6;
 				n->tableElts = $8;
-				n->constraints = NIL;
 				n->oncommit = $10;
 				n->if_not_exists = true;
 				$$ = (Node *)n;
@@ -1694,25 +1675,12 @@ ColConstraintElem:
 					n->indexname = NULL;
 					$$ = (Node *)n;
 				}
-			| CHECK '(' a_expr ')' opt_no_inherit
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_CHECK;
-					n->location = @1;
-					n->is_no_inherit = $5;
-					n->raw_expr = $3;
-					n->cooked_expr = NULL;
-					n->skip_validation = false;
-					n->initially_valid = true;
-					$$ = (Node *)n;
-				}
 			| DEFAULT b_expr
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_DEFAULT;
 					n->location = @1;
 					n->raw_expr = $2;
-					n->cooked_expr = NULL;
 					$$ = (Node *)n;
 				}
 					;
@@ -1734,21 +1702,7 @@ TableConstraint:
 		;
 
 ConstraintElem:
-			CHECK '(' a_expr ')' ConstraintAttributeSpec
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_CHECK;
-					n->location = @1;
-					n->raw_expr = $3;
-					n->cooked_expr = NULL;
-					processCASbits($5, @5, "CHECK",
-								   &n->skip_validation,
-								   &n->is_no_inherit, yyscanner);
-					n->initially_valid = !n->skip_validation;
-					$$ = (Node *)n;
-				}
-			| UNIQUE '(' columnList ')' opt_c_include opt_definition
-				ConstraintAttributeSpec
+			UNIQUE '(' columnList ')' opt_c_include opt_definition
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_UNIQUE;
@@ -1757,11 +1711,9 @@ ConstraintElem:
 					n->including = $5;
 					n->options = $6;
 					n->indexname = NULL;
-					processCASbits($7, @7, "UNIQUE",
-								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-			| UNIQUE ExistingIndex ConstraintAttributeSpec
+			| UNIQUE ExistingIndex
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_UNIQUE;
@@ -1770,12 +1722,9 @@ ConstraintElem:
 					n->including = NIL;
 					n->options = NIL;
 					n->indexname = $2;
-					processCASbits($3, @3, "UNIQUE",
-								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
 			| PRIMARY KEY '(' columnList ')' opt_c_include opt_definition
-				ConstraintAttributeSpec
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_PRIMARY;
@@ -1784,11 +1733,9 @@ ConstraintElem:
 					n->including = $6;
 					n->options = $7;
 					n->indexname = NULL;
-					processCASbits($8, @8, "PRIMARY KEY",
-								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-			| PRIMARY KEY ExistingIndex ConstraintAttributeSpec
+			| PRIMARY KEY ExistingIndex
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_PRIMARY;
@@ -1797,14 +1744,8 @@ ConstraintElem:
 					n->including = NIL;
 					n->options = NIL;
 					n->indexname = $3;
-					processCASbits($4, @4, "PRIMARY KEY",
-								   NULL, NULL, yyscanner);
 					$$ = (Node *)n;
 				}
-		;
-
-opt_no_inherit:	NO INHERIT							{  $$ = true; }
-			| /* EMPTY */							{  $$ = false; }
 		;
 
 opt_column_list:
@@ -2000,28 +1941,6 @@ generic_option_arg:
  ****************************************************************************/
 
 
-		;
-
-
-ConstraintAttributeSpec:
-			/*EMPTY*/
-				{ $$ = 0; }
-			| ConstraintAttributeSpec ConstraintAttributeElem
-				{
-					/*
-					 * We must complain about conflicting options.
-					 * We could, but choose not to, complain about redundant
-					 * options (ie, where $2's bit is already set in $1).
-					 */
-					int		newspec = $1 | $2;
-
-					$$ = newspec;
-				}
-		;
-
-ConstraintAttributeElem:
-			NOT VALID						{ $$ = CAS_NOT_VALID; }
-			| NO INHERIT					{ $$ = CAS_NO_INHERIT; }
 		;
 
 
@@ -7788,47 +7707,6 @@ makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner)
 
 	return r;
 }
-
-/*
- * Process result of ConstraintAttributeSpec, and set appropriate bool flags
- * in the output command node.  Pass NULL for any flags the particular
- * command doesn't support.
- */
-static void
-processCASbits(int cas_bits, int location, const char *constrType,
-			   bool *not_valid, bool *no_inherit, core_yyscan_t yyscanner)
-{
-	/* defaults */
-	if (not_valid)
-		*not_valid = false;
-
-	if (cas_bits & CAS_NOT_VALID)
-	{
-		if (not_valid)
-			*not_valid = true;
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 /* translator: %s is CHECK, UNIQUE, or similar */
-					 errmsg("%s constraints cannot be marked NOT VALID",
-							constrType),
-					 parser_errposition(location)));
-	}
-
-	if (cas_bits & CAS_NO_INHERIT)
-	{
-		if (no_inherit)
-			*no_inherit = true;
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 /* translator: %s is CHECK, UNIQUE, or similar */
-					 errmsg("%s constraints cannot be marked NO INHERIT",
-							constrType),
-					 parser_errposition(location)));
-	}
-}
-
 
 /* parser_init()
  * Initialize to parse one query string

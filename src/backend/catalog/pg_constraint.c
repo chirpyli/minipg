@@ -50,14 +50,11 @@ Oid
 CreateConstraintEntry(const char *constraintName,
 					  Oid constraintNamespace,
 					  char constraintType,
-					  bool isValidated,
 					  Oid relId,
 					  const int16 *constraintKey,
 					  int constraintNKeys,
 					  int constraintNTotalKeys,
 					  Oid indexRelId,
-					  Node *conExpr,
-					  const char *conBin,
 					  bool is_internal)
 {
 	Relation	conDesc;
@@ -106,7 +103,6 @@ CreateConstraintEntry(const char *constraintName,
 	values[Anum_pg_constraint_conname - 1] = NameGetDatum(&cname);
 	values[Anum_pg_constraint_connamespace - 1] = ObjectIdGetDatum(constraintNamespace);
 	values[Anum_pg_constraint_contype - 1] = CharGetDatum(constraintType);
-	values[Anum_pg_constraint_convalidated - 1] = BoolGetDatum(isValidated);
 	values[Anum_pg_constraint_conrelid - 1] = ObjectIdGetDatum(relId);
 	values[Anum_pg_constraint_conindid - 1] = ObjectIdGetDatum(indexRelId);
 
@@ -114,11 +110,6 @@ CreateConstraintEntry(const char *constraintName,
 		values[Anum_pg_constraint_conkey - 1] = PointerGetDatum(conkeyArray);
 	else
 		nulls[Anum_pg_constraint_conkey - 1] = true;
-
-	if (conBin)
-		values[Anum_pg_constraint_conbin - 1] = CStringGetTextDatum(conBin);
-	else
-		nulls[Anum_pg_constraint_conbin - 1] = true;
 
 	tup = heap_form_tuple(RelationGetDescr(conDesc), values, nulls);
 
@@ -171,17 +162,6 @@ CreateConstraintEntry(const char *constraintName,
 	 * assume they are members of the opclass supporting the index, so there's
 	 * an indirect dependency via that.
 	 */
-
-	if (conExpr != NULL)
-	{
-		/*
-		 * Register dependencies from constraint to objects mentioned in CHECK
-		 * expression.
-		 */
-		recordDependencyOnSingleRelExpr(&conobject, conExpr, relId,
-										DEPENDENCY_NORMAL,
-										DEPENDENCY_NORMAL, false);
-	}
 
 	/* Post creation hook for new constraint */
 	InvokeObjectPostCreateHookArg(ConstraintRelationId, conOid, 0,
@@ -391,37 +371,6 @@ RemoveConstraintById(Oid conId)
 		 * relation it's for.
 		 */
 		rel = table_open(con->conrelid, AccessExclusiveLock);
-
-		/*
-		 * We need to update the relchecks count if it is a check constraint
-		 * being dropped.  This update will force backends to rebuild relcache
-		 * entries when we commit.
-		 */
-		if (con->contype == CONSTRAINT_CHECK)
-		{
-			Relation	pgrel;
-			HeapTuple	relTup;
-			Form_pg_class classForm;
-
-			pgrel = table_open(RelationRelationId, RowExclusiveLock);
-			relTup = SearchSysCacheCopy1(RELOID,
-										 ObjectIdGetDatum(con->conrelid));
-			if (!HeapTupleIsValid(relTup))
-				elog(ERROR, "cache lookup failed for relation %u",
-					 con->conrelid);
-			classForm = (Form_pg_class) GETSTRUCT(relTup);
-
-			if (classForm->relchecks == 0)	/* should not happen */
-				elog(ERROR, "relation \"%s\" has relchecks = 0",
-					 RelationGetRelationName(rel));
-			classForm->relchecks--;
-
-			CatalogTupleUpdate(pgrel, &relTup->t_self, relTup);
-
-			heap_freetuple(relTup);
-
-			table_close(pgrel, RowExclusiveLock);
-		}
 
 		/* Keep lock on constraint's rel until end of xact */
 		table_close(rel, NoLock);

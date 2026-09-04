@@ -33,8 +33,6 @@
 
 static void does_not_exist_skipping(ObjectType objtype,
 									Node *object);
-static bool owningrel_does_not_exist_skipping(List *object,
-											  const char **msg, char **name);
 static bool schema_does_not_exist_skipping(List *object,
 										   const char **msg, char **name);
 static bool type_in_list_does_not_exist_skipping(List *typenames,
@@ -111,41 +109,6 @@ RemoveObjects(DropStmt *stmt)
 	performMultipleDeletions(objects, stmt->behavior, 0);
 
 	free_object_addresses(objects);
-}
-
-/*
- * owningrel_does_not_exist_skipping
- *		Subroutine for RemoveObjects
- *
- * After determining that a specification for a rule or trigger returns that
- * the specified object does not exist, test whether its owning relation, and
- * its schema, exist or not; if they do, return false --- the trigger or rule
- * itself is missing instead.  If the owning relation or its schema do not
- * exist, fill the error message format string and name, and return true.
- */
-static bool
-owningrel_does_not_exist_skipping(List *object, const char **msg, char **name)
-{
-	List	   *parent_object;
-	RangeVar   *parent_rel;
-
-	parent_object = list_truncate(list_copy(object),
-								  list_length(object) - 1);
-
-	if (schema_does_not_exist_skipping(parent_object, msg, name))
-		return true;
-
-	parent_rel = makeRangeVarFromNameList(parent_object);
-
-	if (!OidIsValid(RangeVarGetRelid(parent_rel, NoLock, true)))
-	{
-		*msg = gettext_noop("relation \"%s\" does not exist, skipping");
-		*name = NameListToString(parent_object);
-
-		return true;
-	}
-
-	return false;
 }
 
 /*

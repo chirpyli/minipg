@@ -384,7 +384,6 @@ ConnectionStateEnum
 ConnsAllowedState
 ConsiderSplitContext
 Const
-ConstrCheck
 ConstrType
 Constraint
 ConstraintInfo
@@ -1286,7 +1285,6 @@ NestLoopParam
 NestLoopState
 NestPath
 NewColumnValue
-NewConstraint
 NextSampleBlock_function
 NextSampleTuple_function
 NextValueExpr
@@ -2269,7 +2267,6 @@ Syn
 SyncOps
 SyncRequestHandler
 SyncRequestType
-SysFKRelationship
 SysScanDesc
 SyscacheCallbackFunction
 SystemRowsSamplerData

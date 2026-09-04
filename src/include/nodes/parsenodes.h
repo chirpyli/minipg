@@ -1338,10 +1338,7 @@ typedef enum AlterTableType
 	AT_ReAddIndex,				/* internal to commands/tablecmds.c */
 	AT_AddConstraint,			/* add constraint */
 	AT_AddConstraintRecurse,	/* internal to commands/tablecmds.c */
-	AT_ReAddConstraint,			/* internal to commands/tablecmds.c */
 	AT_AlterConstraint,			/* alter constraint */
-	AT_ValidateConstraint,		/* validate constraint */
-	AT_ValidateConstraintRecurse,	/* internal to commands/tablecmds.c */
 	AT_AddIndexConstraint,		/* add constraint using existing index */
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
@@ -1463,7 +1460,6 @@ typedef struct CreateStmt
 	NodeTag		type;
 	RangeVar   *relation;		/* relation to create */
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	List	   *constraints;	/* constraints (list of Constraint nodes) */
 	OnCommitAction oncommit;	/* what do we do at COMMIT? */
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 } CreateStmt;
@@ -1489,7 +1485,6 @@ typedef enum ConstrType			/* types of constraints */
 								 * expect it */
 	CONSTR_NOTNULL,
 	CONSTR_DEFAULT,
-	CONSTR_CHECK,
 	CONSTR_PRIMARY,
 	CONSTR_UNIQUE
 } ConstrType;
@@ -1503,10 +1498,8 @@ typedef struct Constraint
 	char	   *conname;		/* Constraint name, or NULL if unnamed */
 	int			location;		/* token location, or -1 if unknown */
 
-	/* Fields used for constraints with expressions (CHECK and DEFAULT): */
-	bool		is_no_inherit;	/* is constraint non-inheritable? */
+	/* Fields used for constraints with expressions (DEFAULT): */
 	Node	   *raw_expr;		/* expr, as untransformed parse tree */
-	char	   *cooked_expr;	/* expr, as nodeToString representation */
 	char		generated_when; /* ALWAYS or BY DEFAULT */
 
 	/* Fields used for unique constraints (UNIQUE and PRIMARY KEY): */
@@ -1521,10 +1514,6 @@ typedef struct Constraint
 	/* These could be, but currently are not, used for UNIQUE/PKEY: */
 	char	   *access_method;	/* index access method; NULL for default */
 	Node	   *where_clause;	/* partial index predicate */
-
-	/* Fields used for constraints that allow a NOT VALID specification */
-	bool		skip_validation;	/* skip validation of existing rows? */
-	bool		initially_valid;	/* mark the new constraint as valid? */
 } Constraint;
 
 /* ----------------------

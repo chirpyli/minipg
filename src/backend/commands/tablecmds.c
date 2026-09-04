@@ -162,7 +162,6 @@ typedef struct AlteredTableInfo
 	/* Information saved by Phase 1 for Phase 2: */
 	List	   *subcmds[AT_NUM_PASSES]; /* Lists of AlterTableCmd */
 	/* Information saved by Phases 1/2 for Phase 3: */
-	List	   *constraints;	/* List of NewConstraint */
 	List	   *newvals;		/* List of NewColumnValue */
 	List	   *afterStmts;		/* List of utility command parsetrees */
 	bool		verify_new_notnull; /* T if we should recheck NOT NULL */
@@ -177,16 +176,6 @@ typedef struct AlteredTableInfo
 	List	   *changedIndexDefs;	/* string definitions of same */
 	char	   *clusterOnIndex; /* index to use for CLUSTER */
 } AlteredTableInfo;
-
-/* Struct describing one new constraint to check in Phase 3 scan */
-/* Note: new NOT NULL constraints are handled elsewhere */
-typedef struct NewConstraint
-{
-	char	   *name;			/* Constraint name, or NULL if none */
-	ConstrType	contype;		/* CHECK */
-	Node	   *qual;			/* Check expr */
-	ExprState  *qualstate;		/* Execution state for CHECK expr */
-} NewConstraint;
 
 /*
  * Struct describing one new column value that needs to be computed during
@@ -277,13 +266,9 @@ static void RangeVarCallbackForTruncate(const RangeVar *relation,
 										Oid relId, Oid oldRelId, void *arg);
 static List *MergeAttributes(List *schema, List *supers, char relpersistence,
 							 List **supconstr);
-static bool MergeCheckConstraint(List *constraints, char *name, Node *expr);
 static int	findAttrByName(const char *attributeName, List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
 								 Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved);
-static ObjectAddress ATExecValidateConstraint(List **wqueue,
-											  Relation rel, char *constrName,
-											  bool recurse, bool recursing, LOCKMODE lockmode);
 static void CheckAlterTableIsSafe(Relation rel);
 static void ATController(AlterTableStmt *parsetree,
 						 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
@@ -357,17 +342,8 @@ static ObjectAddress ATExecDropColumn(List **wqueue, Relation rel, const char *c
 									  ObjectAddresses *addrs);
 static ObjectAddress ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 									IndexStmt *stmt, bool is_rebuild, LOCKMODE lockmode);
-static ObjectAddress ATExecAddConstraint(List **wqueue,
-										 AlteredTableInfo *tab, Relation rel,
-										 Constraint *newConstraint, bool recurse, bool is_readd,
-										 LOCKMODE lockmode);
 static ObjectAddress ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 											  IndexStmt *stmt, LOCKMODE lockmode);
-static ObjectAddress ATAddCheckConstraint(List **wqueue,
-										  AlteredTableInfo *tab, Relation rel,
-										  Constraint *constr,
-										  bool recurse, bool recursing, bool is_readd,
-										  LOCKMODE lockmode);
 static void ATExecDropConstraint(Relation rel, const char *constrName,
 								 DropBehavior behavior,
 								 bool recurse, bool recursing,
@@ -538,10 +514,8 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 			cooked->name = NULL;
 			cooked->attnum = attnum;
 			cooked->expr = colDef->cooked_default;
-			cooked->skip_validation = false;
 			cooked->is_local = true;	/* not used for defaults */
 			cooked->inhcount = 0;	/* ditto */
-			cooked->is_no_inherit = false;
 			cookedDefaults = lappend(cookedDefaults, cooked);
 			attr->atthasdef = true;
 		}
@@ -621,16 +595,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * Make column generation expressions visible for use by partitioning.
 	 */
 	CommandCounterIncrement();
-
-
-	/*
-	 * Now add any newly specified CHECK constraints to the new relation. Same
-	 * as for defaults above, but these need to come after partitioning is set
-	 * up.
-	 */
-	if (stmt->constraints)
-		AddRelationNewConstraints(rel, NIL, stmt->constraints,
-								  true, true, false, queryString);
 
 	ObjectAddressSet(address, RelationRelationId, relationId);
 
@@ -1690,61 +1654,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 			}
 		}
 
-		/*
-		 * Now copy the CHECK constraints of this parent, adjusting attnos
-		 * using the completed newattmap map.  Identically named constraints
-		 * are merged if possible, else we throw error.
-		 */
-		if (constr && constr->num_check > 0)
-		{
-			ConstrCheck *check = constr->check;
-			int			i;
-
-			for (i = 0; i < constr->num_check; i++)
-			{
-				char	   *name = check[i].ccname;
-				Node	   *expr;
-				bool		found_whole_row;
-
-				/* Adjust Vars to match new table's column numbering */
-				expr = map_variable_attnos(stringToNode(check[i].ccbin),
-										   1, 0,
-										   newattmap,
-										   InvalidOid, &found_whole_row);
-
-				/*
-				 * For the moment we have to reject whole-row variables. We
-				 * could convert them, if we knew the new table's rowtype OID,
-				 * but that hasn't been assigned yet.
-				 */
-				if (found_whole_row)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot convert whole-row table reference"),
-							 errdetail("Constraint \"%s\" contains a whole-row reference to table \"%s\".",
-									   name,
-									   RelationGetRelationName(relation))));
-
-				/* check for duplicate */
-				if (!MergeCheckConstraint(constraints, name, expr))
-				{
-					/* nope, this is a new one */
-					CookedConstraint *cooked;
-
-					cooked = (CookedConstraint *) palloc(sizeof(CookedConstraint));
-					cooked->contype = CONSTR_CHECK;
-					cooked->conoid = InvalidOid;	/* until created */
-					cooked->name = pstrdup(name);
-					cooked->attnum = 0; /* not used for constraints */
-					cooked->expr = expr;
-					cooked->skip_validation = false;
-					cooked->is_local = false;
-					cooked->inhcount = 1;
-					cooked->is_no_inherit = false;
-					constraints = lappend(constraints, cooked);
-				}
-			}
-		}
 
 		free_attrmap(newattmap);
 
@@ -1970,48 +1879,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 }
 
 
-/*
- * MergeCheckConstraint
- *		Try to merge an inherited CHECK constraint with previous ones
- *
- * If we inherit identically-named constraints from multiple parents, we must
- * merge them, or throw an error if they don't have identical definitions.
- *
- * constraints is a list of CookedConstraint structs for previous constraints.
- *
- * Returns true if merged (constraint is a duplicate), or false if it's
- * got a so-far-unique name, or throws error if conflict.
- */
-static bool
-MergeCheckConstraint(List *constraints, char *name, Node *expr)
-{
-	ListCell   *lc;
-
-	foreach(lc, constraints)
-	{
-		CookedConstraint *ccon = (CookedConstraint *) lfirst(lc);
-
-		Assert(ccon->contype == CONSTR_CHECK);
-
-		/* Non-matching names never conflict */
-		if (strcmp(ccon->name, name) != 0)
-			continue;
-
-		if (equal(expr, ccon->expr))
-		{
-			/* OK to merge */
-			ccon->inhcount++;
-			return true;
-		}
-
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("check constraint name \"%s\" appears multiple times but with different expressions",
-						name)));
-	}
-
-	return false;
-}
 
 
 /*
@@ -2427,33 +2294,8 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_ChangeOwner:	/* change visible to SELECT */
 				cmd_lockmode = AccessExclusiveLock;
 				break;
-
-			/*
-			 * Changing foreign table options may affect optimization.
-			 */
-
-				/*
-				 * These subcommands affect write operations only.
-				 */
-
-				/*
-				 * These subcommands affect write operations only. XXX
-				 * Theoretically, these could be ShareRowExclusiveLock.
-				 */
-			case AT_ColumnDefault:
-			case AT_CookedColumnDefault:
-			case AT_AlterConstraint:
-			case AT_AddIndex:	/* from ADD CONSTRAINT */
-			case AT_AddIndexConstraint:
-			case AT_SetNotNull:
-			case AT_DropExpression:
-			case AT_SetCompression:
-				cmd_lockmode = AccessExclusiveLock;
-				break;
-
 			case AT_AddConstraint:
 			case AT_AddConstraintRecurse:	/* becomes AT_AddConstraint */
-			case AT_ReAddConstraint:	/* becomes AT_AddConstraint */
 				if (IsA(cmd->def, Constraint))
 				{
 					Constraint *con = (Constraint *) cmd->def;
@@ -2480,14 +2322,30 @@ AlterTableGetLockLevel(List *cmds)
 				}
 				break;
 
+			/*
+			 * Changing foreign table options may affect optimization.
+			 */
+
 				/*
-				 * These subcommands affect inheritance behaviour. Queries
-				 * started before us will continue to see the old inheritance
-				 * behaviour, while queries started after we commit will see
-				 * new behaviour. No need to prevent reads or writes to the
-				 * subtable while we hook it up though. Changing the TupDesc
-				 * may be a problem, so keep highest lock.
+				 * These subcommands affect write operations only.
 				 */
+
+				/*
+				 * These subcommands affect write operations only. XXX
+				 * Theoretically, these could be ShareRowExclusiveLock.
+				 */
+			case AT_ColumnDefault:
+			case AT_CookedColumnDefault:
+			case AT_AlterConstraint:
+			case AT_AddIndex:	/* from ADD CONSTRAINT */
+			case AT_AddIndexConstraint:
+			case AT_SetNotNull:
+			case AT_DropExpression:
+			case AT_SetCompression:
+				cmd_lockmode = AccessExclusiveLock;
+				break;
+
+
 
 
 				/*
@@ -2507,10 +2365,6 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_ResetOptions:	/* Uses MVCC in getTableAttrs() */
 			cmd_lockmode = ShareUpdateExclusiveLock;
 			break;
-
-		case AT_ValidateConstraint: /* Uses MVCC in getConstraints() */
-				cmd_lockmode = ShareUpdateExclusiveLock;
-				break;
 
 		case AT_AlterColumnGenericOptions:
 			cmd_lockmode = AccessExclusiveLock;
@@ -2766,15 +2620,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_MISC;
 			break;
-		case AT_ValidateConstraint: /* VALIDATE CONSTRAINT */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* Recursion occurs during execution phase */
-			/* No command-specific prep needed except saving recurse flag */
-			if (recurse)
-				cmd->subtype = AT_ValidateConstraintRecurse;
-			pass = AT_PASS_MISC;
-			break;
-
 		case AT_EnableRule:		/* ENABLE/DISABLE RULE variants */
 		case AT_EnableAlwaysRule:
 		case AT_EnableReplicaRule:
@@ -2964,11 +2809,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 										  false, lockmode,
 										  cur_pass, context);
 			/* Depending on constraint type, might be no more work to do now */
-			if (cmd != NULL)
-				address =
-					ATExecAddConstraint(wqueue, tab, rel,
-										(Constraint *) cmd->def,
-										false, false, lockmode);
 			break;
 		case AT_AddConstraintRecurse:	/* ADD CONSTRAINT with recursion */
 			/* Transform the command only during initial examination */
@@ -2977,16 +2817,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 										  true, lockmode,
 										  cur_pass, context);
 			/* Depending on constraint type, might be no more work to do now */
-			if (cmd != NULL)
-				address =
-					ATExecAddConstraint(wqueue, tab, rel,
-										(Constraint *) cmd->def,
-										true, false, lockmode);
-			break;
-		case AT_ReAddConstraint:	/* Re-add pre-existing check constraint */
-			address =
-				ATExecAddConstraint(wqueue, tab, rel, (Constraint *) cmd->def,
-									true, true, lockmode);
 			break;
 		case AT_AddIndexConstraint: /* ADD CONSTRAINT USING INDEX */
 			ATExecAddIndexConstraint(tab, rel, (IndexStmt *) cmd->def,
@@ -3001,15 +2831,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("foreign key constraints are not supported in minipg")));
-			break;
-		case AT_ValidateConstraint: /* VALIDATE CONSTRAINT */
-			ATExecValidateConstraint(wqueue, rel, cmd->name, false,
-											   false, lockmode);
-			break;
-		case AT_ValidateConstraintRecurse:	/* VALIDATE CONSTRAINT with
-											 * recursion */
-			ATExecValidateConstraint(wqueue, rel, cmd->name, true,
-											   false, lockmode);
 			break;
 		case AT_DropConstraint: /* DROP CONSTRAINT */
 			ATExecDropConstraint(rel, cmd->name, cmd->behavior,
@@ -3169,7 +2990,7 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 						break;
 				}
 				break;
-		case AT_AlterColumnGenericOptions:
+			case AT_AlterColumnGenericOptions:
 			/* This command never recurses */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
@@ -3355,8 +3176,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 * constraints generated by ALTER TABLE commands, but don't
 			 * rebuild data.
 			 */
-			if (tab->constraints != NIL || tab->verify_new_notnull ||
-				tab->partition_constraint != NULL)
+			if (tab->verify_new_notnull)
 				ATRewriteTable(tab, InvalidOid, lockmode);
 		}
 	}
@@ -3455,23 +3275,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 	 */
 
 	estate = CreateExecutorState();
-
-	/* Build the needed expression execution states */
-	foreach(l, tab->constraints)
-	{
-		NewConstraint *con = lfirst(l);
-
-		switch (con->contype)
-		{
-			case CONSTR_CHECK:
-				needscan = true;
-				con->qualstate = ExecPrepareExpr((Expr *) con->qual, estate);
-				break;
-			default:
-				elog(ERROR, "unrecognized constraint type: %d",
-					 (int) con->contype);
-		}
-	}
 
 	/* Build expression execution states for partition check quals */
 	if (tab->partition_constraint)
@@ -3697,27 +3500,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 									NameStr(attr->attname),
 									RelationGetRelationName(oldrel)),
 							 errtablecol(oldrel, attn + 1)));
-				}
-			}
-
-			foreach(l, tab->constraints)
-			{
-				NewConstraint *con = lfirst(l);
-
-				switch (con->contype)
-				{
-					case CONSTR_CHECK:
-						if (!ExecCheck(con->qualstate, econtext))
-							ereport(ERROR,
-									(errcode(ERRCODE_CHECK_VIOLATION),
-									 errmsg("check constraint \"%s\" of relation \"%s\" is violated by some row",
-											con->name,
-											RelationGetRelationName(oldrel)),
-									 errtableconstraint(oldrel, con->name)));
-						break;
-					default:
-						elog(ERROR, "unrecognized constraint type: %d",
-							 (int) con->contype);
 				}
 			}
 
@@ -5754,179 +5536,6 @@ ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 	return address;
 }
 
-/*
- * ALTER TABLE ADD CONSTRAINT
- *
- * Return value is the address of the new constraint; if no constraint was
- * added, InvalidObjectAddress is returned.
- */
-static ObjectAddress
-ATExecAddConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
-					Constraint *newConstraint, bool recurse, bool is_readd,
-					LOCKMODE lockmode)
-{
-	ObjectAddress address = InvalidObjectAddress;
-
-	Assert(IsA(newConstraint, Constraint));
-
-	/*
-	 * Currently, we only expect to see CONSTR_CHECK nodes arriving here (see
-	 * the preprocessing done in parse_utilcmd.c).  Use a switch anyway to make
-	 * it easier to add more code later.
-	 */
-	switch (newConstraint->contype)
-	{
-		case CONSTR_CHECK:
-			address =
-				ATAddCheckConstraint(wqueue, tab, rel,
-									 newConstraint, recurse, false, is_readd,
-									 lockmode);
-			break;
-
-		default:
-			elog(ERROR, "unrecognized constraint type: %d",
-				 (int) newConstraint->contype);
-	}
-
-	return address;
-}
-
-/*
- * Add a check constraint to a single table and its children.  Returns the
- * address of the constraint added to the parent relation, if one gets added,
- * or InvalidObjectAddress otherwise.
- *
- * Subroutine for ATExecAddConstraint.
- *
- * We must recurse to child tables during execution, rather than using
- * ALTER TABLE's normal prep-time recursion.  The reason is that all the
- * constraints *must* be given the same name, else they won't be seen as
- * related later.  If the user didn't explicitly specify a name, then
- * AddRelationNewConstraints would normally assign different names to the
- * child constraints.  To fix that, we must capture the name assigned at
- * the parent table and pass that down.
- */
-static ObjectAddress
-ATAddCheckConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
-					 Constraint *constr, bool recurse, bool recursing,
-					 bool is_readd, LOCKMODE lockmode)
-{
-	List	   *newcons;
-	ListCell   *lcon;
-	List	   *children;
-	ListCell   *child;
-	ObjectAddress address = InvalidObjectAddress;
-
-	/* At top level, permission check was done in ATPrepCmd, else do it */
-	if (recursing)
-		ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-
-	/*
-	 * Call AddRelationNewConstraints to do the work, making sure it works on
-	 * a copy of the Constraint so transformExpr can't modify the original. It
-	 * returns a list of cooked constraints.
-	 *
-	 * If the constraint ends up getting merged with a pre-existing one, it's
-	 * omitted from the returned list, which is what we want: we do not need
-	 * to do any validation work.  That can only happen at child tables,
-	 * though, since we disallow merging at the top level.
-	 */
-	newcons = AddRelationNewConstraints(rel, NIL,
-										list_make1(copyObject(constr)),
-										recursing | is_readd,	/* allow_merge */
-										!recursing, /* is_local */
-										is_readd,	/* is_internal */
-										NULL);	/* queryString not available
-												 * here */
-
-	/* we don't expect more than one constraint here */
-	Assert(list_length(newcons) <= 1);
-
-	/* Add each to-be-validated constraint to Phase 3's queue */
-	foreach(lcon, newcons)
-	{
-		CookedConstraint *ccon = (CookedConstraint *) lfirst(lcon);
-
-		if (!ccon->skip_validation)
-		{
-			NewConstraint *newcon;
-
-			newcon = (NewConstraint *) palloc0(sizeof(NewConstraint));
-			newcon->name = ccon->name;
-			newcon->contype = ccon->contype;
-			newcon->qual = ccon->expr;
-
-			tab->constraints = lappend(tab->constraints, newcon);
-		}
-
-		/* Save the actually assigned name if it was defaulted */
-		if (constr->conname == NULL)
-			constr->conname = ccon->name;
-
-		ObjectAddressSet(address, ConstraintRelationId, ccon->conoid);
-	}
-
-	/* At this point we must have a locked-down name to use */
-	Assert(constr->conname != NULL);
-
-	/* Advance command counter in case same table is visited multiple times */
-	CommandCounterIncrement();
-
-	/*
-	 * If the constraint got merged with an existing constraint, we're done.
-	 * We mustn't recurse to child tables in this case, because they've
-	 * already got the constraint, and visiting them again would lead to an
-	 * incorrect value for coninhcount.
-	 */
-	if (newcons == NIL)
-		return address;
-
-	/*
-	 * If adding a NO INHERIT constraint, no need to find our children.
-	 */
-	if (constr->is_no_inherit)
-		return address;
-
-	/*
-	 * Propagate to children as appropriate.  Unlike most other ALTER
-	 * routines, we have to do this one level of recursion at a time; we can't
-	 * use find_all_inheritors to do it in one pass.
-	 */
-	children =
-		find_inheritance_children(RelationGetRelid(rel), lockmode);
-
-	/*
-	 * Check if ONLY was specified with ALTER TABLE.  If so, allow the
-	 * constraint creation only if there are no children currently.  Error out
-	 * otherwise.
-	 */
-	if (!recurse && children != NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("constraint must be added to child tables too")));
-
-	foreach(child, children)
-	{
-		Oid			childrelid = lfirst_oid(child);
-		Relation	childrel;
-		AlteredTableInfo *childtab;
-
-		/* find_inheritance_children already got lock */
-		childrel = table_open(childrelid, NoLock);
-		CheckAlterTableIsSafe(childrel);
-
-		/* Find or create work queue entry for this table */
-		childtab = ATGetQueueEntry(wqueue, childrel);
-
-		/* Recurse to child */
-		ATAddCheckConstraint(wqueue, childtab, childrel,
-							 constr, recurse, true, is_readd, lockmode);
-
-		table_close(childrel, NoLock);
-	}
-
-	return address;
-}
 
 
 
@@ -5954,7 +5563,6 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 	HeapTuple	tuple;
 	bool		found = false;
 	bool		is_no_inherit_constraint = false;
-	char		contype;
 
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();
@@ -5985,8 +5593,6 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 		ObjectAddress conobj;
 
 		con = (Form_pg_constraint) GETSTRUCT(tuple);
-
-		contype = con->contype;
 
 		/*
 		 * Perform the actual constraint deletion
@@ -6066,12 +5672,6 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 		copy_tuple = heap_copytuple(tuple);
 
 		systable_endscan(scan);
-
-		con = (Form_pg_constraint) GETSTRUCT(copy_tuple);
-
-		/* Right now only CHECK constraints can be inherited */
-		if (con->contype != CONSTRAINT_CHECK)
-			elog(ERROR, "inherited constraint is not a CHECK constraint");
 
 		if (recurse)
 		{
@@ -6978,12 +6578,6 @@ ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab, LOCKMODE lockmode)
 		add_exact_object_address(&obj, objects);
 
 		/*
-		 * If the constraint is inherited (only), we don't want to inject a
-		 * new definition here; it'll get recreated when ATAddCheckConstraint
-		 * recurses from adding the parent table's constraint.  But we had to
-		 * carry the info this far so that we can drop the constraint below.
-		 */
-		/*
 		 * When rebuilding another table's constraint that references the
 		 * table we're modifying, we might not yet have any lock on the other
 		 * table, so get one now.  We'll need AccessExclusiveLock for the DROP
@@ -7157,14 +6751,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, char *cmd,
 					cmd->subtype = AT_ReAddIndex;
 					tab->subcmds[AT_PASS_OLD_INDEX] =
 						lappend(tab->subcmds[AT_PASS_OLD_INDEX], cmd);
-				}
-				else if (cmd->subtype == AT_AddConstraint)
-				{
-					Constraint *con = castNode(Constraint, cmd->def);
-
-					cmd->subtype = AT_ReAddConstraint;
-					tab->subcmds[AT_PASS_OLD_CONSTR] =
-						lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
 				}
 				else if (cmd->subtype == AT_SetNotNull)
 				{
@@ -8038,45 +7624,15 @@ bool
 ConstraintImpliedByRelConstraint(Relation scanrel, List *testConstraint, List *provenConstraint)
 {
 	List	   *existConstraint = list_copy(provenConstraint);
-	TupleConstr *constr = RelationGetDescr(scanrel)->constr;
-	int			num_check,
-				i;
-
-	num_check = (constr != NULL) ? constr->num_check : 0;
-	for (i = 0; i < num_check; i++)
-	{
-		Node	   *cexpr;
-
-		/*
-		 * If this constraint hasn't been fully validated yet, we must ignore
-		 * it here.
-		 */
-		if (!constr->check[i].ccvalid)
-			continue;
-
-		cexpr = stringToNode(constr->check[i].ccbin);
-
-		/*
-		 * Run each expression through const-simplification and
-		 * canonicalization.  It is necessary, because we will be comparing it
-		 * to similarly-processed partition constraint expressions, and may
-		 * fail to detect valid matches without this.
-		 */
-		cexpr = eval_const_expressions(NULL, cexpr);
-		cexpr = (Node *) canonicalize_qual((Expr *) cexpr, true);
-
-		existConstraint = list_concat(existConstraint,
-									  make_ands_implicit((Expr *) cexpr));
-	}
 
 	/*
-	 * Try to make the proof.  Since we are comparing CHECK constraints, we
+	 * Try to make the proof.  Since we are comparing NOT NULL constraints, we
 	 * need to use weak implication, i.e., we assume existConstraint is
 	 * not-false and try to prove the same for testConstraint.
 	 *
 	 * Note that predicate_implied_by assumes its first argument is known
-	 * immutable.  That should always be true for both NOT NULL and partition
-	 * constraints, so we don't test it here.
+	 * immutable.  That should always be true for NOT NULL constraints, so we
+	 * don't test it here.
 	 */
 	return predicate_implied_by(testConstraint, existConstraint, true);
 }
@@ -8119,156 +7675,6 @@ GetAttributeCompression(Oid atttypid, char *compression)
 	return cmethod;
 }
 
-/*
- * ATExecValidateConstraint - restored (was removed during FK pruning;
- * foreign-key handling retained but unreachable since FK is unsupported)
- */
-static ObjectAddress
-ATExecValidateConstraint(List **wqueue, Relation rel, char *constrName,
-						 bool recurse, bool recursing, LOCKMODE lockmode)
-{
-	Relation	conrel;
-	SysScanDesc scan;
-	ScanKeyData skey[2];
-	HeapTuple	tuple;
-	Form_pg_constraint con;
-	ObjectAddress address;
-
-	conrel = table_open(ConstraintRelationId, RowExclusiveLock);
-
-	/*
-	 * Find and check the target constraint
-	 */
-	ScanKeyInit(&skey[0],
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(rel)));
-	ScanKeyInit(&skey[1],
-				Anum_pg_constraint_conname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(constrName));
-	scan = systable_beginscan(conrel, ConstraintRelidNameIndexId,
-							  true, NULL, 2, skey);
-
-	/* There can be at most one matching row */
-	if (!HeapTupleIsValid(tuple = systable_getnext(scan)))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("constraint \"%s\" of relation \"%s\" does not exist",
-						constrName, RelationGetRelationName(rel))));
-
-	con = (Form_pg_constraint) GETSTRUCT(tuple);
-	if (con->contype != CONSTRAINT_CHECK)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("constraint \"%s\" of relation \"%s\" is not a foreign key or check constraint",
-						constrName, RelationGetRelationName(rel))));
-
-	if (!con->convalidated)
-	{
-		AlteredTableInfo *tab;
-		HeapTuple	copyTuple;
-		Form_pg_constraint copy_con;
-
-		if (con->contype == CONSTRAINT_CHECK)
-		{
-			List	   *children = NIL;
-			ListCell   *child;
-			NewConstraint *newcon;
-			bool		isnull;
-			Datum		val;
-			char	   *conbin;
-
-			/*
-			 * If we're recursing, the parent has already done this, so skip
-			 * it.  Also, if the constraint is a NO INHERIT constraint, we
-			 * shouldn't try to look for it in the children.
-			 */
-			if (!recursing)
-				children = find_all_inheritors(RelationGetRelid(rel),
-											   lockmode, NULL);
-
-			/*
-			 * For CHECK constraints, we must ensure that we only mark the
-			 * constraint as validated on the parent if it's already validated
-			 * on the children.
-			 *
-			 * We recurse before validating on the parent, to reduce risk of
-			 * deadlocks.
-			 */
-			foreach(child, children)
-			{
-				Oid			childoid = lfirst_oid(child);
-				Relation	childrel;
-
-				if (childoid == RelationGetRelid(rel))
-					continue;
-
-				/*
-				 * If we are told not to recurse, there had better not be any
-				 * child tables, because we can't mark the constraint on the
-				 * parent valid unless it is valid for all child tables.
-				 */
-				if (!recurse)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("constraint must be validated on child tables too")));
-
-				/* find_all_inheritors already got lock */
-				childrel = table_open(childoid, NoLock);
-
-				ATExecValidateConstraint(wqueue, childrel, constrName, false,
-										 true, lockmode);
-				table_close(childrel, NoLock);
-			}
-
-			/* Queue validation for phase 3 */
-			newcon = (NewConstraint *) palloc0(sizeof(NewConstraint));
-			newcon->name = constrName;
-			newcon->contype = CONSTR_CHECK;
-
-			val = SysCacheGetAttr(CONSTROID, tuple,
-								  Anum_pg_constraint_conbin, &isnull);
-			if (isnull)
-				elog(ERROR, "null conbin for constraint %u", con->oid);
-
-			conbin = TextDatumGetCString(val);
-			newcon->qual = (Node *) stringToNode(conbin);
-
-			/* Find or create work queue entry for this table */
-			tab = ATGetQueueEntry(wqueue, rel);
-			tab->constraints = lappend(tab->constraints, newcon);
-
-			/*
-			 * Invalidate relcache so that others see the new validated
-			 * constraint.
-			 */
-			CacheInvalidateRelcache(rel);
-		}
-
-		/*
-		 * Now update the catalog, while we have the door open.
-		 */
-		copyTuple = heap_copytuple(tuple);
-		copy_con = (Form_pg_constraint) GETSTRUCT(copyTuple);
-		copy_con->convalidated = true;
-		CatalogTupleUpdate(conrel, &copyTuple->t_self, copyTuple);
-
-		InvokeObjectPostAlterHook(ConstraintRelationId, con->oid, 0);
-
-		heap_freetuple(copyTuple);
-
-		ObjectAddressSet(address, ConstraintRelationId, con->oid);
-	}
-	else
-		address = InvalidObjectAddress; /* already validated */
-
-	systable_endscan(scan);
-
-	table_close(conrel, RowExclusiveLock);
-
-	return address;
-}
 
 /*
  * =====================================================================

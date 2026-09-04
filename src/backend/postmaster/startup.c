@@ -106,8 +106,7 @@ StartupProcShutdownHandler(SIGNAL_ARGS)
 	if (in_restore_command)
 	{
 		/*
-		 * If we are in a child process (e.g., forked by system() in
-		 * RestoreArchivedFile()), we don't want to call any exit callbacks.
+		 * If we are in a child process , we don't want to call any exit callbacks.
 		 * The parent will take care of that.
 		 */
 		if (MyProcPid == (int) getpid())

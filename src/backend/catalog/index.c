@@ -1711,14 +1711,11 @@ index_constraint_create(Relation heapRelation,
 	conOid = CreateConstraintEntry(constraintName,
 								   namespaceId,
 								   constraintType,
-								   true,
 								   RelationGetRelid(heapRelation),
 								   indexInfo->ii_IndexAttrNumbers,
 								   indexInfo->ii_NumIndexKeyAttrs,
 								   indexInfo->ii_NumIndexAttrs,
 								   indexRelationId, /* index OID */
-								   NULL,	/* no check constraint */
-								   NULL,
 								   is_internal);
 
 	/*

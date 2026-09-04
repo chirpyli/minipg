@@ -548,7 +548,6 @@ AutoVacLauncherMain(int argc, char *argv[])
 	 * Force settable timeouts off to avoid letting these settings prevent
 	 * regular maintenance from being executed.
 	 */
-	SetConfigOption("statement_timeout", "0", PGC_SUSET, PGC_S_OVERRIDE);
 	SetConfigOption("lock_timeout", "0", PGC_SUSET, PGC_S_OVERRIDE);
 	SetConfigOption("idle_in_transaction_session_timeout", "0",
 					PGC_SUSET, PGC_S_OVERRIDE);
@@ -1528,7 +1527,6 @@ AutoVacWorkerMain(int argc, char *argv[])
 	 * Force settable timeouts off to avoid letting these settings prevent
 	 * regular maintenance from being executed.
 	 */
-	SetConfigOption("statement_timeout", "0", PGC_SUSET, PGC_S_OVERRIDE);
 	SetConfigOption("lock_timeout", "0", PGC_SUSET, PGC_S_OVERRIDE);
 	SetConfigOption("idle_in_transaction_session_timeout", "0",
 					PGC_SUSET, PGC_S_OVERRIDE);

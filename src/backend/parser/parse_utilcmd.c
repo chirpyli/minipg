@@ -71,7 +71,6 @@ typedef struct
 	Relation	rel;			/* opened/locked rel, if ALTER */
 	bool		isalter;		/* true if altering existing table */
 	List	   *columns;		/* ColumnDef items */
-	List	   *ckconstraints;	/* CHECK constraints */
 	List	   *ixconstraints;	/* index-creating constraints */
 	List	   *blist;			/* "before list" of things to do before
 								 * creating the table */
@@ -99,8 +98,6 @@ static List *get_opclass(Oid opclass, Oid actual_datatype);
 static void transformIndexConstraints(CreateStmtContext *cxt);
 static IndexStmt *transformIndexConstraint(Constraint *constraint,
 										   CreateStmtContext *cxt);
-static void transformCheckConstraints(CreateStmtContext *cxt,
-									  bool skipValidation);
 static void transformColumnType(CreateStmtContext *cxt, ColumnDef *column);
 static void setSchemaName(const char *context_schema, char **stmt_schema_name);
 
@@ -191,7 +188,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.rel = NULL;
 	cxt.isalter = false;
 	cxt.columns = NIL;
-	cxt.ckconstraints = NIL;
 	cxt.ixconstraints = NIL;
 	cxt.blist = NIL;
 	cxt.alist = NIL;
@@ -240,19 +236,9 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	transformIndexConstraints(&cxt);
 
 	/*
-	 * Postprocess check constraints.
-	 *
-	 * For a new regular table all constraints can be marked valid immediately,
-	 * because the table is new therefore empty. (Foreign tables are not
-	 * supported in minipg, so we always skip validation.)
-	 */
-	transformCheckConstraints(&cxt, true);
-
-	/*
 	 * Output results.
 	 */
 	stmt->tableElts = cxt.columns;
-	stmt->constraints = cxt.ckconstraints;
 
 	result = lappend(cxt.blist, stmt);
 	result = list_concat(result, cxt.alist);
@@ -321,12 +307,7 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 							 parser_errposition(cxt->pstate,
 												constraint->location)));
 				column->raw_default = constraint->raw_expr;
-				Assert(constraint->cooked_expr == NULL);
 				saw_default = true;
-				break;
-
-			case CONSTR_CHECK:
-				cxt->ckconstraints = lappend(cxt->ckconstraints, constraint);
 				break;
 
 			case CONSTR_PRIMARY:
@@ -362,10 +343,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 
 		case CONSTR_UNIQUE:
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
-			break;
-
-		case CONSTR_CHECK:
-			cxt->ckconstraints = lappend(cxt->ckconstraints, constraint);
 			break;
 
 		case CONSTR_NULL:
@@ -1250,40 +1227,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 }
 
 /*
- * transformCheckConstraints
- *		handle CHECK constraints
- *
- * Right now, there's nothing to do here when called from ALTER TABLE,
- * but the other constraint-transformation functions are called in both
- * the CREATE TABLE and ALTER TABLE paths, so do the same here, and just
- * don't do anything if we're not authorized to skip validation.
- */
-static void
-transformCheckConstraints(CreateStmtContext *cxt, bool skipValidation)
-{
-	ListCell   *ckclist;
-
-	if (cxt->ckconstraints == NIL)
-		return;
-
-	/*
-	 * If creating a new table (but not a foreign table), we can safely skip
-	 * validation of check constraints, and nonetheless mark them valid. (This
-	 * will override any user-supplied NOT VALID flag.)
-	 */
-	if (skipValidation)
-	{
-		foreach(ckclist, cxt->ckconstraints)
-		{
-			Constraint *constraint = (Constraint *) lfirst(ckclist);
-
-			constraint->skip_validation = true;
-			constraint->initially_valid = true;
-		}
-	}
-}
-
-/*
  * transformIndexStmt - parse analysis for CREATE INDEX and ALTER TABLE
  *
  * Note: this is a no-op for an index not using either index expressions or
@@ -1689,7 +1632,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 	cxt.rel = rel;
 	cxt.isalter = true;
 	cxt.columns = NIL;
-	cxt.ckconstraints = NIL;
 	cxt.ixconstraints = NIL;
 	cxt.blist = NIL;
 	cxt.alist = NIL;
@@ -1721,19 +1663,18 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 					newcmds = lappend(newcmds, cmd);
 					break;
 				}
+		case AT_AddConstraint:
+		case AT_AddConstraintRecurse:
 
-			case AT_AddConstraint:
-			case AT_AddConstraintRecurse:
-
-				/*
-				 * The original AddConstraint cmd node doesn't go to newcmds
-				 */
-				if (IsA(cmd->def, Constraint))
-					transformTableConstraint(&cxt, (Constraint *) cmd->def);
-				else
-					elog(ERROR, "unrecognized node type: %d",
-						 (int) nodeTag(cmd->def));
-				break;
+			/*
+			 * The original AddConstraint cmd node doesn't go to newcmds
+			 */
+			if (IsA(cmd->def, Constraint))
+				transformTableConstraint(&cxt, (Constraint *) cmd->def);
+			else
+				elog(ERROR, "unrecognized node type: %d",
+					 (int) nodeTag(cmd->def));
+			break;
 
 			case AT_AlterColumnType:
 				{
@@ -1783,7 +1724,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 
 	/* Postprocess constraints */
 	transformIndexConstraints(&cxt);
-	transformCheckConstraints(&cxt, false);
 
 	/*
 	 * Push any index-creation commands into the ALTER, so that they can be
@@ -1820,15 +1760,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 			elog(ERROR, "unexpected stmt type %d", (int) nodeTag(istmt));
 	}
 	cxt.alist = NIL;
-
-	/* Append any CHECK constraints to the commands list */
-	foreach(l, cxt.ckconstraints)
-	{
-		newcmd = makeNode(AlterTableCmd);
-		newcmd->subtype = AT_AddConstraint;
-		newcmd->def = (Node *) lfirst(l);
-		newcmds = lappend(newcmds, newcmd);
-	}
 
 	/* Close rel */
 	relation_close(rel, NoLock);

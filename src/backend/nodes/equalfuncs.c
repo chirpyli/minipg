@@ -1005,7 +1005,6 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(tableElts);
-	COMPARE_NODE_FIELD(constraints);
 	COMPARE_SCALAR_FIELD(oncommit);
 	COMPARE_SCALAR_FIELD(if_not_exists);
 
@@ -1451,9 +1450,7 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_SCALAR_FIELD(contype);
 	COMPARE_STRING_FIELD(conname);
 	COMPARE_LOCATION_FIELD(location);
-	COMPARE_SCALAR_FIELD(is_no_inherit);
 	COMPARE_NODE_FIELD(raw_expr);
-	COMPARE_STRING_FIELD(cooked_expr);
 	COMPARE_SCALAR_FIELD(generated_when);
 	COMPARE_NODE_FIELD(keys);
 	COMPARE_NODE_FIELD(including);
@@ -1461,8 +1458,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_STRING_FIELD(indexname);
 	COMPARE_STRING_FIELD(access_method);
 	COMPARE_NODE_FIELD(where_clause);
-	COMPARE_SCALAR_FIELD(skip_validation);
-	COMPARE_SCALAR_FIELD(initially_valid);
 
 	return true;
 }

@@ -1,7 +1,0 @@
---
--- Verify system catalog foreign key relationships
---
--- minipg: PL/pgSQL removed. The original test used a DO block (plpgsql) to
--- iterate pg_get_catalog_foreign_keys() and raise warnings on violations.
--- Foreign-key integrity of the system catalogs is still enforced by the
--- backend; this procedural checker is dropped.

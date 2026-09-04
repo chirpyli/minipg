@@ -1106,83 +1106,11 @@ ExecutePlan(QueryDesc *queryDesc,
 }
 
 
-/*
- * ExecRelCheck --- check that tuple meets constraints for result relation
- *
- * Returns NULL if OK, else name of failed check constraint
- */
-static const char *
-ExecRelCheck(ResultRelInfo *resultRelInfo,
-			 TupleTableSlot *slot, EState *estate)
-{
-	Relation	rel = resultRelInfo->ri_RelationDesc;
-	int			ncheck = rel->rd_att->constr->num_check;
-	ConstrCheck *check = rel->rd_att->constr->check;
-	ExprContext *econtext;
-	MemoryContext oldContext;
-	int			i;
-
-	/*
-	 * CheckConstraintFetch let this pass with only a warning, but now we
-	 * should fail rather than possibly failing to enforce an important
-	 * constraint.
-	 */
-	if (ncheck != rel->rd_rel->relchecks)
-		elog(ERROR, "%d pg_constraint record(s) missing for relation \"%s\"",
-			 rel->rd_rel->relchecks - ncheck, RelationGetRelationName(rel));
-
-	/*
-	 * If first time through for this result relation, build expression
-	 * nodetrees for rel's constraint expressions.  Keep them in the per-query
-	 * memory context so they'll survive throughout the query.
-	 */
-	if (resultRelInfo->ri_ConstraintExprs == NULL)
-	{
-		oldContext = MemoryContextSwitchTo(estate->es_query_cxt);
-		resultRelInfo->ri_ConstraintExprs =
-			(ExprState **) palloc(ncheck * sizeof(ExprState *));
-		for (i = 0; i < ncheck; i++)
-		{
-			Expr	   *checkconstr;
-
-			checkconstr = stringToNode(check[i].ccbin);
-			resultRelInfo->ri_ConstraintExprs[i] =
-				ExecPrepareExpr(checkconstr, estate);
-		}
-		MemoryContextSwitchTo(oldContext);
-	}
-
-	/*
-	 * We will use the EState's per-tuple context for evaluating constraint
-	 * expressions (creating it if it's not already there).
-	 */
-	econtext = GetPerTupleExprContext(estate);
-
-	/* Arrange for econtext's scan tuple to be the tuple under test */
-	econtext->ecxt_scantuple = slot;
-
-	/* And evaluate the constraints */
-	for (i = 0; i < ncheck; i++)
-	{
-		ExprState  *checkconstr = resultRelInfo->ri_ConstraintExprs[i];
-
-		/*
-		 * NOTE: SQL specifies that a NULL result from a constraint expression
-		 * is not to be treated as a failure.  Therefore, use ExecCheck not
-		 * ExecQual.
-		 */
-		if (!ExecCheck(checkconstr, econtext))
-			return check[i].ccname;
-	}
-
-	/* NULL result means no error */
-	return NULL;
-}
 
 /*
  * ExecConstraints - check constraints of the tuple in 'slot'
  *
- * This checks the traditional NOT NULL and check constraints.
+ * This checks the traditional NOT NULL constraints.
  *
  * The partition constraint is *NOT* checked.
  *
@@ -1264,54 +1192,6 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
 		}
 	}
 
-	if (rel->rd_rel->relchecks > 0)
-	{
-		const char *failed;
-
-		if ((failed = ExecRelCheck(resultRelInfo, slot, estate)) != NULL)
-		{
-			char	   *val_desc;
-			Relation	orig_rel = rel;
-
-			/* See the comment above. */
-			if (resultRelInfo->ri_RootResultRelInfo)
-			{
-				ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
-				TupleDesc	old_tupdesc = RelationGetDescr(rel);
-				AttrMap    *map;
-
-				tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
-				/* a reverse map */
-				map = build_attrmap_by_name_if_req(old_tupdesc,
-												   tupdesc);
-
-				/*
-				 * Partition-specific slot's tupdesc can't be changed, so
-				 * allocate a new one.
-				 */
-				if (map != NULL)
-					slot = execute_attr_map_slot(map, slot,
-												 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
-				modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
-										 ExecGetUpdatedCols(rootrel, estate));
-				rel = rootrel->ri_RelationDesc;
-			}
-			else
-				modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
-										 ExecGetUpdatedCols(resultRelInfo, estate));
-			val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
-													 slot,
-													 tupdesc,
-													 modifiedCols,
-													 64);
-			ereport(ERROR,
-					(errcode(ERRCODE_CHECK_VIOLATION),
-					 errmsg("new row for relation \"%s\" violates check constraint \"%s\"",
-							RelationGetRelationName(orig_rel), failed),
-					 val_desc ? errdetail("Failing row contains %s.", val_desc) : 0,
-					 errtableconstraint(orig_rel, failed)));
-		}
-	}
 }
 
 /*

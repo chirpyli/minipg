@@ -2343,7 +2343,6 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(tableElts);
-	WRITE_NODE_FIELD(constraints);
 	WRITE_ENUM_FIELD(oncommit, OnCommitAction);
 	WRITE_BOOL_FIELD(if_not_exists);
 }
@@ -2978,16 +2977,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 		case CONSTR_DEFAULT:
 			appendStringInfoString(str, "DEFAULT");
 			WRITE_NODE_FIELD(raw_expr);
-			WRITE_STRING_FIELD(cooked_expr);
-			break;
-
-		case CONSTR_CHECK:
-			appendStringInfoString(str, "CHECK");
-			WRITE_BOOL_FIELD(is_no_inherit);
-			WRITE_NODE_FIELD(raw_expr);
-			WRITE_STRING_FIELD(cooked_expr);
-			WRITE_BOOL_FIELD(skip_validation);
-			WRITE_BOOL_FIELD(initially_valid);
 			break;
 
 		case CONSTR_PRIMARY:

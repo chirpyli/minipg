@@ -54,6 +54,4 @@ DECLARE_UNIQUE_INDEX(pg_attrdef_adrelid_adnum_index, 2656, on pg_attrdef using b
 DECLARE_UNIQUE_INDEX_PKEY(pg_attrdef_oid_index, 2657, on pg_attrdef using btree(oid oid_ops));
 #define AttrDefaultOidIndexId  2657
 
-DECLARE_FOREIGN_KEY((adrelid, adnum), pg_attribute, (attrelid, attnum));
-
 #endif							/* PG_ATTRDEF_H */

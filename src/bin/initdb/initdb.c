@@ -92,7 +92,6 @@ static char *lc_time = NULL;
 static char *lc_messages = NULL;
 static char *username = NULL;
 static bool pwprompt = false;
-static char *pwfilename = NULL;
 static char *superuser_password = NULL;
 static bool debug = false;
 static bool noclean = false;
@@ -1042,58 +1041,18 @@ static void
 get_su_pwd(void)
 {
 	char	   *pwd1;
+	char	   *pwd2;
 
-	if (pwprompt)
+	printf("\n");
+	fflush(stdout);
+	pwd1 = simple_prompt("Enter new superuser password: ", false);
+	pwd2 = simple_prompt("Enter it again: ", false);
+	if (strcmp(pwd1, pwd2) != 0)
 	{
-		/*
-		 * Read password from terminal
-		 */
-		char	   *pwd2;
-
-		printf("\n");
-		fflush(stdout);
-		pwd1 = simple_prompt("Enter new superuser password: ", false);
-		pwd2 = simple_prompt("Enter it again: ", false);
-		if (strcmp(pwd1, pwd2) != 0)
-		{
-			fprintf(stderr, _("Passwords didn't match.\n"));
-			exit(1);
-		}
-		free(pwd2);
+		fprintf(stderr, _("Passwords didn't match.\n"));
+		exit(1);
 	}
-	else
-	{
-		/*
-		 * Read password from file
-		 *
-		 * Ideally this should insist that the file not be world-readable.
-		 * However, this option is mainly intended for use on Windows where
-		 * file permissions may not exist at all, so we'll skip the paranoia
-		 * for now.
-		 */
-		FILE	   *pwf = fopen(pwfilename, "r");
-
-		if (!pwf)
-		{
-			pg_log_error("could not open file \"%s\" for reading: %m",
-						 pwfilename);
-			exit(1);
-		}
-		pwd1 = pg_get_line(pwf);
-		if (!pwd1)
-		{
-			if (ferror(pwf))
-				pg_log_error("could not read password from file \"%s\": %m",
-							 pwfilename);
-			else
-				pg_log_error("password file \"%s\" is empty",
-							 pwfilename);
-			exit(1);
-		}
-		fclose(pwf);
-
-		(void) pg_strip_crlf(pwd1);
-	}
+	free(pwd2);
 
 	superuser_password = pwd1;
 }
@@ -1561,7 +1520,6 @@ usage(const char *progname)
 			 "                            set default locale in the respective category for\n"
 			 "                            new databases (default taken from environment)\n"));
 	printf(_("      --no-locale           equivalent to --locale=C\n"));
-	printf(_("      --pwfile=FILE         read password for the new superuser from file\n"));
 	printf(_("  -U, --username=NAME       database superuser name\n"));
 	printf(_("  -W, --pwprompt            prompt for a password for the new superuser\n"));
 	printf(_("  -X, --waldir=WALDIR       location for the write-ahead log directory\n"));
@@ -2101,7 +2059,6 @@ main(int argc, char *argv[])
 		{"lc-messages", required_argument, NULL, 7},
 		{"no-locale", no_argument, NULL, 8},
 		{"pwprompt", no_argument, NULL, 'W'},
-		{"pwfile", required_argument, NULL, 9},
 		{"username", required_argument, NULL, 'U'},
 		{"help", no_argument, NULL, '?'},
 		{"version", no_argument, NULL, 'V'},
@@ -2209,10 +2166,7 @@ main(int argc, char *argv[])
 			case 8:
 				locale = "C";
 				break;
-			case 9:
-				pwfilename = pg_strdup(optarg);
-				break;
-		case 's':
+			case 's':
 			show_setting = true;
 			break;
 		case 'X':
@@ -2281,12 +2235,6 @@ main(int argc, char *argv[])
 		return 0;
 	}
 
-	if (pwprompt && pwfilename)
-	{
-		pg_log_error("password prompt and password file cannot be specified together");
-		exit(1);
-	}
-
 	/* set wal segment size */
 	if (str_wal_segment_size_mb == NULL)
 		wal_segment_size_mb = (DEFAULT_XLOG_SEG_SIZE) / (1024 * 1024);
@@ -2337,7 +2285,7 @@ main(int argc, char *argv[])
 
 	printf("\n");
 
-	if (pwprompt || pwfilename)
+	if (pwprompt)
 		get_su_pwd();
 
 	printf("\n");

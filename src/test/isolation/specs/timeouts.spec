@@ -17,16 +17,6 @@ step rdtbl	{ SELECT * FROM accounts; }
 step wrtbl	{ UPDATE accounts SET balance = balance + 100; }
 teardown	{ ABORT; }
 
-session s2
-setup		{ BEGIN ISOLATION LEVEL READ COMMITTED; }
-step sto	{ SET statement_timeout = '10ms'; }
-step lto	{ SET lock_timeout = '10ms'; }
-step lsto	{ SET lock_timeout = '10ms'; SET statement_timeout = '10s'; }
-step slto	{ SET lock_timeout = '10s'; SET statement_timeout = '10ms'; }
-step locktbl	{ LOCK TABLE accounts; }
-step update	{ DELETE FROM accounts WHERE accountid = 'checking'; }
-teardown	{ ABORT; }
-
 # It's possible that the isolation tester will not observe the final
 # steps as "waiting", thanks to the relatively short timeouts we use.
 # We can ensure consistent test output by marking those steps with (*).

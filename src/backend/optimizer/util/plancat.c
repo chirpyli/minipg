@@ -1045,55 +1045,12 @@ get_relation_constraints(PlannerInfo *root,
 	constr = relation->rd_att->constr;
 	if (constr != NULL)
 	{
-		int			num_check = constr->num_check;
-		int			i;
-
-		for (i = 0; i < num_check; i++)
-		{
-			Node	   *cexpr;
-
-			/*
-			 * If this constraint hasn't been fully validated yet, we must
-			 * ignore it here.  Also ignore if NO INHERIT and we weren't told
-			 * that that's safe.
-			 */
-			if (!constr->check[i].ccvalid)
-				continue;
-
-			cexpr = stringToNode(constr->check[i].ccbin);
-
-			/*
-			 * Run each expression through const-simplification and
-			 * canonicalization.  This is not just an optimization, but is
-			 * necessary, because we will be comparing it to
-			 * similarly-processed qual clauses, and may fail to detect valid
-			 * matches without this.  This must match the processing done to
-			 * qual clauses in preprocess_expression()!  (We can skip the
-			 * stuff involving subqueries, however, since we don't allow any
-			 * in check constraints.)
-			 */
-			cexpr = eval_const_expressions(root, cexpr);
-
-			cexpr = (Node *) canonicalize_qual((Expr *) cexpr, true);
-
-			/* Fix Vars to have the desired varno */
-			if (varno != 1)
-				ChangeVarNodes(cexpr, 1, varno, 0);
-
-			/*
-			 * Finally, convert to implicit-AND format (that is, a List) and
-			 * append the resulting item(s) to our output list.
-			 */
-			result = list_concat(result,
-								 make_ands_implicit((Expr *) cexpr));
-		}
-
 		/* Add NOT NULL constraints in expression form, if requested */
 		if (include_notnull && constr->has_not_null)
 		{
 			int			natts = relation->rd_att->natts;
 
-			for (i = 1; i <= natts; i++)
+			for (int i = 1; i <= natts; i++)
 			{
 				Form_pg_attribute att = TupleDescAttr(relation->rd_att, i - 1);
 

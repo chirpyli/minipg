@@ -190,18 +190,6 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 			}
 		}
 
-		if ((cpy->num_check = constr->num_check) > 0)
-		{
-			cpy->check = (ConstrCheck *) palloc(cpy->num_check * sizeof(ConstrCheck));
-			memcpy(cpy->check, constr->check, cpy->num_check * sizeof(ConstrCheck));
-			for (i = cpy->num_check - 1; i >= 0; i--)
-			{
-				cpy->check[i].ccname = pstrdup(constr->check[i].ccname);
-				cpy->check[i].ccbin = pstrdup(constr->check[i].ccbin);
-				cpy->check[i].ccvalid = constr->check[i].ccvalid;
-			}
-		}
-
 		desc->constr = cpy;
 	}
 
@@ -328,17 +316,6 @@ FreeTupleDesc(TupleDesc tupdesc)
 					pfree(DatumGetPointer(attrmiss[i].am_value));
 			}
 			pfree(attrmiss);
-		}
-		if (tupdesc->constr->num_check > 0)
-		{
-			ConstrCheck *check = tupdesc->constr->check;
-
-			for (i = tupdesc->constr->num_check - 1; i >= 0; i--)
-			{
-				pfree(check[i].ccname);
-				pfree(check[i].ccbin);
-			}
-			pfree(check);
 		}
 		pfree(tupdesc->constr);
 	}
@@ -493,25 +470,6 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 		}
 		else if (constr2->missing)
 			return false;
-		n = constr1->num_check;
-		if (n != (int) constr2->num_check)
-			return false;
-
-		/*
-		 * Similarly, we rely here on the ConstrCheck entries being sorted by
-		 * name.  If there are duplicate names, the outcome of the comparison
-		 * is uncertain, but that should not happen.
-		 */
-		for (i = 0; i < n; i++)
-		{
-			ConstrCheck *check1 = constr1->check + i;
-			ConstrCheck *check2 = constr2->check + i;
-
-			if (!(strcmp(check1->ccname, check2->ccname) == 0 &&
-				  strcmp(check1->ccbin, check2->ccbin) == 0 &&
-				  check1->ccvalid == check2->ccvalid))
-				return false;
-		}
 	}
 	else if (tupdesc2->constr != NULL)
 		return false;
@@ -806,8 +764,6 @@ BuildDescForRelation(List *schema)
 		constr->defval = NULL;
 		constr->missing = NULL;
 		constr->num_defval = 0;
-		constr->check = NULL;
-		constr->num_check = 0;
 		desc->constr = constr;
 	}
 	else

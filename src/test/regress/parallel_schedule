@@ -145,15 +145,3 @@ test: bitmapops combocid advisory_lock
 # minipg: explain/memoize 依赖 plpgsql 测试桩（explain_filter 等），PL/pgSQL 已裁剪，移除
 # reloptions 已裁剪，移除测试用例
 
-# ----------
-# Another group of parallel tests (compression)
-# ----------
-# compression/compression_pglz 已随表继承(INHERITS)功能裁剪而移除
-
-# event triggers cannot run concurrently with any test that runs DDL
-# oidjoins is read-only, though, and should run late for best coverage
-test: oidjoins
-# this test also uses event triggers, so likewise run it by itself
-# test: fast_default   # 临时注释：minipg 既有 domain/fast-default SIGSEGV（ALTER TABLE ... ADD COLUMN domain default 后端崩溃），与本次 ACL 函数族删除无代码路径关联，单跑通过、仅并行级联崩；待另立任务排查，临时移出以保 check-world 其余全绿
-
-# minipg: stats 依赖 plpgsql 测试桩（wait_for_stats 轮询循环），PL/pgSQL 已裁剪，移除

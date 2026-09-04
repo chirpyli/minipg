@@ -9,10 +9,10 @@
 -- adjusting the expected output.  In most cases, the queries should
 -- not find *any* matching entries.
 --
--- NB: we assume the oidjoins test will have caught any dangling links,
--- that is OID or REGPROC fields that are not zero and do not match some
--- row in the linked-to table.  However, if we want to enforce that a link
--- field can't be 0, we have to check it here.
+-- NB: this test does not look for dangling links, that is OID or REGPROC
+-- fields that are not zero and do not match some row in the linked-to table
+-- (minipg 已移除 oidjoins 测试与 pg_get_catalog_foreign_keys() 函数)。
+-- What we check here is that a link field can't be 0.
 --
 -- NB: run this test earlier than the create_operator test, because
 -- that test creates some bogus operators...
@@ -379,8 +379,7 @@ WHERE provolatile = 'i' AND proparallel = 'u';
 
 -- **************** pg_cast ****************
 
--- Catch bogus values in pg_cast columns (other than cases detected by
--- oidjoins test).
+-- Catch bogus values in pg_cast columns.
 
 SELECT *
 FROM pg_cast c

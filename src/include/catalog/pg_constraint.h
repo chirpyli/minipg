@@ -49,7 +49,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	Oid			connamespace BKI_LOOKUP(pg_namespace);	/* OID of namespace
 														 * containing constraint */
 	char		contype;		/* constraint type; see codes below */
-	bool		convalidated;	/* constraint has been validated? */
 
 	/*
 	 * conrelid and conkey are only meaningful if the constraint applies to a
@@ -77,11 +76,6 @@ CATALOG(pg_constraint,2606,ConstraintRelationId)
 	 * NULL for trigger constraints)
 	 */
 	int16		conkey[1];
-
-	/*
-	 * If a check constraint, nodeToString representation of expression
-	 */
-	pg_node_tree conbin;
 #endif
 } FormData_pg_constraint;
 
@@ -101,13 +95,9 @@ DECLARE_UNIQUE_INDEX(pg_constraint_conrelid_conname_index, 2665, on pg_constrain
 DECLARE_UNIQUE_INDEX_PKEY(pg_constraint_oid_index, 2667, on pg_constraint using btree(oid oid_ops));
 #define ConstraintOidIndexId  2667
 
-/* conkey can contain zero (InvalidAttrNumber) if a whole-row Var is used */
-DECLARE_ARRAY_FOREIGN_KEY_OPT((conrelid, conkey), pg_attribute, (attrelid, attnum));
-
 #ifdef EXPOSE_TO_CLIENT_CODE
 
 /* Valid values for contype */
-#define CONSTRAINT_CHECK			'c'
 #define CONSTRAINT_PRIMARY			'p'
 #define CONSTRAINT_UNIQUE			'u'
 
@@ -116,14 +106,11 @@ DECLARE_ARRAY_FOREIGN_KEY_OPT((conrelid, conkey), pg_attribute, (attrelid, attnu
 extern Oid	CreateConstraintEntry(const char *constraintName,
 								  Oid constraintNamespace,
 								  char constraintType,
-								  bool isValidated,
 								  Oid relId,
 								  const int16 *constraintKey,
 								  int constraintNKeys,
 								  int constraintNTotalKeys,
 								  Oid indexRelId,
-								  Node *conExpr,
-								  const char *conBin,
 								  bool is_internal);
 
 extern void RemoveConstraintById(Oid conId);

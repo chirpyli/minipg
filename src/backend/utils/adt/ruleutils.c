@@ -1367,63 +1367,10 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 
 				break;
 			}
-		case CONSTRAINT_CHECK:
-			{
-				Datum		val;
-				bool		isnull;
-				char	   *conbin;
-				char	   *consrc;
-				Node	   *expr;
-				List	   *context;
-
-				/* Fetch constraint expression in parsetree form */
-				val = SysCacheGetAttr(CONSTROID, tup,
-									  Anum_pg_constraint_conbin, &isnull);
-				if (isnull)
-					elog(ERROR, "null conbin for constraint %u",
-						 constraintId);
-
-				conbin = TextDatumGetCString(val);
-				expr = stringToNode(conbin);
-
-				/* Set up deparsing context for Var nodes in constraint */
-				if (conForm->conrelid != InvalidOid)
-				{
-					/* relation constraint */
-					context = deparse_context_for(get_relation_name(conForm->conrelid),
-												  conForm->conrelid);
-				}
-				else
-				{
-					/* domain constraint --- can't have Vars */
-					context = NIL;
-				}
-
-				consrc = deparse_expression_pretty(expr, context, false, false,
-												   prettyFlags, 0);
-
-				/*
-				 * Now emit the constraint definition, adding NO INHERIT if
-				 * necessary.
-				 *
-				 * There are cases where the constraint expression will be
-				 * fully parenthesized and we don't need the outer parens ...
-				 * but there are other cases where we do need 'em.  Be
-				 * conservative for now.
-				 *
-				 * Note that simply checking for leading '(' and trailing ')'
-				 * would NOT be good enough, consider "(x > 0) AND (y > 0)".
-				 */
-				appendStringInfo(&buf, "CHECK (%s)", consrc);
-				break;
-			}
 		default:
 			elog(ERROR, "invalid constraint type \"%c\"", conForm->contype);
 			break;
-	}
-
-	if (!conForm->convalidated)
-		appendStringInfoString(&buf, " NOT VALID");
+		}
 
 	/* Cleanup */
 	systable_endscan(scandesc);

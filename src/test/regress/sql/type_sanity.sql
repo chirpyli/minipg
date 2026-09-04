@@ -7,10 +7,10 @@
 -- so the expected output is easy to maintain ;-).
 -- A test failure indicates someone messed up an entry in the system tables.
 --
--- NB: we assume the oidjoins test will have caught any dangling links,
--- that is OID or REGPROC fields that are not zero and do not match some
--- row in the linked-to table.  However, if we want to enforce that a link
--- field can't be 0, we have to check it here.
+-- NB: this test does not look for dangling links, that is OID or REGPROC
+-- fields that are not zero and do not match some row in the linked-to table
+-- (minipg 已移除 oidjoins 测试与 pg_get_catalog_foreign_keys() 函数)。
+-- What we check here is that a link field can't be 0.
 
 -- **************** pg_type ****************
 

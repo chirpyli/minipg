@@ -52,10 +52,6 @@ extern const PGDLLIMPORT PQcommMethods *PqCommMethods;
 	(PqCommMethods->putmessage_noblock(msgtype, s, len))
 
 /*
- * External functions.
- */
-
-/*
  * prototypes for functions in pqcomm.c
  */
 extern WaitEventSet *FeBeWaitSet;
@@ -81,7 +77,6 @@ extern int	pq_peekbyte(void);
 extern int	pq_getbyte_if_available(unsigned char *c);
 extern bool pq_buffer_has_data(void);
 extern int	pq_putmessage_v2(char msgtype, const char *s, size_t len);
-extern bool pq_check_connection(void);
 
 /*
  * prototypes for functions in be-secure.c

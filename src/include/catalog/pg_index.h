@@ -70,9 +70,6 @@ DECLARE_INDEX(pg_index_indrelid_index, 2678, on pg_index using btree(indrelid oi
 DECLARE_UNIQUE_INDEX_PKEY(pg_index_indexrelid_index, 2679, on pg_index using btree(indexrelid oid_ops));
 #define IndexRelidIndexId  2679
 
-/* indkey can contain zero (InvalidAttrNumber) to represent expressions */
-DECLARE_ARRAY_FOREIGN_KEY_OPT((indrelid, indkey), pg_attribute, (attrelid, attnum));
-
 #ifdef EXPOSE_TO_CLIENT_CODE
 
 /*

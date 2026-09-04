@@ -25,21 +25,12 @@ typedef struct AttrDefault
 	char	   *adbin;			/* nodeToString representation of expr */
 } AttrDefault;
 
-typedef struct ConstrCheck
-{
-	char	   *ccname;
-	char	   *ccbin;			/* nodeToString representation of expr */
-	bool		ccvalid;
-} ConstrCheck;
-
 /* This structure contains constraints of a tuple */
 typedef struct TupleConstr
 {
 	AttrDefault *defval;		/* array */
-	ConstrCheck *check;			/* array */
 	struct AttrMissing *missing;	/* missing attributes values, NULL if none */
 	uint16		num_defval;
-	uint16		num_check;
 	bool		has_not_null;
 } TupleConstr;
 

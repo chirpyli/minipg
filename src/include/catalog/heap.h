@@ -34,16 +34,13 @@ typedef struct RawColumnDefault
 
 typedef struct CookedConstraint
 {
-	ConstrType	contype;		/* CONSTR_DEFAULT or CONSTR_CHECK */
+	ConstrType	contype;		/* CONSTR_DEFAULT */
 	Oid			conoid;			/* constr OID if created, otherwise Invalid */
 	char	   *name;			/* name, or NULL if none */
 	AttrNumber	attnum;			/* which attr (only for DEFAULT) */
-	Node	   *expr;			/* transformed default or check expr */
-	bool		skip_validation;	/* skip validation? (only for CHECK) */
+	Node	   *expr;			/* transformed default expr */
 	bool		is_local;		/* constraint has local (non-inherited) def */
 	int			inhcount;		/* number of times constraint is inherited */
-	bool		is_no_inherit;	/* constraint has local def and cannot be
-								 * inherited */
 } CookedConstraint;
 
 extern Relation heap_create(const char *relname,

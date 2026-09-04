@@ -564,7 +564,9 @@ LINE 1: insert into mlparted (a, b) values (1, 5);
 truncate mlparted;
 ERROR:  relation "mlparted" does not exist
 alter table mlparted add constraint check_b check (b = 3);
-ERROR:  relation "mlparted" does not exist
+ERROR:  syntax error at or near "check"
+LINE 1: alter table mlparted add constraint check_b check (b = 3);
+                                                    ^
 -- minipg: PL/pgSQL removed. The original test used a BR plpgsql trigger to
 -- modify the routed row before the partition constraint check, verifying the
 -- shown row reflected the trigger-modified value. That trigger-based check is
@@ -635,7 +637,9 @@ ERROR:  syntax error at or near "attach"
 LINE 1: alter table mlparted attach partition mlparted5 for values f...
                              ^
 alter table mlparted add constraint check_b check (a = 1 and b < 45);
-ERROR:  relation "mlparted" does not exist
+ERROR:  syntax error at or near "check"
+LINE 1: alter table mlparted add constraint check_b check (a = 1 and...
+                                                    ^
 insert into mlparted values (1, 45, 'a');
 ERROR:  relation "mlparted" does not exist
 LINE 1: insert into mlparted values (1, 45, 'a');

@@ -2482,9 +2482,7 @@ _copyConstraint(const Constraint *from)
 	COPY_SCALAR_FIELD(contype);
 	COPY_STRING_FIELD(conname);
 	COPY_LOCATION_FIELD(location);
-	COPY_SCALAR_FIELD(is_no_inherit);
 	COPY_NODE_FIELD(raw_expr);
-	COPY_STRING_FIELD(cooked_expr);
 	COPY_SCALAR_FIELD(generated_when);
 	COPY_NODE_FIELD(keys);
 	COPY_NODE_FIELD(including);
@@ -2492,8 +2490,6 @@ _copyConstraint(const Constraint *from)
 	COPY_STRING_FIELD(indexname);
 	COPY_STRING_FIELD(access_method);
 	COPY_NODE_FIELD(where_clause);
-	COPY_SCALAR_FIELD(skip_validation);
-	COPY_SCALAR_FIELD(initially_valid);
 
 	return newnode;
 }
@@ -2721,7 +2717,6 @@ CopyCreateStmtFields(const CreateStmt *from, CreateStmt *newnode)
 {
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(tableElts);
-	COPY_NODE_FIELD(constraints);
 	COPY_SCALAR_FIELD(oncommit);
 	COPY_SCALAR_FIELD(if_not_exists);
 }
