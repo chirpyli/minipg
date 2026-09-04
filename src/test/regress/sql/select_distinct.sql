@@ -84,16 +84,6 @@ SET enable_sort=TRUE;
 
 SET work_mem TO DEFAULT;
 
--- Compare results
-
-(SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
-  UNION ALL
-(SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-
-(SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
-  UNION ALL
-(SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-
 DROP TABLE distinct_hash_1;
 DROP TABLE distinct_hash_2;
 DROP TABLE distinct_group_1;

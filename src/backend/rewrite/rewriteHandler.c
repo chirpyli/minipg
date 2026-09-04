@@ -68,12 +68,10 @@ static Query *rewriteRuleAction(Query *parsetree,
 								Query *rule_action,
 								Node *rule_qual,
 								int rt_index,
-								CmdType event,
-								bool *returning_flag);
+								CmdType event);
 static List *adjustJoinTreeList(Query *parsetree, bool removert, int rt_index);
 static List *rewriteTargetListIU(List *targetList,
 								 CmdType commandType,
-								 OverridingKind override,
 								 Relation target_relation,
 								 RangeTblEntry *values_rte,
 								 int values_rte_index,
@@ -329,9 +327,6 @@ acquireLocksOnSubLinks(Node *node, acquireLocksOnSubLinks_context *context)
  *	rule_qual - WHERE condition of rule, or NULL if unconditional
  *	rt_index - RT index of result relation in original query
  *	event - type of rule event
- * Output arguments:
- *	*returning_flag - set true if we rewrite RETURNING clause in rule_action
- *					(must be initialized to false)
  * Return value:
  *	rewritten form of rule_action
  */
@@ -340,8 +335,7 @@ rewriteRuleAction(Query *parsetree,
 				  Query *rule_action,
 				  Node *rule_qual,
 				  int rt_index,
-				  CmdType event,
-				  bool *returning_flag)
+				  CmdType event)
 {
 	int			current_varno,
 				new_varno;
@@ -564,41 +558,6 @@ rewriteRuleAction(Query *parsetree,
 			rule_action = sub_action;
 	}
 
-	/*
-	 * If rule_action has a RETURNING clause, then either throw it away if the
-	 * triggering query has no RETURNING clause, or rewrite it to emit what
-	 * the triggering query's RETURNING clause asks for.  Throw an error if
-	 * more than one rule has a RETURNING clause.
-	 */
-	if (!parsetree->returningList)
-		rule_action->returningList = NIL;
-	else if (rule_action->returningList)
-	{
-		if (*returning_flag)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot have RETURNING lists in multiple rules")));
-		*returning_flag = true;
-		rule_action->returningList = (List *)
-			ReplaceVarsFromTargetList((Node *) parsetree->returningList,
-									  parsetree->resultRelation,
-									  0,
-									  rt_fetch(parsetree->resultRelation,
-											   parsetree->rtable),
-									  rule_action->returningList,
-									  REPLACEVARS_REPORT_ERROR,
-									  0,
-									  &rule_action->hasSubLinks);
-
-		/*
-		 * There could have been some SubLinks in parsetree's returningList,
-		 * in which case we'd better mark the rule_action correctly.
-		 */
-		if (parsetree->hasSubLinks && !rule_action->hasSubLinks)
-			rule_action->hasSubLinks =
-				checkExprHasSubLink((Node *) rule_action->returningList);
-	}
-
 	return rule_action;
 }
 
@@ -675,7 +634,6 @@ adjustJoinTreeList(Query *parsetree, bool removert, int rt_index)
 static List *
 rewriteTargetListIU(List *targetList,
 					CmdType commandType,
-					OverridingKind override,
 					Relation target_relation,
 					RangeTblEntry *values_rte,
 					int values_rte_index,
@@ -1455,19 +1413,6 @@ ApplyRetrieveRule(Query *parsetree,
 			rte->extraUpdatedCols = NULL;
 
 			/*
-			 * For the most part, Vars referencing the view should remain as
-			 * they are, meaning that they implicitly represent OLD values.
-			 * But in the RETURNING list if any, we want such Vars to
-			 * represent NEW values, so change them to reference the new RTE.
-			 *
-			 * Since ChangeVarNodes scribbles on the tree in-place, copy the
-			 * RETURNING list first for safety.
-			 */
-			parsetree->returningList = copyObject(parsetree->returningList);
-			ChangeVarNodes((Node *) parsetree->returningList, rt_index,
-						   parsetree->resultRelation, 0);
-
-			/*
 			 * To allow the executor to compute the original view row to pass
 			 * to the INSTEAD OF trigger, we add a resjunk whole-row Var
 			 * referencing the original RTE.  This will later get expanded
@@ -1894,8 +1839,6 @@ CopyAndAddInvertedQual(Query *parsetree,
  * Output arguments:
  *	*instead_flag - set true if any unqualified INSTEAD rule is found
  *					(must be initialized to false)
- *	*returning_flag - set true if we rewrite RETURNING clause in any rule
- *					(must be initialized to false)
  *	*qual_product - filled with modified original query if any qualified
  *					INSTEAD rule is found (must be initialized to NULL)
  * Return value:
@@ -1916,7 +1859,6 @@ fireRules(Query *parsetree,
 		  CmdType event,
 		  List *locks,
 		  bool *instead_flag,
-		  bool *returning_flag,
 		  Query **qual_product)
 {
 	List	   *results = NIL;
@@ -1978,8 +1920,7 @@ fireRules(Query *parsetree,
 				continue;
 
 			rule_action = rewriteRuleAction(parsetree, rule_action,
-											event_qual, rt_index, event,
-											returning_flag);
+											event_qual, rt_index, event);
 
 			rule_action->querySource = qsrc;
 			rule_action->canSetTag = false; /* might change later */
@@ -2098,7 +2039,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	 *	- Each TLE is a column reference, and each column appears at most once.
 	 *	- FROM contains exactly one base relation.
 	 *	- No GROUP BY or HAVING clauses.
-	 *	- No set operations (UNION, INTERSECT or EXCEPT).
 	 *	- No sub-queries in the WHERE clause that reference the target table.
 	 *
 	 * We ignore that last restriction since it would be complex to enforce
@@ -2936,86 +2876,13 @@ rewriteTargetView(Query *parsetree, Relation view)
 
 		/*
 		 * Even though we copied viewquery already at the top of this
-		 * function, we must duplicate the viewqual again here, because we may
-		 * need to use the quals again below for a WithCheckOption clause.
+		 * function, we must duplicate the viewqual again here
 		 */
 		viewqual = copyObject(viewqual);
 
 		ChangeVarNodes(viewqual, base_rt_index, new_rt_index, 0);
 
 		AddQual(parsetree, (Node *) viewqual);
-	}
-
-	/*
-	 * For INSERT/UPDATE, if the view has the WITH CHECK OPTION, or any parent
-	 * view specified WITH CASCADED CHECK OPTION, add the quals from the view
-	 * to the query's withCheckOptions list.
-	 */
-	if (parsetree->commandType != CMD_DELETE)
-	{
-		bool		has_wco = false;
-		bool		cascaded = false;
-
-		/*
-		 * If the parent view has a cascaded check option, treat this view as
-		 * if it also had a cascaded check option.
-		 *
-		 * New WithCheckOptions are added to the start of the list, so if
-		 * there is a cascaded check option, it will be the first item in the
-		 * list.
-		 */
-		if (parsetree->withCheckOptions != NIL)
-		{
-			WithCheckOption *parent_wco =
-			(WithCheckOption *) linitial(parsetree->withCheckOptions);
-
-			if (parent_wco->cascaded)
-			{
-				has_wco = true;
-				cascaded = true;
-			}
-		}
-
-		/*
-		 * Add the new WithCheckOption to the start of the list, so that
-		 * checks on inner views are run before checks on outer views, as
-		 * required by the SQL standard.
-		 *
-		 * If the new check is CASCADED, we need to add it even if this view
-		 * has no quals, since there may be quals on child views.  A LOCAL
-		 * check can be omitted if this view has no quals.
-		 */
-		if (has_wco && (cascaded || viewquery->jointree->quals != NULL))
-		{
-			WithCheckOption *wco;
-
-			wco = makeNode(WithCheckOption);
-			wco->kind = WCO_VIEW_CHECK;
-			wco->relname = pstrdup(RelationGetRelationName(view));
-			wco->polname = NULL;
-			wco->qual = NULL;
-			wco->cascaded = cascaded;
-
-			parsetree->withCheckOptions = lcons(wco,
-												parsetree->withCheckOptions);
-
-			if (viewquery->jointree->quals != NULL)
-			{
-				wco->qual = (Node *) viewquery->jointree->quals;
-				ChangeVarNodes(wco->qual, base_rt_index, new_rt_index, 0);
-
-				/*
-				 * Make sure that the query is marked correctly if the added
-				 * qual has sublinks.  We can skip this check if the query is
-				 * already marked, or if the command is an UPDATE, in which
-				 * case the same qual will have already been added, and this
-				 * check will already have been done.
-				 */
-				if (!parsetree->hasSubLinks &&
-					parsetree->commandType != CMD_UPDATE)
-					parsetree->hasSubLinks = checkExprHasSubLink(wco->qual);
-			}
-		}
 	}
 
 	table_close(base_rel, NoLock);
@@ -3044,7 +2911,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 {
 	CmdType		event = parsetree->commandType;
 	bool		instead = false;
-	bool		returning = false;
 	bool		updatableview = false;
 	Query	   *qual_product = NULL;
 	List	   *rewritten = NIL;
@@ -3123,7 +2989,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 				/* Process the main targetlist ... */
 				parsetree->targetList = rewriteTargetListIU(parsetree->targetList,
 															parsetree->commandType,
-															parsetree->override,
 															rt_entry_relation,
 															values_rte,
 															values_rte_index,
@@ -3140,7 +3005,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 				parsetree->targetList =
 					rewriteTargetListIU(parsetree->targetList,
 										parsetree->commandType,
-										parsetree->override,
 										rt_entry_relation,
 										NULL, 0, NULL);
 			}
@@ -3151,7 +3015,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 				parsetree->onConflict->onConflictSet =
 					rewriteTargetListIU(parsetree->onConflict->onConflictSet,
 										CMD_UPDATE,
-										parsetree->override,
 										rt_entry_relation,
 										NULL, 0, NULL);
 			}
@@ -3161,7 +3024,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 			parsetree->targetList =
 				rewriteTargetListIU(parsetree->targetList,
 									parsetree->commandType,
-									parsetree->override,
 									rt_entry_relation,
 									NULL, 0, NULL);
 		}
@@ -3184,7 +3046,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 									event,
 									locks,
 									&instead,
-									&returning,
 									&qual_product);
 
 		/*
@@ -3322,12 +3183,9 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 			/*
 			 * Set the "instead" flag, as if there had been an unqualified
 			 * INSTEAD, to prevent the original query from being included a
-			 * second time below.  The transformation will have rewritten any
-			 * RETURNING list, so we can also set "returning" to forestall
-			 * throwing an error below.
+			 * second time below.
 			 */
 			instead = true;
-			returning = true;
 			updatableview = true;
 		}
 
@@ -3379,47 +3237,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 			}
 
 			rewrite_events = list_delete_last(rewrite_events);
-		}
-
-		/*
-		 * If there is an INSTEAD, and the original query has a RETURNING, we
-		 * have to have found a RETURNING in the rule(s), else fail. (Because
-		 * DefineQueryRewrite only allows RETURNING in unconditional INSTEAD
-		 * rules, there's no need to worry whether the substituted RETURNING
-		 * will actually be executed --- it must be.)
-		 */
-		if ((instead || qual_product != NULL) &&
-			parsetree->returningList &&
-			!returning)
-		{
-			switch (event)
-			{
-				case CMD_INSERT:
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot perform INSERT RETURNING on relation \"%s\"",
-									RelationGetRelationName(rt_entry_relation)),
-							 errhint("You need an unconditional ON INSERT DO INSTEAD rule with a RETURNING clause.")));
-					break;
-				case CMD_UPDATE:
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot perform UPDATE RETURNING on relation \"%s\"",
-									RelationGetRelationName(rt_entry_relation)),
-							 errhint("You need an unconditional ON UPDATE DO INSTEAD rule with a RETURNING clause.")));
-					break;
-				case CMD_DELETE:
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot perform DELETE RETURNING on relation \"%s\"",
-									RelationGetRelationName(rt_entry_relation)),
-							 errhint("You need an unconditional ON DELETE DO INSTEAD rule with a RETURNING clause.")));
-					break;
-				default:
-					elog(ERROR, "unrecognized commandType: %d",
-						 (int) event);
-					break;
-			}
 		}
 
 		/*

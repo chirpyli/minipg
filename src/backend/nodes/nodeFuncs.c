@@ -1769,8 +1769,6 @@ expression_tree_walker(Node *node,
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
 			break;
-		case T_WithCheckOption:
-			return walker(((WithCheckOption *) node)->qual, context);
 		case T_Aggref:
 			{
 				Aggref	   *expr = (Aggref *) node;
@@ -2095,11 +2093,7 @@ query_tree_walker(Query *query,
 
 	if (walker((Node *) query->targetList, context))
 		return true;
-	if (walker((Node *) query->withCheckOptions, context))
-		return true;
 	if (walker((Node *) query->onConflict, context))
-		return true;
-	if (walker((Node *) query->returningList, context))
 		return true;
 	if (walker((Node *) query->jointree, context))
 		return true;
@@ -2347,15 +2341,6 @@ expression_tree_mutator(Node *node,
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
-		case T_WithCheckOption:
-			{
-				WithCheckOption *wco = (WithCheckOption *) node;
-				WithCheckOption *newnode;
-
-				FLATCOPY(newnode, wco, WithCheckOption);
-				MUTATE(newnode->qual, wco->qual, Node *);
-				return (Node *) newnode;
-			}
 		case T_Aggref:
 			{
 				Aggref	   *aggref = (Aggref *) node;
@@ -2885,9 +2870,7 @@ query_tree_mutator(Query *query,
 	}
 
 	MUTATE(query->targetList, query->targetList, List *);
-	MUTATE(query->withCheckOptions, query->withCheckOptions, List *);
 	MUTATE(query->onConflict, query->onConflict, OnConflictExpr *);
-	MUTATE(query->returningList, query->returningList, List *);
 	MUTATE(query->jointree, query->jointree, FromExpr *);
 	MUTATE(query->havingQual, query->havingQual, Node *);
 	MUTATE(query->limitOffset, query->limitOffset, Node *);
@@ -3160,8 +3143,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->onConflictClause, context))
 					return true;
-				if (walker(stmt->returningList, context))
-					return true;
 			}
 			break;
 		case T_DeleteStmt:
@@ -3174,8 +3155,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->whereClause, context))
 					return true;
-				if (walker(stmt->returningList, context))
-					return true;
 			}
 			break;
 		case T_UpdateStmt:
@@ -3186,11 +3165,7 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->targetList, context))
 					return true;
-				if (walker(stmt->whereClause, context))
-					return true;
 				if (walker(stmt->fromClause, context))
-					return true;
-				if (walker(stmt->returningList, context))
 					return true;
 			}
 			break;

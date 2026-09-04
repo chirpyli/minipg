@@ -224,7 +224,6 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												bool partColsUpdated,
 												List *resultRelations,
 												List *updateColnosLists,
-												List *withCheckOptionLists, List *returningLists,
 												List *rowMarks, OnConflictExpr *onconflict,
 												int epqParam);
 extern LimitPath *create_limit_path(PlannerInfo *root, RelOptInfo *rel,

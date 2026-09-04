@@ -27,14 +27,6 @@
 #include "nodes/primnodes.h"
 #include "nodes/value.h"
 
-
-typedef enum OverridingKind
-{
-	OVERRIDING_NOT_SET = 0,
-	OVERRIDING_USER_VALUE,
-	OVERRIDING_SYSTEM_VALUE
-} OverridingKind;
-
 /* Possible sources of a Query */
 typedef enum QuerySource
 {
@@ -137,11 +129,7 @@ typedef struct Query
 
 	List	   *targetList;		/* target list (of TargetEntry) */
 
-	OverridingKind override;	/* OVERRIDING clause */
-
 	OnConflictExpr *onConflict; /* ON CONFLICT DO [NOTHING | UPDATE] */
-
-	List	   *returningList;	/* return-values list (of TargetEntry) */
 
 	List	   *groupClause;	/* a list of SortGroupClause's */
 	bool		groupDistinct;	/* is the group by clause distinct? */
@@ -162,9 +150,6 @@ typedef struct Query
 
 	List	   *constraintDeps; /* a list of pg_constraint OIDs that the query
 								 * depends on to be semantically valid */
-
-	List	   *withCheckOptions;	/* a list of WithCheckOption's (added
-									 * during rewrite) */
 
 	/*
 	 * The following two fields identify the portion of the source text string
@@ -892,30 +877,6 @@ typedef struct TableSampleClause
 } TableSampleClause;
 
 /*
- * WithCheckOption -
- *		representation of WITH CHECK OPTION checks to be applied to new tuples
- *		when inserting/updating an auto-updatable view, or RLS WITH CHECK
- *		policies to be applied when inserting/updating a relation with RLS.
- */
-typedef enum WCOKind
-{
-	WCO_VIEW_CHECK,				/* WCO on an auto-updatable view */
-	WCO_RLS_INSERT_CHECK,		/* RLS INSERT WITH CHECK policy */
-	WCO_RLS_UPDATE_CHECK,		/* RLS UPDATE WITH CHECK policy */
-	WCO_RLS_CONFLICT_CHECK		/* RLS ON CONFLICT DO UPDATE USING policy */
-} WCOKind;
-
-typedef struct WithCheckOption
-{
-	NodeTag		type;
-	WCOKind		kind;			/* kind of WCO */
-	char	   *relname;		/* name of relation that specified the WCO */
-	char	   *polname;		/* name of RLS policy being checked */
-	Node	   *qual;			/* constraint qual to check */
-	bool		cascaded;		/* true for a cascaded WCO on a view */
-} WithCheckOption;
-
-/*
  * SortGroupClause -
  *		representation of ORDER BY, GROUP BY, PARTITION BY,
  *		DISTINCT, DISTINCT ON items
@@ -1145,8 +1106,6 @@ typedef struct InsertStmt
 	List	   *cols;			/* optional: names of the target columns */
 	Node	   *selectStmt;		/* the source SELECT/VALUES, or NULL */
 	OnConflictClause *onConflictClause; /* ON CONFLICT clause */
-	List	   *returningList;	/* list of expressions to return */
-	OverridingKind override;	/* OVERRIDING clause */
 } InsertStmt;
 
 /* ----------------------
@@ -1159,7 +1118,6 @@ typedef struct DeleteStmt
 	RangeVar   *relation;		/* relation to delete from */
 	List	   *usingClause;	/* optional using clause for more tables */
 	Node	   *whereClause;	/* qualifications */
-	List	   *returningList;	/* list of expressions to return */
 } DeleteStmt;
 
 /* ----------------------
@@ -1173,17 +1131,13 @@ typedef struct UpdateStmt
 	List	   *targetList;		/* the target list (of ResTarget) */
 	Node	   *whereClause;	/* qualifications */
 	List	   *fromClause;		/* optional from clause for more tables */
-	List	   *returningList;	/* list of expressions to return */
 } UpdateStmt;
 
 /* ----------------------
  *		Select Statement
  *
  * A "simple" SELECT is represented in the output of gram.y by a single
- * SelectStmt node; so is a VALUES construct.  A query containing set
- * operators (UNION, INTERSECT, EXCEPT) is represented by a tree of SelectStmt
- * nodes, in which the leaf nodes are component SELECTs and the internal nodes
- * represent UNION, INTERSECT, or EXCEPT operators.  Using the same node
+ * SelectStmt node; so is a VALUES construct. Using the same node
  * type for both leaf and internal nodes allows gram.y to stick ORDER BY,
  * LIMIT, etc, clause values into a SELECT statement without worrying
  * whether it is a simple or compound SELECT.
@@ -1674,13 +1628,6 @@ typedef struct TransactionStmt
  *		Create View Statement
  * ----------------------
  */
-typedef enum ViewCheckOption
-{
-	NO_CHECK_OPTION,
-	LOCAL_CHECK_OPTION,
-	CASCADED_CHECK_OPTION
-} ViewCheckOption;
-
 typedef struct ViewStmt
 {
 	NodeTag		type;
@@ -1689,7 +1636,6 @@ typedef struct ViewStmt
 	Node	   *query;			/* the SELECT query (as a raw parse tree) */
 	bool		replace;		/* replace an existing view? */
 	List	   *options;		/* options from WITH clause */
-	ViewCheckOption withCheckOption;	/* WITH CHECK OPTION */
 } ViewStmt;
 
 /* ----------------------

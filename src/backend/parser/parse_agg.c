@@ -433,9 +433,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_OFFSET:
 			errkind = true;
 			break;
-		case EXPR_KIND_RETURNING:
-			errkind = true;
-			break;
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
 			errkind = true;

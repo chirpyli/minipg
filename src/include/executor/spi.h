@@ -78,9 +78,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_OK_INSERT			7
 #define SPI_OK_DELETE			8
 #define SPI_OK_UPDATE			9
-#define SPI_OK_INSERT_RETURNING 11
-#define SPI_OK_DELETE_RETURNING 12
-#define SPI_OK_UPDATE_RETURNING 13
 #define SPI_OK_REWRITTEN		14
 #define SPI_OK_REL_REGISTER		15
 #define SPI_OK_REL_UNREGISTER	16

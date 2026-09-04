@@ -6,15 +6,9 @@
 -- count the number of tuples originally, should be 1000
 SELECT count(*) FROM onek;
 
--- pick three random rows, they shouldn't match
-(SELECT unique1 AS random
-  FROM onek ORDER BY random() LIMIT 1)
-INTERSECT
-(SELECT unique1 AS random
-  FROM onek ORDER BY random() LIMIT 1)
-INTERSECT
-(SELECT unique1 AS random
-  FROM onek ORDER BY random() LIMIT 1);
+-- pick a random row
+SELECT unique1 AS random
+  FROM onek ORDER BY random() LIMIT 1;
 
 -- count roughly 1/10 of the tuples
 CREATE TABLE RANDOM_TBL AS

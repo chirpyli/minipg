@@ -426,56 +426,9 @@ AS $$ SELECT 'hello'::varchar(5) $$ LANGUAGE sql STABLE;
 SELECT * FROM rngfunc() GROUP BY 1;
 DROP FUNCTION rngfunc();
 
---
--- some tests on SQL functions with RETURNING
---
-
-CREATE TABLE tt(f1 serial, data text);
-
-create function insert_tt(text) returns int as
-$$ insert into tt(data) values($1) returning f1 $$
-language sql;
-
-select insert_tt('foo');
-select insert_tt('bar');
-select * from tt;
-
--- insert will execute to completion even if function needs just 1 row
-create or replace function insert_tt(text) returns int as
-$$ insert into tt(data) values($1),($1||$1) returning f1 $$
-language sql;
-
-select insert_tt('fool');
-select * from tt;
-
--- setof does what's expected
-create or replace function insert_tt2(text,text) returns setof int as
-$$ insert into tt(data) values($1),($2) returning f1 $$
-language sql;
-
-select insert_tt2('foolish','barrish');
-select * from insert_tt2('baz','quux');
-select * from tt;
-
--- limit doesn't prevent execution to completion
-select insert_tt2('foolish','barrish') limit 1;
-select * from tt;
-
--- minipg: PL/pgSQL removed. The original used a plpgsql trigger (noticetrigger)
--- to verify triggers fire inside SQL-function inserts; that trigger subtest is
--- dropped.
-
--- and rules work
-CREATE TABLE tt_log(f1 int, data text);
-
-create rule insert_tt_rule as on insert to tt do also
-  insert into tt_log values(new.*);
-
-select insert_tt2('foollog','barlog') limit 1;
-select * from tt;
--- note that nextval() gets executed a second time in the rule expansion,
--- which is expected.
-select * from tt_log;
+-- minipg: PL/pgSQL removed. The original had "some tests on SQL functions
+-- with RETURNING" (insert_tt/insert_tt2 plus the insert rule subtest); that
+-- block is dropped because RETURNING is removed.
 
 -- test case for a whole-row-variable bug
 create function rngfunc1(n integer, out a text, out b text)
@@ -523,27 +476,9 @@ select * from array_to_set(array['one', 'two']) as t(f1 point,f2 text);
 explain (verbose, costs off)
   select * from array_to_set(array['one', 'two']) as t(f1 numeric(4,2),f2 text);
 
-CREATE TABLE rngfunc(f1 int8, f2 int8);
-
-create function testrngfunc() returns record as $$
-  insert into rngfunc values (1,2) returning *;
-$$ language sql;
-
-select testrngfunc();
-select * from testrngfunc() as t(f1 int8,f2 int8);
-select * from testrngfunc(); -- fail
-
-drop function testrngfunc();
-
-create function testrngfunc() returns setof record as $$
-  insert into rngfunc values (1,2), (3,4) returning *;
-$$ language sql;
-
-select testrngfunc();
-select * from testrngfunc() as t(f1 int8,f2 int8);
-select * from testrngfunc(); -- fail
-
-drop function testrngfunc();
+-- minipg: the "SQL functions returning record" subtests whose function bodies
+-- were "insert into rngfunc values ... returning *;" are dropped because
+-- RETURNING is removed.
 
 -- Check that typmod imposed by a composite type is honored
 create type rngfunc_type as (f1 numeric(35,6), f2 numeric(35,2));
@@ -595,7 +530,7 @@ select * from testrngfunc();
 select * from testrngfunc();
 
 create or replace function testrngfunc() returns setof rngfunc_type as $$
-  select 1, 2 union select 3, 4 order by 1;
+  select * from (values(1,2),(3,4)) t order by 1;
 $$ language sql immutable;
 
 explain (verbose, costs off)
@@ -659,10 +594,10 @@ drop function get_first_user();
 drop function get_users();
 drop table users;
 
--- check behavior with type coercion required for a set-op
+-- check behavior with type coercion required for a multi-row result
 
 create or replace function rngfuncbar() returns setof text as
-$$ select 'foo'::varchar union all select 'bar'::varchar ; $$
+$$ select * from (values('foo'::varchar),('bar'::varchar)) t $$
 language sql stable;
 
 select rngfuncbar();

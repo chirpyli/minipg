@@ -137,15 +137,6 @@ LINE 1: CREATE TABLE distinct_hash_2 AS
                                      ^
 SET enable_sort=TRUE;
 SET work_mem TO DEFAULT;
--- Compare results
-(SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
-  UNION ALL
-(SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-(SELECT * FROM distinct_hash_1 EXCEPT SELECT * FROM distinct_group_1)
-  UNION ALL
-(SELECT * FROM distinct_group_1 EXCEPT SELECT * FROM distinct_hash_1);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 DROP TABLE distinct_hash_1;
 ERROR:  table "distinct_hash_1" does not exist
 DROP TABLE distinct_hash_2;

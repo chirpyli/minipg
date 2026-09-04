@@ -50,7 +50,7 @@ reset enable_parallel_append;
 
 -- Parallel Append that runs serially
 create function sp_test_func() returns setof text as
-$$ select 'foo'::varchar union all select 'bar'::varchar $$
+$$ select * from (values('foo'::varchar),('bar'::varchar)) t $$
 language sql stable;
 select sp_test_func() order by 1;
 
@@ -382,25 +382,7 @@ select (stringu1 || repeat('abcd', 5000))::int2 from tenk1 where unique1 = 1;
 ROLLBACK TO SAVEPOINT settings;
 
 -- test interaction with set-returning functions
-SAVEPOINT settings;
 
--- multiple subqueries under a single Gather node
--- must set parallel_setup_cost > 0 to discourage multiple Gather nodes
-SET LOCAL parallel_setup_cost = 10;
-EXPLAIN (COSTS OFF)
-SELECT unique1 FROM tenk1 WHERE fivethous = tenthous + 1
-UNION ALL
-SELECT unique1 FROM tenk1 WHERE fivethous = tenthous + 1;
-ROLLBACK TO SAVEPOINT settings;
-
--- can't use multiple subqueries under a single Gather node due to initPlans
-EXPLAIN (COSTS OFF)
-SELECT unique1 FROM tenk1 WHERE fivethous =
-	(SELECT unique1 FROM tenk1 WHERE fivethous = 1 LIMIT 1)
-UNION ALL
-SELECT unique1 FROM tenk1 WHERE fivethous =
-	(SELECT unique2 FROM tenk1 WHERE fivethous = 1 LIMIT 1)
-ORDER BY 1;
 
 
 EXPLAIN (VERBOSE, COSTS OFF)

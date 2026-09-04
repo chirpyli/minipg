@@ -160,14 +160,14 @@ SELECT f1[:1] FROM POINT_TBL;
 SELECT f1[:] FROM POINT_TBL;
 
 -- subscript assignments to fixed-width result in NULL if previous value is NULL
-UPDATE point_tbl SET f1[0] = 10 WHERE f1 IS NULL RETURNING *;
-INSERT INTO point_tbl(f1[0]) VALUES(0) RETURNING *;
+UPDATE point_tbl SET f1[0] = 10 WHERE f1 IS NULL;
+INSERT INTO point_tbl(f1[0]) VALUES(0);
 -- NULL assignments get ignored
-UPDATE point_tbl SET f1[0] = NULL WHERE f1::text = '(10,10)'::point::text RETURNING *;
+UPDATE point_tbl SET f1[0] = NULL WHERE f1::text = '(10,10)'::point::text;
 -- but non-NULL subscript assignments work
-UPDATE point_tbl SET f1[0] = -10, f1[1] = -10 WHERE f1::text = '(10,10)'::point::text RETURNING *;
+UPDATE point_tbl SET f1[0] = -10, f1[1] = -10 WHERE f1::text = '(10,10)'::point::text;
 -- but not to expand the range
-UPDATE point_tbl SET f1[3] = 10 WHERE f1::text = '(-10,-10)'::point::text RETURNING *;
+UPDATE point_tbl SET f1[3] = 10 WHERE f1::text = '(-10,-10)'::point::text;
 
 --
 -- test array extension
@@ -392,13 +392,11 @@ select * from arr_tbl where f1 >= '{1,2,3}' and f1 < '{1,5,3}';
 CREATE TABLE arr_pk_tbl (pk int4 primary key, f1 int[]);
 insert into arr_pk_tbl values (1, '{1,2,3}');
 insert into arr_pk_tbl values (1, '{3,4,5}') on conflict (pk)
-  do update set f1[1] = excluded.f1[1], f1[3] = excluded.f1[3]
-  returning pk, f1;
+  do update set f1[1] = excluded.f1[1], f1[3] = excluded.f1[3];
 insert into arr_pk_tbl(pk, f1[1:2]) values (1, '{6,7,8}') on conflict (pk)
   do update set f1[1] = excluded.f1[1],
     f1[2] = excluded.f1[2],
-    f1[3] = excluded.f1[3]
-  returning pk, f1;
+    f1[3] = excluded.f1[3];
 
 -- note: if above selects don't produce the expected tuple order,
 -- then you didn't get an indexscan plan, and something is busted.

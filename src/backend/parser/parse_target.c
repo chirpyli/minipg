@@ -314,7 +314,7 @@ resolveTargetListUnknowns(ParseState *pstate, List *targetlist)
  *		Mark targetlist columns that are simple Vars with the source
  *		table's OID and column number.
  *
- * Currently, this is done only for SELECT targetlists and RETURNING lists,
+ * Currently, this is done only for SELECT targetlists,
  * since we only need the info if we are going to send it to the frontend.
  */
 void

@@ -641,20 +641,14 @@ SELECT voidtest3(17);
  
 (1 row)
 
-CREATE FUNCTION voidtest4(a int) RETURNS VOID LANGUAGE SQL AS
-$$ INSERT INTO sometable VALUES(a - 1) RETURNING f1 $$;
-SELECT voidtest4(39);
- voidtest4 
------------
- 
-(1 row)
+-- minipg: voidtest4, whose body was "INSERT INTO sometable VALUES(a - 1)
+-- RETURNING f1", is dropped because RETURNING is removed.
 
 TABLE sometable;
- f1 
+ f1
 ----
  18
- 38
-(2 rows)
+(1 row)
 
 CREATE FUNCTION voidtest5(a int) RETURNS SETOF VOID LANGUAGE SQL AS
 $$ SELECT generate_series(1, a) $$ STABLE;
@@ -709,7 +703,6 @@ drop cascades to function functest_sri1()
 drop cascades to function voidtest1(integer)
 drop cascades to function voidtest2(integer,integer)
 drop cascades to function voidtest3(integer)
-drop cascades to function voidtest4(integer)
 drop cascades to function voidtest5(integer)
 drop cascades to function double_append(anyarray,anyelement)
 DROP USER regress_unpriv_user;

@@ -44,7 +44,7 @@
 
 
 static void checkRuleResultList(List *targetList, TupleDesc resultDesc,
-								bool isSelect, bool requireColumnNameMatch);
+								bool requireColumnNameMatch);
 
 
 /*
@@ -344,8 +344,7 @@ DefineQueryRewrite(const char *rulename,
 		 */
 		checkRuleResultList(query->targetList,
 							RelationGetDescr(event_relation),
-						true,
-						true);
+							true);
 
 		/*
 		 * ... there must not be another ON SELECT rule already ...
@@ -429,40 +428,6 @@ DefineQueryRewrite(const char *rulename,
 	}
 	else
 	{
-		/*
-		 * For non-SELECT rules, a RETURNING list can appear in at most one of
-		 * the actions ... and there can't be any RETURNING list at all in a
-		 * conditional or non-INSTEAD rule.  (Actually, there can be at most
-		 * one RETURNING list across all rules on the same event, but it seems
-		 * best to enforce that at rule expansion time.)  If there is a
-		 * RETURNING list, it must match the event relation.
-		 */
-		bool		haveReturning = false;
-
-		foreach(l, action)
-		{
-			query = lfirst_node(Query, l);
-
-			if (!query->returningList)
-				continue;
-			if (haveReturning)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot have multiple RETURNING lists in a rule")));
-			haveReturning = true;
-			if (event_qual != NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("RETURNING lists are not supported in conditional rules")));
-			if (!is_instead)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("RETURNING lists are not supported in non-INSTEAD rules")));
-			checkRuleResultList(query->returningList,
-								RelationGetDescr(event_relation),
-								false, false);
-		}
-
 		/*
 		 * And finally, if it's not an ON SELECT rule then it must *not* be
 		 * named _RETURN.  This prevents accidentally or maliciously replacing
@@ -600,20 +565,16 @@ DefineQueryRewrite(const char *rulename,
  * checkRuleResultList
  *		Verify that targetList produces output compatible with a tupledesc
  *
- * The targetList might be either a SELECT targetlist, or a RETURNING list;
- * isSelect tells which.  This is used for choosing error messages.
+ * The targetList is a SELECT targetlist (of a view's _RETURN rule).
  *
  * A SELECT targetlist may optionally require that column names match.
  */
 static void
-checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
+checkRuleResultList(List *targetList, TupleDesc resultDesc,
 					bool requireColumnNameMatch)
 {
 	ListCell   *tllist;
 	int			i;
-
-	/* Only a SELECT may require a column name match. */
-	Assert(isSelect || !requireColumnNameMatch);
 
 	i = 0;
 	foreach(tllist, targetList)
@@ -631,9 +592,7 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 		if (i > resultDesc->natts)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 isSelect ?
-					 errmsg("SELECT rule's target list has too many entries") :
-					 errmsg("RETURNING list has too many entries")));
+					 errmsg("SELECT rule's target list has too many entries")));
 
 		attr = TupleDescAttr(resultDesc, i - 1);
 		attname = NameStr(attr->attname);
@@ -644,24 +603,11 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 		 * possible if someone tried to convert a relation with dropped
 		 * columns to a view, but the only case we care about supporting
 		 * table-to-view conversion for is pg_dump, and pg_dump won't do that.
-		 *
-		 * Unfortunately, the situation is also possible when adding a rule
-		 * with RETURNING to a regular table, and rejecting that case is
-		 * altogether more annoying.  In principle we could support it by
-		 * modifying the targetlist to include dummy NULL columns
-		 * corresponding to the dropped columns in the tupdesc.  However,
-		 * places like ruleutils.c would have to be fixed to not process such
-		 * entries, and that would take an uncertain and possibly rather large
-		 * amount of work.  (Note we could not dodge that by marking the dummy
-		 * columns resjunk, since it's precisely the non-resjunk tlist columns
-		 * that are expected to correspond to table columns.)
 		 */
 		if (attr->attisdropped)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 isSelect ?
-					 errmsg("cannot convert relation containing dropped columns to view") :
-					 errmsg("cannot create a RETURNING list for a relation containing dropped columns")));
+					 errmsg("cannot convert relation containing dropped columns to view")));
 
 		/* Check name match if required; no need for two error texts here */
 		if (requireColumnNameMatch && strcmp(tle->resname, attname) != 0)
@@ -677,16 +623,9 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 		if (attr->atttypid != tletypid)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 isSelect ?
 					 errmsg("SELECT rule's target entry %d has different type from column \"%s\"",
-							i, attname) :
-					 errmsg("RETURNING list's entry %d has different type from column \"%s\"",
 							i, attname),
-					 isSelect ?
 					 errdetail("SELECT target entry has type %s, but column has type %s.",
-							   format_type_be(tletypid),
-							   format_type_be(attr->atttypid)) :
-					 errdetail("RETURNING list entry has type %s, but column has type %s.",
 							   format_type_be(tletypid),
 							   format_type_be(attr->atttypid))));
 
@@ -701,17 +640,9 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 			attr->atttypmod != -1 && tletypmod != -1)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 isSelect ?
 					 errmsg("SELECT rule's target entry %d has different size from column \"%s\"",
-							i, attname) :
-					 errmsg("RETURNING list's entry %d has different size from column \"%s\"",
 							i, attname),
-					 isSelect ?
 					 errdetail("SELECT target entry has type %s, but column has type %s.",
-							   format_type_with_typemod(tletypid, tletypmod),
-							   format_type_with_typemod(attr->atttypid,
-														attr->atttypmod)) :
-					 errdetail("RETURNING list entry has type %s, but column has type %s.",
 							   format_type_with_typemod(tletypid, tletypmod),
 							   format_type_with_typemod(attr->atttypid,
 														attr->atttypmod))));
@@ -720,9 +651,7 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 	if (i != resultDesc->natts)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 isSelect ?
-				 errmsg("SELECT rule's target list has too few entries") :
-				 errmsg("RETURNING list has too few entries")));
+				 errmsg("SELECT rule's target list has too few entries")));
 }
 
 

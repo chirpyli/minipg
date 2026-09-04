@@ -483,12 +483,6 @@ from gs_data_1 group by cube (g1000, g100,g10);
 set enable_sort = true;
 set work_mem to default;
 
--- Compare results
-
-(select * from gs_hash_1 except select * from gs_group_1)
-  union all
-(select * from gs_group_1 except select * from gs_hash_1);
-
 drop table gs_group_1;
 drop table gs_hash_1;
 

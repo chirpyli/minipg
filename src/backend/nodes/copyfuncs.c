@@ -84,7 +84,6 @@ _copyPlannedStmt(const PlannedStmt *from)
 
 	COPY_SCALAR_FIELD(commandType);
 	COPY_SCALAR_FIELD(queryId);
-	COPY_SCALAR_FIELD(hasReturning);
 	COPY_SCALAR_FIELD(hasModifyingCTE);
 	COPY_SCALAR_FIELD(canSetTag);
 	COPY_SCALAR_FIELD(transientPlan);
@@ -209,8 +208,6 @@ _copyModifyTable(const ModifyTable *from)
 	COPY_SCALAR_FIELD(partColsUpdated);
 	COPY_NODE_FIELD(resultRelations);
 	COPY_NODE_FIELD(updateColnosLists);
-	COPY_NODE_FIELD(withCheckOptionLists);
-	COPY_NODE_FIELD(returningLists);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_SCALAR_FIELD(epqParam);
 	COPY_SCALAR_FIELD(onConflictAction);
@@ -2116,20 +2113,6 @@ _copyTableSampleClause(const TableSampleClause *from)
 	return newnode;
 }
 
-static WithCheckOption *
-_copyWithCheckOption(const WithCheckOption *from)
-{
-	WithCheckOption *newnode = makeNode(WithCheckOption);
-
-	COPY_SCALAR_FIELD(kind);
-	COPY_STRING_FIELD(relname);
-	COPY_STRING_FIELD(polname);
-	COPY_NODE_FIELD(qual);
-	COPY_SCALAR_FIELD(cascaded);
-
-	return newnode;
-}
-
 static SortGroupClause *
 _copySortGroupClause(const SortGroupClause *from)
 {
@@ -2552,9 +2535,7 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);
 	COPY_NODE_FIELD(targetList);
-	COPY_SCALAR_FIELD(override);
 	COPY_NODE_FIELD(onConflict);
-	COPY_NODE_FIELD(returningList);
 	COPY_NODE_FIELD(groupClause);
 	COPY_SCALAR_FIELD(groupDistinct);
 	COPY_NODE_FIELD(groupingSets);
@@ -2566,7 +2547,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_NODE_FIELD(constraintDeps);
-	COPY_NODE_FIELD(withCheckOptions);
 	COPY_LOCATION_FIELD(stmt_location);
 	COPY_SCALAR_FIELD(stmt_len);
 
@@ -2594,8 +2574,6 @@ _copyInsertStmt(const InsertStmt *from)
 	COPY_NODE_FIELD(cols);
 	COPY_NODE_FIELD(selectStmt);
 	COPY_NODE_FIELD(onConflictClause);
-	COPY_NODE_FIELD(returningList);
-	COPY_SCALAR_FIELD(override);
 
 	return newnode;
 }
@@ -2608,7 +2586,6 @@ _copyDeleteStmt(const DeleteStmt *from)
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(usingClause);
 	COPY_NODE_FIELD(whereClause);
-	COPY_NODE_FIELD(returningList);
 
 	return newnode;
 }
@@ -2622,7 +2599,6 @@ _copyUpdateStmt(const UpdateStmt *from)
 	COPY_NODE_FIELD(targetList);
 	COPY_NODE_FIELD(whereClause);
 	COPY_NODE_FIELD(fromClause);
-	COPY_NODE_FIELD(returningList);
 
 	return newnode;
 }
@@ -2843,7 +2819,6 @@ _copyViewStmt(const ViewStmt *from)
 	COPY_NODE_FIELD(query);
 	COPY_SCALAR_FIELD(replace);
 	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(withCheckOption);
 
 	return newnode;
 }
@@ -3536,9 +3511,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_TableSampleClause:
 			retval = _copyTableSampleClause(from);
-			break;
-		case T_WithCheckOption:
-			retval = _copyWithCheckOption(from);
 			break;
 		case T_SortGroupClause:
 			retval = _copySortGroupClause(from);

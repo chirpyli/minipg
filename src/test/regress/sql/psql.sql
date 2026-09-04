@@ -1002,8 +1002,8 @@ SELECT 1;
 SELECT 2 \r
 \p
 SELECT 3 \p
-UNION SELECT 4 \p
-UNION SELECT 5
+  + 4 \p
+  + 5
 ORDER BY 1;
 \r
 \p
@@ -1011,13 +1011,13 @@ ORDER BY 1;
 -- tests for special result variables
 
 -- working query, 2 rows selected
-SELECT 1 AS stuff UNION SELECT 2;
+SELECT 1 AS stuff FROM generate_series(1,2);
 \echo 'error:' :ERROR
 \echo 'error code:' :SQLSTATE
 \echo 'number of rows:' :ROW_COUNT
 
 -- syntax error
-SELECT 1 UNION;
+SELECT (1;
 \echo 'error:' :ERROR
 \echo 'error code:' :SQLSTATE
 \echo 'number of rows:' :ROW_COUNT
@@ -1043,7 +1043,7 @@ DROP TABLE this_table_does_not_exist;
 
 -- nondefault verbosity error settings (except verbose, which is too unstable)
 \set VERBOSITY terse
-SELECT 1 UNION;
+SELECT (1;
 \echo 'error:' :ERROR
 \echo 'error code:' :SQLSTATE
 \echo 'last error message:' :LAST_ERROR_MESSAGE

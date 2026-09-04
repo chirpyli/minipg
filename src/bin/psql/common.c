@@ -949,7 +949,6 @@ static bool
 PrintQueryResults(PGresult *results)
 {
 	bool		success;
-	const char *cmdstatus;
 
 	if (!results)
 		return false;
@@ -966,12 +965,6 @@ PrintQueryResults(PGresult *results)
 				success = PrintResultsInCrosstab(results);
 			else
 				success = PrintQueryTuples(results);
-			/* if it's INSERT/UPDATE/DELETE RETURNING, also print status */
-			cmdstatus = PQcmdStatus(results);
-			if (strncmp(cmdstatus, "INSERT", 6) == 0 ||
-				strncmp(cmdstatus, "UPDATE", 6) == 0 ||
-				strncmp(cmdstatus, "DELETE", 6) == 0)
-				PrintQueryStatus(results);
 			break;
 
 		case PGRES_COMMAND_OK:

@@ -28,14 +28,9 @@
  *		INSTEAD OF trigger.  Earlier processing already
  *		pointed ModifyTable to the underlying relations of any automatically
  *		updatable view not using an INSTEAD OF trigger, so code here can
- *		assume it won't have one as a modification target.  This node does
- *		process ri_WithCheckOptions, which may have expressions from those
- *		automatically updatable views.
+ *		assume it won't have one as a modification target. 
  *
- *		If the query specifies RETURNING, then the ModifyTable returns a
- *		RETURNING tuple after completing each row insert, update, or delete.
- *		It must be called again to continue the operation.  Without RETURNING,
- *		we just loop within the node until all the work is done, then
+ *		We just loop within the node until all the work is done, then
  *		return NULL.  This avoids useless call/return overhead.
  */
 
@@ -71,8 +66,7 @@ static bool ExecOnConflictUpdate(ModifyTableState *mtstate,
 								 TupleTableSlot *planSlot,
 								 TupleTableSlot *excludedSlot,
 								 EState *estate,
-								 bool canSetTag,
-								 TupleTableSlot **returning);
+								 bool canSetTag);
 
 /*
  * Verify that the tuples to be produced by INSERT match the
@@ -147,39 +141,6 @@ ExecCheckPlanOutput(Relation resultRel, List *targetList)
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("table row type and query-specified row type do not match"),
 				 errdetail("Query has too few columns.")));
-}
-
-/*
- * ExecProcessReturning --- evaluate a RETURNING list
- *
- * resultRelInfo: current result rel
- * tupleSlot: slot holding tuple actually inserted/updated/deleted
- * planSlot: slot holding tuple returned by top subplan node
- *
- * Returns a slot holding the result tuple
- */
-static TupleTableSlot *
-ExecProcessReturning(ResultRelInfo *resultRelInfo,
-					 TupleTableSlot *tupleSlot,
-					 TupleTableSlot *planSlot)
-{
-	ProjectionInfo *projectReturning = resultRelInfo->ri_projectReturning;
-	ExprContext *econtext = projectReturning->pi_exprContext;
-
-	/* Make tuple and any needed join variables available to ExecProject */
-	if (tupleSlot)
-		econtext->ecxt_scantuple = tupleSlot;
-	econtext->ecxt_outertuple = planSlot;
-
-	/*
-	 * RETURNING expressions might reference the tableoid column, so
-	 * reinitialize tts_tableOid before evaluating them.
-	 */
-	econtext->ecxt_scantuple->tts_tableOid =
-		RelationGetRelid(resultRelInfo->ri_RelationDesc);
-
-	/* Compute the RETURNING expressions */
-	return ExecProject(projectReturning);
 }
 
 /*
@@ -453,11 +414,9 @@ ExecGetUpdateNewTuple(ResultRelInfo *relinfo,
  *		slot contains the new tuple value to be stored.
  *		planSlot is the output of the ModifyTable's subplan; we use it
  *		to access "junk" columns that are not going to be stored.
- *
- *		Returns RETURNING result if any, otherwise NULL.
  * ----------------------------------------------------------------
  */
-static TupleTableSlot *
+static void
 ExecInsert(ModifyTableState *mtstate,
 		   ResultRelInfo *resultRelInfo,
 		   TupleTableSlot *slot,
@@ -467,7 +426,6 @@ ExecInsert(ModifyTableState *mtstate,
 {
 	Relation	resultRelationDesc;
 	List	   *recheckIndexes = NIL;
-	TupleTableSlot *result = NULL;
 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
 	OnConflictAction onconflict = node->onConflictAction;
 
@@ -484,32 +442,11 @@ ExecInsert(ModifyTableState *mtstate,
 		ExecOpenIndices(resultRelInfo, onconflict != ONCONFLICT_NONE);
 
 	{
-		WCOKind		wco_kind;
-
 		/*
 		 * Constraints might reference the tableoid column, so
 		 * (re-)initialize tts_tableOid before evaluating them.
 		 */
 		slot->tts_tableOid = RelationGetRelid(resultRelationDesc);
-
-		/*
-		 * Check any RLS WITH CHECK policies.
-		 *
-		 * Normally we should check INSERT policies. But if the insert is the
-		 * result of a partition key update that moved the tuple to a new
-		 * partition, we should instead check UPDATE policies, because we are
-		 * executing policies defined on the target table, and not those
-		 * defined on the child partitions.
-		 */
-		wco_kind = (mtstate->operation == CMD_UPDATE) ?
-			WCO_RLS_UPDATE_CHECK : WCO_RLS_INSERT_CHECK;
-
-		/*
-		 * ExecWithCheckOptions() will skip any WCOs which are not of the kind
-		 * we are looking for at this point.
-		 */
-		if (resultRelInfo->ri_WithCheckOptions != NIL)
-			ExecWithCheckOptions(wco_kind, resultRelInfo, slot, estate);
 
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
 		{
@@ -549,14 +486,12 @@ ExecInsert(ModifyTableState *mtstate,
 					 * of another concurrent UPDATE/DELETE to the conflict
 					 * tuple.
 					 */
-					TupleTableSlot *returning = NULL;
-
 					if (ExecOnConflictUpdate(mtstate, resultRelInfo,
 											 &conflictTid, planSlot, slot,
-											 estate, canSetTag, &returning))
+											 estate, canSetTag))
 					{
 						InstrCountTuples2(&mtstate->ps, 1);
-						return returning;
+						return;
 					}
 					else
 						goto vlock;
@@ -568,17 +503,17 @@ ExecInsert(ModifyTableState *mtstate,
 					 * verify that the tuple is visible to the executor's MVCC
 					 * snapshot at higher isolation levels.
 					 *
-					 * Using ExecGetReturningSlot() to store the tuple for the
+					 * Using ExecGetConflictSlot() to store the tuple for the
 					 * recheck isn't that pretty, but we can't trivially use
 					 * the input slot, because it might not be of a compatible
 					 * type. As there's no conflicting usage of
-					 * ExecGetReturningSlot() in the DO NOTHING case...
+					 * ExecGetConflictSlot() in the DO NOTHING case...
 					 */
 					Assert(onconflict == ONCONFLICT_NOTHING);
 					ExecCheckTIDVisible(estate, resultRelInfo, &conflictTid,
-										ExecGetReturningSlot(estate, resultRelInfo));
+										ExecGetConflictSlot(estate, resultRelInfo));
 					InstrCountTuples2(&mtstate->ps, 1);
-					return NULL;
+					return;
 				}
 			}
 
@@ -648,27 +583,6 @@ ExecInsert(ModifyTableState *mtstate,
 		(estate->es_processed)++;
 
 	list_free(recheckIndexes);
-
-	/*
-	 * Check any WITH CHECK OPTION constraints from parent views.  We are
-	 * required to do this after testing all constraints and uniqueness
-	 * violations per the SQL spec, so we do it after actually inserting the
-	 * record into the heap and all indexes.
-	 *
-	 * ExecWithCheckOptions will elog(ERROR) if a violation is found, so the
-	 * tuple will never be seen, if it violates the WITH CHECK OPTION.
-	 *
-	 * ExecWithCheckOptions() will skip any WCOs which are not of the kind we
-	 * are looking for at this point.
-	 */
-	if (resultRelInfo->ri_WithCheckOptions != NIL)
-		ExecWithCheckOptions(WCO_VIEW_CHECK, resultRelInfo, slot, estate);
-
-	/* Process RETURNING if present */
-	if (resultRelInfo->ri_projectReturning)
-		result = ExecProcessReturning(resultRelInfo, slot, planSlot);
-
-	return result;
 }
 
 /* ----------------------------------------------------------------
@@ -680,36 +594,21 @@ ExecInsert(ModifyTableState *mtstate,
  *		When deleting from a table, tupleid identifies the tuple to
  *		delete and oldtuple is NULL.  When deleting through a view
  *		INSTEAD OF trigger, oldtuple is passed to the triggers and identifies
- *		what to delete, and tupleid is invalid.  We use tupleDeleted to indicate
- *		whether the tuple is actually deleted, callers can use it to
- *		decide whether to continue the operation.  When this DELETE is a
- *		part of an UPDATE of partition-key, then the slot returned by
- *		EvalPlanQual() is passed back using output parameter epqslot.
- *
- *		Returns RETURNING result if any, otherwise NULL.
+ *		what to delete, and tupleid is invalid.
  * ----------------------------------------------------------------
  */
-static TupleTableSlot *
+static void
 ExecDelete(ModifyTableState *mtstate,
 		   ResultRelInfo *resultRelInfo,
 		   ItemPointer tupleid,
 		   HeapTuple oldtuple,
-		   TupleTableSlot *planSlot,
 		   EPQState *epqstate,
 		   EState *estate,
-		   bool processReturning,
-		   bool canSetTag,
-		   bool changingPart,
-		   bool *tupleDeleted,
-		   TupleTableSlot **epqreturnslot)
+		   bool canSetTag)
 {
 	Relation	resultRelationDesc = resultRelInfo->ri_RelationDesc;
 	TM_Result	result;
 	TM_FailureData tmfd;
-	TupleTableSlot *slot = NULL;
-
-	if (tupleDeleted)
-		*tupleDeleted = false;
 
 	{
 
@@ -729,7 +628,7 @@ ldelete:;
 									estate->es_crosscheck_snapshot,
 									true /* wait for commit */ ,
 									&tmfd,
-									changingPart);
+									false /* changingPart */);
 
 		switch (result)
 		{
@@ -766,7 +665,7 @@ ldelete:;
 							 errhint("Consider using an AFTER trigger instead of a BEFORE trigger to propagate changes to other rows.")));
 
 				/* Else, already deleted by self; nothing to do */
-				return NULL;
+				return;
 
 			case TM_Ok:
 				break;
@@ -806,19 +705,9 @@ ldelete:;
 												   inputslot);
 							if (TupIsNull(epqslot))
 								/* Tuple not passing quals anymore, exiting... */
-								return NULL;
+								return;
 
-							/*
-							 * If requested, skip delete and pass back the
-							 * updated row.
-							 */
-							if (epqreturnslot)
-							{
-								*epqreturnslot = epqslot;
-								return NULL;
-							}
-							else
-								goto ldelete;
+							goto ldelete;
 
 						case TM_SelfModified:
 
@@ -838,11 +727,11 @@ ldelete:;
 										(errcode(ERRCODE_TRIGGERED_DATA_CHANGE_VIOLATION),
 										 errmsg("tuple to be deleted was already modified by an operation triggered by the current command"),
 										 errhint("Consider using an AFTER trigger instead of a BEFORE trigger to propagate changes to other rows.")));
-							return NULL;
+							return;
 
 						case TM_Deleted:
 							/* tuple already deleted; nothing to do */
-							return NULL;
+							return;
 
 						default:
 
@@ -858,7 +747,7 @@ ldelete:;
 							 */
 							elog(ERROR, "unexpected table_tuple_lock status: %u",
 								 result);
-							return NULL;
+							return;
 					}
 
 					Assert(false);
@@ -871,12 +760,12 @@ ldelete:;
 							(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
 							 errmsg("could not serialize access due to concurrent delete")));
 				/* tuple already deleted; nothing to do */
-				return NULL;
+				return;
 
 			default:
 				elog(ERROR, "unrecognized table_tuple_delete status: %u",
 					 result);
-				return NULL;
+				return;
 		}
 
 		/*
@@ -891,48 +780,7 @@ ldelete:;
 
 	if (canSetTag)
 		(estate->es_processed)++;
-
-	/* Tell caller that the delete actually happened. */
-	if (tupleDeleted)
-		*tupleDeleted = true;
-
-	/* Process RETURNING if present and if requested */
-	if (processReturning && resultRelInfo->ri_projectReturning)
-	{
-		/*
-		 * We have to put the target tuple into a slot, which means first we
-		 * gotta fetch it.  We can use the trigger tuple slot.
-		 */
-		TupleTableSlot *rslot;
-
-		slot = ExecGetReturningSlot(estate, resultRelInfo);
-		if (oldtuple != NULL)
-		{
-			ExecForceStoreHeapTuple(oldtuple, slot, false);
-		}
-		else
-		{
-			if (!table_tuple_fetch_row_version(resultRelationDesc, tupleid,
-												SnapshotAny, slot))
-				elog(ERROR, "failed to fetch deleted tuple for DELETE RETURNING");
-		}
-
-		rslot = ExecProcessReturning(resultRelInfo, slot, planSlot);
-
-		/*
-		 * Before releasing the target tuple again, make sure rslot has a
-		 * local copy of any pass-by-reference values.
-		 */
-		ExecMaterializeSlot(rslot);
-
-		ExecClearTuple(slot);
-
-		return rslot;
-	}
-
-	return NULL;
 }
-
 
 /* ----------------------------------------------------------------
  *		ExecUpdate
@@ -951,15 +799,10 @@ ldelete:;
  *
  *		slot contains the new tuple value to be stored.
  *		planSlot is the output of the ModifyTable's subplan; we use it
- *		to access values from other input tables (for RETURNING),
- *		row-ID junk columns, etc.
- *
- *		Returns RETURNING result if any, otherwise NULL.  On exit, if tupleid
- *		had identified the tuple to update, it will identify the tuple
- *		actually updated after EvalPlanQual.
+ *		to access row-ID junk columns, etc.
  * ----------------------------------------------------------------
  */
-static TupleTableSlot *
+static void
 ExecUpdate(ModifyTableState *mtstate,
 		   ResultRelInfo *resultRelInfo,
 		   ItemPointer tupleid,
@@ -1015,17 +858,6 @@ lreplace:
 		/* ensure slot is independent, consider e.g. EPQ */
 		ExecMaterializeSlot(slot);
 
-		/* Check any RLS UPDATE WITH CHECK policies */
-		if (resultRelInfo->ri_WithCheckOptions != NIL)
-		{
-			/*
-			 * ExecWithCheckOptions() will skip any WCOs which are not of the
-			 * kind we are looking for at this point.
-			 */
-			ExecWithCheckOptions(WCO_RLS_UPDATE_CHECK,
-								 resultRelInfo, slot, estate);
-		}
-
 		/*
 		 * replace the heap tuple
 		 *
@@ -1076,7 +908,7 @@ lreplace:
 							 errhint("Consider using an AFTER trigger instead of a BEFORE trigger to propagate changes to other rows.")));
 
 				/* Else, already updated by self; nothing to do */
-				return NULL;
+				return;
 
 			case TM_Ok:
 				break;
@@ -1117,7 +949,7 @@ lreplace:
 												   inputslot);
 							if (TupIsNull(epqslot))
 								/* Tuple not passing quals anymore, exiting... */
-								return NULL;
+								return;
 
 							/* Make sure ri_oldTupleSlot is initialized. */
 							if (unlikely(!resultRelInfo->ri_projectNewInfoValid))
@@ -1144,7 +976,7 @@ lreplace:
 
 						case TM_Deleted:
 							/* tuple already deleted; nothing to do */
-							return NULL;
+							return;
 
 						case TM_SelfModified:
 
@@ -1164,13 +996,13 @@ lreplace:
 										(errcode(ERRCODE_TRIGGERED_DATA_CHANGE_VIOLATION),
 										 errmsg("tuple to be updated was already modified by an operation triggered by the current command"),
 										 errhint("Consider using an AFTER trigger instead of a BEFORE trigger to propagate changes to other rows.")));
-							return NULL;
+							return;
 
 						default:
 							/* see table_tuple_lock call in ExecDelete() */
 							elog(ERROR, "unexpected table_tuple_lock status: %u",
 								 result);
-							return NULL;
+							return;
 					}
 				}
 
@@ -1182,12 +1014,12 @@ lreplace:
 							(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
 							 errmsg("could not serialize access due to concurrent delete")));
 				/* tuple already deleted; nothing to do */
-				return NULL;
+				return;
 
 			default:
 				elog(ERROR, "unrecognized table_tuple_update status: %u",
 					 result);
-				return NULL;
+				return;
 		}
 
 		/* insert index entries for tuple if necessary */
@@ -1201,24 +1033,6 @@ lreplace:
 		(estate->es_processed)++;
 
 	list_free(recheckIndexes);
-
-	/*
-	 * Check any WITH CHECK OPTION constraints from parent views.  We are
-	 * required to do this after testing all constraints and uniqueness
-	 * violations per the SQL spec, so we do it after actually updating the
-	 * record in the heap and all indexes.
-	 *
-	 * ExecWithCheckOptions() will skip any WCOs which are not of the kind we
-	 * are looking for at this point.
-	 */
-	if (resultRelInfo->ri_WithCheckOptions != NIL)
-		ExecWithCheckOptions(WCO_VIEW_CHECK, resultRelInfo, slot, estate);
-
-	/* Process RETURNING if present */
-	if (resultRelInfo->ri_projectReturning)
-		return ExecProcessReturning(resultRelInfo, slot, planSlot);
-
-	return NULL;
 }
 
 /*
@@ -1239,8 +1053,7 @@ ExecOnConflictUpdate(ModifyTableState *mtstate,
 					 TupleTableSlot *planSlot,
 					 TupleTableSlot *excludedSlot,
 					 EState *estate,
-					 bool canSetTag,
-					 TupleTableSlot **returning)
+					 bool canSetTag)
 {
 	ExprContext *econtext = mtstate->ps.ps_ExprContext;
 	Relation	relation = resultRelInfo->ri_RelationDesc;
@@ -1390,28 +1203,6 @@ ExecOnConflictUpdate(ModifyTableState *mtstate,
 		return true;			/* done with the tuple */
 	}
 
-	if (resultRelInfo->ri_WithCheckOptions != NIL)
-	{
-		/*
-		 * Check target's existing tuple against UPDATE-applicable USING
-		 * security barrier quals (if any), enforced here as RLS checks/WCOs.
-		 *
-		 * The rewriter creates UPDATE RLS checks/WCOs for UPDATE security
-		 * quals, and stores them as WCOs of "kind" WCO_RLS_CONFLICT_CHECK,
-		 * but that's almost the extent of its special handling for ON
-		 * CONFLICT DO UPDATE.
-		 *
-		 * The rewriter will also have associated UPDATE applicable straight
-		 * RLS checks/WCOs for the benefit of the ExecUpdate() call that
-		 * follows.  INSERTs and UPDATEs naturally have mutually exclusive WCO
-		 * kinds, so there is no danger of spurious over-enforcement in the
-		 * INSERT or UPDATE path.
-		 */
-		ExecWithCheckOptions(WCO_RLS_CONFLICT_CHECK, resultRelInfo,
-							 existing,
-							 mtstate->ps.state);
-	}
-
 	/* Project the new tuple version */
 	ExecProject(resultRelInfo->ri_onConflict->oc_ProjInfo);
 
@@ -1420,16 +1211,16 @@ ExecOnConflictUpdate(ModifyTableState *mtstate,
 	 * this session, after the above table_tuple_lock. We choose to not error
 	 * out in that case, in line with ExecUpdate's treatment of similar cases.
 	 * This can happen if an UPDATE is triggered from within ExecQual(),
-	 * ExecWithCheckOptions() or ExecProject() above, e.g. by selecting from a
+	 * ExecProject() above, e.g. by selecting from a
 	 * wCTE in the ON CONFLICT's SET.
 	 */
 
 	/* Execute UPDATE with projection */
-	*returning = ExecUpdate(mtstate, resultRelInfo, conflictTid, NULL,
-							resultRelInfo->ri_onConflict->oc_ProjSlot,
-							planSlot,
-							&mtstate->mt_epqstate, mtstate->ps.state,
-							canSetTag);
+	ExecUpdate(mtstate, resultRelInfo, conflictTid, NULL,
+			   resultRelInfo->ri_onConflict->oc_ProjSlot,
+			   planSlot,
+			   &mtstate->mt_epqstate, mtstate->ps.state,
+			   canSetTag);
 
 	/*
 	 * Clear out existing tuple, as there might not be another conflict among
@@ -1441,21 +1232,10 @@ ExecOnConflictUpdate(ModifyTableState *mtstate,
 }
 
 
-/*
- * ExecPrepareTupleRouting --- prepare for routing one tuple
- *
- * Determine the partition in which the tuple in slot is to be inserted,
- * and return its ResultRelInfo in *partRelInfo.  The return value is
- * a slot holding the tuple of the partition rowtype.
- *
- * This also sets the transition table information in mtstate based on the
- * selected partition.
- */
 /* ----------------------------------------------------------------
  *	   ExecModifyTable
  *
- *		Perform table modifications as required, and return RETURNING results
- *		if needed.
+ *		Perform table modifications as required.
  * ----------------------------------------------------------------
  */
 static TupleTableSlot *
@@ -1517,9 +1297,9 @@ ExecModifyTable(PlanState *pstate)
 		ResetPerTupleExprContext(estate);
 
 		/*
-		 * Reset per-tuple memory context used for processing on conflict and
-		 * returning clauses, to free any expression evaluation storage
-		 * allocated in the previous cycle.
+		 * Reset per-tuple memory context used for processing on conflict
+		 * clauses, to free any expression evaluation storage allocated in
+		 * the previous cycle.
 		 */
 		if (pstate->ps_ExprContext)
 			ResetExprContext(pstate->ps_ExprContext);
@@ -1626,12 +1406,12 @@ ExecModifyTable(PlanState *pstate)
 
 				oldtuple = &oldtupdata;
 			}
-		else
-		{
-			/* A row-ID attr is required for all supported relkinds */
-			Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
+			else
+			{
+				/* A row-ID attr is required for all supported relkinds */
+				Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
+			}
 		}
-	}
 
 		switch (operation)
 		{
@@ -1640,8 +1420,8 @@ ExecModifyTable(PlanState *pstate)
 				if (unlikely(!resultRelInfo->ri_projectNewInfoValid))
 					ExecInitInsertProjection(node, resultRelInfo);
 				slot = ExecGetInsertNewTuple(resultRelInfo, planSlot);
-				slot = ExecInsert(node, resultRelInfo, slot, planSlot,
-								  estate, node->canSetTag);
+				ExecInsert(node, resultRelInfo, slot, planSlot,
+						   estate, node->canSetTag);
 				break;
 			case CMD_UPDATE:
 				tuplock = false;
@@ -1681,32 +1461,22 @@ ExecModifyTable(PlanState *pstate)
 											 oldSlot);
 
 				/* Now apply the update. */
-				slot = ExecUpdate(node, resultRelInfo, tupleid, oldtuple, slot,
-								  planSlot, &node->mt_epqstate, estate,
-								  node->canSetTag);
+				ExecUpdate(node, resultRelInfo, tupleid, oldtuple, slot,
+						   planSlot, &node->mt_epqstate, estate,
+						   node->canSetTag);
 				if (tuplock)
 					UnlockTuple(resultRelInfo->ri_RelationDesc, tupleid,
 								InplaceUpdateTupleLock);
 				break;
 			case CMD_DELETE:
-				slot = ExecDelete(node, resultRelInfo, tupleid, oldtuple,
-								  planSlot, &node->mt_epqstate, estate,
-								  true, /* processReturning */
-								  node->canSetTag,
-								  false,	/* changingPart */
-								  NULL, NULL);
+				ExecDelete(node, resultRelInfo, tupleid, oldtuple,
+						   &node->mt_epqstate, estate,
+						   node->canSetTag);
 				break;
 			default:
 				elog(ERROR, "unknown operation");
 				break;
 		}
-
-		/*
-		 * If we got a RETURNING result, return it to caller.  We'll continue
-		 * the work on next call.
-		 */
-		if (slot)
-			return slot;
 	}
 
 
@@ -1931,75 +1701,15 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	 * Initialize any WITH CHECK OPTION constraints if needed.
 	 */
 	resultRelInfo = mtstate->resultRelInfo;
-	foreach(l, node->withCheckOptionLists)
-	{
-		List	   *wcoList = (List *) lfirst(l);
-		List	   *wcoExprs = NIL;
-		ListCell   *ll;
-
-		foreach(ll, wcoList)
-		{
-			WithCheckOption *wco = (WithCheckOption *) lfirst(ll);
-			ExprState  *wcoExpr = ExecInitQual((List *) wco->qual,
-											   &mtstate->ps);
-
-			wcoExprs = lappend(wcoExprs, wcoExpr);
-		}
-
-		resultRelInfo->ri_WithCheckOptions = wcoList;
-		resultRelInfo->ri_WithCheckOptionExprs = wcoExprs;
-		resultRelInfo++;
-	}
 
 	/*
-	 * Initialize RETURNING projections if needed.
+	 * We still must construct a dummy result tuple type, because InitPlan
+	 * expects one (maybe should change that?).
 	 */
-	if (node->returningLists)
-	{
-		TupleTableSlot *slot;
-		ExprContext *econtext;
+	mtstate->ps.plan->targetlist = NIL;
+	ExecInitResultTypeTL(&mtstate->ps);
 
-		/*
-		 * Initialize result tuple slot and assign its rowtype using the first
-		 * RETURNING list.  We assume the rest will look the same.
-		 */
-		mtstate->ps.plan->targetlist = (List *) linitial(node->returningLists);
-
-		/* Set up a slot for the output of the RETURNING projection(s) */
-		ExecInitResultTupleSlotTL(&mtstate->ps, &TTSOpsVirtual);
-		slot = mtstate->ps.ps_ResultTupleSlot;
-
-		/* Need an econtext too */
-		if (mtstate->ps.ps_ExprContext == NULL)
-			ExecAssignExprContext(estate, &mtstate->ps);
-		econtext = mtstate->ps.ps_ExprContext;
-
-		/*
-		 * Build a projection for each result rel.
-		 */
-		resultRelInfo = mtstate->resultRelInfo;
-		foreach(l, node->returningLists)
-		{
-			List	   *rlist = (List *) lfirst(l);
-
-			resultRelInfo->ri_returningList = rlist;
-			resultRelInfo->ri_projectReturning =
-				ExecBuildProjectionInfo(rlist, econtext, slot, &mtstate->ps,
-										resultRelInfo->ri_RelationDesc->rd_att);
-			resultRelInfo++;
-		}
-	}
-	else
-	{
-		/*
-		 * We still must construct a dummy result tuple type, because InitPlan
-		 * expects one (maybe should change that?).
-		 */
-		mtstate->ps.plan->targetlist = NIL;
-		ExecInitResultTypeTL(&mtstate->ps);
-
-		mtstate->ps.ps_ExprContext = NULL;
-	}
+	mtstate->ps.ps_ExprContext = NULL;
 
 	/* Set the list of arbiter indexes if needed for ON CONFLICT */
 	resultRelInfo = mtstate->resultRelInfo;
@@ -2020,7 +1730,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		ExprContext *econtext;
 		TupleDesc	relationDesc;
 
-		/* already exists if created by RETURNING processing above */
+		/* create an econtext for ON CONFLICT expression evaluation */
 		if (mtstate->ps.ps_ExprContext == NULL)
 			ExecAssignExprContext(estate, &mtstate->ps);
 
@@ -2038,8 +1748,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		/*
 		 * Create the tuple slot for the UPDATE SET projection. We want a slot
 		 * of the table's type here, because the slot will be used to insert
-		 * into the table, and for RETURNING processing - which may access
-		 * system attributes.
+		 * into the table, and it may need to hold system attributes.
 		 */
 		onconfl->oc_ProjSlot =
 			table_slot_create(resultRelInfo->ri_RelationDesc,
@@ -2151,8 +1860,8 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	 * ExecPostprocessPlan.  (It'd actually work fine to add the primary
 	 * ModifyTable node too, but there's no need.)  Note the use of lcons not
 	 * lappend: we need later-initialized ModifyTable nodes to be shut down
-	 * before earlier ones.  This ensures that we don't throw away RETURNING
-	 * rows that need to be seen by a later CTE subplan.
+	 * before earlier ones, so that CTE subplans can consume rows in the
+	 * expected order.
 	 */
 	if (!mtstate->canSetTag)
 		estate->es_auxmodifytables = lcons(mtstate,

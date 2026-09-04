@@ -65,7 +65,6 @@ typedef struct AggClauseCosts
  */
 typedef enum UpperRelationKind
 {
-	UPPERREL_SETOP,				/* result of UNION/INTERSECT/EXCEPT, if any */
 	UPPERREL_PARTIAL_GROUP_AGG, /* result of partial grouping/aggregation, if
 								 * any */
 	UPPERREL_GROUP_AGG,			/* result of grouping/aggregation, if any */
@@ -1683,8 +1682,6 @@ typedef struct ModifyTablePath
 	bool		partColsUpdated;	/* some part key in hierarchy updated? */
 	List	   *resultRelations;	/* integer list of RT indexes */
 	List	   *updateColnosLists;	/* per-target-table update_colnos lists */
-	List	   *withCheckOptionLists;	/* per-target-table WCO lists */
-	List	   *returningLists; /* per-target-table RETURNING tlists */
 	List	   *rowMarks;		/* PlanRowMarks (non-locking only) */
 	OnConflictExpr *onconflict; /* ON CONFLICT clause, or NULL */
 	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */

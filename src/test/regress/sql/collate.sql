@@ -112,20 +112,7 @@ SELECT array_agg(x COLLATE "C" ORDER BY y COLLATE "POSIX") FROM collate_test10;
 SELECT array_agg(a ORDER BY x COLLATE "C", y COLLATE "POSIX") FROM collate_test10;
 SELECT array_agg(a ORDER BY x||y) FROM collate_test10;  -- fail
 
-SELECT a, b FROM collate_test1 UNION ALL SELECT a, b FROM collate_test1 ORDER BY 2;
-SELECT a, b FROM collate_test2 UNION SELECT a, b FROM collate_test2 ORDER BY 2;
-SELECT a, b FROM collate_test2 WHERE a < 4 INTERSECT SELECT a, b FROM collate_test2 WHERE a > 1 ORDER BY 2;
-SELECT a, b FROM collate_test2 EXCEPT SELECT a, b FROM collate_test2 WHERE a < 2 ORDER BY 2;
 
-SELECT a, b FROM collate_test1 UNION ALL SELECT a, b FROM collate_test2 ORDER BY 2; -- fail
-SELECT a, b FROM collate_test1 UNION ALL SELECT a, b FROM collate_test2; -- ok
-SELECT a, b FROM collate_test1 UNION SELECT a, b FROM collate_test2 ORDER BY 2; -- fail
-SELECT a, b COLLATE "C" FROM collate_test1 UNION SELECT a, b FROM collate_test2 ORDER BY 2; -- ok
-SELECT a, b FROM collate_test1 INTERSECT SELECT a, b FROM collate_test2 ORDER BY 2; -- fail
-SELECT a, b FROM collate_test1 EXCEPT SELECT a, b FROM collate_test2 ORDER BY 2; -- fail
-
-CREATE TABLE test_u (a text, b text);
-INSERT INTO test_u SELECT a, b FROM collate_test1 UNION ALL SELECT a, b FROM collate_test2; -- fail
 
 -- ideally this would be a parse-time error, but for now it must be run-time:
 select x < y from collate_test10; -- fail

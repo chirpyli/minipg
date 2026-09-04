@@ -262,9 +262,7 @@ _readQuery(void)
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
-	READ_ENUM_FIELD(override, OverridingKind);
 	READ_NODE_FIELD(onConflict);
-	READ_NODE_FIELD(returningList);
 	READ_NODE_FIELD(groupClause);
 	READ_BOOL_FIELD(groupDistinct);
 	READ_NODE_FIELD(groupingSets);
@@ -276,26 +274,8 @@ _readQuery(void)
 	READ_ENUM_FIELD(limitOption, LimitOption);
 	READ_NODE_FIELD(rowMarks);
 	READ_NODE_FIELD(constraintDeps);
-	READ_NODE_FIELD(withCheckOptions);
 	READ_LOCATION_FIELD(stmt_location);
 	READ_INT_FIELD(stmt_len);
-
-	READ_DONE();
-}
-
-/*
- * _readWithCheckOption
- */
-static WithCheckOption *
-_readWithCheckOption(void)
-{
-	READ_LOCALS(WithCheckOption);
-
-	READ_ENUM_FIELD(kind, WCOKind);
-	READ_STRING_FIELD(relname);
-	READ_STRING_FIELD(polname);
-	READ_NODE_FIELD(qual);
-	READ_BOOL_FIELD(cascaded);
 
 	READ_DONE();
 }
@@ -1265,7 +1245,6 @@ _readPlannedStmt(void)
 
 	READ_ENUM_FIELD(commandType, CmdType);
 	READ_UINT64_FIELD(queryId);
-	READ_BOOL_FIELD(hasReturning);
 	READ_BOOL_FIELD(hasModifyingCTE);
 	READ_BOOL_FIELD(canSetTag);
 	READ_BOOL_FIELD(transientPlan);
@@ -1371,8 +1350,6 @@ _readModifyTable(void)
 	READ_BOOL_FIELD(partColsUpdated);
 	READ_NODE_FIELD(resultRelations);
 	READ_NODE_FIELD(updateColnosLists);
-	READ_NODE_FIELD(withCheckOptionLists);
-	READ_NODE_FIELD(returningLists);
 	READ_NODE_FIELD(rowMarks);
 	READ_INT_FIELD(epqParam);
 	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
@@ -2180,8 +2157,6 @@ parseNodeString(void)
 
 	if (MATCH("QUERY", 5))
 		return_value = _readQuery();
-	else if (MATCH("WITHCHECKOPTION", 15))
-		return_value = _readWithCheckOption();
 	else if (MATCH("SORTGROUPCLAUSE", 15))
 		return_value = _readSortGroupClause();
 	else if (MATCH("GROUPINGSET", 11))

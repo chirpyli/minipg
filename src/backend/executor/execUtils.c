@@ -1121,17 +1121,17 @@ ExecCleanTargetListLength(List *targetlist)
 }
 
 /*
- * Return a relInfo's tuple slot for processing returning tuples.
+ * Return a relInfo's on-demand created slot for ON CONFLICT recheck.
  */
 TupleTableSlot *
-ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo)
+ExecGetConflictSlot(EState *estate, ResultRelInfo *relInfo)
 {
-	if (relInfo->ri_ReturningSlot == NULL)
+	if (relInfo->ri_ConflictSlot == NULL)
 	{
 		Relation	rel = relInfo->ri_RelationDesc;
 		MemoryContext oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
 
-		relInfo->ri_ReturningSlot =
+		relInfo->ri_ConflictSlot =
 			ExecInitExtraTupleSlot(estate,
 								   RelationGetDescr(rel),
 								   table_slot_callbacks(rel));
@@ -1139,7 +1139,7 @@ ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo)
 		MemoryContextSwitchTo(oldcontext);
 	}
 
-	return relInfo->ri_ReturningSlot;
+	return relInfo->ri_ConflictSlot;
 }
 
 /* Return a bitmap representing columns being inserted */

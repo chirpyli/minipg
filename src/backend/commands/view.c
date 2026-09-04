@@ -419,24 +419,6 @@ DefineView(ViewStmt *stmt, const char *queryString,
 		elog(ERROR, "unexpected parse analysis result");
 
 	/*
-	 * Check for unsupported cases.  These tests are redundant with ones in
-	 * DefineQueryRewrite(), but that function will complain about a bogus ON
-	 * SELECT rule, and we'd rather the message complain about a view.
-	 */
-	/*
-	 * If the user specified the WITH CHECK OPTION, add it to the list of
-	 * reloptions.
-	 */
-	if (stmt->withCheckOption == LOCAL_CHECK_OPTION)
-		stmt->options = lappend(stmt->options,
-								makeDefElem("check_option",
-											(Node *) makeString("local"), -1));
-	else if (stmt->withCheckOption == CASCADED_CHECK_OPTION)
-		stmt->options = lappend(stmt->options,
-								makeDefElem("check_option",
-											(Node *) makeString("cascaded"), -1));
-
-	/*
 	 * Check that the view is auto-updatable if WITH CHECK OPTION was
 	 * specified.
 	 */

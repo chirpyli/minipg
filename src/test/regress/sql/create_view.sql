@@ -407,15 +407,11 @@ alter table tt7 drop column xx;
 create table tt8 (x int, z int);
 
 create view vv2 as
-select * from (values(1,2,3,4,5)) v(a,b,c,d,e)
-union all
 select * from tt7 full join tt8 using (x), tt8 tt8x;
 
 select pg_get_viewdef('vv2', true);
 
 create view vv3 as
-select * from (values(1,2,3,4,5,6)) v(a,b,c,x,e,f)
-union all
 select * from
   tt7 full join tt8 using (x),
   tt7 tt7x full join tt8 tt8x using (x);
@@ -423,8 +419,6 @@ select * from
 select pg_get_viewdef('vv3', true);
 
 create view vv4 as
-select * from (values(1,2,3,4,5,6,7)) v(a,b,c,x,e,f,g)
-union all
 select * from
   tt7 full join tt8 using (x),
   tt7 tt7x full join tt8 tt8x using (x) full join tt8 tt8y using (x);
@@ -447,8 +441,6 @@ alter table tt7a drop column xx;
 create table tt8a (x timestamptz, z int);
 
 create view vv2a as
-select * from (values(now(),2,3,now(),5)) v(a,b,c,d,e)
-union all
 select * from tt7a left join tt8a using (x), tt8a tt8ax;
 
 select pg_get_viewdef('vv2a', true);
@@ -558,14 +550,7 @@ create rule updlog as on update to tt15v do also
   insert into tt15v_log values(old, new, row(old,old) < row(new,new));
 \d+ tt15v
 
--- check unique-ification of overlength names
 
-create view tt18v as
-  select * from int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxy
-  union all
-  select * from int8_tbl xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxz;
-select pg_get_viewdef('tt18v', true);
-explain (costs off) select * from tt18v;
 
 -- check display of ScalarArrayOp with a sub-select
 
@@ -623,9 +608,7 @@ select pg_get_viewdef('tt22v', true);
 -- check handling of views with immediately-renamed columns
 
 create view tt23v (col_a, col_b) as
-select q1 as other_name1, q2 as other_name2 from int8_tbl
-union
-select 42, 43;
+select q1 as other_name1, q2 as other_name2 from int8_tbl;
 
 select pg_get_viewdef('tt23v', true);
 select pg_get_ruledef(oid, true) from pg_rewrite

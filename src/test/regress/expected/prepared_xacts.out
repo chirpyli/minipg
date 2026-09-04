@@ -219,7 +219,11 @@ SELECT gid FROM pg_prepared_xacts;
 -- Commit table creation
 COMMIT PREPARED 'regress-one';
 \d pxtest2
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+   Table "public.pxtest2"
+ Column |  Type   | Default 
+--------+---------+---------
+ a      | integer | 
+
 SELECT * FROM pxtest2;
  a 
 ---

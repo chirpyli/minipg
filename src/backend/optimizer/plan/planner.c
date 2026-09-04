@@ -411,7 +411,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 
 	result->commandType = parse->commandType;
 	result->queryId = parse->queryId;
-	result->hasReturning = (parse->returningList != NIL);
 	result->canSetTag = parse->canSetTag;
 	result->transientPlan = glob->transientPlan;
 	result->dependsOnRole = glob->dependsOnRole;
@@ -469,7 +468,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 				 bool hasRecursion, double tuple_fraction)
 {
 	PlannerInfo *root;
-	List	   *newWithCheckOptions;
 	List	   *newHaving;
 	bool		hasOuterJoins;
 	bool		hasResultRTEs;
@@ -622,22 +620,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	/* Constant-folding might have removed all set-returning functions */
 	if (parse->hasTargetSRFs)
 		parse->hasTargetSRFs = expression_returns_set((Node *) parse->targetList);
-
-	newWithCheckOptions = NIL;
-	foreach(l, parse->withCheckOptions)
-	{
-		WithCheckOption *wco = lfirst_node(WithCheckOption, l);
-
-		wco->qual = preprocess_expression(root, wco->qual,
-										  EXPRKIND_QUAL);
-		if (wco->qual != NULL)
-			newWithCheckOptions = lappend(newWithCheckOptions, wco);
-	}
-	parse->withCheckOptions = newWithCheckOptions;
-
-	parse->returningList = (List *)
-		preprocess_expression(root, (Node *) parse->returningList,
-							  EXPRKIND_TARGET);
 
 	preprocess_qual_conditions(root, (Node *) parse->jointree);
 
@@ -1393,8 +1375,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			Index		rootRelation;
 			List	   *resultRelations = NIL;
 			List	   *updateColnosLists = NIL;
-			List	   *withCheckOptionLists = NIL;
-			List	   *returningLists = NIL;
 			List	   *rowMarks;
 
 			if (bms_membership(root->all_result_relids) == BMS_MULTIPLE)
@@ -1438,32 +1418,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 						updateColnosLists = lappend(updateColnosLists,
 													update_colnos);
 					}
-					if (parse->withCheckOptions)
-					{
-						List	   *withCheckOptions = parse->withCheckOptions;
-
-						if (this_result_rel != top_result_rel)
-							withCheckOptions = (List *)
-								adjust_appendrel_attrs_multilevel(root,
-																  (Node *) withCheckOptions,
-																  this_result_rel->relids,
-																  top_result_rel->relids);
-						withCheckOptionLists = lappend(withCheckOptionLists,
-													   withCheckOptions);
-					}
-					if (parse->returningList)
-					{
-						List	   *returningList = parse->returningList;
-
-						if (this_result_rel != top_result_rel)
-							returningList = (List *)
-								adjust_appendrel_attrs_multilevel(root,
-																  (Node *) returningList,
-																  this_result_rel->relids,
-																  top_result_rel->relids);
-						returningLists = lappend(returningLists,
-												 returningList);
-					}
 				}
 
 				if (resultRelations == NIL)
@@ -1482,10 +1436,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 					resultRelations = list_make1_int(parse->resultRelation);
 					if (parse->commandType == CMD_UPDATE)
 						updateColnosLists = list_make1(root->update_colnos);
-					if (parse->withCheckOptions)
-						withCheckOptionLists = list_make1(parse->withCheckOptions);
-					if (parse->returningList)
-						returningLists = list_make1(parse->returningList);
 				}
 			}
 			else
@@ -1495,10 +1445,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 				resultRelations = list_make1_int(parse->resultRelation);
 				if (parse->commandType == CMD_UPDATE)
 					updateColnosLists = list_make1(root->update_colnos);
-				if (parse->withCheckOptions)
-					withCheckOptionLists = list_make1(parse->withCheckOptions);
-				if (parse->returningList)
-					returningLists = list_make1(parse->returningList);
 			}
 
 			/*
@@ -1521,8 +1467,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 										root->partColsUpdated,
 										resultRelations,
 										updateColnosLists,
-										withCheckOptionLists,
-										returningLists,
 										rowMarks,
 										parse->onConflict,
 										assign_special_exec_param(root));

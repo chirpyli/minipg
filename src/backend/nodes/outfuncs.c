@@ -299,7 +299,6 @@ _outPlannedStmt(StringInfo str, const PlannedStmt *node)
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
 	WRITE_UINT64_FIELD(queryId);
-	WRITE_BOOL_FIELD(hasReturning);
 	WRITE_BOOL_FIELD(hasModifyingCTE);
 	WRITE_BOOL_FIELD(canSetTag);
 	WRITE_BOOL_FIELD(transientPlan);
@@ -407,8 +406,6 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_BOOL_FIELD(partColsUpdated);
 	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(updateColnosLists);
-	WRITE_NODE_FIELD(withCheckOptionLists);
-	WRITE_NODE_FIELD(returningLists);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_INT_FIELD(epqParam);
 	WRITE_ENUM_FIELD(onConflictAction, OnConflictAction);
@@ -1875,8 +1872,6 @@ _outModifyTablePath(StringInfo str, const ModifyTablePath *node)
 	WRITE_BOOL_FIELD(partColsUpdated);
 	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(updateColnosLists);
-	WRITE_NODE_FIELD(withCheckOptionLists);
-	WRITE_NODE_FIELD(returningLists);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(onconflict);
 	WRITE_INT_FIELD(epqParam);
@@ -2542,9 +2537,7 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);
 	WRITE_NODE_FIELD(targetList);
-	WRITE_ENUM_FIELD(override, OverridingKind);
 	WRITE_NODE_FIELD(onConflict);
-	WRITE_NODE_FIELD(returningList);
 	WRITE_NODE_FIELD(groupClause);
 	WRITE_BOOL_FIELD(groupDistinct);
 	WRITE_NODE_FIELD(groupingSets);
@@ -2556,21 +2549,8 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(constraintDeps);
-	WRITE_NODE_FIELD(withCheckOptions);
 	WRITE_LOCATION_FIELD(stmt_location);
 	WRITE_INT_FIELD(stmt_len);
-}
-
-static void
-_outWithCheckOption(StringInfo str, const WithCheckOption *node)
-{
-	WRITE_NODE_TYPE("WITHCHECKOPTION");
-
-	WRITE_ENUM_FIELD(kind, WCOKind);
-	WRITE_STRING_FIELD(relname);
-	WRITE_STRING_FIELD(polname);
-	WRITE_NODE_FIELD(qual);
-	WRITE_BOOL_FIELD(cascaded);
 }
 
 static void
@@ -3459,9 +3439,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_Query:
 				_outQuery(str, obj);
-				break;
-			case T_WithCheckOption:
-				_outWithCheckOption(str, obj);
 				break;
 			case T_SortGroupClause:
 				_outSortGroupClause(str, obj);

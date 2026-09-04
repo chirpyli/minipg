@@ -105,27 +105,16 @@ INSERT INTO upsert_test VALUES(1, 'Boo'), (3, 'Zoo');
 -- uncorrelated  sub-select:
 WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
   VALUES (1, 'Bar') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
+  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa);
 -- correlated sub-select:
 INSERT INTO upsert_test VALUES (1, 'Baz'), (3, 'Zaz') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a)
-  RETURNING *;
+  DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a);
 -- correlated sub-select (EXCLUDED.* alias):
 INSERT INTO upsert_test VALUES (1, 'Bat'), (3, 'Zot') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
-  RETURNING *;
+  DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a);
 
--- ON CONFLICT using system attributes in RETURNING, testing both the
--- inserting and updating paths. See bug report at:
--- https://www.postgresql.org/message-id/73436355-6432-49B1-92ED-1FE4F7E7E100%40finefun.com.au
-INSERT INTO upsert_test VALUES (2, 'Beeble') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
-  RETURNING tableoid::regclass, xmin = pg_current_xact_id()::xid AS xmin_correct, xmax = 0 AS xmax_correct;
--- currently xmax is set after a conflict - that's probably not good,
--- but it seems worthwhile to have to be explicit if that changes.
-INSERT INTO upsert_test VALUES (2, 'Brox') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
-  RETURNING tableoid::regclass, xmin = pg_current_xact_id()::xid AS xmin_correct, xmax = pg_current_xact_id()::xid AS xmax_correct;
+-- minipg: the subtest that used RETURNING to check system attributes on the
+-- inserting and updating paths is dropped because RETURNING is removed.
 
 DROP TABLE update_test;
 DROP TABLE upsert_test;
@@ -145,11 +134,11 @@ INSERT INTO upsert_test VALUES(1, 'Boo'), (2, 'Zoo');
 -- uncorrelated sub-select:
 WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
   VALUES (1, 'Bar') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
+  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa);
 -- correlated sub-select:
 WITH aaa AS (SELECT 1 AS ctea, ' Foo' AS cteb) INSERT INTO upsert_test
   VALUES (1, 'Bar'), (2, 'Baz') ON CONFLICT(a)
-  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa) RETURNING *;
+  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa);
 
 DROP TABLE upsert_test;
 
@@ -224,13 +213,13 @@ UPDATE range_parted set e = d;
 -- No row found
 UPDATE part_c_1_100 set c = c + 20 WHERE c = 98;
 -- ok, row movement
-UPDATE part_b_10_b_20 set c = c + 20 returning c, b, a;
+UPDATE part_b_10_b_20 set c = c + 20;
 :show_data;
 
 -- fail, row movement happens only within the partition subtree.
-UPDATE part_b_10_b_20 set b = b - 6 WHERE c > 116 returning *;
+UPDATE part_b_10_b_20 set b = b - 6 WHERE c > 116;
 -- ok, row movement, with subset of rows moved into different partition.
-UPDATE range_parted set b = b - 6 WHERE c > 116 returning a, b + c;
+UPDATE range_parted set b = b - 6 WHERE c > 116;
 
 :show_data;
 
@@ -254,11 +243,8 @@ UPDATE upview set a = 'b', b = 15 WHERE b = 4;
 -- cleanup
 DROP VIEW upview;
 
--- RETURNING having whole-row vars.
-:init_range_parted;
-UPDATE range_parted set c = 95 WHERE a = 'b' and b > 10 and c > 100 returning (range_parted), *;
-:show_data;
-
+-- minipg: the "RETURNING having whole-row vars" subtest is dropped because
+-- RETURNING is removed.
 
 -- Transition tables with update row movement
 :init_range_parted;
@@ -444,36 +430,8 @@ UPDATE list_default set a = 'x' WHERE a = 'd';
 
 DROP TABLE list_parted;
 
--- Test retrieval of system columns with non-consistent partition row types.
--- This is only partially supported, as seen in the results.
-
-create table utrtest (a int, b text) partition by list (a);
-create table utr1 (a int check (a in (1)), q text, b text);
-create table utr2 (a int check (a in (2)), b text);
-alter table utr1 drop column q;
-alter table utrtest attach partition utr1 for values in (1);
-alter table utrtest attach partition utr2 for values in (2);
-
-insert into utrtest values (1, 'foo')
-  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
-insert into utrtest values (2, 'bar')
-  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
-insert into utrtest values (2, 'bar')
-  returning *, tableoid::regclass;
-
-update utrtest set b = b || b from (values (1), (2)) s(x) where a = s.x
-  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
-
-update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
-  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
-
-update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
-  returning *, tableoid::regclass;
-
-delete from utrtest
-  returning *, tableoid::regclass, xmax = pg_current_xact_id()::xid as xmax_ok;
-
-drop table utrtest;
+-- minipg: the "retrieval of system columns with non-consistent partition
+-- row types" subtest is dropped because RETURNING is removed.
 
 
 --------------

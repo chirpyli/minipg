@@ -273,7 +273,6 @@ static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
 									 bool partColsUpdated,
 									 List *resultRelations,
 									 List *updateColnosLists,
-									 List *withCheckOptionLists, List *returningLists,
 									 List *rowMarks, OnConflictExpr *onconflict, int epqParam);
 static GatherMerge *create_gather_merge_plan(PlannerInfo *root,
 											 GatherMergePath *best_path);
@@ -2411,8 +2410,6 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 							best_path->partColsUpdated,
 							best_path->resultRelations,
 							best_path->updateColnosLists,
-							best_path->withCheckOptionLists,
-							best_path->returningLists,
 							best_path->rowMarks,
 							best_path->onconflict,
 							best_path->epqParam);
@@ -5975,7 +5972,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 				 bool partColsUpdated,
 				 List *resultRelations,
 				 List *updateColnosLists,
-				 List *withCheckOptionLists, List *returningLists,
 				 List *rowMarks, OnConflictExpr *onconflict, int epqParam)
 {
 	ModifyTable *node = makeNode(ModifyTable);
@@ -5983,10 +5979,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 	Assert(operation == CMD_UPDATE ?
 		   list_length(resultRelations) == list_length(updateColnosLists) :
 		   updateColnosLists == NIL);
-	Assert(withCheckOptionLists == NIL ||
-		   list_length(resultRelations) == list_length(withCheckOptionLists));
-	Assert(returningLists == NIL ||
-		   list_length(resultRelations) == list_length(returningLists));
 
 	node->plan.lefttree = subplan;
 	node->plan.righttree = NULL;
@@ -6037,8 +6029,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 		node->exclRelTlist = onconflict->exclRelTlist;
 	}
 	node->updateColnosLists = updateColnosLists;
-	node->withCheckOptionLists = withCheckOptionLists;
-	node->returningLists = returningLists;
 	node->rowMarks = rowMarks;
 	node->epqParam = epqParam;
 

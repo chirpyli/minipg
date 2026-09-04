@@ -3231,8 +3231,6 @@ create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
  * 'resultRelations' is an integer list of actual RT indexes of target rel(s)
  * 'updateColnosLists' is a list of UPDATE target column number lists
  *		(one sublist per rel); or NIL if not an UPDATE
- * 'withCheckOptionLists' is a list of WCO lists (one per rel)
- * 'returningLists' is a list of RETURNING tlists (one per rel)
  * 'rowMarks' is a list of PlanRowMarks (non-locking only)
  * 'onconflict' is the ON CONFLICT clause, or NULL
  * 'epqParam' is the ID of Param for EvalPlanQual re-eval
@@ -3245,7 +3243,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 						bool partColsUpdated,
 						List *resultRelations,
 						List *updateColnosLists,
-						List *withCheckOptionLists, List *returningLists,
 						List *rowMarks, OnConflictExpr *onconflict,
 						int epqParam)
 {
@@ -3254,10 +3251,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	Assert(operation == CMD_UPDATE ?
 		   list_length(resultRelations) == list_length(updateColnosLists) :
 		   updateColnosLists == NIL);
-	Assert(withCheckOptionLists == NIL ||
-		   list_length(resultRelations) == list_length(withCheckOptionLists));
-	Assert(returningLists == NIL ||
-		   list_length(resultRelations) == list_length(returningLists));
 
 	pathnode->path.pathtype = T_ModifyTable;
 	pathnode->path.parent = rel;
@@ -3271,10 +3264,10 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->path.pathkeys = NIL;
 
 	/*
-	 * Compute cost & rowcount as subpath cost & rowcount (if RETURNING)
+	 * Compute cost & rowcount as subpath cost & rowcount
 	 *
 	 * Currently, we don't charge anything extra for the actual table
-	 * modification work, nor for the WITH CHECK OPTIONS or RETURNING
+	 * modification work, nor for the WITH CHECK OPTIONS
 	 * expressions if any.  It would only be window dressing, since
 	 * ModifyTable is always a top-level node and there is no way for the
 	 * costs to change any higher-level planning choices.  But we might want
@@ -3282,23 +3275,8 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	 */
 	pathnode->path.startup_cost = subpath->startup_cost;
 	pathnode->path.total_cost = subpath->total_cost;
-	if (returningLists != NIL)
-	{
-		pathnode->path.rows = subpath->rows;
-
-		/*
-		 * Set width to match the subpath output.  XXX this is totally wrong:
-		 * we should return an average of the RETURNING tlist widths.  But
-		 * it's what happened historically, and improving it is a task for
-		 * another day.  (Again, it's mostly window dressing.)
-		 */
-		pathnode->path.pathtarget->width = subpath->pathtarget->width;
-	}
-	else
-	{
-		pathnode->path.rows = 0;
-		pathnode->path.pathtarget->width = 0;
-	}
+	pathnode->path.rows = 0;
+	pathnode->path.pathtarget->width = 0;
 
 	pathnode->subpath = subpath;
 	pathnode->operation = operation;
@@ -3308,8 +3286,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->partColsUpdated = partColsUpdated;
 	pathnode->resultRelations = resultRelations;
 	pathnode->updateColnosLists = updateColnosLists;
-	pathnode->withCheckOptionLists = withCheckOptionLists;
-	pathnode->returningLists = returningLists;
 	pathnode->rowMarks = rowMarks;
 	pathnode->onconflict = onconflict;
 	pathnode->epqParam = epqParam;

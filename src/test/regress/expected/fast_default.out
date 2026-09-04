@@ -493,35 +493,8 @@ SELECT * FROM T WHERE c_bigint > -1 ORDER BY c_bigint, c_text, pk LIMIT 10;
                Filter: (t.c_bigint > '-1'::integer)
 (8 rows)
 
---  DELETE with RETURNING
-DELETE FROM T WHERE pk BETWEEN 10 AND 20 RETURNING *;
- pk | c_bigint | c_text 
-----+----------+--------
- 10 |       -1 | hello
- 11 |        1 | hello
- 12 |        2 | hello
- 13 |        3 | hello
- 14 |        4 | hello
- 15 |        5 | hello
- 16 |        6 | hello
- 17 |        7 | hello
- 18 |        8 | hello
- 19 |        9 | hello
- 20 |       10 | hello
-(11 rows)
-
-EXPLAIN (VERBOSE TRUE, COSTS FALSE)
-DELETE FROM T WHERE pk BETWEEN 10 AND 20 RETURNING *;
-                        QUERY PLAN                         
------------------------------------------------------------
- Delete on fast_default.t
-   Output: pk, c_bigint, c_text
-   ->  Bitmap Heap Scan on fast_default.t
-         Output: ctid
-         Recheck Cond: ((t.pk >= 10) AND (t.pk <= 20))
-         ->  Bitmap Index Scan on t_pkey
-               Index Cond: ((t.pk >= 10) AND (t.pk <= 20))
-(7 rows)
+-- minipg: the "DELETE with RETURNING" subtest is dropped because RETURNING
+-- is removed.
 
 -- UPDATE
 UPDATE T SET c_text = '"' || c_text || '"'  WHERE pk < 10;

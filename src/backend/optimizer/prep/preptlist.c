@@ -15,8 +15,8 @@
  * adds these; they're not in what we receive from the planner/rewriter.)
  *
  * For all query types, there can be additional junk tlist entries, such as
- * sort keys, Vars needed for a RETURNING list, and row ID information needed
- * for SELECT FOR UPDATE locking and/or EvalPlanQual checking.
+ * sort keys and row ID information needed for SELECT FOR UPDATE locking
+ * and/or EvalPlanQual checking.
  *
  * The query rewrite phase also does preprocessing of the targetlist (see
  * rewriteTargetListIU).  The division of labor between here and there is
@@ -199,43 +199,6 @@ preprocess_targetlist(PlannerInfo *root)
 								  true);
 			tlist = lappend(tlist, tle);
 		}
-	}
-
-	/*
-	 * If the query has a RETURNING list, add resjunk entries for any Vars
-	 * used in RETURNING that belong to other relations.  We need to do this
-	 * to make these Vars available for the RETURNING calculation.  Vars that
-	 * belong to the result rel don't need to be added, because they will be
-	 * made to refer to the actual heap tuple.
-	 */
-	if (parse->returningList && list_length(parse->rtable) > 1)
-	{
-		List	   *vars;
-		ListCell   *l;
-
-		vars = pull_var_clause((Node *) parse->returningList,
-							   PVC_RECURSE_AGGREGATES |
-							   PVC_INCLUDE_PLACEHOLDERS);
-		foreach(l, vars)
-		{
-			Var		   *var = (Var *) lfirst(l);
-			TargetEntry *tle;
-
-			if (IsA(var, Var) &&
-				var->varno == result_relation)
-				continue;		/* don't need it */
-
-			if (tlist_member((Expr *) var, tlist))
-				continue;		/* already got it */
-
-			tle = makeTargetEntry((Expr *) var,
-								  list_length(tlist) + 1,
-								  NULL,
-								  true);
-
-			tlist = lappend(tlist, tle);
-		}
-		list_free(vars);
 	}
 
 	root->processed_tlist = tlist;

@@ -865,9 +865,7 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
-	COMPARE_SCALAR_FIELD(override);
 	COMPARE_NODE_FIELD(onConflict);
-	COMPARE_NODE_FIELD(returningList);
 	COMPARE_NODE_FIELD(groupClause);
 	COMPARE_SCALAR_FIELD(groupDistinct);
 	COMPARE_NODE_FIELD(groupingSets);
@@ -879,7 +877,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(rowMarks);
 	COMPARE_NODE_FIELD(constraintDeps);
-	COMPARE_NODE_FIELD(withCheckOptions);
 	COMPARE_LOCATION_FIELD(stmt_location);
 	COMPARE_SCALAR_FIELD(stmt_len);
 
@@ -903,8 +900,6 @@ _equalInsertStmt(const InsertStmt *a, const InsertStmt *b)
 	COMPARE_NODE_FIELD(cols);
 	COMPARE_NODE_FIELD(selectStmt);
 	COMPARE_NODE_FIELD(onConflictClause);
-	COMPARE_NODE_FIELD(returningList);
-	COMPARE_SCALAR_FIELD(override);
 
 	return true;
 }
@@ -915,7 +910,6 @@ _equalDeleteStmt(const DeleteStmt *a, const DeleteStmt *b)
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(usingClause);
 	COMPARE_NODE_FIELD(whereClause);
-	COMPARE_NODE_FIELD(returningList);
 
 	return true;
 }
@@ -927,7 +921,6 @@ _equalUpdateStmt(const UpdateStmt *a, const UpdateStmt *b)
 	COMPARE_NODE_FIELD(targetList);
 	COMPARE_NODE_FIELD(whereClause);
 	COMPARE_NODE_FIELD(fromClause);
-	COMPARE_NODE_FIELD(returningList);
 
 	return true;
 }
@@ -1107,7 +1100,6 @@ _equalViewStmt(const ViewStmt *a, const ViewStmt *b)
 	COMPARE_NODE_FIELD(query);
 	COMPARE_SCALAR_FIELD(replace);
 	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(withCheckOption);
 
 	return true;
 }
@@ -1539,18 +1531,6 @@ _equalTableSampleClause(const TableSampleClause *a, const TableSampleClause *b)
 	COMPARE_SCALAR_FIELD(tsmhandler);
 	COMPARE_NODE_FIELD(args);
 	COMPARE_NODE_FIELD(repeatable);
-
-	return true;
-}
-
-static bool
-_equalWithCheckOption(const WithCheckOption *a, const WithCheckOption *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_STRING_FIELD(relname);
-	COMPARE_STRING_FIELD(polname);
-	COMPARE_NODE_FIELD(qual);
-	COMPARE_SCALAR_FIELD(cascaded);
 
 	return true;
 }
@@ -2079,9 +2059,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TableSampleClause:
 			retval = _equalTableSampleClause(a, b);
-			break;
-		case T_WithCheckOption:
-			retval = _equalWithCheckOption(a, b);
 			break;
 		case T_SortGroupClause:
 			retval = _equalSortGroupClause(a, b);

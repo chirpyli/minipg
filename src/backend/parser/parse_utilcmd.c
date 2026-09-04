@@ -1283,7 +1283,6 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 											  AccessShareLock,
 											  makeAlias("new", NIL),
 											  false, false);
-	/* Must override addRangeTableEntry's default access-check flags */
 
 	/*
 	 * They must be in the namespace too for lookup purposes, but only add the

@@ -13,12 +13,6 @@ SELECT 1 AS zero WHERE 1 IN (SELECT 2);
 SELECT * FROM (SELECT 1 AS x) ss;
 SELECT * FROM ((SELECT 1 AS x)) ss;
 
-(SELECT 2) UNION SELECT 2;
-((SELECT 2)) UNION SELECT 2;
-
-SELECT ((SELECT 2) UNION SELECT 2);
-SELECT (((SELECT 2)) UNION SELECT 2);
-
 SELECT (SELECT ARRAY[1,2,3])[1];
 SELECT ((SELECT ARRAY[1,2,3]))[2];
 SELECT (((SELECT ARRAY[1,2,3])))[3];
@@ -99,9 +93,6 @@ SELECT *, pg_typeof(f1) FROM
 
 -- ... unless there's context to suggest differently
 
-explain (verbose, costs off) select '42' union all select '43';
-explain (verbose, costs off) select '42' union all select 43;
-
 -- check materialization of an initplan reference (bug #14524)
 explain (verbose, costs off)
 select 1 = all (select (select 1));
@@ -159,8 +150,7 @@ SELECT * FROM foo WHERE id IN
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id1,id2 FROM bar GROUP BY id1,id2) AS s);
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id1, id2 FROM bar UNION
-                      SELECT id1, id2 FROM bar) AS s);
+    (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
 
 -- These cases do not
 SELECT * FROM foo WHERE id IN
@@ -168,8 +158,7 @@ SELECT * FROM foo WHERE id IN
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id2 FROM bar GROUP BY id2) AS s);
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id2 FROM bar UNION
-                      SELECT id2 FROM bar) AS s);
+    (SELECT id2 FROM (SELECT DISTINCT id2 FROM bar) AS s);
 
 --
 -- Test case to catch problems with multiply nested sub-SELECTs not getting
@@ -414,8 +403,7 @@ insert into upsert values(1, 'val') on conflict (key) do update set val = 'seen 
 select * from upsert;
 
 insert into upsert values (1, 'x'), (999, 'y')
-on conflict (key) do update set val = (select u from (select 'int4_tbl' u from int4_tbl limit 1) aa)
-returning *;
+on conflict (key) do update set val = (select u from (select 'int4_tbl' u from int4_tbl limit 1) aa);
 
 --
 -- Test case for cross-type partial matching in hashed subplan (bug #7597)
@@ -456,9 +444,9 @@ select * from outer_text where (f1, f2) not in (select * from inner_text);
 --
 
 explain (verbose, costs off)
-select 'foo'::text in (select 'bar'::name union all select 'bar'::name);
+select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 
-select 'foo'::text in (select 'bar'::name union all select 'bar'::name);
+select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 
 --
 -- Test that we don't try to hash nested records (bug #17363)
@@ -474,7 +462,7 @@ select row(row(row(1))) = any (select row(row(1)));
 -- Test case for premature memory release during hashing of subplan output
 --
 
-select '1'::text in (select '1'::name union all select '1'::name);
+select '1'::text in (select '1'::name from generate_series(1,2));
 
 --
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
@@ -550,26 +538,6 @@ select sum(ss.tst::int) from
 where o.ten = 0;
 
 --
--- Test rescan of a SetOp node
---
-explain (costs off)
-select count(*) from
-  onek o cross join lateral (
-    select * from onek i1 where i1.unique1 = o.unique1
-    except
-    select * from onek i2 where i2.unique1 = o.unique2
-  ) ss
-where o.ten = 1;
-
-select count(*) from
-  onek o cross join lateral (
-    select * from onek i1 where i1.unique1 = o.unique1
-    except
-    select * from onek i2 where i2.unique1 = o.unique2
-  ) ss
-where o.ten = 1;
-
---
 -- Check we don't misoptimize a NOT IN where the subquery returns no rows.
 --
 CREATE TABLE notinouter (a int);
@@ -632,10 +600,7 @@ select * from int4_tbl o where (f1, f1) in
 -- check for over-optimization of whole-row Var referencing an Append plan
 --
 select (select q from
-         (select 1,2,3 where f1 > 0
-          union all
-          select 4,5,6.0 where f1 <= 0
-         ) q )
+         (values (1,2,3),(4,5,6.0)) q )
 from int4_tbl;
 
 --
@@ -647,21 +612,17 @@ explain (verbose, costs off)
 select * from
     int4_tbl i4,
     lateral (
-        select i4.f1 > 1 as b, 1 as id
-        from (select random() order by 1) as t1
-      union all
-        select true as b, 2 as id
-    ) as t2
+        values (i4.f1 > 1, 1),
+               (true, 2)
+    ) as t2(b, id)
 where b and f1 >= 0;
 
 select * from
     int4_tbl i4,
     lateral (
-        select i4.f1 > 1 as b, 1 as id
-        from (select random() order by 1) as t1
-      union all
-        select true as b, 2 as id
-    ) as t2
+        values (i4.f1 > 1, 1),
+               (true, 2)
+    ) as t2(b, id)
 where b and f1 >= 0;
 
 --

@@ -64,7 +64,6 @@ static int	count_rowexpr_columns(ParseState *pstate, Node *expr);
 static Query *transformSelectStmt(ParseState *pstate, SelectStmt *stmt);
 static Query *transformValuesClause(ParseState *pstate, SelectStmt *stmt);
 static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt);
-static List *transformReturningList(ParseState *pstate, List *returningList);
 static List *transformUpdateTargetList(ParseState *pstate,
 									   List *targetList);
 static Query *transformExplainStmt(ParseState *pstate,
@@ -374,8 +373,6 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 	qual = transformWhereClause(pstate, stmt->whereClause,
 								EXPR_KIND_WHERE, "WHERE");
 
-	qry->returningList = transformReturningList(pstate, stmt->returningList);
-
 	/* done building the range table and jointree */
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
@@ -416,8 +413,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 
 	qry->commandType = CMD_INSERT;
 	pstate->p_is_insert = true;
-
-	qry->override = stmt->override;
 
 	/*
 	 * We have three cases to deal with: DEFAULT VALUES (selectStmt == NULL),
@@ -755,7 +750,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * contain only the target relation, removing any entries added in a
 	 * sub-SELECT or VALUES list.
 	 */
-	if (stmt->onConflictClause || stmt->returningList)
+	if (stmt->onConflictClause)
 	{
 		pstate->p_namespace = NIL;
 		addNSItemToQuery(pstate, pstate->p_target_nsitem,
@@ -766,11 +761,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	if (stmt->onConflictClause)
 		qry->onConflict = transformOnConflictClause(pstate,
 													stmt->onConflictClause);
-
-	/* Process RETURNING, if any. */
-	if (stmt->returningList)
-		qry->returningList = transformReturningList(pstate,
-													stmt->returningList);
 
 	/* done building the range table and jointree */
 	qry->rtable = pstate->p_rtable;
@@ -971,17 +961,9 @@ transformOnConflictClause(ParseState *pstate,
 			transformUpdateTargetList(pstate, onConflictClause->targetList);
 
 		onConflictWhere = transformWhereClause(pstate,
-											   onConflictClause->whereClause,
-											   EXPR_KIND_WHERE, "WHERE");
-
-		/*
-		 * Remove the EXCLUDED pseudo relation from the query namespace, since
-		 * it's not supposed to be available in RETURNING.  (Maybe someday we
-		 * could allow that, and drop this step.)
-		 */
-		Assert((ParseNamespaceItem *) llast(pstate->p_namespace) == exclNSItem);
-		pstate->p_namespace = list_delete_last(pstate->p_namespace);
-	}
+																							onConflictClause->whereClause,
+																							EXPR_KIND_WHERE, "WHERE");
+		}
 
 	/* Finally, build ON CONFLICT DO [NOTHING | UPDATE] expression */
 	result = makeNode(OnConflictExpr);
@@ -1469,8 +1451,6 @@ transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt)
 	qual = transformWhereClause(pstate, stmt->whereClause,
 								EXPR_KIND_WHERE, "WHERE");
 
-	qry->returningList = transformReturningList(pstate, stmt->returningList);
-
 	/*
 	 * Now we are done with SELECT-like processing, and can get on with
 	 * transforming the target list to match the UPDATE target columns.
@@ -1559,59 +1539,6 @@ transformUpdateTargetList(ParseState *pstate, List *origTlist)
 
 	return tlist;
 }
-
-/*
- * transformReturningList -
- *	handle a RETURNING clause in INSERT/UPDATE/DELETE
- */
-static List *
-transformReturningList(ParseState *pstate, List *returningList)
-{
-	List	   *rlist;
-	int			save_next_resno;
-
-	if (returningList == NIL)
-		return NIL;				/* nothing to do */
-
-	/*
-	 * We need to assign resnos starting at one in the RETURNING list. Save
-	 * and restore the main tlist's value of p_next_resno, just in case
-	 * someone looks at it later (probably won't happen).
-	 */
-	save_next_resno = pstate->p_next_resno;
-	pstate->p_next_resno = 1;
-
-	/* transform RETURNING identically to a SELECT targetlist */
-	rlist = transformTargetList(pstate, returningList, EXPR_KIND_RETURNING);
-
-	/*
-	 * Complain if the nonempty tlist expanded to nothing (which is possible
-	 * if it contains only a star-expansion of a zero-column table).  If we
-	 * allow this, the parsed Query will look like it didn't have RETURNING,
-	 * with results that would probably surprise the user.
-	 */
-	if (rlist == NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("RETURNING must have at least one column"),
-				 parser_errposition(pstate,
-									exprLocation(linitial(returningList)))));
-
-	/* mark column origins */
-	markTargetListOrigins(pstate, rlist);
-
-	/* resolve any still-unresolved output columns as being type text */
-	if (pstate->p_resolve_unknowns)
-		resolveTargetListUnknowns(pstate, rlist);
-
-	/* restore state */
-	pstate->p_next_resno = save_next_resno;
-
-	return rlist;
-}
-
-
-
 
 /*
  * transformExplainStmt -

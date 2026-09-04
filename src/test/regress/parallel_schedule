@@ -127,21 +127,3 @@ test: vacuum_parallel
 # cluster 已随表继承(INHERITS)功能裁剪而移除
 # portals_p2 已随游标功能裁剪而移除
 test: bitmapops combocid advisory_lock
-
-# ----------
-# ----------
-# Another group of parallel tests
-# NB: temp.sql does a reconnect which transiently uses 2 connections,
-# so keep this parallel group to at most 19 tests
-# ----------
-# information_schema 已裁剪，rowtypes 引用 information_schema._pg_expandarray，移除
-# temp/truncate/returning 已随表继承(INHERITS)功能裁剪而移除
-# plpgsql: PL/pgSQL 已裁剪，移除对应测试条目（纯测试见已删 plpgsql.sql）
-
-# ----------
-# Another group of parallel tests
-# ----------
-# indexing 已随表继承(INHERITS)/分区功能裁剪而移除
-# minipg: explain/memoize 依赖 plpgsql 测试桩（explain_filter 等），PL/pgSQL 已裁剪，移除
-# reloptions 已裁剪，移除测试用例
-

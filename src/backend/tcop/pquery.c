@@ -114,7 +114,7 @@ FreeQueryDesc(QueryDesc *qdesc)
 /*
  * ProcessQuery
  *		Execute a single plannable query within a PORTAL_MULTI_QUERY,
- *		PORTAL_ONE_RETURNING, or PORTAL_ONE_MOD_WITH portal
+ *		or PORTAL_ONE_MOD_WITH portal
  *
  *	plan: the plan tree for the query
  *	sourceText: the source text of the query
@@ -199,9 +199,6 @@ ProcessQuery(PlannedStmt *plan,
 PortalStrategy
 ChoosePortalStrategy(List *stmts)
 {
-	int			nSetTag;
-	ListCell   *lc;
-
 	/*
 	 * PORTAL_ONE_SELECT and PORTAL_UTIL_SELECT need only consider the
 	 * single-statement case, since there are no rewrite rules that can add
@@ -226,7 +223,6 @@ ChoosePortalStrategy(List *stmts)
 				{
 					if (UtilityReturnsTuples(query->utilityStmt))
 						return PORTAL_UTIL_SELECT;
-					/* it can't be ONE_RETURNING, so give up */
 					return PORTAL_MULTI_QUERY;
 				}
 			}
@@ -248,7 +244,6 @@ ChoosePortalStrategy(List *stmts)
 				{
 					if (UtilityReturnsTuples(pstmt->utilityStmt))
 						return PORTAL_UTIL_SELECT;
-					/* it can't be ONE_RETURNING, so give up */
 					return PORTAL_MULTI_QUERY;
 				}
 			}
@@ -256,48 +251,6 @@ ChoosePortalStrategy(List *stmts)
 		else
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(stmt));
 	}
-
-	/*
-	 * PORTAL_ONE_RETURNING has to allow auxiliary queries added by rewrite.
-	 * Choose PORTAL_ONE_RETURNING if there is exactly one canSetTag query and
-	 * it has a RETURNING list.
-	 */
-	nSetTag = 0;
-	foreach(lc, stmts)
-	{
-		Node	   *stmt = (Node *) lfirst(lc);
-
-		if (IsA(stmt, Query))
-		{
-			Query	   *query = (Query *) stmt;
-
-			if (query->canSetTag)
-			{
-				if (++nSetTag > 1)
-					return PORTAL_MULTI_QUERY;	/* no need to look further */
-				if (query->commandType == CMD_UTILITY ||
-					query->returningList == NIL)
-					return PORTAL_MULTI_QUERY;	/* no need to look further */
-			}
-		}
-		else if (IsA(stmt, PlannedStmt))
-		{
-			PlannedStmt *pstmt = (PlannedStmt *) stmt;
-
-			if (pstmt->canSetTag)
-			{
-				if (++nSetTag > 1)
-					return PORTAL_MULTI_QUERY;	/* no need to look further */
-				if (pstmt->commandType == CMD_UTILITY ||
-					!pstmt->hasReturning)
-					return PORTAL_MULTI_QUERY;	/* no need to look further */
-			}
-		}
-		else
-			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(stmt));
-	}
-	if (nSetTag == 1)
-		return PORTAL_ONE_RETURNING;
 
 	/* Else, it's the general case... */
 	return PORTAL_MULTI_QUERY;
@@ -349,8 +302,6 @@ FetchStatementTargetList(Node *stmt)
 		{
 			if (query->commandType == CMD_SELECT)
 				return query->targetList;
-			if (query->returningList)
-				return query->returningList;
 			return NIL;
 		}
 	}
@@ -366,8 +317,6 @@ FetchStatementTargetList(Node *stmt)
 		else
 		{
 			if (pstmt->commandType == CMD_SELECT)
-				return pstmt->planTree->targetlist;
-			if (pstmt->hasReturning)
 				return pstmt->planTree->targetlist;
 			return NIL;
 		}
@@ -493,7 +442,6 @@ PortalStart(Portal portal, ParamListInfo params,
 				PopActiveSnapshot();
 				break;
 
-			case PORTAL_ONE_RETURNING:
 			case PORTAL_ONE_MOD_WITH:
 
 				/*
@@ -703,7 +651,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 		switch (portal->strategy)
 		{
 			case PORTAL_ONE_SELECT:
-			case PORTAL_ONE_RETURNING:
 			case PORTAL_ONE_MOD_WITH:
 			case PORTAL_UTIL_SELECT:
 
@@ -801,8 +748,8 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 /*
  * PortalRunSelect
  *		Execute a portal's query in PORTAL_ONE_SELECT mode, and also
- *		when fetching from a completed holdStore in PORTAL_ONE_RETURNING,
- *		PORTAL_ONE_MOD_WITH, and PORTAL_UTIL_SELECT cases.
+ *		when fetching from a completed holdStore in
+ *		PORTAL_ONE_MOD_WITH and PORTAL_UTIL_SELECT cases.
  *
  * This handles simple N-rows-forward cases.
  *
@@ -826,8 +773,8 @@ PortalRunSelect(Portal portal,
 
 	/*
 	 * NB: queryDesc will be NULL if we are fetching from a completed
-	 * PORTAL_ONE_RETURNING, PORTAL_ONE_MOD_WITH, or PORTAL_UTIL_SELECT
-	 * query; can't use it in that path.
+	 * PORTAL_ONE_MOD_WITH or PORTAL_UTIL_SELECT query; can't use it in
+	 * that path.
 	 */
 	queryDesc = portal->queryDesc;
 
@@ -891,8 +838,7 @@ PortalRunSelect(Portal portal,
  * FillPortalStore
  *		Run the query and load result tuples into the portal's tuple store.
  *
- * This is used for PORTAL_ONE_RETURNING, PORTAL_ONE_MOD_WITH, and
- * PORTAL_UTIL_SELECT cases only.
+ * This is used for PORTAL_ONE_MOD_WITH and PORTAL_UTIL_SELECT cases only.
  */
 static void
 FillPortalStore(Portal portal, bool isTopLevel)
@@ -908,7 +854,6 @@ FillPortalStore(Portal portal, bool isTopLevel)
 
 	switch (portal->strategy)
 	{
-		case PORTAL_ONE_RETURNING:
 		case PORTAL_ONE_MOD_WITH:
 
 			/*

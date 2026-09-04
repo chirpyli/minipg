@@ -595,7 +595,7 @@ LINE 1: insert into lparted_nonullpart values (1);
                     ^
 drop table lparted_nonullpart;
 ERROR:  table "lparted_nonullpart" does not exist
--- check that RETURNING works correctly with tuple-routing
+-- check tuple-routing for multi-level partitioned tables
 alter table mlparted drop constraint check_b;
 ERROR:  relation "mlparted" does not exist
 create table mlparted12 partition of mlparted1 for values from (5) to (10);
@@ -1014,31 +1014,5 @@ LINE 1: select tableoid::regclass, * from mcrparted order by a, b;
                                           ^
 drop table mcrparted;
 ERROR:  table "mcrparted" does not exist
--- check that wholerow vars in the RETURNING list work with partitioned tables
-create table returningwrtest (a int) partition by list (a);
-ERROR:  syntax error at or near "partition"
-LINE 1: create table returningwrtest (a int) partition by list (a);
-                                             ^
-create table returningwrtest1 partition of returningwrtest for values in (1);
-ERROR:  syntax error at or near "partition"
-LINE 1: create table returningwrtest1 partition of returningwrtest f...
-                                      ^
-insert into returningwrtest values (1) returning returningwrtest;
-ERROR:  relation "returningwrtest" does not exist
-LINE 1: insert into returningwrtest values (1) returning returningwr...
-                    ^
--- check also that the wholerow vars in RETURNING list are converted as needed
-alter table returningwrtest add b text;
-ERROR:  relation "returningwrtest" does not exist
-create table returningwrtest2 (b text, c int, a int);
-alter table returningwrtest2 drop c;
-alter table returningwrtest attach partition returningwrtest2 for values in (2);
-ERROR:  syntax error at or near "attach"
-LINE 1: alter table returningwrtest attach partition returningwrtest...
-                                    ^
-insert into returningwrtest values (2, 'foo') returning returningwrtest;
-ERROR:  relation "returningwrtest" does not exist
-LINE 1: insert into returningwrtest values (2, 'foo') returning retu...
-                    ^
-drop table returningwrtest;
-ERROR:  table "returningwrtest" does not exist
+-- minipg: wholerow vars in the RETURNING list with partitioned tables
+-- subtest is dropped because RETURNING is removed.

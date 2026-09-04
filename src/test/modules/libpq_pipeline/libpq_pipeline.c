@@ -1499,7 +1499,7 @@ test_uniqviol(PGconn *conn)
 		pg_fatal("failed to begin transaction: %s", PQerrorMessage(conn));
 
 	res = PQprepare(conn, "insertion",
-					"insert into ppln_uniqviol values ($1, $2) returning id",
+					"insert into ppln_uniqviol values ($1, $2)",
 					2, paramTypes);
 	if (res == NULL || PQresultStatus(res) != PGRES_COMMAND_OK)
 		pg_fatal("failed to prepare query: %s", PQerrorMessage(conn));
@@ -1642,6 +1642,16 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 		case PGRES_FATAL_ERROR:
 			got_error = true;
 			fprintf(stderr, "result %d/%d (error): %s\n", results, numsent, PQerrorMessage(conn));
+			PQclear(res);
+
+			res2 = PQgetResult(conn);
+			if (res2 != NULL)
+				pg_fatal("expected NULL, got %s",
+						 PQresStatus(PQresultStatus(res2)));
+			break;
+
+		case PGRES_COMMAND_OK:
+			fprintf(stderr, "result %d/%d: OK\n", results, numsent);
 			PQclear(res);
 
 			res2 = PQgetResult(conn);

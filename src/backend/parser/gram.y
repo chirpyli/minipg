@@ -401,15 +401,11 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 %type <node>	ColConstraint ColConstraintElem
 %type <str>		ExistingIndex
 
-%type <ival>	opt_check_option
-
-
 %type <node>	func_application func_expr_common_subexpr
 %type <node>	func_expr func_expr_windowless
 %type <list>	within_group_clause
 %type <node>	filter_clause
-%type <boolean> opt_if_not_exists
-%type <ival>	generated_when override_kind
+%type <boolean> opt_if_not_exists 
 
 
 /*
@@ -500,7 +496,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
-	RESET RESTART RESTRICT RETURNING RIGHT ROLE ROLLBACK ROLLUP
+	RESET RESTART RESTRICT RIGHT ROLE ROLLBACK ROLLUP
 	ROW ROWS RULE
 
 	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SELECT SEQUENCE SEQUENCES
@@ -2670,7 +2666,7 @@ opt_transaction_chain:
  *****************************************************************************/
 
 ViewStmt: CREATE VIEW qualified_name opt_column_list
-				AS SelectStmt opt_check_option
+				AS SelectStmt
 				{
 					ViewStmt *n = makeNode(ViewStmt);
 					n->view = $3;
@@ -2679,11 +2675,10 @@ ViewStmt: CREATE VIEW qualified_name opt_column_list
 					n->query = $6;
 					n->replace = false;
 					n->options = NIL;
-					n->withCheckOption = $7;
 					$$ = (Node *) n;
 				}
 		| CREATE OR REPLACE VIEW qualified_name opt_column_list
-			AS SelectStmt opt_check_option
+			AS SelectStmt
 			{
 				ViewStmt *n = makeNode(ViewStmt);
 				n->view = $5;
@@ -2692,16 +2687,8 @@ ViewStmt: CREATE VIEW qualified_name opt_column_list
 					n->query = $8;
 					n->replace = true;
 					n->options = NIL;
-					n->withCheckOption = $9;
 					$$ = (Node *) n;
 			}
-		;
-
-opt_check_option:
-		WITH CHECK OPTION				{ $$ = CASCADED_CHECK_OPTION; }
-		| WITH CASCADED CHECK OPTION	{ $$ = CASCADED_CHECK_OPTION; }
-		| WITH LOCAL CHECK OPTION		{ $$ = LOCAL_CHECK_OPTION; }
-		| /* EMPTY */					{ $$ = NO_CHECK_OPTION; }
 		;
 
 /*****************************************************************************
@@ -3100,11 +3087,10 @@ ExplainableStmt:
 
 InsertStmt:
 			INSERT INTO insert_target insert_rest
-			opt_on_conflict returning_clause
+			opt_on_conflict
 				{
 					$4->relation = $3;
 					$4->onConflictClause = $5;
-					$4->returningList = $6;
 					$$ = (Node *) $4;
 				}
 		;
@@ -3134,25 +3120,11 @@ insert_rest:
 					$$->cols = NIL;
 					$$->selectStmt = $1;
 				}
-			| OVERRIDING override_kind VALUE_P SelectStmt
-				{
-					$$ = makeNode(InsertStmt);
-					$$->cols = NIL;
-					$$->override = $2;
-					$$->selectStmt = $4;
-				}
 			| '(' insert_column_list ')' SelectStmt
 				{
 					$$ = makeNode(InsertStmt);
 					$$->cols = $2;
 					$$->selectStmt = $4;
-				}
-			| '(' insert_column_list ')' OVERRIDING override_kind VALUE_P SelectStmt
-				{
-					$$ = makeNode(InsertStmt);
-					$$->cols = $2;
-					$$->override = $5;
-					$$->selectStmt = $7;
 				}
 			| DEFAULT VALUES
 				{
@@ -3160,11 +3132,6 @@ insert_rest:
 					$$->cols = NIL;
 					$$->selectStmt = NULL;
 				}
-		;
-
-override_kind:
-			USER		{ $$ = OVERRIDING_USER_VALUE; }
-			| SYSTEM_P	{ $$ = OVERRIDING_SYSTEM_VALUE; }
 		;
 
 insert_column_list:
@@ -3235,11 +3202,6 @@ opt_conf_expr:
 				}
 		;
 
-returning_clause:
-			RETURNING target_list		{ $$ = $2; }
-			| /* EMPTY */				{ $$ = NIL; }
-		;
-
 
 /*****************************************************************************
  *
@@ -3249,13 +3211,12 @@ returning_clause:
  *****************************************************************************/
 
 DeleteStmt: DELETE_P FROM relation_expr_opt_alias
-			using_clause where_or_current_clause returning_clause
+			using_clause where_or_current_clause
 				{
 					DeleteStmt *n = makeNode(DeleteStmt);
 					n->relation = $3;
 					n->usingClause = $4;
 					n->whereClause = $5;
-					n->returningList = $6;
 					$$ = (Node *)n;
 				}
 		;
@@ -3284,14 +3245,12 @@ UpdateStmt: UPDATE relation_expr_opt_alias
 			SET set_clause_list
 			from_clause
 			where_or_current_clause
-			returning_clause
 				{
 					UpdateStmt *n = makeNode(UpdateStmt);
 					n->relation = $2;
 					n->targetList = $4;
 					n->fromClause = $5;
 					n->whereClause = $6;
-					n->returningList = $7;
 					$$ = (Node *)n;
 				}
 		;
@@ -3518,31 +3477,6 @@ simple_select:
 					n->fromClause = list_make1($2);
 					$$ = (Node *)n;
 				}
-		/*
-		 * Set operations (UNION/INTERSECT/EXCEPT) are not supported in
-		 * minipg; emit a friendly error at parse time rather than allowing
-		 * a confusing syntax error.
-		 */
-		| select_clause UNION set_quantifier select_clause
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
-			}
-		| select_clause INTERSECT set_quantifier select_clause
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
-			}
-		| select_clause EXCEPT set_quantifier select_clause
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg")));
-			}
-		;
-
 		;
 
 /*
@@ -6762,7 +6696,6 @@ reserved_keyword:
 			| ORDER
 			| PLACING
 			| PRIMARY
-			| RETURNING
 			| SELECT
 			| SESSION_USER
 			| SOME

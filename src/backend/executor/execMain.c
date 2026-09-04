@@ -303,8 +303,7 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 	 */
 	estate->es_processed = 0;
 
-	sendTuples = (operation == CMD_SELECT ||
-				  queryDesc->plannedstmt->hasReturning);
+	sendTuples = (operation == CMD_SELECT);
 
 	if (sendTuples)
 		dest->rStartup(dest, operation, queryDesc->tupDesc);
@@ -841,10 +840,9 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_oldTupleSlot = NULL;
 	resultRelInfo->ri_projectNewInfoValid = false;
 	resultRelInfo->ri_ConstraintExprs = NULL;
-	resultRelInfo->ri_projectReturning = NULL;
 	resultRelInfo->ri_onConflictArbiterIndexes = NIL;
 	resultRelInfo->ri_onConflict = NULL;
-	resultRelInfo->ri_ReturningSlot = NULL;
+	resultRelInfo->ri_ConflictSlot = NULL;
 
 	/*
 	 * Only ExecInitPartitionInfo() and ExecInitPartitionDispatchInfo() pass
@@ -1103,152 +1101,6 @@ ExecutePlan(QueryDesc *queryDesc,
 
 	if (use_parallel_mode)
 		ExitParallelMode();
-}
-
-
-
-
-/*
- * ExecWithCheckOptions -- check that tuple satisfies any WITH CHECK OPTIONs
- * of the specified kind.
- *
- * Note that this needs to be called multiple times to ensure that all kinds of
- * WITH CHECK OPTIONs are handled (both those from views which have the WITH
- * CHECK OPTION set and from row-level security policies).  See ExecInsert()
- * and ExecUpdate().
- */
-void
-ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
-					 TupleTableSlot *slot, EState *estate)
-{
-	Relation	rel = resultRelInfo->ri_RelationDesc;
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-	ExprContext *econtext;
-	ListCell   *l1,
-			   *l2;
-
-	/*
-	 * We will use the EState's per-tuple context for evaluating constraint
-	 * expressions (creating it if it's not already there).
-	 */
-	econtext = GetPerTupleExprContext(estate);
-
-	/* Arrange for econtext's scan tuple to be the tuple under test */
-	econtext->ecxt_scantuple = slot;
-
-	/* Check each of the constraints */
-	forboth(l1, resultRelInfo->ri_WithCheckOptions,
-			l2, resultRelInfo->ri_WithCheckOptionExprs)
-	{
-		WithCheckOption *wco = (WithCheckOption *) lfirst(l1);
-		ExprState  *wcoExpr = (ExprState *) lfirst(l2);
-
-		/*
-		 * Skip any WCOs which are not the kind we are looking for at this
-		 * time.
-		 */
-		if (wco->kind != kind)
-			continue;
-
-		/*
-		 * WITH CHECK OPTION checks are intended to ensure that the new tuple
-		 * is visible (in the case of a view) or that it passes the
-		 * 'with-check' policy (in the case of row security). If the qual
-		 * evaluates to NULL or FALSE, then the new tuple won't be included in
-		 * the view or doesn't pass the 'with-check' policy for the table.
-		 */
-		if (!ExecQual(wcoExpr, econtext))
-		{
-			char	   *val_desc;
-			Bitmapset  *modifiedCols;
-
-			switch (wco->kind)
-			{
-					/*
-					 * For WITH CHECK OPTIONs coming from views, we might be
-					 * able to provide the details on the row, depending on
-					 * the permissions on the relation (that is, if the user
-					 * could view it directly anyway).  For RLS violations, we
-					 * don't include the data since we don't know if the user
-					 * should be able to view the tuple as that depends on the
-					 * USING policy.
-					 */
-				case WCO_VIEW_CHECK:
-					/*
-					 * If the tuple was routed to a partition, remap it back
-					 * to the root table's rowtype so the error detail matches
-					 * the input tuple.
-					 */
-					if (resultRelInfo->ri_RootResultRelInfo)
-					{
-						ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
-						TupleDesc	old_tupdesc = RelationGetDescr(rel);
-						AttrMap    *map;
-
-						tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
-						/* a reverse map */
-						map = build_attrmap_by_name_if_req(old_tupdesc,
-														   tupdesc);
-
-						/*
-						 * Partition-specific slot's tupdesc can't be changed,
-						 * so allocate a new one.
-						 */
-						if (map != NULL)
-							slot = execute_attr_map_slot(map, slot,
-														 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
-
-						modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
-												 ExecGetUpdatedCols(rootrel, estate));
-						rel = rootrel->ri_RelationDesc;
-					}
-					else
-						modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
-												 ExecGetUpdatedCols(resultRelInfo, estate));
-					val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
-															 slot,
-															 tupdesc,
-															 modifiedCols,
-															 64);
-
-					ereport(ERROR,
-							(errcode(ERRCODE_WITH_CHECK_OPTION_VIOLATION),
-							 errmsg("new row violates check option for view \"%s\"",
-									wco->relname),
-							 val_desc ? errdetail("Failing row contains %s.",
-												  val_desc) : 0));
-					break;
-				case WCO_RLS_INSERT_CHECK:
-				case WCO_RLS_UPDATE_CHECK:
-					if (wco->polname != NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy \"%s\" for table \"%s\"",
-										wco->polname, wco->relname)));
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy for table \"%s\"",
-										wco->relname)));
-					break;
-				case WCO_RLS_CONFLICT_CHECK:
-					if (wco->polname != NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy \"%s\" (USING expression) for table \"%s\"",
-										wco->polname, wco->relname)));
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy (USING expression) for table \"%s\"",
-										wco->relname)));
-					break;
-				default:
-					elog(ERROR, "unrecognized WCO kind: %u", wco->kind);
-					break;
-			}
-		}
-	}
 }
 
 /*

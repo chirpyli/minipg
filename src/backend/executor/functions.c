@@ -1195,8 +1195,8 @@ fmgr_sql(PG_FUNCTION_ARGS)
 		 * Break from loop if we didn't shut down (implying we got a
 		 * lazily-evaluated row).  Otherwise we'll press on till the whole
 		 * function is done, relying on the tuplestore to keep hold of the
-		 * data to eventually be returned.  This is necessary since an
-		 * INSERT/UPDATE/DELETE RETURNING that sets the result might be
+		 * data to eventually be returned.  This is necessary since a
+		 * set-returning SELECT that sets the result might be
 		 * followed by additional rule-inserted commands, and we want to
 		 * finish doing all those commands before we return anything.
 		 */
@@ -1647,13 +1647,10 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 
 	/*
 	 * If it's a plain SELECT, it returns whatever the targetlist says.
-	 * Otherwise, if it's INSERT/UPDATE/DELETE with RETURNING, it returns
-	 * that. Otherwise, the function return type must be VOID.
+	 * Otherwise, the function return type must be VOID.
 	 *
-	 * Note: eventually replace this test with QueryReturnsTuples?	We'd need
-	 * a more general method of determining the output type, though.  Also, it
-	 * seems too dangerous to consider FETCH or EXECUTE as returning a
-	 * determinable rowtype, since they depend on relatively short-lived
+	 * Note: it seems too dangerous to consider FETCH or EXECUTE as returning
+	 * a determinable rowtype, since they depend on relatively short-lived
 	 * entities.
 	 */
 	if (parse &&
@@ -1663,16 +1660,6 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 		/* tlist is modifiable for a normal SELECT */
 		tlist_is_modifiable = true;
 	}
-	else if (parse &&
-			 (parse->commandType == CMD_INSERT ||
-			  parse->commandType == CMD_UPDATE ||
-			  parse->commandType == CMD_DELETE) &&
-			 parse->returningList)
-	{
-		tlist = parse->returningList;
-		/* returningList can always be modified */
-		tlist_is_modifiable = true;
-	}
 	else
 	{
 		/* Empty function body, or last statement is a utility command */
@@ -1680,7 +1667,7 @@ check_sql_fn_retval_ext(List *queryTreeLists,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("return type mismatch in function declared to return %s",
 						format_type_be(rettype)),
-				 errdetail("Function's final statement must be SELECT or INSERT/UPDATE/DELETE RETURNING.")));
+				 errdetail("Function's final statement must be SELECT.")));
 		return false;			/* keep compiler quiet */
 	}
 
@@ -1905,9 +1892,7 @@ tlist_coercion_finished:
 
 	/*
 	 * If necessary, modify the final Query by injecting an extra Query level
-	 * that just performs a projection.  (It'd be dubious to do this to a
-	 * non-SELECT query, but we never have to; RETURNING lists can always be
-	 * modified in-place.)
+	 * that just performs a projection.
 	 */
 	if (upper_tlist_nontrivial)
 	{

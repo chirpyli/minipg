@@ -248,7 +248,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleExpr(jstate, (Node *) query->jointree);
 	JumbleExpr(jstate, (Node *) query->targetList);
 	JumbleExpr(jstate, (Node *) query->onConflict);
-	JumbleExpr(jstate, (Node *) query->returningList);
 	JumbleExpr(jstate, (Node *) query->groupClause);
 	APP_JUMB(query->groupDistinct);
 	JumbleExpr(jstate, (Node *) query->groupingSets);

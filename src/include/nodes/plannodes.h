@@ -47,8 +47,6 @@ typedef struct PlannedStmt
 
 	uint64		queryId;		/* query identifier (copied from Query) */
 
-	bool		hasReturning;	/* is it insert|update|delete RETURNING? */
-
 	bool		hasModifyingCTE;	/* has insert|update|delete in WITH? */
 
 	bool		canSetTag;		/* do I set the command result tag? */
@@ -218,8 +216,6 @@ typedef struct ModifyTable
 	bool		partColsUpdated;	/* some part key in hierarchy updated? */
 	List	   *resultRelations;	/* integer list of RT indexes */
 	List	   *updateColnosLists;	/* per-target-table update_colnos lists */
-	List	   *withCheckOptionLists;	/* per-target-table WCO lists */
-	List	   *returningLists; /* per-target-table RETURNING tlists */
 	List	   *rowMarks;		/* PlanRowMarks (non-locking only) */
 	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
 	OnConflictAction onConflictAction;	/* ON CONFLICT action */

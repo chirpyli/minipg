@@ -925,44 +925,12 @@ UtilityTupleDescriptor(Node *parsetree)
 				VariableShowStmt *n = (VariableShowStmt *) parsetree;
 
 				return GetPGVariableResultDesc(n->name);
-			}
+		}
 
-		default:
-			return NULL;
+	default:
+		return NULL;
 	}
 }
-
-
-/*
- * QueryReturnsTuples
- *		Return "true" if this Query will send output to the destination.
- */
-#ifdef NOT_USED
-bool
-QueryReturnsTuples(Query *parsetree)
-{
-	switch (parsetree->commandType)
-	{
-		case CMD_SELECT:
-			/* returns tuples */
-			return true;
-		case CMD_INSERT:
-		case CMD_UPDATE:
-		case CMD_DELETE:
-			/* the forms with RETURNING return tuples */
-			if (parsetree->returningList)
-				return true;
-			break;
-		case CMD_UTILITY:
-			return UtilityReturnsTuples(parsetree->utilityStmt);
-		case CMD_UNKNOWN:
-		case CMD_NOTHING:
-			/* probably shouldn't get here */
-			break;
-	}
-	return false;				/* default */
-}
-#endif
 
 
 /*

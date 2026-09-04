@@ -172,8 +172,6 @@ extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  ResultRelInfo *partition_root_rri,
 							  int instrument_options);
 extern ResultRelInfo *ExecGetTriggerResultRel(EState *estate, Oid relid);
-extern void ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
-								 TupleTableSlot *slot, EState *estate);
 extern LockTupleMode ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo);
 extern ExecRowMark *ExecFindRowMark(EState *estate, Index rti, bool missing_ok);
 extern ExecAuxRowMark *ExecBuildAuxRowMark(ExecRowMark *erm, List *targetlist);
@@ -557,7 +555,7 @@ extern Datum GetAttributeByNum(HeapTupleHeader tuple, AttrNumber attrno,
 extern int	ExecTargetListLength(List *targetlist);
 extern int	ExecCleanTargetListLength(List *targetlist);
 
-extern TupleTableSlot *ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo);
+extern TupleTableSlot *ExecGetConflictSlot(EState *estate, ResultRelInfo *relInfo);
 
 extern Bitmapset *ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate);
 extern Bitmapset *ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate);

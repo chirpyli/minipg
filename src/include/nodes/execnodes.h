@@ -420,8 +420,8 @@ typedef struct ResultRelInfo
 	/* updates do LockTuple() before oldtup read; see README.tuplock */
 	bool		ri_needLockTagTuple;
 
-	/* On-demand created slot for returning processing */
-	TupleTableSlot *ri_ReturningSlot;	/* for returning tuples */
+	/* On-demand created slot for ON CONFLICT recheck */
+	TupleTableSlot *ri_ConflictSlot;
 
 	/* batch insert stuff */
 	int			ri_NumSlots;	/* number of slots in the array */
@@ -430,20 +430,8 @@ typedef struct ResultRelInfo
 	TupleTableSlot **ri_Slots;	/* input tuples for batch insert */
 	TupleTableSlot **ri_PlanSlots;
 
-	/* list of WithCheckOption's to be checked */
-	List	   *ri_WithCheckOptions;
-
-	/* list of WithCheckOption expr states */
-	List	   *ri_WithCheckOptionExprs;
-
 	/* array of constraint-checking expr states */
 	ExprState **ri_ConstraintExprs;
-
-	/* list of RETURNING expressions */
-	List	   *ri_returningList;
-
-	/* for computing a RETURNING list */
-	ProjectionInfo *ri_projectReturning;
 
 	/* list of arbiter indexes to use to check conflicts */
 	List	   *ri_onConflictArbiterIndexes;

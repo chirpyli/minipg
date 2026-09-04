@@ -139,14 +139,8 @@ select * from onek
     where (unique1,ten) in (values (1,1), (20,0), (99,9), (17,99))
     order by unique1;
 
--- VALUES is also legal as a standalone query or a set-operation member
+-- VALUES is also legal as a standalone query
 VALUES (1,2), (3,4+4), (7,77.7);
-
-VALUES (1,2), (3,4+4), (7,77.7)
-UNION ALL
-SELECT 2+2, 57
-UNION ALL
-TABLE int8_tbl;
 
 -- corner case: VALUES with no columns
 CREATE TABLE nocols();

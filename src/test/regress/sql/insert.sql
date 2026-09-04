@@ -258,7 +258,7 @@ create table lparted_nonullpart_a partition of lparted_nonullpart for values in 
 insert into lparted_nonullpart values (1);
 drop table lparted_nonullpart;
 
--- check that RETURNING works correctly with tuple-routing
+-- check tuple-routing for multi-level partitioned tables
 alter table mlparted drop constraint check_b;
 create table mlparted12 partition of mlparted1 for values from (5) to (10);
 create table mlparted2 (b int, a int);
@@ -431,15 +431,5 @@ insert into mcrparted values ('aaa', 0), ('b', 0), ('bz', 10), ('c', -10),
 select tableoid::regclass, * from mcrparted order by a, b;
 drop table mcrparted;
 
--- check that wholerow vars in the RETURNING list work with partitioned tables
-create table returningwrtest (a int) partition by list (a);
-create table returningwrtest1 partition of returningwrtest for values in (1);
-insert into returningwrtest values (1) returning returningwrtest;
-
--- check also that the wholerow vars in RETURNING list are converted as needed
-alter table returningwrtest add b text;
-create table returningwrtest2 (b text, c int, a int);
-alter table returningwrtest2 drop c;
-alter table returningwrtest attach partition returningwrtest2 for values in (2);
-insert into returningwrtest values (2, 'foo') returning returningwrtest;
-drop table returningwrtest;
+-- minipg: wholerow vars in the RETURNING list with partitioned tables
+-- subtest is dropped because RETURNING is removed.

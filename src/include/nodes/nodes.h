@@ -337,7 +337,6 @@ typedef enum NodeTag
 	T_RangeTblEntry,
 	T_RangeTblFunction,
 	T_TableSampleClause,
-	T_WithCheckOption,
 	T_SortGroupClause,
 	T_GroupingSet,
 	T_ObjectWithArgs,

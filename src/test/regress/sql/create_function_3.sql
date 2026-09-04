@@ -368,9 +368,8 @@ CREATE FUNCTION voidtest3(a int) RETURNS VOID LANGUAGE SQL AS
 $$ INSERT INTO sometable VALUES(a + 1) $$;
 SELECT voidtest3(17);
 
-CREATE FUNCTION voidtest4(a int) RETURNS VOID LANGUAGE SQL AS
-$$ INSERT INTO sometable VALUES(a - 1) RETURNING f1 $$;
-SELECT voidtest4(39);
+-- minipg: voidtest4, whose body was "INSERT INTO sometable VALUES(a - 1)
+-- RETURNING f1", is dropped because RETURNING is removed.
 
 TABLE sometable;
 

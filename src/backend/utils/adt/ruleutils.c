@@ -3655,9 +3655,7 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	 * use OUTER because that could someday conflict with the normal meaning.)
 	 *
 	 * For ON CONFLICT .. UPDATE we just need the inner tlist to point to the
-	 * excluded expression's tlist. (Similar to the SubqueryScan we don't want
-	 * to reuse OUTER, it's used for RETURNING in some modify table cases,
-	 * although not INSERT .. CONFLICT).
+	 * excluded expression's tlist.
 	 */
 	if (IsA(plan, SubqueryScan))
 		dpns->inner_plan = ((SubqueryScan *) plan)->subplan;
@@ -4891,14 +4889,6 @@ get_insert_query_def(Query *query, deparse_context *context,
 	if (query->targetList)
 		appendStringInfoString(buf, ") ");
 
-	if (query->override)
-	{
-		if (query->override == OVERRIDING_SYSTEM_VALUE)
-			appendStringInfoString(buf, "OVERRIDING SYSTEM VALUE ");
-		else if (query->override == OVERRIDING_USER_VALUE)
-			appendStringInfoString(buf, "OVERRIDING USER VALUE ");
-	}
-
 	if (select_rte)
 	{
 		/* Add the SELECT */
@@ -4991,14 +4981,6 @@ get_insert_query_def(Query *query, deparse_context *context,
 			}
 		}
 	}
-
-	/* Add RETURNING if present */
-	if (query->returningList)
-	{
-		appendContextKeyword(context, " RETURNING",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		get_target_list(query->returningList, context, NULL, colNamesVisible);
-	}
 }
 
 
@@ -5044,14 +5026,6 @@ get_update_query_def(Query *query, deparse_context *context,
 		appendContextKeyword(context, " WHERE ",
 							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 		get_rule_expr(query->jointree->quals, context, false);
-	}
-
-	/* Add RETURNING if present */
-	if (query->returningList)
-	{
-		appendContextKeyword(context, " RETURNING",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		get_target_list(query->returningList, context, NULL, colNamesVisible);
 	}
 }
 
@@ -5237,14 +5211,6 @@ get_delete_query_def(Query *query, deparse_context *context,
 		appendContextKeyword(context, " WHERE ",
 							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 		get_rule_expr(query->jointree->quals, context, false);
-	}
-
-	/* Add RETURNING if present */
-	if (query->returningList)
-	{
-		appendContextKeyword(context, " RETURNING",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		get_target_list(query->returningList, context, NULL, colNamesVisible);
 	}
 }
 

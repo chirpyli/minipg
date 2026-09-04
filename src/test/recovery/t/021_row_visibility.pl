@@ -89,7 +89,7 @@ ok( send_query_and_wait(
 		\%psql_primary,
 		q[
 BEGIN;
-UPDATE test_visibility SET data = 'first update' RETURNING data;
+UPDATE test_visibility SET data = 'first update';
 					   ],
 		qr/^UPDATE 1$/m),
 	'UPDATE');

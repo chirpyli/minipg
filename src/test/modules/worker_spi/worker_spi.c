@@ -135,8 +135,10 @@ worker_spi_main(Datum main_arg)
 {
 	int			index = DatumGetInt32(main_arg);
 	worktable  *table;
+	StringInfoData select_buf;
 	StringInfoData delete_buf;
 	StringInfoData update_buf;
+	StringInfoData read_buf;
 	char		name[20];
 
 	table = palloc(sizeof(worktable));
@@ -169,25 +171,36 @@ worker_spi_main(Datum main_arg)
 	table->name = quote_identifier(table->name);
 
 	/*
-	 * minipg 裁剪了 CTE (WITH) 特性，因此原先的数据修改型 CTE 聚合拆分为
-	 * 两条普通语句：先从 delta 行 DELETE ... RETURNING 求和，再把合计值
-	 * 累加到 total 行。两条语句在同一次事务内执行，逻辑与上游 CTE 版本等价。
+	 * minipg 裁剪了 CTE (WITH) 与 RETURNING 特性，因此原先的数据修改型 CTE
+	 * 聚合拆分为四条普通语句：先从 delta 行 SELECT 求和，再 DELETE delta 行，
+	 * 然后把合计值累加到 total 行，最后 SELECT total 行以输出日志。
+	 * 四条语句在同一次事务内执行，逻辑与上游 CTE 版本等价。
 	 */
+	initStringInfo(&select_buf);
+	appendStringInfo(&select_buf,
+					 "SELECT value FROM %s.%s "
+					 "WHERE type = 'delta'",
+					 table->schema, table->name);
+
 	initStringInfo(&delete_buf);
 	appendStringInfo(&delete_buf,
 					 "DELETE FROM %s.%s "
-					 "WHERE type = 'delta' RETURNING value",
+					 "WHERE type = 'delta'",
 					 table->schema, table->name);
 
 	initStringInfo(&update_buf);
 	appendStringInfo(&update_buf,
 					 "UPDATE %s.%s "
 					 "SET value = %s.value + $1 "
-					 "WHERE type = 'total' "
-					 "RETURNING %s.value",
+					 "WHERE type = 'total'",
 					 table->schema, table->name,
-					 table->name,
 					 table->name);
+
+	initStringInfo(&read_buf);
+	appendStringInfo(&read_buf,
+					 "SELECT value FROM %s.%s "
+					 "WHERE type = 'total'",
+					 table->schema, table->name);
 
 	/*
 	 * Main loop: do this until SIGTERM is received and processed by
@@ -248,13 +261,13 @@ worker_spi_main(Datum main_arg)
 		pgstat_report_activity(STATE_RUNNING, "aggregating delta into total");
 
 		/*
-		 * 第一步：删除所有 delta 行并累加其 value。
+		 * 第一步：读取所有 delta 行并累加其 value。
 		 */
-		debug_query_string = delete_buf.data;
-		ret = SPI_execute(delete_buf.data, false, 0);
+		debug_query_string = select_buf.data;
+		ret = SPI_execute(select_buf.data, true, 0);
 
-		if (ret != SPI_OK_DELETE_RETURNING)
-			elog(FATAL, "worker_spi delete failed for %s.%s: error code %d",
+		if (ret != SPI_OK_SELECT)
+			elog(FATAL, "worker_spi select failed for %s.%s: error code %d",
 				 table->schema, table->name, ret);
 
 		if (SPI_processed > 0)
@@ -275,8 +288,17 @@ worker_spi_main(Datum main_arg)
 		}
 
 		/*
-		 * 第二步：把合计值累加到 total 行。即使本次没有 delta，也执行 UPDATE
-		 * 以便通过 RETURNING 读取当前 total，保持与上游相同的日志输出行为。
+		 * 第二步：删除所有 delta 行。
+		 */
+		debug_query_string = delete_buf.data;
+		ret = SPI_execute(delete_buf.data, false, 0);
+
+		if (ret != SPI_OK_DELETE)
+			elog(FATAL, "worker_spi delete failed for %s.%s: error code %d",
+				 table->schema, table->name, ret);
+
+		/*
+		 * 第三步：把合计值累加到 total 行。
 		 */
 		argvalues[0] = Int64GetDatum(sum);
 
@@ -288,8 +310,18 @@ worker_spi_main(Datum main_arg)
 
 		ret = SPI_execute_plan(plan, argvalues, argnulls, false, 0);
 
-		if (ret != SPI_OK_UPDATE_RETURNING)
+		if (ret != SPI_OK_UPDATE)
 			elog(FATAL, "worker_spi update failed for %s.%s: error code %d",
+				 table->schema, table->name, ret);
+
+		/*
+		 * 第四步：读取当前 total 行的值以输出日志。
+		 */
+		debug_query_string = read_buf.data;
+		ret = SPI_execute(read_buf.data, true, 0);
+
+		if (ret != SPI_OK_SELECT)
+			elog(FATAL, "worker_spi read failed for %s.%s: error code %d",
 				 table->schema, table->name, ret);
 
 		if (SPI_processed > 0)

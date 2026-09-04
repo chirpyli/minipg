@@ -103,8 +103,8 @@ SELECT * FROM fewmore;
 -- SRFs are not allowed in UPDATE (they once were, but it was nonsense)
 UPDATE fewmore SET data = generate_series(4,9);
 
--- SRFs are not allowed in RETURNING
-INSERT INTO fewmore VALUES(1) RETURNING generate_series(1,3);
+-- minipg: the "SRFs are not allowed in RETURNING" subtest is dropped because
+-- RETURNING is removed.
 
 -- nor standalone VALUES (but surely this is a bug?)
 VALUES(1, generate_series(1,2));

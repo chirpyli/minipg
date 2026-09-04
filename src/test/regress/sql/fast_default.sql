@@ -332,10 +332,8 @@ SELECT * FROM T WHERE c_bigint > -1 ORDER BY c_bigint, c_text, pk LIMIT 10;
 EXPLAIN (VERBOSE TRUE, COSTS FALSE)
 SELECT * FROM T WHERE c_bigint > -1 ORDER BY c_bigint, c_text, pk LIMIT 10;
 
---  DELETE with RETURNING
-DELETE FROM T WHERE pk BETWEEN 10 AND 20 RETURNING *;
-EXPLAIN (VERBOSE TRUE, COSTS FALSE)
-DELETE FROM T WHERE pk BETWEEN 10 AND 20 RETURNING *;
+-- minipg: the "DELETE with RETURNING" subtest is dropped because RETURNING
+-- is removed.
 
 -- UPDATE
 UPDATE T SET c_text = '"' || c_text || '"'  WHERE pk < 10;

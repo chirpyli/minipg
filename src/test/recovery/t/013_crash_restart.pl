@@ -83,9 +83,9 @@ $killme_stderr = '';
 #insert a row that should *not* survive, due to in-progress xact
 $killme_stdin .= q[
 BEGIN;
-INSERT INTO alive VALUES($$in-progress-before-sigquit$$) RETURNING status;
+INSERT INTO alive VALUES($$in-progress-before-sigquit$$);
 ];
-ok(pump_until($killme, $psql_timeout, \$killme_stdout, qr/in-progress-before-sigquit/m),
+ok(pump_until($killme, $psql_timeout, \$killme_stdout, qr/INSERT 0 1/m),
 	'inserted in-progress-before-sigquit');
 $killme_stdout = '';
 $killme_stderr = '';
@@ -161,11 +161,11 @@ $killme_stderr = '';
 
 # Insert test rows
 $killme_stdin .= q[
-INSERT INTO alive VALUES($$committed-before-sigkill$$) RETURNING status;
+INSERT INTO alive VALUES($$committed-before-sigkill$$);
 BEGIN;
-INSERT INTO alive VALUES($$in-progress-before-sigkill$$) RETURNING status;
+INSERT INTO alive VALUES($$in-progress-before-sigkill$$);
 ];
-ok(pump_until($killme, $psql_timeout, \$killme_stdout, qr/in-progress-before-sigkill/m),
+ok(pump_until($killme, $psql_timeout, \$killme_stdout, qr/INSERT 0 1.*INSERT 0 1/ms),
 	'inserted in-progress-before-sigkill');
 $killme_stdout = '';
 $killme_stderr = '';
@@ -225,9 +225,9 @@ is( $node->safe_psql('postgres', 'SELECT * FROM alive'),
 
 is( $node->safe_psql(
 		'postgres',
-		'INSERT INTO alive VALUES($$before-orderly-restart$$) RETURNING status'
+		'INSERT INTO alive VALUES($$before-orderly-restart$$)'
 	),
-	'before-orderly-restart',
+	'INSERT 0 1',
 	'can still write after crash restart');
 
 # Just to be sure, check that an orderly restart now still works
@@ -239,9 +239,9 @@ is( $node->safe_psql('postgres', 'SELECT * FROM alive'),
 
 is( $node->safe_psql(
 		'postgres',
-		'INSERT INTO alive VALUES($$after-orderly-restart$$) RETURNING status'
+		'INSERT INTO alive VALUES($$after-orderly-restart$$)'
 	),
-	'after-orderly-restart',
+	'INSERT 0 1',
 	'can still write after orderly restart');
 
 $node->stop();

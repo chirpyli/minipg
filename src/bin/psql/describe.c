@@ -1930,41 +1930,6 @@ describeOneTableDetails(const char *schemaname,
 			}
 			PQclear(result);
 		}
-
-		/* print any publications */
-		if (pset.sversion >= 100000)
-		{
-			printfPQExpBuffer(&buf,
-							  "SELECT pubname\n"
-							  "FROM pg_catalog.pg_publication p\n"
-							  "JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid\n"
-							  "WHERE pr.prrelid = '%s'\n"
-							  "UNION ALL\n"
-							  "SELECT pubname\n"
-							  "FROM pg_catalog.pg_publication p\n"
-							  "WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('%s')\n"
-							  "ORDER BY 1;",
-							  oid, oid);
-
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			if (tuples > 0)
-				printTableAddFooter(&cont, _("Publications:"));
-
-			/* Might be an empty set - that's ok */
-			for (i = 0; i < tuples; i++)
-			{
-				printfPQExpBuffer(&buf, "    \"%s\"",
-								  PQgetvalue(result, i, 0));
-
-				printTableAddFooter(&cont, buf.data);
-			}
-			PQclear(result);
-		}
 	}
 
 	/* Get view_def if table is a view or materialized view */

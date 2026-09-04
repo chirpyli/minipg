@@ -17,15 +17,15 @@ INSERT INTO indtoasttest(descr, f1, f2) VALUES('one-toasted,one-null', NULL, rep
 SELECT descr, substring(make_tuple_indirect(indtoasttest)::text, 1, 200) FROM indtoasttest;
 
 -- modification without changing varlenas
-UPDATE indtoasttest SET cnt = cnt +1 RETURNING substring(indtoasttest::text, 1, 200);
+UPDATE indtoasttest SET cnt = cnt +1;
 
 -- modification without modifying assigned value
-UPDATE indtoasttest SET cnt = cnt +1, f1 = f1 RETURNING substring(indtoasttest::text, 1, 200);
+UPDATE indtoasttest SET cnt = cnt +1, f1 = f1;
 
 -- modification modifying, but effectively not changing
-UPDATE indtoasttest SET cnt = cnt +1, f1 = f1||'' RETURNING substring(indtoasttest::text, 1, 200);
+UPDATE indtoasttest SET cnt = cnt +1, f1 = f1||'';
 
-UPDATE indtoasttest SET cnt = cnt +1, f1 = '-'||f1||'-' RETURNING substring(indtoasttest::text, 1, 200);
+UPDATE indtoasttest SET cnt = cnt +1, f1 = '-'||f1||'-';
 
 SELECT substring(indtoasttest::text, 1, 200) FROM indtoasttest;
 -- check we didn't screw with main/toast tuple visibility

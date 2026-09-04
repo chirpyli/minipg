@@ -1482,12 +1482,6 @@ SPI_result_code_string(int code)
 			return "SPI_OK_DELETE";
 		case SPI_OK_UPDATE:
 			return "SPI_OK_UPDATE";
-		case SPI_OK_INSERT_RETURNING:
-			return "SPI_OK_INSERT_RETURNING";
-		case SPI_OK_DELETE_RETURNING:
-			return "SPI_OK_DELETE_RETURNING";
-		case SPI_OK_UPDATE_RETURNING:
-			return "SPI_OK_UPDATE_RETURNING";
 		case SPI_OK_REWRITTEN:
 			return "SPI_OK_REWRITTEN";
 		case SPI_OK_REL_REGISTER:
@@ -1727,12 +1721,6 @@ _SPI_execute_plan(SPIPlanPtr plan, const SPIExecuteOptions *options,
 			{
 				Query	   *query = lfirst_node(Query, qcl);
 
-				if (query->commandType != CMD_UTILITY &&
-					query->returningList != NIL)
-				{
-					returns_tuples = true;
-					break;
-				}
 				if (query->commandType == CMD_SELECT)
 				{
 					returns_tuples = true;
@@ -1949,22 +1937,13 @@ _SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount)
 				res = SPI_OK_SELECT;
 			break;
 		case CMD_INSERT:
-			if (queryDesc->plannedstmt->hasReturning)
-				res = SPI_OK_INSERT_RETURNING;
-			else
-				res = SPI_OK_INSERT;
+			res = SPI_OK_INSERT;
 			break;
 		case CMD_DELETE:
-			if (queryDesc->plannedstmt->hasReturning)
-				res = SPI_OK_DELETE_RETURNING;
-			else
-				res = SPI_OK_DELETE;
+			res = SPI_OK_DELETE;
 			break;
 		case CMD_UPDATE:
-			if (queryDesc->plannedstmt->hasReturning)
-				res = SPI_OK_UPDATE_RETURNING;
-			else
-				res = SPI_OK_UPDATE;
+			res = SPI_OK_UPDATE;
 			break;
 		default:
 			return SPI_ERROR_OPUNKNOWN;
@@ -1984,7 +1963,7 @@ _SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount)
 
 	_SPI_current->processed = queryDesc->estate->es_processed;
 
-	if ((res == SPI_OK_SELECT || queryDesc->plannedstmt->hasReturning) &&
+	if (res == SPI_OK_SELECT &&
 		queryDesc->dest->mydest == DestSPI)
 	{
 		if (_SPI_checktuples())
