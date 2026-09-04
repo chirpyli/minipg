@@ -541,7 +541,6 @@ makeColumnDef(const char *colname, Oid typeOid, int32 typmod)
 	n->typeName = makeTypeNameFromOid(typeOid, typmod);
 	n->inhcount = 0;
 	n->is_local = true;
-	n->is_not_null = false;
 	n->is_from_type = false;
 	n->storage = 0;
 	n->raw_default = NULL;

@@ -136,7 +136,7 @@ static List *on_commits = NIL;
 /* We could support a RENAME COLUMN pass here, but not currently used */
 #define AT_PASS_ADD_COL			4	/* ADD COLUMN */
 #define AT_PASS_ADD_CONSTR		5	/* ADD constraints (initial examination) */
-#define AT_PASS_COL_ATTRS		6	/* set column attributes, eg NOT NULL */
+#define AT_PASS_COL_ATTRS		6	/* set column attributes, eg compression */
 #define AT_PASS_ADD_INDEXCONSTR	7	/* ADD index-based constraints */
 #define AT_PASS_ADD_INDEX		8	/* ADD indexes */
 #define AT_PASS_ADD_OTHERCONSTR	9	/* ADD other constraints, defaults */
@@ -164,7 +164,6 @@ typedef struct AlteredTableInfo
 	/* Information saved by Phases 1/2 for Phase 3: */
 	List	   *newvals;		/* List of NewColumnValue */
 	List	   *afterStmts;		/* List of utility command parsetrees */
-	bool		verify_new_notnull; /* T if we should recheck NOT NULL */
 	int			rewrite;		/* Reason for forced rewrite, if any */
 	Expr	   *partition_constraint;	/* for attach partition validation */
 	/* true, if validating default due to some other attach/detach */
@@ -308,18 +307,6 @@ static bool check_for_column_name_collision(Relation rel, const char *colname,
 											bool if_not_exists);
 static void add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid);
 static void add_column_collation_dependency(Oid relid, int32 attnum, Oid collid);
-static ObjectAddress ATExecDropNotNull(Relation rel, const char *colName, LOCKMODE lockmode);
-static void ATPrepSetNotNull(List **wqueue, Relation rel,
-							 AlterTableCmd *cmd, bool recurse, bool recursing,
-							 LOCKMODE lockmode,
-							 AlterTableUtilityContext *context);
-static ObjectAddress ATExecSetNotNull(AlteredTableInfo *tab, Relation rel,
-									  const char *colName, LOCKMODE lockmode);
-static void ATExecCheckNotNull(AlteredTableInfo *tab, Relation rel,
-							   const char *colName, LOCKMODE lockmode);
-static bool NotNullImpliedByRelConstraints(Relation rel, Form_pg_attribute attr);
-static bool ConstraintImpliedByRelConstraint(Relation scanrel,
-											 List *testConstraint, List *provenConstraint);
 static ObjectAddress ATExecColumnDefault(Relation rel, const char *colName,
 										 Node *newDefault, LOCKMODE lockmode);
 static ObjectAddress ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
@@ -348,17 +335,13 @@ static void ATExecDropConstraint(Relation rel, const char *constrName,
 								 DropBehavior behavior,
 								 bool recurse, bool recursing,
 								 bool missing_ok, LOCKMODE lockmode);
-static void ATPrepAlterColumnType(List **wqueue,
-								  AlteredTableInfo *tab, Relation rel,
-								  bool recurse, bool recursing,
-								  AlterTableCmd *cmd, LOCKMODE lockmode,
-								  AlterTableUtilityContext *context);
+static void ATPrepAlterColumnType(AlteredTableInfo *tab, Relation rel,
+								  AlterTableCmd *cmd);
 static bool ATColumnChangeRequiresRewrite(Node *expr, AttrNumber varattno);
 static ObjectAddress ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 										   AlterTableCmd *cmd, LOCKMODE lockmode);
 static void RememberConstraintForRebuilding(Oid conoid, AlteredTableInfo *tab);
 static void RememberIndexForRebuilding(Oid indoid, AlteredTableInfo *tab);
-static void RememberStatisticsForRebuilding(Oid indoid, AlteredTableInfo *tab);
 static void ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab,
 								   LOCKMODE lockmode);
 static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId,
@@ -370,8 +353,6 @@ static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
 static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
 static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 									char fires_when, LOCKMODE lockmode);
-static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
-								   DependencyType deptype);
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
 										  const char *column, Node *newValue, LOCKMODE lockmode);
 
@@ -461,7 +442,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	/*
 	 * Create a tuple descriptor from the relation schema.  Note that this
-	 * deals with column names, types, and NOT NULL constraints, but not
+	 * deals with column names and types, but not
 	 * default values or CHECK constraints; we handle those below.
 	 */
 	descriptor = BuildDescForRelation(stmt->tableElts);
@@ -1287,7 +1268,7 @@ storage_name(char c)
  *	   If the same attribute name appears multiple times, then it appears
  *	   in the result table in the proper location for its first appearance.
  *
- *	   Constraints (including NOT NULL constraints) for the child table
+ *	   Constraints for the child table
  *	   are the union of all relevant constraints, from both the child schema
  *	   and parent tables.
  *
@@ -1373,7 +1354,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 					/*
 					 * merge the column options into the column from the type
 					 */
-					coldef->is_not_null = restdef->is_not_null;
 					coldef->raw_default = restdef->raw_default;
 					coldef->cooked_default = restdef->cooked_default;
 					coldef->constraints = restdef->constraints;
@@ -1532,8 +1512,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 				}
 
 				def->inhcount++;
-				/* Merge of NOT NULL constraints = OR 'em together */
-				def->is_not_null |= attribute->attnotnull;
 				/* Default and other constraints are handled below */
 				newattmap->attnums[parent_attno - 1] = exist_attno;
 
@@ -1555,7 +1533,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 													attribute->atttypmod);
 				def->inhcount = 1;
 				def->is_local = false;
-				def->is_not_null = attribute->attnotnull;
 				def->is_from_type = false;
 				def->storage = attribute->attstorage;
 				def->raw_default = NULL;
@@ -1766,8 +1743,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 
 				/* Mark the column as locally defined */
 				def->is_local = true;
-				/* Merge of NOT NULL constraints = OR 'em together */
-				def->is_not_null |= newdef->is_not_null;
 
 				/*
 				 * Check for conflicts related to generated columns.
@@ -1843,7 +1818,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	/*
 	 * Now that we have the column definition list for a partition, we can
 	 * check whether the columns referenced in the column constraint specs
-	 * actually exist.  Also, we merge NOT NULL and defaults into each
+	 * actually exist.  Also, we merge defaults into each
 	 * corresponding column definition.
 	 */
 
@@ -2271,7 +2246,6 @@ AlterTableGetLockLevel(List *cmds)
 				 * CloneFkReferenced.
 				 */
 			case AT_DropConstraint: /* as DROP INDEX */
-			case AT_DropNotNull:	/* may change some SQL plans */
 				cmd_lockmode = AccessExclusiveLock;
 				break;
 
@@ -2339,7 +2313,6 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_AlterConstraint:
 			case AT_AddIndex:	/* from ADD CONSTRAINT */
 			case AT_AddIndexConstraint:
-			case AT_SetNotNull:
 			case AT_DropExpression:
 			case AT_SetCompression:
 				cmd_lockmode = AccessExclusiveLock;
@@ -2370,16 +2343,7 @@ AlterTableGetLockLevel(List *cmds)
 			cmd_lockmode = AccessExclusiveLock;
 			break;
 
-			case AT_CheckNotNull:
-
-				/*
-				 * This only examines the table's schema; but lock must be
-				 * strong enough to prevent concurrent DROP NOT NULL.
-				 */
-				cmd_lockmode = AccessShareLock;
-				break;
-
-			default:			/* oops */
+		default:			/* oops */
 				elog(ERROR, "unrecognized alter table type: %d",
 					 (int) cmd->subtype);
 				break;
@@ -2503,24 +2467,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* This command never recurses */
 			pass = AT_PASS_ADD_OTHERCONSTR;
 			break;
-		case AT_DropNotNull:	/* ALTER COLUMN DROP NOT NULL */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
-			pass = AT_PASS_DROP;
-			break;
-		case AT_SetNotNull:		/* ALTER COLUMN SET NOT NULL */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* Need command-specific recursion decision */
-			ATPrepSetNotNull(wqueue, rel, cmd, recurse, recursing,
-							 lockmode, context);
-			pass = AT_PASS_COL_ATTRS;
-			break;
-		case AT_CheckNotNull:	/* check column is already marked NOT NULL */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
-			/* No command-specific prep needed */
-			pass = AT_PASS_COL_ATTRS;
-			break;
 		case AT_DropExpression: /* ALTER COLUMN DROP EXPRESSION */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
@@ -2594,10 +2540,8 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, recurse, lockmode,
 									  AT_PASS_UNSET, context);
 			Assert(cmd != NULL);
-			/* Performs own recursion */
-		ATPrepAlterColumnType(wqueue, tab, rel, recurse, recursing, cmd,
-								lockmode, context);
-		pass = AT_PASS_ALTER_TYPE;
+			ATPrepAlterColumnType(tab, rel, cmd);
+			pass = AT_PASS_ALTER_TYPE;
 		break;
 		case AT_ChangeOwner:	/* ALTER OWNER */
 			/* This command never recurses */
@@ -2752,16 +2696,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
 									  cur_pass, context);
 			Assert(cmd != NULL);
-			ATExecDropNotNull(rel, cmd->name, lockmode);
-			break;
-		case AT_DropNotNull:	/* ALTER COLUMN DROP NOT NULL */
-			ATExecDropNotNull(rel, cmd->name, lockmode);
-			break;
-		case AT_SetNotNull:		/* ALTER COLUMN SET NOT NULL */
-			ATExecSetNotNull(tab, rel, cmd->name, lockmode);
-			break;
-		case AT_CheckNotNull:	/* check column is already marked NOT NULL */
-			ATExecCheckNotNull(tab, rel, cmd->name, lockmode);
 			break;
 		case AT_DropExpression:
 			ATExecDropExpression(rel, cmd->name, cmd->missing_ok, lockmode);
@@ -2958,13 +2892,6 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		 */
 		switch (cmd2->subtype)
 		{
-			case AT_SetNotNull:
-				/* Need command-specific recursion decision */
-				ATPrepSetNotNull(wqueue, rel, cmd2,
-								 recurse, false,
-								 lockmode, context);
-				pass = AT_PASS_COL_ATTRS;
-				break;
 			case AT_AddIndex:
 				/* This command never recurses */
 				/* No command-specific prep needed */
@@ -3176,8 +3103,6 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 * constraints generated by ALTER TABLE commands, but don't
 			 * rebuild data.
 			 */
-			if (tab->verify_new_notnull)
-				ATRewriteTable(tab, InvalidOid, lockmode);
 		}
 	}
 
@@ -3230,7 +3155,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 	TupleDesc	oldTupDesc;
 	TupleDesc	newTupDesc;
 	bool		needscan = false;
-	List	   *notnull_attrs;
 	int			i;
 	ListCell   *l;
 	EState	   *estate;
@@ -3289,26 +3213,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 
 		/* expr already planned */
 		ex->exprstate = ExecInitExpr((Expr *) ex->expr, NULL);
-	}
-
-	notnull_attrs = NIL;
-	if (newrel || tab->verify_new_notnull)
-	{
-		/*
-		 * If we are rebuilding the tuples OR if we added any new but not
-		 * verified NOT NULL constraints, check all not-null constraints. This
-		 * is a bit of overkill but it minimizes risk of bugs, and
-		 * heap_attisnull is a pretty cheap test anyway.
-		 */
-		for (i = 0; i < newTupDesc->natts; i++)
-		{
-			Form_pg_attribute attr = TupleDescAttr(newTupDesc, i);
-
-			if (attr->attnotnull && !attr->attisdropped)
-				notnull_attrs = lappend_int(notnull_attrs, i);
-		}
-		if (notnull_attrs)
-			needscan = true;
 	}
 
 	if (newrel || needscan)
@@ -3485,23 +3389,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 
 			/* Now check any constraints on the possibly-changed tuple */
 			econtext->ecxt_scantuple = insertslot;
-
-			foreach(l, notnull_attrs)
-			{
-				int			attn = lfirst_int(l);
-
-				if (slot_attisnull(insertslot, attn + 1))
-				{
-					Form_pg_attribute attr = TupleDescAttr(newTupDesc, attn);
-
-					ereport(ERROR,
-							(errcode(ERRCODE_NOT_NULL_VIOLATION),
-							 errmsg("column \"%s\" of relation \"%s\" contains null values",
-									NameStr(attr->attname),
-									RelationGetRelationName(oldrel)),
-							 errtablecol(oldrel, attn + 1)));
-				}
-			}
 
 			if (partqualstate && !ExecCheck(partqualstate, econtext))
 			{
@@ -3887,52 +3774,11 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 	relation_close(depRel, AccessShareLock);
 }
 
-
-/*
-
-
-/*
- * check_of_type
- *
- * Check whether a type is suitable for CREATE TABLE OF/ALTER TABLE OF.  If it
- * isn't suitable, throw an error.  Currently, we require that the type
- * originated with CREATE TYPE AS.  We could support any row type, but doing so
- * would require handling a number of extra corner cases in the DDL commands.
- */
-void
-check_of_type(HeapTuple typetuple)
-{
-	Form_pg_type typ = (Form_pg_type) GETSTRUCT(typetuple);
-	bool		typeOk = false;
-
-	if (typ->typtype == TYPTYPE_COMPOSITE)
-	{
-		Relation	typeRelation;
-
-		Assert(OidIsValid(typ->typrelid));
-		typeRelation = relation_open(typ->typrelid, AccessShareLock);
-		typeOk = (typeRelation->rd_rel->relkind == RELKIND_COMPOSITE_TYPE);
-
-		/*
-		 * Close the parent rel, but keep our AccessShareLock on it until xact
-		 * commit.  That will prevent someone else from deleting or ALTERing
-		 * the type before the typed table creation/conversion commits.
-		 */
-		relation_close(typeRelation, NoLock);
-	}
-	if (!typeOk)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("type %s is not a composite type",
-						format_type_be(typ->oid))));
-}
-
-
 /*
  * ALTER TABLE ADD COLUMN
  *
  * Adds an additional attribute to a relation making the assumption that
- * CHECK, NOT NULL, and FOREIGN KEY constraints will be removed from the
+ * constraints will be removed from the
  * AT_AddColumn AlterTableCmd by parse_utilcmd.c and added as independent
  * AlterTableCmd's.
  *
@@ -3980,9 +3826,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	Oid			collOid;
 	Form_pg_type tform;
 	Expr	   *defval;
-	List	   *children;
-	ListCell   *child;
-	AlterTableCmd *childcmd;
 	ObjectAddress address;
 	TupleDesc	tupdesc;
 	FormData_pg_attribute *aattr[] = {&attribute};
@@ -4066,17 +3909,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		colDef = castNode(ColumnDef, (*cmd)->def);
 	}
 
-	/*
-	 * Cannot add identity column if table has children, because identity does
-	 * not inherit.  (Adding column and identity separately will work.)
-	 */
-	if (colDef->identity &&
-		recurse &&
-		find_inheritance_children(myrelid, NoLock) != NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("cannot recursively add identity column to table that has child tables")));
-
 	pgclass = table_open(RelationRelationId, RowExclusiveLock);
 
 	reltup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(myrelid));
@@ -4117,7 +3949,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	attribute.attstorage = tform->typstorage;
 	attribute.attcompression = GetAttributeCompression(typeOid,
 													   colDef->compression);
-	attribute.attnotnull = colDef->is_not_null;
 	attribute.atthasdef = false;
 	attribute.atthasmissing = false;
 
@@ -4198,8 +4029,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 */
 	if (RELKIND_HAS_STORAGE(relkind) && attribute.attnum > 0)
 	{
-		bool		has_missing = false;
-
 		defval = (Expr *) build_column_default(rel, attribute.attnum);
 
 		if (defval)
@@ -4244,7 +4073,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 					StoreAttrMissingVal(rel, attribute.attnum, missingval);
 					/* Make the additional catalog change visible */
 					CommandCounterIncrement();
-					has_missing = true;
 				}
 				FreeExecutorState(estate);
 			}
@@ -4257,15 +4085,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 				tab->rewrite |= AT_REWRITE_DEFAULT_VAL;
 			}
 		}
-
-		if (!has_missing)
-		{
-			/*
-			 * If the new column is NOT NULL, and there is no missing value,
-			 * tell Phase 3 it needs to check for NULLs.
-			 */
-			tab->verify_new_notnull |= colDef->is_not_null;
-		}
 	}
 
 	/*
@@ -4273,55 +4092,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 */
 	add_column_datatype_dependency(myrelid, newattnum, attribute.atttypid);
 	add_column_collation_dependency(myrelid, newattnum, DEFAULT_COLLATION_OID);
-
-	/*
-	 * Propagate to children as appropriate.  Unlike most other ALTER
-	 * routines, we have to do this one level of recursion at a time; we can't
-	 * use find_all_inheritors to do it in one pass.
-	 */
-	children =
-		find_inheritance_children(RelationGetRelid(rel), lockmode);
-
-	/*
-	 * If we are told not to recurse, there had better not be any child
-	 * tables; else the addition would put them out of step.
-	 */
-	if (children && !recurse)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("column must be added to child tables too")));
-
-	/* Children should see column as singly inherited */
-	if (!recursing)
-	{
-		childcmd = copyObject(*cmd);
-		colDef = castNode(ColumnDef, childcmd->def);
-		colDef->inhcount = 1;
-		colDef->is_local = false;
-	}
-	else
-		childcmd = *cmd;		/* no need to copy again */
-
-	foreach(child, children)
-	{
-		Oid			childrelid = lfirst_oid(child);
-		Relation	childrel;
-		AlteredTableInfo *childtab;
-
-		/* find_inheritance_children already got lock */
-		childrel = table_open(childrelid, NoLock);
-		CheckAlterTableIsSafe(childrel);
-
-		/* Find or create work queue entry for this table */
-		childtab = ATGetQueueEntry(wqueue, childrel);
-
-		/* Recurse to child; return value is ignored */
-		ATExecAddColumn(wqueue, childtab, childrel,
-						&childcmd, recurse, true,
-						lockmode, cur_pass, context);
-
-		table_close(childrel, NoLock);
-	}
 
 	ObjectAddressSubSet(address, RelationRelationId, myrelid, newattnum);
 	return address;
@@ -4422,299 +4192,6 @@ add_column_collation_dependency(Oid relid, int32 attnum, Oid collid)
 }
 
 /*
- * ALTER TABLE ALTER COLUMN DROP NOT NULL
- */
-
-/*
- * Return the address of the modified column.  If the column was already
- * nullable, InvalidObjectAddress is returned.
- */
-static ObjectAddress
-ATExecDropNotNull(Relation rel, const char *colName, LOCKMODE lockmode)
-{
-	HeapTuple	tuple;
-	Form_pg_attribute attTup;
-	AttrNumber	attnum;
-	Relation	attr_rel;
-	List	   *indexoidlist;
-	ListCell   *indexoidscan;
-	ObjectAddress address;
-
-	/*
-	 * lookup the attribute
-	 */
-	attr_rel = table_open(AttributeRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = attTup->attnum;
-
-	/* Prevent them from altering a system attribute */
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	/*
-	 * Check that the attribute is not in a primary key or in an index used as
-	 * a replica identity.
-	 *
-	 * Note: we'll throw error even if the pkey index is not valid.
-	 */
-
-	/* Loop over all indexes on the relation */
-	indexoidlist = RelationGetIndexList(rel);
-
-	foreach(indexoidscan, indexoidlist)
-	{
-		Oid			indexoid = lfirst_oid(indexoidscan);
-		HeapTuple	indexTuple;
-		Form_pg_index indexStruct;
-		int			i;
-
-		indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexoid));
-		if (!HeapTupleIsValid(indexTuple))
-			elog(ERROR, "cache lookup failed for index %u", indexoid);
-		indexStruct = (Form_pg_index) GETSTRUCT(indexTuple);
-
-		/*
-		 * If the index is not a primary key, skip the check.
-		 */
-		if (indexStruct->indisprimary)
-		{
-			/*
-			 * Loop over each attribute in the primary key or the index used
-			 * as replica identity and see if it matches the to-be-altered
-			 * attribute.
-			 */
-			for (i = 0; i < indexStruct->indnkeyatts; i++)
-			{
-				if (indexStruct->indkey.values[i] == attnum)
-				{
-					if (indexStruct->indisprimary)
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-								 errmsg("column \"%s\" is in a primary key",
-										colName)));
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-								 errmsg("column \"%s\" is in index used as replica identity",
-										colName)));
-				}
-			}
-		}
-
-		ReleaseSysCache(indexTuple);
-	}
-
-	list_free(indexoidlist);
-
-	/*
-	 * Okay, actually perform the catalog change ... if needed
-	 */
-	if (attTup->attnotnull)
-	{
-		attTup->attnotnull = false;
-
-		CatalogTupleUpdate(attr_rel, &tuple->t_self, tuple);
-
-		ObjectAddressSubSet(address, RelationRelationId,
-							RelationGetRelid(rel), attnum);
-	}
-	else
-		address = InvalidObjectAddress;
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel), attnum);
-
-	table_close(attr_rel, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * ALTER TABLE ALTER COLUMN SET NOT NULL
- */
-
-static void
-ATPrepSetNotNull(List **wqueue, Relation rel,
-				 AlterTableCmd *cmd, bool recurse, bool recursing,
-				 LOCKMODE lockmode, AlterTableUtilityContext *context)
-{
-	/*
-	 * If we're already recursing, there's nothing to do; the topmost
-	 * invocation of ATSimpleRecursion already visited all children.
-	 */
-	if (recursing)
-		return;
-
-	/*
-	 * If the target column is already marked NOT NULL, we can skip recursing
-	 * to children, because their columns should already be marked NOT NULL as
-	 * well.  But there's no point in checking here unless the relation has
-	 * some children; else we can just wait till execution to check.  (If it
-	 * does have children, however, this can save taking per-child locks
-	 * unnecessarily.  This greatly improves concurrency in some parallel
-	 * restore scenarios.)
-	 */
-	ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
-}
-
-/*
- * Return the address of the modified column.  If the column was already NOT
- * NULL, InvalidObjectAddress is returned.
- */
-static ObjectAddress
-ATExecSetNotNull(AlteredTableInfo *tab, Relation rel,
-				 const char *colName, LOCKMODE lockmode)
-{
-	HeapTuple	tuple;
-	AttrNumber	attnum;
-	Relation	attr_rel;
-	ObjectAddress address;
-
-	/*
-	 * lookup the attribute
-	 */
-	attr_rel = table_open(AttributeRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	attnum = ((Form_pg_attribute) GETSTRUCT(tuple))->attnum;
-
-	/* Prevent them from altering a system attribute */
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	/*
-	 * Okay, actually perform the catalog change ... if needed
-	 */
-	if (!((Form_pg_attribute) GETSTRUCT(tuple))->attnotnull)
-	{
-		((Form_pg_attribute) GETSTRUCT(tuple))->attnotnull = true;
-
-		CatalogTupleUpdate(attr_rel, &tuple->t_self, tuple);
-
-		/*
-		 * Ordinarily phase 3 must ensure that no NULLs exist in columns that
-		 * are set NOT NULL; however, if we can find a constraint which proves
-		 * this then we can skip that.  We needn't bother looking if we've
-		 * already found that we must verify some other NOT NULL constraint.
-		 */
-		if (!tab->verify_new_notnull &&
-			!NotNullImpliedByRelConstraints(rel, (Form_pg_attribute) GETSTRUCT(tuple)))
-		{
-			/* Tell Phase 3 it needs to test the constraint */
-			tab->verify_new_notnull = true;
-		}
-
-		ObjectAddressSubSet(address, RelationRelationId,
-							RelationGetRelid(rel), attnum);
-	}
-	else
-		address = InvalidObjectAddress;
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel), attnum);
-
-	table_close(attr_rel, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * ALTER TABLE ALTER COLUMN CHECK NOT NULL
- *
- * This doesn't exist in the grammar, but we generate AT_CheckNotNull
- * commands against the partitions of a partitioned table if the user
- * writes ALTER TABLE ONLY ... SET NOT NULL on the partitioned table,
- * or tries to create a primary key on it (which internally creates
- * AT_SetNotNull on the partitioned table).   Such a command doesn't
- * allow us to actually modify any partition, but we want to let it
- * go through if the partitions are already properly marked.
- *
- * In future, this might need to adjust the child table's state, likely
- * by incrementing an inheritance count for the attnotnull constraint.
- * For now we need only check for the presence of the flag.
- */
-static void
-ATExecCheckNotNull(AlteredTableInfo *tab, Relation rel,
-				   const char *colName, LOCKMODE lockmode)
-{
-	HeapTuple	tuple;
-
-	tuple = SearchSysCacheAttName(RelationGetRelid(rel), colName);
-
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	if (!((Form_pg_attribute) GETSTRUCT(tuple))->attnotnull)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("constraint must be added to child tables too"),
-				 errdetail("Column \"%s\" of relation \"%s\" is not already NOT NULL.",
-						   colName, RelationGetRelationName(rel)),
-				 errhint("Do not specify the ONLY keyword.")));
-
-	ReleaseSysCache(tuple);
-}
-
-/*
- * NotNullImpliedByRelConstraints
- *		Does rel's existing constraints imply NOT NULL for the given attribute?
- */
-static bool
-NotNullImpliedByRelConstraints(Relation rel, Form_pg_attribute attr)
-{
-	NullTest   *nnulltest = makeNode(NullTest);
-
-	nnulltest->arg = (Expr *) makeVar(1,
-									attr->attnum,
-									attr->atttypid,
-									attr->atttypmod,
-									get_typcollation(attr->atttypid),
-									0);
-	nnulltest->nulltesttype = IS_NOT_NULL;
-
-	/*
-	 * argisrow = false is correct even for a composite column, because
-	 * attnotnull does not represent a SQL-spec IS NOT NULL test in such a
-	 * case, just IS DISTINCT FROM NULL.
-	 */
-	nnulltest->argisrow = false;
-	nnulltest->location = -1;
-
-	if (ConstraintImpliedByRelConstraint(rel, list_make1(nnulltest), NIL))
-	{
-		ereport(DEBUG1,
-				(errmsg_internal("existing constraints on column \"%s.%s\" are sufficient to prove that it does not contain nulls",
-								 RelationGetRelationName(rel), NameStr(attr->attname))));
-		return true;
-	}
-
-	return false;
-}
-
-/*
  * ALTER TABLE ALTER COLUMN SET/DROP DEFAULT
  *
  * Return the address of the affected column.
@@ -4723,7 +4200,6 @@ static ObjectAddress
 ATExecColumnDefault(Relation rel, const char *colName,
 					Node *newDefault, LOCKMODE lockmode)
 {
-	TupleDesc	tupdesc = RelationGetDescr(rel);
 	AttrNumber	attnum;
 	ObjectAddress address;
 
@@ -4810,49 +4286,24 @@ ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
 }
 
 /*
- * ALTER TABLE ALTER COLUMN ADD IDENTITY
- *
- * Return the address of the affected column.
- */
-/*
  * ALTER TABLE ALTER COLUMN DROP EXPRESSION
  */
 static void
 ATPrepDropExpression(Relation rel, AlterTableCmd *cmd, bool recurse, bool recursing, LOCKMODE lockmode)
 {
-	/*
-	 * Reject ONLY if there are child tables.  We could implement this, but it
-	 * is a bit complicated.  GENERATED clauses must be attached to the column
-	 * definition and cannot be added later like DEFAULT, so if a child table
-	 * has a generation expression that the parent does not have, the child
-	 * column will necessarily be an attlocal column.  So to implement ONLY
-	 * here, we'd need extra code to update attislocal of the direct child
-	 * tables, somewhat similar to how DROP COLUMN does it, so that the
-	 * resulting state can be properly dumped and restored.
-	 */
-	if (!recurse &&
-		find_inheritance_children(RelationGetRelid(rel), lockmode))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("ALTER TABLE / DROP EXPRESSION must be applied to child tables too")));
-
-	/*
-	 * Cannot drop generation expression from inherited columns.
-	 */
+	/* Verify the column exists before doing any work on it */
 	if (!recursing)
 	{
 		HeapTuple	tuple;
-		Form_pg_attribute attTup;
 
-		tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), cmd->name);
+		tuple = SearchSysCacheAttName(RelationGetRelid(rel), cmd->name);
 		if (!HeapTupleIsValid(tuple))
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" of relation \"%s\" does not exist",
 							cmd->name, RelationGetRelationName(rel))));
 
-		attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-
+		ReleaseSysCache(tuple);
 	}
 }
 
@@ -5074,9 +4525,7 @@ ATExecSetOptions(Relation rel, const char *colName, Node *options,
 				newtuple;
 	Form_pg_attribute attrtuple;
 	AttrNumber	attnum;
-	Datum		datum,
-				newOptions;
-	bool		isnull;
+	Datum		newOptions;
 	ObjectAddress address;
 	Datum		repl_val[Natts_pg_attribute];
 	bool		repl_null[Natts_pg_attribute];
@@ -5326,7 +4775,6 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 	HeapTuple	tuple;
 	Form_pg_attribute targetatt;
 	AttrNumber	attnum;
-	List	   *children;
 	ObjectAddress object;
 
 	/* At top level, permission check was done in ATPrepCmd, else do it */
@@ -5554,15 +5002,12 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 					 bool recurse, bool recursing,
 					 bool missing_ok, LOCKMODE lockmode)
 {
-	List	   *children;
-	ListCell   *child;
 	Relation	conrel;
 	Form_pg_constraint con;
 	SysScanDesc scan;
 	ScanKeyData skey[2];
 	HeapTuple	tuple;
 	bool		found = false;
-	bool		is_no_inherit_constraint = false;
 
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();
@@ -5627,76 +5072,6 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 		}
 	}
 
-	/*
-	 * Propagate to children as appropriate.  Unlike most other ALTER
-	 * routines, we have to do this one level of recursion at a time; we can't
-	 * use find_all_inheritors to do it in one pass.
-	 */
-	if (!is_no_inherit_constraint)
-		children = find_inheritance_children(RelationGetRelid(rel), lockmode);
-	else
-		children = NIL;
-
-	/*
-	 * If partitions exist, recurse to enforce the constraint on each child.
-	 */
-	foreach(child, children)
-	{
-		Oid			childrelid = lfirst_oid(child);
-		Relation	childrel;
-		HeapTuple	copy_tuple;
-
-		/* find_inheritance_children already got lock */
-		childrel = table_open(childrelid, NoLock);
-		CheckAlterTableIsSafe(childrel);
-
-		ScanKeyInit(&skey[0],
-					Anum_pg_constraint_conrelid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(childrelid));
-		ScanKeyInit(&skey[1],
-					Anum_pg_constraint_conname,
-					BTEqualStrategyNumber, F_NAMEEQ,
-					CStringGetDatum(constrName));
-		scan = systable_beginscan(conrel, ConstraintRelidNameIndexId,
-								  true, NULL, 2, skey);
-
-		/* There can be at most one matching row */
-		if (!HeapTupleIsValid(tuple = systable_getnext(scan)))
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("constraint \"%s\" of relation \"%s\" does not exist",
-							constrName,
-							RelationGetRelationName(childrel))));
-
-		copy_tuple = heap_copytuple(tuple);
-
-		systable_endscan(scan);
-
-		if (recurse)
-		{
-			/* Time to delete this child constraint, too */
-			ATExecDropConstraint(childrel, constrName, behavior,
-								 true, true,
-								 false, lockmode);
-		}
-		else
-		{
-			/*
-			 * If we were told to drop ONLY in this table (no recursion), the
-			 * child constraint remains; make the update visible.
-			 */
-			CatalogTupleUpdate(conrel, &copy_tuple->t_self, copy_tuple);
-
-			/* Make update visible */
-			CommandCounterIncrement();
-		}
-
-		heap_freetuple(copy_tuple);
-
-		table_close(childrel, NoLock);
-	}
-
 	table_close(conrel, RowExclusiveLock);
 }
 
@@ -5718,11 +5093,8 @@ ATExecDropConstraint(Relation rel, const char *constrName,
  * against the unmodified table's state.
  */
 static void
-ATPrepAlterColumnType(List **wqueue,
-					  AlteredTableInfo *tab, Relation rel,
-					  bool recurse, bool recursing,
-					  AlterTableCmd *cmd, LOCKMODE lockmode,
-					  AlterTableUtilityContext *context)
+ATPrepAlterColumnType(AlteredTableInfo *tab, Relation rel,
+					  AlterTableCmd *cmd)
 {
 	char	   *colName = cmd->name;
 	ColumnDef  *def = (ColumnDef *) cmd->def;
@@ -5737,7 +5109,7 @@ ATPrepAlterColumnType(List **wqueue,
 	NewColumnValue *newval;
 	ParseState *pstate = make_parsestate(NULL);
 
-	/* lookup the attribute so we can check inheritance status */
+	/* lookup the attribute */
 	tuple = SearchSysCacheAttName(RelationGetRelid(rel), colName);
 	if (!HeapTupleIsValid(tuple))
 		ereport(ERROR,
@@ -5848,98 +5220,6 @@ ATPrepAlterColumnType(List **wqueue,
 	}
 
 	ReleaseSysCache(tuple);
-
-	/*
-	 * Recurse manually by queueing a new command for each child, if
-	 * necessary. We cannot apply ATSimpleRecursion here because we need to
-	 * remap attribute numbers in the USING expression, if any.
-	 *
-	 * If we are told not to recurse, there had better not be any child
-	 * tables; else the alter would put them out of step.
-	 */
-	if (recurse)
-	{
-		Oid			relid = RelationGetRelid(rel);
-		List	   *child_oids,
-				   *child_numparents;
-		ListCell   *lo,
-				   *li;
-
-		child_oids = find_all_inheritors(relid, lockmode,
-										 &child_numparents);
-
-		/*
-		 * find_all_inheritors does the recursive search of the inheritance
-		 * hierarchy, so all we have to do is process all of the relids in the
-		 * list that it returns.
-		 */
-		forboth(lo, child_oids, li, child_numparents)
-		{
-			Oid			childrelid = lfirst_oid(lo);
-			int			numparents = lfirst_int(li);
-			Relation	childrel;
-			HeapTuple	childtuple;
-			Form_pg_attribute childattTup;
-
-			if (childrelid == relid)
-				continue;
-
-			/* find_all_inheritors already got lock */
-			childrel = relation_open(childrelid, NoLock);
-			CheckAlterTableIsSafe(childrel);
-
-			/*
-			 * Verify that the child doesn't have any inherited definitions of
-			 * this column that came from outside this inheritance hierarchy.
-			 * (renameatt makes a similar test, though in a different way
-			 * because of its different recursion mechanism.)
-			 */
-			childtuple = SearchSysCacheAttName(RelationGetRelid(childrel),
-											   colName);
-			if (!HeapTupleIsValid(childtuple))
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_COLUMN),
-						 errmsg("column \"%s\" of relation \"%s\" does not exist",
-								colName, RelationGetRelationName(childrel))));
-			ReleaseSysCache(childtuple);
-
-			/*
-			 * Remap the attribute numbers.  If no USING expression was
-			 * specified, there is no need for this step.
-			 */
-			if (def->cooked_default)
-			{
-				AttrMap    *attmap;
-				bool		found_whole_row;
-
-				/* create a copy to scribble on */
-				cmd = copyObject(cmd);
-
-				attmap = build_attrmap_by_name(RelationGetDescr(childrel),
-											   RelationGetDescr(rel));
-				((ColumnDef *) cmd->def)->cooked_default =
-					map_variable_attnos(def->cooked_default,
-										1, 0,
-										attmap,
-										InvalidOid, &found_whole_row);
-				if (found_whole_row)
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot convert whole-row table reference"),
-							 errdetail("USING expression contains a whole-row table reference.")));
-				pfree(attmap);
-			}
-			ATPrepCmd(wqueue, childrel, cmd, false, true, lockmode, context);
-			relation_close(childrel, NoLock);
-		}
-	}
-	else if (!recursing &&
-			 find_inheritance_children(RelationGetRelid(rel), NoLock) != NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("type of inherited column \"%s\" must be changed in child tables too",
-						colName)));
-
 }
 
 /*
@@ -6752,16 +6032,6 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, char *cmd,
 					tab->subcmds[AT_PASS_OLD_INDEX] =
 						lappend(tab->subcmds[AT_PASS_OLD_INDEX], cmd);
 				}
-				else if (cmd->subtype == AT_SetNotNull)
-				{
-					/*
-					 * The parser will create AT_SetNotNull subcommands for
-					 * columns of PRIMARY KEY indexes/constraints, but we need
-					 * not do anything with them here, because the columns'
-					 * NOT NULL marks will already have been propagated into
-					 * the new table definition.
-					 */
-				}
 				else
 					elog(ERROR, "unexpected statement subtype: %d",
 						 (int) cmd->subtype);
@@ -6854,63 +6124,6 @@ ATExecEnableDisableRule(Relation rel, const char *rulename,
 {
 	EnableDisableRule(rel, rulename, fires_when);
 }
-
-
-
-/*
- * Drop the dependency created by StoreCatalogInheritance1 (CREATE TABLE
- * INHERITS/ALTER TABLE INHERIT -- refclassid will be RelationRelationId) or
- * heap_create_with_catalog (CREATE TABLE OF/ALTER TABLE OF -- refclassid will
- * be TypeRelationId).  There's no convenient way to do this, so go trawling
- * through pg_depend.
- */
-static void
-drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
-					   DependencyType deptype)
-{
-	Relation	catalogRelation;
-	SysScanDesc scan;
-	ScanKeyData key[3];
-	HeapTuple	depTuple;
-
-	catalogRelation = table_open(DependRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_classid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_objid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-	ScanKeyInit(&key[2],
-				Anum_pg_depend_objsubid,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(0));
-
-	scan = systable_beginscan(catalogRelation, DependDependerIndexId, true,
-							  NULL, 3, key);
-
-	while (HeapTupleIsValid(depTuple = systable_getnext(scan)))
-	{
-		Form_pg_depend dep = (Form_pg_depend) GETSTRUCT(depTuple);
-
-		if (dep->refclassid == refclassid &&
-			dep->refobjid == refobjid &&
-			dep->refobjsubid == 0 &&
-			dep->deptype == deptype)
-			CatalogTupleDelete(catalogRelation, &depTuple->t_self);
-	}
-
-	systable_endscan(scan);
-	table_close(catalogRelation, RowExclusiveLock);
-}
-
-/*
- * ALTER TABLE OF
-
-
-
 
 /*
  * ALTER TABLE ALTER COLUMN SET COMPRESSION
@@ -7610,32 +6823,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	ReleaseSysCache(tuple);
 }
 
-/*
- * ConstraintImpliedByRelConstraint
- *		Do scanrel's existing constraints imply the given constraint?
- *
- * testConstraint is the constraint to validate. provenConstraint is a
- * caller-provided list of conditions which this function may assume
- * to be true. Both provenConstraint and testConstraint must be in
- * implicit-AND form, must only contain immutable clauses, and must
- * contain only Vars with varno = 1.
- */
-bool
-ConstraintImpliedByRelConstraint(Relation scanrel, List *testConstraint, List *provenConstraint)
-{
-	List	   *existConstraint = list_copy(provenConstraint);
-
-	/*
-	 * Try to make the proof.  Since we are comparing NOT NULL constraints, we
-	 * need to use weak implication, i.e., we assume existConstraint is
-	 * not-false and try to prove the same for testConstraint.
-	 *
-	 * Note that predicate_implied_by assumes its first argument is known
-	 * immutable.  That should always be true for NOT NULL constraints, so we
-	 * don't test it here.
-	 */
-	return predicate_implied_by(testConstraint, existConstraint, true);
-}
 
 /*
  * resolve column compression specification to compression method.
@@ -7675,47 +6862,6 @@ GetAttributeCompression(Oid atttypid, char *compression)
 	return cmethod;
 }
 
-
-/*
- * =====================================================================
- * Inheritance catalog query functions (stubs)
- *
- * The pg_inherits system catalog has been removed from minipg, so the
- * functions below no longer query any catalog.  They behave as if no
- * inheritance relationships exist, which keeps the remaining call sites in
- * TRUNCATE / ALTER TABLE recursion / analyze compiling and running
- * correctly now that inheritance is unsupported.
- * =====================================================================
- */
-
-/*
- * find_inheritance_children
- *
- * With no pg_inherits catalog, a relation can have no children.
- */
-List *
-find_inheritance_children(Oid parentrelId, LOCKMODE lockmode)
-{
-	return find_inheritance_children_extended(parentrelId, true,
-											  lockmode, NULL, NULL);
-}
-
-/*
- * find_inheritance_children_extended
- *
- * Always returns NIL, since inheritance is gone.
- */
-List *
-find_inheritance_children_extended(Oid parentrelId, bool omit_detached,
-								   LOCKMODE lockmode, bool *detached_exist,
-								   TransactionId *detached_xmin)
-{
-	if (detached_exist)
-		*detached_exist = false;
-	if (detached_xmin)
-		*detached_xmin = InvalidTransactionId;
-	return NIL;
-}
 
 /*
  * find_all_inheritors

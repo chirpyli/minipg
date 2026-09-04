@@ -1,10 +1,8 @@
 --
 -- insert with DEFAULT in the target_list
 --
-create table inserttest (col1 int4, col2 int4 NOT NULL, col3 text default 'testing');
+create table inserttest (col1 int4, col2 int4, col3 text default 'testing');
 insert into inserttest (col1, col2, col3) values (DEFAULT, DEFAULT, DEFAULT);
-ERROR:  null value in column "col2" of relation "inserttest" violates not-null constraint
-DETAIL:  Failing row contains (null, null, testing).
 insert into inserttest (col2, col3) values (3, DEFAULT);
 insert into inserttest (col1, col2, col3) values (DEFAULT, 5, DEFAULT);
 insert into inserttest values (DEFAULT, 5, 'test');
@@ -12,11 +10,12 @@ insert into inserttest values (DEFAULT, 7);
 select * from inserttest;
  col1 | col2 |  col3   
 ------+------+---------
+      |      | testing
       |    3 | testing
       |    5 | testing
       |    5 | test
       |    7 | testing
-(4 rows)
+(5 rows)
 
 --
 -- insert with similar expression / target_list values (all fail)
@@ -40,11 +39,12 @@ LINE 1: insert into inserttest (col1) values (DEFAULT, DEFAULT);
 select * from inserttest;
  col1 | col2 |  col3   
 ------+------+---------
+      |      | testing
       |    3 | testing
       |    5 | testing
       |    5 | test
       |    7 | testing
-(4 rows)
+(5 rows)
 
 --
 -- VALUES test
@@ -54,6 +54,7 @@ insert into inserttest values(10, 20, '40'), (-1, 2, DEFAULT),
 select * from inserttest;
  col1 | col2 |      col3       
 ------+------+-----------------
+      |      | testing
       |    3 | testing
       |    5 | testing
       |    5 | test
@@ -61,7 +62,7 @@ select * from inserttest;
    10 |   20 | 40
    -1 |    2 | testing
     2 |    3 | values are fun!
-(7 rows)
+(8 rows)
 
 --
 -- TOASTed value test
@@ -70,6 +71,7 @@ insert into inserttest values(30, 50, repeat('x', 10000));
 select col1, col2, char_length(col3) from inserttest;
  col1 | col2 | char_length 
 ------+------+-------------
+      |      |           7
       |    3 |           7
       |    5 |           7
       |    5 |           4
@@ -78,7 +80,7 @@ select col1, col2, char_length(col3) from inserttest;
    -1 |    2 |           7
     2 |    3 |          15
    30 |   50 |       10000
-(8 rows)
+(9 rows)
 
 drop table inserttest;
 --
@@ -159,7 +161,7 @@ insert into part4 values ('b', 10);
 ERROR:  relation "part4" does not exist
 LINE 1: insert into part4 values ('b', 10);
                     ^
--- fail (partition key a has a NOT NULL constraint)
+-- minipg: NOT NULL constraint cropped; partition key null handling differs
 insert into part1 values (null);
 ERROR:  relation "part1" does not exist
 LINE 1: insert into part1 values (null);
@@ -512,10 +514,10 @@ create table mlparted (a int, b int) partition by range (a, b);
 ERROR:  syntax error at or near "partition"
 LINE 1: create table mlparted (a int, b int) partition by range (a, ...
                                              ^
-create table mlparted1 (b int not null, a int not null) partition by range ((b+0));
+create table mlparted1 (b int, a int) partition by range ((b+0));
 ERROR:  syntax error at or near "partition"
-LINE 1: ... table mlparted1 (b int not null, a int not null) partition ...
-                                                             ^
+LINE 1: create table mlparted1 (b int, a int) partition by range ((b...
+                                              ^
 create table mlparted11 (like mlparted1);
 ERROR:  syntax error at or near "like"
 LINE 1: create table mlparted11 (like mlparted1);
@@ -526,7 +528,7 @@ alter table mlparted11 add a int;
 ERROR:  relation "mlparted11" does not exist
 alter table mlparted11 drop a;
 ERROR:  relation "mlparted11" does not exist
-alter table mlparted11 add a int not null;
+alter table mlparted11 add a int;
 ERROR:  relation "mlparted11" does not exist
 -- attnum for key attribute 'a' is different in mlparted, mlparted1, and mlparted11
 select attrelid::regclass, attname, attnum
@@ -600,7 +602,7 @@ create table mlparted12 partition of mlparted1 for values from (5) to (10);
 ERROR:  syntax error at or near "partition"
 LINE 1: create table mlparted12 partition of mlparted1 for values fr...
                                 ^
-create table mlparted2 (b int not null, a int not null);
+create table mlparted2 (b int, a int);
 alter table mlparted attach partition mlparted2 for values from (1, 10) to (1, 20);
 ERROR:  syntax error at or near "attach"
 LINE 1: alter table mlparted attach partition mlparted2 for values f...
@@ -615,7 +617,7 @@ LINE 1: create table mlparted4 (like mlparted);
                                 ^
 alter table mlparted4 drop a;
 ERROR:  relation "mlparted4" does not exist
-alter table mlparted4 add a int not null;
+alter table mlparted4 add a int;
 ERROR:  relation "mlparted4" does not exist
 alter table mlparted attach partition mlparted4 for values from (1, 30) to (1, 40);
 ERROR:  syntax error at or near "attach"
@@ -623,11 +625,11 @@ LINE 1: alter table mlparted attach partition mlparted4 for values f...
                              ^
 alter table mlparted add c text;
 ERROR:  relation "mlparted" does not exist
-create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
+create table mlparted5 (c text, a int, b int) partition by list (c);
 ERROR:  syntax error at or near "partition"
-LINE 1: ...lparted5 (c text, a int not null, b int not null) partition ...
-                                                             ^
-create table mlparted5a (a int not null, c text, b int not null);
+LINE 1: create table mlparted5 (c text, a int, b int) partition by l...
+                                                      ^
+create table mlparted5a (a int, c text, b int);
 alter table mlparted5 attach partition mlparted5a for values in ('a');
 ERROR:  syntax error at or near "attach"
 LINE 1: alter table mlparted5 attach partition mlparted5a for values...

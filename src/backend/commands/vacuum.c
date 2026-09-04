@@ -694,7 +694,6 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 		/* Process a specific relation, and possibly partitions thereof */
 		Oid			relid;
 		HeapTuple	tuple;
-		bool		include_parts;
 		int			rvr_opts;
 
 		/*
@@ -705,8 +704,7 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 
 		/*
 		 * We transiently take AccessShareLock to protect the syscache lookup
-		 * below, as well as find_all_inheritors's expectation that the caller
-		 * holds some lock on the starting relation.
+		 * below.
 		 */
 		rvr_opts = (options & VACOPT_SKIP_LOCKED) ? RVR_SKIP_LOCKED : 0;
 		relid = RangeVarGetRelidExtended(vrel->relation,
@@ -747,47 +745,6 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 													  relid,
 													  vrel->va_cols));
 		MemoryContextSwitchTo(oldcontext);
-
-
-		/*
-		 * Partitioned tables are not supported in this build (minipg); we
-		 * never include child partitions during VACUUM/ANALYZE.
-		 */
-		include_parts = false;
-
-		/*
-		 * If it is, make relation list entries for its partitions.  Note that
-		 * the list returned by find_all_inheritors() includes the passed-in
-		 * OID, so we have to skip that.  There's no point in taking locks on
-		 * the individual partitions yet, and doing so would just add
-		 * unnecessary deadlock risk.  For this last reason we do not check
-		 * yet the ownership of the partitions, which get added to the list to
-		 * process.  Ownership will be checked later on anyway.
-		 */
-		if (include_parts)
-		{
-			List	   *part_oids = find_all_inheritors(relid, NoLock, NULL);
-			ListCell   *part_lc;
-
-			foreach(part_lc, part_oids)
-			{
-				Oid			part_oid = lfirst_oid(part_lc);
-
-				if (part_oid == relid)
-					continue;	/* ignore original table */
-
-				/*
-				 * We omit a RangeVar since it wouldn't be appropriate to
-				 * complain about failure to open one of these relations
-				 * later.
-				 */
-				oldcontext = MemoryContextSwitchTo(vac_context);
-				vacrels = lappend(vacrels, makeVacuumRelation(NULL,
-															  part_oid,
-															  vrel->va_cols));
-				MemoryContextSwitchTo(oldcontext);
-			}
-		}
 
 		/*
 		 * Release lock again.  This means that by the time we actually try to

@@ -255,7 +255,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 static void
 transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 {
-	bool		saw_nullable;
 	bool		saw_default;
 	ListCell   *clist;
 
@@ -265,7 +264,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 	if (column->typeName)
 		transformColumnType(cxt, column);
 
-	saw_nullable = false;
 	saw_default = false;
 
 	foreach(clist, column->constraints)
@@ -274,30 +272,6 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 
 		switch (constraint->contype)
 		{
-			case CONSTR_NULL:
-				if (saw_nullable && column->is_not_null)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting NULL/NOT NULL declarations for column \"%s\" of table \"%s\"",
-									column->colname, cxt->relation->relname),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
-				column->is_not_null = false;
-				saw_nullable = true;
-				break;
-
-			case CONSTR_NOTNULL:
-				if (saw_nullable && !column->is_not_null)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting NULL/NOT NULL declarations for column \"%s\" of table \"%s\"",
-									column->colname, cxt->relation->relname),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
-				column->is_not_null = true;
-				saw_nullable = true;
-				break;
-
 			case CONSTR_DEFAULT:
 				if (saw_default)
 					ereport(ERROR,
@@ -319,12 +293,11 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 				break;
 
-				default:
+			default:
 				elog(ERROR, "unrecognized constraint type: %d",
 					 constraint->contype);
 				break;
 		}
-
 	}
 }
 
@@ -345,8 +318,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
 			break;
 
-		case CONSTR_NULL:
-		case CONSTR_NOTNULL:
 		case CONSTR_DEFAULT:
 			elog(ERROR, "invalid context for constraint type %d",
 				 constraint->contype);
@@ -825,16 +796,12 @@ transformIndexConstraints(CreateStmtContext *cxt)
  *		Transform one UNIQUE, PRIMARY KEY, or EXCLUDE constraint for
  *		transformIndexConstraints.
  *
- * We return an IndexStmt.  For a PRIMARY KEY constraint, we additionally
- * produce NOT NULL constraints, either by marking ColumnDefs in cxt->columns
- * as is_not_null or by adding an ALTER TABLE SET NOT NULL command to
- * cxt->alist.
+ * We return an IndexStmt.
  */
 static IndexStmt *
 transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 {
 	IndexStmt  *index;
-	List	   *notnullcmds = NIL;
 	ListCell   *lc;
 
 	index = makeNode(IndexStmt);
@@ -1043,50 +1010,32 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	/*
 	 * For UNIQUE and PRIMARY KEY, we just have a list of column names.
 	 *
-	 * Make sure referenced keys exist.  If we are making a PRIMARY KEY index,
-	 * also make sure they are NOT NULL.
+	 * Make sure referenced keys exist.
 	 */
 	{
 		foreach(lc, constraint->keys)
 		{
 			char	   *key = strVal(lfirst(lc));
 			bool		found = false;
-			bool		forced_not_null = false;
-			ColumnDef  *column = NULL;
 			ListCell   *columns;
 			IndexElem  *iparam;
 
 			/* Make sure referenced column exists. */
 			foreach(columns, cxt->columns)
 			{
-				column = castNode(ColumnDef, lfirst(columns));
+				ColumnDef  *column = castNode(ColumnDef, lfirst(columns));
+
 				if (strcmp(column->colname, key) == 0)
 				{
 					found = true;
 					break;
 				}
 			}
-			if (found)
-			{
-				/*
-				 * column is defined in the new table.  For PRIMARY KEY, we
-				 * can apply the NOT NULL constraint cheaply here ... unless
-				 * the column is marked is_from_type, in which case marking it
-				 * here would be ineffective (see MergeAttributes).
-				 */
-				if (constraint->contype == CONSTR_PRIMARY &&
-					!column->is_from_type)
-				{
-					column->is_not_null = true;
-					forced_not_null = true;
-				}
-			}
-			else if (SystemAttributeByName(key) != NULL)
+			if (!found && SystemAttributeByName(key) != NULL)
 			{
 				/*
 				 * column will be a system column in the new table, so accept
-				 * it. System columns can't ever be null, so no need to worry
-				 * about PRIMARY/NOT NULL constraint.
+				 * it.
 				 */
 				found = true;
 			}
@@ -1133,19 +1082,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 			iparam->ordering = SORTBY_DEFAULT;
 			iparam->nulls_ordering = SORTBY_NULLS_DEFAULT;
 			index->indexParams = lappend(index->indexParams, iparam);
-
-			/*
-			 * For a primary-key column, also create an item for ALTER TABLE
-			 * SET NOT NULL if we couldn't ensure it via is_not_null above.
-			 */
-			if (constraint->contype == CONSTR_PRIMARY && !forced_not_null)
-			{
-				AlterTableCmd *notnullcmd = makeNode(AlterTableCmd);
-
-				notnullcmd->subtype = AT_SetNotNull;
-				notnullcmd->name = pstrdup(key);
-				notnullcmds = lappend(notnullcmds, notnullcmd);
-			}
 		}
 	}
 
@@ -1205,22 +1141,6 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		iparam->opclass = NIL;
 		iparam->opclassopts = NIL;
 		index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
-	}
-
-	/*
-	 * If we found anything that requires run-time SET NOT NULL, build a full
-	 * ALTER TABLE command for that and add it to cxt->alist.
-	 */
-	if (notnullcmds)
-	{
-		AlterTableStmt *alterstmt = makeNode(AlterTableStmt);
-
-		alterstmt->relation = copyObject(cxt->relation);
-		alterstmt->cmds = notnullcmds;
-		alterstmt->objtype = OBJECT_TABLE;
-		alterstmt->missing_ok = false;
-
-		cxt->alist = lappend(cxt->alist, alterstmt);
 	}
 
 	return index;

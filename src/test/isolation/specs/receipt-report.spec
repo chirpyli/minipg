@@ -18,9 +18,9 @@
 
 setup
 {
-  CREATE TABLE ctl (k text NOT NULL PRIMARY KEY, deposit_date date NOT NULL);
+  CREATE TABLE ctl (k text PRIMARY KEY, deposit_date date);
   INSERT INTO ctl VALUES ('receipt', DATE '2008-12-22');
-  CREATE TABLE receipt (receipt_no int NOT NULL PRIMARY KEY, deposit_date date NOT NULL, amount int8);
+  CREATE TABLE receipt (receipt_no int PRIMARY KEY, deposit_date date, amount int8);
   INSERT INTO receipt VALUES (1, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 1.00);
   INSERT INTO receipt VALUES (2, (SELECT deposit_date FROM ctl WHERE k = 'receipt'), 2.00);
 }

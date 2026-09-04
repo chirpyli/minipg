@@ -132,7 +132,6 @@ static const FormData_pg_attribute a1 = {
 	.attbyval = false,
 	.attalign = TYPALIGN_SHORT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 static const FormData_pg_attribute a2 = {
@@ -145,7 +144,6 @@ static const FormData_pg_attribute a2 = {
 	.attbyval = true,
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 static const FormData_pg_attribute a3 = {
@@ -158,7 +156,6 @@ static const FormData_pg_attribute a3 = {
 	.attbyval = true,
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 static const FormData_pg_attribute a4 = {
@@ -171,7 +168,6 @@ static const FormData_pg_attribute a4 = {
 	.attbyval = true,
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 static const FormData_pg_attribute a5 = {
@@ -184,7 +180,6 @@ static const FormData_pg_attribute a5 = {
 	.attbyval = true,
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 /*
@@ -203,7 +198,6 @@ static const FormData_pg_attribute a6 = {
 	.attbyval = true,
 	.attalign = TYPALIGN_INT,
 	.attstorage = TYPSTORAGE_PLAIN,
-	.attnotnull = true,
 };
 
 static const FormData_pg_attribute *SysAtt[] = {&a1, &a2, &a3, &a4, &a5, &a6};
@@ -715,7 +709,6 @@ InsertPgAttributeTuples(Relation pg_attribute_rel,
 		slot[slotCount]->tts_values[Anum_pg_attribute_attalign - 1] = CharGetDatum(attrs->attalign);
 		slot[slotCount]->tts_values[Anum_pg_attribute_attstorage - 1] = CharGetDatum(attrs->attstorage);
 		slot[slotCount]->tts_values[Anum_pg_attribute_attcompression - 1] = CharGetDatum(attrs->attcompression);
-		slot[slotCount]->tts_values[Anum_pg_attribute_attnotnull - 1] = BoolGetDatum(attrs->attnotnull);
 		slot[slotCount]->tts_values[Anum_pg_attribute_atthasdef - 1] = BoolGetDatum(attrs->atthasdef);
 		slot[slotCount]->tts_values[Anum_pg_attribute_atthasmissing - 1] = BoolGetDatum(attrs->atthasmissing);
 		slot[slotCount]->tts_values[Anum_pg_attribute_attisdropped - 1] = BoolGetDatum(attrs->attisdropped);
@@ -1486,9 +1479,6 @@ RemoveAttributeById(Oid relid, AttrNumber attnum)
 		 * expects it to be valid.
 		 */
 		attStruct->atttypid = InvalidOid;
-
-		/* Remove any NOT NULL constraint the column may have */
-		attStruct->attnotnull = false;
 
 		/* We don't want to keep stats for it anymore */
 		attStruct->attstattarget = 0;

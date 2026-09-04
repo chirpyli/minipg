@@ -1232,22 +1232,6 @@ alter_table_cmds:
 					n->def = $4;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP NOT NULL */
-			| ALTER opt_column ColId DROP NOT NULL_P
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropNotNull;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET NOT NULL */
-			| ALTER opt_column ColId SET NOT NULL_P
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetNotNull;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP EXPRESSION */
 			| ALTER opt_column ColId DROP EXPRESSION
 				{
@@ -1587,7 +1571,6 @@ columnDef:	ColId Typename opt_column_compression ColQualList
 					n->compression = $3;
 					n->inhcount = 0;
 					n->is_local = true;
-					n->is_not_null = false;
 					n->is_from_type = false;
 					n->storage = 0;
 					n->raw_default = NULL;
@@ -1641,21 +1624,7 @@ ColConstraint:
  * or be part of a_expr NOT LIKE or similar constructs).
  */
 ColConstraintElem:
-			NOT NULL_P
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_NOTNULL;
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-			| NULL_P
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_NULL;
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-			| UNIQUE opt_definition
+			UNIQUE opt_definition
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_UNIQUE;
@@ -4439,7 +4408,6 @@ TableFuncElement:	ColId Typename
 					n->typeName = $2;
 					n->inhcount = 0;
 					n->is_local = true;
-					n->is_not_null = false;
 					n->is_from_type = false;
 					n->storage = 0;
 					n->raw_default = NULL;

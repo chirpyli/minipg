@@ -23,10 +23,6 @@
  */
 #define MAXATTR 40
 
-#define BOOTCOL_NULL_AUTO			1
-#define BOOTCOL_NULL_FORCE_NULL		2
-#define BOOTCOL_NULL_FORCE_NOT_NULL 3
-
 extern Relation boot_reldesc;
 extern Form_pg_attribute attrtypes[MAXATTR];
 extern int	numattr;
@@ -37,7 +33,7 @@ extern void AuxiliaryProcessMain(int argc, char *argv[]) pg_attribute_noreturn()
 extern void closerel(char *name);
 extern void boot_openrel(char *name);
 
-extern void DefineAttr(char *name, char *type, int attnum, int nullness);
+extern void DefineAttr(char *name, char *type, int attnum);
 extern void InsertOneTuple(void);
 extern void InsertOneValue(char *value, int i);
 extern void InsertOneNull(int i);

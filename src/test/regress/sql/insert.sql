@@ -1,7 +1,7 @@
 --
 -- insert with DEFAULT in the target_list
 --
-create table inserttest (col1 int4, col2 int4 NOT NULL, col3 text default 'testing');
+create table inserttest (col1 int4, col2 int4, col3 text default 'testing');
 insert into inserttest (col1, col2, col3) values (DEFAULT, DEFAULT, DEFAULT);
 insert into inserttest (col2, col3) values (3, DEFAULT);
 insert into inserttest (col1, col2, col3) values (DEFAULT, 5, DEFAULT);
@@ -84,7 +84,7 @@ insert into part4 values ('a', 10);
 -- ok
 insert into part4 values ('b', 10);
 
--- fail (partition key a has a NOT NULL constraint)
+-- minipg: NOT NULL constraint cropped; partition key null handling differs
 insert into part1 values (null);
 -- fail (expression key (b+0) cannot be null either)
 insert into part1 values (1);
@@ -214,12 +214,12 @@ drop table list_parted;
 
 -- more tests for certain multi-level partitioning scenarios
 create table mlparted (a int, b int) partition by range (a, b);
-create table mlparted1 (b int not null, a int not null) partition by range ((b+0));
+create table mlparted1 (b int, a int) partition by range ((b+0));
 create table mlparted11 (like mlparted1);
 alter table mlparted11 drop a;
 alter table mlparted11 add a int;
 alter table mlparted11 drop a;
-alter table mlparted11 add a int not null;
+alter table mlparted11 add a int;
 -- attnum for key attribute 'a' is different in mlparted, mlparted1, and mlparted11
 select attrelid::regclass, attname, attnum
 from pg_attribute
@@ -261,17 +261,17 @@ drop table lparted_nonullpart;
 -- check that RETURNING works correctly with tuple-routing
 alter table mlparted drop constraint check_b;
 create table mlparted12 partition of mlparted1 for values from (5) to (10);
-create table mlparted2 (b int not null, a int not null);
+create table mlparted2 (b int, a int);
 alter table mlparted attach partition mlparted2 for values from (1, 10) to (1, 20);
 create table mlparted3 partition of mlparted for values from (1, 20) to (1, 30);
 create table mlparted4 (like mlparted);
 alter table mlparted4 drop a;
-alter table mlparted4 add a int not null;
+alter table mlparted4 add a int;
 alter table mlparted attach partition mlparted4 for values from (1, 30) to (1, 40);
 
 alter table mlparted add c text;
-create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
-create table mlparted5a (a int not null, c text, b int not null);
+create table mlparted5 (c text, a int, b int) partition by list (c);
+create table mlparted5a (a int, c text, b int);
 alter table mlparted5 attach partition mlparted5a for values in ('a');
 alter table mlparted attach partition mlparted5 for values from (1, 40) to (1, 50);
 alter table mlparted add constraint check_b check (a = 1 and b < 45);

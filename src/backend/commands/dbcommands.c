@@ -728,13 +728,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	}
 
 	/*
-	 * Permission checks
-	 */
-
-	/* DROP hook for the database being removed */
-	InvokeObjectDropHook(DatabaseRelationId, db_id, 0);
-
-	/*
 	 * Disallow dropping a DB that is marked istemplate.  This is just to
 	 * prevent people from accidentally dropping template0 or template1; they
 	 * can do so if they're really determined ...

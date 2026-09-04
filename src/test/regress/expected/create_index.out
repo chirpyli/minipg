@@ -763,12 +763,10 @@ ALTER TABLE concur_reindex_tab ADD COLUMN c2 text; -- add toast index
 CREATE UNIQUE INDEX concur_reindex_ind1 ON concur_reindex_tab(c1);
 -- Normal index with text column
 CREATE INDEX concur_reindex_ind2 ON concur_reindex_tab(c2);
-ERROR:  column "c2" does not exist
 -- UNIQUE index with expression
 CREATE UNIQUE INDEX concur_reindex_ind3 ON concur_reindex_tab(abs(c1));
 -- Duplicate column names
 CREATE INDEX concur_reindex_ind4 ON concur_reindex_tab(c1, c1, c2);
-ERROR:  column "c2" does not exist
 -- Create table for check on foreign key dependence switch with indexes swapped
 ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
@@ -776,13 +774,7 @@ ERROR:  syntax error at or near "REFERENCES"
 LINE 1: CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_r...
                                                  ^
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
-ERROR:  INSERT has more expressions than target columns
-LINE 1: INSERT INTO concur_reindex_tab VALUES  (1, 'a');
-                                                   ^
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
-ERROR:  INSERT has more expressions than target columns
-LINE 1: INSERT INTO concur_reindex_tab VALUES  (2, 'a');
-                                                   ^
 -- Dependency lookup before and after the follow-up REINDEX commands.
 -- These should remain consistent.
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
@@ -796,9 +788,17 @@ WHERE classid = 'pg_class'::regclass AND
 	    'concur_reindex_ind3'::regclass,
 	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
-ERROR:  relation "concur_reindex_ind2" does not exist
-LINE 8:      'concur_reindex_ind2'::regclass,
-             ^
+            obj            |                           objref                           | deptype 
+---------------------------+------------------------------------------------------------+---------
+ index concur_reindex_ind1 | constraint concur_reindex_ind1 on table concur_reindex_tab | i
+ index concur_reindex_ind2 | column c2 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | table concur_reindex_tab                                   | a
+ index concur_reindex_ind4 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind4 | column c2 of table concur_reindex_tab                      | a
+ table concur_reindex_tab  | schema public                                              | n
+(7 rows)
+
 REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
 REINDEX TABLE CONCURRENTLY concur_reindex_tab;
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
@@ -812,9 +812,17 @@ WHERE classid = 'pg_class'::regclass AND
 	    'concur_reindex_ind3'::regclass,
 	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
-ERROR:  relation "concur_reindex_ind2" does not exist
-LINE 8:      'concur_reindex_ind2'::regclass,
-             ^
+            obj            |                           objref                           | deptype 
+---------------------------+------------------------------------------------------------+---------
+ index concur_reindex_ind1 | constraint concur_reindex_ind1 on table concur_reindex_tab | i
+ index concur_reindex_ind2 | column c2 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind3 | table concur_reindex_tab                                   | a
+ index concur_reindex_ind4 | column c1 of table concur_reindex_tab                      | a
+ index concur_reindex_ind4 | column c2 of table concur_reindex_tab                      | a
+ table concur_reindex_tab  | schema public                                              | n
+(7 rows)
+
 -- Check that indisclustered updates are preserved
 CREATE TABLE concur_clustered(i int);
 CREATE INDEX concur_clustered_i_idx ON concur_clustered(i);
@@ -1006,9 +1014,9 @@ INSERT INTO table1 SELECT generate_series(1,400);
 ERROR:  relation "table1" does not exist
 LINE 1: INSERT INTO table1 SELECT generate_series(1,400);
                     ^
-CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT NOT NULL);
+CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT);
 ERROR:  type "serial" does not exist
-LINE 1: CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT NOT N...
+LINE 1: CREATE TABLE table2(col1 SERIAL PRIMARY KEY, col2 TEXT);
                                  ^
 INSERT INTO table2 SELECT generate_series(1,400), 'abc';
 ERROR:  relation "table2" does not exist

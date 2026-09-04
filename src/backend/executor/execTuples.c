@@ -1978,9 +1978,6 @@ ExecTypeFromTLInternal(List *targetList, bool skipjunk)
 						   exprType((Node *) tle->expr),
 						   exprTypmod((Node *) tle->expr),
 						   0);
-		TupleDescInitEntryCollation(typeInfo,
-									cur_resno,
-									exprCollation((Node *) tle->expr));
 		cur_resno++;
 	}
 
@@ -2012,9 +2009,6 @@ ExecTypeFromExprList(List *exprList)
 						   exprType(e),
 						   exprTypmod(e),
 						   0);
-		TupleDescInitEntryCollation(typeInfo,
-									cur_resno,
-									exprCollation(e));
 		cur_resno++;
 	}
 

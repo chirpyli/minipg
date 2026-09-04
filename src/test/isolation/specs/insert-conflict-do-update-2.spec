@@ -6,7 +6,7 @@
 
 setup
 {
-  CREATE TABLE upsert (key text not null, payload text);
+  CREATE TABLE upsert (key text, payload text);
   CREATE UNIQUE INDEX ON upsert(lower(key)) INCLUDE (payload);
 }
 

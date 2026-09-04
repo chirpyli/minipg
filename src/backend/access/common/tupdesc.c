@@ -127,7 +127,6 @@ CreateTupleDescCopy(TupleDesc tupdesc)
 	{
 		Form_pg_attribute att = TupleDescAttr(desc, i);
 
-		att->attnotnull = false;
 		att->atthasdef = false;
 		att->atthasmissing = false;
 	}
@@ -162,8 +161,6 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 	if (constr)
 	{
 		TupleConstr *cpy = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-		cpy->has_not_null = constr->has_not_null;
 
 		if ((cpy->num_defval = constr->num_defval) > 0)
 		{
@@ -224,7 +221,6 @@ TupleDescCopy(TupleDesc dst, TupleDesc src)
 	{
 		Form_pg_attribute att = TupleDescAttr(dst, i);
 
-		att->attnotnull = false;
 		att->atthasdef = false;
 		att->atthasmissing = false;
 	}
@@ -276,7 +272,6 @@ TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
 	dstAtt->attcacheoff = -1;
 
 	/* since we're not copying constraints or defaults, clear these */
-	dstAtt->attnotnull = false;
 	dstAtt->atthasdef = false;
 	dstAtt->atthasmissing = false;
 }
@@ -415,8 +410,6 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 			return false;
 		if (attr1->attcompression != attr2->attcompression)
 			return false;
-		if (attr1->attnotnull != attr2->attnotnull)
-			return false;
 		if (attr1->atthasdef != attr2->atthasdef)
 			return false;
 		if (attr1->attisdropped != attr2->attisdropped)
@@ -430,8 +423,6 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 		TupleConstr *constr2 = tupdesc2->constr;
 
 		if (constr2 == NULL)
-			return false;
-		if (constr1->has_not_null != constr2->has_not_null)
 			return false;
 		n = constr1->num_defval;
 		if (n != (int) constr2->num_defval)
@@ -511,9 +502,6 @@ hashTupleDesc(TupleDesc desc)
  * in an existing tupdesc; they pass attributeName = NameStr(att->attname)
  * to indicate that the attname field shouldn't be modified.
  *
- * Note that attcollation is set to the default for the specified datatype.
- * If a nondefault collation is needed, insert it afterwards using
- * TupleDescInitEntryCollation.
  */
 void
 TupleDescInitEntry(TupleDesc desc,
@@ -558,7 +546,6 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attnum = attributeNumber;
 	att->attndims = attdim;
 
-	att->attnotnull = false;
 	att->atthasdef = false;
 	att->atthasmissing = false;
 	att->attisdropped = false;
@@ -614,7 +601,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 	att->attnum = attributeNumber;
 	att->attndims = attdim;
 
-	att->attnotnull = false;
 	att->atthasdef = false;
 	att->atthasmissing = false;
 	att->attisdropped = false;
@@ -668,27 +654,6 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 }
 
 /*
- * TupleDescInitEntryCollation
- *
- * Assign a nondefault collation to a previously initialized tuple descriptor
- * entry.
- */
-void
-TupleDescInitEntryCollation(TupleDesc desc,
-							AttrNumber attributeNumber,
-							Oid collationid)
-{
-	/*
-	 * sanity checks
-	 */
-	AssertArg(PointerIsValid(desc));
-	AssertArg(attributeNumber >= 1);
-	AssertArg(attributeNumber <= desc->natts);
-
-}
-
-
-/*
  * BuildDescForRelation
  *
  * Given a relation schema (list of ColumnDef nodes), build a TupleDesc.
@@ -702,7 +667,6 @@ BuildDescForRelation(List *schema)
 	AttrNumber	attnum;
 	ListCell   *l;
 	TupleDesc	desc;
-	bool		has_not_null;
 	char	   *attname;
 	Oid			atttypid;
 	int32		atttypmod;
@@ -714,7 +678,6 @@ BuildDescForRelation(List *schema)
 	 */
 	natts = list_length(schema);
 	desc = CreateTemplateTupleDesc(natts);
-	has_not_null = false;
 
 	attnum = 0;
 
@@ -747,28 +710,10 @@ BuildDescForRelation(List *schema)
 		att = TupleDescAttr(desc, attnum - 1);
 
 		/* Override TupleDescInitEntry's settings as requested */
-		TupleDescInitEntryCollation(desc, attnum, attcollation);
 		if (entry->storage)
 			att->attstorage = entry->storage;
 
 		/* Fill in additional stuff not handled by TupleDescInitEntry */
-		att->attnotnull = entry->is_not_null;
-		has_not_null |= entry->is_not_null;
-	}
-
-	if (has_not_null)
-	{
-		TupleConstr *constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-		constr->has_not_null = true;
-		constr->defval = NULL;
-		constr->missing = NULL;
-		constr->num_defval = 0;
-		desc->constr = constr;
-	}
-	else
-	{
-		desc->constr = NULL;
 	}
 
 	return desc;
@@ -812,12 +757,9 @@ BuildDescFromLists(List *names, List *types, List *typmods, List *collations)
 		char	   *attname = strVal(lfirst(l1));
 		Oid			atttypid = lfirst_oid(l2);
 		int32		atttypmod = lfirst_int(l3);
-		Oid			attcollation = lfirst_oid(l4);
-
 		attnum++;
 
 		TupleDescInitEntry(desc, attnum, attname, atttypid, atttypmod, 0);
-		TupleDescInitEntryCollation(desc, attnum, attcollation);
 	}
 
 	return desc;

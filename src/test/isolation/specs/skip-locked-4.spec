@@ -4,7 +4,7 @@ setup
 {
   CREATE TABLE foo (
 	id int PRIMARY KEY,
-	data text NOT NULL
+	data text
   );
   INSERT INTO foo VALUES (1, 'x'), (2, 'x');
 }

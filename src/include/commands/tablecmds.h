@@ -60,18 +60,6 @@ extern void ExecuteTruncateGuts(List *explicit_rels,
 								DropBehavior behavior,
 								bool restart_seqs);
 
-/*
- * The pg_inherits system catalog has been removed from minipg, so the
- * inheritance-related catalog query functions below are kept only as stubs
- * that behave as if no inheritance relationships exist.  They are referenced
- * by several command paths (e.g. TRUNCATE, ALTER TABLE recursion) that must
- * keep compiling and running correctly even though inheritance is no longer
- * supported.
- */
-extern List *find_inheritance_children(Oid parentrelId, LOCKMODE lockmode);
-extern List *find_inheritance_children_extended(Oid parentrelId, bool omit_detached,
-												LOCKMODE lockmode, bool *detached_exist, TransactionId *detached_xmin);
-
 extern List *find_all_inheritors(Oid parentrelId, LOCKMODE lockmode,
 								 List **parents);
 
@@ -97,7 +85,5 @@ extern void RangeVarCallbackOwnsTable(const RangeVar *relation,
 
 extern void RangeVarCallbackOwnsRelation(const RangeVar *relation,
 										 Oid relId, Oid oldRelId, void *arg);
-extern bool PartConstraintImpliedByRelConstraint(Relation scanrel,
-												 List *partConstraint);
 
 #endif							/* TABLECMDS_H */

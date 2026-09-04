@@ -156,15 +156,6 @@ extern void RunFunctionExecuteHook(Oid objectId);
 									(is_internal));					\
 	} while(0)
 
-#define InvokeObjectDropHook(classId,objectId,subId)				\
-	InvokeObjectDropHookArg((classId),(objectId),(subId),0)
-#define InvokeObjectDropHookArg(classId,objectId,subId,dropflags)	\
-	do {															\
-		if (object_access_hook)										\
-			RunObjectDropHook((classId),(objectId),(subId),			\
-							  (dropflags));							\
-	} while(0)
-
 #define InvokeObjectTruncateHook(objectId)							\
 	do {															\
 		if (object_access_hook)										\

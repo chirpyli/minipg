@@ -1519,8 +1519,6 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 							   exprType(varnode),
 							   exprTypmod(varnode),
 							   0);
-			TupleDescInitEntryCollation(tupleDesc, i,
-										exprCollation(varnode));
 			i++;
 		}
 		Assert(lname == NULL && lvar == NULL);	/* lists same length? */

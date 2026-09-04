@@ -1107,92 +1107,6 @@ ExecutePlan(QueryDesc *queryDesc,
 
 
 
-/*
- * ExecConstraints - check constraints of the tuple in 'slot'
- *
- * This checks the traditional NOT NULL constraints.
- *
- * The partition constraint is *NOT* checked.
- *
- * Note: 'slot' contains the tuple to check the constraints of, which may
- * have been converted from the original input tuple after tuple routing.
- * 'resultRelInfo' is the final result relation, after tuple routing.
- */
-void
-ExecConstraints(ResultRelInfo *resultRelInfo,
-				TupleTableSlot *slot, EState *estate)
-{
-	Relation	rel = resultRelInfo->ri_RelationDesc;
-	TupleDesc	tupdesc = RelationGetDescr(rel);
-	TupleConstr *constr = tupdesc->constr;
-	Bitmapset  *modifiedCols;
-
-	Assert(constr);				/* we should not be called otherwise */
-
-	if (constr->has_not_null)
-	{
-		int			natts = tupdesc->natts;
-		int			attrChk;
-
-		for (attrChk = 1; attrChk <= natts; attrChk++)
-		{
-			Form_pg_attribute att = TupleDescAttr(tupdesc, attrChk - 1);
-
-			if (att->attnotnull && slot_attisnull(slot, attrChk))
-			{
-				char	   *val_desc;
-				Relation	orig_rel = rel;
-				TupleDesc	orig_tupdesc = RelationGetDescr(rel);
-
-				/*
-				 * If the tuple has been routed, it's been converted to the
-				 * partition's rowtype, which might differ from the root
-				 * table's.  We must convert it back to the root table's
-				 * rowtype so that val_desc shown error message matches the
-				 * input tuple.
-				 */
-				if (resultRelInfo->ri_RootResultRelInfo)
-				{
-					ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
-					AttrMap    *map;
-
-					tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
-					/* a reverse map */
-					map = build_attrmap_by_name_if_req(orig_tupdesc,
-													   tupdesc);
-
-					/*
-					 * Partition-specific slot's tupdesc can't be changed, so
-					 * allocate a new one.
-					 */
-					if (map != NULL)
-						slot = execute_attr_map_slot(map, slot,
-													 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
-					modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
-											 ExecGetUpdatedCols(rootrel, estate));
-					rel = rootrel->ri_RelationDesc;
-				}
-				else
-					modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
-											 ExecGetUpdatedCols(resultRelInfo, estate));
-				val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
-														 slot,
-														 tupdesc,
-														 modifiedCols,
-														 64);
-
-				ereport(ERROR,
-						(errcode(ERRCODE_NOT_NULL_VIOLATION),
-						 errmsg("null value in column \"%s\" of relation \"%s\" violates not-null constraint",
-								NameStr(att->attname),
-								RelationGetRelationName(orig_rel)),
-						 val_desc ? errdetail("Failing row contains %s.", val_desc) : 0,
-						 errtablecol(orig_rel, attrChk)));
-			}
-		}
-	}
-
-}
 
 /*
  * ExecWithCheckOptions -- check that tuple satisfies any WITH CHECK OPTIONs
@@ -1260,7 +1174,11 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 					 * USING policy.
 					 */
 				case WCO_VIEW_CHECK:
-					/* See the comment in ExecConstraints(). */
+					/*
+					 * If the tuple was routed to a partition, remap it back
+					 * to the root table's rowtype so the error detail matches
+					 * the input tuple.
+					 */
 					if (resultRelInfo->ri_RootResultRelInfo)
 					{
 						ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;

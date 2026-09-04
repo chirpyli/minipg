@@ -4,8 +4,8 @@ setup
 {
   CREATE TABLE queue (
 	id	int		PRIMARY KEY,
-	data			text	NOT NULL,
-	status			text	NOT NULL
+	data			text,
+	status			text
   );
   INSERT INTO queue VALUES (1, 'foo', 'NEW'), (2, 'bar', 'NEW');
 }

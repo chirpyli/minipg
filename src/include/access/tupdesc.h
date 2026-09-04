@@ -31,7 +31,6 @@ typedef struct TupleConstr
 	AttrDefault *defval;		/* array */
 	struct AttrMissing *missing;	/* missing attributes values, NULL if none */
 	uint16		num_defval;
-	bool		has_not_null;
 } TupleConstr;
 
 /*
@@ -131,10 +130,6 @@ extern void TupleDescInitBuiltinEntry(TupleDesc desc,
 									  Oid oidtypeid,
 									  int32 typmod,
 									  int attdim);
-
-extern void TupleDescInitEntryCollation(TupleDesc desc,
-										AttrNumber attributeNumber,
-										Oid collationid);
 
 extern TupleDesc BuildDescForRelation(List *schema);
 

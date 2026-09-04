@@ -93,7 +93,7 @@ static int num_columns_read = 0;
 %type <list>  boot_index_params
 %type <ielem> boot_index_param
 %type <str>   boot_ident
-%type <ival>  optbootstrap optsharedrelation boot_column_nullness
+%type <ival>  optbootstrap optsharedrelation
 %type <oidval> oidspec optrowtypeoid
 
 %token <str> ID
@@ -104,7 +104,6 @@ static int num_columns_read = 0;
 %token <kw> OPEN XCLOSE XCREATE INSERT_TUPLE
 %token <kw> XDECLARE INDEX ON USING XBUILD INDICES UNIQUE XTOAST
 %token <kw> OBJ_ID XBOOTSTRAP XSHARED_RELATION XROWTYPE_OID
-%token <kw> XFORCE XNOT XNULL
 
 %start TopLevel
 
@@ -415,18 +414,12 @@ boot_column_list:
 		;
 
 boot_column_def:
-		  boot_ident EQUALS boot_ident boot_column_nullness
+		  boot_ident EQUALS boot_ident
 				{
 				   if (++numattr > MAXATTR)
 						elog(FATAL, "too many columns");
-				   DefineAttr($1, $3, numattr-1, $4);
+				   DefineAttr($1, $3, numattr-1);
 				}
-		;
-
-boot_column_nullness:
-			XFORCE XNOT XNULL	{ $$ = BOOTCOL_NULL_FORCE_NOT_NULL; }
-		|	XFORCE XNULL		{  $$ = BOOTCOL_NULL_FORCE_NULL; }
-		| { $$ = BOOTCOL_NULL_AUTO; }
 		;
 
 oidspec:
@@ -464,9 +457,6 @@ boot_ident:
 		| XBOOTSTRAP	{ $$ = pstrdup($1); }
 		| XSHARED_RELATION	{ $$ = pstrdup($1); }
 		| XROWTYPE_OID	{ $$ = pstrdup($1); }
-		| XFORCE		{ $$ = pstrdup($1); }
-		| XNOT			{ $$ = pstrdup($1); }
-		| XNULL			{ $$ = pstrdup($1); }
 		;
 %%
 

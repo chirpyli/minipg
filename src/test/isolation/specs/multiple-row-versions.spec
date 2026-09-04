@@ -8,7 +8,7 @@
 
 setup
 {
- CREATE TABLE t (id int NOT NULL, txt text);
+ CREATE TABLE t (id int, txt text);
  INSERT INTO t (id)
    SELECT x FROM (SELECT * FROM generate_series(1, 1000000)) a(x);
  ALTER TABLE t ADD PRIMARY KEY (id);

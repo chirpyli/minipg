@@ -7,9 +7,9 @@
 
 setup
 {
- CREATE TABLE person (person_id int NOT NULL PRIMARY KEY, name text NOT NULL, is_project_manager bool NOT NULL);
+ CREATE TABLE person (person_id int PRIMARY KEY, name text, is_project_manager bool);
  INSERT INTO person VALUES (1, 'Robert Haas', true);
- CREATE TABLE project (project_no int NOT NULL PRIMARY KEY, description text NOT NULL, project_manager int NOT NULL);
+ CREATE TABLE project (project_no int PRIMARY KEY, description text, project_manager int);
 }
 
 teardown

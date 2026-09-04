@@ -450,7 +450,6 @@ RelationBuildTupleDesc(Relation relation)
 
 	constr = (TupleConstr *) MemoryContextAllocZero(CacheMemoryContext,
 													sizeof(TupleConstr));
-	constr->has_not_null = false;
 
 	/*
 	 * Form a scan key that selects only user attributes (attnum > 0).
@@ -500,8 +499,6 @@ RelationBuildTupleDesc(Relation relation)
 			   ATTRIBUTE_FIXED_PART_SIZE);
 
 		/* Update constraint/default info */
-		if (attp->attnotnull)
-			constr->has_not_null = true;
 		if (attp->atthasdef)
 			ndef++;
 
@@ -596,8 +593,7 @@ RelationBuildTupleDesc(Relation relation)
 	/*
 	 * Set up constraint/default info
 	 */
-	if (constr->has_not_null ||
-		ndef > 0 ||
+	if (ndef > 0 ||
 		attrmiss ||
 		relation->rd_rel->relchecks > 0)
 	{
@@ -1537,7 +1533,7 @@ RelationInitTableAccessMethod(Relation relation)
  *		quite a lot since we only need to work for a few basic system
  *		catalogs.
  *
- * The catalogs this is used for can't have constraints (except attnotnull),
+ * The catalogs this is used for can't have constraints,
  * default values, rules, or triggers, since we don't cope with any of that.
  * (Well, actually, this only matters for properties that need to be valid
  * during bootstrap or before RelationCacheInitializePhase3 runs, and none of
@@ -1552,7 +1548,6 @@ formrdesc(const char *relationName, Oid relationReltype,
 {
 	Relation	relation;
 	int			i;
-	bool		has_not_null;
 
 	/*
 	 * allocate new relation desc, clear all fields of reldesc
@@ -1632,28 +1627,17 @@ formrdesc(const char *relationName, Oid relationReltype,
 	/*
 	 * initialize tuple desc info
 	 */
-	has_not_null = false;
 	for (i = 0; i < natts; i++)
 	{
 		memcpy(TupleDescAttr(relation->rd_att, i),
 			   &attrs[i],
 			   ATTRIBUTE_FIXED_PART_SIZE);
-		has_not_null |= attrs[i].attnotnull;
 		/* make sure attcacheoff is valid */
 		TupleDescAttr(relation->rd_att, i)->attcacheoff = -1;
 	}
 
 	/* initialize first attribute's attcacheoff, cf RelationBuildTupleDesc */
 	TupleDescAttr(relation->rd_att, 0)->attcacheoff = 0;
-
-	/* mark not-null status */
-	if (has_not_null)
-	{
-		TupleConstr *constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-		constr->has_not_null = true;
-		relation->rd_att->constr = constr;
-	}
 
 	/*
 	 * initialize relation id from info in att array (my, this is ugly)
@@ -3051,7 +3035,6 @@ RelationBuildLocalRelation(const char *relname,
 	MemoryContext oldcxt;
 	int			natts = tupDesc->natts;
 	int			i;
-	bool		has_not_null;
 	bool		nailit;
 
 	AssertArg(natts >= 0);
@@ -3121,27 +3104,10 @@ RelationBuildLocalRelation(const char *relname,
 	 * partly to copy it into the cache context, and partly because the new
 	 * relation can't have any defaults or constraints yet; they have to be
 	 * added in later steps, because they require additions to multiple system
-	 * catalogs.  We can copy attnotnull constraints here, however.
+	 * catalogs.
 	 */
 	rel->rd_att = CreateTupleDescCopy(tupDesc);
 	rel->rd_att->tdrefcount = 1;	/* mark as refcounted */
-	has_not_null = false;
-	for (i = 0; i < natts; i++)
-	{
-		Form_pg_attribute satt = TupleDescAttr(tupDesc, i);
-		Form_pg_attribute datt = TupleDescAttr(rel->rd_att, i);
-
-		datt->attnotnull = satt->attnotnull;
-		has_not_null |= satt->attnotnull;
-	}
-
-	if (has_not_null)
-	{
-		TupleConstr *constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-		constr->has_not_null = true;
-		rel->rd_att->constr = constr;
-	}
 
 	/*
 	 * initialize relation tuple form (caller may add/override data later)
@@ -4752,7 +4718,6 @@ load_relcache_init_file(bool shared)
 		size_t		nread;
 		Relation	rel;
 		Form_pg_class relform;
-		bool		has_not_null;
 
 		/* first read the relation descriptor length */
 		nread = fread(&len, 1, sizeof(len), fp);
@@ -4798,7 +4763,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_att->tdtypmod = -1; /* just to be sure */
 
 		/* next read all the attribute tuple form data entries */
-		has_not_null = false;
 		for (i = 0; i < relform->relnatts; i++)
 		{
 			Form_pg_attribute attr = TupleDescAttr(rel->rd_att, i);
@@ -4809,8 +4773,6 @@ load_relcache_init_file(bool shared)
 				goto read_failed;
 			if (fread(attr, 1, len, fp) != len)
 				goto read_failed;
-
-			has_not_null |= attr->attnotnull;
 		}
 
 		/* next read the access method specific field (reloptions - unused) */
@@ -4823,15 +4785,6 @@ load_relcache_init_file(bool shared)
 			if (fread(opts, 1, len, fp) != len)
 				goto read_failed;
 			pfree(opts);
-		}
-
-		/* mark not-null status */
-		if (has_not_null)
-		{
-			TupleConstr *constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-			constr->has_not_null = true;
-			rel->rd_att->constr = constr;
 		}
 
 		/*

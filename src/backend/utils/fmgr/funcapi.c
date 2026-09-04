@@ -263,8 +263,6 @@ get_expr_result_type(Node *expr,
 							   exprType(col),
 							   exprTypmod(col),
 							   0);
-			TupleDescInitEntryCollation(tupdesc, i,
-										exprCollation(col));
 			i++;
 		}
 		if (resultTypeId)
@@ -732,7 +730,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 								   poly_actuals.anyelement_type,
 								   -1,
 								   0);
-				TupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
 				break;
 			case ANYARRAYOID:
 				TupleDescInitEntry(tupdesc, i + 1,
@@ -740,7 +737,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 								   poly_actuals.anyarray_type,
 								   -1,
 								   0);
-				TupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
 				break;
 			case ANYCOMPATIBLEOID:
 			case ANYCOMPATIBLENONARRAYOID:
@@ -749,7 +745,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 								   anyc_actuals.anyelement_type,
 								   -1,
 								   0);
-				TupleDescInitEntryCollation(tupdesc, i + 1, anycompatcollation);
 				break;
 			case ANYCOMPATIBLEARRAYOID:
 				TupleDescInitEntry(tupdesc, i + 1,
@@ -757,7 +752,6 @@ resolve_polymorphic_tupdesc(TupleDesc tupdesc, oidvector *declared_args,
 								   anyc_actuals.anyarray_type,
 								   -1,
 								   0);
-				TupleDescInitEntryCollation(tupdesc, i + 1, anycompatcollation);
 				break;
 			default:
 				break;

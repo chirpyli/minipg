@@ -1084,7 +1084,6 @@ describeOneTableDetails(const char *schemaname,
 	int			attname_col = -1,	/* column indexes in "res" */
 				atttype_col = -1,
 				attrdef_col = -1,
-				attnotnull_col = -1,
 				isindexkey_col = -1,
 				indexdef_col = -1,
 				attstorage_col = -1,
@@ -1316,10 +1315,8 @@ describeOneTableDetails(const char *schemaname,
 		appendPQExpBufferStr(&buf,
 							 ",\n  (SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid, true)"
 							 "\n   FROM pg_catalog.pg_attrdef d"
-							 "\n   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef)"
-							 ",\n  a.attnotnull");
+							 "\n   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef)");
 		attrdef_col = cols++;
-		attnotnull_col = cols++;
 	}
 	if (tableinfo.relkind == RELKIND_INDEX ||
 		tableinfo.relkind == 'I')
@@ -1447,7 +1444,6 @@ describeOneTableDetails(const char *schemaname,
 	headers[cols++] = gettext_noop("Type");
 	if (show_column_details)
 	{
-		headers[cols++] = gettext_noop("Nullable");
 		headers[cols++] = gettext_noop("Default");
 	}
 	if (isindexkey_col >= 0)
@@ -1480,13 +1476,9 @@ describeOneTableDetails(const char *schemaname,
 		/* Type */
 		printTableAddCell(&cont, PQgetvalue(res, i, atttype_col), false, false);
 
-		/* Nullable, Default */
+		/* Default */
 		if (show_column_details)
 		{
-			printTableAddCell(&cont,
-							  strcmp(PQgetvalue(res, i, attnotnull_col), "t") == 0 ? "not null" : "",
-							  false, false);
-
 			printTableAddCell(&cont, PQgetvalue(res, i, attrdef_col), false, false);
 		}
 

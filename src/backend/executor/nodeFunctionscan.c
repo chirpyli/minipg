@@ -411,9 +411,6 @@ ExecInitFunctionScan(FunctionScan *node, EState *estate, int eflags)
 								   funcrettype,
 								   -1,
 								   0);
-				TupleDescInitEntryCollation(tupdesc,
-											(AttrNumber) 1,
-											exprCollation(funcexpr));
 			}
 			else
 			{

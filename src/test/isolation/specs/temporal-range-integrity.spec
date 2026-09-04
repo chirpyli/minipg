@@ -15,9 +15,9 @@
 
 setup
 {
- CREATE TABLE statute (statute_cite text NOT NULL, eff_date date NOT NULL, exp_date date, CONSTRAINT statute_pkey PRIMARY KEY (statute_cite, eff_date));
+ CREATE TABLE statute (statute_cite text, eff_date date, exp_date date, CONSTRAINT statute_pkey PRIMARY KEY (statute_cite, eff_date));
  INSERT INTO statute VALUES ('123.45(1)a', DATE '2008-01-01', NULL);
- CREATE TABLE offense (offense_no int NOT NULL, statute_cite text NOT NULL, offense_date date NOT NULL, CONSTRAINT offense_pkey PRIMARY KEY (offense_no));
+ CREATE TABLE offense (offense_no int, statute_cite text, offense_date date, CONSTRAINT offense_pkey PRIMARY KEY (offense_no));
 }
 
 teardown

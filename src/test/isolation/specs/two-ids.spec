@@ -13,8 +13,8 @@
 
 setup
 {
- create table D1 (id int not null);
- create table D2 (id int not null);
+ create table D1 (id int);
+ create table D2 (id int);
  insert into D1 values (1);
  insert into D2 values (1);
 }

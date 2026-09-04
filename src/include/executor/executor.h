@@ -172,8 +172,6 @@ extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  ResultRelInfo *partition_root_rri,
 							  int instrument_options);
 extern ResultRelInfo *ExecGetTriggerResultRel(EState *estate, Oid relid);
-extern void ExecConstraints(ResultRelInfo *resultRelInfo,
-							TupleTableSlot *slot, EState *estate);
 extern void ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 								 TupleTableSlot *slot, EState *estate);
 extern LockTupleMode ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo);

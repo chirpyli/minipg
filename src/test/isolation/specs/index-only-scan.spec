@@ -7,10 +7,10 @@
 
 setup
 {
-  CREATE TABLE tabx (id int NOT NULL);
+  CREATE TABLE tabx (id int);
   INSERT INTO tabx SELECT generate_series(1,10000);
   ALTER TABLE tabx ADD PRIMARY KEY (id);
-  CREATE TABLE taby (id int NOT NULL);
+  CREATE TABLE taby (id int);
   INSERT INTO taby SELECT generate_series(1,10000);
   ALTER TABLE taby ADD PRIMARY KEY (id);
 }

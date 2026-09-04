@@ -98,9 +98,6 @@ index			{ yylval.kw = "index"; return INDEX; }
 on				{ yylval.kw = "on"; return ON; }
 using			{ yylval.kw = "using"; return USING; }
 toast			{ yylval.kw = "toast"; return XTOAST; }
-FORCE			{ yylval.kw = "FORCE"; return XFORCE; }
-NOT				{ yylval.kw = "NOT"; return XNOT; }
-NULL			{ yylval.kw = "NULL"; return XNULL; }
 
 {id}			{
 					yylval.str = pstrdup(yytext);

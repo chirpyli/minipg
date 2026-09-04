@@ -8,7 +8,7 @@
 
 setup
 {
-	CREATE TABLE bank_account (id TEXT PRIMARY KEY, balance int8 NOT NULL);
+	CREATE TABLE bank_account (id TEXT PRIMARY KEY, balance int8);
 	INSERT INTO bank_account (id, balance) VALUES ('X', 0), ('Y', 0);
 }
 

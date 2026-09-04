@@ -43,12 +43,12 @@ CATALOG(pg_index,2610,IndexRelationId) BKI_SCHEMA_MACRO
 	bool		indislive;		/* is this index alive at all? */
 
 	/* variable-length fields start here, but we allow direct access to indkey */
-	int2vector	indkey BKI_FORCE_NOT_NULL;	/* column numbers of indexed cols,
+	int2vector	indkey;	/* column numbers of indexed cols,
 											 * or 0 */
 
 #ifdef CATALOG_VARLEN
-	oidvector	indclass BKI_LOOKUP(pg_opclass) BKI_FORCE_NOT_NULL; /* opclass identifiers */
-	int2vector	indoption BKI_FORCE_NOT_NULL;	/* per-column flags
+	oidvector	indclass BKI_LOOKUP(pg_opclass); /* opclass identifiers */
+	int2vector	indoption;	/* per-column flags
 												 * (AM-specific meanings) */
 	pg_node_tree indexprs;		/* expression trees for index attributes that
 								 * are not simple column references; one for

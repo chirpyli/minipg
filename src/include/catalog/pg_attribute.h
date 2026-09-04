@@ -135,9 +135,6 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 	 */
 	char		attcompression BKI_DEFAULT('\0');
 
-	/* This flag represents the "NOT NULL" constraint */
-	bool		attnotnull;
-
 	/* Has DEFAULT value or not */
 	bool		atthasdef BKI_DEFAULT(f);
 

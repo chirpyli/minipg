@@ -1054,8 +1054,6 @@ CatalogCacheInitializeCache(CatCache *cache)
 												   cache->cc_keyno[i] - 1);
 
 			keytype = attr->atttypid;
-			/* cache key columns should always be NOT NULL */
-			Assert(attr->attnotnull);
 		}
 		else
 		{

@@ -511,12 +511,6 @@ ExecInsert(ModifyTableState *mtstate,
 		if (resultRelInfo->ri_WithCheckOptions != NIL)
 			ExecWithCheckOptions(wco_kind, resultRelInfo, slot, estate);
 
-		/*
-		 * Check the constraints of the tuple.
-		 */
-		if (resultRelationDesc->rd_att->constr)
-			ExecConstraints(resultRelInfo, slot, estate);
-
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
 		{
 			/* Perform a speculative insertion. */
@@ -1031,12 +1025,6 @@ lreplace:
 			ExecWithCheckOptions(WCO_RLS_UPDATE_CHECK,
 								 resultRelInfo, slot, estate);
 		}
-
-		/*
-		 * Check the constraints of the tuple.
-		 */
-		if (resultRelationDesc->rd_att->constr)
-			ExecConstraints(resultRelInfo, slot, estate);
 
 		/*
 		 * replace the heap tuple

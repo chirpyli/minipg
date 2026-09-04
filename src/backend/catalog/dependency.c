@@ -1228,10 +1228,6 @@ deleteOneObject(const ObjectAddress *object, Relation *depRel, int flags)
 	SysScanDesc scan;
 	HeapTuple	tup;
 
-	/* DROP hook of the objects being removed */
-	InvokeObjectDropHookArg(object->classId, object->objectId,
-							object->objectSubId, flags);
-
 	/*
 	 * Close depRel if we are doing a drop concurrently.  The object deletion
 	 * subroutine will commit the current transaction, so we can't keep the

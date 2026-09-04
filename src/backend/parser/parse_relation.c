@@ -1673,9 +1673,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 							   funcrettype,
 							   exprTypmod(funcexpr),
 							   0);
-			TupleDescInitEntryCollation(tupdesc,
-										(AttrNumber) 1,
-										exprCollation(funcexpr));
 		}
 		else if (functypclass == TYPEFUNC_RECORD)
 		{
@@ -1719,9 +1716,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 								   attrtype,
 								   attrtypmod,
 								   0);
-				TupleDescInitEntryCollation(tupdesc,
-											(AttrNumber) i,
-											attrcollation);
 				rtfunc->funccolnames = lappend(rtfunc->funccolnames,
 											   makeString(pstrdup(attrname)));
 				rtfunc->funccoltypes = lappend_oid(rtfunc->funccoltypes,

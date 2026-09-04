@@ -472,15 +472,6 @@ EOM
 
 		print $bki " $attname = $atttype";
 
-		if (defined $column->{forcenotnull})
-		{
-			print $bki " FORCE NOT NULL";
-		}
-		elsif (defined $column->{forcenull})
-		{
-			print $bki " FORCE NULL";
-		}
-
 		# Emit Anum_* constants
 		printf $def "#define Anum_%s_%s %s\n", $catname, $attname, $attnum;
 	}
@@ -727,7 +718,6 @@ sub gen_pg_attribute
 
 		# Generate entries for user attributes.
 		my $attnum          = 0;
-		my $priorfixedwidth = 1;
 		foreach my $attr (@{ $table->{columns} })
 		{
 			$attnum++;
@@ -735,12 +725,7 @@ sub gen_pg_attribute
 			$row{attnum}   = $attnum;
 			$row{attrelid} = $table->{relation_oid};
 
-			morph_row_for_pgattr(\%row, $schema, $attr, $priorfixedwidth);
-
-			# Update $priorfixedwidth --- must match morph_row_for_pgattr
-			$priorfixedwidth &=
-			  ($row{attnotnull} eq 't'
-				  && ($row{attlen} eq 'NAMEDATALEN' || $row{attlen} > 0));
+			morph_row_for_pgattr(\%row, $schema, $attr);
 
 			# If it's bootstrapped, put an entry in postgres.bki.
 			print_bki_insert(\%row, $schema) if $table->{bootstrap};
@@ -788,7 +773,7 @@ sub gen_pg_attribute
 # Any value not handled here must be supplied by caller.
 sub morph_row_for_pgattr
 {
-	my ($row, $pgattr_schema, $attr, $priorfixedwidth) = @_;
+	my ($row, $pgattr_schema, $attr) = @_;
 	my $attname = $attr->{name};
 	my $atttype = $attr->{type};
 
@@ -810,32 +795,6 @@ sub morph_row_for_pgattr
 	# collation-aware catalog columns must use C collation
 	$row->{attcollation} =
 	  $type->{typcollation} ne '0' ? $C_COLLATION_OID : 0;
-
-	if (defined $attr->{forcenotnull})
-	{
-		$row->{attnotnull} = 't';
-	}
-	elsif (defined $attr->{forcenull})
-	{
-		$row->{attnotnull} = 'f';
-	}
-	elsif ($priorfixedwidth)
-	{
-
-		# attnotnull will automatically be set if the type is
-		# fixed-width and prior columns are likewise fixed-width
-		# and NOT NULL --- compare DefineAttr in bootstrap.c.
-		# At this point the width of type name is still symbolic,
-		# so we need a special test.
-		$row->{attnotnull} =
-		    $row->{attlen} eq 'NAMEDATALEN' ? 't'
-		  : $row->{attlen} > 0              ? 't'
-		  :                                   'f';
-	}
-	else
-	{
-		$row->{attnotnull} = 'f';
-	}
 
 	Catalog::AddDefaultValues($row, $pgattr_schema, 'pg_attribute');
 	return;

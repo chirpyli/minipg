@@ -649,7 +649,7 @@ closerel(char *name)
  * ----------------
  */
 void
-DefineAttr(char *name, char *type, int attnum, int nullness)
+DefineAttr(char *name, char *type, int attnum)
 {
 	Oid			typeoid;
 
@@ -703,39 +703,6 @@ DefineAttr(char *name, char *type, int attnum, int nullness)
 	attrtypes[attnum]->attstattarget = -1;
 	attrtypes[attnum]->attcacheoff = -1;
 	attrtypes[attnum]->atttypmod = -1;
-
-	if (nullness == BOOTCOL_NULL_FORCE_NOT_NULL)
-	{
-		attrtypes[attnum]->attnotnull = true;
-	}
-	else if (nullness == BOOTCOL_NULL_FORCE_NULL)
-	{
-		attrtypes[attnum]->attnotnull = false;
-	}
-	else
-	{
-		Assert(nullness == BOOTCOL_NULL_AUTO);
-
-		/*
-		 * Mark as "not null" if type is fixed-width and prior columns are
-		 * likewise fixed-width and not-null.  This corresponds to case where
-		 * column can be accessed directly via C struct declaration.
-		 */
-		if (attrtypes[attnum]->attlen > 0)
-		{
-			int			i;
-
-			/* check earlier attributes */
-			for (i = 0; i < attnum; i++)
-			{
-				if (attrtypes[i]->attlen <= 0 ||
-					!attrtypes[i]->attnotnull)
-					break;
-			}
-			if (i == attnum)
-				attrtypes[attnum]->attnotnull = true;
-		}
-	}
 }
 
 
@@ -817,11 +784,6 @@ InsertOneNull(int i)
 {
 	elog(DEBUG4, "inserting column %d NULL", i);
 	Assert(i >= 0 && i < MAXATTR);
-	if (TupleDescAttr(boot_reldesc->rd_att, i)->attnotnull)
-		elog(ERROR,
-			 "NULL value specified for not-null column \"%s\" of relation \"%s\"",
-			 NameStr(TupleDescAttr(boot_reldesc->rd_att, i)->attname),
-			 RelationGetRelationName(boot_reldesc));
 	values[i] = PointerGetDatum(NULL);
 	Nulls[i] = true;
 }

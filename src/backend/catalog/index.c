@@ -234,12 +234,6 @@ index_check_primary_key(Relation heapRel,
 				 attnum, RelationGetRelid(heapRel));
 		attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 
-		if (!attform->attnotnull)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("primary key column \"%s\" is not marked NOT NULL",
-							NameStr(attform->attname))));
-
 		ReleaseSysCache(atttuple);
 	}
 }

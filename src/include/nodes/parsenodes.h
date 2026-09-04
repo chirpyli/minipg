@@ -534,7 +534,6 @@ typedef struct ColumnDef
 	char	   *compression;	/* compression method for column */
 	int			inhcount;		/* number of times column is inherited */
 	bool		is_local;		/* column has local (non-inherited) def'n */
-	bool		is_not_null;	/* NOT NULL constraint specified? */
 	bool		is_from_type;	/* column definition came from table type */
 	char		storage;		/* attstorage setting, or 0 for default */
 	Node	   *raw_default;	/* default value (untransformed parse tree) */
@@ -1323,10 +1322,7 @@ typedef enum AlterTableType
 	AT_AddColumnToView,			/* implicitly via CREATE OR REPLACE VIEW */
 	AT_ColumnDefault,			/* alter column default */
 	AT_CookedColumnDefault,		/* add a pre-cooked column default */
-	AT_DropNotNull,				/* alter column drop not null */
-	AT_SetNotNull,				/* alter column set not null */
 	AT_DropExpression,			/* alter column drop expression */
-	AT_CheckNotNull,			/* check column is already marked not null */
 	AT_SetStatistics,			/* alter column set statistics */
 	AT_SetOptions,				/* alter column set ( options ) */
 	AT_ResetOptions,			/* alter column reset ( options ) */
@@ -1481,9 +1477,6 @@ typedef struct CreateStmt
 
 typedef enum ConstrType			/* types of constraints */
 {
-	CONSTR_NULL,				/* not standard SQL, but a lot of people
-								 * expect it */
-	CONSTR_NOTNULL,
 	CONSTR_DEFAULT,
 	CONSTR_PRIMARY,
 	CONSTR_UNIQUE
