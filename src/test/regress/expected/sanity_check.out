@@ -76,7 +76,6 @@ ramp|f
 real_city|f
 road|t
 slow_emp4000|f
-snapshot_test|f
 tenk1|t
 tenk2|t
 testjsonb|f

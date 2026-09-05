@@ -238,9 +238,7 @@ SAVEPOINT q; DROP TABLE remember_node_subid; ROLLBACK TO q;
 COMMIT;
 DROP TABLE remember_node_subid;
 
--- 加载标准回归测试数据（原由 copy.sql/input/copy.source 负责，因 INHERITS 继承
--- 相关测试(create_table 继承链、copy、misc、create_function_2)已随继承功能裁剪而
--- 移除，此处改为在 create_table 内直接加载非继承标准表数据，供其余回归测试使用）
+-- 加载标准回归测试数据
 -- 注：SQL COPY 命令与 psql \copy 元命令已随 COPY 功能裁剪而移除，故改用等价的
 -- INSERT 脚本(data/load_*.sql，由 data/*.data 经 COPY 文本格式转换生成)以加载数据
 \set ECHO none

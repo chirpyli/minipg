@@ -324,144 +324,15 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 		 */
 		HeapTuple	tup;
 		Form_pg_aggregate classForm;
-		int			catDirectArgs;
 
 		tup = SearchSysCache1(AGGFNOID, ObjectIdGetDatum(funcid));
 		if (!HeapTupleIsValid(tup)) /* should not happen */
 			elog(ERROR, "cache lookup failed for aggregate %u", funcid);
 		classForm = (Form_pg_aggregate) GETSTRUCT(tup);
 		aggkind = classForm->aggkind;
-		catDirectArgs = classForm->aggnumdirectargs;
 		ReleaseSysCache(tup);
 
 		/* Now check various disallowed cases. */
-		if (AGGKIND_IS_ORDERED_SET(aggkind))
-		{
-			int			numAggregatedArgs;
-			int			numDirectArgs;
-
-			if (!agg_within_group)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("WITHIN GROUP is required for ordered-set aggregate %s",
-								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
-			/* gram.y rejects DISTINCT + WITHIN GROUP */
-			Assert(!agg_distinct);
-			/* gram.y rejects VARIADIC + WITHIN GROUP */
-			Assert(!func_variadic);
-
-			/*
-			 * Since func_get_detail was working with an undifferentiated list
-			 * of arguments, it might have selected an aggregate that doesn't
-			 * really match because it requires a different division of direct
-			 * and aggregated arguments.  Check that the number of direct
-			 * arguments is actually OK; if not, throw an "undefined function"
-			 * error, similarly to the case where a misplaced ORDER BY is used
-			 * in a regular aggregate call.
-			 */
-			numAggregatedArgs = list_length(agg_order);
-			numDirectArgs = nargs - numAggregatedArgs;
-			Assert(numDirectArgs >= 0);
-
-			if (!OidIsValid(vatype))
-			{
-				/* Test is simple if aggregate isn't variadic */
-				if (numDirectArgs != catDirectArgs)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_FUNCTION),
-							 errmsg("function %s does not exist",
-									func_signature_string(funcname, nargs,
-														  argnames,
-														  actual_arg_types)),
-							 errhint_plural("There is an ordered-set aggregate %s, but it requires %d direct argument, not %d.",
-											"There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-											catDirectArgs,
-											NameListToString(funcname),
-											catDirectArgs, numDirectArgs),
-							 parser_errposition(pstate, location)));
-			}
-			else
-			{
-				/*
-				 * If it's variadic, we have two cases depending on whether
-				 * the agg was "... ORDER BY VARIADIC" or "..., VARIADIC ORDER
-				 * BY VARIADIC".  It's the latter if catDirectArgs equals
-				 * pronargs; to save a catalog lookup, we reverse-engineer
-				 * pronargs from the info we got from func_get_detail.
-				 */
-				int			pronargs;
-
-				pronargs = nargs;
-				if (nvargs > 1)
-					pronargs -= nvargs - 1;
-				if (catDirectArgs < pronargs)
-				{
-					/* VARIADIC isn't part of direct args, so still easy */
-					if (numDirectArgs != catDirectArgs)
-						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_FUNCTION),
-								 errmsg("function %s does not exist",
-										func_signature_string(funcname, nargs,
-															  argnames,
-															  actual_arg_types)),
-								 errhint_plural("There is an ordered-set aggregate %s, but it requires %d direct argument, not %d.",
-												"There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-												catDirectArgs,
-												NameListToString(funcname),
-												catDirectArgs, numDirectArgs),
-								 parser_errposition(pstate, location)));
-				}
-				else
-				{
-					/*
-					 * Both direct and aggregated args were declared variadic.
-					 * For a standard ordered-set aggregate, it's okay as long
-					 * as there aren't too few direct args.  For a
-					 * hypothetical-set aggregate, we assume that the
-					 * hypothetical arguments are those that matched the
-					 * variadic parameter; there must be just as many of them
-					 * as there are aggregated arguments.
-					 */
-					if (aggkind == AGGKIND_HYPOTHETICAL)
-					{
-						if (nvargs != 2 * numAggregatedArgs)
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_FUNCTION),
-									 errmsg("function %s does not exist",
-											func_signature_string(funcname, nargs,
-																  argnames,
-																  actual_arg_types)),
-									 errhint("To use the hypothetical-set aggregate %s, the number of hypothetical direct arguments (here %d) must match the number of ordering columns (here %d).",
-											 NameListToString(funcname),
-											 nvargs - numAggregatedArgs, numAggregatedArgs),
-									 parser_errposition(pstate, location)));
-					}
-					else
-					{
-						if (nvargs <= numAggregatedArgs)
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_FUNCTION),
-									 errmsg("function %s does not exist",
-											func_signature_string(funcname, nargs,
-																  argnames,
-																  actual_arg_types)),
-									 errhint_plural("There is an ordered-set aggregate %s, but it requires at least %d direct argument.",
-													"There is an ordered-set aggregate %s, but it requires at least %d direct arguments.",
-													catDirectArgs,
-													NameListToString(funcname),
-													catDirectArgs),
-									 parser_errposition(pstate, location)));
-					}
-				}
-			}
-
-			/* Check type matching of hypothetical arguments */
-			if (aggkind == AGGKIND_HYPOTHETICAL)
-				unify_hypothetical_args(pstate, fargs, numAggregatedArgs,
-										actual_arg_types, declared_arg_types);
-		}
-		else
 		{
 			/* Normal aggregate, so it can't have WITHIN GROUP */
 			if (agg_within_group)

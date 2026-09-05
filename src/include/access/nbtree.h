@@ -1085,8 +1085,7 @@ typedef BTScanOpaqueData *BTScanOpaque;
 #define SK_BT_NULLS_FIRST	(INDOPTION_NULLS_FIRST << SK_BT_INDOPTION_SHIFT)
 
 /*
- * Constant definition for progress reporting.  Phase numbers must match
- * btbuildphasename.
+ * Constant definition for progress reporting.
  */
 /* PROGRESS_CREATEIDX_SUBPHASE_INITIALIZE is 1 (see progress.h) */
 #define PROGRESS_BTREE_PHASE_INDEXBUILD_TABLESCAN		2
@@ -1232,10 +1231,6 @@ extern void _bt_end_vacuum(Relation rel);
 extern void _bt_end_vacuum_callback(int code, Datum arg);
 extern Size BTreeShmemSize(void);
 extern void BTreeShmemInit(void);
-extern bool btproperty(Oid index_oid, int attno,
-					   IndexAMProperty prop, const char *propname,
-					   bool *res, bool *isnull);
-extern char *btbuildphasename(int64 phasenum);
 extern IndexTuple _bt_truncate(Relation rel, IndexTuple lastleft,
 							   IndexTuple firstright, BTScanInsert itup_key);
 extern int	_bt_keep_natts_fast(Relation rel, IndexTuple lastleft,

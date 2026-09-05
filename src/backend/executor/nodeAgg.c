@@ -4097,10 +4097,7 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 		size_t		numTransArgs;
 
 		/* Detect how many arguments to pass to the transfn */
-		if (AGGKIND_IS_ORDERED_SET(aggref->aggkind))
-			pertrans->numTransInputs = numInputs;
-		else
-			pertrans->numTransInputs = numArguments;
+		pertrans->numTransInputs = numArguments;
 
 		/* account for the current transition state */
 		numTransArgs = pertrans->numTransInputs + 1;
@@ -4197,12 +4194,7 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 	 * Note that by construction, if there is a DISTINCT clause then the ORDER
 	 * BY clause is a prefix of it (see transformDistinctClause).
 	 */
-	if (AGGKIND_IS_ORDERED_SET(aggref->aggkind))
-	{
-		sortlist = NIL;
-		numSortCols = numDistinctCols = 0;
-	}
-	else if (aggref->aggdistinct)
+	if (aggref->aggdistinct)
 	{
 		sortlist = aggref->aggdistinct;
 		numSortCols = numDistinctCols = list_length(sortlist);

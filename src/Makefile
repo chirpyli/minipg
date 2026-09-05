@@ -55,12 +55,10 @@ distprep:
 
 clean:
 	$(MAKE) -C test $@
-	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/isolation $@
 
 distclean maintainer-clean:
 	$(MAKE) -C test $@
-	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/isolation $@
 	rm -f Makefile.port Makefile.global
 

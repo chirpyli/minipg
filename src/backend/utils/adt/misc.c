@@ -178,21 +178,6 @@ current_database(PG_FUNCTION_ARGS)
 }
 
 
-/*
- * current_query()
- *	Expose the current query to the user (useful in stored procedures)
- *	We might want to use ActivePortal->sourceText someday.
- */
-Datum
-current_query(PG_FUNCTION_ARGS)
-{
-	/* there is no easy way to access the more concise 'query_string' */
-	if (debug_query_string)
-		PG_RETURN_TEXT_P(cstring_to_text(debug_query_string));
-	else
-		PG_RETURN_NULL();
-}
-
 /* Function to return the list of grammar keywords */
 Datum
 pg_get_keywords(PG_FUNCTION_ARGS)
@@ -287,79 +272,6 @@ Datum
 pg_typeof(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_OID(get_fn_expr_argtype(fcinfo->flinfo, 0));
-}
-
-
-/*
- * Implementation of the COLLATE FOR expression; returns the collation
- * of the argument.
- */
-Datum
-pg_collation_for(PG_FUNCTION_ARGS)
-{
-	Oid			typeid;
-	Oid			collid;
-
-	typeid = get_fn_expr_argtype(fcinfo->flinfo, 0);
-	if (!typeid)
-		PG_RETURN_NULL();
-	if (!type_is_collatable(typeid) && typeid != UNKNOWNOID)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("collations are not supported by type %s",
-						format_type_be(typeid))));
-
-	collid = PG_GET_COLLATION();
-	if (!collid)
-		PG_RETURN_NULL();
-	PG_RETURN_TEXT_P(cstring_to_text(generate_collation_name(collid)));
-}
-
-
-/*
- * pg_relation_is_updatable - determine which update events the specified
- * relation supports.
- *
- * This relies on relation_is_updatable() in rewriteHandler.c, which see
- * for additional information.
- */
-Datum
-pg_relation_is_updatable(PG_FUNCTION_ARGS)
-{
-	Oid			reloid = PG_GETARG_OID(0);
-	bool		include_triggers = PG_GETARG_BOOL(1);
-
-	PG_RETURN_INT32(relation_is_updatable(reloid, NIL, include_triggers, NULL));
-}
-
-/*
- * pg_column_is_updatable - determine whether a column is updatable
- *
- * This function encapsulates the decision about just what
- * information_schema.columns.is_updatable actually means.  It's not clear
- * whether deletability of the column's relation should be required, so
- * we want that decision in C code where we could change it without initdb.
- */
-Datum
-pg_column_is_updatable(PG_FUNCTION_ARGS)
-{
-	Oid			reloid = PG_GETARG_OID(0);
-	AttrNumber	attnum = PG_GETARG_INT16(1);
-	AttrNumber	col = attnum - FirstLowInvalidHeapAttributeNumber;
-	bool		include_triggers = PG_GETARG_BOOL(2);
-	int			events;
-
-	/* System columns are never updatable */
-	if (attnum <= 0)
-		PG_RETURN_BOOL(false);
-
-	events = relation_is_updatable(reloid, NIL, include_triggers,
-								   bms_make_singleton(col));
-
-	/* We require both updatability and deletability of the relation */
-#define REQ_EVENTS ((1 << CMD_UPDATE) | (1 << CMD_DELETE))
-
-	PG_RETURN_BOOL((events & REQ_EVENTS) == REQ_EVENTS);
 }
 
 

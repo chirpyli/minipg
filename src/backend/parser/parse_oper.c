@@ -921,10 +921,6 @@ make_scalar_array_op(ParseState *pstate, List *opname,
  * (pg_cast must be considered because changes in the set of implicit casts
  * affect the set of applicable operators for any given input datatype.)
  *
- * XXX in principle, ALTER TABLE ... INHERIT could affect the mapping as
- * well, but we disregard that since there's no convenient way to find out
- * about it, and it seems a pretty far-fetched corner-case anyway.
- *
  * Note: at some point it might be worth doing a similar cache for function
  * lookups.  However, the potential gain is a lot less since (a) function
  * names are generally not overloaded as heavily as operator names, and

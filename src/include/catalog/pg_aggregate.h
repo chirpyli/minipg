@@ -121,11 +121,6 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_aggregate_fnoid_index, 2650, on pg_aggregate using 
  * aggregated arguments).
  */
 #define AGGKIND_NORMAL			'n'
-#define AGGKIND_ORDERED_SET		'o'
-#define AGGKIND_HYPOTHETICAL	'h'
-
-/* Use this macro to test for "ordered-set agg including hypothetical case" */
-#define AGGKIND_IS_ORDERED_SET(kind)  ((kind) != AGGKIND_NORMAL)
 
 /*
  * Symbolic values for aggfinalmodify and aggmfinalmodify columns.

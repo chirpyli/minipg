@@ -143,7 +143,7 @@ CATALOG(pg_type,1247,TypeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(71,TypeRelati
 	/*
 	 * Custom ANALYZE procedure for the datatype (0 selects the default).
 	 */
-	regproc		typanalyze BKI_DEFAULT(-) BKI_ARRAY_DEFAULT(array_typanalyze) BKI_LOOKUP_OPT(pg_proc);
+	regproc		typanalyze BKI_DEFAULT(-) BKI_ARRAY_DEFAULT(-) BKI_LOOKUP_OPT(pg_proc);
 
 	/* ----------------
 	 * typalign is the alignment required when storing a value of this

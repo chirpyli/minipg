@@ -13,7 +13,7 @@
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char varchar text int2 int4 int8 oid float4 float8 txid pg_lsn
+test: boolean char varchar text int2 int4 int8 oid float4 float8 pg_lsn
 
 # ----------
 # The second group of parallel tests
@@ -37,7 +37,7 @@ test: horology misc_sanity comments xid mvcc euc_kr
 # create_table 已改写：移除 INHERITS 继承链与 PARTITION BY 分区，保留标准基础表(tenk1/tenk2/onek/person 等)
 test: create_table
 # create_index 为 onek/tenk1/bt_*_heap/hash_*_heap 等基础表建立索引，
-# sanity_check/amutils 等测试依赖这些索引
+# sanity_check 等测试依赖这些索引
 test: create_index
 
 # ----------
@@ -105,7 +105,7 @@ test: dbsize misc_functions sysviews tsrf tidscan tidrangescan
 # collate.*.utf8 tests cannot be run in parallel with each other
 # information_schema 已裁剪，collate.linux.utf8 引用 information_schema，移除
 # rules 已随表继承(INHERITS)功能裁剪而移除
-test: psql_crosstab amutils
+test: psql_crosstab
 
 # run by itself so it can run parallel workers
 # information_schema 已裁剪，select_parallel 引用 information_schema，移除

@@ -4698,12 +4698,6 @@ get_create_object_cmd(EditableObjectType obj_type, Oid oid,
 					char	   *relkind = PQgetvalue(res, 0, 2);
 					char	   *viewdef = PQgetvalue(res, 0, 3);
 
-					/*
-					 * If the backend ever supports CREATE OR REPLACE
-					 * MATERIALIZED VIEW, allow that here; but as of today it
-					 * does not, so editing a matview definition in this way
-					 * is impossible.
-					 */
 					switch (relkind[0])
 					{
 						case RELKIND_VIEW:

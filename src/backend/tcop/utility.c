@@ -942,8 +942,7 @@ UtilityTupleDescriptor(Node *parsetree)
  * We assume it is invoked only on already-parse-analyzed statements
  * (else the contained parsetree isn't a Query yet).
  *
- * In some cases (currently, only EXPLAIN of CREATE TABLE AS/SELECT INTO and
- * CREATE MATERIALIZED VIEW), potentially Query-containing utility statements
+ * In some cases potentially Query-containing utility statements
  * can be nested.  This function will drill down to a non-utility Query, or
  * return NULL if none.
  */

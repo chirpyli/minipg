@@ -12,10 +12,8 @@ override CPPFLAGS := -I. -I$(srcdir) $(CPPFLAGS)
 
 # keep this list arranged alphabetically or it gets to be a mess
 OBJS = \
-	amutils.o \
 	array_expanded.o \
 	array_selfuncs.o \
-	array_typanalyze.o \
 	array_userfuncs.o \
 	arrayfuncs.o \
 	arraysubs.o \
@@ -32,7 +30,6 @@ OBJS = \
 	expandedrecord.o \
 	float.o \
 	format_type.o \
-	genfile.o \
 	int.o \
 	int8.o \
 	like.o \
@@ -45,7 +42,6 @@ OBJS = \
 	numutils.o \
 	oid.o \
 	oracle_compat.o \
-	orderedsetaggs.o \
 	pg_locale.o \
 	pg_lsn.o \
 	pgstatfuncs.o \
@@ -61,7 +57,6 @@ OBJS = \
 	varlena.o \
 	version.o \
 	xid.o \
-	xid8funcs.o
 
 clean distclean maintainer-clean:
 	rm -f lex.backup

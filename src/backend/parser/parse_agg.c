@@ -113,45 +113,6 @@ transformAggregateCall(ParseState *pstate, Aggref *agg,
 	int			save_next_resno;
 	ListCell   *lc;
 
-	if (AGGKIND_IS_ORDERED_SET(agg->aggkind))
-	{
-		/*
-		 * For an ordered-set agg, the args list includes direct args and
-		 * aggregated args; we must split them apart.
-		 */
-		int			numDirectArgs = list_length(args) - list_length(aggorder);
-		List	   *aargs;
-		ListCell   *lc2;
-
-		Assert(numDirectArgs >= 0);
-
-		aargs = list_copy_tail(args, numDirectArgs);
-		agg->aggdirectargs = list_truncate(args, numDirectArgs);
-
-		/*
-		 * Build a tlist from the aggregated args, and make a sortlist entry
-		 * for each one.  Note that the expressions in the SortBy nodes are
-		 * ignored (they are the raw versions of the transformed args); we are
-		 * just looking at the sort information in the SortBy nodes.
-		 */
-		forboth(lc, aargs, lc2, aggorder)
-		{
-			Expr	   *arg = (Expr *) lfirst(lc);
-			SortBy	   *sortby = (SortBy *) lfirst(lc2);
-			TargetEntry *tle;
-
-			/* We don't bother to assign column names to the entries */
-			tle = makeTargetEntry(arg, attno++, NULL, false);
-			tlist = lappend(tlist, tle);
-
-			torder = addTargetToSortList(pstate, tle,
-										 torder, tlist, sortby);
-		}
-
-		/* Never any DISTINCT in an ordered-set agg */
-		Assert(!agg_distinct);
-	}
-	else
 	{
 		/* Regular aggregate, so it has no direct args */
 		agg->aggdirectargs = NIL;

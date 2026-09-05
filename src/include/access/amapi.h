@@ -25,35 +25,6 @@ struct IndexPath;
 /* Likewise, this file shouldn't depend on execnodes.h. */
 struct IndexInfo;
 
-
-/*
- * Properties for amproperty API.  This list covers properties known to the
- * core code, but an index AM can define its own properties, by matching the
- * string property name.
- */
-typedef enum IndexAMProperty
-{
-	AMPROP_UNKNOWN = 0,			/* anything not known to core code */
-	AMPROP_ASC,					/* column properties */
-	AMPROP_DESC,
-	AMPROP_NULLS_FIRST,
-	AMPROP_NULLS_LAST,
-	AMPROP_ORDERABLE,
-	AMPROP_DISTANCE_ORDERABLE,
-	AMPROP_RETURNABLE,
-	AMPROP_SEARCH_ARRAY,
-	AMPROP_SEARCH_NULLS,
-	AMPROP_CLUSTERABLE,			/* index properties */
-	AMPROP_INDEX_SCAN,
-	AMPROP_BITMAP_SCAN,
-	AMPROP_BACKWARD_SCAN,
-	AMPROP_CAN_ORDER,			/* AM properties */
-	AMPROP_CAN_UNIQUE,
-	AMPROP_CAN_MULTI_COL,
-	AMPROP_CAN_EXCLUDE,
-	AMPROP_CAN_INCLUDE
-} IndexAMProperty;
-
 /*
  * We use lists of this struct type to keep track of both operators and
  * support functions while building or adding to an opclass or opfamily.
@@ -143,14 +114,6 @@ typedef void (*amcostestimate_function) (struct PlannerInfo *root,
 /* parse index reloptions */
 typedef bytea *(*amoptions_function) (Datum reloptions,
 									  bool validate);
-
-/* report AM, index, or index column property */
-typedef bool (*amproperty_function) (Oid index_oid, int attno,
-									 IndexAMProperty prop, const char *propname,
-									 bool *res, bool *isnull);
-
-/* name of phase as used in progress reporting */
-typedef char *(*ambuildphasename_function) (int64 phasenum);
 
 /* validate definition of an opclass for this AM */
 typedef bool (*amvalidate_function) (Oid opclassoid);
@@ -253,12 +216,6 @@ typedef struct IndexAmRoutine
 	/* type of data stored in index, or InvalidOid if variable */
 	Oid			amkeytype;
 
-	/*
-	 * If you add new properties to either the above or the below lists, then
-	 * they should also (usually) be exposed via the property API (see
-	 * IndexAMProperty at the top of the file, and utils/adt/amutils.c).
-	 */
-
 	/* interface functions */
 	ambuild_function ambuild;
 	ambuildempty_function ambuildempty;
@@ -268,8 +225,6 @@ typedef struct IndexAmRoutine
 	amcanreturn_function amcanreturn;	/* can be NULL */
 	amcostestimate_function amcostestimate;
 	amoptions_function amoptions;
-	amproperty_function amproperty; /* can be NULL */
-	ambuildphasename_function ambuildphasename; /* can be NULL */
 	amvalidate_function amvalidate;
 	amadjustmembers_function amadjustmembers;	/* can be NULL */
 	ambeginscan_function ambeginscan;

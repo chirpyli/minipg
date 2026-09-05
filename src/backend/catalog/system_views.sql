@@ -556,9 +556,7 @@ CREATE VIEW pg_stat_progress_create_index AS
                       END AS command,
         CASE S.param10 WHEN 0 THEN 'initializing'
                        WHEN 1 THEN 'waiting for writers before build'
-                       WHEN 2 THEN 'building index' ||
-                           COALESCE((': ' || pg_indexam_progress_phasename(S.param9::oid, S.param11)),
-                                    '')
+                       WHEN 2 THEN 'building index'
                        WHEN 3 THEN 'waiting for writers before validation'
                        WHEN 4 THEN 'index validation: scanning index'
                        WHEN 5 THEN 'index validation: sorting tuples'

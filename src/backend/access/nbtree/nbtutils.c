@@ -2122,57 +2122,6 @@ BTreeShmemInit(void)
 		Assert(found);
 }
 
-
-
-/*
- *	btproperty() -- Check boolean properties of indexes.
- *
- * This is optional, but handling AMPROP_RETURNABLE here saves opening the rel
- * to call btcanreturn.
- */
-bool
-btproperty(Oid index_oid, int attno,
-		   IndexAMProperty prop, const char *propname,
-		   bool *res, bool *isnull)
-{
-	switch (prop)
-	{
-		case AMPROP_RETURNABLE:
-			/* answer only for columns, not AM or whole index */
-			if (attno == 0)
-				return false;
-			/* otherwise, btree can always return data */
-			*res = true;
-			return true;
-
-		default:
-			return false;		/* punt to generic code */
-	}
-}
-
-/*
- *	btbuildphasename() -- Return name of index build phase.
- */
-char *
-btbuildphasename(int64 phasenum)
-{
-	switch (phasenum)
-	{
-		case PROGRESS_CREATEIDX_SUBPHASE_INITIALIZE:
-			return "initializing";
-		case PROGRESS_BTREE_PHASE_INDEXBUILD_TABLESCAN:
-			return "scanning table";
-		case PROGRESS_BTREE_PHASE_PERFORMSORT_1:
-			return "sorting live tuples";
-		case PROGRESS_BTREE_PHASE_PERFORMSORT_2:
-			return "sorting dead tuples";
-		case PROGRESS_BTREE_PHASE_LEAF_LOAD:
-			return "loading tuples in tree";
-		default:
-			return NULL;
-	}
-}
-
 /*
  *	_bt_truncate() -- create tuple without unneeded suffix attributes.
  *

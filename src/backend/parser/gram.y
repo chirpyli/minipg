@@ -230,8 +230,8 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 %type <node>	alter_column_default alter_using
 %type <ival>	opt_asc_desc opt_nulls_order
 
-%type <node>	alter_table_cmd alter_type_cmd
-%type <list>	alter_table_cmds alter_type_cmds
+%type <node>	alter_table_cmd
+%type <list>	alter_table_cmds
 
 %type <dbehavior>	opt_drop_behavior
 
@@ -288,7 +288,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 				def_list operator_def_list indirection opt_indirection
 				transaction_mode_list_or_empty
 				OptTableFuncElementList TableFuncElementList opt_type_modifiers
-				using_clause returning_clause
+				using_clause
 			alter_generic_options
 			relation_expr_list
 			vacuum_relation_list opt_vacuum_relation_list
@@ -403,9 +403,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 
 %type <node>	func_application func_expr_common_subexpr
 %type <node>	func_expr func_expr_windowless
-%type <list>	within_group_clause
 %type <node>	filter_clause
-%type <boolean> opt_if_not_exists 
 
 
 /*
@@ -466,7 +464,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 	HAVING HEADER_P HOUR_P
 
 	IDENTITY_P IF_P ILIKE IMMEDIATE IMPLICIT_P IMPORT_P IN_P INCLUDE
-	INCLUDING INCREMENT INDEX INDEXES INHERIT INHERITS INITIALLY
+	INCLUDING INCREMENT INDEX INDEXES INITIALLY
 	INNER_P INPUT_P INSERT INSTEAD INT_P INTEGER
 	INTERSECT INTERVAL INTO IS ISNULL ISOLATION
 
@@ -478,7 +476,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
 
-	MAPPING MATCH MATERIALIZED MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
+	MAPPING MATCH MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
 
 	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NO NONE
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
@@ -1443,59 +1441,6 @@ alter_using:
 		;
 
 
-alter_type_cmds:
-			alter_type_cmd							{ $$ = list_make1($1); }
-			| alter_type_cmds ',' alter_type_cmd	{ $$ = lappend($1, $3); }
-		;
-
-alter_type_cmd:
-			/* ALTER TYPE <name> ADD ATTRIBUTE <coldef> [RESTRICT|CASCADE] */
-			ADD_P ATTRIBUTE TableFuncElement opt_drop_behavior
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_AddColumn;
-					n->def = $3;
-					n->behavior = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TYPE <name> DROP ATTRIBUTE IF EXISTS <attname> [RESTRICT|CASCADE] */
-			| DROP ATTRIBUTE IF_P EXISTS ColId opt_drop_behavior
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropColumn;
-					n->name = $5;
-					n->behavior = $6;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
-			/* ALTER TYPE <name> DROP ATTRIBUTE <attname> [RESTRICT|CASCADE] */
-			| DROP ATTRIBUTE ColId opt_drop_behavior
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropColumn;
-					n->name = $3;
-					n->behavior = $4;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			/* ALTER TYPE <name> ALTER ATTRIBUTE <attname> [SET DATA] TYPE <typename> [RESTRICT|CASCADE] */
-			| ALTER ATTRIBUTE ColId opt_set_data TYPE_P Typename opt_drop_behavior
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					ColumnDef *def = makeNode(ColumnDef);
-					n->subtype = AT_AlterColumnType;
-					n->name = $3;
-					n->def = (Node *) def;
-					n->behavior = $7;
-					/* We only use these fields of the ColumnDef node */
-					def->typeName = $6;
-					def->raw_default = NULL;
-					def->location = @3;
-					$$ = (Node *)n;
-				}
-		;
-
-
 /*****************************************************************************
  *
  *		QUERY :
@@ -1940,10 +1885,6 @@ def_arg:	func_type						{ $$ = (Node *)$1; }
 			| NumericOnly					{ $$ = (Node *)$1; }
 			| Sconst						{ $$ = (Node *)makeString($1); }
 			| NONE							{ $$ = (Node *)makeString(pstrdup($1)); }
-		;
-
-opt_if_not_exists: IF_P NOT EXISTS              { $$ = true; }
-		| /* EMPTY */                          { $$ = false; }
 		;
 
 
@@ -5366,54 +5307,19 @@ func_application: func_name '(' ')'
  * (Note that many of the special SQL functions wouldn't actually make any
  * sense as functional index entries, but we ignore that consideration here.)
  */
-func_expr: func_application within_group_clause filter_clause
-				{
-					FuncCall *n = (FuncCall *) $1;
-					/*
-					 * The order clause for WITHIN GROUP and the one for
-					 * plain-aggregate ORDER BY share a field, so we have to
-					 * check here that at most one is present.  We also check
-					 * for DISTINCT and VARIADIC here to give a better error
-					 * location.  Other consistency checks are deferred to
-					 * parse analysis.
-					 */
-					if ($2 != NIL)
-					{
-						if (n->agg_order != NIL)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("cannot use multiple ORDER BY clauses with WITHIN GROUP"),
-									 parser_errposition(@2)));
-						if (n->agg_distinct)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("cannot use DISTINCT with WITHIN GROUP"),
-									 parser_errposition(@2)));
-						if (n->func_variadic)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("cannot use VARIADIC with WITHIN GROUP"),
-									 parser_errposition(@2)));
-						n->agg_order = $2;
-						n->agg_within_group = true;
-					}
-					n->agg_filter = $3;
-					$$ = (Node *) n;
-				}
-			| func_expr_common_subexpr
-				{ $$ = $1; }
-		;
-
-/*
- * As func_expr but does not accept WINDOW functions directly
- * (but they can still be contained in arguments for functions etc).
- * Use this when window expressions are not allowed, where needed to
- * disambiguate the grammar (e.g. in CREATE INDEX).
- */
+func_expr: func_application filter_clause
+                {
+                        FuncCall *n = (FuncCall *) $1;
+                        n->agg_filter = $2;
+                        $$ = (Node *) n;
+                }
+        | func_expr_common_subexpr
+                { $$ = $1; }
+        ;
 func_expr_windowless:
-			func_application						{ $$ = $1; }
-			| func_expr_common_subexpr				{ $$ = $1; }
-		;
+        func_application                { $$ = $1; }
+        | func_expr_common_subexpr      { $$ = $1; }
+        ;
 
 /*
  * Special expressions that are considered to be functions.
@@ -5609,14 +5515,6 @@ func_expr_common_subexpr:
 				}
 		;
 
-
-/*
- * Aggregate decoration clauses
- */
-within_group_clause:
-			WITHIN GROUP_P '(' sort_clause ')'		{ $$ = $4; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
 
 filter_clause:
 			FILTER '(' WHERE a_expr ')'				{ $$ = $4; }
@@ -6402,8 +6300,6 @@ unreserved_keyword:
 			| INCREMENT
 			| INDEX
 			| INDEXES
-			| INHERIT
-			| INHERITS
 			| INPUT_P
 			| INSERT
 			| INSTEAD
@@ -6422,7 +6318,6 @@ unreserved_keyword:
 			| LOGGED
 			| MAPPING
 			| MATCH
-			| MATERIALIZED
 			| MAXVALUE
 			| MINUTE_P
 			| MINVALUE
@@ -6864,8 +6759,6 @@ bare_label_keyword:
 			| INCREMENT
 			| INDEX
 			| INDEXES
-			| INHERIT
-			| INHERITS
 			| INITIALLY
 			| INNER_P
 			| INPUT_P
@@ -6898,7 +6791,6 @@ bare_label_keyword:
 			| LOGGED
 			| MAPPING
 			| MATCH
-			| MATERIALIZED
 			| MAXVALUE
 			| MINVALUE
 			| MODE

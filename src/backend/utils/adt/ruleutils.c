@@ -1972,8 +1972,6 @@ print_function_arguments(StringInfo buf, HeapTuple proctup,
 			elog(ERROR, "cache lookup failed for aggregate %u",
 				 proc->oid);
 		agg = (Form_pg_aggregate) GETSTRUCT(aggtup);
-		if (AGGKIND_IS_ORDERED_SET(agg->aggkind))
-			insertorderbyat = agg->aggnumdirectargs;
 		ReleaseSysCache(aggtup);
 	}
 
@@ -7700,20 +7698,6 @@ get_agg_expr(Aggref *aggref, deparse_context *context,
 											context->special_exprkind),
 					 (aggref->aggdistinct != NIL) ? "DISTINCT " : "");
 
-	if (AGGKIND_IS_ORDERED_SET(aggref->aggkind))
-	{
-		/*
-		 * Ordered-set aggregates do not use "*" syntax.  Also, we needn't
-		 * worry about inserting VARIADIC.  So we can just dump the direct
-		 * args as-is.
-		 */
-		Assert(!aggref->aggvariadic);
-		get_rule_expr((Node *) aggref->aggdirectargs, context, true);
-		Assert(aggref->aggorder != NIL);
-		appendStringInfoString(buf, ") WITHIN GROUP (ORDER BY ");
-		get_rule_orderby(aggref->aggorder, aggref->args, false, context);
-	}
-	else
 	{
 		/* aggstar can be set only in zero-argument aggregates */
 		if (aggref->aggstar)
@@ -7832,13 +7816,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			}
 			appendStringInfoString(buf, " FROM ");
 			get_rule_expr((Node *) lsecond(expr->args), context, false);
-			appendStringInfoChar(buf, ')');
-			return true;
-
-		case F_PG_COLLATION_FOR:
-			/* COLLATION FOR */
-			appendStringInfoString(buf, "COLLATION FOR (");
-			get_rule_expr((Node *) linitial(expr->args), context, false);
 			appendStringInfoChar(buf, ')');
 			return true;
 

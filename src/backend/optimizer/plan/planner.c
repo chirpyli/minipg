@@ -260,10 +260,7 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	 * parallelism, or if parallel-unsafe functions are present in the query
 	 * tree.
 	 *
-	 * (Note that we do allow CREATE TABLE AS, SELECT INTO, and CREATE
-	 * MATERIALIZED VIEW to use parallel plans, but this is safe only because
-	 * the command is writing into a completely new table which workers won't
-	 * be able to see.  If the workers could see the table, the fact that
+	* If the workers could see the table, the fact that
 	 * group locking would cause them to ignore the leader's heavyweight
 	 * GIN page locks would make this unsafe.  We'll have to fix that somehow
 	 * if we want to allow parallel inserts in general; updates and deletes
