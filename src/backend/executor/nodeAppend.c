@@ -123,7 +123,6 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	appendstate->as_syncdone = false;
 	appendstate->as_begun = false;
 
-	/* No partition pruning (partitioned tables are not supported) */
 	nplans = list_length(node->appendplans);
 
 	/*
@@ -132,7 +131,6 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	Assert(nplans > 0);
 	appendstate->as_valid_subplans = validsubplans =
 		bms_add_range(NULL, 0, nplans - 1);
-	appendstate->as_prune_state = NULL;
 
 	/*
 	 * Initialize result tuple type and slot.

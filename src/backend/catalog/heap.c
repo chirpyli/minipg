@@ -305,10 +305,6 @@ heap_create(const char *relname,
 			/*
 			 * Force reltablespace to zero if the relation has no physical
 			 * storage.  This is mainly just for cleanliness' sake.
-			 *
-			 * Partitioned tables and indexes don't have physical storage
-			 * either, but we want to keep their tablespace settings so that
-			 * their children can inherit it.
 			 */
 			reltablespace = InvalidOid;
 			break;
@@ -521,10 +517,6 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
  * are reliably identifiable only within a session, since the identity info
  * may use a typmod that is only locally assigned.  The caller is expected
  * to know whether these cases are safe.)
- *
- * flags can also control the phrasing of the error messages.  If
- * CHKATYPE_IS_PARTKEY is specified, "attname" should be a partition key
- * column number as text, not a real column name.
  * --------------------------------
  */
 void
@@ -555,17 +547,10 @@ CheckAttributeType(const char *attname,
 			  (atttypid == RECORDOID && (flags & CHKATYPE_ANYRECORD)) ||
 			  (atttypid == RECORDARRAYOID && (flags & CHKATYPE_ANYRECORD))))
 		{
-			if (flags & CHKATYPE_IS_PARTKEY)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				/* translator: first %s is an integer not a name */
-						 errmsg("partition key column %s has pseudo-type %s",
-								attname, format_type_be(atttypid))));
-			else
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-						 errmsg("column \"%s\" has pseudo-type %s",
-								attname, format_type_be(atttypid))));
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+					 errmsg("column \"%s\" has pseudo-type %s",
+							attname, format_type_be(atttypid))));
 		}
 	}
 	else if (att_typtype == TYPTYPE_COMPOSITE)
@@ -604,7 +589,7 @@ CheckAttributeType(const char *attname,
 			CheckAttributeType(NameStr(attr->attname),
 							   attr->atttypid, DEFAULT_COLLATION_OID,
 							   containing_rowtypes,
-							   flags & ~CHKATYPE_IS_PARTKEY);
+							   flags);
 		}
 
 		relation_close(relation, AccessShareLock);
@@ -627,19 +612,11 @@ CheckAttributeType(const char *attname,
 	 */
 	if (!OidIsValid(attcollation) && type_is_collatable(atttypid))
 	{
-		if (flags & CHKATYPE_IS_PARTKEY)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-			/* translator: first %s is an integer not a name */
-					 errmsg("no collation was derived for partition key column %s with collatable type %s",
-							attname, format_type_be(atttypid)),
-					 errhint("Use the COLLATE clause to set the collation explicitly.")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("no collation was derived for column \"%s\" with collatable type %s",
-							attname, format_type_be(atttypid)),
-					 errhint("Use the COLLATE clause to set the collation explicitly.")));
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+				 errmsg("no collation was derived for column \"%s\" with collatable type %s",
+						attname, format_type_be(atttypid)),
+				 errhint("Use the COLLATE clause to set the collation explicitly.")));
 	}
 }
 
@@ -1669,19 +1646,7 @@ heap_drop_with_catalog(Oid relid)
 {
 	Relation	rel;
 	HeapTuple	tuple;
-	Oid			parentOid = InvalidOid,
-				defaultPartOid = InvalidOid;
 
-	/*
-	 * To drop a partition safely, we must grab exclusive lock on its parent,
-	 * because another backend might be about to execute a query on the parent
-	 * table.  If it relies on previously cached partition descriptor, then it
-	 * could attempt to access the just-dropped relation as its partition. We
-	 * must therefore take a table lock strong enough to prevent all queries
-	 * on the table from proceeding until we commit and send out a
-	 * shared-cache-inval notice that will make them update their partition
-	 * descriptors.
-	 */
 	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relid);
@@ -1748,24 +1713,6 @@ heap_drop_with_catalog(Oid relid)
 	 * delete relation tuple
 	 */
 	DeleteRelationTuple(relid);
-
-	if (OidIsValid(parentOid))
-	{
-		/*
-		 * If this is not the default partition, the partition constraint of
-		 * the default partition has changed to include the portion of the key
-		 * space previously covered by the dropped partition.
-		 */
-		if (OidIsValid(defaultPartOid) && relid != defaultPartOid)
-			CacheInvalidateRelcacheByRelid(defaultPartOid);
-
-		/*
-		 * Invalidate the parent's relcache so that the partition is no longer
-		 * included in its partition descriptor.
-		 */
-		CacheInvalidateRelcacheByRelid(parentOid);
-		/* keep the lock */
-	}
 }
 
 
@@ -2376,28 +2323,8 @@ cookDefault(ParseState *pstate,
 	/*
 	 * Transform raw parsetree to executable expression.
 	 */
-	expr = transformExpr(pstate, raw_default, attgenerated ? EXPR_KIND_GENERATED_COLUMN : EXPR_KIND_COLUMN_DEFAULT);
-
-	if (attgenerated)
-	{
-		/* Disallow refs to other generated columns */
-		check_nested_generated(pstate, expr);
-
-		/* Disallow mutable functions */
-		if (contain_mutable_functions_after_planning((Expr *) expr))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("generation expression is not immutable")));
-	}
-	else
-	{
-		/*
-		 * For a default expression, transformExpr() should have rejected
-		 * column references.
-		 */
-		Assert(!contain_var_clause(expr));
-	}
-
+	expr = transformExpr(pstate, raw_default, EXPR_KIND_COLUMN_DEFAULT);
+	
 	/*
 	 * Coerce the expression to the correct type and typmod, if given. This
 	 * should match the parser's processing of non-defaulted expressions ---

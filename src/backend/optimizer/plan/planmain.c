@@ -247,9 +247,10 @@ query_planner(PlannerInfo *root,
 	 * Now expand appendrels by adding "otherrels" for their children.  We
 	 * delay this to the end so that we have as much information as possible
 	 * available for each baserel, including all restriction clauses.  That
-	 * let us prune away partitions that don't satisfy a restriction clause.
-	 * Also note that some information such as lateral_relids is propagated
-	 * from baserels to otherrels here, so we must have computed it already.
+	 * let us prune away inheritance children that don't satisfy a restriction
+	 * clause.  Also note that some information such as lateral_relids is
+	 * propagated from baserels to otherrels here, so we must have computed it
+	 * already.
 	 */
 	add_other_rels_to_query(root);
 

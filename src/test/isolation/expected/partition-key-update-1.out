@@ -1,6 +1,0 @@
-Parsed test spec with 2 sessions
-
-starting permutation: s1b s2b s1u s1c s2d s2c
-setup failed: ERROR:  foreign key constraints are not supported in minipg
-LINE 33:   CREATE TABLE bar (a int REFERENCES foo_range_parted1(a));
-                                   ^

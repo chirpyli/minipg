@@ -350,11 +350,10 @@ static const struct config_enum_entry compute_query_id_options[] = {
 };
 
 /*
- * Although only "on", "off", and "partition" are documented, we
+ * Although only "on" and "off" are documented, we
  * accept all the likely variants of "on" and "off".
  */
 static const struct config_enum_entry constraint_exclusion_options[] = {
-	{"partition", CONSTRAINT_EXCLUSION_PARTITION, false},
 	{"on", CONSTRAINT_EXCLUSION_ON, false},
 	{"off", CONSTRAINT_EXCLUSION_OFF, false},
 	{"true", CONSTRAINT_EXCLUSION_ON, true},
@@ -3543,7 +3542,7 @@ static struct config_enum ConfigureNamesEnum[] =
 			GUC_EXPLAIN
 		},
 		&constraint_exclusion,
-		CONSTRAINT_EXCLUSION_PARTITION, constraint_exclusion_options,
+		CONSTRAINT_EXCLUSION_ON, constraint_exclusion_options,
 		NULL, NULL, NULL
 	},
 

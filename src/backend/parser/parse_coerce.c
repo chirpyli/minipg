@@ -842,8 +842,9 @@ build_coercion_expression(Node *node,
  * coerce_record_to_complex
  *		Coerce a RECORD to a specific composite type.
  *
- * Currently we only support this for inputs that are RowExprs or whole-row
- * Vars.
+ * Currently we only support whole-row Vars as inputs.  The output is a
+ * RowExpr over the individual input columns; row constructors are not
+ * supported in minipg, so this node is only built here.
  */
 static Node *
 coerce_record_to_complex(ParseState *pstate, Node *node,
@@ -862,16 +863,8 @@ coerce_record_to_complex(ParseState *pstate, Node *node,
 	int			ucolno;
 	ListCell   *arg;
 
-	if (node && IsA(node, RowExpr))
-	{
-		/*
-		 * Since the RowExpr must be of type RECORD, we needn't worry about it
-		 * containing any dropped columns.
-		 */
-		args = ((RowExpr *) node)->args;
-	}
-	else if (node && IsA(node, Var) &&
-			 ((Var *) node)->varattno == InvalidAttrNumber)
+	if (node && IsA(node, Var) &&
+		((Var *) node)->varattno == InvalidAttrNumber)
 	{
 		int			rtindex = ((Var *) node)->varno;
 		int			sublevels_up = ((Var *) node)->varlevelsup;

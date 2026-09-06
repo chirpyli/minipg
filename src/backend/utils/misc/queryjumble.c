@@ -467,7 +467,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				SubLink    *sublink = (SubLink *) node;
 
 				APP_JUMB(sublink->subLinkType);
-				APP_JUMB(sublink->subLinkId);
 				JumbleExpr(jstate, (Node *) sublink->testexpr);
 				JumbleQueryInternal(jstate, castNode(Query, sublink->subselect));
 			}
@@ -556,15 +555,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 			break;
 		case T_RowExpr:
 			JumbleExpr(jstate, (Node *) ((RowExpr *) node)->args);
-			break;
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-
-				APP_JUMB(rcexpr->rctype);
-				JumbleExpr(jstate, (Node *) rcexpr->largs);
-				JumbleExpr(jstate, (Node *) rcexpr->rargs);
-			}
 			break;
 		case T_CoalesceExpr:
 			JumbleExpr(jstate, (Node *) ((CoalesceExpr *) node)->args);

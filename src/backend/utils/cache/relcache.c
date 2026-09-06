@@ -2244,8 +2244,8 @@ RelationClearRelation(Relation relation, bool rebuild)
 		 *
 		 * When rebuilding an open relcache entry, we must preserve ref count,
 		 * rd_*Subid, and rd_toastoid state.  Also attempt to preserve the
-		 * pg_class entry (rd_rel), tupledesc, rewrite-rule, partition key,
-		 * and partition descriptor substructures in place, because various
+		 * pg_class entry (rd_rel), tupledesc, and rewrite-rule substructures
+		 * in place, because various
 		 * places assume that these structures won't move while they are
 		 * working with an open relcache entry.  (Note:  the refcount
 		 * mechanism for tupledescs might someday allow us to remove this hack
@@ -4788,8 +4788,7 @@ load_relcache_init_file(bool shared)
 		}
 
 		/*
-		 * If it's an index, there's more to do.  Note we explicitly ignore
-		 * partitioned indexes here.
+		 * If it's an index, there's more to do.
 		 */
 		if (rel->rd_rel->relkind == RELKIND_INDEX)
 		{
@@ -4924,7 +4923,7 @@ load_relcache_init_file(bool shared)
 		 * and subject to change).  They must be rebuilt if needed by
 		 * RelationCacheInitializePhase3.  This is not expected to be a big
 		 * performance hit since few system catalogs have such. Ditto for RLS
-		 * policy data, partition info, index expressions, predicates,
+		 * policy data, index expressions, predicates,
 		 * exclusion info.
 		 */
 		rel->rd_rules = NULL;
@@ -5147,8 +5146,7 @@ write_relcache_init_file(bool shared)
 		write_item(NULL, 0, fp);
 
 		/*
-		 * If it's an index, there's more to do. Note we explicitly ignore
-		 * partitioned indexes here.
+		 * If it's an index, there's more to do.
 		 */
 		if (rel->rd_rel->relkind == RELKIND_INDEX)
 		{

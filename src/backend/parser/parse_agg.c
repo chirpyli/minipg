@@ -360,13 +360,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_WHERE:
 			errkind = true;
 			break;
-		case EXPR_KIND_POLICY:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in policy expressions");
-			else
-				err = _("grouping operations are not allowed in policy expressions");
-
-			break;
 		case EXPR_KIND_HAVING:
 			/* okay */
 			break;
@@ -449,23 +442,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 				err = _("grouping operations are not allowed in EXECUTE parameters");
 
 			break;
-		case EXPR_KIND_GENERATED_COLUMN:
-
-			if (isAgg)
-				err = _("aggregate functions are not allowed in column generation expressions");
-			else
-				err = _("grouping operations are not allowed in column generation expressions");
-
-			break;
-
-		case EXPR_KIND_CALL_ARGUMENT:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in CALL arguments");
-			else
-				err = _("grouping operations are not allowed in CALL arguments");
-
-			break;
-
 		case EXPR_KIND_COPY_WHERE:
 			if (isAgg)
 				err = _("aggregate functions are not allowed in COPY FROM WHERE conditions");

@@ -205,7 +205,6 @@ _copyModifyTable(const ModifyTable *from)
 	COPY_SCALAR_FIELD(canSetTag);
 	COPY_SCALAR_FIELD(nominalRelation);
 	COPY_SCALAR_FIELD(rootRelation);
-	COPY_SCALAR_FIELD(partColsUpdated);
 	COPY_NODE_FIELD(resultRelations);
 	COPY_NODE_FIELD(updateColnosLists);
 	COPY_NODE_FIELD(rowMarks);
@@ -1425,7 +1424,6 @@ _copySubLink(const SubLink *from)
 	SubLink    *newnode = makeNode(SubLink);
 
 	COPY_SCALAR_FIELD(subLinkType);
-	COPY_SCALAR_FIELD(subLinkId);
 	COPY_NODE_FIELD(testexpr);
 	COPY_NODE_FIELD(operName);
 	COPY_NODE_FIELD(subselect);
@@ -1672,24 +1670,6 @@ _copyRowExpr(const RowExpr *from)
 	COPY_SCALAR_FIELD(row_format);
 	COPY_NODE_FIELD(colnames);
 	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
- * _copyRowCompareExpr
- */
-static RowCompareExpr *
-_copyRowCompareExpr(const RowCompareExpr *from)
-{
-	RowCompareExpr *newnode = makeNode(RowCompareExpr);
-
-	COPY_SCALAR_FIELD(rctype);
-	COPY_NODE_FIELD(opnos);
-	COPY_NODE_FIELD(opfamilies);
-	COPY_NODE_FIELD(inputcollids);
-	COPY_NODE_FIELD(largs);
-	COPY_NODE_FIELD(rargs);
 
 	return newnode;
 }
@@ -2315,18 +2295,6 @@ _copyResTarget(const ResTarget *from)
 	COPY_NODE_FIELD(indirection);
 	COPY_NODE_FIELD(val);
 	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-static MultiAssignRef *
-_copyMultiAssignRef(const MultiAssignRef *from)
-{
-	MultiAssignRef *newnode = makeNode(MultiAssignRef);
-
-	COPY_NODE_FIELD(source);
-	COPY_SCALAR_FIELD(colno);
-	COPY_SCALAR_FIELD(ncolumns);
 
 	return newnode;
 }
@@ -3250,9 +3218,6 @@ copyObjectImpl(const void *from)
 		case T_RowExpr:
 			retval = _copyRowExpr(from);
 			break;
-		case T_RowCompareExpr:
-			retval = _copyRowCompareExpr(from);
-			break;
 		case T_CoalesceExpr:
 			retval = _copyCoalesceExpr(from);
 			break;
@@ -3465,9 +3430,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ResTarget:
 			retval = _copyResTarget(from);
-			break;
-		case T_MultiAssignRef:
-			retval = _copyMultiAssignRef(from);
 			break;
 		case T_TypeCast:
 			retval = _copyTypeCast(from);

@@ -2149,79 +2149,6 @@ estimate_array_length(Node *arrayexpr)
 }
 
 /*
- *		rowcomparesel		- Selectivity of RowCompareExpr Node.
- *
- * We estimate RowCompare selectivity by considering just the first (high
- * order) columns, which makes it equivalent to an ordinary OpExpr.  While
- * this estimate could be refined by considering additional columns, it
- * seems unlikely that we could do a lot better without multi-column
- * statistics.
- */
-Selectivity
-rowcomparesel(PlannerInfo *root,
-			  RowCompareExpr *clause,
-			  int varRelid, JoinType jointype, SpecialJoinInfo *sjinfo)
-{
-	Selectivity s1;
-	Oid			opno = linitial_oid(clause->opnos);
-	Oid			inputcollid = linitial_oid(clause->inputcollids);
-	List	   *opargs;
-	bool		is_join_clause;
-
-	/* Build equivalent arg list for single operator */
-	opargs = list_make2(linitial(clause->largs), linitial(clause->rargs));
-
-	/*
-	 * Decide if it's a join clause.  This should match clausesel.c's
-	 * treat_as_join_clause(), except that we intentionally consider only the
-	 * leading columns and not the rest of the clause.
-	 */
-	if (varRelid != 0)
-	{
-		/*
-		 * Caller is forcing restriction mode (eg, because we are examining an
-		 * inner indexscan qual).
-		 */
-		is_join_clause = false;
-	}
-	else if (sjinfo == NULL)
-	{
-		/*
-		 * It must be a restriction clause, since it's being evaluated at a
-		 * scan node.
-		 */
-		is_join_clause = false;
-	}
-	else
-	{
-		/*
-		 * Otherwise, it's a join if there's more than one relation used.
-		 */
-		is_join_clause = (NumRelids(root, (Node *) opargs) > 1);
-	}
-
-	if (is_join_clause)
-	{
-		/* Estimate selectivity for a join clause. */
-		s1 = join_selectivity(root, opno,
-							  opargs,
-							  inputcollid,
-							  jointype,
-							  sjinfo);
-	}
-	else
-	{
-		/* Estimate selectivity for a restriction clause. */
-		s1 = restriction_selectivity(root, opno,
-									 opargs,
-									 inputcollid,
-									 varRelid);
-	}
-
-	return s1;
-}
-
-/*
  *		eqjoinsel		- Join selectivity of "="
  */
 Datum
@@ -4976,9 +4903,9 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 		appinfo = root->append_rel_array[varno];
 
 		/*
-		 * Partitions are mapped to their immediate parent, not the root
-		 * parent, so must be ready to walk up multiple AppendRelInfos.  But
-		 * stop if we hit a parent that is not RTE_RELATION --- that's a
+		 * Inheritance children are mapped to their immediate parent, not the
+		 * root parent, so must be ready to walk up multiple AppendRelInfos.
+		 * But stop if we hit a parent that is not RTE_RELATION --- that's a
 		 * flattened UNION ALL subquery, not an inheritance parent.
 		 */
 		while (appinfo &&
@@ -5877,12 +5804,6 @@ index_other_operands_eval_cost(PlannerInfo *root, List *indexquals)
 
 			other_operand = (Node *) lsecond(op->args);
 		}
-		else if (IsA(clause, RowCompareExpr))
-		{
-			RowCompareExpr *rc = (RowCompareExpr *) clause;
-
-			other_operand = (Node *) rc->rargs;
-		}
 		else if (IsA(clause, ScalarArrayOpExpr))
 		{
 			ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) clause;
@@ -6174,9 +6095,6 @@ btcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 	 * to find out which ones count as boundary quals.  We rely on the
 	 * knowledge that they are given in index column order.
 	 *
-	 * For a RowCompareExpr, we consider only the first column, just as
-	 * rowcomparesel() does.
-	 *
 	 * If there's a ScalarArrayOpExpr in the quals, we'll actually perform N
 	 * index scans not one, but the ScalarArrayOpExpr's operator can be
 	 * considered to act the same as it normally does.
@@ -6216,12 +6134,6 @@ btcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 				OpExpr	   *op = (OpExpr *) clause;
 
 				clause_op = op->opno;
-			}
-			else if (IsA(clause, RowCompareExpr))
-			{
-				RowCompareExpr *rc = (RowCompareExpr *) clause;
-
-				clause_op = linitial_oid(rc->opnos);
 			}
 			else if (IsA(clause, ScalarArrayOpExpr))
 			{

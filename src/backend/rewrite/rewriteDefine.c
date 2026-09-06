@@ -380,8 +380,8 @@ DefineQueryRewrite(const char *rulename,
 		 * Are we converting a relation to a view?
 		 *
 		 * If so, check that the relation is empty because the storage for the
-		 * relation is going to be deleted.  Also insist that the rel not be
-		 * involved in partitioning, nor have any triggers, indexes, child or
+		 * relation is going to be deleted.  Also insist that the rel not have
+		 * any triggers, indexes, child or
 		 * parent tables, RLS policies, or RLS enabled.  (Note: some of these
 		 * tests are too strict, because they will reject relations that once
 		 * had such but don't anymore.  But we don't really care, because this

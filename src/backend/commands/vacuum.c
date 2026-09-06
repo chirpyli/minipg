@@ -663,13 +663,7 @@ vacuum_open_relation(Oid relid, RangeVar *relation, bits32 options,
 
 
 /*
- * Given a VacuumRelation, fill in the table OID if it wasn't specified,
- * and optionally add VacuumRelations for partitions of the table.
- *
- * If a VacuumRelation does not have an OID supplied and is a partitioned
- * table, an extra entry will be added to the output for each partition.
- * Presently, only autovacuum supplies OIDs when calling vacuum(), and
- * it does not want us to expand partitioned tables.
+ * Given a VacuumRelation, fill in the table OID if it wasn't specified.
  *
  * We take care not to modify the input data structure, but instead build
  * new VacuumRelation(s) to return.  (But note that they will reference
@@ -691,7 +685,7 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 	}
 	else
 	{
-		/* Process a specific relation, and possibly partitions thereof */
+		/* Process a specific relation */
 		Oid			relid;
 		HeapTuple	tuple;
 		int			rvr_opts;
@@ -731,10 +725,7 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 			return vacrels;
 		}
 
-		/*
-		 * To check whether the relation is a partitioned table and its
-		 * ownership, fetch its syscache entry.
-		 */
+		/* To check the relation's ownership, fetch its syscache entry. */
 		tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for relation %u", relid);
@@ -785,12 +776,9 @@ get_all_vacuum_rels(int options)
 		MemoryContext oldcontext;
 		Oid			relid = classForm->oid;
 
-		/*
-		 * Partitioned tables are not supported in this build (minipg); only
-		 * regular tables are vacuumable here.
-		 */
-			if (classForm->relkind != RELKIND_RELATION)
-				continue;
+		/* Only regular tables are vacuumable. */
+		if (classForm->relkind != RELKIND_RELATION)
+			continue;
 
 		/*
 		 * Build VacuumRelation(s) specifying the table OIDs to be processed.
@@ -1802,13 +1790,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 		CommitTransactionCommand();
 		return false;
 	}
-
-	/*
-	 * Partitioned tables are not supported in this build (minipg); the
-	 * partition-skip logic above is unreachable.
-	 */
-
-
 
 	/*
 	 * Get a session-level lock too. This will protect our access to the

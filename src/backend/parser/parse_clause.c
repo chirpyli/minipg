@@ -1864,15 +1864,6 @@ flatten_grouping_sets(Node *expr, bool toplevel, bool *hasGroupingSets)
 
 	switch (expr->type)
 	{
-		case T_RowExpr:
-			{
-				RowExpr    *r = (RowExpr *) expr;
-
-				if (r->row_format == COERCE_IMPLICIT_CAST)
-					return flatten_grouping_sets((Node *) r->args,
-												 false, NULL);
-			}
-			break;
 		case T_GroupingSet:
 			{
 				GroupingSet *gset = (GroupingSet *) expr;
@@ -2197,8 +2188,6 @@ transformGroupingSet(List **flatresult,
  * GROUP BY items will be added to the targetlist (as resjunk columns)
  * if not already present, so the targetlist must be passed by reference.
  *
- * This is also used for window PARTITION BY clauses (which act almost the
- * same, but are always interpreted per SQL99 rules).
  *
  * Grouping sets make this a lot more complex than it was. Our goal here is
  * twofold: we make a flat list of SortGroupClause nodes referencing each
@@ -2240,7 +2229,7 @@ transformGroupClause(ParseState *pstate, List *grouplist, List **groupingSets,
 	Bitmapset  *seen_local = NULL;
 
 	/*
-	 * Recursively flatten implicit RowExprs. (Technically this is only needed
+	 * Recursively flatten grouping sets. (Technically this is only needed
 	 * for GROUP BY, per the syntax rules for grouping sets, but we do it
 	 * anyway.)
 	 */

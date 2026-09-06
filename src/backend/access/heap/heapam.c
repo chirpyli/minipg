@@ -1989,7 +1989,6 @@ heap_get_latest_tid(TableScanDesc sscan,
 		 */
 		if ((tp.t_data->t_infomask & HEAP_XMAX_INVALID) ||
 			HeapTupleHeaderIsOnlyLocked(tp.t_data) ||
-			HeapTupleHeaderIndicatesMovedPartitions(tp.t_data) ||
 			ItemPointerEquals(&tp.t_self, &tp.t_data->t_ctid))
 		{
 			UnlockReleaseBuffer(buffer);
@@ -2713,7 +2712,7 @@ xmax_infomask_changed(uint16 new_infomask, uint16 old_infomask)
 TM_Result
 heap_delete(Relation relation, ItemPointer tid,
 			CommandId cid, Snapshot crosscheck, bool wait,
-			TM_FailureData *tmfd, bool changingPart)
+			TM_FailureData *tmfd)
 {
 	TM_Result	result;
 	TransactionId xid = GetCurrentTransactionId();
@@ -2996,10 +2995,6 @@ l1:
 	/* Make sure there is no forward chain link in t_ctid */
 	tp.t_data->t_ctid = tp.t_self;
 
-	/* Signal that this is actually a move into another partition */
-	if (changingPart)
-		HeapTupleHeaderSetMovedPartitions(tp.t_data);
-
 	MarkBufferDirty(buffer);
 
 	/*
@@ -3023,8 +3018,6 @@ l1:
 		xlrec.flags = 0;
 		if (all_visible_cleared)
 			xlrec.flags |= XLH_DELETE_ALL_VISIBLE_CLEARED;
-		if (changingPart)
-			xlrec.flags |= XLH_DELETE_IS_PARTITION_MOVE;
 		xlrec.infobits_set = compute_infobits(tp.t_data->t_infomask,
 											  tp.t_data->t_infomask2);
 		xlrec.offnum = ItemPointerGetOffsetNumber(&tp.t_self);
@@ -3102,7 +3095,7 @@ simple_heap_delete(Relation relation, ItemPointer tid)
 	result = heap_delete(relation, tid,
 						 GetCurrentCommandId(true), InvalidSnapshot,
 						 true /* wait for commit */ ,
-						 &tmfd, false /* changingPart */ );
+						 &tmfd);
 	switch (result)
 	{
 		case TM_SelfModified:
@@ -5852,7 +5845,6 @@ l4:
 next:
 		/* if we find the end of update chain, we're done. */
 		if (mytup.t_data->t_infomask & HEAP_XMAX_INVALID ||
-			HeapTupleHeaderIndicatesMovedPartitions(mytup.t_data) ||
 			ItemPointerEquals(&mytup.t_self, &mytup.t_data->t_ctid) ||
 			HeapTupleHeaderIsOnlyLocked(mytup.t_data))
 		{
@@ -5910,32 +5902,22 @@ heap_lock_updated_tuple(Relation rel,
 						const ItemPointerData *prior_ctid,
 						TransactionId xid, LockTupleMode mode)
 {
+	TransactionId prior_xmax;
+
 	/*
-	 * If the tuple has moved into another partition (effectively a delete)
-	 * stop here.
+	 * If this is the first possibly-multixact-able operation in the
+	 * current transaction, set my per-backend OldestMemberMXactId
+	 * setting. We can be certain that the transaction will never become a
+	 * member of any older MultiXactIds than that.  (We have to do this
+	 * even if we end up just using our own TransactionId below, since
+	 * some other backend could incorporate our XID into a MultiXact
+	 * immediately afterwards.)
 	 */
-	if (!ItemPointerIndicatesMovedPartitions(prior_ctid))
-	{
-		TransactionId prior_xmax;
+	MultiXactIdSetOldestMember();
 
-		/*
-		 * If this is the first possibly-multixact-able operation in the
-		 * current transaction, set my per-backend OldestMemberMXactId
-		 * setting. We can be certain that the transaction will never become a
-		 * member of any older MultiXactIds than that.  (We have to do this
-		 * even if we end up just using our own TransactionId below, since
-		 * some other backend could incorporate our XID into a MultiXact
-		 * immediately afterwards.)
-		 */
-		MultiXactIdSetOldestMember();
-
-		prior_xmax = (prior_infomask & HEAP_XMAX_IS_MULTI) ?
-			MultiXactIdGetUpdateXid(prior_raw_xmax, prior_infomask) : prior_raw_xmax;
-		return heap_lock_updated_tuple_rec(rel, prior_xmax, prior_ctid, xid, mode);
-	}
-
-	/* nothing to lock */
-	return TM_Ok;
+	prior_xmax = (prior_infomask & HEAP_XMAX_IS_MULTI) ?
+		MultiXactIdGetUpdateXid(prior_raw_xmax, prior_infomask) : prior_raw_xmax;
+	return heap_lock_updated_tuple_rec(rel, prior_xmax, prior_ctid, xid, mode);
 }
 
 /*
@@ -9227,10 +9209,7 @@ heap_xlog_delete(XLogReaderState *record)
 			PageClearAllVisible(page);
 
 		/* Make sure t_ctid is set correctly */
-		if (xlrec->flags & XLH_DELETE_IS_PARTITION_MOVE)
-			HeapTupleHeaderSetMovedPartitions(htup);
-		else
-			htup->t_ctid = target_tid;
+		htup->t_ctid = target_tid;
 		PageSetLSN(page, lsn);
 		MarkBufferDirty(buffer);
 	}
@@ -10129,10 +10108,9 @@ heap_mask(char *pagedata, BlockNumber blkno)
 				ItemPointerSet(&page_htup->t_ctid, blkno, off);
 
 			/*
-			 * NB: Not ignoring ctid changes due to the tuple having moved
-			 * (i.e. HeapTupleHeaderIndicatesMovedPartitions), because that's
-			 * important information that needs to be in-sync between primary
-			 * and standby, and thus is WAL logged.
+			 * NB: Not ignoring ctid changes because that's important
+			 * information that needs to be in-sync between primary and
+			 * standby, and thus is WAL logged.
 			 */
 		}
 

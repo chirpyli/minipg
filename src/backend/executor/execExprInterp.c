@@ -69,7 +69,6 @@
 #include "utils/builtins.h"
 #include "utils/date.h"
 #include "utils/datum.h"
-#include "utils/expandedrecord.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/timestamp.h"
@@ -460,8 +459,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_ARRAYEXPR,
 		&&CASE_EEOP_ARRAYCOERCE,
 		&&CASE_EEOP_ROW,
-		&&CASE_EEOP_ROWCOMPARE_STEP,
-		&&CASE_EEOP_ROWCOMPARE_FINAL,
 		&&CASE_EEOP_MINMAX,
 		&&CASE_EEOP_FIELDSELECT,
 		&&CASE_EEOP_FIELDSTORE_DEFORM,
@@ -1320,70 +1317,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex for an inline implementation */
 			ExecEvalRow(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_ROWCOMPARE_STEP)
-		{
-			FunctionCallInfo fcinfo = op->d.rowcompare_step.fcinfo_data;
-			Datum		d;
-
-			/* force NULL result if strict fn and NULL input */
-			if (op->d.rowcompare_step.finfo->fn_strict &&
-				(fcinfo->args[0].isnull || fcinfo->args[1].isnull))
-			{
-				*op->resnull = true;
-				EEO_JUMP(op->d.rowcompare_step.jumpnull);
-			}
-
-			/* Apply comparison function */
-			fcinfo->isnull = false;
-			d = op->d.rowcompare_step.fn_addr(fcinfo);
-			*op->resvalue = d;
-
-			/* force NULL result if NULL function result */
-			if (fcinfo->isnull)
-			{
-				*op->resnull = true;
-				EEO_JUMP(op->d.rowcompare_step.jumpnull);
-			}
-			*op->resnull = false;
-
-			/* If unequal, no need to compare remaining columns */
-			if (DatumGetInt32(*op->resvalue) != 0)
-			{
-				EEO_JUMP(op->d.rowcompare_step.jumpdone);
-			}
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_ROWCOMPARE_FINAL)
-		{
-			int32		cmpresult = DatumGetInt32(*op->resvalue);
-			RowCompareType rctype = op->d.rowcompare_final.rctype;
-
-			*op->resnull = false;
-			switch (rctype)
-			{
-					/* EQ and NE cases aren't allowed here */
-				case ROWCOMPARE_LT:
-					*op->resvalue = BoolGetDatum(cmpresult < 0);
-					break;
-				case ROWCOMPARE_LE:
-					*op->resvalue = BoolGetDatum(cmpresult <= 0);
-					break;
-				case ROWCOMPARE_GE:
-					*op->resvalue = BoolGetDatum(cmpresult >= 0);
-					break;
-				case ROWCOMPARE_GT:
-					*op->resvalue = BoolGetDatum(cmpresult > 0);
-					break;
-				default:
-					Assert(false);
-					break;
-			}
 
 			EEO_NEXT();
 		}
@@ -2906,51 +2839,6 @@ ExecEvalFieldSelect(ExprState *state, ExprEvalStep *op, ExprContext *econtext)
 
 	tupDatum = *op->resvalue;
 
-	/* We can special-case expanded records for speed */
-	if (VARATT_IS_EXTERNAL_EXPANDED(DatumGetPointer(tupDatum)))
-	{
-		ExpandedRecordHeader *erh = (ExpandedRecordHeader *) DatumGetEOHP(tupDatum);
-
-		Assert(erh->er_magic == ER_MAGIC);
-
-		/* Extract record's TupleDesc */
-		tupDesc = expanded_record_get_tupdesc(erh);
-
-		/*
-		 * Find field's attr record.  Note we don't support system columns
-		 * here: a datum tuple doesn't have valid values for most of the
-		 * interesting system columns anyway.
-		 */
-		if (fieldnum <= 0)		/* should never happen */
-			elog(ERROR, "unsupported reference to system column %d in FieldSelect",
-				 fieldnum);
-		if (fieldnum > tupDesc->natts)	/* should never happen */
-			elog(ERROR, "attribute number %d exceeds number of columns %d",
-				 fieldnum, tupDesc->natts);
-		attr = TupleDescAttr(tupDesc, fieldnum - 1);
-
-		/* Check for dropped column, and force a NULL result if so */
-		if (attr->attisdropped)
-		{
-			*op->resnull = true;
-			return;
-		}
-
-		/* Check for type mismatch --- possible after ALTER COLUMN TYPE? */
-		/* As in CheckVarSlotCompatibility, we should but can't check typmod */
-		if (op->d.fieldselect.resulttype != attr->atttypid)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("attribute %d has wrong type", fieldnum),
-					 errdetail("Table has type %s, but query expects %s.",
-							   format_type_be(attr->atttypid),
-							   format_type_be(op->d.fieldselect.resulttype))));
-
-		/* extract the field */
-		*op->resvalue = expanded_record_get_field(erh, fieldnum,
-												  op->resnull);
-	}
-	else
 	{
 		/* Get the composite datum and extract its type fields */
 		tuple = DatumGetHeapTupleHeader(tupDatum);

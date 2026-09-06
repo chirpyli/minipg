@@ -190,7 +190,7 @@ typedef struct SupportRequestRows
  * by the index machinery.  Typically this means that it is a binary OpExpr
  * with the index column value on the left, a pseudo-constant on the right,
  * and an operator that is in the index column's operator family.  Other
- * possibilities include RowCompareExpr, ScalarArrayOpExpr, and NullTest,
+ * possibilities include ScalarArrayOpExpr, and NullTest,
  * depending on the index type; but those seem less likely to be useful for
  * derived index conditions.  "Pseudo-constant" means that the right-hand
  * expression must not contain any volatile functions, nor any Vars of the

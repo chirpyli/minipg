@@ -53,11 +53,6 @@ static List *subbuild_joinrel_joinlist(RelOptInfo *joinrel,
 									   List *joininfo_list,
 									   List *new_joininfo);
 static void add_join_rel(PlannerInfo *root, RelOptInfo *joinrel);
-static void build_child_join_reltarget(PlannerInfo *root,
-									   RelOptInfo *parentrel,
-									   RelOptInfo *childrel,
-									   int nappinfos,
-									   AppendRelInfo **appinfos);
 
 
 /*
@@ -314,8 +309,7 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
 	/*
 	 * Copy the parent's quals to the child, with appropriate substitution of
 	 * variables.  If any constant false or NULL clauses turn up, we can mark
-	 * the child as dummy right away.  (We must do this immediately so that
-	 * pruning works correctly when recursing in expand_partitioned_rtentry.)
+	 * the child as dummy right away.
 	 */
 	if (parent)
 	{
@@ -667,129 +661,6 @@ build_join_rel(PlannerInfo *root,
 		root->join_rel_level[root->join_cur_level] =
 			lappend(root->join_rel_level[root->join_cur_level], joinrel);
 	}
-
-	return joinrel;
-}
-
-/*
- * build_child_join_rel
- *	  Builds RelOptInfo representing join between given two child relations.
- *
- * 'outer_rel' and 'inner_rel' are the RelOptInfos of child relations being
- *		joined
- * 'parent_joinrel' is the RelOptInfo representing the join between parent
- *		relations. Some of the members of new RelOptInfo are produced by
- *		translating corresponding members of this RelOptInfo
- * 'sjinfo': child-join context info
- * 'restrictlist': list of RestrictInfo nodes that apply to this particular
- *		pair of joinable relations
- * 'jointype' is the join type (inner, left, full, etc)
- */
-RelOptInfo *
-build_child_join_rel(PlannerInfo *root, RelOptInfo *outer_rel,
-					 RelOptInfo *inner_rel, RelOptInfo *parent_joinrel,
-					 List *restrictlist, SpecialJoinInfo *sjinfo,
-					 JoinType jointype)
-{
-	RelOptInfo *joinrel = makeNode(RelOptInfo);
-	AppendRelInfo **appinfos;
-	int			nappinfos;
-
-	/* Only joins between "other" relations land here. */
-	Assert(IS_OTHER_REL(outer_rel) && IS_OTHER_REL(inner_rel));
-
-	joinrel->reloptkind = RELOPT_OTHER_JOINREL;
-	joinrel->relids = bms_union(outer_rel->relids, inner_rel->relids);
-	joinrel->rows = 0;
-	/* cheap startup cost is interesting iff not all tuples to be retrieved */
-	joinrel->consider_startup = (root->tuple_fraction > 0);
-	joinrel->consider_param_startup = false;
-	joinrel->consider_parallel = false;
-	joinrel->reltarget = create_empty_pathtarget();
-	joinrel->pathlist = NIL;
-	joinrel->ppilist = NIL;
-	joinrel->partial_pathlist = NIL;
-	joinrel->cheapest_startup_path = NULL;
-	joinrel->cheapest_total_path = NULL;
-	joinrel->cheapest_unique_path = NULL;
-	joinrel->cheapest_parameterized_paths = NIL;
-	joinrel->direct_lateral_relids = NULL;
-	joinrel->lateral_relids = NULL;
-	joinrel->relid = 0;			/* indicates not a baserel */
-	joinrel->rtekind = RTE_JOIN;
-	joinrel->min_attr = 0;
-	joinrel->max_attr = 0;
-	joinrel->attr_needed = NULL;
-	joinrel->attr_widths = NULL;
-	joinrel->lateral_vars = NIL;
-	joinrel->lateral_referencers = NULL;
-	joinrel->indexlist = NIL;
-	joinrel->pages = 0;
-	joinrel->tuples = 0;
-	joinrel->allvisfrac = 0;
-	joinrel->eclass_indexes = NULL;
-	joinrel->subroot = NULL;
-	joinrel->baserestrictinfo = NIL;
-	joinrel->baserestrictcost.startup = 0;
-	joinrel->baserestrictcost.per_tuple = 0;
-	joinrel->joininfo = NIL;
-	joinrel->has_eclass_joins = false;
-	joinrel->top_parent_relids = NULL;
-
-	joinrel->top_parent_relids = bms_union(outer_rel->top_parent_relids,
-											inner_rel->top_parent_relids);
-
-	/* Compute information needed for mapping Vars to the child rel */
-	appinfos = find_appinfos_by_relids(root, joinrel->relids, &nappinfos);
-
-	/* Set up reltarget struct */
-	build_child_join_reltarget(root, parent_joinrel, joinrel,
-							   nappinfos, appinfos);
-
-	/* Construct joininfo list. */
-	joinrel->joininfo = (List *) adjust_appendrel_attrs(root,
-														(Node *) parent_joinrel->joininfo,
-														nappinfos,
-														appinfos);
-
-	/*
-	 * Lateral relids referred in child join will be same as that referred in
-	 * the parent relation.
-	 */
-	joinrel->direct_lateral_relids = (Relids) bms_copy(parent_joinrel->direct_lateral_relids);
-	joinrel->lateral_relids = (Relids) bms_copy(parent_joinrel->lateral_relids);
-
-	/*
-	 * If the parent joinrel has pending equivalence classes, so does the
-	 * child.
-	 */
-	joinrel->has_eclass_joins = parent_joinrel->has_eclass_joins;
-
-	/* Child joinrel is parallel safe if parent is parallel safe. */
-	joinrel->consider_parallel = parent_joinrel->consider_parallel;
-
-	/* Set estimates of the child-joinrel's size. */
-	set_joinrel_size_estimates(root, joinrel, outer_rel, inner_rel,
-							   sjinfo, restrictlist);
-
-	/* We build the join only once. */
-	Assert(!find_join_rel(root, joinrel->relids));
-
-	/* Add the relation to the PlannerInfo. */
-	add_join_rel(root, joinrel);
-
-	/*
-	 * We might need EquivalenceClass members corresponding to the child join,
-	 * so that we can represent sort pathkeys for it.  As with children of
-	 * baserels, we shouldn't need this unless there are relevant eclass joins
-	 * (implying that a merge join might be possible) or pathkeys to sort by.
-	 */
-	if (joinrel->has_eclass_joins || has_useful_pathkeys(root, parent_joinrel))
-		add_child_join_rel_equivalences(root,
-										nappinfos, appinfos,
-										parent_joinrel, joinrel);
-
-	pfree(appinfos);
 
 	return joinrel;
 }
@@ -1523,27 +1394,4 @@ find_param_path_info(RelOptInfo *rel, Relids required_outer)
 	}
 
 	return NULL;
-}
-
-/*
- * build_child_join_reltarget
- *	  Set up a child-join relation's reltarget from a parent-join relation.
- */
-static void
-build_child_join_reltarget(PlannerInfo *root,
-						   RelOptInfo *parentrel,
-						   RelOptInfo *childrel,
-						   int nappinfos,
-						   AppendRelInfo **appinfos)
-{
-	/* Build the targetlist */
-	childrel->reltarget->exprs = (List *)
-		adjust_appendrel_attrs(root,
-							   (Node *) parentrel->reltarget->exprs,
-							   nappinfos, appinfos);
-
-	/* Set the cost and width fields */
-	childrel->reltarget->cost.startup = parentrel->reltarget->cost.startup;
-	childrel->reltarget->cost.per_tuple = parentrel->reltarget->cost.per_tuple;
-	childrel->reltarget->width = parentrel->reltarget->width;
 }

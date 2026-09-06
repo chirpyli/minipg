@@ -52,11 +52,6 @@
 #define INDEX_MAX_KEYS		32
 
 /*
- * Maximum number of columns in a partition key
- */
-#define PARTITION_MAX_KEYS	32
-
-/*
  * Decide whether built-in 8-byte types, including float8, int8, and
  * timestamp, are passed by value.  This is on by default if sizeof(Datum) >=
  * 8 (that is, on 64-bit platforms).  If sizeof(Datum) < 8 (32-bit platforms),

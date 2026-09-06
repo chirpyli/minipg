@@ -132,19 +132,7 @@ add_paths_to_joinrel(PlannerInfo *root,
 	bool		mergejoin_allowed = true;
 	bool		consider_join_pushdown = false;
 	ListCell   *lc;
-	Relids		joinrelids;
-
-	/*
-	 * PlannerInfo doesn't contain the SpecialJoinInfos created for joins
-	 * between child relations, even if there is a SpecialJoinInfo node for
-	 * the join between the topmost parents. So, while calculating Relids set
-	 * representing the restriction, consider relids of topmost parent of
-	 * partitions.
-	 */
-	if (joinrel->reloptkind == RELOPT_OTHER_JOINREL)
-		joinrelids = joinrel->top_parent_relids;
-	else
-		joinrelids = joinrel->relids;
+	Relids		joinrelids = joinrel->relids;
 
 	extra.restrictlist = restrictlist;
 	extra.mergeclause_list = NIL;
@@ -603,13 +591,11 @@ get_memoize_path(PlannerInfo *root, RelOptInfo *innerrel,
 	}
 
 	/*
-	 * When considering a partitionwise join, we have clauses that reference
-	 * the outerrel's top parent not outerrel itself.
+	 * When the outerrel is a child in an inheritance hierarchy, we may have
+	 * clauses that reference the outerrel's top parent, not outerrel itself.
 	 */
 	if (outerrel->reloptkind == RELOPT_OTHER_MEMBER_REL)
 		top_outerrel = find_base_rel(root, bms_singleton_member(outerrel->top_parent_relids));
-	else if (outerrel->reloptkind == RELOPT_OTHER_JOINREL)
-		top_outerrel = find_join_rel(root, outerrel->top_parent_relids);
 	else
 		top_outerrel = outerrel;
 

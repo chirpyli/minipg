@@ -1097,7 +1097,7 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
  * The index quals are passed to the index AM in the form of a ScanKey array.
  * This routine sets up the ScanKeys, fills in all constant fields of the
  * ScanKeys, and prepares information about the keys that have non-constant
- * comparison values.  We divide index qual expressions into five types:
+ * comparison values.  We divide index qual expressions into four types:
  *
  * 1. Simple operator with constant comparison value ("indexkey op constant").
  * For these, we just fill in a ScanKey containing the constant value.
@@ -1107,12 +1107,7 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
  * expression value, and set up an IndexRuntimeKeyInfo struct to drive
  * evaluation of the expression at the right times.
  *
- * 3. RowCompareExpr ("(indexkey, indexkey, ...) op (expr, expr, ...)").
- * For these, we create a header ScanKey plus a subsidiary ScanKey array,
- * as specified in access/skey.h.  The elements of the row comparison
- * can have either constant or non-constant comparison values.
- *
- * 4. ScalarArrayOpExpr ("indexkey op ANY (array-expression)").  If the index
+ * 3. ScalarArrayOpExpr ("indexkey op ANY (array-expression)").  If the index
  * supports amsearcharray, we handle these the same as simple operators,
  * setting the SK_SEARCHARRAY flag to tell the AM to handle them.  Otherwise,
  * we create a ScanKey with everything filled in except the comparison value,
@@ -1120,7 +1115,7 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
  * (Note that if we use an IndexArrayKeyInfo struct, the array expression is
  * always treated as requiring runtime evaluation, even if it's a constant.)
  *
- * 5. NullTest ("indexkey IS NULL/IS NOT NULL").  We just fill in the
+ * 4. NullTest ("indexkey IS NULL/IS NOT NULL").  We just fill in the
  * ScanKey properly.
  *
  * This code is also used to prepare ORDER BY expressions for amcanorderbyop
@@ -1302,146 +1297,6 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 								   ((OpExpr *) clause)->inputcollid,	/* collation */
 								   opfuncid,	/* reg proc to use */
 								   scanvalue);	/* constant */
-		}
-		else if (IsA(clause, RowCompareExpr))
-		{
-			/* (indexkey, indexkey, ...) op (expression, expression, ...) */
-			RowCompareExpr *rc = (RowCompareExpr *) clause;
-			ScanKey		first_sub_key;
-			int			n_sub_key;
-			ListCell   *largs_cell;
-			ListCell   *rargs_cell;
-			ListCell   *opnos_cell;
-			ListCell   *collids_cell;
-
-			Assert(!isorderby);
-
-			first_sub_key = (ScanKey)
-				palloc(list_length(rc->opnos) * sizeof(ScanKeyData));
-			n_sub_key = 0;
-
-			/* Scan RowCompare columns and generate subsidiary ScanKey items */
-			forfour(largs_cell, rc->largs, rargs_cell, rc->rargs,
-					opnos_cell, rc->opnos, collids_cell, rc->inputcollids)
-			{
-				ScanKey		this_sub_key = &first_sub_key[n_sub_key];
-				int			flags = SK_ROW_MEMBER;
-				Datum		scanvalue;
-				Oid			inputcollation;
-
-				leftop = (Expr *) lfirst(largs_cell);
-				rightop = (Expr *) lfirst(rargs_cell);
-				opno = lfirst_oid(opnos_cell);
-				inputcollation = lfirst_oid(collids_cell);
-
-				/*
-				 * leftop should be the index key Var, possibly relabeled
-				 */
-				if (leftop && IsA(leftop, RelabelType))
-					leftop = ((RelabelType *) leftop)->arg;
-
-				Assert(leftop != NULL);
-
-				if (!(IsA(leftop, Var) &&
-					  ((Var *) leftop)->varno == INDEX_VAR))
-					elog(ERROR, "indexqual doesn't have key on left side");
-
-				varattno = ((Var *) leftop)->varattno;
-
-				/*
-				 * We have to look up the operator's associated btree support
-				 * function
-				 */
-				if (index->rd_rel->relam != BTREE_AM_OID ||
-					varattno < 1 || varattno > indnkeyatts)
-					elog(ERROR, "bogus RowCompare index qualification");
-				opfamily = index->rd_opfamily[varattno - 1];
-
-				get_op_opfamily_properties(opno, opfamily, isorderby,
-										   &op_strategy,
-										   &op_lefttype,
-										   &op_righttype);
-
-				if (op_strategy != rc->rctype)
-					elog(ERROR, "RowCompare index qualification contains wrong operator");
-
-				opfuncid = get_opfamily_proc(opfamily,
-											 op_lefttype,
-											 op_righttype,
-											 BTORDER_PROC);
-				if (!RegProcedureIsValid(opfuncid))
-					elog(ERROR, "missing support function %d(%u,%u) in opfamily %u",
-						 BTORDER_PROC, op_lefttype, op_righttype, opfamily);
-
-				/*
-				 * rightop is the constant or variable comparison value
-				 */
-				if (rightop && IsA(rightop, RelabelType))
-					rightop = ((RelabelType *) rightop)->arg;
-
-				Assert(rightop != NULL);
-
-				if (IsA(rightop, Const))
-				{
-					/* OK, simple constant comparison value */
-					scanvalue = ((Const *) rightop)->constvalue;
-					if (((Const *) rightop)->constisnull)
-						flags |= SK_ISNULL;
-				}
-				else
-				{
-					/* Need to treat this one as a runtime key */
-					if (n_runtime_keys >= max_runtime_keys)
-					{
-						if (max_runtime_keys == 0)
-						{
-							max_runtime_keys = 8;
-							runtime_keys = (IndexRuntimeKeyInfo *)
-								palloc(max_runtime_keys * sizeof(IndexRuntimeKeyInfo));
-						}
-						else
-						{
-							max_runtime_keys *= 2;
-							runtime_keys = (IndexRuntimeKeyInfo *)
-								repalloc(runtime_keys, max_runtime_keys * sizeof(IndexRuntimeKeyInfo));
-						}
-					}
-					runtime_keys[n_runtime_keys].scan_key = this_sub_key;
-					runtime_keys[n_runtime_keys].key_expr =
-						ExecInitExpr(rightop, planstate);
-					runtime_keys[n_runtime_keys].key_toastable =
-						TypeIsToastable(op_righttype);
-					n_runtime_keys++;
-					scanvalue = (Datum) 0;
-				}
-
-				/*
-				 * initialize the subsidiary scan key's fields appropriately
-				 */
-				ScanKeyEntryInitialize(this_sub_key,
-									   flags,
-									   varattno,	/* attribute number */
-									   op_strategy, /* op's strategy */
-									   op_righttype,	/* strategy subtype */
-									   inputcollation,	/* collation */
-									   opfuncid,	/* reg proc to use */
-									   scanvalue);	/* constant */
-				n_sub_key++;
-			}
-
-			/* Mark the last subsidiary scankey correctly */
-			first_sub_key[n_sub_key - 1].sk_flags |= SK_ROW_END;
-
-			/*
-			 * We don't use ScanKeyEntryInitialize for the header because it
-			 * isn't going to contain a valid sk_func pointer.
-			 */
-			MemSet(this_scan_key, 0, sizeof(ScanKeyData));
-			this_scan_key->sk_flags = SK_ROW_HEADER;
-			this_scan_key->sk_attno = first_sub_key->sk_attno;
-			this_scan_key->sk_strategy = rc->rctype;
-			/* sk_subtype, sk_collation, sk_func not used in a header */
-			this_scan_key->sk_argument = PointerGetDatum(first_sub_key);
 		}
 		else if (IsA(clause, ScalarArrayOpExpr))
 		{

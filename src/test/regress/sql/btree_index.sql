@@ -175,7 +175,3 @@ INSERT INTO delete_test_table SELECT i, 1, 2, 3 FROM generate_series(1,1000) i;
 -- minipg: ALTER INDEX ... ALTER COLUMN ... SET (...) reloptions removed.
 CREATE INDEX btree_tall_idx2 ON btree_tall_tbl (id);
 DROP INDEX btree_tall_idx2;
--- Partitioned index
-CREATE TABLE btree_part (id int4) PARTITION BY RANGE (id);
-CREATE INDEX btree_part_idx ON btree_part(id);
-DROP TABLE btree_part;

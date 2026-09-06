@@ -124,7 +124,6 @@ CreateExecutorState(void)
 
 	estate->es_result_relations = NULL;
 	estate->es_opened_result_relations = NIL;
-	estate->es_tuple_routing_result_relations = NIL;
 
 	estate->es_insert_pending_result_relations = NIL;
 	estate->es_insert_pending_modifytables = NIL;
@@ -801,7 +800,6 @@ ExecInitResultRelation(EState *estate, ResultRelInfo *resultRelInfo,
 	InitResultRelInfo(resultRelInfo,
 					  resultRelationDesc,
 					  rti,
-					  NULL,
 					  estate->es_instrument);
 
 	if (estate->es_result_relations == NULL)

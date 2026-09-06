@@ -190,16 +190,13 @@ static Node *fix_upper_expr_mutator(Node *node,
  * 4. Aggrefs in Agg plan nodes need to be adjusted in some cases involving
  * partial aggregation or minmax aggregate optimization.
  *
- * 5. PARAM_MULTIEXPR Params are replaced by regular PARAM_EXEC Params,
- * now that we have finished planning all MULTIEXPR subplans.
- *
- * 6. AlternativeSubPlan expressions are replaced by just one of their
+ * 5. AlternativeSubPlan expressions are replaced by just one of their
  * alternatives, using an estimate of how many times they'll be executed.
  *
- * 7. We compute regproc OIDs for operators (ie, we look up the function
+ * 6. We compute regproc OIDs for operators (ie, we look up the function
  * that implements each op).
  *
- * 8. We create lists of specific objects that the plan depends on.
+ * 7. We create lists of specific objects that the plan depends on.
  * Relation dependencies are represented by OIDs, and everything else by
  * PlanInvalItems (this distinction is motivated by the shared-inval APIs).
  * Currently, relations, user-defined functions, and domains are the only
@@ -1586,27 +1583,11 @@ fix_expr_common(PlannerInfo *root, Node *node)
  * fix_param_node
  *		Do set_plan_references processing on a Param
  *
- * If it's a PARAM_MULTIEXPR, replace it with the appropriate Param from
- * root->multiexpr_params; otherwise no change is needed.
- * Just for paranoia's sake, we make a copy of the node in either case.
+ * Just for paranoia's sake, we make a copy of the node.
  */
 static Node *
 fix_param_node(PlannerInfo *root, Param *p)
 {
-	if (p->paramkind == PARAM_MULTIEXPR)
-	{
-		int			subqueryid = p->paramid >> 16;
-		int			colno = p->paramid & 0xFFFF;
-		List	   *params;
-
-		if (subqueryid <= 0 ||
-			subqueryid > list_length(root->multiexpr_params))
-			elog(ERROR, "unexpected PARAM_MULTIEXPR ID: %d", p->paramid);
-		params = (List *) list_nth(root->multiexpr_params, subqueryid - 1);
-		if (colno <= 0 || colno > list_length(params))
-			elog(ERROR, "unexpected PARAM_MULTIEXPR ID: %d", p->paramid);
-		return copyObject(list_nth(params, colno - 1));
-	}
 	return (Node *) copyObject(p);
 }
 
@@ -1664,7 +1645,7 @@ fix_alternative_subplan(PlannerInfo *root, AlternativeSubPlan *asplan,
  *		Do set_plan_references processing on a scan-level expression
  *
  * This consists of incrementing all Vars' varnos by rtoffset,
- * replacing PARAM_MULTIEXPR Params, expanding PlaceHolderVars,
+ * expanding PlaceHolderVars,
  * replacing Aggref nodes that should be replaced by initplan output Params,
  * choosing the best implementation for AlternativeSubPlans,
  * looking up operator opcode info for OpExpr and related nodes,
@@ -1687,7 +1668,6 @@ fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset, double num_exec)
 	context.num_exec = num_exec;
 
 	if (rtoffset != 0 ||
-		root->multiexpr_params != NIL ||
 		root->glob->lastPHId != 0 ||
 		root->minmax_aggs != NIL ||
 		root->hasAlternativeSubPlans)
@@ -1698,8 +1678,7 @@ fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset, double num_exec)
 	{
 		/*
 		 * If rtoffset == 0, we don't need to change any Vars, and if there
-		 * are no MULTIEXPR subqueries then we don't need to replace
-		 * PARAM_MULTIEXPR Params, and if there are no placeholders anywhere
+		 * are no placeholders anywhere
 		 * we won't need to remove them, and if there are no minmax Aggrefs we
 		 * won't need to replace them, and if there are no AlternativeSubPlans
 		 * we won't need to remove them.  Then it's OK to just scribble on the

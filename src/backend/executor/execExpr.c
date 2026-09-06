@@ -55,8 +55,6 @@ typedef struct ExprSetupInfo
 	AttrNumber	last_inner;
 	AttrNumber	last_outer;
 	AttrNumber	last_scan;
-	/* MULTIEXPR SubPlan nodes appearing in the expression: */
-	List	   *multiexpr_subplans;
 } ExprSetupInfo;
 
 static void ExecReadyExpr(ExprState *state);
@@ -1330,21 +1328,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				SubPlan    *subplan = (SubPlan *) node;
 				SubPlanState *sstate;
 
-				/*
-				 * Real execution of a MULTIEXPR SubPlan has already been
-				 * done. What we have to do here is return a dummy NULL record
-				 * value in case this targetlist element is assigned
-				 * someplace.
-				 */
-				if (subplan->subLinkType == MULTIEXPR_SUBLINK)
-				{
-					scratch.opcode = EEOP_CONST;
-					scratch.d.constval.value = (Datum) 0;
-					scratch.d.constval.isnull = true;
-					ExprEvalPushStep(state, &scratch);
-					break;
-				}
-
 				if (!state->parent)
 					elog(ERROR, "SubPlan found with no parent plan");
 
@@ -1921,127 +1904,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-				int			nopers = list_length(rcexpr->opnos);
-				List	   *adjust_jumps = NIL;
-				ListCell   *l_left_expr,
-						   *l_right_expr,
-						   *l_opno,
-						   *l_opfamily,
-						   *l_inputcollid;
-				ListCell   *lc;
-
-				/*
-				 * Iterate over each field, prepare comparisons.  To handle
-				 * NULL results, prepare jumps to after the expression.  If a
-				 * comparison yields a != 0 result, jump to the final step.
-				 */
-				Assert(list_length(rcexpr->largs) == nopers);
-				Assert(list_length(rcexpr->rargs) == nopers);
-				Assert(list_length(rcexpr->opfamilies) == nopers);
-				Assert(list_length(rcexpr->inputcollids) == nopers);
-
-				forfive(l_left_expr, rcexpr->largs,
-						l_right_expr, rcexpr->rargs,
-						l_opno, rcexpr->opnos,
-						l_opfamily, rcexpr->opfamilies,
-						l_inputcollid, rcexpr->inputcollids)
-				{
-					Expr	   *left_expr = (Expr *) lfirst(l_left_expr);
-					Expr	   *right_expr = (Expr *) lfirst(l_right_expr);
-					Oid			opno = lfirst_oid(l_opno);
-					Oid			opfamily = lfirst_oid(l_opfamily);
-					Oid			inputcollid = lfirst_oid(l_inputcollid);
-					int			strategy;
-					Oid			lefttype;
-					Oid			righttype;
-					Oid			proc;
-					FmgrInfo   *finfo;
-					FunctionCallInfo fcinfo;
-
-					get_op_opfamily_properties(opno, opfamily, false,
-											   &strategy,
-											   &lefttype,
-											   &righttype);
-					proc = get_opfamily_proc(opfamily,
-											 lefttype,
-											 righttype,
-											 BTORDER_PROC);
-					if (!OidIsValid(proc))
-						elog(ERROR, "missing support function %d(%u,%u) in opfamily %u",
-							 BTORDER_PROC, lefttype, righttype, opfamily);
-
-					/* Set up the primary fmgr lookup information */
-					finfo = palloc0(sizeof(FmgrInfo));
-					fcinfo = palloc0(SizeForFunctionCallInfo(2));
-					fmgr_info(proc, finfo);
-					fmgr_info_set_expr((Node *) node, finfo);
-					InitFunctionCallInfoData(*fcinfo, finfo, 2,
-											 inputcollid, NULL, NULL);
-
-					/*
-					 * If we enforced permissions checks on index support
-					 * functions, we'd need to make a check here.  But the
-					 * index support machinery doesn't do that, and thus
-					 * neither does this code.
-					 */
-
-					/* evaluate left and right args directly into fcinfo */
-					ExecInitExprRec(left_expr, state,
-									&fcinfo->args[0].value, &fcinfo->args[0].isnull);
-					ExecInitExprRec(right_expr, state,
-									&fcinfo->args[1].value, &fcinfo->args[1].isnull);
-
-					scratch.opcode = EEOP_ROWCOMPARE_STEP;
-					scratch.d.rowcompare_step.finfo = finfo;
-					scratch.d.rowcompare_step.fcinfo_data = fcinfo;
-					scratch.d.rowcompare_step.fn_addr = finfo->fn_addr;
-					/* jump targets filled below */
-					scratch.d.rowcompare_step.jumpnull = -1;
-					scratch.d.rowcompare_step.jumpdone = -1;
-
-					ExprEvalPushStep(state, &scratch);
-					adjust_jumps = lappend_int(adjust_jumps,
-											   state->steps_len - 1);
-				}
-
-				/*
-				 * We could have a zero-column rowtype, in which case the rows
-				 * necessarily compare equal.
-				 */
-				if (nopers == 0)
-				{
-					scratch.opcode = EEOP_CONST;
-					scratch.d.constval.value = Int32GetDatum(0);
-					scratch.d.constval.isnull = false;
-					ExprEvalPushStep(state, &scratch);
-				}
-
-				/* Finally, examine the last comparison result */
-				scratch.opcode = EEOP_ROWCOMPARE_FINAL;
-				scratch.d.rowcompare_final.rctype = rcexpr->rctype;
-				ExprEvalPushStep(state, &scratch);
-
-				/* adjust jump targets */
-				foreach(lc, adjust_jumps)
-				{
-					ExprEvalStep *as = &state->steps[lfirst_int(lc)];
-
-					Assert(as->opcode == EEOP_ROWCOMPARE_STEP);
-					Assert(as->d.rowcompare_step.jumpdone == -1);
-					Assert(as->d.rowcompare_step.jumpnull == -1);
-
-					/* jump to comparison evaluation */
-					as->d.rowcompare_step.jumpdone = state->steps_len - 1;
-					/* jump to the following expression */
-					as->d.rowcompare_step.jumpnull = state->steps_len;
-				}
-
-				break;
-			}
-
 		case T_CoalesceExpr:
 			{
 				CoalesceExpr *coalesce = (CoalesceExpr *) node;
@@ -2372,7 +2234,7 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 static void
 ExecCreateExprSetupSteps(ExprState *state, Node *node)
 {
-	ExprSetupInfo info = {0, 0, 0, NIL};
+	ExprSetupInfo info = {0, 0, 0};
 
 	/* Prescan to find out what we need. */
 	expr_setup_walker(node, &info);
@@ -2428,41 +2290,6 @@ ExecPushExprSetupSteps(ExprState *state, ExprSetupInfo *info)
 		if (ExecComputeSlotInfo(state, &scratch))
 			ExprEvalPushStep(state, &scratch);
 	}
-
-	/*
-	 * Add steps to execute any MULTIEXPR SubPlans appearing in the
-	 * expression.  We need to evaluate these before any of the Params
-	 * referencing their outputs are used, but after we've prepared for any
-	 * Var references they may contain.  (There cannot be cross-references
-	 * between MULTIEXPR SubPlans, so we needn't worry about their order.)
-	 */
-	foreach(lc, info->multiexpr_subplans)
-	{
-		SubPlan    *subplan = (SubPlan *) lfirst(lc);
-		SubPlanState *sstate;
-
-		Assert(subplan->subLinkType == MULTIEXPR_SUBLINK);
-
-		/* This should match what ExecInitExprRec does for other SubPlans: */
-
-		if (!state->parent)
-			elog(ERROR, "SubPlan found with no parent plan");
-
-		sstate = ExecInitSubPlan(subplan, state->parent);
-
-		/* add SubPlanState nodes to state->parent->subPlan */
-		state->parent->subPlan = lappend(state->parent->subPlan,
-										 sstate);
-
-		scratch.opcode = EEOP_SUBPLAN;
-		scratch.d.subplan.sstate = sstate;
-
-		/* The result can be ignored, but we better put it somewhere */
-		scratch.resvalue = &state->resvalue;
-		scratch.resnull = &state->resnull;
-
-		ExprEvalPushStep(state, &scratch);
-	}
 }
 
 /*
@@ -2495,16 +2322,6 @@ expr_setup_walker(Node *node, ExprSetupInfo *info)
 				break;
 		}
 		return false;
-	}
-
-	/* Collect all MULTIEXPR SubPlans, too */
-	if (IsA(node, SubPlan))
-	{
-		SubPlan    *subplan = (SubPlan *) node;
-
-		if (subplan->subLinkType == MULTIEXPR_SUBLINK)
-			info->multiexpr_subplans = lappend(info->multiexpr_subplans,
-											   subplan);
 	}
 
 	/*

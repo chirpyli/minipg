@@ -317,7 +317,7 @@
 # - Other Planner Options -
 
 #default_statistics_target = 100	# range 1-10000
-#constraint_exclusion = partition	# on, off, or partition
+#constraint_exclusion = on	# on, or off
 #from_collapse_limit = 8
 #join_collapse_limit = 8		# 1 disables collapsing of explicit
 					# JOIN clauses

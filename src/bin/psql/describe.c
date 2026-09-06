@@ -1098,7 +1098,6 @@ describeOneTableDetails(const char *schemaname,
 		bool		hasindex;
 		bool		hasrules;
 		bool		hasoids;
-		bool		ispartition;
 		Oid			tablespace;
 		char	   *reloptions;
 		char		relpersistence;
@@ -1120,7 +1119,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence, am.amname\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1137,7 +1136,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, false AS relispartition, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1153,7 +1152,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, false as relispartition, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1169,7 +1168,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
-						  "false as relispartition, %s, c.reltablespace, "
+						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1185,7 +1184,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
-						  "false as relispartition, %s, c.reltablespace, "
+						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -1201,7 +1200,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
-						  "false as relispartition, %s, c.reltablespace, "
+						  "%s, c.reltablespace, "
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1216,7 +1215,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
-						  "false as relispartition, %s, c.reltablespace\n"
+						  "%s, c.reltablespace\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -1231,7 +1230,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
-						  "false as relispartition, %s, reltablespace\n"
+						  "%s, reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(reloptions, E', ')" : "''"),
@@ -1242,7 +1241,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
-						  "false as relispartition, '', reltablespace\n"
+						  "'', reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
 						  oid);
 	}
@@ -1251,7 +1250,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
-						  "false as relispartition, '', ''\n"
+						  "'', ''\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
 						  oid);
 	}
@@ -1273,16 +1272,15 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
 	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 3), "t") == 0;
 	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 6), "t") == 0;
-	tableinfo.ispartition = strcmp(PQgetvalue(res, 0, 7), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?
-		pg_strdup(PQgetvalue(res, 0, 8)) : NULL;
+		pg_strdup(PQgetvalue(res, 0, 7)) : NULL;
 	tableinfo.tablespace = (pset.sversion >= 80000) ?
-		atooid(PQgetvalue(res, 0, 9)) : 0;
+		atooid(PQgetvalue(res, 0, 8)) : 0;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 10)) : 0;
+		*(PQgetvalue(res, 0, 9)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 11) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 11));
+		tableinfo.relam = PQgetisnull(res, 0, 10) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 10));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -1291,8 +1289,7 @@ describeOneTableDetails(const char *schemaname,
 	/* Identify whether we should print collation, nullable, default vals */
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
-		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
-		tableinfo.relkind == 'p')
+		tableinfo.relkind == RELKIND_COMPOSITE_TYPE)
 		show_column_details = true;
 
 	/*
@@ -1318,8 +1315,7 @@ describeOneTableDetails(const char *schemaname,
 							 "\n   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef)");
 		attrdef_col = cols++;
 	}
-	if (tableinfo.relkind == RELKIND_INDEX ||
-		tableinfo.relkind == 'I')
+	if (tableinfo.relkind == RELKIND_INDEX)
 	{
 		if (pset.sversion >= 110000)
 		{
@@ -1340,8 +1336,7 @@ describeOneTableDetails(const char *schemaname,
 		/* compression info, if relevant to relkind */
 		if (pset.sversion >= 140000 &&
 			!pset.hide_compression &&
-			(tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == 'p'))
+			tableinfo.relkind == RELKIND_RELATION)
 		{
 			appendPQExpBufferStr(&buf, ",\n  a.attcompression AS attcompression");
 			attcompression_col = cols++;
@@ -1349,9 +1344,7 @@ describeOneTableDetails(const char *schemaname,
 
 		/* stats target, if relevant to relkind */
 		if (tableinfo.relkind == RELKIND_RELATION ||
-			tableinfo.relkind == RELKIND_INDEX ||
-			tableinfo.relkind == 'I' ||
-			tableinfo.relkind == 'p')
+			tableinfo.relkind == RELKIND_INDEX)
 		{
 		appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
 			attstattarget_col = cols++;
@@ -1362,8 +1355,7 @@ describeOneTableDetails(const char *schemaname,
 		 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
 		tableinfo.relkind == RELKIND_VIEW ||
-		tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
-		tableinfo.relkind == 'p')
+		tableinfo.relkind == RELKIND_COMPOSITE_TYPE)
 	{
 			appendPQExpBufferStr(&buf, ",\n  pg_catalog.col_description(a.attrelid, a.attnum)");
 			attdescr_col = cols++;
@@ -1402,14 +1394,6 @@ describeOneTableDetails(const char *schemaname,
 				printfPQExpBuffer(&title, _("Index \"%s.%s\""),
 								  schemaname, relationname);
 			break;
-		case 'I':
-			if (tableinfo.relpersistence == 'u')
-				printfPQExpBuffer(&title, _("Unlogged partitioned index \"%s.%s\""),
-								  schemaname, relationname);
-			else
-				printfPQExpBuffer(&title, _("Partitioned index \"%s.%s\""),
-								  schemaname, relationname);
-			break;
 		case 's':
 			/* not used as of 8.2, but keep it for backwards compatibility */
 			printfPQExpBuffer(&title, _("Special relation \"%s.%s\""),
@@ -1422,14 +1406,6 @@ describeOneTableDetails(const char *schemaname,
 		case RELKIND_COMPOSITE_TYPE:
 			printfPQExpBuffer(&title, _("Composite type \"%s.%s\""),
 							  schemaname, relationname);
-			break;
-		case 'p':
-			if (tableinfo.relpersistence == 'u')
-				printfPQExpBuffer(&title, _("Unlogged partitioned table \"%s.%s\""),
-								  schemaname, relationname);
-			else
-				printfPQExpBuffer(&title, _("Partitioned table \"%s.%s\""),
-								  schemaname, relationname);
 			break;
 		default:
 			/* untranslated unknown relkind */
@@ -1528,80 +1504,6 @@ describeOneTableDetails(const char *schemaname,
 
 	/* Make footers */
 
-	if (tableinfo.ispartition)
-	{
-		/* Footer information for a partition child table */
-		PGresult   *result;
-
-		printfPQExpBuffer(&buf,
-						  "SELECT inhparent::pg_catalog.regclass,\n  ");
-
-		appendPQExpBuffer(&buf,
-						  pset.sversion >= 140000 ? "inhdetachpending" :
-						  "false as inhdetachpending");
-
-		/* If verbose, also request the partition constraint definition */
-		if (verbose)
-			appendPQExpBufferStr(&buf,
-								 ",\n  pg_catalog.pg_get_partition_constraintdef(c.oid)");
-		appendPQExpBuffer(&buf,
-						  "\nFROM pg_catalog.pg_class c"
-						  "\nWHERE c.oid = '%s' AND false;", oid);
-		result = PSQLexec(buf.data);
-		if (!result)
-			goto error_return;
-
-		if (PQntuples(result) > 0)
-		{
-			char	   *parent_name = PQgetvalue(result, 0, 0);
-			char	   *partdef = PQgetvalue(result, 0, 1);
-			char	   *detached = PQgetvalue(result, 0, 2);
-
-			printfPQExpBuffer(&tmpbuf, _("Partition of: %s %s%s"), parent_name,
-							  partdef,
-							  strcmp(detached, "t") == 0 ? " DETACH PENDING" : "");
-			printTableAddFooter(&cont, tmpbuf.data);
-
-			if (verbose)
-			{
-				char	   *partconstraintdef = NULL;
-
-				if (!PQgetisnull(result, 0, 3))
-					partconstraintdef = PQgetvalue(result, 0, 3);
-				/* If there isn't any constraint, show that explicitly */
-				if (partconstraintdef == NULL || partconstraintdef[0] == '\0')
-					printfPQExpBuffer(&tmpbuf, _("No partition constraint"));
-				else
-					printfPQExpBuffer(&tmpbuf, _("Partition constraint: %s"),
-									  partconstraintdef);
-				printTableAddFooter(&cont, tmpbuf.data);
-			}
-		}
-		PQclear(result);
-	}
-
-	if (tableinfo.relkind == 'p')
-	{
-		/* Footer information for a partitioned table (partitioning parent) */
-		PGresult   *result;
-
-		printfPQExpBuffer(&buf,
-						  "SELECT pg_catalog.pg_get_partkeydef('%s'::pg_catalog.oid);",
-						  oid);
-		result = PSQLexec(buf.data);
-		if (!result)
-			goto error_return;
-
-		if (PQntuples(result) == 1)
-		{
-			char	   *partkeydef = PQgetvalue(result, 0, 0);
-
-			printfPQExpBuffer(&tmpbuf, _("Partition key: %s"), partkeydef);
-			printTableAddFooter(&cont, tmpbuf.data);
-		}
-		PQclear(result);
-	}
-
 	if (tableinfo.relkind == RELKIND_TOASTVALUE)
 	{
 		/* For a TOAST table, print name of owning table */
@@ -1629,8 +1531,7 @@ describeOneTableDetails(const char *schemaname,
 		PQclear(result);
 	}
 
-	if (tableinfo.relkind == RELKIND_INDEX ||
-		tableinfo.relkind == 'I')
+	if (tableinfo.relkind == RELKIND_INDEX)
 	{
 		/* Footer information about an index */
 		PGresult   *result;
@@ -1690,20 +1591,14 @@ describeOneTableDetails(const char *schemaname,
 
 			printTableAddFooter(&cont, tmpbuf.data);
 
-			/*
-			 * If it's a partitioned index, we'll print the tablespace below
-			 */
-			if (tableinfo.relkind == RELKIND_INDEX)
-				add_tablespace_footer(&cont, tableinfo.relkind,
-									  tableinfo.tablespace, true);
+			add_tablespace_footer(&cont, tableinfo.relkind,
+								  tableinfo.tablespace, true);
 		}
 
 		PQclear(result);
 	}
 	/* If you add relkinds here, see also "Finish printing..." stanza below */
 	else if (tableinfo.relkind == RELKIND_RELATION ||
-			 tableinfo.relkind == 'p' ||
-			 tableinfo.relkind == 'I' ||
 			 tableinfo.relkind == RELKIND_TOASTVALUE)
 	{
 		/* Footer information about a table */
@@ -1994,20 +1889,12 @@ describeOneTableDetails(const char *schemaname,
 	 * Finish printing the footer information about a table.
 	 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
-		tableinfo.relkind == 'p' ||
-		tableinfo.relkind == 'I' ||
 		tableinfo.relkind == RELKIND_TOASTVALUE)
 	{
-		bool		is_partitioned;
 		PGresult   *result;
 		int			tuples;
 
-		/* simplify some repeated tests below */
-		is_partitioned = (tableinfo.relkind == 'p' ||
-						  tableinfo.relkind == 'I');
-
-
-		/* print tables inherited from (exclude partitioned parents) */
+		/* print tables inherited from */
 		printfPQExpBuffer(&buf,
 						  "SELECT c.oid::pg_catalog.regclass\n"
 						  "FROM pg_catalog.pg_class c\n"
@@ -2043,7 +1930,7 @@ describeOneTableDetails(const char *schemaname,
 		}
 
 		/*
-		 * print child tables (with additional info if partitions)
+		 * print child tables
 		 *
 		 * NOTE: minipg has removed the pg_inherits system catalog (inheritance
 		 * and partitioning are no longer supported), so there can never be any
@@ -2064,39 +1951,23 @@ describeOneTableDetails(const char *schemaname,
 			goto error_return;
 		tuples = PQntuples(result);
 
-		/*
-		 * For a partitioned table with no partitions, always print the number
-		 * of partitions as zero, even when verbose output is expected.
-		 * Otherwise, we will not print "Partitions" section for a partitioned
-		 * table without any partitions.
-		 */
-		if (is_partitioned && tuples == 0)
-		{
-			printfPQExpBuffer(&buf, _("Number of partitions: %d"), tuples);
-			printTableAddFooter(&cont, buf.data);
-		}
-		else if (!verbose)
+		if (!verbose)
 		{
 			/* print the number of child tables, if any */
 			if (tuples > 0)
 			{
-				if (is_partitioned)
-					printfPQExpBuffer(&buf, _("Number of partitions: %d (Use \\d+ to list them.)"), tuples);
-				else
-					printfPQExpBuffer(&buf, _("Number of child tables: %d (Use \\d+ to list them.)"), tuples);
+				printfPQExpBuffer(&buf, _("Number of child tables: %d (Use \\d+ to list them.)"), tuples);
 				printTableAddFooter(&cont, buf.data);
 			}
 		}
 		else
 		{
 			/* display the list of child tables */
-			const char *ct = is_partitioned ? _("Partitions") : _("Child tables");
+			const char *ct = _("Child tables");
 			int			ctw = pg_wcswidth(ct, strlen(ct), pset.encoding);
 
 			for (i = 0; i < tuples; i++)
 			{
-				char		child_relkind = *PQgetvalue(result, i, 1);
-
 				if (i == 0)
 					printfPQExpBuffer(&buf, "%s: %s",
 									  ct, PQgetvalue(result, i, 0));
@@ -2105,11 +1976,6 @@ describeOneTableDetails(const char *schemaname,
 									  ctw, "", PQgetvalue(result, i, 0));
 				if (!PQgetisnull(result, i, 3))
 					appendPQExpBuffer(&buf, " %s", PQgetvalue(result, i, 3));
-				if (child_relkind == 'p' ||
-					child_relkind == 'I')
-					appendPQExpBufferStr(&buf, ", PARTITIONED");
-				if (strcmp(PQgetvalue(result, i, 2), "t") == 0)
-					appendPQExpBufferStr(&buf, " (DETACH PENDING)");
 				if (i < tuples - 1)
 					appendPQExpBufferChar(&buf, ',');
 
@@ -2180,8 +2046,6 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
 	/* relkinds for which we support tablespaces */
 	if (relkind == RELKIND_RELATION ||
 		relkind == RELKIND_INDEX ||
-		relkind == 'p' ||
-		relkind == 'I' ||
 		relkind == RELKIND_TOASTVALUE)
 	{
 		/*
@@ -2279,8 +2143,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  " WHEN " CppAsString2(RELKIND_INDEX) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
-					  " WHEN " "'p'" " THEN '%s'"
-					  " WHEN " "'I'" " THEN '%s'"
 					  " END as \"%s\"",
 					  gettext_noop("Schema"),
 					  gettext_noop("Name"),
@@ -2289,8 +2151,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  gettext_noop("index"),
 					  gettext_noop("special"),
 					  gettext_noop("TOAST table"),
-					  gettext_noop("partitioned table"),
-					  gettext_noop("partitioned index"),
 					  gettext_noop("Type"));
 	cols_so_far = 3;
 
@@ -2370,8 +2230,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	appendPQExpBufferStr(&buf, "\nWHERE c.relkind IN (");
 	if (showTables)
 	{
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_RELATION) ","
-							 "'p'" ",");
+		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_RELATION) ",");
 		/* with 'S' or a pattern, allow 't' to match TOAST tables too */
 		if (showSystem || pattern)
 			appendPQExpBufferStr(&buf, CppAsString2(RELKIND_TOASTVALUE) ",");
@@ -2379,8 +2238,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	if (showViews)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_VIEW) ",");
 	if (showIndexes)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ","
-							 "'I'" ",");
+		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ",");
 	if (showSystem || pattern)
 		appendPQExpBufferStr(&buf, "'s',"); /* was RELKIND_SPECIAL */
 

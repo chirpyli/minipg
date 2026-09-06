@@ -903,7 +903,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	subroot->outer_params = NULL;
 	subroot->planner_cxt = CurrentMemoryContext;
 	subroot->init_plans = NIL;
-	subroot->multiexpr_params = NIL;
 	subroot->eq_classes = NIL;
 	subroot->ec_merging_done = false;
 	subroot->all_result_relids = NULL;

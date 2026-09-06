@@ -1,6 +1,0 @@
-Parsed test spec with 3 sessions
-
-starting permutation: s1b s1s s2d s3i1 s1c
-setup failed: ERROR:  foreign key constraints are not supported in minipg
-LINE 9:   CREATE TABLE d_lp_fk_r (a int references d_lp_fk);
-                                        ^

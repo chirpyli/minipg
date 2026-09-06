@@ -778,8 +778,6 @@ ProcessUtilitySlow(ParseState *pstate,
 						DefineIndex(relid,	/* OID of heap relation */
 									stmt,
 									InvalidOid, /* no predefined OID */
-									InvalidOid, /* no parent index */
-									InvalidOid, /* no parent constraint */
 									is_alter_table,
 									true,	/* check_rights */
 									true,	/* check_not_in_use */

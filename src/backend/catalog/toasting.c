@@ -282,8 +282,8 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	coloptions[0] = 0;
 	coloptions[1] = 0;
 
-	index_create(toast_rel, toast_idxname, toastIndexOid, InvalidOid,
-				 InvalidOid, InvalidOid,
+	index_create(toast_rel, toast_idxname, toastIndexOid,
+				 InvalidOid,
 				 indexInfo,
 				 list_make2("chunk_id", "chunk_seq"),
 				 BTREE_AM_OID,

@@ -83,9 +83,8 @@
 #define PROGRESS_CREATEIDX_SUBPHASE				10	/* phase # filled by AM */
 #define PROGRESS_CREATEIDX_TUPLES_TOTAL			11
 #define PROGRESS_CREATEIDX_TUPLES_DONE			12
-#define PROGRESS_CREATEIDX_PARTITIONS_TOTAL		13
-#define PROGRESS_CREATEIDX_PARTITIONS_DONE		14
-/* 15 and 16 reserved for "block number" metrics */
+/* 13, 14 and 15 reserved for "partition" metrics */
+/* 16 reserved for "block number" metrics */
 
 /* Phases of CREATE INDEX (as advertised via PROGRESS_CREATEIDX_PHASE) */
 #define PROGRESS_CREATEIDX_PHASE_WAIT_1			1

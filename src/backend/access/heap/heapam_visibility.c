@@ -442,8 +442,7 @@ HeapTupleSatisfiesToast(HeapTuple htup, Snapshot snapshot,
  *	TM_SelfModified: The tuple was updated by the current transaction, after
  *	the current scan started.
  *
- *	TM_Updated: The tuple was updated by a committed transaction (including
- *	the case where the tuple was moved into a different partition).
+ *	TM_Updated: The tuple was updated by a committed transaction.
  *
  *	TM_Deleted: The tuple was deleted by a committed transaction.
  *

@@ -27,8 +27,6 @@ extern void RemoveObjects(DropStmt *stmt);
 extern ObjectAddress DefineIndex(Oid relationId,
 								 IndexStmt *stmt,
 								 Oid indexRelationId,
-								 Oid parentIndexId,
-								 Oid parentConstraintId,
 								 bool is_alter_table,
 								 bool check_rights,
 								 bool check_not_in_use,

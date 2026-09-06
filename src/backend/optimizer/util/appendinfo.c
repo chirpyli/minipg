@@ -73,7 +73,7 @@ make_append_rel_info(Relation parentrel, Relation childrel,
  * column, which is either the 1-based index of the corresponding parent
  * column, or 0 if there's no match (that happens for dropped child columns,
  * as well as child columns beyond those of the parent, which are allowed in
- * traditional inheritance though not partitioning).
+ * traditional inheritance).
  *
  * For paranoia's sake, we match type/collation as well as attribute name.
  */
@@ -539,7 +539,7 @@ adjust_child_relids(Relids relids, int nappinfos, AppendRelInfo **appinfos)
 /*
  * Replace any relid present in top_parent_relids with its child in
  * child_relids. Members of child_relids can be multiple levels below top
- * parent in the partition hierarchy.
+ * parent in the inheritance hierarchy.
  */
 Relids
 adjust_child_relids_multilevel(PlannerInfo *root, Relids relids,

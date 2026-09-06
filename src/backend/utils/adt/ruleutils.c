@@ -5038,39 +5038,7 @@ get_update_query_targetlist_def(Query *query, List *targetList,
 {
 	StringInfo	buf = context->buf;
 	ListCell   *l;
-	ListCell   *next_ma_cell;
-	int			remaining_ma_columns;
 	const char *sep;
-	SubLink    *cur_ma_sublink;
-	List	   *ma_sublinks;
-
-	/*
-	 * Prepare to deal with MULTIEXPR assignments: collect the source SubLinks
-	 * into a list.  We expect them to appear, in ID order, in resjunk tlist
-	 * entries.
-	 */
-	ma_sublinks = NIL;
-	if (query->hasSubLinks)		/* else there can't be any */
-	{
-		foreach(l, targetList)
-		{
-			TargetEntry *tle = (TargetEntry *) lfirst(l);
-
-			if (tle->resjunk && IsA(tle->expr, SubLink))
-			{
-				SubLink    *sl = (SubLink *) tle->expr;
-
-				if (sl->subLinkType == MULTIEXPR_SUBLINK)
-				{
-					ma_sublinks = lappend(ma_sublinks, sl);
-					Assert(sl->subLinkId == list_length(ma_sublinks));
-				}
-			}
-		}
-	}
-	next_ma_cell = list_head(ma_sublinks);
-	cur_ma_sublink = NULL;
-	remaining_ma_columns = 0;
 
 	/* Add the comma separated list of 'attname = value' */
 	sep = "";
@@ -5082,59 +5050,9 @@ get_update_query_targetlist_def(Query *query, List *targetList,
 		if (tle->resjunk)
 			continue;			/* ignore junk entries */
 
-		/* Emit separator (OK whether we're in multiassignment or not) */
+		/* Emit separator */
 		appendStringInfoString(buf, sep);
 		sep = ", ";
-
-		/*
-		 * Check to see if we're starting a multiassignment group: if so,
-		 * output a left paren.
-		 */
-		if (next_ma_cell != NULL && cur_ma_sublink == NULL)
-		{
-			/*
-		 * We must dig down into the expr to see if it's a PARAM_MULTIEXPR
-		 * Param.  That could be buried under FieldStores and
-		 * SubscriptingRefs (cf processIndirection()),
-		 * and underneath those there could be an implicit type coercion.
-		 * Because we would ignore implicit type coercions anyway, we
-		 * don't need to be as careful as processIndirection() is about
-		 * descending past implicit type coercions.
-		 */
-			expr = (Node *) tle->expr;
-			while (expr)
-			{
-				if (IsA(expr, FieldStore))
-				{
-					FieldStore *fstore = (FieldStore *) expr;
-
-					expr = (Node *) linitial(fstore->newvals);
-				}
-				else if (IsA(expr, SubscriptingRef))
-				{
-					SubscriptingRef *sbsref = (SubscriptingRef *) expr;
-
-					if (sbsref->refassgnexpr == NULL)
-						break;
-
-					expr = (Node *) sbsref->refassgnexpr;
-				}
-				else
-					break;
-			}
-			expr = strip_implicit_coercions(expr);
-
-			if (expr && IsA(expr, Param) &&
-				((Param *) expr)->paramkind == PARAM_MULTIEXPR)
-			{
-				cur_ma_sublink = (SubLink *) lfirst(next_ma_cell);
-				next_ma_cell = lnext(ma_sublinks, next_ma_cell);
-				remaining_ma_columns = count_nonjunk_tlist_entries(((Query *) cur_ma_sublink->subselect)->targetList);
-				Assert(((Param *) expr)->paramid ==
-					   ((cur_ma_sublink->subLinkId << 16) | 1));
-				appendStringInfoChar(buf, '(');
-			}
-		}
 
 		/*
 		 * Put out name of target column; look in the catalogs, not at
@@ -5150,20 +5068,6 @@ get_update_query_targetlist_def(Query *query, List *targetList,
 		 * off the top-level nodes representing the indirection assignments.
 		 */
 		expr = processIndirection((Node *) tle->expr, context);
-
-		/*
-		 * If we're in a multiassignment, skip printing anything more, unless
-		 * this is the last column; in which case, what we print should be the
-		 * sublink, not the Param.
-		 */
-		if (cur_ma_sublink != NULL)
-		{
-			if (--remaining_ma_columns > 0)
-				continue;		/* not the last column of multiassignment */
-			appendStringInfoChar(buf, ')');
-			expr = (Node *) cur_ma_sublink;
-			cur_ma_sublink = NULL;
-		}
 
 		appendStringInfoString(buf, " = ");
 
@@ -7133,35 +7037,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-
-				/*
-				 * SQL99 allows "ROW" to be omitted when there is more than
-				 * one column, but for simplicity we always print it.  Within
-				 * a ROW expression, whole-row Vars need special treatment, so
-				 * use get_rule_list_toplevel.
-				 */
-				appendStringInfoString(buf, "(ROW(");
-				get_rule_list_toplevel(rcexpr->largs, context, true);
-
-				/*
-				 * We assume that the name of the first-column operator will
-				 * do for all the rest too.  This is definitely open to
-				 * failure, eg if some but not all operators were renamed
-				 * since the construct was parsed, but there seems no way to
-				 * be perfect.
-				 */
-				appendStringInfo(buf, ") %s ROW(",
-								 generate_operator_name(linitial_oid(rcexpr->opnos),
-														exprType(linitial(rcexpr->largs)),
-														exprType(linitial(rcexpr->rargs))));
-				get_rule_list_toplevel(rcexpr->rargs, context, true);
-				appendStringInfoString(buf, "))");
-			}
-			break;
-
 		case T_CoalesceExpr:
 			{
 				CoalesceExpr *coalesceexpr = (CoalesceExpr *) node;
@@ -8189,18 +8064,6 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 			}
 			appendStringInfoChar(buf, ')');
 		}
-		else if (IsA(sublink->testexpr, RowCompareExpr))
-		{
-			/* multiple combining operators, < <= > >= cases */
-			RowCompareExpr *rcexpr = (RowCompareExpr *) sublink->testexpr;
-
-			appendStringInfoChar(buf, '(');
-			get_rule_expr((Node *) rcexpr->largs, context, true);
-			opname = generate_operator_name(linitial_oid(rcexpr->opnos),
-											exprType(linitial(rcexpr->largs)),
-											exprType(linitial(rcexpr->rargs)));
-			appendStringInfoChar(buf, ')');
-		}
 		else
 			elog(ERROR, "unrecognized testexpr type: %d",
 				 (int) nodeTag(sublink->testexpr));
@@ -8225,12 +8088,7 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 			appendStringInfo(buf, " %s ALL ", opname);
 			break;
 
-		case ROWCOMPARE_SUBLINK:
-			appendStringInfo(buf, " %s ", opname);
-			break;
-
 		case EXPR_SUBLINK:
-		case MULTIEXPR_SUBLINK:
 		case ARRAY_SUBLINK:
 			need_paren = false;
 			break;

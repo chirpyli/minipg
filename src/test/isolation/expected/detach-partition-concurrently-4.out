@@ -1,6 +1,0 @@
-Parsed test spec with 3 sessions
-
-starting permutation: s2snitch s1b s1s s2detach s1cancel s1insert s1c
-setup failed: ERROR:  foreign key constraints are not supported in minipg
-LINE 8:  create table d4_fk (a int references d4_primary);
-                                   ^

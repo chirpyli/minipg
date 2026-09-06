@@ -647,7 +647,6 @@ _readSubLink(void)
 	READ_LOCALS(SubLink);
 
 	READ_ENUM_FIELD(subLinkType, SubLinkType);
-	READ_INT_FIELD(subLinkId);
 	READ_NODE_FIELD(testexpr);
 	READ_NODE_FIELD(operName);
 	READ_NODE_FIELD(subselect);
@@ -857,24 +856,6 @@ _readRowExpr(void)
 	READ_ENUM_FIELD(row_format, CoercionForm);
 	READ_NODE_FIELD(colnames);
 	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readRowCompareExpr
- */
-static RowCompareExpr *
-_readRowCompareExpr(void)
-{
-	READ_LOCALS(RowCompareExpr);
-
-	READ_ENUM_FIELD(rctype, RowCompareType);
-	READ_NODE_FIELD(opnos);
-	READ_NODE_FIELD(opfamilies);
-	READ_NODE_FIELD(inputcollids);
-	READ_NODE_FIELD(largs);
-	READ_NODE_FIELD(rargs);
 
 	READ_DONE();
 }
@@ -1347,7 +1328,6 @@ _readModifyTable(void)
 	READ_BOOL_FIELD(canSetTag);
 	READ_UINT_FIELD(nominalRelation);
 	READ_UINT_FIELD(rootRelation);
-	READ_BOOL_FIELD(partColsUpdated);
 	READ_NODE_FIELD(resultRelations);
 	READ_NODE_FIELD(updateColnosLists);
 	READ_NODE_FIELD(rowMarks);
@@ -2219,8 +2199,6 @@ parseNodeString(void)
 		return_value = _readArrayExpr();
 	else if (MATCH("ROW", 3))
 		return_value = _readRowExpr();
-	else if (MATCH("ROWCOMPARE", 10))
-		return_value = _readRowCompareExpr();
 	else if (MATCH("COALESCE", 8))
 		return_value = _readCoalesceExpr();
 	else if (MATCH("MINMAX", 6))

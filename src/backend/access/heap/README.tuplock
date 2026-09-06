@@ -165,8 +165,8 @@ are per-catalog:
 
   pg_class systable_inplace_update_begin() callers: before the call, acquire a
   lock on the relation in mode ShareUpdateExclusiveLock or stricter.  If the
-  update targets a row of RELKIND_INDEX (but not RELKIND_PARTITIONED_INDEX),
-  that lock must be on the table.  Locking the index rel is not necessary.
+  update targets a row of RELKIND_INDEX, that lock must be on the table.
+  Locking the index rel is not necessary.
   (This allows VACUUM to overwrite per-index pg_class while holding a lock on
   the table alone.) systable_inplace_update_begin() acquires and releases
   LOCKTAG_TUPLE in InplaceUpdateTupleLock, an alias for ExclusiveLock, on each

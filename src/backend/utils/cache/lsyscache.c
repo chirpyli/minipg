@@ -621,12 +621,6 @@ get_op_hash_functions_ext(Oid opno, Oid inputtype,
 		if (typentry->hash_proc != F_HASH_ARRAY)
 			return false;
 	}
-	else if (opno == RECORD_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc != F_HASH_RECORD)
-			return false;
-	}
 
 	/* OK, do the normal lookup */
 	return get_op_hash_functions(opno, lhs_procno, rhs_procno);
@@ -640,7 +634,8 @@ get_op_hash_functions_ext(Oid opno, Oid inputtype,
  *
  * In addition to the normal btree operators, we consider a <> operator to be
  * a "member" of an opfamily if its negator is an equality operator of the
- * opfamily.  ROWCOMPARE_NE is returned as the strategy number for this case.
+ * opfamily.  BTNE_STRATEGY_NUMBER is returned as the strategy number for this
+ * case.
  */
 List *
 get_op_btree_interpretation(Oid opno)
@@ -711,11 +706,11 @@ get_op_btree_interpretation(Oid opno)
 				if (op_strategy != BTEqualStrategyNumber)
 					continue;
 
-				/* OK, report it with "strategy" ROWCOMPARE_NE */
+				/* OK, report it with the "not equal" strategy number */
 				thisresult = (OpBtreeInterpretation *)
 					palloc(sizeof(OpBtreeInterpretation));
 				thisresult->opfamily_id = op_form->amopfamily;
-				thisresult->strategy = ROWCOMPARE_NE;
+				thisresult->strategy = BTNE_STRATEGY_NUMBER;
 				thisresult->oplefttype = op_form->amoplefttype;
 				thisresult->oprighttype = op_form->amoprighttype;
 				result = lappend(result, thisresult);
@@ -1433,7 +1428,7 @@ op_input_types(Oid opno, Oid *lefttype, Oid *righttype)
  * opfamily entries for this operator and associated sortops.  The pg_operator
  * flag is just a hint to tell the planner whether to bother looking.)
  *
- * In some cases (currently only array_eq and record_eq), mergejoinability
+ * In some cases (currently only array_eq), mergejoinability
  * depends on the specific input data type the operator is invoked for, so
  * that must be passed as well. We currently assume that only one input's type
  * is needed to check this --- by convention, pass the left input's data type.
@@ -1446,7 +1441,7 @@ op_mergejoinable(Oid opno, Oid inputtype)
 	TypeCacheEntry *typentry;
 
 	/*
-	 * For array_eq or record_eq, we can sort if the element or field types
+	 * For array_eq, we can sort if the element types
 	 * are all sortable.  We could implement all the checks for that here, but
 	 * the typcache already does that and caches the results too, so let's
 	 * rely on the typcache.
@@ -1455,12 +1450,6 @@ op_mergejoinable(Oid opno, Oid inputtype)
 	{
 		typentry = lookup_type_cache(inputtype, TYPECACHE_CMP_PROC);
 		if (typentry->cmp_proc == F_BTARRAYCMP)
-			result = true;
-	}
-	else if (opno == RECORD_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_CMP_PROC);
-		if (typentry->cmp_proc == F_BTRECORDCMP)
 			result = true;
 	}
 	else
@@ -1484,7 +1473,7 @@ op_mergejoinable(Oid opno, Oid inputtype)
  * Returns true if the operator is hashjoinable.  (There must be a suitable
  * hash opfamily entry for this operator if it is so marked.)
  *
- * In some cases (currently array_eq, record_eq),
+ * In some cases (currently array_eq),
  * hashjoinability depends on the specific input data type the operator is
  * invoked for, so that must be passed as well.  We currently assume that only
  * one input's type is needed to check this --- by convention, pass the left
@@ -1502,12 +1491,6 @@ op_hashjoinable(Oid opno, Oid inputtype)
 	{
 		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
 		if (typentry->hash_proc == F_HASH_ARRAY)
-			result = true;
-	}
-	else if (opno == RECORD_EQ_OP)
-	{
-		typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
-		if (typentry->hash_proc == F_HASH_RECORD)
 			result = true;
 	}
 	else

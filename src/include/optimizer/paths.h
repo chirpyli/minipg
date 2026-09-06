@@ -58,8 +58,6 @@ extern int	compute_parallel_worker(RelOptInfo *rel, double heap_pages,
 									double index_pages, int max_workers);
 extern void create_partial_bitmap_paths(PlannerInfo *root, RelOptInfo *rel,
 										Path *bitmapqual);
-extern void generate_partitionwise_join_paths(PlannerInfo *root,
-											  RelOptInfo *rel);
 
 #ifdef OPTIMIZER_DEBUG
 extern void debug_print_rel(PlannerInfo *root, RelOptInfo *rel);
@@ -160,11 +158,6 @@ extern void add_child_rel_equivalences(PlannerInfo *root,
 									   AppendRelInfo *appinfo,
 									   RelOptInfo *parent_rel,
 									   RelOptInfo *child_rel);
-extern void add_child_join_rel_equivalences(PlannerInfo *root,
-											int nappinfos,
-											AppendRelInfo **appinfos,
-											RelOptInfo *parent_rel,
-											RelOptInfo *child_rel);
 extern List *generate_implied_equalities_for_column(PlannerInfo *root,
 													RelOptInfo *rel,
 													ec_matches_callback_type callback,
@@ -207,8 +200,6 @@ extern Path *get_cheapest_fractional_path_for_pathkeys(List *paths,
 extern Path *get_cheapest_parallel_safe_total_inner(List *paths);
 extern List *build_index_pathkeys(PlannerInfo *root, IndexOptInfo *index,
 								  ScanDirection scandir);
-extern List *build_partition_pathkeys(PlannerInfo *root, RelOptInfo *partrel,
-									  ScanDirection scandir, bool *partialkeys);
 extern List *build_expression_pathkey(PlannerInfo *root, Expr *expr,
 									  Relids nullable_relids, Oid opno,
 									  Relids rel, bool create_it);

@@ -2053,9 +2053,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 		case EXPR_KIND_WHERE:
 			errkind = true;
 			break;
-		case EXPR_KIND_POLICY:
-			err = _("set-returning functions are not allowed in policy expressions");
-			break;
 		case EXPR_KIND_HAVING:
 			errkind = true;
 			break;
@@ -2115,14 +2112,8 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 		case EXPR_KIND_EXECUTE_PARAMETER:
 			err = _("set-returning functions are not allowed in EXECUTE parameters");
 			break;
-		case EXPR_KIND_CALL_ARGUMENT:
-			err = _("set-returning functions are not allowed in CALL arguments");
-			break;
 		case EXPR_KIND_COPY_WHERE:
 			err = _("set-returning functions are not allowed in COPY FROM WHERE conditions");
-			break;
-		case EXPR_KIND_GENERATED_COLUMN:
-			err = _("set-returning functions are not allowed in column generation expressions");
 			break;
 		case EXPR_KIND_CYCLE_MARK:
 			errkind = true;

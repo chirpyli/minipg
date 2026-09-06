@@ -1262,9 +1262,8 @@ create_append_path(PlannerInfo *root,
 	pathnode->path.pathtarget = rel->reltarget;
 
 	/*
-	 * minipg does not support partitioned tables, so always compute
-	 * param_info the same way as for an appendrel (no run-time pruning
-	 * quals from partitioning).
+	 * For appendrels (including inheritance trees), compute param_info using
+	 * get_appendrel_parampathinfo.
 	 */
 	pathnode->path.param_info = get_appendrel_parampathinfo(rel,
 															required_outer);
@@ -3226,8 +3225,6 @@ create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
  * 'canSetTag' is true if we set the command tag/es_processed
  * 'nominalRelation' is the parent RT index for use of EXPLAIN
  * 'rootRelation' is the partitioned/inherited table root RTI, or 0 if none
- * 'partColsUpdated' is true if any partitioning columns are being updated,
- *		either from the target relation or a descendent partitioned table.
  * 'resultRelations' is an integer list of actual RT indexes of target rel(s)
  * 'updateColnosLists' is a list of UPDATE target column number lists
  *		(one sublist per rel); or NIL if not an UPDATE
@@ -3240,7 +3237,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 						Path *subpath,
 						CmdType operation, bool canSetTag,
 						Index nominalRelation, Index rootRelation,
-						bool partColsUpdated,
 						List *resultRelations,
 						List *updateColnosLists,
 						List *rowMarks, OnConflictExpr *onconflict,
@@ -3283,7 +3279,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->canSetTag = canSetTag;
 	pathnode->nominalRelation = nominalRelation;
 	pathnode->rootRelation = rootRelation;
-	pathnode->partColsUpdated = partColsUpdated;
 	pathnode->resultRelations = resultRelations;
 	pathnode->updateColnosLists = updateColnosLists;
 	pathnode->rowMarks = rowMarks;
@@ -3618,13 +3613,13 @@ do { \
 	 * If possible, reparameterize the given path, making a copy.
 	 *
 	 * This function is currently only applied to the inner side of a nestloop
-	 * join that is being partitioned by the partitionwise-join code.  Hence,
-	 * we need only support path types that plausibly arise in that context.
-	 * (In particular, supporting sorted path types would be a waste of code
-	 * and cycles: even if we translated them here, they'd just lose in
-	 * subsequent cost comparisons.)  If we do see an unsupported path type,
-	 * that just means we won't be able to generate a partitionwise-join plan
-	 * using that path type.
+	 * join whose inner relation is parameterized by the topmost parent of an
+	 * inheritance hierarchy.  Hence, we need only support path types that
+	 * plausibly arise in that context.  (In particular, supporting sorted
+	 * path types would be a waste of code and cycles: even if we translated
+	 * them here, they'd just lose in subsequent cost comparisons.)  If we do
+	 * see an unsupported path type, that just means we won't be able to
+	 * generate a join plan using that path type.
 	 */
 	switch (nodeTag(path))
 	{

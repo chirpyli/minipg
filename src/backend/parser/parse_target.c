@@ -128,9 +128,6 @@ transformTargetList(ParseState *pstate, List *targetlist,
 	bool		expand_star;
 	ListCell   *o_target;
 
-	/* Shouldn't have any leftover multiassign items at start */
-	Assert(pstate->p_multiassign_exprs == NIL);
-
 	/* Expand "something.*" in SELECT and RETURNING, but not UPDATE */
 	expand_star = (exprKind != EXPR_KIND_UPDATE_SOURCE);
 
@@ -187,19 +184,6 @@ transformTargetList(ParseState *pstate, List *targetlist,
 												exprKind,
 												res->name,
 												false));
-	}
-
-	/*
-	 * If any multiassign resjunk items were created, attach them to the end
-	 * of the targetlist.  This should only happen in an UPDATE tlist.  We
-	 * don't need to worry about numbering of these items; transformUpdateStmt
-	 * will set their resnos.
-	 */
-	if (pstate->p_multiassign_exprs)
-	{
-		Assert(exprKind == EXPR_KIND_UPDATE_SOURCE);
-		p_target = list_concat(p_target, pstate->p_multiassign_exprs);
-		pstate->p_multiassign_exprs = NIL;
 	}
 
 	return p_target;
@@ -1765,10 +1749,8 @@ FigureColnameInternal(Node *node, char **name)
 					}
 					break;
 					/* As with other operator-like nodes, these have no names */
-				case MULTIEXPR_SUBLINK:
 				case ALL_SUBLINK:
 				case ANY_SUBLINK:
-				case ROWCOMPARE_SUBLINK:
 					break;
 			}
 			break;
@@ -1784,10 +1766,6 @@ FigureColnameInternal(Node *node, char **name)
 		case T_A_ArrayExpr:
 			/* make ARRAY[] act like a function */
 			*name = "array";
-			return 2;
-		case T_RowExpr:
-			/* make ROW() act like a function */
-			*name = "row";
 			return 2;
 		case T_CoalesceExpr:
 			/* make coalesce() act like a regular function */

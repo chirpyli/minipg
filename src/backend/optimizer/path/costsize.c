@@ -4251,20 +4251,6 @@ cost_qual_eval_walker(Node *node, cost_qual_eval_context *context)
 			context->total.per_tuple += perelemcost.per_tuple *
 				estimate_array_length((Node *) acoerce->arg);
 	}
-	else if (IsA(node, RowCompareExpr))
-	{
-		/* Conservatively assume we will check all the columns */
-		RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-		ListCell   *lc;
-
-		foreach(lc, rcexpr->opnos)
-		{
-			Oid			opid = lfirst_oid(lc);
-
-			add_function_cost(context->root, get_opcode(opid), NULL,
-							  &context->total);
-		}
-	}
 	else if (IsA(node, MinMaxExpr) ||
 			 IsA(node, SQLValueFunction))
 	{

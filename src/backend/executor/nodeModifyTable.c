@@ -408,8 +408,7 @@ ExecGetUpdateNewTuple(ResultRelInfo *relinfo,
  *		ExecInsert
  *
  *		For INSERT, we have to insert the tuple into the target relation
- *		(or partition thereof) and insert appropriate tuples into the index
- *		relations.
+ *		and insert appropriate tuples into the index relations.
  *
  *		slot contains the new tuple value to be stored.
  *		planSlot is the output of the ModifyTable's subplan; we use it
@@ -627,8 +626,7 @@ ldelete:;
 									estate->es_snapshot,
 									estate->es_crosscheck_snapshot,
 									true /* wait for commit */ ,
-									&tmfd,
-									false /* changingPart */);
+									&tmfd);
 
 		switch (result)
 		{
@@ -1581,12 +1579,12 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	 * - the relation for which we will fire FOR STATEMENT triggers,
 	 * - the relation into whose tuple format all captured transition tuples
 	 *   must be converted, and
-	 * - the root partitioned table used for tuple routing.
+	 * - the root table of the inheritance hierarchy.
 	 *
-	 * If it's a partitioned or inherited table, the root partition or
-	 * appendrel RTE doesn't appear elsewhere in the plan and its RT index is
-	 * given explicitly in node->rootRelation.  Otherwise, the target relation
-	 * is the sole relation in the node->resultRelations list.
+	 * If it's an inherited table, the root appendrel RTE doesn't appear
+	 * elsewhere in the plan and its RT index is given explicitly in
+	 * node->rootRelation.  Otherwise, the target relation is the sole
+	 * relation in the node->resultRelations list.
 	 *----------
 	 */
 	if (node->rootRelation > 0)

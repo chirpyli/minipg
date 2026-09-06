@@ -29,6 +29,14 @@ typedef struct OpBtreeInterpretation
 	Oid			oprighttype;	/* declared right input datatype */
 } OpBtreeInterpretation;
 
+/*
+ * Strategy number reported for a <> operator whose negator is an equality
+ * operator: there is no btree strategy for <>, so we use a dedicated
+ * sentinel value above the real strategies (1..5).  This must match the
+ * BTNE symbol used by the predicate-implication tables in predtest.c.
+ */
+#define BTNE_STRATEGY_NUMBER	6
+
 /* I/O function selector for get_type_io_data */
 typedef enum IOFuncSelector
 {

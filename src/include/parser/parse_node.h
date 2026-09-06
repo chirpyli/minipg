@@ -65,10 +65,7 @@ typedef enum ParseExprKind
 	EXPR_KIND_STATS_EXPRESSION, /* extended statistics expression */
 	EXPR_KIND_ALTER_COL_TRANSFORM,	/* transform expr in ALTER COLUMN TYPE */
 	EXPR_KIND_EXECUTE_PARAMETER,	/* parameter value in EXECUTE */
-	EXPR_KIND_POLICY,			/* USING or WITH CHECK expr in policy */
-	EXPR_KIND_CALL_ARGUMENT,	/* procedure argument in CALL */
 	EXPR_KIND_COPY_WHERE,		/* WHERE condition in COPY FROM */
-	EXPR_KIND_GENERATED_COLUMN, /* generation expression for a column */
 	EXPR_KIND_CYCLE_MARK,		/* cycle mark value */
 } ParseExprKind;
 
@@ -128,8 +125,6 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  *
  * p_next_resno: next TargetEntry.resno to assign, starting from 1.
  *
- * p_multiassign_exprs: partially-processed MultiAssignRef source expressions.
- *
  * p_locking_clause: query's FOR UPDATE/FOR SHARE clause, if any.
  *
  * p_locked_from_parent: true if parent query level applies FOR UPDATE/SHARE
@@ -165,7 +160,6 @@ struct ParseState
 	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
 	ParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
-	List	   *p_multiassign_exprs;	/* junk tlist entries for multiassign */
 	List	   *p_locking_clause;	/* raw FOR UPDATE/FOR SHARE info */
 	bool		p_locked_from_parent;	/* parent has marked this subquery
 										 * with FOR UPDATE/FOR SHARE */

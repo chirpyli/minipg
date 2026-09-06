@@ -1364,10 +1364,10 @@ ExplainNode(PlanState *planstate, List *ancestors,
 	es->workers_state = save_workers_state;
 
 	/*
-	 * If partition pruning was done during executor initialization, the
-	 * number of child plans we'll display below will be less than the number
-	 * of subplans that was specified in the plan.  To make this a bit less
-	 * mysterious, emit an indication that this happened.  Note that this
+	 * If some child plans were eliminated during executor initialization,
+	 * the number of child plans we'll display below will be less than the
+	 * number of subplans that was specified in the plan.  To make this a bit
+	 * less mysterious, emit an indication that this happened.  Note that this
 	 * field is emitted now because we want it to be a property of the parent
 	 * node; it *cannot* be emitted within the Plans sub-node we'll open next.
 	 */

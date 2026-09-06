@@ -146,9 +146,6 @@ Indexes:
  expr   | text | yes  | (f1 || f2)
 unique, btree, for table "public.func_index_heap"
 
--- this should fail because of unsafe column type (anonymous record)
-create index on func_index_heap ((f1 || f2), (row(f1, f2)));
-ERROR:  column "row" has pseudo-type record
 --
 -- Test unique index with included columns
 --
@@ -349,17 +346,6 @@ ERROR:  index "cwi_uniq4_idx" does not exist
 LINE 1: ALTER TABLE cwi_test ADD UNIQUE USING INDEX cwi_uniq4_idx;
                                  ^
 DROP TABLE cwi_test;
--- ADD CONSTRAINT USING INDEX is forbidden on partitioned tables
-CREATE TABLE cwi_test(a int) PARTITION BY hash (a);
-ERROR:  syntax error at or near "PARTITION"
-LINE 1: CREATE TABLE cwi_test(a int) PARTITION BY hash (a);
-                                     ^
-create unique index on cwi_test (a);
-ERROR:  relation "cwi_test" does not exist
-alter table cwi_test add primary key using index cwi_test_a_idx ;
-ERROR:  relation "cwi_test" does not exist
-DROP TABLE cwi_test;
-ERROR:  table "cwi_test" does not exist
 --
 -- Check handling of indexes on system columns
 --
@@ -735,17 +721,6 @@ ORDER BY thousand;
 (2 rows)
 
 RESET enable_indexonlyscan;
---
--- Check elimination of constant-NULL subexpressions
---
-explain (costs off)
-  select * from tenk1 where (thousand, tenthous) in ((1,1001), (null,null));
-                      QUERY PLAN                      
-------------------------------------------------------
- Index Scan using tenk1_thous_tenthous on tenk1
-   Index Cond: ((thousand = 1) AND (tenthous = 1001))
-(2 rows)
-
 --
 -- Check matching of boolean index columns to WHERE conditions and sort keys
 --

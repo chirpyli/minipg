@@ -221,7 +221,6 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												Path *subpath,
 												CmdType operation, bool canSetTag,
 												Index nominalRelation, Index rootRelation,
-												bool partColsUpdated,
 												List *resultRelations,
 												List *updateColnosLists,
 												List *rowMarks, OnConflictExpr *onconflict,
@@ -277,9 +276,5 @@ extern ParamPathInfo *get_appendrel_parampathinfo(RelOptInfo *appendrel,
 												  Relids required_outer);
 extern ParamPathInfo *find_param_path_info(RelOptInfo *rel,
 										   Relids required_outer);
-extern RelOptInfo *build_child_join_rel(PlannerInfo *root,
-										RelOptInfo *outer_rel, RelOptInfo *inner_rel,
-										RelOptInfo *parent_joinrel, List *restrictlist,
-										SpecialJoinInfo *sjinfo, JoinType jointype);
 
 #endif							/* PATHNODE_H */

@@ -175,15 +175,6 @@ typedef enum ExprEvalOp
 	EEOP_ARRAYCOERCE,
 	EEOP_ROW,
 
-	/*
-	 * Compare two individual elements of each of two compared ROW()
-	 * expressions.  Skip to ROWCOMPARE_FINAL if elements are not equal.
-	 */
-	EEOP_ROWCOMPARE_STEP,
-
-	/* evaluate boolean value based on previous ROWCOMPARE_STEP operations */
-	EEOP_ROWCOMPARE_FINAL,
-
 	/* evaluate GREATEST() or LEAST() */
 	EEOP_MINMAX,
 
@@ -437,25 +428,6 @@ typedef struct ExprEvalStep
 			Datum	   *elemvalues;
 			bool	   *elemnulls;
 		}			row;
-
-		/* for EEOP_ROWCOMPARE_STEP */
-		struct
-		{
-			/* lookup and call data for column comparison function */
-			FmgrInfo   *finfo;
-			FunctionCallInfo fcinfo_data;
-			PGFunction	fn_addr;
-			/* target for comparison resulting in NULL */
-			int			jumpnull;
-			/* target for comparison yielding inequality */
-			int			jumpdone;
-		}			rowcompare_step;
-
-		/* for EEOP_ROWCOMPARE_FINAL */
-		struct
-		{
-			RowCompareType rctype;
-		}			rowcompare_final;
 
 		/* for EEOP_MINMAX */
 		struct

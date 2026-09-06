@@ -200,9 +200,6 @@ extern Selectivity scalararraysel(PlannerInfo *root,
 								  bool is_join_clause,
 								  int varRelid, JoinType jointype, SpecialJoinInfo *sjinfo);
 extern int	estimate_array_length(Node *arrayexpr);
-extern Selectivity rowcomparesel(PlannerInfo *root,
-								 RowCompareExpr *clause,
-								 int varRelid, JoinType jointype, SpecialJoinInfo *sjinfo);
 
 extern void mergejoinscansel(PlannerInfo *root, Node *clause,
 							 Oid opfamily, int strategy, bool nulls_first,

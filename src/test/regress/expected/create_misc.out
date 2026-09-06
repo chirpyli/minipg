@@ -76,10 +76,6 @@ CREATE TABLE ramp (
 INSERT INTO ramp
 	SELECT * FROM road
 	WHERE name LIKE '%Ramp';
--- 注：原 create_misc 中的 person* 继承展开、ihighway/shighway(a_star/b_star/c_star
--- /d_star/e_star/f_star) 等均为 INHERITS 表继承层级，随 minipg 移除 INHERITS 语法一并
--- 删除；这些继承表无其余回归测试引用，故不再创建。另外 minipg 已移除 polygon 类型、
--- CREATE TABLE AS / SELECT INTO 语法，故改用显式建表 + INSERT SELECT 的形式改写。
 --
 -- for internal portal (cursor) tests
 --

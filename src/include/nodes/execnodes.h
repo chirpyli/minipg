@@ -482,12 +482,6 @@ typedef struct EState
 											 * es_result_relations in no
 											 * specific order */
 
-	/*
-	 * The following list contains ResultRelInfos created by the tuple routing
-	 * code for partitions that aren't found in the es_result_relations array.
-	 */
-	List	   *es_tuple_routing_result_relations;
-
 	/* Parameter info: */
 	ParamListInfo es_param_list_info;	/* values of external params */
 	ParamExecData *es_param_exec_vals;	/* values of internal params */
@@ -1090,10 +1084,7 @@ typedef struct ModifyTableState
  *		nplans				how many plans are in the array
  *		whichplan			which synchronous plan is being executed (0 .. n-1)
  *							or a special negative value. See nodeAppend.c.
- *		prune_state			details required to allow partitions to be
- *							eliminated from the scan, or NULL if not possible.
- *		valid_subplans		for runtime pruning, valid synchronous appendplans
- *							indexes to scan.
+ *		valid_subplans		valid synchronous appendplans indexes to scan.
  * ----------------
  */
 
@@ -1101,7 +1092,6 @@ struct AppendState;
 typedef struct AppendState AppendState;
 struct ParallelAppendState;
 typedef struct ParallelAppendState ParallelAppendState;
-struct PartitionPruneState;
 
 struct AppendState
 {
@@ -1115,7 +1105,6 @@ struct AppendState
 										 * the first partial plan */
 	ParallelAppendState *as_pstate; /* parallel coordination info */
 	Size		pstate_len;		/* size of parallel coordination info */
-	struct PartitionPruneState *as_prune_state;
 	Bitmapset  *as_valid_subplans;
 	bool		(*choose_next_subplan) (AppendState *);
 };
@@ -1129,10 +1118,7 @@ struct AppendState
  *		slots			current output tuple of each subplan
  *		heap			heap of active tuples
  *		initialized		true if we have fetched first tuple from each subplan
- *		prune_state		details required to allow partitions to be
- *						eliminated from the scan, or NULL if not possible.
- *		valid_subplans	for runtime pruning, valid mergeplans indexes to
- *						scan.
+ *		valid_subplans	valid mergeplans indexes to scan.
  * ----------------
  */
 typedef struct MergeAppendState
@@ -1145,7 +1131,6 @@ typedef struct MergeAppendState
 	TupleTableSlot **ms_slots;	/* array of length ms_nplans */
 	struct binaryheap *ms_heap; /* binary heap of slot indices */
 	bool		ms_initialized; /* are subplans started? */
-	struct PartitionPruneState *ms_prune_state;
 	Bitmapset  *ms_valid_subplans;
 } MergeAppendState;
 

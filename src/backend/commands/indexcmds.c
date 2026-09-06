@@ -450,10 +450,6 @@ WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
  * 'stmt': IndexStmt describing the properties of the new index.
  * 'indexRelationId': normally InvalidOid, but during bootstrap can be
  *		nonzero to specify a preselected OID for the index.
- * 'parentIndexId': the OID of the parent index; InvalidOid if not the child
- *		of a partitioned index.
- * 'parentConstraintId': the OID of the parent constraint; InvalidOid if not
- *		the child of a constraint (only used when recursing)
  * 'is_alter_table': this is due to an ALTER rather than a CREATE operation.
  * 'check_rights': check for CREATE rights in namespace and tablespace.  (This
  *		should be true except when ALTER is deleting/recreating an index.)
@@ -469,8 +465,6 @@ ObjectAddress
 DefineIndex(Oid relationId,
 			IndexStmt *stmt,
 			Oid indexRelationId,
-			Oid parentIndexId,
-			Oid parentConstraintId,
 			bool is_alter_table,
 			bool check_rights,
 			bool check_not_in_use,
@@ -494,7 +488,6 @@ DefineIndex(Oid relationId,
 	IndexAmRoutine *amRoutine;
 	bool		amcanorder;
 	amoptions_function amoptions;
-	bool		partitioned;
 	bool		safe_index;
 	Datum		reloptions;
 	int16	   *coloptions;
@@ -524,18 +517,14 @@ DefineIndex(Oid relationId,
 	concurrent = stmt->concurrent;
 
 	/*
-	 * Start progress report.  If we're building a partition, this was already
-	 * done.
+	 * Start progress report.
 	 */
-	if (!OidIsValid(parentIndexId))
-	{
-		pgstat_progress_start_command(PROGRESS_COMMAND_CREATE_INDEX,
-									  relationId);
-		pgstat_progress_update_param(PROGRESS_CREATEIDX_COMMAND,
-									 concurrent ?
-									 PROGRESS_CREATEIDX_COMMAND_CREATE_CONCURRENTLY :
-									 PROGRESS_CREATEIDX_COMMAND_CREATE);
-	}
+	pgstat_progress_start_command(PROGRESS_COMMAND_CREATE_INDEX,
+								  relationId);
+	pgstat_progress_update_param(PROGRESS_CREATEIDX_COMMAND,
+								 concurrent ?
+								 PROGRESS_CREATEIDX_COMMAND_CREATE_CONCURRENTLY :
+								 PROGRESS_CREATEIDX_COMMAND_CREATE);
 
 	/*
 	 * No index OID to report yet
@@ -611,26 +600,6 @@ DefineIndex(Oid relationId,
 					errmsg("\"%s\" is not a table",
 							RelationGetRelationName(rel))));
 			break;
-	}
-
-	/*
-	 * Partitioned tables are not supported in this build (minipg); the
-	 * 'partitioned' flag is always false here.
-	 */
-	partitioned = false;
-	if (partitioned)
-	{
-		/*
-		 * Note: we check 'stmt->concurrent' rather than 'concurrent', so that
-		 * the error is thrown also for temporary tables.  Seems better to be
-		 * consistent, even though we could do it on temporary table because
-		 * we're not actually doing it concurrently.
-		 */
-		if (stmt->concurrent)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot create index on partitioned table \"%s\" concurrently",
-							RelationGetRelationName(rel))));
 	}
 
 	/*
@@ -776,17 +745,6 @@ DefineIndex(Oid relationId,
 		index_check_primary_key(rel, indexInfo, is_alter_table, stmt);
 
 	/*
-	 * If this table is partitioned and we're creating a unique index or a
-	 * primary key, make sure that the partition key is a subset of the
-	 * index's columns.  Otherwise it would be possible to violate uniqueness
-	 * by putting values that ought to be unique in different partitions.
-	 *
-	 * We could lift this limitation if we had global indexes, but those have
-	 * their own problems, so this is a useful feature combination.
-	 */
-
-
-	/*
 	 * We disallow indexes on system columns.  They would not necessarily get
 	 * updated correctly, and they don't seem useful anyway.
 	 */
@@ -858,31 +816,22 @@ DefineIndex(Oid relationId,
 	/*
 	 * Make the catalog entries for the index, including constraints. This
 	 * step also actually builds the index, except if caller requested not to
-	 * or in concurrent mode, in which case it'll be done later, or doing a
-	 * partitioned index (because those don't have storage).
+	 * or in concurrent mode, in which case it'll be done later.
 	 */
 	flags = constr_flags = 0;
 	if (stmt->isconstraint)
 		flags |= INDEX_CREATE_ADD_CONSTRAINT;
-	if (skip_build || concurrent || partitioned)
+	if (skip_build || concurrent)
 		flags |= INDEX_CREATE_SKIP_BUILD;
 	if (stmt->if_not_exists)
 		flags |= INDEX_CREATE_IF_NOT_EXISTS;
 	if (concurrent)
 		flags |= INDEX_CREATE_CONCURRENT;
-	if (partitioned)
-		flags |= INDEX_CREATE_PARTITIONED;
 	if (stmt->primary)
 		flags |= INDEX_CREATE_IS_PRIMARY;
 
-	/*
-	 * If the table is partitioned, and recursion was declined but partitions
-	 * exist, mark the index as invalid.
-	 */
-
 	indexRelationId =
-		index_create(rel, indexRelationName, indexRelationId, parentIndexId,
-					 parentConstraintId,
+		index_create(rel, indexRelationName, indexRelationId,
 					 stmt->oldNode, indexInfo, indexColNames,
 					 accessMethodId, tablespaceId,
 					 classObjectId,
@@ -905,9 +854,7 @@ DefineIndex(Oid relationId,
 
 		table_close(rel, NoLock);
 
-		/* If this is the top-level index, we're done */
-		if (!OidIsValid(parentIndexId))
-			pgstat_progress_end_command();
+		pgstat_progress_end_command();
 
 		return address;
 	}
@@ -928,9 +875,7 @@ DefineIndex(Oid relationId,
 		/* Close the heap and we're done, in the non-concurrent case */
 		table_close(rel, NoLock);
 
-		/* If this is the top-level index, we're done. */
-		if (!OidIsValid(parentIndexId))
-			pgstat_progress_end_command();
+		pgstat_progress_end_command();
 
 		return address;
 	}
@@ -2252,9 +2197,6 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		/*
 		 * Only regular tables can have indexes, so ignore any
 		 * other kind of relation.
-		 *
-		 * Partitioned tables/indexes are skipped but matching leaf partitions
-		 * are processed.
 		 */
 			if (classtuple->relkind != RELKIND_RELATION)
 				continue;

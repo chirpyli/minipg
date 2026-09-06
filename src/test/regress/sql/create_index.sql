@@ -136,8 +136,6 @@ INSERT INTO func_index_heap VALUES('QWERTY');
 \d func_index_heap
 \d func_index_index
 
--- this should fail because of unsafe column type (anonymous record)
-create index on func_index_heap ((f1 || f2), (row(f1, f2)));
 
 
 --
@@ -267,12 +265,6 @@ ALTER TABLE cwi_test ADD UNIQUE USING INDEX cwi_uniq3_idx;  -- fail
 CREATE UNIQUE INDEX cwi_uniq4_idx ON cwi_test(b collate "POSIX");
 ALTER TABLE cwi_test ADD UNIQUE USING INDEX cwi_uniq4_idx;  -- fail
 
-DROP TABLE cwi_test;
-
--- ADD CONSTRAINT USING INDEX is forbidden on partitioned tables
-CREATE TABLE cwi_test(a int) PARTITION BY hash (a);
-create unique index on cwi_test (a);
-alter table cwi_test add primary key using index cwi_test_a_idx ;
 DROP TABLE cwi_test;
 
 --
@@ -442,12 +434,6 @@ ORDER BY thousand;
 
 RESET enable_indexonlyscan;
 
---
--- Check elimination of constant-NULL subexpressions
---
-
-explain (costs off)
-  select * from tenk1 where (thousand, tenthous) in ((1,1001), (null,null));
 
 --
 -- Check matching of boolean index columns to WHERE conditions and sort keys

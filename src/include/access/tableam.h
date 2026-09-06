@@ -83,8 +83,7 @@ typedef enum TM_Result
 	TM_SelfModified,
 
 	/*
-	 * The affected tuple was updated by another transaction. This includes
-	 * the case where tuple was moved to another partition.
+	 * The affected tuple was updated by another transaction.
 	 */
 	TM_Updated,
 
@@ -512,8 +511,7 @@ typedef struct TableAmRoutine
 								 Snapshot snapshot,
 								 Snapshot crosscheck,
 								 bool wait,
-								 TM_FailureData *tmfd,
-								 bool changingPart);
+								 TM_FailureData *tmfd);
 
 	/* see table_tuple_update() for reference about parameters */
 	TM_Result	(*tuple_update) (Relation rel,
@@ -859,8 +857,7 @@ typedef struct TableAmRoutine
 
 /*
  * Returns slot callbacks suitable for holding tuples of the appropriate type
- * for the relation.  Works for tables, views, foreign tables and partitioned
- * tables.
+ * for the relation.  Works for tables, views and foreign tables.
  */
 extern const TupleTableSlotOps *table_slot_callbacks(Relation rel);
 
@@ -1441,8 +1438,6 @@ table_multi_insert(Relation rel, TupleTableSlot **slots, int nslots,
  *	wait - true if should wait for any conflicting update to commit/abort
  * Output parameters:
  *	tmfd - filled in failure cases (see below)
- *	changingPart - true iff the tuple is being moved to another partition
- *		table due to an update of the partition key. Otherwise, false.
  *
  * Normal, successful return value is TM_Ok, which means we did actually
  * delete it.  Failure return codes are TM_SelfModified, TM_Updated, and
@@ -1455,11 +1450,11 @@ table_multi_insert(Relation rel, TupleTableSlot **slots, int nslots,
 static inline TM_Result
 table_tuple_delete(Relation rel, ItemPointer tid, CommandId cid,
 				   Snapshot snapshot, Snapshot crosscheck, bool wait,
-				   TM_FailureData *tmfd, bool changingPart)
+				   TM_FailureData *tmfd)
 {
 	return rel->rd_tableam->tuple_delete(rel, tid, cid,
 										 snapshot, crosscheck,
-										 wait, tmfd, changingPart);
+										 wait, tmfd);
 }
 
 /*

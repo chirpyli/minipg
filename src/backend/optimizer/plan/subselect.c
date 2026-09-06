@@ -60,7 +60,7 @@ typedef struct finalize_primnode_context
 
 static Node *build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 						   List *plan_params,
-						   SubLinkType subLinkType, int subLinkId,
+						   SubLinkType subLinkType,
 						   Node *testexpr, List *testexpr_paramids,
 						   bool unknownEqFalse);
 static List *generate_subquery_params(PlannerInfo *root, List *tlist,
@@ -140,14 +140,11 @@ get_first_col_type(Plan *plan, Oid *coltype, int32 *coltypmod,
  * to do the subplan as an InitPlan, the SubPlan node instead goes into
  * root->init_plans, and what we return here is an expression tree
  * representing the InitPlan's result: usually just a Param node representing
- * a single scalar result, but possibly a row comparison tree containing
- * multiple Param nodes, or for a MULTIEXPR subquery a simple NULL constant
- * (since the real output Params are elsewhere in the tree, and the MULTIEXPR
- * subquery itself is in a resjunk tlist entry whose value is uninteresting).
+ * a single scalar result.
  */
 static Node *
 make_subplan(PlannerInfo *root, Query *orig_subquery,
-			 SubLinkType subLinkType, int subLinkId,
+			 SubLinkType subLinkType,
 			 Node *testexpr, bool isTopQual)
 {
 	Query	   *subquery;
@@ -179,7 +176,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 	 * first tuple will be retrieved.  For ALL and ANY subplans, we will be
 	 * able to stop evaluating if the test condition fails or matches, so very
 	 * often not all the tuples will be retrieved; for lack of a better idea,
-	 * specify 50% retrieval.  For EXPR, MULTIEXPR, and ROWCOMPARE subplans,
+	 * specify 50% retrieval.  For EXPR subplans,
 	 * use default behavior (we're only expecting one row out, anyway).
 	 *
 	 * NOTE: if you change these numbers, also change cost_subplan() in
@@ -224,7 +221,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 
 	/* And convert to SubPlan or InitPlan format. */
 	result = build_subplan(root, plan, subroot, plan_params,
-						   subLinkType, subLinkId,
+						   subLinkType,
 						   testexpr, NIL, isTopQual);
 
 	/*
@@ -277,7 +274,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 				hashplan = castNode(SubPlan,
 									build_subplan(root, plan, subroot,
 												  plan_params,
-												  ANY_SUBLINK, 0,
+												  ANY_SUBLINK,
 												  newtestexpr,
 												  paramIds,
 												  true));
@@ -306,7 +303,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 static Node *
 build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 			  List *plan_params,
-			  SubLinkType subLinkType, int subLinkId,
+			  SubLinkType subLinkType,
 			  Node *testexpr, List *testexpr_paramids,
 			  bool unknownEqFalse)
 {
@@ -360,15 +357,9 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 	}
 
 	/*
-	 * Un-correlated or undirect correlated plans of EXISTS, EXPR, ARRAY,
-	 * ROWCOMPARE, or MULTIEXPR types can be used as initPlans.  For EXISTS,
-	 * EXPR, or ARRAY, we return a Param referring to the result of evaluating
-	 * the initPlan.  For ROWCOMPARE, we must modify the testexpr tree to
-	 * contain PARAM_EXEC Params instead of the PARAM_SUBLINK Params emitted
-	 * by the parser, and then return that tree.  For MULTIEXPR, we return a
-	 * null constant: the resjunk targetlist item containing the SubLink does
-	 * not need to return anything useful, since the referencing Params are
-	 * elsewhere.
+	 * Un-correlated or undirect correlated plans of EXISTS, EXPR, or ARRAY
+	 * types can be used as initPlans.  For these, we return a Param referring
+	 * to the result of evaluating the initPlan.
 	 */
 	if (splan->parParam == NIL && subLinkType == EXISTS_SUBLINK)
 	{
@@ -414,62 +405,6 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 		splan->setParam = list_make1_int(prm->paramid);
 		isInitPlan = true;
 		result = (Node *) prm;
-	}
-	else if (splan->parParam == NIL && subLinkType == ROWCOMPARE_SUBLINK)
-	{
-		/* Adjust the Params */
-		List	   *params;
-
-		Assert(testexpr != NULL);
-		params = generate_subquery_params(root,
-										  plan->targetlist,
-										  &splan->paramIds);
-		result = convert_testexpr(root,
-								  testexpr,
-								  params);
-		splan->setParam = list_copy(splan->paramIds);
-		isInitPlan = true;
-
-		/*
-		 * The executable expression is returned to become part of the outer
-		 * plan's expression tree; it is not kept in the initplan node.
-		 */
-	}
-	else if (subLinkType == MULTIEXPR_SUBLINK)
-	{
-		/*
-		 * Whether it's an initplan or not, it needs to set a PARAM_EXEC Param
-		 * for each output column.
-		 */
-		List	   *params;
-
-		Assert(testexpr == NULL);
-		params = generate_subquery_params(root,
-										  plan->targetlist,
-										  &splan->setParam);
-
-		/*
-		 * Save the list of replacement Params in the n'th cell of
-		 * root->multiexpr_params; setrefs.c will use it to replace
-		 * PARAM_MULTIEXPR Params.
-		 */
-		while (list_length(root->multiexpr_params) < subLinkId)
-			root->multiexpr_params = lappend(root->multiexpr_params, NIL);
-		lc = list_nth_cell(root->multiexpr_params, subLinkId - 1);
-		Assert(lfirst(lc) == NIL);
-		lfirst(lc) = params;
-
-		/* It can be an initplan if there are no parParams. */
-		if (splan->parParam == NIL)
-		{
-			isInitPlan = true;
-			result = (Node *) makeNullConst(RECORDOID, -1, InvalidOid);
-		}
-		else
-		{
-			isInitPlan = false;
-			result = (Node *) splan;
-		}
 	}
 	else
 	{
@@ -836,8 +771,7 @@ hash_ok_operator(OpExpr *expr)
 	/* quick out if not a binary operator */
 	if (list_length(expr->args) != 2)
 		return false;
-	if (opid == ARRAY_EQ_OP ||
-		opid == RECORD_EQ_OP)
+	if (opid == ARRAY_EQ_OP)
 	{
 		/* these are strict, but must check input type to ensure hashable */
 		Node	   *leftarg = linitial(expr->args);
@@ -1572,7 +1506,6 @@ process_sublinks_mutator(Node *node, process_sublinks_context *context)
 		return make_subplan(context->root,
 							(Query *) sublink->subselect,
 							sublink->subLinkType,
-							sublink->subLinkId,
 							testexpr,
 							context->isTopQual);
 	}

@@ -89,7 +89,6 @@ ExecInitMergeAppend(MergeAppend *node, EState *estate, int eflags)
 	Assert(nplans > 0);
 	mergestate->ms_valid_subplans = validsubplans =
 		bms_add_range(NULL, 0, nplans - 1);
-	mergestate->ms_prune_state = NULL;
 
 	mergeplanstates = (PlanState **) palloc(nplans * sizeof(PlanState *));
 	mergestate->mergeplans = mergeplanstates;

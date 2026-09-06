@@ -270,7 +270,6 @@ static ProjectSet *make_project_set(List *tlist, Plan *subplan);
 static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
 									 CmdType operation, bool canSetTag,
 									 Index nominalRelation, Index rootRelation,
-									 bool partColsUpdated,
 									 List *resultRelations,
 									 List *updateColnosLists,
 									 List *rowMarks, OnConflictExpr *onconflict, int epqParam);
@@ -2407,7 +2406,6 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 							best_path->canSetTag,
 							best_path->nominalRelation,
 							best_path->rootRelation,
-							best_path->partColsUpdated,
 							best_path->resultRelations,
 							best_path->updateColnosLists,
 							best_path->rowMarks,
@@ -4307,23 +4305,8 @@ fix_indexqual_clause(PlannerInfo *root, IndexOptInfo *index, int indexcol,
 		linitial(op->args) = fix_indexqual_operand(linitial(op->args),
 												   index,
 												   indexcol);
-	}
-	else if (IsA(clause, RowCompareExpr))
-	{
-		RowCompareExpr *rc = (RowCompareExpr *) clause;
-		ListCell   *lca,
-				   *lcai;
-
-		/* Replace the indexkey expressions with index Vars. */
-		Assert(list_length(rc->largs) == list_length(indexcolnos));
-		forboth(lca, rc->largs, lcai, indexcolnos)
-		{
-			lfirst(lca) = fix_indexqual_operand(lfirst(lca),
-												index,
-												lfirst_int(lcai));
 		}
-	}
-	else if (IsA(clause, ScalarArrayOpExpr))
+		else if (IsA(clause, ScalarArrayOpExpr))
 	{
 		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) clause;
 
@@ -5969,7 +5952,6 @@ static ModifyTable *
 make_modifytable(PlannerInfo *root, Plan *subplan,
 				 CmdType operation, bool canSetTag,
 				 Index nominalRelation, Index rootRelation,
-				 bool partColsUpdated,
 				 List *resultRelations,
 				 List *updateColnosLists,
 				 List *rowMarks, OnConflictExpr *onconflict, int epqParam)
@@ -5990,7 +5972,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 	node->canSetTag = canSetTag;
 	node->nominalRelation = nominalRelation;
 	node->rootRelation = rootRelation;
-	node->partColsUpdated = partColsUpdated;
 	node->resultRelations = resultRelations;
 	if (!onconflict)
 	{

@@ -90,11 +90,6 @@ static HTAB *TypeCacheHash = NULL;
 #define TCFLAGS_HAVE_ELEM_COMPARE			0x000800
 #define TCFLAGS_HAVE_ELEM_HASHING			0x001000
 #define TCFLAGS_HAVE_ELEM_EXTENDED_HASHING	0x002000
-#define TCFLAGS_CHECKED_FIELD_PROPERTIES	0x004000
-#define TCFLAGS_HAVE_FIELD_EQUALITY			0x008000
-#define TCFLAGS_HAVE_FIELD_COMPARE			0x010000
-#define TCFLAGS_HAVE_FIELD_HASHING			0x020000
-#define TCFLAGS_HAVE_FIELD_EXTENDED_HASHING	0x040000
 
 /* The flags associated with equality/comparison/hashing are all but these: */
 #define TCFLAGS_OPERATOR_FLAGS \
@@ -255,11 +250,6 @@ static bool array_element_has_compare(TypeCacheEntry *typentry);
 static bool array_element_has_hashing(TypeCacheEntry *typentry);
 static bool array_element_has_extended_hashing(TypeCacheEntry *typentry);
 static void cache_array_element_properties(TypeCacheEntry *typentry);
-static bool record_fields_have_equality(TypeCacheEntry *typentry);
-static bool record_fields_have_compare(TypeCacheEntry *typentry);
-static bool record_fields_have_hashing(TypeCacheEntry *typentry);
-static bool record_fields_have_extended_hashing(TypeCacheEntry *typentry);
-static void cache_record_field_properties(TypeCacheEntry *typentry);
 static void TypeCacheRelCallback(Datum arg, Oid relid);
 static void TypeCacheTypCallback(Datum arg, int cacheid, uint32 hashvalue);
 static void TypeCacheOpcCallback(Datum arg, int cacheid, uint32 hashvalue);
@@ -496,16 +486,13 @@ lookup_type_cache(Oid type_id, int flags)
 										 HTEqualStrategyNumber);
 
 		/*
-		 * If the proposed equality operator is array_eq or record_eq, check
-		 * to see if the element type or column types support equality.  If
-		 * not, array_eq or record_eq would fail at runtime, so we don't want
+		 * If the proposed equality operator is array_eq, check
+		 * to see if the element type supports equality.  If
+		 * not, array_eq would fail at runtime, so we don't want
 		 * to report that the type has equality.
 		 */
 		if (eq_opr == ARRAY_EQ_OP &&
 			!array_element_has_equality(typentry))
-			eq_opr = InvalidOid;
-		else if (eq_opr == RECORD_EQ_OP &&
-				 !record_fields_have_equality(typentry))
 			eq_opr = InvalidOid;
 
 		/* Force update of eq_opr_finfo only if we're changing state */
@@ -535,13 +522,10 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTLessStrategyNumber);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed.
+		 * As above, make sure array_cmp will succeed.
 		 */
 		if (lt_opr == ARRAY_LT_OP &&
 			!array_element_has_compare(typentry))
-			lt_opr = InvalidOid;
-		else if (lt_opr == RECORD_LT_OP &&
-				 !record_fields_have_compare(typentry))
 			lt_opr = InvalidOid;
 
 		typentry->lt_opr = lt_opr;
@@ -559,13 +543,10 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTGreaterStrategyNumber);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed.
+		 * As above, make sure array_cmp will succeed.
 		 */
 		if (gt_opr == ARRAY_GT_OP &&
 			!array_element_has_compare(typentry))
-			gt_opr = InvalidOid;
-		else if (gt_opr == RECORD_GT_OP &&
-				 !record_fields_have_compare(typentry))
 			gt_opr = InvalidOid;
 
 		typentry->gt_opr = gt_opr;
@@ -583,13 +564,10 @@ lookup_type_cache(Oid type_id, int flags)
 										 BTORDER_PROC);
 
 		/*
-		 * As above, make sure array_cmp or record_cmp will succeed.
+		 * As above, make sure array_cmp will succeed.
 		 */
 		if (cmp_proc == F_BTARRAYCMP &&
 			!array_element_has_compare(typentry))
-			cmp_proc = InvalidOid;
-		else if (cmp_proc == F_BTRECORDCMP &&
-				 !record_fields_have_compare(typentry))
 			cmp_proc = InvalidOid;
 
 		/* Force update of cmp_proc_finfo only if we're changing state */
@@ -620,13 +598,10 @@ lookup_type_cache(Oid type_id, int flags)
 										  HASHSTANDARD_PROC);
 
 		/*
-		 * As above, make sure hash_array or hash_record will succeed.
+		 * As above, make sure hash_array will succeed.
 		 */
 		if (hash_proc == F_HASH_ARRAY &&
 			!array_element_has_hashing(typentry))
-			hash_proc = InvalidOid;
-		else if (hash_proc == F_HASH_RECORD &&
-				 !record_fields_have_hashing(typentry))
 			hash_proc = InvalidOid;
 
 		/* Force update of hash_proc_finfo only if we're changing state */
@@ -658,14 +633,10 @@ lookup_type_cache(Oid type_id, int flags)
 												   HASHEXTENDED_PROC);
 
 		/*
-		 * As above, make sure hash_array_extended or hash_record_extended
-		 * will succeed.
+		 * As above, make sure hash_array_extended will succeed.
 		 */
 		if (hash_extended_proc == F_HASH_ARRAY_EXTENDED &&
 			!array_element_has_extended_hashing(typentry))
-			hash_extended_proc = InvalidOid;
-		else if (hash_extended_proc == F_HASH_RECORD_EXTENDED &&
-				 !record_fields_have_extended_hashing(typentry))
 			hash_extended_proc = InvalidOid;
 
 		/* Force update of proc finfo only if we're changing state */
@@ -838,112 +809,6 @@ cache_array_element_properties(TypeCacheEntry *typentry)
 			typentry->flags |= TCFLAGS_HAVE_ELEM_EXTENDED_HASHING;
 	}
 	typentry->flags |= TCFLAGS_CHECKED_ELEM_PROPERTIES;
-}
-
-/*
- * Likewise, some helper functions for composite types.
- */
-
-static bool
-record_fields_have_equality(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_FIELD_PROPERTIES))
-		cache_record_field_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_FIELD_EQUALITY) != 0;
-}
-
-static bool
-record_fields_have_compare(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_FIELD_PROPERTIES))
-		cache_record_field_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_FIELD_COMPARE) != 0;
-}
-
-static bool
-record_fields_have_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_FIELD_PROPERTIES))
-		cache_record_field_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_FIELD_HASHING) != 0;
-}
-
-static bool
-record_fields_have_extended_hashing(TypeCacheEntry *typentry)
-{
-	if (!(typentry->flags & TCFLAGS_CHECKED_FIELD_PROPERTIES))
-		cache_record_field_properties(typentry);
-	return (typentry->flags & TCFLAGS_HAVE_FIELD_EXTENDED_HASHING) != 0;
-}
-
-static void
-cache_record_field_properties(TypeCacheEntry *typentry)
-{
-	/*
-	 * For type RECORD, we can't really tell what will work, since we don't
-	 * have access here to the specific anonymous type.  Just assume that
-	 * equality and comparison will (we may get a failure at runtime).  We
-	 * could also claim that hashing works, but then if code that has the
-	 * option between a comparison-based (sort-based) and a hash-based plan
-	 * chooses hashing, stuff could fail that would otherwise work if it chose
-	 * a comparison-based plan.  In practice more types support comparison
-	 * than hashing.
-	 */
-	if (typentry->type_id == RECORDOID)
-	{
-		typentry->flags |= (TCFLAGS_HAVE_FIELD_EQUALITY |
-							TCFLAGS_HAVE_FIELD_COMPARE);
-	}
-	else if (typentry->typtype == TYPTYPE_COMPOSITE)
-	{
-		TupleDesc	tupdesc;
-		int			newflags;
-		int			i;
-
-		/* Fetch composite type's tupdesc if we don't have it already */
-		if (typentry->tupDesc == NULL)
-			load_typcache_tupdesc(typentry);
-		tupdesc = typentry->tupDesc;
-
-		/* Must bump the refcount while we do additional catalog lookups */
-		IncrTupleDescRefCount(tupdesc);
-
-		/* Have each property if all non-dropped fields have the property */
-		newflags = (TCFLAGS_HAVE_FIELD_EQUALITY |
-					TCFLAGS_HAVE_FIELD_COMPARE |
-					TCFLAGS_HAVE_FIELD_HASHING |
-					TCFLAGS_HAVE_FIELD_EXTENDED_HASHING);
-		for (i = 0; i < tupdesc->natts; i++)
-		{
-			TypeCacheEntry *fieldentry;
-			Form_pg_attribute attr = TupleDescAttr(tupdesc, i);
-
-			if (attr->attisdropped)
-				continue;
-
-			fieldentry = lookup_type_cache(attr->atttypid,
-										   TYPECACHE_EQ_OPR |
-										   TYPECACHE_CMP_PROC |
-										   TYPECACHE_HASH_PROC |
-										   TYPECACHE_HASH_EXTENDED_PROC);
-			if (!OidIsValid(fieldentry->eq_opr))
-				newflags &= ~TCFLAGS_HAVE_FIELD_EQUALITY;
-			if (!OidIsValid(fieldentry->cmp_proc))
-				newflags &= ~TCFLAGS_HAVE_FIELD_COMPARE;
-			if (!OidIsValid(fieldentry->hash_proc))
-				newflags &= ~TCFLAGS_HAVE_FIELD_HASHING;
-			if (!OidIsValid(fieldentry->hash_extended_proc))
-				newflags &= ~TCFLAGS_HAVE_FIELD_EXTENDED_HASHING;
-
-			/* We can drop out of the loop once we disprove all bits */
-			if (newflags == 0)
-				break;
-		}
-		typentry->flags |= newflags;
-
-		DecrTupleDescRefCount(tupdesc);
-	}
-	typentry->flags |= TCFLAGS_CHECKED_FIELD_PROPERTIES;
 }
 
 

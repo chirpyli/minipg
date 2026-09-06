@@ -384,7 +384,6 @@ static bool
 _equalSubLink(const SubLink *a, const SubLink *b)
 {
 	COMPARE_SCALAR_FIELD(subLinkType);
-	COMPARE_SCALAR_FIELD(subLinkId);
 	COMPARE_NODE_FIELD(testexpr);
 	COMPARE_NODE_FIELD(operName);
 	COMPARE_NODE_FIELD(subselect);
@@ -561,19 +560,6 @@ _equalRowExpr(const RowExpr *a, const RowExpr *b)
 	COMPARE_COERCIONFORM_FIELD(row_format);
 	COMPARE_NODE_FIELD(colnames);
 	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalRowCompareExpr(const RowCompareExpr *a, const RowCompareExpr *b)
-{
-	COMPARE_SCALAR_FIELD(rctype);
-	COMPARE_NODE_FIELD(opnos);
-	COMPARE_NODE_FIELD(opfamilies);
-	COMPARE_NODE_FIELD(inputcollids);
-	COMPARE_NODE_FIELD(largs);
-	COMPARE_NODE_FIELD(rargs);
 
 	return true;
 }
@@ -1315,16 +1301,6 @@ _equalResTarget(const ResTarget *a, const ResTarget *b)
 }
 
 static bool
-_equalMultiAssignRef(const MultiAssignRef *a, const MultiAssignRef *b)
-{
-	COMPARE_NODE_FIELD(source);
-	COMPARE_SCALAR_FIELD(colno);
-	COMPARE_SCALAR_FIELD(ncolumns);
-
-	return true;
-}
-
-static bool
 _equalTypeName(const TypeName *a, const TypeName *b)
 {
 	COMPARE_NODE_FIELD(names);
@@ -1812,9 +1788,6 @@ equal(const void *a, const void *b)
 		case T_RowExpr:
 			retval = _equalRowExpr(a, b);
 			break;
-		case T_RowCompareExpr:
-			retval = _equalRowCompareExpr(a, b);
-			break;
 		case T_CoalesceExpr:
 			retval = _equalCoalesceExpr(a, b);
 			break;
@@ -2014,9 +1987,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_ResTarget:
 			retval = _equalResTarget(a, b);
-			break;
-		case T_MultiAssignRef:
-			retval = _equalMultiAssignRef(a, b);
 			break;
 		case T_TypeCast:
 			retval = _equalTypeCast(a, b);

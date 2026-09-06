@@ -194,7 +194,7 @@ index_close(Relation relation, LOCKMODE lockmode)
 /* ----------------
  *		validate_relation_kind - check the relation's kind
  *
- *		Make sure relkind is an index or a partitioned index.
+ *		Make sure relkind is an index.
  * ----------------
  */
 static inline void

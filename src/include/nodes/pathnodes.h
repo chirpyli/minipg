@@ -236,9 +236,6 @@ struct PlannerInfo
 
 	List	   *init_plans;		/* init SubPlans for query */
 
-	List	   *multiexpr_params;	/* List of Lists of Params for MULTIEXPR
-									 * subquery outputs */
-
 	List	   *eq_classes;		/* list of active EquivalenceClasses */
 
 	bool		ec_merging_done;	/* set true once ECs are canonical */
@@ -260,20 +257,14 @@ struct PlannerInfo
 
 	/*
 	 * all_result_relids is empty for SELECT, otherwise it contains at least
-	 * parse->resultRelation.  For UPDATE/DELETE across an inheritance or
-	 * partitioning tree, the result rel's child relids are added.  When using
-	 * multi-level partitioning, intermediate partitioned rels are included.
-	 * leaf_result_relids is similar except that only actual result tables,
-	 * not partitioned tables, are included in it.
+	 * parse->resultRelation.  For UPDATE/DELETE across an inheritance tree,
+	 * the result rel's child relids are added.
+	 * leaf_result_relids is similar except that only actual result tables
+	 * are included in it.
 	 */
 	Relids		all_result_relids;	/* set of all result relids */
 	Relids		leaf_result_relids; /* set of all leaf relids */
 
-	/*
-	 * Note: for AppendRelInfos describing partitions of a partitioned table,
-	 * we guarantee that partitions that come earlier in the partitioned
-	 * table's PartitionDesc will appear earlier in append_rel_list.
-	 */
 	List	   *append_rel_list;	/* list of AppendRelInfos */
 
 	List	   *row_identity_vars;	/* list of RowIdentityVarInfos */
@@ -361,9 +352,6 @@ struct PlannerInfo
 
 	/* optional private data for join_search_hook */
 	void	   *join_search_private;
-
-	/* Does this query modify any partition key columns? */
-	bool		partColsUpdated;
 };
 
 
@@ -408,11 +396,6 @@ struct PlannerInfo
  * At one time we also made otherrels to represent join RTEs, for use in
  * handling join alias Vars.  Currently this is not needed because all join
  * alias Vars are expanded to non-aliased form during preprocess_expression.
- *
- * We also have relations representing joins between child relations of
- * different partitioned tables. These relations are not added to
- * join_rel_level lists as they are not joined directly by the dynamic
- * programming algorithm.
  *
  * There is also a RelOptKind for "upper" relations, which are RelOptInfos
  * that describe post-scan/join processing steps, such as aggregation.
@@ -534,48 +517,6 @@ struct PlannerInfo
  * We store baserestrictcost in the RelOptInfo (for base relations) because
  * we know we will need it at least once (to price the sequential scan)
  * and may need it multiple times to price index scans.
- *
- * A join relation is considered to be partitioned if it is formed from a
- * join of two relations that are partitioned, have matching partitioning
- * schemes, and are joined on an equijoin of the partitioning columns.
- * Under those conditions we can consider the join relation to be partitioned
- * by either relation's partitioning keys, though some care is needed if
- * either relation can be forced to null by outer-joining.  For example, an
- * outer join like (A LEFT JOIN B ON A.a = B.b) may produce rows with B.b
- * NULL.  These rows may not fit the partitioning conditions imposed on B.
- * Hence, strictly speaking, the join is not partitioned by B.b and thus
- * partition keys of an outer join should include partition key expressions
- * from the non-nullable side only.  However, if a subsequent join uses
- * strict comparison operators (and all commonly-used equijoin operators are
- * strict), the presence of nulls doesn't cause a problem: such rows couldn't
- * match anything on the other side and thus they don't create a need to do
- * any cross-partition sub-joins.  Hence we can treat such values as still
- * partitioning the join output for the purpose of additional partitionwise
- * joining, so long as a strict join operator is used by the next join.
- *
- * If the relation is partitioned, these fields will be set:
- *
- *		part_scheme - Partitioning scheme of the relation
- *		nparts - Number of partitions
- *		boundinfo - Partition bounds
- *		partbounds_merged - true if partition bounds are merged ones
- *		partition_qual - Partition constraint if not the root
- *		part_rels - RelOptInfos for each partition
- *		all_partrels - Relids set of all partition relids
- *		partexprs, nullable_partexprs - Partition key expressions
- *
- * The partexprs and nullable_partexprs arrays each contain
- * part_scheme->partnatts elements.  Each of the elements is a list of
- * partition key expressions.  For partitioned base relations, there is one
- * expression in each partexprs element, and nullable_partexprs is empty.
- * For partitioned join relations, each base relation within the join
- * contributes one partition key expression per partitioning column;
- * that expression goes in the partexprs[i] list if the base relation
- * is not nullable by this join or any lower outer join, or in the
- * nullable_partexprs[i] list if the base relation is nullable.
- * Furthermore, FULL JOINs add extra nullable_partexprs expressions
- * corresponding to COALESCE expressions of the left and right join columns,
- * to simplify matching join clauses to those lists.
  *----------
  */
 
@@ -587,7 +528,6 @@ typedef enum RelOptKind
 	RELOPT_BASEREL,
 	RELOPT_JOINREL,
 	RELOPT_OTHER_MEMBER_REL,
-	RELOPT_OTHER_JOINREL,
 	RELOPT_UPPER_REL,
 	RELOPT_OTHER_UPPER_REL,
 	RELOPT_DEADREL
@@ -603,8 +543,7 @@ typedef enum RelOptKind
 
 /* Is the given relation a join relation? */
 #define IS_JOIN_REL(rel)	\
-	((rel)->reloptkind == RELOPT_JOINREL || \
-	 (rel)->reloptkind == RELOPT_OTHER_JOINREL)
+	((rel)->reloptkind == RELOPT_JOINREL)
 
 /* Is the given relation an upper relation? */
 #define IS_UPPER_REL(rel)	\
@@ -614,7 +553,6 @@ typedef enum RelOptKind
 /* Is the given relation an "other" relation? */
 #define IS_OTHER_REL(rel) \
 	((rel)->reloptkind == RELOPT_OTHER_MEMBER_REL || \
-	 (rel)->reloptkind == RELOPT_OTHER_JOINREL || \
 	 (rel)->reloptkind == RELOPT_OTHER_UPPER_REL)
 
 typedef struct RelOptInfo
@@ -1121,11 +1059,7 @@ typedef struct IndexPath
  * represent a weaker condition.
  *
  * Normally, indexcol is the index of the single index column the clause
- * works on, and indexcols is NIL.  But if the clause is a RowCompareExpr,
- * indexcol is the index of the leading column, and indexcols is a list of
- * all the affected columns.  (Note that indexcols matches up with the
- * columns of the actual indexable RowCompareExpr in indexquals, which
- * might be different from the original in rinfo.)
+ * works on, and indexcols is NIL.
  *
  * An IndexPath's IndexClause list is required to be ordered by index
  * column, i.e. the indexcol values must form a nondecreasing sequence.
@@ -1138,7 +1072,7 @@ typedef struct IndexClause
 	List	   *indexquals;		/* indexqual(s) derived from it */
 	bool		lossy;			/* are indexquals a lossy version of clause? */
 	AttrNumber	indexcol;		/* index column the clause uses (zero-based) */
-	List	   *indexcols;		/* multiple index columns, if RowCompare */
+	List	   *indexcols;		/* multiple index columns, if any */
 } IndexClause;
 
 /*
@@ -1679,7 +1613,6 @@ typedef struct ModifyTablePath
 	bool		canSetTag;		/* do we set the command tag/es_processed? */
 	Index		nominalRelation;	/* Parent RT index for use of EXPLAIN */
 	Index		rootRelation;	/* Root RT index, if partitioned/inherited */
-	bool		partColsUpdated;	/* some part key in hierarchy updated? */
 	List	   *resultRelations;	/* integer list of RT indexes */
 	List	   *updateColnosLists;	/* per-target-table update_colnos lists */
 	List	   *rowMarks;		/* PlanRowMarks (non-locking only) */
@@ -2144,7 +2077,7 @@ typedef struct AppendRelInfo
 /*
  * Information about a row-identity "resjunk" column in UPDATE/DELETE.
  *
- * In partitioned UPDATE/DELETE it's important for child partitions to share
+ * It's important for child tables in an inheritance tree to share
  * row-identity columns whenever possible, so as not to chew up too many
  * targetlist columns.  We use these structs to track which identity columns
  * have been requested.  In the finished plan, each of these will give rise

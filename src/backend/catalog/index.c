@@ -102,7 +102,6 @@ static void InitializeAttributeOids(Relation indexRelation,
 									int numatts, Oid indexoid);
 static void AppendAttributeTuples(Relation indexRelation, Datum *attopts);
 static void UpdateIndexRelation(Oid indexoid, Oid heapoid,
-								Oid parentIndexId,
 								IndexInfo *indexInfo,
 								Oid *classOids,
 								int16 *coloptions,
@@ -193,8 +192,8 @@ index_check_primary_key(Relation heapRel,
 	int			i;
 
 	/*
-	 * If ALTER TABLE or CREATE TABLE .. PARTITION OF, check that there isn't
-	 * already a PRIMARY KEY.  In CREATE TABLE for an ordinary relation, we
+	 * If ALTER TABLE, check that there isn't already a PRIMARY KEY.  In
+	 * CREATE TABLE for an ordinary relation, we
 	 * have faith that the parser rejected multiple pkey clauses; and CREATE
 	 * INDEX doesn't have a way to say PRIMARY KEY, so it's no problem either.
 	 */
@@ -507,7 +506,6 @@ AppendAttributeTuples(Relation indexRelation, Datum *attopts)
 static void
 UpdateIndexRelation(Oid indexoid,
 					Oid heapoid,
-					Oid parentIndexId,
 					IndexInfo *indexInfo,
 					Oid *classOids,
 					int16 *coloptions,
@@ -622,10 +620,6 @@ UpdateIndexRelation(Oid indexoid,
  * indexRelationId: normally, pass InvalidOid to let this routine
  *		generate an OID for the index.  During bootstrap this may be
  *		nonzero to specify a preselected OID.
- * parentIndexRelid: if creating an index partition, the OID of the
- *		parent index; otherwise InvalidOid.
- * parentConstraintId: if creating a constraint on a partition, the OID
- *		of the constraint in the parent; otherwise InvalidOid.
  * relFileNode: normally, pass InvalidOid to get new storage.  May be
  *		nonzero to attach an existing valid build.
  * indexInfo: same info executor uses to insert into the index
@@ -650,8 +644,6 @@ UpdateIndexRelation(Oid indexoid,
  *		INDEX_CREATE_IF_NOT_EXISTS:
  *			do not throw an error if a relation with the same name
  *			already exists.
- *		INDEX_CREATE_PARTITIONED:
- *			create a partitioned index (table must be partitioned)
  *
  * constr_flags: flags passed to index_constraint_create
  *		(only if INDEX_CREATE_ADD_CONSTRAINT is set)
@@ -665,8 +657,6 @@ Oid
 index_create(Relation heapRelation,
 			 const char *indexRelationName,
 			 Oid indexRelationId,
-			 Oid parentIndexRelid,
-			 Oid parentConstraintId,
 			 Oid relFileNode,
 			 IndexInfo *indexInfo,
 			 List *indexColNames,
@@ -885,7 +875,7 @@ index_create(Relation heapRelation,
 	 *	  (Or, could define a rule to maintain the predicate) --Nels, Feb '92
 	 * ----------------
 	 */
-	UpdateIndexRelation(indexRelationId, heapRelationId, parentIndexRelid,
+	UpdateIndexRelation(indexRelationId, heapRelationId,
 						indexInfo,
 						classObjectId, coloptions,
 						isprimary,
@@ -938,7 +928,6 @@ index_create(Relation heapRelation,
 
 			localaddr = index_constraint_create(heapRelation,
 												indexRelationId,
-												parentConstraintId,
 												indexInfo,
 												indexRelationName,
 												constraintType,
@@ -982,21 +971,6 @@ index_create(Relation heapRelation,
 
 			record_object_address_dependencies(&myself, addrs, DEPENDENCY_AUTO);
 			free_object_addresses(addrs);
-		}
-
-		/*
-		 * If this is an index partition, create partition dependencies on
-		 * both the parent index and the table.  (Note: these must be *in
-		 * addition to*, not instead of, all other dependencies.  Otherwise
-		 * we'll be short some dependencies after DETACH PARTITION.)
-		 */
-		if (OidIsValid(parentIndexRelid))
-		{
-			ObjectAddressSet(referenced, RelationRelationId, parentIndexRelid);
-			recordDependencyOn(&myself, &referenced, DEPENDENCY_PARTITION_PRI);
-
-			ObjectAddressSet(referenced, RelationRelationId, heapRelationId);
-			recordDependencyOn(&myself, &referenced, DEPENDENCY_PARTITION_SEC);
 		}
 
 		/* placeholder for normal dependencies */
@@ -1228,16 +1202,10 @@ index_concurrently_create_copy(Relation heapRelation, Oid oldIndexId,
 
 	/*
 	 * Now create the new index.
-	 *
-	 * For a partition index, we adjust the partition dependency later, to
-	 * ensure a consistent state at all times.  That is why parentIndexRelid
-	 * is not set here.
 	 */
 	newIndexId = index_create(heapRelation,
 							  newName,
 							  InvalidOid,	/* indexRelationId */
-							  InvalidOid,	/* parentIndexRelid */
-							  InvalidOid,	/* parentConstraintId */
 							  InvalidOid,	/* relFileNode */
 							  newInfo,
 							  indexColNames,
@@ -1380,7 +1348,6 @@ index_concurrently_swap(Oid newIndexId, Oid oldIndexId, const char *oldName)
 	namestrcpy(&newClassForm->relname, NameStr(oldClassForm->relname));
 	namestrcpy(&oldClassForm->relname, oldName);
 
-	/* Swap the partition flags to track inheritance properly */
 	CatalogTupleUpdate(pg_class, &oldClassTuple->t_self, oldClassTuple);
 	CatalogTupleUpdate(pg_class, &newClassTuple->t_self, newClassTuple);
 
@@ -1623,8 +1590,6 @@ index_concurrently_set_dead(Oid heapId, Oid indexId)
  *
  * heapRelation: table owning the index (must be suitably locked by caller)
  * indexRelationId: OID of the index
- * parentConstraintId: if constraint is on a partition, the OID of the
- *		constraint in the parent.
  * indexInfo: same info executor uses to insert into the index
  * constraintName: what it say (generally, should match name of index)
  * constraintType: one of CONSTRAINT_PRIMARY or CONSTRAINT_UNIQUE
@@ -1639,7 +1604,6 @@ index_concurrently_set_dead(Oid heapId, Oid indexId)
 ObjectAddress
 index_constraint_create(Relation heapRelation,
 						Oid indexRelationId,
-						Oid parentConstraintId,
 						IndexInfo *indexInfo,
 						const char *constraintName,
 						char constraintType,
@@ -1686,18 +1650,9 @@ index_constraint_create(Relation heapRelation,
 		deleteDependencyRecordsForClass(RelationRelationId, indexRelationId,
 										RelationRelationId, DEPENDENCY_AUTO);
 
-	if (OidIsValid(parentConstraintId))
-	{
-		islocal = false;
-		inhcount = 1;
-		noinherit = false;
-	}
-	else
-	{
-		islocal = true;
-		inhcount = 0;
-		noinherit = true;
-	}
+	islocal = true;
+	inhcount = 0;
+	noinherit = true;
 
 	/*
 	 * Construct a pg_constraint entry.
@@ -1721,21 +1676,6 @@ index_constraint_create(Relation heapRelation,
 	ObjectAddressSet(myself, ConstraintRelationId, conOid);
 	ObjectAddressSet(idxaddr, RelationRelationId, indexRelationId);
 	recordDependencyOn(&idxaddr, &myself, DEPENDENCY_INTERNAL);
-
-	/*
-	 * Also, if this is a constraint on a partition, give it partition-type
-	 * dependencies on the parent constraint as well as the table.
-	 */
-	if (OidIsValid(parentConstraintId))
-	{
-		ObjectAddress referenced;
-
-		ObjectAddressSet(referenced, ConstraintRelationId, parentConstraintId);
-		recordDependencyOn(&myself, &referenced, DEPENDENCY_PARTITION_PRI);
-		ObjectAddressSet(referenced, RelationRelationId,
-						 RelationGetRelid(heapRelation));
-		recordDependencyOn(&myself, &referenced, DEPENDENCY_PARTITION_SEC);
-	}
 
 	/*
 	 * If needed, mark the index as primary in pg_index.

@@ -906,8 +906,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 		return true;
 	else if (IsA(node, RowExpr))
 		return true;
-	else if (IsA(node, RowCompareExpr))
-		return true;
 	else if (IsA(node, CoalesceExpr))
 		return true;
 	else if (IsA(node, MinMaxExpr))
@@ -1141,32 +1139,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 				{
 					/* Node is leaky, so reject if it contains Vars */
 					if (contain_var_clause(node))
-						return true;
-				}
-			}
-			break;
-
-		case T_RowCompareExpr:
-			{
-				/*
-				 * It's worth special-casing this because a leaky comparison
-				 * function only compromises one pair of row elements, which
-				 * might not contain Vars while others do.
-				 */
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-				ListCell   *opid;
-				ListCell   *larg;
-				ListCell   *rarg;
-
-				forthree(opid, rcexpr->opnos,
-						 larg, rcexpr->largs,
-						 rarg, rcexpr->rargs)
-				{
-					Oid			funcid = get_opcode(lfirst_oid(opid));
-
-					if (!get_func_leakproof(funcid) &&
-						(contain_var_clause((Node *) lfirst(larg)) ||
-						 contain_var_clause((Node *) lfirst(rarg))))
 						return true;
 				}
 			}

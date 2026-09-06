@@ -154,26 +154,6 @@ INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_series(1,300) AS x;
 ERROR:  relation "tbl" does not exist
 LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_seri...
                     ^
-explain (costs off)
-select * from tbl where (c1,c2,c3) < (2,5,1);
-ERROR:  relation "tbl" does not exist
-LINE 2: select * from tbl where (c1,c2,c3) < (2,5,1);
-                      ^
-select * from tbl where (c1,c2,c3) < (2,5,1);
-ERROR:  relation "tbl" does not exist
-LINE 1: select * from tbl where (c1,c2,c3) < (2,5,1);
-                      ^
--- row comparison that compares high key at page boundary
-SET enable_seqscan = off;
-explain (costs off)
-select * from tbl where (c1,c2,c3) < (262,1,1) limit 1;
-ERROR:  relation "tbl" does not exist
-LINE 2: select * from tbl where (c1,c2,c3) < (262,1,1) limit 1;
-                      ^
-select * from tbl where (c1,c2,c3) < (262,1,1) limit 1;
-ERROR:  relation "tbl" does not exist
-LINE 1: select * from tbl where (c1,c2,c3) < (262,1,1) limit 1;
-                      ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
 RESET enable_seqscan;

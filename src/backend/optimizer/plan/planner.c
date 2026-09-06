@@ -481,7 +481,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	root->outer_params = NULL;
 	root->planner_cxt = CurrentMemoryContext;
 	root->init_plans = NIL;
-	root->multiexpr_params = NIL;
 	root->eq_classes = NIL;
 	root->ec_merging_done = false;
 	root->all_result_relids =
@@ -505,7 +504,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	else
 		root->wt_param_id = -1;
 	root->non_recursive_path = NULL;
-	root->partColsUpdated = false;
 
 
 	/*
@@ -543,7 +541,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	 * example if there are no JOIN RTEs we can avoid the expense of doing
 	 * flatten_join_alias_vars().  This must be done after we have finished
 	 * adding rangetable entries, of course.  (Note: actually, processing of
-	 * inherited or partitioned rels can cause RTEs for their child tables to
+	 * inherited rels can cause RTEs for their child tables to
 	 * get added later; but those must all be RTE_RELATION entries, so they
 	 * don't invalidate the conclusions drawn here.)
 	 */
@@ -1461,7 +1459,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 										parse->canSetTag,
 										parse->resultRelation,
 										rootRelation,
-										root->partColsUpdated,
 										resultRelations,
 										updateColnosLists,
 										rowMarks,
@@ -5149,14 +5146,6 @@ apply_scanjoin_target_to_paths(PlannerInfo *root,
 	 * pathtarget (cf. create_append_path).
 	 */
 	rel->reltarget = llast_node(PathTarget, scanjoin_targets);
-
-	/*
-	 * If the relation is partitioned, recursively apply the scan/join target
-	 * to all partitions, and generate brand-new Append paths in which the
-	 * scan/join target is computed below the Append rather than above it.
-	 * Since Append is not projection-capable, that might save a separate
-	 * Result node.
-	 */
 
 	/*
 	 * Consider generating Gather or Gather Merge paths.  We must only do this

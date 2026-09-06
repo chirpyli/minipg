@@ -299,14 +299,14 @@ heapam_tuple_complete_speculative(Relation relation, TupleTableSlot *slot,
 static TM_Result
 heapam_tuple_delete(Relation relation, ItemPointer tid, CommandId cid,
 					Snapshot snapshot, Snapshot crosscheck, bool wait,
-					TM_FailureData *tmfd, bool changingPart)
+					TM_FailureData *tmfd)
 {
 	/*
 	 * Currently Deleting of index tuples are handled at vacuum, in case if
 	 * the storage itself is cleaning the dead tuples by itself, it is the
 	 * time to call the index tuple deletion also.
 	 */
-	return heap_delete(relation, tid, cid, crosscheck, wait, tmfd, changingPart);
+	return heap_delete(relation, tid, cid, crosscheck, wait, tmfd);
 }
 
 
@@ -395,11 +395,6 @@ tuple_lock_retry:
 			InitDirtySnapshot(SnapshotDirty);
 			for (;;)
 			{
-				if (ItemPointerIndicatesMovedPartitions(tid))
-					ereport(ERROR,
-							(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
-							 errmsg("tuple to be locked was already moved to another partition due to concurrent update")));
-
 				tuple->t_self = *tid;
 				if (heap_fetch_extended(relation, &SnapshotDirty, tuple,
 										&buffer, true))

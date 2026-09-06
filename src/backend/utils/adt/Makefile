@@ -27,7 +27,6 @@ OBJS = \
 	dbsize.o \
 	encode.o \
 	expandeddatum.o \
-	expandedrecord.o \
 	float.o \
 	format_type.o \
 	int.o \

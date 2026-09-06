@@ -283,7 +283,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 				qualified_name_list any_name any_name_list
 				any_operator expr_list attrs
 				distinct_clause
-				target_list opt_target_list insert_column_list set_target_list
+				target_list opt_target_list insert_column_list
 				set_clause_list set_clause
 				def_list operator_def_list indirection opt_indirection
 				transaction_mode_list_or_empty
@@ -347,7 +347,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 %type <boolean> opt_ordinality
 %type <list>	func_arg_list func_arg_list_opt
 %type <node>	func_arg_expr
-%type <list>	row explicit_row implicit_row type_list array_expr_list
+%type <list>	row type_list array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
 %type <list>	when_clause_list
 %type <ival>	sub_type
@@ -486,7 +486,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 	ORDER ORDINALITY OTHERS OUTER_P
 	OVER OVERLAPS OVERLAY OVERRIDING OWNED OWNER
 
-	PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS
+	PARSER PARTIAL PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
 	PRIVILEGES PROGRAM
 
@@ -495,7 +495,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
 	RESET RESTART RESTRICT RIGHT ROLE ROLLBACK ROLLUP
-	ROW ROWS RULE
+	ROWS RULE
 
 	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
@@ -562,7 +562,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
  * If those keywords have the same precedence as IDENT then they clearly act
  * the same as non-keywords, reducing the risk of unwanted precedence effects.
  *
- * We need to do this for PARTITION, RANGE, ROWS, and GROUPS to support
+ * We need to do this for RANGE, ROWS, and GROUPS to support
  * opt_existing_window_name (see comment there).
  *
  * The frame_bound productions UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING
@@ -580,7 +580,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
  * Using the same precedence as IDENT seems right for the reasons given above.
  */
 %nonassoc	UNBOUNDED		/* ideally would have same precedence as IDENT */
-%nonassoc	IDENT PARTITION RANGE ROWS GROUPS PRECEDING FOLLOWING CUBE ROLLUP
+%nonassoc	IDENT RANGE ROWS GROUPS PRECEDING FOLLOWING CUBE ROLLUP
 %left		Op OPERATOR		/* multi-character ops and user-defined operators */
 %left		'+' '-'
 %left		'*' '/' '%'
@@ -3207,27 +3207,6 @@ set_clause:
 					$1->val = (Node *) $3;
 					$$ = list_make1($1);
 				}
-			| '(' set_target_list ')' '=' a_expr
-				{
-					int ncolumns = list_length($2);
-					int i = 1;
-					ListCell *col_cell;
-
-					/* Create a MultiAssignRef source for each target */
-					foreach(col_cell, $2)
-					{
-						ResTarget *res_col = (ResTarget *) lfirst(col_cell);
-						MultiAssignRef *r = makeNode(MultiAssignRef);
-
-						r->source = (Node *) $5;
-						r->colno = i;
-						r->ncolumns = ncolumns;
-						res_col->val = (Node *) r;
-						i++;
-					}
-
-					$$ = $2;
-				}
 		;
 
 set_target:
@@ -3239,11 +3218,6 @@ set_target:
 					$$->val = NULL;	/* upper production sets this */
 					$$->location = @1;
 				}
-		;
-
-set_target_list:
-			set_target								{ $$ = list_make1($1); }
-			| set_target_list ',' set_target		{ $$ = lappend($1,$3); }
 		;
 
 
@@ -3621,8 +3595,7 @@ I_or_F_const:
 		;
 
 /* noise words */
-row_or_rows: ROW									{ $$ = 0; }
-			| ROWS									{ $$ = 0; }
+row_or_rows: ROWS									{ $$ = 0; }
 		;
 
 first_or_next: FIRST_P								{ $$ = 0; }
@@ -3758,9 +3731,8 @@ locked_rels_list:
 
 
 /*
- * We should allow ROW '(' expr_list ')' too, but that seems to require
- * making VALUES a fully reserved word, which will probably break more apps
- * than allowing the noise-word is worth.
+ * Note: the ROW keyword no longer exists in minipg, so there is no
+ * ROW '(' expr_list ')' form to consider allowing here.
  */
 values_clause:
 			VALUES '(' expr_list ')'
@@ -4951,7 +4923,6 @@ a_expr:		c_expr									{ $$ = $1; }
 						/* generate foo = ANY (subquery) */
 						SubLink *n = (SubLink *) $3;
 						n->subLinkType = ANY_SUBLINK;
-						n->subLinkId = 0;
 						n->testexpr = $1;
 						n->operName = NIL;		/* show it's IN not = ANY */
 						n->location = @2;
@@ -4972,7 +4943,6 @@ a_expr:		c_expr									{ $$ = $1; }
 						/* Make an = ANY node */
 						SubLink *n = (SubLink *) $4;
 						n->subLinkType = ANY_SUBLINK;
-						n->subLinkId = 0;
 						n->testexpr = $1;
 						n->operName = NIL;		/* show it's IN not = ANY */
 						n->location = @2;
@@ -4989,7 +4959,6 @@ a_expr:		c_expr									{ $$ = $1; }
 				{
 					SubLink *n = makeNode(SubLink);
 					n->subLinkType = $3;
-					n->subLinkId = 0;
 					n->testexpr = $1;
 					n->operName = $2;
 					n->subselect = $4;
@@ -5135,7 +5104,6 @@ c_expr:		columnref								{ $$ = $1; }
 				{
 					SubLink *n = makeNode(SubLink);
 					n->subLinkType = EXPR_SUBLINK;
-					n->subLinkId = 0;
 					n->testexpr = NULL;
 					n->operName = NIL;
 					n->subselect = $1;
@@ -5157,7 +5125,6 @@ c_expr:		columnref								{ $$ = $1; }
 					SubLink *n = makeNode(SubLink);
 					A_Indirection *a = makeNode(A_Indirection);
 					n->subLinkType = EXPR_SUBLINK;
-					n->subLinkId = 0;
 					n->testexpr = NULL;
 					n->operName = NIL;
 					n->subselect = $1;
@@ -5170,7 +5137,6 @@ c_expr:		columnref								{ $$ = $1; }
 				{
 					SubLink *n = makeNode(SubLink);
 					n->subLinkType = EXISTS_SUBLINK;
-					n->subLinkId = 0;
 					n->testexpr = NULL;
 					n->operName = NIL;
 					n->subselect = $2;
@@ -5181,7 +5147,6 @@ c_expr:		columnref								{ $$ = $1; }
 				{
 					SubLink *n = makeNode(SubLink);
 					n->subLinkType = ARRAY_SUBLINK;
-					n->subLinkId = 0;
 					n->testexpr = NULL;
 					n->operName = NIL;
 					n->subselect = $2;
@@ -5194,26 +5159,6 @@ c_expr:		columnref								{ $$ = $1; }
 					/* point outermost A_ArrayExpr to the ARRAY keyword */
 					n->location = @1;
 					$$ = (Node *)n;
-				}
-			| explicit_row
-				{
-					RowExpr *r = makeNode(RowExpr);
-					r->args = $1;
-					r->row_typeid = InvalidOid;	/* not analyzed yet */
-					r->colnames = NIL;	/* to be filled in during analysis */
-					r->row_format = COERCE_EXPLICIT_CALL; /* abuse */
-					r->location = @1;
-					$$ = (Node *)r;
-				}
-			| implicit_row
-				{
-					RowExpr *r = makeNode(RowExpr);
-					r->args = $1;
-					r->row_typeid = InvalidOid;	/* not analyzed yet */
-					r->colnames = NIL;	/* to be filled in during analysis */
-					r->row_format = COERCE_IMPLICIT_CAST; /* abuse */
-					r->location = @1;
-					$$ = (Node *)r;
 				}
 			| GROUPING '(' expr_list ')'
 			  {
@@ -5530,22 +5475,13 @@ filter_clause:
  * Supporting nonterminals for expressions.
  */
 
-/* Explicit row production.
- *
- * SQL99 allows an optional ROW keyword, so we can now do single-element rows
- * without conflicting with the parenthesized a_expr production.  Without the
- * ROW keyword, there must be more than one a_expr inside the parens.
+/*
+ * Row production.  In minipg this never builds a RowExpr (row constructors
+ * are not supported); it is retained solely as the left and right operand
+ * list syntax of the OVERLAPS operator.  Note that the ROW keyword itself
+ * is gone, so only the parenthesized forms are accepted.
  */
-row:		ROW '(' expr_list ')'					{ $$ = $3; }
-			| ROW '(' ')'							{ $$ = NIL; }
-			| '(' expr_list ',' a_expr ')'			{ $$ = lappend($2, $4); }
-		;
-
-explicit_row:	ROW '(' expr_list ')'				{ $$ = $3; }
-			| ROW '(' ')'							{ $$ = NIL; }
-		;
-
-implicit_row:	'(' expr_list ',' a_expr ')'		{ $$ = lappend($2, $4); }
+row:		'(' expr_list ',' a_expr ')'			{ $$ = lappend($2, $4); }
 		;
 
 sub_type:	ANY										{ $$ = ANY_SUBLINK; }
@@ -5721,14 +5657,6 @@ position_list:
  *
  * In the parser we map them both to a call to the substring() function and
  * rely on type resolution to pick the right one.
- *
- * In SQL:2003, the second variant was changed to
- *     text SIMILAR pattern ESCAPE escape
- * We could in theory map that to a different function internally, but
- * since we still support the SQL:1999 version, we don't.  However,
- * ruleutils.c will reverse-list the call in the newer style.
- * (SIMILAR TO syntax and the regex-based variant are not supported in
- * this build.)
  */
 substr_list:
 			a_expr FROM a_expr FOR a_expr
@@ -6347,7 +6275,6 @@ unreserved_keyword:
 			| OWNER
 			| PARSER
 			| PARTIAL
-			| PARTITION
 			| PASSING
 			| PASSWORD
 			| PLANS
@@ -6485,7 +6412,6 @@ col_name_keyword:
 			| POSITION
 			| PRECISION
 			| REAL
-			| ROW
 			| SETOF
 			| SMALLINT
 			| SUBSTRING
@@ -6829,7 +6755,6 @@ bare_label_keyword:
 			| OWNER
 			| PARSER
 			| PARTIAL
-			| PARTITION
 			| PASSING
 			| PASSWORD
 			| PLACING
@@ -6866,7 +6791,6 @@ bare_label_keyword:
 			| ROLE
 			| ROLLBACK
 			| ROLLUP
-			| ROW
 			| ROWS
 			| RULE
 			| SAVEPOINT

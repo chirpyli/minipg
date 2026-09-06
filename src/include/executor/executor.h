@@ -169,7 +169,6 @@ extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  Relation resultRelationDesc,
 							  Index resultRelationIndex,
-							  ResultRelInfo *partition_root_rri,
 							  int instrument_options);
 extern ResultRelInfo *ExecGetTriggerResultRel(EState *estate, Oid relid);
 extern LockTupleMode ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo);

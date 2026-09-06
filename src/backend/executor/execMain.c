@@ -821,7 +821,6 @@ void
 InitResultRelInfo(ResultRelInfo *resultRelInfo,
 				  Relation resultRelationDesc,
 				  Index resultRelationIndex,
-				  ResultRelInfo *partition_root_rri,
 				  int instrument_options)
 {
 	MemSet(resultRelInfo, 0, sizeof(ResultRelInfo));
@@ -843,14 +842,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_onConflictArbiterIndexes = NIL;
 	resultRelInfo->ri_onConflict = NULL;
 	resultRelInfo->ri_ConflictSlot = NULL;
-
-	/*
-	 * Only ExecInitPartitionInfo() and ExecInitPartitionDispatchInfo() pass
-	 * non-NULL partition_root_rri.  For child relations that are part of the
-	 * initial query rather than being dynamically added by tuple routing,
-	 * this field is filled in ExecInitModifyTable().
-	 */
-	resultRelInfo->ri_RootResultRelInfo = partition_root_rri;
 }
 
 /* ----------------------------------------------------------------

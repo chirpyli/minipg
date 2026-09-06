@@ -403,7 +403,6 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_BOOL_FIELD(canSetTag);
 	WRITE_UINT_FIELD(nominalRelation);
 	WRITE_UINT_FIELD(rootRelation);
-	WRITE_BOOL_FIELD(partColsUpdated);
 	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(updateColnosLists);
 	WRITE_NODE_FIELD(rowMarks);
@@ -1142,7 +1141,6 @@ _outSubLink(StringInfo str, const SubLink *node)
 	WRITE_NODE_TYPE("SUBLINK");
 
 	WRITE_ENUM_FIELD(subLinkType, SubLinkType);
-	WRITE_INT_FIELD(subLinkId);
 	WRITE_NODE_FIELD(testexpr);
 	WRITE_NODE_FIELD(operName);
 	WRITE_NODE_FIELD(subselect);
@@ -1319,19 +1317,6 @@ _outRowExpr(StringInfo str, const RowExpr *node)
 	WRITE_ENUM_FIELD(row_format, CoercionForm);
 	WRITE_NODE_FIELD(colnames);
 	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outRowCompareExpr(StringInfo str, const RowCompareExpr *node)
-{
-	WRITE_NODE_TYPE("ROWCOMPARE");
-
-	WRITE_ENUM_FIELD(rctype, RowCompareType);
-	WRITE_NODE_FIELD(opnos);
-	WRITE_NODE_FIELD(opfamilies);
-	WRITE_NODE_FIELD(inputcollids);
-	WRITE_NODE_FIELD(largs);
-	WRITE_NODE_FIELD(rargs);
 }
 
 static void
@@ -1869,7 +1854,6 @@ _outModifyTablePath(StringInfo str, const ModifyTablePath *node)
 	WRITE_BOOL_FIELD(canSetTag);
 	WRITE_UINT_FIELD(nominalRelation);
 	WRITE_UINT_FIELD(rootRelation);
-	WRITE_BOOL_FIELD(partColsUpdated);
 	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(updateColnosLists);
 	WRITE_NODE_FIELD(rowMarks);
@@ -1976,7 +1960,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(join_rel_list);
 	WRITE_INT_FIELD(join_cur_level);
 	WRITE_NODE_FIELD(init_plans);
-	WRITE_NODE_FIELD(multiexpr_params);
 	WRITE_NODE_FIELD(eq_classes);
 	WRITE_BOOL_FIELD(ec_merging_done);
 	WRITE_NODE_FIELD(canon_pathkeys);
@@ -2010,7 +1993,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_INT_FIELD(wt_param_id);
 	WRITE_BITMAPSET_FIELD(curOuterRels);
 	WRITE_NODE_FIELD(curOuterParams);
-	WRITE_BOOL_FIELD(partColsUpdated);
 }
 
 static void
@@ -2876,16 +2858,6 @@ _outResTarget(StringInfo str, const ResTarget *node)
 }
 
 static void
-_outMultiAssignRef(StringInfo str, const MultiAssignRef *node)
-{
-	WRITE_NODE_TYPE("MULTIASSIGNREF");
-
-	WRITE_NODE_FIELD(source);
-	WRITE_INT_FIELD(colno);
-	WRITE_INT_FIELD(ncolumns);
-}
-
-static void
 _outSortBy(StringInfo str, const SortBy *node)
 {
 	WRITE_NODE_TYPE("SORTBY");
@@ -3218,9 +3190,6 @@ outNode(StringInfo str, const void *obj)
 			case T_RowExpr:
 				_outRowExpr(str, obj);
 				break;
-			case T_RowCompareExpr:
-				_outRowCompareExpr(str, obj);
-				break;
 			case T_CoalesceExpr:
 				_outCoalesceExpr(str, obj);
 				break;
@@ -3487,9 +3456,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ResTarget:
 				_outResTarget(str, obj);
-				break;
-			case T_MultiAssignRef:
-				_outMultiAssignRef(str, obj);
 				break;
 			case T_SortBy:
 				_outSortBy(str, obj);

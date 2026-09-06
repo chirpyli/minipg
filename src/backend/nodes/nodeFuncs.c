@@ -112,11 +112,6 @@ exprType(const Node *expr)
 											format_type_be(exprType((Node *) tent->expr)))));
 					}
 				}
-				else if (sublink->subLinkType == MULTIEXPR_SUBLINK)
-				{
-					/* MULTIEXPR is always considered to return RECORD */
-					type = RECORDOID;
-				}
 				else
 				{
 					/* for all other sublink types, result is boolean */
@@ -142,11 +137,6 @@ exprType(const Node *expr)
 									 errmsg("could not find array type for data type %s",
 											format_type_be(subplan->firstColType))));
 					}
-				}
-				else if (subplan->subLinkType == MULTIEXPR_SUBLINK)
-				{
-					/* MULTIEXPR is always considered to return RECORD */
-					type = RECORDOID;
 				}
 				else
 				{
@@ -195,9 +185,6 @@ exprType(const Node *expr)
 			break;
 		case T_RowExpr:
 			type = ((const RowExpr *) expr)->row_typeid;
-			break;
-		case T_RowCompareExpr:
-			type = BOOLOID;
 			break;
 		case T_CoalesceExpr:
 			type = ((const CoalesceExpr *) expr)->coalescetype;
@@ -865,10 +852,6 @@ exprCollation(const Node *expr)
 			/* RowExpr's result is composite ... */
 			coll = InvalidOid;	/* ... so it has no collation */
 			break;
-		case T_RowCompareExpr:
-			/* RowCompareExpr's result is boolean ... */
-			coll = InvalidOid;	/* ... so it has no collation */
-			break;
 		case T_CoalesceExpr:
 			coll = ((const CoalesceExpr *) expr)->coalescecollid;
 			break;
@@ -1060,10 +1043,6 @@ exprSetCollation(Node *expr, Oid collation)
 			/* RowExpr's result is composite ... */
 			Assert(!OidIsValid(collation)); /* ... so never set a collation */
 			break;
-		case T_RowCompareExpr:
-			/* RowCompareExpr's result is boolean ... */
-			Assert(!OidIsValid(collation)); /* ... so never set a collation */
-			break;
 		case T_CoalesceExpr:
 			((CoalesceExpr *) expr)->coalescecollid = collation;
 			break;
@@ -1097,8 +1076,6 @@ exprSetCollation(Node *expr, Oid collation)
  *	  Assign input-collation information to an expression tree node.
  *
  * This is a no-op for node types that don't store their input collation.
- * Note we omit RowCompareExpr, which needs special treatment since it
- * contains multiple input collation OIDs.
  */
 void
 exprSetInputCollation(Node *expr, Oid inputcollation)
@@ -1317,10 +1294,6 @@ exprLocation(const Node *expr)
 			/* the location points at ROW or (, which must be leftmost */
 			loc = ((const RowExpr *) expr)->location;
 			break;
-		case T_RowCompareExpr:
-			/* just use leftmost argument's location */
-			loc = exprLocation((Node *) ((const RowCompareExpr *) expr)->largs);
-			break;
 		case T_CoalesceExpr:
 			/* COALESCE keyword should always be the first thing */
 			loc = ((const CoalesceExpr *) expr)->location;
@@ -1408,9 +1381,6 @@ exprLocation(const Node *expr)
 		case T_ResTarget:
 			/* we need not examine the contained expression (if any) */
 			loc = ((const ResTarget *) expr)->location;
-			break;
-		case T_MultiAssignRef:
-			loc = exprLocation(((const MultiAssignRef *) expr)->source);
 			break;
 		case T_TypeCast:
 			{
@@ -1621,20 +1591,6 @@ check_functions_in_node(Node *node, check_function_callback checker,
 								  &iofunc, &typisvarlena);
 				if (checker(iofunc, context))
 					return true;
-			}
-			break;
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-				ListCell   *opid;
-
-				foreach(opid, rcexpr->opnos)
-				{
-					Oid			opfuncid = get_opcode(lfirst_oid(opid));
-
-					if (checker(opfuncid, context))
-						return true;
-				}
 			}
 			break;
 		default:
@@ -1942,16 +1898,6 @@ expression_tree_walker(Node *node,
 		case T_RowExpr:
 			/* Assume colnames isn't interesting */
 			return walker(((RowExpr *) node)->args, context);
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-
-				if (walker(rcexpr->largs, context))
-					return true;
-				if (walker(rcexpr->rargs, context))
-					return true;
-			}
-			break;
 		case T_CoalesceExpr:
 			return walker(((CoalesceExpr *) node)->args, context);
 		case T_MinMaxExpr:
@@ -2625,17 +2571,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_RowCompareExpr:
-			{
-				RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-				RowCompareExpr *newnode;
-
-				FLATCOPY(newnode, rcexpr, RowCompareExpr);
-				MUTATE(newnode->largs, rcexpr->largs, List *);
-				MUTATE(newnode->rargs, rcexpr->rargs, List *);
-				return (Node *) newnode;
-			}
-			break;
 		case T_CoalesceExpr:
 			{
 				CoalesceExpr *coalesceexpr = (CoalesceExpr *) node;
@@ -3266,8 +3201,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_MultiAssignRef:
-			return walker(((MultiAssignRef *) node)->source, context);
 		case T_TypeCast:
 			{
 				TypeCast   *tc = (TypeCast *) node;

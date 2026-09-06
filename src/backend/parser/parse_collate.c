@@ -324,57 +324,6 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 				}
 			}
 			break;
-		case T_RowExpr:
-			{
-				/*
-				 * RowExpr is a special case because the subexpressions are
-				 * independent: we don't want to complain if some of them have
-				 * incompatible explicit collations.
-				 */
-				RowExpr    *expr = (RowExpr *) node;
-
-				assign_list_collations(context->pstate, expr->args);
-
-				/*
-				 * Since the result is always composite and therefore never
-				 * has a collation, we can just stop here: this node has no
-				 * impact on the collation of its parent.
-				 */
-				return false;	/* done */
-			}
-		case T_RowCompareExpr:
-			{
-				/*
-				 * For RowCompare, we have to find the common collation of
-				 * each pair of input columns and build a list.  If we can't
-				 * find a common collation, we just put InvalidOid into the
-				 * list, which may or may not cause an error at runtime.
-				 */
-				RowCompareExpr *expr = (RowCompareExpr *) node;
-				List	   *colls = NIL;
-				ListCell   *l;
-				ListCell   *r;
-
-				forboth(l, expr->largs, r, expr->rargs)
-				{
-					Node	   *le = (Node *) lfirst(l);
-					Node	   *re = (Node *) lfirst(r);
-					Oid			coll;
-
-					coll = select_common_collation(context->pstate,
-												   list_make2(le, re),
-												   true);
-					colls = lappend_oid(colls, coll);
-				}
-				expr->inputcollids = colls;
-
-				/*
-				 * Since the result is always boolean and therefore never has
-				 * a collation, we can just stop here: this node has no impact
-				 * on the collation of its parent.
-				 */
-				return false;	/* done */
-			}
 		case T_TargetEntry:
 			(void) expression_tree_walker(node,
 										  assign_collations_walker,

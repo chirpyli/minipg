@@ -5,7 +5,7 @@
  *
  * This file provides utility routines to build and manage attribute
  * mappings by comparing input and output TupleDescs.  Such mappings
- * are typically used by DDL operating on inheritance and partition trees
+ * are typically used by DDL operating on inheritance trees
  * to do a conversion between rowtypes logically equivalent but with
  * columns in a different order, taking into account dropped columns.
  * They are also used by the tuple conversion routines in tupconvert.c.
@@ -200,8 +200,8 @@ build_attrmap_by_name(TupleDesc indesc,
 
 		/*
 		 * Now search for an attribute with the same name in the indesc. It
-		 * seems likely that a partitioned table will have the attributes in
-		 * the same order as the partition, so the search below is optimized
+		 * seems likely that the attributes will be in the same order as the
+		 * related child table, so the search below is optimized
 		 * for that case.  It is possible that columns are dropped in one of
 		 * the relations, but not the other, so we use the 'nextindesc'
 		 * counter to track the starting point of the search.  If the inner

@@ -83,11 +83,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* OID of result type */
 	Oid			prorettype BKI_LOOKUP(pg_type);
 
-	/*
-	 * variable-length fields start here, but we allow direct access to
-	 * proargtypes
-	 */
-
 	/* parameter types (excludes OUT params) */
 	oidvector	proargtypes BKI_LOOKUP(pg_type);
 

@@ -20,11 +20,6 @@ CREATE INDEX tid_ind ON tid_tab(a);
 SELECT currtid2('tid_ind'::text, '(0,1)'::tid); -- fails
 DROP INDEX tid_ind;
 
--- Partitioned table, no storage
-CREATE TABLE tid_part (a int) PARTITION BY RANGE (a);
-SELECT currtid2('tid_part'::text, '(0,1)'::tid); -- fails
-DROP TABLE tid_part;
-
 -- Views
 -- ctid not defined in the view
 CREATE VIEW tid_view_no_ctid AS SELECT a FROM tid_tab;

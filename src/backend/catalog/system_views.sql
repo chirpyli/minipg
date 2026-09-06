@@ -571,9 +571,7 @@ CREATE VIEW pg_stat_progress_create_index AS
         S.param16 AS blocks_total,
         S.param17 AS blocks_done,
         S.param12 AS tuples_total,
-        S.param13 AS tuples_done,
-        S.param14 AS partitions_total,
-        S.param15 AS partitions_done
+        S.param13 AS tuples_done
     FROM pg_stat_get_progress_info('CREATE INDEX') AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 

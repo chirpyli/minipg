@@ -165,9 +165,6 @@ typedef struct AlteredTableInfo
 	List	   *newvals;		/* List of NewColumnValue */
 	List	   *afterStmts;		/* List of utility command parsetrees */
 	int			rewrite;		/* Reason for forced rewrite, if any */
-	Expr	   *partition_constraint;	/* for attach partition validation */
-	/* true, if validating default due to some other attach/detach */
-	bool		validate_default;
 	/* Objects to rebuild after completing ALTER TYPE operations */
 	List	   *changedConstraintOids;	/* OIDs of constraints to rebuild */
 	List	   *changedConstraintDefs;	/* string definitions of same */
@@ -241,7 +238,6 @@ struct DropRelationCallbackState
 	LOCKMODE	heap_lockmode;
 	/* These fields are state to track which subsidiary locks are held: */
 	Oid			heapOid;
-	Oid			partParentOid;
 	/* These fields are passed back by RangeVarCallbackForDropRelation: */
 	char		actual_relkind;
 	char		actual_relpersistence;
@@ -255,10 +251,6 @@ struct DropRelationCallbackState
 #define		ATT_FOREIGN_TABLE		0x0020
 
 
-/*
- * Partition tables are expected to be dropped when the parent partitioned
- * table gets dropped. Hence for partitioning we use AUTO dependency.
- */
 static void truncate_check_rel(Oid relid, Form_pg_class reltuple);
 static void truncate_check_activity(Relation rel);
 static void RangeVarCallbackForTruncate(const RangeVar *relation,
@@ -564,17 +556,11 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * apply the parser's transformExpr routine, but transformExpr doesn't
 	 * work unless we have a pre-existing relation. So, the transformation has
 	 * to be postponed to this final step of CREATE TABLE.
-	 *
-	 * This needs to be before processing the partitioning clauses because
-	 * those could refer to generated columns.
 	 */
 	if (rawDefaults)
 		AddRelationNewConstraints(rel, rawDefaults, NIL,
 								  true, true, false, queryString);
 
-	/*
-	 * Make column generation expressions visible for use by partitioning.
-	 */
 	CommandCounterIncrement();
 
 	ObjectAddressSet(address, RelationRelationId, relationId);
@@ -751,7 +737,6 @@ RemoveRelations(DropStmt *drop)
 			ShareUpdateExclusiveLock : AccessExclusiveLock;
 		/* We must initialize these fields to show that no locks are held: */
 		state.heapOid = InvalidOid;
-		state.partParentOid = InvalidOid;
 
 		relOid = RangeVarGetRelidExtended(rel, lockmode, RVR_MISSING_OK,
 										  RangeVarCallbackForDropRelation,
@@ -792,8 +777,6 @@ RemoveRelations(DropStmt *drop)
 /*
  * Before acquiring a table lock, check whether we have sufficient rights.
  * In the case of DROP INDEX, also try to lock the table before the index.
- * Also, if the table to be dropped is a partition, we try to lock the parent
- * first.
  */
 static void
 RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid, Oid oldRelOid,
@@ -818,17 +801,6 @@ RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid, Oid oldRelOid,
 	{
 		UnlockRelationOid(state->heapOid, heap_lockmode);
 		state->heapOid = InvalidOid;
-	}
-
-	/*
-	 * Similarly, if we previously locked some other partition's heap, and the
-	 * name we're looking up no longer refers to that relation, release the
-	 * now-useless lock.
-	 */
-	if (relOid != oldRelOid && OidIsValid(state->partParentOid))
-	{
-		UnlockRelationOid(state->partParentOid, AccessExclusiveLock);
-		state->partParentOid = InvalidOid;
 	}
 
 	/* Didn't find a relation, so no need for locking or permission checks. */
@@ -895,7 +867,7 @@ RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid, Oid oldRelOid,
 	 * regular queries lock tables before their indexes, we risk deadlock if
 	 * we do it the other way around.  No error if we don't find a pg_index
 	 * entry, though --- the relation may have been dropped.  Note that this
-	 * code will execute for either plain or partitioned indexes.
+	 * code will execute for plain indexes.
 	 */
 	if (expected_relkind == RELKIND_INDEX &&
 		relOid != oldRelOid)
@@ -1171,9 +1143,7 @@ truncate_check_rel(Oid relid, Form_pg_class reltuple)
 	char	   *relname = NameStr(reltuple->relname);
 
 	/*
-	 * Only allow truncate on regular tables and partitioned tables (although,
-	 * the latter are only being included here for the following checks; no
-	 * physical truncation will occur in their case.).
+	 * Only allow truncate on regular tables.
 	 */
 	if (reltuple->relkind != RELKIND_RELATION)
 		ereport(ERROR,
@@ -1371,12 +1341,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	}
 
 	/*
-	 * In case of a partition, there are no new column definitions, only dummy
-	 * ColumnDefs created for column constraints.  Set them aside for now and
-	 * process them at the end.
-	 */
-
-	/*
 	 * Scan the parents left-to-right, and merge their attributes to form a
 	 * list of inherited attributes (inhSchema).  Also check to see if we need
 	 * to inherit an OID column.
@@ -1397,12 +1361,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 
 		/* caller already got lock */
 		relation = table_open(parent, NoLock);
-
-		/*
-		 * Check for active uses of the parent partitioned table in the
-		 * current transaction, such as being used in some manner by an
-		 * enclosing command.
-		 */
 
 		/*
 		 * We do not allow partitions to participate in regular inheritance.
@@ -1644,8 +1602,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	/*
 	 * If we had no inherited attributes, the result schema is just the
 	 * explicitly declared columns.  Otherwise, we need to merge the declared
-	 * columns into the inherited schema list.  Although, we never have any
-	 * explicitly declared columns if the table is a partition.
+	 * columns into the inherited schema list.
 	 */
 	if (inhSchema != NIL)
 	{
@@ -1815,7 +1772,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	}
 
 	/*
-	 * Now that we have the column definition list for a partition, we can
+	 * Now that we have the column definition list, we can
 	 * check whether the columns referenced in the column constraint specs
 	 * actually exist.  Also, we merge defaults into each
 	 * corresponding column definition.
@@ -2411,10 +2368,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 	tab = ATGetQueueEntry(wqueue, rel);
 
 	/*
-	 * Disallow any ALTER TABLE other than ALTER TABLE DETACH FINALIZE on
-	 * partitions that are pending detach.
-	 */
-	/*
 	 * Copy the original subcommand for each table, so we can scribble on it.
 	 * This avoids conflicts when different child tables need to make
 	 * different parse transformations (for example, the same column may have
@@ -2650,13 +2603,7 @@ ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode,
 	{
 		AlteredTableInfo *tab = (AlteredTableInfo *) lfirst(ltab);
 
-		/*
-		 * If the table is source table of ATTACH PARTITION command, we did
-		 * not modify anything about it that will change its toasting
-		 * requirement, so no need to check.
-		 */
-		if ((tab->relkind == RELKIND_RELATION &&
-			 tab->partition_constraint == NULL))
+		if (tab->relkind == RELKIND_RELATION)
 			AlterTableCreateToastTable(tab->relid, lockmode);
 	}
 }
@@ -3016,7 +2963,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			/* Build a temporary relation and copy data */
 			Relation	OldHeap;
 			Oid			OIDNewHeap;
-			Oid			partitionTableSpace;
+			Oid			NewHeapTableSpace;
 			char		persistence;
 
 			OldHeap = table_open(tab->relid, NoLock);
@@ -3035,7 +2982,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			/*
 			 * Select destination tablespace (always use original)
 			 */
-			partitionTableSpace = OldHeap->rd_rel->reltablespace;
+			NewHeapTableSpace = OldHeap->rd_rel->reltablespace;
 
 			/*
 			 * Select persistence of transient table (same as original)
@@ -3070,7 +3017,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 			 * persistence. That wouldn't work for pg_class, but that can't be
 			 * unlogged anyway.
 			 */
-			OIDNewHeap = make_new_heap(tab->relid, partitionTableSpace, persistence,
+			OIDNewHeap = make_new_heap(tab->relid, NewHeapTableSpace, persistence,
 									   lockmode);
 
 			/*
@@ -3153,14 +3100,12 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 	Relation	newrel;
 	TupleDesc	oldTupDesc;
 	TupleDesc	newTupDesc;
-	bool		needscan = false;
 	int			i;
 	ListCell   *l;
 	EState	   *estate;
 	CommandId	mycid;
 	BulkInsertState bistate;
 	int			ti_options;
-	ExprState  *partqualstate = NULL;
 
 	/*
 	 * Open the relation(s).  We have surely already locked the existing
@@ -3199,13 +3144,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 
 	estate = CreateExecutorState();
 
-	/* Build expression execution states for partition check quals */
-	if (tab->partition_constraint)
-	{
-		needscan = true;
-		partqualstate = ExecPrepareExpr(tab->partition_constraint, estate);
-	}
-
 	foreach(l, tab->newvals)
 	{
 		NewColumnValue *ex = lfirst(l);
@@ -3214,7 +3152,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 		ex->exprstate = ExecInitExpr((Expr *) ex->expr, NULL);
 	}
 
-	if (newrel || needscan)
+	if (newrel)
 	{
 		ExprContext *econtext;
 		TupleTableSlot *oldslot;
@@ -3388,22 +3326,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 
 			/* Now check any constraints on the possibly-changed tuple */
 			econtext->ecxt_scantuple = insertslot;
-
-			if (partqualstate && !ExecCheck(partqualstate, econtext))
-			{
-				if (tab->validate_default)
-					ereport(ERROR,
-							(errcode(ERRCODE_CHECK_VIOLATION),
-							 errmsg("updated partition constraint for default partition \"%s\" would be violated by some row",
-									RelationGetRelationName(oldrel)),
-							 errtable(oldrel)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_CHECK_VIOLATION),
-							 errmsg("partition constraint of relation \"%s\" is violated by some row",
-									RelationGetRelationName(oldrel)),
-							 errtable(oldrel)));
-			}
 
 			/* Write the tuple out to the new relation */
 			if (newrel)
@@ -3723,13 +3645,7 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 		}
 
 		/*
-		 * We definitely should reject if the relation has storage.  If it's
-		 * partitioned, then perhaps we don't have to reject: if there are
-		 * partitions then we'll fail when we find one, else there is no
-		 * stored data to worry about.  However, it's possible that the type
-		 * change would affect conclusions about whether the type is sortable
-		 * or hashable and thus (if it's a partitioning column) break the
-		 * partitioning rule.  For now, reject for partitioned rels too.
+		 * We definitely should reject if the relation has storage.
 		 */
 		if (RELKIND_HAS_STORAGE(rel->rd_rel->relkind))
 		{
@@ -4873,8 +4789,6 @@ ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 	address = DefineIndex(RelationGetRelid(rel),
 						  stmt,
 						  InvalidOid,	/* no predefined OID */
-						  InvalidOid,	/* no parent index */
-						  InvalidOid,	/* no parent constraint */
 						  true, /* is_alter_table */
 						  check_rights,
 						  false,	/* check_not_in_use - we did it already */
@@ -4970,7 +4884,6 @@ ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 
 	address = index_constraint_create(rel,
 									  index_oid,
-									  InvalidOid,
 									  indexInfo,
 									  constraintName,
 									  constraintType,

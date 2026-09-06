@@ -72,10 +72,8 @@ typedef struct
 #define DEPFLAG_NORMAL		0x0002	/* reached via normal dependency */
 #define DEPFLAG_AUTO		0x0004	/* reached via auto dependency */
 #define DEPFLAG_INTERNAL	0x0008	/* reached via internal dependency */
-#define DEPFLAG_PARTITION	0x0010	/* reached via partition dependency */
 #define DEPFLAG_EXTENSION	0x0020	/* reached via extension dependency */
 #define DEPFLAG_REVERSE		0x0040	/* reverse internal/extension link */
-#define DEPFLAG_IS_PART		0x0080	/* has a partition dependency */
 #define DEPFLAG_SUBOBJECT	0x0100	/* subobject of another deletable object */
 
 
@@ -409,7 +407,6 @@ findDependentObjects(const ObjectAddress *object,
 	HeapTuple	tup;
 	ObjectAddress otherObject;
 	ObjectAddress owningObject;
-	ObjectAddress partitionObject;
 	ObjectAddressAndFlags *dependentObjects;
 	int			numDependentObjects;
 	int			maxDependentObjects;
@@ -491,7 +488,6 @@ findDependentObjects(const ObjectAddress *object,
 
 	/* initialize variables that loop may fill */
 	memset(&owningObject, 0, sizeof(owningObject));
-	memset(&partitionObject, 0, sizeof(partitionObject));
 
 	while (HeapTupleIsValid(tup = systable_getnext(scan)))
 	{
@@ -503,10 +499,8 @@ findDependentObjects(const ObjectAddress *object,
 
 		/*
 		 * When scanning dependencies of a whole object, we may find rows
-		 * linking sub-objects of the object to the object itself.  (Normally,
-		 * such a dependency is implicit, but we must make explicit ones in
-		 * some cases involving partitioning.)  We must ignore such rows to
-		 * avoid infinite recursion.
+		 * linking sub-objects of the object to the object itself.
+		 * We must ignore such rows to avoid infinite recursion.
 		 */
 		if (otherObject.classId == object->classId &&
 			otherObject.objectId == object->objectId &&
@@ -663,8 +657,7 @@ findDependentObjects(const ObjectAddress *object,
 				 * probably got only the flag bits associated with the
 				 * dependency we're looking at.  We need to add the objflags
 				 * that were passed to this recursion level, too, else we may
-				 * get a bogus failure in reportDependentObjects (if, for
-				 * example, we were called due to a partition dependency).
+				 * get a bogus failure in reportDependentObjects.
 				 *
 				 * If somehow the current object didn't get scheduled for
 				 * deletion, bleat.  (That would imply that somebody deleted
@@ -681,40 +674,6 @@ findDependentObjects(const ObjectAddress *object,
 
 				/* And we're done here. */
 				return;
-
-			case DEPENDENCY_PARTITION_PRI:
-
-				/*
-				 * Remember that this object has a partition-type dependency.
-				 * After the dependency scan, we'll complain if we didn't find
-				 * a reason to delete one of its partition dependencies.
-				 */
-				objflags |= DEPFLAG_IS_PART;
-
-				/*
-				 * Also remember the primary partition owner, for error
-				 * messages.  If there are multiple primary owners (which
-				 * there should not be), we'll report a random one of them.
-				 */
-				partitionObject = otherObject;
-				break;
-
-			case DEPENDENCY_PARTITION_SEC:
-
-				/*
-				 * Only use secondary partition owners in error messages if we
-				 * find no primary owner (which probably shouldn't happen).
-				 */
-				if (!(objflags & DEPFLAG_IS_PART))
-					partitionObject = otherObject;
-
-				/*
-				 * Remember that this object has a partition-type dependency.
-				 * After the dependency scan, we'll complain if we didn't find
-				 * a reason to delete one of its partition dependencies.
-				 */
-				objflags |= DEPFLAG_IS_PART;
-				break;
 
 			case DEPENDENCY_PIN:
 
@@ -736,18 +695,13 @@ findDependentObjects(const ObjectAddress *object,
 
 	/*
 	 * If we found an INTERNAL or EXTENSION dependency when we're at outer
-	 * level, complain about it now.  If we also found a PARTITION dependency,
-	 * we prefer to report the PARTITION dependency.  This is arbitrary but
-	 * seems to be more useful in practice.
+	 * level, complain about it now.
 	 */
 	if (OidIsValid(owningObject.classId))
 	{
 		char	   *otherObjDesc;
 
-		if (OidIsValid(partitionObject.classId))
-			otherObjDesc = getObjectDescription(&partitionObject, false);
-		else
-			otherObjDesc = getObjectDescription(&owningObject, false);
+		otherObjDesc = getObjectDescription(&owningObject, false);
 
 		ereport(ERROR,
 				(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
@@ -802,8 +756,7 @@ findDependentObjects(const ObjectAddress *object,
 
 		/*
 		 * If what we found is a sub-object of the current object, just ignore
-		 * it.  (Normally, such a dependency is implicit, but we must make
-		 * explicit ones in some cases involving partitioning.)
+		 * it.
 		 */
 		if (otherObject.classId == object->classId &&
 			otherObject.objectId == object->objectId &&
@@ -845,10 +798,6 @@ findDependentObjects(const ObjectAddress *object,
 				break;
 			case DEPENDENCY_INTERNAL:
 				subflags = DEPFLAG_INTERNAL;
-				break;
-			case DEPENDENCY_PARTITION_PRI:
-			case DEPENDENCY_PARTITION_SEC:
-				subflags = DEPFLAG_PARTITION;
 				break;
 			case DEPENDENCY_EXTENSION:
 				subflags = DEPFLAG_EXTENSION;
@@ -925,15 +874,11 @@ findDependentObjects(const ObjectAddress *object,
 	/*
 	 * Finally, we can add the target object to targetObjects.  Be careful to
 	 * include any flags that were passed back down to us from inner recursion
-	 * levels.  Record the "dependee" as being either the most important
-	 * partition owner if there is one, else the object we recursed from, if
-	 * any.  (The logic in reportDependentObjects() is such that it can only
-	 * need one of those objects.)
+	 * levels.  Record the "dependee" as being the object we recursed from,
+	 * if any.
 	 */
 	extra.flags = mystack.flags;
-	if (extra.flags & DEPFLAG_IS_PART)
-		extra.dependee = partitionObject;
-	else if (stack)
+	if (stack)
 		extra.dependee = *stack->object;
 	else
 		memset(&extra.dependee, 0, sizeof(extra.dependee));
@@ -966,35 +911,6 @@ reportDependentObjects(const ObjectAddresses *targetObjects,
 	int			numReportedClient = 0;
 	int			numNotReportedClient = 0;
 	int			i;
-
-	/*
-	 * If we need to delete any partition-dependent objects, make sure that
-	 * we're deleting at least one of their partition dependencies, too. That
-	 * can be detected by checking that we reached them by a PARTITION
-	 * dependency at some point.
-	 *
-	 * We just report the first such object, as in most cases the only way to
-	 * trigger this complaint is to explicitly try to delete one partition of
-	 * a partitioned object.
-	 */
-	for (i = 0; i < targetObjects->numrefs; i++)
-	{
-		const ObjectAddressExtra *extra = &targetObjects->extras[i];
-
-		if ((extra->flags & DEPFLAG_IS_PART) &&
-			!(extra->flags & DEPFLAG_PARTITION))
-		{
-			const ObjectAddress *object = &targetObjects->refs[i];
-			char	   *otherObjDesc = getObjectDescription(&extra->dependee,
-															false);
-
-			ereport(ERROR,
-					(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
-					 errmsg("cannot drop %s because %s requires it",
-							getObjectDescription(object, false), otherObjDesc),
-					 errhint("You can drop %s instead.", otherObjDesc)));
-		}
-	}
 
 	/*
 	 * If no error is to be thrown, and the msglevel is too low to be shown to
@@ -1041,12 +957,11 @@ reportDependentObjects(const ObjectAddresses *targetObjects,
 
 		/*
 		 * If, at any stage of the recursive search, we reached the object via
-		 * an AUTO, INTERNAL, PARTITION, or EXTENSION dependency, then it's
+		 * an AUTO, INTERNAL, or EXTENSION dependency, then it's
 		 * okay to delete it even in RESTRICT mode.
 		 */
 		if (extra->flags & (DEPFLAG_AUTO |
 							DEPFLAG_INTERNAL |
-							DEPFLAG_PARTITION |
 							DEPFLAG_EXTENSION))
 		{
 			/*
@@ -1920,23 +1835,6 @@ find_expr_references_walker(Node *node,
 
 		add_object_address(OCLASS_TYPE, rowexpr->row_typeid, 0,
 						   context->addrs);
-	}
-	else if (IsA(node, RowCompareExpr))
-	{
-		RowCompareExpr *rcexpr = (RowCompareExpr *) node;
-		ListCell   *l;
-
-		foreach(l, rcexpr->opnos)
-		{
-			add_object_address(OCLASS_OPERATOR, lfirst_oid(l), 0,
-							   context->addrs);
-		}
-		foreach(l, rcexpr->opfamilies)
-		{
-			add_object_address(OCLASS_OPFAMILY, lfirst_oid(l), 0,
-							   context->addrs);
-		}
-		/* fall through to examine arguments */
 	}
 	else if (IsA(node, OnConflictExpr))
 	{

@@ -1070,68 +1070,6 @@ SELECT 4 AS \gdesc
 \echo 'last error message:' :LAST_ERROR_MESSAGE
 \echo 'last error code:' :LAST_ERROR_SQLSTATE
 
-create schema testpart;
-
-
-
--- run test inside own schema and hide other partitions
-set search_path to testpart;
-
-create table testtable_apple(logdate date);
-create table testtable_orange(logdate date);
-create index testtable_apple_index on testtable_apple(logdate);
-create index testtable_orange_index on testtable_orange(logdate);
-
-create table testpart_apple(logdate date) partition by range(logdate);
-create table testpart_orange(logdate date) partition by range(logdate);
-
-create index testpart_apple_index on testpart_apple(logdate);
-create index testpart_orange_index on testpart_orange(logdate);
-
--- only partition related object should be displayed
-\dP test*apple*
-\dPt test*apple*
-\dPi test*apple*
-
-drop table testtable_apple;
-drop table testtable_orange;
-drop table testpart_apple;
-drop table testpart_orange;
-
-create table parent_tab (id int) partition by range (id);
-create index parent_index on parent_tab (id);
-create table child_0_10 partition of parent_tab
-  for values from (0) to (10);
-create table child_10_20 partition of parent_tab
-  for values from (10) to (20);
-create table child_20_30 partition of parent_tab
-  for values from (20) to (30);
-insert into parent_tab values (generate_series(0,29));
-create table child_30_40 partition of parent_tab
-for values from (30) to (40)
-  partition by range(id);
-create table child_30_35 partition of child_30_40
-  for values from (30) to (35);
-create table child_35_40 partition of child_30_40
-   for values from (35) to (40);
-insert into parent_tab values (generate_series(30,39));
-
-\dPt
-\dPi
-
-\dP testpart.*
-\dP
-
-\dPtn
-\dPin
-\dPn
-\dPn testpart.*
-
-drop table parent_tab cascade;
-
-drop schema testpart;
-
-set search_path to default;
 
 
 -- \d on toast table (use pg_statistic's toast table, which has a known name)
@@ -1229,9 +1167,6 @@ set search_path to default;
 \dp host.regression.public.a_star
 \dp "regres+ion".public.a_star
 \dp nonesuch.public.a_star
-\dP host.regression.public.mlparted
-\dP "regres(sion)".public.mlparted
-\dP nonesuch.public.mlparted
 \drds nonesuch.lc_messages
 \drds regression.lc_messages
 \dx regression.plpgsql
@@ -1264,7 +1199,6 @@ set search_path to default;
 \do "no.such.operator"
 \dO "no.such.collation"
 \dp "no.such.access.privilege"
-\dP "no.such.partitioned.relation"
 \drds "no.such.setting"
 \dT "no.such.data.type"
 \dx "no.such.installed.extension"
@@ -1292,7 +1226,6 @@ set search_path to default;
 \do "no.such.schema"."no.such.operator"
 \dO "no.such.schema"."no.such.collation"
 \dp "no.such.schema"."no.such.access.privilege"
-\dP "no.such.schema"."no.such.partitioned.relation"
 \drds "no.such.schema"."no.such.setting"
 \dT "no.such.schema"."no.such.data.type"
 \dx "no.such.schema"."no.such.installed.extension"
@@ -1316,7 +1249,6 @@ set search_path to default;
 \do regression."no.such.schema"."no.such.operator"
 \dO regression."no.such.schema"."no.such.collation"
 \dp regression."no.such.schema"."no.such.access.privilege"
-\dP regression."no.such.schema"."no.such.partitioned.relation"
 \dT regression."no.such.schema"."no.such.data.type"
 \dX regression."no.such.schema"."no.such.extended.statistics"
 
@@ -1338,6 +1270,5 @@ set search_path to default;
 \do "no.such.database"."no.such.schema"."no.such.operator"
 \dO "no.such.database"."no.such.schema"."no.such.collation"
 \dp "no.such.database"."no.such.schema"."no.such.access.privilege"
-\dP "no.such.database"."no.such.schema"."no.such.partitioned.relation"
 \dT "no.such.database"."no.such.schema"."no.such.data.type"
 \dX "no.such.database"."no.such.schema"."no.such.extended.statistics"

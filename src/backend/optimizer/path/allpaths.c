@@ -95,7 +95,6 @@ static Path *get_cheapest_parameterized_child_path(PlannerInfo *root,
 static void accumulate_append_subpath(Path *path,
 									  List **subpaths,
 									  List **special_subpaths);
-static Path *get_singleton_append_subpath(Path *path);
 static void set_dummy_rel_pathlist(RelOptInfo *rel);
 static void set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								  Index rti, RangeTblEntry *rte);
@@ -164,8 +163,8 @@ make_one_rel(PlannerInfo *root, List *joinlist)
 	/*
 	 * We should now have size estimates for every actual table involved in
 	 * the query, and we also know which if any have been deleted from the
-	 * query by join removal, pruned by partition pruning, or eliminated by
-	 * constraint exclusion.  So we can now compute total_table_pages.
+	 * query by join removal, or eliminated by constraint exclusion.  So we
+	 * can now compute total_table_pages.
 	 *
 	 * Note that appendrels are not double-counted here, even though we don't
 	 * bother to distinguish RelOptInfos for appendrel parents, because the
@@ -1466,12 +1465,8 @@ add_paths_to_append_rel(PlannerInfo *root, RelOptInfo *rel,
  * generate_orderedappend_paths
  *		Generate ordered append paths for an append relation
  *
- * Usually we generate MergeAppend paths here, but there are some special
- * cases where we can generate simple Append paths, because the subpaths
- * can provide tuples in the required order already.
- *
- * We generate a path for each ordering (pathkey list) appearing in
- * all_child_pathkeys.
+ * We generate a MergeAppend path for each ordering (pathkey list) appearing
+ * in all_child_pathkeys.
  *
  * We consider both cheapest-startup and cheapest-total cases, ie, for each
  * interesting ordering, collect all the cheapest startup subpaths and all the
@@ -1495,19 +1490,6 @@ generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 							 List *all_child_pathkeys)
 {
 	ListCell   *lcp;
-	List	   *partition_pathkeys = NIL;
-	List	   *partition_pathkeys_desc = NIL;
-	bool		partition_pathkeys_partial = true;
-	bool		partition_pathkeys_desc_partial = true;
-
-	/*
-	 * Some partitioned table setups may allow us to use an Append node
-	 * instead of a MergeAppend.  This is possible in cases such as RANGE
-	 * partitioned tables where it's guaranteed that an earlier partition must
-	 * contain rows which come earlier in the sort order.  To detect whether
-	 * this is relevant, build pathkey descriptions of the partition ordering,
-	 * for both forward and reverse scans.
-	 */
 
 	/* Now consider each interesting sort ordering */
 	foreach(lcp, all_child_pathkeys)
@@ -1517,27 +1499,6 @@ generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 		List	   *total_subpaths = NIL;
 		bool		startup_neq_total = false;
 		ListCell   *lcr;
-		bool		match_partition_order;
-		bool		match_partition_order_desc;
-
-		/*
-		 * Determine if this sort ordering matches any partition pathkeys we
-		 * have, for both ascending and descending partition order.  If the
-		 * partition pathkeys happen to be contained in pathkeys then it still
-		 * works, as described above, providing that the partition pathkeys
-		 * are complete and not just a prefix of the partition keys.  (In such
-		 * cases we'll be relying on the child paths to have sorted the
-		 * lower-order columns of the required pathkeys.)
-		 */
-		match_partition_order =
-			pathkeys_contained_in(pathkeys, partition_pathkeys) ||
-			(!partition_pathkeys_partial &&
-			 pathkeys_contained_in(partition_pathkeys, pathkeys));
-
-		match_partition_order_desc = !match_partition_order &&
-			(pathkeys_contained_in(pathkeys, partition_pathkeys_desc) ||
-			 (!partition_pathkeys_desc_partial &&
-			  pathkeys_contained_in(partition_pathkeys_desc, pathkeys)));
 
 		/* Select the child paths for this ordering... */
 		foreach(lcr, live_childrels)
@@ -1581,89 +1542,27 @@ generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 				startup_neq_total = true;
 
 			/*
-			 * Collect the appropriate child paths.  The required logic varies
-			 * for the Append and MergeAppend cases.
+			 * Rely on accumulate_append_subpath to collect the
+			 * child paths for the MergeAppend.
 			 */
-			if (match_partition_order)
-			{
-				/*
-				 * We're going to make a plain Append path.  We don't need
-				 * most of what accumulate_append_subpath would do, but we do
-				 * want to cut out child Appends or MergeAppends if they have
-				 * just a single subpath (and hence aren't doing anything
-				 * useful).
-				 */
-				cheapest_startup = get_singleton_append_subpath(cheapest_startup);
-				cheapest_total = get_singleton_append_subpath(cheapest_total);
-
-				startup_subpaths = lappend(startup_subpaths, cheapest_startup);
-				total_subpaths = lappend(total_subpaths, cheapest_total);
-			}
-			else if (match_partition_order_desc)
-			{
-				/*
-				 * As above, but we need to reverse the order of the children,
-				 * because nodeAppend.c doesn't know anything about reverse
-				 * ordering and will scan the children in the order presented.
-				 */
-				cheapest_startup = get_singleton_append_subpath(cheapest_startup);
-				cheapest_total = get_singleton_append_subpath(cheapest_total);
-
-				startup_subpaths = lcons(cheapest_startup, startup_subpaths);
-				total_subpaths = lcons(cheapest_total, total_subpaths);
-			}
-			else
-			{
-				/*
-				 * Otherwise, rely on accumulate_append_subpath to collect the
-				 * child paths for the MergeAppend.
-				 */
-				accumulate_append_subpath(cheapest_startup,
-										  &startup_subpaths, NULL);
-				accumulate_append_subpath(cheapest_total,
-										  &total_subpaths, NULL);
-			}
+			accumulate_append_subpath(cheapest_startup,
+									  &startup_subpaths, NULL);
+			accumulate_append_subpath(cheapest_total,
+									  &total_subpaths, NULL);
 		}
 
-		/* ... and build the Append or MergeAppend paths */
-		if (match_partition_order || match_partition_order_desc)
-		{
-			/* We only need Append */
-			add_path(rel, (Path *) create_append_path(root,
-													  rel,
-													  startup_subpaths,
-													  NIL,
-													  pathkeys,
-													  NULL,
-													  0,
-													  false,
-													  -1));
-			if (startup_neq_total)
-				add_path(rel, (Path *) create_append_path(root,
-														  rel,
-														  total_subpaths,
-														  NIL,
-														  pathkeys,
-														  NULL,
-														  0,
-														  false,
-														  -1));
-		}
-		else
-		{
-			/* We need MergeAppend */
+		/* ... and build the MergeAppend paths */
+		add_path(rel, (Path *) create_merge_append_path(root,
+														rel,
+														startup_subpaths,
+														pathkeys,
+														NULL));
+		if (startup_neq_total)
 			add_path(rel, (Path *) create_merge_append_path(root,
 															rel,
-															startup_subpaths,
+															total_subpaths,
 															pathkeys,
 															NULL));
-			if (startup_neq_total)
-				add_path(rel, (Path *) create_merge_append_path(root,
-																rel,
-																total_subpaths,
-																pathkeys,
-																NULL));
-		}
 	}
 }
 
@@ -1799,36 +1698,6 @@ accumulate_append_subpath(Path *path, List **subpaths, List **special_subpaths)
 	}
 
 	*subpaths = lappend(*subpaths, path);
-}
-
-/*
- * get_singleton_append_subpath
- *		Returns the single subpath of an Append/MergeAppend, or just
- *		return 'path' if it's not a single sub-path Append/MergeAppend.
- *
- * Note: 'path' must not be a parallel-aware path.
- */
-static Path *
-get_singleton_append_subpath(Path *path)
-{
-	Assert(!path->parallel_aware);
-
-	if (IsA(path, AppendPath))
-	{
-		AppendPath *apath = (AppendPath *) path;
-
-		if (list_length(apath->subpaths) == 1)
-			return (Path *) linitial(apath->subpaths);
-	}
-	else if (IsA(path, MergeAppendPath))
-	{
-		MergeAppendPath *mpath = (MergeAppendPath *) path;
-
-		if (list_length(mpath->subpaths) == 1)
-			return (Path *) linitial(mpath->subpaths);
-	}
-
-	return path;
 }
 
 /*
@@ -2681,9 +2550,8 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 		join_search_one_level(root, lev);
 
 		/*
-		 * Run generate_partitionwise_join_paths() and
-		 * generate_useful_gather_paths() for each just-processed joinrel.  We
-		 * could not do this earlier because both regular and partial paths
+		 * Run generate_useful_gather_paths() for each just-processed joinrel.
+		 * We could not do this earlier because both regular and partial paths
 		 * can get added to a particular joinrel at multiple times within
 		 * join_search_one_level.
 		 *
@@ -2859,15 +2727,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
  * there are no non-DISTINCT output columns, so we needn't check.  Note that
  * subquery_is_pushdown_safe already reported that we can't use volatile
  * quals if there's DISTINCT or DISTINCT ON.)
- *
- * 4. If the subquery has any window functions, we must not push down quals
- * that reference any output columns that are not listed in all the subquery's
- * window PARTITION BY clauses.  We can push down quals that use only
- * partitioning columns because they should succeed or fail identically for
- * every row of any one window partition, and totally excluding some
- * partitions will not change a window function's results for remaining
- * partitions.  (Again, this also requires nonvolatile quals, but
- * subquery_is_pushdown_safe handles that.)
  */
 static void
 check_output_expressions(Query *subquery, pushdown_safety_info *safetyInfo)

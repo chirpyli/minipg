@@ -74,7 +74,7 @@ ExecSubPlan(SubPlanState *node,
 	*isNull = false;
 
 	/* Sanity checks */
-	if (subplan->setParam != NIL && subplan->subLinkType != MULTIEXPR_SUBLINK)
+	if (subplan->setParam != NIL)
 		elog(ERROR, "cannot set parent params from subquery");
 
 	/* Force forward-scan mode for evaluation */
@@ -254,21 +254,14 @@ ExecScanSubPlan(SubPlanState *node,
 	 * is boolean as are the results of the combining operators. We combine
 	 * results across tuples (if the subplan produces more than one) using OR
 	 * semantics for ANY_SUBLINK or AND semantics for ALL_SUBLINK.
-	 * (ROWCOMPARE_SUBLINK doesn't allow multiple tuples from the subplan.)
 	 * NULL results from the combining operators are handled according to the
 	 * usual SQL semantics for OR and AND.  The result for no input tuples is
-	 * FALSE for ANY_SUBLINK, TRUE for ALL_SUBLINK, NULL for
-	 * ROWCOMPARE_SUBLINK.
+	 * FALSE for ANY_SUBLINK, TRUE for ALL_SUBLINK.
 	 *
 	 * For EXPR_SUBLINK we require the subplan to produce no more than one
 	 * tuple, else an error is raised.  If zero tuples are produced, we return
 	 * NULL.  Assuming we get a tuple, we just use its first column (there can
 	 * be only one non-junk column in this case).
-	 *
-	 * For MULTIEXPR_SUBLINK, we push the per-column subplan outputs out to
-	 * the setParams and then return a dummy false value.  There must not be
-	 * multiple tuples returned from the subplan; if zero tuples are produced,
-	 * set the setParams to NULL.
 	 *
 	 * For ARRAY_SUBLINK we allow the subplan to produce any number of tuples,
 	 * and form an array of the first column's values.  Note in particular
@@ -321,47 +314,6 @@ ExecScanSubPlan(SubPlanState *node,
 			continue;
 		}
 
-		if (subLinkType == MULTIEXPR_SUBLINK)
-		{
-			/* cannot allow multiple input tuples for MULTIEXPR sublink */
-			if (found)
-				ereport(ERROR,
-						(errcode(ERRCODE_CARDINALITY_VIOLATION),
-						 errmsg("more than one row returned by a subquery used as an expression")));
-			found = true;
-
-			/*
-			 * We need to copy the subplan's tuple in case any result is of
-			 * pass-by-ref type --- our output values will point into this
-			 * copied tuple!  Can't use the subplan's instance of the tuple
-			 * since it won't still be valid after next ExecProcNode() call.
-			 * node->curTuple keeps track of the copied tuple for eventual
-			 * freeing.
-			 */
-			if (node->curTuple)
-				heap_freetuple(node->curTuple);
-			node->curTuple = ExecCopySlotHeapTuple(slot);
-
-			/*
-			 * Now set all the setParam params from the columns of the tuple
-			 */
-			col = 1;
-			foreach(plst, subplan->setParam)
-			{
-				int			paramid = lfirst_int(plst);
-				ParamExecData *prmdata;
-
-				prmdata = &(econtext->ecxt_param_exec_vals[paramid]);
-				Assert(prmdata->execPlan == NULL);
-				prmdata->value = heap_getattr(node->curTuple, col, tdesc,
-											  &(prmdata->isnull));
-				col++;
-			}
-
-			/* keep scanning subplan to make sure there's only one tuple */
-			continue;
-		}
-
 		if (subLinkType == ARRAY_SUBLINK)
 		{
 			Datum		dvalue;
@@ -377,16 +329,10 @@ ExecScanSubPlan(SubPlanState *node,
 			continue;
 		}
 
-		/* cannot allow multiple input tuples for ROWCOMPARE sublink either */
-		if (subLinkType == ROWCOMPARE_SUBLINK && found)
-			ereport(ERROR,
-					(errcode(ERRCODE_CARDINALITY_VIOLATION),
-					 errmsg("more than one row returned by a subquery used as an expression")));
-
 		found = true;
 
 		/*
-		 * For ALL, ANY, and ROWCOMPARE sublinks, load up the Params
+		 * For ALL and ANY sublinks, load up the Params
 		 * representing the columns of the sub-select, and then evaluate the
 		 * combining expression.
 		 */
@@ -417,8 +363,9 @@ ExecScanSubPlan(SubPlanState *node,
 				break;			/* needn't look at any more rows */
 			}
 		}
-		else if (subLinkType == ALL_SUBLINK)
+		else
 		{
+			/* must be ALL_SUBLINK */
 			/* combine across rows per AND semantics */
 			if (rownull)
 				*isNull = true;
@@ -428,12 +375,6 @@ ExecScanSubPlan(SubPlanState *node,
 				*isNull = false;
 				break;			/* needn't look at any more rows */
 			}
-		}
-		else
-		{
-			/* must be ROWCOMPARE_SUBLINK */
-			result = rowresult;
-			*isNull = rownull;
 		}
 	}
 
@@ -448,28 +389,13 @@ ExecScanSubPlan(SubPlanState *node,
 	{
 		/*
 		 * deal with empty subplan result.  result/isNull were previously
-		 * initialized correctly for all sublink types except EXPR and
-		 * ROWCOMPARE; for those, return NULL.
+		 * initialized correctly for all sublink types except EXPR;
+		 * for that, return NULL.
 		 */
-		if (subLinkType == EXPR_SUBLINK ||
-			subLinkType == ROWCOMPARE_SUBLINK)
+		if (subLinkType == EXPR_SUBLINK)
 		{
 			result = (Datum) 0;
 			*isNull = true;
-		}
-		else if (subLinkType == MULTIEXPR_SUBLINK)
-		{
-			/* We don't care about function result, but set the setParams */
-			foreach(l, subplan->setParam)
-			{
-				int			paramid = lfirst_int(l);
-				ParamExecData *prmdata;
-
-				prmdata = &(econtext->ecxt_param_exec_vals[paramid]);
-				Assert(prmdata->execPlan == NULL);
-				prmdata->value = (Datum) 0;
-				prmdata->isnull = true;
-			}
 		}
 	}
 
@@ -1145,9 +1071,7 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 		}
 
 		if (found &&
-			(subLinkType == EXPR_SUBLINK ||
-			 subLinkType == MULTIEXPR_SUBLINK ||
-			 subLinkType == ROWCOMPARE_SUBLINK))
+			(subLinkType == EXPR_SUBLINK))
 			ereport(ERROR,
 					(errcode(ERRCODE_CARDINALITY_VIOLATION),
 					 errmsg("more than one row returned by a subquery used as an expression")));

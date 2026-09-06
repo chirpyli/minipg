@@ -1167,8 +1167,8 @@ predicate_implied_by_simple_clause(Expr *predicate, Node *clause,
  * is strict for "foo", since then the predicate must yield false or NULL
  * (and since "foo" appears in the predicate, it's known immutable).
  *
- * (The main motivation for covering these IS [NOT] NULL cases is to support
- * using IS NULL/IS NOT NULL as partition-defining constraints.)
+ * (The main motivation for covering these IS [NOT] NULL cases is that they
+ * are common in manually-written constraint expressions.)
  *
  * Finally, if both clauses are binary operator expressions, we may be able
  * to prove something using the system's knowledge about operators; those
@@ -1524,7 +1524,7 @@ clause_is_strict_for(Node *clause, Node *subexpr, bool allow_false)
 #define BTEQ BTEqualStrategyNumber
 #define BTGE BTGreaterEqualStrategyNumber
 #define BTGT BTGreaterStrategyNumber
-#define BTNE ROWCOMPARE_NE
+#define BTNE BTNE_STRATEGY_NUMBER
 
 /* We use "none" for 0/false to make the tables align nicely */
 #define none 0

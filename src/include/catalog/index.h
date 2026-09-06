@@ -61,14 +61,11 @@ extern void index_check_primary_key(Relation heapRel,
 #define	INDEX_CREATE_SKIP_BUILD				(1 << 2)
 #define	INDEX_CREATE_CONCURRENT				(1 << 3)
 #define	INDEX_CREATE_IF_NOT_EXISTS			(1 << 4)
-#define	INDEX_CREATE_PARTITIONED			(1 << 5)
-#define INDEX_CREATE_INVALID				(1 << 6)
+#define INDEX_CREATE_INVALID				(1 << 5)
 
 extern Oid	index_create(Relation heapRelation,
 						 const char *indexRelationName,
 						 Oid indexRelationId,
-						 Oid parentIndexRelid,
-						 Oid parentConstraintId,
 						 Oid relFileNode,
 						 IndexInfo *indexInfo,
 						 List *indexColNames,
@@ -103,7 +100,6 @@ extern void index_concurrently_set_dead(Oid heapId,
 
 extern ObjectAddress index_constraint_create(Relation heapRelation,
 											 Oid indexRelationId,
-											 Oid parentConstraintId,
 											 IndexInfo *indexInfo,
 											 const char *constraintName,
 											 char constraintType,

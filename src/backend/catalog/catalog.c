@@ -138,8 +138,7 @@ IsCatalogRelationOid(Oid relid)
  *		tables, but concurrent SQL UPDATE on the same table may overwrite
  *		those modifications.
  *
- *		The executor can assume these are not partitions or partitioned and
- *		have no triggers.
+ *		The executor can assume these have no triggers.
  */
 bool
 IsInplaceUpdateRelation(Relation relation)

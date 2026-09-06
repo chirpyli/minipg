@@ -52,12 +52,10 @@ static Node *transformAExprIn(ParseState *pstate, A_Expr *a);
 static Node *transformAExprBetween(ParseState *pstate, A_Expr *a);
 static Node *transformBoolExpr(ParseState *pstate, BoolExpr *a);
 static Node *transformFuncCall(ParseState *pstate, FuncCall *fn);
-static Node *transformMultiAssignRef(ParseState *pstate, MultiAssignRef *maref);
 static Node *transformCaseExpr(ParseState *pstate, CaseExpr *c);
 static Node *transformSubLink(ParseState *pstate, SubLink *sublink);
 static Node *transformArrayExpr(ParseState *pstate, A_ArrayExpr *a,
 								Oid array_type, Oid element_type, int32 typmod);
-static Node *transformRowExpr(ParseState *pstate, RowExpr *r, bool allowDefault);
 static Node *transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c);
 static Node *transformMinMaxExpr(ParseState *pstate, MinMaxExpr *m);
 static Node *transformSQLValueFunction(ParseState *pstate,
@@ -69,10 +67,6 @@ static Node *transformWholeRowRef(ParseState *pstate,
 								  int sublevels_up, int location);
 static Node *transformIndirection(ParseState *pstate, A_Indirection *ind);
 static Node *transformTypeCast(ParseState *pstate, TypeCast *tc);
-static Node *make_row_comparison_op(ParseState *pstate, List *opname,
-									List *largs, List *rargs, int location);
-static Node *make_row_distinct_op(ParseState *pstate, List *opname,
-								  RowExpr *lrow, RowExpr *rrow, int location);
 static Expr *make_distinct_op(ParseState *pstate, List *opname,
 							  Node *ltree, Node *rtree, int location);
 static Node *make_nulltest_from_distinct(ParseState *pstate,
@@ -198,10 +192,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 			result = transformFuncCall(pstate, (FuncCall *) expr);
 			break;
 
-		case T_MultiAssignRef:
-			result = transformMultiAssignRef(pstate, (MultiAssignRef *) expr);
-			break;
-
 		case T_GroupingFunc:
 			result = transformGroupingFunc(pstate, (GroupingFunc *) expr);
 			break;
@@ -221,10 +211,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 
 		case T_CaseExpr:
 			result = transformCaseExpr(pstate, (CaseExpr *) expr);
-			break;
-
-		case T_RowExpr:
-			result = transformRowExpr(pstate, (RowExpr *) expr, false);
 			break;
 
 		case T_CoalesceExpr:
@@ -437,7 +423,7 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 	/*
 	 * Check to see if the column reference is in an invalid place within the
 	 * query.  We allow column references in most places, except in default
-	 * expressions and partition bound expressions.
+	 * expressions.
 	 */
 	err = NULL;
 	switch (pstate->p_expr_kind)
@@ -451,7 +437,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_FROM_SUBSELECT:
 		case EXPR_KIND_FROM_FUNCTION:
 		case EXPR_KIND_WHERE:
-		case EXPR_KIND_POLICY:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_FILTER:
 		case EXPR_KIND_SELECT_TARGET:
@@ -472,9 +457,7 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_STATS_EXPRESSION:
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 		case EXPR_KIND_EXECUTE_PARAMETER:
-		case EXPR_KIND_CALL_ARGUMENT:
 		case EXPR_KIND_COPY_WHERE:
-		case EXPR_KIND_GENERATED_COLUMN:
 		case EXPR_KIND_CYCLE_MARK:
 			/* okay */
 			break;
@@ -854,36 +837,6 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 
 		result = transformExprRecurse(pstate, (Node *) n);
 	}
-	else if (lexpr && IsA(lexpr, RowExpr) &&
-			 rexpr && IsA(rexpr, SubLink) &&
-			 ((SubLink *) rexpr)->subLinkType == EXPR_SUBLINK)
-	{
-		/*
-		 * Convert "row op subselect" into a ROWCOMPARE sublink. Formerly the
-		 * grammar did this, but now that a row construct is allowed anywhere
-		 * in expressions, it's easier to do it here.
-		 */
-		SubLink    *s = (SubLink *) rexpr;
-
-		s->subLinkType = ROWCOMPARE_SUBLINK;
-		s->testexpr = lexpr;
-		s->operName = a->name;
-		s->location = a->location;
-		result = transformExprRecurse(pstate, (Node *) s);
-	}
-	else if (lexpr && IsA(lexpr, RowExpr) &&
-			 rexpr && IsA(rexpr, RowExpr))
-	{
-		/* ROW() op ROW() is handled specially */
-		lexpr = transformExprRecurse(pstate, lexpr);
-		rexpr = transformExprRecurse(pstate, rexpr);
-
-		result = make_row_comparison_op(pstate,
-										a->name,
-										castNode(RowExpr, lexpr)->args,
-										castNode(RowExpr, rexpr)->args,
-										a->location);
-	}
 	else
 	{
 		/* Ordinary scalar operator */
@@ -951,24 +904,11 @@ transformAExprDistinct(ParseState *pstate, A_Expr *a)
 	lexpr = transformExprRecurse(pstate, lexpr);
 	rexpr = transformExprRecurse(pstate, rexpr);
 
-	if (lexpr && IsA(lexpr, RowExpr) &&
-		rexpr && IsA(rexpr, RowExpr))
-	{
-		/* ROW() op ROW() is handled specially */
-		result = make_row_distinct_op(pstate, a->name,
-									  (RowExpr *) lexpr,
-									  (RowExpr *) rexpr,
-									  a->location);
-	}
-	else
-	{
-		/* Ordinary scalar operator */
-		result = (Node *) make_distinct_op(pstate,
-										   a->name,
-										   lexpr,
-										   rexpr,
-										   a->location);
-	}
+	result = (Node *) make_distinct_op(pstate,
+									   a->name,
+									   lexpr,
+									   rexpr,
+									   a->location);
 
 	/*
 	 * If it's NOT DISTINCT, we first build a DistinctExpr and then stick a
@@ -1095,8 +1035,7 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 		/*
 		 * Do we have an array type to use?  Aside from the case where there
 		 * isn't one, we don't risk using ScalarArrayOpExpr when the common
-		 * type is RECORD, because the RowExpr comparison logic below can cope
-		 * with some cases of non-identical row types.
+		 * type is RECORD, because record comparison is not supported.
 		 */
 		if (OidIsValid(scalar_type) && scalar_type != RECORDOID)
 			array_type = get_array_type(scalar_type);
@@ -1149,26 +1088,13 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 		Node	   *rexpr = (Node *) lfirst(l);
 		Node	   *cmp;
 
-		if (IsA(lexpr, RowExpr) &&
-			IsA(rexpr, RowExpr))
-		{
-			/* ROW() op ROW() is handled specially */
-			cmp = make_row_comparison_op(pstate,
-										 a->name,
-										 copyObject(((RowExpr *) lexpr)->args),
-										 ((RowExpr *) rexpr)->args,
-										 a->location);
-		}
-		else
-		{
-			/* Ordinary scalar operator */
-			cmp = (Node *) make_op(pstate,
-								   a->name,
-								   copyObject(lexpr),
-								   rexpr,
-								   pstate->p_last_srf,
-								   a->location);
-		}
+		/* Ordinary scalar operator */
+		cmp = (Node *) make_op(pstate,
+							   a->name,
+							   copyObject(lexpr),
+							   rexpr,
+							   pstate->p_last_srf,
+							   a->location);
 
 		cmp = coerce_to_boolean(pstate, cmp, "IN");
 		if (result == NULL)
@@ -1357,154 +1283,6 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 }
 
 static Node *
-transformMultiAssignRef(ParseState *pstate, MultiAssignRef *maref)
-{
-	SubLink    *sublink;
-	RowExpr    *rexpr;
-	Query	   *qtree;
-	TargetEntry *tle;
-
-	/* We should only see this in first-stage processing of UPDATE tlists */
-	Assert(pstate->p_expr_kind == EXPR_KIND_UPDATE_SOURCE);
-
-	/* We only need to transform the source if this is the first column */
-	if (maref->colno == 1)
-	{
-		/*
-		 * For now, we only allow EXPR SubLinks and RowExprs as the source of
-		 * an UPDATE multiassignment.  This is sufficient to cover interesting
-		 * cases; at worst, someone would have to write (SELECT * FROM expr)
-		 * to expand a composite-returning expression of another form.
-		 */
-		if (IsA(maref->source, SubLink) &&
-			((SubLink *) maref->source)->subLinkType == EXPR_SUBLINK)
-		{
-			/* Relabel it as a MULTIEXPR_SUBLINK */
-			sublink = (SubLink *) maref->source;
-			sublink->subLinkType = MULTIEXPR_SUBLINK;
-			/* And transform it */
-			sublink = (SubLink *) transformExprRecurse(pstate,
-													   (Node *) sublink);
-
-			qtree = castNode(Query, sublink->subselect);
-
-			/* Check subquery returns required number of columns */
-			if (count_nonjunk_tlist_entries(qtree->targetList) != maref->ncolumns)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("number of columns does not match number of values"),
-						 parser_errposition(pstate, sublink->location)));
-
-			/*
-			 * Build a resjunk tlist item containing the MULTIEXPR SubLink,
-			 * and add it to pstate->p_multiassign_exprs, whence it will later
-			 * get appended to the completed targetlist.  We needn't worry
-			 * about selecting a resno for it; transformUpdateStmt will do
-			 * that.
-			 */
-			tle = makeTargetEntry((Expr *) sublink, 0, NULL, true);
-			pstate->p_multiassign_exprs = lappend(pstate->p_multiassign_exprs,
-												  tle);
-
-			/*
-			 * Assign a unique-within-this-targetlist ID to the MULTIEXPR
-			 * SubLink.  We can just use its position in the
-			 * p_multiassign_exprs list.
-			 */
-			sublink->subLinkId = list_length(pstate->p_multiassign_exprs);
-		}
-		else if (IsA(maref->source, RowExpr))
-		{
-			/* Transform the RowExpr, allowing SetToDefault items */
-			rexpr = (RowExpr *) transformRowExpr(pstate,
-												 (RowExpr *) maref->source,
-												 true);
-
-			/* Check it returns required number of columns */
-			if (list_length(rexpr->args) != maref->ncolumns)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("number of columns does not match number of values"),
-						 parser_errposition(pstate, rexpr->location)));
-
-			/*
-			 * Temporarily append it to p_multiassign_exprs, so we can get it
-			 * back when we come back here for additional columns.
-			 */
-			tle = makeTargetEntry((Expr *) rexpr, 0, NULL, true);
-			pstate->p_multiassign_exprs = lappend(pstate->p_multiassign_exprs,
-												  tle);
-		}
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("source for a multiple-column UPDATE item must be a sub-SELECT or ROW() expression"),
-					 parser_errposition(pstate, exprLocation(maref->source))));
-	}
-	else
-	{
-		/*
-		 * Second or later column in a multiassignment.  Re-fetch the
-		 * transformed SubLink or RowExpr, which we assume is still the last
-		 * entry in p_multiassign_exprs.
-		 */
-		Assert(pstate->p_multiassign_exprs != NIL);
-		tle = (TargetEntry *) llast(pstate->p_multiassign_exprs);
-	}
-
-	/*
-	 * Emit the appropriate output expression for the current column
-	 */
-	if (IsA(tle->expr, SubLink))
-	{
-		Param	   *param;
-
-		sublink = (SubLink *) tle->expr;
-		Assert(sublink->subLinkType == MULTIEXPR_SUBLINK);
-		qtree = castNode(Query, sublink->subselect);
-
-		/* Build a Param representing the current subquery output column */
-		tle = (TargetEntry *) list_nth(qtree->targetList, maref->colno - 1);
-		Assert(!tle->resjunk);
-
-		param = makeNode(Param);
-		param->paramkind = PARAM_MULTIEXPR;
-		param->paramid = (sublink->subLinkId << 16) | maref->colno;
-		param->paramtype = exprType((Node *) tle->expr);
-		param->paramtypmod = exprTypmod((Node *) tle->expr);
-		param->paramcollid = exprCollation((Node *) tle->expr);
-		param->location = exprLocation((Node *) tle->expr);
-
-		return (Node *) param;
-	}
-
-	if (IsA(tle->expr, RowExpr))
-	{
-		Node	   *result;
-
-		rexpr = (RowExpr *) tle->expr;
-
-		/* Just extract and return the next element of the RowExpr */
-		result = (Node *) list_nth(rexpr->args, maref->colno - 1);
-
-		/*
-		 * If we're at the last column, delete the RowExpr from
-		 * p_multiassign_exprs; we don't need it anymore, and don't want it in
-		 * the finished UPDATE tlist.  We assume this is still the last entry
-		 * in p_multiassign_exprs.
-		 */
-		if (maref->colno == maref->ncolumns)
-			pstate->p_multiassign_exprs =
-				list_delete_last(pstate->p_multiassign_exprs);
-
-		return result;
-	}
-
-	elog(ERROR, "unexpected expr type in multiassign list");
-	return NULL;				/* keep compiler quiet */
-}
-
-static Node *
 transformCaseExpr(ParseState *pstate, CaseExpr *c)
 {
 	CaseExpr   *newc = makeNode(CaseExpr);
@@ -1670,7 +1448,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_FROM_SUBSELECT:
 		case EXPR_KIND_FROM_FUNCTION:
 		case EXPR_KIND_WHERE:
-		case EXPR_KIND_POLICY:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_FILTER:
 		case EXPR_KIND_SELECT_TARGET:
@@ -1709,14 +1486,8 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_EXECUTE_PARAMETER:
 			err = _("cannot use subquery in EXECUTE parameter");
 			break;
-		case EXPR_KIND_CALL_ARGUMENT:
-			err = _("cannot use subquery in CALL argument");
-			break;
 		case EXPR_KIND_COPY_WHERE:
 			err = _("cannot use subquery in COPY FROM WHERE condition");
-			break;
-		case EXPR_KIND_GENERATED_COLUMN:
-			err = _("cannot use subquery in column generation expression");
 			break;
 
 			/*
@@ -1779,18 +1550,12 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		sublink->testexpr = NULL;
 		sublink->operName = NIL;
 	}
-	else if (sublink->subLinkType == MULTIEXPR_SUBLINK)
-	{
-		/* Same as EXPR case, except no restriction on number of columns */
-		sublink->testexpr = NULL;
-		sublink->operName = NIL;
-	}
 	else
 	{
-		/* ALL, ANY, or ROWCOMPARE: generate row-comparing expression */
+		/* ALL or ANY: generate a row-comparing expression */
 		Node	   *lefthand;
-		List	   *left_list;
-		List	   *right_list;
+		Param	   *rparam = NULL;
+		TargetEntry *tent;
 		ListCell   *l;
 
 		/*
@@ -1800,63 +1565,48 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 			sublink->operName = list_make1(makeString("="));
 
 		/*
-		 * Transform lefthand expression, and convert to a list
+		 * Transform lefthand expression.  It must be a scalar expression;
+		 * row constructors are not supported in minipg.
 		 */
 		lefthand = transformExprRecurse(pstate, sublink->testexpr);
-		if (lefthand && IsA(lefthand, RowExpr))
-			left_list = ((RowExpr *) lefthand)->args;
-		else
-			left_list = list_make1(lefthand);
 
 		/*
-		 * Build a list of PARAM_SUBLINK nodes representing the output columns
-		 * of the subquery.
+		 * The subquery must return exactly one column.  We could rely on
+		 * make_op to complain, but we prefer to generate a more specific
+		 * error message.
 		 */
-		right_list = NIL;
+		if (count_nonjunk_tlist_entries(qtree->targetList) != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("subquery must return only one column"),
+					 parser_errposition(pstate, sublink->location)));
+
 		foreach(l, qtree->targetList)
 		{
-			TargetEntry *tent = (TargetEntry *) lfirst(l);
-			Param	   *param;
-
+			tent = (TargetEntry *) lfirst(l);
 			if (tent->resjunk)
 				continue;
 
-			param = makeNode(Param);
-			param->paramkind = PARAM_SUBLINK;
-			param->paramid = tent->resno;
-			param->paramtype = exprType((Node *) tent->expr);
-			param->paramtypmod = exprTypmod((Node *) tent->expr);
-			param->paramcollid = exprCollation((Node *) tent->expr);
-			param->location = -1;
-
-			right_list = lappend(right_list, param);
+			rparam = makeNode(Param);
+			rparam->paramkind = PARAM_SUBLINK;
+			rparam->paramid = tent->resno;
+			rparam->paramtype = exprType((Node *) tent->expr);
+			rparam->paramtypmod = exprTypmod((Node *) tent->expr);
+			rparam->paramcollid = exprCollation((Node *) tent->expr);
+			rparam->location = -1;
+			break;
 		}
 
 		/*
-		 * We could rely on make_row_comparison_op to complain if the list
-		 * lengths differ, but we prefer to generate a more specific error
-		 * message.
+		 * Identify the combining operator and generate the comparison
+		 * expression.
 		 */
-		if (list_length(left_list) < list_length(right_list))
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("subquery has too many columns"),
-					 parser_errposition(pstate, sublink->location)));
-		if (list_length(left_list) > list_length(right_list))
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("subquery has too few columns"),
-					 parser_errposition(pstate, sublink->location)));
-
-		/*
-		 * Identify the combining operator(s) and generate a suitable
-		 * row-comparison expression.
-		 */
-		sublink->testexpr = make_row_comparison_op(pstate,
-												   sublink->operName,
-												   left_list,
-												   right_list,
-												   sublink->location);
+		sublink->testexpr = (Node *) make_op(pstate,
+											 sublink->operName,
+											 lefthand,
+											 (Node *) rparam,
+											 pstate->p_last_srf,
+											 sublink->location);
 	}
 
 	return result;
@@ -2028,44 +1778,6 @@ transformArrayExpr(ParseState *pstate, A_ArrayExpr *a,
 	newa->location = a->location;
 
 	return (Node *) newa;
-}
-
-static Node *
-transformRowExpr(ParseState *pstate, RowExpr *r, bool allowDefault)
-{
-	RowExpr    *newr;
-	char		fname[16];
-	int			fnum;
-
-	newr = makeNode(RowExpr);
-
-	/* Transform the field expressions */
-	newr->args = transformExpressionList(pstate, r->args,
-										 pstate->p_expr_kind, allowDefault);
-
-	/* Disallow more columns than will fit in a tuple */
-	if (list_length(newr->args) > MaxTupleAttributeNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_COLUMNS),
-				 errmsg("ROW expressions can have at most %d entries",
-						MaxTupleAttributeNumber),
-				 parser_errposition(pstate, r->location)));
-
-	/* Barring later casting, we consider the type RECORD */
-	newr->row_typeid = RECORDOID;
-	newr->row_format = COERCE_IMPLICIT_CAST;
-
-	/* ROW() has anonymous columns, so invent some field names */
-	newr->colnames = NIL;
-	for (fnum = 1; fnum <= list_length(newr->args); fnum++)
-	{
-		snprintf(fname, sizeof(fname), "f%d", fnum);
-		newr->colnames = lappend(newr->colnames, makeString(pstrdup(fname)));
-	}
-
-	newr->location = r->location;
-
-	return (Node *) newr;
 }
 
 static Node *
@@ -2251,13 +1963,10 @@ transformWholeRowRef(ParseState *pstate, ParseNamespaceItem *nsitem,
 					 int sublevels_up, int location)
 {
 	/*
-	 * Build the appropriate referencing node.  Normally this can be a
-	 * whole-row Var, but if the nsitem is a JOIN USING alias then it contains
-	 * only a subset of the columns of the underlying join RTE, so that will
-	 * not work.  Instead we immediately expand the reference into a RowExpr.
-	 * Since the JOIN USING's common columns are fully determined at this
-	 * point, there seems no harm in expanding it now rather than during
-	 * planning.
+	 * Build the appropriate referencing node, a whole-row Var.  If the
+	 * nsitem is a JOIN USING alias it contains only a subset of the columns
+	 * of the underlying join RTE; expanding such a reference would require
+	 * building a row expression, which minipg does not support.
 	 *
 	 * Note that if the RTE is a function returning scalar, we create just a
 	 * plain reference to the function value, not a composite containing a
@@ -2266,7 +1975,12 @@ transformWholeRowRef(ParseState *pstate, ParseNamespaceItem *nsitem,
 	 * "rel.*" mean the same thing for composite relations, so why not for
 	 * scalar functions...
 	 */
-	if (nsitem->p_names == nsitem->p_rte->eref)
+	if (nsitem->p_names != nsitem->p_rte->eref)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("whole-row reference to JOIN USING alias is not supported"),
+				 parser_errposition(pstate, location)));
+
 	{
 		Var		   *result;
 
@@ -2280,30 +1994,6 @@ transformWholeRowRef(ParseState *pstate, ParseNamespaceItem *nsitem,
 		markVarForSelectPriv(pstate, result);
 
 		return (Node *) result;
-	}
-	else
-	{
-		RowExpr    *rowexpr;
-		List	   *fields;
-
-		/*
-		 * We want only as many columns as are listed in p_names->colnames,
-		 * and we should use those names not whatever possibly-aliased names
-		 * are in the RTE.  We needn't worry about marking the RTE for SELECT
-		 * access, as the common columns are surely so marked already.
-		 */
-		expandRTE(nsitem->p_rte, nsitem->p_rtindex,
-				  sublevels_up, location, false,
-				  NULL, &fields);
-		rowexpr = makeNode(RowExpr);
-		rowexpr->args = list_truncate(fields,
-									  list_length(nsitem->p_names->colnames));
-		rowexpr->row_typeid = RECORDOID;
-		rowexpr->row_format = COERCE_IMPLICIT_CAST;
-		rowexpr->colnames = copyObject(nsitem->p_names->colnames);
-		rowexpr->location = location;
-
-		return (Node *) rowexpr;
 	}
 }
 
@@ -2393,261 +2083,6 @@ transformTypeCast(ParseState *pstate, TypeCast *tc)
 }
 
 /*
- * Transform a "row compare-op row" construct
- *
- * The inputs are lists of already-transformed expressions.
- * As with coerce_type, pstate may be NULL if no special unknown-Param
- * processing is wanted.
- *
- * The output may be a single OpExpr, an AND or OR combination of OpExprs,
- * or a RowCompareExpr.  In all cases it is guaranteed to return boolean.
- * The AND, OR, and RowCompareExpr cases further imply things about the
- * behavior of the operators (ie, they behave as =, <>, or < <= > >=).
- */
-static Node *
-make_row_comparison_op(ParseState *pstate, List *opname,
-					   List *largs, List *rargs, int location)
-{
-	RowCompareExpr *rcexpr;
-	RowCompareType rctype;
-	List	   *opexprs;
-	List	   *opnos;
-	List	   *opfamilies;
-	ListCell   *l,
-			   *r;
-	List	  **opinfo_lists;
-	Bitmapset  *strats;
-	int			nopers;
-	int			i;
-
-	nopers = list_length(largs);
-	if (nopers != list_length(rargs))
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("unequal number of entries in row expressions"),
-				 parser_errposition(pstate, location)));
-
-	/*
-	 * We can't compare zero-length rows because there is no principled basis
-	 * for figuring out what the operator is.
-	 */
-	if (nopers == 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot compare rows of zero length"),
-				 parser_errposition(pstate, location)));
-
-	/*
-	 * Identify all the pairwise operators, using make_op so that behavior is
-	 * the same as in the simple scalar case.
-	 */
-	opexprs = NIL;
-	forboth(l, largs, r, rargs)
-	{
-		Node	   *larg = (Node *) lfirst(l);
-		Node	   *rarg = (Node *) lfirst(r);
-		OpExpr	   *cmp;
-
-		cmp = castNode(OpExpr, make_op(pstate, opname, larg, rarg,
-									   pstate->p_last_srf, location));
-
-		/*
-		 * We don't use coerce_to_boolean here because we insist on the
-		 * operator yielding boolean directly, not via coercion.  If it
-		 * doesn't yield bool it won't be in any index opfamilies...
-		 */
-		if (cmp->opresulttype != BOOLOID)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("row comparison operator must yield type boolean, "
-							"not type %s",
-							format_type_be(cmp->opresulttype)),
-					 parser_errposition(pstate, location)));
-		if (expression_returns_set((Node *) cmp))
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("row comparison operator must not return a set"),
-					 parser_errposition(pstate, location)));
-		opexprs = lappend(opexprs, cmp);
-	}
-
-	/*
-	 * If rows are length 1, just return the single operator.  In this case we
-	 * don't insist on identifying btree semantics for the operator (but we
-	 * still require it to return boolean).
-	 */
-	if (nopers == 1)
-		return (Node *) linitial(opexprs);
-
-	/*
-	 * Now we must determine which row comparison semantics (= <> < <= > >=)
-	 * apply to this set of operators.  We look for btree opfamilies
-	 * containing the operators, and see which interpretations (strategy
-	 * numbers) exist for each operator.
-	 */
-	opinfo_lists = (List **) palloc(nopers * sizeof(List *));
-	strats = NULL;
-	i = 0;
-	foreach(l, opexprs)
-	{
-		Oid			opno = ((OpExpr *) lfirst(l))->opno;
-		Bitmapset  *this_strats;
-		ListCell   *j;
-
-		opinfo_lists[i] = get_op_btree_interpretation(opno);
-
-		/*
-		 * convert strategy numbers into a Bitmapset to make the intersection
-		 * calculation easy.
-		 */
-		this_strats = NULL;
-		foreach(j, opinfo_lists[i])
-		{
-			OpBtreeInterpretation *opinfo = lfirst(j);
-
-			this_strats = bms_add_member(this_strats, opinfo->strategy);
-		}
-		if (i == 0)
-			strats = this_strats;
-		else
-			strats = bms_int_members(strats, this_strats);
-		i++;
-	}
-
-	/*
-	 * If there are multiple common interpretations, we may use any one of
-	 * them ... this coding arbitrarily picks the lowest btree strategy
-	 * number.
-	 */
-	i = bms_first_member(strats);
-	if (i < 0)
-	{
-		/* No common interpretation, so fail */
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("could not determine interpretation of row comparison operator %s",
-						strVal(llast(opname))),
-				 errhint("Row comparison operators must be associated with btree operator families."),
-				 parser_errposition(pstate, location)));
-	}
-	rctype = (RowCompareType) i;
-
-	/*
-	 * For = and <> cases, we just combine the pairwise operators with AND or
-	 * OR respectively.
-	 */
-	if (rctype == ROWCOMPARE_EQ)
-		return (Node *) makeBoolExpr(AND_EXPR, opexprs, location);
-	if (rctype == ROWCOMPARE_NE)
-		return (Node *) makeBoolExpr(OR_EXPR, opexprs, location);
-
-	/*
-	 * Otherwise we need to choose exactly which opfamily to associate with
-	 * each operator.
-	 */
-	opfamilies = NIL;
-	for (i = 0; i < nopers; i++)
-	{
-		Oid			opfamily = InvalidOid;
-		ListCell   *j;
-
-		foreach(j, opinfo_lists[i])
-		{
-			OpBtreeInterpretation *opinfo = lfirst(j);
-
-			if (opinfo->strategy == rctype)
-			{
-				opfamily = opinfo->opfamily_id;
-				break;
-			}
-		}
-		if (OidIsValid(opfamily))
-			opfamilies = lappend_oid(opfamilies, opfamily);
-		else					/* should not happen */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("could not determine interpretation of row comparison operator %s",
-							strVal(llast(opname))),
-					 errdetail("There are multiple equally-plausible candidates."),
-					 parser_errposition(pstate, location)));
-	}
-
-	/*
-	 * Now deconstruct the OpExprs and create a RowCompareExpr.
-	 *
-	 * Note: can't just reuse the passed largs/rargs lists, because of
-	 * possibility that make_op inserted coercion operations.
-	 */
-	opnos = NIL;
-	largs = NIL;
-	rargs = NIL;
-	foreach(l, opexprs)
-	{
-		OpExpr	   *cmp = (OpExpr *) lfirst(l);
-
-		opnos = lappend_oid(opnos, cmp->opno);
-		largs = lappend(largs, linitial(cmp->args));
-		rargs = lappend(rargs, lsecond(cmp->args));
-	}
-
-	rcexpr = makeNode(RowCompareExpr);
-	rcexpr->rctype = rctype;
-	rcexpr->opnos = opnos;
-	rcexpr->opfamilies = opfamilies;
-	rcexpr->inputcollids = NIL; /* assign_expr_collations will fix this */
-	rcexpr->largs = largs;
-	rcexpr->rargs = rargs;
-
-	return (Node *) rcexpr;
-}
-
-/*
- * Transform a "row IS DISTINCT FROM row" construct
- *
- * The input RowExprs are already transformed
- */
-static Node *
-make_row_distinct_op(ParseState *pstate, List *opname,
-					 RowExpr *lrow, RowExpr *rrow,
-					 int location)
-{
-	Node	   *result = NULL;
-	List	   *largs = lrow->args;
-	List	   *rargs = rrow->args;
-	ListCell   *l,
-			   *r;
-
-	if (list_length(largs) != list_length(rargs))
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("unequal number of entries in row expressions"),
-				 parser_errposition(pstate, location)));
-
-	forboth(l, largs, r, rargs)
-	{
-		Node	   *larg = (Node *) lfirst(l);
-		Node	   *rarg = (Node *) lfirst(r);
-		Node	   *cmp;
-
-		cmp = (Node *) make_distinct_op(pstate, opname, larg, rarg, location);
-		if (result == NULL)
-			result = cmp;
-		else
-			result = (Node *) makeBoolExpr(OR_EXPR,
-										   list_make2(result, cmp),
-										   location);
-	}
-
-	if (result == NULL)
-	{
-		/* zero-length rows?  Generate constant FALSE */
-		result = makeBoolConst(false, false);
-	}
-
-	return result;
-}
-
-/*
  * make the node for an IS DISTINCT FROM operator
  */
 static Expr *
@@ -2726,8 +2161,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "function in FROM";
 		case EXPR_KIND_WHERE:
 			return "WHERE";
-		case EXPR_KIND_POLICY:
-			return "POLICY";
 		case EXPR_KIND_HAVING:
 			return "HAVING";
 		case EXPR_KIND_FILTER:
@@ -2767,12 +2200,8 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "USING";
 		case EXPR_KIND_EXECUTE_PARAMETER:
 			return "EXECUTE";
-		case EXPR_KIND_CALL_ARGUMENT:
-			return "CALL";
 		case EXPR_KIND_COPY_WHERE:
 			return "WHERE";
-		case EXPR_KIND_GENERATED_COLUMN:
-			return "GENERATED AS";
 		case EXPR_KIND_CYCLE_MARK:
 			return "CYCLE";
 
