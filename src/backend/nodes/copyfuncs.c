@@ -2409,14 +2409,11 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_STRING_FIELD(colname);
 	COPY_NODE_FIELD(typeName);
 	COPY_STRING_FIELD(compression);
-	COPY_SCALAR_FIELD(inhcount);
 	COPY_SCALAR_FIELD(is_local);
 	COPY_SCALAR_FIELD(is_from_type);
 	COPY_SCALAR_FIELD(storage);
 	COPY_NODE_FIELD(raw_default);
 	COPY_NODE_FIELD(cooked_default);
-	COPY_SCALAR_FIELD(identity);
-	COPY_NODE_FIELD(identitySequence);
 	COPY_SCALAR_FIELD(generated);
 	COPY_NODE_FIELD(constraints);
 	COPY_LOCATION_FIELD(location);
@@ -2433,7 +2430,6 @@ _copyConstraint(const Constraint *from)
 	COPY_STRING_FIELD(conname);
 	COPY_LOCATION_FIELD(location);
 	COPY_NODE_FIELD(raw_expr);
-	COPY_SCALAR_FIELD(generated_when);
 	COPY_NODE_FIELD(keys);
 	COPY_NODE_FIELD(including);
 	COPY_NODE_FIELD(options);

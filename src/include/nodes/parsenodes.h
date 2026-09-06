@@ -500,15 +500,11 @@ typedef struct ColumnDef
 	char	   *colname;		/* name of column */
 	TypeName   *typeName;		/* type of column */
 	char	   *compression;	/* compression method for column */
-	int			inhcount;		/* number of times column is inherited */
 	bool		is_local;		/* column has local (non-inherited) def'n */
 	bool		is_from_type;	/* column definition came from table type */
 	char		storage;		/* attstorage setting, or 0 for default */
 	Node	   *raw_default;	/* default value (untransformed parse tree) */
 	Node	   *cooked_default; /* default value (transformed expr tree) */
-	char		identity;		/* attidentity setting */
-	RangeVar   *identitySequence;	/* to store identity sequence name for
-									 * ALTER TABLE ... ADD COLUMN */
 	char		generated;		/* attgenerated setting */
 	List	   *constraints;	/* other constraints on column */
 	int			location;		/* parse location, or -1 if none/unknown */
@@ -1430,7 +1426,6 @@ typedef struct Constraint
 
 	/* Fields used for constraints with expressions (DEFAULT): */
 	Node	   *raw_expr;		/* expr, as untransformed parse tree */
-	char		generated_when; /* ALWAYS or BY DEFAULT */
 
 	/* Fields used for unique constraints (UNIQUE and PRIMARY KEY): */
 	List	   *keys;			/* String nodes naming referenced key

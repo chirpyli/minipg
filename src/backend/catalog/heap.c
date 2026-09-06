@@ -2106,8 +2106,7 @@ StoreAttrDefault(Relation rel, AttrNumber attnum,
  *
  * Each CookedConstraint struct is modified to store the new catalog tuple OID.
  *
- * NOTE: only pre-cooked expressions will be passed this way, which is to
- * say expressions inherited from an existing relation.  Newly parsed
+ * NOTE: only pre-cooked expressions will be passed this way.  Newly parsed
  * expressions can be added later, by direct calls to StoreAttrDefault
  * (see AddRelationNewConstraints()).
  */
@@ -2155,7 +2154,6 @@ StoreConstraints(Relation rel, List *cooked_constraints, bool is_internal)
  * newColDefaults: list of RawColumnDefault structures
  * newConstraints: list of Constraint nodes
  * allow_merge: true if constraints may be merged with existing ones
- * is_local: true if definition is local, false if it's inherited
  * is_internal: true if result of some internal process, not a user request
  *
  * All entries in newColDefaults will be processed.  Entries in newConstraints
@@ -2176,7 +2174,6 @@ AddRelationNewConstraints(Relation rel,
 						  List *newColDefaults,
 						  List *newConstraints,
 						  bool allow_merge,
-						  bool is_local,
 						  bool is_internal,
 						  const char *queryString)
 {
@@ -2236,65 +2233,12 @@ AddRelationNewConstraints(Relation rel,
 		cooked->name = NULL;
 		cooked->attnum = colDef->attnum;
 		cooked->expr = expr;
-		cooked->is_local = is_local;
-		cooked->inhcount = is_local ? 0 : 1;
 		cookedConstraints = lappend(cookedConstraints, cooked);
 	}
 
 	return cookedConstraints;
 }
 
-
-/*
- * Check for references to generated columns
- */
-static bool
-check_nested_generated_walker(Node *node, void *context)
-{
-	ParseState *pstate = context;
-
-	if (node == NULL)
-		return false;
-	else if (IsA(node, Var))
-	{
-		Var		   *var = (Var *) node;
-		Oid			relid;
-		AttrNumber	attnum;
-
-		relid = rt_fetch(var->varno, pstate->p_rtable)->relid;
-		if (!OidIsValid(relid))
-			return false;		/* XXX shouldn't we raise an error? */
-
-		attnum = var->varattno;
-
-		if (attnum > 0 && false)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("cannot use generated column \"%s\" in column generation expression",
-							get_attname(relid, attnum, false)),
-					 errdetail("A generated column cannot reference another generated column."),
-					 parser_errposition(pstate, var->location)));
-		/* A whole-row Var is necessarily self-referential, so forbid it */
-		if (attnum == 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("cannot use whole-row variable in column generation expression"),
-					 errdetail("This would cause the generated column to depend on its own value."),
-					 parser_errposition(pstate, var->location)));
-		/* System columns were already checked in the parser */
-
-		return false;
-	}
-	else
-		return expression_tree_walker(node, check_nested_generated_walker,
-									  (void *) context);
-}
-
-static void
-check_nested_generated(ParseState *pstate, Node *node)
-{
-	check_nested_generated_walker(node, pstate);
-}
 
 /*
  * Take a raw default and convert it to a cooked format ready for

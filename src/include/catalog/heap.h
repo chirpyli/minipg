@@ -38,8 +38,6 @@ typedef struct CookedConstraint
 	char	   *name;			/* name, or NULL if none */
 	AttrNumber	attnum;			/* which attr (only for DEFAULT) */
 	Node	   *expr;			/* transformed default expr */
-	bool		is_local;		/* constraint has local (non-inherited) def */
-	int			inhcount;		/* number of times constraint is inherited */
 } CookedConstraint;
 
 extern Relation heap_create(const char *relname,
@@ -96,7 +94,6 @@ extern List *AddRelationNewConstraints(Relation rel,
 									   List *newColDefaults,
 									   List *newConstraints,
 									   bool allow_merge,
-									   bool is_local,
 									   bool is_internal,
 									   const char *queryString);
 

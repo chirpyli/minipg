@@ -2425,14 +2425,11 @@ _outColumnDef(StringInfo str, const ColumnDef *node)
 	WRITE_STRING_FIELD(colname);
 	WRITE_NODE_FIELD(typeName);
 	WRITE_STRING_FIELD(compression);
-	WRITE_INT_FIELD(inhcount);
 	WRITE_BOOL_FIELD(is_local);
 	WRITE_BOOL_FIELD(is_from_type);
 	WRITE_CHAR_FIELD(storage);
 	WRITE_NODE_FIELD(raw_default);
 	WRITE_NODE_FIELD(cooked_default);
-	WRITE_CHAR_FIELD(identity);
-	WRITE_NODE_FIELD(identitySequence);
 	WRITE_CHAR_FIELD(generated);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_LOCATION_FIELD(location);

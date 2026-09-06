@@ -1396,14 +1396,11 @@ _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 	COMPARE_STRING_FIELD(colname);
 	COMPARE_NODE_FIELD(typeName);
 	COMPARE_STRING_FIELD(compression);
-	COMPARE_SCALAR_FIELD(inhcount);
 	COMPARE_SCALAR_FIELD(is_local);
 	COMPARE_SCALAR_FIELD(is_from_type);
 	COMPARE_SCALAR_FIELD(storage);
 	COMPARE_NODE_FIELD(raw_default);
 	COMPARE_NODE_FIELD(cooked_default);
-	COMPARE_SCALAR_FIELD(identity);
-	COMPARE_NODE_FIELD(identitySequence);
 	COMPARE_SCALAR_FIELD(generated);
 	COMPARE_NODE_FIELD(constraints);
 	COMPARE_LOCATION_FIELD(location);
@@ -1418,7 +1415,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_STRING_FIELD(conname);
 	COMPARE_LOCATION_FIELD(location);
 	COMPARE_NODE_FIELD(raw_expr);
-	COMPARE_SCALAR_FIELD(generated_when);
 	COMPARE_NODE_FIELD(keys);
 	COMPARE_NODE_FIELD(including);
 	COMPARE_NODE_FIELD(options);

@@ -158,7 +158,6 @@ static Node *makeNotExpr(Node *expr, int location);
 static Node *makeAArrayExpr(List *elements, int location);
 static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 								  int location);
-static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner);
 %}
 
 %pure-parser
@@ -248,7 +247,6 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
 %type <boolean>	opt_or_replace
-			opt_if_exists
 				opt_transaction_chain
 %type <ival>	opt_nowait_or_skip
 
@@ -257,7 +255,7 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 %type <list>	OptSchemaEltList
 
 %type <str>		access_method_clause attr_name
-			name file_name
+			name
 			opt_index_name cluster_index_specification
 
 %type <list>	func_name qual_Op qual_all_Op subquery_Op
@@ -285,9 +283,9 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 				distinct_clause
 				target_list opt_target_list insert_column_list
 				set_clause_list set_clause
-				def_list operator_def_list indirection opt_indirection
+				def_list indirection opt_indirection
 				transaction_mode_list_or_empty
-				OptTableFuncElementList TableFuncElementList opt_type_modifiers
+				TableFuncElementList opt_type_modifiers
 				using_clause
 			alter_generic_options
 			relation_expr_list
@@ -338,16 +336,15 @@ static RangeVar *makeRangeVarFromAnyName(List *names, int position, core_yyscan_
 
 %type <node>	TableElement ConstraintElem TableFuncElement
 %type <node>	columnDef
-%type <defelt>	def_elem operator_def_elem
+%type <defelt>	def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
 				columnref in_expr having_clause func_table array_expr
-				operator_def_arg
 %type <list>	rowsfrom_item rowsfrom_list opt_col_def_list
 %type <boolean> opt_ordinality
 %type <list>	func_arg_list func_arg_list_opt
 %type <node>	func_arg_expr
-%type <list>	row type_list array_expr_list
+%type <list>	row array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
 %type <list>	when_clause_list
 %type <ival>	sub_type
@@ -1510,7 +1507,6 @@ columnDef:	ColId Typename opt_column_compression ColQualList
 					n->colname = $1;
 					n->typeName = $2;
 					n->compression = $3;
-					n->inhcount = 0;
 					n->is_local = true;
 					n->is_from_type = false;
 					n->storage = 0;
@@ -2195,10 +2191,6 @@ opt_definition:
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
-opt_if_exists: IF_P EXISTS						{ $$ = true; }
-		| /*EMPTY*/								{ $$ = false; }
-		;
-
 
 /*****************************************************************************
  *
@@ -2335,15 +2327,6 @@ AlterObjectSchemaStmt:
  *
  *****************************************************************************/
 
-
-/* must be similar enough to def_arg to avoid reduce/reduce conflicts */
-operator_def_arg:
-			func_type						{ $$ = (Node *)$1; }
-			| reserved_keyword				{ $$ = (Node *)makeString(pstrdup($1)); }
-			| qual_all_Op					{ $$ = (Node *)$1; }
-			| NumericOnly					{ $$ = (Node *)$1; }
-			| Sconst						{ $$ = (Node *)makeString($1); }
-		;
 
 /*****************************************************************************
  *
@@ -4232,11 +4215,6 @@ where_or_current_clause:
 	;
 
 
-OptTableFuncElementList:
-			TableFuncElementList				{ $$ = $1; }
-			| /*EMPTY*/							{ $$ = NIL; }
-		;
-
 TableFuncElementList:
 			TableFuncElement
 				{
@@ -4253,7 +4231,6 @@ TableFuncElement:	ColId Typename
 					ColumnDef *n = makeNode(ColumnDef);
 					n->colname = $1;
 					n->typeName = $2;
-					n->inhcount = 0;
 					n->is_local = true;
 					n->is_from_type = false;
 					n->storage = 0;
@@ -5584,9 +5561,6 @@ func_arg_list_opt:	func_arg_list					{ $$ = $1; }
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
-type_list:	Typename								{ $$ = list_make1($1); }
-			| type_list ',' Typename				{ $$ = lappend($1, $3); }
-		;
 
 array_expr: '[' expr_list ']'
 				{
@@ -5923,7 +5897,6 @@ name:		ColId									{ $$ = $1; };
 
 attr_name:	ColLabel								{ $$ = $1; };
 
-file_name:	Sconst									{ $$ = $1; };
 
 /*
  * The production for a qualified func_name has to exactly match the
@@ -6892,16 +6865,6 @@ any_operator:
 						{ $$ = lcons(makeString($1), $3); }
 		;
 
-operator_def_list:	operator_def_elem					{ $$ = list_make1($1); }
-			| operator_def_list ',' operator_def_elem			{ $$ = lappend($1, $3); }
-		;
-
-operator_def_elem: ColLabel '=' NONE
-						{ $$ = makeDefElem($1, NULL, @1); }
-		   | ColLabel '=' operator_def_arg
-						{ $$ = makeDefElem($1, (Node *) $3, @1); }
-		;
-
 
 %%
 
@@ -7383,47 +7346,6 @@ makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod, int location)
 	return (Node *) svf;
 }
 
-/*
- * Convert a list of (dotted) names to a RangeVar (like
- * makeRangeVarFromNameList, but with position support).  The
- * "AnyName" refers to the any_name production in the grammar.
- */
-static RangeVar *
-makeRangeVarFromAnyName(List *names, int position, core_yyscan_t yyscanner)
-{
-	RangeVar *r = makeNode(RangeVar);
-
-	switch (list_length(names))
-	{
-		case 1:
-			r->catalogname = NULL;
-			r->schemaname = NULL;
-			r->relname = strVal(linitial(names));
-			break;
-		case 2:
-			r->catalogname = NULL;
-			r->schemaname = strVal(linitial(names));
-			r->relname = strVal(lsecond(names));
-			break;
-		case 3:
-			r->catalogname = strVal(linitial(names));
-			r->schemaname = strVal(lsecond(names));
-			r->relname = strVal(lthird(names));
-			break;
-		default:
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("improper qualified name (too many dotted names): %s",
-							NameListToString(names)),
-					 parser_errposition(position)));
-			break;
-	}
-
-	r->relpersistence = RELPERSISTENCE_PERMANENT;
-	r->location = position;
-
-	return r;
-}
 
 /* parser_init()
  * Initialize to parse one query string

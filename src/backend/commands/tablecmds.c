@@ -255,9 +255,7 @@ static void truncate_check_rel(Oid relid, Form_pg_class reltuple);
 static void truncate_check_activity(Relation rel);
 static void RangeVarCallbackForTruncate(const RangeVar *relation,
 										Oid relId, Oid oldRelId, void *arg);
-static List *MergeAttributes(List *schema, List *supers, char relpersistence,
-							 List **supconstr);
-static int	findAttrByName(const char *attributeName, List *schema);
+static List *MergeAttributes(List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
 								 Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved);
 static void CheckAlterTableIsSafe(Relation rel);
@@ -348,8 +346,6 @@ static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
 										  const char *column, Node *newValue, LOCKMODE lockmode);
 
-static const char *storage_name(char c);
-
 static void RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid,
 											Oid oldRelOid, void *arg);
 static void RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid,
@@ -385,7 +381,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Oid			relationId;
 	Relation	rel;
 	TupleDesc	descriptor;
-	List	   *old_constraints;
 	List	   *rawDefaults;
 	List	   *cookedDefaults;
 	ListCell   *listptr;
@@ -423,14 +418,10 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		ownerId = GetUserId();
 
 	/*
-	 * Look up inheritance ancestors and generate relation schema, including
-	 * inherited attributes.  (Note that stmt->tableElts is destructively
-	 * modified by MergeAttributes.)
+	 * Validate the relation schema.  (Note that stmt->tableElts is
+	 * destructively modified by MergeAttributes.)
 	 */
-	stmt->tableElts =
-		MergeAttributes(stmt->tableElts, NIL,
-						stmt->relation->relpersistence,
-						&old_constraints);
+	stmt->tableElts = MergeAttributes(stmt->tableElts);
 
 	/*
 	 * Create a tuple descriptor from the relation schema.  Note that this
@@ -441,8 +432,8 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	/*
 	 * Find columns with default values and prepare for insertion of the
-	 * defaults.  Pre-cooked (that is, inherited) defaults go into a list of
-	 * CookedConstraint structs that we'll pass to heap_create_with_catalog,
+	 * defaults.  Pre-cooked defaults go into a list of CookedConstraint
+	 * structs that we'll pass to heap_create_with_catalog,
 	 * while raw defaults go into a list of RawColumnDefault structs that will
 	 * be processed by AddRelationNewConstraints.  (We can't deal with raw
 	 * expressions until we can do transformExpr.)
@@ -487,8 +478,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 			cooked->name = NULL;
 			cooked->attnum = attnum;
 			cooked->expr = colDef->cooked_default;
-			cooked->is_local = true;	/* not used for defaults */
-			cooked->inhcount = 0;	/* ditto */
 			cookedDefaults = lappend(cookedDefaults, cooked);
 			attr->atthasdef = true;
 		}
@@ -510,9 +499,9 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		accessMethodId = get_table_am_oid(accessMethod, false);
 
 	/*
-	 * Create the relation.  Inherited defaults and constraints are passed in
-	 * for immediate handling --- since they don't need parsing, they can be
-	 * stored immediately.
+	 * Create the relation.  Pre-cooked defaults are passed in for immediate
+	 * handling --- since they don't need parsing, they can be stored
+	 * immediately.
 	 */
 	relationId = heap_create_with_catalog(relname,
 										  namespaceId,
@@ -522,8 +511,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 										  ownerId,
 										  accessMethodId,
 										  descriptor,
-										  list_concat(cookedDefaults,
-													  old_constraints),
+										  cookedDefaults,
 										  relkind,
 										  stmt->relation->relpersistence,
 										  false,
@@ -559,7 +547,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 */
 	if (rawDefaults)
 		AddRelationNewConstraints(rel, rawDefaults, NIL,
-								  true, true, false, queryString);
+								  true, false, queryString);
 
 	CommandCounterIncrement();
 
@@ -1174,95 +1162,21 @@ truncate_check_activity(Relation rel)
 	CheckTableNotInUse(rel, "TRUNCATE");
 }
 
-/*
- * storage_name
- *	  returns the name corresponding to a typstorage/attstorage enum value
- */
-static const char *
-storage_name(char c)
-{
-	switch (c)
-	{
-		case TYPSTORAGE_PLAIN:
-			return "PLAIN";
-		case TYPSTORAGE_EXTERNAL:
-			return "EXTERNAL";
-		case TYPSTORAGE_EXTENDED:
-			return "EXTENDED";
-		case TYPSTORAGE_MAIN:
-			return "MAIN";
-		default:
-			return "???";
-	}
-}
-
 /*----------
  * MergeAttributes
- *		Returns new schema given initial schema and superclasses.
+ *		Check the column definition list of a to-be-created relation.
  *
  * Input arguments:
  * 'schema' is the column/attribute definition for the table. (It's a list
  *		of ColumnDef's.) It is destructively changed.
- * 'supers' is a list of OIDs of parent relations, already locked by caller.
- * 'relpersistence' is the persistence type of the table.
- *
- * Output arguments:
- * 'supconstr' receives a list of constraints belonging to the parents,
- *		updated as necessary to be valid for the child.
  *
  * Return value:
  * Completed schema list.
- *
- * Notes:
- *	  The order in which the attributes are inherited is very important.
- *	  Intuitively, the inherited attributes should come first. If a table
- *	  inherits from multiple parents, the order of those attributes are
- *	  according to the order of the parents specified in CREATE TABLE.
- *
- *	  Here's an example:
- *
- *		create table person (name text, age int4, location point);
- *		create table emp (salary int4, manager text) inherits(person);
- *		create table student (gpa float8) inherits (person);
- *		create table stud_emp (percent int4) inherits (emp, student);
- *
- *	  The order of the attributes of stud_emp is:
- *
- *							person {1:name, 2:age, 3:location}
- *							/	 \
- *			   {6:gpa}	student   emp {4:salary, 5:manager}
- *							\	 /
- *						   stud_emp {7:percent}
- *
- *	   If the same attribute name appears multiple times, then it appears
- *	   in the result table in the proper location for its first appearance.
- *
- *	   Constraints for the child table
- *	   are the union of all relevant constraints, from both the child schema
- *	   and parent tables.
- *
- *	   The default value for a child column is defined as:
- *		(1) If the child schema specifies a default, that value is used.
- *		(2) If neither the child nor any parent specifies a default, then
- *			the column will not have a default.
- *		(3) If conflicting defaults are inherited from different parents
- *			(and not overridden by the child), an error is raised.
- *		(4) Otherwise the inherited default is used.
- *		Rule (3) is new in Postgres 7.1; in earlier releases you got a
- *		rather arbitrary choice of which parent default to use.
  *----------
  */
 static List *
-MergeAttributes(List *schema, List *supers, char relpersistence,
-				List **supconstr)
+MergeAttributes(List *schema)
 {
-	List	   *inhSchema = NIL;
-	List	   *constraints = NIL;
-	bool		have_bogus_defaults = false;
-	int			child_attno;
-	static Node bogus_marker = {0}; /* marks conflicting defaults */
-	ListCell   *entry;
-
 	/*
 	 * Check for and reject tables with too many columns. We perform this
 	 * check relatively early for two reasons: (a) we don't run the risk of
@@ -1270,9 +1184,6 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	 * okay if we're processing <= 1600 columns, but could take minutes to
 	 * execute if the user attempts to create a table with hundreds of
 	 * thousands of columns.
-	 *
-	 * Note that we also need to check that we do not exceed this figure after
-	 * including columns from inherited relations.
 	 */
 	if (list_length(schema) > MaxHeapAttributeNumber)
 		ereport(ERROR,
@@ -1283,8 +1194,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 	/*
 	 * Check for duplicate names in the explicit list of attributes.
 	 *
-	 * Although we might consider merging such entries in the same way that we
-	 * handle name conflicts for inherited attributes, it seems to make more
+	 * Although we might consider merging such entries, it seems to make more
 	 * sense to assume such conflicts are errors.
 	 *
 	 * We don't use foreach() here because we have two nested loops over the
@@ -1340,506 +1250,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 		}
 	}
 
-	/*
-	 * Scan the parents left-to-right, and merge their attributes to form a
-	 * list of inherited attributes (inhSchema).  Also check to see if we need
-	 * to inherit an OID column.
-	 */
-	child_attno = 0;
-	foreach(entry, supers)
-	{
-		Oid			parent = lfirst_oid(entry);
-		Relation	relation;
-		TupleDesc	tupleDesc;
-		TupleConstr *constr;
-		AttrMap    *newattmap;
-		List	   *inherited_defaults;
-		List	   *cols_with_defaults;
-		AttrNumber	parent_attno;
-		ListCell   *lc1;
-		ListCell   *lc2;
-
-		/* caller already got lock */
-		relation = table_open(parent, NoLock);
-
-		/*
-		 * We do not allow partitions to participate in regular inheritance.
-		 */
-		if (relation->rd_rel->relkind != RELKIND_RELATION)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("inherited relation \"%s\" is not a table or foreign table",
-							RelationGetRelationName(relation))));
-
-		/*
-		 * Temporary relations are not supported in this build, so there is no
-		 * need to validate permanent/temporary inheritance compatibility.
-		 */
-
-		/*
-		 * We should have an UNDER permission flag for this, but for now,
-		 * demand that creator of a child table own the parent.
-		 */
-
-		 tupleDesc = RelationGetDescr(relation);
-		constr = tupleDesc->constr;
-
-		/*
-		 * newattmap->attnums[] will contain the child-table attribute numbers
-		 * for the attributes of this parent table.  (They are not the same
-		 * for parents after the first one, nor if we have dropped columns.)
-		 */
-		newattmap = make_attrmap(tupleDesc->natts);
-
-		/* We can't process inherited defaults until newattmap is complete. */
-		inherited_defaults = cols_with_defaults = NIL;
-
-		for (parent_attno = 1; parent_attno <= tupleDesc->natts;
-			 parent_attno++)
-		{
-			Form_pg_attribute attribute = TupleDescAttr(tupleDesc,
-														parent_attno - 1);
-			char	   *attributeName = NameStr(attribute->attname);
-			int			exist_attno;
-			ColumnDef  *def;
-
-			/*
-			 * Ignore dropped columns in the parent.
-			 */
-			if (attribute->attisdropped)
-				continue;		/* leave newattmap->attnums entry as zero */
-
-			/*
-			 * Does it conflict with some previously inherited column?
-			 */
-			exist_attno = findAttrByName(attributeName, inhSchema);
-			if (exist_attno > 0)
-			{
-				Oid			defTypeId;
-				int32		deftypmod;
-
-				/*
-				 * Yes, try to merge the two column definitions. They must
-				 * have the same type, typmod, and collation.
-				 */
-				ereport(NOTICE,
-						(errmsg("merging multiple inherited definitions of column \"%s\"",
-								attributeName)));
-				def = (ColumnDef *) list_nth(inhSchema, exist_attno - 1);
-				typenameTypeIdAndMod(NULL, def->typeName, &defTypeId, &deftypmod);
-				if (defTypeId != attribute->atttypid ||
-					deftypmod != attribute->atttypmod)
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("inherited column \"%s\" has a type conflict",
-									attributeName),
-							 errdetail("%s versus %s",
-									   format_type_with_typemod(defTypeId,
-																deftypmod),
-									   format_type_with_typemod(attribute->atttypid,
-																attribute->atttypmod))));
-
-
-				/* Copy/check storage parameter */
-				if (def->storage == 0)
-					def->storage = attribute->attstorage;
-				else if (def->storage != attribute->attstorage)
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("inherited column \"%s\" has a storage parameter conflict",
-									attributeName),
-							 errdetail("%s versus %s",
-									   storage_name(def->storage),
-									   storage_name(attribute->attstorage))));
-
-				/* Copy/check compression parameter */
-				if (CompressionMethodIsValid(attribute->attcompression))
-				{
-					const char *compression =
-					GetCompressionMethodName(attribute->attcompression);
-
-					if (def->compression == NULL)
-						def->compression = pstrdup(compression);
-					else if (strcmp(def->compression, compression) != 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_DATATYPE_MISMATCH),
-								 errmsg("column \"%s\" has a compression method conflict",
-										attributeName),
-								 errdetail("%s versus %s", def->compression, compression)));
-				}
-
-				def->inhcount++;
-				/* Default and other constraints are handled below */
-				newattmap->attnums[parent_attno - 1] = exist_attno;
-
-				/* Check for GENERATED conflicts */
-				if (def->generated != '\0')
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("inherited column \"%s\" has a generation conflict",
-									attributeName)));
-			}
-			else
-			{
-				/*
-				 * No, create a new inherited column
-				 */
-				def = makeNode(ColumnDef);
-				def->colname = pstrdup(attributeName);
-				def->typeName = makeTypeNameFromOid(attribute->atttypid,
-													attribute->atttypmod);
-				def->inhcount = 1;
-				def->is_local = false;
-				def->is_from_type = false;
-				def->storage = attribute->attstorage;
-				def->raw_default = NULL;
-				def->cooked_default = NULL;
-				def->generated = '\0';
-				def->constraints = NIL;
-				def->location = -1;
-				if (CompressionMethodIsValid(attribute->attcompression))
-					def->compression =
-						pstrdup(GetCompressionMethodName(attribute->attcompression));
-				else
-					def->compression = NULL;
-				inhSchema = lappend(inhSchema, def);
-				newattmap->attnums[parent_attno - 1] = ++child_attno;
-			}
-
-			/*
-			 * Locate default if any
-			 */
-			if (attribute->atthasdef)
-			{
-				Node	   *this_default = NULL;
-
-				/* Find default in constraint structure */
-				if (constr != NULL)
-				{
-					AttrDefault *attrdef = constr->defval;
-
-					for (int i = 0; i < constr->num_defval; i++)
-					{
-						if (attrdef[i].adnum == parent_attno)
-						{
-							this_default = stringToNode(attrdef[i].adbin);
-							break;
-						}
-					}
-				}
-				if (this_default == NULL)
-					elog(ERROR, "default expression not found for attribute %d of relation \"%s\"",
-						 parent_attno, RelationGetRelationName(relation));
-
-				/*
-				 * If it's a GENERATED default, it might contain Vars that
-				 * need to be mapped to the inherited column(s)' new numbers.
-				 * We can't do that till newattmap is ready, so just remember
-				 * all the inherited default expressions for the moment.
-				 */
-				inherited_defaults = lappend(inherited_defaults, this_default);
-				cols_with_defaults = lappend(cols_with_defaults, def);
-			}
-		}
-
-		/*
-		 * Now process any inherited default expressions, adjusting attnos
-		 * using the completed newattmap map.
-		 */
-		forboth(lc1, inherited_defaults, lc2, cols_with_defaults)
-		{
-			Node	   *this_default = (Node *) lfirst(lc1);
-			ColumnDef  *def = (ColumnDef *) lfirst(lc2);
-			bool		found_whole_row;
-
-			/* Adjust Vars to match new table's column numbering */
-			this_default = map_variable_attnos(this_default,
-											   1, 0,
-											   newattmap,
-											   InvalidOid, &found_whole_row);
-
-			/*
-			 * For the moment we have to reject whole-row variables.  We could
-			 * convert them, if we knew the new table's rowtype OID, but that
-			 * hasn't been assigned yet.  (A variable could only appear in a
-			 * generation expression, so the error message is correct.)
-			 */
-			if (found_whole_row)
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot convert whole-row table reference"),
-						 errdetail("Generation expression for column \"%s\" contains a whole-row reference to table \"%s\".",
-								   def->colname,
-								   RelationGetRelationName(relation))));
-
-			/*
-			 * If we already had a default from some prior parent, check to
-			 * see if they are the same.  If so, no problem; if not, mark the
-			 * column as having a bogus default.  Below, we will complain if
-			 * the bogus default isn't overridden by the child schema.
-			 */
-			Assert(def->raw_default == NULL);
-			if (def->cooked_default == NULL)
-				def->cooked_default = this_default;
-			else if (!equal(def->cooked_default, this_default))
-			{
-				def->cooked_default = &bogus_marker;
-				have_bogus_defaults = true;
-			}
-		}
-
-
-		free_attrmap(newattmap);
-
-		/*
-		 * Close the parent rel, but keep our lock on it until xact commit.
-		 * That will prevent someone else from deleting or ALTERing the parent
-		 * before the child is committed.
-		 */
-		table_close(relation, NoLock);
-	}
-
-	/*
-	 * If we had no inherited attributes, the result schema is just the
-	 * explicitly declared columns.  Otherwise, we need to merge the declared
-	 * columns into the inherited schema list.
-	 */
-	if (inhSchema != NIL)
-	{
-		int			schema_attno = 0;
-
-		foreach(entry, schema)
-		{
-			ColumnDef  *newdef = lfirst(entry);
-			char	   *attributeName = newdef->colname;
-			int			exist_attno;
-
-			schema_attno++;
-
-			/*
-			 * Does it conflict with some previously inherited column?
-			 */
-			exist_attno = findAttrByName(attributeName, inhSchema);
-			if (exist_attno > 0)
-			{
-				ColumnDef  *def;
-				Oid			defTypeId,
-							newTypeId;
-				int32		deftypmod,
-							newtypmod;
-				Oid			defcollid,
-							newcollid;
-
-				/*
-				 * Yes, try to merge the two column definitions. They must
-				 * have the same type, typmod, and collation.
-				 */
-				if (exist_attno == schema_attno)
-					ereport(NOTICE,
-							(errmsg("merging column \"%s\" with inherited definition",
-									attributeName)));
-				else
-					ereport(NOTICE,
-							(errmsg("moving and merging column \"%s\" with inherited definition", attributeName),
-							 errdetail("User-specified column moved to the position of the inherited column.")));
-				def = (ColumnDef *) list_nth(inhSchema, exist_attno - 1);
-				typenameTypeIdAndMod(NULL, def->typeName, &defTypeId, &deftypmod);
-				typenameTypeIdAndMod(NULL, newdef->typeName, &newTypeId, &newtypmod);
-				if (defTypeId != newTypeId || deftypmod != newtypmod)
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("column \"%s\" has a type conflict",
-									attributeName),
-							 errdetail("%s versus %s",
-									   format_type_with_typemod(defTypeId,
-																deftypmod),
-									   format_type_with_typemod(newTypeId,
-																newtypmod))));
-				defcollid = GetColumnDefCollation(defTypeId);
-				newcollid = GetColumnDefCollation(newTypeId);
-				if (defcollid != newcollid)
-					ereport(ERROR,
-							(errcode(ERRCODE_COLLATION_MISMATCH),
-							 errmsg("column \"%s\" has a collation conflict",
-									attributeName),
-							 errdetail("\"%s\" versus \"%s\"",
-									   get_collation_name(defcollid),
-									   get_collation_name(newcollid))));
-
-				/*
-				 * Identity is never inherited.  The new column can have an
-				 * identity definition, so we always just take that one.
-				 */
-				def->identity = newdef->identity;
-
-				/* Copy storage parameter */
-				if (def->storage == 0)
-					def->storage = newdef->storage;
-				else if (newdef->storage != 0 && def->storage != newdef->storage)
-					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("column \"%s\" has a storage parameter conflict",
-									attributeName),
-							 errdetail("%s versus %s",
-									   storage_name(def->storage),
-									   storage_name(newdef->storage))));
-
-				/* Copy compression parameter */
-				if (def->compression == NULL)
-					def->compression = newdef->compression;
-				else if (newdef->compression != NULL)
-				{
-					if (strcmp(def->compression, newdef->compression) != 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_DATATYPE_MISMATCH),
-								 errmsg("column \"%s\" has a compression method conflict",
-										attributeName),
-								 errdetail("%s versus %s", def->compression, newdef->compression)));
-				}
-
-				/* Mark the column as locally defined */
-				def->is_local = true;
-
-				/*
-				 * Check for conflicts related to generated columns.
-				 *
-				 * If the parent column is generated, the child column must be
-				 * unadorned and will be made a generated column.  (We could
-				 * in theory allow the child column definition specifying the
-				 * exact same generation expression, but that's a bit
-				 * complicated to implement and doesn't seem very useful.)  We
-				 * also check that the child column doesn't specify a default
-				 * value or identity, which matches the rules for a single
-				 * column in parse_util.c.
-				 */
-				if (def->generated)
-				{
-					if (newdef->generated)
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-								 errmsg("child column \"%s\" specifies generation expression",
-										def->colname),
-								 errhint("Omit the generation expression in the definition of the child table column to inherit the generation expression from the parent table.")));
-					if (newdef->raw_default && !newdef->generated)
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-								 errmsg("column \"%s\" inherits from generated column but specifies default",
-										def->colname)));
-					if (newdef->identity)
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-								 errmsg("column \"%s\" inherits from generated column but specifies identity",
-										def->colname)));
-				}
-
-				/*
-				 * If the parent column is not generated, then take whatever
-				 * the child column definition says.
-				 */
-				else
-				{
-					if (newdef->generated)
-						def->generated = newdef->generated;
-				}
-
-				/* If new def has a default, override previous default */
-				if (newdef->raw_default != NULL)
-				{
-					def->raw_default = newdef->raw_default;
-					def->cooked_default = newdef->cooked_default;
-				}
-			}
-			else
-			{
-				/*
-				 * No, attach new column to result schema
-				 */
-				inhSchema = lappend(inhSchema, newdef);
-			}
-		}
-
-		schema = inhSchema;
-
-		/*
-		 * Check that we haven't exceeded the legal # of columns after merging
-		 * in inherited columns.
-		 */
-		if (list_length(schema) > MaxHeapAttributeNumber)
-			ereport(ERROR,
-					(errcode(ERRCODE_TOO_MANY_COLUMNS),
-					 errmsg("tables can have at most %d columns",
-							MaxHeapAttributeNumber)));
-	}
-
-	/*
-	 * Now that we have the column definition list, we can
-	 * check whether the columns referenced in the column constraint specs
-	 * actually exist.  Also, we merge defaults into each
-	 * corresponding column definition.
-	 */
-
-	/*
-	 * If we found any conflicting parent default values, check to make sure
-	 * they were overridden by the child.
-	 */
-	if (have_bogus_defaults)
-	{
-		foreach(entry, schema)
-		{
-			ColumnDef  *def = lfirst(entry);
-
-			if (def->cooked_default == &bogus_marker)
-			{
-				if (def->generated)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-							 errmsg("column \"%s\" inherits conflicting generation expressions",
-									def->colname)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-							 errmsg("column \"%s\" inherits conflicting default values",
-									def->colname),
-							 errhint("To resolve the conflict, specify a default explicitly.")));
-			}
-		}
-	}
-
-	*supconstr = constraints;
 	return schema;
-}
-
-
-
-
-/*
- * StoreCatalogInheritance
- *		Updates the system catalogs with proper inheritance information.
- *
- * supers is a list of the OIDs of the new relation's direct ancestors.
- */
-/*
- * Look for an existing schema entry with the given name.
- *
- * Returns the index (starting with 1) if attribute already exists in schema,
- * 0 if it doesn't.
- */
-static int
-findAttrByName(const char *attributeName, List *schema)
-{
-	ListCell   *s;
-	int			i = 1;
-
-	foreach(s, schema)
-	{
-		ColumnDef  *def = lfirst(s);
-
-		if (strcmp(attributeName, def->colname) == 0)
-			return i;
-
-		i++;
-	}
-	return 0;
 }
 
 
@@ -3754,50 +3165,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 
 	attrdesc = table_open(AttributeRelationId, RowExclusiveLock);
 
-	/*
-	 * Are we adding the column to a recursion child?  If so, check whether to
-	 * merge with an existing definition for the column.  If we do merge, we
-	 * must not recurse.  Children will already have the column, and recursing
-	 * into them would mess up attinhcount.
-	 */
-	if (colDef->inhcount > 0)
-	{
-		HeapTuple	tuple;
-
-		/* Does child already have a column by this name? */
-		tuple = SearchSysCacheCopyAttName(myrelid, colDef->colname);
-		if (HeapTupleIsValid(tuple))
-		{
-			Form_pg_attribute childatt = (Form_pg_attribute) GETSTRUCT(tuple);
-			Oid			ctypeId;
-			int32		ctypmod;
-
-			/* Child column must match on type, typmod, and collation */
-			typenameTypeIdAndMod(NULL, colDef->typeName, &ctypeId, &ctypmod);
-			if (ctypeId != childatt->atttypid ||
-				ctypmod != childatt->atttypmod)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("child table \"%s\" has different type for column \"%s\"",
-								RelationGetRelationName(rel), colDef->colname)));
-			CatalogTupleUpdate(attrdesc, &tuple->t_self, tuple);
-
-			heap_freetuple(tuple);
-
-			/* Inform the user about the merge */
-			ereport(NOTICE,
-					(errmsg("merging definition of column \"%s\" for child \"%s\"",
-							colDef->colname, RelationGetRelationName(rel))));
-
-			table_close(attrdesc, RowExclusiveLock);
-
-			/* Make the child column change visible */
-			CommandCounterIncrement();
-
-			return InvalidObjectAddress;
-		}
-	}
-
 	/* skip if the name already exists and if_not_exists is true */
 	if (!check_for_column_name_collision(rel, colDef->colname, if_not_exists))
 	{
@@ -3912,7 +3279,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		 * _list_ of defaults, but we just do one.
 		 */
 		AddRelationNewConstraints(rel, list_make1(rawEnt), NIL,
-								  false, true, false, NULL);
+								  false, false, NULL);
 
 		/* Make the additional catalog changes visible */
 		CommandCounterIncrement();
@@ -4163,7 +3530,7 @@ ATExecColumnDefault(Relation rel, const char *colName,
 		 * _list_ of defaults, but we just do one.
 		 */
 		AddRelationNewConstraints(rel, list_make1(rawEnt), NIL,
-								  false, true, false, NULL);
+								  false, false, NULL);
 	}
 
 	ObjectAddressSubSet(address, RelationRelationId,
@@ -4656,9 +4023,7 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE loc
  *
  * DROP COLUMN cannot use the normal ALTER TABLE recursion mechanism,
  * because we have to decide at runtime whether to recurse or not depending
- * on whether attinhcount goes to zero or not.  (We can't check this in a
- * static pre-pass because it won't handle multiple inheritance situations
- * correctly.)
+ * on whether the column is actually dropped or not.
  */
 static void
 ATPrepDropColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
