@@ -295,8 +295,6 @@ static void add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid);
 static void add_column_collation_dependency(Oid relid, int32 attnum, Oid collid);
 static ObjectAddress ATExecSetStatistics(Relation rel, const char *colName, int16 colNum,
 										 Node *newValue, LOCKMODE lockmode);
-static ObjectAddress ATExecSetOptions(Relation rel, const char *colName,
-									  Node *options, bool isReset, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStorage(Relation rel, const char *colName,
 									  Node *newValue, LOCKMODE lockmode);
 static void ATPrepDropColumn(List **wqueue, Relation rel, bool recurse,
@@ -1565,7 +1563,6 @@ AlterTableGetLockLevel(List *cmds)
 				 * These subcommands affect write operations only. XXX
 				 * Theoretically, these could be ShareRowExclusiveLock.
 				 */
-			case AT_AlterConstraint:
 			case AT_AddIndex:	/* from ADD CONSTRAINT */
 			case AT_AddIndexConstraint:
 			case AT_SetCompression:
@@ -1588,8 +1585,6 @@ AlterTableGetLockLevel(List *cmds)
 			case AT_SetStatistics:	/* Uses MVCC in getTableAttrs() */
 			case AT_ClusterOn:	/* Uses MVCC in getIndexes() */
 			case AT_DropCluster:	/* Uses MVCC in getIndexes() */
-			case AT_SetOptions: /* Uses MVCC in getTableAttrs() */
-			case AT_ResetOptions:	/* Uses MVCC in getTableAttrs() */
 			cmd_lockmode = ShareUpdateExclusiveLock;
 			break;
 
@@ -1699,12 +1694,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
-		case AT_SetOptions:		/* ALTER COLUMN SET ( options ) */
-		case AT_ResetOptions:	/* ALTER COLUMN RESET ( options ) */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			pass = AT_PASS_MISC;
-			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 			/* No command-specific prep needed */
@@ -1767,11 +1756,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATSimplePermissions(rel, ATT_TABLE);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
-		case AT_AlterConstraint:	/* ALTER CONSTRAINT */
-			ATSimplePermissions(rel, ATT_TABLE);
-			/* Recursion occurs during execution phase */
 			pass = AT_PASS_MISC;
 			break;
 		case AT_EnableRule:		/* ENABLE/DISABLE RULE variants */
@@ -1893,12 +1877,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_SetStatistics:	/* ALTER COLUMN SET STATISTICS */
 			ATExecSetStatistics(rel, cmd->name, cmd->num, cmd->def, lockmode);
 			break;
-		case AT_SetOptions:		/* ALTER COLUMN SET ( options ) */
-			ATExecSetOptions(rel, cmd->name, cmd->def, false, lockmode);
-			break;
-		case AT_ResetOptions:	/* ALTER COLUMN RESET ( options ) */
-			ATExecSetOptions(rel, cmd->name, cmd->def, true, lockmode);
-			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			ATExecSetStorage(rel, cmd->name, cmd->def, lockmode);
 			break;
@@ -1943,16 +1921,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_AddIndexConstraint: /* ADD CONSTRAINT USING INDEX */
 			ATExecAddIndexConstraint(tab, rel, (IndexStmt *) cmd->def,
 											   lockmode);
-			break;
-		case AT_AlterConstraint:	/* ALTER CONSTRAINT */
-
-			/*
-			 * ALTER CONSTRAINT is only meaningful for foreign-key
-			 * constraints, which are not supported in minipg.
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("foreign key constraints are not supported in minipg")));
 			break;
 		case AT_DropConstraint: /* DROP CONSTRAINT */
 			ATExecDropConstraint(rel, cmd->name, cmd->behavior,
@@ -3229,74 +3197,6 @@ ATExecSetStatistics(Relation rel, const char *colName, int16 colNum, Node *newVa
 	ObjectAddressSubSet(address, RelationRelationId,
 						RelationGetRelid(rel), attnum);
 	heap_freetuple(tuple);
-
-	table_close(attrelation, RowExclusiveLock);
-
-	return address;
-}
-
-/*
- * Return value is the address of the modified column
- */
-static ObjectAddress
-ATExecSetOptions(Relation rel, const char *colName, Node *options,
-				 bool isReset, LOCKMODE lockmode)
-{
-	Relation	attrelation;
-	HeapTuple	tuple,
-				newtuple;
-	Form_pg_attribute attrtuple;
-	AttrNumber	attnum;
-	Datum		newOptions;
-	ObjectAddress address;
-	Datum		repl_val[Natts_pg_attribute];
-	bool		repl_null[Natts_pg_attribute];
-	bool		repl_repl[Natts_pg_attribute];
-
-	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
-
-	tuple = SearchSysCacheAttName(RelationGetRelid(rel), colName);
-
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-	attrtuple = (Form_pg_attribute) GETSTRUCT(tuple);
-
-	attnum = attrtuple->attnum;
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	/* Generate new proposed attoptions (text array) */
-	newOptions = (Datum) 0;
-
-	/* Build new tuple. */
-	memset(repl_null, false, sizeof(repl_null));
-	memset(repl_repl, false, sizeof(repl_repl));
-	if (newOptions != (Datum) 0)
-		repl_val[Anum_pg_attribute_attoptions - 1] = newOptions;
-	else
-		repl_null[Anum_pg_attribute_attoptions - 1] = true;
-	repl_repl[Anum_pg_attribute_attoptions - 1] = true;
-	newtuple = heap_modify_tuple(tuple, RelationGetDescr(attrelation),
-								 repl_val, repl_null, repl_repl);
-
-	/* Update system catalog. */
-	CatalogTupleUpdate(attrelation, &newtuple->t_self, newtuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attrtuple->attnum);
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-
-	heap_freetuple(newtuple);
-
-	ReleaseSysCache(tuple);
 
 	table_close(attrelation, RowExclusiveLock);
 

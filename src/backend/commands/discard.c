@@ -37,10 +37,6 @@ DiscardCommand(DiscardStmt *stmt, bool isTopLevel)
 			/* Plan cache has been removed; DISCARD PLANS is now a no-op */
 			break;
 
-		case DISCARD_TEMP:
-			/* Temporary tables are no longer supported. */
-			break;
-
 		default:
 			elog(ERROR, "unrecognized DISCARD target: %d", stmt->target);
 	}

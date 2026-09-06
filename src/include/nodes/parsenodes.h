@@ -520,9 +520,6 @@ typedef struct IndexElem
 typedef enum DefElemAction
 {
 	DEFELEM_UNSPEC,				/* no action given */
-	DEFELEM_SET,
-	DEFELEM_ADD,
-	DEFELEM_DROP
 } DefElemAction;
 
 typedef struct DefElem
@@ -1230,8 +1227,6 @@ typedef enum AlterTableType
 	AT_AddColumnRecurse,		/* internal to commands/tablecmds.c */
 	AT_AddColumnToView,			/* implicitly via CREATE OR REPLACE VIEW */
 	AT_SetStatistics,			/* alter column set statistics */
-	AT_SetOptions,				/* alter column set ( options ) */
-	AT_ResetOptions,			/* alter column reset ( options ) */
 	AT_SetStorage,				/* alter column set storage */
 	AT_SetCompression,			/* alter column set compression */
 	AT_DropColumn,				/* drop column */
@@ -1240,15 +1235,12 @@ typedef enum AlterTableType
 	AT_ReAddIndex,				/* internal to commands/tablecmds.c */
 	AT_AddConstraint,			/* add constraint */
 	AT_AddConstraintRecurse,	/* internal to commands/tablecmds.c */
-	AT_AlterConstraint,			/* alter constraint */
 	AT_AddIndexConstraint,		/* add constraint using existing index */
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
 	AT_AlterColumnType,			/* alter column type */
 	AT_ClusterOn,				/* CLUSTER ON */
 	AT_DropCluster,				/* SET WITHOUT CLUSTER */
-	AT_SetRelOptions,			/* SET (...) -- AM specific parameters */
-	AT_ResetRelOptions,			/* RESET (...) -- AM specific parameters */
 	AT_ReplaceRelOptions,		/* replace reloption list in its entirety */
 	AT_EnableRule,				/* ENABLE RULE name */
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
@@ -1678,7 +1670,6 @@ typedef enum DiscardMode
 {
 	DISCARD_ALL,
 	DISCARD_PLANS,
-	DISCARD_TEMP
 } DiscardMode;
 
 typedef struct DiscardStmt

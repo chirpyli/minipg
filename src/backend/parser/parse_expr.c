@@ -438,12 +438,9 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_OFFSET:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
-		case EXPR_KIND_FUNCTION_DEFAULT:
 		case EXPR_KIND_INDEX_EXPRESSION:
 		case EXPR_KIND_INDEX_PREDICATE:
-		case EXPR_KIND_STATS_EXPRESSION:
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
-		case EXPR_KIND_CYCLE_MARK:
 			/* okay */
 			break;
 
@@ -1442,20 +1439,13 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_OFFSET:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
-		case EXPR_KIND_CYCLE_MARK:
 			/* okay */
-			break;
-		case EXPR_KIND_FUNCTION_DEFAULT:
-			err = _("cannot use subquery in DEFAULT expression");
 			break;
 		case EXPR_KIND_INDEX_EXPRESSION:
 			err = _("cannot use subquery in index expression");
 			break;
 		case EXPR_KIND_INDEX_PREDICATE:
 			err = _("cannot use subquery in index predicate");
-			break;
-		case EXPR_KIND_STATS_EXPRESSION:
-			err = _("cannot use subquery in statistics expression");
 			break;
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			err = _("cannot use subquery in transform expression");
@@ -2156,18 +2146,12 @@ ParseExprKindName(ParseExprKind exprKind)
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
 			return "VALUES";
-		case EXPR_KIND_FUNCTION_DEFAULT:
-			return "DEFAULT";
 		case EXPR_KIND_INDEX_EXPRESSION:
 			return "index expression";
 		case EXPR_KIND_INDEX_PREDICATE:
 			return "index predicate";
-		case EXPR_KIND_STATS_EXPRESSION:
-			return "statistics expression";
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			return "USING";
-		case EXPR_KIND_CYCLE_MARK:
-			return "CYCLE";
 
 			/*
 			 * There is intentionally no default: case here, so that the

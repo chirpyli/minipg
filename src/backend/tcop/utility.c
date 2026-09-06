@@ -1202,9 +1202,6 @@ CreateCommandTag(Node *parsetree)
 				case DISCARD_PLANS:
 					tag = CMDTAG_DISCARD_PLANS;
 					break;
-				case DISCARD_TEMP:
-					tag = CMDTAG_DISCARD_TEMP;
-					break;
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}

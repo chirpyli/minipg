@@ -391,14 +391,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_VALUES_SINGLE:
 			errkind = true;
 			break;
-		case EXPR_KIND_FUNCTION_DEFAULT:
-
-			if (isAgg)
-				err = _("aggregate functions are not allowed in DEFAULT expressions");
-			else
-				err = _("grouping operations are not allowed in DEFAULT expressions");
-
-			break;
 		case EXPR_KIND_INDEX_EXPRESSION:
 			if (isAgg)
 				err = _("aggregate functions are not allowed in index expressions");
@@ -413,23 +405,12 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 				err = _("grouping operations are not allowed in index predicates");
 
 			break;
-		case EXPR_KIND_STATS_EXPRESSION:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in statistics expressions");
-			else
-				err = _("grouping operations are not allowed in statistics expressions");
-
-			break;
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			if (isAgg)
 				err = _("aggregate functions are not allowed in transform expressions");
 			else
 				err = _("grouping operations are not allowed in transform expressions");
 
-			break;
-
-		case EXPR_KIND_CYCLE_MARK:
-			errkind = true;
 			break;
 
 			/*
