@@ -29,7 +29,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_namespace.h"
-#include "catalog/pg_shdepend.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -259,14 +258,11 @@ IsSharedRelation(Oid relationId)
 {
 	/* These are the shared catalogs (look for BKI_SHARED_RELATION) */
 	if (relationId == DatabaseRelationId ||
-		relationId == SharedDependRelationId ||
 		relationId == TableSpaceRelationId)
 		return true;
 	/* These are their indexes */
 	if (relationId == DatabaseNameIndexId ||
 		relationId == DatabaseOidIndexId ||
-		relationId == SharedDependDependerIndexId ||
-		relationId == SharedDependReferenceIndexId ||
 		relationId == TablespaceOidIndexId ||
 		relationId == TablespaceNameIndexId)
 		return true;

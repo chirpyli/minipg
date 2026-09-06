@@ -1203,13 +1203,6 @@ deleteOneObject(const ObjectAddress *object, Relation *depRel, int flags)
 
 	systable_endscan(scan);
 
-	/*
-	 * Delete shared dependency references related to this object.  Again, if
-	 * subId = 0, remove records for sub-objects too.
-	 */
-	deleteSharedDependencyRecordsFor(object->classId, object->objectId,
-									 object->objectSubId);
-
 
 	/*
 	 * CommandCounterIncrement here to ensure that preceding changes are all

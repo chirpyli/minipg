@@ -40,7 +40,6 @@
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
-#include "catalog/pg_shdepend.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
@@ -1116,7 +1115,6 @@ RelationInvalidatesSnapshotsOnly(Oid relid)
 	switch (relid)
 	{
 		case DependRelationId:
-		case SharedDependRelationId:
 			return true;
 		default:
 			break;

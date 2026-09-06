@@ -64,7 +64,6 @@ pg_operator|t
 pg_opfamily|t
 pg_proc|t
 pg_rewrite|t
-pg_shdepend|t
 pg_statistic|t
 pg_tablespace|t
 pg_type|t

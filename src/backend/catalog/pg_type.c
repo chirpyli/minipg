@@ -482,7 +482,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 	if (rebuild)
 	{
 		deleteDependencyRecordsFor(TypeRelationId, typeObjectId, true);
-		deleteSharedDependencyRecordsFor(TypeRelationId, typeObjectId, 0);
 	}
 
 	ObjectAddressSet(myself, TypeRelationId, typeObjectId);

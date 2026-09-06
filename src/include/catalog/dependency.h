@@ -38,46 +38,12 @@ typedef enum DependencyType
 	DEPENDENCY_PIN = 'p'
 } DependencyType;
 
-/*
- * There is also a SharedDependencyType enum type that determines the exact
- * semantics of an entry in pg_shdepend.  Just like regular dependency entries,
- * any pg_shdepend entry means that the referenced object cannot be dropped
- * unless the dependent object is dropped at the same time.  There are some
- * additional rules however:
- *
- * (a) For a SHARED_DEPENDENCY_PIN entry, there is no dependent object --
- * rather, the referenced object is an essential part of the system.  This
- * applies to the initdb-created superuser.  Entries of this type are only
- * created by initdb; objects in this category don't need further pg_shdepend
- * entries if more objects come to depend on them.
- *
- * (b) a SHARED_DEPENDENCY_OWNER entry means that the referenced object is
- * the role owning the dependent object.  The referenced object must be
- * a pg_authid entry.
- *
- * (c) a SHARED_DEPENDENCY_ACL entry means that the referenced object is
- * a role mentioned in the ACL field of the dependent object.  The referenced
- * object must be a pg_authid entry.  (SHARED_DEPENDENCY_ACL entries are not
- * created for the owner of an object; hence two objects may be linked by
- * one or the other, but not both, of these dependency types.)
- *
- * SHARED_DEPENDENCY_INVALID is a value used as a parameter in internal
- * routines, and is not valid in the catalog itself.
- */
-typedef enum SharedDependencyType
-{
-	SHARED_DEPENDENCY_PIN = 'p',
-	SHARED_DEPENDENCY_OWNER = 'o',
-	SHARED_DEPENDENCY_ACL = 'a',
-	SHARED_DEPENDENCY_INVALID = 0
-} SharedDependencyType;
-
 /* expansible list of ObjectAddresses (private in dependency.c) */
 typedef struct ObjectAddresses ObjectAddresses;
 
 /*
  * This enum covers all system catalogs whose OIDs can appear in
- * pg_depend.classId or pg_shdepend.classId.  Keep object_classes[] in sync.
+ * pg_depend.classId.  Keep object_classes[] in sync.
  */
 typedef enum ObjectClass
 {
@@ -197,25 +163,5 @@ extern Oid	getExtensionType(Oid extensionOid, const char *typname);
 extern Oid	get_index_constraint(Oid indexId);
 
 extern List *get_index_ref_constraints(Oid indexId);
-
-/* in pg_shdepend.c */
-
-extern void recordSharedDependencyOn(ObjectAddress *depender,
-									 ObjectAddress *referenced,
-									 SharedDependencyType deptype);
-
-extern void deleteSharedDependencyRecordsFor(Oid classId, Oid objectId,
-											 int32 objectSubId);
-
-extern bool checkSharedDependencies(Oid classId, Oid objectId,
-									char **detail_msg, char **detail_log_msg);
-
-extern void shdepLockAndCheckObject(Oid classId, Oid objectId);
-
-extern void copyTemplateDependencies(Oid templateDbId, Oid newDbId);
-
-extern void dropDatabaseDependencies(Oid databaseId);
-
-extern void shdepDropOwned(List *relids, DropBehavior behavior);
 
 #endif							/* DEPENDENCY_H */

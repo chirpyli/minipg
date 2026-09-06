@@ -467,13 +467,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 
 	CatalogTupleInsert(pg_database_rel, tuple);
 
-	/*
-	 * Now generate additional catalog entries associated with the new DB
-	 */
-
-	/* Create pg_shdepend entries for objects within database */
-	copyTemplateDependencies(src_dboid, dboid);
-
 	/* Post creation hook for new database */
 	InvokeObjectPostCreateHook(DatabaseRelationId, dboid, 0);
 
@@ -763,11 +756,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 				 errmsg("database \"%s\" is being accessed by other users",
 						dbname),
 				 errdetail_busy_db(notherbackends, npreparedxacts)));
-
-	/*
-	 * Remove shared dependency references for the database.
-	 */
-	dropDatabaseDependencies(db_id);
 
 	/*
 	 * Except for the deletion of the catalog row, subsequent actions are not

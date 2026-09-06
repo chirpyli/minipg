@@ -29,7 +29,6 @@ OBJS = \
 	pg_depend.o \
 	pg_namespace.o \
 	pg_operator.o \
-	pg_shdepend.o \
 	pg_type.o \
 	storage.o \
 	toasting.o
@@ -49,7 +48,6 @@ CATALOG_HEADERS := \
 	pg_rewrite.h \
 	pg_cast.h pg_namespace.h pg_conversion.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
-	pg_shdepend.h \
 	pg_extension.h \
 	pg_collation.h
 

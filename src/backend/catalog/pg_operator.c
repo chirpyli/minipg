@@ -776,7 +776,6 @@ makeOperatorDependencies(HeapTuple tuple,
 	if (isUpdate)
 	{
 		deleteDependencyRecordsFor(myself.classId, myself.objectId, true);
-		deleteSharedDependencyRecordsFor(myself.classId, myself.objectId, 0);
 	}
 
 	addrs = new_object_addresses();

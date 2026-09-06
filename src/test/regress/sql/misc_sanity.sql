@@ -23,19 +23,6 @@ WHERE refclassid = 0 OR refobjid = 0 OR
       (deptype != 'p' AND (classid = 0 OR objid = 0)) OR
       (deptype = 'p' AND (classid != 0 OR objid != 0 OR objsubid != 0));
 
--- **************** pg_shdepend ****************
-
--- Look for illegal values in pg_shdepend fields.
--- classid/objid can be zero, but only in 'p' entries
-
-SELECT *
-FROM pg_shdepend as d1
-WHERE refclassid = 0 OR refobjid = 0 OR
-      deptype NOT IN ('a', 'o', 'p', 'r') OR
-      (deptype != 'p' AND (classid = 0 OR objid = 0)) OR
-      (deptype = 'p' AND (dbid != 0 OR classid != 0 OR objid != 0 OR objsubid != 0));
-
-
 -- Check each OID-containing system catalog to see if its lowest-numbered OID
 -- is pinned.  If not, and if that OID was generated during initdb, then
 -- perhaps initdb forgot to scan that catalog for pinnable entries.
@@ -72,7 +59,7 @@ ORDER BY 1, 2;
 -- system catalogs without primary keys
 --
 -- Current exceptions:
--- * pg_depend, pg_shdepend don't have a unique key
+-- * pg_depend doesn't have a unique key
 SELECT relname
 FROM pg_class
 WHERE relnamespace = 'pg_catalog'::regnamespace AND relkind = 'r'

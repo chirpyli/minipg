@@ -1088,8 +1088,6 @@ setup_depend(FILE *cmdfd)
 		 */
 		"DELETE FROM pg_depend;\n\n",
 		"VACUUM pg_depend;\n\n",
-		"DELETE FROM pg_shdepend;\n\n",
-		"VACUUM pg_shdepend;\n\n",
 
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_class;\n\n",
