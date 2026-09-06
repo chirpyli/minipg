@@ -427,20 +427,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 				err = _("grouping operations are not allowed in transform expressions");
 
 			break;
-		case EXPR_KIND_EXECUTE_PARAMETER:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in EXECUTE parameters");
-			else
-				err = _("grouping operations are not allowed in EXECUTE parameters");
-
-			break;
-		case EXPR_KIND_COPY_WHERE:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in COPY FROM WHERE conditions");
-			else
-				err = _("grouping operations are not allowed in COPY FROM WHERE conditions");
-
-			break;
 
 		case EXPR_KIND_CYCLE_MARK:
 			errkind = true;

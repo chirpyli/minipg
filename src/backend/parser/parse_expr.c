@@ -443,8 +443,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_INDEX_PREDICATE:
 		case EXPR_KIND_STATS_EXPRESSION:
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
-		case EXPR_KIND_EXECUTE_PARAMETER:
-		case EXPR_KIND_COPY_WHERE:
 		case EXPR_KIND_CYCLE_MARK:
 			/* okay */
 			break;
@@ -1462,12 +1460,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			err = _("cannot use subquery in transform expression");
 			break;
-		case EXPR_KIND_EXECUTE_PARAMETER:
-			err = _("cannot use subquery in EXECUTE parameter");
-			break;
-		case EXPR_KIND_COPY_WHERE:
-			err = _("cannot use subquery in COPY FROM WHERE condition");
-			break;
 
 			/*
 			 * There is intentionally no default: case here, so that the
@@ -2174,10 +2166,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "statistics expression";
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			return "USING";
-		case EXPR_KIND_EXECUTE_PARAMETER:
-			return "EXECUTE";
-		case EXPR_KIND_COPY_WHERE:
-			return "WHERE";
 		case EXPR_KIND_CYCLE_MARK:
 			return "CYCLE";
 

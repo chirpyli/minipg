@@ -62,8 +62,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_INDEX_PREDICATE,	/* index predicate */
 	EXPR_KIND_STATS_EXPRESSION, /* extended statistics expression */
 	EXPR_KIND_ALTER_COL_TRANSFORM,	/* transform expr in ALTER COLUMN TYPE */
-	EXPR_KIND_EXECUTE_PARAMETER,	/* parameter value in EXECUTE */
-	EXPR_KIND_COPY_WHERE,		/* WHERE condition in COPY FROM */
 	EXPR_KIND_CYCLE_MARK,		/* cycle mark value */
 } ParseExprKind;
 

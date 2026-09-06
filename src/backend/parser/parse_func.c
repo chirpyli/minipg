@@ -2017,12 +2017,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 		case EXPR_KIND_ALTER_COL_TRANSFORM:
 			err = _("set-returning functions are not allowed in transform expressions");
 			break;
-		case EXPR_KIND_EXECUTE_PARAMETER:
-			err = _("set-returning functions are not allowed in EXECUTE parameters");
-			break;
-		case EXPR_KIND_COPY_WHERE:
-			err = _("set-returning functions are not allowed in COPY FROM WHERE conditions");
-			break;
 		case EXPR_KIND_CYCLE_MARK:
 			errkind = true;
 			break;
