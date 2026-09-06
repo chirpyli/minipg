@@ -477,7 +477,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 
 	memset(options, 0, sizeof *options);
 
-	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:hlL:no:p:P:qR:sStU:v:VxXz?01",
+	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:h:lL:no:p:P:qR:sStU:v:VxXz?01",
 							long_options, &optindex)) != -1)
 	{
 		switch (c)

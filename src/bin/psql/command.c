@@ -36,15 +36,6 @@
 #include "settings.h"
 #include "variables.h"
 
-/*
- * Editable database object types.
- */
-typedef enum EditableObjectType
-{
-	EditableFunction,
-	EditableView
-} EditableObjectType;
-
 /* local function declarations */
 static backslashResult exec_command(const char *cmd,
 									PsqlScanState scan_state,
@@ -65,8 +56,8 @@ static bool exec_command_dfo(PsqlScanState scan_state, const char *cmd,
 							 bool show_verbose, bool show_system);
 static backslashResult exec_command_edit(PsqlScanState scan_state, bool active_branch,
 										 PQExpBuffer query_buf, PQExpBuffer previous_buf);
-static backslashResult exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
-										  PQExpBuffer query_buf, bool is_func);
+static backslashResult exec_command_ev(PsqlScanState scan_state, bool active_branch,
+									   PQExpBuffer query_buf);
 static backslashResult exec_command_echo(PsqlScanState scan_state, bool active_branch,
 										 const char *cmd);
 static backslashResult exec_command_elif(PsqlScanState scan_state, ConditionalStack cstack,
@@ -108,8 +99,8 @@ static backslashResult exec_command_s(PsqlScanState scan_state, bool active_bran
 static backslashResult exec_command_set(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_setenv(PsqlScanState scan_state, bool active_branch,
 										   const char *cmd);
-static backslashResult exec_command_sf_sv(PsqlScanState scan_state, bool active_branch,
-										  const char *cmd, bool is_func);
+static backslashResult exec_command_sv(PsqlScanState scan_state, bool active_branch,
+									   const char *cmd);
 static backslashResult exec_command_t(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_timing(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_unrestrict(PsqlScanState scan_state, bool active_branch,
@@ -143,13 +134,11 @@ static bool do_edit(const char *filename_arg, PQExpBuffer query_buf,
 					int lineno, bool discard_on_quit, bool *edited);
 static bool do_shell(const char *command);
 static bool do_watch(PQExpBuffer query_buf, double sleep);
-static bool lookup_object_oid(EditableObjectType obj_type, const char *desc,
-							  Oid *obj_oid);
-static bool get_create_object_cmd(EditableObjectType obj_type, Oid oid,
-								  PQExpBuffer buf);
+static bool lookup_object_oid(const char *desc, Oid *obj_oid);
+static bool get_create_object_cmd(Oid oid, PQExpBuffer buf);
 static int	strip_lineno_from_objdesc(char *obj);
 static int	count_lines_in_buf(PQExpBuffer buf);
-static void print_with_linenumbers(FILE *output, char *lines, bool is_func);
+static void print_with_linenumbers(FILE *output, char *lines);
 static void minimal_error_message(PGresult *res);
 
 static bool printPsetInfo(const char *param, printQueryOpt *popt);
@@ -311,10 +300,8 @@ exec_command(const char *cmd,
 	else if (strcmp(cmd, "e") == 0 || strcmp(cmd, "edit") == 0)
 		status = exec_command_edit(scan_state, active_branch,
 								   query_buf, previous_buf);
-	else if (strcmp(cmd, "ef") == 0)
-		status = exec_command_ef_ev(scan_state, active_branch, query_buf, true);
 	else if (strcmp(cmd, "ev") == 0)
-		status = exec_command_ef_ev(scan_state, active_branch, query_buf, false);
+		status = exec_command_ev(scan_state, active_branch, query_buf);
 	else if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "qecho") == 0 ||
 			 strcmp(cmd, "warn") == 0)
 		status = exec_command_echo(scan_state, active_branch, cmd);
@@ -367,10 +354,8 @@ exec_command(const char *cmd,
 		status = exec_command_set(scan_state, active_branch);
 	else if (strcmp(cmd, "setenv") == 0)
 		status = exec_command_setenv(scan_state, active_branch, cmd);
-	else if (strcmp(cmd, "sf") == 0 || strcmp(cmd, "sf+") == 0)
-		status = exec_command_sf_sv(scan_state, active_branch, cmd, true);
 	else if (strcmp(cmd, "sv") == 0 || strcmp(cmd, "sv+") == 0)
-		status = exec_command_sf_sv(scan_state, active_branch, cmd, false);
+		status = exec_command_sv(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "t") == 0)
 		status = exec_command_t(scan_state, active_branch);
 	else if (strcmp(cmd, "timing") == 0)
@@ -911,12 +896,12 @@ exec_command_edit(PsqlScanState scan_state, bool active_branch,
 }
 
 /*
- * \ef/\ev -- edit the named function/view, or
- * present a blank CREATE FUNCTION/VIEW template if no argument is given
+ * \ev -- edit the named view, or
+ * present a blank CREATE VIEW template if no argument is given
  */
 static backslashResult
-exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
-				   PQExpBuffer query_buf, bool is_func)
+exec_command_ev(PsqlScanState scan_state, bool active_branch,
+				PQExpBuffer query_buf)
 {
 	backslashResult status = PSQL_CMD_SKIP_LINE;
 
@@ -935,7 +920,6 @@ exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
 		else
 		{
 			Oid			obj_oid = InvalidOid;
-			EditableObjectType eot = is_func ? EditableFunction : EditableView;
 
 			lineno = strip_lineno_from_objdesc(obj_desc);
 			if (lineno == 0)
@@ -947,56 +931,20 @@ exec_command_ef_ev(PsqlScanState scan_state, bool active_branch,
 			{
 				/* set up an empty command to fill in */
 				resetPQExpBuffer(query_buf);
-				if (is_func)
-					appendPQExpBufferStr(query_buf,
-										 "CREATE FUNCTION ( )\n"
-										 " RETURNS \n"
-										 " LANGUAGE \n"
-										 " -- common options:  IMMUTABLE  STABLE  STRICT  SECURITY DEFINER\n"
-										 "AS $function$\n"
-										 "\n$function$\n");
-				else
-					appendPQExpBufferStr(query_buf,
-										 "CREATE VIEW  AS\n"
-										 " SELECT \n"
-										 "  -- something...\n");
+				appendPQExpBufferStr(query_buf,
+									 "CREATE VIEW  AS\n"
+									 " SELECT \n"
+									 "  -- something...\n");
 			}
-			else if (!lookup_object_oid(eot, obj_desc, &obj_oid))
+			else if (!lookup_object_oid(obj_desc, &obj_oid))
 			{
 				/* error already reported */
 				status = PSQL_CMD_ERROR;
 			}
-			else if (!get_create_object_cmd(eot, obj_oid, query_buf))
+			else if (!get_create_object_cmd(obj_oid, query_buf))
 			{
 				/* error already reported */
 				status = PSQL_CMD_ERROR;
-			}
-			else if (is_func && lineno > 0)
-			{
-				/*
-				 * lineno "1" should correspond to the first line of the
-				 * function body.  We expect that pg_get_functiondef() will
-				 * emit that on a line beginning with "AS ", "BEGIN ", or
-				 * "RETURN ", and that there can be no such line before the
-				 * real start of the function body.  Increment lineno by the
-				 * number of lines before that line, so that it becomes
-				 * relative to the first line of the function definition.
-				 */
-				const char *lines = query_buf->data;
-
-				while (*lines != '\0')
-				{
-					if (strncmp(lines, "AS ", 3) == 0 ||
-						strncmp(lines, "BEGIN ", 6) == 0 ||
-						strncmp(lines, "RETURN ", 7) == 0)
-						break;
-					lineno++;
-					/* find start of next line */
-					lines = strchr(lines, '\n');
-					if (!lines)
-						break;
-					lines++;
-				}
 			}
 		}
 
@@ -2017,11 +1965,11 @@ exec_command_setenv(PsqlScanState scan_state, bool active_branch,
 }
 
 /*
- * \sf/\sv -- show a function/view's source code
+ * \sv -- show a view's source code
  */
 static backslashResult
-exec_command_sf_sv(PsqlScanState scan_state, bool active_branch,
-				   const char *cmd, bool is_func)
+exec_command_sv(PsqlScanState scan_state, bool active_branch,
+				const char *cmd)
 {
 	backslashResult status = PSQL_CMD_SKIP_LINE;
 
@@ -2031,39 +1979,21 @@ exec_command_sf_sv(PsqlScanState scan_state, bool active_branch,
 		PQExpBuffer buf;
 		char	   *obj_desc;
 		Oid			obj_oid = InvalidOid;
-		EditableObjectType eot = is_func ? EditableFunction : EditableView;
 
 		buf = createPQExpBuffer();
 		obj_desc = psql_scan_slash_option(scan_state,
 										  OT_WHOLE_LINE, NULL, true);
-		if (pset.sversion < (is_func ? 80400 : 70400))
+		if (!obj_desc)
 		{
-			char		sverbuf[32];
-
-			formatPGVersionNumber(pset.sversion, false,
-								  sverbuf, sizeof(sverbuf));
-			if (is_func)
-				pg_log_error("The server (version %s) does not support showing function source.",
-							 sverbuf);
-			else
-				pg_log_error("The server (version %s) does not support showing view definitions.",
-							 sverbuf);
+			pg_log_error("view name is required");
 			status = PSQL_CMD_ERROR;
 		}
-		else if (!obj_desc)
-		{
-			if (is_func)
-				pg_log_error("function name is required");
-			else
-				pg_log_error("view name is required");
-			status = PSQL_CMD_ERROR;
-		}
-		else if (!lookup_object_oid(eot, obj_desc, &obj_oid))
+		else if (!lookup_object_oid(obj_desc, &obj_oid))
 		{
 			/* error already reported */
 			status = PSQL_CMD_ERROR;
 		}
-		else if (!get_create_object_cmd(eot, obj_oid, buf))
+		else if (!get_create_object_cmd(obj_oid, buf))
 		{
 			/* error already reported */
 			status = PSQL_CMD_ERROR;
@@ -2092,7 +2022,7 @@ exec_command_sf_sv(PsqlScanState scan_state, bool active_branch,
 			if (show_linenumbers)
 			{
 				/* add line numbers */
-				print_with_linenumbers(output, buf->data, is_func);
+				print_with_linenumbers(output, buf->data);
 			}
 			else
 			{
@@ -4473,40 +4403,20 @@ echo_hidden_command(const char *query)
  * object description; unfortunately it can be hard to tell the difference.
  */
 static bool
-lookup_object_oid(EditableObjectType obj_type, const char *desc,
-				  Oid *obj_oid)
+lookup_object_oid(const char *desc, Oid *obj_oid)
 {
 	bool		result = true;
 	PQExpBuffer query = createPQExpBuffer();
 	PGresult   *res;
 
-	switch (obj_type)
-	{
-		case EditableFunction:
-
-			/*
-			 * We have a function description, e.g. "x" or "x(int)".  Issue a
-			 * query to retrieve the function's OID using a cast to regproc or
-			 * regprocedure (as appropriate).
-			 */
-			appendPQExpBufferStr(query, "SELECT ");
-			appendStringLiteralConn(query, desc, pset.db);
-			appendPQExpBuffer(query, "::pg_catalog.%s::pg_catalog.oid",
-							  strchr(desc, '(') ? "regprocedure" : "regproc");
-			break;
-
-		case EditableView:
-
-			/*
-			 * Convert view name (possibly schema-qualified) to OID.  Note:
-			 * this code doesn't check if the relation is actually a view.
-			 * We'll detect that in get_create_object_cmd().
-			 */
-			appendPQExpBufferStr(query, "SELECT ");
-			appendStringLiteralConn(query, desc, pset.db);
-			appendPQExpBufferStr(query, "::pg_catalog.regclass::pg_catalog.oid");
-			break;
-	}
+	/*
+	 * Convert view name (possibly schema-qualified) to OID.  Note: this code
+	 * doesn't check if the relation is actually a view.  We'll detect that in
+	 * get_create_object_cmd().
+	 */
+	appendPQExpBufferStr(query, "SELECT ");
+	appendStringLiteralConn(query, desc, pset.db);
+	appendPQExpBufferStr(query, "::pg_catalog.regclass::pg_catalog.oid");
 
 	if (!echo_hidden_command(query->data))
 	{
@@ -4533,47 +4443,26 @@ lookup_object_oid(EditableObjectType obj_type, const char *desc,
  * database object.  If successful, the result is stored in buf.
  */
 static bool
-get_create_object_cmd(EditableObjectType obj_type, Oid oid,
-					  PQExpBuffer buf)
+get_create_object_cmd(Oid oid, PQExpBuffer buf)
 {
 	bool		result = true;
 	PQExpBuffer query = createPQExpBuffer();
 	PGresult   *res;
 
-	switch (obj_type)
-	{
-		case EditableFunction:
-			printfPQExpBuffer(query,
-							  "SELECT pg_catalog.pg_get_functiondef(%u)",
-							  oid);
-			break;
-
-		case EditableView:
-
-			/*
-			 * pg_get_viewdef() just prints the query, so we must prepend
-			 * CREATE for ourselves.  We must fully qualify the view name to
-			 * ensure the right view gets replaced.  Also, check relation kind
-			 * to be sure it's a view.
-			 *
-			 * Starting with 9.2, views may have reloptions (security_barrier)
-			 * and from 9.4 onwards they may also have WITH [LOCAL|CASCADED]
-			 * CHECK OPTION.  These are not part of the view definition
-			 * returned by pg_get_viewdef() and so need to be retrieved
-			 * separately.  Materialized views (introduced in 9.3) may have
-			 * arbitrary storage parameter reloptions.
-			 *
-			 * reloptions have been removed.
-			 */
-			printfPQExpBuffer(query,
-							  "SELECT nspname, relname, relkind, "
-							  "pg_catalog.pg_get_viewdef(c.oid, true) "
-							  "FROM pg_catalog.pg_class c "
-							  "LEFT JOIN pg_catalog.pg_namespace n "
-							  "ON c.relnamespace = n.oid WHERE c.oid = %u",
-							  oid);
-			break;
-	}
+	/*
+	 * pg_get_viewdef() just prints the query, so we must prepend CREATE for
+	 * ourselves.  We must fully qualify the view name to ensure the right
+	 * view gets replaced.  Also, check relation kind to be sure it's a view.
+	 *
+	 * reloptions have been removed.
+	 */
+	printfPQExpBuffer(query,
+					  "SELECT nspname, relname, relkind, "
+					  "pg_catalog.pg_get_viewdef(c.oid, true) "
+					  "FROM pg_catalog.pg_class c "
+					  "LEFT JOIN pg_catalog.pg_namespace n "
+					  "ON c.relnamespace = n.oid WHERE c.oid = %u",
+					  oid);
 
 	if (!echo_hidden_command(query->data))
 	{
@@ -4584,41 +4473,32 @@ get_create_object_cmd(EditableObjectType obj_type, Oid oid,
 	if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) == 1)
 	{
 		resetPQExpBuffer(buf);
-		switch (obj_type)
 		{
-			case EditableFunction:
-				appendPQExpBufferStr(buf, PQgetvalue(res, 0, 0));
-				break;
+			char	   *nspname = PQgetvalue(res, 0, 0);
+			char	   *relname = PQgetvalue(res, 0, 1);
+			char	   *relkind = PQgetvalue(res, 0, 2);
+			char	   *viewdef = PQgetvalue(res, 0, 3);
 
-			case EditableView:
-				{
-					char	   *nspname = PQgetvalue(res, 0, 0);
-					char	   *relname = PQgetvalue(res, 0, 1);
-					char	   *relkind = PQgetvalue(res, 0, 2);
-					char	   *viewdef = PQgetvalue(res, 0, 3);
+			switch (relkind[0])
+			{
+				case RELKIND_VIEW:
+					appendPQExpBufferStr(buf, "CREATE OR REPLACE VIEW ");
+					break;
+				default:
+					pg_log_error("\"%s.%s\" is not a view",
+								 nspname, relname);
+					result = false;
+					break;
+			}
+			appendPQExpBuffer(buf, "%s.", fmtId(nspname));
+			appendPQExpBufferStr(buf, fmtId(relname));
 
-					switch (relkind[0])
-					{
-						case RELKIND_VIEW:
-							appendPQExpBufferStr(buf, "CREATE OR REPLACE VIEW ");
-							break;
-						default:
-							pg_log_error("\"%s.%s\" is not a view",
-										 nspname, relname);
-							result = false;
-							break;
-					}
-					appendPQExpBuffer(buf, "%s.", fmtId(nspname));
-					appendPQExpBufferStr(buf, fmtId(relname));
+			/* View definition from pg_get_viewdef (a SELECT query) */
+			appendPQExpBuffer(buf, " AS\n%s", viewdef);
 
-					/* View definition from pg_get_viewdef (a SELECT query) */
-					appendPQExpBuffer(buf, " AS\n%s", viewdef);
-
-					/* Get rid of the semicolon that pg_get_viewdef appends */
-					if (buf->len > 0 && buf->data[buf->len - 1] == ';')
-						buf->data[--(buf->len)] = '\0';
-				}
-				break;
+			/* Get rid of the semicolon that pg_get_viewdef appends */
+			if (buf->len > 0 && buf->data[buf->len - 1] == ';')
+				buf->data[--(buf->len)] = '\0';
 		}
 		/* Make sure result ends with a newline */
 		if (buf->len > 0 && buf->data[buf->len - 1] != '\n')
@@ -4637,10 +4517,10 @@ get_create_object_cmd(EditableObjectType obj_type, Oid oid,
 }
 
 /*
- * If the given argument of \ef or \ev ends with a line number, delete the line
+ * If the given argument of \ev ends with a line number, delete the line
  * number from the argument string and return it as an integer.  (We need
- * this kluge because we're too lazy to parse \ef's function or \ev's view
- * argument carefully --- we just slop it up in OT_WHOLE_LINE mode.)
+ * this kluge because we're too lazy to parse \ev's view argument carefully
+ * --- we just slop it up in OT_WHOLE_LINE mode.)
  *
  * Returns -1 if no line number is present, 0 on error, or a positive value
  * on success.
@@ -4725,44 +4605,26 @@ count_lines_in_buf(PQExpBuffer buf)
 /*
  * Write text at *lines to output with line numbers.
  *
- * For functions, lineno "1" should correspond to the first line of the
- * function body; lines before that are unnumbered.  We expect that
- * pg_get_functiondef() will emit that on a line beginning with "AS ",
- * "BEGIN ", or "RETURN ", and that there can be no such line before
- * the real start of the function body.
- *
  * Caution: this scribbles on *lines.
  */
 static void
-print_with_linenumbers(FILE *output, char *lines, bool is_func)
+print_with_linenumbers(FILE *output, char *lines)
 {
-	bool		in_header = is_func;
 	int			lineno = 0;
 
 	while (*lines != '\0')
 	{
 		char	   *eol;
 
-		if (in_header &&
-			(strncmp(lines, "AS ", 3) == 0 ||
-			 strncmp(lines, "BEGIN ", 6) == 0 ||
-			 strncmp(lines, "RETURN ", 7) == 0))
-			in_header = false;
-
-		/* increment lineno only for body's lines */
-		if (!in_header)
-			lineno++;
+		lineno++;
 
 		/* find and mark end of current line */
 		eol = strchr(lines, '\n');
 		if (eol != NULL)
 			*eol = '\0';
 
-		/* show current line as appropriate */
-		if (in_header)
-			fprintf(output, "        %s\n", lines);
-		else
-			fprintf(output, "%-7d %s\n", lineno, lines);
+		/* show current line with its line number */
+		fprintf(output, "%-7d %s\n", lineno, lines);
 
 		/* advance to next line, if any */
 		if (eol == NULL)

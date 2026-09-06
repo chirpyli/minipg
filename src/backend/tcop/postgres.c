@@ -151,7 +151,6 @@ static int	InteractiveBackend(StringInfo inBuf);
 static int	interactive_getc(void);
 static int	SocketBackend(StringInfo inBuf);
 static int	ReadCommand(StringInfo inBuf);
-static bool check_log_statement(List *stmt_list);
 static int	errdetail_abort(void);
 static int	errdetail_recovery_conflict(void);
 static void start_xact_command(void);

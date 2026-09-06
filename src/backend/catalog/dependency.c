@@ -1230,6 +1230,9 @@ doDeletion(const ObjectAddress *object, int flags)
 {
 	switch (getObjectClass(object))
 	{
+		case OCLASS_CONVERSION:
+			break;
+
 		case OCLASS_CLASS:
 			{
 				char		relKind = get_rel_relkind(object->objectId);

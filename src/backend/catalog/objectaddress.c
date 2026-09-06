@@ -1679,6 +1679,9 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 
 	switch (getObjectClass(object))
 	{
+		case OCLASS_CONVERSION:
+			break;
+
 		case OCLASS_CLASS:
 			if (object->objectSubId == 0)
 				getRelationDescription(&buffer, object->objectId, missing_ok);
@@ -2536,6 +2539,9 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 	switch (getObjectClass(object))
 	{
+		case OCLASS_CONVERSION:
+			break;
+
 		case OCLASS_CLASS:
 			getRelationTypeDescription(&buffer, object->objectId,
 									   object->objectSubId,
@@ -2790,6 +2796,9 @@ getObjectIdentityParts(const ObjectAddress *object,
 
 	switch (getObjectClass(object))
 	{
+		case OCLASS_CONVERSION:
+			break;
+
 		case OCLASS_CLASS:
 			{
 				char	   *attr = NULL;

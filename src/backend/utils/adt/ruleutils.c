@@ -328,16 +328,11 @@ static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 static char *pg_get_ruledef_worker(Oid ruleoid, int prettyFlags);
 static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
 									bool attrsOnly, bool keysOnly,
-									bool showTblSpc, bool inherits,
+									bool showTblSpc,
 									int prettyFlags, bool missing_ok);
 static char *pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 										 int prettyFlags, bool missing_ok);
 static text *pg_get_expr_worker(text *expr, Oid relid, int prettyFlags);
-static int	print_function_arguments(StringInfo buf, HeapTuple proctup,
-									 bool print_table_args, bool print_defaults);
-static void print_function_rettype(StringInfo buf, HeapTuple proctup);
-static void print_function_trftypes(StringInfo buf, HeapTuple proctup);
-static void print_function_sqlbody(StringInfo buf, HeapTuple proctup);
 static void set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 							 Bitmapset *rels_used);
 static void set_deparse_for_query(deparse_namespace *dpns, Query *query,
@@ -387,7 +382,6 @@ static void get_update_query_targetlist_def(Query *query, List *targetList,
 											RangeTblEntry *rte);
 static void get_delete_query_def(Query *query, deparse_context *context,
 								 bool colNamesVisible);
-static void get_utility_query_def(Query *query, deparse_context *context);
 static void get_basic_select_query(Query *query, deparse_context *context,
 								   TupleDesc resultDesc, bool colNamesVisible);
 static void get_target_list(List *targetList, deparse_context *context,
@@ -465,12 +459,6 @@ static char *generate_function_name(Oid funcid, int nargs,
 static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static void add_cast_to(StringInfo buf, Oid typid);
 static text *string_to_text(char *str);
-
-/*
- * minipg 已删除表继承（INHERITS）：RangeTblEntry 不再有 inh 标志，任何查询
- * 都不存在"是否包含子表"的区别，因此不再输出 ONLY 关键字。
- */
-#define only_marker(rte)  ""
 
 
 /* ----------
@@ -812,7 +800,7 @@ pg_get_indexdef(PG_FUNCTION_ARGS)
 
 	res = pg_get_indexdef_worker(indexrelid, 0,
 								 false, false,
-								 false, false,
+								 false,
 								 prettyFlags, true);
 
 	if (res == NULL)
@@ -834,7 +822,7 @@ pg_get_indexdef_ext(PG_FUNCTION_ARGS)
 
 	res = pg_get_indexdef_worker(indexrelid, colno,
 								 colno != 0, false,
-								 false, false,
+								 false,
 								 prettyFlags, true);
 
 	if (res == NULL)
@@ -853,7 +841,7 @@ pg_get_indexdef_string(Oid indexrelid)
 {
 	return pg_get_indexdef_worker(indexrelid, 0,
 								  false, false,
-								  true, true,
+								  true,
 								  0, false);
 }
 
@@ -867,23 +855,7 @@ pg_get_indexdef_columns(Oid indexrelid, bool pretty)
 
 	return pg_get_indexdef_worker(indexrelid, 0,
 								  true, true,
-								  false, false,
-								  prettyFlags, false);
-}
-
-/* Internal version, extensible with flags to control its behavior */
-char *
-pg_get_indexdef_columns_extended(Oid indexrelid, bits16 flags)
-{
-	bool		pretty = ((flags & RULE_INDEXDEF_PRETTY) != 0);
-	bool		keys_only = ((flags & RULE_INDEXDEF_KEYS_ONLY) != 0);
-	int			prettyFlags;
-
-	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
-
-	return pg_get_indexdef_worker(indexrelid, 0,
-								  true, keys_only,
-								  false, false,
+								  false,
 								  prettyFlags, false);
 }
 
@@ -894,7 +866,7 @@ pg_get_indexdef_columns_extended(Oid indexrelid, bits16 flags)
 static char *
 pg_get_indexdef_worker(Oid indexrelid, int colno,
 					   bool attrsOnly, bool keysOnly,
-					   bool showTblSpc, bool inherits,
+					   bool showTblSpc,
 					   int prettyFlags, bool missing_ok)
 {
 	HeapTuple	ht_idx;
@@ -1506,742 +1478,6 @@ pg_get_expr_worker(text *expr, Oid relid, int prettyFlags)
 		relation_close(rel, AccessShareLock);
 
 	return string_to_text(str);
-}
-
-
-/* ----------
- * pg_get_userbyid		- Get a user name by roleid and
- *				  fallback to 'unknown (OID=n)'
- * ----------
- */
-Datum
-pg_get_userbyid(PG_FUNCTION_ARGS)
-{
-	Name		result;
-
-	/*
-	 * Allocate space for the result
-	 */
-	result = (Name) palloc(NAMEDATALEN);
-	memset(NameStr(*result), 0, NAMEDATALEN);
-
-	/*
-	 * minipg 没有用户/角色概念，所有对象 owner 均为唯一的超级用户 "postgres"。
-	 */
-	strncpy(NameStr(*result), "postgres", NAMEDATALEN - 1);
-
-	PG_RETURN_NAME(result);
-}
-
-
-/*
- * pg_get_functiondef
- *		Returns the complete "CREATE OR REPLACE FUNCTION ..." statement for
- *		the specified function.
- *
- * Note: if you change the output format of this function, be careful not
- * to break psql's rules (in \ef and \sf) for identifying the start of the
- * function body.  To wit: the function body starts on a line that begins with
- * "AS ", "BEGIN ", or "RETURN ", and no preceding line will look like that.
- */
-Datum
-pg_get_functiondef(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	StringInfoData buf;
-	StringInfoData dq;
-	HeapTuple	proctup;
-	Form_pg_proc proc;
-	bool		isfunction;
-	Datum		tmp;
-	bool		isnull;
-	const char *prosrc;
-	const char *name;
-	const char *nsp;
-	float4		procost;
-	int			oldlen;
-
-	initStringInfo(&buf);
-
-	/* Look up the function */
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	proc = (Form_pg_proc) GETSTRUCT(proctup);
-	name = NameStr(proc->proname);
-
-	if (proc->prokind == PROKIND_AGGREGATE)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is an aggregate function", name)));
-
-	isfunction = (proc->prokind != PROKIND_PROCEDURE);
-
-	/*
-	 * We always qualify the function name, to ensure the right function gets
-	 * replaced.
-	 */
-	nsp = get_namespace_name(proc->pronamespace);
-	appendStringInfo(&buf, "CREATE OR REPLACE %s %s(",
-					 isfunction ? "FUNCTION" : "PROCEDURE",
-					 quote_qualified_identifier(nsp, name));
-	(void) print_function_arguments(&buf, proctup, false, true);
-	appendStringInfoString(&buf, ")\n");
-	if (isfunction)
-	{
-		appendStringInfoString(&buf, " RETURNS ");
-		print_function_rettype(&buf, proctup);
-		appendStringInfoChar(&buf, '\n');
-	}
-
-	print_function_trftypes(&buf, proctup);
-
-	appendStringInfo(&buf, " LANGUAGE %s\n",
-					 quote_identifier(get_language_name(proc->prolang, false)));
-
-	/* Emit some miscellaneous options on one line */
-	oldlen = buf.len;
-
-	if (proc->prokind == PROKIND_WINDOW)
-		appendStringInfoString(&buf, " WINDOW");
-	switch (proc->provolatile)
-	{
-		case PROVOLATILE_IMMUTABLE:
-			appendStringInfoString(&buf, " IMMUTABLE");
-			break;
-		case PROVOLATILE_STABLE:
-			appendStringInfoString(&buf, " STABLE");
-			break;
-		case PROVOLATILE_VOLATILE:
-			break;
-	}
-
-	switch (proc->proparallel)
-	{
-		case PROPARALLEL_SAFE:
-			appendStringInfoString(&buf, " PARALLEL SAFE");
-			break;
-		case PROPARALLEL_RESTRICTED:
-			appendStringInfoString(&buf, " PARALLEL RESTRICTED");
-			break;
-		case PROPARALLEL_UNSAFE:
-			break;
-	}
-
-	if (proc->proisstrict)
-		appendStringInfoString(&buf, " STRICT");
-	if (proc->prosecdef)
-		appendStringInfoString(&buf, " SECURITY DEFINER");
-	if (proc->proleakproof)
-		appendStringInfoString(&buf, " LEAKPROOF");
-
-	/* This code for the default cost and rows should match functioncmds.c */
-	if (proc->prolang == INTERNALlanguageId ||
-		proc->prolang == ClanguageId)
-		procost = 1;
-	else
-		procost = 100;
-	if (proc->procost != procost)
-		appendStringInfo(&buf, " COST %g", proc->procost);
-
-	if (proc->prorows > 0 && proc->prorows != 1000)
-		appendStringInfo(&buf, " ROWS %g", proc->prorows);
-
-	if (proc->prosupport)
-	{
-		Oid			argtypes[1];
-
-		/*
-		 * We should qualify the support function's name if it wouldn't be
-		 * resolved by lookup in the current search path.
-		 */
-		argtypes[0] = INTERNALOID;
-		appendStringInfo(&buf, " SUPPORT %s",
-						 generate_function_name(proc->prosupport, 1,
-												NIL, argtypes,
-												false, NULL, EXPR_KIND_NONE));
-	}
-
-	if (oldlen != buf.len)
-		appendStringInfoChar(&buf, '\n');
-
-	/* Emit any proconfig options, one per line */
-	tmp = SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_proconfig, &isnull);
-	if (!isnull)
-	{
-		ArrayType  *a = DatumGetArrayTypeP(tmp);
-		int			i;
-
-		Assert(ARR_ELEMTYPE(a) == TEXTOID);
-		Assert(ARR_NDIM(a) == 1);
-		Assert(ARR_LBOUND(a)[0] == 1);
-
-		for (i = 1; i <= ARR_DIMS(a)[0]; i++)
-		{
-			Datum		d;
-
-			d = array_ref(a, 1, &i,
-						  -1 /* varlenarray */ ,
-						  -1 /* TEXT's typlen */ ,
-						  false /* TEXT's typbyval */ ,
-						  TYPALIGN_INT /* TEXT's typalign */ ,
-						  &isnull);
-			if (!isnull)
-			{
-				char	   *configitem = TextDatumGetCString(d);
-				char	   *pos;
-
-				pos = strchr(configitem, '=');
-				if (pos == NULL)
-					continue;
-				*pos++ = '\0';
-
-				appendStringInfo(&buf, " SET %s TO ",
-								 quote_identifier(configitem));
-
-				/*
-				 * Variables that are marked GUC_LIST_QUOTE were already fully
-				 * quoted by flatten_set_variable_args() before they were put
-				 * into the proconfig array.  However, because the quoting
-				 * rules used there aren't exactly like SQL's, we have to
-				 * break the list value apart and then quote the elements as
-				 * string literals.  (The elements may be double-quoted as-is,
-				 * but we can't just feed them to the SQL parser; it would do
-				 * the wrong thing with elements that are zero-length or
-				 * longer than NAMEDATALEN.)
-				 *
-				 * Variables that are not so marked should just be emitted as
-				 * simple string literals.  If the variable is not known to
-				 * guc.c, we'll do that; this makes it unsafe to use
-				 * GUC_LIST_QUOTE for extension variables.
-				 */
-				if (GetConfigOptionFlags(configitem, true) & GUC_LIST_QUOTE)
-				{
-					List	   *namelist;
-					ListCell   *lc;
-
-					/* Parse string into list of identifiers */
-					if (!SplitGUCList(pos, ',', &namelist))
-					{
-						/* this shouldn't fail really */
-						elog(ERROR, "invalid list syntax in proconfig item");
-					}
-					foreach(lc, namelist)
-					{
-						char	   *curname = (char *) lfirst(lc);
-
-						simple_quote_literal(&buf, curname);
-						if (lnext(namelist, lc))
-							appendStringInfoString(&buf, ", ");
-					}
-				}
-				else
-					simple_quote_literal(&buf, pos);
-				appendStringInfoChar(&buf, '\n');
-			}
-		}
-	}
-
-	/* And finally the function definition ... */
-	(void) SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_prosqlbody, &isnull);
-	if (proc->prolang == SQLlanguageId && !isnull)
-	{
-		print_function_sqlbody(&buf, proctup);
-	}
-	else
-	{
-		appendStringInfoString(&buf, "AS ");
-
-		tmp = SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_probin, &isnull);
-		if (!isnull)
-		{
-			simple_quote_literal(&buf, TextDatumGetCString(tmp));
-			appendStringInfoString(&buf, ", "); /* assume prosrc isn't null */
-		}
-
-		tmp = SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_prosrc, &isnull);
-		if (isnull)
-			elog(ERROR, "null prosrc");
-		prosrc = TextDatumGetCString(tmp);
-
-		/*
-		 * We always use dollar quoting.  Figure out a suitable delimiter.
-		 *
-		 * Since the user is likely to be editing the function body string, we
-		 * shouldn't use a short delimiter that he might easily create a
-		 * conflict with.  Hence prefer "$function$"/"$procedure$", but extend
-		 * if needed.
-		 */
-		initStringInfo(&dq);
-		appendStringInfoChar(&dq, '$');
-		appendStringInfoString(&dq, (isfunction ? "function" : "procedure"));
-		while (strstr(prosrc, dq.data) != NULL)
-			appendStringInfoChar(&dq, 'x');
-		appendStringInfoChar(&dq, '$');
-
-		appendBinaryStringInfo(&buf, dq.data, dq.len);
-		appendStringInfoString(&buf, prosrc);
-		appendBinaryStringInfo(&buf, dq.data, dq.len);
-	}
-
-	appendStringInfoChar(&buf, '\n');
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(string_to_text(buf.data));
-}
-
-/*
- * pg_get_function_arguments
- *		Get a nicely-formatted list of arguments for a function.
- *		This is everything that would go between the parentheses in
- *		CREATE FUNCTION.
- */
-Datum
-pg_get_function_arguments(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	StringInfoData buf;
-	HeapTuple	proctup;
-
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	initStringInfo(&buf);
-
-	(void) print_function_arguments(&buf, proctup, false, true);
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(string_to_text(buf.data));
-}
-
-/*
- * pg_get_function_identity_arguments
- *		Get a formatted list of arguments for a function.
- *		This is everything that would go between the parentheses in
- *		ALTER FUNCTION, etc.  In particular, don't print defaults.
- */
-Datum
-pg_get_function_identity_arguments(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	StringInfoData buf;
-	HeapTuple	proctup;
-
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	initStringInfo(&buf);
-
-	(void) print_function_arguments(&buf, proctup, false, false);
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(string_to_text(buf.data));
-}
-
-/*
- * pg_get_function_result
- *		Get a nicely-formatted version of the result type of a function.
- *		This is what would appear after RETURNS in CREATE FUNCTION.
- */
-Datum
-pg_get_function_result(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	StringInfoData buf;
-	HeapTuple	proctup;
-
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	if (((Form_pg_proc) GETSTRUCT(proctup))->prokind == PROKIND_PROCEDURE)
-	{
-		ReleaseSysCache(proctup);
-		PG_RETURN_NULL();
-	}
-
-	initStringInfo(&buf);
-
-	print_function_rettype(&buf, proctup);
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(string_to_text(buf.data));
-}
-
-/*
- * Guts of pg_get_function_result: append the function's return type
- * to the specified buffer.
- */
-static void
-print_function_rettype(StringInfo buf, HeapTuple proctup)
-{
-	Form_pg_proc proc = (Form_pg_proc) GETSTRUCT(proctup);
-	int			ntabargs = 0;
-	StringInfoData rbuf;
-
-	initStringInfo(&rbuf);
-
-	if (proc->proretset)
-	{
-		/* It might be a table function; try to print the arguments */
-		appendStringInfoString(&rbuf, "TABLE(");
-		ntabargs = print_function_arguments(&rbuf, proctup, true, false);
-		if (ntabargs > 0)
-			appendStringInfoChar(&rbuf, ')');
-		else
-			resetStringInfo(&rbuf);
-	}
-
-	if (ntabargs == 0)
-	{
-		/* Not a table function, so do the normal thing */
-		if (proc->proretset)
-			appendStringInfoString(&rbuf, "SETOF ");
-		appendStringInfoString(&rbuf, format_type_be(proc->prorettype));
-	}
-
-	appendBinaryStringInfo(buf, rbuf.data, rbuf.len);
-}
-
-/*
- * Common code for pg_get_function_arguments and pg_get_function_result:
- * append the desired subset of arguments to buf.  We print only TABLE
- * arguments when print_table_args is true, and all the others when it's false.
- * We print argument defaults only if print_defaults is true.
- * Function return value is the number of arguments printed.
- */
-static int
-print_function_arguments(StringInfo buf, HeapTuple proctup,
-						 bool print_table_args, bool print_defaults)
-{
-	Form_pg_proc proc = (Form_pg_proc) GETSTRUCT(proctup);
-	int			numargs;
-	Oid		   *argtypes;
-	char	  **argnames;
-	char	   *argmodes;
-	int			insertorderbyat = -1;
-	int			argsprinted;
-	int			inputargno;
-	int			nlackdefaults;
-	List	   *argdefaults = NIL;
-	ListCell   *nextargdefault = NULL;
-	int			i;
-
-	numargs = get_func_arg_info(proctup,
-								&argtypes, &argnames, &argmodes);
-
-	nlackdefaults = numargs;
-	if (print_defaults && proc->pronargdefaults > 0)
-	{
-		Datum		proargdefaults;
-		bool		isnull;
-
-		proargdefaults = SysCacheGetAttr(PROCOID, proctup,
-										 Anum_pg_proc_proargdefaults,
-										 &isnull);
-		if (!isnull)
-		{
-			char	   *str;
-
-			str = TextDatumGetCString(proargdefaults);
-			argdefaults = castNode(List, stringToNode(str));
-			pfree(str);
-			nextargdefault = list_head(argdefaults);
-			/* nlackdefaults counts only *input* arguments lacking defaults */
-			nlackdefaults = proc->pronargs - list_length(argdefaults);
-		}
-	}
-
-	argsprinted = 0;
-	inputargno = 0;
-	for (i = 0; i < numargs; i++)
-	{
-		Oid			argtype = argtypes[i];
-		char	   *argname = argnames ? argnames[i] : NULL;
-		char		argmode = argmodes ? argmodes[i] : PROARGMODE_IN;
-		const char *modename;
-		bool		isinput;
-
-		switch (argmode)
-		{
-			case PROARGMODE_IN:
-
-				/*
-				 * For procedures, explicitly mark all argument modes, so as
-				 * to avoid ambiguity with the SQL syntax for DROP PROCEDURE.
-				 */
-				if (proc->prokind == PROKIND_PROCEDURE)
-					modename = "IN ";
-				else
-					modename = "";
-				isinput = true;
-				break;
-			case PROARGMODE_INOUT:
-				modename = "INOUT ";
-				isinput = true;
-				break;
-			case PROARGMODE_OUT:
-				modename = "OUT ";
-				isinput = false;
-				break;
-			case PROARGMODE_VARIADIC:
-				modename = "VARIADIC ";
-				isinput = true;
-				break;
-			case PROARGMODE_TABLE:
-				modename = "";
-				isinput = false;
-				break;
-			default:
-				elog(ERROR, "invalid parameter mode '%c'", argmode);
-				modename = NULL;	/* keep compiler quiet */
-				isinput = false;
-				break;
-		}
-		if (isinput)
-			inputargno++;		/* this is a 1-based counter */
-
-		if (print_table_args != (argmode == PROARGMODE_TABLE))
-			continue;
-
-		if (argsprinted == insertorderbyat)
-		{
-			if (argsprinted)
-				appendStringInfoChar(buf, ' ');
-			appendStringInfoString(buf, "ORDER BY ");
-		}
-		else if (argsprinted)
-			appendStringInfoString(buf, ", ");
-
-		appendStringInfoString(buf, modename);
-		if (argname && argname[0])
-			appendStringInfo(buf, "%s ", quote_identifier(argname));
-		appendStringInfoString(buf, format_type_be(argtype));
-		if (print_defaults && isinput && inputargno > nlackdefaults)
-		{
-			Node	   *expr;
-
-			Assert(nextargdefault != NULL);
-			expr = (Node *) lfirst(nextargdefault);
-			nextargdefault = lnext(argdefaults, nextargdefault);
-
-			appendStringInfo(buf, " DEFAULT %s",
-							 deparse_expression(expr, NIL, false, false));
-		}
-		argsprinted++;
-
-		/* nasty hack: print the last arg twice for variadic ordered-set agg */
-		if (argsprinted == insertorderbyat && i == numargs - 1)
-		{
-			i--;
-			/* aggs shouldn't have defaults anyway, but just to be sure ... */
-			print_defaults = false;
-		}
-	}
-
-	return argsprinted;
-}
-
-static bool
-is_input_argument(int nth, const char *argmodes)
-{
-	return (!argmodes
-			|| argmodes[nth] == PROARGMODE_IN
-			|| argmodes[nth] == PROARGMODE_INOUT
-			|| argmodes[nth] == PROARGMODE_VARIADIC);
-}
-
-/*
- * Append used transformed types to specified buffer
- */
-static void
-print_function_trftypes(StringInfo buf, HeapTuple proctup)
-{
-	Oid		   *trftypes;
-	int			ntypes;
-
-	ntypes = get_func_trftypes(proctup, &trftypes);
-	if (ntypes > 0)
-	{
-		int			i;
-
-		appendStringInfoString(buf, " TRANSFORM ");
-		for (i = 0; i < ntypes; i++)
-		{
-			if (i != 0)
-				appendStringInfoString(buf, ", ");
-			appendStringInfo(buf, "FOR TYPE %s", format_type_be(trftypes[i]));
-		}
-		appendStringInfoChar(buf, '\n');
-	}
-}
-
-/*
- * Get textual representation of a function argument's default value.  The
- * second argument of this function is the argument number among all arguments
- * (i.e. proallargtypes, *not* proargtypes), starting with 1, because that's
- * how information_schema.sql uses it.
- */
-Datum
-pg_get_function_arg_default(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	int32		nth_arg = PG_GETARG_INT32(1);
-	HeapTuple	proctup;
-	Form_pg_proc proc;
-	int			numargs;
-	Oid		   *argtypes;
-	char	  **argnames;
-	char	   *argmodes;
-	int			i;
-	List	   *argdefaults;
-	Node	   *node;
-	char	   *str;
-	int			nth_inputarg;
-	Datum		proargdefaults;
-	bool		isnull;
-	int			nth_default;
-
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	numargs = get_func_arg_info(proctup, &argtypes, &argnames, &argmodes);
-	if (nth_arg < 1 || nth_arg > numargs || !is_input_argument(nth_arg - 1, argmodes))
-	{
-		ReleaseSysCache(proctup);
-		PG_RETURN_NULL();
-	}
-
-	nth_inputarg = 0;
-	for (i = 0; i < nth_arg; i++)
-		if (is_input_argument(i, argmodes))
-			nth_inputarg++;
-
-	proargdefaults = SysCacheGetAttr(PROCOID, proctup,
-									 Anum_pg_proc_proargdefaults,
-									 &isnull);
-	if (isnull)
-	{
-		ReleaseSysCache(proctup);
-		PG_RETURN_NULL();
-	}
-
-	str = TextDatumGetCString(proargdefaults);
-	argdefaults = castNode(List, stringToNode(str));
-	pfree(str);
-
-	proc = (Form_pg_proc) GETSTRUCT(proctup);
-
-	/*
-	 * Calculate index into proargdefaults: proargdefaults corresponds to the
-	 * last N input arguments, where N = pronargdefaults.
-	 */
-	nth_default = nth_inputarg - 1 - (proc->pronargs - proc->pronargdefaults);
-
-	if (nth_default < 0 || nth_default >= list_length(argdefaults))
-	{
-		ReleaseSysCache(proctup);
-		PG_RETURN_NULL();
-	}
-	node = list_nth(argdefaults, nth_default);
-	str = deparse_expression(node, NIL, false, false);
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(string_to_text(str));
-}
-
-static void
-print_function_sqlbody(StringInfo buf, HeapTuple proctup)
-{
-	int			numargs;
-	Oid		   *argtypes;
-	char	  **argnames;
-	char	   *argmodes;
-	deparse_namespace dpns = {0};
-	Datum		tmp;
-	bool		isnull;
-	Node	   *n;
-
-	dpns.funcname = pstrdup(NameStr(((Form_pg_proc) GETSTRUCT(proctup))->proname));
-	numargs = get_func_arg_info(proctup,
-								&argtypes, &argnames, &argmodes);
-	dpns.numargs = numargs;
-	dpns.argnames = argnames;
-
-	tmp = SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_prosqlbody, &isnull);
-	Assert(!isnull);
-	n = stringToNode(TextDatumGetCString(tmp));
-
-	if (IsA(n, List))
-	{
-		List	   *stmts;
-		ListCell   *lc;
-
-		stmts = linitial(castNode(List, n));
-
-		appendStringInfoString(buf, "BEGIN ATOMIC\n");
-
-		foreach(lc, stmts)
-		{
-			Query	   *query = lfirst_node(Query, lc);
-
-			/* It seems advisable to get at least AccessShareLock on rels */
-			AcquireRewriteLocks(query, false, false);
-			get_query_def(query, buf, list_make1(&dpns), NULL, false,
-						  PRETTYFLAG_INDENT, WRAP_COLUMN_DEFAULT, 1);
-			appendStringInfoChar(buf, ';');
-			appendStringInfoChar(buf, '\n');
-		}
-
-		appendStringInfoString(buf, "END");
-	}
-	else
-	{
-		Query	   *query = castNode(Query, n);
-
-		/* It seems advisable to get at least AccessShareLock on rels */
-		AcquireRewriteLocks(query, false, false);
-		get_query_def(query, buf, list_make1(&dpns), NULL, false,
-					  0, WRAP_COLUMN_DEFAULT, 0);
-	}
-}
-
-Datum
-pg_get_function_sqlbody(PG_FUNCTION_ARGS)
-{
-	Oid			funcid = PG_GETARG_OID(0);
-	StringInfoData buf;
-	HeapTuple	proctup;
-	bool		isnull;
-
-	initStringInfo(&buf);
-
-	/* Look up the function */
-	proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(proctup))
-		PG_RETURN_NULL();
-
-	(void) SysCacheGetAttr(PROCOID, proctup, Anum_pg_proc_prosqlbody, &isnull);
-	if (isnull)
-	{
-		ReleaseSysCache(proctup);
-		PG_RETURN_NULL();
-	}
-
-	print_function_sqlbody(&buf, proctup);
-
-	ReleaseSysCache(proctup);
-
-	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
 
 
@@ -4087,10 +3323,6 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 			appendStringInfoString(buf, "NOTHING");
 			break;
 
-		case CMD_UTILITY:
-			get_utility_query_def(query, &context);
-			break;
-
 		default:
 			elog(ERROR, "unrecognized query command type: %d",
 				 query->commandType);
@@ -4987,8 +4219,7 @@ get_update_query_def(Query *query, deparse_context *context,
 		appendStringInfoChar(buf, ' ');
 		context->indentLevel += PRETTYINDENT_STD;
 	}
-	appendStringInfo(buf, "UPDATE %s%s",
-					 only_marker(rte),
+	appendStringInfo(buf, "UPDATE %s",
 					 generate_relation_name(rte->relid, NIL));
 
 	/* Print the relation alias, if needed */
@@ -5081,8 +4312,7 @@ get_delete_query_def(Query *query, deparse_context *context,
 		appendStringInfoChar(buf, ' ');
 		context->indentLevel += PRETTYINDENT_STD;
 	}
-	appendStringInfo(buf, "DELETE FROM %s%s",
-					 only_marker(rte),
+	appendStringInfo(buf, "DELETE FROM %s",
 					 generate_relation_name(rte->relid, NIL));
 
 	/* Print the relation alias, if needed */
@@ -5100,20 +4330,6 @@ get_delete_query_def(Query *query, deparse_context *context,
 	}
 }
 
-
-/* ----------
- * get_utility_query_def			- Parse back a UTILITY parsetree
- * ----------
- */
-static void
-get_utility_query_def(Query *query, deparse_context *context)
-{
-	/*
-	 * LISTEN/NOTIFY/UNLISTEN are not supported in minipg (see mydoc/CHANGE.md),
-	 * so no utility statement can appear in a rule body anymore.
-	 */
-	elog(ERROR, "unexpected utility statement type");
-}
 
 /*
  * Display a Var appropriately.
@@ -8215,8 +7431,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 		{
 			case RTE_RELATION:
 				/* Normal relation RTE */
-				appendStringInfo(buf, "%s%s",
-								 only_marker(rte),
+				appendStringInfo(buf, "%s",
 								 generate_relation_name(rte->relid,
 														context->namespaces));
 				break;
@@ -9309,80 +8524,4 @@ string_to_text(char *str)
 	result = cstring_to_text(str);
 	pfree(str);
 	return result;
-}
-
-/*
- * deflist_to_tuplestore - Helper function to convert DefElem list to
- * tuplestore usable in SRF.
- */
-static void
-deflist_to_tuplestore(ReturnSetInfo *rsinfo, List *options)
-{
-	ListCell   *cell;
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
-	Datum		values[2];
-	bool		nulls[2];
-	MemoryContext per_query_ctx;
-	MemoryContext oldcontext;
-
-	/* check to see if caller supports us returning a tuplestore */
-	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("set-valued function called in context that cannot accept a set")));
-	if (!(rsinfo->allowedModes & SFRM_Materialize) ||
-		rsinfo->expectedDesc == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("materialize mode required, but it is not allowed in this context")));
-
-	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
-	oldcontext = MemoryContextSwitchTo(per_query_ctx);
-
-	/*
-	 * Now prepare the result set.
-	 */
-	tupdesc = CreateTupleDescCopy(rsinfo->expectedDesc);
-	tupstore = tuplestore_begin_heap(true, false, work_mem);
-	rsinfo->returnMode = SFRM_Materialize;
-	rsinfo->setResult = tupstore;
-	rsinfo->setDesc = tupdesc;
-
-	foreach(cell, options)
-	{
-		DefElem    *def = lfirst(cell);
-
-		values[0] = CStringGetTextDatum(def->defname);
-		nulls[0] = false;
-		if (def->arg)
-		{
-			values[1] = CStringGetTextDatum(strVal(def->arg));
-			nulls[1] = false;
-		}
-		else
-		{
-			values[1] = (Datum) 0;
-			nulls[1] = true;
-		}
-		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
-	}
-
-	/* clean up and return the tuplestore */
-	tuplestore_donestoring(tupstore);
-
-	MemoryContextSwitchTo(oldcontext);
-}
-
-/*
- * Convert options array to name/value table.  Useful for information
- * schema and pg_dump.
- */
-Datum
-pg_options_to_table(PG_FUNCTION_ARGS)
-{
-	deflist_to_tuplestore((ReturnSetInfo *) fcinfo->resultinfo,
-						  NIL);
-
-	return (Datum) 0;
 }

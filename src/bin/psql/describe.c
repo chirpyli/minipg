@@ -80,30 +80,18 @@ describeAggregates(const char *pattern, bool verbose, bool showSystem)
 					  gettext_noop("Name"),
 					  gettext_noop("Result data type"));
 
-	if (pset.sversion >= 80400)
-		appendPQExpBuffer(&buf,
-						  "  CASE WHEN p.pronargs = 0\n"
-						  "    THEN CAST('*' AS pg_catalog.text)\n"
-						  "    ELSE pg_catalog.pg_get_function_arguments(p.oid)\n"
-						  "  END AS \"%s\",\n",
-						  gettext_noop("Argument data types"));
-	else if (pset.sversion >= 80200)
-		appendPQExpBuffer(&buf,
-						  "  CASE WHEN p.pronargs = 0\n"
-						  "    THEN CAST('*' AS pg_catalog.text)\n"
-						  "    ELSE\n"
-						  "    pg_catalog.array_to_string(ARRAY(\n"
-						  "      SELECT\n"
-						  "        pg_catalog.format_type(p.proargtypes[s.i], NULL)\n"
-						  "      FROM\n"
-						  "        pg_catalog.generate_series(0, pg_catalog.array_upper(p.proargtypes, 1)) AS s(i)\n"
-						  "    ), ', ')\n"
-						  "  END AS \"%s\",\n",
-						  gettext_noop("Argument data types"));
-	else
-		appendPQExpBuffer(&buf,
-						  "  pg_catalog.format_type(p.proargtypes[0], NULL) AS \"%s\",\n",
-						  gettext_noop("Argument data types"));
+	appendPQExpBuffer(&buf,
+					  "  CASE WHEN p.pronargs = 0\n"
+					  "    THEN CAST('*' AS pg_catalog.text)\n"
+					  "    ELSE\n"
+					  "    pg_catalog.array_to_string(ARRAY(\n"
+					  "      SELECT\n"
+					  "        pg_catalog.format_type(p.proargtypes[s.i], NULL)\n"
+					  "      FROM\n"
+					  "        pg_catalog.generate_series(0, pg_catalog.array_upper(p.proargtypes, 1)) AS s(i)\n"
+					  "    ), ', ')\n"
+					  "  END AS \"%s\",\n",
+					  gettext_noop("Argument data types"));
 
 	if (pset.sversion >= 110000)
 		appendPQExpBuffer(&buf,
@@ -265,104 +253,29 @@ describeFunctions(const char *functypes, const char *func_pattern,
 					  gettext_noop("Schema"),
 					  gettext_noop("Name"));
 
-	if (pset.sversion >= 110000)
-		appendPQExpBuffer(&buf,
-						  "  pg_catalog.pg_get_function_result(p.oid) as \"%s\",\n"
-						  "  pg_catalog.pg_get_function_arguments(p.oid) as \"%s\",\n"
-						  " CASE p.prokind\n"
-						  "  WHEN 'a' THEN '%s'\n"
-						  "  WHEN 'w' THEN '%s'\n"
-						  "  WHEN 'p' THEN '%s'\n"
-						  "  ELSE '%s'\n"
-						  " END as \"%s\"",
-						  gettext_noop("Result data type"),
-						  gettext_noop("Argument data types"),
-		/* translator: "agg" is short for "aggregate" */
-						  gettext_noop("agg"),
-						  gettext_noop("window"),
-						  gettext_noop("proc"),
-						  gettext_noop("func"),
-						  gettext_noop("Type"));
-	else if (pset.sversion >= 80400)
-		appendPQExpBuffer(&buf,
-						  "  pg_catalog.pg_get_function_result(p.oid) as \"%s\",\n"
-						  "  pg_catalog.pg_get_function_arguments(p.oid) as \"%s\",\n"
-						  " CASE\n"
-						  "  WHEN p.proisagg THEN '%s'\n"
-						  "  WHEN p.proiswindow THEN '%s'\n"
-						  "  WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN '%s'\n"
-						  "  ELSE '%s'\n"
-						  " END as \"%s\"",
-						  gettext_noop("Result data type"),
-						  gettext_noop("Argument data types"),
-		/* translator: "agg" is short for "aggregate" */
-						  gettext_noop("agg"),
-						  gettext_noop("window"),
-						  gettext_noop("trigger"),
-						  gettext_noop("func"),
-						  gettext_noop("Type"));
-	else if (pset.sversion >= 80100)
-		appendPQExpBuffer(&buf,
-						  "  CASE WHEN p.proretset THEN 'SETOF ' ELSE '' END ||\n"
-						  "  pg_catalog.format_type(p.prorettype, NULL) as \"%s\",\n"
-						  "  CASE WHEN proallargtypes IS NOT NULL THEN\n"
-						  "    pg_catalog.array_to_string(ARRAY(\n"
-						  "      SELECT\n"
-						  "        CASE\n"
-						  "          WHEN p.proargmodes[s.i] = 'i' THEN ''\n"
-						  "          WHEN p.proargmodes[s.i] = 'o' THEN 'OUT '\n"
-						  "          WHEN p.proargmodes[s.i] = 'b' THEN 'INOUT '\n"
-						  "          WHEN p.proargmodes[s.i] = 'v' THEN 'VARIADIC '\n"
-						  "        END ||\n"
-						  "        CASE\n"
-						  "          WHEN COALESCE(p.proargnames[s.i], '') = '' THEN ''\n"
-						  "          ELSE p.proargnames[s.i] || ' '\n"
-						  "        END ||\n"
-						  "        pg_catalog.format_type(p.proallargtypes[s.i], NULL)\n"
-						  "      FROM\n"
-						  "        pg_catalog.generate_series(1, pg_catalog.array_upper(p.proallargtypes, 1)) AS s(i)\n"
-						  "    ), ', ')\n"
-						  "  ELSE\n"
-						  "    pg_catalog.array_to_string(ARRAY(\n"
-						  "      SELECT\n"
-						  "        CASE\n"
-						  "          WHEN COALESCE(p.proargnames[s.i+1], '') = '' THEN ''\n"
-						  "          ELSE p.proargnames[s.i+1] || ' '\n"
-						  "          END ||\n"
-						  "        pg_catalog.format_type(p.proargtypes[s.i], NULL)\n"
-						  "      FROM\n"
-						  "        pg_catalog.generate_series(0, pg_catalog.array_upper(p.proargtypes, 1)) AS s(i)\n"
-						  "    ), ', ')\n"
-						  "  END AS \"%s\",\n"
-						  "  CASE\n"
-						  "    WHEN p.proisagg THEN '%s'\n"
-						  "    WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN '%s'\n"
-						  "    ELSE '%s'\n"
-						  "  END AS \"%s\"",
-						  gettext_noop("Result data type"),
-						  gettext_noop("Argument data types"),
-		/* translator: "agg" is short for "aggregate" */
-						  gettext_noop("agg"),
-						  gettext_noop("trigger"),
-						  gettext_noop("func"),
-						  gettext_noop("Type"));
-	else
-		appendPQExpBuffer(&buf,
-						  "  CASE WHEN p.proretset THEN 'SETOF ' ELSE '' END ||\n"
-						  "  pg_catalog.format_type(p.prorettype, NULL) as \"%s\",\n"
-						  "  pg_catalog.oidvectortypes(p.proargtypes) as \"%s\",\n"
-						  "  CASE\n"
-						  "    WHEN p.proisagg THEN '%s'\n"
-						  "    WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN '%s'\n"
-						  "    ELSE '%s'\n"
-						  "  END AS \"%s\"",
-						  gettext_noop("Result data type"),
-						  gettext_noop("Argument data types"),
-		/* translator: "agg" is short for "aggregate" */
-						  gettext_noop("agg"),
-						  gettext_noop("trigger"),
-						  gettext_noop("func"),
-						  gettext_noop("Type"));
+	appendPQExpBuffer(&buf,
+					  "  CASE WHEN p.proretset THEN 'SETOF ' ELSE '' END ||\n"
+					  "  pg_catalog.format_type(p.prorettype, NULL) as \"%s\",\n"
+					  "  pg_catalog.array_to_string(ARRAY(\n"
+					  "      SELECT\n"
+					  "        pg_catalog.format_type(p.proargtypes[s.i], NULL)\n"
+					  "      FROM\n"
+					  "        pg_catalog.generate_series(0, pg_catalog.array_upper(p.proargtypes, 1)) AS s(i)\n"
+					  "    ), ', ') AS \"%s\",\n"
+					  "  CASE p.prokind\n"
+					  "    WHEN 'a' THEN '%s'\n"
+					  "    WHEN 'w' THEN '%s'\n"
+					  "    WHEN 'p' THEN '%s'\n"
+					  "    ELSE '%s'\n"
+					  "  END AS \"%s\"",
+					  gettext_noop("Result data type"),
+					  gettext_noop("Argument data types"),
+	/* translator: "agg" is short for "aggregate" */
+					  gettext_noop("agg"),
+					  gettext_noop("window"),
+					  gettext_noop("proc"),
+					  gettext_noop("func"),
+					  gettext_noop("Type"));
 
 	if (verbose)
 	{
@@ -395,14 +308,9 @@ describeFunctions(const char *functypes, const char *func_pattern,
 		appendPQExpBuffer(&buf,
 						  ",\n l.lanname as \"%s\"",
 						  gettext_noop("Language"));
-		if (pset.sversion >= 140000)
-			appendPQExpBuffer(&buf,
-							  ",\n COALESCE(pg_catalog.pg_get_function_sqlbody(p.oid), p.prosrc) as \"%s\"",
-							  gettext_noop("Source code"));
-		else
-			appendPQExpBuffer(&buf,
-							  ",\n p.prosrc as \"%s\"",
-							  gettext_noop("Source code"));
+		appendPQExpBuffer(&buf,
+						  ",\n p.prosrc as \"%s\"",
+						  gettext_noop("Source code"));
 		appendPQExpBuffer(&buf,
 						  ",\n pg_catalog.obj_description(p.oid, 'pg_proc') as \"%s\"",
 						  gettext_noop("Description"));
