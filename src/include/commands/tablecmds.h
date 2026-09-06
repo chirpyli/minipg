@@ -60,9 +60,6 @@ extern void ExecuteTruncateGuts(List *explicit_rels,
 								DropBehavior behavior,
 								bool restart_seqs);
 
-extern List *find_all_inheritors(Oid parentrelId, LOCKMODE lockmode,
-								 List **parents);
-
 extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
 extern void ResetRelRewrite(Oid myrelid);
 

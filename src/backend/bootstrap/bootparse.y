@@ -225,7 +225,6 @@ Boot_CreateStmt:
 													  BOOTSTRAP_SUPERUSERID,
 													  HEAP_TABLE_AM_OID,
 													  tupdesc,
-													  NIL,
 													  RELKIND_RELATION,
 													  RELPERSISTENCE_PERMANENT,
 													  shared_relation,

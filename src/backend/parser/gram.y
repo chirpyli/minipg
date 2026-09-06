@@ -1507,8 +1507,6 @@ columnDef:	ColId Typename opt_column_compression ColQualList
 					n->colname = $1;
 					n->typeName = $2;
 					n->compression = $3;
-					n->is_local = true;
-					n->is_from_type = false;
 					n->storage = 0;
 					n->raw_default = NULL;
 					n->cooked_default = NULL;
@@ -4231,8 +4229,6 @@ TableFuncElement:	ColId Typename
 					ColumnDef *n = makeNode(ColumnDef);
 					n->colname = $1;
 					n->typeName = $2;
-					n->is_local = true;
-					n->is_from_type = false;
 					n->storage = 0;
 					n->raw_default = NULL;
 					n->cooked_default = NULL;

@@ -95,9 +95,6 @@ static ObjectAddress AddNewRelationType(const char *typeName,
 										Oid ownerid,
 										Oid new_row_type,
 										Oid new_array_type);
-static void StoreConstraints(Relation rel, List *cooked_constraints,
-							 bool is_internal);
-
 
 /* ----------------------------------------------------------------
  *				XXX UGLY HARD CODED BADNESS FOLLOWS XXX
@@ -408,9 +405,7 @@ heap_create(const char *relname,
  *		6) AddNewAttributeTuples() is called to register the
  *		   new relation's schema in pg_attribute.
  *
- *		7) StoreConstraints is called ()		- vadim 08/22/97
- *
- *		8) the relations are closed and the new relation's oid
+ *		7) the relations are closed and the new relation's oid
  *		   is returned.
  *
  * ----------------------------------------------------------------
@@ -975,7 +970,6 @@ AddNewRelationType(const char *typeName,
  *	ownerid: OID of new rel's owner
  *	accessmtd: OID of new rel's access method
  *	tupdesc: tuple descriptor (source of column definitions)
- *	cooked_constraints: list of precooked check constraints and defaults
  *	relkind: relkind for new rel
  *	relpersistence: rel's persistence status (permanent, temp, or unlogged)
  *	shared_relation: true if it's to be a shared relation
@@ -1001,7 +995,6 @@ heap_create_with_catalog(const char *relname,
 						 Oid ownerid,
 						 Oid accessmtd,
 						 TupleDesc tupdesc,
-						 List *cooked_constraints,
 						 char relkind,
 						 char relpersistence,
 						 bool shared_relation,
@@ -1265,15 +1258,6 @@ heap_create_with_catalog(const char *relname,
 
 	/* Post creation hook for new relation */
 	InvokeObjectPostCreateHookArg(RelationRelationId, relid, 0, is_internal);
-
-	/*
-	 * Store any supplied constraints and defaults.
-	 *
-	 * NB: this may do a CommandCounterIncrement and rebuild the relcache
-	 * entry, so the relation must be valid and self-consistent at this point.
-	 * In particular, there are not yet constraints and defaults anywhere.
-	 */
-	StoreConstraints(new_rel_desc, cooked_constraints, is_internal);
 
 	/*
 	 * If there's a special on-commit action, remember it
@@ -2102,47 +2086,6 @@ StoreAttrDefault(Relation rel, AttrNumber attnum,
 
 
 /*
- * Store defaults and constraints (passed as a list of CookedConstraint).
- *
- * Each CookedConstraint struct is modified to store the new catalog tuple OID.
- *
- * NOTE: only pre-cooked expressions will be passed this way.  Newly parsed
- * expressions can be added later, by direct calls to StoreAttrDefault
- * (see AddRelationNewConstraints()).
- */
-static void
-StoreConstraints(Relation rel, List *cooked_constraints, bool is_internal)
-{
-	ListCell   *lc;
-
-	if (cooked_constraints == NIL)
-		return;					/* nothing to do */
-
-	/*
-	 * Deparsing of constraint expressions will fail unless the just-created
-	 * pg_attribute tuples for this relation are made visible.  So, bump the
-	 * command counter.  CAUTION: this will cause a relcache entry rebuild.
-	 */
-	CommandCounterIncrement();
-
-	foreach(lc, cooked_constraints)
-	{
-		CookedConstraint *con = (CookedConstraint *) lfirst(lc);
-
-		switch (con->contype)
-		{
-			case CONSTR_DEFAULT:
-				con->conoid = StoreAttrDefault(rel, con->attnum, con->expr,
-											   is_internal, false);
-				break;
-			default:
-				elog(ERROR, "unrecognized constraint type: %d",
-					 (int) con->contype);
-		}
-	}
-}
-
-/*
  * AddRelationNewConstraints
  *
  * Add new column default expressions and/or constraint check expressions
@@ -2159,9 +2102,6 @@ StoreConstraints(Relation rel, List *cooked_constraints, bool is_internal)
  * All entries in newColDefaults will be processed.  Entries in newConstraints
  * will be processed only if they are CONSTR_CHECK type.
  *
- * Returns a list of CookedConstraint nodes that shows the cooked form of
- * the default and constraint expressions added to the relation.
- *
  * NB: caller should have opened rel with some self-conflicting lock mode,
  * and should hold that lock till end of transaction; for normal cases that'll
  * be AccessExclusiveLock, but if caller knows that the constraint is already
@@ -2169,7 +2109,7 @@ StoreConstraints(Relation rel, List *cooked_constraints, bool is_internal)
  * assume the caller has done a CommandCounterIncrement if necessary to make
  * the relation's catalog tuples visible.
  */
-List *
+void
 AddRelationNewConstraints(Relation rel,
 						  List *newColDefaults,
 						  List *newConstraints,
@@ -2177,12 +2117,10 @@ AddRelationNewConstraints(Relation rel,
 						  bool is_internal,
 						  const char *queryString)
 {
-	List	   *cookedConstraints = NIL;
 	ParseState *pstate;
 	ParseNamespaceItem *nsitem;
 	ListCell   *cell;
 	Node	   *expr;
-	CookedConstraint *cooked;
 
 	/*
 	 * Create a dummy ParseState and insert the target relation as its sole
@@ -2205,7 +2143,6 @@ AddRelationNewConstraints(Relation rel,
 	{
 		RawColumnDefault *colDef = (RawColumnDefault *) lfirst(cell);
 		Form_pg_attribute atp = TupleDescAttr(rel->rd_att, colDef->attnum - 1);
-		Oid			defOid;
 
 		expr = cookDefault(pstate, colDef->raw_default,
 						   atp->atttypid, atp->atttypmod,
@@ -2224,19 +2161,8 @@ AddRelationNewConstraints(Relation rel,
 			 castNode(Const, expr)->constisnull))
 			continue;
 
-		defOid = StoreAttrDefault(rel, colDef->attnum, expr, is_internal,
-								  false);
-
-		cooked = (CookedConstraint *) palloc(sizeof(CookedConstraint));
-		cooked->contype = CONSTR_DEFAULT;
-		cooked->conoid = defOid;
-		cooked->name = NULL;
-		cooked->attnum = colDef->attnum;
-		cooked->expr = expr;
-		cookedConstraints = lappend(cookedConstraints, cooked);
+		StoreAttrDefault(rel, colDef->attnum, expr, is_internal, false);
 	}
-
-	return cookedConstraints;
 }
 
 

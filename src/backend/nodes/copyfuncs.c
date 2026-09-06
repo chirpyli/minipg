@@ -2409,8 +2409,6 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_STRING_FIELD(colname);
 	COPY_NODE_FIELD(typeName);
 	COPY_STRING_FIELD(compression);
-	COPY_SCALAR_FIELD(is_local);
-	COPY_SCALAR_FIELD(is_from_type);
 	COPY_SCALAR_FIELD(storage);
 	COPY_NODE_FIELD(raw_default);
 	COPY_NODE_FIELD(cooked_default);

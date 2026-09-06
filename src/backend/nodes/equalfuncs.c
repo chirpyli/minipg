@@ -1396,8 +1396,6 @@ _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 	COMPARE_STRING_FIELD(colname);
 	COMPARE_NODE_FIELD(typeName);
 	COMPARE_STRING_FIELD(compression);
-	COMPARE_SCALAR_FIELD(is_local);
-	COMPARE_SCALAR_FIELD(is_from_type);
 	COMPARE_SCALAR_FIELD(storage);
 	COMPARE_NODE_FIELD(raw_default);
 	COMPARE_NODE_FIELD(cooked_default);

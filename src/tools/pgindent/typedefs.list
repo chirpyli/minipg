@@ -393,7 +393,6 @@ ConvInfo
 ConvProcInfo
 ConversionLocation
 ConvertRowtypeExpr
-CookedConstraint
 Cost
 CostSelector
 Counters

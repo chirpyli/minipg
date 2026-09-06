@@ -263,7 +263,7 @@ static void ATController(AlterTableStmt *parsetree,
 						 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
 						 AlterTableUtilityContext *context);
 static void ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
-					  bool recurse, bool recursing, LOCKMODE lockmode,
+					  bool recurse, LOCKMODE lockmode,
 					  AlterTableUtilityContext *context);
 static void ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode,
 							  AlterTableUtilityContext *context);
@@ -282,15 +282,12 @@ static void ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockm
 static AlteredTableInfo *ATGetQueueEntry(List **wqueue, Relation rel);
 static void ATSimplePermissions(Relation rel, int allowed_targets);
 static void ATWrongRelkindError(Relation rel, int allowed_targets);
-static void ATSimpleRecursion(List **wqueue, Relation rel,
-							  AlterTableCmd *cmd, bool recurse, LOCKMODE lockmode,
-							  AlterTableUtilityContext *context);
-static void ATPrepAddColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
+static void ATPrepAddColumn(List **wqueue, Relation rel, bool recurse,
 							bool is_view, AlterTableCmd *cmd, LOCKMODE lockmode,
 							AlterTableUtilityContext *context);
 static ObjectAddress ATExecAddColumn(List **wqueue, AlteredTableInfo *tab,
 									 Relation rel, AlterTableCmd **cmd,
-									 bool recurse, bool recursing,
+									 bool recurse,
 									 LOCKMODE lockmode, int cur_pass,
 									 AlterTableUtilityContext *context);
 static bool check_for_column_name_collision(Relation rel, const char *colname,
@@ -299,9 +296,7 @@ static void add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid);
 static void add_column_collation_dependency(Oid relid, int32 attnum, Oid collid);
 static ObjectAddress ATExecColumnDefault(Relation rel, const char *colName,
 										 Node *newDefault, LOCKMODE lockmode);
-static ObjectAddress ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
-											  Node *newDefault);
-static void ATPrepDropExpression(Relation rel, AlterTableCmd *cmd, bool recurse, bool recursing, LOCKMODE lockmode);
+static void ATPrepDropExpression(Relation rel, AlterTableCmd *cmd);
 static ObjectAddress ATExecDropExpression(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStatistics(Relation rel, const char *colName, int16 colNum,
 										 Node *newValue, LOCKMODE lockmode);
@@ -309,21 +304,20 @@ static ObjectAddress ATExecSetOptions(Relation rel, const char *colName,
 									  Node *options, bool isReset, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStorage(Relation rel, const char *colName,
 									  Node *newValue, LOCKMODE lockmode);
-static void ATPrepDropColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
+static void ATPrepDropColumn(List **wqueue, Relation rel, bool recurse,
 							 AlterTableCmd *cmd, LOCKMODE lockmode,
 							 AlterTableUtilityContext *context);
 static ObjectAddress ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 									  DropBehavior behavior,
-									  bool recurse, bool recursing,
-									  bool missing_ok, LOCKMODE lockmode,
-									  ObjectAddresses *addrs);
+									  bool recurse,
+									  bool missing_ok, LOCKMODE lockmode);
 static ObjectAddress ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 									IndexStmt *stmt, bool is_rebuild, LOCKMODE lockmode);
 static ObjectAddress ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 											  IndexStmt *stmt, LOCKMODE lockmode);
 static void ATExecDropConstraint(Relation rel, const char *constrName,
 								 DropBehavior behavior,
-								 bool recurse, bool recursing,
+								 bool recurse,
 								 bool missing_ok, LOCKMODE lockmode);
 static void ATPrepAlterColumnType(AlteredTableInfo *tab, Relation rel,
 								  AlterTableCmd *cmd);
@@ -382,7 +376,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Relation	rel;
 	TupleDesc	descriptor;
 	List	   *rawDefaults;
-	List	   *cookedDefaults;
 	ListCell   *listptr;
 	AttrNumber	attnum;
 
@@ -432,10 +425,8 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	/*
 	 * Find columns with default values and prepare for insertion of the
-	 * defaults.  Pre-cooked defaults go into a list of CookedConstraint
-	 * structs that we'll pass to heap_create_with_catalog,
-	 * while raw defaults go into a list of RawColumnDefault structs that will
-	 * be processed by AddRelationNewConstraints.  (We can't deal with raw
+	 * defaults.  They go into a list of RawColumnDefault structs that will be
+	 * processed by AddRelationNewConstraints.  (We can't deal with raw
 	 * expressions until we can do transformExpr.)
 	 *
 	 * We can set the atthasdef flags now in the tuple descriptor; this just
@@ -443,7 +434,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * pg_attribute rows.
 	 */
 	rawDefaults = NIL;
-	cookedDefaults = NIL;
 	attnum = 0;
 
 	foreach(listptr, stmt->tableElts)
@@ -454,11 +444,11 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		attnum++;
 		attr = TupleDescAttr(descriptor, attnum - 1);
 
+		Assert(colDef->cooked_default == NULL);
+
 		if (colDef->raw_default != NULL)
 		{
 			RawColumnDefault *rawEnt;
-
-			Assert(colDef->cooked_default == NULL);
 
 			rawEnt = (RawColumnDefault *) palloc(sizeof(RawColumnDefault));
 			rawEnt->attnum = attnum;
@@ -466,19 +456,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 			rawEnt->missingMode = false;
 			rawEnt->generated = colDef->generated;
 			rawDefaults = lappend(rawDefaults, rawEnt);
-			attr->atthasdef = true;
-		}
-		else if (colDef->cooked_default != NULL)
-		{
-			CookedConstraint *cooked;
-
-			cooked = (CookedConstraint *) palloc(sizeof(CookedConstraint));
-			cooked->contype = CONSTR_DEFAULT;
-			cooked->conoid = InvalidOid;	/* until created */
-			cooked->name = NULL;
-			cooked->attnum = attnum;
-			cooked->expr = colDef->cooked_default;
-			cookedDefaults = lappend(cookedDefaults, cooked);
 			attr->atthasdef = true;
 		}
 
@@ -498,11 +475,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	if (accessMethod != NULL)
 		accessMethodId = get_table_am_oid(accessMethod, false);
 
-	/*
-	 * Create the relation.  Pre-cooked defaults are passed in for immediate
-	 * handling --- since they don't need parsing, they can be stored
-	 * immediately.
-	 */
 	relationId = heap_create_with_catalog(relname,
 										  namespaceId,
 										  InvalidOid,   	/* 表空间管理已裁剪，始终使用默认表空间 */
@@ -511,7 +483,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 										  ownerId,
 										  accessMethodId,
 										  descriptor,
-										  cookedDefaults,
 										  relkind,
 										  stmt->relation->relpersistence,
 										  false,
@@ -1192,61 +1163,24 @@ MergeAttributes(List *schema)
 						MaxHeapAttributeNumber)));
 
 	/*
-	 * Check for duplicate names in the explicit list of attributes.
-	 *
-	 * Although we might consider merging such entries, it seems to make more
-	 * sense to assume such conflicts are errors.
-	 *
-	 * We don't use foreach() here because we have two nested loops over the
-	 * schema list, with possible element deletions in the inner one.  If we
-	 * used foreach_delete_current() it could only fix up the state of one of
-	 * the loops, so it seems cleaner to use looping over list indexes for
-	 * both loops.  Note that any deletion will happen beyond where the outer
-	 * loop is, so its index never needs adjustment.
+	 * Check for duplicate names in the list of attributes.  Although we might
+	 * consider merging such entries, it seems to make more sense to assume
+	 * such conflicts are errors.
 	 */
 	for (int coldefpos = 0; coldefpos < list_length(schema); coldefpos++)
 	{
 		ColumnDef  *coldef = list_nth_node(ColumnDef, schema, coldefpos);
 
-		if (coldef->typeName == NULL)
-		{
-			/*
-			 * Typed table column option that does not belong to a column from
-			 * the type.  This works because the columns from the type come
-			 * first in the list.
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("column \"%s\" does not exist",
-							coldef->colname)));
-		}
-
-		/* restpos scans all entries beyond coldef; incr is in loop body */
-		for (int restpos = coldefpos + 1; restpos < list_length(schema);)
+		/* restpos scans all entries beyond coldef */
+		for (int restpos = coldefpos + 1; restpos < list_length(schema); restpos++)
 		{
 			ColumnDef  *restdef = list_nth_node(ColumnDef, schema, restpos);
 
 			if (strcmp(coldef->colname, restdef->colname) == 0)
-			{
-				if (coldef->is_from_type)
-				{
-					/*
-					 * merge the column options into the column from the type
-					 */
-					coldef->raw_default = restdef->raw_default;
-					coldef->cooked_default = restdef->cooked_default;
-					coldef->constraints = restdef->constraints;
-					coldef->is_from_type = false;
-					schema = list_delete_nth_cell(schema, restpos);
-				}
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_DUPLICATE_COLUMN),
-							 errmsg("column \"%s\" specified more than once",
-									coldef->colname)));
-			}
-			else
-				restpos++;
+				ereport(ERROR,
+						(errcode(ERRCODE_DUPLICATE_COLUMN),
+						 errmsg("column \"%s\" specified more than once",
+								coldef->colname)));
 		}
 	}
 
@@ -1676,7 +1610,6 @@ AlterTableGetLockLevel(List *cmds)
 				 * Theoretically, these could be ShareRowExclusiveLock.
 				 */
 			case AT_ColumnDefault:
-			case AT_CookedColumnDefault:
 			case AT_AlterConstraint:
 			case AT_AddIndex:	/* from ADD CONSTRAINT */
 			case AT_AddIndexConstraint:
@@ -1745,7 +1678,7 @@ ATController(AlterTableStmt *parsetree,
 	{
 		AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
 
-		ATPrepCmd(&wqueue, rel, cmd, recurse, false, lockmode, context);
+		ATPrepCmd(&wqueue, rel, cmd, recurse, lockmode, context);
 	}
 
 	/* Close the relation, but keep lock until commit */
@@ -1769,7 +1702,7 @@ ATController(AlterTableStmt *parsetree,
  */
 static void
 ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
-		  bool recurse, bool recursing, LOCKMODE lockmode,
+		  bool recurse, LOCKMODE lockmode,
 		  AlterTableUtilityContext *context)
 {
 	AlteredTableInfo *tab;
@@ -1798,14 +1731,14 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_AddColumn:		/* ADD COLUMN */
 			ATSimplePermissions(rel,
 								ATT_TABLE | ATT_COMPOSITE_TYPE | ATT_FOREIGN_TABLE);
-			ATPrepAddColumn(wqueue, rel, recurse, recursing, false, cmd,
+			ATPrepAddColumn(wqueue, rel, recurse, false, cmd,
 							lockmode, context);
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_ADD_COL;
 			break;
 		case AT_AddColumnToView:	/* add column via CREATE OR REPLACE VIEW */
 			ATSimplePermissions(rel, ATT_VIEW);
-			ATPrepAddColumn(wqueue, rel, recurse, recursing, true, cmd,
+			ATPrepAddColumn(wqueue, rel, recurse, true, cmd,
 							lockmode, context);
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_ADD_COL;
@@ -1819,26 +1752,16 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			 * rules.
 			 */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
 			/* No command-specific prep needed */
 			pass = cmd->def ? AT_PASS_ADD_OTHERCONSTR : AT_PASS_DROP;
 			break;
-		case AT_CookedColumnDefault:	/* add a pre-cooked default */
-			/* This is currently used only in CREATE TABLE */
-			/* (so the permission check really isn't necessary) */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* This command never recurses */
-			pass = AT_PASS_ADD_OTHERCONSTR;
-			break;
 		case AT_DropExpression: /* ALTER COLUMN DROP EXPRESSION */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
-			ATPrepDropExpression(rel, cmd, recurse, recursing, lockmode);
+			ATPrepDropExpression(rel, cmd);
 			pass = AT_PASS_DROP;
 			break;
 		case AT_SetStatistics:	/* ALTER COLUMN SET STATISTICS */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_INDEX | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
@@ -1850,7 +1773,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
@@ -1863,7 +1785,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_DropColumn:		/* DROP COLUMN */
 			ATSimplePermissions(rel,
 								ATT_TABLE | ATT_COMPOSITE_TYPE | ATT_FOREIGN_TABLE);
-			ATPrepDropColumn(wqueue, rel, recurse, recursing, cmd,
+			ATPrepDropColumn(wqueue, rel, recurse, cmd,
 							 lockmode, context);
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_DROP;
@@ -2035,19 +1957,16 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 		case AT_AddColumn:		/* ADD COLUMN */
 		case AT_AddColumnToView:	/* add column via CREATE OR REPLACE VIEW */
 			ATExecAddColumn(wqueue, tab, rel, &cmd,
-									  false, false,
+									  false,
 									  lockmode, cur_pass, context);
 			break;
 		case AT_AddColumnRecurse:
 			ATExecAddColumn(wqueue, tab, rel, &cmd,
-									  true, false,
+									  true,
 									  lockmode, cur_pass, context);
 			break;
 		case AT_ColumnDefault:	/* ALTER COLUMN DEFAULT */
 			ATExecColumnDefault(rel, cmd->name, cmd->def, lockmode);
-			break;
-		case AT_CookedColumnDefault:	/* add a pre-cooked default */
-			ATExecCookedColumnDefault(rel, cmd->num, cmd->def);
 			break;
 		case AT_AddIdentity:
 			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
@@ -2075,15 +1994,13 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_DropColumn:		/* DROP COLUMN */
 			ATExecDropColumn(wqueue, rel, cmd->name,
-									   cmd->behavior, false, false,
-									   cmd->missing_ok, lockmode,
-									   NULL);
+									   cmd->behavior, false,
+									   cmd->missing_ok, lockmode);
 			break;
 		case AT_DropColumnRecurse:	/* DROP COLUMN with recursion */
 			ATExecDropColumn(wqueue, rel, cmd->name,
-									   cmd->behavior, true, false,
-									   cmd->missing_ok, lockmode,
-									   NULL);
+									   cmd->behavior, true,
+									   cmd->missing_ok, lockmode);
 			break;
 		case AT_AddIndex:		/* ADD INDEX */
 			ATExecAddIndex(tab, rel, (IndexStmt *) cmd->def, false,
@@ -2125,12 +2042,12 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_DropConstraint: /* DROP CONSTRAINT */
 			ATExecDropConstraint(rel, cmd->name, cmd->behavior,
-								 false, false,
+								 false,
 								 cmd->missing_ok, lockmode);
 			break;
 		case AT_DropConstraintRecurse:	/* DROP CONSTRAINT with recursion */
 			ATExecDropConstraint(rel, cmd->name, cmd->behavior,
-								 true, false,
+								 true,
 								 cmd->missing_ok, lockmode);
 			break;
 		case AT_AlterColumnType:	/* ALTER COLUMN TYPE */
@@ -2897,54 +2814,6 @@ ATWrongRelkindError(Relation rel, int allowed_targets)
 			 errmsg(msg, RelationGetRelationName(rel))));
 }
 
-/*
- * ATSimpleRecursion
- *
- * Simple table recursion sufficient for most ALTER TABLE operations.
- * All direct and indirect children are processed in an unspecified order.
- * Note that if a child inherits from the original table via multiple
- * inheritance paths, it will be visited just once.
- */
-static void
-ATSimpleRecursion(List **wqueue, Relation rel,
-				  AlterTableCmd *cmd, bool recurse, LOCKMODE lockmode,
-				  AlterTableUtilityContext *context)
-{
-	/*
-	 * Propagate to children, if desired.  (Inheritance is no longer
-	 * supported, so there are never any children; this is effectively a
-	 * no-op, but kept for call-site compatibility.)
-	 */
-	if (recurse)
-	{
-		Oid			relid = RelationGetRelid(rel);
-		ListCell   *child;
-		List	   *children;
-
-		children = find_all_inheritors(relid, lockmode, NULL);
-
-		/*
-		 * find_all_inheritors does the recursive search of the inheritance
-		 * hierarchy, so all we have to do is process all of the relids in the
-		 * list that it returns.
-		 */
-		foreach(child, children)
-		{
-			Oid			childrelid = lfirst_oid(child);
-			Relation	childrel;
-
-			if (childrelid == relid)
-				continue;
-			/* find_all_inheritors already got lock */
-			childrel = relation_open(childrelid, NoLock);
-			CheckAlterTableIsSafe(childrel);
-			ATPrepCmd(wqueue, childrel, cmd, false, true, lockmode, context);
-			relation_close(childrel, NoLock);
-		}
-	}
-}
-
-
 
 /*
  * find_composite_type_dependencies
@@ -3115,7 +2984,7 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
  * situations correctly.)
  */
 static void
-ATPrepAddColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
+ATPrepAddColumn(List **wqueue, Relation rel, bool recurse,
 				bool is_view, AlterTableCmd *cmd, LOCKMODE lockmode,
 				AlterTableUtilityContext *context)
 {
@@ -3133,7 +3002,7 @@ ATPrepAddColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
 static ObjectAddress
 ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 				AlterTableCmd **cmd,
-				bool recurse, bool recursing,
+				bool recurse,
 				LOCKMODE lockmode, int cur_pass,
 				AlterTableUtilityContext *context)
 {
@@ -3156,12 +3025,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	TupleDesc	tupdesc;
 	FormData_pg_attribute *aattr[] = {&attribute};
 
-	/* since this function recurses, it could be driven to stack overflow */
-	check_stack_depth();
-
-	/* At top level, permission check was done in ATPrepCmd, else do it */
-	if (recursing)
-		ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 
 	attrdesc = table_open(AttributeRelationId, RowExclusiveLock);
 
@@ -3178,12 +3041,11 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * executing, subsidiary operations (such as creation of unique indexes);
 	 * so we mustn't do it until we have made the if_not_exists check.
 	 *
-	 * When recursing, the command was already transformed and we needn't do
-	 * so again.  Also, if context isn't given we can't transform.  (That
-	 * currently happens only for AT_AddColumnToView; we expect that view.c
-	 * passed us a ColumnDef that doesn't need work.)
+	 * If context isn't given we can't transform.  (That currently happens
+	 * only for AT_AddColumnToView; we expect that view.c passed us a
+	 * ColumnDef that doesn't need work.)
 	 */
-	if (context != NULL && !recursing)
+	if (context != NULL)
 	{
 		*cmd = ATParseTransformCmd(wqueue, tab, rel, *cmd, recurse, lockmode,
 								   cur_pass, context);
@@ -3538,55 +3400,24 @@ ATExecColumnDefault(Relation rel, const char *colName,
 	return address;
 }
 
-/*
- * Add a pre-cooked default expression.
- *
- * Return the address of the affected column.
- */
-static ObjectAddress
-ATExecCookedColumnDefault(Relation rel, AttrNumber attnum,
-						  Node *newDefault)
-{
-	ObjectAddress address;
-
-	/* We assume no checking is required */
-
-	/*
-	 * Remove any old default for the column.  We use RESTRICT here for
-	 * safety, but at present we do not expect anything to depend on the
-	 * default.  (In ordinary cases, there could not be a default in place
-	 * anyway, but it's possible when combining LIKE with inheritance.)
-	 */
-	RemoveAttrDefault(RelationGetRelid(rel), attnum, DROP_RESTRICT, false,
-					  true);
-
-	(void) StoreAttrDefault(rel, attnum, newDefault, true, false);
-
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	return address;
-}
 
 /*
  * ALTER TABLE ALTER COLUMN DROP EXPRESSION
  */
 static void
-ATPrepDropExpression(Relation rel, AlterTableCmd *cmd, bool recurse, bool recursing, LOCKMODE lockmode)
+ATPrepDropExpression(Relation rel, AlterTableCmd *cmd)
 {
+	HeapTuple	tuple;
+
 	/* Verify the column exists before doing any work on it */
-	if (!recursing)
-	{
-		HeapTuple	tuple;
+	tuple = SearchSysCacheAttName(RelationGetRelid(rel), cmd->name);
+	if (!HeapTupleIsValid(tuple))
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_COLUMN),
+				 errmsg("column \"%s\" of relation \"%s\" does not exist",
+						cmd->name, RelationGetRelationName(rel))));
 
-		tuple = SearchSysCacheAttName(RelationGetRelid(rel), cmd->name);
-		if (!HeapTupleIsValid(tuple))
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("column \"%s\" of relation \"%s\" does not exist",
-							cmd->name, RelationGetRelationName(rel))));
-
-		ReleaseSysCache(tuple);
-	}
+	ReleaseSysCache(tuple);
 }
 
 /*
@@ -4026,7 +3857,7 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE loc
  * on whether the column is actually dropped or not.
  */
 static void
-ATPrepDropColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
+ATPrepDropColumn(List **wqueue, Relation rel, bool recurse,
 				 AlterTableCmd *cmd, LOCKMODE lockmode,
 				 AlterTableUtilityContext *context)
 {
@@ -4048,27 +3879,16 @@ ATPrepDropColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
 static ObjectAddress
 ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 				 DropBehavior behavior,
-				 bool recurse, bool recursing,
-				 bool missing_ok, LOCKMODE lockmode,
-				 ObjectAddresses *addrs)
+				 bool recurse,
+				 bool missing_ok, LOCKMODE lockmode)
 {
 	HeapTuple	tuple;
 	Form_pg_attribute targetatt;
 	AttrNumber	attnum;
 	ObjectAddress object;
+	ObjectAddresses *addrs;
 
-	/* At top level, permission check was done in ATPrepCmd, else do it */
-	if (recursing)
-		ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-
-	/* Initialize addrs on the first invocation */
-	Assert(!recursing || addrs != NULL);
-
-	/* since this function recurses, it could be driven to stack overflow */
-	check_stack_depth();
-
-	if (!recursing)
-		addrs = new_object_addresses();
+	addrs = new_object_addresses();
 
 	/*
 	 * get the number of the attribute
@@ -4110,12 +3930,9 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 	object.objectSubId = attnum;
 	add_exact_object_address(&object, addrs);
 
-	if (!recursing)
-	{
-		/* Recursion has ended, drop everything that was collected */
-		performMultipleDeletions(addrs, behavior, 0);
-		free_object_addresses(addrs);
-	}
+	/* Drop everything that was collected */
+	performMultipleDeletions(addrs, behavior, 0);
+	free_object_addresses(addrs);
 
 	return object;
 }
@@ -4276,7 +4093,7 @@ ATExecAddIndexConstraint(AlteredTableInfo *tab, Relation rel,
 static void
 ATExecDropConstraint(Relation rel, const char *constrName,
 					 DropBehavior behavior,
-					 bool recurse, bool recursing,
+					 bool recurse,
 					 bool missing_ok, LOCKMODE lockmode)
 {
 	Relation	conrel;
@@ -4288,10 +4105,6 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();
-
-	/* At top level, permission check was done in ATPrepCmd, else do it */
-	if (recursing)
-		ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 
 	conrel = table_open(ConstraintRelationId, RowExclusiveLock);
 
@@ -6139,18 +5952,3 @@ GetAttributeCompression(Oid atttypid, char *compression)
 	return cmethod;
 }
 
-
-/*
- * find_all_inheritors
- *
- * Returns a single-element list containing only the parent itself, matching
- * the historical behavior where the parent is always present (callers skip
- * entries equal to the original relation).  There are never any children.
- */
-List *
-find_all_inheritors(Oid parentrelId, LOCKMODE lockmode, List **parents)
-{
-	if (parents)
-		*parents = NIL;
-	return list_make1_oid(parentrelId);
-}

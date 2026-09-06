@@ -31,15 +31,6 @@ typedef struct RawColumnDefault
 	char		generated;		/* attgenerated setting */
 } RawColumnDefault;
 
-typedef struct CookedConstraint
-{
-	ConstrType	contype;		/* CONSTR_DEFAULT */
-	Oid			conoid;			/* constr OID if created, otherwise Invalid */
-	char	   *name;			/* name, or NULL if none */
-	AttrNumber	attnum;			/* which attr (only for DEFAULT) */
-	Node	   *expr;			/* transformed default expr */
-} CookedConstraint;
-
 extern Relation heap_create(const char *relname,
 							Oid relnamespace,
 							Oid reltablespace,
@@ -63,7 +54,6 @@ extern Oid	heap_create_with_catalog(const char *relname,
 									 Oid ownerid,
 									 Oid accessmtd,
 									 TupleDesc tupdesc,
-									 List *cooked_constraints,
 									 char relkind,
 									 char relpersistence,
 									 bool shared_relation,
@@ -90,12 +80,12 @@ extern void InsertPgClassTuple(Relation pg_class_desc,
 							   Relation new_rel_desc,
 							   Oid new_rel_oid);
 
-extern List *AddRelationNewConstraints(Relation rel,
-									   List *newColDefaults,
-									   List *newConstraints,
-									   bool allow_merge,
-									   bool is_internal,
-									   const char *queryString);
+extern void AddRelationNewConstraints(Relation rel,
+									  List *newColDefaults,
+									  List *newConstraints,
+									  bool allow_merge,
+									  bool is_internal,
+									  const char *queryString);
 
 extern void RelationClearMissing(Relation rel);
 
