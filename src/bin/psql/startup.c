@@ -448,7 +448,6 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 		{"field-separator", required_argument, NULL, 'F'},
 		{"field-separator-zero", no_argument, NULL, 'z'},
 		{"host", required_argument, NULL, 'h'},
-		{"html", no_argument, NULL, 'H'},
 		{"list", no_argument, NULL, 'l'},
 		{"log-file", required_argument, NULL, 'L'},
 		{"no-readline", no_argument, NULL, 'n'},
@@ -462,7 +461,6 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 		{"single-step", no_argument, NULL, 's'},
 		{"single-line", no_argument, NULL, 'S'},
 		{"tuples-only", no_argument, NULL, 't'},
-		{"table-attr", required_argument, NULL, 'T'},
 		{"username", required_argument, NULL, 'U'},
 		{"set", required_argument, NULL, 'v'},
 		{"variable", required_argument, NULL, 'v'},
@@ -479,7 +477,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 
 	memset(options, 0, sizeof *options);
 
-	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:h:HlL:no:p:P:qR:sStT:U:v:VxXz?01",
+	while ((c = getopt_long(argc, argv, "aAbc:d:eEf:F:hlL:no:p:P:qR:sStU:v:VxXz?01",
 							long_options, &optindex)) != -1)
 	{
 		switch (c)
@@ -524,10 +522,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 			case 'h':
 				options->host = pg_strdup(optarg);
 				break;
-			case 'H':
-				pset.popt.topt.format = PRINT_HTML;
-				break;
-			case 'l':
+				case 'l':
 				options->list_dbs = true;
 				break;
 			case 'L':
@@ -584,10 +579,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 			case 't':
 				pset.popt.topt.tuples_only = true;
 				break;
-			case 'T':
-				pset.popt.topt.tableAttr = pg_strdup(optarg);
-				break;
-			case 'U':
+				case 'U':
 				options->username = pg_strdup(optarg);
 				break;
 			case 'v':

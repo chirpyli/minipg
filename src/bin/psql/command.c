@@ -87,7 +87,6 @@ static backslashResult process_command_g_options(char *first_option,
 static backslashResult exec_command_gdesc(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_gexec(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_gset(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_html(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_include(PsqlScanState scan_state, bool active_branch,
 											const char *cmd);
 static backslashResult exec_command_if(PsqlScanState scan_state, ConditionalStack cstack,
@@ -112,7 +111,6 @@ static backslashResult exec_command_setenv(PsqlScanState scan_state, bool active
 static backslashResult exec_command_sf_sv(PsqlScanState scan_state, bool active_branch,
 										  const char *cmd, bool is_func);
 static backslashResult exec_command_t(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_T(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_timing(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_unrestrict(PsqlScanState scan_state, bool active_branch,
 											   const char *cmd);
@@ -340,8 +338,6 @@ exec_command(const char *cmd,
 		status = exec_command_gexec(scan_state, active_branch);
 	else if (strcmp(cmd, "gset") == 0)
 		status = exec_command_gset(scan_state, active_branch);
-	else if (strcmp(cmd, "H") == 0 || strcmp(cmd, "html") == 0)
-		status = exec_command_html(scan_state, active_branch);
 	else if (strcmp(cmd, "i") == 0 || strcmp(cmd, "include") == 0 ||
 			 strcmp(cmd, "ir") == 0 || strcmp(cmd, "include_relative") == 0)
 		status = exec_command_include(scan_state, active_branch, cmd);
@@ -377,8 +373,6 @@ exec_command(const char *cmd,
 		status = exec_command_sf_sv(scan_state, active_branch, cmd, false);
 	else if (strcmp(cmd, "t") == 0)
 		status = exec_command_t(scan_state, active_branch);
-	else if (strcmp(cmd, "T") == 0)
-		status = exec_command_T(scan_state, active_branch);
 	else if (strcmp(cmd, "timing") == 0)
 		status = exec_command_timing(scan_state, active_branch);
 	else if (strcmp(cmd, "unrestrict") == 0)
@@ -1361,25 +1355,6 @@ exec_command_gset(PsqlScanState scan_state, bool active_branch)
 }
 
 /*
- * \H and \html -- toggle HTML formatting
- */
-static backslashResult
-exec_command_html(PsqlScanState scan_state, bool active_branch)
-{
-	bool		success = true;
-
-	if (active_branch)
-	{
-		if (pset.popt.topt.format != PRINT_HTML)
-			success = do_pset("format", "html", &pset.popt, pset.quiet);
-		else
-			success = do_pset("format", "aligned", &pset.popt, pset.quiet);
-	}
-
-	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
-}
-
-/*
  * \i and \ir -- include a file
  */
 static backslashResult
@@ -1823,7 +1798,7 @@ exec_command_pset(PsqlScanState scan_state, bool active_branch)
 				"fieldsep_zero", "footer", "format", "linestyle", "null",
 				"numericlocale", "pager", "pager_min_lines",
 				"recordsep", "recordsep_zero",
-				"tableattr", "title", "tuples_only",
+				"title", "tuples_only",
 				"unicode_border_linestyle",
 				"unicode_column_linestyle",
 				"unicode_header_linestyle",
@@ -2154,28 +2129,6 @@ exec_command_t(PsqlScanState scan_state, bool active_branch)
 
 		success = do_pset("tuples_only", opt, &pset.popt, pset.quiet);
 		free(opt);
-	}
-	else
-		ignore_slash_options(scan_state);
-
-	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
-}
-
-/*
- * \T -- define html <table ...> attributes
- */
-static backslashResult
-exec_command_T(PsqlScanState scan_state, bool active_branch)
-{
-	bool		success = true;
-
-	if (active_branch)
-	{
-		char	   *value = psql_scan_slash_option(scan_state,
-												   OT_NORMAL, NULL, false);
-
-		success = do_pset("tableattr", value, &pset.popt, pset.quiet);
-		free(value);
 	}
 	else
 		ignore_slash_options(scan_state);
@@ -3628,23 +3581,8 @@ _align2string(enum printFormat in)
 		case PRINT_ALIGNED:
 			return "aligned";
 			break;
-		case PRINT_ASCIIDOC:
-			return "asciidoc";
-			break;
 		case PRINT_CSV:
 			return "csv";
-			break;
-		case PRINT_HTML:
-			return "html";
-			break;
-		case PRINT_LATEX:
-			return "latex";
-			break;
-		case PRINT_LATEX_LONGTABLE:
-			return "latex-longtable";
-			break;
-		case PRINT_TROFF_MS:
-			return "troff-ms";
 			break;
 		case PRINT_UNALIGNED:
 			return "unaligned";
@@ -3724,11 +3662,7 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 		{
 			/* remember to update error message below when adding more */
 			{"aligned", PRINT_ALIGNED},
-			{"asciidoc", PRINT_ASCIIDOC},
 			{"csv", PRINT_CSV},
-			{"html", PRINT_HTML},
-			{"latex", PRINT_LATEX},
-			{"troff-ms", PRINT_TROFF_MS},
 			{"unaligned", PRINT_UNALIGNED},
 			{"wrapped", PRINT_WRAPPED}
 		};
@@ -3756,18 +3690,9 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 			}
 			if (match_pos >= 0)
 				popt->topt.format = formats[match_pos].number;
-			else if (pg_strncasecmp("latex-longtable", value, vallen) == 0)
-			{
-				/*
-				 * We must treat latex-longtable specially because latex is a
-				 * prefix of it; if both were in the table above, we'd think
-				 * "latex" is ambiguous.
-				 */
-				popt->topt.format = PRINT_LATEX_LONGTABLE;
-			}
 			else
 			{
-				pg_log_error("\\pset: allowed formats are aligned, asciidoc, csv, html, latex, latex-longtable, troff-ms, unaligned, wrapped");
+				pg_log_error("\\pset: allowed formats are aligned, csv, unaligned, wrapped");
 				return false;
 			}
 		}
@@ -3960,16 +3885,6 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 			popt->title = pg_strdup(value);
 	}
 
-	/* set HTML table tag options */
-	else if (strcmp(param, "T") == 0 || strcmp(param, "tableattr") == 0)
-	{
-		free(popt->topt.tableAttr);
-		if (!value)
-			popt->topt.tableAttr = NULL;
-		else
-			popt->topt.tableAttr = pg_strdup(value);
-	}
-
 	/* toggle use of pager */
 	else if (strcmp(param, "pager") == 0)
 	{
@@ -4155,16 +4070,6 @@ printPsetInfo(const char *param, printQueryOpt *popt)
 		printf(_("Record separator is zero byte.\n"));
 	}
 
-	/* show HTML table tag options */
-	else if (strcmp(param, "T") == 0 || strcmp(param, "tableattr") == 0)
-	{
-		if (popt->topt.tableAttr)
-			printf(_("Table attributes are \"%s\".\n"),
-				   popt->topt.tableAttr);
-		else
-			printf(_("Table attributes unset.\n"));
-	}
-
 	/* show title override */
 	else if (strcmp(param, "C") == 0 || strcmp(param, "title") == 0)
 	{
@@ -4231,8 +4136,6 @@ savePsetInfo(const printQueryOpt *popt)
 		save->topt.fieldSep.separator = pg_strdup(popt->topt.fieldSep.separator);
 	if (popt->topt.recordSep.separator)
 		save->topt.recordSep.separator = pg_strdup(popt->topt.recordSep.separator);
-	if (popt->topt.tableAttr)
-		save->topt.tableAttr = pg_strdup(popt->topt.tableAttr);
 	if (popt->nullPrint)
 		save->nullPrint = pg_strdup(popt->nullPrint);
 	if (popt->title)
@@ -4262,8 +4165,6 @@ restorePsetInfo(printQueryOpt *popt, printQueryOpt *save)
 		free(popt->topt.fieldSep.separator);
 	if (popt->topt.recordSep.separator)
 		free(popt->topt.recordSep.separator);
-	if (popt->topt.tableAttr)
-		free(popt->topt.tableAttr);
 	if (popt->nullPrint)
 		free(popt->nullPrint);
 	if (popt->title)
@@ -4371,8 +4272,6 @@ pset_value_string(const char *param, printQueryOpt *popt)
 								  : "");
 	else if (strcmp(param, "recordsep_zero") == 0)
 		return pstrdup(pset_bool_string(popt->topt.recordSep.separator_zero));
-	else if (strcmp(param, "tableattr") == 0)
-		return popt->topt.tableAttr ? pset_quoted_string(popt->topt.tableAttr) : pstrdup("");
 	else if (strcmp(param, "title") == 0)
 		return popt->title ? pset_quoted_string(popt->title) : pstrdup("");
 	else if (strcmp(param, "tuples_only") == 0)

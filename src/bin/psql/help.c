@@ -244,18 +244,15 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\a                     toggle between unaligned and aligned output mode\n"));
 	fprintf(output, _("  \\C [STRING]            set table title, or unset if none\n"));
 	fprintf(output, _("  \\f [STRING]            show or set field separator for unaligned query output\n"));
-	fprintf(output, _("  \\H                     toggle HTML output mode (currently %s)\n"),
-			ON(pset.popt.topt.format == PRINT_HTML));
 	fprintf(output, _("  \\pset [NAME [VALUE]]   set table output option\n"
 					  "                         (border|columns|csv_fieldsep|expanded|fieldsep|\n"
 					  "                         fieldsep_zero|footer|format|linestyle|null|\n"
 					  "                         numericlocale|pager|pager_min_lines|recordsep|\n"
-					  "                         recordsep_zero|tableattr|title|tuples_only|\n"
+					  "                         recordsep_zero|title|tuples_only|\n"
 					  "                         unicode_border_linestyle|unicode_column_linestyle|\n"
 					  "                         unicode_header_linestyle)\n"));
 	fprintf(output, _("  \\t [on|off]            show only rows (currently %s)\n"),
 			ON(pset.popt.topt.tuples_only));
-	fprintf(output, _("  \\T [STRING]            set HTML <table> tag attributes, or unset if none\n"));
 	fprintf(output, _("  \\x [on|off|auto]       toggle expanded output (currently %s)\n"),
 			pset.popt.topt.expanded == 2 ? "auto" : ON(pset.popt.topt.expanded));
 	fprintf(output, "\n");
@@ -406,7 +403,7 @@ helpVariables(unsigned short int pager)
 	fprintf(output, _("  footer\n"
 					  "    enable or disable display of the table footer [on, off]\n"));
 	fprintf(output, _("  format\n"
-					  "    set output format [unaligned, aligned, wrapped, html, asciidoc, ...]\n"));
+					  "    set output format [unaligned, aligned, wrapped, csv]\n"));
 	fprintf(output, _("  linestyle\n"
 					  "    set the border line drawing style [ascii, old-ascii, unicode]\n"));
 	fprintf(output, _("  null\n"
@@ -419,9 +416,6 @@ helpVariables(unsigned short int pager)
 					  "    record (line) separator for unaligned output\n"));
 	fprintf(output, _("  recordsep_zero\n"
 					  "    set record separator for unaligned output to a zero byte\n"));
-	fprintf(output, _("  tableattr (or T)\n"
-					  "    specify attributes for table tag in html format, or proportional\n"
-					  "    column widths for left-aligned data types in latex-longtable format\n"));
 	fprintf(output, _("  title\n"
 					  "    set the table title for subsequently printed tables\n"));
 	fprintf(output, _("  tuples_only\n"

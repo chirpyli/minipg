@@ -25,12 +25,7 @@ enum printFormat
 {
 	PRINT_NOTHING = 0,			/* to make sure someone initializes this */
 	PRINT_ALIGNED,
-	PRINT_ASCIIDOC,
 	PRINT_CSV,
-	PRINT_HTML,
-	PRINT_LATEX,
-	PRINT_LATEX_LONGTABLE,
-	PRINT_TROFF_MS,
 	PRINT_UNALIGNED,
 	PRINT_WRAPPED
 	/* add your favourite output format here ... */
@@ -114,7 +109,6 @@ typedef struct printTableOpt
 	char		csvFieldSep[2]; /* field separator for csv format */
 	bool		numericLocale;	/* locale-aware numeric units separator and
 								 * decimal marker */
-	char	   *tableAttr;		/* attributes for HTML <table ...> */
 	int			encoding;		/* character encoding */
 	int			env_columns;	/* $COLUMNS on psql start, 0 is unset */
 	int			columns;		/* target width for wrapped format */
@@ -186,8 +180,6 @@ extern void set_sigpipe_trap_state(bool ignore);
 
 extern FILE *PageOutput(int lines, const printTableOpt *topt);
 extern void ClosePager(FILE *pagerpipe);
-
-extern void html_escaped_print(const char *in, FILE *fout);
 
 extern void printTableInit(printTableContent *const content,
 						   const printTableOpt *opt, const char *title,
