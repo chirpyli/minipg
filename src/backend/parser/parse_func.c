@@ -2002,9 +2002,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			/* okay, since we process this like a SELECT tlist */
 			pstate->p_hasTargetSRFs = true;
 			break;
-		case EXPR_KIND_CHECK_CONSTRAINT:
-			err = _("set-returning functions are not allowed in check constraints");
-			break;
 		case EXPR_KIND_FUNCTION_DEFAULT:
 			err = _("set-returning functions are not allowed in DEFAULT expressions");
 			break;

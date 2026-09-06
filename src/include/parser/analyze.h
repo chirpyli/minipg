@@ -20,8 +20,6 @@
 
 extern Query *parse_analyze(RawStmt *parseTree, const char *sourceText,
 							Oid *paramTypes, int numParams, QueryEnvironment *queryEnv);
-extern Query *parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
-									  Oid **paramTypes, int *numParams);
 
 extern Query *parse_sub_analyze(Node *parseTree, ParseState *parentParseState,
 								bool locked_from_parent,

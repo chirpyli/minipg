@@ -111,40 +111,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 	return query;
 }
 
-/*
- * parse_analyze_varparams
- *
- * This variant is used when it's okay to deduce information about $n
- * symbol datatypes from context.  The passed-in paramTypes[] array can
- * be modified or enlarged (via repalloc).
- */
-Query *
-parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
-						Oid **paramTypes, int *numParams)
-{
-	ParseState *pstate = make_parsestate(NULL);
-	Query	   *query;
-
-	Assert(sourceText != NULL); /* required as of 8.4 */
-
-	pstate->p_sourcetext = sourceText;
-
-	parse_variable_parameters(pstate, paramTypes, numParams);
-
-	query = transformTopLevelStmt(pstate, parseTree);
-
-	/* make sure all is well with parameter types */
-	check_variable_parameters(pstate, query);
-
-	if (IsQueryIdEnabled())
-		JumbleQuery(query, sourceText);
-
-	free_parsestate(pstate);
-
-	pgstat_report_query_id(query->queryId, false);
-
-	return query;
-}
 
 /*
  * parse_sub_analyze

@@ -57,7 +57,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_OFFSET,			/* OFFSET */
 	EXPR_KIND_VALUES,			/* VALUES */
 	EXPR_KIND_VALUES_SINGLE,	/* single-row VALUES (in INSERT only) */
-	EXPR_KIND_CHECK_CONSTRAINT, /* CHECK constraint for a table */
 	EXPR_KIND_FUNCTION_DEFAULT, /* default parameter value for function */
 	EXPR_KIND_INDEX_EXPRESSION, /* index expression */
 	EXPR_KIND_INDEX_PREDICATE,	/* index predicate */

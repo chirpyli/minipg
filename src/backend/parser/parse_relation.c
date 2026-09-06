@@ -575,15 +575,6 @@ scanNSItemForColumn(ParseState *pstate, ParseNamespaceItem *nsitem,
 	if (attnum == InvalidAttrNumber)
 		return NULL;			/* Return NULL if no match */
 
-	/* In constraint check, no system column is allowed except tableOid */
-	if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT &&
-		attnum < InvalidAttrNumber && attnum != TableOidAttributeNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("system column \"%s\" reference in check constraint is invalid",
-						colname),
-				 parser_errposition(pstate, location)));
-
 	/* Found a valid match, so build a Var */
 	if (attnum > InvalidAttrNumber)
 	{

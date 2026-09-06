@@ -391,13 +391,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_VALUES_SINGLE:
 			errkind = true;
 			break;
-		case EXPR_KIND_CHECK_CONSTRAINT:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in check constraints");
-			else
-				err = _("grouping operations are not allowed in check constraints");
-
-			break;
 		case EXPR_KIND_FUNCTION_DEFAULT:
 
 			if (isAgg)
