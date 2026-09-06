@@ -218,8 +218,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	VacAttrStats **vacattrstats;
 	AnlIndexData *indexdata;
 	int			targrows,
-				numrows,
-				minrows;
+				numrows;
 	double		totalrows,
 				totaldeadrows;
 	HeapTuple  *rows;

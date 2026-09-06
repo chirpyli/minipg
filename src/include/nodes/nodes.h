@@ -168,7 +168,6 @@ typedef enum NodeTag
 	T_SQLValueFunction,
 	T_NullTest,
 	T_BooleanTest,
-	T_SetToDefault,
 	T_InferenceElem,
 	T_TargetEntry,
 	T_RangeTblRef,
@@ -343,7 +342,6 @@ typedef enum NodeTag
 	T_RowMarkClause,
 	T_InferClause,
 	T_OnConflictClause,
-	T_RoleSpec,
 	T_VacuumRelation,
 
 	/*

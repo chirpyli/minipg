@@ -1639,7 +1639,6 @@ pg_stat_get_wal(PG_FUNCTION_ARGS)
 	TupleDesc	tupdesc;
 	Datum		values[PG_STAT_GET_WAL_COLS];
 	bool		nulls[PG_STAT_GET_WAL_COLS];
-	char		buf[256];
 	PgStat_WalStats *wal_stats;
 
 	/* Initialise values and NULL flags arrays */

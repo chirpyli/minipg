@@ -487,7 +487,6 @@ DefineIndex(Oid relationId,
 	Form_pg_am	accessMethodForm;
 	IndexAmRoutine *amRoutine;
 	bool		amcanorder;
-	amoptions_function amoptions;
 	bool		safe_index;
 	Datum		reloptions;
 	int16	   *coloptions;
@@ -700,7 +699,6 @@ DefineIndex(Oid relationId,
 				 errmsg("access method \"%s\" does not support multicolumn indexes",
 						accessMethodName)));
 	amcanorder = amRoutine->amcanorder;
-	amoptions = amRoutine->amoptions;
 
 	pfree(amRoutine);
 	ReleaseSysCache(tuple);

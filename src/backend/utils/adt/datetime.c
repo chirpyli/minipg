@@ -44,10 +44,6 @@ static int	DecodeDate(char *str, int fmask, int *tmask, bool *is2digits,
 					   struct pg_tm *tm);
 static char *AppendSeconds(char *cp, int sec, fsec_t fsec,
 						   int precision, bool fillzeros);
-static void AdjustFractSeconds(double frac, struct pg_tm *tm, fsec_t *fsec,
-							   int scale);
-static void AdjustFractDays(double frac, struct pg_tm *tm, fsec_t *fsec,
-							int scale);
 static int	DetermineTimeZoneOffsetInternal(struct pg_tm *tm, pg_tz *tzp,
 											pg_time_t *tp);
 static bool DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t,
@@ -496,38 +492,6 @@ AppendTimestampSeconds(char *cp, struct pg_tm *tm, fsec_t fsec)
 	return AppendSeconds(cp, tm->tm_sec, fsec, MAX_TIMESTAMP_PRECISION, true);
 }
 
-/*
- * Multiply frac by scale (to produce seconds) and add to *tm & *fsec.
- * We assume the input frac is less than 1 so overflow is not an issue.
- */
-static void
-AdjustFractSeconds(double frac, struct pg_tm *tm, fsec_t *fsec, int scale)
-{
-	int			sec;
-
-	if (frac == 0)
-		return;
-	frac *= scale;
-	sec = (int) frac;
-	tm->tm_sec += sec;
-	frac -= sec;
-	*fsec += rint(frac * 1000000);
-}
-
-/* As above, but initial scale produces days */
-static void
-AdjustFractDays(double frac, struct pg_tm *tm, fsec_t *fsec, int scale)
-{
-	int			extra_days;
-
-	if (frac == 0)
-		return;
-	frac *= scale;
-	extra_days = (int) frac;
-	tm->tm_mday += extra_days;
-	frac -= extra_days;
-	AdjustFractSeconds(frac, tm, fsec, SECS_PER_DAY);
-}
 
 /* Fetch a fractional-second value with suitable error checking */
 static int
@@ -3093,49 +3057,6 @@ ClearPgTm(struct pg_tm *tm, fsec_t *fsec)
  *	preceding an hh:mm:ss field. - thomas 1998-04-30
  */
 
-/*
- * Helper functions to avoid duplicated code in DecodeISO8601Interval.
- *
- * Parse a decimal value and break it into integer and fractional parts.
- * Returns 0 or DTERR code.
- */
-static int
-ParseISO8601Number(char *str, char **endptr, int *ipart, double *fpart)
-{
-	double		val;
-
-	if (!(isdigit((unsigned char) *str) || *str == '-' || *str == '.'))
-		return DTERR_BAD_FORMAT;
-	errno = 0;
-	val = strtod(str, endptr);
-	/* did we not see anything that looks like a double? */
-	if (*endptr == str || errno != 0)
-		return DTERR_BAD_FORMAT;
-	/* watch out for overflow */
-	if (val < INT_MIN || val > INT_MAX)
-		return DTERR_FIELD_OVERFLOW;
-	/* be very sure we truncate towards zero (cf dtrunc()) */
-	if (val >= 0)
-		*ipart = (int) floor(val);
-	else
-		*ipart = (int) -floor(-val);
-	*fpart = val - *ipart;
-	return 0;
-}
-
-/*
- * Determine number of integral digits in a valid ISO 8601 number field
- * (we should ignore sign and any fraction part)
- */
-static int
-ISO8601IntegerWidth(char *fieldstart)
-{
-	/* We might have had a leading '-' */
-	if (*fieldstart == '-')
-		fieldstart++;
-	return strspn(fieldstart, "0123456789");
-}
-
 
 /* DecodeISO8601Interval()
  *	Decode an ISO 8601 time interval of the "format with designators"
@@ -3601,63 +3522,6 @@ EncodeDateTime(struct pg_tm *tm, fsec_t fsec, bool print_tz, int tz, const char 
 	*str = '\0';
 }
 
-
-/*
- * Helper functions to avoid duplicated code in EncodeInterval.
- */
-
-/* Append an ISO-8601-style interval field, but only if value isn't zero */
-static char *
-AddISO8601IntPart(char *cp, int value, char units)
-{
-	if (value == 0)
-		return cp;
-	sprintf(cp, "%d%c", value, units);
-	return cp + strlen(cp);
-}
-
-/* Append a postgres-style interval field, but only if value isn't zero */
-static char *
-AddPostgresIntPart(char *cp, int value, const char *units,
-				   bool *is_zero, bool *is_before)
-{
-	if (value == 0)
-		return cp;
-	sprintf(cp, "%s%s%d %s%s",
-			(!*is_zero) ? " " : "",
-			(*is_before && value > 0) ? "+" : "",
-			value,
-			units,
-			(value != 1) ? "s" : "");
-
-	/*
-	 * Each nonzero field sets is_before for (only) the next one.  This is a
-	 * tad bizarre but it's how it worked before...
-	 */
-	*is_before = (value < 0);
-	*is_zero = false;
-	return cp + strlen(cp);
-}
-
-/* Append a verbose-style interval field, but only if value isn't zero */
-static char *
-AddVerboseIntPart(char *cp, int value, const char *units,
-				  bool *is_zero, bool *is_before)
-{
-	if (value == 0)
-		return cp;
-	/* first nonzero value sets is_before */
-	if (*is_zero)
-	{
-		*is_before = (value < 0);
-		value = abs(value);
-	}
-	else if (*is_before)
-		value = -value;
-	sprintf(cp, " %d %s%s", value, units, (value == 1) ? "" : "s");
-	*is_zero = false;
-	return cp + strlen(cp);
-}
 
 
 /* EncodeInterval()

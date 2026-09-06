@@ -84,8 +84,6 @@ const char *debug_query_string; /* client-supplied query string */
 /* Note: whereToSendOutput is initialized for the bootstrap/standalone case */
 CommandDest whereToSendOutput = DestDebug;
 
-int			log_statement = LOGSTMT_NONE;
-
 /* GUC variable for maximum stack depth (measured in kilobytes) */
 int			max_stack_depth = 100;
 
@@ -565,7 +563,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	ParseState *pstate;
 	Query	   *query;
 	List	   *querytree_list;
-	JumbleState *jstate = NULL;
 
 	Assert(query_string != NULL);	/* required as of 8.4 */
 
@@ -582,7 +579,7 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	query = transformTopLevelStmt(pstate, parsetree);
 
 	if (IsQueryIdEnabled())
-		jstate = JumbleQuery(query, query_string);
+		JumbleQuery(query, query_string);
 
 	free_parsestate(pstate);
 
@@ -733,7 +730,6 @@ exec_simple_query(const char *query_string)
 	List	   *parsetree_list;
 	ListCell   *parsetree_item;
 	bool		save_log_statement_stats = log_statement_stats;
-	bool		was_logged = false;
 	bool		use_implicit_block;
 
 	/*
@@ -771,15 +767,6 @@ exec_simple_query(const char *query_string)
 	 * we are in aborted transaction state!)
 	 */
 	parsetree_list = pg_parse_query(query_string);
-
-	/* Log immediately if dictated by log_statement */
-	if (check_log_statement(parsetree_list))
-	{
-		ereport(LOG,
-				(errmsg("statement: %s", query_string),
-				 errhidestmt(true)));
-		was_logged = true;
-	}
 
 	/*
 	 * Switch back to transaction context to enter the loop.
@@ -1909,8 +1896,6 @@ set_debug_options(int debug_flag, GucContext context, GucSource source)
 	else
 		SetConfigOption("log_min_messages", "notice", context, source);
 
-	if (debug_flag >= 2)
-		SetConfigOption("log_statement", "all", context, source);
 	if (debug_flag >= 3)
 		SetConfigOption("debug_print_parse", "true", context, source);
 	if (debug_flag >= 4)
@@ -2922,29 +2907,6 @@ ShowUsage(const char *title)
 			 errdetail_internal("%s", str.data)));
 
 	pfree(str.data);
-}
-
-
-static bool
-check_log_statement(List *stmt_list)
-{
-	ListCell   *stmt_item;
-
-	if (log_statement == LOGSTMT_NONE)
-		return false;
-	if (log_statement == LOGSTMT_ALL)
-		return true;
-
-	/* Else we have to inspect the statement(s) to see whether to log */
-	foreach(stmt_item, stmt_list)
-	{
-		Node	   *stmt = (Node *) lfirst(stmt_item);
-
-		if (GetCommandLogLevel(stmt) <= log_statement)
-			return true;
-	}
-
-	return false;
 }
 
 static int

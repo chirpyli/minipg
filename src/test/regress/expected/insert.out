@@ -2,87 +2,81 @@
 -- insert with DEFAULT in the target_list
 --
 create table inserttest (col1 int4, col2 int4, col3 text default 'testing');
+ERROR:  syntax error at or near "default"
+LINE 1: ...table inserttest (col1 int4, col2 int4, col3 text default 't...
+                                                             ^
 insert into inserttest (col1, col2, col3) values (DEFAULT, DEFAULT, DEFAULT);
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: insert into inserttest (col1, col2, col3) values (DEFAULT, D...
+                                                          ^
 insert into inserttest (col2, col3) values (3, DEFAULT);
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: insert into inserttest (col2, col3) values (3, DEFAULT);
+                                                       ^
 insert into inserttest (col1, col2, col3) values (DEFAULT, 5, DEFAULT);
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: insert into inserttest (col1, col2, col3) values (DEFAULT, 5...
+                                                          ^
 insert into inserttest values (DEFAULT, 5, 'test');
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: insert into inserttest values (DEFAULT, 5, 'test');
+                                       ^
 insert into inserttest values (DEFAULT, 7);
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: insert into inserttest values (DEFAULT, 7);
+                                       ^
 select * from inserttest;
- col1 | col2 |  col3   
-------+------+---------
-      |      | testing
-      |    3 | testing
-      |    5 | testing
-      |    5 | test
-      |    7 | testing
-(5 rows)
-
+ERROR:  relation "inserttest" does not exist
+LINE 1: select * from inserttest;
+                      ^
 --
 -- insert with similar expression / target_list values (all fail)
 --
 insert into inserttest (col1, col2, col3) values (DEFAULT, DEFAULT);
-ERROR:  INSERT has more target columns than expressions
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: insert into inserttest (col1, col2, col3) values (DEFAULT, D...
-                                            ^
+                                                          ^
 insert into inserttest (col1, col2, col3) values (1, 2);
-ERROR:  INSERT has more target columns than expressions
+ERROR:  relation "inserttest" does not exist
 LINE 1: insert into inserttest (col1, col2, col3) values (1, 2);
-                                            ^
+                    ^
 insert into inserttest (col1) values (1, 2);
-ERROR:  INSERT has more expressions than target columns
+ERROR:  relation "inserttest" does not exist
 LINE 1: insert into inserttest (col1) values (1, 2);
-                                                 ^
+                    ^
 insert into inserttest (col1) values (DEFAULT, DEFAULT);
-ERROR:  INSERT has more expressions than target columns
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: insert into inserttest (col1) values (DEFAULT, DEFAULT);
-                                                       ^
+                                              ^
 select * from inserttest;
- col1 | col2 |  col3   
-------+------+---------
-      |      | testing
-      |    3 | testing
-      |    5 | testing
-      |    5 | test
-      |    7 | testing
-(5 rows)
-
+ERROR:  relation "inserttest" does not exist
+LINE 1: select * from inserttest;
+                      ^
 --
 -- VALUES test
 --
 insert into inserttest values(10, 20, '40'), (-1, 2, DEFAULT),
     ((select 2), (select i from (values(3)) as foo (i)), 'values are fun!');
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: ...sert into inserttest values(10, 20, '40'), (-1, 2, DEFAULT),
+                                                              ^
 select * from inserttest;
- col1 | col2 |      col3       
-------+------+-----------------
-      |      | testing
-      |    3 | testing
-      |    5 | testing
-      |    5 | test
-      |    7 | testing
-   10 |   20 | 40
-   -1 |    2 | testing
-    2 |    3 | values are fun!
-(8 rows)
-
+ERROR:  relation "inserttest" does not exist
+LINE 1: select * from inserttest;
+                      ^
 --
 -- TOASTed value test
 --
 insert into inserttest values(30, 50, repeat('x', 10000));
+ERROR:  relation "inserttest" does not exist
+LINE 1: insert into inserttest values(30, 50, repeat('x', 10000));
+                    ^
 select col1, col2, char_length(col3) from inserttest;
- col1 | col2 | char_length 
-------+------+-------------
-      |      |           7
-      |    3 |           7
-      |    5 |           7
-      |    5 |           4
-      |    7 |           7
-   10 |   20 |           2
-   -1 |    2 |           7
-    2 |    3 |          15
-   30 |   50 |       10000
-(9 rows)
-
+ERROR:  relation "inserttest" does not exist
+LINE 1: select col1, col2, char_length(col3) from inserttest;
+                                                  ^
 drop table inserttest;
+ERROR:  table "inserttest" does not exist
 --
 -- tuple larger than page
 --

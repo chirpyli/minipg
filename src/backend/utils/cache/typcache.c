@@ -979,7 +979,7 @@ lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod)
 	TupleDesc	tmp;
 
 	tmp = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
-	return CreateTupleDescCopyConstr(tmp);
+	return CreateTupleDescCopy(tmp);
 }
 
 /*

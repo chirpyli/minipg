@@ -72,11 +72,6 @@ static void ExecutePlan(QueryDesc *queryDesc,
 						ScanDirection direction,
 						DestReceiver *dest);
 static void ExecCheckXactReadOnly(PlannedStmt *plannedstmt);
-static char *ExecBuildSlotValueDescription(Oid reloid,
-										   TupleTableSlot *slot,
-										   TupleDesc tupdesc,
-										   Bitmapset *modifiedCols,
-										   int maxfieldlen);
 static void EvalPlanQualStart(EPQState *epqstate, Plan *planTree);
 
 /* end of local decls */
@@ -1092,87 +1087,6 @@ ExecutePlan(QueryDesc *queryDesc,
 
 	if (use_parallel_mode)
 		ExitParallelMode();
-}
-
-/*
- * ExecBuildSlotValueDescription -- construct a string representing a tuple
- *
- * This is intentionally very similar to BuildIndexValueDescription, but
- * unlike that function, we truncate long field values (to at most maxfieldlen
- * bytes).  That seems necessary here since heap field values could be very
- * long, whereas index entries typically aren't so wide.
- *
- * Also, unlike the case with index entries, we need to be prepared to ignore
- * dropped columns.  We used to use the slot's tuple descriptor to decode the
- * data, but the slot's descriptor doesn't identify dropped columns, so we
- * now need to be passed the relation's descriptor.
- *
- * Note that, like BuildIndexValueDescription, if the user does not have
- * permission to view any of the columns involved, a NULL is returned.  Unlike
- * BuildIndexValueDescription, if the user has access to view a subset of the
- * column involved, that subset will be returned with a key identifying which
- * columns they are.
- */
-static char *
-ExecBuildSlotValueDescription(Oid reloid,
-							  TupleTableSlot *slot,
-							  TupleDesc tupdesc,
-							  Bitmapset *modifiedCols,
-							  int maxfieldlen)
-{
-	StringInfoData buf;
-	bool		write_comma = false;
-	int			i;
-
-	initStringInfo(&buf);
-
-	appendStringInfoChar(&buf, '(');
-
-	/* Make sure the tuple is fully deconstructed */
-	slot_getallattrs(slot);
-
-	for (i = 0; i < tupdesc->natts; i++)
-	{
-		char	   *val;
-		int			vallen;
-		Form_pg_attribute att = TupleDescAttr(tupdesc, i);
-
-		/* ignore dropped columns */
-		if (att->attisdropped)
-			continue;
-
-		if (slot->tts_isnull[i])
-			val = "null";
-		else
-		{
-			Oid			foutoid;
-			bool		typisvarlena;
-
-			getTypeOutputInfo(att->atttypid,
-							  &foutoid, &typisvarlena);
-			val = OidOutputFunctionCall(foutoid, slot->tts_values[i]);
-		}
-
-		if (write_comma)
-			appendStringInfoString(&buf, ", ");
-		else
-			write_comma = true;
-
-		/* truncate if needed */
-		vallen = strlen(val);
-		if (vallen <= maxfieldlen)
-			appendBinaryStringInfo(&buf, val, vallen);
-		else
-		{
-			vallen = pg_mbcliplen(val, vallen, maxfieldlen);
-			appendBinaryStringInfo(&buf, val, vallen);
-			appendStringInfoString(&buf, "...");
-		}
-	}
-
-	appendStringInfoChar(&buf, ')');
-
-	return buf.data;
 }
 
 

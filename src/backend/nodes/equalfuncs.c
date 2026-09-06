@@ -622,17 +622,6 @@ _equalBooleanTest(const BooleanTest *a, const BooleanTest *b)
 }
 
 static bool
-_equalSetToDefault(const SetToDefault *a, const SetToDefault *b)
-{
-	COMPARE_SCALAR_FIELD(typeId);
-	COMPARE_SCALAR_FIELD(typeMod);
-	COMPARE_SCALAR_FIELD(collation);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalInferenceElem(const InferenceElem *a, const InferenceElem *b)
 {
 	COMPARE_NODE_FIELD(expr);
@@ -949,7 +938,6 @@ _equalAlterTableCmd(const AlterTableCmd *a, const AlterTableCmd *b)
 	COMPARE_SCALAR_FIELD(subtype);
 	COMPARE_STRING_FIELD(name);
 	COMPARE_SCALAR_FIELD(num);
-	COMPARE_NODE_FIELD(newowner);
 	COMPARE_NODE_FIELD(def);
 	COMPARE_SCALAR_FIELD(behavior);
 	COMPARE_SCALAR_FIELD(missing_ok);
@@ -1561,17 +1549,6 @@ _equalOnConflictClause(const OnConflictClause *a, const OnConflictClause *b)
 	return true;
 }
 
-
-static bool
-_equalRoleSpec(const RoleSpec *a, const RoleSpec *b)
-{
-	COMPARE_SCALAR_FIELD(roletype);
-	COMPARE_STRING_FIELD(rolename);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
 /*
  * Stuff from pg_list.h
  */
@@ -1797,9 +1774,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_BooleanTest:
 			retval = _equalBooleanTest(a, b);
-			break;
-		case T_SetToDefault:
-			retval = _equalSetToDefault(a, b);
 			break;
 		case T_InferenceElem:
 			retval = _equalInferenceElem(a, b);
@@ -2042,9 +2016,6 @@ equal(const void *a, const void *b)
 		case T_ObjectWithArgs:
 			retval = _equalObjectWithArgs(a, b);
 			break;
-			break;
-		case T_RoleSpec:
-			retval = _equalRoleSpec(a, b);
 			break;
 
 		default:

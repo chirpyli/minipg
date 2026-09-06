@@ -1,7 +1,7 @@
 # 要求
+- 每次删减功能，请尽量消除编译警告，消除无效代码。
+- 每次删减功能，请通过回归测试 make check-world。
 
-- 通过回归测试make check-world 成功
-- 每次删减功能，在回归测试完全通过后，请自动更新mydoc/CHANGE.md文档，说明删减了什么功能。
 
 ## 不可被裁剪的部分
 
@@ -14,10 +14,9 @@
 - 不建议使用perl或python等脚本修改代码
 - 裁剪时不用担心全库重编译
 - 在分析是否可裁剪时，需要考虑该功能是否为数据库内核的核心功能，如果为非核心功能，则可以考虑进行裁剪，需要从学习数据库内核的角度来考虑，学习价值低的优先裁剪，学习价值高的则暂不裁剪。
-- sgml文档的裁剪不用记录到CHANGE.md文档中
 - 裁剪代码倾向于彻底裁剪，尽量不用用条件编译等方式，不用保留死代码，无需代码需要进行清理。
 
 ## 参考
 
-- postgres源码：/home/postgres/works/opensource/postgres ， 该postgres源码为minipg项目裁剪前的源码，在分析minipg项目时，可以参考该postgres源码
+- postgres源码：/home/postgres/works/opensource/postgres ， 该postgres源码为minipg项目裁剪前的源码，在分析minipg项目时，可以参考该postgres源码。
 - 在制定裁剪方案时，可参考postgres的该功能的历史提交记录，以便于对比分析，另外可以分析该功能是在哪个版本中引入的，以便于分析该功能的引入原因，去判断裁剪方案。

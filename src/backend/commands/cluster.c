@@ -1435,16 +1435,6 @@ finish_heap_swap(Oid OIDOldHeap, Oid OIDNewHeap,
 		}
 		relation_close(newrel, NoLock);
 	}
-
-	/* if it's not a catalog table, clear any missing attribute settings */
-	if (!is_system_catalog)
-	{
-		Relation	newrel;
-
-		newrel = table_open(OIDOldHeap, NoLock);
-		RelationClearMissing(newrel);
-		relation_close(newrel, NoLock);
-	}
 }
 
 

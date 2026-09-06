@@ -943,22 +943,6 @@ _readBooleanTest(void)
 }
 
 /*
- * _readSetToDefault
- */
-static SetToDefault *
-_readSetToDefault(void)
-{
-	READ_LOCALS(SetToDefault);
-
-	READ_OID_FIELD(typeId);
-	READ_INT_FIELD(typeMod);
-	READ_OID_FIELD(collation);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
  * _readInferenceElem
  */
 static InferenceElem *
@@ -2209,8 +2193,6 @@ parseNodeString(void)
 		return_value = _readNullTest();
 	else if (MATCH("BOOLEANTEST", 11))
 		return_value = _readBooleanTest();
-	else if (MATCH("SETTODEFAULT", 12))
-		return_value = _readSetToDefault();
 	else if (MATCH("INFERENCEELEM", 13))
 		return_value = _readInferenceElem();
 	else if (MATCH("TARGETENTRY", 11))

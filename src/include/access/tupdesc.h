@@ -19,24 +19,10 @@
 #include "nodes/pg_list.h"
 
 
-typedef struct AttrDefault
-{
-	AttrNumber	adnum;
-	char	   *adbin;			/* nodeToString representation of expr */
-} AttrDefault;
-
-/* This structure contains constraints of a tuple */
-typedef struct TupleConstr
-{
-	AttrDefault *defval;		/* array */
-	struct AttrMissing *missing;	/* missing attributes values, NULL if none */
-	uint16		num_defval;
-} TupleConstr;
-
 /*
  * This struct is passed around within the backend to describe the structure
  * of tuples.  For tuples coming from on-disk relations, the information is
- * collected from the pg_attribute, pg_attrdef, and pg_constraint catalogs.
+ * collected from the pg_attribute and pg_constraint catalogs.
  * Transient row types (such as the result of a join query) have anonymous
  * TupleDesc structs that generally omit any constraint info; therefore the
  * structure is designed to let the constraints be omitted efficiently.
@@ -70,7 +56,6 @@ typedef struct TupleDescData
 	Oid			tdtypeid;		/* composite type ID for tuple type */
 	int32		tdtypmod;		/* typmod for tuple type */
 	int			tdrefcount;		/* reference count, or -1 if not counting */
-	TupleConstr *constr;		/* constraints, or NULL if none */
 	/* attrs[N] is the description of Attribute Number N+1 */
 	FormData_pg_attribute attrs[FLEXIBLE_ARRAY_MEMBER];
 }			TupleDescData;
@@ -84,8 +69,6 @@ extern TupleDesc CreateTemplateTupleDesc(int natts);
 extern TupleDesc CreateTupleDesc(int natts, Form_pg_attribute *attrs);
 
 extern TupleDesc CreateTupleDescCopy(TupleDesc tupdesc);
-
-extern TupleDesc CreateTupleDescCopyConstr(TupleDesc tupdesc);
 
 #define TupleDescSize(src) \
 	(offsetof(struct TupleDescData, attrs) + \

@@ -135,12 +135,6 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 	 */
 	char		attcompression BKI_DEFAULT('\0');
 
-	/* Has DEFAULT value or not */
-	bool		atthasdef BKI_DEFAULT(f);
-
-	/* Has a missing value or not */
-	bool		atthasmissing BKI_DEFAULT(f);
-
 	/* Is dropped (ie, logically invisible) or not */
 	bool		attisdropped BKI_DEFAULT(f);
 
@@ -149,12 +143,6 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 
 	/* Column-level options */
 	text		attoptions[1] BKI_DEFAULT(_null_);
-
-	/*
-	 * Missing value for added columns. This is a one element array which lets
-	 * us store a value of the attribute type here.
-	 */
-	anyarray	attmissingval BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_attribute;
 

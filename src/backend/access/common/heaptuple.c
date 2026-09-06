@@ -84,129 +84,10 @@
 #define VARLENA_ATT_IS_PACKABLE(att) \
 	((att)->attstorage != TYPSTORAGE_PLAIN)
 
-/*
- * Setup for cacheing pass-by-ref missing attributes in a way that survives
- * tupleDesc destruction.
- */
-
-typedef struct
-{
-	int			len;
-	Datum		value;
-} missing_cache_key;
-
-static HTAB *missing_cache = NULL;
-
-static uint32
-missing_hash(const void *key, Size keysize)
-{
-	const missing_cache_key *entry = (missing_cache_key *) key;
-
-	return hash_bytes((const unsigned char *) entry->value, entry->len);
-}
-
-static int
-missing_match(const void *key1, const void *key2, Size keysize)
-{
-	const missing_cache_key *entry1 = (missing_cache_key *) key1;
-	const missing_cache_key *entry2 = (missing_cache_key *) key2;
-
-	if (entry1->len != entry2->len)
-		return entry1->len > entry2->len ? 1 : -1;
-
-	return memcmp(DatumGetPointer(entry1->value),
-				  DatumGetPointer(entry2->value),
-				  entry1->len);
-}
-
-static void
-init_missing_cache()
-{
-	HASHCTL		hash_ctl;
-
-	hash_ctl.keysize = sizeof(missing_cache_key);
-	hash_ctl.entrysize = sizeof(missing_cache_key);
-	hash_ctl.hcxt = TopMemoryContext;
-	hash_ctl.hash = missing_hash;
-	hash_ctl.match = missing_match;
-	missing_cache =
-		hash_create("Missing Values Cache",
-					32,
-					&hash_ctl,
-					HASH_ELEM | HASH_CONTEXT | HASH_FUNCTION | HASH_COMPARE);
-}
-
 /* ----------------------------------------------------------------
  *						misc support routines
  * ----------------------------------------------------------------
  */
-
-/*
- * Return the missing value of an attribute, or NULL if there isn't one.
- */
-Datum
-getmissingattr(TupleDesc tupleDesc,
-			   int attnum, bool *isnull)
-{
-	Form_pg_attribute att;
-
-	Assert(attnum <= tupleDesc->natts);
-	Assert(attnum > 0);
-
-	att = TupleDescAttr(tupleDesc, attnum - 1);
-
-	if (att->atthasmissing)
-	{
-		AttrMissing *attrmiss;
-
-		Assert(tupleDesc->constr);
-		Assert(tupleDesc->constr->missing);
-
-		attrmiss = tupleDesc->constr->missing + (attnum - 1);
-
-		if (attrmiss->am_present)
-		{
-			missing_cache_key key;
-			missing_cache_key *entry;
-			bool		found;
-			MemoryContext oldctx;
-
-			*isnull = false;
-
-			/* no  need to cache by-value attributes */
-			if (att->attbyval)
-				return attrmiss->am_value;
-
-			/* set up cache if required */
-			if (missing_cache == NULL)
-				init_missing_cache();
-
-			/* check if there's a cache entry */
-			Assert(att->attlen > 0 || att->attlen == -1);
-			if (att->attlen > 0)
-				key.len = att->attlen;
-			else
-				key.len = VARSIZE_ANY(attrmiss->am_value);
-			key.value = attrmiss->am_value;
-
-			entry = hash_search(missing_cache, &key, HASH_ENTER, &found);
-
-			if (!found)
-			{
-				/* cache miss, so we need a non-transient copy of the datum */
-				oldctx = MemoryContextSwitchTo(TopMemoryContext);
-				entry->value =
-					datumCopy(attrmiss->am_value, false, att->attlen);
-				MemoryContextSwitchTo(oldctx);
-			}
-
-			return entry->value;
-		}
-	}
-
-	*isnull = true;
-	return PointerGetDatum(NULL);
-}
 
 /*
  * heap_compute_data_size
@@ -456,17 +337,12 @@ bool
 heap_attisnull(HeapTuple tup, int attnum, TupleDesc tupleDesc)
 {
 	/*
-	 * We allow a NULL tupledesc for relations not expected to have missing
-	 * values, such as catalog relations and indexes.
+	 * We allow a NULL tupledesc for relations not expected to have defaults,
+	 * such as catalog relations and indexes.
 	 */
 	Assert(!tupleDesc || attnum <= tupleDesc->natts);
 	if (attnum > (int) HeapTupleHeaderGetNatts(tup->t_data))
-	{
-		if (tupleDesc && TupleDescAttr(tupleDesc, attnum - 1)->atthasmissing)
-			return false;
-		else
-			return true;
-	}
+		return true;
 
 	if (attnum > 0)
 	{
@@ -817,8 +693,7 @@ heap_copytuple_with_tuple(HeapTuple src, HeapTuple dest)
 
 /*
  * Expand a tuple which has fewer attributes than required. For each attribute
- * not present in the sourceTuple, if there is a missing value that will be
- * used. Otherwise the attribute will be set to NULL.
+ * not present in the sourceTuple, the attribute will be set to NULL.
  *
  * The source tuple must have fewer attributes than the required number.
  *
@@ -831,9 +706,7 @@ expand_tuple(HeapTuple *targetHeapTuple,
 			 HeapTuple sourceTuple,
 			 TupleDesc tupleDesc)
 {
-	AttrMissing *attrmiss = NULL;
 	int			attnum;
-	int			firstmissingnum;
 	bool		hasNulls = HeapTupleHasNulls(sourceTuple);
 	HeapTupleHeader targetTHeader;
 	HeapTupleHeader sourceTHeader = sourceTuple->t_data;
@@ -859,66 +732,10 @@ expand_tuple(HeapTuple *targetHeapTuple,
 
 	targetDataLen = sourceDataLen;
 
-	if (tupleDesc->constr &&
-		tupleDesc->constr->missing)
-	{
-		/*
-		 * If there are missing values we want to put them into the tuple.
-		 * Before that we have to compute the extra length for the values
-		 * array and the variable length data.
-		 */
-		attrmiss = tupleDesc->constr->missing;
-
-		/*
-		 * Find the first item in attrmiss for which we don't have a value in
-		 * the source. We can ignore all the missing entries before that.
-		 */
-		for (firstmissingnum = sourceNatts;
-			 firstmissingnum < natts;
-			 firstmissingnum++)
-		{
-			if (attrmiss[firstmissingnum].am_present)
-				break;
-			else
-				hasNulls = true;
-		}
-
-		/*
-		 * Now walk the missing attributes. If there is a missing value make
-		 * space for it. Otherwise, it's going to be NULL.
-		 */
-		for (attnum = firstmissingnum;
-			 attnum < natts;
-			 attnum++)
-		{
-			if (attrmiss[attnum].am_present)
-			{
-				Form_pg_attribute att = TupleDescAttr(tupleDesc, attnum);
-
-				targetDataLen = att_align_datum(targetDataLen,
-												att->attalign,
-												att->attlen,
-												attrmiss[attnum].am_value);
-
-				targetDataLen = att_addlength_pointer(targetDataLen,
-													  att->attlen,
-													  attrmiss[attnum].am_value);
-			}
-			else
-			{
-				/* no missing value, so it must be null */
-				hasNulls = true;
-			}
-		}
-	}							/* end if have missing values */
-	else
-	{
-		/*
-		 * If there are no missing values at all then NULLS must be allowed,
-		 * since some of the attributes are known to be absent.
-		 */
-		hasNulls = true;
-	}
+	/*
+	 * Some attributes are known to be absent, so NULLS must be allowed.
+	 */
+	hasNulls = true;
 
 	len = 0;
 
@@ -1018,37 +835,24 @@ expand_tuple(HeapTuple *targetHeapTuple,
 
 	targetData += sourceDataLen;
 
-	/* Now fill in the missing values */
+	/* Now fill in the missing attributes as NULL */
 	for (attnum = sourceNatts; attnum < natts; attnum++)
 	{
-
 		Form_pg_attribute attr = TupleDescAttr(tupleDesc, attnum);
 
-		if (attrmiss && attrmiss[attnum].am_present)
-		{
-			fill_val(attr,
-					 nullBits ? &nullBits : NULL,
-					 &bitMask,
-					 &targetData,
-					 infoMask,
-					 attrmiss[attnum].am_value,
-					 false);
-		}
-		else
-		{
-			fill_val(attr,
-					 &nullBits,
-					 &bitMask,
-					 &targetData,
-					 infoMask,
-					 (Datum) 0,
-					 true);
-		}
-	}							/* end loop over missing attributes */
+		fill_val(attr,
+				 &nullBits,
+				 &bitMask,
+				 &targetData,
+				 infoMask,
+				 (Datum) 0,
+				 true);
+	}
 }
 
 /*
- * Fill in the missing values for a minimal HeapTuple
+ * Expand a minimal HeapTuple to the full tuple descriptor, filling absent
+ * attributes as NULL.
  */
 MinimalTuple
 minimal_expand_tuple(HeapTuple sourceTuple, TupleDesc tupleDesc)
@@ -1060,7 +864,8 @@ minimal_expand_tuple(HeapTuple sourceTuple, TupleDesc tupleDesc)
 }
 
 /*
- * Fill in the missing values for an ordinary HeapTuple
+ * Expand an ordinary HeapTuple to the full tuple descriptor, filling absent
+ * attributes as NULL.
  */
 HeapTuple
 heap_expand_tuple(HeapTuple sourceTuple, TupleDesc tupleDesc)
@@ -1422,10 +1227,13 @@ heap_deform_tuple(HeapTuple tuple, TupleDesc tupleDesc,
 
 	/*
 	 * If tuple doesn't have all the atts indicated by tupleDesc, read the
-	 * rest as nulls or missing values as appropriate.
+	 * rest as nulls.
 	 */
 	for (; attnum < tdesc_natts; attnum++)
-		values[attnum] = getmissingattr(tupleDesc, attnum + 1, &isnull[attnum]);
+	{
+		values[attnum] = (Datum) 0;
+		isnull[attnum] = true;
+	}
 }
 
 /*

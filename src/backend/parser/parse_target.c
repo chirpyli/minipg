@@ -84,17 +84,7 @@ transformTargetEntry(ParseState *pstate,
 {
 	/* Transform the node if caller didn't do it already */
 	if (expr == NULL)
-	{
-		/*
-		 * If it's a SetToDefault node and we should allow that, pass it
-		 * through unmodified.  (transformExpr will throw the appropriate
-		 * error if we're disallowing it.)
-		 */
-		if (exprKind == EXPR_KIND_UPDATE_SOURCE && IsA(node, SetToDefault))
-			expr = node;
-		else
-			expr = transformExpr(pstate, node, exprKind);
-	}
+		expr = transformExpr(pstate, node, exprKind);
 
 	if (colname == NULL && !resjunk)
 	{
@@ -199,13 +189,10 @@ transformTargetList(ParseState *pstate, List *targetlist,
  * decoration.  Also, we don't expect any multiassign constructs within the
  * list, so there's nothing to do for that.  We use this for ROW() and
  * VALUES() constructs.
- *
- * exprKind is not enough to tell us whether to allow SetToDefault, so
- * an additional flag is needed for that.
  */
 List *
 transformExpressionList(ParseState *pstate, List *exprlist,
-						ParseExprKind exprKind, bool allowDefault)
+						ParseExprKind exprKind)
 {
 	List	   *result = NIL;
 	ListCell   *lc;
@@ -246,16 +233,8 @@ transformExpressionList(ParseState *pstate, List *exprlist,
 			}
 		}
 
-		/*
-		 * Not "something.*", so transform as a single expression.  If it's a
-		 * SetToDefault node and we should allow that, pass it through
-		 * unmodified.  (transformExpr will throw the appropriate error if
-		 * we're disallowing it.)
-		 */
-		if (allowDefault && IsA(e, SetToDefault))
-			 /* do nothing */ ;
-		else
-			e = transformExpr(pstate, e, exprKind);
+		/* Not "something.*", so transform as a single expression. */
+		e = transformExpr(pstate, e, exprKind);
 
 		result = lappend(result, e);
 	}
@@ -431,37 +410,6 @@ transformAssignedExpr(ParseState *pstate,
 	attrtype = attnumTypeId(rd, attrno);
 	attrtypmod = TupleDescAttr(rd->rd_att, attrno - 1)->atttypmod;
 	attrcollation = DEFAULT_COLLATION_OID;
-
-	/*
-	 * If the expression is a DEFAULT placeholder, insert the attribute's
-	 * type/typmod/collation into it so that exprType etc will report the
-	 * right things.  (We expect that the eventually substituted default
-	 * expression will in fact have this type and typmod.  The collation
-	 * likely doesn't matter, but let's set it correctly anyway.)  Also,
-	 * reject trying to update a subfield or array element with DEFAULT, since
-	 * there can't be any default for portions of a column.
-	 */
-	if (expr && IsA(expr, SetToDefault))
-	{
-		SetToDefault *def = (SetToDefault *) expr;
-
-		def->typeId = attrtype;
-		def->typeMod = attrtypmod;
-		def->collation = attrcollation;
-		if (indirection)
-		{
-			if (IsA(linitial(indirection), A_Indices))
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot set an array element to DEFAULT"),
-						 parser_errposition(pstate, location)));
-			else
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot set a subfield to DEFAULT"),
-						 parser_errposition(pstate, location)));
-		}
-	}
 
 	/* Now we can use exprType() safely. */
 	type_id = exprType((Node *) expr);

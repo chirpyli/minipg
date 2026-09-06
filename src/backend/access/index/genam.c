@@ -156,13 +156,8 @@ IndexScanEnd(IndexScanDesc scan)
  *
  * Construct a string describing the contents of an index entry, in the
  * form "(key_name, ...)=(key_value, ...)".  This is currently used
- * for building unique-constraint and exclusion-constraint error messages,
- * so only key columns of the index are checked and printed.
- *
- * Note that if the user does not have permissions to view all of the
- * columns involved then a NULL is returned.  Returning a partial key seems
- * unlikely to be useful and we have no way to know which of the columns the
- * user provided (unlike in ExecBuildSlotValueDescription).
+ * for building unique-constraint error messages, so only key columns of
+ * the index are checked and printed.
  *
  * The passed-in values/nulls arrays are the "raw" input to the index AM,
  * e.g. results of FormIndexDatum --- this is not necessarily what is stored
@@ -173,15 +168,13 @@ BuildIndexValueDescription(Relation indexRelation,
 						   Datum *values, bool *isnull)
 {
 	StringInfoData buf;
-	Form_pg_index idxrec;
 	int			indnkeyatts;
 	int			i;
 	Oid			indexrelid = RelationGetRelid(indexRelation);
 
 	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
 
-	idxrec = indexRelation->rd_index;
-	Assert(indexrelid == idxrec->indexrelid);
+	Assert(indexrelid == indexRelation->rd_index->indexrelid);
 
 	initStringInfo(&buf);
 	appendStringInfo(&buf, "(%s)=(",

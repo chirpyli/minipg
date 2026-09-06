@@ -519,7 +519,7 @@ ExecBuildUpdateProjection(List *targetList,
 	int			nAssignableCols;
 	bool		sawJunk;
 	Bitmapset  *assignedCols;
-	ExprSetupInfo deform = {0, 0, 0, NIL};
+	ExprSetupInfo deform = {0, 0, 0};
 	ExprEvalStep scratch = {0};
 	int			outerattnum;
 	ListCell   *lc,
@@ -2251,7 +2251,6 @@ static void
 ExecPushExprSetupSteps(ExprState *state, ExprSetupInfo *info)
 {
 	ExprEvalStep scratch = {0};
-	ListCell   *lc;
 
 	scratch.resvalue = NULL;
 	scratch.resnull = NULL;
@@ -2807,7 +2806,7 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 	PlanState  *parent = &aggstate->ss.ps;
 	ExprEvalStep scratch = {0};
 	bool		isCombine = DO_AGGSPLIT_COMBINE(aggstate->aggsplit);
-	ExprSetupInfo deform = {0, 0, 0, NIL};
+	ExprSetupInfo deform = {0, 0, 0};
 
 	state->expr = (Expr *) aggstate;
 	state->parent = parent;

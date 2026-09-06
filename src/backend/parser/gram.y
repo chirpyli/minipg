@@ -142,7 +142,6 @@ static Node *makeFloatConst(char *str, int location);
 static Node *makeNullAConst(int location);
 static Node *makeAConst(Value *v, int location);
 static Node *makeBoolAConst(bool state, int location);
-static RoleSpec *makeRoleSpec(RoleSpecType type, int location);
 static void check_qualified_name(List *names, core_yyscan_t yyscanner);
 static List *check_func_name(List *names, core_yyscan_t yyscanner);
 static List *check_indirection(List *indirection, core_yyscan_t yyscanner);
@@ -199,7 +198,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	ResTarget			*target;
 	InsertStmt			*istmt;
 	VariableSetStmt		*vsetstmt;
-	RoleSpec			*rolespec;
 	struct SelectLimit	*selectlimit;
 	SetQuantifier	 setquantifier;
 	struct GroupClause  *groupclause;
@@ -226,7 +224,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
 
-%type <node>	alter_column_default alter_using
+%type <node>	alter_using
 %type <ival>	opt_asc_desc opt_nulls_order
 
 %type <node>	alter_table_cmd
@@ -287,7 +285,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				transaction_mode_list_or_empty
 				TableFuncElementList opt_type_modifiers
 				using_clause
-			alter_generic_options
 			relation_expr_list
 			vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
@@ -360,10 +357,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	tablesample_clause opt_repeatable_clause
 %type <target>	target_el set_target insert_column_item
 
-%type <str>		generic_option_name
-%type <node>	generic_option_arg
-%type <defelt>	generic_option_elem alter_generic_option_elem
-%type <list>	alter_generic_option_list
 
 %type <ival>	reindex_target_type reindex_target_multitable
 
@@ -386,7 +379,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <str>		var_name type_function_name param_name
 %type <str>		createdb_opt_name
 %type <node>	var_value zone_value
-%type <rolespec> RoleSpec
 
 %type <keyword> unreserved_keyword type_func_name_keyword
 %type <keyword> col_name_keyword reserved_keyword
@@ -1214,32 +1206,6 @@ alter_table_cmds:
 				n->def = $2;
 				$$ = (Node *)n;
 			}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> {SET DEFAULT <expr>|DROP DEFAULT} */
-			| ALTER opt_column ColId alter_column_default
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ColumnDefault;
-					n->name = $3;
-					n->def = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP EXPRESSION */
-			| ALTER opt_column ColId DROP EXPRESSION
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropExpression;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> DROP EXPRESSION IF EXISTS */
-			| ALTER opt_column ColId DROP EXPRESSION IF_P EXISTS
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropExpression;
-					n->name = $3;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET STATISTICS <SignedIconst> */
 			| ALTER opt_column ColId SET STATISTICS SignedIconst
 				{
@@ -1321,14 +1287,6 @@ alter_table_cmds:
 					def->location = @3;
 					$$ = (Node *)n;
 				}
-			| ALTER opt_column ColId alter_generic_options
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_AlterColumnGenericOptions;
-					n->name = $3;
-					n->def = (Node *) $4;
-					$$ = (Node *)n;
-				}
 			/* ALTER TABLE <name> DROP CONSTRAINT IF EXISTS <name> [RESTRICT|CASCADE] */
 			| DROP CONSTRAINT IF_P EXISTS name opt_drop_behavior
 				{
@@ -1347,13 +1305,6 @@ alter_table_cmds:
 					n->name = $3;
 					n->behavior = $4;
 					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> SET WITHOUT OIDS, for backward compat */
-			| SET WITHOUT OIDS
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropOids;
 					$$ = (Node *)n;
 				}
 			/* ALTER TABLE <name> CLUSTER ON <indexname> */
@@ -1404,26 +1355,6 @@ alter_table_cmds:
 					n->name = $3;
 					$$ = (Node *)n;
 					}
-			/* ALTER TABLE <name> OWNER TO RoleSpec */
-			| OWNER TO RoleSpec
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ChangeOwner;
-					n->newowner = $3;
-					$$ = (Node *)n;
-				}
-			| alter_generic_options
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_GenericOptions;
-					n->def = (Node *)$1;
-					$$ = (Node *) n;
-				}
-		;
-
-alter_column_default:
-			SET DEFAULT a_expr			{ $$ = $3; }
-			| DROP DEFAULT				{ $$ = NULL; }
 		;
 
 opt_drop_behavior:
@@ -1543,21 +1474,6 @@ ColConstraint:
 			| ColConstraintElem						{ $$ = $1; }
 		;
 
-/* DEFAULT NULL is already the default for Postgres.
- * But define it here and carry it forward into the system
- * to make it explicit.
- * - thomas 1998-09-13
- *
- * WITH NULL and NULL are not SQL-standard syntax elements,
- * so leave them out. Use DEFAULT NULL to explicitly indicate
- * that a column may have that value. WITH NULL leads to
- * shift/reduce conflicts with WITH TIME ZONE anyway.
- * - thomas 1999-01-08
- *
- * DEFAULT expression must be b_expr not a_expr to prevent shift/reduce
- * conflict on NOT (since NOT might start a subsequent NOT NULL constraint,
- * or be part of a_expr NOT LIKE or similar constructs).
- */
 ColConstraintElem:
 			UNIQUE opt_definition
 				{
@@ -1579,15 +1495,7 @@ ColConstraintElem:
 					n->indexname = NULL;
 					$$ = (Node *)n;
 				}
-			| DEFAULT b_expr
-				{
-					Constraint *n = makeNode(Constraint);
-					n->contype = CONSTR_DEFAULT;
-					n->location = @1;
-					n->raw_expr = $2;
-					$$ = (Node *)n;
-				}
-					;
+		;
 
 
 /* ConstraintElem specifies constraint syntax which is not embedded into
@@ -1782,58 +1690,6 @@ create_extension_opt_item:
  *
  *****************************************************************************/
 
-/* Options definition for ALTER TABLE ALTER COLUMN SET (...) */
-alter_generic_options:
-			OPTIONS	'(' alter_generic_option_list ')'		{ $$ = $3; }
-		;
-
-alter_generic_option_list:
-			alter_generic_option_elem
-				{
-					$$ = list_make1($1);
-				}
-			| alter_generic_option_list ',' alter_generic_option_elem
-				{
-					$$ = lappend($1, $3);
-				}
-		;
-
-alter_generic_option_elem:
-			generic_option_elem
-				{
-					$$ = $1;
-				}
-			| SET generic_option_elem
-				{
-					$$ = $2;
-					$$->defaction = DEFELEM_SET;
-				}
-			| ADD_P generic_option_elem
-				{
-					$$ = $2;
-					$$->defaction = DEFELEM_ADD;
-				}
-			| DROP generic_option_name
-				{
-					$$ = makeDefElemExtended(NULL, $2, NULL, DEFELEM_DROP, @2);
-				}
-		;
-
-generic_option_elem:
-			generic_option_name generic_option_arg
-				{
-					$$ = makeDefElem($1, $2, @1);
-				}
-		;
-
-generic_option_name:
-				ColLabel			{ $$ = $1; }
-		;
-
-/* We could use def_arg here, but the spec only requires string literals */
-generic_option_arg:
-				Sconst				{ $$ = (Node *) makeString($1); }
-		;
 
 
 /*****************************************************************************
@@ -3047,12 +2903,6 @@ insert_rest:
 					$$ = makeNode(InsertStmt);
 					$$->cols = $2;
 					$$->selectStmt = $4;
-				}
-			| DEFAULT VALUES
-				{
-					$$ = makeNode(InsertStmt);
-					$$->cols = NIL;
-					$$->selectStmt = NULL;
 				}
 		;
 
@@ -4961,20 +4811,6 @@ a_expr:		c_expr									{ $$ = $1; }
 							 errmsg("UNIQUE predicate is not yet implemented"),
 							 parser_errposition(@1)));
 				}
-			| DEFAULT
-				{
-					/*
-					 * The SQL spec only allows DEFAULT in "contextually typed
-					 * expressions", but for us, it's easier to allow it in
-					 * any a_expr and then throw error during parse analysis
-					 * if it's in an inappropriate context.  This way also
-					 * lets us say something smarter than "syntax error".
-					 */
-					SetToDefault *n = makeNode(SetToDefault);
-					/* parse analysis will fill in the rest */
-					n->location = @1;
-					$$ = (Node *)n;
-				}
 		;
 
 /*
@@ -5991,47 +5827,6 @@ Sconst:		SCONST									{ $$ = $1; };
 SignedIconst: Iconst								{ $$ = $1; }
 			| '+' Iconst							{ $$ = + $2; }
 			| '-' Iconst							{ $$ = - $2; }
-		;
-
-RoleSpec:	NonReservedWord
-					{
-						/*
-						 * "public" and "none" are not keywords, but they must
-						 * be treated specially here.
-						 */
-						RoleSpec *n;
-						if (strcmp($1, "public") == 0)
-						{
-							n = (RoleSpec *) makeRoleSpec(ROLESPEC_PUBLIC, @1);
-							n->roletype = ROLESPEC_PUBLIC;
-						}
-						else if (strcmp($1, "none") == 0)
-						{
-							ereport(ERROR,
-									(errcode(ERRCODE_RESERVED_NAME),
-									 errmsg("role name \"%s\" is reserved",
-											"none"),
-									 parser_errposition(@1)));
-						}
-						else
-						{
-							n = makeRoleSpec(ROLESPEC_CSTRING, @1);
-							n->rolename = pstrdup($1);
-						}
-						$$ = n;
-					}
-			| CURRENT_ROLE
-					{
-						$$ = makeRoleSpec(ROLESPEC_CURRENT_ROLE, @1);
-					}
-			| CURRENT_USER
-					{
-						$$ = makeRoleSpec(ROLESPEC_CURRENT_USER, @1);
-					}
-			| SESSION_USER
-					{
-						$$ = makeRoleSpec(ROLESPEC_SESSION_USER, @1);
-					}
 		;
 
 
@@ -7061,19 +6856,6 @@ makeBoolAConst(bool state, int location)
 	return makeTypeCast((Node *)n, SystemTypeName("bool"), -1);
 }
 
-/* makeRoleSpec
- * Create a RoleSpec with the given type
- */
-static RoleSpec *
-makeRoleSpec(RoleSpecType type, int location)
-{
-	RoleSpec *spec = makeNode(RoleSpec);
-
-	spec->roletype = type;
-	spec->location = location;
-
-	return spec;
-}
 
 /* check_qualified_name --- check the result of qualified_name production
  *

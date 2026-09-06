@@ -100,10 +100,10 @@ INSERT INTO func_index_heap VALUES('QWERTY');
 -- while we're here, see that the metadata looks sane
 \d func_index_heap
 Table "public.func_index_heap"
- Column | Type | Default 
---------+------+---------
- f1     | text | 
- f2     | text | 
+ Column | Type 
+--------+------
+ f1     | text
+ f2     | text
 Indexes:
     "func_index_index" UNIQUE, btree (textcat(f1, f2))
 
@@ -132,10 +132,10 @@ INSERT INTO func_index_heap VALUES('QWERTY');
 -- while we're here, see that the metadata looks sane
 \d func_index_heap
 Table "public.func_index_heap"
- Column | Type | Default 
---------+------+---------
- f1     | text | 
- f2     | text | 
+ Column | Type 
+--------+------
+ f1     | text
+ f2     | text
 Indexes:
     "func_index_index" UNIQUE, btree ((f1 || f2))
 
@@ -220,10 +220,10 @@ DELETE FROM concur_heap WHERE f1 = 'b';
 VACUUM FULL concur_heap;
 \d concur_heap
 Table "public.concur_heap"
- Column | Type | Default 
---------+------+---------
- f1     | text | 
- f2     | text | 
+ Column | Type 
+--------+------
+ f1     | text
+ f2     | text
 Indexes:
     "concur_heap_expr_idx" btree ((f2 || f1))
     "concur_index1" btree (f2, f1)
@@ -236,10 +236,10 @@ Indexes:
 REINDEX TABLE concur_heap;
 \d concur_heap
 Table "public.concur_heap"
- Column | Type | Default 
---------+------+---------
- f1     | text | 
- f2     | text | 
+ Column | Type 
+--------+------
+ f1     | text
+ f2     | text
 Indexes:
     "concur_heap_expr_idx" btree ((f2 || f1))
     "concur_index1" btree (f2, f1)
@@ -270,10 +270,10 @@ DROP INDEX CONCURRENTLY "concur_index1";
 DROP INDEX CONCURRENTLY "concur_heap_expr_idx";
 \d concur_heap
 Table "public.concur_heap"
- Column | Type | Default 
---------+------+---------
- f1     | text | 
- f2     | text | 
+ Column | Type 
+--------+------
+ f1     | text
+ f2     | text
 Indexes:
     "std_index" btree (f2)
 
@@ -287,12 +287,12 @@ INSERT INTO cwi_test VALUES(1, 2), (3, 4), (5, 6);
 CREATE UNIQUE INDEX cwi_uniq_idx ON cwi_test(a , b);
 ALTER TABLE cwi_test ADD primary key USING INDEX cwi_uniq_idx;
 \d cwi_test
-         Table "public.cwi_test"
- Column |         Type          | Default 
---------+-----------------------+---------
- a      | integer               | 
- b      | character varying(10) | 
- c      | character(1)          | 
+    Table "public.cwi_test"
+ Column |         Type          
+--------+-----------------------
+ a      | integer
+ b      | character varying(10)
+ c      | character(1)
 Indexes:
     "cwi_uniq_idx" PRIMARY KEY, btree (a, b)
 
@@ -310,12 +310,12 @@ ALTER TABLE cwi_test DROP CONSTRAINT cwi_uniq_idx,
 		USING INDEX cwi_uniq2_idx;
 NOTICE:  ALTER TABLE / ADD CONSTRAINT USING INDEX will rename index "cwi_uniq2_idx" to "cwi_replaced_pkey"
 \d cwi_test
-         Table "public.cwi_test"
- Column |         Type          | Default 
---------+-----------------------+---------
- a      | integer               | 
- b      | character varying(10) | 
- c      | character(1)          | 
+    Table "public.cwi_test"
+ Column |         Type          
+--------+-----------------------
+ a      | integer
+ b      | character varying(10)
+ c      | character(1)
 Indexes:
     "cwi_replaced_pkey" PRIMARY KEY, btree (b, a)
 
@@ -898,10 +898,10 @@ WARNING:  cannot reindex system catalogs concurrently, skipping all
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
 Table "public.concur_reindex_tab"
- Column |  Type   | Default 
---------+---------+---------
- c1     | integer | 
- c2     | text    | 
+ Column |  Type   
+--------+---------
+ c1     | integer
+ c2     | text
 Indexes:
     "concur_reindex_ind1" PRIMARY KEY, btree (c1)
     "concur_reindex_ind2" btree (c2)
@@ -924,9 +924,9 @@ ERROR:  could not create unique index "concur_reindex_ind5_ccnew"
 DETAIL:  Key (c1)=(1) is duplicated.
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
- Column |  Type   | Default 
---------+---------+---------
- c1     | integer | 
+ Column |  Type   
+--------+---------
+ c1     | integer
 Indexes:
     "concur_reindex_ind5" UNIQUE, btree (c1) INVALID
     "concur_reindex_ind5_ccnew" UNIQUE, btree (c1) INVALID
@@ -940,9 +940,9 @@ WARNING:  cannot reindex invalid index "public.concur_reindex_ind5" concurrently
 NOTICE:  table "concur_reindex_tab4" has no indexes that can be reindexed concurrently
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
- Column |  Type   | Default 
---------+---------+---------
- c1     | integer | 
+ Column |  Type   
+--------+---------
+ c1     | integer
 Indexes:
     "concur_reindex_ind5" UNIQUE, btree (c1) INVALID
 
@@ -950,9 +950,9 @@ Indexes:
 REINDEX INDEX CONCURRENTLY concur_reindex_ind5;
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
- Column |  Type   | Default 
---------+---------+---------
- c1     | integer | 
+ Column |  Type   
+--------+---------
+ c1     | integer
 Indexes:
     "concur_reindex_ind5" UNIQUE, btree (c1)
 

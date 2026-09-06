@@ -551,10 +551,6 @@ PostmasterMain(int argc, char *argv[])
 				set_debug_options(atoi(optarg), PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 
-			case 'E':
-				SetConfigOption("log_statement", "all", PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
 			case 'e':
 				SetConfigOption("datestyle", "euro", PGC_POSTMASTER, PGC_S_ARGV);
 				break;
@@ -1510,7 +1506,6 @@ ProcessStartupPacket(Port *port, bool ssl_done)
 	ProtocolVersion proto;
 	MemoryContext oldcontext;
 
-retry:
 	pq_startmsgread();
 
 	/*

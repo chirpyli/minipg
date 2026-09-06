@@ -199,37 +199,37 @@ DROP TABLE relation_filenode_check;
 -- check restriction with default expressions
 -- invalid use of column reference in default expressions
 CREATE TABLE default_expr_column (id int DEFAULT (id));
-ERROR:  cannot use column reference in DEFAULT expression
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: CREATE TABLE default_expr_column (id int DEFAULT (id));
-                                                          ^
+                                                 ^
 CREATE TABLE default_expr_column (id int DEFAULT (bar.id));
-ERROR:  cannot use column reference in DEFAULT expression
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: CREATE TABLE default_expr_column (id int DEFAULT (bar.id));
-                                                          ^
+                                                 ^
 CREATE TABLE default_expr_agg_column (id int DEFAULT (avg(id)));
-ERROR:  cannot use column reference in DEFAULT expression
-LINE 1: ...TE TABLE default_expr_agg_column (id int DEFAULT (avg(id)));
-                                                                 ^
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: CREATE TABLE default_expr_agg_column (id int DEFAULT (avg(id...
+                                                     ^
 -- invalid column definition
 CREATE TABLE default_expr_non_column (a int DEFAULT (avg(non_existent)));
-ERROR:  cannot use column reference in DEFAULT expression
-LINE 1: ...TABLE default_expr_non_column (a int DEFAULT (avg(non_existe...
-                                                             ^
+ERROR:  syntax error at or near "DEFAULT"
+LINE 1: CREATE TABLE default_expr_non_column (a int DEFAULT (avg(non...
+                                                    ^
 -- invalid use of aggregate
 CREATE TABLE default_expr_agg (a int DEFAULT (avg(1)));
-ERROR:  aggregate functions are not allowed in DEFAULT expressions
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: CREATE TABLE default_expr_agg (a int DEFAULT (avg(1)));
-                                                      ^
+                                             ^
 -- invalid use of subquery
 CREATE TABLE default_expr_agg (a int DEFAULT (select 1));
-ERROR:  cannot use subquery in DEFAULT expression
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: CREATE TABLE default_expr_agg (a int DEFAULT (select 1));
-                                                     ^
+                                             ^
 -- invalid use of set-returning function
 CREATE TABLE default_expr_agg (a int DEFAULT (generate_series(1,3)));
-ERROR:  set-returning functions are not allowed in DEFAULT expressions
+ERROR:  syntax error at or near "DEFAULT"
 LINE 1: CREATE TABLE default_expr_agg (a int DEFAULT (generate_serie...
-                                                      ^
+                                             ^
 -- Verify that subtransaction rollback restores rd_createSubid.
 BEGIN;
 CREATE TABLE remember_create_subid (c int);

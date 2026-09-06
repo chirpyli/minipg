@@ -20,7 +20,7 @@
 extern List *transformTargetList(ParseState *pstate, List *targetlist,
 								 ParseExprKind exprKind);
 extern List *transformExpressionList(ParseState *pstate, List *exprlist,
-									 ParseExprKind exprKind, bool allowDefault);
+									 ParseExprKind exprKind);
 extern void resolveTargetListUnknowns(ParseState *pstate, List *targetlist);
 extern void markTargetListOrigins(ParseState *pstate, List *targetlist);
 extern TargetEntry *transformTargetEntry(ParseState *pstate,

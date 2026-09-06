@@ -78,7 +78,6 @@
  * Retained here because they drive ALTER TABLE rewrite logic, not event
  * triggers themselves.
  */
-#define AT_REWRITE_DEFAULT_VAL		0x02
 #define AT_REWRITE_COLUMN_REWRITE	0x04
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -294,10 +293,6 @@ static bool check_for_column_name_collision(Relation rel, const char *colname,
 											bool if_not_exists);
 static void add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid);
 static void add_column_collation_dependency(Oid relid, int32 attnum, Oid collid);
-static ObjectAddress ATExecColumnDefault(Relation rel, const char *colName,
-										 Node *newDefault, LOCKMODE lockmode);
-static void ATPrepDropExpression(Relation rel, AlterTableCmd *cmd);
-static ObjectAddress ATExecDropExpression(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStatistics(Relation rel, const char *colName, int16 colNum,
 										 Node *newValue, LOCKMODE lockmode);
 static ObjectAddress ATExecSetOptions(Relation rel, const char *colName,
@@ -375,7 +370,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Oid			relationId;
 	Relation	rel;
 	TupleDesc	descriptor;
-	List	   *rawDefaults;
 	ListCell   *listptr;
 	AttrNumber	attnum;
 
@@ -418,22 +412,14 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 
 	/*
 	 * Create a tuple descriptor from the relation schema.  Note that this
-	 * deals with column names and types, but not
-	 * default values or CHECK constraints; we handle those below.
+	 * deals with column names and types, but not CHECK constraints; we handle
+	 * those below.
 	 */
 	descriptor = BuildDescForRelation(stmt->tableElts);
 
 	/*
-	 * Find columns with default values and prepare for insertion of the
-	 * defaults.  They go into a list of RawColumnDefault structs that will be
-	 * processed by AddRelationNewConstraints.  (We can't deal with raw
-	 * expressions until we can do transformExpr.)
-	 *
-	 * We can set the atthasdef flags now in the tuple descriptor; this just
-	 * saves StoreAttrDefault from having to do an immediate update of the
-	 * pg_attribute rows.
+	 * Set per-column flags such as compression from the column definitions.
 	 */
-	rawDefaults = NIL;
 	attnum = 0;
 
 	foreach(listptr, stmt->tableElts)
@@ -445,19 +431,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		attr = TupleDescAttr(descriptor, attnum - 1);
 
 		Assert(colDef->cooked_default == NULL);
-
-		if (colDef->raw_default != NULL)
-		{
-			RawColumnDefault *rawEnt;
-
-			rawEnt = (RawColumnDefault *) palloc(sizeof(RawColumnDefault));
-			rawEnt->attnum = attnum;
-			rawEnt->raw_default = colDef->raw_default;
-			rawEnt->missingMode = false;
-			rawEnt->generated = colDef->generated;
-			rawDefaults = lappend(rawDefaults, rawEnt);
-			attr->atthasdef = true;
-		}
 
 		if (colDef->compression)
 			attr->attcompression = GetAttributeCompression(attr->atttypid,
@@ -506,19 +479,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * complaining about deadlock risks.
 	 */
 	rel = relation_open(relationId, AccessExclusiveLock);
-
-	/*
-	 * Now add any newly specified column default and generation expressions
-	 * to the new relation.  These are passed to us in the form of raw
-	 * parsetrees; we need to transform them to executable expression trees
-	 * before they can be added. The most convenient way to do that is to
-	 * apply the parser's transformExpr routine, but transformExpr doesn't
-	 * work unless we have a pre-existing relation. So, the transformation has
-	 * to be postponed to this final step of CREATE TABLE.
-	 */
-	if (rawDefaults)
-		AddRelationNewConstraints(rel, rawDefaults, NIL,
-								  true, false, queryString);
 
 	CommandCounterIncrement();
 
@@ -1555,7 +1515,6 @@ AlterTableGetLockLevel(List *cmds)
 				 */
 			case AT_DropColumn: /* change visible to SELECT */
 			case AT_AddColumnToView:	/* CREATE VIEW */
-			case AT_DropOids:	/* used to equiv to DropColumn */
 			case AT_EnableAlwaysRule:	/* may change SELECT rules */
 			case AT_EnableReplicaRule:	/* may change SELECT rules */
 			case AT_EnableRule: /* may change SELECT rules */
@@ -1566,9 +1525,6 @@ AlterTableGetLockLevel(List *cmds)
 				/*
 				 * Changing owner may remove implicit SELECT privileges
 				 */
-			case AT_ChangeOwner:	/* change visible to SELECT */
-				cmd_lockmode = AccessExclusiveLock;
-				break;
 			case AT_AddConstraint:
 			case AT_AddConstraintRecurse:	/* becomes AT_AddConstraint */
 				if (IsA(cmd->def, Constraint))
@@ -1609,11 +1565,9 @@ AlterTableGetLockLevel(List *cmds)
 				 * These subcommands affect write operations only. XXX
 				 * Theoretically, these could be ShareRowExclusiveLock.
 				 */
-			case AT_ColumnDefault:
 			case AT_AlterConstraint:
 			case AT_AddIndex:	/* from ADD CONSTRAINT */
 			case AT_AddIndexConstraint:
-			case AT_DropExpression:
 			case AT_SetCompression:
 				cmd_lockmode = AccessExclusiveLock;
 				break;
@@ -1639,9 +1593,6 @@ AlterTableGetLockLevel(List *cmds)
 			cmd_lockmode = ShareUpdateExclusiveLock;
 			break;
 
-		case AT_AlterColumnGenericOptions:
-			cmd_lockmode = AccessExclusiveLock;
-			break;
 
 		default:			/* oops */
 				elog(ERROR, "unrecognized alter table type: %d",
@@ -1743,23 +1694,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_ADD_COL;
 			break;
-		case AT_ColumnDefault:	/* ALTER COLUMN DEFAULT */
-
-			/*
-			 * We allow defaults on views so that INSERT into a view can have
-			 * default-ish behavior.  This works because the rewriter
-			 * substitutes default values into INSERTs before it expands
-			 * rules.
-			 */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE);
-			/* No command-specific prep needed */
-			pass = cmd->def ? AT_PASS_ADD_OTHERCONSTR : AT_PASS_DROP;
-			break;
-		case AT_DropExpression: /* ALTER COLUMN DROP EXPRESSION */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			ATPrepDropExpression(rel, cmd);
-			pass = AT_PASS_DROP;
-			break;
 		case AT_SetStatistics:	/* ALTER COLUMN SET STATISTICS */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_INDEX | ATT_FOREIGN_TABLE);
 			/* No command-specific prep needed */
@@ -1828,21 +1762,12 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATPrepAlterColumnType(tab, rel, cmd);
 			pass = AT_PASS_ALTER_TYPE;
 		break;
-		case AT_ChangeOwner:	/* ALTER OWNER */
-			/* This command never recurses */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
 		case AT_ClusterOn:		/* CLUSTER ON */
 		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
 			ATSimplePermissions(rel, ATT_TABLE);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
-			break;
-		case AT_DropOids:		/* SET WITHOUT OIDS */
-			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			pass = AT_PASS_DROP;
 			break;
 		case AT_AlterConstraint:	/* ALTER CONSTRAINT */
 			ATSimplePermissions(rel, ATT_TABLE);
@@ -1965,17 +1890,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 									  true,
 									  lockmode, cur_pass, context);
 			break;
-		case AT_ColumnDefault:	/* ALTER COLUMN DEFAULT */
-			ATExecColumnDefault(rel, cmd->name, cmd->def, lockmode);
-			break;
-		case AT_AddIdentity:
-			cmd = ATParseTransformCmd(wqueue, tab, rel, cmd, false, lockmode,
-									  cur_pass, context);
-			Assert(cmd != NULL);
-			break;
-		case AT_DropExpression:
-			ATExecDropExpression(rel, cmd->name, cmd->missing_ok, lockmode);
-			break;
 		case AT_SetStatistics:	/* ALTER COLUMN SET STATISTICS */
 			ATExecSetStatistics(rel, cmd->name, cmd->num, cmd->def, lockmode);
 			break;
@@ -2059,9 +1973,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
 			ATExecDropCluster(rel, lockmode);
-			break;
-		case AT_DropOids:		/* SET WITHOUT OIDS */
-			/* nothing to do here, oid columns don't exist anymore */
 			break;
 		case AT_EnableRule:		/* ENABLE RULE name */
 			ATExecEnableDisableRule(rel, cmd->name,
@@ -2190,11 +2101,6 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 						pass = AT_PASS_ADD_OTHERCONSTR;
 						break;
 				}
-				break;
-			case AT_AlterColumnGenericOptions:
-			/* This command never recurses */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
 				break;
 			default:
 				pass = cur_pass;
@@ -2712,7 +2618,7 @@ ATGetQueueEntry(List **wqueue, Relation rel)
 	tab->relid = relid;
 	tab->rel = NULL;			/* set later */
 	tab->relkind = rel->rd_rel->relkind;
-	tab->oldDesc = CreateTupleDescCopyConstr(RelationGetDescr(rel));
+	tab->oldDesc = CreateTupleDescCopy(RelationGetDescr(rel));
 
 	*wqueue = lappend(*wqueue, tab);
 
@@ -3014,13 +2920,11 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	HeapTuple	reltup;
 	FormData_pg_attribute attribute;
 	int			newattnum;
-	char		relkind;
 	HeapTuple	typeTuple;
 	Oid			typeOid;
 	int32		typmod;
 	Oid			collOid;
 	Form_pg_type tform;
-	Expr	   *defval;
 	ObjectAddress address;
 	TupleDesc	tupdesc;
 	FormData_pg_attribute *aattr[] = {&attribute};
@@ -3058,8 +2962,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	reltup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(myrelid));
 	if (!HeapTupleIsValid(reltup))
 		elog(ERROR, "cache lookup failed for relation %u", myrelid);
-	relkind = ((Form_pg_class) GETSTRUCT(reltup))->relkind;
-
 	/* Determine the new attribute's number */
 	newattnum = ((Form_pg_class) GETSTRUCT(reltup))->relnatts + 1;
 	if (newattnum > MaxHeapAttributeNumber)
@@ -3093,8 +2995,8 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	attribute.attstorage = tform->typstorage;
 	attribute.attcompression = GetAttributeCompression(typeOid,
 													   colDef->compression);
-	attribute.atthasdef = false;
-	attribute.atthasmissing = false;
+
+	attribute.attisdropped = false;
 
 	/* attribute.attacl is handled by InsertPgAttributeTuples() */
 
@@ -3122,114 +3024,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 
 	/* Make the attribute's catalog entry visible */
 	CommandCounterIncrement();
-
-	/*
-	 * Store the DEFAULT, if any, in the catalogs
-	 */
-	if (colDef->raw_default)
-	{
-		RawColumnDefault *rawEnt;
-
-		rawEnt = (RawColumnDefault *) palloc(sizeof(RawColumnDefault));
-		rawEnt->attnum = attribute.attnum;
-		rawEnt->raw_default = copyObject(colDef->raw_default);
-		rawEnt->missingMode = false;	/* XXX vestigial */
-		rawEnt->generated = colDef->generated;
-
-		/*
-		 * This function is intended for CREATE TABLE, so it processes a
-		 * _list_ of defaults, but we just do one.
-		 */
-		AddRelationNewConstraints(rel, list_make1(rawEnt), NIL,
-								  false, false, NULL);
-
-		/* Make the additional catalog changes visible */
-		CommandCounterIncrement();
-	}
-
-	/*
-	 * Tell Phase 3 to fill in the default expression, if there is one.
-	 *
-	 * If there is no default, Phase 3 doesn't have to do anything, because
-	 * that effectively means that the default is NULL.  The heap tuple access
-	 * routines always check for attnum > # of attributes in tuple, and return
-	 * NULL if so, so without any modification of the tuple data we will get
-	 * the effect of NULL values in the new column.
-	 *
-	 * Note: we use build_column_default, and not just the cooked default
-	 * returned by AddRelationNewConstraints, so that the right thing happens
-	 * when a datatype's default applies.
-	 *
-	 * Note: it might seem that this should happen at the end of Phase 2, so
-	 * that the effects of subsequent subcommands can be taken into account.
-	 * It's intentional that we do it now, though.  The new column should be
-	 * filled according to what is said in the ADD COLUMN subcommand, so that
-	 * the effects are the same as if this subcommand had been run by itself
-	 * and the later subcommands had been issued in new ALTER TABLE commands.
-	 *
-	 * We can skip this entirely for relations without storage, since Phase 3
-	 * is certainly not going to touch them.  System attributes don't have
-	 * interesting defaults, either.
-	 */
-	if (RELKIND_HAS_STORAGE(relkind) && attribute.attnum > 0)
-	{
-		defval = (Expr *) build_column_default(rel, attribute.attnum);
-
-		if (defval)
-		{
-			NewColumnValue *newval;
-
-			/* Prepare defval for execution, either here or in Phase 3 */
-			defval = expression_planner(defval);
-
-			/* Add the new default to the newvals list */
-			newval = (NewColumnValue *) palloc0(sizeof(NewColumnValue));
-			newval->attnum = attribute.attnum;
-			newval->expr = defval;
-			newval->is_generated = (colDef->generated != '\0');
-
-			tab->newvals = lappend(tab->newvals, newval);
-
-			/*
-			 * Attempt to skip a complete table rewrite by storing the
-			 * specified DEFAULT value outside of the heap.  This is only
-			 * allowed for plain relations and non-generated columns, and the
-			 * default expression can't be volatile (stable is OK).
-			 */
-			if (rel->rd_rel->relkind == RELKIND_RELATION &&
-				!colDef->generated &&
-				!contain_volatile_functions((Node *) defval))
-			{
-				EState	   *estate;
-				ExprState  *exprState;
-				Datum		missingval;
-				bool		missingIsNull;
-
-				/* Evaluate the default expression */
-				estate = CreateExecutorState();
-				exprState = ExecPrepareExpr(defval, estate);
-				missingval = ExecEvalExpr(exprState,
-										  GetPerTupleExprContext(estate),
-										  &missingIsNull);
-				/* If it turns out NULL, nothing to do; else store it */
-				if (!missingIsNull)
-				{
-					StoreAttrMissingVal(rel, attribute.attnum, missingval);
-					/* Make the additional catalog change visible */
-					CommandCounterIncrement();
-				}
-				FreeExecutorState(estate);
-			}
-			else
-			{
-				/*
-				 * Failed to use missing mode.  We have to do a table rewrite
-				 * to install the value.
-				 */
-				tab->rewrite |= AT_REWRITE_DEFAULT_VAL;
-			}
-		}
-	}
 
 	/*
 	 * Add needed dependency entries for the new column.
@@ -3335,192 +3129,7 @@ add_column_collation_dependency(Oid relid, int32 attnum, Oid collid)
 	}
 }
 
-/*
- * ALTER TABLE ALTER COLUMN SET/DROP DEFAULT
- *
- * Return the address of the affected column.
- */
-static ObjectAddress
-ATExecColumnDefault(Relation rel, const char *colName,
-					Node *newDefault, LOCKMODE lockmode)
-{
-	AttrNumber	attnum;
-	ObjectAddress address;
 
-	/*
-	 * get the number of the attribute
-	 */
-	attnum = get_attnum(RelationGetRelid(rel), colName);
-	if (attnum == InvalidAttrNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	/* Prevent them from altering a system attribute */
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	/*
-	 * Remove any old default for the column.  We use RESTRICT here for
-	 * safety, but at present we do not expect anything to depend on the
-	 * default.
-	 *
-	 * We treat removing the existing default as an internal operation when it
-	 * is preparatory to adding a new default, but as a user-initiated
-	 * operation when the user asked for a drop.
-	 */
-	RemoveAttrDefault(RelationGetRelid(rel), attnum, DROP_RESTRICT, false,
-					  newDefault == NULL ? false : true);
-
-	if (newDefault)
-	{
-		/* SET DEFAULT */
-		RawColumnDefault *rawEnt;
-
-		rawEnt = (RawColumnDefault *) palloc(sizeof(RawColumnDefault));
-		rawEnt->attnum = attnum;
-		rawEnt->raw_default = newDefault;
-		rawEnt->missingMode = false;
-		rawEnt->generated = '\0';
-
-		/*
-		 * This function is intended for CREATE TABLE, so it processes a
-		 * _list_ of defaults, but we just do one.
-		 */
-		AddRelationNewConstraints(rel, list_make1(rawEnt), NIL,
-								  false, false, NULL);
-	}
-
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	return address;
-}
-
-
-/*
- * ALTER TABLE ALTER COLUMN DROP EXPRESSION
- */
-static void
-ATPrepDropExpression(Relation rel, AlterTableCmd *cmd)
-{
-	HeapTuple	tuple;
-
-	/* Verify the column exists before doing any work on it */
-	tuple = SearchSysCacheAttName(RelationGetRelid(rel), cmd->name);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						cmd->name, RelationGetRelationName(rel))));
-
-	ReleaseSysCache(tuple);
-}
-
-/*
- * Return the address of the affected column.
- */
-static ObjectAddress
-ATExecDropExpression(Relation rel, const char *colName, bool missing_ok, LOCKMODE lockmode)
-{
-	HeapTuple	tuple;
-	Form_pg_attribute attTup;
-	AttrNumber	attnum;
-	Relation	attrelation;
-	ObjectAddress address;
-
-	attrelation = table_open(AttributeRelationId, RowExclusiveLock);
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), colName);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel))));
-
-	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = attTup->attnum;
-
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"",
-						colName)));
-
-	CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attTup->attnum);
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	heap_freetuple(tuple);
-
-	table_close(attrelation, RowExclusiveLock);
-
-	CommandCounterIncrement();
-
-	RemoveAttrDefault(RelationGetRelid(rel), attnum, DROP_RESTRICT, false, false);
-
-	/*
-	 * Remove all dependencies of this (formerly generated) column on other
-	 * columns in the same table.  (See StoreAttrDefault() for which
-	 * dependencies are created.)  We don't expect there to be dependencies
-	 * between columns of the same table for other reasons, so it's okay to
-	 * remove all of them.
-	 */
-	{
-		Relation	depRel;
-		ScanKeyData key[3];
-		SysScanDesc scan;
-		HeapTuple	tup;
-
-		depRel = table_open(DependRelationId, RowExclusiveLock);
-
-		ScanKeyInit(&key[0],
-					Anum_pg_depend_classid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(RelationRelationId));
-		ScanKeyInit(&key[1],
-					Anum_pg_depend_objid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(RelationGetRelid(rel)));
-		ScanKeyInit(&key[2],
-					Anum_pg_depend_objsubid,
-					BTEqualStrategyNumber, F_INT4EQ,
-					Int32GetDatum(attnum));
-
-		scan = systable_beginscan(depRel, DependDependerIndexId, true,
-								  NULL, 3, key);
-
-		while (HeapTupleIsValid(tup = systable_getnext(scan)))
-		{
-			Form_pg_depend depform = (Form_pg_depend) GETSTRUCT(tup);
-
-			if (depform->refclassid == RelationRelationId &&
-				depform->refobjid == RelationGetRelid(rel) &&
-				depform->refobjsubid != 0 &&
-				depform->deptype == DEPENDENCY_AUTO)
-			{
-				CatalogTupleDelete(depRel, &tup->t_self);
-			}
-		}
-
-		systable_endscan(scan);
-
-		table_close(depRel, RowExclusiveLock);
-	}
-
-	return address;
-}
-
-/*
- * ALTER TABLE ALTER COLUMN SET STATISTICS
- *
- * Return value is the address of the modified column
- */
 static ObjectAddress
 ATExecSetStatistics(Relation rel, const char *colName, int16 colNum, Node *newValue, LOCKMODE lockmode)
 {
@@ -4376,7 +3985,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	Oid			targettype;
 	int32		targettypmod;
 	Oid			targetcollid;
-	Node	   *defaultexpr;
 	Relation	attrelation;
 	Relation	depRel;
 	ScanKeyData key[3];
@@ -4390,11 +3998,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	 */
 	if (tab->rewrite)
 	{
-		Relation	newrel;
-
-		newrel = table_open(RelationGetRelid(rel), NoLock);
-		RelationClearMissing(newrel);
-		relation_close(newrel, NoLock);
 		/* make sure we don't conflict with later attribute modifications */
 		CommandCounterIncrement();
 	}
@@ -4426,40 +4029,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	targettype = tform->oid;
 	/* And the collation */
 	targetcollid = GetColumnDefCollation(targettype);
-
-	/*
-	 * If there is a default expression for the column, get it and ensure we
-	 * can coerce it to the new datatype.  (We must do this before changing
-	 * the column type, because build_column_default itself will try to
-	 * coerce, and will not issue the error message we want if it fails.)
-	 *
-	 * We remove any implicit coercion steps at the top level of the old
-	 * default expression; this has been agreed to satisfy the principle of
-	 * least surprise.  (The conversion to the new column type should act like
-	 * it started from what the user sees as the stored expression, and the
-	 * implicit coercions aren't going to be shown.)
-	 */
-	if (attTup->atthasdef)
-	{
-		defaultexpr = build_column_default(rel, attnum);
-		Assert(defaultexpr);
-		defaultexpr = strip_implicit_coercions(defaultexpr);
-		defaultexpr = coerce_to_target_type(NULL,	/* no UNKNOWN params */
-											defaultexpr, exprType(defaultexpr),
-											targettype, targettypmod,
-											COERCION_ASSIGNMENT,
-											COERCE_IMPLICIT_CAST,
-											-1);
-		if (defaultexpr == NULL)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("default for column \"%s\" cannot be cast automatically to type %s",
-							colName, format_type_be(targettype))));
-		}
-	}
-	else
-		defaultexpr = NULL;
 
 	/*
 	 * Find everything that depends on the column (constraints, indexes, etc),
@@ -4541,6 +4110,10 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 				RememberConstraintForRebuilding(foundObject.objectId, tab);
 				break;
 
+			case OCLASS_CONVERSION:
+				/* Conversions do not depend on columns. */
+				break;
+
 			case OCLASS_PROC:
 
 				/*
@@ -4570,15 +4143,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 						 errdetail("%s depends on column \"%s\"",
 								   getObjectDescription(&foundObject, false),
 								   colName)));
-				break;
-
-			case OCLASS_DEFAULT:
-
-				/*
-				 * Ignore the column's default expression, since we will fix
-				 * it below.
-				 */
-				Assert(defaultexpr);
 				break;
 
 			case OCLASS_TYPE:
@@ -4667,71 +4231,8 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 
 	/*
 	 * Here we go --- change the recorded column type and collation.  (Note
-	 * heapTup is a copy of the syscache entry, so okay to scribble on.) First
-	 * fix up the missing value if any.
+	 * heapTup is a copy of the syscache entry, so okay to scribble on.)
 	 */
-	if (attTup->atthasmissing)
-	{
-		Datum		missingval;
-		bool		missingNull;
-
-		/* if rewrite is true the missing value should already be cleared */
-		Assert(tab->rewrite == 0);
-
-		/* Get the missing value datum */
-		missingval = heap_getattr(heapTup,
-								  Anum_pg_attribute_attmissingval,
-								  attrelation->rd_att,
-								  &missingNull);
-
-		/* if it's a null array there is nothing to do */
-
-		if (!missingNull)
-		{
-			/*
-			 * Get the datum out of the array and repack it in a new array
-			 * built with the new type data. We assume that since the table
-			 * doesn't need rewriting, the actual Datum doesn't need to be
-			 * changed, only the array metadata.
-			 */
-
-			int			one = 1;
-			bool		isNull;
-			Datum		valuesAtt[Natts_pg_attribute];
-			bool		nullsAtt[Natts_pg_attribute];
-			bool		replacesAtt[Natts_pg_attribute];
-			HeapTuple	newTup;
-
-			MemSet(valuesAtt, 0, sizeof(valuesAtt));
-			MemSet(nullsAtt, false, sizeof(nullsAtt));
-			MemSet(replacesAtt, false, sizeof(replacesAtt));
-
-			missingval = array_get_element(missingval,
-										   1,
-										   &one,
-										   0,
-										   attTup->attlen,
-										   attTup->attbyval,
-										   attTup->attalign,
-										   &isNull);
-			missingval = PointerGetDatum(construct_array(&missingval,
-														 1,
-														 targettype,
-														 tform->typlen,
-														 tform->typbyval,
-														 tform->typalign));
-
-			valuesAtt[Anum_pg_attribute_attmissingval - 1] = missingval;
-			replacesAtt[Anum_pg_attribute_attmissingval - 1] = true;
-			nullsAtt[Anum_pg_attribute_attmissingval - 1] = false;
-
-			newTup = heap_modify_tuple(heapTup, RelationGetDescr(attrelation),
-									   valuesAtt, nullsAtt, replacesAtt);
-			heap_freetuple(heapTup);
-			heapTup = newTup;
-			attTup = (Form_pg_attribute) GETSTRUCT(heapTup);
-		}
-	}
 
 	attTup->atttypid = targettype;
 	attTup->atttypmod = targettypmod;
@@ -4759,28 +4260,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 
 	InvokeObjectPostAlterHook(RelationRelationId,
 							  RelationGetRelid(rel), attnum);
-
-	/*
-	 * Update the default, if present, by brute force --- remove and re-add
-	 * the default.  Probably unsafe to take shortcuts, since the new version
-	 * may well have additional dependencies.  (It's okay to do this now,
-	 * rather than after other ALTER TYPE commands, since the default won't
-	 * depend on other column types.)
-	 */
-	if (defaultexpr)
-	{
-		/* Must make new row visible since it will be updated again */
-		CommandCounterIncrement();
-
-		/*
-		 * We use RESTRICT here for safety, but at present we do not expect
-		 * anything to depend on the default.
-		 */
-		RemoveAttrDefault(RelationGetRelid(rel), attnum, DROP_RESTRICT, true,
-						  true);
-
-		StoreAttrDefault(rel, attnum, defaultexpr, true, false);
-	}
 
 	ObjectAddressSubSet(address, RelationRelationId,
 						RelationGetRelid(rel), attnum);

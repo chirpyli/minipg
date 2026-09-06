@@ -23,14 +23,6 @@
 #define CHKATYPE_ANYARRAY		0x01	/* allow ANYARRAY */
 #define CHKATYPE_ANYRECORD		0x02	/* allow RECORD and RECORD[] */
 
-typedef struct RawColumnDefault
-{
-	AttrNumber	attnum;			/* attribute to attach default to */
-	Node	   *raw_default;	/* default value (untransformed parse tree) */
-	bool		missingMode;	/* obsolete, no longer used */
-	char		generated;		/* attgenerated setting */
-} RawColumnDefault;
-
 extern Relation heap_create(const char *relname,
 							Oid relnamespace,
 							Oid reltablespace,
@@ -80,37 +72,10 @@ extern void InsertPgClassTuple(Relation pg_class_desc,
 							   Relation new_rel_desc,
 							   Oid new_rel_oid);
 
-extern void AddRelationNewConstraints(Relation rel,
-									  List *newColDefaults,
-									  List *newConstraints,
-									  bool allow_merge,
-									  bool is_internal,
-									  const char *queryString);
-
-extern void RelationClearMissing(Relation rel);
-
-extern void StoreAttrMissingVal(Relation rel, AttrNumber attnum,
-								Datum missingval);
-extern void SetAttrMissing(Oid relid, char *attname, char *value);
-
-extern Oid	StoreAttrDefault(Relation rel, AttrNumber attnum,
-							 Node *expr, bool is_internal,
-							 bool add_column_mode);
-
-extern Node *cookDefault(ParseState *pstate,
-						 Node *raw_default,
-						 Oid atttypid,
-						 int32 atttypmod,
-						 const char *attname,
-						 char attgenerated);
-
 extern void DeleteRelationTuple(Oid relid);
 extern void DeleteAttributeTuples(Oid relid);
 extern void DeleteSystemAttributeTuples(Oid relid);
 extern void RemoveAttributeById(Oid relid, AttrNumber attnum);
-extern void RemoveAttrDefault(Oid relid, AttrNumber attnum,
-							  DropBehavior behavior, bool complain, bool internal);
-extern void RemoveAttrDefaultById(Oid attrdefId);
 extern void CopyStatistics(Oid fromrelid, Oid torelid);
 extern void RemoveStatistics(Oid relid, AttrNumber attnum);
 

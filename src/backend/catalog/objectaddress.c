@@ -25,7 +25,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
-#include "catalog/pg_attrdef.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -404,9 +403,9 @@ static const struct object_type_map
 	{
 		"table constraint", OBJECT_TABCONSTRAINT
 	},
-	/* OCLASS_DEFAULT */
+	/* OCLASS_CONVERSION */
 	{
-		"default value", OBJECT_DEFAULT
+		"conversion", OBJECT_CONVERSION
 	},
 	/* OCLASS_LANGUAGE */
 	{
@@ -471,9 +470,6 @@ static ObjectAddress get_object_address_relobject(ObjectType objtype,
 static ObjectAddress get_object_address_attribute(ObjectType objtype,
 												  List *object, Relation *relp,
 												  LOCKMODE lockmode, bool missing_ok);
-static ObjectAddress get_object_address_attrdef(ObjectType objtype,
-												List *object, Relation *relp, LOCKMODE lockmode,
-												bool missing_ok);
 static ObjectAddress get_object_address_type(ObjectType objtype,
 											 TypeName *typename, bool missing_ok);
 static ObjectAddress get_object_address_opcf(ObjectType objtype, List *object,
@@ -564,14 +560,8 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_COLUMN:
 				address =
 					get_object_address_attribute(objtype, castNode(List, object),
-												 &relation, lockmode,
-												 missing_ok);
-				break;
-			case OBJECT_DEFAULT:
-				address =
-					get_object_address_attrdef(objtype, castNode(List, object),
-											   &relation, lockmode,
-											   missing_ok);
+												&relation, lockmode,
+												missing_ok);
 				break;
 			case OBJECT_RULE:
 			case OBJECT_TABCONSTRAINT:
@@ -956,92 +946,6 @@ get_object_address_attribute(ObjectType objtype, List *object,
 	address.classId = RelationRelationId;
 	address.objectId = reloid;
 	address.objectSubId = attnum;
-
-	*relp = relation;
-	return address;
-}
-
-/*
- * Find the ObjectAddress for an attribute's default value.
- */
-static ObjectAddress
-get_object_address_attrdef(ObjectType objtype, List *object,
-						   Relation *relp, LOCKMODE lockmode,
-						   bool missing_ok)
-{
-	ObjectAddress address;
-	List	   *relname;
-	Oid			reloid;
-	Relation	relation;
-	const char *attname;
-	AttrNumber	attnum;
-	TupleDesc	tupdesc;
-	Oid			defoid;
-
-	/* Extract relation name and open relation. */
-	if (list_length(object) < 2)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("column name must be qualified")));
-	attname = strVal(llast(object));
-	relname = list_truncate(list_copy(object), list_length(object) - 1);
-	/* XXX no missing_ok support here */
-	relation = relation_openrv(makeRangeVarFromNameList(relname), lockmode);
-	reloid = RelationGetRelid(relation);
-
-	tupdesc = RelationGetDescr(relation);
-
-	/* Look up attribute number and scan pg_attrdef to find its tuple */
-	attnum = get_attnum(reloid, attname);
-	defoid = InvalidOid;
-	if (attnum != InvalidAttrNumber && tupdesc->constr != NULL)
-	{
-		Relation	attrdef;
-		ScanKeyData keys[2];
-		SysScanDesc scan;
-		HeapTuple	tup;
-
-		attrdef = relation_open(AttrDefaultRelationId, AccessShareLock);
-		ScanKeyInit(&keys[0],
-					Anum_pg_attrdef_adrelid,
-					BTEqualStrategyNumber,
-					F_OIDEQ,
-					ObjectIdGetDatum(reloid));
-		ScanKeyInit(&keys[1],
-					Anum_pg_attrdef_adnum,
-					BTEqualStrategyNumber,
-					F_INT2EQ,
-					Int16GetDatum(attnum));
-		scan = systable_beginscan(attrdef, AttrDefaultIndexId, true,
-								  NULL, 2, keys);
-		if (HeapTupleIsValid(tup = systable_getnext(scan)))
-		{
-			Form_pg_attrdef atdform = (Form_pg_attrdef) GETSTRUCT(tup);
-
-			defoid = atdform->oid;
-		}
-
-		systable_endscan(scan);
-		relation_close(attrdef, AccessShareLock);
-	}
-	if (!OidIsValid(defoid))
-	{
-		if (!missing_ok)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("default value for column \"%s\" of relation \"%s\" does not exist",
-							attname, NameListToString(relname))));
-
-		address.classId = AttrDefaultRelationId;
-		address.objectId = InvalidOid;
-		address.objectSubId = InvalidAttrNumber;
-		relation_close(relation, lockmode);
-		return address;
-	}
-
-	address.classId = AttrDefaultRelationId;
-	address.objectId = defoid;
-	address.objectSubId = 0;
 
 	*relp = relation;
 	return address;
@@ -1935,53 +1839,8 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-			{
-				Relation	attrdefDesc;
-				ScanKeyData skey[1];
-				SysScanDesc adscan;
-				HeapTuple	tup;
-				Form_pg_attrdef attrdef;
-				ObjectAddress colobject;
 
-				attrdefDesc = table_open(AttrDefaultRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_attrdef_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				adscan = systable_beginscan(attrdefDesc, AttrDefaultOidIndexId,
-											true, NULL, 1, skey);
-
-				tup = systable_getnext(adscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for attrdef %u",
-							 object->objectId);
-
-					systable_endscan(adscan);
-					table_close(attrdefDesc, AccessShareLock);
-					break;
-				}
-
-				attrdef = (Form_pg_attrdef) GETSTRUCT(tup);
-
-				colobject.classId = RelationRelationId;
-				colobject.objectId = attrdef->adrelid;
-				colobject.objectSubId = attrdef->adnum;
-
-				/* translator: %s is typically "column %s of table %s" */
-				appendStringInfo(&buffer, _("default value for %s"),
-								 getObjectDescription(&colobject, false));
-
-				systable_endscan(adscan);
-				table_close(attrdefDesc, AccessShareLock);
-				break;
-			}
-
-		case OCLASS_LANGUAGE:
+			case OCLASS_LANGUAGE:
 			{
 				char	   *langname = get_language_name(object->objectId,
 														 missing_ok);
@@ -2706,9 +2565,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			break;
 
 
-		case OCLASS_DEFAULT:
-			appendStringInfoString(&buffer, "default value");
-			break;
 
 		case OCLASS_LANGUAGE:
 			appendStringInfoString(&buffer, "language");
@@ -3095,54 +2951,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 				break;
 			}
 
-		case OCLASS_DEFAULT:
-			{
-				Relation	attrdefDesc;
-				ScanKeyData skey[1];
-				SysScanDesc adscan;
-
-				HeapTuple	tup;
-				Form_pg_attrdef attrdef;
-				ObjectAddress colobject;
-
-				attrdefDesc = table_open(AttrDefaultRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_attrdef_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				adscan = systable_beginscan(attrdefDesc, AttrDefaultOidIndexId,
-											true, NULL, 1, skey);
-
-				tup = systable_getnext(adscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for attrdef %u",
-							 object->objectId);
-
-					systable_endscan(adscan);
-					table_close(attrdefDesc, AccessShareLock);
-					break;
-				}
-
-				attrdef = (Form_pg_attrdef) GETSTRUCT(tup);
-
-				colobject.classId = RelationRelationId;
-				colobject.objectId = attrdef->adrelid;
-				colobject.objectSubId = attrdef->adnum;
-
-				appendStringInfo(&buffer, "for %s",
-								 getObjectIdentityParts(&colobject,
-														objname, objargs,
-														false));
-
-				systable_endscan(adscan);
-				table_close(attrdefDesc, AccessShareLock);
-				break;
-			}
 
 		case OCLASS_LANGUAGE:
 			{

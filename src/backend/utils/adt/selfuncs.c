@@ -4411,12 +4411,6 @@ get_join_variables(PlannerInfo *root, List *args, SpecialJoinInfo *sjinfo,
 		*join_is_reversed = false;
 }
 
-static void
-ReleaseDummy(HeapTuple tuple)
-{
-	pfree(tuple);
-}
-
 /*
  * examine_variable
  *		Try to look up statistical data about an expression.
@@ -4557,7 +4551,6 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
 		 * operator we are estimating for.  FIXME later.
 		 */
 		ListCell   *ilist;
-		ListCell   *slist;
 
 		foreach(ilist, onerel->indexlist)
 		{
@@ -4883,10 +4876,9 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 bool
 all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 {
-	RangeTblEntry *rte = planner_rt_fetch(varno, root);
 	int			varattno;
 
-	Assert(rte->rtekind == RTE_RELATION);
+	Assert(planner_rt_fetch(varno, root)->rtekind == RTE_RELATION);
 
 	/*
 	 * Permissions and securityQuals must be checked on the table actually
@@ -4972,8 +4964,7 @@ all_rows_selectable(PlannerInfo *root, Index varno, Bitmapset *varattnos)
 		}
 
 		/* Perform the access check on this parent rel */
-		rte = planner_rt_fetch(varno, root);
-		Assert(rte->rtekind == RTE_RELATION);
+		Assert(planner_rt_fetch(varno, root)->rtekind == RTE_RELATION);
 	}
 
 	/*

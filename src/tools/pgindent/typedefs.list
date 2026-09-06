@@ -119,9 +119,7 @@ AttStatsSlot
 AttoptCacheEntry
 AttoptCacheKey
 AttrDefInfo
-AttrDefault
 AttrMap
-AttrMissing
 AttrNumber
 AttributeOpts
 AuthRequest
@@ -611,7 +609,6 @@ FormData_pg_aggregate
 FormData_pg_am
 FormData_pg_amop
 FormData_pg_amproc
-FormData_pg_attrdef
 FormData_pg_attribute
 FormData_pg_auth_members
 FormData_pg_authid
@@ -650,7 +647,6 @@ Form_pg_aggregate
 Form_pg_am
 Form_pg_amop
 Form_pg_amproc
-Form_pg_attrdef
 Form_pg_attribute
 Form_pg_auth_members
 Form_pg_authid
@@ -1871,7 +1867,6 @@ RangeType
 RangeVar
 RangeVarGetRelidCallback
 Ranges
-RawColumnDefault
 RawParseMode
 RawStmt
 ReadBufPtrType
@@ -2096,7 +2091,6 @@ SetConstraintTriggerData
 SetExprState
 SetFunctionReturnMode
 SetQuantifier
-SetToDefault
 SetupWorkerPtrType
 ShDependObjectInfo
 SharedAggInfo
@@ -2432,7 +2426,6 @@ TsmRoutine
 TupOutputState
 TupSortStatus
 TupStoreStatus
-TupleConstr
 TupleConversionMap
 TupleDesc
 TupleHashEntry

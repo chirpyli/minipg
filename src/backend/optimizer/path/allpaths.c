@@ -82,10 +82,6 @@ static void set_tablesample_rel_size(PlannerInfo *root, RelOptInfo *rel,
 									 RangeTblEntry *rte);
 static void set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 										 RangeTblEntry *rte);
-static void set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
-								Index rti, RangeTblEntry *rte);
-static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
-									Index rti, RangeTblEntry *rte);
 static void generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 										 List *live_childrels,
 										 List *all_child_pathkeys);
@@ -288,9 +284,7 @@ set_base_rel_sizes(PlannerInfo *root)
 		/*
 		 * If parallelism is allowable for this query in general, see whether
 		 * it's allowable for this rel in particular.  We have to do this
-		 * before set_rel_size(), because (a) if this rel is an inheritance
-		 * parent, set_append_rel_size() will use and perhaps change the rel's
-		 * consider_parallel flag, and (b) for some RTE types, set_rel_size()
+		 * before set_rel_size(), because for some RTE types, set_rel_size()
 		 * goes ahead and makes paths immediately.
 		 */
 		if (root->glob->parallelModeOK)
@@ -343,8 +337,7 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		/*
 		 * We proved we don't need to scan the rel via constraint exclusion,
 		 * so set up a single dummy path for it.  Here we only check this for
-		 * regular baserels; if it's an otherrel, CE was already checked in
-		 * set_append_rel_size().
+		 * regular baserels.
 		 *
 		 * In this case, we go ahead and set up the relation's path right away
 		 * instead of leaving it for set_rel_pathlist to do.  This is because
@@ -548,10 +541,8 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 			}
 
 			/*
-			 * There are additional considerations for appendrels, which we'll
-			 * deal with in set_append_rel_size and set_append_rel_pathlist.
-			 * For now, just set consider_parallel based on the rel's own
-			 * quals and targetlist.
+			 * Just set consider_parallel based on the rel's own quals and
+			 * targetlist.
 			 */
 			break;
 
@@ -774,318 +765,6 @@ set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *
 	add_path(rel, path);
 
 	/* For the moment, at least, there are no other paths to consider */
-}
-
-/*
- * set_append_rel_size
- *	  Set size estimates for a simple "append relation"
- *
- * The passed-in rel and RTE represent the entire append relation.  The
- * relation's contents are computed by appending together the output of the
- * individual member relations.  Note that in the non-partitioned inheritance
- * case, the first member relation is actually the same table as is mentioned
- * in the parent RTE ... but it has a different RTE and RelOptInfo.  This is
- * a good thing because their outputs are not the same size.
- */
-static void
-set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
-					Index rti, RangeTblEntry *rte)
-{
-	int			parentRTindex = rti;
-	bool		has_live_children;
-	double		parent_rows;
-	double		parent_size;
-	double	   *parent_attrsizes;
-	int			nattrs;
-	ListCell   *l;
-
-	/* Guard against stack overflow due to overly deep inheritance tree. */
-	check_stack_depth();
-
-	Assert(IS_SIMPLE_REL(rel));
-
-	/*
-	 * Initialize to compute size estimates for whole append relation.
-	 *
-	 * We handle width estimates by weighting the widths of different child
-	 * rels proportionally to their number of rows.  This is sensible because
-	 * the use of width estimates is mainly to compute the total relation
-	 * "footprint" if we have to sort or hash it.  To do this, we sum the
-	 * total equivalent size (in "double" arithmetic) and then divide by the
-	 * total rowcount estimate.  This is done separately for the total rel
-	 * width and each attribute.
-	 *
-	 * Note: if you consider changing this logic, beware that child rels could
-	 * have zero rows and/or width, if they were excluded by constraints.
-	 */
-	has_live_children = false;
-	parent_rows = 0;
-	parent_size = 0;
-	nattrs = rel->max_attr - rel->min_attr + 1;
-	parent_attrsizes = (double *) palloc0(nattrs * sizeof(double));
-
-	foreach(l, root->append_rel_list)
-	{
-		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
-		int			childRTindex;
-		RangeTblEntry *childRTE;
-		RelOptInfo *childrel;
-		ListCell   *parentvars;
-		ListCell   *childvars;
-
-		/* append_rel_list contains all append rels; ignore others */
-		if (appinfo->parent_relid != parentRTindex)
-			continue;
-
-		childRTindex = appinfo->child_relid;
-		childRTE = root->simple_rte_array[childRTindex];
-
-		/*
-		 * The child rel's RelOptInfo was already created during
-		 * add_other_rels_to_query.
-		 */
-		childrel = find_base_rel(root, childRTindex);
-		Assert(childrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
-
-		/* We may have already proven the child to be dummy. */
-		if (IS_DUMMY_REL(childrel))
-			continue;
-
-		/*
-		 * We have to copy the parent's targetlist and quals to the child,
-		 * with appropriate substitution of variables.  However, the
-		 * baserestrictinfo quals were already copied/substituted when the
-		 * child RelOptInfo was built.  So we don't need any additional setup
-		 * before applying constraint exclusion.
-		 */
-		if (relation_excluded_by_constraints(root, childrel, childRTE))
-		{
-			/*
-			 * This child need not be scanned, so we can omit it from the
-			 * appendrel.
-			 */
-			set_dummy_rel_pathlist(childrel);
-			continue;
-		}
-
-		/*
-		 * Constraint exclusion failed, so copy the parent's join quals and
-		 * targetlist to the child, with appropriate variable substitutions.
-		 *
-		 * NB: the resulting childrel->reltarget->exprs may contain arbitrary
-		 * expressions, which otherwise would not occur in a rel's targetlist.
-		 * Code that might be looking at an appendrel child must cope with
-		 * such.  (Normally, a rel's targetlist would only include Vars and
-		 * PlaceHolderVars.)  XXX we do not bother to update the cost or width
-		 * fields of childrel->reltarget; not clear if that would be useful.
-		 */
-		childrel->joininfo = (List *)
-			adjust_appendrel_attrs(root,
-								   (Node *) rel->joininfo,
-								   1, &appinfo);
-		childrel->reltarget->exprs = (List *)
-			adjust_appendrel_attrs(root,
-								   (Node *) rel->reltarget->exprs,
-								   1, &appinfo);
-
-		/*
-		 * We have to make child entries in the EquivalenceClass data
-		 * structures as well.  This is needed either if the parent
-		 * participates in some eclass joins (because we will want to consider
-		 * inner-indexscan joins on the individual children) or if the parent
-		 * has useful pathkeys (because we should try to build MergeAppend
-		 * paths that produce those sort orderings).
-		 */
-		if (rel->has_eclass_joins || has_useful_pathkeys(root, rel))
-			add_child_rel_equivalences(root, appinfo, rel, childrel);
-		childrel->has_eclass_joins = rel->has_eclass_joins;
-
-		/*
-		 * Note: we could compute appropriate attr_needed data for the child's
-		 * variables, by transforming the parent's attr_needed through the
-		 * translated_vars mapping.  However, currently there's no need
-		 * because attr_needed is only examined for base relations not
-		 * otherrels.  So we just leave the child's attr_needed empty.
-		 */
-
-		/*
-		 * If parallelism is allowable for this query in general, see whether
-		 * it's allowable for this childrel in particular.  But if we've
-		 * already decided the appendrel is not parallel-safe as a whole,
-		 * there's no point in considering parallelism for this child.  For
-		 * consistency, do this before calling set_rel_size() for the child.
-		 */
-		if (root->glob->parallelModeOK && rel->consider_parallel)
-			set_rel_consider_parallel(root, childrel, childRTE);
-
-		/*
-		 * Compute the child's size.
-		 */
-		set_rel_size(root, childrel, childRTindex, childRTE);
-
-		/*
-		 * It is possible that constraint exclusion detected a contradiction
-		 * within a child subquery, even though we didn't prove one above. If
-		 * so, we can skip this child.
-		 */
-		if (IS_DUMMY_REL(childrel))
-			continue;
-
-		/* We have at least one live child. */
-		has_live_children = true;
-
-		/*
-		 * If any live child is not parallel-safe, treat the whole appendrel
-		 * as not parallel-safe.  In future we might be able to generate plans
-		 * in which some children are farmed out to workers while others are
-		 * not; but we don't have that today, so it's a waste to consider
-		 * partial paths anywhere in the appendrel unless it's all safe.
-		 * (Child rels visited before this one will be unmarked in
-		 * set_append_rel_pathlist().)
-		 */
-		if (!childrel->consider_parallel)
-			rel->consider_parallel = false;
-
-		/*
-		 * Accumulate size information from each live child.
-		 */
-		Assert(childrel->rows > 0);
-
-		parent_rows += childrel->rows;
-		parent_size += childrel->reltarget->width * childrel->rows;
-
-		/*
-		 * Accumulate per-column estimates too.  We need not do anything for
-		 * PlaceHolderVars in the parent list.  If child expression isn't a
-		 * Var, or we didn't record a width estimate for it, we have to fall
-		 * back on a datatype-based estimate.
-		 *
-		 * By construction, child's targetlist is 1-to-1 with parent's.
-		 */
-		forboth(parentvars, rel->reltarget->exprs,
-				childvars, childrel->reltarget->exprs)
-		{
-			Var		   *parentvar = (Var *) lfirst(parentvars);
-			Node	   *childvar = (Node *) lfirst(childvars);
-
-			if (IsA(parentvar, Var) && parentvar->varno == parentRTindex)
-			{
-				int			pndx = parentvar->varattno - rel->min_attr;
-				int32		child_width = 0;
-
-				if (IsA(childvar, Var) &&
-					((Var *) childvar)->varno == childrel->relid)
-				{
-					int			cndx = ((Var *) childvar)->varattno - childrel->min_attr;
-
-					child_width = childrel->attr_widths[cndx];
-				}
-				if (child_width <= 0)
-					child_width = get_typavgwidth(exprType(childvar),
-												  exprTypmod(childvar));
-				Assert(child_width > 0);
-				parent_attrsizes[pndx] += child_width * childrel->rows;
-			}
-		}
-	}
-
-	if (has_live_children)
-	{
-		/*
-		 * Save the finished size estimates.
-		 */
-		int			i;
-
-		Assert(parent_rows > 0);
-		rel->rows = parent_rows;
-		rel->reltarget->width = rint(parent_size / parent_rows);
-		for (i = 0; i < nattrs; i++)
-			rel->attr_widths[i] = rint(parent_attrsizes[i] / parent_rows);
-
-		/*
-		 * Set "raw tuples" count equal to "rows" for the appendrel; needed
-		 * because some places assume rel->tuples is valid for any baserel.
-		 */
-		rel->tuples = parent_rows;
-
-		/*
-		 * Note that we leave rel->pages as zero; this is important to avoid
-		 * double-counting the appendrel tree in total_table_pages.
-		 */
-	}
-	else
-	{
-		/*
-		 * All children were excluded by constraints, so mark the whole
-		 * appendrel dummy.  We must do this in this phase so that the rel's
-		 * dummy-ness is visible when we generate paths for other rels.
-		 */
-		set_dummy_rel_pathlist(rel);
-	}
-
-	pfree(parent_attrsizes);
-}
-
-/*
- * set_append_rel_pathlist
- *	  Build access paths for an "append relation"
- */
-static void
-set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
-						Index rti, RangeTblEntry *rte)
-{
-	int			parentRTindex = rti;
-	List	   *live_childrels = NIL;
-	ListCell   *l;
-
-	/*
-	 * Generate access paths for each member relation, and remember the
-	 * non-dummy children.
-	 */
-	foreach(l, root->append_rel_list)
-	{
-		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
-		int			childRTindex;
-		RangeTblEntry *childRTE;
-		RelOptInfo *childrel;
-
-		/* append_rel_list contains all append rels; ignore others */
-		if (appinfo->parent_relid != parentRTindex)
-			continue;
-
-		/* Re-locate the child RTE and RelOptInfo */
-		childRTindex = appinfo->child_relid;
-		childRTE = root->simple_rte_array[childRTindex];
-		childrel = root->simple_rel_array[childRTindex];
-
-		/*
-		 * If set_append_rel_size() decided the parent appendrel was
-		 * parallel-unsafe at some point after visiting this child rel, we
-		 * need to propagate the unsafety marking down to the child, so that
-		 * we don't generate useless partial paths for it.
-		 */
-		if (!rel->consider_parallel)
-			childrel->consider_parallel = false;
-
-		/*
-		 * Compute the child's access paths.
-		 */
-		set_rel_pathlist(root, childrel, childRTindex, childRTE);
-
-		/*
-		 * If child is dummy, ignore it.
-		 */
-		if (IS_DUMMY_REL(childrel))
-			continue;
-
-		/*
-		 * Child is live, so add it to the live_childrels list for use below.
-		 */
-		live_childrels = lappend(live_childrels, childrel);
-	}
-
-	/* Add paths to the append relation. */
-	add_paths_to_append_rel(root, rel, live_childrels);
 }
 
 
@@ -2965,8 +2644,7 @@ remove_unused_subquery_outputs(Query *subquery, RelOptInfo *rel)
 	 *
 	 * Add all the attributes needed for joins or final output.  Note: we must
 	 * look at rel's targetlist, not the attr_needed data, because attr_needed
-	 * isn't computed for inheritance child rels, cf set_append_rel_size().
-	 * (XXX might be worth changing that sometime.)
+	 * isn't computed for inheritance child rels.
 	 */
 	pull_varattnos((Node *) rel->reltarget->exprs, rel->relid, &attrs_used);
 

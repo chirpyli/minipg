@@ -206,34 +206,18 @@ index_check_primary_key(Relation heapRel,
 	}
 
 	/*
-	 * Check that all of the attributes in a primary key are marked as not
-	 * null.  (We don't really expect to see that; it'd mean the parser messed
-	 * up.  But it seems wise to check anyway.)
+	 * Check that all columns of the index are simple column references, not
+	 * expressions.  (We don't really expect to see that; it'd mean the parser
+	 * messed up.  But it seems wise to check anyway.)
 	 */
 	for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
 	{
 		AttrNumber	attnum = indexInfo->ii_IndexAttrNumbers[i];
-		HeapTuple	atttuple;
-		Form_pg_attribute attform;
 
 		if (attnum == 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("primary keys cannot be expressions")));
-
-		/* System attributes are never null, so no need to check */
-		if (attnum < 0)
-			continue;
-
-		atttuple = SearchSysCache2(ATTNUM,
-								   ObjectIdGetDatum(RelationGetRelid(heapRel)),
-								   Int16GetDatum(attnum));
-		if (!HeapTupleIsValid(atttuple))
-			elog(ERROR, "cache lookup failed for attribute %d of relation %u",
-				 attnum, RelationGetRelid(heapRel));
-		attform = (Form_pg_attribute) GETSTRUCT(atttuple);
-
-		ReleaseSysCache(atttuple);
 	}
 }
 
@@ -250,7 +234,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 						 Oid *classObjectId)
 {
 	int			numatts = indexInfo->ii_NumIndexAttrs;
-	int			numkeyatts = indexInfo->ii_NumIndexKeyAttrs;
 	ListCell   *colnames_item = list_head(indexColNames);
 	ListCell   *indexpr_item = list_head(indexInfo->ii_Expressions);
 	IndexAmRoutine *amroutine;
@@ -1616,9 +1599,6 @@ index_constraint_create(Relation heapRelation,
 				idxaddr;
 	Oid			conOid;
 	bool		mark_as_primary;
-	bool		islocal;
-	bool		noinherit;
-	int			inhcount;
 
 	mark_as_primary = (constr_flags & INDEX_CONSTR_CREATE_MARK_AS_PRIMARY) != 0;
 
@@ -1649,10 +1629,6 @@ index_constraint_create(Relation heapRelation,
 	if (constr_flags & INDEX_CONSTR_CREATE_REMOVE_OLD_DEPS)
 		deleteDependencyRecordsForClass(RelationRelationId, indexRelationId,
 										RelationRelationId, DEPENDENCY_AUTO);
-
-	islocal = true;
-	inhcount = 0;
-	noinherit = true;
 
 	/*
 	 * Construct a pg_constraint entry.

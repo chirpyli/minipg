@@ -41,8 +41,6 @@ typedef struct RangeQueryClause
 
 static void addRangeClause(RangeQueryClause **rqlist, Node *clause,
 						   bool varonleft, bool isLTsel, Selectivity s2);
-static RelOptInfo *find_single_rel_for_clauses(PlannerInfo *root,
-											   List *clauses);
 static Selectivity clauselist_selectivity_or(PlannerInfo *root,
 											 List *clauses,
 											 int varRelid,
@@ -474,70 +472,6 @@ addRangeClause(RangeQueryClause **rqlist, Node *clause,
 	}
 	rqelem->next = *rqlist;
 	*rqlist = rqelem;
-}
-
-/*
- * find_single_rel_for_clauses
- *		Examine each clause in 'clauses' and determine if all clauses
- *		reference only a single relation.  If so return that relation,
- *		otherwise return NULL.
- */
-static RelOptInfo *
-find_single_rel_for_clauses(PlannerInfo *root, List *clauses)
-{
-	int			lastrelid = 0;
-	ListCell   *l;
-
-	foreach(l, clauses)
-	{
-		RestrictInfo *rinfo = (RestrictInfo *) lfirst(l);
-		int			relid;
-
-		/*
-		 * If we have a list of bare clauses rather than RestrictInfos, we
-		 * could pull out their relids the hard way with pull_varnos().
-		 * However, currently the extended-stats machinery won't do anything
-		 * with non-RestrictInfo clauses anyway, so there's no point in
-		 * spending extra cycles; just fail if that's what we have.
-		 *
-		 * An exception to that rule is if we have a bare BoolExpr AND clause.
-		 * We treat this as a special case because the restrictinfo machinery
-		 * doesn't build RestrictInfos on top of AND clauses.
-		 */
-		if (is_andclause(rinfo))
-		{
-			RelOptInfo *rel;
-
-			rel = find_single_rel_for_clauses(root,
-											  ((BoolExpr *) rinfo)->args);
-
-			if (rel == NULL)
-				return NULL;
-			if (lastrelid == 0)
-				lastrelid = rel->relid;
-			else if (rel->relid != lastrelid)
-				return NULL;
-
-			continue;
-		}
-
-		if (!IsA(rinfo, RestrictInfo))
-			return NULL;
-
-		if (bms_is_empty(rinfo->clause_relids))
-			continue;			/* we can ignore variable-free clauses */
-		if (!bms_get_singleton_member(rinfo->clause_relids, &relid))
-			return NULL;		/* multiple relations in this clause */
-		if (lastrelid == 0)
-			lastrelid = relid;	/* first clause referencing a relation */
-		else if (relid != lastrelid)
-			return NULL;		/* relation not same as last one */
-	}
-
-	if (lastrelid != 0)
-		return find_base_rel(root, lastrelid);
-
-	return NULL;				/* no clauses */
 }
 
 /*

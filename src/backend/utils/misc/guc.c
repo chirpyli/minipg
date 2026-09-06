@@ -278,17 +278,6 @@ static const struct config_enum_entry log_error_verbosity_options[] = {
 StaticAssertDecl(lengthof(log_error_verbosity_options) == (PGERROR_VERBOSE + 2),
 				 "array length mismatch");
 
-static const struct config_enum_entry log_statement_options[] = {
-	{"none", LOGSTMT_NONE, false},
-	{"ddl", LOGSTMT_DDL, false},
-	{"mod", LOGSTMT_MOD, false},
-	{"all", LOGSTMT_ALL, false},
-	{NULL, 0, false}
-};
-
-StaticAssertDecl(lengthof(log_statement_options) == (LOGSTMT_ALL + 2),
-				 "array length mismatch");
-
 static const struct config_enum_entry isolation_level_options[] = {
 	{"serializable", XACT_SERIALIZABLE, false},
 	{"repeatable read", XACT_REPEATABLE_READ, false},
@@ -3618,16 +3607,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&log_min_error_statement,
 		ERROR, server_message_level_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_statement", PGC_SUSET, LOGGING_WHAT,
-			gettext_noop("Sets the type of statements logged."),
-			NULL
-		},
-		&log_statement,
-		LOGSTMT_NONE, log_statement_options,
 		NULL, NULL, NULL
 	},
 

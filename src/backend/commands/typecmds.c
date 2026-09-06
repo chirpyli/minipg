@@ -71,36 +71,6 @@
 #include "utils/syscache.h"
 
 
-/* parameter structure for AlterTypeRecurse() */
-typedef struct
-{
-	/* Flags indicating which type attributes to update */
-	bool		updateStorage;
-	bool		updateReceive;
-	bool		updateSend;
-	bool		updateTypmodin;
-	bool		updateTypmodout;
-	bool		updateAnalyze;
-	bool		updateSubscript;
-	/* New values for relevant attributes */
-	char		storage;
-	Oid			receiveOid;
-	Oid			sendOid;
-	Oid			typmodinOid;
-	Oid			typmodoutOid;
-	Oid			analyzeOid;
-	Oid			subscriptOid;
-} AlterTypeRecurseParams;
-
-static Oid	findTypeReceiveFunction(List *procname, Oid typeOid);
-static Oid	findTypeSendFunction(List *procname, Oid typeOid);
-static Oid	findTypeTypmodinFunction(List *procname);
-static Oid	findTypeTypmodoutFunction(List *procname);
-static Oid	findTypeAnalyzeFunction(List *procname, Oid typeOid);
-static Oid	findTypeSubscriptingFunction(List *procname, Oid typeOid);
-static void AlterTypeRecurse(Oid typeOid, bool isImplicitArray,
-							 HeapTuple tup, Relation catalog,
-							 AlterTypeRecurseParams *atparams);
 
 
 /*

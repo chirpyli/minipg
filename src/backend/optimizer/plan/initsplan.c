@@ -130,33 +130,6 @@ add_base_rels_to_query(PlannerInfo *root, Node *jtnode)
 			 (int) nodeTag(jtnode));
 }
 
-/*
- * add_other_rels_to_query
- *	  create "otherrel" RelOptInfos for the children of appendrel baserels
- *
- * At the end of this process, there should be RelOptInfos for all relations
- * that will be scanned by the query.
- */
-void
-add_other_rels_to_query(PlannerInfo *root)
-{
-	int			rti;
-
-	for (rti = 1; rti < root->simple_rel_array_size; rti++)
-	{
-		RelOptInfo *rel = root->simple_rel_array[rti];
-		RangeTblEntry *rte = root->simple_rte_array[rti];
-
-		/* there may be empty slots corresponding to non-baserel RTEs */
-		if (rel == NULL)
-			continue;
-
-		/* Ignore any "otherrels" that were already added. */
-		if (rel->reloptkind != RELOPT_BASEREL)
-			continue;
-	}
-}
-
 
 /*****************************************************************************
  *

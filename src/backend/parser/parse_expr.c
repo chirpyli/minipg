@@ -241,18 +241,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 			break;
 
 			/*
-			 * In all places where DEFAULT is legal, the caller should have
-			 * processed it rather than passing it to transformExpr().
-			 */
-		case T_SetToDefault:
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("DEFAULT is not allowed in this context"),
-					 parser_errposition(pstate,
-										((SetToDefault *) expr)->location)));
-			break;
-
-			/*
 			 * CaseTestExpr doesn't require any processing; it is only
 			 * injected into parse trees in a fully-formed state.
 			 *
@@ -460,10 +448,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_COPY_WHERE:
 		case EXPR_KIND_CYCLE_MARK:
 			/* okay */
-			break;
-
-		case EXPR_KIND_COLUMN_DEFAULT:
-			err = _("cannot use column reference in DEFAULT expression");
 			break;
 
 			/*
@@ -1467,7 +1451,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_CHECK_CONSTRAINT:
 			err = _("cannot use subquery in check constraint");
 			break;
-		case EXPR_KIND_COLUMN_DEFAULT:
 		case EXPR_KIND_FUNCTION_DEFAULT:
 			err = _("cannot use subquery in DEFAULT expression");
 			break;
@@ -2187,7 +2170,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "VALUES";
 		case EXPR_KIND_CHECK_CONSTRAINT:
 			return "CHECK";
-		case EXPR_KIND_COLUMN_DEFAULT:
 		case EXPR_KIND_FUNCTION_DEFAULT:
 			return "DEFAULT";
 		case EXPR_KIND_INDEX_EXPRESSION:

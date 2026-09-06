@@ -35,6 +35,7 @@
 #include "access/table.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_operator.h"
+#include "commands/defrem.h"
 #include "utils/syscache.h"
 
 /*

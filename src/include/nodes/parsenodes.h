@@ -278,26 +278,6 @@ typedef struct TypeCast
 } TypeCast;
 
 /*
- * RoleSpec - a role name or one of a few special values.
- */
-typedef enum RoleSpecType
-{
-	ROLESPEC_CSTRING,			/* role name is stored as a C string */
-	ROLESPEC_CURRENT_ROLE,		/* role spec is CURRENT_ROLE */
-	ROLESPEC_CURRENT_USER,		/* role spec is CURRENT_USER */
-	ROLESPEC_SESSION_USER,		/* role spec is SESSION_USER */
-	ROLESPEC_PUBLIC				/* role name is "public" */
-} RoleSpecType;
-
-typedef struct RoleSpec
-{
-	NodeTag		type;
-	RoleSpecType roletype;		/* Type of this rolespec */
-	char	   *rolename;		/* filled only for ROLESPEC_CSTRING */
-	int			location;		/* token location, or -1 if unknown */
-} RoleSpec;
-
-/*
  * FuncCall - a function or aggregate invocation
  *
  * agg_order (if not NIL) indicates we saw 'foo(... ORDER BY ...)', or if
@@ -1139,10 +1119,7 @@ typedef struct SelectStmt
 	/*
 	 * In a "leaf" node representing a VALUES list, the above fields are all
 	 * null, and instead this field is set.  Note that the elements of the
-	 * sublists are just expressions, without ResTarget decoration. Also note
-	 * that a list element can be DEFAULT (represented as a SetToDefault
-	 * node), regardless of the context of the VALUES list. It's up to parse
-	 * analysis to reject that where not valid.
+	 * sublists are just expressions, without ResTarget decoration.
 	 */
 	List	   *valuesLists;	/* untransformed list of expression lists */
 
@@ -1187,6 +1164,7 @@ typedef enum ObjectType
 	OBJECT_AMPROC,
 	OBJECT_ATTRIBUTE,			/* type's attribute, when distinct from column */
 	OBJECT_CAST,
+	OBJECT_CONVERSION,
 	OBJECT_COLUMN,
 	OBJECT_COLLATION,
 	OBJECT_DATABASE,
@@ -1251,8 +1229,6 @@ typedef enum AlterTableType
 	AT_AddColumn,				/* add column */
 	AT_AddColumnRecurse,		/* internal to commands/tablecmds.c */
 	AT_AddColumnToView,			/* implicitly via CREATE OR REPLACE VIEW */
-	AT_ColumnDefault,			/* alter column default */
-	AT_DropExpression,			/* alter column drop expression */
 	AT_SetStatistics,			/* alter column set statistics */
 	AT_SetOptions,				/* alter column set ( options ) */
 	AT_ResetOptions,			/* alter column reset ( options ) */
@@ -1269,23 +1245,15 @@ typedef enum AlterTableType
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
 	AT_AlterColumnType,			/* alter column type */
-	AT_AlterColumnGenericOptions,	/* alter column OPTIONS (...) */
-	AT_ChangeOwner,				/* change owner */
 	AT_ClusterOn,				/* CLUSTER ON */
 	AT_DropCluster,				/* SET WITHOUT CLUSTER */
-	AT_DropOids,				/* SET WITHOUT OIDS */
 	AT_SetRelOptions,			/* SET (...) -- AM specific parameters */
 	AT_ResetRelOptions,			/* RESET (...) -- AM specific parameters */
 	AT_ReplaceRelOptions,		/* replace reloption list in its entirety */
 	AT_EnableRule,				/* ENABLE RULE name */
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
 	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
-	AT_DisableRule,				/* DISABLE RULE name */
-	AT_GenericOptions,			/* OPTIONS (...) */
-	AT_AddIdentity,				/* ADD IDENTITY */
-	AT_SetIdentity,				/* SET identity column options */
-	AT_DropIdentity,			/* DROP IDENTITY */
-	AT_ReAddStatistics			/* internal to commands/tablecmds.c */
+	AT_DisableRule				/* DISABLE RULE name */
 } AlterTableType;
 
 typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
@@ -1296,7 +1264,6 @@ typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
 								 * or tablespace */
 	int16		num;			/* attribute number for columns referenced by
 								 * number */
-	RoleSpec   *newowner;
 	Node	   *def;			/* definition of new column, index,
 								 * constraint, or parent table */
 	DropBehavior behavior;		/* RESTRICT or CASCADE for DROP cases */

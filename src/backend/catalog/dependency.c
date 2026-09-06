@@ -25,7 +25,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
-#include "catalog/pg_attrdef.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -121,7 +120,7 @@ static const Oid object_classes[] = {
 	CastRelationId,				/* OCLASS_CAST */
 	CollationRelationId,		/* OCLASS_COLLATION */
 	ConstraintRelationId,		/* OCLASS_CONSTRAINT */
-	AttrDefaultRelationId,		/* OCLASS_DEFAULT */
+	ConversionRelationId,		/* OCLASS_CONVERSION */
 	LanguageRelationId,			/* OCLASS_LANGUAGE */
 	OperatorRelationId,			/* OCLASS_OPERATOR */
 	OperatorClassRelationId,	/* OCLASS_OPCLASS */
@@ -1264,10 +1263,6 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_CONSTRAINT:
 			RemoveConstraintById(object->objectId);
-			break;
-
-		case OCLASS_DEFAULT:
-			RemoveAttrDefaultById(object->objectId);
 			break;
 
 		case OCLASS_OPERATOR:
@@ -2454,8 +2449,7 @@ getObjectClass(const ObjectAddress *object)
 			return OCLASS_CONSTRAINT;
 
 		case ConversionRelationId:
-		case AttrDefaultRelationId:
-			return OCLASS_DEFAULT;
+			return OCLASS_CONVERSION;
 
 		case LanguageRelationId:
 			return OCLASS_LANGUAGE;

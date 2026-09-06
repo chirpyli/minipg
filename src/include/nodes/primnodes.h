@@ -1107,22 +1107,6 @@ typedef struct BooleanTest
 } BooleanTest;
 
 /*
- * Placeholder node for a DEFAULT marker in an INSERT or UPDATE command.
- *
- * This is not an executable expression: it must be replaced by the actual
- * column default expression during rewriting.  But it is convenient to
- * treat it as an expression node during parsing and rewriting.
- */
-typedef struct SetToDefault
-{
-	Expr		xpr;
-	Oid			typeId;			/* type for substituted value */
-	int32		typeMod;		/* typemod for substituted value */
-	Oid			collation;		/* collation for the substituted value */
-	int			location;		/* token location, or -1 if unknown */
-} SetToDefault;
-
-/*
  * InferenceElem - an element of a unique index inference specification
  *
  * This mostly matches the structure of IndexElems, but having a dedicated

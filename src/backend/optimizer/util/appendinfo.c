@@ -919,7 +919,7 @@ distribute_row_identity_vars(PlannerInfo *root)
 	 * and forcibly copy them into the reltarget list of the topmost target
 	 * relation.  That's sufficient because they'll be copied to the
 	 * individual leaf target rels (with appropriate translation) later,
-	 * during appendrel expansion --- see set_append_rel_size().
+	 * during appendrel expansion.
 	 */
 	target_rel = find_base_rel(root, result_relation);
 
@@ -961,21 +961,17 @@ expand_appendrel_subquery(PlannerInfo *root, RelOptInfo *rel,
 	{
 		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
 		Index		childRTindex = appinfo->child_relid;
-		RangeTblEntry *childrte;
-		RelOptInfo *childrel;
 
 		/* append_rel_list contains all append rels; ignore others */
 		if (appinfo->parent_relid != rti)
 			continue;
 
-		/* find the child RTE, which should already exist */
+		/* the child RTE should already exist */
 		Assert(childRTindex < root->simple_rel_array_size);
-		childrte = root->simple_rte_array[childRTindex];
-		Assert(childrte != NULL);
+		Assert(root->simple_rte_array[childRTindex] != NULL);
 
 		/* Build the child RelOptInfo. */
-		childrel = build_simple_rel(root, childRTindex, rel, false);
-
+		build_simple_rel(root, childRTindex, rel, false);
 	}
 }
 

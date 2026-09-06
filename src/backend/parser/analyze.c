@@ -89,7 +89,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 {
 	ParseState *pstate = make_parsestate(NULL);
 	Query	   *query;
-	JumbleState *jstate = NULL;
 
 	Assert(sourceText != NULL); /* required as of 8.4 */
 
@@ -103,7 +102,7 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 	query = transformTopLevelStmt(pstate, parseTree);
 
 	if (IsQueryIdEnabled())
-		jstate = JumbleQuery(query, sourceText);
+		JumbleQuery(query, sourceText);
 
 	free_parsestate(pstate);
 
@@ -125,7 +124,6 @@ parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
 {
 	ParseState *pstate = make_parsestate(NULL);
 	Query	   *query;
-	JumbleState *jstate = NULL;
 
 	Assert(sourceText != NULL); /* required as of 8.4 */
 
@@ -139,7 +137,7 @@ parse_analyze_varparams(RawStmt *parseTree, const char *sourceText,
 	check_variable_parameters(pstate, query);
 
 	if (IsQueryIdEnabled())
-		jstate = JumbleQuery(query, sourceText);
+		JumbleQuery(query, sourceText);
 
 	free_parsestate(pstate);
 
@@ -588,11 +586,10 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 			List	   *sublist = (List *) lfirst(lc);
 
 			/*
-			 * Do basic expression transformation (same as a ROW() expr, but
-			 * allow SetToDefault at top level)
+			 * Do basic expression transformation (same as a ROW() expr).
 			 */
 			sublist = transformExpressionList(pstate, sublist,
-											  EXPR_KIND_VALUES, true);
+											  EXPR_KIND_VALUES);
 
 			/*
 			 * All the sublists must be the same length, *after*
@@ -705,13 +702,11 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 		Assert(list_length(valuesLists) == 1);
 
 		/*
-		 * Do basic expression transformation (same as a ROW() expr, but allow
-		 * SetToDefault at top level)
+		 * Do basic expression transformation (same as a ROW() expr).
 		 */
 		exprList = transformExpressionList(pstate,
 										   (List *) linitial(valuesLists),
-										   EXPR_KIND_VALUES_SINGLE,
-										   true);
+										   EXPR_KIND_VALUES_SINGLE);
 
 		/* Prepare row for assignment to target table */
 		exprList = transformInsertRow(pstate, exprList,
@@ -1197,11 +1192,10 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 		List	   *sublist = (List *) lfirst(lc);
 
 		/*
-		 * Do basic expression transformation (same as a ROW() expr, but here
-		 * we disallow SetToDefault)
+		 * Do basic expression transformation (same as a ROW() expr).
 		 */
 		sublist = transformExpressionList(pstate, sublist,
-										  EXPR_KIND_VALUES, false);
+										  EXPR_KIND_VALUES);
 
 		/*
 		 * All the sublists must be the same length, *after* transformation

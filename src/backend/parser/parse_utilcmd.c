@@ -93,7 +93,6 @@ static void transformColumnDefinition(CreateStmtContext *cxt,
 									  ColumnDef *column);
 static void transformTableConstraint(CreateStmtContext *cxt,
 									 Constraint *constraint);
-static List *get_collation(Oid collation, Oid actual_datatype);
 static List *get_opclass(Oid opclass, Oid actual_datatype);
 static void transformIndexConstraints(CreateStmtContext *cxt);
 static IndexStmt *transformIndexConstraint(Constraint *constraint,
@@ -630,40 +629,6 @@ generateClonedIndexStmt(RangeVar *heapRel, Relation source_idx,
 	return index;
 }
 
-
-/*
- * get_collation		- fetch qualified name of a collation
- *
- * If collation is InvalidOid or is the default for the given actual_datatype,
- * then the return value is NIL.
- */
-static List *
-get_collation(Oid collation, Oid actual_datatype)
-{
-	List	   *result;
-	HeapTuple	ht_coll;
-	Form_pg_collation coll_rec;
-	char	   *nsp_name;
-	char	   *coll_name;
-
-	if (!OidIsValid(collation))
-		return NIL;				/* easy case */
-	if (collation == get_typcollation(actual_datatype))
-		return NIL;				/* just let it default */
-
-	ht_coll = SearchSysCache1(COLLOID, ObjectIdGetDatum(collation));
-	if (!HeapTupleIsValid(ht_coll))
-		elog(ERROR, "cache lookup failed for collation %u", collation);
-	coll_rec = (Form_pg_collation) GETSTRUCT(ht_coll);
-
-	/* For simplicity, we always schema-qualify the name */
-	nsp_name = get_namespace_name(coll_rec->collnamespace);
-	coll_name = pstrdup(NameStr(coll_rec->collname));
-	result = list_make2(makeString(nsp_name), makeString(coll_name));
-
-	ReleaseSysCache(ht_coll);
-	return result;
-}
 
 /*
  * get_opclass			- fetch qualified name of an index operator class
@@ -1500,6 +1465,8 @@ transformRuleStmt(RuleStmt *stmt, const char *queryString,
 
 	/* Close relation, but keep the exclusive lock */
 	table_close(rel, NoLock);
+
+	return stmt;
 }
 
 

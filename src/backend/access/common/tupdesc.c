@@ -69,7 +69,6 @@ CreateTemplateTupleDesc(int natts)
 	 * Initialize other fields of the tupdesc.
 	 */
 	desc->natts = natts;
-	desc->constr = NULL;
 	desc->tdtypeid = RECORDOID;
 	desc->tdtypmod = -1;
 	desc->tdrefcount = -1;		/* assume not reference-counted */
@@ -110,7 +109,6 @@ TupleDesc
 CreateTupleDescCopy(TupleDesc tupdesc)
 {
 	TupleDesc	desc;
-	int			i;
 
 	desc = CreateTemplateTupleDesc(tupdesc->natts);
 
@@ -119,18 +117,6 @@ CreateTupleDescCopy(TupleDesc tupdesc)
 		   TupleDescAttr(tupdesc, 0),
 		   desc->natts * sizeof(FormData_pg_attribute));
 
-	/*
-	 * Since we're not copying constraints and defaults, clear fields
-	 * associated with them.
-	 */
-	for (i = 0; i < desc->natts; i++)
-	{
-		Form_pg_attribute att = TupleDescAttr(desc, i);
-
-		att->atthasdef = false;
-		att->atthasmissing = false;
-	}
-
 	/* We can copy the tuple type identification, too */
 	desc->tdtypeid = tupdesc->tdtypeid;
 	desc->tdtypmod = tupdesc->tdtypmod;
@@ -138,93 +124,11 @@ CreateTupleDescCopy(TupleDesc tupdesc)
 	return desc;
 }
 
-/*
- * CreateTupleDescCopyConstr
- *		This function creates a new TupleDesc by copying from an existing
- *		TupleDesc (including its constraints and defaults).
- */
-TupleDesc
-CreateTupleDescCopyConstr(TupleDesc tupdesc)
-{
-	TupleDesc	desc;
-	TupleConstr *constr = tupdesc->constr;
-	int			i;
-
-	desc = CreateTemplateTupleDesc(tupdesc->natts);
-
-	/* Flat-copy the attribute array */
-	memcpy(TupleDescAttr(desc, 0),
-		   TupleDescAttr(tupdesc, 0),
-		   desc->natts * sizeof(FormData_pg_attribute));
-
-	/* Copy the TupleConstr data structure, if any */
-	if (constr)
-	{
-		TupleConstr *cpy = (TupleConstr *) palloc0(sizeof(TupleConstr));
-
-		if ((cpy->num_defval = constr->num_defval) > 0)
-		{
-			cpy->defval = (AttrDefault *) palloc(cpy->num_defval * sizeof(AttrDefault));
-			memcpy(cpy->defval, constr->defval, cpy->num_defval * sizeof(AttrDefault));
-			for (i = cpy->num_defval - 1; i >= 0; i--)
-				cpy->defval[i].adbin = pstrdup(constr->defval[i].adbin);
-		}
-
-		if (constr->missing)
-		{
-			cpy->missing = (AttrMissing *) palloc(tupdesc->natts * sizeof(AttrMissing));
-			memcpy(cpy->missing, constr->missing, tupdesc->natts * sizeof(AttrMissing));
-			for (i = tupdesc->natts - 1; i >= 0; i--)
-			{
-				if (constr->missing[i].am_present)
-				{
-					Form_pg_attribute attr = TupleDescAttr(tupdesc, i);
-
-					cpy->missing[i].am_value = datumCopy(constr->missing[i].am_value,
-														 attr->attbyval,
-														 attr->attlen);
-				}
-			}
-		}
-
-		desc->constr = cpy;
-	}
-
-	/* We can copy the tuple type identification, too */
-	desc->tdtypeid = tupdesc->tdtypeid;
-	desc->tdtypmod = tupdesc->tdtypmod;
-
-	return desc;
-}
-
-/*
- * TupleDescCopy
- *		Copy a tuple descriptor into caller-supplied memory.
- *		The memory may be shared memory mapped at any address, and must
- *		be sufficient to hold TupleDescSize(src) bytes.
- *
- * !!! Constraints and defaults are not copied !!!
- */
 void
 TupleDescCopy(TupleDesc dst, TupleDesc src)
 {
-	int			i;
-
 	/* Flat-copy the header and attribute array */
 	memcpy(dst, src, TupleDescSize(src));
-
-	/*
-	 * Since we're not copying constraints and defaults, clear fields
-	 * associated with them.
-	 */
-	for (i = 0; i < dst->natts; i++)
-	{
-		Form_pg_attribute att = TupleDescAttr(dst, i);
-
-		att->atthasdef = false;
-		att->atthasmissing = false;
-	}
-	dst->constr = NULL;
 
 	/*
 	 * Also, assume the destination is not to be ref-counted.  (Copying the
@@ -270,10 +174,6 @@ TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
 	 */
 	dstAtt->attnum = dstAttno;
 	dstAtt->attcacheoff = -1;
-
-	/* since we're not copying constraints or defaults, clear these */
-	dstAtt->atthasdef = false;
-	dstAtt->atthasmissing = false;
 }
 
 /*
@@ -282,38 +182,12 @@ TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
 void
 FreeTupleDesc(TupleDesc tupdesc)
 {
-	int			i;
-
 	/*
 	 * Possibly this should assert tdrefcount == 0, to disallow explicit
 	 * freeing of un-refcounted tupdescs?
 	 */
 	Assert(tupdesc->tdrefcount <= 0);
 
-	if (tupdesc->constr)
-	{
-		if (tupdesc->constr->num_defval > 0)
-		{
-			AttrDefault *attrdef = tupdesc->constr->defval;
-
-			for (i = tupdesc->constr->num_defval - 1; i >= 0; i--)
-				pfree(attrdef[i].adbin);
-			pfree(attrdef);
-		}
-		if (tupdesc->constr->missing)
-		{
-			AttrMissing *attrmiss = tupdesc->constr->missing;
-
-			for (i = tupdesc->natts - 1; i >= 0; i--)
-			{
-				if (attrmiss[i].am_present
-					&& !TupleDescAttr(tupdesc, i)->attbyval)
-					pfree(DatumGetPointer(attrmiss[i].am_value));
-			}
-			pfree(attrmiss);
-		}
-		pfree(tupdesc->constr);
-	}
 
 	pfree(tupdesc);
 }
@@ -364,8 +238,8 @@ DecrTupleDescRefCount(TupleDesc tupdesc)
 bool
 equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 {
-	int			i,
-				n;
+int			i;
+
 
 	if (tupdesc1->natts != tupdesc2->natts)
 		return false;
@@ -387,8 +261,7 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 		 * general it seems safer to check them always.
 		 *
 		 * attcacheoff must NOT be checked since it's possibly not set in both
-		 * copies.  We also intentionally ignore atthasmissing, since that's
-		 * not very relevant in tupdescs, which lack the attmissingval field.
+		 * copies.
 		 */
 		if (strcmp(NameStr(attr1->attname), NameStr(attr2->attname)) != 0)
 			return false;
@@ -410,60 +283,11 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 			return false;
 		if (attr1->attcompression != attr2->attcompression)
 			return false;
-		if (attr1->atthasdef != attr2->atthasdef)
-			return false;
 		if (attr1->attisdropped != attr2->attisdropped)
 			return false;
 		/* variable-length fields are not even present... */
 	}
 
-	if (tupdesc1->constr != NULL)
-	{
-		TupleConstr *constr1 = tupdesc1->constr;
-		TupleConstr *constr2 = tupdesc2->constr;
-
-		if (constr2 == NULL)
-			return false;
-		n = constr1->num_defval;
-		if (n != (int) constr2->num_defval)
-			return false;
-		/* We assume here that both AttrDefault arrays are in adnum order */
-		for (i = 0; i < n; i++)
-		{
-			AttrDefault *defval1 = constr1->defval + i;
-			AttrDefault *defval2 = constr2->defval + i;
-
-			if (defval1->adnum != defval2->adnum)
-				return false;
-			if (strcmp(defval1->adbin, defval2->adbin) != 0)
-				return false;
-		}
-		if (constr1->missing)
-		{
-			if (!constr2->missing)
-				return false;
-			for (i = 0; i < tupdesc1->natts; i++)
-			{
-				AttrMissing *missval1 = constr1->missing + i;
-				AttrMissing *missval2 = constr2->missing + i;
-
-				if (missval1->am_present != missval2->am_present)
-					return false;
-				if (missval1->am_present)
-				{
-					Form_pg_attribute missatt1 = TupleDescAttr(tupdesc1, i);
-
-					if (!datumIsEqual(missval1->am_value, missval2->am_value,
-									  missatt1->attbyval, missatt1->attlen))
-						return false;
-				}
-			}
-		}
-		else if (constr2->missing)
-			return false;
-	}
-	else if (tupdesc2->constr != NULL)
-		return false;
 	return true;
 }
 
@@ -546,8 +370,7 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attnum = attributeNumber;
 	att->attndims = attdim;
 
-	att->atthasdef = false;
-	att->atthasmissing = false;
+
 	att->attisdropped = false;
 	/* attoptions is not present in tupledescs */
 
@@ -601,8 +424,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 	att->attnum = attributeNumber;
 	att->attndims = attdim;
 
-	att->atthasdef = false;
-	att->atthasmissing = false;
+
 	att->attisdropped = false;
 	/* attoptions is not present in tupledescs */
 
@@ -670,7 +492,6 @@ BuildDescForRelation(List *schema)
 	char	   *attname;
 	Oid			atttypid;
 	int32		atttypmod;
-	Oid			attcollation;
 	int			attdim;
 
 	/*
@@ -696,7 +517,6 @@ BuildDescForRelation(List *schema)
 		attname = entry->colname;
 		typenameTypeIdAndMod(NULL, entry->typeName, &atttypid, &atttypmod);
 
-		attcollation = GetColumnDefCollation(atttypid);
 		attdim = list_length(entry->typeName->arrayBounds);
 
 		if (entry->typeName->setof)

@@ -1858,44 +1858,6 @@ ExecInitNullTupleSlot(EState *estate, TupleDesc tupType,
  */
 
 /*
- * Fill in missing values for a TupleTableSlot.
- *
- * This is only exposed because it's needed for JIT compiled tuple
- * deforming. That exception aside, there should be no callers outside of this
- * file.
- */
-void
-slot_getmissingattrs(TupleTableSlot *slot, int startAttNum, int lastAttNum)
-{
-	AttrMissing *attrmiss = NULL;
-
-	if (slot->tts_tupleDescriptor->constr)
-		attrmiss = slot->tts_tupleDescriptor->constr->missing;
-
-	if (!attrmiss)
-	{
-		/* no missing values array at all, so just fill everything in as NULL */
-		memset(slot->tts_values + startAttNum, 0,
-			   (lastAttNum - startAttNum) * sizeof(Datum));
-		memset(slot->tts_isnull + startAttNum, 1,
-			   (lastAttNum - startAttNum) * sizeof(bool));
-	}
-	else
-	{
-		int			missattnum;
-
-		/* if there is a missing values array we must process them one by one */
-		for (missattnum = startAttNum;
-			 missattnum < lastAttNum;
-			 missattnum++)
-		{
-			slot->tts_values[missattnum] = attrmiss[missattnum].am_value;
-			slot->tts_isnull[missattnum] = !attrmiss[missattnum].am_present;
-		}
-	}
-}
-
-/*
  * slot_getsomeattrs_int - workhorse for slot_getsomeattrs()
  */
 void
@@ -1912,12 +1874,15 @@ slot_getsomeattrs_int(TupleTableSlot *slot, int attnum)
 	slot->tts_ops->getsomeattrs(slot, attnum);
 
 	/*
-	 * If the underlying tuple doesn't have enough attributes, tuple
-	 * descriptor must have the missing attributes.
+	 * If the underlying tuple doesn't have enough attributes, fill the
+	 * remaining attributes as NULL.
 	 */
 	if (unlikely(slot->tts_nvalid < attnum))
 	{
-		slot_getmissingattrs(slot, slot->tts_nvalid, attnum);
+		memset(slot->tts_values + slot->tts_nvalid, 0,
+			   (attnum - slot->tts_nvalid) * sizeof(Datum));
+		memset(slot->tts_isnull + slot->tts_nvalid, 1,
+			   (attnum - slot->tts_nvalid) * sizeof(bool));
 		slot->tts_nvalid = attnum;
 	}
 }

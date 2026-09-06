@@ -47,7 +47,6 @@ pg_aggregate|t
 pg_am|t
 pg_amop|t
 pg_amproc|t
-pg_attrdef|t
 pg_attribute|t
 pg_cast|t
 pg_class|t

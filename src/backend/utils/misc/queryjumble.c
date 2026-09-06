@@ -592,13 +592,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) bt->arg);
 			}
 			break;
-		case T_SetToDefault:
-			{
-				SetToDefault *sd = (SetToDefault *) node;
-
-				APP_JUMB(sd->typeId);
-			}
-			break;
 		case T_InferenceElem:
 			{
 				InferenceElem *ie = (InferenceElem *) node;

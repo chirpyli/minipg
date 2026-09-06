@@ -32,16 +32,6 @@ extern int	PostAuthDelay;
 
 /* GUC-configurable parameters */
 
-typedef enum
-{
-	LOGSTMT_NONE,				/* log no statements */
-	LOGSTMT_DDL,				/* log data definition statements */
-	LOGSTMT_MOD,				/* log modification statements, plus DDL */
-	LOGSTMT_ALL					/* log all statements */
-} LogStmtLevel;
-
-extern PGDLLIMPORT int log_statement;
-
 /* Flags for restrict_nonsystem_relation_kind value */
 #define RESTRICT_RELKIND_VIEW			0x01
 

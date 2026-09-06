@@ -219,10 +219,10 @@ SELECT gid FROM pg_prepared_xacts;
 -- Commit table creation
 COMMIT PREPARED 'regress-one';
 \d pxtest2
-   Table "public.pxtest2"
- Column |  Type   | Default 
---------+---------+---------
- a      | integer | 
+Table "public.pxtest2"
+ Column |  Type   
+--------+---------
+ a      | integer
 
 SELECT * FROM pxtest2;
  a 

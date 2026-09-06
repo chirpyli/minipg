@@ -1377,17 +1377,6 @@ _outBooleanTest(StringInfo str, const BooleanTest *node)
 }
 
 static void
-_outSetToDefault(StringInfo str, const SetToDefault *node)
-{
-	WRITE_NODE_TYPE("SETTODEFAULT");
-
-	WRITE_OID_FIELD(typeId);
-	WRITE_INT_FIELD(typeMod);
-	WRITE_OID_FIELD(collation);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outInferenceElem(StringInfo str, const InferenceElem *node)
 {
 	WRITE_NODE_TYPE("INFERENCEELEM");
@@ -3199,9 +3188,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_BooleanTest:
 				_outBooleanTest(str, obj);
-				break;
-			case T_SetToDefault:
-				_outSetToDefault(str, obj);
 				break;
 			case T_InferenceElem:
 				_outInferenceElem(str, obj);

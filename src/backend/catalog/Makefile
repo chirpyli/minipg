@@ -42,7 +42,7 @@ include $(top_srcdir)/src/backend/common.mk
 # ordering dependencies.
 CATALOG_HEADERS := \
 	pg_proc.h pg_type.h pg_attribute.h pg_class.h \
-	pg_attrdef.h pg_constraint.h pg_index.h pg_operator.h \
+	pg_constraint.h pg_index.h pg_operator.h \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
 	pg_language.h pg_aggregate.h \
 	pg_statistic.h \

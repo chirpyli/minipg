@@ -1083,7 +1083,6 @@ describeOneTableDetails(const char *schemaname,
 	int			cols;
 	int			attname_col = -1,	/* column indexes in "res" */
 				atttype_col = -1,
-				attrdef_col = -1,
 				isindexkey_col = -1,
 				indexdef_col = -1,
 				attstorage_col = -1,
@@ -1103,7 +1102,6 @@ describeOneTableDetails(const char *schemaname,
 		char		relpersistence;
 		char	   *relam;
 	}			tableinfo;
-	bool		show_column_details = false;
 
 	myopt.default_footer = false;
 	/* This output looks confusing in expanded mode. */
@@ -1286,12 +1284,6 @@ describeOneTableDetails(const char *schemaname,
 	PQclear(res);
 	res = NULL;
 
-	/* Identify whether we should print collation, nullable, default vals */
-	if (tableinfo.relkind == RELKIND_RELATION ||
-		tableinfo.relkind == RELKIND_VIEW ||
-		tableinfo.relkind == RELKIND_COMPOSITE_TYPE)
-		show_column_details = true;
-
 	/*
 	 * Get per-column info
 	 *
@@ -1306,15 +1298,6 @@ describeOneTableDetails(const char *schemaname,
 	appendPQExpBufferStr(&buf, ",\n  pg_catalog.format_type(a.atttypid, a.atttypmod)");
 	atttype_col = cols++;
 
-	if (show_column_details)
-	{
-		/* use "pretty" mode for expression to avoid excessive parentheses */
-		appendPQExpBufferStr(&buf,
-							 ",\n  (SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid, true)"
-							 "\n   FROM pg_catalog.pg_attrdef d"
-							 "\n   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef)");
-		attrdef_col = cols++;
-	}
 	if (tableinfo.relkind == RELKIND_INDEX)
 	{
 		if (pset.sversion >= 110000)
@@ -1418,10 +1401,6 @@ describeOneTableDetails(const char *schemaname,
 	cols = 0;
 	headers[cols++] = gettext_noop("Column");
 	headers[cols++] = gettext_noop("Type");
-	if (show_column_details)
-	{
-		headers[cols++] = gettext_noop("Default");
-	}
 	if (isindexkey_col >= 0)
 		headers[cols++] = gettext_noop("Key?");
 	if (indexdef_col >= 0)
@@ -1451,12 +1430,6 @@ describeOneTableDetails(const char *schemaname,
 
 		/* Type */
 		printTableAddCell(&cont, PQgetvalue(res, i, atttype_col), false, false);
-
-		/* Default */
-		if (show_column_details)
-		{
-			printTableAddCell(&cont, PQgetvalue(res, i, attrdef_col), false, false);
-		}
 
 		/* Info for index columns */
 		if (isindexkey_col >= 0)

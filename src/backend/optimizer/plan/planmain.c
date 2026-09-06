@@ -244,17 +244,6 @@ query_planner(PlannerInfo *root,
 	extract_restriction_or_clauses(root);
 
 	/*
-	 * Now expand appendrels by adding "otherrels" for their children.  We
-	 * delay this to the end so that we have as much information as possible
-	 * available for each baserel, including all restriction clauses.  That
-	 * let us prune away inheritance children that don't satisfy a restriction
-	 * clause.  Also note that some information such as lateral_relids is
-	 * propagated from baserels to otherrels here, so we must have computed it
-	 * already.
-	 */
-	add_other_rels_to_query(root);
-
-	/*
 	 * Distribute any UPDATE/DELETE row identity variables to the target
 	 * relations.  This can't be done till we've finished expansion of
 	 * appendrels.

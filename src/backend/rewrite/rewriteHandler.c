@@ -72,18 +72,11 @@ static Query *rewriteRuleAction(Query *parsetree,
 static List *adjustJoinTreeList(Query *parsetree, bool removert, int rt_index);
 static List *rewriteTargetListIU(List *targetList,
 								 CmdType commandType,
-								 Relation target_relation,
-								 RangeTblEntry *values_rte,
-								 int values_rte_index,
-								 Bitmapset **unused_values_attrnos);
+								 Relation target_relation);
 static TargetEntry *process_matched_tle(TargetEntry *src_tle,
-										TargetEntry *prior_tle,
-										const char *attrName);
+									TargetEntry *prior_tle,
+									const char *attrName);
 static Node *get_assignment_input(Node *node);
-static bool rewriteValuesRTE(Query *parsetree, RangeTblEntry *rte, int rti,
-							 Relation target_relation,
-							 Bitmapset *unused_cols);
-static void rewriteValuesRTEToNulls(Query *parsetree, RangeTblEntry *rte);
 static void markQueryForLocking(Query *qry, Node *jtnode,
 								LockClauseStrength strength, LockWaitPolicy waitPolicy,
 								bool pushedDown);
@@ -621,23 +614,11 @@ adjustJoinTreeList(Query *parsetree, bool removert, int rt_index)
  * references to NEW.foo will produce wrong or incomplete results.  Item 3
  * is not needed for rewriting, but it is helpful for the planner, and we
  * can do it essentially for free while handling the other items.
- *
- * If values_rte is non-NULL (i.e., we are doing a multi-row INSERT using
- * values from a VALUES RTE), we populate *unused_values_attrnos with the
- * attribute numbers of any unused columns from the VALUES RTE.  This can
- * happen for identity and generated columns whose targetlist entries are
- * replaced with generated expressions (if INSERT ... OVERRIDING USER VALUE is
- * used, or all the values to be inserted are DEFAULT).  This information is
- * required by rewriteValuesRTE() to handle any DEFAULT items in the unused
- * columns.  The caller must have initialized *unused_values_attrnos to NULL.
  */
 static List *
 rewriteTargetListIU(List *targetList,
 					CmdType commandType,
-					Relation target_relation,
-					RangeTblEntry *values_rte,
-					int values_rte_index,
-					Bitmapset **unused_values_attrnos)
+					Relation target_relation)
 {
 	TargetEntry **new_tles;
 	List	   *new_tlist = NIL;
@@ -708,77 +689,12 @@ rewriteTargetListIU(List *targetList,
 	for (attrno = 1; attrno <= numattrs; attrno++)
 	{
 		TargetEntry *new_tle = new_tles[attrno - 1];
-		bool		apply_default;
 
 		att_tup = TupleDescAttr(target_relation->rd_att, attrno - 1);
 
 		/* We can (and must) ignore deleted attributes */
 		if (att_tup->attisdropped)
 			continue;
-
-		/*
-		 * Handle the two cases where we need to insert a default expression:
-		 * it's an INSERT and there's no tlist entry for the column, or the
-		 * tlist entry is a DEFAULT placeholder node.
-		 */
-		apply_default = ((new_tle == NULL && commandType == CMD_INSERT) ||
-						 (new_tle && new_tle->expr && IsA(new_tle->expr, SetToDefault)));
-
-		if (commandType == CMD_INSERT)
-		{
-			int			values_attrno = 0;
-
-			/* Source attribute number for values that come from a VALUES RTE */
-			if (values_rte && new_tle && IsA(new_tle->expr, Var))
-			{
-				Var		   *var = (Var *) new_tle->expr;
-
-				if (var->varno == values_rte_index)
-					values_attrno = var->varattno;
-			}
-
-			/*
-			 * For an INSERT from a VALUES RTE, return the attribute numbers
-			 * of any VALUES columns that will no longer be used (due to the
-			 * targetlist entry being replaced by a default expression).
-			 */
-			if (values_attrno != 0 && apply_default && unused_values_attrnos)
-				*unused_values_attrnos = bms_add_member(*unused_values_attrnos,
-														values_attrno);
-		}
-
-		if (apply_default)
-		{
-			Node	   *new_expr;
-
-			new_expr = build_column_default(target_relation, attrno);
-
-			/*
-			 * If there is no default (ie, default is effectively NULL), we
-			 * can omit the tlist entry in the INSERT case, since the planner
-			 * can insert a NULL for itself, and there's no point in spending
-			 * any more rewriter cycles on the entry.  But in the UPDATE case
-			 * we've got to explicitly set the column to NULL.
-			 */
-			if (!new_expr)
-			{
-				if (commandType == CMD_INSERT)
-					new_tle = NULL;
-				else
-					new_expr = (Node *) makeConst(att_tup->atttypid,
-												 att_tup->atttypmod,
-												 get_typcollation(att_tup->atttypid),
-												 att_tup->attlen,
-												 (Datum) 0, true,
-												 att_tup->attbyval);
-			}
-
-			if (new_expr)
-				new_tle = makeTargetEntry((Expr *) new_expr,
-										  attrno,
-										  pstrdup(NameStr(att_tup->attname)),
-										  false);
-		}
 
 		if (new_tle)
 			new_tlist = lappend(new_tlist, new_tle);
@@ -943,354 +859,6 @@ get_assignment_input(Node *node)
 	return NULL;
 }
 
-/*
- * Make an expression tree for the default value for a column.
- *
- * If there is no default, return a NULL instead.
- */
-Node *
-build_column_default(Relation rel, int attrno)
-{
-	TupleDesc	rd_att = rel->rd_att;
-	Form_pg_attribute att_tup = TupleDescAttr(rd_att, attrno - 1);
-	Oid			atttype = att_tup->atttypid;
-	int32		atttypmod = att_tup->atttypmod;
-	Node	   *expr = NULL;
-	Oid			exprtype;
-
-	/*
-	 * If relation has a default for this column, fetch that expression.
-	 */
-	if (att_tup->atthasdef)
-	{
-		if (rd_att->constr && rd_att->constr->num_defval > 0)
-		{
-			AttrDefault *defval = rd_att->constr->defval;
-			int			ndef = rd_att->constr->num_defval;
-
-			while (--ndef >= 0)
-			{
-				if (attrno == defval[ndef].adnum)
-				{
-					/* Found it, convert string representation to node tree. */
-					expr = stringToNode(defval[ndef].adbin);
-					break;
-				}
-			}
-		}
-		if (expr == NULL)
-			elog(ERROR, "default expression not found for attribute %d of relation \"%s\"",
-				 attrno, RelationGetRelationName(rel));
-	}
-
-	if (expr == NULL)
-		return NULL;			/* No default anywhere */
-
-	/*
-	 * Make sure the value is coerced to the target column type; this will
-	 * generally be true already. This should match
-	 * the parser's processing of non-defaulted expressions --- see
-	 * transformAssignedExpr().
-	 */
-	exprtype = exprType(expr);
-
-	expr = coerce_to_target_type(NULL,	/* no UNKNOWN params here */
-								 expr, exprtype,
-								 atttype, atttypmod,
-								 COERCION_ASSIGNMENT,
-								 COERCE_IMPLICIT_CAST,
-								 -1);
-	if (expr == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("column \"%s\" is of type %s"
-						" but default expression is of type %s",
-						NameStr(att_tup->attname),
-						format_type_be(atttype),
-						format_type_be(exprtype)),
-				 errhint("You will need to rewrite or cast the expression.")));
-
-	return expr;
-}
-
-
-/* Does VALUES RTE contain any SetToDefault items? */
-static bool
-searchForDefault(RangeTblEntry *rte)
-{
-	ListCell   *lc;
-
-	foreach(lc, rte->values_lists)
-	{
-		List	   *sublist = (List *) lfirst(lc);
-		ListCell   *lc2;
-
-		foreach(lc2, sublist)
-		{
-			Node	   *col = (Node *) lfirst(lc2);
-
-			if (IsA(col, SetToDefault))
-				return true;
-		}
-	}
-	return false;
-}
-
-
-/*
- * When processing INSERT ... VALUES with a VALUES RTE (ie, multiple VALUES
- * lists), we have to replace any DEFAULT items in the VALUES lists with
- * the appropriate default expressions.  The other aspects of targetlist
- * rewriting need be applied only to the query's targetlist proper.
- *
- * For an auto-updatable view, each DEFAULT item in the VALUES list is
- * replaced with the default from the view, if it has one.  Otherwise it is
- * left untouched so that the underlying base relation's default can be
- * applied instead (when we later recurse to here after rewriting the query
- * to refer to the base relation instead of the view).
- *
- * For other types of relation, including rule- and trigger-updatable views,
- * all DEFAULT items are replaced, and if the target relation doesn't have a
- * default, the value is explicitly set to NULL.
- *
- * Also, if a DEFAULT item is found in a column mentioned in unused_cols,
- * it is explicitly set to NULL.  This happens for columns in the VALUES RTE
- * whose corresponding targetlist entries have already been replaced with the
- * relation's default expressions, so that any values in those columns of the
- * VALUES RTE are no longer used.  This can happen for identity and generated
- * columns (if INSERT ... OVERRIDING USER VALUE is used, or all the values to
- * be inserted are DEFAULT).  In principle we could replace all entries in
- * such a column with NULL, whether DEFAULT or not; but it doesn't seem worth
- * the trouble.
- *
- * Note that we may have subscripted or field assignment targetlist entries,
- * as well as more complex expressions from already-replaced DEFAULT items if
- * we have recursed to here for an auto-updatable view. However, it ought to
- * be impossible for such entries to have DEFAULTs assigned to them, except
- * for unused columns, as described above --- we should only have to replace
- * DEFAULT items for targetlist entries that contain simple Vars referencing
- * the VALUES RTE, or which are no longer referred to by the targetlist.
- *
- * Returns true if all DEFAULT items were replaced, and false if some were
- * left untouched.
- */
-static bool
-rewriteValuesRTE(Query *parsetree, RangeTblEntry *rte, int rti,
-				 Relation target_relation,
-				 Bitmapset *unused_cols)
-{
-	List	   *newValues;
-	ListCell   *lc;
-	bool		isAutoUpdatableView;
-	bool		allReplaced;
-	int			numattrs;
-	int		   *attrnos;
-
-	/* Steps below are not sensible for non-INSERT queries */
-	Assert(parsetree->commandType == CMD_INSERT);
-	Assert(rte->rtekind == RTE_VALUES);
-
-	/*
-	 * Rebuilding all the lists is a pretty expensive proposition in a big
-	 * VALUES list, and it's a waste of time if there aren't any DEFAULT
-	 * placeholders.  So first scan to see if there are any.
-	 */
-	if (!searchForDefault(rte))
-		return true;			/* nothing to do */
-
-	/*
-	 * Scan the targetlist for entries referring to the VALUES RTE, and note
-	 * the target attributes. As noted above, we should only need to do this
-	 * for targetlist entries containing simple Vars --- nothing else in the
-	 * VALUES RTE should contain DEFAULT items (except possibly for unused
-	 * columns), and we complain if such a thing does occur.
-	 */
-	numattrs = list_length(linitial(rte->values_lists));
-	attrnos = (int *) palloc0(numattrs * sizeof(int));
-
-	foreach(lc, parsetree->targetList)
-	{
-		TargetEntry *tle = (TargetEntry *) lfirst(lc);
-
-		if (IsA(tle->expr, Var))
-		{
-			Var		   *var = (Var *) tle->expr;
-
-			if (var->varno == rti)
-			{
-				int			attrno = var->varattno;
-
-				Assert(attrno >= 1 && attrno <= numattrs);
-				attrnos[attrno - 1] = tle->resno;
-			}
-		}
-	}
-
-	/*
-	 * Check if the target relation is an auto-updatable view, in which case
-	 * unresolved defaults will be left untouched rather than being set to
-	 * NULL.
-	 */
-	isAutoUpdatableView = false;
-	if (target_relation->rd_rel->relkind == RELKIND_VIEW)
-	{
-		List	   *locks;
-		bool		hasUpdate;
-		bool		found;
-		ListCell   *l;
-
-		/* Look for an unconditional DO INSTEAD rule */
-		locks = matchLocks(CMD_INSERT, target_relation->rd_rules,
-						   parsetree->resultRelation, parsetree, &hasUpdate);
-
-		found = false;
-		foreach(l, locks)
-		{
-			RewriteRule *rule_lock = (RewriteRule *) lfirst(l);
-
-			if (rule_lock->isInstead &&
-				rule_lock->qual == NULL)
-			{
-				found = true;
-				break;
-			}
-		}
-
-		/*
-		 * If we didn't find an unconditional DO INSTEAD rule, assume that the
-		 * view is auto-updatable.  If it isn't, rewriteTargetView() will
-		 * throw an error.
-		 */
-		if (!found)
-			isAutoUpdatableView = true;
-	}
-
-	newValues = NIL;
-	allReplaced = true;
-	foreach(lc, rte->values_lists)
-	{
-		List	   *sublist = (List *) lfirst(lc);
-		List	   *newList = NIL;
-		ListCell   *lc2;
-		int			i;
-
-		Assert(list_length(sublist) == numattrs);
-
-		i = 0;
-		foreach(lc2, sublist)
-		{
-			Node	   *col = (Node *) lfirst(lc2);
-			int			attrno = attrnos[i++];
-
-			if (IsA(col, SetToDefault))
-			{
-				Form_pg_attribute att_tup;
-				Node	   *new_expr;
-
-				/*
-				 * If this column isn't used, just replace the DEFAULT with
-				 * NULL (attrno will be 0 in this case because the targetlist
-				 * entry will have been replaced by the default expression).
-				 */
-				if (bms_is_member(i, unused_cols))
-				{
-					SetToDefault *def = (SetToDefault *) col;
-
-					newList = lappend(newList,
-									  makeNullConst(def->typeId,
-													def->typeMod,
-													def->collation));
-					continue;
-				}
-
-				if (attrno == 0)
-					elog(ERROR, "cannot set value in column %d to DEFAULT", i);
-				Assert(attrno > 0 && attrno <= target_relation->rd_att->natts);
-				att_tup = TupleDescAttr(target_relation->rd_att, attrno - 1);
-
-				if (!att_tup->attisdropped)
-					new_expr = build_column_default(target_relation, attrno);
-				else
-					new_expr = NULL;	/* force a NULL if dropped */
-
-				/*
-				 * If there is no default (ie, default is effectively NULL),
-				 * we've got to explicitly set the column to NULL, unless the
-				 * target relation is an auto-updatable view.
-				 */
-				if (!new_expr)
-				{
-					if (isAutoUpdatableView)
-					{
-						/* Leave the value untouched */
-						newList = lappend(newList, col);
-						allReplaced = false;
-						continue;
-					}
-
-					new_expr = (Node *) makeConst(att_tup->atttypid,
-												 att_tup->atttypmod,
-												 get_typcollation(att_tup->atttypid),
-												 att_tup->attlen,
-												 (Datum) 0, true,
-												 att_tup->attbyval);
-				}
-				newList = lappend(newList, new_expr);
-			}
-			else
-				newList = lappend(newList, col);
-		}
-		newValues = lappend(newValues, newList);
-	}
-	rte->values_lists = newValues;
-
-	pfree(attrnos);
-
-	return allReplaced;
-}
-
-/*
- * Mop up any remaining DEFAULT items in the given VALUES RTE by
- * replacing them with NULL constants.
- *
- * This is used for the product queries generated by DO ALSO rules attached to
- * an auto-updatable view.  The action can't depend on the "target relation"
- * since the product query might not have one (it needn't be an INSERT).
- * Essentially, such queries are treated as being attached to a rule-updatable
- * view.
- */
-static void
-rewriteValuesRTEToNulls(Query *parsetree, RangeTblEntry *rte)
-{
-	List	   *newValues;
-	ListCell   *lc;
-
-	newValues = NIL;
-	foreach(lc, rte->values_lists)
-	{
-		List	   *sublist = (List *) lfirst(lc);
-		List	   *newList = NIL;
-		ListCell   *lc2;
-
-		foreach(lc2, sublist)
-		{
-			Node	   *col = (Node *) lfirst(lc2);
-
-			if (IsA(col, SetToDefault))
-			{
-				SetToDefault *def = (SetToDefault *) col;
-
-				newList = lappend(newList, makeNullConst(def->typeId,
-														 def->typeMod,
-														 def->collation));
-			}
-			else
-				newList = lappend(newList, col);
-		}
-		newValues = lappend(newValues, newList);
-	}
-	rte->values_lists = newValues;
-}
 
 
 /*
@@ -2506,12 +2074,6 @@ rewriteTargetView(Query *parsetree, Relation view)
 	new_rt_index = list_length(parsetree->rtable);
 
 	/*
-	 * INSERTs never inherit.  For UPDATE/DELETE, we use the view query's
-	 * inheritance flag for the base relation.
-	 */
-	if (parsetree->commandType == CMD_INSERT)
-
-	/*
 	 * Adjust the view's targetlist Vars to reference the new target RTE, ie
 	 * make their varnos be new_rt_index instead of base_rt_index.  There can
 	 * be no Vars for other rels in the tlist, so this is sufficient to pull
@@ -2776,8 +2338,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 		int			product_orig_rt_length;
 		List	   *product_queries;
 		bool		hasUpdate = false;
-		int			values_rte_index = 0;
-		bool		defaults_remaining = false;
 
 		result_relation = parsetree->resultRelation;
 		Assert(result_relation != 0);
@@ -2795,62 +2355,11 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 		 */
 		if (event == CMD_INSERT)
 		{
-			ListCell   *lc2;
-			RangeTblEntry *values_rte = NULL;
-
-			/*
-			 * Test if it's a multi-row INSERT ... VALUES (...), (...), ... by
-			 * looking for a VALUES RTE in the fromlist.  For product queries,
-			 * we must ignore any already-processed VALUES RTEs from the
-			 * original query.  These appear at the start of the rangetable.
-			 */
-			foreach(lc2, parsetree->jointree->fromlist)
-			{
-				RangeTblRef *rtr = (RangeTblRef *) lfirst(lc2);
-
-				if (IsA(rtr, RangeTblRef) && rtr->rtindex > orig_rt_length)
-				{
-					RangeTblEntry *rte = rt_fetch(rtr->rtindex,
-												  parsetree->rtable);
-
-					if (rte->rtekind == RTE_VALUES)
-					{
-						/* should not find more than one VALUES RTE */
-						if (values_rte != NULL)
-							elog(ERROR, "more than one VALUES RTE found");
-
-						values_rte = rte;
-						values_rte_index = rtr->rtindex;
-					}
-				}
-			}
-
-			if (values_rte)
-			{
-				Bitmapset  *unused_values_attrnos = NULL;
-
-				/* Process the main targetlist ... */
-				parsetree->targetList = rewriteTargetListIU(parsetree->targetList,
-															parsetree->commandType,
-															rt_entry_relation,
-															values_rte,
-															values_rte_index,
-															&unused_values_attrnos);
-				/* ... and the VALUES expression lists */
-				if (!rewriteValuesRTE(parsetree, values_rte, values_rte_index,
-									  rt_entry_relation,
-									  unused_values_attrnos))
-					defaults_remaining = true;
-			}
-			else
-			{
-				/* Process just the main targetlist */
-				parsetree->targetList =
-					rewriteTargetListIU(parsetree->targetList,
-										parsetree->commandType,
-										rt_entry_relation,
-										NULL, 0, NULL);
-			}
+			/* Process the main targetlist */
+			parsetree->targetList =
+				rewriteTargetListIU(parsetree->targetList,
+									parsetree->commandType,
+									rt_entry_relation);
 
 			if (parsetree->onConflict &&
 				parsetree->onConflict->action == ONCONFLICT_UPDATE)
@@ -2858,8 +2367,7 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 				parsetree->onConflict->onConflictSet =
 					rewriteTargetListIU(parsetree->onConflict->onConflictSet,
 										CMD_UPDATE,
-										rt_entry_relation,
-										NULL, 0, NULL);
+										rt_entry_relation);
 			}
 		}
 		else if (event == CMD_UPDATE)
@@ -2867,8 +2375,7 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 			parsetree->targetList =
 				rewriteTargetListIU(parsetree->targetList,
 									parsetree->commandType,
-									rt_entry_relation,
-									NULL, 0, NULL);
+									rt_entry_relation);
 		}
 		else if (event == CMD_DELETE)
 		{
@@ -2890,59 +2397,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 									locks,
 									&instead,
 									&qual_product);
-
-		/*
-		 * If we have a VALUES RTE with any remaining untouched DEFAULT items,
-		 * and we got any product queries, finalize the VALUES RTE for each
-		 * product query (replacing the remaining DEFAULT items with NULLs).
-		 * We don't do this for the original query, because we know that it
-		 * must be an auto-insert on a view, and so should use the base
-		 * relation's defaults for any remaining DEFAULT items.
-		 */
-		if (defaults_remaining && product_queries != NIL)
-		{
-			ListCell   *n;
-
-			/*
-			 * Each product query has its own copy of the VALUES RTE at the
-			 * same index in the rangetable, so we must finalize each one.
-			 *
-			 * Note that if the product query is an INSERT ... SELECT, then
-			 * the VALUES RTE will be at the same index in the SELECT part of
-			 * the product query rather than the top-level product query
-			 * itself.
-			 */
-			foreach(n, product_queries)
-			{
-				Query	   *pt = (Query *) lfirst(n);
-				RangeTblEntry *values_rte;
-
-				if (pt->commandType == CMD_INSERT &&
-					pt->jointree && IsA(pt->jointree, FromExpr) &&
-					list_length(pt->jointree->fromlist) == 1)
-				{
-					Node	   *jtnode = (Node *) linitial(pt->jointree->fromlist);
-
-					if (IsA(jtnode, RangeTblRef))
-					{
-						int			rtindex = ((RangeTblRef *) jtnode)->rtindex;
-						RangeTblEntry *src_rte = rt_fetch(rtindex, pt->rtable);
-
-						if (src_rte->rtekind == RTE_SUBQUERY &&
-							src_rte->subquery &&
-							IsA(src_rte->subquery, Query) &&
-							src_rte->subquery->commandType == CMD_SELECT)
-							pt = src_rte->subquery;
-					}
-				}
-
-				values_rte = rt_fetch(values_rte_index, pt->rtable);
-				if (values_rte->rtekind != RTE_VALUES)
-					elog(ERROR, "failed to find VALUES RTE in product query");
-
-				rewriteValuesRTEToNulls(pt, values_rte);
-			}
-		}
 
 		/*
 		 * If there was no unqualified INSTEAD rule, and the target relation

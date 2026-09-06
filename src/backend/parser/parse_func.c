@@ -43,9 +43,6 @@ typedef enum
 	FUNCLOOKUP_AMBIGUOUS
 } FuncLookupError;
 
-static void unify_hypothetical_args(ParseState *pstate,
-									List *fargs, int numAggregatedArgs,
-									Oid *actual_arg_types, Oid *declared_arg_types);
 static Oid	FuncNameAsType(List *funcname);
 static Node *ParseComplexProjection(ParseState *pstate, const char *funcname,
 									Node *first_arg, int location);
@@ -1439,91 +1436,6 @@ func_get_detail(List *funcname,
 
 
 /*
- * unify_hypothetical_args()
- *
- * Ensure that each hypothetical direct argument of a hypothetical-set
- * aggregate has the same type as the corresponding aggregated argument.
- * Modify the expressions in the fargs list, if necessary, and update
- * actual_arg_types[].
- *
- * If the agg declared its args non-ANY (even ANYELEMENT), we need only a
- * sanity check that the declared types match; make_fn_arguments will coerce
- * the actual arguments to match the declared ones.  But if the declaration
- * is ANY, nothing will happen in make_fn_arguments, so we need to fix any
- * mismatch here.  We use the same type resolution logic as UNION etc.
- */
-static void
-unify_hypothetical_args(ParseState *pstate,
-						List *fargs,
-						int numAggregatedArgs,
-						Oid *actual_arg_types,
-						Oid *declared_arg_types)
-{
-	int			numDirectArgs,
-				numNonHypotheticalArgs;
-	int			hargpos;
-
-	numDirectArgs = list_length(fargs) - numAggregatedArgs;
-	numNonHypotheticalArgs = numDirectArgs - numAggregatedArgs;
-	/* safety check (should only trigger with a misdeclared agg) */
-	if (numNonHypotheticalArgs < 0)
-		elog(ERROR, "incorrect number of arguments to hypothetical-set aggregate");
-
-	/* Check each hypothetical arg and corresponding aggregated arg */
-	for (hargpos = numNonHypotheticalArgs; hargpos < numDirectArgs; hargpos++)
-	{
-		int			aargpos = numDirectArgs + (hargpos - numNonHypotheticalArgs);
-		ListCell   *harg = list_nth_cell(fargs, hargpos);
-		ListCell   *aarg = list_nth_cell(fargs, aargpos);
-		Oid			commontype;
-		int32		commontypmod;
-
-		/* A mismatch means AggregateCreate didn't check properly ... */
-		if (declared_arg_types[hargpos] != declared_arg_types[aargpos])
-			elog(ERROR, "hypothetical-set aggregate has inconsistent declared argument types");
-
-		/* No need to unify if make_fn_arguments will coerce */
-		if (declared_arg_types[hargpos] != ANYOID)
-			continue;
-
-		/*
-		 * Select common type, giving preference to the aggregated argument's
-		 * type (we'd rather coerce the direct argument once than coerce all
-		 * the aggregated values).
-		 */
-		commontype = select_common_type(pstate,
-										list_make2(lfirst(aarg), lfirst(harg)),
-										"WITHIN GROUP",
-										NULL);
-		commontypmod = select_common_typmod(pstate,
-											list_make2(lfirst(aarg), lfirst(harg)),
-											commontype);
-
-		/*
-		 * Perform the coercions.  We don't need to worry about NamedArgExprs
-		 * here because they aren't supported with aggregates.
-		 */
-		lfirst(harg) = coerce_type(pstate,
-								   (Node *) lfirst(harg),
-								   actual_arg_types[hargpos],
-								   commontype, commontypmod,
-								   COERCION_IMPLICIT,
-								   COERCE_IMPLICIT_CAST,
-								   -1);
-		actual_arg_types[hargpos] = commontype;
-		lfirst(aarg) = coerce_type(pstate,
-								   (Node *) lfirst(aarg),
-								   actual_arg_types[aargpos],
-								   commontype, commontypmod,
-								   COERCION_IMPLICIT,
-								   COERCE_IMPLICIT_CAST,
-								   -1);
-		actual_arg_types[aargpos] = commontype;
-	}
-}
-
-
-/*
  * make_fn_arguments()
  *
  * Given the actual argument expressions for a function, and the desired
@@ -2093,7 +2005,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 		case EXPR_KIND_CHECK_CONSTRAINT:
 			err = _("set-returning functions are not allowed in check constraints");
 			break;
-		case EXPR_KIND_COLUMN_DEFAULT:
 		case EXPR_KIND_FUNCTION_DEFAULT:
 			err = _("set-returning functions are not allowed in DEFAULT expressions");
 			break;

@@ -202,7 +202,6 @@ bool
 existsTimeLineHistory(TimeLineID probeTLI)
 {
 	char		path[MAXPGPATH];
-	char		histfname[MAXFNAMELEN];
 	FILE	   *fd;
 
 	/* Timeline 1 does not have a history file, so no need to check */
@@ -280,7 +279,6 @@ writeTimeLineHistory(TimeLineID newTLI, TimeLineID parentTLI,
 {
 	char		path[MAXPGPATH];
 	char		tmppath[MAXPGPATH];
-	char		histfname[MAXFNAMELEN];
 	char		buffer[BLCKSZ];
 	int			srcfd;
 	int			fd;

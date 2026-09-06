@@ -132,7 +132,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	/*
 	 * Estimate relation size --- unless it's an inheritance parent, in which
 	 * case the size we want is not the rel's own size but the size of its
-	 * inheritance tree.  That will be computed in set_append_rel_size().
+	 * inheritance tree.
 	 */
 	if (!inhparent)
 		estimate_rel_size(relation, rel->attr_widths - rel->min_attr,
@@ -1132,9 +1132,9 @@ build_physical_tlist(PlannerInfo *root, RelOptInfo *rel)
 				Form_pg_attribute att_tup = TupleDescAttr(relation->rd_att,
 														  attrno - 1);
 
-				if (att_tup->attisdropped || att_tup->atthasmissing)
+				if (att_tup->attisdropped)
 				{
-					/* found a dropped or missing col, so punt */
+					/* found a dropped col, so punt */
 					tlist = NIL;
 					break;
 				}

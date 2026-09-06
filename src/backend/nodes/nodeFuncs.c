@@ -201,9 +201,7 @@ exprType(const Node *expr)
 		case T_BooleanTest:
 			type = BOOLOID;
 			break;
-		case T_SetToDefault:
-			type = ((const SetToDefault *) expr)->typeId;
-			break;
+
 		case T_InferenceElem:
 			{
 				const InferenceElem *n = (const InferenceElem *) expr;
@@ -438,8 +436,6 @@ exprTypmod(const Node *expr)
 			break;
 		case T_SQLValueFunction:
 			return ((const SQLValueFunction *) expr)->typmod;
-		case T_SetToDefault:
-			return ((const SetToDefault *) expr)->typeMod;
 		case T_PlaceHolderVar:
 			return exprTypmod((Node *) ((const PlaceHolderVar *) expr)->phexpr);
 		default:
@@ -873,9 +869,6 @@ exprCollation(const Node *expr)
 			/* BooleanTest's result is boolean ... */
 			coll = InvalidOid;	/* ... so it has no collation */
 			break;
-		case T_SetToDefault:
-			coll = ((const SetToDefault *) expr)->collation;
-			break;
 		case T_InferenceElem:
 			coll = exprCollation((Node *) ((const InferenceElem *) expr)->expr);
 			break;
@@ -1061,9 +1054,6 @@ exprSetCollation(Node *expr, Oid collation)
 		case T_BooleanTest:
 			/* BooleanTest's result is boolean ... */
 			Assert(!OidIsValid(collation)); /* ... so never set a collation */
-			break;
-		case T_SetToDefault:
-			((SetToDefault *) expr)->collation = collation;
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));
@@ -1323,9 +1313,6 @@ exprLocation(const Node *expr)
 				loc = leftmostLoc(bexpr->location,
 								  exprLocation((Node *) bexpr->arg));
 			}
-			break;
-		case T_SetToDefault:
-			loc = ((const SetToDefault *) expr)->location;
 			break;
 		case T_TargetEntry:
 			/* just use argument's location */
@@ -1720,7 +1707,6 @@ expression_tree_walker(Node *node,
 		case T_Param:
 		case T_CaseTestExpr:
 		case T_SQLValueFunction:
-		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
@@ -2283,7 +2269,6 @@ expression_tree_mutator(Node *node,
 		case T_Param:
 		case T_CaseTestExpr:
 		case T_SQLValueFunction:
-		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
@@ -2984,7 +2969,6 @@ raw_expression_tree_walker(Node *node,
 
 	switch (nodeTag(node))
 	{
-		case T_SetToDefault:
 		case T_SQLValueFunction:
 		case T_Integer:
 		case T_Float:

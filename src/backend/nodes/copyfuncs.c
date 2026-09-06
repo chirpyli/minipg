@@ -1756,22 +1756,6 @@ _copyBooleanTest(const BooleanTest *from)
 }
 
 /*
- * _copySetToDefault
- */
-static SetToDefault *
-_copySetToDefault(const SetToDefault *from)
-{
-	SetToDefault *newnode = makeNode(SetToDefault);
-
-	COPY_SCALAR_FIELD(typeId);
-	COPY_SCALAR_FIELD(typeMod);
-	COPY_SCALAR_FIELD(collation);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
  * _copyInferenceElem
  */
 static InferenceElem *
@@ -2465,19 +2449,6 @@ _copyLockingClause(const LockingClause *from)
 }
 
 
-static RoleSpec *
-_copyRoleSpec(const RoleSpec *from)
-{
-	RoleSpec   *newnode = makeNode(RoleSpec);
-
-	COPY_SCALAR_FIELD(roletype);
-	COPY_STRING_FIELD(rolename);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-
 static Query *
 _copyQuery(const Query *from)
 {
@@ -2609,7 +2580,6 @@ _copyAlterTableCmd(const AlterTableCmd *from)
 	COPY_SCALAR_FIELD(subtype);
 	COPY_STRING_FIELD(name);
 	COPY_SCALAR_FIELD(num);
-	COPY_NODE_FIELD(newowner);
 	COPY_NODE_FIELD(def);
 	COPY_SCALAR_FIELD(behavior);
 	COPY_SCALAR_FIELD(missing_ok);
@@ -3227,9 +3197,6 @@ copyObjectImpl(const void *from)
 		case T_BooleanTest:
 			retval = _copyBooleanTest(from);
 			break;
-		case T_SetToDefault:
-			retval = _copySetToDefault(from);
-			break;
 		case T_InferenceElem:
 			retval = _copyInferenceElem(from);
 			break;
@@ -3485,9 +3452,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ObjectWithArgs:
 			retval = _copyObjectWithArgs(from);
-			break;
-		case T_RoleSpec:
-			retval = _copyRoleSpec(from);
 			break;
 
 			/*

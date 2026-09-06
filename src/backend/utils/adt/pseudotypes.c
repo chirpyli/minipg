@@ -288,7 +288,6 @@ pg_node_tree_send(PG_FUNCTION_ARGS)
  * Dummy I/O functions for various other pseudotypes.
  */
 PSEUDOTYPE_DUMMY_IO_FUNCS(any);
-PSEUDOTYPE_DUMMY_IO_FUNCS(trigger);
 PSEUDOTYPE_DUMMY_IO_FUNCS(language_handler);
 PSEUDOTYPE_DUMMY_IO_FUNCS(table_am_handler);
 PSEUDOTYPE_DUMMY_IO_FUNCS(index_am_handler);

@@ -323,7 +323,6 @@ static char *deparse_expression_pretty(Node *expr, List *dpcontext,
 									   int prettyFlags, int startIndent);
 static char *pg_get_viewdef_worker(Oid viewoid,
 								   int prettyFlags, int wrapColumn);
-static char *pg_get_triggerdef_worker(Oid trigid, bool pretty);
 static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 										 StringInfo buf);
 static char *pg_get_ruledef_worker(Oid ruleoid, int prettyFlags);
@@ -465,7 +464,6 @@ static char *generate_function_name(Oid funcid, int nargs,
 									ParseExprKind special_exprkind);
 static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static void add_cast_to(StringInfo buf, Oid typid);
-static char *generate_qualified_type_name(Oid typid);
 static text *string_to_text(char *str);
 
 /*
@@ -1959,20 +1957,6 @@ print_function_arguments(StringInfo buf, HeapTuple proctup,
 			/* nlackdefaults counts only *input* arguments lacking defaults */
 			nlackdefaults = proc->pronargs - list_length(argdefaults);
 		}
-	}
-
-	/* Check for special treatment of ordered-set aggregates */
-	if (proc->prokind == PROKIND_AGGREGATE)
-	{
-		HeapTuple	aggtup;
-		Form_pg_aggregate agg;
-
-		aggtup = SearchSysCache1(AGGFNOID, proc->oid);
-		if (!HeapTupleIsValid(aggtup))
-			elog(ERROR, "cache lookup failed for aggregate %u",
-				 proc->oid);
-		agg = (Form_pg_aggregate) GETSTRUCT(aggtup);
-		ReleaseSysCache(aggtup);
 	}
 
 	argsprinted = 0;
@@ -6117,7 +6101,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_Var:
 		case T_Const:
 		case T_Param:
-		case T_SetToDefault:
 			/* single words: always simple */
 			return true;
 
@@ -7205,10 +7188,6 @@ get_rule_expr(Node *node, deparse_context *context,
 				if (!PRETTY_PAREN(context))
 					appendStringInfoChar(buf, ')');
 			}
-			break;
-
-		case T_SetToDefault:
-			appendStringInfoString(buf, "DEFAULT");
 			break;
 
 		case T_InferenceElem:
@@ -9285,42 +9264,6 @@ add_cast_to(StringInfo buf, Oid typid)
 }
 
 /*
- * generate_qualified_type_name
- *		Compute the name to display for a type specified by OID
- *
- * This is different from format_type_be() in that we unconditionally
- * schema-qualify the name.  That also means no special syntax for
- * SQL-standard type names ... although in current usage, this should
- * only get used for domains, so such cases wouldn't occur anyway.
- */
-static char *
-generate_qualified_type_name(Oid typid)
-{
-	HeapTuple	tp;
-	Form_pg_type typtup;
-	char	   *typname;
-	char	   *nspname;
-	char	   *result;
-
-	tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for type %u", typid);
-	typtup = (Form_pg_type) GETSTRUCT(tp);
-	typname = NameStr(typtup->typname);
-
-	nspname = get_namespace_name(typtup->typnamespace);
-	if (!nspname)
-		elog(ERROR, "cache lookup failed for namespace %u",
-			 typtup->typnamespace);
-
-	result = quote_qualified_identifier(nspname, typname);
-
-	ReleaseSysCache(tp);
-
-	return result;
-}
-
-/*
  * generate_collation_name
  *		Compute the name to display for a collation specified by OID
  *
@@ -9438,8 +9381,6 @@ deflist_to_tuplestore(ReturnSetInfo *rsinfo, List *options)
 Datum
 pg_options_to_table(PG_FUNCTION_ARGS)
 {
-	Datum		array = PG_GETARG_DATUM(0);
-
 	deflist_to_tuplestore((ReturnSetInfo *) fcinfo->resultinfo,
 						  NIL);
 

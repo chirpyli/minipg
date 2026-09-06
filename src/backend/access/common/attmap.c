@@ -297,12 +297,6 @@ check_attrmap_match(TupleDesc indesc,
 		Form_pg_attribute inatt = TupleDescAttr(indesc, i);
 		Form_pg_attribute outatt = TupleDescAttr(outdesc, i);
 
-		/*
-		 * If the input column has a missing attribute, we need a conversion.
-		 */
-		if (inatt->atthasmissing)
-			return false;
-
 		if (attrMap->attnums[i] == (i + 1))
 			continue;
 

@@ -45,7 +45,6 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_amproc.h"
-#include "catalog/pg_attrdef.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_namespace.h"
@@ -281,8 +280,6 @@ static Relation RelationBuildDesc(Oid targetRelId, bool insertIt);
 static void RelationInitPhysicalAddr(Relation relation);
 static void load_critical_index(Oid indexoid, Oid heapoid);
 static TupleDesc GetPgIndexDescriptor(void);
-static void AttrDefaultFetch(Relation relation, int ndef);
-static int	AttrDefaultCmp(const void *a, const void *b);
 static void InitIndexAmRoutine(Relation relation);
 static void IndexSupportInitialize(oidvector *indclass,
 								   RegProcedure *indexSupport,
@@ -429,7 +426,7 @@ AllocateRelationDesc(Form_pg_class relp)
  *		RelationBuildTupleDesc
  *
  *		Form the relation's tuple descriptor from information in
- *		the pg_attribute, pg_attrdef & pg_constraint system catalogs.
+ *		the pg_attribute & pg_constraint system catalogs.
  */
 static void
 RelationBuildTupleDesc(Relation relation)
@@ -439,17 +436,12 @@ RelationBuildTupleDesc(Relation relation)
 	SysScanDesc pg_attribute_scan;
 	ScanKeyData skey[2];
 	int			need;
-	TupleConstr *constr;
-	AttrMissing *attrmiss = NULL;
-	int			ndef = 0;
 
 	/* fill rd_att's type ID fields (compare heap.c's AddNewRelationTuple) */
 	relation->rd_att->tdtypeid =
 		relation->rd_rel->reltype ? relation->rd_rel->reltype : RECORDOID;
 	relation->rd_att->tdtypmod = -1;	/* just to be sure */
 
-	constr = (TupleConstr *) MemoryContextAllocZero(CacheMemoryContext,
-													sizeof(TupleConstr));
 
 	/*
 	 * Form a scan key that selects only user attributes (attnum > 0).
@@ -498,61 +490,6 @@ RelationBuildTupleDesc(Relation relation)
 			   attp,
 			   ATTRIBUTE_FIXED_PART_SIZE);
 
-		/* Update constraint/default info */
-		if (attp->atthasdef)
-			ndef++;
-
-		/* If the column has a "missing" value, put it in the attrmiss array */
-		if (attp->atthasmissing)
-		{
-			Datum		missingval;
-			bool		missingNull;
-
-			/* Do we have a missing value? */
-			missingval = heap_getattr(pg_attribute_tuple,
-									  Anum_pg_attribute_attmissingval,
-									  pg_attribute_desc->rd_att,
-									  &missingNull);
-			if (!missingNull)
-			{
-				/* Yes, fetch from the array */
-				MemoryContext oldcxt;
-				bool		is_null;
-				int			one = 1;
-				Datum		missval;
-
-				if (attrmiss == NULL)
-					attrmiss = (AttrMissing *)
-						MemoryContextAllocZero(CacheMemoryContext,
-											   relation->rd_rel->relnatts *
-											   sizeof(AttrMissing));
-
-				missval = array_get_element(missingval,
-											1,
-											&one,
-											-1,
-											attp->attlen,
-											attp->attbyval,
-											attp->attalign,
-											&is_null);
-				Assert(!is_null);
-				if (attp->attbyval)
-				{
-					/* for copy by val just copy the datum direct */
-					attrmiss[attnum - 1].am_value = missval;
-				}
-				else
-				{
-					/* otherwise copy in the correct context */
-					oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-					attrmiss[attnum - 1].am_value = datumCopy(missval,
-															  attp->attbyval,
-															  attp->attlen);
-					MemoryContextSwitchTo(oldcxt);
-				}
-				attrmiss[attnum - 1].am_present = true;
-			}
-		}
 		need--;
 		if (need == 0)
 			break;
@@ -590,27 +527,6 @@ RelationBuildTupleDesc(Relation relation)
 	if (RelationGetNumberOfAttributes(relation) > 0)
 		TupleDescAttr(relation->rd_att, 0)->attcacheoff = 0;
 
-	/*
-	 * Set up constraint/default info
-	 */
-	if (ndef > 0 ||
-		attrmiss ||
-		relation->rd_rel->relchecks > 0)
-	{
-		relation->rd_att->constr = constr;
-
-		if (ndef > 0)			/* DEFAULTs */
-			AttrDefaultFetch(relation, ndef);
-		else
-			constr->num_defval = 0;
-
-		constr->missing = attrmiss;
-	}
-	else
-	{
-		pfree(constr);
-		relation->rd_att->constr = NULL;
-	}
 }
 
 /*
@@ -1127,11 +1043,9 @@ RelationInitIndexAccessInfo(Relation relation)
 {
 	HeapTuple	tuple;
 	Form_pg_am	aform;
-	Datum		indcollDatum;
 	Datum		indclassDatum;
 	Datum		indoptionDatum;
 	bool		isnull;
-	oidvector  *indcoll;
 	oidvector  *indclass;
 	int2vector *indoption;
 	MemoryContext indexcxt;
@@ -3764,9 +3678,8 @@ load_critical_index(Oid indexoid, Oid heapoid)
  * fields of pg_index before we have the standard catalog caches
  * available.  We use predefined data that's set up in just the same way as
  * the bootstrapped reldescs used by formrdesc().  The resulting tupdesc is
- * not 100% kosher: it does not have the correct rowtype OID in tdtypeid, nor
- * does it have a TupleConstr field.  But it's good enough for the purpose of
- * extracting fields.
+ * not 100% kosher: it does not have the correct rowtype OID in tdtypeid.
+ * But it's good enough for the purpose of extracting fields.
  */
 static TupleDesc
 BuildHardcodedDescriptor(int natts, const FormData_pg_attribute *attrs)
@@ -3791,8 +3704,6 @@ BuildHardcodedDescriptor(int natts, const FormData_pg_attribute *attrs)
 	/* initialize first attribute's attcacheoff, cf RelationBuildTupleDesc */
 	TupleDescAttr(result, 0)->attcacheoff = 0;
 
-	/* Note: we don't bother to set up a TupleConstr entry */
-
 	MemoryContextSwitchTo(oldcxt);
 
 	return result;
@@ -3809,104 +3720,6 @@ GetPgIndexDescriptor(void)
 											   Desc_pg_index);
 
 	return pgindexdesc;
-}
-
-/*
- * Load any default attribute value definitions for the relation.
- *
- * ndef is the number of attributes that were marked atthasdef.
- *
- * Note: we don't make it a hard error to be missing some pg_attrdef records.
- * We can limp along as long as nothing needs to use the default value.  Code
- * that fails to find an expected AttrDefault record should throw an error.
- */
-static void
-AttrDefaultFetch(Relation relation, int ndef)
-{
-	AttrDefault *attrdef;
-	Relation	adrel;
-	SysScanDesc adscan;
-	ScanKeyData skey;
-	HeapTuple	htup;
-	int			found = 0;
-
-	/* Allocate array with room for as many entries as expected */
-	attrdef = (AttrDefault *)
-		MemoryContextAllocZero(CacheMemoryContext,
-							   ndef * sizeof(AttrDefault));
-
-	/* Search pg_attrdef for relevant entries */
-	ScanKeyInit(&skey,
-				Anum_pg_attrdef_adrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
-
-	adrel = table_open(AttrDefaultRelationId, AccessShareLock);
-	adscan = systable_beginscan(adrel, AttrDefaultIndexId, true,
-								NULL, 1, &skey);
-
-	while (HeapTupleIsValid(htup = systable_getnext(adscan)))
-	{
-		Form_pg_attrdef adform = (Form_pg_attrdef) GETSTRUCT(htup);
-		Datum		val;
-		bool		isnull;
-
-		/* protect limited size of array */
-		if (found >= ndef)
-		{
-			elog(WARNING, "unexpected pg_attrdef record found for attribute %d of relation \"%s\"",
-				 adform->adnum, RelationGetRelationName(relation));
-			break;
-		}
-
-		val = fastgetattr(htup,
-						  Anum_pg_attrdef_adbin,
-						  adrel->rd_att, &isnull);
-		if (isnull)
-			elog(WARNING, "null adbin for attribute %d of relation \"%s\"",
-				 adform->adnum, RelationGetRelationName(relation));
-		else
-		{
-			/* detoast and convert to cstring in caller's context */
-			char	   *s = TextDatumGetCString(val);
-
-			attrdef[found].adnum = adform->adnum;
-			attrdef[found].adbin = MemoryContextStrdup(CacheMemoryContext, s);
-			pfree(s);
-			found++;
-		}
-	}
-
-	systable_endscan(adscan);
-	table_close(adrel, AccessShareLock);
-
-	if (found != ndef)
-		elog(WARNING, "%d pg_attrdef record(s) missing for relation \"%s\"",
-			 ndef - found, RelationGetRelationName(relation));
-
-	/*
-	 * Sort the AttrDefault entries by adnum, for the convenience of
-	 * equalTupleDescs().  (Usually, they already will be in order, but this
-	 * might not be so if systable_getnext isn't using an index.)
-	 */
-	if (found > 1)
-		qsort(attrdef, found, sizeof(AttrDefault), AttrDefaultCmp);
-
-	/* Install array only after it's fully valid */
-	relation->rd_att->constr->defval = attrdef;
-	relation->rd_att->constr->num_defval = found;
-}
-
-/*
- * qsort comparator to sort AttrDefault entries by adnum
- */
-static int
-AttrDefaultCmp(const void *a, const void *b)
-{
-	const AttrDefault *ada = (const AttrDefault *) a;
-	const AttrDefault *adb = (const AttrDefault *) b;
-
-	return ada->adnum - adb->adnum;
 }
 
 /*

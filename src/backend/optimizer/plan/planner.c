@@ -1021,7 +1021,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	bool		final_target_parallel_safe;
 	RelOptInfo *current_rel;
 	RelOptInfo *final_rel;
-	FinalPathExtraData extra;
 	ListCell   *lc;
 	PathTarget *sort_input_target;
 	List	   *sort_input_targets;
@@ -1485,11 +1484,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			add_partial_path(final_rel, partial_path);
 		}
 	}
-
-	extra.limit_needed = limit_needed(parse);
-	extra.limit_tuples = limit_tuples;
-	extra.count_est = count_est;
-	extra.offset_est = offset_est;
 
 	/* Note: currently, we leave it to callers to do set_cheapest() */
 }

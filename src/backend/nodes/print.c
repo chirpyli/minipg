@@ -297,7 +297,7 @@ print_rt(const List *rtable)
 					   i, rte->eref->aliasname);
 		}
 
-		printf("\t%s\t%s\n",
+		printf("\t%s\n",
 			   (rte->inFromCl ? "inFromCl" : ""));
 		i++;
 	}

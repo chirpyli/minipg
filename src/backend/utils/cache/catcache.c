@@ -1019,7 +1019,7 @@ CatalogCacheInitializeCache(CatCache *cache)
 	/*
 	 * copy the relcache's tuple descriptor to permanent cache storage
 	 */
-	tupdesc = CreateTupleDescCopyConstr(RelationGetDescr(relation));
+	tupdesc = CreateTupleDescCopy(RelationGetDescr(relation));
 
 	/*
 	 * save the relation's name and relisshared flag, too (cc_relname is used

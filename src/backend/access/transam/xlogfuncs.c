@@ -635,21 +635,6 @@ pg_is_in_recovery(PG_FUNCTION_ARGS)
 }
 
 /*
- * Compute the difference in bytes between two WAL locations.
- */
-Datum
-pg_wal_lsn_diff(PG_FUNCTION_ARGS)
-{
-	Datum		result;
-
-	result = DirectFunctionCall2(pg_lsn_mi,
-								 PG_GETARG_DATUM(0),
-								 PG_GETARG_DATUM(1));
-
-	PG_RETURN_DATUM(result);
-}
-
-/*
  * Returns bool with current on-line backup mode, a global state.
  */
 Datum

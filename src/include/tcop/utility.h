@@ -95,8 +95,6 @@ CreateCommandName(Node *parsetree)
 	return GetCommandTagName(CreateCommandTag(parsetree));
 }
 
-extern LogStmtLevel GetCommandLogLevel(Node *parsetree);
-
 extern bool CommandIsReadOnly(PlannedStmt *pstmt);
 
 #endif							/* UTILITY_H */
