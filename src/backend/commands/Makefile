@@ -28,7 +28,6 @@ OBJS = \
 	opclasscmds.o \
 	operatorcmds.o \
 	portalcmds.o \
-	proclang.o \
 	schemacmds.o \
 	tablecmds.o \
 	tablespace.o \

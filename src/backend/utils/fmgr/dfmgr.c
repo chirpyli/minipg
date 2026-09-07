@@ -429,7 +429,6 @@ internal_unload_library(const char *libname)
 			if (PG_fini)
 				(*PG_fini) ();
 
-			clear_external_function_hash(file_scanner->handle);
 			dlclose(file_scanner->handle);
 			free((char *) file_scanner);
 			/* prv does not change */

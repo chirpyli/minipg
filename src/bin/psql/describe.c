@@ -306,9 +306,6 @@ describeFunctions(const char *functypes, const char *func_pattern,
 						  gettext_noop("invoker"),
 						  gettext_noop("Security"));
 		appendPQExpBuffer(&buf,
-						  ",\n l.lanname as \"%s\"",
-						  gettext_noop("Language"));
-		appendPQExpBuffer(&buf,
 						  ",\n p.prosrc as \"%s\"",
 						  gettext_noop("Source code"));
 		appendPQExpBuffer(&buf,
@@ -327,10 +324,6 @@ describeFunctions(const char *functypes, const char *func_pattern,
 						  "     LEFT JOIN pg_catalog.pg_namespace nt%d ON nt%d.oid = t%d.typnamespace\n",
 						  i, i, i, i, i, i);
 	}
-
-	if (verbose)
-		appendPQExpBufferStr(&buf,
-							 "     LEFT JOIN pg_catalog.pg_language l ON l.oid = p.prolang\n");
 
 	have_where = false;
 
@@ -2171,72 +2164,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	PQclear(res);
 	return true;
 }
-
-/*
- * \dL
- *
- * Describes languages.
- */
-bool
-listLanguages(const char *pattern, bool verbose, bool showSystem)
-{
-	PQExpBufferData buf;
-	PGresult   *res;
-	printQueryOpt myopt = pset.popt;
-
-	initPQExpBuffer(&buf);
-
-	printfPQExpBuffer(&buf,
-					  "SELECT l.lanname AS \"%s\"\n",
-					  gettext_noop("Name"));
-	appendPQExpBuffer(&buf,
-					  ",\n       l.lanpltrusted AS \"%s\"",
-					  gettext_noop("Trusted"));
-
-	if (verbose)
-	{
-		appendPQExpBuffer(&buf,
-						  ",\n       NOT l.lanispl AS \"%s\",\n"
-						  "       l.lanplcallfoid::pg_catalog.regprocedure AS \"%s\",\n"
-						  "       l.lanvalidator::pg_catalog.regprocedure AS \"%s\",\n       ",
-						  gettext_noop("Internal language"),
-						  gettext_noop("Call handler"),
-						  gettext_noop("Validator"));
-		if (pset.sversion >= 90000)
-			appendPQExpBuffer(&buf, "l.laninline::pg_catalog.regprocedure AS \"%s\",\n       ",
-							  gettext_noop("Inline handler"));
-	}
-
-	appendPQExpBuffer(&buf,
-					  "\nFROM pg_catalog.pg_language l\n");
-
-	if (pattern)
-		if (!validateSQLNamePattern(&buf, pattern, false, false,
-									NULL, "l.lanname", NULL, NULL,
-									NULL, 2))
-			return false;
-
-	if (!showSystem && !pattern)
-		appendPQExpBufferStr(&buf, "WHERE l.lanplcallfoid != 0\n");
-
-
-	appendPQExpBufferStr(&buf, "ORDER BY 1;");
-
-	res = PSQLexec(buf.data);
-	termPQExpBuffer(&buf);
-	if (!res)
-		return false;
-
-	myopt.nullPrint = NULL;
-	myopt.title = _("List of languages");
-	myopt.translate_header = true;
-
-	printQuery(res, &myopt, pset.queryFout, false, pset.logfile);
-
-	PQclear(res);
-	return true;
-}
-
 
 /*
  * \dC

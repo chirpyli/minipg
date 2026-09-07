@@ -67,7 +67,6 @@ extern bool listCollations(const char *pattern, bool verbose, bool showSystem);
 extern bool listSchemas(const char *pattern, bool verbose, bool showSystem);
 
 /* \dL */
-extern bool listLanguages(const char *pattern, bool verbose, bool showSystem);
 
 /* \dx */
 extern bool listExtensions(const char *pattern);

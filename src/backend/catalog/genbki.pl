@@ -236,13 +236,6 @@ foreach my $row (@{ $catalog_data{pg_collation} })
 	$collationoids{ $row->{collname} } = $row->{oid};
 }
 
-# language OID lookup
-my %langoids;
-foreach my $row (@{ $catalog_data{pg_language} })
-{
-	$langoids{ $row->{lanname} } = $row->{oid};
-}
-
 # namespace (schema) OID lookup
 my %namespaceoids;
 foreach my $row (@{ $catalog_data{pg_namespace} })
@@ -367,7 +360,6 @@ my %lookup_kind = (
 	pg_authid      => \%authidoids,
 	pg_class       => \%classoids,
 	pg_collation   => \%collationoids,
-	pg_language    => \%langoids,
 	pg_namespace   => \%namespaceoids,
 	pg_opclass     => \%opcoids,
 	pg_operator    => \%operoids,

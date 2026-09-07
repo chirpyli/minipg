@@ -141,8 +141,6 @@ extern void fmgr_info_cxt(Oid functionId, FmgrInfo *finfo,
 extern void fmgr_info_copy(FmgrInfo *dstinfo, FmgrInfo *srcinfo,
 						   MemoryContext destcxt);
 
-extern void fmgr_symbol(Oid functionId, char **mod, char **fn);
-
 /*
  * This macro initializes all the fields of a FunctionCallInfoBaseData except
  * for the args[] array.
@@ -699,9 +697,6 @@ extern bytea *OidSendFunctionCall(Oid functionId, Datum val);
 /*
  * Routines in fmgr.c
  */
-extern const Pg_finfo_record *fetch_finfo_record(void *filehandle, const char *funcname);
-extern void clear_external_function_hash(void *filehandle);
-extern Oid	fmgr_internal_function(const char *proname);
 extern Oid	get_fn_expr_rettype(FmgrInfo *flinfo);
 extern Oid	get_fn_expr_argtype(FmgrInfo *flinfo, int argnum);
 extern Oid	get_call_expr_argtype(fmNodePtr expr, int argnum);
@@ -711,7 +706,6 @@ extern bool get_fn_expr_variadic(FmgrInfo *flinfo);
 extern bytea *get_fn_opclass_options(FmgrInfo *flinfo);
 extern bool has_fn_opclass_options(FmgrInfo *flinfo);
 extern void set_fn_opclass_options(FmgrInfo *flinfo, bytea *options);
-extern bool CheckFunctionValidatorAccess(Oid validatorOid, Oid functionOid);
 
 /*
  * Routines in dfmgr.c

@@ -31,7 +31,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -119,7 +118,6 @@ static const Oid object_classes[] = {
 	CastRelationId,				/* OCLASS_CAST */
 	CollationRelationId,		/* OCLASS_COLLATION */
 	ConstraintRelationId,		/* OCLASS_CONSTRAINT */
-	LanguageRelationId,			/* OCLASS_LANGUAGE */
 	OperatorRelationId,			/* OCLASS_OPERATOR */
 	OperatorClassRelationId,	/* OCLASS_OPCLASS */
 	OperatorFamilyRelationId,	/* OCLASS_OPFAMILY */
@@ -1270,7 +1268,6 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_CAST:
 		case OCLASS_COLLATION:
-		case OCLASS_LANGUAGE:
 		case OCLASS_OPCLASS:
 		case OCLASS_OPFAMILY:
 		case OCLASS_AM:
@@ -2438,9 +2435,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case ConstraintRelationId:
 			return OCLASS_CONSTRAINT;
-
-		case LanguageRelationId:
-			return OCLASS_LANGUAGE;
 
 		case OperatorRelationId:
 			return OCLASS_OPERATOR;

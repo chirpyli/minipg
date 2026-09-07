@@ -30,7 +30,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -41,7 +40,6 @@
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
-#include "commands/proclang.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -202,19 +200,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		Anum_pg_proc_pronamespace,
 		InvalidAttrNumber,
 		OBJECT_FUNCTION,
-		false
-	},
-	{
-		"language",
-		LanguageRelationId,
-		LanguageOidIndexId,
-		LANGOID,
-		LANGNAME,
-		Anum_pg_language_oid,
-		Anum_pg_language_lanname,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_LANGUAGE,
 		false
 	},
 	{
@@ -390,10 +375,6 @@ static const struct object_type_map
 	{
 		"table constraint", OBJECT_TABCONSTRAINT
 	},
-	/* OCLASS_LANGUAGE */
-	{
-		"language", OBJECT_LANGUAGE
-	},
 	/* OCLASS_OPERATOR */
 	{
 		"operator", OBJECT_OPERATOR
@@ -554,7 +535,6 @@ get_object_address(ObjectType objtype, Node *object,
 			case OBJECT_DATABASE:
 			case OBJECT_EXTENSION:
 			case OBJECT_SCHEMA:
-			case OBJECT_LANGUAGE:
 				address = get_object_address_unqualified(objtype,
 														 (Value *) object, missing_ok);
 				break;
@@ -742,11 +722,6 @@ get_object_address_unqualified(ObjectType objtype,
 			address.objectId = get_namespace_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
-		case OBJECT_LANGUAGE:
-		address.classId = LanguageRelationId;
-		address.objectId = get_language_oid(name, missing_ok);
-		address.objectSubId = 0;
-		break;
 	default:
 		elog(ERROR, "unrecognized objtype: %d", (int) objtype);
 			/* placate compiler, which doesn't know elog won't return */
@@ -1292,7 +1267,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_COLLATION:
 		case OBJECT_DATABASE:
 		case OBJECT_EXTENSION:
-		case OBJECT_LANGUAGE:
 		case OBJECT_SCHEMA:
 			if (list_length(name) != 1)
 				ereport(ERROR,
@@ -1819,18 +1793,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				}
 
 				ReleaseSysCache(conTup);
-				break;
-			}
-
-
-			case OCLASS_LANGUAGE:
-			{
-				char	   *langname = get_language_name(object->objectId,
-														 missing_ok);
-
-				if (langname)
-					appendStringInfo(&buffer, _("language %s"),
-									 get_language_name(object->objectId, false));
 				break;
 			}
 
@@ -2547,12 +2509,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 										 missing_ok);
 			break;
 
-
-
-		case OCLASS_LANGUAGE:
-			appendStringInfoString(&buffer, "language");
-			break;
-
 		case OCLASS_OPERATOR:
 			appendStringInfoString(&buffer, "operator");
 			break;
@@ -2934,29 +2890,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 				break;
 			}
 
-
-		case OCLASS_LANGUAGE:
-			{
-				HeapTuple	langTup;
-				Form_pg_language langForm;
-
-				langTup = SearchSysCache1(LANGOID,
-										  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(langTup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for language %u",
-							 object->objectId);
-					break;
-				}
-				langForm = (Form_pg_language) GETSTRUCT(langTup);
-				appendStringInfoString(&buffer,
-									   quote_identifier(NameStr(langForm->lanname)));
-				if (objname)
-					*objname = list_make1(pstrdup(NameStr(langForm->lanname)));
-				ReleaseSysCache(langTup);
-				break;
-			}
 		case OCLASS_OPERATOR:
 			{
 				bits16		flags = FORMAT_OPERATOR_FORCE_QUALIFY | FORMAT_OPERATOR_INVALID_AS_NULL;

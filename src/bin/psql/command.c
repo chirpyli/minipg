@@ -700,9 +700,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 						break;
 				}
 				break;
-			case 'L':
-				success = listLanguages(pattern, show_verbose, show_system);
-				break;
 			case 'n':
 				success = listSchemas(pattern, show_verbose, show_system);
 				break;

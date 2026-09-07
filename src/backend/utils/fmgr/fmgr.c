@@ -16,7 +16,6 @@
 #include "postgres.h"
 
 #include "access/detoast.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "executor/functions.h"
@@ -37,29 +36,8 @@
 PGDLLIMPORT needs_fmgr_hook_type needs_fmgr_hook = NULL;
 PGDLLIMPORT fmgr_hook_type fmgr_hook = NULL;
 
-/*
- * Hashtable for fast lookup of external C functions
- */
-typedef struct
-{
-	/* fn_oid is the hash key and so must be first! */
-	Oid			fn_oid;			/* OID of an external C function */
-	TransactionId fn_xmin;		/* for checking up-to-dateness */
-	ItemPointerData fn_tid;
-	PGFunction	user_fn;		/* the function's address */
-	const Pg_finfo_record *inforec; /* address of its info record */
-} CFuncHashTabEntry;
-
-static HTAB *CFuncHash = NULL;
-
-
 static void fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 								   bool ignore_security);
-static void fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple);
-static void fmgr_info_other_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple);
-static CFuncHashTabEntry *lookup_C_func(HeapTuple procedureTuple);
-static void record_C_func(HeapTuple procedureTuple,
-						  PGFunction user_fn, const Pg_finfo_record *inforec);
 
 extern Datum fmgr_security_definer(PG_FUNCTION_ARGS);
 
@@ -211,6 +189,13 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		return;
 	}
 
+	/*
+	 * Dispatch on the function's implementation language.  Only two
+	 * languages can still occur: internal functions, whose C symbol is
+	 * named by prosrc, and SQL-language functions, whose body text is in
+	 * prosrc.  C-language and procedural-language functions no longer
+	 * exist, so anything else is an error.
+	 */
 	switch (procedureStruct->prolang)
 	{
 		case INTERNALlanguageId:
@@ -218,11 +203,9 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 			/*
 			 * For an ordinary builtin function, we should never get here
 			 * because the fmgr_isbuiltin() search above will have succeeded.
-			 * However, if the user has done a CREATE FUNCTION to create an
-			 * alias for a builtin function, we can end up here.  In that case
-			 * we have to look up the function by name.  The name of the
-			 * internal function is stored in prosrc (it doesn't have to be
-			 * the same as the name of the alias!)
+			 * However, aggregate functions are not listed in
+			 * fmgr_builtins[], so those reach this code and have to be
+			 * looked up by name (they all point at aggregate_dummy).
 			 */
 			prosrcdatum = SysCacheGetAttr(PROCOID, procedureTuple,
 										  Anum_pg_proc_prosrc, &isnull);
@@ -242,358 +225,20 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 			finfo->fn_stats = 0;	/* ie, never track */
 			break;
 
-		case ClanguageId:
-			fmgr_info_C_lang(functionId, finfo, procedureTuple);
-			finfo->fn_stats = 0;	/* ie, track if ALL */
-			break;
-
 		case SQLlanguageId:
 			finfo->fn_addr = fmgr_sql;
 			finfo->fn_stats = 0;	/* ie, track if ALL */
 			break;
 
 		default:
-			fmgr_info_other_lang(functionId, finfo, procedureTuple);
-			finfo->fn_stats = 0;	/* ie, track if not OFF */
+			elog(ERROR, "unsupported language %u for function %u",
+				 procedureStruct->prolang, functionId);
 			break;
 	}
 
 	finfo->fn_oid = functionId;
 	ReleaseSysCache(procedureTuple);
 }
-
-/*
- * Return module and C function name providing implementation of functionId.
- *
- * If *mod == NULL and *fn == NULL, no C symbol is known to implement
- * function.
- *
- * If *mod == NULL and *fn != NULL, the function is implemented by a symbol in
- * the main binary.
- *
- * If *mod != NULL and *fn != NULL the function is implemented in an extension
- * shared object.
- *
- * The returned module and function names are pstrdup'ed into the current
- * memory context.
- */
-void
-fmgr_symbol(Oid functionId, char **mod, char **fn)
-{
-	HeapTuple	procedureTuple;
-	Form_pg_proc procedureStruct;
-	bool		isnull;
-	Datum		prosrcattr;
-	Datum		probinattr;
-
-	procedureTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(functionId));
-	if (!HeapTupleIsValid(procedureTuple))
-		elog(ERROR, "cache lookup failed for function %u", functionId);
-	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
-
-	if (procedureStruct->prosecdef ||
-		!heap_attisnull(procedureTuple, Anum_pg_proc_proconfig, NULL) ||
-		FmgrHookIsNeeded(functionId))
-	{
-		*mod = NULL;			/* core binary */
-		*fn = pstrdup("fmgr_security_definer");
-		ReleaseSysCache(procedureTuple);
-		return;
-	}
-
-	/* see fmgr_info_cxt_security for the individual cases */
-	switch (procedureStruct->prolang)
-	{
-		case INTERNALlanguageId:
-			prosrcattr = SysCacheGetAttr(PROCOID, procedureTuple,
-										 Anum_pg_proc_prosrc, &isnull);
-			if (isnull)
-				elog(ERROR, "null prosrc");
-
-			*mod = NULL;		/* core binary */
-			*fn = TextDatumGetCString(prosrcattr);
-			break;
-
-		case ClanguageId:
-			prosrcattr = SysCacheGetAttr(PROCOID, procedureTuple,
-										 Anum_pg_proc_prosrc, &isnull);
-			if (isnull)
-				elog(ERROR, "null prosrc for C function %u", functionId);
-
-			probinattr = SysCacheGetAttr(PROCOID, procedureTuple,
-										 Anum_pg_proc_probin, &isnull);
-			if (isnull)
-				elog(ERROR, "null probin for C function %u", functionId);
-
-			/*
-			 * No need to check symbol presence / API version here, already
-			 * checked in fmgr_info_cxt_security.
-			 */
-			*mod = TextDatumGetCString(probinattr);
-			*fn = TextDatumGetCString(prosrcattr);
-			break;
-
-		case SQLlanguageId:
-			*mod = NULL;		/* core binary */
-			*fn = pstrdup("fmgr_sql");
-			break;
-
-		default:
-			*mod = NULL;
-			*fn = NULL;			/* unknown, pass pointer */
-			break;
-	}
-
-	ReleaseSysCache(procedureTuple);
-}
-
-
-/*
- * Special fmgr_info processing for C-language functions.  Note that
- * finfo->fn_oid is not valid yet.
- */
-static void
-fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
-{
-	CFuncHashTabEntry *hashentry;
-	PGFunction	user_fn;
-	const Pg_finfo_record *inforec;
-	bool		isnull;
-
-	/*
-	 * See if we have the function address cached already
-	 */
-	hashentry = lookup_C_func(procedureTuple);
-	if (hashentry)
-	{
-		user_fn = hashentry->user_fn;
-		inforec = hashentry->inforec;
-	}
-	else
-	{
-		Datum		prosrcattr,
-					probinattr;
-		char	   *prosrcstring,
-				   *probinstring;
-		void	   *libraryhandle;
-
-		/*
-		 * Get prosrc and probin strings (link symbol and library filename).
-		 * While in general these columns might be null, that's not allowed
-		 * for C-language functions.
-		 */
-		prosrcattr = SysCacheGetAttr(PROCOID, procedureTuple,
-									 Anum_pg_proc_prosrc, &isnull);
-		if (isnull)
-			elog(ERROR, "null prosrc for C function %u", functionId);
-		prosrcstring = TextDatumGetCString(prosrcattr);
-
-		probinattr = SysCacheGetAttr(PROCOID, procedureTuple,
-									 Anum_pg_proc_probin, &isnull);
-		if (isnull)
-			elog(ERROR, "null probin for C function %u", functionId);
-		probinstring = TextDatumGetCString(probinattr);
-
-		/* Look up the function itself */
-		user_fn = load_external_function(probinstring, prosrcstring, true,
-										 &libraryhandle);
-
-		/* Get the function information record (real or default) */
-		inforec = fetch_finfo_record(libraryhandle, prosrcstring);
-
-		/* Cache the addresses for later calls */
-		record_C_func(procedureTuple, user_fn, inforec);
-
-		pfree(prosrcstring);
-		pfree(probinstring);
-	}
-
-	switch (inforec->api_version)
-	{
-		case 1:
-			/* New style: call directly */
-			finfo->fn_addr = user_fn;
-			break;
-		default:
-			/* Shouldn't get here if fetch_finfo_record did its job */
-			elog(ERROR, "unrecognized function API version: %d",
-				 inforec->api_version);
-			break;
-	}
-}
-
-/*
- * Special fmgr_info processing for other-language functions.  Note
- * that finfo->fn_oid is not valid yet.
- */
-static void
-fmgr_info_other_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
-{
-	Form_pg_proc procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
-	Oid			language = procedureStruct->prolang;
-	HeapTuple	languageTuple;
-	Form_pg_language languageStruct;
-	FmgrInfo	plfinfo;
-
-	languageTuple = SearchSysCache1(LANGOID, ObjectIdGetDatum(language));
-	if (!HeapTupleIsValid(languageTuple))
-		elog(ERROR, "cache lookup failed for language %u", language);
-	languageStruct = (Form_pg_language) GETSTRUCT(languageTuple);
-
-	/*
-	 * Look up the language's call handler function, ignoring any attributes
-	 * that would normally cause insertion of fmgr_security_definer.  We need
-	 * to get back a bare pointer to the actual C-language function.
-	 */
-	fmgr_info_cxt_security(languageStruct->lanplcallfoid, &plfinfo,
-						   CurrentMemoryContext, true);
-	finfo->fn_addr = plfinfo.fn_addr;
-
-	ReleaseSysCache(languageTuple);
-}
-
-/*
- * Fetch and validate the information record for the given external function.
- * The function is specified by a handle for the containing library
- * (obtained from load_external_function) as well as the function name.
- *
- * If no info function exists for the given name an error is raised.
- *
- * This function is broken out of fmgr_info_C_lang so that fmgr_c_validator
- * can validate the information record for a function not yet entered into
- * pg_proc.
- */
-const Pg_finfo_record *
-fetch_finfo_record(void *filehandle, const char *funcname)
-{
-	char	   *infofuncname;
-	PGFInfoFunction infofunc;
-	const Pg_finfo_record *inforec;
-
-	infofuncname = psprintf("pg_finfo_%s", funcname);
-
-	/* Try to look up the info function */
-	infofunc = (PGFInfoFunction) lookup_external_function(filehandle,
-														  infofuncname);
-	if (infofunc == NULL)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not find function information for function \"%s\"",
-						funcname),
-				 errhint("SQL-callable functions need an accompanying PG_FUNCTION_INFO_V1(funcname).")));
-		return NULL;			/* silence compiler */
-	}
-
-	/* Found, so call it */
-	inforec = (*infofunc) ();
-
-	/* Validate result as best we can */
-	if (inforec == NULL)
-		elog(ERROR, "null result from info function \"%s\"", infofuncname);
-	switch (inforec->api_version)
-	{
-		case 1:
-			/* OK, no additional fields to validate */
-			break;
-		default:
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("unrecognized API version %d reported by info function \"%s\"",
-							inforec->api_version, infofuncname)));
-			break;
-	}
-
-	pfree(infofuncname);
-	return inforec;
-}
-
-
-/*-------------------------------------------------------------------------
- *		Routines for caching lookup information for external C functions.
- *
- * The routines in dfmgr.c are relatively slow, so we try to avoid running
- * them more than once per external function per session.  We use a hash table
- * with the function OID as the lookup key.
- *-------------------------------------------------------------------------
- */
-
-/*
- * lookup_C_func: try to find a C function in the hash table
- *
- * If an entry exists and is up to date, return it; else return NULL
- */
-static CFuncHashTabEntry *
-lookup_C_func(HeapTuple procedureTuple)
-{
-	Oid			fn_oid = ((Form_pg_proc) GETSTRUCT(procedureTuple))->oid;
-	CFuncHashTabEntry *entry;
-
-	if (CFuncHash == NULL)
-		return NULL;			/* no table yet */
-	entry = (CFuncHashTabEntry *)
-		hash_search(CFuncHash,
-					&fn_oid,
-					HASH_FIND,
-					NULL);
-	if (entry == NULL)
-		return NULL;			/* no such entry */
-	if (entry->fn_xmin == HeapTupleHeaderGetRawXmin(procedureTuple->t_data) &&
-		ItemPointerEquals(&entry->fn_tid, &procedureTuple->t_self))
-		return entry;			/* OK */
-	return NULL;				/* entry is out of date */
-}
-
-/*
- * record_C_func: enter (or update) info about a C function in the hash table
- */
-static void
-record_C_func(HeapTuple procedureTuple,
-			  PGFunction user_fn, const Pg_finfo_record *inforec)
-{
-	Oid			fn_oid = ((Form_pg_proc) GETSTRUCT(procedureTuple))->oid;
-	CFuncHashTabEntry *entry;
-	bool		found;
-
-	/* Create the hash table if it doesn't exist yet */
-	if (CFuncHash == NULL)
-	{
-		HASHCTL		hash_ctl;
-
-		hash_ctl.keysize = sizeof(Oid);
-		hash_ctl.entrysize = sizeof(CFuncHashTabEntry);
-		CFuncHash = hash_create("CFuncHash",
-								100,
-								&hash_ctl,
-								HASH_ELEM | HASH_BLOBS);
-	}
-
-	entry = (CFuncHashTabEntry *)
-		hash_search(CFuncHash,
-					&fn_oid,
-					HASH_ENTER,
-					&found);
-	/* OID is already filled in */
-	entry->fn_xmin = HeapTupleHeaderGetRawXmin(procedureTuple->t_data);
-	entry->fn_tid = procedureTuple->t_self;
-	entry->user_fn = user_fn;
-	entry->inforec = inforec;
-}
-
-/*
- * clear_external_function_hash: remove entries for a library being closed
- *
- * Presently we just zap the entire hash table, but later it might be worth
- * the effort to remove only the entries associated with the given handle.
- */
-void
-clear_external_function_hash(void *filehandle)
-{
-	if (CFuncHash)
-		hash_destroy(CFuncHash);
-	CFuncHash = NULL;
-}
-
 
 /*
  * Copy an FmgrInfo struct
@@ -609,22 +254,6 @@ fmgr_info_copy(FmgrInfo *dstinfo, FmgrInfo *srcinfo,
 	memcpy(dstinfo, srcinfo, sizeof(FmgrInfo));
 	dstinfo->fn_mcxt = destcxt;
 	dstinfo->fn_extra = NULL;
-}
-
-
-/*
- * Specialized lookup routine for fmgr_internal_validator: given the alleged
- * name of an internal function, return the OID of the function.
- * If the name is not recognized, return InvalidOid.
- */
-Oid
-fmgr_internal_function(const char *proname)
-{
-	const FmgrBuiltin *fbp = fmgr_lookupByName(proname);
-
-	if (fbp == NULL)
-		return InvalidOid;
-	return fbp->foid;
 }
 
 
@@ -1995,73 +1624,4 @@ get_fn_opclass_options(FmgrInfo *flinfo)
 	return NULL;
 }
 
-/*-------------------------------------------------------------------------
- *		Support routines for procedural language implementations
- *-------------------------------------------------------------------------
- */
-
-/*
- * Verify that a validator is actually associated with the language of a
- * particular function and that the user has access to both the language and
- * the function.  All validators should call this before doing anything
- * substantial.  Doing so ensures a user cannot achieve anything with explicit
- * calls to validators that he could not achieve with CREATE FUNCTION or by
- * simply calling an existing function.
- *
- * When this function returns false, callers should skip all validation work
- * and call PG_RETURN_VOID().  This never happens at present; it is reserved
- * for future expansion.
- *
- * In particular, checking that the validator corresponds to the function's
- * language allows untrusted language validators to assume they process only
- * superuser-chosen source code.  (Untrusted language call handlers, by
- * definition, do assume that.)  A user lacking the USAGE language privilege
- * would be unable to reach the validator through CREATE FUNCTION, so we check
- * that to block explicit calls as well.  Checking the EXECUTE privilege on
- * the function is often superfluous, because most users can clone the
- * function to get an executable copy.  It is meaningful against users with no
- * database TEMP right and no permanent schema CREATE right, thereby unable to
- * create any function.  Also, if the function tracks persistent state by
- * function OID or name, validating the original function might permit more
- * mischief than creating and validating a clone thereof.
- */
-bool
-CheckFunctionValidatorAccess(Oid validatorOid, Oid functionOid)
-{
-	HeapTuple	procTup;
-	HeapTuple	langTup;
-	Form_pg_proc procStruct;
-	Form_pg_language langStruct;
-
-	/*
-	 * Get the function's pg_proc entry.  Throw a user-facing error for bad
-	 * OID, because validators can be called with user-specified OIDs.
-	 */
-	procTup = SearchSysCache1(PROCOID, ObjectIdGetDatum(functionOid));
-	if (!HeapTupleIsValid(procTup))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("function with OID %u does not exist", functionOid)));
-	procStruct = (Form_pg_proc) GETSTRUCT(procTup);
-
-	/*
-	 * Fetch pg_language entry to know if this is the correct validation
-	 * function for that pg_proc entry.
-	 */
-	langTup = SearchSysCache1(LANGOID, ObjectIdGetDatum(procStruct->prolang));
-	if (!HeapTupleIsValid(langTup))
-		elog(ERROR, "cache lookup failed for language %u", procStruct->prolang);
-	langStruct = (Form_pg_language) GETSTRUCT(langTup);
-
-	if (langStruct->lanvalidator != validatorOid)
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("language validation function %u called for language %u instead of %u",
-						validatorOid, procStruct->prolang,
-						langStruct->lanvalidator)));
-
-	ReleaseSysCache(procTup);
-	ReleaseSysCache(langTup);
-
-	return true;
-}
+/* (validator support removed: no procedural languages and no CREATE FUNCTION) */

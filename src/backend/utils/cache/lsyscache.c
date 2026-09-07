@@ -26,7 +26,6 @@
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -1226,30 +1225,6 @@ get_constraint_index(Oid conoid)
 	}
 	else
 		return InvalidOid;
-}
-
-/*				---------- LANGUAGE CACHE ----------					 */
-
-char *
-get_language_name(Oid langoid, bool missing_ok)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(LANGOID, ObjectIdGetDatum(langoid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_language lantup = (Form_pg_language) GETSTRUCT(tp);
-		char	   *result;
-
-		result = pstrdup(NameStr(lantup->lanname));
-		ReleaseSysCache(tp);
-		return result;
-	}
-
-	if (!missing_ok)
-		elog(ERROR, "cache lookup failed for language %u",
-			 langoid);
-	return NULL;
 }
 
 /*				---------- OPCLASS CACHE ----------						 */

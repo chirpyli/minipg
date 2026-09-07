@@ -22,7 +22,6 @@
 #include "access/htup_details.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_class.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"

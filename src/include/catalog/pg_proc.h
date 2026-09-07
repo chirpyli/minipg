@@ -37,8 +37,8 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* OID of namespace containing this proc */
 	Oid			pronamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
 
-	/* OID of pg_language entry */
-	Oid			prolang BKI_DEFAULT(internal) BKI_LOOKUP(pg_language);
+	/* language of the implementation (see INTERNALlanguageId etc below) */
+	Oid			prolang BKI_DEFAULT(12);
 
 	/* estimated execution cost */
 	float4		procost BKI_DEFAULT(1);
@@ -140,6 +140,16 @@ DECLARE_UNIQUE_INDEX(pg_proc_proname_args_nsp_index, 2691, on pg_proc using btre
 #define PROKIND_AGGREGATE 'a'
 #define PROKIND_WINDOW 'w'
 #define PROKIND_PROCEDURE 'p'
+
+/*
+ * Symbolic values for prolang column.  These used to be generated from
+ * pg_language.dat, but only the three built-in languages remain, so they
+ * are now hard-wired here.  (prolang is still needed to tell SQL-language
+ * functions apart from internal ones.)
+ */
+#define INTERNALlanguageId	12
+#define ClanguageId			13
+#define SQLlanguageId		14
 
 /*
  * Symbolic values for provolatile column: these indicate whether the result

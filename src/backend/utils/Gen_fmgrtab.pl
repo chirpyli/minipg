@@ -196,8 +196,9 @@ foreach my $s (sort { $a->{oid} <=> $b->{oid} } @fmgr)
 	$sqlname .= "_" . $s->{args} if ($proname_counts{ $s->{name} } > 1);
 	$sqlname =~ s/\s+/_/g;
 	print $ofh "#define F_" . uc $sqlname . " $s->{oid}\n";
-	# We want only one extern per internal-language, non-aggregate function
-	if (   $s->{lang} eq 'internal'
+	# We want only one extern per internal-language, non-aggregate function.
+	# ('12' is INTERNALlanguageId; SQL-language functions use '14'.)
+	if (   $s->{lang} eq '12'
 		&& $s->{kind} ne 'a'
 		&& !$seenit{ $s->{prosrc} })
 	{
@@ -216,7 +217,9 @@ my $last_builtin_oid = 0;
 my $fmgr_count       = 0;
 foreach my $s (sort { $a->{oid} <=> $b->{oid} } @fmgr)
 {
-	next if $s->{lang} ne 'internal';
+	# Only internal-language functions are listed in fmgr_builtins[];
+	# SQL-language functions are dispatched through fmgr_sql instead.
+	next if $s->{lang} ne '12';
 	# We do not need entries for aggregate functions
 	next if $s->{kind} eq 'a';
 

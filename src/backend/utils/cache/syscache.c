@@ -32,7 +32,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -269,28 +268,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		64
-	},
-	{LanguageRelationId,		/* LANGNAME */
-		LanguageNameIndexId,
-		1,
-		{
-			Anum_pg_language_lanname,
-			0,
-			0,
-			0
-		},
-		4
-	},
-	{LanguageRelationId,		/* LANGOID */
-		LanguageOidIndexId,
-		1,
-		{
-			Anum_pg_language_oid,
-			0,
-			0,
-			0
-		},
-		4
 	},
 	{NamespaceRelationId,		/* NAMESPACENAME */
 		NamespaceNameIndexId,
