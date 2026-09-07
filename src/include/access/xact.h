@@ -96,12 +96,6 @@ extern PGDLLIMPORT bool bsysscan;
 extern int	MyXactFlags;
 
 /*
- * XACT_FLAGS_ACCESSEDTEMPNAMESPACE - set when a temporary object is accessed.
- * We don't allow PREPARE TRANSACTION in that case.
- */
-#define XACT_FLAGS_ACCESSEDTEMPNAMESPACE		(1U << 0)
-
-/*
  * XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK - records whether the top level xact
  * logged any Access Exclusive Locks.
  */

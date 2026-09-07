@@ -48,7 +48,6 @@ typedef struct OverrideSearchPath
 {
 	List	   *schemas;		/* OIDs of explicitly named schemas */
 	bool		addCatalog;		/* implicitly prepend pg_catalog? */
-	bool		addTemp;		/* implicitly prepend temp schema? */
 	uint64		generation;		/* for quick detection of equality to active */
 } OverrideSearchPath;
 
@@ -77,7 +76,6 @@ extern Oid	RangeVarGetCreationNamespace(const RangeVar *newRelation);
 extern Oid	RangeVarGetAndCheckCreationNamespace(RangeVar *newRelation,
 												 LOCKMODE lockmode,
 												 Oid *existing_relation_id);
-extern void RangeVarAdjustRelationPersistence(RangeVar *newRelation, Oid nspid);
 extern Oid	RelnameGetRelid(const char *relname);
 extern bool RelationIsVisible(Oid relid);
 

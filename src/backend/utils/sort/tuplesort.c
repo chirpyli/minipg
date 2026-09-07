@@ -101,7 +101,6 @@
 #include "access/nbtree.h"
 #include "catalog/index.h"
 #include "catalog/pg_am.h"
-#include "commands/tablespace.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
@@ -2659,13 +2658,6 @@ inittapestate(Tuplesortstate *state, int maxTapes)
 
 	if (tapeSpace + GetMemoryChunkSpace(state->memtuples) < state->allowedMem)
 		USEMEM(state, tapeSpace);
-
-	/*
-	 * Make sure that the temp file(s) underlying the tape set are created in
-	 * suitable temp tablespaces.  For parallel sorts, this should have been
-	 * called already, but it doesn't matter if it is called a second time.
-	 */
-	PrepareTempTablespaces();
 
 	state->mergeactive = (bool *) palloc0(maxTapes * sizeof(bool));
 	state->tp_fib = (int *) palloc0(maxTapes * sizeof(int));

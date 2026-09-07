@@ -1343,7 +1343,6 @@ typedef struct CreateStmt
 	NodeTag		type;
 	RangeVar   *relation;		/* relation to create */
 	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	OnCommitAction oncommit;	/* what do we do at COMMIT? */
 	bool		if_not_exists;	/* just do nothing if it already exists? */
 } CreateStmt;
 

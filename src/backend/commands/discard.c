@@ -22,7 +22,7 @@
 static void DiscardAll(bool isTopLevel);
 
 /*
- * DISCARD { ALL | TEMP | PLANS }
+ * DISCARD { ALL | PLANS }
  */
 void
 DiscardCommand(DiscardStmt *stmt, bool isTopLevel)

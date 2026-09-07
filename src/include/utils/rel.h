@@ -53,6 +53,11 @@ typedef struct RelationData
 	RelFileNode rd_node;		/* relation physical identifier */
 	SMgrRelation rd_smgr;		/* cached file handle, or NULL */
 	int			rd_refcnt;		/* reference count */
+	/*
+	 * 临时表已裁剪：rd_backend 恒为 InvalidBackendId，rd_islocaltemp 恒为
+	 * false。这两个字段保留是因为本地缓冲池（localbuf.c）与 smgr 的
+	 * RelFileNodeBackend 结构仍按 backend id 编码，改造面过大。
+	 */
 	BackendId	rd_backend;		/* owning backend id, if temporary relation */
 	bool		rd_islocaltemp; /* rel is a temp rel of this session */
 	bool		rd_isnailed;	/* rel is nailed in cache */

@@ -28,10 +28,6 @@ typedef struct SharedFileSet
 	uint32		number;			/* per-PID identifier */
 	slock_t		mutex;			/* mutex protecting the reference count */
 	int			refcnt;			/* number of attached backends */
-	int			ntablespaces;	/* number of tablespaces to use */
-	Oid			tablespaces[8]; /* OIDs of tablespaces to use. Assumes that
-								 * it's rare that there more than temp
-								 * tablespaces. */
 } SharedFileSet;
 
 extern void SharedFileSetInit(SharedFileSet *fileset, dsm_segment *seg);

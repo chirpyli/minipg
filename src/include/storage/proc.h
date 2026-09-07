@@ -167,9 +167,6 @@ struct PGPROC
 	Oid			databaseId;		/* OID of database this backend is using */
 	Oid			roleId;			/* OID of role using this backend */
 
-	Oid			tempNamespaceId;	/* OID of temp schema this backend is
-									 * using */
-
 	bool		isBackgroundWorker; /* true if not a regular backend. */
 
 	/*

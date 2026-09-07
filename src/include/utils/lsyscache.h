@@ -191,7 +191,6 @@ extern bool get_attstatsslot(AttStatsSlot *sslot, HeapTuple statstuple,
 							 int reqkind, Oid reqop, int flags);
 extern void free_attstatsslot(AttStatsSlot *sslot);
 extern char *get_namespace_name(Oid nspid);
-extern char *get_namespace_name_or_temp(Oid nspid);
 extern Oid	get_index_column_opclass(Oid index_oid, int attno);
 extern bool get_index_isvalid(Oid index_oid);
 extern bool get_index_isclustered(Oid index_oid);

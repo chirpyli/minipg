@@ -951,7 +951,6 @@ _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(tableElts);
-	COMPARE_SCALAR_FIELD(oncommit);
 	COMPARE_SCALAR_FIELD(if_not_exists);
 
 	return true;

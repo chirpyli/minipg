@@ -57,22 +57,13 @@
  * In addition to the explicit list, implicitly-searched namespaces
  * may be included:
  *
- * 1. If a TEMP table namespace has been initialized in this session, it
- * is implicitly searched first.  (The only time this doesn't happen is
- * when we are obeying an override search path spec that says not to use the
- * temp namespace, or the temp namespace is included in the explicit list.)
- *
- * 2. The system catalog namespace is always searched.  If the system
+ * 1. The system catalog namespace is always searched.  If the system
  * namespace is present in the explicit path then it will be searched in
- * the specified order; otherwise it will be searched after TEMP tables and
- * *before* the explicit list.  (It might seem that the system namespace
- * should be implicitly last, but this behavior appears to be required by
- * SQL99.  Also, this provides a way to search the system namespace first
- * without thereby making it the default creation target namespace.)
- *
- * For security reasons, searches using the search path will ignore the temp
- * namespace when searching for any object type other than relations and
- * types.  (We must allow types since temp tables have rowtypes.)
+ * the specified order; otherwise it will be searched *before* the explicit
+ * list.  (It might seem that the system namespace should be implicitly
+ * last, but this behavior appears to be required by SQL99.  Also, this
+ * provides a way to search the system namespace first without thereby
+ * making it the default creation target namespace.)
  *
  * The default creation target namespace is always the first element of the
  * explicit list.  If the explicit list is empty, there is no default target.
@@ -512,24 +503,9 @@ RangeVarGetAndCheckCreationNamespace(RangeVar *relation,
 		oldnspid = nspid;
 	}
 
-	RangeVarAdjustRelationPersistence(relation, nspid);
 	if (existing_relation_id != NULL)
 		*existing_relation_id = relid;
 	return nspid;
-}
-
-/*
- * Adjust the relpersistence for an about-to-be-created relation based on the
- * creation namespace, and throw an error for invalid combinations.
- */
-void
-RangeVarAdjustRelationPersistence(RangeVar *newRelation, Oid nspid)
-{
-	/*
-	 * Temporary relations are no longer supported; relpersistence is always
-	 * RELPERSISTENCE_PERMANENT and no temporary schemas can exist, so there
-	 * is nothing to adjust here.
-	 */
 }
 
 /*
@@ -2303,13 +2279,6 @@ OverrideSearchPathMatchesCurrent(OverrideSearchPath *path)
  * We allow nested overrides, hence the push/pop terminology.  The GUC
  * search_path variable is ignored while an override is active.
  *
- * It's possible that newpath->useTemp is set but there is no longer any
- * active temp namespace, if the path was saved during a transaction that
- * created a temp namespace and was later rolled back.  In that case we just
- * ignore useTemp.  A plausible alternative would be to create a new temp
- * namespace, but for existing callers that's not necessary because an empty
- * temp namespace wouldn't affect their results anyway.
- *
  * It's also worth noting that other schemas listed in newpath might not
  * exist anymore either.  We don't worry about this because OIDs that match
  * no existing namespace will simply not produce any hits during searches.
@@ -2798,9 +2767,6 @@ NamespaceCallback(Datum arg, int cacheid, uint32 hashvalue)
  *
  * The returned list includes the implicitly-prepended namespaces only if
  * includeImplicit is true.
- *
- * Note: calling this may result in a CommandCounterIncrement operation,
- * if we have to create or clean out the temp namespace.
  */
 List *
 fetch_search_path(bool includeImplicit)

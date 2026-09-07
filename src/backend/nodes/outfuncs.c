@@ -2252,7 +2252,6 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(tableElts);
-	WRITE_ENUM_FIELD(oncommit, OnCommitAction);
 	WRITE_BOOL_FIELD(if_not_exists);
 }
 

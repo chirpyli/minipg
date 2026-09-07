@@ -57,7 +57,6 @@
 #include <limits.h>
 
 #include "access/htup_details.h"
-#include "commands/tablespace.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
 #include "storage/buffile.h"
@@ -809,12 +808,9 @@ tuplestore_puttuple_common(Tuplestorestate *state, void *tuple)
 				return;
 
 			/*
-			 * Nope; time to switch to tape-based operation.  Make sure that
-			 * the temp file(s) are created in suitable temp tablespaces.
+			 * Nope; time to switch to tape-based operation.  Associate the
+			 * file with the store's resource owner.
 			 */
-			PrepareTempTablespaces();
-
-			/* associate the file with the store's resource owner */
 			oldowner = CurrentResourceOwner;
 			CurrentResourceOwner = state->resowner;
 

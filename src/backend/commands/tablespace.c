@@ -8,7 +8,6 @@
  *
  *	- TablespaceCreateDbspace：按需创建 per-database 子目录（md.c 依赖）
  *	- GetDefaultTablespace：恒返回数据库默认表空间
- *	- PrepareTempTablespaces：临时文件固定使用数据库默认表空间
  *	- get_tablespace_name：pg_tablespace 目录查询
  *	- directory_is_empty / remove_tablespace_symlink：文件系统工具函数
  *
@@ -234,41 +233,6 @@ remove_tablespace_symlink(const char *linkloc)
 						linkloc)));
 	}
 }
-
-/*
- * Routines for handling the GUC variable 'temp_tablespaces'.
- */
-
-/*
- * PrepareTempTablespaces -- prepare to use temp tablespaces
- *
- * 表空间管理已裁剪：临时文件一律使用数据库默认表空间，因此本函数
- * 直接让 fd.c 使用当前数据库的默认表空间。
- */
-void
-PrepareTempTablespaces(void)
-{
-	/* No work if already done in current transaction */
-	if (TempTablespacesAreSet())
-		return;
-
-	/*
-	 * Can't do catalog access unless within a transaction.  This is just a
-	 * safety check in case this function is called by low-level code that
-	 * could conceivably execute outside a transaction.  Note that in such a
-	 * scenario, fd.c will fall back to using the current database's default
-	 * tablespace, which should always be OK.
-	 */
-	if (!IsTransactionState())
-		return;
-
-	/*
-	 * 临时表空间 GUC（temp_tablespaces）已裁剪，固定使用数据库默认表空间。
-	 * 空列表（InvalidOid 表示数据库默认表空间）即满足需求。
-	 */
-	SetTempTablespaces(NULL, 0);
-}
-
 
 /*
  * get_tablespace_name - given a tablespace OID, look up the name

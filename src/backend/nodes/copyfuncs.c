@@ -2590,7 +2590,6 @@ CopyCreateStmtFields(const CreateStmt *from, CreateStmt *newnode)
 {
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(tableElts);
-	COPY_SCALAR_FIELD(oncommit);
 	COPY_SCALAR_FIELD(if_not_exists);
 }
 

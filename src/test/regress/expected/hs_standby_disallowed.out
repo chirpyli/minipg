@@ -32,7 +32,7 @@ truncate hs3;
 ERROR:  cannot execute TRUNCATE TABLE in a read-only transaction
 ROLLBACK;
 -- DDL
-create temporary table hstemp1 (col1 integer);
+CREATE TABLE hstemp1 (col1 integer);
 ERROR:  cannot execute CREATE TABLE in a read-only transaction
 BEGIN;
 drop table hs2;

@@ -31,16 +31,12 @@
  *
  * Create a namespace (schema) with the given name and owner OID.
  *
- * If isTemp is true, this schema is a per-backend schema for holding
- * temporary tables.  Currently, it is used to prevent it from being
- * linked as a member of any active extension.  (If someone does CREATE
- * TEMP TABLE in an extension script, we don't want the temp schema to
- * become part of the extension). And to avoid checking for default ACL
- * for temp namespace (as it is not necessary).
+ * Temporary namespaces are not supported in this build, so every namespace
+ * is a regular one.
  * ---------------
  */
 Oid
-NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
+NamespaceCreate(const char *nspName, Oid ownerId)
 {
 	Relation	nspdesc;
 	HeapTuple	tup;
@@ -92,9 +88,8 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 
 	/* dependency on owner */
 
-	/* dependency on extension ... but not for magic temp schemas */
-	if (!isTemp)
-		recordDependencyOnCurrentExtension(&myself, false);
+	/* dependency on extension */
+	recordDependencyOnCurrentExtension(&myself, false);
 
 	/* Post creation hook for new schema */
 	InvokeObjectPostCreateHook(NamespaceRelationId, nspoid, 0);

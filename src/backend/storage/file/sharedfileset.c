@@ -25,8 +25,6 @@
 #include <limits.h>
 
 #include "catalog/pg_tablespace.h"
-#include "commands/tablespace.h"
-#include "common/hashfn.h"
 #include "miscadmin.h"
 #include "nodes/pg_list.h"
 #include "storage/dsm.h"
@@ -38,9 +36,8 @@ static List *filesetlist = NIL;
 
 static void SharedFileSetOnDetach(dsm_segment *segment, Datum datum);
 static void SharedFileSetDeleteOnProcExit(int status, Datum arg);
-static void SharedFileSetPath(char *path, SharedFileSet *fileset, Oid tablespace);
+static void SharedFileSetPath(char *path, SharedFileSet *fileset);
 static void SharedFilePath(char *path, SharedFileSet *fileset, const char *name);
-static Oid	ChooseTablespace(const SharedFileSet *fileset, const char *name);
 
 /*
  * Initialize a space for temporary files that can be opened by other backends.
@@ -55,10 +52,9 @@ static Oid	ChooseTablespace(const SharedFileSet *fileset, const char *name);
  * expected to explicitly remove such files by using SharedFileSetDelete/
  * SharedFileSetDeleteAll or we remove such files on proc exit.
  *
- * Files will be distributed over the tablespaces configured in
- * temp_tablespaces.
+ * Files always live in the current database's default tablespace.
  *
- * Under the covers the set is one or more directories which will eventually
+ * Under the covers the set is one directory which will eventually
  * be deleted.
  */
 void
@@ -71,33 +67,6 @@ SharedFileSetInit(SharedFileSet *fileset, dsm_segment *seg)
 	fileset->creator_pid = MyProcPid;
 	fileset->number = counter;
 	counter = (counter + 1) % INT_MAX;
-
-	/* Capture the tablespace OIDs so that all backends agree on them. */
-	PrepareTempTablespaces();
-	fileset->ntablespaces =
-		GetTempTablespaces(&fileset->tablespaces[0],
-						   lengthof(fileset->tablespaces));
-	if (fileset->ntablespaces == 0)
-	{
-		/* If the GUC is empty, use current database's default tablespace */
-		fileset->tablespaces[0] = MyDatabaseTableSpace;
-		fileset->ntablespaces = 1;
-	}
-	else
-	{
-		int			i;
-
-		/*
-		 * An entry of InvalidOid means use the default tablespace for the
-		 * current database.  Replace that now, to be sure that all users of
-		 * the SharedFileSet agree on what to do.
-		 */
-		for (i = 0; i < fileset->ntablespaces; i++)
-		{
-			if (fileset->tablespaces[i] == InvalidOid)
-				fileset->tablespaces[i] = MyDatabaseTableSpace;
-		}
-	}
 
 	/* Register our cleanup callback. */
 	if (seg)
@@ -165,10 +134,9 @@ SharedFileSetCreate(SharedFileSet *fileset, const char *name)
 	{
 		char		tempdirpath[MAXPGPATH];
 		char		filesetpath[MAXPGPATH];
-		Oid			tablespace = ChooseTablespace(fileset, name);
 
-		TempTablespacePath(tempdirpath, tablespace);
-		SharedFileSetPath(filesetpath, fileset, tablespace);
+		TempTablespacePath(tempdirpath, MyDatabaseTableSpace);
+		SharedFileSetPath(filesetpath, fileset);
 		PathNameCreateTemporaryDir(tempdirpath, filesetpath);
 		file = PathNameCreateTemporaryFile(path, true);
 	}
@@ -214,18 +182,13 @@ void
 SharedFileSetDeleteAll(SharedFileSet *fileset)
 {
 	char		dirpath[MAXPGPATH];
-	int			i;
 
 	/*
-	 * Delete the directory we created in each tablespace.  Doesn't fail
-	 * because we use this in error cleanup paths, but can generate LOG
-	 * message on IO error.
+	 * Delete the directory we created.  Doesn't fail because we use this in
+	 * error cleanup paths, but can generate LOG message on IO error.
 	 */
-	for (i = 0; i < fileset->ntablespaces; ++i)
-	{
-		SharedFileSetPath(dirpath, fileset, fileset->tablespaces[i]);
-		PathNameDeleteTemporaryDir(dirpath);
-	}
+	SharedFileSetPath(dirpath, fileset);
+	PathNameDeleteTemporaryDir(dirpath);
 
 	/* Unregister the shared fileset */
 	SharedFileSetUnregister(fileset);
@@ -251,9 +214,9 @@ SharedFileSetOnDetach(dsm_segment *segment, Datum datum)
 	SpinLockRelease(&fileset->mutex);
 
 	/*
-	 * If we are the last to detach, we delete the directory in all
-	 * tablespaces.  Note that we are still actually attached for the rest of
-	 * this function so we can safely access its data.
+	 * If we are the last to detach, we delete the directory.  Note that we
+	 * are still actually attached for the rest of this function so we can
+	 * safely access its data.
 	 */
 	if (unlink_all)
 		SharedFileSetDeleteAll(fileset);
@@ -316,30 +279,20 @@ SharedFileSetUnregister(SharedFileSet *input_fileset)
 }
 
 /*
- * Build the path for the directory holding the files backing a SharedFileSet
- * in a given tablespace.
+ * Build the path for the directory holding the files backing a SharedFileSet.
+ *
+ * 共享临时文件一律位于当前数据库的默认表空间中，因此所有 attach 到该
+ * fileset 的 backend 都会计算出相同的路径。
  */
 static void
-SharedFileSetPath(char *path, SharedFileSet *fileset, Oid tablespace)
+SharedFileSetPath(char *path, SharedFileSet *fileset)
 {
 	char		tempdirpath[MAXPGPATH];
 
-	TempTablespacePath(tempdirpath, tablespace);
+	TempTablespacePath(tempdirpath, MyDatabaseTableSpace);
 	snprintf(path, MAXPGPATH, "%s/%s%lu.%u.sharedfileset",
 			 tempdirpath, PG_TEMP_FILE_PREFIX,
 			 (unsigned long) fileset->creator_pid, fileset->number);
-}
-
-/*
- * Sorting hat to determine which tablespace a given shared temporary file
- * belongs in.
- */
-static Oid
-ChooseTablespace(const SharedFileSet *fileset, const char *name)
-{
-	uint32		hash = hash_any((const unsigned char *) name, strlen(name));
-
-	return fileset->tablespaces[hash % fileset->ntablespaces];
 }
 
 /*
@@ -350,6 +303,6 @@ SharedFilePath(char *path, SharedFileSet *fileset, const char *name)
 {
 	char		dirpath[MAXPGPATH];
 
-	SharedFileSetPath(dirpath, fileset, ChooseTablespace(fileset, name));
+	SharedFileSetPath(dirpath, fileset);
 	snprintf(path, MAXPGPATH, "%s/%s", dirpath, name);
 }

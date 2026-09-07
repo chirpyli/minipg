@@ -1266,10 +1266,10 @@ RecordTransactionCommit(void)
 		 * isn't controlling visibility of the change that prompted invals,
 		 * other sessions need the inval even if this transactions aborts.
 		 *
-		 * ON COMMIT DELETE ROWS does a nontransactional index_build(), which
-		 * queues a relcache inval, including in transactions without an xid
-		 * that had read the (empty) table.  Standbys don't need any ON COMMIT
-		 * DELETE ROWS invals, but we've not done the work to withhold them.
+		 * A nontransactional index_build() queues a relcache inval, including
+		 * in transactions without an xid that had read the table.  Standbys
+		 * don't need those invals, but we've not done the work to withhold
+		 * them.
 		 */
 		if (nmsgs != 0)
 		{
@@ -2067,12 +2067,6 @@ CommitTransaction(void)
 		AtEOXact_Parallel(true);
 
 	/*
-	 * Let ON COMMIT management do its thing (must happen after closing
-	 * portals, to avoid dangling-reference problems)
-	 */
-	PreCommit_on_commit_actions();
-
-	/*
 	 * Synchronize files that are created and not WAL-logged during this
 	 * transaction. This must happen before AtEOXact_RelationMap(), so that we
 	 * don't see committed-but-broken files after a crash.
@@ -2198,7 +2192,6 @@ CommitTransaction(void)
 	 */
 	AtEOXact_GUC(true, 1);
 	AtEOXact_SPI(true);
-	AtEOXact_on_commit_actions(true);
 	AtEOXact_Namespace(true, is_parallel_worker);
 	AtEOXact_SMgr();
 	AtEOXact_Files(true);
@@ -2278,12 +2271,6 @@ PrepareTransaction(void)
 	 */
 
 	/*
-	 * Let ON COMMIT management do its thing (must happen after closing
-	 * portals, to avoid dangling-reference problems)
-	 */
-	PreCommit_on_commit_actions();
-
-	/*
 	 * Synchronize files that are created and not WAL-logged during this
 	 * transaction. This must happen before EndPrepare(), so that we don't see
 	 * committed-but-broken files after a crash and COMMIT PREPARED.
@@ -2296,31 +2283,6 @@ PrepareTransaction(void)
 	 * errors to be raised for failure patterns found at commit.
 	 */
 	PreCommit_CheckForSerializationFailure();
-
-	/*
-	 * Don't allow PREPARE TRANSACTION if we've accessed a temporary table in
-	 * this transaction.  Having the prepared xact hold locks on another
-	 * backend's temp table seems a bad idea --- for instance it would prevent
-	 * the backend from exiting.  There are other problems too, such as how to
-	 * clean up the source backend's local buffers and ON COMMIT state if the
-	 * prepared xact includes a DROP of a temp table.
-	 *
-	 * Other objects types, like functions, operators or extensions, share the
-	 * same restriction as they should not be created, locked or dropped as
-	 * this can mess up with this session or even a follow-up session trying
-	 * to use the same temporary namespace.
-	 *
-	 * We must check this after executing any ON COMMIT actions, because they
-	 * might still access a temp relation.
-	 *
-	 * XXX In principle this could be relaxed to allow some useful special
-	 * cases, such as a temp table created and dropped all within the
-	 * transaction.  That seems to require much more bookkeeping though.
-	 */
-	if ((MyXactFlags & XACT_FLAGS_ACCESSEDTEMPNAMESPACE))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot PREPARE a transaction that has operated on temporary objects")));
 
 	/*
 	 * Likewise, don't allow PREPARE after pg_export_snapshot.  This could be
@@ -2459,7 +2421,6 @@ PrepareTransaction(void)
 	/* PREPARE acts the same as COMMIT as far as GUC is concerned */
 	AtEOXact_GUC(true, 1);
 	AtEOXact_SPI(true);
-	AtEOXact_on_commit_actions(true);
 	AtEOXact_Namespace(true, false);
 	AtEOXact_SMgr();
 	AtEOXact_Files(true);
@@ -2662,7 +2623,6 @@ AbortTransaction(void)
 
 		AtEOXact_GUC(false, 1);
 		AtEOXact_SPI(false);
-		AtEOXact_on_commit_actions(false);
 		AtEOXact_Namespace(false, is_parallel_worker);
 		AtEOXact_SMgr();
 		AtEOXact_Files(false);
@@ -4808,8 +4768,6 @@ CommitSubTransaction(void)
 
 	AtEOXact_GUC(true, s->gucNestLevel);
 	AtEOSubXact_SPI(true, s->subTransactionId);
-	AtEOSubXact_on_commit_actions(true, s->subTransactionId,
-								  s->parent->subTransactionId);
 	AtEOSubXact_Namespace(true, s->subTransactionId,
 						  s->parent->subTransactionId);
 	AtEOSubXact_Files(true, s->subTransactionId,
@@ -4965,8 +4923,6 @@ AbortSubTransaction(void)
 
 		AtEOXact_GUC(false, s->gucNestLevel);
 		AtEOSubXact_SPI(false, s->subTransactionId);
-		AtEOSubXact_on_commit_actions(false, s->subTransactionId,
-									  s->parent->subTransactionId);
 		AtEOSubXact_Namespace(false, s->subTransactionId,
 							  s->parent->subTransactionId);
 		AtEOSubXact_Files(false, s->subTransactionId,

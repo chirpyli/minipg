@@ -159,7 +159,6 @@ show synchronous_commit;
 (1 row)
 
 reset synchronous_commit;
-discard temp;
 discard all;
 -- ALLOWED COMMANDS
 CHECKPOINT;

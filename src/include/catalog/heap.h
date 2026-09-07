@@ -50,15 +50,12 @@ extern Oid	heap_create_with_catalog(const char *relname,
 									 char relpersistence,
 									 bool shared_relation,
 									 bool mapped_relation,
-									 OnCommitAction oncommit,
 									 bool allow_system_table_mods,
 									 bool is_internal,
 									 Oid relrewrite,
 									 ObjectAddress *typaddress);
 
 extern void heap_drop_with_catalog(Oid relid);
-
-extern void heap_truncate(List *relids);
 
 extern void heap_truncate_one_rel(Relation rel);
 

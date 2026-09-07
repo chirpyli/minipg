@@ -2355,11 +2355,8 @@ ReindexMultipleInternal(List *relids, ReindexParams *params)
  * Returns true if any indexes have been rebuilt (including toast table's
  * indexes, when relevant), otherwise returns false.
  *
- * NOTE: This cannot be used on temporary relations.  A concurrent build would
- * cause issues with ON COMMIT actions triggered by the transactions of the
- * concurrent build.  Temporary relations are not subject to concurrent
- * concerns, so there's no need for the more complicated concurrent build,
- * anyway, and a non-concurrent reindex is more efficient.
+ * NOTE: this is only used for permanent relations; temporary relations are
+ * not supported in this build.
  */
 static bool
 ReindexRelationConcurrently(Oid relationOid, ReindexParams *params)

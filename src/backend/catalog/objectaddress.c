@@ -2847,7 +2847,7 @@ getObjectIdentityParts(const ObjectAddress *object,
 					break;
 				}
 				coll = (Form_pg_collation) GETSTRUCT(collTup);
-				schema = get_namespace_name_or_temp(coll->collnamespace);
+				schema = get_namespace_name(coll->collnamespace);
 				appendStringInfoString(&buffer,
 									   quote_qualified_identifier(schema,
 																  NameStr(coll->collname)));
@@ -2923,7 +2923,7 @@ getObjectIdentityParts(const ObjectAddress *object,
 					break;
 				}
 				opcForm = (Form_pg_opclass) GETSTRUCT(opcTup);
-				schema = get_namespace_name_or_temp(opcForm->opcnamespace);
+				schema = get_namespace_name(opcForm->opcnamespace);
 
 				amTup = SearchSysCache1(AMOID,
 										ObjectIdGetDatum(opcForm->opcmethod));
@@ -3130,7 +3130,7 @@ getObjectIdentityParts(const ObjectAddress *object,
 			{
 				char	   *nspname;
 
-				nspname = get_namespace_name_or_temp(object->objectId);
+				nspname = get_namespace_name(object->objectId);
 				if (!nspname)
 				{
 					if (!missing_ok)
@@ -3242,7 +3242,7 @@ getOpFamilyIdentity(StringInfo buffer, Oid opfid, List **object,
 			 opfForm->opfmethod);
 	amForm = (Form_pg_am) GETSTRUCT(amTup);
 
-	schema = get_namespace_name_or_temp(opfForm->opfnamespace);
+	schema = get_namespace_name(opfForm->opfnamespace);
 	appendStringInfo(buffer, "%s USING %s",
 					 quote_qualified_identifier(schema,
 												NameStr(opfForm->opfname)),
@@ -3282,7 +3282,7 @@ getRelationIdentity(StringInfo buffer, Oid relid, List **object,
 	}
 	relForm = (Form_pg_class) GETSTRUCT(relTup);
 
-	schema = get_namespace_name_or_temp(relForm->relnamespace);
+	schema = get_namespace_name(relForm->relnamespace);
 	appendStringInfoString(buffer,
 						   quote_qualified_identifier(schema,
 													  NameStr(relForm->relname)));

@@ -179,7 +179,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	bool				boolean;
 	JoinType			jtype;
 	DropBehavior		dbehavior;
-	OnCommitAction		oncommit;
 	List				*list;
 	Node				*node;
 	Value				*value;
@@ -296,7 +295,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 
 %type <boolean>  opt_restart_seqs
-%type <oncommit> OnCommitOption
 
 %type <ival>	for_locking_strength
 %type <node>	for_locking_item
@@ -1386,28 +1384,25 @@ alter_using:
  *****************************************************************************/
 
 CreateStmt:	CREATE TABLE qualified_name '(' OptTableElementList ')'
-			OnCommitOption
-			{
-				CreateStmt *n = makeNode(CreateStmt);
-				$3->relpersistence = RELPERSISTENCE_PERMANENT;
-				n->relation = $3;
-				n->tableElts = $5;
-				n->oncommit = $7;
-				n->if_not_exists = false;
-				$$ = (Node *)n;
-			}
-		| CREATE TABLE IF_P NOT EXISTS qualified_name '('
-			OptTableElementList ')' OnCommitOption
-			{
-				CreateStmt *n = makeNode(CreateStmt);
-				$6->relpersistence = RELPERSISTENCE_PERMANENT;
-				n->relation = $6;
-				n->tableElts = $8;
-				n->oncommit = $10;
-				n->if_not_exists = true;
-				$$ = (Node *)n;
-			}
-		;
+		{
+			CreateStmt *n = makeNode(CreateStmt);
+			$3->relpersistence = RELPERSISTENCE_PERMANENT;
+			n->relation = $3;
+			n->tableElts = $5;
+			n->if_not_exists = false;
+			$$ = (Node *)n;
+		}
+	| CREATE TABLE IF_P NOT EXISTS qualified_name '('
+		OptTableElementList ')'
+		{
+			CreateStmt *n = makeNode(CreateStmt);
+			$6->relpersistence = RELPERSISTENCE_PERMANENT;
+			n->relation = $6;
+			n->tableElts = $8;
+			n->if_not_exists = true;
+			$$ = (Node *)n;
+		}
+	;
 
 OptTableElementList:
 			TableElementList					{ $$ = $1; }
@@ -1579,12 +1574,6 @@ columnElem: ColId
 opt_c_include:	INCLUDE '(' columnList ')'			{ $$ = $3; }
 			 |		/* EMPTY */						{ $$ = NIL; }
 			 ;
-
-OnCommitOption:  ON COMMIT DROP				{ $$ = ONCOMMIT_DROP; }
-			| ON COMMIT DELETE_P ROWS		{ $$ = ONCOMMIT_DELETE_ROWS; }
-			| ON COMMIT PRESERVE ROWS		{ $$ = ONCOMMIT_PRESERVE_ROWS; }
-			| /*EMPTY*/						{ $$ = ONCOMMIT_NOOP; }
-		;
 
 ExistingIndex:   USING INDEX name					{ $$ = $3; }
 		;

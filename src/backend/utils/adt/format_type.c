@@ -273,7 +273,7 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 			TypeIsVisible(type_oid))
 			nspname = NULL;
 		else
-			nspname = get_namespace_name_or_temp(typeform->typnamespace);
+			nspname = get_namespace_name(typeform->typnamespace);
 
 		typname = NameStr(typeform->typname);
 

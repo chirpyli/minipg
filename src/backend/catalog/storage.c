@@ -620,9 +620,7 @@ RestorePendingSyncs(char *startAddress)
  * subxact immediately.
  *
  * Note: It's possible that we're being asked to remove a relation that has
- * no physical storage in any fork. In particular, it's possible that we're
- * cleaning up an old temporary relation for which RemovePgTempFiles has
- * already recovered the physical storage.
+ * no physical storage in any fork.
  */
 void
 smgrDoPendingDeletes(bool isCommit)
@@ -828,18 +826,11 @@ smgrDoPendingSyncs(bool isCommit, bool isParallelWorker)
 }
 
 /*
- * smgrGetPendingDeletes() -- Get a list of non-temp relations to be deleted.
+ * smgrGetPendingDeletes() -- Get a list of relations to be deleted.
  *
  * The return value is the number of relations scheduled for termination.
  * *ptr is set to point to a freshly-palloc'd array of RelFileNodes.
  * If there are no relations to be deleted, *ptr is set to NULL.
- *
- * Only non-temporary relations are included in the returned list.  This is OK
- * because the list is used only in contexts where temporary relations don't
- * matter: we're either writing to the two-phase state file (and transactions
- * that have touched temp tables can't be prepared) or we're writing to xlog
- * (and all temporary files will be zapped if we restart anyway, so no need
- * for redo to do it also).
  *
  * Note that the list does not include anything scheduled for termination
  * by upper-level transactions.

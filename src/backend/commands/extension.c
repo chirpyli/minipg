@@ -1037,8 +1037,7 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
 	 * the default creation target namespace.  Then add the schemas of any
 	 * prerequisite extensions, unless they are in pg_catalog which would be
 	 * searched anyway.  (Listing pg_catalog explicitly in a non-first
-	 * position would be bad for security.)  Finally add pg_temp to ensure
-	 * that temp objects can't take precedence over others.
+	 * position would be bad for security.)
 	 *
 	 * Note: it might look tempting to use PushOverrideSearchPath for this,
 	 * but we cannot do that.  We have to actually set the search_path GUC in
@@ -1055,7 +1054,6 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
 		if (reqname && strcmp(reqname, "pg_catalog") != 0)
 			appendStringInfo(&pathbuf, ", %s", quote_identifier(reqname));
 	}
-	appendStringInfoString(&pathbuf, ", pg_temp");
 
 	(void) set_config_option("search_path", pathbuf.data,
 							 PGC_USERSET, PGC_S_SESSION,

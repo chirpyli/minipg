@@ -478,7 +478,6 @@ MarkAsPreparingGuts(GlobalTransaction gxact, TransactionId xid, const char *gid,
 	proc->pid = 0;
 	proc->databaseId = databaseid;
 	proc->roleId = owner;
-	proc->tempNamespaceId = InvalidOid;
 	proc->isBackgroundWorker = true;
 	proc->lwWaiting = LW_WS_NOT_WAITING;
 	proc->lwWaitMode = 0;

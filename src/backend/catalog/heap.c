@@ -965,7 +965,6 @@ AddNewRelationType(const char *typeName,
  *	relpersistence: rel's persistence status (permanent, temp, or unlogged)
  *	shared_relation: true if it's to be a shared relation
  *	mapped_relation: true if the relation will use the relfilenode map
- *	oncommit: ON COMMIT marking (only relevant if it's a temp table)
  *	reloptions: reloptions in Datum form, or (Datum) 0 if none
  *	allow_system_table_mods: true to allow creation in system namespaces
  *	is_internal: is this a system-generated catalog?
@@ -990,7 +989,6 @@ heap_create_with_catalog(const char *relname,
 						 char relpersistence,
 						 bool shared_relation,
 						 bool mapped_relation,
-						 OnCommitAction oncommit,
 						 bool allow_system_table_mods,
 						 bool is_internal,
 						 Oid relrewrite,
@@ -1251,12 +1249,6 @@ heap_create_with_catalog(const char *relname,
 	InvokeObjectPostCreateHookArg(RelationRelationId, relid, 0, is_internal);
 
 	/*
-	 * If there's a special on-commit action, remember it
-	 */
-	if (oncommit != ONCOMMIT_NOOP)
-		register_on_commit_action(relid, oncommit);
-
-	/*
 	 * ok, the relation has been cataloged, so close our relations and return
 	 * the OID of the newly created relation.
 	 */
@@ -1512,11 +1504,6 @@ heap_drop_with_catalog(Oid relid)
 	relation_close(rel, NoLock);
 
 	/*
-	 * Forget any ON COMMIT action for the rel
-	 */
-	remove_on_commit_action(relid);
-
-	/*
 	 * Flush the relation from the relcache.  We want to do this before
 	 * starting to remove catalog entries, just to be certain that no relcache
 	 * entry rebuild will happen partway through.  (That should not really
@@ -1653,8 +1640,7 @@ RelationTruncateIndexes(Relation heapRelation)
 		 * tuples that actually need indexing, we can use a dummy IndexInfo.
 		 * This is slightly cheaper to build, but the real point is to avoid
 		 * possibly running user-defined code in index expressions or
-		 * predicates.  We might be getting invoked during ON COMMIT
-		 * processing, and we don't want to run any such code then.
+		 * predicates.
 		 */
 		indexInfo = BuildDummyIndexInfo(currentIndex);
 
@@ -1669,44 +1655,6 @@ RelationTruncateIndexes(Relation heapRelation)
 
 		/* We're done with this index */
 		index_close(currentIndex, NoLock);
-	}
-}
-
-/*
- *	 heap_truncate
- *
- *	 This routine deletes all data within all the specified relations.
- *
- * This is not transaction-safe!  There is another, transaction-safe
- * implementation in commands/tablecmds.c.  We now use this only for
- * ON COMMIT truncation of temporary tables, where it doesn't matter.
- */
-void
-heap_truncate(List *relids)
-{
-	List	   *relations = NIL;
-	ListCell   *cell;
-
-	/* Open relations for processing, and grab exclusive access on each */
-	foreach(cell, relids)
-	{
-		Oid			rid = lfirst_oid(cell);
-		Relation	rel;
-
-		rel = table_open(rid, AccessExclusiveLock);
-		relations = lappend(relations, rel);
-	}
-
-	/* OK to do it */
-	foreach(cell, relations)
-	{
-		Relation	rel = lfirst(cell);
-
-		/* Truncate the relation */
-		heap_truncate_one_rel(rel);
-
-		/* Close the relation, but keep exclusive lock on it until commit */
-		table_close(rel, NoLock);
 	}
 }
 

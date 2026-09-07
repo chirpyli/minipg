@@ -3145,18 +3145,6 @@ get_namespace_name(Oid nspid)
 		return NULL;
 }
 
-/*
- * get_namespace_name_or_temp
- *		As above, but if it is this backend's temporary namespace, return
- *		"pg_temp" instead.  Temporary namespaces are no longer supported, so
- *		this is equivalent to get_namespace_name.
- */
-char *
-get_namespace_name_or_temp(Oid nspid)
-{
-	return get_namespace_name(nspid);
-}
-
 /*				---------- PG_INDEX CACHE ----------				 */
 
 /*

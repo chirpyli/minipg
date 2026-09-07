@@ -197,7 +197,6 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		 */
 		createStmt->relation = relation;
 		createStmt->tableElts = attrList;
-		createStmt->oncommit = ONCOMMIT_NOOP;
 		createStmt->if_not_exists = false;
 
 		/*

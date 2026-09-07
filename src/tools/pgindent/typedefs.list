@@ -2332,7 +2332,6 @@ Tcl_Interp
 Tcl_NotifierProcs
 Tcl_Obj
 Tcl_Time
-TempNamespaceStatus
 TestDecodingData
 TestDecodingTxnData
 TestSpec
@@ -3194,7 +3193,6 @@ svtype
 symbol
 tablespaceinfo
 teSection
-temp_tablespaces_extra
 test_re_flags
 test_regex_ctx
 test_shm_mq_header

@@ -191,10 +191,6 @@ importantly:
   - No commit or abort record is written; the initiating backend is
     responsible for this.
 
-  - Cleanup of pg_temp namespaces is not done.  Parallel workers cannot
-    safely access the initiating backend's pg_temp namespace, and should
-    not create one of their own.
-
 Coding Conventions
 ===================
 

@@ -132,11 +132,6 @@ InitializeRelfilenodeMap(void)
  * Map a relation's (tablespace, filenode) to a relation's oid and cache the
  * result.
  *
- * A temporary relation may share its relfilenumber with a permanent relation
- * or temporary relations created in other backends.  Being able to uniquely
- * identify a temporary relation would require a backend's proc number, which
- * we do not know about.  Hence, this function ignores this case.
- *
  * Returns InvalidOid if no relation matching the criteria could be found.
  */
 Oid
