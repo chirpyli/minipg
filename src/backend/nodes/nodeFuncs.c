@@ -3309,7 +3309,6 @@ planstate_tree_walker(PlanState *planstate,
 					  void *context)
 {
 	Plan	   *plan = planstate->plan;
-	ListCell   *lc;
 
 	/* Guard against stack overflow due to overly complex plan trees */
 	check_stack_depth();
@@ -3362,13 +3361,6 @@ planstate_tree_walker(PlanState *planstate,
 		case T_SubqueryScan:
 			if (walker(((SubqueryScanState *) planstate)->subplan, context))
 				return true;
-			break;
-		case T_CustomScan:
-			foreach(lc, ((CustomScanState *) planstate)->custom_ps)
-			{
-				if (walker((PlanState *) lfirst(lc), context))
-					return true;
-			}
 			break;
 		default:
 			break;

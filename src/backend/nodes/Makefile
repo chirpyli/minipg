@@ -16,7 +16,6 @@ OBJS = \
 	bitmapset.o \
 	copyfuncs.o \
 	equalfuncs.o \
-	extensible.o \
 	list.o \
 	makefuncs.o \
 	nodeFuncs.o \

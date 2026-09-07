@@ -54,10 +54,10 @@ ExecScanFetch(ScanState *node,
 		if (scanrelid == 0)
 		{
 			/*
-			 * This is a CustomScan which has pushed down a join to the remote
-			 * side.  If it is a descendant node in the EPQ recheck plan tree,
-			 * run the recheck method function.  Otherwise, run the access
-			 * method function below.
+			 * This is a scan whose scanrelid is zero, meaning it does not
+			 * scan a table directly.  If it is a descendant node in the
+			 * EPQ recheck plan tree, run the recheck method function.
+			 * Otherwise, run the access method function below.
 			 */
 			if (bms_is_member(epqstate->epqParam, node->ps.plan->extParam))
 			{
@@ -326,27 +326,7 @@ ExecScanReScan(ScanState *node)
 			epqstate->relsubs_done[scanrelid - 1] =
 				epqstate->epqExtra->relsubs_blocked[scanrelid - 1];
 		else
-		{
-			Bitmapset  *relids;
-			int			rtindex = -1;
-
-			/*
-			 * If a custom scan provider has replaced the join with a scan,
-			 * there are multiple RTIs; reset the relsubs_done flag for all of
-			 * them.
-			 */
-			if (IsA(node->ps.plan, CustomScan))
-				relids = ((CustomScan *) node->ps.plan)->custom_relids;
-			else
-				elog(ERROR, "unexpected scan node: %d",
-					 (int) nodeTag(node->ps.plan));
-
-			while ((rtindex = bms_next_member(relids, rtindex)) >= 0)
-			{
-				Assert(rtindex > 0);
-				epqstate->relsubs_done[rtindex - 1] =
-					epqstate->epqExtra->relsubs_blocked[rtindex - 1];
-			}
-		}
+			elog(ERROR, "unexpected scan node: %d",
+				 (int) nodeTag(node->ps.plan));
 	}
 }

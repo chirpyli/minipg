@@ -63,7 +63,6 @@ typedef enum NodeTag
 	T_FunctionScan,
 	T_ValuesScan,
 	T_NamedTuplestoreScan,
-	T_CustomScan,
 	T_Join,
 	T_NestLoop,
 	T_MergeJoin,
@@ -111,7 +110,6 @@ typedef enum NodeTag
 	T_FunctionScanState,
 	T_ValuesScanState,
 	T_NamedTuplestoreScanState,
-	T_CustomScanState,
 	T_JoinState,
 	T_NestLoopState,
 	T_MergeJoinState,
@@ -204,7 +202,6 @@ typedef enum NodeTag
 	T_TidPath,
 	T_TidRangePath,
 	T_SubqueryScanPath,
-	T_CustomPath,
 	T_NestPath,
 	T_MergePath,
 	T_HashPath,
@@ -268,11 +265,6 @@ typedef enum NodeTag
 	T_List,
 	T_IntList,
 	T_OidList,
-
-	/*
-	 * TAGS FOR EXTENSIBLE NODES (extensible.h)
-	 */
-	T_ExtensibleNode,
 
 	/*
 	 * TAGS FOR STATEMENT NODES (mostly in parsenodes.h)

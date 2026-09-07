@@ -1637,11 +1637,10 @@ deparse_context_for_plan_tree(PlannedStmt *pstmt, List *rtable_names)
  * provide the parent Plan node.  Then OUTER_VAR and INNER_VAR references
  * can be resolved by drilling down into the left and right child plans.
  * Similarly, INDEX_VAR references can be resolved by reference to the
- * indextlist given in a parent IndexOnlyScan node, or to the scan tlist in
- * ForeignScan and CustomScan nodes.  (Note that we don't currently support
- * deparsing of indexquals in regular IndexScan or BitmapIndexScan nodes;
- * for those, we can only deparse the indexqualorig fields, which won't
- * contain INDEX_VAR Vars.)
+ * indextlist given in a parent IndexOnlyScan node.  (Note that we don't
+ * currently support deparsing of indexquals in regular IndexScan or
+ * BitmapIndexScan nodes; for those, we can only deparse the indexqualorig
+ * fields, which won't contain INDEX_VAR Vars.)
  *
  * The ancestors list is a list of the Plan's parent Plan and SubPlan nodes,
  * the most-closely-nested first.  This is needed to resolve PARAM_EXEC
@@ -2891,8 +2890,6 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	/* Set up referent for INDEX_VAR Vars, if needed */
 	if (IsA(plan, IndexOnlyScan))
 		dpns->index_tlist = ((IndexOnlyScan *) plan)->indextlist;
-	else if (IsA(plan, CustomScan))
-		dpns->index_tlist = ((CustomScan *) plan)->custom_scan_tlist;
 	else
 		dpns->index_tlist = NIL;
 }

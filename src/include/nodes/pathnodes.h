@@ -1163,40 +1163,6 @@ typedef struct SubqueryScanPath
 } SubqueryScanPath;
 
 /*
- * CustomPath represents a table scan or a table join done by some out-of-core
- * extension.
- *
- * We provide a set of hooks here - which the provider must take care to set
- * up correctly - to allow extensions to supply their own methods of scanning
- * a relation or joing relations.  For example, a provider might provide GPU
- * acceleration, a cache-based scan, or some other kind of logic we haven't
- * dreamed up yet.
- *
- * CustomPaths can be injected into the planning process for a base or join
- * relation by set_rel_pathlist_hook or set_join_pathlist_hook functions,
- * respectively.
- *
- * Core code must avoid assuming that the CustomPath is only as large as
- * the structure declared here; providers are allowed to make it the first
- * element in a larger structure.  (Since the planner never copies Paths,
- * this doesn't add any complication.)  However, for consistency with the
- * FDW case, we provide a "custom_private" field in CustomPath; providers
- * may prefer to use that rather than define another struct type.
- */
-
-struct CustomPathMethods;
-
-typedef struct CustomPath
-{
-	Path		path;
-	uint32		flags;			/* mask of CUSTOMPATH_* flags, see
-								 * nodes/extensible.h */
-	List	   *custom_paths;	/* list of child Path nodes, if any */
-	List	   *custom_private;
-	const struct CustomPathMethods *methods;
-} CustomPath;
-
-/*
  * AppendPath represents an Append plan, ie, successive execution of
  * several member plans.
  *

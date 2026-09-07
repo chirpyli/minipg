@@ -30,7 +30,6 @@
 #include "postgres.h"
 
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/pathnodes.h"
 #include "utils/datum.h"
 
@@ -795,26 +794,6 @@ _equalPlaceHolderInfo(const PlaceHolderInfo *a, const PlaceHolderInfo *b)
 	COMPARE_BITMAPSET_FIELD(ph_lateral);
 	COMPARE_BITMAPSET_FIELD(ph_needed);
 	COMPARE_SCALAR_FIELD(ph_width);
-
-	return true;
-}
-
-/*
- * Stuff from extensible.h
- */
-static bool
-_equalExtensibleNode(const ExtensibleNode *a, const ExtensibleNode *b)
-{
-	const ExtensibleNodeMethods *methods;
-
-	COMPARE_STRING_FIELD(extnodename);
-
-	/* At this point, we know extnodename is the same for both nodes. */
-	methods = GetExtensibleNodeMethods(a->extnodename, false);
-
-	/* compare the private fields */
-	if (!methods->nodeEqual(a, b))
-		return false;
 
 	return true;
 }
@@ -1829,12 +1808,6 @@ equal(const void *a, const void *b)
 			retval = _equalValue(a, b);
 			break;
 
-			/*
-			 * EXTENSIBLE NODES
-			 */
-		case T_ExtensibleNode:
-			retval = _equalExtensibleNode(a, b);
-			break;
 
 			/*
 			 * PARSE NODES

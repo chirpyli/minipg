@@ -450,9 +450,9 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 
 	/*
 	 * Allow a plugin to editorialize on the set of Paths for this base
-	 * relation.  It could add new paths (such as CustomPaths) by calling
-	 * add_path(), or add_partial_path() if parallel aware.  It could also
-	 * delete or modify paths added by the core code.
+	 * relation.  It could add new paths by calling add_path(), or
+	 * add_partial_path() if parallel aware.  It could also delete or modify
+	 * paths added by the core code.
 	 */
 	if (set_rel_pathlist_hook)
 		(*set_rel_pathlist_hook) (root, rel, rti, rte);
@@ -2933,9 +2933,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			break;
 		case T_SubqueryScanPath:
 			ptype = "SubqueryScan";
-			break;
-		case T_CustomPath:
-			ptype = "CustomScan";
 			break;
 		case T_NestPath:
 			ptype = "NestLoop";

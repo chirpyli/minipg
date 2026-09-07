@@ -34,7 +34,6 @@ OBJS = \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \
 	nodeBitmapOr.o \
-	nodeCustom.o \
 	nodeFunctionscan.o \
 	nodeGather.o \
 	nodeGatherMerge.o \

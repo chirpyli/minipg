@@ -17,7 +17,6 @@
 #include <math.h>
 
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/appendinfo.h"
 #include "optimizer/clauses.h"
@@ -3722,34 +3721,6 @@ do { \
 				FLAT_COPY_PATH(bopath, path, BitmapOrPath);
 				REPARAMETERIZE_CHILD_PATH_LIST(bopath->bitmapquals);
 				new_path = (Path *) bopath;
-			}
-			break;
-
-		case T_CustomPath:
-			{
-				CustomPath *cpath;
-
-				/*
-				 * If the path's restriction clauses contain lateral
-				 * references to the other relation, we can't reparameterize,
-				 * because we must not change the RelOptInfo's contents here.
-				 * (Doing so would break things if we end up using a
-				 * non-partitionwise join.)
-				 */
-				if (ris_contain_references_to(root,
-											  path->parent->baserestrictinfo,
-											  child_rel->top_parent_relids))
-					return NULL;
-
-				FLAT_COPY_PATH(cpath, path, CustomPath);
-				REPARAMETERIZE_CHILD_PATH_LIST(cpath->custom_paths);
-				if (cpath->methods &&
-					cpath->methods->ReparameterizeCustomPathByChild)
-					cpath->custom_private =
-						cpath->methods->ReparameterizeCustomPathByChild(root,
-																		cpath->custom_private,
-																		child_rel);
-				new_path = (Path *) cpath;
 			}
 			break;
 

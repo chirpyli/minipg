@@ -23,7 +23,6 @@
 #include "postgres.h"
 
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/pathnodes.h"
 #include "nodes/plannodes.h"
 #include "utils/datum.h"
@@ -655,39 +654,6 @@ _copyNamedTuplestoreScan(const NamedTuplestoreScan *from)
 	 * copy remainder of node
 	 */
 	COPY_STRING_FIELD(enrname);
-
-	return newnode;
-}
-
-/*
- * _copyCustomScan
- */
-static CustomScan *
-_copyCustomScan(const CustomScan *from)
-{
-	CustomScan *newnode = makeNode(CustomScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(flags);
-	COPY_NODE_FIELD(custom_plans);
-	COPY_NODE_FIELD(custom_exprs);
-	COPY_NODE_FIELD(custom_private);
-	COPY_NODE_FIELD(custom_scan_tlist);
-	COPY_BITMAPSET_FIELD(custom_relids);
-
-	/*
-	 * NOTE: The method field of CustomScan is required to be a pointer to a
-	 * static table of callback functions.  So we don't copy the table itself,
-	 * just reference the original one.
-	 */
-	COPY_SCALAR_FIELD(methods);
 
 	return newnode;
 }
@@ -2883,28 +2849,6 @@ _copyCreateSchemaStmt(const CreateSchemaStmt *from)
 	return newnode;
 }
 
-
-/* ****************************************************************
- *					extensible.h copy functions
- * ****************************************************************
- */
-static ExtensibleNode *
-_copyExtensibleNode(const ExtensibleNode *from)
-{
-	ExtensibleNode *newnode;
-	const ExtensibleNodeMethods *methods;
-
-	methods = GetExtensibleNodeMethods(from->extnodename, false);
-	newnode = (ExtensibleNode *) newNode(methods->node_size,
-										 T_ExtensibleNode);
-	COPY_STRING_FIELD(extnodename);
-
-	/* copy the private fields */
-	methods->nodeCopy(newnode, from);
-
-	return newnode;
-}
-
 /* ****************************************************************
  *					value.h copy functions
  * ****************************************************************
@@ -3033,9 +2977,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_NamedTuplestoreScan:
 			retval = _copyNamedTuplestoreScan(from);
-			break;
-		case T_CustomScan:
-			retval = _copyCustomScan(from);
 			break;
 		case T_Join:
 			retval = _copyJoin(from);
@@ -3262,13 +3203,6 @@ copyObjectImpl(const void *from)
 		case T_IntList:
 		case T_OidList:
 			retval = list_copy(from);
-			break;
-
-			/*
-			 * EXTENSIBLE NODES
-			 */
-		case T_ExtensibleNode:
-			retval = _copyExtensibleNode(from);
 			break;
 
 			/*

@@ -28,7 +28,6 @@
 #include "executor/nodeAgg.h"
 #include "executor/nodeAppend.h"
 #include "executor/nodeBitmapHeapscan.h"
-#include "executor/nodeCustom.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
 #include "executor/nodeIncrementalSort.h"
@@ -251,11 +250,6 @@ ExecParallelEstimate(PlanState *planstate, ExecParallelEstimateContext *e)
 				ExecAppendEstimate((AppendState *) planstate,
 								   e->pcxt);
 			break;
-		case T_CustomScanState:
-			if (planstate->plan->parallel_aware)
-				ExecCustomScanEstimate((CustomScanState *) planstate,
-									   e->pcxt);
-			break;
 		case T_BitmapHeapScanState:
 			if (planstate->plan->parallel_aware)
 				ExecBitmapHeapEstimate((BitmapHeapScanState *) planstate,
@@ -469,11 +463,6 @@ ExecParallelInitializeDSM(PlanState *planstate,
 			if (planstate->plan->parallel_aware)
 				ExecAppendInitializeDSM((AppendState *) planstate,
 										d->pcxt);
-			break;
-		case T_CustomScanState:
-			if (planstate->plan->parallel_aware)
-				ExecCustomScanInitializeDSM((CustomScanState *) planstate,
-											d->pcxt);
 			break;
 		case T_BitmapHeapScanState:
 			if (planstate->plan->parallel_aware)
@@ -933,11 +922,6 @@ ExecParallelReInitializeDSM(PlanState *planstate,
 			if (planstate->plan->parallel_aware)
 				ExecAppendReInitializeDSM((AppendState *) planstate, pcxt);
 			break;
-		case T_CustomScanState:
-			if (planstate->plan->parallel_aware)
-				ExecCustomScanReInitializeDSM((CustomScanState *) planstate,
-											  pcxt);
-			break;
 		case T_BitmapHeapScanState:
 			if (planstate->plan->parallel_aware)
 				ExecBitmapHeapReInitializeDSM((BitmapHeapScanState *) planstate,
@@ -1234,11 +1218,6 @@ ExecParallelInitializeWorker(PlanState *planstate, ParallelWorkerContext *pwcxt)
 		case T_AppendState:
 			if (planstate->plan->parallel_aware)
 				ExecAppendInitializeWorker((AppendState *) planstate, pwcxt);
-			break;
-		case T_CustomScanState:
-			if (planstate->plan->parallel_aware)
-				ExecCustomScanInitializeWorker((CustomScanState *) planstate,
-											   pwcxt);
 			break;
 		case T_BitmapHeapScanState:
 			if (planstate->plan->parallel_aware)

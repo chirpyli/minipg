@@ -79,7 +79,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeCustom.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
@@ -254,13 +253,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_NamedTuplestoreScan:
 			result = (PlanState *) ExecInitNamedTuplestoreScan((NamedTuplestoreScan *) node,
 															   estate, eflags);
-			break;
-
-
-
-		case T_CustomScan:
-			result = (PlanState *) ExecInitCustomScan((CustomScan *) node,
-													  estate, eflags);
 			break;
 
 			/*
@@ -630,12 +622,6 @@ ExecEndNode(PlanState *node)
 			ExecEndNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
-
-
-		case T_CustomScanState:
-			ExecEndCustomScan((CustomScanState *) node);
-			break;
-
 			/*
 			 * join nodes
 			 */
@@ -739,9 +725,6 @@ ExecShutdownNode_walker(PlanState *node, void *context)
 	{
 		case T_GatherState:
 			ExecShutdownGather((GatherState *) node);
-			break;
-		case T_CustomScanState:
-			ExecShutdownCustomScan((CustomScanState *) node);
 			break;
 		case T_GatherMergeState:
 			ExecShutdownGatherMerge((GatherMergeState *) node);

@@ -416,12 +416,6 @@ CteScanState
 CteState
 CtlCommand
 CtxtHandle
-CustomExecMethods
-CustomOutPtrType
-CustomPath
-CustomScan
-CustomScanMethods
-CustomScanState
 CycleCtr
 DBState
 DCHCacheEntry
@@ -560,9 +554,6 @@ ExprEvalRowtypeCache
 ExprEvalStep
 ExprState
 ExprStateEvalFunc
-ExtensibleNode
-ExtensibleNodeEntry
-ExtensibleNodeMethods
 ExtensionControlFile
 ExtensionInfo
 ExtensionMemberId

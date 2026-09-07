@@ -22,7 +22,6 @@
 #include "access/sysattr.h"
 #include "catalog/pg_class.h"
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/clauses.h"
@@ -142,9 +141,6 @@ static NamedTuplestoreScan *create_namedtuplestorescan_plan(PlannerInfo *root,
 															Path *best_path, List *tlist, List *scan_clauses);
 static Result *create_resultscan_plan(PlannerInfo *root, Path *best_path,
 									  List *tlist, List *scan_clauses);
-static CustomScan *create_customscan_plan(PlannerInfo *root,
-										  CustomPath *best_path,
-										  List *tlist, List *scan_clauses);
 static NestLoop *create_nestloop_plan(PlannerInfo *root, NestPath *best_path);
 static MergeJoin *create_mergejoin_plan(PlannerInfo *root, MergePath *best_path);
 static HashJoin *create_hashjoin_plan(PlannerInfo *root, HashPath *best_path);
@@ -364,7 +360,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_FunctionScan:
 		case T_ValuesScan:
 		case T_NamedTuplestoreScan:
-		case T_CustomScan:
 			plan = create_scan_plan(root, best_path, flags);
 			break;
 		case T_HashJoin:
@@ -686,14 +681,6 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 												   scan_clauses);
 			break;
 
-
-		case T_CustomScan:
-			plan = (Plan *) create_customscan_plan(root,
-												   (CustomPath *) best_path,
-												   tlist,
-												   scan_clauses);
-			break;
-
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) best_path->pathtype);
@@ -787,15 +774,6 @@ use_physical_tlist(PlannerInfo *root, Path *path, int flags)
 	 * create_append_plan instructs its children to return an exact tlist).
 	 */
 	if (rel->reloptkind != RELOPT_BASEREL)
-		return false;
-
-	/*
-	 * Also, don't do it to a CustomPath; the premise that we're extracting
-	 * columns from a simple physical tuple is unlikely to hold for those.
-	 * (When it does make sense, the custom path creator can set up the path's
-	 * pathtarget that way.)
-	 */
-	if (IsA(path, CustomPath))
 		return false;
 
 	/*
@@ -3475,76 +3453,6 @@ create_resultscan_plan(PlannerInfo *root, Path *best_path,
 
 	return scan_plan;
 }
-
-/*
- * create_customscan_plan
- *
- * Transform a CustomPath into a Plan.
- */
-static CustomScan *
-create_customscan_plan(PlannerInfo *root, CustomPath *best_path,
-					   List *tlist, List *scan_clauses)
-{
-	CustomScan *cplan;
-	RelOptInfo *rel = best_path->path.parent;
-	List	   *custom_plans = NIL;
-	ListCell   *lc;
-
-	/* Recursively transform child paths. */
-	foreach(lc, best_path->custom_paths)
-	{
-		Plan	   *plan = create_plan_recurse(root, (Path *) lfirst(lc),
-											   CP_EXACT_TLIST);
-
-		custom_plans = lappend(custom_plans, plan);
-	}
-
-	/*
-	 * Sort clauses into the best execution order, although custom-scan
-	 * provider can reorder them again.
-	 */
-	scan_clauses = order_qual_clauses(root, scan_clauses);
-
-	/*
-	 * Invoke custom plan provider to create the Plan node represented by the
-	 * CustomPath.
-	 */
-	cplan = castNode(CustomScan,
-					 best_path->methods->PlanCustomPath(root,
-														rel,
-														best_path,
-														tlist,
-														scan_clauses,
-														custom_plans));
-
-	/*
-	 * Copy cost data from Path to Plan; no need to make custom-plan providers
-	 * do this
-	 */
-	copy_generic_path_info(&cplan->scan.plan, &best_path->path);
-
-	/* Likewise, copy the relids that are represented by this custom scan */
-	cplan->custom_relids = best_path->path.parent->relids;
-
-	/*
-	 * Replace any outer-relation variables with nestloop params in the qual
-	 * and custom_exprs expressions.  We do this last so that the custom-plan
-	 * provider doesn't have to be involved.  (Note that parts of custom_exprs
-	 * could have come from join clauses, so doing this beforehand on the
-	 * scan_clauses wouldn't work.)  We assume custom_scan_tlist contains no
-	 * such variables.
-	 */
-	if (best_path->path.param_info)
-	{
-		cplan->scan.plan.qual = (List *)
-			replace_nestloop_params(root, (Node *) cplan->scan.plan.qual);
-		cplan->custom_exprs = (List *)
-			replace_nestloop_params(root, (Node *) cplan->custom_exprs);
-	}
-
-	return cplan;
-}
-
 
 /*****************************************************************************
  *

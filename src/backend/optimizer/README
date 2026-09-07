@@ -376,7 +376,6 @@ RelOptInfo      - a relation or joined relations
   TidRangePath  - scan a contiguous range of CTIDs
   SubqueryScanPath - scan a subquery-in-FROM
   ForeignPath   - scan a foreign table, foreign join or foreign upper-relation
-  CustomPath    - for custom scan providers
   AppendPath    - append multiple subpaths together
   MergeAppendPath - merge multiple subpaths, preserving their common sort order
   GroupResultPath - childless Result plan node (used for degenerate grouping)

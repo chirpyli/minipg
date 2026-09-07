@@ -21,7 +21,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeCustom.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
@@ -51,7 +50,6 @@
 #include "executor/nodeTidscan.h"
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
-#include "nodes/extensible.h"
 #include "nodes/nodeFuncs.h"
 #include "nodes/pathnodes.h"
 #include "utils/rel.h"
@@ -212,12 +210,6 @@ ExecReScan(PlanState *node)
 			ExecReScanNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
-			break;
-
-		case T_CustomScanState:
-			ExecReScanCustomScan((CustomScanState *) node);
-			break;
-
 		case T_NestLoopState:
 			ExecReScanNestLoop((NestLoopState *) node);
 			break;
@@ -308,10 +300,6 @@ ExecMarkPos(PlanState *node)
 			ExecIndexOnlyMarkPos((IndexOnlyScanState *) node);
 			break;
 
-		case T_CustomScanState:
-			ExecCustomMarkPos((CustomScanState *) node);
-			break;
-
 		case T_MaterialState:
 			ExecMaterialMarkPos((MaterialState *) node);
 			break;
@@ -355,10 +343,6 @@ ExecRestrPos(PlanState *node)
 
 		case T_IndexOnlyScanState:
 			ExecIndexOnlyRestrPos((IndexOnlyScanState *) node);
-			break;
-
-		case T_CustomScanState:
-			ExecCustomRestrPos((CustomScanState *) node);
 			break;
 
 		case T_MaterialState:
@@ -408,14 +392,6 @@ ExecSupportsMarkRestore(Path *pathnode)
 		case T_Sort:
 			return true;
 
-		case T_CustomScan:
-			{
-				CustomPath *customPath = castNode(CustomPath, pathnode);
-
-				if (customPath->flags & CUSTOMPATH_SUPPORT_MARK_RESTORE)
-					return true;
-				return false;
-			}
 		case T_Result:
 
 			/*
@@ -532,15 +508,6 @@ ExecSupportsBackwardScan(Plan *node)
 
 		case T_SubqueryScan:
 			return ExecSupportsBackwardScan(((SubqueryScan *) node)->subplan);
-
-		case T_CustomScan:
-			{
-				uint32		flags = ((CustomScan *) node)->flags;
-
-				if (flags & CUSTOMPATH_SUPPORT_BACKWARD_SCAN)
-					return true;
-			}
-			return false;
 
 		case T_SeqScan:
 		case T_TidScan:

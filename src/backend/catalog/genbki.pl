@@ -191,11 +191,6 @@ my %GenbkiNextOids;
 # within a given Postgres release, such as fixed OIDs.  Do not substitute
 # anything that could depend on platform or configuration.  (The right place
 # to handle those sorts of things is in initdb.c's bootstrap_template1().)
-my $C_COLLATION_OID =
-  Catalog::FindDefinedSymbolFromData($catalog_data{pg_collation},
-	'C_COLLATION_OID');
-
-
 # Fill in pg_class.relnatts by looking at the referenced catalog's schema.
 # This is ugly but there's no better place; Catalog::AddDefaultValues
 # can't do it, for lack of easy access to the other catalog.
@@ -783,10 +778,6 @@ sub morph_row_for_pgattr
 
 	# set attndims if it's an array type
 	$row->{attndims} = $type->{typcategory} eq 'A' ? '1' : '0';
-
-	# collation-aware catalog columns must use C collation
-	$row->{attcollation} =
-	  $type->{typcollation} ne '0' ? $C_COLLATION_OID : 0;
 
 	Catalog::AddDefaultValues($row, $pgattr_schema, 'pg_attribute');
 	return;

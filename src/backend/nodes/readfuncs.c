@@ -34,8 +34,8 @@
 
 #include "fmgr.h"
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/parsenodes.h"
+#include "nodes/pathnodes.h"
 #include "nodes/plannodes.h"
 #include "nodes/readfuncs.h"
 #include "utils/builtins.h"
@@ -232,7 +232,7 @@ _readBitmapset(void)
 }
 
 /*
- * for use by extensions which define extensible nodes
+ * Public routine to read a bitmapset
  */
 Bitmapset *
 readBitmapset(void)
@@ -1619,37 +1619,6 @@ _readNamedTuplestoreScan(void)
 	READ_DONE();
 }
 
-
-
-/*
- * _readCustomScan
- */
-static CustomScan *
-_readCustomScan(void)
-{
-	READ_LOCALS(CustomScan);
-	char	   *custom_name;
-	const CustomScanMethods *methods;
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_UINT_FIELD(flags);
-	READ_NODE_FIELD(custom_plans);
-	READ_NODE_FIELD(custom_exprs);
-	READ_NODE_FIELD(custom_private);
-	READ_NODE_FIELD(custom_scan_tlist);
-	READ_BITMAPSET_FIELD(custom_relids);
-
-	/* Lookup CustomScanMethods by CustomName */
-	token = pg_strtok(&length); /* skip methods: */
-	token = pg_strtok(&length); /* CustomName */
-	custom_name = nullable_string(token, length);
-	methods = GetCustomScanMethods(custom_name, false);
-	local_node->methods = methods;
-
-	READ_DONE();
-}
-
 /*
  * ReadCommonJoin
  *	Assign the basic stuff of all nodes that inherit from Join
@@ -2067,36 +2036,6 @@ _readAlternativeSubPlan(void)
 }
 
 /*
- * _readExtensibleNode
- */
-static ExtensibleNode *
-_readExtensibleNode(void)
-{
-	const ExtensibleNodeMethods *methods;
-	ExtensibleNode *local_node;
-	const char *extnodename;
-
-	READ_TEMP_LOCALS();
-
-	token = pg_strtok(&length); /* skip :extnodename */
-	token = pg_strtok(&length); /* get extnodename */
-
-	extnodename = nullable_string(token, length);
-	if (!extnodename)
-		elog(ERROR, "extnodename has to be supplied");
-	methods = GetExtensibleNodeMethods(extnodename, false);
-
-	local_node = (ExtensibleNode *) newNode(methods->node_size,
-											T_ExtensibleNode);
-	local_node->extnodename = extnodename;
-
-	/* deserialize the private fields */
-	methods->nodeRead(local_node);
-
-	READ_DONE();
-}
-
-/*
  * parseNodeString
  *
  * Given a character string representing a node tree, parseNodeString creates
@@ -2259,8 +2198,6 @@ parseNodeString(void)
 		return_value = _readValuesScan();
 	else if (MATCH("NAMEDTUPLESTORESCAN", 19))
 		return_value = _readNamedTuplestoreScan();
-	else if (MATCH("CUSTOMSCAN", 10))
-		return_value = _readCustomScan();
 	else if (MATCH("JOIN", 4))
 		return_value = _readJoin();
 	else if (MATCH("NESTLOOP", 8))
@@ -2303,8 +2240,6 @@ parseNodeString(void)
 		return_value = _readSubPlan();
 	else if (MATCH("ALTERNATIVESUBPLAN", 18))
 		return_value = _readAlternativeSubPlan();
-	else if (MATCH("EXTENSIBLENODE", 14))
-		return_value = _readExtensibleNode();
 	else
 	{
 		elog(ERROR, "badly formatted node string \"%.32s\"...", token);

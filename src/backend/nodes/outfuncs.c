@@ -31,7 +31,6 @@
 
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
-#include "nodes/extensible.h"
 #include "nodes/pathnodes.h"
 #include "nodes/plannodes.h"
 #include "utils/datum.h"
@@ -638,26 +637,6 @@ _outNamedTuplestoreScan(StringInfo str, const NamedTuplestoreScan *node)
 	_outScanInfo(str, (const Scan *) node);
 
 	WRITE_STRING_FIELD(enrname);
-}
-
-
-
-static void
-_outCustomScan(StringInfo str, const CustomScan *node)
-{
-	WRITE_NODE_TYPE("CUSTOMSCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_UINT_FIELD(flags);
-	WRITE_NODE_FIELD(custom_plans);
-	WRITE_NODE_FIELD(custom_exprs);
-	WRITE_NODE_FIELD(custom_private);
-	WRITE_NODE_FIELD(custom_scan_tlist);
-	WRITE_BITMAPSET_FIELD(custom_relids);
-	/* CustomName is a key to lookup CustomScanMethods */
-	appendStringInfoString(str, " :methods ");
-	outToken(str, node->methods->CustomName);
 }
 
 static void
@@ -1587,21 +1566,6 @@ _outSubqueryScanPath(StringInfo str, const SubqueryScanPath *node)
 	WRITE_NODE_FIELD(subpath);
 }
 
-
-static void
-_outCustomPath(StringInfo str, const CustomPath *node)
-{
-	WRITE_NODE_TYPE("CUSTOMPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_UINT_FIELD(flags);
-	WRITE_NODE_FIELD(custom_paths);
-	WRITE_NODE_FIELD(custom_private);
-	appendStringInfoString(str, " :methods ");
-	outToken(str, node->methods->CustomName);
-}
-
 static void
 _outAppendPath(StringInfo str, const AppendPath *node)
 {
@@ -2272,27 +2236,6 @@ _outPlannerParamItem(StringInfo str, const PlannerParamItem *node)
 
 	WRITE_NODE_FIELD(item);
 	WRITE_INT_FIELD(paramId);
-}
-
-/*****************************************************************************
- *
- *	Stuff from extensible.h
- *
- *****************************************************************************/
-
-static void
-_outExtensibleNode(StringInfo str, const ExtensibleNode *node)
-{
-	const ExtensibleNodeMethods *methods;
-
-	methods = GetExtensibleNodeMethods(node->extnodename, false);
-
-	WRITE_NODE_TYPE("EXTENSIBLENODE");
-
-	WRITE_STRING_FIELD(extnodename);
-
-	/* serialize the private fields */
-	methods->nodeOut(str, node);
 }
 
 /*****************************************************************************
@@ -3030,9 +2973,6 @@ outNode(StringInfo str, const void *obj)
 			case T_NamedTuplestoreScan:
 				_outNamedTuplestoreScan(str, obj);
 				break;
-		case T_CustomScan:
-				_outCustomScan(str, obj);
-				break;
 			case T_Join:
 				_outJoin(str, obj);
 				break;
@@ -3229,10 +3169,7 @@ outNode(StringInfo str, const void *obj)
 				_outTidRangePath(str, obj);
 				break;
 			case T_SubqueryScanPath:
-			_outSubqueryScanPath(str, obj);
-			break;
-		case T_CustomPath:
-				_outCustomPath(str, obj);
+				_outSubqueryScanPath(str, obj);
 				break;
 			case T_AppendPath:
 				_outAppendPath(str, obj);
@@ -3362,9 +3299,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_GroupingSetData:
 				_outGroupingSetData(str, obj);
-				break;
-			case T_ExtensibleNode:
-				_outExtensibleNode(str, obj);
 				break;
 			case T_CreateStmt:
 				_outCreateStmt(str, obj);

@@ -16,8 +16,8 @@
 #include "access/xact.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
+#include "commands/explain.h"
 #include "executor/nodeHash.h"
-#include "nodes/extensible.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/analyze.h"
@@ -117,8 +117,6 @@ static void ExplainMemberNodes(PlanState **planstates, int nplans,
 static void ExplainMissingMembers(int nplans, int nchildren, ExplainState *es);
 static void ExplainSubPlans(List *plans, List *ancestors,
 							const char *relationship, ExplainState *es);
-static void ExplainCustomChildren(CustomScanState *css,
-								  List *ancestors, ExplainState *es);
 static ExplainWorkersState *ExplainCreateWorkersState(int num_workers);
 static void ExplainOpenWorker(int n, ExplainState *es);
 static void ExplainCloseWorker(int n, ExplainState *es);
@@ -622,10 +620,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 			*rels_used = bms_add_member(*rels_used,
 										((Scan *) plan)->scanrelid);
 			break;
-		case T_CustomScan:
-			*rels_used = bms_add_members(*rels_used,
-										 ((CustomScan *) plan)->custom_relids);
-			break;
 		case T_ModifyTable:
 			*rels_used = bms_add_member(*rels_used,
 										((ModifyTable *) plan)->nominalRelation);
@@ -674,7 +668,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 {
 	Plan	   *plan = planstate->plan;
 	const char *pname;			/* node type name for text output */
-	const char *custom_name = NULL;
 	ExplainWorkersState *save_workers_state = es->workers_state;
 	int			save_indent = es->indent;
 	bool		haschildren;
@@ -777,13 +770,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_NamedTuplestoreScan:
 			pname = "Named Tuplestore Scan";
 			break;
-		case T_CustomScan:
-			custom_name = ((CustomScan *) plan)->methods->CustomName;
-			if (custom_name)
-				pname = psprintf("Custom Scan (%s)", custom_name);
-			else
-				pname = "Custom Scan";
-			break;
 		case T_Material:
 			pname = "Materialize";
 			break;
@@ -873,10 +859,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_FunctionScan:
 		case T_ValuesScan:
 			ExplainScanTarget((Scan *) plan, es);
-			break;
-		case T_CustomScan:
-			if (((Scan *) plan)->scanrelid > 0)
-				ExplainScanTarget((Scan *) plan, es);
 			break;
 		case T_IndexScan:
 			{
@@ -1228,18 +1210,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 											   planstate, es);
 			}
 			break;
-		case T_CustomScan:
-			{
-				CustomScanState *css = (CustomScanState *) planstate;
-
-				show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-				if (plan->qual)
-					show_instrumentation_count("Rows Removed by Filter", 1,
-											   planstate, es);
-				if (css->methods->ExplainCustomScan)
-					css->methods->ExplainCustomScan(css, ancestors, es);
-			}
-			break;
 		case T_NestLoop:
 			show_upper_qual(((NestLoop *) plan)->join.joinqual,
 							"Join Filter", planstate, ancestors, es);
@@ -1395,8 +1365,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		IsA(plan, BitmapAnd) ||
 		IsA(plan, BitmapOr) ||
 		IsA(plan, SubqueryScan) ||
-		(IsA(planstate, CustomScanState) &&
-		 ((CustomScanState *) planstate)->custom_ps != NIL) ||
 		planstate->subPlan;
 	if (haschildren)
 	{
@@ -1444,10 +1412,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_SubqueryScan:
 			ExplainNode(((SubqueryScanState *) planstate)->subplan, ancestors,
 						"Subquery", NULL, es);
-			break;
-		case T_CustomScan:
-			ExplainCustomChildren((CustomScanState *) planstate,
-								  ancestors, es);
 			break;
 		default:
 			break;
@@ -2722,7 +2686,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 		case T_BitmapHeapScan:
 		case T_TidScan:
 		case T_TidRangeScan:
-		case T_CustomScan:
 		case T_ModifyTable:
 			/* Assert it's on a real relation */
 			Assert(rte->rtekind == RTE_RELATION);
@@ -2975,20 +2938,6 @@ ExplainSubPlans(List *plans, List *ancestors,
 
 		ancestors = list_delete_first(ancestors);
 	}
-}
-
-/*
- * Explain a list of children of a CustomScan.
- */
-static void
-ExplainCustomChildren(CustomScanState *css, List *ancestors, ExplainState *es)
-{
-	ListCell   *cell;
-	const char *label =
-	(list_length(css->custom_ps) != 1 ? "children" : "child");
-
-	foreach(cell, css->custom_ps)
-		ExplainNode((PlanState *) lfirst(cell), ancestors, label, NULL, es);
 }
 
 /*

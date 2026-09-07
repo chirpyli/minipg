@@ -105,7 +105,7 @@ typedef struct Expr
  * join node varno becomes INNER_VAR or OUTER_VAR and varattno becomes the
  * index of the proper element of that subplan's target list.  Similarly,
  * INDEX_VAR is used to identify Vars that reference an index column rather
- * than a heap column.  (In ForeignScan and CustomScan plan nodes, INDEX_VAR
+ * than a heap column.  (In ForeignScan plan nodes, INDEX_VAR
  * is abused to signify references to columns of a custom scan tuple type.)
  *
  * ROWID_VAR is used in the planner to identify nonce variables that carry
