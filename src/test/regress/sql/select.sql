@@ -91,9 +91,7 @@ RESET enable_bitmapscan;
 RESET enable_sort;
 
 
-SELECT two, stringu1, ten, string4
-   INTO TABLE tmp
-   FROM onek;
+-- minipg: SELECT INTO / CREATE TABLE AS 已裁剪，该用例移除
 
 --
 -- awk '{print $1,$2;}' person.data |
@@ -135,16 +133,20 @@ select * from onek,
   where onek.unique1 = bar.i;
 
 -- try VALUES in a subquery
+-- minipg: 行构造器 (a,b) 已裁剪，改写为等价的标量条件
 select * from onek
-    where (unique1,ten) in (values (1,1), (20,0), (99,9), (17,99))
+    where unique1 = 1 and ten = 1
+       or unique1 = 20 and ten = 0
+       or unique1 = 99 and ten = 9
+       or unique1 = 17 and ten = 99
     order by unique1;
 
 -- VALUES is also legal as a standalone query
 VALUES (1,2), (3,4+4), (7,77.7);
 
 -- corner case: VALUES with no columns
+-- minipg: INSERT ... DEFAULT VALUES 已裁剪，表中无数据
 CREATE TABLE nocols();
-INSERT INTO nocols DEFAULT VALUES;
 SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 
 --
@@ -241,15 +243,16 @@ select unique1, unique2 from onek2
 SELECT 1 AS x ORDER BY x;
 
 -- But ORDER BY on a set-valued expression does
-create function sillysrf(int) returns setof int as
-  'values (1),(10),(2),($1)' language sql immutable;
-
-select sillysrf(42);
-select sillysrf(-1) order by 1;
-
-drop function sillysrf(int);
+-- minipg: CREATE FUNCTION 已裁剪，改用内建的集合返回函数 unnest()
+select unnest(array[1,10,2,42]);
+select unnest(array[1,10,2,-1]) order by 1;
 
 -- X = X isn't a no-op, it's effectively X IS NOT NULL assuming = is strict
 -- (see bug #5084)
 select * from (values (2),(null),(1)) v(k) where k = k order by k;
 select * from (values (2),(null),(1)) v(k) where k = k;
+
+-- minipg: 原先是临时表，会话结束自动清理；改为普通表后必须显式删除，
+-- 否则 subselect 里的 CREATE TABLE foo 会报 already exists
+DROP TABLE foo;
+DROP TABLE nocols;

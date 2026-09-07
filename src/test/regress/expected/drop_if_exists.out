@@ -25,27 +25,7 @@ CREATE INDEX test_index_exists on test_exists(a);
 DROP INDEX IF EXISTS test_index_exists;
 DROP INDEX test_index_exists;
 ERROR:  index "test_index_exists" does not exist
--- sequence
-DROP SEQUENCE test_sequence_exists;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: DROP SEQUENCE test_sequence_exists;
-             ^
-DROP SEQUENCE IF EXISTS test_sequence_exists;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: DROP SEQUENCE IF EXISTS test_sequence_exists;
-             ^
-CREATE SEQUENCE test_sequence_exists;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: CREATE SEQUENCE test_sequence_exists;
-               ^
-DROP SEQUENCE IF EXISTS test_sequence_exists;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: DROP SEQUENCE IF EXISTS test_sequence_exists;
-             ^
-DROP SEQUENCE test_sequence_exists;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: DROP SEQUENCE test_sequence_exists;
-             ^
+-- minipg: SEQUENCE 已裁剪，DROP SEQUENCE 语法一并移除
 -- schema
 DROP SCHEMA test_schema_exists;
 ERROR:  schema "test_schema_exists" does not exist
@@ -55,188 +35,25 @@ CREATE SCHEMA test_schema_exists;
 DROP SCHEMA IF EXISTS test_schema_exists;
 DROP SCHEMA test_schema_exists;
 ERROR:  schema "test_schema_exists" does not exist
--- type
-DROP TYPE test_type_exists;
-ERROR:  type "test_type_exists" does not exist
-DROP TYPE IF EXISTS test_type_exists;
-NOTICE:  type "test_type_exists" does not exist, skipping
-CREATE type test_type_exists as (a int, b text);
-DROP TYPE IF EXISTS test_type_exists;
-DROP TYPE test_type_exists;
-ERROR:  type "test_type_exists" does not exist
----
---- role/user/group
----
--- collation
-DROP COLLATION IF EXISTS test_collation_exists;
-ERROR:  syntax error at or near "COLLATION"
-LINE 1: DROP COLLATION IF EXISTS test_collation_exists;
-             ^
--- text search parser
-DROP TEXT SEARCH PARSER test_tsparser_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH PARSER test_tsparser_exists;
-             ^
-DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
-             ^
--- text search dictionary
-DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-             ^
-DROP TEXT SEARCH DICTIONARY IF EXISTS test_tsdict_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH DICTIONARY IF EXISTS test_tsdict_exists;
-             ^
-CREATE TEXT SEARCH DICTIONARY test_tsdict_exists (
-        Template=ispell,
-        DictFile=ispell_sample,
-        AffFile=ispell_sample
-);
-ERROR:  syntax error at or near "TEXT"
-LINE 1: CREATE TEXT SEARCH DICTIONARY test_tsdict_exists (
-               ^
-DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-             ^
--- test search template
-DROP TEXT SEARCH TEMPLATE test_tstemplate_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH TEMPLATE test_tstemplate_exists;
-             ^
-DROP TEXT SEARCH TEMPLATE IF EXISTS test_tstemplate_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH TEMPLATE IF EXISTS test_tstemplate_exists;
-             ^
--- text search configuration
-DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-             ^
-DROP TEXT SEARCH CONFIGURATION IF EXISTS test_tsconfig_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH CONFIGURATION IF EXISTS test_tsconfig_exist...
-             ^
-CREATE TEXT SEARCH CONFIGURATION test_tsconfig_exists (COPY=english);
-ERROR:  syntax error at or near "TEXT"
-LINE 1: CREATE TEXT SEARCH CONFIGURATION test_tsconfig_exists (COPY=...
-               ^
-DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-             ^
+-- minipg: CREATE/DROP TYPE、角色、COLLATION、全文检索对象均已裁剪，相关用例移除
 -- extension
 DROP EXTENSION test_extension_exists;
 ERROR:  extension "test_extension_exists" does not exist
 DROP EXTENSION IF EXISTS test_extension_exists;
 NOTICE:  extension "test_extension_exists" does not exist, skipping
--- functions
-DROP FUNCTION test_function_exists();
-ERROR:  function test_function_exists() does not exist
-DROP FUNCTION IF EXISTS test_function_exists();
-NOTICE:  function test_function_exists() does not exist, skipping
-DROP FUNCTION test_function_exists(int, text, int[]);
-ERROR:  function test_function_exists(integer, text, integer[]) does not exist
-DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
-NOTICE:  function test_function_exists(pg_catalog.int4,text,pg_catalog.int4[]) does not exist, skipping
--- trigger
-DROP TRIGGER test_trigger_exists ON test_exists;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER test_trigger_exists ON test_exists;
-             ^
-DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
-             ^
-DROP TRIGGER test_trigger_exists ON no_such_table;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER test_trigger_exists ON no_such_table;
-             ^
-DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table;
-             ^
-DROP TRIGGER test_trigger_exists ON no_such_schema.no_such_table;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER test_trigger_exists ON no_such_schema.no_such_t...
-             ^
-DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_schema.no_such_table;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_schema...
-             ^
-CREATE TRIGGER test_trigger_exists
-    BEFORE UPDATE ON test_exists
-    FOR EACH ROW EXECUTE PROCEDURE suppress_redundant_updates_trigger();
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: CREATE TRIGGER test_trigger_exists
-               ^
-DROP TRIGGER test_trigger_exists ON test_exists;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER test_trigger_exists ON test_exists;
-             ^
+-- minipg: CREATE/DROP FUNCTION 与 CREATE/DROP TRIGGER 已裁剪，相关用例移除
 -- drop the table
 DROP TABLE IF EXISTS test_exists;
 DROP TABLE test_exists;
 ERROR:  table "test_exists" does not exist
 -- be tolerant with missing schemas, types, etc
-DROP COLLATION IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "COLLATION"
-LINE 1: DROP COLLATION IF EXISTS no_such_schema.foo;
-             ^
-DROP FUNCTION IF EXISTS no_such_schema.foo();
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP FUNCTION IF EXISTS foo(no_such_type);
-NOTICE:  type "no_such_type" does not exist, skipping
-DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
-NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP INDEX IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP SEQUENCE IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: DROP SEQUENCE IF EXISTS no_such_schema.foo;
-             ^
 DROP TABLE IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
-             ^
-DROP TEXT SEARCH DICTIONARY IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH DICTIONARY IF EXISTS no_such_schema.foo;
-             ^
-DROP TEXT SEARCH PARSER IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH PARSER IF EXISTS no_such_schema.foo;
-             ^
-DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
-ERROR:  syntax error at or near "TEXT"
-LINE 1: DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
-             ^
-DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
-ERROR:  syntax error at or near "TRIGGER"
-LINE 1: DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
-             ^
-DROP TYPE IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP VIEW IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
--- Check we receive an ambiguous function error when there are
--- multiple matching functions.
-CREATE FUNCTION test_ambiguous_funcname(int) returns int as $$ select $1; $$ language sql;
-CREATE FUNCTION test_ambiguous_funcname(text) returns text as $$ select $1; $$ language sql;
-DROP FUNCTION test_ambiguous_funcname;
-ERROR:  function name "test_ambiguous_funcname" is not unique
-HINT:  Specify the argument list to select the function unambiguously.
-DROP FUNCTION IF EXISTS test_ambiguous_funcname;
-ERROR:  function name "test_ambiguous_funcname" is not unique
-HINT:  Specify the argument list to select the function unambiguously.
--- cleanup
-DROP FUNCTION test_ambiguous_funcname(int);
-DROP FUNCTION test_ambiguous_funcname(text);
+-- minipg: 歧义函数名用例依赖 CREATE FUNCTION，已移除
 -- This test checks both the functionality of 'if exists' and the syntax
 -- of the drop database command.
 drop database test_database_exists (force);

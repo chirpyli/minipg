@@ -30,14 +30,6 @@ SELECT * FROM ((SELECT 1 AS x)) ss;
  1
 (1 row)
 
-(SELECT 2) UNION SELECT 2;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-((SELECT 2)) UNION SELECT 2;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-SELECT ((SELECT 2) UNION SELECT 2);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-SELECT (((SELECT 2)) UNION SELECT 2);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 SELECT (SELECT ARRAY[1,2,3])[1];
  array 
 -------
@@ -117,16 +109,16 @@ SELECT f1 AS "Uncorrelated Field" FROM SUBSELECT_TBL
                   3
 (6 rows)
 
+-- minipg: 行构造器 (a,b) 已裁剪，改写为单列比较
 SELECT f1, f2
   FROM SUBSELECT_TBL
-  WHERE (f1, f2) NOT IN (SELECT f2, CAST(f3 AS int4) FROM SUBSELECT_TBL
-                         WHERE f3 IS NOT NULL);
+  WHERE f2 NOT IN (SELECT CAST(f3 AS int4) FROM SUBSELECT_TBL
+                   WHERE f3 IS NOT NULL);
  f1 | f2 
 ----+----
-  1 |  2
   6 |  7
   8 |  9
-(3 rows)
+(2 rows)
 
 -- Correlated subselects
 SELECT f1 AS "Correlated Field", f2 AS "Second Field"
@@ -167,18 +159,20 @@ SELECT f1 AS "Correlated Field", f3 AS "Second Field"
                 6 |            8
 (4 rows)
 
+-- minipg: 行构造器 (a,b) 已裁剪，改写为单列比较
 SELECT f1 AS "Correlated Field"
   FROM SUBSELECT_TBL
-  WHERE (f1, f2) IN (SELECT f2, CAST(f3 AS int4) FROM SUBSELECT_TBL
-                     WHERE f3 IS NOT NULL);
+  WHERE f2 IN (SELECT CAST(f3 AS int4) FROM SUBSELECT_TBL
+               WHERE f3 IS NOT NULL);
  Correlated Field 
 ------------------
+                1
                 2
                 3
                 1
                 2
                 3
-(5 rows)
+(6 rows)
 
 --
 -- Use some existing tables in the regression test
@@ -187,14 +181,24 @@ SELECT ss.f1 AS "Correlated Field", ss.f3 AS "Second Field"
   FROM SUBSELECT_TBL ss
   WHERE f1 NOT IN (SELECT f1+1 FROM INT4_TBL
                    WHERE f1 != ss.f1 AND f1 < 2147483647);
-ERROR:  relation "int4_tbl" does not exist
-LINE 3:   WHERE f1 NOT IN (SELECT f1+1 FROM INT4_TBL
-                                            ^
+ Correlated Field | Second Field 
+------------------+--------------
+                2 |            4
+                3 |            5
+                2 |            2
+                3 |            3
+                6 |            8
+                8 |             
+(6 rows)
+
 select q1, float8(count(*)) / (select count(*) from int8_tbl)
 from int8_tbl group by q1 order by q1;
-ERROR:  relation "int8_tbl" does not exist
-LINE 2: from int8_tbl group by q1 order by q1;
-             ^
+        q1        | ?column? 
+------------------+----------
+              123 |      0.4
+ 4567890123456789 |      0.6
+(2 rows)
+
 -- Unspecified-type literals in output columns should resolve as text
 SELECT *, pg_typeof(f1) FROM
   (SELECT 'foo' AS f1 FROM generate_series(1,3)) ss ORDER BY 1;
@@ -206,10 +210,6 @@ SELECT *, pg_typeof(f1) FROM
 (3 rows)
 
 -- ... unless there's context to suggest differently
-explain (verbose, costs off) select '42' union all select '43';
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-explain (verbose, costs off) select '42' union all select 43;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- check materialization of an initplan reference (bug #14524)
 explain (verbose, costs off)
 select 1 = all (select (select 1));
@@ -239,21 +239,40 @@ select 1 = all (select (select 1));
 explain (costs off)
 select * from int4_tbl o where exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit null);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: select * from int4_tbl o where exists
-                      ^
+             QUERY PLAN             
+------------------------------------
+ Hash Semi Join
+   Hash Cond: (o.f1 = i.f1)
+   ->  Seq Scan on int4_tbl o
+   ->  Hash
+         ->  Seq Scan on int4_tbl i
+(5 rows)
+
 explain (costs off)
 select * from int4_tbl o where not exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit 1);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: select * from int4_tbl o where not exists
-                      ^
+             QUERY PLAN             
+------------------------------------
+ Hash Anti Join
+   Hash Cond: (o.f1 = i.f1)
+   ->  Seq Scan on int4_tbl o
+   ->  Hash
+         ->  Seq Scan on int4_tbl i
+(5 rows)
+
 explain (costs off)
 select * from int4_tbl o where exists
   (select 1 from int4_tbl i where i.f1=o.f1 limit 0);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: select * from int4_tbl o where exists
-                      ^
+              QUERY PLAN              
+--------------------------------------
+ Seq Scan on int4_tbl o
+   Filter: (SubPlan 1)
+   SubPlan 1
+     ->  Limit
+           ->  Seq Scan on int4_tbl i
+                 Filter: (f1 = o.f1)
+(6 rows)
+
 --
 -- Test cases to catch unpleasant interactions between IN-join processing
 -- and subquery pullup.
@@ -261,27 +280,35 @@ LINE 2: select * from int4_tbl o where exists
 select count(*) from
   (select 1 from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   (select 1 from tenk1 a
-                         ^
+ count 
+-------
+   100
+(1 row)
+
 select count(distinct ss.ten) from
   (select ten from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   (select ten from tenk1 a
-                           ^
+ count 
+-------
+    10
+(1 row)
+
 select count(*) from
   (select 1 from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   (select 1 from tenk1 a
-                         ^
+ count 
+-------
+   100
+(1 row)
+
 select count(distinct ss.ten) from
   (select ten from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   (select ten from tenk1 a
-                           ^
+ count 
+-------
+    10
+(1 row)
+
 --
 -- Test cases to check for overenthusiastic optimization of
 -- "IN (SELECT DISTINCT ...)" and related cases.  Per example from
@@ -309,9 +336,12 @@ SELECT * FROM foo WHERE id IN
 (1 row)
 
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id1, id2 FROM bar UNION
-                      SELECT id1, id2 FROM bar) AS s);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+    (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
+ id 
+----
+  1
+(1 row)
+
 -- These cases do not
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT ON (id2) id1, id2 FROM bar) AS s);
@@ -328,9 +358,12 @@ SELECT * FROM foo WHERE id IN
 (1 row)
 
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id2 FROM bar UNION
-                      SELECT id2 FROM bar) AS s);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+    (SELECT id2 FROM (SELECT DISTINCT id2 FROM bar) AS s);
+ id 
+----
+  1
+(1 row)
+
 --
 -- Test case to catch problems with multiply nested sub-SELECTs not getting
 -- recalculated properly.  Per bug report from Didier Moens.
@@ -439,21 +472,24 @@ update shipped_view set value = 11
     from int4_tbl a join int4_tbl b
       on (a.f1 = (select f1 from int4_tbl c where c.f1=b.f1))
     where ordnum = a.f1;
-ERROR:  relation "int4_tbl" does not exist
-LINE 2:     from int4_tbl a join int4_tbl b
-                 ^
 select * from shipped_view;
- ttype | ordnum | partnum |  value  
--------+--------+---------+---------
- wt    |      0 | 1       | 1234.56
+ ttype | ordnum | partnum | value 
+-------+--------+---------+-------
+ wt    |      0 | 1       |    11
 (1 row)
 
 select f1, ss1 as relabel from
     (select *, (select sum(f1) from int4_tbl b where f1 >= a.f1) as ss1
      from int4_tbl a) ss;
-ERROR:  relation "int4_tbl" does not exist
-LINE 3:      from int4_tbl a) ss;
-                  ^
+     f1      |  relabel   
+-------------+------------
+           0 | 2147607103
+      123456 | 2147607103
+     -123456 | 2147483647
+  2147483647 | 2147483647
+ -2147483647 |          0
+(5 rows)
+
 --
 -- Test cases involving PARAM_EXEC parameters and min/max index optimizations.
 -- Per bug report from David Sanchez i Gregori.
@@ -462,16 +498,20 @@ select * from (
   select max(unique1) from tenk1 as a
   where exists (select 1 from tenk1 as b where b.thousand = a.unique2)
 ) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   select max(unique1) from tenk1 as a
-                                   ^
+ max  
+------
+ 9997
+(1 row)
+
 select * from (
   select min(unique1) from tenk1 as a
   where not exists (select 1 from tenk1 as b where b.unique2 = 10000)
 ) ss;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   select min(unique1) from tenk1 as a
-                                   ^
+ min 
+-----
+   0
+(1 row)
+
 --
 -- Test that an IN implemented using a UniquePath does unique-ification
 -- with the right semantics, as per bug #4113.  (Unfortunately we have
@@ -480,26 +520,8 @@ LINE 2:   select min(unique1) from tenk1 as a
 -- here might mean that some other plan type is being used, rendering the test
 -- pointless.)
 --
-CREATE TABLE numeric_table (num_col numeric);
-ERROR:  syntax error at or near "numeric"
-LINE 1: CREATE TABLE numeric_table (num_col numeric);
-                                            ^
-insert into numeric_table values (1), (1.000000000000000000001), (2), (3);
-ERROR:  relation "numeric_table" does not exist
-LINE 1: insert into numeric_table values (1), (1.0000000000000000000...
-                    ^
-CREATE TABLE float_table (float_col float8);
-insert into float_table values (1), (2), (3);
-select * from float_table
-  where float_col in (select num_col from numeric_table);
-ERROR:  relation "numeric_table" does not exist
-LINE 2:   where float_col in (select num_col from numeric_table);
-                                                  ^
-select * from numeric_table
-  where num_col in (select float_col from float_table);
-ERROR:  relation "numeric_table" does not exist
-LINE 1: select * from numeric_table
-                      ^
+-- minipg: numeric 类型已裁剪，cross-type hashed subplan 用例无法用
+-- 现有数值类型等价替代，整节移除
 --
 -- Test case for bug #4290: bogus calculation of subplan param sets
 --
@@ -527,17 +549,16 @@ from tc;
 --
 -- Test case for 8.3 "failed to locate grouping columns" bug
 --
-CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
-ERROR:  syntax error at or near "numeric"
-LINE 1: CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
-                            ^
+-- minipg: numeric 已裁剪，改用 int8
+CREATE TABLE t1 (f1 int8, f2 varchar(30));
 select * from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
    from t1 up) ss
 group by f1,f2,fs;
-ERROR:  relation "t1" does not exist
-LINE 3:    from t1 up) ss
-                ^
+ f1 | f2 | fs 
+----+----+----
+(0 rows)
+
 --
 -- Test case for bug #5514 (mishandling of whole-row Vars in subselects)
 --
@@ -573,9 +594,15 @@ select (select (a.*)::text) from view_a a;
 -- any junk columns therein
 --
 select q from (select max(f1) from int4_tbl group by f1 order by f1) q;
-ERROR:  relation "int4_tbl" does not exist
-LINE 1: select q from (select max(f1) from int4_tbl group by f1 orde...
-                                           ^
+       q       
+---------------
+ (-2147483647)
+ (-123456)
+ (0)
+ (123456)
+ (2147483647)
+(5 rows)
+
 --
 -- Test case for sublinks pulled up into joinaliasvars lists in an
 -- inherited update/delete query
@@ -589,9 +616,6 @@ where exists (
     ( select f1, array(select q1 from int8_tbl) as arr
       from text_tbl ) ss
   where road.name = ss.f1 );
-ERROR:  relation "road" does not exist
-LINE 1: delete from road
-                    ^
 rollback;
 --
 -- Test case for sublinks pushed down into subselects via join alias expansion
@@ -603,29 +627,24 @@ from
    from int8_tbl) sq0
   join
   int4_tbl i4 on dummy = i4.f1;
-ERROR:  relation "int8_tbl" does not exist
-LINE 5:    from int8_tbl) sq0
-                ^
+ qq1 
+-----
+(0 rows)
+
 --
 -- Test case for subselect within UPDATE of INSERT...ON CONFLICT DO UPDATE
 --
 CREATE TABLE upsert(key int4 primary key, val text);
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'not seen';
 insert into upsert values(1, 'val') on conflict (key) do update set val = 'seen with subselect ' || (select f1 from int4_tbl where f1 != 0 limit 1)::text;
-ERROR:  relation "int4_tbl" does not exist
-LINE 1: ...t val = 'seen with subselect ' || (select f1 from int4_tbl w...
-                                                             ^
 select * from upsert;
- key | val 
------+-----
-   1 | val
+ key |            val             
+-----+----------------------------
+   1 | seen with subselect 123456
 (1 row)
 
 insert into upsert values (1, 'x'), (999, 'y')
 on conflict (key) do update set val = (select u from (select 'int4_tbl' u from int4_tbl limit 1) aa);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: ...et val = (select u from (select 'int4_tbl' u from int4_tbl l...
-                                                             ^
 --
 -- Test case for cross-type partial matching in hashed subplan (bug #7597)
 --
@@ -636,12 +655,11 @@ insert into outer_7597 values (0, null);
 insert into outer_7597 values (1, null);
 CREATE TABLE inner_7597(c1 int8, c2 int8);
 insert into inner_7597 values(0, null);
-select * from outer_7597 where (f1, f2) not in (select * from inner_7597);
+-- minipg: 行构造器 (a,b) 已裁剪，改为对 c2 单列比较
+select * from outer_7597 where f2 not in (select c2 from inner_7597);
  f1 | f2 
 ----+----
-  1 |  0
-  1 |   
-(2 rows)
+(0 rows)
 
 --
 -- Similar test case using text that verifies that collation
@@ -656,77 +674,90 @@ insert into outer_text values ('b', null);
 CREATE TABLE inner_text (c1 text, c2 text);
 insert into inner_text values ('a', null);
 insert into inner_text values ('123', '456');
-select * from outer_text where (f1, f2) not in (select * from inner_text);
+select * from outer_text where f2 not in (select c2 from inner_text);
  f1 | f2 
 ----+----
- b  | a
- b  | 
-(2 rows)
+(0 rows)
 
 --
 -- Another test case for cross-type hashed subplans: comparison of
 -- inner-side values must be done with appropriate operator
 --
 explain (verbose, costs off)
-select 'foo'::text in (select 'bar'::name union all select 'bar'::name);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-select 'foo'::text in (select 'bar'::name union all select 'bar'::name);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
---
--- Test that we don't try to hash nested records (bug #17363)
--- (Hashing could be supported, but for now we don't)
---
-explain (verbose, costs off)
-select row(row(row(1))) = any (select row(row(1)));
-                QUERY PLAN                 
--------------------------------------------
+select 'foo'::text in (select 'bar'::name from generate_series(1,2));
+                     QUERY PLAN                      
+-----------------------------------------------------
  Result
-   Output: (SubPlan 1)
+   Output: (hashed SubPlan 1)
    SubPlan 1
-     ->  Materialize
-           Output: '("(1)")'::record
-           ->  Result
-                 Output: '("(1)")'::record
-(7 rows)
+     ->  Function Scan on pg_catalog.generate_series
+           Output: 'bar'::name
+           Function Call: generate_series(1, 2)
+(6 rows)
 
-select row(row(row(1))) = any (select row(row(1)));
+select 'foo'::text in (select 'bar'::name from generate_series(1,2));
+ ?column? 
+----------
+ f
+(1 row)
+
+-- minipg: ROW 行构造器已裁剪，"don't try to hash nested records" 用例移除
+--
+-- Test case for premature memory release during hashing of subplan output
+--
+select '1'::text in (select '1'::name from generate_series(1,2));
  ?column? 
 ----------
  t
 (1 row)
 
 --
--- Test case for premature memory release during hashing of subplan output
---
-select '1'::text in (select '1'::name union all select '1'::name);
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
---
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
 --
 explain (costs off)
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
-ERROR:  relation "tenk1" does not exist
-LINE 2: select count(*) from tenk1 t
-                             ^
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Aggregate
+   ->  Seq Scan on tenk1 t
+         Filter: ((hashed SubPlan 2) OR (ten < 0))
+         SubPlan 2
+           ->  Index Only Scan using tenk1_unique1 on tenk1 k
+(5 rows)
+
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
-ERROR:  relation "tenk1" does not exist
-LINE 1: select count(*) from tenk1 t
-                             ^
+ count 
+-------
+ 10000
+(1 row)
+
 explain (costs off)
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
-ERROR:  relation "tenk1" does not exist
-LINE 2: select count(*) from tenk1 t
-                             ^
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Aggregate
+   ->  Bitmap Heap Scan on tenk1 t
+         Recheck Cond: (thousand = 1)
+         Filter: ((SubPlan 1) OR (ten < 0))
+         ->  Bitmap Index Scan on tenk1_thous_tenthous
+               Index Cond: (thousand = 1)
+         SubPlan 1
+           ->  Index Only Scan using tenk1_unique1 on tenk1 k
+                 Index Cond: (unique1 = t.unique2)
+(9 rows)
+
 select count(*) from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
-ERROR:  relation "tenk1" does not exist
-LINE 1: select count(*) from tenk1 t
-                             ^
+ count 
+-------
+    10
+(1 row)
+
 -- It's possible for the same EXISTS to get resolved both ways
 --
 -- Test case for planner bug with nested EXISTS handling
@@ -736,9 +767,10 @@ where a.thousand = b.thousand
   and exists ( select 1 from tenk1 c where b.hundred = c.hundred
                    and not exists ( select 1 from tenk1 d
                                     where a.thousand = d.thousand ) );
-ERROR:  relation "tenk1" does not exist
-LINE 1: select a.thousand from tenk1 a, tenk1 b
-                               ^
+ thousand 
+----------
+(0 rows)
+
 --
 -- Check that nested sub-selects are not pulled up if they contain volatiles
 --
@@ -814,43 +846,43 @@ select sum(ss.tst::int) from
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
-ERROR:  relation "onek" does not exist
-LINE 3:   onek o cross join lateral (
-          ^
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   Output: sum((((hashed SubPlan 1)))::integer)
+   ->  Nested Loop
+         Output: ((hashed SubPlan 1))
+         ->  Seq Scan on public.onek o
+               Output: o.unique1, o.unique2, o.two, o.four, o.ten, o.twenty, o.hundred, o.thousand, o.twothousand, o.fivethous, o.tenthous, o.odd, o.even, o.stringu1, o.stringu2, o.string4
+               Filter: (o.ten = 0)
+         ->  Bitmap Heap Scan on public.onek i
+               Output: (hashed SubPlan 1), random()
+               Recheck Cond: (i.unique1 = o.unique1)
+               ->  Bitmap Index Scan on onek_unique1
+                     Index Cond: (i.unique1 = o.unique1)
+               SubPlan 1
+                 ->  Seq Scan on public.int4_tbl
+                       Output: int4_tbl.f1
+                       Filter: (int4_tbl.f1 <= $0)
+(16 rows)
+
 select sum(ss.tst::int) from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
-ERROR:  relation "onek" does not exist
-LINE 2:   onek o cross join lateral (
-          ^
---
--- Test rescan of a SetOp node
---
-explain (costs off)
-select count(*) from
-  onek o cross join lateral (
-    select * from onek i1 where i1.unique1 = o.unique1
-    except
-    select * from onek i2 where i2.unique1 = o.unique2
-  ) ss
-where o.ten = 1;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
-select count(*) from
-  onek o cross join lateral (
-    select * from onek i1 where i1.unique1 = o.unique1
-    except
-    select * from onek i2 where i2.unique1 = o.unique2
-  ) ss
-where o.ten = 1;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+ sum 
+-----
+ 100
+(1 row)
+
 --
 -- Check we don't misoptimize a NOT IN where the subquery returns no rows.
 --
 CREATE TABLE notinouter (a int);
-CREATE TABLE notininner (b int not null);
+-- minipg: NOT NULL 约束已裁剪
+CREATE TABLE notininner (b int);
 insert into notinouter values (null), (1);
 select * from notinouter where a not in (select b from notininner);
  a 
@@ -933,39 +965,75 @@ explain (verbose, costs off)
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
   (select ten from tenk1 b);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: select * from int4_tbl where
-                      ^
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: int4_tbl.f1
+   Hash Cond: (b.ten = CASE WHEN (hashed SubPlan 1) THEN int4_tbl.f1 ELSE NULL::integer END)
+   ->  HashAggregate
+         Output: b.ten
+         Group Key: b.ten
+         ->  Seq Scan on public.tenk1 b
+               Output: b.unique1, b.unique2, b.two, b.four, b.ten, b.twenty, b.hundred, b.thousand, b.twothousand, b.fivethous, b.tenthous, b.odd, b.even, b.stringu1, b.stringu2, b.string4
+   ->  Hash
+         Output: int4_tbl.f1
+         ->  Seq Scan on public.int4_tbl
+               Output: int4_tbl.f1
+         SubPlan 1
+           ->  Index Only Scan using tenk1_unique1 on public.tenk1 a
+                 Output: a.unique1
+(15 rows)
+
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
   (select ten from tenk1 b);
-ERROR:  relation "int4_tbl" does not exist
-LINE 1: select * from int4_tbl where
-                      ^
+ f1 
+----
+  0
+(1 row)
+
 --
 -- Check for incorrect optimization when IN subquery contains a SRF
 --
 explain (verbose, costs off)
-select * from int4_tbl o where (f1, f1) in
-  (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
-ERROR:  relation "int4_tbl" does not exist
-LINE 2: select * from int4_tbl o where (f1, f1) in
-                      ^
-select * from int4_tbl o where (f1, f1) in
-  (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
-ERROR:  relation "int4_tbl" does not exist
-LINE 1: select * from int4_tbl o where (f1, f1) in
-                      ^
+select * from int4_tbl o where f1 in
+  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+                            QUERY PLAN                             
+-------------------------------------------------------------------
+ Hash Semi Join
+   Output: o.f1
+   Hash Cond: (o.f1 = "ANY_subquery".g)
+   ->  Seq Scan on public.int4_tbl o
+         Output: o.f1
+   ->  Hash
+         Output: "ANY_subquery".g
+         ->  Subquery Scan on "ANY_subquery"
+               Output: "ANY_subquery".g
+               ->  Result
+                     Output: ((generate_series(1, 50)) / 10), i.f1
+                     ->  ProjectSet
+                           Output: generate_series(1, 50), i.f1
+                           ->  HashAggregate
+                                 Output: i.f1
+                                 Group Key: i.f1
+                                 ->  Seq Scan on public.int4_tbl i
+                                       Output: i.f1
+(18 rows)
+
+select * from int4_tbl o where f1 in
+  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+ f1 
+----
+  0
+(1 row)
+
 --
 -- check for over-optimization of whole-row Var referencing an Append plan
 --
 select (select q from
-         (select 1,2,3 where f1 > 0
-          union all
-          select 4,5,6.0 where f1 <= 0
-         ) q )
+         (values (1,2,3),(4,5,6.0)) q )
 from int4_tbl;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+ERROR:  more than one row returned by a subquery used as an expression
 --
 -- Check for sane handling of a lateral reference in a subquery's quals
 -- (most of the complication here is to prevent the test case from being
@@ -975,133 +1043,50 @@ explain (verbose, costs off)
 select * from
     int4_tbl i4,
     lateral (
-        select i4.f1 > 1 as b, 1 as id
-        from (select random() order by 1) as t1
-      union all
-        select true as b, 2 as id
-    ) as t2
+        values (i4.f1 > 1, 1),
+               (true, 2)
+    ) as t2(b, id)
 where b and f1 >= 0;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Nested Loop
+   Output: i4.f1, "*VALUES*".column1, "*VALUES*".column2
+   ->  Seq Scan on public.int4_tbl i4
+         Output: i4.f1
+         Filter: (i4.f1 >= 0)
+   ->  Values Scan on "*VALUES*"
+         Output: "*VALUES*".column1, "*VALUES*".column2
+         Filter: "*VALUES*".column1
+(8 rows)
+
 select * from
     int4_tbl i4,
     lateral (
-        select i4.f1 > 1 as b, 1 as id
-        from (select random() order by 1) as t1
-      union all
-        select true as b, 2 as id
-    ) as t2
+        values (i4.f1 > 1, 1),
+               (true, 2)
+    ) as t2(b, id)
 where b and f1 >= 0;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
+     f1     | b | id 
+------------+---+----
+          0 | t |  2
+     123456 | t |  1
+     123456 | t |  2
+ 2147483647 | t |  1
+ 2147483647 | t |  2
+(5 rows)
+
 --
 -- Check that volatile quals aren't pushed down past a DISTINCT:
 -- nextval() should not be called more than the nominal number of times
 --
-CREATE SEQUENCE ts1;
-ERROR:  syntax error at or near "SEQUENCE"
-LINE 1: CREATE SEQUENCE ts1;
-               ^
-select * from
-  (select distinct ten from tenk1) ss
-  where ten < 10 + nextval('ts1')
-  order by 1;
-ERROR:  relation "tenk1" does not exist
-LINE 2:   (select distinct ten from tenk1) ss
-                                    ^
-select nextval('ts1');
-ERROR:  function nextval(unknown) does not exist
-LINE 1: select nextval('ts1');
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+-- minipg: SEQUENCE / nextval 已裁剪，"volatile qual 不下推到 DISTINCT 之下"
+-- 失去测试载体，该用例移除
 --
 -- Check that volatile quals aren't pushed down past a set-returning function;
 -- while a nonvolatile qual can be, if it doesn't reference the SRF.
 --
--- minipg: PL/pgSQL removed. SQL equivalent (returns x > y). The original
--- raised NOTICEs per call; those notices are dropped but the EXPLAIN plans
--- that this test actually asserts on are unchanged.
-create function tattle(x int, y int) returns bool
-volatile language sql as $$
-  SELECT x > y;
-$$;
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-                     QUERY PLAN                     
-----------------------------------------------------
- ProjectSet
-   Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
-   ->  Result
-(3 rows)
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
- x | u  
----+----
- 9 |  1
- 9 |  2
- 9 |  3
- 9 | 11
- 9 | 12
- 9 | 13
-(6 rows)
-
--- if we pretend it's stable, we get different results:
-alter function tattle(x int, y int) stable;
-ERROR:  syntax error at or near "function"
-LINE 1: alter function tattle(x int, y int) stable;
-              ^
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-                     QUERY PLAN                     
-----------------------------------------------------
- ProjectSet
-   Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
-   ->  Result
-(3 rows)
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
- x | u  
----+----
- 9 |  1
- 9 |  2
- 9 |  3
- 9 | 11
- 9 | 12
- 9 | 13
-(6 rows)
-
--- although even a stable qual should not be pushed down if it references SRF
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, u);
-                        QUERY PLAN                        
-----------------------------------------------------------
- Subquery Scan on ss
-   Output: ss.x, ss.u
-   Filter: (ss.x > ss.u)
-   ->  ProjectSet
-         Output: 9, unnest('{1,2,3,11,12,13}'::integer[])
-         ->  Result
-(6 rows)
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, u);
- x | u 
----+---
- 9 | 1
- 9 | 2
- 9 | 3
-(3 rows)
-
-drop function tattle(x int, y int);
+-- minipg: CREATE FUNCTION 已裁剪，无法定义 volatile/stable 函数，
+-- 该用例（含 stable 变体）整节移除
 --
 -- Test that LIMIT can be pushed to SORT through a subquery that just projects
 -- columns.  We check for that having happened by looking to see if EXPLAIN

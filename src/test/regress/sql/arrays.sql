@@ -153,21 +153,8 @@ UPDATE arrtest_s SET a[:] = '{23, 24, 25}';  -- fail, too small
 INSERT INTO arrtest_s VALUES(NULL, NULL);
 UPDATE arrtest_s SET a[:] = '{11, 12, 13, 14, 15}';  -- fail, no good with null
 
--- check with fixed-length-array type, such as point
-SELECT f1[0:1] FROM POINT_TBL;
-SELECT f1[0:] FROM POINT_TBL;
-SELECT f1[:1] FROM POINT_TBL;
-SELECT f1[:] FROM POINT_TBL;
-
--- subscript assignments to fixed-width result in NULL if previous value is NULL
-UPDATE point_tbl SET f1[0] = 10 WHERE f1 IS NULL;
-INSERT INTO point_tbl(f1[0]) VALUES(0);
--- NULL assignments get ignored
-UPDATE point_tbl SET f1[0] = NULL WHERE f1::text = '(10,10)'::point::text;
--- but non-NULL subscript assignments work
-UPDATE point_tbl SET f1[0] = -10, f1[1] = -10 WHERE f1::text = '(10,10)'::point::text;
--- but not to expand the range
-UPDATE point_tbl SET f1[3] = 10 WHERE f1::text = '(-10,-10)'::point::text;
+-- minipg: point 类型与 POINT_TBL 已随 geometry 类型裁剪而移除，
+-- 定长数组的下标用例整节移除
 
 --
 -- test array extension
@@ -287,14 +274,7 @@ SELECT * FROM unnest(ARRAY[1,2,3,2,3,1,2]) WITH ORDINALITY AS t(v, pos)
 SELECT array_position('[2:4]={1,2,3}'::int[], 1);
 SELECT array_positions('[2:4]={1,2,3}'::int[], 1);
 
-SELECT
-    array_position(ids, (1, 1)),
-    array_positions(ids, (1, 1))
-        FROM
-(VALUES
-    (ARRAY[(0, 0), (1, 1)]),
-    (ARRAY[(1, 1)])
-) AS f (ids);
+-- minipg: 行构造器 / 元组数组已裁剪，array_position 的复合类型用例移除
 
 -- operators
 SELECT a FROM arrtest WHERE b = ARRAY[[[113,142],[1,147]]];
@@ -307,8 +287,7 @@ SELECT ARRAY[[1,2],[3,4]] || ARRAY[5,6] AS "{{1,2},{3,4},{5,6}}";
 SELECT ARRAY[0,0] || ARRAY[1,1] || ARRAY[2,2] AS "{0,0,1,1,2,2}";
 SELECT 0 || ARRAY[1,2] || 3 AS "{0,1,2,3}";
 SELECT ARRAY[1.1] || ARRAY[2,3,4];
-SELECT array_agg(x) || array_agg(x) FROM (VALUES (ROW(1,2)), (ROW(3,4))) v(x);
-SELECT ROW(1,2) || array_agg(x) FROM (VALUES (ROW(3,4)), (ROW(5,6))) v(x);
+-- minipg: ROW 构造器已裁剪，复合类型的数组连接用例移除
 
 SELECT * FROM array_op_test WHERE i @> '{32}' ORDER BY seqno;
 SELECT * FROM array_op_test WHERE i && '{32}' ORDER BY seqno;
@@ -487,22 +466,8 @@ INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{}','{{pink,white,blue,red,grey,orange}}','{2.1,1.87,1.4,2.2}');
 SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
 
-create or replace function unnest1(anyarray)
-returns setof anyelement as $$
-select $1[s] from generate_subscripts($1,1) g(s);
-$$ language sql immutable;
-
-create or replace function unnest2(anyarray)
-returns setof anyelement as $$
-select $1[s1][s2] from generate_subscripts($1,1) g1(s1),
-                   generate_subscripts($1,2) g2(s2);
-$$ language sql immutable;
-
-select * from unnest1(array[1,2,3]);
-select * from unnest2(array[[1,2,3],[4,5,6]]);
-
-drop function unnest1(anyarray);
-drop function unnest2(anyarray);
+-- minipg: CREATE FUNCTION 已裁剪，unnest1/unnest2 自定义展开函数用例移除；
+-- 内建 unnest() 已在下方覆盖同语义
 
 select array_fill(null::integer, array[3,3],array[2,2]);
 select array_fill(null::integer, array[3,3]);
@@ -656,6 +621,10 @@ insert into t1 (f1[5].q1) values(42);
 select * from t1;
 update t1 set f1[5].q2 = 43;
 select * from t1;
+
+-- minipg: 原先是临时表，会话结束自动清理；改为普通表后必须显式删除，
+-- 否则 subselect 里的 CREATE TABLE t1 会报 already exists
+DROP TABLE t1;
 
 -- Tests for polymorphic-array form of width_bucket()
 

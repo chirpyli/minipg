@@ -1240,7 +1240,6 @@ typedef enum AlterTableType
 	AT_AlterColumnType,			/* alter column type */
 	AT_ClusterOn,				/* CLUSTER ON */
 	AT_DropCluster,				/* SET WITHOUT CLUSTER */
-	AT_ReplaceRelOptions,		/* replace reloption list in its entirety */
 	AT_EnableRule,				/* ENABLE RULE name */
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
 	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
@@ -1568,7 +1567,6 @@ typedef struct ViewStmt
 	List	   *aliases;		/* target column names */
 	Node	   *query;			/* the SELECT query (as a raw parse tree) */
 	bool		replace;		/* replace an existing view? */
-	List	   *options;		/* options from WITH clause */
 } ViewStmt;
 
 /* ----------------------

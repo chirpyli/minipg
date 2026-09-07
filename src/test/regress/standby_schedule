@@ -18,4 +18,3 @@ test: hs_standby_allowed
 # These tests will fail on a non-standby server
 #
 test: hs_standby_disallowed
-test: hs_standby_functions

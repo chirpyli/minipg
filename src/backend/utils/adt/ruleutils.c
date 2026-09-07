@@ -300,9 +300,7 @@ typedef void (*rsv_callback) (Node *node, deparse_context *context,
  * Global data
  * ----------
  */
-static SPIPlanPtr plan_getrulebyoid = NULL;
 static const char *query_getrulebyoid = "SELECT * FROM pg_catalog.pg_rewrite WHERE oid = $1";
-static SPIPlanPtr plan_getviewrule = NULL;
 static const char *query_getviewrule = "SELECT * FROM pg_catalog.pg_rewrite WHERE ev_class = $1 AND rulename = $2";
 
 /* GUC parameters */
@@ -525,11 +523,14 @@ pg_get_ruledef_worker(Oid ruleoid, int prettyFlags)
 		elog(ERROR, "SPI_connect failed");
 
 	/*
-	 * On the first call prepare the plan to lookup pg_rewrite. We read
-	 * pg_rewrite over the SPI manager instead of using the syscache to be
-	 * checked for read access on pg_rewrite.
+	 * Prepare the plan to look up pg_rewrite. We read pg_rewrite over the
+	 * SPI manager instead of using the syscache to be checked for read
+	 * access on pg_rewrite.
+	 *
+	 * minipg: plancache 已裁剪，SPI_keepplan() 退化为空操作，缓存下来的
+	 * SPI plan 在 SPI_finish() 之后就失效了，跨调用复用会拿到野指针。
+	 * 因此这里每次调用都重新 prepare，用完立即释放。
 	 */
-	if (plan_getrulebyoid == NULL)
 	{
 		Oid			argtypes[1];
 		SPIPlanPtr	plan;
@@ -538,16 +539,15 @@ pg_get_ruledef_worker(Oid ruleoid, int prettyFlags)
 		plan = SPI_prepare(query_getrulebyoid, 1, argtypes);
 		if (plan == NULL)
 			elog(ERROR, "SPI_prepare failed for \"%s\"", query_getrulebyoid);
-		SPI_keepplan(plan);
-		plan_getrulebyoid = plan;
-	}
 
-	/*
-	 * Get the pg_rewrite tuple for this rule
-	 */
-	args[0] = ObjectIdGetDatum(ruleoid);
-	nulls[0] = ' ';
-	spirc = SPI_execute_plan(plan_getrulebyoid, args, nulls, true, 0);
+		/*
+		 * Get the pg_rewrite tuple for this rule
+		 */
+		args[0] = ObjectIdGetDatum(ruleoid);
+		nulls[0] = ' ';
+		spirc = SPI_execute_plan(plan, args, nulls, true, 0);
+		SPI_freeplan(plan);
+	}
 	if (spirc != SPI_OK_SELECT)
 		elog(ERROR, "failed to get pg_rewrite tuple for rule %u", ruleoid);
 	if (SPI_processed != 1)
@@ -718,11 +718,12 @@ pg_get_viewdef_worker(Oid viewoid, int prettyFlags, int wrapColumn)
 		elog(ERROR, "SPI_connect failed");
 
 	/*
-	 * On the first call prepare the plan to lookup pg_rewrite. We read
-	 * pg_rewrite over the SPI manager instead of using the syscache to be
-	 * checked for read access on pg_rewrite.
+	 * Prepare the plan to look up pg_rewrite. We read pg_rewrite over the
+	 * SPI manager instead of using the syscache to be checked for read
+	 * access on pg_rewrite.
+	 *
+	 * minipg: 同上，plancache 已裁剪，改为每次调用重新 prepare 并释放。
 	 */
-	if (plan_getviewrule == NULL)
 	{
 		Oid			argtypes[2];
 		SPIPlanPtr	plan;
@@ -732,18 +733,17 @@ pg_get_viewdef_worker(Oid viewoid, int prettyFlags, int wrapColumn)
 		plan = SPI_prepare(query_getviewrule, 2, argtypes);
 		if (plan == NULL)
 			elog(ERROR, "SPI_prepare failed for \"%s\"", query_getviewrule);
-		SPI_keepplan(plan);
-		plan_getviewrule = plan;
-	}
 
-	/*
-	 * Get the pg_rewrite tuple for the view's SELECT rule
-	 */
-	args[0] = ObjectIdGetDatum(viewoid);
-	args[1] = DirectFunctionCall1(namein, CStringGetDatum(ViewSelectRuleName));
-	nulls[0] = ' ';
-	nulls[1] = ' ';
-	spirc = SPI_execute_plan(plan_getviewrule, args, nulls, true, 0);
+		/*
+		 * Get the pg_rewrite tuple for the view's SELECT rule
+		 */
+		args[0] = ObjectIdGetDatum(viewoid);
+		args[1] = DirectFunctionCall1(namein, CStringGetDatum(ViewSelectRuleName));
+		nulls[0] = ' ';
+		nulls[1] = ' ';
+		spirc = SPI_execute_plan(plan, args, nulls, true, 0);
+		SPI_freeplan(plan);
+	}
 	if (spirc != SPI_OK_SELECT)
 		elog(ERROR, "failed to get pg_rewrite tuple for view %u", viewoid);
 	if (SPI_processed != 1)

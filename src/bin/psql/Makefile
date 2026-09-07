@@ -69,9 +69,5 @@ clean distclean:
 # so do not clean them in the clean/distclean rules
 maintainer-clean: distclean
 	rm -f psqlscanslash.c
-
-check:
-	$(prove_check)
-
-installcheck:
-	$(prove_installcheck)
+# psql 的 TAP 用例（t/010_tab_completion.pl）依赖已裁剪的
+# CREATE TYPE/ENUM、\lo_import、COPY 等能力，已随用例一并删除。

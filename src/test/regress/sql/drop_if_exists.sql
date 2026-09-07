@@ -34,17 +34,7 @@ DROP INDEX IF EXISTS test_index_exists;
 
 DROP INDEX test_index_exists;
 
--- sequence
-
-DROP SEQUENCE test_sequence_exists;
-
-DROP SEQUENCE IF EXISTS test_sequence_exists;
-
-CREATE SEQUENCE test_sequence_exists;
-
-DROP SEQUENCE IF EXISTS test_sequence_exists;
-
-DROP SEQUENCE test_sequence_exists;
+-- minipg: SEQUENCE 已裁剪，DROP SEQUENCE 语法一并移除
 
 -- schema
 
@@ -58,84 +48,14 @@ DROP SCHEMA IF EXISTS test_schema_exists;
 
 DROP SCHEMA test_schema_exists;
 
--- type
-
-DROP TYPE test_type_exists;
-
-DROP TYPE IF EXISTS test_type_exists;
-
-CREATE type test_type_exists as (a int, b text);
-
-DROP TYPE IF EXISTS test_type_exists;
-
-DROP TYPE test_type_exists;
-
----
---- role/user/group
----
-
-
-
-
-
-
-
-
-
-
-
--- collation
-DROP COLLATION IF EXISTS test_collation_exists;
-
--- text search parser
-DROP TEXT SEARCH PARSER test_tsparser_exists;
-DROP TEXT SEARCH PARSER IF EXISTS test_tsparser_exists;
-
--- text search dictionary
-DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-DROP TEXT SEARCH DICTIONARY IF EXISTS test_tsdict_exists;
-CREATE TEXT SEARCH DICTIONARY test_tsdict_exists (
-        Template=ispell,
-        DictFile=ispell_sample,
-        AffFile=ispell_sample
-);
-DROP TEXT SEARCH DICTIONARY test_tsdict_exists;
-
--- test search template
-DROP TEXT SEARCH TEMPLATE test_tstemplate_exists;
-DROP TEXT SEARCH TEMPLATE IF EXISTS test_tstemplate_exists;
-
--- text search configuration
-DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
-DROP TEXT SEARCH CONFIGURATION IF EXISTS test_tsconfig_exists;
-CREATE TEXT SEARCH CONFIGURATION test_tsconfig_exists (COPY=english);
-DROP TEXT SEARCH CONFIGURATION test_tsconfig_exists;
+-- minipg: CREATE/DROP TYPE、角色、COLLATION、全文检索对象均已裁剪，相关用例移除
 
 -- extension
+
 DROP EXTENSION test_extension_exists;
 DROP EXTENSION IF EXISTS test_extension_exists;
 
--- functions
-DROP FUNCTION test_function_exists();
-DROP FUNCTION IF EXISTS test_function_exists();
-
-DROP FUNCTION test_function_exists(int, text, int[]);
-DROP FUNCTION IF EXISTS test_function_exists(int, text, int[]);
-
--- trigger
-DROP TRIGGER test_trigger_exists ON test_exists;
-DROP TRIGGER IF EXISTS test_trigger_exists ON test_exists;
-
-DROP TRIGGER test_trigger_exists ON no_such_table;
-DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table;
-
-DROP TRIGGER test_trigger_exists ON no_such_schema.no_such_table;
-DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_schema.no_such_table;
-
-CREATE TRIGGER test_trigger_exists
-    BEFORE UPDATE ON test_exists
-    FOR EACH ROW EXECUTE PROCEDURE suppress_redundant_updates_trigger();
-DROP TRIGGER test_trigger_exists ON test_exists;
+-- minipg: CREATE/DROP FUNCTION 与 CREATE/DROP TRIGGER 已裁剪，相关用例移除
 
 -- drop the table
 
@@ -145,31 +65,11 @@ DROP TABLE test_exists;
 
 -- be tolerant with missing schemas, types, etc
 
-DROP COLLATION IF EXISTS no_such_schema.foo;
-DROP FUNCTION IF EXISTS no_such_schema.foo();
-DROP FUNCTION IF EXISTS foo(no_such_type);
-DROP FUNCTION IF EXISTS foo(no_such_schema.no_such_type);
 DROP INDEX IF EXISTS no_such_schema.foo;
-DROP SEQUENCE IF EXISTS no_such_schema.foo;
 DROP TABLE IF EXISTS no_such_schema.foo;
-DROP TEXT SEARCH CONFIGURATION IF EXISTS no_such_schema.foo;
-DROP TEXT SEARCH DICTIONARY IF EXISTS no_such_schema.foo;
-DROP TEXT SEARCH PARSER IF EXISTS no_such_schema.foo;
-DROP TEXT SEARCH TEMPLATE IF EXISTS no_such_schema.foo;
-DROP TRIGGER IF EXISTS foo ON no_such_schema.bar;
-DROP TYPE IF EXISTS no_such_schema.foo;
 DROP VIEW IF EXISTS no_such_schema.foo;
 
--- Check we receive an ambiguous function error when there are
--- multiple matching functions.
-CREATE FUNCTION test_ambiguous_funcname(int) returns int as $$ select $1; $$ language sql;
-CREATE FUNCTION test_ambiguous_funcname(text) returns text as $$ select $1; $$ language sql;
-DROP FUNCTION test_ambiguous_funcname;
-DROP FUNCTION IF EXISTS test_ambiguous_funcname;
-
--- cleanup
-DROP FUNCTION test_ambiguous_funcname(int);
-DROP FUNCTION test_ambiguous_funcname(text);
+-- minipg: 歧义函数名用例依赖 CREATE FUNCTION，已移除
 
 -- This test checks both the functionality of 'if exists' and the syntax
 -- of the drop database command.

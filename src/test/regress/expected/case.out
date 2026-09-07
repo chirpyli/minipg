@@ -338,13 +338,12 @@ SELECT * FROM CASE_TBL;
 -- the isNull flag for the case test value incorrectly became true, causing
 -- the third WHEN-clause not to match.  The volatile function calls are needed
 -- to prevent constant-folding in the planner, which would hide the bug.
--- minipg: PL/pgSQL removed; SQL function equivalent.
-CREATE FUNCTION vol(text) returns text as
-  'SELECT $1' language sql volatile;
+-- minipg: CREATE FUNCTION 已裁剪，改用标量子查询代替 volatile 函数，
+-- 同样可以阻止 planner 常量折叠（标量子链接不会被折叠）。
 SELECT CASE
-  (CASE vol('bar')
+  (CASE (SELECT 'bar')
     WHEN 'foo' THEN 'it was foo!'
-    WHEN vol(null) THEN 'null input'
+    WHEN (SELECT NULL::text) THEN 'null input'
     WHEN 'bar' THEN 'it was bar!' END
   )
   WHEN 'it was foo!' THEN 'foo recognized'
@@ -355,7 +354,6 @@ SELECT CASE
  bar recognized
 (1 row)
 
-DROP FUNCTION vol(text);
 --
 -- Clean up
 --

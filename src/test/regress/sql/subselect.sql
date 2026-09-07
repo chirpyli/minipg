@@ -48,10 +48,11 @@ SELECT f1 AS "Uncorrelated Field" FROM SUBSELECT_TBL
   WHERE f1 IN (SELECT f2 FROM SUBSELECT_TBL WHERE
     f2 IN (SELECT f1 FROM SUBSELECT_TBL));
 
+-- minipg: 行构造器 (a,b) 已裁剪，改写为单列比较
 SELECT f1, f2
   FROM SUBSELECT_TBL
-  WHERE (f1, f2) NOT IN (SELECT f2, CAST(f3 AS int4) FROM SUBSELECT_TBL
-                         WHERE f3 IS NOT NULL);
+  WHERE f2 NOT IN (SELECT CAST(f3 AS int4) FROM SUBSELECT_TBL
+                   WHERE f3 IS NOT NULL);
 
 -- Correlated subselects
 
@@ -69,10 +70,11 @@ SELECT f1 AS "Correlated Field", f3 AS "Second Field"
   WHERE f3 IN (SELECT upper.f1 + f2 FROM SUBSELECT_TBL
                WHERE f2 = CAST(f3 AS integer));
 
+-- minipg: 行构造器 (a,b) 已裁剪，改写为单列比较
 SELECT f1 AS "Correlated Field"
   FROM SUBSELECT_TBL
-  WHERE (f1, f2) IN (SELECT f2, CAST(f3 AS int4) FROM SUBSELECT_TBL
-                     WHERE f3 IS NOT NULL);
+  WHERE f2 IN (SELECT CAST(f3 AS int4) FROM SUBSELECT_TBL
+               WHERE f3 IS NOT NULL);
 
 --
 -- Use some existing tables in the regression test
@@ -293,17 +295,8 @@ select * from (
 -- pointless.)
 --
 
-CREATE TABLE numeric_table (num_col numeric);
-insert into numeric_table values (1), (1.000000000000000000001), (2), (3);
-
-CREATE TABLE float_table (float_col float8);
-insert into float_table values (1), (2), (3);
-
-select * from float_table
-  where float_col in (select num_col from numeric_table);
-
-select * from numeric_table
-  where num_col in (select float_col from float_table);
+-- minipg: numeric 类型已裁剪，cross-type hashed subplan 用例无法用
+-- 现有数值类型等价替代，整节移除
 
 --
 -- Test case for bug #4290: bogus calculation of subplan param sets
@@ -335,7 +328,8 @@ from tc;
 -- Test case for 8.3 "failed to locate grouping columns" bug
 --
 
-CREATE TABLE t1 (f1 numeric(14,0), f2 varchar(30));
+-- minipg: numeric 已裁剪，改用 int8
+CREATE TABLE t1 (f1 int8, f2 varchar(30));
 
 select * from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
@@ -418,7 +412,8 @@ insert into outer_7597 values (1, null);
 CREATE TABLE inner_7597(c1 int8, c2 int8);
 insert into inner_7597 values(0, null);
 
-select * from outer_7597 where (f1, f2) not in (select * from inner_7597);
+-- minipg: 行构造器 (a,b) 已裁剪，改为对 c2 单列比较
+select * from outer_7597 where f2 not in (select c2 from inner_7597);
 
 --
 -- Similar test case using text that verifies that collation
@@ -436,7 +431,7 @@ CREATE TABLE inner_text (c1 text, c2 text);
 insert into inner_text values ('a', null);
 insert into inner_text values ('123', '456');
 
-select * from outer_text where (f1, f2) not in (select * from inner_text);
+select * from outer_text where f2 not in (select c2 from inner_text);
 
 --
 -- Another test case for cross-type hashed subplans: comparison of
@@ -448,15 +443,7 @@ select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 
 select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 
---
--- Test that we don't try to hash nested records (bug #17363)
--- (Hashing could be supported, but for now we don't)
---
-
-explain (verbose, costs off)
-select row(row(row(1))) = any (select row(row(1)));
-
-select row(row(row(1))) = any (select row(row(1)));
+-- minipg: ROW 行构造器已裁剪，"don't try to hash nested records" 用例移除
 
 --
 -- Test case for premature memory release during hashing of subplan output
@@ -531,7 +518,8 @@ where o.ten = 0;
 -- Check we don't misoptimize a NOT IN where the subquery returns no rows.
 --
 CREATE TABLE notinouter (a int);
-CREATE TABLE notininner (b int not null);
+-- minipg: NOT NULL 约束已裁剪
+CREATE TABLE notininner (b int);
 insert into notinouter values (null), (1);
 
 select * from notinouter where a not in (select b from notininner);
@@ -581,10 +569,10 @@ select * from int4_tbl where
 -- Check for incorrect optimization when IN subquery contains a SRF
 --
 explain (verbose, costs off)
-select * from int4_tbl o where (f1, f1) in
-  (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
-select * from int4_tbl o where (f1, f1) in
-  (select f1, generate_series(1,50) / 10 g from int4_tbl i group by f1);
+select * from int4_tbl o where f1 in
+  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+select * from int4_tbl o where f1 in
+  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
 
 --
 -- check for over-optimization of whole-row Var referencing an Append plan
@@ -619,59 +607,15 @@ where b and f1 >= 0;
 -- Check that volatile quals aren't pushed down past a DISTINCT:
 -- nextval() should not be called more than the nominal number of times
 --
-CREATE SEQUENCE ts1;
-
-select * from
-  (select distinct ten from tenk1) ss
-  where ten < 10 + nextval('ts1')
-  order by 1;
-
-select nextval('ts1');
+-- minipg: SEQUENCE / nextval 已裁剪，"volatile qual 不下推到 DISTINCT 之下"
+-- 失去测试载体，该用例移除
 
 --
 -- Check that volatile quals aren't pushed down past a set-returning function;
 -- while a nonvolatile qual can be, if it doesn't reference the SRF.
 --
--- minipg: PL/pgSQL removed. SQL equivalent (returns x > y). The original
--- raised NOTICEs per call; those notices are dropped but the EXPLAIN plans
--- that this test actually asserts on are unchanged.
-create function tattle(x int, y int) returns bool
-volatile language sql as $$
-  SELECT x > y;
-$$;
-
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-
--- if we pretend it's stable, we get different results:
-alter function tattle(x int, y int) stable;
-
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, 8);
-
--- although even a stable qual should not be pushed down if it references SRF
-explain (verbose, costs off)
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, u);
-
-select * from
-  (select 9 as x, unnest(array[1,2,3,11,12,13]) as u) ss
-  where tattle(x, u);
-
-drop function tattle(x int, y int);
+-- minipg: CREATE FUNCTION 已裁剪，无法定义 volatile/stable 函数，
+-- 该用例（含 stable 变体）整节移除
 
 --
 -- Test that LIMIT can be pushed to SORT through a subquery that just projects

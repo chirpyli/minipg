@@ -2716,7 +2716,6 @@ _copyViewStmt(const ViewStmt *from)
 	COPY_NODE_FIELD(aliases);
 	COPY_NODE_FIELD(query);
 	COPY_SCALAR_FIELD(replace);
-	COPY_NODE_FIELD(options);
 
 	return newnode;
 }

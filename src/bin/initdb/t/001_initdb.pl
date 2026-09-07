@@ -67,11 +67,7 @@ command_like(
 	[ 'pg_controldata', $datadir ],
 	qr/Data page checksum version:.*0/,
 	'checksums are disabled in control file');
-# pg_checksums fails with checksums disabled by default.  This is
-# not part of the tests included in pg_checksums to save from
-# the creation of an extra instance.
-command_fails([ 'pg_checksums', '-D', $datadir ],
-	"pg_checksums fails with data checksum disabled");
+# minipg 已裁剪 pg_checksums 工具，相关断言一并移除。
 
 command_ok([ 'initdb', '-S', $datadir ], 'sync only');
 command_fails([ 'initdb', $datadir ], 'existing data directory');

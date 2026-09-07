@@ -13,7 +13,7 @@
 # ----------
 # The first group of parallel tests
 # ----------
-test: boolean char varchar text int2 int4 int8 oid float4 float8 pg_lsn
+test: boolean char varchar text int2 int4 int8 oid float4 float8 pg_lsn name
 
 # ----------
 # The second group of parallel tests
@@ -26,7 +26,17 @@ test: strings numerology date time timestamp timestamptz
 # ----------
 # Another group of parallel tests
 # horology depends on interval, timestamp, timestamptz
-test: horology misc_sanity comments xid mvcc euc_kr
+test: horology misc_sanity comments xid mvcc euc_kr case
+
+# ----------
+# 依赖 date 建立的 date_tbl
+# ----------
+test: expressions
+
+# ----------
+# 错误与 GUC 报告、reg* 类型转换、schema 解析
+# ----------
+test: errors guc regproc namespace
 
 # ----------
 # These four each depend on the previous one
@@ -122,3 +132,26 @@ test: vacuum_parallel
 # cluster 已随表继承(INHERITS)功能裁剪而移除
 # portals_p2 已随游标功能裁剪而移除
 test: bitmapops combocid advisory_lock
+
+# ----------
+# 以下为核心 SQL 测试，已剔除被裁剪特性的语句后重新纳入调度。
+# 它们依赖 create_table / create_misc / create_index 建立的
+# onek / tenk1 / onek2 / int4_tbl / int8_tbl 等基础表，必须排在其后。
+# ----------
+# select 与 subselect 都会建表 foo，subselect 与 arrays 都会建表 t1，
+# 同名表不能在同一个并发组里，故拆成两组
+test: select arrays limit
+
+test: subselect groupingsets
+
+test: delete drop_if_exists functional_deps create_view
+
+test: create_schema tid transactions
+
+# reindex_catalog 会 REINDEX 系统表，必须独占一组
+test: reindex_catalog
+
+# ----------
+# 系统表一致性检查
+# ----------
+test: type_sanity opr_sanity

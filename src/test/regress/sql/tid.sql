@@ -10,10 +10,7 @@ TRUNCATE tid_tab;
 
 -- Tests for currtid2() with various relation kinds
 
--- Sequence
-CREATE SEQUENCE tid_seq;
-SELECT currtid2('tid_seq'::text, '(0,1)'::tid); -- ok
-DROP SEQUENCE tid_seq;
+-- minipg: SEQUENCE 已裁剪，currtid2() 的序列分支无法测试，移除
 
 -- Index, fails with incorrect relation type
 CREATE INDEX tid_ind ON tid_tab(a);

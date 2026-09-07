@@ -2,7 +2,7 @@
 CREATE TABLE articles (
     id int CONSTRAINT articles_pkey PRIMARY KEY,
     keywords text,
-    title text UNIQUE NOT NULL,
+    title text UNIQUE,
     body text UNIQUE,
     created date
 );
@@ -22,7 +22,8 @@ GROUP BY id;
 ----+----------+-------+------+---------
 (0 rows)
 
--- group by unique not null (fail/todo)
+-- minipg: NOT NULL 约束已裁剪，title 只是 nullable UNIQUE，
+-- 不构成函数依赖，此用例改为预期失败
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY title;
@@ -97,7 +98,8 @@ ERROR:  column "aic.changed" must appear in the GROUP BY clause or be used in an
 LINE 1: SELECT aic.changed
                ^
 -- example from documentation
-CREATE TABLE products (product_id int, name text, price numeric);
+-- minipg: numeric 已裁剪，改用 int
+CREATE TABLE products (product_id int, name text, price int);
 CREATE TABLE sales (product_id int, units int);
 -- OK
 SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
@@ -124,21 +126,22 @@ SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
 (0 rows)
 
 -- Drupal example, http://drupal.org/node/555530
+-- minipg: SERIAL、NOT NULL 与列 DEFAULT 均已裁剪
 CREATE TABLE node (
-    nid SERIAL,
-    vid integer NOT NULL default '0',
-    type varchar(32) NOT NULL default '',
-    title varchar(128) NOT NULL default '',
-    uid integer NOT NULL default '0',
-    status integer NOT NULL default '1',
-    created integer NOT NULL default '0',
+    nid int,
+    vid integer,
+    type varchar(32),
+    title varchar(128),
+    uid integer,
+    status integer,
+    created integer,
     -- snip
     PRIMARY KEY (nid, vid)
 );
 CREATE TABLE users (
-    uid integer NOT NULL default '0',
-    name varchar(60) NOT NULL default '',
-    pass varchar(32) NOT NULL default '',
+    uid integer,
+    name varchar(60),
+    pass varchar(32),
     -- snip
     PRIMARY KEY (uid),
     UNIQUE (name)
@@ -200,21 +203,16 @@ DROP VIEW fdv2;
 CREATE VIEW fdv3 AS
 SELECT id, keywords, title, body, created
 FROM articles
-GROUP BY id
-UNION
-SELECT id, keywords, title, body, created
-FROM articles
 GROUP BY id;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
+ERROR:  cannot drop constraint articles_pkey on table articles because other objects depend on it
+DETAIL:  view fdv3 depends on constraint articles_pkey on table articles
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP VIEW fdv3;
-ERROR:  view "fdv3" does not exist
 CREATE VIEW fdv4 AS
 SELECT * FROM articles WHERE title IN (SELECT title FROM articles GROUP BY id);
-ERROR:  column "articles.title" must appear in the GROUP BY clause or be used in an aggregate function
-LINE 2: SELECT * FROM articles WHERE title IN (SELECT title FROM art...
-                                                      ^
 ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT; -- fail
-ERROR:  constraint "articles_pkey" of relation "articles" does not exist
+ERROR:  cannot drop constraint articles_pkey on table articles because other objects depend on it
+DETAIL:  view fdv4 depends on constraint articles_pkey on table articles
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP VIEW fdv4;
-ERROR:  view "fdv4" does not exist

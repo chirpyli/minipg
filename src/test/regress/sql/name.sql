@@ -43,45 +43,8 @@ SELECT c.f1 FROM NAME_TBL c WHERE c.f1 > '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ12
 
 SELECT c.f1 FROM NAME_TBL c WHERE c.f1 >= '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQR';
 
-SELECT c.f1 FROM NAME_TBL c WHERE c.f1 ~ '.*';
-
-SELECT c.f1 FROM NAME_TBL c WHERE c.f1 !~ '.*';
-
-SELECT c.f1 FROM NAME_TBL c WHERE c.f1 ~ '[0-9]';
-
-SELECT c.f1 FROM NAME_TBL c WHERE c.f1 ~ '.*asdf.*';
+-- minipg: 正则表达式运算符（~ / !~）已裁剪，name 上的正则匹配用例移除
+-- minipg: parse_ident 单参版本 parse_ident(text) 已裁剪（pg_proc 中只剩
+-- parse_ident(text, bool)），parse_ident 相关用例整节移除
 
 DROP TABLE NAME_TBL;
-
-DO $$
-DECLARE r text[];
-BEGIN
-  r := parse_ident('Schemax.Tabley');
-  RAISE NOTICE '%', format('%I.%I', r[1], r[2]);
-  r := parse_ident('"SchemaX"."TableY"');
-  RAISE NOTICE '%', format('%I.%I', r[1], r[2]);
-END;
-$$;
-
-SELECT parse_ident('foo.boo');
-SELECT parse_ident('foo.boo[]'); -- should fail
-SELECT parse_ident('foo.boo[]', strict => false); -- ok
-
--- should fail
-SELECT parse_ident(' ');
-SELECT parse_ident(' .aaa');
-SELECT parse_ident(' aaa . ');
-SELECT parse_ident('aaa.a%b');
-SELECT parse_ident(E'X\rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
-
-SELECT length(a[1]), length(a[2]) from parse_ident('"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx".yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy') as a ;
-
-SELECT parse_ident(' first . "  second  " ."   third   ". "  ' || repeat('x',66) || '"');
-SELECT parse_ident(' first . "  second  " ."   third   ". "  ' || repeat('x',66) || '"')::name[];
-
-SELECT parse_ident(E'"c".X XXXX\002XXXXXX');
-SELECT parse_ident('1020');
-SELECT parse_ident('10.20');
-SELECT parse_ident('.');
-SELECT parse_ident('.1020');
-SELECT parse_ident('xxx.1020');

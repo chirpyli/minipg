@@ -21,10 +21,10 @@ SELECT regproc('now');
  now
 (1 row)
 
-SELECT regprocedure('abs(numeric)');
- regprocedure 
---------------
- abs(numeric)
+SELECT regprocedure('abs(float8)');
+     regprocedure      
+-----------------------
+ abs(double precision)
 (1 row)
 
 SELECT regclass('pg_class');
@@ -63,10 +63,10 @@ SELECT to_regproc('now');
  now
 (1 row)
 
-SELECT to_regprocedure('abs(numeric)');
- to_regprocedure 
------------------
- abs(numeric)
+SELECT to_regprocedure('abs(float8)');
+    to_regprocedure    
+-----------------------
+ abs(double precision)
 (1 row)
 
 SELECT to_regclass('pg_class');
@@ -106,10 +106,10 @@ SELECT regproc('pg_catalog.now');
  now
 (1 row)
 
-SELECT regprocedure('pg_catalog.abs(numeric)');
- regprocedure 
---------------
- abs(numeric)
+SELECT regprocedure('pg_catalog.abs(float8)');
+     regprocedure      
+-----------------------
+ abs(double precision)
 (1 row)
 
 SELECT regclass('pg_catalog.pg_class');
@@ -142,10 +142,10 @@ SELECT to_regproc('pg_catalog.now');
  now
 (1 row)
 
-SELECT to_regprocedure('pg_catalog.abs(numeric)');
- to_regprocedure 
------------------
- abs(numeric)
+SELECT to_regprocedure('pg_catalog.abs(float8)');
+    to_regprocedure    
+-----------------------
+ abs(double precision)
 (1 row)
 
 SELECT to_regclass('pg_catalog.pg_class');
@@ -195,7 +195,7 @@ SELECT to_regnamespace('"pg_catalog"');
 -- without schemaname
 SELECT regoper('||//');
 ERROR:  operator does not exist: ||//
-LINE 1: SELECT regoper('||//');
+LINE 3: SELECT regoper('||//');
                        ^
 SELECT regoperator('++(int4,int4)');
 ERROR:  operator does not exist: ++(int4,int4)
@@ -205,9 +205,9 @@ SELECT regproc('know');
 ERROR:  function "know" does not exist
 LINE 1: SELECT regproc('know');
                        ^
-SELECT regprocedure('absinthe(numeric)');
-ERROR:  function "absinthe(numeric)" does not exist
-LINE 1: SELECT regprocedure('absinthe(numeric)');
+SELECT regprocedure('absinthe(float8)');
+ERROR:  function "absinthe(float8)" does not exist
+LINE 1: SELECT regprocedure('absinthe(float8)');
                             ^
 SELECT regclass('pg_classes');
 ERROR:  relation "pg_classes" does not exist
@@ -230,9 +230,9 @@ SELECT regproc('ng_catalog.now');
 ERROR:  schema "ng_catalog" does not exist
 LINE 1: SELECT regproc('ng_catalog.now');
                        ^
-SELECT regprocedure('ng_catalog.abs(numeric)');
+SELECT regprocedure('ng_catalog.abs(float8)');
 ERROR:  schema "ng_catalog" does not exist
-LINE 1: SELECT regprocedure('ng_catalog.abs(numeric)');
+LINE 1: SELECT regprocedure('ng_catalog.abs(float8)');
                             ^
 SELECT regclass('ng_catalog.pg_class');
 ERROR:  schema "ng_catalog" does not exist
@@ -279,7 +279,7 @@ SELECT to_regproc('know');
  
 (1 row)
 
-SELECT to_regprocedure('absinthe(numeric)');
+SELECT to_regprocedure('absinthe(float8)');
  to_regprocedure 
 -----------------
  
@@ -322,7 +322,7 @@ SELECT to_regproc('ng_catalog.now');
  
 (1 row)
 
-SELECT to_regprocedure('ng_catalog.abs(numeric)');
+SELECT to_regprocedure('ng_catalog.abs(float8)');
  to_regprocedure 
 -----------------
  

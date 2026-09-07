@@ -168,8 +168,9 @@ SHOW special."weird name";
 --
 
 -- do changes
+-- minipg: 临时表与 ON COMMIT 已裁剪，改为普通表
 SET vacuum_cost_delay = 13;
-CREATE TABLE tmp_foo (data text) ON COMMIT DELETE ROWS;
+CREATE TABLE tmp_foo (data text);
 -- look changes
 SHOW vacuum_cost_delay;
 SELECT relname from pg_class where relname = 'tmp_foo';
@@ -180,6 +181,10 @@ DISCARD ALL;
 SHOW vacuum_cost_delay;
 SELECT relname from pg_class where relname = 'tmp_foo';
 SELECT current_user = 'regress_guc_user';
+
+-- minipg: 原先是临时表，DISCARD ALL 会顺带清理；改为普通表后必须显式删除，
+-- 否则会污染 sanity_check 的表清单
+DROP TABLE tmp_foo;
 
 --
 -- search_path should react to changes in pg_namespace
@@ -193,23 +198,8 @@ drop schema not_there_initially;
 select current_schemas(false);
 reset search_path;
 
---
--- Tests for function-local GUC settings
---
-
-set work_mem = '3MB';
-
-create function report_guc(text) returns text as
-$$ select current_setting($1) $$ language sql
-set work_mem = '1MB';
-
-select report_guc('work_mem'), current_setting('work_mem');
-
-
--- minipg: PL/pgSQL removed. The original test used plpgsql functions to verify
--- SET LOCAL restriction by a function SET option, plain SET inside a function,
--- and rollback-on-error of function-level SET. Those plpgsql-only checks are
--- dropped.
+-- minipg: 函数级 GUC 设置（CREATE FUNCTION ... SET）依赖已裁剪的
+-- CREATE FUNCTION，plpgsql 相关检查亦已移除，整节删除。
 
 -- check current_setting()'s behavior with invalid setting name
 

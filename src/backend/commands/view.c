@@ -45,7 +45,7 @@ static void checkViewTupleDesc(TupleDesc newdesc, TupleDesc olddesc);
  */
 static ObjectAddress
 DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
-					  List *options, Query *viewParse)
+					  Query *viewParse)
 {
 	Oid			viewOid;
 	LOCKMODE	lockmode;
@@ -156,29 +156,13 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		/*
 		 * Update the query for the view.
 		 *
-		 * Note that we must do this before updating the view options, because
-		 * the new options may not be compatible with the old view query (for
-		 * example if we attempt to add the WITH CHECK OPTION, we require that
-		 * the new view be automatically updatable, but the old view may not
-		 * have been).
+		 * minipg: reloptions 与 WITH CHECK OPTION 均已裁剪，视图不再携带任何
+		 * 选项，原先"用 AT_ReplaceRelOptions 整体替换视图选项"的步骤已删除。
 		 */
 		StoreViewQuery(viewOid, viewParse, replace);
 
 		/* Make the new view query visible */
 		CommandCounterIncrement();
-
-		/*
-		 * Update the view's options.
-		 *
-		 * The new options list replaces the existing options list, even if
-		 * it's empty.
-		 */
-		atcmd = makeNode(AlterTableCmd);
-		atcmd->subtype = AT_ReplaceRelOptions;
-		atcmd->def = (Node *) options;
-		atcmds = list_make1(atcmd);
-
-		AlterTableInternal(viewOid, atcmds, true);
 
 		/*
 		 * There is very little to do here to update the view's dependencies.
@@ -395,8 +379,6 @@ DefineView(ViewStmt *stmt, const char *queryString,
 	RawStmt    *rawstmt;
 	Query	   *viewParse;
 	RangeVar   *view;
-	ListCell   *cell;
-	bool		check_option;
 	ObjectAddress address;
 
 	/*
@@ -419,34 +401,9 @@ DefineView(ViewStmt *stmt, const char *queryString,
 		elog(ERROR, "unexpected parse analysis result");
 
 	/*
-	 * Check that the view is auto-updatable if WITH CHECK OPTION was
-	 * specified.
+	 * minipg: WITH CHECK OPTION 已裁剪，视图不再携带任何选项，
+	 * 原先"若指定 WITH CHECK OPTION 则要求视图可自动更新"的检查已删除。
 	 */
-	check_option = false;
-
-	foreach(cell, stmt->options)
-	{
-		DefElem    *defel = (DefElem *) lfirst(cell);
-
-		if (strcmp(defel->defname, "check_option") == 0)
-			check_option = true;
-	}
-
-	/*
-	 * If the check option is specified, look to see if the view is actually
-	 * auto-updatable or not.
-	 */
-	if (check_option)
-	{
-		const char *view_updatable_error =
-		view_query_is_auto_updatable(viewParse, true);
-
-		if (view_updatable_error)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("WITH CHECK OPTION is supported only on automatically updatable views"),
-					 errhint("%s", _(view_updatable_error))));
-	}
 
 	/*
 	 * If a list of column names was given, run through and insert these into
@@ -492,7 +449,7 @@ DefineView(ViewStmt *stmt, const char *queryString,
 	 * aborted.
 	 */
 	address = DefineVirtualRelation(view, viewParse->targetList,
-									stmt->replace, stmt->options, viewParse);
+									stmt->replace, viewParse);
 
 	return address;
 }

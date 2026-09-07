@@ -2452,7 +2452,6 @@ ViewStmt: CREATE VIEW qualified_name opt_column_list
 					n->aliases = $4;
 					n->query = $6;
 					n->replace = false;
-					n->options = NIL;
 					$$ = (Node *) n;
 				}
 		| CREATE OR REPLACE VIEW qualified_name opt_column_list
@@ -2464,7 +2463,6 @@ ViewStmt: CREATE VIEW qualified_name opt_column_list
 				n->aliases = $6;
 					n->query = $8;
 					n->replace = true;
-					n->options = NIL;
 					$$ = (Node *) n;
 			}
 		;

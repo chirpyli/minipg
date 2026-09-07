@@ -4,9 +4,9 @@
 
 BEGIN;
 
-SELECT *
-   INTO TABLE xacttest
-   FROM aggtest;
+-- minipg: SELECT INTO / CREATE TABLE AS 已裁剪，改为显式建表 + INSERT SELECT
+CREATE TABLE xacttest (a int2, b float4);
+INSERT INTO xacttest SELECT * FROM aggtest;
 
 INSERT INTO xacttest (a, b) VALUES (777, 777.777);
 
@@ -88,8 +88,7 @@ INSERT INTO writetest VALUES (1); -- fail
 SELECT * FROM writetest; -- ok
 DELETE FROM temptest; -- ok
 UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = temptest.a; -- ok
-PREPARE test AS UPDATE writetest SET a = 0; -- ok
-EXECUTE test; -- fail
+-- minipg: PREPARE / EXECUTE（预备语句）已裁剪，该用例移除
 SELECT * FROM writetest, temptest; -- ok
 
 START TRANSACTION READ WRITE;
@@ -257,41 +256,9 @@ SELECT 1;			-- this should work
 -- also check that they don't see commits of concurrent transactions, but
 -- that's a mite hard to do within the limitations of pg_regress.)
 --
+-- minipg: CREATE FUNCTION 已裁剪，"stable/volatile 函数是否稳定" 一节
+-- 失去测试载体，整节移除；仅保留 xacttest 的内容快照。
 select * from xacttest;
-
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' stable;
-
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-rollback;
-
--- But a volatile function can see the partial results of the calling query
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' volatile;
-
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-rollback;
-
--- minipg: PL/pgSQL removed; SQL equivalent of the SPI-dependent version.
-create or replace function max_xacttest() returns smallint language sql as
-'SELECT max(a) FROM xacttest' stable;
-
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-rollback;
-
-create or replace function max_xacttest() returns smallint language sql as
-'SELECT max(a) FROM xacttest' volatile;
-
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-rollback;
 
 
 -- test case for problems with dropping an open relation during abort

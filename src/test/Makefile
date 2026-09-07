@@ -12,7 +12,9 @@ subdir = src/test
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
-SUBDIRS = perl postmaster regress isolation modules
+# postmaster 目录原用于 postmaster 层面的 TAP 测试，用例早已随上游迁移移除，
+# minipg 中只剩空壳（无 t/ 目录），保留会让 prove 打空，已一并删除。
+SUBDIRS = perl regress isolation modules
 
 # We don't build or execute these by default, but we do want "make
 # clean" etc to recurse into them.  (We must filter out those that we

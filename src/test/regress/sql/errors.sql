@@ -65,37 +65,20 @@ drop table nonesuch;
 --
 -- ALTER TABLE
 
--- relation renaming
+-- minipg: ALTER TABLE ... RENAME 与继承表（emp/stud_emp）均已裁剪，
+-- 改用仍支持的 ADD COLUMN 触发同类报错
 
 -- missing relation name
-alter table rename;
+alter table add column;
 
 -- no such relation
-alter table nonesuch rename to newnonesuch;
+alter table nonesuch add column newnonesuch int;
 
--- no such relation
-alter table nonesuch rename to stud_emp;
+-- column already exists
+alter table aggtest add column a int;
 
--- conflict
-alter table stud_emp rename to aggtest;
-
--- self-conflict
-alter table stud_emp rename to stud_emp;
-
-
--- attribute renaming
-
--- no such relation
-alter table nonesuchrel rename column nonesuchatt to newnonesuchatt;
-
--- no such attribute
-alter table emp rename column nonesuchatt to newnonesuchatt;
-
--- conflict
-alter table emp rename column salary to manager;
-
--- conflict
-alter table emp rename column salary to ctid;
+-- reserved column name
+alter table aggtest add column ctid int;
 
 
 --
@@ -122,29 +105,31 @@ drop index nonesuch;
 
 
 --
--- DROP FUNCTION
+-- minipg: DROP FUNCTION 已裁剪，改为 DROP VIEW 验证同类报错
+-- DROP VIEW
 
--- missing function name
-drop function ();
+-- missing view name
+drop view;
 
--- bad function name
-drop function 314159();
+-- bad view name
+drop view 314159;
 
--- no such function
-drop function nonesuch();
+-- no such view
+drop view nonesuch;
 
 
 --
--- DROP TYPE
+-- minipg: DROP TYPE 已裁剪，改为 DROP SCHEMA 验证同类报错
+-- DROP SCHEMA
 
--- missing type name
-drop type;
+-- missing schema name
+drop schema;
 
--- bad type name
-drop type 314159;
+-- bad schema name
+drop schema 314159;
 
--- no such type
-drop type nonesuch;
+-- no such schema
+drop schema nonesuch;
 
 
 --
@@ -198,40 +183,36 @@ VALUES(123) 123
 
 -- with a tab
 CREATE TABLE foo
-  (id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY,
-	id3 INTEGER NOT NUL,
-   id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL);
+  (id INT4 UNIQUE, id2 TEXT PRIMARY KEY,
+	id3 INTEGER NUL,
+   id4 INT4 UNIQUE, id5 TEXT UNIQUE);
 
 -- long line to be truncated on the left
-CREATE TABLE foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
-id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL);
+CREATE TABLE foo(id INT4 UNIQUE, id2 TEXT PRIMARY KEY, id3 INTEGER NUL,
+id4 INT4 UNIQUE, id5 TEXT UNIQUE);
 
 -- long line to be truncated on the right
 CREATE TABLE foo(
-id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL, id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY);
+id3 INTEGER NUL, id4 INT4 UNIQUE, id5 TEXT UNIQUE, id INT4 UNIQUE, id2 TEXT PRIMARY KEY);
 
 -- long line to be truncated both ways
-CREATE TABLE foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL);
+CREATE TABLE foo(id INT4 UNIQUE, id2 TEXT PRIMARY KEY, id3 INTEGER NUL, id4 INT4 UNIQUE, id5 TEXT UNIQUE);
 
 -- long line to be truncated on the left, many lines
 CREATE
 TABLE
-foo(id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL,
+foo(id INT4 UNIQUE, id2 TEXT PRIMARY KEY, id3 INTEGER NUL,
 id4 INT4
-UNIQUE
-NOT
-NULL,
+UNIQUE,
 id5 TEXT
-UNIQUE
-NOT
-NULL)
+UNIQUE)
 ;
 
 -- long line to be truncated on the right, many lines
 CREATE
 TABLE
 foo(
-id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL, id INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY)
+id3 INTEGER NUL, id4 INT4 UNIQUE, id5 TEXT UNIQUE, id INT4 UNIQUE, id2 TEXT PRIMARY KEY)
 ;
 
 -- long line to be truncated both ways, many lines
@@ -240,9 +221,9 @@ TABLE
 foo
 (id
 INT4
-UNIQUE NOT NULL, idx INT4 UNIQUE NOT NULL, idy INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL,
-idz INT4 UNIQUE NOT NULL,
-idv INT4 UNIQUE NOT NULL);
+UNIQUE, idx INT4 UNIQUE, idy INT4 UNIQUE, id2 TEXT PRIMARY KEY, id3 INTEGER NUL, id4 INT4 UNIQUE, id5 TEXT UNIQUE,
+idz INT4 UNIQUE,
+idv INT4 UNIQUE);
 
 -- more than 10 lines...
 CREATE
@@ -251,18 +232,12 @@ foo
 (id
 INT4
 UNIQUE
-NOT
-NULL
 ,
 idm
 INT4
-UNIQUE
-NOT
-NULL,
-idx INT4 UNIQUE NOT NULL, idy INT4 UNIQUE NOT NULL, id2 TEXT NOT NULL PRIMARY KEY, id3 INTEGER NOT NUL, id4 INT4 UNIQUE NOT NULL, id5 TEXT UNIQUE NOT NULL,
-idz INT4 UNIQUE NOT NULL,
+UNIQUE,
+idx INT4 UNIQUE, idy INT4 UNIQUE, id2 TEXT PRIMARY KEY, id3 INTEGER NUL, id4 INT4 UNIQUE, id5 TEXT UNIQUE,
+idz INT4 UNIQUE,
 idv
 INT4
-UNIQUE
-NOT
-NULL);
+UNIQUE);

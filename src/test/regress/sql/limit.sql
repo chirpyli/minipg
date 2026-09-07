@@ -36,52 +36,7 @@ SELECT ''::text AS five, unique1, unique2, stringu1
 select * from int8_tbl limit (case when random() < 0.5 then null::bigint end);
 select * from int8_tbl offset (case when random() < 0.5 then null::bigint end);
 
--- Test assorted cases involving backwards fetch from a LIMIT plan node
-begin;
-
-declare c1 cursor for select * from int8_tbl limit 10;
-fetch all in c1;
-fetch 1 in c1;
-fetch backward 1 in c1;
-fetch backward all in c1;
-fetch backward 1 in c1;
-fetch all in c1;
-
-declare c2 cursor for select * from int8_tbl limit 3;
-fetch all in c2;
-fetch 1 in c2;
-fetch backward 1 in c2;
-fetch backward all in c2;
-fetch backward 1 in c2;
-fetch all in c2;
-
-declare c3 cursor for select * from int8_tbl offset 3;
-fetch all in c3;
-fetch 1 in c3;
-fetch backward 1 in c3;
-fetch backward all in c3;
-fetch backward 1 in c3;
-fetch all in c3;
-
-declare c4 cursor for select * from int8_tbl offset 10;
-fetch all in c4;
-fetch 1 in c4;
-fetch backward 1 in c4;
-fetch backward all in c4;
-fetch backward 1 in c4;
-fetch all in c4;
-
-declare c5 cursor for select * from int8_tbl order by q1 fetch first 2 rows with ties;
-fetch all in c5;
-fetch 1 in c5;
-fetch backward 1 in c5;
-fetch backward 1 in c5;
-fetch all in c5;
-fetch backward all in c5;
-fetch all in c5;
-fetch backward all in c5;
-
-rollback;
+-- minipg: 游标（DECLARE/FETCH）已裁剪，LIMIT 计划节点反向扫描的用例移除
 
 -- Stress test for variable LIMIT in conjunction with bounded-heap sorting
 
@@ -97,25 +52,7 @@ SELECT
 -- with ORDER BY and LIMIT.
 --
 
-CREATE SEQUENCE testseq;
-
-explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
-
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
-
-select currval('testseq');
-
-explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
-
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
-
-select currval('testseq');
+-- minipg: SEQUENCE / nextval / currval 已裁剪，volatile 函数相关的用例移除
 
 explain (verbose, costs off)
 select unique1, unique2, generate_series(1,10)
@@ -154,12 +91,14 @@ select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
 
 --
 -- FETCH FIRST
+-- minipg: 语法只保留了 row_or_rows = ROWS，单数 ROW 与 NEXT 均已裁剪，
+-- 用例统一改用 ROWS
 -- Check the WITH TIES clause
 --
 
 SELECT  thousand
 		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES;
+		ORDER BY thousand FETCH FIRST 2 ROWS WITH TIES;
 
 SELECT  thousand
 		FROM onek WHERE thousand < 5
@@ -167,21 +106,21 @@ SELECT  thousand
 
 SELECT  thousand
 		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 1 ROW WITH TIES;
+		ORDER BY thousand FETCH FIRST 1 ROWS WITH TIES;
 
 SELECT  thousand
 		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 2 ROW ONLY;
+		ORDER BY thousand FETCH FIRST 2 ROWS ONLY;
 
 -- SKIP LOCKED and WITH TIES are incompatible
 SELECT  thousand
 		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 1 ROW WITH TIES FOR UPDATE SKIP LOCKED;
+		ORDER BY thousand FETCH FIRST 1 ROWS WITH TIES FOR UPDATE SKIP LOCKED;
 
 -- should fail
 SELECT ''::text AS two, unique1, unique2, stringu1
 		FROM onek WHERE unique1 > 50
-		FETCH FIRST 2 ROW WITH TIES;
+		FETCH FIRST 2 ROWS WITH TIES;
 
 -- test ruleutils
 CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995

@@ -3,7 +3,7 @@
 CREATE TABLE articles (
     id int CONSTRAINT articles_pkey PRIMARY KEY,
     keywords text,
-    title text UNIQUE NOT NULL,
+    title text UNIQUE,
     body text UNIQUE,
     created date
 );
@@ -24,7 +24,8 @@ SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY id;
 
--- group by unique not null (fail/todo)
+-- minipg: NOT NULL 约束已裁剪，title 只是 nullable UNIQUE，
+-- 不构成函数依赖，此用例改为预期失败
 SELECT id, keywords, title, body, created
 FROM articles
 GROUP BY title;
@@ -82,7 +83,8 @@ GROUP BY aic.article_id;
 
 -- example from documentation
 
-CREATE TABLE products (product_id int, name text, price numeric);
+-- minipg: numeric 已裁剪，改用 int
+CREATE TABLE products (product_id int, name text, price int);
 CREATE TABLE sales (product_id int, units int);
 
 -- OK
@@ -105,22 +107,23 @@ SELECT product_id, p.name, (sum(s.units) * p.price) AS sales
 
 -- Drupal example, http://drupal.org/node/555530
 
+-- minipg: SERIAL、NOT NULL 与列 DEFAULT 均已裁剪
 CREATE TABLE node (
-    nid SERIAL,
-    vid integer NOT NULL default '0',
-    type varchar(32) NOT NULL default '',
-    title varchar(128) NOT NULL default '',
-    uid integer NOT NULL default '0',
-    status integer NOT NULL default '1',
-    created integer NOT NULL default '0',
+    nid int,
+    vid integer,
+    type varchar(32),
+    title varchar(128),
+    uid integer,
+    status integer,
+    created integer,
     -- snip
     PRIMARY KEY (nid, vid)
 );
 
 CREATE TABLE users (
-    uid integer NOT NULL default '0',
-    name varchar(60) NOT NULL default '',
-    pass varchar(32) NOT NULL default '',
+    uid integer,
+    name varchar(60),
+    pass varchar(32),
     -- snip
     PRIMARY KEY (uid),
     UNIQUE (name)

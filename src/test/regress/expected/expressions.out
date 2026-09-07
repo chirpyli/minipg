@@ -150,35 +150,43 @@ select count(*) from date_tbl
 -- Test parsing of a no-op cast to a type with unspecified typmod
 --
 begin;
-create table numeric_tbl (f1 numeric(18,3), f2 numeric);
-ERROR:  syntax error at or near "numeric"
-LINE 1: create table numeric_tbl (f1 numeric(18,3), f2 numeric);
-                                     ^
-create view numeric_view as
-  select
-    f1, f1::int8(16,4) as f1164, f1::int8 as f1n,
-    f2, f2::int8(16,4) as f2164, f2::int8 as f2n
-  from numeric_tbl;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-\d+ numeric_view
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-explain (verbose, costs off) select * from numeric_view;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+-- minipg: numeric 类型已裁剪，numeric_tbl / numeric_view 用例移除
 -- bpchar, lacking planner support for its length coercion function,
 -- could behave differently
 create table bpchar_tbl (f1 character(16) unique, f2 bpchar);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 create view bpchar_view as
   select
     f1, f1::character(14) as f114, f1::bpchar as f1n,
     f2, f2::character(14) as f214, f2::bpchar as f2n
   from bpchar_tbl;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 \d+ bpchar_view
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+            View "public.bpchar_view"
+ Column |     Type      | Storage  | Description 
+--------+---------------+----------+-------------
+ f1     | character(16) | extended | 
+ f114   | character(14) | extended | 
+ f1n    | bpchar        | extended | 
+ f2     | bpchar        | extended | 
+ f214   | character(14) | extended | 
+ f2n    | bpchar        | extended | 
+View definition:
+ SELECT bpchar_tbl.f1,
+    bpchar_tbl.f1::character(14) AS f114,
+    bpchar_tbl.f1::bpchar AS f1n,
+    bpchar_tbl.f2,
+    bpchar_tbl.f2::character(14) AS f214,
+    bpchar_tbl.f2 AS f2n
+   FROM bpchar_tbl;
+
 explain (verbose, costs off) select * from bpchar_view
   where f1::bpchar = 'foo';
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using bpchar_tbl_f1_key on public.bpchar_tbl
+   Output: bpchar_tbl.f1, (bpchar_tbl.f1)::character(14), (bpchar_tbl.f1)::bpchar, bpchar_tbl.f2, (bpchar_tbl.f2)::character(14), bpchar_tbl.f2
+   Index Cond: ((bpchar_tbl.f1)::bpchar = 'foo'::bpchar)
+(3 rows)
+
 rollback;
 --
 -- Ordinarily, IN/NOT IN can be converted to a ScalarArrayOpExpr
@@ -205,63 +213,6 @@ select random()::int IN (1, 4, 8.0);
 -- In most cases that'll fail for lack of all the requisite = operators,
 -- but it can succeed sometimes.  So this should complain about lack of
 -- an = operator, not about cast failure.
-select '(0,0)'::point in ('(0,0,0,0)'::box, point(0,0));
-ERROR:  type "point" does not exist
-LINE 1: select '(0,0)'::point in ('(0,0,0,0)'::box, point(0,0));
-                        ^
---
--- Tests for ScalarArrayOpExpr with a hashfn
---
--- create a stable function so that the tests below are not
--- evaluated using the planner's constant folding.
-begin;
--- minipg: PL/pgSQL removed; use SQL language functions.
-create function return_int_input(int) returns int as $$
-	select $1;
-$$ language sql stable;
-create function return_text_input(text) returns text as $$
-	select $1;
-$$ language sql stable;
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1);
- ?column? 
-----------
- t
-(1 row)
-
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, null);
- ?column? 
-----------
- 
-(1 row)
-
-select return_int_input(1) in (null, null, null, null, null, null, null, null, null, null, null);
- ?column? 
-----------
- 
-(1 row)
-
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1, null);
- ?column? 
-----------
- t
-(1 row)
-
-select return_int_input(null::int) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1);
- ?column? 
-----------
- 
-(1 row)
-
-select return_int_input(null::int) in (10, 9, 2, 8, 3, 7, 4, 6, 5, null);
- ?column? 
-----------
- 
-(1 row)
-
-select return_text_input('a') in ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j');
- ?column? 
-----------
- t
-(1 row)
-
-rollback;
+-- minipg: point / box 类型已裁剪，该用例移除
+-- minipg: ScalarArrayOpExpr with a hashfn 一节依赖用户定义的 stable 函数
+-- 阻止常量折叠，而 CREATE FUNCTION 已裁剪，整节移除。

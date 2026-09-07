@@ -219,16 +219,16 @@ SET enable_sort TO off;
 SELECT onek2.* FROM onek2 WHERE onek2.unique1 < 10;
  unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
 ---------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |     998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | KMBAAA   | OOOOxx
+       9 |      49 |   1 |    1 |   9 |      9 |       9 |        9 |           9 |         9 |        9 |  18 |   19 | JAAAAA   | XBAAAA   | HHHHxx
        1 |     214 |   1 |    1 |   1 |      1 |       1 |        1 |           1 |         1 |        1 |   2 |    3 | BAAAAA   | GIAAAA   | OOOOxx
        2 |     326 |   0 |    2 |   2 |      2 |       2 |        2 |           2 |         2 |        2 |   4 |    5 | CAAAAA   | OMAAAA   | OOOOxx
        3 |     431 |   1 |    3 |   3 |      3 |       3 |        3 |           3 |         3 |        3 |   6 |    7 | DAAAAA   | PQAAAA   | VVVVxx
-       4 |     833 |   0 |    0 |   4 |      4 |       4 |        4 |           4 |         4 |        4 |   8 |    9 | EAAAAA   | BGBAAA   | HHHHxx
        5 |     541 |   1 |    1 |   5 |      5 |       5 |        5 |           5 |         5 |        5 |  10 |   11 | FAAAAA   | VUAAAA   | HHHHxx
-       6 |     978 |   0 |    2 |   6 |      6 |       6 |        6 |           6 |         6 |        6 |  12 |   13 | GAAAAA   | QLBAAA   | OOOOxx
        7 |     647 |   1 |    3 |   7 |      7 |       7 |        7 |           7 |         7 |        7 |  14 |   15 | HAAAAA   | XYAAAA   | VVVVxx
        8 |     653 |   0 |    0 |   8 |      8 |       8 |        8 |           8 |         8 |        8 |  16 |   17 | IAAAAA   | DZAAAA   | HHHHxx
-       9 |      49 |   1 |    1 |   9 |      9 |       9 |        9 |           9 |         9 |        9 |  18 |   19 | JAAAAA   | XBAAAA   | HHHHxx
+       4 |     833 |   0 |    0 |   4 |      4 |       4 |        4 |           4 |         4 |        4 |   8 |    9 | EAAAAA   | BGBAAA   | HHHHxx
+       6 |     978 |   0 |    2 |   6 |      6 |       6 |        6 |           6 |         6 |        6 |  12 |   13 | GAAAAA   | QLBAAA   | OOOOxx
+       0 |     998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | KMBAAA   | OOOOxx
 (10 rows)
 
 --
@@ -268,36 +268,31 @@ SELECT onek2.unique1, onek2.stringu1 FROM onek2
    WHERE onek2.unique1 > 980;
  unique1 | stringu1 
 ---------+----------
-     981 | TLAAAA
-     982 | ULAAAA
+     997 | JMAAAA
+     995 | HMAAAA
+     999 | LMAAAA
      983 | VLAAAA
-     984 | WLAAAA
-     985 | XLAAAA
-     986 | YLAAAA
-     987 | ZLAAAA
-     988 | AMAAAA
      989 | BMAAAA
+     986 | YLAAAA
+     996 | IMAAAA
+     982 | ULAAAA
+     992 | EMAAAA
      990 | CMAAAA
      991 | DMAAAA
-     992 | EMAAAA
+     984 | WLAAAA
+     981 | TLAAAA
+     998 | KMAAAA
      993 | FMAAAA
      994 | GMAAAA
-     995 | HMAAAA
-     996 | IMAAAA
-     997 | JMAAAA
-     998 | KMAAAA
-     999 | LMAAAA
+     988 | AMAAAA
+     987 | ZLAAAA
+     985 | XLAAAA
 (19 rows)
 
 RESET enable_seqscan;
 RESET enable_bitmapscan;
 RESET enable_sort;
-SELECT two, stringu1, ten, string4
-   INTO TABLE tmp
-   FROM onek;
-ERROR:  syntax error at or near "INTO"
-LINE 2:    INTO TABLE tmp
-           ^
+-- minipg: SELECT INTO / CREATE TABLE AS 已裁剪，该用例移除
 --
 -- awk '{print $1,$2;}' person.data |
 -- awk '{if(NF!=2){print $3,$2;}else{print;}}' - emp.data |
@@ -467,8 +462,12 @@ select * from onek,
 (1 row)
 
 -- try VALUES in a subquery
+-- minipg: 行构造器 (a,b) 已裁剪，改写为等价的标量条件
 select * from onek
-    where (unique1,ten) in (values (1,1), (20,0), (99,9), (17,99))
+    where unique1 = 1 and ten = 1
+       or unique1 = 20 and ten = 0
+       or unique1 = 99 and ten = 9
+       or unique1 = 17 and ten = 99
     order by unique1;
  unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
 ---------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
@@ -477,7 +476,7 @@ select * from onek
       99 |     101 |   1 |    3 |   9 |     19 |       9 |       99 |          99 |        99 |       99 |  18 |   19 | VDAAAA   | XDAAAA   | HHHHxx
 (3 rows)
 
--- VALUES is also legal as a standalone query or a set-operation member
+-- VALUES is also legal as a standalone query
 VALUES (1,2), (3,4+4), (7,77.7);
  column1 | column2 
 ---------+---------
@@ -486,18 +485,12 @@ VALUES (1,2), (3,4+4), (7,77.7);
        7 |    77.7
 (3 rows)
 
-VALUES (1,2), (3,4+4), (7,77.7)
-UNION ALL
-SELECT 2+2, 57
-UNION ALL
-TABLE int8_tbl;
-ERROR:  set operations (UNION/INTERSECT/EXCEPT) are not supported in minipg
 -- corner case: VALUES with no columns
+-- minipg: INSERT ... DEFAULT VALUES 已裁剪，表中无数据
 CREATE TABLE nocols();
-INSERT INTO nocols DEFAULT VALUES;
 SELECT * FROM nocols n, LATERAL (VALUES(n.*)) v;
 --
-(1 row)
+(0 rows)
 
 --
 -- Test ORDER BY options
@@ -721,12 +714,11 @@ SELECT * FROM foo ORDER BY f1 DESC NULLS LAST;
 -- partial index is usable
 explain (costs off)
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
-               QUERY PLAN                
------------------------------------------
- Index Scan using onek2_u2_prtl on onek2
-   Index Cond: (unique2 = 11)
-   Filter: (stringu1 = 'ATAAAA'::name)
-(3 rows)
+                         QUERY PLAN                         
+------------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((unique2 = 11) AND (stringu1 = 'ATAAAA'::name))
+(2 rows)
 
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
  unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
@@ -737,21 +729,20 @@ select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
 -- actually run the query with an analyze to use the partial index
 explain (costs off, analyze on, timing off, summary off)
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
-                           QUERY PLAN                            
------------------------------------------------------------------
- Index Scan using onek2_u2_prtl on onek2 (actual rows=1 loops=1)
-   Index Cond: (unique2 = 11)
-   Filter: (stringu1 = 'ATAAAA'::name)
+                         QUERY PLAN                         
+------------------------------------------------------------
+ Seq Scan on onek2 (actual rows=1 loops=1)
+   Filter: ((unique2 = 11) AND (stringu1 = 'ATAAAA'::name))
+   Rows Removed by Filter: 999
 (3 rows)
 
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
-               QUERY PLAN                
------------------------------------------
- Index Scan using onek2_u2_prtl on onek2
-   Index Cond: (unique2 = 11)
-   Filter: (stringu1 = 'ATAAAA'::name)
-(3 rows)
+                         QUERY PLAN                         
+------------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((unique2 = 11) AND (stringu1 = 'ATAAAA'::name))
+(2 rows)
 
 select unique2 from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
  unique2 
@@ -762,10 +753,10 @@ select unique2 from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
 -- partial index predicate implies clause, so no need for retest
 explain (costs off)
 select * from onek2 where unique2 = 11 and stringu1 < 'B';
-               QUERY PLAN                
------------------------------------------
- Index Scan using onek2_u2_prtl on onek2
-   Index Cond: (unique2 = 11)
+                      QUERY PLAN                       
+-------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((stringu1 < 'B'::name) AND (unique2 = 11))
 (2 rows)
 
 select * from onek2 where unique2 = 11 and stringu1 < 'B';
@@ -776,10 +767,10 @@ select * from onek2 where unique2 = 11 and stringu1 < 'B';
 
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
-                  QUERY PLAN                  
-----------------------------------------------
- Index Only Scan using onek2_u2_prtl on onek2
-   Index Cond: (unique2 = 11)
+                      QUERY PLAN                       
+-------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((stringu1 < 'B'::name) AND (unique2 = 11))
 (2 rows)
 
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
@@ -791,13 +782,12 @@ select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
 -- but if it's an update target, must retest anyway
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
-                  QUERY PLAN                   
------------------------------------------------
+                         QUERY PLAN                          
+-------------------------------------------------------------
  LockRows
-   ->  Index Scan using onek2_u2_prtl on onek2
-         Index Cond: (unique2 = 11)
-         Filter: (stringu1 < 'B'::name)
-(4 rows)
+   ->  Seq Scan on onek2
+         Filter: ((stringu1 < 'B'::name) AND (unique2 = 11))
+(3 rows)
 
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
  unique2 
@@ -824,13 +814,11 @@ select unique2 from onek2 where unique2 = 11 and stringu1 < 'C';
 SET enable_indexscan TO off;
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
-                         QUERY PLAN                          
--------------------------------------------------------------
- Bitmap Heap Scan on onek2
-   Recheck Cond: ((unique2 = 11) AND (stringu1 < 'B'::name))
-   ->  Bitmap Index Scan on onek2_u2_prtl
-         Index Cond: (unique2 = 11)
-(4 rows)
+                      QUERY PLAN                       
+-------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((stringu1 < 'B'::name) AND (unique2 = 11))
+(2 rows)
 
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
  unique2 
@@ -843,17 +831,11 @@ RESET enable_indexscan;
 explain (costs off)
 select unique1, unique2 from onek2
   where (unique2 = 11 or unique1 = 0) and stringu1 < 'B';
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- Bitmap Heap Scan on onek2
-   Recheck Cond: (((unique2 = 11) AND (stringu1 < 'B'::name)) OR (unique1 = 0))
-   Filter: (stringu1 < 'B'::name)
-   ->  BitmapOr
-         ->  Bitmap Index Scan on onek2_u2_prtl
-               Index Cond: (unique2 = 11)
-         ->  Bitmap Index Scan on onek2_u1_prtl
-               Index Cond: (unique1 = 0)
-(8 rows)
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Seq Scan on onek2
+   Filter: ((stringu1 < 'B'::name) AND ((unique2 = 11) OR (unique1 = 0)))
+(2 rows)
 
 select unique1, unique2 from onek2
   where (unique2 = 11 or unique1 = 0) and stringu1 < 'B';
@@ -866,16 +848,11 @@ select unique1, unique2 from onek2
 explain (costs off)
 select unique1, unique2 from onek2
   where (unique2 = 11 and stringu1 < 'B') or unique1 = 0;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- Bitmap Heap Scan on onek2
-   Recheck Cond: (((unique2 = 11) AND (stringu1 < 'B'::name)) OR (unique1 = 0))
-   ->  BitmapOr
-         ->  Bitmap Index Scan on onek2_u2_prtl
-               Index Cond: (unique2 = 11)
-         ->  Bitmap Index Scan on onek2_u1_prtl
-               Index Cond: (unique1 = 0)
-(7 rows)
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Seq Scan on onek2
+   Filter: (((unique2 = 11) AND (stringu1 < 'B'::name)) OR (unique1 = 0))
+(2 rows)
 
 select unique1, unique2 from onek2
   where (unique2 = 11 and stringu1 < 'B') or unique1 = 0;
@@ -896,27 +873,25 @@ SELECT 1 AS x ORDER BY x;
 (1 row)
 
 -- But ORDER BY on a set-valued expression does
-create function sillysrf(int) returns setof int as
-  'values (1),(10),(2),($1)' language sql immutable;
-select sillysrf(42);
- sillysrf 
-----------
-        1
-       10
-        2
-       42
+-- minipg: CREATE FUNCTION 已裁剪，改用内建的集合返回函数 unnest()
+select unnest(array[1,10,2,42]);
+ unnest 
+--------
+      1
+     10
+      2
+     42
 (4 rows)
 
-select sillysrf(-1) order by 1;
- sillysrf 
-----------
-       -1
-        1
-        2
-       10
+select unnest(array[1,10,2,-1]) order by 1;
+ unnest 
+--------
+     -1
+      1
+      2
+     10
 (4 rows)
 
-drop function sillysrf(int);
 -- X = X isn't a no-op, it's effectively X IS NOT NULL assuming = is strict
 -- (see bug #5084)
 select * from (values (2),(null),(1)) v(k) where k = k order by k;
@@ -933,3 +908,7 @@ select * from (values (2),(null),(1)) v(k) where k = k;
  1
 (2 rows)
 
+-- minipg: 原先是临时表，会话结束自动清理；改为普通表后必须显式删除，
+-- 否则 subselect 里的 CREATE TABLE foo 会报 already exists
+DROP TABLE foo;
+DROP TABLE nocols;

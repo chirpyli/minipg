@@ -2,20 +2,18 @@
 -- TRANSACTIONS
 --
 BEGIN;
-SELECT *
-   INTO TABLE xacttest
-   FROM aggtest;
-ERROR:  syntax error at or near "INTO"
-LINE 2:    INTO TABLE xacttest
-           ^
+-- minipg: SELECT INTO / CREATE TABLE AS 已裁剪，改为显式建表 + INSERT SELECT
+CREATE TABLE xacttest (a int2, b float4);
+INSERT INTO xacttest SELECT * FROM aggtest;
 INSERT INTO xacttest (a, b) VALUES (777, 777.777);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 END;
 -- should retrieve one value--
 SELECT a FROM xacttest WHERE a > 100;
-ERROR:  relation "xacttest" does not exist
-LINE 1: SELECT a FROM xacttest WHERE a > 100;
-                      ^
+  a  
+-----
+ 777
+(1 row)
+
 BEGIN;
 CREATE TABLE disappear (a int4);
 DELETE FROM aggtest;
@@ -134,14 +132,7 @@ DELETE FROM temptest; -- ok
 ERROR:  cannot execute DELETE in a read-only transaction
 UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = temptest.a; -- ok
 ERROR:  cannot execute UPDATE in a read-only transaction
-PREPARE test AS UPDATE writetest SET a = 0; -- ok
-ERROR:  syntax error at or near "test"
-LINE 1: PREPARE test AS UPDATE writetest SET a = 0;
-                ^
-EXECUTE test; -- fail
-ERROR:  syntax error at or near "EXECUTE"
-LINE 1: EXECUTE test;
-        ^
+-- minipg: PREPARE / EXECUTE（预备语句）已裁剪，该用例移除
 SELECT * FROM writetest, temptest; -- ok
  a | a 
 ---+---
@@ -404,64 +395,18 @@ SELECT 1;			-- this should work
 -- also check that they don't see commits of concurrent transactions, but
 -- that's a mite hard to do within the limitations of pg_regress.)
 --
+-- minipg: CREATE FUNCTION 已裁剪，"stable/volatile 函数是否稳定" 一节
+-- 失去测试载体，整节移除；仅保留 xacttest 的内容快照。
 select * from xacttest;
-ERROR:  relation "xacttest" does not exist
-LINE 1: select * from xacttest;
-                      ^
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' stable;
-ERROR:  relation "xacttest" does not exist
-LINE 2: 'select max(a) from xacttest' stable;
-                            ^
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-ERROR:  relation "xacttest" does not exist
-LINE 1: update xacttest set a = max_xacttest() + 10 where a > 0;
-               ^
-select * from xacttest;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-rollback;
--- But a volatile function can see the partial results of the calling query
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' volatile;
-ERROR:  relation "xacttest" does not exist
-LINE 2: 'select max(a) from xacttest' volatile;
-                            ^
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-ERROR:  relation "xacttest" does not exist
-LINE 1: update xacttest set a = max_xacttest() + 10 where a > 0;
-               ^
-select * from xacttest;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-rollback;
--- minipg: PL/pgSQL removed; SQL equivalent of the SPI-dependent version.
-create or replace function max_xacttest() returns smallint language sql as
-'SELECT max(a) FROM xacttest' stable;
-ERROR:  relation "xacttest" does not exist
-LINE 2: 'SELECT max(a) FROM xacttest' stable;
-                            ^
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-ERROR:  relation "xacttest" does not exist
-LINE 1: update xacttest set a = max_xacttest() + 10 where a > 0;
-               ^
-select * from xacttest;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-rollback;
-create or replace function max_xacttest() returns smallint language sql as
-'SELECT max(a) FROM xacttest' volatile;
-ERROR:  relation "xacttest" does not exist
-LINE 2: 'SELECT max(a) FROM xacttest' volatile;
-                            ^
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-ERROR:  relation "xacttest" does not exist
-LINE 1: update xacttest set a = max_xacttest() + 10 where a > 0;
-               ^
-select * from xacttest;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-rollback;
+  a  |    b    
+-----+---------
+  56 |     7.8
+ 100 |  99.097
+   0 | 0.09561
+  42 |  324.78
+ 777 | 777.777
+(5 rows)
+
 -- test case for problems with dropping an open relation during abort
 BEGIN;
 	savepoint x;

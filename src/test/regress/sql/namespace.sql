@@ -13,7 +13,7 @@ CREATE SCHEMA test_ns_schema_1
               SELECT a+1 AS a, b+1 AS b FROM abc
 
        CREATE TABLE abc (
-              a serial,
+              a int,
               b int UNIQUE
        );
 
@@ -41,28 +41,29 @@ DROP SCHEMA test_ns_schema_2 CASCADE;
 SELECT COUNT(*) FROM pg_class WHERE relnamespace =
     (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
 
-INSERT INTO test_ns_schema_1.abc DEFAULT VALUES;
-INSERT INTO test_ns_schema_1.abc DEFAULT VALUES;
-INSERT INTO test_ns_schema_1.abc DEFAULT VALUES;
+-- minipg: DEFAULT VALUES 已裁剪，改为显式插入
+INSERT INTO test_ns_schema_1.abc (a, b) VALUES (1, 1);
+INSERT INTO test_ns_schema_1.abc (a, b) VALUES (2, 2);
+INSERT INTO test_ns_schema_1.abc (a, b) VALUES (3, 3);
 
 SELECT * FROM test_ns_schema_1.abc;
 SELECT * FROM test_ns_schema_1.abc_view;
 
-ALTER SCHEMA test_ns_schema_1 RENAME TO test_ns_schema_renamed;
+-- minipg: ALTER SCHEMA ... RENAME 已裁剪，无法改名，直接对原 schema 断言
 SELECT COUNT(*) FROM pg_class WHERE relnamespace =
     (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
 
 -- test IF NOT EXISTS cases
-CREATE SCHEMA test_ns_schema_renamed; -- fail, already exists
-CREATE SCHEMA IF NOT EXISTS test_ns_schema_renamed; -- ok with notice
-CREATE SCHEMA IF NOT EXISTS test_ns_schema_renamed -- fail, disallowed
+CREATE SCHEMA test_ns_schema_1; -- fail, already exists
+CREATE SCHEMA IF NOT EXISTS test_ns_schema_1; -- ok with notice
+CREATE SCHEMA IF NOT EXISTS test_ns_schema_1 -- fail, disallowed
        CREATE TABLE abc (
-              a serial,
+              a int,
               b int UNIQUE
        );
 
-DROP SCHEMA test_ns_schema_renamed CASCADE;
+DROP SCHEMA test_ns_schema_1 CASCADE;
 
 -- verify that the objects were dropped
 SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_renamed');
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');

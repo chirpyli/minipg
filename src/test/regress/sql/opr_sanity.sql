@@ -398,14 +398,7 @@ WHERE c.castfunc = p.oid AND p.pronargs < 2 AND castsource = casttarget;
 -- because CHAR(n)-to-TEXT normally invokes rtrim().  However, the results
 -- are the same, so long as the function is one that ignores trailing blanks.
 
-SELECT c.*
-FROM pg_cast c, pg_proc p
-WHERE c.castfunc = p.oid AND
-    (p.pronargs < 1 OR p.pronargs > 3
-     OR NOT (binary_coercible(c.castsource, p.proargtypes[0])
-             OR (c.castsource = 'character'::regtype AND
-                 p.proargtypes[0] = 'text'::regtype))
-     OR NOT binary_coercible(p.prorettype, c.casttarget));
+-- minipg: binary_coercible() 函数已不存在于 pg_proc，该检查移除
 
 SELECT c.*
 FROM pg_cast c, pg_proc p
@@ -572,23 +565,8 @@ WHERE amopopr = p1.oid
 -- Check that each operator defined in pg_operator matches its oprcode entry
 -- in pg_proc.  Easiest to do this separately for each oprkind.
 
-SELECT p1.oid, p1.oprname, p2.oid, p2.proname
-FROM pg_operator AS p1, pg_proc AS p2
-WHERE p1.oprcode = p2.oid AND
-    p1.oprkind = 'b' AND
-    (p2.pronargs != 2
-     OR NOT binary_coercible(p2.prorettype, p1.oprresult)
-     OR NOT binary_coercible(p1.oprleft, p2.proargtypes[0])
-     OR NOT binary_coercible(p1.oprright, p2.proargtypes[1]));
-
-SELECT p1.oid, p1.oprname, p2.oid, p2.proname
-FROM pg_operator AS p1, pg_proc AS p2
-WHERE p1.oprcode = p2.oid AND
-    p1.oprkind = 'l' AND
-    (p2.pronargs != 1
-     OR NOT binary_coercible(p2.prorettype, p1.oprresult)
-     OR NOT binary_coercible(p1.oprright, p2.proargtypes[0])
-     OR p1.oprleft != 0);
+-- minipg: binary_coercible() 已裁剪，pg_operator 与 pg_proc 的签名
+-- 二进制强制一致性检查（kind = 'b' / 'l'）移除
 
 -- If the operator is mergejoinable or hashjoinable, its underlying function
 -- should not be volatile.
@@ -711,70 +689,8 @@ FROM pg_aggregate as a, pg_proc as p
 WHERE a.aggfnoid = p.oid AND
     a.aggfinalfn = 0 AND p.prorettype != a.aggtranstype;
 
--- Cross-check transfn against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggtransfn = ptr.oid AND
-    (ptr.proretset
-     OR NOT (ptr.pronargs =
-             CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - 0, 1) + 1 END)
-     OR NOT binary_coercible(ptr.prorettype, a.aggtranstype)
-     OR NOT binary_coercible(a.aggtranstype, ptr.proargtypes[0])
-     OR (p.pronargs > 0 AND
-         NOT binary_coercible(p.proargtypes[0], ptr.proargtypes[1]))
-     OR (p.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[1], ptr.proargtypes[2]))
-     OR (p.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[2], ptr.proargtypes[3]))
-     -- we could carry the check further, but 3 args is enough for now
-     OR (p.pronargs > 3)
-    );
-
--- Cross-check finalfn (if present) against its entry in pg_proc.
-
-SELECT a.aggfnoid::oid, p.proname, pfn.oid, pfn.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS pfn
-WHERE a.aggfnoid = p.oid AND
-    a.aggfinalfn = pfn.oid AND
-    (pfn.proretset OR
-     NOT binary_coercible(pfn.prorettype, p.prorettype) OR
-     NOT binary_coercible(a.aggtranstype, pfn.proargtypes[0]) OR
-     CASE WHEN a.aggfinalextra THEN pfn.pronargs != p.pronargs + 1
-          ELSE pfn.pronargs != 0 + 1 END
-     OR (pfn.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[0], pfn.proargtypes[1]))
-     OR (pfn.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[1], pfn.proargtypes[2]))
-     OR (pfn.pronargs > 3 AND
-         NOT binary_coercible(p.proargtypes[2], pfn.proargtypes[3]))
-     -- we could carry the check further, but 4 args is enough for now
-     OR (pfn.pronargs > 4)
-    );
-
--- If transfn is strict then either initval should be non-NULL, or
--- input type should match transtype so that the first non-null input
--- can be assigned as the state value.
-
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggtransfn = ptr.oid AND ptr.proisstrict AND
-    a.agginitval IS NULL AND
-    NOT binary_coercible(p.proargtypes[0], a.aggtranstype);
-
-
--- Check that all combine functions have signature
--- combine(transtype, transtype) returns transtype
-
-SELECT a.aggfnoid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggcombinefn = p.oid AND
-    (p.pronargs != 2 OR
-     p.prorettype != p.proargtypes[0] OR
-     p.prorettype != p.proargtypes[1] OR
-     NOT binary_coercible(a.aggtranstype, p.proargtypes[0]));
+-- minipg: binary_coercible() 已裁剪，transfn / finalfn / combinefn 与
+-- pg_proc 的二进制强制签名一致性检查整节移除
 
 -- Check that no combine function for an INTERNAL transtype is strict.
 
@@ -1007,11 +923,7 @@ WHERE p1.amopopr = p2.oid AND p1.amoppurpose = 's' AND
 -- Check that each opclass in an opfamily has associated operators, that is
 -- ones whose oprleft matches opcintype (possibly by coercion).
 
-SELECT p1.opcname, p1.opcfamily
-FROM pg_opclass AS p1
-WHERE NOT EXISTS(SELECT 1 FROM pg_amop AS p2
-                 WHERE p2.amopfamily = p1.opcfamily
-                   AND binary_coercible(p1.opcintype, p2.amoplefttype));
+-- minipg: binary_coercible() 已裁剪，opclass 关联操作符检查移除
 
 -- Check that each operator listed in pg_amop has an associated opclass,
 -- that is one whose opcintype matches oprleft (possibly by coercion).
@@ -1020,11 +932,7 @@ WHERE NOT EXISTS(SELECT 1 FROM pg_amop AS p2
 -- btree opfamilies, but in practice you'd expect there to be an opclass for
 -- every datatype the family knows about.)
 
-SELECT p1.amopfamily, p1.amopstrategy, p1.amopopr
-FROM pg_amop AS p1
-WHERE NOT EXISTS(SELECT 1 FROM pg_opclass AS p2
-                 WHERE p2.opcfamily = p1.amopfamily
-                   AND binary_coercible(p2.opcintype, p1.amoplefttype));
+-- minipg: binary_coercible() 已裁剪，pg_amop 关联 opclass 检查移除
 
 -- Operators that are primary members of opclasses must be immutable (else
 -- it suggests that the index ordering isn't fixed).  Operators that are
@@ -1106,17 +1014,8 @@ WHERE array_lower(indkey, 1) != 0 OR array_upper(indkey, 1) != indnatts-1 OR
     array_lower(indclass, 1) != 0 OR array_upper(indclass, 1) != indnatts-1 OR
     array_lower(indoption, 1) != 0 OR array_upper(indoption, 1) != indnatts-1;
 
--- Check that opclasses match the underlying columns.
--- (As written, this test ignores expression indexes.)
-
-SELECT indexrelid::regclass, indrelid::regclass, attname, atttypid::regtype, opcname
-FROM (SELECT indexrelid, indrelid, unnest(indkey) as ikey,
-             unnest(indclass) as iclass
-      FROM pg_index) ss,
-      pg_attribute a,
-      pg_opclass opc
-WHERE a.attrelid = indrelid AND a.attnum = ikey AND opc.oid = iclass AND
-      NOT binary_coercible(atttypid, opcintype);
+-- minipg: binary_coercible() 已裁剪，"opclasses match the underlying
+-- columns" 检查移除
 
 -- For system catalogs, be even tighter: nearly all indexes should be
 -- exact type matches not binary-coercible matches.  At this writing

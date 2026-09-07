@@ -70,17 +70,7 @@ select count(*) from date_tbl
 --
 begin;
 
-create table numeric_tbl (f1 numeric(18,3), f2 numeric);
-
-create view numeric_view as
-  select
-    f1, f1::int8(16,4) as f1164, f1::int8 as f1n,
-    f2, f2::int8(16,4) as f2164, f2::int8 as f2n
-  from numeric_tbl;
-
-\d+ numeric_view
-
-explain (verbose, costs off) select * from numeric_view;
+-- minipg: numeric 类型已裁剪，numeric_tbl / numeric_view 用例移除
 
 -- bpchar, lacking planner support for its length coercion function,
 -- could behave differently
@@ -114,32 +104,7 @@ select random()::int IN (1, 4, 8.0);
 -- In most cases that'll fail for lack of all the requisite = operators,
 -- but it can succeed sometimes.  So this should complain about lack of
 -- an = operator, not about cast failure.
-select '(0,0)'::point in ('(0,0,0,0)'::box, point(0,0));
+-- minipg: point / box 类型已裁剪，该用例移除
 
-
---
--- Tests for ScalarArrayOpExpr with a hashfn
---
-
--- create a stable function so that the tests below are not
--- evaluated using the planner's constant folding.
-begin;
-
--- minipg: PL/pgSQL removed; use SQL language functions.
-create function return_int_input(int) returns int as $$
-	select $1;
-$$ language sql stable;
-
-create function return_text_input(text) returns text as $$
-	select $1;
-$$ language sql stable;
-
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1);
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, null);
-select return_int_input(1) in (null, null, null, null, null, null, null, null, null, null, null);
-select return_int_input(1) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1, null);
-select return_int_input(null::int) in (10, 9, 2, 8, 3, 7, 4, 6, 5, 1);
-select return_int_input(null::int) in (10, 9, 2, 8, 3, 7, 4, 6, 5, null);
-select return_text_input('a') in ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j');
-
-rollback;
+-- minipg: ScalarArrayOpExpr with a hashfn 一节依赖用户定义的 stable 函数
+-- 阻止常量折叠，而 CREATE FUNCTION 已裁剪，整节移除。

@@ -1052,7 +1052,6 @@ _equalViewStmt(const ViewStmt *a, const ViewStmt *b)
 	COMPARE_NODE_FIELD(aliases);
 	COMPARE_NODE_FIELD(query);
 	COMPARE_SCALAR_FIELD(replace);
-	COMPARE_NODE_FIELD(options);
 
 	return true;
 }
