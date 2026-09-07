@@ -1,7 +1,7 @@
 --
 -- TYPE_SANITY
 -- Sanity checks for common errors in making type-related system tables:
--- pg_type, pg_class, pg_attribute, pg_range.
+-- pg_type, pg_class, pg_attribute.
 --
 -- None of the SELECTs here should ever find any matching entries,
 -- so the expected output is easy to maintain ;-).
@@ -70,22 +70,6 @@ FROM   pg_type p1 LEFT JOIN pg_type p2 ON (p1.typarray = p2.oid)
 WHERE  p1.typarray <> 0 AND
        (p2.oid IS NULL OR
         p2.typsubscript <> 'array_subscript_handler'::regproc);
-
--- Look for range types that do not have a pg_range entry
-SELECT p1.oid, p1.typname
-FROM pg_type as p1
-WHERE p1.typtype = 'r' AND
-   NOT EXISTS(SELECT 1 FROM pg_range r WHERE rngtypid = p1.oid);
-
--- Look for range types whose typalign isn't sufficient
-SELECT p1.oid, p1.typname, p1.typalign, p2.typname, p2.typalign
-FROM pg_type as p1
-     LEFT JOIN pg_range as r ON rngtypid = p1.oid
-     LEFT JOIN pg_type as p2 ON rngsubtype = p2.oid
-WHERE p1.typtype = 'r' AND
-    (p1.typalign != (CASE WHEN p2.typalign = 'd' THEN 'd'::"char"
-                          ELSE 'i'::"char" END)
-     OR p2.oid IS NULL);
 
 -- Text conversion routines must be provided.
 
@@ -345,12 +329,6 @@ WHERE p1.typanalyze = p2.oid AND NOT
 
 -- there does not seem to be a reason to care about volatility of typanalyze
 
--- range_typanalyze should be used for all and only range types
-
-SELECT t.oid, t.typname, t.typanalyze
-FROM pg_type t LEFT JOIN pg_range r on t.oid = r.rngtypid
-WHERE (t.typanalyze = 'range_typanalyze'::regproc) != (r.rngtypid IS NOT NULL);
-
 -- array_typanalyze should be used for all and only array types
 -- As of 9.2 this finds int2vector and oidvector, which are weird anyway
 
@@ -428,52 +406,6 @@ WHERE p1.atttypid = p2.oid AND
      p1.attalign != p2.typalign OR
      p1.attbyval != p2.typbyval OR
      (p1.attstorage != p2.typstorage AND p1.attstorage != 'p'));
-
--- **************** pg_range ****************
-
--- Look for illegal values in pg_range fields.
-
-SELECT p1.rngtypid, p1.rngsubtype
-FROM pg_range as p1
-WHERE p1.rngtypid = 0 OR p1.rngsubtype = 0 OR p1.rngsubopc = 0;
-
--- rngcollation should be specified iff subtype is collatable
-
-SELECT p1.rngtypid, p1.rngsubtype, p1.rngcollation, t.typcollation
-FROM pg_range p1 JOIN pg_type t ON t.oid = p1.rngsubtype
-WHERE (rngcollation = 0) != (typcollation = 0);
-
--- opclass had better be a btree opclass accepting the subtype.
--- We must allow anyarray matches, cf IsBinaryCoercible()
-
-SELECT p1.rngtypid, p1.rngsubtype, o.opcmethod, o.opcname
-FROM pg_range p1 JOIN pg_opclass o ON o.oid = p1.rngsubopc
-WHERE o.opcmethod != 403 OR
-    ((o.opcintype != p1.rngsubtype) AND NOT
-     (o.opcintype = 'pg_catalog.anyarray'::regtype AND
-      EXISTS(select 1 from pg_catalog.pg_type where
-             oid = p1.rngsubtype and typelem != 0 and
-             typsubscript = 'array_subscript_handler'::regproc)));
-
--- canonical function, if any, had better match the range type
-
-SELECT p1.rngtypid, p1.rngsubtype, p.proname
-FROM pg_range p1 JOIN pg_proc p ON p.oid = p1.rngcanonical
-WHERE pronargs != 1 OR proargtypes[0] != rngtypid OR prorettype != rngtypid;
-
--- subdiff function, if any, had better match the subtype
-
-SELECT p1.rngtypid, p1.rngsubtype, p.proname
-FROM pg_range p1 JOIN pg_proc p ON p.oid = p1.rngsubdiff
-WHERE pronargs != 2
-    OR proargtypes[0] != rngsubtype OR proargtypes[1] != rngsubtype
-    OR prorettype != 'pg_catalog.float8'::regtype;
-
--- every range should have a valid multirange
-
-SELECT p1.rngtypid, p1.rngsubtype, p1.rngmultitypid
-FROM pg_range p1
-WHERE p1.rngmultitypid IS NULL OR p1.rngmultitypid = 0;
 
 -- Create a table that holds all the known in-core data types and leave it
 -- around so as pg_upgrade is able to test their binary compatibility.
