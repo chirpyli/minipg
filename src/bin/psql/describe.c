@@ -1011,7 +1011,7 @@ describeOneTableDetails(const char *schemaname,
 	if (pset.sversion >= 120000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence, am.amname\n"
@@ -1028,7 +1028,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 100000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -1044,7 +1044,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90500)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -1060,7 +1060,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90400)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -1076,7 +1076,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90100)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -1092,7 +1092,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "FROM pg_catalog.pg_class c\n "
@@ -1107,7 +1107,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80400)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
 						  ""
 						  "%s, c.reltablespace\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -1122,7 +1122,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80200)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "%s, reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -1133,7 +1133,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "'', reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -1142,7 +1142,7 @@ describeOneTableDetails(const char *schemaname,
 	else
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relchecks, relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, relhasrules, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "'', ''\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -1161,20 +1161,19 @@ describeOneTableDetails(const char *schemaname,
 		goto error_return;
 	}
 
-	tableinfo.checks = atoi(PQgetvalue(res, 0, 0));
-	tableinfo.relkind = *(PQgetvalue(res, 0, 1));
-	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
-	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 3), "t") == 0;
-	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 6), "t") == 0;
+	tableinfo.relkind = *(PQgetvalue(res, 0, 0));
+	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 1), "t") == 0;
+	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
+	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 5), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?
-		pg_strdup(PQgetvalue(res, 0, 7)) : NULL;
+		pg_strdup(PQgetvalue(res, 0, 6)) : NULL;
 	tableinfo.tablespace = (pset.sversion >= 80000) ?
-		atooid(PQgetvalue(res, 0, 8)) : 0;
+		atooid(PQgetvalue(res, 0, 7)) : 0;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 9)) : 0;
+		*(PQgetvalue(res, 0, 8)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 10) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 10));
+		tableinfo.relam = PQgetisnull(res, 0, 9) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 9));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -1565,40 +1564,6 @@ describeOneTableDetails(const char *schemaname,
 			}
 			PQclear(result);
 		}
-
-		/* print table (and column) check constraints */
-		if (tableinfo.checks)
-		{
-			printfPQExpBuffer(&buf,
-							  "SELECT r.conname, "
-							  "pg_catalog.pg_get_constraintdef(r.oid, true)\n"
-							  "FROM pg_catalog.pg_constraint r\n"
-							  "WHERE r.conrelid = '%s' AND r.contype = 'c'\n"
-							  "ORDER BY 1;",
-							  oid);
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			if (tuples > 0)
-			{
-				printTableAddFooter(&cont, _("Check constraints:"));
-				for (i = 0; i < tuples; i++)
-				{
-					/* untranslated constraint name and def */
-					printfPQExpBuffer(&buf, "    \"%s\" %s",
-									  PQgetvalue(result, i, 0),
-									  PQgetvalue(result, i, 1));
-
-					printTableAddFooter(&cont, buf.data);
-				}
-			}
-			PQclear(result);
-		}
-
-
 
 		/* print rules */
 		if (tableinfo.hasrules)

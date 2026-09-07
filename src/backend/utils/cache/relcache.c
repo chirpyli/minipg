@@ -1515,9 +1515,6 @@ formrdesc(const char *relationName, Oid relationReltype,
 	/* formrdesc is used only for permanent relations */
 	relation->rd_rel->relpersistence = RELPERSISTENCE_PERMANENT;
 
-	/* ... and they're always populated, too */
-	relation->rd_rel->relispopulated = true;
-
 	relation->rd_rel->relpages = 0;
 	relation->rd_rel->reltuples = -1;
 	relation->rd_rel->relallvisible = 0;
@@ -3047,9 +3044,6 @@ RelationBuildLocalRelation(const char *relname,
 			elog(ERROR, "invalid relpersistence: %c", relpersistence);
 			break;
 	}
-
-	/* relations are populated initially */
-	rel->rd_rel->relispopulated = true;
 
 	/*
 	 * Insert relation physical and logical identifiers (OIDs) into the right

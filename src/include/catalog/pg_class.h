@@ -87,13 +87,8 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	 * contain entries with negative attnums for system attributes.
 	 */
 
-	/* # of CHECK constraints for class */
-	int16		relchecks BKI_DEFAULT(0);
-
 	/* has (or has had) any rules */
 	bool		relhasrules BKI_DEFAULT(f);
-
-	bool		relispopulated BKI_DEFAULT(t);
 
 	/* link to original rel during table rewrite; otherwise 0 */
 	Oid			relrewrite BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_class);

@@ -3767,12 +3767,11 @@ expand_function_arguments(List *args, bool include_out_arguments,
 static List *
 reorder_function_arguments(List *args, int pronargs)
 {
-	int			nargsprovided = list_length(args);
 	Node	   *argarray[FUNC_MAX_ARGS];
 	ListCell   *lc;
 	int			i;
 
-	Assert(nargsprovided <= pronargs);
+	Assert(list_length(args) <= pronargs);
 	if (pronargs < 0 || pronargs > FUNC_MAX_ARGS)
 		elog(ERROR, "too many function arguments");
 	memset(argarray, 0, pronargs * sizeof(Node *));
