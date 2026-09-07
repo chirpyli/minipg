@@ -1278,7 +1278,6 @@ update_attstats(Oid relid, bool inh, int natts, VacAttrStats **vacattrstats)
 
 		values[Anum_pg_statistic_starelid - 1] = ObjectIdGetDatum(relid);
 		values[Anum_pg_statistic_staattnum - 1] = Int16GetDatum(stats->attr->attnum);
-		values[Anum_pg_statistic_stainherit - 1] = BoolGetDatum(inh);
 		values[Anum_pg_statistic_stanullfrac - 1] = Float4GetDatum(stats->stanullfrac);
 		values[Anum_pg_statistic_stawidth - 1] = Int32GetDatum(stats->stawidth);
 		values[Anum_pg_statistic_stadistinct - 1] = Float4GetDatum(stats->stadistinct);

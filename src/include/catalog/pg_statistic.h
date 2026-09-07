@@ -32,7 +32,6 @@ CATALOG(pg_statistic,2619,StatisticRelationId)
 	Oid			starelid BKI_LOOKUP(pg_class);	/* relation containing
 												 * attribute */
 	int16		staattnum;		/* attribute (column) stats are for */
-	bool		stainherit;		/* true if inheritance children are included */
 
 	/* the fraction of the column's entries that are NULL: */
 	float4		stanullfrac;
@@ -129,7 +128,7 @@ typedef FormData_pg_statistic *Form_pg_statistic;
 
 DECLARE_TOAST(pg_statistic, 2840, 2841);
 
-DECLARE_UNIQUE_INDEX_PKEY(pg_statistic_relid_att_inh_index, 2696, on pg_statistic using btree(starelid oid_ops, staattnum int2_ops, stainherit bool_ops));
+DECLARE_UNIQUE_INDEX_PKEY(pg_statistic_relid_att_inh_index, 2696, on pg_statistic using btree(starelid oid_ops, staattnum int2_ops));
 #define StatisticRelidAttnumInhIndexId	2696
 
 #ifdef EXPOSE_TO_CLIENT_CODE
