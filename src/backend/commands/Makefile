@@ -17,7 +17,6 @@ OBJS = \
 	amcmds.o \
 	analyze.o \
 	cluster.o \
-	collationcmds.o \
 	dbcommands.o \
 	define.o \
 	discard.o \

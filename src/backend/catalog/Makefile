@@ -23,9 +23,7 @@ OBJS = \
 	objectaccess.o \
 	objectaddress.o \
 	pg_cast.o \
-	pg_collation.o \
 	pg_constraint.o \
-	pg_conversion.o \
 	pg_depend.o \
 	pg_namespace.o \
 	pg_operator.o \
@@ -46,7 +44,7 @@ CATALOG_HEADERS := \
 	pg_language.h pg_aggregate.h \
 	pg_statistic.h \
 	pg_rewrite.h \
-	pg_cast.h pg_namespace.h pg_conversion.h pg_depend.h \
+	pg_cast.h pg_namespace.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
 	pg_extension.h \
 	pg_collation.h
@@ -58,7 +56,7 @@ POSTGRES_BKI_SRCS := $(addprefix $(top_srcdir)/src/include/catalog/, $(CATALOG_H
 # The .dat files we need can just be listed alphabetically.
 POSTGRES_BKI_DATA = $(addprefix $(top_srcdir)/src/include/catalog/,\
 	pg_aggregate.dat pg_am.dat pg_amop.dat pg_amproc.dat \
-	pg_cast.dat pg_class.dat pg_collation.dat pg_conversion.dat \
+	pg_cast.dat pg_class.dat pg_collation.dat \
 	pg_database.dat pg_language.dat \
 	pg_namespace.dat pg_opclass.dat pg_operator.dat pg_opfamily.dat \
 	pg_proc.dat pg_tablespace.dat \

@@ -101,7 +101,6 @@
 #include "access/tableam.h"
 #include "access/visibilitymap.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_collation.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_statistic.h"
 #include "executor/nodeAgg.h"
@@ -1056,7 +1055,6 @@ ineq_histogram_selectivity(PlannerInfo *root,
 						 ATTSTATSSLOT_VALUES))
 	{
 		if (sslot.nvalues > 1 &&
-			sslot.stacoll == collation &&
 			comparison_ops_are_compatible(sslot.staop, opoid))
 		{
 			/*
@@ -5233,7 +5231,7 @@ get_variable_range(PlannerInfo *root, VariableStatData *vardata,
 						 STATISTIC_KIND_HISTOGRAM, sortop,
 						 ATTSTATSSLOT_VALUES))
 	{
-		if (sslot.stacoll == collation && sslot.nvalues > 0)
+		if (sslot.nvalues > 0)
 		{
 			tmin = datumCopy(sslot.values[0], typByVal, typLen);
 			tmax = datumCopy(sslot.values[sslot.nvalues - 1], typByVal, typLen);

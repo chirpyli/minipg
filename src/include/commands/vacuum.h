@@ -93,8 +93,7 @@
  * Note: all comparisons done for statistical purposes should use the
  * underlying column's collation (attcollation), except in situations
  * where a noncollatable container type contains a collatable type;
- * in that case use the type's default collation.  Be sure to record
- * the appropriate collation in stacoll.
+ * in that case use the type's default collation.
  *----------
  */
 typedef struct VacAttrStats *VacAttrStatsP;
@@ -145,7 +144,6 @@ typedef struct VacAttrStats
 	float4		stadistinct;	/* # distinct values */
 	int16		stakind[STATISTIC_NUM_SLOTS];
 	Oid			staop[STATISTIC_NUM_SLOTS];
-	Oid			stacoll[STATISTIC_NUM_SLOTS];
 	int			numnumbers[STATISTIC_NUM_SLOTS];
 	float4	   *stanumbers[STATISTIC_NUM_SLOTS];
 	int			numvalues[STATISTIC_NUM_SLOTS];

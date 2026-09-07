@@ -119,7 +119,6 @@ int
 PrepareClientEncoding(int encoding)
 {
 	int			current_server_encoding;
-	ListCell   *lc;
 
 	if (!PG_VALID_FE_ENCODING(encoding))
 		return -1;
@@ -138,73 +137,12 @@ PrepareClientEncoding(int encoding)
 		encoding == PG_SQL_ASCII)
 		return 0;
 
-	if (IsTransactionState())
-	{
-		/*
-		 * If we're in a live transaction, it's safe to access the catalogs,
-		 * so look up the functions.  We repeat the lookup even if the info is
-		 * already cached, so that we can react to changes in the contents of
-		 * pg_conversion.
-		 */
-		Oid			to_server_proc,
-					to_client_proc;
-		ConvProcInfo *convinfo;
-		MemoryContext oldcontext;
-
-		to_server_proc = FindDefaultConversionProc(encoding,
-												   current_server_encoding);
-		if (!OidIsValid(to_server_proc))
-			return -1;
-		to_client_proc = FindDefaultConversionProc(current_server_encoding,
-												   encoding);
-		if (!OidIsValid(to_client_proc))
-			return -1;
-
-		/*
-		 * Load the fmgr info into TopMemoryContext (could still fail here)
-		 */
-		convinfo = (ConvProcInfo *) MemoryContextAlloc(TopMemoryContext,
-													   sizeof(ConvProcInfo));
-		convinfo->s_encoding = current_server_encoding;
-		convinfo->c_encoding = encoding;
-		fmgr_info_cxt(to_server_proc, &convinfo->to_server_info,
-					  TopMemoryContext);
-		fmgr_info_cxt(to_client_proc, &convinfo->to_client_info,
-					  TopMemoryContext);
-
-		/* Attach new info to head of list */
-		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
-		ConvProcList = lcons(convinfo, ConvProcList);
-		MemoryContextSwitchTo(oldcontext);
-
-		/*
-		 * We cannot yet remove any older entry for the same encoding pair,
-		 * since it could still be in use.  SetClientEncoding will clean up.
-		 */
-
-		return 0;				/* success */
-	}
-	else
-	{
-		/*
-		 * If we're not in a live transaction, the only thing we can do is
-		 * restore a previous setting using the cache.  This covers all
-		 * transaction-rollback cases.  The only case it might not work for is
-		 * trying to change client_encoding on the fly by editing
-		 * postgresql.conf and SIGHUP'ing.  Which would probably be a stupid
-		 * thing to do anyway.
-		 */
-		foreach(lc, ConvProcList)
-		{
-			ConvProcInfo *oldinfo = (ConvProcInfo *) lfirst(lc);
-
-			if (oldinfo->s_encoding == current_server_encoding &&
-				oldinfo->c_encoding == encoding)
-				return 0;
-		}
-
-		return -1;				/* it's not cached, so fail */
-	}
+	/*
+	 * Encoding conversion support has been removed.  The only supported client
+	 * encodings are the server encoding (handled above) and SQL_ASCII; any
+	 * other combination is unsupported.
+	 */
+	return -1;
 }
 
 /*
@@ -289,8 +227,6 @@ SetClientEncoding(int encoding)
 void
 InitializeClientEncoding(void)
 {
-	int			current_server_encoding;
-
 	Assert(!backend_startup_complete);
 	backend_startup_complete = true;
 
@@ -308,34 +244,6 @@ InitializeClientEncoding(void)
 						GetDatabaseEncodingName())));
 	}
 
-	/*
-	 * Also look up the UTF8-to-server conversion function if needed.  Since
-	 * the server encoding is fixed within any one backend process, we don't
-	 * have to do this more than once.
-	 */
-	current_server_encoding = GetDatabaseEncoding();
-	if (current_server_encoding != PG_UTF8 &&
-		current_server_encoding != PG_SQL_ASCII)
-	{
-		Oid			utf8_to_server_proc;
-
-		AssertCouldGetRelation();
-		utf8_to_server_proc =
-			FindDefaultConversionProc(PG_UTF8,
-									  current_server_encoding);
-		/* If there's no such conversion, just leave the pointer as NULL */
-		if (OidIsValid(utf8_to_server_proc))
-		{
-			FmgrInfo   *finfo;
-
-			finfo = (FmgrInfo *) MemoryContextAlloc(TopMemoryContext,
-													sizeof(FmgrInfo));
-			fmgr_info_cxt(utf8_to_server_proc, finfo,
-						  TopMemoryContext);
-			/* Set Utf8ToServerConvProc only after data is fully valid */
-			Utf8ToServerConvProc = finfo;
-		}
-	}
 }
 
 /*
@@ -365,9 +273,6 @@ unsigned char *
 pg_do_encoding_conversion(unsigned char *src, int len,
 						  int src_encoding, int dest_encoding)
 {
-	unsigned char *result;
-	Oid			proc;
-
 	if (len <= 0)
 		return src;				/* empty string is always valid */
 
@@ -384,75 +289,26 @@ pg_do_encoding_conversion(unsigned char *src, int len,
 		return src;
 	}
 
-	if (!IsTransactionState())	/* shouldn't happen */
-		elog(ERROR, "cannot perform encoding conversion outside a transaction");
-
-	proc = FindDefaultConversionProc(src_encoding, dest_encoding);
-	if (!OidIsValid(proc))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("default conversion function for encoding \"%s\" to \"%s\" does not exist",
-						pg_encoding_to_char(src_encoding),
-						pg_encoding_to_char(dest_encoding))));
-
 	/*
-	 * Allocate space for conversion result, being wary of integer overflow.
-	 *
-	 * len * MAX_CONVERSION_GROWTH is typically a vast overestimate of the
-	 * required space, so it might exceed MaxAllocSize even though the result
-	 * would actually fit.  We do not want to hand back a result string that
-	 * exceeds MaxAllocSize, because callers might not cope gracefully --- but
-	 * if we just allocate more than that, and don't use it, that's fine.
+	 * Encoding conversion support has been removed.  All supported cases (equal
+	 * encodings, SQL_ASCII) are handled above; any other combination is
+	 * unsupported.
 	 */
-	if ((Size) len >= (MaxAllocHugeSize / (Size) MAX_CONVERSION_GROWTH))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("out of memory"),
-				 errdetail("String of %d bytes is too long for encoding conversion.",
-						   len)));
+	ereport(ERROR,
+			(errcode(ERRCODE_UNDEFINED_FUNCTION),
+			 errmsg("default conversion function for encoding \"%s\" to \"%s\" does not exist",
+					pg_encoding_to_char(src_encoding),
+					pg_encoding_to_char(dest_encoding))));
 
-	result = (unsigned char *)
-		MemoryContextAllocHuge(CurrentMemoryContext,
-							   (Size) len * MAX_CONVERSION_GROWTH + 1);
-
-	(void) OidFunctionCall6(proc,
-							Int32GetDatum(src_encoding),
-							Int32GetDatum(dest_encoding),
-							CStringGetDatum(src),
-							CStringGetDatum(result),
-							Int32GetDatum(len),
-							BoolGetDatum(false));
-
-	/*
-	 * If the result is large, it's worth repalloc'ing to release any extra
-	 * space we asked for.  The cutoff here is somewhat arbitrary, but we
-	 * *must* check when len * MAX_CONVERSION_GROWTH exceeds MaxAllocSize.
-	 */
-	if (len > 1000000)
-	{
-		Size		resultlen = strlen((char *) result);
-
-		if (resultlen >= MaxAllocSize)
-			ereport(ERROR,
-					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-					 errmsg("out of memory"),
-					 errdetail("String of %d bytes is too long for encoding conversion.",
-							   len)));
-
-		result = (unsigned char *) repalloc(result, resultlen + 1);
-	}
-
-	return result;
+	return src;				/* unreachable, keeps compiler quiet */
 }
 
 /*
  * Convert src string to another encoding.
  *
  * This function has a different API than the other conversion functions.
- * The caller should've looked up the conversion function using
- * FindDefaultConversionProc().  Unlike the other functions, the converted
- * result is not palloc'd.  It is written to the caller-supplied buffer
- * instead.
+ * The converted result is not palloc'd.  It is written to the caller-supplied
+ * buffer instead.
  *
  * src_encoding   - encoding to convert from
  * dest_encoding  - encoding to convert to

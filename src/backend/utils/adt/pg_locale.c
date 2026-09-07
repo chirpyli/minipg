@@ -51,7 +51,6 @@
 #include "mb/pg_wchar.h"
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
-#include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/relcache.h"
@@ -498,8 +497,9 @@ pg_newlocale_from_collation(Oid collid)
 		const char *collctype pg_attribute_unused();
 		struct pg_locale_struct result;
 		pg_locale_t resultp;
-		Datum		collversion;
-		bool		isnull;
+#ifdef HAVE_LOCALE_T
+		locale_t	loc;
+#endif
 
 		tp = SearchSysCache1(COLLOID, ObjectIdGetDatum(collid));
 		if (!HeapTupleIsValid(tp))
@@ -511,81 +511,41 @@ pg_newlocale_from_collation(Oid collid)
 
 		/* We'll fill in the result struct locally before allocating memory */
 		memset(&result, 0, sizeof(result));
-		result.provider = collform->collprovider;
+		result.provider = COLLPROVIDER_LIBC;
 		result.deterministic = collform->collisdeterministic;
 
-		if (collform->collprovider == COLLPROVIDER_LIBC)
-		{
 #ifdef HAVE_LOCALE_T
-			locale_t	loc;
-
-			if (strcmp(collcollate, collctype) == 0)
-			{
-				/* Normal case where they're the same */
-				errno = 0;
-				loc = newlocale(LC_COLLATE_MASK | LC_CTYPE_MASK, collcollate,
-								NULL);
-				if (!loc)
-					report_newlocale_failure(collcollate);
-			}
-			else
-			{
-				/* We need two newlocale() steps */
-				locale_t	loc1;
-
-				errno = 0;
-				loc1 = newlocale(LC_COLLATE_MASK, collcollate, NULL);
-				if (!loc1)
-					report_newlocale_failure(collcollate);
-				errno = 0;
-				loc = newlocale(LC_CTYPE_MASK, collctype, loc1);
-				if (!loc)
-					report_newlocale_failure(collctype);
-			}
-
-			result.info.lt = loc;
-#else							/* not HAVE_LOCALE_T */
-			/* platform that doesn't support locale_t */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("collation provider LIBC is not supported on this platform")));
-#endif							/* not HAVE_LOCALE_T */
-		}
-
-		collversion = SysCacheGetAttr(COLLOID, tp, Anum_pg_collation_collversion,
-									  &isnull);
-		if (!isnull)
+		if (strcmp(collcollate, collctype) == 0)
 		{
-			char	   *actual_versionstr;
-			char	   *collversionstr;
-
-			actual_versionstr = get_collation_actual_version(collform->collprovider, collcollate);
-			if (!actual_versionstr)
-			{
-				/*
-				 * This could happen when specifying a version in CREATE
-				 * COLLATION for a libc locale, or manually creating a mess in
-				 * the catalogs.
-				 */
-				ereport(ERROR,
-						(errmsg("collation \"%s\" has no actual version, but a version was specified",
-								NameStr(collform->collname))));
-			}
-			collversionstr = TextDatumGetCString(collversion);
-
-			if (strcmp(actual_versionstr, collversionstr) != 0)
-				ereport(WARNING,
-						(errmsg("collation \"%s\" has version mismatch",
-								NameStr(collform->collname)),
-						 errdetail("The collation in the database was created using version %s, "
-								   "but the operating system provides version %s.",
-								   collversionstr, actual_versionstr),
-						 errhint("Rebuild all objects affected by this collation and run "
-								 "ALTER COLLATION %s REFRESH VERSION, "
-								 "or build PostgreSQL with the right library version.",
-								 quote_qualified_identifier(get_namespace_name(collform->collnamespace),
-															NameStr(collform->collname)))));
+			/* Normal case where they're the same */
+			errno = 0;
+			loc = newlocale(LC_COLLATE_MASK | LC_CTYPE_MASK, collcollate,
+							NULL);
+			if (!loc)
+				report_newlocale_failure(collcollate);
 		}
+		else
+		{
+			/* We need two newlocale() steps */
+			locale_t	loc1;
+
+			errno = 0;
+			loc1 = newlocale(LC_COLLATE_MASK, collcollate, NULL);
+			if (!loc1)
+				report_newlocale_failure(collcollate);
+			errno = 0;
+			loc = newlocale(LC_CTYPE_MASK, collctype, loc1);
+			if (!loc)
+				report_newlocale_failure(collctype);
+		}
+
+		result.info.lt = loc;
+#else							/* not HAVE_LOCALE_T */
+		/* platform that doesn't support locale_t */
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("collation provider LIBC is not supported on this platform")));
+#endif							/* not HAVE_LOCALE_T */
 
 		ReleaseSysCache(tp);
 
@@ -598,45 +558,6 @@ pg_newlocale_from_collation(Oid collid)
 
 	return cache_entry->locale;
 }
-
-/*
- * Get provider-specific collation version string for the given collation from
- * the operating system/library.
- */
-char *
-get_collation_actual_version(char collprovider, const char *collcollate)
-{
-	char	   *collversion = NULL;
-
-	if (collprovider == COLLPROVIDER_LIBC &&
-		pg_strcasecmp("C", collcollate) != 0 &&
-		pg_strncasecmp("C.", collcollate, 2) != 0 &&
-		pg_strcasecmp("POSIX", collcollate) != 0)
-	{
-#if defined(__GLIBC__)
-		/* Use the glibc version because we don't have anything better. */
-		collversion = pstrdup(gnu_get_libc_version());
-#elif defined(LC_VERSION_MASK)
-		locale_t	loc;
-
-		/* Look up FreeBSD collation version. */
-		loc = newlocale(LC_COLLATE_MASK, collcollate, NULL);
-		if (loc)
-		{
-			collversion =
-				pstrdup(querylocale(LC_COLLATE_MASK | LC_VERSION_MASK, loc));
-			freelocale(loc);
-		}
-		else
-			ereport(ERROR,
-					(errmsg("could not load locale \"%s\"", collcollate)));
-#endif
-	}
-
-	return collversion;
-}
-
-
 
 /*
  * These functions convert from/to libc's wchar_t, *not* pg_wchar_t.

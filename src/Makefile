@@ -17,7 +17,6 @@ SUBDIRS = \
 	port \
 	timezone \
 	backend \
-	backend/utils/mb/conversion_procs \
 	include \
 	interfaces \
 	fe_utils \

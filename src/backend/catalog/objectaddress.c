@@ -28,7 +28,6 @@
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
-#include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
@@ -165,18 +164,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		OBJECT_TABCONSTRAINT,
 		false
-	},
-	{
-		"conversion",
-		ConversionRelationId,
-		ConversionOidIndexId,
-		CONVOID,
-		CONNAMENSP,
-		Anum_pg_conversion_oid,
-		Anum_pg_conversion_conname,
-		Anum_pg_conversion_connamespace,
-		InvalidAttrNumber,
-		true
 	},
 	{
 		"database",
@@ -402,10 +389,6 @@ static const struct object_type_map
 	/* OCLASS_CONSTRAINT */
 	{
 		"table constraint", OBJECT_TABCONSTRAINT
-	},
-	/* OCLASS_CONVERSION */
-	{
-		"conversion", OBJECT_CONVERSION
 	},
 	/* OCLASS_LANGUAGE */
 	{
@@ -1679,9 +1662,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 
 	switch (getObjectClass(object))
 	{
-		case OCLASS_CONVERSION:
-			break;
-
 		case OCLASS_CLASS:
 			if (object->objectSubId == 0)
 				getRelationDescription(&buffer, object->objectId, missing_ok);
@@ -2539,9 +2519,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 
 	switch (getObjectClass(object))
 	{
-		case OCLASS_CONVERSION:
-			break;
-
 		case OCLASS_CLASS:
 			getRelationTypeDescription(&buffer, object->objectId,
 									   object->objectSubId,
@@ -2796,9 +2773,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 
 	switch (getObjectClass(object))
 	{
-		case OCLASS_CONVERSION:
-			break;
-
 		case OCLASS_CLASS:
 			{
 				char	   *attr = NULL;

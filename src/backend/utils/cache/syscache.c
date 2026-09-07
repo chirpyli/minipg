@@ -29,7 +29,6 @@
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
-#include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
 #include "catalog/pg_extension.h"
@@ -238,28 +237,6 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		8
 	},
-	{ConversionRelationId,		/* CONDEFAULT */
-		ConversionDefaultIndexId,
-		4,
-		{
-			Anum_pg_conversion_connamespace,
-			Anum_pg_conversion_conforencoding,
-			Anum_pg_conversion_contoencoding,
-			Anum_pg_conversion_oid
-		},
-		8
-	},
-	{ConversionRelationId,		/* CONNAMENSP */
-		ConversionNameNspIndexId,
-		2,
-		{
-			Anum_pg_conversion_conname,
-			Anum_pg_conversion_connamespace,
-			0,
-			0
-		},
-		8
-	},
 	{ConstraintRelationId,		/* CONSTROID */
 		ConstraintOidIndexId,
 		1,
@@ -270,17 +247,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		16
-	},
-	{ConversionRelationId,		/* CONVOID */
-		ConversionOidIndexId,
-		1,
-		{
-			Anum_pg_conversion_oid,
-			0,
-			0,
-			0
-		},
-		8
 	},
 	{DatabaseRelationId,		/* DATABASEOID */
 		DatabaseOidIndexId,

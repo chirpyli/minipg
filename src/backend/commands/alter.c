@@ -23,7 +23,6 @@
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "commands/alter.h"
-#include "commands/collationcmds.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"

@@ -4010,10 +4010,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 				RememberConstraintForRebuilding(foundObject.objectId, tab);
 				break;
 
-			case OCLASS_CONVERSION:
-				/* Conversions do not depend on columns. */
-				break;
-
 			case OCLASS_PROC:
 
 				/*

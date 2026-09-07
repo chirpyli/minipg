@@ -52,7 +52,6 @@ pg_cast|t
 pg_class|t
 pg_collation|t
 pg_constraint|t
-pg_conversion|t
 pg_database|t
 pg_depend|t
 pg_extension|t

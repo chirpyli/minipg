@@ -34,6 +34,10 @@ extern bool lc_collate_is_c(Oid collation);
 extern bool lc_ctype_is_c(Oid collation);
 
 
+/* collation provider codes */
+#define COLLPROVIDER_LIBC		'c'
+
+
 /*
  * We define our own wrapper around locale_t so we can keep the same
  * function signatures for all builds, while not having to create a
@@ -56,8 +60,6 @@ struct pg_locale_struct
 typedef struct pg_locale_struct *pg_locale_t;
 
 extern pg_locale_t pg_newlocale_from_collation(Oid collid);
-
-extern char *get_collation_actual_version(char collprovider, const char *collcollate);
 
 /* These functions convert from/to libc's wchar_t, *not* pg_wchar_t */
 extern size_t wchar2char(char *to, const wchar_t *from, size_t tolen,

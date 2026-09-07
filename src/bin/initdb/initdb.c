@@ -61,7 +61,6 @@
 
 #include "access/xlog_internal.h"
 #include "catalog/pg_class_d.h" /* pgrminclude ignore */
-#include "catalog/pg_collation_d.h"
 #include "common/file_perm.h"
 #include "common/file_utils.h"
 #include "common/logging.h"
@@ -189,7 +188,6 @@ static void bootstrap_template1(void);
 static void get_su_pwd(void);
 static void setup_depend(FILE *cmdfd);
 static void setup_run_file(FILE *cmdfd, const char *filename);
-static void setup_collation(FILE *cmdfd);
 static void vacuum_db(FILE *cmdfd);
 static void make_template0(FILE *cmdfd);
 static void make_postgres(FILE *cmdfd);
@@ -1100,8 +1098,6 @@ setup_depend(FILE *cmdfd)
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_constraint;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_conversion;\n\n",
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_language;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_operator;\n\n",
@@ -1153,25 +1149,6 @@ setup_run_file(FILE *cmdfd, const char *filename)
 	PG_CMD_PUTS("\n\n");
 
 	free(lines);
-}
-
-/*
- * populate pg_collation
- */
-static void
-setup_collation(FILE *cmdfd)
-{
-	/*
-	 * Add an SQL-standard name.  We don't want to pin this, so it doesn't go
-	 * in pg_collation.h.  But add it before reading system collations, so
-	 * that it wins if libc defines a locale named ucs_basic.
-	 */
-	PG_CMD_PRINTF("INSERT INTO pg_collation (oid, collname, collnamespace, collprovider, collisdeterministic, collencoding, collcollate, collctype)"
-				  "VALUES (pg_nextoid('pg_catalog.pg_collation', 'oid', 'pg_catalog.pg_collation_oid_index'), 'ucs_basic', 'pg_catalog'::regnamespace, '%c', true, %d, 'C', 'C');\n\n",
-				  COLLPROVIDER_LIBC, PG_UTF8);
-
-	/* Now import all collations we can find in the operating system */
-	PG_CMD_PUTS("SELECT pg_import_system_collations('pg_catalog');\n\n");
 }
 
 /*
@@ -2027,8 +2004,6 @@ initialize_data_directory(void)
 	 */
 
 	setup_run_file(cmdfd, system_views_file);
-
-	setup_collation(cmdfd);
 
 	vacuum_db(cmdfd);
 

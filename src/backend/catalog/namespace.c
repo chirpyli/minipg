@@ -26,7 +26,6 @@
 #include "catalog/dependency.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_collation.h"
-#include "catalog/pg_conversion.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -1963,83 +1962,7 @@ CollationIsVisible(Oid collid)
 }
 
 
-/*
- * ConversionGetConid
- *		Try to resolve an unqualified conversion name.
- *		Returns OID if conversion found in search path, else InvalidOid.
- *
- * This is essentially the same as RelnameGetRelid.
- */
-Oid
-ConversionGetConid(const char *conname)
-{
-	Oid			conid;
-	ListCell   *l;
 
-	recomputeNamespacePath();
-
-	foreach(l, activeSearchPath)
-	{
-		Oid			namespaceId = lfirst_oid(l);
-
-		conid = GetSysCacheOid2(CONNAMENSP, Anum_pg_conversion_oid,
-								PointerGetDatum(conname),
-								ObjectIdGetDatum(namespaceId));
-		if (OidIsValid(conid))
-			return conid;
-	}
-
-	/* Not found in path */
-	return InvalidOid;
-}
-
-/*
- * ConversionIsVisible
- *		Determine whether a conversion (identified by OID) is visible in the
- *		current search path.  Visible means "would be found by searching
- *		for the unqualified conversion name".
- */
-bool
-ConversionIsVisible(Oid conid)
-{
-	HeapTuple	contup;
-	Form_pg_conversion conform;
-	Oid			connamespace;
-	bool		visible;
-
-	contup = SearchSysCache1(CONVOID, ObjectIdGetDatum(conid));
-	if (!HeapTupleIsValid(contup))
-		elog(ERROR, "cache lookup failed for conversion %u", conid);
-	conform = (Form_pg_conversion) GETSTRUCT(contup);
-
-	recomputeNamespacePath();
-
-	/*
-	 * Quick check: if it ain't in the path at all, it ain't visible. Items in
-	 * the system namespace are surely in the path and so we needn't even do
-	 * list_member_oid() for them.
-	 */
-	connamespace = conform->connamespace;
-	if (connamespace != PG_CATALOG_NAMESPACE &&
-		!list_member_oid(activeSearchPath, connamespace))
-		visible = false;
-	else
-	{
-		/*
-		 * If it is in the path, it might still not be visible; it could be
-		 * hidden by another conversion of the same name earlier in the path.
-		 * So we must do a slow check to see if this conversion would be found
-		 * by ConversionGetConid.
-		 */
-		char	   *conname = NameStr(conform->conname);
-
-		visible = (ConversionGetConid(conname) == conid);
-	}
-
-	ReleaseSysCache(contup);
-
-	return visible;
-}
 
 
 
@@ -2602,82 +2525,6 @@ get_collation_oid(List *name, bool missing_ok)
 }
 
 /*
- * get_conversion_oid - find a conversion by possibly qualified name
- */
-Oid
-get_conversion_oid(List *name, bool missing_ok)
-{
-	char	   *schemaname;
-	char	   *conversion_name;
-	Oid			namespaceId;
-	Oid			conoid = InvalidOid;
-	ListCell   *l;
-
-	/* deconstruct the name list */
-	DeconstructQualifiedName(name, &schemaname, &conversion_name);
-
-	if (schemaname)
-	{
-		/* use exact schema given */
-		namespaceId = LookupExplicitNamespace(schemaname, missing_ok);
-		if (missing_ok && !OidIsValid(namespaceId))
-			conoid = InvalidOid;
-		else
-			conoid = GetSysCacheOid2(CONNAMENSP, Anum_pg_conversion_oid,
-									 PointerGetDatum(conversion_name),
-									 ObjectIdGetDatum(namespaceId));
-	}
-	else
-	{
-		/* search for it in search path */
-		recomputeNamespacePath();
-
-		foreach(l, activeSearchPath)
-		{
-			namespaceId = lfirst_oid(l);
-
-			conoid = GetSysCacheOid2(CONNAMENSP, Anum_pg_conversion_oid,
-									 PointerGetDatum(conversion_name),
-									 ObjectIdGetDatum(namespaceId));
-			if (OidIsValid(conoid))
-				return conoid;
-		}
-	}
-
-	/* Not found in path */
-	if (!OidIsValid(conoid) && !missing_ok)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("conversion \"%s\" does not exist",
-						NameListToString(name))));
-	return conoid;
-}
-
-/*
- * FindDefaultConversionProc - find default encoding conversion proc
- */
-Oid
-FindDefaultConversionProc(int32 for_encoding, int32 to_encoding)
-{
-	Oid			proc;
-	ListCell   *l;
-
-	recomputeNamespacePath();
-
-	foreach(l, activeSearchPath)
-	{
-		Oid			namespaceId = lfirst_oid(l);
-
-		proc = FindDefaultConversion(namespaceId, for_encoding, to_encoding);
-		if (OidIsValid(proc))
-			return proc;
-	}
-
-	/* Not found in path */
-	return InvalidOid;
-}
-
-/*
  * recomputeNamespacePath - recompute path derived variables if needed.
  */
 static void
@@ -3134,28 +2981,6 @@ pg_opfamily_is_visible(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	PG_RETURN_BOOL(OpfamilyIsVisible(oid));
-}
-
-Datum
-pg_collation_is_visible(PG_FUNCTION_ARGS)
-{
-	Oid			oid = PG_GETARG_OID(0);
-
-	if (!SearchSysCacheExists1(COLLOID, ObjectIdGetDatum(oid)))
-		PG_RETURN_NULL();
-
-	PG_RETURN_BOOL(CollationIsVisible(oid));
-}
-
-Datum
-pg_conversion_is_visible(PG_FUNCTION_ARGS)
-{
-	Oid			oid = PG_GETARG_OID(0);
-
-	if (!SearchSysCacheExists1(CONVOID, ObjectIdGetDatum(oid)))
-		PG_RETURN_NULL();
-
-	PG_RETURN_BOOL(ConversionIsVisible(oid));
 }
 
 /*

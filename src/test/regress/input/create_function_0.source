@@ -30,9 +30,6 @@ CREATE FUNCTION test_enc_setup() RETURNS void
     AS '@libdir@/regress@DLSUFFIX@', 'test_enc_setup'
     LANGUAGE C STRICT;
 
-CREATE FUNCTION test_enc_conversion(bytea, name, name, bool, validlen OUT int, result OUT bytea)
-    AS '@libdir@/regress@DLSUFFIX@', 'test_enc_conversion'
-    LANGUAGE C STRICT;
 
 CREATE FUNCTION binary_coercible(oid, oid)
     RETURNS bool

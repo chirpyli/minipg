@@ -2360,7 +2360,7 @@ listCollations(const char *pattern, bool verbose, bool showSystem)
 	PQExpBufferData buf;
 	PGresult   *res;
 	printQueryOpt myopt = pset.popt;
-	static const bool translate_columns[] = {false, false, false, false, false, true, false};
+	static const bool translate_columns[] = {false, false, false, false, true, false};
 
 	initPQExpBuffer(&buf);
 
@@ -2373,15 +2373,6 @@ listCollations(const char *pattern, bool verbose, bool showSystem)
 					  gettext_noop("Name"),
 					  gettext_noop("Collate"),
 					  gettext_noop("Ctype"));
-
-	if (pset.sversion >= 100000)
-		appendPQExpBuffer(&buf,
-						  ",\n       CASE c.collprovider WHEN 'd' THEN 'default' WHEN 'c' THEN 'libc' END AS \"%s\"",
-						  gettext_noop("Provider"));
-	else
-		appendPQExpBuffer(&buf,
-						  ",\n       'libc' AS \"%s\"",
-						  gettext_noop("Provider"));
 
 	if (pset.sversion >= 120000)
 		appendPQExpBuffer(&buf,
@@ -2409,15 +2400,12 @@ listCollations(const char *pattern, bool verbose, bool showSystem)
 
 	/*
 	 * Hide collations that aren't usable in the current database's encoding.
-	 * If you think to change this, note that pg_collation_is_visible rejects
-	 * unusable collations, so you will need to hack name pattern processing
-	 * somehow to avoid inconsistent behavior.
 	 */
 	appendPQExpBufferStr(&buf, "      AND c.collencoding IN (-1, pg_catalog.pg_char_to_encoding(pg_catalog.getdatabaseencoding()))\n");
 
 	if (!validateSQLNamePattern(&buf, pattern, true, false,
 								"n.nspname", "c.collname", NULL,
-								"pg_catalog.pg_collation_is_visible(c.oid)",
+								NULL,
 								NULL, 3))
 		return false;
 
