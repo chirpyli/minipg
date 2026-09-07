@@ -9,10 +9,10 @@
 -- adjusting the expected output.  In most cases, the queries should
 -- not find *any* matching entries.
 --
--- NB: we assume the oidjoins test will have caught any dangling links,
--- that is OID or REGPROC fields that are not zero and do not match some
--- row in the linked-to table.  However, if we want to enforce that a link
--- field can't be 0, we have to check it here.
+-- NB: this test does not look for dangling links, that is OID or REGPROC
+-- fields that are not zero and do not match some row in the linked-to table
+-- (minipg 已移除 oidjoins 测试与 pg_get_catalog_foreign_keys() 函数)。
+-- What we check here is that a link field can't be 0.
 --
 -- NB: run this test earlier than the create_operator test, because
 -- that test creates some bogus operators...
@@ -134,11 +134,9 @@ WHERE p1.oid != p2.oid AND
 ORDER BY 1, 2;
          prorettype          |        prorettype        
 -----------------------------+--------------------------
- bigint                      | xid8
  text                        | character varying
  timestamp without time zone | timestamp with time zone
- txid_snapshot               | pg_snapshot
-(4 rows)
+(2 rows)
 
 SELECT DISTINCT p1.proargtypes[0]::regtype, p2.proargtypes[0]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -154,12 +152,10 @@ WHERE p1.oid != p2.oid AND
 ORDER BY 1, 2;
          proargtypes         |       proargtypes        
 -----------------------------+--------------------------
- bigint                      | xid8
  text                        | character
  text                        | character varying
  timestamp without time zone | timestamp with time zone
- txid_snapshot               | pg_snapshot
-(5 rows)
+(3 rows)
 
 SELECT DISTINCT p1.proargtypes[1]::regtype, p2.proargtypes[1]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -177,8 +173,7 @@ ORDER BY 1, 2;
 -----------------------------+--------------------------
  integer                     | xid
  timestamp without time zone | timestamp with time zone
- txid_snapshot               | pg_snapshot
-(3 rows)
+(2 rows)
 
 SELECT DISTINCT p1.proargtypes[2]::regtype, p2.proargtypes[2]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -717,8 +712,7 @@ WHERE provolatile = 'i' AND proparallel = 'u';
 (0 rows)
 
 -- **************** pg_cast ****************
--- Catch bogus values in pg_cast columns (other than cases detected by
--- oidjoins test).
+-- Catch bogus values in pg_cast columns.
 SELECT *
 FROM pg_cast c
 WHERE castsource = 0 OR casttarget = 0 OR castcontext NOT IN ('e', 'a', 'i')
@@ -769,10 +763,10 @@ WHERE c.castfunc = p.oid AND
              OR (c.castsource = 'character'::regtype AND
                  p.proargtypes[0] = 'text'::regtype))
      OR NOT binary_coercible(p.prorettype, c.casttarget));
- oid | castsource | casttarget | castfunc | castcontext | castmethod 
------+------------+------------+----------+-------------+------------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 5:      OR NOT (binary_coercible(c.castsource, p.proargtypes[0]...
+                     ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT c.*
 FROM pg_cast c, pg_proc p
 WHERE c.castfunc = p.oid AND
@@ -807,7 +801,6 @@ WHERE c.castmethod = 'b' AND
  character varying | character  |        0 | i
  pg_node_tree      | text       |        0 | i
 (3 rows)
-
 
 -- **************** pg_operator ****************
 -- Look for illegal values in pg_operator fields.
@@ -891,10 +884,6 @@ ORDER BY 1, 2;
  &    | &
  &&   | &&
  *    | *
- *<   | *>
- *<=  | *>=
- *<>  | *<>
- *=   | *=
  +    | +
  <    | >
  <=   | >=
@@ -904,7 +893,7 @@ ORDER BY 1, 2;
  |    | |
  ~<=~ | ~>=~
  ~<~  | ~>~
-(17 rows)
+(13 rows)
 
 -- Likewise for negator pairs.
 SELECT DISTINCT o1.oprname AS op1, o2.oprname AS op2
@@ -915,15 +904,12 @@ ORDER BY 1, 2;
 ------+------
  !~~  | ~~
  !~~* | ~~*
- *<   | *>=
- *<=  | *>
- *<>  | *=
  <    | >=
  <=   | >
  <>   | =
  ~<=~ | ~>~
  ~<~  | ~>=~
-(10 rows)
+(7 rows)
 
 -- A mergejoinable or hashjoinable operator must be binary, must return
 -- boolean, and must have a commutator (itself, unless it's a cross-type
@@ -999,10 +985,10 @@ WHERE p1.oprcode = p2.oid AND
      OR NOT binary_coercible(p2.prorettype, p1.oprresult)
      OR NOT binary_coercible(p1.oprleft, p2.proargtypes[0])
      OR NOT binary_coercible(p1.oprright, p2.proargtypes[1]));
- oid | oprname | oid | proname 
------+---------+-----+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 6:      OR NOT binary_coercible(p2.prorettype, p1.oprresult)
+                    ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT p1.oid, p1.oprname, p2.oid, p2.proname
 FROM pg_operator AS p1, pg_proc AS p2
 WHERE p1.oprcode = p2.oid AND
@@ -1011,10 +997,10 @@ WHERE p1.oprcode = p2.oid AND
      OR NOT binary_coercible(p2.prorettype, p1.oprresult)
      OR NOT binary_coercible(p1.oprright, p2.proargtypes[0])
      OR p1.oprleft != 0);
- oid | oprname | oid | proname 
------+---------+-----+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 6:      OR NOT binary_coercible(p2.prorettype, p1.oprresult)
+                    ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- If the operator is mergejoinable or hashjoinable, its underlying function
 -- should not be volatile.
 SELECT p1.oid, p1.oprname, p2.oid, p2.proname
@@ -1122,11 +1108,8 @@ SELECT ctid, aggfnoid::oid
 FROM pg_aggregate as p1
 WHERE aggfnoid = 0 OR aggtransfn = 0 OR
     aggkind NOT IN ('n', 'o', 'h') OR
-    aggnumdirectargs < 0 OR
-    (aggkind = 'n' AND aggnumdirectargs > 0) OR
     aggfinalmodify NOT IN ('r', 's', 'w') OR
-    aggmfinalmodify NOT IN ('r', 's', 'w') OR
-    aggtranstype = 0 OR aggtransspace < 0 OR aggmtransspace < 0;
+    aggtranstype = 0 OR aggtransspace < 0;
  ctid | aggfnoid 
 ------+----------
 (0 rows)
@@ -1135,7 +1118,7 @@ WHERE aggfnoid = 0 OR aggtransfn = 0 OR
 SELECT a.aggfnoid::oid, p.proname
 FROM pg_aggregate as a, pg_proc as p
 WHERE a.aggfnoid = p.oid AND
-    (p.prokind != 'a' OR p.proretset OR p.pronargs < a.aggnumdirectargs);
+    (p.prokind != 'a' OR p.proretset);
  aggfnoid | proname 
 ----------+---------
 (0 rows)
@@ -1166,7 +1149,7 @@ WHERE a.aggfnoid = p.oid AND
     (ptr.proretset
      OR NOT (ptr.pronargs =
              CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
+             ELSE greatest(p.pronargs - 0, 1) + 1 END)
      OR NOT binary_coercible(ptr.prorettype, a.aggtranstype)
      OR NOT binary_coercible(a.aggtranstype, ptr.proargtypes[0])
      OR (p.pronargs > 0 AND
@@ -1178,10 +1161,10 @@ WHERE a.aggfnoid = p.oid AND
      -- we could carry the check further, but 3 args is enough for now
      OR (p.pronargs > 3)
     );
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 9:      OR NOT binary_coercible(ptr.prorettype, a.aggtranstype)
+                    ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Cross-check finalfn (if present) against its entry in pg_proc.
 SELECT a.aggfnoid::oid, p.proname, pfn.oid, pfn.proname
 FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS pfn
@@ -1191,7 +1174,7 @@ WHERE a.aggfnoid = p.oid AND
      NOT binary_coercible(pfn.prorettype, p.prorettype) OR
      NOT binary_coercible(a.aggtranstype, pfn.proargtypes[0]) OR
      CASE WHEN a.aggfinalextra THEN pfn.pronargs != p.pronargs + 1
-          ELSE pfn.pronargs != a.aggnumdirectargs + 1 END
+          ELSE pfn.pronargs != 0 + 1 END
      OR (pfn.pronargs > 1 AND
          NOT binary_coercible(p.proargtypes[0], pfn.proargtypes[1]))
      OR (pfn.pronargs > 2 AND
@@ -1201,10 +1184,10 @@ WHERE a.aggfnoid = p.oid AND
      -- we could carry the check further, but 4 args is enough for now
      OR (pfn.pronargs > 4)
     );
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 6:      NOT binary_coercible(pfn.prorettype, p.prorettype) OR
+                 ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- If transfn is strict then either initval should be non-NULL, or
 -- input type should match transtype so that the first non-null input
 -- can be assigned as the state value.
@@ -1214,133 +1197,10 @@ WHERE a.aggfnoid = p.oid AND
     a.aggtransfn = ptr.oid AND ptr.proisstrict AND
     a.agginitval IS NULL AND
     NOT binary_coercible(p.proargtypes[0], a.aggtranstype);
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
--- Check for inconsistent specifications of moving-aggregate columns.
-SELECT ctid, aggfnoid::oid
-FROM pg_aggregate as p1
-WHERE aggmtranstype != 0 AND
-    (aggmtransfn = 0 OR aggminvtransfn = 0);
- ctid | aggfnoid 
-------+----------
-(0 rows)
-
-SELECT ctid, aggfnoid::oid
-FROM pg_aggregate as p1
-WHERE aggmtranstype = 0 AND
-    (aggmtransfn != 0 OR aggminvtransfn != 0 OR aggmfinalfn != 0 OR
-     aggmtransspace != 0 OR aggminitval IS NOT NULL);
- ctid | aggfnoid 
-------+----------
-(0 rows)
-
--- If there is no mfinalfn then the output type must be the mtranstype.
-SELECT a.aggfnoid::oid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn != 0 AND
-    a.aggmfinalfn = 0 AND p.prorettype != a.aggmtranstype;
- aggfnoid | proname 
-----------+---------
-(0 rows)
-
--- Cross-check mtransfn (if present) against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND
-    (ptr.proretset
-     OR NOT (ptr.pronargs =
-             CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
-     OR NOT binary_coercible(ptr.prorettype, a.aggmtranstype)
-     OR NOT binary_coercible(a.aggmtranstype, ptr.proargtypes[0])
-     OR (p.pronargs > 0 AND
-         NOT binary_coercible(p.proargtypes[0], ptr.proargtypes[1]))
-     OR (p.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[1], ptr.proargtypes[2]))
-     OR (p.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[2], ptr.proargtypes[3]))
-     -- we could carry the check further, but 3 args is enough for now
-     OR (p.pronargs > 3)
-    );
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
--- Cross-check minvtransfn (if present) against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggminvtransfn = ptr.oid AND
-    (ptr.proretset
-     OR NOT (ptr.pronargs =
-             CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
-     OR NOT binary_coercible(ptr.prorettype, a.aggmtranstype)
-     OR NOT binary_coercible(a.aggmtranstype, ptr.proargtypes[0])
-     OR (p.pronargs > 0 AND
-         NOT binary_coercible(p.proargtypes[0], ptr.proargtypes[1]))
-     OR (p.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[1], ptr.proargtypes[2]))
-     OR (p.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[2], ptr.proargtypes[3]))
-     -- we could carry the check further, but 3 args is enough for now
-     OR (p.pronargs > 3)
-    );
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
--- Cross-check mfinalfn (if present) against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, pfn.oid, pfn.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS pfn
-WHERE a.aggfnoid = p.oid AND
-    a.aggmfinalfn = pfn.oid AND
-    (pfn.proretset OR
-     NOT binary_coercible(pfn.prorettype, p.prorettype) OR
-     NOT binary_coercible(a.aggmtranstype, pfn.proargtypes[0]) OR
-     CASE WHEN a.aggmfinalextra THEN pfn.pronargs != p.pronargs + 1
-          ELSE pfn.pronargs != a.aggnumdirectargs + 1 END
-     OR (pfn.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[0], pfn.proargtypes[1]))
-     OR (pfn.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[1], pfn.proargtypes[2]))
-     OR (pfn.pronargs > 3 AND
-         NOT binary_coercible(p.proargtypes[2], pfn.proargtypes[3]))
-     -- we could carry the check further, but 4 args is enough for now
-     OR (pfn.pronargs > 4)
-    );
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
--- If mtransfn is strict then either minitval should be non-NULL, or
--- input type should match mtranstype so that the first non-null input
--- can be assigned as the state value.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND ptr.proisstrict AND
-    a.aggminitval IS NULL AND
-    NOT binary_coercible(p.proargtypes[0], a.aggmtranstype);
- aggfnoid | proname | oid | proname 
-----------+---------+-----+---------
-(0 rows)
-
--- mtransfn and minvtransfn should have same strictness setting.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname, iptr.oid, iptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr, pg_proc AS iptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND
-    a.aggminvtransfn = iptr.oid AND
-    ptr.proisstrict != iptr.proisstrict;
- aggfnoid | proname | oid | proname | oid | proname 
-----------+---------+-----+---------+-----+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 6:     NOT binary_coercible(p.proargtypes[0], a.aggtranstype);
+                ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that all combine functions have signature
 -- combine(transtype, transtype) returns transtype
 SELECT a.aggfnoid, p.proname
@@ -1350,10 +1210,10 @@ WHERE a.aggcombinefn = p.oid AND
      p.prorettype != p.proargtypes[0] OR
      p.prorettype != p.proargtypes[1] OR
      NOT binary_coercible(a.aggtranstype, p.proargtypes[0]));
- aggfnoid | proname 
-----------+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 7:      NOT binary_coercible(a.aggtranstype, p.proargtypes[0]))...
+                 ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that no combine function for an INTERNAL transtype is strict.
 SELECT a.aggfnoid, p.proname
 FROM pg_aggregate as a, pg_proc as p
@@ -1510,15 +1370,18 @@ WHERE p1.opfmethod = 0 OR p1.opfnamespace = 0;
 -- get noticed.
 SELECT oid, opfname FROM pg_opfamily f
 WHERE NOT EXISTS (SELECT 1 FROM pg_opclass WHERE opcfamily = f.oid);
- oid  |   opfname    
-------+--------------
+ oid  |     opfname      
+------+------------------
  1974 | network_ops
  1975 | network_ops
  1984 | macaddr_ops
  1985 | macaddr_ops
  3371 | macaddr8_ops
  3372 | macaddr8_ops
-(6 rows)
+ 2994 | record_ops
+ 6194 | record_ops
+ 3194 | record_image_ops
+(9 rows)
 
 -- **************** pg_opclass ****************
 -- Look for illegal values in pg_opclass fields
@@ -1624,22 +1487,17 @@ FROM pg_amop p1 LEFT JOIN pg_operator p2 ON amopopr = p2.oid
 ORDER BY 1, 2, 3;
  amopmethod | amopstrategy | oprname 
 ------------+--------------+---------
-        403 |            1 | *<
         403 |            1 | <
         403 |            1 | ~<~
-        403 |            2 | *<=
         403 |            2 | <=
         403 |            2 | ~<=~
-        403 |            3 | *=
         403 |            3 | =
-        403 |            4 | *>=
         403 |            4 | >=
         403 |            4 | ~>=~
-        403 |            5 | *>
         403 |            5 | >
         403 |            5 | ~>~
         405 |            1 | =
-(15 rows)
+(10 rows)
 
 -- Check that all opclass search operators have selectivity estimators.
 -- This is not absolutely required, but it seems a reasonable thing
@@ -1659,10 +1517,10 @@ FROM pg_opclass AS p1
 WHERE NOT EXISTS(SELECT 1 FROM pg_amop AS p2
                  WHERE p2.amopfamily = p1.opcfamily
                    AND binary_coercible(p1.opcintype, p2.amoplefttype));
- opcname | opcfamily 
----------+-----------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 5:                    AND binary_coercible(p1.opcintype, p2.amo...
+                               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Check that each operator listed in pg_amop has an associated opclass,
 -- that is one whose opcintype matches oprleft (possibly by coercion).
 -- Otherwise the operator is useless because it cannot be matched to an index.
@@ -1674,10 +1532,10 @@ FROM pg_amop AS p1
 WHERE NOT EXISTS(SELECT 1 FROM pg_opclass AS p2
                  WHERE p2.opcfamily = p1.amopfamily
                    AND binary_coercible(p2.opcintype, p1.amoplefttype));
- amopfamily | amopstrategy | amopopr 
-------------+--------------+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 5:                    AND binary_coercible(p2.opcintype, p1.amo...
+                               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- Operators that are primary members of opclasses must be immutable (else
 -- it suggests that the index ordering isn't fixed).  Operators that are
 -- cross-type members need only be stable, since they are just shorthands
@@ -1750,18 +1608,16 @@ LEFT JOIN pg_amproc AS amp ON amp.amprocfamily = opf.oid AND
 WHERE am.amname = 'btree' AND
     amp.amproc IS DISTINCT FROM 'btequalimage'::regproc
 ORDER BY 1, 2, 3;
-        proc        |  opfamily_name   |   opclass_name   |    opcintype     
---------------------+------------------+------------------+------------------
- btvarstrequalimage | bpchar_ops       | bpchar_ops       | character
- btvarstrequalimage | text_ops         | name_ops         | name
- btvarstrequalimage | text_ops         | text_ops         | text
- btvarstrequalimage | text_ops         | varchar_ops      | text
-                    | array_ops        | array_ops        | anyarray
-                    | float_ops        | float4_ops       | real
-                    | float_ops        | float8_ops       | double precision
-                    | record_image_ops | record_image_ops | record
-                    | record_ops       | record_ops       | record
-(9 rows)
+        proc        | opfamily_name | opclass_name |    opcintype     
+--------------------+---------------+--------------+------------------
+ btvarstrequalimage | bpchar_ops    | bpchar_ops   | character
+ btvarstrequalimage | text_ops      | name_ops     | name
+ btvarstrequalimage | text_ops      | text_ops     | text
+ btvarstrequalimage | text_ops      | varchar_ops  | text
+                    | array_ops     | array_ops    | anyarray
+                    | float_ops     | float4_ops   | real
+                    | float_ops     | float8_ops   | double precision
+(7 rows)
 
 -- **************** pg_index ****************
 -- Look for illegal values in pg_index fields.
@@ -1793,10 +1649,10 @@ FROM (SELECT indexrelid, indrelid, unnest(indkey) as ikey,
       pg_opclass opc
 WHERE a.attrelid = indrelid AND a.attnum = ikey AND opc.oid = iclass AND
       NOT binary_coercible(atttypid, opcintype);
- indexrelid | indrelid | attname | atttypid | opcname 
-------------+----------+---------+----------+---------
-(0 rows)
-
+ERROR:  function binary_coercible(oid, oid) does not exist
+LINE 8:       NOT binary_coercible(atttypid, opcintype);
+                  ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 -- For system catalogs, be even tighter: nearly all indexes should be
 -- exact type matches not binary-coercible matches.  At this writing
 -- the only exception is an OID index on a regproc column.

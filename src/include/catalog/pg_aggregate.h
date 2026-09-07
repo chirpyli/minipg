@@ -34,9 +34,6 @@ CATALOG(pg_aggregate,2600,AggregateRelationId)
 	/* aggregate kind, see AGGKIND_ categories below */
 	char		aggkind BKI_DEFAULT(n);
 
-	/* number of arguments that are "direct" arguments */
-	int16		aggnumdirectargs BKI_DEFAULT(0);
-
 	/* transition function */
 	regproc		aggtransfn BKI_LOOKUP(pg_proc);
 
@@ -52,26 +49,11 @@ CATALOG(pg_aggregate,2600,AggregateRelationId)
 	/* function to convert bytea to transtype (0 if none) */
 	regproc		aggdeserialfn BKI_DEFAULT(-) BKI_LOOKUP_OPT(pg_proc);
 
-	/* forward function for moving-aggregate mode (0 if none) */
-	regproc		aggmtransfn BKI_DEFAULT(-) BKI_LOOKUP_OPT(pg_proc);
-
-	/* inverse function for moving-aggregate mode (0 if none) */
-	regproc		aggminvtransfn BKI_DEFAULT(-) BKI_LOOKUP_OPT(pg_proc);
-
-	/* final function for moving-aggregate mode (0 if none) */
-	regproc		aggmfinalfn BKI_DEFAULT(-) BKI_LOOKUP_OPT(pg_proc);
-
 	/* true to pass extra dummy arguments to aggfinalfn */
 	bool		aggfinalextra BKI_DEFAULT(f);
 
-	/* true to pass extra dummy arguments to aggmfinalfn */
-	bool		aggmfinalextra BKI_DEFAULT(f);
-
 	/* tells whether aggfinalfn modifies transition state */
 	char		aggfinalmodify BKI_DEFAULT(r);
-
-	/* tells whether aggmfinalfn modifies transition state */
-	char		aggmfinalmodify BKI_DEFAULT(r);
 
 	/* associated sort operator (0 if none) */
 	Oid			aggsortop BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_operator);
@@ -82,19 +64,10 @@ CATALOG(pg_aggregate,2600,AggregateRelationId)
 	/* estimated size of state data (0 for default estimate) */
 	int32		aggtransspace BKI_DEFAULT(0);
 
-	/* type of moving-aggregate state data (0 if none) */
-	Oid			aggmtranstype BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_type);
-
-	/* estimated size of moving-agg state (0 for default est) */
-	int32		aggmtransspace BKI_DEFAULT(0);
-
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
 
 	/* initial value for transition state (can be NULL) */
 	text		agginitval BKI_DEFAULT(_null_);
-
-	/* initial value for moving-agg state (can be NULL) */
-	text		aggminitval BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_aggregate;
 

@@ -687,18 +687,15 @@ SELECT ctid, aggfnoid::oid
 FROM pg_aggregate as p1
 WHERE aggfnoid = 0 OR aggtransfn = 0 OR
     aggkind NOT IN ('n', 'o', 'h') OR
-    aggnumdirectargs < 0 OR
-    (aggkind = 'n' AND aggnumdirectargs > 0) OR
     aggfinalmodify NOT IN ('r', 's', 'w') OR
-    aggmfinalmodify NOT IN ('r', 's', 'w') OR
-    aggtranstype = 0 OR aggtransspace < 0 OR aggmtransspace < 0;
+    aggtranstype = 0 OR aggtransspace < 0;
 
 -- Make sure the matching pg_proc entry is sensible, too.
 
 SELECT a.aggfnoid::oid, p.proname
 FROM pg_aggregate as a, pg_proc as p
 WHERE a.aggfnoid = p.oid AND
-    (p.prokind != 'a' OR p.proretset OR p.pronargs < a.aggnumdirectargs);
+    (p.prokind != 'a' OR p.proretset);
 
 -- Make sure there are no prokind = PROKIND_AGGREGATE pg_proc entries without matches.
 
@@ -722,7 +719,7 @@ WHERE a.aggfnoid = p.oid AND
     (ptr.proretset
      OR NOT (ptr.pronargs =
              CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
+             ELSE greatest(p.pronargs - 0, 1) + 1 END)
      OR NOT binary_coercible(ptr.prorettype, a.aggtranstype)
      OR NOT binary_coercible(a.aggtranstype, ptr.proargtypes[0])
      OR (p.pronargs > 0 AND
@@ -745,7 +742,7 @@ WHERE a.aggfnoid = p.oid AND
      NOT binary_coercible(pfn.prorettype, p.prorettype) OR
      NOT binary_coercible(a.aggtranstype, pfn.proargtypes[0]) OR
      CASE WHEN a.aggfinalextra THEN pfn.pronargs != p.pronargs + 1
-          ELSE pfn.pronargs != a.aggnumdirectargs + 1 END
+          ELSE pfn.pronargs != 0 + 1 END
      OR (pfn.pronargs > 1 AND
          NOT binary_coercible(p.proargtypes[0], pfn.proargtypes[1]))
      OR (pfn.pronargs > 2 AND
@@ -767,109 +764,6 @@ WHERE a.aggfnoid = p.oid AND
     a.agginitval IS NULL AND
     NOT binary_coercible(p.proargtypes[0], a.aggtranstype);
 
--- Check for inconsistent specifications of moving-aggregate columns.
-
-SELECT ctid, aggfnoid::oid
-FROM pg_aggregate as p1
-WHERE aggmtranstype != 0 AND
-    (aggmtransfn = 0 OR aggminvtransfn = 0);
-
-SELECT ctid, aggfnoid::oid
-FROM pg_aggregate as p1
-WHERE aggmtranstype = 0 AND
-    (aggmtransfn != 0 OR aggminvtransfn != 0 OR aggmfinalfn != 0 OR
-     aggmtransspace != 0 OR aggminitval IS NOT NULL);
-
--- If there is no mfinalfn then the output type must be the mtranstype.
-
-SELECT a.aggfnoid::oid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn != 0 AND
-    a.aggmfinalfn = 0 AND p.prorettype != a.aggmtranstype;
-
--- Cross-check mtransfn (if present) against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND
-    (ptr.proretset
-     OR NOT (ptr.pronargs =
-             CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
-     OR NOT binary_coercible(ptr.prorettype, a.aggmtranstype)
-     OR NOT binary_coercible(a.aggmtranstype, ptr.proargtypes[0])
-     OR (p.pronargs > 0 AND
-         NOT binary_coercible(p.proargtypes[0], ptr.proargtypes[1]))
-     OR (p.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[1], ptr.proargtypes[2]))
-     OR (p.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[2], ptr.proargtypes[3]))
-     -- we could carry the check further, but 3 args is enough for now
-     OR (p.pronargs > 3)
-    );
-
--- Cross-check minvtransfn (if present) against its entry in pg_proc.
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggminvtransfn = ptr.oid AND
-    (ptr.proretset
-     OR NOT (ptr.pronargs =
-             CASE WHEN a.aggkind = 'n' THEN p.pronargs + 1
-             ELSE greatest(p.pronargs - a.aggnumdirectargs, 1) + 1 END)
-     OR NOT binary_coercible(ptr.prorettype, a.aggmtranstype)
-     OR NOT binary_coercible(a.aggmtranstype, ptr.proargtypes[0])
-     OR (p.pronargs > 0 AND
-         NOT binary_coercible(p.proargtypes[0], ptr.proargtypes[1]))
-     OR (p.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[1], ptr.proargtypes[2]))
-     OR (p.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[2], ptr.proargtypes[3]))
-     -- we could carry the check further, but 3 args is enough for now
-     OR (p.pronargs > 3)
-    );
-
--- Cross-check mfinalfn (if present) against its entry in pg_proc.
-
-SELECT a.aggfnoid::oid, p.proname, pfn.oid, pfn.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS pfn
-WHERE a.aggfnoid = p.oid AND
-    a.aggmfinalfn = pfn.oid AND
-    (pfn.proretset OR
-     NOT binary_coercible(pfn.prorettype, p.prorettype) OR
-     NOT binary_coercible(a.aggmtranstype, pfn.proargtypes[0]) OR
-     CASE WHEN a.aggmfinalextra THEN pfn.pronargs != p.pronargs + 1
-          ELSE pfn.pronargs != a.aggnumdirectargs + 1 END
-     OR (pfn.pronargs > 1 AND
-         NOT binary_coercible(p.proargtypes[0], pfn.proargtypes[1]))
-     OR (pfn.pronargs > 2 AND
-         NOT binary_coercible(p.proargtypes[1], pfn.proargtypes[2]))
-     OR (pfn.pronargs > 3 AND
-         NOT binary_coercible(p.proargtypes[2], pfn.proargtypes[3]))
-     -- we could carry the check further, but 4 args is enough for now
-     OR (pfn.pronargs > 4)
-    );
-
--- If mtransfn is strict then either minitval should be non-NULL, or
--- input type should match mtranstype so that the first non-null input
--- can be assigned as the state value.
-
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND ptr.proisstrict AND
-    a.aggminitval IS NULL AND
-    NOT binary_coercible(p.proargtypes[0], a.aggmtranstype);
-
--- mtransfn and minvtransfn should have same strictness setting.
-
-SELECT a.aggfnoid::oid, p.proname, ptr.oid, ptr.proname, iptr.oid, iptr.proname
-FROM pg_aggregate AS a, pg_proc AS p, pg_proc AS ptr, pg_proc AS iptr
-WHERE a.aggfnoid = p.oid AND
-    a.aggmtransfn = ptr.oid AND
-    a.aggminvtransfn = iptr.oid AND
-    ptr.proisstrict != iptr.proisstrict;
 
 -- Check that all combine functions have signature
 -- combine(transtype, transtype) returns transtype
