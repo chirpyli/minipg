@@ -301,11 +301,6 @@ describeFunctions(const char *functypes, const char *func_pattern,
 							  gettext_noop("unsafe"),
 							  gettext_noop("Parallel"));
 		appendPQExpBuffer(&buf,
-						  ",\n CASE WHEN prosecdef THEN '%s' ELSE '%s' END AS \"%s\"",
-						  gettext_noop("definer"),
-						  gettext_noop("invoker"),
-						  gettext_noop("Security"));
-		appendPQExpBuffer(&buf,
 						  ",\n p.prosrc as \"%s\"",
 						  gettext_noop("Source code"));
 		appendPQExpBuffer(&buf,

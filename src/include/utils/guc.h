@@ -373,12 +373,6 @@ extern TupleDesc GetPGVariableResultDesc(const char *name);
 extern void ExecSetVariableStmt(VariableSetStmt *stmt, bool isTopLevel);
 extern char *ExtractSetVariableArgs(VariableSetStmt *stmt);
 
-extern void ProcessGUCArray(ArrayType *array,
-							GucContext context, GucSource source, GucAction action);
-extern ArrayType *GUCArrayAdd(ArrayType *array, const char *name, const char *value);
-extern ArrayType *GUCArrayDelete(ArrayType *array, const char *name);
-extern ArrayType *GUCArrayReset(ArrayType *array);
-
 /* GUC serialization */
 extern Size EstimateGUCStateSpace(void);
 extern void SerializeGUCState(Size maxsize, char *start_address);

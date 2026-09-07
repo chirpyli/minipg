@@ -36,10 +36,10 @@ extern Node *ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 extern FuncDetailCode func_get_detail(List *funcname,
 									  List *fargs, List *fargnames,
 									  int nargs, Oid *argtypes,
-									  bool expand_variadic, bool expand_defaults,
+									  bool expand_variadic,
 									  Oid *funcid, Oid *rettype,
 									  bool *retset, int *nvargs, Oid *vatype,
-									  Oid **true_typeids, List **argdefaults);
+									  Oid **true_typeids);
 
 extern int	func_match_argtypes(int nargs,
 								Oid *input_typeids,

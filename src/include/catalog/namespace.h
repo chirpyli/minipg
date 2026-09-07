@@ -33,7 +33,6 @@ typedef struct _FuncCandidateList
 	int			nominalnargs;	/* either pronargs or length(proallargtypes) */
 	int			nargs;			/* number of arg types returned */
 	int			nvargs;			/* number of args to become variadic array */
-	int			ndargs;			/* number of defaulted args */
 	int		   *argnumbers;		/* args' positional indexes, if named call */
 	Oid			args[FLEXIBLE_ARRAY_MEMBER];	/* arg types */
 }		   *FuncCandidateList;
@@ -89,7 +88,6 @@ extern bool TypeIsVisible(Oid typid);
 extern FuncCandidateList FuncnameGetCandidates(List *names,
 											   int nargs, List *argnames,
 											   bool expand_variadic,
-											   bool expand_defaults,
 											   bool include_out_arguments,
 											   bool missing_ok);
 extern bool FunctionIsVisible(Oid funcid);

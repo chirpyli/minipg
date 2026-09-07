@@ -3789,8 +3789,6 @@ static void reapply_stacked_values(struct config_generic *variable,
 static void ShowGUCConfigOption(const char *name, DestReceiver *dest);
 static void ShowAllGUCConfig(DestReceiver *dest);
 static char *_ShowOption(struct config_generic *record, bool use_units);
-static bool validate_option_array_item(const char *name, const char *value,
-									   bool skipIfNoPermissions);
 /*
  * Some infrastructure for checking malloc/strdup/realloc calls
  */
@@ -4906,8 +4904,8 @@ AtStart_GUC(void)
 
 /*
  * Enter a new nesting level for GUC values.  This is called at subtransaction
- * start, and when entering a function that has proconfig settings, and in
- * some other places where we want to set GUC variables transiently.
+ * start, and in some other places where we want to set GUC variables
+ * transiently.
  * NOTE we must not risk error here, else subtransaction start will be unhappy.
  */
 int
@@ -4918,11 +4916,11 @@ NewGUCNestLevel(void)
 
 /*
  * Do GUC processing at transaction or subtransaction commit or abort, or
- * when exiting a function that has proconfig settings, or when undoing a
- * transient assignment to some GUC variables.  (The name is thus a bit of
- * a misnomer; perhaps it should be ExitGUCNestLevel or some such.)
- * During abort, we discard all GUC settings that were applied at nesting
- * levels >= nestLevel.  nestLevel == 1 corresponds to the main transaction.
+ * when undoing a transient assignment to some GUC variables.  (The name is
+ * thus a bit of a misnomer; perhaps it should be ExitGUCNestLevel or some
+ * such.) During abort, we discard all GUC settings that were applied at
+ * nesting levels >= nestLevel.  nestLevel == 1 corresponds to the main
+ * transaction.
  */
 void
 AtEOXact_GUC(bool isCommit, int nestLevel)
@@ -4954,10 +4952,10 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 
 		/*
 		 * Process and pop each stack entry within the nest level. To simplify
-		 * fmgr_security_definer() and other places that use GUC_ACTION_SAVE,
-		 * we allow failure exit from code that uses a local nest level to be
-		 * recovered at the surrounding transaction or subtransaction abort;
-		 * so there could be more than one stack entry to pop.
+		 * places that use GUC_ACTION_SAVE, we allow failure exit from code
+		 * that uses a local nest level to be recovered at the surrounding
+		 * transaction or subtransaction abort; so there could be more than
+		 * one stack entry to pop.
 		 */
 		while ((stack = gconf->stack) != NULL &&
 			   stack->nest_level >= nestLevel)
@@ -6040,10 +6038,7 @@ set_config_option(const char *name, const char *value,
 
 	/*
 	 * GUC_ACTION_SAVE changes are acceptable during a parallel operation,
-	 * because the current worker will also pop the change.  We're probably
-	 * dealing with a function having a proconfig entry.  Only the function's
-	 * body should observe the change, and peer workers do not share in the
-	 * execution of a function call started by this worker.
+	 * because the current worker will also pop the change.
 	 *
 	 * Also allow normal setting if the GUC is marked GUC_ALLOW_IN_PARALLEL.
 	 *
@@ -9160,366 +9155,6 @@ ParseLongOption(const char *string, char **name, char **value)
 			*cp = '_';
 }
 
-
-/*
- * Handle options fetched from pg_proc.proconfig, etc.
- * Caller must specify proper context/source/action.
- *
- * The array parameter must be an array of TEXT (it must not be NULL).
- */
-void
-ProcessGUCArray(ArrayType *array,
-				GucContext context, GucSource source, GucAction action)
-{
-	int			i;
-
-	Assert(array != NULL);
-	Assert(ARR_ELEMTYPE(array) == TEXTOID);
-	Assert(ARR_NDIM(array) == 1);
-	Assert(ARR_LBOUND(array)[0] == 1);
-
-	for (i = 1; i <= ARR_DIMS(array)[0]; i++)
-	{
-		Datum		d;
-		bool		isnull;
-		char	   *s;
-		char	   *name;
-		char	   *value;
-		char	   *namecopy;
-		char	   *valuecopy;
-
-		d = array_ref(array, 1, &i,
-					  -1 /* varlenarray */ ,
-					  -1 /* TEXT's typlen */ ,
-					  false /* TEXT's typbyval */ ,
-					  TYPALIGN_INT /* TEXT's typalign */ ,
-					  &isnull);
-
-		if (isnull)
-			continue;
-
-		s = TextDatumGetCString(d);
-
-		ParseLongOption(s, &name, &value);
-		if (!value)
-		{
-			ereport(WARNING,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("could not parse setting for parameter \"%s\"",
-							name)));
-			free(name);
-			continue;
-		}
-
-		/* free malloc'd strings immediately to avoid leak upon error */
-		namecopy = pstrdup(name);
-		free(name);
-		valuecopy = pstrdup(value);
-		free(value);
-
-		(void) set_config_option(namecopy, valuecopy,
-								 context, source,
-								 action, true, 0, false);
-
-		pfree(namecopy);
-		pfree(valuecopy);
-		pfree(s);
-	}
-}
-
-
-/*
- * Add an entry to an option array.  The array parameter may be NULL
- * to indicate the current table entry is NULL.
- */
-ArrayType *
-GUCArrayAdd(ArrayType *array, const char *name, const char *value)
-{
-	struct config_generic *record;
-	Datum		datum;
-	char	   *newval;
-	ArrayType  *a;
-
-	Assert(name);
-	Assert(value);
-
-	/* test if the option is valid and we're allowed to set it */
-	(void) validate_option_array_item(name, value, false);
-
-	/* normalize name (converts obsolete GUC names to modern spellings) */
-	record = find_option(name, false, true, WARNING);
-	if (record)
-		name = record->name;
-
-	/* build new item for array */
-	newval = psprintf("%s=%s", name, value);
-	datum = CStringGetTextDatum(newval);
-
-	if (array)
-	{
-		int			index;
-		bool		isnull;
-		int			i;
-
-		Assert(ARR_ELEMTYPE(array) == TEXTOID);
-		Assert(ARR_NDIM(array) == 1);
-		Assert(ARR_LBOUND(array)[0] == 1);
-
-		index = ARR_DIMS(array)[0] + 1; /* add after end */
-
-		for (i = 1; i <= ARR_DIMS(array)[0]; i++)
-		{
-			Datum		d;
-			char	   *current;
-
-			d = array_ref(array, 1, &i,
-						  -1 /* varlenarray */ ,
-						  -1 /* TEXT's typlen */ ,
-						  false /* TEXT's typbyval */ ,
-						  TYPALIGN_INT /* TEXT's typalign */ ,
-						  &isnull);
-			if (isnull)
-				continue;
-			current = TextDatumGetCString(d);
-
-			/* check for match up through and including '=' */
-			if (strncmp(current, newval, strlen(name) + 1) == 0)
-			{
-				index = i;
-				break;
-			}
-		}
-
-		a = array_set(array, 1, &index,
-					  datum,
-					  false,
-					  -1 /* varlena array */ ,
-					  -1 /* TEXT's typlen */ ,
-					  false /* TEXT's typbyval */ ,
-					  TYPALIGN_INT /* TEXT's typalign */ );
-	}
-	else
-		a = construct_array(&datum, 1,
-							TEXTOID,
-							-1, false, TYPALIGN_INT);
-
-	return a;
-}
-
-
-/*
- * Delete an entry from an option array.  The array parameter may be NULL
- * to indicate the current table entry is NULL.  Also, if the return value
- * is NULL then a null should be stored.
- */
-ArrayType *
-GUCArrayDelete(ArrayType *array, const char *name)
-{
-	struct config_generic *record;
-	ArrayType  *newarray;
-	int			i;
-	int			index;
-
-	Assert(name);
-
-	/* test if the option is valid and we're allowed to set it */
-	(void) validate_option_array_item(name, NULL, false);
-
-	/* normalize name (converts obsolete GUC names to modern spellings) */
-	record = find_option(name, false, true, WARNING);
-	if (record)
-		name = record->name;
-
-	/* if array is currently null, then surely nothing to delete */
-	if (!array)
-		return NULL;
-
-	newarray = NULL;
-	index = 1;
-
-	for (i = 1; i <= ARR_DIMS(array)[0]; i++)
-	{
-		Datum		d;
-		char	   *val;
-		bool		isnull;
-
-		d = array_ref(array, 1, &i,
-					  -1 /* varlenarray */ ,
-					  -1 /* TEXT's typlen */ ,
-					  false /* TEXT's typbyval */ ,
-					  TYPALIGN_INT /* TEXT's typalign */ ,
-					  &isnull);
-		if (isnull)
-			continue;
-		val = TextDatumGetCString(d);
-
-		/* ignore entry if it's what we want to delete */
-		if (strncmp(val, name, strlen(name)) == 0
-			&& val[strlen(name)] == '=')
-			continue;
-
-		/* else add it to the output array */
-		if (newarray)
-			newarray = array_set(newarray, 1, &index,
-								 d,
-								 false,
-								 -1 /* varlenarray */ ,
-								 -1 /* TEXT's typlen */ ,
-								 false /* TEXT's typbyval */ ,
-								 TYPALIGN_INT /* TEXT's typalign */ );
-		else
-			newarray = construct_array(&d, 1,
-									   TEXTOID,
-									   -1, false, TYPALIGN_INT);
-
-		index++;
-	}
-
-	return newarray;
-}
-
-
-/*
- * Given a GUC array, delete all settings from it that our permission
- * level allows: if superuser, delete them all; if regular user, only
- * those that are PGC_USERSET
- */
-ArrayType *
-GUCArrayReset(ArrayType *array)
-{
-	ArrayType  *newarray;
-	int			i;
-	int			index;
-
-	/* if array is currently null, nothing to do */
-	if (!array)
-		return NULL;
-
-	/* if we're superuser, we can delete everything, so just do it */
-	if (true)
-		return NULL;
-
-	newarray = NULL;
-	index = 1;
-
-	for (i = 1; i <= ARR_DIMS(array)[0]; i++)
-	{
-		Datum		d;
-		char	   *val;
-		char	   *eqsgn;
-		bool		isnull;
-
-		d = array_ref(array, 1, &i,
-					  -1 /* varlenarray */ ,
-					  -1 /* TEXT's typlen */ ,
-					  false /* TEXT's typbyval */ ,
-					  TYPALIGN_INT /* TEXT's typalign */ ,
-					  &isnull);
-		if (isnull)
-			continue;
-		val = TextDatumGetCString(d);
-
-		eqsgn = strchr(val, '=');
-		*eqsgn = '\0';
-
-		/* skip if we have permission to delete it */
-		if (validate_option_array_item(val, NULL, true))
-			continue;
-
-		/* else add it to the output array */
-		if (newarray)
-			newarray = array_set(newarray, 1, &index,
-								 d,
-								 false,
-								 -1 /* varlenarray */ ,
-								 -1 /* TEXT's typlen */ ,
-								 false /* TEXT's typbyval */ ,
-								 TYPALIGN_INT /* TEXT's typalign */ );
-		else
-			newarray = construct_array(&d, 1,
-									   TEXTOID,
-									   -1, false, TYPALIGN_INT);
-
-		index++;
-		pfree(val);
-	}
-
-	return newarray;
-}
-
-/*
- * Validate a proposed option setting for GUCArrayAdd/Delete/Reset.
- *
- * name is the option name.  value is the proposed value for the Add case,
- * or NULL for the Delete/Reset cases.  If skipIfNoPermissions is true, it's
- * not an error to have no permissions to set the option.
- *
- * Returns true if OK, false if skipIfNoPermissions is true and user does not
- * have permission to change this option (all other error cases result in an
- * error being thrown).
- */
-static bool
-validate_option_array_item(const char *name, const char *value,
-						   bool skipIfNoPermissions)
-
-{
-	struct config_generic *gconf;
-
-	/*
-	 * There are three cases to consider:
-	 *
-	 * name is a known GUC variable.  Check the value normally, check
-	 * permissions normally (i.e., allow if variable is USERSET, or if it's
-	 * SUSET and user is superuser).
-	 *
-	 * name is not known, but exists or can be created as a placeholder (i.e.,
-	 * it has a valid custom name).  We allow this case if you're a superuser,
-	 * otherwise not.  Superusers are assumed to know what they're doing. We
-	 * can't allow it for other users, because when the placeholder is
-	 * resolved it might turn out to be a SUSET variable;
-	 * define_custom_variable assumes we checked that.
-	 *
-	 * name is not known and can't be created as a placeholder.  Throw error,
-	 * unless skipIfNoPermissions is true, in which case return false.
-	 */
-	gconf = find_option(name, true, skipIfNoPermissions, ERROR);
-	if (!gconf)
-	{
-		/* not known, failed to make a placeholder */
-		return false;
-	}
-
-	if (gconf->flags & GUC_CUSTOM_PLACEHOLDER)
-	{
-		/*
-		 * We cannot do any meaningful check on the value, so only permissions
-		 * are useful to check.
-		 */
-		if (true)
-			return true;
-		if (skipIfNoPermissions)
-			return false;
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied to set parameter \"%s\"", name)));
-	}
-
-	/* manual permissions check so we can avoid an error being thrown */
-	if (gconf->context == PGC_USERSET)
-		 /* ok */ ;
-	else if (gconf->context == PGC_SUSET && true)
-		 /* ok */ ;
-	else if (skipIfNoPermissions)
-		return false;
-	/* if a permissions error should be thrown, let set_config_option do it */
-
-	/* test for permissions and valid option value */
-	(void) set_config_option(name, value,
-							 true ? PGC_SUSET : PGC_USERSET,
-							 PGC_S_TEST, GUC_ACTION_SET, false, 0, false);
-
-	return true;
-}
 
 
 /*

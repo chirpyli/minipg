@@ -97,11 +97,9 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	ListCell   *l;
 	Node	   *first_arg = NULL;
 	int			nargs;
-	int			nargsplusdefs;
 	Oid			actual_arg_types[FUNC_MAX_ARGS];
 	Oid		   *declared_arg_types;
 	List	   *argnames;
-	List	   *argdefaults;
 	Node	   *retval;
 	bool		retset;
 	int			nvargs;
@@ -257,10 +255,10 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 
 	fdresult = func_get_detail(funcname, fargs, argnames, nargs,
 							   actual_arg_types,
-							   !func_variadic, true,
+							   !func_variadic,
 							   &funcid, &rettype, &retset,
 							   &nvargs, &vatype,
-							   &declared_arg_types, &argdefaults);
+							   &declared_arg_types);
 
 	cancel_parser_errposition_callback(&pcbstate);
 
@@ -423,38 +421,13 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	}
 
 	/*
-	 * If there are default arguments, we have to include their types in
-	 * actual_arg_types for the purpose of checking generic type consistency.
-	 * However, we do NOT put them into the generated parse node, because
-	 * their actual values might change before the query gets run.  The
-	 * planner has to insert the up-to-date values at plan time.
-	 */
-	nargsplusdefs = nargs;
-	foreach(l, argdefaults)
-	{
-		Node	   *expr = (Node *) lfirst(l);
-
-		/* probably shouldn't happen ... */
-		if (nargsplusdefs >= FUNC_MAX_ARGS)
-			ereport(ERROR,
-					(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-					 errmsg_plural("cannot pass more than %d argument to a function",
-								   "cannot pass more than %d arguments to a function",
-								   FUNC_MAX_ARGS,
-								   FUNC_MAX_ARGS),
-					 parser_errposition(pstate, location)));
-
-		actual_arg_types[nargsplusdefs++] = exprType(expr);
-	}
-
-	/*
 	 * enforce consistency with polymorphic argument and return types,
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
 	rettype = enforce_generic_type_consistency(actual_arg_types,
 											   declared_arg_types,
-											   nargsplusdefs,
+											   nargs,
 											   rettype,
 											   false);
 
@@ -1089,16 +1062,13 @@ func_select_candidate(int nargs,
  *	2) apply the ambiguous-function resolution rules
  *
  * Return values *funcid through *true_typeids receive info about the function.
- * If argdefaults isn't NULL, *argdefaults receives a list of any default
- * argument expressions that need to be added to the given arguments.
  *
  * When processing a named- or mixed-notation call (ie, fargnames isn't NIL),
- * the returned true_typeids and argdefaults are ordered according to the
- * call's argument ordering: first any positional arguments, then the named
- * arguments, then defaulted arguments (if needed and allowed by
- * expand_defaults).  Some care is needed if this information is to be compared
- * to the function's pg_proc entry, but in practice the caller can usually
- * just work with the call's argument ordering.
+ * the returned true_typeids are ordered according to the call's argument
+ * ordering: first any positional arguments, then the named arguments.
+ * Some care is needed if this information is to be compared to the
+ * function's pg_proc entry, but in practice the caller can usually just
+ * work with the call's argument ordering.
  *
  * We rely primarily on fargnames/nargs/argtypes as the argument description.
  * The actual expression node list is passed in fargs so that we can check
@@ -1114,14 +1084,12 @@ func_get_detail(List *funcname,
 				int nargs,
 				Oid *argtypes,
 				bool expand_variadic,
-				bool expand_defaults,
 				Oid *funcid,	/* return value */
 				Oid *rettype,	/* return value */
 				bool *retset,	/* return value */
 				int *nvargs,	/* return value */
 				Oid *vatype,	/* return value */
-				Oid **true_typeids, /* return value */
-				List **argdefaults) /* optional return value */
+				Oid **true_typeids) /* return value */
 {
 	FuncCandidateList raw_candidates;
 	FuncCandidateList best_candidate;
@@ -1133,12 +1101,10 @@ func_get_detail(List *funcname,
 	*nvargs = 0;
 	*vatype = InvalidOid;
 	*true_typeids = NULL;
-	if (argdefaults)
-		*argdefaults = NIL;
 
 	/* Get list of possible candidates from namespace search */
 	raw_candidates = FuncnameGetCandidates(funcname, nargs, fargnames,
-										   expand_variadic, expand_defaults,
+										   expand_variadic,
 										   false, false);
 
 	/*
@@ -1344,74 +1310,6 @@ func_get_detail(List *funcname,
 		*rettype = pform->prorettype;
 		*retset = pform->proretset;
 		*vatype = pform->provariadic;
-		/* fetch default args if caller wants 'em */
-		if (argdefaults && best_candidate->ndargs > 0)
-		{
-			Datum		proargdefaults;
-			bool		isnull;
-			char	   *str;
-			List	   *defaults;
-
-			/* shouldn't happen, FuncnameGetCandidates messed up */
-			if (best_candidate->ndargs > pform->pronargdefaults)
-				elog(ERROR, "not enough default arguments");
-
-			proargdefaults = SysCacheGetAttr(PROCOID, ftup,
-											 Anum_pg_proc_proargdefaults,
-											 &isnull);
-			Assert(!isnull);
-			str = TextDatumGetCString(proargdefaults);
-			defaults = castNode(List, stringToNode(str));
-			pfree(str);
-
-			/* Delete any unused defaults from the returned list */
-			if (best_candidate->argnumbers != NULL)
-			{
-				/*
-				 * This is a bit tricky in named notation, since the supplied
-				 * arguments could replace any subset of the defaults.  We
-				 * work by making a bitmapset of the argnumbers of defaulted
-				 * arguments, then scanning the defaults list and selecting
-				 * the needed items.  (This assumes that defaulted arguments
-				 * should be supplied in their positional order.)
-				 */
-				Bitmapset  *defargnumbers;
-				int		   *firstdefarg;
-				List	   *newdefaults;
-				ListCell   *lc;
-				int			i;
-
-				defargnumbers = NULL;
-				firstdefarg = &best_candidate->argnumbers[best_candidate->nargs - best_candidate->ndargs];
-				for (i = 0; i < best_candidate->ndargs; i++)
-					defargnumbers = bms_add_member(defargnumbers,
-												   firstdefarg[i]);
-				newdefaults = NIL;
-				i = best_candidate->nominalnargs - pform->pronargdefaults;
-				foreach(lc, defaults)
-				{
-					if (bms_is_member(i, defargnumbers))
-						newdefaults = lappend(newdefaults, lfirst(lc));
-					i++;
-				}
-				Assert(list_length(newdefaults) == best_candidate->ndargs);
-				bms_free(defargnumbers);
-				*argdefaults = newdefaults;
-			}
-			else
-			{
-				/*
-				 * Defaults for positional notation are lots easier; just
-				 * remove any unwanted ones from the front.
-				 */
-				int			ndelete;
-
-				ndelete = list_length(defaults) - best_candidate->ndargs;
-				if (ndelete > 0)
-					defaults = list_delete_first_n(defaults, ndelete);
-				*argdefaults = defaults;
-			}
-		}
 
 		switch (pform->prokind)
 		{
@@ -1686,7 +1584,7 @@ LookupFuncNameInternal(List *funcname, int nargs, const Oid *argtypes,
 	*lookupError = FUNCLOOKUP_NOSUCHFUNC;
 
 	/* Get list of candidate objects */
-	clist = FuncnameGetCandidates(funcname, nargs, NIL, false, false,
+	clist = FuncnameGetCandidates(funcname, nargs, NIL, false,
 								  false, missing_ok);
 
 	/* Scan list for a match to the arg types (if specified) */

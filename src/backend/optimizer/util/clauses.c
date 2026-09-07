@@ -121,11 +121,7 @@ static Expr *simplify_function(Oid funcid,
 							   Oid result_collid, Oid input_collid, List **args_p,
 							   bool funcvariadic, bool process_args, bool allow_non_const,
 							   eval_const_expressions_context *context);
-static List *reorder_function_arguments(List *args, int pronargs,
-										HeapTuple func_tuple);
-static List *add_function_defaults(List *args, int pronargs,
-								   HeapTuple func_tuple);
-static List *fetch_function_defaults(HeapTuple func_tuple);
+static List *reorder_function_arguments(List *args, int pronargs);
 static void recheck_cast_function_args(List *args, Oid result_type,
 									   Oid *proargtypes, int pronargs,
 									   HeapTuple func_tuple);
@@ -3682,7 +3678,6 @@ simplify_function(Oid funcid, Oid result_type, int32 result_typmod,
 
 /*
  * expand_function_arguments: convert named-notation args to positional args
- * and/or insert default args, as needed
  *
  * Returns a possibly-transformed version of the args list.
  *
@@ -3756,16 +3751,7 @@ expand_function_arguments(List *args, bool include_out_arguments,
 	/* If so, we must apply reorder_function_arguments */
 	if (has_named_args)
 	{
-		args = reorder_function_arguments(args, pronargs, func_tuple);
-		/* Recheck argument types and add casts if needed */
-		recheck_cast_function_args(args, result_type,
-								   proargtypes, pronargs,
-								   func_tuple);
-	}
-	else if (list_length(args) < pronargs)
-	{
-		/* No named args, but we seem to be short some defaults */
-		args = add_function_defaults(args, pronargs, func_tuple);
+		args = reorder_function_arguments(args, pronargs);
 		/* Recheck argument types and add casts if needed */
 		recheck_cast_function_args(args, result_type,
 								   proargtypes, pronargs,
@@ -3777,14 +3763,10 @@ expand_function_arguments(List *args, bool include_out_arguments,
 
 /*
  * reorder_function_arguments: convert named-notation args to positional args
- *
- * This function also inserts default argument values as needed, since it's
- * impossible to form a truly valid positional call without that.
  */
 static List *
-reorder_function_arguments(List *args, int pronargs, HeapTuple func_tuple)
+reorder_function_arguments(List *args, int pronargs)
 {
-	Form_pg_proc funcform = (Form_pg_proc) GETSTRUCT(func_tuple);
 	int			nargsprovided = list_length(args);
 	Node	   *argarray[FUNC_MAX_ARGS];
 	ListCell   *lc;
@@ -3817,23 +3799,6 @@ reorder_function_arguments(List *args, int pronargs, HeapTuple func_tuple)
 		}
 	}
 
-	/*
-	 * Fetch default expressions, if needed, and insert into array at proper
-	 * locations (they aren't necessarily consecutive or all used)
-	 */
-	if (nargsprovided < pronargs)
-	{
-		List	   *defaults = fetch_function_defaults(func_tuple);
-
-		i = pronargs - funcform->pronargdefaults;
-		foreach(lc, defaults)
-		{
-			if (argarray[i] == NULL)
-				argarray[i] = (Node *) lfirst(lc);
-			i++;
-		}
-	}
-
 	/* Now reconstruct the args list in proper order */
 	args = NIL;
 	for (i = 0; i < pronargs; i++)
@@ -3843,56 +3808,6 @@ reorder_function_arguments(List *args, int pronargs, HeapTuple func_tuple)
 	}
 
 	return args;
-}
-
-/*
- * add_function_defaults: add missing function arguments from its defaults
- *
- * This is used only when the argument list was positional to begin with,
- * and so we know we just need to add defaults at the end.
- */
-static List *
-add_function_defaults(List *args, int pronargs, HeapTuple func_tuple)
-{
-	int			nargsprovided = list_length(args);
-	List	   *defaults;
-	int			ndelete;
-
-	/* Get all the default expressions from the pg_proc tuple */
-	defaults = fetch_function_defaults(func_tuple);
-
-	/* Delete any unused defaults from the list */
-	ndelete = nargsprovided + list_length(defaults) - pronargs;
-	if (ndelete < 0)
-		elog(ERROR, "not enough default arguments");
-	if (ndelete > 0)
-		defaults = list_delete_first_n(defaults, ndelete);
-
-	/* And form the combined argument list, not modifying the input list */
-	return list_concat_copy(args, defaults);
-}
-
-/*
- * fetch_function_defaults: get function's default arguments as expression list
- */
-static List *
-fetch_function_defaults(HeapTuple func_tuple)
-{
-	List	   *defaults;
-	Datum		proargdefaults;
-	bool		isnull;
-	char	   *str;
-
-	/* The error cases here shouldn't happen, but check anyway */
-	proargdefaults = SysCacheGetAttr(PROCOID, func_tuple,
-									 Anum_pg_proc_proargdefaults,
-									 &isnull);
-	if (isnull)
-		elog(ERROR, "not enough default arguments");
-	str = TextDatumGetCString(proargdefaults);
-	defaults = castNode(List, stringToNode(str));
-	pfree(str);
-	return defaults;
 }
 
 /*
@@ -4114,10 +4029,8 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 	 */
 	if (funcform->prolang != SQLlanguageId ||
 		funcform->prokind != PROKIND_FUNCTION ||
-		funcform->prosecdef ||
 		funcform->proretset ||
 		funcform->prorettype == RECORDOID ||
-		!heap_attisnull(func_tuple, Anum_pg_proc_proconfig, NULL) ||
 		funcform->pronargs != list_length(args))
 		return NULL;
 
@@ -4127,10 +4040,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 
 	/* Check permission to call function (fail later, if not) */
 	if (false)
-		return NULL;
-
-	/* Check whether a plugin wants to hook function entry/exit */
-	if (FmgrHookIsNeeded(funcid))
 		return NULL;
 
 	/*
@@ -4179,56 +4088,28 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 	sqlerrcontext.previous = error_context_stack;
 	error_context_stack = &sqlerrcontext;
 
-	/* If we have prosqlbody, pay attention to that not prosrc */
-	tmp = SysCacheGetAttr(PROCOID,
-						  func_tuple,
-						  Anum_pg_proc_prosqlbody,
-						  &isNull);
-	if (!isNull)
-	{
-		Node	   *n;
-		List	   *querytree_list;
+	/* Set up to handle parameters while parsing the function body. */
+	pinfo = prepare_sql_fn_parse_info(func_tuple,
+									  (Node *) fexpr,
+									  input_collid);
 
-		n = stringToNode(TextDatumGetCString(tmp));
-		if (IsA(n, List))
-			querytree_list = linitial_node(List, castNode(List, n));
-		else
-			querytree_list = list_make1(n);
-		if (list_length(querytree_list) != 1)
-			goto fail;
-		querytree = linitial(querytree_list);
+	/*
+	 * We just do parsing and parse analysis, not rewriting, because
+	 * rewriting will not affect table-free-SELECT-only queries, which is
+	 * all that we care about.  Also, we can punt as soon as we detect
+	 * more than one command in the function body.
+	 */
+	raw_parsetree_list = pg_parse_query(src);
+	if (list_length(raw_parsetree_list) != 1)
+		goto fail;
 
-		/*
-		 * Because we'll insist below that the querytree have an empty rtable
-		 * and no sublinks, it cannot have any relation references that need
-		 * to be locked or rewritten.  So we can omit those steps.
-		 */
-	}
-	else
-	{
-		/* Set up to handle parameters while parsing the function body. */
-		pinfo = prepare_sql_fn_parse_info(func_tuple,
-										  (Node *) fexpr,
-										  input_collid);
+	pstate = make_parsestate(NULL);
+	pstate->p_sourcetext = src;
+	sql_fn_parser_setup(pstate, pinfo);
 
-		/*
-		 * We just do parsing and parse analysis, not rewriting, because
-		 * rewriting will not affect table-free-SELECT-only queries, which is
-		 * all that we care about.  Also, we can punt as soon as we detect
-		 * more than one command in the function body.
-		 */
-		raw_parsetree_list = pg_parse_query(src);
-		if (list_length(raw_parsetree_list) != 1)
-			goto fail;
+	querytree = transformTopLevelStmt(pstate, linitial(raw_parsetree_list));
 
-		pstate = make_parsestate(NULL);
-		pstate->p_sourcetext = src;
-		sql_fn_parser_setup(pstate, pinfo);
-
-		querytree = transformTopLevelStmt(pstate, linitial(raw_parsetree_list));
-
-		free_parsestate(pstate);
-	}
+	free_parsestate(pstate);
 
 	/*
 	 * The single command must be a simple "SELECT expression".
@@ -4668,10 +4549,6 @@ inline_set_returning_function(PlannerInfo *root, RangeTblEntry *rte)
 	if (false)
 		return NULL;
 
-	/* Check whether a plugin wants to hook function entry/exit */
-	if (FmgrHookIsNeeded(func_oid))
-		return NULL;
-
 	/*
 	 * OK, let's take a look at the function's pg_proc entry.
 	 */
@@ -4695,10 +4572,8 @@ inline_set_returning_function(PlannerInfo *root, RangeTblEntry *rte)
 		funcform->proisstrict ||
 		funcform->provolatile == PROVOLATILE_VOLATILE ||
 		funcform->prorettype == VOIDOID ||
-		funcform->prosecdef ||
 		!funcform->proretset ||
-		list_length(fexpr->args) != funcform->pronargs ||
-		!heap_attisnull(func_tuple, Anum_pg_proc_proconfig, NULL))
+		list_length(fexpr->args) != funcform->pronargs)
 	{
 		ReleaseSysCache(func_tuple);
 		return NULL;
@@ -4734,59 +4609,31 @@ inline_set_returning_function(PlannerInfo *root, RangeTblEntry *rte)
 	sqlerrcontext.previous = error_context_stack;
 	error_context_stack = &sqlerrcontext;
 
-	/* If we have prosqlbody, pay attention to that not prosrc */
-	tmp = SysCacheGetAttr(PROCOID,
-						  func_tuple,
-						  Anum_pg_proc_prosqlbody,
-						  &isNull);
-	if (!isNull)
-	{
-		Node	   *n;
+	/*
+	 * Set up to handle parameters while parsing the function body.  We
+	 * can use the FuncExpr just created as the input for
+	 * prepare_sql_fn_parse_info.
+	 */
+	pinfo = prepare_sql_fn_parse_info(func_tuple,
+									  (Node *) fexpr,
+									  fexpr->inputcollid);
 
-		n = stringToNode(TextDatumGetCString(tmp));
-		if (IsA(n, List))
-			querytree_list = linitial_node(List, castNode(List, n));
-		else
-			querytree_list = list_make1(n);
-		if (list_length(querytree_list) != 1)
-			goto fail;
-		querytree = linitial(querytree_list);
+	/*
+	 * Parse, analyze, and rewrite (unlike inline_function(), we can't
+	 * skip rewriting here).  We can fail as soon as we find more than one
+	 * query, though.
+	 */
+	raw_parsetree_list = pg_parse_query(src);
+	if (list_length(raw_parsetree_list) != 1)
+		goto fail;
 
-		/* Acquire necessary locks, then apply rewriter. */
-		AcquireRewriteLocks(querytree, true, false);
-		querytree_list = pg_rewrite_query(querytree);
-		if (list_length(querytree_list) != 1)
-			goto fail;
-		querytree = linitial(querytree_list);
-	}
-	else
-	{
-		/*
-		 * Set up to handle parameters while parsing the function body.  We
-		 * can use the FuncExpr just created as the input for
-		 * prepare_sql_fn_parse_info.
-		 */
-		pinfo = prepare_sql_fn_parse_info(func_tuple,
-										  (Node *) fexpr,
-										  fexpr->inputcollid);
-
-		/*
-		 * Parse, analyze, and rewrite (unlike inline_function(), we can't
-		 * skip rewriting here).  We can fail as soon as we find more than one
-		 * query, though.
-		 */
-		raw_parsetree_list = pg_parse_query(src);
-		if (list_length(raw_parsetree_list) != 1)
-			goto fail;
-
-		querytree_list = pg_analyze_and_rewrite_params(linitial(raw_parsetree_list),
-													   src,
-													   (ParserSetupHook) sql_fn_parser_setup,
-													   pinfo, NULL);
-		if (list_length(querytree_list) != 1)
-			goto fail;
-		querytree = linitial(querytree_list);
-	}
+	querytree_list = pg_analyze_and_rewrite_params(linitial(raw_parsetree_list),
+												   src,
+												   (ParserSetupHook) sql_fn_parser_setup,
+												   pinfo, NULL);
+	if (list_length(querytree_list) != 1)
+		goto fail;
+	querytree = linitial(querytree_list);
 
 	/*
 	 * Also resolve the actual function result tupdesc, if composite.  If we

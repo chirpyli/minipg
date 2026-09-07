@@ -30,16 +30,8 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
-/*
- * Hooks for function calls
- */
-PGDLLIMPORT needs_fmgr_hook_type needs_fmgr_hook = NULL;
-PGDLLIMPORT fmgr_hook_type fmgr_hook = NULL;
-
-static void fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
-								   bool ignore_security);
-
-extern Datum fmgr_security_definer(PG_FUNCTION_ARGS);
+static void fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo,
+								   MemoryContext mcxt);
 
 
 /*
@@ -101,7 +93,7 @@ fmgr_lookupByName(const char *name)
 void
 fmgr_info(Oid functionId, FmgrInfo *finfo)
 {
-	fmgr_info_cxt_security(functionId, finfo, CurrentMemoryContext, false);
+	fmgr_info_cxt_security(functionId, finfo, CurrentMemoryContext);
 }
 
 /*
@@ -111,16 +103,14 @@ fmgr_info(Oid functionId, FmgrInfo *finfo)
 void
 fmgr_info_cxt(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt)
 {
-	fmgr_info_cxt_security(functionId, finfo, mcxt, false);
+	fmgr_info_cxt_security(functionId, finfo, mcxt);
 }
 
 /*
- * This one does the actual work.  ignore_security is ordinarily false
- * but is set to true when we need to avoid recursion.
+ * This one does the actual work.
  */
 static void
-fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
-					   bool ignore_security)
+fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt)
 {
 	const FmgrBuiltin *fbp;
 	HeapTuple	procedureTuple;
@@ -162,32 +152,6 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 	finfo->fn_nargs = procedureStruct->pronargs;
 	finfo->fn_strict = procedureStruct->proisstrict;
 	finfo->fn_retset = procedureStruct->proretset;
-
-	/*
-	 * If it has prosecdef set, non-null proconfig, or if a plugin wants to
-	 * hook function entry/exit, use fmgr_security_definer call handler ---
-	 * unless we are being called again by fmgr_security_definer or
-	 * fmgr_info_other_lang.
-	 *
-	 * When using fmgr_security_definer, function stats tracking is always
-	 * disabled at the outer level, and instead we set the flag properly in
-	 * fmgr_security_definer's private flinfo and implement the tracking
-	 * inside fmgr_security_definer.  This loses the ability to charge the
-	 * overhead of fmgr_security_definer to the function, but gains the
-	 * ability to set the track_functions GUC as a local GUC parameter of an
-	 * interesting function and have the right things happen.
-	 */
-	if (!ignore_security &&
-		(procedureStruct->prosecdef ||
-		 !heap_attisnull(procedureTuple, Anum_pg_proc_proconfig, NULL) ||
-		 FmgrHookIsNeeded(functionId)))
-	{
-		finfo->fn_addr = fmgr_security_definer;
-		finfo->fn_stats = 0;	/* ie, never track */
-		finfo->fn_oid = functionId;
-		ReleaseSysCache(procedureTuple);
-		return;
-	}
 
 	/*
 	 * Dispatch on the function's implementation language.  Only two
@@ -254,152 +218,6 @@ fmgr_info_copy(FmgrInfo *dstinfo, FmgrInfo *srcinfo,
 	memcpy(dstinfo, srcinfo, sizeof(FmgrInfo));
 	dstinfo->fn_mcxt = destcxt;
 	dstinfo->fn_extra = NULL;
-}
-
-
-/*
- * Support for security-definer and proconfig-using functions.  We support
- * both of these features using the same call handler, because they are
- * often used together and it would be inefficient (as well as notationally
- * messy) to have two levels of call handler involved.
- */
-struct fmgr_security_definer_cache
-{
-	FmgrInfo	flinfo;			/* lookup info for target function */
-	Oid			userid;			/* userid to set, or InvalidOid */
-	ArrayType  *proconfig;		/* GUC values to set, or NULL */
-	Datum		arg;			/* passthrough argument for plugin modules */
-};
-
-/*
- * Function handler for security-definer/proconfig/plugin-hooked functions.
- * We extract the OID of the actual function and do a fmgr lookup again.
- * Then we fetch the pg_proc row and copy the owner ID and proconfig fields.
- * (All this info is cached for the duration of the current query.)
- * To execute a call, we temporarily replace the flinfo with the cached
- * and looked-up one, while keeping the outer fcinfo (which contains all
- * the actual arguments, etc.) intact.  This is not re-entrant, but then
- * the fcinfo itself can't be used reentrantly anyway.
- */
-extern Datum
-fmgr_security_definer(PG_FUNCTION_ARGS)
-{
-	Datum		result;
-	struct fmgr_security_definer_cache *volatile fcache;
-	FmgrInfo   *save_flinfo;
-	Oid			save_userid;
-	int			save_sec_context;
-	volatile int save_nestlevel;
-	PgStat_FunctionCallUsage fcusage;
-
-	if (!fcinfo->flinfo->fn_extra)
-	{
-		HeapTuple	tuple;
-		Form_pg_proc procedureStruct;
-		Datum		datum;
-		bool		isnull;
-		MemoryContext oldcxt;
-
-		fcache = MemoryContextAllocZero(fcinfo->flinfo->fn_mcxt,
-										sizeof(*fcache));
-
-		fmgr_info_cxt_security(fcinfo->flinfo->fn_oid, &fcache->flinfo,
-							   fcinfo->flinfo->fn_mcxt, true);
-		fcache->flinfo.fn_expr = fcinfo->flinfo->fn_expr;
-
-		tuple = SearchSysCache1(PROCOID,
-								ObjectIdGetDatum(fcinfo->flinfo->fn_oid));
-		if (!HeapTupleIsValid(tuple))
-			elog(ERROR, "cache lookup failed for function %u",
-				 fcinfo->flinfo->fn_oid);
-		procedureStruct = (Form_pg_proc) GETSTRUCT(tuple);
-
-		if (procedureStruct->prosecdef)
-			fcache->userid = GetUserId();
-
-		datum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proconfig,
-								&isnull);
-		if (!isnull)
-		{
-			oldcxt = MemoryContextSwitchTo(fcinfo->flinfo->fn_mcxt);
-			fcache->proconfig = DatumGetArrayTypePCopy(datum);
-			MemoryContextSwitchTo(oldcxt);
-		}
-
-		ReleaseSysCache(tuple);
-
-		fcinfo->flinfo->fn_extra = fcache;
-	}
-	else
-		fcache = fcinfo->flinfo->fn_extra;
-
-	/* GetUserIdAndSecContext is cheap enough that no harm in a wasted call */
-	GetUserIdAndSecContext(&save_userid, &save_sec_context);
-	if (fcache->proconfig)		/* Need a new GUC nesting level */
-		save_nestlevel = NewGUCNestLevel();
-	else
-		save_nestlevel = 0;		/* keep compiler quiet */
-
-	if (OidIsValid(fcache->userid))
-		SetUserIdAndSecContext(fcache->userid,
-							   save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
-
-	if (fcache->proconfig)
-	{
-		ProcessGUCArray(fcache->proconfig,
-						PGC_SUSET,
-						PGC_S_SESSION,
-						GUC_ACTION_SAVE);
-	}
-
-	/* function manager hook */
-	if (fmgr_hook)
-		(*fmgr_hook) (FHET_START, &fcache->flinfo, &fcache->arg);
-
-	/*
-	 * We don't need to restore GUC or userid settings on error, because the
-	 * ensuing xact or subxact abort will do that.  The PG_TRY block is only
-	 * needed to clean up the flinfo link.
-	 */
-	save_flinfo = fcinfo->flinfo;
-
-	PG_TRY();
-	{
-		fcinfo->flinfo = &fcache->flinfo;
-
-		/* See notes in fmgr_info_cxt_security */
-		pgstat_init_function_usage(fcinfo, &fcusage);
-
-		result = FunctionCallInvoke(fcinfo);
-
-		/*
-		 * We could be calling either a regular or a set-returning function,
-		 * so we have to test to see what finalize flag to use.
-		 */
-		pgstat_end_function_usage(&fcusage,
-								  (fcinfo->resultinfo == NULL ||
-								   !IsA(fcinfo->resultinfo, ReturnSetInfo) ||
-								   ((ReturnSetInfo *) fcinfo->resultinfo)->isDone != ExprMultipleResult));
-	}
-	PG_CATCH();
-	{
-		fcinfo->flinfo = save_flinfo;
-		if (fmgr_hook)
-			(*fmgr_hook) (FHET_ABORT, &fcache->flinfo, &fcache->arg);
-		PG_RE_THROW();
-	}
-	PG_END_TRY();
-
-	fcinfo->flinfo = save_flinfo;
-
-	if (fcache->proconfig)
-		AtEOXact_GUC(true, save_nestlevel);
-	if (OidIsValid(fcache->userid))
-		SetUserIdAndSecContext(save_userid, save_sec_context);
-	if (fmgr_hook)
-		(*fmgr_hook) (FHET_END, &fcache->flinfo, &fcache->arg);
-
-	return result;
 }
 
 

@@ -1068,50 +1068,6 @@ get_func_arg_info(HeapTuple procTup,
 }
 
 /*
- * get_func_trftypes
- *
- * Returns the number of transformed types used by the function.
- * If there are any, a palloc'd array of the type OIDs is returned
- * into *p_trftypes.
- */
-int
-get_func_trftypes(HeapTuple procTup,
-				  Oid **p_trftypes)
-{
-	Datum		protrftypes;
-	ArrayType  *arr;
-	int			nelems;
-	bool		isNull;
-
-	protrftypes = SysCacheGetAttr(PROCOID, procTup,
-								  Anum_pg_proc_protrftypes,
-								  &isNull);
-	if (!isNull)
-	{
-		/*
-		 * We expect the arrays to be 1-D arrays of the right types; verify
-		 * that.  For the OID and char arrays, we don't need to use
-		 * deconstruct_array() since the array data is just going to look like
-		 * a C array of values.
-		 */
-		arr = DatumGetArrayTypeP(protrftypes);	/* ensure not toasted */
-		nelems = ARR_DIMS(arr)[0];
-		if (ARR_NDIM(arr) != 1 ||
-			nelems < 0 ||
-			ARR_HASNULL(arr) ||
-			ARR_ELEMTYPE(arr) != OIDOID)
-			elog(ERROR, "protrftypes is not a 1-D Oid array or it contains nulls");
-		*p_trftypes = (Oid *) palloc(nelems * sizeof(Oid));
-		memcpy(*p_trftypes, ARR_DATA_PTR(arr),
-			   nelems * sizeof(Oid));
-
-		return nelems;
-	}
-	else
-		return 0;
-}
-
-/*
  * get_func_input_arg_names
  *
  * Extract the names of input arguments only, given a function's

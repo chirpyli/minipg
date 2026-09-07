@@ -55,9 +55,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* see PROKIND_ categories below */
 	char		prokind BKI_DEFAULT(f);
 
-	/* security definer */
-	bool		prosecdef BKI_DEFAULT(f);
-
 	/* is it a leak-proof function? */
 	bool		proleakproof BKI_DEFAULT(f);
 
@@ -77,9 +74,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* Note: need not be given in pg_proc.dat; genbki.pl will compute it */
 	int16		pronargs;
 
-	/* number of arguments with defaults */
-	int16		pronargdefaults BKI_DEFAULT(0);
-
 	/* OID of result type */
 	Oid			prorettype BKI_LOOKUP(pg_type);
 
@@ -97,23 +91,11 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* parameter names (NULL if no names) */
 	text		proargnames[1] BKI_DEFAULT(_null_);
 
-	/* list of expression trees for argument defaults (NULL if none) */
-	pg_node_tree proargdefaults BKI_DEFAULT(_null_);
-
-	/* types for which to apply transforms */
-	Oid			protrftypes[1] BKI_DEFAULT(_null_) BKI_LOOKUP(pg_type);
-
 	/* procedure source text */
 	text		prosrc;
 
 	/* secondary procedure info (can be NULL) */
 	text		probin BKI_DEFAULT(_null_);
-
-	/* pre-parsed SQL function body */
-	pg_node_tree prosqlbody BKI_DEFAULT(_null_);
-
-	/* procedure-local GUC settings */
-	text		proconfig[1] BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_proc;
 

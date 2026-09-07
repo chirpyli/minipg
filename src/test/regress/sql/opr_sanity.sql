@@ -26,8 +26,6 @@ SELECT p1.oid, p1.proname
 FROM pg_proc as p1
 WHERE p1.prolang = 0 OR p1.prorettype = 0 OR
        p1.pronargs < 0 OR
-       p1.pronargdefaults < 0 OR
-       p1.pronargdefaults > p1.pronargs OR
        array_lower(p1.proargtypes, 1) != 0 OR
        array_upper(p1.proargtypes, 1) != p1.pronargs-1 OR
        0::oid = ANY (p1.proargtypes) OR
@@ -37,30 +35,18 @@ WHERE p1.prolang = 0 OR p1.prorettype = 0 OR
        provolatile NOT IN ('i', 's', 'v') OR
        proparallel NOT IN ('s', 'r', 'u');
 
--- prosrc should never be null; it can be empty only if prosqlbody isn't null
+-- prosrc should never be null nor empty
 SELECT p1.oid, p1.proname
 FROM pg_proc as p1
 WHERE prosrc IS NULL;
 SELECT p1.oid, p1.proname
 FROM pg_proc as p1
-WHERE (prosrc = '' OR prosrc = '-') AND prosqlbody IS NULL;
+WHERE prosrc = '' OR prosrc = '-';
 
 -- proretset should only be set for normal functions
 SELECT p1.oid, p1.proname
 FROM pg_proc AS p1
 WHERE proretset AND prokind != 'f';
-
--- currently, no built-in functions should be SECURITY DEFINER;
--- this might change in future, but there will probably never be many.
-SELECT p1.oid, p1.proname
-FROM pg_proc AS p1
-WHERE prosecdef
-ORDER BY 1;
-
--- pronargdefaults should be 0 iff proargdefaults is null
-SELECT p1.oid, p1.proname
-FROM pg_proc AS p1
-WHERE (pronargdefaults <> 0) != (proargdefaults IS NOT NULL);
 
 -- probin should be non-empty for C functions, null everywhere else
 SELECT p1.oid, p1.proname
@@ -98,7 +84,6 @@ WHERE p1.oid < p2.oid AND
     (p1.prokind != 'a' OR p2.prokind != 'a') AND
     (p1.prolang != p2.prolang OR
      p1.prokind != p2.prokind OR
-     p1.prosecdef != p2.prosecdef OR
      p1.proleakproof != p2.proleakproof OR
      p1.proisstrict != p2.proisstrict OR
      p1.proretset != p2.proretset OR
@@ -1002,12 +987,6 @@ WHERE p1.oid < p2.oid AND p1.proname = p2.proname AND
     p1.prokind = 'a' AND p2.prokind = 'a' AND
     array_dims(p1.proargtypes) != array_dims(p2.proargtypes)
 ORDER BY 1;
-
--- For the same reason, built-in aggregates with default arguments are no good.
-
-SELECT oid, proname
-FROM pg_proc AS p
-WHERE prokind = 'a' AND proargdefaults IS NOT NULL;
 
 -- For the same reason, we avoid creating built-in variadic aggregates, except
 -- that variadic ordered-set aggregates are OK (since they have special syntax
