@@ -62,60 +62,12 @@ select 1 as var1, NULL as var2, 3 as var3 \gset
 select 10 as test01, 20 as test02 from generate_series(1,3) \gset
 select 10 as test01, 20 as test02 from generate_series(1,0) \gset
 
--- \gdesc
-
-SELECT
-    NULL AS zero,
-    1 AS one,
-    2.0 AS two,
-    'three' AS three,
-    $1 AS four,
-    sin($2) as five,
-    'foo'::varchar(4) as six,
-    CURRENT_DATE AS now
-\gdesc
-
--- should fail cleanly - syntax error
-SELECT 1 + \gdesc
-
--- check behavior with empty results
-SELECT \gdesc
-CREATE TABLE bububu(a int) \gdesc
-
--- subject command should not have executed
-TABLE bububu;  -- fail
-
--- query buffer should remain unchanged
-SELECT 1 AS x, 'Hello', 2 AS y, true AS "dirty\name"
-\gdesc
-\g
-
--- all on one line
-SELECT 3 AS x, 'Hello', 4 AS y, true AS "dirty\name" \gdesc \g
-
--- test for server bug #17983 with empty statement in aborted transaction
-set search_path = default;
-begin;
-bogus;
-;
-\gdesc
-rollback;
-
--- \gexec
-
-CREATE TABLE gexec_test(a int, b text, c date, d float);
-select format('create index on gexec_test(%I)', attname)
-from pg_attribute
-where attrelid = 'gexec_test'::regclass and attnum > 0
-order by attnum
-\gexec
-
 -- show all pset options
 \pset
 
 -- test multi-line headers, wrapping, and newline indicators
 -- in aligned, unaligned, and wrapped formats
-prepare q as select array_to_string(array_agg(repeat('x',2*n)),E'\n') as "ab
+create view q as select array_to_string(array_agg(repeat('x',2*n)),E'\n') as "ab
 
 c", array_to_string(array_agg(repeat('y',20-2*n)),E'\n') as "a
 bc" from generate_series(1,10) as n(n) group by n>1 order by n>1;
@@ -127,54 +79,54 @@ bc" from generate_series(1,10) as n(n) group by n>1 order by n>1;
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset expanded on
 \pset columns 20
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset linestyle old-ascii
 
@@ -183,59 +135,59 @@ execute q;
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset expanded on
 \pset columns 20
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
-deallocate q;
+drop view q;
 
 -- test single-line header and data
-prepare q as select repeat('x',2*n) as "0123456789abcdef", repeat('y',20-2*n) as "0123456789" from generate_series(1,10) as n;
+create view q as select repeat('x',2*n) as "0123456789abcdef", repeat('y',20-2*n) as "0123456789" from generate_series(1,10) as n;
 
 \pset linestyle ascii
 
@@ -244,81 +196,81 @@ prepare q as select repeat('x',2*n) as "0123456789abcdef", repeat('y',20-2*n) as
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset expanded on
 \pset columns 30
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset expanded on
 \pset columns 20
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset linestyle old-ascii
 
@@ -327,55 +279,55 @@ execute q;
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset expanded on
 
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 \pset format aligned
-execute q;
+select * from q;
 \pset format wrapped
-execute q;
+select * from q;
 
-deallocate q;
+drop view q;
 
 -- expanded output with short-width columns
 \pset border 2
@@ -466,18 +418,18 @@ from generate_series(0,3) n;
 \df exp
 \pset tuples_only false
 
-prepare q as
+create view q as
   select 'some"text' as "a""title", E'  <foo>\n<bar>' as "junk",
          '   ' as "empty", n as int
   from generate_series(1,2) as n;
 
 \pset expanded off
-execute q;
+select * from q;
 
 \pset expanded on
-execute q;
+select * from q;
 
-deallocate q;
+drop view q;
 
 -- special cases
 \pset expanded off
@@ -663,11 +615,8 @@ select \if false \\ (bogus \else \\ 42 \endif \\ forty_two;
 	\c arg1 arg2 arg3 arg4
 	\cd arg1
 	\conninfo
-	\copyright
-	SELECT 1 as one, 2, 3 \crosstabview
 	\dt arg1
 	\e arg1 arg2
-	\ef whole_line
 	\ev whole_line
 	\echo arg1 arg2 arg3 arg4 arg5
 	\echo arg1
@@ -676,19 +625,13 @@ select \if false \\ (bogus \else \\ 42 \endif \\ forty_two;
 	\f arg1
 	\g arg1
 	\gx arg1
-	\gexec
 	SELECT 1 AS one \gset
-	\h
 	\?
-	\html
 	\i arg1
 	\ir arg1
 	\l arg1
-	\lo arg1 arg2
-	\lo_list
 	\o arg1
 	\p
-	\password arg1
 	\prompt arg1 arg2
 	\pset arg1 arg2
 	\q
@@ -697,20 +640,17 @@ select \if false \\ (bogus \else \\ 42 \endif \\ forty_two;
 	\s arg1
 	\set arg1 arg2 arg3 arg4 arg5 arg6 arg7
 	\setenv arg1 arg2
-	\sf whole_line
 	\sv whole_line
 	\t arg1
 	\timing arg1
 	\unrestrict not_valid
 	\unset arg1
 	\w arg1
-	\watch arg1
 	\x arg1
 	-- \else here is eaten as part of OT_FILEPIPE argument
 	\w |/no/such/file \else
 	-- \endif here is eaten as part of whole-line argument
 	\! whole_line \endif
-	\z
 \else
 	\echo 'should print #8-1'
 \endif
@@ -733,29 +673,6 @@ SELECT :{?i} AS i_is_defined;
 
 SELECT NOT :{?no_such_var} AS no_such_var_is_not_defined;
 
--- SHOW_CONTEXT
-
-\set SHOW_CONTEXT never
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-
-\set SHOW_CONTEXT errors
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-
-\set SHOW_CONTEXT always
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-
 -- test printing and clearing the query buffer
 SELECT 1;
 \p
@@ -777,7 +694,7 @@ SELECT 1 AS stuff FROM generate_series(1,2);
 \echo 'number of rows:' :ROW_COUNT
 
 -- syntax error
-SELECT (1;
+SELECT 1 UNION;
 \echo 'error:' :ERROR
 \echo 'error code:' :SQLSTATE
 \echo 'number of rows:' :ROW_COUNT
@@ -803,7 +720,7 @@ DROP TABLE this_table_does_not_exist;
 
 -- nondefault verbosity error settings (except verbose, which is too unstable)
 \set VERBOSITY terse
-SELECT (1;
+SELECT 1 UNION;
 \echo 'error:' :ERROR
 \echo 'error code:' :SQLSTATE
 \echo 'last error message:' :LAST_ERROR_MESSAGE
@@ -815,22 +732,6 @@ SELECT 1/0;
 \echo 'last error message:' :LAST_ERROR_MESSAGE
 
 \set VERBOSITY default
-
--- working \gdesc
-SELECT 3 AS three, 4 AS four \gdesc
-\echo 'error:' :ERROR
-\echo 'error code:' :SQLSTATE
-\echo 'number of rows:' :ROW_COUNT
-
--- \gdesc with an error
-SELECT 4 AS \gdesc
-\echo 'error:' :ERROR
-\echo 'error code:' :SQLSTATE
-\echo 'number of rows:' :ROW_COUNT
-\echo 'last error message:' :LAST_ERROR_MESSAGE
-\echo 'last error code:' :LAST_ERROR_SQLSTATE
-
-
 
 -- \d on toast table (use pg_statistic's toast table, which has a known name)
 \d pg_toast.pg_toast_2619
@@ -859,13 +760,6 @@ SELECT 4 AS \gdesc
 \df *._pg_expandarray
 \do - pg_catalog.int4
 \do && anyarray *
-
--- check \sf
-\sf information_schema._pg_expandarray
-\sf+ information_schema._pg_expandarray
-\sf+ interval_pl_time
-\sf ts_debug(text)
-\sf+ ts_debug(text)
 
 -- check describing invalid multipart names
 \dA regression.heap
@@ -900,18 +794,6 @@ SELECT 4 AS \gdesc
 \df host.regression.public.namelen
 \df regres[qrstuv]ion.public.namelen
 \df nonesuch.public.namelen
-\dF host.regression.pg_catalog.arabic
-\dF regres{1,2}ion.pg_catalog.arabic
-\dF nonesuch.pg_catalog.arabic
-\dFd host.regression.pg_catalog.arabic_stem
-\dFd regres?ion.pg_catalog.arabic_stem
-\dFd nonesuch.pg_catalog.arabic_stem
-\dFp host.regression.pg_catalog.default
-\dFp ^regression.pg_catalog.default
-\dFp nonesuch.pg_catalog.default
-\dFt host.regression.pg_catalog.ispell
-\dFt regression$.pg_catalog.ispell
-\dFt nonesuch.pg_catalog.ispell
 \dL host.regression.plpgsql
 \dL *.plpgsql
 \dL nonesuch.plpgsql
@@ -924,16 +806,10 @@ SELECT 4 AS \gdesc
 \dO host.regression.pg_catalog.POSIX
 \dO .pg_catalog.POSIX
 \dO nonesuch.pg_catalog.POSIX
-\dp host.regression.public.a_star
-\dp "regres+ion".public.a_star
-\dp nonesuch.public.a_star
 \drds nonesuch.lc_messages
 \drds regression.lc_messages
 \dx regression.plpgsql
 \dx nonesuch.plpgsql
-\dX host.regression.public.func_deps_stat
-\dX "^regression$".public.func_deps_stat
-\dX nonesuch.public.func_deps_stat
 \dy regression.myevt
 \dy nonesuch.myevt
 
@@ -950,19 +826,13 @@ SELECT 4 AS \gdesc
 \dt "no.such.relation"
 \dv "no.such.relation"
 \df "no.such.function"
-\dF "no.such.text.search.configuration"
-\dFd "no.such.text.search.dictionary"
-\dFp "no.such.text.search.parser"
-\dFt "no.such.text.search.template"
 \dL "no.such.language"
 \dn "no.such.schema"
 \do "no.such.operator"
 \dO "no.such.collation"
-\dp "no.such.access.privilege"
 \drds "no.such.setting"
 \dT "no.such.data.type"
 \dx "no.such.installed.extension"
-\dX "no.such.extended.statistics"
 \dy "no.such.event.trigger"
 
 -- again, but with dotted schema qualifications.
@@ -978,18 +848,12 @@ SELECT 4 AS \gdesc
 \dt "no.such.schema"."no.such.relation"
 \dv "no.such.schema"."no.such.relation"
 \df "no.such.schema"."no.such.function"
-\dF "no.such.schema"."no.such.text.search.configuration"
-\dFd "no.such.schema"."no.such.text.search.dictionary"
-\dFp "no.such.schema"."no.such.text.search.parser"
-\dFt "no.such.schema"."no.such.text.search.template"
 \dL "no.such.schema"."no.such.language"
 \do "no.such.schema"."no.such.operator"
 \dO "no.such.schema"."no.such.collation"
-\dp "no.such.schema"."no.such.access.privilege"
 \drds "no.such.schema"."no.such.setting"
 \dT "no.such.schema"."no.such.data.type"
 \dx "no.such.schema"."no.such.installed.extension"
-\dX "no.such.schema"."no.such.extended.statistics"
 \dy "no.such.schema"."no.such.event.trigger"
 
 -- again, but with current database and dotted schema qualifications.
@@ -1002,15 +866,9 @@ SELECT 4 AS \gdesc
 \dt regression."no.such.schema"."no.such.relation"
 \dv regression."no.such.schema"."no.such.relation"
 \df regression."no.such.schema"."no.such.function"
-\dF regression."no.such.schema"."no.such.text.search.configuration"
-\dFd regression."no.such.schema"."no.such.text.search.dictionary"
-\dFp regression."no.such.schema"."no.such.text.search.parser"
-\dFt regression."no.such.schema"."no.such.text.search.template"
 \do regression."no.such.schema"."no.such.operator"
 \dO regression."no.such.schema"."no.such.collation"
-\dp regression."no.such.schema"."no.such.access.privilege"
 \dT regression."no.such.schema"."no.such.data.type"
-\dX regression."no.such.schema"."no.such.extended.statistics"
 
 -- again, but with dotted database and dotted schema qualifications.
 \dt "no.such.database"."no.such.schema"."no.such.table.relation"
@@ -1023,12 +881,6 @@ SELECT 4 AS \gdesc
 \dt "no.such.database"."no.such.schema"."no.such.relation"
 \dv "no.such.database"."no.such.schema"."no.such.relation"
 \df "no.such.database"."no.such.schema"."no.such.function"
-\dF "no.such.database"."no.such.schema"."no.such.text.search.configuration"
-\dFd "no.such.database"."no.such.schema"."no.such.text.search.dictionary"
-\dFp "no.such.database"."no.such.schema"."no.such.text.search.parser"
-\dFt "no.such.database"."no.such.schema"."no.such.text.search.template"
 \do "no.such.database"."no.such.schema"."no.such.operator"
 \dO "no.such.database"."no.such.schema"."no.such.collation"
-\dp "no.such.database"."no.such.schema"."no.such.access.privilege"
 \dT "no.such.database"."no.such.schema"."no.such.data.type"
-\dX "no.such.database"."no.such.schema"."no.such.extended.statistics"

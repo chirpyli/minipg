@@ -16,14 +16,12 @@
 #include "command.h"
 #include "common.h"
 #include "common/logging.h"
-#include "crosstabview.h"
 #include "fe_utils/cancel.h"
 #include "fe_utils/mbprint.h"
 #include "fe_utils/string_utils.h"
 #include "portability/instr_time.h"
 #include "settings.h"
 
-static bool DescribeQuery(const char *query, double *elapsed_msec);
 static bool command_no_begin(const char *query);
 
 
@@ -568,95 +566,6 @@ PSQLexec(const char *query)
 
 
 /*
- * PSQLexecWatch
- *
- * This function is used for \watch command to send the query to
- * the server and print out the results.
- *
- * Returns 1 if the query executed successfully, 0 if it cannot be repeated,
- * e.g., because of the interrupt, -1 on error.
- */
-int
-PSQLexecWatch(const char *query, const printQueryOpt *opt)
-{
-	PGresult   *res;
-	double		elapsed_msec = 0;
-	instr_time	before;
-	instr_time	after;
-
-	if (!pset.db)
-	{
-		pg_log_error("You are currently not connected to a database.");
-		return 0;
-	}
-
-	SetCancelConn(pset.db);
-
-	if (pset.timing)
-		INSTR_TIME_SET_CURRENT(before);
-
-	res = PQexec(pset.db, query);
-
-	ResetCancelConn();
-
-	if (!AcceptResult(res))
-	{
-		ClearOrSaveResult(res);
-		return 0;
-	}
-
-	if (pset.timing)
-	{
-		INSTR_TIME_SET_CURRENT(after);
-		INSTR_TIME_SUBTRACT(after, before);
-		elapsed_msec = INSTR_TIME_GET_MILLISEC(after);
-	}
-
-	/*
-	 * If SIGINT is sent while the query is processing, the interrupt will be
-	 * consumed.  The user's intention, though, is to cancel the entire watch
-	 * process, so detect a sent cancellation request and exit in this case.
-	 */
-	if (cancel_pressed)
-	{
-		PQclear(res);
-		return 0;
-	}
-
-	switch (PQresultStatus(res))
-	{
-		case PGRES_TUPLES_OK:
-			printQuery(res, opt, pset.queryFout, false, pset.logfile);
-			break;
-
-		case PGRES_COMMAND_OK:
-			fprintf(pset.queryFout, "%s\n%s\n\n", opt->title, PQcmdStatus(res));
-			break;
-
-		case PGRES_EMPTY_QUERY:
-			pg_log_error("\\watch cannot be used with an empty query");
-			PQclear(res);
-			return -1;
-
-		default:
-			pg_log_error("unexpected result status for \\watch");
-			PQclear(res);
-			return -1;
-	}
-
-	PQclear(res);
-
-	fflush(pset.queryFout);
-
-	/* Possible microtiming output */
-	if (pset.timing)
-		PrintTiming(elapsed_msec);
-
-	return 1;
-}
-
-
-/*
  * PrintQueryTuples: assuming query result is OK, print its tuples
  *
  * Returns true if successful, false otherwise.
@@ -770,75 +679,6 @@ StoreQueryTuple(const PGresult *result)
 
 
 /*
- * ExecQueryTuples: assuming query result is OK, execute each query
- * result field as a SQL statement
- *
- * Returns true if successful, false otherwise.
- */
-static bool
-ExecQueryTuples(const PGresult *result)
-{
-	bool		success = true;
-	int			nrows = PQntuples(result);
-	int			ncolumns = PQnfields(result);
-	int			r,
-				c;
-
-	/*
-	 * We must turn off gexec_flag to avoid infinite recursion.  Note that
-	 * SendQuery prevents it from being applied when fetching the
-	 * queries-to-execute, because it can't handle recursion either.
-	 */
-	pset.gexec_flag = false;
-
-	for (r = 0; r < nrows; r++)
-	{
-		for (c = 0; c < ncolumns; c++)
-		{
-			if (!PQgetisnull(result, r, c))
-			{
-				const char *query = PQgetvalue(result, r, c);
-
-				/* Abandon execution if cancel_pressed */
-				if (cancel_pressed)
-					goto loop_exit;
-
-				/*
-				 * ECHO_ALL mode should echo these queries, but SendQuery
-				 * assumes that MainLoop did that, so we have to do it here.
-				 */
-				if (pset.echo == PSQL_ECHO_ALL && !pset.singlestep)
-				{
-					puts(query);
-					fflush(stdout);
-				}
-
-				if (!SendQuery(query))
-				{
-					/* Error - abandon execution if ON_ERROR_STOP */
-					success = false;
-					if (pset.on_error_stop)
-						goto loop_exit;
-				}
-			}
-		}
-	}
-
-loop_exit:
-
-	/*
-	 * Restore state.  We know gexec_flag was on, else we'd not be here. (We
-	 * also know it'll get turned off at end of command, but that's not ours
-	 * to do here.)
-	 */
-	pset.gexec_flag = true;
-
-	/* Return true if all queries were successful */
-	return success;
-}
-
-
-/*
  * ProcessResult: utility function for use by SendQuery() only
  *
  * When our command string contained a COPY FROM STDIN or COPY TO STDOUT,
@@ -947,13 +787,9 @@ PrintQueryResults(PGresult *results)
 	switch (PQresultStatus(results))
 	{
 		case PGRES_TUPLES_OK:
-			/* store or execute or print the data ... */
+			/* store or print the data ... */
 			if (pset.gset_prefix)
 				success = StoreQueryTuple(results);
-			else if (pset.gexec_flag)
-				success = ExecQueryTuples(results);
-			else if (pset.crosstab_flag)
-				success = PrintResultsInCrosstab(results);
 			else
 				success = PrintQueryTuples(results);
 			break;
@@ -1005,8 +841,9 @@ SendQuery(const char *query)
 	PGTransactionStatusType transaction_status;
 	double		elapsed_msec = 0;
 	bool		OK = false;
-	int			i;
 	bool		on_error_rollback_savepoint = false;
+	instr_time	before,
+				after;
 
 	if (!pset.db)
 	{
@@ -1082,39 +919,26 @@ SendQuery(const char *query)
 		on_error_rollback_savepoint = true;
 	}
 
-	if (pset.gdesc_flag)
+	/* Default fetch-it-all-and-print mode */
+	if (pset.timing)
+		INSTR_TIME_SET_CURRENT(before);
+
+	results = PQexec(pset.db, query);
+
+	/* these operations are included in the timing result: */
+	ResetCancelConn();
+	OK = ProcessResult(&results);
+
+	if (pset.timing)
 	{
-		/* Describe query's result columns, without executing it */
-		OK = DescribeQuery(query, &elapsed_msec);
-		ResetCancelConn();
-		results = NULL;			/* PQclear(NULL) does nothing */
+		INSTR_TIME_SET_CURRENT(after);
+		INSTR_TIME_SUBTRACT(after, before);
+		elapsed_msec = INSTR_TIME_GET_MILLISEC(after);
 	}
-	else
-	{
-		/* Default fetch-it-all-and-print mode */
-		instr_time	before,
-					after;
 
-		if (pset.timing)
-			INSTR_TIME_SET_CURRENT(before);
-
-		results = PQexec(pset.db, query);
-
-		/* these operations are included in the timing result: */
-		ResetCancelConn();
-		OK = ProcessResult(&results);
-
-		if (pset.timing)
-		{
-			INSTR_TIME_SET_CURRENT(after);
-			INSTR_TIME_SUBTRACT(after, before);
-			elapsed_msec = INSTR_TIME_GET_MILLISEC(after);
-		}
-
-		/* but printing results isn't: */
-		if (OK && results)
-			OK = PrintQueryResults(results);
-	}
+	/* but printing results isn't: */
+	if (OK && results)
+		OK = PrintQueryResults(results);
 
 	if (!OK && pset.echo == PSQL_ECHO_ERRORS)
 		pg_log_info("STATEMENT:  %s", query);
@@ -1227,134 +1051,6 @@ sendquery_cleanup:
 		free(pset.gset_prefix);
 		pset.gset_prefix = NULL;
 	}
-
-	/* reset \gdesc trigger */
-	pset.gdesc_flag = false;
-
-	/* reset \gexec trigger */
-	pset.gexec_flag = false;
-
-	/* reset \crosstabview trigger */
-	pset.crosstab_flag = false;
-	for (i = 0; i < lengthof(pset.ctv_args); i++)
-	{
-		pg_free(pset.ctv_args[i]);
-		pset.ctv_args[i] = NULL;
-	}
-
-	return OK;
-}
-
-
-/*
- * DescribeQuery: describe the result columns of a query, without executing it
- *
- * Returns true if the operation executed successfully, false otherwise.
- *
- * If pset.timing is on, total query time (exclusive of result-printing) is
- * stored into *elapsed_msec.
- */
-static bool
-DescribeQuery(const char *query, double *elapsed_msec)
-{
-	PGresult   *results;
-	bool		OK;
-	instr_time	before,
-				after;
-
-	*elapsed_msec = 0;
-
-	if (pset.timing)
-		INSTR_TIME_SET_CURRENT(before);
-
-	/*
-	 * To parse the query but not execute it, we prepare it, using the unnamed
-	 * prepared statement.  This is invisible to psql users, since there's no
-	 * way to access the unnamed prepared statement from psql user space. The
-	 * next Parse or Query protocol message would overwrite the statement
-	 * anyway.  (So there's no great need to clear it when done, which is a
-	 * good thing because libpq provides no easy way to do that.)
-	 */
-	results = PQprepare(pset.db, "", query, 0, NULL);
-	if (PQresultStatus(results) != PGRES_COMMAND_OK)
-	{
-		pg_log_info("%s", PQerrorMessage(pset.db));
-		SetResultVariables(results, false);
-		ClearOrSaveResult(results);
-		return false;
-	}
-	PQclear(results);
-
-	results = PQdescribePrepared(pset.db, "");
-	OK = AcceptResult(results) &&
-		(PQresultStatus(results) == PGRES_COMMAND_OK);
-	if (OK && results)
-	{
-		if (PQnfields(results) > 0)
-		{
-			PQExpBufferData buf;
-			int			i;
-
-			initPQExpBuffer(&buf);
-
-			printfPQExpBuffer(&buf,
-							  "SELECT name AS \"%s\", pg_catalog.format_type(tp, tpm) AS \"%s\"\n"
-							  "FROM (VALUES ",
-							  gettext_noop("Column"),
-							  gettext_noop("Type"));
-
-			for (i = 0; i < PQnfields(results); i++)
-			{
-				const char *name;
-				char	   *escname;
-
-				if (i > 0)
-					appendPQExpBufferStr(&buf, ",");
-
-				name = PQfname(results, i);
-				escname = PQescapeLiteral(pset.db, name, strlen(name));
-
-				if (escname == NULL)
-				{
-					pg_log_info("%s", PQerrorMessage(pset.db));
-					PQclear(results);
-					termPQExpBuffer(&buf);
-					return false;
-				}
-
-				appendPQExpBuffer(&buf, "(%s, '%u'::pg_catalog.oid, %d)",
-								  escname,
-								  PQftype(results, i),
-								  PQfmod(results, i));
-
-				PQfreemem(escname);
-			}
-
-			appendPQExpBufferStr(&buf, ") s(name, tp, tpm)");
-			PQclear(results);
-
-			results = PQexec(pset.db, buf.data);
-			OK = AcceptResult(results);
-
-			if (pset.timing)
-			{
-				INSTR_TIME_SET_CURRENT(after);
-				INSTR_TIME_SUBTRACT(after, before);
-				*elapsed_msec += INSTR_TIME_GET_MILLISEC(after);
-			}
-
-			if (OK && results)
-				OK = PrintQueryResults(results);
-
-			termPQExpBuffer(&buf);
-		}
-		else
-			fprintf(pset.queryFout,
-					_("The command has no result, or the result has no columns.\n"));
-	}
-
-	SetResultVariables(results, OK);
-	ClearOrSaveResult(results);
 
 	return OK;
 }

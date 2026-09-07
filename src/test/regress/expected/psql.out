@@ -9,8 +9,6 @@ invalid variable name: "invalid/name"
 -- fail: invalid value for special variable
 \set AUTOCOMMIT foo
 unrecognized value "foo" for "AUTOCOMMIT": Boolean expected
-\set FETCH_COUNT foo
-invalid value "foo" for "FETCH_COUNT": integer expected
 -- check handling of built-in boolean variable
 \echo :ON_ERROR_ROLLBACK
 off
@@ -51,31 +49,6 @@ four  | 4
      3 |    4
 (1 row)
 
--- \gx should work in FETCH_COUNT mode too
-\set FETCH_COUNT 1
-SELECT 1 as one, 2 as two \g
- one | two 
------+-----
-   1 |   2
-(1 row)
-
-\gx
--[ RECORD 1 ]
-one | 1
-two | 2
-
-SELECT 3 as three, 4 as four \gx
--[ RECORD 1 ]
-three | 3
-four  | 4
-
-\g
- three | four 
--------+------
-     3 |    4
-(1 row)
-
-\unset FETCH_COUNT
 -- \g/\gx with pset options
 SELECT 1 as one, 2 as two \g (format=csv csv_fieldsep='\t')
 one	two
@@ -140,144 +113,6 @@ select 10 as test01, 20 as test02 from generate_series(1,3) \gset
 more than one row returned for \gset
 select 10 as test01, 20 as test02 from generate_series(1,0) \gset
 no rows returned for \gset
--- \gset should work in FETCH_COUNT mode too
-\set FETCH_COUNT 1
-select 1 as x, 2 as y \gset pref01_ \\ \echo :pref01_x
-1
-select 3 as x, 4 as y \gset pref01_ \echo :pref01_x \echo :pref01_y
-3
-4
-select 10 as test01, 20 as test02 from generate_series(1,3) \gset
-more than one row returned for \gset
-select 10 as test01, 20 as test02 from generate_series(1,0) \gset
-no rows returned for \gset
-\unset FETCH_COUNT
--- \gdesc
-SELECT
-    NULL AS zero,
-    1 AS one,
-    2.0 AS two,
-    'three' AS three,
-    $1 AS four,
-    sin($2) as five,
-    'foo'::varchar(4) as six,
-    CURRENT_DATE AS now
-\gdesc
- Column |         Type         
---------+----------------------
- zero   | text
- one    | integer
- two    | numeric
- three  | text
- four   | text
- five   | double precision
- six    | character varying(4)
- now    | date
-(8 rows)
-
--- should fail cleanly - syntax error
-SELECT 1 + \gdesc
-ERROR:  syntax error at end of input
-LINE 1: SELECT 1 + 
-                   ^
--- check behavior with empty results
-SELECT \gdesc
-The command has no result, or the result has no columns.
-CREATE TABLE bububu(a int) \gdesc
-The command has no result, or the result has no columns.
--- subject command should not have executed
-TABLE bububu;  -- fail
-ERROR:  relation "bububu" does not exist
-LINE 1: TABLE bububu;
-              ^
--- query buffer should remain unchanged
-SELECT 1 AS x, 'Hello', 2 AS y, true AS "dirty\name"
-\gdesc
-   Column   |  Type   
-------------+---------
- x          | integer
- ?column?   | text
- y          | integer
- dirty\name | boolean
-(4 rows)
-
-\g
- x | ?column? | y | dirty\name 
----+----------+---+------------
- 1 | Hello    | 2 | t
-(1 row)
-
--- all on one line
-SELECT 3 AS x, 'Hello', 4 AS y, true AS "dirty\name" \gdesc \g
-   Column   |  Type   
-------------+---------
- x          | integer
- ?column?   | text
- y          | integer
- dirty\name | boolean
-(4 rows)
-
- x | ?column? | y | dirty\name 
----+----------+---+------------
- 3 | Hello    | 4 | t
-(1 row)
-
--- test for server bug #17983 with empty statement in aborted transaction
-set search_path = default;
-begin;
-bogus;
-ERROR:  syntax error at or near "bogus"
-LINE 1: bogus;
-        ^
-;
-\gdesc
-The command has no result, or the result has no columns.
-rollback;
--- \gexec
-create temporary table gexec_test(a int, b text, c date, d float);
-select format('create index on gexec_test(%I)', attname)
-from pg_attribute
-where attrelid = 'gexec_test'::regclass and attnum > 0
-order by attnum
-\gexec
-create index on gexec_test(a)
-create index on gexec_test(b)
-create index on gexec_test(c)
-create index on gexec_test(d)
--- \gexec should work in FETCH_COUNT mode too
--- (though the fetch limit applies to the executed queries not the meta query)
-\set FETCH_COUNT 1
-select 'select 1 as ones', 'select x.y, x.y*2 as double from generate_series(1,4) as x(y)'
-union all
-select 'drop table gexec_test', NULL
-union all
-select 'drop table gexec_test', 'select ''2000-01-01''::date as party_over'
-\gexec
-select 1 as ones
- ones 
-------
-    1
-(1 row)
-
-select x.y, x.y*2 as double from generate_series(1,4) as x(y)
- y | double 
----+--------
- 1 |      2
- 2 |      4
- 3 |      6
- 4 |      8
-(4 rows)
-
-drop table gexec_test
-drop table gexec_test
-ERROR:  table "gexec_test" does not exist
-select '2000-01-01'::date as party_over
- party_over 
-------------
- 01-01-2000
-(1 row)
-
-\unset FETCH_COUNT
 -- show all pset options
 \pset
 border                   1
@@ -302,7 +137,7 @@ unicode_column_linestyle single
 unicode_header_linestyle single
 -- test multi-line headers, wrapping, and newline indicators
 -- in aligned, unaligned, and wrapped formats
-prepare q as select array_to_string(array_agg(repeat('x',2*n)),E'\n') as "ab
+create view q as select array_to_string(array_agg(repeat('x',2*n)),E'\n') as "ab
 
 c", array_to_string(array_agg(repeat('y',20-2*n)),E'\n') as "a
 bc" from generate_series(1,10) as n(n) group by n>1 order by n>1;
@@ -311,7 +146,7 @@ bc" from generate_series(1,10) as n(n) group by n>1 order by n>1;
 \pset columns 40
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -336,7 +171,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
          ab         +        a         +
                     +        bc         
          c                              
@@ -354,7 +189,7 @@ xxxxxxxxxxxxxxxxxxxx
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
          ab         +        a         +
                     +        bc         
          c                              
@@ -373,7 +208,7 @@ xxxxxxxxxxxxxxxxxxxx
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -398,7 +233,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
           ab         +|         a         +
                      +|         bc         
           c           |                    
@@ -416,7 +251,7 @@ execute q;
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
         ab        +|         a         +
                   +|         bc         
          c         |                    
@@ -437,7 +272,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -462,7 +297,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
 +----------------------+--------------------+
 |          ab         +|         a         +|
 |                     +|         bc         |
@@ -482,7 +317,7 @@ execute q;
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
 +-----------------+--------------------+
 |       ab       +|         a         +|
 |                +|         bc         |
@@ -508,7 +343,7 @@ execute q;
 \pset columns 20
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -537,7 +372,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 * Record 1            
 ab+ xx
   +
@@ -565,7 +400,7 @@ bc  yyyyyyyyyyyyyy      +
     
 
 \pset format wrapped
-execute q;
+select * from q;
 * Record 1       
 ab+ xx
   +
@@ -598,7 +433,7 @@ bc .y              +
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -627,7 +462,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 -[ RECORD 1 ]------------
 ab+| xx
   +|
@@ -655,7 +490,7 @@ bc | yyyyyyyyyyyyyy      +
    | 
 
 \pset format wrapped
-execute q;
+select * from q;
 -[ RECORD 1 ]------
 ab+| xx
   +|
@@ -688,7 +523,7 @@ bc |.yy            +
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -717,7 +552,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 +-[ RECORD 1 ]--------------+
 | ab+| xx                   |
 |   +|                      |
@@ -746,7 +581,7 @@ execute q;
 +----+----------------------+
 
 \pset format wrapped
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+
 | ab+| xx          |
 |   +|             |
@@ -787,7 +622,7 @@ execute q;
 \pset columns 40
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -812,7 +647,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
          ab                  a         
                     +        bc        
          c          +                  
@@ -830,7 +665,7 @@ xxxxxxxxxxxxxxxxxxxx
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
          ab                  a         
                     +        bc        
          c          +                  
@@ -849,7 +684,7 @@ xxxxxxxxxxxxxxxxxxxx
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -874,7 +709,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
           ab          |         a          
 +                     |+        bc         
 +         c           |+                   
@@ -892,7 +727,7 @@ execute q;
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
         ab         |         a          
 +                  |+        bc         
 +        c         |+                   
@@ -913,7 +748,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|a
@@ -938,7 +773,7 @@ yy
 
 (2 rows)
 \pset format aligned
-execute q;
+select * from q;
 +----------------------+--------------------+
 |          ab          |         a          |
 |+                     |+        bc         |
@@ -958,7 +793,7 @@ execute q;
 (2 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
 +-----------------+--------------------+
 |       ab        |         a          |
 |+                |+        bc         |
@@ -984,7 +819,7 @@ execute q;
 \pset columns 20
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -1013,7 +848,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 * Record 1             
  ab xx
 +  
@@ -1041,7 +876,7 @@ execute q;
     
 
 \pset format wrapped
-execute q;
+select * from q;
 * Record 1         
  ab xx
 +  
@@ -1072,7 +907,7 @@ execute q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -1101,7 +936,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 -[ RECORD 1 ]-------------
  ab | xx
 +   ;
@@ -1129,7 +964,7 @@ execute q;
     : 
 
 \pset format wrapped
-execute q;
+select * from q;
 -[ RECORD 1 ]-------
  ab | xx
 +   ;
@@ -1162,7 +997,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 ab
 
 c|xx
@@ -1191,7 +1026,7 @@ yyyy
 yy
 
 \pset format aligned
-execute q;
+select * from q;
 +-[ RECORD 1 ]--------------+
 | ab | xx                   |
 |+   ;                      |
@@ -1220,7 +1055,7 @@ execute q;
 +----+----------------------+
 
 \pset format wrapped
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+
 | ab | xx          |
 |+   ;             |
@@ -1256,15 +1091,15 @@ execute q;
 |    :             |
 +----+-------------+
 
-deallocate q;
+drop view q;
 -- test single-line header and data
-prepare q as select repeat('x',2*n) as "0123456789abcdef", repeat('y',20-2*n) as "0123456789" from generate_series(1,10) as n;
+create view q as select repeat('x',2*n) as "0123456789abcdef", repeat('y',20-2*n) as "0123456789" from generate_series(1,10) as n;
 \pset linestyle ascii
 \pset expanded off
 \pset columns 40
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -1278,7 +1113,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
   0123456789abcdef       0123456789     
 -------------------- ------------------
 xx                   yyyyyyyyyyyyyyyyyy
@@ -1294,7 +1129,7 @@ xxxxxxxxxxxxxxxxxxxx
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
   0123456789abcdef       0123456789     
 -------------------- ------------------
 xx                   yyyyyyyyyyyyyyyyyy
@@ -1311,7 +1146,7 @@ xxxxxxxxxxxxxxxxxxxx
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -1325,7 +1160,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
    0123456789abcdef   |     0123456789     
 ----------------------+--------------------
  xx                   | yyyyyyyyyyyyyyyyyy
@@ -1341,7 +1176,7 @@ execute q;
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
   0123456789abcdef   |    0123456789    
 ---------------------+------------------
  xx                  | yyyyyyyyyyyyyyyy.
@@ -1360,7 +1195,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -1374,7 +1209,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
 +----------------------+--------------------+
 |   0123456789abcdef   |     0123456789     |
 +----------------------+--------------------+
@@ -1392,7 +1227,7 @@ execute q;
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
 +--------------------+-----------------+
 |  0123456789abcdef  |   0123456789    |
 +--------------------+-----------------+
@@ -1416,7 +1251,7 @@ execute q;
 \pset columns 30
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -1447,7 +1282,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 * Record 1                          
 0123456789abcdef xx
 0123456789       yyyyyyyyyyyyyyyyyy
@@ -1480,7 +1315,7 @@ execute q;
 0123456789       
 
 \pset format wrapped
-execute q;
+select * from q;
 * Record 1                  
 0123456789abcdef xx
 0123456789       yyyyyyyyyyyy.
@@ -1521,7 +1356,7 @@ execute q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -1552,7 +1387,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 -[ RECORD 1 ]----+---------------------
 0123456789abcdef | xx
 0123456789       | yyyyyyyyyyyyyyyyyy
@@ -1585,7 +1420,7 @@ execute q;
 0123456789       | 
 
 \pset format wrapped
-execute q;
+select * from q;
 -[ RECORD 1 ]----+-----------
 0123456789abcdef | xx
 0123456789       | yyyyyyyyyy.
@@ -1628,7 +1463,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -1659,7 +1494,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+----------------------+
 | 0123456789abcdef | xx                   |
 | 0123456789       | yyyyyyyyyyyyyyyyyy   |
@@ -1693,7 +1528,7 @@ execute q;
 +------------------+----------------------+
 
 \pset format wrapped
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+---------+
 | 0123456789abcdef | xx      |
 | 0123456789       | yyyyyyy.|
@@ -1748,7 +1583,7 @@ execute q;
 \pset columns 20
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -1779,7 +1614,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 * Record 1                          
 0123456789abcdef xx
 0123456789       yyyyyyyyyyyyyyyyyy
@@ -1812,7 +1647,7 @@ execute q;
 0123456789       
 
 \pset format wrapped
-execute q;
+select * from q;
 * Record 1         
 0123456789abcdef xx
 0123456789       yyy.
@@ -1900,7 +1735,7 @@ execute q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -1931,7 +1766,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 -[ RECORD 1 ]----+---------------------
 0123456789abcdef | xx
 0123456789       | yyyyyyyyyyyyyyyyyy
@@ -1964,7 +1799,7 @@ execute q;
 0123456789       | 
 
 \pset format wrapped
-execute q;
+select * from q;
 -[ RECORD 1 ]----+----
 0123456789abcdef | xx
 0123456789       | yyy.
@@ -2052,7 +1887,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -2083,7 +1918,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+----------------------+
 | 0123456789abcdef | xx                   |
 | 0123456789       | yyyyyyyyyyyyyyyyyy   |
@@ -2117,7 +1952,7 @@ execute q;
 +------------------+----------------------+
 
 \pset format wrapped
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+-----+
 | 0123456789abcdef | xx  |
 | 0123456789       | yyy.|
@@ -2209,7 +2044,7 @@ execute q;
 \pset columns 40
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -2223,7 +2058,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
   0123456789abcdef       0123456789    
 -------------------- ------------------
 xx                   yyyyyyyyyyyyyyyyyy
@@ -2239,7 +2074,7 @@ xxxxxxxxxxxxxxxxxxxx
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
   0123456789abcdef       0123456789    
 -------------------- ------------------
 xx                   yyyyyyyyyyyyyyyyyy
@@ -2256,7 +2091,7 @@ xxxxxxxxxxxxxxxxxxxx
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -2270,7 +2105,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
    0123456789abcdef   |     0123456789     
 ----------------------+--------------------
  xx                   | yyyyyyyyyyyyyyyyyy
@@ -2286,7 +2121,7 @@ execute q;
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
   0123456789abcdef   |    0123456789    
 ---------------------+------------------
  xx                  | yyyyyyyyyyyyyyyy 
@@ -2305,7 +2140,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|0123456789
 xx|yyyyyyyyyyyyyyyyyy
 xxxx|yyyyyyyyyyyyyyyy
@@ -2319,7 +2154,7 @@ xxxxxxxxxxxxxxxxxx|yy
 xxxxxxxxxxxxxxxxxxxx|
 (10 rows)
 \pset format aligned
-execute q;
+select * from q;
 +----------------------+--------------------+
 |   0123456789abcdef   |     0123456789     |
 +----------------------+--------------------+
@@ -2337,7 +2172,7 @@ execute q;
 (10 rows)
 
 \pset format wrapped
-execute q;
+select * from q;
 +--------------------+-----------------+
 |  0123456789abcdef  |   0123456789    |
 +--------------------+-----------------+
@@ -2360,7 +2195,7 @@ execute q;
 \pset expanded on
 \pset border 0
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -2391,7 +2226,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 * Record 1                          
 0123456789abcdef xx
 0123456789       yyyyyyyyyyyyyyyyyy
@@ -2424,7 +2259,7 @@ execute q;
 0123456789       
 
 \pset format wrapped
-execute q;
+select * from q;
 * Record 1                          
 0123456789abcdef xx
 0123456789       yyyyyyyyyyyyyyyyyy
@@ -2458,7 +2293,7 @@ execute q;
 
 \pset border 1
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -2489,7 +2324,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 -[ RECORD 1 ]----+---------------------
 0123456789abcdef | xx
 0123456789       | yyyyyyyyyyyyyyyyyy
@@ -2522,7 +2357,7 @@ execute q;
 0123456789       | 
 
 \pset format wrapped
-execute q;
+select * from q;
 -[ RECORD 1 ]----+---------------------
 0123456789abcdef | xx
 0123456789       | yyyyyyyyyyyyyyyyyy
@@ -2556,7 +2391,7 @@ execute q;
 
 \pset border 2
 \pset format unaligned
-execute q;
+select * from q;
 0123456789abcdef|xx
 0123456789|yyyyyyyyyyyyyyyyyy
 
@@ -2587,7 +2422,7 @@ execute q;
 0123456789abcdef|xxxxxxxxxxxxxxxxxxxx
 0123456789|
 \pset format aligned
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+----------------------+
 | 0123456789abcdef | xx                   |
 | 0123456789       | yyyyyyyyyyyyyyyyyy   |
@@ -2621,7 +2456,7 @@ execute q;
 +------------------+----------------------+
 
 \pset format wrapped
-execute q;
+select * from q;
 +-[ RECORD 1 ]-----+-------------------+
 | 0123456789abcdef | xx                |
 | 0123456789       | yyyyyyyyyyyyyyyyy |
@@ -2657,7 +2492,7 @@ execute q;
 | 0123456789       |                   |
 +------------------+-------------------+
 
-deallocate q;
+drop view q;
 -- expanded output with short-width columns
 \pset border 2
 \pset expanded on
@@ -2688,48 +2523,26 @@ drop table psql_short_tab;
 \pset border 1
 -- support table for output-format tests (useful to create a footer)
 create table psql_serial_tab (id serial);
+ERROR:  type "serial" does not exist
+LINE 1: create table psql_serial_tab (id serial);
+                                         ^
 -- test header/footer/tuples_only behavior in aligned/unaligned/wrapped cases
 \pset format aligned
 \pset expanded off
 \d psql_serial_tab_id_seq
-               Sequence "public.psql_serial_tab_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache 
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.psql_serial_tab.id
-
 \pset tuples_only true
 \df exp
  pg_catalog | exp  | double precision | double precision    | func
- pg_catalog | exp  | numeric          | numeric             | func
 
 \pset tuples_only false
 \pset expanded on
 \d psql_serial_tab_id_seq
-Sequence "public.psql_serial_tab_id_seq"
--[ RECORD 1 ]---------
-Type      | integer
-Start     | 1
-Minimum   | 1
-Maximum   | 2147483647
-Increment | 1
-Cycles?   | no
-Cache     | 1
-
-Owned by: public.psql_serial_tab.id
-
 \pset tuples_only true
 \df exp
 Schema              | pg_catalog
 Name                | exp
 Result data type    | double precision
 Argument data types | double precision
-Type                | func
---------------------+-----------------
-Schema              | pg_catalog
-Name                | exp
-Result data type    | numeric
-Argument data types | numeric
 Type                | func
 
 \pset tuples_only false
@@ -2740,28 +2553,12 @@ select 1 where false;
 \pset format unaligned
 \pset expanded off
 \d psql_serial_tab_id_seq
-Sequence "public.psql_serial_tab_id_seq"
-Type|Start|Minimum|Maximum|Increment|Cycles?|Cache
-integer|1|1|2147483647|1|no|1
-Owned by: public.psql_serial_tab.id
 \pset tuples_only true
 \df exp
 pg_catalog|exp|double precision|double precision|func
-pg_catalog|exp|numeric|numeric|func
 \pset tuples_only false
 \pset expanded on
 \d psql_serial_tab_id_seq
-Sequence "public.psql_serial_tab_id_seq"
-
-Type|integer
-Start|1
-Minimum|1
-Maximum|2147483647
-Increment|1
-Cycles?|no
-Cache|1
-
-Owned by: public.psql_serial_tab.id
 \pset tuples_only true
 \df exp
 Schema|pg_catalog
@@ -2769,54 +2566,23 @@ Name|exp
 Result data type|double precision
 Argument data types|double precision
 Type|func
-
-Schema|pg_catalog
-Name|exp
-Result data type|numeric
-Argument data types|numeric
-Type|func
 \pset tuples_only false
 \pset format wrapped
 \pset expanded off
 \d psql_serial_tab_id_seq
-               Sequence "public.psql_serial_tab_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache 
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.psql_serial_tab.id
-
 \pset tuples_only true
 \df exp
  pg_catalog | exp  | double precision | double precision    | func
- pg_catalog | exp  | numeric          | numeric             | func
 
 \pset tuples_only false
 \pset expanded on
 \d psql_serial_tab_id_seq
-Sequence "public.psql_serial_tab_id_seq"
--[ RECORD 1 ]---------
-Type      | integer
-Start     | 1
-Minimum   | 1
-Maximum   | 2147483647
-Increment | 1
-Cycles?   | no
-Cache     | 1
-
-Owned by: public.psql_serial_tab.id
-
 \pset tuples_only true
 \df exp
 Schema              | pg_catalog
 Name                | exp
 Result data type    | double precision
 Argument data types | double precision
-Type                | func
---------------------+-----------------
-Schema              | pg_catalog
-Name                | exp
-Result data type    | numeric
-Argument data types | numeric
 Type                | func
 
 \pset tuples_only false
@@ -2840,22 +2606,12 @@ from generate_series(0,3) n;
 \pset border 1
 \pset expanded off
 \d psql_serial_tab_id_seq
-Type,Start,Minimum,Maximum,Increment,Cycles?,Cache
-integer,1,1,2147483647,1,no,1
 \pset tuples_only true
 \df exp
 pg_catalog,exp,double precision,double precision,func
-pg_catalog,exp,numeric,numeric,func
 \pset tuples_only false
 \pset expanded on
 \d psql_serial_tab_id_seq
-Type,integer
-Start,1
-Minimum,1
-Maximum,2147483647
-Increment,1
-Cycles?,no
-Cache,1
 \pset tuples_only true
 \df exp
 Schema,pg_catalog
@@ -2863,25 +2619,20 @@ Name,exp
 Result data type,double precision
 Argument data types,double precision
 Type,func
-Schema,pg_catalog
-Name,exp
-Result data type,numeric
-Argument data types,numeric
-Type,func
 \pset tuples_only false
-prepare q as
+create view q as
   select 'some"text' as "a""title", E'  <foo>\n<bar>' as "junk",
          '   ' as "empty", n as int
   from generate_series(1,2) as n;
 \pset expanded off
-execute q;
+select * from q;
 "a""title",junk,empty,int
 "some""text","  <foo>
 <bar>",   ,1
 "some""text","  <foo>
 <bar>",   ,2
 \pset expanded on
-execute q;
+select * from q;
 "a""title","some""text"
 junk,"  <foo>
 <bar>"
@@ -2892,7 +2643,7 @@ junk,"  <foo>
 <bar>"
 empty,   
 int,2
-deallocate q;
+drop view q;
 -- special cases
 \pset expanded off
 select 'comma,comma' as comma, 'semi;semi' as semi;
@@ -2925,6 +2676,7 @@ select '\' as d1, '' as d2;
 \pset csv_fieldsep ','
 -- clean up after output format tests
 drop table psql_serial_tab;
+ERROR:  table "psql_serial_tab" does not exist
 \pset format aligned
 \pset expanded off
 \pset border 1
@@ -3112,12 +2864,8 @@ bar 'bar' "bar"
 	\c arg1 arg2 arg3 arg4
 	\cd arg1
 	\conninfo
-	\copy arg1 arg2 arg3 arg4 arg5 arg6
-	\copyright
-	SELECT 1 as one, 2, 3 \crosstabview
 	\dt arg1
 	\e arg1 arg2
-	\ef whole_line
 	\ev whole_line
 	\echo arg1 arg2 arg3 arg4 arg5
 	\echo arg1
@@ -3126,20 +2874,13 @@ bar 'bar' "bar"
 	\f arg1
 	\g arg1
 	\gx arg1
-	\gexec
 	SELECT 1 AS one \gset
-	\h
 	\?
-	\html
 	\i arg1
 	\ir arg1
 	\l arg1
-	\lo arg1 arg2
-invalid command \lo
-	\lo_list
 	\o arg1
 	\p
-	\password arg1
 	\prompt arg1 arg2
 	\pset arg1 arg2
 	\q
@@ -3148,20 +2889,17 @@ invalid command \lo
 	\s arg1
 	\set arg1 arg2 arg3 arg4 arg5 arg6 arg7
 	\setenv arg1 arg2
-	\sf whole_line
 	\sv whole_line
 	\t arg1
 	\timing arg1
 	\unrestrict not_valid
 	\unset arg1
 	\w arg1
-	\watch arg1
 	\x arg1
 	-- \else here is eaten as part of OT_FILEPIPE argument
 	\w |/no/such/file \else
 	-- \endif here is eaten as part of whole-line argument
 	\! whole_line \endif
-	\z
 \else
 	\echo 'should print #8-1'
 should print #8-1
@@ -3192,34 +2930,6 @@ SELECT NOT :{?no_such_var} AS no_such_var_is_not_defined;
  t
 (1 row)
 
--- SHOW_CONTEXT
-\set SHOW_CONTEXT never
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-NOTICE:  foo
-ERROR:  bar
-\set SHOW_CONTEXT errors
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-NOTICE:  foo
-ERROR:  bar
-CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
-\set SHOW_CONTEXT always
-do $$
-begin
-  raise notice 'foo';
-  raise exception 'bar';
-end $$;
-NOTICE:  foo
-CONTEXT:  PL/pgSQL function inline_code_block line 3 at RAISE
-ERROR:  bar
-CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
 -- test printing and clearing the query buffer
 SELECT 1;
  ?column? 
@@ -3234,31 +2944,29 @@ SELECT 2 \r
 SELECT 1;
 SELECT 3 \p
 SELECT 3 
-UNION SELECT 4 \p
+  + 4 \p
 SELECT 3 
-UNION SELECT 4 
-UNION SELECT 5
+  + 4 
+  + 5
 ORDER BY 1;
  ?column? 
 ----------
-        3
-        4
-        5
-(3 rows)
+       12
+(1 row)
 
 \r
 \p
 SELECT 3 
-UNION SELECT 4 
-UNION SELECT 5
+  + 4 
+  + 5
 ORDER BY 1;
 -- tests for special result variables
 -- working query, 2 rows selected
-SELECT 1 AS stuff UNION SELECT 2;
+SELECT 1 AS stuff FROM generate_series(1,2);
  stuff 
 -------
      1
-     2
+     1
 (2 rows)
 
 \echo 'error:' :ERROR
@@ -3269,9 +2977,9 @@ error code: 00000
 number of rows: 2
 -- syntax error
 SELECT 1 UNION;
-ERROR:  syntax error at or near ";"
+ERROR:  syntax error at or near "UNION"
 LINE 1: SELECT 1 UNION;
-                      ^
+                 ^
 \echo 'error:' :ERROR
 error: true
 \echo 'error code:' :SQLSTATE
@@ -3279,7 +2987,7 @@ error code: 42601
 \echo 'number of rows:' :ROW_COUNT
 number of rows: 0
 \echo 'last error message:' :LAST_ERROR_MESSAGE
-last error message: syntax error at or near ";"
+last error message: syntax error at or near "UNION"
 \echo 'last error code:' :LAST_ERROR_SQLSTATE
 last error code: 42601
 -- empty query
@@ -3292,7 +3000,7 @@ error code: 00000
 number of rows: 0
 -- must have kept previous values
 \echo 'last error message:' :LAST_ERROR_MESSAGE
-last error message: syntax error at or near ";"
+last error message: syntax error at or near "UNION"
 \echo 'last error code:' :LAST_ERROR_SQLSTATE
 last error code: 42601
 -- other query error
@@ -3311,13 +3019,13 @@ last error code: 42P01
 -- nondefault verbosity error settings (except verbose, which is too unstable)
 \set VERBOSITY terse
 SELECT 1 UNION;
-ERROR:  syntax error at or near ";" at character 15
+ERROR:  syntax error at or near "UNION" at character 10
 \echo 'error:' :ERROR
 error: true
 \echo 'error code:' :SQLSTATE
 error code: 42601
 \echo 'last error message:' :LAST_ERROR_MESSAGE
-last error message: syntax error at or near ";"
+last error message: syntax error at or near "UNION"
 \set VERBOSITY sqlstate
 SELECT 1/0;
 ERROR:  22012
@@ -3328,93 +3036,6 @@ error code: 22012
 \echo 'last error message:' :LAST_ERROR_MESSAGE
 last error message: division by zero
 \set VERBOSITY default
--- working \gdesc
-SELECT 3 AS three, 4 AS four \gdesc
- Column |  Type   
---------+---------
- three  | integer
- four   | integer
-(2 rows)
-
-\echo 'error:' :ERROR
-error: false
-\echo 'error code:' :SQLSTATE
-error code: 00000
-\echo 'number of rows:' :ROW_COUNT
-number of rows: 2
--- \gdesc with an error
-SELECT 4 AS \gdesc
-ERROR:  syntax error at end of input
-LINE 1: SELECT 4 AS 
-                    ^
-\echo 'error:' :ERROR
-error: true
-\echo 'error code:' :SQLSTATE
-error code: 42601
-\echo 'number of rows:' :ROW_COUNT
-number of rows: 0
-\echo 'last error message:' :LAST_ERROR_MESSAGE
-last error message: syntax error at end of input
-\echo 'last error code:' :LAST_ERROR_SQLSTATE
-last error code: 42601
--- check row count for a cursor-fetched query
-\set FETCH_COUNT 10
-select unique2 from tenk1 order by unique2 limit 19;
- unique2 
----------
-       0
-       1
-       2
-       3
-       4
-       5
-       6
-       7
-       8
-       9
-      10
-      11
-      12
-      13
-      14
-      15
-      16
-      17
-      18
-(19 rows)
-
-\echo 'error:' :ERROR
-error: false
-\echo 'error code:' :SQLSTATE
-error code: 00000
-\echo 'number of rows:' :ROW_COUNT
-number of rows: 19
--- cursor-fetched query with an error after the first group
-select 1/(15-unique2) from tenk1 order by unique2 limit 19;
- ?column? 
-----------
-        0
-        0
-        0
-        0
-        0
-        0
-        0
-        0
-        0
-        0
-ERROR:  division by zero
-\echo 'error:' :ERROR
-error: true
-\echo 'error code:' :SQLSTATE
-error code: 22012
-\echo 'number of rows:' :ROW_COUNT
-number of rows: 0
-\echo 'last error message:' :LAST_ERROR_MESSAGE
-last error message: division by zero
-\echo 'last error code:' :LAST_ERROR_SQLSTATE
-last error code: 22012
-\unset FETCH_COUNT
 -- \d on toast table (use pg_statistic's toast table, which has a known name)
 \d pg_toast.pg_toast_2619
 TOAST table "pg_toast.pg_toast_2619"
@@ -3433,31 +3054,26 @@ List of access methods
  Name  | Type  
 -------+-------
  btree | Index
- gin   | Index
  hash  | Index
  heap  | Table
- heap2 | Table
-(5 rows)
+(3 rows)
 
 \dA *
 List of access methods
  Name  | Type  
 -------+-------
  btree | Index
- gin   | Index
  hash  | Index
  heap  | Table
- heap2 | Table
-(5 rows)
+(3 rows)
 
 \dA h*
 List of access methods
- Name  | Type  
--------+-------
- hash  | Index
- heap  | Table
- heap2 | Table
-(3 rows)
+ Name | Type  
+------+-------
+ hash | Index
+ heap | Table
+(2 rows)
 
 \dA foo
 List of access methods
@@ -3473,35 +3089,30 @@ List of access methods
 
 \dA: extra argument "bar" ignored
 \dA+
-                      List of access methods
- Name  | Type  |       Handler        |        Description         
--------+-------+----------------------+----------------------------
- btree | Index | bthandler            | b-tree index access method
- gin   | Index | ginhandler           | 
- hash  | Index | hashhandler          | hash index access method
- heap  | Table | heap_tableam_handler | heap table access method
- heap2 | Table | heap_tableam_handler | 
-(5 rows)
+               List of access methods
+ Name  | Type  |       Handler        | Description 
+-------+-------+----------------------+-------------
+ btree | Index | bthandler            | 
+ hash  | Index | hashhandler          | 
+ heap  | Table | heap_tableam_handler | 
+(3 rows)
 
 \dA+ *
-                      List of access methods
- Name  | Type  |       Handler        |        Description         
--------+-------+----------------------+----------------------------
- btree | Index | bthandler            | b-tree index access method
- gin   | Index | ginhandler           | 
- hash  | Index | hashhandler          | hash index access method
- heap  | Table | heap_tableam_handler | heap table access method
- heap2 | Table | heap_tableam_handler | 
-(5 rows)
+               List of access methods
+ Name  | Type  |       Handler        | Description 
+-------+-------+----------------------+-------------
+ btree | Index | bthandler            | 
+ hash  | Index | hashhandler          | 
+ heap  | Table | heap_tableam_handler | 
+(3 rows)
 
 \dA+ h*
-                     List of access methods
- Name  | Type  |       Handler        |       Description        
--------+-------+----------------------+--------------------------
- hash  | Index | hashhandler          | hash index access method
- heap  | Table | heap_tableam_handler | heap table access method
- heap2 | Table | heap_tableam_handler | 
-(3 rows)
+              List of access methods
+ Name | Type  |       Handler        | Description 
+------+-------+----------------------+-------------
+ hash | Index | hashhandler          | 
+ heap | Table | heap_tableam_handler | 
+(2 rows)
 
 \dA+ foo
        List of access methods
@@ -3511,38 +3122,33 @@ List of access methods
 
 -- check \df, \do with argument specifications
 \df *sqrt
-                             List of functions
-   Schema   |     Name     | Result data type | Argument data types | Type 
-------------+--------------+------------------+---------------------+------
- pg_catalog | dsqrt        | double precision | double precision    | func
- pg_catalog | numeric_sqrt | numeric          | numeric             | func
- pg_catalog | sqrt         | double precision | double precision    | func
- pg_catalog | sqrt         | numeric          | numeric             | func
-(4 rows)
-
-\df *sqrt num*
-                             List of functions
-   Schema   |     Name     | Result data type | Argument data types | Type 
-------------+--------------+------------------+---------------------+------
- pg_catalog | numeric_sqrt | numeric          | numeric             | func
- pg_catalog | sqrt         | numeric          | numeric             | func
+                         List of functions
+   Schema   | Name  | Result data type | Argument data types | Type 
+------------+-------+------------------+---------------------+------
+ pg_catalog | dsqrt | double precision | double precision    | func
+ pg_catalog | sqrt  | double precision | double precision    | func
 (2 rows)
 
+\df *sqrt num*
+                       List of functions
+ Schema | Name | Result data type | Argument data types | Type 
+--------+------+------------------+---------------------+------
+(0 rows)
+
 \df int*pl
-                            List of functions
-   Schema   |    Name     | Result data type | Argument data types | Type 
-------------+-------------+------------------+---------------------+------
- pg_catalog | int24pl     | integer          | smallint, integer   | func
- pg_catalog | int28pl     | bigint           | smallint, bigint    | func
- pg_catalog | int2pl      | smallint         | smallint, smallint  | func
- pg_catalog | int42pl     | integer          | integer, smallint   | func
- pg_catalog | int48pl     | bigint           | integer, bigint     | func
- pg_catalog | int4pl      | integer          | integer, integer    | func
- pg_catalog | int82pl     | bigint           | bigint, smallint    | func
- pg_catalog | int84pl     | bigint           | bigint, integer     | func
- pg_catalog | int8pl      | bigint           | bigint, bigint      | func
- pg_catalog | interval_pl | interval         | interval, interval  | func
-(10 rows)
+                          List of functions
+   Schema   |  Name   | Result data type | Argument data types | Type 
+------------+---------+------------------+---------------------+------
+ pg_catalog | int24pl | integer          | smallint, integer   | func
+ pg_catalog | int28pl | bigint           | smallint, bigint    | func
+ pg_catalog | int2pl  | smallint         | smallint, smallint  | func
+ pg_catalog | int42pl | integer          | integer, smallint   | func
+ pg_catalog | int48pl | bigint           | integer, bigint     | func
+ pg_catalog | int4pl  | integer          | integer, integer    | func
+ pg_catalog | int82pl | bigint           | bigint, smallint    | func
+ pg_catalog | int84pl | bigint           | bigint, integer     | func
+ pg_catalog | int8pl  | bigint           | bigint, bigint      | func
+(9 rows)
 
 \df int*pl int4
                           List of functions
@@ -3562,92 +3168,44 @@ List of access methods
  pg_catalog | int8pl  | bigint           | bigint, bigint      | func
 (3 rows)
 
-\df acl* aclitem[]
-                                                                    List of functions
-   Schema   |    Name     | Result data type |                                        Argument data types                                         | Type 
-------------+-------------+------------------+----------------------------------------------------------------------------------------------------+------
- pg_catalog | aclcontains | boolean          | aclitem[], aclitem                                                                                 | func
- pg_catalog | aclexplode  | SETOF record     | acl aclitem[], OUT grantor oid, OUT grantee oid, OUT privilege_type text, OUT is_grantable boolean | func
- pg_catalog | aclinsert   | aclitem[]        | aclitem[], aclitem                                                                                 | func
- pg_catalog | aclremove   | aclitem[]        | aclitem[], aclitem                                                                                 | func
-(4 rows)
-
 \df has_database_privilege oid text
-                                  List of functions
-   Schema   |          Name          | Result data type | Argument data types | Type 
-------------+------------------------+------------------+---------------------+------
- pg_catalog | has_database_privilege | boolean          | oid, text           | func
- pg_catalog | has_database_privilege | boolean          | oid, text, text     | func
-(2 rows)
+                       List of functions
+ Schema | Name | Result data type | Argument data types | Type 
+--------+------+------------------+---------------------+------
+(0 rows)
 
 \df has_database_privilege oid text -
-                                  List of functions
-   Schema   |          Name          | Result data type | Argument data types | Type 
-------------+------------------------+------------------+---------------------+------
- pg_catalog | has_database_privilege | boolean          | oid, text           | func
-(1 row)
+                       List of functions
+ Schema | Name | Result data type | Argument data types | Type 
+--------+------+------------------+---------------------+------
+(0 rows)
 
 \dfa bit* small*
-                          List of functions
-   Schema   |  Name   | Result data type | Argument data types | Type 
-------------+---------+------------------+---------------------+------
- pg_catalog | bit_and | smallint         | smallint            | agg
- pg_catalog | bit_or  | smallint         | smallint            | agg
- pg_catalog | bit_xor | smallint         | smallint            | agg
-(3 rows)
+                       List of functions
+ Schema | Name | Result data type | Argument data types | Type 
+--------+------+------------------+---------------------+------
+(0 rows)
 
 \df *._pg_expandarray
-                                             List of functions
-       Schema       |      Name       | Result data type |            Argument data types            | Type 
---------------------+-----------------+------------------+-------------------------------------------+------
- information_schema | _pg_expandarray | SETOF record     | anyarray, OUT x anyelement, OUT n integer | func
-(1 row)
+                       List of functions
+ Schema | Name | Result data type | Argument data types | Type 
+--------+------+------------------+---------------------+------
+(0 rows)
 
 \do - pg_catalog.int4
                                List of operators
    Schema   | Name | Left arg type | Right arg type | Result type | Description 
 ------------+------+---------------+----------------+-------------+-------------
- pg_catalog | -    |               | integer        | integer     | negate
+ pg_catalog | -    |               | integer        | integer     | 
 (1 row)
 
 \do && anyarray *
                                List of operators
    Schema   | Name | Left arg type | Right arg type | Result type | Description 
 ------------+------+---------------+----------------+-------------+-------------
- pg_catalog | &&   | anyarray      | anyarray       | boolean     | overlaps
+ pg_catalog | &&   | anyarray      | anyarray       | boolean     | 
 (1 row)
 
--- check \sf
-\sf information_schema._pg_expandarray
-CREATE OR REPLACE FUNCTION information_schema._pg_expandarray(anyarray, OUT x anyelement, OUT n integer)
- RETURNS SETOF record
- LANGUAGE sql
- IMMUTABLE PARALLEL SAFE STRICT
-AS $function$select $1[s],
-        s operator(pg_catalog.-) pg_catalog.array_lower($1,1) operator(pg_catalog.+) 1
-        from pg_catalog.generate_series(pg_catalog.array_lower($1,1),
-                                        pg_catalog.array_upper($1,1),
-                                        1) as g(s)$function$
-\sf+ information_schema._pg_expandarray
-        CREATE OR REPLACE FUNCTION information_schema._pg_expandarray(anyarray, OUT x anyelement, OUT n integer)
-         RETURNS SETOF record
-         LANGUAGE sql
-         IMMUTABLE PARALLEL SAFE STRICT
-1       AS $function$select $1[s],
-2               s operator(pg_catalog.-) pg_catalog.array_lower($1,1) operator(pg_catalog.+) 1
-3               from pg_catalog.generate_series(pg_catalog.array_lower($1,1),
-4                                               pg_catalog.array_upper($1,1),
-5                                               1) as g(s)$function$
-\sf+ interval_pl_time
-        CREATE OR REPLACE FUNCTION pg_catalog.interval_pl_time(interval, time without time zone)
-         RETURNS time without time zone
-         LANGUAGE sql
-         IMMUTABLE PARALLEL SAFE STRICT COST 1
-1       RETURN ($2 + $1)
-\sf ts_debug(text)
-ERROR:  function "ts_debug(text)" does not exist
-\sf+ ts_debug(text)
-ERROR:  function "ts_debug(text)" does not exist
 -- check describing invalid multipart names
 \dA regression.heap
 improper qualified name (too many dotted names): regression.heap
@@ -3672,17 +3230,11 @@ cross-database references are not implemented: ).pg_catalog.int8
 \dC nonesuch.pg_catalog.int8
 cross-database references are not implemented: nonesuch.pg_catalog.int8
 \dd host.regression.pg_catalog.pg_class
-improper qualified name (too many dotted names): host.regression.pg_catalog.pg_class
 \dd [.pg_catalog.pg_class
-cross-database references are not implemented: [.pg_catalog.pg_class
 \dd nonesuch.pg_catalog.pg_class
-cross-database references are not implemented: nonesuch.pg_catalog.pg_class
 \ddp host.regression.pg_catalog.pg_class
-improper qualified name (too many dotted names): host.regression.pg_catalog.pg_class
 \ddp {.pg_catalog.pg_class
-cross-database references are not implemented: {.pg_catalog.pg_class
 \ddp nonesuch.pg_catalog.pg_class
-cross-database references are not implemented: nonesuch.pg_catalog.pg_class
 \di host.regression.public.tenk1_hundred
 improper qualified name (too many dotted names): host.regression.public.tenk1_hundred
 \di ..public.tenk1_hundred
@@ -3713,40 +3265,12 @@ improper qualified name (too many dotted names): host.regression.public.namelen
 cross-database references are not implemented: regres[qrstuv]ion.public.namelen
 \df nonesuch.public.namelen
 cross-database references are not implemented: nonesuch.public.namelen
-\dF host.regression.pg_catalog.arabic
-improper qualified name (too many dotted names): host.regression.pg_catalog.arabic
-\dF regres{1,2}ion.pg_catalog.arabic
-cross-database references are not implemented: regres{1,2}ion.pg_catalog.arabic
-\dF nonesuch.pg_catalog.arabic
-cross-database references are not implemented: nonesuch.pg_catalog.arabic
-\dFd host.regression.pg_catalog.arabic_stem
-improper qualified name (too many dotted names): host.regression.pg_catalog.arabic_stem
-\dFd regres?ion.pg_catalog.arabic_stem
-cross-database references are not implemented: regres?ion.pg_catalog.arabic_stem
-\dFd nonesuch.pg_catalog.arabic_stem
-cross-database references are not implemented: nonesuch.pg_catalog.arabic_stem
-\dFp host.regression.pg_catalog.default
-improper qualified name (too many dotted names): host.regression.pg_catalog.default
-\dFp ^regression.pg_catalog.default
-cross-database references are not implemented: ^regression.pg_catalog.default
-\dFp nonesuch.pg_catalog.default
-cross-database references are not implemented: nonesuch.pg_catalog.default
-\dFt host.regression.pg_catalog.ispell
-improper qualified name (too many dotted names): host.regression.pg_catalog.ispell
-\dFt regression$.pg_catalog.ispell
-cross-database references are not implemented: regression$.pg_catalog.ispell
-\dFt nonesuch.pg_catalog.ispell
-cross-database references are not implemented: nonesuch.pg_catalog.ispell
-\dg nonesuch.pg_database_owner
-improper qualified name (too many dotted names): nonesuch.pg_database_owner
-\dg regression.pg_database_owner
-improper qualified name (too many dotted names): regression.pg_database_owner
 \dL host.regression.plpgsql
-improper qualified name (too many dotted names): host.regression.plpgsql
+invalid command \dL
 \dL *.plpgsql
-cross-database references are not implemented: *.plpgsql
+invalid command \dL
 \dL nonesuch.plpgsql
-cross-database references are not implemented: nonesuch.plpgsql
+invalid command \dL
 \dn host.regression.public
 improper qualified name (too many dotted names): host.regression.public
 \dn """".public
@@ -3765,36 +3289,18 @@ improper qualified name (too many dotted names): host.regression.pg_catalog.POSI
 cross-database references are not implemented: .pg_catalog.POSIX
 \dO nonesuch.pg_catalog.POSIX
 cross-database references are not implemented: nonesuch.pg_catalog.POSIX
-\dp host.regression.public.a_star
-improper qualified name (too many dotted names): host.regression.public.a_star
-\dp "regres+ion".public.a_star
-cross-database references are not implemented: "regres+ion".public.a_star
-\dp nonesuch.public.a_star
-cross-database references are not implemented: nonesuch.public.a_star
-\dP host.regression.public.mlparted
-improper qualified name (too many dotted names): host.regression.public.mlparted
-\dP "regres(sion)".public.mlparted
-cross-database references are not implemented: "regres(sion)".public.mlparted
-\dP nonesuch.public.mlparted
-cross-database references are not implemented: nonesuch.public.mlparted
 \drds nonesuch.lc_messages
-improper qualified name (too many dotted names): nonesuch.lc_messages
+invalid command \drds
 \drds regression.lc_messages
-improper qualified name (too many dotted names): regression.lc_messages
+invalid command \drds
 \dx regression.plpgsql
 improper qualified name (too many dotted names): regression.plpgsql
 \dx nonesuch.plpgsql
 improper qualified name (too many dotted names): nonesuch.plpgsql
-\dX host.regression.public.func_deps_stat
-improper qualified name (too many dotted names): host.regression.public.func_deps_stat
-\dX "^regression$".public.func_deps_stat
-cross-database references are not implemented: "^regression$".public.func_deps_stat
-\dX nonesuch.public.func_deps_stat
-cross-database references are not implemented: nonesuch.public.func_deps_stat
 \dy regression.myevt
-improper qualified name (too many dotted names): regression.myevt
+invalid command \dy
 \dy nonesuch.myevt
-improper qualified name (too many dotted names): nonesuch.myevt
+invalid command \dy
 -- check that dots within quoted name segments are not counted
 \dA "no.such.access.method"
 List of access methods
@@ -3803,9 +3309,9 @@ List of access methods
 (0 rows)
 
 \dt "no.such.table.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \da "no.such.aggregate.function"
@@ -3827,39 +3333,29 @@ List of access methods
 (0 rows)
 
 \dd "no.such.object.description"
-         Object descriptions
- Schema | Name | Object | Description 
---------+------+--------+-------------
-(0 rows)
-
 \ddp "no.such.default.access.privilege"
-         Default access privileges
- Owner | Schema | Type | Access privileges 
--------+--------+------+-------------------
-(0 rows)
-
 \di "no.such.index.relation"
-          List of relations
- Schema | Name | Type | Owner | Table 
---------+------+------+-------+-------
+      List of relations
+ Schema | Name | Type | Table 
+--------+------+------+-------
 (0 rows)
 
 \dm "no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dt "no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dv "no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \df "no.such.function"
@@ -3868,37 +3364,12 @@ List of access methods
 --------+------+------------------+---------------------+------
 (0 rows)
 
-\dF "no.such.text.search.configuration"
-ERROR:  relation "pg_catalog.pg_ts_config" does not exist
-LINE 5: FROM pg_catalog.pg_ts_config c
-             ^
-\dFd "no.such.text.search.dictionary"
-ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
-LINE 5: FROM pg_catalog.pg_ts_dict d
-             ^
-\dFp "no.such.text.search.parser"
-ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
-LINE 5: FROM pg_catalog.pg_ts_parser p
-             ^
-\dFt "no.such.text.search.template"
-ERROR:  relation "pg_catalog.pg_ts_template" does not exist
-LINE 5: FROM pg_catalog.pg_ts_template t
-             ^
-\dg "no.such.role"
-           List of roles
- Role name | Attributes | Member of 
------------+------------+-----------
-
 \dL "no.such.language"
-          List of languages
- Name | Owner | Trusted | Description 
-------+-------+---------+-------------
-(0 rows)
-
+invalid command \dL
 \dn "no.such.schema"
 List of schemas
- Name | Owner 
-------+-------
+ Name 
+------
 (0 rows)
 
 \do "no.such.operator"
@@ -3908,23 +3379,13 @@ List of schemas
 (0 rows)
 
 \dO "no.such.collation"
-                     List of collations
- Schema | Name | Collate | Ctype | Provider | Deterministic? 
---------+------+---------+-------+----------+----------------
-(0 rows)
-
-\dp "no.such.access.privilege"
-                      Access privileges
- Schema | Name | Type | Access privileges | Column privileges 
---------+------+------+-------------------+-------------------
+                List of collations
+ Schema | Name | Collate | Ctype | Deterministic? 
+--------+------+---------+-------+----------------
 (0 rows)
 
 \drds "no.such.setting"
-      List of settings
- Role | Database | Settings 
-------+----------+----------
-(0 rows)
-
+invalid command \drds
 \dT "no.such.data.type"
      List of data types
  Schema | Name | Description 
@@ -3932,30 +3393,20 @@ List of schemas
 (0 rows)
 
 \dx "no.such.installed.extension"
-     List of installed extensions
- Name | Version | Schema | Description 
-------+---------+--------+-------------
-(0 rows)
-
-\dX "no.such.extended.statistics"
-                 List of extended statistics
- Schema | Name | Definition | Ndistinct | Dependencies | MCV 
---------+------+------------+-----------+--------------+-----
+List of installed extensions
+ Name | Version | Schema 
+------+---------+--------
 (0 rows)
 
 \dy "no.such.event.trigger"
-              List of event triggers
- Name | Event | Owner | Enabled | Function | Tags 
-------+-------+-------+---------+----------+------
-(0 rows)
-
+invalid command \dy
 -- again, but with dotted schema qualifications.
 \dA "no.such.schema"."no.such.access.method"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.access.method"
 \dt "no.such.schema"."no.such.table.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \da "no.such.schema"."no.such.aggregate.function"
@@ -3973,39 +3424,29 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
 (0 rows)
 
 \dd "no.such.schema"."no.such.object.description"
-         Object descriptions
- Schema | Name | Object | Description 
---------+------+--------+-------------
-(0 rows)
-
 \ddp "no.such.schema"."no.such.default.access.privilege"
-         Default access privileges
- Owner | Schema | Type | Access privileges 
--------+--------+------+-------------------
-(0 rows)
-
 \di "no.such.schema"."no.such.index.relation"
-          List of relations
- Schema | Name | Type | Owner | Table 
---------+------+------+-------+-------
+      List of relations
+ Schema | Name | Type | Table 
+--------+------+------+-------
 (0 rows)
 
 \dm "no.such.schema"."no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dt "no.such.schema"."no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dv "no.such.schema"."no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \df "no.such.schema"."no.such.function"
@@ -4014,26 +3455,8 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.opera
 --------+------+------------------+---------------------+------
 (0 rows)
 
-\dF "no.such.schema"."no.such.text.search.configuration"
-ERROR:  relation "pg_catalog.pg_ts_config" does not exist
-LINE 5: FROM pg_catalog.pg_ts_config c
-             ^
-\dFd "no.such.schema"."no.such.text.search.dictionary"
-ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
-LINE 5: FROM pg_catalog.pg_ts_dict d
-             ^
-\dFp "no.such.schema"."no.such.text.search.parser"
-ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
-LINE 5: FROM pg_catalog.pg_ts_parser p
-             ^
-\dFt "no.such.schema"."no.such.text.search.template"
-ERROR:  relation "pg_catalog.pg_ts_template" does not exist
-LINE 5: FROM pg_catalog.pg_ts_template t
-             ^
-\dg "no.such.schema"."no.such.role"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.role"
 \dL "no.such.schema"."no.such.language"
-cross-database references are not implemented: "no.such.schema"."no.such.language"
+invalid command \dL
 \do "no.such.schema"."no.such.operator"
                              List of operators
  Schema | Name | Left arg type | Right arg type | Result type | Description 
@@ -4041,19 +3464,13 @@ cross-database references are not implemented: "no.such.schema"."no.such.languag
 (0 rows)
 
 \dO "no.such.schema"."no.such.collation"
-                     List of collations
- Schema | Name | Collate | Ctype | Provider | Deterministic? 
---------+------+---------+-------+----------+----------------
-(0 rows)
-
-\dp "no.such.schema"."no.such.access.privilege"
-                      Access privileges
- Schema | Name | Type | Access privileges | Column privileges 
---------+------+------+-------------------+-------------------
+                List of collations
+ Schema | Name | Collate | Ctype | Deterministic? 
+--------+------+---------+-------+----------------
 (0 rows)
 
 \drds "no.such.schema"."no.such.setting"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.setting"
+invalid command \drds
 \dT "no.such.schema"."no.such.data.type"
      List of data types
  Schema | Name | Description 
@@ -4062,19 +3479,13 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.setti
 
 \dx "no.such.schema"."no.such.installed.extension"
 improper qualified name (too many dotted names): "no.such.schema"."no.such.installed.extension"
-\dX "no.such.schema"."no.such.extended.statistics"
-                 List of extended statistics
- Schema | Name | Definition | Ndistinct | Dependencies | MCV 
---------+------+------------+-----------+--------------+-----
-(0 rows)
-
 \dy "no.such.schema"."no.such.event.trigger"
-improper qualified name (too many dotted names): "no.such.schema"."no.such.event.trigger"
+invalid command \dy
 -- again, but with current database and dotted schema qualifications.
 \dt regression."no.such.schema"."no.such.table.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \da regression."no.such.schema"."no.such.aggregate.function"
@@ -4090,33 +3501,28 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
 (0 rows)
 
 \dd regression."no.such.schema"."no.such.object.description"
-         Object descriptions
- Schema | Name | Object | Description 
---------+------+--------+-------------
-(0 rows)
-
 \di regression."no.such.schema"."no.such.index.relation"
-          List of relations
- Schema | Name | Type | Owner | Table 
---------+------+------+-------+-------
+      List of relations
+ Schema | Name | Type | Table 
+--------+------+------+-------
 (0 rows)
 
 \dm regression."no.such.schema"."no.such.materialized.view"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dt regression."no.such.schema"."no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \dv regression."no.such.schema"."no.such.relation"
-      List of relations
- Schema | Name | Type | Owner 
---------+------+------+-------
+  List of relations
+ Schema | Name | Type 
+--------+------+------
 (0 rows)
 
 \df regression."no.such.schema"."no.such.function"
@@ -4125,22 +3531,6 @@ improper qualified name (too many dotted names): "no.such.schema"."no.such.event
 --------+------+------------------+---------------------+------
 (0 rows)
 
-\dF regression."no.such.schema"."no.such.text.search.configuration"
-ERROR:  relation "pg_catalog.pg_ts_config" does not exist
-LINE 5: FROM pg_catalog.pg_ts_config c
-             ^
-\dFd regression."no.such.schema"."no.such.text.search.dictionary"
-ERROR:  relation "pg_catalog.pg_ts_dict" does not exist
-LINE 5: FROM pg_catalog.pg_ts_dict d
-             ^
-\dFp regression."no.such.schema"."no.such.text.search.parser"
-ERROR:  relation "pg_catalog.pg_ts_parser" does not exist
-LINE 5: FROM pg_catalog.pg_ts_parser p
-             ^
-\dFt regression."no.such.schema"."no.such.text.search.template"
-ERROR:  relation "pg_catalog.pg_ts_template" does not exist
-LINE 5: FROM pg_catalog.pg_ts_template t
-             ^
 \do regression."no.such.schema"."no.such.operator"
                              List of operators
  Schema | Name | Left arg type | Right arg type | Result type | Description 
@@ -4148,27 +3538,15 @@ LINE 5: FROM pg_catalog.pg_ts_template t
 (0 rows)
 
 \dO regression."no.such.schema"."no.such.collation"
-                     List of collations
- Schema | Name | Collate | Ctype | Provider | Deterministic? 
---------+------+---------+-------+----------+----------------
-(0 rows)
-
-\dp regression."no.such.schema"."no.such.access.privilege"
-                      Access privileges
- Schema | Name | Type | Access privileges | Column privileges 
---------+------+------+-------------------+-------------------
+                List of collations
+ Schema | Name | Collate | Ctype | Deterministic? 
+--------+------+---------+-------+----------------
 (0 rows)
 
 \dT regression."no.such.schema"."no.such.data.type"
      List of data types
  Schema | Name | Description 
 --------+------+-------------
-(0 rows)
-
-\dX regression."no.such.schema"."no.such.extended.statistics"
-                 List of extended statistics
- Schema | Name | Definition | Ndistinct | Dependencies | MCV 
---------+------+------------+-----------+--------------+-----
 (0 rows)
 
 -- again, but with dotted database and dotted schema qualifications.
@@ -4179,9 +3557,7 @@ cross-database references are not implemented: "no.such.database"."no.such.schem
 \dC "no.such.database"."no.such.schema"."no.such.cast"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.cast"
 \dd "no.such.database"."no.such.schema"."no.such.object.description"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.object.description"
 \ddp "no.such.database"."no.such.schema"."no.such.default.access.privilege"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.default.access.privilege"
 \di "no.such.database"."no.such.schema"."no.such.index.relation"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.index.relation"
 \dm "no.such.database"."no.such.schema"."no.such.materialized.view"
@@ -4192,21 +3568,9 @@ cross-database references are not implemented: "no.such.database"."no.such.schem
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.relation"
 \df "no.such.database"."no.such.schema"."no.such.function"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.function"
-\dF "no.such.database"."no.such.schema"."no.such.text.search.configuration"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.text.search.configuration"
-\dFd "no.such.database"."no.such.schema"."no.such.text.search.dictionary"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.text.search.dictionary"
-\dFp "no.such.database"."no.such.schema"."no.such.text.search.parser"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.text.search.parser"
-\dFt "no.such.database"."no.such.schema"."no.such.text.search.template"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.text.search.template"
 \do "no.such.database"."no.such.schema"."no.such.operator"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.operator"
 \dO "no.such.database"."no.such.schema"."no.such.collation"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.collation"
-\dp "no.such.database"."no.such.schema"."no.such.access.privilege"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.access.privilege"
 \dT "no.such.database"."no.such.schema"."no.such.data.type"
 cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.data.type"
-\dX "no.such.database"."no.such.schema"."no.such.extended.statistics"
-cross-database references are not implemented: "no.such.database"."no.such.schema"."no.such.extended.statistics"

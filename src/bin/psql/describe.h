@@ -37,18 +37,6 @@ extern bool objectDescription(const char *pattern, bool showSystem);
 /* \d foo */
 extern bool describeTableDetails(const char *pattern, bool verbose, bool showSystem);
 
-/* \dF */
-extern bool listTSConfigs(const char *pattern, bool verbose);
-
-/* \dFp */
-extern bool listTSParsers(const char *pattern, bool verbose);
-
-/* \dFd */
-extern bool listTSDictionaries(const char *pattern, bool verbose);
-
-/* \dFt */
-extern bool listTSTemplates(const char *pattern, bool verbose);
-
 /* \l */
 extern bool listAllDbs(const char *pattern, bool verbose);
 

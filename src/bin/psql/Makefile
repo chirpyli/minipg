@@ -27,7 +27,6 @@ OBJS = \
 	$(WIN32RES) \
 	command.o \
 	common.o \
-	crosstabview.o \
 	describe.o \
 	help.o \
 	input.o \

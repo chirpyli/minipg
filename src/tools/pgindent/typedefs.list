@@ -2671,8 +2671,6 @@ assign_collations_context
 autovac_table
 av_relation
 avl_dbase
-avl_node
-avl_tree
 avw_dbase
 backslashResult
 backup_manifest_info
@@ -3042,7 +3040,6 @@ pgstat_page
 pgstattuple_type
 pgthreadlock_t
 pid_t
-pivot_field
 planner_hook_type
 plpgsql_CastHashEntry
 plpgsql_CastHashKey

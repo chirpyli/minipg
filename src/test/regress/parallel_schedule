@@ -99,7 +99,8 @@ test: dbsize misc_functions sysviews tsrf tidscan tidrangescan
 # collate.*.utf8 tests cannot be run in parallel with each other
 # information_schema 已裁剪，collate.linux.utf8 引用 information_schema，移除
 # rules 已随表继承(INHERITS)功能裁剪而移除
-test: psql_crosstab
+# psql_crosstab 已随 psql \crosstabview 命令裁剪而移除，恢复 psql 主测试
+test: psql
 
 # run by itself so it can run parallel workers
 # information_schema 已裁剪，select_parallel 引用 information_schema，移除

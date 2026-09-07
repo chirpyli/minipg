@@ -20,7 +20,6 @@
 #include "common.h"
 #include "common/logging.h"
 #include "common/string.h"
-#include "crosstabview.h"
 #include "describe.h"
 #include "fe_utils/cancel.h"
 #include "fe_utils/print.h"
@@ -30,7 +29,6 @@
 #include "libpq-fe.h"
 #include "libpq/pqcomm.h"
 #include "mainloop.h"
-#include "portability/instr_time.h"
 #include "pqexpbuffer.h"
 #include "psqlscanslash.h"
 #include "settings.h"
@@ -48,7 +46,6 @@ static backslashResult exec_command_connect(PsqlScanState scan_state, bool activ
 static backslashResult exec_command_cd(PsqlScanState scan_state, bool active_branch,
 									   const char *cmd);
 static backslashResult exec_command_conninfo(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_crosstabview(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_d(PsqlScanState scan_state, bool active_branch,
 									  const char *cmd);
 static bool exec_command_dfo(PsqlScanState scan_state, const char *cmd,
@@ -75,8 +72,6 @@ static backslashResult process_command_g_options(char *first_option,
 												 PsqlScanState scan_state,
 												 bool active_branch,
 												 const char *cmd);
-static backslashResult exec_command_gdesc(PsqlScanState scan_state, bool active_branch);
-static backslashResult exec_command_gexec(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_gset(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_include(PsqlScanState scan_state, bool active_branch,
 											const char *cmd);
@@ -110,8 +105,6 @@ static backslashResult exec_command_unset(PsqlScanState scan_state, bool active_
 static backslashResult exec_command_write(PsqlScanState scan_state, bool active_branch,
 										  const char *cmd,
 										  PQExpBuffer query_buf, PQExpBuffer previous_buf);
-static backslashResult exec_command_watch(PsqlScanState scan_state, bool active_branch,
-										  PQExpBuffer query_buf, PQExpBuffer previous_buf);
 static backslashResult exec_command_x(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_shell_escape(PsqlScanState scan_state, bool active_branch);
 static backslashResult exec_command_slash_command_help(PsqlScanState scan_state, bool active_branch);
@@ -133,7 +126,6 @@ static bool do_connect(enum trivalue reuse_previous_specification,
 static bool do_edit(const char *filename_arg, PQExpBuffer query_buf,
 					int lineno, bool discard_on_quit, bool *edited);
 static bool do_shell(const char *command);
-static bool do_watch(PQExpBuffer query_buf, double sleep);
 static bool lookup_object_oid(const char *desc, Oid *obj_oid);
 static bool get_create_object_cmd(Oid oid, PQExpBuffer buf);
 static int	strip_lineno_from_objdesc(char *obj);
@@ -293,8 +285,6 @@ exec_command(const char *cmd,
 		status = exec_command_cd(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "conninfo") == 0)
 		status = exec_command_conninfo(scan_state, active_branch);
-	else if (strcmp(cmd, "crosstabview") == 0)
-		status = exec_command_crosstabview(scan_state, active_branch);
 	else if (cmd[0] == 'd')
 		status = exec_command_d(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "e") == 0 || strcmp(cmd, "edit") == 0)
@@ -319,10 +309,6 @@ exec_command(const char *cmd,
 		status = exec_command_f(scan_state, active_branch);
 	else if (strcmp(cmd, "g") == 0 || strcmp(cmd, "gx") == 0)
 		status = exec_command_g(scan_state, active_branch, cmd);
-	else if (strcmp(cmd, "gdesc") == 0)
-		status = exec_command_gdesc(scan_state, active_branch);
-	else if (strcmp(cmd, "gexec") == 0)
-		status = exec_command_gexec(scan_state, active_branch);
 	else if (strcmp(cmd, "gset") == 0)
 		status = exec_command_gset(scan_state, active_branch);
 	else if (strcmp(cmd, "i") == 0 || strcmp(cmd, "include") == 0 ||
@@ -366,9 +352,6 @@ exec_command(const char *cmd,
 		status = exec_command_unset(scan_state, active_branch, cmd);
 	else if (strcmp(cmd, "w") == 0 || strcmp(cmd, "write") == 0)
 		status = exec_command_write(scan_state, active_branch, cmd,
-									query_buf, previous_buf);
-	else if (strcmp(cmd, "watch") == 0)
-		status = exec_command_watch(scan_state, active_branch,
 									query_buf, previous_buf);
 	else if (strcmp(cmd, "x") == 0)
 		status = exec_command_x(scan_state, active_branch);
@@ -590,30 +573,6 @@ exec_command_conninfo(PsqlScanState scan_state, bool active_branch)
 }
 
 /*
- * \crosstabview -- execute a query and display results in crosstab
- */
-static backslashResult
-exec_command_crosstabview(PsqlScanState scan_state, bool active_branch)
-{
-	backslashResult status = PSQL_CMD_SKIP_LINE;
-
-	if (active_branch)
-	{
-		int			i;
-
-		for (i = 0; i < lengthof(pset.ctv_args); i++)
-			pset.ctv_args[i] = psql_scan_slash_option(scan_state,
-													  OT_NORMAL, NULL, true);
-		pset.crosstab_flag = true;
-		status = PSQL_CMD_SEND;
-	}
-	else
-		ignore_slash_options(scan_state);
-
-	return status;
-}
-
-/*
  * \d* commands
  */
 static backslashResult
@@ -720,27 +679,6 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 			case 's':
 				success = listTables(&cmd[1], pattern, show_verbose, show_system);
 				break;
-			case 'F':			/* text search subsystem */
-				switch (cmd[2])
-				{
-					case '\0':
-					case '+':
-						success = listTSConfigs(pattern, show_verbose);
-						break;
-					case 'p':
-						success = listTSParsers(pattern, show_verbose);
-						break;
-					case 'd':
-						success = listTSDictionaries(pattern, show_verbose);
-						break;
-					case 't':
-						success = listTSTemplates(pattern, show_verbose);
-						break;
-					default:
-						status = PSQL_CMD_UNKNOWN;
-						break;
-				}
-			break;
 		case 'x':			/* Extensions */
 				if (show_verbose)
 					success = listExtensionContents(pattern);
@@ -1234,40 +1172,6 @@ process_command_g_options(char *first_option, PsqlScanState scan_state,
 	}
 
 	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
-}
-
-/*
- * \gdesc -- describe query result
- */
-static backslashResult
-exec_command_gdesc(PsqlScanState scan_state, bool active_branch)
-{
-	backslashResult status = PSQL_CMD_SKIP_LINE;
-
-	if (active_branch)
-	{
-		pset.gdesc_flag = true;
-		status = PSQL_CMD_SEND;
-	}
-
-	return status;
-}
-
-/*
- * \gexec -- send query and execute each field of result
- */
-static backslashResult
-exec_command_gexec(PsqlScanState scan_state, bool active_branch)
-{
-	backslashResult status = PSQL_CMD_SKIP_LINE;
-
-	if (active_branch)
-	{
-		pset.gexec_flag = true;
-		status = PSQL_CMD_SEND;
-	}
-
-	return status;
 }
 
 /*
@@ -2252,45 +2156,6 @@ exec_command_write(PsqlScanState scan_state, bool active_branch,
 		ignore_slash_filepipe(scan_state);
 
 	return status;
-}
-
-/*
- * \watch -- execute a query every N seconds
- */
-static backslashResult
-exec_command_watch(PsqlScanState scan_state, bool active_branch,
-				   PQExpBuffer query_buf, PQExpBuffer previous_buf)
-{
-	bool		success = true;
-
-	if (active_branch)
-	{
-		char	   *opt = psql_scan_slash_option(scan_state,
-												 OT_NORMAL, NULL, true);
-		double		sleep = 2;
-
-		/* Convert optional sleep-length argument */
-		if (opt)
-		{
-			sleep = strtod(opt, NULL);
-			if (sleep <= 0)
-				sleep = 1;
-			free(opt);
-		}
-
-		/* If query_buf is empty, recall and execute previous query */
-		(void) copy_previous_query(query_buf, previous_buf);
-
-		success = do_watch(query_buf, sleep);
-
-		/* Reset the query buffer as though for \r */
-		resetPQExpBuffer(query_buf);
-		psql_scan_reset(scan_state);
-	}
-	else
-		ignore_slash_options(scan_state);
-
-	return success ? PSQL_CMD_SKIP_LINE : PSQL_CMD_ERROR;
 }
 
 /*
@@ -4245,122 +4110,6 @@ do_shell(const char *command)
 		return false;
 	}
 	return true;
-}
-
-/*
- * do_watch -- handler for \watch
- *
- * We break this out of exec_command to avoid having to plaster "volatile"
- * onto a bunch of exec_command's variables to silence stupider compilers.
- */
-static bool
-do_watch(PQExpBuffer query_buf, double sleep)
-{
-	long		sleep_ms = (long) (sleep * 1000);
-	printQueryOpt myopt = pset.popt;
-	const char *strftime_fmt;
-	const char *user_title;
-	char	   *title;
-	int			title_len;
-	int			res = 0;
-
-	if (!query_buf || query_buf->len <= 0)
-	{
-		pg_log_error("\\watch cannot be used with an empty query");
-		return false;
-	}
-
-	/*
-	 * Choose format for timestamps.  We might eventually make this a \pset
-	 * option.  In the meantime, using a variable for the format suppresses
-	 * overly-anal-retentive gcc warnings about %c being Y2K sensitive.
-	 */
-	strftime_fmt = "%c";
-
-	/*
-	 * Set up rendering options, in particular, disable the pager, because
-	 * nobody wants to be prompted while watching the output of 'watch'.
-	 */
-	myopt.topt.pager = 0;
-
-	/*
-	 * If there's a title in the user configuration, make sure we have room
-	 * for it in the title buffer.  Allow 128 bytes for the timestamp plus 128
-	 * bytes for the rest.
-	 */
-	user_title = myopt.title;
-	title_len = (user_title ? strlen(user_title) : 0) + 256;
-	title = pg_malloc(title_len);
-
-	for (;;)
-	{
-		time_t		timer;
-		char		timebuf[128];
-		long		i;
-
-		/*
-		 * Prepare title for output.  Note that we intentionally include a
-		 * newline at the end of the title; this is somewhat historical but it
-		 * makes for reasonably nicely formatted output in simple cases.
-		 */
-		timer = time(NULL);
-		strftime(timebuf, sizeof(timebuf), strftime_fmt, localtime(&timer));
-
-		if (user_title)
-			snprintf(title, title_len, _("%s\t%s (every %gs)\n"),
-					 user_title, timebuf, sleep);
-		else
-			snprintf(title, title_len, _("%s (every %gs)\n"),
-					 timebuf, sleep);
-		myopt.title = title;
-
-		/* Run the query and print out the results */
-		res = PSQLexecWatch(query_buf->data, &myopt);
-
-		/*
-		 * PSQLexecWatch handles the case where we can no longer repeat the
-		 * query, and returns 0 or -1.
-		 */
-		if (res <= 0)
-			break;
-
-		/*
-		 * Set up cancellation of 'watch' via SIGINT.  We redo this each time
-		 * through the loop since it's conceivable something inside
-		 * PSQLexecWatch could change sigint_interrupt_jmp.
-		 */
-		if (sigsetjmp(sigint_interrupt_jmp, 1) != 0)
-			break;
-
-		/*
-		 * Enable 'watch' cancellations and wait a while before running the
-		 * query again.  Break the sleep into short intervals (at most 1s)
-		 * since pg_usleep isn't interruptible on some platforms.
-		 */
-		sigint_interrupt_enabled = true;
-		i = sleep_ms;
-		while (i > 0)
-		{
-			long		s = Min(i, 1000L);
-
-			pg_usleep(s * 1000L);
-			if (cancel_pressed)
-				break;
-			i -= s;
-		}
-		sigint_interrupt_enabled = false;
-	}
-
-	/*
-	 * If the terminal driver echoed "^C", libedit/libreadline might be
-	 * confused about the cursor position.  Therefore, inject a newline
-	 * before the next prompt is displayed.
-	 */
-	fprintf(stdout, "\n");
-	fflush(stdout);
-
-	pg_free(title);
-	return (res >= 0);
 }
 
 /*

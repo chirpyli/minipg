@@ -26,7 +26,6 @@ concur_reindex_tab|t
 date_tbl|f
 dept|f
 equipment_r|f
-extra_wide_table|f
 fast_emp4000|f
 float4_tbl|f
 float8_tbl|f

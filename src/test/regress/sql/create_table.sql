@@ -191,16 +191,6 @@ REINDEX INDEX unlogged2_pkey;
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
 DROP TABLE unlogged2;
 
--- create an extra wide table to test for issues related to that
--- (temporarily hide query, to avoid the long CREATE TABLE stmt)
-\set ECHO none
-SELECT 'CREATE TABLE extra_wide_table(firstc text, '|| array_to_string(array_agg('c'||i||' bool'),',')||', lastc text);'
-FROM generate_series(1, 1100) g(i)
-\gexec
-\set ECHO all
-INSERT INTO extra_wide_table(firstc, lastc) VALUES('first col', 'last col');
-SELECT firstc, lastc FROM extra_wide_table;
-
 -- temporary tables are ignored by pg_filenode_relation().
 CREATE TABLE relation_filenode_check(c1 int);
 SELECT relpersistence,

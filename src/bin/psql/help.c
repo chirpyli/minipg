@@ -147,16 +147,13 @@ slashUsage(unsigned short int pager)
 	 * Use "psql --help=commands | wc" to count correctly.  It's okay to count
 	 * the USE_READLINE line even in builds without that.
 	 */
-	output = PageOutput(135, pager ? &(pset.popt.topt) : NULL);
+	output = PageOutput(127, pager ? &(pset.popt.topt) : NULL);
 
 	fprintf(output, _("General\n"));
 	fprintf(output, _("  \\copyright             show PostgreSQL usage and distribution terms\n"));
-	fprintf(output, _("  \\crosstabview [COLUMNS] execute query and display results in crosstab\n"));
 	fprintf(output, _("  \\errverbose            show most recent error message at maximum verbosity\n"));
 	fprintf(output, _("  \\g [(OPTIONS)] [FILE]  execute query (and send results to file or |pipe);\n"
 					  "                         \\g with no arguments is equivalent to a semicolon\n"));
-	fprintf(output, _("  \\gdesc                 describe result of query, without executing it\n"));
-	fprintf(output, _("  \\gexec                 execute query, then execute each value in its result\n"));
 	fprintf(output, _("  \\gset [PREFIX]         execute query and store results in psql variables\n"));
 	fprintf(output, _("  \\gx [(OPTIONS)] [FILE] as \\g, but forces expanded output mode\n"));
 	fprintf(output, _("  \\q                     quit psql\n"));
@@ -164,7 +161,6 @@ slashUsage(unsigned short int pager)
 					  "                         enter restricted mode with provided key\n"));
 	fprintf(output, _("  \\unrestrict RESTRICT_KEY\n"
 					  "                         exit restricted mode if key matches\n"));
-	fprintf(output, _("  \\watch [SEC]           execute query every SEC seconds\n"));
 	fprintf(output, "\n");
 
 	fprintf(output, _("Help\n"));
@@ -213,10 +209,6 @@ slashUsage(unsigned short int pager)
 	fprintf(output, _("  \\dd[S]  [PATTERN]      show object descriptions not displayed elsewhere\n"));
 	fprintf(output, _("  \\df[anptw][S+] [FUNCPTRN [TYPEPTRN ...]]\n"
 					  "                         list [only agg/normal/procedure/trigger/window] functions\n"));
-	fprintf(output, _("  \\dF[+]  [PATTERN]      list text search configurations\n"));
-	fprintf(output, _("  \\dFd[+] [PATTERN]      list text search dictionaries\n"));
-	fprintf(output, _("  \\dFp[+] [PATTERN]      list text search parsers\n"));
-	fprintf(output, _("  \\dFt[+] [PATTERN]      list text search templates\n"));
 	fprintf(output, _("  \\dg[S+] [PATTERN]      list roles\n"));
 	fprintf(output, _("  \\di[S+] [PATTERN]      list indexes\n"));
 	fprintf(output, _("  \\dm[S+] [PATTERN]      list materialized views\n"));
