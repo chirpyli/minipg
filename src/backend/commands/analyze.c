@@ -1338,10 +1338,9 @@ update_attstats(Oid relid, bool inh, int natts, VacAttrStats **vacattrstats)
 		}
 
 		/* Is there already a pg_statistic tuple for this attribute? */
-		oldtup = SearchSysCache3(STATRELATTINH,
+		oldtup = SearchSysCache2(STATRELATTINH,
 								 ObjectIdGetDatum(relid),
-								 Int16GetDatum(stats->attr->attnum),
-								 BoolGetDatum(inh));
+								 Int16GetDatum(stats->attr->attnum));
 
 		if (HeapTupleIsValid(oldtup))
 		{

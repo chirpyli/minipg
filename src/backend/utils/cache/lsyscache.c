@@ -2934,10 +2934,9 @@ get_attavgwidth(Oid relid, AttrNumber attnum)
 		if (stawidth > 0)
 			return stawidth;
 	}
-	tp = SearchSysCache3(STATRELATTINH,
+	tp = SearchSysCache2(STATRELATTINH,
 						 ObjectIdGetDatum(relid),
-						 Int16GetDatum(attnum),
-						 BoolGetDatum(false));
+						 Int16GetDatum(attnum));
 	if (HeapTupleIsValid(tp))
 	{
 		stawidth = ((Form_pg_statistic) GETSTRUCT(tp))->stawidth;

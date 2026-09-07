@@ -4696,10 +4696,9 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 		 * Plain table or parent of an inheritance appendrel, so look up the
 		 * column in pg_statistic
 		 */
-		vardata->statsTuple = SearchSysCache3(STATRELATTINH,
+		vardata->statsTuple = SearchSysCache2(STATRELATTINH,
 											  ObjectIdGetDatum(rte->relid),
-											  Int16GetDatum(var->varattno),
-											  BoolGetDatum(false));
+											  Int16GetDatum(var->varattno));
 		vardata->freefunc = ReleaseSysCache;
 
 		if (HeapTupleIsValid(vardata->statsTuple))
@@ -6276,10 +6275,9 @@ btcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 		}
 		else
 		{
-			vardata.statsTuple = SearchSysCache3(STATRELATTINH,
+			vardata.statsTuple = SearchSysCache2(STATRELATTINH,
 												 ObjectIdGetDatum(relid),
-												 Int16GetDatum(colnum),
-												 BoolGetDatum(false));
+												 Int16GetDatum(colnum));
 			vardata.freefunc = ReleaseSysCache;
 		}
 	}
@@ -6302,10 +6300,9 @@ btcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
 		}
 		else
 		{
-			vardata.statsTuple = SearchSysCache3(STATRELATTINH,
+			vardata.statsTuple = SearchSysCache2(STATRELATTINH,
 												 ObjectIdGetDatum(relid),
-												 Int16GetDatum(colnum),
-												 BoolGetDatum(false));
+												 Int16GetDatum(colnum));
 			vardata.freefunc = ReleaseSysCache;
 		}
 	}
