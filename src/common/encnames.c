@@ -25,9 +25,8 @@
  * isalnum() chars only. It means ISO-8859-1, iso_8859-1 and Iso8859_1
  * are always converted to 'iso88591'. All must be lower case.
  *
- * minipg supports only three encodings: SQL_ASCII, UTF8 and LATIN1
- * (ISO-8859-1).  All other encodings were removed to slim down the
- * character set machinery.
+ * minipg supports only two encodings: SQL_ASCII and UTF8.  All other
+ * encodings were removed to slim down the character set machinery.
  */
 typedef struct pg_encname
 {
@@ -37,12 +36,6 @@ typedef struct pg_encname
 
 static const pg_encname pg_encname_tbl[] =
 {
-	{
-		"iso88591", PG_LATIN1
-	},							/* ISO-8859-1; RFC1345,KXS2 */
-	{
-		"latin1", PG_LATIN1
-	},							/* alias for ISO-8859-1 */
 	{
 		"sqlascii", PG_SQL_ASCII
 	},
@@ -62,8 +55,7 @@ static const pg_encname pg_encname_tbl[] =
 const pg_enc2name pg_enc2name_tbl[] =
 {
 	{"SQL_ASCII", PG_SQL_ASCII},
-	{"UTF8", PG_UTF8},
-	{"LATIN1", PG_LATIN1}
+	{"UTF8", PG_UTF8}
 };
 
 

@@ -33,8 +33,8 @@
  * verifystr() for the encoding.  For server-encodings, also define mb2wchar()
  * and wchar2mb() conversion functions.
  *
- * minipg supports only three encodings: SQL_ASCII, UTF8 and LATIN1
- * (ISO-8859-1).  All other encodings were removed to slim down the character
+ * minipg supports only two encodings: SQL_ASCII and UTF8.  All other
+ * encodings were removed to slim down the character
  * set machinery.
  */
 #define MB2CHAR_NEED_AT_LEAST(len, need) if ((len) < (need)) break
@@ -328,24 +328,6 @@ pg_utf_dsplen(const unsigned char *s)
 }
 
 /*
- * ISO8859-1
- */
-static int
-pg_latin12wchar_with_len(const unsigned char *from, pg_wchar *to, int len)
-{
-	int			cnt = 0;
-
-	while (len > 0 && *from)
-	{
-		*to++ = *from++;
-		len--;
-		cnt++;
-	}
-	*to = 0;
-	return cnt;
-}
-
-/*
  * Trivial conversion from pg_wchar to single byte encoding. Just ignores
  * high bits.
  * caller should allocate enough space for "to"
@@ -365,18 +347,6 @@ pg_wchar2single_with_len(const pg_wchar *from, unsigned char *to, int len)
 	}
 	*to = 0;
 	return cnt;
-}
-
-static int
-pg_latin1_mblen(const unsigned char *s)
-{
-	return 1;
-}
-
-static int
-pg_latin1_dsplen(const unsigned char *s)
-{
-	return pg_ascii_dsplen(s);
 }
 
 /*
@@ -409,23 +379,6 @@ pg_ascii_verifychar(const unsigned char *s, int len)
 
 static int
 pg_ascii_verifystr(const unsigned char *s, int len)
-{
-	const unsigned char *nullpos = memchr(s, 0, len);
-
-	if (nullpos == NULL)
-		return len;
-	else
-		return nullpos - s;
-}
-
-static int
-pg_latin1_verifychar(const unsigned char *s, int len)
-{
-	return 1;
-}
-
-static int
-pg_latin1_verifystr(const unsigned char *s, int len)
 {
 	const unsigned char *nullpos = memchr(s, 0, len);
 
@@ -587,7 +540,6 @@ pg_encoding_set_invalid(int encoding, char *dst)
 const pg_wchar_tbl pg_wchar_table[] = {
 	{pg_ascii2wchar_with_len, pg_wchar2single_with_len, pg_ascii_mblen, pg_ascii_dsplen, pg_ascii_verifychar, pg_ascii_verifystr, 1},	/* PG_SQL_ASCII */
 	{pg_utf2wchar_with_len, pg_wchar2utf_with_len, pg_utf_mblen, pg_utf_dsplen, pg_utf8_verifychar, pg_utf8_verifystr, 4},	/* PG_UTF8 */
-	{pg_latin12wchar_with_len, pg_wchar2single_with_len, pg_latin1_mblen, pg_latin1_dsplen, pg_latin1_verifychar, pg_latin1_verifystr, 1},	/* PG_LATIN1 */
 };
 
 /*

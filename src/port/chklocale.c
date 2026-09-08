@@ -47,11 +47,6 @@ static const struct encoding_match encoding_match_list[] = {
 	{PG_UTF8, "utf8"},
 	{PG_UTF8, "CP65001"},
 
-	{PG_LATIN1, "ISO-8859-1"},
-	{PG_LATIN1, "ISO8859-1"},
-	{PG_LATIN1, "iso88591"},
-	{PG_LATIN1, "CP28591"},
-
 	{PG_SQL_ASCII, "US-ASCII"},
 
 	{PG_SQL_ASCII, NULL}		/* end marker */

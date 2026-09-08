@@ -38,20 +38,18 @@ typedef unsigned int pg_wchar;
  *
  * PG_SQL_ASCII is default encoding and must be = 0.
  *
- * minipg supports only three encodings: SQL_ASCII, UTF8 and LATIN1
- * (ISO-8859-1).  All other encodings were removed to slim down the
- * character set machinery.
+ * minipg supports only two encodings: SQL_ASCII and UTF8.  All other
+ * encodings were removed to slim down the character set machinery.
  */
 typedef enum pg_enc
 {
 	PG_SQL_ASCII = 0,			/* SQL/ASCII */
 	PG_UTF8,					/* Unicode UTF8 */
-	PG_LATIN1,					/* ISO-8859-1 Latin 1 */
 	_PG_LAST_ENCODING_			/* mark only */
 
 } pg_enc;
 
-#define PG_ENCODING_BE_LAST PG_LATIN1
+#define PG_ENCODING_BE_LAST PG_UTF8
 
 /*
  * Please use these tests before access to pg_enc2name_tbl[]
