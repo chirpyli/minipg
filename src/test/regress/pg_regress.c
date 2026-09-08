@@ -1688,8 +1688,6 @@ create_database(const char *dbname)
 		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0%s", dbname,
 					 (nolocale) ? " LC_COLLATE='C' LC_CTYPE='C'" : "");
 	psql_command(dbname,
-				 "SET lc_messages TO 'C';"
-				 "SET lc_numeric TO 'C';"
 				 "SET bytea_output TO 'hex';"
 				 "SET timezone_abbreviations TO 'Default';");
 

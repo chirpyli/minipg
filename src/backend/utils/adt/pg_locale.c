@@ -61,10 +61,6 @@
 #endif
 
 
-/* GUC settings */
-char	   *locale_messages;
-char	   *locale_numeric;
-
 /* Cache for collation-related knowledge */
 
 typedef struct
@@ -202,54 +198,6 @@ check_locale(int category, const char *locale, char **canonname)
  * value, whatever it was (so long as the environment setting is legal).
  * This will have been locked down by an earlier call to pg_perm_setlocale.
  */
-bool
-check_locale_numeric(char **newval, void **extra, GucSource source)
-{
-	return check_locale(LC_NUMERIC, *newval, NULL);
-}
-
-/*
- * We allow LC_MESSAGES to actually be set globally.
- *
- * Note: we normally disallow value = "" because it wouldn't have consistent
- * semantics (it'd effectively just use the previous value).  However, this
- * is the value passed for PGC_S_DEFAULT, so don't complain in that case,
- * not even if the attempted setting fails due to invalid environment value.
- * The idea there is just to accept the environment setting *if possible*
- * during startup, until we can read the proper value from postgresql.conf.
- */
-bool
-check_locale_messages(char **newval, void **extra, GucSource source)
-{
-	if (**newval == '\0')
-	{
-		if (source == PGC_S_DEFAULT)
-			return true;
-		else
-			return false;
-	}
-
-	/*
-	 * LC_MESSAGES category does not exist everywhere, but accept it anyway
-	 */
-#ifdef LC_MESSAGES
-	return check_locale(LC_MESSAGES, *newval, NULL);
-#else
-	return true;
-#endif
-}
-
-void
-assign_locale_messages(const char *newval, void *extra)
-{
-	/*
-	 * LC_MESSAGES category does not exist everywhere, but accept it anyway.
-	 * We ignore failure, as per comment above.
-	 */
-#ifdef LC_MESSAGES
-	(void) pg_perm_setlocale(LC_MESSAGES, newval);
-#endif
-}
 
 /*
  * Cache mechanism for collation information.

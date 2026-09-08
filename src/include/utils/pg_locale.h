@@ -18,15 +18,6 @@
 #include "utils/guc.h"
 
 
-/* GUC settings */
-extern char *locale_messages;
-extern char *locale_numeric;
-
-
-extern bool check_locale_messages(char **newval, void **extra, GucSource source);
-extern void assign_locale_messages(const char *newval, void *extra);
-extern bool check_locale_numeric(char **newval, void **extra, GucSource source);
-
 extern bool check_locale(int category, const char *locale, char **canonname);
 extern char *pg_perm_setlocale(int category, const char *locale);
 

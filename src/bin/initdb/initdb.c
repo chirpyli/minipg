@@ -86,9 +86,7 @@ static char *pg_data = NULL;
 static char *locale = NULL;
 static char *lc_collate = NULL;
 static char *lc_ctype = NULL;
-static char *lc_numeric = NULL;
 static char *lc_time = NULL;
-static char *lc_messages = NULL;
 static char *username = NULL;
 static bool pwprompt = false;
 static char *superuser_password = NULL;
@@ -836,14 +834,6 @@ setup_config(void)
 			 pretty_wal_size(DEFAULT_MAX_WAL_SEGS));
 	conflines = replace_token(conflines, "#max_wal_size = 1GB", repltok);
 
-	snprintf(repltok, sizeof(repltok), "lc_messages = '%s'",
-			 escape_quotes(lc_messages));
-	conflines = replace_token(conflines, "#lc_messages = 'C'", repltok);
-
-	snprintf(repltok, sizeof(repltok), "lc_numeric = '%s'",
-			 escape_quotes(lc_numeric));
-	conflines = replace_token(conflines, "#lc_numeric = 'C'", repltok);
-
 	switch (locale_date_order(lc_time))
 	{
 		case DATEORDER_YMD:
@@ -1442,12 +1432,8 @@ setlocales(void)
 			lc_ctype = locale;
 		if (!lc_collate)
 			lc_collate = locale;
-		if (!lc_numeric)
-			lc_numeric = locale;
 		if (!lc_time)
 			lc_time = locale;
-		if (!lc_messages)
-			lc_messages = locale;
 	}
 
 	/*
@@ -1459,18 +1445,8 @@ setlocales(void)
 	lc_ctype = canonname;
 	check_locale_name(LC_COLLATE, lc_collate, &canonname);
 	lc_collate = canonname;
-	check_locale_name(LC_NUMERIC, lc_numeric, &canonname);
-	lc_numeric = canonname;
 	check_locale_name(LC_TIME, lc_time, &canonname);
 	lc_time = canonname;
-#if defined(LC_MESSAGES)
-	check_locale_name(LC_MESSAGES, lc_messages, &canonname);
-	lc_messages = canonname;
-#else
-	/* when LC_MESSAGES is not available, use the LC_CTYPE setting */
-	check_locale_name(LC_CTYPE, lc_messages, &canonname);
-	lc_messages = canonname;
-#endif
 }
 
 /*
@@ -1486,8 +1462,8 @@ usage(const char *progname)
 	printf(_(" [-D, --pgdata=]DATADIR     location for this database cluster\n"));
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
-	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
-			 "      --lc-numeric=, --lc-time=LOCALE\n"
+	printf(_("      --lc-collate=, --lc-ctype=LOCALE\n"
+			 "      --lc-time=LOCALE\n"
 			 "                            set default locale in the respective category for\n"
 			 "                            new databases (default taken from environment)\n"));
 	printf(_("      --no-locale           equivalent to --locale=C\n"));
@@ -1605,22 +1581,16 @@ setup_locale_encoding(void)
 	setlocales();
 
 	if (strcmp(lc_ctype, lc_collate) == 0 &&
-		strcmp(lc_ctype, lc_time) == 0 &&
-		strcmp(lc_ctype, lc_numeric) == 0 &&
-		strcmp(lc_ctype, lc_messages) == 0)
+		strcmp(lc_ctype, lc_time) == 0)
 		printf(_("The database cluster will be initialized with locale \"%s\".\n"), lc_ctype);
 	else
 	{
 		printf(_("The database cluster will be initialized with locales\n"
 				 "  COLLATE:  %s\n"
 				 "  CTYPE:    %s\n"
-				 "  MESSAGES: %s\n"
-				 "  NUMERIC:  %s\n"
 				 "  TIME:     %s\n"),
 			   lc_collate,
 			   lc_ctype,
-			   lc_messages,
-			   lc_numeric,
 			   lc_time);
 	}
 
@@ -2023,9 +1993,7 @@ main(int argc, char *argv[])
 		{"locale", required_argument, NULL, 1},
 		{"lc-collate", required_argument, NULL, 2},
 		{"lc-ctype", required_argument, NULL, 3},
-		{"lc-numeric", required_argument, NULL, 5},
 		{"lc-time", required_argument, NULL, 6},
-		{"lc-messages", required_argument, NULL, 7},
 		{"no-locale", no_argument, NULL, 8},
 		{"pwprompt", no_argument, NULL, 'W'},
 		{"username", required_argument, NULL, 'U'},
@@ -2123,14 +2091,8 @@ main(int argc, char *argv[])
 			case 3:
 				lc_ctype = pg_strdup(optarg);
 				break;
-			case 5:
-				lc_numeric = pg_strdup(optarg);
-				break;
 			case 6:
 				lc_time = pg_strdup(optarg);
-				break;
-			case 7:
-				lc_messages = pg_strdup(optarg);
 				break;
 			case 8:
 				locale = "C";

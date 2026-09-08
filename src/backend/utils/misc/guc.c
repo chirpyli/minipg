@@ -3194,26 +3194,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"lc_messages", PGC_SUSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets the language in which messages are displayed."),
-			NULL
-		},
-		&locale_messages,
-		"",
-		check_locale_messages, assign_locale_messages, NULL
-	},
-
-	{
-		{"lc_numeric", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets the locale for formatting numbers."),
-			NULL
-		},
-		&locale_numeric,
-		"C",
-		check_locale_numeric, NULL, NULL
-	},
-
-	{
 		{"session_preload_libraries", PGC_SUSET, CLIENT_CONN_PRELOAD,
 			gettext_noop("Lists shared libraries to preload into each backend."),
 			NULL,

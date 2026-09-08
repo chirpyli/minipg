@@ -15,9 +15,8 @@ $node->init();
 $node->append_conf(
 	'postgresql.conf', qq(
 logging_collector = on
-# these ensure stability of test results:
+# this ensures stability of test results:
 log_rotation_age = 0
-lc_messages = 'C'
 ));
 
 $node->start();

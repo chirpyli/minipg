@@ -566,9 +566,6 @@
 					# encoding
 
 # These settings are initialized by initdb, but they can be changed.
-#lc_messages = 'C'			# locale for system error message
-				# strings
-#lc_numeric = 'C'			# locale for number formatting
 
 # default configuration for text search
 #default_text_search_config = 'pg_catalog.simple'
