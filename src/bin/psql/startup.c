@@ -16,7 +16,6 @@
 #include "describe.h"
 #include "fe_utils/print.h"
 #include "getopt_long.h"
-#include "help.h"
 #include "input.h"
 #include "mainloop.h"
 #include "settings.h"
@@ -120,11 +119,6 @@ main(int argc, char *argv[])
 
 	if (argc > 1)
 	{
-		if ((strcmp(argv[1], "-?") == 0) || (argc == 2 && (strcmp(argv[1], "--help") == 0)))
-		{
-			usage(NOPAGER);
-			exit(EXIT_SUCCESS);
-		}
 		if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0)
 		{
 			showVersion();
@@ -467,7 +461,6 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 		{"version", no_argument, NULL, 'V'},
 		{"expanded", no_argument, NULL, 'x'},
 		{"no-psqlrc", no_argument, NULL, 'X'},
-		{"help", optional_argument, NULL, 1},
 		{"csv", no_argument, NULL, 2},
 		{NULL, 0, NULL, 0}
 	};
@@ -623,32 +616,8 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 				options->single_txn = true;
 				break;
 			case '?':
-				if (optind <= argc &&
-					strcmp(argv[optind - 1], "-?") == 0)
-				{
-					/* actual help option given */
-					usage(NOPAGER);
-					exit(EXIT_SUCCESS);
-				}
-				else
-				{
-					/* getopt error (unknown option or missing argument) */
-					goto unknown_option;
-				}
-				break;
-			case 1:
-				{
-					if (!optarg || strcmp(optarg, "options") == 0)
-						usage(NOPAGER);
-					else if (optarg && strcmp(optarg, "commands") == 0)
-						slashUsage(NOPAGER);
-					else if (optarg && strcmp(optarg, "variables") == 0)
-						helpVariables(NOPAGER);
-					else
-						goto unknown_option;
-
-					exit(EXIT_SUCCESS);
-				}
+				/* getopt error (unknown option or missing argument) */
+				goto unknown_option;
 				break;
 			case 2:
 				pset.popt.topt.format = PRINT_CSV;

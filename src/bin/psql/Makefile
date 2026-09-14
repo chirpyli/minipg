@@ -28,7 +28,6 @@ OBJS = \
 	command.o \
 	common.o \
 	describe.o \
-	help.o \
 	input.o \
 	mainloop.o \
 	prompt.o \

@@ -9,31 +9,6 @@
 #define DESCRIBE_H
 
 
-/* \da */
-extern bool describeAggregates(const char *pattern, bool verbose, bool showSystem);
-
-/* \dA */
-extern bool describeAccessMethods(const char *pattern, bool verbose);
-
-/* \df, \dfa, \dfn, \dft, \dfw, etc. */
-extern bool describeFunctions(const char *functypes, const char *func_pattern,
-							  char **arg_patterns, int num_arg_patterns,
-							  bool verbose, bool showSystem);
-
-/* \dT */
-extern bool describeTypes(const char *pattern, bool verbose, bool showSystem);
-
-/* \do */
-extern bool describeOperators(const char *oper_pattern,
-							  char **arg_patterns, int num_arg_patterns,
-							  bool verbose, bool showSystem);
-
-/* \z (or \dp) */
-extern bool permissionsList(const char *pattern);
-
-/* \dd */
-extern bool objectDescription(const char *pattern, bool showSystem);
-
 /* \d foo */
 extern bool describeTableDetails(const char *pattern, bool verbose, bool showSystem);
 
@@ -42,29 +17,5 @@ extern bool listAllDbs(const char *pattern, bool verbose);
 
 /* \dt, \di, \ds, \dS, etc. */
 extern bool listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSystem);
-
-/* \dc */
-
-/* \dC */
-extern bool listCasts(const char *pattern, bool verbose);
-
-/* \dO */
-extern bool listCollations(const char *pattern, bool verbose, bool showSystem);
-
-/* \dn */
-extern bool listSchemas(const char *pattern, bool verbose, bool showSystem);
-
-/* \dL */
-
-/* \dx */
-extern bool listExtensions(const char *pattern);
-
-/* \dx+ */
-extern bool listExtensionContents(const char *pattern);
-
-/* \dAc */
-extern bool listOperatorClasses(const char *access_method_pattern,
-								const char *opclass_pattern,
-								bool verbose);
 
 #endif							/* DESCRIBE_H */
