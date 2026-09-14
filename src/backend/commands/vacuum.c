@@ -23,13 +23,13 @@
 #include <math.h>
 
 #include "access/clog.h"
-#include "access/commit_ts.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/htup_details.h"
 #include "access/multixact.h"
 #include "access/tableam.h"
 #include "access/transam.h"
+#include "access/xlog.h"
 #include "access/xact.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_database.h"
@@ -1641,19 +1641,9 @@ vac_truncate_clog(TransactionId frozenXID,
 	}
 
 	/*
-	 * Advance the oldest value for commit timestamps before truncating, so
-	 * that if a user requests a timestamp for a transaction we're truncating
-	 * away right after this point, they get NULL instead of an ugly "file not
-	 * found" error from slru.c.  This doesn't matter for xact/multixact
-	 * because they are not subject to arbitrary lookups from users.
-	 */
-	AdvanceOldestCommitTsXid(frozenXID);
-
-	/*
-	 * Truncate CLOG, multixact and CommitTs to the oldest computed value.
+	 * Truncate CLOG and multixact to the oldest computed value.
 	 */
 	TruncateCLOG(frozenXID, oldestxid_datoid);
-	TruncateCommitTs(frozenXID);
 	TruncateMultiXact(minMulti, minmulti_datoid);
 
 	/*

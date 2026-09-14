@@ -141,7 +141,6 @@ static WalUsage prevWalUsage;
  * all SLRUs without an explicit entry (e.g. SLRUs in extensions).
  */
 static const char *const slru_names[] = {
-	"CommitTs",
 	"MultiXactMember",
 	"MultiXactOffset",
 	"Notify",

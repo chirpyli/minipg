@@ -76,7 +76,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "access/commit_ts.h"
 #include "access/htup_details.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
@@ -2259,16 +2258,6 @@ RecordTransactionCommitPrepared(TransactionId xid,
 								 initfileinval,
 								 MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
 								 xid, gid);
-
-	/*
-	 * Record commit timestamp.
-	 *
-	 * We don't need to WAL-log anything here, as the commit record written
-	 * above already contains the data.
-	 */
-	TransactionTreeSetCommitTsData(xid, nchildren, children,
-								   committs,
-								   InvalidRepOriginId);
 
 	/*
 	 * We don't currently try to sleep before flush here ... nor is there any

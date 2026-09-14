@@ -95,7 +95,7 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 	 * Construct a tuple descriptor for the result row.  This must match this
 	 * function's pg_proc entry!
 	 */
-	tupdesc = CreateTemplateTupleDesc(18);
+	tupdesc = CreateTemplateTupleDesc(16);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "checkpoint_lsn",
 					   PG_LSNOID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 2, "redo_lsn",
@@ -126,11 +126,7 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 					   XIDOID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 15, "oldest_multi_dbid",
 					   OIDOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 16, "oldest_commit_ts_xid",
-					   XIDOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 17, "newest_commit_ts_xid",
-					   XIDOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 18, "checkpoint_time",
+	TupleDescInitEntry(tupdesc, (AttrNumber) 16, "checkpoint_time",
 					   TIMESTAMPTZOID, -1, 0);
 	tupdesc = BlessTupleDesc(tupdesc);
 
@@ -198,14 +194,8 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 	values[14] = ObjectIdGetDatum(ControlFile->checkPointCopy.oldestMultiDB);
 	nulls[14] = false;
 
-	values[15] = TransactionIdGetDatum(ControlFile->checkPointCopy.oldestCommitTsXid);
+	values[15] = TimestampTzGetDatum(time_t_to_timestamptz(ControlFile->checkPointCopy.time));
 	nulls[15] = false;
-
-	values[16] = TransactionIdGetDatum(ControlFile->checkPointCopy.newestCommitTsXid);
-	nulls[16] = false;
-
-	values[17] = TimestampTzGetDatum(time_t_to_timestamptz(ControlFile->checkPointCopy.time));
-	nulls[17] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);
 

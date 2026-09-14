@@ -129,8 +129,6 @@ extern const char *const IndividualLWLockNames[];	/* in lwlocknames.c */
 static const char *const BuiltinTrancheNames[] = {
 	/* LWTRANCHE_XACT_BUFFER: */
 	"XactBuffer",
-	/* LWTRANCHE_COMMITTS_BUFFER: */
-	"CommitTsBuffer",
 	/* LWTRANCHE_SUBTRANS_BUFFER: */
 	"SubtransBuffer",
 	/* LWTRANCHE_MULTIXACTOFFSET_BUFFER: */

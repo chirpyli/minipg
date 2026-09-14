@@ -1432,7 +1432,7 @@ SlruPagePrecedesTestOffset(SlruCtl ctl, int per_page, uint32 offset)
 	Assert(ctl->PagePrecedes(rhs / per_page, (lhs - 3 * per_page) / per_page));
 	Assert(ctl->PagePrecedes(rhs / per_page, (lhs - 2 * per_page) / per_page));
 	Assert(ctl->PagePrecedes(rhs / per_page, (lhs - 1 * per_page) / per_page)
-		   || (1U << 31) % per_page != 0);	/* See CommitTsPagePrecedes() */
+		   || (1U << 31) % per_page != 0);	/* See CLOGPagePrecedes() */
 	Assert(ctl->PagePrecedes((lhs + 1 * per_page) / per_page, rhs / per_page)
 		   || (1U << 31) % per_page != 0);
 	Assert(ctl->PagePrecedes((lhs + 2 * per_page) / per_page, rhs / per_page));

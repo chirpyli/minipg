@@ -228,9 +228,6 @@
 
 # Set these on the primary and on any standby that will send replication data.
 
-#track_commit_timestamp = off	# collect timestamp of transaction commit
-				# (change requires restart)
-
 # - Primary Server -
 
 # These settings are ignored on a standby server.

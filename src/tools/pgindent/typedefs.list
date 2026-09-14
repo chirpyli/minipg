@@ -357,8 +357,6 @@ CommandId
 CommandTag
 CommandTagBehavior
 CommentItem
-CommitTimestampEntry
-CommitTimestampShared
 CommonEntry
 CommonTableExpr
 CompareScalarsContext
@@ -3282,7 +3280,6 @@ xl_btree_unlink_page
 xl_btree_update
 xl_btree_vacuum
 xl_clog_truncate
-xl_commit_ts_truncate
 xl_dbase_create_rec
 xl_dbase_drop_rec
 xl_end_of_recovery

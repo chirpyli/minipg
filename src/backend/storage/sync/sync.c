@@ -18,7 +18,6 @@
 #include <fcntl.h>
 #include <sys/file.h>
 
-#include "access/commit_ts.h"
 #include "access/clog.h"
 #include "access/multixact.h"
 #include "access/xlog.h"
@@ -108,10 +107,6 @@ static const SyncOps syncsw[] = {
 	/* pg_xact */
 	[SYNC_HANDLER_CLOG] = {
 		.sync_syncfiletag = clogsyncfiletag
-	},
-	/* pg_commit_ts */
-	[SYNC_HANDLER_COMMIT_TS] = {
-		.sync_syncfiletag = committssyncfiletag
 	},
 	/* pg_multixact/offsets */
 	[SYNC_HANDLER_MULTIXACT_OFFSET] = {

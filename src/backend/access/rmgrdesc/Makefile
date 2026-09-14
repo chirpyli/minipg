@@ -10,7 +10,6 @@ include $(top_builddir)/src/Makefile.global
 
 OBJS = \
 	clogdesc.o \
-	committsdesc.o \
 	dbasedesc.o \
 	genericdesc.o \
 	hashdesc.o \

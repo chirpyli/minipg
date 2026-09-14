@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #include "access/clog.h"
-#include "access/commit_ts.h"
+
 #include "access/heaptoast.h"
 #include "access/multixact.h"
 #include "access/rewriteheap.h"
@@ -33,6 +33,7 @@
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog_internal.h"
+#include "access/xlog.h"
 #include "access/xlogarchive.h"
 #include "access/xloginsert.h"
 #include "access/xlogreader.h"
@@ -4521,7 +4522,6 @@ InitControlFile(uint64 sysidentifier)
 	ControlFile->max_locks_per_xact = max_locks_per_xact;
 	ControlFile->wal_level = wal_level;
 	ControlFile->wal_log_hints = wal_log_hints;
-	ControlFile->track_commit_timestamp = track_commit_timestamp;
 }
 
 static void
@@ -5152,8 +5152,6 @@ BootStrapXLOG(void)
 	checkPoint.oldestXidDB = TemplateDbOid;
 	checkPoint.oldestMulti = FirstMultiXactId;
 	checkPoint.oldestMultiDB = TemplateDbOid;
-	checkPoint.oldestCommitTsXid = InvalidTransactionId;
-	checkPoint.newestCommitTsXid = InvalidTransactionId;
 	checkPoint.time = (pg_time_t) time(NULL);
 	checkPoint.oldestActiveXid = InvalidTransactionId;
 
@@ -5164,7 +5162,6 @@ BootStrapXLOG(void)
 	AdvanceOldestClogXid(checkPoint.oldestXid);
 	SetTransactionIdLimit(checkPoint.oldestXid, checkPoint.oldestXidDB);
 	SetMultiXactIdLimit(checkPoint.oldestMulti, checkPoint.oldestMultiDB, true);
-	SetCommitTsLimit(InvalidTransactionId, InvalidTransactionId);
 
 	/* Set up the XLOG page header */
 	page->xlp_magic = XLOG_PAGE_MAGIC;
@@ -5245,7 +5242,6 @@ BootStrapXLOG(void)
 
 	/* Bootstrap the commit log, too */
 	BootStrapCLOG();
-	BootStrapCommitTs();
 	BootStrapSUBTRANS();
 	BootStrapMultiXact();
 
@@ -6767,10 +6763,6 @@ StartupXLOG(void)
 	ereport(DEBUG1,
 			(errmsg_internal("oldest MultiXactId: %u, in database %u",
 							 checkPoint.oldestMulti, checkPoint.oldestMultiDB)));
-	ereport(DEBUG1,
-			(errmsg_internal("commit timestamp Xid oldest/newest: %u/%u",
-							 checkPoint.oldestCommitTsXid,
-							 checkPoint.newestCommitTsXid)));
 	if (!TransactionIdIsNormal(XidFromFullTransactionId(checkPoint.nextXid)))
 		ereport(PANIC,
 				(errmsg("invalid next transaction ID")));
@@ -6783,8 +6775,6 @@ StartupXLOG(void)
 	AdvanceOldestClogXid(checkPoint.oldestXid);
 	SetTransactionIdLimit(checkPoint.oldestXid, checkPoint.oldestXidDB);
 	SetMultiXactIdLimit(checkPoint.oldestMulti, checkPoint.oldestMultiDB, true);
-	SetCommitTsLimit(checkPoint.oldestCommitTsXid,
-					 checkPoint.newestCommitTsXid);
 	XLogCtl->ckptFullXid = checkPoint.nextXid;
 
 	/*
@@ -6798,15 +6788,6 @@ StartupXLOG(void)
 	 * truncations.
 	 */
 	StartupMultiXact();
-
-	/*
-	 * Ditto for commit timestamps.  Activate the facility if the setting is
-	 * enabled in the control file, as there should be no tracking of commit
-	 * timestamps done when the setting was disabled.  This facility can be
-	 * started or stopped when replaying a XLOG_PARAMETER_CHANGE record.
-	 */
-	if (ControlFile->track_commit_timestamp)
-		StartupCommitTs();
 
 	/*
 	 * Initialize unlogged LSN. On a clean shutdown, it's restored from the
@@ -7934,12 +7915,6 @@ StartupXLOG(void)
 	}
 
 	/*
-	 * Local WAL inserts enabled, so it's time to finish initialization of
-	 * commit timestamp.
-	 */
-	CompleteCommitTsInitialization();
-
-	/*
 	 * All done with end-of-recovery actions.
 	 *
 	 * Now allow backends to write WAL and update the control file status in
@@ -8954,11 +8929,6 @@ CreateCheckPoint(int flags)
 	checkPoint.oldestXidDB = ShmemVariableCache->oldestXidDB;
 	LWLockRelease(XidGenLock);
 
-	LWLockAcquire(CommitTsLock, LW_SHARED);
-	checkPoint.oldestCommitTsXid = ShmemVariableCache->oldestCommitTsXid;
-	checkPoint.newestCommitTsXid = ShmemVariableCache->newestCommitTsXid;
-	LWLockRelease(CommitTsLock);
-
 	LWLockAcquire(OidGenLock, LW_SHARED);
 	checkPoint.nextOid = ShmemVariableCache->nextOid;
 	if (!shutdown)
@@ -9292,7 +9262,6 @@ CheckPointGuts(XLogRecPtr checkPointRedo, int flags)
 	TRACE_POSTGRESQL_BUFFER_CHECKPOINT_START(flags);
 	CheckpointStats.ckpt_write_t = GetCurrentTimestamp();
 	CheckPointCLOG();
-	CheckPointCommitTs();
 	CheckPointSUBTRANS();
 	CheckPointMultiXact();
 	CheckPointPredicate();
@@ -9824,8 +9793,7 @@ XLogReportParameters(void)
 		MaxConnections != ControlFile->MaxConnections ||
 		max_worker_processes != ControlFile->max_worker_processes ||
 		max_prepared_xacts != ControlFile->max_prepared_xacts ||
-		max_locks_per_xact != ControlFile->max_locks_per_xact ||
-		track_commit_timestamp != ControlFile->track_commit_timestamp)
+		max_locks_per_xact != ControlFile->max_locks_per_xact)
 	{
 		/*
 		 * The change in number of backend slots doesn't need to be WAL-logged
@@ -9845,7 +9813,6 @@ XLogReportParameters(void)
 			xlrec.max_locks_per_xact = max_locks_per_xact;
 			xlrec.wal_level = wal_level;
 			xlrec.wal_log_hints = wal_log_hints;
-			xlrec.track_commit_timestamp = track_commit_timestamp;
 
 			XLogBeginInsert();
 			XLogRegisterData((char *) &xlrec, sizeof(xlrec));
@@ -9862,7 +9829,6 @@ XLogReportParameters(void)
 		ControlFile->max_locks_per_xact = max_locks_per_xact;
 		ControlFile->wal_level = wal_level;
 		ControlFile->wal_log_hints = wal_log_hints;
-		ControlFile->track_commit_timestamp = track_commit_timestamp;
 		UpdateControlFile();
 
 		LWLockRelease(ControlFileLock);
@@ -10286,10 +10252,6 @@ xlog_redo(XLogReaderState *record)
 			ControlFile->minRecoveryPoint = lsn;
 			ControlFile->minRecoveryPointTLI = ThisTimeLineID;
 		}
-
-		CommitTsParameterChange(xlrec.track_commit_timestamp,
-								ControlFile->track_commit_timestamp);
-		ControlFile->track_commit_timestamp = xlrec.track_commit_timestamp;
 
 		UpdateControlFile();
 		LWLockRelease(ControlFileLock);

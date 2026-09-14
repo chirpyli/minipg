@@ -41,8 +41,6 @@ SyncRepLock							32
 BackgroundWorkerLock				33
 DynamicSharedMemoryControlLock		34
 AutoFileLock						35
-CommitTsSLRULock					38
-CommitTsLock						39
 MultiXactTruncationLock				41
 OldSnapshotTimeMapLock				42
 XactTruncationLock					44

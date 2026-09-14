@@ -20,7 +20,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "access/commit_ts.h"
 #include "access/multixact.h"
 #include "access/parallel.h"
 #include "access/subtrans.h"
@@ -1324,16 +1323,6 @@ RecordTransactionCommit(void)
 							RelcacheInitFileInval,
 							MyXactFlags,
 							InvalidTransactionId, NULL /* plain commit */ );
-
-		/*
-		 * Record commit timestamp.
-		 *
-		 * We don't need to WAL-log anything here, as the commit record
-		 * written above already contains the data.
-		 */
-		TransactionTreeSetCommitTsData(xid, nchildren, children,
-									   xactStopTimestamp,
-									   InvalidRepOriginId);
 	}
 
 	/*
@@ -5615,7 +5604,6 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 				 RepOriginId origin_id)
 {
 	TransactionId max_xid;
-	TimestampTz commit_time;
 
 	Assert(TransactionIdIsValid(xid));
 
@@ -5623,12 +5611,6 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 
 	/* Make sure nextXid is beyond any XID mentioned in the record. */
 	AdvanceNextFullTransactionIdPastXid(max_xid);
-
-	commit_time = parsed->xact_time;
-
-	/* Set the transaction commit timestamp and metadata */
-	TransactionTreeSetCommitTsData(xid, parsed->nsubxacts, parsed->subxacts,
-								   commit_time, origin_id);
 
 	if (standbyState == STANDBY_DISABLED)
 	{

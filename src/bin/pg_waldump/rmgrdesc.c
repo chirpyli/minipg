@@ -9,7 +9,6 @@
 #include "postgres.h"
 
 #include "access/clog.h"
-#include "access/commit_ts.h"
 #include "access/generic_xlog.h"
 #include "access/hash_xlog.h"
 #include "access/heapam_xlog.h"

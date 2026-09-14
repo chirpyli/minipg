@@ -30,7 +30,7 @@
 #endif
 #include <unistd.h>
 
-#include "access/commit_ts.h"
+
 #include "access/rmgr.h"
 #include "access/tableam.h"
 #include "access/toast_compression.h"
@@ -979,15 +979,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_REPORT | GUC_NO_SHOW_ALL | GUC_NO_RESET_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_ALLOW_IN_PARALLEL
 		},
 		&session_auth_is_superuser,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"track_commit_timestamp", PGC_POSTMASTER, REPLICATION_SENDING,
-			gettext_noop("Collects transaction commit time."),
-			NULL
-		},
-		&track_commit_timestamp,
 		false,
 		NULL, NULL, NULL
 	},
