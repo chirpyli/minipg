@@ -142,17 +142,11 @@ typedef struct ConfigVariable
 } ConfigVariable;
 
 extern bool ParseConfigFile(const char *config_file, bool strict,
-							const char *calling_file, int calling_lineno,
-							int depth, int elevel,
+							int elevel,
 							ConfigVariable **head_p, ConfigVariable **tail_p);
 extern bool ParseConfigFp(FILE *fp, const char *config_file,
-						  int depth, int elevel,
+						  int elevel,
 						  ConfigVariable **head_p, ConfigVariable **tail_p);
-extern bool ParseConfigDirectory(const char *includedir,
-								 const char *calling_file, int calling_lineno,
-								 int depth, int elevel,
-								 ConfigVariable **head_p,
-								 ConfigVariable **tail_p);
 extern void FreeConfigVariables(ConfigVariable *list);
 extern char *DeescapeQuotedString(const char *s);
 

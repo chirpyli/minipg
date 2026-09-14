@@ -623,22 +623,4 @@
 #recovery_init_sync_method = fsync	# fsync, syncfs (Linux 5.8+)
 
 
-#------------------------------------------------------------------------------
-# CONFIG FILE INCLUDES
-#------------------------------------------------------------------------------
 
-# These options allow settings to be loaded from files other than the
-# default postgresql.conf.  Note that these are directives, not variable
-# assignments, so they can usefully be given more than once.
-
-#include_dir = '...'			# include files ending in '.conf' from
-					# a directory, e.g., 'conf.d'
-#include_if_exists = '...'		# include file only if it exists
-#include = '...'			# include file
-
-
-#------------------------------------------------------------------------------
-# CUSTOMIZED OPTIONS
-#------------------------------------------------------------------------------
-
-# Add settings for extensions here

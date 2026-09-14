@@ -182,7 +182,7 @@ ProcessConfigFileInternal(GucContext context, bool applySettings, int elevel)
 	head = tail = NULL;
 
 	if (!ParseConfigFile(ConfigFileName, true,
-						 NULL, 0, 0, elevel,
+						 elevel,
 						 &head, &tail))
 	{
 		/* Syntax error(s) detected in the file, so bail out */
@@ -199,7 +199,7 @@ ProcessConfigFileInternal(GucContext context, bool applySettings, int elevel)
 	if (DataDir)
 	{
 		if (!ParseConfigFile(PG_AUTOCONF_FILENAME, false,
-							 NULL, 0, 0, elevel,
+							 elevel,
 							 &head, &tail))
 		{
 			/* Syntax error(s) detected in the file, so bail out */
@@ -514,44 +514,27 @@ bail_out:
 
 /*
  * Given a configuration file or directory location that may be a relative
- * path, return an absolute one.  We consider the location to be relative to
- * the directory holding the calling file, or to DataDir if no calling file.
+ * path, return an absolute one relative to DataDir.
  */
 static char *
-AbsoluteConfigLocation(const char *location, const char *calling_file)
+AbsoluteConfigLocation(const char *location)
 {
 	char		abs_path[MAXPGPATH];
 
 	if (is_absolute_path(location))
 		return pstrdup(location);
-	else
-	{
-		if (calling_file != NULL)
-		{
-			strlcpy(abs_path, calling_file, sizeof(abs_path));
-			get_parent_directory(abs_path);
-			join_path_components(abs_path, abs_path, location);
-			canonicalize_path(abs_path);
-		}
-		else
-		{
-			AssertState(DataDir);
-			join_path_components(abs_path, DataDir, location);
-			canonicalize_path(abs_path);
-		}
-		return pstrdup(abs_path);
-	}
+
+	AssertState(DataDir);
+	join_path_components(abs_path, DataDir, location);
+	canonicalize_path(abs_path);
+	return pstrdup(abs_path);
 }
 
 /*
- * Read and parse a single configuration file.  This function recurses
- * to handle "include" directives.
+ * Read and parse a single configuration file.
  *
  * If "strict" is true, treat failure to open the config file as an error,
  * otherwise just skip the file.
- *
- * calling_file/calling_lineno identify the source of the request.
- * Pass NULL/0 if not recursing from an inclusion request.
  *
  * See ParseConfigFp for further details.  This one merely adds opening the
  * config file rather than working from a caller-supplied file descriptor,
@@ -559,8 +542,7 @@ AbsoluteConfigLocation(const char *location, const char *calling_file)
  */
 bool
 ParseConfigFile(const char *config_file, bool strict,
-				const char *calling_file, int calling_lineno,
-				int depth, int elevel,
+				int elevel,
 				ConfigVariable **head_p,
 				ConfigVariable **tail_p)
 {
@@ -579,48 +561,12 @@ ParseConfigFile(const char *config_file, bool strict,
 				 errmsg("empty configuration file name: \"%s\"",
 						config_file)));
 		record_config_file_error("empty configuration file name",
-								 calling_file, calling_lineno,
+								 NULL, 0,
 								 head_p, tail_p);
 		return false;
 	}
 
-	/*
-	 * Reject too-deep include nesting depth.  This is just a safety check to
-	 * avoid dumping core due to stack overflow if an include file loops back
-	 * to itself.  The maximum nesting depth is pretty arbitrary.
-	 */
-	if (depth > 10)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("could not open configuration file \"%s\": maximum nesting depth exceeded",
-						config_file)));
-		record_config_file_error("nesting depth exceeded",
-								 calling_file, calling_lineno,
-								 head_p, tail_p);
-		return false;
-	}
-
-	abs_path = AbsoluteConfigLocation(config_file, calling_file);
-
-	/*
-	 * Reject direct recursion.  Indirect recursion is also possible, but it's
-	 * harder to detect and so doesn't seem worth the trouble.  (We test at
-	 * this step because the canonicalization done by AbsoluteConfigLocation
-	 * makes it more likely that a simple strcmp comparison will match.)
-	 */
-	if (calling_file && strcmp(abs_path, calling_file) == 0)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("configuration file recursion in \"%s\"",
-						calling_file)));
-		record_config_file_error("configuration file recursion",
-								 calling_file, calling_lineno,
-								 head_p, tail_p);
-		pfree(abs_path);
-		return false;
-	}
+	abs_path = AbsoluteConfigLocation(config_file);
 
 	fp = AllocateFile(abs_path, "r");
 	if (!fp)
@@ -633,7 +579,7 @@ ParseConfigFile(const char *config_file, bool strict,
 							abs_path)));
 			record_config_file_error(psprintf("could not open file \"%s\"",
 											  abs_path),
-									 calling_file, calling_lineno,
+									 NULL, 0,
 									 head_p, tail_p);
 			OK = false;
 		}
@@ -646,7 +592,7 @@ ParseConfigFile(const char *config_file, bool strict,
 		goto cleanup;
 	}
 
-	OK = ParseConfigFp(fp, abs_path, depth, elevel, head_p, tail_p);
+	OK = ParseConfigFp(fp, abs_path, elevel, head_p, tail_p);
 
 cleanup:
 	if (fp)
@@ -702,13 +648,11 @@ GUC_flex_fatal(const char *msg)
 }
 
 /*
- * Read and parse a single configuration file.  This function recurses
- * to handle "include" directives.
+ * Read and parse a single configuration file.
  *
  * Input parameters:
  *	fp: file pointer from AllocateFile for the configuration file to parse
  *	config_file: absolute or relative path name of the configuration file
- *	depth: recursion depth (should be 0 in the outermost call)
  *	elevel: error logging level to use
  * Input/Output parameters:
  *	head_p, tail_p: head and tail of linked list of name/value pairs
@@ -727,12 +671,11 @@ GUC_flex_fatal(const char *msg)
  *
  * Note: this function is used to parse not only postgresql.conf, but
  * various other configuration files that use the same "name = value"
- * syntax.  Hence, do not do anything here or in the subsidiary routines
- * ParseConfigFile/ParseConfigDirectory that assumes we are processing
- * GUCs specifically.
+ * syntax.  Hence, do not do anything here or in the subsidiary routine
+ * ParseConfigFile that assumes we are processing GUCs specifically.
  */
 bool
-ParseConfigFp(FILE *fp, const char *config_file, int depth, int elevel,
+ParseConfigFp(FILE *fp, const char *config_file, int elevel,
 			  ConfigVariable **head_p, ConfigVariable **tail_p)
 {
 	volatile bool OK = true;
@@ -813,52 +756,6 @@ ParseConfigFp(FILE *fp, const char *config_file, int depth, int elevel,
 		}
 
 		/* OK, process the option name and value */
-		if (guc_name_compare(opt_name, "include_dir") == 0)
-		{
-			/*
-			 * An include_dir directive isn't a variable and should be
-			 * processed immediately.
-			 */
-			if (!ParseConfigDirectory(opt_value,
-									  config_file, ConfigFileLineno - 1,
-									  depth + 1, elevel,
-									  head_p, tail_p))
-				OK = false;
-			yy_switch_to_buffer(lex_buffer);
-			pfree(opt_name);
-			pfree(opt_value);
-		}
-		else if (guc_name_compare(opt_name, "include_if_exists") == 0)
-		{
-			/*
-			 * An include_if_exists directive isn't a variable and should be
-			 * processed immediately.
-			 */
-			if (!ParseConfigFile(opt_value, false,
-								 config_file, ConfigFileLineno - 1,
-								 depth + 1, elevel,
-								 head_p, tail_p))
-				OK = false;
-			yy_switch_to_buffer(lex_buffer);
-			pfree(opt_name);
-			pfree(opt_value);
-		}
-		else if (guc_name_compare(opt_name, "include") == 0)
-		{
-			/*
-			 * An include directive isn't a variable and should be processed
-			 * immediately.
-			 */
-			if (!ParseConfigFile(opt_value, true,
-								 config_file, ConfigFileLineno - 1,
-								 depth + 1, elevel,
-								 head_p, tail_p))
-				OK = false;
-			yy_switch_to_buffer(lex_buffer);
-			pfree(opt_name);
-			pfree(opt_value);
-		}
-		else
 		{
 			/* ordinary variable, append to list */
 			item = palloc(sizeof *item);
@@ -943,157 +840,6 @@ cleanup:
 	ConfigFileLineno = save_ConfigFileLineno;
 	GUC_flex_fatal_jmp = save_GUC_flex_fatal_jmp;
 	return OK;
-}
-
-/*
- * Read and parse all config files in a subdirectory in alphabetical order
- *
- * includedir is the absolute or relative path to the subdirectory to scan.
- *
- * calling_file/calling_lineno identify the source of the request.
- * Pass NULL/0 if not recursing from an inclusion request.
- *
- * See ParseConfigFp for further details.
- */
-bool
-ParseConfigDirectory(const char *includedir,
-					 const char *calling_file, int calling_lineno,
-					 int depth, int elevel,
-					 ConfigVariable **head_p,
-					 ConfigVariable **tail_p)
-{
-	char	   *directory;
-	DIR		   *d;
-	struct dirent *de;
-	char	  **filenames;
-	int			num_filenames;
-	int			size_filenames;
-	bool		status;
-
-	/*
-	 * Reject directory name that is all-blank (including empty), as that
-	 * leads to confusion --- we'd read the containing directory, typically
-	 * resulting in recursive inclusion of the same file(s).
-	 */
-	if (strspn(includedir, " \t\r\n") == strlen(includedir))
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("empty configuration directory name: \"%s\"",
-						includedir)));
-		record_config_file_error("empty configuration directory name",
-								 calling_file, calling_lineno,
-								 head_p, tail_p);
-		return false;
-	}
-
-	/*
-	 * We don't check for recursion or too-deep nesting depth here; the
-	 * subsequent calls to ParseConfigFile will take care of that.
-	 */
-
-	directory = AbsoluteConfigLocation(includedir, calling_file);
-	d = AllocateDir(directory);
-	if (d == NULL)
-	{
-		ereport(elevel,
-				(errcode_for_file_access(),
-				 errmsg("could not open configuration directory \"%s\": %m",
-						directory)));
-		record_config_file_error(psprintf("could not open directory \"%s\"",
-										  directory),
-								 calling_file, calling_lineno,
-								 head_p, tail_p);
-		status = false;
-		goto cleanup;
-	}
-
-	/*
-	 * Read the directory and put the filenames in an array, so we can sort
-	 * them prior to processing the contents.
-	 */
-	size_filenames = 32;
-	filenames = (char **) palloc(size_filenames * sizeof(char *));
-	num_filenames = 0;
-
-	while ((de = ReadDir(d, directory)) != NULL)
-	{
-		struct stat st;
-		char		filename[MAXPGPATH];
-
-		/*
-		 * Only parse files with names ending in ".conf".  Explicitly reject
-		 * files starting with ".".  This excludes things like "." and "..",
-		 * as well as typical hidden files, backup files, and editor debris.
-		 */
-		if (strlen(de->d_name) < 6)
-			continue;
-		if (de->d_name[0] == '.')
-			continue;
-		if (strcmp(de->d_name + strlen(de->d_name) - 5, ".conf") != 0)
-			continue;
-
-		join_path_components(filename, directory, de->d_name);
-		canonicalize_path(filename);
-		if (stat(filename, &st) == 0)
-		{
-			if (!S_ISDIR(st.st_mode))
-			{
-				/* Add file to array, increasing its size in blocks of 32 */
-				if (num_filenames >= size_filenames)
-				{
-					size_filenames += 32;
-					filenames = (char **) repalloc(filenames,
-											size_filenames * sizeof(char *));
-				}
-				filenames[num_filenames] = pstrdup(filename);
-				num_filenames++;
-			}
-		}
-		else
-		{
-			/*
-			 * stat does not care about permissions, so the most likely reason
-			 * a file can't be accessed now is if it was removed between the
-			 * directory listing and now.
-			 */
-			ereport(elevel,
-					(errcode_for_file_access(),
-					 errmsg("could not stat file \"%s\": %m",
-							filename)));
-			record_config_file_error(psprintf("could not stat file \"%s\"",
-											  filename),
-									 calling_file, calling_lineno,
-									 head_p, tail_p);
-			status = false;
-			goto cleanup;
-		}
-	}
-
-	if (num_filenames > 0)
-	{
-		int			i;
-
-		qsort(filenames, num_filenames, sizeof(char *), pg_qsort_strcmp);
-		for (i = 0; i < num_filenames; i++)
-		{
-			if (!ParseConfigFile(filenames[i], true,
-								 calling_file, calling_lineno,
-								 depth, elevel,
-								 head_p, tail_p))
-			{
-				status = false;
-				goto cleanup;
-			}
-		}
-	}
-	status = true;
-
-cleanup:
-	if (d)
-		FreeDir(d);
-	pfree(directory);
-	return status;
 }
 
 /*
