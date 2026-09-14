@@ -54,7 +54,7 @@
  *	Also, whenever we see an operation on a pg_class, pg_attribute, or
  *	pg_index tuple, we register a relcache flush operation for the relation
  *	described by that tuple (as specified in CacheInvalidateHeapTuple()).
- *	Likewise for pg_constraint tuples for foreign keys on relations.
+ *	Likewise for pg_constraint tuples (e.g. CHECK/EXCLUSION constraints) on relations.
  *
  *	We keep the relcache flush requests in lists separate from the catcache
  *	tuple flush requests.  This allows us to issue all the pending catcache

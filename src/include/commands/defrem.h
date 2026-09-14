@@ -46,9 +46,6 @@ extern Oid	GetDefaultOpClass(Oid type_id, Oid am_id);
 extern Oid	ResolveOpClass(List *opclass, Oid attrType,
 						   const char *accessMethodName, Oid accessMethodId);
 
-/* commands/functioncmds.c */
-extern void RemoveFunctionById(Oid funcOid);
-
 /* commands/operatorcmds.c */
 extern void RemoveOperatorById(Oid operOid);
 

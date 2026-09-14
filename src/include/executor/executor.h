@@ -48,10 +48,8 @@
  * MARK indicates that the plan node must support Mark/Restore calls.
  * When this is not passed, no Mark/Restore will occur.
  *
- * SKIP_TRIGGERS tells ExecutorStart/ExecutorFinish to skip calling
- * AfterTriggerBeginQuery/AfterTriggerEndQuery.  This does not necessarily
- * mean that the plan can't queue any AFTER triggers; just that the caller
- * is responsible for there being a trigger context for them to be queued in.
+ * SKIP_TRIGGERS is accepted for API compatibility but has no effect in this
+ * trimmed build, since the AFTER-trigger machinery has been removed.
  */
 #define EXEC_FLAG_EXPLAIN_ONLY	0x0001	/* EXPLAIN, no ANALYZE */
 #define EXEC_FLAG_REWIND		0x0002	/* need efficient rescan */

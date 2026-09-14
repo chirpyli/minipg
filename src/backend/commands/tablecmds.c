@@ -1765,9 +1765,9 @@ ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode,
 	/*
 	 * We process all the tables "in parallel", one pass at a time.  This is
 	 * needed because we may have to propagate work from one table to another
-	 * (specifically, ALTER TYPE on a foreign key's PK has to dispatch the
-	 * re-adding of the foreign key constraint to the other table).  Work can
-	 * only be propagated into later passes, however.
+	 * (for example, ALTER TYPE on a column referenced by a constraint in
+	 * another table needs to dispatch the corresponding work to that table).
+	 * Work can only be propagated into later passes, however.
 	 */
 	for (pass = 0; pass < AT_NUM_PASSES; pass++)
 	{
@@ -2008,7 +2008,7 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		 * executing the subcommand immediately, as a substitute for the
 		 * original subcommand.  (Note, however, that this does cause
 		 * AT_AddConstraint subcommands to be rescheduled into later passes,
-		 * which is important for index and foreign key constraints.)
+		 * which is important for index, CHECK, and EXCLUSION constraints.)
 		 *
 		 * We assume we needn't do any phase-1 checks for added subcommands.
 		 */
@@ -2224,11 +2224,9 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
 	}
 
 	/*
-	 * Foreign key constraints are checked in a final pass, since (a) it's
-	 * generally best to examine each one separately, and (b) it's at least
-	 * theoretically possible that we have changed both relations of the
-	 * foreign key, and we'd better have finished both rewrites before we try
-	 * to read the tables.
+	 * CHECK and EXCLUSION constraints are checked in a final pass, since it's
+	 * generally best to examine each one separately.  (Foreign-key constraint
+	 * enforcement is not built into this trimmed kernel.)
 	 */
 	foreach(ltab, *wqueue)
 	{
@@ -4263,7 +4261,7 @@ ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab, LOCKMODE lockmode)
 	 * the case of a constraint on another table, we might not yet have
 	 * exclusive lock on the table the constraint is attached to, and we need
 	 * to get that before reparsing/dropping.  (That's possible at least for
-	 * FOREIGN KEY, CHECK, and EXCLUSION constraints; in non-FK cases it
+	 * CHECK and EXCLUSION constraints; in those cases it
 	 * requires a dependency on the target table's composite type in the other
 	 * table's constraint expressions.)
 	 *

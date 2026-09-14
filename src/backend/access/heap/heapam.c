@@ -2267,7 +2267,7 @@ heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
 	 * To allow parallel inserts, we need to ensure that they are safe to be
 	 * performed in workers. We have the infrastructure to allow parallel
 	 * inserts in general except for the cases where inserts generate a new
-	 * CommandId (eg. inserts into a table having a foreign key column).
+	 * CommandId.
 	 */
 	if (IsParallelWorker())
 		ereport(ERROR,
@@ -3320,7 +3320,7 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
 	/*
 	 * If we're not updating any "key" column, we can grab a weaker lock type.
 	 * This allows for more concurrency when we are running simultaneously
-	 * with foreign key checks.
+	 * with other updates.
 	 *
 	 * Note that if a column gets detoasted while executing the update, but
 	 * the value ends up being the same, this test will fail and we will use

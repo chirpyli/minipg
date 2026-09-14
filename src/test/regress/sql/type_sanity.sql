@@ -338,7 +338,7 @@ WHERE p1.typanalyze = p2.oid AND NOT
 SELECT p1.oid, p1.relname
 FROM pg_class as p1
 WHERE relkind NOT IN ('r', 'i', 'S', 't', 'v', 'm', 'c', 'f', 'p') OR
-    relpersistence NOT IN ('p', 'u', 't');
+    relpersistence <> 'p';
 
 -- All tables and indexes should have an access method.
 SELECT p1.oid, p1.relname

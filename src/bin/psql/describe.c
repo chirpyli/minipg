@@ -505,24 +505,16 @@ describeOneTableDetails(const char *schemaname,
 	switch (tableinfo.relkind)
 	{
 		case RELKIND_RELATION:
-			if (tableinfo.relpersistence == 'u')
-				printfPQExpBuffer(&title, _("Unlogged table \"%s.%s\""),
-								  schemaname, relationname);
-			else
-				printfPQExpBuffer(&title, _("Table \"%s.%s\""),
-								  schemaname, relationname);
+			printfPQExpBuffer(&title, _("Table \"%s.%s\""),
+							  schemaname, relationname);
 			break;
 		case RELKIND_VIEW:
 			printfPQExpBuffer(&title, _("View \"%s.%s\""),
 							  schemaname, relationname);
 			break;
 		case RELKIND_INDEX:
-			if (tableinfo.relpersistence == 'u')
-				printfPQExpBuffer(&title, _("Unlogged index \"%s.%s\""),
-								  schemaname, relationname);
-			else
-				printfPQExpBuffer(&title, _("Index \"%s.%s\""),
-								  schemaname, relationname);
+			printfPQExpBuffer(&title, _("Index \"%s.%s\""),
+							  schemaname, relationname);
 			break;
 		case 's':
 			/* not used as of 8.2, but keep it for backwards compatibility */

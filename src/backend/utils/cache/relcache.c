@@ -4041,8 +4041,7 @@ RelationGetIndexPredicate(Relation relation)
  * predicates.)
  *
  * Depending on attrKind, a bitmap covering the attnums for all index columns,
- * for all potential foreign key columns, or for all columns in the configured
- * replica identity index is returned.
+ * or for all columns in the configured replica identity index is returned.
  *
  * Attribute numbers are offset by FirstLowInvalidHeapAttributeNumber so that
  * we can include system attributes (e.g., OID) in the bitmap representation.
@@ -4157,7 +4156,7 @@ restart:
 		else
 			indexPredicate = NULL;
 
-		/* Can this index be referenced by a foreign key? */
+		/* Can this index be used as a key (unique, simple columns)? */
 		isKey = indexDesc->rd_index->indisunique &&
 			indexExpressions == NULL &&
 			indexPredicate == NULL;

@@ -1114,8 +1114,9 @@ get_index_constraint(Oid indexId)
 
 /*
  * get_index_ref_constraints
- *		Given the OID of an index, return the OID of all foreign key
- *		constraints which reference the index.
+ *		Given the OID of an index, return the OID of all constraints which
+ *		reference the index (foreign-key constraints in a full build; none in
+ *		this trimmed build where FK enforcement has been removed).
  */
 List *
 get_index_ref_constraints(Oid indexId)

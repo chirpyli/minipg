@@ -23,7 +23,6 @@ OBJS = \
 	dropcmds.o \
 	explain.o \
 	extension.o \
-	functioncmds.o \
 	indexcmds.o \
 	opclasscmds.o \
 	operatorcmds.o \
