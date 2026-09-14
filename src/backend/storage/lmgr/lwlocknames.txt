@@ -31,8 +31,6 @@ AutovacuumLock						22
 AutovacuumScheduleLock				23
 SyncScanLock						24
 RelationMappingLock					25
-NotifySLRULock						26
-NotifyQueueLock						27
 SerializableXactHashLock			28
 SerializableFinishedListLock		29
 SerializablePredicateListLock		30
@@ -46,4 +44,3 @@ OldSnapshotTimeMapLock				42
 XactTruncationLock					44
 # 45 was XactTruncationLock until removal of BackendRandomLock
 WrapLimitsVacuumLock				46
-NotifyQueueTailLock					47

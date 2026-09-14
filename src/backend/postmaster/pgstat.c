@@ -143,7 +143,6 @@ static WalUsage prevWalUsage;
 static const char *const slru_names[] = {
 	"MultiXactMember",
 	"MultiXactOffset",
-	"Notify",
 	"Serial",
 	"Subtrans",
 	"Xact",
