@@ -58,7 +58,6 @@ extern TransactionId GetOldestNonRemovableTransactionId(Relation rel);
 extern TransactionId GetOldestTransactionIdConsideredRunning(void);
 extern TransactionId GetOldestActiveTransactionId(void);
 extern TransactionId GetOldestSafeDecodingTransactionId(bool catalogOnly);
-extern void GetReplicationHorizons(TransactionId *slot_xmin, TransactionId *catalog_xmin);
 
 extern VirtualTransactionId *GetVirtualXIDsDelayingChkpt(int *nvxids);
 extern VirtualTransactionId *GetVirtualXIDsDelayingChkptEnd(int *nvxids);
@@ -92,8 +91,5 @@ extern void TerminateOtherDBBackends(Oid databaseId);
 extern void XidCacheRemoveRunningXids(TransactionId xid,
 									  int nxids, const TransactionId *xids,
 									  TransactionId latestXid);
-
-extern void ProcArraySetReplicationSlotXmin(TransactionId xmin,
-											TransactionId catalog_xmin, bool already_locked);
 
 #endif							/* PROCARRAY_H */

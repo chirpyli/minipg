@@ -145,8 +145,6 @@ static const char *const BuiltinTrancheNames[] = {
 	"BufferContent",
 	/* LWTRANCHE_REPLICATION_ORIGIN_STATE: */
 	"ReplicationOriginState",
-	/* LWTRANCHE_REPLICATION_SLOT_IO: */
-	"ReplicationSlotIO",
 	/* LWTRANCHE_LOCK_FASTPATH: */
 	"LockFastPath",
 	/* LWTRANCHE_BUFFER_MAPPING: */

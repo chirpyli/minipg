@@ -421,9 +421,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_RECOVERY_PAUSE:
 			event_name = "RecoveryPause";
 			break;
-		case WAIT_EVENT_REPLICATION_SLOT_DROP:
-			event_name = "ReplicationSlotDrop";
-			break;
 		case WAIT_EVENT_SAFE_SNAPSHOT:
 			event_name = "SafeSnapshot";
 			break;
@@ -617,18 +614,6 @@ pgstat_get_wait_io(WaitEventIO w)
 			break;
 		case WAIT_EVENT_REORDER_LOGICAL_MAPPING_READ:
 			event_name = "ReorderLogicalMappingRead";
-			break;
-		case WAIT_EVENT_REPLICATION_SLOT_READ:
-			event_name = "ReplicationSlotRead";
-			break;
-		case WAIT_EVENT_REPLICATION_SLOT_RESTORE_SYNC:
-			event_name = "ReplicationSlotRestoreSync";
-			break;
-		case WAIT_EVENT_REPLICATION_SLOT_SYNC:
-			event_name = "ReplicationSlotSync";
-			break;
-		case WAIT_EVENT_REPLICATION_SLOT_WRITE:
-			event_name = "ReplicationSlotWrite";
 			break;
 		case WAIT_EVENT_SLRU_FLUSH_SYNC:
 			event_name = "SLRUFlushSync";

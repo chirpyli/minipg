@@ -102,7 +102,6 @@
 #define PGSTAT_DB_HASH_SIZE		16
 #define PGSTAT_TAB_HASH_SIZE	512
 #define PGSTAT_FUNCTION_HASH_SIZE	512
-#define PGSTAT_REPLSLOT_HASH_SIZE	32
 
 
 /* ----------
@@ -273,7 +272,6 @@ static PgStat_ArchiverStats archiverStats;
 static PgStat_GlobalStats globalStats;
 static PgStat_WalStats walStats;
 static PgStat_SLRUStats slruStats[SLRU_NUM_ELEMENTS];
-static HTAB *replSlotStatHash = NULL;
 
 /*
  * List of OIDs of databases we need to write out.  If an entry is InvalidOid,
@@ -309,9 +307,6 @@ static void backend_read_statsfile(void);
 static bool pgstat_write_statsfile_needed(void);
 static bool pgstat_db_requested(Oid databaseid);
 
-static PgStat_StatReplSlotEntry *pgstat_get_replslot_entry(NameData name, bool create_it);
-static void pgstat_reset_replslot(PgStat_StatReplSlotEntry *slotstats, TimestampTz ts);
-
 static void pgstat_send_tabstat(PgStat_MsgTabstat *tsmsg, TimestampTz now);
 static void pgstat_send_funcstats(void);
 static void pgstat_send_slru(void);
@@ -334,7 +329,6 @@ static void pgstat_recv_resetcounter(PgStat_MsgResetcounter *msg, int len);
 static void pgstat_recv_resetsharedcounter(PgStat_MsgResetsharedcounter *msg, int len);
 static void pgstat_recv_resetsinglecounter(PgStat_MsgResetsinglecounter *msg, int len);
 static void pgstat_recv_resetslrucounter(PgStat_MsgResetslrucounter *msg, int len);
-static void pgstat_recv_resetreplslotcounter(PgStat_MsgResetreplslotcounter *msg, int len);
 static void pgstat_recv_autovac(PgStat_MsgAutovacStart *msg, int len);
 static void pgstat_recv_vacuum(PgStat_MsgVacuum *msg, int len);
 static void pgstat_recv_analyze(PgStat_MsgAnalyze *msg, int len);
@@ -348,7 +342,6 @@ static void pgstat_recv_recoveryconflict(PgStat_MsgRecoveryConflict *msg, int le
 static void pgstat_recv_deadlock(PgStat_MsgDeadlock *msg, int len);
 static void pgstat_recv_connect(PgStat_MsgConnect *msg, int len);
 static void pgstat_recv_disconnect(PgStat_MsgDisconnect *msg, int len);
-static void pgstat_recv_replslot(PgStat_MsgReplSlot *msg, int len);
 static void pgstat_recv_tempfile(PgStat_MsgTempFile *msg, int len);
 
 /* ------------------------------------------------------------
@@ -1435,37 +1428,6 @@ pgstat_reset_slru_counter(const char *name)
 }
 
 /* ----------
- * pgstat_reset_replslot_counter() -
- *
- *	Tell the statistics collector to reset a single replication slot
- *	counter, or all replication slots counters (when name is null).
- *
- *	Permission checking for this function is managed through the normal
- *	GRANT system.
- * ----------
- */
-void
-pgstat_reset_replslot_counter(const char *name)
-{
-	PgStat_MsgResetreplslotcounter msg;
-
-	if (pgStatSock == PGINVALID_SOCKET)
-		return;
-
-	if (name)
-	{
-		namestrcpy(&msg.m_slotname, name);
-		msg.clearall = false;
-	}
-	else
-		msg.clearall = true;
-
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_RESETREPLSLOTCOUNTER);
-
-	pgstat_send(&msg, sizeof(msg));
-}
-
-/* ----------
  * pgstat_report_autovac() -
  *
  *	Called from autovacuum.c to report startup of an autovacuum process.
@@ -1686,71 +1648,6 @@ static bool
 pgstat_should_report_connstat(void)
 {
 	return MyBackendType == B_BACKEND;
-}
-
-/* ----------
- * pgstat_report_replslot() -
- *
- *	Tell the collector about replication slot statistics.
- * ----------
- */
-void
-pgstat_report_replslot(const PgStat_StatReplSlotEntry *repSlotStat)
-{
-	PgStat_MsgReplSlot msg;
-
-	/*
-	 * Prepare and send the message
-	 */
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_REPLSLOT);
-	namestrcpy(&msg.m_slotname, NameStr(repSlotStat->slotname));
-	msg.m_create = false;
-	msg.m_drop = false;
-	msg.m_spill_txns = repSlotStat->spill_txns;
-	msg.m_spill_count = repSlotStat->spill_count;
-	msg.m_spill_bytes = repSlotStat->spill_bytes;
-	msg.m_stream_txns = repSlotStat->stream_txns;
-	msg.m_stream_count = repSlotStat->stream_count;
-	msg.m_stream_bytes = repSlotStat->stream_bytes;
-	msg.m_total_txns = repSlotStat->total_txns;
-	msg.m_total_bytes = repSlotStat->total_bytes;
-	pgstat_send(&msg, sizeof(PgStat_MsgReplSlot));
-}
-
-/* ----------
- * pgstat_report_replslot_create() -
- *
- *	Tell the collector about creating the replication slot.
- * ----------
- */
-void
-pgstat_report_replslot_create(const char *slotname)
-{
-	PgStat_MsgReplSlot msg;
-
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_REPLSLOT);
-	namestrcpy(&msg.m_slotname, slotname);
-	msg.m_create = true;
-	msg.m_drop = false;
-	pgstat_send(&msg, sizeof(PgStat_MsgReplSlot));
-}
-
-/* ----------
- * pgstat_report_replslot_drop() -
- *
- *	Tell the collector about dropping the replication slot.
- * ----------
- */
-void
-pgstat_report_replslot_drop(const char *slotname)
-{
-	PgStat_MsgReplSlot msg;
-
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_REPLSLOT);
-	namestrcpy(&msg.m_slotname, slotname);
-	msg.m_create = false;
-	msg.m_drop = true;
-	pgstat_send(&msg, sizeof(PgStat_MsgReplSlot));
 }
 
 /* ----------
@@ -2735,22 +2632,6 @@ pgstat_fetch_slru(void)
 }
 
 /*
- * ---------
- * pgstat_fetch_replslot() -
- *
- *	Support function for the SQL-callable pgstat* functions. Returns
- *	a pointer to the replication slot statistics struct.
- * ---------
- */
-PgStat_StatReplSlotEntry *
-pgstat_fetch_replslot(NameData slotname)
-{
-	backend_read_statsfile();
-
-	return pgstat_get_replslot_entry(slotname, false);
-}
-
-/*
  * Shut down a single backend's statistics reporting at process exit.
  *
  * Flush any remaining statistics counts out to the collector.
@@ -3194,11 +3075,6 @@ PgstatCollectorMain(int argc, char *argv[])
 												 len);
 					break;
 
-				case PGSTAT_MTYPE_RESETREPLSLOTCOUNTER:
-					pgstat_recv_resetreplslotcounter(&msg.msg_resetreplslotcounter,
-													 len);
-					break;
-
 				case PGSTAT_MTYPE_AUTOVAC_START:
 					pgstat_recv_autovac(&msg.msg_autovacuum_start, len);
 					break;
@@ -3246,10 +3122,6 @@ PgstatCollectorMain(int argc, char *argv[])
 
 				case PGSTAT_MTYPE_TEMPFILE:
 					pgstat_recv_tempfile(&msg.msg_tempfile, len);
-					break;
-
-				case PGSTAT_MTYPE_REPLSLOT:
-					pgstat_recv_replslot(&msg.msg_replslot, len);
 					break;
 
 				case PGSTAT_MTYPE_CONNECT:
@@ -3523,22 +3395,6 @@ pgstat_write_statsfiles(bool permanent, bool allDbs)
 		fputc('D', fpout);
 		rc = fwrite(dbentry, offsetof(PgStat_StatDBEntry, tables), 1, fpout);
 		(void) rc;				/* we'll check for error with ferror */
-	}
-
-	/*
-	 * Write replication slot stats struct
-	 */
-	if (replSlotStatHash)
-	{
-		PgStat_StatReplSlotEntry *slotent;
-
-		hash_seq_init(&hstat, replSlotStatHash);
-		while ((slotent = (PgStat_StatReplSlotEntry *) hash_seq_search(&hstat)) != NULL)
-		{
-			fputc('R', fpout);
-			rc = fwrite(slotent, sizeof(PgStat_StatReplSlotEntry), 1, fpout);
-			(void) rc;			/* we'll check for error with ferror */
-		}
 	}
 
 	/*
@@ -3961,45 +3817,6 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 
 				break;
 
-				/*
-				 * 'R'	A PgStat_StatReplSlotEntry struct describing a
-				 * replication slot follows.
-				 */
-			case 'R':
-				{
-					PgStat_StatReplSlotEntry slotbuf;
-					PgStat_StatReplSlotEntry *slotent;
-
-					if (fread(&slotbuf, 1, sizeof(PgStat_StatReplSlotEntry), fpin)
-						!= sizeof(PgStat_StatReplSlotEntry))
-					{
-						ereport(pgStatRunningInCollector ? LOG : WARNING,
-								(errmsg("corrupted statistics file \"%s\"",
-										statfile)));
-						goto done;
-					}
-
-					/* Create hash table if we don't have it already. */
-					if (replSlotStatHash == NULL)
-					{
-						HASHCTL		hash_ctl;
-
-						hash_ctl.keysize = sizeof(NameData);
-						hash_ctl.entrysize = sizeof(PgStat_StatReplSlotEntry);
-						hash_ctl.hcxt = pgStatLocalContext;
-						replSlotStatHash = hash_create("Replication slots hash",
-													   PGSTAT_REPLSLOT_HASH_SIZE,
-													   &hash_ctl,
-													   HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
-					}
-
-					slotent = (PgStat_StatReplSlotEntry *) hash_search(replSlotStatHash,
-																	   (void *) &slotbuf.slotname,
-																	   HASH_ENTER, NULL);
-					memcpy(slotent, &slotbuf, sizeof(PgStat_StatReplSlotEntry));
-					break;
-				}
-
 			case 'E':
 				goto done;
 
@@ -4211,7 +4028,6 @@ pgstat_read_db_statsfile_timestamp(Oid databaseid, bool permanent,
 	PgStat_ArchiverStats myArchiverStats;
 	PgStat_WalStats myWalStats;
 	PgStat_SLRUStats mySLRUStats[SLRU_NUM_ELEMENTS];
-	PgStat_StatReplSlotEntry myReplSlotStats;
 	FILE	   *fpin;
 	int32		format_id;
 	const char *statfile = permanent ? PGSTAT_STAT_PERMANENT_FILENAME : pgstat_stat_filename;
@@ -4324,22 +4140,6 @@ pgstat_read_db_statsfile_timestamp(Oid databaseid, bool permanent,
 					goto done;
 				}
 
-				break;
-
-				/*
-				 * 'R'	A PgStat_StatReplSlotEntry struct describing a
-				 * replication slot follows.
-				 */
-			case 'R':
-				if (fread(&myReplSlotStats, 1, sizeof(PgStat_StatReplSlotEntry), fpin)
-					!= sizeof(PgStat_StatReplSlotEntry))
-				{
-					ereport(pgStatRunningInCollector ? LOG : WARNING,
-							(errmsg("corrupted statistics file \"%s\"",
-									statfile)));
-					FreeFile(fpin);
-					return false;
-				}
 				break;
 
 			case 'E':
@@ -4531,7 +4331,6 @@ pgstat_clear_snapshot(void)
 	/* Reset variables */
 	pgStatLocalContext = NULL;
 	pgStatDBHash = NULL;
-	replSlotStatHash = NULL;
 
 	/*
 	 * Historically the backend_status.c facilities lived in this file, and
@@ -4948,51 +4747,6 @@ pgstat_recv_resetslrucounter(PgStat_MsgResetslrucounter *msg, int len)
 	}
 }
 
-/* ----------
- * pgstat_recv_resetreplslotcounter() -
- *
- *	Reset some replication slot statistics of the cluster.
- * ----------
- */
-static void
-pgstat_recv_resetreplslotcounter(PgStat_MsgResetreplslotcounter *msg,
-								 int len)
-{
-	PgStat_StatReplSlotEntry *slotent;
-	TimestampTz ts;
-
-	/* Return if we don't have replication slot statistics */
-	if (replSlotStatHash == NULL)
-		return;
-
-	ts = GetCurrentTimestamp();
-	if (msg->clearall)
-	{
-		HASH_SEQ_STATUS sstat;
-
-		hash_seq_init(&sstat, replSlotStatHash);
-		while ((slotent = (PgStat_StatReplSlotEntry *) hash_seq_search(&sstat)) != NULL)
-			pgstat_reset_replslot(slotent, ts);
-	}
-	else
-	{
-		/* Get the slot statistics to reset */
-		slotent = pgstat_get_replslot_entry(msg->m_slotname, false);
-
-		/*
-		 * Nothing to do if the given slot entry is not found.  This could
-		 * happen when the slot with the given name is removed and the
-		 * corresponding statistics entry is also removed before receiving the
-		 * reset message.
-		 */
-		if (!slotent)
-			return;
-
-		/* Reset the stats for the requested replication slot */
-		pgstat_reset_replslot(slotent, ts);
-	}
-}
-
 
 /* ----------
  * pgstat_recv_autovac() -
@@ -5241,57 +4995,6 @@ pgstat_recv_deadlock(PgStat_MsgDeadlock *msg, int len)
 }
 
 /* ----------
- * pgstat_recv_replslot() -
- *
- *	Process a REPLSLOT message.
- * ----------
- */
-static void
-pgstat_recv_replslot(PgStat_MsgReplSlot *msg, int len)
-{
-	if (msg->m_drop)
-	{
-		Assert(!msg->m_create);
-
-		/* Remove the replication slot statistics with the given name */
-		if (replSlotStatHash != NULL)
-			(void) hash_search(replSlotStatHash,
-							   (void *) &(msg->m_slotname),
-							   HASH_REMOVE,
-							   NULL);
-	}
-	else
-	{
-		PgStat_StatReplSlotEntry *slotent;
-
-		slotent = pgstat_get_replslot_entry(msg->m_slotname, true);
-		Assert(slotent);
-
-		if (msg->m_create)
-		{
-			/*
-			 * If the message for dropping the slot with the same name gets
-			 * lost, slotent has stats for the old slot. So we initialize all
-			 * counters at slot creation.
-			 */
-			pgstat_reset_replslot(slotent, 0);
-		}
-		else
-		{
-			/* Update the replication slot statistics */
-			slotent->spill_txns += msg->m_spill_txns;
-			slotent->spill_count += msg->m_spill_count;
-			slotent->spill_bytes += msg->m_spill_bytes;
-			slotent->stream_txns += msg->m_stream_txns;
-			slotent->stream_count += msg->m_stream_count;
-			slotent->stream_bytes += msg->m_stream_bytes;
-			slotent->total_txns += msg->m_total_txns;
-			slotent->total_bytes += msg->m_total_bytes;
-		}
-	}
-}
-
-/* ----------
  * pgstat_recv_connect() -
  *
  *	Process a CONNECT message.
@@ -5473,83 +5176,6 @@ pgstat_db_requested(Oid databaseid)
 		return true;
 
 	return false;
-}
-
-/* ----------
- * pgstat_replslot_entry
- *
- * Return the entry of replication slot stats with the given name. Return
- * NULL if not found and the caller didn't request to create it.
- *
- * create tells whether to create the new slot entry if it is not found.
- * ----------
- */
-static PgStat_StatReplSlotEntry *
-pgstat_get_replslot_entry(NameData name, bool create)
-{
-	PgStat_StatReplSlotEntry *slotent;
-	bool		found;
-
-	if (replSlotStatHash == NULL)
-	{
-		HASHCTL		hash_ctl;
-
-		/*
-		 * Quick return NULL if the hash table is empty and the caller didn't
-		 * request to create the entry.
-		 */
-		if (!create)
-			return NULL;
-
-		hash_ctl.keysize = sizeof(NameData);
-		hash_ctl.entrysize = sizeof(PgStat_StatReplSlotEntry);
-		replSlotStatHash = hash_create("Replication slots hash",
-									   PGSTAT_REPLSLOT_HASH_SIZE,
-									   &hash_ctl,
-									   HASH_ELEM | HASH_BLOBS);
-	}
-
-	slotent = (PgStat_StatReplSlotEntry *) hash_search(replSlotStatHash,
-													   (void *) &name,
-													   create ? HASH_ENTER : HASH_FIND,
-													   &found);
-
-	if (!slotent)
-	{
-		/* not found */
-		Assert(!create && !found);
-		return NULL;
-	}
-
-	/* initialize the entry */
-	if (create && !found)
-	{
-		namestrcpy(&(slotent->slotname), NameStr(name));
-		pgstat_reset_replslot(slotent, 0);
-	}
-
-	return slotent;
-}
-
-/* ----------
- * pgstat_reset_replslot
- *
- * Reset the given replication slot stats.
- * ----------
- */
-static void
-pgstat_reset_replslot(PgStat_StatReplSlotEntry *slotent, TimestampTz ts)
-{
-	/* reset only counters. Don't clear slot name */
-	slotent->spill_txns = 0;
-	slotent->spill_count = 0;
-	slotent->spill_bytes = 0;
-	slotent->stream_txns = 0;
-	slotent->stream_count = 0;
-	slotent->stream_bytes = 0;
-	slotent->total_txns = 0;
-	slotent->total_bytes = 0;
-	slotent->stat_reset_timestamp = ts;
 }
 
 /*

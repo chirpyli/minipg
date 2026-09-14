@@ -90,11 +90,6 @@ typedef struct ProcArrayStruct
 	 */
 	TransactionId lastOverflowedXid;
 
-	/* oldest xmin of any replication slot */
-	TransactionId replication_slot_xmin;
-	/* oldest catalog xmin of any replication slot */
-	TransactionId replication_slot_catalog_xmin;
-
 	/* indexes into allProcs[], has PROCARRAY_MAXPROCS entries */
 	int			pgprocnos[FLEXIBLE_ARRAY_MEMBER];
 } ProcArrayStruct;
@@ -185,13 +180,6 @@ typedef struct ComputeXidHorizonsResult
 	FullTransactionId latest_completed;
 
 	/*
-	 * The same for procArray->replication_slot_xmin and.
-	 * procArray->replication_slot_catalog_xmin.
-	 */
-	TransactionId slot_xmin;
-	TransactionId slot_catalog_xmin;
-
-	/*
 	 * Oldest xid that any backend might still consider running. This needs to
 	 * include processes running VACUUM, in contrast to the normal visibility
 	 * cutoffs, as vacuum needs to be able to perform pg_subtrans lookups when
@@ -207,22 +195,8 @@ typedef struct ComputeXidHorizonsResult
 	/*
 	 * Oldest xid for which deleted tuples need to be retained in shared
 	 * tables.
-	 *
-	 * This includes the effects of replication slots. If that's not desired,
-	 * look at shared_oldest_nonremovable_raw;
 	 */
 	TransactionId shared_oldest_nonremovable;
-
-	/*
-	 * Oldest xid that may be necessary to retain in shared tables. This is
-	 * the same as shared_oldest_nonremovable, except that is not affected by
-	 * replication slot's catalog_xmin.
-	 *
-	 * This is mainly useful to be able to send the catalog_xmin to upstream
-	 * streaming replication servers via hot_standby_feedback, so they can
-	 * apply the limit only when accessing catalog tables.
-	 */
-	TransactionId shared_oldest_nonremovable_raw;
 
 	/*
 	 * Oldest xid for which deleted tuples need to be retained in non-shared
@@ -449,8 +423,6 @@ CreateSharedProcArray(void)
 		procArray->headKnownAssignedXids = 0;
 		SpinLockInit(&procArray->known_assigned_xids_lck);
 		procArray->lastOverflowedXid = InvalidTransactionId;
-		procArray->replication_slot_xmin = InvalidTransactionId;
-		procArray->replication_slot_catalog_xmin = InvalidTransactionId;
 		ShmemVariableCache->xactCompletionCount = 1;
 	}
 
@@ -1689,7 +1661,7 @@ TransactionIdIsActive(TransactionId xid)
  * Determine XID horizons.
  *
  * This is used by wrapper functions like GetOldestNonRemovableTransactionId()
- * (for VACUUM), GetReplicationHorizons() (for hot_standby_feedback), etc as
+ * (for VACUUM), etc as
  * well as "internally" by GlobalVisUpdate() (see comment above struct
  * GlobalVisState).
  *
@@ -1793,14 +1765,6 @@ ComputeXidHorizons(ComputeXidHorizonsResult *h)
 		else
 			h->temp_oldest_nonremovable = initial;
 	}
-
-	/*
-	 * Fetch slot horizons while ProcArrayLock is held - the
-	 * LWLockAcquire/LWLockRelease are a barrier, ensuring this happens inside
-	 * the lock.
-	 */
-	h->slot_xmin = procArray->replication_slot_xmin;
-	h->slot_catalog_xmin = procArray->replication_slot_catalog_xmin;
 
 	for (int index = 0; index < arrayP->numProcs; index++)
 	{
@@ -1939,28 +1903,9 @@ ComputeXidHorizons(ComputeXidHorizonsResult *h)
 	}
 
 	/*
-	 * Check whether there are replication slots requiring an older xmin.
+	 * Initialize the catalog horizon with the data horizon.
 	 */
-	h->shared_oldest_nonremovable =
-		TransactionIdOlder(h->shared_oldest_nonremovable, h->slot_xmin);
-	h->data_oldest_nonremovable =
-		TransactionIdOlder(h->data_oldest_nonremovable, h->slot_xmin);
-
-	/*
-	 * The only difference between catalog / data horizons is that the slot's
-	 * catalog xmin is applied to the catalog one (so catalogs can be accessed
-	 * for logical decoding). Initialize with data horizon, and then back up
-	 * further if necessary. Have to back up the shared horizon as well, since
-	 * that also can contain catalogs.
-	 */
-	h->shared_oldest_nonremovable_raw = h->shared_oldest_nonremovable;
-	h->shared_oldest_nonremovable =
-		TransactionIdOlder(h->shared_oldest_nonremovable,
-						   h->slot_catalog_xmin);
 	h->catalog_oldest_nonremovable = h->data_oldest_nonremovable;
-	h->catalog_oldest_nonremovable =
-		TransactionIdOlder(h->catalog_oldest_nonremovable,
-						   h->slot_catalog_xmin);
 
 	/*
 	 * It's possible that slots / vacuum_defer_cleanup_age backed up the
@@ -1997,12 +1942,6 @@ ComputeXidHorizons(ComputeXidHorizonsResult *h)
 										 h->data_oldest_nonremovable));
 	Assert(TransactionIdPrecedesOrEquals(h->oldest_considered_running,
 										 h->temp_oldest_nonremovable));
-	Assert(!TransactionIdIsValid(h->slot_xmin) ||
-		   TransactionIdPrecedesOrEquals(h->oldest_considered_running,
-										 h->slot_xmin));
-	Assert(!TransactionIdIsValid(h->slot_catalog_xmin) ||
-		   TransactionIdPrecedesOrEquals(h->oldest_considered_running,
-										 h->slot_catalog_xmin));
 
 	/* update approximate horizons with the computed horizons */
 	GlobalVisUpdateApply(h);
@@ -2081,26 +2020,6 @@ GetOldestTransactionIdConsideredRunning(void)
 	ComputeXidHorizons(&horizons);
 
 	return horizons.oldest_considered_running;
-}
-
-/*
- * Return the visibility horizons for a hot standby feedback message.
- */
-void
-GetReplicationHorizons(TransactionId *xmin, TransactionId *catalog_xmin)
-{
-	ComputeXidHorizonsResult horizons;
-
-	ComputeXidHorizons(&horizons);
-
-	/*
-	 * Don't want to use shared_oldest_nonremovable here, as that contains the
-	 * effect of replication slot's catalog_xmin. We want to send a separate
-	 * feedback for the catalog horizon, so the primary can remove data table
-	 * contents more aggressively.
-	 */
-	*xmin = horizons.shared_oldest_nonremovable_raw;
-	*catalog_xmin = horizons.slot_catalog_xmin;
 }
 
 /*
@@ -2259,9 +2178,6 @@ GetSnapshotData(Snapshot snapshot)
 	int			mypgxactoff;
 	TransactionId myxid;
 	uint64		curXactCompletionCount;
-
-	TransactionId replication_slot_xmin = InvalidTransactionId;
-	TransactionId replication_slot_catalog_xmin = InvalidTransactionId;
 
 	Assert(snapshot != NULL);
 
@@ -2480,9 +2396,6 @@ GetSnapshotData(Snapshot snapshot)
 	 * LWLockRelease below is a barrier, ensuring this happens inside the
 	 * lock.
 	 */
-	replication_slot_xmin = procArray->replication_slot_xmin;
-	replication_slot_catalog_xmin = procArray->replication_slot_catalog_xmin;
-
 	if (!TransactionIdIsValid(MyProc->xmin))
 		MyProc->xmin = TransactionXmin = xmin;
 
@@ -2509,10 +2422,6 @@ GetSnapshotData(Snapshot snapshot)
 								   vacuum_defer_cleanup_age,
 								   oldestfxid);
 
-		/* Check whether there's a replication slot requiring an older xmin. */
-		def_vis_xid_data =
-			TransactionIdOlder(def_vis_xid_data, replication_slot_xmin);
-
 		/*
 		 * Rows in non-shared, non-catalog tables possibly could be vacuumed
 		 * if older than this xid.
@@ -2523,9 +2432,6 @@ GetSnapshotData(Snapshot snapshot)
 		 * Check whether there's a replication slot requiring an older catalog
 		 * xmin.
 		 */
-		def_vis_xid =
-			TransactionIdOlder(replication_slot_catalog_xmin, def_vis_xid);
-
 		def_vis_fxid = FullXidRelativeTo(latest_completed, def_vis_xid);
 		def_vis_fxid_data = FullXidRelativeTo(latest_completed, def_vis_xid_data);
 
@@ -3021,24 +2927,6 @@ GetOldestSafeDecodingTransactionId(bool catalogOnly)
 	 */
 	LWLockAcquire(XidGenLock, LW_SHARED);
 	oldestSafeXid = XidFromFullTransactionId(ShmemVariableCache->nextXid);
-
-	/*
-	 * If there's already a slot pegging the xmin horizon, we can start with
-	 * that value, it's guaranteed to be safe since it's computed by this
-	 * routine initially and has been enforced since.  We can always use the
-	 * slot's general xmin horizon, but the catalog horizon is only usable
-	 * when only catalog data is going to be looked at.
-	 */
-	if (TransactionIdIsValid(procArray->replication_slot_xmin) &&
-		TransactionIdPrecedes(procArray->replication_slot_xmin,
-							  oldestSafeXid))
-		oldestSafeXid = procArray->replication_slot_xmin;
-
-	if (catalogOnly &&
-		TransactionIdIsValid(procArray->replication_slot_catalog_xmin) &&
-		TransactionIdPrecedes(procArray->replication_slot_catalog_xmin,
-							  oldestSafeXid))
-		oldestSafeXid = procArray->replication_slot_catalog_xmin;
 
 	/*
 	 * If we're not in recovery, we walk over the procarray and collect the
@@ -3960,32 +3848,6 @@ TerminateOtherDBBackends(Oid databaseId)
 			}
 		}
 	}
-}
-
-/*
- * ProcArraySetReplicationSlotXmin
- *
- * Install limits to future computations of the xmin horizon to prevent vacuum
- * and HOT pruning from removing affected rows still needed by clients with
- * replication slots.
- */
-void
-ProcArraySetReplicationSlotXmin(TransactionId xmin, TransactionId catalog_xmin,
-								bool already_locked)
-{
-	Assert(!already_locked || LWLockHeldByMe(ProcArrayLock));
-
-	if (!already_locked)
-		LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
-
-	procArray->replication_slot_xmin = xmin;
-	procArray->replication_slot_catalog_xmin = catalog_xmin;
-
-	if (!already_locked)
-		LWLockRelease(ProcArrayLock);
-
-	elog(DEBUG1, "xmin required by slots: data %u, catalog %u",
-		 xmin, catalog_xmin);
 }
 
 /*
