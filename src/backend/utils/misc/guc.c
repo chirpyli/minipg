@@ -157,8 +157,6 @@ static int	syslog_facility = 0;
 static void assign_syslog_facility(int newval, void *extra);
 static void assign_syslog_ident(const char *newval, void *extra);
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
-static bool check_stage_log_stats(bool *newval, void **extra, GucSource source);
-static bool check_log_stats(bool *newval, void **extra, GucSource source);
 static bool check_canonical_path(char **newval, void **extra, GucSource source);
 static bool check_timezone_abbreviations(char **newval, void **extra, GucSource source);
 static void assign_timezone_abbreviations(const char *newval, void *extra);
@@ -442,11 +440,6 @@ bool		Debug_print_parse = false;
 bool		Debug_print_rewritten = false;
 bool		Debug_pretty_print = true;
 
-bool		log_planner_stats = false;
-bool		log_executor_stats = false;
-bool		log_statement_stats = false;	/* this is sort of all three above
-											 * together */
-bool		log_btree_build_stats = false;
 
 /*
  * This GUC exists solely for backward compatibility, check its definition for
@@ -1170,46 +1163,6 @@ static struct config_bool ConfigureNamesBool[] =
 		true,
 		NULL, NULL, NULL
 	},
-	{
-		{"log_planner_stats", PGC_SUSET, STATS_MONITORING,
-			gettext_noop("Writes planner performance statistics to the server log."),
-			NULL
-		},
-		&log_planner_stats,
-		false,
-		check_stage_log_stats, NULL, NULL
-	},
-	{
-		{"log_executor_stats", PGC_SUSET, STATS_MONITORING,
-			gettext_noop("Writes executor performance statistics to the server log."),
-			NULL
-		},
-		&log_executor_stats,
-		false,
-		check_stage_log_stats, NULL, NULL
-	},
-	{
-		{"log_statement_stats", PGC_SUSET, STATS_MONITORING,
-			gettext_noop("Writes cumulative performance statistics to the server log."),
-			NULL
-		},
-		&log_statement_stats,
-		false,
-		check_log_stats, NULL, NULL
-	},
-#ifdef BTREE_BUILD_STATS
-	{
-		{"log_btree_build_stats", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Logs system resource usage statistics (memory and CPU) on various B-tree operations."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&log_btree_build_stats,
-		false,
-		NULL, NULL, NULL
-	},
-#endif
-
 	{
 		{"track_activities", PGC_SUSET, STATS_COLLECTOR,
 			gettext_noop("Collects information about executing commands."),
@@ -9516,31 +9469,6 @@ check_temp_buffers(int *newval, void **extra, GucSource source)
 	return true;
 }
 
-
-static bool
-check_stage_log_stats(bool *newval, void **extra, GucSource source)
-{
-	if (*newval && log_statement_stats)
-	{
-		GUC_check_errdetail("Cannot enable parameter when \"log_statement_stats\" is true.");
-		return false;
-	}
-	return true;
-}
-
-static bool
-check_log_stats(bool *newval, void **extra, GucSource source)
-{
-	if (*newval &&
-		(log_planner_stats || log_executor_stats))
-	{
-		GUC_check_errdetail("Cannot enable \"log_statement_stats\" when "
-							"\"log_planner_stats\", "
-							"or \"log_executor_stats\" is true.");
-		return false;
-	}
-	return true;
-}
 
 static bool
 check_canonical_path(char **newval, void **extra, GucSource source)

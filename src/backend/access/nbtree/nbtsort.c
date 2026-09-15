@@ -301,10 +301,6 @@ btbuild(Relation heap, Relation index, IndexInfo *indexInfo)
 	BTBuildState buildstate;
 	double		reltuples;
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-		ResetUsage();
-#endif							/* BTREE_BUILD_STATS */
 
 	buildstate.isunique = indexInfo->ii_Unique;
 	buildstate.havedead = false;
@@ -341,13 +337,6 @@ btbuild(Relation heap, Relation index, IndexInfo *indexInfo)
 	result->heap_tuples = reltuples;
 	result->index_tuples = buildstate.indtuples;
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-	{
-		ShowUsage("BTREE BUILD STATS");
-		ResetUsage();
-	}
-#endif							/* BTREE_BUILD_STATS */
 
 	return result;
 }
@@ -539,13 +528,6 @@ _bt_leafbuild(BTSpool *btspool, BTSpool *btspool2)
 {
 	BTWriteState wstate;
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-	{
-		ShowUsage("BTREE BUILD (Spool) STATISTICS");
-		ResetUsage();
-	}
-#endif							/* BTREE_BUILD_STATS */
 
 	/* Execute the sort */
 	pgstat_progress_update_param(PROGRESS_CREATEIDX_SUBPHASE,
@@ -1771,13 +1753,6 @@ _bt_leader_participate_as_worker(BTBuildState *buildstate)
 							   btleader->sharedsort, btleader->sharedsort2,
 							   sortmem, true);
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-	{
-		ShowUsage("BTREE BUILD (Leader Partial Spool) STATISTICS");
-		ResetUsage();
-	}
-#endif							/* BTREE_BUILD_STATS */
 }
 
 /*
@@ -1800,10 +1775,6 @@ _bt_parallel_build_main(dsm_segment *seg, shm_toc *toc)
 	BufferUsage *bufferusage;
 	int			sortmem;
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-		ResetUsage();
-#endif							/* BTREE_BUILD_STATS */
 
 	/*
 	 * The only possible status flag that can be set to the parallel worker is
@@ -1880,13 +1851,6 @@ _bt_parallel_build_main(dsm_segment *seg, shm_toc *toc)
 	InstrEndParallelQuery(&bufferusage[ParallelWorkerNumber],
 						  &walusage[ParallelWorkerNumber]);
 
-#ifdef BTREE_BUILD_STATS
-	if (log_btree_build_stats)
-	{
-		ShowUsage("BTREE BUILD (Worker Partial Spool) STATISTICS");
-		ResetUsage();
-	}
-#endif							/* BTREE_BUILD_STATS */
 
 	index_close(indexRel, indexLockmode);
 	table_close(heapRel, heapLockmode);

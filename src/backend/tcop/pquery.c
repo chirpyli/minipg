@@ -607,12 +607,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 	if (qc)
 		InitializeQueryCompletion(qc);
 
-	if (log_executor_stats && portal->strategy != PORTAL_MULTI_QUERY)
-	{
-		elog(DEBUG3, "PortalRun");
-		/* PORTAL_MULTI_QUERY logs its own stats per query */
-		ResetUsage();
-	}
 
 	/*
 	 * Check for improper portal use, and mark portal active.
@@ -737,8 +731,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 		CurrentResourceOwner = saveResourceOwner;
 	PortalContext = savePortalContext;
 
-	if (log_executor_stats && portal->strategy != PORTAL_MULTI_QUERY)
-		ShowUsage("EXECUTOR STATISTICS");
 
 	TRACE_POSTGRESQL_QUERY_EXECUTE_DONE();
 
@@ -1067,8 +1059,6 @@ PortalRunMulti(Portal portal,
 			 */
 			TRACE_POSTGRESQL_QUERY_EXECUTE_START();
 
-			if (log_executor_stats)
-				ResetUsage();
 
 			/*
 			 * Must always have a snapshot for plannable queries.  First time
@@ -1127,8 +1117,6 @@ PortalRunMulti(Portal portal,
 							 altdest, NULL);
 			}
 
-			if (log_executor_stats)
-				ShowUsage("EXECUTOR STATISTICS");
 
 			TRACE_POSTGRESQL_QUERY_EXECUTE_DONE();
 		}

@@ -76,12 +76,9 @@ extern void PostgresMain(int argc, char *argv[],
 						 const char *dbname,
 						 const char *username) pg_attribute_noreturn();
 extern long get_stack_depth_rlimit(void);
-extern void ResetUsage(void);
-extern void ShowUsage(const char *title);
 extern void set_debug_options(int debug_flag,
 							  GucContext context, GucSource source);
 extern bool set_plan_disabling_options(const char *arg,
 									   GucContext context, GucSource source);
-extern const char *get_stats_option_name(const char *arg);
 
 #endif							/* TCOPPROT_H */

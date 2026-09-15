@@ -232,10 +232,6 @@ extern bool Debug_print_plan;
 extern bool Debug_print_parse;
 extern bool Debug_print_rewritten;
 extern bool Debug_pretty_print;
-extern bool log_planner_stats;
-extern bool log_executor_stats;
-extern bool log_statement_stats;
-extern bool log_btree_build_stats;
 extern bool session_auth_is_superuser;
 
 extern int	log_parameter_max_length;
