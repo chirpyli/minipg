@@ -2018,11 +2018,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 											  locally_added_param);
 				scan_params = bms_add_member(bms_copy(scan_params),
 											 locally_added_param);
-				finalize_primnode((Node *) mtplan->onConflictSet,
-								  &context);
-				finalize_primnode((Node *) mtplan->onConflictWhere,
-								  &context);
-				/* exclRelTlist contains only Vars, doesn't need examination */
 			}
 			break;
 

@@ -223,7 +223,7 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												Index nominalRelation, Index rootRelation,
 												List *resultRelations,
 												List *updateColnosLists,
-												List *rowMarks, OnConflictExpr *onconflict,
+												List *rowMarks,
 												int epqParam);
 extern LimitPath *create_limit_path(PlannerInfo *root, RelOptInfo *rel,
 									Path *subpath,

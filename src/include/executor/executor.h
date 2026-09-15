@@ -161,8 +161,7 @@ extern void standard_ExecutorFinish(QueryDesc *queryDesc);
 extern void ExecutorEnd(QueryDesc *queryDesc);
 extern void standard_ExecutorEnd(QueryDesc *queryDesc);
 extern void ExecutorRewind(QueryDesc *queryDesc);
-extern void CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
-								   OnConflictAction onConflictAction);
+extern void CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation);
 extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation);
 extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  Relation resultRelationDesc,
@@ -552,8 +551,6 @@ extern Datum GetAttributeByNum(HeapTupleHeader tuple, AttrNumber attrno,
 extern int	ExecTargetListLength(List *targetlist);
 extern int	ExecCleanTargetListLength(List *targetlist);
 
-extern TupleTableSlot *ExecGetConflictSlot(EState *estate, ResultRelInfo *relInfo);
-
 extern Bitmapset *ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate);
 extern Bitmapset *ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate);
 extern Bitmapset *ExecGetAllUpdatedCols(ResultRelInfo *relinfo, EState *estate);
@@ -567,11 +564,10 @@ extern List *ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 								   TupleTableSlot *slot, EState *estate,
 								   bool update,
 								   bool noDupErr,
-								   bool *specConflict, List *arbiterIndexes);
+								   bool *specConflict);
 extern bool ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo,
 									  TupleTableSlot *slot,
-									  EState *estate, ItemPointer conflictTid,
-									  List *arbiterIndexes);
+									  EState *estate, ItemPointer conflictTid);
 
 /*
  * prototypes from functions in nodeModifyTable.c

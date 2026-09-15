@@ -60,13 +60,6 @@ typedef struct MTTargetRelLookup
 	Oid			relationOid;	/* hash key, must be first */
 	int			relationIndex;	/* rel's index in resultRelInfo[] array */
 } MTTargetRelLookup;
-static bool ExecOnConflictUpdate(ModifyTableState *mtstate,
-								 ResultRelInfo *resultRelInfo,
-								 ItemPointer conflictTid,
-								 TupleTableSlot *planSlot,
-								 TupleTableSlot *excludedSlot,
-								 EState *estate,
-								 bool canSetTag);
 
 /*
  * Verify that the tuples to be produced by INSERT match the
@@ -425,9 +418,6 @@ ExecInsert(ModifyTableState *mtstate,
 {
 	Relation	resultRelationDesc;
 	List	   *recheckIndexes = NIL;
-	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
-	OnConflictAction onconflict = node->onConflictAction;
-
 	ExecMaterializeSlot(slot);
 
 	resultRelationDesc = resultRelInfo->ri_RelationDesc;
@@ -438,7 +428,7 @@ ExecInsert(ModifyTableState *mtstate,
 	 */
 	if (resultRelationDesc->rd_rel->relhasindex &&
 		resultRelInfo->ri_IndexRelationDescs == NULL)
-		ExecOpenIndices(resultRelInfo, onconflict != ONCONFLICT_NONE);
+		ExecOpenIndices(resultRelInfo, false);
 
 	{
 		/*
@@ -447,135 +437,16 @@ ExecInsert(ModifyTableState *mtstate,
 		 */
 		slot->tts_tableOid = RelationGetRelid(resultRelationDesc);
 
-		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
-		{
-			/* Perform a speculative insertion. */
-			uint32		specToken;
-			ItemPointerData conflictTid;
-			bool		specConflict;
-			List	   *arbiterIndexes;
+		/* insert the tuple normally */
+		table_tuple_insert(resultRelationDesc, slot,
+						   estate->es_output_cid,
+						   0, NULL);
 
-			arbiterIndexes = resultRelInfo->ri_onConflictArbiterIndexes;
-
-			/*
-			 * Do a non-conclusive check for conflicts first.
-			 *
-			 * We're not holding any locks yet, so this doesn't guarantee that
-			 * the later insert won't conflict.  But it avoids leaving behind
-			 * a lot of canceled speculative insertions, if you run a lot of
-			 * INSERT ON CONFLICT statements that do conflict.
-			 *
-			 * We loop back here if we find a conflict below, either during
-			 * the pre-check, or when we re-check after inserting the tuple
-			 * speculatively.  Better allow interrupts in case some bug makes
-			 * this an infinite loop.
-			 */
-	vlock:
-			CHECK_FOR_INTERRUPTS();
-			specConflict = false;
-			if (!ExecCheckIndexConstraints(resultRelInfo, slot, estate,
-										   &conflictTid, arbiterIndexes))
-			{
-				/* committed conflict tuple found */
-				if (onconflict == ONCONFLICT_UPDATE)
-				{
-					/*
-					 * In case of ON CONFLICT DO UPDATE, execute the UPDATE
-					 * part.  Be prepared to retry if the UPDATE fails because
-					 * of another concurrent UPDATE/DELETE to the conflict
-					 * tuple.
-					 */
-					if (ExecOnConflictUpdate(mtstate, resultRelInfo,
-											 &conflictTid, planSlot, slot,
-											 estate, canSetTag))
-					{
-						InstrCountTuples2(&mtstate->ps, 1);
-						return;
-					}
-					else
-						goto vlock;
-				}
-				else
-				{
-					/*
-					 * In case of ON CONFLICT DO NOTHING, do nothing. However,
-					 * verify that the tuple is visible to the executor's MVCC
-					 * snapshot at higher isolation levels.
-					 *
-					 * Using ExecGetConflictSlot() to store the tuple for the
-					 * recheck isn't that pretty, but we can't trivially use
-					 * the input slot, because it might not be of a compatible
-					 * type. As there's no conflicting usage of
-					 * ExecGetConflictSlot() in the DO NOTHING case...
-					 */
-					Assert(onconflict == ONCONFLICT_NOTHING);
-					ExecCheckTIDVisible(estate, resultRelInfo, &conflictTid,
-										ExecGetConflictSlot(estate, resultRelInfo));
-					InstrCountTuples2(&mtstate->ps, 1);
-					return;
-				}
-			}
-
-			/*
-			 * Before we start insertion proper, acquire our "speculative
-			 * insertion lock".  Others can use that to wait for us to decide
-			 * if we're going to go ahead with the insertion, instead of
-			 * waiting for the whole transaction to complete.
-			 */
-			specToken = SpeculativeInsertionLockAcquire(GetCurrentTransactionId());
-
-			/* insert the tuple, with the speculative token */
-			table_tuple_insert_speculative(resultRelationDesc, slot,
-										   estate->es_output_cid,
-										   0,
-										   NULL,
-										   specToken);
-
-			/* insert index entries for tuple */
+		/* insert index entries for tuple */
+		if (resultRelInfo->ri_NumIndices > 0)
 			recheckIndexes = ExecInsertIndexTuples(resultRelInfo,
-												   slot, estate, false, true,
-												   &specConflict,
-												   arbiterIndexes);
-
-			/* adjust the tuple's state accordingly */
-			table_tuple_complete_speculative(resultRelationDesc, slot,
-											 specToken, !specConflict);
-
-			/*
-			 * Wake up anyone waiting for our decision.  They will re-check
-			 * the tuple, see that it's no longer speculative, and wait on our
-			 * XID as if this was a regularly inserted tuple all along.  Or if
-			 * we killed the tuple, they will see it's dead, and proceed as if
-			 * the tuple never existed.
-			 */
-			SpeculativeInsertionLockRelease(GetCurrentTransactionId());
-
-			/*
-			 * If there was a conflict, start from the beginning.  We'll do
-			 * the pre-check again, which will now find the conflicting tuple
-			 * (unless it aborts before we get there).
-			 */
-			if (specConflict)
-			{
-				list_free(recheckIndexes);
-				goto vlock;
-			}
-
-			/* Since there was no insertion conflict, we're done */
-		}
-		else
-		{
-			/* insert the tuple normally */
-			table_tuple_insert(resultRelationDesc, slot,
-							   estate->es_output_cid,
-							   0, NULL);
-
-			/* insert index entries for tuple */
-			if (resultRelInfo->ri_NumIndices > 0)
-				recheckIndexes = ExecInsertIndexTuples(resultRelInfo,
-													   slot, estate, false,
-													   false, NULL, NIL);
-		}
+												   slot, estate, false,
+												   false, NULL);
 	}
 
 	if (canSetTag)
@@ -1024,7 +895,7 @@ lreplace:
 		if (resultRelInfo->ri_NumIndices > 0 && update_indexes)
 			recheckIndexes = ExecInsertIndexTuples(resultRelInfo,
 												   slot, estate, true, false,
-												   NULL, NIL);
+												   NULL);
 	}
 
 	if (canSetTag)
@@ -1033,209 +904,6 @@ lreplace:
 	list_free(recheckIndexes);
 }
 
-/*
- * ExecOnConflictUpdate --- execute UPDATE of INSERT ON CONFLICT DO UPDATE
- *
- * Try to lock tuple for update as part of speculative insertion.  If
- * a qual originating from ON CONFLICT DO UPDATE is satisfied, update
- * (but still lock row, even though it may not satisfy estate's
- * snapshot).
- *
- * Returns true if we're done (with or without an update), or false if
- * the caller must retry the INSERT from scratch.
- */
-static bool
-ExecOnConflictUpdate(ModifyTableState *mtstate,
-					 ResultRelInfo *resultRelInfo,
-					 ItemPointer conflictTid,
-					 TupleTableSlot *planSlot,
-					 TupleTableSlot *excludedSlot,
-					 EState *estate,
-					 bool canSetTag)
-{
-	ExprContext *econtext = mtstate->ps.ps_ExprContext;
-	Relation	relation = resultRelInfo->ri_RelationDesc;
-	ExprState  *onConflictSetWhere = resultRelInfo->ri_onConflict->oc_WhereClause;
-	TupleTableSlot *existing = resultRelInfo->ri_onConflict->oc_Existing;
-	TM_FailureData tmfd;
-	LockTupleMode lockmode;
-	TM_Result	test;
-	Datum		xminDatum;
-	TransactionId xmin;
-	bool		isnull;
-
-	/*
-	 * Parse analysis should have blocked ON CONFLICT for all system
-	 * relations, which includes these.  There's no fundamental obstacle to
-	 * supporting this; we'd just need to handle LOCKTAG_TUPLE like the other
-	 * ExecUpdate() caller.
-	 */
-	Assert(!resultRelInfo->ri_needLockTagTuple);
-
-	/* Determine lock mode to use */
-	lockmode = ExecUpdateLockMode(estate, resultRelInfo);
-
-	/*
-	 * Lock tuple for update.  Don't follow updates when tuple cannot be
-	 * locked without doing so.  A row locking conflict here means our
-	 * previous conclusion that the tuple is conclusively committed is not
-	 * true anymore.
-	 */
-	test = table_tuple_lock(relation, conflictTid,
-							estate->es_snapshot,
-							existing, estate->es_output_cid,
-							lockmode, LockWaitBlock, 0,
-							&tmfd);
-	switch (test)
-	{
-		case TM_Ok:
-			/* success! */
-			break;
-
-		case TM_Invisible:
-
-			/*
-			 * This can occur when a just inserted tuple is updated again in
-			 * the same command. E.g. because multiple rows with the same
-			 * conflicting key values are inserted.
-			 *
-			 * This is somewhat similar to the ExecUpdate() TM_SelfModified
-			 * case.  We do not want to proceed because it would lead to the
-			 * same row being updated a second time in some unspecified order,
-			 * and in contrast to plain UPDATEs there's no historical behavior
-			 * to break.
-			 *
-			 * It is the user's responsibility to prevent this situation from
-			 * occurring.  These problems are why SQL-2003 similarly specifies
-			 * that for SQL MERGE, an exception must be raised in the event of
-			 * an attempt to update the same row twice.
-			 */
-			xminDatum = slot_getsysattr(existing,
-										MinTransactionIdAttributeNumber,
-										&isnull);
-			Assert(!isnull);
-			xmin = DatumGetTransactionId(xminDatum);
-
-			if (TransactionIdIsCurrentTransactionId(xmin))
-				ereport(ERROR,
-						(errcode(ERRCODE_CARDINALITY_VIOLATION),
-						 errmsg("ON CONFLICT DO UPDATE command cannot affect row a second time"),
-						 errhint("Ensure that no rows proposed for insertion within the same command have duplicate constrained values.")));
-
-			/* This shouldn't happen */
-			elog(ERROR, "attempted to lock invisible tuple");
-			break;
-
-		case TM_SelfModified:
-
-			/*
-			 * This state should never be reached. As a dirty snapshot is used
-			 * to find conflicting tuples, speculative insertion wouldn't have
-			 * seen this row to conflict with.
-			 */
-			elog(ERROR, "unexpected self-updated tuple");
-			break;
-
-		case TM_Updated:
-			if (IsolationUsesXactSnapshot())
-				ereport(ERROR,
-						(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
-						 errmsg("could not serialize access due to concurrent update")));
-
-			/*
-			 * Tell caller to try again from the very start.
-			 *
-			 * It does not make sense to use the usual EvalPlanQual() style
-			 * loop here, as the new version of the row might not conflict
-			 * anymore, or the conflicting tuple has actually been deleted.
-			 */
-			ExecClearTuple(existing);
-			return false;
-
-		case TM_Deleted:
-			if (IsolationUsesXactSnapshot())
-				ereport(ERROR,
-						(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
-						 errmsg("could not serialize access due to concurrent delete")));
-
-			/* see TM_Updated case */
-			ExecClearTuple(existing);
-			return false;
-
-		default:
-			elog(ERROR, "unrecognized table_tuple_lock status: %u", test);
-	}
-
-	/* Success, the tuple is locked. */
-
-	/*
-	 * Verify that the tuple is visible to our MVCC snapshot if the current
-	 * isolation level mandates that.
-	 *
-	 * It's not sufficient to rely on the check within ExecUpdate() as e.g.
-	 * CONFLICT ... WHERE clause may prevent us from reaching that.
-	 *
-	 * This means we only ever continue when a new command in the current
-	 * transaction could see the row, even though in READ COMMITTED mode the
-	 * tuple will not be visible according to the current statement's
-	 * snapshot.  This is in line with the way UPDATE deals with newer tuple
-	 * versions.
-	 */
-	ExecCheckTupleVisible(estate, relation, existing);
-
-	/*
-	 * Make tuple and any needed join variables available to ExecQual and
-	 * ExecProject.  The EXCLUDED tuple is installed in ecxt_innertuple, while
-	 * the target's existing tuple is installed in the scantuple.  EXCLUDED
-	 * has been made to reference INNER_VAR in setrefs.c, but there is no
-	 * other redirection.
-	 */
-	econtext->ecxt_scantuple = existing;
-	econtext->ecxt_innertuple = excludedSlot;
-	econtext->ecxt_outertuple = NULL;
-
-	if (!ExecQual(onConflictSetWhere, econtext))
-	{
-		ExecClearTuple(existing);	/* see return below */
-		InstrCountFiltered1(&mtstate->ps, 1);
-		return true;			/* done with the tuple */
-	}
-
-	/* Project the new tuple version */
-	ExecProject(resultRelInfo->ri_onConflict->oc_ProjInfo);
-
-	/*
-	 * Note that it is possible that the target tuple has been modified in
-	 * this session, after the above table_tuple_lock. We choose to not error
-	 * out in that case, in line with ExecUpdate's treatment of similar cases.
-	 * This can happen if an UPDATE is triggered from within ExecQual(),
-	 * ExecProject() above, e.g. by selecting from a
-	 * wCTE in the ON CONFLICT's SET.
-	 */
-
-	/* Execute UPDATE with projection */
-	ExecUpdate(mtstate, resultRelInfo, conflictTid, NULL,
-			   resultRelInfo->ri_onConflict->oc_ProjSlot,
-			   planSlot,
-			   &mtstate->mt_epqstate, mtstate->ps.state,
-			   canSetTag);
-
-	/*
-	 * Clear out existing tuple, as there might not be another conflict among
-	 * the next input rows. Don't want to hold resources till the end of the
-	 * query.
-	 */
-	ExecClearTuple(existing);
-	return true;
-}
-
-
-/* ----------------------------------------------------------------
- *	   ExecModifyTable
- *
- *		Perform table modifications as required.
- * ----------------------------------------------------------------
- */
 static TupleTableSlot *
 ExecModifyTable(PlanState *pstate)
 {
@@ -1631,8 +1299,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		/*
 		 * Verify result relation is a valid target for the current operation
 		 */
-		CheckValidResultRelNew(resultRelInfo, operation,
-							   node->onConflictAction);
+		CheckValidResultRelNew(resultRelInfo, operation);
 
 		resultRelInfo++;
 		i++;
@@ -1708,70 +1375,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	ExecInitResultTypeTL(&mtstate->ps);
 
 	mtstate->ps.ps_ExprContext = NULL;
-
-	/* Set the list of arbiter indexes if needed for ON CONFLICT */
-	resultRelInfo = mtstate->resultRelInfo;
-	if (node->onConflictAction != ONCONFLICT_NONE)
-	{
-		/* insert may only have one relation, inheritance is not expanded */
-		Assert(nrels == 1);
-		resultRelInfo->ri_onConflictArbiterIndexes = node->arbiterIndexes;
-	}
-
-	/*
-	 * If needed, Initialize target list, projection and qual for ON CONFLICT
-	 * DO UPDATE.
-	 */
-	if (node->onConflictAction == ONCONFLICT_UPDATE)
-	{
-		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
-		ExprContext *econtext;
-		TupleDesc	relationDesc;
-
-		/* create an econtext for ON CONFLICT expression evaluation */
-		if (mtstate->ps.ps_ExprContext == NULL)
-			ExecAssignExprContext(estate, &mtstate->ps);
-
-		econtext = mtstate->ps.ps_ExprContext;
-		relationDesc = resultRelInfo->ri_RelationDesc->rd_att;
-
-		/* create state for DO UPDATE SET operation */
-		resultRelInfo->ri_onConflict = onconfl;
-
-		/* initialize slot for the existing tuple */
-		onconfl->oc_Existing =
-			table_slot_create(resultRelInfo->ri_RelationDesc,
-							  &mtstate->ps.state->es_tupleTable);
-
-		/*
-		 * Create the tuple slot for the UPDATE SET projection. We want a slot
-		 * of the table's type here, because the slot will be used to insert
-		 * into the table, and it may need to hold system attributes.
-		 */
-		onconfl->oc_ProjSlot =
-			table_slot_create(resultRelInfo->ri_RelationDesc,
-							  &mtstate->ps.state->es_tupleTable);
-
-		/* build UPDATE SET projection state */
-		onconfl->oc_ProjInfo =
-			ExecBuildUpdateProjection(node->onConflictSet,
-									  true,
-									  node->onConflictCols,
-									  relationDesc,
-									  econtext,
-									  onconfl->oc_ProjSlot,
-									  &mtstate->ps);
-
-		/* initialize state to evaluate the WHERE clause, if any */
-		if (node->onConflictWhere)
-		{
-			ExprState  *qualexpr;
-
-			qualexpr = ExecInitQual((List *) node->onConflictWhere,
-									&mtstate->ps);
-			onconfl->oc_WhereClause = qualexpr;
-		}
-	}
 
 	/*
 	 * If we have any secondary relations in an UPDATE or DELETE, they need to

@@ -129,8 +129,6 @@ typedef struct Query
 
 	List	   *targetList;		/* target list (of TargetEntry) */
 
-	OnConflictExpr *onConflict; /* ON CONFLICT DO [NOTHING | UPDATE] */
-
 	List	   *groupClause;	/* a list of SortGroupClause's */
 	bool		groupDistinct;	/* is the group by clause distinct? */
 
@@ -986,37 +984,6 @@ typedef struct RowMarkClause
 	bool		pushedDown;		/* pushed down from higher query level? */
 } RowMarkClause;
 
-/*
- * InferClause -
- *		ON CONFLICT unique index inference clause
- *
- * Note: InferClause does not propagate into the Query representation.
- */
-typedef struct InferClause
-{
-	NodeTag		type;
-	List	   *indexElems;		/* IndexElems to infer unique index */
-	Node	   *whereClause;	/* qualification (partial-index predicate) */
-	char	   *conname;		/* Constraint name, or NULL if unnamed */
-	int			location;		/* token location, or -1 if unknown */
-} InferClause;
-
-/*
- * OnConflictClause -
- *		representation of ON CONFLICT clause
- *
- * Note: OnConflictClause does not propagate into the Query representation.
- */
-typedef struct OnConflictClause
-{
-	NodeTag		type;
-	OnConflictAction action;	/* DO NOTHING or UPDATE? */
-	InferClause *infer;			/* Optional index inference clause */
-	List	   *targetList;		/* the target list (of ResTarget) */
-	Node	   *whereClause;	/* qualifications */
-	int			location;		/* token location, or -1 if unknown */
-} OnConflictClause;
-
 /*****************************************************************************
  *		Raw Grammar Output Statements
  *****************************************************************************/
@@ -1059,7 +1026,6 @@ typedef struct InsertStmt
 	RangeVar   *relation;		/* relation to insert into */
 	List	   *cols;			/* optional: names of the target columns */
 	Node	   *selectStmt;		/* the source SELECT/VALUES, or NULL */
-	OnConflictClause *onConflictClause; /* ON CONFLICT clause */
 } InsertStmt;
 
 /* ----------------------

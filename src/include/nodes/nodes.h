@@ -34,7 +34,6 @@ typedef enum NodeTag
 	T_ExprContext,
 	T_ProjectionInfo,
 	T_JunkFilter,
-	T_OnConflictSetState,
 	T_ResultRelInfo,
 	T_EState,
 	T_TupleTableSlot,
@@ -166,12 +165,10 @@ typedef enum NodeTag
 	T_SQLValueFunction,
 	T_NullTest,
 	T_BooleanTest,
-	T_InferenceElem,
 	T_TargetEntry,
 	T_RangeTblRef,
 	T_JoinExpr,
 	T_FromExpr,
-	T_OnConflictExpr,
 
 	/*
 	 * TAGS FOR EXPRESSION STATE NODES (execnodes.h)
@@ -330,8 +327,6 @@ typedef enum NodeTag
 	T_ObjectWithArgs,
 	T_LockingClause,
 	T_RowMarkClause,
-	T_InferClause,
-	T_OnConflictClause,
 	T_VacuumRelation,
 
 	/*
@@ -628,18 +623,6 @@ typedef enum AggSplit
 #define DO_AGGSPLIT_SERIALIZE(as)	(((as) & AGGSPLITOP_SERIALIZE) != 0)
 #define DO_AGGSPLIT_DESERIALIZE(as) (((as) & AGGSPLITOP_DESERIALIZE) != 0)
 
-/*
- * OnConflictAction -
- *	  "ON CONFLICT" clause type of query
- *
- * This is needed in both parsenodes.h and plannodes.h, so put it here...
- */
-typedef enum OnConflictAction
-{
-	ONCONFLICT_NONE,			/* No "ON CONFLICT" clause */
-	ONCONFLICT_NOTHING,			/* ON CONFLICT ... DO NOTHING */
-	ONCONFLICT_UPDATE			/* ON CONFLICT ... DO UPDATE */
-} OnConflictAction;
 
 /*
  * LimitOption -

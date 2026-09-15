@@ -58,8 +58,6 @@ static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt);
 static List *transformInsertRow(ParseState *pstate, List *exprlist,
 								List *stmtcols, List *icolumns, List *attrnos,
 								bool strip_indirection);
-static OnConflictExpr *transformOnConflictClause(ParseState *pstate,
-												 OnConflictClause *onConflictClause);
 static Query *transformSelectStmt(ParseState *pstate, SelectStmt *stmt);
 static Query *transformValuesClause(ParseState *pstate, SelectStmt *stmt);
 static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt);
@@ -705,23 +703,6 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 										   attr_num - FirstLowInvalidHeapAttributeNumber);
 	}
 
-	/*
-	 * If we have any clauses yet to process, set the query namespace to
-	 * contain only the target relation, removing any entries added in a
-	 * sub-SELECT or VALUES list.
-	 */
-	if (stmt->onConflictClause)
-	{
-		pstate->p_namespace = NIL;
-		addNSItemToQuery(pstate, pstate->p_target_nsitem,
-						 false, true, true);
-	}
-
-	/* Process ON CONFLICT, if any. */
-	if (stmt->onConflictClause)
-		qry->onConflict = transformOnConflictClause(pstate,
-													stmt->onConflictClause);
-
 	/* done building the range table and jointree */
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
@@ -831,169 +812,7 @@ transformInsertRow(ParseState *pstate, List *exprlist,
 	return result;
 }
 
-/*
- * transformOnConflictClause -
- *	  transforms an OnConflictClause in an INSERT
- */
-static OnConflictExpr *
-transformOnConflictClause(ParseState *pstate,
-						  OnConflictClause *onConflictClause)
-{
-	ParseNamespaceItem *exclNSItem = NULL;
-	List	   *arbiterElems;
-	Node	   *arbiterWhere;
-	Oid			arbiterConstraint;
-	List	   *onConflictSet = NIL;
-	Node	   *onConflictWhere = NULL;
-	int			exclRelIndex = 0;
-	List	   *exclRelTlist = NIL;
-	OnConflictExpr *result;
 
-	/*
-	 * If this is ON CONFLICT ... UPDATE, first create the range table entry
-	 * for the EXCLUDED pseudo relation, so that that will be present while
-	 * processing arbiter expressions.  (You can't actually reference it from
-	 * there, but this provides a useful error message if you try.)
-	 */
-	if (onConflictClause->action == ONCONFLICT_UPDATE)
-	{
-		Relation	targetrel = pstate->p_target_relation;
-		RangeTblEntry *exclRte;
-
-		exclNSItem = addRangeTableEntryForRelation(pstate,
-												   targetrel,
-												   RowExclusiveLock,
-												   makeAlias("excluded", NIL),
-												   false, false);
-		exclRte = exclNSItem->p_rte;
-		exclRelIndex = exclNSItem->p_rtindex;
-
-		/*
-		 * relkind is set to composite to signal that we're not dealing with
-		 * an actual relation, and no permission checks are required on it.
-		 * (We'll check the actual target relation, instead.)
-		 */
-		exclRte->relkind = RELKIND_COMPOSITE_TYPE;
-		/* other permissions fields in exclRte are already empty */
-
-		/* Create EXCLUDED rel's targetlist for use by EXPLAIN */
-		exclRelTlist = BuildOnConflictExcludedTargetlist(targetrel,
-														 exclRelIndex);
-	}
-
-	/* Process the arbiter clause, ON CONFLICT ON (...) */
-	transformOnConflictArbiter(pstate, onConflictClause, &arbiterElems,
-							   &arbiterWhere, &arbiterConstraint);
-
-	/* Process DO UPDATE */
-	if (onConflictClause->action == ONCONFLICT_UPDATE)
-	{
-		/*
-		 * Expressions in the UPDATE targetlist need to be handled like UPDATE
-		 * not INSERT.  We don't need to save/restore this because all INSERT
-		 * expressions have been parsed already.
-		 */
-		pstate->p_is_insert = false;
-
-		/*
-		 * Add the EXCLUDED pseudo relation to the query namespace, making it
-		 * available in the UPDATE subexpressions.
-		 */
-		addNSItemToQuery(pstate, exclNSItem, false, true, true);
-
-		/*
-		 * Now transform the UPDATE subexpressions.
-		 */
-		onConflictSet =
-			transformUpdateTargetList(pstate, onConflictClause->targetList);
-
-		onConflictWhere = transformWhereClause(pstate,
-																							onConflictClause->whereClause,
-																							EXPR_KIND_WHERE, "WHERE");
-		}
-
-	/* Finally, build ON CONFLICT DO [NOTHING | UPDATE] expression */
-	result = makeNode(OnConflictExpr);
-
-	result->action = onConflictClause->action;
-	result->arbiterElems = arbiterElems;
-	result->arbiterWhere = arbiterWhere;
-	result->constraint = arbiterConstraint;
-	result->onConflictSet = onConflictSet;
-	result->onConflictWhere = onConflictWhere;
-	result->exclRelIndex = exclRelIndex;
-	result->exclRelTlist = exclRelTlist;
-
-	return result;
-}
-
-
-/*
- * BuildOnConflictExcludedTargetlist
- *		Create target list for the EXCLUDED pseudo-relation of ON CONFLICT,
- *		representing the columns of targetrel with varno exclRelIndex.
- *
- * Note: Exported for use in the rewriter.
- */
-List *
-BuildOnConflictExcludedTargetlist(Relation targetrel,
-								  Index exclRelIndex)
-{
-	List	   *result = NIL;
-	int			attno;
-	Var		   *var;
-	TargetEntry *te;
-
-	/*
-	 * Note that resnos of the tlist must correspond to attnos of the
-	 * underlying relation, hence we need entries for dropped columns too.
-	 */
-	for (attno = 0; attno < RelationGetNumberOfAttributes(targetrel); attno++)
-	{
-		Form_pg_attribute attr = TupleDescAttr(targetrel->rd_att, attno);
-		char	   *name;
-
-		if (attr->attisdropped)
-		{
-			/*
-			 * can't use atttypid here, but it doesn't really matter what type
-			 * the Const claims to be.
-			 */
-			var = (Var *) makeNullConst(INT4OID, -1, InvalidOid);
-			name = NULL;
-		}
-		else
-		{
-			var = makeVar(exclRelIndex, attno + 1,
-						  attr->atttypid, attr->atttypmod,
-						  DEFAULT_COLLATION_OID,
-						  0);
-			name = pstrdup(NameStr(attr->attname));
-		}
-
-		te = makeTargetEntry((Expr *) var,
-							 attno + 1,
-							 name,
-							 false);
-
-		result = lappend(result, te);
-	}
-
-	/*
-	 * Add a whole-row-Var entry to support references to "EXCLUDED.*".  Like
-	 * the other entries in the EXCLUDED tlist, its resno must match the Var's
-	 * varattno, else the wrong things happen while resolving references in
-	 * setrefs.c.  This is against normal conventions for targetlists, but
-	 * it's okay since we don't use this as a real tlist.
-	 */
-	var = makeVar(exclRelIndex, InvalidAttrNumber,
-				  targetrel->rd_rel->reltype,
-				  -1, InvalidOid, 0);
-	te = makeTargetEntry((Expr *) var, InvalidAttrNumber, NULL, true);
-	result = lappend(result, te);
-
-	return result;
-}
 
 
 /*

@@ -79,7 +79,6 @@ create_upper_paths_hook_type create_upper_paths_hook = NULL;
 #define EXPRKIND_APPINFO			7
 #define EXPRKIND_PHV				8
 #define EXPRKIND_TABLESAMPLE		9
-#define EXPRKIND_ARBITER_ELEM		10
 #define EXPRKIND_TABLEFUNC			11
 #define EXPRKIND_TABLEFUNC_LATERAL	12
 
@@ -626,27 +625,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	parse->limitCount = preprocess_expression(root, parse->limitCount,
 											  EXPRKIND_LIMIT);
 
-	if (parse->onConflict)
-	{
-		parse->onConflict->arbiterElems = (List *)
-			preprocess_expression(root,
-								  (Node *) parse->onConflict->arbiterElems,
-								  EXPRKIND_ARBITER_ELEM);
-		parse->onConflict->arbiterWhere =
-			preprocess_expression(root,
-								  parse->onConflict->arbiterWhere,
-								  EXPRKIND_QUAL);
-		parse->onConflict->onConflictSet = (List *)
-			preprocess_expression(root,
-								  (Node *) parse->onConflict->onConflictSet,
-								  EXPRKIND_TARGET);
-		parse->onConflict->onConflictWhere =
-			preprocess_expression(root,
-								  parse->onConflict->onConflictWhere,
-								  EXPRKIND_QUAL);
-		/* exclRelTlist contains only Vars, so no preprocessing needed */
-	}
-
 	root->append_rel_list = (List *)
 		preprocess_expression(root, (Node *) root->append_rel_list,
 							  EXPRKIND_APPINFO);
@@ -908,10 +886,6 @@ preprocess_expression(PlannerInfo *root, Node *expr, int kind)
 	if (root->parse->hasSubLinks)
 		expr = SS_process_sublinks(root, expr, (kind == EXPRKIND_QUAL));
 
-	/*
-	 * XXX do not insert anything here unless you have grokked the comments in
-	 * SS_replace_correlation_vars ...
-	 */
 
 	/* Replace uplevel vars with Param nodes (this IS possible in VALUES) */
 	if (root->query_level > 1)
@@ -1274,11 +1248,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		}
 
 		/*
-		 * If we have window functions, consider ways to implement those.  We
-		 * build a new upperrel representing the output of this phase.
-		 */
-
-		/*
 		 * If there is a DISTINCT clause, consider ways to implement that. We
 		 * build a new upperrel representing the output of this phase.
 		 */
@@ -1461,7 +1430,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 										resultRelations,
 										updateColnosLists,
 										rowMarks,
-										parse->onConflict,
 										assign_special_exec_param(root));
 		}
 

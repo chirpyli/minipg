@@ -263,8 +263,6 @@ ExecCloseIndices(ResultRelInfo *resultRelInfo)
  *		the same is done for non-deferred constraints, but report
  *		if conflict was speculative or deferred conflict to caller)
  *
- *		If 'arbiterIndexes' is nonempty, noDupErr applies only to
- *		those indexes.  NIL means noDupErr applies to all indexes.
  * ----------------------------------------------------------------
  */
 List *
@@ -273,8 +271,7 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 					  EState *estate,
 					  bool update,
 					  bool noDupErr,
-					  bool *specConflict,
-					  List *arbiterIndexes)
+					  bool *specConflict)
 {
 	ItemPointer tupleid = &slot->tts_tid;
 	List	   *result = NIL;
@@ -362,10 +359,7 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 					   isnull);
 
 		/* Check whether to apply noDupErr to this index */
-		applyNoDupErr = noDupErr &&
-			(arbiterIndexes == NIL ||
-			 list_member_oid(arbiterIndexes,
-							 indexRelation->rd_index->indexrelid));
+		applyNoDupErr = noDupErr;
 
 		/*
 		 * The index AM does the actual insertion, plus uniqueness checking.
@@ -436,9 +430,6 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
  *		Otherwise returns false, and the TID of the conflicting
  *		tuple is returned in *conflictTid.
  *
- *		If 'arbiterIndexes' is given, only those indexes are checked.
- *		NIL means all indexes.
- *
  *		Note that this doesn't lock the values in any way, so it's
  *		possible that a conflicting tuple is inserted immediately
  *		after this returns.  But this can be used for a pre-check
@@ -447,8 +438,7 @@ ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
  */
 bool
 ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
-						  EState *estate, ItemPointer conflictTid,
-						  List *arbiterIndexes)
+						  EState *estate, ItemPointer conflictTid)
 {
 	int			i;
 	int			numIndices;
@@ -459,7 +449,6 @@ ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
 	Datum		values[INDEX_MAX_KEYS];
 	bool		isnull[INDEX_MAX_KEYS];
 	ItemPointerData invalidItemPtr;
-	bool		checkedIndex = false;
 
 	ItemPointerSetInvalid(conflictTid);
 	ItemPointerSetInvalid(&invalidItemPtr);
@@ -503,20 +492,12 @@ ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
 		if (!indexInfo->ii_ReadyForInserts)
 			continue;
 
-		/* When specific arbiter indexes requested, only examine them */
-		if (arbiterIndexes != NIL &&
-			!list_member_oid(arbiterIndexes,
-							 indexRelation->rd_index->indexrelid))
-			continue;
-
 		if (!indexRelation->rd_index->indimmediate)
 			ereport(ERROR,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters"),
+					 errmsg("deferrable unique constraints/exclusion constraints are not supported as conflict arbiters"),
 					 errtableconstraint(heapRelation,
 										RelationGetRelationName(indexRelation))));
-
-		checkedIndex = true;
 
 		/* Check for partial index */
 		if (indexInfo->ii_Predicate != NIL)
@@ -558,9 +539,6 @@ ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
 		if (!satisfiesConstraint)
 			return false;
 	}
-
-	if (arbiterIndexes != NIL && !checkedIndex)
-		elog(ERROR, "unexpected failure to find arbiter index");
 
 	return true;
 }

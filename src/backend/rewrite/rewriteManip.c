@@ -337,9 +337,6 @@ OffsetVarNodes(Node *node, int offset, int sublevels_up)
 			if (qry->resultRelation)
 				qry->resultRelation += offset;
 
-			if (qry->onConflict && qry->onConflict->exclRelIndex)
-				qry->onConflict->exclRelIndex += offset;
-
 			foreach(l, qry->rowMarks)
 			{
 				RowMarkClause *rc = (RowMarkClause *) lfirst(l);
@@ -513,10 +510,6 @@ ChangeVarNodes(Node *node, int rt_index, int new_index, int sublevels_up)
 
 			if (qry->resultRelation == rt_index)
 				qry->resultRelation = new_index;
-
-			/* this is unlikely to ever be used, but ... */
-			if (qry->onConflict && qry->onConflict->exclRelIndex == rt_index)
-				qry->onConflict->exclRelIndex = new_index;
 
 			foreach(l, qry->rowMarks)
 			{

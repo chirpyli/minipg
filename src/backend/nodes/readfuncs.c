@@ -262,7 +262,6 @@ _readQuery(void)
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
-	READ_NODE_FIELD(onConflict);
 	READ_NODE_FIELD(groupClause);
 	READ_BOOL_FIELD(groupDistinct);
 	READ_NODE_FIELD(groupingSets);
@@ -943,21 +942,6 @@ _readBooleanTest(void)
 }
 
 /*
- * _readInferenceElem
- */
-static InferenceElem *
-_readInferenceElem(void)
-{
-	READ_LOCALS(InferenceElem);
-
-	READ_NODE_FIELD(expr);
-	READ_OID_FIELD(infercollid);
-	READ_OID_FIELD(inferopclass);
-
-	READ_DONE();
-}
-
-/*
  * _readTargetEntry
  */
 static TargetEntry *
@@ -1024,25 +1008,6 @@ _readFromExpr(void)
 	READ_DONE();
 }
 
-/*
- * _readOnConflictExpr
- */
-static OnConflictExpr *
-_readOnConflictExpr(void)
-{
-	READ_LOCALS(OnConflictExpr);
-
-	READ_ENUM_FIELD(action, OnConflictAction);
-	READ_NODE_FIELD(arbiterElems);
-	READ_NODE_FIELD(arbiterWhere);
-	READ_OID_FIELD(constraint);
-	READ_NODE_FIELD(onConflictSet);
-	READ_NODE_FIELD(onConflictWhere);
-	READ_INT_FIELD(exclRelIndex);
-	READ_NODE_FIELD(exclRelTlist);
-
-	READ_DONE();
-}
 
 /*
  *	Stuff from pathnodes.h.
@@ -1316,13 +1281,6 @@ _readModifyTable(void)
 	READ_NODE_FIELD(updateColnosLists);
 	READ_NODE_FIELD(rowMarks);
 	READ_INT_FIELD(epqParam);
-	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
-	READ_NODE_FIELD(arbiterIndexes);
-	READ_NODE_FIELD(onConflictSet);
-	READ_NODE_FIELD(onConflictCols);
-	READ_NODE_FIELD(onConflictWhere);
-	READ_UINT_FIELD(exclRelRTI);
-	READ_NODE_FIELD(exclRelTlist);
 
 	READ_DONE();
 }
@@ -2132,8 +2090,6 @@ parseNodeString(void)
 		return_value = _readNullTest();
 	else if (MATCH("BOOLEANTEST", 11))
 		return_value = _readBooleanTest();
-	else if (MATCH("INFERENCEELEM", 13))
-		return_value = _readInferenceElem();
 	else if (MATCH("TARGETENTRY", 11))
 		return_value = _readTargetEntry();
 	else if (MATCH("RANGETBLREF", 11))
@@ -2142,8 +2098,6 @@ parseNodeString(void)
 		return_value = _readJoinExpr();
 	else if (MATCH("FROMEXPR", 8))
 		return_value = _readFromExpr();
-	else if (MATCH("ONCONFLICTEXPR", 14))
-		return_value = _readOnConflictExpr();
 	else if (MATCH("APPENDRELINFO", 13))
 		return_value = _readAppendRelInfo();
 	else if (MATCH("RTE", 3))

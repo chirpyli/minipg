@@ -352,21 +352,6 @@ typedef struct JunkFilter
 } JunkFilter;
 
 /*
- * OnConflictSetState
- *
- * Executor state of an ON CONFLICT DO UPDATE operation.
- */
-typedef struct OnConflictSetState
-{
-	NodeTag		type;
-
-	TupleTableSlot *oc_Existing;	/* slot to store existing target tuple in */
-	TupleTableSlot *oc_ProjSlot;	/* CONFLICT ... SET ... projection target */
-	ProjectionInfo *oc_ProjInfo;	/* for ON CONFLICT DO UPDATE SET */
-	ExprState  *oc_WhereClause; /* state for the WHERE clause */
-} OnConflictSetState;
-
-/*
  * ResultRelInfo
  *
  * Whenever we update an existing relation, we have to update indexes on the
@@ -420,9 +405,6 @@ typedef struct ResultRelInfo
 	/* updates do LockTuple() before oldtup read; see README.tuplock */
 	bool		ri_needLockTagTuple;
 
-	/* On-demand created slot for ON CONFLICT recheck */
-	TupleTableSlot *ri_ConflictSlot;
-
 	/* batch insert stuff */
 	int			ri_NumSlots;	/* number of slots in the array */
 	int			ri_NumSlotsInitialized; /* number of initialized slots */
@@ -432,12 +414,6 @@ typedef struct ResultRelInfo
 
 	/* array of constraint-checking expr states */
 	ExprState **ri_ConstraintExprs;
-
-	/* list of arbiter indexes to use to check conflicts */
-	List	   *ri_onConflictArbiterIndexes;
-
-	/* ON CONFLICT evaluation state */
-	OnConflictSetState *ri_onConflict;
 
 	/*
 	 * ri_RootResultRelInfo gives the target relation mentioned in the query.

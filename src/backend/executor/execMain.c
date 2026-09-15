@@ -711,15 +711,11 @@ InitPlan(QueryDesc *queryDesc, int eflags)
  * Generally the parser and/or planner should have noticed any such mistake
  * already, but let's make sure.
  *
- * For INSERT ON CONFLICT, the result relation is required to support the
- * onConflictAction, regardless of whether a conflict actually occurs.
- *
  * Note: when changing this function, you probably also need to look at
  * CheckValidRowMarkRel.
  */
 void
-CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
-					   OnConflictAction onConflictAction)
+CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation)
 {
 	Relation	resultRel = resultRelInfo->ri_RelationDesc;
 
@@ -765,7 +761,7 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation,
 void
 CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 {
-	CheckValidResultRelNew(resultRelInfo, operation, ONCONFLICT_NONE);
+	CheckValidResultRelNew(resultRelInfo, operation);
 }
 
 /*
@@ -834,9 +830,6 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_oldTupleSlot = NULL;
 	resultRelInfo->ri_projectNewInfoValid = false;
 	resultRelInfo->ri_ConstraintExprs = NULL;
-	resultRelInfo->ri_onConflictArbiterIndexes = NIL;
-	resultRelInfo->ri_onConflict = NULL;
-	resultRelInfo->ri_ConflictSlot = NULL;
 }
 
 /* ----------------------------------------------------------------

@@ -2880,9 +2880,7 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	else
 		dpns->inner_plan = innerPlan(plan);
 
-	if (IsA(plan, ModifyTable))
-		dpns->inner_tlist = ((ModifyTable *) plan)->exclRelTlist;
-	else if (dpns->inner_plan)
+	if (dpns->inner_plan)
 		dpns->inner_tlist = dpns->inner_plan->targetlist;
 	else
 		dpns->inner_tlist = NIL;
@@ -4126,71 +4124,6 @@ get_insert_query_def(Query *query, deparse_context *context,
 		appendStringInfoString(buf, "DEFAULT VALUES");
 	}
 
-	/* Add ON CONFLICT if present */
-	if (query->onConflict)
-	{
-		OnConflictExpr *confl = query->onConflict;
-
-		appendStringInfoString(buf, " ON CONFLICT");
-
-		if (confl->arbiterElems)
-		{
-			/* Add the single-VALUES expression list */
-			appendStringInfoChar(buf, '(');
-			get_rule_expr((Node *) confl->arbiterElems, context, false);
-			appendStringInfoChar(buf, ')');
-
-			/* Add a WHERE clause (for partial indexes) if given */
-			if (confl->arbiterWhere != NULL)
-			{
-				bool		save_varprefix;
-
-				/*
-				 * Force non-prefixing of Vars, since parser assumes that they
-				 * belong to target relation.  WHERE clause does not use
-				 * InferenceElem, so this is separately required.
-				 */
-				save_varprefix = context->varprefix;
-				context->varprefix = false;
-
-				appendContextKeyword(context, " WHERE ",
-									 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-				get_rule_expr(confl->arbiterWhere, context, false);
-
-				context->varprefix = save_varprefix;
-			}
-		}
-		else if (OidIsValid(confl->constraint))
-		{
-			char	   *constraint = get_constraint_name(confl->constraint);
-
-			if (!constraint)
-				elog(ERROR, "cache lookup failed for constraint %u",
-					 confl->constraint);
-			appendStringInfo(buf, " ON CONSTRAINT %s",
-							 quote_identifier(constraint));
-		}
-
-		if (confl->action == ONCONFLICT_NOTHING)
-		{
-			appendStringInfoString(buf, " DO NOTHING");
-		}
-		else
-		{
-			appendStringInfoString(buf, " DO UPDATE SET ");
-			/* Deparse targetlist */
-			get_update_query_targetlist_def(query, confl->onConflictSet,
-											context, rte);
-
-			/* Add a WHERE clause if given */
-			if (confl->onConflictWhere != NULL)
-			{
-				appendContextKeyword(context, " WHERE ",
-									 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-				get_rule_expr(confl->onConflictWhere, context, false);
-			}
-		}
-	}
 }
 
 
@@ -6401,54 +6334,6 @@ get_rule_expr(Node *node, deparse_context *context,
 					appendStringInfoChar(buf, ')');
 			}
 			break;
-
-		case T_InferenceElem:
-			{
-				InferenceElem *iexpr = (InferenceElem *) node;
-				bool		save_varprefix;
-				bool		need_parens;
-
-				/*
-				 * InferenceElem can only refer to target relation, so a
-				 * prefix is not useful, and indeed would cause parse errors.
-				 */
-				save_varprefix = context->varprefix;
-				context->varprefix = false;
-
-				/*
-				 * Parenthesize the element unless it's a simple Var or a bare
-				 * function call.  Follows pg_get_indexdef_worker().
-				 */
-				need_parens = !IsA(iexpr->expr, Var);
-				if (IsA(iexpr->expr, FuncExpr) &&
-					((FuncExpr *) iexpr->expr)->funcformat ==
-					COERCE_EXPLICIT_CALL)
-					need_parens = false;
-
-				if (need_parens)
-					appendStringInfoChar(buf, '(');
-				get_rule_expr((Node *) iexpr->expr,
-							  context, false);
-				if (need_parens)
-					appendStringInfoChar(buf, ')');
-
-				context->varprefix = save_varprefix;
-
-				if (iexpr->infercollid)
-					appendStringInfo(buf, " COLLATE %s",
-									 generate_collation_name(iexpr->infercollid));
-
-				/* Add the operator class name, if not default */
-				if (iexpr->inferopclass)
-				{
-					Oid			inferopclass = iexpr->inferopclass;
-					Oid			inferopcinputtype = get_opclass_input_type(iexpr->inferopclass);
-
-					get_opclass_name(inferopclass, inferopcinputtype, buf);
-				}
-			}
-			break;
-
 
 		case T_List:
 			{

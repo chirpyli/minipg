@@ -1103,27 +1103,6 @@ ExecCleanTargetListLength(List *targetlist)
 	return len;
 }
 
-/*
- * Return a relInfo's on-demand created slot for ON CONFLICT recheck.
- */
-TupleTableSlot *
-ExecGetConflictSlot(EState *estate, ResultRelInfo *relInfo)
-{
-	if (relInfo->ri_ConflictSlot == NULL)
-	{
-		Relation	rel = relInfo->ri_RelationDesc;
-		MemoryContext oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-
-		relInfo->ri_ConflictSlot =
-			ExecInitExtraTupleSlot(estate,
-								   RelationGetDescr(rel),
-								   table_slot_callbacks(rel));
-
-		MemoryContextSwitchTo(oldcontext);
-	}
-
-	return relInfo->ri_ConflictSlot;
-}
 
 /* Return a bitmap representing columns being inserted */
 Bitmapset *

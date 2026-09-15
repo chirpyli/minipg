@@ -1569,7 +1569,7 @@ typedef struct LockRowsPath
  *
  * We represent most things that will be in the ModifyTable plan node
  * literally, except we have a child Path not Plan.  But analysis of the
- * OnConflictExpr is deferred to createplan.c, as is collection of FDW data.
+ * FDW data is deferred to createplan.c.
  */
 typedef struct ModifyTablePath
 {
@@ -1582,7 +1582,6 @@ typedef struct ModifyTablePath
 	List	   *resultRelations;	/* integer list of RT indexes */
 	List	   *updateColnosLists;	/* per-target-table update_colnos lists */
 	List	   *rowMarks;		/* PlanRowMarks (non-locking only) */
-	OnConflictExpr *onconflict; /* ON CONFLICT clause, or NULL */
 	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
 } ModifyTablePath;
 

@@ -247,7 +247,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleRangeTable(jstate, query->rtable);
 	JumbleExpr(jstate, (Node *) query->jointree);
 	JumbleExpr(jstate, (Node *) query->targetList);
-	JumbleExpr(jstate, (Node *) query->onConflict);
 	JumbleExpr(jstate, (Node *) query->groupClause);
 	APP_JUMB(query->groupDistinct);
 	JumbleExpr(jstate, (Node *) query->groupingSets);
@@ -592,15 +591,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) bt->arg);
 			}
 			break;
-		case T_InferenceElem:
-			{
-				InferenceElem *ie = (InferenceElem *) node;
-
-				APP_JUMB(ie->infercollid);
-				APP_JUMB(ie->inferopclass);
-				JumbleExpr(jstate, ie->expr);
-			}
-			break;
 		case T_TargetEntry:
 			{
 				TargetEntry *tle = (TargetEntry *) node;
@@ -635,20 +625,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 
 				JumbleExpr(jstate, (Node *) from->fromlist);
 				JumbleExpr(jstate, from->quals);
-			}
-			break;
-		case T_OnConflictExpr:
-			{
-				OnConflictExpr *conf = (OnConflictExpr *) node;
-
-				APP_JUMB(conf->action);
-				JumbleExpr(jstate, (Node *) conf->arbiterElems);
-				JumbleExpr(jstate, conf->arbiterWhere);
-				JumbleExpr(jstate, (Node *) conf->onConflictSet);
-				JumbleExpr(jstate, conf->onConflictWhere);
-				APP_JUMB(conf->constraint);
-				APP_JUMB(conf->exclRelIndex);
-				JumbleExpr(jstate, (Node *) conf->exclRelTlist);
 			}
 			break;
 		case T_List:

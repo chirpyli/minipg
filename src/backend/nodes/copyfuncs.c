@@ -208,13 +208,6 @@ _copyModifyTable(const ModifyTable *from)
 	COPY_NODE_FIELD(updateColnosLists);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_SCALAR_FIELD(epqParam);
-	COPY_SCALAR_FIELD(onConflictAction);
-	COPY_NODE_FIELD(arbiterIndexes);
-	COPY_NODE_FIELD(onConflictSet);
-	COPY_NODE_FIELD(onConflictCols);
-	COPY_NODE_FIELD(onConflictWhere);
-	COPY_SCALAR_FIELD(exclRelRTI);
-	COPY_NODE_FIELD(exclRelTlist);
 
 	return newnode;
 }
@@ -1722,21 +1715,6 @@ _copyBooleanTest(const BooleanTest *from)
 }
 
 /*
- * _copyInferenceElem
- */
-static InferenceElem *
-_copyInferenceElem(const InferenceElem *from)
-{
-	InferenceElem *newnode = makeNode(InferenceElem);
-
-	COPY_NODE_FIELD(expr);
-	COPY_SCALAR_FIELD(infercollid);
-	COPY_SCALAR_FIELD(inferopclass);
-
-	return newnode;
-}
-
-/*
  * _copyTargetEntry
  */
 static TargetEntry *
@@ -1799,26 +1777,6 @@ _copyFromExpr(const FromExpr *from)
 
 	COPY_NODE_FIELD(fromlist);
 	COPY_NODE_FIELD(quals);
-
-	return newnode;
-}
-
-/*
- * _copyOnConflictExpr
- */
-static OnConflictExpr *
-_copyOnConflictExpr(const OnConflictExpr *from)
-{
-	OnConflictExpr *newnode = makeNode(OnConflictExpr);
-
-	COPY_SCALAR_FIELD(action);
-	COPY_NODE_FIELD(arbiterElems);
-	COPY_NODE_FIELD(arbiterWhere);
-	COPY_SCALAR_FIELD(constraint);
-	COPY_NODE_FIELD(onConflictSet);
-	COPY_NODE_FIELD(onConflictWhere);
-	COPY_SCALAR_FIELD(exclRelIndex);
-	COPY_NODE_FIELD(exclRelTlist);
 
 	return newnode;
 }
@@ -2078,33 +2036,6 @@ _copyRowMarkClause(const RowMarkClause *from)
 	COPY_SCALAR_FIELD(strength);
 	COPY_SCALAR_FIELD(waitPolicy);
 	COPY_SCALAR_FIELD(pushedDown);
-
-	return newnode;
-}
-
-static InferClause *
-_copyInferClause(const InferClause *from)
-{
-	InferClause *newnode = makeNode(InferClause);
-
-	COPY_NODE_FIELD(indexElems);
-	COPY_NODE_FIELD(whereClause);
-	COPY_STRING_FIELD(conname);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-static OnConflictClause *
-_copyOnConflictClause(const OnConflictClause *from)
-{
-	OnConflictClause *newnode = makeNode(OnConflictClause);
-
-	COPY_SCALAR_FIELD(action);
-	COPY_NODE_FIELD(infer);
-	COPY_NODE_FIELD(targetList);
-	COPY_NODE_FIELD(whereClause);
-	COPY_LOCATION_FIELD(location);
 
 	return newnode;
 }
@@ -2434,7 +2365,6 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);
 	COPY_NODE_FIELD(targetList);
-	COPY_NODE_FIELD(onConflict);
 	COPY_NODE_FIELD(groupClause);
 	COPY_SCALAR_FIELD(groupDistinct);
 	COPY_NODE_FIELD(groupingSets);
@@ -2472,7 +2402,6 @@ _copyInsertStmt(const InsertStmt *from)
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(cols);
 	COPY_NODE_FIELD(selectStmt);
-	COPY_NODE_FIELD(onConflictClause);
 
 	return newnode;
 }
@@ -3136,9 +3065,6 @@ copyObjectImpl(const void *from)
 		case T_BooleanTest:
 			retval = _copyBooleanTest(from);
 			break;
-		case T_InferenceElem:
-			retval = _copyInferenceElem(from);
-			break;
 		case T_TargetEntry:
 			retval = _copyTargetEntry(from);
 			break;
@@ -3150,9 +3076,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_FromExpr:
 			retval = _copyFromExpr(from);
-			break;
-		case T_OnConflictExpr:
-			retval = _copyOnConflictExpr(from);
 			break;
 
 			/*
@@ -3375,12 +3298,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_RowMarkClause:
 			retval = _copyRowMarkClause(from);
-			break;
-		case T_InferClause:
-			retval = _copyInferClause(from);
-			break;
-		case T_OnConflictClause:
-			retval = _copyOnConflictClause(from);
 			break;
 		case T_ObjectWithArgs:
 			retval = _copyObjectWithArgs(from);

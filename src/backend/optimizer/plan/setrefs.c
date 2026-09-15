@@ -892,40 +892,9 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				Assert(splan->plan.targetlist == NIL);
 				Assert(splan->plan.qual == NIL);
 
-				/*
-				 * We treat ModifyTable with ON CONFLICT as a form of 'pseudo
-				 * join', where the inner side is the EXCLUDED tuple.
-				 * Therefore use fix_join_expr to setup the relevant variables
-				 * to INNER_VAR.
-				 */
-				if (splan->onConflictSet)
-				{
-					indexed_tlist *itlist;
-
-					itlist = build_tlist_index(splan->exclRelTlist);
-
-					splan->onConflictSet =
-						fix_join_expr(root, splan->onConflictSet,
-									  NULL, itlist,
-									  linitial_int(splan->resultRelations),
-									  rtoffset, NUM_EXEC_QUAL(plan));
-
-					splan->onConflictWhere = (Node *)
-						fix_join_expr(root, (List *) splan->onConflictWhere,
-									  NULL, itlist,
-									  linitial_int(splan->resultRelations),
-									  rtoffset, NUM_EXEC_QUAL(plan));
-
-					pfree(itlist);
-
-					splan->exclRelTlist =
-						fix_scan_list(root, splan->exclRelTlist, rtoffset, 1);
-				}
-
 				splan->nominalRelation += rtoffset;
 				if (splan->rootRelation)
 					splan->rootRelation += rtoffset;
-				splan->exclRelRTI += rtoffset;
 
 				foreach(l, splan->resultRelations)
 				{

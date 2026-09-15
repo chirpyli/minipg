@@ -37,7 +37,4 @@ extern void applyLockingClause(Query *qry, Index rtindex,
 							   LockClauseStrength strength,
 							   LockWaitPolicy waitPolicy, bool pushedDown);
 
-extern List *BuildOnConflictExcludedTargetlist(Relation targetrel,
-											   Index exclRelIndex);
-
 #endif							/* ANALYZE_H */

@@ -268,7 +268,7 @@ static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
 									 Index nominalRelation, Index rootRelation,
 									 List *resultRelations,
 									 List *updateColnosLists,
-									 List *rowMarks, OnConflictExpr *onconflict, int epqParam);
+									 List *rowMarks, int epqParam);
 static GatherMerge *create_gather_merge_plan(PlannerInfo *root,
 											 GatherMergePath *best_path);
 
@@ -2387,7 +2387,6 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 							best_path->resultRelations,
 							best_path->updateColnosLists,
 							best_path->rowMarks,
-							best_path->onconflict,
 							best_path->epqParam);
 
 	copy_generic_path_info(&plan->plan, &best_path->path);
@@ -5862,9 +5861,9 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 				 Index nominalRelation, Index rootRelation,
 				 List *resultRelations,
 				 List *updateColnosLists,
-				 List *rowMarks, OnConflictExpr *onconflict, int epqParam)
-{
-	ModifyTable *node = makeNode(ModifyTable);
+				 List *rowMarks, int epqParam)
+				 {
+				 ModifyTable *node = makeNode(ModifyTable);
 
 	Assert(operation == CMD_UPDATE ?
 		   list_length(resultRelations) == list_length(updateColnosLists) :
@@ -5881,42 +5880,6 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
 	node->nominalRelation = nominalRelation;
 	node->rootRelation = rootRelation;
 	node->resultRelations = resultRelations;
-	if (!onconflict)
-	{
-		node->onConflictAction = ONCONFLICT_NONE;
-		node->onConflictSet = NIL;
-		node->onConflictCols = NIL;
-		node->onConflictWhere = NULL;
-		node->arbiterIndexes = NIL;
-		node->exclRelRTI = 0;
-		node->exclRelTlist = NIL;
-	}
-	else
-	{
-		node->onConflictAction = onconflict->action;
-
-		/*
-		 * Here we convert the ON CONFLICT UPDATE tlist, if any, to the
-		 * executor's convention of having consecutive resno's.  The actual
-		 * target column numbers are saved in node->onConflictCols.  (This
-		 * could be done earlier, but there seems no need to.)
-		 */
-		node->onConflictSet = onconflict->onConflictSet;
-		node->onConflictCols =
-			extract_update_targetlist_colnos(node->onConflictSet);
-		node->onConflictWhere = onconflict->onConflictWhere;
-
-		/*
-		 * If a set of unique index inference elements was provided (an
-		 * INSERT...ON CONFLICT "inference specification"), then infer
-		 * appropriate unique indexes (or throw an error if none are
-		 * available).
-		 */
-		node->arbiterIndexes = infer_arbiter_indexes(root);
-
-		node->exclRelRTI = onconflict->exclRelIndex;
-		node->exclRelTlist = onconflict->exclRelTlist;
-	}
 	node->updateColnosLists = updateColnosLists;
 	node->rowMarks = rowMarks;
 	node->epqParam = epqParam;

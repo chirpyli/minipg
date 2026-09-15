@@ -191,8 +191,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	Alias				*alias;
 	RangeVar			*range;
 	Node				*with;
-	InferClause			*infer;
-	OnConflictClause	*onconflict;
 	A_Indices			*aind;
 	ResTarget			*target;
 	InsertStmt			*istmt;
@@ -322,8 +320,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <ival>	row_or_rows first_or_next
 
 %type <istmt>	insert_rest
-%type <infer>	opt_conf_expr
-%type <onconflict> opt_on_conflict
 
 %type <vsetstmt> generic_set set_rest set_rest_more generic_reset reset_rest
 
@@ -2852,10 +2848,8 @@ ExplainableStmt:
 
 InsertStmt:
 			INSERT INTO insert_target insert_rest
-			opt_on_conflict
 				{
 					$4->relation = $3;
-					$4->onConflictClause = $5;
 					$$ = (Node *) $4;
 				}
 		;
@@ -2908,56 +2902,6 @@ insert_column_item:
 					$$->indirection = check_indirection($2, yyscanner);
 					$$->val = NULL;
 					$$->location = @1;
-				}
-		;
-
-opt_on_conflict:
-			ON CONFLICT opt_conf_expr DO UPDATE SET set_clause_list	where_clause
-				{
-					$$ = makeNode(OnConflictClause);
-					$$->action = ONCONFLICT_UPDATE;
-					$$->infer = $3;
-					$$->targetList = $7;
-					$$->whereClause = $8;
-					$$->location = @1;
-				}
-			|
-			ON CONFLICT opt_conf_expr DO NOTHING
-				{
-					$$ = makeNode(OnConflictClause);
-					$$->action = ONCONFLICT_NOTHING;
-					$$->infer = $3;
-					$$->targetList = NIL;
-					$$->whereClause = NULL;
-					$$->location = @1;
-				}
-			| /*EMPTY*/
-				{
-					$$ = NULL;
-				}
-		;
-
-opt_conf_expr:
-			'(' index_params ')' where_clause
-				{
-					$$ = makeNode(InferClause);
-					$$->indexElems = $2;
-					$$->whereClause = $4;
-					$$->conname = NULL;
-					$$->location = @1;
-				}
-			|
-			ON CONSTRAINT name
-				{
-					$$ = makeNode(InferClause);
-					$$->indexElems = NIL;
-					$$->whereClause = NULL;
-					$$->conname = $3;
-					$$->location = @1;
-				}
-			| /*EMPTY*/
-				{
-					$$ = NULL;
 				}
 		;
 

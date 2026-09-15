@@ -1760,20 +1760,6 @@ perform_pullup_replace_vars(PlannerInfo *root,
 	 */
 	parse->targetList = (List *)
 		pullup_replace_vars((Node *) parse->targetList, rvcontext);
-	if (parse->onConflict)
-	{
-		parse->onConflict->onConflictSet = (List *)
-			pullup_replace_vars((Node *) parse->onConflict->onConflictSet,
-								rvcontext);
-		parse->onConflict->onConflictWhere =
-			pullup_replace_vars(parse->onConflict->onConflictWhere,
-								rvcontext);
-
-		/*
-		 * We assume ON CONFLICT's arbiterElems, arbiterWhere, exclRelTlist
-		 * can't contain any references to a subquery.
-		 */
-	}
 	replace_vars_in_jointree((Node *) parse->jointree, rvcontext,
 							 lowest_nulling_outer_join);
 	parse->havingQual = pullup_replace_vars(parse->havingQual, rvcontext);

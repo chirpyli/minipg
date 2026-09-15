@@ -607,7 +607,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 	if (qc)
 		InitializeQueryCompletion(qc);
 
-
 	/*
 	 * Check for improper portal use, and mark portal active.
 	 */

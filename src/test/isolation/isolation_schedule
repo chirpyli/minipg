@@ -27,10 +27,7 @@ test: lock-update-delete
 test: lock-update-traversal
 # inherit-temp 已随表继承(INHERITS)功能裁剪而移除
 # temp-schema-cleanup 已随临时表功能裁剪而移除（CREATE TEMPORARY TABLE 不再支持）
-test: insert-conflict-do-nothing
-test: insert-conflict-do-nothing-2
-test: insert-conflict-do-update
-test: insert-conflict-do-update-2
+# insert-conflict-*: INSERT ON CONFLICT 功能已裁剪，移除
 # insert-conflict-do-update-3: 依赖 writable CTE (WITH ... AS (INSERT ... ON CONFLICT DO UPDATE))，WITH 语法已裁剪，移除
 # insert-conflict-do-update-4 已随分区功能裁剪而移除
 # insert-conflict-specconflict: 依赖 plpgsql 过程语言（blurt_and_lock 带 RAISE NOTICE），PL/pgSQL 已裁剪，移除

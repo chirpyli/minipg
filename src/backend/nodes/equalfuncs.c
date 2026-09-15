@@ -621,16 +621,6 @@ _equalBooleanTest(const BooleanTest *a, const BooleanTest *b)
 }
 
 static bool
-_equalInferenceElem(const InferenceElem *a, const InferenceElem *b)
-{
-	COMPARE_NODE_FIELD(expr);
-	COMPARE_SCALAR_FIELD(infercollid);
-	COMPARE_SCALAR_FIELD(inferopclass);
-
-	return true;
-}
-
-static bool
 _equalTargetEntry(const TargetEntry *a, const TargetEntry *b)
 {
 	COMPARE_NODE_FIELD(expr);
@@ -677,20 +667,6 @@ _equalFromExpr(const FromExpr *a, const FromExpr *b)
 	return true;
 }
 
-static bool
-_equalOnConflictExpr(const OnConflictExpr *a, const OnConflictExpr *b)
-{
-	COMPARE_SCALAR_FIELD(action);
-	COMPARE_NODE_FIELD(arbiterElems);
-	COMPARE_NODE_FIELD(arbiterWhere);
-	COMPARE_SCALAR_FIELD(constraint);
-	COMPARE_NODE_FIELD(onConflictSet);
-	COMPARE_NODE_FIELD(onConflictWhere);
-	COMPARE_SCALAR_FIELD(exclRelIndex);
-	COMPARE_NODE_FIELD(exclRelTlist);
-
-	return true;
-}
 
 /*
  * Stuff from pathnodes.h
@@ -819,7 +795,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
-	COMPARE_NODE_FIELD(onConflict);
 	COMPARE_NODE_FIELD(groupClause);
 	COMPARE_SCALAR_FIELD(groupDistinct);
 	COMPARE_NODE_FIELD(groupingSets);
@@ -853,7 +828,6 @@ _equalInsertStmt(const InsertStmt *a, const InsertStmt *b)
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(cols);
 	COMPARE_NODE_FIELD(selectStmt);
-	COMPARE_NODE_FIELD(onConflictClause);
 
 	return true;
 }
@@ -1503,29 +1477,6 @@ _equalRowMarkClause(const RowMarkClause *a, const RowMarkClause *b)
 	return true;
 }
 
-static bool
-_equalInferClause(const InferClause *a, const InferClause *b)
-{
-	COMPARE_NODE_FIELD(indexElems);
-	COMPARE_NODE_FIELD(whereClause);
-	COMPARE_STRING_FIELD(conname);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalOnConflictClause(const OnConflictClause *a, const OnConflictClause *b)
-{
-	COMPARE_SCALAR_FIELD(action);
-	COMPARE_NODE_FIELD(infer);
-	COMPARE_NODE_FIELD(targetList);
-	COMPARE_NODE_FIELD(whereClause);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
 /*
  * Stuff from pg_list.h
  */
@@ -1752,9 +1703,6 @@ equal(const void *a, const void *b)
 		case T_BooleanTest:
 			retval = _equalBooleanTest(a, b);
 			break;
-		case T_InferenceElem:
-			retval = _equalInferenceElem(a, b);
-			break;
 		case T_TargetEntry:
 			retval = _equalTargetEntry(a, b);
 			break;
@@ -1763,9 +1711,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_FromExpr:
 			retval = _equalFromExpr(a, b);
-			break;
-		case T_OnConflictExpr:
-			retval = _equalOnConflictExpr(a, b);
 			break;
 		case T_JoinExpr:
 			retval = _equalJoinExpr(a, b);
@@ -1977,12 +1922,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_RowMarkClause:
 			retval = _equalRowMarkClause(a, b);
-			break;
-		case T_InferClause:
-			retval = _equalInferClause(a, b);
-			break;
-		case T_OnConflictClause:
-			retval = _equalOnConflictClause(a, b);
 			break;
 		case T_ObjectWithArgs:
 			retval = _equalObjectWithArgs(a, b);

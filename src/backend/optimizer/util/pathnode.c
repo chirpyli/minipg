@@ -3228,7 +3228,6 @@ create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
  * 'updateColnosLists' is a list of UPDATE target column number lists
  *		(one sublist per rel); or NIL if not an UPDATE
  * 'rowMarks' is a list of PlanRowMarks (non-locking only)
- * 'onconflict' is the ON CONFLICT clause, or NULL
  * 'epqParam' is the ID of Param for EvalPlanQual re-eval
  */
 ModifyTablePath *
@@ -3238,7 +3237,7 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 						Index nominalRelation, Index rootRelation,
 						List *resultRelations,
 						List *updateColnosLists,
-						List *rowMarks, OnConflictExpr *onconflict,
+						List *rowMarks,
 						int epqParam)
 {
 	ModifyTablePath *pathnode = makeNode(ModifyTablePath);
@@ -3281,7 +3280,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->resultRelations = resultRelations;
 	pathnode->updateColnosLists = updateColnosLists;
 	pathnode->rowMarks = rowMarks;
-	pathnode->onconflict = onconflict;
 	pathnode->epqParam = epqParam;
 
 	return pathnode;

@@ -623,9 +623,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_ModifyTable:
 			*rels_used = bms_add_member(*rels_used,
 										((ModifyTable *) plan)->nominalRelation);
-			if (((ModifyTable *) plan)->exclRelRTI)
-				*rels_used = bms_add_member(*rels_used,
-											((ModifyTable *) plan)->exclRelRTI);
 			break;
 		case T_Append:
 			*rels_used = bms_add_members(*rels_used,
@@ -2747,9 +2744,8 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 /*
  * Show extra information for a ModifyTable node
  *
- * We have two objectives here.  First, if there's more than one target
- * table or it's different from the nominal target, identify the actual
- * target(s).  Second, show information about ON CONFLICT.
+ * If there's more than one target table or it's different from the nominal
+ * target, identify the actual target(s).
  */
 static void
 show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
@@ -2759,8 +2755,6 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 	const char *operation;
 	bool		labeltargets;
 	int			j;
-	List	   *idxNames = NIL;
-	ListCell   *lst;
 
 	switch (node->operation)
 	{
@@ -2808,58 +2802,9 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 			es->indent++;
 		}
 	}
-
-	/* Gather names of ON CONFLICT arbiter indexes */
-	foreach(lst, node->arbiterIndexes)
-	{
-		char	   *indexname = get_rel_name(lfirst_oid(lst));
-
-		idxNames = lappend(idxNames, indexname);
 	}
 
-	if (node->onConflictAction != ONCONFLICT_NONE)
-	{
-		ExplainPropertyText("Conflict Resolution",
-							node->onConflictAction == ONCONFLICT_NOTHING ?
-							"NOTHING" : "UPDATE",
-							es);
 
-		/*
-		 * Don't display arbiter indexes at all when DO NOTHING variant
-		 * implicitly ignores all conflicts
-		 */
-		if (idxNames)
-			ExplainPropertyList("Conflict Arbiter Indexes", idxNames, es);
-
-		/* ON CONFLICT DO UPDATE WHERE qual is specially displayed */
-		if (node->onConflictWhere)
-		{
-			show_upper_qual((List *) node->onConflictWhere, "Conflict Filter",
-							&mtstate->ps, ancestors, es);
-			show_instrumentation_count("Rows Removed by Conflict Filter", 1, &mtstate->ps, es);
-		}
-
-		/* EXPLAIN ANALYZE display of actual outcome for each tuple proposed */
-		if (es->analyze && mtstate->ps.instrument)
-		{
-			double		total;
-			double		insert_path;
-			double		other_path;
-
-			InstrEndLoop(outerPlanState(mtstate)->instrument);
-
-			/* count the number of source rows */
-			total = outerPlanState(mtstate)->instrument->ntuples;
-			other_path = mtstate->ps.instrument->ntuples2;
-			insert_path = total - other_path;
-
-			ExplainPropertyFloat("Tuples Inserted", NULL,
-								 insert_path, 0, es);
-			ExplainPropertyFloat("Conflicting Tuples", NULL,
-								 other_path, 0, es);
-		}
-	}
-}
 
 /*
  * Explain the constituent plans of an Append, MergeAppend,
