@@ -303,9 +303,6 @@ static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static ObjectAddress ATExecClusterOn(Relation rel, const char *indexName,
-									 LOCKMODE lockmode);
-static void ATExecDropCluster(Relation rel, LOCKMODE lockmode);
 static void ATExecEnableDisableRule(Relation rel, const char *rulename,
 									char fires_when, LOCKMODE lockmode);
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
@@ -1552,8 +1549,6 @@ AlterTableGetLockLevel(List *cmds)
 				 * updates.
 				 */
 			case AT_SetStatistics:	/* Uses MVCC in getTableAttrs() */
-			case AT_ClusterOn:	/* Uses MVCC in getIndexes() */
-			case AT_DropCluster:	/* Uses MVCC in getIndexes() */
 			cmd_lockmode = ShareUpdateExclusiveLock;
 			break;
 
@@ -1720,13 +1715,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATPrepAlterColumnType(tab, rel, cmd);
 			pass = AT_PASS_ALTER_TYPE;
 		break;
-		case AT_ClusterOn:		/* CLUSTER ON */
-		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
-			ATSimplePermissions(rel, ATT_TABLE);
-			/* These commands never recurse */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
 		case AT_EnableRule:		/* ENABLE/DISABLE RULE variants */
 		case AT_EnableAlwaysRule:
 		case AT_EnableReplicaRule:
@@ -1905,12 +1893,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			/* parse transformation was done earlier */
 		ATExecAlterColumnType(tab, rel, cmd, lockmode);
 		break;
-		case AT_ClusterOn:		/* CLUSTER ON */
-			ATExecClusterOn(rel, cmd->name, lockmode);
-			break;
-		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
-			ATExecDropCluster(rel, lockmode);
-			break;
 		case AT_EnableRule:		/* ENABLE RULE name */
 			ATExecEnableDisableRule(rel, cmd->name,
 									RULE_FIRES_ON_ORIGIN, lockmode);
@@ -4326,21 +4308,6 @@ ATPostAlterTypeCleanup(List **wqueue, AlteredTableInfo *tab, LOCKMODE lockmode)
 
 
 	/*
-	 * Queue up command to restore marking of index used for cluster.
-	 */
-	if (tab->clusterOnIndex)
-	{
-		AlterTableCmd *cmd = makeNode(AlterTableCmd);
-
-		cmd->subtype = AT_ClusterOn;
-		cmd->name = tab->clusterOnIndex;
-
-		/* do it after indexes and constraints */
-		tab->subcmds[AT_PASS_OLD_CONSTR] =
-			lappend(tab->subcmds[AT_PASS_OLD_CONSTR], cmd);
-	}
-
-	/*
 	 * It should be okay to use DROP_RESTRICT here, since nothing else should
 	 * be depending on these objects.
 	 */
@@ -4497,51 +4464,6 @@ TryReuseIndex(Oid oldId, IndexStmt *stmt)
 		}
 		index_close(irel, NoLock);
 	}
-}
-
-/*
- * ALTER TABLE CLUSTER ON
- *
- * The only thing we have to do is to change the indisclustered bits.
- *
- * Return the address of the new clustering index.
- */
-static ObjectAddress
-ATExecClusterOn(Relation rel, const char *indexName, LOCKMODE lockmode)
-{
-	Oid			indexOid;
-	ObjectAddress address;
-
-	indexOid = get_relname_relid(indexName, rel->rd_rel->relnamespace);
-
-	if (!OidIsValid(indexOid))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("index \"%s\" for table \"%s\" does not exist",
-						indexName, RelationGetRelationName(rel))));
-
-	/* Check index is valid to cluster on */
-	check_index_is_clusterable(rel, indexOid, false, lockmode);
-
-	/* And do the work */
-	mark_index_clustered(rel, indexOid, false);
-
-	ObjectAddressSet(address,
-					 RelationRelationId, indexOid);
-
-	return address;
-}
-
-/*
- * ALTER TABLE SET WITHOUT CLUSTER
- *
- * We have to find any indexes on the table that have indisclustered bit
- * set and turn it off.
- */
-static void
-ATExecDropCluster(Relation rel, LOCKMODE lockmode)
-{
-	mark_index_clustered(rel, InvalidOid, false);
 }
 
 /*

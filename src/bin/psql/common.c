@@ -1183,18 +1183,6 @@ command_no_begin(const char *query)
 	 */
 	if (wordlen == 6 && pg_strncasecmp(query, "vacuum", 6) == 0)
 		return true;
-	if (wordlen == 7 && pg_strncasecmp(query, "cluster", 7) == 0)
-	{
-		/* CLUSTER with any arguments is allowed in transactions */
-		query += wordlen;
-
-		query = skip_white_space(query);
-
-		if (isalpha((unsigned char) query[0]))
-			return false;		/* has additional words */
-		return true;			/* it's CLUSTER without arguments */
-	}
-
 	if (wordlen == 6 && pg_strncasecmp(query, "create", 6) == 0)
 	{
 		query += wordlen;

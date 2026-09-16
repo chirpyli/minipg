@@ -1204,8 +1204,6 @@ typedef enum AlterTableType
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
 	AT_AlterColumnType,			/* alter column type */
-	AT_ClusterOn,				/* CLUSTER ON */
-	AT_DropCluster,				/* SET WITHOUT CLUSTER */
 	AT_EnableRule,				/* ENABLE RULE name */
 	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
 	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
@@ -1556,18 +1554,6 @@ typedef struct DropdbStmt
 	bool		missing_ok;		/* skip error if db is missing? */
 	List	   *options;		/* currently only FORCE is supported */
 } DropdbStmt;
-
-/* ----------------------
- *		Cluster Statement (support pbrown's cluster index implementation)
- * ----------------------
- */
-typedef struct ClusterStmt
-{
-	NodeTag		type;
-	RangeVar   *relation;		/* relation being indexed, or NULL if all */
-	char	   *indexname;		/* original index defined */
-	List	   *params;			/* list of DefElem nodes */
-} ClusterStmt;
 
 /* ----------------------
  *		Vacuum and Analyze Statements

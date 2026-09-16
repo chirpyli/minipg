@@ -911,16 +911,6 @@ _equalObjectWithArgs(const ObjectWithArgs *a, const ObjectWithArgs *b)
 
 
 static bool
-_equalClusterStmt(const ClusterStmt *a, const ClusterStmt *b)
-{
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_STRING_FIELD(indexname);
-	COMPARE_NODE_FIELD(params);
-
-	return true;
-}
-
-static bool
 _equalCreateStmt(const CreateStmt *a, const CreateStmt *b)
 {
 	COMPARE_NODE_FIELD(relation);
@@ -1778,9 +1768,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterTableCmd:
 			retval = _equalAlterTableCmd(a, b);
-			break;
-		case T_ClusterStmt:
-			retval = _equalClusterStmt(a, b);
 			break;
 		case T_CreateStmt:
 			retval = _equalCreateStmt(a, b);

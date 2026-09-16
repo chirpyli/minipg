@@ -154,7 +154,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_OK_IN_RECOVERY | COMMAND_OK_IN_READ_ONLY_TXN;
 			}
 
-		case T_ClusterStmt:
 		case T_ReindexStmt:
 		case T_VacuumStmt:
 			{
@@ -505,10 +504,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			/* no event triggers for global objects */
 			PreventInTransactionBlock(isTopLevel, "DROP DATABASE");
 			DropDatabase(pstate, (DropdbStmt *) parsetree);
-			break;
-
-		case T_ClusterStmt:
-			cluster(pstate, (ClusterStmt *) parsetree, isTopLevel);
 			break;
 
 		case T_VacuumStmt:
@@ -1152,10 +1147,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_DropdbStmt:
 			tag = CMDTAG_DROP_DATABASE;
-			break;
-
-		case T_ClusterStmt:
-			tag = CMDTAG_CLUSTER;
 			break;
 
 		case T_VacuumStmt:

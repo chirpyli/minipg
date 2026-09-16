@@ -861,19 +861,6 @@ WHERE classid = 'pg_class'::regclass AND
  table concur_reindex_tab  | schema public                                              | n
 (7 rows)
 
--- Check that indisclustered updates are preserved
-CREATE TABLE concur_clustered(i int);
-CREATE INDEX concur_clustered_i_idx ON concur_clustered(i);
-ALTER TABLE concur_clustered CLUSTER ON concur_clustered_i_idx;
-REINDEX TABLE CONCURRENTLY concur_clustered;
-SELECT indexrelid::regclass, indisclustered FROM pg_index
-  WHERE indrelid = 'concur_clustered'::regclass;
-       indexrelid       | indisclustered 
-------------------------+----------------
- concur_clustered_i_idx | t
-(1 row)
-
-DROP TABLE concur_clustered;
 -- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 -- Check errors
 -- Cannot run inside a transaction block

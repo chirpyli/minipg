@@ -70,7 +70,6 @@ ANALYZE hs1;
 
 VACUUM hs2;
 
-CLUSTER hs2 using hs1_pkey;
 
 REINDEX TABLE hs2;
 

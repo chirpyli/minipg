@@ -2496,18 +2496,6 @@ _copyObjectWithArgs(const ObjectWithArgs *from)
 }
 
 
-static ClusterStmt *
-_copyClusterStmt(const ClusterStmt *from)
-{
-	ClusterStmt *newnode = makeNode(ClusterStmt);
-
-	COPY_NODE_FIELD(relation);
-	COPY_STRING_FIELD(indexname);
-	COPY_NODE_FIELD(params);
-
-	return newnode;
-}
-
 /*
  * CopyCreateStmtFields
  *
@@ -3152,9 +3140,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_AlterTableCmd:
 			retval = _copyAlterTableCmd(from);
-			break;
-		case T_ClusterStmt:
-			retval = _copyClusterStmt(from);
 			break;
 		case T_CreateStmt:
 			retval = _copyCreateStmt(from);

@@ -29,7 +29,6 @@ typedef struct ClusterParams
 	bits32		options;		/* bitmask of CLUOPT_* */
 } ClusterParams;
 
-extern void cluster(ParseState *pstate, ClusterStmt *stmt, bool isTopLevel);
 extern void cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params);
 extern void check_index_is_clusterable(Relation OldHeap, Oid indexOid,
 									   bool recheck, LOCKMODE lockmode);

@@ -674,7 +674,6 @@ describeOneTableDetails(const char *schemaname,
 		{
 			char	   *indisunique = PQgetvalue(result, 0, 0);
 			char	   *indisprimary = PQgetvalue(result, 0, 1);
-			char	   *indisclustered = PQgetvalue(result, 0, 2);
 			char	   *indisvalid = PQgetvalue(result, 0, 3);
 			char	   *indamname = PQgetvalue(result, 0, 4);
 			char	   *indtable = PQgetvalue(result, 0, 5);
@@ -694,9 +693,6 @@ describeOneTableDetails(const char *schemaname,
 
 			if (strlen(indpred))
 				appendPQExpBuffer(&tmpbuf, _(", predicate (%s)"), indpred);
-
-			if (strcmp(indisclustered, "t") == 0)
-				appendPQExpBufferStr(&tmpbuf, _(", clustered"));
 
 			if (strcmp(indisvalid, "t") != 0)
 				appendPQExpBufferStr(&tmpbuf, _(", invalid"));
@@ -791,9 +787,6 @@ describeOneTableDetails(const char *schemaname,
 					}
 
 					/* Add these for all cases */
-					if (strcmp(PQgetvalue(result, i, 3), "t") == 0)
-						appendPQExpBufferStr(&buf, " CLUSTER");
-
 					if (strcmp(PQgetvalue(result, i, 4), "t") != 0)
 						appendPQExpBufferStr(&buf, " INVALID");
 

@@ -275,7 +275,6 @@ typedef enum NodeTag
 	T_SelectStmt,
 	T_AlterTableStmt,
 	T_AlterTableCmd,
-	T_ClusterStmt,
 	T_CreateStmt,
 	T_DropStmt,
 	T_TruncateStmt,

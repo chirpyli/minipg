@@ -203,7 +203,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	stmt toplevel_stmt schema_stmt
 		AlterObjectSchemaStmt
 		AlterTableStmt
-		AnalyzeStmt ClusterStmt
+		AnalyzeStmt
 		CreateExtensionStmt
 		CreateSchemaStmt CreateStmt
 		CreatedbStmt DeleteStmt DiscardStmt
@@ -251,7 +251,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <str>		access_method_clause attr_name
 			name
-			opt_index_name cluster_index_specification
+			opt_index_name
 
 %type <list>	func_name qual_Op qual_all_Op subquery_Op
 				opt_class
@@ -649,7 +649,6 @@ stmt:	AlterObjectSchemaStmt
 			| AlterTableStmt
 			| AnalyzeStmt
 			| CheckPointStmt
-			| ClusterStmt
 			| CreateExtensionStmt
 			| CreateSchemaStmt
 			| CreateStmt
@@ -1299,22 +1298,6 @@ alter_table_cmds:
 					n->name = $3;
 					n->behavior = $4;
 					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> CLUSTER ON <indexname> */
-			| CLUSTER ON name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_ClusterOn;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> SET WITHOUT CLUSTER */
-			| SET WITHOUT CLUSTER
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DropCluster;
-					n->name = NULL;
 					$$ = (Node *)n;
 				}
 			/* ALTER TABLE <name> ENABLE RULE <rule> */
@@ -2595,63 +2578,7 @@ drop_option:
  *****************************************************************************/
 
 
-/*****************************************************************************
- *
- *		QUERY:
- *				CLUSTER [VERBOSE] <qualified_name> [ USING <index_name> ]
- *				CLUSTER [ (options) ] <qualified_name> [ USING <index_name> ]
- *				CLUSTER [VERBOSE]
- *				CLUSTER [VERBOSE] <index_name> ON <qualified_name> (for pre-8.3)
- *
- *****************************************************************************/
 
-ClusterStmt:
-			CLUSTER opt_verbose qualified_name cluster_index_specification
-				{
-					ClusterStmt *n = makeNode(ClusterStmt);
-					n->relation = $3;
-					n->indexname = $4;
-					n->params = NIL;
-					if ($2)
-						n->params = lappend(n->params, makeDefElem("verbose", NULL, @2));
-					$$ = (Node*)n;
-				}
-
-			| CLUSTER '(' utility_option_list ')' qualified_name cluster_index_specification
-				{
-					ClusterStmt *n = makeNode(ClusterStmt);
-					n->relation = $5;
-					n->indexname = $6;
-					n->params = $3;
-					$$ = (Node*)n;
-				}
-			| CLUSTER opt_verbose
-				{
-					ClusterStmt *n = makeNode(ClusterStmt);
-					n->relation = NULL;
-					n->indexname = NULL;
-					n->params = NIL;
-					if ($2)
-						n->params = lappend(n->params, makeDefElem("verbose", NULL, @2));
-					$$ = (Node*)n;
-				}
-			/* kept for pre-8.3 compatibility */
-			| CLUSTER opt_verbose name ON qualified_name
-				{
-					ClusterStmt *n = makeNode(ClusterStmt);
-					n->relation = $5;
-					n->indexname = $3;
-					n->params = NIL;
-					if ($2)
-						n->params = lappend(n->params, makeDefElem("verbose", NULL, @2));
-					$$ = (Node*)n;
-				}
-		;
-
-cluster_index_specification:
-			USING name				{ $$ = $2; }
-			| /*EMPTY*/				{ $$ = NULL; }
-		;
 
 
 /*****************************************************************************
@@ -5853,7 +5780,6 @@ unreserved_keyword:
 			| CHARACTERISTICS
 			| CHECKPOINT
 			| CLASS
-			| CLUSTER
 			| COLUMNS
 			| COMMENT
 			| COMMIT
@@ -6279,7 +6205,6 @@ bare_label_keyword:
 			| CHECK
 			| CHECKPOINT
 			| CLASS
-			| CLUSTER
 			| COALESCE
 			| COLUMN
 			| COLUMNS
