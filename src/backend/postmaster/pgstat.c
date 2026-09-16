@@ -47,7 +47,7 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/fork_process.h"
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
@@ -1469,7 +1469,7 @@ pgstat_report_vacuum(Oid tableoid, bool shared,
 	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_VACUUM);
 	msg.m_databaseid = shared ? InvalidOid : MyDatabaseId;
 	msg.m_tableoid = tableoid;
-	msg.m_autovacuum = IsAutoVacuumWorkerProcess();
+	msg.m_autovacuum = false;
 	msg.m_vacuumtime = GetCurrentTimestamp();
 	msg.m_live_tuples = livetuples;
 	msg.m_dead_tuples = deadtuples;
@@ -1524,7 +1524,7 @@ pgstat_report_analyze(Relation rel,
 	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_ANALYZE);
 	msg.m_databaseid = rel->rd_rel->relisshared ? InvalidOid : MyDatabaseId;
 	msg.m_tableoid = RelationGetRelid(rel);
-	msg.m_autovacuum = IsAutoVacuumWorkerProcess();
+	msg.m_autovacuum = false;
 	msg.m_resetcounter = resetcounter;
 	msg.m_analyzetime = GetCurrentTimestamp();
 	msg.m_live_tuples = livetuples;
@@ -4180,15 +4180,10 @@ backend_read_statsfile(void)
 	Assert(!pgStatRunningInCollector);
 
 	/*
-	 * In a normal backend, we check staleness of the data for our own DB, and
-	 * so we send MyDatabaseId in inquiry messages.  In the autovac launcher,
-	 * check staleness of the shared-catalog data, and send InvalidOid in
-	 * inquiry messages so as not to force writing unnecessary data.
+	 * We check staleness of the data for our own DB, and so we send
+	 * MyDatabaseId in inquiry messages.
 	 */
-	if (IsAutoVacuumLauncherProcess())
-		inquiry_db = InvalidOid;
-	else
-		inquiry_db = MyDatabaseId;
+	inquiry_db = MyDatabaseId;
 
 	/*
 	 * Loop until fresh enough stats file is available or we ran out of time.
@@ -4226,12 +4221,8 @@ backend_read_statsfile(void)
 			 * actually accept.
 			 */
 			ref_ts = cur_ts;
-			if (IsAutoVacuumWorkerProcess())
-				min_ts = TimestampTzPlusMilliseconds(ref_ts,
-													 -PGSTAT_RETRY_DELAY);
-			else
-				min_ts = TimestampTzPlusMilliseconds(ref_ts,
-													 -PGSTAT_STAT_INTERVAL);
+			min_ts = TimestampTzPlusMilliseconds(ref_ts,
+												 -PGSTAT_STAT_INTERVAL);
 		}
 
 		/*
@@ -4284,14 +4275,10 @@ backend_read_statsfile(void)
 						"because stats collector is not responding")));
 
 	/*
-	 * Autovacuum launcher wants stats about all databases, but a shallow read
-	 * is sufficient.  Regular backends want a deep read for just the tables
-	 * they can see (MyDatabaseId + shared catalogs).
+	 * We want a deep read for just the tables we can see (MyDatabaseId +
+	 * shared catalogs).
 	 */
-	if (IsAutoVacuumLauncherProcess())
-		pgStatDBHash = pgstat_read_statsfiles(InvalidOid, false, false);
-	else
-		pgStatDBHash = pgstat_read_statsfiles(MyDatabaseId, false, true);
+	pgStatDBHash = pgstat_read_statsfiles(MyDatabaseId, false, true);
 }
 
 

@@ -36,7 +36,7 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
 #include "storage/fd.h"
@@ -692,10 +692,10 @@ void
 InitializeSessionUserIdStandalone(void)
 {
 	/*
-	 * This function should only be called in single-user mode, in autovacuum
-	 * workers, and in background workers.
+	 * This function should only be called in single-user mode, in background
+	 * workers.
 	 */
-	AssertState(!IsUnderPostmaster || IsAutoVacuumWorkerProcess() || IsBackgroundWorker);
+	AssertState(!IsUnderPostmaster || IsBackgroundWorker);
 
 	/* call only once */
 	AssertState(!OidIsValid(AuthenticatedUserId));

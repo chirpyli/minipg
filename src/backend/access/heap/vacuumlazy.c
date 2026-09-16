@@ -9,8 +9,8 @@
  * finite memory space usage.  To do that, we set upper bounds on the number of
  * tuples we will keep track of at once.
  *
- * We are willing to use at most maintenance_work_mem (or perhaps
- * autovacuum_work_mem) memory space to keep track of dead tuples.  We
+ * We are willing to use at most maintenance_work_mem memory space to keep
+ * track of dead tuples.  We
  * initially allocate an array of TIDs of that size, with an upper limit that
  * depends on table size (this limit ensures we don't allocate a huge area
  * uselessly for vacuuming small tables).  If the array threatens to overflow,
@@ -71,7 +71,7 @@
 #include "optimizer/paths.h"
 #include "pgstat.h"
 #include "portability/instr_time.h"
-#include "postmaster/autovacuum.h"
+
 #include "storage/bufmgr.h"
 #include "storage/freespace.h"
 #include "storage/lmgr.h"
@@ -510,8 +510,8 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	TransactionId FreezeLimit;
 	MultiXactId MultiXactCutoff;
 
-	/* measure elapsed time iff autovacuum logging requires it */
-	if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+	/* measure elapsed time iff logging requires it */
+	if (params->log_min_duration >= 0)
 	{
 		pg_rusage_init(&ru0);
 		starttime = GetCurrentTimestamp();
@@ -608,8 +608,8 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	vacrel->indname = NULL;
 	vacrel->phase = VACUUM_ERRCB_PHASE_UNKNOWN;
 
-	/* Save index names iff autovacuum logging requires it */
-	if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0 &&
+	/* Save index names iff logging requires it */
+	if (params->log_min_duration >= 0 &&
 		vacrel->nindexes > 0)
 	{
 		indnames = palloc(sizeof(char *) * vacrel->nindexes);
@@ -729,7 +729,7 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	pgstat_progress_end_command();
 
 	/* and log the action if appropriate */
-	if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+	if (params->log_min_duration >= 0)
 	{
 		TimestampTz endtime = GetCurrentTimestamp();
 
@@ -2620,7 +2620,7 @@ lazy_check_wraparound_failsafe(LVRelState *vacrel)
 						vacrel->relname,
 						vacrel->num_index_scans),
 				 errdetail("The table's relfrozenxid or relminmxid is too far in the past."),
-				 errhint("Consider increasing configuration parameter \"maintenance_work_mem\" or \"autovacuum_work_mem\".\n"
+				 errhint("Consider increasing configuration parameter \"maintenance_work_mem\".\n"
 						 "You might also need to consider other ways for VACUUM to keep up with the allocation of transaction IDs.")));
 
 		/* Stop applying cost limits from this point on */
@@ -3452,9 +3452,7 @@ static long
 compute_max_dead_tuples(BlockNumber relblocks, bool hasindex)
 {
 	long		maxtuples;
-	int			vac_work_mem = IsAutoVacuumWorkerProcess() &&
-	autovacuum_work_mem != -1 ?
-	autovacuum_work_mem : maintenance_work_mem;
+	int			vac_work_mem = maintenance_work_mem;
 
 	if (hasindex)
 	{

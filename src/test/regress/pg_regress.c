@@ -2040,7 +2040,6 @@ regression_main(int argc, char *argv[],
 			exit(2);
 		}
 		fputs("\n# Configuration added by pg_regress\n\n", pg_conf);
-		fputs("log_autovacuum_min_duration = 0\n", pg_conf);
 		fputs("log_checkpoints = on\n", pg_conf);
 		fputs("log_line_prefix = '%m %b[%p] %q%a '\n", pg_conf);
 		fputs("log_lock_waits = on\n", pg_conf);

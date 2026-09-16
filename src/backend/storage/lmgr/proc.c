@@ -40,7 +40,7 @@
 #include "access/xact.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
 #include "storage/lmgr.h"
@@ -139,9 +139,8 @@ ProcGlobalSemas(void)
  *	  running out when trying to start another backend is a common failure.
  *	  So, now we grab enough semaphores to support the desired max number
  *	  of backends immediately at initialization --- if the sysadmin has set
- *	  MaxConnections, max_worker_processes, max_wal_senders, or
- *	  autovacuum_max_workers higher than his kernel will support, he'll
- *	  find out sooner rather than later.
+ *	  MaxConnections, max_worker_processes, max_wal_senders higher than his
+ *	  kernel will support, he'll find out sooner rather than later.
  *
  *	  Another reason for creating semaphores here is that the semaphore
  *	  implementation typically requires us to create semaphores in the
@@ -168,7 +167,6 @@ InitProcGlobal(void)
 	 */
 	ProcGlobal->spins_per_delay = DEFAULT_SPINS_PER_DELAY;
 	ProcGlobal->freeProcs = NULL;
-	ProcGlobal->autovacFreeProcs = NULL;
 	ProcGlobal->bgworkerFreeProcs = NULL;
 	ProcGlobal->walsenderFreeProcs = NULL;
 	ProcGlobal->startupProc = NULL;
@@ -240,14 +238,7 @@ InitProcGlobal(void)
 			ProcGlobal->freeProcs = &procs[i];
 			procs[i].procgloballist = &ProcGlobal->freeProcs;
 		}
-		else if (i < MaxConnections + autovacuum_max_workers + 1)
-		{
-			/* PGPROC for AV launcher/worker, add to autovacFreeProcs list */
-			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->autovacFreeProcs;
-			ProcGlobal->autovacFreeProcs = &procs[i];
-			procs[i].procgloballist = &ProcGlobal->autovacFreeProcs;
-		}
-		else if (i < MaxConnections + autovacuum_max_workers + 1 + max_worker_processes)
+		else if (i < MaxConnections + 1 + max_worker_processes)
 		{
 			/* PGPROC for bgworker, add to bgworkerFreeProcs list */
 			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->bgworkerFreeProcs;
@@ -309,9 +300,7 @@ InitProcess(void)
 		elog(ERROR, "you already exist");
 
 	/* Decide which list should supply our PGPROC. */
-	if (IsAnyAutoVacuumProcess())
-		procgloballist = &ProcGlobal->autovacFreeProcs;
-	else if (IsBackgroundWorker)
+	if (IsBackgroundWorker)
 		procgloballist = &ProcGlobal->bgworkerFreeProcs;
 	else
 		procgloballist = &ProcGlobal->freeProcs;
@@ -357,10 +346,9 @@ InitProcess(void)
 	/*
 	 * Now that we have a PGPROC, mark ourselves as an active postmaster
 	 * child; this is so that the postmaster can detect it if we exit without
-	 * cleaning up.  (XXX autovac launcher currently doesn't participate in
-	 * this; it probably should.)
+	 * cleaning up.
 	 */
-	if (IsUnderPostmaster && !IsAutoVacuumLauncherProcess())
+	if (IsUnderPostmaster)
 		MarkPostmasterChildActive();
 
 	/*
@@ -383,9 +371,6 @@ InitProcess(void)
 	MyProc->delayChkpt = false;
 	MyProc->delayChkptEnd = false;
 	MyProc->statusFlags = 0;
-	/* NB -- autovac launcher intentionally does not set IS_AUTOVACUUM */
-	if (IsAutoVacuumWorkerProcess())
-		MyProc->statusFlags |= PROC_IS_AUTOVACUUM;
 	MyProc->lwWaiting = LW_WS_NOT_WAITING;
 	MyProc->lwWaitMode = 0;
 	MyProc->waitLock = NULL;
@@ -941,15 +926,10 @@ ProcKill(int code, Datum arg)
 
 	/*
 	 * This process is no longer present in shared memory in any meaningful
-	 * way, so tell the postmaster we've cleaned up acceptably well. (XXX
-	 * autovac launcher should be included here someday)
+	 * way, so tell the postmaster we've cleaned up acceptably well.
 	 */
-	if (IsUnderPostmaster && !IsAutoVacuumLauncherProcess())
+	if (IsUnderPostmaster)
 		MarkPostmasterChildInactive();
-
-	/* wake autovac launcher if needed -- see comments in FreeWorkerInfo */
-	if (AutovacuumLauncherPid != 0)
-		kill(AutovacuumLauncherPid, SIGUSR2);
 }
 
 /*
@@ -1095,7 +1075,6 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	LOCKMASK	myHeldLocks = MyProc->heldLocks;
 	TimestampTz standbyWaitStart = 0;
 	bool		early_deadlock = false;
-	bool		allow_autovacuum_cancel = true;
 	bool		logged_recovery_conflict = false;
 	ProcWaitStatus myWaitStatus;
 	PGPROC	   *leader = MyProc->lockGroupLeader;
@@ -1398,88 +1377,6 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 		 */
 		myWaitStatus = *((volatile ProcWaitStatus *) &MyProc->waitStatus);
 
-		/*
-		 * If we are not deadlocked, but are waiting on an autovacuum-induced
-		 * task, send a signal to interrupt it.
-		 */
-		if (deadlock_state == DS_BLOCKED_BY_AUTOVACUUM && allow_autovacuum_cancel)
-		{
-			PGPROC	   *autovac = GetBlockingAutoVacuumPgproc();
-			uint8		statusFlags;
-			uint8		lockmethod_copy;
-			LOCKTAG		locktag_copy;
-
-			/*
-			 * Grab info we need, then release lock immediately.  Note this
-			 * coding means that there is a tiny chance that the process
-			 * terminates its current transaction and starts a different one
-			 * before we have a change to send the signal; the worst possible
-			 * consequence is that a for-wraparound vacuum is cancelled.  But
-			 * that could happen in any case unless we were to do kill() with
-			 * the lock held, which is much more undesirable.
-			 */
-			LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
-			statusFlags = ProcGlobal->statusFlags[autovac->pgxactoff];
-			lockmethod_copy = lock->tag.locktag_lockmethodid;
-			locktag_copy = lock->tag;
-			LWLockRelease(ProcArrayLock);
-
-			/*
-			 * Only do it if the worker is not working to protect against Xid
-			 * wraparound.
-			 */
-			if ((statusFlags & PROC_IS_AUTOVACUUM) &&
-				!(statusFlags & PROC_VACUUM_FOR_WRAPAROUND))
-			{
-				int			pid = autovac->pid;
-
-				/* report the case, if configured to do so */
-				if (message_level_is_interesting(DEBUG1))
-				{
-					StringInfoData locktagbuf;
-					StringInfoData logbuf;	/* errdetail for server log */
-
-					initStringInfo(&locktagbuf);
-					initStringInfo(&logbuf);
-					DescribeLockTag(&locktagbuf, &locktag_copy);
-					appendStringInfo(&logbuf,
-									 "Process %d waits for %s on %s.",
-									 MyProcPid,
-									 GetLockmodeName(lockmethod_copy, lockmode),
-									 locktagbuf.data);
-
-					ereport(DEBUG1,
-							(errmsg_internal("sending cancel to blocking autovacuum PID %d",
-											 pid),
-							 errdetail_log("%s", logbuf.data)));
-
-					pfree(locktagbuf.data);
-					pfree(logbuf.data);
-				}
-
-				/* send the autovacuum worker Back to Old Kent Road */
-				if (kill(pid, SIGINT) < 0)
-				{
-					/*
-					 * There's a race condition here: once we release the
-					 * ProcArrayLock, it's possible for the autovac worker to
-					 * close up shop and exit before we can do the kill().
-					 * Therefore, we do not whinge about no-such-process.
-					 * Other errors such as EPERM could conceivably happen if
-					 * the kernel recycles the PID fast enough, but such cases
-					 * seem improbable enough that it's probably best to issue
-					 * a warning if we see some other errno.
-					 */
-					if (errno != ESRCH)
-						ereport(WARNING,
-								(errmsg("could not send signal to process %d: %m",
-										pid)));
-				}
-			}
-
-			/* prevent signal from being sent again more than once */
-			allow_autovacuum_cancel = false;
-		}
 
 		/*
 		 * If awoken after the deadlock check interrupt has run, and

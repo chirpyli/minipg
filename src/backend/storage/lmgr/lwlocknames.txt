@@ -27,8 +27,6 @@ TwoPhaseStateLock					18
 TablespaceCreateLock				19
 BtreeVacuumLock						20
 AddinShmemInitLock					21
-AutovacuumLock						22
-AutovacuumScheduleLock				23
 SyncScanLock						24
 RelationMappingLock					25
 SerializableXactHashLock			28

@@ -58,7 +58,7 @@
 #include "parser/parser.h"
 #include "parser/scansup.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
@@ -171,8 +171,7 @@ static const char *show_tcp_keepalives_count(void);
 static const char *show_tcp_user_timeout(void);
 static bool check_maxconnections(int *newval, void **extra, GucSource source);
 static bool check_max_worker_processes(int *newval, void **extra, GucSource source);
-static bool check_autovacuum_max_workers(int *newval, void **extra, GucSource source);
-static bool check_autovacuum_work_mem(int *newval, void **extra, GucSource source);
+
 static bool check_effective_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_huge_page_size(int *newval, void **extra, GucSource source);
@@ -1212,15 +1211,7 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"autovacuum", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Starts the autovacuum subprocess."),
-			NULL
-		},
-		&autovacuum_start_daemon,
-		true,
-		NULL, NULL, NULL
-	},
+
 
 #ifdef LOCK_DEBUG
 	{
@@ -1888,15 +1879,7 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"autovacuum_vacuum_cost_limit", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Vacuum cost amount available before napping, for autovacuum."),
-			NULL
-		},
-		&autovacuum_vac_cost_limit,
-		-1, -1, 10000,
-		NULL, NULL, NULL
-	},
+
 
 	{
 		{"max_files_per_process", PGC_POSTMASTER, RESOURCES_KERNEL,
@@ -2246,17 +2229,7 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"log_autovacuum_min_duration", PGC_SIGHUP, LOGGING_WHAT,
-			gettext_noop("Sets the minimum execution time above which "
-						 "autovacuum actions will be logged."),
-			gettext_noop("Zero prints all actions. -1 turns autovacuum logging off."),
-			GUC_UNIT_MS
-		},
-		&Log_autovacuum_min_duration,
-		-1, -1, INT_MAX,
-		NULL, NULL, NULL
-	},
+
 
 	{
 		{"log_parameter_max_length", PGC_SUSET, LOGGING_WHAT,
@@ -2484,43 +2457,10 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"autovacuum_naptime", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Time to sleep between autovacuum runs."),
-			NULL,
-			GUC_UNIT_S
-		},
-		&autovacuum_naptime,
-		60, 1, INT_MAX / 1000,
-		NULL, NULL, NULL
-	},
-	{
-		{"autovacuum_vacuum_threshold", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Minimum number of tuple updates or deletes prior to vacuum."),
-			NULL
-		},
-		&autovacuum_vac_thresh,
-		50, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"autovacuum_vacuum_insert_threshold", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums."),
-			NULL
-		},
-		&autovacuum_vac_ins_thresh,
-		1000, -1, INT_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"autovacuum_analyze_threshold", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Minimum number of tuple inserts, updates, or deletes prior to analyze."),
-			NULL
-		},
-		&autovacuum_anl_thresh,
-		50, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
+
+
+
+
 	{
 		/* see varsup.c for why this is PGC_POSTMASTER not PGC_SIGHUP */
 		{"autovacuum_freeze_max_age", PGC_POSTMASTER, AUTOVACUUM,
@@ -2546,16 +2486,7 @@ static struct config_int ConfigureNamesInt[] =
 		400000000, 10000, 2000000000,
 		NULL, NULL, NULL
 	},
-	{
-		/* see max_connections */
-		{"autovacuum_max_workers", PGC_POSTMASTER, AUTOVACUUM,
-			gettext_noop("Sets the maximum number of simultaneously running autovacuum worker processes."),
-			NULL
-		},
-		&autovacuum_max_workers,
-		3, 1, MAX_BACKENDS,
-		check_autovacuum_max_workers, NULL, NULL
-	},
+
 
 	{
 		{"max_parallel_maintenance_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
@@ -2589,16 +2520,7 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"autovacuum_work_mem", PGC_SIGHUP, RESOURCES_MEM,
-			gettext_noop("Sets the maximum memory to be used by each autovacuum worker process."),
-			NULL,
-			GUC_UNIT_KB
-		},
-		&autovacuum_work_mem,
-		-1, -1, MAX_KILOBYTES,
-		check_autovacuum_work_mem, NULL, NULL
-	},
+
 
 	{
 		{"old_snapshot_threshold", PGC_POSTMASTER, RESOURCES_ASYNCHRONOUS,
@@ -2888,46 +2810,13 @@ static struct config_real ConfigureNamesReal[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"autovacuum_vacuum_cost_delay", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Vacuum cost delay in milliseconds, for autovacuum."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&autovacuum_vac_cost_delay,
-		2, -1, 100,
-		NULL, NULL, NULL
-	},
 
-	{
-		{"autovacuum_vacuum_scale_factor", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Number of tuple updates or deletes prior to vacuum as a fraction of reltuples."),
-			NULL
-		},
-		&autovacuum_vac_scale,
-		0.2, 0.0, 100.0,
-		NULL, NULL, NULL
-	},
 
-	{
-		{"autovacuum_vacuum_insert_scale_factor", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Number of tuple inserts prior to vacuum as a fraction of reltuples."),
-			NULL
-		},
-		&autovacuum_vac_ins_scale,
-		0.2, 0.0, 100.0,
-		NULL, NULL, NULL
-	},
 
-	{
-		{"autovacuum_analyze_scale_factor", PGC_SIGHUP, AUTOVACUUM,
-			gettext_noop("Number of tuple inserts, updates, or deletes prior to analyze as a fraction of reltuples."),
-			NULL
-		},
-		&autovacuum_anl_scale,
-		0.1, 0.0, 100.0,
-		NULL, NULL, NULL
-	},
+
+
+
+
 
 	{
 		{"checkpoint_completion_target", PGC_SIGHUP, WAL_CHECKPOINTS,
@@ -9621,48 +9510,16 @@ show_tcp_user_timeout(void)
 static bool
 check_maxconnections(int *newval, void **extra, GucSource source)
 {
-	if (*newval + autovacuum_max_workers + 1 +
+	if (*newval + 1 +
 		max_worker_processes > MAX_BACKENDS)
 		return false;
-	return true;
-}
-
-static bool
-check_autovacuum_max_workers(int *newval, void **extra, GucSource source)
-{
-	if (MaxConnections + *newval + 1 +
-		max_worker_processes > MAX_BACKENDS)
-		return false;
-	return true;
-}
-
-static bool
-check_autovacuum_work_mem(int *newval, void **extra, GucSource source)
-{
-	/*
-	 * -1 indicates fallback.
-	 *
-	 * If we haven't yet changed the boot_val default of -1, just let it be.
-	 * Autovacuum will look to maintenance_work_mem instead.
-	 */
-	if (*newval == -1)
-		return true;
-
-	/*
-	 * We clamp manually-set values to at least 1MB.  Since
-	 * maintenance_work_mem is always set to at least this value, do the same
-	 * here.
-	 */
-	if (*newval < 1024)
-		*newval = 1024;
-
 	return true;
 }
 
 static bool
 check_max_worker_processes(int *newval, void **extra, GucSource source)
 {
-	if (MaxConnections + autovacuum_max_workers + 1 +
+	if (MaxConnections + 1 +
 		*newval > MAX_BACKENDS)
 		return false;
 	return true;

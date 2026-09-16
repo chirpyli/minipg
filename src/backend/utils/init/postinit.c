@@ -36,7 +36,7 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
@@ -392,8 +392,7 @@ InitializeMaxBackends(void)
 {
 	Assert(MaxBackends == 0);
 
-	/* the extra unit accounts for the autovacuum launcher */
-	MaxBackends = MaxConnections + autovacuum_max_workers + 1 +
+	MaxBackends = MaxConnections + 1 +
 		max_worker_processes;
 
 	/* internal error because the values were all checked previously */
@@ -574,15 +573,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * entirely possible, we need the AbortTransaction call to clean up.
 	 */
 	before_shmem_exit(ShutdownPostgres, 0);
-
-	/* The autovacuum launcher is done here */
-	if (IsAutoVacuumLauncherProcess())
-	{
-		/* report this backend in the PgBackendStatus array */
-		pgstat_bestart();
-
-		return;
-	}
 
 	/*
 	 * Start a new transaction here before first access to db, and get a

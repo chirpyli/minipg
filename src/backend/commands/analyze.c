@@ -51,7 +51,7 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "parser/parse_oper.h"
 #include "parser/parse_relation.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "statistics/extended_stats_internal.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -258,8 +258,8 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
-	/* measure elapsed time iff autovacuum logging requires it */
-	if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+	/* measure elapsed time iff logging requires it */
+	if (params->log_min_duration >= 0)
 	{
 		if (track_io_timing)
 		{
@@ -577,7 +577,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	vac_close_indexes(nindexes, Irel, NoLock);
 
 	/* Log the action if appropriate */
-	if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+	if (params->log_min_duration >= 0)
 	{
 		TimestampTz endtime = GetCurrentTimestamp();
 

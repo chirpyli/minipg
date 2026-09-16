@@ -3658,8 +3658,7 @@ CountUserBackends(Oid roleid)
  * CountOtherDBBackends -- check for other backends running in the given DB
  *
  * If there are other backends in the DB, we will wait a maximum of 5 seconds
- * for them to exit.  Autovacuum backends are encouraged to exit early by
- * sending them SIGTERM, but normal user backends are just waited for.
+ * for them to exit.
  *
  * The current backend is always ignored; it is caller's responsibility to
  * check whether the current backend uses the given DB, if it's important.
@@ -3682,14 +3681,11 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
 {
 	ProcArrayStruct *arrayP = procArray;
 
-#define MAXAUTOVACPIDS	10		/* max autovacs to SIGTERM per iteration */
-	int			autovac_pids[MAXAUTOVACPIDS];
 	int			tries;
 
 	/* 50 tries with 100ms sleep between tries makes 5 sec total wait */
 	for (tries = 0; tries < 50; tries++)
 	{
-		int			nautovacs = 0;
 		bool		found = false;
 		int			index;
 
@@ -3703,7 +3699,6 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
 		{
 			int			pgprocno = arrayP->pgprocnos[index];
 			PGPROC	   *proc = &allProcs[pgprocno];
-			uint8		statusFlags = ProcGlobal->statusFlags[index];
 
 			if (proc->databaseId != databaseId)
 				continue;
@@ -3715,27 +3710,13 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
 			if (proc->pid == 0)
 				(*nprepared)++;
 			else
-			{
 				(*nbackends)++;
-				if ((statusFlags & PROC_IS_AUTOVACUUM) &&
-					nautovacs < MAXAUTOVACPIDS)
-					autovac_pids[nautovacs++] = proc->pid;
-			}
 		}
 
 		LWLockRelease(ProcArrayLock);
 
 		if (!found)
 			return false;		/* no conflicting backends, so done */
-
-		/*
-		 * Send SIGTERM to any conflicting autovacuums before sleeping. We
-		 * postpone this step until after the loop because we don't want to
-		 * hold ProcArrayLock while issuing kill(). We have no idea what might
-		 * block kill() inside the kernel...
-		 */
-		for (index = 0; index < nautovacs; index++)
-			(void) kill(autovac_pids[index], SIGTERM);	/* ignore any error */
 
 		/* sleep, then try again */
 		pg_usleep(100 * 1000L); /* 100ms */

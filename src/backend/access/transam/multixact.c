@@ -82,7 +82,7 @@
 #include "lib/ilist.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "postmaster/autovacuum.h"
+
 #include "storage/lmgr.h"
 #include "storage/pmsignal.h"
 #include "storage/proc.h"
@@ -1149,7 +1149,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 			 * Immediately kick autovacuum into action as we're already in
 			 * ERROR territory.
 			 */
-			SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
+			
 
 			/* complain even if that DB has disappeared */
 			if (oldest_datname)
@@ -1174,7 +1174,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 		 * plenty of chances before we get into real trouble.
 		 */
 		if (IsUnderPostmaster && (result % 65536) == 0)
-			SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
+			
 
 		if (!MultiXactIdPrecedes(result, multiWarnLimit))
 		{
@@ -1252,7 +1252,7 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 								 nmembers))
 	{
 		/* see comment in the corresponding offsets wraparound case */
-		SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
+		
 
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
@@ -1264,27 +1264,6 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 								  MultiXactState->offsetStopLimit - nextOffset - 1),
 				 errhint("Execute a database-wide VACUUM in database with OID %u with reduced vacuum_multixact_freeze_min_age and vacuum_multixact_freeze_table_age settings.",
 						 MultiXactState->oldestMultiXactDB)));
-	}
-
-	/*
-	 * Check whether we should kick autovacuum into action, to prevent members
-	 * wraparound. NB we use a much larger window to trigger autovacuum than
-	 * just the warning limit. The warning is just a measure of last resort -
-	 * this is in line with GetNewTransactionId's behaviour.
-	 */
-	if (!MultiXactState->oldestOffsetKnown ||
-		(MultiXactState->nextOffset - MultiXactState->oldestOffset
-		 > MULTIXACT_MEMBER_SAFE_THRESHOLD))
-	{
-		/*
-		 * To avoid swamping the postmaster with signals, we issue the autovac
-		 * request only when crossing a segment boundary. With default
-		 * compilation settings that's roughly after 50k members.  This still
-		 * gives plenty of chances before we get into real trouble.
-		 */
-		if ((MXOffsetToMemberPage(nextOffset) / SLRU_PAGES_PER_SEGMENT) !=
-			(MXOffsetToMemberPage(nextOffset + nmembers) / SLRU_PAGES_PER_SEGMENT))
-			SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
 	}
 
 	if (MultiXactState->oldestOffsetKnown &&
@@ -2447,7 +2426,7 @@ SetMultiXactIdLimit(MultiXactId oldest_datminmxid, Oid oldest_datoid,
 	 */
 	if ((MultiXactIdPrecedes(multiVacLimit, curMulti) ||
 		 needs_offset_vacuum) && IsUnderPostmaster)
-		SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
+		
 
 	/* Give an immediate warning if past the wrap warn point */
 	if (MultiXactIdPrecedes(multiWarnLimit, curMulti))

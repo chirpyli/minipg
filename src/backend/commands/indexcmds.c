@@ -368,7 +368,7 @@ WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
 	VirtualTransactionId *old_snapshots;
 
 	old_snapshots = GetCurrentVirtualXIDs(limitXmin, true, false,
-										  PROC_IS_AUTOVACUUM | PROC_IN_VACUUM
+										  PROC_IN_VACUUM
 										  | PROC_IN_SAFE_IC,
 										  &n_old_snapshots);
 	if (progress)
@@ -389,7 +389,7 @@ WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
 
 			newer_snapshots = GetCurrentVirtualXIDs(limitXmin,
 													true, false,
-													PROC_IS_AUTOVACUUM | PROC_IN_VACUUM
+													PROC_IN_VACUUM
 													| PROC_IN_SAFE_IC,
 													&n_newer_snapshots);
 			for (j = i; j < n_old_snapshots; j++)

@@ -51,19 +51,17 @@ struct XidCache
 /*
  * Flags for PGPROC->statusFlags and PROC_HDR->statusFlags[]
  */
-#define		PROC_IS_AUTOVACUUM	0x01	/* is it an autovac worker? */
 #define		PROC_IN_VACUUM		0x02	/* currently running lazy vacuum */
 #define		PROC_IN_SAFE_IC		0x04	/* currently running CREATE INDEX
 										 * CONCURRENTLY or REINDEX
 										 * CONCURRENTLY on non-expressional,
 										 * non-partial index */
-#define		PROC_VACUUM_FOR_WRAPAROUND	0x08	/* set by autovac only */
 #define		PROC_IN_LOGICAL_DECODING	0x10	/* currently doing logical
 												 * decoding outside xact */
 
 /* flags reset at EOXact */
 #define		PROC_VACUUM_STATE_MASK \
-	(PROC_IN_VACUUM | PROC_IN_SAFE_IC | PROC_VACUUM_FOR_WRAPAROUND)
+	(PROC_IN_VACUUM | PROC_IN_SAFE_IC)
 
 /*
  * Xmin-related flags. Make sure any flags that affect how the process' Xmin
@@ -347,8 +345,6 @@ typedef struct PROC_HDR
 	uint32		allProcCount;
 	/* Head of list of free PGPROC structures */
 	PGPROC	   *freeProcs;
-	/* Head of list of autovacuum's free PGPROC structures */
-	PGPROC	   *autovacFreeProcs;
 	/* Head of list of bgworker free PGPROC structures */
 	PGPROC	   *bgworkerFreeProcs;
 	/* Head of list of walsender free PGPROC structures */

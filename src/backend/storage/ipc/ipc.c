@@ -25,7 +25,7 @@
 
 #include "miscadmin.h"
 #ifdef PROFILE_PID_DIR
-#include "postmaster/autovacuum.h"
+
 #endif
 #include "storage/dsm.h"
 #include "storage/ipc.h"
@@ -137,10 +137,7 @@ proc_exit(int code)
 		 */
 		char		gprofDirName[32];
 
-		if (IsAutoVacuumWorkerProcess())
-			snprintf(gprofDirName, 32, "gprof/avworker");
-		else
-			snprintf(gprofDirName, 32, "gprof/%d", (int) getpid());
+		snprintf(gprofDirName, 32, "gprof/%d", (int) getpid());
 
 		/*
 		 * Use mkdir() instead of MakePGDirectory() since we aren't making a

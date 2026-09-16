@@ -100,7 +100,7 @@
 #include "pg_getopt.h"
 #include "pgstat.h"
 #include "port/pg_bswap.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/fork_process.h"
 #include "postmaster/interrupt.h"
@@ -129,9 +129,8 @@
  * and CountChildren().
  */
 #define BACKEND_TYPE_NORMAL		0x0001	/* normal backend */
-#define BACKEND_TYPE_AUTOVAC	0x0002	/* autovacuum worker process */
 #define BACKEND_TYPE_BGWORKER	0x0008	/* bgworker process */
-#define BACKEND_TYPE_ALL		0x000B	/* OR of all the above */
+#define BACKEND_TYPE_ALL		0x0009	/* OR of all the above */
 
 /*
  * List of active backends (or child processes anyway; we don't actually
@@ -140,7 +139,7 @@
  * children we have and send them appropriate signals when necessary.
  *
  * As shown in the above set of backend types, this list includes not only
- * "normal" client sessions, but also autovacuum workers, walsenders, and
+ * "normal" client sessions, but also walsenders, and
  * background workers.  (Note that at the time of launch, walsenders are
  * labeled BACKEND_TYPE_NORMAL; we relabel them to BACKEND_TYPE_WALSND
  * upon noticing they've changed their PMChildFlags entry.  Hence that check
@@ -153,7 +152,7 @@
  * they will never become live backends.  dead_end children are not assigned a
  * PMChildSlot.  dead_end children have bkend_type NORMAL.
  *
- * "Special" children such as the startup, bgwriter and autovacuum launcher
+ * "Special" children such as the startup, bgwriter
  * tasks are not in this list.  They are tracked via StartupPID and other
  * pid_t variables below.  (Thus, there can't be more than one of any given
  * "special" child process type.  We use BackendList entries for any child
@@ -208,7 +207,6 @@ static pid_t StartupPID = 0,
 			BgWriterPID = 0,
 			CheckpointerPID = 0,
 			WalWriterPID = 0,
-			AutoVacPID = 0,
 			PgStatPID = 0,
 			SysLoggerPID = 0;
 
@@ -322,12 +320,6 @@ bool		ClientAuthInProgress = false;	/* T during new-client
 
 bool		redirection_done = false;	/* stderr redirected for syslogger? */
 
-/* received START_AUTOVAC_LAUNCHER signal */
-static volatile sig_atomic_t start_autovac_launcher = false;
-
-/* the launcher needs to be signaled to communicate some condition */
-static volatile bool avlauncher_needs_signal = false;
-
 /* set when there's a worker that needs to be started up */
 static volatile bool StartWorkerNeeded = true;
 static volatile bool HaveCrashedWorker = false;
@@ -379,7 +371,6 @@ static bool assign_backendlist_entry(RegisteredBgWorker *rw);
 static void maybe_start_bgworkers(void);
 static bool CreateOptsFile(int argc, char *argv[], char *fullprogname);
 static pid_t StartChildProcess(AuxProcType type);
-static void StartAutovacuumWorker(void);
 static void InitPostmasterDeathWatchHandle(void);
 
 #define StartupDataBase()		StartChildProcess(StartupProcess)
@@ -467,7 +458,7 @@ PostmasterMain(int argc, char *argv[])
 	 * CAUTION: when changing this list, check for side-effects on the signal
 	 * handling setup of child processes.  See tcop/postgres.c,
 	 * bootstrap/bootstrap.c, postmaster/bgwriter.c, postmaster/walwriter.c,
-	 * postmaster/autovacuum.c, postmaster/pgstat.c,
+	 * postmaster/pgstat.c,
 	 * postmaster/syslogger.c, postmaster/bgworker.c and
 	 * postmaster/checkpointer.c.
 	 */
@@ -951,11 +942,6 @@ PostmasterMain(int argc, char *argv[])
 	pgstat_init();
 
 	/*
-	 * Initialize the autovacuum subsystem (again, no process start yet)
-	 */
-	autovac_init();
-
-	/*
 	 * Remember postmaster startup time
 	 */
 	PgStartTime = GetCurrentTimestamp();
@@ -1324,33 +1310,10 @@ ServerLoop(void)
 		if (WalWriterPID == 0 && pmState == PM_RUN)
 			WalWriterPID = StartWalWriter();
 
-		/*
-		 * If we have lost the autovacuum launcher, try to start a new one. We
-		 * don't want autovacuum to run in binary upgrade mode because
-		 * autovacuum might update relfrozenxid for empty tables before the
-		 * physical files are put in place.
-		 */
-		if (!IsBinaryUpgrade && AutoVacPID == 0 &&
-			(AutoVacuumingActive() || start_autovac_launcher) &&
-			pmState == PM_RUN)
-		{
-			AutoVacPID = StartAutoVacLauncher();
-			if (AutoVacPID != 0)
-				start_autovac_launcher = false; /* signal processed */
-		}
-
 		/* If we have lost the stats collector, try to start a new one */
 		if (PgStatPID == 0 &&
 			(pmState == PM_RUN || pmState == PM_HOT_STANDBY))
 			PgStatPID = pgstat_start();
-
-		/* If we need to signal the autovacuum launcher, do so now */
-		if (avlauncher_needs_signal)
-		{
-			avlauncher_needs_signal = false;
-			if (AutoVacPID != 0)
-				kill(AutoVacPID, SIGUSR2);
-		}
 
 		/* Get other worker processes running, if needed */
 		if (StartWorkerNeeded || HaveCrashedWorker)
@@ -1838,7 +1801,7 @@ processCancelRequest(Port *port, void *pkt)
 /*
  * canAcceptConnections --- check to see if database state allows connections
  * of the specified type.  backend_type can be BACKEND_TYPE_NORMAL,
- * BACKEND_TYPE_AUTOVAC, or BACKEND_TYPE_BGWORKER.  (Note that we don't yet
+ * or BACKEND_TYPE_BGWORKER.  (Note that we don't yet
  * know whether a NORMAL connection might turn into a walsender.)
  */
 static CAC_state
@@ -1848,8 +1811,8 @@ canAcceptConnections(int backend_type)
 
 	/*
 	 * Can't start backends when in startup/shutdown/inconsistent recovery
-	 * state.  We treat autovac workers the same as user backends for this
-	 * purpose.  However, bgworkers are excluded from this test; we expect
+	 * state.  Normal user backends are subject to this test; however,
+	 * bgworkers are excluded from this test; we expect
 	 * bgworker_should_start_now() decided whether the DB state allows them.
 	 */
 	if (pmState != PM_RUN && pmState != PM_HOT_STANDBY &&
@@ -1868,7 +1831,7 @@ canAcceptConnections(int backend_type)
 
 	/*
 	 * "Smart shutdown" restrictions are applied only to normal connections,
-	 * not to autovac workers or bgworkers.  When only superusers can connect,
+	 * not to bgworkers.  When only superusers can connect,
 	 * we return CAC_SUPERUSER to indicate that superuserness must be checked
 	 * later.  Note that neither CAC_OK nor CAC_SUPERUSER can safely be
 	 * returned until we have checked for too many children.
@@ -2077,8 +2040,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 			signal_child(CheckpointerPID, SIGHUP);
 		if (WalWriterPID != 0)
 			signal_child(WalWriterPID, SIGHUP);
-		if (AutoVacPID != 0)
-			signal_child(AutoVacPID, SIGHUP);
 		if (SysLoggerPID != 0)
 			signal_child(SysLoggerPID, SIGHUP);
 		if (PgStatPID != 0)
@@ -2352,8 +2313,6 @@ reaper(SIGNAL_ARGS)
 			 * Likewise, start other special children as needed.  In a restart
 			 * situation, some of them may be alive already.
 			 */
-			if (!IsBinaryUpgrade && AutoVacuumingActive() && AutoVacPID == 0)
-				AutoVacPID = StartAutoVacLauncher();
 			if (PgStatPID == 0)
 				PgStatPID = pgstat_start();
 
@@ -2446,21 +2405,6 @@ reaper(SIGNAL_ARGS)
 			if (!EXIT_STATUS_0(exitstatus))
 				HandleChildCrash(pid, exitstatus,
 								 _("WAL writer process"));
-			continue;
-		}
-
-		/*
-		 * Was it the autovacuum launcher?	Normal exit can be ignored; we'll
-		 * start a new one at the next iteration of the postmaster's main
-		 * loop, if necessary.  Any other exit condition is treated as a
-		 * crash.
-		 */
-		if (pid == AutoVacPID)
-		{
-			AutoVacPID = 0;
-			if (!EXIT_STATUS_0(exitstatus))
-				HandleChildCrash(pid, exitstatus,
-								 _("autovacuum launcher process"));
 			continue;
 		}
 
@@ -2677,7 +2621,7 @@ CleanupBackend(int pid,
 
 /*
  * HandleChildCrash -- cleanup after failed backend, bgwriter, checkpointer,
- * walwriter, autovacuum or background worker.
+ * walwriter or background worker.
  *
  * The objectives here are to clean up our local state about the child
  * process, and to signal all other remaining children to quickdie.
@@ -2853,18 +2797,6 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 		signal_child(WalWriterPID, (SendStop ? SIGSTOP : SIGQUIT));
 	}
 
-	/* Take care of the autovacuum launcher too */
-	if (pid == AutoVacPID)
-		AutoVacPID = 0;
-	else if (AutoVacPID != 0 && take_action)
-	{
-		ereport(DEBUG2,
-				(errmsg_internal("sending %s to process %d",
-								 (SendStop ? "SIGSTOP" : "SIGQUIT"),
-								 (int) AutoVacPID)));
-		signal_child(AutoVacPID, (SendStop ? SIGSTOP : SIGQUIT));
-	}
-
 	/*
 	 * Force a power-cycle of the pgstat process too.  (This isn't absolutely
 	 * necessary, but it seems like a good idea for robustness, and it
@@ -3001,9 +2933,6 @@ PostmasterStateMachine(void)
 
 		/* Signal all backend children */
 		SignalSomeChildren(SIGTERM, BACKEND_TYPE_ALL);
-		/* and the autovac launcher too */
-		if (AutoVacPID != 0)
-			signal_child(AutoVacPID, SIGTERM);
 		/* and the bgwriter too */
 		if (BgWriterPID != 0)
 			signal_child(BgWriterPID, SIGTERM);
@@ -3026,9 +2955,9 @@ PostmasterStateMachine(void)
 	if (pmState == PM_WAIT_BACKENDS)
 	{
 		/*
-		 * PM_WAIT_BACKENDS state ends when we have no regular backends
-		 * (including autovac workers), no bgworkers (including unconnected
-		 * ones), and no walwriter, autovac launcher or bgwriter.  If we are
+		 * PM_WAIT_BACKENDS state ends when we have no regular backends,
+		 * no bgworkers (including unconnected
+		 * ones), and no walwriter or bgwriter.  If we are
 		 * doing crash recovery or an immediate shutdown then we expect the
 		 * checkpointer to exit as well, otherwise not. The stats and
 		 * syslogger processes are disregarded since they are not connected to
@@ -3041,8 +2970,7 @@ PostmasterStateMachine(void)
 			BgWriterPID == 0 &&
 			(CheckpointerPID == 0 ||
 			 (!FatalError && Shutdown < ImmediateShutdown)) &&
-			WalWriterPID == 0 &&
-			AutoVacPID == 0)
+			WalWriterPID == 0)
 		{
 			if (Shutdown >= ImmediateShutdown || FatalError)
 			{
@@ -3131,7 +3059,6 @@ PostmasterStateMachine(void)
 			Assert(BgWriterPID == 0);
 			Assert(CheckpointerPID == 0);
 			Assert(WalWriterPID == 0);
-			Assert(AutoVacPID == 0);
 			/* syslogger is not considered here */
 			pmState = PM_NO_CHILDREN;
 		}
@@ -3333,8 +3260,6 @@ TerminateChildren(int signal)
 		signal_child(CheckpointerPID, signal);
 	if (WalWriterPID != 0)
 		signal_child(WalWriterPID, signal);
-	if (AutoVacPID != 0)
-		signal_child(AutoVacPID, signal);
 	if (PgStatPID != 0)
 		signal_child(PgStatPID, signal);
 }
@@ -3343,8 +3268,6 @@ TerminateChildren(int signal)
  * BackendStartup -- start backend process
  *
  * returns: STATUS_ERROR if the fork failed, STATUS_OK otherwise.
- *
- * Note: if you change this code, also consider StartAutovacuumWorker.
  */
 static int
 BackendStartup(Port *port)
@@ -3775,28 +3698,6 @@ sigusr1_handler(SIGNAL_ARGS)
 		}
 	}
 
-	if (CheckPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER) &&
-		Shutdown <= SmartShutdown && pmState < PM_STOP_BACKENDS)
-	{
-		/*
-		 * Start one iteration of the autovacuum daemon, even if autovacuuming
-		 * is nominally not enabled.  This is so we can have an active defense
-		 * against transaction ID wraparound.  We set a flag for the main loop
-		 * to do it rather than trying to do it here --- this is because the
-		 * autovac process itself may send the signal, and we want to handle
-		 * that by launching another iteration as soon as the current one
-		 * completes.
-		 */
-		start_autovac_launcher = true;
-	}
-
-	if (CheckPostmasterSignal(PMSIGNAL_START_AUTOVAC_WORKER) &&
-		Shutdown <= SmartShutdown && pmState < PM_STOP_BACKENDS)
-	{
-		/* The autovacuum launcher wants us to start a worker process. */
-		StartAutovacuumWorker();
-	}
-
 	/*
 	 * Try to advance postmaster's state machine, if a child requests it.
 	 *
@@ -4009,90 +3910,7 @@ StartChildProcess(AuxProcType type)
 	return pid;
 }
 
-/*
- * StartAutovacuumWorker
- *		Start an autovac worker process.
- *
- * This function is here because it enters the resulting PID into the
- * postmaster's private backends list.
- *
- * NB -- this code very roughly matches BackendStartup.
- */
-static void
-StartAutovacuumWorker(void)
-{
-	Backend    *bn;
 
-	/*
-	 * If not in condition to run a process, don't try, but handle it like a
-	 * fork failure.  This does not normally happen, since the signal is only
-	 * supposed to be sent by autovacuum launcher when it's OK to do it, but
-	 * we have to check to avoid race-condition problems during DB state
-	 * changes.
-	 */
-	if (canAcceptConnections(BACKEND_TYPE_AUTOVAC) == CAC_OK)
-	{
-		/*
-		 * Compute the cancel key that will be assigned to this session. We
-		 * probably don't need cancel keys for autovac workers, but we'd
-		 * better have something random in the field to prevent unfriendly
-		 * people from sending cancels to them.
-		 */
-		if (!RandomCancelKey(&MyCancelKey))
-		{
-			ereport(LOG,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("could not generate random cancel key")));
-			return;
-		}
-
-		bn = (Backend *) malloc(sizeof(Backend));
-		if (bn)
-		{
-			bn->cancel_key = MyCancelKey;
-
-			/* Autovac workers are not dead_end and need a child slot */
-			bn->dead_end = false;
-			bn->child_slot = MyPMChildSlot = AssignPostmasterChildSlot();
-			bn->bgworker_notify = false;
-
-			bn->pid = StartAutoVacWorker();
-			if (bn->pid > 0)
-			{
-				bn->bkend_type = BACKEND_TYPE_AUTOVAC;
-				dlist_push_head(&BackendList, &bn->elem);
-				/* all OK */
-				return;
-			}
-
-			/*
-			 * fork failed, fall through to report -- actual error message was
-			 * logged by StartAutoVacWorker
-			 */
-			(void) ReleasePostmasterChildSlot(bn->child_slot);
-			free(bn);
-		}
-		else
-			ereport(LOG,
-					(errcode(ERRCODE_OUT_OF_MEMORY),
-					 errmsg("out of memory")));
-	}
-
-	/*
-	 * Report the failure to the launcher, if it's running.  (If it's not, we
-	 * might not even be connected to shared memory, so don't try to call
-	 * AutoVacWorkerFailed.)  Note that we also need to signal it so that it
-	 * responds to the condition, but we don't do that here, instead waiting
-	 * for ServerLoop to do it.  This way we avoid a ping-pong signaling in
-	 * quick succession between the autovac launcher and postmaster in case
-	 * things get ugly.
-	 */
-	if (AutoVacPID != 0)
-	{
-		AutoVacWorkerFailed();
-		avlauncher_needs_signal = true;
-	}
-}
 
 /*
  * Create the opts file
@@ -4135,7 +3953,7 @@ CreateOptsFile(int argc, char *argv[], char *fullprogname)
  *
  * This reports the number of entries needed in per-child-process arrays
  * (the PMChildFlags array).
- * These arrays include regular backends, autovac workers, walsenders
+ * These arrays include regular backends, walsenders
  * and background workers, but not special children nor dead_end children.
  * This allows the arrays to have a fixed maximum size, to wit the same
  * too-many-children limit enforced by canAcceptConnections().  The exact value
@@ -4144,7 +3962,7 @@ CreateOptsFile(int argc, char *argv[], char *fullprogname)
 int
 MaxLivePostmasterChildren(void)
 {
-	return 2 * (MaxConnections + autovacuum_max_workers + 1 +
+	return 2 * (MaxConnections + 1 +
 				max_worker_processes);
 }
 
@@ -4216,7 +4034,7 @@ BackgroundWorkerUnblockSignals(void)
  * Returns true on success, false on failure.
  * In either case, update the RegisteredBgWorker's state appropriately.
  *
- * This code is heavily based on autovacuum.c, q.v.
+ * This code is heavily based on bgworker.c, q.v.
  */
 static bool
 do_start_bgworker(RegisteredBgWorker *rw)

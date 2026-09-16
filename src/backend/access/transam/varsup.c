@@ -20,7 +20,7 @@
 #include "access/xlog.h"
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
-#include "postmaster/autovacuum.h"
+
 #include "storage/pmsignal.h"
 #include "storage/proc.h"
 #include "utils/syscache.h"
@@ -107,14 +107,6 @@ GetNewTransactionId(bool isSubXact)
 		Oid			oldest_datoid = ShmemVariableCache->oldestXidDB;
 
 		LWLockRelease(XidGenLock);
-
-		/*
-		 * To avoid swamping the postmaster with signals, we issue the autovac
-		 * request only once per 64K transaction starts.  This still gives
-		 * plenty of chances before we get into real trouble.
-		 */
-		if (IsUnderPostmaster && (xid % 65536) == 0)
-			SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
 
 		if (IsUnderPostmaster &&
 			TransactionIdFollowsOrEquals(xid, xidStopLimit))
@@ -425,18 +417,6 @@ SetTransactionIdLimit(TransactionId oldest_datfrozenxid, Oid oldest_datoid)
 	ereport(DEBUG1,
 			(errmsg_internal("transaction ID wrap limit is %u, limited by database with OID %u",
 							 xidWrapLimit, oldest_datoid)));
-
-	/*
-	 * If past the autovacuum force point, immediately signal an autovac
-	 * request.  The reason for this is that autovac only processes one
-	 * database per invocation.  Once it's finished cleaning up the oldest
-	 * database, it'll call here, and we'll signal the postmaster to start
-	 * another iteration immediately if there are still any old databases.
-	 */
-	if (TransactionIdFollowsOrEquals(curXid, xidVacLimit) &&
-		IsUnderPostmaster && !InRecovery)
-		SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_LAUNCHER);
-
 	/* Give an immediate warning if past the wrap warn point */
 	if (TransactionIdFollowsOrEquals(curXid, xidWarnLimit) && !InRecovery)
 	{

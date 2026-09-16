@@ -24,7 +24,7 @@
 #include "access/twophase.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
@@ -125,7 +125,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, PMSignalShmemSize());
 		size = add_size(size, ProcSignalShmemSize());
 		size = add_size(size, CheckpointerShmemSize());
-		size = add_size(size, AutoVacuumShmemSize());
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
@@ -224,7 +223,6 @@ CreateSharedMemoryAndSemaphores(void)
 	PMSignalShmemInit();
 	ProcSignalShmemInit();
 	CheckpointerShmemInit();
-	AutoVacuumShmemInit();
 
 	/*
 	 * Set up other modules that need some shared memory space

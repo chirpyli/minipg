@@ -41,7 +41,7 @@
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "postmaster/bgworker_internals.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -64,6 +64,15 @@ int			vacuum_multixact_freeze_min_age;
 int			vacuum_multixact_freeze_table_age;
 int			vacuum_failsafe_age;
 int			vacuum_multixact_failsafe_age;
+
+/*
+ * Freeze age limits that drive XID/MultiXact wraparound defense.  These are
+ * shared with the core freeze logic (varsup.c, multixact.c) and are kept even
+ * though the autovacuum daemon has been removed, so that manual VACUUM and the
+ * wraparound limits continue to work.
+ */
+int			autovacuum_freeze_max_age;
+int			autovacuum_multixact_freeze_max_age;
 
 
 /* A few variables that don't seem worth passing around as parameters */
@@ -345,10 +354,9 @@ vacuum(List *relations, VacuumParams *params,
 				 errmsg("PROCESS_TOAST required with VACUUM FULL")));
 
 	/*
-	 * Send info about dead objects to the statistics collector, unless we are
-	 * in autovacuum --- autovacuum.c does this for itself.
+	 * Send info about dead objects to the statistics collector.
 	 */
-	if ((params->options & VACOPT_VACUUM) && !IsAutoVacuumWorkerProcess())
+	if (params->options & VACOPT_VACUUM)
 		pgstat_vacuum_stat();
 
 	/*
@@ -410,17 +418,14 @@ vacuum(List *relations, VacuumParams *params,
 	 * For ANALYZE (no VACUUM): if inside a transaction block, we cannot
 	 * start/commit our own transactions.  Also, there's no need to do so if
 	 * only processing one relation.  For multiple relations when not within a
-	 * transaction block, and also in an autovacuum worker, use own
-	 * transactions so we can release locks sooner.
+	 * transaction block, use own transactions so we can release locks sooner.
 	 */
 	if (params->options & VACOPT_VACUUM)
 		use_own_xacts = true;
 	else
 	{
 		Assert(params->options & VACOPT_ANALYZE);
-		if (IsAutoVacuumWorkerProcess())
-			use_own_xacts = true;
-		else if (in_outer_xact)
+		if (in_outer_xact)
 			use_own_xacts = false;
 		else if (list_length(relations) > 1)
 			use_own_xacts = true;
@@ -539,11 +544,10 @@ vacuum(List *relations, VacuumParams *params,
 		StartTransactionCommand();
 	}
 
-	if ((params->options & VACOPT_VACUUM) && !IsAutoVacuumWorkerProcess())
+	if (params->options & VACOPT_VACUUM)
 	{
 		/*
 		 * Update pg_database.datfrozenxid, and truncate pg_xact if possible.
-		 * (autovacuum.c does this for itself.)
 		 */
 		vac_update_datfrozenxid();
 	}
@@ -616,12 +620,7 @@ vacuum_open_relation(Oid relid, RangeVar *relation, bits32 options,
 	 * statements in the permission checks; otherwise, only log if the caller
 	 * so requested.
 	 */
-	if (!IsAutoVacuumWorkerProcess())
-		elevel = WARNING;
-	else if (verbose)
-		elevel = LOG;
-	else
-		return NULL;
+	elevel = WARNING;
 
 	if ((options & VACOPT_VACUUM) != 0)
 	{
@@ -689,12 +688,6 @@ expand_vacuum_rel(VacuumRelation *vrel, int options)
 		Oid			relid;
 		HeapTuple	tuple;
 		int			rvr_opts;
-
-		/*
-		 * Since autovacuum workers supply OIDs when calling vacuum(), no
-		 * autovacuum worker should reach this code.
-		 */
-		Assert(!IsAutoVacuumWorkerProcess());
 
 		/*
 		 * We transiently take AccessShareLock to protect the syscache lookup
@@ -1727,8 +1720,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params)
 		 */
 		LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
 		MyProc->statusFlags |= PROC_IN_VACUUM;
-		if (params->is_wraparound)
-			MyProc->statusFlags |= PROC_VACUUM_FOR_WRAPAROUND;
 		ProcGlobal->statusFlags[MyProc->pgxactoff] = MyProc->statusFlags;
 		LWLockRelease(ProcArrayLock);
 	}
@@ -2006,9 +1997,6 @@ vacuum_delay_point(void)
 			exit(1);
 
 		VacuumCostBalance = 0;
-
-		/* update balance values for workers */
-		AutoVacuumUpdateDelay();
 
 		/* Might have gotten an interrupt while sleeping */
 		CHECK_FOR_INTERRUPTS();

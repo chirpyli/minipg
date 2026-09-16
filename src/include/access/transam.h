@@ -274,6 +274,10 @@ extern TransactionId TransactionIdLatest(TransactionId mainxid,
 										 int nxids, const TransactionId *xids);
 extern XLogRecPtr TransactionIdGetCommitLSN(TransactionId xid);
 
+/* in commands/vacuum.c */
+extern int	autovacuum_freeze_max_age;
+extern int	autovacuum_multixact_freeze_max_age;
+
 /* in transam/varsup.c */
 extern FullTransactionId GetNewTransactionId(bool isSubXact);
 extern void AdvanceNextFullTransactionIdPastXid(TransactionId xid);

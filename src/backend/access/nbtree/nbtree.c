@@ -27,7 +27,7 @@
 #include "miscadmin.h"
 #include "nodes/execnodes.h"
 #include "pgstat.h"
-#include "postmaster/autovacuum.h"
+
 #include "storage/condition_variable.h"
 #include "storage/indexfsm.h"
 #include "storage/ipc.h"
