@@ -809,10 +809,6 @@ _outLimit(StringInfo str, const Limit *node)
 	WRITE_NODE_FIELD(limitOffset);
 	WRITE_NODE_FIELD(limitCount);
 	WRITE_ENUM_FIELD(limitOption, LimitOption);
-	WRITE_INT_FIELD(uniqNumCols);
-	WRITE_ATTRNUMBER_ARRAY(uniqColIdx, node->uniqNumCols);
-	WRITE_OID_ARRAY(uniqOperators, node->uniqNumCols);
-	WRITE_OID_ARRAY(uniqCollations, node->uniqNumCols);
 }
 
 static void

@@ -2302,8 +2302,7 @@ create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path)
 		plan = (Plan *) make_limit(plan,
 								   subparse->limitOffset,
 								   subparse->limitCount,
-								   subparse->limitOption,
-								   0, NULL, NULL, NULL);
+								   subparse->limitOption);
 
 		/* Must apply correct cost/width data to Limit node */
 		plan->startup_cost = mminfo->path->startup_cost;
@@ -2405,43 +2404,14 @@ create_limit_plan(PlannerInfo *root, LimitPath *best_path, int flags)
 {
 	Limit	   *plan;
 	Plan	   *subplan;
-	int			numUniqkeys = 0;
-	AttrNumber *uniqColIdx = NULL;
-	Oid		   *uniqOperators = NULL;
-	Oid		   *uniqCollations = NULL;
 
 	/* Limit doesn't project, so tlist requirements pass through */
 	subplan = create_plan_recurse(root, best_path->subpath, flags);
 
-	/* Extract information necessary for comparing rows for WITH TIES. */
-	if (best_path->limitOption == LIMIT_OPTION_WITH_TIES)
-	{
-		Query	   *parse = root->parse;
-		ListCell   *l;
-
-		numUniqkeys = list_length(parse->sortClause);
-		uniqColIdx = (AttrNumber *) palloc(numUniqkeys * sizeof(AttrNumber));
-		uniqOperators = (Oid *) palloc(numUniqkeys * sizeof(Oid));
-		uniqCollations = (Oid *) palloc(numUniqkeys * sizeof(Oid));
-
-		numUniqkeys = 0;
-		foreach(l, parse->sortClause)
-		{
-			SortGroupClause *sortcl = (SortGroupClause *) lfirst(l);
-			TargetEntry *tle = get_sortgroupclause_tle(sortcl, parse->targetList);
-
-			uniqColIdx[numUniqkeys] = tle->resno;
-			uniqOperators[numUniqkeys] = sortcl->eqop;
-			uniqCollations[numUniqkeys] = exprCollation((Node *) tle->expr);
-			numUniqkeys++;
-		}
-	}
-
 	plan = make_limit(subplan,
 					  best_path->limitOffset,
 					  best_path->limitCount,
-					  best_path->limitOption,
-					  numUniqkeys, uniqColIdx, uniqOperators, uniqCollations);
+					  best_path->limitOption);
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -5789,8 +5759,7 @@ make_lockrows(Plan *lefttree, List *rowMarks, int epqParam)
  */
 Limit *
 make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
-		   LimitOption limitOption, int uniqNumCols, AttrNumber *uniqColIdx,
-		   Oid *uniqOperators, Oid *uniqCollations)
+		   LimitOption limitOption)
 {
 	Limit	   *node = makeNode(Limit);
 	Plan	   *plan = &node->plan;
@@ -5803,10 +5772,6 @@ make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
 	node->limitOffset = limitOffset;
 	node->limitCount = limitCount;
 	node->limitOption = limitOption;
-	node->uniqNumCols = uniqNumCols;
-	node->uniqColIdx = uniqColIdx;
-	node->uniqOperators = uniqOperators;
-	node->uniqCollations = uniqCollations;
 
 	return node;
 }

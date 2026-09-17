@@ -93,50 +93,17 @@ select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
 -- FETCH FIRST
 -- minipg: 语法只保留了 row_or_rows = ROWS，单数 ROW 与 NEXT 均已裁剪，
 -- 用例统一改用 ROWS
--- Check the WITH TIES clause
---
-
-SELECT  thousand
-		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 2 ROWS WITH TIES;
-
-SELECT  thousand
-		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST ROWS WITH TIES;
-
-SELECT  thousand
-		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 1 ROWS WITH TIES;
-
 SELECT  thousand
 		FROM onek WHERE thousand < 5
 		ORDER BY thousand FETCH FIRST 2 ROWS ONLY;
 
--- SKIP LOCKED and WITH TIES are incompatible
-SELECT  thousand
-		FROM onek WHERE thousand < 5
-		ORDER BY thousand FETCH FIRST 1 ROWS WITH TIES FOR UPDATE SKIP LOCKED;
-
--- should fail
-SELECT ''::text AS two, unique1, unique2, stringu1
-		FROM onek WHERE unique1 > 50
-		FETCH FIRST 2 ROWS WITH TIES;
-
 -- test ruleutils
-CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
-		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10;
-\d+ limit_thousand_v_1
+
 CREATE VIEW limit_thousand_v_2 AS SELECT thousand FROM onek WHERE thousand < 995
 		ORDER BY thousand OFFSET 10 FETCH FIRST 5 ROWS ONLY;
 \d+ limit_thousand_v_2
-CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
-		ORDER BY thousand FETCH FIRST NULL ROWS WITH TIES;		-- fails
-CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
-		ORDER BY thousand FETCH FIRST (NULL+1) ROWS WITH TIES;
-\d+ limit_thousand_v_3
-CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
-		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES;
-\d+ limit_thousand_v_4
+
+
 CREATE VIEW limit_thousand_v_5 AS SELECT thousand FROM onek WHERE thousand < 995
 		ORDER BY thousand FETCH FIRST NULL ROWS ONLY;
 \d+ limit_thousand_v_5

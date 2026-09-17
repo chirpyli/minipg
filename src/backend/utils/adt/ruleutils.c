@@ -3406,33 +3406,13 @@ get_select_query_def(Query *query, deparse_context *context,
 	}
 	if (query->limitCount != NULL)
 	{
-		if (query->limitOption == LIMIT_OPTION_WITH_TIES)
-		{
-			/*
-			 * The limitCount arg is a c_expr, so it needs parens. Simple
-			 * literals and function expressions would not need parens, but
-			 * unfortunately it's hard to tell if the expression will be
-			 * printed as a simple literal like 123 or as a typecast
-			 * expression, like '-123'::int4. The grammar accepts the former
-			 * without quoting, but not the latter.
-			 */
-			appendContextKeyword(context, " FETCH FIRST ",
-								 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-			appendStringInfoChar(buf, '(');
-			get_rule_expr(query->limitCount, context, false);
-			appendStringInfoChar(buf, ')');
-			appendStringInfoString(buf, " ROWS WITH TIES");
-		}
+		appendContextKeyword(context, " LIMIT ",
+							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
+		if (IsA(query->limitCount, Const) &&
+			((Const *) query->limitCount)->constisnull)
+			appendStringInfoString(buf, "ALL");
 		else
-		{
-			appendContextKeyword(context, " LIMIT ",
-								 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-			if (IsA(query->limitCount, Const) &&
-				((Const *) query->limitCount)->constisnull)
-				appendStringInfoString(buf, "ALL");
-			else
-				get_rule_expr(query->limitCount, context, false);
-		}
+			get_rule_expr(query->limitCount, context, false);
 	}
 
 	/* Add FOR [KEY] UPDATE/SHARE clauses if present */

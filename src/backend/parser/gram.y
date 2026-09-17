@@ -1349,15 +1349,6 @@ alter_using:
 /*****************************************************************************
  *
  *		QUERY :
- *				close <portalname>
- *
- *****************************************************************************/
-
-
-
-/*****************************************************************************
- *
- *		QUERY :
  *				CREATE TABLE relname
  *
  *****************************************************************************/
@@ -2568,18 +2559,6 @@ drop_option:
 				}
 		;
 
-/*****************************************************************************
- *
- * Manipulate a conversion
- *
- *		CREATE [DEFAULT] CONVERSION <conversion_name>
- *		FOR <encoding_name> TO <encoding_name> FROM <func_name>
- *
- *****************************************************************************/
-
-
-
-
 
 /*****************************************************************************
  *
@@ -3207,28 +3186,12 @@ limit_clause:
 					n->limitOption = LIMIT_OPTION_COUNT;
 					$$ = n;
 				}
-			| FETCH first_or_next select_fetch_first_value row_or_rows WITH TIES
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = NULL;
-					n->limitCount = $3;
-					n->limitOption = LIMIT_OPTION_WITH_TIES;
-					$$ = n;
-				}
 			| FETCH first_or_next row_or_rows ONLY
 				{
 					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
 					n->limitOffset = NULL;
 					n->limitCount = makeIntConst(1, -1);
 					n->limitOption = LIMIT_OPTION_COUNT;
-					$$ = n;
-				}
-			| FETCH first_or_next row_or_rows WITH TIES
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = NULL;
-					n->limitCount = makeIntConst(1, -1);
-					n->limitOption = LIMIT_OPTION_WITH_TIES;
 					$$ = n;
 				}
 		;
@@ -6807,31 +6770,12 @@ insertSelectOptions(SelectStmt *stmt,
 					 parser_errposition(exprLocation(limitClause->limitCount))));
 		stmt->limitCount = limitClause->limitCount;
 	}
-	if (limitClause && limitClause->limitOption != LIMIT_OPTION_DEFAULT)
+	if (limitClause)
 	{
 		if (stmt->limitOption)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("multiple limit options not allowed")));
-		if (!stmt->sortClause && limitClause->limitOption == LIMIT_OPTION_WITH_TIES)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("WITH TIES cannot be specified without ORDER BY clause")));
-		if (limitClause->limitOption == LIMIT_OPTION_WITH_TIES && stmt->lockingClause)
-		{
-			ListCell   *lc;
-
-			foreach(lc, stmt->lockingClause)
-			{
-				LockingClause *lock = lfirst_node(LockingClause, lc);
-
-				if (lock->waitPolicy == LockWaitSkip)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("%s and %s options cannot be used together",
-									"SKIP LOCKED", "WITH TIES")));
-			}
-		}
 		stmt->limitOption = limitClause->limitOption;
 	}
 }

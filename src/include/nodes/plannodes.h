@@ -835,10 +835,6 @@ typedef struct Limit
 	Node	   *limitOffset;	/* OFFSET parameter, or NULL if none */
 	Node	   *limitCount;		/* COUNT parameter, or NULL if none */
 	LimitOption limitOption;	/* limit type */
-	int			uniqNumCols;	/* number of columns to check for similarity  */
-	AttrNumber *uniqColIdx;		/* their indexes in the target list */
-	Oid		   *uniqOperators;	/* equality operators to compare with */
-	Oid		   *uniqCollations; /* collations for equality comparisons */
 } Limit;
 
 

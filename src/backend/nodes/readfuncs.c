@@ -1896,10 +1896,6 @@ _readLimit(void)
 	READ_NODE_FIELD(limitOffset);
 	READ_NODE_FIELD(limitCount);
 	READ_ENUM_FIELD(limitOption, LimitOption);
-	READ_INT_FIELD(uniqNumCols);
-	READ_ATTRNUMBER_ARRAY(uniqColIdx, local_node->uniqNumCols);
-	READ_OID_ARRAY(uniqOperators, local_node->uniqNumCols);
-	READ_OID_ARRAY(uniqCollations, local_node->uniqNumCols);
 
 	READ_DONE();
 }

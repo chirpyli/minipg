@@ -49,9 +49,7 @@ extern Agg *make_agg(List *tlist, List *qual,
 					 List *groupingSets, List *chain, double dNumGroups,
 					 Size transitionSpace, Plan *lefttree);
 extern Limit *make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
-						 LimitOption limitOption, int uniqNumCols,
-						 AttrNumber *uniqColIdx, Oid *uniqOperators,
-						 Oid *uniqCollations);
+						 LimitOption limitOption);
 
 /*
  * prototypes for plan/initsplan.c
