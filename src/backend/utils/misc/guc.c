@@ -25,9 +25,6 @@
 #endif
 #include <sys/mman.h>
 #include <sys/stat.h>
-#ifdef HAVE_SYSLOG
-#include <syslog.h>
-#endif
 #include <unistd.h>
 
 
@@ -148,14 +145,6 @@ static bool check_wal_consistency_checking(char **newval, void **extra,
 										   GucSource source);
 static void assign_wal_consistency_checking(const char *newval, void *extra);
 
-#ifdef HAVE_SYSLOG
-static int	syslog_facility = LOG_LOCAL0;
-#else
-static int	syslog_facility = 0;
-#endif
-
-static void assign_syslog_facility(int newval, void *extra);
-static void assign_syslog_ident(const char *newval, void *extra);
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
 static bool check_canonical_path(char **newval, void **extra, GucSource source);
 static bool check_timezone_abbreviations(char **newval, void **extra, GucSource source);
@@ -280,22 +269,6 @@ static const struct config_enum_entry isolation_level_options[] = {
 	{"repeatable read", XACT_REPEATABLE_READ, false},
 	{"read committed", XACT_READ_COMMITTED, false},
 	{"read uncommitted", XACT_READ_UNCOMMITTED, false},
-	{NULL, 0}
-};
-
-static const struct config_enum_entry syslog_facility_options[] = {
-#ifdef HAVE_SYSLOG
-	{"local0", LOG_LOCAL0, false},
-	{"local1", LOG_LOCAL1, false},
-	{"local2", LOG_LOCAL2, false},
-	{"local3", LOG_LOCAL3, false},
-	{"local4", LOG_LOCAL4, false},
-	{"local5", LOG_LOCAL5, false},
-	{"local6", LOG_LOCAL6, false},
-	{"local7", LOG_LOCAL7, false},
-#else
-	{"none", 0, false},
-#endif
 	{NULL, 0}
 };
 
@@ -484,7 +457,6 @@ int			huge_page_size;
  * cases provide the value for SHOW to display.  The real state is elsewhere
  * and is kept in sync by assign_hooks.
  */
-static char *syslog_ident_str;
 static double phony_random_seed;
 static char *client_encoding_string;
 static char *datestyle_string;
@@ -1351,7 +1323,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 	{
 		{"logging_collector", PGC_POSTMASTER, LOGGING_WHERE,
-			gettext_noop("Start a subprocess to capture stderr, csvlog and/or jsonlog into log files."),
+			gettext_noop("Start a subprocess to capture stderr into log files."),
 			NULL
 		},
 		&Logging_collector,
@@ -1536,26 +1508,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&quote_all_identifiers,
 		false,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"syslog_sequence_numbers", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Add sequence number to syslog messages to avoid duplicate suppression."),
-			NULL
-		},
-		&syslog_sequence_numbers,
-		true,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"syslog_split_messages", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Split messages sent to syslog by lines and to fit into 1024 bytes."),
-			NULL
-		},
-		&syslog_split_messages,
-		true,
 		NULL, NULL, NULL
 	},
 
@@ -3121,9 +3073,7 @@ static struct config_string ConfigureNamesString[] =
 	{
 		{"log_destination", PGC_SIGHUP, LOGGING_WHERE,
 			gettext_noop("Sets the destination for server log output."),
-			gettext_noop("Valid values are combinations of \"stderr\", "
-						 "\"syslog\", \"csvlog\", and \"eventlog\", "
-						 "depending on the platform."),
+			gettext_noop("Valid value is \"stderr\"."),
 			GUC_LIST_INPUT
 		},
 		&Log_destination_string,
@@ -3150,17 +3100,6 @@ static struct config_string ConfigureNamesString[] =
 		&Log_filename,
 		"postgresql-%Y-%m-%d_%H%M%S.log",
 		NULL, NULL, NULL
-	},
-
-	{
-		{"syslog_ident", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Sets the program name used to identify PostgreSQL "
-						 "messages in syslog."),
-			NULL
-		},
-		&syslog_ident_str,
-		"postgres",
-		NULL, assign_syslog_ident, NULL
 	},
 
 	{
@@ -3421,21 +3360,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		&log_min_error_statement,
 		ERROR, server_message_level_options,
 		NULL, NULL, NULL
-	},
-
-	{
-		{"syslog_facility", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Sets the syslog \"facility\" to be used when syslog enabled."),
-			NULL
-		},
-		&syslog_facility,
-#ifdef HAVE_SYSLOG
-		LOG_LOCAL0,
-#else
-		0,
-#endif
-		syslog_facility_options,
-		NULL, assign_syslog_facility, NULL
 	},
 
 	{
@@ -9291,12 +9215,6 @@ check_log_destination(char **newval, void **extra, GucSource source)
 
 		if (pg_strcasecmp(tok, "stderr") == 0)
 			newlogdest |= LOG_DESTINATION_STDERR;
-		else if (pg_strcasecmp(tok, "csvlog") == 0)
-			newlogdest |= LOG_DESTINATION_CSVLOG;
-#ifdef HAVE_SYSLOG
-		else if (pg_strcasecmp(tok, "syslog") == 0)
-			newlogdest |= LOG_DESTINATION_SYSLOG;
-#endif
 		else
 		{
 			GUC_check_errdetail("Unrecognized key word: \"%s\".", tok);
@@ -9320,25 +9238,6 @@ static void
 assign_log_destination(const char *newval, void *extra)
 {
 	Log_destination = *((int *) extra);
-}
-
-static void
-assign_syslog_facility(int newval, void *extra)
-{
-#ifdef HAVE_SYSLOG
-	set_syslog_parameters(syslog_ident_str ? syslog_ident_str : "postgres",
-						  newval);
-#endif
-	/* Without syslog support, just ignore it */
-}
-
-static void
-assign_syslog_ident(const char *newval, void *extra)
-{
-#ifdef HAVE_SYSLOG
-	set_syslog_parameters(newval, syslog_facility);
-#endif
-	/* Without syslog support, it will always be set to "none", so ignore */
 }
 
 

@@ -75,7 +75,7 @@ extern int	syslogPipe[2];
 
 extern int	SysLogger_Start(void);
 
-extern void write_syslogger_file(const char *buffer, int count, int dest);
+extern void write_syslogger_file(const char *buffer, int count);
 
 extern bool CheckLogrotateSignal(void);
 extern void RemoveLogrotateSignalFiles(void);

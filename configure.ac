@@ -1442,10 +1442,6 @@ if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
   AC_LIBOBJ(getopt)
 fi
 
-AC_CHECK_FUNC(syslog,
-              [AC_CHECK_HEADER(syslog.h,
-                               [AC_DEFINE(HAVE_SYSLOG, 1, [Define to 1 if you have the syslog interface.])])])
-
 AC_CACHE_CHECK([for opterr], pgac_cv_var_int_opterr,
 [AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <unistd.h>],
   [extern int opterr; opterr = 1;])],

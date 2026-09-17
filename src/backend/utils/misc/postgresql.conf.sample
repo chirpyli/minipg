@@ -326,15 +326,10 @@
 
 # - Where to Log -
 
-#log_destination = 'stderr'		# Valid values are combinations of
-					# stderr, csvlog, syslog, and eventlog,
-					# depending on platform.  csvlog
-					# requires logging_collector to be on.
+#log_destination = 'stderr'		# Valid value is "stderr".
 
 # This is used when logging to stderr:
-#logging_collector = on		# Enable capturing of stderr and csvlog
-					# into log files. Required to be on for
-					# csvlogs.
+#logging_collector = on		# Enable capturing of stderr into log files.
 					# (change requires restart)
 
 # These are only used if logging_collector is on:
@@ -357,12 +352,6 @@
 					# or size-driven rotation.  Default is
 					# off, meaning append to existing files
 					# in all cases.
-
-# These are relevant when logging to syslog:
-#syslog_facility = 'LOCAL0'
-#syslog_ident = 'postgres'
-#syslog_sequence_numbers = on
-#syslog_split_messages = on
 
 # - When to Log -
 

@@ -13997,17 +13997,6 @@ esac
 
 fi
 
-ac_fn_c_check_func "$LINENO" "syslog" "ac_cv_func_syslog"
-if test "x$ac_cv_func_syslog" = xyes; then :
-  ac_fn_c_check_header_mongrel "$LINENO" "syslog.h" "ac_cv_header_syslog_h" "$ac_includes_default"
-if test "x$ac_cv_header_syslog_h" = xyes; then :
-
-$as_echo "#define HAVE_SYSLOG 1" >>confdefs.h
-
-fi
-
-
-fi
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for opterr" >&5

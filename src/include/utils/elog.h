@@ -428,23 +428,14 @@ extern int	Log_error_verbosity;
 extern char *Log_line_prefix;
 extern int	Log_destination;
 extern char *Log_destination_string;
-extern bool syslog_sequence_numbers;
-extern bool syslog_split_messages;
 
 /* Log destination bitmap */
 #define LOG_DESTINATION_STDERR	 1
-#define LOG_DESTINATION_SYSLOG	 2
-#define LOG_DESTINATION_EVENTLOG 4
-#define LOG_DESTINATION_CSVLOG	 8
 
 /* Other exported functions */
 extern void DebugFileOpen(void);
 extern char *unpack_sql_state(int sql_state);
 extern bool in_error_recursion_trouble(void);
-
-#ifdef HAVE_SYSLOG
-extern void set_syslog_parameters(const char *ident, int facility);
-#endif
 
 /*
  * Write errors to stderr (or by equal means when stderr is

@@ -59,9 +59,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <ctype.h>
-#ifdef HAVE_SYSLOG
-#include <syslog.h>
-#endif
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
@@ -110,28 +107,6 @@ int			Log_error_verbosity = PGERROR_VERBOSE;
 char	   *Log_line_prefix = NULL; /* format for extra log line info */
 int			Log_destination = LOG_DESTINATION_STDERR;
 char	   *Log_destination_string = NULL;
-bool		syslog_sequence_numbers = true;
-bool		syslog_split_messages = true;
-
-#ifdef HAVE_SYSLOG
-
-/*
- * Max string length to send to syslog().  Note that this doesn't count the
- * sequence-number prefix we add, and of course it doesn't count the prefix
- * added by syslog itself.  Solaris and sysklogd truncate the final message
- * at 1024 bytes, so this value leaves 124 bytes for those prefixes.  (Most
- * other syslog implementations seem to have limits of 2KB or so.)
- */
-#ifndef PG_SYSLOG_LIMIT
-#define PG_SYSLOG_LIMIT 900
-#endif
-
-static bool openlog_done = false;
-static char *syslog_ident = NULL;
-static int	syslog_facility = LOG_LOCAL0;
-
-static void write_syslog(int level, const char *line);
-#endif
 
 /* We provide a small stack of ErrorData records for re-entrant cases */
 #define ERRORDATA_STACK_SIZE  5
@@ -173,9 +148,8 @@ static void setup_formatted_log_time(void);
 static void setup_formatted_start_time(void);
 static const char *process_log_prefix_padding(const char *p, int *padding);
 static void log_line_prefix(StringInfo buf, ErrorData *edata);
-static void write_csvlog(ErrorData *edata);
 static void send_message_to_server_log(ErrorData *edata);
-static void write_pipe_chunks(char *data, int len, int dest);
+static void write_pipe_chunks(char *data, int len);
 static void send_message_to_frontend(ErrorData *edata);
 static const char *error_severity(int elevel);
 static void append_with_tabs(StringInfo buf, const char *str);
@@ -1971,150 +1945,6 @@ DebugFileOpen(void)
 }
 
 
-#ifdef HAVE_SYSLOG
-
-/*
- * Set or update the parameters for syslog logging
- */
-void
-set_syslog_parameters(const char *ident, int facility)
-{
-	/*
-	 * guc.c is likely to call us repeatedly with same parameters, so don't
-	 * thrash the syslog connection unnecessarily.  Also, we do not re-open
-	 * the connection until needed, since this routine will get called whether
-	 * or not Log_destination actually mentions syslog.
-	 *
-	 * Note that we make our own copy of the ident string rather than relying
-	 * on guc.c's.  This may be overly paranoid, but it ensures that we cannot
-	 * accidentally free a string that syslog is still using.
-	 */
-	if (syslog_ident == NULL || strcmp(syslog_ident, ident) != 0 ||
-		syslog_facility != facility)
-	{
-		if (openlog_done)
-		{
-			closelog();
-			openlog_done = false;
-		}
-		if (syslog_ident)
-			free(syslog_ident);
-		syslog_ident = strdup(ident);
-		/* if the strdup fails, we will cope in write_syslog() */
-		syslog_facility = facility;
-	}
-}
-
-
-/*
- * Write a message line to syslog
- */
-static void
-write_syslog(int level, const char *line)
-{
-	static unsigned long seq = 0;
-
-	int			len;
-	const char *nlpos;
-
-	/* Open syslog connection if not done yet */
-	if (!openlog_done)
-	{
-		openlog(syslog_ident ? syslog_ident : "postgres",
-				LOG_PID | LOG_NDELAY | LOG_NOWAIT,
-				syslog_facility);
-		openlog_done = true;
-	}
-
-	/*
-	 * We add a sequence number to each log message to suppress "same"
-	 * messages.
-	 */
-	seq++;
-
-	/*
-	 * Our problem here is that many syslog implementations don't handle long
-	 * messages in an acceptable manner. While this function doesn't help that
-	 * fact, it does work around by splitting up messages into smaller pieces.
-	 *
-	 * We divide into multiple syslog() calls if message is too long or if the
-	 * message contains embedded newline(s).
-	 */
-	len = strlen(line);
-	nlpos = strchr(line, '\n');
-	if (syslog_split_messages && (len > PG_SYSLOG_LIMIT || nlpos != NULL))
-	{
-		int			chunk_nr = 0;
-
-		while (len > 0)
-		{
-			char		buf[PG_SYSLOG_LIMIT + 1];
-			int			buflen;
-			int			i;
-
-			/* if we start at a newline, move ahead one char */
-			if (line[0] == '\n')
-			{
-				line++;
-				len--;
-				/* we need to recompute the next newline's position, too */
-				nlpos = strchr(line, '\n');
-				continue;
-			}
-
-			/* copy one line, or as much as will fit, to buf */
-			if (nlpos != NULL)
-				buflen = nlpos - line;
-			else
-				buflen = len;
-			buflen = Min(buflen, PG_SYSLOG_LIMIT);
-			memcpy(buf, line, buflen);
-			buf[buflen] = '\0';
-
-			/* trim to multibyte letter boundary */
-			buflen = pg_mbcliplen(buf, buflen, buflen);
-			if (buflen <= 0)
-				return;
-			buf[buflen] = '\0';
-
-			/* already word boundary? */
-			if (line[buflen] != '\0' &&
-				!isspace((unsigned char) line[buflen]))
-			{
-				/* try to divide at word boundary */
-				i = buflen - 1;
-				while (i > 0 && !isspace((unsigned char) buf[i]))
-					i--;
-
-				if (i > 0)		/* else couldn't divide word boundary */
-				{
-					buflen = i;
-					buf[i] = '\0';
-				}
-			}
-
-			chunk_nr++;
-
-			if (syslog_sequence_numbers)
-				syslog(level, "[%lu-%d] %s", seq, chunk_nr, buf);
-			else
-				syslog(level, "[%d] %s", chunk_nr, buf);
-
-			line += buflen;
-			len -= buflen;
-		}
-	}
-	else
-	{
-		/* message short enough */
-		if (syslog_sequence_numbers)
-			syslog(level, "[%lu] %s", seq, line);
-		else
-			syslog(level, "%s", line);
-	}
-}
-#endif							/* HAVE_SYSLOG */
-
 static void
 write_console(const char *line, int len)
 {
@@ -2594,231 +2424,6 @@ appendCSVLiteral(StringInfo buf, const char *data)
 	appendStringInfoCharMacro(buf, '"');
 }
 
-/*
- * Constructs the error message, depending on the Errordata it gets, in a CSV
- * format which is described in doc/src/sgml/config.sgml.
- */
-static void
-write_csvlog(ErrorData *edata)
-{
-	StringInfoData buf;
-	bool		print_stmt = false;
-
-	/* static counter for line numbers */
-	static long log_line_number = 0;
-
-	/* has counter been reset in current process? */
-	static int	log_my_pid = 0;
-
-	/*
-	 * This is one of the few places where we'd rather not inherit a static
-	 * variable's value from the postmaster.  But since we will, reset it when
-	 * MyProcPid changes.
-	 */
-	if (log_my_pid != MyProcPid)
-	{
-		log_line_number = 0;
-		log_my_pid = MyProcPid;
-		formatted_start_time[0] = '\0';
-	}
-	log_line_number++;
-
-	initStringInfo(&buf);
-
-	/*
-	 * timestamp with milliseconds
-	 *
-	 * Check if the timestamp is already calculated for the syslog message,
-	 * and use it if so.  Otherwise, get the current timestamp.  This is done
-	 * to put same timestamp in both syslog and csvlog messages.
-	 */
-	if (formatted_log_time[0] == '\0')
-		setup_formatted_log_time();
-
-	appendStringInfoString(&buf, formatted_log_time);
-	appendStringInfoChar(&buf, ',');
-
-	/* username */
-	if (MyProcPort)
-		appendCSVLiteral(&buf, MyProcPort->user_name);
-	appendStringInfoChar(&buf, ',');
-
-	/* database name */
-	if (MyProcPort)
-		appendCSVLiteral(&buf, MyProcPort->database_name);
-	appendStringInfoChar(&buf, ',');
-
-	/* Process id  */
-	if (MyProcPid != 0)
-		appendStringInfo(&buf, "%d", MyProcPid);
-	appendStringInfoChar(&buf, ',');
-
-	/* Remote host and port */
-	if (MyProcPort && MyProcPort->remote_host)
-	{
-		appendStringInfoChar(&buf, '"');
-		appendStringInfoString(&buf, MyProcPort->remote_host);
-		if (MyProcPort->remote_port && MyProcPort->remote_port[0] != '\0')
-		{
-			appendStringInfoChar(&buf, ':');
-			appendStringInfoString(&buf, MyProcPort->remote_port);
-		}
-		appendStringInfoChar(&buf, '"');
-	}
-	appendStringInfoChar(&buf, ',');
-
-	/* session id */
-	appendStringInfo(&buf, "%" INT64_MODIFIER "x.%x", MyStartTime, MyProcPid);
-	appendStringInfoChar(&buf, ',');
-
-	/* Line number */
-	appendStringInfo(&buf, "%ld", log_line_number);
-	appendStringInfoChar(&buf, ',');
-
-	/* PS display */
-	if (MyProcPort)
-	{
-		StringInfoData msgbuf;
-		const char *psdisp;
-		int			displen;
-
-		initStringInfo(&msgbuf);
-
-		psdisp = get_ps_display(&displen);
-		appendBinaryStringInfo(&msgbuf, psdisp, displen);
-		appendCSVLiteral(&buf, msgbuf.data);
-
-		pfree(msgbuf.data);
-	}
-	appendStringInfoChar(&buf, ',');
-
-	/* session start timestamp */
-	if (formatted_start_time[0] == '\0')
-		setup_formatted_start_time();
-	appendStringInfoString(&buf, formatted_start_time);
-	appendStringInfoChar(&buf, ',');
-
-	/* Virtual transaction id */
-	/* keep VXID format in sync with lockfuncs.c */
-	if (MyProc != NULL && MyProc->backendId != InvalidBackendId)
-		appendStringInfo(&buf, "%d/%u", MyProc->backendId, MyProc->lxid);
-	appendStringInfoChar(&buf, ',');
-
-	/* Transaction id */
-	appendStringInfo(&buf, "%u", GetTopTransactionIdIfAny());
-	appendStringInfoChar(&buf, ',');
-
-	/* Error severity */
-	appendStringInfoString(&buf, _(error_severity(edata->elevel)));
-	appendStringInfoChar(&buf, ',');
-
-	/* SQL state code */
-	appendStringInfoString(&buf, unpack_sql_state(edata->sqlerrcode));
-	appendStringInfoChar(&buf, ',');
-
-	/* errmessage */
-	appendCSVLiteral(&buf, edata->message);
-	appendStringInfoChar(&buf, ',');
-
-	/* errdetail or errdetail_log */
-	if (edata->detail_log)
-		appendCSVLiteral(&buf, edata->detail_log);
-	else
-		appendCSVLiteral(&buf, edata->detail);
-	appendStringInfoChar(&buf, ',');
-
-	/* errhint */
-	appendCSVLiteral(&buf, edata->hint);
-	appendStringInfoChar(&buf, ',');
-
-	/* internal query */
-	appendCSVLiteral(&buf, edata->internalquery);
-	appendStringInfoChar(&buf, ',');
-
-	/* if printed internal query, print internal pos too */
-	if (edata->internalpos > 0 && edata->internalquery != NULL)
-		appendStringInfo(&buf, "%d", edata->internalpos);
-	appendStringInfoChar(&buf, ',');
-
-	/* errcontext */
-	if (!edata->hide_ctx)
-		appendCSVLiteral(&buf, edata->context);
-	appendStringInfoChar(&buf, ',');
-
-	/* user query --- only reported if not disabled by the caller */
-	if (is_log_level_output(edata->elevel, log_min_error_statement) &&
-		debug_query_string != NULL &&
-		!edata->hide_stmt)
-		print_stmt = true;
-	if (print_stmt)
-		appendCSVLiteral(&buf, debug_query_string);
-	appendStringInfoChar(&buf, ',');
-	if (print_stmt && edata->cursorpos > 0)
-		appendStringInfo(&buf, "%d", edata->cursorpos);
-	appendStringInfoChar(&buf, ',');
-
-	/* file error location */
-	if (Log_error_verbosity >= PGERROR_VERBOSE)
-	{
-		StringInfoData msgbuf;
-
-		initStringInfo(&msgbuf);
-
-		if (edata->funcname && edata->filename)
-			appendStringInfo(&msgbuf, "%s, %s:%d",
-							 edata->funcname, edata->filename,
-							 edata->lineno);
-		else if (edata->filename)
-			appendStringInfo(&msgbuf, "%s:%d",
-							 edata->filename, edata->lineno);
-		appendCSVLiteral(&buf, msgbuf.data);
-		pfree(msgbuf.data);
-	}
-	appendStringInfoChar(&buf, ',');
-
-	/* application name */
-	if (application_name)
-		appendCSVLiteral(&buf, application_name);
-
-	appendStringInfoChar(&buf, ',');
-
-	/* backend type */
-	if (MyProcPid == PostmasterPid)
-		appendCSVLiteral(&buf, "postmaster");
-	else if (MyBackendType == B_BG_WORKER)
-		appendCSVLiteral(&buf, MyBgworkerEntry->bgw_type);
-	else
-		appendCSVLiteral(&buf, GetBackendTypeDesc(MyBackendType));
-
-	appendStringInfoChar(&buf, ',');
-
-	/* leader PID */
-	if (MyProc)
-	{
-		PGPROC	   *leader = MyProc->lockGroupLeader;
-
-		/*
-		 * Show the leader only for active parallel workers.  This leaves out
-		 * the leader of a parallel group.
-		 */
-		if (leader && leader->pid != MyProcPid)
-			appendStringInfo(&buf, "%d", leader->pid);
-	}
-	appendStringInfoChar(&buf, ',');
-
-	/* query id */
-	appendStringInfo(&buf, "%lld", (long long) pgstat_get_my_query_id());
-
-	appendStringInfoChar(&buf, '\n');
-
-	/* If in the syslogger process, try to write messages direct to file */
-	if (MyBackendType == B_LOGGER)
-		write_syslogger_file(buf.data, buf.len, LOG_DESTINATION_CSVLOG);
-	else
-		write_pipe_chunks(buf.data, buf.len, LOG_DESTINATION_CSVLOG);
-
-	pfree(buf.data);
-}
 
 /*
  * Unpack MAKE_SQLSTATE code. Note that this returns a pointer to a
@@ -2950,47 +2555,6 @@ send_message_to_server_log(ErrorData *edata)
 		appendStringInfoChar(&buf, '\n');
 	}
 
-#ifdef HAVE_SYSLOG
-	/* Write to syslog, if enabled */
-	if (Log_destination & LOG_DESTINATION_SYSLOG)
-	{
-		int			syslog_level;
-
-		switch (edata->elevel)
-		{
-			case DEBUG5:
-			case DEBUG4:
-			case DEBUG3:
-			case DEBUG2:
-			case DEBUG1:
-				syslog_level = LOG_DEBUG;
-				break;
-			case LOG:
-			case LOG_SERVER_ONLY:
-			case INFO:
-				syslog_level = LOG_INFO;
-				break;
-			case NOTICE:
-			case WARNING:
-			case WARNING_CLIENT_ONLY:
-				syslog_level = LOG_NOTICE;
-				break;
-			case ERROR:
-				syslog_level = LOG_WARNING;
-				break;
-			case FATAL:
-				syslog_level = LOG_ERR;
-				break;
-			case PANIC:
-			default:
-				syslog_level = LOG_CRIT;
-				break;
-		}
-
-		write_syslog(syslog_level, buf.data);
-	}
-#endif							/* HAVE_SYSLOG */
-
 	/* Write to stderr, if enabled */
 	if ((Log_destination & LOG_DESTINATION_STDERR) || whereToSendOutput == DestDebug)
 	{
@@ -3000,43 +2564,16 @@ send_message_to_server_log(ErrorData *edata)
 		 * Otherwise, just do a vanilla write to stderr.
 		 */
 		if (redirection_done && MyBackendType != B_LOGGER)
-			write_pipe_chunks(buf.data, buf.len, LOG_DESTINATION_STDERR);
+			write_pipe_chunks(buf.data, buf.len);
 		else
 			write_console(buf.data, buf.len);
 	}
 
 	/* If in the syslogger process, try to write messages direct to file */
 	if (MyBackendType == B_LOGGER)
-		write_syslogger_file(buf.data, buf.len, LOG_DESTINATION_STDERR);
+		write_syslogger_file(buf.data, buf.len);
 
-	/* Write to CSV log if enabled */
-	if (Log_destination & LOG_DESTINATION_CSVLOG)
-	{
-		if (redirection_done || MyBackendType == B_LOGGER)
-		{
-			/*
-			 * send CSV data if it's safe to do so (syslogger doesn't need the
-			 * pipe). First get back the space in the message buffer.
-			 */
-			pfree(buf.data);
-			write_csvlog(edata);
-		}
-		else
-		{
-			/*
-			 * syslogger not up (yet), so just dump the message to stderr,
-			 * unless we already did so above.
-			 */
-			if (!(Log_destination & LOG_DESTINATION_STDERR) &&
-				whereToSendOutput != DestDebug)
-				write_console(buf.data, buf.len);
-			pfree(buf.data);
-		}
-	}
-	else
-	{
-		pfree(buf.data);
-	}
+	pfree(buf.data);
 }
 
 /*
@@ -3060,7 +2597,7 @@ send_message_to_server_log(ErrorData *edata)
  * rc to void to shut up the compiler.
  */
 static void
-write_pipe_chunks(char *data, int len, int dest)
+write_pipe_chunks(char *data, int len)
 {
 	PipeProtoChunk p;
 	int			fd = fileno(stderr);
@@ -3074,7 +2611,7 @@ write_pipe_chunks(char *data, int len, int dest)
 	/* write all but the last chunk */
 	while (len > PIPE_MAX_PAYLOAD)
 	{
-		p.proto.is_last = (dest == LOG_DESTINATION_CSVLOG ? 'F' : 'f');
+		p.proto.is_last = 'f';
 		p.proto.len = PIPE_MAX_PAYLOAD;
 		memcpy(p.proto.data, data, PIPE_MAX_PAYLOAD);
 		rc = write(fd, &p, PIPE_HEADER_SIZE + PIPE_MAX_PAYLOAD);
@@ -3084,7 +2621,7 @@ write_pipe_chunks(char *data, int len, int dest)
 	}
 
 	/* write the last chunk */
-	p.proto.is_last = (dest == LOG_DESTINATION_CSVLOG ? 'T' : 't');
+	p.proto.is_last = 't';
 	p.proto.len = len;
 	memcpy(p.proto.data, data, len);
 	rc = write(fd, &p, PIPE_HEADER_SIZE + len);
