@@ -1486,23 +1486,6 @@ typedef struct CheckPointStmt
 } CheckPointStmt;
 
 /* ----------------------
- * Discard Statement
- * ----------------------
- */
-
-typedef enum DiscardMode
-{
-	DISCARD_ALL,
-	DISCARD_PLANS,
-} DiscardMode;
-
-typedef struct DiscardStmt
-{
-	NodeTag		type;
-	DiscardMode target;
-} DiscardStmt;
-
-/* ----------------------
  *		REINDEX Statement
  * ----------------------
  */

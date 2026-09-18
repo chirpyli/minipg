@@ -2599,16 +2599,6 @@ _copyVariableShowStmt(const VariableShowStmt *from)
 	return newnode;
 }
 
-static DiscardStmt *
-_copyDiscardStmt(const DiscardStmt *from)
-{
-	DiscardStmt *newnode = makeNode(DiscardStmt);
-
-	COPY_SCALAR_FIELD(target);
-
-	return newnode;
-}
-
 static CreateExtensionStmt *
 _copyCreateExtensionStmt(const CreateExtensionStmt *from)
 {
@@ -3059,9 +3049,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_VariableShowStmt:
 			retval = _copyVariableShowStmt(from);
-			break;
-		case T_DiscardStmt:
-			retval = _copyDiscardStmt(from);
 			break;
 		case T_CreateExtensionStmt:
 			retval = _copyCreateExtensionStmt(from);

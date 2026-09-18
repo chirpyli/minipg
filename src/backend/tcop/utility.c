@@ -29,7 +29,6 @@
 #include "commands/cluster.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/discard.h"
 #include "commands/explain.h"
 #include "commands/extension.h"
 #include "commands/portalcmds.h"
@@ -139,7 +138,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				return COMMAND_IS_STRICTLY_READ_ONLY;
 			}
 
-		case T_DiscardStmt:
 		case T_VariableSetStmt:
 			{
 				/*
@@ -271,24 +269,6 @@ PreventCommandDuringRecovery(const char *cmdname)
 				(errcode(ERRCODE_READ_ONLY_SQL_TRANSACTION),
 		/* translator: %s is name of a SQL command, eg CREATE */
 				 errmsg("cannot execute %s during recovery",
-						cmdname)));
-}
-
-/*
- * CheckRestrictedOperation: throw error for hazardous command if we're
- * inside a security restriction context.
- *
- * This is needed to protect session-local state for which there is not any
- * better-defined protection mechanism, such as ownership.
- */
-static void
-CheckRestrictedOperation(const char *cmdname)
-{
-	if (InSecurityRestrictedOperation())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-		/* translator: %s is name of a SQL command, eg PREPARE */
-				 errmsg("cannot execute %s within security-restricted operation",
 						cmdname)));
 }
 
@@ -522,12 +502,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 				GetPGVariable(n->name, dest);
 			}
-			break;
-
-		case T_DiscardStmt:
-			/* should we allow DISCARD PLANS? */
-			CheckRestrictedOperation("DISCARD");
-			DiscardCommand((DiscardStmt *) parsetree, isTopLevel);
 			break;
 
 		case T_CheckPointStmt:
@@ -1178,20 +1152,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_VariableShowStmt:
 			tag = CMDTAG_SHOW;
-			break;
-
-		case T_DiscardStmt:
-			switch (((DiscardStmt *) parsetree)->target)
-			{
-				case DISCARD_ALL:
-					tag = CMDTAG_DISCARD_ALL;
-					break;
-				case DISCARD_PLANS:
-					tag = CMDTAG_DISCARD_PLANS;
-					break;
-				default:
-					tag = CMDTAG_UNKNOWN;
-			}
 			break;
 
 		case T_CheckPointStmt:

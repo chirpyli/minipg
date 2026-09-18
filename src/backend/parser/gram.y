@@ -197,7 +197,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 		AnalyzeStmt
 		CreateExtensionStmt
 		CreateSchemaStmt CreateStmt
-		CreatedbStmt DeleteStmt DiscardStmt
+		CreatedbStmt DeleteStmt
 		DropdbStmt DropStmt
 		ExplainStmt
 		IndexStmt InsertStmt
@@ -411,7 +411,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPTH DESC
-	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P
+	DETACH DICTIONARY DISABLE_P DISTINCT DO DOCUMENT_P
 	DOUBLE_P DROP
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
@@ -628,7 +628,6 @@ stmt:	AlterObjectSchemaStmt
 			| CreateStmt
 			| CreatedbStmt
 			| DeleteStmt
-			| DiscardStmt
 			| DropStmt
 			| DropdbStmt
 			| ExplainStmt
@@ -1033,29 +1032,6 @@ CheckPointStmt:
 					CheckPointStmt *n = makeNode(CheckPointStmt);
 					$$ = (Node *)n;
 				}
-		;
-
-
-/*****************************************************************************
- *
- * DISCARD { ALL | PLANS }
- *
- *****************************************************************************/
-
-DiscardStmt:
-			DISCARD ALL
-				{
-					DiscardStmt *n = makeNode(DiscardStmt);
-					n->target = DISCARD_ALL;
-					$$ = (Node *) n;
-				}
-			| DISCARD PLANS
-				{
-					DiscardStmt *n = makeNode(DiscardStmt);
-					n->target = DISCARD_PLANS;
-					$$ = (Node *) n;
-				}
-
 		;
 
 
@@ -5490,7 +5466,6 @@ unreserved_keyword:
 			| DETACH
 			| DICTIONARY
 			| DISABLE_P
-			| DISCARD
 			| DOCUMENT_P
 			| DOUBLE_P
 			| DROP
@@ -5927,7 +5902,6 @@ bare_label_keyword:
 			| DETACH
 			| DICTIONARY
 			| DISABLE_P
-			| DISCARD
 			| DISTINCT
 			| DO
 			| DOCUMENT_P

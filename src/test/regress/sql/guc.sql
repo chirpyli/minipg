@@ -164,29 +164,6 @@ SET special."weird name" = 'foo';  -- could be allowed, but we choose not to
 SHOW special."weird name";
 
 --
--- Test DISCARD ALL
---
-
--- do changes
--- minipg: 临时表与 ON COMMIT 已裁剪，改为普通表
-SET vacuum_cost_delay = 13;
-CREATE TABLE tmp_foo (data text);
--- look changes
-SHOW vacuum_cost_delay;
-SELECT relname from pg_class where relname = 'tmp_foo';
-SELECT current_user = 'regress_guc_user';
--- discard everything
-DISCARD ALL;
--- look again
-SHOW vacuum_cost_delay;
-SELECT relname from pg_class where relname = 'tmp_foo';
-SELECT current_user = 'regress_guc_user';
-
--- minipg: 原先是临时表，DISCARD ALL 会顺带清理；改为普通表后必须显式删除，
--- 否则会污染 sanity_check 的表清单
-DROP TABLE tmp_foo;
-
---
 -- search_path should react to changes in pg_namespace
 --
 

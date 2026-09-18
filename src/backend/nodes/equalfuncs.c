@@ -1061,14 +1061,6 @@ _equalVariableShowStmt(const VariableShowStmt *a, const VariableShowStmt *b)
 }
 
 static bool
-_equalDiscardStmt(const DiscardStmt *a, const DiscardStmt *b)
-{
-	COMPARE_SCALAR_FIELD(target);
-
-	return true;
-}
-
-static bool
 _equalCreateExtensionStmt(const CreateExtensionStmt *a, const CreateExtensionStmt *b)
 {
 	COMPARE_STRING_FIELD(extname);
@@ -1753,9 +1745,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_VariableShowStmt:
 			retval = _equalVariableShowStmt(a, b);
-			break;
-		case T_DiscardStmt:
-			retval = _equalDiscardStmt(a, b);
 			break;
 		case T_CreateExtensionStmt:
 			retval = _equalCreateExtensionStmt(a, b);

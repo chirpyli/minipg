@@ -72,10 +72,6 @@ set synchronous_commit = on;
 show synchronous_commit;
 reset synchronous_commit;
 
-discard all;
-
 -- ALLOWED COMMANDS
 
 CHECKPOINT;
-
-discard all;

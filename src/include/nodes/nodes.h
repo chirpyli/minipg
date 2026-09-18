@@ -276,7 +276,6 @@ typedef enum NodeTag
 	T_ExplainStmt,
 	T_VariableSetStmt,
 	T_VariableShowStmt,
-	T_DiscardStmt,
 	T_ReindexStmt,
 	T_CheckPointStmt,
 	T_CreateSchemaStmt,

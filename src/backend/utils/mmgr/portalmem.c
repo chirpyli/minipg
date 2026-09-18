@@ -527,37 +527,6 @@ PortalDrop(Portal portal, bool isTopCommit)
 }
 
 /*
- * Delete all non-active portals.
- *
- * Used by command: DISCARD ALL
- */
-void
-PortalHashTableDeleteAll(void)
-{
-	HASH_SEQ_STATUS status;
-	PortalHashEnt *hentry;
-
-	if (PortalHashTable == NULL)
-		return;
-
-	hash_seq_init(&status, PortalHashTable);
-	while ((hentry = hash_seq_search(&status)) != NULL)
-	{
-		Portal		portal = hentry->portal;
-
-		/* Can't close the active portal (the one running the command) */
-		if (portal->status == PORTAL_ACTIVE)
-			continue;
-
-		PortalDrop(portal, false);
-
-		/* Restart the iteration in case that led to other drops */
-		hash_seq_term(&status);
-		hash_seq_init(&status, PortalHashTable);
-	}
-}
-
-/*
  * Pre-commit processing for portals.
  *
  * Portals created in this transaction are simply removed, since we are

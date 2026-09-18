@@ -19,7 +19,6 @@ OBJS = \
 	cluster.o \
 	dbcommands.o \
 	define.o \
-	discard.o \
 	dropcmds.o \
 	explain.o \
 	extension.o \
