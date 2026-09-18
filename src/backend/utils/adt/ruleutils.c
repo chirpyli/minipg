@@ -3571,23 +3571,7 @@ get_basic_select_query(Query *query, deparse_context *context,
 	/* Add the DISTINCT clause if given */
 	if (query->distinctClause != NIL)
 	{
-		if (query->hasDistinctOn)
-		{
-			appendStringInfoString(buf, " DISTINCT ON (");
-			sep = "";
-			foreach(l, query->distinctClause)
-			{
-				SortGroupClause *srt = (SortGroupClause *) lfirst(l);
-
-				appendStringInfoString(buf, sep);
-				get_rule_sortgroupclause(srt->tleSortGroupRef, query->targetList,
-										 false, context);
-				sep = ", ";
-			}
-			appendStringInfoChar(buf, ')');
-		}
-		else
-			appendStringInfoString(buf, " DISTINCT");
+		appendStringInfoString(buf, " DISTINCT");
 	}
 
 	/* Then we tell what to select (the targetlist) */

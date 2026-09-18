@@ -257,7 +257,6 @@ _readQuery(void)
 	READ_BOOL_FIELD(hasAggs);
 	READ_BOOL_FIELD(hasTargetSRFs);
 	READ_BOOL_FIELD(hasSubLinks);
-	READ_BOOL_FIELD(hasDistinctOn);
 	READ_BOOL_FIELD(hasForUpdate);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);

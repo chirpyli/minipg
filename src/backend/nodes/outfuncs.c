@@ -2357,7 +2357,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_BOOL_FIELD(hasAggs);
 	WRITE_BOOL_FIELD(hasTargetSRFs);
 	WRITE_BOOL_FIELD(hasSubLinks);
-	WRITE_BOOL_FIELD(hasDistinctOn);
 	WRITE_BOOL_FIELD(hasForUpdate);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);

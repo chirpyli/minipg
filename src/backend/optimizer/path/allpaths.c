@@ -2394,13 +2394,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
  * 2. We must not push down any quals that refer to subselect outputs that
  * contain volatile functions, for fear of introducing strange results due
  * to multiple evaluation of a volatile function.
- *
- * 3. If the subquery uses DISTINCT ON, we must not push down any quals that
- * refer to non-DISTINCT output columns, because that could change the set
- * of rows returned.  (This condition is vacuous for DISTINCT, because then
- * there are no non-DISTINCT output columns, so we needn't check.  Note that
- * subquery_is_pushdown_safe already reported that we can't use volatile
- * quals if there's DISTINCT or DISTINCT ON.)
  */
 static void
 check_output_expressions(Query *subquery, pushdown_safety_info *safetyInfo)
@@ -2429,15 +2422,6 @@ check_output_expressions(Query *subquery, pushdown_safety_info *safetyInfo)
 		/* Volatile functions are unsafe (point 2) */
 		if (contain_volatile_functions((Node *) tle->expr))
 		{
-			safetyInfo->unsafeColumns[tle->resno] = true;
-			continue;
-		}
-
-		/* If subquery uses DISTINCT ON, check point 3 */
-		if (subquery->hasDistinctOn &&
-			!targetIsInSortList(tle, InvalidOid, subquery->distinctClause))
-		{
-			/* non-DISTINCT column, so mark it unsafe */
 			safetyInfo->unsafeColumns[tle->resno] = true;
 			continue;
 		}
@@ -2627,10 +2611,10 @@ remove_unused_subquery_outputs(Query *subquery, RelOptInfo *rel)
 	ListCell   *lc;
 
 	/*
-	 * If subquery has regular DISTINCT (not DISTINCT ON), we're wasting our
-	 * time: all its output columns must be used in the distinctClause.
+	 * If subquery has DISTINCT, we're wasting our time: all its output
+	 * columns must be used in the distinctClause.
 	 */
-	if (subquery->distinctClause && !subquery->hasDistinctOn)
+	if (subquery->distinctClause)
 		return;
 
 	/*

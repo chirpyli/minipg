@@ -108,33 +108,6 @@ SELECT generate_series(1,3) IS DISTINCT FROM 2;
 -- but SRFs in function RTEs must be at top level (annoying restriction)
 SELECT * FROM int4mul(generate_series(1,2), 10);
 
--- DISTINCT ON is evaluated before tSRF evaluation if SRF is not
--- referenced either in ORDER BY or in the DISTINCT ON list. The ORDER
--- BY reference can be implicitly generated, if there's no other ORDER BY.
-
--- implicit reference (via implicit ORDER) to all columns
-SELECT DISTINCT ON (a) a, b, generate_series(1,3) g
-FROM (VALUES (3, 2), (3,1), (1,1), (1,4), (5,3), (5,1)) AS t(a, b);
-
--- unreferenced in DISTINCT ON or ORDER BY
-SELECT DISTINCT ON (a) a, b, generate_series(1,3) g
-FROM (VALUES (3, 2), (3,1), (1,1), (1,4), (5,3), (5,1)) AS t(a, b)
-ORDER BY a, b DESC;
-
--- referenced in ORDER BY
-SELECT DISTINCT ON (a) a, b, generate_series(1,3) g
-FROM (VALUES (3, 2), (3,1), (1,1), (1,4), (5,3), (5,1)) AS t(a, b)
-ORDER BY a, b DESC, g DESC;
-
--- referenced in ORDER BY and DISTINCT ON
-SELECT DISTINCT ON (a, b, g) a, b, generate_series(1,3) g
-FROM (VALUES (3, 2), (3,1), (1,1), (1,4), (5,3), (5,1)) AS t(a, b)
-ORDER BY a, b DESC, g DESC;
-
--- only SRF mentioned in DISTINCT ON
-SELECT DISTINCT ON (g) a, b, generate_series(1,3) g
-FROM (VALUES (3, 2), (3,1), (1,1), (1,4), (5,3), (5,1)) AS t(a, b);
-
 -- LIMIT / OFFSET is evaluated after SRF evaluation
 SELECT a, generate_series(1,2) FROM (VALUES(1),(2),(3)) r(a) LIMIT 2 OFFSET 2;
 -- SRFs are not allowed in LIMIT.

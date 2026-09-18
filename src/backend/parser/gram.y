@@ -3074,7 +3074,6 @@ set_quantifier:
  */
 distinct_clause:
 			DISTINCT								{ $$ = list_make1(NIL); }
-			| DISTINCT ON '(' expr_list ')'			{ $$ = $4; }
 		;
 
 opt_all_clause:

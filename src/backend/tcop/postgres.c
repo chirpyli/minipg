@@ -640,10 +640,8 @@ pg_plan_query(Query *querytree, const char *query_string, int cursorOptions,
 
 	TRACE_POSTGRESQL_QUERY_PLAN_START();
 
-
 	/* call the optimizer */
 	plan = planner(querytree, query_string, cursorOptions, boundParams);
-
 
 	/*
 	 * Print plan if debugging.

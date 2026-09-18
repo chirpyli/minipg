@@ -1884,10 +1884,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			/* okay */
 			pstate->p_hasTargetSRFs = true;
 			break;
-		case EXPR_KIND_DISTINCT_ON:
-			/* okay */
-			pstate->p_hasTargetSRFs = true;
-			break;
 		case EXPR_KIND_LIMIT:
 		case EXPR_KIND_OFFSET:
 			errkind = true;

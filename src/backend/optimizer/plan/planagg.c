@@ -366,7 +366,6 @@ build_minmax_path(PlannerInfo *root, MinMaxAggInfo *mminfo,
 	parse->havingQual = NULL;
 	subroot->hasHavingQual = false;
 	parse->distinctClause = NIL;
-	parse->hasDistinctOn = false;
 	parse->hasAggs = false;
 
 	/* Build "target IS NOT NULL" expression */

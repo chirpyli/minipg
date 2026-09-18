@@ -85,8 +85,6 @@ static TargetEntry *findTargetlistEntrySQL92(ParseState *pstate, Node *node,
 											 List **tlist, ParseExprKind exprKind);
 static TargetEntry *findTargetlistEntrySQL99(ParseState *pstate, Node *node,
 											 List **tlist, ParseExprKind exprKind);
-static int	get_matching_location(int sortgroupref,
-								  List *sortgrouprefs, List *exprs);
 static List *addTargetToGroupList(ParseState *pstate, TargetEntry *tle,
 								  List *grouplist, List *targetlist, int location);
 
@@ -1560,9 +1558,6 @@ checkTargetlistEntrySQL92(ParseState *pstate, TargetEntry *tle,
 		case EXPR_KIND_ORDER_BY:
 			/* no extra checks needed */
 			break;
-		case EXPR_KIND_DISTINCT_ON:
-			/* no extra checks needed */
-			break;
 		default:
 			elog(ERROR, "unexpected exprKind in checkTargetlistEntrySQL92");
 			break;
@@ -1582,7 +1577,7 @@ checkTargetlistEntrySQL92(ParseState *pstate, TargetEntry *tle,
  * the standard never did.  However, for GROUP BY we prefer a SQL99 match.
  * This function is *not* used for WINDOW definitions.
  *
- * node		the ORDER BY, GROUP BY, or DISTINCT ON expression to be matched
+ * node		the ORDER BY or GROUP BY expression to be matched
  * tlist	the target list (passed by reference so we can append to it)
  * exprKind identifies clause type being processed
  */
@@ -1611,9 +1606,6 @@ findTargetlistEntrySQL92(ParseState *pstate, Node *node, List **tlist,
 	 *	  to see if the identifier matches any FROM column name, and only
 	 *	  try for a targetlist name if it doesn't.  This ensures that we
 	 *	  adhere to the spec in the case where the name could be both.
-	 *	  DISTINCT ON isn't in the standard, so we can do what we like there;
-	 *	  we choose to make it work like ORDER BY, on the rather flimsy
-	 *	  grounds that ordinary DISTINCT works on targetlist entries.
 	 *
 	 * 2. IntegerConstant
 	 *	  This means to use the n'th item in the existing target list.
@@ -2081,142 +2073,6 @@ transformDistinctClause(ParseState *pstate,
 				 errmsg("SELECT DISTINCT must have at least one column")));
 
 	return result;
-}
-
-/*
- * transformDistinctOnClause -
- *	  transform a DISTINCT ON clause
- *
- * Since we may need to add items to the query's targetlist, that list
- * is passed by reference.
- *
- * As with GROUP BY, we absorb the sorting semantics of ORDER BY as much as
- * possible into the distinctClause.  This avoids a possible need to re-sort,
- * and allows the user to choose the equality semantics used by DISTINCT,
- * should she be working with a datatype that has more than one equality
- * operator.
- */
-List *
-transformDistinctOnClause(ParseState *pstate, List *distinctlist,
-						  List **targetlist, List *sortClause)
-{
-	List	   *result = NIL;
-	List	   *sortgrouprefs = NIL;
-	bool		skipped_sortitem;
-	ListCell   *lc;
-	ListCell   *lc2;
-
-	/*
-	 * Add all the DISTINCT ON expressions to the tlist (if not already
-	 * present, they are added as resjunk items).  Assign sortgroupref numbers
-	 * to them, and make a list of these numbers.  (NB: we rely below on the
-	 * sortgrouprefs list being one-for-one with the original distinctlist.
-	 * Also notice that we could have duplicate DISTINCT ON expressions and
-	 * hence duplicate entries in sortgrouprefs.)
-	 */
-	foreach(lc, distinctlist)
-	{
-		Node	   *dexpr = (Node *) lfirst(lc);
-		int			sortgroupref;
-		TargetEntry *tle;
-
-		tle = findTargetlistEntrySQL92(pstate, dexpr, targetlist,
-									   EXPR_KIND_DISTINCT_ON);
-		sortgroupref = assignSortGroupRef(tle, *targetlist);
-		sortgrouprefs = lappend_int(sortgrouprefs, sortgroupref);
-	}
-
-	/*
-	 * If the user writes both DISTINCT ON and ORDER BY, adopt the sorting
-	 * semantics from ORDER BY items that match DISTINCT ON items, and also
-	 * adopt their column sort order.  We insist that the distinctClause and
-	 * sortClause match, so throw error if we find the need to add any more
-	 * distinctClause items after we've skipped an ORDER BY item that wasn't
-	 * in DISTINCT ON.
-	 */
-	skipped_sortitem = false;
-	foreach(lc, sortClause)
-	{
-		SortGroupClause *scl = (SortGroupClause *) lfirst(lc);
-
-		if (list_member_int(sortgrouprefs, scl->tleSortGroupRef))
-		{
-			if (skipped_sortitem)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-						 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-						 parser_errposition(pstate,
-											get_matching_location(scl->tleSortGroupRef,
-																  sortgrouprefs,
-																  distinctlist))));
-			else
-				result = lappend(result, copyObject(scl));
-		}
-		else
-			skipped_sortitem = true;
-	}
-
-	/*
-	 * Now add any remaining DISTINCT ON items, using default sort/group
-	 * semantics for their data types.  (Note: this is pretty questionable; if
-	 * the ORDER BY list doesn't include all the DISTINCT ON items and more
-	 * besides, you certainly aren't using DISTINCT ON in the intended way,
-	 * and you probably aren't going to get consistent results.  It might be
-	 * better to throw an error or warning here.  But historically we've
-	 * allowed it, so keep doing so.)
-	 */
-	forboth(lc, distinctlist, lc2, sortgrouprefs)
-	{
-		Node	   *dexpr = (Node *) lfirst(lc);
-		int			sortgroupref = lfirst_int(lc2);
-		TargetEntry *tle = get_sortgroupref_tle(sortgroupref, *targetlist);
-
-		if (targetIsInSortList(tle, InvalidOid, result))
-			continue;			/* already in list (with some semantics) */
-		if (skipped_sortitem)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-					 parser_errposition(pstate, exprLocation(dexpr))));
-		result = addTargetToGroupList(pstate, tle,
-									  result, *targetlist,
-									  exprLocation(dexpr));
-	}
-
-	/*
-	 * An empty result list is impossible here because of grammar
-	 * restrictions.
-	 */
-	Assert(result != NIL);
-
-	return result;
-}
-
-/*
- * get_matching_location
- *		Get the exprLocation of the exprs member corresponding to the
- *		(first) member of sortgrouprefs that equals sortgroupref.
- *
- * This is used so that we can point at a troublesome DISTINCT ON entry.
- * (Note that we need to use the original untransformed DISTINCT ON list
- * item, as whatever TLE it corresponds to will very possibly have a
- * parse location pointing to some matching entry in the SELECT list
- * or ORDER BY list.)
- */
-static int
-get_matching_location(int sortgroupref, List *sortgrouprefs, List *exprs)
-{
-	ListCell   *lcs;
-	ListCell   *lce;
-
-	forboth(lcs, sortgrouprefs, lce, exprs)
-	{
-		if (lfirst_int(lcs) == sortgroupref)
-			return exprLocation((Node *) lfirst(lce));
-	}
-	/* if no match, caller blew it */
-	elog(ERROR, "get_matching_location: no matching sortgroupref");
-	return -1;					/* keep compiler quiet */
 }
 
 

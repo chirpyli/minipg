@@ -4786,7 +4786,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 		 * If subquery uses DISTINCT, we can't make use of any stats for the
 		 * variable ... but, if it's the only DISTINCT column, we are entitled
 		 * to consider it unique.  We do the test this way so that it works
-		 * for cases involving DISTINCT ON.
+		 * for cases involving DISTINCT.
 		 */
 		if (subquery->distinctClause)
 		{

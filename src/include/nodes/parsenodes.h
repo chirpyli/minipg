@@ -121,7 +121,6 @@ typedef struct Query
 	bool		hasAggs;		/* has aggregates in tlist or havingQual */
 	bool		hasTargetSRFs;	/* has set-returning functions in tlist */
 	bool		hasSubLinks;	/* has subquery SubLink */
-	bool		hasDistinctOn;	/* distinctClause is from DISTINCT ON */
 	bool		hasForUpdate;	/* FOR [KEY] UPDATE/SHARE was specified */
 
 	List	   *rtable;			/* list of range table entries */
@@ -829,7 +828,7 @@ typedef struct TableSampleClause
 /*
  * SortGroupClause -
  *		representation of ORDER BY, GROUP BY,
- *		DISTINCT, DISTINCT ON items
+ *		DISTINCT items
  *
  * You might think that ORDER BY is only interested in defining ordering,
  * and GROUP/DISTINCT are only interested in defining equality.  However,
@@ -875,14 +874,13 @@ typedef struct TableSampleClause
  * and it's relatively expensive to get it again later.  Note there is no
  * need for a "sortable" flag since OidIsValid(sortop) serves the purpose.
  *
- * A query might have both ORDER BY and DISTINCT (or DISTINCT ON) clauses.
- * In SELECT DISTINCT, the distinctClause list is as long or longer than the
- * sortClause list, while in SELECT DISTINCT ON it's typically shorter.
- * The two lists must match up to the end of the shorter one --- the parser
+ * A query might have both ORDER BY and DISTINCT clauses.  In SELECT DISTINCT,
+ * the distinctClause list is as long or longer than the sortClause list.  The
+ * two lists must match up to the end of the shorter one --- the parser
  * rearranges the distinctClause if necessary to make this true.  (This
  * restriction ensures that only one sort step is needed to both satisfy the
- * ORDER BY and set up for the Unique step.  This is semantically necessary
- * for DISTINCT ON, and presents no real drawback for DISTINCT.)
+ * ORDER BY and set up for the Unique step, and presents no real drawback for
+ * DISTINCT.)
  */
 typedef struct SortGroupClause
 {
@@ -1001,8 +999,8 @@ typedef struct SelectStmt
 	/*
 	 * These fields are used only in "leaf" SelectStmts.
 	 */
-	List	   *distinctClause; /* NULL, list of DISTINCT ON exprs, or
-								 * lcons(NIL,NIL) for all (SELECT DISTINCT) */
+	List	   *distinctClause; /* NULL, or list_make1(NIL) for all
+								 * (SELECT DISTINCT) */
 	List	   *targetList;		/* the target list (of ResTarget) */
 	List	   *fromClause;		/* the FROM clause */
 	Node	   *whereClause;	/* WHERE qualification */

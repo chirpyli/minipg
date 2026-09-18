@@ -328,9 +328,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		case EXPR_KIND_ORDER_BY:
 			/* okay */
 			break;
-		case EXPR_KIND_DISTINCT_ON:
-			/* okay */
-			break;
 		case EXPR_KIND_LIMIT:
 		case EXPR_KIND_OFFSET:
 			errkind = true;

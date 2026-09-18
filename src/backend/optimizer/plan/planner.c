@@ -4142,10 +4142,9 @@ create_distinct_paths(PlannerInfo *root,
 
 	/*
 	 * We don't compute anything at this level, so distinct_rel will be
-	 * parallel-safe if the input rel is parallel-safe.  In particular, if
-	 * there is a DISTINCT ON (...) clause, any path for the input_rel will
-	 * output those expressions, and will not be parallel-safe unless those
-	 * expressions are parallel-safe.
+	 * parallel-safe if the input rel is parallel-safe.  In particular, any
+	 * path for the input_rel will output the distinctClause expressions, and
+	 * will not be parallel-safe unless those expressions are parallel-safe.
 	 */
 	distinct_rel->consider_parallel = input_rel->consider_parallel;
 
@@ -4183,22 +4182,10 @@ create_distinct_paths(PlannerInfo *root,
 		 * First, if we have any adequately-presorted paths, just stick a
 		 * Unique node on those.  Then consider doing an explicit sort of the
 		 * cheapest input path and Unique'ing that.
-		 *
-		 * When we have DISTINCT ON, we must sort by the more rigorous of
-		 * DISTINCT and ORDER BY, else it won't have the desired behavior.
-		 * Also, if we do have to do an explicit sort, we might as well use
-		 * the more rigorous ordering to avoid a second sort later.  (Note
-		 * that the parser will have ensured that one clause is a prefix of
-		 * the other.)
 		 */
 		List	   *needed_pathkeys;
 
-		if (parse->hasDistinctOn &&
-			list_length(root->distinct_pathkeys) <
-			list_length(root->sort_pathkeys))
-			needed_pathkeys = root->sort_pathkeys;
-		else
-			needed_pathkeys = root->distinct_pathkeys;
+		needed_pathkeys = root->distinct_pathkeys;
 
 		foreach(lc, input_rel->pathlist)
 		{
@@ -4214,17 +4201,7 @@ create_distinct_paths(PlannerInfo *root,
 			}
 		}
 
-		/* For explicit-sort case, always use the more rigorous clause */
-		if (list_length(root->distinct_pathkeys) <
-			list_length(root->sort_pathkeys))
-		{
-			needed_pathkeys = root->sort_pathkeys;
-			/* Assert checks that parser didn't mess up... */
-			Assert(pathkeys_contained_in(root->distinct_pathkeys,
-										 needed_pathkeys));
-		}
-		else
-			needed_pathkeys = root->distinct_pathkeys;
+		needed_pathkeys = root->distinct_pathkeys;
 
 		path = cheapest_input_path;
 		if (!pathkeys_contained_in(needed_pathkeys, path->pathkeys))
@@ -4244,17 +4221,15 @@ create_distinct_paths(PlannerInfo *root,
 	 * Consider hash-based implementations of DISTINCT, if possible.
 	 *
 	 * If we were not able to make any other types of path, we *must* hash or
-	 * die trying.  If we do have other choices, there are two things that
-	 * should prevent selection of hashing: if the query uses DISTINCT ON
-	 * (because it won't really have the expected behavior if we hash), or if
-	 * enable_hashagg is off.
+	 * die trying.  If we do have other choices, the only thing that should
+	 * prevent selection of hashing is if enable_hashagg is off.
 	 *
 	 * Note: grouping_is_hashable() is much more expensive to check than the
 	 * other gating conditions, so we want to do it last.
 	 */
 	if (distinct_rel->pathlist == NIL)
 		allow_hash = true;		/* we have no alternatives */
-	else if (parse->hasDistinctOn || !enable_hashagg)
+	else if (!enable_hashagg)
 		allow_hash = false;		/* policy-based decision not to hash */
 	else
 		allow_hash = true;		/* default */

@@ -2326,7 +2326,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(hasAggs);
 	COPY_SCALAR_FIELD(hasTargetSRFs);
 	COPY_SCALAR_FIELD(hasSubLinks);
-	COPY_SCALAR_FIELD(hasDistinctOn);
 	COPY_SCALAR_FIELD(hasForUpdate);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);

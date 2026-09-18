@@ -833,7 +833,7 @@ query_is_distinct_for_with_collations(Query *query, List *distinct_cols)
 	DistinctColInfo *dcinfo;
 
 	/*
-	 * DISTINCT (including DISTINCT ON) guarantees uniqueness if all the
+	 * DISTINCT guarantees uniqueness if all the
 	 * columns in the DISTINCT clause appear in colnos and operator semantics
 	 * match.  This is true even if there are SRFs in the DISTINCT columns or
 	 * elsewhere in the tlist.

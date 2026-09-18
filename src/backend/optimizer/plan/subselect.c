@@ -1164,7 +1164,6 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 	query->groupClause = NIL;
 	query->distinctClause = NIL;
 	query->sortClause = NIL;
-	query->hasDistinctOn = false;
 
 	return true;
 }

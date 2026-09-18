@@ -34,8 +34,6 @@ extern List *transformSortClause(ParseState *pstate, List *orderlist,
 
 extern List *transformDistinctClause(ParseState *pstate,
 									 List **targetlist, List *sortClause, bool is_agg);
-extern List *transformDistinctOnClause(ParseState *pstate, List *distinctlist,
-									   List **targetlist, List *sortClause);
 
 extern List *addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 								 List *sortlist, List *targetlist, SortBy *sortby);

@@ -156,8 +156,6 @@ SELECT * FROM foo WHERE id IN
 
 -- These cases do not
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT DISTINCT ON (id2) id1, id2 FROM bar) AS s);
-SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT id2 FROM bar GROUP BY id2) AS s);
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id2 FROM bar) AS s);
