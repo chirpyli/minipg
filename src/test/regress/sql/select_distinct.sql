@@ -32,7 +32,7 @@ SELECT DISTINCT two, string4, ten
 -- awk 'BEGIN{FS="      ";}{if(NF!=1){print $5;}else{print;}}' - stud_emp.data |
 -- sort -n -r | uniq
 --
-SELECT DISTINCT p.age FROM person* p ORDER BY age using >;
+SELECT DISTINCT p.age FROM person p ORDER BY age using >;
 
 --
 -- Check mentioning same column more than once

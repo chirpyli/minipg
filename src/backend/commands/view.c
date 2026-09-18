@@ -338,12 +338,12 @@ UpdateRangeTableOfViewParse(Oid viewOid, Query *viewParse)
 	nsitem = addRangeTableEntryForRelation(pstate, viewRel,
 										   AccessShareLock,
 										   makeAlias("old", NIL),
-										   false, false);
+										   false);
 	rt_entry1 = nsitem->p_rte;
 	nsitem = addRangeTableEntryForRelation(pstate, viewRel,
 										   AccessShareLock,
 										   makeAlias("new", NIL),
-										   false, false);
+										   false);
 	rt_entry2 = nsitem->p_rte;
 
 	/* Must override addRangeTableEntry's default access-check flags */

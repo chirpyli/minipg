@@ -1258,7 +1258,6 @@ ParseNamespaceItem *
 addRangeTableEntry(ParseState *pstate,
 				   RangeVar *relation,
 				   Alias *alias,
-				   bool inh,
 				   bool inFromCl)
 {
 	RangeTblEntry *rte = makeNode(RangeTblEntry);
@@ -1352,11 +1351,10 @@ addRangeTableEntry(ParseState *pstate,
  */
 ParseNamespaceItem *
 addRangeTableEntryForRelation(ParseState *pstate,
-							  Relation rel,
-							  int lockmode,
-							  Alias *alias,
-							  bool inh,
-							  bool inFromCl)
+							   Relation rel,
+							   int lockmode,
+							   Alias *alias,
+							   bool inFromCl)
 {
 	RangeTblEntry *rte = makeNode(RangeTblEntry);
 	char	   *refname = alias ? alias->aliasname : RelationGetRelationName(rel);
@@ -1681,12 +1679,6 @@ addRangeTableEntryForFunction(ParseState *pstate,
 				Oid			attrcollation;
 
 				attrname = n->colname;
-				if (n->typeName->setof)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("column \"%s\" cannot be declared SETOF",
-									attrname),
-							 parser_errposition(pstate, n->location)));
 				typenameTypeIdAndMod(pstate, n->typeName,
 									 &attrtype, &attrtypmod);
 				attrcollation = GetColumnDefCollation(attrtype);

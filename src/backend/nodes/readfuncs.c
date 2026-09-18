@@ -261,7 +261,6 @@ _readQuery(void)
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
 	READ_NODE_FIELD(groupClause);
-	READ_BOOL_FIELD(groupDistinct);
 	READ_NODE_FIELD(havingQual);
 	READ_NODE_FIELD(distinctClause);
 	READ_NODE_FIELD(sortClause);

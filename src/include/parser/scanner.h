@@ -48,9 +48,9 @@ typedef union core_YYSTYPE
  * However, those are not defined in this file, because bison insists on
  * defining them for itself.  The token codes used by the core scanner are
  * the ASCII characters plus these:
- *	%token <str>	IDENT UIDENT FCONST SCONST USCONST BCONST XCONST Op
+ *	%token <str>	IDENT UIDENT FCONST SCONST USCONST Op
  *	%token <ival>	ICONST PARAM
- *	%token			TYPECAST DOT_DOT COLON_EQUALS EQUALS_GREATER
+ *	%token			TYPECAST COLON_EQUALS EQUALS_GREATER
  *	%token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
  * The above token definitions *must* be the first ones declared in any
  * bison parser built atop this scanner, so that they will have consistent

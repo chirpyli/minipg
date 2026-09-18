@@ -3212,9 +3212,7 @@ get_basic_select_query(Query *query, deparse_context *context,
 		ParseExprKind save_exprkind;
 
 		appendContextKeyword(context, " GROUP BY ",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		if (query->groupDistinct)
-			appendStringInfoString(buf, "DISTINCT ");
+						 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 
 		save_exprkind = context->special_exprkind;
 		context->special_exprkind = EXPR_KIND_GROUP_BY;

@@ -812,8 +812,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 		relids = lappend_oid(relids, myrelid);
 	}
 
-	ExecuteTruncateGuts(rels, relids, relids_logged,
-						stmt->behavior, stmt->restart_seqs);
+	ExecuteTruncateGuts(rels, relids, relids_logged, stmt->behavior);
 
 	/* And close the rels */
 	foreach(cell, rels)
@@ -841,7 +840,7 @@ void
 ExecuteTruncateGuts(List *explicit_rels,
 					List *relids,
 					List *relids_logged,
-					DropBehavior behavior, bool restart_seqs)
+					DropBehavior behavior)
 {
 	List	   *rels;
 	SubTransactionId mySubid;
@@ -986,8 +985,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 		xlrec.flags = 0;
 		if (behavior == DROP_CASCADE)
 			xlrec.flags |= XLH_TRUNCATE_CASCADE;
-		if (restart_seqs)
-			xlrec.flags |= XLH_TRUNCATE_RESTART_SEQS;
 
 		XLogBeginInsert();
 		XLogRegisterData((char *) &xlrec, SizeOfHeapTruncate);

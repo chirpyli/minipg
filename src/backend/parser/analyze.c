@@ -304,7 +304,6 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 
 	/* set up range table with just the result rel */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 false,
 										 true);
 	nsitem = pstate->p_target_nsitem;
 
@@ -412,7 +411,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * to the joinlist or namespace.
 	 */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 false, false);
+										 false);
 
 	/* Validate stmt->cols list, or build default list if no list given */
 	icolumns = checkInsertTargets(pstate, stmt->cols, &attrnos);
@@ -859,7 +858,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 											qry->sortClause,
 											EXPR_KIND_GROUP_BY,
 											false /* allow SQL92 rules */ );
-	qry->groupDistinct = stmt->groupDistinct;
 
 	if (stmt->distinctClause == NIL)
 	{
@@ -1095,7 +1093,6 @@ transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt)
 	pstate->p_is_insert = false;
 
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
-										 false,
 										 true);
 	nsitem = pstate->p_target_nsitem;
 

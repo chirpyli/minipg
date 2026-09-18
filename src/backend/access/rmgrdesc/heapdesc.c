@@ -87,8 +87,6 @@ heap_desc(StringInfo buf, XLogReaderState *record)
 
 		if (xlrec->flags & XLH_TRUNCATE_CASCADE)
 			appendStringInfoString(buf, "cascade ");
-		if (xlrec->flags & XLH_TRUNCATE_RESTART_SEQS)
-			appendStringInfoString(buf, "restart_seqs ");
 		appendStringInfo(buf, "nrelids %u relids", xlrec->nrelids);
 		for (i = 0; i < xlrec->nrelids; i++)
 			appendStringInfo(buf, " %u", xlrec->relids[i]);

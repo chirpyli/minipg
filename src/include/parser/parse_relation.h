@@ -40,16 +40,14 @@ extern void markVarForSelectPriv(ParseState *pstate, Var *var);
 extern Relation parserOpenTable(ParseState *pstate, const RangeVar *relation,
 								int lockmode);
 extern ParseNamespaceItem *addRangeTableEntry(ParseState *pstate,
-											  RangeVar *relation,
-											  Alias *alias,
-											  bool inh,
-											  bool inFromCl);
+										   RangeVar *relation,
+										   Alias *alias,
+										   bool inFromCl);
 extern ParseNamespaceItem *addRangeTableEntryForRelation(ParseState *pstate,
-														 Relation rel,
-														 int lockmode,
-														 Alias *alias,
-														 bool inh,
-														 bool inFromCl);
+														  Relation rel,
+														  int lockmode,
+														  Alias *alias,
+														  bool inFromCl);
 extern ParseNamespaceItem *addRangeTableEntryForSubquery(ParseState *pstate,
 														 Query *subquery,
 														 Alias *alias,

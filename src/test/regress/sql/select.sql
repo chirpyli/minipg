@@ -99,8 +99,8 @@ RESET enable_sort;
 -- awk '{if(NF!=2){print $3,$2;}else{print;}}' - student.data |
 -- awk 'BEGIN{FS="      ";}{if(NF!=2){print $4,$5;}else{print;}}' - stud_emp.data
 --
--- SELECT name, age FROM person*; ??? check if different
-SELECT p.name, p.age FROM person* p;
+-- SELECT name, age FROM person; ??? check if different
+SELECT p.name, p.age FROM person p;
 
 --
 -- awk '{print $1,$2;}' person.data |
@@ -109,7 +109,7 @@ SELECT p.name, p.age FROM person* p;
 -- awk 'BEGIN{FS="      ";}{if(NF!=1){print $4,$5;}else{print;}}' - stud_emp.data |
 -- sort +1nr -2
 --
-SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
+SELECT p.name, p.age FROM person p ORDER BY age using >, name;
 
 --
 -- Test some cases involving whole-row Var referencing a subquery

@@ -116,11 +116,9 @@ typedef struct xl_heap_delete
  * xl_heap_truncate flag values, 8 bits are available.
  */
 #define XLH_TRUNCATE_CASCADE					(1<<0)
-#define XLH_TRUNCATE_RESTART_SEQS				(1<<1)
 
 /*
- * For truncate we list all truncated relids in an array, followed by all
- * sequence relids that need to be restarted, if any.
+ * For truncate we list all truncated relids in an array.
  * All rels are always within the same database, so we just list dbid once.
  */
 typedef struct xl_heap_truncate

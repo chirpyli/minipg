@@ -202,13 +202,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 						 parser_errposition(pstate, defel->location)));
 			dconnlimit = defel;
 		}
-		else if (strcmp(defel->defname, "location") == 0)
-		{
-			ereport(WARNING,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("LOCATION is not supported anymore"),
-					 parser_errposition(pstate, defel->location)));
-		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),

@@ -239,17 +239,29 @@ SELECT time without time zone 'T040506.789-08';
 (1 row)
 
 SELECT time with time zone '040506.789+08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone '040506.789+08';
+                    ^
 SELECT time with time zone '040506.789-08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone '040506.789-08';
+                    ^
 SELECT time with time zone 'T040506.789+08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone 'T040506.789+08';
+                    ^
 SELECT time with time zone 'T040506.789-08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone 'T040506.789-08';
+                    ^
 SELECT time with time zone 'T040506.789 +08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone 'T040506.789 +08';
+                    ^
 SELECT time with time zone 'T040506.789 -08';
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone 'T040506.789 -08';
+                    ^
 SET DateStyle = 'Postgres, MDY';
 -- Check Julian dates BC
 SELECT date 'J1520447' AS "Confucius' Birthday";
@@ -274,9 +286,13 @@ SELECT date '1981-02-03' + time '04:05:06' AS "Date + Time";
 (1 row)
 
 SELECT date '1991-02-03' + time with time zone '04:05:06 PST' AS "Date + Time PST";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT date '1991-02-03' + time with time zone '04:05:06 PST...
+                                        ^
 SELECT date '2001-02-03' + time with time zone '04:05:06 UTC' AS "Date + Time UTC";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT date '2001-02-03' + time with time zone '04:05:06 UTC...
+                                        ^
 SELECT date '1991-02-03' + interval '2 years' AS "Add Two Years";
 ERROR:  syntax error at or near "'2 years'"
 LINE 1: SELECT date '1991-02-03' + interval '2 years' AS "Add Two Ye...
@@ -292,7 +308,9 @@ LINE 1: SELECT date '1991-02-03' - time '04:05:06' AS "Subtract Time...
                                  ^
 HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 SELECT date '1991-02-03' - time with time zone '04:05:06 UTC' AS "Subtract Time UTC";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT date '1991-02-03' - time with time zone '04:05:06 UTC...
+                                        ^
 --
 -- timestamp, interval arithmetic
 --
@@ -472,11 +490,17 @@ SELECT timestamptz(date '1994-01-01', time '10:00') AS "Jan_01_1994_9am";
 (1 row)
 
 SELECT timestamptz(date '1994-01-01', time with time zone '11:00-8') AS "Jan_01_1994_11am";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT timestamptz(date '1994-01-01', time with time zone '1...
+                                                   ^
 SELECT timestamptz(date '1994-01-01', time with time zone '10:00-8') AS "Jan_01_1994_10am";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT timestamptz(date '1994-01-01', time with time zone '1...
+                                                   ^
 SELECT timestamptz(date '1994-01-01', time with time zone '11:00-5') AS "Jan_01_1994_8am";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT timestamptz(date '1994-01-01', time with time zone '1...
+                                                   ^
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_TBL;
 ERROR:  syntax error at or near "'1 year'"
 LINE 1: SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_T...
@@ -513,15 +537,21 @@ ERROR:  syntax error at or near "'1 month 04:01'"
 LINE 1: SELECT time '03:30' + interval '1 month 04:01' AS "07:31:00"...
                                        ^
 SELECT CAST(time with time zone '01:02-08' AS interval) AS "+00:01";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT CAST(time with time zone '01:02-08' AS interval) AS "...
+                         ^
 SELECT CAST(interval '02:03' AS time with time zone) AS "02:03:00-08";
 ERROR:  syntax error at or near "'02:03'"
 LINE 1: SELECT CAST(interval '02:03' AS time with time zone) AS "02:...
                              ^
 SELECT time with time zone '01:30-08' - interval '02:01' AS "23:29:00-08";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone '01:30-08' - interval '02:01' AS ...
+                    ^
 SELECT time with time zone '02:30-08' + interval '36:01' AS "14:31:00-08";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT time with time zone '02:30-08' + interval '36:01' AS ...
+                    ^
 -- These two tests cannot be used because they default to current timezone,
 -- which may be either -08 or -07 depending on the time of year.
 -- SELECT time with time zone '01:30' + interval '02:01' AS "03:31:00-08";
@@ -529,10 +559,14 @@ ERROR:  time with time zone is not supported
 -- Try the following two tests instead, as a poor substitute
 SELECT CAST(CAST(date 'today' + time with time zone '05:30'
             + interval '02:01' AS time with time zone) AS time) AS "07:31:00";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT CAST(CAST(date 'today' + time with time zone '05:30'
+                                             ^
 SELECT CAST(cast(date 'today' + time with time zone '03:30'
   + interval '1 month 04:01' as timestamp without time zone) AS time) AS "07:31:00";
-ERROR:  time with time zone is not supported
+ERROR:  syntax error at or near "with"
+LINE 1: SELECT CAST(cast(date 'today' + time with time zone '03:30'
+                                             ^
 SELECT t.d1 AS t, i.f1 AS i, t.d1 + i.f1 AS "add", t.d1 - i.f1 AS "subtract"
   FROM TIMESTAMP_TBL t, INTERVAL_TBL i
   WHERE t.d1 BETWEEN '1990-01-01' AND '2001-01-01'

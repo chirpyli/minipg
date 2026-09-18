@@ -1145,7 +1145,7 @@ transformIndexStmt(Oid relid, IndexStmt *stmt, const char *queryString)
 	rel = relation_open(relid, NoLock);
 	nsitem = addRangeTableEntryForRelation(pstate, rel,
 										   AccessShareLock,
-										   NULL, false, true);
+										   NULL, true);
 
 	/* no to join list, yes to namespaces */
 	addNSItemToQuery(pstate, nsitem, false, true, true);
@@ -1247,7 +1247,6 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 										   rel,
 										   AccessShareLock,
 										   NULL,
-										   false,
 										   true);
 	addNSItemToQuery(pstate, nsitem, false, true, true);
 

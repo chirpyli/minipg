@@ -160,7 +160,7 @@ transformFromClause(ParseState *pstate, List *frmList)
  */
 int
 setTargetTable(ParseState *pstate, RangeVar *relation,
-			   bool inh, bool alsoSource)
+			   bool alsoSource)
 {
 	ParseNamespaceItem *nsitem;
 
@@ -194,7 +194,7 @@ setTargetTable(ParseState *pstate, RangeVar *relation,
 	 */
 	nsitem = addRangeTableEntryForRelation(pstate, pstate->p_target_relation,
 										   RowExclusiveLock,
-										   relation->alias, inh, false);
+										   relation->alias, false);
 
 	/* remember the RTE/nsitem as being the query target */
 	pstate->p_target_nsitem = nsitem;
@@ -366,7 +366,7 @@ static ParseNamespaceItem *
 transformTableEntry(ParseState *pstate, RangeVar *r)
 {
 	/* addRangeTableEntry does all the work */
-	return addRangeTableEntry(pstate, r, r->alias, false, true);
+	return addRangeTableEntry(pstate, r, r->alias, true);
 }
 
 /*

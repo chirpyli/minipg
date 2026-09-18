@@ -2137,7 +2137,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(fromClause);
 	WRITE_NODE_FIELD(whereClause);
 	WRITE_NODE_FIELD(groupClause);
-	WRITE_BOOL_FIELD(groupDistinct);
 	WRITE_NODE_FIELD(havingClause);
 	WRITE_NODE_FIELD(valuesLists);
 	WRITE_NODE_FIELD(sortClause);
@@ -2194,7 +2193,6 @@ _outTypeName(StringInfo str, const TypeName *node)
 
 	WRITE_NODE_FIELD(names);
 	WRITE_OID_FIELD(typeOid);
-	WRITE_BOOL_FIELD(setof);
 	WRITE_BOOL_FIELD(pct_type);
 	WRITE_NODE_FIELD(typmods);
 	WRITE_INT_FIELD(typemod);
@@ -2267,7 +2265,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(jointree);
 	WRITE_NODE_FIELD(targetList);
 	WRITE_NODE_FIELD(groupClause);
-	WRITE_BOOL_FIELD(groupDistinct);
 	WRITE_NODE_FIELD(havingQual);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);

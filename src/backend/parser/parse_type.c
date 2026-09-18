@@ -703,10 +703,6 @@ typeStringToTypeName(const char *str)
 	Assert(list_length(raw_parsetree_list) == 1);
 	typeName = linitial_node(TypeName, raw_parsetree_list);
 
-	/* The grammar allows SETOF in TypeName, but we don't want that here. */
-	if (typeName->setof)
-		goto fail;
-
 	return typeName;
 
 fail:

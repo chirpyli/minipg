@@ -519,12 +519,6 @@ BuildDescForRelation(List *schema)
 
 		attdim = list_length(entry->typeName->arrayBounds);
 
-		if (entry->typeName->setof)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("column \"%s\" cannot be declared SETOF",
-							attname)));
-
 		TupleDescInitEntry(desc, attnum, attname,
 						   atttypid, atttypmod, attdim);
 		att = TupleDescAttr(desc, attnum - 1);

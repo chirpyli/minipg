@@ -110,13 +110,6 @@
 
 
 
-/* Private struct for the result of group_clause production */
-typedef struct GroupClause
-{
-	bool	distinct;
-	List   *list;
-} GroupClause;
-
 #define parser_yyerror(msg)  scanner_yyerror(msg, yyscanner)
 #define parser_errposition(pos)  scanner_errposition(pos, yyscanner)
 
@@ -187,8 +180,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	InsertStmt			*istmt;
 	VariableSetStmt		*vsetstmt;
 	struct SelectLimit	*selectlimit;
-	SetQuantifier	 setquantifier;
-	struct GroupClause  *groupclause;
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt
@@ -271,14 +262,9 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 			vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
 
-%type <groupclause> group_clause
-%type <list>	group_by_list
+%type <list>	group_clause group_by_list
 %type <node>	group_by_item
 
-
-%type <boolean>  opt_restart_seqs
-
-%type <setquantifier> set_quantifier
 
 %type <node>	join_qual
 %type <jtype>	join_type
@@ -332,7 +318,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				Character ConstCharacter
 				CharacterWithLength CharacterWithoutLength
 				ConstDatetime
-				Bit ConstBit BitWithLength BitWithoutLength
 %type <str>		character
 %type <str>		extract_arg
 %type <boolean> opt_varying opt_timezone
@@ -364,18 +349,14 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 /*
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
  * They must be listed first so that their numeric codes do not depend on
- * the set of keywords.  PL/pgSQL depends on this so that it can share the
- * same lexer.  If you add/change tokens here, fix PL/pgSQL to match!
+ * the set of keywords.
  *
  * UIDENT and USCONST are reduced to IDENT and SCONST in parser.c, so that
  * they need no productions here; but we must assign token codes to them.
- *
- * DOT_DOT is unused in the core SQL grammar, and so will always provoke
- * parse errors.  It is needed by PL/pgSQL.
  */
-%token <str>	IDENT UIDENT FCONST SCONST USCONST BCONST XCONST Op
+%token <str>	IDENT UIDENT FCONST SCONST USCONST Op
 %token <ival>	ICONST PARAM
-%token			TYPECAST DOT_DOT COLON_EQUALS EQUALS_GREATER
+%token			TYPECAST COLON_EQUALS EQUALS_GREATER
 %token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
 
 /*
@@ -390,14 +371,14 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	ALL ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
 	ASSIGNMENT ASYMMETRIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
-	BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
+	BEFORE BEGIN_P BETWEEN BIGINT BINARY
 	BOOLEAN_P BOTH BREADTH BY
 
-	CACHE CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
+	CACHE CASCADE CASCADED CASE CAST CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS
 	CLUSTER COALESCE COLUMN COLUMNS COMMENT COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
-	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
+	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONVERSION_P COPY
 	CREATE CROSS CSV CUBE CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
 	CURRENT_TIMESTAMP CURRENT_USER CYCLE
@@ -418,7 +399,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	HAVING HEADER_P HOUR_P
 
-	IDENTITY_P IF_P ILIKE IMMEDIATE IMPLICIT_P IMPORT_P IN_P INCLUDE
+	IF_P ILIKE IMMEDIATE IMPLICIT_P IMPORT_P IN_P INCLUDE
 	INCLUDING INCREMENT INDEX INDEXES INITIALLY
 	INNER_P INPUT_P INSERT INT_P INTEGER
 	INTERSECT INTERVAL INTO IS ISNULL ISOLATION
@@ -429,7 +410,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	LABEL LARGE_P LAST_P LATERAL_P
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
-	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
+	LOCALTIME LOCALTIMESTAMP LOCK_P LOCKED LOGGED
 
 	MAPPING MATCH MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
 
@@ -439,7 +420,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	OBJECT_P OF OFF OFFSET OIDS OLD ON ONLY OPERATOR OPTION OPTIONS OR
 	ORDER ORDINALITY OTHERS OUTER_P
-	OVER OVERLAPS OVERLAY OVERRIDING OWNED OWNER
+	OVER OVERLAPS OVERLAY OVERRIDING OWNED
 
 	PARSER PARTIAL PASSING PASSWORD PLACING PLANS
 	POSITION PRECEDING PRECISION PREPARE PREPARED PRIMARY
@@ -449,11 +430,11 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
-	RESET RESTART RESTRICT RIGHT ROLE ROLLBACK ROLLUP
+	RESET RESTRICT RIGHT ROLE ROLLBACK ROLLUP
 	ROWS
 
 	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SELECT SEQUENCE SEQUENCES
-	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
+	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SHARE SHOW
 	SIMPLE SKIP SMALLINT SNAPSHOT SOME SQL_P
 	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRIP_P
 	SUBSTRING SYMMETRIC SYSID SYSTEM_P
@@ -805,14 +786,6 @@ set_rest_more:	/* Generic SET syntaxes: */
 					else
 						n->kind = VAR_SET_DEFAULT;
 					$$ = n;
-				}
-			| CATALOG_P Sconst
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("current database cannot be changed"),
-							 parser_errposition(@2)));
-					$$ = NULL; /*not reached*/
 				}
 			| SCHEMA Sconst
 				{
@@ -1539,13 +1512,6 @@ create_extension_opt_item:
 				{
 					$$ = makeDefElem("new_version", (Node *)makeString($2), @1);
 				}
-			| FROM NonReservedWord_or_Sconst
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("CREATE EXTENSION ... FROM is no longer supported"),
-							 parser_errposition(@1)));
-				}
 			| CASCADE
 				{
 					$$ = makeDefElem("cascade", (Node *)makeInteger(true), @1);
@@ -1719,20 +1685,13 @@ attrs:		'.' attr_name
  *****************************************************************************/
 
 TruncateStmt:
-			TRUNCATE opt_table relation_expr_list opt_restart_seqs opt_drop_behavior
+			TRUNCATE opt_table relation_expr_list opt_drop_behavior
 				{
 					TruncateStmt *n = makeNode(TruncateStmt);
 					n->relations = $3;
-					n->restart_seqs = $4;
-					n->behavior = $5;
+					n->behavior = $4;
 					$$ = (Node *)n;
 				}
-		;
-
-opt_restart_seqs:
-			CONTINUE_P IDENTITY_P		{ $$ = false; }
-			| RESTART IDENTITY_P		{ $$ = true; }
-			| /* EMPTY */				{ $$ = false; }
 		;
 
 
@@ -1894,13 +1853,6 @@ func_type:	Typename								{ $$ = $1; }
 					$$ = makeTypeNameFromNameList(lcons(makeString($1), $2));
 					$$->pct_type = true;
 					$$->location = @1;
-				}
-			| SETOF type_function_name attrs '%' TYPE_P
-				{
-					$$ = makeTypeNameFromNameList(lcons(makeString($2), $3));
-					$$->pct_type = true;
-					$$->setof = true;
-					$$->location = @2;
 				}
 		;
 
@@ -2251,8 +2203,6 @@ createdb_opt_name:
 			IDENT							{ $$ = $1; }
 			| CONNECTION LIMIT				{ $$ = pstrdup("connection_limit"); }
 			| ENCODING						{ $$ = pstrdup($1); }
-			| LOCATION						{ $$ = pstrdup($1); }
-			| OWNER							{ $$ = pstrdup($1); }
 			| TEMPLATE						{ $$ = pstrdup($1); }
 	;
 
@@ -2762,8 +2712,7 @@ simple_select:
 					n->targetList = $3;
 					n->fromClause = $4;
 					n->whereClause = $5;
-					n->groupClause = ($6)->list;
-					n->groupDistinct = ($6)->distinct;
+					n->groupClause = $6;
 					n->havingClause = $7;
 					$$ = (Node *)n;
 				}
@@ -2776,8 +2725,7 @@ simple_select:
 					n->targetList = $3;
 					n->fromClause = $4;
 					n->whereClause = $5;
-					n->groupClause = ($6)->list;
-					n->groupDistinct = ($6)->distinct;
+					n->groupClause = $6;
 					n->havingClause = $7;
 					$$ = (Node *)n;
 				}
@@ -2808,12 +2756,6 @@ simple_select:
  */
 opt_table:	TABLE
 		| /*EMPTY*/
-		;
-
-set_quantifier:
-			ALL										{ $$ = SET_QUANTIFIER_ALL; }
-			| DISTINCT								{ $$ = SET_QUANTIFIER_DISTINCT; }
-			| /*EMPTY*/								{ $$ = SET_QUANTIFIER_DEFAULT; }
 		;
 
 /* We use (NIL) as a placeholder to indicate that all target expressions
@@ -2884,20 +2826,8 @@ sortby:		a_expr USING qual_all_Op opt_nulls_order
  *
  */
 group_clause:
-			GROUP_P BY set_quantifier group_by_list
-				{
-					GroupClause *n = (GroupClause *) palloc(sizeof(GroupClause));
-					n->distinct = $3 == SET_QUANTIFIER_DISTINCT;
-					n->list = $4;
-					$$ = n;
-				}
-			| /*EMPTY*/
-				{
-					GroupClause *n = (GroupClause *) palloc(sizeof(GroupClause));
-					n->distinct = false;
-					n->list = NIL;
-					$$ = n;
-				}
+			GROUP_P BY group_by_list				{ $$ = $3; }
+			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
 group_by_list:
@@ -3271,26 +3201,7 @@ join_qual: USING '(' name_list ')' opt_alias_clause_for_join_using
 relation_expr:
 			qualified_name
 				{
-					/* inheritance query, implicitly */
 					$$ = $1;
-					$$->alias = NULL;
-				}
-			| qualified_name '*'
-				{
-					/* inheritance query, explicitly */
-					$$ = $1;
-					$$->alias = NULL;
-				}
-			| ONLY qualified_name
-				{
-					/* no inheritance */
-					$$ = $2;
-					$$->alias = NULL;
-				}
-			| ONLY '(' qualified_name ')'
-				{
-					/* no inheritance, SQL99-style syntax */
-					$$ = $3;
 					$$->alias = NULL;
 				}
 		;
@@ -3457,34 +3368,16 @@ Typename:	SimpleTypename opt_array_bounds
 					$$ = $1;
 					$$->arrayBounds = $2;
 				}
-			| SETOF SimpleTypename opt_array_bounds
-				{
-					$$ = $2;
-					$$->arrayBounds = $3;
-					$$->setof = true;
-				}
 			/* SQL standard syntax, currently only one-dimensional */
 			| SimpleTypename ARRAY '[' Iconst ']'
 				{
 					$$ = $1;
 					$$->arrayBounds = list_make1(makeInteger($4));
 				}
-			| SETOF SimpleTypename ARRAY '[' Iconst ']'
-				{
-					$$ = $2;
-					$$->arrayBounds = list_make1(makeInteger($5));
-					$$->setof = true;
-				}
 			| SimpleTypename ARRAY
 				{
 					$$ = $1;
 					$$->arrayBounds = list_make1(makeInteger(-1));
-				}
-			| SETOF SimpleTypename ARRAY
-				{
-					$$ = $2;
-					$$->arrayBounds = list_make1(makeInteger(-1));
-					$$->setof = true;
 				}
 		;
 
@@ -3500,15 +3393,14 @@ opt_array_bounds:
 SimpleTypename:
 			GenericType								{ $$ = $1; }
 			| Numeric								{ $$ = $1; }
-			| Bit									{ $$ = $1; }
 			| Character								{ $$ = $1; }
 			| ConstDatetime							{ $$ = $1; }
 		;
 
 /* We have a separate ConstTypename to allow defaulting fixed-length
- * types such as CHAR() and BIT() to an unspecified length.
+ * types such as CHAR() to an unspecified length.
  * SQL9x requires that these default to a length of one, but this
- * makes no sense for constructs like CHAR 'hi' and BIT '0101',
+ * makes no sense for constructs like CHAR 'hi',
  * where there is an obvious better choice to make.
  * Note that ConstInterval is not included here since it must
  * be pushed up higher in the rules to accommodate the postfix
@@ -3518,7 +3410,6 @@ SimpleTypename:
  */
 ConstTypename:
 			Numeric									{ $$ = $1; }
-			| ConstBit								{ $$ = $1; }
 			| ConstCharacter						{ $$ = $1; }
 			| ConstDatetime							{ $$ = $1; }
 		;
@@ -3622,63 +3513,6 @@ opt_float:	'(' Iconst ')'
 		;
 
 /*
- * SQL bit-field data types
- * The following implements BIT() and BIT VARYING().
- */
-Bit:		BitWithLength
-				{
-					$$ = $1;
-				}
-			| BitWithoutLength
-				{
-					$$ = $1;
-				}
-		;
-
-/* ConstBit is like Bit except "BIT" defaults to unspecified length */
-/* See notes for ConstCharacter, which addresses same issue for "CHAR" */
-ConstBit:	BitWithLength
-				{
-					$$ = $1;
-				}
-			| BitWithoutLength
-				{
-					$$ = $1;
-					$$->typmods = NIL;
-				}
-		;
-
-BitWithLength:
-			BIT opt_varying '(' expr_list ')'
-				{
-					char *typname;
-
-					typname = $2 ? "varbit" : "bit";
-					$$ = SystemTypeName(typname);
-					$$->typmods = $4;
-					$$->location = @1;
-				}
-		;
-
-BitWithoutLength:
-			BIT opt_varying
-				{
-					/* bit defaults to bit(1), varbit to no limit */
-					if ($2)
-					{
-						$$ = SystemTypeName("varbit");
-					}
-					else
-					{
-						$$ = SystemTypeName("bit");
-						$$->typmods = list_make1(makeIntConst(1, -1));
-					}
-					$$->location = @1;
-				}
-		;
-
-
-/*
  * SQL character data types
  * The following implements CHAR() and VARCHAR().
  */
@@ -3767,22 +3601,25 @@ ConstDatetime:
 						$$ = SystemTypeName("timestamp");
 					$$->location = @1;
 				}
-			| TIME '(' Iconst ')' opt_timezone
+			| TIME '(' Iconst ')' WITHOUT TIME ZONE
 				{
-					if ($5)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("time with time zone is not supported")));
 					$$ = SystemTypeName("time");
 					$$->typmods = list_make1(makeIntConst($3, @3));
 					$$->location = @1;
 				}
-			| TIME opt_timezone
+			| TIME '(' Iconst ')'
 				{
-					if ($2)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("time with time zone is not supported")));
+					$$ = SystemTypeName("time");
+					$$->typmods = list_make1(makeIntConst($3, @3));
+					$$->location = @1;
+				}
+			| TIME WITHOUT TIME ZONE
+				{
+					$$ = SystemTypeName("time");
+					$$->location = @1;
+				}
+			| TIME
+				{
 					$$ = SystemTypeName("time");
 					$$->location = @1;
 				}
@@ -4147,22 +3984,6 @@ a_expr:		c_expr									{ $$ = $1; }
 						$$ = (Node *) makeA_Expr(AEXPR_OP_ANY, $2, $1, $5, @2);
 					else
 						$$ = (Node *) makeA_Expr(AEXPR_OP_ALL, $2, $1, $5, @2);
-				}
-			| UNIQUE select_with_parens
-				{
-					/* Not sure how to get rid of the parentheses
-					 * but there are lots of shift/reduce errors without them.
-					 *
-					 * Should be able to implement this by plopping the entire
-					 * select into a node, then transforming the target expressions
-					 * from whatever they are into count(*), and testing the
-					 * entire result equal to one.
-					 * But, will probably implement a separate node in the executor.
-					 */
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("UNIQUE predicate is not yet implemented"),
-							 parser_errposition(@1)));
 				}
 		;
 
@@ -5249,7 +5070,6 @@ unreserved_keyword:
 			| CACHE
 			| CASCADE
 			| CASCADED
-			| CATALOG_P
 			| CHAIN
 			| CHARACTERISTICS
 			| CHECKPOINT
@@ -5264,7 +5084,6 @@ unreserved_keyword:
 			| CONNECTION
 			| CONSTRAINTS
 			| CONTENT_P
-			| CONTINUE_P
 			| CONVERSION_P
 			| COPY
 			| CSV
@@ -5310,7 +5129,6 @@ unreserved_keyword:
 			| GROUPS
 			| HEADER_P
 			| HOUR_P
-			| IDENTITY_P
 			| IF_P
 			| IMMEDIATE
 			| IMPLICIT_P
@@ -5331,7 +5149,6 @@ unreserved_keyword:
 			| LISTEN
 			| LOAD
 			| LOCAL
-			| LOCATION
 			| LOCK_P
 			| LOCKED
 			| LOGGED
@@ -5362,7 +5179,6 @@ unreserved_keyword:
 			| OVER
 			| OVERRIDING
 			| OWNED
-			| OWNER
 			| PARSER
 			| PARTIAL
 			| PASSING
@@ -5388,7 +5204,6 @@ unreserved_keyword:
 			| REPLACE
 			| REPLICA
 			| RESET
-			| RESTART
 			| RESTRICT
 			| ROLE
 			| ROLLBACK
@@ -5471,7 +5286,6 @@ unreserved_keyword:
 col_name_keyword:
 			  BETWEEN
 			| BIGINT
-			| BIT
 			| BOOLEAN_P
 			| CHAR_P
 			| CHARACTER
@@ -5495,7 +5309,6 @@ col_name_keyword:
 			| POSITION
 			| PRECISION
 			| REAL
-			| SETOF
 			| SMALLINT
 			| SUBSTRING
 			| TIME
@@ -5653,7 +5466,6 @@ bare_label_keyword:
 			| BETWEEN
 			| BIGINT
 			| BINARY
-			| BIT
 			| BOOLEAN_P
 			| BOTH
 			| BREADTH
@@ -5663,7 +5475,6 @@ bare_label_keyword:
 			| CASCADED
 			| CASE
 			| CAST
-			| CATALOG_P
 			| CHAIN
 			| CHARACTERISTICS
 			| CHECK
@@ -5683,7 +5494,6 @@ bare_label_keyword:
 			| CONSTRAINT
 			| CONSTRAINTS
 			| CONTENT_P
-			| CONTINUE_P
 			| CONVERSION_P
 			| COPY
 			| CROSS
@@ -5749,7 +5559,6 @@ bare_label_keyword:
 			| GREATEST
 			| GROUPS
 			| HEADER_P
-			| IDENTITY_P
 			| IF_P
 			| ILIKE
 			| IMMEDIATE
@@ -5786,7 +5595,6 @@ bare_label_keyword:
 			| LOCAL
 			| LOCALTIME
 			| LOCALTIMESTAMP
-			| LOCATION
 			| LOCK_P
 			| LOCKED
 			| LOGGED
@@ -5826,7 +5634,6 @@ bare_label_keyword:
 			| OVERLAY
 			| OVERRIDING
 			| OWNED
-			| OWNER
 			| PARSER
 			| PARTIAL
 			| PASSING
@@ -5857,7 +5664,6 @@ bare_label_keyword:
 			| REPLACE
 			| REPLICA
 			| RESET
-			| RESTART
 			| RESTRICT
 			| RIGHT
 			| ROLE
@@ -5874,7 +5680,6 @@ bare_label_keyword:
 			| SESSION
 			| SESSION_USER
 			| SET
-			| SETOF
 			| SETS
 			| SHARE
 			| SHOW

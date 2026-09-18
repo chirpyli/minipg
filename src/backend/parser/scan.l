@@ -170,10 +170,8 @@ extern void core_yyset_column(int column_no, yyscan_t yyscanner);
  * We use exclusive states for quoted strings, extended comments,
  * and to eliminate parsing troubles for numeric strings.
  * Exclusive states:
- *  <xb> bit string literal
  *  <xc> extended C-style comments
  *  <xd> delimited identifiers (double-quoted identifiers)
- *  <xh> hexadecimal numeric string
  *  <xq> standard quoted strings
  *  <xqs> quote stop (detect continued strings)
  *  <xe> extended quoted strings (support backslash escape sequences)
@@ -186,10 +184,8 @@ extern void core_yyset_column(int column_no, yyscan_t yyscanner);
  * The default one is probably not the right thing.
  */
 
-%x xb
 %x xc
 %x xd
-%x xh
 %x xq
 %x xqs
 %x xe
@@ -248,22 +244,6 @@ quotecontinue	{whitespace_with_newline}{quote}
  * allow continuation of the {quotecontinue} token.
  */
 quotecontinuefail	{whitespace}*"-"?
-
-/* Bit string
- * It is tempting to scan the string for only those characters
- * which are allowed. However, this leads to silently swallowed
- * characters if illegal characters are included in the string.
- * For example, if xbinside is [01] then B'ABCD' is interpreted
- * as a zero-length string, and the ABCD' is lost!
- * Better to pass the string forward and let the input routines
- * validate the contents.
- */
-xbstart			[bB]{quote}
-xbinside		[^']*
-
-/* Hexadecimal number */
-xhstart			[xX]{quote}
-xhinside		[^']*
 
 /* National character */
 xnstart			[nN]{quote}
@@ -348,7 +328,6 @@ identifier		{ident_start}{ident_cont}*
 
 /* Assorted special-case operators and operator-like tokens */
 typecast		"::"
-dot_dot			\.\.
 colon_equals	":="
 
 /*
@@ -383,7 +362,7 @@ operator		{op_chars}+
  * instead we pass it separately to parser. there it gets
  * coerced via doNegate() -- Leon aug 20 1999
  *
- * {decimalfail} is used because we would like "1..10" to lex as 1, dot_dot, 10.
+ * {decimalfail} is used because we would like "1..10" to lex as 1, then .., 10.
  *
  * {realfail1} and {realfail2} are added to prevent the need for scanner
  * backup when the {real} rule fails to match completely.
@@ -459,38 +438,6 @@ other			.
 				}
 } /* <xc> */
 
-{xbstart}		{
-					/* Binary bit type.
-					 * At some point we should simply pass the string
-					 * forward to the parser and label it there.
-					 * In the meantime, place a leading "b" on the string
-					 * to mark it for the input routine as a binary string.
-					 */
-					SET_YYLLOC();
-					BEGIN(xb);
-					startlit();
-					addlitchar('b', yyscanner);
-				}
-<xh>{xhinside}	|
-<xb>{xbinside}	{
-					addlit(yytext, yyleng, yyscanner);
-				}
-<xb><<EOF>>		{ yyerror("unterminated bit string literal"); }
-
-{xhstart}		{
-					/* Hexadecimal bit type.
-					 * At some point we should simply pass the string
-					 * forward to the parser and label it there.
-					 * In the meantime, place a leading "x" on the string
-					 * to mark it for the input routine as a hex string.
-					 */
-					SET_YYLLOC();
-					BEGIN(xh);
-					startlit();
-					addlitchar('x', yyscanner);
-				}
-<xh><<EOF>>		{ yyerror("unterminated hexadecimal string literal"); }
-
 {xnstart}		{
 					/* National character.
 					 * We will pass this along as a normal character string,
@@ -546,7 +493,7 @@ other			.
 					startlit();
 				}
 
-<xb,xh,xq,xe,xus>{quote} {
+<xq,xe,xus>{quote} {
 					/*
 					 * When we are scanning a quoted string and see an end
 					 * quote, we must look ahead for a possible continuation.
@@ -579,12 +526,6 @@ other			.
 
 					switch (yyextra->state_before_str_stop)
 					{
-						case xb:
-							yylval->str = litbufdup(yyscanner);
-							return BCONST;
-						case xh:
-							yylval->str = litbufdup(yyscanner);
-							return XCONST;
 						case xq:
 						case xe:
 							/*
@@ -814,11 +755,6 @@ other			.
 {typecast}		{
 					SET_YYLLOC();
 					return TYPECAST;
-				}
-
-{dot_dot}		{
-					SET_YYLLOC();
-					return DOT_DOT;
 				}
 
 {colon_equals}	{

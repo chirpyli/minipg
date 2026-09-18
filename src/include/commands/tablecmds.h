@@ -56,8 +56,7 @@ extern void ExecuteTruncate(TruncateStmt *stmt);
 extern void ExecuteTruncateGuts(List *explicit_rels,
 								List *relids,
 								List *relids_logged,
-								DropBehavior behavior,
-								bool restart_seqs);
+								DropBehavior behavior);
 
 extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
 extern void ResetRelRewrite(Oid myrelid);

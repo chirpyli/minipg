@@ -53,14 +53,6 @@ typedef enum SortByNulls
 	SORTBY_NULLS_LAST
 } SortByNulls;
 
-/* Options for [ ALL | DISTINCT ] */
-typedef enum SetQuantifier
-{
-	SET_QUANTIFIER_DEFAULT,
-	SET_QUANTIFIER_ALL,
-	SET_QUANTIFIER_DISTINCT
-} SetQuantifier;
-
 /*
  * Grantable rights are encoded so that we can OR them together in a bitmask.
  * AclMode is defined as uint32 and holds these privilege bits.
@@ -128,7 +120,6 @@ typedef struct Query
 	List	   *targetList;		/* target list (of TargetEntry) */
 
 	List	   *groupClause;	/* a list of SortGroupClause's */
-	bool		groupDistinct;	/* is the group by clause distinct? */
 
 	Node	   *havingQual;		/* qualifications applied to groups */
 
@@ -176,7 +167,6 @@ typedef struct TypeName
 	NodeTag		type;
 	List	   *names;			/* qualified name (list of Value strings) */
 	Oid			typeOid;		/* type identified by OID */
-	bool		setof;			/* is a set? */
 	bool		pct_type;		/* %TYPE specified? */
 	List	   *typmods;		/* type modifier expression(s) */
 	int32		typemod;		/* prespecified type modifier */
@@ -564,10 +554,6 @@ typedef struct DefElem
  *	  items for any such columns with null pointers.  (We can't simply delete
  *	  them from the joinaliasvars list, because that would affect the attnums
  *	  of Vars referencing the rest of the list.)
- *
- *	  inh is true for relation references that should be expanded to include
- *	  inheritance children, if the rel has any.  This *must* be false for
- *	  RTEs other than RTE_RELATION entries.
  *
  *	  inFromCl marks those range variables that are listed in the FROM clause.
  *	  It's false for RTEs that are added to a query behind the scenes, such
@@ -958,7 +944,6 @@ typedef struct SelectStmt
 	List	   *fromClause;		/* the FROM clause */
 	Node	   *whereClause;	/* WHERE qualification */
 	List	   *groupClause;	/* GROUP BY clauses */
-	bool		groupDistinct;	/* Is this GROUP BY DISTINCT? */
 	Node	   *havingClause;	/* HAVING conditional-expression */
 
 	/*
@@ -1268,7 +1253,6 @@ typedef struct TruncateStmt
 {
 	NodeTag		type;
 	List	   *relations;		/* relations (RangeVars) to be truncated */
-	bool		restart_seqs;	/* restart owned sequences? */
 	DropBehavior behavior;		/* RESTRICT or CASCADE behavior */
 } TruncateStmt;
 
