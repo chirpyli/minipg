@@ -90,8 +90,6 @@ VACUUM hs2;
 ERROR:  cannot execute VACUUM during recovery
 CLUSTER hs2 using hs1_pkey;
 ERROR:  cannot execute CLUSTER during recovery
-REINDEX TABLE hs2;
-ERROR:  cannot execute REINDEX during recovery
 REVOKE SELECT ON hs1 FROM PUBLIC;
 ERROR:  cannot execute REVOKE in a read-only transaction
 GRANT SELECT ON hs1 TO PUBLIC;

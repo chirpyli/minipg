@@ -202,7 +202,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 		ExplainStmt
 		IndexStmt InsertStmt
 		ExplainableStmt
-		ReindexStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
@@ -327,8 +326,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	tablesample_clause opt_repeatable_clause
 %type <target>	target_el set_target insert_column_item
 
-
-%type <ival>	reindex_target_type reindex_target_multitable
 
 %type <typnam>	Typename SimpleTypename ConstTypename
 				GenericType Numeric opt_float
@@ -629,8 +626,7 @@ stmt:	AlterObjectSchemaStmt
 			| ExplainStmt
 			| IndexStmt
 		| InsertStmt
-			| ReindexStmt
-			| SelectStmt
+		| SelectStmt
 			| TransactionStmt
 		| TruncateStmt
 		| UpdateStmt
@@ -1946,72 +1942,6 @@ opt_definition:
 		;
 
 
-/*****************************************************************************
- *
- *		QUERY:
- *
- *		REINDEX [ (options) ] type [CONCURRENTLY] <name>
- *****************************************************************************/
-
-ReindexStmt:
-			REINDEX reindex_target_type opt_concurrently qualified_name
-				{
-					ReindexStmt *n = makeNode(ReindexStmt);
-					n->kind = $2;
-					n->relation = $4;
-					n->name = NULL;
-					n->params = NIL;
-					if ($3)
-						n->params = lappend(n->params,
-								makeDefElem("concurrently", NULL, @3));
-					$$ = (Node *)n;
-				}
-			| REINDEX reindex_target_multitable opt_concurrently name
-				{
-					ReindexStmt *n = makeNode(ReindexStmt);
-					n->kind = $2;
-					n->name = $4;
-					n->relation = NULL;
-					n->params = NIL;
-					if ($3)
-						n->params = lappend(n->params,
-								makeDefElem("concurrently", NULL, @3));
-					$$ = (Node *)n;
-				}
-			| REINDEX '(' utility_option_list ')' reindex_target_type opt_concurrently qualified_name
-				{
-					ReindexStmt *n = makeNode(ReindexStmt);
-					n->kind = $5;
-					n->relation = $7;
-					n->name = NULL;
-					n->params = $3;
-					if ($6)
-						n->params = lappend(n->params,
-								makeDefElem("concurrently", NULL, @6));
-					$$ = (Node *)n;
-				}
-			| REINDEX '(' utility_option_list ')' reindex_target_multitable opt_concurrently name
-				{
-					ReindexStmt *n = makeNode(ReindexStmt);
-					n->kind = $5;
-					n->name = $7;
-					n->relation = NULL;
-					n->params = $3;
-					if ($6)
-						n->params = lappend(n->params,
-								makeDefElem("concurrently", NULL, @6));
-					$$ = (Node *)n;
-				}
-		;
-reindex_target_type:
-			INDEX					{ $$ = REINDEX_OBJECT_INDEX; }
-			| TABLE					{ $$ = REINDEX_OBJECT_TABLE; }
-		;
-reindex_target_multitable:
-			SCHEMA					{ $$ = REINDEX_OBJECT_SCHEMA; }
-			| SYSTEM_P				{ $$ = REINDEX_OBJECT_SYSTEM; }
-			| DATABASE				{ $$ = REINDEX_OBJECT_DATABASE; }
-		;
 
 /*****************************************************************************
  *
@@ -5484,7 +5414,6 @@ unreserved_keyword:
 			| REF_P
 			| REFERENCING
 			| REFRESH
-			| REINDEX
 			| RELEASE
 			| RENAME
 			| REPEATABLE
@@ -5955,7 +5884,6 @@ bare_label_keyword:
 			| REF_P
 			| REFERENCING
 			| REFRESH
-			| REINDEX
 			| RELEASE
 			| RENAME
 			| REPEATABLE

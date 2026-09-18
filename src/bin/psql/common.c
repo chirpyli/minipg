@@ -1228,12 +1228,10 @@ command_no_begin(const char *query)
 	}
 
 	/*
-	 * Note: these tests will match DROP SYSTEM and REINDEX TABLESPACE, which
-	 * aren't really valid commands so we don't care much. The other four
-	 * possible matches are correct.
+	 * Note: these tests will match DROP SYSTEM, which isn't really a valid
+	 * command so we don't care much. The other possible matches are correct.
 	 */
-	if ((wordlen == 4 && pg_strncasecmp(query, "drop", 4) == 0) ||
-		(wordlen == 7 && pg_strncasecmp(query, "reindex", 7) == 0))
+	if (wordlen == 4 && pg_strncasecmp(query, "drop", 4) == 0)
 	{
 		query += wordlen;
 
@@ -1259,7 +1257,7 @@ command_no_begin(const char *query)
 				wordlen += PQmblenBounded(&query[wordlen], pset.encoding);
 
 			/*
-			 * REINDEX [ TABLE | INDEX ] CONCURRENTLY are not allowed in
+			 * DROP [ TABLE | INDEX ] CONCURRENTLY are not allowed in
 			 * xacts.
 			 */
 			if (wordlen == 12 && pg_strncasecmp(query, "concurrently", 12) == 0)

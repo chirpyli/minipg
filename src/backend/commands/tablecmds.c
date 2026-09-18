@@ -919,7 +919,6 @@ ExecuteTruncateGuts(List *explicit_rels,
 		{
 			Oid			heap_relid;
 			Oid			toast_relid;
-			ReindexParams reindex_params = {0};
 
 			/*
 			 * This effectively deletes all rows in the table, and may be done
@@ -957,8 +956,7 @@ ExecuteTruncateGuts(List *explicit_rels,
 			/*
 			 * Reconstruct the indexes to match, and we're done.
 			 */
-			reindex_relation(heap_relid, REINDEX_REL_PROCESS_TOAST,
-							 &reindex_params);
+			reindex_relation(heap_relid, REINDEX_REL_PROCESS_TOAST);
 		}
 
 		pgstat_count_truncate(rel);

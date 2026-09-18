@@ -165,7 +165,6 @@ SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogg
  unlogged2_pkey | i       | p
 (2 rows)
 
-REINDEX INDEX unlogged2_pkey;
 SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
     relname     | relkind | relpersistence 
 ----------------+---------+----------------

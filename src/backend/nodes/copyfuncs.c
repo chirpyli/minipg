@@ -2595,19 +2595,6 @@ _copyCreateExtensionStmt(const CreateExtensionStmt *from)
 	return newnode;
 }
 
-static ReindexStmt *
-_copyReindexStmt(const ReindexStmt *from)
-{
-	ReindexStmt *newnode = makeNode(ReindexStmt);
-
-	COPY_SCALAR_FIELD(kind);
-	COPY_NODE_FIELD(relation);
-	COPY_STRING_FIELD(name);
-	COPY_NODE_FIELD(params);
-
-	return newnode;
-}
-
 static CreateSchemaStmt *
 _copyCreateSchemaStmt(const CreateSchemaStmt *from)
 {
@@ -3033,9 +3020,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _copyCreateExtensionStmt(from);
-			break;
-		case T_ReindexStmt:
-			retval = _copyReindexStmt(from);
 			break;
 		case T_CheckPointStmt:
 			retval = (void *) makeNode(CheckPointStmt);

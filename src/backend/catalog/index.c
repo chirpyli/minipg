@@ -2995,8 +2995,7 @@ IndexGetRelation(Oid indexId, bool missing_ok)
  * reindex_index - This routine is used to recreate a single index
  */
 void
-reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
-			  ReindexParams *params)
+reindex_index(Oid indexId, bool skip_constraint_checks, char persistence)
 {
 	Relation	iRel,
 				heapRelation;
@@ -3006,29 +3005,14 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	int			save_nestlevel;
 	IndexInfo  *indexInfo;
 	volatile bool skipped_constraint = false;
-	PGRUsage	ru0;
-	bool		progress = ((params->options & REINDEXOPT_REPORT_PROGRESS) != 0);
 
-	pg_rusage_init(&ru0);
+	heapId = IndexGetRelation(indexId, false);
 
 	/*
 	 * Open and lock the parent heap relation.  ShareLock is sufficient since
 	 * we only need to be sure no schema or data changes are going on.
 	 */
-	heapId = IndexGetRelation(indexId,
-							  (params->options & REINDEXOPT_MISSING_OK) != 0);
-	/* if relation is missing, leave */
-	if (!OidIsValid(heapId))
-		return;
-
-	if ((params->options & REINDEXOPT_MISSING_OK) != 0)
-		heapRelation = try_table_open(heapId, ShareLock);
-	else
-		heapRelation = table_open(heapId, ShareLock);
-
-	/* if relation is gone, leave */
-	if (!heapRelation)
-		return;
+	heapRelation = table_open(heapId, ShareLock);
 
 	/*
 	 * Switch to the table owner's userid, so that any index functions are run
@@ -3040,48 +3024,11 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
 	save_nestlevel = NewGUCNestLevel();
 
-	if (progress)
-	{
-		const int	progress_cols[] = {
-			PROGRESS_CREATEIDX_COMMAND,
-			PROGRESS_CREATEIDX_INDEX_OID
-		};
-		const int64 progress_vals[] = {
-			PROGRESS_CREATEIDX_COMMAND_REINDEX,
-			indexId
-		};
-
-		pgstat_progress_start_command(PROGRESS_COMMAND_CREATE_INDEX,
-									  heapId);
-		pgstat_progress_update_multi_param(2, progress_cols, progress_vals);
-	}
-
 	/*
 	 * Open the target index relation and get an exclusive lock on it, to
 	 * ensure that no one else is touching this particular index.
 	 */
-	if ((params->options & REINDEXOPT_MISSING_OK) != 0)
-		iRel = try_index_open(indexId, AccessExclusiveLock);
-	else
-		iRel = index_open(indexId, AccessExclusiveLock);
-
-	/* if index relation is gone, leave */
-	if (!iRel)
-	{
-		/* Roll back any GUC changes */
-		AtEOXact_GUC(false, save_nestlevel);
-
-		/* Restore userid and security context */
-		SetUserIdAndSecContext(save_userid, save_sec_context);
-
-		/* Close parent heap relation, but keep locks */
-		table_close(heapRelation, NoLock);
-		return;
-	}
-
-	if (progress)
-		pgstat_progress_update_param(PROGRESS_CREATEIDX_ACCESS_METHOD_OID,
-									 iRel->rd_rel->relam);
+	iRel = index_open(indexId, AccessExclusiveLock);
 
 	/*
 	 * Don't allow reindex of an invalid index on TOAST table.  This is a
@@ -3208,14 +3155,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 		table_close(pg_index, RowExclusiveLock);
 	}
 
-	/* Log what we did */
-	if ((params->options & REINDEXOPT_VERBOSE) != 0)
-		ereport(INFO,
-				(errmsg("index \"%s\" was reindexed",
-						get_rel_name(indexId)),
-				 errdetail_internal("%s",
-									pg_rusage_show(&ru0))));
-
 	/* Roll back any GUC changes executed by index functions */
 	AtEOXact_GUC(false, save_nestlevel);
 
@@ -3225,9 +3164,6 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	/* Close rels, but keep locks */
 	index_close(iRel, NoLock);
 	table_close(heapRelation, NoLock);
-
-	if (progress)
-		pgstat_progress_end_command();
 }
 
 /*
@@ -3263,7 +3199,7 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
  * index rebuild.
  */
 bool
-reindex_relation(Oid relid, int flags, ReindexParams *params)
+reindex_relation(Oid relid, int flags)
 {
 	Relation	rel;
 	Oid			toast_relid;
@@ -3276,16 +3212,9 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 	/*
 	 * Open and lock the relation.  ShareLock is sufficient since we only need
 	 * to prevent schema and data changes in it.  The lock level used here
-	 * should match ReindexTable().
+	 * should match the callers such as CLUSTER.
 	 */
-	if ((params->options & REINDEXOPT_MISSING_OK) != 0)
-		rel = try_table_open(relid, ShareLock);
-	else
-		rel = table_open(relid, ShareLock);
-
-	/* if relation is gone, leave */
-	if (!rel)
-		return false;
+	rel = table_open(relid, ShareLock);
 
 	toast_relid = rel->rd_rel->reltoastrelid;
 
@@ -3349,7 +3278,7 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 		}
 
 		reindex_index(indexOid, !(flags & REINDEX_REL_CHECK_CONSTRAINTS),
-					  persistence, params);
+					  persistence);
 
 		CommandCounterIncrement();
 
@@ -3375,14 +3304,7 @@ reindex_relation(Oid relid, int flags, ReindexParams *params)
 	 */
 	if ((flags & REINDEX_REL_PROCESS_TOAST) && OidIsValid(toast_relid))
 	{
-		/*
-		 * Note that this should fail if the toast relation is missing, so
-		 * reset REINDEXOPT_MISSING_OK.
-		 */
-		ReindexParams newparams = *params;
-
-		newparams.options &= ~(REINDEXOPT_MISSING_OK);
-		result |= reindex_relation(toast_relid, flags, &newparams);
+		result |= reindex_relation(toast_relid, flags);
 	}
 
 	return result;

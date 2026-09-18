@@ -1057,17 +1057,6 @@ _equalCreateExtensionStmt(const CreateExtensionStmt *a, const CreateExtensionStm
 }
 
 static bool
-_equalReindexStmt(const ReindexStmt *a, const ReindexStmt *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_STRING_FIELD(name);
-	COMPARE_NODE_FIELD(params);
-
-	return true;
-}
-
-static bool
 _equalCreateSchemaStmt(const CreateSchemaStmt *a, const CreateSchemaStmt *b)
 {
 	COMPARE_STRING_FIELD(schemaname);
@@ -1731,9 +1720,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CreateExtensionStmt:
 			retval = _equalCreateExtensionStmt(a, b);
-			break;
-		case T_ReindexStmt:
-			retval = _equalReindexStmt(a, b);
 			break;
 		case T_CheckPointStmt:
 			retval = true;

@@ -211,11 +211,7 @@ COMMIT;
 BEGIN;
 CREATE INDEX std_index on concur_heap(f2);
 COMMIT;
--- Failed builds are left invalid by VACUUM FULL, fixed by REINDEX
 VACUUM FULL concur_heap;
-REINDEX TABLE concur_heap;
-ERROR:  could not create unique index "concur_index3"
-DETAIL:  Key (f2)=(b) is duplicated.
 DELETE FROM concur_heap WHERE f1 = 'b';
 VACUUM FULL concur_heap;
 \d concur_heap
@@ -233,7 +229,6 @@ Indexes:
     "concur_index5" btree (f2) WHERE f1 = 'x'::text
     "std_index" btree (f2)
 
-REINDEX TABLE concur_heap;
 \d concur_heap
 Table "public.concur_heap"
  Column | Type 
@@ -244,7 +239,7 @@ Indexes:
     "concur_heap_expr_idx" btree ((f2 || f1))
     "concur_index1" btree (f2, f1)
     "concur_index2" UNIQUE, btree (f1)
-    "concur_index3" UNIQUE, btree (f2)
+    "concur_index3" UNIQUE, btree (f2) INVALID
     "concur_index4" btree (f2) WHERE f1 = 'a'::text
     "concur_index5" btree (f2) WHERE f1 = 'x'::text
     "std_index" btree (f2)
@@ -718,23 +713,14 @@ explain (costs off)
 (2 rows)
 
 --
--- REINDEX (VERBOSE)
 --
 CREATE TABLE reindex_verbose(id integer primary key);
 \set VERBOSITY terse \\ -- suppress machine-dependent details
-REINDEX (VERBOSE) TABLE reindex_verbose;
-INFO:  index "reindex_verbose_pkey" was reindexed
 \set VERBOSITY default
 DROP TABLE reindex_verbose;
 --
--- REINDEX CONCURRENTLY
 --
 CREATE TABLE concur_reindex_tab (c1 int);
--- REINDEX
-REINDEX TABLE concur_reindex_tab; -- notice
-NOTICE:  table "concur_reindex_tab" has no indexes to reindex
-REINDEX (CONCURRENTLY) TABLE concur_reindex_tab; -- notice
-NOTICE:  table "concur_reindex_tab" has no indexes that can be reindexed concurrently
 ALTER TABLE concur_reindex_tab ADD COLUMN c2 text; -- add toast index
 -- Normal index with integer column
 CREATE UNIQUE INDEX concur_reindex_ind1 ON concur_reindex_tab(c1);
@@ -752,7 +738,6 @@ LINE 1: CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_r...
                                                  ^
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
--- Dependency lookup before and after the follow-up REINDEX commands.
 -- These should remain consistent.
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
@@ -776,8 +761,6 @@ WHERE classid = 'pg_class'::regclass AND
  table concur_reindex_tab  | schema public                                              | n
 (7 rows)
 
-REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
-REINDEX TABLE CONCURRENTLY concur_reindex_tab;
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
        deptype
@@ -800,27 +783,12 @@ WHERE classid = 'pg_class'::regclass AND
  table concur_reindex_tab  | schema public                                              | n
 (7 rows)
 
--- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 -- Check errors
 -- Cannot run inside a transaction block
 BEGIN;
-REINDEX TABLE CONCURRENTLY concur_reindex_tab;
-ERROR:  REINDEX CONCURRENTLY cannot run inside a transaction block
 COMMIT;
-REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relation
-ERROR:  cannot reindex system catalogs concurrently
-REINDEX INDEX CONCURRENTLY pg_class_oid_index; -- no catalog index
-ERROR:  cannot reindex system catalogs concurrently
 -- These are the toast table and index of pg_proc.
-REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1255; -- no catalog toast table
-ERROR:  cannot reindex system catalogs concurrently
-REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1255_index; -- no catalog toast index
-ERROR:  cannot reindex system catalogs concurrently
-REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
-ERROR:  cannot reindex system catalogs concurrently
 -- Warns about catalog relations
-REINDEX SCHEMA CONCURRENTLY pg_catalog;
-WARNING:  cannot reindex system catalogs concurrently, skipping all
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
 Table "public.concur_reindex_tab"
@@ -845,9 +813,6 @@ ERROR:  could not create unique index "concur_reindex_ind5"
 DETAIL:  Key (c1)=(1) is duplicated.
 -- Reindexing concurrently this index fails with the same failure.
 -- The extra index created is itself invalid, and can be dropped.
-REINDEX INDEX CONCURRENTLY concur_reindex_ind5;
-ERROR:  could not create unique index "concur_reindex_ind5_ccnew"
-DETAIL:  Key (c1)=(1) is duplicated.
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
  Column |  Type   
@@ -855,15 +820,11 @@ Table "public.concur_reindex_tab4"
  c1     | integer
 Indexes:
     "concur_reindex_ind5" UNIQUE, btree (c1) INVALID
-    "concur_reindex_ind5_ccnew" UNIQUE, btree (c1) INVALID
 
 DROP INDEX concur_reindex_ind5_ccnew;
+ERROR:  index "concur_reindex_ind5_ccnew" does not exist
 -- This makes the previous failure go away, so the index can become valid.
 DELETE FROM concur_reindex_tab4 WHERE c1 = 1;
--- The invalid index is not processed when running REINDEX TABLE.
-REINDEX TABLE CONCURRENTLY concur_reindex_tab4;
-WARNING:  cannot reindex invalid index "public.concur_reindex_ind5" concurrently, skipping
-NOTICE:  table "concur_reindex_tab4" has no indexes that can be reindexed concurrently
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
  Column |  Type   
@@ -872,15 +833,13 @@ Table "public.concur_reindex_tab4"
 Indexes:
     "concur_reindex_ind5" UNIQUE, btree (c1) INVALID
 
--- But it is fixed with REINDEX INDEX.
-REINDEX INDEX CONCURRENTLY concur_reindex_ind5;
 \d concur_reindex_tab4
 Table "public.concur_reindex_tab4"
  Column |  Type   
 --------+---------
  c1     | integer
 Indexes:
-    "concur_reindex_ind5" UNIQUE, btree (c1)
+    "concur_reindex_ind5" UNIQUE, btree (c1) INVALID
 
 DROP TABLE concur_reindex_tab4;
 -- Check handling of indexes with expressions and predicates.  The
@@ -927,7 +886,6 @@ SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
  CREATE UNIQUE INDEX concur_exprs_index_pred_2 ON public.concur_exprs_tab USING btree (((1 / c1))) WHERE ('-H'::text >= (c2)::text)
 (1 row)
 
-REINDEX TABLE CONCURRENTLY concur_exprs_tab;
 SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
                                           pg_get_indexdef                                          
 ---------------------------------------------------------------------------------------------------
@@ -993,10 +951,7 @@ SELECT attrelid::regclass, attnum, attstattarget
 
 DROP TABLE concur_exprs_tab;
 --
--- REINDEX SCHEMA
 --
-REINDEX SCHEMA schema_to_reindex; -- failure, schema does not exist
-ERROR:  schema "schema_to_reindex" does not exist
 CREATE SCHEMA schema_to_reindex;
 SET search_path = 'schema_to_reindex';
 CREATE TABLE table1(col1 SERIAL PRIMARY KEY);
@@ -1043,7 +998,6 @@ FROM pg_class where oid in
 ERROR:  relation "reindex_before" does not exist
 LINE 1: INSERT INTO reindex_before
                     ^
-REINDEX SCHEMA schema_to_reindex;
 CREATE TABLE reindex_after (oid oid, relname name, relfilenode relfilenode, relkind char);
 ERROR:  type "relfilenode" does not exist
 LINE 1: ...reindex_after (oid oid, relname name, relfilenode relfilenod...
@@ -1063,17 +1017,10 @@ SELECT  b.relname,
 ERROR:  relation "reindex_before" does not exist
 LINE 5:   FROM reindex_before b JOIN pg_class a ON b.oid = a.oid
                ^
-REINDEX SCHEMA schema_to_reindex;
 BEGIN;
-REINDEX SCHEMA schema_to_reindex; -- failure, cannot run in a transaction
-ERROR:  REINDEX SCHEMA cannot run inside a transaction block
 END;
 -- concurrently
-REINDEX SCHEMA CONCURRENTLY schema_to_reindex;
 -- Failure for unauthorized user
-REINDEX SCHEMA schema_to_reindex;
 -- Permission failures with toast tables and indexes (pg_proc here)
-REINDEX TABLE pg_toast.pg_toast_1255;
-REINDEX INDEX pg_toast.pg_toast_1255_index;
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;

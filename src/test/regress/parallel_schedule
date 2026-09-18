@@ -148,9 +148,6 @@ test: delete drop_if_exists functional_deps create_view
 
 test: create_schema tid transactions
 
-# reindex_catalog 会 REINDEX 系统表，必须独占一组
-test: reindex_catalog
-
 # ----------
 # 系统表一致性检查
 # ----------

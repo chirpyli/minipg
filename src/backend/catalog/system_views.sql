@@ -533,8 +533,6 @@ CREATE VIEW pg_stat_progress_create_index AS
         CAST(S.param7 AS oid) AS index_relid,
         CASE S.param1 WHEN 1 THEN 'CREATE INDEX'
                       WHEN 2 THEN 'CREATE INDEX CONCURRENTLY'
-                      WHEN 3 THEN 'REINDEX'
-                      WHEN 4 THEN 'REINDEX CONCURRENTLY'
                       END AS command,
         CASE S.param10 WHEN 0 THEN 'initializing'
                        WHEN 1 THEN 'waiting for writers before build'

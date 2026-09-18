@@ -146,10 +146,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				 * synchronized among cooperating backends.
 				 */
 				return COMMAND_OK_IN_RECOVERY | COMMAND_OK_IN_READ_ONLY_TXN;
-			}
+				}
 
-		case T_ReindexStmt:
-		case T_VacuumStmt:
+				case T_VacuumStmt:
 			{
 				/*
 				 * These commands write WAL, so they're not strictly
@@ -505,10 +504,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 		case T_CheckPointStmt:
 			RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_WAIT |
 							  (RecoveryInProgress() ? 0 : CHECKPOINT_FORCE));
-			break;
-
-		case T_ReindexStmt:
-			ExecReindex(pstate, (ReindexStmt *) parsetree, isTopLevel);
 			break;
 
 			/*
@@ -1148,10 +1143,6 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CheckPointStmt:
 			tag = CMDTAG_CHECKPOINT;
-			break;
-
-		case T_ReindexStmt:
-			tag = CMDTAG_REINDEX;
 			break;
 
 			/* already-planned queries */

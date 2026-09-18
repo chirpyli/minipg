@@ -152,13 +152,11 @@ DROP TABLE tbl;
 
 
 /*
- * 5. REINDEX
  */
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
 SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
 ALTER TABLE tbl DROP COLUMN c3;
 SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
-REINDEX INDEX tbl_c1_c2_c3_c4_key;
 SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
 ALTER TABLE tbl DROP COLUMN c1;
 SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;

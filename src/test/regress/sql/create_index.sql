@@ -201,13 +201,10 @@ BEGIN;
 CREATE INDEX std_index on concur_heap(f2);
 COMMIT;
 
--- Failed builds are left invalid by VACUUM FULL, fixed by REINDEX
 VACUUM FULL concur_heap;
-REINDEX TABLE concur_heap;
 DELETE FROM concur_heap WHERE f1 = 'b';
 VACUUM FULL concur_heap;
 \d concur_heap
-REINDEX TABLE concur_heap;
 \d concur_heap
 
 --
@@ -431,21 +428,15 @@ explain (costs off)
   select * from boolindex where b is false order by i desc;
 
 --
--- REINDEX (VERBOSE)
 --
 CREATE TABLE reindex_verbose(id integer primary key);
 \set VERBOSITY terse \\ -- suppress machine-dependent details
-REINDEX (VERBOSE) TABLE reindex_verbose;
 \set VERBOSITY default
 DROP TABLE reindex_verbose;
 
 --
--- REINDEX CONCURRENTLY
 --
 CREATE TABLE concur_reindex_tab (c1 int);
--- REINDEX
-REINDEX TABLE concur_reindex_tab; -- notice
-REINDEX (CONCURRENTLY) TABLE concur_reindex_tab; -- notice
 ALTER TABLE concur_reindex_tab ADD COLUMN c2 text; -- add toast index
 -- Normal index with integer column
 CREATE UNIQUE INDEX concur_reindex_ind1 ON concur_reindex_tab(c1);
@@ -460,7 +451,6 @@ ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
--- Dependency lookup before and after the follow-up REINDEX commands.
 -- These should remain consistent.
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
@@ -473,8 +463,6 @@ WHERE classid = 'pg_class'::regclass AND
 	    'concur_reindex_ind3'::regclass,
 	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
-REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
-REINDEX TABLE CONCURRENTLY concur_reindex_tab;
 SELECT pg_describe_object(classid, objid, objsubid) as obj,
        pg_describe_object(refclassid,refobjid,refobjsubid) as objref,
        deptype
@@ -486,21 +474,13 @@ WHERE classid = 'pg_class'::regclass AND
 	    'concur_reindex_ind3'::regclass,
 	    'concur_reindex_ind4'::regclass)
   ORDER BY 1, 2;
--- minipg: 分区表(PARTITION BY)已被裁剪，移除对应的分区 REINDEX 测试块。
 
 -- Check errors
 -- Cannot run inside a transaction block
 BEGIN;
-REINDEX TABLE CONCURRENTLY concur_reindex_tab;
 COMMIT;
-REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relation
-REINDEX INDEX CONCURRENTLY pg_class_oid_index; -- no catalog index
 -- These are the toast table and index of pg_proc.
-REINDEX TABLE CONCURRENTLY pg_toast.pg_toast_1255; -- no catalog toast table
-REINDEX INDEX CONCURRENTLY pg_toast.pg_toast_1255_index; -- no catalog toast index
-REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
 -- Warns about catalog relations
-REINDEX SCHEMA CONCURRENTLY pg_catalog;
 
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
@@ -513,16 +493,11 @@ INSERT INTO concur_reindex_tab4 VALUES (1), (1), (2);
 CREATE UNIQUE INDEX CONCURRENTLY concur_reindex_ind5 ON concur_reindex_tab4 (c1);
 -- Reindexing concurrently this index fails with the same failure.
 -- The extra index created is itself invalid, and can be dropped.
-REINDEX INDEX CONCURRENTLY concur_reindex_ind5;
 \d concur_reindex_tab4
 DROP INDEX concur_reindex_ind5_ccnew;
 -- This makes the previous failure go away, so the index can become valid.
 DELETE FROM concur_reindex_tab4 WHERE c1 = 1;
--- The invalid index is not processed when running REINDEX TABLE.
-REINDEX TABLE CONCURRENTLY concur_reindex_tab4;
 \d concur_reindex_tab4
--- But it is fixed with REINDEX INDEX.
-REINDEX INDEX CONCURRENTLY concur_reindex_ind5;
 \d concur_reindex_tab4
 DROP TABLE concur_reindex_tab4;
 
@@ -550,7 +525,6 @@ SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (
 SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
-REINDEX TABLE CONCURRENTLY concur_exprs_tab;
 SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
@@ -575,9 +549,7 @@ SELECT attrelid::regclass, attnum, attstattarget
 DROP TABLE concur_exprs_tab;
 
 --
--- REINDEX SCHEMA
 --
-REINDEX SCHEMA schema_to_reindex; -- failure, schema does not exist
 CREATE SCHEMA schema_to_reindex;
 SET search_path = 'schema_to_reindex';
 CREATE TABLE table1(col1 SERIAL PRIMARY KEY);
@@ -599,7 +571,6 @@ SELECT oid, 'pg_toast_TABLE_index', relfilenode, relkind, reltoastrelid
 FROM pg_class where oid in
 	(select indexrelid from pg_index where indrelid in
 		(select reltoastrelid from reindex_before where reltoastrelid > 0));
-REINDEX SCHEMA schema_to_reindex;
 CREATE TABLE reindex_after (oid oid, relname name, relfilenode relfilenode, relkind char);
 INSERT INTO reindex_after SELECT oid, relname, relfilenode, relkind
 	FROM pg_class
@@ -610,19 +581,13 @@ SELECT  b.relname,
         ELSE 'relfilenode has changed' END
   FROM reindex_before b JOIN pg_class a ON b.oid = a.oid
   ORDER BY 1;
-REINDEX SCHEMA schema_to_reindex;
 BEGIN;
-REINDEX SCHEMA schema_to_reindex; -- failure, cannot run in a transaction
 END;
 
 -- concurrently
-REINDEX SCHEMA CONCURRENTLY schema_to_reindex;
 
 -- Failure for unauthorized user
-REINDEX SCHEMA schema_to_reindex;
 -- Permission failures with toast tables and indexes (pg_proc here)
-REINDEX TABLE pg_toast.pg_toast_1255;
-REINDEX INDEX pg_toast.pg_toast_1255_index;
 
 -- Clean up
 DROP SCHEMA schema_to_reindex CASCADE;
