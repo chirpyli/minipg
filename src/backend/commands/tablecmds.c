@@ -301,8 +301,6 @@ static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static void ATExecEnableDisableRule(Relation rel, const char *rulename,
-									char fires_when, LOCKMODE lockmode);
 static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
 										  const char *column, Node *newValue, LOCKMODE lockmode);
 
@@ -1475,10 +1473,6 @@ AlterTableGetLockLevel(List *cmds)
 				 */
 			case AT_DropColumn: /* change visible to SELECT */
 			case AT_AddColumnToView:	/* CREATE VIEW */
-			case AT_EnableAlwaysRule:	/* may change SELECT rules */
-			case AT_EnableReplicaRule:	/* may change SELECT rules */
-			case AT_EnableRule: /* may change SELECT rules */
-			case AT_DisableRule:	/* may change SELECT rules */
 				cmd_lockmode = AccessExclusiveLock;
 				break;
 
@@ -1711,15 +1705,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATPrepAlterColumnType(tab, rel, cmd);
 			pass = AT_PASS_ALTER_TYPE;
 		break;
-		case AT_EnableRule:		/* ENABLE/DISABLE RULE variants */
-		case AT_EnableAlwaysRule:
-		case AT_EnableReplicaRule:
-		case AT_DisableRule:
-			ATSimplePermissions(rel, ATT_TABLE);
-			/* These commands never recurse */
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
 		default:				/* oops */
 			elog(ERROR, "unrecognized alter table type: %d",
 				 (int) cmd->subtype);
@@ -1889,22 +1874,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			/* parse transformation was done earlier */
 		ATExecAlterColumnType(tab, rel, cmd, lockmode);
 		break;
-		case AT_EnableRule:		/* ENABLE RULE name */
-			ATExecEnableDisableRule(rel, cmd->name,
-									RULE_FIRES_ON_ORIGIN, lockmode);
-			break;
-		case AT_EnableAlwaysRule:	/* ENABLE ALWAYS RULE name */
-			ATExecEnableDisableRule(rel, cmd->name,
-									RULE_FIRES_ALWAYS, lockmode);
-			break;
-		case AT_EnableReplicaRule:	/* ENABLE REPLICA RULE name */
-			ATExecEnableDisableRule(rel, cmd->name,
-									RULE_FIRES_ON_REPLICA, lockmode);
-			break;
-		case AT_DisableRule:	/* DISABLE RULE name */
-			ATExecEnableDisableRule(rel, cmd->name,
-									RULE_DISABLED, lockmode);
-			break;
 
 		default:				/* oops */
 			elog(ERROR, "unrecognized alter table type: %d",
@@ -4421,18 +4390,6 @@ TryReuseIndex(Oid oldId, IndexStmt *stmt)
 		}
 		index_close(irel, NoLock);
 	}
-}
-
-/*
- * ALTER TABLE ENABLE/DISABLE RULE
- *
- * We just pass this off to rewriteDefine.c.
- */
-static void
-ATExecEnableDisableRule(Relation rel, const char *rulename,
-						char fires_when, LOCKMODE lockmode)
-{
-	EnableDisableRule(rel, rulename, fires_when);
 }
 
 /*

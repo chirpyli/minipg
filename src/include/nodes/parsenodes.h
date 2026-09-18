@@ -1081,11 +1081,7 @@ typedef enum AlterTableType
 	AT_AddIndexConstraint,		/* add constraint using existing index */
 	AT_DropConstraint,			/* drop constraint */
 	AT_DropConstraintRecurse,	/* internal to commands/tablecmds.c */
-	AT_AlterColumnType,			/* alter column type */
-	AT_EnableRule,				/* ENABLE RULE name */
-	AT_EnableAlwaysRule,		/* ENABLE ALWAYS RULE name */
-	AT_EnableReplicaRule,		/* ENABLE REPLICA RULE name */
-	AT_DisableRule				/* DISABLE RULE name */
+	AT_AlterColumnType			/* alter column type */
 } AlterTableType;
 
 typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */

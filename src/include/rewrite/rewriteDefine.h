@@ -19,15 +19,10 @@
 #include "utils/relcache.h"
 
 #define RULE_FIRES_ON_ORIGIN	'O'
-#define RULE_FIRES_ALWAYS		'A'
-#define RULE_FIRES_ON_REPLICA	'R'
-#define RULE_DISABLED			'D'
 
 
 extern ObjectAddress DefineQueryRewrite(Oid event_relid, bool replace,
 										List *action);
 
-extern void EnableDisableRule(Relation rel, const char *rulename,
-							  char fires_when);
 
 #endif							/* REWRITEDEFINE_H */

@@ -450,7 +450,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCING
 	REFRESH REINDEX RELEASE RENAME REPEATABLE REPLACE REPLICA
 	RESET RESTART RESTRICT RIGHT ROLE ROLLBACK ROLLUP
-	ROWS RULE
+	ROWS
 
 	SAVEPOINT SCHEMA SCHEMAS SEARCH SECOND_P SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETS SETOF SHARE SHOW
@@ -1241,38 +1241,6 @@ alter_table_cmds:
 					n->missing_ok = false;
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> ENABLE RULE <rule> */
-			| ENABLE_P RULE name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableRule;
-					n->name = $3;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE ALWAYS RULE <rule> */
-			| ENABLE_P ALWAYS RULE name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableAlwaysRule;
-					n->name = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ENABLE REPLICA RULE <rule> */
-			| ENABLE_P REPLICA RULE name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_EnableReplicaRule;
-					n->name = $4;
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> DISABLE RULE <rule> */
-			| DISABLE_P RULE name
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_DisableRule;
-					n->name = $3;
-					$$ = (Node *)n;
-					}
 		;
 
 opt_drop_behavior:
@@ -5426,7 +5394,6 @@ unreserved_keyword:
 			| ROLLBACK
 			| ROLLUP
 			| ROWS
-			| RULE
 			| SAVEPOINT
 			| SCHEMA
 			| SCHEMAS
@@ -5897,7 +5864,6 @@ bare_label_keyword:
 			| ROLLBACK
 			| ROLLUP
 			| ROWS
-			| RULE
 			| SAVEPOINT
 			| SCHEMA
 			| SCHEMAS
