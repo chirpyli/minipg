@@ -1274,11 +1274,10 @@ addRangeTableEntry(ParseState *pstate,
 
 	/*
 	 * Identify the type of lock we'll need on this relation.  It's not the
-	 * query's target table (that case is handled elsewhere), so we need
-	 * either RowShareLock if it's locked by FOR UPDATE/SHARE, or plain
-	 * AccessShareLock otherwise.
+	 * query's target table (that case is handled elsewhere), so a plain
+	 * AccessShareLock will do.
 	 */
-	lockmode = isLockedRefname(pstate, refname) ? RowShareLock : AccessShareLock;
+	lockmode = AccessShareLock;
 
 	/*
 	 * Get the rel's OID.  This access also ensures that we have an up-to-date
@@ -2113,54 +2112,6 @@ addRangeTableEntryForENR(ParseState *pstate,
 									tupdesc);
 }
 
-
-/*
- * Has the specified refname been selected FOR UPDATE/FOR SHARE?
- *
- * This is used when we have not yet done transformLockingClause, but need
- * to know the correct lock to take during initial opening of relations.
- *
- * Note: we pay no attention to whether it's FOR UPDATE vs FOR SHARE,
- * since the table-level lock is the same either way.
- */
-bool
-isLockedRefname(ParseState *pstate, const char *refname)
-{
-	ListCell   *l;
-
-	/*
-	 * If we are in a subquery specified as locked FOR UPDATE/SHARE from
-	 * parent level, then act as though there's a generic FOR UPDATE here.
-	 */
-	if (pstate->p_locked_from_parent)
-		return true;
-
-	foreach(l, pstate->p_locking_clause)
-	{
-		LockingClause *lc = (LockingClause *) lfirst(l);
-
-		if (lc->lockedRels == NIL)
-		{
-			/* all tables used in query */
-			return true;
-		}
-		else
-		{
-			/* just the named tables */
-			ListCell   *l2;
-
-			foreach(l2, lc->lockedRels)
-			{
-				RangeVar   *thisrel = (RangeVar *) lfirst(l2);
-
-				if (strcmp(refname, thisrel->relname) == 0)
-					return true;
-			}
-		}
-	}
-	return false;
-}
-
 /*
  * Add the given nsitem/RTE as a top-level entry in the pstate's join list
  * and/or namespace list.  (We assume caller has checked for any
@@ -2982,26 +2933,6 @@ get_tle_by_resno(List *tlist, AttrNumber resno)
 
 		if (tle->resno == resno)
 			return tle;
-	}
-	return NULL;
-}
-
-/*
- * Given a Query and rangetable index, return relation's RowMarkClause if any
- *
- * Returns NULL if relation is not selected FOR UPDATE/SHARE
- */
-RowMarkClause *
-get_parse_rowmark(Query *qry, Index rtindex)
-{
-	ListCell   *l;
-
-	foreach(l, qry->rowMarks)
-	{
-		RowMarkClause *rc = (RowMarkClause *) lfirst(l);
-
-		if (rc->rti == rtindex)
-			return rc;
 	}
 	return NULL;
 }

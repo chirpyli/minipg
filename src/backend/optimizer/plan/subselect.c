@@ -799,12 +799,6 @@ hash_ok_operator(OpExpr *expr)
 
 
 /*
- * contain_dml: is any subquery not a plain SELECT?
- *
- * We reject SELECT FOR UPDATE/SHARE as well as INSERT etc.
- */
-
-/*
  * convert_ANY_sublink_to_join: try to convert an ANY SubLink to a join
  *
  * The caller has found an ANY SubLink at the top level of one of the query's
@@ -1105,17 +1099,15 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 {
 	/*
 	 * We don't try to simplify at all if the query uses set operations,
-	 * aggregates, grouping sets, SRFs, modifying CTEs, HAVING, or FOR
-	 * UPDATE/SHARE; none of these seem likely in normal usage and their
-	 * possible effects are complex.  (Note: we could ignore an "OFFSET 0"
-	 * clause, but that traditionally is used as an optimization fence, so we
-	 * don't.)
+	 * aggregates, grouping sets, SRFs, modifying CTEs, or HAVING; none of
+	 * these seem likely in normal usage and their possible effects are
+	 * complex.  (Note: we could ignore an "OFFSET 0" clause, but that
+	 * traditionally is used as an optimization fence, so we don't.)
 	 */
 	if (query->commandType != CMD_SELECT ||
 		query->hasAggs ||
 		query->hasTargetSRFs ||
-		query->havingQual ||
-		query->rowMarks)
+		query->havingQual)
 		return false;
 
 	/*
@@ -2078,15 +2070,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 							  &context);
 			break;
 
-
-		case T_LockRows:
-			/* Force descendant scan nodes to reference epqParam */
-			locally_added_param = ((LockRows *) plan)->epqParam;
-			valid_params = bms_add_member(bms_copy(valid_params),
-										  locally_added_param);
-			scan_params = bms_add_member(bms_copy(scan_params),
-										 locally_added_param);
-			break;
 
 		case T_Agg:
 			{

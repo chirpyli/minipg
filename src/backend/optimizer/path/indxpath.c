@@ -3052,9 +3052,9 @@ check_index_predicates(PlannerInfo *root, RelOptInfo *rel)
 	 * Normally we remove quals that are implied by a partial index's
 	 * predicate from indrestrictinfo, indicating that they need not be
 	 * checked explicitly by an indexscan plan using this index.  However, if
-	 * the rel is a target relation of UPDATE/DELETE/SELECT FOR UPDATE, we
-	 * cannot remove such quals from the plan, because they need to be in the
-	 * plan so that they will be properly rechecked by EvalPlanQual testing.
+	 * the rel is a target relation of UPDATE/DELETE, we cannot remove such
+	 * quals from the plan, because they need to be in the plan so that they
+	 * will be properly rechecked by EvalPlanQual testing.
 	 * Some day we might want to remove such quals from the main plan anyway
 	 * and pass them through to EvalPlanQual via a side channel; but for now,
 	 * we just don't remove implied quals at all for target relations.

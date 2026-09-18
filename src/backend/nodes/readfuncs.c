@@ -257,7 +257,6 @@ _readQuery(void)
 	READ_BOOL_FIELD(hasAggs);
 	READ_BOOL_FIELD(hasTargetSRFs);
 	READ_BOOL_FIELD(hasSubLinks);
-	READ_BOOL_FIELD(hasForUpdate);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
@@ -266,7 +265,6 @@ _readQuery(void)
 	READ_NODE_FIELD(havingQual);
 	READ_NODE_FIELD(distinctClause);
 	READ_NODE_FIELD(sortClause);
-	READ_NODE_FIELD(rowMarks);
 	READ_NODE_FIELD(constraintDeps);
 	READ_LOCATION_FIELD(stmt_location);
 	READ_INT_FIELD(stmt_len);
@@ -292,21 +290,7 @@ _readSortGroupClause(void)
 }
 
 
-/*
- * _readRowMarkClause
- */
-static RowMarkClause *
-_readRowMarkClause(void)
-{
-	READ_LOCALS(RowMarkClause);
 
-	READ_UINT_FIELD(rti);
-	READ_ENUM_FIELD(strength, LockClauseStrength);
-	READ_ENUM_FIELD(waitPolicy, LockWaitPolicy);
-	READ_BOOL_FIELD(pushedDown);
-
-	READ_DONE();
-}
 
 
 
@@ -1830,22 +1814,6 @@ _readHash(void)
 
 
 /*
- * _readLockRows
- */
-static LockRows *
-_readLockRows(void)
-{
-	READ_LOCALS(LockRows);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_NODE_FIELD(rowMarks);
-	READ_INT_FIELD(epqParam);
-
-	READ_DONE();
-}
-
-/*
  * _readNestLoopParam
  */
 static NestLoopParam *
@@ -1961,8 +1929,6 @@ parseNodeString(void)
 		return_value = _readQuery();
 	else if (MATCH("SORTGROUPCLAUSE", 15))
 		return_value = _readSortGroupClause();
-	else if (MATCH("ROWMARKCLAUSE", 13))
-		return_value = _readRowMarkClause();
 	else if (MATCH("ALIAS", 5))
 		return_value = _readAlias();
 	else if (MATCH("RANGEVAR", 8))
@@ -2117,8 +2083,6 @@ parseNodeString(void)
 		return_value = _readGatherMerge();
 	else if (MATCH("HASH", 4))
 		return_value = _readHash();
-	else if (MATCH("LOCKROWS", 8))
-		return_value = _readLockRows();
 	else if (MATCH("NESTLOOPPARAM", 13))
 		return_value = _readNestLoopParam();
 	else if (MATCH("PLANROWMARK", 11))

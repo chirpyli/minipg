@@ -1502,17 +1502,6 @@ typedef struct AggPath
 } AggPath;
 
 /*
- * LockRowsPath represents acquiring row locks for SELECT FOR UPDATE/SHARE
- */
-typedef struct LockRowsPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	List	   *rowMarks;		/* a list of PlanRowMark's */
-	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
-} LockRowsPath;
-
-/*
  * ModifyTablePath represents performing INSERT/UPDATE/DELETE modifications
  *
  * We represent most things that will be in the ModifyTable plan node

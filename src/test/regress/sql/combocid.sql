@@ -60,8 +60,6 @@ SELECT ctid,cmin,* FROM combocidtest;
 
 SAVEPOINT s1;
 
--- this doesn't affect cmin
-SELECT ctid,cmin,* FROM combocidtest FOR UPDATE;
 SELECT ctid,cmin,* FROM combocidtest;
 
 -- but this does
@@ -85,12 +83,12 @@ CREATE TABLE IF NOT EXISTS testcase(
 );
 INSERT INTO testcase VALUES (1, 0);
 BEGIN;
-SELECT * FROM testcase WHERE testcase.id = 1 FOR UPDATE;
+SELECT * FROM testcase WHERE testcase.id = 1;
 UPDATE testcase SET balance = balance + 400 WHERE id=1;
 SAVEPOINT subxact;
 UPDATE testcase SET balance = balance - 100 WHERE id=1;
 ROLLBACK TO SAVEPOINT subxact;
 -- should return one tuple
-SELECT * FROM testcase WHERE id = 1 FOR UPDATE;
+SELECT * FROM testcase WHERE id = 1;
 ROLLBACK;
 DROP TABLE testcase;

@@ -203,10 +203,6 @@ select * from onek2 where unique2 = 11 and stringu1 < 'B';
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
--- but if it's an update target, must retest anyway
-explain (costs off)
-select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
-select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
 -- partial index is not applicable
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'C';

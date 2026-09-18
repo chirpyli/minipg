@@ -9,11 +9,6 @@ SET transaction_read_only = off;
 begin transaction read write;
 commit;
 
--- SELECT
-
-select * from hs1 FOR SHARE;
-select * from hs1 FOR UPDATE;
-
 -- DML
 BEGIN;
 insert into hs1 values (37);

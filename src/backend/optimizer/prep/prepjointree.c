@@ -1099,12 +1099,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	parse->rtable = list_concat(parse->rtable, subquery->rtable);
 
 	/*
-	 * Pull up any FOR UPDATE/SHARE markers, too.  (OffsetVarNodes already
-	 * adjusted the marker rtindexes, so just concat the lists.)
-	 */
-	parse->rowMarks = list_concat(parse->rowMarks, subquery->rowMarks);
-
-	/*
 	 * We also have to fix the relid sets of any PlaceHolderVar nodes in the
 	 * parent query.  (This could perhaps be done by pullup_replace_vars(),
 	 * but it seems cleaner to use two passes.)  Note in particular that any
@@ -1201,20 +1195,13 @@ is_simple_subquery(PlannerInfo *root, Query *subquery, RangeTblEntry *rte,
 	/*
 	 * Can't pull up a subquery involving grouping, aggregation, SRFs,
 	 * sorting, limiting, or WITH.  (XXX WITH could possibly be allowed later)
-	 *
-	 * We also don't pull up a subquery that has explicit FOR UPDATE/SHARE
-	 * clauses, because pullup would cause the locking to occur semantically
-	 * higher than it should.  Implicit FOR UPDATE/SHARE is okay because in
-	 * that case the locking was originally declared in the upper query
-	 * anyway.
 	 */
 	if (subquery->hasAggs ||
 		subquery->hasTargetSRFs ||
 		subquery->groupClause ||
 		subquery->havingQual ||
 		subquery->sortClause ||
-		subquery->distinctClause ||
-		subquery->hasForUpdate)
+		subquery->distinctClause)
 		return false;
 
 	/*

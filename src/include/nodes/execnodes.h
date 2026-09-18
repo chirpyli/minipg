@@ -537,7 +537,7 @@ typedef struct ExecRowMark
 	Index		prti;			/* parent range table index, if child */
 	Index		rowmarkId;		/* unique identifier for resjunk columns */
 	RowMarkType markType;		/* see enum in nodes/plannodes.h */
-	LockClauseStrength strength;	/* LockingClause's strength, or LCS_NONE */
+	LockClauseStrength strength;	/* lock strength, or LCS_NONE */
 	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
 	bool		ermActive;		/* is this mark relevant for current tuple? */
 	ItemPointerData curCtid;	/* ctid of currently locked tuple, if any */
@@ -548,8 +548,8 @@ typedef struct ExecRowMark
  * ExecAuxRowMark -
  *	   additional runtime representation of FOR [KEY] UPDATE/SHARE clauses
  *
- * Each LockRows and ModifyTable node keeps a list of the rowmarks it needs to
- * deal with.  In addition to a pointer to the related entry in es_rowmarks,
+ * Each ModifyTable node keeps a list of the rowmarks it needs to deal with.
+ * In addition to a pointer to the related entry in es_rowmarks,
  * this struct carries the column number(s) of the resjunk columns associated
  * with the rowmark (see comments for PlanRowMark for more detail).
  */
@@ -901,8 +901,8 @@ typedef struct PlanState
 	} while(0)
 
 /*
- * EPQState is state for executing an EvalPlanQual recheck on a candidate
- * tuples e.g. in ModifyTable or LockRows.
+ * EPQState is state for executing an EvalPlanQual recheck on candidate
+ * tuples e.g. in ModifyTable.
  *
  * To execute EPQ a separate EState is created (stored in ->recheckestate),
  * which shares some resources, like the rangetable, with the main query's
@@ -2151,18 +2151,5 @@ typedef struct HashState
 	/* Parallel hash state. */
 	struct ParallelHashJoinState *parallel_state;
 } HashState;
-
-/* ----------------
- *	 LockRowsState information
- *
- *		LockRows nodes are used to enforce FOR [KEY] UPDATE/SHARE locking.
- * ----------------
- */
-typedef struct LockRowsState
-{
-	PlanState	ps;				/* its first field is NodeTag */
-	List	   *lr_arowMarks;	/* List of ExecAuxRowMarks */
-	EPQState	lr_epqstate;	/* for evaluating EvalPlanQual rechecks */
-} LockRowsState;
 
 #endif							/* EXECNODES_H */

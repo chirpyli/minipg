@@ -803,31 +803,13 @@ typedef struct Hash
 	double		rows_total;		/* estimate total rows if parallel_aware */
 } Hash;
 
-/* ----------------
- *		lock-rows node
- *
- * rowMarks identifies the rels to be locked by this node; it should be
- * a subset of the rowMarks listed in the top-level PlannedStmt.
- * epqParam is a Param that all scan nodes below this one must depend on.
- * It is used to force re-evaluation of the plan during EvalPlanQual.
- * ----------------
- */
-typedef struct LockRows
-{
-	Plan		plan;
-	List	   *rowMarks;		/* a list of PlanRowMark's */
-	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
-} LockRows;
-
-
 /*
  * RowMarkType -
  *	  enums for types of row-marking operations
  *
  * The first four of these values represent different lock strengths that
- * we can take on tuples according to SELECT FOR [KEY] UPDATE/SHARE requests.
- * We support these on regular tables, as well as on foreign tables whose FDWs
- * report support for late locking.  For other foreign tables, any locking
+ * we can take on tuples.  We support these on regular tables, as well as on
+ * foreign tables whose FDWs report support for late locking.  For other foreign tables, any locking
  * that might be done for such requests must happen during the initial row
  * fetch; their FDWs provide no mechanism for going back to lock a row later.
  * This means that the semantics will be a bit different than for a local
@@ -837,9 +819,9 @@ typedef struct LockRows
  * doing a separate remote query to lock each selected row is usually pretty
  * unappealing, so early locking remains a credible design choice for FDWs.
  *
- * When doing UPDATE, DELETE, or SELECT FOR UPDATE/SHARE, we have to uniquely
- * identify all the source rows, not only those from the target relations, so
- * that we can perform EvalPlanQual rechecking at need.  For plain tables we
+ * When doing UPDATE or DELETE, we have to uniquely identify all the source
+ * rows, not only those from the target relations, so that we can perform
+ * EvalPlanQual rechecking at need.  For plain tables we
  * can just fetch the TID, much as for a target relation; this case is
  * represented by ROW_MARK_REFERENCE.  Otherwise (for example for VALUES or
  * FUNCTION scans) we have to copy the whole row value.  ROW_MARK_COPY is
@@ -864,12 +846,12 @@ typedef enum RowMarkType
 
 /*
  * PlanRowMark -
- *	   plan-time representation of FOR [KEY] UPDATE/SHARE clauses
+ *	   plan-time representation of row-marking requirements
  *
- * When doing UPDATE, DELETE, or SELECT FOR UPDATE/SHARE, we create a separate
- * PlanRowMark node for each non-target relation in the query.  Relations that
- * are not specified as FOR UPDATE/SHARE are marked ROW_MARK_REFERENCE (if
- * regular tables or supported foreign tables) or ROW_MARK_COPY (if not).
+ * When doing UPDATE or DELETE, we create a separate PlanRowMark node for each
+ * non-target relation in the query.  Relations that don't need locking are
+ * marked ROW_MARK_REFERENCE (if regular tables or supported foreign tables)
+ * or ROW_MARK_COPY (if not).
  *
  * Initially all PlanRowMarks have rti == prti and isParent == false.
  * When the planner discovers that a relation is the root of an inheritance
@@ -908,7 +890,7 @@ typedef struct PlanRowMark
 	Index		rowmarkId;		/* unique identifier for resjunk columns */
 	RowMarkType markType;		/* see enum above */
 	int			allMarkTypes;	/* OR of (1<<markType) for all children */
-	LockClauseStrength strength;	/* LockingClause's strength, or LCS_NONE */
+	LockClauseStrength strength;	/* lock strength, or LCS_NONE */
 	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED options */
 	bool		isParent;		/* true if this is a "dummy" parent entry */
 } PlanRowMark;

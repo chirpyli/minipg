@@ -77,9 +77,6 @@ static TargetEntry *process_matched_tle(TargetEntry *src_tle,
 									TargetEntry *prior_tle,
 									const char *attrName);
 static Node *get_assignment_input(Node *node);
-static void markQueryForLocking(Query *qry, Node *jtnode,
-								LockClauseStrength strength, LockWaitPolicy waitPolicy,
-								bool pushedDown);
 static List *matchLocks(CmdType event, RuleLock *rulelocks,
 						int varno, Query *parsetree, bool *hasUpdate);
 static Query *fireRIRrules(Query *parsetree, List *activeRIRs);
@@ -102,12 +99,6 @@ static Bitmapset *adjust_view_column_set(Bitmapset *cols, List *targetlist);
  * If forExecute is false, AccessShareLock is acquired on all relations.
  * This case is suitable for ruleutils.c, for example, where we only need
  * schema stability and we don't intend to actually modify any relations.
- *
- * forUpdatePushedDown indicates that a pushed-down FOR [KEY] UPDATE/SHARE
- * applies to the current subquery, requiring all rels to be opened with at
- * least RowShareLock.  This should always be false at the top of the
- * recursion.  When it is true, we adjust RTE rellockmode fields to reflect
- * the higher lock level.  This flag is ignored if forExecute is false.
  *
  * A secondary purpose of this routine is to fix up JOIN RTE references to
  * dropped columns (see details below).  Such RTEs are modified in-place.
@@ -133,8 +124,7 @@ static Bitmapset *adjust_view_column_set(Bitmapset *cols, List *targetlist);
  */
 void
 AcquireRewriteLocks(Query *parsetree,
-					bool forExecute,
-					bool forUpdatePushedDown)
+					bool forExecute)
 {
 	ListCell   *l;
 	int			rt_index;
@@ -172,13 +162,6 @@ AcquireRewriteLocks(Query *parsetree,
 				 */
 				if (!forExecute)
 					lockmode = AccessShareLock;
-				else if (forUpdatePushedDown)
-				{
-					/* Upgrade RTE's lock mode to reflect pushed-down lock */
-					if (rte->rellockmode == AccessShareLock)
-						rte->rellockmode = RowShareLock;
-					lockmode = rte->rellockmode;
-				}
 				else
 					lockmode = rte->rellockmode;
 
@@ -261,10 +244,7 @@ AcquireRewriteLocks(Query *parsetree,
 				 * The subquery RTE itself is all right, but we have to
 				 * recurse to process the represented subquery.
 				 */
-				AcquireRewriteLocks(rte->subquery,
-									forExecute,
-									(forUpdatePushedDown ||
-									 get_parse_rowmark(parsetree, rt_index) != NULL));
+				AcquireRewriteLocks(rte->subquery, forExecute);
 				break;
 
 			default:
@@ -296,8 +276,7 @@ acquireLocksOnSubLinks(Node *node, acquireLocksOnSubLinks_context *context)
 
 		/* Do what we came for */
 		AcquireRewriteLocks((Query *) sub->subselect,
-							context->for_execute,
-							false);
+							context->for_execute);
 		/* Fall through to process lefthand args of SubLink */
 	}
 
@@ -350,7 +329,7 @@ rewriteRuleAction(Query *parsetree,
 	/*
 	 * Acquire necessary locks and fix any deleted JOIN RTE entries.
 	 */
-	AcquireRewriteLocks(rule_action, true, false);
+	AcquireRewriteLocks(rule_action, true);
 	(void) acquireLocksOnSubLinks(rule_qual, &context);
 
 	current_varno = rt_index;
@@ -926,7 +905,6 @@ ApplyRetrieveRule(Query *parsetree,
 	Query	   *rule_action;
 	RangeTblEntry *rte,
 			   *subrte;
-	RowMarkClause *rc;
 	int			numCols;
 
 	if (list_length(rule->actions) != 1)
@@ -1002,40 +980,15 @@ ApplyRetrieveRule(Query *parsetree,
 	}
 
 	/*
-	 * Check if there's a FOR [KEY] UPDATE/SHARE clause applying to this view.
-	 *
-	 * Note: we needn't explicitly consider any such clauses appearing in
-	 * ancestor query levels; their effects have already been pushed down to
-	 * here by markQueryForLocking, and will be reflected in "rc".
-	 */
-	rc = get_parse_rowmark(parsetree, rt_index);
-
-	/*
 	 * Make a modifiable copy of the view query, and acquire needed locks on
-	 * the relations it mentions.  Force at least RowShareLock for all such
-	 * rels if there's a FOR [KEY] UPDATE/SHARE clause affecting this view.
+	 * the relations it mentions.
 	 */
 	rule_action = copyObject(linitial(rule->actions));
 
-	AcquireRewriteLocks(rule_action, true, (rc != NULL));
-
-	/*
-	 * If FOR [KEY] UPDATE/SHARE of view, mark all the contained tables as
-	 * implicit FOR [KEY] UPDATE/SHARE, the same as the parser would have done
-	 * if the view's subquery had been written out explicitly.
-	 */
-	if (rc != NULL)
-		markQueryForLocking(rule_action, (Node *) rule_action->jointree,
-							rc->strength, rc->waitPolicy, true);
+	AcquireRewriteLocks(rule_action, true);
 
 	/*
 	 * Recursively expand any view references inside the view.
-	 *
-	 * Note: this must happen after markQueryForLocking.  That way, any UPDATE
-	 * permission bits needed for sub-views are initially applied to their
-	 * RTE_RELATION RTEs by markQueryForLocking, and then transferred to their
-	 * OLD rangetable entries by the action below (in a recursive call of this
-	 * routine).
 	 */
 	rule_action = fireRIRrules(rule_action, activeRIRs);
 
@@ -1089,62 +1042,6 @@ ApplyRetrieveRule(Query *parsetree,
 	}
 
 	return parsetree;
-}
-
-/*
- * Recursively mark all relations used by a view as FOR [KEY] UPDATE/SHARE.
- *
- * This may generate an invalid query, eg if some sub-query uses an
- * aggregate.  We leave it to the planner to detect that.
- *
- * NB: this must agree with the parser's transformLockingClause() routine.
- * However, unlike the parser we have to be careful not to mark a view's
- * OLD and NEW rels for updating.  The best way to handle that seems to be
- * to scan the jointree to determine which rels are used.
- */
-static void
-markQueryForLocking(Query *qry, Node *jtnode,
-					LockClauseStrength strength, LockWaitPolicy waitPolicy,
-					bool pushedDown)
-{
-	if (jtnode == NULL)
-		return;
-	if (IsA(jtnode, RangeTblRef))
-	{
-		int			rti = ((RangeTblRef *) jtnode)->rtindex;
-		RangeTblEntry *rte = rt_fetch(rti, qry->rtable);
-
-		if (rte->rtekind == RTE_RELATION)
-		{
-			applyLockingClause(qry, rti, strength, waitPolicy, pushedDown);
-		}
-		else if (rte->rtekind == RTE_SUBQUERY)
-		{
-			applyLockingClause(qry, rti, strength, waitPolicy, pushedDown);
-			/* FOR UPDATE/SHARE of subquery is propagated to subquery's rels */
-			markQueryForLocking(rte->subquery, (Node *) rte->subquery->jointree,
-								strength, waitPolicy, true);
-		}
-		/* other RTE types are unaffected by FOR UPDATE */
-	}
-	else if (IsA(jtnode, FromExpr))
-	{
-		FromExpr   *f = (FromExpr *) jtnode;
-		ListCell   *l;
-
-		foreach(l, f->fromlist)
-			markQueryForLocking(qry, lfirst(l), strength, waitPolicy, pushedDown);
-	}
-	else if (IsA(jtnode, JoinExpr))
-	{
-		JoinExpr   *j = (JoinExpr *) jtnode;
-
-		markQueryForLocking(qry, j->larg, strength, waitPolicy, pushedDown);
-		markQueryForLocking(qry, j->rarg, strength, waitPolicy, pushedDown);
-	}
-	else
-		elog(ERROR, "unrecognized node type: %d",
-			 (int) nodeTag(jtnode));
 }
 
 

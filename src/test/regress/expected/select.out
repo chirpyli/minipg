@@ -768,22 +768,6 @@ select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
       11
 (1 row)
 
--- but if it's an update target, must retest anyway
-explain (costs off)
-select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
-                         QUERY PLAN                          
--------------------------------------------------------------
- LockRows
-   ->  Seq Scan on onek2
-         Filter: ((stringu1 < 'B'::name) AND (unique2 = 11))
-(3 rows)
-
-select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
- unique2 
----------
-      11
-(1 row)
-
 -- partial index is not applicable
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'C';

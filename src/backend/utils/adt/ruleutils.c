@@ -3114,7 +3114,7 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		query = getInsertSelectQuery(query, NULL);
 
 		/* Must acquire locks right away; see notes in get_query_def() */
-		AcquireRewriteLocks(query, false, false);
+		AcquireRewriteLocks(query, false);
 
 		context.buf = buf;
 		context.namespaces = list_make1(&dpns);
@@ -3280,7 +3280,7 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 	 * We are only deparsing the query (we are not about to execute it), so we
 	 * only need AccessShareLock on the relations it mentions.
 	 */
-	AcquireRewriteLocks(query, false, false);
+	AcquireRewriteLocks(query, false);
 
 	context.buf = buf;
 	context.namespaces = lcons(&dpns, list_copy(parentnamespace));
@@ -3393,51 +3393,6 @@ get_select_query_def(Query *query, deparse_context *context,
 						 force_colno, context);
 	}
 
-	/* Add FOR [KEY] UPDATE/SHARE clauses if present */
-	if (query->hasForUpdate)
-	{
-		foreach(l, query->rowMarks)
-		{
-			RowMarkClause *rc = (RowMarkClause *) lfirst(l);
-
-			/* don't print implicit clauses */
-			if (rc->pushedDown)
-				continue;
-
-			switch (rc->strength)
-			{
-				case LCS_NONE:
-					/* we intentionally throw an error for LCS_NONE */
-					elog(ERROR, "unrecognized LockClauseStrength %d",
-						 (int) rc->strength);
-					break;
-				case LCS_FORKEYSHARE:
-					appendContextKeyword(context, " FOR KEY SHARE",
-										 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-					break;
-				case LCS_FORSHARE:
-					appendContextKeyword(context, " FOR SHARE",
-										 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-					break;
-				case LCS_FORNOKEYUPDATE:
-					appendContextKeyword(context, " FOR NO KEY UPDATE",
-										 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-					break;
-				case LCS_FORUPDATE:
-					appendContextKeyword(context, " FOR UPDATE",
-										 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-					break;
-			}
-
-			appendStringInfo(buf, " OF %s",
-							 quote_identifier(get_rtable_name(rc->rti,
-															  context)));
-			if (rc->waitPolicy == LockWaitError)
-				appendStringInfoString(buf, " NOWAIT");
-			else if (rc->waitPolicy == LockWaitSkip)
-				appendStringInfoString(buf, " SKIP LOCKED");
-		}
-	}
 
 }
 

@@ -84,7 +84,6 @@ extern ParseNamespaceItem *addRangeTableEntryForJoin(ParseState *pstate,
 extern ParseNamespaceItem *addRangeTableEntryForENR(ParseState *pstate,
 													RangeVar *rv,
 													bool inFromCl);
-extern bool isLockedRefname(ParseState *pstate, const char *refname);
 extern void addNSItemToQuery(ParseState *pstate, ParseNamespaceItem *nsitem,
 							 bool addToJoinList,
 							 bool addToRelNameSpace, bool addToVarNameSpace);

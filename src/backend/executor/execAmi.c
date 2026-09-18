@@ -30,7 +30,6 @@
 #include "executor/nodeIncrementalSort.h"
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
-#include "executor/nodeLockRows.h"
 #include "executor/nodeMaterial.h"
 #include "executor/nodeMemoize.h"
 #include "executor/nodeMergeAppend.h"
@@ -251,10 +250,6 @@ ExecReScan(PlanState *node)
 
 		case T_HashState:
 			ExecReScanHash((HashState *) node);
-			break;
-
-		case T_LockRowsState:
-			ExecReScanLockRows((LockRowsState *) node);
 			break;
 
 		default:
@@ -519,9 +514,6 @@ ExecSupportsBackwardScan(Plan *node)
 			 * tuples in memory, so it can't scan backwards.
 			 */
 			return false;
-
-		case T_LockRows:
-			return ExecSupportsBackwardScan(outerPlan(node));
 
 		default:
 			return false;

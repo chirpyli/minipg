@@ -105,8 +105,6 @@ static Group *create_group_plan(PlannerInfo *root, GroupPath *best_path);
 static Unique *create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best_path,
 										int flags);
 static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
-static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
-									  int flags);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
 static SeqScan *create_seqscan_plan(PlannerInfo *root, Path *best_path,
 									List *tlist, List *scan_clauses);
@@ -252,7 +250,6 @@ static Unique *make_unique_from_pathkeys(Plan *lefttree,
 										 List *pathkeys, int numCols);
 static Gather *make_gather(List *qptlist, List *qpqual,
 						   int nworkers, int rescan_param, bool single_copy, Plan *subplan);
-static LockRows *make_lockrows(Plan *lefttree, List *rowMarks, int epqParam);
 static Result *make_result(List *tlist, Node *resconstantqual, Plan *subplan);
 static ProjectSet *make_project_set(List *tlist, Plan *subplan);
 static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
@@ -440,11 +437,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			Assert(IsA(best_path, AggPath));
 			plan = (Plan *) create_agg_plan(root,
 											(AggPath *) best_path);
-			break;
-		case T_LockRows:
-			plan = (Plan *) create_lockrows_plan(root,
-												 (LockRowsPath *) best_path,
-												 flags);
 			break;
 		case T_ModifyTable:
 			plan = (Plan *) create_modifytable_plan(root,
@@ -2044,29 +2036,6 @@ create_agg_plan(PlannerInfo *root, AggPath *best_path)
 	return plan;
 }
 
-
-/*
- * create_lockrows_plan
- *
- *	  Create a LockRows plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static LockRows *
-create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
-					 int flags)
-{
-	LockRows   *plan;
-	Plan	   *subplan;
-
-	/* LockRows doesn't project, so tlist requirements pass through */
-	subplan = create_plan_recurse(root, best_path->subpath, flags);
-
-	plan = make_lockrows(subplan, best_path->rowMarks, best_path->epqParam);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
 
 /*
  * create_modifytable_plan
@@ -5359,27 +5328,6 @@ make_gather(List *qptlist,
 
 
 /*
- * make_lockrows
- *	  Build a LockRows plan node
- */
-static LockRows *
-make_lockrows(Plan *lefttree, List *rowMarks, int epqParam)
-{
-	LockRows   *node = makeNode(LockRows);
-	Plan	   *plan = &node->plan;
-
-	plan->targetlist = lefttree->targetlist;
-	plan->qual = NIL;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-
-	node->rowMarks = rowMarks;
-	node->epqParam = epqParam;
-
-	return node;
-}
-
-/*
  * make_result
  *	  Build a Result plan node
  */
@@ -5471,7 +5419,6 @@ is_projection_capable_path(Path *path)
 		case T_Sort:
 		case T_IncrementalSort:
 		case T_Unique:
-		case T_LockRows:
 		case T_ModifyTable:
 		case T_MergeAppend:
 			return false;
@@ -5513,7 +5460,6 @@ is_projection_capable_plan(Plan *plan)
 		case T_Memoize:
 		case T_Sort:
 		case T_Unique:
-		case T_LockRows:
 		case T_ModifyTable:
 		case T_Append:
 		case T_MergeAppend:

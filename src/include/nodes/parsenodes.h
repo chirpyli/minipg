@@ -121,7 +121,6 @@ typedef struct Query
 	bool		hasAggs;		/* has aggregates in tlist or havingQual */
 	bool		hasTargetSRFs;	/* has set-returning functions in tlist */
 	bool		hasSubLinks;	/* has subquery SubLink */
-	bool		hasForUpdate;	/* FOR [KEY] UPDATE/SHARE was specified */
 
 	List	   *rtable;			/* list of range table entries */
 	FromExpr   *jointree;		/* table join tree (FROM and WHERE clauses) */
@@ -136,8 +135,6 @@ typedef struct Query
 	List	   *distinctClause; /* a list of SortGroupClause's */
 
 	List	   *sortClause;		/* a list of SortGroupClause's */
-
-	List	   *rowMarks;		/* a list of RowMarkClause's */
 
 	List	   *constraintDeps; /* a list of pg_constraint OIDs that the query
 								 * depends on to be semantically valid */
@@ -522,23 +519,6 @@ typedef struct DefElem
 	int			location;		/* token location, or -1 if unknown */
 } DefElem;
 
-/*
- * LockingClause - raw representation of FOR [NO KEY] UPDATE/[KEY] SHARE
- *		options
- *
- * Note: lockedRels == NIL means "all relations in query".  Otherwise it
- * is a list of RangeVar nodes.  (We use RangeVar mainly because it carries
- * a location field --- currently, parse analysis insists on unqualified
- * names in LockingClause.)
- */
-typedef struct LockingClause
-{
-	NodeTag		type;
-	List	   *lockedRels;		/* FOR [KEY] UPDATE/SHARE relations */
-	LockClauseStrength strength;
-	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
-} LockingClause;
-
 /****************************************************************************
  *	Nodes for a Query tree
  ****************************************************************************/
@@ -592,9 +572,9 @@ typedef struct LockingClause
  *	  inFromCl marks those range variables that are listed in the FROM clause.
  *	  It's false for RTEs that are added to a query behind the scenes, such
  *	  as the NEW and OLD variables for a rule, or the subqueries of a UNION.
- *	  This flag is not used during parsing (except in transformLockingClause,
- *	  q.v.); the parser now uses a separate "namespace" data structure to
- *	  control visibility.  But it is needed by ruleutils.c to determine
+ *	  This flag is not used during parsing; the parser uses a separate
+ *	  "namespace" data structure to control visibility.  But it is needed
+ *	  by ruleutils.c to determine
  *	  whether RTEs should be shown in decompiled queries.
  *
  *	  For SELECT/INSERT/UPDATE permissions, if the user doesn't have
@@ -655,8 +635,7 @@ typedef struct RangeTblEntry
 	 *
 	 * rellockmode is really LOCKMODE, but it's declared int to avoid having
 	 * to include lock-related headers here.  It must be RowExclusiveLock if
-	 * the RTE is an INSERT/UPDATE/DELETE target, else RowShareLock if the RTE
-	 * is a SELECT FOR UPDATE/FOR SHARE target, else AccessShareLock.
+	 * the RTE is an INSERT/UPDATE/DELETE target, else AccessShareLock.
 	 *
 	 * Note: in some cases, rule expansion may result in RTEs that are marked
 	 * with RowExclusiveLock even though they are not the target of the
@@ -887,27 +866,6 @@ typedef struct SortGroupClause
 	bool		hashable;		/* can eqop be implemented by hashing? */
 } SortGroupClause;
 
-/*
- * RowMarkClause -
- *	   parser output representation of FOR [KEY] UPDATE/SHARE clauses
- *
- * Query.rowMarks contains a separate RowMarkClause node for each relation
- * identified as a FOR [KEY] UPDATE/SHARE target.  If one of these clauses
- * is applied to a subquery, we generate RowMarkClauses for all normal and
- * subquery rels in the subquery, but they are marked pushedDown = true to
- * distinguish them from clauses that were explicitly written at this query
- * level.  Also, Query.hasForUpdate tells whether there were explicit FOR
- * UPDATE/SHARE/KEY SHARE clauses in the current query level.
- */
-typedef struct RowMarkClause
-{
-	NodeTag		type;
-	Index		rti;			/* range table index of target relation */
-	LockClauseStrength strength;
-	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
-	bool		pushedDown;		/* pushed down from higher query level? */
-} RowMarkClause;
-
 /*****************************************************************************
  *		Raw Grammar Output Statements
  *****************************************************************************/
@@ -1015,7 +973,6 @@ typedef struct SelectStmt
 	 * SelectStmts.
 	 */
 	List	   *sortClause;		/* sort clause (a list of SortBy's) */
-	List	   *lockingClause;	/* FOR UPDATE (list of LockingClause's) */
 
 	/* Eventually add fields for CORRESPONDING spec here */
 } SelectStmt;

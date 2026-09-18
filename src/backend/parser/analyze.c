@@ -65,8 +65,6 @@ static List *transformUpdateTargetList(ParseState *pstate,
 									   List *targetList);
 static Query *transformExplainStmt(ParseState *pstate,
 								   ExplainStmt *stmt);
-static void transformLockingClause(ParseState *pstate, Query *qry,
-								   LockingClause *lc, bool pushedDown);
 
 
 /*
@@ -116,13 +114,11 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
  */
 Query *
 parse_sub_analyze(Node *parseTree, ParseState *parentParseState,
-				  bool locked_from_parent,
 				  bool resolve_unknowns)
 {
 	ParseState *pstate = make_parsestate(parentParseState);
 	Query	   *query;
 
-	pstate->p_locked_from_parent = locked_from_parent;
 	pstate->p_resolve_unknowns = resolve_unknowns;
 
 	query = transformStmt(pstate, parseTree);
@@ -380,13 +376,12 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * VALUES list, or general SELECT input.  We special-case VALUES, both for
 	 * efficiency and so we can handle DEFAULT specifications.
 	 *
-	 * The grammar allows attaching ORDER BY, FOR UPDATE, or WITH to a
-	 * VALUES clause.  If we have any of those, treat it as a general SELECT;
-	 * so it will work, but you can't use DEFAULT items together with those.
+	 * The grammar allows attaching ORDER BY or WITH to a VALUES clause.  If
+	 * we have any of those, treat it as a general SELECT; so it will work,
+	 * but you can't use DEFAULT items together with those.
 	 */
 	isGeneralSelect = (selectStmt && (selectStmt->valuesLists == NIL ||
-									  selectStmt->sortClause != NIL ||
-									  selectStmt->lockingClause != NIL));
+									  selectStmt->sortClause != NIL));
 
 	/*
 	 * If a non-nil rangetable/namespace was passed in, and we are doing
@@ -829,9 +824,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	qry->commandType = CMD_SELECT;
 
-	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
-	pstate->p_locking_clause = stmt->lockingClause;
-
 	/* process the FROM clause */
 	transformFromClause(pstate, stmt->fromClause);
 
@@ -893,12 +885,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	qry->hasSubLinks = pstate->p_hasSubLinks;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
 	qry->hasAggs = pstate->p_hasAggs;
-
-	foreach(l, stmt->lockingClause)
-	{
-		transformLockingClause(pstate, qry,
-							   (LockingClause *) lfirst(l), false);
-	}
 
 	assign_query_collations(pstate, qry);
 
@@ -1076,23 +1062,13 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	qry->targetList = expandNSItemAttrs(pstate, nsitem, 0, -1);
 
 	/*
-	 * The grammar allows attaching ORDER BY, LIMIT, and FOR UPDATE to a
-	 * VALUES, so cope.
+	 * The grammar allows attaching ORDER BY and LIMIT to a VALUES, so cope.
 	 */
 	qry->sortClause = transformSortClause(pstate,
 										  stmt->sortClause,
 										  &qry->targetList,
 										  EXPR_KIND_ORDER_BY,
 										  false /* allow SQL92 rules */ );
-
-	if (stmt->lockingClause)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s cannot be applied to VALUES",
-						LCS_asString(((LockingClause *)
-									  linitial(stmt->lockingClause))->strength))));
 
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
@@ -1253,320 +1229,4 @@ transformExplainStmt(ParseState *pstate, ExplainStmt *stmt)
 	result->utilityStmt = (Node *) stmt;
 
 	return result;
-}
-
-
-/*
- * Produce a string representation of a LockClauseStrength value.
- * This should only be applied to valid values (not LCS_NONE).
- */
-const char *
-LCS_asString(LockClauseStrength strength)
-{
-	switch (strength)
-	{
-		case LCS_NONE:
-			Assert(false);
-			break;
-		case LCS_FORKEYSHARE:
-			return "FOR KEY SHARE";
-		case LCS_FORSHARE:
-			return "FOR SHARE";
-		case LCS_FORNOKEYUPDATE:
-			return "FOR NO KEY UPDATE";
-		case LCS_FORUPDATE:
-			return "FOR UPDATE";
-	}
-	return "FOR some";			/* shouldn't happen */
-}
-
-/*
- * Check for features that are not supported with FOR [KEY] UPDATE/SHARE.
- *
- * exported so planner can check again after rewriting, query pullup, etc
- */
-void
-CheckSelectLocking(Query *qry, LockClauseStrength strength)
-{
-	Assert(strength != LCS_NONE);	/* else caller error */
-
-	if (qry->distinctClause != NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with DISTINCT clause",
-						LCS_asString(strength))));
-	if (qry->groupClause != NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with GROUP BY clause",
-						LCS_asString(strength))));
-	if (qry->havingQual != NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with HAVING clause",
-						LCS_asString(strength))));
-	if (qry->hasAggs)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with aggregate functions",
-						LCS_asString(strength))));
-	if (qry->hasTargetSRFs)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		/*------
-		  translator: %s is a SQL row locking clause such as FOR UPDATE */
-				 errmsg("%s is not allowed with set-returning functions in the target list",
-						LCS_asString(strength))));
-}
-
-/*
- * Transform a FOR [KEY] UPDATE/SHARE clause
- *
- * This basically involves replacing names by integer relids.
- *
- * NB: if you need to change this, see also markQueryForLocking()
- * in rewriteHandler.c, and isLockedRefname() in parse_relation.c.
- */
-static void
-transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
-					   bool pushedDown)
-{
-	List	   *lockedRels = lc->lockedRels;
-	ListCell   *l;
-	ListCell   *rt;
-	Index		i;
-	LockingClause *allrels;
-
-	CheckSelectLocking(qry, lc->strength);
-
-	/* make a clause we can pass down to subqueries to select all rels */
-	allrels = makeNode(LockingClause);
-	allrels->lockedRels = NIL;	/* indicates all rels */
-	allrels->strength = lc->strength;
-	allrels->waitPolicy = lc->waitPolicy;
-
-	if (lockedRels == NIL)
-	{
-		/*
-		 * Lock all regular tables used in query and its subqueries.  We
-		 * examine inFromCl to exclude auto-added RTEs, particularly NEW/OLD
-		 * in rules.  This is a bit of an abuse of a mostly-obsolete flag, but
-		 * it's convenient.  We can't rely on the namespace mechanism that has
-		 * largely replaced inFromCl, since for example we need to lock
-		 * base-relation RTEs even if they are masked by upper joins.
-		 */
-		i = 0;
-		foreach(rt, qry->rtable)
-		{
-			RangeTblEntry *rte = (RangeTblEntry *) lfirst(rt);
-
-			++i;
-			if (!rte->inFromCl)
-				continue;
-			switch (rte->rtekind)
-			{
-				case RTE_RELATION:
-					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
-									   pushedDown);
-					break;
-				case RTE_SUBQUERY:
-					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
-									   pushedDown);
-
-					/*
-					 * FOR UPDATE/SHARE of subquery is propagated to all of
-					 * subquery's rels, too.  We could do this later (based on
-					 * the marking of the subquery RTE) but it is convenient
-					 * to have local knowledge in each query level about which
-					 * rels need to be opened with RowShareLock.
-					 */
-					transformLockingClause(pstate, rte->subquery,
-										   allrels, true);
-					break;
-				default:
-					/* ignore JOIN, SPECIAL, FUNCTION, VALUES, CTE RTEs */
-					break;
-			}
-		}
-	}
-	else
-	{
-		/*
-		 * Lock just the named tables.  As above, we allow locking any base
-		 * relation regardless of alias-visibility rules, so we need to
-		 * examine inFromCl to exclude OLD/NEW.
-		 */
-		foreach(l, lockedRels)
-		{
-			RangeVar   *thisrel = (RangeVar *) lfirst(l);
-
-			/* For simplicity we insist on unqualified alias names here */
-			if (thisrel->catalogname || thisrel->schemaname)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-				/*------
-				  translator: %s is a SQL row locking clause such as FOR UPDATE */
-						 errmsg("%s must specify unqualified relation names",
-								LCS_asString(lc->strength)),
-						 parser_errposition(pstate, thisrel->location)));
-
-			i = 0;
-			foreach(rt, qry->rtable)
-			{
-				RangeTblEntry *rte = (RangeTblEntry *) lfirst(rt);
-				char	   *rtename;
-
-				++i;
-				if (!rte->inFromCl)
-					continue;
-
-				/*
-				 * A join RTE without an alias is not visible as a relation
-				 * name and needs to be skipped (otherwise it might hide a
-				 * base relation with the same name), except if it has a USING
-				 * alias, which *is* visible.
-				 */
-				if (rte->rtekind == RTE_JOIN && rte->alias == NULL)
-				{
-					if (rte->join_using_alias == NULL)
-						continue;
-					rtename = rte->join_using_alias->aliasname;
-				}
-				else
-					rtename = rte->eref->aliasname;
-
-				if (strcmp(rtename, thisrel->relname) == 0)
-				{
-					switch (rte->rtekind)
-					{
-						case RTE_RELATION:
-							applyLockingClause(qry, i, lc->strength,
-											   lc->waitPolicy, pushedDown);
-							break;
-						case RTE_SUBQUERY:
-							applyLockingClause(qry, i, lc->strength,
-											   lc->waitPolicy, pushedDown);
-							/* see comment above */
-							transformLockingClause(pstate, rte->subquery,
-												   allrels, true);
-							break;
-						case RTE_JOIN:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a join",
-											LCS_asString(lc->strength)),
-									 parser_errposition(pstate, thisrel->location)));
-							break;
-						case RTE_FUNCTION:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a function",
-											LCS_asString(lc->strength)),
-									 parser_errposition(pstate, thisrel->location)));
-							break;
-						case RTE_VALUES:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to VALUES",
-											LCS_asString(lc->strength)),
-								 parser_errposition(pstate, thisrel->location)));
-						break;
-					case RTE_NAMEDTUPLESTORE:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a named tuplestore",
-											LCS_asString(lc->strength)),
-									 parser_errposition(pstate, thisrel->location)));
-							break;
-
-							/* Shouldn't be possible to see RTE_RESULT here */
-
-						default:
-							elog(ERROR, "unrecognized RTE type: %d",
-								 (int) rte->rtekind);
-							break;
-					}
-					break;		/* out of foreach loop */
-				}
-			}
-			if (rt == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_TABLE),
-				/*------
-				  translator: %s is a SQL row locking clause such as FOR UPDATE */
-						 errmsg("relation \"%s\" in %s clause not found in FROM clause",
-								thisrel->relname,
-								LCS_asString(lc->strength)),
-						 parser_errposition(pstate, thisrel->location)));
-		}
-	}
-}
-
-/*
- * Record locking info for a single rangetable item
- */
-void
-applyLockingClause(Query *qry, Index rtindex,
-				   LockClauseStrength strength, LockWaitPolicy waitPolicy,
-				   bool pushedDown)
-{
-	RowMarkClause *rc;
-
-	Assert(strength != LCS_NONE);	/* else caller error */
-
-	/* If it's an explicit clause, make sure hasForUpdate gets set */
-	if (!pushedDown)
-		qry->hasForUpdate = true;
-
-	/* Check for pre-existing entry for same rtindex */
-	if ((rc = get_parse_rowmark(qry, rtindex)) != NULL)
-	{
-		/*
-		 * If the same RTE is specified with more than one locking strength,
-		 * use the strongest.  (Reasonable, since you can't take both a shared
-		 * and exclusive lock at the same time; it'll end up being exclusive
-		 * anyway.)
-		 *
-		 * Similarly, if the same RTE is specified with more than one lock
-		 * wait policy, consider that NOWAIT wins over SKIP LOCKED, which in
-		 * turn wins over waiting for the lock (the default).  This is a bit
-		 * more debatable but raising an error doesn't seem helpful. (Consider
-		 * for instance SELECT FOR UPDATE NOWAIT from a view that internally
-		 * contains a plain FOR UPDATE spec.)  Having NOWAIT win over SKIP
-		 * LOCKED is reasonable since the former throws an error in case of
-		 * coming across a locked tuple, which may be undesirable in some
-		 * cases but it seems better than silently returning inconsistent
-		 * results.
-		 *
-		 * And of course pushedDown becomes false if any clause is explicit.
-		 */
-		rc->strength = Max(rc->strength, strength);
-		rc->waitPolicy = Max(rc->waitPolicy, waitPolicy);
-		rc->pushedDown &= pushedDown;
-		return;
-	}
-
-	/* Make a new RowMarkClause */
-	rc = makeNode(RowMarkClause);
-	rc->rti = rtindex;
-	rc->strength = strength;
-	rc->waitPolicy = waitPolicy;
-	rc->pushedDown = pushedDown;
-	qry->rowMarks = lappend(qry->rowMarks, rc);
 }

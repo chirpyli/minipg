@@ -2965,10 +2965,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			subpath = ((AggPath *) path)->subpath;
 			break;
 
-		case T_LockRowsPath:
-			ptype = "LockRows";
-			subpath = ((LockRowsPath *) path)->subpath;
-			break;
 		case T_ModifyTablePath:
 			ptype = "ModifyTable";
 			break;

@@ -114,11 +114,6 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  *
  * p_next_resno: next TargetEntry.resno to assign, starting from 1.
  *
- * p_locking_clause: query's FOR UPDATE/FOR SHARE clause, if any.
- *
- * p_locked_from_parent: true if parent query level applies FOR UPDATE/SHARE
- * to this subquery as a whole.
- *
  * p_resolve_unknowns: resolve unknown-type SELECT output columns as type TEXT
  * (this is true by default).
  *
@@ -149,9 +144,6 @@ struct ParseState
 	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
 	ParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
-	List	   *p_locking_clause;	/* raw FOR UPDATE/FOR SHARE info */
-	bool		p_locked_from_parent;	/* parent has marked this subquery
-										 * with FOR UPDATE/FOR SHARE */
 	bool		p_resolve_unknowns; /* resolve unknown-type SELECT outputs as
 									 * type text */
 

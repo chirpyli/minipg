@@ -395,7 +395,6 @@ RelOptInfo      - a relation or joined relations
   WindowAggPath - a WindowAgg plan node applied to some sub-path
   SetOpPath     - a SetOp plan node applied to some sub-path
   RecursiveUnionPath - a RecursiveUnion plan node applied to two sub-paths
-  LockRowsPath  - a LockRows plan node applied to some sub-path
   ModifyTablePath - a ModifyTable plan node applied to some sub-path(s)
   LimitPath     - a Limit plan node applied to some sub-path
   NestPath      - nested-loop joins
@@ -1015,7 +1014,7 @@ UPPERREL_ORDERED	result of ORDER BY, if any
 UPPERREL_FINAL		result of any remaining top-level actions
 
 UPPERREL_FINAL is used to represent any final processing steps, currently
-LockRows (SELECT FOR UPDATE), LIMIT/OFFSET, and ModifyTable.  There is no
+LIMIT/OFFSET and ModifyTable.  There is no
 flexibility about the order in which these steps are done, and thus no need
 to subdivide this stage more finely.
 

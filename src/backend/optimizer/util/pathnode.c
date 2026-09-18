@@ -2906,54 +2906,6 @@ create_agg_path(PlannerInfo *root,
 
 
 /*
- * create_lockrows_path
- *	  Creates a pathnode that represents acquiring row locks
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'rowMarks' is a list of PlanRowMark's
- * 'epqParam' is the ID of Param for EvalPlanQual re-eval
- */
-LockRowsPath *
-create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
-					 Path *subpath, List *rowMarks, int epqParam)
-{
-	LockRowsPath *pathnode = makeNode(LockRowsPath);
-
-	pathnode->path.pathtype = T_LockRows;
-	pathnode->path.parent = rel;
-	/* LockRows doesn't project, so use source path's pathtarget */
-	pathnode->path.pathtarget = subpath->pathtarget;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	pathnode->path.parallel_safe = false;
-	pathnode->path.parallel_workers = 0;
-	pathnode->path.rows = subpath->rows;
-
-	/*
-	 * The result cannot be assumed sorted, since locking might cause the sort
-	 * key columns to be replaced with new values.
-	 */
-	pathnode->path.pathkeys = NIL;
-
-	pathnode->subpath = subpath;
-	pathnode->rowMarks = rowMarks;
-	pathnode->epqParam = epqParam;
-
-	/*
-	 * We should charge something extra for the costs of row locking and
-	 * possible refetches, but it's hard to say how much.  For now, use
-	 * cpu_tuple_cost per row.
-	 */
-	pathnode->path.startup_cost = subpath->startup_cost;
-	pathnode->path.total_cost = subpath->total_cost +
-		cpu_tuple_cost * subpath->rows;
-
-	return pathnode;
-}
-
-/*
  * create_modifytable_path
  *	  Creates a pathnode that represents performing INSERT/UPDATE/DELETE mods
  *

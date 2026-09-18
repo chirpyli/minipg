@@ -775,7 +775,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(hasAggs);
 	COMPARE_SCALAR_FIELD(hasTargetSRFs);
 	COMPARE_SCALAR_FIELD(hasSubLinks);
-	COMPARE_SCALAR_FIELD(hasForUpdate);
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
@@ -784,7 +783,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(havingQual);
 	COMPARE_NODE_FIELD(distinctClause);
 	COMPARE_NODE_FIELD(sortClause);
-	COMPARE_NODE_FIELD(rowMarks);
 	COMPARE_NODE_FIELD(constraintDeps);
 	COMPARE_LOCATION_FIELD(stmt_location);
 	COMPARE_SCALAR_FIELD(stmt_len);
@@ -845,7 +843,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(havingClause);
 	COMPARE_NODE_FIELD(valuesLists);
 	COMPARE_NODE_FIELD(sortClause);
-	COMPARE_NODE_FIELD(lockingClause);
 
 	return true;
 }
@@ -1341,16 +1338,6 @@ _equalDefElem(const DefElem *a, const DefElem *b)
 }
 
 static bool
-_equalLockingClause(const LockingClause *a, const LockingClause *b)
-{
-	COMPARE_NODE_FIELD(lockedRels);
-	COMPARE_SCALAR_FIELD(strength);
-	COMPARE_SCALAR_FIELD(waitPolicy);
-
-	return true;
-}
-
-static bool
 _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 {
 	COMPARE_SCALAR_FIELD(rtekind);
@@ -1422,17 +1409,6 @@ _equalSortGroupClause(const SortGroupClause *a, const SortGroupClause *b)
 	return true;
 }
 
-
-static bool
-_equalRowMarkClause(const RowMarkClause *a, const RowMarkClause *b)
-{
-	COMPARE_SCALAR_FIELD(rti);
-	COMPARE_SCALAR_FIELD(strength);
-	COMPARE_SCALAR_FIELD(waitPolicy);
-	COMPARE_SCALAR_FIELD(pushedDown);
-
-	return true;
-}
 
 /*
  * Stuff from pg_list.h
@@ -1853,9 +1829,6 @@ equal(const void *a, const void *b)
 		case T_DefElem:
 			retval = _equalDefElem(a, b);
 			break;
-		case T_LockingClause:
-			retval = _equalLockingClause(a, b);
-			break;
 		case T_RangeTblEntry:
 			retval = _equalRangeTblEntry(a, b);
 			break;
@@ -1867,9 +1840,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_SortGroupClause:
 			retval = _equalSortGroupClause(a, b);
-			break;
-		case T_RowMarkClause:
-			retval = _equalRowMarkClause(a, b);
 			break;
 		case T_ObjectWithArgs:
 			retval = _equalObjectWithArgs(a, b);

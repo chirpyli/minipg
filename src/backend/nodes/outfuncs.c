@@ -798,17 +798,6 @@ _outHash(StringInfo str, const Hash *node)
 
 
 static void
-_outLockRows(StringInfo str, const LockRows *node)
-{
-	WRITE_NODE_TYPE("LOCKROWS");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_NODE_FIELD(rowMarks);
-	WRITE_INT_FIELD(epqParam);
-}
-
-static void
 _outNestLoopParam(StringInfo str, const NestLoopParam *node)
 {
 	WRITE_NODE_TYPE("NESTLOOPPARAM");
@@ -1676,18 +1665,6 @@ _outAggPath(StringInfo str, const AggPath *node)
 
 
 static void
-_outLockRowsPath(StringInfo str, const LockRowsPath *node)
-{
-	WRITE_NODE_TYPE("LOCKROWSPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_NODE_FIELD(rowMarks);
-	WRITE_INT_FIELD(epqParam);
-}
-
-static void
 _outModifyTablePath(StringInfo str, const ModifyTablePath *node)
 {
 	WRITE_NODE_TYPE("MODIFYTABLEPATH");
@@ -2164,7 +2141,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(havingClause);
 	WRITE_NODE_FIELD(valuesLists);
 	WRITE_NODE_FIELD(sortClause);
-	WRITE_NODE_FIELD(lockingClause);
 }
 
 static void
@@ -2194,17 +2170,6 @@ _outDefElem(StringInfo str, const DefElem *node)
 	WRITE_ENUM_FIELD(defaction, DefElemAction);
 	WRITE_LOCATION_FIELD(location);
 }
-
-static void
-_outLockingClause(StringInfo str, const LockingClause *node)
-{
-	WRITE_NODE_TYPE("LOCKINGCLAUSE");
-
-	WRITE_NODE_FIELD(lockedRels);
-	WRITE_ENUM_FIELD(strength, LockClauseStrength);
-	WRITE_ENUM_FIELD(waitPolicy, LockWaitPolicy);
-}
-
 
 static void
 _outColumnDef(StringInfo str, const ColumnDef *node)
@@ -2298,7 +2263,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_BOOL_FIELD(hasAggs);
 	WRITE_BOOL_FIELD(hasTargetSRFs);
 	WRITE_BOOL_FIELD(hasSubLinks);
-	WRITE_BOOL_FIELD(hasForUpdate);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);
 	WRITE_NODE_FIELD(targetList);
@@ -2307,7 +2271,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(havingQual);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);
-	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(constraintDeps);
 	WRITE_LOCATION_FIELD(stmt_location);
 	WRITE_INT_FIELD(stmt_len);
@@ -2326,16 +2289,6 @@ _outSortGroupClause(StringInfo str, const SortGroupClause *node)
 }
 
 
-static void
-_outRowMarkClause(StringInfo str, const RowMarkClause *node)
-{
-	WRITE_NODE_TYPE("ROWMARKCLAUSE");
-
-	WRITE_UINT_FIELD(rti);
-	WRITE_ENUM_FIELD(strength, LockClauseStrength);
-	WRITE_ENUM_FIELD(waitPolicy, LockWaitPolicy);
-	WRITE_BOOL_FIELD(pushedDown);
-}
 
 
 
@@ -2851,9 +2804,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Hash:
 				_outHash(str, obj);
 				break;
-			case T_LockRows:
-				_outLockRows(str, obj);
-				break;
 			case T_NestLoopParam:
 				_outNestLoopParam(str, obj);
 				break;
@@ -3043,9 +2993,6 @@ outNode(StringInfo str, const void *obj)
 			case T_AggPath:
 				_outAggPath(str, obj);
 				break;
-			case T_LockRowsPath:
-				_outLockRowsPath(str, obj);
-				break;
 			case T_ModifyTablePath:
 				_outModifyTablePath(str, obj);
 				break;
@@ -3139,9 +3086,6 @@ outNode(StringInfo str, const void *obj)
 			case T_SortGroupClause:
 				_outSortGroupClause(str, obj);
 				break;
-			case T_RowMarkClause:
-				_outRowMarkClause(str, obj);
-				break;
 			case T_RangeTblEntry:
 				_outRangeTblEntry(str, obj);
 				break;
@@ -3201,9 +3145,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_DefElem:
 				_outDefElem(str, obj);
-				break;
-			case T_LockingClause:
-				_outLockingClause(str, obj);
 				break;
 
 			default:

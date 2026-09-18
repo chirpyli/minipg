@@ -34,9 +34,6 @@ select * from pg_database where nonesuch = pg_database.datname;
 -- bad attribute name on rhs of operator
 select * from pg_database where pg_database.datname = nonesuch;
 
--- grouping with FOR UPDATE
-select null from pg_database group by datname for update;
-
 
 --
 -- DELETE

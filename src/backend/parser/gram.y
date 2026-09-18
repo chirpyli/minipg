@@ -139,8 +139,7 @@ static void check_qualified_name(List *names, core_yyscan_t yyscanner);
 static List *check_func_name(List *names, core_yyscan_t yyscanner);
 static List *check_indirection(List *indirection, core_yyscan_t yyscanner);
 static void insertSelectOptions(SelectStmt *stmt,
-								List *sortClause, List *lockingClause,
-								core_yyscan_t yyscanner);
+								List *sortClause, core_yyscan_t yyscanner);
 static Node *doNegate(Node *n, int location);
 static void doNegateFloat(Value *v);
 static Node *makeAndExpr(Node *lexpr, Node *rexpr, int location);
@@ -235,7 +234,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <defelt>	drop_option
 %type <boolean>	opt_or_replace
 				opt_transaction_chain
-%type <ival>	opt_nowait_or_skip
 
 
 %type <str>		OptSchemaName
@@ -264,7 +262,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				sort_clause opt_sort_clause sortby_list index_params
 				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
-				qualified_name_list any_name any_name_list
+				any_name any_name_list
 				any_operator expr_list attrs
 				distinct_clause
 				target_list opt_target_list insert_column_list
@@ -284,10 +282,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <boolean>  opt_restart_seqs
 
-%type <ival>	for_locking_strength
-%type <node>	for_locking_item
-%type <list>	for_locking_clause opt_for_locking_clause for_locking_items
-%type <list>	locked_rels_list
 %type <setquantifier> set_quantifier
 
 %type <node>	join_qual
@@ -2816,13 +2810,6 @@ using_clause:
 		;
 
 
-opt_nowait_or_skip:
-			NOWAIT							{ $$ = LockWaitError; }
-			| SKIP LOCKED					{ $$ = LockWaitSkip; }
-			| /*EMPTY*/						{ $$ = LockWaitBlock; }
-		;
-
-
 /*****************************************************************************
  *
  *		QUERY:
@@ -2928,24 +2915,12 @@ select_with_parens:
  * The duplicative productions are annoying, but hard to get rid of without
  * creating shift/reduce conflicts.
  *
- *	The locking clause (FOR UPDATE etc) may be before or after LIMIT/OFFSET.
- *	In <=7.2.X, LIMIT/OFFSET had to be after FOR UPDATE
- *	We now support both orderings, but prefer LIMIT/OFFSET before the locking
- * clause.
- *	2002-08-28 bjm
  */
 select_no_parens:
 		simple_select						{ $$ = $1; }
 		| select_clause sort_clause
 			{
-				insertSelectOptions((SelectStmt *) $1, $2, NIL,
-									yyscanner);
-				$$ = $1;
-			}
-		| select_clause opt_sort_clause for_locking_clause
-			{
-				insertSelectOptions((SelectStmt *) $1, $2, $3,
-									yyscanner);
+				insertSelectOptions((SelectStmt *) $1, $2, yyscanner);
 				$$ = $1;
 			}
 	;
@@ -3143,45 +3118,6 @@ having_clause:
 			HAVING a_expr							{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NULL; }
 		;
-
-for_locking_clause:
-			for_locking_items						{ $$ = $1; }
-			| FOR READ ONLY							{ $$ = NIL; }
-		;
-
-opt_for_locking_clause:
-			for_locking_clause						{ $$ = $1; }
-			| /* EMPTY */							{ $$ = NIL; }
-		;
-
-for_locking_items:
-			for_locking_item						{ $$ = list_make1($1); }
-			| for_locking_items for_locking_item	{ $$ = lappend($1, $2); }
-		;
-
-for_locking_item:
-			for_locking_strength locked_rels_list opt_nowait_or_skip
-				{
-					LockingClause *n = makeNode(LockingClause);
-					n->lockedRels = $2;
-					n->strength = $1;
-					n->waitPolicy = $3;
-					$$ = (Node *) n;
-				}
-		;
-
-for_locking_strength:
-			FOR UPDATE							{ $$ = LCS_FORUPDATE; }
-			| FOR NO KEY UPDATE					{ $$ = LCS_FORNOKEYUPDATE; }
-			| FOR SHARE							{ $$ = LCS_FORSHARE; }
-			| FOR KEY SHARE						{ $$ = LCS_FORKEYSHARE; }
-		;
-
-locked_rels_list:
-			OF qualified_name_list					{ $$ = $2; }
-			| /* EMPTY */							{ $$ = NIL; }
-		;
-
 
 /*
  * Note: the ROW keyword no longer exists in minipg, so there is no
@@ -5281,11 +5217,6 @@ target_el:	a_expr AS ColLabel
  *
  *****************************************************************************/
 
-qualified_name_list:
-			qualified_name							{ $$ = list_make1($1); }
-			| qualified_name_list ',' qualified_name { $$ = lappend($1, $3); }
-		;
-
 /*
  * The production for a qualified relation name has to exactly match the
  * production for a qualified func_name, because in a FROM clause we cannot
@@ -6512,8 +6443,7 @@ check_indirection(List *indirection, core_yyscan_t yyscanner)
  */
 static void
 insertSelectOptions(SelectStmt *stmt,
-					List *sortClause, List *lockingClause,
-					core_yyscan_t yyscanner)
+					List *sortClause, core_yyscan_t yyscanner)
 {
 	Assert(IsA(stmt, SelectStmt));
 
@@ -6530,8 +6460,6 @@ insertSelectOptions(SelectStmt *stmt,
 					 parser_errposition(exprLocation((Node *) sortClause))));
 		stmt->sortClause = sortClause;
 	}
-	/* We can handle multiple locking clauses, though */
-	stmt->lockingClause = list_concat(stmt->lockingClause, lockingClause);
 }
 
 /* SystemFuncName()

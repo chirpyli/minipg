@@ -750,13 +750,6 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 	{
 		Query	   *query = (Query *) node;
 
-		/* SELECT FOR UPDATE/SHARE must be treated as unsafe */
-		if (query->rowMarks != NULL)
-		{
-			context->max_hazard = PROPARALLEL_UNSAFE;
-			return true;
-		}
-
 		/* Recurse into subselects */
 		return query_tree_walker(query,
 								 max_parallel_hazard_walker,

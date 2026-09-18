@@ -1979,11 +1979,6 @@ query_tree_walker(Query *query,
 			return true;
 	}
 
-	/*
-	 * rowMarks is not walked because it contains only rangetable indexes (and
-	 * flags etc.) and therefore should be handled at Query level similarly.
-	 */
-
 	if (!(flags & QTW_IGNORE_RANGE_TABLE))
 	{
 		if (range_table_walker(query->rtable, walker, context, flags))
@@ -2678,12 +2673,6 @@ query_tree_mutator(Query *query,
 		MUTATE(query->distinctClause, query->distinctClause, List *);
 	}
 
-	/*
-	 *
-	 * rowMarks contains only rangetable indexes (and flags etc.) and
-	 * therefore should be handled at Query level similarly.
-	 */
-
 	query->rtable = range_table_mutator(query->rtable,
 										mutator, context, flags);
 	return query;
@@ -2967,8 +2956,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->sortClause, context))
 					return true;
-				if (walker(stmt->lockingClause, context))
-					return true;
 			}
 			break;
 		case T_A_Expr:
@@ -3116,8 +3103,6 @@ raw_expression_tree_walker(Node *node,
 				/* opclass names are deemed uninteresting */
 			}
 			break;
-		case T_LockingClause:
-			return walker(((LockingClause *) node)->lockedRels, context);
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));

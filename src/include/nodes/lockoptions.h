@@ -14,9 +14,9 @@
 #define LOCKOPTIONS_H
 
 /*
- * This enum represents the different strengths of FOR UPDATE/SHARE clauses.
- * The ordering here is important, because the highest numerical value takes
- * precedence when a RTE is specified multiple ways.  See applyLockingClause.
+ * This enum represents the different strengths of row locking.  Only LCS_NONE
+ * is used now that the FOR UPDATE/SHARE clauses have been trimmed, but the
+ * remaining values are retained as part of the row-marking infrastructure.
  */
 typedef enum LockClauseStrength
 {
@@ -28,10 +28,8 @@ typedef enum LockClauseStrength
 } LockClauseStrength;
 
 /*
- * This enum controls how to deal with rows being locked by FOR UPDATE/SHARE
- * clauses (i.e., it represents the NOWAIT and SKIP LOCKED options).
- * The ordering here is important, because the highest numerical value takes
- * precedence when a RTE is specified multiple ways.  See applyLockingClause.
+ * This enum controls how to deal with rows being locked (i.e., it represents
+ * the NOWAIT and SKIP LOCKED options).
  */
 typedef enum LockWaitPolicy
 {

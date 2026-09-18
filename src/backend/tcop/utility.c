@@ -81,9 +81,7 @@ CommandIsReadOnly(PlannedStmt *pstmt)
 	switch (pstmt->commandType)
 	{
 		case CMD_SELECT:
-			if (pstmt->rowMarks != NIL)
-				return false;	/* SELECT FOR [KEY] UPDATE/SHARE */
-			else if (pstmt->hasModifyingCTE)
+			if (pstmt->hasModifyingCTE)
 				return false;	/* data-modifying CTE */
 			else
 				return true;
@@ -1218,30 +1216,7 @@ CreateCommandTag(Node *parsetree)
 						 * will be useful for complaints about read-only
 						 * statements
 						 */
-						if (stmt->rowMarks != NIL)
-						{
-							/* not 100% but probably close enough */
-							switch (((PlanRowMark *) linitial(stmt->rowMarks))->strength)
-							{
-								case LCS_FORKEYSHARE:
-									tag = CMDTAG_SELECT_FOR_KEY_SHARE;
-									break;
-								case LCS_FORSHARE:
-									tag = CMDTAG_SELECT_FOR_SHARE;
-									break;
-								case LCS_FORNOKEYUPDATE:
-									tag = CMDTAG_SELECT_FOR_NO_KEY_UPDATE;
-									break;
-								case LCS_FORUPDATE:
-									tag = CMDTAG_SELECT_FOR_UPDATE;
-									break;
-								default:
-									tag = CMDTAG_SELECT;
-									break;
-							}
-						}
-						else
-							tag = CMDTAG_SELECT;
+						tag = CMDTAG_SELECT;
 						break;
 					case CMD_UPDATE:
 						tag = CMDTAG_UPDATE;
@@ -1278,30 +1253,7 @@ CreateCommandTag(Node *parsetree)
 						 * will be useful for complaints about read-only
 						 * statements
 						 */
-						if (stmt->rowMarks != NIL)
-						{
-							/* not 100% but probably close enough */
-							switch (((RowMarkClause *) linitial(stmt->rowMarks))->strength)
-							{
-								case LCS_FORKEYSHARE:
-									tag = CMDTAG_SELECT_FOR_KEY_SHARE;
-									break;
-								case LCS_FORSHARE:
-									tag = CMDTAG_SELECT_FOR_SHARE;
-									break;
-								case LCS_FORNOKEYUPDATE:
-									tag = CMDTAG_SELECT_FOR_NO_KEY_UPDATE;
-									break;
-								case LCS_FORUPDATE:
-									tag = CMDTAG_SELECT_FOR_UPDATE;
-									break;
-								default:
-									tag = CMDTAG_UNKNOWN;
-									break;
-							}
-						}
-						else
-							tag = CMDTAG_SELECT;
+						tag = CMDTAG_SELECT;
 						break;
 					case CMD_UPDATE:
 						tag = CMDTAG_UPDATE;

@@ -76,7 +76,6 @@ typedef enum NodeTag
 	T_Gather,
 	T_GatherMerge,
 	T_Hash,
-	T_LockRows,
 	/* these aren't subclasses of Plan: */
 	T_NestLoopParam,
 	T_PlanRowMark,
@@ -122,7 +121,6 @@ typedef enum NodeTag
 	T_GatherState,
 	T_GatherMergeState,
 	T_HashState,
-	T_LockRowsState,
 
 	/*
 	 * TAGS FOR PRIMITIVE NODES (primnodes.h)
@@ -214,7 +212,6 @@ typedef enum NodeTag
 	T_GroupPath,
 	T_UpperUniquePath,
 	T_AggPath,
-	T_LockRowsPath,
 	T_ModifyTablePath,
 	/* these aren't subclasses of Path: */
 	T_EquivalenceClass,
@@ -314,8 +311,6 @@ typedef enum NodeTag
 	T_TableSampleClause,
 	T_SortGroupClause,
 	T_ObjectWithArgs,
-	T_LockingClause,
-	T_RowMarkClause,
 	T_VacuumRelation,
 
 	/*

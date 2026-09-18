@@ -50,7 +50,6 @@ static void AppendJumble(JumbleState *jstate,
 						 const unsigned char *item, Size size);
 static void JumbleQueryInternal(JumbleState *jstate, Query *query);
 static void JumbleRangeTable(JumbleState *jstate, List *rtable);
-static void JumbleRowMarks(JumbleState *jstate, List *rowMarks);
 static void JumbleExpr(JumbleState *jstate, Node *node);
 static void RecordConstLocation(JumbleState *jstate, int location);
 
@@ -252,7 +251,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleExpr(jstate, query->havingQual);
 	JumbleExpr(jstate, (Node *) query->distinctClause);
 	JumbleExpr(jstate, (Node *) query->sortClause);
-	JumbleRowMarks(jstate, query->rowMarks);
 }
 
 /*
@@ -294,27 +292,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 			default:
 				elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
 				break;
-		}
-	}
-}
-
-/*
- * Jumble a rowMarks list
- */
-static void
-JumbleRowMarks(JumbleState *jstate, List *rowMarks)
-{
-	ListCell   *lc;
-
-	foreach(lc, rowMarks)
-	{
-		RowMarkClause *rowmark = lfirst_node(RowMarkClause, lc);
-
-		if (!rowmark->pushedDown)
-		{
-			APP_JUMB(rowmark->rti);
-			APP_JUMB(rowmark->strength);
-			APP_JUMB(rowmark->waitPolicy);
 		}
 	}
 }

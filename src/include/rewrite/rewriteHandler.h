@@ -19,8 +19,7 @@
 
 extern List *QueryRewrite(Query *parsetree);
 extern void AcquireRewriteLocks(Query *parsetree,
-								bool forExecute,
-								bool forUpdatePushedDown);
+								bool forExecute);
 
 extern Query *get_view_query(Relation view);
 extern const char *view_query_is_auto_updatable(Query *viewquery,

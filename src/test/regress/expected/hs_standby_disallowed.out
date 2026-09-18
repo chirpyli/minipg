@@ -9,11 +9,6 @@ begin transaction read write;
 ERROR:  cannot set transaction read-write mode during recovery
 commit;
 WARNING:  there is no transaction in progress
--- SELECT
-select * from hs1 FOR SHARE;
-ERROR:  cannot execute SELECT FOR SHARE in a read-only transaction
-select * from hs1 FOR UPDATE;
-ERROR:  cannot execute SELECT FOR UPDATE in a read-only transaction
 -- DML
 BEGIN;
 insert into hs1 values (37);

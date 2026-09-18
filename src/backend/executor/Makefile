@@ -43,7 +43,6 @@ OBJS = \
 	nodeIncrementalSort.o \
 	nodeIndexonlyscan.o \
 	nodeIndexscan.o \
-	nodeLockRows.o \
 	nodeMaterial.o \
 	nodeMemoize.o \
 	nodeMergeAppend.o \

@@ -312,23 +312,14 @@ OffsetVarNodes(Node *node, int offset, int sublevels_up)
 		/*
 		 * If we are starting at a Query, and sublevels_up is zero, then we
 		 * must also fix rangetable indexes in the Query itself --- namely
-		 * resultRelation, exclRelIndex and rowMarks entries.  sublevels_up
-		 * cannot be zero when recursing into a subquery, so there's no need
-		 * to have the same logic inside OffsetVarNodes_walker.
+		 * resultRelation and exclRelIndex entries.  sublevels_up cannot be
+		 * zero when recursing into a subquery, so there's no need to have
+		 * the same logic inside OffsetVarNodes_walker.
 		 */
 		if (sublevels_up == 0)
 		{
-			ListCell   *l;
-
 			if (qry->resultRelation)
 				qry->resultRelation += offset;
-
-			foreach(l, qry->rowMarks)
-			{
-				RowMarkClause *rc = (RowMarkClause *) lfirst(l);
-
-				rc->rti += offset;
-			}
 		}
 		query_tree_walker(qry, OffsetVarNodes_walker,
 						  (void *) &context, 0);
@@ -485,24 +476,14 @@ ChangeVarNodes(Node *node, int rt_index, int new_index, int sublevels_up)
 		/*
 		 * If we are starting at a Query, and sublevels_up is zero, then we
 		 * must also fix rangetable indexes in the Query itself --- namely
-		 * resultRelation and rowMarks entries.  sublevels_up cannot be zero
-		 * when recursing into a subquery, so there's no need to have the same
-		 * logic inside ChangeVarNodes_walker.
+		 * resultRelation.  sublevels_up cannot be zero when recursing into a
+		 * subquery, so there's no need to have the same logic inside
+		 * ChangeVarNodes_walker.
 		 */
 		if (sublevels_up == 0)
 		{
-			ListCell   *l;
-
 			if (qry->resultRelation == rt_index)
 				qry->resultRelation = new_index;
-
-			foreach(l, qry->rowMarks)
-			{
-				RowMarkClause *rc = (RowMarkClause *) lfirst(l);
-
-				if (rc->rti == rt_index)
-					rc->rti = new_index;
-			}
 		}
 		query_tree_walker(qry, ChangeVarNodes_walker,
 						  (void *) &context, 0);

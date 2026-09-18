@@ -808,9 +808,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Unique:
 			pname = "Unique";
 			break;
-		case T_LockRows:
-			pname = "LockRows";
-			break;
 		case T_Hash:
 			pname = "Hash";
 			break;

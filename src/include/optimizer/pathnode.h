@@ -199,8 +199,6 @@ extern AggPath *create_agg_path(PlannerInfo *root,
 								List *qual,
 								const AggClauseCosts *aggcosts,
 								double numGroups);
-extern LockRowsPath *create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
-										  Path *subpath, List *rowMarks, int epqParam);
 extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												RelOptInfo *rel,
 												Path *subpath,

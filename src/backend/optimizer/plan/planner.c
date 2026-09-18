@@ -1185,34 +1185,19 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	/*
 	 * If the input rel is marked consider_parallel and there's nothing that's
 	 * not parallel-safe in the LIMIT clause, then the final_rel can be marked
-	 * consider_parallel as well.  Note that if the query has rowMarks or is
-	 * not a SELECT, consider_parallel will be false for every relation in the
-	 * query.
+	 * consider_parallel as well.  Note that if the query is not a SELECT,
+	 * consider_parallel will be false for every relation in the query.
 	 */
 	if (current_rel->consider_parallel)
 		final_rel->consider_parallel = true;
 
 	/*
 	 * Generate paths for the final_rel.  Insert all surviving paths, with
-	 * LockRows, Limit, and/or ModifyTable steps added if needed.
+	 * Limit and/or ModifyTable steps added if needed.
 	 */
 	foreach(lc, current_rel->pathlist)
 	{
 		Path	   *path = (Path *) lfirst(lc);
-
-		/*
-		 * If there is a FOR [KEY] UPDATE/SHARE clause, add the LockRows node.
-		 * (Note: we intentionally test parse->rowMarks not root->rowMarks
-		 * here.  If there are only non-locking rowmarks, they should be
-		 * handled by the ModifyTable node instead.  However, root->rowMarks
-		 * is what goes into the LockRows node.)
-		 */
-		if (parse->rowMarks)
-		{
-			path = (Path *) create_lockrows_path(root, final_rel, path,
-												 root->rowMarks,
-												 assign_special_exec_param(root));
-		}
 
 		/*
 		 * If this is an INSERT/UPDATE/DELETE, add the ModifyTable node.
@@ -1295,14 +1280,9 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			}
 
 			/*
-			 * If there was a FOR [KEY] UPDATE/SHARE clause, the LockRows node
-			 * will have dealt with fetching non-locked marked rows, else we
-			 * need to have ModifyTable do that.
+			 * ModifyTable fetches non-locked marked rows for EvalPlanQual.
 			 */
-			if (parse->rowMarks)
-				rowMarks = NIL;
-			else
-				rowMarks = root->rowMarks;
+			rowMarks = root->rowMarks;
 
 			path = (Path *)
 				create_modifytable_path(root, final_rel,
@@ -1327,7 +1307,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	 */
 	if (final_rel->consider_parallel && root->query_level > 1)
 	{
-		Assert(!parse->rowMarks && parse->commandType == CMD_SELECT);
+		Assert(parse->commandType == CMD_SELECT);
 		foreach(lc, current_rel->partial_pathlist)
 		{
 			Path	   *partial_path = (Path *) lfirst(lc);
@@ -1353,80 +1333,27 @@ preprocess_rowmarks(PlannerInfo *root)
 	ListCell   *l;
 	int			i;
 
-	if (parse->rowMarks)
-	{
-		/*
-		 * We've got trouble if FOR [KEY] UPDATE/SHARE appears inside
-		 * grouping, since grouping renders a reference to individual tuple
-		 * CTIDs invalid.  This is also checked at parse time, but that's
-		 * insufficient because of rule substitution, query pullup, etc.
-		 */
-		CheckSelectLocking(parse, linitial_node(RowMarkClause,
-												parse->rowMarks)->strength);
-	}
-	else
-	{
-		/*
-		 * We only need rowmarks for UPDATE, DELETE, or FOR [KEY]
-		 * UPDATE/SHARE.
-		 */
-		if (parse->commandType != CMD_UPDATE &&
-			parse->commandType != CMD_DELETE)
-			return;
-	}
+	/*
+	 * We only need rowmarks for UPDATE or DELETE, so that EvalPlanQual can
+	 * re-fetch the other relations referenced in the query.
+	 */
+	if (parse->commandType != CMD_UPDATE &&
+		parse->commandType != CMD_DELETE)
+		return;
 
 	/*
 	 * We need to have rowmarks for all base relations except the target. We
 	 * make a bitmapset of all base rels and then remove the items we don't
-	 * need or have FOR [KEY] UPDATE/SHARE marks for.
+	 * need.
 	 */
 	rels = get_relids_in_jointree((Node *) parse->jointree, false);
 	if (parse->resultRelation)
 		rels = bms_del_member(rels, parse->resultRelation);
 
 	/*
-	 * Convert RowMarkClauses to PlanRowMark representation.
+	 * Add rowmarks for all non-target base relations.
 	 */
 	prowmarks = NIL;
-	foreach(l, parse->rowMarks)
-	{
-		RowMarkClause *rc = lfirst_node(RowMarkClause, l);
-		RangeTblEntry *rte = rt_fetch(rc->rti, parse->rtable);
-		PlanRowMark *newrc;
-
-		/*
-		 * Currently, it is syntactically impossible to have FOR UPDATE et al
-		 * applied to an update/delete target rel.  If that ever becomes
-		 * possible, we should drop the target from the PlanRowMark list.
-		 */
-		Assert(rc->rti != parse->resultRelation);
-
-		/*
-		 * Ignore RowMarkClauses for subqueries; they aren't real tables and
-		 * can't support true locking.  Subqueries that got flattened into the
-		 * main query should be ignored completely.  Any that didn't will get
-		 * ROW_MARK_COPY items in the next loop.
-		 */
-		if (rte->rtekind != RTE_RELATION)
-			continue;
-
-		rels = bms_del_member(rels, rc->rti);
-
-		newrc = makeNode(PlanRowMark);
-		newrc->rti = newrc->prti = rc->rti;
-		newrc->rowmarkId = ++(root->glob->lastRowMarkId);
-		newrc->markType = select_rowmark_type(rte, rc->strength);
-		newrc->allMarkTypes = (1 << newrc->markType);
-		newrc->strength = rc->strength;
-		newrc->waitPolicy = rc->waitPolicy;
-		newrc->isParent = false;
-
-		prowmarks = lappend(prowmarks, newrc);
-	}
-
-	/*
-	 * Now, add rowmarks for any non-target, non-locked base relations.
-	 */
 	i = 0;
 	foreach(l, parse->rtable)
 	{
@@ -1465,32 +1392,11 @@ select_rowmark_type(RangeTblEntry *rte, LockClauseStrength strength)
 	}
 	else
 	{
-		/* Regular table, apply the appropriate lock type */
-		switch (strength)
-		{
-			case LCS_NONE:
-
-				/*
-				 * We don't need a tuple lock, only the ability to re-fetch
-				 * the row.
-				 */
-				return ROW_MARK_REFERENCE;
-				break;
-			case LCS_FORKEYSHARE:
-				return ROW_MARK_KEYSHARE;
-				break;
-			case LCS_FORSHARE:
-				return ROW_MARK_SHARE;
-				break;
-			case LCS_FORNOKEYUPDATE:
-				return ROW_MARK_NOKEYEXCLUSIVE;
-				break;
-			case LCS_FORUPDATE:
-				return ROW_MARK_EXCLUSIVE;
-				break;
-		}
-		elog(ERROR, "unrecognized LockClauseStrength %d", (int) strength);
-		return ROW_MARK_EXCLUSIVE;	/* keep compiler quiet */
+		/*
+		 * We don't need a tuple lock, only the ability to re-fetch the row.
+		 */
+		Assert(strength == LCS_NONE);
+		return ROW_MARK_REFERENCE;
 	}
 }
 

@@ -15,8 +15,7 @@
  * adds these; they're not in what we receive from the planner/rewriter.)
  *
  * For all query types, there can be additional junk tlist entries, such as
- * sort keys and row ID information needed for SELECT FOR UPDATE locking
- * and/or EvalPlanQual checking.
+ * sort keys and row ID information needed for EvalPlanQual checking.
  *
  * The query rewrite phase also does preprocessing of the targetlist (see
  * rewriteTargetListIU).  The division of labor between here and there is
@@ -128,10 +127,10 @@ preprocess_targetlist(PlannerInfo *root)
 
 	/*
 	 * Add necessary junk columns for rowmarked rels.  These values are needed
-	 * for locking of rels selected FOR UPDATE/SHARE, and to do EvalPlanQual
-	 * rechecking.  See comments for PlanRowMark in plannodes.h.  If you
-	 * change this stanza, see also the appendrel expansion path, which has to
-	 * be able to add on junk columns equivalent to these.
+	 * to do EvalPlanQual rechecking.  See comments for PlanRowMark in
+	 * plannodes.h.  If you change this stanza, see also the appendrel
+	 * expansion path, which has to be able to add on junk columns equivalent
+	 * to these.
 	 *
 	 * (Someday it might be useful to fold these resjunk columns into the
 	 * row-identity-column management used for UPDATE/DELETE.  Today is not

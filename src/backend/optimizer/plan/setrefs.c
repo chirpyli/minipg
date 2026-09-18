@@ -769,27 +769,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			 */
 			Assert(plan->qual == NIL);
 			break;
-		case T_LockRows:
-			{
-				LockRows   *splan = (LockRows *) plan;
-
-				/*
-				 * Like the plan types above, LockRows doesn't evaluate its
-				 * tlist or quals.  But we have to fix up the RT indexes in
-				 * its rowmarks.
-				 */
-				set_dummy_tlist_references(plan, rtoffset);
-				Assert(splan->plan.qual == NIL);
-
-				foreach(l, splan->rowMarks)
-				{
-					PlanRowMark *rc = (PlanRowMark *) lfirst(l);
-
-					rc->rti += rtoffset;
-					rc->prti += rtoffset;
-				}
-			}
-			break;
 		case T_Agg:
 			{
 				Agg		   *agg = (Agg *) plan;

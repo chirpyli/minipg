@@ -955,28 +955,6 @@ _copyHash(const Hash *from)
 
 
 /*
- * _copyLockRows
- */
-static LockRows *
-_copyLockRows(const LockRows *from)
-{
-	LockRows   *newnode = makeNode(LockRows);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_NODE_FIELD(rowMarks);
-	COPY_SCALAR_FIELD(epqParam);
-
-	return newnode;
-}
-
-/*
  * _copyNestLoopParam
  */
 static NestLoopParam *
@@ -1969,19 +1947,6 @@ _copySortGroupClause(const SortGroupClause *from)
 }
 
 
-static RowMarkClause *
-_copyRowMarkClause(const RowMarkClause *from)
-{
-	RowMarkClause *newnode = makeNode(RowMarkClause);
-
-	COPY_SCALAR_FIELD(rti);
-	COPY_SCALAR_FIELD(strength);
-	COPY_SCALAR_FIELD(waitPolicy);
-	COPY_SCALAR_FIELD(pushedDown);
-
-	return newnode;
-}
-
 static A_Expr *
 _copyAExpr(const A_Expr *from)
 {
@@ -2274,19 +2239,6 @@ _copyDefElem(const DefElem *from)
 	return newnode;
 }
 
-static LockingClause *
-_copyLockingClause(const LockingClause *from)
-{
-	LockingClause *newnode = makeNode(LockingClause);
-
-	COPY_NODE_FIELD(lockedRels);
-	COPY_SCALAR_FIELD(strength);
-	COPY_SCALAR_FIELD(waitPolicy);
-
-	return newnode;
-}
-
-
 static Query *
 _copyQuery(const Query *from)
 {
@@ -2301,7 +2253,6 @@ _copyQuery(const Query *from)
 	COPY_SCALAR_FIELD(hasAggs);
 	COPY_SCALAR_FIELD(hasTargetSRFs);
 	COPY_SCALAR_FIELD(hasSubLinks);
-	COPY_SCALAR_FIELD(hasForUpdate);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(jointree);
 	COPY_NODE_FIELD(targetList);
@@ -2310,7 +2261,6 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(havingQual);
 	COPY_NODE_FIELD(distinctClause);
 	COPY_NODE_FIELD(sortClause);
-	COPY_NODE_FIELD(rowMarks);
 	COPY_NODE_FIELD(constraintDeps);
 	COPY_LOCATION_FIELD(stmt_location);
 	COPY_SCALAR_FIELD(stmt_len);
@@ -2381,7 +2331,6 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(havingClause);
 	COPY_NODE_FIELD(valuesLists);
 	COPY_NODE_FIELD(sortClause);
-	COPY_NODE_FIELD(lockingClause);
 
 	return newnode;
 }
@@ -2862,9 +2811,6 @@ copyObjectImpl(const void *from)
 		case T_Hash:
 			retval = _copyHash(from);
 			break;
-		case T_LockRows:
-			retval = _copyLockRows(from);
-			break;
 		case T_NestLoopParam:
 			retval = _copyNestLoopParam(from);
 			break;
@@ -3190,9 +3136,6 @@ copyObjectImpl(const void *from)
 		case T_DefElem:
 			retval = _copyDefElem(from);
 			break;
-		case T_LockingClause:
-			retval = _copyLockingClause(from);
-			break;
 		case T_RangeTblEntry:
 			retval = _copyRangeTblEntry(from);
 			break;
@@ -3204,9 +3147,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_SortGroupClause:
 			retval = _copySortGroupClause(from);
-			break;
-		case T_RowMarkClause:
-			retval = _copyRowMarkClause(from);
 			break;
 		case T_ObjectWithArgs:
 			retval = _copyObjectWithArgs(from);
