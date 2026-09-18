@@ -307,7 +307,6 @@ struct PlannerInfo
 	List	   *update_colnos;
 
 	/* Fields filled during create_plan() for use in setrefs.c */
-	List	   *minmax_aggs;	/* List of MinMaxAggInfos */
 
 	MemoryContext planner_cxt;	/* context holding PlannerInfo */
 
@@ -315,7 +314,6 @@ struct PlannerInfo
 									 * query */
 
 	double		tuple_fraction; /* tuple_fraction passed to query_planner */
-	double		limit_tuples;	/* limit_tuples passed to query_planner */
 
 	Index		qual_security_level;	/* minimum security_level for quals */
 	/* Note: qual_security_level is zero if there are no securityQuals */
@@ -1182,7 +1180,6 @@ typedef struct AppendPath
 	List	   *subpaths;		/* list of component Paths */
 	/* Index of first partial path in subpaths; list_length(subpaths) if none */
 	int			first_partial_path;
-	double		limit_tuples;	/* hard limit on output tuples, or -1 */
 } AppendPath;
 
 #define IS_DUMMY_APPEND(p) \
@@ -1204,7 +1201,6 @@ typedef struct MergeAppendPath
 {
 	Path		path;
 	List	   *subpaths;		/* list of component Paths */
-	double		limit_tuples;	/* hard limit on output tuples, or -1 */
 } MergeAppendPath;
 
 /*
@@ -1506,17 +1502,6 @@ typedef struct AggPath
 } AggPath;
 
 /*
- * MinMaxAggPath represents computation of MIN/MAX aggregates from indexes
- */
-typedef struct MinMaxAggPath
-{
-	Path		path;
-	List	   *mmaggregates;	/* list of MinMaxAggInfo */
-	List	   *quals;			/* HAVING quals, if any */
-} MinMaxAggPath;
-
-
-/*
  * LockRowsPath represents acquiring row locks for SELECT FOR UPDATE/SHARE
  */
 typedef struct LockRowsPath
@@ -1547,18 +1532,6 @@ typedef struct ModifyTablePath
 	List	   *rowMarks;		/* PlanRowMarks (non-locking only) */
 	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
 } ModifyTablePath;
-
-/*
- * LimitPath represents applying LIMIT/OFFSET restrictions
- */
-typedef struct LimitPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	Node	   *limitOffset;	/* OFFSET parameter, or NULL if none */
-	Node	   *limitCount;		/* COUNT parameter, or NULL if none */
-	LimitOption limitOption;	/* FETCH FIRST with ties or exact number */
-} LimitPath;
 
 
 /*
@@ -2067,24 +2040,6 @@ typedef struct PlaceHolderInfo
 	Relids		ph_needed;		/* highest level the value is needed at */
 	int32		ph_width;		/* estimated attribute width */
 } PlaceHolderInfo;
-
-/*
- * This struct describes one potentially index-optimizable MIN/MAX aggregate
- * function.  MinMaxAggPath contains a list of these, and if we accept that
- * path, the list is stored into root->minmax_aggs for use during setrefs.c.
- */
-typedef struct MinMaxAggInfo
-{
-	NodeTag		type;
-
-	Oid			aggfnoid;		/* pg_proc Oid of the aggregate */
-	Oid			aggsortop;		/* Oid of its sort operator */
-	Expr	   *target;			/* expression we are aggregating on */
-	PlannerInfo *subroot;		/* modified "root" for planning the subquery */
-	Path	   *path;			/* access path for subquery */
-	Cost		pathcost;		/* estimated cost to fetch first row */
-	Param	   *param;			/* param for subplan's output */
-} MinMaxAggInfo;
 
 /*
  * At runtime, PARAM_EXEC slots are used to pass values around from one plan

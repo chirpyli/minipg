@@ -36,9 +36,9 @@ SELECT unnest(ARRAY[1, 2]) FROM few WHERE false;
 -- SRF shouldn't prevent upper query from recognizing lower as dummy
 explain (verbose, costs off)
 SELECT * FROM few f1,
-  (SELECT unnest(ARRAY[1,2]) FROM few f2 WHERE false OFFSET 0) ss;
+  (SELECT unnest(ARRAY[1,2]) FROM few f2 WHERE false) ss;
 SELECT * FROM few f1,
-  (SELECT unnest(ARRAY[1,2]) FROM few f2 WHERE false OFFSET 0) ss;
+  (SELECT unnest(ARRAY[1,2]) FROM few f2 WHERE false) ss;
 
 -- SRF output order of sorting is maintained, if SRF is not referenced
 SELECT few.id, generate_series(1,3) g FROM few ORDER BY id DESC;
@@ -108,15 +108,7 @@ SELECT generate_series(1,3) IS DISTINCT FROM 2;
 -- but SRFs in function RTEs must be at top level (annoying restriction)
 SELECT * FROM int4mul(generate_series(1,2), 10);
 
--- LIMIT / OFFSET is evaluated after SRF evaluation
-SELECT a, generate_series(1,2) FROM (VALUES(1),(2),(3)) r(a) LIMIT 2 OFFSET 2;
--- SRFs are not allowed in LIMIT.
-SELECT 1 LIMIT generate_series(1,3);
-
--- tSRF in correlated subquery, referencing table outside
-SELECT (SELECT generate_series(1,3) LIMIT 1 OFFSET few.id) FROM few;
--- tSRF in correlated subquery, referencing SRF outside
-SELECT (SELECT generate_series(1,3) LIMIT 1 OFFSET g.i) FROM generate_series(0,3) g(i);
+-- minipg: LIMIT/OFFSET 已裁剪，SRF 与 LIMIT/OFFSET 交互的用例整节移除
 
 -- Some fun cases involving duplicate SRF calls
 explain (verbose, costs off)

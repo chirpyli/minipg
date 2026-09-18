@@ -17,17 +17,17 @@ teardown
 
 session s1
 setup		{ BEGIN; }
-step s1a	{ SELECT * FROM queue ORDER BY id FOR UPDATE LIMIT 1; }
+step s1a	{ SELECT * FROM queue ORDER BY id FOR UPDATE; }
 step s1b	{ COMMIT; }
 
 session s2
 setup		{ BEGIN; }
-step s2a	{ SELECT * FROM queue ORDER BY id FOR UPDATE LIMIT 1; }
+step s2a	{ SELECT * FROM queue ORDER BY id FOR UPDATE; }
 step s2b	{ COMMIT; }
 
 session s3
 setup		{ BEGIN; }
-step s3a	{ SELECT * FROM queue ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1; }
+step s3a	{ SELECT * FROM queue ORDER BY id FOR UPDATE SKIP LOCKED; }
 step s3b	{ COMMIT; }
 
 # s3 skips to the second record because it can't obtain the tuple lock

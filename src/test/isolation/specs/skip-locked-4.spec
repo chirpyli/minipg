@@ -16,7 +16,7 @@ teardown
 
 session s1
 setup		{ BEGIN; }
-step s1a	{ SELECT * FROM foo WHERE pg_advisory_lock(0) IS NOT NULL ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED; }
+step s1a	{ SELECT * FROM foo WHERE pg_advisory_lock(0) IS NOT NULL ORDER BY id FOR UPDATE SKIP LOCKED; }
 step s1b	{ COMMIT; }
 
 session s2

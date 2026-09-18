@@ -17,13 +17,13 @@ teardown
 
 session s1
 setup		{ BEGIN; }
-step s1a	{ SELECT * FROM queue ORDER BY id FOR SHARE SKIP LOCKED LIMIT 1; }
+step s1a	{ SELECT * FROM queue ORDER BY id FOR SHARE SKIP LOCKED; }
 step s1b	{ COMMIT; }
 
 session s2
 setup		{ BEGIN; }
-step s2a	{ SELECT * FROM queue ORDER BY id FOR SHARE SKIP LOCKED LIMIT 1; }
-step s2b	{ SELECT * FROM queue ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1; }
+step s2a	{ SELECT * FROM queue ORDER BY id FOR SHARE SKIP LOCKED; }
+step s2b	{ SELECT * FROM queue ORDER BY id FOR UPDATE SKIP LOCKED; }
 step s2c	{ COMMIT; }
 
 # s1 and s2 both get SHARE lock, creating a multixact lock, then s2

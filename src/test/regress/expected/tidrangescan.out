@@ -195,12 +195,12 @@ SELECT ctid FROM tidrangescan WHERE '(1,7)' >= ctid AND ctid > '(1,4)';
 (3 rows)
 
 -- extreme offsets
-SELECT ctid FROM tidrangescan WHERE ctid > '(0,65535)' AND ctid < '(1,0)' LIMIT 1;
+SELECT ctid FROM tidrangescan WHERE ctid > '(0,65535)' AND ctid < '(1,0)';
  ctid 
 ------
 (0 rows)
 
-SELECT ctid FROM tidrangescan WHERE ctid < '(0,0)' LIMIT 1;
+SELECT ctid FROM tidrangescan WHERE ctid < '(0,0)';
  ctid 
 ------
 (0 rows)

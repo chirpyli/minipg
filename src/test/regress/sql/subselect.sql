@@ -100,18 +100,7 @@ explain (verbose, costs off)
 select 1 = all (select (select 1));
 select 1 = all (select (select 1));
 
---
--- Check EXISTS simplification with LIMIT
---
-explain (costs off)
-select * from int4_tbl o where exists
-  (select 1 from int4_tbl i where i.f1=o.f1 limit null);
-explain (costs off)
-select * from int4_tbl o where not exists
-  (select 1 from int4_tbl i where i.f1=o.f1 limit 1);
-explain (costs off)
-select * from int4_tbl o where exists
-  (select 1 from int4_tbl i where i.f1=o.f1 limit 0);
+-- minipg: LIMIT 已裁剪，EXISTS 与 LIMIT 简化交互的用例整节移除
 
 --
 -- Test cases to catch unpleasant interactions between IN-join processing
@@ -603,33 +592,7 @@ where b and f1 >= 0;
 -- minipg: CREATE FUNCTION 已裁剪，无法定义 volatile/stable 函数，
 -- 该用例（含 stable 变体）整节移除
 
---
--- Test that LIMIT can be pushed to SORT through a subquery that just projects
--- columns.  We check for that having happened by looking to see if EXPLAIN
--- ANALYZE shows that a top-N sort was used.  We must suppress or filter away
--- all the non-invariant parts of the EXPLAIN ANALYZE output.
---
-create table sq_limit (pk int primary key, c1 int, c2 int);
-insert into sq_limit values
-    (1, 1, 1),
-    (2, 2, 2),
-    (3, 3, 3),
-    (4, 4, 4),
-    (5, 1, 1),
-    (6, 2, 2),
-    (7, 3, 3),
-    (8, 4, 4);
-
--- minipg: PL/pgSQL removed. The original used a plpgsql function to normalize
--- the non-deterministic "Memory: NkB" field of EXPLAIN ANALYZE output. Use a
--- costs-off EXPLAIN instead, which is deterministic, to verify LIMIT is pushed
--- to the top-N sort.
-explain (costs off)
-select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
-
-select * from (select pk,c2 from sq_limit order by c1,pk) as x limit 3;
-
-drop table sq_limit;
+-- minipg: LIMIT 已裁剪，"LIMIT 下推到 SORT" 的用例整节移除
 
 -- minipg: SQL cursors are removed, so the backward-scan-direction test for
 -- expression subqueries (bug #15336) is dropped; it required a scroll cursor

@@ -140,7 +140,7 @@ test: bitmapops combocid advisory_lock
 # ----------
 # select 与 subselect 都会建表 foo，subselect 与 arrays 都会建表 t1，
 # 同名表不能在同一个并发组里，故拆成两组
-test: select arrays limit
+test: select arrays
 
 test: subselect
 

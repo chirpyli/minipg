@@ -811,9 +811,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_LockRows:
 			pname = "LockRows";
 			break;
-		case T_Limit:
-			pname = "Limit";
-			break;
 		case T_Hash:
 			pname = "Hash";
 			break;

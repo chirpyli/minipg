@@ -380,14 +380,12 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * VALUES list, or general SELECT input.  We special-case VALUES, both for
 	 * efficiency and so we can handle DEFAULT specifications.
 	 *
-	 * The grammar allows attaching ORDER BY, LIMIT, FOR UPDATE, or WITH to a
+	 * The grammar allows attaching ORDER BY, FOR UPDATE, or WITH to a
 	 * VALUES clause.  If we have any of those, treat it as a general SELECT;
 	 * so it will work, but you can't use DEFAULT items together with those.
 	 */
 	isGeneralSelect = (selectStmt && (selectStmt->valuesLists == NIL ||
 									  selectStmt->sortClause != NIL ||
-									  selectStmt->limitOffset != NULL ||
-									  selectStmt->limitCount != NULL ||
 									  selectStmt->lockingClause != NIL));
 
 	/*
@@ -885,15 +883,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 													  false);
 	}
 
-	/* transform LIMIT */
-	qry->limitOffset = transformLimitClause(pstate, stmt->limitOffset,
-											EXPR_KIND_OFFSET, "OFFSET",
-											stmt->limitOption);
-	qry->limitCount = transformLimitClause(pstate, stmt->limitCount,
-										   EXPR_KIND_LIMIT, "LIMIT",
-										   stmt->limitOption);
-	qry->limitOption = stmt->limitOption;
-
 	/* resolve any still-unresolved output columns as being type text */
 	if (pstate->p_resolve_unknowns)
 		resolveTargetListUnknowns(pstate, qry->targetList);
@@ -1095,14 +1084,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 										  &qry->targetList,
 										  EXPR_KIND_ORDER_BY,
 										  false /* allow SQL92 rules */ );
-
-	qry->limitOffset = transformLimitClause(pstate, stmt->limitOffset,
-											EXPR_KIND_OFFSET, "OFFSET",
-											stmt->limitOption);
-	qry->limitCount = transformLimitClause(pstate, stmt->limitCount,
-										   EXPR_KIND_LIMIT, "LIMIT",
-										   stmt->limitOption);
-	qry->limitOption = stmt->limitOption;
 
 	if (stmt->lockingClause)
 		ereport(ERROR,

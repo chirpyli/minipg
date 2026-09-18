@@ -380,7 +380,7 @@ select pg_get_ruledef(oid, true) from pg_rewrite
 -- test extraction of FieldSelect field names (get_name_for_var_field)
 
 explain (verbose, costs off)
-select (r).column2 from (select r from (values(1,2),(3,4)) r limit 1) ss;
+select (r).column2 from (select r from (values(1,2),(3,4)) r) ss;
 
 -- test pretty-print parenthesization rules, and SubLink deparsing
 

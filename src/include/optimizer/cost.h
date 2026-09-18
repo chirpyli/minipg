@@ -96,13 +96,11 @@ extern void cost_resultscan(Path *path, PlannerInfo *root,
 extern void cost_recursive_union(Path *runion, Path *nrterm, Path *rterm);
 extern void cost_sort(Path *path, PlannerInfo *root,
 					  List *pathkeys, Cost input_cost, double tuples, int width,
-					  Cost comparison_cost, int sort_mem,
-					  double limit_tuples);
+					  Cost comparison_cost, int sort_mem);
 extern void cost_incremental_sort(Path *path,
 								  PlannerInfo *root, List *pathkeys, int presorted_keys,
 								  Cost input_startup_cost, Cost input_total_cost,
-								  double input_tuples, int width, Cost comparison_cost, int sort_mem,
-								  double limit_tuples);
+								  double input_tuples, int width, Cost comparison_cost, int sort_mem);
 extern void cost_append(AppendPath *path);
 extern void cost_merge_append(Path *path, PlannerInfo *root,
 							  List *pathkeys, int n_streams,

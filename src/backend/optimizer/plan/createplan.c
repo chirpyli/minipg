@@ -105,12 +105,9 @@ static Group *create_group_plan(PlannerInfo *root, GroupPath *best_path);
 static Unique *create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best_path,
 										int flags);
 static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
-static Result *create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path);
 static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
 									  int flags);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
-static Limit *create_limit_plan(PlannerInfo *root, LimitPath *best_path,
-								int flags);
 static SeqScan *create_seqscan_plan(PlannerInfo *root, Path *best_path,
 									List *tlist, List *scan_clauses);
 static SampleScan *create_samplescan_plan(PlannerInfo *root, Path *best_path,
@@ -157,8 +154,7 @@ static List *get_switched_clauses(List *clauses, Relids outerrelids);
 static List *order_qual_clauses(PlannerInfo *root, List *clauses);
 static void copy_generic_path_info(Plan *dest, Path *src);
 static void copy_plan_costsize(Plan *dest, Plan *src);
-static void label_sort_with_costsize(PlannerInfo *root, Sort *plan,
-									 double limit_tuples);
+static void label_sort_with_costsize(PlannerInfo *root, Sort *plan);
 static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid);
 static SampleScan *make_samplescan(List *qptlist, List *qpqual, Index scanrelid,
 								   TableSampleClause *tsc);
@@ -381,11 +377,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 											  (ProjectionPath *) best_path,
 											  flags);
 			}
-			else if (IsA(best_path, MinMaxAggPath))
-			{
-				plan = (Plan *) create_minmaxagg_plan(root,
-													  (MinMaxAggPath *) best_path);
-			}
 			else if (IsA(best_path, GroupResultPath))
 			{
 				plan = (Plan *) create_group_result_plan(root,
@@ -458,11 +449,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_ModifyTable:
 			plan = (Plan *) create_modifytable_plan(root,
 													(ModifyTablePath *) best_path);
-			break;
-		case T_Limit:
-			plan = (Plan *) create_limit_plan(root,
-											  (LimitPath *) best_path,
-											  flags);
 			break;
 		case T_GatherMerge:
 			plan = (Plan *) create_gather_merge_plan(root,
@@ -1140,7 +1126,7 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 											 sortColIdx, sortOperators,
 											 collations, nullsFirst);
 
-				label_sort_with_costsize(root, sort, best_path->limit_tuples);
+				label_sort_with_costsize(root, sort);
 				subplan = (Plan *) sort;
 			}
 		}
@@ -1274,7 +1260,7 @@ create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
 										 sortColIdx, sortOperators,
 										 collations, nullsFirst);
 
-			label_sort_with_costsize(root, sort, best_path->limit_tuples);
+			label_sort_with_costsize(root, sort);
 			subplan = (Plan *) sort;
 		}
 
@@ -1618,7 +1604,7 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 			groupColPos++;
 		}
 		sort = make_sort_from_sortclauses(sortList, subplan);
-		label_sort_with_costsize(root, sort, -1.0);
+		label_sort_with_costsize(root, sort);
 		plan = (Plan *) make_unique_from_sortclauses((Plan *) sort, sortList);
 	}
 
@@ -2060,71 +2046,6 @@ create_agg_plan(PlannerInfo *root, AggPath *best_path)
 
 
 /*
- * create_minmaxagg_plan
- *
- *	  Create a Result plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static Result *
-create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path)
-{
-	Result	   *plan;
-	List	   *tlist;
-	ListCell   *lc;
-
-	/* Prepare an InitPlan for each aggregate's subquery. */
-	foreach(lc, best_path->mmaggregates)
-	{
-		MinMaxAggInfo *mminfo = (MinMaxAggInfo *) lfirst(lc);
-		PlannerInfo *subroot = mminfo->subroot;
-		Query	   *subparse = subroot->parse;
-		Plan	   *plan;
-
-		/*
-		 * Generate the plan for the subquery. We already have a Path, but we
-		 * have to convert it to a Plan and attach a LIMIT node above it.
-		 * Since we are entering a different planner context (subroot),
-		 * recurse to create_plan not create_plan_recurse.
-		 */
-		plan = create_plan(subroot, mminfo->path);
-
-		plan = (Plan *) make_limit(plan,
-								   subparse->limitOffset,
-								   subparse->limitCount,
-								   subparse->limitOption);
-
-		/* Must apply correct cost/width data to Limit node */
-		plan->startup_cost = mminfo->path->startup_cost;
-		plan->total_cost = mminfo->pathcost;
-		plan->plan_rows = 1;
-		plan->plan_width = mminfo->path->pathtarget->width;
-		plan->parallel_aware = false;
-		plan->parallel_safe = mminfo->path->parallel_safe;
-
-		/* Convert the plan into an InitPlan in the outer query. */
-		SS_make_initplan_from_plan(root, subroot, plan, mminfo->param);
-	}
-
-	/* Generate the output plan --- basically just a Result */
-	tlist = build_path_tlist(root, &best_path->path);
-
-	plan = make_result(tlist, (Node *) best_path->quals, NULL);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	/*
-	 * During setrefs.c, we'll need to replace references to the Agg nodes
-	 * with InitPlan output params.  (We can't just do that locally in the
-	 * MinMaxAgg node, because path nodes above here may have Agg references
-	 * as well.)  Save the mmaggregates list to tell setrefs.c to do that.
-	 */
-	Assert(root->minmax_aggs == NIL);
-	root->minmax_aggs = best_path->mmaggregates;
-
-	return plan;
-}
-
-/*
  * create_lockrows_plan
  *
  *	  Create a LockRows plan for 'best_path' and (recursively) plans
@@ -2181,32 +2102,6 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 
 	return plan;
 }
-
-/*
- * create_limit_plan
- *
- *	  Create a Limit plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static Limit *
-create_limit_plan(PlannerInfo *root, LimitPath *best_path, int flags)
-{
-	Limit	   *plan;
-	Plan	   *subplan;
-
-	/* Limit doesn't project, so tlist requirements pass through */
-	subplan = create_plan_recurse(root, best_path->subpath, flags);
-
-	plan = make_limit(subplan,
-					  best_path->limitOffset,
-					  best_path->limitCount,
-					  best_path->limitOption);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
 
 /*****************************************************************************
  *
@@ -3389,7 +3284,7 @@ create_mergejoin_plan(PlannerInfo *root,
 												   best_path->outersortkeys,
 												   outer_relids);
 
-		label_sort_with_costsize(root, sort, -1.0);
+		label_sort_with_costsize(root, sort);
 		outer_plan = (Plan *) sort;
 		outerpathkeys = best_path->outersortkeys;
 	}
@@ -3403,7 +3298,7 @@ create_mergejoin_plan(PlannerInfo *root,
 												   best_path->innersortkeys,
 												   inner_relids);
 
-		label_sort_with_costsize(root, sort, -1.0);
+		label_sort_with_costsize(root, sort);
 		inner_plan = (Plan *) sort;
 		innerpathkeys = best_path->innersortkeys;
 	}
@@ -4287,11 +4182,9 @@ copy_plan_costsize(Plan *dest, Plan *src)
  * included in the cost of the Path node we're working from, but since it's
  * not split out, we have to re-figure it using cost_sort().  This is just
  * to label the Sort node nicely for EXPLAIN.
- *
- * limit_tuples is as for cost_sort (in particular, pass -1 if no limit)
  */
 static void
-label_sort_with_costsize(PlannerInfo *root, Sort *plan, double limit_tuples)
+label_sort_with_costsize(PlannerInfo *root, Sort *plan)
 {
 	Plan	   *lefttree = plan->plan.lefttree;
 	Path		sort_path;		/* dummy for result of cost_sort */
@@ -4307,8 +4200,7 @@ label_sort_with_costsize(PlannerInfo *root, Sort *plan, double limit_tuples)
 			  lefttree->plan_rows,
 			  lefttree->plan_width,
 			  0.0,
-			  work_mem,
-			  limit_tuples);
+			  work_mem);
 	plan->plan.startup_cost = sort_path.startup_cost;
 	plan->plan.total_cost = sort_path.total_cost;
 	plan->plan.plan_rows = lefttree->plan_rows;
@@ -5488,29 +5380,6 @@ make_lockrows(Plan *lefttree, List *rowMarks, int epqParam)
 }
 
 /*
- * make_limit
- *	  Build a Limit plan node
- */
-Limit *
-make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
-		   LimitOption limitOption)
-{
-	Limit	   *node = makeNode(Limit);
-	Plan	   *plan = &node->plan;
-
-	plan->targetlist = lefttree->targetlist;
-	plan->qual = NIL;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-
-	node->limitOffset = limitOffset;
-	node->limitCount = limitCount;
-	node->limitOption = limitOption;
-
-	return node;
-}
-
-/*
  * make_result
  *	  Build a Result plan node
  */
@@ -5603,7 +5472,6 @@ is_projection_capable_path(Path *path)
 		case T_IncrementalSort:
 		case T_Unique:
 		case T_LockRows:
-		case T_Limit:
 		case T_ModifyTable:
 		case T_MergeAppend:
 			return false;
@@ -5646,7 +5514,6 @@ is_projection_capable_plan(Plan *plan)
 		case T_Sort:
 		case T_Unique:
 		case T_LockRows:
-		case T_Limit:
 		case T_ModifyTable:
 		case T_Append:
 		case T_MergeAppend:

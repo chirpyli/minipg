@@ -1296,15 +1296,6 @@ create_append_path(PlannerInfo *root,
 	pathnode->first_partial_path = list_length(subpaths);
 	pathnode->subpaths = list_concat(subpaths, partial_subpaths);
 
-	/*
-	 * Apply query-wide LIMIT if known and path is for sole base relation.
-	 * (Handling this at this low level is a bit klugy.)
-	 */
-	if (root != NULL && bms_equal(rel->relids, root->all_baserels))
-		pathnode->limit_tuples = root->limit_tuples;
-	else
-		pathnode->limit_tuples = -1.0;
-
 	foreach(l, pathnode->subpaths)
 	{
 		Path	   *subpath = (Path *) lfirst(l);
@@ -1417,15 +1408,6 @@ create_merge_append_path(PlannerInfo *root,
 	pathnode->subpaths = subpaths;
 
 	/*
-	 * Apply query-wide LIMIT if known and path is for sole base relation.
-	 * (Handling this at this low level is a bit klugy.)
-	 */
-	if (bms_equal(rel->relids, root->all_baserels))
-		pathnode->limit_tuples = root->limit_tuples;
-	else
-		pathnode->limit_tuples = -1.0;
-
-	/*
 	 * Add up the sizes and costs of the input paths.
 	 */
 	pathnode->path.rows = 0;
@@ -1457,8 +1439,7 @@ create_merge_append_path(PlannerInfo *root,
 					  subpath->parent->tuples,
 					  subpath->pathtarget->width,
 					  0.0,
-					  work_mem,
-					  pathnode->limit_tuples);
+					  work_mem);
 			input_startup_cost += sort_path.startup_cost;
 			input_total_cost += sort_path.total_cost;
 		}
@@ -1775,8 +1756,7 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 				  rel->rows,
 				  subpath->pathtarget->width,
 				  0.0,
-				  work_mem,
-				  -1.0);
+				  work_mem);
 
 		/*
 		 * Charge one cpu_operator_cost per comparison per input tuple. We
@@ -1898,8 +1878,7 @@ create_gather_merge_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 				  subpath->rows,
 				  subpath->pathtarget->width,
 				  0.0,
-				  work_mem,
-				  -1);
+				  work_mem);
 		input_startup_cost += sort_path.startup_cost;
 		input_total_cost += sort_path.total_cost;
 	}
@@ -2670,16 +2649,13 @@ create_set_projection_path(PlannerInfo *root,
  * 'pathkeys' represents the desired sort order
  * 'presorted_keys' is the number of keys by which the input path is
  *		already sorted
- * 'limit_tuples' is the estimated bound on the number of output tuples,
- *		or -1 if no LIMIT or couldn't estimate
  */
 IncrementalSortPath *
 create_incremental_sort_path(PlannerInfo *root,
 							 RelOptInfo *rel,
 							 Path *subpath,
 							 List *pathkeys,
-							 int presorted_keys,
-							 double limit_tuples)
+							 int presorted_keys)
 {
 	IncrementalSortPath *sort = makeNode(IncrementalSortPath);
 	SortPath   *pathnode = &sort->spath;
@@ -2705,7 +2681,7 @@ create_incremental_sort_path(PlannerInfo *root,
 						  subpath->rows,
 						  subpath->pathtarget->width,
 						  0.0,	/* XXX comparison_cost shouldn't be 0? */
-						  work_mem, limit_tuples);
+						  work_mem);
 
 	sort->nPresortedCols = presorted_keys;
 
@@ -2719,15 +2695,12 @@ create_incremental_sort_path(PlannerInfo *root,
  * 'rel' is the parent relation associated with the result
  * 'subpath' is the path representing the source of data
  * 'pathkeys' represents the desired sort order
- * 'limit_tuples' is the estimated bound on the number of output tuples,
- *		or -1 if no LIMIT or couldn't estimate
  */
 SortPath *
 create_sort_path(PlannerInfo *root,
 				 RelOptInfo *rel,
 				 Path *subpath,
-				 List *pathkeys,
-				 double limit_tuples)
+				 List *pathkeys)
 {
 	SortPath   *pathnode = makeNode(SortPath);
 
@@ -2750,7 +2723,7 @@ create_sort_path(PlannerInfo *root,
 			  subpath->rows,
 			  subpath->pathtarget->width,
 			  0.0,				/* XXX comparison_cost shouldn't be 0? */
-			  work_mem, limit_tuples);
+			  work_mem);
 
 	return pathnode;
 }
@@ -2929,73 +2902,6 @@ create_agg_path(PlannerInfo *root,
 }
 
 
-/*
- * create_minmaxagg_path
- *	  Creates a pathnode that represents computation of MIN/MAX aggregates
- *
- * 'rel' is the parent relation associated with the result
- * 'target' is the PathTarget to be computed
- * 'mmaggregates' is a list of MinMaxAggInfo structs
- * 'quals' is the HAVING quals if any
- */
-MinMaxAggPath *
-create_minmaxagg_path(PlannerInfo *root,
-					  RelOptInfo *rel,
-					  PathTarget *target,
-					  List *mmaggregates,
-					  List *quals)
-{
-	MinMaxAggPath *pathnode = makeNode(MinMaxAggPath);
-	Cost		initplan_cost;
-	ListCell   *lc;
-
-	/* The topmost generated Plan node will be a Result */
-	pathnode->path.pathtype = T_Result;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = target;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	/* A MinMaxAggPath implies use of initplans, so cannot be parallel-safe */
-	pathnode->path.parallel_safe = false;
-	pathnode->path.parallel_workers = 0;
-	/* Result is one unordered row */
-	pathnode->path.rows = 1;
-	pathnode->path.pathkeys = NIL;
-
-	pathnode->mmaggregates = mmaggregates;
-	pathnode->quals = quals;
-
-	/* Calculate cost of all the initplans ... */
-	initplan_cost = 0;
-	foreach(lc, mmaggregates)
-	{
-		MinMaxAggInfo *mminfo = (MinMaxAggInfo *) lfirst(lc);
-
-		initplan_cost += mminfo->pathcost;
-	}
-
-	/* add tlist eval cost for each output row, plus cpu_tuple_cost */
-	pathnode->path.startup_cost = initplan_cost + target->cost.startup;
-	pathnode->path.total_cost = initplan_cost + target->cost.startup +
-		target->cost.per_tuple + cpu_tuple_cost;
-
-	/*
-	 * Add cost of qual, if any --- but we ignore its selectivity, since our
-	 * rowcount estimate should be 1 no matter what the qual is.
-	 */
-	if (quals)
-	{
-		QualCost	qual_cost;
-
-		cost_qual_eval(&qual_cost, quals, root);
-		pathnode->path.startup_cost += qual_cost.startup;
-		pathnode->path.total_cost += qual_cost.startup + qual_cost.per_tuple;
-	}
-
-	return pathnode;
-}
-
 
 
 
@@ -3118,127 +3024,6 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	return pathnode;
 }
 
-/*
- * create_limit_path
- *	  Creates a pathnode that represents performing LIMIT/OFFSET
- *
- * In addition to providing the actual OFFSET and LIMIT expressions,
- * the caller must provide estimates of their values for costing purposes.
- * The estimates are as computed by preprocess_limit(), ie, 0 represents
- * the clause not being present, and -1 means it's present but we could
- * not estimate its value.
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'limitOffset' is the actual OFFSET expression, or NULL
- * 'limitCount' is the actual LIMIT expression, or NULL
- * 'offset_est' is the estimated value of the OFFSET expression
- * 'count_est' is the estimated value of the LIMIT expression
- */
-LimitPath *
-create_limit_path(PlannerInfo *root, RelOptInfo *rel,
-				  Path *subpath,
-				  Node *limitOffset, Node *limitCount,
-				  LimitOption limitOption,
-				  int64 offset_est, int64 count_est)
-{
-	LimitPath  *pathnode = makeNode(LimitPath);
-
-	pathnode->path.pathtype = T_Limit;
-	pathnode->path.parent = rel;
-	/* Limit doesn't project, so use source path's pathtarget */
-	pathnode->path.pathtarget = subpath->pathtarget;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	pathnode->path.parallel_aware = false;
-	pathnode->path.parallel_safe = rel->consider_parallel &&
-		subpath->parallel_safe;
-	pathnode->path.parallel_workers = subpath->parallel_workers;
-	pathnode->path.rows = subpath->rows;
-	pathnode->path.startup_cost = subpath->startup_cost;
-	pathnode->path.total_cost = subpath->total_cost;
-	pathnode->path.pathkeys = subpath->pathkeys;
-	pathnode->subpath = subpath;
-	pathnode->limitOffset = limitOffset;
-	pathnode->limitCount = limitCount;
-	pathnode->limitOption = limitOption;
-
-	/*
-	 * Adjust the output rows count and costs according to the offset/limit.
-	 */
-	adjust_limit_rows_costs(&pathnode->path.rows,
-							&pathnode->path.startup_cost,
-							&pathnode->path.total_cost,
-							offset_est, count_est);
-
-	return pathnode;
-}
-
-/*
- * adjust_limit_rows_costs
- *	  Adjust the size and cost estimates for a LimitPath node according to the
- *	  offset/limit.
- *
- * This is only a cosmetic issue if we are at top level, but if we are
- * building a subquery then it's important to report correct info to the outer
- * planner.
- *
- * When the offset or count couldn't be estimated, use 10% of the estimated
- * number of rows emitted from the subpath.
- *
- * XXX we don't bother to add eval costs of the offset/limit expressions
- * themselves to the path costs.  In theory we should, but in most cases those
- * expressions are trivial and it's just not worth the trouble.
- */
-void
-adjust_limit_rows_costs(double *rows,	/* in/out parameter */
-						Cost *startup_cost, /* in/out parameter */
-						Cost *total_cost,	/* in/out parameter */
-						int64 offset_est,
-						int64 count_est)
-{
-	double		input_rows = *rows;
-	Cost		input_startup_cost = *startup_cost;
-	Cost		input_total_cost = *total_cost;
-
-	if (offset_est != 0)
-	{
-		double		offset_rows;
-
-		if (offset_est > 0)
-			offset_rows = (double) offset_est;
-		else
-			offset_rows = clamp_row_est(input_rows * 0.10);
-		if (offset_rows > *rows)
-			offset_rows = *rows;
-		if (input_rows > 0)
-			*startup_cost +=
-				(input_total_cost - input_startup_cost)
-				* offset_rows / input_rows;
-		*rows -= offset_rows;
-		if (*rows < 1)
-			*rows = 1;
-	}
-
-	if (count_est != 0)
-	{
-		double		count_rows;
-
-		if (count_est > 0)
-			count_rows = (double) count_est;
-		else
-			count_rows = clamp_row_est(input_rows * 0.10);
-		if (count_rows > *rows)
-			count_rows = *rows;
-		if (input_rows > 0)
-			*total_cost = *startup_cost +
-				(input_total_cost - input_startup_cost)
-				* count_rows / input_rows;
-		*rows = count_rows;
-		if (*rows < 1)
-			*rows = 1;
-	}
-}
 
 
 /*

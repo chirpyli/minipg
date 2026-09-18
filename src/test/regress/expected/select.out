@@ -420,19 +420,19 @@ SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
 --
 -- Test some cases involving whole-row Var referencing a subquery
 --
-select foo from (select 1 offset 0) as foo;
+select foo from (select 1) as foo;
  foo 
 -----
  (1)
 (1 row)
 
-select foo from (select null offset 0) as foo;
+select foo from (select null) as foo;
  foo 
 -----
  ()
 (1 row)
 
-select foo from (select 'xyzzy',1,null offset 0) as foo;
+select foo from (select 'xyzzy',1,null) as foo;
     foo     
 ------------
  (xyzzy,1,)
@@ -449,18 +449,7 @@ select * from onek, (values(147, 'RFAAAA'), (931, 'VJAAAA')) as v (i, j)
      931 |       1 |   1 |    3 |   1 |     11 |       1 |       31 |         131 |       431 |      931 |   2 |    3 | VJAAAA   | BAAAAA   | HHHHxx  | 931 | VJAAAA
 (2 rows)
 
--- a more complex case
--- looks like we're coding lisp :-)
-select * from onek,
-  (values ((select i from
-    (values(10000), (2), (389), (1000), (2000), ((select 10029))) as foo(i)
-    order by i asc limit 1))) bar (i)
-  where onek.unique1 = bar.i;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 | i 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------+---
-       2 |     326 |   0 |    2 |   2 |      2 |       2 |        2 |           2 |         2 |        2 |   4 |    5 | CAAAAA   | OMAAAA   | OOOOxx  | 2
-(1 row)
-
+-- minipg: LIMIT 已裁剪，依赖 LIMIT 返回单行的复杂 VALUES 用例移除
 -- try VALUES in a subquery
 -- minipg: 行构造器 (a,b) 已裁剪，改写为等价的标量条件
 select * from onek

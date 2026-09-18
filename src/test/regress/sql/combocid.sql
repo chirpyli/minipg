@@ -6,16 +6,16 @@ CREATE TABLE combocidtest (foobar int);
 BEGIN;
 
 -- a few dummy ops to push up the CommandId counter
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
 
 INSERT INTO combocidtest VALUES (1);
 INSERT INTO combocidtest VALUES (2);
@@ -43,16 +43,16 @@ SELECT ctid,cmin,* FROM combocidtest;
 BEGIN;
 
 -- a few dummy ops to push up the CommandId counter
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
-INSERT INTO combocidtest SELECT 1 LIMIT 0;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
+INSERT INTO combocidtest SELECT 1 WHERE false;
 
 INSERT INTO combocidtest VALUES (444);
 

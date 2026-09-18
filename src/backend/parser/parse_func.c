@@ -1865,10 +1865,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			/* okay */
 			pstate->p_hasTargetSRFs = true;
 			break;
-		case EXPR_KIND_LIMIT:
-		case EXPR_KIND_OFFSET:
-			errkind = true;
-			break;
 		case EXPR_KIND_VALUES:
 			/* SRFs are presently not supported by nodeValuesscan.c */
 			errkind = true;

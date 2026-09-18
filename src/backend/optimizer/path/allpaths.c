@@ -561,19 +561,6 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 			 * set_subquery_pathlist() might push some of these quals down
 			 * into the subquery itself, but that doesn't change anything.)
 			 *
-			 * We can't push sub-select containing LIMIT/OFFSET to workers as
-			 * there is no guarantee that the row order will be fully
-			 * deterministic, and applying LIMIT/OFFSET will lead to
-			 * inconsistent results at the top-level.  (In some cases, where
-			 * the result is ordered, we could relax this restriction.  But it
-			 * doesn't currently seem worth expending extra effort to do so.)
-			 */
-			{
-				Query	   *subquery = castNode(Query, rte->subquery);
-
-				if (limit_needed(subquery))
-					return;
-			}
 			break;
 
 		case RTE_JOIN:
@@ -2027,8 +2014,7 @@ generate_useful_gather_paths(PlannerInfo *root, RelOptInfo *rel, bool override_r
 				tmp = (Path *) create_sort_path(root,
 												rel,
 												subpath,
-												useful_pathkeys,
-												-1.0);
+												useful_pathkeys);
 
 				rows = tmp->rows * tmp->parallel_workers;
 
@@ -2063,8 +2049,7 @@ generate_useful_gather_paths(PlannerInfo *root, RelOptInfo *rel, bool override_r
 															rel,
 															subpath,
 															useful_pathkeys,
-															presorted_keys,
-															-1);
+															presorted_keys);
 
 				path = create_gather_merge_path(root, rel,
 												tmp,
@@ -2360,9 +2345,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 						  pushdown_safety_info *safetyInfo)
 {
 	/* Check point 1 */
-	if (subquery->limitOffset != NULL || subquery->limitCount != NULL)
-		return false;
-
 	/* Check points 3, 4, and 5 */
 	if (subquery->distinctClause ||
 		subquery->hasTargetSRFs)
@@ -2983,19 +2965,12 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			subpath = ((AggPath *) path)->subpath;
 			break;
 
-		case T_MinMaxAggPath:
-			ptype = "MinMaxAgg";
-			break;
 		case T_LockRowsPath:
 			ptype = "LockRows";
 			subpath = ((LockRowsPath *) path)->subpath;
 			break;
 		case T_ModifyTablePath:
 			ptype = "ModifyTable";
-			break;
-		case T_LimitPath:
-			ptype = "Limit";
-			subpath = ((LimitPath *) path)->subpath;
 			break;
 		default:
 			ptype = "???Path";

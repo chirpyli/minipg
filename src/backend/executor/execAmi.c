@@ -30,7 +30,6 @@
 #include "executor/nodeIncrementalSort.h"
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
-#include "executor/nodeLimit.h"
 #include "executor/nodeLockRows.h"
 #include "executor/nodeMaterial.h"
 #include "executor/nodeMemoize.h"
@@ -258,10 +257,6 @@ ExecReScan(PlanState *node)
 			ExecReScanLockRows((LockRowsState *) node);
 			break;
 
-		case T_LimitState:
-			ExecReScanLimit((LimitState *) node);
-			break;
-
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(node));
 			break;
@@ -402,8 +397,6 @@ ExecSupportsMarkRestore(Path *pathnode)
 			 */
 			if (IsA(pathnode, ProjectionPath))
 				return ExecSupportsMarkRestore(((ProjectionPath *) pathnode)->subpath);
-			else if (IsA(pathnode, MinMaxAggPath))
-				return false;	/* childless Result */
 			else if (IsA(pathnode, GroupResultPath))
 				return false;	/* childless Result */
 			else
@@ -528,7 +521,6 @@ ExecSupportsBackwardScan(Plan *node)
 			return false;
 
 		case T_LockRows:
-		case T_Limit:
 			return ExecSupportsBackwardScan(outerPlan(node));
 
 		default:

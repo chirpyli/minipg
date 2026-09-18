@@ -1963,10 +1963,6 @@ query_tree_walker(Query *query,
 		return true;
 	if (walker(query->havingQual, context))
 		return true;
-	if (walker(query->limitOffset, context))
-		return true;
-	if (walker(query->limitCount, context))
-		return true;
 
 	/*
 	 * Most callers aren't interested in SortGroupClause nodes since those
@@ -2668,8 +2664,6 @@ query_tree_mutator(Query *query,
 	MUTATE(query->targetList, query->targetList, List *);
 	MUTATE(query->jointree, query->jointree, FromExpr *);
 	MUTATE(query->havingQual, query->havingQual, Node *);
-	MUTATE(query->limitOffset, query->limitOffset, Node *);
-	MUTATE(query->limitCount, query->limitCount, Node *);
 
 	/*
 	 * Most callers aren't interested in SortGroupClause nodes since those
@@ -2972,10 +2966,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(stmt->valuesLists, context))
 					return true;
 				if (walker(stmt->sortClause, context))
-					return true;
-				if (walker(stmt->limitOffset, context))
-					return true;
-				if (walker(stmt->limitCount, context))
 					return true;
 				if (walker(stmt->lockingClause, context))
 					return true;

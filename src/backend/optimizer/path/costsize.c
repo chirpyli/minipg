@@ -1577,8 +1577,7 @@ cost_resultscan(Path *path, PlannerInfo *root,
 static void
 cost_tuplesort(Cost *startup_cost, Cost *run_cost,
 			   double tuples, int width,
-			   Cost comparison_cost, int sort_mem,
-			   double limit_tuples)
+			   Cost comparison_cost, int sort_mem)
 {
 	double		input_bytes = relation_byte_size(tuples, width);
 	double		output_bytes;
@@ -1595,17 +1594,8 @@ cost_tuplesort(Cost *startup_cost, Cost *run_cost,
 	/* Include the default cost-per-comparison */
 	comparison_cost += 2.0 * cpu_operator_cost;
 
-	/* Do we have a useful LIMIT? */
-	if (limit_tuples > 0 && limit_tuples < tuples)
-	{
-		output_tuples = limit_tuples;
-		output_bytes = relation_byte_size(output_tuples, width);
-	}
-	else
-	{
-		output_tuples = tuples;
-		output_bytes = input_bytes;
-	}
+	output_tuples = tuples;
+	output_bytes = input_bytes;
 
 	if (output_bytes > sort_mem_bytes)
 	{
@@ -1657,9 +1647,7 @@ cost_tuplesort(Cost *startup_cost, Cost *run_cost,
 	 * Also charge a small amount (arbitrarily set equal to operator cost) per
 	 * extracted tuple.  We don't charge cpu_tuple_cost because a Sort node
 	 * doesn't do qual-checking or projection, so it has less overhead than
-	 * most plan nodes.  Note it's correct to use tuples not output_tuples
-	 * here --- the upper LIMIT will pro-rate the run cost so we'd be double
-	 * counting the LIMIT otherwise.
+	 * most plan nodes.
 	 */
 	*run_cost = cpu_operator_cost * tuples;
 }
@@ -1680,8 +1668,7 @@ void
 cost_incremental_sort(Path *path,
 					  PlannerInfo *root, List *pathkeys, int presorted_keys,
 					  Cost input_startup_cost, Cost input_total_cost,
-					  double input_tuples, int width, Cost comparison_cost, int sort_mem,
-					  double limit_tuples)
+					  double input_tuples, int width, Cost comparison_cost, int sort_mem)
 {
 	Cost		startup_cost = 0,
 				run_cost = 0,
@@ -1770,8 +1757,7 @@ cost_incremental_sort(Path *path,
 	 * group size by half.
 	 */
 	cost_tuplesort(&group_startup_cost, &group_run_cost,
-				   1.5 * group_tuples, width, comparison_cost, sort_mem,
-				   limit_tuples);
+				   1.5 * group_tuples, width, comparison_cost, sort_mem);
 
 	/*
 	 * Startup cost of incremental sort is the startup cost of its first group
@@ -1819,8 +1805,7 @@ cost_incremental_sort(Path *path,
 void
 cost_sort(Path *path, PlannerInfo *root,
 		  List *pathkeys, Cost input_cost, double tuples, int width,
-		  Cost comparison_cost, int sort_mem,
-		  double limit_tuples)
+		  Cost comparison_cost, int sort_mem)
 
 {
 	Cost		startup_cost;
@@ -1828,8 +1813,7 @@ cost_sort(Path *path, PlannerInfo *root,
 
 	cost_tuplesort(&startup_cost, &run_cost,
 				   tuples, width,
-				   comparison_cost, sort_mem,
-				   limit_tuples);
+				   comparison_cost, sort_mem);
 
 	if (!enable_sort)
 		startup_cost += disable_cost;
@@ -1998,8 +1982,7 @@ cost_append(AppendPath *apath)
 							  subpath->rows,
 							  subpath->pathtarget->width,
 							  0.0,
-							  work_mem,
-							  apath->limit_tuples);
+							  work_mem);
 					subpath = &sort_path;
 				}
 
@@ -3029,8 +3012,7 @@ initial_cost_mergejoin(PlannerInfo *root, JoinCostWorkspace *workspace,
 				  outer_path_rows,
 				  outer_path->pathtarget->width,
 				  0.0,
-				  work_mem,
-				  -1.0);
+				  work_mem);
 		startup_cost += sort_path.startup_cost;
 		startup_cost += (sort_path.total_cost - sort_path.startup_cost)
 			* outerstartsel;
@@ -3055,8 +3037,7 @@ initial_cost_mergejoin(PlannerInfo *root, JoinCostWorkspace *workspace,
 				  inner_path_rows,
 				  inner_path->pathtarget->width,
 				  0.0,
-				  work_mem,
-				  -1.0);
+				  work_mem);
 		startup_cost += sort_path.startup_cost;
 		startup_cost += (sort_path.total_cost - sort_path.startup_cost)
 			* innerstartsel;

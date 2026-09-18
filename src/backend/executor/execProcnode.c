@@ -88,7 +88,6 @@
 #include "executor/nodeIncrementalSort.h"
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
-#include "executor/nodeLimit.h"
 #include "executor/nodeLockRows.h"
 #include "executor/nodeMaterial.h"
 #include "executor/nodeMemoize.h"
@@ -329,11 +328,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_LockRows:
 			result = (PlanState *) ExecInitLockRows((LockRows *) node,
 													estate, eflags);
-			break;
-
-		case T_Limit:
-			result = (PlanState *) ExecInitLimit((Limit *) node,
-												 estate, eflags);
 			break;
 
 		default:
@@ -674,10 +668,6 @@ ExecEndNode(PlanState *node)
 
 		case T_LockRowsState:
 			ExecEndLockRows((LockRowsState *) node);
-			break;
-
-		case T_LimitState:
-			ExecEndLimit((LimitState *) node);
 			break;
 
 		default:

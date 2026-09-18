@@ -3393,27 +3393,6 @@ get_select_query_def(Query *query, deparse_context *context,
 						 force_colno, context);
 	}
 
-	/*
-	 * Add the LIMIT/OFFSET clauses if given. If non-default options, use the
-	 * standard spelling of LIMIT.
-	 */
-	if (query->limitOffset != NULL)
-	{
-		appendContextKeyword(context, " OFFSET ",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-		get_rule_expr(query->limitOffset, context, false);
-	}
-	if (query->limitCount != NULL)
-	{
-		appendContextKeyword(context, " LIMIT ",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-		if (IsA(query->limitCount, Const) &&
-			((Const *) query->limitCount)->constisnull)
-			appendStringInfoString(buf, "ALL");
-		else
-			get_rule_expr(query->limitCount, context, false);
-	}
-
 	/* Add FOR [KEY] UPDATE/SHARE clauses if present */
 	if (query->hasForUpdate)
 	{

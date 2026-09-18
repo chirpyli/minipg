@@ -252,9 +252,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleExpr(jstate, query->havingQual);
 	JumbleExpr(jstate, (Node *) query->distinctClause);
 	JumbleExpr(jstate, (Node *) query->sortClause);
-	JumbleExpr(jstate, query->limitOffset);
-	JumbleExpr(jstate, query->limitCount);
-	APP_JUMB(query->limitOption);
 	JumbleRowMarks(jstate, query->rowMarks);
 }
 

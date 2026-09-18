@@ -784,9 +784,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(havingQual);
 	COMPARE_NODE_FIELD(distinctClause);
 	COMPARE_NODE_FIELD(sortClause);
-	COMPARE_NODE_FIELD(limitOffset);
-	COMPARE_NODE_FIELD(limitCount);
-	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(rowMarks);
 	COMPARE_NODE_FIELD(constraintDeps);
 	COMPARE_LOCATION_FIELD(stmt_location);
@@ -848,9 +845,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(havingClause);
 	COMPARE_NODE_FIELD(valuesLists);
 	COMPARE_NODE_FIELD(sortClause);
-	COMPARE_NODE_FIELD(limitOffset);
-	COMPARE_NODE_FIELD(limitCount);
-	COMPARE_SCALAR_FIELD(limitOption);
 	COMPARE_NODE_FIELD(lockingClause);
 
 	return true;

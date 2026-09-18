@@ -6,9 +6,7 @@
 -- count the number of tuples originally, should be 1000
 SELECT count(*) FROM onek;
 
--- pick a random row
-SELECT unique1 AS random
-  FROM onek ORDER BY random() LIMIT 1;
+-- minipg: LIMIT 已裁剪，"随机取一行" 用例移除
 
 -- count roughly 1/10 of the tuples
 CREATE TABLE RANDOM_TBL AS

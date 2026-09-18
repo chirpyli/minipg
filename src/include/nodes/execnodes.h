@@ -2165,41 +2165,4 @@ typedef struct LockRowsState
 	EPQState	lr_epqstate;	/* for evaluating EvalPlanQual rechecks */
 } LockRowsState;
 
-/* ----------------
- *	 LimitState information
- *
- *		Limit nodes are used to enforce LIMIT/OFFSET clauses.
- *		They just select the desired subrange of their subplan's output.
- *
- * offset is the number of initial tuples to skip (0 does nothing).
- * count is the number of tuples to return after skipping the offset tuples.
- * If no limit count was specified, count is undefined and noCount is true.
- * When lstate == LIMIT_INITIAL, offset/count/noCount haven't been set yet.
- * ----------------
- */
-typedef enum
-{
-	LIMIT_INITIAL,				/* initial state for LIMIT node */
-	LIMIT_RESCAN,				/* rescan after recomputing parameters */
-	LIMIT_EMPTY,				/* there are no returnable rows */
-	LIMIT_INWINDOW,				/* have returned a row in the window */
-	LIMIT_SUBPLANEOF,			/* at EOF of subplan (within window) */
-	LIMIT_WINDOWEND,			/* stepped off end of window */
-	LIMIT_WINDOWSTART			/* stepped off beginning of window */
-} LimitStateCond;
-
-typedef struct LimitState
-{
-	PlanState	ps;				/* its first field is NodeTag */
-	ExprState  *limitOffset;	/* OFFSET parameter, or NULL if none */
-	ExprState  *limitCount;		/* COUNT parameter, or NULL if none */
-	LimitOption limitOption;	/* limit specification type */
-	int64		offset;			/* current OFFSET value */
-	int64		count;			/* current COUNT, if any */
-	bool		noCount;		/* if true, ignore count */
-	LimitStateCond lstate;		/* state machine status, as above */
-	int64		position;		/* 1-based index of last tuple returned */
-	TupleTableSlot *subSlot;	/* tuple last obtained from subplan */
-} LimitState;
-
 #endif							/* EXECNODES_H */

@@ -109,13 +109,6 @@
 
 
 
-/* Private struct for the result of opt_select_limit production */
-typedef struct SelectLimit
-{
-	Node *limitOffset;
-	Node *limitCount;
-	LimitOption limitOption;
-} SelectLimit;
 
 /* Private struct for the result of group_clause production */
 typedef struct GroupClause
@@ -147,7 +140,6 @@ static List *check_func_name(List *names, core_yyscan_t yyscanner);
 static List *check_indirection(List *indirection, core_yyscan_t yyscanner);
 static void insertSelectOptions(SelectStmt *stmt,
 								List *sortClause, List *lockingClause,
-								SelectLimit *limitClause,
 								core_yyscan_t yyscanner);
 static Node *doNegate(Node *n, int location);
 static void doNegateFloat(Value *v);
@@ -263,7 +255,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <str>		iso_level opt_encoding
 %type <node>	vacuum_relation
-%type <selectlimit> opt_select_limit select_limit limit_clause
 
 %type <list>	parse_toplevel stmtmulti
 				OptTableElementList TableElementList definition
@@ -313,10 +304,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <objtype>	object_type_any_name
 				drop_type_name
 
-%type <node>	select_limit_value
-				offset_clause select_offset_value
-				select_fetch_first_value I_or_F_const
-%type <ival>	row_or_rows first_or_next
 
 %type <istmt>	insert_rest
 
@@ -2948,29 +2935,20 @@ select_with_parens:
  *	2002-08-28 bjm
  */
 select_no_parens:
-			simple_select						{ $$ = $1; }
-			| select_clause sort_clause
-				{
-					insertSelectOptions((SelectStmt *) $1, $2, NIL,
-										NULL,
-										yyscanner);
-					$$ = $1;
-				}
-			| select_clause opt_sort_clause for_locking_clause opt_select_limit
-				{
-					insertSelectOptions((SelectStmt *) $1, $2, $3,
-										$4,
-										yyscanner);
-					$$ = $1;
-				}
-			| select_clause opt_sort_clause select_limit opt_for_locking_clause
-				{
-					insertSelectOptions((SelectStmt *) $1, $2, $4,
-										$3,
-										yyscanner);
-					$$ = $1;
-				}
-		;
+		simple_select						{ $$ = $1; }
+		| select_clause sort_clause
+			{
+				insertSelectOptions((SelectStmt *) $1, $2, NIL,
+									yyscanner);
+				$$ = $1;
+			}
+		| select_clause opt_sort_clause for_locking_clause
+			{
+				insertSelectOptions((SelectStmt *) $1, $2, $3,
+									yyscanner);
+				$$ = $1;
+			}
+	;
 
 select_clause:
 			simple_select							{ $$ = $1; }
@@ -3115,135 +3093,6 @@ sortby:		a_expr USING qual_all_Op opt_nulls_order
 		;
 
 
-select_limit:
-			limit_clause offset_clause
-				{
-					$$ = $1;
-					($$)->limitOffset = $2;
-				}
-			| offset_clause limit_clause
-				{
-					$$ = $2;
-					($$)->limitOffset = $1;
-				}
-			| limit_clause
-				{
-					$$ = $1;
-				}
-			| offset_clause
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = $1;
-					n->limitCount = NULL;
-					n->limitOption = LIMIT_OPTION_COUNT;
-					$$ = n;
-				}
-		;
-
-opt_select_limit:
-			select_limit						{ $$ = $1; }
-			| /* EMPTY */						{ $$ = NULL; }
-		;
-
-limit_clause:
-			LIMIT select_limit_value
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = NULL;
-					n->limitCount = $2;
-					n->limitOption = LIMIT_OPTION_COUNT;
-					$$ = n;
-				}
-			| LIMIT select_limit_value ',' select_offset_value
-				{
-					/* Disabled because it was too confusing, bjm 2002-02-18 */
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("LIMIT #,# syntax is not supported"),
-							 errhint("Use separate LIMIT and OFFSET clauses."),
-							 parser_errposition(@1)));
-				}
-			/* SQL:2008 syntax */
-			/* to avoid shift/reduce conflicts, handle the optional value with
-			 * a separate production rather than an opt_ expression.  The fact
-			 * that ONLY is fully reserved means that this way, we defer any
-			 * decision about what rule reduces ROW or ROWS to the point where
-			 * we can see the ONLY token in the lookahead slot.
-			 */
-			| FETCH first_or_next select_fetch_first_value row_or_rows ONLY
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = NULL;
-					n->limitCount = $3;
-					n->limitOption = LIMIT_OPTION_COUNT;
-					$$ = n;
-				}
-			| FETCH first_or_next row_or_rows ONLY
-				{
-					SelectLimit *n = (SelectLimit *) palloc(sizeof(SelectLimit));
-					n->limitOffset = NULL;
-					n->limitCount = makeIntConst(1, -1);
-					n->limitOption = LIMIT_OPTION_COUNT;
-					$$ = n;
-				}
-		;
-
-offset_clause:
-			OFFSET select_offset_value
-				{ $$ = $2; }
-			/* SQL:2008 syntax */
-			| OFFSET select_fetch_first_value row_or_rows
-				{ $$ = $2; }
-		;
-
-select_limit_value:
-			a_expr									{ $$ = $1; }
-			| ALL
-				{
-					/* LIMIT ALL is represented as a NULL constant */
-					$$ = makeNullAConst(@1);
-				}
-		;
-
-select_offset_value:
-			a_expr									{ $$ = $1; }
-		;
-
-/*
- * Allowing full expressions without parentheses causes various parsing
- * problems with the trailing ROW/ROWS key words.  SQL spec only calls for
- * <simple value specification>, which is either a literal or a parameter (but
- * an <SQL parameter reference> could be an identifier, bringing up conflicts
- * with ROW/ROWS). We solve this by leveraging the presence of ONLY (see above)
- * to determine whether the expression is missing rather than trying to make it
- * optional in this rule.
- *
- * c_expr covers almost all the spec-required cases (and more), but it doesn't
- * cover signed numeric literals, which are allowed by the spec. So we include
- * those here explicitly. We need FCONST as well as ICONST because values that
- * don't fit in the platform's "long", but do fit in bigint, should still be
- * accepted here. (This is possible in 64-bit Windows as well as all 32-bit
- * builds.)
- */
-select_fetch_first_value:
-			c_expr									{ $$ = $1; }
-			| '+' I_or_F_const
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", NULL, $2, @1); }
-			| '-' I_or_F_const
-				{ $$ = doNegate($2, @1); }
-		;
-
-I_or_F_const:
-			Iconst									{ $$ = makeIntConst($1,@1); }
-			| FCONST								{ $$ = makeFloatConst($1,@1); }
-		;
-
-/* noise words */
-row_or_rows: ROWS									{ $$ = 0; }
-		;
-
-first_or_next: FIRST_P								{ $$ = 0; }
-	;
 
 
 /*
@@ -6664,7 +6513,6 @@ check_indirection(List *indirection, core_yyscan_t yyscanner)
 static void
 insertSelectOptions(SelectStmt *stmt,
 					List *sortClause, List *lockingClause,
-					SelectLimit *limitClause,
 					core_yyscan_t yyscanner)
 {
 	Assert(IsA(stmt, SelectStmt));
@@ -6684,32 +6532,6 @@ insertSelectOptions(SelectStmt *stmt,
 	}
 	/* We can handle multiple locking clauses, though */
 	stmt->lockingClause = list_concat(stmt->lockingClause, lockingClause);
-	if (limitClause && limitClause->limitOffset)
-	{
-		if (stmt->limitOffset)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("multiple OFFSET clauses not allowed"),
-					 parser_errposition(exprLocation(limitClause->limitOffset))));
-		stmt->limitOffset = limitClause->limitOffset;
-	}
-	if (limitClause && limitClause->limitCount)
-	{
-		if (stmt->limitCount)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("multiple LIMIT clauses not allowed"),
-					 parser_errposition(exprLocation(limitClause->limitCount))));
-		stmt->limitCount = limitClause->limitCount;
-	}
-	if (limitClause)
-	{
-		if (stmt->limitOption)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("multiple limit options not allowed")));
-		stmt->limitOption = limitClause->limitOption;
-	}
 }
 
 /* SystemFuncName()

@@ -798,18 +798,6 @@ _outHash(StringInfo str, const Hash *node)
 
 
 static void
-_outLimit(StringInfo str, const Limit *node)
-{
-	WRITE_NODE_TYPE("LIMIT");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_NODE_FIELD(limitOffset);
-	WRITE_NODE_FIELD(limitCount);
-	WRITE_ENUM_FIELD(limitOption, LimitOption);
-}
-
-static void
 _outLockRows(StringInfo str, const LockRows *node)
 {
 	WRITE_NODE_TYPE("LOCKROWS");
@@ -1525,7 +1513,6 @@ _outAppendPath(StringInfo str, const AppendPath *node)
 
 	WRITE_NODE_FIELD(subpaths);
 	WRITE_INT_FIELD(first_partial_path);
-	WRITE_FLOAT_FIELD(limit_tuples, "%.0f");
 }
 
 static void
@@ -1536,7 +1523,6 @@ _outMergeAppendPath(StringInfo str, const MergeAppendPath *node)
 	_outPathInfo(str, (const Path *) node);
 
 	WRITE_NODE_FIELD(subpaths);
-	WRITE_FLOAT_FIELD(limit_tuples, "%.0f");
 }
 
 static void
@@ -1690,17 +1676,6 @@ _outAggPath(StringInfo str, const AggPath *node)
 
 
 static void
-_outMinMaxAggPath(StringInfo str, const MinMaxAggPath *node)
-{
-	WRITE_NODE_TYPE("MINMAXAGGPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(mmaggregates);
-	WRITE_NODE_FIELD(quals);
-}
-
-static void
 _outLockRowsPath(StringInfo str, const LockRowsPath *node)
 {
 	WRITE_NODE_TYPE("LOCKROWSPATH");
@@ -1728,19 +1703,6 @@ _outModifyTablePath(StringInfo str, const ModifyTablePath *node)
 	WRITE_NODE_FIELD(updateColnosLists);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_INT_FIELD(epqParam);
-}
-
-static void
-_outLimitPath(StringInfo str, const LimitPath *node)
-{
-	WRITE_NODE_TYPE("LIMITPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_NODE_FIELD(limitOffset);
-	WRITE_NODE_FIELD(limitCount);
-	WRITE_ENUM_FIELD(limitOption, LimitOption);
 }
 
 static void
@@ -1848,10 +1810,8 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(sort_pathkeys);
 	WRITE_NODE_FIELD(processed_tlist);
 	WRITE_NODE_FIELD(update_colnos);
-	WRITE_NODE_FIELD(minmax_aggs);
 	WRITE_FLOAT_FIELD(total_table_pages, "%.0f");
 	WRITE_FLOAT_FIELD(tuple_fraction, "%.4f");
-	WRITE_FLOAT_FIELD(limit_tuples, "%.0f");
 	WRITE_UINT_FIELD(qual_security_level);
 	WRITE_BOOL_FIELD(hasJoinRTEs);
 	WRITE_BOOL_FIELD(hasLateralRTEs);
@@ -2132,20 +2092,6 @@ _outPlaceHolderInfo(StringInfo str, const PlaceHolderInfo *node)
 }
 
 static void
-_outMinMaxAggInfo(StringInfo str, const MinMaxAggInfo *node)
-{
-	WRITE_NODE_TYPE("MINMAXAGGINFO");
-
-	WRITE_OID_FIELD(aggfnoid);
-	WRITE_OID_FIELD(aggsortop);
-	WRITE_NODE_FIELD(target);
-	/* We intentionally omit subroot --- too large, not interesting enough */
-	WRITE_NODE_FIELD(path);
-	WRITE_FLOAT_FIELD(pathcost, "%.2f");
-	WRITE_NODE_FIELD(param);
-}
-
-static void
 _outPlannerParamItem(StringInfo str, const PlannerParamItem *node)
 {
 	WRITE_NODE_TYPE("PLANNERPARAMITEM");
@@ -2218,9 +2164,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(havingClause);
 	WRITE_NODE_FIELD(valuesLists);
 	WRITE_NODE_FIELD(sortClause);
-	WRITE_NODE_FIELD(limitOffset);
-	WRITE_NODE_FIELD(limitCount);
-	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(lockingClause);
 }
 
@@ -2364,9 +2307,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(havingQual);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);
-	WRITE_NODE_FIELD(limitOffset);
-	WRITE_NODE_FIELD(limitCount);
-	WRITE_ENUM_FIELD(limitOption, LimitOption);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(constraintDeps);
 	WRITE_LOCATION_FIELD(stmt_location);
@@ -2914,9 +2854,6 @@ outNode(StringInfo str, const void *obj)
 			case T_LockRows:
 				_outLockRows(str, obj);
 				break;
-			case T_Limit:
-				_outLimit(str, obj);
-				break;
 			case T_NestLoopParam:
 				_outNestLoopParam(str, obj);
 				break;
@@ -3106,19 +3043,13 @@ outNode(StringInfo str, const void *obj)
 			case T_AggPath:
 				_outAggPath(str, obj);
 				break;
-			case T_MinMaxAggPath:
-				_outMinMaxAggPath(str, obj);
-				break;
 			case T_LockRowsPath:
 				_outLockRowsPath(str, obj);
 				break;
 			case T_ModifyTablePath:
 				_outModifyTablePath(str, obj);
 				break;
-			case T_LimitPath:
-				_outLimitPath(str, obj);
-				break;
-			case T_GatherMergePath:
+				case T_GatherMergePath:
 				_outGatherMergePath(str, obj);
 				break;
 			case T_NestPath:
@@ -3178,10 +3109,7 @@ outNode(StringInfo str, const void *obj)
 			case T_PlaceHolderInfo:
 				_outPlaceHolderInfo(str, obj);
 				break;
-			case T_MinMaxAggInfo:
-				_outMinMaxAggInfo(str, obj);
-				break;
-			case T_PlannerParamItem:
+				case T_PlannerParamItem:
 				_outPlannerParamItem(str, obj);
 				break;
 			case T_CreateStmt:

@@ -276,7 +276,6 @@ OffsetVarNodes_walker(Node *node, OffsetVarNodes_context *context)
 	Assert(!IsA(node, PlanRowMark));
 	Assert(!IsA(node, SpecialJoinInfo));
 	Assert(!IsA(node, PlaceHolderInfo));
-	Assert(!IsA(node, MinMaxAggInfo));
 
 	if (IsA(node, Query))
 	{
@@ -449,7 +448,6 @@ ChangeVarNodes_walker(Node *node, ChangeVarNodes_context *context)
 	/* Shouldn't need to handle other planner auxiliary nodes here */
 	Assert(!IsA(node, SpecialJoinInfo));
 	Assert(!IsA(node, PlaceHolderInfo));
-	Assert(!IsA(node, MinMaxAggInfo));
 
 	if (IsA(node, Query))
 	{
@@ -698,7 +696,6 @@ rangeTableEntry_used_walker(Node *node,
 	Assert(!IsA(node, SpecialJoinInfo));
 	Assert(!IsA(node, AppendRelInfo));
 	Assert(!IsA(node, PlaceHolderInfo));
-	Assert(!IsA(node, MinMaxAggInfo));
 
 	if (IsA(node, Query))
 	{

@@ -137,10 +137,6 @@ typedef struct Query
 
 	List	   *sortClause;		/* a list of SortGroupClause's */
 
-	Node	   *limitOffset;	/* # of result tuples to skip (int8 expr) */
-	Node	   *limitCount;		/* # of result tuples to return (int8 expr) */
-	LimitOption limitOption;	/* limit type */
-
 	List	   *rowMarks;		/* a list of RowMarkClause's */
 
 	List	   *constraintDeps; /* a list of pg_constraint OIDs that the query
@@ -1019,9 +1015,6 @@ typedef struct SelectStmt
 	 * SelectStmts.
 	 */
 	List	   *sortClause;		/* sort clause (a list of SortBy's) */
-	Node	   *limitOffset;	/* # of result tuples to skip */
-	Node	   *limitCount;		/* # of result tuples to return */
-	LimitOption limitOption;	/* limit type */
 	List	   *lockingClause;	/* FOR UPDATE (list of LockingClause's) */
 
 	/* Eventually add fields for CORRESPONDING spec here */
@@ -1333,8 +1326,6 @@ typedef struct TruncateStmt
  * correspond to any SQL grammar.
  * ----------------------
  */
-#define CURSOR_OPT_GENERIC_PLAN 0x0200	/* force use of generic plan */
-#define CURSOR_OPT_CUSTOM_PLAN	0x0400	/* force use of custom plan */
 #define CURSOR_OPT_PARALLEL_OK	0x0800	/* parallel mode OK */
 
 /* ----------------------

@@ -977,29 +977,6 @@ _copyLockRows(const LockRows *from)
 }
 
 /*
- * _copyLimit
- */
-static Limit *
-_copyLimit(const Limit *from)
-{
-	Limit	   *newnode = makeNode(Limit);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_NODE_FIELD(limitOffset);
-	COPY_NODE_FIELD(limitCount);
-	COPY_SCALAR_FIELD(limitOption);
-
-	return newnode;
-}
-
-/*
  * _copyNestLoopParam
  */
 static NestLoopParam *
@@ -2333,9 +2310,6 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(havingQual);
 	COPY_NODE_FIELD(distinctClause);
 	COPY_NODE_FIELD(sortClause);
-	COPY_NODE_FIELD(limitOffset);
-	COPY_NODE_FIELD(limitCount);
-	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_NODE_FIELD(constraintDeps);
 	COPY_LOCATION_FIELD(stmt_location);
@@ -2407,9 +2381,6 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(havingClause);
 	COPY_NODE_FIELD(valuesLists);
 	COPY_NODE_FIELD(sortClause);
-	COPY_NODE_FIELD(limitOffset);
-	COPY_NODE_FIELD(limitCount);
-	COPY_SCALAR_FIELD(limitOption);
 	COPY_NODE_FIELD(lockingClause);
 
 	return newnode;
@@ -2893,9 +2864,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_LockRows:
 			retval = _copyLockRows(from);
-			break;
-		case T_Limit:
-			retval = _copyLimit(from);
 			break;
 		case T_NestLoopParam:
 			retval = _copyNestLoopParam(from);

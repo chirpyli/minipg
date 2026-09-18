@@ -95,9 +95,6 @@ static void preprocess_qual_conditions(PlannerInfo *root, Node *jtnode);
 static void grouping_planner(PlannerInfo *root, double tuple_fraction);
 
 static void preprocess_rowmarks(PlannerInfo *root);
-static double preprocess_limit(PlannerInfo *root,
-							   double tuple_fraction,
-							   int64 *offset_est, int64 *count_est);
 static void remove_useless_groupby_columns(PlannerInfo *root);
 static List *preprocess_groupclause(PlannerInfo *root, List *force);
 static void standard_qp_callback(PlannerInfo *root, void *extra);
@@ -126,8 +123,7 @@ static RelOptInfo *create_distinct_paths(PlannerInfo *root,
 static RelOptInfo *create_ordered_paths(PlannerInfo *root,
 										RelOptInfo *input_rel,
 										PathTarget *target,
-										bool target_parallel_safe,
-										double limit_tuples);
+										bool target_parallel_safe);
 static PathTarget *make_group_input_target(PlannerInfo *root,
 										   PathTarget *final_target);
 static PathTarget *make_partial_grouping_target(PlannerInfo *root,
@@ -460,7 +456,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	root->processed_tlist = NIL;
 	root->update_colnos = NIL;
 
-	root->minmax_aggs = NIL;
 	root->qual_security_level = 0;
 	root->hasPseudoConstantQuals = false;
 	root->hasAlternativeSubPlans = false;
@@ -586,11 +581,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 	parse->havingQual = preprocess_expression(root, parse->havingQual,
 											  EXPRKIND_QUAL);
-
-	parse->limitOffset = preprocess_expression(root, parse->limitOffset,
-											   EXPRKIND_LIMIT);
-	parse->limitCount = preprocess_expression(root, parse->limitCount,
-											  EXPRKIND_LIMIT);
 
 	root->append_rel_list = (List *)
 		preprocess_expression(root, (Node *) root->append_rel_list,
@@ -951,9 +941,6 @@ static void
 grouping_planner(PlannerInfo *root, double tuple_fraction)
 {
 	Query	   *parse = root->parse;
-	int64		offset_est = 0;
-	int64		count_est = 0;
-	double		limit_tuples = -1.0;
 	bool		have_postponed_srfs = false;
 	PathTarget *final_target;
 	List	   *final_targets;
@@ -977,20 +964,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	bool		scanjoin_target_same_exprs;
 	bool		have_grouping;
 	standard_qp_extra qp_extra;
-
-	/* Tweak caller-supplied tuple_fraction if have LIMIT/OFFSET */
-	if (parse->limitCount || parse->limitOffset)
-	{
-		tuple_fraction = preprocess_limit(root, tuple_fraction,
-										  &offset_est, &count_est);
-
-		/*
-		 * If we have a known LIMIT, and don't have an unknown OFFSET, we can
-		 * estimate the effects of using a bounded sort.
-		 */
-		if (count_est > 0 && offset_est >= 0)
-			limit_tuples = (double) count_est + (double) offset_est;
-	}
 
 		/* Make tuple_fraction accessible to lower-level routines */
 		root->tuple_fraction = tuple_fraction;
@@ -1023,30 +996,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			preprocess_aggrefs(root, (Node *) root->processed_tlist);
 			preprocess_aggrefs(root, (Node *) parse->havingQual);
 		}
-
-		/*
-		 * Preprocess MIN/MAX aggregates, if any.  Note: be careful about
-		 * adding logic between here and the query_planner() call.  Anything
-		 * that is needed in MIN/MAX-optimizable cases will have to be
-		 * duplicated in planagg.c.
-		 */
-		if (parse->hasAggs)
-			preprocess_minmax_aggregates(root);
-
-		/*
-		 * Figure out whether there's a hard limit on the number of rows that
-		 * query_planner's result subplan needs to return.  Even if we know a
-		 * hard limit overall, it doesn't apply if the query has any
-		 * grouping/aggregation operations, or SRFs in the tlist.
-		 */
-		if (parse->groupClause ||
-			parse->distinctClause ||
-			parse->hasAggs ||
-			parse->hasTargetSRFs ||
-			root->hasHavingQual)
-			root->limit_tuples = -1.0;
-		else
-			root->limit_tuples = limit_tuples;
 
 		/* Set up data needed by standard_qp_callback */
 		qp_extra.groupClause = parse->groupClause;
@@ -1213,18 +1162,14 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	/*
 	 * If ORDER BY was given, consider ways to implement that, and generate a
 	 * new upperrel containing only paths that emit the correct ordering and
-	 * project the correct final_target.  We can apply the original
-	 * limit_tuples limit in sort costing here, but only if there are no
-	 * postponed SRFs.
+	 * project the correct final_target.
 	 */
 	if (parse->sortClause)
 	{
 		current_rel = create_ordered_paths(root,
 										   current_rel,
 										   final_target,
-										   final_target_parallel_safe,
-										   have_postponed_srfs ? -1.0 :
-										   limit_tuples);
+										   final_target_parallel_safe);
 		/* Fix things up if final_target contains SRFs */
 		if (parse->hasTargetSRFs)
 			adjust_paths_for_srfs(root, current_rel,
@@ -1244,9 +1189,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	 * not a SELECT, consider_parallel will be false for every relation in the
 	 * query.
 	 */
-	if (current_rel->consider_parallel &&
-		is_parallel_safe(root, parse->limitOffset) &&
-		is_parallel_safe(root, parse->limitCount))
+	if (current_rel->consider_parallel)
 		final_rel->consider_parallel = true;
 
 	/*
@@ -1269,18 +1212,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			path = (Path *) create_lockrows_path(root, final_rel, path,
 												 root->rowMarks,
 												 assign_special_exec_param(root));
-		}
-
-		/*
-		 * If there is a LIMIT/OFFSET clause, add the LIMIT node.
-		 */
-		if (limit_needed(parse))
-		{
-			path = (Path *) create_limit_path(root, final_rel, path,
-											  parse->limitOffset,
-											  parse->limitCount,
-											  parse->limitOption,
-											  offset_est, count_est);
 		}
 
 		/*
@@ -1394,8 +1325,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	 * Generate partial paths for final_rel, too, if outer query levels might
 	 * be able to make use of them.
 	 */
-	if (final_rel->consider_parallel && root->query_level > 1 &&
-		!limit_needed(parse))
+	if (final_rel->consider_parallel && root->query_level > 1)
 	{
 		Assert(!parse->rowMarks && parse->commandType == CMD_SELECT);
 		foreach(lc, current_rel->partial_pathlist)
@@ -1564,246 +1494,6 @@ select_rowmark_type(RangeTblEntry *rte, LockClauseStrength strength)
 	}
 }
 
-/*
- * preprocess_limit - do pre-estimation for LIMIT and/or OFFSET clauses
- *
- * We try to estimate the values of the LIMIT/OFFSET clauses, and pass the
- * results back in *count_est and *offset_est.  These variables are set to
- * 0 if the corresponding clause is not present, and -1 if it's present
- * but we couldn't estimate the value for it.  (The "0" convention is OK
- * for OFFSET but a little bit bogus for LIMIT: effectively we estimate
- * LIMIT 0 as though it were LIMIT 1.  But this is in line with the planner's
- * usual practice of never estimating less than one row.)  These values will
- * be passed to create_limit_path, which see if you change this code.
- *
- * The return value is the suitably adjusted tuple_fraction to use for
- * planning the query.  This adjustment is not overridable, since it reflects
- * plan actions that grouping_planner() will certainly take, not assumptions
- * about context.
- */
-static double
-preprocess_limit(PlannerInfo *root, double tuple_fraction,
-				 int64 *offset_est, int64 *count_est)
-{
-	Query	   *parse = root->parse;
-	Node	   *est;
-	double		limit_fraction;
-
-	/* Should not be called unless LIMIT or OFFSET */
-	Assert(parse->limitCount || parse->limitOffset);
-
-	/*
-	 * Try to obtain the clause values.  We use estimate_expression_value
-	 * primarily because it can sometimes do something useful with Params.
-	 */
-	if (parse->limitCount)
-	{
-		est = estimate_expression_value(root, parse->limitCount);
-		if (est && IsA(est, Const))
-		{
-			if (((Const *) est)->constisnull)
-			{
-				/* NULL indicates LIMIT ALL, ie, no limit */
-				*count_est = 0; /* treat as not present */
-			}
-			else
-			{
-				*count_est = DatumGetInt64(((Const *) est)->constvalue);
-				if (*count_est <= 0)
-					*count_est = 1; /* force to at least 1 */
-			}
-		}
-		else
-			*count_est = -1;	/* can't estimate */
-	}
-	else
-		*count_est = 0;			/* not present */
-
-	if (parse->limitOffset)
-	{
-		est = estimate_expression_value(root, parse->limitOffset);
-		if (est && IsA(est, Const))
-		{
-			if (((Const *) est)->constisnull)
-			{
-				/* Treat NULL as no offset; the executor will too */
-				*offset_est = 0;	/* treat as not present */
-			}
-			else
-			{
-				*offset_est = DatumGetInt64(((Const *) est)->constvalue);
-				if (*offset_est < 0)
-					*offset_est = 0;	/* treat as not present */
-			}
-		}
-		else
-			*offset_est = -1;	/* can't estimate */
-	}
-	else
-		*offset_est = 0;		/* not present */
-
-	if (*count_est != 0)
-	{
-		/*
-		 * A LIMIT clause limits the absolute number of tuples returned.
-		 * However, if it's not a constant LIMIT then we have to guess; for
-		 * lack of a better idea, assume 10% of the plan's result is wanted.
-		 */
-		if (*count_est < 0 || *offset_est < 0)
-		{
-			/* LIMIT or OFFSET is an expression ... punt ... */
-			limit_fraction = 0.10;
-		}
-		else
-		{
-			/* LIMIT (plus OFFSET, if any) is max number of tuples needed */
-			limit_fraction = (double) *count_est + (double) *offset_est;
-		}
-
-		/*
-		 * If we have absolute limits from both caller and LIMIT, use the
-		 * smaller value; likewise if they are both fractional.  If one is
-		 * fractional and the other absolute, we can't easily determine which
-		 * is smaller, but we use the heuristic that the absolute will usually
-		 * be smaller.
-		 */
-		if (tuple_fraction >= 1.0)
-		{
-			if (limit_fraction >= 1.0)
-			{
-				/* both absolute */
-				tuple_fraction = Min(tuple_fraction, limit_fraction);
-			}
-			else
-			{
-				/* caller absolute, limit fractional; use caller's value */
-			}
-		}
-		else if (tuple_fraction > 0.0)
-		{
-			if (limit_fraction >= 1.0)
-			{
-				/* caller fractional, limit absolute; use limit */
-				tuple_fraction = limit_fraction;
-			}
-			else
-			{
-				/* both fractional */
-				tuple_fraction = Min(tuple_fraction, limit_fraction);
-			}
-		}
-		else
-		{
-			/* no info from caller, just use limit */
-			tuple_fraction = limit_fraction;
-		}
-	}
-	else if (*offset_est != 0 && tuple_fraction > 0.0)
-	{
-		/*
-		 * We have an OFFSET but no LIMIT.  This acts entirely differently
-		 * from the LIMIT case: here, we need to increase rather than decrease
-		 * the caller's tuple_fraction, because the OFFSET acts to cause more
-		 * tuples to be fetched instead of fewer.  This only matters if we got
-		 * a tuple_fraction > 0, however.
-		 *
-		 * As above, use 10% if OFFSET is present but unestimatable.
-		 */
-		if (*offset_est < 0)
-			limit_fraction = 0.10;
-		else
-			limit_fraction = (double) *offset_est;
-
-		/*
-		 * If we have absolute counts from both caller and OFFSET, add them
-		 * together; likewise if they are both fractional.  If one is
-		 * fractional and the other absolute, we want to take the larger, and
-		 * we heuristically assume that's the fractional one.
-		 */
-		if (tuple_fraction >= 1.0)
-		{
-			if (limit_fraction >= 1.0)
-			{
-				/* both absolute, so add them together */
-				tuple_fraction += limit_fraction;
-			}
-			else
-			{
-				/* caller absolute, limit fractional; use limit */
-				tuple_fraction = limit_fraction;
-			}
-		}
-		else
-		{
-			if (limit_fraction >= 1.0)
-			{
-				/* caller fractional, limit absolute; use caller's value */
-			}
-			else
-			{
-				/* both fractional, so add them together */
-				tuple_fraction += limit_fraction;
-				if (tuple_fraction >= 1.0)
-					tuple_fraction = 0.0;	/* assume fetch all */
-			}
-		}
-	}
-
-	return tuple_fraction;
-}
-
-/*
- * limit_needed - do we actually need a Limit plan node?
- *
- * If we have constant-zero OFFSET and constant-null LIMIT, we can skip adding
- * a Limit node.  This is worth checking for because "OFFSET 0" is a common
- * locution for an optimization fence.  (Because other places in the planner
- * merely check whether parse->limitOffset isn't NULL, it will still work as
- * an optimization fence --- we're just suppressing unnecessary run-time
- * overhead.)
- *
- * This might look like it could be merged into preprocess_limit, but there's
- * a key distinction: here we need hard constants in OFFSET/LIMIT, whereas
- * in preprocess_limit it's good enough to consider estimated values.
- */
-bool
-limit_needed(Query *parse)
-{
-	Node	   *node;
-
-	node = parse->limitCount;
-	if (node)
-	{
-		if (IsA(node, Const))
-		{
-			/* NULL indicates LIMIT ALL, ie, no limit */
-			if (!((Const *) node)->constisnull)
-				return true;	/* LIMIT with a constant value */
-		}
-		else
-			return true;		/* non-constant LIMIT */
-	}
-
-	node = parse->limitOffset;
-	if (node)
-	{
-		if (IsA(node, Const))
-		{
-			/* Treat NULL as no offset; the executor would too */
-			if (!((Const *) node)->constisnull)
-			{
-				int64		offset = DatumGetInt64(((Const *) node)->constvalue);
-
-				if (offset != 0)
-					return true;	/* OFFSET with a nonzero value */
-			}
-		}
-		else
-			return true;		/* non-constant OFFSET */
-	}
-
-	return false;				/* don't need a Limit plan node */
-}
 
 
 /*
@@ -2656,7 +2346,7 @@ make_sort_input_target(PlannerInfo *root,
 	 */
 	if (!(postpone_srfs || have_volatile ||
 		  (have_expensive &&
-		   (parse->limitCount || root->tuple_fraction > 0))))
+		   (root->tuple_fraction > 0))))
 		return final_target;
 
 	/*
@@ -3047,7 +2737,7 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 	seqScanPath = create_seqscan_path(root, rel, NULL, 0);
 	cost_sort(&seqScanAndSortPath, root, NIL,
 			  seqScanPath->total_cost, rel->tuples, rel->reltarget->width,
-			  comparisonCost, maintenance_work_mem, -1.0);
+			  comparisonCost, maintenance_work_mem);
 
 	/* Estimate the cost of index scan */
 	indexScanPath = create_index_path(root, indexInfo,
@@ -3241,8 +2931,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 					path = (Path *) create_sort_path(root,
 													 grouped_rel,
 													 path,
-													 root->group_pathkeys,
-													 -1.0);
+													 root->group_pathkeys);
 
 				/* Now decide what to stick atop it */
 				if (parse->hasAggs)
@@ -3306,11 +2995,10 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 			Assert(list_length(root->group_pathkeys) != 1);
 
 			path = (Path *) create_incremental_sort_path(root,
-														 grouped_rel,
-														 path,
-														 root->group_pathkeys,
-														 presorted_keys,
-														 -1.0);
+													 grouped_rel,
+													 path,
+													 root->group_pathkeys,
+													 presorted_keys);
 
 			/* Now decide what to stick atop it */
 			if (parse->hasAggs)
@@ -3380,8 +3068,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 					path = (Path *) create_sort_path(root,
 													 grouped_rel,
 													 path,
-													 root->group_pathkeys,
-													 -1.0);
+													 root->group_pathkeys);
 				}
 
 				if (parse->hasAggs)
@@ -3431,8 +3118,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 															 grouped_rel,
 															 path,
 															 root->group_pathkeys,
-															 presorted_keys,
-															 -1.0);
+															 presorted_keys);
 
 				if (parse->hasAggs)
 					add_path(grouped_rel, (Path *)
@@ -3636,8 +3322,7 @@ create_partial_grouping_paths(PlannerInfo *root,
 					path = (Path *) create_sort_path(root,
 													 partially_grouped_rel,
 													 path,
-													 root->group_pathkeys,
-													 -1.0);
+													 root->group_pathkeys);
 
 				if (parse->hasAggs)
 					add_path(partially_grouped_rel, (Path *)
@@ -3690,11 +3375,10 @@ create_partial_grouping_paths(PlannerInfo *root,
 
 				/* Since we have presorted keys, consider incremental sort. */
 				path = (Path *) create_incremental_sort_path(root,
-															 partially_grouped_rel,
-															 path,
-															 root->group_pathkeys,
-															 presorted_keys,
-															 -1.0);
+														 partially_grouped_rel,
+														 path,
+														 root->group_pathkeys,
+														 presorted_keys);
 
 				if (parse->hasAggs)
 					add_path(partially_grouped_rel, (Path *)
@@ -3742,8 +3426,7 @@ create_partial_grouping_paths(PlannerInfo *root,
 					path = (Path *) create_sort_path(root,
 													 partially_grouped_rel,
 													 path,
-													 root->group_pathkeys,
-													 -1.0);
+													 root->group_pathkeys);
 
 				if (parse->hasAggs)
 					add_partial_path(partially_grouped_rel, (Path *)
@@ -3792,8 +3475,7 @@ create_partial_grouping_paths(PlannerInfo *root,
 														 partially_grouped_rel,
 														 path,
 														 root->group_pathkeys,
-														 presorted_keys,
-														 -1.0);
+														 presorted_keys);
 
 			if (parse->hasAggs)
 				add_partial_path(partially_grouped_rel, (Path *)
@@ -3893,8 +3575,7 @@ gather_grouping_paths(PlannerInfo *root, RelOptInfo *rel)
 		total_groups =
 			cheapest_partial_path->rows * cheapest_partial_path->parallel_workers;
 		path = (Path *) create_sort_path(root, rel, cheapest_partial_path,
-										 root->group_pathkeys,
-										 -1.0);
+										 root->group_pathkeys);
 		path = (Path *)
 			create_gather_merge_path(root,
 									 rel,
@@ -3939,8 +3620,7 @@ gather_grouping_paths(PlannerInfo *root, RelOptInfo *rel)
 													 rel,
 													 path,
 													 root->group_pathkeys,
-													 presorted_keys,
-													 -1.0);
+													 presorted_keys);
 
 		path = (Path *)
 			create_gather_merge_path(root,
@@ -4207,8 +3887,7 @@ create_distinct_paths(PlannerInfo *root,
 		if (!pathkeys_contained_in(needed_pathkeys, path->pathkeys))
 			path = (Path *) create_sort_path(root, distinct_rel,
 											 path,
-											 needed_pathkeys,
-											 -1.0);
+											 needed_pathkeys);
 
 		add_path(distinct_rel, (Path *)
 				 create_upper_unique_path(root, distinct_rel,
@@ -4279,8 +3958,6 @@ create_distinct_paths(PlannerInfo *root,
  *
  * input_rel: contains the source-data Paths
  * target: the output tlist the result Paths must emit
- * limit_tuples: estimated bound on the number of output tuples,
- *		or -1 if no LIMIT or couldn't estimate
  *
  * XXX This only looks at sort_pathkeys. I wonder if it needs to look at the
  * other pathkeys (grouping, ...) like generate_useful_gather_paths.
@@ -4289,8 +3966,7 @@ static RelOptInfo *
 create_ordered_paths(PlannerInfo *root,
 					 RelOptInfo *input_rel,
 					 PathTarget *target,
-					 bool target_parallel_safe,
-					 double limit_tuples)
+					 bool target_parallel_safe)
 {
 	Path	   *cheapest_input_path = input_rel->cheapest_total_path;
 	RelOptInfo *ordered_rel;
@@ -4336,14 +4012,12 @@ create_ordered_paths(PlannerInfo *root,
 			if (input_path == cheapest_input_path)
 			{
 				/*
-				 * Sort the cheapest input path. An explicit sort here can
-				 * take advantage of LIMIT.
+				 * Sort the cheapest input path.
 				 */
 				sorted_path = (Path *) create_sort_path(root,
-														ordered_rel,
-														input_path,
-														root->sort_pathkeys,
-														limit_tuples);
+															ordered_rel,
+															input_path,
+															root->sort_pathkeys);
 				/* Add projection step if needed */
 				if (sorted_path->pathtarget != target)
 					sorted_path = apply_projection_to_path(root, ordered_rel,
@@ -4371,8 +4045,7 @@ create_ordered_paths(PlannerInfo *root,
 																ordered_rel,
 																input_path,
 																root->sort_pathkeys,
-																presorted_keys,
-																limit_tuples);
+																presorted_keys);
 
 			/* Add projection step if needed */
 			if (sorted_path->pathtarget != target)
@@ -4413,8 +4086,7 @@ create_ordered_paths(PlannerInfo *root,
 			path = (Path *) create_sort_path(root,
 											 ordered_rel,
 											 cheapest_partial_path,
-											 root->sort_pathkeys,
-											 limit_tuples);
+											 root->sort_pathkeys);
 
 			total_groups = cheapest_partial_path->rows *
 				cheapest_partial_path->parallel_workers;
@@ -4475,8 +4147,7 @@ create_ordered_paths(PlannerInfo *root,
 																	ordered_rel,
 																	input_path,
 																	root->sort_pathkeys,
-																	presorted_keys,
-																	limit_tuples);
+																	presorted_keys);
 				total_groups = input_path->rows *
 					input_path->parallel_workers;
 				sorted_path = (Path *)

@@ -1469,63 +1469,6 @@ transformWhereClause(ParseState *pstate, Node *clause,
 }
 
 
-/*
- * transformLimitClause -
- *	  Transform the expression and make sure it is of type bigint.
- *	  Used for LIMIT and allied clauses.
- *
- * Note: as of Postgres 8.2, LIMIT expressions are expected to yield int8,
- * rather than int4 as before.
- *
- * constructName does not affect the semantics, but is used in error messages
- */
-Node *
-transformLimitClause(ParseState *pstate, Node *clause,
-					 ParseExprKind exprKind, const char *constructName,
-					 LimitOption limitOption)
-{
-	Node	   *qual;
-
-	if (clause == NULL)
-		return NULL;
-
-	qual = transformExpr(pstate, clause, exprKind);
-
-	qual = coerce_to_specific_type(pstate, qual, INT8OID, constructName);
-
-	/* LIMIT can't refer to any variables of the current query */
-	checkExprIsVarFree(pstate, qual, constructName);
-
-	return qual;
-}
-
-/*
- * checkExprIsVarFree
- *		Check that given expr has no Vars of the current query level
- *		(aggregates and window functions should have been rejected already).
- *
- * This is used to check expressions that have to have a consistent value
- * across all rows of the query, such as a LIMIT.  Arguably it should reject
- * volatile functions, too, but we don't do that --- whatever value the
- * function gives on first execution is what you get.
- *
- * constructName does not affect the semantics, but is used in error messages
- */
-static void
-checkExprIsVarFree(ParseState *pstate, Node *n, const char *constructName)
-{
-	if (contain_vars_of_level(n, 0))
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-		/* translator: %s is name of a SQL construct, eg LIMIT */
-				 errmsg("argument of %s must not contain variables",
-						constructName),
-				 parser_errposition(pstate,
-									locate_var_of_level(n, 0))));
-	}
-}
-
 
 /*
  * checkTargetlistEntrySQL92 -

@@ -338,31 +338,7 @@ SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 
 DROP INDEX onek_nulltest;
 
--- Check initial-positioning logic too
-
-CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2);
-
-SET enable_seqscan = OFF;
-SET enable_indexscan = ON;
-SET enable_bitmapscan = OFF;
-
-SELECT unique1, unique2 FROM onek_with_null
-  ORDER BY unique2 LIMIT 2;
-SELECT unique1, unique2 FROM onek_with_null WHERE unique2 >= -1
-  ORDER BY unique2 LIMIT 2;
-SELECT unique1, unique2 FROM onek_with_null WHERE unique2 >= 0
-  ORDER BY unique2 LIMIT 2;
-
-SELECT unique1, unique2 FROM onek_with_null
-  ORDER BY unique2 DESC LIMIT 2;
-SELECT unique1, unique2 FROM onek_with_null WHERE unique2 >= -1
-  ORDER BY unique2 DESC LIMIT 2;
-SELECT unique1, unique2 FROM onek_with_null WHERE unique2 < 999
-  ORDER BY unique2 DESC LIMIT 2;
-
-RESET enable_seqscan;
-RESET enable_indexscan;
-RESET enable_bitmapscan;
+-- minipg: LIMIT 已裁剪，依赖 LIMIT 的索引 initial-positioning 用例整节移除
 
 DROP TABLE onek_with_null;
 
@@ -442,17 +418,17 @@ RESET enable_indexonlyscan;
 CREATE TABLE boolindex (b bool, i int, unique(b, i), junk float);
 
 explain (costs off)
-  select * from boolindex order by b, i limit 10;
+  select * from boolindex order by b, i;
 explain (costs off)
-  select * from boolindex where b order by i limit 10;
+  select * from boolindex where b order by i;
 explain (costs off)
-  select * from boolindex where b = true order by i desc limit 10;
+  select * from boolindex where b = true order by i desc;
 explain (costs off)
-  select * from boolindex where not b order by i limit 10;
+  select * from boolindex where not b order by i;
 explain (costs off)
-  select * from boolindex where b is true order by i desc limit 10;
+  select * from boolindex where b is true order by i desc;
 explain (costs off)
-  select * from boolindex where b is false order by i desc limit 10;
+  select * from boolindex where b is false order by i desc;
 
 --
 -- REINDEX (VERBOSE)

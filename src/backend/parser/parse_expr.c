@@ -428,8 +428,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_UPDATE_TARGET:
 		case EXPR_KIND_GROUP_BY:
 		case EXPR_KIND_ORDER_BY:
-		case EXPR_KIND_LIMIT:
-		case EXPR_KIND_OFFSET:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
 		case EXPR_KIND_INDEX_EXPRESSION:
@@ -1427,8 +1425,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_UPDATE_TARGET:
 		case EXPR_KIND_GROUP_BY:
 		case EXPR_KIND_ORDER_BY:
-		case EXPR_KIND_LIMIT:
-		case EXPR_KIND_OFFSET:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
 			/* okay */
@@ -2127,10 +2123,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "GROUP BY";
 		case EXPR_KIND_ORDER_BY:
 			return "ORDER BY";
-		case EXPR_KIND_LIMIT:
-			return "LIMIT";
-		case EXPR_KIND_OFFSET:
-			return "OFFSET";
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
 			return "VALUES";

@@ -790,25 +790,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				}
 			}
 			break;
-		case T_Limit:
-			{
-				Limit	   *splan = (Limit *) plan;
-
-				/*
-				 * Like the plan types above, Limit doesn't evaluate its tlist
-				 * or quals.  It does have live expressions for limit/offset,
-				 * however; and those cannot contain subplan variable refs, so
-				 * fix_scan_expr works for them.
-				 */
-				set_dummy_tlist_references(plan, rtoffset);
-				Assert(splan->plan.qual == NIL);
-
-				splan->limitOffset =
-					fix_scan_expr(root, splan->limitOffset, rtoffset, 1);
-				splan->limitCount =
-					fix_scan_expr(root, splan->limitCount, rtoffset, 1);
-			}
-			break;
 		case T_Agg:
 			{
 				Agg		   *agg = (Agg *) plan;
@@ -1538,7 +1519,6 @@ fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset, double num_exec)
 
 	if (rtoffset != 0 ||
 		root->glob->lastPHId != 0 ||
-		root->minmax_aggs != NIL ||
 		root->hasAlternativeSubPlans)
 	{
 		return fix_scan_expr_mutator(node, &context);
@@ -1586,20 +1566,6 @@ fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context)
 	}
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *aggref = (Aggref *) node;
-		Param	   *aggparam;
-
-		/* See if the Aggref should be replaced by a Param */
-		aggparam = find_minmax_agg_replacement_param(context->root, aggref);
-		if (aggparam != NULL)
-		{
-			/* Make a copy of the Param for paranoia's sake */
-			return (Node *) copyObject(aggparam);
-		}
-		/* If no match, just fall through to process it normally */
-	}
 	if (IsA(node, PlaceHolderVar))
 	{
 		/* At scan level, we should always just evaluate the contained expr */
@@ -2448,20 +2414,6 @@ fix_upper_expr_mutator(Node *node, fix_upper_expr_context *context)
 	/* Special cases (apply only AFTER failing to match to lower tlist) */
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *aggref = (Aggref *) node;
-		Param	   *aggparam;
-
-		/* See if the Aggref should be replaced by a Param */
-		aggparam = find_minmax_agg_replacement_param(context->root, aggref);
-		if (aggparam != NULL)
-		{
-			/* Make a copy of the Param for paranoia's sake */
-			return (Node *) copyObject(aggparam);
-		}
-		/* If no match, just fall through to process it normally */
-	}
 	if (IsA(node, AlternativeSubPlan))
 		return fix_upper_expr_mutator(fix_alternative_subplan(context->root,
 															  (AlternativeSubPlan *) node,
@@ -2471,38 +2423,6 @@ fix_upper_expr_mutator(Node *node, fix_upper_expr_context *context)
 	return expression_tree_mutator(node,
 								   fix_upper_expr_mutator,
 								   (void *) context);
-}
-
-
-/*
- * find_minmax_agg_replacement_param
- *		If the given Aggref is one that we are optimizing into a subquery
- *		(cf. planagg.c), then return the Param that should replace it.
- *		Else return NULL.
- *
- * This is exported so that SS_finalize_plan can use it before setrefs.c runs.
- * Note that it will not find anything until we have built a Plan from a
- * MinMaxAggPath, as root->minmax_aggs will never be filled otherwise.
- */
-Param *
-find_minmax_agg_replacement_param(PlannerInfo *root, Aggref *aggref)
-{
-	if (root->minmax_aggs != NIL &&
-		list_length(aggref->args) == 1)
-	{
-		TargetEntry *curTarget = (TargetEntry *) linitial(aggref->args);
-		ListCell   *lc;
-
-		foreach(lc, root->minmax_aggs)
-		{
-			MinMaxAggInfo *mminfo = (MinMaxAggInfo *) lfirst(lc);
-
-			if (mminfo->aggfnoid == aggref->aggfnoid &&
-				equal(mminfo->target, curTarget->expr))
-				return mminfo->param;
-		}
-	}
-	return NULL;
 }
 
 

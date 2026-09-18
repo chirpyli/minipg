@@ -27,11 +27,6 @@ extern RelOptInfo *query_planner(PlannerInfo *root,
 								 query_pathkeys_callback qp_callback, void *qp_extra);
 
 /*
- * prototypes for plan/planagg.c
- */
-extern void preprocess_minmax_aggregates(PlannerInfo *root);
-
-/*
  * prototypes for plan/createplan.c
  */
 extern Plan *create_plan(PlannerInfo *root, Path *best_path);
@@ -48,8 +43,6 @@ extern Agg *make_agg(List *tlist, List *qual,
 					 int numGroupCols, AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
 					 double dNumGroups,
 					 Size transitionSpace, Plan *lefttree);
-extern Limit *make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
-						 LimitOption limitOption);
 
 /*
  * prototypes for plan/initsplan.c
@@ -100,8 +93,6 @@ extern bool innerrel_is_unique(PlannerInfo *root,
  * prototypes for plan/setrefs.c
  */
 extern Plan *set_plan_references(PlannerInfo *root, Plan *plan);
-extern Param *find_minmax_agg_replacement_param(PlannerInfo *root,
-												Aggref *aggref);
 extern void record_plan_function_dependency(PlannerInfo *root, Oid funcid);
 extern bool extract_query_dependencies_walker(Node *node, PlannerInfo *root);
 

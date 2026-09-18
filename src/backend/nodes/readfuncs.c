@@ -266,9 +266,6 @@ _readQuery(void)
 	READ_NODE_FIELD(havingQual);
 	READ_NODE_FIELD(distinctClause);
 	READ_NODE_FIELD(sortClause);
-	READ_NODE_FIELD(limitOffset);
-	READ_NODE_FIELD(limitCount);
-	READ_ENUM_FIELD(limitOption, LimitOption);
 	READ_NODE_FIELD(rowMarks);
 	READ_NODE_FIELD(constraintDeps);
 	READ_LOCATION_FIELD(stmt_location);
@@ -1849,23 +1846,6 @@ _readLockRows(void)
 }
 
 /*
- * _readLimit
- */
-static Limit *
-_readLimit(void)
-{
-	READ_LOCALS(Limit);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_NODE_FIELD(limitOffset);
-	READ_NODE_FIELD(limitCount);
-	READ_ENUM_FIELD(limitOption, LimitOption);
-
-	READ_DONE();
-}
-
-/*
  * _readNestLoopParam
  */
 static NestLoopParam *
@@ -2139,8 +2119,6 @@ parseNodeString(void)
 		return_value = _readHash();
 	else if (MATCH("LOCKROWS", 8))
 		return_value = _readLockRows();
-	else if (MATCH("LIMIT", 5))
-		return_value = _readLimit();
 	else if (MATCH("NESTLOOPPARAM", 13))
 		return_value = _readNestLoopParam();
 	else if (MATCH("PLANROWMARK", 11))

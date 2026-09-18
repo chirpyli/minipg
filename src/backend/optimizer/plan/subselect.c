@@ -1105,7 +1105,7 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 {
 	/*
 	 * We don't try to simplify at all if the query uses set operations,
-	 * aggregates, grouping sets, SRFs, modifying CTEs, HAVING, OFFSET, or FOR
+	 * aggregates, grouping sets, SRFs, modifying CTEs, HAVING, or FOR
 	 * UPDATE/SHARE; none of these seem likely in normal usage and their
 	 * possible effects are complex.  (Note: we could ignore an "OFFSET 0"
 	 * clause, but that traditionally is used as an optimization fence, so we
@@ -1115,43 +1115,8 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 		query->hasAggs ||
 		query->hasTargetSRFs ||
 		query->havingQual ||
-		query->limitOffset ||
 		query->rowMarks)
 		return false;
-
-	/*
-	 * LIMIT with a constant positive (or NULL) value doesn't affect the
-	 * semantics of EXISTS, so let's ignore such clauses.  This is worth doing
-	 * because people accustomed to certain other DBMSes may be in the habit
-	 * of writing EXISTS(SELECT ... LIMIT 1) as an optimization.  If there's a
-	 * LIMIT with anything else as argument, though, we can't simplify.
-	 */
-	if (query->limitCount)
-	{
-		/*
-		 * The LIMIT clause has not yet been through eval_const_expressions,
-		 * so we have to apply that here.  It might seem like this is a waste
-		 * of cycles, since the only case plausibly worth worrying about is
-		 * "LIMIT 1" ... but what we'll actually see is "LIMIT int8(1::int4)",
-		 * so we have to fold constants or we're not going to recognize it.
-		 */
-		Node	   *node = eval_const_expressions(root, query->limitCount);
-		Const	   *limit;
-
-		/* Might as well update the query if we simplified the clause. */
-		query->limitCount = node;
-
-		if (!IsA(node, Const))
-			return false;
-
-		limit = (Const *) node;
-		Assert(limit->consttype == INT8OID);
-		if (!limit->constisnull && DatumGetInt64(limit->constvalue) <= 0)
-			return false;
-
-		/* Whether or not the targetlist is safe, we can drop the LIMIT. */
-		query->limitCount = NULL;
-	}
 
 	/*
 	 * Otherwise, we can throw away the targetlist, as well as any GROUP,
@@ -2113,13 +2078,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 							  &context);
 			break;
 
-		case T_Limit:
-			finalize_primnode(((Limit *) plan)->limitOffset,
-							  &context);
-			finalize_primnode(((Limit *) plan)->limitCount,
-							  &context);
-			break;
-
 
 		case T_LockRows:
 			/* Force descendant scan nodes to reference epqParam */
@@ -2306,25 +2264,6 @@ finalize_primnode(Node *node, finalize_primnode_context *context)
 			context->paramids = bms_add_member(context->paramids, paramid);
 		}
 		return false;			/* no more to do here */
-	}
-	else if (IsA(node, Aggref))
-	{
-		/*
-		 * Check to see if the aggregate will be replaced by a Param
-		 * referencing a subquery output during setrefs.c.  If so, we must
-		 * account for that Param here.  (For various reasons, it's not
-		 * convenient to perform that substitution earlier than setrefs.c, nor
-		 * to perform this processing after setrefs.c.  Thus we need a wart
-		 * here.)
-		 */
-		Aggref	   *aggref = (Aggref *) node;
-		Param	   *aggparam;
-
-		aggparam = find_minmax_agg_replacement_param(context->root, aggref);
-		if (aggparam != NULL)
-			context->paramids = bms_add_member(context->paramids,
-											   aggparam->paramid);
-		/* Fall through to examine the agg's arguments */
 	}
 	else if (IsA(node, SubPlan))
 	{

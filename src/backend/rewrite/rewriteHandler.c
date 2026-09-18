@@ -1630,9 +1630,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	if (viewquery->havingQual != NULL)
 		return gettext_noop("Views containing HAVING are not automatically updatable.");
 
-	if (viewquery->limitOffset != NULL || viewquery->limitCount != NULL)
-		return gettext_noop("Views containing LIMIT or OFFSET are not automatically updatable.");
-
 	/*
 	 * We must not allow window functions or set returning functions in the
 	 * targetlist. Otherwise we might end up inserting them into the quals of

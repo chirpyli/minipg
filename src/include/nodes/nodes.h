@@ -77,7 +77,6 @@ typedef enum NodeTag
 	T_GatherMerge,
 	T_Hash,
 	T_LockRows,
-	T_Limit,
 	/* these aren't subclasses of Plan: */
 	T_NestLoopParam,
 	T_PlanRowMark,
@@ -124,7 +123,6 @@ typedef enum NodeTag
 	T_GatherMergeState,
 	T_HashState,
 	T_LockRowsState,
-	T_LimitState,
 
 	/*
 	 * TAGS FOR PRIMITIVE NODES (primnodes.h)
@@ -216,10 +214,8 @@ typedef enum NodeTag
 	T_GroupPath,
 	T_UpperUniquePath,
 	T_AggPath,
-	T_MinMaxAggPath,
 	T_LockRowsPath,
 	T_ModifyTablePath,
-	T_LimitPath,
 	/* these aren't subclasses of Path: */
 	T_EquivalenceClass,
 	T_EquivalenceMember,
@@ -232,7 +228,6 @@ typedef enum NodeTag
 	T_AppendRelInfo,
 	T_RowIdentityVarInfo,
 	T_PlaceHolderInfo,
-	T_MinMaxAggInfo,
 	T_PlannerParamItem,
 
 	/*
@@ -617,17 +612,5 @@ typedef enum AggSplit
 #define DO_AGGSPLIT_SERIALIZE(as)	(((as) & AGGSPLITOP_SERIALIZE) != 0)
 #define DO_AGGSPLIT_DESERIALIZE(as) (((as) & AGGSPLITOP_DESERIALIZE) != 0)
 
-
-/*
- * LimitOption -
- *	LIMIT option of query
- *
- * This is needed in both parsenodes.h and plannodes.h, so put it here...
- */
-typedef enum LimitOption
-{
-	LIMIT_OPTION_COUNT,			/* FETCH FIRST... ONLY */
-	LIMIT_OPTION_DEFAULT,		/* No limit present */
-} LimitOption;
 
 #endif							/* NODES_H */

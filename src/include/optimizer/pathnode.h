@@ -172,14 +172,12 @@ extern ProjectSetPath *create_set_projection_path(PlannerInfo *root,
 extern SortPath *create_sort_path(PlannerInfo *root,
 								  RelOptInfo *rel,
 								  Path *subpath,
-								  List *pathkeys,
-								  double limit_tuples);
+								  List *pathkeys);
 extern IncrementalSortPath *create_incremental_sort_path(PlannerInfo *root,
 														 RelOptInfo *rel,
 														 Path *subpath,
 														 List *pathkeys,
-														 int presorted_keys,
-														 double limit_tuples);
+														 int presorted_keys);
 extern GroupPath *create_group_path(PlannerInfo *root,
 									RelOptInfo *rel,
 									Path *subpath,
@@ -201,11 +199,6 @@ extern AggPath *create_agg_path(PlannerInfo *root,
 								List *qual,
 								const AggClauseCosts *aggcosts,
 								double numGroups);
-extern MinMaxAggPath *create_minmaxagg_path(PlannerInfo *root,
-											RelOptInfo *rel,
-											PathTarget *target,
-											List *mmaggregates,
-											List *quals);
 extern LockRowsPath *create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
 										  Path *subpath, List *rowMarks, int epqParam);
 extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
@@ -217,14 +210,6 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												List *updateColnosLists,
 												List *rowMarks,
 												int epqParam);
-extern LimitPath *create_limit_path(PlannerInfo *root, RelOptInfo *rel,
-									Path *subpath,
-									Node *limitOffset, Node *limitCount,
-									LimitOption limitOption,
-									int64 offset_est, int64 count_est);
-extern void adjust_limit_rows_costs(double *rows,
-									Cost *startup_cost, Cost *total_cost,
-									int64 offset_est, int64 count_est);
 
 extern Path *reparameterize_path(PlannerInfo *root, Path *path,
 								 Relids required_outer,

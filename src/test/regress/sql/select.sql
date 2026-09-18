@@ -114,9 +114,9 @@ SELECT p.name, p.age FROM person* p ORDER BY age using >, name;
 --
 -- Test some cases involving whole-row Var referencing a subquery
 --
-select foo from (select 1 offset 0) as foo;
-select foo from (select null offset 0) as foo;
-select foo from (select 'xyzzy',1,null offset 0) as foo;
+select foo from (select 1) as foo;
+select foo from (select null) as foo;
+select foo from (select 'xyzzy',1,null) as foo;
 
 --
 -- Test VALUES lists
@@ -124,13 +124,7 @@ select foo from (select 'xyzzy',1,null offset 0) as foo;
 select * from onek, (values(147, 'RFAAAA'), (931, 'VJAAAA')) as v (i, j)
     WHERE onek.unique1 = v.i and onek.stringu1 = v.j;
 
--- a more complex case
--- looks like we're coding lisp :-)
-select * from onek,
-  (values ((select i from
-    (values(10000), (2), (389), (1000), (2000), ((select 10029))) as foo(i)
-    order by i asc limit 1))) bar (i)
-  where onek.unique1 = bar.i;
+-- minipg: LIMIT 已裁剪，依赖 LIMIT 返回单行的复杂 VALUES 用例移除
 
 -- try VALUES in a subquery
 -- minipg: 行构造器 (a,b) 已裁剪，改写为等价的标量条件

@@ -51,8 +51,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_UPDATE_TARGET,	/* UPDATE assignment target item */
 	EXPR_KIND_GROUP_BY,			/* GROUP BY */
 	EXPR_KIND_ORDER_BY,			/* ORDER BY */
-	EXPR_KIND_LIMIT,			/* LIMIT */
-	EXPR_KIND_OFFSET,			/* OFFSET */
 	EXPR_KIND_VALUES,			/* VALUES */
 	EXPR_KIND_VALUES_SINGLE,	/* single-row VALUES (in INSERT only) */
 	EXPR_KIND_INDEX_EXPRESSION, /* index expression */
