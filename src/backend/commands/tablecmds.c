@@ -154,16 +154,14 @@ typedef struct AlteredTableInfo
  * Struct describing one new column value that needs to be computed during
  * Phase 3 copy (this could be either a new column with a non-null default, or
  * a column that we're changing the type of).  Columns without such an entry
- * are just copied from the old table during ATRewriteTable.  Note that the
- * expr is an expression over *old* table values, except when is_generated
- * is true; then it is an expression over columns of the *new* tuple.
+ * are just copied from the old table during ATRewriteTable.  The expr is an
+ * expression over *old* table values.
  */
 typedef struct NewColumnValue
 {
 	AttrNumber	attnum;			/* which column */
 	Expr	   *expr;			/* expression to compute */
 	ExprState  *exprstate;		/* execution state */
-	bool		is_generated;	/* is it a GENERATED expression? */
 } NewColumnValue;
 
 /*
@@ -2413,10 +2411,10 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 					newslot->tts_isnull[lfirst_int(lc)] = true;
 
 				/*
-				 * Constraints and GENERATED expressions might reference the
-				 * tableoid column, so fill tts_tableOid with the desired
-				 * value.  (We must do this each time, because it gets
-				 * overwritten with newrel's OID during storing.)
+				 * Constraints might reference the tableoid column, so fill
+				 * tts_tableOid with the desired value.  (We must do this each
+				 * time, because it gets overwritten with newrel's OID during
+				 * storing.)
 				 */
 				newslot->tts_tableOid = RelationGetRelid(oldrel);
 
@@ -2432,9 +2430,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 				{
 					NewColumnValue *ex = lfirst(l);
 
-					if (ex->is_generated)
-						continue;
-
 					newslot->tts_values[ex->attnum - 1]
 						= ExecEvalExpr(ex->exprstate,
 									   econtext,
@@ -2442,26 +2437,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 				}
 
 				ExecStoreVirtualTuple(newslot);
-
-				/*
-				 * Now, evaluate any expressions whose inputs come from the
-				 * new tuple.  We assume these columns won't reference each
-				 * other, so that there's no ordering dependency.
-				 */
-				econtext->ecxt_scantuple = newslot;
-
-				foreach(l, tab->newvals)
-				{
-					NewColumnValue *ex = lfirst(l);
-
-					if (!ex->is_generated)
-						continue;
-
-					newslot->tts_values[ex->attnum - 1]
-						= ExecEvalExpr(ex->exprstate,
-									   econtext,
-									   &newslot->tts_isnull[ex->attnum - 1]);
-				}
 
 				insertslot = newslot;
 			}
@@ -3746,7 +3721,6 @@ ATPrepAlterColumnType(AlteredTableInfo *tab, Relation rel,
 		newval = (NewColumnValue *) palloc0(sizeof(NewColumnValue));
 		newval->attnum = attnum;
 		newval->expr = (Expr *) transform;
-		newval->is_generated = false;
 
 		tab->newvals = lappend(tab->newvals, newval);
 		if (ATColumnChangeRequiresRewrite(transform, attnum))
@@ -3929,21 +3903,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 					{
 						Assert(foundObject.objectSubId == 0);
 						RememberIndexForRebuilding(foundObject.objectId, tab);
-					}
-					else if (relKind == RELKIND_RELATION &&
-							 foundObject.objectSubId != 0 &&
-							 get_attgenerated(foundObject.objectId, foundObject.objectSubId))
-					{
-						/*
-						 * Changing the type of a column that is used by a
-						 * generated column is not allowed by SQL standard. It
-						 * might be doable with some thinking and effort.
-						 */
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("cannot alter type of a column used by a generated column"),
-								 errdetail("Column \"%s\" is used by generated column \"%s\".",
-										   colName, get_attname(foundObject.objectId, foundObject.objectSubId, false))));
 					}
 					else
 					{

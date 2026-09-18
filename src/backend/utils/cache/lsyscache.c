@@ -978,27 +978,6 @@ get_attstattarget(Oid relid, AttrNumber attnum)
 }
 
 /*
- * get_attgenerated
- *
- *		Given the relation id and the attribute number,
- *		return the "attgenerated" field from the attribute relation.
- *
- *		Errors if not found.
- *
- *		Since not generated is represented by '\0', this can also be used as a
- *		Boolean test.
- */
-char
-get_attgenerated(Oid relid, AttrNumber attnum)
-{
-	/*
-	 * Generated columns have been removed in minipg, so no attribute is ever
-	 * generated.  Kept as a stub returning '\0' for any remaining callers.
-	 */
-	return '\0';
-}
-
-/*
  * get_atttype
  *
  *		Given the relation OID and the attribute number with the relation,
