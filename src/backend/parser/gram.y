@@ -203,7 +203,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 		IndexStmt InsertStmt
 		ExplainableStmt
 		ReindexStmt
-		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
@@ -232,8 +231,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <list>	utility_option_list
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
-%type <boolean>	opt_or_replace
-				opt_transaction_chain
+%type <boolean>	opt_transaction_chain
 
 
 %type <str>		OptSchemaName
@@ -257,7 +255,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <list>	parse_toplevel stmtmulti
 				OptTableElementList TableElementList definition
 				opt_definition
-				RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
 				sort_clause opt_sort_clause sortby_list index_params
 				opt_include opt_c_include index_including_params
@@ -290,11 +287,10 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <list>	extract_list overlay_list position_list
 %type <list>	substr_list trim_list
 
-%type <boolean> opt_instead
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
 %type <boolean> opt_freeze opt_analyze
 
-%type <ival>	event opt_set_data
+%type <ival>	opt_set_data
 %type <objtype>	object_type_any_name
 				drop_type_name
 
@@ -394,7 +390,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ACCESS ACTION ADD_P ADMIN AFTER
-	ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
+	ALL ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
 	ASSIGNMENT ASYMMETRIC AT ATTACH ATTRIBUTE AUTHORIZATION
 
 	BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
@@ -411,7 +407,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DEPTH DESC
-	DETACH DICTIONARY DISABLE_P DISTINCT DO DOCUMENT_P
+	DETACH DICTIONARY DISABLE_P DISTINCT DOCUMENT_P
 	DOUBLE_P DROP
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
@@ -427,7 +423,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	IDENTITY_P IF_P ILIKE IMMEDIATE IMPLICIT_P IMPORT_P IN_P INCLUDE
 	INCLUDING INCREMENT INDEX INDEXES INITIALLY
-	INNER_P INPUT_P INSERT INSTEAD INT_P INTEGER
+	INNER_P INPUT_P INSERT INT_P INTEGER
 	INTERSECT INTERVAL INTO IS ISNULL ISOLATION
 
 	JOIN
@@ -441,7 +437,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	MAPPING MATCH MAXVALUE MINUTE_P MINVALUE MODE MONTH_P
 
 	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NO NONE
-	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
+	NOT NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
 
 	OBJECT_P OF OFF OFFSET OIDS OLD ON ONLY OPERATOR OPTION OPTIONS OR
@@ -634,7 +630,6 @@ stmt:	AlterObjectSchemaStmt
 			| IndexStmt
 		| InsertStmt
 			| ReindexStmt
-			| RuleStmt
 			| SelectStmt
 			| TransactionStmt
 		| TruncateStmt
@@ -1917,10 +1912,6 @@ opt_nulls_order: NULLS_LA FIRST_P			{ $$ = SORTBY_NULLS_FIRST; }
 		;
 
 
-opt_or_replace:
-			OR REPLACE								{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
 
 /*
  * Ideally param_name should be ColId, but that causes too many conflicts.
@@ -2098,76 +2089,6 @@ AlterObjectSchemaStmt:
  * We repurpose ALTER OPERATOR's version of "definition" here
  *
  *****************************************************************************/
-
-
-
-/*****************************************************************************
- *
- *		QUERY:	Define Rewrite Rule
- *
- *****************************************************************************/
-
-RuleStmt:	CREATE opt_or_replace RULE name AS
-			ON event TO qualified_name where_clause
-			DO opt_instead RuleActionList
-				{
-					RuleStmt *n = makeNode(RuleStmt);
-					n->replace = $2;
-					n->relation = $9;
-					n->rulename = $4;
-					n->whereClause = $10;
-					n->event = $7;
-					n->instead = $12;
-					n->actions = $13;
-					$$ = (Node *)n;
-				}
-		;
-
-RuleActionList:
-			NOTHING									{ $$ = NIL; }
-			| RuleActionStmt						{ $$ = list_make1($1); }
-			| '(' RuleActionMulti ')'				{ $$ = $2; }
-		;
-
-/* the thrashing around here is to discard "empty" statements... */
-RuleActionMulti:
-			RuleActionMulti ';' RuleActionStmtOrEmpty
-				{ if ($3 != NULL)
-					$$ = lappend($1, $3);
-				  else
-					$$ = $1;
-				}
-			| RuleActionStmtOrEmpty
-				{ if ($1 != NULL)
-					$$ = list_make1($1);
-				  else
-					$$ = NIL;
-				}
-		;
-
-RuleActionStmt:
-			SelectStmt
-			| InsertStmt
-			| UpdateStmt
-			| DeleteStmt
-		;
-
-RuleActionStmtOrEmpty:
-			RuleActionStmt							{ $$ = $1; }
-			|	/*EMPTY*/							{ $$ = NULL; }
-		;
-
-event:		SELECT									{ $$ = CMD_SELECT; }
-			| UPDATE								{ $$ = CMD_UPDATE; }
-			| DELETE_P								{ $$ = CMD_DELETE; }
-			| INSERT								{ $$ = CMD_INSERT; }
-		 ;
-
-opt_instead:
-			INSTEAD									{ $$ = true; }
-			| ALSO									{ $$ = false; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
 
 
 /*****************************************************************************
@@ -5417,7 +5338,6 @@ unreserved_keyword:
 			| ADD_P
 			| ADMIN
 			| AFTER
-			| ALSO
 			| ALTER
 			| ALWAYS
 			| ASSIGNMENT
@@ -5504,7 +5424,6 @@ unreserved_keyword:
 			| INDEXES
 			| INPUT_P
 			| INSERT
-			| INSTEAD
 			| ISOLATION
 			| KEY
 			| LABEL
@@ -5529,7 +5448,6 @@ unreserved_keyword:
 			| NAMES
 			| NEW
 			| NO
-			| NOTHING
 			| NOTIFY
 			| NOWAIT
 			| NULLS_P
@@ -5758,7 +5676,6 @@ reserved_keyword:
 			| DEFERRABLE
 			| DESC
 			| DISTINCT
-			| DO
 			| ELSE
 			| END_P
 			| EXCEPT
@@ -5822,7 +5739,6 @@ bare_label_keyword:
 			| ADMIN
 			| AFTER
 			| ALL
-			| ALSO
 			| ALTER
 			| ALWAYS
 			| ANALYSE
@@ -5903,7 +5819,6 @@ bare_label_keyword:
 			| DICTIONARY
 			| DISABLE_P
 			| DISTINCT
-			| DO
 			| DOCUMENT_P
 			| DOUBLE_P
 			| DROP
@@ -5954,7 +5869,6 @@ bare_label_keyword:
 			| INNER_P
 			| INPUT_P
 			| INSERT
-			| INSTEAD
 			| INT_P
 			| INTEGER
 			| INTERVAL
@@ -5994,7 +5908,6 @@ bare_label_keyword:
 			| NO
 			| NONE
 			| NOT
-			| NOTHING
 			| NOTIFY
 			| NOWAIT
 			| NULL_P

@@ -26,8 +26,6 @@ extern AlterTableStmt *transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 											   List **afterStmts);
 extern IndexStmt *transformIndexStmt(Oid relid, IndexStmt *stmt,
 									 const char *queryString);
-extern RuleStmt *transformRuleStmt(RuleStmt *stmt, const char *queryString,
-							  List **actions, Node **whereClause);
 extern List *transformCreateSchemaStmtElements(List *schemaElts,
 											   const char *schemaName);
 extern IndexStmt *generateClonedIndexStmt(RangeVar *heapRel,

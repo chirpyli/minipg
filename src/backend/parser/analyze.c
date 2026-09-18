@@ -820,7 +820,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 {
 	Query	   *qry = makeNode(Query);
 	Node	   *qual;
-	ListCell   *l;
 
 	qry->commandType = CMD_SELECT;
 

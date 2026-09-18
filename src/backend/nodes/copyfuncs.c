@@ -2474,22 +2474,6 @@ _copyAlterObjectSchemaStmt(const AlterObjectSchemaStmt *from)
 
 
 
-static RuleStmt *
-_copyRuleStmt(const RuleStmt *from)
-{
-	RuleStmt   *newnode = makeNode(RuleStmt);
-
-	COPY_NODE_FIELD(relation);
-	COPY_STRING_FIELD(rulename);
-	COPY_NODE_FIELD(whereClause);
-	COPY_SCALAR_FIELD(event);
-	COPY_SCALAR_FIELD(instead);
-	COPY_NODE_FIELD(actions);
-	COPY_SCALAR_FIELD(replace);
-
-	return newnode;
-}
-
 static TransactionStmt *
 _copyTransactionStmt(const TransactionStmt *from)
 {
@@ -3019,9 +3003,6 @@ copyObjectImpl(const void *from)
 
 		case T_AlterObjectSchemaStmt:
 			retval = _copyAlterObjectSchemaStmt(from);
-			break;
-		case T_RuleStmt:
-			retval = _copyRuleStmt(from);
 			break;
 		case T_TransactionStmt:
 			retval = _copyTransactionStmt(from);

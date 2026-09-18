@@ -23,14 +23,8 @@
 #define RULE_FIRES_ON_REPLICA	'R'
 #define RULE_DISABLED			'D'
 
-extern ObjectAddress DefineRule(RuleStmt *stmt, const char *queryString);
 
-extern ObjectAddress DefineQueryRewrite(const char *rulename,
-										Oid event_relid,
-										Node *event_qual,
-										CmdType event_type,
-										bool is_instead,
-										bool replace,
+extern ObjectAddress DefineQueryRewrite(Oid event_relid, bool replace,
 										List *action);
 
 extern void EnableDisableRule(Relation rel, const char *rulename,

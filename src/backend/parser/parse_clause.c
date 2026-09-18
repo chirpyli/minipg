@@ -79,8 +79,6 @@ static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 static void setNamespaceColumnVisibility(List *namespace, bool cols_visible);
 static void setNamespaceLateralState(List *namespace,
 									 bool lateral_only, bool lateral_ok);
-static void checkExprIsVarFree(ParseState *pstate, Node *n,
-							   const char *constructName);
 static TargetEntry *findTargetlistEntrySQL92(ParseState *pstate, Node *node,
 											 List **tlist, ParseExprKind exprKind);
 static TargetEntry *findTargetlistEntrySQL99(ParseState *pstate, Node *node,

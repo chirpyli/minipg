@@ -14,15 +14,6 @@
  * string literal (including a function body!) or a multiline comment.
  */
 
-CREATE VIEW pg_rules AS
-    SELECT
-        N.nspname AS schemaname,
-        C.relname AS tablename,
-        R.rulename AS rulename,
-        pg_get_ruledef(R.oid) AS definition
-    FROM (pg_rewrite R JOIN pg_class C ON (C.oid = R.ev_class))
-        LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
-    WHERE R.rulename != '_RETURN';
 
 CREATE VIEW pg_views AS
     SELECT
@@ -144,14 +135,6 @@ CREATE VIEW pg_prepared_xacts AS
 CREATE VIEW pg_settings AS
     SELECT * FROM pg_show_all_settings() AS A;
 
-CREATE RULE pg_settings_u AS
-    ON UPDATE TO pg_settings
-    WHERE new.name = old.name DO
-    SELECT set_config(old.name, new.setting, 'f');
-
-CREATE RULE pg_settings_n AS
-    ON UPDATE TO pg_settings
-    DO INSTEAD NOTHING;
 
 
 CREATE VIEW pg_file_settings AS

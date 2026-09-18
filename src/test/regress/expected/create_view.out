@@ -1001,16 +1001,6 @@ select pg_get_viewdef('tt23v', true);
     FROM int8_tbl;
 (1 row)
 
-select pg_get_ruledef(oid, true) from pg_rewrite
-  where ev_class = 'tt23v'::regclass and ev_type = '1';
-                         pg_get_ruledef                          
------------------------------------------------------------------
- CREATE RULE "_RETURN" AS                                       +
-     ON SELECT TO tt23v DO INSTEAD  SELECT int8_tbl.q1 AS col_a,+
-     int8_tbl.q2 AS col_b                                       +
-    FROM int8_tbl;
-(1 row)
-
 -- test extraction of FieldSelect field names (get_name_for_var_field)
 explain (verbose, costs off)
 select (r).column2 from (select r from (values(1,2),(3,4)) r) ss;
@@ -1048,29 +1038,6 @@ select pg_get_viewdef('tt26v', true);
     FROM ( VALUES (1,2,3)) v(x, y, z);
 (1 row)
 
--- Test that changing the relkind of a relcache entry doesn't cause
--- trouble. Prior instances of where it did:
--- CALDaNm2yXz+zOtv7y5zBd5WKT8O0Ld3YxikuU3dcyCvxF7gypA@mail.gmail.com
--- CALDaNm3oZA-8Wbps2Jd1g5_Gjrr-x3YWrJPek-mF5Asrrvz2Dg@mail.gmail.com
-CREATE TABLE tt26(c int);
-BEGIN;
-CREATE TABLE tt27(c int);
-SAVEPOINT q;
-CREATE RULE "_RETURN" AS ON SELECT TO tt27 DO INSTEAD SELECT * FROM tt26;
-SELECT * FROM tt27;
- c 
----
-(0 rows)
-
-ROLLBACK TO q;
-CREATE RULE "_RETURN" AS ON SELECT TO tt27 DO INSTEAD SELECT * FROM tt26;
-ROLLBACK;
-BEGIN;
-CREATE TABLE tt28(c int);
-CREATE RULE "_RETURN" AS ON SELECT TO tt28 DO INSTEAD SELECT * FROM tt26;
-CREATE RULE "_RETURN" AS ON SELECT TO tt28 DO INSTEAD SELECT * FROM tt26;
-ERROR:  "tt28" is already a view
-ROLLBACK;
 -- test restriction on non-system view expansion.
 create table tt27v_tbl (a int);
 create view tt27v as select a from tt27v_tbl;
@@ -1088,7 +1055,7 @@ select viewname from pg_views where viewname = 'tt27v'; -- Ok to access a system
 reset restrict_nonsystem_relation_kind;
 -- clean up all the random objects we made above
 DROP SCHEMA testviewschm2 CASCADE;
-NOTICE:  drop cascades to 53 other objects
+NOTICE:  drop cascades to 52 other objects
 DETAIL:  drop cascades to table tbl1
 drop cascades to table tbl2
 drop cascades to table tbl3
@@ -1139,6 +1106,5 @@ drop cascades to view tt21v
 drop cascades to view tt22v
 drop cascades to view tt23v
 drop cascades to view tt26v
-drop cascades to table tt26
 drop cascades to table tt27v_tbl
 drop cascades to view tt27v

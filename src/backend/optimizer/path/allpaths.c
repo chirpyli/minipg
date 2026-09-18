@@ -560,7 +560,7 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 			 * the SubqueryScanPath as not parallel-safe.  (Note that
 			 * set_subquery_pathlist() might push some of these quals down
 			 * into the subquery itself, but that doesn't change anything.)
-			 *
+			 */
 			break;
 
 		case RTE_JOIN:

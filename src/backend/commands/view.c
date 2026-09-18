@@ -280,12 +280,7 @@ DefineViewRules(Oid viewOid, Query *viewParse, bool replace)
 	 * Set up the ON SELECT rule.  Since the query has already been through
 	 * parse analysis, we use DefineQueryRewrite() directly.
 	 */
-	DefineQueryRewrite(pstrdup(ViewSelectRuleName),
-					   viewOid,
-					   NULL,
-					   CMD_SELECT,
-					   true,
-					   replace,
+	DefineQueryRewrite(viewOid, replace,
 					   list_make1(viewParse));
 
 	/*

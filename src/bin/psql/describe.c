@@ -801,101 +801,6 @@ describeOneTableDetails(const char *schemaname,
 			}
 			PQclear(result);
 		}
-
-		/* print rules */
-		if (tableinfo.hasrules)
-		{
-			if (pset.sversion >= 80300)
-			{
-				printfPQExpBuffer(&buf,
-								  "SELECT r.rulename, trim(trailing ';' from pg_catalog.pg_get_ruledef(r.oid, true)), "
-								  "ev_enabled\n"
-								  "FROM pg_catalog.pg_rewrite r\n"
-								  "WHERE r.ev_class = '%s' ORDER BY 1;",
-								  oid);
-			}
-			else
-			{
-				printfPQExpBuffer(&buf,
-								  "SELECT r.rulename, trim(trailing ';' from pg_catalog.pg_get_ruledef(r.oid, true)), "
-								  "'O' AS ev_enabled\n"
-								  "FROM pg_catalog.pg_rewrite r\n"
-								  "WHERE r.ev_class = '%s' ORDER BY 1;",
-								  oid);
-			}
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-			else
-				tuples = PQntuples(result);
-
-			if (tuples > 0)
-			{
-				bool		have_heading;
-				int			category;
-
-				for (category = 0; category < 4; category++)
-				{
-					have_heading = false;
-
-					for (i = 0; i < tuples; i++)
-					{
-						const char *ruledef;
-						bool		list_rule = false;
-
-						switch (category)
-						{
-							case 0:
-								if (*PQgetvalue(result, i, 2) == 'O')
-									list_rule = true;
-								break;
-							case 1:
-								if (*PQgetvalue(result, i, 2) == 'D')
-									list_rule = true;
-								break;
-							case 2:
-								if (*PQgetvalue(result, i, 2) == 'A')
-									list_rule = true;
-								break;
-							case 3:
-								if (*PQgetvalue(result, i, 2) == 'R')
-									list_rule = true;
-								break;
-						}
-						if (!list_rule)
-							continue;
-
-						if (!have_heading)
-						{
-							switch (category)
-							{
-								case 0:
-									printfPQExpBuffer(&buf, _("Rules:"));
-									break;
-								case 1:
-									printfPQExpBuffer(&buf, _("Disabled rules:"));
-									break;
-								case 2:
-									printfPQExpBuffer(&buf, _("Rules firing always:"));
-									break;
-								case 3:
-									printfPQExpBuffer(&buf, _("Rules firing on replica only:"));
-									break;
-							}
-							printTableAddFooter(&cont, buf.data);
-							have_heading = true;
-						}
-
-						/* Everything after "CREATE RULE" is echoed verbatim */
-						ruledef = PQgetvalue(result, i, 1);
-						ruledef += 12;
-						printfPQExpBuffer(&buf, "    %s", ruledef);
-						printTableAddFooter(&cont, buf.data);
-					}
-				}
-			}
-			PQclear(result);
-		}
 	}
 
 	/* Get view_def if table is a view or materialized view */
@@ -918,41 +823,9 @@ describeOneTableDetails(const char *schemaname,
 
 	if (view_def)
 	{
-		PGresult   *result = NULL;
-
 		/* Footer information about a view */
 		printTableAddFooter(&cont, _("View definition:"));
 		printTableAddFooter(&cont, view_def);
-
-		/* print rules */
-		if (tableinfo.hasrules)
-		{
-			printfPQExpBuffer(&buf,
-							  "SELECT r.rulename, trim(trailing ';' from pg_catalog.pg_get_ruledef(r.oid, true))\n"
-							  "FROM pg_catalog.pg_rewrite r\n"
-							  "WHERE r.ev_class = '%s' AND r.rulename != '_RETURN' ORDER BY 1;",
-							  oid);
-			result = PSQLexec(buf.data);
-			if (!result)
-				goto error_return;
-
-			if (PQntuples(result) > 0)
-			{
-				printTableAddFooter(&cont, _("Rules:"));
-				for (i = 0; i < PQntuples(result); i++)
-				{
-					const char *ruledef;
-
-					/* Everything after "CREATE RULE" is echoed verbatim */
-					ruledef = PQgetvalue(result, i, 1);
-					ruledef += 12;
-
-					printfPQExpBuffer(&buf, " %s", ruledef);
-					printTableAddFooter(&cont, buf.data);
-				}
-			}
-			PQclear(result);
-		}
 	}
 
 

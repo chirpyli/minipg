@@ -374,8 +374,6 @@ create view tt23v (col_a, col_b) as
 select q1 as other_name1, q2 as other_name2 from int8_tbl;
 
 select pg_get_viewdef('tt23v', true);
-select pg_get_ruledef(oid, true) from pg_rewrite
-  where ev_class = 'tt23v'::regclass and ev_type = '1';
 
 -- test extraction of FieldSelect field names (get_name_for_var_field)
 
@@ -398,27 +396,6 @@ select x + y + z as c1,
 from (values(1,2,3)) v(x,y,z);
 select pg_get_viewdef('tt26v', true);
 
-
--- Test that changing the relkind of a relcache entry doesn't cause
--- trouble. Prior instances of where it did:
--- CALDaNm2yXz+zOtv7y5zBd5WKT8O0Ld3YxikuU3dcyCvxF7gypA@mail.gmail.com
--- CALDaNm3oZA-8Wbps2Jd1g5_Gjrr-x3YWrJPek-mF5Asrrvz2Dg@mail.gmail.com
-CREATE TABLE tt26(c int);
-
-BEGIN;
-CREATE TABLE tt27(c int);
-SAVEPOINT q;
-CREATE RULE "_RETURN" AS ON SELECT TO tt27 DO INSTEAD SELECT * FROM tt26;
-SELECT * FROM tt27;
-ROLLBACK TO q;
-CREATE RULE "_RETURN" AS ON SELECT TO tt27 DO INSTEAD SELECT * FROM tt26;
-ROLLBACK;
-
-BEGIN;
-CREATE TABLE tt28(c int);
-CREATE RULE "_RETURN" AS ON SELECT TO tt28 DO INSTEAD SELECT * FROM tt26;
-CREATE RULE "_RETURN" AS ON SELECT TO tt28 DO INSTEAD SELECT * FROM tt26;
-ROLLBACK;
 
 -- test restriction on non-system view expansion.
 create table tt27v_tbl (a int);

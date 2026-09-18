@@ -52,7 +52,6 @@
 #include "parser/parser.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteHandler.h"
-#include "rewrite/rewriteManip.h"
 #include "rewrite/rewriteSupport.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
@@ -300,7 +299,6 @@ typedef void (*rsv_callback) (Node *node, deparse_context *context,
  * Global data
  * ----------
  */
-static const char *query_getrulebyoid = "SELECT * FROM pg_catalog.pg_rewrite WHERE oid = $1";
 static const char *query_getviewrule = "SELECT * FROM pg_catalog.pg_rewrite WHERE ev_class = $1 AND rulename = $2";
 
 /* GUC parameters */
@@ -322,7 +320,6 @@ static char *pg_get_viewdef_worker(Oid viewoid,
 								   int prettyFlags, int wrapColumn);
 static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 										 StringInfo buf);
-static char *pg_get_ruledef_worker(Oid ruleoid, int prettyFlags);
 static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
 									bool attrsOnly, bool keysOnly,
 									bool showTblSpc,
@@ -360,8 +357,6 @@ static void push_ancestor_plan(deparse_namespace *dpns, ListCell *ancestor_cell,
 							   deparse_namespace *save_dpns);
 static void pop_ancestor_plan(deparse_namespace *dpns,
 							  deparse_namespace *save_dpns);
-static void make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
-						 int prettyFlags);
 static void make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 						 int prettyFlags, int wrapColumn);
 static void get_query_def(Query *query, StringInfo buf, List *parentnamespace,
@@ -455,128 +450,6 @@ static char *generate_function_name(Oid funcid, int nargs,
 static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static void add_cast_to(StringInfo buf, Oid typid);
 static text *string_to_text(char *str);
-
-
-/* ----------
- * pg_get_ruledef		- Do it all and return a text
- *				  that could be used as a statement
- *				  to recreate the rule
- * ----------
- */
-Datum
-pg_get_ruledef(PG_FUNCTION_ARGS)
-{
-	Oid			ruleoid = PG_GETARG_OID(0);
-	int			prettyFlags;
-	char	   *res;
-
-	prettyFlags = PRETTYFLAG_INDENT;
-
-	res = pg_get_ruledef_worker(ruleoid, prettyFlags);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-
-Datum
-pg_get_ruledef_ext(PG_FUNCTION_ARGS)
-{
-	Oid			ruleoid = PG_GETARG_OID(0);
-	bool		pretty = PG_GETARG_BOOL(1);
-	int			prettyFlags;
-	char	   *res;
-
-	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
-
-	res = pg_get_ruledef_worker(ruleoid, prettyFlags);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-
-static char *
-pg_get_ruledef_worker(Oid ruleoid, int prettyFlags)
-{
-	Datum		args[1];
-	char		nulls[1];
-	int			spirc;
-	HeapTuple	ruletup;
-	TupleDesc	rulettc;
-	StringInfoData buf;
-
-	/*
-	 * Do this first so that string is alloc'd in outer context not SPI's.
-	 */
-	initStringInfo(&buf);
-
-	/*
-	 * Connect to SPI manager
-	 */
-	if (SPI_connect() != SPI_OK_CONNECT)
-		elog(ERROR, "SPI_connect failed");
-
-	/*
-	 * Prepare the plan to look up pg_rewrite. We read pg_rewrite over the
-	 * SPI manager instead of using the syscache to be checked for read
-	 * access on pg_rewrite.
-	 *
-	 * minipg: plancache 已裁剪，SPI_keepplan() 退化为空操作，缓存下来的
-	 * SPI plan 在 SPI_finish() 之后就失效了，跨调用复用会拿到野指针。
-	 * 因此这里每次调用都重新 prepare，用完立即释放。
-	 */
-	{
-		Oid			argtypes[1];
-		SPIPlanPtr	plan;
-
-		argtypes[0] = OIDOID;
-		plan = SPI_prepare(query_getrulebyoid, 1, argtypes);
-		if (plan == NULL)
-			elog(ERROR, "SPI_prepare failed for \"%s\"", query_getrulebyoid);
-
-		/*
-		 * Get the pg_rewrite tuple for this rule
-		 */
-		args[0] = ObjectIdGetDatum(ruleoid);
-		nulls[0] = ' ';
-		spirc = SPI_execute_plan(plan, args, nulls, true, 0);
-		SPI_freeplan(plan);
-	}
-	if (spirc != SPI_OK_SELECT)
-		elog(ERROR, "failed to get pg_rewrite tuple for rule %u", ruleoid);
-	if (SPI_processed != 1)
-	{
-		/*
-		 * There is no tuple data available here, just keep the output buffer
-		 * empty.
-		 */
-	}
-	else
-	{
-		/*
-		 * Get the rule's definition and put it into executor's memory
-		 */
-		ruletup = SPI_tuptable->vals[0];
-		rulettc = SPI_tuptable->tupdesc;
-		make_ruledef(&buf, ruletup, rulettc, prettyFlags);
-	}
-
-	/*
-	 * Disconnect from SPI manager
-	 */
-	if (SPI_finish() != SPI_OK_FINISH)
-		elog(ERROR, "SPI_finish failed");
-
-	if (buf.len == 0)
-		return NULL;
-
-	return buf.data;
-}
 
 
 /* ----------
@@ -2983,193 +2856,6 @@ pop_ancestor_plan(deparse_namespace *dpns, deparse_namespace *save_dpns)
 
 
 /* ----------
- * make_ruledef			- reconstruct the CREATE RULE command
- *				  for a given pg_rewrite tuple
- * ----------
- */
-static void
-make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
-			 int prettyFlags)
-{
-	char	   *rulename;
-	char		ev_type;
-	Oid			ev_class;
-	bool		is_instead;
-	char	   *ev_qual;
-	char	   *ev_action;
-	List	   *actions;
-	Relation	ev_relation;
-	TupleDesc	viewResultDesc = NULL;
-	int			fno;
-	Datum		dat;
-	bool		isnull;
-
-	/*
-	 * Get the attribute values from the rules tuple
-	 */
-	fno = SPI_fnumber(rulettc, "rulename");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
-	Assert(!isnull);
-	rulename = NameStr(*(DatumGetName(dat)));
-
-	fno = SPI_fnumber(rulettc, "ev_type");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
-	Assert(!isnull);
-	ev_type = DatumGetChar(dat);
-
-	fno = SPI_fnumber(rulettc, "ev_class");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
-	Assert(!isnull);
-	ev_class = DatumGetObjectId(dat);
-
-	fno = SPI_fnumber(rulettc, "is_instead");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
-	Assert(!isnull);
-	is_instead = DatumGetBool(dat);
-
-	fno = SPI_fnumber(rulettc, "ev_qual");
-	ev_qual = SPI_getvalue(ruletup, rulettc, fno);
-	Assert(ev_qual != NULL);
-
-	fno = SPI_fnumber(rulettc, "ev_action");
-	ev_action = SPI_getvalue(ruletup, rulettc, fno);
-	Assert(ev_action != NULL);
-	actions = (List *) stringToNode(ev_action);
-	if (actions == NIL)
-		elog(ERROR, "invalid empty ev_action list");
-
-	ev_relation = table_open(ev_class, AccessShareLock);
-
-	/*
-	 * Build the rules definition text
-	 */
-	appendStringInfo(buf, "CREATE RULE %s AS",
-					 quote_identifier(rulename));
-
-	if (prettyFlags & PRETTYFLAG_INDENT)
-		appendStringInfoString(buf, "\n    ON ");
-	else
-		appendStringInfoString(buf, " ON ");
-
-	/* The event the rule is fired for */
-	switch (ev_type)
-	{
-		case '1':
-			appendStringInfoString(buf, "SELECT");
-			viewResultDesc = RelationGetDescr(ev_relation);
-			break;
-
-		case '2':
-			appendStringInfoString(buf, "UPDATE");
-			break;
-
-		case '3':
-			appendStringInfoString(buf, "INSERT");
-			break;
-
-		case '4':
-			appendStringInfoString(buf, "DELETE");
-			break;
-
-		default:
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("rule \"%s\" has unsupported event type %d",
-							rulename, ev_type)));
-			break;
-	}
-
-	/* The relation the rule is fired on */
-	appendStringInfo(buf, " TO %s",
-					 (prettyFlags & PRETTYFLAG_SCHEMA) ?
-					 generate_relation_name(ev_class, NIL) :
-					 generate_qualified_relation_name(ev_class));
-
-	/* If the rule has an event qualification, add it */
-	if (strcmp(ev_qual, "<>") != 0)
-	{
-		Node	   *qual;
-		Query	   *query;
-		deparse_context context;
-		deparse_namespace dpns;
-
-		if (prettyFlags & PRETTYFLAG_INDENT)
-			appendStringInfoString(buf, "\n  ");
-		appendStringInfoString(buf, " WHERE ");
-
-		qual = stringToNode(ev_qual);
-
-		/*
-		 * We need to make a context for recognizing any Vars in the qual
-		 * (which can only be references to OLD and NEW).  Use the rtable of
-		 * the first query in the action list for this purpose.
-		 */
-		query = (Query *) linitial(actions);
-
-		/*
-		 * If the action is INSERT...SELECT, OLD/NEW have been pushed down
-		 * into the SELECT, and that's what we need to look at. (Ugly kluge
-		 * ... try to fix this when we redesign querytrees.)
-		 */
-		query = getInsertSelectQuery(query, NULL);
-
-		/* Must acquire locks right away; see notes in get_query_def() */
-		AcquireRewriteLocks(query, false);
-
-		context.buf = buf;
-		context.namespaces = list_make1(&dpns);
-		context.varprefix = (list_length(query->rtable) != 1);
-		context.prettyFlags = prettyFlags;
-		context.wrapColumn = WRAP_COLUMN_DEFAULT;
-		context.indentLevel = PRETTYINDENT_STD;
-		context.special_exprkind = EXPR_KIND_NONE;
-		context.appendparents = NULL;
-
-		set_deparse_for_query(&dpns, query, NIL);
-
-		get_rule_expr(qual, &context, false);
-	}
-
-	appendStringInfoString(buf, " DO ");
-
-	/* The INSTEAD keyword (if so) */
-	if (is_instead)
-		appendStringInfoString(buf, "INSTEAD ");
-
-	/* Finally the rules actions */
-	if (list_length(actions) > 1)
-	{
-		ListCell   *action;
-		Query	   *query;
-
-		appendStringInfoChar(buf, '(');
-		foreach(action, actions)
-		{
-			query = (Query *) lfirst(action);
-			get_query_def(query, buf, NIL, viewResultDesc, true,
-						  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
-			if (prettyFlags)
-				appendStringInfoString(buf, ";\n");
-			else
-				appendStringInfoString(buf, "; ");
-		}
-		appendStringInfoString(buf, ");");
-	}
-	else
-	{
-		Query	   *query;
-
-		query = (Query *) linitial(actions);
-		get_query_def(query, buf, NIL, viewResultDesc, true,
-					  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
-		appendStringInfoChar(buf, ';');
-	}
-
-	table_close(ev_relation, AccessShareLock);
-}
-
-
-/* ----------
  * make_viewdef			- reconstruct the SELECT part of a
  *				  view rewrite rule
  * ----------
@@ -3374,9 +3060,7 @@ static void
 get_select_query_def(Query *query, deparse_context *context,
 					 TupleDesc resultDesc, bool colNamesVisible)
 {
-	StringInfo	buf = context->buf;
 	bool		force_colno;
-	ListCell   *l;
 
 	/*
 	 * Decompile the top-level query body.

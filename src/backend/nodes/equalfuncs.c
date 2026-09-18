@@ -957,20 +957,6 @@ _equalAlterObjectSchemaStmt(const AlterObjectSchemaStmt *a, const AlterObjectSch
 
 
 static bool
-_equalRuleStmt(const RuleStmt *a, const RuleStmt *b)
-{
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_STRING_FIELD(rulename);
-	COMPARE_NODE_FIELD(whereClause);
-	COMPARE_SCALAR_FIELD(event);
-	COMPARE_SCALAR_FIELD(instead);
-	COMPARE_NODE_FIELD(actions);
-	COMPARE_SCALAR_FIELD(replace);
-
-	return true;
-}
-
-static bool
 _equalTransactionStmt(const TransactionStmt *a, const TransactionStmt *b)
 {
 	COMPARE_SCALAR_FIELD(kind);
@@ -1715,9 +1701,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_AlterObjectSchemaStmt:
 			retval = _equalAlterObjectSchemaStmt(a, b);
-			break;
-		case T_RuleStmt:
-			retval = _equalRuleStmt(a, b);
 			break;
 		case T_TransactionStmt:
 			retval = _equalTransactionStmt(a, b);

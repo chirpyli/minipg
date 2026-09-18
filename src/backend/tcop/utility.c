@@ -41,7 +41,6 @@
 #include "miscadmin.h"
 #include "parser/parse_utilcmd.h"
 #include "postmaster/bgwriter.h"
-#include "rewrite/rewriteDefine.h"
 #include "rewrite/rewriteRemove.h"
 #include "storage/fd.h"
 #include "tcop/pquery.h"
@@ -118,7 +117,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropStmt:
 		case T_DropdbStmt:
 		case T_IndexStmt:
-		case T_RuleStmt:
 		case T_TruncateStmt:
 		case T_ViewStmt:
 			{
@@ -760,9 +758,6 @@ ProcessUtilitySlow(ParseState *pstate,
 									pstmt->stmt_location, pstmt->stmt_len);
 				break;
 
-			case T_RuleStmt:	/* CREATE RULE */
-				address = DefineRule((RuleStmt *) parsetree, queryString);
-				break;
 
 			case T_DropStmt:
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
@@ -1105,9 +1100,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_VIEW;
 			break;
 
-		case T_RuleStmt:
-			tag = CMDTAG_CREATE_RULE;
-			break;
 
 		case T_IndexStmt:
 			tag = CMDTAG_CREATE_INDEX;
