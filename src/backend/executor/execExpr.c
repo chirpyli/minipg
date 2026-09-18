@@ -2807,8 +2807,6 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 						  &deform);
 		expr_setup_walker((Node *) pertrans->aggref->aggdistinct,
 						  &deform);
-		expr_setup_walker((Node *) pertrans->aggref->aggfilter,
-						  &deform);
 	}
 	ExecPushExprSetupSteps(state, &deform);
 
@@ -2824,25 +2822,6 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 		bool	   *strictnulls = NULL;
 		int			argno;
 		ListCell   *bail;
-
-		/*
-		 * If filter present, emit. Do so before evaluating the input, to
-		 * avoid potentially unneeded computations, or even worse, unintended
-		 * side-effects.  When combining, all the necessary filtering has
-		 * already been done.
-		 */
-		if (pertrans->aggref->aggfilter && !isCombine)
-		{
-			/* evaluate filter expression */
-			ExecInitExprRec(pertrans->aggref->aggfilter, state,
-							&state->resvalue, &state->resnull);
-			/* and jump out if false */
-			scratch.opcode = EEOP_JUMP_IF_NOT_TRUE;
-			scratch.d.jump.jumpdone = -1;	/* adjust later */
-			ExprEvalPushStep(state, &scratch);
-			adjust_bailout = lappend_int(adjust_bailout,
-										 state->steps_len - 1);
-		}
 
 		/*
 		 * Evaluate arguments to aggregate/combine function.

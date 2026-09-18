@@ -628,7 +628,6 @@ makeFuncCall(List *name, List *args, CoercionForm funcformat, int location)
 	n->funcname = name;
 	n->args = args;
 	n->agg_order = NIL;
-	n->agg_filter = NULL;
 	n->agg_within_group = false;
 	n->agg_star = false;
 	n->agg_distinct = false;

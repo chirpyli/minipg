@@ -385,7 +385,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <node>	func_application func_expr_common_subexpr
 %type <node>	func_expr func_expr_windowless
-%type <node>	filter_clause
 
 
 /*
@@ -438,7 +437,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXPRESSION
 	EXTENSION EXTRACT
 
-	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
+	FALSE_P FAMILY FETCH FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
 	FORCE FREEZE FROM FULL
 
 	GLOBAL GREATEST GROUP_P GROUPS
@@ -4828,12 +4827,8 @@ func_application: func_name '(' ')'
  * (Note that many of the special SQL functions wouldn't actually make any
  * sense as functional index entries, but we ignore that consideration here.)
  */
-func_expr: func_application filter_clause
-                {
-                        FuncCall *n = (FuncCall *) $1;
-                        n->agg_filter = $2;
-                        $$ = (Node *) n;
-                }
+func_expr: func_application
+                { $$ = $1; }
         | func_expr_common_subexpr
                 { $$ = $1; }
         ;
@@ -5037,10 +5032,6 @@ func_expr_common_subexpr:
 		;
 
 
-filter_clause:
-			FILTER '(' WHERE a_expr ')'				{ $$ = $4; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
 
 
 /*
@@ -5738,7 +5729,6 @@ unreserved_keyword:
 			| EXPRESSION
 			| EXTENSION
 			| FAMILY
-			| FILTER
 			| FINALIZE
 			| FIRST_P
 			| FOLLOWING

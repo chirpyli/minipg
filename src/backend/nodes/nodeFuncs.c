@@ -1691,8 +1691,6 @@ expression_tree_walker(Node *node,
 				if (expression_tree_walker((Node *) expr->aggdistinct,
 										   walker, context))
 					return true;
-				if (walker((Node *) expr->aggfilter, context))
-					return true;
 			}
 			break;
 		case T_SubscriptingRef:
@@ -2211,7 +2209,6 @@ expression_tree_mutator(Node *node,
 				MUTATE(newnode->args, aggref->args, List *);
 				MUTATE(newnode->aggorder, aggref->aggorder, List *);
 				MUTATE(newnode->aggdistinct, aggref->aggdistinct, List *);
-				MUTATE(newnode->aggfilter, aggref->aggfilter, Expr *);
 				return (Node *) newnode;
 			}
 			break;
@@ -3013,8 +3010,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(fcall->args, context))
 					return true;
 				if (walker(fcall->agg_order, context))
-					return true;
-				if (walker(fcall->agg_filter, context))
 					return true;
 				/* function name is deemed uninteresting */
 			}

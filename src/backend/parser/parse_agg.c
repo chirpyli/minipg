@@ -56,7 +56,6 @@ typedef struct
 static int	check_agg_arguments(ParseState *pstate,
 								List *directargs,
 								List *args,
-								Expr *filter,
 								int agglocation);
 static bool check_agg_arguments_walker(Node *node,
 									   check_agg_arguments_context *context);
@@ -216,7 +215,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 {
 	List	   *directargs = NIL;
 	List	   *args = NIL;
-	Expr	   *filter = NULL;
 	int			min_varlevel;
 	int			location = -1;
 	Index	   *p_levelsup;
@@ -230,7 +228,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 
 		directargs = agg->aggdirectargs;
 		args = agg->args;
-		filter = agg->aggfilter;
 		location = agg->location;
 		p_levelsup = &agg->agglevelsup;
 	}
@@ -244,7 +241,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 	min_varlevel = check_agg_arguments(pstate,
 									   directargs,
 									   args,
-									   filter,
 									   location);
 
 	*p_levelsup = min_varlevel;
@@ -310,9 +306,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 			break;
 		case EXPR_KIND_HAVING:
 			/* okay */
-			break;
-		case EXPR_KIND_FILTER:
-			errkind = true;
 			break;
 		case EXPR_KIND_SELECT_TARGET:
 			/* okay */
@@ -397,9 +390,8 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
  *	  one is its parent, etc).
  *
  * The aggregate's level is the same as the level of the lowest-level variable
- * or aggregate in its aggregated arguments (including any ORDER BY columns)
- * or filter expression; or if it contains no variables at all, we presume it
- * to be local.
+ * or aggregate in its aggregated arguments (including any ORDER BY columns);
+ * or if it contains no variables at all, we presume it to be local.
  *
  * Vars/Aggs in direct arguments are *not* counted towards determining the
  * agg's level, as those arguments aren't evaluated per-row but only
@@ -419,7 +411,6 @@ static int
 check_agg_arguments(ParseState *pstate,
 					List *directargs,
 					List *args,
-					Expr *filter,
 					int agglocation)
 {
 	int			agglevel;
@@ -433,7 +424,6 @@ check_agg_arguments(ParseState *pstate,
 	context.sublevels_up = 0;
 
 	(void) check_agg_arguments_walker((Node *) args, &context);
-	(void) check_agg_arguments_walker((Node *) filter, &context);
 
 	/*
 	 * If we found no vars nor aggs at all, it's a level-zero aggregate;
@@ -459,8 +449,6 @@ check_agg_arguments(ParseState *pstate,
 		int			aggloc;
 
 		aggloc = locate_agg_of_level((Node *) args, agglevel);
-		if (aggloc < 0)
-			aggloc = locate_agg_of_level((Node *) filter, agglevel);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
 				 errmsg("aggregate function calls cannot be nested"),
@@ -789,9 +777,9 @@ check_ungrouped_columns_walker(Node *node,
 		{
 			/*
 			 * If we find an aggregate call of the original level, do not
-			 * recurse into its normal arguments, ORDER BY arguments, or
-			 * filter; ungrouped vars there are not an error.  But we should
-			 * check direct arguments as though they weren't in an aggregate.
+			 * recurse into its normal arguments, ORDER BY arguments; ungrouped
+			 * vars there are not an error.  But we should check direct
+			 * arguments as though they weren't in an aggregate.
 			 * We set a special flag in the context to help produce a useful
 			 * error message for ungrouped vars in direct arguments.
 			 */

@@ -269,7 +269,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 			AggTransInfo *transinfo = palloc(sizeof(AggTransInfo));
 
 			transinfo->args = aggref->args;
-			transinfo->aggfilter = aggref->aggfilter;
 			transinfo->transfn_oid = aggtransfn;
 			transinfo->combinefn_oid = aggcombinefn;
 			transinfo->serialfn_oid = aggserialfn;
@@ -396,8 +395,7 @@ find_compatible_agg(PlannerInfo *root, Aggref *newagg,
 			newagg->aggkind != existingRef->aggkind ||
 			!equal(newagg->args, existingRef->args) ||
 			!equal(newagg->aggorder, existingRef->aggorder) ||
-			!equal(newagg->aggdistinct, existingRef->aggdistinct) ||
-			!equal(newagg->aggfilter, existingRef->aggfilter))
+			!equal(newagg->aggdistinct, existingRef->aggdistinct))
 			continue;
 
 		/* if it's the same aggregate function then report exact match */
@@ -526,7 +524,7 @@ GetAggInitVal(Datum textInitVal, Oid transtype)
  *
  * For each AggTransInfo, we add the cost of an aggregate transition using
  * either the transfn or combinefn depending on the 'aggsplit' value.  We also
- * account for the costs of any aggfilters and any serializations and
+ * account for the costs of any serializations and
  * deserializations of the transition state and also estimate the total space
  * needed for the transition states as if each aggregate's state was stored in
  * memory concurrently (as would be done in a HashAgg plan).
@@ -578,20 +576,6 @@ get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit, AggClauseCosts *costs
 			costs->transCost.startup += argcosts.startup;
 			costs->transCost.per_tuple += argcosts.per_tuple;
 
-			/*
-			 * Add any filter's cost to per-input-row costs.
-			 *
-			 * XXX Ideally we should reduce input expression costs according
-			 * to filter selectivity, but it's not clear it's worth the
-			 * trouble.
-			 */
-			if (transinfo->aggfilter)
-			{
-				cost_qual_eval_node(&argcosts, (Node *) transinfo->aggfilter,
-									root);
-				costs->transCost.startup += argcosts.startup;
-				costs->transCost.per_tuple += argcosts.per_tuple;
-			}
 		}
 
 		/*

@@ -4148,11 +4148,10 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 	pertrans->numDistinctCols = numDistinctCols;
 
 	/*
-	 * If we have either sorting or filtering to do, create a tupledesc and
-	 * slot corresponding to the aggregated inputs (including sort
-	 * expressions) of the agg.
+	 * If we have sorting to do, create a tupledesc and slot corresponding to
+	 * the aggregated inputs (including sort expressions) of the agg.
 	 */
-	if (numSortCols > 0 || aggref->aggfilter)
+	if (numSortCols > 0)
 	{
 		pertrans->sortdesc = ExecTypeFromTL(aggref->args);
 		pertrans->sortslot =

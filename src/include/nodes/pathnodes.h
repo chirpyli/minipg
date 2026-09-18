@@ -2307,7 +2307,6 @@ typedef struct AggInfo
 typedef struct AggTransInfo
 {
 	List	   *args;
-	Expr	   *aggfilter;
 
 	/* Oid of the state transition function */
 	Oid			transfn_oid;

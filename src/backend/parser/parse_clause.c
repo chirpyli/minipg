@@ -514,7 +514,6 @@ transformRangeFunction(ParseState *pstate, RangeFunction *r)
 				strcmp(strVal(linitial(fc->funcname)), "unnest") == 0 &&
 				list_length(fc->args) > 1 &&
 				fc->agg_order == NIL &&
-				fc->agg_filter == NULL &&
 				!fc->agg_star &&
 				!fc->agg_distinct &&
 				!fc->func_variadic &&

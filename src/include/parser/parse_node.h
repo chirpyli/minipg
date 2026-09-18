@@ -45,7 +45,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_FROM_FUNCTION,	/* function in FROM clause */
 	EXPR_KIND_WHERE,			/* WHERE */
 	EXPR_KIND_HAVING,			/* HAVING */
-	EXPR_KIND_FILTER,			/* FILTER */
 	EXPR_KIND_SELECT_TARGET,	/* SELECT target list item */
 	EXPR_KIND_INSERT_TARGET,	/* INSERT target list item */
 	EXPR_KIND_UPDATE_SOURCE,	/* UPDATE assignment source item */

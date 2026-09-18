@@ -258,14 +258,6 @@ can_minmax_aggs(PlannerInfo *root, List **context)
 			return false;
 		/* note: we do not care if DISTINCT is mentioned ... */
 
-		/*
-		 * We might implement the optimization when a FILTER clause is present
-		 * by adding the filter to the quals of the generated subquery.  For
-		 * now, just punt.
-		 */
-		if (aggref->aggfilter != NULL)
-			return false;
-
 		aggsortop = fetch_agg_sort_op(aggref->aggfnoid);
 		if (!OidIsValid(aggsortop))
 			return false;		/* not a MIN/MAX aggregate */

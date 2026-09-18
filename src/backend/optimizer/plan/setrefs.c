@@ -1933,16 +1933,13 @@ convert_combining_aggrefs(Node *node, void *context)
 		/*
 		 * For the parent Aggref, we want to copy all the fields of the
 		 * original aggregate *except* the args list, which we'll replace
-		 * below, and the aggfilter expression, which should be applied only
-		 * by the child not the parent.  Rather than explicitly knowing about
-		 * all the other fields here, we can momentarily modify child_agg to
-		 * provide a suitable source for copyObject.
+		 * below.  Rather than explicitly knowing about all the other fields
+		 * here, we can momentarily modify child_agg to provide a suitable
+		 * source for copyObject.
 		 */
 		child_agg->args = NIL;
-		child_agg->aggfilter = NULL;
 		parent_agg = copyObject(child_agg);
 		child_agg->args = orig_agg->args;
-		child_agg->aggfilter = orig_agg->aggfilter;
 
 		/*
 		 * Now, set up child_agg to represent the first phase of partial

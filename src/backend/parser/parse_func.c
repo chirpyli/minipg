@@ -85,7 +85,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 {
 	bool		is_column = (fn == NULL);
 	List	   *agg_order = (fn ? fn->agg_order : NIL);
-	Expr	   *agg_filter = NULL;
 	bool		agg_within_group = (fn ? fn->agg_within_group : false);
 	bool		agg_star = (fn ? fn->agg_star : false);
 	bool		agg_distinct = (fn ? fn->agg_distinct : false);
@@ -107,14 +106,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	FuncDetailCode fdresult;
 	char		aggkind = 0;
 	ParseCallbackState pcbstate;
-
-	/*
-	 * If there's an aggregate filter, transform it using transformWhereClause
-	 */
-	if (fn && fn->agg_filter != NULL)
-		agg_filter = (Expr *) transformWhereClause(pstate, fn->agg_filter,
-												   EXPR_KIND_FILTER,
-												   "FILTER");
 
 	/*
 	 * Most of the rest of the parser just assumes that functions do not have
@@ -211,7 +202,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	 * aggregate or variadic decoration, or named arguments).
 	 */
 	could_be_projection = (nargs == 1 &&
-						   agg_order == NIL && agg_filter == NULL &&
+						   agg_order == NIL &&
 						   !agg_star && !agg_distinct &&
 						   !func_variadic && argnames == NIL &&
 						   list_length(funcname) == 1 &&
@@ -295,12 +286,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("ORDER BY specified, but %s is not an aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-		if (agg_filter)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("FILTER specified, but %s is not an aggregate function",
 							NameListToString(funcname)),
 					 parser_errposition(pstate, location)));
 	}
@@ -529,7 +514,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 		/* aggargtypes will be set by transformAggregateCall */
 		/* aggdirectargs and args will be set by transformAggregateCall */
 		/* aggorder and aggdistinct will be set by transformAggregateCall */
-		aggref->aggfilter = agg_filter;
 		aggref->aggstar = agg_star;
 		aggref->aggvariadic = func_variadic;
 		aggref->aggkind = aggkind;
@@ -1864,9 +1848,6 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			errkind = true;
 			break;
 		case EXPR_KIND_HAVING:
-			errkind = true;
-			break;
-		case EXPR_KIND_FILTER:
 			errkind = true;
 			break;
 		case EXPR_KIND_SELECT_TARGET:

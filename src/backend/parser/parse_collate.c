@@ -467,17 +467,11 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 						{
 							/*
 							 * Aggref is messy enough that we give it its own
-							 * function, in fact three of them.  The FILTER
-							 * clause is independent of the rest of the
-							 * aggregate, however, so it can be processed
-							 * separately.
+							 * function, in fact three of them.
 							 */
 							Aggref	   *aggref = (Aggref *) node;
 
 							assign_aggregate_collations(aggref, &loccontext);
-
-							assign_expr_collations(context->pstate,
-												   (Node *) aggref->aggfilter);
 							}
 							break;
 							case T_CaseExpr:

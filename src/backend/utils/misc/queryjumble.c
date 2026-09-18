@@ -396,7 +396,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) expr->args);
 				JumbleExpr(jstate, (Node *) expr->aggorder);
 				JumbleExpr(jstate, (Node *) expr->aggdistinct);
-				JumbleExpr(jstate, (Node *) expr->aggfilter);
 			}
 			break;
 
